@@ -2,7 +2,11 @@
 
 **Firmware-Version:** 4.35k (main branch)
 **Datum:** 2026-02-22
+**Author:** DK5EN / Martin S. Werner
 **Betrifft:** `lora_functions.cpp`, `esp32_main.cpp`, `loop_functions.cpp`
+**Referenz:** https://github.com/DK5EN/HeltecV3_MeshCom_Fork/blob/lora-improve/BUG_REPORT_RINGBUFFER_ANALYSE.md
+**Bug Report:** https://github.com/icssw-org/MeshCom-Firmware/issues/708
+
 
 ---
 
@@ -195,7 +199,7 @@ Wenn Knoten B eine Nachricht von Knoten A empfängt und weiterleitet (Relay/Mesh
 Aber: Das ACK des Empfängers (Knoten C) richtet sich an die Original-Message-ID von **Knoten A** — Knoten B ist nicht der Absender und wird daher **nie ein passendes ACK erhalten**.
 
 ```mermaid
-graph LR
+graph TD
     A["Knoten A<br/>(Absender)"] -->|"Nachricht<br/>msg_id=0x1234"| B["Knoten B<br/>(Relay)"]
     B -->|"Relay<br/>msg_id=0x1234<br/>status=0x00 ⚠️"| C["Knoten C<br/>(Empfänger)"]
     C -->|"ACK<br/>ref_id=0x1234"| B
