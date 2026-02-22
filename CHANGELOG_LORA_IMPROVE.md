@@ -13,21 +13,23 @@
 
 ### BLUF (Bottom Line Up Front)
 
-Die Original-Firmware MeshCom 4.35k verliert unter optimalen Funkbedingungen (RSSI -33 dBm, SNR +6 dB, 3 Meter Abstand) **32% aller Nachrichten**. Die Ursache ist nicht das Funkmedium, sondern **8 Firmware-Bugs** in der LoRa-Zustandsmaschine, dem Ringbuffer-Management und dem ACK-System.
+Die Original-Firmware MeshCom 4.35k verliert unter optimalen Funkbedingungen (RSSI -33 dBm, SNR +6 dB, 3 Meter Abstand) **32% aller Nachrichten**. Die Ursache ist nicht das Funkmedium, sondern **12 Firmware-Bugs** in der LoRa-Zustandsmaschine, dem Ringbuffer-Management und dem ACK-System.
 
-Der Branch `lora-improve` behebt alle 8 Bugs durch **minimale, zielgerichtete Patches** in 5 Quelldateien. Das Ergebnis:
+Der Branch `lora-improve` behebt alle 12 Bugs durch **minimale, zielgerichtete Patches** in 5 Quelldateien. Das Ergebnis:
 
 | Metrik | Vorher (main) | Nachher (lora-improve) |
 |--------|---------------|------------------------|
 | Nachrichtenverlust (unidirektional) | 32% | **0%** |
+| Nachrichtenverlust (bidirektional, reverse) | 70-100% | **< 30%** (erwartet) |
 | Ringbuffer-Ueberlauf-Ereignisse | 52-89 pro Testlauf | **0** |
-| Retransmit-Verhalten | endlos, unkontrolliert | **max. 5 Versuche, 30s Intervall** |
+| Ringbuffer-Deadlock (done-Slots) | 35+ Minuten | **nie** |
+| Retransmit-Verhalten | endlos, unkontrolliert | **max. 3 Versuche, 40s Intervall** |
 | ACK-Erkennung (Non-Gateway) | defekt (nie erkannt) | **funktional** |
 | DM-Retransmit trotz ACK | ja (endlos) | **gestoppt nach ACK** |
 | RX-Blindzeit nach Paketempfang | bis 4.5s | **< 1ms** |
 | Sende-Verzoegerung (CAD-Wait) | 7 Loop-Zyklen blind | **3 Loop-Zyklen** |
 
-**Kernaussage:** Saemtlicher Nachrichtenverlust war firmware-bedingt. Kein einziges Paket ging durch Funkprobleme verloren.
+**Kernaussage:** Saemtlicher Nachrichtenverlust war firmware-bedingt. Kein einziges Paket ging durch Funkprobleme verloren. Die bidirektionalen Probleme (BUG #9-#12) waren eine Wechselwirkung der drei Ringbuffer-Bugs, die einen Teufelskreis aus aggressiven Retransmits, Ringbuffer-Saettigung und TX-Monopolisierung bildeten.
 
 ### DRY (Don't Repeat Yourself) -- Aenderungsuebersicht
 
@@ -41,13 +43,19 @@ Der Branch `lora-improve` behebt alle 8 Bugs durch **minimale, zielgerichtete Pa
 | 6 | BUG #6 | Non-Gateway-ACK ohne Original-Message-ID: ACK wird nie erkannt | lora_functions.cpp | ~648-656 |
 | 7 | BUG #7* | Relay-Nachrichten mit Retransmit-Flag: Ringbuffer-Ueberflutung | lora_functions.cpp | ~820-840 |
 | 8 | BUG #8 | DM-Retransmit trotz ACK: Ringbuffer wird nicht bereinigt | lora_functions.cpp | ~473-501 |
+| 9 | BUG #9 | `done`-Slots nie bereinigt: Ringbuffer-Deadlock nach ~50 Min. | lora_functions.cpp | ~1015 (doTX) |
+| 10 | BUG #10 | Retransmit-Parameter zu aggressiv (5 Retries, 30s) fuer Bidi | lora_functions.cpp | ~1176, ~1203 |
+| 11 | BUG #11 | `updateRetransmissionStatus()` scannt ausserhalb iRead-iWrite | lora_functions.cpp | ~1183-1187 |
+| 12 | BUG #12 | Slot-Clearing vor Rollback-Pfaden zerstoert Nachrichtendaten | lora_functions.cpp | doTX(), 3 Stellen |
 
 *BUG #7 wird im RING_BUFFER_FIX_GUIDE als "FIX #1 (Relay fire-and-forget)" gefuehrt und entspricht BUG #3 im BUG_REPORT_RINGBUFFER_ANALYSE.
+
+**BUG #9-#12 wurden durch den bidirektionalen Testharness (12 Testfaelle, 249 Nachrichten) identifiziert. Dokumentiert in `BUG_REPORT_RING_BUFFER_DEADLOCK.md`.**
 
 Zusaetzlich: 19 neue `[MC-DBG]` Debug-Meldungen fuer vollstaendige Transparenz der Zustandsmaschine, plus `startsWith`-Edge-Case-Fix fuer Nachrichten die mit `{` beginnen.
 
 **Gesamte RAM-Kosten:** 30 Bytes (`retryCount[MAX_RING]`).
-**Neue Dateien:** Keine.
+**Neue Dateien:** Keine (ausser Dokumentation).
 **Neue Abhaengigkeiten:** Keine.
 **Architektur-Aenderungen:** Keine.
 
@@ -97,11 +105,11 @@ Dieser Abschnitt beschreibt, wie die Firmware **nach** Anwendung aller Patches f
 
 **Nachher (BUG #5 + BUG #7 + Retry-System):**
 
-1. **30-Sekunden Retransmit-Intervall:** Der Schwellwert wurde von `0x20` (62s) auf `0x10` (30s) geaendert. 30s liegt ueber der P90-Latenz (22.5s), sodass keine vorzeitigen Duplikate entstehen. --> Siehe [BUG #5](#bug-5----retransmit-timer-zu-lang-kein-limit)
+1. **40-Sekunden Retransmit-Intervall:** Der Schwellwert wurde von `0x20` (62s) ueber `0x10` (30s) auf `0x15` (40s) optimiert. 40s bietet genuegend RX-Fenster fuer bidirektionalen Betrieb, ohne vorzeitige Duplikate zu erzeugen. --> Siehe [BUG #5](#bug-5----retransmit-timer-zu-lang-kein-limit), [BUG #10](#bug-10----retransmit-parameter-zu-aggressiv-fuer-bidi)
 
-2. **Maximal 5 Retransmit-Versuche:** Ein neues `retryCount[MAX_RING]`-Array (30 Bytes) zaehlt die Wiederholungen pro Nachricht. Nach 5 Versuchen (= 150s / 2.5 Minuten) wird aufgegeben (`RETRANSMIT_GIVEUP`). --> Siehe [BUG #5](#bug-5----retransmit-timer-zu-lang-kein-limit)
+2. **Maximal 3 Retransmit-Versuche:** Ein neues `retryCount[MAX_RING]`-Array (30 Bytes) zaehlt die Wiederholungen pro Nachricht. Nach 3 Versuchen (= 120s / 2 Minuten) wird aufgegeben (`RETRANSMIT_GIVEUP`). Urspruenglich 5 Versuche -- reduziert nach bidirektionalem Test, der zeigte, dass 5 Retries den TX-Kanal fuer 150-283s monopolisieren. --> Siehe [BUG #5](#bug-5----retransmit-timer-zu-lang-kein-limit), [BUG #10](#bug-10----retransmit-parameter-zu-aggressiv-fuer-bidi)
 
-3. **Festes 30s-Intervall (kein exponentieller Backoff):** Jeder Retry wartet gleich lang (30s). Die Entscheidung fuer festes Intervall statt exponentiellem Backoff basiert auf der Beobachtung, dass bei konstanten Funkbedingungen ein kuerzeres Intervall die Zuverlaessigkeit erhoet.
+3. **Festes 40s-Intervall (kein exponentieller Backoff):** Jeder Retry wartet gleich lang (40s). Die Entscheidung fuer festes Intervall statt exponentiellem Backoff basiert auf der Beobachtung, dass bei konstanten Funkbedingungen ein gleichmaessiges Intervall die Zuverlaessigkeit erhoeht.
 
 4. **Relay ist Fire-and-Forget:** Alle Relay-Nachrichten (empfangen von anderen Knoten zur Weiterleitung) erhalten `status=0xFF`. Der Relay-Knoten sendet einmal und vergisst. Nur der **urspruengliche Absender** retransmittiert. --> Siehe [BUG #7](#bug-7----relay-nachrichten-mit-retransmit-flag)
 
@@ -157,8 +165,10 @@ Eintrag-Layout:
 | Aspekt | Vorher (main) | Nachher (lora-improve) |
 |--------|---------------|------------------------|
 | Status `0x7F` (Retransmit-Kopie) | Spezial-Status, wird von `doTX()` sofort auf `0xFF` gesetzt | **Entfernt.** Retransmit-Kopien starten mit `0x01` und durchlaufen den normalen Timer-Zyklus |
-| Retry-Tracking | Keines | `retryCount[MAX_RING]` (30 Bytes), max. 5 Versuche |
+| Retry-Tracking | Keines | `retryCount[MAX_RING]` (30 Bytes), max. 3 Versuche |
 | Relay-Eintraege | `status=0x00` (Retransmit aktiv) | `status=0xFF` (Fire-and-Forget) |
+| Slot-Bereinigung nach TX | Keine (done-Slots bleiben erhalten) | **Sofortige Bereinigung** nach erfolgreicher Uebertragung oder Drop (BUG #9 + #12) |
+| Scan-Bereich von `updateRetransmissionStatus()` | Alle 30 Slots (0..MAX_RING) | **Nur aktiver Bereich** iRead→iWrite (BUG #11) |
 | Ueberlauf-Erkennung | Stumm (iRead wird vorgerueckt) | `[MC-DBG] RING_OVERFLOW` wird **immer** geloggt |
 | Zustandsuebersicht | Keine | `[MC-DBG] RING_STATUS` alle 30s (queued/pending/retrying/done) |
 
@@ -172,22 +182,28 @@ Eintrag-Layout:
    ringBuffer[slot][1] = 0x01 (Timer startet)
 
 3. Alle 2 Sekunden: updateRetransmissionStatus()
-   ringBuffer[slot][1]++ (0x01 -> 0x02 -> ... -> 0x10)
+   - Scannt NUR aktive Slots im Bereich iRead→iWrite (BUG #11 Fix)
+   ringBuffer[slot][1]++ (0x01 -> 0x02 -> ... -> 0x15)
 
 4a. ACK empfangen (vor Schwellwert):
     ringBuffer[slot][1] = 0xFF, retryCount[slot] = 0
     --> Retransmit gestoppt
 
-4b. Schwellwert 0x10 erreicht (30s ohne ACK):
-    - Pruefung: retryCount[slot] >= MAX_RETRANSMIT (5)?
+4b. Schwellwert 0x15 erreicht (40s ohne ACK):
+    - Pruefung: retryCount[slot] >= MAX_RETRANSMIT (3)?
       Ja  --> ringBuffer[slot][1] = 0xFF, RETRANSMIT_GIVEUP
       Nein --> Original-Slot auf 0xFF
               Kopie nach ringBuffer[iWrite] mit status=0x01
               retryCount[iWrite] = retryCount[slot] + 1
               --> Naechster Retry-Zyklus
 
-5. Nach 5 Versuchen (150s / 2.5 Minuten):
+5. Nach 3 Versuchen (120s / 2 Minuten):
    RETRANSMIT_GIVEUP --> Nachricht wird aufgegeben
+
+6. doTX() sendet Slot und raeumt auf:
+   - Slot-Daten werden NACH erfolgreicher Uebertragung geloescht (BUG #9 + #12 Fix)
+   - ringBuffer[slot][0] = 0, ringBuffer[slot][1] = 0xFF, retryCount[slot] = 0
+   - Bei CAD-Wait oder APRS-Chip-Fehler: Rollback, Slot bleibt erhalten
 ```
 
 ---
@@ -212,6 +228,10 @@ ccfc411  Bug Report submitted
 1f5dc1a  Add firmware binary and OTA screenshot
 1dda2bb  Simplify README
 1f64c62  Replace firmware binary with standardized naming
+12c6f06  Add comprehensive German patch documentation for lora-improve branch
+4b75ef3  Add release process documentation
+d42c024  Fix ring buffer deadlock and deferred slot clearing (Bugs 1-4)
+829432d  Update firmware binary for release 4.35k.02.19-DK5EN
 ```
 
 ### Aenderung 1: RX-Timeout-Schutz (BUG #1)
@@ -282,8 +302,8 @@ ccfc411  Bug Report submitted
 **Was wurde geaendert:**
 - Neues Array `uint8_t retryCount[MAX_RING] = {0}` (30 Bytes RAM)
 - `extern`-Deklaration in `loop_functions_extern.h`
-- Schwellwert von `0x20` (62s) auf `0x10` (30s) geaendert
-- `MAX_RETRANSMIT = 5` definiert (festes Intervall, 5 Versuche = max. 150s)
+- Schwellwert von `0x20` (62s) ueber `0x10` (30s) auf final `0x15` (40s) geaendert (siehe BUG #10)
+- `MAX_RETRANSMIT` von 5 auf 3 reduziert (festes Intervall, 3 Versuche = max. 120s) (siehe BUG #10)
 - Retransmit-Kopien starten mit `status=0x01` statt `0x7F`
 - `retryCount[iWrite] = retryCount[ircheck] + 1` bei Kopie
 - Giveup-Logik: `retryCount >= MAX_RETRANSMIT` --> `status=0xFF`
@@ -399,6 +419,76 @@ ccfc411  Bug Report submitted
 | `RELAY_QUEUED` | lora_functions.cpp | Relay-Nachricht eingereiht |
 | `RETRANSMIT` | lora_functions.cpp | Retransmit mit Versuchsnummer |
 | `RETRANSMIT_GIVEUP` | lora_functions.cpp | Retransmit aufgegeben (max. erreicht) |
+
+### Aenderung 13: Consumed-Slot-Clearing in doTX() (BUG #9)
+
+**Datei:** `src/lora_functions.cpp`, `doTX()`, 3 Stellen
+**Commit:** `d42c024`
+**Referenz:** [BUG #9](#bug-9----consumed-slots-nie-bereinigt-ringbuffer-deadlock)
+**Quelle:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 1
+
+**Was wurde geaendert:**
+- Nach erfolgreicher Uebertragung (APRS und normal) sowie nach Drop-Pfaden (TX disabled, Decode-Fehler) wird der konsumierte Slot bereinigt:
+  `ringBuffer[save_read][0] = 0`, `ringBuffer[save_read][1] = 0xFF`, `retryCount[save_read] = 0`
+- Die Bereinigung erfolgt an 3 Stellen: APRS-TX-Erfolg, Normal-TX-Erfolg, Non-Rollback-Drop
+- Die zwei Rollback-Pfade (CAD-Wait, APRS-Chip-Fehler) bereinigen den Slot NICHT -- der Slot bleibt intakt fuer den naechsten Versuch (BUG #12 Fix)
+
+**Wirkung:** Verhindert, dass `done`-Slots (status=0xFF, size>0) sich ansammeln und den Ringbuffer permanent blockieren. Vor diesem Fix trat nach ~50 Minuten ein Deadlock ein, bei dem alle 30 Slots stale Daten enthielten und keine neuen Nachrichten geschrieben werden konnten. 193 phantom RING_OVERFLOW-Ereignisse und 35+ Minuten Deadlock im Testlauf.
+
+### Aenderung 14: Retransmit-Parameter-Optimierung fuer Bidi (BUG #10)
+
+**Datei:** `src/lora_functions.cpp`, Zeilen ~1176 und ~1203
+**Commit:** `d42c024`
+**Referenz:** [BUG #10](#bug-10----retransmit-parameter-zu-aggressiv-fuer-bidi)
+**Quelle:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 2
+
+**Was wurde geaendert:**
+- `MAX_RETRANSMIT` von 5 auf 3 reduziert
+- Retransmit-Schwellwert von `0x10` (30s) auf `0x15` (40s) erhoeht
+- Kommentar aktualisiert: "40s per retry (20 ticks x 2s), total max 120s (2 min)"
+
+**Wirkung:** Maximale Retransmit-Dauer sinkt von 150-283s auf 120s. Maximale Slots pro Nachricht sinken von 6 auf 4. TX-Airtime pro Nachricht sinkt von 4.3s auf 2.8s. Der bidirektionale Safe-Gap sollte von ~23s auf ~15s sinken.
+
+### Aenderung 15: Aktiver Scan-Bereich in updateRetransmissionStatus() (BUG #11)
+
+**Datei:** `src/lora_functions.cpp`, Zeilen ~1183-1187
+**Commit:** `d42c024`
+**Referenz:** [BUG #11](#bug-11----updateretransmissionstatus-scannt-ausserhalb-active-range)
+**Quelle:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 3
+
+**Was wurde geaendert:**
+- Schleife `for(int ircheck=0; ircheck < MAX_RING; ircheck++)` ersetzt durch:
+  ```cpp
+  int count = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+  for(int q = 0; q < count; q++) {
+      int ircheck = (iRead + q) % MAX_RING;
+  ```
+- Scannt nur noch Slots im aktiven Bereich iRead→iWrite
+
+**Wirkung:** Defense-in-Depth gegen Ghost-Retransmits. Selbst wenn ein konsumierter Slot nicht korrekt bereinigt wurde (z.B. durch zukuenftige Code-Aenderungen), kann `updateRetransmissionStatus()` ihn nicht finden, da er ausserhalb des aktiven Bereichs liegt.
+
+### Aenderung 16: Deferred Slot-Clearing / Rollback-Schutz (BUG #12)
+
+**Datei:** `src/lora_functions.cpp`, `doTX()`, 3+1 Stellen
+**Commit:** `d42c024`
+**Referenz:** [BUG #12](#bug-12----slot-clearing-vor-rollback-pfaden)
+**Quelle:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 4
+
+**Was wurde geaendert:**
+- Das Slot-Clearing (BUG #9 Fix) wurde von der Position direkt nach `iRead++` entfernt
+- Stattdessen: Clearing an 3 Stellen nach der endgueltigen TX-Entscheidung platziert
+- Erklaerungskommentar an der urspruenglichen Position eingefuegt
+- Pfad-Analyse:
+
+| Pfad | iRead restored? | Slot bereinigt? |
+|------|----------------|-----------------|
+| CAD-Wait (tx_waiting) | Ja | Nein -- Slot fuer Retry erhalten |
+| APRS-Chip-Fehler | Ja | Nein -- Slot fuer Retry erhalten |
+| APRS-TX-Erfolg | Nein | Ja -- Slot konsumiert |
+| Normal-TX-Erfolg | Nein | Ja -- Slot konsumiert |
+| TX disabled / Decode-Fehler | Nein | Ja -- Slot gedroppt |
+
+**Wirkung:** Verhindert, dass der BUG #9 Fix Nachrichtendaten zerstoert, bevor die Rollback-Pfade sie wiederherstellen koennen. Ohne diesen Fix wuerde jede Nachricht, die den CAD-Wait-Pfad durchlaeuft (= alle Erstversuche), als Zero-Length-Paket gesendet.
 
 ---
 
@@ -541,8 +631,8 @@ void OnHeaderDetect(void) {
 
 **Pruef-Signatur fuer AI Agent:** Suche `updateRetransmissionStatus()` in `lora_functions.cpp`. Pruefe:
 - Gibt es ein `retryCount`-Array oder aequivalenten Retry-Zaehler?
-- Gibt es eine `MAX_RETRANSMIT`-Konstante (empfohlen: 3-5)?
-- Ist der Schwellwert fuer den ersten Retransmit <= 0x10 (30s)?
+- Gibt es eine `MAX_RETRANSMIT`-Konstante (empfohlen: 3)?
+- Ist der Schwellwert fuer den ersten Retransmit `0x15` (40s)? (Siehe auch BUG #10)
 - Werden Retransmit-Kopien mit `status=0x01` statt `0x7F` erstellt?
 - Wird bei Ueberschreitung des Limits `status=0xFF` gesetzt?
 - Wird `retryCount` bei ACK-Empfang zurueckgesetzt?
@@ -669,12 +759,119 @@ if(iackcheck >= 0) {
 
 ---
 
+### BUG #9 -- Consumed Slots nie bereinigt: Ringbuffer-Deadlock
+
+**Schweregrad:** Kritisch
+**Auswirkung:** Permanenter Ringbuffer-Deadlock nach ~50 Minuten, 193 phantom RING_OVERFLOW-Ereignisse, 35+ Minuten Ausfallzeit
+**Datei:** `src/lora_functions.cpp`
+**Betroffene Funktion:** `doTX()`
+**Aenderungen:** [Aenderung 13](#aenderung-13-consumed-slot-clearing-in-dotx-bug-9)
+**Quellen:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 1
+
+**Symptom:** Nach ~50 Minuten Betrieb zeigt `RING_STATUS`: `queued=0 pending=0 retrying=0 done=30 iW=18 iR=18`. Alle 30 Slots enthalten stale `0xFF`-Eintraege mit `size > 0`. Der Buffer meldet `queued=0`, aber jedes neue Write loest `RING_OVERFLOW` aus, da `iWrite` in `iRead` hineinlaeuft.
+
+**Ursache:** `doTX()` konsumiert einen Slot durch Lesen der Daten und Vorruecken von `iRead`, bereinigt aber **nie** die Slot-Daten. Der konsumierte Slot behaelt `size > 0` und `status = 0x01`. `updateRetransmissionStatus()` findet diese Geister-Slots (BUG #11) und erzeugt Retransmit-Kopien. Durch Retry-Giveup erreichen alle Slots `status = 0xFF` mit `size > 0` -- permanent blockiert.
+
+**Pruef-Signatur fuer AI Agent:** Suche in `doTX()` nach der Stelle, an der `iRead` vorgerueckt wird. Pruefe:
+- Werden `ringBuffer[save_read][0]`, `[1]` und `retryCount[save_read]` nach erfolgreicher TX bereinigt?
+- Erfolgt die Bereinigung **nach** der TX-Entscheidung (nicht davor -- siehe BUG #12)?
+- Werden Drop-Pfade (TX disabled, Decode-Fehler) ebenfalls bereinigt?
+
+**Fix-Muster:**
+```cpp
+// Nach erfolgreicher Uebertragung oder Drop (NICHT bei Rollback):
+ringBuffer[save_read][0] = 0;       // size loeschen
+ringBuffer[save_read][1] = 0xFF;    // terminal status
+retryCount[save_read] = 0;          // retry counter zuruecksetzen
+```
+
+---
+
+### BUG #10 -- Retransmit-Parameter zu aggressiv fuer Bidi
+
+**Schweregrad:** Hoch
+**Auswirkung:** TX-Kanal fuer 150-283s pro Nachricht monopolisiert, bidirektionaler Reverse-Pfad 70-100% Verlust
+**Datei:** `src/lora_functions.cpp`
+**Betroffene Zeilen:** ~1176 (`MAX_RETRANSMIT`), ~1203 (threshold)
+**Aenderungen:** [Aenderung 14](#aenderung-14-retransmit-parameter-optimierung-fuer-bidi-bug-10)
+**Quellen:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 2
+
+**Symptom:** Unidirektional 99→12 = 0% Verlust, aber bidirektional 99→12 = 70-100% Verlust. Der Reverse-Pfad allein funktioniert -- das Problem ist TX-Contention durch den Forward-Pfad.
+
+**Ursache:** 5 Retries bei 30s Intervall = 6 Ring-Slots pro Nachricht, 4.3s TX-Airtime pro Nachricht. Bei gleichzeitigem Bidi-Betrieb uebersteigt die Senderate die Abarbeitungsrate des Ringbuffers. Die kumulierte TX-Zeit monopolisiert den Half-Duplex-Funk und blockiert den Empfang. Testergebnis: Bidi funktioniert ab Gap >= 23s, versagt darunter.
+
+**Pruef-Signatur fuer AI Agent:** Suche in `lora_functions.cpp` nach `MAX_RETRANSMIT` und dem Retransmit-Schwellwert. Pruefe:
+- Ist `MAX_RETRANSMIT <= 3`?
+- Ist der Schwellwert `>= 0x15` (40s bei 2s-Tick)?
+- Maximale Retransmit-Dauer <= 120s?
+- Max. Slots pro Nachricht <= 4?
+
+---
+
+### BUG #11 -- updateRetransmissionStatus() scannt ausserhalb Active Range
+
+**Schweregrad:** Hoch
+**Auswirkung:** Ghost-Retransmits von bereits konsummierten Slots fuellen den Buffer
+**Datei:** `src/lora_functions.cpp`
+**Betroffene Funktion:** `updateRetransmissionStatus()`
+**Aenderungen:** [Aenderung 15](#aenderung-15-aktiver-scan-bereich-in-updateretransmissionstatus-bug-11)
+**Quellen:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 3
+
+**Symptom:** Retransmit-Kopien werden fuer Nachrichten erzeugt, die `doTX()` bereits gesendet hat. Diese "Ghost-Retransmits" fuellen den Ringbuffer von der iWrite-Seite.
+
+**Ursache:** Die Schleife `for(int ircheck=0; ircheck < MAX_RING; ircheck++)` scannt **alle** 30 Slots, unabhaengig davon, ob sie im aktiven Bereich `iRead → iWrite` liegen. Konsumierte Slots hinter `iRead` mit `size > 0` und `status = 0x01..0x0F` werden getickert und loesen Retransmit-Kopien aus.
+
+**Pruef-Signatur fuer AI Agent:** Suche in `updateRetransmissionStatus()`. Pruefe:
+- Wird die Schleife auf den aktiven Bereich `iRead → iWrite` beschraenkt?
+- Wird der Wrap-Around korrekt berechnet: `count = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite)`?
+- Wird `ircheck = (iRead + q) % MAX_RING` verwendet?
+
+**Fix-Muster:**
+```cpp
+int count = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+for(int q = 0; q < count; q++) {
+    int ircheck = (iRead + q) % MAX_RING;
+    // ... restliche Logik unveraendert ...
+}
+```
+
+---
+
+### BUG #12 -- Slot-Clearing vor Rollback-Pfaden
+
+**Schweregrad:** Mittel
+**Auswirkung:** Jede Nachricht ueber den CAD-Wait-Pfad (= alle Erstversuche) wird als Zero-Length-Paket gesendet
+**Datei:** `src/lora_functions.cpp`
+**Betroffene Funktion:** `doTX()`
+**Aenderungen:** [Aenderung 16](#aenderung-16-deferred-slot-clearing--rollback-schutz-bug-12)
+**Quellen:** `BUG_REPORT_RING_BUFFER_DEADLOCK.md` Bug 4
+
+**Symptom:** Nach Anwendung des BUG #9 Fixes werden Nachrichten intermittierend als Zero-Length-Pakete gesendet oder gehen stumm verloren.
+
+**Ursache:** BUG #9's Fix platzierte das Slot-Clearing direkt nach `iRead++`, **vor** der TX-Entscheidung. `doTX()` hat zwei Rollback-Pfade (CAD-Wait, APRS-Chip-Fehler), die `iRead` zuruecksetzen und den Slot beim naechsten Aufruf erneut lesen. Nach dem Clearing ist `ringBuffer[save_read][0] = 0` (size geloescht), aber die Rollback-Pfade stellen nur `[1]` (Status) wieder her. Beim naechsten `doTX()`-Aufruf wird `sendlng = 0` gelesen.
+
+**Pruef-Signatur fuer AI Agent:** Suche in `doTX()` nach dem Slot-Clearing-Code. Pruefe:
+- Liegt das Clearing **nach** allen Rollback-Pfaden (CAD-Wait, APRS-Chip-Fehler)?
+- Oder liegt es an 3 separaten Stellen (APRS-TX-Erfolg, Normal-TX-Erfolg, Drop-Pfad)?
+- Wird auf den Rollback-Pfaden **kein** Clearing durchgefuehrt?
+
+**Fix-Muster:**
+```cpp
+// Slot-Clearing NICHT direkt nach iRead++, sondern:
+// 1. Nach APRS-TX-Erfolg (vor return true)
+// 2. Nach Normal-TX-Erfolg (vor return true)
+// 3. Nach Drop-Pfaden (TX disabled, decode failure)
+// NICHT auf Rollback-Pfaden (CAD-Wait, APRS-Chip-Fehler)
+```
+
+---
+
 ## TEIL 4: GEAENDERTE DATEIEN -- ZUSAMMENFASSUNG
 
 | Datei | Aenderungen | Bugs |
 |-------|-------------|------|
 | `src/esp32/esp32_main.cpp` | BUG #1 Fix (Timeout-Schutz), BUG #2 Fix (RX-Neustart in checkRX + Main Loop Cleanup), Debug A-H, CRC-Diagnose erweitert, RING_STATUS periodisch | #1, #2 |
-| `src/lora_functions.cpp` | BUG #3 Fix (OnHeaderDetect), BUG #4 Fix (cmd_counter 7->3), BUG #5 Fix (Retransmit-System komplett), BUG #6 Fix (ACK msg_id), BUG #7 Fix (Relay fire-and-forget), BUG #8 Fix (DM-ACK Ringbuffer-Bereinigung), Debug I-L, N-P, 0x7F-Entfernung | #3, #4, #5, #6, #7, #8 |
+| `src/lora_functions.cpp` | BUG #3 Fix (OnHeaderDetect), BUG #4 Fix (cmd_counter 7->3), BUG #5 Fix (Retransmit-System komplett), BUG #6 Fix (ACK msg_id), BUG #7 Fix (Relay fire-and-forget), BUG #8 Fix (DM-ACK Ringbuffer-Bereinigung), BUG #9 Fix (Slot-Clearing in doTX), BUG #10 Fix (MAX_RETRANSMIT 3, threshold 0x15), BUG #11 Fix (Active-Range-Scan), BUG #12 Fix (Deferred Clearing), Debug I-L, N-P, 0x7F-Entfernung | #3-#12 |
 | `src/loop_functions.cpp` | `retryCount[MAX_RING]` Array, startsWith-Fix, RING_OVERFLOW-Logging | #5, startsWith |
 | `src/loop_functions_extern.h` | `extern uint8_t retryCount[MAX_RING]` | #5 |
 | `src/udp_functions.cpp` | `retryCount[iWrite] = 0` bei UDP-Nachrichteneinfuegung | #5 |
@@ -687,14 +884,14 @@ if(iackcheck >= 0) {
 
 Dieses Dokument dient als Eingabe fuer einen AI Coding Agent bei neuen Firmware-Releases. Der Agent soll:
 
-1. **Pruefen:** Fuer jeden Bug (BUG #1 bis #8 + startsWith) anhand der "Pruef-Signatur" feststellen, ob der Bug in der neuen Version behoben wurde.
+1. **Pruefen:** Fuer jeden Bug (BUG #1 bis #12 + startsWith) anhand der "Pruef-Signatur" feststellen, ob der Bug in der neuen Version behoben wurde.
 2. **Patchen:** Falls nicht behoben, die Patches aus dem `lora-improve` Branch auf die neue Version anwenden.
 3. **Verifizieren:** Die Debug-Meldungen (`[MC-DBG]`) nutzen, um die Wirksamkeit der Patches zu bestaetigen.
 
 ### 5.2 Pruef-Workflow
 
 ```
-Fuer jeden Bug in [BUG #1, #2, #3, #4, #5, #6, #7, #8, startsWith]:
+Fuer jeden Bug in [BUG #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, startsWith]:
   1. Lies die "Pruef-Signatur" des Bugs
   2. Suche die beschriebenen Code-Muster in der neuen Firmware
   3. Ergebnis:
@@ -713,22 +910,28 @@ Bei Anwendung auf eine neue Firmware-Version folgende Reihenfolge einhalten:
 4. BUG #3 + #4 (OnHeaderDetect + CAD-Counter) -- zusammen testen
 5. BUG #6 (ACK msg_id) -- isoliert testbar
 6. BUG #7 (Relay fire-and-forget) -- isoliert testbar
-7. BUG #5 (Retransmit-System) -- benoetigt retryCount
+7. BUG #5 + #10 (Retransmit-System + Parameter-Tuning) -- benoetigt retryCount
 8. BUG #8 (DM-ACK Ringbuffer) -- benoetigt retryCount
-9. startsWith-Fix -- trivial
-10. Debug-Meldungen -- unabhaengig von Fixes
+9. BUG #9 + #12 (Consumed-Slot-Clearing + Deferred Clearing) -- ZUSAMMEN anwenden, nie #9 ohne #12!
+10. BUG #11 (Active-Range-Scan) -- Defense-in-Depth, nach #9 anwenden
+11. startsWith-Fix -- trivial
+12. Debug-Meldungen -- unabhaengig von Fixes
 
 ### 5.4 Erfolgskriterien
 
 | Metrik | Zielwert |
 |--------|----------|
 | Nachrichtenverlust (unidirektional, 3m) | < 5% |
+| Nachrichtenverlust (bidirektional, reverse) | < 30% |
 | RING_OVERFLOW-Ereignisse | 0 |
+| Ringbuffer-Deadlock (done=30) | Nie |
+| RING_STATUS done-Zaehler | Bleibt nahe 0 (Slots werden nach TX bereinigt) |
 | RETRANSMIT_GIVEUP sichtbar | Ja (beweist Retry-Cap funktioniert) |
+| RETRANSMIT_GIVEUP Anzahl | < 20 pro Testlauf (vorher 83) |
 | ONRXDONE_TIME | Messbar, typisch 10-50ms |
 | RX_TIMEOUT skipped | > 0 (beweist BUG #1 Fix aktiv) |
 | RX_RESTARTED after_readData | 1 pro empfangenem Paket |
-| RING_STATUS queued | Bleibt unter 20 |
+| RING_STATUS queued | Bleibt unter 15 (vorher 30/30 saturiert) |
 
 ### 5.5 Versprechen
 
@@ -751,20 +954,25 @@ Wir werden die Bug-Suche und das Patchen bei jeder neuen Firmware-Version durchf
 | `RING_BUFFER_FIX_GUIDE.md` | Ringbuffer-Architektur, FIX #1 (Relay), FIX #2 (Retransmit-Cap), ADR-001 (Mesh-ACK) |
 | `BUG_REPORT_RINGBUFFER_ANALYSE.md` | Deutschsprachiger Bug-Report mit Mermaid-Diagrammen, BUG #1-#6, eingereicht als GitHub Issue #708 |
 | `BUG_REPORT_DM_RETRANSMIT.md` | BUG #7 und #8, DM-spezifische ACK-Analyse |
+| `BUG_REPORT_RING_BUFFER_DEADLOCK.md` | Bidirektionaler Testharness-Bericht (12 Tests, 249 Nachrichten), BUG #9-#12, Deadlock-Analyse |
 
 ## ANHANG B: Bug-Querverweis-Matrix
 
-| Bug-ID | FIRMWARE_FIX_GUIDE | RING_BUFFER_FIX_GUIDE | BUG_REPORT_RINGBUFFER | BUG_REPORT_DM_RETRANSMIT |
-|--------|--------------------|-----------------------|-----------------------|--------------------------|
-| BUG #1 | Abschnitt 5 "BUG #1" | -- | Abschnitt 2 | -- |
-| BUG #2 | Abschnitt 5 "BUG #2" | -- | Abschnitt 3 | -- |
-| BUG #3 | Abschnitt 5 "BUG #3" | -- | -- | -- |
-| BUG #4 | Abschnitt 5 "BUG #4" | -- | Abschnitt 5 | -- |
-| BUG #5 | Abschnitt 5 "BUG #5" | Abschnitt 4 "FIX #2" | Abschnitt 6 | -- |
-| BUG #6 | -- | -- | Abschnitt 7 | -- |
-| BUG #7 | -- | Abschnitt 4 "FIX #1" | Abschnitt 4 (als "BUG #3") | -- |
-| BUG #8 | -- | -- | -- | Abschnitt 3 |
-| startsWith | -- | -- | -- | Abschnitt 5 |
+| Bug-ID | FIRMWARE_FIX_GUIDE | RING_BUFFER_FIX_GUIDE | BUG_REPORT_RINGBUFFER | BUG_REPORT_DM_RETRANSMIT | BUG_REPORT_DEADLOCK |
+|--------|--------------------|-----------------------|-----------------------|--------------------------|---------------------|
+| BUG #1 | Abschnitt 5 "BUG #1" | -- | Abschnitt 2 | -- | -- |
+| BUG #2 | Abschnitt 5 "BUG #2" | -- | Abschnitt 3 | -- | -- |
+| BUG #3 | Abschnitt 5 "BUG #3" | -- | -- | -- | -- |
+| BUG #4 | Abschnitt 5 "BUG #4" | -- | Abschnitt 5 | -- | -- |
+| BUG #5 | Abschnitt 5 "BUG #5" | Abschnitt 4 "FIX #2" | Abschnitt 6 | -- | -- |
+| BUG #6 | -- | -- | Abschnitt 7 | -- | -- |
+| BUG #7 | -- | Abschnitt 4 "FIX #1" | Abschnitt 4 (als "BUG #3") | -- | -- |
+| BUG #8 | -- | -- | -- | Abschnitt 3 | -- |
+| BUG #9 | -- | -- | -- | -- | Bug 1 |
+| BUG #10 | -- | -- | -- | -- | Bug 2 |
+| BUG #11 | -- | -- | -- | -- | Bug 3 |
+| BUG #12 | -- | -- | -- | -- | Bug 4 |
+| startsWith | -- | -- | -- | Abschnitt 5 | -- |
 
 ## ANHANG C: Nummerierungs-Hinweis
 
@@ -777,6 +985,11 @@ Die Bug-Nummern sind ueber die verschiedenen Dokumente nicht immer konsistent:
 - `RING_BUFFER_FIX_GUIDE.md` verwendet FIX #1 und FIX #2
   - FIX #1 (Relay fire-and-forget) = hier BUG #7
   - FIX #2 (Retransmit-Cap) = hier BUG #5
-- Dieses Dokument verwendet die kanonische Nummerierung BUG #1-#8
+- `BUG_REPORT_RING_BUFFER_DEADLOCK.md` verwendet Bug 1-4 mit eigener Zaehlung
+  - Dessen Bug 1 (done-Slots nie bereinigt) = hier BUG #9
+  - Dessen Bug 2 (Retransmit zu aggressiv) = hier BUG #10
+  - Dessen Bug 3 (Scan ausserhalb Active Range) = hier BUG #11
+  - Dessen Bug 4 (Premature Slot Clearing) = hier BUG #12
+- Dieses Dokument verwendet die kanonische Nummerierung BUG #1-#12
 
 Die Bug-IDs in diesem Dokument sind die **autoritativen** Referenzen fuer den AI Coding Agent.
