@@ -1,7 +1,6 @@
-# MeshCom Firmware 4.35k -- Patchdokumentation Branch `lora-improve`
+# MeshCom Firmware 4.35k -- Patchdokumentation
 
 **Firmware-Basis:** MeshCom 4.35k.02.19 (main branch)
-**Branch:** `lora-improve`
 **Datum:** 2026-02-22
 **Autor:** DK5EN / Martin S. Werner
 **Plattform:** ESP32 (Heltec WiFi LoRa 32 V3, SX1262 via RadioLib)
