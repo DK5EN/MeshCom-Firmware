@@ -1,0 +1,149 @@
+// (C) 2023 OE1KBC Kurt Baumann, OE1KFR Rainer 
+// (C) 2016, 2017, 2018, 2018, 2019, 2020 OE1KBC Kurt Baumann
+//
+// 20230326: Version 4.00: START
+
+#include <Arduino.h>
+#include <configuration.h>
+
+#ifdef ESP32
+
+#include <loop_functions.h>
+#include <loop_functions_extern.h>
+#include <lora_setchip.h>
+
+#include "esp32_flash.h"
+
+#if defined BOARD_T5_EPAPER
+// extra source
+#elif defined BOARD_TRACKER
+#elif defined(BOARD_T_DECK)
+#elif defined(BOARD_T_DECK_PLUS)
+#elif defined(BOARD_T_DECK_PRO)
+#elif defined BOARD_E290
+#include "heltec-eink-modules.h"
+
+extern EInkDisplay_VisionMasterE290 e290_display;
+
+#include "Fonts/FreeSans9pt7b.h"
+#include "Fonts/FreeSansBold12pt7b.h"
+#include "Fonts/FreeSans12pt7b.h"
+#include "Fonts/FreeSans18pt7b.h"
+
+#else
+    #include <U8g2lib.h>
+    extern U8G2 *u8g2;
+    extern U8G2 u8g2_1;
+    extern U8G2 u8g2_2;
+#endif   
+
+void initDisplay()
+{
+#if ! defined(BOARD_E290) && ! defined(BOARD_T_DECK) && ! defined(BOARD_T_DECK_PLUS) && ! defined(BOARD_TRACKER) && !defined (BOARD_T5_EPAPER) && !defined (BOARD_T_DECK_PRO)
+    Serial.println(F("[INIT]...Auto detecting display:"));
+        
+    int idtype = esp32_isSSD1306(0x3C);
+
+    // SSD1306 .... idtype 2   u8g2_1
+    // SH1106 ..... idtype 1   u8g2_2
+
+    u8g2 = NULL;
+
+    if(idtype < 0)
+    {
+        bDisplayOff = true;
+        return;
+    }
+
+    if (idtype == 1)
+    {
+        u8g2 = &u8g2_1;
+    }
+    else
+    {
+        u8g2 = &u8g2_2;
+    }
+
+    u8g2->begin();
+    u8g2->setContrast(0);  // Default to minimum brightness
+
+#endif
+
+}
+
+void startDisplay(char line1[20], char line2[20], char line3[20])
+{
+    #if defined(BOARD_E290)
+
+    char cvers[20];
+
+    sprintf(cvers, "%s/%-1.1s <%s>", SOURCE_VERSION, SOURCE_VERSION_SUB, getCountry(meshcom_settings.node_country).c_str());
+
+    e290_display.clear();
+    e290_display.fastmodeOn();
+
+    e290_display.landscape();
+
+    e290_display.setRotation(270);
+
+    e290_display.fillCircle(10, 10,
+        10,                             // Radius: 10px
+        BLACK                           // Color: black
+        );
+
+    e290_display.setFont( &FreeSansBold12pt7b );
+    e290_display.setCursor(20, 50);
+    e290_display.printf("MeshCom %s\n", cvers);
+    e290_display.setCursor(65, 80);
+    e290_display.setFont( &FreeSans12pt7b );
+    e290_display.println("HELTEC E290");
+
+    e290_display.setFont( &FreeSans9pt7b );
+    e290_display.setCursor(30, 18);
+    e290_display.println(line1);
+    e290_display.setCursor(80, 100);
+    e290_display.println(line2);
+    e290_display.setCursor(65, 120);
+    e290_display.println(line3);
+
+    e290_display.update();
+
+    #elif defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_TRACKER) || defined (BOARD_T5_EPAPER) || defined(BOARD_T_DECK_PRO)
+    // do nothing
+    #else
+
+    char cvers[20];
+
+    if(u8g2 == NULL)
+        return;
+
+    u8g2->clearDisplay();
+    u8g2->firstPage();
+
+    do
+    {
+        
+        #if defined (BOARD_TRACKER)
+//TODO
+        #elif defined (BOARD_STICK_V3)
+            u8g2->setFont(u8g2_font_6x10_tf);
+            u8g2->drawStr(36, 42, "MeshCom 4");
+            sprintf(cvers, "%s/%s %s", SOURCE_VERSION, SOURCE_VERSION_SUB, getCountry(meshcom_settings.node_country).c_str());
+            u8g2->drawStr(36, 52, cvers);
+            u8g2->drawStr(36, 62, "icssw.org");
+        #else
+            u8g2->setFont(u8g2_font_10x20_mf);
+            u8g2->drawStr(5, 16, "MeshCom 4.0");
+            u8g2->setFont(u8g2_font_6x10_mf);
+            sprintf(cvers, "FW %s/%s <%s>", SOURCE_VERSION, SOURCE_VERSION_SUB, getCountry(meshcom_settings.node_country).c_str());
+            u8g2->drawStr(5, 30, cvers);
+            u8g2->drawStr(5, 40, line1);
+            u8g2->drawStr(5, 50, line2);
+            u8g2->drawStr(5, 60, line3);
+        #endif
+    } while (u8g2->nextPage());
+
+    #endif
+}
+
+#endif
