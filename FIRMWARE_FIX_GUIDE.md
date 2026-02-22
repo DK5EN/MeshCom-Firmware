@@ -51,7 +51,7 @@ Messages that DO arrive have these latencies (99→12):
 
 The minimum latency of 5.8s for a 3-meter link is itself evidence of firmware overhead. SF11 airtime for an 80-byte packet is ~1.5s. The remaining ~4.3s is firmware processing delay (primarily the `cmd_counter=7` CAD wait loop on the sender).
 
-**Retransmit recommendation**: The current firmware retransmits after ~320s. Based on the data, retransmit should happen after **20s** (P90). Give up after **120s** (no message ever arrived later than 114s).
+**Retransmit recommendation**: The current firmware retransmits after ~62s (status 0x01→0x20 at 2s intervals; the code comment says 320s but is wrong). Based on the data, retransmit should happen after **30s**. Give up after **120s** (no message ever arrived later than 114s).
 
 ---
 
@@ -375,6 +375,125 @@ void OnHeaderDetect(void)
 
 ---
 
+### BUG #4: No actual CAD scan — `cmd_counter=7` is a blind delay, not channel sensing
+
+**File**: `src/lora_functions.cpp` lines 1073-1087
+
+**The bug**: The comment says "vor jeden senden 7 aufeinander folgende CAD abwarten" (wait for 7 consecutive CAD before each send). But there is NO actual CAD scan. The `MAX_CAD_WAIT=10` constant is defined in `configuration_global.h:89` but never used. RadioLib's `radio.startChannelScan()` is never called. Instead, the firmware simply counts down 7 main loop iterations (~35-140ms total depending on loop speed) and then transmits blindly.
+
+At SF11, a LoRa preamble alone is ~100ms. A 7-iteration delay of ~35-140ms is not long enough to reliably detect channel activity, and it does not actually listen — it just waits.
+
+**Current code** (lora_functions.cpp lines 1073-1087):
+
+```cpp
+// vor jeden senden 7 aufeinander folgende CAD abwarten
+{
+    cmd_counter=7;
+    iRead=save_read;
+    ringBuffer[iRead][1] = save_ring_status;
+    tx_waiting=true;
+    return false;
+}
+```
+
+**Fix (minimal PoC)**: Reduce `cmd_counter` from 7 to 3. This shortens the blind backoff delay. Combined with Bug #3 fix (OnHeaderDetect no longer resets the counter), the overall TX latency is reduced while still providing a minimal random backoff.
+
+A full hardware CAD implementation using `radio.startChannelScan()` is deferred to the comprehensive rewrite — it requires adding a new state machine state (CAD_SCANNING) and a callback for the scan result, which is beyond "minimal fix" scope.
+
+**Patched code** (lora_functions.cpp line 1076):
+
+```cpp
+// Change from:
+    cmd_counter=7;
+// To:
+    cmd_counter=3;    // Reduced: 7 was too long, causes unnecessary TX delay
+```
+
+**Expected improvement**: Combined with Bug #3 fix, TX latency drops from ~7 iterations to ~3 iterations. This directly reduces the end-to-end message latency (currently 5.8s minimum).
+
+**Debug**: The existing `[MC-DBG] CAD_WAIT remaining=%d` message (Section 6, item J) already tracks this counter. After the fix, you should see `CAD_WAIT remaining=3`, `2`, `1` instead of `7`, `6`, ..., `1`.
+
+---
+
+### BUG #5: Retransmit timer too long
+
+**File**: `src/lora_functions.cpp` line 1173
+
+**The bug**: The retransmission check `updateRetransmissionStatus()` is called every 2 seconds (esp32_main.cpp line 1562). Each call increments the ring buffer status byte. When it reaches `0x20` (32 decimal), the message is retransmitted. Starting from status `0x01` (marked as sent), that is 31 increments × 2 seconds = **62 seconds**.
+
+Note: The code comment says "32 x 10sec = 320sec" but this is wrong — the timer fires every 2 seconds, not 10.
+
+For our measured P90 latency of 22.5s and max of 114s, 62 seconds is reasonable for a first retransmit. However, based on actual data, **30 seconds** is optimal — it is above P90 (22.5s) so we won't duplicate messages still in flight, but fast enough to recover from a single lost transmission.
+
+**Current code** (lora_functions.cpp line 1173):
+
+```cpp
+if(ringBuffer[ircheck][1] == 0x20)    // 32 x 10sec = 320sec (5min 20sec) Wartezeit
+```
+
+**Patched code**:
+
+```cpp
+if(ringBuffer[ircheck][1] == 0x10)    // 15 x 2sec = 30sec retransmit
+```
+
+**Additionally**, add a debug message just before the retransmit:
+
+```cpp
+if(bLORADEBUG)
+{
+    unsigned int ring_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
+    Serial.printf("[MC-DBG] RETRANSMIT after_sec=%d msg_id=%08X\n",
+        (ringBuffer[ircheck][1] - 1) * 2, ring_msg_id);
+}
+```
+
+**Expected improvement**: Messages that are lost on first attempt get retransmitted within 30 seconds instead of 62 seconds.
+
+---
+
+### CRC Error Enhanced Diagnostics
+
+**File**: `src/esp32/esp32_main.cpp` lines 2836-2849 (in `checkRX`)
+
+**The gap**: The current CRC error log is just `[LoRa]...CRC error!` — no RSSI, no SNR, no packet size, no timestamp context. At +6dB SNR, CRC errors cannot be caused by noise. Each CRC error is evidence of an on-air collision or a firmware buffer issue. We need full context to distinguish these.
+
+**Current code** (after BUG #2 patch already applied):
+
+```cpp
+    if(bLORADEBUG)
+        Serial.println(F("[LoRa]...CRC error!"));
+```
+
+**Patched code** — replace with:
+
+```cpp
+    if(bLORADEBUG)
+    {
+        Serial.printf("[MC-DBG] CRC_ERROR rssi=%.1f snr=%.1f freq_err=%.1f size=%d ts=%lu\n",
+            radio.getRSSI(), radio.getSNR(), radio.getFrequencyError(),
+            (int)ibytes, millis());
+    }
+```
+
+Note: On CRC error, the SX1262 may still report valid RSSI/SNR from the header (which was decoded successfully before the payload CRC failed). If RSSI is strong (-33 dBm) and SNR is high (+6 dB), this confirms the CRC error is from a collision, not noise. If RSSI/SNR are reported as 0 or invalid, the SX1262 did not decode the header at all.
+
+**Additionally**, log the `ibytes` (reported packet size). A CRC error from a collision often shows an unexpected packet size because two overlapping transmissions produce garbage length.
+
+---
+
+### Harness Configuration: Increase Finalize Timeout to 120s
+
+**File**: `src/lora_harness/tracker.py` — the `finalize()` method
+
+**The gap**: The test harness currently marks a message as lost after 30 seconds. But we observed messages arriving as late as 114 seconds. With the retransmit timer now at 30s, a retransmitted message could arrive at 30s + ~10s latency = ~40s. The harness must wait long enough to capture retransmitted messages.
+
+**Change**: Set the finalize timeout from 30 seconds to **120 seconds** in the harness code. This is a Python change, not firmware.
+
+This ensures we accurately measure the improvement. Without this change, messages that arrive between 30-120s would still be counted as lost, masking the benefit of the retransmit timer fix.
+
+---
+
 ## 6. New Debug Messages
 
 All new debug messages use the format `[MC-DBG]` prefix for machine parsing. The test harness will parse these with regex `\[MC-DBG\]\s+(.+)`.
@@ -519,6 +638,8 @@ This one is NOT gated by bLORADEBUG — ring buffer overflow should always be vi
 | `RADIO_TX` | lora_functions.cpp | startTransmit called | Confirms actual LoRa TX with payload length |
 | `HDR_DETECT` | lora_functions.cpp | Preamble detected | Shows CAD interruptions with context |
 | `RING_OVERFLOW` | loop_functions.cpp | Ring buffer wraps | Always logged — critical error |
+| `CRC_ERROR` | esp32_main.cpp | CRC mismatch on RX | RSSI/SNR/size context for collision diagnosis |
+| `RETRANSMIT` | lora_functions.cpp | Message retransmitted | Proves retransmit timer works, shows delay |
 
 ### 6.3 What was previously a blind spot — now visible
 
@@ -531,6 +652,8 @@ This one is NOT gated by bLORADEBUG — ring buffer overflow should always be vi
 | Is the ring buffer overflowing? | Silent overwrite | `RING_OVERFLOW` always logged |
 | When does the radio actually transmit? | Only post-TX log via printBuffer | `RADIO_TX` with length, before startTransmit |
 | Was a pending RX packet saved from timeout reset? | N/A (bug) | `RX_TIMEOUT_SKIP` proves fix works |
+| What caused a CRC error? Collision or noise? | Just "CRC error!" — no context | `CRC_ERROR` with RSSI/SNR/size proves collision |
+| When does retransmit fire? How long did it wait? | Only via `[RETX]` (separate flag) | `RETRANSMIT` with seconds and msg_id |
 
 ---
 
@@ -554,9 +677,14 @@ We have serial debug on Node-12 (receiver) but NOT on Node-99 (sender). Node-99 
 
 | File | Changes | Lines Affected |
 |------|---------|----------------|
-| `src/esp32/esp32_main.cpp` | BUG #1 fix (RECEIVE_TIMEOUT), BUG #2 fix (checkRX RX restart), debug messages A-H | ~1570-1608, ~1613-1636, ~1651, ~1694, ~1718, ~2751-2790 |
-| `src/lora_functions.cpp` | BUG #2 fix (OnRxDone timing), BUG #3 fix (OnHeaderDetect), debug messages I-L | ~100, ~882, ~947, ~1101, ~1262-1272 |
+| `src/esp32/esp32_main.cpp` | BUG #1 fix (RECEIVE_TIMEOUT), BUG #2 fix (checkRX RX restart), CRC enhanced debug, debug messages A-H | ~1570-1608, ~1613-1636, ~1651, ~1694, ~1718, ~2751-2850 |
+| `src/lora_functions.cpp` | BUG #3 fix (OnHeaderDetect), BUG #4 fix (cmd_counter 7→3), BUG #5 fix (retransmit 0x20→0x10), debug messages I-L + RETRANSMIT | ~100, ~882, ~947, ~1076, ~1101, ~1173, ~1262-1272 |
 | `src/loop_functions.cpp` | Debug message M (ring buffer overflow) | ~3753 |
+
+**Harness change** (Python, not firmware):
+| File | Change |
+|------|--------|
+| `src/lora_harness/tracker.py` | Increase finalize timeout from 30s to 120s |
 
 No new files. No new dependencies. No architecture changes.
 
@@ -576,6 +704,9 @@ After applying the patches, run the same test harness (`uv run lora-harness`) wi
 | RX_TIMEOUT_SKIP events | N/A | > 0 (proves BUG #1 fix active) |
 | RX_RESTARTED after_readData | N/A | 1 per received packet (proves BUG #2 fix) |
 | RING_OVERFLOW events | unknown | 0 |
+| CRC_ERROR with RSSI/SNR | no context | RSSI > -50dBm confirms collision, not noise |
+| RETRANSMIT events | never (too slow) | should appear at ~30s for any lost msg |
+| Harness finalize timeout | 30s | 120s (captures retransmitted messages) |
 
 ### 9.2 How to verify each fix
 
@@ -595,10 +726,11 @@ The test harness at `src/lora_harness/serial_monitor.py` needs to capture `[MC-D
 
 Apply fixes in this order to isolate their individual impact:
 
-1. **First**: Add ALL debug messages (Section 6) WITHOUT any bug fixes. Run one test. This establishes the baseline with full visibility.
+1. **First**: Add ALL debug messages (Section 6) WITHOUT any bug fixes. Update harness timeout to 120s. Run one test. This establishes the baseline with full visibility.
 2. **Second**: Apply BUG #1 fix (RECEIVE_TIMEOUT). Run test. Compare loss rate.
 3. **Third**: Apply BUG #2 fix (early RX restart in checkRX). Run test. Compare loss rate.
-4. **Fourth**: Apply BUG #3 fix (OnHeaderDetect). Run test. Compare loss rate.
+4. **Fourth**: Apply BUG #3 fix (OnHeaderDetect) + BUG #4 fix (cmd_counter 7→3). Run test. Compare loss rate.
+5. **Fifth**: Apply BUG #5 fix (retransmit timer 0x20→0x10). Run test. Verify retransmit events appear in logs.
 
 This incremental approach proves which fix has the most impact and avoids introducing regressions from multiple simultaneous changes.
 
@@ -613,17 +745,23 @@ This incremental approach proves which fix has the most impact and avoids introd
 | BUG #2: Early startReceive after readData | Medium — radio starts listening while OnRxDone processes old packet | If a NEW packet arrives during processing, receiveFlag will be set. The next loop iteration will process it. No data race because readData copies to local buffer |
 | BUG #2: Removing redundant interrupt rewiring in main loop | Low — checkRX now handles this internally | Verify that transmittedFlag path still works correctly |
 | BUG #3: Not resetting cmd_counter in OnHeaderDetect | Medium — TX may start while another station is finishing | The `is_receiving=true` flag still blocks TX entry. TX only starts after is_receiving is cleared in OnRxDone |
+| BUG #4: cmd_counter 7→3 | Low — shorter backoff before TX | Still provides random backoff; Bug #3 fix ensures it completes |
+| BUG #5: Retransmit 0x20→0x10 (62s→30s) | Low — more frequent retransmit | 30s is above P90 latency (22.5s), so no premature duplicates |
 
 ---
 
 ## 12. Summary
 
-Three minimal patches to the MeshCom 4.35k firmware:
+Five minimal patches to the MeshCom 4.35k firmware:
 
-1. **RECEIVE_TIMEOUT**: Check `receiveFlag` before resetting; call `startReceive()` before rewiring interrupts
-2. **checkRX**: Call `startReceive()` immediately after `readData()`, before OnRxDone processing
-3. **OnHeaderDetect**: Stop resetting `cmd_counter` and `tx_waiting` on every preamble
+1. **BUG #1 — RECEIVE_TIMEOUT**: Check `receiveFlag` before resetting; call `startReceive()` before rewiring interrupts
+2. **BUG #2 — checkRX**: Call `startReceive()` immediately after `readData()`, before OnRxDone processing
+3. **BUG #3 — OnHeaderDetect**: Stop resetting `cmd_counter` and `tx_waiting` on every preamble
+4. **BUG #4 — CAD counter**: Reduce blind backoff from 7 to 3 iterations (real hardware CAD deferred to rewrite)
+5. **BUG #5 — Retransmit timer**: Change threshold from `0x20` to `0x10` (62s → 30s)
 
-Plus 13 new `[MC-DBG]` debug messages that eliminate all serial output blind spots.
+Plus one CRC error diagnostic enhancement and one harness configuration change (finalize timeout 30s → 120s).
+
+Plus 15 new `[MC-DBG]` debug messages that eliminate all serial output blind spots, including CRC error context (RSSI/SNR/size) and retransmit events.
 
 **Expected outcome**: Loss rate drops from ~32% to < 5%, proving the firmware — not the RF channel — was the bottleneck all along.
