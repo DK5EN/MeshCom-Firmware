@@ -49,7 +49,7 @@ SIMPLE_COUNTERS = {
 
 # Alert thresholds
 STUCK_STATE_SECONDS = 30
-NO_TRANSITION_SECONDS = 60
+NO_TRANSITION_SECONDS = 30
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
 RX_RESTART_PER_MIN_THRESHOLD = 30
@@ -104,6 +104,9 @@ class Monitor:
         # Watchdog recovery tracking
         self.watchdog_recoveries_interval: int = 0
 
+        # No-transition silence tracking (for resolved alerts)
+        self.radio_was_silent = False
+
         # Alerts collected this interval
         self.alerts: list[str] = []
 
@@ -122,6 +125,14 @@ class Monitor:
         m = RE_STATE_TRANSITION.search(line)
         if m:
             from_st, to_st, rc = m.group(1), m.group(2), int(m.group(3))
+            # Resolved: first transition after radio silence
+            if self.radio_was_silent:
+                silence_dur = now - self.last_transition
+                self._resolved(
+                    f"Radio alive after {silence_dur:.0f}s silence — "
+                    f"woke up via {from_st}->{to_st}"
+                )
+                self.radio_was_silent = False
             # accumulate time in previous state
             if self.current_state:
                 self.state_time[self.current_state] += now - self.state_since
@@ -265,6 +276,12 @@ class Monitor:
         self.alerts.append(alert_line)
         print(f"\033[91m{alert_line}\033[0m", flush=True)
 
+    def _resolved(self, msg: str) -> None:
+        ts = datetime.now().strftime("%H:%M:%S")
+        resolved_line = f"[RESOLVED {ts}] {msg}"
+        self.alerts.append(resolved_line)
+        print(f"\033[92m{resolved_line}\033[0m", flush=True)
+
     # -- periodic checks (called from main thread) --------------------------
 
     def check_stuck_state(self) -> None:
@@ -277,6 +294,7 @@ class Monitor:
                         f"{now - self.state_since:.0f}s"
                     )
             if (now - self.last_transition) > NO_TRANSITION_SECONDS:
+                self.radio_was_silent = True
                 self._alert(
                     f"No state transitions for {now - self.last_transition:.0f}s"
                 )
