@@ -34,6 +34,10 @@ RE_CAD_GIVEUP = re.compile(r"\[MC-DBG\]\s+CAD_GIVEUP")
 RE_RETRANSMIT_GIVEUP = re.compile(r"\[MC-DBG\]\s+RETRANSMIT_GIVEUP")
 RE_WIFI_DBG = re.compile(r"\[WIFI-DBG\]\s+(.*)")
 RE_UDP_RESET = re.compile(r"resetMeshComUDP")
+RE_RING_STATUS = re.compile(
+    r"\[MC-DBG\]\s+RING_STATUS\s+queued=(\d+)\s+pending=(\d+)\s+retrying=(\d+)\s+done=(\d+)"
+)
+RE_WATCHDOG = re.compile(r"\[MC-DBG\]\s+WATCHDOG_RECOVERY")
 
 SIMPLE_COUNTERS = {
     "OnRxDone": "rx_packets",
@@ -49,6 +53,8 @@ NO_TRANSITION_SECONDS = 60
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
 RX_RESTART_PER_MIN_THRESHOLD = 30
+RADIO_SILENT_THRESHOLD = 30  # seconds without RX_TIMEOUT_FIRE = radio freeze
+RING_ZOMBIE_CONSECUTIVE = 3  # consecutive RING_STATUS with retrying>0, queued==0
 
 LORA_STATES = [
     "IDLE", "RX_LISTEN", "RX_PROCESS", "TX_PREPARE", "TX_ACTIVE", "TX_DONE",
@@ -81,6 +87,22 @@ class Monitor:
         # WiFi/UDP status
         self.wifi_events_interval: list[str] = []
         self.udp_resets_interval = 0
+
+        # Radio silent tracking (RX_TIMEOUT_FIRE gaps)
+        self.last_rx_timeout_fire: float | None = None
+        self.max_radio_gap: float = 0.0  # per interval
+        self.max_radio_gap_total: float = 0.0  # lifetime
+        self.radio_silent_events_interval: int = 0
+
+        # Ring buffer zombie tracking
+        self.ring_last_queued: int = 0
+        self.ring_last_pending: int = 0
+        self.ring_last_retrying: int = 0
+        self.ring_last_done: int = 0
+        self.ring_zombie_streak: int = 0  # consecutive reports with retrying>0, queued==0
+
+        # Watchdog recovery tracking
+        self.watchdog_recoveries_interval: int = 0
 
         # Alerts collected this interval
         self.alerts: list[str] = []
@@ -182,8 +204,48 @@ class Monitor:
             self._alert("UDP RESET detected")
             return
 
-        # RX restart (startReceive again)
+        # RING_STATUS parsing and zombie tracking
+        m = RE_RING_STATUS.search(line)
+        if m:
+            self.ring_last_queued = int(m.group(1))
+            self.ring_last_pending = int(m.group(2))
+            self.ring_last_retrying = int(m.group(3))
+            self.ring_last_done = int(m.group(4))
+            if self.ring_last_retrying > 0 and self.ring_last_queued == 0:
+                self.ring_zombie_streak += 1
+                if self.ring_zombie_streak >= RING_ZOMBIE_CONSECUTIVE:
+                    self._alert(
+                        f"RING_ZOMBIE retrying={self.ring_last_retrying} "
+                        f"stuck for {self.ring_zombie_streak * 30}s+"
+                    )
+            else:
+                self.ring_zombie_streak = 0
+            return
+
+        # Watchdog recovery detection
+        if RE_WATCHDOG.search(line):
+            self.watchdog_recoveries_interval += 1
+            self.counters["watchdog_recoveries"] += 1
+            self.total["watchdog_recoveries"] += 1
+            self._alert("WATCHDOG_RECOVERY — radio re-initialized after silence")
+            return
+
+        # RX restart (startReceive again) and RX_TIMEOUT_FIRE gap tracking
         if "startReceive again" in line or "RX_TIMEOUT_FIRE" in line:
+            # Radio silent gap detection (only on RX_TIMEOUT_FIRE)
+            if "RX_TIMEOUT_FIRE" in line:
+                if self.last_rx_timeout_fire is not None:
+                    gap = now - self.last_rx_timeout_fire
+                    if gap > self.max_radio_gap:
+                        self.max_radio_gap = gap
+                    if gap > self.max_radio_gap_total:
+                        self.max_radio_gap_total = gap
+                    if gap > RADIO_SILENT_THRESHOLD:
+                        self.radio_silent_events_interval += 1
+                        self.total["radio_silent"] += 1
+                        self._alert(f"RADIO_SILENT gap={gap:.0f}s (no RX_TIMEOUT_FIRE)")
+                self.last_rx_timeout_fire = now
+
             prev_count = len(self.rx_restart_times)
             self.rx_restart_times.append(now)
             # prune older than 60s
@@ -271,6 +333,11 @@ class Monitor:
                 f"Drops: {drops} | "
                 f"CAD false pos: {self.counters.get('cad_false_pos', 0)} | "
                 f"Retransmit fails: {self.counters.get('retransmit_fails', 0)}\n"
+                f"Radio: {self.radio_silent_events_interval} silent events "
+                f"(max gap: {self.max_radio_gap:.0f}s) | "
+                f"Watchdog: {self.watchdog_recoveries_interval} recoveries\n"
+                f"Ring:  queued={self.ring_last_queued} retrying={self.ring_last_retrying} "
+                f"done={self.ring_last_done} (last seen)\n"
                 f"WiFi: {wifi_str} | UDP: {udp_str}\n"
                 f"Alerts: {alert_str}\n"
                 f"{'=' * 60}\n"
@@ -280,7 +347,10 @@ class Monitor:
                 f"  TOTALS: RX={self.total['rx_packets']} "
                 f"TX={self.total['tx_packets']} "
                 f"Errors={self.total['rx_errors']} "
-                f"Drops={sum(v for k, v in self.total.items() if k.startswith('drop_'))}\n"
+                f"Drops={sum(v for k, v in self.total.items() if k.startswith('drop_'))} "
+                f"RadioSilent={self.total['radio_silent']} "
+                f"(max gap: {self.max_radio_gap_total:.0f}s) "
+                f"Watchdog={self.total['watchdog_recoveries']}\n"
             )
 
             print(summary, flush=True)
@@ -291,6 +361,9 @@ class Monitor:
             self.alerts = []
             self.wifi_events_interval = []
             self.udp_resets_interval = 0
+            self.radio_silent_events_interval = 0
+            self.max_radio_gap = 0.0
+            self.watchdog_recoveries_interval = 0
             self.interval_start = now
 
 
