@@ -1991,12 +1991,13 @@ void esp32loop()
             // channel is free
             // nothing was detected
             // do not print anything, it just spams the console
-            if (iWrite != iRead)
+            if (iWrite != iRead || iAckRead != iAckWrite)
             {
                 // Debug E: TX_GATE_ENTER
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cmd_ctr=%d tx_wait=%d\n",
+                    Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d ack_qlen=%d cmd_ctr=%d tx_wait=%d\n",
                         (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                        (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite),
                         cmd_counter, tx_waiting);
 
                 // save transmission state between loops

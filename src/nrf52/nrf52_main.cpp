@@ -1078,11 +1078,12 @@ extern bool btimeClient;
 
     if(iReceiveTimeOutTime == 0 && is_receiving == false && tx_is_active == false)
     {
-        if (iWrite != iRead)
+        if (iWrite != iRead || iAckRead != iAckWrite)
         {
             if(bLORADEBUG)
-                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cmd_ctr=%d tx_wait=%d\n",
+                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d ack_qlen=%d cmd_ctr=%d tx_wait=%d\n",
                     (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                    (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite),
                     cmd_counter, tx_waiting);
             doTX();
         }

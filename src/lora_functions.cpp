@@ -181,26 +181,24 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 {
                     print_buff[5]--;
 
-                    // Pre-check: drop ACK forward if ring buffer is nearly full
-                    int ack_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
-                    if(ack_pending >= MAX_RING - 2)
+                    // ACK fast-path: use dedicated ackBuffer instead of main ringBuffer
+                    int ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                    if(ack_pending >= MAX_ACK_RING - 1)
                     {
                         if(bLORADEBUG)
-                            Serial.printf("[MC-DBG] ACK_FWD_DROPPED buffer_full pending=%d\n", ack_pending);
+                            Serial.printf("[MC-DBG] ACK_FWD_DROPPED ack_buf_full pending=%d\n", ack_pending);
                     }
                     else
                     {
-                        ringBuffer[iWrite][0]=12;
-                        ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
-                        memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+                        ackBuffer[iAckWrite][0]=12;
+                        ackBuffer[iAckWrite][1]=0xFF;
+                        memcpy(ackBuffer[iAckWrite]+2, print_buff, 12);
 
-                        retryCount[iWrite] = 0;
-                        addRingPointer(iWrite, iRead, MAX_RING);
-                        /*
-                        iWrite++;
-                        if(iWrite >= MAX_RING)
-                            iWrite=0;
-                        */
+                        iAckWrite = (iAckWrite + 1) % MAX_ACK_RING;
+
+                        unsigned long ack_msg_id = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] ACK_FAST_QUEUED msg_ref=%08lX ack_qlen=%d\n", ack_msg_id, ack_pending + 1);
 
                         if(bDisplayInfo)
                         {
@@ -721,26 +719,20 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
                                                 print_buff[11]=0x00;     // msg always 0x00 at the end
                                                 
-                                                // Pre-check: drop GW ACK if ring buffer is nearly full
-                                                int gw_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
-                                                if(gw_pending >= MAX_RING - 2)
+                                                // ACK fast-path: use dedicated ackBuffer for GW ACKs
+                                                int gw_ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                                                if(gw_ack_pending >= MAX_ACK_RING - 2)
                                                 {
                                                     if(bLORADEBUG)
-                                                        Serial.printf("[MC-DBG] GW_ACK_DROPPED buffer_full pending=%d\n", gw_pending);
+                                                        Serial.printf("[MC-DBG] GW_ACK_DROPPED ack_buf_full pending=%d\n", gw_ack_pending);
                                                 }
                                                 else
                                                 {
-                                                    ringBuffer[iWrite][0]=12;
-                                                    ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
-                                                    memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+                                                    ackBuffer[iAckWrite][0]=12;
+                                                    ackBuffer[iAckWrite][1]=0xFF;
+                                                    memcpy(ackBuffer[iAckWrite]+2, print_buff, 12);
 
-                                                    addRingPointer(iWrite, iRead, MAX_RING);
-
-                                                    /*
-                                                    iWrite++;
-                                                    if(iWrite >= MAX_RING)
-                                                        iWrite=0;
-                                                    */
+                                                    iAckWrite = (iAckWrite + 1) % MAX_ACK_RING;
 
                                                     if(bDisplayInfo)
                                                     {
@@ -750,6 +742,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                     }
 
                                                     unsigned long mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
+
+                                                    if(bLORADEBUG)
+                                                        Serial.printf("[MC-DBG] ACK_FAST_QUEUED msg_ref=%08lX ack_qlen=%d\n", mid, gw_ack_pending + 1);
 
                                                     bool bServerFlag = false;
                                                     if((print_buff[5] & 0x80) == 0x80)
@@ -764,19 +759,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                     print_buff[3]=(msg_counter >> 16) & 0xFF;
                                                     print_buff[4]=(msg_counter >> 24) & 0xFF;
 
-                                                    // Re-check before second GW ACK insertion
-                                                    gw_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
-                                                    if(gw_pending < MAX_RING - 2)
+                                                    // Second GW ACK with new msg_id
+                                                    gw_ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                                                    if(gw_ack_pending < MAX_ACK_RING - 1)
                                                     {
-                                                        memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+                                                        ackBuffer[iAckWrite][0]=12;
+                                                        ackBuffer[iAckWrite][1]=0xFF;
+                                                        memcpy(ackBuffer[iAckWrite]+2, print_buff, 12);
 
-                                                        addRingPointer(iWrite, iRead, MAX_RING);
-
-                                                        /*
-                                                        iWrite++;
-                                                        if(iWrite >= MAX_RING)
-                                                            iWrite=0;
-                                                        */
+                                                        iAckWrite = (iAckWrite + 1) % MAX_ACK_RING;
                                                     }
 
                                                     mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
@@ -1048,6 +1039,105 @@ bool doTX()
         cmd_counter--;
 
         return false;
+    }
+
+    // === ACK Fast-Path: dedicated ackBuffer has highest TX priority ===
+    if (iAckRead != iAckWrite)
+    {
+        sendlng = ackBuffer[iAckRead][0];  // always 12
+        if(sendlng >= UDP_TX_BUF_SIZE)
+            sendlng = UDP_TX_BUF_SIZE - 1;
+
+        memset(lora_tx_buffer, 0x00, UDP_TX_BUF_SIZE + 1);
+        memcpy(lora_tx_buffer, ackBuffer[iAckRead] + 2, sendlng);
+        lora_tx_buffer[sendlng] = 0x00;
+
+        int save_ack_read = iAckRead;
+
+        iAckRead = (iAckRead + 1) % MAX_ACK_RING;
+
+        if (TX_ENABLE == 1)
+        {
+            struct aprsMessage aprsmsg;
+            uint16_t msg_type_b_lora = decodeAPRS(lora_tx_buffer, (uint16_t)sendlng, aprsmsg);
+
+            if(msg_type_b_lora != 0x00)
+            {
+                // CAD: Channel Activity Detection before sending ACK
+                #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
+                {
+                    radio.standby();
+                    delay(3);
+                    radio.clearPacketSentAction();
+                    int cad_result = radio.scanChannel();
+
+                    if(cad_result == RADIOLIB_LORA_DETECTED)
+                    {
+                        delay(1);
+                        cad_result = radio.scanChannel();
+                    }
+
+                    extern void setFlagSent(void);
+                    radio.setPacketSentAction(setFlagSent);
+
+                    if(cad_result == RADIOLIB_LORA_DETECTED)
+                    {
+                        // Channel busy: put ACK back and retry next cycle
+                        iAckRead = save_ack_read;
+
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] ACK_FAST_CAD_BUSY, retry next cycle\n");
+
+                        return false;
+                    }
+                }
+                #else
+                if(tx_waiting)
+                {
+                    tx_waiting = false;
+                }
+                else
+                {
+                    cmd_counter = 3;
+                    iAckRead = save_ack_read;
+                    tx_waiting = true;
+                    return false;
+                }
+                #endif
+
+                tx_waiting = false;
+                tx_is_active = true;
+
+                #if defined BOARD_RAK4630
+                    Radio.Send(lora_tx_buffer, sendlng);
+                #else
+                    #ifndef BOARD_T5_EPAPER
+                    #ifdef RADIO_CTRL
+                        digitalWrite(RADIO_CTRL, LOW);
+                        delay(2);
+                    #endif
+                    #ifdef BOARD_HELTEC_V4
+                    enablePATransmit();
+                    #endif
+
+                    int ack_qlen = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] ACK_FAST_TX len=%d ack_qlen=%d\n", sendlng, ack_qlen);
+
+                    transmissionState = radio.startTransmit(lora_tx_buffer, sendlng);
+                    #endif
+                    bLED_RED = true;
+                #endif
+
+                if(bDisplayInfo)
+                {
+                    printBuffer_ack((char*)"TX-ACK-Fast", lora_tx_buffer, sendlng);
+                    Serial.println("");
+                }
+
+                return true;
+            }
+        }
     }
 
     if (iWrite != iRead && iRead < MAX_RING)

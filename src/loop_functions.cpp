@@ -255,6 +255,11 @@ int iRetransmit=-1;
 // FIX: Per-slot retry counter for retransmit cap
 uint8_t retryCount[MAX_RING] = {0};
 
+// ACK fast-path buffer (priority TX, bypasses main ringBuffer)
+unsigned char ackBuffer[MAX_ACK_RING][14] = {0};  // 12 bytes payload + 2 header
+int iAckWrite = 0;
+int iAckRead = 0;
+
 // RINGBUFFER for incomming LoRa RX msg_id
 uint8_t ringBufferLoraRX[MAX_RING][5] = {0};
 uint8_t loraWrite = 0;   // counter for ringbuffer

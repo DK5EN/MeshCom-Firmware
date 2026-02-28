@@ -162,6 +162,11 @@ extern int iRead;
 extern int iRetransmit;
 extern uint8_t retryCount[MAX_RING];
 
+// ACK fast-path buffer (priority TX)
+extern unsigned char ackBuffer[MAX_ACK_RING][14];
+extern int iAckWrite;
+extern int iAckRead;
+
 extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;
