@@ -65,8 +65,7 @@ void initDisplay()
     }
 
     u8g2->begin();
-
-    u8g2->setContrast(meshcom_settings.node_contrast);
+    u8g2->setContrast(255);  // Default to maximum brightness
 
 #endif
 
