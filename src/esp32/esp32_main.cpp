@@ -382,6 +382,22 @@ LLCC68 radio = new Module(LORA_CS, LORA_DIO0, LORA_RST, LORA_DIO1);
 
 #endif
 
+// Unified DIO1/IRQ pin definition for all board variants.
+// Used for DIO1 pin polling to detect stuck-HIGH interrupts (Semtech LoRaMac-node #1060).
+#if defined(SX127X) || defined(BOARD_E220)
+  #define LORA_IRQ_PIN LORA_DIO0
+#elif defined(SX1262X) || defined(SX1262_V3) || defined(SX1262_V4)
+  #define LORA_IRQ_PIN SX1262X_IRQ
+#elif defined(SX126X)
+  #define LORA_IRQ_PIN SX1268_IRQ
+#elif defined(SX1262_E22) || defined(SX1268_E22)
+  #define LORA_IRQ_PIN SX126x_IRQ
+#elif defined(USING_SX1262)
+  #define LORA_IRQ_PIN RADIO_DIO1_PIN
+#elif defined(SX1262_E290)
+  #define LORA_IRQ_PIN PIN_LORA_DIO_1
+#endif
+
 // Lora callback Function declarations
 int checkRX(bool bRadio);
 
@@ -468,11 +484,25 @@ int transitionTo(LoRaState newState)
         case LORA_RX_LISTEN:
             // Optimized order: enable gate BEFORE startReceive to minimize blind window
             bEnableInterruptTransmit = false;
-            radio.clearPacketSentAction();
-            radio.clearPacketReceivedAction();
+            // FIX: Skip detach/reattach cycle for DIO1 interrupt.
+            // setPacketReceivedAction() calls attachInterrupt() which atomically
+            // replaces any existing handler (including the TX sent handler).
+            // The previous clear+set pattern called detachInterrupt() first,
+            // creating a race window where DIO1 rising edges were lost.
             radio.setPacketReceivedAction(setFlagReceive);
             bEnableInterruptReceive = true;
             rc = radio.startReceive();
+            #ifdef LORA_IRQ_PIN
+            // FIX: Poll DIO1 pin after startReceive() to catch lost edge interrupts.
+            // If DIO1 is already HIGH, a radio event occurred during the transition
+            // but the edge-triggered MCU interrupt missed it (Semtech LoRaMac-node #1060).
+            if(rc == RADIOLIB_ERR_NONE && digitalRead(LORA_IRQ_PIN) == HIGH)
+            {
+                receiveFlag = true;
+                if(bLORADEBUG)
+                    Serial.println(F("[MC-DBG] DIO1_POLL_RESCUE: DIO1 HIGH after startReceive"));
+            }
+            #endif
             is_receiving = false;
             tx_is_active = false;
             break;
@@ -485,7 +515,8 @@ int transitionTo(LoRaState newState)
 
         case LORA_TX_PREPARE:
             bEnableInterruptReceive = false;
-            radio.clearPacketReceivedAction();
+            // FIX: Skip explicit clearPacketReceivedAction() -- setPacketSentAction()
+            // atomically replaces the RX handler via attachInterrupt().
             bEnableInterruptTransmit = true;
             radio.setPacketSentAction(setFlagSent);
             tx_waiting = true;
@@ -1794,6 +1825,21 @@ void esp32loop()
                     queued, pending, retrying, done, iWrite, iRead);
             }
         }
+
+        // FIX: DIO1 stuck-HIGH recovery (Semtech LoRaMac-node #1060).
+        // If DIO1 is HIGH but receiveFlag was not set, the edge-triggered MCU
+        // interrupt missed the rising edge. This happens when DIO1 goes HIGH
+        // during a brief window where the ISR was being reconfigured.
+        // Cost: one GPIO read per loop iteration (~100ns on ESP32).
+        #ifdef LORA_IRQ_PIN
+        if(loraState == LORA_RX_LISTEN && !receiveFlag && !transmittedFlag
+           && digitalRead(LORA_IRQ_PIN) == HIGH)
+        {
+            receiveFlag = true;
+            if(bLORADEBUG)
+                Serial.println(F("[MC-DBG] DIO1_STUCK_HIGH_RESCUE: DIO1 HIGH but no receiveFlag"));
+        }
+        #endif
 
         if(iReceiveTimeOutTime > 0)
         {
