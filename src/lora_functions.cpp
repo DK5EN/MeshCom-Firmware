@@ -1195,11 +1195,26 @@ bool doTX()
                         // standby() required: scanChannel() calls getPacketType() via SPI
                         // which returns 0xFF if radio is in active RX mode (RADIOLIB_LORA_DETECTED false positive)
                         radio.standby();
-                        delay(2);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
+                        delay(3);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
                         // scanChannel() triggers DIO1 on completion — temporarily
                         // clear the TX-done handler to prevent spurious transmittedFlag
                         radio.clearPacketSentAction();
                         int cad_result = radio.scanChannel();
+
+                        // Double-scan: if first scan reports busy, verify with a second scan.
+                        // SX1262 SPI reads after RX->STANDBY can return stale IRQ flags,
+                        // causing false RADIOLIB_LORA_DETECTED (-702). A genuine signal
+                        // will trigger both scans; a false positive from SPI settling typically
+                        // clears on the second read.
+                        if(cad_result == RADIOLIB_LORA_DETECTED)
+                        {
+                            delay(1);
+                            cad_result = radio.scanChannel();
+
+                            if(bLORADEBUG && cad_result != RADIOLIB_LORA_DETECTED)
+                                Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE: 1st=-702, 2nd=free"));
+                        }
+
                         extern void setFlagSent(void);
                         radio.setPacketSentAction(setFlagSent);
 
@@ -1210,8 +1225,8 @@ bool doTX()
                         if(cad_result == RADIOLIB_LORA_DETECTED
                            && cad_retries < MAX_CAD_WAIT)
                         {
-                            // Kanal belegt: zufaelliger Backoff 1-5 Iterationen (2-10s)
-                            cad_backoff = 1 + (int)(esp_random() % 5);
+                            // Kanal belegt (doppelt bestätigt): Backoff 1-2 Iterationen
+                            cad_backoff = 1 + (int)(esp_random() % 2);
                             cad_retries++;
 
                             if(bLORADEBUG)
