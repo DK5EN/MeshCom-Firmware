@@ -1985,6 +1985,17 @@ void esp32loop()
             }
         }
 
+        // ACK fast-path: bypass RX timeout when ACKs are pending
+        if(iReceiveTimeOutTime != 0 && loraState == LORA_RX_LISTEN && iAckRead != iAckWrite)
+        {
+            if(bLORADEBUG)
+            {
+                int aq = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                Serial.printf("[MC-DBG] ACK_FAST_TRIGGER ack_qlen=%d\n", aq);
+            }
+            iReceiveTimeOutTime = 0;
+        }
+
         // Check transmit now
         if(iReceiveTimeOutTime == 0 && loraState == LORA_RX_LISTEN)
         {

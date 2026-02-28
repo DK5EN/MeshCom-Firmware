@@ -172,6 +172,23 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     }
                                 
                     own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
+
+                    // Cancel pending retransmit for this msg_id
+                    for(int irc = 0; irc < MAX_RING; irc++)
+                    {
+                        if(ringBuffer[irc][0] > 0 && ringBuffer[irc][1] != 0xFF)
+                        {
+                            unsigned int ring_msg_id = (ringBuffer[irc][6]<<24) | (ringBuffer[irc][5]<<16) | (ringBuffer[irc][4]<<8) | ringBuffer[irc][3];
+                            if(ring_msg_id == msg_id)
+                            {
+                                ringBuffer[irc][0] = 0;
+                                ringBuffer[irc][1] = 0xFF;
+                                retryCount[irc] = 0;
+                                if(bLORADEBUG)
+                                    Serial.printf("[MC-DBG] ACK_CANCEL_RETRANSMIT slot=%d msg_id=%08X\n", irc, msg_id);
+                            }
+                        }
+                    }
                 }
             }
             else
@@ -1142,6 +1159,19 @@ bool doTX()
 
     if (iWrite != iRead && iRead < MAX_RING)
     {
+        // Skip cleared slots (duplicate detection may have released the entry)
+        if(ringBuffer[iRead][0] == 0)
+        {
+            if(bLORADEBUG)
+                Serial.printf("[MC-DBG] SLOT_SKIP iRead=%d (cleared)\n", iRead);
+            ringBuffer[iRead][1] = 0xFF;
+            retryCount[iRead] = 0;
+            iRead++;
+            if(iRead >= MAX_RING)
+                iRead = 0;
+            return false;  // retry immediately on next cycle
+        }
+
         sendlng = ringBuffer[iRead][0];
         if(sendlng >= UDP_TX_BUF_SIZE)
             sendlng = UDP_TX_BUF_SIZE - 1;
