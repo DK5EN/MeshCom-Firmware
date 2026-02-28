@@ -2042,6 +2042,17 @@ void esp32loop()
                 }
             }
         }
+
+        // FIX C: Re-arm the software timeout if still disabled after TX gate check.
+        // Without this, when the timeout fires and no TX is pending, iReceiveTimeOutTime
+        // stays 0 permanently — the 4.5s periodic radio restart stops, and the radio
+        // has no health monitoring until a packet happens to arrive.
+        // Observed in field: 67-103s gaps with no RX_TIMEOUT_FIRE.
+        if(iReceiveTimeOutTime == 0 && loraState == LORA_RX_LISTEN)
+        {
+            iReceiveTimeOutTime = millis();
+        }
+
     } // bRadio active
 
     #endif
