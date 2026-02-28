@@ -1474,6 +1474,15 @@ void esp32setup()
     }
 
     Serial.println(F("[LoRa]...All settings successfully changed"));
+
+    // FIX: Arm the software timeout after initial startReceive().
+    // Without this, iReceiveTimeOutTime stays 0 from initialization,
+    // the timeout guard (iReceiveTimeOutTime > 0) is always false,
+    // and the periodic RX restart never fires until the first packet
+    // arrives or the first TX completes. On a quiet channel this means
+    // the radio has no health monitoring during the entire initial phase.
+    iReceiveTimeOutTime = millis();
+
     #endif
 
     //#endif
