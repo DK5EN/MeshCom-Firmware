@@ -409,6 +409,7 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
     if (len > 245)
     {
         Serial.printf("[ERR]...BLE out-buffer to long <%i> <%-245.245s>\n", len, buffer);
+        len = 245;  // cap length to prevent buffer overflow
     }
 
     //first two bytes are always the message length
@@ -420,17 +421,7 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
         Serial.printf("<%s> BLEComToPhone RingBuff added len=%i to element: %u\n", buffer, len, ComToPhoneWrite);
     }
 
-    ComToPhoneWrite++;
-    
-    //Serial.printf("toPhoneWrite:%i\n", toPhoneWrite);
-
-    if (ComToPhoneWrite >= MAX_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
-    {
-        if(bBLEDEBUG)
-            Serial.printf("[ERR]...BLEComToPhoneRingBuff overflow! Reset to 0 from %i\n", ComToPhoneWrite);
-
-        ComToPhoneWrite = 0;
-    }
+    addRingPointer(ComToPhoneWrite, ComToPhoneRead, MAX_RING);
 }
 
 void addBLECommandBack(char text[UDP_TX_BUF_SIZE])

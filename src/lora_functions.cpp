@@ -59,6 +59,10 @@
 #include <t5-epaper/t5epaper_main.h>
 #endif
 
+#if defined(ESP32)
+    #include <esp_random.h>
+#endif
+
 #include "lora_functions.h"
 #include "loop_functions.h"
 #include <loop_functions_extern.h>
@@ -177,21 +181,31 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 {
                     print_buff[5]--;
 
-                    ringBuffer[iWrite][0]=12;
-                    ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
-                    memcpy(ringBuffer[iWrite]+2, print_buff, 12);
-
-                    retryCount[iWrite] = 0;
-                    addRingPointer(iWrite, iRead, MAX_RING, "tx");
-                    /*
-                    iWrite++;
-                    if(iWrite >= MAX_RING)
-                        iWrite=0;
-                    */
-
-                    if(bDisplayInfo)
+                    // Pre-check: drop ACK forward if ring buffer is nearly full
+                    int ack_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                    if(ack_pending >= MAX_RING - 2)
                     {
-                        Serial.print(" This packet to mesh");
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] ACK_FWD_DROPPED buffer_full pending=%d\n", ack_pending);
+                    }
+                    else
+                    {
+                        ringBuffer[iWrite][0]=12;
+                        ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
+                        memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+
+                        retryCount[iWrite] = 0;
+                        addRingPointer(iWrite, iRead, MAX_RING);
+                        /*
+                        iWrite++;
+                        if(iWrite >= MAX_RING)
+                            iWrite=0;
+                        */
+
+                        if(bDisplayInfo)
+                        {
+                            Serial.print(" This packet to mesh");
+                        }
                     }
                 }
             }
@@ -707,53 +721,68 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
                                                 print_buff[11]=0x00;     // msg always 0x00 at the end
                                                 
-                                                ringBuffer[iWrite][0]=12;
-                                                ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
-                                                memcpy(ringBuffer[iWrite]+2, print_buff, 12);
-
-                                                addRingPointer(iWrite, iRead, MAX_RING, "tx");
-
-                                                /*
-                                                iWrite++;
-                                                if(iWrite >= MAX_RING)
-                                                    iWrite=0;
-                                                */
-
-                                                if(bDisplayInfo)
+                                                // Pre-check: drop GW ACK if ring buffer is nearly full
+                                                int gw_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                                                if(gw_pending >= MAX_RING - 2)
                                                 {
-                                                    Serial.print(getTimeString());
-                                                    Serial.printf(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
-                                                    bNewLine=true;
+                                                    if(bLORADEBUG)
+                                                        Serial.printf("[MC-DBG] GW_ACK_DROPPED buffer_full pending=%d\n", gw_pending);
                                                 }
-                                                                                            
-                                                unsigned long mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
+                                                else
+                                                {
+                                                    ringBuffer[iWrite][0]=12;
+                                                    ringBuffer[iWrite][1]=0xFF; // retransmission Status ...0xFF no retransmission
+                                                    memcpy(ringBuffer[iWrite]+2, print_buff, 12);
 
-                                                bool bServerFlag = false;
-                                                if((print_buff[5] & 0x80) == 0x80)
-                                                    bServerFlag=true;
+                                                    addRingPointer(iWrite, iRead, MAX_RING);
 
-                                                addLoraRxBuffer(mid, bServerFlag);
+                                                    /*
+                                                    iWrite++;
+                                                    if(iWrite >= MAX_RING)
+                                                        iWrite=0;
+                                                    */
 
-                                                msg_counter=millis();   // ACK mit neuer msg_id versenden
+                                                    if(bDisplayInfo)
+                                                    {
+                                                        Serial.print(getTimeString());
+                                                        Serial.printf(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
+                                                        bNewLine=true;
+                                                    }
 
-                                                print_buff[1]=msg_counter & 0xFF;
-                                                print_buff[2]=(msg_counter >> 8) & 0xFF;
-                                                print_buff[3]=(msg_counter >> 16) & 0xFF;
-                                                print_buff[4]=(msg_counter >> 24) & 0xFF;
+                                                    unsigned long mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
 
-                                                memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+                                                    bool bServerFlag = false;
+                                                    if((print_buff[5] & 0x80) == 0x80)
+                                                        bServerFlag=true;
 
-                                                addRingPointer(iWrite, iRead, MAX_RING, "tx");
+                                                    addLoraRxBuffer(mid, bServerFlag);
 
-                                                /*
-                                                iWrite++;
-                                                if(iWrite >= MAX_RING)
-                                                    iWrite=0;
-                                                */
+                                                    msg_counter=millis();   // ACK mit neuer msg_id versenden
 
-                                                mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
-                                                
-                                                addLoraRxBuffer(mid, bServerFlag);
+                                                    print_buff[1]=msg_counter & 0xFF;
+                                                    print_buff[2]=(msg_counter >> 8) & 0xFF;
+                                                    print_buff[3]=(msg_counter >> 16) & 0xFF;
+                                                    print_buff[4]=(msg_counter >> 24) & 0xFF;
+
+                                                    // Re-check before second GW ACK insertion
+                                                    gw_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                                                    if(gw_pending < MAX_RING - 2)
+                                                    {
+                                                        memcpy(ringBuffer[iWrite]+2, print_buff, 12);
+
+                                                        addRingPointer(iWrite, iRead, MAX_RING);
+
+                                                        /*
+                                                        iWrite++;
+                                                        if(iWrite >= MAX_RING)
+                                                            iWrite=0;
+                                                        */
+                                                    }
+
+                                                    mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
+
+                                                    addLoraRxBuffer(mid, bServerFlag);
+                                                }
                                             }
                                         }
                                     }
@@ -871,24 +900,34 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(size + 2 > UDP_TX_BUF_SIZE)
                                     size = UDP_TX_BUF_SIZE - 2;
 
-                                memset(ringBuffer[iWrite], 0x00, UDP_TX_BUF_SIZE+1);
-
-                                ringBuffer[iWrite][0]=size;
-                                memcpy(ringBuffer[iWrite]+2, RcvBuffer, size);
-
-                                // FIX: Relay messages are fire-and-forget.
-                                // Only the ORIGINATING node should retransmit.
-                                ringBuffer[iWrite][1] = 0xFF; // no retransmission for ANY relay message
-
-                                if(bLORADEBUG)
+                                // Pre-check: drop relay if ring buffer is nearly full (reserve 2 slots for own messages)
+                                int pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                                if(pending >= MAX_RING - 2)
                                 {
-                                    unsigned int relay_msg_id = (ringBuffer[iWrite][6]<<24) | (ringBuffer[iWrite][5]<<16) | (ringBuffer[iWrite][4]<<8) | ringBuffer[iWrite][3];
-                                    Serial.printf("[MC-DBG] RELAY_QUEUED msg_id=%08X type=%02X len=%d\n",
-                                        relay_msg_id, ringBuffer[iWrite][2], size);
+                                    if(bLORADEBUG)
+                                        Serial.printf("[MC-DBG] RELAY_DROPPED buffer_full pending=%d\n", pending);
                                 }
+                                else
+                                {
+                                    memset(ringBuffer[iWrite], 0x00, UDP_TX_BUF_SIZE+1);
 
-                                retryCount[iWrite] = 0;
-                                addRingPointer(iWrite, iRead, MAX_RING, "tx");
+                                    ringBuffer[iWrite][0]=size;
+                                    memcpy(ringBuffer[iWrite]+2, RcvBuffer, size);
+
+                                    // FIX: Relay messages are fire-and-forget.
+                                    // Only the ORIGINATING node should retransmit.
+                                    ringBuffer[iWrite][1] = 0xFF; // no retransmission for ANY relay message
+
+                                    if(bLORADEBUG)
+                                    {
+                                        unsigned int relay_msg_id = (ringBuffer[iWrite][6]<<24) | (ringBuffer[iWrite][5]<<16) | (ringBuffer[iWrite][4]<<8) | ringBuffer[iWrite][3];
+                                        Serial.printf("[MC-DBG] RELAY_QUEUED msg_id=%08X type=%02X len=%d\n",
+                                            relay_msg_id, ringBuffer[iWrite][2], size);
+                                    }
+
+                                    retryCount[iWrite] = 0;
+                                    addRingPointer(iWrite, iRead, MAX_RING);
+                                }
 
                                 /*
                                 iWrite++;
@@ -1135,26 +1174,80 @@ bool doTX()
 
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
+                    // --- CAD: Channel Activity Detection vor dem Senden ---
+                    #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
+                    {
+                        static int cad_backoff = 0;
+                        static int cad_retries = 0;
+
+                        // Backoff-Zaehler: Warte-Iterationen vor naechstem CAD-Scan
+                        if(cad_backoff > 0)
+                        {
+                            cad_backoff--;
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] CAD_BACKOFF remaining=%d\n", cad_backoff);
+                            iRead = save_read;
+                            ringBuffer[iRead][1] = save_ring_status;
+                            return false;
+                        }
+
+                        // Echtes CAD: Kanal pruefen via RadioLib scanChannel()
+                        // standby() required: scanChannel() calls getPacketType() via SPI
+                        // which returns 0xFF if radio is in active RX mode (RADIOLIB_LORA_DETECTED false positive)
+                        radio.standby();
+                        delay(2);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
+                        // scanChannel() triggers DIO1 on completion — temporarily
+                        // clear the TX-done handler to prevent spurious transmittedFlag
+                        radio.clearPacketSentAction();
+                        int cad_result = radio.scanChannel();
+                        extern void setFlagSent(void);
+                        radio.setPacketSentAction(setFlagSent);
+
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] CAD_SCAN result=%d retries=%d\n",
+                                cad_result, cad_retries);
+
+                        if(cad_result == RADIOLIB_LORA_DETECTED
+                           && cad_retries < MAX_CAD_WAIT)
+                        {
+                            // Kanal belegt: zufaelliger Backoff 1-5 Iterationen (2-10s)
+                            cad_backoff = 1 + (int)(esp_random() % 5);
+                            cad_retries++;
+
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] CAD_BUSY backoff=%d retries=%d\n",
+                                    cad_backoff, cad_retries);
+
+                            iRead = save_read;
+                            ringBuffer[iRead][1] = save_ring_status;
+                            return false;
+                        }
+
+                        // Kanal frei oder MAX_CAD_WAIT erreicht: senden
+                        if(bLORADEBUG && cad_retries >= MAX_CAD_WAIT)
+                            Serial.printf("[MC-DBG] CAD_GIVEUP retries=%d, TX forced\n",
+                                cad_retries);
+
+                        cad_retries = 0;
+                        cad_backoff = 0;
+                    }
+                    #else
+                    // Nicht-SX1262 Boards: bestehende Logik beibehalten
                     if(tx_waiting)
                     {
                         tx_waiting=false;
                     }
                     else
                     {
-                        //vor jeden senden CAD abwarten
-                        //if(aprsmsg.msg_payload.indexOf(":ack") > 0)
-                        {
-                            cmd_counter=3;    // FIX BUG #4: Reduced from 7 — blind delay, not real CAD
-
-                            iRead=save_read;
-                            ringBuffer[iRead][1] = save_ring_status;
-
-                            tx_waiting=true;
-                            
-                            return false;
-                        }
+                        cmd_counter=3;
+                        iRead=save_read;
+                        ringBuffer[iRead][1] = save_ring_status;
+                        tx_waiting=true;
+                        return false;
                     }
+                    #endif
 
+                    tx_waiting = false;
                     tx_is_active = true;
 
                     // you can transmit C-string or Arduino string up to
@@ -1253,9 +1346,15 @@ bool updateRetransmissionStatus()
         {
             ringBuffer[ircheck][1]++;
 
-            // Fixed-interval retransmit: 40s per retry (20 ticks × 2s)
-            //   Retry 1-3: each waits 40s → total max 120s (2 min)
-            uint8_t threshold = 0x15;
+            // Randomisiertes Retransmit-Intervall: Basis 34s +/- 10s Jitter
+            // Jitter wird deterministisch aus Message-ID abgeleitet (stabil pro Nachricht,
+            // aber unterschiedlich zwischen Nachrichten/Knoten)
+            // Feldtests zeigen: Nachrichten werden typischerweise nach >20s erfolgreich zugestellt,
+            // daher Minimum 24s (12 Ticks) als untere Grenze.
+            uint8_t msg_hash = ringBuffer[ircheck][3] ^ ringBuffer[ircheck][4]
+                             ^ ringBuffer[ircheck][5] ^ ringBuffer[ircheck][6];
+            int jitter = (int)(msg_hash % 11) - 5;  // -5 bis +5 Ticks = -10s bis +10s
+            uint8_t threshold = (uint8_t)(0x11 + jitter);  // 12-22 Ticks = 24-44s
 
             if(ringBuffer[ircheck][1] == threshold)
             {
@@ -1296,6 +1395,15 @@ bool updateRetransmissionStatus()
                             Serial.printf("%c", ringBuffer[ircheck][iq]);
                     }
                     Serial.println("");
+                }
+
+                // Pre-check: skip retransmit copy if ring buffer is nearly full
+                int rtx_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                if(rtx_pending >= MAX_RING - 2)
+                {
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] RETRANSMIT_DROPPED buffer_full pending=%d\n", rtx_pending);
+                    return false;
                 }
 
                 // Mark original as done
