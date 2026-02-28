@@ -1356,13 +1356,15 @@ bool updateRetransmissionStatus()
             int jitter = (int)(msg_hash % 11) - 5;  // -5 bis +5 Ticks = -10s bis +10s
             uint8_t threshold = (uint8_t)(0x11 + jitter);  // 12-22 Ticks = 24-44s
 
-            if(ringBuffer[ircheck][1] == threshold)
+            if(ringBuffer[ircheck][1] >= threshold)
             {
                 // Check retry cap
                 if(retryCount[ircheck] >= MAX_RETRANSMIT)
                 {
-                    // Give up — max retries exhausted
+                    // Give up — max retries exhausted, release slot completely
+                    ringBuffer[ircheck][0] = 0;
                     ringBuffer[ircheck][1] = 0xFF;
+                    retryCount[ircheck] = 0;
 
                     if(bLORADEBUG)
                     {
@@ -1401,6 +1403,11 @@ bool updateRetransmissionStatus()
                 int rtx_pending = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
                 if(rtx_pending >= MAX_RING - 2)
                 {
+                    // Release slot to prevent zombie — buffer too full for retransmit
+                    ringBuffer[ircheck][0] = 0;
+                    ringBuffer[ircheck][1] = 0xFF;
+                    retryCount[ircheck] = 0;
+
                     if(bLORADEBUG)
                         Serial.printf("[MC-DBG] RETRANSMIT_DROPPED buffer_full pending=%d\n", rtx_pending);
                     return false;
