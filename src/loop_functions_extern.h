@@ -155,6 +155,9 @@ extern float BATTexp12;
 extern float BATexp12pre;
 extern float BATexp2;
 
+// CSMA: Channel utilization for adaptive backoff
+extern uint8_t channel_util_percent;
+
 // RINGBUFFER for incoming UDP lora packets for lora TX
 extern unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5];
 extern int iWrite;

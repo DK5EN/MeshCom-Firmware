@@ -412,6 +412,15 @@ volatile bool bEnableInterruptReceive = true;
 unsigned long iReceiveTimeOutTime = 0;
 unsigned long inoReceiveTimeOutTime = 0;
 
+// CSMA: Airtime tracker for channel utilization measurement
+uint32_t airtime_rx_us = 0;        // accumulated RX airtime in current window (microseconds)
+uint32_t airtime_tx_us = 0;        // accumulated TX airtime in current window (microseconds)
+unsigned long airtime_decay_timer = 0;  // last decay timestamp
+uint8_t channel_util_percent = 0;  // current channel utilization 0-100%
+
+// CSMA: Randomized TX jitter to desynchronize nodes (0-2000ms added to RECEIVE_TIMEOUT)
+uint16_t rx_timeout_jitter = 0;
+
 // flag to indicate if we are currently allowed to transmittig
 volatile bool transmittedFlag = false;
 volatile bool bEnableInterruptTransmit = false;
@@ -1805,17 +1814,37 @@ void esp32loop()
             }
         }
 
-        if(!bGATEWAY)
+        // Retransmit timer runs on ALL nodes (including gateways).
+        // Gateways also send own text messages that need ACK tracking.
+        // Previously gated by !bGATEWAY, which caused zombie slots on gateways.
+        if ((retransmit_timer + (1000 * 2)) < millis())   // repeat 2 seconds
         {
-            if ((retransmit_timer + (1000 * 2)) < millis())   // repeat 2 seconds
-            {
-                updateRetransmissionStatus();
+            updateRetransmissionStatus();
 
-                retransmit_timer = millis();
-            }
+            retransmit_timer = millis();
         }
 
-        // FIX: Periodic ring buffer utilization report (every 30s)
+        // CSMA: Airtime decay and channel utilization update (every 10s)
+        if((millis() - airtime_decay_timer) > 10000)
+        {
+            // Calculate utilization before decay: airtime accumulated over ~20s effective window
+            // (due to exponential half-life of 10s, effective window is ~20s)
+            uint32_t total_airtime = airtime_rx_us + airtime_tx_us;
+            uint32_t util = total_airtime / 200000UL;
+            channel_util_percent = (util > 100) ? 100 : (uint8_t)util;
+            // 200000 = 20s * 1000000us / 100 → gives percentage
+
+            if(bLORADEBUG)
+                Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%ums tx=%ums util=%u%%\n",
+                    airtime_rx_us / 1000, airtime_tx_us / 1000, channel_util_percent);
+
+            // Exponential decay: halve accumulators
+            airtime_rx_us /= 2;
+            airtime_tx_us /= 2;
+            airtime_decay_timer = millis();
+        }
+
+        // Periodic ring buffer utilization report (every 30s)
         {
             static unsigned long ring_status_timer = 0;
             if(bLORADEBUG && (millis() - ring_status_timer) > 30000)
@@ -1852,13 +1881,16 @@ void esp32loop()
 
         if(iReceiveTimeOutTime > 0)
         {
-            // Timeout RECEIVE_TIMEOUT
-            if((iReceiveTimeOutTime + RECEIVE_TIMEOUT) < millis())
+            // Timeout RECEIVE_TIMEOUT + random jitter (4.5-6.5s) to desynchronize nodes
+            if((iReceiveTimeOutTime + RECEIVE_TIMEOUT + rx_timeout_jitter) < millis())
             {
                 // Debug A: RX_TIMEOUT_FIRE
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu\n",
-                        millis(), iReceiveTimeOutTime, millis() - iReceiveTimeOutTime);
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu jitter=%u\n",
+                        millis(), iReceiveTimeOutTime, millis() - iReceiveTimeOutTime, rx_timeout_jitter);
+
+                // Roll new jitter for next cycle
+                rx_timeout_jitter = esp_random() % 2001;  // 0-2000ms
 
                 // FIX BUG #1: Do not reset radio if a received packet is pending
                 if(receiveFlag)
@@ -1875,23 +1907,40 @@ void esp32loop()
                 }
                 else
                 {
-                    iReceiveTimeOutTime=0;
+                    // FIX 1: Check if SX1262 is mid-reception before restarting.
+                    // getIrqFlags() reads the IRQ register via SPI without side effects.
+                    uint32_t irqFlags = radio.getIrqFlags();
+                    bool rxInProgress = (irqFlags & (RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED
+                                                   | RADIOLIB_SX126X_IRQ_HEADER_VALID)) != 0;
 
-                    int state = transitionTo(LORA_RX_LISTEN);
-
-                    // Debug B: RX_RESTART after timeout
-                    if(bLORADEBUG)
-                        Serial.printf("[MC-DBG] RX_RESTART src=timeout state=%d\n", state);
-
-                    if(bLORADEBUG)
+                    if(rxInProgress)
                     {
-                        Serial.print(getTimeString());
-                        if (state == RADIOLIB_ERR_NONE)
-                            Serial.println(F(" [LoRa]...Receive Timeout, startReceive again with sucess"));
-                        else
+                        // A packet is being received right now -- don't abort it.
+                        iReceiveTimeOutTime = millis();
+
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED: irqFlags=0x%04X (rx in progress)\n", irqFlags);
+                    }
+                    else
+                    {
+                        iReceiveTimeOutTime=0;
+
+                        int state = transitionTo(LORA_RX_LISTEN);
+
+                        // Debug B: RX_RESTART after timeout
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] RX_RESTART src=timeout state=%d\n", state);
+
+                        if(bLORADEBUG)
                         {
-                            Serial.print(F(" [LoRa]...Receive Timeout, startReceive again with error = "));
-                            Serial.println(state);
+                            Serial.print(getTimeString());
+                            if (state == RADIOLIB_ERR_NONE)
+                                Serial.println(F(" [LoRa]...Receive Timeout, startReceive again with sucess"));
+                            else
+                            {
+                                Serial.print(F(" [LoRa]...Receive Timeout, startReceive again with error = "));
+                                Serial.println(state);
+                            }
                         }
                     }
                 }
@@ -1922,6 +1971,13 @@ void esp32loop()
             else
             if(transmittedFlag)
             {
+                // CSMA: Track TX airtime for channel utilization
+                {
+                    extern int sendlng;
+                    if(sendlng > 0)
+                        airtime_tx_us += radio.getTimeOnAir(sendlng);
+                }
+
                 transitionTo(LORA_TX_DONE);
 
                 // Debug G: TX_DONE
@@ -3078,6 +3134,9 @@ int checkRX(bool bRadio)
 
     if (state == RADIOLIB_ERR_LORA_HEADER_DAMAGED || state == RADIOLIB_ERR_NONE)
     {
+        // CSMA: Track RX airtime for channel utilization
+        airtime_rx_us += radio.getTimeOnAir(ibytes);
+
         // FIX BUG #2: Save RSSI/SNR/FreqError BEFORE restarting RX.
         // These read from SX1262 hardware registers via SPI and would be
         // invalidated once startReceive() transitions the radio to standby+RX.

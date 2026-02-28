@@ -1182,7 +1182,7 @@ bool doTX()
         lora_tx_buffer[sendlng]=0x00;
 
         int save_read = iRead;
-        char save_ring_status = ringBuffer[iRead][1];
+        unsigned char save_ring_status = ringBuffer[iRead][1];
 
         if(ringBuffer[iRead][1] == 0x00) // mark open to send
             ringBuffer[iRead][1] = 0x01; // mark as sent
@@ -1315,24 +1315,29 @@ bool doTX()
                         // standby() required: scanChannel() calls getPacketType() via SPI
                         // which returns 0xFF if radio is in active RX mode (RADIOLIB_LORA_DETECTED false positive)
                         radio.standby();
-                        delay(3);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
+                        delay(5);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
                         // scanChannel() triggers DIO1 on completion — temporarily
                         // clear the TX-done handler to prevent spurious transmittedFlag
                         radio.clearPacketSentAction();
                         int cad_result = radio.scanChannel();
 
-                        // Double-scan: if first scan reports busy, verify with a second scan.
-                        // SX1262 SPI reads after RX->STANDBY can return stale IRQ flags,
-                        // causing false RADIOLIB_LORA_DETECTED (-702). A genuine signal
-                        // will trigger both scans; a false positive from SPI settling typically
-                        // clears on the second read.
+                        // Triple-scan: SX1262 SPI reads after RX->STANDBY return stale IRQ flags,
+                        // causing false RADIOLIB_LORA_DETECTED (-702). Field tests show 55-100%
+                        // false positive rate on first scan. Require 2 consecutive busy results
+                        // to confirm genuine channel activity.
                         if(cad_result == RADIOLIB_LORA_DETECTED)
                         {
-                            delay(1);
+                            delay(3);
                             cad_result = radio.scanChannel();
 
+                            if(cad_result == RADIOLIB_LORA_DETECTED)
+                            {
+                                delay(3);
+                                cad_result = radio.scanChannel();
+                            }
+
                             if(bLORADEBUG && cad_result != RADIOLIB_LORA_DETECTED)
-                                Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE: 1st=-702, 2nd=free"));
+                                Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE"));
                         }
 
                         extern void setFlagSent(void);
@@ -1345,13 +1350,15 @@ bool doTX()
                         if(cad_result == RADIOLIB_LORA_DETECTED
                            && cad_retries < MAX_CAD_WAIT)
                         {
-                            // Kanal belegt (doppelt bestätigt): Backoff 1-2 Iterationen
-                            cad_backoff = 1 + (int)(esp_random() % 2);
+                            // CSMA: Scale backoff with channel utilization
+                            // Low util (0-20%): backoff=1, High util (80-100%): backoff=1..5
+                            uint8_t cw = 1 + (channel_util_percent / 25);  // 1..5
+                            cad_backoff = 1 + (esp_random() % cw);
                             cad_retries++;
 
                             if(bLORADEBUG)
-                                Serial.printf("[MC-DBG] CAD_BUSY backoff=%d retries=%d\n",
-                                    cad_backoff, cad_retries);
+                                Serial.printf("[MC-DBG] CAD_BUSY backoff=%d retries=%d util=%u%% cw=%u\n",
+                                    cad_backoff, cad_retries, channel_util_percent, cw);
 
                             iRead = save_read;
                             ringBuffer[iRead][1] = save_ring_status;
@@ -1476,6 +1483,14 @@ bool updateRetransmissionStatus()
         }
 
         int size = ringBuffer[ircheck][0];
+
+        // Diagnostic: log every retrying slot so we can trace zombie root cause
+        if(bLORADEBUG && size > 0 && ringBuffer[ircheck][1] != 0x00 && ringBuffer[ircheck][1] != 0xFF)
+        {
+            unsigned int diag_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
+            Serial.printf("[MC-DBG] RETX_TICK slot=%d status=%02X type=%02X size=%d retry=%d msg_id=%08X\n",
+                ircheck, ringBuffer[ircheck][1], ringBuffer[ircheck][2], size, retryCount[ircheck], diag_msg_id);
+        }
 
         if(size > 0 && ringBuffer[ircheck][1] != 0x00 && ringBuffer[ircheck][1] != 0xFF)
         {
