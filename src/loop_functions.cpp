@@ -3070,8 +3070,10 @@ void sendHey()
         Serial.println();
     }
 
-    // store last message to compare later on
-    insertOwnTx(aprsmsg.msg_id);
+    // HEY is fire-and-forget (broadcast discovery) — no ACK expected.
+    // Do NOT call insertOwnTx() here: it would occupy an own_msg_id slot
+    // that never gets cleared (HEARD path is text-only 0x3A), causing a
+    // persistent retrying=1 zombie in RING_STATUS.
 
     if(bGATEWAY)
     {

@@ -37,6 +37,12 @@ RE_UDP_RESET = re.compile(r"resetMeshComUDP")
 RE_RING_STATUS = re.compile(
     r"\[MC-DBG\]\s+RING_STATUS\s+queued=(\d+)\s+pending=(\d+)\s+retrying=(\d+)\s+done=(\d+)"
 )
+# RING_OVERFLOW buf=raw_rx is a normal cyclical buffer for the web UI — not a
+# real overflow.  The firmware reuses the oldest slot when the ring is full,
+# so no data is lost that matters for RF operation.  We silently count these
+# but never alert on them.  Other buffer names (if they ever appear) still
+# trigger an alert.
+RE_RING_OVERFLOW = re.compile(r"\[MC-DBG\]\s+RING_OVERFLOW\s+buf=(\w+)")
 RE_WATCHDOG = re.compile(r"\[MC-DBG\]\s+WATCHDOG_RECOVERY")
 
 SIMPLE_COUNTERS = {
@@ -233,6 +239,16 @@ class Monitor:
                 self.ring_zombie_streak = 0
             return
 
+        # RING_OVERFLOW — silence raw_rx (web-UI cyclical buffer), alert others
+        m = RE_RING_OVERFLOW.search(line)
+        if m:
+            buf_name = m.group(1)
+            self.counters[f"ring_overflow_{buf_name}"] += 1
+            self.total[f"ring_overflow_{buf_name}"] += 1
+            if buf_name != "raw_rx":
+                self._alert(f"RING_OVERFLOW buf={buf_name}")
+            return
+
         # Watchdog recovery detection
         if RE_WATCHDOG.search(line):
             self.watchdog_recoveries_interval += 1
@@ -361,6 +377,10 @@ class Monitor:
                 f"{'=' * 60}\n"
             )
             # totals line
+            # ring overflow counts (raw_rx is benign web-UI buffer cycling)
+            raw_rx_overflow = self.counters.get("ring_overflow_raw_rx", 0)
+            raw_rx_overflow_total = self.total.get("ring_overflow_raw_rx", 0)
+
             summary += (
                 f"  TOTALS: RX={self.total['rx_packets']} "
                 f"TX={self.total['tx_packets']} "
@@ -369,6 +389,8 @@ class Monitor:
                 f"RadioSilent={self.total['radio_silent']} "
                 f"(max gap: {self.max_radio_gap_total:.0f}s) "
                 f"Watchdog={self.total['watchdog_recoveries']}\n"
+                f"  WebUI ring cycles: {raw_rx_overflow} this interval, "
+                f"{raw_rx_overflow_total} total (normal — not a real overflow)\n"
             )
 
             print(summary, flush=True)
