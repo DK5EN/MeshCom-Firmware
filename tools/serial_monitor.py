@@ -14,7 +14,7 @@ import argparse
 import os
 import re
 import signal
-import sys
+import termios
 import threading
 import time
 from collections import defaultdict
@@ -43,7 +43,14 @@ RE_RING_STATUS = re.compile(
 # but never alert on them.  Other buffer names (if they ever appear) still
 # trigger an alert.
 RE_RING_OVERFLOW = re.compile(r"\[MC-DBG\]\s+RING_OVERFLOW\s+buf=(\w+)")
-RE_WATCHDOG = re.compile(r"\[MC-DBG\]\s+WATCHDOG_RECOVERY")
+RE_CHANNEL_UTIL = re.compile(
+    r"\[MC-DBG\]\s+CHANNEL_UTIL\s+rx=(\d+)ms\s+tx=(\d+)ms\s+util=(\d+)%"
+)
+RE_RX_TIMEOUT_FIRE = re.compile(
+    r"RX_TIMEOUT_FIRE.*?wait=(\d+(?:\.\d+)?).*?util=(\d+)"
+)
+RE_CAD_FALSE_POSITIVE = re.compile(r"\[MC-DBG\]\s+CAD_FALSE_POSITIVE")
+RE_RX_TIMEOUT_DEFERRED = re.compile(r"\[MC-DBG\]\s+RX_TIMEOUT_DEFERRED")
 
 SIMPLE_COUNTERS = {
     "OnRxDone": "rx_packets",
@@ -58,8 +65,8 @@ STUCK_STATE_SECONDS = 30
 NO_TRANSITION_SECONDS = 30
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
-RX_RESTART_PER_MIN_THRESHOLD = 30
-RADIO_SILENT_THRESHOLD = 30  # seconds without RX_TIMEOUT_FIRE = radio freeze
+RX_RESTART_PER_MIN_THRESHOLD = 60  # adaptive wait 2-3s at idle → ~50/min normal
+RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
 RING_ZOMBIE_CONSECUTIVE = 3  # consecutive RING_STATUS with retrying>0, queued==0
 
 LORA_STATES = [
@@ -107,8 +114,13 @@ class Monitor:
         self.ring_last_done: int = 0
         self.ring_zombie_streak: int = 0  # consecutive reports with retrying>0, queued==0
 
-        # Watchdog recovery tracking
-        self.watchdog_recoveries_interval: int = 0
+        # CSMA / adaptive wait tracking
+        self.last_channel_util: int | None = None  # last reported util%
+        self.channel_util_samples: list[int] = []  # all util% values this interval
+        self.channel_rx_ms_total: int = 0  # cumulative rx airtime this interval
+        self.channel_tx_ms_total: int = 0  # cumulative tx airtime this interval
+        self.adaptive_wait_min: float | None = None  # per interval
+        self.adaptive_wait_max: float | None = None  # per interval
 
         # No-transition silence tracking (for resolved alerts)
         self.radio_was_silent = False
@@ -249,16 +261,41 @@ class Monitor:
                 self._alert(f"RING_OVERFLOW buf={buf_name}")
             return
 
-        # Watchdog recovery detection
-        if RE_WATCHDOG.search(line):
-            self.watchdog_recoveries_interval += 1
-            self.counters["watchdog_recoveries"] += 1
-            self.total["watchdog_recoveries"] += 1
-            self._alert("WATCHDOG_RECOVERY — radio re-initialized after silence")
+        # CHANNEL_UTIL periodic report (every 10s from firmware)
+        m = RE_CHANNEL_UTIL.search(line)
+        if m:
+            rx_ms, tx_ms, util_pct = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            self.last_channel_util = util_pct
+            self.channel_util_samples.append(util_pct)
+            self.channel_rx_ms_total += rx_ms
+            self.channel_tx_ms_total += tx_ms
+            self.counters["channel_util_reports"] += 1
+            self.total["channel_util_reports"] += 1
+            return
+
+        # CAD_FALSE_POSITIVE (double-scan filter catching stale SPI reads)
+        if RE_CAD_FALSE_POSITIVE.search(line):
+            self.counters["cad_false_pos_filtered"] += 1
+            self.total["cad_false_pos_filtered"] += 1
+            return
+
+        # RX_TIMEOUT_DEFERRED (IRQ guard saves a packet)
+        if RE_RX_TIMEOUT_DEFERRED.search(line):
+            self.counters["rx_timeout_deferred"] += 1
+            self.total["rx_timeout_deferred"] += 1
             return
 
         # RX restart (startReceive again) and RX_TIMEOUT_FIRE gap tracking
         if "startReceive again" in line or "RX_TIMEOUT_FIRE" in line:
+            # Parse adaptive wait fields from RX_TIMEOUT_FIRE
+            m_fire = RE_RX_TIMEOUT_FIRE.search(line)
+            if m_fire:
+                wait_val = float(m_fire.group(1))
+                if self.adaptive_wait_min is None or wait_val < self.adaptive_wait_min:
+                    self.adaptive_wait_min = wait_val
+                if self.adaptive_wait_max is None or wait_val > self.adaptive_wait_max:
+                    self.adaptive_wait_max = wait_val
+
             # Radio silent gap detection (only on RX_TIMEOUT_FIRE)
             if "RX_TIMEOUT_FIRE" in line:
                 if self.last_rx_timeout_fire is not None:
@@ -353,6 +390,30 @@ class Monitor:
 
             alert_str = "none" if not self.alerts else f"{len(self.alerts)} (see above)"
 
+            # channel utilization stats
+            if self.channel_util_samples:
+                samples = self.channel_util_samples
+                util_min = min(samples)
+                util_max = max(samples)
+                util_avg = sum(samples) / len(samples)
+                util_str = f"min={util_min}% avg={util_avg:.0f}% max={util_max}%"
+                airtime_str = (
+                    f"rx={self.channel_rx_ms_total}ms "
+                    f"tx={self.channel_tx_ms_total}ms "
+                    f"({len(samples)} samples)"
+                )
+            else:
+                util_str = "no data yet"
+                airtime_str = ""
+
+            # adaptive wait info
+            if self.adaptive_wait_min is not None:
+                wait_str = f"{self.adaptive_wait_min:.1f}-{self.adaptive_wait_max:.1f}s"
+            else:
+                wait_str = "no data yet"
+            deferred = self.counters.get("rx_timeout_deferred", 0)
+            cad_fp_filtered = self.counters.get("cad_false_pos_filtered", 0)
+
             summary = (
                 f"\n{'=' * 60}\n"
                 f"SUMMARY {t_start:%H:%M}-{t_end:%H:%M} "
@@ -366,10 +427,14 @@ class Monitor:
                 f"State: {state_str or 'no transitions'}\n"
                 f"Drops: {drops} | "
                 f"CAD false pos: {self.counters.get('cad_false_pos', 0)} | "
+                f"CAD filtered: {cad_fp_filtered} | "
                 f"Retransmit fails: {self.counters.get('retransmit_fails', 0)}\n"
                 f"Radio: {self.radio_silent_events_interval} silent events "
                 f"(max gap: {self.max_radio_gap:.0f}s) | "
-                f"Watchdog: {self.watchdog_recoveries_interval} recoveries\n"
+                f"Deferred: {deferred}\n"
+                f"Channel: {util_str}\n"
+                + (f"  Airtime: {airtime_str}\n" if airtime_str else "")
+                + f"Adaptive wait: {wait_str}\n"
                 f"Ring:  queued={self.ring_last_queued} retrying={self.ring_last_retrying} "
                 f"done={self.ring_last_done} (last seen)\n"
                 f"WiFi: {wifi_str} | UDP: {udp_str}\n"
@@ -388,7 +453,7 @@ class Monitor:
                 f"Drops={sum(v for k, v in self.total.items() if k.startswith('drop_'))} "
                 f"RadioSilent={self.total['radio_silent']} "
                 f"(max gap: {self.max_radio_gap_total:.0f}s) "
-                f"Watchdog={self.total['watchdog_recoveries']}\n"
+                f"Deferred={self.total['rx_timeout_deferred']}\n"
                 f"  WebUI ring cycles: {raw_rx_overflow} this interval, "
                 f"{raw_rx_overflow_total} total (normal — not a real overflow)\n"
             )
@@ -403,7 +468,11 @@ class Monitor:
             self.udp_resets_interval = 0
             self.radio_silent_events_interval = 0
             self.max_radio_gap = 0.0
-            self.watchdog_recoveries_interval = 0
+            self.channel_util_samples = []
+            self.channel_rx_ms_total = 0
+            self.channel_tx_ms_total = 0
+            self.adaptive_wait_min = None
+            self.adaptive_wait_max = None
             self.interval_start = now
 
 
@@ -463,13 +532,16 @@ def main() -> None:
     log_name = f"meshcom_{datetime.now():%Y-%m-%d_%H%M%S}.log"
     log_path = os.path.join(log_dir, log_name)
 
-    print(f"MeshCom Serial Monitor")
+    print("MeshCom Serial Monitor")
     print(f"Port: {args.port} @ {args.baud}")
     print(f"Log:  {log_path}")
     print(f"Summary every {args.interval}s")
-    print(f"Press Ctrl+C to stop\n")
+    print("Press Ctrl+C to stop\n")
 
-    # Open serial with DTR/RTS disabled to avoid hardware reset
+    # Open serial with DTR/RTS disabled to avoid hardware reset.
+    # CP2102 on macOS: the driver toggles DTR/RTS via non-atomic ioctls on open,
+    # which briefly pulls the reset line low even with dtr=False/rts=False.
+    # Clearing HUPCL prevents the modem-hangup reset on close/reopen.
     ser = serial.Serial()
     ser.port = args.port
     ser.baudrate = args.baud
@@ -477,6 +549,11 @@ def main() -> None:
     ser.dtr = False
     ser.rts = False
     ser.open()
+    # Clear HUPCL to prevent reset glitch on subsequent close/reopen
+    attrs = termios.tcgetattr(ser.fd)
+    attrs[2] &= ~termios.HUPCL  # cflag
+    termios.tcsetattr(ser.fd, termios.TCSANOW, attrs)
+    time.sleep(0.5)  # let any glitch-reset recover before reading
 
     monitor = Monitor(summary_interval=args.interval)
     stop_event = threading.Event()
