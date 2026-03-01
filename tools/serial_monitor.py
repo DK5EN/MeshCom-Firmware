@@ -54,6 +54,9 @@ RE_RX_TIMEOUT_FIRE = re.compile(
 )
 RE_CAD_FALSE_POSITIVE = re.compile(r"\[MC-DBG\]\s+CAD_FALSE_POSITIVE")
 RE_RX_TIMEOUT_DEFERRED = re.compile(r"\[MC-DBG\]\s+RX_TIMEOUT_DEFERRED")
+RE_NTP_FAIL = re.compile(r"TimeClient no (?:update|force update) possible")
+RE_NTP_OK = re.compile(r"TimeClient now \(UTC\)")
+RE_HB_TIMEOUT = re.compile(r"\[UDP\] Heartbeat timeout")
 
 SIMPLE_COUNTERS = {
     "OnRxDone": "rx_packets",
@@ -71,6 +74,7 @@ CAD_FALSE_POSITIVE_STREAK = 6
 RX_RESTART_PER_MIN_THRESHOLD = 60  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
 RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
 RING_ZOMBIE_CONSECUTIVE = 5  # consecutive RING_STATUS with retrying>0, queued==0 (150s)
+HB_TIMEOUT_CYCLE_THRESHOLD = 3  # consecutive heartbeat timeouts = server unreachable
 
 LORA_STATES = [
     "IDLE", "RX_LISTEN", "RX_PROCESS", "TX_PREPARE", "TX_ACTIVE", "TX_DONE",
@@ -127,6 +131,14 @@ class Monitor:
 
         # No-transition silence tracking (for resolved alerts)
         self.radio_was_silent = False
+
+        # NTP tracking
+        self.ntp_fails_interval: int = 0
+        self.ntp_last_ok: float | None = None
+
+        # Heartbeat timeout cycle tracking
+        self.hb_timeout_streak: int = 0
+        self.hb_timeout_cycle_alerted: bool = False
 
         # Alerts collected this interval
         self.alerts: list[str] = []
@@ -234,6 +246,46 @@ class Monitor:
             self.counters["udp_resets"] += 1
             self.total["udp_resets"] += 1
             self._alert("UDP RESET detected")
+            return
+
+        # Heartbeat timeout from server — track consecutive cycles
+        if RE_HB_TIMEOUT.search(line):
+            self.hb_timeout_streak += 1
+            self.counters["hb_timeouts"] += 1
+            self.total["hb_timeouts"] += 1
+            if (self.hb_timeout_streak >= HB_TIMEOUT_CYCLE_THRESHOLD
+                    and not self.hb_timeout_cycle_alerted):
+                self._alert(
+                    f"SERVER UNREACHABLE: {self.hb_timeout_streak} consecutive "
+                    f"heartbeat timeouts (~{self.hb_timeout_streak * 90}s)"
+                )
+                self.hb_timeout_cycle_alerted = True
+            return
+
+        # Server responded (RX-UDP = GATE packet from server) — reset HB streak
+        if "RX-UDP" in line:
+            if self.hb_timeout_streak > 0:
+                if self.hb_timeout_cycle_alerted:
+                    self._resolved(
+                        f"Server back after {self.hb_timeout_streak} "
+                        f"heartbeat timeouts (~{self.hb_timeout_streak * 90}s)"
+                    )
+                self.hb_timeout_streak = 0
+                self.hb_timeout_cycle_alerted = False
+            return
+
+        # NTP failure detection
+        if RE_NTP_FAIL.search(line):
+            self.ntp_fails_interval += 1
+            self.counters["ntp_fails"] += 1
+            self.total["ntp_fails"] += 1
+            self._alert(f"NTP FAILURE: {line.strip()}")
+            return
+
+        if RE_NTP_OK.search(line):
+            if self.ntp_fails_interval > 0:
+                self._resolved("NTP recovered")
+            self.ntp_last_ok = now
             return
 
         # RING_STATUS parsing and zombie tracking
@@ -384,9 +436,13 @@ class Monitor:
             # drop summary
             drops = sum(v for k, v in self.counters.items() if k.startswith("drop_"))
 
-            # wifi/udp status
+            # wifi/udp/server status
             wifi_str = "stable" if not self.wifi_events_interval else "EVENTS"
             udp_str = "ok" if self.udp_resets_interval == 0 else f"{self.udp_resets_interval} resets"
+            hb_to = self.counters.get("hb_timeouts", 0)
+            ntp_f = self.ntp_fails_interval
+            server_str = "ok" if hb_to == 0 else f"{hb_to} HB timeouts"
+            ntp_str = "ok" if ntp_f == 0 else f"{ntp_f} failures"
 
             alert_str = "none" if not self.alerts else f"{len(self.alerts)} (see above)"
 
@@ -437,7 +493,8 @@ class Monitor:
                 + f"Adaptive wait: {wait_str}\n"
                 f"Ring:  queued={self.ring_last_queued} retrying={self.ring_last_retrying} "
                 f"done={self.ring_last_done} (last seen)\n"
-                f"WiFi: {wifi_str} | UDP: {udp_str}\n"
+                f"WiFi: {wifi_str} | UDP: {udp_str} | "
+                f"Server: {server_str} | NTP: {ntp_str}\n"
                 f"Alerts: {alert_str}\n"
                 f"{'=' * 60}\n"
             )
@@ -454,6 +511,8 @@ class Monitor:
                 f"RadioSilent={self.total['radio_silent']} "
                 f"(max gap: {self.max_radio_gap_total:.0f}s) "
                 f"Deferred={self.total['rx_timeout_deferred']}\n"
+                f"  HB_Timeouts={self.total['hb_timeouts']} "
+                f"NTP_Fails={self.total['ntp_fails']}\n"
                 f"  WebUI ring cycles: {raw_rx_overflow} this interval, "
                 f"{raw_rx_overflow_total} total (normal — not a real overflow)\n"
             )
@@ -473,6 +532,7 @@ class Monitor:
             self.channel_tx_ms_total = 0
             self.adaptive_wait_min = None
             self.adaptive_wait_max = None
+            self.ntp_fails_interval = 0
             self.interval_start = now
 
 
