@@ -36,7 +36,10 @@
 // Meshcom Params
 #define LONGNAME_MAXLEN 20 // maximum length of the longname
 #define TX_ENABLE 1        // switch to en/disable LoRa TX
-#define MAX_CAD_WAIT 10    // maximum retries on channel free detection when we want to TX lora
+#define NUM_SYM_CAD      2       // CAD symbols for SX126x sub-GHz
+#define CSMA_CW_MIN      3       // Min CW exponent (2^3 = 8 Slots)
+#define CSMA_CW_MAX      8       // Max CW exponent (2^8 = 256 Slots)
+#define CAD_WATCHDOG_MS  30000   // Force TX after 30s (Watchdog)
 #define MAX_CALL_LEN 20     // max length of Callsign
 
 // UDP
@@ -65,18 +68,21 @@
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_LOG 20                         // max count of messages in ringbuffer
 #define MAX_RING_UDP 20                    // size of Ringbuffer for UDP TX messages received from LoRa
+#define MAX_ACK_RING 8                     // size of dedicated ACK fast-path ringbuffer
 #elif defined(ENABLE_SBUFFER)
 #define MAX_MHEARD 5                       // max count of messages in mheard ringbuffer
 #define MAX_MHPATH 5                       // max count of messages in mhpath ringbuffer
 #define MAX_RING 20                        // max count of messages in ringbuffer
 #define MAX_LOG 20                         // max count of messages in ringbuffer
 #define MAX_RING_UDP 20                    // size of Ringbuffer for UDP TX messages received from LoRa
+#define MAX_ACK_RING 8                     // size of dedicated ACK fast-path ringbuffer
 #else
 #define MAX_MHEARD 20                      // max count of messages in mheard ringbuffer
 #define MAX_MHPATH 30                      // max count of messages in mhpath ringbuffer
 #define MAX_RING 30                        // max count of messages in ringbuffer
 #define MAX_LOG 20                         // max count of messages in LOG-ringbuffer
 #define MAX_RING_UDP 20                    // size of Ringbuffer for UDP TX messages received from LoRa
+#define MAX_ACK_RING 8                     // size of dedicated ACK fast-path ringbuffer
 #endif
 
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message

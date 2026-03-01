@@ -1076,13 +1076,25 @@ extern bool btimeClient;
         }
     }
 
+    // ACK fast-path: bypass RX timeout when ACKs are pending
+    if(iReceiveTimeOutTime != 0 && is_receiving == false && tx_is_active == false && iAckRead != iAckWrite)
+    {
+        if(bLORADEBUG)
+        {
+            int aq = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+            Serial.printf("[MC-DBG] ACK_FAST_TRIGGER ack_qlen=%d\n", aq);
+        }
+        iReceiveTimeOutTime = 0;
+    }
+
     if(iReceiveTimeOutTime == 0 && is_receiving == false && tx_is_active == false)
     {
-        if (iWrite != iRead)
+        if (iWrite != iRead || iAckRead != iAckWrite)
         {
             if(bLORADEBUG)
-                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cmd_ctr=%d tx_wait=%d\n",
+                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d ack_qlen=%d cmd_ctr=%d tx_wait=%d\n",
                     (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                    (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite),
                     cmd_counter, tx_waiting);
             doTX();
         }

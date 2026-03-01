@@ -255,6 +255,11 @@ int iRetransmit=-1;
 // FIX: Per-slot retry counter for retransmit cap
 uint8_t retryCount[MAX_RING] = {0};
 
+// ACK fast-path buffer (priority TX, bypasses main ringBuffer)
+unsigned char ackBuffer[MAX_ACK_RING][14] = {0};  // 12 bytes payload + 2 header
+int iAckWrite = 0;
+int iAckRead = 0;
+
 // RINGBUFFER for incomming LoRa RX msg_id
 uint8_t ringBufferLoraRX[MAX_RING][5] = {0};
 uint8_t loraWrite = 0;   // counter for ringbuffer
@@ -409,6 +414,7 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
     if (len > 245)
     {
         Serial.printf("[ERR]...BLE out-buffer to long <%i> <%-245.245s>\n", len, buffer);
+        len = 245;  // cap length to prevent buffer overflow
     }
 
     //first two bytes are always the message length
@@ -420,17 +426,7 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
         Serial.printf("<%s> BLEComToPhone RingBuff added len=%i to element: %u\n", buffer, len, ComToPhoneWrite);
     }
 
-    ComToPhoneWrite++;
-    
-    //Serial.printf("toPhoneWrite:%i\n", toPhoneWrite);
-
-    if (ComToPhoneWrite >= MAX_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
-    {
-        if(bBLEDEBUG)
-            Serial.printf("[ERR]...BLEComToPhoneRingBuff overflow! Reset to 0 from %i\n", ComToPhoneWrite);
-
-        ComToPhoneWrite = 0;
-    }
+    addRingPointer(ComToPhoneWrite, ComToPhoneRead, MAX_RING);
 }
 
 void addBLECommandBack(char text[UDP_TX_BUF_SIZE])
@@ -3074,8 +3070,10 @@ void sendHey()
         Serial.println();
     }
 
-    // store last message to compare later on
-    insertOwnTx(aprsmsg.msg_id);
+    // HEY is fire-and-forget (broadcast discovery) — no ACK expected.
+    // Do NOT call insertOwnTx() here: it would occupy an own_msg_id slot
+    // that never gets cleared (HEARD path is text-only 0x3A), causing a
+    // persistent retrying=1 zombie in RING_STATUS.
 
     if(bGATEWAY)
     {
