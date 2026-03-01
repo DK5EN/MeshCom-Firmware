@@ -470,6 +470,24 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             
                     if(own_msg_id[icheck][4] != 0x02)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
+
+                    // Cancel retransmit — ein anderer Knoten hat die Nachricht bereits relayed,
+                    // Nachbarn haben sie im Dedup-Cache, unser Echo kommt nie zurueck.
+                    for(int irc = 0; irc < MAX_RING; irc++)
+                    {
+                        if(ringBuffer[irc][0] > 0 && ringBuffer[irc][1] != 0xFF)
+                        {
+                            unsigned int ring_msg_id = (ringBuffer[irc][6]<<24) | (ringBuffer[irc][5]<<16) | (ringBuffer[irc][4]<<8) | ringBuffer[irc][3];
+                            if(ring_msg_id == aprsmsg.msg_id)
+                            {
+                                ringBuffer[irc][0] = 0;
+                                ringBuffer[irc][1] = 0xFF;
+                                retryCount[irc] = 0;
+                                if(bLORADEBUG)
+                                    Serial.printf("[MC-DBG] HEARD_CANCEL_RETRANSMIT slot=%d msg_id=%08X\n", irc, aprsmsg.msg_id);
+                            }
+                        }
+                    }
                 }
             }
             else
@@ -1545,6 +1563,7 @@ bool updateRetransmissionStatus()
                 if(retryCount[ircheck] >= MAX_RETRANSMIT)
                 {
                     // Give up — max retries exhausted, release slot completely
+                    int final_retries = retryCount[ircheck];
                     ringBuffer[ircheck][0] = 0;
                     ringBuffer[ircheck][1] = 0xFF;
                     retryCount[ircheck] = 0;
@@ -1553,7 +1572,7 @@ bool updateRetransmissionStatus()
                     {
                         unsigned int ring_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
                         Serial.printf("[MC-DBG] RETRANSMIT_GIVEUP retries=%d msg_id=%08X\n",
-                            retryCount[ircheck], ring_msg_id);
+                            final_retries, ring_msg_id);
                     }
 
                     continue;
