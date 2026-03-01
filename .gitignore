@@ -403,3 +403,12 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Claude Code
+CLAUDE.md
+
+# Local tools and binaries
+safeboot-s3.bin
+tools/build_firmware.sh
+tools/collision_chart.py
+tools/zombie_analysis.py
