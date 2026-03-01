@@ -408,7 +408,7 @@ class Monitor:
 
             # adaptive wait info
             if self.adaptive_wait_min is not None:
-                wait_str = f"{self.adaptive_wait_min:.1f}-{self.adaptive_wait_max:.1f}s"
+                wait_str = f"{self.adaptive_wait_min:.0f}-{self.adaptive_wait_max:.0f}ms"
             else:
                 wait_str = "no data yet"
             deferred = self.counters.get("rx_timeout_deferred", 0)
