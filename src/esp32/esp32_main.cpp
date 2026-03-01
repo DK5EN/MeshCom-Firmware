@@ -190,6 +190,7 @@ String str;
 // Textmessage buffer from phone, hasMsgFromPhone flag indicates new message
 extern char textbuff_phone [MAX_MSG_LEN_PHONE];
 extern uint8_t txt_msg_len_phone;
+extern unsigned long last_upd_timer;
 
 NimBLEServer *pServer = NULL;
 NimBLECharacteristic* pTxCharacteristic;
@@ -208,29 +209,30 @@ const char config_cmds[json_configs_cnt][20] = {"--info", "--seset", "--wifiset"
 uint8_t config_cmds_index = 0;
 uint8_t iPhoneState=0;
 
+// FreeRTOS Queue for BLE data from NimBLE task to Main Loop
+#include "freertos/queue.h"
+
+struct BleQueueItem {
+    uint8_t data[MAX_MSG_LEN_PHONE];
+    size_t length;
+};
+
+static QueueHandle_t bleQueue = NULL;
+static volatile bool connect_pending = false;
+
 // Bluetooth UUIDs are standardized. For more info: https://www.bluetooth.com/specifications/assigned-numbers/
 // Nordic UUID DB is here: https://github.com/NordicSemiconductor/bluetooth-numbers-database
 
 
 class MyServerCallbacks: public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override 
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override
     {
         deviceConnected = true;
         config_to_phone_prepare = true;
-        
-        Serial.printf("BLE Connected with: %s\n", connInfo.getAddress().toString().c_str());
-        /**
-         *  We can use the connection handle here to ask for different connection parameters.
-         *  Args: connection handle, min connection interval, max connection interval
-         *  latency, supervision timeout.
-         *  Units; Min/Max Intervals: 1.25 millisecond increments.
-         *  Latency: number of intervals allowed to skip.
-         *  Timeout: 10 millisecond increments.
-         */
-        pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
-        // set the config finish msg for phone at the end of the queue, so it comes after the offline TXT msgs
-        commandAction((char*)"--conffin", isPhoneReady, true);
+        connect_pending = true;  // commandAction runs in Main Loop
 
+        Serial.printf("BLE Connected with: %s\n", connInfo.getAddress().toString().c_str());
+        pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
     };
 
     void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override 
@@ -278,17 +280,12 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
     }*/
 
     void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override {
-
-        uint8_t conf_data[MAX_MSG_LEN_PHONE] = {0};
-        size_t conf_length=0;
-        conf_length = pCharacteristic->getLength(); // getLength();
-
-        if (conf_length <= 0)
+        BleQueueItem item = {};
+        item.length = pCharacteristic->getLength();
+        if (item.length <= 0 || item.length > MAX_MSG_LEN_PHONE)
             return;
-        
-        memcpy(conf_data, pCharacteristic->getValue() , conf_length);
-
-        readPhoneCommand(conf_data);
+        memcpy(item.data, pCharacteristic->getValue(), item.length);
+        xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
     }
 
 } chrCallbacks;
@@ -1519,6 +1516,8 @@ void esp32setup()
 
     Serial.printf("[BLE ]...Device started with BLE-Name <%s>\n", strBLEName.c_str());
 
+    bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
+
     NimBLEDevice::init(strBLEName);
 
     Serial.printf("[BLE ]...Device-Address <%s>\n", NimBLEDevice::toString().c_str());
@@ -2406,6 +2405,21 @@ void esp32loop()
         tdeck_update_header_bt();
         #endif
     }    // check if message from phone to send
+
+    // BLE Queue: process data from NimBLE task in Main Loop context
+    {
+        BleQueueItem bleItem;
+        while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+            readPhoneCommand(bleItem.data);
+        }
+    }
+
+    // BLE connect pending: run conffin in Main Loop context
+    if (connect_pending) {
+        connect_pending = false;
+        commandAction((char*)"--conffin", isPhoneReady, true);
+    }
+
     if(hasMsgFromPhone)
     {
         if(bBLEDEBUG)
@@ -3016,6 +3030,14 @@ void esp32loop()
             sendMeshComHeartbeat();
 
             hb_timer = millis();
+
+            // Heartbeat-loss detection (analog to nRF52)
+            if (last_upd_timer > 0 && (last_upd_timer + (MAX_HB_RX_TIME * 1000)) < millis())
+            {
+                Serial.println("[UDP] Heartbeat timeout — no GATE/BEAT from server, resetting");
+                resetMeshComUDP();
+                last_upd_timer = millis();  // prevent reset loop
+            }
         }
 
         meshcom_settings.node_last_upd_timer = hb_timer;
