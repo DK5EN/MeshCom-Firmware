@@ -61,6 +61,7 @@ bool udp_is_busy = false;
 uint16_t lora_tx_msg_len = 0;
 
 unsigned long last_upd_timer = 0; // last time we got a HB
+extern bool hb_warn_logged;
 bool had_initial_udp_conn = false;  // indicator that we had already a udp connection
 
 uint8_t err_cnt_udp_tx = 0;    // counter on errors sending message via UDP
@@ -159,7 +160,8 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           bool bBLELoopOut = true;
 
           last_upd_timer = millis();
-          
+          hb_warn_logged = false;
+
           memcpy(convBuffer, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, lora_tx_msg_len);
 
           // send JSON to Extern IP
@@ -371,11 +373,13 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           42 45 41 54 00 09 4F 45 31 4B 46 52 2D 47 57 01 05 4B 46 52 36 35
         */
         last_upd_timer = millis();
+        hb_warn_logged = false;
       }
       else
       {
         DEBUG_MSG("ERROR", "Received udp message without indicator");
         last_upd_timer = millis();
+        hb_warn_logged = false;
       }
     } 
     else
