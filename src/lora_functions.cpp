@@ -685,7 +685,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}<", 6) == 0)
                                         bMeshDestination = false;   // falsche Zeit nicht weiter geben
                                     else
+                                    {
                                         sendDisplayText(aprsmsg, rssi, snr);
+                                        addBLEOutBuffer(RcvBuffer, size);
+                                    }
 
                                     bSendAckGateway=false;
                                 }

@@ -224,6 +224,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}", 5) == 0)
             {
                 sendDisplayText(aprsmsg, 99, 0);
+                addBLEOutBuffer(convBuffer, size);
             }
             else
             if((strcmp(destination_call, "*") == 0 && !bNoMSGtoALL) || strcmp(destination_call, meshcom_settings.node_call) == 0 || CheckGroup(destination_call) > 0)
