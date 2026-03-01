@@ -419,17 +419,17 @@ void sendMeshComUDP()
                 // if we have too much errors sending, reset UDP
                 if (err_cnt_udp_tx >= MAX_ERR_UDP_TX)
                 {
+                    Serial.printf("[WIFI-DBG] UDP TX error limit (%d) reached, calling resetMeshComUDP\n", MAX_ERR_UDP_TX);
+
                     // avoid TX and UDP
                     hasIPaddress = false;
                     meshcom_settings.node_hasIPaddress = hasIPaddress;
                     //cmd_counter = 50;
 
-                    if(bDisplayCont)
-                      Serial.println("[ERROR]...resetMeshComUDP");
-
                     err_cnt_udp_tx = 0;
-                    
+
                     resetMeshComUDP();
+                    return;  // socket reset, don't call endPacket
                 }
             }
 
@@ -650,14 +650,18 @@ bool checkWifiPing()
 
   if(hasIPaddress)
   {
-    if(!Ping.ping(meshcom_settings.node_gw))
+    // Non-blocking check: WiFi status instead of blocking ICMP ping
+    // Server reachability is now covered by heartbeat-loss detection
+    if(WiFi.status() != WL_CONNECTED)
     {
       ifalseping--;
 
-      Serial.printf("%s [WIFI]..Ping to IP<%s> failed:%i\n", getTimeString().c_str(), meshcom_settings.node_gw, ifalseping);
+      Serial.printf("%s [WIFI]..WiFi not connected, count:%i\n", getTimeString().c_str(), ifalseping);
 
       if(ifalseping <= 0)
       {
+        Serial.println("[WIFI-DBG] checkWifiPing: ifalseping exhausted, disconnecting WiFi");
+
         Udp.stop();
 
         WiFi.disconnect(true, true);
@@ -668,12 +672,11 @@ bool checkWifiPing()
       }
 
       return false;
-      
     }
     else
     {
       if(bDEBUG && bDisplayCont)
-        Serial.printf("%s [WIFI]..Ping to IP<%s> success\n", getTimeString().c_str(), meshcom_settings.node_gw);
+        Serial.printf("%s [WIFI]..WiFi connected\n", getTimeString().c_str());
     }
   }
 
@@ -689,13 +692,8 @@ String udpUpdateTimeClient()
     if(!timeClient.forceUpdate())
     {
       Serial.println("TimeClient no force update possible");
+      Serial.println("[WIFI-DBG] NTP update failed, will retry next cycle");
 
-      Udp.stop();
-
-      WiFi.disconnect(true, true);
-
-      hasIPaddress=false;
-      
       return "none";
     }
   }
@@ -952,14 +950,14 @@ void resetMeshComUDP()
 
   WiFi.disconnect(true, true);
 
-  hasIPaddress=false;
+  hasIPaddress = false;
+  meshcom_settings.node_hasIPaddress = false;
+  iWlanWait = 0;
+  web_timer = 0;
 
-  if(bGATEWAY || bWEBSERVER)
-  {
-    startMeshComUDP();
+  Serial.println("[WIFI-DBG] resetMeshComUDP: WiFi disconnected, flags reset for reconnect");
 
-    sendDisplayHead(false);
-  }
+  sendDisplayHead(false);
 }
 
 #endif
@@ -981,11 +979,7 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     //DEBUG_MSG_VAL("UDP", udpWrite, "UDP Ringbuf added El.:");
     //neth.printBuffer(ringBufferUDPout[udpWrite], len + 1);
 
-    //NOT addRingPointer(udpWrite, udpRead, MAX_RING_UDP);
-
-    udpWrite++;
-    if (udpWrite >= MAX_RING_UDP) // if the buffer is full we start at index 0 -> take care of overwriting!
-        udpWrite = 0;
+    addRingPointer(udpWrite, udpRead, MAX_RING_UDP);
 }
 
 void sendKEEP()

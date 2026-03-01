@@ -101,20 +101,35 @@ void getExtern(unsigned char incoming[], int len)
     return;
   }
 
-  const char* dst = inputJson["dst"]; // "OE5BYE-1"
-  const char* msg = inputJson["msg"]; // "Test 1 2 3"
-  aprsmsg.msg_destination_path = dst;
-  aprsmsg.msg_payload = msg;
-  
-  //Serial.printf("aprsmsg.msg_destination_path:%s aprsmsg.msg_payload:%s\n", aprsmsg.msg_destination_path, aprsmsg.msg_payload);
-
-  if(aprsmsg.msg_payload == "none")
+  // Validate type field
+  const char* type = inputJson["type"];
+  if (type == nullptr || strcmp(type, "msg") != 0)
   {
-    Serial.println("wrong JSON to send message");
+    Serial.println("[EXT] JSON type missing or not 'msg'");
     return;
   }
-  
-  snprintf(val,160, ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
+
+  const char* dst = inputJson["dst"];
+  const char* msg = inputJson["msg"];
+
+  // Null-check: required fields must be present
+  if (dst == nullptr || msg == nullptr)
+  {
+    Serial.println("[EXT] JSON missing 'dst' or 'msg' field");
+    return;
+  }
+
+  // Length validation
+  if (strlen(dst) == 0 || strlen(dst) > 9 || strlen(msg) == 0 || strlen(msg) > 150)
+  {
+    Serial.printf("[EXT] JSON field length invalid: dst=%d msg=%d\n", strlen(dst), strlen(msg));
+    return;
+  }
+
+  aprsmsg.msg_destination_path = dst;
+  aprsmsg.msg_payload = msg;
+
+  snprintf(val, 160, ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
 
   sendMessage(val, strlen(val));
 }
@@ -383,6 +398,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     if (!UdpExtern.write(u_json, strlen(c_json)))
     {
       resetExternUDP();
+      return;  // socket reset, skip endPacket and telemetry
     }
 
     UdpExtern.endPacket();
