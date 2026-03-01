@@ -5,6 +5,9 @@ Connects to a Heltec WiFi LoRa 32 V3 (or similar) via serial with DTR/RTS
 disabled to avoid triggering a hardware reset. Logs all output to a timestamped
 file in /tmp/meshcom_monitor/ and prints alerts + periodic summaries to console.
 
+Dk5EN / Martin 
+1. März 2026
+
 Usage:
     python3 tools/serial_monitor.py
     python3 tools/serial_monitor.py --port /dev/cu.usbserial-0001 --interval 300
@@ -499,6 +502,12 @@ def reader_thread(
             continue
         if not line:
             continue
+        # Replace binary artefacts: keep printable ASCII, newline, tab;
+        # replace everything else with a dot placeholder.
+        line = "".join(
+            ch if (ch in "\t\n" or (ch.isprintable() and ord(ch) < 0xFFFD)) else "."
+            for ch in line
+        )
 
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         log_line = f"{ts}  {line}\n"
