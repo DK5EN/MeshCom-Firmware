@@ -418,7 +418,7 @@ uint32_t airtime_tx_us = 0;        // accumulated TX airtime in current window (
 unsigned long airtime_decay_timer = 0;  // last decay timestamp
 uint8_t channel_util_percent = 0;  // current channel utilization 0-100%
 
-// CSMA: Randomized TX jitter to desynchronize nodes (0-2000ms added to RECEIVE_TIMEOUT)
+// CSMA: Random jitter added to adaptive TX wait (0-1000ms normal, 0-3000ms when busy)
 uint16_t rx_timeout_jitter = 0;
 
 // flag to indicate if we are currently allowed to transmittig
@@ -1492,6 +1492,10 @@ void esp32setup()
     // the radio has no health monitoring during the entire initial phase.
     iReceiveTimeOutTime = millis();
 
+    // CSMA/CA: Calculate slot time from current SF/BW settings
+    extern void csma_update_slot_time();
+    csma_update_slot_time();
+
     #endif
 
     //#endif
@@ -1881,16 +1885,36 @@ void esp32loop()
 
         if(iReceiveTimeOutTime > 0)
         {
-            // Timeout RECEIVE_TIMEOUT + random jitter (4.5-6.5s) to desynchronize nodes
-            if((iReceiveTimeOutTime + RECEIVE_TIMEOUT + rx_timeout_jitter) < millis())
+            // Adaptive TX wait: base 2000ms + utilization-dependent backoff
+            // Below 65%: linear scaling (0-2000ms extra)
+            // Above 65%: exponential scaling (2000-12000ms extra)
+            // Plus random jitter scaled by utilization
+            uint16_t adaptive_wait;
+            if(channel_util_percent <= 65)
+            {
+                // Linear: 0% → 2000ms, 65% → 4000ms
+                adaptive_wait = 2000 + (uint16_t)((uint32_t)channel_util_percent * 2000 / 65);
+            }
+            else
+            {
+                // Exponential above target: 65% → 4000ms, 85% → 9000ms, 95% → 14000ms
+                uint16_t excess = channel_util_percent - 65;  // 0..35
+                // 4000 + excess^2 * 10000 / 1225 (quadratic scaling)
+                adaptive_wait = 4000 + (uint16_t)((uint32_t)excess * excess * 10000 / 1225);
+            }
+
+            // Jitter: wider spread when channel is busy (more competitors)
+            uint16_t jitter_range = (channel_util_percent > 65) ? 3000 : 1000;
+
+            if((iReceiveTimeOutTime + adaptive_wait + rx_timeout_jitter) < millis())
             {
                 // Debug A: RX_TIMEOUT_FIRE
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu jitter=%u\n",
-                        millis(), iReceiveTimeOutTime, millis() - iReceiveTimeOutTime, rx_timeout_jitter);
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu delta=%lu wait=%u jitter=%u util=%u%%\n",
+                        millis(), millis() - iReceiveTimeOutTime, adaptive_wait, rx_timeout_jitter, channel_util_percent);
 
                 // Roll new jitter for next cycle
-                rx_timeout_jitter = esp_random() % 2001;  // 0-2000ms
+                rx_timeout_jitter = esp_random() % (jitter_range + 1);
 
                 // FIX BUG #1: Do not reset radio if a received packet is pending
                 if(receiveFlag)
@@ -2087,36 +2111,27 @@ void esp32loop()
                 }
                 else
                 {
+                    // doTX() returned false — CAD_BUSY (backoff) or error.
+                    // Go back to RX and re-arm with short timeout so the radio
+                    // stays in RX (receiving packets) during backoff, and
+                    // RX_TIMEOUT_FIRE keeps firing (prevents RADIO_SILENT gaps).
                     #ifdef BOARD_HELTEC_V4
                     disablePATransmit();
                     #endif
-                    if(bLORADEBUG)
-                        Serial.print(F("[LoRa]...Starting to listen again... "));
 
-                    int state = transitionTo(LORA_RX_LISTEN);
-                    if (state == RADIOLIB_ERR_NONE)
-                    {
-                        if(bLORADEBUG)
-                            Serial.println(F("success!"));
-                    }
-                    else
-                    {
-                        if(bLORADEBUG)
-                        {
-                            Serial.print(F("failed, code "));
-                            Serial.println(state);
-                        }
-                    }
+                    transitionTo(LORA_RX_LISTEN);
+                    // Set to 1 so RX_TIMEOUT_FIRE triggers immediately
+                    // (1 + adaptive_wait < millis() is always true).
+                    // The real backoff timing is controlled by cad_backoff_until in doTX().
+                    iReceiveTimeOutTime = 1;
                 }
             }
         }
 
-        // FIX C: Re-arm the software timeout if still disabled after TX gate check.
-        // Without this, when the timeout fires and no TX is pending, iReceiveTimeOutTime
-        // stays 0 permanently — the 4.5s periodic radio restart stops, and the radio
-        // has no health monitoring until a packet happens to arrive.
-        // Observed in field: 67-103s gaps with no RX_TIMEOUT_FIRE.
-        if(iReceiveTimeOutTime == 0 && loraState == LORA_RX_LISTEN)
+        // Re-arm the software timeout when TX queue is empty and timer
+        // is not running. This covers the idle case (no pending packets).
+        if(iReceiveTimeOutTime == 0 && loraState == LORA_RX_LISTEN
+           && iWrite == iRead && iAckRead == iAckWrite)
         {
             iReceiveTimeOutTime = millis();
         }

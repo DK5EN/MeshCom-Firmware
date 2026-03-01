@@ -36,7 +36,10 @@
 // Meshcom Params
 #define LONGNAME_MAXLEN 20 // maximum length of the longname
 #define TX_ENABLE 1        // switch to en/disable LoRa TX
-#define MAX_CAD_WAIT 3     // maximum retries on channel free detection when we want to TX lora
+#define NUM_SYM_CAD      2       // CAD symbols for SX126x sub-GHz
+#define CSMA_CW_MIN      3       // Min CW exponent (2^3 = 8 Slots)
+#define CSMA_CW_MAX      8       // Max CW exponent (2^8 = 256 Slots)
+#define CAD_WATCHDOG_MS  30000   // Force TX after 30s (Watchdog)
 #define MAX_CALL_LEN 20     // max length of Callsign
 
 // UDP

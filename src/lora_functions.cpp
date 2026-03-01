@@ -97,6 +97,33 @@ uint8_t preamble_cnt = 0;     // stores how often a preamble detect is thrown
 
 unsigned long track_to_meshcom_timer = 0;
 
+// CSMA/CA: Slot time for CAD backoff (default for SF11/BW125)
+uint16_t csma_slot_time_ms = 49;
+
+void csma_update_slot_time()
+{
+    int sf = meshcom_settings.node_sf;
+    float bw = meshcom_settings.node_bw;
+
+    if(sf == 0 || bw == 0)
+    {
+        csma_slot_time_ms = 49;  // fallback SF11/BW125
+        return;
+    }
+
+    // symbolTime = 2^SF / BW_kHz (in ms)
+    float symbol_time_ms = (float)(1UL << sf) / bw;
+    // slotTime = max(2.25, NUM_SYM_CAD + 0.5) * symbolTime + 7.6ms
+    float cad_factor = (NUM_SYM_CAD + 0.5f > 2.25f) ? (NUM_SYM_CAD + 0.5f) : 2.25f;
+    float slot_time = cad_factor * symbol_time_ms + 7.6f;
+    csma_slot_time_ms = (uint16_t)(slot_time + 0.5f);  // round
+
+    if(csma_slot_time_ms < 10) csma_slot_time_ms = 10;  // safety floor
+
+    Serial.printf("[MC-DBG] CSMA_SLOT_TIME sf=%d bw=%.0f sym=%.2fms slot=%ums\n",
+        sf, bw, symbol_time_ms, csma_slot_time_ms);
+}
+
 bool bNewLine = false;
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
@@ -237,10 +264,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     {
         memcpy(RcvBuffer, payload, size);
 
-        // RX-OK do not need retransmission
+        // RX-OK: cancel retransmissions for messages we already sent
+        // Only cancel slots that have been transmitted at least once (status > 0x00).
+        // Status 0x00 = queued but not yet sent — must not be cancelled, otherwise
+        // a faster gateway's LoRa TX suppresses our initial TX (race condition).
         for(int ircheck=0;ircheck<MAX_RING;ircheck++)
         {
-            if(ringBuffer[ircheck][0] > 0 && ringBuffer[ircheck][1] != 0xFF)
+            if(ringBuffer[ircheck][0] > 0 && ringBuffer[ircheck][1] != 0xFF && ringBuffer[ircheck][1] > 0x00)
             {
                 unsigned int ring_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
 
@@ -1294,47 +1324,32 @@ bool doTX()
 
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
-                    // --- CAD: Channel Activity Detection vor dem Senden ---
+                    // --- CSMA/CA: Slot-based CAD Backoff (Meshtastic-Style) ---
                     #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
                     {
-                        static int cad_backoff = 0;
+                        static unsigned long cad_backoff_until = 0;
+                        static unsigned long cad_first_busy_ts = 0;
                         static int cad_retries = 0;
 
-                        // Backoff-Zaehler: Warte-Iterationen vor naechstem CAD-Scan
-                        if(cad_backoff > 0)
+                        // Phase 1: Time-based gate — skip radio access during backoff
+                        if(millis() < cad_backoff_until)
                         {
-                            cad_backoff--;
-                            if(bLORADEBUG)
-                                Serial.printf("[MC-DBG] CAD_BACKOFF remaining=%d\n", cad_backoff);
                             iRead = save_read;
                             ringBuffer[iRead][1] = save_ring_status;
                             return false;
                         }
 
-                        // Echtes CAD: Kanal pruefen via RadioLib scanChannel()
-                        // standby() required: scanChannel() calls getPacketType() via SPI
-                        // which returns 0xFF if radio is in active RX mode (RADIOLIB_LORA_DETECTED false positive)
+                        // Phase 2: CAD scan
                         radio.standby();
-                        delay(5);  // SX1262 needs settling time after RX->STANDBY before SPI reads are reliable
-                        // scanChannel() triggers DIO1 on completion — temporarily
-                        // clear the TX-done handler to prevent spurious transmittedFlag
+                        delay(2);
                         radio.clearPacketSentAction();
                         int cad_result = radio.scanChannel();
 
-                        // Triple-scan: SX1262 SPI reads after RX->STANDBY return stale IRQ flags,
-                        // causing false RADIOLIB_LORA_DETECTED (-702). Field tests show 55-100%
-                        // false positive rate on first scan. Require 2 consecutive busy results
-                        // to confirm genuine channel activity.
+                        // Double-scan: confirm LORA_DETECTED (stale IRQ filter)
                         if(cad_result == RADIOLIB_LORA_DETECTED)
                         {
-                            delay(3);
+                            delay(2);
                             cad_result = radio.scanChannel();
-
-                            if(cad_result == RADIOLIB_LORA_DETECTED)
-                            {
-                                delay(3);
-                                cad_result = radio.scanChannel();
-                            }
 
                             if(bLORADEBUG && cad_result != RADIOLIB_LORA_DETECTED)
                                 Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE"));
@@ -1343,35 +1358,53 @@ bool doTX()
                         extern void setFlagSent(void);
                         radio.setPacketSentAction(setFlagSent);
 
-                        if(bLORADEBUG)
-                            Serial.printf("[MC-DBG] CAD_SCAN result=%d retries=%d\n",
-                                cad_result, cad_retries);
-
-                        if(cad_result == RADIOLIB_LORA_DETECTED
-                           && cad_retries < MAX_CAD_WAIT)
+                        if(cad_result == RADIOLIB_LORA_DETECTED)
                         {
-                            // CSMA: Scale backoff with channel utilization
-                            // Low util (0-20%): backoff=1, High util (80-100%): backoff=1..5
-                            uint8_t cw = 1 + (channel_util_percent / 25);  // 1..5
-                            cad_backoff = 1 + (esp_random() % cw);
-                            cad_retries++;
+                            // Watchdog: force TX after CAD_WATCHDOG_MS
+                            if(cad_first_busy_ts == 0)
+                                cad_first_busy_ts = millis();
 
-                            if(bLORADEBUG)
-                                Serial.printf("[MC-DBG] CAD_BUSY backoff=%d retries=%d util=%u%% cw=%u\n",
-                                    cad_backoff, cad_retries, channel_util_percent, cw);
+                            if(millis() - cad_first_busy_ts >= CAD_WATCHDOG_MS)
+                            {
+                                Serial.printf("[MC-DBG] CAD_WATCHDOG forced TX after %lums, retries=%d\n",
+                                    millis() - cad_first_busy_ts, cad_retries);
+                                cad_backoff_until = 0;
+                                cad_first_busy_ts = 0;
+                                cad_retries = 0;
+                                // fall through to TX
+                            }
+                            else
+                            {
+                                cad_retries++;
 
-                            iRead = save_read;
-                            ringBuffer[iRead][1] = save_ring_status;
-                            return false;
+                                // CW exponent scales with channel utilization
+                                int cw_exp = CSMA_CW_MIN + (int)((long)channel_util_percent * (CSMA_CW_MAX - CSMA_CW_MIN) / 100);
+                                if(cw_exp > CSMA_CW_MAX) cw_exp = CSMA_CW_MAX;
+                                int cw_size = 1 << cw_exp;
+                                int slots = random(1, cw_size + 1);  // [1, cw_size]
+                                unsigned long backoff_ms = (unsigned long)slots * csma_slot_time_ms;
+                                cad_backoff_until = millis() + backoff_ms;
+
+                                if(bLORADEBUG)
+                                    Serial.printf("[MC-DBG] CAD_BUSY slots=%d backoff=%lums retries=%d util=%u%% cw=%d\n",
+                                        slots, backoff_ms, cad_retries, channel_util_percent, cw_exp);
+
+                                iRead = save_read;
+                                ringBuffer[iRead][1] = save_ring_status;
+                                return false;
+                            }
                         }
+                        else
+                        {
+                            // Channel clear
+                            if(bLORADEBUG && cad_retries > 0)
+                                Serial.printf("[MC-DBG] CAD_CLEAR after retries=%d, total_wait=%lums\n",
+                                    cad_retries, (cad_first_busy_ts > 0) ? millis() - cad_first_busy_ts : 0UL);
 
-                        // Kanal frei oder MAX_CAD_WAIT erreicht: senden
-                        if(bLORADEBUG && cad_retries >= MAX_CAD_WAIT)
-                            Serial.printf("[MC-DBG] CAD_GIVEUP retries=%d, TX forced\n",
-                                cad_retries);
-
-                        cad_retries = 0;
-                        cad_backoff = 0;
+                            cad_backoff_until = 0;
+                            cad_first_busy_ts = 0;
+                            cad_retries = 0;
+                        }
                     }
                     #else
                     // Nicht-SX1262 Boards: bestehende Logik beibehalten
