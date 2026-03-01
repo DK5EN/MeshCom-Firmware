@@ -191,6 +191,7 @@ String str;
 extern char textbuff_phone [MAX_MSG_LEN_PHONE];
 extern uint8_t txt_msg_len_phone;
 extern unsigned long last_upd_timer;
+extern bool hb_warn_logged;
 
 NimBLEServer *pServer = NULL;
 NimBLECharacteristic* pTxCharacteristic;
@@ -3032,17 +3033,51 @@ void esp32loop()
         // heartbeat
         if ((hb_timer + (HEARTBEAT_INTERVAL * 1000)) < millis())
         {
-            //DEBUG_MSG("UDP", "Sending Heartbeat");
             sendMeshComHeartbeat();
-
             hb_timer = millis();
 
-            // Heartbeat-loss detection (analog to nRF52)
-            if (last_upd_timer > 0 && (last_upd_timer + (MAX_HB_RX_TIME * 1000)) < millis())
+            if (last_upd_timer > 0)
             {
-                Serial.println("[UDP] Heartbeat timeout — no GATE/BEAT from server, resetting");
-                resetMeshComUDP();
-                last_upd_timer = millis();  // prevent reset loop
+                unsigned long hb_age = millis() - last_upd_timer;
+
+                // Stage 1: diagnostic warning at 35s
+                if (hb_age > (HB_WARN_TIME * 1000) && !hb_warn_logged)
+                {
+                    bool wifi_ok = (WiFi.status() == WL_CONNECTED);
+                    Serial.printf("[UDP] Server not responding for %lus — WiFi %s\n",
+                                  hb_age / 1000, wifi_ok ? "CONNECTED" : "NOT_CONNECTED");
+                    hb_warn_logged = true;
+
+                    // WiFi actually down → reset immediately, don't wait
+                    if (!wifi_ok)
+                    {
+                        Serial.println("[UDP] WiFi down — resetting");
+                        resetMeshComUDP();
+                        last_upd_timer = millis();
+                        hb_warn_logged = false;
+                    }
+                }
+
+                // Stage 2: timeout at 65s
+                if (hb_age > (MAX_HB_RX_TIME * 1000))
+                {
+                    bool wifi_ok = (WiFi.status() == WL_CONNECTED);
+
+                    if (!wifi_ok)
+                    {
+                        Serial.printf("[UDP] Heartbeat timeout %lus — WiFi NOT_CONNECTED, resetting\n",
+                                      hb_age / 1000);
+                        resetMeshComUDP();
+                    }
+                    else
+                    {
+                        Serial.printf("[UDP] Heartbeat timeout %lus — WiFi CONNECTED, server unresponsive, waiting\n",
+                                      hb_age / 1000);
+                    }
+
+                    last_upd_timer = millis();
+                    hb_warn_logged = false;
+                }
             }
         }
 

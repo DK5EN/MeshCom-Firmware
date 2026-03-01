@@ -338,6 +338,7 @@ unsigned long telemetry_timer = 0;      // we check periodically to send TELEMET
 unsigned long temphum_timer = 0;        // we check periodically get TEMP/HUM
 unsigned long druck_timer = 0;          // we check periodically get AIRPRESURE
 unsigned long hb_timer = 0;
+bool hb_warn_logged = false;
 unsigned long web_timer = 0;
 
 // Function that gets current epoch time
