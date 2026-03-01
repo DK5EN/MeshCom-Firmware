@@ -70,7 +70,7 @@ RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
 RX_RESTART_PER_MIN_THRESHOLD = 60  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
 RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
-RING_ZOMBIE_CONSECUTIVE = 3  # consecutive RING_STATUS with retrying>0, queued==0
+RING_ZOMBIE_CONSECUTIVE = 5  # consecutive RING_STATUS with retrying>0, queued==0 (150s)
 
 LORA_STATES = [
     "IDLE", "RX_LISTEN", "RX_PROCESS", "TX_PREPARE", "TX_ACTIVE", "TX_DONE",
