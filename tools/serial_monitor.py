@@ -68,7 +68,7 @@ STUCK_STATE_SECONDS = 30
 NO_TRANSITION_SECONDS = 30
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
-RX_RESTART_PER_MIN_THRESHOLD = 60  # adaptive wait 2-3s at idle → ~50/min normal
+RX_RESTART_PER_MIN_THRESHOLD = 60  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
 RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
 RING_ZOMBIE_CONSECUTIVE = 3  # consecutive RING_STATUS with retrying>0, queued==0
 
@@ -288,9 +288,8 @@ class Monitor:
             self.total["rx_timeout_deferred"] += 1
             return
 
-        # RX restart (startReceive again) and RX_TIMEOUT_FIRE gap tracking
-        if "startReceive again" in line or "RX_TIMEOUT_FIRE" in line:
-            # Parse adaptive wait fields from RX_TIMEOUT_FIRE
+        # RX_TIMEOUT_FIRE: adaptive wait tracking, radio-silent gap, flood detection
+        if "RX_TIMEOUT_FIRE" in line:
             m_fire = RE_RX_TIMEOUT_FIRE.search(line)
             if m_fire:
                 wait_val = float(m_fire.group(1))
@@ -299,27 +298,25 @@ class Monitor:
                 if self.adaptive_wait_max is None or wait_val > self.adaptive_wait_max:
                     self.adaptive_wait_max = wait_val
 
-            # Radio silent gap detection (only on RX_TIMEOUT_FIRE)
-            if "RX_TIMEOUT_FIRE" in line:
-                if self.last_rx_timeout_fire is not None:
-                    gap = now - self.last_rx_timeout_fire
-                    if gap > self.max_radio_gap:
-                        self.max_radio_gap = gap
-                    if gap > self.max_radio_gap_total:
-                        self.max_radio_gap_total = gap
-                    if gap > RADIO_SILENT_THRESHOLD:
-                        self.radio_silent_events_interval += 1
-                        self.total["radio_silent"] += 1
-                        self._alert(f"RADIO_SILENT gap={gap:.0f}s (no RX_TIMEOUT_FIRE)")
-                self.last_rx_timeout_fire = now
+            # Radio silent gap detection
+            if self.last_rx_timeout_fire is not None:
+                gap = now - self.last_rx_timeout_fire
+                if gap > self.max_radio_gap:
+                    self.max_radio_gap = gap
+                if gap > self.max_radio_gap_total:
+                    self.max_radio_gap_total = gap
+                if gap > RADIO_SILENT_THRESHOLD:
+                    self.radio_silent_events_interval += 1
+                    self.total["radio_silent"] += 1
+                    self._alert(f"RADIO_SILENT gap={gap:.0f}s (no RX_TIMEOUT_FIRE)")
+            self.last_rx_timeout_fire = now
 
+            # Flood detection — only timeout-driven restarts count
             prev_count = len(self.rx_restart_times)
             self.rx_restart_times.append(now)
-            # prune older than 60s
             cutoff = now - 60
             self.rx_restart_times = [t for t in self.rx_restart_times if t > cutoff]
             cur_count = len(self.rx_restart_times)
-            # alert once when crossing threshold, not on every event
             if (cur_count > RX_RESTART_PER_MIN_THRESHOLD
                     and prev_count <= RX_RESTART_PER_MIN_THRESHOLD):
                 self._alert(
