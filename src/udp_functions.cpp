@@ -320,7 +320,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
               // first byte is always the len of the msg
               // UDP messages send to LoRa TX
               // resend only Packet to all
-              
+
               // store last message to compare later on
               insertOwnTx(aprsmsg.msg_id);
 
