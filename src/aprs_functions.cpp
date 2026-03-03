@@ -61,6 +61,10 @@ bool CheckOwnGroup(String callsign)
     if(checkgroup == 0)
         return false;
 
+    // Group 9 (HF only) is always received regardless of node group configuration
+    if(checkgroup == 9)
+        return true;
+
     bool bHasGroup=false;
 
     for(int ig=0;ig<6;ig++)
