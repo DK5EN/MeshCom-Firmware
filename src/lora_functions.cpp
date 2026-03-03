@@ -794,38 +794,38 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     }
                                 }
 
-                                if(bGATEWAY)
+                                if(bSendAckGateway)
                                 {
-                                    if(bSendAckGateway)
-                                    {
-                                        print_buff[6]=aprsmsg.msg_id & 0xFF;
-                                        print_buff[7]=(aprsmsg.msg_id >> 8) & 0xFF;
-                                        print_buff[8]=(aprsmsg.msg_id >> 16) & 0xFF;
-                                        print_buff[9]=(aprsmsg.msg_id >> 24) & 0xFF;
+                                    print_buff[6]=aprsmsg.msg_id & 0xFF;
+                                    print_buff[7]=(aprsmsg.msg_id >> 8) & 0xFF;
+                                    print_buff[8]=(aprsmsg.msg_id >> 16) & 0xFF;
+                                    print_buff[9]=(aprsmsg.msg_id >> 24) & 0xFF;
 
-                                        // nur bei Meldungen an fremde mit ACK
-                                        if(checkOwnTx(aprsmsg.msg_id) >= 0)
+                                    if(checkOwnTx(aprsmsg.msg_id) >= 0)
+                                    {
+                                        // Own message heard back — BLE notification (GW only)
+                                        if(bGATEWAY && aprsmsg.msg_destination_path == "*")
                                         {
-                                            // und an alle geht Wolke mit Hackerl an BLE senden
-                                            if(aprsmsg.msg_destination_path == "*")
-                                            {
-                                                print_buff[5]=0x41;
-                                                print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00 
-                                                print_buff[11]=0x00;     // msg always 0x00 at the end
-                                                addBLEOutBuffer(print_buff+5, 7);
-                                            }
+                                            print_buff[5]=0x41;
+                                            print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
+                                            print_buff[11]=0x00;     // msg always 0x00 at the end
+                                            addBLEOutBuffer(print_buff+5, 7);
                                         }
-                                        else
+                                    }
+                                    else
+                                    {
+                                        //Check DM Message nicht vom GW ACK nur wenn "*" (an alle), "WLNK-1", "APRS2SOTA" und Group-Message
+                                        if(strcmp(destination_call, "*") == 0 || strcmp(destination_call, "WLNK-1") == 0 || strcmp(destination_call, "APRS2SOTA") == 0 || CheckGroup(destination_call) > 0)
                                         {
-                                            if(bDisplayInfo && !bNewLine)
+                                            if(bGATEWAY)
                                             {
-                                                Serial.println("");
-                                                bNewLine=true;
-                                            }
-                                            
-                                            //Check DM Message nicht vom GW ACK nur wenn "*" (an alle), "WLNK-1", "APRS2SOTA" und Group-Message
-                                            if(strcmp(destination_call, "*") == 0 || strcmp(destination_call, "WLNK-1") == 0 || strcmp(destination_call, "APRS2SOTA") == 0 || CheckGroup(destination_call) > 0)
-                                            {
+                                                // Gateway ACK: server flag, double ACK
+                                                if(bDisplayInfo && !bNewLine)
+                                                {
+                                                    Serial.println("");
+                                                    bNewLine=true;
+                                                }
+
                                                 // ACK MSG 0x41 | 0x01020111 | max_hop | 0x01020304 | 1/0 ack from GW or Node 0x00 = Node, 0x01 = GW
                                                 msg_counter=millis();   // ACK mit neuer msg_id versenden
 
@@ -843,7 +843,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[9]=(aprsmsg.msg_id >> 24) & 0xFF;
                                                 print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
                                                 print_buff[11]=0x00;     // msg always 0x00 at the end
-                                                
+
                                                 // ACK fast-path: use dedicated ackBuffer for GW ACKs
                                                 if(ackBuffer_has_msgid(aprsmsg.msg_id))
                                                 {
@@ -906,6 +906,54 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                                     addLoraRxBuffer(mid, bServerFlag);
                                                 }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                // Node ACK: single ACK, no server flag, cancel sender retransmit
+                                                msg_counter=millis();
+
+                                                print_buff[0]=0x41;
+                                                print_buff[1]=msg_counter & 0xFF;
+                                                print_buff[2]=(msg_counter >> 8) & 0xFF;
+                                                print_buff[3]=(msg_counter >> 16) & 0xFF;
+                                                print_buff[4]=(msg_counter >> 24) & 0xFF;
+                                                print_buff[5]=meshcom_settings.max_hop_text;  // no server flag
+                                                print_buff[6]=aprsmsg.msg_id & 0xFF;
+                                                print_buff[7]=(aprsmsg.msg_id >> 8) & 0xFF;
+                                                print_buff[8]=(aprsmsg.msg_id >> 16) & 0xFF;
+                                                print_buff[9]=(aprsmsg.msg_id >> 24) & 0xFF;
+                                                print_buff[10]=0x00;     // Node ACK (not GW)
+                                                print_buff[11]=0x00;
+
+                                                if(ackBuffer_has_msgid(aprsmsg.msg_id))
+                                                {
+                                                    if(bLORADEBUG)
+                                                        Serial.printf("[MC-DBG] NODE_ACK_DEDUP msg_id=%08X already_pending\n", aprsmsg.msg_id);
+                                                }
+                                                else
+                                                {
+                                                    int ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
+                                                    if(ack_pending >= MAX_ACK_RING - 1)
+                                                    {
+                                                        if(bLORADEBUG)
+                                                            Serial.printf("[MC-DBG] NODE_ACK_DROPPED ack_buf_full pending=%d\n", ack_pending);
+                                                    }
+                                                    else
+                                                    {
+                                                        ackBuffer[iAckWrite][0]=12;
+                                                        ackBuffer[iAckWrite][1]=0xFF;
+                                                        memcpy(ackBuffer[iAckWrite]+2, print_buff, 12);
+
+                                                        iAckWrite = (iAckWrite + 1) % MAX_ACK_RING;
+
+                                                        unsigned long mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
+
+                                                        if(bLORADEBUG)
+                                                            Serial.printf("[MC-DBG] NODE_ACK_QUEUED msg_ref=%08lX ack_qlen=%d\n", mid, ack_pending + 1);
+
+                                                        addLoraRxBuffer(mid, false);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1155,6 +1203,10 @@ bool is_new_packet(uint8_t compBuffer[4])
 //////////////////////////////////////////////////////////////////////////
 // LoRa TX functions
 
+#if defined BOARD_RAK4630
+static bool nrf52_cad_scan(void);
+#endif
+
 /**@brief our Lora TX sequence
  */
 bool doTX()
@@ -1204,8 +1256,20 @@ bool doTX()
             if(msg_type_b_lora != 0x00)
             {
                 // CAD: Channel Activity Detection before sending ACK
-                #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
+                #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630)
                 {
+                    #if defined(BOARD_RAK4630)
+                    bool detected = nrf52_cad_scan();
+                    if (detected) {
+                        detected = nrf52_cad_scan();  // double-scan for false positive filter
+                    }
+                    if (detected) {
+                        iAckRead = save_ack_read;
+                        if (bLORADEBUG)
+                            Serial.printf("[MC-DBG] ACK_FAST_CAD_BUSY, retry next cycle\n");
+                        return false;
+                    }
+                    #else
                     radio.standby();
                     delay(3);
                     radio.clearPacketSentAction();
@@ -1230,6 +1294,7 @@ bool doTX()
 
                         return false;
                     }
+                    #endif
                 }
                 #else
                 if(tx_waiting)
@@ -1418,7 +1483,7 @@ bool doTX()
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
                     // --- CSMA/CA: Slot-based CAD Backoff (Meshtastic-Style) ---
-                    #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
+                    #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630)
                     {
                         static unsigned long cad_backoff_until = 0;
                         static unsigned long cad_first_busy_ts = 0;
@@ -1433,6 +1498,14 @@ bool doTX()
                         }
 
                         // Phase 2: CAD scan
+                        #if defined(BOARD_RAK4630)
+                        bool detected = nrf52_cad_scan();
+                        if (detected) {
+                            detected = nrf52_cad_scan();  // double-scan for false positive filter
+                            if(bLORADEBUG && !detected)
+                                Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE"));
+                        }
+                        #else
                         radio.standby();
                         delay(2);
                         radio.clearPacketSentAction();
@@ -1450,8 +1523,10 @@ bool doTX()
 
                         extern void setFlagSent(void);
                         radio.setPacketSentAction(setFlagSent);
+                        bool detected = (cad_result == RADIOLIB_LORA_DETECTED);
+                        #endif
 
-                        if(cad_result == RADIOLIB_LORA_DETECTED)
+                        if(detected)
                         {
                             // Watchdog: force TX after CAD_WATCHDOG_MS
                             if(cad_first_busy_ts == 0)
@@ -1713,6 +1788,39 @@ bool updateRetransmissionStatus()
 
     return false;
 }
+
+#if defined BOARD_RAK4630
+static volatile bool cad_done_flag = false;
+static volatile bool cad_activity_detected = false;
+
+void OnCadDone(bool activity)
+{
+    cad_activity_detected = activity;
+    cad_done_flag = true;
+}
+
+// Synchronous CAD scan for nRF52/RAK4630
+// Returns true if channel activity detected, false if clear
+static bool nrf52_cad_scan(void)
+{
+    cad_done_flag = false;
+    cad_activity_detected = false;
+
+    Radio.SetCadParams(NUM_SYM_CAD, RADIOLIB_SX126X_DETPEAK, RADIOLIB_SX126X_DETMIN, 0, 0);
+    Radio.StartCad();
+
+    // Wait for CadDone callback (typ. <10ms for 2-symbol CAD)
+    unsigned long t0 = millis();
+    while (!cad_done_flag && (millis() - t0 < 100)) {
+        delay(1);
+    }
+
+    // Re-enter RX after CAD
+    Radio.Rx(RX_TIMEOUT_VALUE);
+
+    return cad_activity_detected;
+}
+#endif
 
 /**@brief Function to be executed on Radio Tx Done event
  */
