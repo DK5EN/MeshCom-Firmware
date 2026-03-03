@@ -58,6 +58,39 @@ RE_NTP_FAIL = re.compile(r"TimeClient no (?:update|force update) possible")
 RE_NTP_OK = re.compile(r"TimeClient now \(UTC\)")
 RE_HB_TIMEOUT = re.compile(r"\[UDP\] Heartbeat timeout")
 
+# ACK deduplication and tracking patterns
+RE_ACK_RX_CANCEL = re.compile(
+    r"\[MC-DBG\]\s+ACK_RX_CANCEL\s+msg_id=([0-9A-Fa-f]+)\s+cancelled=(\d+)"
+)
+RE_ACK_FWD_DEDUP = re.compile(
+    r"\[MC-DBG\]\s+ACK_FWD_DEDUP\s+msg_id=([0-9A-Fa-f]+)\s+already_pending"
+)
+RE_GW_ACK_DEDUP = re.compile(
+    r"\[MC-DBG\]\s+GW_ACK_DEDUP\s+msg_id=([0-9A-Fa-f]+)\s+already_pending"
+)
+RE_ACK_SLOT_SKIP = re.compile(
+    r"\[MC-DBG\]\s+ACK_SLOT_SKIP\s+iAckRead=(\d+)\s+\(cancelled\)"
+)
+RE_ACK_FAST_QUEUED = re.compile(
+    r"\[MC-DBG\]\s+ACK_FAST_QUEUED\s+msg_ref=([0-9A-Fa-f]+)\s+ack_qlen=(\d+)"
+)
+RE_ACK_FAST_TX = re.compile(
+    r"\[MC-DBG\]\s+ACK_FAST_TX\s+len=(\d+)\s+ack_qlen=(\d+)"
+)
+RE_ACK_FWD_DROPPED = re.compile(
+    r"\[MC-DBG\]\s+ACK_FWD_DROPPED\s+ack_buf_full\s+pending=(\d+)"
+)
+RE_GW_ACK_DROPPED = re.compile(
+    r"\[MC-DBG\]\s+GW_ACK_DROPPED\s+ack_buf_full\s+pending=(\d+)"
+)
+RE_ACK_CANCEL_RETRANSMIT = re.compile(
+    r"\[MC-DBG\]\s+ACK_CANCEL_RETRANSMIT\s+slot=(\d+)\s+msg_id=([0-9A-Fa-f]+)"
+)
+RE_ACK_RECEIVED = re.compile(
+    r"\[MC-DBG\]\s+ACK_RECEIVED\s+retid=(\d+)\s+msg_id=([0-9A-Fa-f]+)"
+)
+RE_ACK_FAST_CAD_BUSY = re.compile(r"\[MC-DBG\]\s+ACK_FAST_CAD_BUSY")
+
 SIMPLE_COUNTERS = {
     "OnRxDone": "rx_packets",
     "OnRxTimeout": "rx_timeouts",
@@ -340,6 +373,82 @@ class Monitor:
             self.total["rx_timeout_deferred"] += 1
             return
 
+        # -- ACK deduplication tracking -----------------------------------------
+
+        # ACK_RX_CANCEL: heard another ACK, cancelled N pending
+        m = RE_ACK_RX_CANCEL.search(line)
+        if m:
+            cancelled = int(m.group(2))
+            self.counters["ack_rx_cancel"] += 1
+            self.total["ack_rx_cancel"] += 1
+            self.counters["ack_rx_cancel_saved"] += cancelled
+            self.total["ack_rx_cancel_saved"] += cancelled
+            return
+
+        # ACK_FWD_DEDUP: prevented duplicate re-forward
+        if RE_ACK_FWD_DEDUP.search(line):
+            self.counters["ack_fwd_dedup"] += 1
+            self.total["ack_fwd_dedup"] += 1
+            return
+
+        # GW_ACK_DEDUP: prevented duplicate gateway ACK
+        if RE_GW_ACK_DEDUP.search(line):
+            self.counters["gw_ack_dedup"] += 1
+            self.total["gw_ack_dedup"] += 1
+            return
+
+        # ACK_SLOT_SKIP: TX skipping cancelled slot
+        if RE_ACK_SLOT_SKIP.search(line):
+            self.counters["ack_slot_skip"] += 1
+            self.total["ack_slot_skip"] += 1
+            return
+
+        # ACK_FAST_QUEUED: ACK queued for TX
+        if RE_ACK_FAST_QUEUED.search(line):
+            self.counters["ack_fast_queued"] += 1
+            self.total["ack_fast_queued"] += 1
+            return
+
+        # ACK_FAST_TX: ACK actually transmitted
+        if RE_ACK_FAST_TX.search(line):
+            self.counters["ack_fast_tx"] += 1
+            self.total["ack_fast_tx"] += 1
+            return
+
+        # ACK_FWD_DROPPED: ACK dropped, buffer full
+        m = RE_ACK_FWD_DROPPED.search(line)
+        if m:
+            self.counters["ack_fwd_dropped"] += 1
+            self.total["ack_fwd_dropped"] += 1
+            self._alert(f"ACK_FWD_DROPPED: buffer full, pending={m.group(1)}")
+            return
+
+        # GW_ACK_DROPPED: GW ACK dropped, buffer full
+        m = RE_GW_ACK_DROPPED.search(line)
+        if m:
+            self.counters["gw_ack_dropped"] += 1
+            self.total["gw_ack_dropped"] += 1
+            self._alert(f"GW_ACK_DROPPED: buffer full, pending={m.group(1)}")
+            return
+
+        # ACK_CANCEL_RETRANSMIT: cancelled a retransmit slot
+        if RE_ACK_CANCEL_RETRANSMIT.search(line):
+            self.counters["ack_cancel_retransmit"] += 1
+            self.total["ack_cancel_retransmit"] += 1
+            return
+
+        # ACK_RECEIVED: received ACK for own message
+        if RE_ACK_RECEIVED.search(line):
+            self.counters["ack_received"] += 1
+            self.total["ack_received"] += 1
+            return
+
+        # ACK_FAST_CAD_BUSY: CAD busy during ACK TX
+        if RE_ACK_FAST_CAD_BUSY.search(line):
+            self.counters["ack_cad_busy"] += 1
+            self.total["ack_cad_busy"] += 1
+            return
+
         # RX_TIMEOUT_FIRE: adaptive wait tracking, radio-silent gap, flood detection
         if "RX_TIMEOUT_FIRE" in line:
             m_fire = RE_RX_TIMEOUT_FIRE.search(line)
@@ -470,6 +579,25 @@ class Monitor:
             deferred = self.counters.get("rx_timeout_deferred", 0)
             cad_fp_filtered = self.counters.get("cad_false_pos_filtered", 0)
 
+            # ACK dedup stats
+            ack_saved = (
+                self.counters.get("ack_rx_cancel_saved", 0)
+                + self.counters.get("ack_fwd_dedup", 0)
+                + self.counters.get("gw_ack_dedup", 0)
+                + self.counters.get("ack_slot_skip", 0)
+            )
+            ack_tx = self.counters.get("ack_fast_tx", 0)
+            ack_queued = self.counters.get("ack_fast_queued", 0)
+            ack_drops = (
+                self.counters.get("ack_fwd_dropped", 0)
+                + self.counters.get("gw_ack_dropped", 0)
+            )
+            ack_total_possible = ack_saved + ack_tx
+            if ack_total_possible > 0:
+                ack_eff_str = f"{ack_saved / ack_total_possible * 100:.0f}%"
+            else:
+                ack_eff_str = "n/a"
+
             summary = (
                 f"\n{'=' * 60}\n"
                 f"SUMMARY {t_start:%H:%M}-{t_end:%H:%M} "
@@ -488,6 +616,17 @@ class Monitor:
                 f"Radio: {self.radio_silent_events_interval} silent events "
                 f"(max gap: {self.max_radio_gap:.0f}s) | "
                 f"Deferred: {deferred}\n"
+                f"ACK Dedup: saved={ack_saved} "
+                f"(cancel={self.counters.get('ack_rx_cancel_saved', 0)} "
+                f"fwd_dedup={self.counters.get('ack_fwd_dedup', 0)} "
+                f"gw_dedup={self.counters.get('gw_ack_dedup', 0)} "
+                f"skip={self.counters.get('ack_slot_skip', 0)}) "
+                f"tx={ack_tx} eff={ack_eff_str}\n"
+                f"  ACK: queued={ack_queued} "
+                f"received={self.counters.get('ack_received', 0)} "
+                f"cad_busy={self.counters.get('ack_cad_busy', 0)} "
+                f"cancel_retx={self.counters.get('ack_cancel_retransmit', 0)} "
+                f"drops={ack_drops}\n"
                 f"Channel: {util_str}\n"
                 + (f"  Airtime: {airtime_str}\n" if airtime_str else "")
                 + f"Adaptive wait: {wait_str}\n"
@@ -513,6 +652,10 @@ class Monitor:
                 f"Deferred={self.total['rx_timeout_deferred']}\n"
                 f"  HB_Timeouts={self.total['hb_timeouts']} "
                 f"NTP_Fails={self.total['ntp_fails']}\n"
+                f"  ACK_Saved={self.total['ack_rx_cancel_saved'] + self.total['ack_fwd_dedup'] + self.total['gw_ack_dedup'] + self.total['ack_slot_skip']} "
+                f"ACK_TX={self.total['ack_fast_tx']} "
+                f"ACK_Drops={self.total['ack_fwd_dropped'] + self.total['gw_ack_dropped']} "
+                f"ACK_Received={self.total['ack_received']}\n"
                 f"  WebUI ring cycles: {raw_rx_overflow} this interval, "
                 f"{raw_rx_overflow_total} total (normal — not a real overflow)\n"
             )
