@@ -125,6 +125,50 @@ void csma_update_slot_time()
 }
 
 bool bNewLine = false;
+
+//////////////////////////////////////////////////////////////////////////
+// ACK deduplication helpers
+
+/**@brief Check if ackBuffer already has a pending entry for given msg_id */
+static bool ackBuffer_has_msgid(unsigned int msg_id)
+{
+    int idx = iAckRead;
+    while(idx != iAckWrite)
+    {
+        if(ackBuffer[idx][0] > 0)
+        {
+            unsigned int buf_id = ackBuffer[idx][8] | (ackBuffer[idx][9] << 8)
+                                | (ackBuffer[idx][10] << 16) | (ackBuffer[idx][11] << 24);
+            if(buf_id == msg_id)
+                return true;
+        }
+        idx = (idx + 1) % MAX_ACK_RING;
+    }
+    return false;
+}
+
+/**@brief Cancel all pending ackBuffer entries for given msg_id (set length to 0) */
+static int ackBuffer_cancel_msgid(unsigned int msg_id)
+{
+    int cancelled = 0;
+    int idx = iAckRead;
+    while(idx != iAckWrite)
+    {
+        if(ackBuffer[idx][0] > 0)
+        {
+            unsigned int buf_id = ackBuffer[idx][8] | (ackBuffer[idx][9] << 8)
+                                | (ackBuffer[idx][10] << 16) | (ackBuffer[idx][11] << 24);
+            if(buf_id == msg_id)
+            {
+                ackBuffer[idx][0] = 0;
+                cancelled++;
+            }
+        }
+        idx = (idx + 1) % MAX_ACK_RING;
+    }
+    return cancelled;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
@@ -174,6 +218,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         unsigned msg_id = print_buff[6] | (print_buff[7] << 8) | (print_buff[8] << 16) | (print_buff[9] << 24);
         int itxcheck = checkOwnTx(msg_id);
         bool bIsNew = is_new_packet(print_buff+1);
+
+        // Level 2 ACK dedup: cancel our pending ACK if someone else already sent one
+        int ack_cancelled = ackBuffer_cancel_msgid(msg_id);
+        if(ack_cancelled > 0 && bLORADEBUG)
+            Serial.printf("[MC-DBG] ACK_RX_CANCEL msg_id=%08X cancelled=%d\n", msg_id, ack_cancelled);
 
         if(bIsNew || itxcheck >= 0)
         {
@@ -226,6 +275,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     print_buff[5]--;
 
                     // ACK fast-path: use dedicated ackBuffer instead of main ringBuffer
+                    if(ackBuffer_has_msgid(msg_id))
+                    {
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] ACK_FWD_DEDUP msg_id=%08X already_pending\n", msg_id);
+                    }
+                    else
+                    {
                     int ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
                     if(ack_pending >= MAX_ACK_RING - 1)
                     {
@@ -248,6 +304,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         {
                             Serial.print(" This packet to mesh");
                         }
+                    }
                     }
                 }
             }
@@ -788,6 +845,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[11]=0x00;     // msg always 0x00 at the end
                                                 
                                                 // ACK fast-path: use dedicated ackBuffer for GW ACKs
+                                                if(ackBuffer_has_msgid(aprsmsg.msg_id))
+                                                {
+                                                    if(bLORADEBUG)
+                                                        Serial.printf("[MC-DBG] GW_ACK_DEDUP msg_id=%08X already_pending\n", aprsmsg.msg_id);
+                                                }
+                                                else
+                                                {
                                                 int gw_ack_pending = (iAckWrite >= iAckRead) ? (iAckWrite - iAckRead) : (MAX_ACK_RING - iAckRead + iAckWrite);
                                                 if(gw_ack_pending >= MAX_ACK_RING - 2)
                                                 {
@@ -841,6 +905,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                     mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
 
                                                     addLoraRxBuffer(mid, bServerFlag);
+                                                }
                                                 }
                                             }
                                         }
@@ -1109,6 +1174,14 @@ bool doTX()
     }
 
     // === ACK Fast-Path: dedicated ackBuffer has highest TX priority ===
+    // Skip cancelled entries (dedup may have cleared them)
+    while(iAckRead != iAckWrite && ackBuffer[iAckRead][0] == 0)
+    {
+        if(bLORADEBUG)
+            Serial.printf("[MC-DBG] ACK_SLOT_SKIP iAckRead=%d (cancelled)\n", iAckRead);
+        iAckRead = (iAckRead + 1) % MAX_ACK_RING;
+    }
+
     if (iAckRead != iAckWrite)
     {
         sendlng = ackBuffer[iAckRead][0];  // always 12
