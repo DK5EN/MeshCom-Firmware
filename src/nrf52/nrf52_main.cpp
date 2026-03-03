@@ -162,6 +162,8 @@ static RadioEvents_t RadioEvents;
 // flag to indicate if we are after receiving
 unsigned long iReceiveTimeOutTime = 0;
 
+uint8_t channel_util_percent = 0;  // nRF52 has no airtime tracking, stays 0 → CW = CSMA_CW_MIN
+
 bool g_meshcom_initialized;
 bool init_flash_done=false;
 
@@ -762,6 +764,9 @@ void nrf52setup()
     RadioEvents.RxError = OnRxError;
     //RadioEvents.PreAmpDetect = OnPreambleDetect;
     RadioEvents.PreAmpDetect = OnHeaderDetect;
+
+    extern void OnCadDone(bool activity);
+    RadioEvents.CadDone = OnCadDone;
     
     // 4.34w we use EU8 instead of EU
     if(meshcom_settings.node_country == 0)
