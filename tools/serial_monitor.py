@@ -104,7 +104,7 @@ STUCK_STATE_SECONDS = 30
 NO_TRANSITION_SECONDS = 30
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
 CAD_FALSE_POSITIVE_STREAK = 6
-RX_RESTART_PER_MIN_THRESHOLD = 60  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
+RX_RESTART_PER_MIN_THRESHOLD = 70  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
 RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
 RING_ZOMBIE_CONSECUTIVE = 5  # consecutive RING_STATUS with retrying>0, queued==0 (150s)
 HB_TIMEOUT_CYCLE_THRESHOLD = 3  # consecutive heartbeat timeouts = server unreachable
@@ -638,10 +638,6 @@ class Monitor:
                 f"{'=' * 60}\n"
             )
             # totals line
-            # ring overflow counts (raw_rx is benign web-UI buffer cycling)
-            raw_rx_overflow = self.counters.get("ring_overflow_raw_rx", 0)
-            raw_rx_overflow_total = self.total.get("ring_overflow_raw_rx", 0)
-
             summary += (
                 f"  TOTALS: RX={self.total['rx_packets']} "
                 f"TX={self.total['tx_packets']} "
@@ -656,8 +652,6 @@ class Monitor:
                 f"ACK_TX={self.total['ack_fast_tx']} "
                 f"ACK_Drops={self.total['ack_fwd_dropped'] + self.total['gw_ack_dropped']} "
                 f"ACK_Received={self.total['ack_received']}\n"
-                f"  WebUI ring cycles: {raw_rx_overflow} this interval, "
-                f"{raw_rx_overflow_total} total (normal — not a real overflow)\n"
             )
 
             print(summary, flush=True)

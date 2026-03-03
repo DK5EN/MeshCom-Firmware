@@ -3792,7 +3792,7 @@ void addRingPointer(int &pWrite, int &pRead, int iMAX, const char* bufName)
             if (pRead >= iMAX) // if the buffer is full we start at index 0 -> take care of overwriting!
                 pRead = 0;
 
-            if(bLORADEBUG)
+            if(bLORADEBUG && strcmp(bufName, "raw_rx") != 0)
             {
                 Serial.printf("[MC-DBG] RING_OVERFLOW buf=%s\n", bufName);
             }
