@@ -150,9 +150,6 @@ int iDisplayChange = 0;
 unsigned long lastHeardTime = 0;
 unsigned long posfixinterall = 0;
 
-unsigned long currentWiFiMillis = 0;
-unsigned long previousWiFiMillis = 0;
-
 // Timer variables for persitence to SD
 unsigned long lastsavePOSPersistence = 0;
 unsigned long lastsaveMHEARDPersistence = 0;

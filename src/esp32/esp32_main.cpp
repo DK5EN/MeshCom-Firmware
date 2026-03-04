@@ -2307,25 +2307,6 @@ void esp32loop()
         }
     }
 
-    if(meshcom_settings.node_hasIPaddress)
-    {
-        currentWiFiMillis = millis();
-
-        // if WiFi is down, try reconnecting every 5 sec
-        if ((WiFi.status() != WL_CONNECTED) && (currentWiFiMillis - previousWiFiMillis >= 5000))
-        {
-            Serial.printf("%s [WIFI]..Reconnecting to WiFi...\n", getTimeString().c_str());
-
-            WiFi.disconnect();
-            //WiFi.reconnect();
-
-            meshcom_settings.node_hasIPaddress=false;
-            web_timer=0;
-
-            previousWiFiMillis = currentWiFiMillis;
-        }
-    }
-
     // SOFTSER
     #if defined(ENABLE_SOFTSER)
         if(bSOFTSERON)

@@ -208,9 +208,6 @@ extern double gps_refresh_intervall;   // sec
 extern unsigned long posinfo_interval; // check interval
 extern unsigned long posfixinterall;
 
-extern unsigned long currentWiFiMillis;
-extern unsigned long previousWiFiMillis;
-
 // Timer variables for persitence to SD
 extern unsigned long lastsavePOSPersistence;
 extern unsigned long lastsaveMHEARDPersistence;
