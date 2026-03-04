@@ -102,6 +102,8 @@
 #define MAX_HB_RX_TIME 65                  // time we wait for an HB from server in seconds
 #define HB_WARN_TIME 35                    // seconds before logging server-not-responding warning
 
+#define MAX_RETRANSMIT 3                   // max retransmit attempts per message
+
 #define MAX_HOP_TEXT_DEFAULT 4             // max hop set on text-message
 #define MAX_HOP_POS_DEFAULT 2              // max hop set on pos-message
 

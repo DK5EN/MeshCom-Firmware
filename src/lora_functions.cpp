@@ -1682,9 +1682,6 @@ bool doTX()
 // based on:
 // unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE] = {0};
 
-// Maximum retransmit attempts per message
-#define MAX_RETRANSMIT 3
-
 bool updateRetransmissionStatus()
 {
     for(int ircheck = 0; ircheck < MAX_RING; ircheck++)
