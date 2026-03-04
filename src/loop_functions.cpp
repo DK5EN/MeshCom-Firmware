@@ -267,7 +267,7 @@ int iAckWrite = 0;
 int iAckRead = 0;
 
 // RINGBUFFER for incomming LoRa RX msg_id
-uint8_t ringBufferLoraRX[MAX_RING][5] = {0};
+uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5] = {0};
 uint8_t loraWrite = 0;   // counter for ringbuffer
 
 // RINGBUFFER RAW LoRa RX
@@ -475,13 +475,13 @@ void addLoraRxBuffer(unsigned int msg_id, bool bserver)
         ringBufferLoraRX[loraWrite][4] = 0;
 
     loraWrite++;
-    if (loraWrite >= MAX_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
+    if (loraWrite >= MAX_DEDUP_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
         loraWrite = 0;
 }
 
 int checkOwnRx(uint8_t compBuffer[4])
 {
-    for(int ilo=0; ilo<MAX_RING; ilo++)
+    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
     {
         if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
             return ilo;
@@ -492,7 +492,7 @@ int checkOwnRx(uint8_t compBuffer[4])
 
 bool checkServerRx(uint8_t compBuffer[4])
 {
-    for(int ilo=0; ilo<MAX_RING; ilo++)
+    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
     {
         if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
         {

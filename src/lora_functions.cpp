@@ -1196,7 +1196,7 @@ void OnRxError(void)
  */
 bool is_new_packet(uint8_t compBuffer[4])
 {
-    for(int ib=0; ib<MAX_RING; ib++)
+    for(int ib=0; ib<MAX_DEDUP_RING; ib++)
     {
             if (memcmp(compBuffer, ringBufferLoraRX[ib], 4) == 0)
             {
