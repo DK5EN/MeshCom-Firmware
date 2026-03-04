@@ -9,8 +9,9 @@ konkrete Loesungsansaetze fuer die identifizierten Puffer-Engpaesse.
 
 ### Problemstellung
 
-Die aktuelle Puffer-Dimensionierung ist statisch (Compile-Time-Konstanten) und geht
-implizit von einem kleinen Netzwerk aus. Die kritische Groesse ist nicht die Anzahl
+Die Puffer-Dimensionierung ist statisch (Compile-Time-Konstanten). Seit der
+Entkopplung von MAX_DEDUP_RING und MAX_ACK_RING von MAX_RING sind die kritischsten
+Puffer separat konfigurierbar. Die kritische Groesse ist nicht die Anzahl
 der Nodes im Gesamtnetz, sondern die **Anzahl gleichzeitig hoerbarer Nodes im
 LoRa-Einzugsbereich**.
 
@@ -39,7 +40,7 @@ ACKs pro Broadcast bei N hoerbaren Nodes:
 
   -> Jeder ACK hat eine EIGENE msg_id -> JEDER belegt einen Dedup-Slot!
   -> Bei 8 Nodes: bis zu 10 ACK-msg_ids im Dedup-Puffer
-  -> Bei 8 Nodes: bis zu 10 ACKs im ackBuffer (der nur 8 Slots hat!)
+  -> Bei 8 Nodes: bis zu 10 ACKs im ackBuffer (16 Slots, genuegend Headroom)
 ```
 
 ### Antwort
@@ -82,7 +83,7 @@ ackBuffer-Bedarf:
 ### ackBuffer-Dimensionierung
 
 ```
-Empfehlung:  MAX_ACK_RING = 16
+Aktuell:  MAX_ACK_RING = 16 (umgesetzt)
 
 Begruendung:
   8 Nodes -> max 9 ACKs pro Broadcast
@@ -102,12 +103,13 @@ Pro Minute:     8 Broadcasts * 10 = 80 Eintraege
 Retransmit-Fenster: max 44 Sekunden
 -> In 44 Sekunden: ~6 Broadcasts * 10 = 60 Eintraege
 
-Aktuell: 30 Slots -> REICHT NICHT (60 > 30)
+Aktuell: 60 Slots (MAX_DEDUP_RING, entkoppelt von MAX_RING) -> AUSREICHEND
+  60 / 10 = 6 Broadcasts bevor Ueberschreiben -> Dedup-Fenster ~180s
 
-Empfehlung:  MAX_RING erhoehen auf 60 oder 80
-  ODER: Nur Nachrichten-IDs speichern, ACK-IDs nicht
-        (ACKs sind Fire&Forget und brauchen kein Dedup im klassischen Sinn)
-  ODER: Zeitbasiertes Expiry (siehe Abschnitt 4)
+Moegliche weitere Optimierungen:
+  - Nur Nachrichten-IDs speichern, ACK-IDs nicht
+    (ACKs sind Fire&Forget und brauchen kein Dedup im klassischen Sinn)
+  - Zeitbasiertes Expiry (siehe Abschnitt 4)
 ```
 
 ### ringBuffer-Dimensionierung (TX)
@@ -141,69 +143,27 @@ Geschaetzte Nutzung:                              ~122 KB
 Freier Heap (gemessen, ESP.getFreeHeap()):        ~80-100 KB (typisch)
 ```
 
-**Szenario A: ackBuffer von 8 auf 16, ringBufferLoraRX von 30 auf 60**
+**Umgesetzt: ackBuffer 16, Dedup 60 (Plan A)**
 
 ```
-Zusaetzlicher RAM:
+Zusaetzlicher RAM gegenueber Ausgangszustand:
   ackBuffer:          +8 * 14          =    112 Byte
   ringBufferLoraRX:   +30 * 5          =    150 Byte
                                        --------
   Total zusaetzlich:                       262 Byte
 
-Bewertung: PROBLEMLOS, weniger als 0.3 KB
+Bewertung: PROBLEMLOS, weniger als 0.3 KB.
+Loest die beiden kritischsten Probleme (ackBuffer-Overflow und Dedup-Ueberlauf).
 ```
 
-**Szenario B: Alle Puffer fuer 8 Nodes optimiert**
+**Weitere Skalierung (falls zukuenftig noetig)**
 
 ```
-MAX_ACK_RING = 16:    +112 Byte
-Dedup-Puffer = 80:    +250 Byte (von 30*5 auf 80*5)
+Fuer >20 Nodes: ringBuffer und BLE-Puffer vergroessern.
 ringBuffer = 40:      +10 * 260 = 2,600 Byte
 BLE-Puffer = 40:      +10 * 305 * 2 = 6,100 Byte
-                      --------
-Total zusaetzlich:    9,062 Byte = ~9 KB
-
-Neuer Gesamt-Puffer:  ~50 KB
-Geschaetzte Nutzung:  ~131 KB
-Freier Heap:          ~70-90 KB
-
-Bewertung: PASST NOCH KOMFORTABEL in den Heltec V3
+Total zusaetzlich:    ~9 KB -> Freier Heap ~70-90K (Heltec V3: machbar)
 ```
-
-**Szenario C: Aggressiv -- alle Puffer verdoppelt**
-
-```
-ringBuffer[60][260]:      +30 * 260 =  7,800 Byte
-ackBuffer[16][14]:        +8 * 14   =    112 Byte
-ringBufferLoraRX[60][5]:  +30 * 5   =    150 Byte
-own_msg_id[60][5]:        +30 * 5   =    150 Byte
-BLEtoPhoneBuff[60][305]:  +30 * 305 =  9,150 Byte
-BLEComToPhoneBuff[60][305]: +30*305 =  9,150 Byte
-                                    --------
-Total zusaetzlich:                   26,512 Byte = ~26 KB
-
-Neuer Gesamt-Puffer:  ~68 KB
-Geschaetzte Nutzung:  ~148 KB
-Freier Heap:          ~52-72 KB
-
-Bewertung: GRENZWERTIG -- WiFi/BLE brauchen dynamischen Heap.
-           Moeglich, aber kein grosser Spielraum mehr.
-```
-
-### Fazit RAM
-
-```
-+------+---------------------+--------+----------+------------------+
-| Plan | Aenderung           | Kosten | Heap     | Bewertung        |
-+------+---------------------+--------+----------+------------------+
-| A    | ackBuf 16, Dedup 60 | 262 B  | ~80-100K | EMPFOHLEN        |
-| B    | Alle fuer 8 Nodes   | 9 KB   | ~70-90K  | Machbar          |
-| C    | Alles verdoppelt    | 26 KB  | ~52-72K  | Grenzwertig      |
-+------+---------------------+--------+----------+------------------+
-```
-
-**Plan A ist der klare Gewinner**: minimaler RAM-Aufwand, loest die beiden
-kritischsten Probleme (ackBuffer-Overflow und Dedup-Puffer-Ueberlauf).
 
 ---
 
@@ -215,16 +175,22 @@ In `configuration_global.h` gibt es drei Build-Varianten:
 
 ```c
 #if defined(ENABLE_XML)       // E22_XML-DevKitC Board
-  #define MAX_RING 20         // kleinere Puffer
+  #define MAX_RING 20         // kleinere TX-Puffer
+  #define MAX_DEDUP_RING 40   // Dedup-Puffer (entkoppelt von TX)
   #define MAX_MHEARD 5
   #define MAX_MHPATH 5
 #elif defined(ENABLE_SBUFFER) // TOTER CODE -- nirgends verwendet
   #define MAX_RING 20
+  #define MAX_DEDUP_RING 40
 #else                         // ALLE ANDEREN BOARDS (Heltec V3, T-Beam, RAK, ...)
-  #define MAX_RING 30         // Standard-Groesse
+  #define MAX_RING 30         // Standard-Groesse TX-Puffer
+  #define MAX_DEDUP_RING 60   // Dedup-Puffer (entkoppelt)
   #define MAX_MHEARD 20
   #define MAX_MHPATH 30
 #endif
+// Alle Builds:
+#define MAX_ACK_RING 16       // ACK Fast-Path (separat)
+#define MAX_RETRANSMIT 3      // Max Retransmit-Versuche pro Nachricht
 ```
 
 ### Warum existiert das?
@@ -242,32 +208,21 @@ In `configuration_global.h` gibt es drei Build-Varianten:
 
 ### Problem
 
-MAX_RING steuert zu viele unabhaengige Puffer gleichzeitig. Die optimale Groesse
-ist fuer jeden Puffer unterschiedlich:
+Seit der Entkopplung steuert MAX_RING nur noch TX-Puffer, BLE-Puffer und own_msg_id.
+Die kritischsten Puffer haben eigene Konstanten:
 
 ```
-ringBuffer (TX):        30 reicht (Slots werden schnell frei)
-ringBufferLoraRX:       30 ist ZU KLEIN fuer Dedup bei vielen Nodes
-ackBuffer:              8 ist unabhaengig von MAX_RING, ABER ZU KLEIN
-BLEtoPhoneBuff:         30 reicht (BLE raeumt schnell ab)
-own_msg_id:             30 reicht
+ringBuffer (TX):        MAX_RING = 30 (Slots werden schnell frei)
+ringBufferLoraRX:       MAX_DEDUP_RING = 60 (entkoppelt, genuegend fuer 5+ Broadcasts)
+ackBuffer:              MAX_ACK_RING = 16 (genuegend fuer 10-Node-Szenarien)
+BLEtoPhoneBuff:         MAX_RING = 30 (BLE raeumt schnell ab)
+own_msg_id:             MAX_RING = 30 (reicht)
 ```
 
-### Empfehlung
+### Offene Punkte
 
-Separate Konstanten pro Puffer einfuehren statt alles an MAX_RING zu haengen:
-
-```c
-#define MAX_TX_RING      30   // ringBuffer (TX-Queue)
-#define MAX_DEDUP_RING   60   // ringBufferLoraRX (Duplikat-Erkennung)
-#define MAX_ACK_RING     16   // ackBuffer (ACK Fast-Path)
-#define MAX_OWN_TX       30   // own_msg_id
-#define MAX_BLE_RING     30   // BLE Phone Buffers
-#define MAX_LOG          20   // RAW RX Log
-#define MAX_UDP_RING     20   // UDP Outgoing
-```
-
-RAM-Kosten gegenueber Ist-Zustand: nur +262 Byte (Dedup 60 statt 30, ACK 16 statt 8).
+Weitere Entkopplung moeglich (MAX_OWN_TX, MAX_BLE_RING separat), aber
+aktuell kein Engpass. Erst bei >20 Nodes relevant.
 
 ---
 
@@ -369,11 +324,13 @@ Eher nicht empfohlen fuer diesen Anwendungsfall.
 
 ```
 Retransmit (Status=0x00):
-  NUR user-originierte Textnachrichten (Typ 0x3A)
+  User-originierte Textnachrichten (Typ 0x3A, BLE/lokal): 3 Retries
+  UDP-Text DM (persoenlich, z.B. OE1ABC):                 2 Retries
+  UDP-Text Broadcast (*) und Gruppe (z.B. 9999):           1 Retry
   NICHT: {CET}, {MCP}, {SET} Kontrollnachrichten
-  NICHT: Positionen, HEY, ACKs, Relays, UDP-to-LoRa
+  NICHT: Positionen, HEY, ACKs, Relays
 
-Alles andere ist bereits Fire-and-Forget (Status=0xFF).
+Alles andere ist Fire-and-Forget (Status=0xFF).
 ```
 
 ### Was waere, wenn wir ALLES Fire-and-Forget machen?
@@ -395,30 +352,28 @@ Nachteile:
   - Phone-App kann dem User nicht mehr "zugestellt" anzeigen
 ```
 
-### Differenziertes Fire-and-Forget
-
-Statt "alles oder nichts" koennte man differenzieren:
+### Umgesetztes Retry-Modell (differenziert nach Quelle und Typ)
 
 ```
-+-------------------+------------------+-------------------------------+
-| Nachrichtentyp    | Aktuell          | Vorschlag                     |
-+-------------------+------------------+-------------------------------+
-| Text an *         | 3x Retry         | Fire-and-Forget               |
-|                   |                  | (Broadcast erreicht sowieso   |
-|                   |                  | alle in Reichweite)            |
-+-------------------+------------------+-------------------------------+
-| Text an Gruppe    | 3x Retry         | Fire-and-Forget               |
-|                   |                  | (wie Broadcast)               |
-+-------------------+------------------+-------------------------------+
-| Text an Callsign  | 3x Retry         | 1x Retry BEIBEHALTEN          |
-| (DM)              |                  | (Zustellgarantie wichtig)     |
-+-------------------+------------------+-------------------------------+
-| Position          | Fire-and-Forget  | Keine Aenderung               |
-+-------------------+------------------+-------------------------------+
-| HEY               | Fire-and-Forget  | Keine Aenderung               |
-+-------------------+------------------+-------------------------------+
-| ACK               | Fire-and-Forget  | Keine Aenderung               |
-+-------------------+------------------+-------------------------------+
++-------------------+---------------------+-------------------------------+
+| Nachrichtentyp    | Retries             | Mechanismus                   |
++-------------------+---------------------+-------------------------------+
+| Lokal Text (BLE)  | 3 Retries           | retryCount=0, MAX_RETRANSMIT=3|
++-------------------+---------------------+-------------------------------+
+| UDP Text DM       | 2 Retries           | retryCount=1                  |
+| (an Callsign)     |                     | (Zustellgarantie wichtig)     |
++-------------------+---------------------+-------------------------------+
+| UDP Text Broadcast| 1 Retry             | retryCount=2                  |
+| (* oder Gruppe)   |                     | (Kompromiss: 1x reicht meist) |
++-------------------+---------------------+-------------------------------+
+| UDP CET/SET       | Fire-and-Forget     | Status=0xFF                   |
++-------------------+---------------------+-------------------------------+
+| Position          | Fire-and-Forget     | Status=0xFF                   |
++-------------------+---------------------+-------------------------------+
+| HEY               | Fire-and-Forget     | Status=0xFF                   |
++-------------------+---------------------+-------------------------------+
+| ACK               | Fire-and-Forget     | Status=0xFF                   |
++-------------------+---------------------+-------------------------------+
 ```
 
 ### Auswirkung auf ACK-Storms
@@ -429,14 +384,16 @@ Wenn Broadcasts Fire-and-Forget sind:
 - ABER: wenn wir keine ACKs mehr senden, fallen ACK-Storms komplett weg!
 
 ```
-Szenario: 8 Nodes, Broadcast, OHNE ACKs:
+Szenario: 8 Nodes, Broadcast, OHNE ACKs (theoretisch):
   Kanalauslastung = 1 Original + 7 Relays = 8 Pakete
   KEIN ACK, KEIN ACK-Relay, KEIN Retransmit
 
-  vs. Ist-Zustand:
-  1 Original + 7 Relays + 9 ACKs + ACK-Relays + bis zu 3 Retransmits
-  = 8 + 9 + ~63 ACK-Relays + bis zu 3*8 = 24 Retransmit-Pakete
-  = ~104 Pakete (!!!)
+  vs. Aktueller Zustand (1 Retry fuer UDP-Broadcast):
+  1 Original + 7 Relays + 9 ACKs + ACK-Relays + max 1 Retransmit
+  = 8 + 9 + ~63 ACK-Relays + 8 Retransmit-Pakete
+  = ~88 Pakete
+
+  ACK-Suppression fuer Broadcasts wuerde das auf ~8 Pakete reduzieren.
 ```
 
 ### Kompromiss: ACK-Suppression fuer Broadcasts
@@ -456,163 +413,109 @@ Begruendung:
 
 ---
 
-## 6. Von 3 Retransmits auf 1 Retransmit
+## 6. Retransmit-Abstufung (umgesetzt)
 
-### Ist-Zustand
-
-```
-MAX_RETRANSMIT = 3
-Intervall:     24-44 Sekunden (Jitter basierend auf msg_id Hash)
-Slot-Belegung: Bis zu 132 Sekunden pro Nachricht (3 * 44s worst case)
-Zeitlinie:
-
-  T=0s     Erster TX
-  T=24-44s Zweiter TX (1. Retry)
-  T=48-88s Dritter TX (2. Retry)
-  T=72-132s Vierter TX (3. Retry) oder Aufgabe
-```
-
-### Vorschlag: MAX_RETRANSMIT = 1
+### Mechanismus
 
 ```
-Intervall:     24-44 Sekunden (unveraendert)
-Slot-Belegung: Bis zu 44 Sekunden pro Nachricht (1 * 44s worst case)
-Zeitlinie:
+MAX_RETRANSMIT = 3 (in configuration_global.h)
+Intervall:     24-44 Sekunden (Jitter basierend auf msg_id Hash, deterministisch)
+Timer:         updateRetransmissionStatus() inkrementiert Status-Byte alle 2s
 
-  T=0s     Erster TX
-  T=24-44s Zweiter TX (1. und einziger Retry) oder Aufgabe
+Die Anzahl effektiver Retries wird ueber den Startwert von retryCount gesteuert:
+  retryCount startet bei N, wird pro Retry um 1 erhoeht.
+  Bei retryCount >= MAX_RETRANSMIT (3) wird aufgegeben.
 ```
 
-### Vorteile
+### Retries nach Nachrichtentyp und Quelle
 
 ```
-1. Slot-Belegung -67%:
-   132s -> 44s max pro Nachricht
-   Bei 30 Slots: Durchsatz verdreifacht sich theoretisch
-
-2. Kanalauslastung -50%:
-   Statt 4 TX (1+3) nur 2 TX (1+1) pro Nachricht im Worst Case
-   Bei 8 Nodes: 8 Retransmits weniger pro Nachricht
-
-3. Retransmit-Storm-Risiko sinkt drastisch:
-   Weniger Retransmits = weniger Chance auf Dedup-Puffer-Ueberlauf
-   = weniger Kaskaden
-
-4. Einfachere Analyse:
-   Nur 2 Zustaende (gesendet, einmal retried) statt 4
-```
-
-### Risiken
-
-```
-1. Zustellrate sinkt bei schlechter Funkverbindung:
-   Bei 50% Paketverlust:
-     3 Retransmits: Zustellwahrscheinlichkeit = 1 - 0.5^4 = 93.75%
-     1 Retransmit:  Zustellwahrscheinlichkeit = 1 - 0.5^2 = 75%
-     0 Retransmits: Zustellwahrscheinlichkeit = 50%
-
-   ABER: in einem Mesh-Netzwerk mit mehreren Pfaden ist die effektive
-   Zustellrate hoeher, weil Relays die Nachricht ueber alternative
-   Wege zum Empfaenger bringen.
-
-2. DMs koennten verloren gehen:
-   Bei Callsign-adressierten Nachrichten ist jeder Verlust
-   fuer den User sichtbar und aergerlich.
-   -> Empfehlung: DMs bei 1 Retry belassen oder sogar 2 Retry
-```
-
-### Differenzierter Vorschlag
-
-```
-+-------------------+----------+-----------+-------------------------------+
-| Nachrichtentyp    | Aktuell  | Vorschlag | Begruendung                   |
-+-------------------+----------+-----------+-------------------------------+
-| Text an * / Grp   | 3 Retry  | 0 Retry   | Broadcast = Fire-and-Forget   |
-|                   |          |           | Mesh sorgt fuer Verbreitung   |
-+-------------------+----------+-----------+-------------------------------+
-| Text DM (Callsign)| 3 Retry  | 1 Retry   | Zustellgarantie wichtig,      |
-|                   |          |           | aber 3 ist zu viel            |
-+-------------------+----------+-----------+-------------------------------+
-| Position          | 0        | 0         | Keine Aenderung               |
-+-------------------+----------+-----------+-------------------------------+
-| HEY               | 0        | 0         | Keine Aenderung               |
-+-------------------+----------+-----------+-------------------------------+
++-------------------+-------------+-----------+-------------------------------+
+| Nachrichtentyp    | retryCount  | Retries   | Slot-Belegung (worst case)    |
++-------------------+-------------+-----------+-------------------------------+
+| Lokal Text (BLE)  | 0           | 3 Retries | ~132s (3 * 44s)               |
++-------------------+-------------+-----------+-------------------------------+
+| UDP Text DM       | 1           | 2 Retries | ~88s (2 * 44s)                |
+| (an Callsign)     |             |           |                               |
++-------------------+-------------+-----------+-------------------------------+
+| UDP Text Broadcast| 2           | 1 Retry   | ~44s (1 * 44s)                |
+| (* oder Gruppe)   |             |           |                               |
++-------------------+-------------+-----------+-------------------------------+
+| UDP CET/SET       | 0 (0xFF)    | 0         | Sofort frei nach TX           |
++-------------------+-------------+-----------+-------------------------------+
+| Position/HEY/ACK  | 0 (0xFF)    | 0         | Sofort frei nach TX           |
++-------------------+-------------+-----------+-------------------------------+
 ```
 
 ### Auswirkung auf das 8-Node-Szenario
 
 ```
-IST-ZUSTAND (3 Retry, ACKs fuer alles):
-  1 Broadcast generiert:
+VORHER (3 Retry fuer alle UDP-Texte, ACKs fuer alles):
+  1 UDP-Broadcast generiert:
     8 LoRa-Pakete (1 + 7 Relays)
     9 ACKs + ~63 ACK-Relays
     bis zu 3 Retransmits * 8 = 24 Pakete
     Total: ~104 Pakete auf dem Kanal
 
-VORSCHLAG (0 Retry fuer Broadcast, keine ACKs fuer Broadcast):
-  1 Broadcast generiert:
+JETZT (1 Retry fuer UDP-Broadcast):
+  1 UDP-Broadcast generiert:
     8 LoRa-Pakete (1 + 7 Relays)
-    0 ACKs
-    0 Retransmits
-    Total: 8 Pakete auf dem Kanal
+    9 ACKs + ~63 ACK-Relays (unveraendert)
+    max 1 Retransmit * 8 = 8 Pakete
+    Total: ~88 Pakete auf dem Kanal
 
-  -> REDUKTION UM FAKTOR 13 (!!!)
+  -> Reduktion der Retransmit-Last um 67%
+  -> DMs behalten 2 Retries fuer zuverlaessige Zustellung
 ```
 
 ---
 
-## 7. Zusammenfassung der Empfehlungen
+## 7. Umsetzungsstatus
 
-### Massnahme 1: Sofort umsetzbar, minimal-invasiv
+### UMGESETZT: ackBuffer von 8 auf 16
 
 ```
-Aenderung:  MAX_ACK_RING = 16  (statt 8)
+Aenderung:  MAX_ACK_RING = 16
 Datei:      configuration_global.h
 RAM-Kosten: +112 Byte
 Effekt:     ackBuffer-Overflow bei 8+ Nodes vermieden
 ```
 
-### Massnahme 2: Sofort umsetzbar, minimal-invasiv
+### UMGESETZT: Dedup-Puffer entkoppelt und vergroessert
 
 ```
-Aenderung:  Separater Dedup-Puffer, 60 Slots (statt MAX_RING=30)
-Dateien:    configuration_global.h, loop_functions.cpp
+Aenderung:  MAX_DEDUP_RING = 60 (40 bei XML/SBUFFER), entkoppelt von MAX_RING
+Dateien:    configuration_global.h, loop_functions.cpp, loop_functions_extern.h, lora_functions.cpp
 RAM-Kosten: +150 Byte
 Effekt:     Dedup-Fenster verdoppelt, weniger Storm-Kaskaden
 ```
 
-### Massnahme 3: Design-Entscheidung erforderlich
+### UMGESETZT: Differenzierte Retries fuer UDP-Textnachrichten
 
 ```
-Aenderung:  Broadcasts/Gruppen -> Fire-and-Forget (kein Retry, kein ACK)
-            Nur DMs behalten Retry (1x statt 3x)
-Dateien:    lora_functions.cpp, loop_functions.cpp
+Aenderung:  UDP DM: 2 Retries, UDP Broadcast/Gruppe: 1 Retry, CET/SET: Fire&Forget
+Dateien:    udp_functions.cpp, configuration_global.h (MAX_RETRANSMIT verschoben)
 RAM-Kosten: 0
-Effekt:     Kanalauslastung um Faktor 10+ reduziert
-            ACK-Storms eliminiert
-            Simpler Code
-Risiko:     Phone-App verliert "zugestellt"-Feedback fuer Broadcasts
-            -> Alternative: HEARD-Status nutzen (kostenlos)
+Effekt:     Retry-Last fuer Broadcasts um 67% reduziert
+            DMs behalten zuverlaessige Zustellung
+            CET/SET bleiben leichtgewichtig
 ```
 
-### Massnahme 4: Mittelfristig
+### UMGESETZT: Loop-Detection und Hop-Counter-Safeguard
 
 ```
-Aenderung:  Separate Puffer-Konstanten statt gemeinsames MAX_RING
-            ENABLE_SBUFFER Toter Code entfernen
-Dateien:    configuration_global.h, loop_functions.cpp, loop_functions_extern.h
-RAM-Kosten: 0 (Umstrukturierung)
-Effekt:     Jeder Puffer optimal dimensioniert
-            Sauberere Architektur
+Aenderung:  Eigenes Callsign in Source-Path erkennen -> Relay blockieren
+            Path-Count gegen max_hop pruefen (zusaetzlich zum Hop-Counter)
+Dateien:    lora_functions.cpp, aprs_functions.cpp
+Effekt:     Broadcast-Loops und ueberzaehlige Relays verhindert
 ```
 
-### Prioritaet
+### OFFEN: Weitere Optimierungen
 
 ```
-Empfohlene Reihenfolge:
-
-  1. Massnahme 3 (Fire-and-Forget fuer Broadcasts) -- groesster Effekt, 0 Byte RAM
-  2. Massnahme 1 (ackBuffer 16) -- 112 Byte, verhindert akute Overflows
-  3. Massnahme 2 (Dedup 60) -- 150 Byte, haertet Dedup ab
-  4. Massnahme 4 (Refactoring) -- Aufraumen, keine Eile
+- ACK-Suppression fuer Broadcasts (keine ACKs bei ServerFlag)
+- Getrennte Dedup-Puffer fuer Nachrichten und ACKs
+- Zeitbasiertes Expiry im Dedup-Puffer
+- ENABLE_SBUFFER toten Code entfernen
+- Weitere Puffer-Konstanten entkoppeln (MAX_OWN_TX, MAX_BLE_RING)
 ```

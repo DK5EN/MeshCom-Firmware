@@ -93,14 +93,14 @@ DM-ACK (:ackNNN):    msg_id = (MAC_22bit << 10) | (iAckId & 0x3FF)
 | Puffer | Slots | Slot-Groesse | Zweck |
 |--------|-------|-------------|-------|
 | `ringBuffer` | 30 (20*) | 260 Byte | LoRa TX-Queue (Haupt-Sendepuffer) |
-| `ackBuffer` | **8** | 14 Byte | ACK Fast-Path (hoechste Prio) |
-| `ringBufferLoraRX` | 30 (20*) | 5 Byte | "Schon gehoert" Dedup (msg_id + ServerFlag) |
+| `ackBuffer` | 16 (alle Builds) | 14 Byte | ACK Fast-Path (hoechste Prio) |
+| `ringBufferLoraRX` | 60 (40*) | 5 Byte | "Schon gehoert" Dedup (msg_id + ServerFlag), eigene Konstante MAX_DEDUP_RING |
 | `own_msg_id` | 30 (20*) | 5 Byte | Eigene gesendete msg_ids (fuer ACK-Matching) |
 | `ringbufferRAWLoraRX` | 20 | 260 Byte | Raw RX Log (Debug/WebUI) |
 | `ringBufferUDPout` | 20 | 275 Byte | UDP-Ausgang zum Server (nur GW) |
 | `BLEtoPhoneBuff` | 30 | 305 Byte | BLE-Ausgang zum Handy |
 
-\* = 20 bei Builds mit ENABLE_XML oder ENABLE_SBUFFER
+\* = bei Builds mit ENABLE_XML oder ENABLE_SBUFFER: MAX_RING=20, MAX_DEDUP_RING=40
 
 ### 4.2 ringBuffer -- Status-Byte [1]
 
@@ -118,12 +118,12 @@ flowchart TD
 
     B -->|Eigene Textnachricht| C[ringBuffer, Status=0x00<br/>Retransmit aktiv]
     B -->|Eigene Position/HEY| D[ringBuffer, Status=0xFF<br/>Fire & Forget]
-    B -->|UDP vom Server| E[ringBuffer, Status=0xFF<br/>Fire & Forget]
+    B -->|UDP vom Server| E[ringBuffer, Status bedingt<br/>DM: 2 Retries, Bcast/Grp: 1 Retry<br/>CET/SET: Fire & Forget]
     B -->|LoRa Relay/Mesh| F[ringBuffer, Status=0xFF<br/>Fire & Forget]
     B -->|ACK senden| G[ackBuffer, Status=0xFF<br/>Hoechste Prio]
 
     C --> H[insertOwnTx -> own_msg_id]
-    E --> H
+    E --> H2[insertOwnTx -> own_msg_id]
 
     C --> I[addLoraRxBuffer -> ringBufferLoraRX]
     E --> I
@@ -170,17 +170,22 @@ sequenceDiagram
 1. **ACK empfangen** (0x41 mit passender orig_msg_id) -> ringBuffer-Slot geloescht
 2. **HEARD** (eigene Nachricht von anderem Node gerelayed gehoert) -> ringBuffer-Slot geloescht
 3. **DM :ack empfangen** -> ringBuffer-Slot auf 0xFF gesetzt
-4. **Max Retries (3) erreicht** -> Slot freigegeben
-5. **Puffer voll** bei Retransmit-Versuch -> Slot gedroppt
+4. **Max Retries erreicht** (retryCount >= MAX_RETRANSMIT=3) -> Slot freigegeben
+5. **Puffer voll** bei Retransmit-Versuch (pending >= MAX_RING-2) -> Slot gedroppt
 
 ### 5.4 Retransmit-Timing
 
 ```
 Basis:     ~34 Sekunden
-Jitter:    +/- 10 Sekunden (basierend auf msg_id Hash)
+Jitter:    +/- 10 Sekunden (basierend auf msg_id Hash, deterministisch)
 Intervall: 24-44 Sekunden zwischen Retransmits
-Max:       3 Retransmits, dann Aufgabe
 Timer:     updateRetransmissionStatus() alle 2 Sekunden
+Max:       retryCount >= MAX_RETRANSMIT (3), dann Aufgabe
+           Effektive Retries haengen vom Startwert von retryCount ab:
+             Eigene Textnachricht (BLE/lokal): retryCount=0 -> 3 Retries
+             UDP DM (persoenliche Nachricht):  retryCount=1 -> 2 Retries
+             UDP Broadcast/Gruppe:             retryCount=2 -> 1 Retry
+             UDP CET/SET, Pos, HEY, Relay:     Status=0xFF  -> kein Retry
 ```
 
 ---
@@ -188,7 +193,7 @@ Timer:     updateRetransmissionStatus() alle 2 Sekunden
 ## 6. TX-Prioritaeten
 
 ```
-Prioritaet 1 (HOECHSTE):  ackBuffer (8 Slots)
+Prioritaet 1 (HOECHSTE):  ackBuffer (16 Slots)
                            -> ACKs werden IMMER vor normalen Nachrichten gesendet
                            -> Einfaches CAD ohne adaptiven Backoff
 
@@ -260,8 +265,10 @@ flowchart TD
     NO_UP --> SEND_ACK_NODE{Node-ACK?<br/>!ServerFlag}
     SEND_ACK_NODE -->|Ja| NODE_ACK[Node-ACK<br/>in ackBuffer]
 
-    SHOW --> MESH{Mesh ON?<br/>Hop > 0?}
-    MESH -->|Ja| RELAY[Hop--, Path+=Call<br/>ringBuffer 0xFF]
+    SHOW --> MESH{Mesh ON?<br/>Hop > 0?<br/>Path-Count < max_hop+1?}
+    MESH -->|Ja| LOOP{Loop-Detection:<br/>eigenes Call in Path?}
+    LOOP -->|Nein| RELAY[Hop--, Path+=Call<br/>ringBuffer 0xFF]
+    LOOP -->|Ja| BLOCK[RELAY_LOOP_BLOCKED]
     MESH -->|Nein| NO_RELAY[Kein Relay]
 ```
 
@@ -280,9 +287,10 @@ sequenceDiagram
     S->>G: UDP "GATE" + APRS-Paket
     Note over G: decodeAPRS()<br/>msg_server = true setzen<br/>Path += eigenes Call
 
-    G->>G: ringBuffer[iWrite] Status=0xFF<br/>insertOwnTx(msg_id)<br/>addLoraRxBuffer(msg_id, server=true)
+    G->>G: ringBuffer[iWrite]<br/>insertOwnTx(msg_id)<br/>addLoraRxBuffer(msg_id, server=true)
+    Note over G: Status abhaengig vom Typ:<br/>DM: 0x00 (2 Retries)<br/>Bcast/Grp: 0x00 (1 Retry)<br/>CET/SET: 0xFF (Fire&Forget)
 
-    G->>N: LoRa TX (Fire & Forget, kein Retry)
+    G->>N: LoRa TX
 
     Note over N: is_new_packet() = true<br/>msg_server = true erkannt
     N->>N: Anzeigen + BLE
@@ -297,7 +305,10 @@ sequenceDiagram
     end
 ```
 
-**Retransmit:** Keiner. Der GW sendet mit Status=0xFF (Fire&Forget). Der Server ist fuer eigene Zuverlaessigkeit verantwortlich.
+**Retransmit:** Abhaengig vom Nachrichtentyp:
+- DM (persoenlich): 2 Retries (retryCount startet bei 1)
+- Broadcast/Gruppe: 1 Retry (retryCount startet bei 2)
+- CET/SET: Fire&Forget (Status=0xFF)
 
 ### 8.2 Szenario: Lokaler Node sendet Textnachricht
 
@@ -347,7 +358,7 @@ Identisch zu Broadcast, ausser:
 
 - Nur der Empfaenger (OE1ABC) zeigt an und sendet DM-ACK (`:ackNNN` im Payload)
 - Zwischen-Nodes senden KEINEN ACK, relayed nur per Mesh
-- Der Sender retransmitted bis DM-ACK kommt (max 3x)
+- Der Sender retransmitted bis DM-ACK kommt (max 3x lokal, max 2x bei UDP)
 
 ### 8.3 Szenario: LoRa-Paket empfangen (nach Node-Typ)
 
@@ -409,10 +420,13 @@ Puffer-Bilanz: Minimal
 
 ```
 Server->G:  UDP "GATE" Paket
-G sendet:   ringBuffer Status=0xFF, ServerFlag=true
+G sendet:   ringBuffer Status=0x00, retryCount=2 (1 Retry fuer Broadcast)
+            ServerFlag=true, insertOwnTx(msg_id)
 A empfaengt: Anzeigen, KEIN ACK (ServerFlag), KEIN Relay (kein Mesh)
 
-Puffer-Bilanz: Minimal
+Falls kein ACK innerhalb 24-44s: 1 Retry, dann Aufgabe.
+Bei DM (z.B. an OE1ABC): retryCount=1 -> 2 Retries.
+Bei CET/SET: Status=0xFF, kein Retry.
 ```
 
 ### 9.2 Voll vermaschtes Quadrat: A, B, C (Mesh ON) + G (GW+Mesh)
@@ -547,7 +561,7 @@ Jeder hoert jeden (worst case).
 #### Eine einzelne Textnachricht (Broadcast)
 
 ```
-ringBufferLoraRX (Dedup, 30 Slots):
+ringBufferLoraRX (Dedup, 60 Slots / MAX_DEDUP_RING):
   WICHTIG: Alle Relays tragen dieselbe msg_id wie das Original!
   is_new_packet() prueft per memcmp nur die 4-Byte msg_id.
   -> 1 Broadcast belegt nur 1 Dedup-Slot fuer die Nachricht selbst.
@@ -560,16 +574,16 @@ ringBufferLoraRX (Dedup, 30 Slots):
      + 1 Nachrichten-ID
      = 12 Dedup-Eintraege pro Broadcast
 
-  -> Bei 3 gleichzeitigen Broadcasts: 36 Eintraege -> Puffer VOLL (30)!
+  -> Bei 5 gleichzeitigen Broadcasts: 60 Eintraege -> Puffer VOLL (60)
+     (mit alten 30 Slots war bei 3 Broadcasts Schluss)
 
-ackBuffer (8 Slots):
+ackBuffer (16 Slots / MAX_ACK_RING):
   2 GWs senden je 2 ACKs = 4 ACKs
   7 Mesh-Nodes senden je 1 ACK = 7 ACKs
   -> 11 ACKs total, aber jeder Node sieht nur die ACKs in Reichweite
   -> Jeder der 9 empfangenden Nodes will einen ACK senden
   -> ackBuffer_cancel_msgid reduziert: GW-ACK cancelt Node-ACKs
-  -> Trotzdem: Timing-Race! Wenn 9+ ACKs fast gleichzeitig in den
-     8-Slot ackBuffer muessen -> OVERFLOW!
+  -> 16 Slots bieten genuegend Headroom fuer 10-Node-Szenarien
 
 ringBuffer (30 Slots):
   9 Nodes relayed die Nachricht = 9 Slots (alle 0xFF)
@@ -583,17 +597,15 @@ ringBuffer (30 Slots):
 Wenn jeder der 10 Nodes alle 5 Minuten eine Nachricht sendet:
   = 2 Nachrichten/Minute
 
-ringBufferLoraRX (30 Slots, kein Expiry!):
+ringBufferLoraRX (60 Slots / MAX_DEDUP_RING, kein Expiry!):
   Pro Broadcast: 1 msg_id + ~11 ACK-msg_ids = 12 Dedup-Eintraege
   (Nachricht: 1 Slot, ACKs: je 1 Slot wegen eigener ack_msg_id)
-  30 Slots / 12 = 2-3 Broadcasts bevor Ueberschreiben
-  Bei 2 msg/min: Dedup-Fenster = ~60-90 Sekunden
+  60 Slots / 12 = 5 Broadcasts bevor Ueberschreiben
+  Bei 2 msg/min: Dedup-Fenster = ~150 Sekunden
 
-  PROBLEM: Retransmit-Intervall = 24-44 Sekunden
-  -> Retransmit kommt, waehrend Original noch im Dedup-Puffer ist -> OK
-  -> ABER: bei hoher Last (>3 Broadcasts in 44s) kann ein Retransmit
-     ankommen, nachdem seine msg_id schon ueberschrieben wurde!
-     -> Nachricht wird ERNEUT verarbeitet und gerelayed -> STORM!
+  Retransmit-Intervall = 24-44 Sekunden -> passt komfortabel ins Fenster.
+  Bei sehr hoher Last (>5 Broadcasts in 44s) kann ein Retransmit
+  ankommen, nachdem seine msg_id schon ueberschrieben wurde.
 
   Haupttreiber des Dedup-Verbrauchs sind die ACK-IDs, nicht die
   Nachrichten-Relays (die alle dieselbe msg_id tragen).
@@ -605,10 +617,10 @@ ringBufferLoraRX (30 Slots, kein Expiry!):
 +---------------------------+-------+------------------------------------+
 | Puffer                    | Slots | Kritisch bei                       |
 +---------------------------+-------+------------------------------------+
-| ackBuffer                 |   8   | >4 Nodes mit Mesh/GW in Reichweite|
-|                           |       | ACK-Storm bei Broadcasts!          |
+| ackBuffer                 |  16   | >8 Nodes mit Mesh/GW in Reichweite |
+|                           |       | (genuegend Headroom fuer 10 Nodes) |
 +---------------------------+-------+------------------------------------+
-| ringBufferLoraRX (Dedup)  |  30   | >3 gleichzeitige Broadcasts        |
+| ringBufferLoraRX (Dedup)  |  60   | >5 gleichzeitige Broadcasts        |
 |                           |       | bei 10 Nodes (~12 IDs pro Broadcast|
 |                           |       | wegen ACK-msg_ids, nicht Relays!)  |
 |                           |       | KEIN ZEITLICHES EXPIRY!            |
@@ -675,20 +687,18 @@ die Nachrichten-Relays (die alle dieselbe msg_id tragen).
 
 ## 11. Identifizierte Probleme und Empfehlungen
 
-### Problem 1: ackBuffer zu klein (8 Slots)
+### Problem 1: ackBuffer -- geloest
 
 **Symptom:** `ACK_FWD_DROPPED ack_buf_full` in Logs
-**Ursache:** Bei >4 Mesh-Nodes in Reichweite laufen die 8 Slots ueber
-**Empfehlung:** ackBuffer auf mindestens 16 Slots vergroessern, oder ACK-Suppression: nur GW-ACK senden wenn GW vorhanden, Node-ACK unterdruecken wenn GW-ACK schon gesehen
+**Loesung:** MAX_ACK_RING von 8 auf 16 vergroessert. Genuegend Headroom fuer 10-Node-Szenarien.
+**Offen:** ACK-Suppression (nur GW-ACK senden wenn GW vorhanden) wuerde die ACK-Last weiter reduzieren.
 
-### Problem 2: ringBufferLoraRX hat kein zeitliches Expiry
+### Problem 2: ringBufferLoraRX -- entschaerft
 
-**Symptom:** Bei hoher Nachrichtendichte werden alte msg_ids zu frueh ueberschrieben, Duplikate durchgelassen, ACK-Storms ausgeloest
-**Ursache:** Reiner Ring-Puffer mit 30 Slots, kein Zeitstempel. Haupttreiber der Puffer-Belastung sind die ACK-msg_ids (jeder ACK hat eigene millis()-basierte ID), nicht die Nachrichten-Relays (die alle dieselbe msg_id tragen). Pro Broadcast werden ~12 Dedup-Slots verbraucht (1 Nachricht + ~11 ACKs bei 10 Nodes).
-**Empfehlung:**
-- Zeitstempel pro Eintrag hinzufuegen, Eintraege erst nach >60s ueberschreiben
-- Oder: Puffergroesse dynamisch an Netzwerkgroesse anpassen
-- Oder: Getrennte Dedup-Puffer fuer Nachrichten und ACKs (siehe ringbuffer-discussion.md)
+**Symptom:** Bei hoher Nachrichtendichte werden alte msg_ids zu frueh ueberschrieben
+**Loesung:** MAX_DEDUP_RING auf 60 vergroessert (entkoppelt von MAX_RING). Dedup-Fenster verdoppelt.
+**Offen:** Kein zeitliches Expiry. Bei >5 gleichzeitigen Broadcasts in 44s kann der Puffer ueberlaufen.
+**Moegliche Erweiterung:** Getrennte Dedup-Puffer fuer Nachrichten und ACKs (siehe ringbuffer-discussion.md)
 
 ### Problem 3: Zu viele Nodes mit GW+Mesh verursachen ACK-Multiplikation
 
@@ -717,23 +727,19 @@ die Nachrichten-Relays (die alle dieselbe msg_id tragen).
 ## 12. Zusammenfassung der Puffer-Dimensionierung
 
 ```
-Empfohlene Mindestgroessen fuer 10 Nodes (2 GW, alle Mesh):
+Aktuelle Groessen (Stand Firmware-DEV):
 
-ringBufferLoraRX:  60+ Slots
-                   Aktuell: 30 -> KRITISCH
-                   Grund: ~12 Dedup-Eintraege pro Broadcast
-                   (1 Nachricht + ~11 ACKs mit je eigener ack_msg_id)
-                   Nachrichten-Relays verbrauchen KEINE zusaetzlichen Slots
-                   (alle tragen dieselbe msg_id wie das Original)
+ringBufferLoraRX:  60 Slots (MAX_DEDUP_RING, entkoppelt von MAX_RING)
+                   Ausreichend fuer ~5 gleichzeitige Broadcasts bei 10 Nodes
+                   (~12 Dedup-Eintraege pro Broadcast)
 
-ackBuffer:         16+ Slots
-                   Aktuell: 8 -> KNAPP
-                   Grund: bis zu 11 ACKs pro Broadcast bei 10 Nodes
+ackBuffer:         16 Slots (MAX_ACK_RING)
+                   Genuegend Headroom fuer 10-Node-Szenarien
 
-ringBuffer:        30 Slots -> AUSREICHEND wenn Retransmit-Storm vermieden
+ringBuffer:        30 Slots (MAX_RING) -> AUSREICHEND
 
-own_msg_id:        30 Slots -> OK
+own_msg_id:        30 Slots (MAX_RING) -> OK
 
-Fuer 20+ Nodes: alle Werte verdoppeln oder Architektur ueberdenken
-(getrennte Dedup-Puffer fuer Nachrichten/ACKs, ACK-Suppression)
+Fuer 20+ Nodes: Architektur ueberdenken
+(getrennte Dedup-Puffer fuer Nachrichten/ACKs, ACK-Suppression, zeitliches Expiry)
 ```
