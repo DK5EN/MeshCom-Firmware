@@ -1039,7 +1039,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                 aprsmsg.msg_last_hw = BOARD_HARDWARE | 0x80; // hardware  last sending node   last sending node (0x80)
                                 aprsmsg.msg_source_mod = (getMOD() & 0xF) | (meshcom_settings.node_country << 4); // modulation & country
-                            
+
+                                // Loop detection: skip relay if own callsign already in path
+                                {
+                                    String searchCall = String(",") + meshcom_settings.node_call + ",";
+                                    String searchPath = String(",") + aprsmsg.msg_source_path + ",";
+                                    if(searchPath.indexOf(searchCall) >= 0)
+                                    {
+                                        if(bLORADEBUG)
+                                            Serial.printf("[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path\n");
+                                        goto skip_relay;
+                                    }
+                                }
+
                                 if(bSHORTPATH)
                                 {
                                     /* short path */
@@ -1112,6 +1124,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     bNewLine=true;
                                 }
                             }
+skip_relay: ;
                         }
                         else
                         {

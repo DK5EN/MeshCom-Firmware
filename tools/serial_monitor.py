@@ -54,6 +54,7 @@ RE_RX_TIMEOUT_FIRE = re.compile(
 )
 RE_CAD_FALSE_POSITIVE = re.compile(r"\[MC-DBG\]\s+CAD_FALSE_POSITIVE")
 RE_RX_TIMEOUT_DEFERRED = re.compile(r"\[MC-DBG\]\s+RX_TIMEOUT_DEFERRED")
+RE_RELAY_LOOP_BLOCKED = re.compile(r"\[MC-DBG\]\s+RELAY_LOOP_BLOCKED")
 RE_NTP_FAIL = re.compile(r"TimeClient no (?:update|force update) possible")
 RE_NTP_OK = re.compile(r"TimeClient now \(UTC\)")
 RE_HB_TIMEOUT = re.compile(r"\[UDP\] Heartbeat timeout")
@@ -373,6 +374,12 @@ class Monitor:
             self.total["rx_timeout_deferred"] += 1
             return
 
+        # RELAY_LOOP_BLOCKED (loop detection prevented a relay)
+        if RE_RELAY_LOOP_BLOCKED.search(line):
+            self.counters["relay_loop_blocked"] += 1
+            self.total["relay_loop_blocked"] += 1
+            return
+
         # -- ACK deduplication tracking -----------------------------------------
 
         # ACK_RX_CANCEL: heard another ACK, cancelled N pending
@@ -610,6 +617,7 @@ class Monitor:
                 f"{self.counters['tx_timeouts']} timeouts\n"
                 f"State: {state_str or 'no transitions'}\n"
                 f"Drops: {drops} | "
+                f"Loop blocked: {self.counters.get('relay_loop_blocked', 0)} | "
                 f"CAD false pos: {self.counters.get('cad_false_pos', 0)} | "
                 f"CAD filtered: {cad_fp_filtered} | "
                 f"Retransmit fails: {self.counters.get('retransmit_fails', 0)}\n"
@@ -643,6 +651,7 @@ class Monitor:
                 f"TX={self.total['tx_packets']} "
                 f"Errors={self.total['rx_errors']} "
                 f"Drops={sum(v for k, v in self.total.items() if k.startswith('drop_'))} "
+                f"LoopBlocked={self.total['relay_loop_blocked']} "
                 f"RadioSilent={self.total['radio_silent']} "
                 f"(max gap: {self.max_radio_gap_total:.0f}s) "
                 f"Deferred={self.total['rx_timeout_deferred']}\n"
