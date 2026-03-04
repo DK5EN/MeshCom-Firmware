@@ -1269,7 +1269,7 @@ bool doTX()
             if(msg_type_b_lora != 0x00)
             {
                 // CAD: Channel Activity Detection before sending ACK
-                #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630)
+                #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630) || defined(SX127X)
                 {
                     #if defined(BOARD_RAK4630)
                     bool detected = nrf52_cad_scan();
@@ -1288,7 +1288,7 @@ bool doTX()
                     radio.clearPacketSentAction();
                     int cad_result = radio.scanChannel();
 
-                    if(cad_result == RADIOLIB_LORA_DETECTED)
+                    if(cad_result == CAD_ACTIVITY_DETECTED)
                     {
                         delay(1);
                         cad_result = radio.scanChannel();
@@ -1297,7 +1297,7 @@ bool doTX()
                     extern void setFlagSent(void);
                     radio.setPacketSentAction(setFlagSent);
 
-                    if(cad_result == RADIOLIB_LORA_DETECTED)
+                    if(cad_result == CAD_ACTIVITY_DETECTED)
                     {
                         // Channel busy: put ACK back and retry next cycle
                         iAckRead = save_ack_read;
@@ -1496,7 +1496,7 @@ bool doTX()
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
                     // --- CSMA/CA: Slot-based CAD Backoff (Meshtastic-Style) ---
-                    #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630)
+                    #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630) || defined(SX127X)
                     {
                         static unsigned long cad_backoff_until = 0;
                         static unsigned long cad_first_busy_ts = 0;
@@ -1525,7 +1525,7 @@ bool doTX()
                         int cad_result = radio.scanChannel();
 
                         // Double-scan: confirm LORA_DETECTED (stale IRQ filter)
-                        if(cad_result == RADIOLIB_LORA_DETECTED)
+                        if(cad_result == CAD_ACTIVITY_DETECTED)
                         {
                             delay(2);
                             cad_result = radio.scanChannel();
@@ -1536,7 +1536,7 @@ bool doTX()
 
                         extern void setFlagSent(void);
                         radio.setPacketSentAction(setFlagSent);
-                        bool detected = (cad_result == RADIOLIB_LORA_DETECTED);
+                        bool detected = (cad_result == CAD_ACTIVITY_DETECTED);
                         #endif
 
                         if(detected)

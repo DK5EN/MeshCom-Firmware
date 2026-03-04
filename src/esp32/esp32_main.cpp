@@ -3248,15 +3248,40 @@ int checkRX(bool bRadio)
     else
     if (state == RADIOLIB_ERR_CRC_MISMATCH)
     {
-        // FIX BUG #2: Also restart RX after CRC error
+        // Save signal metrics and packet length BEFORE restarting RX
+        // (SPI registers are invalidated by startReceive)
+        size_t  crc_len  = radio.getPacketLength(true);
+        float   crc_rssi = radio.getRSSI();
+        float   crc_snr  = radio.getSNR();
+        float   crc_ferr = radio.getFrequencyError();
+
+        // Restart RX immediately
         transitionTo(LORA_RX_LISTEN);
 
-        // packet was received, but is malformed
+        // packet was received, but CRC check failed — dump raw data for analysis
         if(bLORADEBUG)
         {
+            if (crc_len > 255) crc_len = 255;
+
             Serial.printf("[MC-DBG] CRC_ERROR rssi=%.1f snr=%.1f freq_err=%.1f size=%d ts=%lu\n",
-                radio.getRSSI(), radio.getSNR(), radio.getFrequencyError(),
-                (int)ibytes, millis());
+                crc_rssi, crc_snr, crc_ferr,
+                (int)crc_len, millis());
+
+            // Raw hex dump of the CRC-failed packet
+            Serial.printf("[MC-DBG] CRC_RAW[%d]: ", (int)crc_len);
+            for (size_t i = 0; i < crc_len; i++)
+            {
+                Serial.printf("%02X ", payload[i]);
+            }
+            Serial.println();
+
+            // ASCII representation (printable chars only, rest as '.')
+            Serial.printf("[MC-DBG] CRC_ASC[%d]: ", (int)crc_len);
+            for (size_t i = 0; i < crc_len; i++)
+            {
+                Serial.printf("%c", (payload[i] >= 0x20 && payload[i] <= 0x7E) ? (char)payload[i] : '.');
+            }
+            Serial.println();
         }
     }
     else

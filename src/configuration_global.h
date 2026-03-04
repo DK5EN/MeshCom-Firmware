@@ -40,6 +40,14 @@
 #define CSMA_CW_MIN      3       // Min CW exponent (2^3 = 8 Slots)
 #define CSMA_CW_MAX      8       // Max CW exponent (2^8 = 256 Slots)
 #define CAD_WATCHDOG_MS  30000   // Force TX after 30s (Watchdog)
+
+// Chip-agnostic CAD result: SX127x returns PREAMBLE_DETECTED, SX126x returns LORA_DETECTED
+#if defined(SX127X)
+  #define CAD_ACTIVITY_DETECTED  RADIOLIB_PREAMBLE_DETECTED
+#else
+  #define CAD_ACTIVITY_DETECTED  RADIOLIB_LORA_DETECTED
+#endif
+
 #define MAX_CALL_LEN 20     // max length of Callsign
 
 // UDP
