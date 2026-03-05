@@ -313,7 +313,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             }
           }
 
-          if(!checkOwnTx(aprsmsg.msg_id))
+          if(checkOwnTx(aprsmsg.msg_id) < 0)
           {
             if(bUDPtoLoraSend)
             {
