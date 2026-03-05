@@ -17,6 +17,9 @@
 - **UDP→LoRa Retry**: DM-Nachrichten erhalten 2 Retries, Broadcast/Group 1 Retry, CET/SET bleiben Fire-and-Forget
 - **UDP-to-LoRa Relay**: Fire-and-Forget — Server-bestätigte Nachrichten werden nicht mehr auf LoRa retransmitted
 
+### Bugfix
+- **UDP→LoRa Gateway defekt**: `checkOwnTx()` Rückgabewert (`int`, -1 = nicht gefunden) wurde als Boolean behandelt — `!(-1)` ist false, dadurch wurden **alle** Server-Nachrichten blockiert und nie per LoRa ausgesendet. Betraf alle Gateways seit Upstream-Commit 0953496.
+
 ### Mesh-Stabilität
 - **Dedup Buffer**: Von `MAX_RING` entkoppelt und auf 60 Slots erhöht (vorher 30), `MAX_ACK_RING` von 8 auf 16
 - **Loop Detection**: Eigenes Callsign im Source-Path wird vor Relay erkannt, Hop-Counter auf 4 Bit maskiert
