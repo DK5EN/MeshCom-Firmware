@@ -979,11 +979,7 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     //DEBUG_MSG_VAL("UDP", udpWrite, "UDP Ringbuf added El.:");
     //neth.printBuffer(ringBufferUDPout[udpWrite], len + 1);
 
-    //NOT addRingPointer(udpWrite, udpRead, MAX_RING_UDP);
-
-    udpWrite++;
-    if (udpWrite >= MAX_RING_UDP) // if the buffer is full we start at index 0 -> take care of overwriting!
-        udpWrite = 0;
+    addRingPointer(udpWrite, udpRead, MAX_RING_UDP);
 }
 
 void sendKEEP()
