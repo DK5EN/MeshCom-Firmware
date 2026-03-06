@@ -689,13 +689,8 @@ String udpUpdateTimeClient()
     if(!timeClient.forceUpdate())
     {
       Serial.println("TimeClient no force update possible");
+      Serial.println("[WIFI-DBG] NTP update failed, will retry next cycle");
 
-      Udp.stop();
-
-      WiFi.disconnect(true, true);
-
-      hasIPaddress=false;
-      
       return "none";
     }
   }
