@@ -1805,9 +1805,6 @@ void esp32loop()
 
                 checkRX(bRadio);
 
-                if(bLORADEBUG)
-                    Serial.printf("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
-
                 // FIX BUG #2: checkRX() now restarts RX internally.
                 // Remove redundant interrupt rewiring that would double-reconfigure.
                 // Only reset the timeout timers here.
