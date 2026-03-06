@@ -259,14 +259,9 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 	/*******************************************************************/
 
     void onAuthenticationComplete(NimBLEConnInfo& connInfo) override {
-        /** Check that encryption was successful, if not we disconnect the client */
-        if (!connInfo.isEncrypted()) {
-            NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
-            Serial.printf("Encrypt connection failed - disconnecting client\n");
-            return;
-        }
-
-        Serial.printf("Secured connection to: %s\n", connInfo.getAddress().toString().c_str());
+        Serial.printf("Client connected: %s (encrypted: %s)\n",
+            connInfo.getAddress().toString().c_str(),
+            connInfo.isEncrypted() ? "yes" : "no");
     }
 } serverCallbacks;
 
