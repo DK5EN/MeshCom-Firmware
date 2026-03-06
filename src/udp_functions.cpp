@@ -419,17 +419,17 @@ void sendMeshComUDP()
                 // if we have too much errors sending, reset UDP
                 if (err_cnt_udp_tx >= MAX_ERR_UDP_TX)
                 {
+                    Serial.printf("[WIFI-DBG] UDP TX error limit (%d) reached, calling resetMeshComUDP\n", MAX_ERR_UDP_TX);
+
                     // avoid TX and UDP
                     hasIPaddress = false;
                     meshcom_settings.node_hasIPaddress = hasIPaddress;
                     //cmd_counter = 50;
 
-                    if(bDisplayCont)
-                      Serial.println("[ERROR]...resetMeshComUDP");
-
                     err_cnt_udp_tx = 0;
-                    
+
                     resetMeshComUDP();
+                    return;  // socket reset, don't call endPacket
                 }
             }
 
@@ -950,14 +950,14 @@ void resetMeshComUDP()
 
   WiFi.disconnect(true, true);
 
-  hasIPaddress=false;
+  hasIPaddress = false;
+  meshcom_settings.node_hasIPaddress = false;
+  iWlanWait = 0;
+  web_timer = 0;
 
-  if(bGATEWAY || bWEBSERVER)
-  {
-    startMeshComUDP();
+  Serial.println("[WIFI-DBG] resetMeshComUDP: WiFi disconnected, flags reset for reconnect");
 
-    sendDisplayHead(false);
-  }
+  sendDisplayHead(false);
 }
 
 #endif
