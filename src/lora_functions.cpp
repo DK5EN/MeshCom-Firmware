@@ -175,6 +175,30 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 
                     own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
                 }
+
+                // stop retransmission in ring buffer for this msg_id
+                for(int ircheck=0; ircheck<MAX_RING; ircheck++)
+                {
+                    if(ringBuffer[ircheck][0] > 0 && ringBuffer[ircheck][1] != 0xFF)
+                    {
+                        unsigned int ring_msg_id =
+                            (ringBuffer[ircheck][6]<<24) |
+                            (ringBuffer[ircheck][5]<<16) |
+                            (ringBuffer[ircheck][4]<<8)  |
+                             ringBuffer[ircheck][3];
+
+                        if(ring_msg_id == msg_id)
+                        {
+                            ringBuffer[ircheck][1] = 0xFF;
+                            retryCount[ircheck] = 0;
+
+                            if(bDisplayRetx)
+                            {
+                                Serial.printf("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n", ircheck, ring_msg_id);
+                            }
+                        }
+                    }
+                }
             }
             else
             {
