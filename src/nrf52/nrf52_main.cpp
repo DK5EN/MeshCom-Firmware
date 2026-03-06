@@ -1084,6 +1084,24 @@ extern bool btimeClient;
         }
     }
 
+    // Channel utilization report (every 10s)
+    {
+        static unsigned long ch_util_timer = 0;
+        if(bLORADEBUG && (millis() - ch_util_timer) > 10000)
+        {
+            unsigned long window = millis() - ch_util_timer;
+            ch_util_timer = millis();
+            unsigned long rx_ms = ch_util_rx_accum;
+            unsigned long tx_ms = ch_util_tx_accum;
+            ch_util_rx_accum = 0;
+            ch_util_tx_accum = 0;
+            unsigned int util = (unsigned int)((rx_ms + tx_ms) * 100 / window);
+            if(util > 100) util = 100;
+            Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
+                rx_ms, tx_ms, util);
+        }
+    }
+
     if(iReceiveTimeOutTime > 0)
     {
         if((iReceiveTimeOutTime + csma_timeout) < millis())
@@ -1152,6 +1170,7 @@ extern bool btimeClient;
                         Serial.printf("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
                     }
 
+                    ch_util_tx_start = millis();
                     csma_reset();
                     doTX();
                 }

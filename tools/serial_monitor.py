@@ -17,6 +17,7 @@ import argparse
 import os
 import re
 import signal
+import sys
 import termios
 import threading
 import time
@@ -114,6 +115,15 @@ LORA_STATES = [
     "IDLE", "RX_LISTEN", "RX_PROCESS", "TX_PREPARE", "TX_ACTIVE", "TX_DONE",
 ]
 
+STATE_CHAR = {
+    "IDLE": ".",
+    "RX_LISTEN": "R",
+    "RX_PROCESS": "r",
+    "TX_PREPARE": "C",
+    "TX_ACTIVE": "T",
+    "TX_DONE": "t",
+}
+
 
 class Monitor:
     def __init__(self, summary_interval: int) -> None:
@@ -177,7 +187,23 @@ class Monitor:
         # Alerts collected this interval
         self.alerts: list[str] = []
 
+        # Inline activity indicator
+        self.activity_indicator = True
+        self._indicator_dirty = False
+
         self.lock = threading.Lock()
+
+    def _indicator(self, ch: str) -> None:
+        if self.activity_indicator:
+            sys.stdout.write(ch)
+            sys.stdout.flush()
+            self._indicator_dirty = True
+
+    def _indicator_newline(self) -> None:
+        if self._indicator_dirty:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            self._indicator_dirty = False
 
     # -- event processing ---------------------------------------------------
 
@@ -208,6 +234,8 @@ class Monitor:
             self.last_transition = now
             self.counters["transitions"] += 1
             self.total["transitions"] += 1
+            ch = "!" if rc != 0 else STATE_CHAR.get(to_st, "?")
+            self._indicator(ch)
             if rc != 0:
                 self._alert(f"State transition {from_st}->{to_st} returned rc={rc}")
             return
@@ -218,8 +246,10 @@ class Monitor:
                 self.counters[counter_name] += 1
                 self.total[counter_name] += 1
                 if counter_name == "rx_errors":
+                    self._indicator("x")
                     self._alert(f"RX ERROR detected: {line.strip()}")
                 if counter_name == "tx_timeouts":
+                    self._indicator("!")
                     self._alert(f"TX TIMEOUT: {line.strip()}")
                 return
 
@@ -492,12 +522,14 @@ class Monitor:
                 )
 
     def _alert(self, msg: str) -> None:
+        self._indicator_newline()
         ts = datetime.now().strftime("%H:%M:%S")
         alert_line = f"[ALERT {ts}] {msg}"
         self.alerts.append(alert_line)
         print(f"\033[91m{alert_line}\033[0m", flush=True)
 
     def _resolved(self, msg: str) -> None:
+        self._indicator_newline()
         ts = datetime.now().strftime("%H:%M:%S")
         resolved_line = f"[RESOLVED {ts}] {msg}"
         self.alerts.append(resolved_line)
@@ -524,6 +556,7 @@ class Monitor:
 
     def print_summary(self) -> None:
         with self.lock:
+            self._indicator_newline()
             now = time.monotonic()
             elapsed = now - self.interval_start
             uptime = now - self.start_time

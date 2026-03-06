@@ -102,6 +102,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     // Debug I: OnRxDone timing — capture start time
     unsigned long _onrxdone_start = millis();
 
+    if(ch_util_rx_start > 0)
+    {
+        ch_util_rx_accum += millis() - ch_util_rx_start;
+        ch_util_rx_start = 0;
+    }
+
 #if defined BOARD_RAK4630
     // FIX BUG #2 (nRF52): RX sofort neu starten um Blindfenster zu minimieren.
     // Sicherheitskopie: Payload koennte auf internen Radiopuffer zeigen,
@@ -957,6 +963,11 @@ void OnRxTimeout(void)
     if(bLORADEBUG)
         Serial.println("OnRxTimeout");
 
+    if(ch_util_rx_start > 0)
+    {
+        ch_util_rx_accum += millis() - ch_util_rx_start;
+        ch_util_rx_start = 0;
+    }
     is_receiving = false;
 }
 
@@ -972,6 +983,11 @@ void OnRxError(void)
     if(bLORADEBUG)
         Serial.println("OnRxError");
 
+    if(ch_util_rx_start > 0)
+    {
+        ch_util_rx_accum += millis() - ch_util_rx_start;
+        ch_util_rx_start = 0;
+    }
     is_receiving = false;
 }
 
@@ -1298,6 +1314,12 @@ bool updateRetransmissionStatus()
  */
 void OnTxDone(void)
 {
+    if(ch_util_tx_start > 0)
+    {
+        ch_util_tx_accum += millis() - ch_util_tx_start;
+        ch_util_tx_start = 0;
+    }
+
     if(bLORADEBUG)
         Serial.println("OnTXDone");
 
@@ -1328,6 +1350,12 @@ void OnTxDone(void)
  */
 void OnTxTimeout(void)
 {
+    if(ch_util_tx_start > 0)
+    {
+        ch_util_tx_accum += millis() - ch_util_tx_start;
+        ch_util_tx_start = 0;
+    }
+
     if(bLORADEBUG)
         Serial.println("OnTXTimeout");
 
@@ -1361,6 +1389,7 @@ void OnHeaderDetect(void)
 {
     // Block TX during active reception.
     is_receiving = true;
+    ch_util_rx_start = millis();
 
     // Debug L: HDR_DETECT with state context
     if(bLORADEBUG)

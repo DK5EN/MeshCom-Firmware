@@ -192,6 +192,12 @@ extern bool tx_is_active;   // flag to store we are transmitting  a lora packet.
 extern int cad_attempt;
 extern unsigned long csma_timeout;
 
+// Channel utilization tracking (10s window)
+extern unsigned long ch_util_rx_start;
+extern unsigned long ch_util_tx_start;
+extern unsigned long ch_util_rx_accum;
+extern unsigned long ch_util_tx_accum;
+
 extern int isPhoneReady;      // flag we receive from phone when itis ready to receive data
 extern bool bPhoneTimeValid;
 extern bool bNTPDateTimeValid;
