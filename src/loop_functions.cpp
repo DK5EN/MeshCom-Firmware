@@ -290,6 +290,9 @@ bool is_receiving = false;  // flag to store we are receiving a lora packet.
 bool tx_is_active = false;  // flag to store we are transmitting  a lora packet.
 bool tx_waiting = false;
 
+int cad_attempt = 0;
+unsigned long csma_timeout = CSMA_BASE_0;
+
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 
 // APP Time OK

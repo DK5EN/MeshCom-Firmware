@@ -1,7 +1,7 @@
 #define SOURCE_VERSION "4.35"
 #define SOURCE_VERSION_SUB "o"
 
-#define FLASH_VERSION 20260103
+#define FLASH_VERSION 20260306
 
 //Hardware Types
 #define TLORA_V2 1
@@ -92,6 +92,15 @@
 #define RADIOLIB_SX126X_CAD 0x07           // 0x00...length off    0x07...32-bit detect
 #define RADIOLIB_SX126X_DETMIN  10         // default 10
 #define RADIOLIB_SX126X_DETPEAK 25         // default 25
+
+// CSMA/CA - Slot-basierter Backoff mit Hardware-CAD
+#define CSMA_BASE_0         4500    // Basis-Timeout Versuch 0 (ms)
+#define CSMA_BASE_1         3000    // Basis-Timeout Versuch 1 (ms)
+#define CSMA_BASE_2         2000    // Basis-Timeout Versuch 2 (ms)
+#define CSMA_SLOT_SIZE      35      // Slot-Groesse (ms): 28ms CAD + 2ms TX-Switch + 5ms Safety
+#define CSMA_SLOTS_0        10      // Zufalls-Slots bei Versuch 0 (max 350ms Jitter)
+#define CSMA_SLOTS_1_2      5       // Zufalls-Slots bei Versuch 1-2 (max 175ms Jitter)
+#define CSMA_MAX_ATTEMPTS   3       // Ab hier: Rapid-fire CAD bis Kanal frei
 
 // SOFTSERIEL
 #define SOFTSER_REFRESH_INTERVAL 5         // SOFTSER Refresh alle 5 Minuten
