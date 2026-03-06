@@ -398,6 +398,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     if (!UdpExtern.write(u_json, strlen(c_json)))
     {
       resetExternUDP();
+      return;  // socket reset, skip endPacket and telemetry
     }
 
     UdpExtern.endPacket();
