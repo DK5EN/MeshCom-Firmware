@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # MeshCom Log-Analyse Tool
-# Extracts all analysis data from a MeshCom serial log in a single pass.
+# Extracts all analysis data from a MeshCom serial monitor log in a single pass.
+# Expects the log format produced by serial_monitor.py:
+#   2026-03-06 15:36:58.248  [firmware output here]
+#
 # Usage: ./tools/loganalyse.sh <logfile>
 #
 # Output: Structured sections separated by "=== SECTION_NAME ===" markers
@@ -54,80 +57,98 @@ echo "TOTAL_LINES: $(wc -l < "$LOGFILE")"
 # ─── 2. ACTIVE NODES ───
 section "NODES"
 
-# Extract callsign, RSSI, SNR, HW, FW, hop from MH-LoRa lines
-# Output: one line per MH-LoRa occurrence with key fields
-grep "MH-LoRa:" "$LOGFILE" | awk '{
-    # Extract timestamp (first field)
-    ts = $1
-    # Find the MH-LoRa: content
-    idx = index($0, "MH-LoRa:")
-    rest = substr($0, idx + 8)
-    # Print timestamp + rest for downstream processing
-    print ts " " rest
-}' | head -50000 > /tmp/mh_lora_raw.txt
-
-# Per-callsign summary
-# Extract callsign (first token after MH-LoRa:), count, RSSI range
-awk '{
-    # rest starts after timestamp
-    # typical: OE1XYZ-15 ... R:-105 S:-5 ... H03 HW:17 FW:44:5
-    split($0, a, " ")
-    # callsign is a[2] (after timestamp)
-    cs = a[2]
-    if (cs == "") next
-
-    count[cs]++
-
-    # Find RSSI (R: field)
+# Single-pass awk: correlate "Received packet:" RSSI/SNR with subsequent MH-LoRa lines.
+# Extract callsign from route field (first callsign before comma or ">").
+awk '
+/Received packet:/ {
     for (i=1; i<=NF; i++) {
-        if ($i ~ /^R:/) {
-            val = substr($i, 3) + 0
-            if (!(cs in rssi_min) || val < rssi_min[cs]) rssi_min[cs] = val
-            if (!(cs in rssi_max) || val > rssi_max[cs]) rssi_max[cs] = val
+        if ($i == "RSSI:") {
+            for (j=i+1; j<=NF; j++) {
+                if ($j != "" && $j ~ /^-?[0-9]/) { last_rssi = $j + 0; break }
+            }
         }
-        if ($i ~ /^S:/) {
-            val = substr($i, 3) + 0
-            if (!(cs in snr_min) || val < snr_min[cs]) snr_min[cs] = val
-            if (!(cs in snr_max) || val > snr_max[cs]) snr_max[cs] = val
-            snr_sum[cs] += val
-            snr_cnt[cs]++
+        if ($i == "SNR:") {
+            for (j=i+1; j<=NF; j++) {
+                if ($j != "" && $j ~ /^-?[0-9]/) { last_snr = $j + 0; break }
+            }
         }
+    }
+    has_rssi = 1
+    next
+}
+
+/MH-LoRa:/ {
+    # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
+    ts = $2
+
+    # Find route field (contains ">")
+    cs = ""
+    for (i=1; i<=NF; i++) {
+        if ($i ~ />/) {
+            # Route like "DK7CH-1,DL7OSX-1>*!..."
+            # First callsign is before first comma or ">"
+            split($i, r, /[,>]/)
+            cs = r[1]
+            break
+        }
+    }
+    if (cs == "" || cs ~ /^[0-9]/) next
+
+    cnt[cs]++
+
+    # RSSI/SNR from preceding Received packet line
+    if (has_rssi) {
+        if (!(cs in rssi_min) || last_rssi < rssi_min[cs]) rssi_min[cs] = last_rssi
+        if (!(cs in rssi_max) || last_rssi > rssi_max[cs]) rssi_max[cs] = last_rssi
+        if (!(cs in snr_min) || last_snr < snr_min[cs]) snr_min[cs] = last_snr
+        if (!(cs in snr_max) || last_snr > snr_max[cs]) snr_max[cs] = last_snr
+        snr_sum[cs] += last_snr
+        snr_cnt[cs]++
+        has_rssi = 0
+    }
+
+    # Hop count (H01, H02, ...)
+    for (i=1; i<=NF; i++) {
         if ($i ~ /^H[0-9][0-9]$/) {
             h = $i
             if (!(cs in hop_vals)) hop_vals[cs] = h
             else if (index(hop_vals[cs], h) == 0) hop_vals[cs] = hop_vals[cs] "," h
-        }
-        if ($i ~ /^HW:/) {
-            hw[cs] = $i
-        }
-        if ($i ~ /^FW:/) {
-            fw[cs] = $i
+            break
         }
     }
 
-    # First/last seen
-    ts = $1
+    # HW and FW
+    for (i=1; i<=NF; i++) {
+        if ($i ~ /^HW:/) hw[cs] = $i
+        if ($i ~ /^FW:/) fw[cs] = $i
+    }
+
+    # First/last seen (serial monitor time)
     if (!(cs in first_seen)) first_seen[cs] = ts
     last_seen[cs] = ts
 }
 END {
-    # Sort by count descending
-    n = asorti(count, sorted)
-    # Print header
-    printf "%-15s %6s %12s %10s %8s %8s %8s %s\n", "CALLSIGN", "COUNT", "RSSI", "SNR_AVG", "HOPS", "HW", "FW", "FIRST_SEEN"
-    # Collect into array for sorting
-    for (i=1; i<=n; i++) {
-        cs = sorted[i]
+    for (cs in cnt) {
         savg = (snr_cnt[cs] > 0) ? sprintf("%.1f", snr_sum[cs]/snr_cnt[cs]) : "?"
-        printf "%-15s %6d %4d..%4d %10s %8s %8s %8s %s\n", \
-            cs, count[cs], rssi_min[cs], rssi_max[cs], savg, \
-            hop_vals[cs], (cs in hw ? hw[cs] : "?"), (cs in fw ? fw[cs] : "?"), first_seen[cs]
+        if (cs in rssi_min)
+            rssi_str = sprintf("%4d..%4d", rssi_min[cs], rssi_max[cs])
+        else
+            rssi_str = "       n/a"
+        printf "%-15s %6d %12s %10s %8s %8s %8s %s\n", \
+            cs, cnt[cs], rssi_str, savg, \
+            (cs in hop_vals ? hop_vals[cs] : "?"), \
+            (cs in hw ? hw[cs] : "?"), \
+            (cs in fw ? fw[cs] : "?"), \
+            first_seen[cs]
     }
-}' /tmp/mh_lora_raw.txt | sort -t' ' -k2 -rn
+}' "$LOGFILE" | (
+    printf "%-15s %6s %12s %10s %8s %8s %8s %s\n" "CALLSIGN" "COUNT" "RSSI" "SNR_AVG" "HOPS" "HW" "FW" "FIRST_SEEN"
+    sort -t' ' -k2 -rn
+)
 
 echo ""
-echo "UNIQUE_NODES: $(awk '{print $2}' /tmp/mh_lora_raw.txt | sort -u | wc -l | tr -d ' ')"
-echo "TOTAL_MH_PACKETS: $(wc -l < /tmp/mh_lora_raw.txt)"
+echo "UNIQUE_NODES: $(grep "MH-LoRa:" "$LOGFILE" | awk '{for(i=1;i<=NF;i++){if($i~/>/){{split($i,r,/[,>]/);if(r[1]!=""&&r[1]!~/^[0-9]/)print r[1];break}}}}' | sort -u | wc -l | tr -d ' ')"
+echo "TOTAL_MH_PACKETS: $(grep -c 'MH-LoRa:' "$LOGFILE")"
 
 # ─── 3. MESSAGE TYPES ───
 section "MESSAGE_TYPES"
@@ -151,7 +172,7 @@ END {
 # Notable text messages (extract up to 20)
 echo ""
 echo "--- NOTABLE_TEXTS ---"
-grep "RX-LoRa:" "$LOGFILE" | grep -v 'H@R\|HG@R\|\*!' | head -20 || true
+grep "RX-LoRa-All:" "$LOGFILE" | grep -v 'H@R\|HG@R\|\*!' | head -20 || true
 
 # ─── 4. HOP DISTRIBUTION ───
 section "HOP_DISTRIBUTION"
@@ -159,8 +180,8 @@ section "HOP_DISTRIBUTION"
 echo "--- MH-LoRa (Empfangen) ---"
 grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
-echo "--- RX-LoRa (Akzeptiert) ---"
-grep "RX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+echo "--- RX-LoRa2 (Akzeptiert) ---"
+grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- TX-LoRa (Gesendet) ---"
 grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
@@ -168,22 +189,25 @@ grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn ||
 # ─── 5. LOOPS ───
 section "LOOPS"
 
-echo "LOOP_COUNT: $(grep -ci 'loop' "$LOGFILE" 2>/dev/null || echo 0)"
-grep -i "loop" "$LOGFILE" | head -10 || true
+echo "RELAY_LOOP_BLOCKED: $(grep -c 'RELAY_LOOP_BLOCKED' "$LOGFILE" 2>/dev/null; true)"
+grep "RELAY_LOOP_BLOCKED" "$LOGFILE" | head -10 || true
 
 # ─── 6. CHANNEL UTILIZATION ───
 section "CHANNEL_UTIL"
 
-grep "CHANNEL_UTIL" "$LOGFILE" | awk '{
-    # Extract timestamp and utilization value
-    ts = $1
-    # Find rx= value
+{ grep "CHANNEL_UTIL" "$LOGFILE" || true; } | awk '{
+    # Serial monitor timestamp is $2 (HH:MM:SS.mmm)
+    ts = $2
     for (i=1; i<=NF; i++) {
         if ($i ~ /^rx=/) {
             val = substr($i, 4) + 0.0
-            print ts, val
+        }
+        if ($i ~ /^util=/) {
+            util = substr($i, 6) + 0.0
         }
     }
+    # Use util% as the main metric
+    if (util != "") print ts, util
 }' > /tmp/channel_util.txt
 
 if [ -s /tmp/channel_util.txt ]; then
@@ -196,7 +220,6 @@ if [ -s /tmp/channel_util.txt ]; then
         if (count == 1 || val < min) min = val
         if (val >= 70) high70++
         if (val >= 90) high90++
-        # Split into first/second half
         vals[count] = val
     }
     END {
@@ -222,22 +245,19 @@ if [ -s /tmp/channel_util.txt ]; then
     echo ""
     echo "--- BUCKETS_10MIN ---"
     awk '{
-        # Assume timestamp format like HH:MM:SS or similar
+        # Timestamp is HH:MM:SS.mmm — split by ":" for hour:minute
         split($1, t, ":")
-        # Group by 10-min intervals
         bucket = t[1] ":" sprintf("%02d", int(t[2]/10)*10)
         sum[bucket] += $2
         cnt[bucket]++
         if (!(bucket in mx) || $2 > mx[bucket]) mx[bucket] = $2
     }
     END {
-        n = asorti(sum, sorted)
         printf "%-8s %8s %8s %5s\n", "TIME", "AVG%", "MAX%", "N"
-        for (i=1; i<=n; i++) {
-            b = sorted[i]
+        for (b in sum) {
             printf "%-8s %8.1f %8.1f %5d\n", b, sum[b]/cnt[b], mx[b], cnt[b]
         }
-    }' /tmp/channel_util.txt
+    }' /tmp/channel_util.txt | sort
 else
     echo "NO_DATA"
 fi
@@ -245,22 +265,19 @@ fi
 # ─── 7. ACK ANALYSIS ───
 section "ACK_ANALYSIS"
 
-echo "NODE_ACK_QUEUED: $(grep -c 'NODE_ACK_QUEUED' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "ACK_FAST_QUEUED: $(grep -c 'ACK_FAST_QUEUED' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "ACK_FAST_TX: $(grep -c 'ACK_FAST_TX' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "TX_ACK_FAST: $(grep -c 'TX-ACK-Fast' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "ACK_FAST_QUEUED: $(grep -c 'ACK_FAST_QUEUED' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_FAST_TX: $(grep -c 'ACK_FAST_TX' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_RX_CANCEL: $(grep -c 'ACK_RX_CANCEL' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_FWD_DEDUP: $(grep -c 'ACK_FWD_DEDUP' "$LOGFILE" 2>/dev/null; true)"
+echo "GW_ACK_DEDUP: $(grep -c 'GW_ACK_DEDUP' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_SLOT_SKIP: $(grep -c 'ACK_SLOT_SKIP' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_FWD_DROPPED: $(grep -c 'ACK_FWD_DROPPED' "$LOGFILE" 2>/dev/null; true)"
+echo "GW_ACK_DROPPED: $(grep -c 'GW_ACK_DROPPED' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_CANCEL_RETRANSMIT: $(grep -c 'ACK_CANCEL_RETRANSMIT' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_RECEIVED: $(grep -c 'ACK_RECEIVED' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_FAST_CAD_BUSY: $(grep -c 'ACK_FAST_CAD_BUSY' "$LOGFILE" 2>/dev/null; true)"
 
-# ACK storm check: ACKs per original message ID
-echo ""
-echo "--- ACK_PER_MSGID (top 10) ---"
-grep "TX-ACK-Fast" "$LOGFILE" | awk -F'TX-ACK-Fast:' '{print $2}' | awk '{print $4}' | sort | uniq -c | sort -rn | head -10 || true
-
-# ACK distribution
-echo ""
-echo "--- ACK_DISTRIBUTION ---"
-grep "TX-ACK-Fast" "$LOGFILE" | awk -F'TX-ACK-Fast:' '{print $2}' | awk '{print $4}' | sort | uniq -c | awk '{print $1}' | sort | uniq -c | sort -rn || true
-
-# ACK queue length
+# ACK queue length distribution
 echo ""
 echo "--- ACK_QLEN ---"
 grep -oE 'ack_qlen=[0-9]+' "$LOGFILE" | sort | uniq -c | sort -rn || true
@@ -268,23 +285,23 @@ grep -oE 'ack_qlen=[0-9]+' "$LOGFILE" | sort | uniq -c | sort -rn || true
 # ─── 8. CRC ERRORS ───
 section "CRC_ERRORS"
 
-echo "CRC_ERROR_COUNT: $(grep -c 'CRC_ERROR' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "CRC_ERROR_COUNT: $(grep -c 'CRC_ERROR' "$LOGFILE" 2>/dev/null; true)"
 
 grep "CRC_ERROR" "$LOGFILE" | awk '{
     for (i=1; i<=NF; i++) {
-        if ($i ~ /^R:/) rssi = $i
-        if ($i ~ /^S:/) snr = $i
-        if ($i ~ /freq_err/) ferr = $i
-        if ($i ~ /^sz=/) sz = $i
+        if ($i ~ /^rssi=/) rssi = $i
+        if ($i ~ /^snr=/) snr = $i
+        if ($i ~ /^freq_err=/) ferr = $i
+        if ($i ~ /^size=/) sz = $i
     }
-    print $1, rssi, snr, ferr, sz
+    print $2, rssi, snr, ferr, sz
 }' | head -50 || true
 
 # Classify by freq error
 echo ""
 echo "--- CRC_FREQ_CLASSIFICATION ---"
 grep "CRC_ERROR" "$LOGFILE" | grep -oE 'freq_err=[0-9.-]+' | awk -F= '{
-    v = ($2 < 0) ? -$2 : $2
+    v = $2 + 0; if (v < 0) v = -v
     if (v > 3000) offfreq++
     else if (v > 1000) medium++
     else collision++
@@ -298,7 +315,7 @@ END {
 # ─── 9. RETRIES (RING_STATUS) ───
 section "RING_STATUS"
 
-echo "RING_STATUS_COUNT: $(grep -c 'RING_STATUS' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "RING_STATUS_COUNT: $(grep -c 'RING_STATUS' "$LOGFILE" 2>/dev/null; true)"
 
 echo "--- RETRYING ---"
 grep "RING_STATUS" "$LOGFILE" | grep -oE 'retrying=[0-9]+' | sort | uniq -c | sort -rn || true
@@ -312,18 +329,19 @@ grep "RING_STATUS" "$LOGFILE" | grep -oE 'queued=[0-9]+' | sort | uniq -c | sort
 # ─── 10. MISSING ACKS ───
 section "MISSING_ACKS"
 
-echo "ACK_TIMEOUT: $(grep -ci 'ACK_TIMEOUT' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "ACK_FAIL: $(grep -ci 'ACK_FAIL' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "ACK_MISS: $(grep -ci 'ACK_MISS' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "ACK_LOST: $(grep -ci 'ACK_LOST' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "ACK_TIMEOUT: $(grep -ci 'ACK_TIMEOUT' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_FAIL: $(grep -ci 'ACK_FAIL' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_MISS: $(grep -ci 'ACK_MISS' "$LOGFILE" 2>/dev/null; true)"
+echo "ACK_LOST: $(grep -ci 'ACK_LOST' "$LOGFILE" 2>/dev/null; true)"
+echo "RETRANSMIT_GIVEUP: $(grep -c 'RETRANSMIT_GIVEUP' "$LOGFILE" 2>/dev/null; true)"
 
 # ─── 11. DEDUP ───
 section "DEDUP"
 
-echo "DEDUP_EXPLICIT: $(grep -ci 'dedup\|DEDUP' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "DEDUP_EXPLICIT: $(grep -ci 'dedup\|DEDUP' "$LOGFILE" 2>/dev/null; true)"
 
-MH_COUNT=$(grep -c "MH-LoRa:" "$LOGFILE" 2>/dev/null || echo 0)
-RX_COUNT=$(grep -c "RX-LoRa:" "$LOGFILE" 2>/dev/null || echo 0)
+MH_COUNT=$(grep -c "MH-LoRa:" "$LOGFILE" 2>/dev/null; true)
+RX_COUNT=$(grep -c "RX-LoRa2:" "$LOGFILE" 2>/dev/null; true)
 echo "MH_LORA_HEARD: $MH_COUNT"
 echo "RX_LORA_ACCEPTED: $RX_COUNT"
 echo "IMPLICIT_DEDUP: $((MH_COUNT - RX_COUNT))"
@@ -341,8 +359,8 @@ grep "MH-LoRa:" "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{pr
 # ─── 12. STATE MACHINE ───
 section "STATE_MACHINE"
 
-echo "MC_SM_TOTAL: $(grep -c 'MC-SM' "$LOGFILE" 2>/dev/null || echo 0)"
-echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -vc 'rc=0' 2>/dev/null || echo 0)"
+echo "MC_SM_TOTAL: $(grep -c 'MC-SM' "$LOGFILE" 2>/dev/null; true)"
+echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -vc 'rc=0' 2>/dev/null; true)"
 
 grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | head -10 || true
 
@@ -351,24 +369,24 @@ section "ADDITIONAL"
 
 echo "--- WIFI_ISSUES ---"
 grep -iE 'disconnect|reconnect|WIFI.*fail' "$LOGFILE" | head -10 || true
-echo "WIFI_ISSUE_COUNT: $(grep -ciE 'disconnect|reconnect|WIFI.*fail' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "WIFI_ISSUE_COUNT: $(grep -ciE 'disconnect|reconnect|WIFI.*fail' "$LOGFILE" 2>/dev/null; true)"
 
 echo ""
 echo "--- CRASHES ---"
 grep -iE 'panic|abort|watchdog|wdt|backtrace|guru.meditation' "$LOGFILE" | head -10 || true
-echo "CRASH_COUNT: $(grep -ciE 'panic|abort|watchdog|wdt|backtrace|guru.meditation' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "CRASH_COUNT: $(grep -ciE 'panic|abort|watchdog|wdt|backtrace|guru.meditation' "$LOGFILE" 2>/dev/null; true)"
 
 echo ""
 echo "--- HEAP_TREND ---"
 grep '\[HEAP\]' "$LOGFILE" | head -5
 echo "..."
 grep '\[HEAP\]' "$LOGFILE" | tail -5
-HEAP_SAMPLES=$(grep -c '\[HEAP\]' "$LOGFILE" 2>/dev/null || echo 0)
+HEAP_SAMPLES=$(grep -c '\[HEAP\]' "$LOGFILE" 2>/dev/null; true)
 echo "HEAP_SAMPLES: $HEAP_SAMPLES"
 
 echo ""
 echo "--- ONRXDONE_TIME ---"
-grep "ONRXDONE_TIME" "$LOGFILE" | grep -oE 'ONRXDONE_TIME=[0-9]+' | awk -F= '{
+grep "ONRXDONE_TIME" "$LOGFILE" | grep -oE 'ms=[0-9]+' | awk -F= '{
     sum += $2; count++
     if (count == 1 || $2 > max) max = $2
     if (count == 1 || $2 < min) min = $2
@@ -379,12 +397,32 @@ END {
 }' || true
 
 echo ""
-echo "--- RX_TIMEOUT ---"
-echo "RX_TIMEOUT_FIRE: $(grep -c 'RX_TIMEOUT_FIRE' "$LOGFILE" 2>/dev/null || echo 0)"
+echo "--- RX_TIMEOUT_FIRE ---"
+echo "RX_TIMEOUT_FIRE: $(grep -c 'RX_TIMEOUT_FIRE' "$LOGFILE" 2>/dev/null; true)"
+grep "RX_TIMEOUT_FIRE" "$LOGFILE" | grep -oE 'wait=[0-9.]+' | awk -F= '{
+    sum += $2; count++
+    if (count == 1 || $2 > max) max = $2
+    if (count == 1 || $2 < min) min = $2
+}
+END {
+    if (count > 0) printf "ADAPTIVE_WAIT: AVG=%.0f MIN=%.0f MAX=%.0f ms (%d samples)\n", sum/count, min, max, count
+    else print "NO_WAIT_DATA"
+}' || true
+
+echo ""
+echo "--- BUFFER_DROPS ---"
+echo "BUFFER_DROPS: $(grep -c 'DROPPED.*buffer_full\|_DROPPED' "$LOGFILE" 2>/dev/null; true)"
+grep -E 'DROPPED|buffer_full' "$LOGFILE" | head -10 || true
+
+echo ""
+echo "--- CAD_STATS ---"
+echo "CAD_GIVEUP: $(grep -c 'CAD_GIVEUP' "$LOGFILE" 2>/dev/null; true)"
+echo "CAD_FALSE_POSITIVE: $(grep -c 'CAD_FALSE_POSITIVE' "$LOGFILE" 2>/dev/null; true)"
+echo "RX_TIMEOUT_DEFERRED: $(grep -c 'RX_TIMEOUT_DEFERRED' "$LOGFILE" 2>/dev/null; true)"
 
 # ─── DONE ───
 section "END"
 echo "Analysis complete."
 
 # Cleanup
-rm -f /tmp/mh_lora_raw.txt /tmp/channel_util.txt
+rm -f /tmp/channel_util.txt
