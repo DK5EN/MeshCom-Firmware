@@ -941,6 +941,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     iReceiveTimeOutTime = millis();
     csma_timeout = csma_compute_timeout(cad_attempt);
 
+    if(bLORADEBUG)
+        Serial.printf("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
     is_receiving = false;
 }
 
@@ -1311,6 +1313,12 @@ void OnTxDone(void)
         Radio.Rx(RX_TIMEOUT_VALUE);
         csma_reset();
 
+        if(bLORADEBUG)
+        {
+            Serial.printf("[MC-SM] TX_ACTIVE -> TX_DONE rc=0\n");
+            Serial.printf("[MC-SM] TX_DONE -> RX_LISTEN rc=0\n");
+        }
+
     #endif
 
     tx_is_active = false;
@@ -1356,7 +1364,10 @@ void OnHeaderDetect(void)
 
     // Debug L: HDR_DETECT with state context
     if(bLORADEBUG)
+    {
+        Serial.printf("[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n");
         Serial.printf("[MC-DBG] HDR_DETECT cad_attempt=%d\n", cad_attempt);
+    }
 }
 
 unsigned long csma_compute_timeout(int attempt) {
