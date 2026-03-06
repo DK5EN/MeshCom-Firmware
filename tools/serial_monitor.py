@@ -236,8 +236,6 @@ class Monitor:
             self.total["transitions"] += 1
             ch = "!" if rc != 0 else STATE_CHAR.get(to_st, "?")
             self._indicator(ch)
-            if rc != 0:
-                self._alert(f"State transition {from_st}->{to_st} returned rc={rc}")
             return
 
         # Simple counters
