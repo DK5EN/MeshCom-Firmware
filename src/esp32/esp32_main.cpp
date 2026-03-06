@@ -190,6 +190,7 @@ String str;
 // Textmessage buffer from phone, hasMsgFromPhone flag indicates new message
 extern char textbuff_phone [MAX_MSG_LEN_PHONE];
 extern uint8_t txt_msg_len_phone;
+extern unsigned long last_upd_timer;
 
 // FreeRTOS Queue for BLE data from NimBLE task to Main Loop
 #include "freertos/queue.h"
@@ -2823,6 +2824,14 @@ void esp32loop()
             sendMeshComHeartbeat();
 
             hb_timer = millis();
+
+            // Heartbeat-loss detection (analog to nRF52)
+            if (last_upd_timer > 0 && (last_upd_timer + (MAX_HB_RX_TIME * 1000)) < millis())
+            {
+                Serial.println("[UDP] Heartbeat timeout — no GATE/BEAT from server, resetting");
+                resetMeshComUDP();
+                last_upd_timer = millis();  // prevent reset loop
+            }
         }
 
         meshcom_settings.node_last_upd_timer = hb_timer;
