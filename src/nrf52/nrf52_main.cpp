@@ -1089,8 +1089,8 @@ extern bool btimeClient;
         if((iReceiveTimeOutTime + csma_timeout) < millis())
         {
             if(bLORADEBUG)
-                Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu\n",
-                    millis(), iReceiveTimeOutTime, millis() - iReceiveTimeOutTime);
+                Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu wait=%lu delta=%lu\n",
+                    millis(), csma_timeout, millis() - iReceiveTimeOutTime);
 
             // BUG #1 Aequivalent: Wenn Header erkannt, ist Empfang moeglicherweise
             // noch aktiv. Timer verlaengern statt zuruecksetzen.
@@ -1098,14 +1098,17 @@ extern bool btimeClient;
             {
                 iReceiveTimeOutTime = millis();
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT skipped: is_receiving=true\n");
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=is_receiving\n");
             }
             else
             {
                 iReceiveTimeOutTime = 0;
                 Radio.Rx(RX_TIMEOUT_VALUE);
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] IDLE -> RX_LISTEN rc=0\n");
                     Serial.printf("[MC-DBG] RX_RESTART src=timeout\n");
+                }
             }
         }
     }
@@ -1118,9 +1121,12 @@ extern bool btimeClient;
             {
                 // Start CAD scan
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] IDLE -> TX_PREPARE rc=0\n");
                     Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
                         (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
                         cad_attempt);
+                }
 
                 cad_in_progress = true;
                 cad_done_flag = false;
@@ -1132,12 +1138,19 @@ extern bool btimeClient;
             {
                 cad_in_progress = false;
                 cad_done_flag = false;
+                if(bLORADEBUG)
+                    Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", cad_channel_busy ? -702 : 0);
 
                 if(!cad_channel_busy)
                 {
+                    if(cad_double_check && bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_FALSE_POSITIVE\n");
                     // Channel free — transmit
                     if(bLORADEBUG)
+                    {
+                        Serial.printf("[MC-SM] TX_PREPARE -> TX_ACTIVE rc=0\n");
                         Serial.printf("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
+                    }
 
                     csma_reset();
                     doTX();
@@ -1161,8 +1174,11 @@ extern bool btimeClient;
                     csma_timeout = csma_compute_timeout(cad_attempt);
 
                     if(bLORADEBUG)
+                    {
+                        Serial.printf("[MC-SM] TX_PREPARE -> IDLE rc=-1\n");
                         Serial.printf("[MC-DBG] CAD_BUSY attempt=%d next_timeout=%lu\n",
                             cad_attempt, csma_timeout);
+                    }
 
                     Radio.Rx(RX_TIMEOUT_VALUE);
                     iReceiveTimeOutTime = millis();
