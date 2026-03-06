@@ -1713,8 +1713,8 @@ void esp32loop()
             {
                 // Debug A: RX_TIMEOUT_FIRE
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu\n",
-                        millis(), iReceiveTimeOutTime, millis() - iReceiveTimeOutTime);
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu wait=%lu delta=%lu\n",
+                        millis(), csma_timeout, millis() - iReceiveTimeOutTime);
 
                 // FIX BUG #1: Do not reset radio if a received packet is pending
                 if(receiveFlag)
@@ -1724,10 +1724,7 @@ void esp32loop()
                     iReceiveTimeOutTime = millis();
 
                     if(bLORADEBUG)
-                    {
-                        Serial.print(getTimeString());
-                        Serial.println(F(" [MC-DBG] RX_TIMEOUT skipped: receiveFlag pending"));
-                    }
+                        Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=receiveFlag\n");
                 }
                 else
                 {
@@ -1749,7 +1746,10 @@ void esp32loop()
 
                     // Debug B: RX_RESTART after timeout
                     if(bLORADEBUG)
+                    {
+                        Serial.printf("[MC-SM] IDLE -> RX_LISTEN rc=%d\n", state);
                         Serial.printf("[MC-DBG] RX_RESTART src=timeout state=%d\n", state);
+                    }
 
                     if(bLORADEBUG)
                     {
@@ -1773,7 +1773,10 @@ void esp32loop()
             {
                 // Debug C: RX_FLAG_PROCESS
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n");
                     Serial.printf("[MC-DBG] RX_FLAG_PROCESS ts=%lu\n", millis());
+                }
 
                 // reset flags first
                 bEnableInterruptReceive = false;
@@ -1783,6 +1786,9 @@ void esp32loop()
                 // that means we got a packet
 
                 checkRX(bRadio);
+
+                if(bLORADEBUG)
+                    Serial.printf("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
 
                 // FIX BUG #2: checkRX() now restarts RX internally.
                 // Remove redundant interrupt rewiring that would double-reconfigure.
@@ -1802,7 +1808,10 @@ void esp32loop()
 
                 // Debug G: TX_DONE
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] TX_ACTIVE -> TX_DONE rc=%d\n", transmissionState);
                     Serial.printf("[MC-DBG] TX_DONE state=%d ts=%lu\n", transmissionState, millis());
+                }
 
                 if (transmissionState == RADIOLIB_ERR_NONE)
                 {
@@ -1855,7 +1864,10 @@ void esp32loop()
 
                 // Debug H: RX_RESTARTED after TX
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] TX_DONE -> RX_LISTEN rc=%d\n", state);
                     Serial.printf("[MC-DBG] RX_RESTARTED src=after_tx state=%d\n", state);
+                }
 
                 if (state != RADIOLIB_ERR_NONE)
                 {
@@ -1881,9 +1893,12 @@ void esp32loop()
             {
                 // Debug E: TX_GATE_ENTER
                 if(bLORADEBUG)
+                {
+                    Serial.printf("[MC-SM] IDLE -> TX_PREPARE rc=0\n");
                     Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
                         (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
                         cad_attempt);
+                }
 
                 // Disable RX interrupt before CAD scan
                 bEnableInterruptReceive = false;
@@ -1891,6 +1906,8 @@ void esp32loop()
 
                 // CAD Scan 1
                 int cad_result = radio.scanChannel();
+                if(bLORADEBUG)
+                    Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", cad_result);
 
                 bool channel_free = false;
                 if(cad_result == RADIOLIB_CHANNEL_FREE)
@@ -1904,8 +1921,14 @@ void esp32loop()
                         Serial.printf("[MC-DBG] CAD_BUSY_1 attempt=%d, double-check...\n", cad_attempt);
 
                     cad_result = radio.scanChannel();
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", cad_result);
                     if(cad_result == RADIOLIB_CHANNEL_FREE)
+                    {
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-DBG] CAD_FALSE_POSITIVE\n");
                         channel_free = true;
+                    }
                 }
 
                 if(channel_free)
@@ -1927,8 +1950,11 @@ void esp32loop()
                     {
                         // Debug F: TX_START
                         if(bLORADEBUG)
+                        {
+                            Serial.printf("[MC-SM] TX_PREPARE -> TX_ACTIVE rc=0\n");
                             Serial.printf("[MC-DBG] TX_START qlen=%d\n",
                                 (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite));
+                        }
                     }
                     else
                     {
@@ -1937,6 +1963,8 @@ void esp32loop()
                         #endif
 
                         // doTX() returned false (empty queue race) — restore RX
+                        if(bLORADEBUG)
+                            Serial.printf("[MC-SM] TX_PREPARE -> IDLE rc=0\n");
                         bEnableInterruptTransmit = false;
                         radio.clearPacketSentAction();
 
@@ -1952,8 +1980,11 @@ void esp32loop()
                     csma_timeout = csma_compute_timeout(cad_attempt);
 
                     if(bLORADEBUG)
+                    {
+                        Serial.printf("[MC-SM] TX_PREPARE -> IDLE rc=-1\n");
                         Serial.printf("[MC-DBG] CAD_BUSY attempt=%d next_timeout=%lu\n",
                             cad_attempt, csma_timeout);
+                    }
 
                     // Restore RX
                     bEnableInterruptReceive = true;
