@@ -1762,9 +1762,6 @@ void esp32loop()
 
                     bEnableInterruptReceive = true;
 
-                    // Reset timeout so next cycle can fire
-                    iReceiveTimeOutTime = millis();
-
                     // Debug B: RX_RESTART after timeout
                     if(bLORADEBUG)
                     {
@@ -2012,6 +2009,11 @@ void esp32loop()
 
                     iReceiveTimeOutTime = millis();
                 }
+            }
+            else
+            {
+                // Nothing to send — restart timeout cycle
+                iReceiveTimeOutTime = millis();
             }
         }
     } // bRadio active
