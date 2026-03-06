@@ -4,11 +4,12 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 
-#MESHCOM ignored 
+#MESHCOM ignored
 .pio
 .vscode
 .*
 !/.gitignore
+CLAUDE.md
 
 # User-specific files
 *.rsuser
