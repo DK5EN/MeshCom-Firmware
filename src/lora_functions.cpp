@@ -1517,7 +1517,7 @@ bool doTX()
 
                         if(cad_result == CAD_ACTIVITY_DETECTED)
                         {
-                            delay(2);
+                            delay(1);
                             cad_result = radio.scanChannel();
 
                             if(bLORADEBUG && cad_result != RADIOLIB_LORA_DETECTED)
@@ -1708,17 +1708,12 @@ bool updateRetransmissionStatus()
         {
             ringBuffer[ircheck][1]++;
 
-            // Randomisiertes Retransmit-Intervall: Basis 34s +/- 10s Jitter
-            // Jitter wird deterministisch aus Message-ID abgeleitet (stabil pro Nachricht,
-            // aber unterschiedlich zwischen Nachrichten/Knoten)
-            // Feldtests zeigen: Nachrichten werden typischerweise nach >20s erfolgreich zugestellt,
-            // daher Minimum 24s (12 Ticks) als untere Grenze.
-            uint8_t msg_hash = ringBuffer[ircheck][3] ^ ringBuffer[ircheck][4]
-                             ^ ringBuffer[ircheck][5] ^ ringBuffer[ircheck][6];
-            int jitter = (int)(msg_hash % 11) - 5;  // -5 bis +5 Ticks = -10s bis +10s
-            uint8_t threshold = (uint8_t)(0x11 + jitter);  // 12-22 Ticks = 24-44s
-
-            if(ringBuffer[ircheck][1] >= threshold)
+            // Retransmit-Intervall: 34s (0x11 Ticks à 2s)
+            // Kein expliziter Jitter noetig: CW-Backoff (cw_value) ueberlebt
+            // zwischen TX-Versuchen und wird bei CAD_BUSY dekrementiert.
+            // Nodes mit mehrfachem CAD_BUSY haben niedrigeren cw_value
+            // und damit kuerzere adaptive_wait → impliziter Vorrang.
+            if(ringBuffer[ircheck][1] >= 0x11)
             {
                 // Check retry cap
                 if(retryCount[ircheck] >= MAX_RETRANSMIT)

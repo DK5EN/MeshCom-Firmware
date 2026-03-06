@@ -2125,10 +2125,16 @@ void esp32loop()
         }
 
         // Re-arm the software timeout when TX queue is empty and timer
-        // is not running. This covers the idle case (no pending packets).
+        // is not running. Roll a new CW jitter to desynchronize nodes.
         if(iReceiveTimeOutTime == 0 && loraState == LORA_RX_LISTEN
            && iWrite == iRead && iAckRead == iAckWrite)
         {
+            // Roll CW jitter: same formula as CSMA backoff
+            int cw_exp = CSMA_CW_MIN + (int)((long)channel_util_percent * (CSMA_CW_MAX - CSMA_CW_MIN) / 100);
+            if(cw_exp > CSMA_CW_MAX) cw_exp = CSMA_CW_MAX;
+            int cw_size = 1 << cw_exp;
+            cw_value = (int8_t)random(1, cw_size + 1);
+
             iReceiveTimeOutTime = millis();
         }
 
