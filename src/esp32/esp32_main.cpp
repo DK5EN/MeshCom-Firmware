@@ -2864,7 +2864,18 @@ void esp32loop()
                         {
                             iWlanWait = 0;
 
-                            Serial.println("[WIFI]...SET but no Wifi connect ...please wait for next try (5 min)");
+                            if (!bAllStarted)
+                            {
+                                // First boot failure — reset WiFi hardware and retry immediately
+                                Serial.println("[WIFI]...no connection at boot — resetting WiFi and retrying");
+                                WiFi.disconnect(true, true);
+                                delay(100);
+                                startWIFI();  // sets iWlanWait = 1, triggers doWiFiConnect() polling
+                            }
+                            else
+                            {
+                                Serial.println("[WIFI]...SET but no Wifi connect ...please wait for next try (5 min)");
+                            }
 
                             bAllStarted=true;
                         }
