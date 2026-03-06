@@ -37,8 +37,8 @@
 #define LONGNAME_MAXLEN 20 // maximum length of the longname
 #define TX_ENABLE 1        // switch to en/disable LoRa TX
 #define NUM_SYM_CAD      2       // CAD symbols for SX126x sub-GHz
-#define CSMA_CW_MIN      3       // Min CW exponent (2^3 = 8 Slots)
-#define CSMA_CW_MAX      8       // Max CW exponent (2^8 = 256 Slots)
+#define CSMA_CW_MIN      2       // Min CW exponent (2^2 = 4 Slots)
+#define CSMA_CW_MAX      6       // Max CW exponent (2^6 = 64 Slots)
 #define CAD_WATCHDOG_MS  30000   // Force TX after 30s (Watchdog)
 
 // Chip-agnostic CAD result: SX127x returns PREAMBLE_DETECTED, SX126x returns LORA_DETECTED

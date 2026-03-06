@@ -99,6 +99,7 @@ unsigned long track_to_meshcom_timer = 0;
 
 // CSMA/CA: Slot time for CAD backoff (default for SF11/BW125)
 uint16_t csma_slot_time_ms = 49;
+int8_t cw_value = -1;  // Contention Window counter: -1=idle, 0=aggressive, >0=countdown
 
 void csma_update_slot_time()
 {
@@ -1284,7 +1285,7 @@ bool doTX()
                     }
                     #else
                     radio.standby();
-                    delay(3);
+                    delay(2);
                     radio.clearPacketSentAction();
                     int cad_result = radio.scanChannel();
 
@@ -1495,26 +1496,16 @@ bool doTX()
 
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
-                    // --- CSMA/CA: Slot-based CAD Backoff (Meshtastic-Style) ---
+                    // --- CSMA/CA: CW-based CAD with Adaptive Wait ---
                     #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || defined(BOARD_RAK4630) || defined(SX127X)
                     {
-                        static unsigned long cad_backoff_until = 0;
                         static unsigned long cad_first_busy_ts = 0;
-                        static int cad_retries = 0;
 
-                        // Phase 1: Time-based gate — skip radio access during backoff
-                        if(millis() < cad_backoff_until)
-                        {
-                            iRead = save_read;
-                            ringBuffer[iRead][1] = save_ring_status;
-                            return false;
-                        }
-
-                        // Phase 2: CAD scan
+                        // CAD scan (double-scan for false positive filter)
                         #if defined(BOARD_RAK4630)
                         bool detected = nrf52_cad_scan();
                         if (detected) {
-                            detected = nrf52_cad_scan();  // double-scan for false positive filter
+                            detected = nrf52_cad_scan();
                             if(bLORADEBUG && !detected)
                                 Serial.println(F("[MC-DBG] CAD_FALSE_POSITIVE"));
                         }
@@ -1524,7 +1515,6 @@ bool doTX()
                         radio.clearPacketSentAction();
                         int cad_result = radio.scanChannel();
 
-                        // Double-scan: confirm LORA_DETECTED (stale IRQ filter)
                         if(cad_result == CAD_ACTIVITY_DETECTED)
                         {
                             delay(2);
@@ -1547,28 +1537,41 @@ bool doTX()
 
                             if(millis() - cad_first_busy_ts >= CAD_WATCHDOG_MS)
                             {
-                                Serial.printf("[MC-DBG] CAD_WATCHDOG forced TX after %lums, retries=%d\n",
-                                    millis() - cad_first_busy_ts, cad_retries);
-                                cad_backoff_until = 0;
+                                Serial.printf("[MC-DBG] CAD_WATCHDOG forced TX after %lums\n",
+                                    millis() - cad_first_busy_ts);
                                 cad_first_busy_ts = 0;
-                                cad_retries = 0;
+                                cw_value = -1;
                                 // fall through to TX
                             }
                             else
                             {
-                                cad_retries++;
+                                // CW backoff: roll or decrement
+                                if(cw_value == -1)
+                                {
+                                    // First busy: roll CW value
+                                    int cw_exp = CSMA_CW_MIN + (int)((long)channel_util_percent * (CSMA_CW_MAX - CSMA_CW_MIN) / 100);
+                                    if(cw_exp > CSMA_CW_MAX) cw_exp = CSMA_CW_MAX;
+                                    int cw_size = 1 << cw_exp;
+                                    cw_value = (int8_t)random(1, cw_size + 1);
 
-                                // CW exponent scales with channel utilization
-                                int cw_exp = CSMA_CW_MIN + (int)((long)channel_util_percent * (CSMA_CW_MAX - CSMA_CW_MIN) / 100);
-                                if(cw_exp > CSMA_CW_MAX) cw_exp = CSMA_CW_MAX;
-                                int cw_size = 1 << cw_exp;
-                                int slots = random(1, cw_size + 1);  // [1, cw_size]
-                                unsigned long backoff_ms = (unsigned long)slots * csma_slot_time_ms;
-                                cad_backoff_until = millis() + backoff_ms;
-
-                                if(bLORADEBUG)
-                                    Serial.printf("[MC-DBG] CAD_BUSY slots=%d backoff=%lums retries=%d util=%u%% cw=%d\n",
-                                        slots, backoff_ms, cad_retries, channel_util_percent, cw_exp);
+                                    if(bLORADEBUG)
+                                        Serial.printf("[MC-DBG] CAD_BUSY cw_roll=%d util=%u%% cw_exp=%d\n",
+                                            cw_value, channel_util_percent, cw_exp);
+                                }
+                                else if(cw_value > 0)
+                                {
+                                    cw_value--;
+                                    if(bLORADEBUG)
+                                        Serial.printf("[MC-DBG] CAD_BUSY cw=%d util=%u%%\n",
+                                            cw_value, channel_util_percent);
+                                }
+                                else
+                                {
+                                    // cw_value == 0: stay aggressive
+                                    if(bLORADEBUG)
+                                        Serial.printf("[MC-DBG] CAD_BUSY cw=0 (aggressive) util=%u%%\n",
+                                            channel_util_percent);
+                                }
 
                                 iRead = save_read;
                                 ringBuffer[iRead][1] = save_ring_status;
@@ -1577,14 +1580,12 @@ bool doTX()
                         }
                         else
                         {
-                            // Channel clear
-                            if(bLORADEBUG && cad_retries > 0)
-                                Serial.printf("[MC-DBG] CAD_CLEAR after retries=%d, total_wait=%lums\n",
-                                    cad_retries, (cad_first_busy_ts > 0) ? millis() - cad_first_busy_ts : 0UL);
+                            // Channel clear — send
+                            if(bLORADEBUG && cw_value >= 0)
+                                Serial.printf("[MC-DBG] CAD_CLEAR cw_was=%d\n", cw_value);
 
-                            cad_backoff_until = 0;
+                            cw_value = -1;
                             cad_first_busy_ts = 0;
-                            cad_retries = 0;
                         }
                     }
                     #else

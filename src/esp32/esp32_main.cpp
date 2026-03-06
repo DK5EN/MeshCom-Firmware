@@ -415,7 +415,6 @@ unsigned long airtime_decay_timer = 0;  // last decay timestamp
 uint8_t channel_util_percent = 0;  // current channel utilization 0-100%
 
 // CSMA: Random jitter added to adaptive TX wait (0-1000ms normal, 0-3000ms when busy)
-uint16_t rx_timeout_jitter = 0;
 
 // flag to indicate if we are currently allowed to transmittig
 volatile bool transmittedFlag = false;
@@ -1830,15 +1829,15 @@ void esp32loop()
             retransmit_timer = millis();
         }
 
-        // CSMA: Airtime decay and channel utilization update (every 10s)
-        if((millis() - airtime_decay_timer) > 10000)
+        // CSMA: Airtime decay and channel utilization update (every 45s)
+        if((millis() - airtime_decay_timer) > 45000)
         {
-            // Calculate utilization before decay: airtime accumulated over ~20s effective window
-            // (due to exponential half-life of 10s, effective window is ~20s)
+            // Calculate utilization before decay: airtime accumulated over ~90s effective window
+            // (due to exponential half-life of 45s, effective window is ~90s)
             uint32_t total_airtime = airtime_rx_us + airtime_tx_us;
-            uint32_t util = total_airtime / 200000UL;
+            uint32_t util = total_airtime / 900000UL;
             channel_util_percent = (util > 100) ? 100 : (uint8_t)util;
-            // 200000 = 20s * 1000000us / 100 → gives percentage
+            // 900000 = 90s * 1000000us / 100 → gives percentage
 
             if(bLORADEBUG)
                 Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%ums tx=%ums util=%u%%\n",
@@ -1889,8 +1888,7 @@ void esp32loop()
         {
             // Adaptive TX wait: base 2000ms + utilization-dependent backoff
             // Below 65%: linear scaling (0-2000ms extra)
-            // Above 65%: exponential scaling (2000-12000ms extra)
-            // Plus random jitter scaled by utilization
+            // Above 65%: quadratic scaling (up to 10000ms total)
             uint16_t adaptive_wait;
             if(channel_util_percent <= 65)
             {
@@ -1899,24 +1897,21 @@ void esp32loop()
             }
             else
             {
-                // Exponential above target: 65% → 4000ms, 85% → 9000ms, 95% → 14000ms
+                // Quadratic above target: 65% → 4000ms, 85% → 6449ms, 100% → 10000ms
                 uint16_t excess = channel_util_percent - 65;  // 0..35
-                // 4000 + excess^2 * 10000 / 1225 (quadratic scaling)
-                adaptive_wait = 4000 + (uint16_t)((uint32_t)excess * excess * 10000 / 1225);
+                // 4000 + excess^2 * 6000 / 1225 (quadratic scaling, max 10000ms)
+                adaptive_wait = 4000 + (uint16_t)((uint32_t)excess * excess * 6000 / 1225);
             }
 
-            // Jitter: wider spread when channel is busy (more competitors)
-            uint16_t jitter_range = (channel_util_percent > 65) ? 3000 : 1000;
+            // CW slot extra: adds cw_value * slot_time when in backoff
+            uint16_t cw_extra = (cw_value > 0) ? (uint16_t)cw_value * csma_slot_time_ms : 0;
 
-            if((iReceiveTimeOutTime + adaptive_wait + rx_timeout_jitter) < millis())
+            if((iReceiveTimeOutTime + adaptive_wait + cw_extra) < millis())
             {
                 // Debug A: RX_TIMEOUT_FIRE
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu delta=%lu wait=%u jitter=%u util=%u%%\n",
-                        millis(), millis() - iReceiveTimeOutTime, adaptive_wait, rx_timeout_jitter, channel_util_percent);
-
-                // Roll new jitter for next cycle
-                rx_timeout_jitter = esp_random() % (jitter_range + 1);
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu delta=%lu wait=%u cw_extra=%u util=%u%%\n",
+                        millis(), millis() - iReceiveTimeOutTime, adaptive_wait, cw_extra, channel_util_percent);
 
                 // FIX BUG #1: Do not reset radio if a received packet is pending
                 if(receiveFlag)
@@ -2122,10 +2117,9 @@ void esp32loop()
                     #endif
 
                     transitionTo(LORA_RX_LISTEN);
-                    // Set to 1 so RX_TIMEOUT_FIRE triggers immediately
-                    // (1 + adaptive_wait < millis() is always true).
-                    // The real backoff timing is controlled by cad_backoff_until in doTX().
-                    iReceiveTimeOutTime = 1;
+                    // Restart adaptive wait timer from now.
+                    // CW backoff is handled via cw_value * slot in the wait calculation.
+                    iReceiveTimeOutTime = millis();
                 }
             }
         }
