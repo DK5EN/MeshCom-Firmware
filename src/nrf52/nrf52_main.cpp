@@ -25,7 +25,21 @@
 #include "onebutton_functions.h"
 
 #include <OneButton.h>
+#include <malloc.h>
 OneButton btn;
+
+// nRF52 heap monitoring: heap_3 wraps libc malloc, so we use mallinfo()
+// fordblks = free bytes within arena already obtained from system
+// The gap between current sbrk and stack is additional free memory
+extern "C" char *sbrk(int incr);
+static uint32_t nrf52_getFreeHeap(void)
+{
+    struct mallinfo mi = mallinfo();
+    char topOfStack;
+    // free = (stack pointer - current program break) + free chunks inside arena
+    uint32_t freeFromSbrk = (uint32_t)(&topOfStack) - (uint32_t)sbrk(0);
+    return freeFromSbrk + mi.fordblks;
+}
 
 // Ethernet Object
 NrfETH neth;
@@ -335,6 +349,8 @@ void nrf52setup()
 
     Serial.println("=====================================");
     Serial.println("[INIT] START CLIENT");
+    Serial.printf("%s;[HEAP];%lu;(free)\n", getTimeString().c_str(),
+        (unsigned long)nrf52_getFreeHeap());
 
     // init nach Reboot
     init_loop_function();
@@ -1736,9 +1752,15 @@ if (isPhoneReady == 1)
 
     }
 
+    if(bDisplayCont)
+    {
+        Serial.printf("%s;[HEAP];%lu;(free)\n", getTimeString().c_str(),
+            (unsigned long)nrf52_getFreeHeap());
+    }
+
     //  We are on FreeRTOS, give other tasks a chance to run
     delay(100);
-    
+
     yield();
 }
 
