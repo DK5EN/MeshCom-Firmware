@@ -82,7 +82,7 @@
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message
 #define MAX_ERR_UDP_TX 10                  // maximum of errors on sending KEEP messages via UDP (derived from Udp.endPacket())
 #define DHCP_REFRESH 1                     // Refreshtime of DHCP Address in minutes
-#define MAX_HB_RX_TIME 30                  // time we wait for an HB from server in seconds
+#define MAX_HB_RX_TIME 40                  // time we wait for an HB from server in seconds
 
 #define MAX_HOP_TEXT_DEFAULT 4             // max hop set on text-message
 #define MAX_HOP_POS_DEFAULT 2              // max hop set on pos-message

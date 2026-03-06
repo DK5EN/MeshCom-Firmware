@@ -650,14 +650,18 @@ bool checkWifiPing()
 
   if(hasIPaddress)
   {
-    if(!Ping.ping(meshcom_settings.node_gw))
+    // Non-blocking check: WiFi status instead of blocking ICMP ping
+    // Server reachability is now covered by heartbeat-loss detection
+    if(WiFi.status() != WL_CONNECTED)
     {
       ifalseping--;
 
-      Serial.printf("%s [WIFI]..Ping to IP<%s> failed:%i\n", getTimeString().c_str(), meshcom_settings.node_gw, ifalseping);
+      Serial.printf("%s [WIFI]..WiFi not connected, count:%i\n", getTimeString().c_str(), ifalseping);
 
       if(ifalseping <= 0)
       {
+        Serial.println("[WIFI-DBG] checkWifiPing: ifalseping exhausted, disconnecting WiFi");
+
         Udp.stop();
 
         WiFi.disconnect(true, true);
@@ -668,12 +672,11 @@ bool checkWifiPing()
       }
 
       return false;
-      
     }
     else
     {
       if(bDEBUG && bDisplayCont)
-        Serial.printf("%s [WIFI]..Ping to IP<%s> success\n", getTimeString().c_str(), meshcom_settings.node_gw);
+        Serial.printf("%s [WIFI]..WiFi connected\n", getTimeString().c_str());
     }
   }
 
