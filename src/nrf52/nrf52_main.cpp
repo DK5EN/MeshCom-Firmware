@@ -176,6 +176,13 @@ static RadioEvents_t RadioEvents;
 // flag to indicate if we are after receiving
 unsigned long iReceiveTimeOutTime = 0;
 
+// CSMA/CA async CAD state
+volatile bool cad_done_flag = false;
+volatile bool cad_channel_busy = false;
+bool cad_in_progress = false;
+bool cad_double_check = false;
+unsigned long cad_start_time = 0;
+
 bool g_meshcom_initialized;
 bool init_flash_done=false;
 
@@ -311,6 +318,12 @@ void getMacAddr(uint8_t *dmac)
     dmac[2] = src[3];
     dmac[1] = src[4];
     dmac[0] = src[5]; // | 0xc0; // MSB high two bits get set elsewhere in the bluetooth stack
+}
+
+void OnCadDone(bool channelActivityDetected)
+{
+    cad_channel_busy = channelActivityDetected;
+    cad_done_flag = true;
 }
 
 void RadioInit()
@@ -777,9 +790,10 @@ void nrf52setup()
     RadioEvents.TxTimeout = OnTxTimeout;
     RadioEvents.RxTimeout = OnRxTimeout;
     RadioEvents.RxError = OnRxError;
+    RadioEvents.CadDone = OnCadDone;
     //RadioEvents.PreAmpDetect = OnPreambleDetect;
     RadioEvents.PreAmpDetect = OnHeaderDetect;
-    
+
     // 4.34w we use EU8 instead of EU
     if(meshcom_settings.node_country == 0)
         meshcom_settings.node_country = 8;
@@ -854,6 +868,9 @@ void nrf52setup()
 
     //  Start receiving LoRa packets
     Radio.Rx(RX_TIMEOUT_VALUE);
+
+    // Configure CAD parameters: 4 symbols, DETPEAK/DETMIN from config, CAD_ONLY mode
+    Radio.SetCadParams(LORA_CAD_04_SYMBOL, RADIOLIB_SX126X_DETPEAK, RADIOLIB_SX126X_DETMIN, LORA_CAD_ONLY, 0);
 
     // set left button interrupt
     //pinMode(LEFT_BUTTON, INPUT);
@@ -1069,7 +1086,7 @@ extern bool btimeClient;
 
     if(iReceiveTimeOutTime > 0)
     {
-        if((iReceiveTimeOutTime + RECEIVE_TIMEOUT) < millis())
+        if((iReceiveTimeOutTime + csma_timeout) < millis())
         {
             if(bLORADEBUG)
                 Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu last_event=%lu delta=%lu\n",
@@ -1097,11 +1114,71 @@ extern bool btimeClient;
     {
         if (iWrite != iRead)
         {
-            if(bLORADEBUG)
-                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
-                    (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
-                    cad_attempt);
-            doTX();
+            if(!cad_in_progress && !cad_done_flag)
+            {
+                // Start CAD scan
+                if(bLORADEBUG)
+                    Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
+                        (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                        cad_attempt);
+
+                cad_in_progress = true;
+                cad_done_flag = false;
+                cad_double_check = false;
+                cad_start_time = millis();
+                Radio.StartCad();
+            }
+            else if(cad_done_flag)
+            {
+                cad_in_progress = false;
+                cad_done_flag = false;
+
+                if(!cad_channel_busy)
+                {
+                    // Channel free — transmit
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
+
+                    csma_reset();
+                    doTX();
+                }
+                else if(!cad_double_check)
+                {
+                    // First scan busy — double-check
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_BUSY_1 attempt=%d, double-check...\n", cad_attempt);
+
+                    cad_double_check = true;
+                    cad_in_progress = true;
+                    cad_done_flag = false;
+                    cad_start_time = millis();
+                    Radio.StartCad();
+                }
+                else
+                {
+                    // Double-check confirmed busy — backoff
+                    cad_attempt++;
+                    csma_timeout = csma_compute_timeout(cad_attempt);
+
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_BUSY attempt=%d next_timeout=%lu\n",
+                            cad_attempt, csma_timeout);
+
+                    Radio.Rx(RX_TIMEOUT_VALUE);
+                    iReceiveTimeOutTime = millis();
+                }
+            }
+            else if(cad_in_progress && (millis() - cad_start_time > 100))
+            {
+                // Safety timeout: CadDone never fired
+                if(bLORADEBUG)
+                    Serial.printf("[MC-DBG] CAD_SAFETY_TIMEOUT\n");
+
+                cad_in_progress = false;
+                cad_done_flag = false;
+                Radio.Rx(RX_TIMEOUT_VALUE);
+                iReceiveTimeOutTime = millis();
+            }
         }
     }
 

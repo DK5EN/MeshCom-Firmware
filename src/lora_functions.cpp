@@ -939,6 +939,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         Serial.println("OnRxDone");
 
     iReceiveTimeOutTime = millis();
+    csma_timeout = csma_compute_timeout(cad_attempt);
 
     is_receiving = false;
 }
@@ -1308,6 +1309,7 @@ void OnTxDone(void)
         }
 
         Radio.Rx(RX_TIMEOUT_VALUE);
+        csma_reset();
 
     #endif
 
