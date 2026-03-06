@@ -50,7 +50,7 @@ RE_CHANNEL_UTIL = re.compile(
     r"\[MC-DBG\]\s+CHANNEL_UTIL\s+rx=(\d+)ms\s+tx=(\d+)ms\s+util=(\d+)%"
 )
 RE_RX_TIMEOUT_FIRE = re.compile(
-    r"RX_TIMEOUT_FIRE.*?wait=(\d+(?:\.\d+)?).*?util=(\d+)"
+    r"RX_TIMEOUT_FIRE.*?wait=(\d+(?:\.\d+)?)"
 )
 RE_CAD_FALSE_POSITIVE = re.compile(r"\[MC-DBG\]\s+CAD_FALSE_POSITIVE")
 RE_RX_TIMEOUT_DEFERRED = re.compile(r"\[MC-DBG\]\s+RX_TIMEOUT_DEFERRED")
@@ -789,10 +789,7 @@ def main() -> None:
 
     # Main loop: periodic summaries + stuck-state checks
     try:
-        while not stop_event.is_set():
-            stop_event.wait(timeout=10)
-            if stop_event.is_set():
-                break
+        while not stop_event.wait(timeout=1):
             monitor.check_stuck_state()
 
             elapsed = time.monotonic() - monitor.interval_start
