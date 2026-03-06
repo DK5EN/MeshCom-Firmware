@@ -2964,7 +2964,7 @@ void esp32loop()
                     {
                         doWiFiConnect();
 
-                        if(iWlanWait > 30)
+                        if(iWlanWait > 15)
                         {
                             iWlanWait = 0;
 
