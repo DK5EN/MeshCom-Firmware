@@ -1002,18 +1002,6 @@ bool doTX()
 {
     //#if not defined(BOARD_T_DECK_PRO)
 
-    // next TX new TX-DELAY
-    if(cmd_counter > 0)
-    {
-        // Debug J: CAD_WAIT
-        if(bLORADEBUG)
-            Serial.printf("[MC-DBG] CAD_WAIT remaining=%d\n", cmd_counter);
-
-        cmd_counter--;
-
-        return false;
-    }
-
     if (iWrite != iRead && iRead < MAX_RING)
     {
         sendlng = ringBuffer[iRead][0];
@@ -1050,8 +1038,6 @@ bool doTX()
 #ifndef BOARD_TLORA_OLV216
             if(lora_tx_buffer[0] == '<' && bDisplayTrack)
             {
-                tx_waiting=false;
-
                 tx_is_active = true;
 
                 // you can transmit C-string or Arduino string up to
@@ -1138,26 +1124,6 @@ bool doTX()
 
                 if(msg_type_b_lora != 0x00) // 0x41 ACK
                 {
-                    if(tx_waiting)
-                    {
-                        tx_waiting=false;
-                    }
-                    else
-                    {
-                        //vor jeden senden CAD abwarten
-                        //if(aprsmsg.msg_payload.indexOf(":ack") > 0)
-                        {
-                            cmd_counter=3;    // FIX BUG #4: Reduced from 7 — blind delay, not real CAD
-
-                            iRead=save_read;
-                            ringBuffer[iRead][1] = save_ring_status;
-
-                            tx_waiting=true;
-                            
-                            return false;
-                        }
-                    }
-
                     tx_is_active = true;
 
                     // you can transmit C-string or Arduino string up to
@@ -1383,12 +1349,27 @@ void OnPreambleDetect(void)
  */
 void OnHeaderDetect(void)
 {
-    // FIX BUG #3: Only block TX during active reception.
-    // Do NOT reset cmd_counter or tx_waiting.
-    // The CAD wait will resume after this packet is processed.
+    // Block TX during active reception.
     is_receiving = true;
 
     // Debug L: HDR_DETECT with state context
     if(bLORADEBUG)
-        Serial.printf("[MC-DBG] HDR_DETECT tx_wait=%d cmd_ctr=%d\n", tx_waiting, cmd_counter);
+        Serial.printf("[MC-DBG] HDR_DETECT cad_attempt=%d\n", cad_attempt);
+}
+
+unsigned long csma_compute_timeout(int attempt) {
+    unsigned long base;
+    int slots;
+    switch(attempt) {
+        case 0:  base = CSMA_BASE_0; slots = CSMA_SLOTS_0; break;
+        case 1:  base = CSMA_BASE_1; slots = CSMA_SLOTS_1_2; break;
+        case 2:  base = CSMA_BASE_2; slots = CSMA_SLOTS_1_2; break;
+        default: base = 0; slots = 0; break; // rapid-fire
+    }
+    return base + (unsigned long)random(0, slots + 1) * CSMA_SLOT_SIZE;
+}
+
+void csma_reset(void) {
+    cad_attempt = 0;
+    csma_timeout = csma_compute_timeout(0);
 }

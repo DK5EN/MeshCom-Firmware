@@ -22,4 +22,7 @@ void OnHeaderDetect(void);
 
 bool updateRetransmissionStatus(void);
 
+unsigned long csma_compute_timeout(int attempt);
+void csma_reset(void);
+
 #endif

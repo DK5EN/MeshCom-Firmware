@@ -1882,13 +1882,9 @@ void esp32loop()
             {
                 // Debug E: TX_GATE_ENTER
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cmd_ctr=%d tx_wait=%d\n",
+                    Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
                         (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
-                        cmd_counter, tx_waiting);
-
-                // save transmission state between loops
-                cmd_counter=0;
-                tx_waiting=true;
+                        cad_attempt);
 
                 // clear Receive Interrupt
                 bEnableInterruptReceive = false;

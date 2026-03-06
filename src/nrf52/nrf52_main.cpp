@@ -1098,9 +1098,9 @@ extern bool btimeClient;
         if (iWrite != iRead)
         {
             if(bLORADEBUG)
-                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cmd_ctr=%d tx_wait=%d\n",
+                Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
                     (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
-                    cmd_counter, tx_waiting);
+                    cad_attempt);
             doTX();
         }
     }
@@ -1390,7 +1390,7 @@ if (isPhoneReady == 1)
                 if(!neth.hasIPaddress)
                 {
                     neth.hasIPaddress = false;
-                    cmd_counter = 50;
+                    iReceiveTimeOutTime = millis();
 
                     if(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6)
                     {

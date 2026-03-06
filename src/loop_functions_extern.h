@@ -186,10 +186,8 @@ extern int ComToPhoneRead;
 extern uint8_t ringBufferLoraRX[MAX_RING][5]; //Ringbuffer for UDP TX from LoRa RX, first byte is length
 extern uint8_t loraWrite;   // counter for ringbuffer
 
-extern int cmd_counter; // ticker dependant on main cycle delay time
 extern bool is_receiving;   // flag to store we are receiving a lora packet.
 extern bool tx_is_active;   // flag to store we are transmitting  a lora packet.
-extern bool tx_waiting;
 
 extern int cad_attempt;
 extern unsigned long csma_timeout;
