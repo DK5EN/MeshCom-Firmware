@@ -1708,8 +1708,8 @@ void esp32loop()
 
         if(iReceiveTimeOutTime > 0)
         {
-            // Timeout RECEIVE_TIMEOUT
-            if((iReceiveTimeOutTime + RECEIVE_TIMEOUT) < millis())
+            // Timeout csma_timeout (slot-basierter Backoff)
+            if((iReceiveTimeOutTime + csma_timeout) < millis())
             {
                 // Debug A: RX_TIMEOUT_FIRE
                 if(bLORADEBUG)
@@ -1789,6 +1789,7 @@ void esp32loop()
                 // Only reset the timeout timers here.
                 inoReceiveTimeOutTime=millis();
                 iReceiveTimeOutTime = millis();
+                csma_timeout = csma_compute_timeout(cad_attempt);
             }
             else
             if(transmittedFlag)
@@ -1869,15 +1870,13 @@ void esp32loop()
                 inoReceiveTimeOutTime=millis();
 
                 iReceiveTimeOutTime = millis(); // start to wait for next transmit
+                csma_reset();
             }
         }
 
-        // Check transmit now
+        // Check transmit now (CSMA/CA with Hardware-CAD)
         if(iReceiveTimeOutTime == 0 && !bEnableInterruptTransmit)
         {
-            // channel is free
-            // nothing was detected
-            // do not print anything, it just spams the console
             if (iWrite != iRead)
             {
                 // Debug E: TX_GATE_ENTER
@@ -1886,58 +1885,82 @@ void esp32loop()
                         (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
                         cad_attempt);
 
-                // clear Receive Interrupt
+                // Disable RX interrupt before CAD scan
                 bEnableInterruptReceive = false;
-                radio.clearPacketReceivedAction();  //KBC 0801
+                radio.clearPacketReceivedAction();
 
-                // set Transmit Interupt
-                bEnableInterruptTransmit = true; //KBC 0801
-                radio.setPacketSentAction(setFlagSent); //KBC 0801
+                // CAD Scan 1
+                int cad_result = radio.scanChannel();
 
-                #ifdef BOARD_HELTEC_V4
-                enablePATransmit();
-                #endif
-
-                if(doTX())
+                bool channel_free = false;
+                if(cad_result == RADIOLIB_CHANNEL_FREE)
                 {
-                    //KBC 0801 bEnableInterruptTransmit = true;
-
-                    // Debug F: TX_START
-                    if(bLORADEBUG)
-                        Serial.printf("[MC-DBG] TX_START qlen=%d\n",
-                            (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite));
+                    channel_free = true;
                 }
                 else
                 {
-                    #ifdef BOARD_HELTEC_V4
-                    disablePATransmit();
-                    #endif
+                    // Double-Check: second scan to filter false positives
                     if(bLORADEBUG)
-                        Serial.print(F("[LoRa]...Starting to listen again... "));
+                        Serial.printf("[MC-DBG] CAD_BUSY_1 attempt=%d, double-check...\n", cad_attempt);
 
-                    // clear Transmit Interrupt
-                    bEnableInterruptReceive = false; // KBC 0801
-                    bEnableInterruptTransmit = false; // KBC 0801
-                    radio.clearPacketSentAction();  //KBC 0801
+                    cad_result = radio.scanChannel();
+                    if(cad_result == RADIOLIB_CHANNEL_FREE)
+                        channel_free = true;
+                }
 
-                    // set Receive Interupt
-                    bEnableInterruptReceive = true; //KBC 0801
-                    radio.setPacketReceivedAction(setFlagReceive); //KBC 0801
+                if(channel_free)
+                {
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
 
-                    int state = radio.startReceive();
-                    if (state == RADIOLIB_ERR_NONE)
+                    csma_reset();
+
+                    // set Transmit Interrupt
+                    bEnableInterruptTransmit = true;
+                    radio.setPacketSentAction(setFlagSent);
+
+                    #ifdef BOARD_HELTEC_V4
+                    enablePATransmit();
+                    #endif
+
+                    if(doTX())
                     {
+                        // Debug F: TX_START
                         if(bLORADEBUG)
-                            Serial.println(F("success!"));
+                            Serial.printf("[MC-DBG] TX_START qlen=%d\n",
+                                (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite));
                     }
                     else
                     {
-                        if(bLORADEBUG)
-                        {
-                            Serial.print(F("failed, code "));
-                            Serial.println(state);
-                        }
-                    }        
+                        #ifdef BOARD_HELTEC_V4
+                        disablePATransmit();
+                        #endif
+
+                        // doTX() returned false (empty queue race) — restore RX
+                        bEnableInterruptTransmit = false;
+                        radio.clearPacketSentAction();
+
+                        bEnableInterruptReceive = true;
+                        radio.setPacketReceivedAction(setFlagReceive);
+                        radio.startReceive();
+                    }
+                }
+                else
+                {
+                    // Channel busy confirmed — backoff
+                    cad_attempt++;
+                    csma_timeout = csma_compute_timeout(cad_attempt);
+
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_BUSY attempt=%d next_timeout=%lu\n",
+                            cad_attempt, csma_timeout);
+
+                    // Restore RX
+                    bEnableInterruptReceive = true;
+                    radio.setPacketReceivedAction(setFlagReceive);
+                    radio.startReceive();
+
+                    iReceiveTimeOutTime = millis();
                 }
             }
         }
