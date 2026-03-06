@@ -157,6 +157,7 @@ class Monitor:
         self.max_radio_gap: float = 0.0  # per interval
         self.max_radio_gap_total: float = 0.0  # lifetime
         self.radio_silent_events_interval: int = 0
+        self.rx_process_since_last_timeout: int = 0  # RX_PROCESS events since last RX_TIMEOUT_FIRE
 
         # Ring buffer zombie tracking
         self.ring_last_queued: int = 0
@@ -234,6 +235,8 @@ class Monitor:
             self.last_transition = now
             self.counters["transitions"] += 1
             self.total["transitions"] += 1
+            if to_st == "RX_PROCESS":
+                self.rx_process_since_last_timeout += 1
             ch = "!" if rc != 0 else STATE_CHAR.get(to_st, "?")
             self._indicator(ch)
             return
@@ -502,9 +505,17 @@ class Monitor:
                 if gap > self.max_radio_gap_total:
                     self.max_radio_gap_total = gap
                 if gap > RADIO_SILENT_THRESHOLD:
-                    self.radio_silent_events_interval += 1
-                    self.total["radio_silent"] += 1
-                    self._alert(f"RADIO_SILENT gap={gap:.0f}s (no RX_TIMEOUT_FIRE)")
+                    if self.rx_process_since_last_timeout > 0:
+                        # Channel was busy — not a radio problem
+                        self._indicator("B")
+                        self.counters["channel_busy"] += 1
+                        self.total["channel_busy"] += 1
+                    else:
+                        # No RX activity either — real radio silence
+                        self.radio_silent_events_interval += 1
+                        self.total["radio_silent"] += 1
+                        self._alert(f"RADIO_SILENT gap={gap:.0f}s (no RX_TIMEOUT_FIRE)")
+            self.rx_process_since_last_timeout = 0
             self.last_rx_timeout_fire = now
 
             # Flood detection — only timeout-driven restarts count
@@ -654,6 +665,7 @@ class Monitor:
                 f"Retransmit fails: {self.counters.get('retransmit_fails', 0)}\n"
                 f"Radio: {self.radio_silent_events_interval} silent events "
                 f"(max gap: {self.max_radio_gap:.0f}s) | "
+                f"Channel busy: {self.counters.get('channel_busy', 0)} | "
                 f"Deferred: {deferred}\n"
                 f"ACK Dedup: saved={ack_saved} "
                 f"(cancel={self.counters.get('ack_rx_cancel_saved', 0)} "
