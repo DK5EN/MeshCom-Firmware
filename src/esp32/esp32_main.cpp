@@ -3095,6 +3095,10 @@ int checkRX(bool bRadio)
             Serial.println(F(" Hz"));
         }
 
+        // RX channel utilization: calculate airtime from packet length
+        // (ESP32 has no OnHeaderDetect, so ch_util_rx_start is never set)
+        ch_util_rx_accum += radio.getTimeOnAir(ibytes) / 1000;  // us -> ms
+
         OnRxDone(payload, (uint16_t)ibytes, saved_rssi, saved_snr);
     }
     else
@@ -3108,6 +3112,9 @@ int checkRX(bool bRadio)
             radio.setPacketReceivedAction(setFlagReceive);
             radio.startReceive();
         }
+
+        // RX channel utilization: CRC-failed packet still occupied the channel
+        ch_util_rx_accum += radio.getTimeOnAir(ibytes) / 1000;  // us -> ms
 
         // packet was received, but is malformed
         if(bLORADEBUG)
