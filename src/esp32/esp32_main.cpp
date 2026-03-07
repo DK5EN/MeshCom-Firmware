@@ -1765,6 +1765,18 @@ void esp32loop()
                     if(bLORADEBUG)
                         Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=receiveFlag\n");
                 }
+                // FIX: Do not reset radio if a packet reception is in progress.
+                // Poll IRQ register for PREAMBLE_DETECTED or HEADER_VALID —
+                // if set, the radio is actively demodulating a packet and
+                // calling startReceive() would abort it.
+                else if(radio.getIrqFlags() & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
+                                                RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED))
+                {
+                    iReceiveTimeOutTime = millis();
+
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=irq_rx_active\n");
+                }
                 else
                 {
                     iReceiveTimeOutTime=0;
