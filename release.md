@@ -17,6 +17,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 
 ## Bugfixes
 
+### RX-Timeout bricht laufenden Paketempfang ab (NEU - v4.35n_20260307_fix2)
+- **Ursache**: Der CSMA-Timeout-Handler rief `startReceive()` auf um das Radio periodisch neu zu starten, pruefte aber nur `receiveFlag` (fertig empfangene Pakete). Pakete die noch demoduliert wurden (Preamble erkannt, Daten noch im Anflug) wurden durch den Radio-Reset stillschweigend abgebrochen.
+- **Auswirkung**: Log-Analyse zweier Nodes (DK5EN-99 als Repeater, DK5EN-12 als Empfaenger) zeigte 20 von 22 verlorenen Paketen (9.2% Verlustrate) durch exakt dieses Timing: `RX_TIMEOUT_FIRE` waehrend aktiver Paketdemodulation.
+- **Fix**: IRQ-Register-Polling (`radio.getIrqFlags()`) auf `PREAMBLE_DETECTED`/`HEADER_VALID` vor dem `startReceive()`-Aufruf im Timeout-Handler. Bei laufendem Empfang wird der Timeout aufgeschoben statt das Radio neu zu starten. Gleiches Muster wie bereits im TX-Gate implementiert.
+- **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
 ### checkOwnTx() -1 Return-Wert korrekt behandelt (NEU - v4.35n_20260307_fix1)
 - **Boolean-Kontext-Bug behoben**: `if(!checkOwnTx(...))` interpretierte -1 (Fehler) als false, nicht als error-Zustand.
 - **Korrekte Behandlung**: `int icheck = checkOwnTx(...); if(icheck < 0)` erlaubt proper Fehlerbehandlung. Betroffene Datei: `src/udp_functions.cpp` Zeile 315.
