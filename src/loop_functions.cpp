@@ -63,7 +63,7 @@ int iWlanWait = 0;
 extern float global_batt;
 extern int global_proz;
 
-bool bSetLoRaAPRS = false;
+volatile bool bSetLoRaAPRS = false;
 
 bool bDEBUG = false;
 bool bLORADEBUG = false;
@@ -285,17 +285,17 @@ int ComToPhoneRead=0;
 bool hasMsgFromPhone = false;
 
 // LoRa RX/TX sequence control
-bool is_receiving = false;  // flag to store we are receiving a lora packet.
-bool tx_is_active = false;  // flag to store we are transmitting  a lora packet.
+volatile bool is_receiving = false;  // flag to store we are receiving a lora packet.
+volatile bool tx_is_active = false;  // flag to store we are transmitting  a lora packet.
 
 int cad_attempt = 0;
 unsigned long csma_timeout = CSMA_BASE_0;
 
 // Channel utilization tracking (10s window)
-unsigned long ch_util_rx_start = 0;   // timestamp when RX started
-unsigned long ch_util_tx_start = 0;   // timestamp when TX started
-unsigned long ch_util_rx_accum = 0;   // accumulated RX airtime (ms) in current window
-unsigned long ch_util_tx_accum = 0;   // accumulated TX airtime (ms) in current window
+volatile unsigned long ch_util_rx_start = 0;   // timestamp when RX started
+volatile unsigned long ch_util_tx_start = 0;   // timestamp when TX started
+volatile unsigned long ch_util_rx_accum = 0;   // accumulated RX airtime (ms) in current window
+volatile unsigned long ch_util_tx_accum = 0;   // accumulated TX airtime (ms) in current window
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 
@@ -471,6 +471,10 @@ void addBLECommandBack(char text[UDP_TX_BUF_SIZE])
  */
 void addLoraRxBuffer(unsigned int msg_id, bool bserver)
 {
+    if(bLORADEBUG)
+        Serial.printf("[MC-DBG] RX_DEDUP_ADD msg_id=%08X srv=%d slot=%d/%d\n",
+                      msg_id, bserver, loraWrite, MAX_DEDUP_RING);
+
     // byte 0-3 msg_id
     ringBufferLoraRX[loraWrite][3] = msg_id >> 24;
     ringBufferLoraRX[loraWrite][2] = msg_id >> 16;
@@ -2403,7 +2407,7 @@ void sendMessage(char *msg_text, int len)
     }
 
     retryCount[iWrite] = 0;
-    addRingPointer(iWrite, iRead, MAX_RING, "tx");
+    addTxRingEntry("user_msg");
 
     /*
     iWrite++;
@@ -2758,7 +2762,7 @@ void sendPosition(unsigned int uintervall, double lat, char lat_c, double lon, c
         ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
         memcpy(ringBuffer[iWrite]+2, msg_buffer, ilng);
 
-        addRingPointer(iWrite, iRead, MAX_RING, "tx");
+        addTxRingEntry("user_pos");
 
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
@@ -2882,7 +2886,7 @@ void sendPosition(unsigned int uintervall, double lat, char lat_c, double lon, c
         ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
         memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
 
-        addRingPointer(iWrite, iRead, MAX_RING, "tx");
+        addTxRingEntry("user_wx");
 
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
@@ -2954,7 +2958,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
     memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
 
-    addRingPointer(iWrite, iRead, MAX_RING, "tx");
+    addTxRingEntry("user_hey");
 
     /*
     iWrite++;
@@ -3029,7 +3033,7 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
     ringBuffer[iWrite][1]=0xFF;    // ACK-Status byte 0xFF for no retransmission
     memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
 
-    addRingPointer(iWrite, iRead, MAX_RING, "tx");
+    addTxRingEntry("beacon");
 
     /*
     iWrite++;
@@ -3102,7 +3106,7 @@ void sendHey()
         ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
         memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
 
-        addRingPointer(iWrite, iRead, MAX_RING, "tx");
+        addTxRingEntry("auto_pos");
 
         /*
         iWrite++;
@@ -3370,7 +3374,7 @@ void sendTelemetry(int ID)
             memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
 
             if(!bDisplayTrack)
-                addRingPointer(iWrite, iRead, MAX_RING, "tx");
+                addTxRingEntry("phone_msg");
         }
 
         // send value messages to Lora-APRS
@@ -3386,7 +3390,7 @@ void sendTelemetry(int ID)
             ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
             memcpy(ringBuffer[iWrite]+2, msg_buffer, tlng);
 
-            addRingPointer(iWrite, iRead, MAX_RING, "tx");
+            addTxRingEntry("phone_raw");
         }
     }
 }

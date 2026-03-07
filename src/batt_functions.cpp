@@ -14,7 +14,7 @@ int global_proz = 0;
 unsigned long BattTimeWait = 0;
 unsigned long BattTimeAPP = 0;
 
-extern bool is_receiving;
+extern volatile bool is_receiving;
 
 #if defined(BOARD_RAK4630)
 

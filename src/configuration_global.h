@@ -1,7 +1,7 @@
 #define SOURCE_VERSION "4.35"
 #define SOURCE_VERSION_SUB "n"
 
-#define FLASH_VERSION 20260306
+#define FLASH_VERSION 20260307
 
 //Hardware Types
 #define TLORA_V2 1
@@ -104,6 +104,17 @@
 #define CSMA_SLOTS_0        10      // Zufalls-Slots bei Versuch 0 (max 350ms Jitter)
 #define CSMA_SLOTS_1_2      5       // Zufalls-Slots bei Versuch 1-2 (max 175ms Jitter)
 #define CSMA_MAX_ATTEMPTS   3       // Ab hier: Rapid-fire CAD bis Kanal frei
+
+// LoRa Message Types
+#define MSG_TYPE_ACK          0x41
+#define MSG_TYPE_TEXT         0x3A
+#define MSG_TYPE_POSITION     0x21
+#define MSG_TYPE_HEY          0x40
+
+// Ring Buffer Slot Status (ringBuffer[slot][1])
+#define RING_STATUS_READY     0x00   // Ready to send
+#define RING_STATUS_SENT      0x01   // Sent, waiting for ACK/timer
+#define RING_STATUS_DONE      0xFF   // Final, no retransmission
 
 // SOFTSERIEL
 #define SOFTSER_REFRESH_INTERVAL 5         // SOFTSER Refresh alle 5 Minuten
