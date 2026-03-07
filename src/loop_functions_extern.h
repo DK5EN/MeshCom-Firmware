@@ -191,6 +191,7 @@ extern volatile bool tx_is_active;   // flag to store we are transmitting  a lor
 
 extern int cad_attempt;
 extern unsigned long csma_timeout;
+extern int rx_irq_defer_count;
 
 // Channel utilization tracking (10s window)
 extern volatile unsigned long ch_util_rx_start;

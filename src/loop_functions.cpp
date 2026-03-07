@@ -290,6 +290,7 @@ volatile bool tx_is_active = false;  // flag to store we are transmitting  a lor
 
 int cad_attempt = 0;
 unsigned long csma_timeout = CSMA_BASE_0;
+int rx_irq_defer_count = 0;
 
 // Channel utilization tracking (10s window)
 volatile unsigned long ch_util_rx_start = 0;   // timestamp when RX started

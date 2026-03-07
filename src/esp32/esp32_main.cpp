@@ -1769,16 +1769,23 @@ void esp32loop()
                 // Poll IRQ register for PREAMBLE_DETECTED or HEADER_VALID —
                 // if set, the radio is actively demodulating a packet and
                 // calling startReceive() would abort it.
-                else if(radio.getIrqFlags() & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
+                // Limit deferrals to 3 — a real packet completes within one
+                // timeout window, so consecutive deferrals indicate stale IRQ flags.
+                else if((radio.getIrqFlags() & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
                                                 RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED))
+                        && rx_irq_defer_count < 3)
                 {
+                    rx_irq_defer_count++;
                     iReceiveTimeOutTime = millis();
 
                     if(bLORADEBUG)
-                        Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=irq_rx_active\n");
+                        Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=irq_rx_active cnt=%d\n", rx_irq_defer_count);
                 }
                 else
                 {
+                    if(rx_irq_defer_count >= 3 && bLORADEBUG)
+                        Serial.printf("[MC-DBG] RX_IRQ_STALE forced restart after %d deferrals\n", rx_irq_defer_count);
+                    rx_irq_defer_count = 0;
                     iReceiveTimeOutTime=0;
 
                     // FIX BUG #1: Call startReceive FIRST, then re-wire interrupts.
@@ -1842,6 +1849,7 @@ void esp32loop()
                 // reset flags first
                 bEnableInterruptReceive = false;
                 receiveFlag = false;
+                rx_irq_defer_count = 0;
 
                 // DIO triggered while reception is ongoing
                 // that means we got a packet

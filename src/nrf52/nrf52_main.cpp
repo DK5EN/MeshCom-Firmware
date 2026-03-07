@@ -1112,14 +1112,18 @@ extern bool btimeClient;
 
             // BUG #1 Aequivalent: Wenn Header erkannt, ist Empfang moeglicherweise
             // noch aktiv. Timer verlaengern statt zuruecksetzen.
-            if(is_receiving)
+            if(is_receiving && rx_irq_defer_count < 3)
             {
+                rx_irq_defer_count++;
                 iReceiveTimeOutTime = millis();
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=is_receiving\n");
+                    Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=is_receiving cnt=%d\n", rx_irq_defer_count);
             }
             else
             {
+                if(rx_irq_defer_count >= 3 && bLORADEBUG)
+                    Serial.printf("[MC-DBG] RX_IRQ_STALE forced restart after %d deferrals\n", rx_irq_defer_count);
+                rx_irq_defer_count = 0;
                 iReceiveTimeOutTime = 0;
                 Radio.Rx(RX_TIMEOUT_VALUE);
                 if(bLORADEBUG)

@@ -17,6 +17,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 
 ## Bugfixes
 
+### Stale IRQ-Flags blockieren Radio dauerhaft (NEU - v4.35n_20260307_fix3)
+- **Ursache**: Der in fix2 eingefuehrte IRQ-Schutz (`PREAMBLE_DETECTED`/`HEADER_VALID`-Pruefung) hatte kein Limit fuer aufeinanderfolgende Deferrals. Bei Stoersignalen oder fehlgeschlagenen Empfaengen bleiben die SX1262-IRQ-Flags latched -- jeder Timeout-Zyklus (~4.5s) wurde erneut aufgeschoben, ohne dass je ein Paket empfangen wurde.
+- **Auswirkung**: Radio-Stillstand von ueber 100 Sekunden beobachtet (Log: 22+ aufeinanderfolgende `RX_TIMEOUT_DEFERRED src=irq_rx_active`). Waehrend dieser Zeit werden keine Pakete empfangen oder gesendet -- der Node ist effektiv taub.
+- **Fix**: Maximale Anzahl aufeinanderfolgender IRQ-Deferrals auf 3 begrenzt (≈13.5s). Bei Ueberschreitung wird `startReceive()` erzwungen, unabhaengig vom IRQ-Status. Zaehler wird bei erfolgreichem Empfang oder Radio-Restart zurueckgesetzt. Neuer Debug-Log `RX_IRQ_STALE` bei erzwungenem Restart.
+- **Betroffene Dateien**: `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/loop_functions.cpp`, `src/loop_functions_extern.h`
+
 ### RX-Timeout bricht laufenden Paketempfang ab (NEU - v4.35n_20260307_fix2)
 - **Ursache**: Der CSMA-Timeout-Handler rief `startReceive()` auf um das Radio periodisch neu zu starten, pruefte aber nur `receiveFlag` (fertig empfangene Pakete). Pakete die noch demoduliert wurden (Preamble erkannt, Daten noch im Anflug) wurden durch den Radio-Reset stillschweigend abgebrochen.
 - **Auswirkung**: Log-Analyse zweier Nodes (DK5EN-99 als Repeater, DK5EN-12 als Empfaenger) zeigte 20 von 22 verlorenen Paketen (9.2% Verlustrate) durch exakt dieses Timing: `RX_TIMEOUT_FIRE` waehrend aktiver Paketdemodulation.
