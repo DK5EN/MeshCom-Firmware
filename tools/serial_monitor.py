@@ -794,9 +794,18 @@ def main() -> None:
     print("Press Ctrl+C to stop\n")
 
     # Open serial with DTR/RTS disabled to avoid hardware reset.
-    # CP2102 on macOS: the driver toggles DTR/RTS via non-atomic ioctls on open,
-    # which briefly pulls the reset line low even with dtr=False/rts=False.
-    # Clearing HUPCL prevents the modem-hangup reset on close/reopen.
+    # CP2102 on macOS: pyserial's open() internally calls os.open() which makes
+    # the driver assert DTR/RTS *before* pyserial can clear them via ioctl.
+    # Fix: pre-configure the TTY with O_NOCTTY (no modem control signals) and
+    # set CLOCAL + clear HUPCL *before* pyserial touches the port.
+    # See: https://github.com/pyserial/pyserial/issues/124
+    fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    attrs = termios.tcgetattr(fd)
+    attrs[2] &= ~termios.HUPCL  # no DTR drop on close
+    attrs[2] |= termios.CLOCAL  # ignore modem control lines
+    termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    os.close(fd)
+    # Now pyserial opens the already-configured TTY — no reset pulse
     ser = serial.Serial()
     ser.port = args.port
     ser.baudrate = args.baud
@@ -804,11 +813,6 @@ def main() -> None:
     ser.dtr = False
     ser.rts = False
     ser.open()
-    # Clear HUPCL to prevent reset glitch on subsequent close/reopen
-    attrs = termios.tcgetattr(ser.fd)
-    attrs[2] &= ~termios.HUPCL  # cflag
-    termios.tcsetattr(ser.fd, termios.TCSANOW, attrs)
-    time.sleep(0.5)  # let any glitch-reset recover before reading
 
     monitor = Monitor(summary_interval=args.interval)
     stop_event = threading.Event()
