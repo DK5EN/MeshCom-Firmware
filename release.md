@@ -17,6 +17,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 
 ## Bugfixes
 
+### UDP-to-LoRa Relay: Pakete gehen verloren wenn anderer Gateway schneller sendet (NEU - v4.35n_20260307_fix4)
+- **Ursache**: UDP-empfangene Text-Nachrichten wurden mit `status=0x00` (RING_STATUS_READY) in den TX-Ringpuffer geschrieben. Wenn ein anderer Gateway (z.B. DL7OSX-1) dieselbe msg_id vor dem lokalen Node via LoRa aussendet, erkennt der LoRa-RX-Handler den Ringpuffer-Eintrag als "bereits gehoert" und loescht den Slot (`len=0, status=0xFF`). Beim naechsten `doTX()` ist der Slot leer -- APRS-Decode schlaegt fehl mit `size <0> to short`.
+- **Auswirkung**: Log-Analyse von DK5EN-99 zeigte 24 von 64 UDP-empfangenen Paketen (37.5%) wurden still verworfen. DK5EN-12 (nur ueber DK5EN-99 erreichbar) hat diese Nachrichten nie erhalten.
+- **Fix**: UDP-Relay-Nachrichten verwenden jetzt immer `status=0xFF` (RING_STATUS_DONE / fire-and-forget). Retransmission ist Aufgabe des sendenden Nodes, nicht des Gateways. Durch `status=0xFF` ueberspringt der LoRa-RX-Handler den Slot (Bedingung `status != RING_STATUS_DONE`), und `doTX()` sendet die Nachricht zuverlaessig aus.
+- **Betroffene Datei**: `src/udp_functions.cpp`
+
 ### Stale IRQ-Flags blockieren Radio dauerhaft (NEU - v4.35n_20260307_fix3)
 - **Ursache**: Der in fix2 eingefuehrte IRQ-Schutz (`PREAMBLE_DETECTED`/`HEADER_VALID`-Pruefung) hatte kein Limit fuer aufeinanderfolgende Deferrals. Bei Stoersignalen oder fehlgeschlagenen Empfaengen bleiben die SX1262-IRQ-Flags latched -- jeder Timeout-Zyklus (~4.5s) wurde erneut aufgeschoben, ohne dass je ein Paket empfangen wurde.
 - **Auswirkung**: Radio-Stillstand von ueber 100 Sekunden beobachtet (Log: 22+ aufeinanderfolgende `RX_TIMEOUT_DEFERRED src=irq_rx_active`). Waehrend dieser Zeit werden keine Pakete empfangen oder gesendet -- der Node ist effektiv taub.
