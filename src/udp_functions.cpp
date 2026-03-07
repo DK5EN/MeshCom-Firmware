@@ -312,14 +312,15 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             }
           }
 
-          if(!checkOwnTx(aprsmsg.msg_id))
+          int icheck = checkOwnTx(aprsmsg.msg_id);
+          if(icheck < 0)
           {
             if(bUDPtoLoraSend)
             {
               // first byte is always the len of the msg
               // UDP messages send to LoRa TX
               // resend only Packet to all
-              
+
               // store last message to compare later on
               insertOwnTx(aprsmsg.msg_id);
 

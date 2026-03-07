@@ -17,6 +17,10 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 
 ## Bugfixes
 
+### checkOwnTx() -1 Return-Wert korrekt behandelt (NEU - v4.35n_20260307_fix1)
+- **Boolean-Kontext-Bug behoben**: `if(!checkOwnTx(...))` interpretierte -1 (Fehler) als false, nicht als error-Zustand.
+- **Korrekte Behandlung**: `int icheck = checkOwnTx(...); if(icheck < 0)` erlaubt proper Fehlerbehandlung. Betroffene Datei: `src/udp_functions.cpp` Zeile 315.
+
 ### Retransmit-Ringpuffer: Nachrichtenverlust behoben
 - **updateRetransmissionStatus()** scannt wieder alle MAX_RING Slots statt nur den eingeschraenkten [iRead..iWrite)-Bereich. Bereits konsumierte Slots enthalten noch gueltige Retry-Daten und muessen weiter erreichbar sein.
 - **Text-Nachrichten-Slots** werden nach TX nicht mehr sofort geloescht. Nur Fire-and-Forget-Eintraege (Relay/ACK/Beacon mit Status 0xFF) werden direkt freigegeben; Text-Nachrichten bleiben fuer Retry-Tracking erhalten.
