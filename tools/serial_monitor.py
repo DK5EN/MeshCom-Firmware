@@ -105,7 +105,7 @@ SIMPLE_COUNTERS = {
 STUCK_STATE_SECONDS = 30
 NO_TRANSITION_SECONDS = 30
 RX_TIMEOUT_ALERT_THRESHOLD = 10  # per summary interval
-CAD_FALSE_POSITIVE_STREAK = 6
+CAD_BUSY_STREAK = 6
 RX_RESTART_PER_MIN_THRESHOLD = 70  # only counts RX_TIMEOUT_FIRE, not post-RX restarts
 RADIO_SILENT_THRESHOLD = 20  # adaptive wait max ~16s at 95% util; 20s = real trouble
 RING_ZOMBIE_CONSECUTIVE = 5  # consecutive RING_STATUS with retrying>0, queued==0 (150s)
@@ -271,11 +271,11 @@ class Monitor:
             self.total["cad_scans"] += 1
             if result == -702:
                 self.cad_streak += 1
-                self.counters["cad_false_pos"] += 1
-                self.total["cad_false_pos"] += 1
-                if self.cad_streak == CAD_FALSE_POSITIVE_STREAK:
+                self.counters["cad_busy"] += 1
+                self.total["cad_busy"] += 1
+                if self.cad_streak == CAD_BUSY_STREAK:
                     self._alert(
-                        f"CAD FALSE POSITIVE streak: {self.cad_streak}+ consecutive -702"
+                        f"CAD BUSY streak: {self.cad_streak}+ consecutive LORA_DETECTED (-702)"
                     )
             else:
                 self.cad_streak = 0
@@ -660,7 +660,7 @@ class Monitor:
                 f"State: {state_str or 'no transitions'}\n"
                 f"Drops: {drops} | "
                 f"Loop blocked: {self.counters.get('relay_loop_blocked', 0)} | "
-                f"CAD false pos: {self.counters.get('cad_false_pos', 0)} | "
+                f"CAD busy: {self.counters.get('cad_busy', 0)} | "
                 f"CAD filtered: {cad_fp_filtered} | "
                 f"Retransmit fails: {self.counters.get('retransmit_fails', 0)}\n"
                 f"Radio: {self.radio_silent_events_interval} silent events "

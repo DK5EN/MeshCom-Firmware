@@ -1688,14 +1688,14 @@ void esp32loop()
             }
         }
 
-        if(!bGATEWAY)
+        // Retransmission status must tick on ALL nodes (including gateways).
+        // Without this, gateway text messages stay stuck at RING_STATUS_SENT
+        // forever if no echo is received via LoRa (RING_ZOMBIE).
+        if ((retransmit_timer + (1000 * 2)) < millis())
         {
-            if ((retransmit_timer + (1000 * 2)) < millis())   // repeat 2 seconds
-            {
-                updateRetransmissionStatus();
+            updateRetransmissionStatus();
 
-                retransmit_timer = millis();
-            }
+            retransmit_timer = millis();
         }
 
         // FIX: Periodic ring buffer utilization report (every 30s)

@@ -17,6 +17,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 
 ## Bugfixes
 
+### Gateway RING_ZOMBIE: Retransmit-Timer auf Gateways nie getaktet (NEU - v4.35n_20260308_fix1)
+- **Ursache**: `updateRetransmissionStatus()` war durch `if(!bGATEWAY)` geschuetzt -- auf Gateway-Nodes wurde der Retransmit-Timer nie getaktet. Ein gesendeter Text-Nachrichten-Slot blieb nach TX bei `status=0x01` (RING_STATUS_SENT) stecken, weil der Timer den Status nie von 0x01 bis zum Threshold 0x15 hochzaehlen konnte.
+- **Auswirkung**: Wenn kein Echo der eigenen Nachricht via LoRa zurueckkam (schwaches Signal, Netzwerk-Partition), blieb der Slot als "Zombie" im Ring Buffer. RING_STATUS zeigte dauerhaft `retrying=1, queued=0`. Der Slot wurde erst beim naechsten Ringpuffer-Umlauf ueberschrieben -- bis dahin war ein Slot permanent blockiert.
+- **Fix**: `if(!bGATEWAY)`-Guard entfernt. Gateways durchlaufen jetzt denselben Retransmit-Zyklus (40s pro Retry, max 3 Retries = 120s) wie alle anderen Nodes.
+- **Betroffene Dateien**: `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
+
 ### UDP-to-LoRa Relay: Pakete gehen verloren wenn anderer Gateway schneller sendet (NEU - v4.35n_20260307_fix4)
 - **Ursache**: UDP-empfangene Text-Nachrichten wurden mit `status=0x00` (RING_STATUS_READY) in den TX-Ringpuffer geschrieben. Wenn ein anderer Gateway (z.B. DL7OSX-1) dieselbe msg_id vor dem lokalen Node via LoRa aussendet, erkennt der LoRa-RX-Handler den Ringpuffer-Eintrag als "bereits gehoert" und loescht den Slot (`len=0, status=0xFF`). Beim naechsten `doTX()` ist der Slot leer -- APRS-Decode schlaegt fehl mit `size <0> to short`.
 - **Auswirkung**: Log-Analyse von DK5EN-99 zeigte 24 von 64 UDP-empfangenen Paketen (37.5%) wurden still verworfen. DK5EN-12 (nur ueber DK5EN-99 erreichbar) hat diese Nachrichten nie erhalten.
@@ -181,6 +187,7 @@ Bringt ESP32 auf Paritaet mit dem NRF52-`OnHeaderDetect`-Callback.
 ### serial_monitor.py
 - Neues Echtzeit-Monitoring-Tool: parst Firmware-Output, farbcodierte Events, Inline-Activity-Indicator (`.RrCTt` fuer States, `x!` fuer Fehler).
 - **CHANNEL_BUSY vs. RADIO_SILENT**: Unterscheidet aktive Kanalnutzung (legitime Kollisionen) von echtem Funkstille-Zustand. Verhindert Fehlalarme.
+- **CAD-Alert umbenannt** (NEU - v4.35n_20260308_fix1): `CAD FALSE POSITIVE streak` zu `CAD BUSY streak` korrigiert. Der Alert zaehlt aufeinanderfolgende `LORA_DETECTED` (-702) Ergebnisse -- das sind echte Kanal-Busy-Erkennungen, keine False Positives. Counter `cad_false_pos` zu `cad_busy` umbenannt. Der separate Counter `cad_false_pos_filtered` (Double-Check filtert echte False Positives) bleibt unveraendert.
 - Ctrl+C-Handler und `RE_RX_TIMEOUT_FIRE`-Regex korrigiert.
 
 ### loganalyse.sh
