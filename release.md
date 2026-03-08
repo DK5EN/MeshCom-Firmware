@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-07)
+# Release Notes -- MeshCom Firmware v4.35n (2026-03-08)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -22,6 +22,18 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Auswirkung**: Log-Analyse von DK5EN-99 zeigte 24 von 64 UDP-empfangenen Paketen (37.5%) wurden still verworfen. DK5EN-12 (nur ueber DK5EN-99 erreichbar) hat diese Nachrichten nie erhalten.
 - **Fix**: UDP-Relay-Nachrichten verwenden jetzt immer `status=0xFF` (RING_STATUS_DONE / fire-and-forget). Retransmission ist Aufgabe des sendenden Nodes, nicht des Gateways. Durch `status=0xFF` ueberspringt der LoRa-RX-Handler den Slot (Bedingung `status != RING_STATUS_DONE`), und `doTX()` sendet die Nachricht zuverlaessig aus.
 - **Betroffene Datei**: `src/udp_functions.cpp`
+
+### RX_IRQ_STALE RSSI-Validierung und Header/Preamble-Differenzierung (NEU - v4.35n_20260308_fix2)
+- **Ursache**: Die in fix3 eingefuehrte IRQ-Deferral-Logik behandelte `PREAMBLE_DETECTED` und `HEADER_VALID` identisch (jeweils bis zu 3 Deferrals a 4,5s = max 13,5s Blockade). Log-Analyse zeigte: 95% der RX_IRQ_STALE Events traten bei leerem Kanal auf (CHANNEL_UTIL=0%) — die SX1262 IRQ-Flags blieben nach abgebrochenen Transmissions oder Rauschimpulsen latched.
+- **Auswirkung**: DK5EN-99: 230 Events = 53 Min verlorene Empfangszeit. DK5EN-12: 112 Events = 26 Min.
+- **Fix**: Dreistufige Verbesserung: (1) RSSI-Validierung via `radio.getRSSI(false)` — bei RSSI < -126 dBm (unter Noise Floor) werden IRQ-Flags als stale erkannt und sofort zum Radio-Restart durchgefallen. (2) HEADER_VALID: bis zu 3 Deferrals (unveraendert, starker Indikator). (3) PREAMBLE_DETECTED ohne Header: max 1 Deferral (schwacher Indikator). Neue Debug-Logs: `RX_IRQ_STALE_EARLY` (RSSI-basiert), `RX_TIMEOUT_DEFERRED src=header_valid/preamble_only`.
+- **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
+### CAD-Storm Rapid-Fire: 100ms Preamble-Check statt 0ms (NEU - v4.35n_20260308_fix1)
+- **Ursache**: Bei `cad_attempt >= 3` (CSMA_MAX_ATTEMPTS erreicht) gab `csma_compute_timeout()` 0ms zurueck — das Radio wurde ohne jede Pause sofort restarted und der naechste CAD-Scan ausgefuehrt. Bei 0ms Wartezeit hat das Radio keine Chance, eingehende Preambles von schwachen Nodes zu erkennen.
+- **Auswirkung**: Schwache Nodes (entfernte Stationen) werden im Rapid-Fire-Modus systematisch ueberfahren, weil deren Preamble nie detektiert wird.
+- **Fix**: Neue Konstante `CSMA_RAPID_RX_MS` (100ms) als minimales RX-Fenster im Rapid-Fire-Modus. Statt sofortigem CAD-Retry hoert das Radio 100ms zu. Die bestehende IRQ-Polling-Logik (RSSI-Validierung + Header/Preamble-Differenzierung) entscheidet dann automatisch: Preamble erkannt = Deferral, kein Signal = sofort weiter mit CAD. Kosten: ~100ms pro Versuch (vernachlaessigbar vs. 2000-4500ms Backoff davor).
+- **Betroffene Dateien**: `src/configuration_global.h`, `src/lora_functions.cpp`
 
 ### Stale IRQ-Flags blockieren Radio dauerhaft (NEU - v4.35n_20260307_fix3)
 - **Ursache**: Der in fix2 eingefuehrte IRQ-Schutz (`PREAMBLE_DETECTED`/`HEADER_VALID`-Pruefung) hatte kein Limit fuer aufeinanderfolgende Deferrals. Bei Stoersignalen oder fehlgeschlagenen Empfaengen bleiben die SX1262-IRQ-Flags latched -- jeder Timeout-Zyklus (~4.5s) wurde erneut aufgeschoben, ohne dass je ein Paket empfangen wurde.

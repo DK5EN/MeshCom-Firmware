@@ -1,7 +1,7 @@
 #define SOURCE_VERSION "4.35"
 #define SOURCE_VERSION_SUB "n"
 
-#define FLASH_VERSION 20260307
+#define FLASH_VERSION 20260308
 
 //Hardware Types
 #define TLORA_V2 1
@@ -104,6 +104,7 @@
 #define CSMA_SLOTS_0        10      // Zufalls-Slots bei Versuch 0 (max 350ms Jitter)
 #define CSMA_SLOTS_1_2      5       // Zufalls-Slots bei Versuch 1-2 (max 175ms Jitter)
 #define CSMA_MAX_ATTEMPTS   3       // Ab hier: Rapid-fire CAD bis Kanal frei
+#define CSMA_RAPID_RX_MS    100     // Preamble-Check Fenster im Rapid-fire Modus (ms)
 
 // LoRa Message Types
 #define MSG_TYPE_ACK          0x41

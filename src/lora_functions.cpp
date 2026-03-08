@@ -1558,7 +1558,7 @@ unsigned long csma_compute_timeout(int attempt) {
         case 0:  base = CSMA_BASE_0; slots = CSMA_SLOTS_0; break;
         case 1:  base = CSMA_BASE_1; slots = CSMA_SLOTS_1_2; break;
         case 2:  base = CSMA_BASE_2; slots = CSMA_SLOTS_1_2; break;
-        default: base = 0; slots = 0; break; // rapid-fire
+        default: base = CSMA_RAPID_RX_MS; slots = 0; break; // rapid-fire with preamble check
     }
     return base + (unsigned long)random(0, slots + 1) * CSMA_SLOT_SIZE;
 }

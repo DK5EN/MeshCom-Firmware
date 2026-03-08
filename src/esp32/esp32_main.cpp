@@ -1769,71 +1769,109 @@ void esp32loop()
                 // Poll IRQ register for PREAMBLE_DETECTED or HEADER_VALID —
                 // if set, the radio is actively demodulating a packet and
                 // calling startReceive() would abort it.
-                // Limit deferrals to 3 — a real packet completes within one
-                // timeout window, so consecutive deferrals indicate stale IRQ flags.
-                else if((radio.getIrqFlags() & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
-                                                RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED))
-                        && rx_irq_defer_count < 3)
-                {
-                    rx_irq_defer_count++;
-                    iReceiveTimeOutTime = millis();
-
-                    if(bLORADEBUG)
-                        Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=irq_rx_active cnt=%d\n", rx_irq_defer_count);
-                }
+                // RSSI validation: stale IRQ flags with no signal are rejected early.
+                // Header valid: strong indicator, up to 3 deferrals allowed.
+                // Preamble only: weak indicator, max 1 deferral allowed.
                 else
                 {
-                    if(rx_irq_defer_count >= 3 && bLORADEBUG)
-                        Serial.printf("[MC-DBG] RX_IRQ_STALE forced restart after %d deferrals\n", rx_irq_defer_count);
-                    rx_irq_defer_count = 0;
-                    iReceiveTimeOutTime=0;
+                    bool shouldDefer = false;
+                    uint32_t irqFlags = radio.getIrqFlags();
+                    bool irq_active = irqFlags & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
+                                                   RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED);
 
-                    // FIX BUG #1: Call startReceive FIRST, then re-wire interrupts.
-                    // Disable interrupt gating while we reconfigure
-                    bEnableInterruptReceive = false;
-                    bEnableInterruptTransmit = false;
-
-                    int state = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
-
-                    // Now re-wire the interrupt callback
-                    radio.clearPacketReceivedAction();
-                    radio.clearPacketSentAction();
-                    radio.setPacketReceivedAction(setFlagReceive);
-
-                    bEnableInterruptReceive = true;
-
-                    // Flanken-Recovery
-                    #ifdef LORA_DIO1
-                    if(digitalRead(LORA_DIO1) == HIGH)
+                    if(irq_active)
                     {
-                        receiveFlag = true;
-                        if(bLORADEBUG)
-                            Serial.println(F("[MC-DBG] RX_TIMEOUT missed_edge recovery"));
-                    }
-                    #endif
+                        bool header_valid = irqFlags & RADIOLIB_SX126X_IRQ_HEADER_VALID;
+                        float currentRSSI = radio.getRSSI(false);
 
-                    // Debug B: RX_RESTART after timeout
-                    if(bLORADEBUG)
-                    {
-                        Serial.printf("[MC-SM] IDLE -> RX_LISTEN rc=%d\n", state);
-                        Serial.printf("[MC-DBG] RX_RESTART src=timeout state=%d\n", state);
-                    }
-
-                    if(bLORADEBUG)
-                    {
-                        Serial.print(getTimeString());
-                        if (state == RADIOLIB_ERR_NONE)
-                            Serial.println(F(" [LoRa]...Receive Timeout, startReceive again with sucess"));
+                        if(currentRSSI < -126.0f)
+                        {
+                            // No signal present — IRQ flags are stale
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] RX_IRQ_STALE_EARLY rssi=%.0f flags=%s cnt=%d\n",
+                                    currentRSSI, header_valid ? "HDR" : "PRE", rx_irq_defer_count);
+                        }
+                        else if(header_valid && rx_irq_defer_count < 3)
+                        {
+                            shouldDefer = true;
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=header_valid rssi=%.0f cnt=%d\n",
+                                    currentRSSI, rx_irq_defer_count);
+                        }
+                        else if(!header_valid && rx_irq_defer_count < 1)
+                        {
+                            shouldDefer = true;
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] RX_TIMEOUT_DEFERRED src=preamble_only rssi=%.0f cnt=%d\n",
+                                    currentRSSI, rx_irq_defer_count);
+                        }
                         else
                         {
-                            Serial.print(F(" [LoRa]...Receive Timeout, startReceive again with error = "));
-                            Serial.println(state);
+                            if(bLORADEBUG)
+                                Serial.printf("[MC-DBG] RX_IRQ_STALE rssi=%.0f flags=%s cnt=%d\n",
+                                    currentRSSI, header_valid ? "HDR" : "PRE", rx_irq_defer_count);
+                        }
+                    }
+
+                    if(shouldDefer)
+                    {
+                        rx_irq_defer_count++;
+                        iReceiveTimeOutTime = millis();
+                    }
+                    else
+                    {
+                        if(rx_irq_defer_count > 0 && bLORADEBUG)
+                            Serial.printf("[MC-DBG] RX_IRQ_STALE forced restart after %d deferrals\n", rx_irq_defer_count);
+                        rx_irq_defer_count = 0;
+                        iReceiveTimeOutTime=0;
+
+                        // FIX BUG #1: Call startReceive FIRST, then re-wire interrupts.
+                        // Disable interrupt gating while we reconfigure
+                        bEnableInterruptReceive = false;
+                        bEnableInterruptTransmit = false;
+
+                        int state = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
+
+                        // Now re-wire the interrupt callback
+                        radio.clearPacketReceivedAction();
+                        radio.clearPacketSentAction();
+                        radio.setPacketReceivedAction(setFlagReceive);
+
+                        bEnableInterruptReceive = true;
+
+                        // Flanken-Recovery
+                        #ifdef LORA_DIO1
+                        if(digitalRead(LORA_DIO1) == HIGH)
+                        {
+                            receiveFlag = true;
+                            if(bLORADEBUG)
+                                Serial.println(F("[MC-DBG] RX_TIMEOUT missed_edge recovery"));
+                        }
+                        #endif
+
+                        // Debug B: RX_RESTART after timeout
+                        if(bLORADEBUG)
+                        {
+                            Serial.printf("[MC-SM] IDLE -> RX_LISTEN rc=%d\n", state);
+                            Serial.printf("[MC-DBG] RX_RESTART src=timeout state=%d\n", state);
+                        }
+
+                        if(bLORADEBUG)
+                        {
+                            Serial.print(getTimeString());
+                            if (state == RADIOLIB_ERR_NONE)
+                                Serial.println(F(" [LoRa]...Receive Timeout, startReceive again with sucess"));
+                            else
+                            {
+                                Serial.print(F(" [LoRa]...Receive Timeout, startReceive again with error = "));
+                                Serial.println(state);
+                            }
                         }
                     }
                 }
             }
         }
-        
+
         if(receiveFlag || transmittedFlag)
         {
             // check ongoing reception
