@@ -3090,10 +3090,11 @@ void esp32loop()
 
                             if (!bAllStarted)
                             {
-                                // First boot failure — reset WiFi hardware and retry immediately
-                                Serial.println("[WIFI]...no connection at boot — resetting WiFi and retrying");
+                                // First boot failure — full radio power-cycle and retry
+                                Serial.println("[WIFI]...no connection at boot — full radio reset and retrying");
                                 WiFi.disconnect(true, true);
-                                delay(100);
+                                WiFi.mode(WIFI_OFF);
+                                delay(1500);
                                 startWIFI();  // sets iWlanWait = 1, triggers doWiFiConnect() polling
                             }
                             else

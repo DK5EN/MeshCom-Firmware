@@ -58,6 +58,7 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Binaeres ACK (0x41)** stoppt jetzt die Retransmission im Ringpuffer -- zuvor wurde nur der Phone-Notification-Status gesetzt, Broadcast/Group-Retries liefen endlos weiter.
 
 ### WiFi-Stabilitaet
+- **Full Radio Power-Cycle bei Init** (NEU - v4.35n_20260308_fix3): `WiFi.disconnect(true,true)` allein reicht nach einem Glitch-Reboot nicht aus -- der ESP-IDF WiFi-Stack bleibt mit `E wifi:timeout when WiFi un-init, type=4` haengen. Fix: Vor jeder WiFi-Initialisierung in `startWIFI()` wird der Radio-Chip komplett ausgeschaltet (`WiFi.mode(WIFI_OFF)` + 1000ms Delay), dann sauber neu gestartet (`WiFi.mode(WIFI_STA)` + 200ms). Beim Boot-Retry in `esp32_main.cpp` zusaetzlich 1500ms Pause fuer stabilen Hardware-Reset. Behebt zuverlaessig das Problem, dass beide Heltec V3 nach Signal-Glitch-Reboots keine IP-Adresse vom DHCP erhalten.
 - **NTP-Fehler**: Ein fehlgeschlagenes `timeClient.forceUpdate()` reisst nicht mehr die gesamte WiFi-Verbindung ab (kein `WiFi.disconnect()` / `Udp.stop()` mehr). UDP-Dienste bleiben stabil.
 - **Ping durch Status ersetzt**: Blockierendes `Ping.ping()` (bis zu 5s Main-Loop-Blockade) durch nicht-blockierendes `WiFi.status()` ersetzt. Behebt T-Deck WiFi-Abbrueche nach ~10 Minuten.
 - **Heartbeat-Timeout**: Zweistufiges System -- Warnung bei 35s mit WiFi-Status-Check, tatsaechlicher Reset erst bei 65s und nur bei tatsaechlich getrennter Verbindung. Log-Analyse zeigte 22 unnoetige WiFi-Resets in 4 Stunden bei durchgehender Konnektivitaet.

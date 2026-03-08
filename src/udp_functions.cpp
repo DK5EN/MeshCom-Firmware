@@ -493,7 +493,8 @@ bool startWIFI()
         Serial.println("[WIFI]...bWIFIAP=true");
 
     WiFi.disconnect(true, true);
-    delay(500);
+    WiFi.mode(WIFI_OFF);
+    delay(1000);
 
     hasIPaddress=false;
 
@@ -524,10 +525,13 @@ bool startWIFI()
   }
 
   if (bDEBUG)
-      Serial.println("[WIFI]...WiFi.disconnect(true, true)");
+      Serial.println("[WIFI]...WiFi full radio reset");
 
   WiFi.disconnect(true, true);
-	delay(500);
+  WiFi.mode(WIFI_OFF);
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  delay(200);
 
   hasIPaddress=false;
 
