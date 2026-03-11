@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-08)
+# Release Notes -- MeshCom Firmware v4.35n (2026-03-11)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -34,6 +34,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Auswirkung**: DK5EN-99: 230 Events = 53 Min verlorene Empfangszeit. DK5EN-12: 112 Events = 26 Min.
 - **Fix**: Dreistufige Verbesserung: (1) RSSI-Validierung via `radio.getRSSI(false)` — bei RSSI < -126 dBm (unter Noise Floor) werden IRQ-Flags als stale erkannt und sofort zum Radio-Restart durchgefallen. (2) HEADER_VALID: bis zu 3 Deferrals (unveraendert, starker Indikator). (3) PREAMBLE_DETECTED ohne Header: max 1 Deferral (schwacher Indikator). Neue Debug-Logs: `RX_IRQ_STALE_EARLY` (RSSI-basiert), `RX_TIMEOUT_DEFERRED src=header_valid/preamble_only`.
 - **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
+### RAK/NRF52 CAD startet nicht im RX-Continuous-Modus (NEU - v4.35n_20260311)
+- **Ursache**: `Radio.StartCad()` der SX126x-Arduino Library ruft `SX126xSetCad()` auf, ohne vorher in STDBY_RC zu wechseln. Wenn das Radio in RX-Continuous-Mode ist (von `Radio.Rx(0)`), ignoriert der SX126x-Chip den SetCad-Befehl stillschweigend. CAD startet nie, DIO1 feuert nie, `OnCadDone` wird nie aufgerufen — jeder CAD-Versuch endet im 100ms Safety-Timeout.
+- **Auswirkung**: Auf RAK4631/NRF52 lief jeder CAD-Scan in den Safety-Timeout. CSMA/CA konnte den Kanal nie pruefen und sendete blind nach Timeout-Ablauf.
+- **Fix**: `Radio.Standby()` vor jedem `Radio.StartCad()` Aufruf. Bringt das Radio in STDBY_RC, sodass der SetCad-Befehl korrekt ausgefuehrt wird. Gleiches Muster wie RadioLib auf ESP32 (`standby() -> clearIrqStatus() -> setCad()`).
+- **Betroffene Datei**: `src/nrf52/nrf52_main.cpp`
 
 ### CAD-Storm Rapid-Fire: 100ms Preamble-Check statt 0ms (NEU - v4.35n_20260308_fix1)
 - **Ursache**: Bei `cad_attempt >= 3` (CSMA_MAX_ATTEMPTS erreicht) gab `csma_compute_timeout()` 0ms zurueck — das Radio wurde ohne jede Pause sofort restarted und der naechste CAD-Scan ausgefuehrt. Bei 0ms Wartezeit hat das Radio keine Chance, eingehende Preambles von schwachen Nodes zu erkennen.

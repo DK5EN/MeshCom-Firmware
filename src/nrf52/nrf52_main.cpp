@@ -1154,6 +1154,7 @@ extern bool btimeClient;
                 cad_done_flag = false;
                 cad_double_check = false;
                 cad_start_time = millis();
+                Radio.Standby();
                 Radio.StartCad();
             }
             else if(cad_done_flag)
@@ -1188,6 +1189,7 @@ extern bool btimeClient;
                     cad_in_progress = true;
                     cad_done_flag = false;
                     cad_start_time = millis();
+                    Radio.Standby();
                     Radio.StartCad();
                 }
                 else
