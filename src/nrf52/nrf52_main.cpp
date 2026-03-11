@@ -1156,7 +1156,15 @@ extern bool btimeClient;
                 cad_start_time = millis();
                 Radio.StartCad();
             }
-            else if(cad_done_flag)
+            else if(cad_in_progress)
+            {
+                // Poll radio IRQ processing — the SX126x library background
+                // task is not running, so BgIrqProcess() must be called
+                // explicitly to dispatch OnCadDone from the DIO1 interrupt.
+                Radio.BgIrqProcess();
+            }
+
+            if(cad_done_flag)
             {
                 cad_in_progress = false;
                 cad_done_flag = false;

@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-08)
+# Release Notes -- MeshCom Firmware v4.35n (2026-03-11)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -16,6 +16,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 ---
 
 ## Bugfixes
+
+### RAK/NRF52 CAD-Callback wird nie aufgerufen -- Gateway sendet nicht (NEU - v4.35n_20260311)
+- **Ursache**: MeshCom ruft `Radio.Init()` direkt auf statt `lora_hardware_init()` der SX126x-Arduino-Library. Dadurch wird der FreeRTOS-Background-Task, der `Radio.BgIrqProcess()` ausfuehrt, nie gestartet. DIO1-Interrupts feuern zwar, aber die IRQ-Flags werden nie ausgelesen und `OnCadDone()` wird nie dispatcht. `_lora_sem` bleibt NULL -- `xSemaphoreGiveFromISR(NULL)` in jeder ISR ist ein stiller Fehler.
+- **Auswirkung**: Jeder CAD-Scan endet im 100ms Safety-Timeout (`CAD_SAFETY_TIMEOUT`). Die TX-Queue waechst endlos (qlen 2→10+), aber kein einziges Paket wird jemals via LoRa gesendet. Der Gateway empfaengt Pakete (RX funktioniert ueber Timer-basierte Mechanismen), kann aber nichts senden.
+- **Fix**: Expliziter `Radio.BgIrqProcess()`-Aufruf im Main-Loop waehrend `cad_in_progress`. Verarbeitet die DIO1-IRQ-Flags und dispatcht `OnCadDone`, wodurch `cad_done_flag` gesetzt wird. Minimaler Eingriff -- kein Umbau des bestehenden Interrupt-Modells.
+- **Betroffene Datei**: `src/nrf52/nrf52_main.cpp`
 
 ### Gateway RING_ZOMBIE: Retransmit-Timer auf Gateways nie getaktet (NEU - v4.35n_20260308_fix1)
 - **Ursache**: `updateRetransmissionStatus()` war durch `if(!bGATEWAY)` geschuetzt -- auf Gateway-Nodes wurde der Retransmit-Timer nie getaktet. Ein gesendeter Text-Nachrichten-Slot blieb nach TX bei `status=0x01` (RING_STATUS_SENT) stecken, weil der Timer den Status nie von 0x01 bis zum Threshold 0x15 hochzaehlen konnte.
