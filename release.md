@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-11)
+# Release Notes -- MeshCom Firmware v4.35n (2026-03-13)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -34,6 +34,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Auswirkung**: DK5EN-99: 230 Events = 53 Min verlorene Empfangszeit. DK5EN-12: 112 Events = 26 Min.
 - **Fix**: Dreistufige Verbesserung: (1) RSSI-Validierung via `radio.getRSSI(false)` — bei RSSI < -126 dBm (unter Noise Floor) werden IRQ-Flags als stale erkannt und sofort zum Radio-Restart durchgefallen. (2) HEADER_VALID: bis zu 3 Deferrals (unveraendert, starker Indikator). (3) PREAMBLE_DETECTED ohne Header: max 1 Deferral (schwacher Indikator). Neue Debug-Logs: `RX_IRQ_STALE_EARLY` (RSSI-basiert), `RX_TIMEOUT_DEFERRED src=header_valid/preamble_only`.
 - **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
+### DM-ACK Relay: Ring-Buffer-Eintrag ohne Laenge/Status (NEU - v4.35n_20260313)
+- **Ursache**: Im `rx_dm_ack_new`-Pfad (DM-ACK mit neuer msg_id weiterleiten) fehlten die Zuweisungen `ringBuffer[iWrite][0]=12` (Laenge) und `ringBuffer[iWrite][1]=RING_STATUS_DONE` (Status). Der direkt darueberstellende `rx_dm_ack_gw`-Pfad setzt beide korrekt. Beim zweiten ACK wurden nur die Daten per `memcpy` geschrieben, aber Laenge und Status blieben auf den Werten des vorherigen Slot-Zustands (typisch: len=0, status=0xFF).
+- **Auswirkung**: `doTX()` liest den Slot mit len=0, ruft `decodeAPRS()` mit Laenge 0 auf, was die Fehlermeldungen `APRS decode - Packet discarded, wrong APRS-protocol - size <0> to short!` und `LoRa starting with 0x00 and 000000 ... no decode` erzeugt. Das ACK wird nicht gesendet — der empfangende Node erhaelt keine Bestaetigung ueber den zweiten Hop.
+- **Fix**: `ringBuffer[iWrite][0]=12` und `ringBuffer[iWrite][1]=RING_STATUS_DONE` vor dem `memcpy` eingefuegt, identisch zum `rx_dm_ack_gw`-Pfad.
+- **Betroffene Datei**: `src/lora_functions.cpp`
 
 ### RAK/NRF52 CAD startet nicht im RX-Continuous-Modus (NEU - v4.35n_20260311)
 - **Ursache**: `Radio.StartCad()` der SX126x-Arduino Library ruft `SX126xSetCad()` auf, ohne vorher in STDBY_RC zu wechseln. Wenn das Radio in RX-Continuous-Mode ist (von `Radio.Rx(0)`), ignoriert der SX126x-Chip den SetCad-Befehl stillschweigend. CAD startet nie, DIO1 feuert nie, `OnCadDone` wird nie aufgerufen — jeder CAD-Versuch endet im 100ms Safety-Timeout.
