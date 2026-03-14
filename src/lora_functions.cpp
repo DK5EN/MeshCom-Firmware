@@ -104,6 +104,35 @@ unsigned long track_to_meshcom_timer = 0;
 
 bool bNewLine = false;
 
+// ONRXDONE_TIME monitoring (always active, not behind bLORADEBUG)
+unsigned long onrxdone_max_ms = 0;
+unsigned int  onrxdone_warn_count = 0;
+
+// Deferred display update — avoid I2C transfer inside OnRxDone
+volatile bool bPendingDisplayText = false;
+volatile bool bPendingDisplayPos = false;
+struct aprsMessage pendingDisplayMsg;
+int16_t pendingDisplayRssi = 0;
+int8_t  pendingDisplaySnr = 0;
+
+// Queue display text update for main loop execution
+static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
+{
+    pendingDisplayMsg = aprsmsg;
+    pendingDisplayRssi = rssi;
+    pendingDisplaySnr = snr;
+    bPendingDisplayText = true;
+}
+
+// Queue display position update for main loop execution
+static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
+{
+    pendingDisplayMsg = aprsmsg;
+    pendingDisplayRssi = rssi;
+    pendingDisplaySnr = snr;
+    bPendingDisplayPos = true;
+}
+
 /**
  * Extract the 4-byte message ID from a ring buffer slot.
  * ringBuffer layout: [0]=len, [1]=status, [2]=msg_type, [3..6]=msg_id (LE)
@@ -545,9 +574,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // txtmessage, position, hey
                 if(msg_type_b_lora == MSG_TYPE_TEXT || msg_type_b_lora == MSG_TYPE_POSITION || msg_type_b_lora == MSG_TYPE_HEY)
                 {
-                    // Extern Server
+                    // Extern Server (deferred — avoid blocking UDP in radio callback)
                     if(bEXTUDP)
-                        sendExtern(true, (char*)"lora", RcvBuffer, size, rssi, snr);
+                        queueExtern((char*)"lora", RcvBuffer, size, rssi, snr);
 
                     // print aprs message
                     if(bDisplayInfo)
@@ -662,7 +691,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                     uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                                    sendDisplayText(aprsmsg, rssi, snr);
+                                    queueDisplayText(aprsmsg, rssi, snr);
 
                                     addBLEOutBuffer(tempRcvBuffer, tempsize);
                                 }
@@ -671,7 +700,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     //
                                     // next sequence to send incomming DM-Message to Display and/or APP via BLE
                                     //
-                                    sendDisplayText(aprsmsg, rssi, snr);
+                                    queueDisplayText(aprsmsg, rssi, snr);
 
                                     addBLEOutBuffer(RcvBuffer, size);
                                 }
@@ -684,13 +713,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 bool bSendAckGateway=true;
                                 if(memcmp(aprsmsg.msg_payload.c_str(), "{MCP}", 5) == 0)
                                 {
-                                    sendDisplayText(aprsmsg, rssi, snr);
+                                    queueDisplayText(aprsmsg, rssi, snr);
                                     bSendAckGateway=false;
                                 }
                                 else
                                 if(memcmp(aprsmsg.msg_payload.c_str(), "{SET}", 5) == 0)
                                 {
-                                    sendDisplayText(aprsmsg, rssi, snr);
+                                    queueDisplayText(aprsmsg, rssi, snr);
                                     bSendAckGateway=false;
                                 }
                                 else
@@ -699,7 +728,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}<", 6) == 0)
                                         bMeshDestination = false;   // falsche Zeit nicht weiter geben
                                     else
-                                        sendDisplayText(aprsmsg, rssi, snr);
+                                        queueDisplayText(aprsmsg, rssi, snr);
 
                                     bSendAckGateway=false;
                                 }
@@ -710,7 +739,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     //
                                     if((strcmp(destination_call, "*") == 0 && !bNoMSGtoALL) || CheckOwnGroup(destination_call))
                                     {
-                                        sendDisplayText(aprsmsg, rssi, snr);
+                                        queueDisplayText(aprsmsg, rssi, snr);
 
                                         // APP Offline
                                         if(isPhoneReady == 0)
@@ -741,7 +770,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         #if defined(ENABLE_SOFTSER)
                                             if(bSOFTSERREAD)
                                             {
-                                                sendDisplayText(aprsmsg, rssi, snr);
+                                                queueDisplayText(aprsmsg, rssi, snr);
                                                 displaySOFTSER(aprsmsg);
                                             }
                                         #endif
@@ -857,7 +886,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         if(msg_type_b_lora == MSG_TYPE_POSITION)
                         {
                             if(!bSOFTSERREAD)
-                                sendDisplayPosition(aprsmsg, rssi, snr);
+                                queueDisplayPosition(aprsmsg, rssi, snr);
 
                             if(isPhoneReady > 0)
                                 addBLEOutBuffer(RcvBuffer, size);
@@ -1031,8 +1060,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     // to minimize the RX blind window (BUG #2 fix).
 
     // Debug I: ONRXDONE_TIME — measure processing duration
-    if(bLORADEBUG)
-        CB_PRINTF("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+    {
+        unsigned long _onrxdone_elapsed = millis() - _onrxdone_start;
+        if(bLORADEBUG)
+            CB_PRINTF("[MC-DBG] ONRXDONE_TIME ms=%lu\n", _onrxdone_elapsed);
+        if(_onrxdone_elapsed > onrxdone_max_ms)
+            onrxdone_max_ms = _onrxdone_elapsed;
+        if(_onrxdone_elapsed > ONRXDONE_WARN_MS)
+        {
+            onrxdone_warn_count++;
+            CB_PRINTF("[MC-WARN] ONRXDONE_SLOW ms=%lu threshold=%d\n",
+                _onrxdone_elapsed, ONRXDONE_WARN_MS);
+        }
+    }
 
     if(bLORADEBUG)
         CB_PRINTF("OnRxDone\n");

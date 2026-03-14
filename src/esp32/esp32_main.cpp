@@ -1727,6 +1727,18 @@ void esp32loop()
             }
         }
 
+        // Deferred display update from OnRxDone (avoid I2C inside radio callback)
+        if(bPendingDisplayText)
+        {
+            sendDisplayText(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
+            bPendingDisplayText = false;
+        }
+        if(bPendingDisplayPos)
+        {
+            sendDisplayPosition(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
+            bPendingDisplayPos = false;
+        }
+
         // Channel utilization report (every 10s)
         {
             static unsigned long ch_util_timer = 0;
@@ -1742,6 +1754,11 @@ void esp32loop()
                 if(util > 100) util = 100;
                 Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
                     rx_ms, tx_ms, util);
+                // ONRXDONE stats: report max and warn count, then reset
+                Serial.printf("[MC-DBG] ONRXDONE_STATS max=%lums warn=%u (>%dms)\n",
+                    onrxdone_max_ms, onrxdone_warn_count, ONRXDONE_WARN_MS);
+                onrxdone_max_ms = 0;
+                onrxdone_warn_count = 0;
             }
         }
 
@@ -3060,6 +3077,7 @@ void esp32loop()
     if(bEXTUDP)
     {
         getExternUDP();
+        flushExternQueue();
     }
 
     if(bWEBSERVER || bEXTUDP || bGATEWAY)

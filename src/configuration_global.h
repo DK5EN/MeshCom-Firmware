@@ -106,6 +106,9 @@
 #define CSMA_MAX_ATTEMPTS   3       // Ab hier: Rapid-fire CAD bis Kanal frei
 #define CSMA_RAPID_RX_MS    100     // Preamble-Check Fenster im Rapid-fire Modus (ms)
 
+// OnRxDone processing time monitoring
+#define ONRXDONE_WARN_MS    50      // Warnung wenn OnRxDone laenger als X ms dauert
+
 // LoRa Message Types
 #define MSG_TYPE_ACK          0x41
 #define MSG_TYPE_TEXT         0x3A

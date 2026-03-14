@@ -41,6 +41,15 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Fix**: `ringBuffer[iWrite][0]=12` und `ringBuffer[iWrite][1]=RING_STATUS_DONE` vor dem `memcpy` eingefuegt, identisch zum `rx_dm_ack_gw`-Pfad.
 - **Betroffene Datei**: `src/lora_functions.cpp`
 
+### OnRxDone Display/WiFi-Blockade: I2C und UDP aus Radio-Callback entfernt (NEU - v4.35n_20260314_fix1)
+- **Ursache**: `sendDisplayText()` und `sendDisplayPosition()` fuehrten I2C-Transfers (SSD1306 OLED via `u8g2->firstPage()/nextPage()`) direkt im `OnRxDone()`-Callback aus. Auf dem ESP32 konkurriert der WiFi-Stack (Core 0) mit I2C-Zugriffen und blockiert die Transfers sporadisch fuer bis zu 600ms. Zusaetzlich rief `sendExtern()` synchron `UdpExtern.beginPacket()`/`.endPacket()` auf — bei aktivem ExtUDP potenziell 500ms+ durch DNS oder Socket-Wartezeiten.
+- **Auswirkung**: Log-Analyse (OE1KFR-7, Heltec V3) zeigte bimodale ONRXDONE_TIME-Verteilung: 495x <=50ms, aber 38x >600ms (MAX=622ms). Alle 600ms-Events traten bei Text-Nachrichten an eigene Gruppe auf (Display-Update + Gateway-ACK-Erzeugung). Waehrend der 600ms-Blockade ist das Radio taub — keine Pakete koennen empfangen werden.
+- **Fix**: Dreifacher Ansatz:
+  1. **Display-Update deferred**: `sendDisplayText()`/`sendDisplayPosition()` werden nicht mehr direkt aufgerufen. Stattdessen werden die Daten in eine Pending-Struct (`pendingDisplayMsg`) kopiert. Der Main-Loop prueft `bPendingDisplayText`/`bPendingDisplayPos` und fuehrt den I2C-Transfer aus.
+  2. **sendExtern async**: `sendExtern()` im OnRxDone-Pfad durch `queueExtern()` ersetzt. Ein kleiner Ringpuffer (4 Slots) nimmt die Rohdaten auf. `flushExternQueue()` im Main-Loop fuehrt JSON-Aufbau + UDP-Send aus.
+  3. **ONRXDONE_TIME-Alarm**: Warnung `[MC-WARN] ONRXDONE_SLOW` wird immer geloggt wenn die Verarbeitungszeit >50ms uebersteigt (nicht hinter `bLORADEBUG`). Statistik (`ONRXDONE_STATS max=Xms warn=Y`) alle 10s im CHANNEL_UTIL-Report.
+- **Betroffene Dateien**: `src/lora_functions.cpp`, `src/loop_functions_extern.h`, `src/extudp_functions.cpp`, `src/extudp_functions.h`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/configuration_global.h`
+
 ### RAK/NRF52 Serial-Hang: CDC-ACM blockiert _lora_task (NEU - v4.35n_20260314)
 - **Ursache**: Auf dem nRF52840 (RAK4630) laeuft die USB-Serial-Ausgabe ueber Adafruit_USBD_CDC. Dessen `write()` blockiert in einer `while(remain && tud_cdc_n_connected)` Schleife, wenn der CDC-ACM-Puffer voll ist. Die SX126x-Arduino-Library dispatcht Radio-Callbacks (OnTxDone, OnRxDone, OnRxTimeout, ...) aus einem dedizierten FreeRTOS-Task (`_lora_task`). Wenn `Serial.printf()` in diesem Kontext blockiert, kann `_lora_task` keine Radio-IRQs mehr verarbeiten — die gesamte Firmware haengt.
 - **Auswirkung**: Nutzer berichten, dass sich die serielle Verbindung auf RAK-Nodes "weghaengt", meist nach einem TX. Der Node reagiert weder auf serielle Befehle noch auf LoRa-Pakete. Erst ein Hardware-Reset behebt das Problem. Ein externes Serial-Monitor-Script (pyserial) verstaerkt das Problem, da es den CDC-ACM-Puffer schneller fuellt.
@@ -223,17 +232,17 @@ Bringt ESP32 auf Paritaet mit dem NRF52-`OnHeaderDetect`-Callback.
 | `platformio.ini` | RadioLib 7.6.0 |
 | `variants/t_deck_pro/platformio.ini` | RadioLib 7.6.0 |
 | `variants/t5_epaper/platformio.ini` | RadioLib 7.6.0 |
-| `src/configuration_global.h` | Konstanten, Version, Message-Types, Ring-Status |
-| `src/esp32/esp32_main.cpp` | WiFi, BLE, CSMA/CA, IRQ-Polling, Atomarer RX-Restart, Logging, Timeout |
+| `src/configuration_global.h` | Konstanten, Version, Message-Types, Ring-Status, ONRXDONE_WARN_MS |
+| `src/esp32/esp32_main.cpp` | WiFi, BLE, CSMA/CA, IRQ-Polling, Atomarer RX-Restart, Logging, Timeout, Deferred-Display, ONRXDONE_STATS |
 | `src/deferred_serial.h` | Deferred-Serial-Ringpuffer fuer RAK/NRF52 (neu) |
-| `src/nrf52/nrf52_main.cpp` | CSMA/CA, Logging, Heap-Monitoring, Deferred-Serial-Flush |
-| `src/lora_functions.cpp` | Retransmit, ACK, CAD, handleACK(), Helper-Funktionen, Double-Buffer, nRF52-Port, CB_PRINTF |
+| `src/nrf52/nrf52_main.cpp` | CSMA/CA, Logging, Heap-Monitoring, Deferred-Serial-Flush, Deferred-Display, ONRXDONE_STATS |
+| `src/lora_functions.cpp` | Retransmit, ACK, CAD, handleACK(), Helper-Funktionen, Double-Buffer, nRF52-Port, CB_PRINTF, Deferred-Display, queueExtern |
 | `src/loop_functions.cpp` | Dedup-Puffer, CSMA-Konstanten, volatile Flags, addTxRingEntry(), CB_PRINTF |
 | `src/loop_functions.h` | addTxRingEntry() Deklaration |
-| `src/loop_functions_extern.h` | volatile extern-Deklarationen |
+| `src/loop_functions_extern.h` | volatile extern-Deklarationen, ONRXDONE/Display-Deferred externs |
 | `src/batt_functions.cpp` | volatile extern Fix |
 | `src/udp_functions.cpp` | UDP-Reset, NTP, Heartbeat, addTxRingEntry() |
-| `src/extudp_functions.cpp` | JSON-Validierung, Socket-Schutz |
+| `src/extudp_functions.cpp` | JSON-Validierung, Socket-Schutz, queueExtern/flushExternQueue |
 | `src/phone_commands.cpp` | BLE Queue-Integration |
 | `src/aprs_functions.cpp` | Loop-Detection, Hop-Counter |
 | `tools/serial_monitor.py` | Echtzeit-Monitor |
