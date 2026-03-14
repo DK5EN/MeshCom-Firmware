@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n_20260314_fix2 (2026-03-14)
+# Release Notes -- MeshCom Firmware v4.35n_20260314_fix3 (2026-03-14)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -16,6 +16,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 ---
 
 ## Bugfixes
+
+### read_batt() missbraucht is_receiving-Flag (NEU - v4.35n_20260314_fix3)
+- **Ursache**: `read_batt()` in `batt_functions.cpp` setzte `is_receiving = true` am Eintritt und `is_receiving = false` am Austritt. Dieses Flag signalisiert eigentlich "LoRa-Paket wird empfangen" und wird von der State Machine verwendet, um TX-Versuche zu blockieren und Timeouts zu verschieben. Die Batteriemessung missbrauchte es als generischen Lock.
+- **Auswirkung**: Race Condition -- wenn ein LoRa-Header waehrend der Batteriemessung erkannt wird (`OnHeaderDetect()` setzt `is_receiving = true`), ueberschreibt `read_batt()` am Ende das Flag mit `false`. Die State Machine glaubt dann faelschlich, kein Empfang lauefe, und koennte einen TX-Versuch starten, der den laufenden Empfang stoert. Auf Heltec V3 ist das Zeitfenster durch `delay(100)` beim ADC-Read besonders gross.
+- **Fix**: Alle `is_receiving`-Zuweisungen aus `read_batt()` entfernt (Eintritt, zwei TRACKER-Early-Returns, Austritt) sowie die nicht mehr benoetigte `extern volatile bool is_receiving;`-Deklaration. Der Aufrufer prueft bereits `if (tx_is_active == false && is_receiving == false)` bevor `read_batt()` aufgerufen wird -- der Guard ist damit redundant.
+- **Betroffene Datei**: `src/batt_functions.cpp`
 
 ### Gateway RING_ZOMBIE: Retransmit-Timer auf Gateways nie getaktet (NEU - v4.35n_20260308_fix1)
 - **Ursache**: `updateRetransmissionStatus()` war durch `if(!bGATEWAY)` geschuetzt -- auf Gateway-Nodes wurde der Retransmit-Timer nie getaktet. Ein gesendeter Text-Nachrichten-Slot blieb nach TX bei `status=0x01` (RING_STATUS_SENT) stecken, weil der Timer den Status nie von 0x01 bis zum Threshold 0x15 hochzaehlen konnte.
