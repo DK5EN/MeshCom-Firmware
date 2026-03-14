@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-14)
+# Release Notes -- MeshCom Firmware v4.35n_20260314_fix2 (2026-03-14)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -49,6 +49,22 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
   2. **sendExtern async**: `sendExtern()` im OnRxDone-Pfad durch `queueExtern()` ersetzt. Ein kleiner Ringpuffer (4 Slots) nimmt die Rohdaten auf. `flushExternQueue()` im Main-Loop fuehrt JSON-Aufbau + UDP-Send aus.
   3. **ONRXDONE_TIME-Alarm**: Warnung `[MC-WARN] ONRXDONE_SLOW` wird immer geloggt wenn die Verarbeitungszeit >50ms uebersteigt (nicht hinter `bLORADEBUG`). Statistik (`ONRXDONE_STATS max=Xms warn=Y`) alle 10s im CHANNEL_UTIL-Report.
 - **Betroffene Dateien**: `src/lora_functions.cpp`, `src/loop_functions_extern.h`, `src/extudp_functions.cpp`, `src/extudp_functions.h`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/configuration_global.h`
+
+### Buffer-Unterdimensionierung: MHEARD/MHPATH/DEDUP zu klein fuer Bergstandorte (NEU - v4.35n_20260314_fix2)
+- **Ursache**: Log-Analyse von 5 Berg-Gateways (OE1KBC, OE3XIR, OE3MAG, OE3XOC, OE3XWJ) ueber 60+ Stunden zeigte, dass **85-124 Nodes direkt via HF (H00)** gehoert werden. MAX_MHEARD war auf 20 eingestellt — der Puffer wurde staendig ueberschrieben, Routing-Informationen gingen verloren.
+- **Auswirkung**: MHeard-Tabelle rotierte staendig (Faktor 4.25-6.2x unterdimensioniert). Unvollstaendige Netzwerksicht auf dem Server. MAX_DEDUP_RING (60) zeigte Wraparounds bei OE1KBC.
+- **Fix**: Plattform-differenzierte Buffer-Groessen in `configuration_global.h`:
+  - **ESP32-S3 / nRF52840** (voller RAM): MAX_MHEARD=120, MAX_MHPATH=150, MAX_DEDUP_RING=100, MAX_RING_UDP=30
+  - **ESP32 original** (DRAM-limitiert): MAX_MHEARD=30, MAX_MHPATH=40, MAX_DEDUP_RING=70, MAX_RING_UDP=25
+  - **ENABLE_XML**: MAX_MHEARD=50, MAX_MHPATH=50, MAX_DEDUP_RING=60
+- **RAM-Impact**: +16 KB auf ESP32-S3/nRF52 (6.5% von 243 KB), +3 KB auf ESP32 original. Alle Targets bauen sauber.
+- **Betroffene Datei**: `src/configuration_global.h`
+
+### BLE-Buffer-Overflow ohne BLE-Client: Sinnloses Buffering verhindert (NEU - v4.35n_20260314_fix2)
+- **Ursache**: `addBLEOutBuffer()` und `addBLEComToOutBuffer()` schrieben Daten in den Phone-Ringpuffer auch wenn kein BLE-Client verbunden war. Der Puffer lief ueber und erzeugte `RING_OVERFLOW buf=phone` Meldungen (z.B. 285x auf OE3MAG in 2h42m).
+- **Auswirkung**: Sinnloser Speicherverbrauch, irrelevante Overflow-Meldungen im Log, sporadische 572-782ms Blockierungen im RX-Pfad durch BLE-Write-Versuche.
+- **Fix**: Early-Return `if (!g_ble_uart_is_connected) return;` in beiden Funktionen. Daten werden nur noch gepuffert wenn ein BLE-Client tatsaechlich verbunden ist.
+- **Betroffene Datei**: `src/loop_functions.cpp`
 
 ### RAK/NRF52 Serial-Hang: CDC-ACM blockiert _lora_task (NEU - v4.35n_20260314)
 - **Ursache**: Auf dem nRF52840 (RAK4630) laeuft die USB-Serial-Ausgabe ueber Adafruit_USBD_CDC. Dessen `write()` blockiert in einer `while(remain && tud_cdc_n_connected)` Schleife, wenn der CDC-ACM-Puffer voll ist. Die SX126x-Arduino-Library dispatcht Radio-Callbacks (OnTxDone, OnRxDone, OnRxTimeout, ...) aus einem dedizierten FreeRTOS-Task (`_lora_task`). Wenn `Serial.printf()` in diesem Kontext blockiert, kann `_lora_task` keine Radio-IRQs mehr verarbeiten — die gesamte Firmware haengt.
@@ -232,12 +248,12 @@ Bringt ESP32 auf Paritaet mit dem NRF52-`OnHeaderDetect`-Callback.
 | `platformio.ini` | RadioLib 7.6.0 |
 | `variants/t_deck_pro/platformio.ini` | RadioLib 7.6.0 |
 | `variants/t5_epaper/platformio.ini` | RadioLib 7.6.0 |
-| `src/configuration_global.h` | Konstanten, Version, Message-Types, Ring-Status, ONRXDONE_WARN_MS |
+| `src/configuration_global.h` | Konstanten, Version, Message-Types, Ring-Status, ONRXDONE_WARN_MS, Buffer-Groessen (MHEARD/MHPATH/DEDUP/UDP) |
 | `src/esp32/esp32_main.cpp` | WiFi, BLE, CSMA/CA, IRQ-Polling, Atomarer RX-Restart, Logging, Timeout, Deferred-Display, ONRXDONE_STATS |
 | `src/deferred_serial.h` | Deferred-Serial-Ringpuffer fuer RAK/NRF52 (neu) |
 | `src/nrf52/nrf52_main.cpp` | CSMA/CA, Logging, Heap-Monitoring, Deferred-Serial-Flush, Deferred-Display, ONRXDONE_STATS |
 | `src/lora_functions.cpp` | Retransmit, ACK, CAD, handleACK(), Helper-Funktionen, Double-Buffer, nRF52-Port, CB_PRINTF, Deferred-Display, queueExtern |
-| `src/loop_functions.cpp` | Dedup-Puffer, CSMA-Konstanten, volatile Flags, addTxRingEntry(), CB_PRINTF |
+| `src/loop_functions.cpp` | Dedup-Puffer, CSMA-Konstanten, volatile Flags, addTxRingEntry(), CB_PRINTF, BLE-Guard fuer Phone-Buffer |
 | `src/loop_functions.h` | addTxRingEntry() Deklaration |
 | `src/loop_functions_extern.h` | volatile extern-Deklarationen, ONRXDONE/Display-Deferred externs |
 | `src/batt_functions.cpp` | volatile extern Fix |

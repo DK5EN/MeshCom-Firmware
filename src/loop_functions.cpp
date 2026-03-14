@@ -65,6 +65,7 @@ bool bLED_CLEAR=false;
 bool bLED_DELAY=false;
 
 extern unsigned long rebootAuto;
+extern bool g_ble_uart_is_connected;
 
 int iWlanWait = 0;
 
@@ -377,6 +378,9 @@ unsigned long getUnixClock()
  */
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
 {
+    if (!g_ble_uart_is_connected)
+        return;
+
     if (len > UDP_TX_BUF_SIZE)
         len = UDP_TX_BUF_SIZE-4; // just for safety
 
@@ -426,6 +430,9 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
  */
 void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
 {
+    if (!g_ble_uart_is_connected)
+        return;
+
     if (len > 245)
     {
         Serial.printf("[ERR]...BLE out-buffer to long <%i> <%-245.245s>\n", len, buffer);
