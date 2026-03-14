@@ -70,6 +70,15 @@
 
 #include "softser_functions.h"
 
+#if defined(BOARD_RAK4630)
+#include "deferred_serial.h"
+#else
+// On non-RAK platforms callbacks run in main-loop context — no deferral needed
+#define CB_PRINTF(...)    Serial.printf(__VA_ARGS__)
+#define RADIO_CB_BEGIN()
+#define RADIO_CB_END()
+#endif
+
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
 #endif
@@ -173,9 +182,9 @@ static bool handleACK(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                 if(bDisplayInfo)
                 {
-                    Serial.println();
-                    Serial.print(getTimeString());
-                    Serial.printf(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
+                    CB_PRINTF("\n");
+                    CB_PRINTF("%s", getTimeString().c_str());
+                    CB_PRINTF(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
                 }
 
                 own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
@@ -184,7 +193,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // stop retransmission in ring buffer for this msg_id
             int ackSlot = findAndStopRingSlot(msg_id);
             if(ackSlot >= 0 && bDisplayRetx)
-                Serial.printf("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n",
+                CB_PRINTF("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n",
                               ackSlot, msg_id);
         }
         else
@@ -203,7 +212,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                 if(bDisplayInfo)
                 {
-                    Serial.print(" This packet to mesh");
+                    CB_PRINTF(" This packet to mesh");
                 }
             }
         }
@@ -211,7 +220,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
     if(bDisplayInfo)
     {
-        Serial.println("");
+        CB_PRINTF("\n");
     }
 
     return true;
@@ -222,6 +231,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
+    RADIO_CB_BEGIN();
     // Debug I: OnRxDone timing — capture start time
     unsigned long _onrxdone_start = millis();
 
@@ -246,11 +256,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     if(rxBufInUse[nextBuf])
     {
         // Beide Buffer belegt -- muss ueberschreiben
-        Serial.printf("[MC-DBG] RX_BUF_OVERWRITE buf=%d (still in use)\n", nextBuf);
+        CB_PRINTF("[MC-DBG] RX_BUF_OVERWRITE buf=%d (still in use)\n", nextBuf);
     }
     else if(bLORADEBUG)
     {
-        Serial.printf("[MC-DBG] RX_BUF_SWITCH buf=%d->%d\n", rxBufIndex, nextBuf);
+        CB_PRINTF("[MC-DBG] RX_BUF_SWITCH buf=%d->%d\n", rxBufIndex, nextBuf);
     }
 
     rxBufIndex = nextBuf;
@@ -260,7 +270,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     size = rxSize;
     Radio.Rx(RX_TIMEOUT_VALUE);
     if(bLORADEBUG)
-        Serial.printf("[MC-DBG] RX_RESTART_EARLY src=OnRxDone\n");
+        CB_PRINTF("[MC-DBG] RX_RESTART_EARLY src=OnRxDone\n");
 #endif
 
     // only for Test T5_EPAPER
@@ -283,10 +293,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
         // Debug I: ONRXDONE_TIME
         if(bLORADEBUG)
-            Serial.printf("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+            CB_PRINTF("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
 
         iReceiveTimeOutTime = millis();
         csma_timeout = csma_compute_timeout(cad_attempt);
+        RADIO_CB_END();
         return;
     }
 
@@ -321,10 +332,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             ringBuffer[rxSlot][0] = 0;
 
             if(bDisplayRetx)
-                Serial.printf("\n[RETX] got lora rx for retid:%i no need status:%02X lng;%i msg-id:%c-%08X\n",
+                CB_PRINTF("\n[RETX] got lora rx for retid:%i no need status:%02X lng;%i msg-id:%c-%08X\n",
                               rxSlot, dbg_status, dbg_lng, dbg_type, dbg_msg_id);
             if(bLORADEBUG)
-                Serial.printf("[MC-DBG] ACK_RECEIVED retid=%d msg_id=%08X\n",
+                CB_PRINTF("[MC-DBG] ACK_RECEIVED retid=%d msg_id=%08X\n",
                               rxSlot, dbg_msg_id);
         }
 
@@ -340,13 +351,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         if(bDisplayCont)
         {
             printBuffer_aprs((char*)"RX-LoRa-All", aprsmsg);
-            Serial.println("");
+            CB_PRINTF("\n");
         }
 
         if(msg_type_b_lora == 0x00)
         {
             if(bDisplayCont)
-                Serial.printf("[LORA-ERROR]...%03i RCV:%s\n", size, RcvBuffer+6);
+                CB_PRINTF("[LORA-ERROR]...%03i RCV:%s\n", size, RcvBuffer+6);
         }
         else
         {
@@ -475,7 +486,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     if(bLORADEBUG && bDisplayInfo)
                     {
                         printBuffer_aprs((char*)"MH-LoRa", aprsmsg);
-                        Serial.println();
+                        CB_PRINTF("\n");
                         bNewLine=true;
                     }
                     //
@@ -502,8 +513,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                     if(bDisplayInfo)
                     {
-                        Serial.print(getTimeString());
-                        Serial.printf(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
+                        CB_PRINTF("%s", getTimeString().c_str());
+                        CB_PRINTF(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
                         bNewLine=true;
                     }
             
@@ -609,9 +620,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     
                                     if(bDisplayInfo)
                                     {
-                                        Serial.println();
-                                        Serial.print(getTimeString());
-                                        Serial.printf("[ACK-MSGID] ack_msg_id:%02X%02X%02X%02X\n", print_buff[4], print_buff[3], print_buff[2], print_buff[1]);
+                                        CB_PRINTF("\n");
+                                        CB_PRINTF("%s", getTimeString().c_str());
+                                        CB_PRINTF("[ACK-MSGID] ack_msg_id:%02X%02X%02X%02X\n", print_buff[4], print_buff[3], print_buff[2], print_buff[1]);
                                         bNewLine=true;
                                     }
                             
@@ -623,7 +634,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         // BUG #8 fix: clear ringBuffer entry to stop retransmission
                                         int dmSlot = findAndStopRingSlot(msg_counter);
                                         if(dmSlot >= 0 && bDisplayRetx)
-                                            Serial.printf("\n[RETX] DM-ACK for retid:%i stop retransmit msg-id:%08X\n",
+                                            CB_PRINTF("\n[RETX] DM-ACK for retid:%i stop retransmit msg-id:%08X\n",
                                                           dmSlot, msg_counter);
                                     }
 
@@ -639,10 +650,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     
                                     if(bDisplayInfo && !bNewLine)
                                     {
-                                        Serial.println("");
+                                        CB_PRINTF("\n");
                                         bNewLine=true;
                                     }
-                                        
+
                                     SendAckMessage(aprsmsg.msg_source_call, iAckId);
 
                                     aprsmsg.msg_payload = aprsmsg.msg_payload.substring(0, iEnqPos);
@@ -762,7 +773,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         {
                                             if(bDisplayInfo && !bNewLine)
                                             {
-                                                Serial.println("");
+                                                CB_PRINTF("\n");
                                                 bNewLine=true;
                                             }
                                             
@@ -801,8 +812,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                                 if(bDisplayInfo)
                                                 {
-                                                    Serial.print(getTimeString());
-                                                    Serial.printf(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
+                                                    CB_PRINTF("%s", getTimeString().c_str());
+                                                    CB_PRINTF(" ACK from LoRa GW %02X %02X%02X%02X%02X %02X %02X\n", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
                                                     bNewLine=true;
                                                 }
                                                                                             
@@ -925,7 +936,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     if(searchPath.indexOf(searchCall) >= 0)
                                     {
                                         if(bLORADEBUG)
-                                            Serial.printf("[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path\n");
+                                            CB_PRINTF("[MC-DBG] RELAY_LOOP_BLOCKED own_call_in_path\n");
                                         goto skip_relay;
                                     }
                                 }
@@ -973,7 +984,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(bLORADEBUG)
                                 {
                                     unsigned int relay_msg_id = (ringBuffer[iWrite][6]<<24) | (ringBuffer[iWrite][5]<<16) | (ringBuffer[iWrite][4]<<8) | ringBuffer[iWrite][3];
-                                    Serial.printf("[MC-DBG] RELAY_QUEUED msg_id=%08X type=%02X len=%d\n",
+                                    CB_PRINTF("[MC-DBG] RELAY_QUEUED msg_id=%08X type=%02X len=%d\n",
                                         relay_msg_id, ringBuffer[iWrite][2], size);
                                 }
 
@@ -988,7 +999,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 
                                 if(bDisplayInfo)
                                 {
-                                    Serial.println(" This packet to mesh");
+                                    CB_PRINTF(" This packet to mesh\n");
                                     bNewLine=true;
                                 }
                             }
@@ -997,7 +1008,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         else
                         {
                             if(bDisplayInfo && !bNewLine)
-                                Serial.println("");
+                                CB_PRINTF("\n");
                         }
                     }
                 }
@@ -1021,10 +1032,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
     // Debug I: ONRXDONE_TIME — measure processing duration
     if(bLORADEBUG)
-        Serial.printf("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+        CB_PRINTF("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
 
     if(bLORADEBUG)
-        Serial.println("OnRxDone");
+        CB_PRINTF("OnRxDone\n");
 
     iReceiveTimeOutTime = millis();
     csma_timeout = csma_compute_timeout(cad_attempt);
@@ -1032,24 +1043,26 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 #if defined BOARD_RAK4630
     rxBufInUse[rxBufIndex] = false;
     if(bLORADEBUG)
-        Serial.printf("[MC-DBG] RX_BUF_RELEASE buf=%d\n", rxBufIndex);
+        CB_PRINTF("[MC-DBG] RX_BUF_RELEASE buf=%d\n", rxBufIndex);
 #endif
 
     if(bLORADEBUG)
-        Serial.printf("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
+        CB_PRINTF("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
     is_receiving = false;
+    RADIO_CB_END();
 }
 
 /**@brief Function to be executed on Radio Rx Timeout event
  */
 void OnRxTimeout(void)
 {
+    RADIO_CB_BEGIN();
     #if defined BOARD_RAK4630
         Radio.Rx(RX_TIMEOUT_VALUE);
     #endif
 
     if(bLORADEBUG)
-        Serial.println("OnRxTimeout");
+        CB_PRINTF("OnRxTimeout\n");
 
     if(ch_util_rx_start > 0)
     {
@@ -1057,6 +1070,7 @@ void OnRxTimeout(void)
         ch_util_rx_start = 0;
     }
     is_receiving = false;
+    RADIO_CB_END();
 }
 
 /**@brief Function to be executed on Radio Rx Error event
@@ -1064,12 +1078,13 @@ void OnRxTimeout(void)
 
 void OnRxError(void)
 {
+    RADIO_CB_BEGIN();
     #if defined BOARD_RAK4630
         Radio.Rx(RX_TIMEOUT_VALUE);
     #endif
 
     if(bLORADEBUG)
-        Serial.println("OnRxError");
+        CB_PRINTF("OnRxError\n");
 
     if(ch_util_rx_start > 0)
     {
@@ -1077,6 +1092,7 @@ void OnRxError(void)
         ch_util_rx_start = 0;
     }
     is_receiving = false;
+    RADIO_CB_END();
 }
 
 /**@brief Function to check if we have a Lora packet already received
@@ -1093,7 +1109,7 @@ bool is_new_packet(uint8_t compBuffer[4])
                                       ((uint32_t)compBuffer[1] << 8) |
                                       ((uint32_t)compBuffer[2] << 16) |
                                       ((uint32_t)compBuffer[3] << 24);
-                    Serial.printf("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n",
+                    CB_PRINTF("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n",
                                   dup_id, ib);
                 }
                 return false;
@@ -1106,7 +1122,7 @@ bool is_new_packet(uint8_t compBuffer[4])
                           ((uint32_t)compBuffer[1] << 8) |
                           ((uint32_t)compBuffer[2] << 16) |
                           ((uint32_t)compBuffer[3] << 24);
-        Serial.printf("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", new_id);
+        CB_PRINTF("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", new_id);
     }
     return true;
 }
@@ -1129,7 +1145,7 @@ void addTxRingEntry(const char* source)
                         (uint32_t)ringBuffer[iWrite][3];
         int queued = (iWrite >= iRead) ? (iWrite - iRead)
                                        : (MAX_RING - iRead + iWrite);
-        Serial.printf("[MC-DBG] RING_WRITE slot=%d type=%02X status=%02X "
+        CB_PRINTF("[MC-DBG] RING_WRITE slot=%d type=%02X status=%02X "
                       "len=%d msg_id=%08X queued=%d/%d src=%s\n",
                       iWrite, ringBuffer[iWrite][2], ringBuffer[iWrite][1],
                       ringBuffer[iWrite][0], mid, queued, MAX_RING, source);
@@ -1146,7 +1162,7 @@ void addTxRingEntry(const char* source)
                            ((uint32_t)ringBuffer[iRead][4] << 8)  |
                             (uint32_t)ringBuffer[iRead][3];
         // IMMER loggen (nicht nur bLORADEBUG) -- Paketverlust ist kritisch
-        Serial.printf("[MC-DBG] RING_DROP slot=%d type=%02X status=%02X "
+        CB_PRINTF("[MC-DBG] RING_DROP slot=%d type=%02X status=%02X "
                       "msg_id=%08X retry=%d (overwritten by %s)\n",
                       iRead, ringBuffer[iRead][2], ringBuffer[iRead][1],
                       lost_id, retryCount[iRead], source);
@@ -1468,6 +1484,7 @@ bool updateRetransmissionStatus()
  */
 void OnTxDone(void)
 {
+    RADIO_CB_BEGIN();
     if(ch_util_tx_start > 0)
     {
         ch_util_tx_accum += millis() - ch_util_tx_start;
@@ -1475,7 +1492,7 @@ void OnTxDone(void)
     }
 
     if(bLORADEBUG)
-        Serial.println("OnTXDone");
+        CB_PRINTF("OnTXDone\n");
 
     #if defined BOARD_RAK4630
 
@@ -1491,19 +1508,21 @@ void OnTxDone(void)
 
         if(bLORADEBUG)
         {
-            Serial.printf("[MC-SM] TX_ACTIVE -> TX_DONE rc=0\n");
-            Serial.printf("[MC-SM] TX_DONE -> RX_LISTEN rc=0\n");
+            CB_PRINTF("[MC-SM] TX_ACTIVE -> TX_DONE rc=0\n");
+            CB_PRINTF("[MC-SM] TX_DONE -> RX_LISTEN rc=0\n");
         }
 
     #endif
 
     tx_is_active = false;
+    RADIO_CB_END();
 }
 
 /**@brief Function to be executed on Radio Tx Timeout event
  */
 void OnTxTimeout(void)
 {
+    RADIO_CB_BEGIN();
     if(ch_util_tx_start > 0)
     {
         ch_util_tx_accum += millis() - ch_util_tx_start;
@@ -1511,7 +1530,7 @@ void OnTxTimeout(void)
     }
 
     if(bLORADEBUG)
-        Serial.println("OnTXTimeout");
+        CB_PRINTF("OnTXTimeout\n");
 
     #if defined BOARD_RAK4630
 
@@ -1527,6 +1546,7 @@ void OnTxTimeout(void)
     #endif
 
     tx_is_active = false;
+    RADIO_CB_END();
 }
 
 /**@brief fires when a preamble is detected 
@@ -1534,13 +1554,16 @@ void OnTxTimeout(void)
  */
 void OnPreambleDetect(void)
 {
-    Serial.println("OnPreambleDetect");
+    RADIO_CB_BEGIN();
+    CB_PRINTF("OnPreambleDetect\n");
+    RADIO_CB_END();
 }
 
 /**@brief fires when a header is detected 
  */
 void OnHeaderDetect(void)
 {
+    RADIO_CB_BEGIN();
     // Block TX during active reception.
     is_receiving = true;
     ch_util_rx_start = millis();
@@ -1548,9 +1571,10 @@ void OnHeaderDetect(void)
     // Debug L: HDR_DETECT with state context
     if(bLORADEBUG)
     {
-        Serial.printf("[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n");
-        Serial.printf("[MC-DBG] HDR_DETECT cad_attempt=%d\n", cad_attempt);
+        CB_PRINTF("[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n");
+        CB_PRINTF("[MC-DBG] HDR_DETECT cad_attempt=%d\n", cad_attempt);
     }
+    RADIO_CB_END();
 }
 
 unsigned long csma_compute_timeout(int attempt) {

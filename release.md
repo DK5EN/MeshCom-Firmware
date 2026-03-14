@@ -1,4 +1,4 @@
-# Release Notes -- MeshCom Firmware v4.35n (2026-03-13)
+# Release Notes -- MeshCom Firmware v4.35n (2026-03-14)
 
 Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `pr/dev-bugfix`, `pr-dev-bugfix-csma`).
 
@@ -40,6 +40,12 @@ Zusammenfassung aller Aenderungen gegenueber dem Upstream-DEV-Branch (Branches `
 - **Auswirkung**: `doTX()` liest den Slot mit len=0, ruft `decodeAPRS()` mit Laenge 0 auf, was die Fehlermeldungen `APRS decode - Packet discarded, wrong APRS-protocol - size <0> to short!` und `LoRa starting with 0x00 and 000000 ... no decode` erzeugt. Das ACK wird nicht gesendet — der empfangende Node erhaelt keine Bestaetigung ueber den zweiten Hop.
 - **Fix**: `ringBuffer[iWrite][0]=12` und `ringBuffer[iWrite][1]=RING_STATUS_DONE` vor dem `memcpy` eingefuegt, identisch zum `rx_dm_ack_gw`-Pfad.
 - **Betroffene Datei**: `src/lora_functions.cpp`
+
+### RAK/NRF52 Serial-Hang: CDC-ACM blockiert _lora_task (NEU - v4.35n_20260314)
+- **Ursache**: Auf dem nRF52840 (RAK4630) laeuft die USB-Serial-Ausgabe ueber Adafruit_USBD_CDC. Dessen `write()` blockiert in einer `while(remain && tud_cdc_n_connected)` Schleife, wenn der CDC-ACM-Puffer voll ist. Die SX126x-Arduino-Library dispatcht Radio-Callbacks (OnTxDone, OnRxDone, OnRxTimeout, ...) aus einem dedizierten FreeRTOS-Task (`_lora_task`). Wenn `Serial.printf()` in diesem Kontext blockiert, kann `_lora_task` keine Radio-IRQs mehr verarbeiten — die gesamte Firmware haengt.
+- **Auswirkung**: Nutzer berichten, dass sich die serielle Verbindung auf RAK-Nodes "weghaengt", meist nach einem TX. Der Node reagiert weder auf serielle Befehle noch auf LoRa-Pakete. Erst ein Hardware-Reset behebt das Problem. Ein externes Serial-Monitor-Script (pyserial) verstaerkt das Problem, da es den CDC-ACM-Puffer schneller fuellt.
+- **Fix**: Deferred-Serial-Output-System: Radio-Callbacks schreiben nicht mehr direkt auf Serial, sondern in einen kleinen Ringpuffer (24 Slots x 200 Bytes). Der Main-Loop (`nrf52loop()`) flusht den Puffer zu Serial, wo Blocking akzeptabel ist. Kontextabhaengiges Macro `CB_PRINTF()` waehlt automatisch: in `_lora_task` → deferred (non-blocking), im Main-Loop → direkt Serial (blocking OK). Auf ESP32 ist `CB_PRINTF` ein direkter Fallthrough zu `Serial.printf()` (kein Verhaltenswechsel).
+- **Betroffene Dateien**: `src/deferred_serial.h` (neu), `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`, `src/loop_functions.cpp`
 
 ### RAK/NRF52 CAD startet nicht im RX-Continuous-Modus (NEU - v4.35n_20260311)
 - **Ursache**: `Radio.StartCad()` der SX126x-Arduino Library ruft `SX126xSetCad()` auf, ohne vorher in STDBY_RC zu wechseln. Wenn das Radio in RX-Continuous-Mode ist (von `Radio.Rx(0)`), ignoriert der SX126x-Chip den SetCad-Befehl stillschweigend. CAD startet nie, DIO1 feuert nie, `OnCadDone` wird nie aufgerufen — jeder CAD-Versuch endet im 100ms Safety-Timeout.
@@ -219,9 +225,10 @@ Bringt ESP32 auf Paritaet mit dem NRF52-`OnHeaderDetect`-Callback.
 | `variants/t5_epaper/platformio.ini` | RadioLib 7.6.0 |
 | `src/configuration_global.h` | Konstanten, Version, Message-Types, Ring-Status |
 | `src/esp32/esp32_main.cpp` | WiFi, BLE, CSMA/CA, IRQ-Polling, Atomarer RX-Restart, Logging, Timeout |
-| `src/nrf52/nrf52_main.cpp` | CSMA/CA, Logging, Heap-Monitoring |
-| `src/lora_functions.cpp` | Retransmit, ACK, CAD, handleACK(), Helper-Funktionen, Double-Buffer, nRF52-Port |
-| `src/loop_functions.cpp` | Dedup-Puffer, CSMA-Konstanten, volatile Flags, addTxRingEntry() |
+| `src/deferred_serial.h` | Deferred-Serial-Ringpuffer fuer RAK/NRF52 (neu) |
+| `src/nrf52/nrf52_main.cpp` | CSMA/CA, Logging, Heap-Monitoring, Deferred-Serial-Flush |
+| `src/lora_functions.cpp` | Retransmit, ACK, CAD, handleACK(), Helper-Funktionen, Double-Buffer, nRF52-Port, CB_PRINTF |
+| `src/loop_functions.cpp` | Dedup-Puffer, CSMA-Konstanten, volatile Flags, addTxRingEntry(), CB_PRINTF |
 | `src/loop_functions.h` | addTxRingEntry() Deklaration |
 | `src/loop_functions_extern.h` | volatile extern-Deklarationen |
 | `src/batt_functions.cpp` | volatile extern Fix |
