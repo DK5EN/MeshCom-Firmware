@@ -9,7 +9,8 @@ Dk5EN / Martin
 1. März 2026
 
 Usage:
-    python3 tools/serial_monitor.py
+    python3 tools/serial_monitor.py                          # NRF52/RAK (CDC-ACM)
+    python3 tools/serial_monitor.py --no-dtr                 # ESP32/CP2102 (no reset)
     python3 tools/serial_monitor.py --port /dev/cu.usbserial-0001 --interval 300
 """
 
@@ -779,6 +780,12 @@ def main() -> None:
         default=300,
         help="Summary interval in seconds (default: 300)",
     )
+    parser.add_argument(
+        "--no-dtr",
+        action="store_true",
+        help="Suppress DTR/RTS to prevent hardware reset (needed for CP2102/ESP32, "
+             "NOT for CDC-ACM/NRF52 where DTR=True is required)",
+    )
     args = parser.parse_args()
 
     # Create log directory and file
@@ -788,31 +795,35 @@ def main() -> None:
     log_path = os.path.join(log_dir, log_name)
 
     print("MeshCom Serial Monitor")
-    print(f"Port: {args.port} @ {args.baud}")
+    dtr_mode = "suppressed (--no-dtr)" if args.no_dtr else "enabled (default)"
+    print(f"Port: {args.port} @ {args.baud}  DTR: {dtr_mode}")
     print(f"Log:  {log_path}")
     print(f"Summary every {args.interval}s")
     print("Press Ctrl+C to stop\n")
 
-    # Open serial with DTR/RTS disabled to avoid hardware reset.
-    # CP2102 on macOS: pyserial's open() internally calls os.open() which makes
-    # the driver assert DTR/RTS *before* pyserial can clear them via ioctl.
-    # Fix: pre-configure the TTY with O_NOCTTY (no modem control signals) and
-    # set CLOCAL + clear HUPCL *before* pyserial touches the port.
-    # See: https://github.com/pyserial/pyserial/issues/124
-    fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    attrs = termios.tcgetattr(fd)
-    attrs[2] &= ~termios.HUPCL  # no DTR drop on close
-    attrs[2] |= termios.CLOCAL  # ignore modem control lines
-    termios.tcsetattr(fd, termios.TCSANOW, attrs)
-    os.close(fd)
-    # Now pyserial opens the already-configured TTY — no reset pulse
-    ser = serial.Serial()
-    ser.port = args.port
-    ser.baudrate = args.baud
-    ser.timeout = 1
-    ser.dtr = False
-    ser.rts = False
-    ser.open()
+    # Open serial port.
+    # --no-dtr: Suppress DTR/RTS to prevent hardware reset on CP2102 (ESP32).
+    #   CP2102 on macOS: pyserial's open() asserts DTR/RTS before we can clear
+    #   them, so we pre-configure the TTY via termios.
+    #   See: https://github.com/pyserial/pyserial/issues/124
+    # Default (DTR=True): Required for CDC-ACM (NRF52/RAK4630) where the device
+    #   only considers a terminal connected when DTR is asserted.
+    if args.no_dtr:
+        fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+        attrs = termios.tcgetattr(fd)
+        attrs[2] &= ~termios.HUPCL  # no DTR drop on close
+        attrs[2] |= termios.CLOCAL  # ignore modem control lines
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+        os.close(fd)
+        ser = serial.Serial()
+        ser.port = args.port
+        ser.baudrate = args.baud
+        ser.timeout = 1
+        ser.dtr = False
+        ser.rts = False
+        ser.open()
+    else:
+        ser = serial.Serial(args.port, args.baud, timeout=1)
 
     monitor = Monitor(summary_interval=args.interval)
     stop_event = threading.Event()

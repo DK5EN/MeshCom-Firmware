@@ -10,13 +10,6 @@
 #include <nrf52_functions.h>
 #include <extudp_functions.h>
 
-// Deferred serial output for radio callbacks — see deferred_serial.h
-#include "deferred_serial.h"
-char    _dsr_buf[DSR_SLOTS][DSR_SLOT_SIZE];
-volatile uint8_t _dsr_wr = 0;
-volatile uint8_t _dsr_rd = 0;
-volatile bool    _in_radio_isr_task = false;
-
 #include <TinyGPSPlus.h>
 
 #include "Adafruit_SHTC3.h"
@@ -956,9 +949,6 @@ void nrf52setup()
 
 void nrf52loop()
 {
-    // Drain deferred serial output from radio callbacks (see deferred_serial.h)
-    deferred_serial_flush();
-
     // get RTC Now
     // RTC hat Vorrang zu Zeit via MeshCom-Server
     bool bMyClock = true;
