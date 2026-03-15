@@ -1,3 +1,29 @@
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix4 (2026-03-15)
+
+APRS-Parser Hardening: korrupte RF-Pakete koennen keinen Absturz mehr verursachen.
+
+---
+
+## Aenderungen seit v4.35n_prio_v20260315_fix3
+
+### 18. APRS-Parser: Source/Destination-Path-Schleifen gegen korrupte Pakete abgesichert
+- **Ursache**: Ein korruptes RF-Paket ohne `>` Trennzeichen (z.B. `OE1FUC-13,OE3MAG-12,OE3CZC-##...Muell...`) liess die Source-Path-Schleife in `decodeAPRS()` den gesamten Restbuffer durchlaufen. Fuer jedes Byte wurde `String::concat()` aufgerufen — bei ~250 Bytes Muell fuehrte das zu 488ms Verarbeitungszeit (normal: 1-9ms) und Heap-Fragmentierung auf dem ESP32.
+- **Auswirkung**: OE1KBC-12 und OE3MAG-12 abgestuerzt am 15.03.2026 nach Empfang eines solchen Pakets.
+- **Fix**: Beide Path-Parsing-Schleifen (Source + Destination) begrenzt auf max 120 Bytes. Non-Printable-Bytes (< 0x20 oder > 0x7E) brechen die Schleife sofort ab. Der bestehende `bSourceEndOk`/`bDestinationEndOk`-Check verwirft das Paket dann automatisch.
+- **Betroffene Datei**: `src/aprs_functions.cpp`
+
+### 19. APRS-Parser: Buffer-Overread bei FW-Sub-Version behoben
+- **Ursache**: Nach dem Parsen von FW-Version und Hardware-Byte wurde `RcvBuffer[inext]` ohne Bounds-Check gelesen. Die Zeilen direkt darueber hatten den Check `if(inext < rsize)`, Zeile 403 nicht.
+- **Fix**: `inext < rsize` Guard eingefuegt, analog zu den bestehenden Guards.
+- **Betroffene Datei**: `src/aprs_functions.cpp`
+
+### 20. printAsciiBuffer: Bounds-Check bei kurzen Buffern
+- **Ursache**: Die Debug-Funktion griff auf `buffer[0..3]` zu ohne vorher `len >= 4` zu pruefen.
+- **Fix**: `if(len < 4) return;` als erstes Statement.
+- **Betroffene Datei**: `src/loop_functions.cpp`
+
+---
+
 # Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix3 (2026-03-15)
 
 Heltec V2: GPS-Pins von GPIO 3/23 auf GPIO 12/13 umgelegt.
