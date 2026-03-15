@@ -899,7 +899,14 @@ void esp32setup()
     #endif
     
     #if defined(ENABLE_GPS)
-        GPS_Init();
+        if(bGPSON)
+        {
+            GPS_Init();
+        }
+        else
+        {
+            Serial.println("[GPS] disabled by user setting — skipping init");
+        }
     #else
     
     #if defined(BOARD_T_DECK_PRO)

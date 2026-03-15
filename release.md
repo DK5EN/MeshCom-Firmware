@@ -1,3 +1,19 @@
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix1 (2026-03-15)
+
+Bugfix fuer Heltec V2: GPS-Init blockiert serielle Kommandos.
+
+---
+
+## Aenderungen seit v4.35n_prio_v20260315
+
+### 12. Heltec V2: GPS-Init blockiert serielle Kommandoeingabe
+- **Ursache**: `GPS_Init()` wurde beim Start bedingungslos aufgerufen (`#if defined(ENABLE_GPS)`), ohne den Runtime-Flag `bGPSON` zu pruefen. Auf dem Heltec V2 verwendet GPS `GPIO 3` als TX-Pin — derselbe Pin wie UART0 RX (USB-Serial). Die GPS-Baudraten-Erkennung (4 Baudraten x 2s = ~8s) belegte den Pin und blockierte danach den seriellen Empfang dauerhaft.
+- **Auswirkung**: Bug-Report: Heltec V2 nimmt keine seriellen Kommandos mehr an. V3 und RAK nicht betroffen (dedizierte GPS-Pins ohne UART0-Konflikt).
+- **Fix**: `bGPSON`-Check vor `GPS_Init()` — wenn GPS vom User nicht aktiviert ist, wird die GPS-Initialisierung uebersprungen. Log-Ausgabe bei deaktiviertem GPS.
+- **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
+---
+
 # Release Notes -- MeshCom Firmware v4.35n_prio_v20260315 (2026-03-15)
 
 Nachrichtenprioritaet, Trickle-HEY und erweiterte Statistik auf Basis von
