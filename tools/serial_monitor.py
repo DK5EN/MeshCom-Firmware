@@ -186,6 +186,10 @@ class Monitor:
         self.hb_timeout_streak: int = 0
         self.hb_timeout_cycle_alerted: bool = False
 
+        # Priority/Trickle tracking
+        self.last_mc_stat: str | None = None
+        self.last_mc_hwm: str | None = None
+
         # Alerts collected this interval
         self.alerts: list[str] = []
 
@@ -531,6 +535,38 @@ class Monitor:
                     f"RX RESTART flood: {cur_count}/min"
                 )
 
+        # Priority statistics from firmware
+        if "[MC-STAT]" in line:
+            self.counters["mc_stat_lines"] = self.counters.get("mc_stat_lines", 0) + 1
+            self.last_mc_stat = line.strip()
+            return
+
+        if "[MC-PRIO]" in line:
+            self.counters["mc_prio_lines"] = self.counters.get("mc_prio_lines", 0) + 1
+            # Check for Prio-1 starvation (latency > 10000ms)
+            m = re.search(r"p1_lat_max=(\d+)ms", line)
+            if m and int(m.group(1)) > 10000:
+                self._alert(f"PRIO1_STARVED: p1_lat_max={m.group(1)}ms (>10s)")
+            return
+
+        if "[MC-TRICKLE]" in line:
+            self.counters["trickle_events"] = self.counters.get("trickle_events", 0) + 1
+            if "SUPPRESS" in line:
+                self.counters["trickle_suppress"] = self.counters.get("trickle_suppress", 0) + 1
+            elif "TOPO_CHANGE" in line:
+                self.counters["trickle_topo_change"] = self.counters.get("trickle_topo_change", 0) + 1
+            return
+
+        if "[MC-HWM]" in line:
+            self.last_mc_hwm = line.strip()
+            return
+
+        # Priority drop alert
+        if "RING_DROP_PRIO" in line:
+            self.counters["ring_drop_prio"] = self.counters.get("ring_drop_prio", 0) + 1
+            self.total["ring_drop_prio"] = self.total.get("ring_drop_prio", 0) + 1
+            return
+
     def _alert(self, msg: str) -> None:
         self._indicator_newline()
         ts = datetime.now().strftime("%H:%M:%S")
@@ -684,6 +720,12 @@ class Monitor:
                 + f"Adaptive wait: {wait_str}\n"
                 f"Ring:  queued={self.ring_last_queued} retrying={self.ring_last_retrying} "
                 f"done={self.ring_last_done} (last seen)\n"
+                f"Prio: stat_lines={self.counters.get('mc_stat_lines', 0)} "
+                f"prio_drops={self.counters.get('ring_drop_prio', 0)} "
+                f"preempt=see [MC-STAT]\n"
+                f"Trickle: events={self.counters.get('trickle_events', 0)} "
+                f"suppress={self.counters.get('trickle_suppress', 0)} "
+                f"topo_change={self.counters.get('trickle_topo_change', 0)}\n"
                 f"WiFi: {wifi_str} | UDP: {udp_str} | "
                 f"Server: {server_str} | NTP: {ntp_str}\n"
                 f"Alerts: {alert_str}\n"

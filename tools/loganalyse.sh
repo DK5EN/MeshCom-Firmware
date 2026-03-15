@@ -927,6 +927,54 @@ if [ $# -ge 2 ] && [ -f "$2" ]; then
     rm -f /tmp/cross_log1_msgids.txt /tmp/cross_log2_msgids.txt
 fi
 
+# ─── PRIORITY DISTRIBUTION ───
+section "PRIORITY_DISTRIBUTION"
+if grep -q '\[MC-STAT\]' "$LOG1"; then
+    echo "--- TX counts per priority (from [MC-STAT] lines) ---"
+    grep '\[MC-STAT\]' "$LOG1" | tail -20
+    echo ""
+    echo "--- Latency per priority (from [MC-PRIO] lines) ---"
+    grep '\[MC-PRIO\]' "$LOG1" | tail -20
+    echo ""
+    echo "--- Priority drops ---"
+    grep 'RING_DROP_PRIO\|RING_DROP_NEW' "$LOG1" | wc -l | awk '{printf "  Total priority drops: %d\n", $1}'
+    grep 'RING_DROP_PRIO' "$LOG1" | grep -oP 'prio=\d' | sort | uniq -c | sort -rn || true
+else
+    echo "  No [MC-STAT] data found (priority queue not active or no data yet)"
+fi
+
+# ─── TRICKLE HEY ───
+section "TRICKLE_HEY"
+if grep -q '\[MC-TRICKLE\]' "$LOG1"; then
+    echo "--- Trickle-HEY events ---"
+    trickle_send=$(grep -c 'MC-TRICKLE.*SEND' "$LOG1" || true)
+    trickle_suppress=$(grep -c 'MC-TRICKLE.*SUPPRESS' "$LOG1" || true)
+    trickle_topo=$(grep -c 'MC-TRICKLE.*TOPO_CHANGE' "$LOG1" || true)
+    trickle_total=$((trickle_send + trickle_suppress))
+    if [ "$trickle_total" -gt 0 ]; then
+        suppress_pct=$((trickle_suppress * 100 / trickle_total))
+    else
+        suppress_pct=0
+    fi
+    echo "  HEY sent: $trickle_send"
+    echo "  HEY suppressed: $trickle_suppress ($suppress_pct%)"
+    echo "  Topology changes: $trickle_topo"
+    echo ""
+    echo "--- Last 10 Trickle events ---"
+    grep '\[MC-TRICKLE\]' "$LOG1" | tail -10
+else
+    echo "  No [MC-TRICKLE] data found (Trickle-HEY not active or no data yet)"
+fi
+
+# ─── HIGH WATER MARKS ───
+section "HIGH_WATER_MARKS"
+if grep -q '\[MC-HWM\]' "$LOG1"; then
+    echo "--- High-Water Marks ---"
+    grep '\[MC-HWM\]' "$LOG1" | tail -5
+else
+    echo "  No [MC-HWM] data found"
+fi
+
 # ─── DONE ───
 section "END"
 echo "Analysis complete."

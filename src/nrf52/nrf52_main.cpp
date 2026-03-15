@@ -1453,12 +1453,34 @@ if (isPhoneReady == 1)
         }
     }
 
-    // HEYINFO_INTERVAL in Seconds == 15 minutes
-    if (((heyinfo_timer + (HEYINFO_INTERVAL * 1000)) < millis()) || bHeyFirst)
+    // Trickle-HEY: adaptive interval (RFC 6206)
+    if (((heyinfo_timer + trickle_interval_ms) < millis()) || bHeyFirst)
     {
         bHeyFirst = false;
-        
-        sendHey();
+
+        // Check for topology change
+        int current_neighbors = getMheardCount();
+        if(trickle_last_neighbor_count >= 0 && current_neighbors != trickle_last_neighbor_count)
+        {
+            trickle_interval_ms = TRICKLE_IMIN_S * 1000UL;
+            trickle_consistent_count = 0;
+        }
+        trickle_last_neighbor_count = current_neighbors;
+
+        // Trickle suppression
+        if(trickle_consistent_count >= TRICKLE_K)
+        {
+            if(bDisplayInfo)
+                Serial.printf("[MC-TRICKLE] SUPPRESS consistent=%d interval=%lums\n",
+                    trickle_consistent_count, trickle_interval_ms);
+        }
+        else
+        {
+            sendHey();
+        }
+
+        trickle_interval_ms = min(trickle_interval_ms * 2, (unsigned long)(TRICKLE_IMAX_S * 1000UL));
+        trickle_consistent_count = 0;
 
         heyinfo_timer = millis();
     }

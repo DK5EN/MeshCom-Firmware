@@ -1,3 +1,62 @@
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315 (2026-03-15)
+
+Nachrichtenprioritaet, Trickle-HEY und erweiterte Statistik auf Basis von
+`v4.35p_fixes`. Implementierung von ADR-001 Phase 1 (kein On-Air-Change).
+
+---
+
+## Aenderungen seit v4.35n_20260315_fix3
+
+### Priority-Queue: 5-stufige Nachrichtenprioritaet (ADR-001 Vorschlag A)
+- **Problem**: DMs und ACKs standen hinter 5-10 Relay/HEY-Paketen in der FIFO-Queue.
+  Bei 50-80% CAD-Busy-Rate fuehrte das zu 10-50s unnoetige Verzoegerung fuer menschliche Nachrichten.
+- **Loesung**: 5 Prioritaetsstufen mit differenziertem CSMA-Backoff. ACK und DM werden
+  jetzt bevorzugt gesendet — erwartete Latenz-Reduktion von 10-50s auf 2-3s fuer Prio-1 Pakete.
+- **Prioritaetsstufen**:
+  - Prio 1 (Kritisch): ACK + persoenliche DM — CSMA-Backoff 2000ms
+  - Prio 2 (Hoch): Gruppen + Broadcast "*" — CSMA-Backoff 3000ms
+  - Prio 3 (Normal): Mesh-Relay — CSMA-Backoff 4000ms
+  - Prio 4 (Niedrig): Position — CSMA-Backoff 4500ms
+  - Prio 5 (Hintergrund): HEY — CSMA-Backoff 5000ms
+- **Prio-Erkennung**: `getMessagePriority()` erkennt Typ via msg_type Byte,
+  Relay via `RING_STATUS_DONE`, DM vs Gruppe via `CheckGroup()`.
+  Relay-Pakete werden zuverlaessig ueber den Status bei Einfuegen unterschieden.
+- **Prio-Entnahme**: `getNextTxSlot()` scannt den Ring-Buffer nach hoechster Prioritaet.
+  Bei gleicher Prio: FIFO-Reihenfolge (aeltester zuerst). Ersetzt die alte `iRead++` FIFO-Logik.
+- **Prio-Drop**: Bei voller Queue wird der aelteste Eintrag der niedrigsten Prioritaet
+  verworfen. Neues Paket wird nur eingefuegt wenn es hoehere Prio hat als das zu droppende.
+  ACKs und DMs werden nie zugunsten niedrigerer Pakete verworfen.
+- **RAM-Aufwand**: 30+120 Bytes (`ringPriority[MAX_RING]` + `ringEnqueueTime[MAX_RING]`)
+- **Kein On-Air-Change**: Alte Firmware empfaengt alle Pakete korrekt.
+- **Betroffene Dateien**: `src/configuration_global.h`, `src/loop_functions_extern.h`,
+  `src/loop_functions.cpp`, `src/lora_functions.h`, `src/lora_functions.cpp`,
+  `src/esp32/esp32_main.cpp`
+
+### Trickle-HEY: Adaptive HEY-Frequenz (ADR-001 Vorschlag C, RFC 6206)
+- **Problem**: Bei 100 Nodes mit HEY alle 15 Min: ~7 HEY/Min = ein HEY alle 8.5s.
+  Signifikanter Overhead bei 50-80% CAD-Busy.
+- **Loesung**: Trickle-Algorithmus (RFC 6206 adaptiert) passt HEY-Intervall dynamisch an.
+  Erwartete Einsparung: 60-70% weniger HEY-Traffic in stabilen Netzen.
+- **Parameter**: Imin=30s, Imax=15min (wie bisher), k=2 (Redundanzschwelle)
+- **Verhalten**:
+  - Intervall verdoppelt sich bei Stabilitaet (30s -> 1m -> 2m -> 4m -> 8m -> 15m)
+  - Reset auf 30s bei Topologieaenderung (neuer/verlorener Nachbar via getMheardCount())
+  - Suppression: HEY wird unterdrueckt wenn >=2 konsistente Nachbar-HEYs gehoert
+- **Logging**: `[MC-TRICKLE] SEND/SUPPRESS/TOPO_CHANGE interval=... consistent=... neighbors=...`
+- **Betroffene Dateien**: `src/configuration_global.h`, `src/loop_functions_extern.h`,
+  `src/loop_functions.cpp`, `src/lora_functions.cpp`,
+  `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
+
+### Erweiterte Statistik und Logging (ADR-001 Vorschlag D)
+- **[MC-STAT]** alle 5 Minuten: TX-Zaehler pro Prioritaet, Drops pro Prio, Preemption-Zaehler
+- **[MC-PRIO]** alle 5 Minuten: Latenz avg/max pro Prioritaetsstufe (Queue-to-TX)
+- **[MC-HWM]** alle 30 Minuten: Queue/CSMA High-Water-Marks, aktuelles Trickle-Intervall
+- **serial_monitor.py**: Neue Alerts (PRIO1_STARVED >10s), Trickle-Summary in Intervall-Report
+- **loganalyse.sh**: Neue Sektionen PRIORITY_DISTRIBUTION, TRICKLE_HEY, HIGH_WATER_MARKS
+- **Betroffene Dateien**: `src/esp32/esp32_main.cpp`, `tools/serial_monitor.py`, `tools/loganalyse.sh`
+
+---
+
 # Release Notes -- MeshCom Firmware v4.35n_20260315_fix3 (2026-03-15)
 
 Bugfixes und Verbesserungen auf Basis von `oe1kbc_v4.35p`. Diese Version
