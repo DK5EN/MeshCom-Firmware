@@ -278,7 +278,7 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     */
     char cBuffer[60];
     snprintf(cBuffer, sizeof(cBuffer), "%s|%s|%c|%i|%u|%i|%i|%.1lf|%i|%i|%i|", mheardLine.mh_date.c_str(), mheardLine.mh_time.c_str(), mheardLine.mh_payload_type, mheardLine.mh_hw,
-     mheardLine.mh_mod, mheardLine.mh_rssi, mheardLine.mh_snr, mheardLine.mh_dist, mheardLine.mh_path_len, mheardLine.mh_mesh, mheardNCount[ipos]); 
+     mheardLine.mh_mod, mheardLine.mh_rssi, mheardLine.mh_snr, mheardLine.mh_dist, mheardLine.mh_path_len, mheardLine.mh_mesh, mheardLine.mh_ncount);
     memcpy(mheardBuffer[ipos], cBuffer, sizeof(cBuffer));
 
     // generate JSON
@@ -365,27 +365,14 @@ void updateHeyPath(struct mheardLine &mheardLine)
                 }
 
                 //NeighborCount einfügen
-                // check old format
-                int icolon=mheardLine.mh_path_payload.indexOf(",");
                 int ipos=mheardLine.mh_path_payload.indexOf(";");
-                
+
                 if(bDisplayCont)
                 {
-                    Serial.print(icolon);
-                    Serial.print("/");
                     Serial.print(ipos);
-                    Serial.print("/");
                 }
 
                 if(ipos <= 0)
-                {
-                    if(bDisplayCont)
-                        Serial.println("");
-
-                    return;
-                }
-
-                if(icolon > 0 && icolon < ipos)
                 {
                     if(bDisplayCont)
                         Serial.println("");
@@ -407,7 +394,7 @@ void updateHeyPath(struct mheardLine &mheardLine)
 
                 char cBuffer[60];
                 snprintf(cBuffer, sizeof(cBuffer), "%s|%s|%c|%i|%u|%i|%i|%.1lf|%i|%i|%i|", mheardLine.mh_date.c_str(), mheardLine.mh_time.c_str(), mheardLine.mh_payload_type, mheardLine.mh_hw,
-                mheardLine.mh_mod, mheardLine.mh_rssi, mheardLine.mh_snr, mheardLine.mh_dist, mheardLine.mh_path_len, mheardLine.mh_mesh, mheardNCount[imh]);
+                mheardLine.mh_mod, mheardLine.mh_rssi, mheardLine.mh_snr, mheardLine.mh_dist, mheardLine.mh_path_len, mheardLine.mh_mesh, mheardLine.mh_ncount);
                 memcpy(mheardBuffer[imh], cBuffer, sizeof(cBuffer));
 
                 return; // call heard direct
@@ -513,7 +500,7 @@ int getMheardCount()
     {
         if(mheardCalls[iset][0] != 0x00)
         {
-            if((mheardEpoch[iset]+60*60) > getUnixClock())  // mhread last hour
+            if((mheardEpoch[iset]+60*60*12) > getUnixClock())  // mheard last 12 hours
             {
                 imhcount++;
             }
@@ -579,12 +566,6 @@ void sendMheard()
                 xval = getValue(mhstringdec, '|', 8);
                 mheardLine.mh_path_len = xval.toInt();
 
-                xval = getValue(mhstringdec, '|', 9);
-                mheardLine.mh_mesh = xval.toInt();
-
-                xval = getValue(mhstringdec, '|', 10);
-                mheardLine.mh_ncount = xval.toInt();
-
                 // generate JSON
                 JsonDocument mhdoc;
 
@@ -599,8 +580,6 @@ void sendMheard()
                 mhdoc["SNR"] = mheardLine.mh_snr;
                 mhdoc["DIST"] = mheardLine.mh_dist;
                 mhdoc["PL"] = mheardLine.mh_path_len;
-                mhdoc["MESH"] = mheardLine.mh_mesh;
-                mhdoc["NCNT"] = mheardLine.mh_ncount;
 
                 // send to Phone
                 uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
