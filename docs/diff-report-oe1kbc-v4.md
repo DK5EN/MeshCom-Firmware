@@ -13,11 +13,9 @@ Aenderungen seit v3: Kurt hat 2 weitere Commits gemacht (1862d09, 9e05b33) — A
 
 **Kurt hat weitere Fixes uebernommen — Audio komplett, CONFFIN Timing uebernommen:**
 
-- **Neu erledigt (seit v3):** Audio Log-Tags (alle 15 verbleibenden Stellen), CONFFIN Timing (esp32_main, nrf52_ble, nrf52_main)
-- **Uebernommen:** sendMheard MESH/NCNT Feature (Kurts Ansatz in unseren Code integriert)
 - **Offen:** MHeard stale ncount, APRS IGate-Text, sendPosition Magic-Values, POSINFO printf-Bug, Persistence Size-Check, CONFFIN addBLEComToOutBuffer
-- **Rueckschritt:** `mheardLine.mh_ncount = mheardNCount[ipos]` weiterhin vorhanden
-- **Neues Problem:** `connect_pending` in esp32_main.cpp ist jetzt toter Code (wird gesetzt aber nie gelesen)
+- `mheardLine.mh_ncount = mheardNCount[ipos]` weiterhin vorhanden
+- `connect_pending` in esp32_main.cpp ist jetzt toter Code (wird gesetzt aber nie gelesen)
 
 ---
 
