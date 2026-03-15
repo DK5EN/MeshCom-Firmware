@@ -227,7 +227,11 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
             }
             else
             {
-                if(strcmp(mheardCalls[iset], mheardLine.mh_callsign.c_str()) == 0)
+                int ivgll = mheardLine.mh_callsign.length();
+                if(strlen(mheardCalls[iset]) > (size_t)ivgll)
+                    ivgll = strlen(mheardCalls[iset]);
+
+                if(memcmp(mheardCalls[iset], mheardLine.mh_callsign.c_str(), ivgll) == 0)
                 {
                     ipos=iset;
                 }
@@ -258,7 +262,10 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     }
 
     memset(mheardCalls[ipos], 0x00, sizeof(mheardCalls[ipos]));
-    memcpy(mheardCalls[ipos], mheardLine.mh_callsign.c_str(), mheardLine.mh_callsign.length());
+    size_t call_len = mheardLine.mh_callsign.length();
+    if(call_len >= sizeof(mheardCalls[ipos]))
+        call_len = sizeof(mheardCalls[ipos]) - 1;
+    memcpy(mheardCalls[ipos], mheardLine.mh_callsign.c_str(), call_len);
     
     mheardEpoch[ipos] = getUnixClock();
     /*
@@ -346,7 +353,7 @@ void updateHeyPath(struct mheardLine &mheardLine)
             if(strlen(mheardCalls[imh]) > (size_t)ivgll)
                 ivgll=strlen(mheardCalls[imh]);
 
-            if(strcmp(mheardCalls[imh], mheardLine.mh_sourcecallsign.c_str()) == 0)
+            if(memcmp(mheardCalls[imh], mheardLine.mh_sourcecallsign.c_str(), ivgll) == 0)
             {
                 if(bDisplayCont)
                 {
@@ -425,7 +432,7 @@ void updateHeyPath(struct mheardLine &mheardLine)
                 if(strlen(mheardPathCalls[iset]) > (size_t)ivgll)
                     ivgll=strlen(mheardPathCalls[iset]);
 
-                if(strcmp(mheardPathCalls[iset], mheardLine.mh_sourcecallsign.c_str()) == 0)
+                if(memcmp(mheardPathCalls[iset], mheardLine.mh_sourcecallsign.c_str(), ivgll) == 0)
                 {
                     ipos=iset;
                 }
