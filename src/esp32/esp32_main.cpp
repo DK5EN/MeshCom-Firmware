@@ -255,7 +255,6 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
     {
         deviceConnected = true;
         config_to_phone_prepare = true;
-        connect_pending = true;  // commandAction runs in Main Loop
 
         Serial.printf("BLE Connected with: %s\n", connInfo.getAddress().toString().c_str());
         pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
@@ -2437,12 +2436,6 @@ void esp32loop()
         }
     }
 
-    // BLE connect pending: run conffin in Main Loop context
-    if (connect_pending) {
-        connect_pending = false;
-        commandAction((char*)"--conffin", isPhoneReady, true);
-    }
-
     if(hasMsgFromPhone)
     {
         if(bBLEDEBUG)
@@ -2470,8 +2463,10 @@ void esp32loop()
 
             sendMheard();
 
+            commandAction((char*)"--conffin", isPhoneReady, true);
+
             config_to_phone_prepare_timer = millis();
-            
+
             config_to_phone_prepare = false;
         }
         else

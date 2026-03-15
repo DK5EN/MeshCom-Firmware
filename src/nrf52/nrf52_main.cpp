@@ -1383,6 +1383,8 @@ if (isPhoneReady == 1)
 
             sendMheard();
 
+            commandAction((char*)"--conffin", isPhoneReady, true);
+
             config_to_phone_prepare_timer=millis();
 
             config_to_phone_prepare = false;
