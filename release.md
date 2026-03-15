@@ -1,7 +1,17 @@
-# Release Notes -- MeshCom Firmware v4.35n_20260315_fix1 (2026-03-15)
+# Release Notes -- MeshCom Firmware v4.35n_20260315_fix2 (2026-03-15)
 
 Bugfixes und Verbesserungen auf Basis von `oe1kbc_v4.35p`. Diese Version
 laeuft als "U-Boot" (Vorab-Test) vor der offiziellen v4.35p.
+
+---
+
+## Aenderungen seit v4.35n_20260315_fix1
+
+### 11. T-Deck / T-Deck Plus: CURRENT_LIMIT 240→140 — Boot-Hang behoben
+- **Ursache**: `setCurrentLimit()` akzeptiert nur Werte im Bereich 0–140 mA. Die T-Deck-Varianten hatten `CURRENT_LIMIT 240` definiert. Der `setCurrentLimit()`-Aufruf war in aelteren Versionen auskommentiert (`/* ... */`) und hatte daher nie Auswirkung. Durch das Uncomment in fix1 wurde der Code aktiv — der ueberhoethe Wert loeste `RADIOLIB_ERR_INVALID_CURRENT_LIMIT` aus, woraufhin die Firmware in eine `while(true)`-Endlosschleife ging.
+- **Auswirkung**: T-Deck und T-Deck Plus booteten nicht mehr und waren nicht bedienbar (Bug-Report 2026-03-15).
+- **Fix**: `CURRENT_LIMIT` in beiden Varianten von 240 auf 140 mA korrigiert (Maximum des SX1262/SX1268 OCP-Bereichs, konsistent mit allen anderen Board-Varianten).
+- **Betroffene Dateien**: `variants/t_deck/configuration.h`, `variants/t_deck_plus/configuration.h`
 
 ---
 
