@@ -295,18 +295,18 @@ int ComToPhoneRead=0;
 bool hasMsgFromPhone = false;
 
 // LoRa RX/TX sequence control
-volatile bool is_receiving = false;  // flag to store we are receiving a lora packet.
-volatile bool tx_is_active = false;  // flag to store we are transmitting  a lora packet.
+std::atomic<bool> is_receiving{false};  // flag to store we are receiving a lora packet.
+std::atomic<bool> tx_is_active{false};  // flag to store we are transmitting  a lora packet.
 
 int cad_attempt = 0;
 unsigned long csma_timeout = CSMA_BASE_0;
 int rx_irq_defer_count = 0;
 
 // Channel utilization tracking (10s window)
-volatile unsigned long ch_util_rx_start = 0;   // timestamp when RX started
-volatile unsigned long ch_util_tx_start = 0;   // timestamp when TX started
-volatile unsigned long ch_util_rx_accum = 0;   // accumulated RX airtime (ms) in current window
-volatile unsigned long ch_util_tx_accum = 0;   // accumulated TX airtime (ms) in current window
+std::atomic<unsigned long> ch_util_rx_start{0};   // timestamp when RX started
+std::atomic<unsigned long> ch_util_tx_start{0};   // timestamp when TX started
+std::atomic<unsigned long> ch_util_rx_accum{0};   // accumulated RX airtime (ms) in current window
+std::atomic<unsigned long> ch_util_tx_accum{0};   // accumulated TX airtime (ms) in current window
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 
@@ -1976,11 +1976,11 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     ipt=0;
 
     // check Batt
-    for(itxt=istarttext; itxt<=aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=istarttext; itxt<aprsmsg.msg_payload.length(); itxt++)
     {
         if(aprsmsg.msg_payload.charAt(itxt) == '/' && aprsmsg.msg_payload.charAt(itxt+1) == 'B' && aprsmsg.msg_payload.charAt(itxt+2) == '=')
         {
-            for(unsigned int id=itxt+3;id<=aprsmsg.msg_payload.length();id++)
+            for(unsigned int id=itxt+3;id<aprsmsg.msg_payload.length();id++)
             {
                 // ENDE
                 if(aprsmsg.msg_payload.charAt(id) == '/' || aprsmsg.msg_payload.charAt(id) == ' ' || id == aprsmsg.msg_payload.length())
@@ -2020,11 +2020,11 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
     #endif
 
-    for(itxt=istarttext; itxt<=aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=istarttext; itxt<aprsmsg.msg_payload.length(); itxt++)
     {
         if(aprsmsg.msg_payload.charAt(itxt) == '/' && aprsmsg.msg_payload.charAt(itxt+1) == 'A' && aprsmsg.msg_payload.charAt(itxt+2) == '=')
         {
-            for(unsigned int id=itxt+3;id<=aprsmsg.msg_payload.length();id++)
+            for(unsigned int id=itxt+3;id<aprsmsg.msg_payload.length();id++)
             {
                 // ENDE
                 if(aprsmsg.msg_payload.charAt(id) == '/' || aprsmsg.msg_payload.charAt(id) == ' ' || id == aprsmsg.msg_payload.length())

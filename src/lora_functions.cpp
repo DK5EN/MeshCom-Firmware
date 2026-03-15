@@ -255,10 +255,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     // Debug I: OnRxDone timing — capture start time
     unsigned long _onrxdone_start = millis();
 
-    if(ch_util_rx_start > 0)
     {
-        ch_util_rx_accum += millis() - ch_util_rx_start;
-        ch_util_rx_start = 0;
+        unsigned long _rx_s = ch_util_rx_start.exchange(0);
+        if(_rx_s > 0)
+            ch_util_rx_accum.fetch_add(millis() - _rx_s);
     }
 
 #if defined BOARD_RAK4630
@@ -1096,10 +1096,10 @@ void OnRxTimeout(void)
     if(bLORADEBUG)
         Serial.printf("OnRxTimeout\n");
 
-    if(ch_util_rx_start > 0)
     {
-        ch_util_rx_accum += millis() - ch_util_rx_start;
-        ch_util_rx_start = 0;
+        unsigned long _rx_s = ch_util_rx_start.exchange(0);
+        if(_rx_s > 0)
+            ch_util_rx_accum.fetch_add(millis() - _rx_s);
     }
     is_receiving = false;
 }
@@ -1116,10 +1116,10 @@ void OnRxError(void)
     if(bLORADEBUG)
         Serial.printf("OnRxError\n");
 
-    if(ch_util_rx_start > 0)
     {
-        ch_util_rx_accum += millis() - ch_util_rx_start;
-        ch_util_rx_start = 0;
+        unsigned long _rx_s = ch_util_rx_start.exchange(0);
+        if(_rx_s > 0)
+            ch_util_rx_accum.fetch_add(millis() - _rx_s);
     }
     is_receiving = false;
 }
@@ -1680,10 +1680,10 @@ bool updateRetransmissionStatus()
  */
 void OnTxDone(void)
 {
-    if(ch_util_tx_start > 0)
     {
-        ch_util_tx_accum += millis() - ch_util_tx_start;
-        ch_util_tx_start = 0;
+        unsigned long _tx_s = ch_util_tx_start.exchange(0);
+        if(_tx_s > 0)
+            ch_util_tx_accum.fetch_add(millis() - _tx_s);
     }
 
     if(bLORADEBUG)
@@ -1716,10 +1716,10 @@ void OnTxDone(void)
  */
 void OnTxTimeout(void)
 {
-    if(ch_util_tx_start > 0)
     {
-        ch_util_tx_accum += millis() - ch_util_tx_start;
-        ch_util_tx_start = 0;
+        unsigned long _tx_s = ch_util_tx_start.exchange(0);
+        if(_tx_s > 0)
+            ch_util_tx_accum.fetch_add(millis() - _tx_s);
     }
 
     if(bLORADEBUG)

@@ -6,6 +6,8 @@
  *  @author      Ralph Weich (DD5RW)
  *  @date        2025-12-03
  */
+#include <atomic>
+
 extern bool bnextread;
 
 extern int ifalseping;
@@ -188,18 +190,18 @@ extern int ComToPhoneRead;
 extern uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5]; //Ringbuffer for received msg_id deduplication
 extern uint8_t loraWrite;   // counter for ringbuffer
 
-extern volatile bool is_receiving;   // flag to store we are receiving a lora packet.
-extern volatile bool tx_is_active;   // flag to store we are transmitting  a lora packet.
+extern std::atomic<bool> is_receiving;   // flag to store we are receiving a lora packet.
+extern std::atomic<bool> tx_is_active;   // flag to store we are transmitting  a lora packet.
 
 extern int cad_attempt;
 extern unsigned long csma_timeout;
 extern int rx_irq_defer_count;
 
 // Channel utilization tracking (10s window)
-extern volatile unsigned long ch_util_rx_start;
-extern volatile unsigned long ch_util_tx_start;
-extern volatile unsigned long ch_util_rx_accum;
-extern volatile unsigned long ch_util_tx_accum;
+extern std::atomic<unsigned long> ch_util_rx_start;
+extern std::atomic<unsigned long> ch_util_tx_start;
+extern std::atomic<unsigned long> ch_util_rx_accum;
+extern std::atomic<unsigned long> ch_util_tx_accum;
 
 // Trickle-HEY state
 extern unsigned long trickle_interval_ms;       // Aktuelles Intervall (Imin..Imax)

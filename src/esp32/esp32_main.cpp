@@ -1775,10 +1775,8 @@ void esp32loop()
             {
                 unsigned long window = millis() - ch_util_timer;
                 ch_util_timer = millis();
-                unsigned long rx_ms = ch_util_rx_accum;
-                unsigned long tx_ms = ch_util_tx_accum;
-                ch_util_rx_accum = 0;
-                ch_util_tx_accum = 0;
+                unsigned long rx_ms = ch_util_rx_accum.exchange(0);
+                unsigned long tx_ms = ch_util_tx_accum.exchange(0);
                 unsigned int util = (unsigned int)((rx_ms + tx_ms) * 100 / window);
                 if(util > 100) util = 100;
                 Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
@@ -3388,7 +3386,7 @@ int checkRX(bool bRadio)
 
         // RX channel utilization: calculate airtime from packet length
         // (ESP32 has no OnHeaderDetect, so ch_util_rx_start is never set)
-        ch_util_rx_accum += radio.getTimeOnAir(ibytes) / 1000;  // us -> ms
+        ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
 
         OnRxDone(payload, (uint16_t)ibytes, saved_rssi, saved_snr);
     }
@@ -3413,7 +3411,7 @@ int checkRX(bool bRadio)
         }
 
         // RX channel utilization: CRC-failed packet still occupied the channel
-        ch_util_rx_accum += radio.getTimeOnAir(ibytes) / 1000;  // us -> ms
+        ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
 
         // Diagnose-Output: RSSI/SNR + kompletter Payload-Hex-Dump
         if(bLORADEBUG)

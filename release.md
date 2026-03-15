@@ -1,3 +1,36 @@
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix2 (2026-03-15)
+
+Code-Review Fixes: 3 Bugs behoben + Race Conditions in Channel-Utilization beseitigt.
+
+---
+
+## Aenderungen seit v4.35n_prio_v20260315_fix1
+
+### 13. UTC-Offset-Rechenfehler in mheard Path-Anzeige (Bug)
+- **Ursache**: Die Zeitberechnung fuer mheard-Path-Timestamps verwendete `(60 * 60 + 24)` = 3624 statt `3600` Sekunden pro Stunde. Zusaetzlich wurde `node_utcoff` (float, unterstuetzt Halbstunden-Zonen wie UTC+5:30) auf `(int)` gecastet, was die Halbstunden-Praezision verlor.
+- **Auswirkung**: mheard-Path-Zeiten waren je nach UTC-Offset 24s bis ~5min falsch (bei UTC+12). Halbstunden-Zonen (Indien, Nepal) zeigten zusaetzlich 30min Abweichung.
+- **Fix**: Formel an das korrekte Pattern `(long)(meshcom_settings.node_utcoff * 3600.0)` angeglichen, wie es bereits in `loop_functions.cpp` und `web_functions.cpp` an anderen Stellen verwendet wird.
+- **Betroffene Dateien**: `src/mheard_functions.cpp` (2 Stellen), `src/web_functions/web_functions.cpp` (1 Stelle)
+
+### 14. Off-by-One in APRS-Telemetrie-Parsing (Bug)
+- **Ursache**: 15 Parsing-Schleifen in `decodeAPRSPOS()` und der Display-Funktion verwendeten `id <= PayloadBuffer.length()`, was den Zugriff auf Index == length erlaubte (Out-of-Bounds). In 14 der 15 Schleifen wurde `charAt(id)` in der Break-Condition aufgerufen, BEVOR die Bounds-Pruefung `id == PayloadBuffer.length()` griff.
+- **Auswirkung**: Out-of-Bounds-Lesezugriff bei APRS-Paketen, deren Payload genau am Feldende endet (z.B. letztes Feld ohne nachfolgendes `/`). Arduino `charAt()` gibt `\0` zurueck, daher kein Crash, aber undefiniertes Parsing-Verhalten moeglich.
+- **Fix**: `id <= X.length()` durch `id < X.length()` ersetzt in allen 15 Schleifen (13 in `aprs_functions.cpp`, 2 in `loop_functions.cpp`).
+- **Betroffene Dateien**: `src/aprs_functions.cpp`, `src/loop_functions.cpp`
+
+### 15. pow(2,n) durch Bit-Shift ersetzt (Bug)
+- **Ursache**: ADC-Maximalwert wurde mit `pow(2, resolution) - 1` berechnet. `pow()` gibt `double` zurueck, die implizite Konversion zu `int` kann Rundungsfehler verursachen.
+- **Fix**: Ersetzt durch `(1 << resolution) - 1` — schneller, deterministisch, kein Fliesskomma-Risiko.
+- **Betroffene Datei**: `src/batt_functions.cpp`
+
+### 16. Race Conditions: volatile durch std::atomic ersetzt
+- **Ursache**: Die Channel-Utilization-Counter (`ch_util_rx_accum`, `ch_util_tx_accum`) und ISR-Flags (`is_receiving`, `tx_is_active`) waren als `volatile` deklariert. Auf dem nRF52 laufen die Radio-Callbacks (`OnRxDone`, `OnTxDone`, `OnHeaderDetect`) in einem separaten LoRa-Task — dort ist das `+=` Read-Modify-Write-Pattern nicht atomar. `volatile` verhindert nur Compiler-Optimierungen, bietet aber keine Atomizitaetsgarantie auf ARM Cortex.
+- **Auswirkung**: Auf nRF52 konnten Channel-Utilization-Werte durch gleichzeitigen Zugriff von Radio-Task und Main-Loop verfaelscht werden (Lost Updates). Auf ESP32 bestand kein reales Problem (deferred ISR im Main Loop), aber der Code war nicht formal korrekt.
+- **Fix**: `volatile bool` / `volatile unsigned long` durch `std::atomic<bool>` / `std::atomic<unsigned long>` ersetzt. Das `+=`-Pattern wird durch `fetch_add()` + `exchange()` atomar ausgefuehrt. Einfache Reads/Writes (`=`, `==`, `if(...)`) funktionieren mit `std::atomic` transparent weiter.
+- **Betroffene Dateien**: `src/loop_functions_extern.h`, `src/loop_functions.cpp`, `src/lora_functions.cpp` (5 Stellen), `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
+
+---
+
 # Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix1 (2026-03-15)
 
 Bugfix fuer Heltec V2: GPS-Init blockiert serielle Kommandos.
