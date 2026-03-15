@@ -1,3 +1,18 @@
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix3 (2026-03-15)
+
+Heltec V2: GPS-Pins von GPIO 3/23 auf GPIO 12/13 umgelegt.
+
+---
+
+## Aenderungen seit v4.35n_prio_v20260315_fix2
+
+### 17. Heltec V2: GPS-Pins auf GPIO 12/13 umgelegt
+- **Ursache**: Der bisherige Fix (bGPSON-Check) umgeht den Pin-Konflikt nur bei deaktiviertem GPS. Bei aktiviertem GPS belegt GPIO 3 (GPS_TX_PIN = UART0 RX) weiterhin den USB-Serial-Empfang. Auch GPIO 23 (GPS_RX_PIN) ist suboptimal — auf manchen Heltec-V2-Revisionen ist er anderweitig belegt.
+- **Fix**: GPS-Pins auf freie GPIOs umgelegt: `GPS_RX_PIN 13` (ESP32 Input, kein Strapping Pin), `GPS_TX_PIN 12` (ESP32 Output, Strapping Pin MTDI — als Output sicher, da GPS-RX hochohmig ist und beim Boot nicht zieht). UART0 (GPIO 3) bleibt frei fuer serielle Kommandos.
+- **Betroffene Datei**: `variants/heltec_wifi_lora_32_V2/configuration.h`
+
+---
+
 # Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix2 (2026-03-15)
 
 Code-Review Fixes: 3 Bugs behoben + Race Conditions in Channel-Utilization beseitigt.
