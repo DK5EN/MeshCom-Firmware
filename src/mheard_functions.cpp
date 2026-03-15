@@ -566,6 +566,12 @@ void sendMheard()
                 xval = getValue(mhstringdec, '|', 8);
                 mheardLine.mh_path_len = xval.toInt();
 
+                xval = getValue(mhstringdec, '|', 9);
+                mheardLine.mh_mesh = xval.toInt();
+
+                xval = getValue(mhstringdec, '|', 10);
+                mheardLine.mh_ncount = xval.toInt();
+
                 // generate JSON
                 JsonDocument mhdoc;
 
@@ -580,6 +586,8 @@ void sendMheard()
                 mhdoc["SNR"] = mheardLine.mh_snr;
                 mhdoc["DIST"] = mheardLine.mh_dist;
                 mhdoc["PL"] = mheardLine.mh_path_len;
+                mhdoc["MESH"] = mheardLine.mh_mesh;
+                mhdoc["NCNT"] = mheardLine.mh_ncount;
 
                 // send to Phone
                 uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};

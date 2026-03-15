@@ -1,7 +1,19 @@
-# Release Notes -- MeshCom Firmware v4.35n_20260315 (2026-03-15)
+# Release Notes -- MeshCom Firmware v4.35n_20260315_fix1 (2026-03-15)
 
 Bugfixes und Verbesserungen auf Basis von `oe1kbc_v4.35p`. Diese Version
 laeuft als "U-Boot" (Vorab-Test) vor der offiziellen v4.35p.
+
+---
+
+## Aenderungen seit v4.35n_20260315
+
+### GPS_REFRESH_INTERVAL auf 5s zurueckgesetzt
+- Die Aenderung auf 10s war nicht upstream-konform. Zurueck auf 5s um keine unnoetige Differenz zum Upstream zu erzeugen.
+- **Betroffene Datei**: `src/configuration_global.h`
+
+### sendMheard MESH/NCNT Feature uebernommen
+- Kurts Weiterentwicklung in `sendMheard()` uebernommen: Beim BLE-Reconnect sendet die Firmware jetzt auch MESH- und NCNT-Felder (getValue Felder 9+10) im JSON an die Phone-App. Zuvor wurden diese Felder bei uns als Bug geflagged — nach Analyse ist es ein sinnvolles Feature.
+- **Betroffene Datei**: `src/mheard_functions.cpp`
 
 ---
 
