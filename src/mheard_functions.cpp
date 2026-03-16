@@ -227,9 +227,9 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
             }
             else
             {
-                int ivgll = mheardLine.mh_callsign.length();
+                int ivgll= mheardLine.mh_callsign.length();
                 if(strlen(mheardCalls[iset]) > (size_t)ivgll)
-                    ivgll = strlen(mheardCalls[iset]);
+                    ivgll=strlen(mheardCalls[iset]);
 
                 if(memcmp(mheardCalls[iset], mheardLine.mh_callsign.c_str(), ivgll) == 0)
                 {
@@ -246,9 +246,12 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
 
     //Serial.printf("inext:%i ipos:%i\n", inext, ipos);
 
+    bool bNew=false;
+
     if(inext >= 0 && ipos == -1)
     {
         ipos=inext;
+        bNew=false;
     }
     else
     if(inext == -1 && ipos == -1)
@@ -262,20 +265,18 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     }
 
     memset(mheardCalls[ipos], 0x00, sizeof(mheardCalls[ipos]));
-    size_t call_len = mheardLine.mh_callsign.length();
-    if(call_len >= sizeof(mheardCalls[ipos]))
-        call_len = sizeof(mheardCalls[ipos]) - 1;
-    memcpy(mheardCalls[ipos], mheardLine.mh_callsign.c_str(), call_len);
-    
+    size_t len = min(mheardLine.mh_callsign.length(), sizeof(mheardCalls[ipos]) - 1);
+    memcpy(mheardCalls[ipos], mheardLine.mh_callsign.c_str(), len);
+
     mheardEpoch[ipos] = getUnixClock();
-    /*
-    String mh_time;
-    String mh_callsign;
-    uint8_t mh_hw;
-    uint8_t mh_mod;
-    int16_t mh_rssi;
-    int8_t mh_snr;
-    */
+
+    // da bei dem eintreffen von updateMHeard kein NCOUNT dabei ist
+    // wird dieser aus dem bestehenden Tabellen-Wert  mheardNCount[]; ergänzt
+    if(bNew)
+        mheardLine.mh_ncount = 0;
+    else
+        mheardLine.mh_ncount = mheardNCount[ipos];
+
     char cBuffer[60];
     snprintf(cBuffer, sizeof(cBuffer), "%s|%s|%c|%i|%u|%i|%i|%.1lf|%i|%i|%i|", mheardLine.mh_date.c_str(), mheardLine.mh_time.c_str(), mheardLine.mh_payload_type, mheardLine.mh_hw,
      mheardLine.mh_mod, mheardLine.mh_rssi, mheardLine.mh_snr, mheardLine.mh_dist, mheardLine.mh_path_len, mheardLine.mh_mesh, mheardLine.mh_ncount);
@@ -365,6 +366,7 @@ void updateHeyPath(struct mheardLine &mheardLine)
                 }
 
                 //NeighborCount einfügen
+                // check old format
                 int ipos=mheardLine.mh_path_payload.indexOf(";");
 
                 if(bDisplayCont)
@@ -376,7 +378,6 @@ void updateHeyPath(struct mheardLine &mheardLine)
                 {
                     if(bDisplayCont)
                         Serial.println("");
-
                     return;
                 }
 

@@ -423,17 +423,6 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 mheardLine.mh_ncount = 0;
                 mheardLine.mh_path_payload = "";
 
-                if(aprsmsg.payload_type == '@')
-                {
-                    ///////////////////////////////////////////////
-                    // Path
-                    mheardLine.mh_path_payload = aprsmsg.msg_payload;
-
-                    updateHeyPath(mheardLine);
-                    //
-                    ///////////////////////////////////////////////
-                }
-
                 // Mheard immer auch bei Hey
                 {
                     ///////////////////////////////////////////////
@@ -511,6 +500,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     //
                     ///////////////////////////////////////////////
                 }
+
+                if(aprsmsg.payload_type == '@')
+                {
+                    ///////////////////////////////////////////////
+                    // Path
+                    mheardLine.mh_path_payload = aprsmsg.msg_payload;
+
+                    updateHeyPath(mheardLine);
+                    //
+                    ///////////////////////////////////////////////
+                }
+
+
             }
 
             //
