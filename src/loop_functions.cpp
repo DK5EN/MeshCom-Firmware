@@ -2117,7 +2117,7 @@ void printAsciiBuffer(uint8_t *buffer, int len)
 
     for (int i = 0; i < ulen; i++)
     {
-        if(buffer[i] < 0x20 || buffer[i] < 0x7f)
+        if(buffer[i] < 0x20 || buffer[i] > 0x7E)
             Serial.print("#");
         else
             Serial.printf("%c", buffer[i]);
