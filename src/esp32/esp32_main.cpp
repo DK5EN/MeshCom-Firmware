@@ -53,7 +53,7 @@ Timeout timerSerial;
   #endif
 #endif
 
-#if defined (ENABLE_GPS)
+#if defined(ENABLE_GPS)
     #include "gps_functions.h"
     extern GPSData gpsData;
 #endif
@@ -227,7 +227,6 @@ struct BleQueueItem {
 };
 
 static QueueHandle_t bleQueue = NULL;
-static volatile bool connect_pending = false;
 
 NimBLEServer *pServer = NULL;
 NimBLECharacteristic* pTxCharacteristic;
@@ -901,14 +900,7 @@ void esp32setup()
     #endif
     
     #if defined(ENABLE_GPS)
-        if(bGPSON)
-        {
-            GPS_Init();
-        }
-        else
-        {
-            Serial.println("[GPS] disabled by user setting — skipping init");
-        }
+        GPS_Init();
     #else
     
     #if defined(BOARD_T_DECK_PRO)

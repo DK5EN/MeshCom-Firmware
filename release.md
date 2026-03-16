@@ -7,6 +7,36 @@ Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
 
 ---
 
+## Upstream-Sync 2026-03-16 (oe1kbc_v4.35p, zweite Runde)
+
+### SDWrapper entfernt — externe SD-Bibliothek
+- Gesamtes `src/SDWrapper/` Verzeichnis (122 Dateien, ~27.000 Zeilen) entfernt.
+  Upstream verwendet jetzt die externe Library `sdcard_esp32` (GitHub: glucee/sdcard_esp32).
+- T-Deck und T-Deck Plus: Library in `lib_deps` aufgenommen, SDWrapper aus Build-Filter ausgeschlossen.
+- **Betroffene Dateien**: `src/SDWrapper/*` (geloescht), `platformio.ini`, `variants/t_deck/platformio.ini`, `variants/t_deck_plus/platformio.ini`
+
+### BaseDisplay: virtual Destruktor
+- `~BaseDisplay()` auf `virtual ~BaseDisplay()` geaendert — korrekte C++-Praxis fuer polymorphe Klassen.
+- **Betroffene Datei**: `src/Displays/BaseDisplay/base.h`
+
+### APRS: node_atxt direkt verwenden
+- `encodeLoRaAPRS()` verwendete eine temporaere `String`-Variable mit Fallback `"(via MeshCom)"`. Upstream nutzt `meshcom_settings.node_atxt` direkt — spart String-Allokation.
+- **Betroffene Datei**: `src/aprs_functions.cpp`
+
+### ExtUDP: "none" Payload-Check
+- Neue Validierung: JSON-Payload `"none"` wird abgefangen und mit Fehlermeldung abgebrochen.
+- **Betroffene Datei**: `src/extudp_functions.cpp`
+
+### GPS_Init() immer aufrufen
+- `GPS_Init()` wird jetzt ohne `bGPSON`-Check aufgerufen (wie upstream). Unbenutzte Variable `connect_pending` entfernt.
+- **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+
+### serial_monitor.py: Log-Verzeichnis
+- Log-Verzeichnis von `/tmp/meshcom_monitor` auf `./meshcom_monitor` geaendert (upstream-konform).
+- **Betroffene Datei**: `tools/serial_monitor.py`
+
+---
+
 ## strcpy/strcat Buffer-Overflow Hardening (2026-03-16)
 
 Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varianten ersetzt.
@@ -120,10 +150,8 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
 - **Fix**: GPS-Pins auf freie GPIOs umgelegt: `GPS_RX_PIN 13`, `GPS_TX_PIN 12`. UART0 (GPIO 3) bleibt frei fuer serielle Kommandos.
 - **Betroffene Datei**: `variants/heltec_wifi_lora_32_V2/configuration.h`
 
-**GPS-Init blockierte serielle Kommandoeingabe**
-- `GPS_Init()` wurde bedingungslos aufgerufen, ohne den Runtime-Flag `bGPSON` zu pruefen. Die GPS-Baudraten-Erkennung (~8s) belegte GPIO 3 und blockierte den seriellen Empfang dauerhaft.
-- **Fix**: `bGPSON`-Check vor `GPS_Init()`. Log-Ausgabe bei deaktiviertem GPS.
-- **Betroffene Datei**: `src/esp32/esp32_main.cpp`
+**GPS-Init blockierte serielle Kommandoeingabe** (revertiert)
+- Dieser Fix wurde rueckgaengig gemacht: upstream ruft `GPS_Init()` jetzt wieder bedingungslos auf. Siehe Upstream-Sync oben.
 
 ### T-Deck / T-Deck Plus: Boot-Hang durch ungueltige Current-Limit
 

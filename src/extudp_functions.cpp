@@ -158,7 +158,13 @@ void getExtern(unsigned char incoming[], int len)
 
   aprsmsg.msg_destination_path = dst;
   aprsmsg.msg_payload = msg;
-  
+
+  if(aprsmsg.msg_payload == "none")
+  {
+    Serial.println("wrong JSON to send message");
+    return;
+  }
+
   snprintf(val,160, ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
 
   sendMessage(val, strlen(val));

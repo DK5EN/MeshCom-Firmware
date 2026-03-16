@@ -913,7 +913,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Create log directory and file
-    log_dir = "/tmp/meshcom_monitor"
+    log_dir = "./meshcom_monitor"
     os.makedirs(log_dir, exist_ok=True)
     log_name = f"meshcom_{datetime.now():%Y-%m-%d_%H%M%S}.log"
     log_path = os.path.join(log_dir, log_name)
