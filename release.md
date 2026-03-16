@@ -1,6 +1,6 @@
-# Release Notes -- MeshCom Firmware v4.35n_prio_v20260316_fix1 (2026-03-16)
+# Release Notes -- MeshCom Firmware v4.35* (2026-03-16)
 
-Nachrichtenprioritaet (ADR-001 Phase 1), Trickle-HEY, erweiterte Statistik,
+Nachrichtenprioritaet, Trickle-HEY, erweiterte Statistik,
 APRS-Parser Hardening und diverse Bugfixes auf Basis von `oe1kbc_v4.35p`.
 
 Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
@@ -50,7 +50,7 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
 
 ## Neue Features
 
-### Priority-Queue: 5-stufige Nachrichtenprioritaet (ADR-001 Vorschlag A)
+### Priority-Queue: 5-stufige Nachrichtenprioritaet
 - **Problem**: DMs und ACKs standen hinter 5-10 Relay/HEY-Paketen in der FIFO-Queue.
   Bei 50-80% CAD-Busy-Rate fuehrte das zu 10-50s unnoetige Verzoegerung fuer menschliche Nachrichten.
 - **Loesung**: 5 Prioritaetsstufen mit differenziertem CSMA-Backoff:
@@ -84,7 +84,7 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
   `src/loop_functions.cpp`, `src/lora_functions.cpp`,
   `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
 
-### Erweiterte Statistik und Logging (ADR-001 Vorschlag D)
+### Erweiterte Statistik und Logging
 - **[MC-STAT]** alle 5 Minuten: TX-Zaehler pro Prioritaet, Drops pro Prio, Preemption-Zaehler
 - **[MC-PRIO]** alle 5 Minuten: Latenz avg/max pro Prioritaetsstufe (Queue-to-TX)
 - **[MC-HWM]** alle 30 Minuten: Queue/CSMA High-Water-Marks, aktuelles Trickle-Intervall
