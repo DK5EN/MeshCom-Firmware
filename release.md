@@ -1,9 +1,27 @@
-# Release Notes -- MeshCom Firmware v4.35n_prio_v20260315_fix4 (2026-03-15)
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260316 (2026-03-16)
 
 Nachrichtenprioritaet (ADR-001 Phase 1), Trickle-HEY, erweiterte Statistik,
 APRS-Parser Hardening und diverse Bugfixes auf Basis von `oe1kbc_v4.35p`.
 
 Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
+
+---
+
+## Upstream-Sync 2026-03-16 (oe1kbc_v4.35p)
+
+### GPS: Log-Ausgaben nur bei aktiviertem GPS
+- Baudrate-Erkennung und "not found"-Meldungen werden nur noch bei `bGPSON == true` ausgegeben. Reduziert Log-Spam wenn GPS deaktiviert ist.
+- **Betroffene Datei**: `src/gps_functions.cpp`
+
+### MHeard: ncount-Logik korrigiert
+- Bei Nicht-HEY-Paketen (Position, Text) ist kein NCOUNT im Paket enthalten. `updateMheard()` uebernimmt jetzt den bestehenden Tabellenwert `mheardNCount[ipos]` statt den (leeren) Paket-Wert.
+- `updateHeyPath()` wird nach `updateMheard()` aufgerufen, damit der ncount beim Path-Update bereits aktuell ist.
+- **Betroffene Dateien**: `src/mheard_functions.cpp`, `src/lora_functions.cpp`
+
+### NRF52: sendPosition mit vorheriger Position bei Richtungsaenderung
+- Bei `posinfo_shot` (Richtungs-/Distanz-Trigger) wird die Position von `posinfo_prev_lat/lon` gesendet statt der aktuellen GPS-Position — damit wird die Kurve auf der Karte korrekt abgebildet.
+- 15s Mindestabstand zwischen Positions-Sendungen (`posinfo_timer_min`) verhindert Spam.
+- **Betroffene Datei**: `src/nrf52/nrf52_main.cpp`
 
 ---
 
