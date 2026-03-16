@@ -406,18 +406,21 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
             inext++;
         }
 
-        if(inext < rsize && RcvBuffer[inext] == 0x7e)
+        if(inext < rsize)
         {
-            aprsmsg.msg_source_fw_sub_version = '#';
-            inext++;
-        }
-        else if(inext < rsize)
-        {
-            if(RcvBuffer[inext] == 0x00)
+            if(RcvBuffer[inext] == 0x7e)
+            {
                 aprsmsg.msg_source_fw_sub_version = '#';
+                inext++;
+            }
             else
-                aprsmsg.msg_source_fw_sub_version = RcvBuffer[inext];
-            inext++;
+            {
+                if(RcvBuffer[inext] == 0x00)
+                    aprsmsg.msg_source_fw_sub_version = '#';
+                else
+                    aprsmsg.msg_source_fw_sub_version = RcvBuffer[inext];
+                inext++;
+            }
         }
 
         if(inext < rsize)
