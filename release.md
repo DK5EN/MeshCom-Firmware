@@ -1,9 +1,32 @@
-# Release Notes -- MeshCom Firmware v4.35n_prio_v20260316 (2026-03-16)
+# Release Notes -- MeshCom Firmware v4.35n_prio_v20260316_fix1 (2026-03-16)
 
 Nachrichtenprioritaet (ADR-001 Phase 1), Trickle-HEY, erweiterte Statistik,
 APRS-Parser Hardening und diverse Bugfixes auf Basis von `oe1kbc_v4.35p`.
 
 Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
+
+---
+
+## strcpy/strcat Buffer-Overflow Hardening (2026-03-16)
+
+Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varianten ersetzt.
+
+### SSID-Migration: Buffer-Overflow behoben (ESP32 + NRF52)
+- `node_ossid[40]` wurde via `strcpy()` in `node_ssid[33]` kopiert — 7 Byte Overflow in angrenzende Struct-Felder.
+- **Fix**: `strncpy()` mit `sizeof(node_ssid) - 1`.
+- **Betroffene Dateien**: `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
+
+### commandCheck(): unbegrenzter Parameter in 100-Byte Buffer
+- `strcpy(vmsg[100], msg)` ohne Laengenpruefung — `msg` kann beliebig lang sein.
+- **Fix**: `strncpy()` mit `sizeof(vmsg) - 1`.
+- **Betroffene Datei**: `src/command_functions.cpp`
+
+### Display-Text und Serial-Input: Bounds-Checks ergaenzt
+- `pageLastTextLong1[25]` und `pageLastTextLong2[200]`: Source konnte laenger als Buffer sein (3 Plattformen: T-Deck Pro, E290, Tracker).
+- `line_text[21]`: `strcat()`-Schleife ohne Bounds-Check beim ersten Concat.
+- `msg_text[600]`: Serial-Input ohne Laengenpruefung (ESP32 + NRF52).
+- **Fix**: `strncpy()`/`strncat()` mit `sizeof()`.
+- **Betroffene Dateien**: `src/loop_functions.cpp`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
 
 ---
 
