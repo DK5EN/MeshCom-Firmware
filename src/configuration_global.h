@@ -138,18 +138,18 @@
 #define MSG_PRIO_BACKGROUND 5   // HEY (0x40)
 
 // Priority-dependent CSMA base timeouts (ms)
-#define CSMA_PRIO_BASE_1    2000   // ACK/DM
+#define CSMA_PRIO_BASE_1    3000   // ACK/DM
 #define CSMA_PRIO_BASE_2    3000   // Gruppen/Broadcast
-#define CSMA_PRIO_BASE_3    4000   // Relay
-#define CSMA_PRIO_BASE_4    4500   // Position
-#define CSMA_PRIO_BASE_5    5000   // HEY
+#define CSMA_PRIO_BASE_3    4500   // Relay
+#define CSMA_PRIO_BASE_4    5500   // Position
+#define CSMA_PRIO_BASE_5    5500   // HEY
 
 // Priority-dependent CSMA slot ranges
-#define CSMA_PRIO_SLOTS_1   3    // max 105ms Jitter
-#define CSMA_PRIO_SLOTS_2   5    // max 175ms Jitter
-#define CSMA_PRIO_SLOTS_3   8    // max 280ms Jitter
+#define CSMA_PRIO_SLOTS_1   10   // max 350ms Jitter
+#define CSMA_PRIO_SLOTS_2   10   // max 350ms Jitter
+#define CSMA_PRIO_SLOTS_3   10   // max 350ms Jitter
 #define CSMA_PRIO_SLOTS_4   10   // max 350ms Jitter
-#define CSMA_PRIO_SLOTS_5   12   // max 420ms Jitter
+#define CSMA_PRIO_SLOTS_5   10   // max 350ms Jitter
 
 // Trickle-HEY (RFC 6206 adaptiert)
 #define TRICKLE_IMIN_S        30      // Schnellstes HEY-Intervall (30s nach Topologieaenderung)
