@@ -189,6 +189,15 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
 - **Fix**: `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()` um alle Radio.*-Aufrufe
   im Main Loop und `Radio.Send()` in doTX.
 
+**Radio-Watchdog bei leerer TX-Queue (P3)**
+- Wenn die TX-Queue leer ist und keine RX-Aktivitaet vorliegt, wird
+  `iReceiveTimeOutTime` nicht gesetzt. Ohne Timer-Zyklus erkennt der
+  Main Loop nicht, wenn der SX1262 keine Interrupts mehr liefert —
+  unbegrenzte Funkstille moeglich (~46s beobachtet auf OE1KBC-12).
+- **Fix**: `else`-Branch analog zu ESP32 (`esp32_main.cpp:2203-2207`)
+  eingefuegt. Periodischer `Radio.Rx()`-Restart ueber normalen
+  CSMA-Timeout-Zyklus (~5s).
+
 - **Betroffene Dateien**: `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`,
   `src/loop_functions_extern.h`
 
