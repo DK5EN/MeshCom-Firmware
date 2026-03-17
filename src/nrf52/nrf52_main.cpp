@@ -1087,15 +1087,24 @@ extern bool btimeClient;
     }
 
     // Deferred display update from OnRxDone (avoid I2C inside radio callback)
-    if(bPendingDisplayText)
+    // RACE-01 fix: snapshot under critical section, display call outside
     {
-        sendDisplayText(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
-        bPendingDisplayText = false;
-    }
-    if(bPendingDisplayPos)
-    {
-        sendDisplayPosition(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
-        bPendingDisplayPos = false;
+        taskENTER_CRITICAL();
+        bool _pendText = bPendingDisplayText;
+        bool _pendPos = bPendingDisplayPos;
+        struct aprsMessage _msg;
+        int16_t _rssi = 0;
+        int8_t _snr = 0;
+        if(_pendText || _pendPos) {
+            _msg = pendingDisplayMsg;
+            _rssi = pendingDisplayRssi;
+            _snr = pendingDisplaySnr;
+            bPendingDisplayText = false;
+            bPendingDisplayPos = false;
+        }
+        taskEXIT_CRITICAL();
+        if(_pendText) sendDisplayText(_msg, _rssi, _snr);
+        if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
     }
 
     // Channel utilization report (every 10s)

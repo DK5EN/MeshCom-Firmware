@@ -200,6 +200,11 @@ extern volatile bool cad_in_progress;
 extern volatile bool cad_done_flag;
 extern volatile bool cad_double_check;
 
+// RACE-01 fix: spinlock for deferred display update (ISR → main loop)
+#if defined(ESP32)
+extern portMUX_TYPE displayMux;
+#endif
+
 // Channel utilization tracking (10s window)
 extern std::atomic<unsigned long> ch_util_rx_start;
 extern std::atomic<unsigned long> ch_util_tx_start;

@@ -8,6 +8,7 @@
  *  @date        2025-12-03
  */
 #include <Arduino.h>
+#include <atomic>
 #include <configuration.h>
 #include <RadioLib.h>
 
@@ -402,19 +403,19 @@ LLCC68 radio = new Module(LORA_CS, LORA_DIO0, LORA_RST, LORA_DIO1);
 int checkRX(bool bRadio);
 
 // save transmission state between loops
-int transmissionState = RADIOLIB_ERR_UNKNOWN;
+volatile int transmissionState = RADIOLIB_ERR_UNKNOWN;
 
 // flag to indicate that a preamble was not detected
-volatile bool receiveFlag = false;
-volatile bool bEnableInterruptReceive = true;
+std::atomic<bool> receiveFlag{false};
+std::atomic<bool> bEnableInterruptReceive{true};
 
 // flag to indicate if we are after receiving
 unsigned long iReceiveTimeOutTime = 0;
 unsigned long inoReceiveTimeOutTime = 0;
 
 // flag to indicate if we are currently allowed to transmittig
-volatile bool transmittedFlag = false;
-volatile bool bEnableInterruptTransmit = false;
+std::atomic<bool> transmittedFlag{false};
+std::atomic<bool> bEnableInterruptTransmit{false};
 
 // flag to indicate that a packet was detected or CAD timed out
 volatile bool scanFlag = false;
@@ -1742,15 +1743,24 @@ void esp32loop()
         }
 
         // Deferred display update from OnRxDone (avoid I2C inside radio callback)
-        if(bPendingDisplayText)
+        // RACE-01 fix: snapshot under spinlock, display call outside
         {
-            sendDisplayText(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
-            bPendingDisplayText = false;
-        }
-        if(bPendingDisplayPos)
-        {
-            sendDisplayPosition(pendingDisplayMsg, pendingDisplayRssi, pendingDisplaySnr);
-            bPendingDisplayPos = false;
+            portENTER_CRITICAL(&displayMux);
+            bool _pendText = bPendingDisplayText;
+            bool _pendPos = bPendingDisplayPos;
+            struct aprsMessage _msg;
+            int16_t _rssi = 0;
+            int8_t _snr = 0;
+            if(_pendText || _pendPos) {
+                _msg = pendingDisplayMsg;
+                _rssi = pendingDisplayRssi;
+                _snr = pendingDisplaySnr;
+                bPendingDisplayText = false;
+                bPendingDisplayPos = false;
+            }
+            portEXIT_CRITICAL(&displayMux);
+            if(_pendText) sendDisplayText(_msg, _rssi, _snr);
+            if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
         }
 
         // Channel utilization report (every 10s)

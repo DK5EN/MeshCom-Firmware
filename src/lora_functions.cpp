@@ -4,44 +4,44 @@
 #ifdef SX127X
     #include <RadioLib.h>
     extern SX1278 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #ifdef BOARD_E220
     #include <RadioLib.h>
     // RadioModule derived from SX1262 
     extern LLCC68 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #ifdef SX1262X
     #include <RadioLib.h>
     extern SX1262 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #ifdef SX126X
     #include <RadioLib.h>
     extern SX1268 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #if defined(SX1262_E22) || defined(USING_SX1262)
     #include <RadioLib.h>
     extern SX1262 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #ifdef SX1268_E22
     #include <RadioLib.h>
     extern SX1268 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #if defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4)
     #include <RadioLib.h>
     extern SX1262 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #ifdef BOARD_HELTEC_V4
@@ -51,7 +51,7 @@
 #ifdef BOARD_T_ECHO
     #include <RadioLib.h>
     extern SX1262 radio;
-    extern int transmissionState;
+    extern volatile int transmissionState;
 #endif
 
 #if defined(BOARD_T5_EPAPER)
@@ -109,22 +109,47 @@ struct aprsMessage pendingDisplayMsg;
 int16_t pendingDisplayRssi = 0;
 int8_t  pendingDisplaySnr = 0;
 
+// RACE-01 fix: spinlock protects pendingDisplayMsg struct copy between ISR and main loop
+#if defined(ESP32)
+portMUX_TYPE displayMux = portMUX_INITIALIZER_UNLOCKED;
+#endif
+
 // Queue display text update for main loop execution
 static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
+#if defined(ESP32)
+    portENTER_CRITICAL(&displayMux);
+#elif defined(BOARD_RAK4630)
+    taskENTER_CRITICAL();
+#endif
     pendingDisplayMsg = aprsmsg;
     pendingDisplayRssi = rssi;
     pendingDisplaySnr = snr;
     bPendingDisplayText = true;
+#if defined(ESP32)
+    portEXIT_CRITICAL(&displayMux);
+#elif defined(BOARD_RAK4630)
+    taskEXIT_CRITICAL();
+#endif
 }
 
 // Queue display position update for main loop execution
 static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
+#if defined(ESP32)
+    portENTER_CRITICAL(&displayMux);
+#elif defined(BOARD_RAK4630)
+    taskENTER_CRITICAL();
+#endif
     pendingDisplayMsg = aprsmsg;
     pendingDisplayRssi = rssi;
     pendingDisplaySnr = snr;
     bPendingDisplayPos = true;
+#if defined(ESP32)
+    portEXIT_CRITICAL(&displayMux);
+#elif defined(BOARD_RAK4630)
+    taskEXIT_CRITICAL();
+#endif
 }
 
 /**
