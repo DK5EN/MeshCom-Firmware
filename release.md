@@ -130,11 +130,12 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
 - **Problem**: DMs und ACKs standen hinter 5-10 Relay/HEY-Paketen in der FIFO-Queue.
   Bei 50-80% CAD-Busy-Rate fuehrte das zu 10-50s unnoetige Verzoegerung fuer menschliche Nachrichten.
 - **Loesung**: 5 Prioritaetsstufen mit differenziertem CSMA-Backoff:
-  - Prio 1 (Kritisch): ACK + persoenliche DM — CSMA-Backoff 2000ms
-  - Prio 2 (Hoch): Gruppen + Broadcast "*" — CSMA-Backoff 3000ms
-  - Prio 3 (Normal): Mesh-Relay — CSMA-Backoff 4000ms
-  - Prio 4 (Niedrig): Position — CSMA-Backoff 4500ms
-  - Prio 5 (Hintergrund): HEY — CSMA-Backoff 5000ms
+  - Prio 1 (Kritisch): ACK + persoenliche DM — CSMA-Base 3000ms + 0-350ms Jitter
+  - Prio 2 (Hoch): Gruppen + Broadcast "*" — CSMA-Base 3000ms + 0-350ms Jitter
+  - Prio 3 (Normal): Mesh-Relay — CSMA-Base 4500ms + 0-350ms Jitter
+  - Prio 4 (Niedrig): Position — CSMA-Base 5500ms + 0-350ms Jitter
+  - Prio 5 (Hintergrund): HEY — CSMA-Base 5500ms + 0-350ms Jitter
+  - Retry-Reduktion: 2. Versuch -17%, 3. Versuch -33% auf Base-Wert
 - **Prio-Erkennung**: `getMessagePriority()` erkennt Typ via msg_type Byte,
   Relay via `RING_STATUS_DONE`, DM vs Gruppe via `CheckGroup()`.
 - **Prio-Entnahme**: `getNextTxSlot()` scannt den Ring-Buffer nach hoechster Prioritaet.
