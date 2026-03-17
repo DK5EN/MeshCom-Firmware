@@ -179,8 +179,8 @@ unsigned long iReceiveTimeOutTime = 0;
 // CSMA/CA async CAD state
 volatile bool cad_done_flag = false;
 volatile bool cad_channel_busy = false;
-bool cad_in_progress = false;
-bool cad_double_check = false;
+volatile bool cad_in_progress = false;
+volatile bool cad_double_check = false;
 unsigned long cad_start_time = 0;
 
 bool g_meshcom_initialized;
@@ -1142,7 +1142,9 @@ extern bool btimeClient;
                     Serial.printf("[MC-DBG] RX_IRQ_STALE forced restart after %d deferrals\n", rx_irq_defer_count);
                 rx_irq_defer_count = 0;
                 iReceiveTimeOutTime = 0;
+                taskENTER_CRITICAL();
                 Radio.Rx(RX_TIMEOUT_VALUE);
+                taskEXIT_CRITICAL();
                 if(bLORADEBUG)
                 {
                     Serial.printf("[MC-SM] IDLE -> RX_LISTEN rc=0\n");
@@ -1171,8 +1173,10 @@ extern bool btimeClient;
                 cad_done_flag = false;
                 cad_double_check = false;
                 cad_start_time = millis();
+                taskENTER_CRITICAL();
                 Radio.Standby();
                 Radio.StartCad();
+                taskEXIT_CRITICAL();
             }
             else if(cad_done_flag)
             {
@@ -1206,8 +1210,10 @@ extern bool btimeClient;
                     cad_in_progress = true;
                     cad_done_flag = false;
                     cad_start_time = millis();
+                    taskENTER_CRITICAL();
                     Radio.Standby();
                     Radio.StartCad();
+                    taskEXIT_CRITICAL();
                 }
                 else
                 {
@@ -1222,7 +1228,9 @@ extern bool btimeClient;
                             cad_attempt, csma_timeout);
                     }
 
+                    taskENTER_CRITICAL();
                     Radio.Rx(RX_TIMEOUT_VALUE);
+                    taskEXIT_CRITICAL();
                     iReceiveTimeOutTime = millis();
                 }
             }
@@ -1234,7 +1242,9 @@ extern bool btimeClient;
 
                 cad_in_progress = false;
                 cad_done_flag = false;
+                taskENTER_CRITICAL();
                 Radio.Rx(RX_TIMEOUT_VALUE);
+                taskEXIT_CRITICAL();
                 iReceiveTimeOutTime = millis();
             }
         }
