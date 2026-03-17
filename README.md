@@ -71,7 +71,7 @@ Ergebnis: 10-50 Sekunden unnötige Verzögerung für menschliche Nachrichten.
 - **5 Prioritätsstufen** — ACK/DM (Prio 1) bis HEY (Prio 5)
 - **Prio-Erkennung** via `getMessagePriority()`: msg_type, RING_STATUS_DONE (Relay), CheckGroup(dest)
 - **Prio-Entnahme** via `getNextTxSlot()`: scannt Ring-Buffer, waehlt hoechste Prio (FIFO bei gleicher Prio)
-- **Prio-CSMA-Backoff**: 2000ms (ACK/DM) bis 5000ms (HEY), statt einheitlich 4500ms
+- **Prio-CSMA-Backoff**: 3000ms (ACK/DM/Gruppe) bis 5500ms (POS/HEY), statt einheitlich 4500ms
 - **Prio-Drop**: bei voller Queue wird niedrigste Prio verworfen; neues Paket nur eingefuegt wenn hoehere Prio
 - **Trickle-HEY**: adaptives Intervall 30s–15min (RFC 6206), Suppression bei >=2 konsistenten Nachbar-HEYs
 - **Latenz-Tracking**: `ringEnqueueTime[MAX_RING]`, Statistik pro Prio alle 5 Min
@@ -233,11 +233,11 @@ Höhere Priorität = kürzerer Backoff = schnellerer Kanalzugriff:
 
 | Prio | Base-Timeout | Slot-Range | Effektive Wartezeit |
 |------|-------------|------------|---------------------|
-| 1 (ACK/DM) | 2000 ms | 0-3 Slots (105ms) | 2.0 - 2.1s |
-| 2 (Gruppe/*) | 3000 ms | 0-5 Slots (175ms) | 3.0 - 3.2s |
-| 3 (Relay) | 4000 ms | 0-8 Slots (280ms) | 4.0 - 4.3s |
-| 4 (POS) | 4500 ms | 0-10 Slots (350ms) | 4.5 - 4.85s |
-| 5 (HEY) | 5000 ms | 0-12 Slots (420ms) | 5.0 - 5.4s |
+| 1 (ACK/DM) | 3000 ms | 0-10 Slots (350ms) | 3.0 - 3.35s |
+| 2 (Gruppe/*) | 3000 ms | 0-10 Slots (350ms) | 3.0 - 3.35s |
+| 3 (Relay) | 4500 ms | 0-10 Slots (350ms) | 4.5 - 4.85s |
+| 4 (POS) | 5500 ms | 0-10 Slots (350ms) | 5.5 - 5.85s |
+| 5 (HEY) | 5500 ms | 0-10 Slots (350ms) | 5.5 - 5.85s |
 
 ### 4.4 Koexistenz mit alter Firmware
 
@@ -265,25 +265,25 @@ if(iReceiveTimeOutTime == 0 && !bEnableInterruptTransmit)
 
 ```mermaid
 sequenceDiagram
-    participant NEW as Neue Firmware<br/>(Prio-Backoff 2.0s + CAD)
+    participant NEW as Neue Firmware<br/>(Prio-Backoff 3.0s + CAD)
     participant OLD as Alte Firmware<br/>(Blind-Timer 4.5s, kein CAD)
     participant CH as Kanal
 
     Note over CH: Letztes Paket empfangen
 
     rect rgb(200, 230, 255)
-        Note over NEW: t=0: Timer läuft<br/>Prio-1 Backoff: 2.0s
+        Note over NEW: t=0: Timer läuft<br/>Prio-1 Backoff: 3.0s
         Note over OLD: t=0: Timer läuft<br/>RECEIVE_TIMEOUT: 4.5s
     end
 
-    NEW->>NEW: t=2.0s: CAD-Scan → Kanal frei
+    NEW->>NEW: t=3.0s: CAD-Scan → Kanal frei
     NEW->>CH: TX! (Prio-1 Paket)
 
-    Note over OLD: t=2.0s: Hört neues Paket<br/>→ Timer Reset!<br/>iReceiveTimeOutTime = millis()
+    Note over OLD: t=3.0s: Hört neues Paket<br/>→ Timer Reset!<br/>iReceiveTimeOutTime = millis()
 
     CH->>OLD: Paket empfangen
 
-    Note over OLD: t=6.5s: Timer läuft erneut ab<br/>→ Blind senden (kein CAD)
+    Note over OLD: t=7.5s: Timer läuft erneut ab<br/>→ Blind senden (kein CAD)
     OLD->>CH: TX! (ohne Kanalcheck)
 
     Note over NEW,OLD: Koexistenz funktioniert:<br/>Alte FW wird durch empfangene Pakete<br/>natürlich zurückgehalten.<br/>Aber: Sie KOLLIDIERT öfter,<br/>weil sie blind sendet.
@@ -295,7 +295,7 @@ sequenceDiagram
 |----------|-----------|--------|
 | Neue FW sendet während alte wartet | Alte FW hört Paket → Timer-Reset → wartet nochmal 4.5s | Kein Problem |
 | Alte FW Timer läuft ab, Kanal belegt | Alte FW sendet blind → **Kollision!** | Wie bisher — alte FW kollidiert heute schon |
-| Beide Timer laufen gleichzeitig ab | Neue FW sendet nach 2.0s, alte nach 4.5s → zeitversetzt | Neue FW ist 2.5s früher dran |
+| Beide Timer laufen gleichzeitig ab | Neue FW sendet nach 3.0s, alte nach 4.5s → zeitversetzt | Neue FW ist 1.5s früher dran |
 | Kanal leer, beide wollen senden | Neue FW gewinnt immer (kürzerer Timeout) | Korrekt — Update-Anreiz |
 
 **Wichtig:** Die alte Firmware wird **nicht schlechter** als heute. Sie kollidiert heute schon blind — das ändert sich nicht. Die neue Firmware ist einfach **schneller und sicherer dran** dank CAD + kurzerem Prio-Backoff. Das ist ein natürlicher Anreiz zum Update, ohne alte Nodes auszusperren.
@@ -835,7 +835,7 @@ gantt
 | Phase | Beschreibung | Status | On-Air | Risiko |
 |-------|-------------|--------|--------|--------|
 | **1a** | `ringPriority[MAX_RING]` + Prio-Entnahme via `getNextTxSlot()` | **Implementiert** | Nein | Niedrig |
-| **1b** | Prio-abhaengige CSMA-Timeouts (2000–5000ms) | **Implementiert** | Nein | Niedrig |
+| **1b** | Prio-abhaengige CSMA-Timeouts (3000–5500ms) | **Implementiert** | Nein | Niedrig |
 | **1c** | Prio-Drop bei voller Queue (niedrigste Prio zuerst) | **Implementiert** | Nein | Niedrig |
 | **1d** | Trickle-HEY: adaptives Intervall 30s–15min (RFC 6206) | **Implementiert** | Nein | Niedrig |
 | **1e** | [MC-STAT], [MC-PRIO], [MC-HWM], [MC-TRICKLE] Logging | **Implementiert** | Nein | Sehr niedrig |
