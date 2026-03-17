@@ -181,7 +181,7 @@ volatile bool cad_done_flag = false;
 volatile bool cad_channel_busy = false;
 volatile bool cad_in_progress = false;
 volatile bool cad_double_check = false;
-unsigned long cad_start_time = 0;
+volatile unsigned long cad_start_time = 0;
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -322,8 +322,11 @@ void getMacAddr(uint8_t *dmac)
 
 void OnCadDone(bool channelActivityDetected)
 {
+    // RACE-05 fix: atomic flag update under critical section
+    taskENTER_CRITICAL();
     cad_channel_busy = channelActivityDetected;
     cad_done_flag = true;
+    taskEXIT_CRITICAL();
 }
 
 void RadioInit()
@@ -1167,7 +1170,16 @@ extern bool btimeClient;
     {
         if (iWrite != iRead)
         {
-            if(!cad_in_progress && !cad_done_flag)
+            // RACE-05 fix: snapshot CAD flags under critical section,
+            // then act on snapshot values outside the lock
+            taskENTER_CRITICAL();
+            bool _cad_ip = cad_in_progress;
+            bool _cad_df = cad_done_flag;
+            bool _cad_cb = cad_channel_busy;
+            bool _cad_dc = cad_double_check;
+            taskEXIT_CRITICAL();
+
+            if(!_cad_ip && !_cad_df)
             {
                 // Start CAD scan
                 if(bLORADEBUG)
@@ -1178,25 +1190,29 @@ extern bool btimeClient;
                         cad_attempt);
                 }
 
+                taskENTER_CRITICAL();
                 cad_in_progress = true;
                 cad_done_flag = false;
                 cad_double_check = false;
                 cad_start_time = millis();
+                taskEXIT_CRITICAL();
                 taskENTER_CRITICAL();
                 Radio.Standby();
                 Radio.StartCad();
                 taskEXIT_CRITICAL();
             }
-            else if(cad_done_flag)
+            else if(_cad_df)
             {
+                taskENTER_CRITICAL();
                 cad_in_progress = false;
                 cad_done_flag = false;
+                taskEXIT_CRITICAL();
                 if(bLORADEBUG)
-                    Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", cad_channel_busy ? -702 : 0);
+                    Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", _cad_cb ? -702 : 0);
 
-                if(!cad_channel_busy)
+                if(!_cad_cb)
                 {
-                    if(cad_double_check && bLORADEBUG)
+                    if(_cad_dc && bLORADEBUG)
                         Serial.printf("[MC-DBG] CAD_FALSE_POSITIVE\n");
                     // Channel free — transmit
                     if(bLORADEBUG)
@@ -1209,16 +1225,18 @@ extern bool btimeClient;
                     csma_reset();
                     doTX();
                 }
-                else if(!cad_double_check)
+                else if(!_cad_dc)
                 {
                     // First scan busy — double-check
                     if(bLORADEBUG)
                         Serial.printf("[MC-DBG] CAD_BUSY_1 attempt=%d, double-check...\n", cad_attempt);
 
+                    taskENTER_CRITICAL();
                     cad_double_check = true;
                     cad_in_progress = true;
                     cad_done_flag = false;
                     cad_start_time = millis();
+                    taskEXIT_CRITICAL();
                     taskENTER_CRITICAL();
                     Radio.Standby();
                     Radio.StartCad();
@@ -1243,14 +1261,16 @@ extern bool btimeClient;
                     iReceiveTimeOutTime = millis();
                 }
             }
-            else if(cad_in_progress && (millis() - cad_start_time > 100))
+            else if(_cad_ip && (millis() - cad_start_time > 100))
             {
                 // Safety timeout: CadDone never fired
                 if(bLORADEBUG)
                     Serial.printf("[MC-DBG] CAD_SAFETY_TIMEOUT\n");
 
+                taskENTER_CRITICAL();
                 cad_in_progress = false;
                 cad_done_flag = false;
+                taskEXIT_CRITICAL();
                 taskENTER_CRITICAL();
                 Radio.Rx(RX_TIMEOUT_VALUE);
                 taskEXIT_CRITICAL();

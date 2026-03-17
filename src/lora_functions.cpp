@@ -316,14 +316,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     else if(bLORADEBUG)
         Serial.printf("[MC-DBG] RX_BUF_SWITCH buf=%d\n", rxBufIndex);
     Radio.Rx(RX_TIMEOUT_VALUE);
-    // CAD aborted by RX — reset so main loop doesn't deadlock
+    // RACE-05 fix: CAD abort under critical section
+    taskENTER_CRITICAL();
+    bool _cad_was_active = cad_in_progress;
     if(cad_in_progress) {
         cad_in_progress = false;
         cad_done_flag = false;
         cad_double_check = false;
-        if(bLORADEBUG)
-            Serial.printf("[MC-DBG] CAD_ABORT_BY_RX\n");
     }
+    taskEXIT_CRITICAL();
+    if(_cad_was_active && bLORADEBUG)
+        Serial.printf("[MC-DBG] CAD_ABORT_BY_RX\n");
     if(bLORADEBUG)
         Serial.printf("[MC-DBG] RX_RESTART_EARLY src=OnRxDone\n");
 #endif
@@ -1132,11 +1135,14 @@ void OnRxTimeout(void)
 {
     #if defined BOARD_RAK4630
         Radio.Rx(RX_TIMEOUT_VALUE);
+        // RACE-05 fix: CAD abort under critical section
+        taskENTER_CRITICAL();
         if(cad_in_progress) {
             cad_in_progress = false;
             cad_done_flag = false;
             cad_double_check = false;
         }
+        taskEXIT_CRITICAL();
     #endif
 
     if(bLORADEBUG)
@@ -1157,11 +1163,14 @@ void OnRxError(void)
 {
     #if defined BOARD_RAK4630
         Radio.Rx(RX_TIMEOUT_VALUE);
+        // RACE-05 fix: CAD abort under critical section
+        taskENTER_CRITICAL();
         if(cad_in_progress) {
             cad_in_progress = false;
             cad_done_flag = false;
             cad_double_check = false;
         }
+        taskEXIT_CRITICAL();
     #endif
 
     if(bLORADEBUG)
