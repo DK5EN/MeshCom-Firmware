@@ -172,6 +172,26 @@ Alle unsicheren `strcpy()` und `strcat()` Aufrufe durch groessenbegrenzte Varian
 
 ## Bugfixes
 
+### RAK4630: Silent Freeze nach ~14h Betrieb behoben (2026-03-17)
+
+**Race Condition in CSMA/CA State Machine (P1)**
+- Wenn `OnRxDone` waehrend einer laufenden CAD-Operation feuert, ruft der Callback
+  `Radio.Rx()` auf, was die CAD abbricht. Die Flags `cad_in_progress`/`cad_done_flag`
+  werden aber nicht zurueckgesetzt — die State Machine wartet auf ein `OnCadDone` das
+  nie kommt. Ohne Watchdog friert der Node permanent ein (~14h MTBF).
+- **Fix**: CAD-State-Flags in OnRxDone, OnRxTimeout und OnRxError zuruecksetzen.
+  `cad_in_progress` und `cad_double_check` als `volatile` deklariert.
+
+**SPI-Bus-Schutz zwischen Main Loop und Radio Task (P2)**
+- Die SX126x-Arduino Library hat keinen Mutex fuer SPI-Zugriffe. Main Loop
+  (`Radio.Standby/StartCad/Rx`) und Background Task (`RadioBgIrqProcess`)
+  koennen gleichzeitig auf den SPI-Bus zugreifen — SPI-Korruption moeglich.
+- **Fix**: `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()` um alle Radio.*-Aufrufe
+  im Main Loop und `Radio.Send()` in doTX.
+
+- **Betroffene Dateien**: `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`,
+  `src/loop_functions_extern.h`
+
 ### APRS-Parser Hardening
 
 **Source/Destination-Path-Schleifen gegen korrupte Pakete abgesichert**
