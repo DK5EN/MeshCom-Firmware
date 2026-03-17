@@ -266,7 +266,7 @@ uint8_t retryCount[MAX_RING] = {0};
 
 // RINGBUFFER for incomming LoRa RX msg_id
 uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5] = {0};
-uint8_t loraWrite = 0;   // counter for ringbuffer
+std::atomic<uint8_t> loraWrite{0};   // counter for ringbuffer
 
 // RINGBUFFER RAW LoRa RX
 unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5] = {0};
@@ -504,24 +504,25 @@ void addBLECommandBack(char text[UDP_TX_BUF_SIZE])
  */
 void addLoraRxBuffer(unsigned int msg_id, bool bserver)
 {
+    // RACE-03 fix: local copy for atomic index — write buffer content first,
+    // then atomically update index so readers see complete entries
+    uint8_t slot = loraWrite.load();
+
     if(bLORADEBUG)
         Serial.printf("[MC-DBG] RX_DEDUP_ADD msg_id=%08X srv=%d slot=%d/%d\n",
-                      msg_id, bserver, loraWrite, MAX_DEDUP_RING);
+                      msg_id, bserver, slot, MAX_DEDUP_RING);
 
     // byte 0-3 msg_id
-    ringBufferLoraRX[loraWrite][3] = msg_id >> 24;
-    ringBufferLoraRX[loraWrite][2] = msg_id >> 16;
-    ringBufferLoraRX[loraWrite][1] = msg_id >> 8;
-    ringBufferLoraRX[loraWrite][0] = msg_id;
+    ringBufferLoraRX[slot][3] = msg_id >> 24;
+    ringBufferLoraRX[slot][2] = msg_id >> 16;
+    ringBufferLoraRX[slot][1] = msg_id >> 8;
+    ringBufferLoraRX[slot][0] = msg_id;
+    ringBufferLoraRX[slot][4] = bserver ? 1 : 0;
 
-    if(bserver)
-        ringBufferLoraRX[loraWrite][4] = 1;
-    else
-        ringBufferLoraRX[loraWrite][4] = 0;
-
-    loraWrite++;
-    if (loraWrite >= MAX_DEDUP_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
-        loraWrite = 0;
+    uint8_t next = slot + 1;
+    if (next >= MAX_DEDUP_RING)
+        next = 0;
+    loraWrite.store(next);
 }
 
 int checkOwnRx(uint8_t compBuffer[4])

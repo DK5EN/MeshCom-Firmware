@@ -188,7 +188,7 @@ extern int ComToPhoneWrite;
 extern int ComToPhoneRead;
 
 extern uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5]; //Ringbuffer for received msg_id deduplication
-extern uint8_t loraWrite;   // counter for ringbuffer
+extern std::atomic<uint8_t> loraWrite;   // counter for ringbuffer
 
 extern std::atomic<bool> is_receiving;   // flag to store we are receiving a lora packet.
 extern std::atomic<bool> tx_is_active;   // flag to store we are transmitting  a lora packet.
