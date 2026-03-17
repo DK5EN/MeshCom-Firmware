@@ -1319,12 +1319,16 @@ int getNextTxSlot(void)
  */
 static void advanceIReadPastEmpty(void)
 {
-    while(iRead != iWrite && ringBuffer[iRead][0] == 0)
+    // RACE-02 fix: local copies for atomic indices
+    int localRead = iRead.load();
+    int localWrite = iWrite.load();
+    while(localRead != localWrite && ringBuffer[localRead][0] == 0)
     {
-        iRead++;
-        if(iRead >= MAX_RING)
-            iRead = 0;
+        localRead++;
+        if(localRead >= MAX_RING)
+            localRead = 0;
     }
+    iRead.store(localRead);
 }
 
 /**
@@ -1412,7 +1416,12 @@ void addTxRingEntry(const char* source)
         }
     }
 
-    addRingPointer(iWrite, iRead, MAX_RING, "tx");
+    // RACE-02 fix: local copies for atomic-safe ring pointer advance
+    int localWrite = iWrite.load();
+    int localRead = iRead.load();
+    addRingPointer(localWrite, localRead, MAX_RING, "tx");
+    iWrite.store(localWrite);
+    iRead.store(localRead);
 }
 
 /**@brief our Lora TX sequence — priority-based slot selection
