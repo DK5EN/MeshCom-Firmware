@@ -7,6 +7,62 @@ Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
 
 ---
 
+## Race Condition Fixes 2026-03-17
+
+Systematisches Security-Audit hat 10 Race Conditions zwischen ISR- und Main-Loop-Kontext
+identifiziert (siehe `docs/audit-buffer-race-2026-03-17.md`). 5 davon hier behoben:
+
+### RACE-01: ISR Display Queue Spinlock
+- `pendingDisplayMsg` (aprsMessage mit String-Objekten) wurde aus dem OnRxDone-ISR ohne
+  Synchronisation in eine globale Variable kopiert. Main-Loop konnte halb geschriebene
+  Struct lesen → Memory Corruption.
+- **Fix:** portMUX-Spinlock (ESP32) / taskENTER_CRITICAL (NRF52) um Schreib- und Lese-Seite.
+  Display-I2C-Calls bleiben ausserhalb der Critical Section.
+- **Dateien:** `lora_functions.cpp`, `esp32_main.cpp`, `nrf52_main.cpp`, `loop_functions_extern.h`
+
+### RACE-07: ISR Flags auf std::atomic
+- `receiveFlag`, `bEnableInterruptReceive`, `transmittedFlag`, `bEnableInterruptTransmit`
+  waren `volatile bool` — reicht nicht fuer atomare Lese-/Schreiboperationen zwischen ISR
+  und Main-Loop auf Dual-Core ESP32.
+- **Fix:** `std::atomic<bool>` (lock-free auf Xtensa).
+- **Datei:** `esp32_main.cpp`
+
+### RACE-08: transmissionState volatile
+- `transmissionState` war plain `int`, wird aber in ISR gesetzt und im Main-Loop gelesen.
+  Compiler konnte den Wert cachen.
+- **Fix:** `volatile int` + alle 8 extern-Deklarationen angepasst.
+- **Dateien:** `esp32_main.cpp`, `lora_functions.cpp`
+
+### RACE-02: Ring-Buffer-Indizes atomar
+- `iWrite`/`iRead` (TX Ring Buffer) waren plain `int`, von ISR (OnRxDone → addTxRingEntry)
+  und Main-Loop (doTX, advanceIReadPastEmpty) ohne Synchronisation gelesen/geschrieben.
+- **Fix:** `std::atomic<int>` mit Local-Copy-Pattern fuer `addRingPointer`-Kompatibilitaet.
+- **Dateien:** `loop_functions.cpp`, `loop_functions_extern.h`, `lora_functions.cpp`
+
+### RACE-04: RX Double-Buffer Critical Section (NRF52)
+- `rxBufIndex` und `rxBufInUse[]` wurden in OnRxDone ohne Schutz vor re-entrantem ISR
+  modifiziert. Nach `Radio.Rx()` konnte ein neuer OnRxDone den aktuellen Buffer ueberschreiben.
+- **Fix:** `taskENTER_CRITICAL`/`taskEXIT_CRITICAL` um Buffer-Swap und beide Release-Punkte.
+- **Datei:** `lora_functions.cpp`
+
+### RACE-05: CAD State Machine Critical Sections (NRF52)
+- 4 CAD-Flags wurden von 3 verschiedenen ISRs (OnCadDone, OnRxDone, OnRxTimeout/OnRxError)
+  und dem Main-Loop gleichzeitig gelesen/geschrieben. `volatile` allein reicht nicht fuer
+  Multi-Flag-Atomizitaet → Lost-Wakeup-Bugs, inkonsistente Zustandsuebergaenge.
+- **Fix:** Snapshot-Pattern im Main-Loop (alle Flags unter Critical Section lesen, dann
+  ausserhalb handeln). OnCadDone und alle ISR-CAD-Aborts unter Critical Section.
+  `cad_start_time` auf `volatile` geaendert.
+- **Dateien:** `nrf52_main.cpp`, `lora_functions.cpp`
+
+### RACE-03: Dedup-Buffer atomar
+- `loraWrite` war plain `uint8_t`, wird in `addLoraRxBuffer()` geschrieben und indirekt
+  von `is_new_packet()` gelesen (scannt alle Slots per `memcmp`). Torn Writes moeglich.
+- **Fix:** `std::atomic<uint8_t>` mit Local-Copy-Pattern — Buffer-Content wird zuerst
+  geschrieben, dann Index atomar aktualisiert.
+- **Dateien:** `loop_functions.cpp`, `loop_functions_extern.h`
+
+---
+
 ## Upstream-Sync 2026-03-17 (oe1kbc_v4.35p, dritte Runde)
 
 ### GPS-Konsolidierung: esp32_gps → esp32_pmu, GPS_FUNCTIONS entfernt
