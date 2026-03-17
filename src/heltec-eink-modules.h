@@ -19,7 +19,7 @@
 //#include "Displays/GDE029A1/GDE029A1.h"                 // Heltec 2.9" BW V2    - Blue tab
 
 // All-in-one "Wireless Paper" boards
-#include "Displays/DEPG0213BNS800/DEPG0213BNS800.h"         
-#include "Displays/LCMEN2R13EFC1/LCMEN2R13EFC1.h"
+//#include "Displays/DEPG0213BNS800/DEPG0213BNS800.h"
+//#include "Displays/LCMEN2R13EFC1/LCMEN2R13EFC1.h"
 
 #endif

@@ -20,7 +20,7 @@
 SPIClass ethSPI(FSPI);
 #endif
 
-#include "esp32_gps.h"
+#include "esp32_pmu.h"
 #include "esp32_flash.h"
 #include <esp_adc_cal.h>
 
@@ -58,9 +58,6 @@ Timeout timerSerial;
     extern GPSData gpsData;
 #endif
 
-#if defined (GPS_FUNCTIONS)
-    #include "gps_functions.h"
-#endif
 
 // Sensors
 #include "bmx280.h"
@@ -557,7 +554,7 @@ void esp32setup()
     Serial.begin(MONITOR_SPEED);
     
     while (!Serial && !timerSerial.time_over());
-    if (Serial) { for (int i=0;i<10;i++) { Serial.println("."); delay(1000); } } //delay for Terminal connect
+    if (Serial) { for (int i=0;i<5;i++) { Serial.println("."); delay(1000); } } //delay for Terminal connect
 
     #if defined BOARD_T5_EPAPER
         if (psramInit()) {
@@ -902,15 +899,9 @@ void esp32setup()
     #if defined(ENABLE_GPS)
         GPS_Init();
     #else
-    
-    #if defined(BOARD_T_DECK_PRO)
-        #if defined(GPS_FUNCTIONS)
-            setupPMU();
-            beginGPS();
-        #elif defined(BOARD_T5_EPAPER)
-        #else
-            setupPMU();
-        #endif
+
+    #if !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T5_EPAPER)
+        setupPMU();
     #endif
 
     #endif
@@ -2646,12 +2637,6 @@ void esp32loop()
 
             #ifdef BOARD_T_DECK_PRO
                 igps = tdeck_get_gps();
-            #else
-                #if defined (GPS_FUNCTIONS)
-                    igps = loopGPS();
-                #else
-                    igps = getGPS();
-                #endif
             #endif
 
             #endif // ENABLE_GPS

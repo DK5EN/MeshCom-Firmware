@@ -38,12 +38,8 @@
 #include "tft_display_functions.h"
 #endif
 // TinyGPS
-#if defined(ENABLE_GPS)
+#if defined(ENABLE_GPS) || defined(ENABLE_RAK_GPS)
 extern TinyGPSPlus gps;
-#elif defined(ENABLE_RAK_GPS)
-extern TinyGPSPlus gps;
-#else
-extern TinyGPSPlus tinyGPSPlus;
 #endif
 
 bool bnextread=false;

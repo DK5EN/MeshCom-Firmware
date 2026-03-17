@@ -34,17 +34,4 @@ String GPS_GetMaidenhead();  // Maidenhead-Locator (fuer Amateurfunk)
 
 #endif // ENABLE_GPS
 
-#ifdef GPS_FUNCTIONS
-    void switchGPS();
-    bool setupGPS();
-    void stopGPS();
-    unsigned int loopGPS();
- 
-    unsigned int displayInfo();
-    bool GPS_Recovery();
-
-    bool beginGPS();
-
-#endif
-
 #endif

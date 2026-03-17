@@ -1,9 +1,55 @@
-# Release Notes -- MeshCom Firmware v4.35* (2026-03-16)
+# Release Notes -- MeshCom Firmware v4.35* (2026-03-17)
 
 Nachrichtenprioritaet, Trickle-HEY, erweiterte Statistik,
 APRS-Parser Hardening und diverse Bugfixes auf Basis von `oe1kbc_v4.35p`.
 
 Kein On-Air-Change — alte Firmware empfaengt alle Pakete korrekt.
+
+---
+
+## Upstream-Sync 2026-03-17 (oe1kbc_v4.35p, dritte Runde)
+
+### GPS-Konsolidierung: esp32_gps → esp32_pmu, GPS_FUNCTIONS entfernt
+- `esp32_gps.cpp` in `esp32_pmu.cpp` umbenannt — nur noch `setupPMU()` enthalten.
+  Gesamter Legacy-GPS-Code entfernt (~700 Zeilen): u-blox State-Machine (`readGPS()`,
+  `getGPS()`, `checkGPS()`), Auto-Baud-Erkennung, `SFE_UBLOX_GNSS`, HardwareSerial/SoftwareSerial.
+- `esp32_gps.h` durch minimales `esp32_pmu.h` ersetzt (nur `setupPMU()`-Deklaration).
+- `gps_functions.cpp`: `GPS_FUNCTIONS`-Block (~370 Zeilen) geloescht. `TinyGPSPlus gps`
+  ist jetzt die globale Instanz (nicht mehr `extern`). Alle Plattformen nutzen denselben Pfad.
+- `lora_functions.cpp` und `loop_functions.cpp`: `tinyGPSPLus`/`tinyGPSPlus`-Externs
+  durch einheitliches `extern TinyGPSPlus gps` ersetzt.
+- `t-deck-pro/peri_gps.cpp` und `tdeck_pro.cpp`: Eigene `TinyGPSPlus`-Instanzen durch
+  `extern TinyGPSPlus gps` ersetzt (verhindert Duplicate-Symbol-Fehler).
+- `command_functions.cpp`: Tote Variablen `extern int state` / `extern bool bMitHardReset` entfernt.
+- `esp32_main.cpp`: Include auf `esp32_pmu.h` aktualisiert, `GPS_FUNCTIONS`-Bloecke in Setup
+  und Loop entfernt, Serial-Startup-Delay von 10s auf 5s reduziert.
+- Varianten: `//#define GPS_FUNCTIONS` (T-Beam-1W) und `#define GPS_L76K` (T-Deck-Pro) entfernt.
+- **Betroffene Dateien**: `src/esp32/esp32_pmu.cpp` (umbenannt), `src/esp32/esp32_pmu.h` (umbenannt),
+  `src/gps_functions.cpp`, `src/gps_functions.h`, `src/lora_functions.cpp`, `src/loop_functions.cpp`,
+  `src/command_functions.cpp`, `src/esp32/esp32_main.cpp`, `src/t-deck-pro/peri_gps.cpp`,
+  `src/t-deck-pro/tdeck_pro.cpp`, `variants/LilyGo_T-Beam-1W/configuration.h`,
+  `variants/t_deck_pro/configuration.h`
+
+### mh_hw Masking entfernt
+- `mheardLine.mh_hw = aprsmsg.msg_last_hw & 0x7F` entfernte das MSB, das "Last-Sending"
+  Information traegt. Downstream-Konsumenten verloren diese Information.
+- **Fix**: `& 0x7F` entfernt — voller 8-Bit HW-Wert wird gespeichert.
+- **Betroffene Datei**: `src/lora_functions.cpp`
+
+### E-Paper Display-Treiber reduziert
+- 8 unbenutzte Display-Treiber-Verzeichnisse geloescht (DEPG0150, DEPG0154, DEPG0213,
+  DEPG0290BNS75A, GDE029A1, GDEP015OC1, LCMEN2R13EFC1, QYEG0213RWS800).
+- Wireless Paper Includes in `heltec-eink-modules.h` auskommentiert.
+- `DISABLE_SDCARD` Define fuer VisionMasterE290 hinzugefuegt (kein SD-Kartenleser auf diesen Boards).
+- `BaseDisplay/base.h`: SDWrapper-Include und Klassenmember mit `#ifndef DISABLE_SDCARD` geschuetzt.
+- **Betroffene Dateien**: `src/Displays/` (8 Verzeichnisse geloescht), `src/heltec-eink-modules.h`,
+  `src/Platforms/VisionMasterE290/VisionMasterE290.h`, `src/Displays/BaseDisplay/base.h`
+
+### T-Deck / T-Deck Plus: sdcard_esp32 Library entfernt
+- Die upstream hinzugefuegte `sdcard_esp32` Library (glucee) wurde nicht vom Code referenziert und
+  verursachte Build-Fehler (fehlende Framework-Includes fuer FS.h). T-Deck nutzt Standard `<SD.h>`.
+- **Fix**: `sdcard_esp32` aus `lib_deps` entfernt, `-<SDWrapper/*>` Build-Filter entfernt (Verzeichnis existiert nicht mehr).
+- **Betroffene Dateien**: `variants/t_deck/platformio.ini`, `variants/t_deck_plus/platformio.ini`
 
 ---
 

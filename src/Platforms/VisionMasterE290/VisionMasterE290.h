@@ -20,7 +20,10 @@
         #define DEFAULT_SDI             1
         #define DEFAULT_CLK             2
         #define DEFAULT_MISO            33              // Arbitrary, not connected on PCB. Suppress compiler warning.
-        
+
+        // Optimization
+        #define DISABLE_SDCARD                          // Nobody is going to solder an SD Card reader onto these boards
+
         // Paging
         #define DEFAULT_PAGE_HEIGHT     panel_height    // On this platform, these defaults are fixed: there is currently no support for paging
         #define MAX_PAGE_HEIGHT         panel_height
