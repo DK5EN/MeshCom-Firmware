@@ -1727,7 +1727,9 @@ void esp32loop()
                     else if(ringBuffer[i][1] == RING_STATUS_READY) pending++;
                     else retrying++;
                 }
-                int queued = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+                int w = iWrite.load();
+                int r = iRead.load();
+                int queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
                 int dedup_used = 0;
                 for(int i = 0; i < MAX_DEDUP_RING; i++)
                 {
@@ -1737,7 +1739,7 @@ void esp32loop()
                 }
                 Serial.printf("[MC-DBG] RING_STATUS queued=%d pending=%d retrying=%d "
                               "done=%d iW=%d iR=%d dedup=%d/%d\n",
-                              queued, pending, retrying, done, iWrite, iRead,
+                              queued, pending, retrying, done, w, r,
                               dedup_used, MAX_DEDUP_RING);
             }
         }
@@ -1788,7 +1790,6 @@ void esp32loop()
         if((millis() - stat_prio_timer) > (unsigned long)(PRIO_STAT_INTERVAL_S * 1000UL))
         {
             stat_prio_timer = millis();
-            int queued = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
             Serial.printf("[MC-STAT] t=%ds qmax=%d/%d\n",
                 PRIO_STAT_INTERVAL_S, stat_queue_hwm, MAX_RING);
             Serial.printf("  tx: p1=%d p2=%d p3=%d p4=%d p5=%d preempt=%d\n",
@@ -1802,7 +1803,7 @@ void esp32loop()
                 if(stat_tx_count[p] > 0)
                 {
                     uint32_t avg = stat_latency_sum[p] / stat_tx_count[p];
-                    Serial.printf("[MC-PRIO] p%d_lat_avg=%lums p%d_lat_max=%dms p%d_cnt=%d\n",
+                    Serial.printf("[MC-PRIO] p%d_lat_avg=%ums p%d_lat_max=%dms p%d_cnt=%d\n",
                         p, avg, p, stat_latency_max[p], p, stat_tx_count[p]);
                 }
             }
@@ -2081,14 +2082,16 @@ void esp32loop()
             // channel is free
             // nothing was detected
             // do not print anything, it just spams the console
-            if (iWrite != iRead)
+            int _w = iWrite.load();
+            int _r = iRead.load();
+            if (_w != _r)
             {
                 // Debug E: TX_GATE_ENTER
                 if(bLORADEBUG)
                 {
                     Serial.printf("[MC-SM] IDLE -> TX_PREPARE rc=0\n");
                     Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
-                        (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                        (_w >= _r) ? (_w - _r) : (MAX_RING - _r + _w),
                         cad_attempt);
                 }
 
@@ -2167,8 +2170,10 @@ void esp32loop()
                         if(bLORADEBUG)
                         {
                             Serial.printf("[MC-SM] TX_PREPARE -> TX_ACTIVE rc=0\n");
+                            int __w = iWrite.load();
+                            int __r = iRead.load();
                             Serial.printf("[MC-DBG] TX_START qlen=%d\n",
-                                (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite));
+                                (__w >= __r) ? (__w - __r) : (MAX_RING - __r + __w));
                         }
                     }
                     else

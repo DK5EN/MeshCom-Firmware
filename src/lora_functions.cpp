@@ -1351,43 +1351,45 @@ static void advanceIReadPastEmpty(void)
  */
 void addTxRingEntry(const char* source)
 {
+    int w = iWrite.load();
+    int r = iRead.load();
+
     if(bLORADEBUG)
     {
-        uint32_t mid = ((uint32_t)ringBuffer[iWrite][6] << 24) |
-                       ((uint32_t)ringBuffer[iWrite][5] << 16) |
-                       ((uint32_t)ringBuffer[iWrite][4] << 8)  |
-                        (uint32_t)ringBuffer[iWrite][3];
-        int queued = (iWrite >= iRead) ? (iWrite - iRead)
-                                       : (MAX_RING - iRead + iWrite);
+        uint32_t mid = ((uint32_t)ringBuffer[w][6] << 24) |
+                       ((uint32_t)ringBuffer[w][5] << 16) |
+                       ((uint32_t)ringBuffer[w][4] << 8)  |
+                        (uint32_t)ringBuffer[w][3];
+        int queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
         Serial.printf("[MC-DBG] RING_WRITE slot=%d type=%02X status=%02X "
                       "len=%d msg_id=%08X queued=%d/%d src=%s\n",
-                      iWrite, ringBuffer[iWrite][2], ringBuffer[iWrite][1],
-                      ringBuffer[iWrite][0], mid, queued, MAX_RING, source);
+                      w, ringBuffer[w][2], ringBuffer[w][1],
+                      ringBuffer[w][0], mid, queued, MAX_RING, source);
     }
 
     // Assign priority and enqueue timestamp
-    ringPriority[iWrite] = getMessagePriority(iWrite);
-    ringEnqueueTime[iWrite] = millis();
+    ringPriority[w] = getMessagePriority(w);
+    ringEnqueueTime[w] = millis();
 
     // Track queue depth for high-water mark
-    int queued_now = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+    int queued_now = (w >= r) ? (w - r) : (MAX_RING - r + w);
     if(queued_now + 1 > stat_queue_hwm)
         stat_queue_hwm = queued_now + 1;
 
     if(bLORADEBUG)
-        Serial.printf("[MC-DBG] RING_PRIO slot=%d prio=%d\n", iWrite, ringPriority[iWrite]);
+        Serial.printf("[MC-DBG] RING_PRIO slot=%d prio=%d\n", w, ringPriority[w]);
 
     // Priority-aware overflow: when queue is full, drop lowest-priority oldest entry
-    int nextWrite = iWrite + 1;
+    int nextWrite = w + 1;
     if(nextWrite >= MAX_RING) nextWrite = 0;
-    if(nextWrite == iRead && ringBuffer[iRead][0] > 0)
+    if(nextWrite == r && ringBuffer[r][0] > 0)
     {
         // Find the oldest entry of the lowest priority in the queue
-        uint8_t new_prio = ringPriority[iWrite];
+        uint8_t new_prio = ringPriority[w];
         int worst_slot = -1;
         uint8_t worst_prio = 0;
-        int scan = iRead;
-        while(scan != iWrite)
+        int scan = r;
+        while(scan != w)
         {
             if(ringBuffer[scan][0] > 0 && ringPriority[scan] > worst_prio)
             {
@@ -1416,15 +1418,15 @@ void addTxRingEntry(const char* source)
         else
         {
             // New packet is same or lower priority than everything in queue — drop it
-            uint32_t lost_id = ((uint32_t)ringBuffer[iWrite][6] << 24) |
-                               ((uint32_t)ringBuffer[iWrite][5] << 16) |
-                               ((uint32_t)ringBuffer[iWrite][4] << 8)  |
-                                (uint32_t)ringBuffer[iWrite][3];
+            uint32_t lost_id = ((uint32_t)ringBuffer[w][6] << 24) |
+                               ((uint32_t)ringBuffer[w][5] << 16) |
+                               ((uint32_t)ringBuffer[w][4] << 8)  |
+                                (uint32_t)ringBuffer[w][3];
             Serial.printf("[MC-DBG] RING_DROP_NEW slot=%d prio=%d type=%02X "
                           "msg_id=%08X (queue full, no lower prio to evict)\n",
-                          iWrite, new_prio, ringBuffer[iWrite][2], lost_id);
+                          w, new_prio, ringBuffer[w][2], lost_id);
             stat_drop_count[new_prio]++;
-            ringBuffer[iWrite][0] = 0; // Don't enqueue
+            ringBuffer[w][0] = 0; // Don't enqueue
             return; // Don't advance write pointer
         }
     }
@@ -1459,7 +1461,7 @@ bool doTX()
         }
 
         // Track preemption (out-of-order send)
-        if(txSlot != iRead)
+        if(txSlot != iRead.load())
             stat_preempt_count++;
 
         sendlng = ringBuffer[txSlot][0];
@@ -1480,8 +1482,9 @@ bool doTX()
                               ((uint32_t)ringBuffer[txSlot][5] << 16) |
                               ((uint32_t)ringBuffer[txSlot][4] << 8)  |
                                (uint32_t)ringBuffer[txSlot][3];
-            int queued = (iWrite >= iRead) ? (iWrite - iRead)
-                                           : (MAX_RING - iRead + iWrite);
+            int tw = iWrite.load();
+            int tr = iRead.load();
+            int queued = (tw >= tr) ? (tw - tr) : (MAX_RING - tr + tw);
             Serial.printf("[MC-DBG] RING_TX_READ slot=%d prio=%d type=%02X status=%02X "
                           "len=%d msg_id=%08X retry=%d queued=%d/%d lat=%lums\n",
                           txSlot, prio, ringBuffer[txSlot][2], ringBuffer[txSlot][1],

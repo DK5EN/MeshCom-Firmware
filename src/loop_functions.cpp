@@ -2449,8 +2449,9 @@ void sendMessage(char *msg_text, int len)
 
     if(bDisplayRetx)
     {
-        unsigned int ring_msg_id = (ringBuffer[iWrite][6]<<24) | (ringBuffer[iWrite][5]<<16) | (ringBuffer[iWrite][4]<<8) | ringBuffer[iWrite][3];
-        Serial.printf("einfügen retid:%i status:%02X lng;%02X msg-id: %c-%08X\n", iWrite, ringBuffer[iWrite][1], ringBuffer[iWrite][0], ringBuffer[iWrite][2], ring_msg_id);
+        int w = iWrite.load();
+        unsigned int ring_msg_id = (ringBuffer[w][6]<<24) | (ringBuffer[w][5]<<16) | (ringBuffer[w][4]<<8) | ringBuffer[w][3];
+        Serial.printf("einfügen retid:%i status:%02X lng;%02X msg-id: %c-%08X\n", w, ringBuffer[w][1], ringBuffer[w][0], ringBuffer[w][2], ring_msg_id);
     }
 
     retryCount[iWrite] = 0;

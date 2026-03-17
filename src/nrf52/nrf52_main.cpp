@@ -1083,9 +1083,11 @@ extern bool btimeClient;
                 else if(ringBuffer[i][1] == 0x00) pending++;
                 else retrying++;
             }
-            int queued = (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite);
+            int w = iWrite.load();
+            int r = iRead.load();
+            int queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
             Serial.printf("[MC-DBG] RING_STATUS queued=%d pending=%d retrying=%d done=%d iW=%d iR=%d\n",
-                queued, pending, retrying, done, iWrite, iRead);
+                queued, pending, retrying, done, w, r);
         }
     }
 
@@ -1168,7 +1170,9 @@ extern bool btimeClient;
 
     if(iReceiveTimeOutTime == 0 && is_receiving == false && tx_is_active == false)
     {
-        if (iWrite != iRead)
+        int _w = iWrite.load();
+        int _r = iRead.load();
+        if (_w != _r)
         {
             // RACE-05 fix: snapshot CAD flags under critical section,
             // then act on snapshot values outside the lock
@@ -1186,7 +1190,7 @@ extern bool btimeClient;
                 {
                     Serial.printf("[MC-SM] IDLE -> TX_PREPARE rc=0\n");
                     Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
-                        (iWrite >= iRead) ? (iWrite - iRead) : (MAX_RING - iRead + iWrite),
+                        (_w >= _r) ? (_w - _r) : (MAX_RING - _r + _w),
                         cad_attempt);
                 }
 
