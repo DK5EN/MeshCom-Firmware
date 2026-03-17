@@ -298,23 +298,23 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
     uint16_t rxSize = (size <= UDP_TX_BUF_SIZE) ? size : UDP_TX_BUF_SIZE;
 
-    // Naechsten freien Buffer waehlen
+    // RACE-04 fix: critical section around double-buffer swap to prevent
+    // re-entrant ISR from corrupting buffer state
+    taskENTER_CRITICAL();
     uint8_t nextBuf = (rxBufIndex + 1) % 2;
-    if(rxBufInUse[nextBuf])
-    {
-        // Beide Buffer belegt -- muss ueberschreiben
-        Serial.printf("[MC-DBG] RX_BUF_OVERWRITE buf=%d (still in use)\n", nextBuf);
-    }
-    else if(bLORADEBUG)
-    {
-        Serial.printf("[MC-DBG] RX_BUF_SWITCH buf=%d->%d\n", rxBufIndex, nextBuf);
-    }
-
+    bool _overwrite = rxBufInUse[nextBuf];
     rxBufIndex = nextBuf;
     rxBufInUse[rxBufIndex] = true;
     memcpy(rxPayloadCopy[rxBufIndex], payload, rxSize);
     payload = rxPayloadCopy[rxBufIndex];
     size = rxSize;
+    taskEXIT_CRITICAL();
+
+    // Debug logging outside critical section
+    if(_overwrite)
+        Serial.printf("[MC-DBG] RX_BUF_OVERWRITE buf=%d (still in use)\n", rxBufIndex);
+    else if(bLORADEBUG)
+        Serial.printf("[MC-DBG] RX_BUF_SWITCH buf=%d\n", rxBufIndex);
     Radio.Rx(RX_TIMEOUT_VALUE);
     // CAD aborted by RX — reset so main loop doesn't deadlock
     if(cad_in_progress) {
@@ -342,7 +342,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     if(handleACK(payload, size, rssi, snr))
     {
 #if defined BOARD_RAK4630
+        taskENTER_CRITICAL();
         rxBufInUse[rxBufIndex] = false;
+        taskEXIT_CRITICAL();
 #endif
         is_receiving = false;
 
@@ -1112,7 +1114,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     csma_timeout = csma_compute_timeout(cad_attempt);
 
 #if defined BOARD_RAK4630
+    taskENTER_CRITICAL();
     rxBufInUse[rxBufIndex] = false;
+    taskEXIT_CRITICAL();
     if(bLORADEBUG)
         Serial.printf("[MC-DBG] RX_BUF_RELEASE buf=%d\n", rxBufIndex);
 #endif
