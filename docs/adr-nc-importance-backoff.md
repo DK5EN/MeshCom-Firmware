@@ -1,4 +1,4 @@
-# ADR: Netzwichtigkeits-basierter Relay-Backoff (NC-Importance)
+# ADR 02: Netzwichtigkeits-basierter Relay-Backoff (NC-Importance)
 
 **Status:** Draft
 
