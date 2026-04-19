@@ -2,6 +2,34 @@
 
 
 
+## Upstream-Sync 2026-04-19 (oe1kbc_v4.35p)
+
+Rebase auf aktuellen upstream (HEAD b531a17). Neue Aenderungen aus upstream:
+- v4.35p t_echo (f79df08)
+- v4.35p wireless_tracker (2648c7d)
+- v4.35p SX1262 min power -9dBm -- 27 variant configs angepasst (546ad01)
+- v4.35p heltec_t114 corr -- Duplikat [nrf52] Section entfernt (fd1cbd3)
+- v4.35p.04.19 -- E22-DevKitC/E22_1262/ttgo-lora32-v21 lib_ignore erweitert, GPS am E22_1262 deaktiviert (41a2d88)
+- v4.35p.04.19 -- nrf52 onebutton + loop_functions Anpassungen (bbcff2f)
+- v4.35p.04.19 -- nrf52_functions Korrekturen (c114322)
+- v4.35p.04.19 -- command_functions Korrekturen (b531a17)
+
+Unsere uebernommenen Commits: 1 -- unser T114/RAK4631-Fix (00b166e) wurde von upstream in fd1cbd3 adaptiert und beim Rebase automatisch weggelassen.
+
+### Bekanntes Problem: E22-DevKitC DRAM Overflow
+
+Der Build fuer `E22-DevKitC` (AZ-Delivery DevKit V4, SX1268) schlaegt auf diesem Upstream-Stand mit 40 Byte DRAM-Overflow fehl:
+
+```
+ld: region `dram0_0_seg' overflowed by 40 bytes
+```
+
+Reproduzierbar auf reinem upstream/oe1kbc_v4.35p ohne unsere Commits -- **Upstream-Defekt**, nicht durch unser Patchset verursacht. Ursache sind die zusaetzlichen statischen Allokationen aus 546ad01 (SX1262 Power-Range) und 41a2d88 (E22 lib_ignore/GPS Aenderungen), die den klassischen ESP32 (nicht-S3) DRAM ueberschreiten.
+
+Betroffen ist nur `E22-DevKitC`. Alle anderen 6 Standardtargets (Heltec V3, T-Beam, T-Beam Supreme, T-Deck, T-Deck Plus, WisBlock RAK4631) bauen sauber.
+
+---
+
 ## Upstream-Sync 2026-04-17 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD 95bd4c4). Neue Aenderungen aus upstream:
