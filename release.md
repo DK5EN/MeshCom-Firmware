@@ -2,6 +2,16 @@
 
 
 
+## Upstream-Sync 2026-05-09 (oe1kbc_v4.35p)
+
+Rebase auf aktuellen upstream (HEAD aa457d8). Neue Aenderungen aus upstream:
+- v4.35p.04.08 mh distance (760c368)
+- v4.35p.04.08 mh corr (aa457d8)
+
+Unsere uebernommenen Commits: keine.
+
+---
+
 ## Upstream-Sync 2026-04-19 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD b531a17). Neue Aenderungen aus upstream:
