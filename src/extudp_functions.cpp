@@ -340,10 +340,18 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     return;
   }
 
+  // ESP32 Loop-Task-Stack = 8 KB → 1000 B auf Stack ok.
+  // nRF52 Loop-Task-Stack = 4 KB → BSS, sonst Stack-Overflow Crash bei
+  // sendPosition → sendExtern (siehe Commit 1951aa7d, fix RAK4631).
+#ifdef ESP32
+  char c_json[500] = {0};
+  char c_tjson[500] = {0};
+#else
   static char c_json[500];
   static char c_tjson[500];
   memset(c_json, 0, sizeof(c_json));
   memset(c_tjson, 0, sizeof(c_tjson));
+#endif
 
   char escape_symbol[3];
   char escape_group[3];
