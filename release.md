@@ -2,6 +2,34 @@
 
 
 
+## Upstream-Sync 2026-05-17 (dev)
+
+Wechsel des Upstream-Targets von `oe1kbc_v4.35p` auf `dev`. Hintergrund: Upstream hat
+nahezu alle Versions-Branches geloescht und entwickelt jetzt aktiv auf `dev`, in das
+sowohl `oe1kbc_v4.35p` als auch der neue `oe1kbc_tls` Branch gemerged wurden.
+`oe1kbc_v4.35p` ist nun in `dev` enthalten und liegt 19 Commits zurueck.
+
+Rebase auf aktuellen upstream/dev (HEAD 9c9e1908). Neue Aenderungen aus upstream:
+- v4.35p tlsconsole + iram reduction (67311a4c)
+- Lazy ssl_context allocation -- Heap-Reduktion auf Low-RAM Nodes (e6ce9f20, von DH1FR)
+- v4.35p tls disable (431cbb1f)
+- DISABLE_TLS_CONSOLE Guard fuer Low-RAM Boards (E22_XML-DevKitC) (0972ec73, von DH1FR)
+- v4.35p tls_console excl. on xml (e637fa65)
+- Fix: guard tlsConsoleSetPassword calls with #ifdef ESP32 (nRF52 build) (d2ff12b7)
+- Fix: use auto& for s_hwSerial to support USBCDC on ESP32-S3/S2/C3 (309796d0)
+- Rename Telnet -> TLS-Console: tls_console.cpp/.h, --tlsconsole cmd, --passwd none/status
+- Fix --telnet command: status query, prevent match against --tel telemetry handler
+- v4.35p code review (01d55b71)
+- v4.35p checkmesh (2083fdbd)
+
+Unsere uebernommenen Commits: keine.
+
+Konflikt-Aufloesung: Trivialer Whitespace-Konflikt in `platformio.ini` (Zeilenaufteilung
+der NimBLE-Flags `-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4` / `-Wall -Wextra`).
+Saubere zweizeilige Form uebernommen, Inhalt identisch.
+
+---
+
 ## Upstream-Sync 2026-05-09 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD aa457d8). Neue Aenderungen aus upstream:
