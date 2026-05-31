@@ -2,6 +2,26 @@
 
 
 
+## Upstream-Sync 2026-05-31 (dev)
+
+Rebase auf aktuellen upstream/dev (HEAD eba328b4). Neue Aenderungen aus upstream:
+- v4.35p web_function (4a0fe3e2) -- Labels "APRS Symbol" und "APRS Group" in der
+  Web-Setup-Seite (`web_functions.cpp`, `sub_page_setup`) vertauscht; reine
+  UI-Korrektur, keine Logik-Aenderung.
+
+Unsere uebernommenen Commits: keine. Alle 14 lokalen Commits wurden sauber
+appliziert, keine Konflikte, kein `.load()/.store()`-Mismatch.
+
+Hinweis: Die Merge-Commits #957-#960 (WebService fix, netconsole stop,
+no log_functions, RAK SSID weg) waren bereits ueber den 05-25 Rebase auf
+v4.35p.05.23 in unserem Branch enthalten; einzig `web_function` ist neu.
+
+Build-Test vor dem Push: `heltec_wifi_lora_32_V3` (ESP32) und `wiscore_rak4631`
+(nRF52) erfolgreich kompiliert -- beide Zweige der plattformbedingten
+`sendExtern`-Pufferallokation abgedeckt.
+
+---
+
 ## Upstream-Sync 2026-05-17 (dev)
 
 Wechsel des Upstream-Targets von `oe1kbc_v4.35p` auf `dev`. Hintergrund: Upstream hat
