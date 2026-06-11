@@ -2,6 +2,32 @@
 
 
 
+## Upstream-Sync 2026-06-11 (dev)
+
+Rebase auf aktuellen upstream/dev (HEAD 871da1ad). Grosser Sync mit umfangreichen
+Source-Aenderungen (59 Dateien, +4077/-1629). Neue Aenderungen aus upstream:
+- via/routing-Ueberarbeitung -- mehrere Commits "v4.35p via/routing" und
+  "routing, optical" (`via_functions.cpp/.h`, `loop_functions.cpp`,
+  `lora_functions.cpp`, `udp_functions.cpp`).
+- Neues Debug-Modul printfdeb -- `printfdeb_functions.cpp/.h` (printlndeb,
+  printdeb, printfdeb), CSV/Manual de/en.
+- Netconsole ohne USB/WiFi -- Panic/Reboot verhindern, wenn Netconsole ohne
+  WiFi-Verbindung laeuft (`net_console.cpp`); Nutzung ohne Gateway/Webserver.
+- batt_function -- Batterie ohne Akku (0V -> 100%), Korrektur ESP32-E22-PCB BATT,
+  Wireless-Paper BATT-Messung (`esp32_pmu.cpp`, `batt_functions.cpp`).
+- web_functions -- Fix doppelte HTML-Element-ID im Web-Interface (#998),
+  web_functions Updates (`web_functions.cpp`, `web_setup.cpp`).
+- Heltec Wireless Paper Variante (E0213A367, HW-ID 57) -- neue Variante auf
+  dev-Basis, 24 Commits (E-Ink-Tuning, Boot-Screen, GPS/Track-Seiten,
+  Batterie-Skalierung, TCXO via DIO3); betrifft uns nur ueber gemeinsame Dateien.
+- Weiteres: S3/T3 1.3 Support, Download-Tool, README HW-Update, safeboot.bin.
+
+Unsere uebernommenen Commits: keine. Alle 16 lokalen Commits sauber appliziert.
+Einziger Konflikt: `FLASH_VERSION` in `configuration_global.h` -- auf upstream-Wert
+20260608 aufgeloest (wird ohnehin erst beim Build gesetzt). Kein
+`.load()/.store()`-Mismatch. Unser einziger Source-Delta bleibt
+`extudp_functions.cpp` (sendExtern-Fix, +10) und `platformio.ini`.
+
 ## Upstream-Sync 2026-05-31 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD eba328b4). Neue Aenderungen aus upstream:
