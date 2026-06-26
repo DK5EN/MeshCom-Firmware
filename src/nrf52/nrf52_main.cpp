@@ -1165,7 +1165,7 @@ void nrf52loop()
         // every 15 minutes
         if(btimeClient)
         {
-            if((updateTimeClient + 1000 * 60 * 15) < millis() || updateTimeClient == 0)
+            if((uint32_t)(millis() - updateTimeClient) >= (uint32_t)(1000 * 60 * 15) || updateTimeClient == 0)
             {
                 strTime = neth.udpUpdateTimeClient();
 
@@ -1229,7 +1229,7 @@ void nrf52loop()
     // Retransmission status must tick on ALL nodes (including gateways).
     // Without this, gateway text messages stay stuck at RING_STATUS_SENT
     // forever if no echo is received via LoRa (RING_ZOMBIE).
-    if ((retransmit_timer + (1000 * 2)) < millis())
+    if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
     {
         updateRetransmissionStatus();
 
@@ -1302,7 +1302,7 @@ void nrf52loop()
 
     if(iReceiveTimeOutTime > 0)
     {
-        if((iReceiveTimeOutTime + csma_timeout) < millis())
+        if((uint32_t)(millis() - iReceiveTimeOutTime) >= (uint32_t)csma_timeout)
         {
             if(bLORADEBUG)
                 Serial.printf("[MC-DBG] RX_TIMEOUT_FIRE ts=%lu wait=%lu delta=%lu\n",
@@ -1481,7 +1481,7 @@ void nrf52loop()
     if(bSOFTSERON)
     {
         // check every 5 seconds to ready next telemetry via serial interface
-        if ((softser_refresh_timer + 5000) < millis() && softserFunktion == 0)
+        if ((uint32_t)(millis() - softser_refresh_timer) >= 5000 && softserFunktion == 0)
         {
             if(lastSOFTSER_MINUTE != meshcom_settings.node_date_minute)
             {
@@ -1531,7 +1531,7 @@ void nrf52loop()
 
     #if defined(ENABLE_MCP23017)
     // 5 sec
-    if ((mcp_refresh_timer + 5000) < millis())
+    if ((uint32_t)(millis() - mcp_refresh_timer) >= 5000)
     {
         // get i/o state
         if(loopMCP23017())
@@ -1566,7 +1566,7 @@ void nrf52loop()
         if(bGPSON)
         {
             // gps refresh every 10 sec
-            if ((gps_refresh_timer + (GPS_REFRESH_INTERVAL * 1000)) < millis())
+            if ((uint32_t)(millis() - gps_refresh_timer) >= (uint32_t)(GPS_REFRESH_INTERVAL * 1000))
             {
                 unsigned int igps = getGPS();
 
@@ -1591,7 +1591,7 @@ void nrf52loop()
         if(bGPSON)
         {
             // gps refresh every sec
-            if ((gps_refresh_timer + 1000) < millis())
+            if ((uint32_t)(millis() - gps_refresh_timer) >= 1000)
             {
                 unsigned int igps = POSINFO_INTERVAL;
 
@@ -1651,7 +1651,7 @@ void nrf52loop()
         if(bGPSON)
         {
             // check GPS ON and activ --> <gKeyNum == 2> the signal must be active
-            if ((gps_refresh_timer + (5 * (GPS_REFRESH_INTERVAL * 1000))) < millis())
+            if ((uint32_t)(millis() - gps_refresh_timer) >= (uint32_t)(5 * (GPS_REFRESH_INTERVAL * 1000)))
             {
                 posinfo_fix = false;
                 posinfo_satcount = 0;
@@ -1691,7 +1691,7 @@ void nrf52loop()
         else
         {
             // wait after BLE Connect 3 sec.
-            if(millis() < config_to_phone_prepare_timer + 3000)
+            if((uint32_t)(millis() - config_to_phone_prepare_timer) < 3000)
                 iPhoneState = 0;
 
             if (iPhoneState > 3)   // only every 6 times of mainloop send to phone  RAK 2 x ESP
@@ -1722,7 +1722,7 @@ void nrf52loop()
         }
 
         // 5 minuten
-        if((config_to_phone_datetime_timer + (5 * 60 * 1000)) < millis())
+        if((uint32_t)(millis() - config_to_phone_datetime_timer) >= (5 * 60 * 1000))
         {
             bNTPDateTimeValid=false;
 
@@ -1735,7 +1735,7 @@ void nrf52loop()
     if(ncnt_hold != incnt)
     {
         // minimal alle 60 sec
-        if((posinfo_timer_min + 60000) < millis())
+        if((uint32_t)(millis() - posinfo_timer_min) >= 60000)
         {
             posinfo_shot = true;
             ncnt_hold = incnt;
@@ -1747,10 +1747,10 @@ void nrf52loop()
     //Serial.printf(" posinfo_timer:%ld posinfo_interval:%ld timer:%ld millis:%ld\n", posinfo_timer, posinfo_interval, (posinfo_timer + (posinfo_interval * 1000)), millis());
 
     // posinfo_interval in Seconds
-    if (((posinfo_timer + (posinfo_interval * 1000)) < millis()) || (millis() > 100000 && millis() < 130000 && bPosFirst) || posinfo_shot)
+    if (((uint32_t)(millis() - posinfo_timer) >= (uint32_t)(posinfo_interval * 1000)) || (millis() > 100000 && millis() < 130000 && bPosFirst) || posinfo_shot)
     {
         // minimal transmit time only max 30 sec
-        if((posinfo_timer_min + 30000) < millis())
+        if((uint32_t)(millis() - posinfo_timer_min) >= 30000)
         {
             if(bDisplayInfo)
             {
@@ -1826,7 +1826,7 @@ void nrf52loop()
     }
 
     // Trickle-HEY: adaptive interval (RFC 6206)
-    if (((heyinfo_timer + trickle_interval_ms) < millis()) || bHeyFirst)
+    if (((uint32_t)(millis() - heyinfo_timer) >= trickle_interval_ms) || bHeyFirst)
     {
         bHeyFirst = false;
 
@@ -1869,7 +1869,7 @@ void nrf52loop()
     if(iNextTelemetry < 5)
         akt_timer= 15 * 1000; // 15 Seconds PARM, UNIT, EQNS and 1st T-Message
 
-    if (((telemetry_timer + akt_timer) < millis()) || bHeyFirst)
+    if (((uint32_t)(millis() - telemetry_timer) >= (uint32_t)akt_timer) || bHeyFirst)
     {
         bHeyFirst = false;
         
@@ -1913,7 +1913,7 @@ void nrf52loop()
             meshcom_settings.node_last_upd_timer = neth.last_upd_timer;
             
             // check HB response (we also check successful sending KEEP. check if they work together!)
-            if((neth.last_upd_timer + (MAX_HB_RX_TIME * 1000)) < millis())
+            if((uint32_t)(millis() - neth.last_upd_timer) >= (uint32_t)(MAX_HB_RX_TIME * 1000))
             {
                 if(bDEBUG)
                     Serial.println("LOOP GATEWAY last_upd_timer actions");
@@ -1947,7 +1947,7 @@ void nrf52loop()
             }
             
             // DHCP refresh
-            if ((dhcp_timer + (DHCP_REFRESH * 60000)) < millis())
+            if ((uint32_t)(millis() - dhcp_timer) >= (uint32_t)(DHCP_REFRESH * 60000))
             {
                 if(neth.hasETHHardware)
                 {
@@ -1972,7 +1972,7 @@ void nrf52loop()
     #if defined(SHTC3)
 
     // TEMP/HUM
-    if (((temphum_timer + TEMPHUM_INTERVAL) < millis()))
+    if (((uint32_t)(millis() - temphum_timer) >= TEMPHUM_INTERVAL))
     {
         if(shtc3_found)
             getTEMP();
@@ -1987,7 +1987,7 @@ void nrf52loop()
     if(bLPS33)
     {
         // DRUCK
-        if (((druck_timer + DRUCK_INTERVAL) < millis()))
+        if (((uint32_t)(millis() - druck_timer) >= DRUCK_INTERVAL))
         {
             getPRESSURE();
 
@@ -2045,7 +2045,7 @@ void nrf52loop()
     if(BattTimeWait == 0)
         BattTimeWait = millis() - 31000;
 
-    if ((BattTimeWait + 30000) < millis())
+    if ((uint32_t)(millis() - BattTimeWait) >= 30000)
     {
         if (tx_is_active == false && is_receiving == false)
         {
@@ -2063,7 +2063,7 @@ void nrf52loop()
         if (heapMonTimer == 0)
             heapMonTimer = millis();
 
-        if ((heapMonTimer + 60000) < millis())
+        if ((uint32_t)(millis() - heapMonTimer) >= 60000)
         {
             uint32_t freeHeap = nrf52_getFreeHeap();
 
@@ -2091,7 +2091,7 @@ void nrf52loop()
             onewireTimeWait = millis() - 10000;
 
 
-        if ((onewireTimeWait + 30000) < millis())  // 30 sec
+        if ((uint32_t)(millis() - onewireTimeWait) >= 30000)  // 30 sec
         {
             //if (tx_is_active == false && is_receiving == false)
             {
@@ -2119,7 +2119,7 @@ void nrf52loop()
     {
         unsigned long lreduction = 0;
 
-        if ((BMXTimeWait + 60000) < millis())   // 60 sec
+        if ((uint32_t)(millis() - BMXTimeWait) >= 60000)   // 60 sec
         {
             #if defined(ENABLE_BMX280)
                 if(loopBMX280())
@@ -2174,7 +2174,7 @@ void nrf52loop()
     #if defined(ENABLE_BMP390)
     if((bBMP3ON && bmp3_found))
     {
-        if ((BMP3TimeWait + 60000) < millis())   // 60 sec
+        if ((uint32_t)(millis() - BMP3TimeWait) >= 60000)   // 60 sec
         {
             if(loopBMP390())
             {
@@ -2198,7 +2198,7 @@ void nrf52loop()
         if(MCU811TimeWait == 0)
             MCU811TimeWait = millis() - 10000;
 
-        if ((MCU811TimeWait + 60000) < millis())   // 60 sec
+        if ((uint32_t)(millis() - MCU811TimeWait) >= 60000)   // 60 sec
         {
             // read MCU-811 Sensor
             if(loopMCU811())
@@ -2223,7 +2223,7 @@ void nrf52loop()
         if(INA226TimeWait == 0)
             INA226TimeWait = millis() - 10000;
 
-        if ((INA226TimeWait + 60000) < millis())   // 60 sec
+        if ((uint32_t)(millis() - INA226TimeWait) >= 60000)   // 60 sec
         {
             // read INA Sensor
             if(loopINA226())
@@ -2243,7 +2243,7 @@ void nrf52loop()
     #if defined(ENABLE_BMX680)
     if(bBME680ON && bme680_found)
     {
-        if ((bme680_timer + 60000) < millis() || delay_bme680 <= 0)
+        if ((uint32_t)(millis() - bme680_timer) >= 60000 || delay_bme680 <= 0)
         {
             if (delay_bme680 <= 0)
             {
@@ -2268,7 +2268,7 @@ void nrf52loop()
     // heartbeat
     if (bGATEWAY)
     {
-        if ((hb_timer + (HEARTBEAT_INTERVAL * 1000)) < millis())
+        if ((uint32_t)(millis() - hb_timer) >= (uint32_t)(HEARTBEAT_INTERVAL * 1000))
         {
             if(bDisplayCont)
             {
@@ -2293,7 +2293,7 @@ void nrf52loop()
 
     if(bWEBSERVER || bEXTUDP)
     {
-        if (web_timer == 0 || ((web_timer + (HEARTBEAT_INTERVAL * 1000 * 30)) < millis()))   // repeat 15 minutes
+        if (web_timer == 0 || ((uint32_t)(millis() - web_timer) >= (uint32_t)(HEARTBEAT_INTERVAL * 1000 * 30)))   // repeat 15 minutes
         {
             meshcom_settings.node_hasIPaddress = neth.hasIPaddress;
 
