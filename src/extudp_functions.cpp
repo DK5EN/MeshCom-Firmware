@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <atomic>
 
 #include <extudp_functions.h>
 #include <loop_functions.h>
@@ -51,7 +52,7 @@ struct externQueueEntry {
     int16_t  rssi;
     int8_t   snr;
     char     src_type[8];
-    bool     used;
+    std::atomic<bool> used{false};
 };
 static struct externQueueEntry externQueue[MAX_EXTERN_QUEUE];
 static int externQueueWrite = 0;
@@ -592,13 +593,17 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
 void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
     struct externQueueEntry *entry = &externQueue[externQueueWrite];
-    if(buflen > 500) buflen = 500;
+    if(buflen > sizeof(entry->buffer)) {
+        Serial.printf("[EXT] queueExtern: buflen %u > %u, dropped\n",
+                      (unsigned)buflen, (unsigned)sizeof(entry->buffer));
+        return;
+    }
     memcpy(entry->buffer, buffer, buflen);
     entry->buflen = buflen;
     entry->rssi = rssi;
     entry->snr = snr;
     snprintf(entry->src_type, sizeof(entry->src_type), "%s", src_type);
-    entry->used = true;
+    entry->used.store(true, std::memory_order_release);
     externQueueWrite = (externQueueWrite + 1) % MAX_EXTERN_QUEUE;
 }
 
@@ -606,11 +611,11 @@ void flushExternQueue()
 {
     for(int i = 0; i < MAX_EXTERN_QUEUE; i++)
     {
-        if(externQueue[i].used)
+        if(externQueue[i].used.load(std::memory_order_acquire))
         {
             sendExtern(true, externQueue[i].src_type, externQueue[i].buffer,
                        externQueue[i].buflen, externQueue[i].rssi, externQueue[i].snr);
-            externQueue[i].used = false;
+            externQueue[i].used.store(false, std::memory_order_relaxed);
         }
     }
 }
