@@ -219,7 +219,7 @@ float read_batt(void)
 		wpPushVolt(rawVoltage);   // 2x/s -> letzte 10 Rohwerte fuer die "AKKU LOW"-Anzeige
 		#endif
 
-		if ((batt_show_timer + (1000 * std::max(1,BATTshowtime))) < millis())  // 1 .. 99s
+		if ((uint32_t)(millis() - batt_show_timer) >= (uint32_t)(1000 * std::max(1,BATTshowtime)))  // 1 .. 99s
 		{
 			batt_show_timer = millis();
 

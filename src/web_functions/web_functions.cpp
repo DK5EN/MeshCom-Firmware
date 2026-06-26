@@ -237,7 +237,7 @@ void web_client_html(CommonWebClient web_client)
         for (int iwid = 0; iwid < 10; iwid++)
         {
             // check passwort Time expired 4h
-            if((ulong)(web_ip_passwd_time[iwid] + (1000 * 60 * 60 * 4)) < millis())
+            if((uint32_t)(millis() - (uint32_t)web_ip_passwd_time[iwid]) >= (1000U * 60 * 60 * 4))
             {
                 web_ip_passwd_time[iwid] = 0;
                 memset(web_ip[iwid], 0x00, sizeof(web_ip[iwid]));

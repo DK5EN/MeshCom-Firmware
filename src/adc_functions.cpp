@@ -67,7 +67,7 @@ void loop_ADCFunctions()
             if (ADCalpha == 0.0) { ADCalpha = 0.001; }
 
             int ADCintervall = (int)meshcom_settings.node_analog_alpha % 100;
-            if ((analog_oversample_timer + std::max(2,ADCintervall)) < millis())  //min. 2ms, max. 99ms
+            if ((uint32_t)(millis() - analog_oversample_timer) >= (uint32_t)std::max(2,ADCintervall))  //min. 2ms, max. 99ms
             {
                 //digitalWrite(BOARD_LED, LOW);  // OE3WAS für TEST Timing
                 //digitalWrite(BOARD_LED, HIGH);  // OE3WAS für TEST
@@ -94,7 +94,7 @@ void loop_ADCFunctions()
             }
 
             int ADCshowtime = (int)meshcom_settings.node_analog_alpha / 100;
-            if ((analog_show_timer + (1000 * std::max(1,ADCshowtime))) < millis())  // 1 .. 99s
+            if ((uint32_t)(millis() - analog_show_timer) >= (uint32_t)(1000 * std::max(1,ADCshowtime)))  // 1 .. 99s
             {
                 Serial.printf("[ADC1]; GPIO%d; %s; %u; %.3f; %u; %u; %.1f; %.1f; %.1f\n",
                     meshcom_settings.node_analog_pin, getTimeString().c_str(),
