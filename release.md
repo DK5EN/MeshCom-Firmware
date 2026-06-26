@@ -2,6 +2,22 @@
 
 
 
+## Upstream-Sync 2026-06-26 (dev)
+
+Rebase auf aktuellen upstream/dev (HEAD d3af8986). Neue Aenderungen aus upstream:
+- Heltec E213: neues Board (ESP32-S3 + SX1262 + 2.13" E-Ink, PR #1021, Stego-Lab)
+- v4.35p minor (PR #1020)
+- v4.35p default settings (PR #1018)
+- v4.35p heltec v3 yota (PR #1017)
+- v4.35p init heltec v3 (PR #1016)
+- v4.35p T-DECK SETUP (PR #1014)
+- v4.35p via -- mehrere Commits (PRs #1013, #1010, #1009)
+
+Unsere uebernommenen Commits: keine. Alle 17 lokalen Commits sauber appliziert,
+kein Konflikt.
+
+---
+
 ## Upstream-Sync 2026-06-11 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD 871da1ad). Grosser Sync mit umfangreichen
