@@ -159,7 +159,7 @@ void saveMHeardPersistence()
         }
 
         // check to save to SD only every 30 sec
-        if(lastsaveMHEARDPersistence + 30000 > millis())
+        if((uint32_t)(millis() - lastsaveMHEARDPersistence) < 30000)
             return;
 
         lastsaveMHEARDPersistence = millis();
@@ -191,7 +191,7 @@ void savePathPersistence()
         }
 
         // check to save to SD only every 30 sec
-        if(lastsavePATHPersistence + 30000 > millis())
+        if((uint32_t)(millis() - lastsavePATHPersistence) < 30000)
             return;
 
         lastsavePATHPersistence = millis();

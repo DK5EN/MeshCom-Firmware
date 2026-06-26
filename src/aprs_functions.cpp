@@ -6,6 +6,8 @@
 #include <debugconf.h>
 #include <configuration.h>
 
+#define MAX_APRS_FRAME_SIZE 340
+
 char shortSUBVERSION()
 {
     char csfw[2]={0};
@@ -143,6 +145,9 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 
         return 0x00;
     }
+
+    if(rsize > MAX_APRS_FRAME_SIZE)
+        return 0x00;
 
     aprsmsg.payload_type = RcvBuffer[0];
 
