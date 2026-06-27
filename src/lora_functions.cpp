@@ -365,9 +365,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
     // Debug logging outside critical section
     if(_overwrite)
+    {
+#ifdef LORA_ISR_DEBUG
         printfdeb("[MC-DBG] RX_BUF_OVERWRITE buf=%d (still in use)\n", rxBufIndex);
+#endif
+    }
     else if(bLORADEBUG)
+    {
+#ifdef LORA_ISR_DEBUG
         printfdeb("[MC-DBG] RX_BUF_SWITCH buf=%d\n", rxBufIndex);
+#endif
+    }
     // SPI guard: defer Radio.Rx() if Ethernet (W5100S) owns the shared SPI bus
     if(bSPI_ETH_Active) {
         bPendingRadioRx = true;
@@ -384,13 +392,25 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     }
     taskEXIT_CRITICAL();
     if(_cad_was_active && bLORADEBUG)
+    {
+#ifdef LORA_ISR_DEBUG
         printfdeb("[MC-DBG] CAD_ABORT_BY_RX\n");
+#endif
+    }
     if(bLORADEBUG)
+    {
+#ifdef LORA_ISR_DEBUG
         printfdeb("[MC-DBG] RX_RESTART_EARLY src=OnRxDone\n");
+#endif
+    }
     // Log RX_LISTEN -> RX_PROCESS here (not in OnHeaderDetect ISR where
     // Serial.printf is unreliable on nRF52)
     if(bLORADEBUG)
+    {
+#ifdef LORA_ISR_DEBUG
         printfdeb("[MC-SM] RX_LISTEN -> RX_PROCESS rc=0\n");
+#endif
+    }
     #endif
 
     // only for Test T5_EPAPER
@@ -1767,7 +1787,7 @@ bool doTX()
                 // you can transmit C-string or Arduino string up to
                 // 256 characters long
                 // Position zumindest alle funf Minuten auch zu MeshCom senden
-                if(millis() > track_to_meshcom_timer + 1000 * 60 * 5)
+                if((uint32_t)(millis() - track_to_meshcom_timer) >= 1000 * 60 * 5)
                 {
                     #if defined BOARD_RAK4630
                         taskENTER_CRITICAL();
