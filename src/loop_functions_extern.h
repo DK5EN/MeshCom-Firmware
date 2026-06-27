@@ -179,8 +179,8 @@ extern float BATexp2;
 
 // RINGBUFFER for incoming UDP lora packets for lora TX
 extern unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5];
-extern volatile int iWrite;
-extern volatile int iRead;
+extern std::atomic<uint8_t> iWrite;
+extern std::atomic<uint8_t> iRead;
 extern int iRetransmit;
 extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
@@ -216,9 +216,9 @@ extern std::atomic<bool> tx_is_active;   // flag to store we are transmitting  a
 extern int cad_attempt;
 extern unsigned long csma_timeout;
 extern int rx_irq_defer_count;
-extern volatile bool cad_in_progress;
-extern volatile bool cad_done_flag;
-extern volatile bool cad_double_check;
+extern std::atomic<bool> cad_in_progress;
+extern std::atomic<bool> cad_done_flag;
+extern std::atomic<bool> cad_double_check;
 
 
 // RACE-01 fix: spinlock for deferred display update (ISR → main loop)

@@ -235,10 +235,10 @@ static RadioEvents_t RadioEvents;
 unsigned long iReceiveTimeOutTime = 0;
 
 // CSMA/CA async CAD state
-volatile bool cad_done_flag = false;
-volatile bool cad_channel_busy = false;
-volatile bool cad_in_progress = false;
-volatile bool cad_double_check = false;
+std::atomic<bool> cad_done_flag{false};
+std::atomic<bool> cad_channel_busy{false};
+std::atomic<bool> cad_in_progress{false};
+std::atomic<bool> cad_double_check{false};
 unsigned long cad_start_time = 0;
 
 bool g_meshcom_initialized;
@@ -394,7 +394,7 @@ void OnCadDone(bool channelActivityDetected)
     // RACE-05 fix: atomic flag update under critical section
     taskENTER_CRITICAL();
     cad_channel_busy = channelActivityDetected;
-    cad_done_flag = true;
+    cad_done_flag.store(true, std::memory_order_release);
     taskEXIT_CRITICAL();
 }
 
