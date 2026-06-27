@@ -183,7 +183,7 @@ void IRAM_ATTR handleRxInterrupt() {
   currentMicros = micros();
   duration = currentMicros - lastMicros;
   
-  if (pulseIndex < SAMPLE_COUNT && duration > 2) {
+  if (pulseIndex + 1 < SAMPLE_COUNT && duration > 2) {
     pulseIndex = pulseIndex+1;
     pulseTimes[pulseIndex] = duration;
   }

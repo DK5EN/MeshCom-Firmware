@@ -3456,6 +3456,9 @@ void sendMessage(char *msg_text, int len)
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
+    if (iWrite == iRead) {   // ring full: about to overwrite an unread slot
+        Serial.printf("[RING] overflow, slot %d dropped\n", (int)iWrite);
+    }
     ringBuffer[iWrite][0]=aprsmsg.msg_len;
     memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
     
@@ -3809,7 +3812,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         bSendViaAPRS=true;
     }
 
-    if(lastHeardTime + 15000 < millis() && (intervall == POSINFO_INTERVAL || intervall == 0x9999)) // wenn die letzte gehörte LoRa-Nachricht < 5sec dann auch via MeshCom
+    if((uint32_t)(millis() - lastHeardTime) >= 15000 && (intervall == POSINFO_INTERVAL || intervall == 0x9999)) // wenn die letzte gehörte LoRa-Nachricht < 5sec dann auch via MeshCom
     {
         bSendViaMesh = true;
 
@@ -3817,7 +3820,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         posfixinterall = millis();
     }
 
-    if(((posfixinterall + (POSINFO_INTERVAL * 1000)) < millis()))
+    if((uint32_t)(millis() - posfixinterall) >= (POSINFO_INTERVAL * 1000))
     {
         bSendViaMesh = true;
 
