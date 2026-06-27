@@ -1703,7 +1703,21 @@ void addTxRingEntry(const char* source)
         }
     }
 
-    addRingPointer(iWrite, iRead, MAX_RING, "tx");
+    // advance tx ring write pointer — inlined addRingPointer (C1): the helper
+    // takes volatile int& and cannot bind to the now-atomic iWrite/iRead.
+    uint8_t txWnext = (uint8_t)(iWrite + 1);
+    if (txWnext >= MAX_RING)
+        txWnext = 0;
+    iWrite = txWnext;
+    if (iRead == txWnext)   // ring full: advance read pointer past the overwritten slot
+    {
+        uint8_t txRnext = (uint8_t)(txWnext + 1);
+        if (txRnext >= MAX_RING)
+            txRnext = 0;
+        iRead = txRnext;
+        if (bLORADEBUG)
+            printfdeb("[MC-DBG] RING_OVERFLOW buf=tx\n");
+    }
 }
 
 /**@brief our Lora TX sequence — priority-based slot selection

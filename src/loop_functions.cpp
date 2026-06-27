@@ -388,8 +388,8 @@ int iWriteOwn=0;
 
 // RINGBUFFER for incoming UDP lora packets for lora TX
 unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5] = {0};
-volatile int iWrite = 0;
-volatile int iRead = 0;
+std::atomic<uint8_t> iWrite{0};
+std::atomic<uint8_t> iRead{0};
 int iRetransmit=-1;
 
 // FIX: Per-slot retry counter for retransmit cap

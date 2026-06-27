@@ -636,7 +636,7 @@ void NrfETH::fillUDP_RING_BUFFER(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_b
   ringBuffer[iWrite][1] = 0xFF;
   memcpy(ringBuffer[iWrite] + 2, buffer, rx_buf_size);
 
-  DEBUG_MSG_VAL("RADIO", iWrite, "fill LORA Send:");
+  DEBUG_MSG_VAL("RADIO", (int)iWrite, "fill LORA Send:");
 
   iWrite++;
   if (iWrite >= MAX_RING) // if the buffer is full we start at index 0 -> take care of overwriting!
