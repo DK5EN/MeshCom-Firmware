@@ -2,6 +2,34 @@
 
 
 
+## Upstream-Sync 2026-07-12 (dev)
+
+Rebase auf aktuellen upstream/dev (HEAD 2832e192). Grosser Sync, 63 neue
+Commits aus upstream seit 2026-06-26:
+- TBEAM 1W Deepsleep deaktiviert; Wireless Paper Deepsleep-Pfad an Vision
+  Master E213 angeglichen (Stego-Lab, PR #1050).
+- E218 GPS aktiviert; NCount-Fix "from Hey only >= 4.35p" (mehrere Commits).
+- Neue Hardware-Variante ESP32-LoRaPRS (E22/RA01) -- platformio.ini,
+  Variant-Configs, mehrere Folge-Commits (dl1mx, PR #1029).
+- Terminalkommando --rotate 0/90/180/270 (E-Ink Display drehen), Fix
+  Buffer-Overflow-Grenze im {MCP}-Handler (sizeof(clfd) statt sizeof(cset))
+  (Stego-Lab, PRs #1033/#1034).
+- Security-Fixes: Buffer-Overflow in TinyGsmClientSequansMonarch.h (snprintf
+  statt sprintf, PR #1019, orbisai0security); V-001 Security-Vulnerability-Fix.
+- Heltec E213: 180 Grad gedreht, diverse v4.35p-Minor-Fixes; GPS-T114 und
+  BTCODE Fixes.
+
+Konflikt beim Rebase in `loop_functions.cpp`: Upstream hat einen neuen
+`intervall == 0xFFFF` Zweig (nur LoRa-APRS) direkt vor unserer
+millis()-wraparound-sicheren Bedingung eingefuegt. Aufgeloest durch Uebernahme
+beider Aenderungen (neuer 0xFFFF-Zweig aus upstream + unsere wraparound-sichere
+Pruefung).
+
+Unsere uebernommenen Commits: keine. Alle 26 lokalen Commits sauber appliziert
+(1 Konflikt manuell aufgeloest, siehe oben).
+
+---
+
 ## Upstream-Sync 2026-06-26 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD d3af8986). Neue Aenderungen aus upstream:
