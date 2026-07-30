@@ -114,8 +114,12 @@ int printfdeb(const char *uformat, ...)
         for (int i = 0; temp[i] != '\0'; i++) { if (temp[i] == '.') { temp[i] = ','; } }
 
     bDEBUGLNG = false; // wieder deaktivieren
-    
-    Serial.printf(temp);
+
+    // SEC-02: temp enthaelt bereits substituierten Text — u.a. ueber Funk empfangene
+    // Nutzdaten, die per %s eingesetzt wurden. Wird temp als Format-String uebergeben,
+    // parst printf darin enthaltene %-Direktiven ein zweites Mal (%s/%n) ohne passende
+    // varargs -> Stack-Leseszugriffe bzw. Schreibzugriff. Immer als Argument uebergeben.
+    Serial.printf("%s", temp);
 
     if(temp != loc_buf){
         free(temp);
