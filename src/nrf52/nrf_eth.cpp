@@ -512,9 +512,14 @@ int NrfETH::getUDP()
         {
           memcpy(config_buf, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, packetSize - UDP_MSG_INDICATOR_LEN);
           // fill rest of buffer with 0
-          for (int i = 0; i < UDP_CONF_BUFF_SIZE; i++)
+          // N-03: Laufindex startet beim Ende der Nutzdaten und laeuft bis zum
+          // Pufferende. Vorher lief i von 0..UDP_CONF_BUFF_SIZE-1 und wurde
+          // zusaetzlich um die Paketlaenge versetzt -> Schreibzugriff bis
+          // config_buf[packetSize-4+254], bei packetSize=255 also 251 Bytes
+          // hinter dem 255-Byte-Stackpuffer.
+          for (int i = packetSize - UDP_MSG_INDICATOR_LEN; i < UDP_CONF_BUFF_SIZE; i++)
           {
-            config_buf[packetSize - UDP_MSG_INDICATOR_LEN + i] = 0x00;
+            config_buf[i] = 0x00;
           }
 
           // print the message
