@@ -1,0 +1,20 @@
+# Vendored third-party libraries — never reformat
+lib/
+
+# Build artefacts and PlatformIO state
+.pio/
+build_output.txt
+
+# Binary / byte-pinned artefacts
+*.bin
+*.uf2
+*.hex
+*.csv
+
+# Generated / captured data
+tools/meshcom_monitor/
+tools/__pycache__/
+data/
+
+# Board definitions are consumed verbatim by PlatformIO
+boards/
