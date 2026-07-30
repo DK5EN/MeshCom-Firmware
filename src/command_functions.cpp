@@ -3209,14 +3209,14 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    if(commandCheck(msg_text+2, (char*)"symid") == 0)
+    if(commandCheck(msg_text+2, (char*)"symid ") == 0)
     {
         _owner_c[0] = meshcom_settings.node_symid;
 
         meshcom_settings.node_symid=msg_text[8];
 
         bool bSymbolTable = false;
-        if(meshcom_settings.node_symid == '/' || meshcom_settings.node_symid != '\'')
+        if(meshcom_settings.node_symid == '/' || meshcom_settings.node_symid == '\\')
             bSymbolTable = true;
         else
         if(meshcom_settings.node_symid >= '0' && meshcom_settings.node_symid <= '9')
@@ -3239,7 +3239,7 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    if(commandCheck(msg_text+2, (char*)"symcd") == 0)
+    if(commandCheck(msg_text+2, (char*)"symcd ") == 0)
     {
         _owner_c[0] = meshcom_settings.node_symcd;
 

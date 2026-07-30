@@ -3835,7 +3835,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
     // set default
     // Symbol Table / \ 0-9 A-Z  (compressed a-z)
     bool bSymbolTable = false;
-    if(meshcom_settings.node_symid == '/' || meshcom_settings.node_symid != '\'')
+    if(meshcom_settings.node_symid == '/' || meshcom_settings.node_symid == '\\')
         bSymbolTable = true;
     else
     if(meshcom_settings.node_symid >= '0' && meshcom_settings.node_symid <= '9')
