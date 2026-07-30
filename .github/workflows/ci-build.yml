@@ -1,0 +1,137 @@
+name: CI Build
+
+# Gate für Pull Requests und Branch-Pushes.
+#
+# Bewusst getrennt von meshcom-ci.yml: jene Workflow läuft ausschließlich auf
+# Tags und veröffentlicht ein GitHub-Release. Sie darf nicht auf PRs laufen.
+# Diese hier baut nur und veröffentlicht nichts.
+#
+# Die Environment-Liste wird zur Laufzeit aus platformio.ini gelesen, damit eine
+# neue Variante nicht vergessen werden kann.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+  workflow_dispatch:
+
+# Ein laufender Build für denselben Branch/PR wird abgebrochen, wenn nachgeschoben wird.
+concurrency:
+  group: ci-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  list-envs:
+    name: Environments ermitteln
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.collect.outputs.envs }}
+      count: ${{ steps.collect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio
+      - id: collect
+        name: default_envs aus platformio.ini lesen
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, subprocess
+          raw = subprocess.run(
+              ["pio", "project", "config", "--json-output"],
+              capture_output=True, text=True, check=True).stdout
+          cfg = dict(json.loads(raw))
+          default = []
+          for key, value in dict(cfg.get("platformio", [])).items():
+              if key == "default_envs":
+                  default = list(value)
+          # Fallback: alle deklarierten Environments, falls default_envs fehlt
+          if not default:
+              default = [s.split(":", 1)[1] for s, _ in json.loads(raw)
+                         if s.startswith("env:")]
+          print("envs=" + json.dumps(sorted(default)))
+          print("count=" + str(len(default)))
+          PY
+      - name: Gefundene Environments anzeigen
+        run: |
+          echo "::notice::${{ steps.collect.outputs.count }} Environments werden gebaut"
+          echo '${{ steps.collect.outputs.envs }}'
+
+  build:
+    name: ${{ matrix.env }}
+    needs: list-envs
+    runs-on: ubuntu-latest
+    strategy:
+      # Alle Boards durchbauen, auch wenn eines bricht — sonst sieht man nur das erste.
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        env: ${{ fromJSON(needs.list-envs.outputs.envs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: PlatformIO-Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'variants/*/platformio.ini') }}
+          restore-keys: |
+            pio-${{ runner.os }}-${{ matrix.env }}-
+            pio-${{ runner.os }}-
+
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio intelhex
+
+      - name: T-Beam-Supreme-Boarddefinition nachziehen
+        # Wird von platform-espressif32 nicht mitgeliefert; identisch zu meshcom-ci.yml.
+        if: matrix.env == 'ttgo_tbeam_supreme'
+        run: |
+          mkdir -p ~/.platformio/platforms/espressif32/boards
+          wget -qO ~/.platformio/platforms/espressif32/boards/t-beams3-supreme.json \
+            https://raw.githubusercontent.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/master/boards/t-beams3-supreme.json
+
+      - name: Bauen
+        run: |
+          set -o pipefail
+          pio run -e ${{ matrix.env }} 2>&1 | tee build.log
+
+      - name: RAM/Flash und Warnungen berichten
+        if: always()
+        run: |
+          [ -f build.log ] || exit 0
+          usage=$(grep -E '^(RAM|Flash):' build.log | tr '\n' ' ')
+          [ -n "$usage" ] && echo "::notice title=${{ matrix.env }} Speicher::$usage"
+          # Nur Warnungen aus src/ zählen; libdeps sind Fremdcode.
+          warn=$(grep -c '^src/.*warning:' build.log || true)
+          echo "::notice title=${{ matrix.env }} Warnungen::${warn} in src/"
+          grep '^src/.*warning:' build.log | sort -u | head -20 || true
+
+  result:
+    name: Build-Gate
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ergebnis auswerten
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::Mindestens ein Environment hat nicht gebaut."
+            exit 1
+          fi
+          echo "Alle Environments gebaut."
