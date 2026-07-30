@@ -65,6 +65,26 @@ jobs:
           echo "::notice::${{ steps.collect.outputs.count }} Environments werden gebaut"
           echo '${{ steps.collect.outputs.envs }}'
 
+  unit-tests:
+    name: Unit-Tests (nativ)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: pio-native-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-native-${{ runner.os }}-
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio
+      - name: Tests ausfuehren
+        run: pio test -e native
+
   build:
     name: ${{ matrix.env }}
     needs: list-envs
@@ -124,14 +144,20 @@ jobs:
 
   result:
     name: Build-Gate
-    needs: build
+    needs: [build, unit-tests]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Ergebnis auswerten
         run: |
+          fail=0
           if [ "${{ needs.build.result }}" != "success" ]; then
             echo "::error::Mindestens ein Environment hat nicht gebaut."
-            exit 1
+            fail=1
           fi
-          echo "Alle Environments gebaut."
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "::error::Die nativen Unit-Tests sind fehlgeschlagen."
+            fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "Alle Environments gebaut, alle Tests gruen."
+          exit $fail
