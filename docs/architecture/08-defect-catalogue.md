@@ -43,18 +43,62 @@ This catalogue **adopts the existing IDs**. New findings get `N-nn`.
 The concept contained errors that would have sent work in the wrong direction. Listed
 first because several of its recommendations must be withdrawn before anyone acts on them.
 
-### C-01 — `OnRxDone` does not run in interrupt context — **VERIFIED**
+### C-01 — `OnRxDone` does not run in interrupt context — **VERIFIED (nRF52 half CORRECTED 2026-07-31)**
 
 01 and 04 state the RX callback runs "off the radio callback" with everything it touches
 shared with the main loop. Wrong on both platforms, differently:
 
 - **ESP32:** the only call is `checkRX()` at `esp32_main.cpp:3778`, itself called from
   `esp32loop()` at `:2217`. It runs in `loopTask`. The only ISR is
-  `setFlagReceive`/`setFlagSent` (`:487`, `:503`) — nine lines, four atomics.
-- **nRF52:** it runs in the SX126x `"LORA"` FreeRTOS task at priority 2, which **preempts
-  `loop()` at priority 1**.
+  `setFlagReceive`/`setFlagSent` (`:487`, `:503`) — nine lines, four atomics. **This half
+  stands.**
+- **nRF52: the original statement here — "it runs in the SX126x `LORA` FreeRTOS task at
+  priority 2, which preempts `loop()` at priority 1" — is WRONG.** See below.
 
-This mislabel is load-bearing — it is the stated justification for `displayMux`.
+#### Correction: the nRF52 preemption path is a different task
+
+The `"LORA"` task is created at **priority 1**, the same as `loop_task`, and therefore
+preempts nothing:
+
+```c
+// SX126x-Arduino board.cpp:44      ← #ifndef cannot see an enum, so this macro wins
+#ifndef TASK_PRIO_NORMAL
+#define TASK_PRIO_NORMAL 1
+#endif
+// board.cpp:498
+xTaskCreate(_lora_task, "LORA", 4096, NULL, TASK_PRIO_NORMAL, &_loraTaskHandle);
+
+// Adafruit core rtos.h:59          ← what the library meant to use
+TASK_PRIO_NORMAL  = 2,
+// Adafruit core main.cpp:88
+xTaskCreate(loop_task, "loop", LOOP_STACK_SZ, NULL, TASK_PRIO_LOW /* =1 */, &_loopHandle);
+```
+
+`FreeRTOSConfig.h` additionally sets `configUSE_TIME_SLICING 0`, so equal-priority tasks do
+not even round-robin. This is a latent defect in the vendored library, not in this project's
+code.
+
+**The genuine preemptor is the FreeRTOS timer service task**, and it is worse than what the
+original claim described:
+
+```
+radio.cpp:599  TimerInit(&RxTimeoutTimer, RadioOnRxTimeoutIrq)
+  → nrf52832/timer.cpp:41  SoftwareTimer timerTickers[10]      (#ifdef NRF52_SERIES)
+  → SoftwareTimer.cpp:39   xTimerCreate(...)
+  → FreeRTOS timer service task:  configTIMER_TASK_PRIORITY 2
+                                  configTIMER_TASK_STACK_DEPTH 256 words = 1 KB
+  → RadioOnRxTimeoutIrq() → RadioBgIrqProcess() → RadioEvents->RxDone(...)  == OnRxDone
+```
+
+So on nRF52 the 968-line `OnRxDone` — nesting depth 13, seven `String` allocations per
+packet, plus display, BLE and UDP enqueue — can run **on a 1 KB stack at priority 2**,
+preempting both `loop()` and the `"LORA"` task (both priority 1). The `"LORA"` task's own
+stack is 4096 words = 16 KB.
+
+Full derivation, ownership map and the revised interleavings:
+[`09-concurrency-map.md`](09-concurrency-map.md). `N-14` below is revised accordingly.
+
+This mislabel was load-bearing — it is the stated justification for `displayMux`.
 
 ### C-02 — the radio-interface recommendation is ~10× oversized and mis-targeted — **VERIFIED**
 
@@ -171,7 +215,7 @@ unauthenticated, unattributable.
 
 ### N-01 — `{MCP}` remote command: password check is a character-set membership test — **VERIFIED** — Critical, RF
 
-`src/loop_functions.cpp:2057-2071`
+`src/loop_functions.cpp:2126-2140` (was `:2057` pre-rebase)
 
 ```c
 for(int ip=0;ip<5;ip++) {
@@ -209,7 +253,7 @@ password.
 
 ### N-02 — `{SET}` mutates mesh routing with no authentication — **VERIFIED** — Critical, RF
 
-`src/loop_functions.cpp:2121-2127`
+`src/loop_functions.cpp:2190-2196` (was `:2121` pre-rebase)
 
 ```c
 if(aprsmsg.msg_payload.startsWith("{SET}") > 0) {
@@ -251,7 +295,7 @@ Chain of three sites:
 
 1. `loop_functions.cpp:527` — `if (len > UDP_TX_BUF_SIZE) len = UDP_TX_BUF_SIZE-4;` lets
    `len ∈ {252,253,254,255}` through unchanged.
-2. `loop_functions.cpp:546` — `BLEtoPhoneBuff[toPhoneWrite][0] = len + 4;` into one byte →
+2. `loop_functions.cpp:548` — `BLEtoPhoneBuff[toPhoneWrite][0] = len + 4;` into one byte →
    wraps to 0,1,2,3. (This is `BUG-08`.)
 3. `web_functions.cpp:1279,1296` — `uint8_t blelen = …[0];` then
    `memcpy(toPhoneBuff, …, blelen - 4);`. Promotion to `int` gives −4…−1; conversion to
@@ -265,7 +309,7 @@ before the subtraction.
 
 ### N-05 — heap over-read is rebroadcast over the air — **VERIFIED** — High, RF
 
-`src/mheard_functions.cpp:526` and `:532`
+`src/mheard_functions.cpp:526` and `:532` (unchanged by the rebase)
 
 ```c
 int ipc = mheardLine.mh_sourcepath.length() - ips;
@@ -284,7 +328,7 @@ then displayed, JSON-exported to the phone, and used to build **outgoing HEY pat
 
 ### N-06 — unbounded array index from a web parameter — **VERIFIED** — Critical, LAN
 
-`src/web_functions/web_setup.cpp:551`
+`src/web_functions/web_setup.cpp:500`, `:527` and `:550` — **three sites**, not one (was cited as `:551` pre-rebase)
 
 ```c
 uint8_t t_io = (uint8_t)port.charAt(1) - 48;
@@ -300,9 +344,10 @@ followed by `save_settings()`.
 
 ### N-07 — BLE command channel is unauthenticated and ungated — **VERIFIED** — Critical, BLE range
 
-`esp32_main.cpp:1588` `setSecurityAuth(false,false,false)`; `:1613-1626` all `WRITE_ENC` /
-`READ_ENC` commented out; `:2784` the `if(hasMsgFromPhone)` dispatch calls `commandAction`
-with **no `isPhoneReady` gate** — that check begins only at `:2794`. Any BLE device in
+`esp32_main.cpp:1596` `setSecurityAuth(false,false,false)`; the `WRITE_ENC` / `READ_ENC`
+properties are commented out a few lines below; the `if(hasMsgFromPhone)` dispatch calls
+`commandAction` with **no `isPhoneReady` gate** — that check begins only in the following
+block. (Line numbers shifted ~8 by the rebase; re-derive before fixing.) Any BLE device in
 range reaches the full command surface including `--cleanflash`, `--setpwd`, `--ota-update`.
 
 A prior audit accepted this as "only a buggy app could do that". The code does not
@@ -388,10 +433,19 @@ spinlock held. On nRF52 the same code runs under `taskENTER_CRITICAL()`.
 ### N-14 — nRF52 TX ring is multi-writer with no mutual exclusion — **CONFIRMED** — High
 
 `iWrite` is loaded three times across `ringBuffer[iWrite][0]=…; memcpy(ringBuffer[iWrite]+2,…); addTxRingEntry()`.
-The `LORA` task (`lora_functions.cpp:1169`) preempts `loop_task`
-(`loop_functions.cpp:3219`) mid-`memcpy`; both fill the same slot and a spliced frame goes
+Two writers can interleave mid-`memcpy`, both fill the same slot, and a spliced frame goes
 on the air. **The C1 "atomic iWrite/iRead" fix does not address this** — atomic indices are
 not mutual exclusion.
+
+> **CORRECTED 2026-07-31 — the interleaving mechanism stated here was wrong.** The original
+> text said "the `LORA` task preempts `loop_task`". It cannot: both run at priority 1 and
+> `configUSE_TIME_SLICING` is 0 (see [C-01](#c-01--onrxdone-does-not-run-in-interrupt-context--verified-nrf52-half-corrected-2026-07-31)).
+> The two real interleavings are (a) the **FreeRTOS timer service task at priority 2**,
+> which reaches `OnRxDone` via `RadioOnRxTimeoutIrq → RadioBgIrqProcess`, and (b) a yield
+> point inside the `"LORA"` task's own enqueue path (`printfdeb` → `Serial.printf` →
+> `yield()` when the CDC FIFO is full). The defect and its severity are unchanged; only the
+> explanation of _how_ two writers meet is corrected. Current line numbers and the rewritten
+> interleaving: [`09-concurrency-map.md`](09-concurrency-map.md).
 
 The correct pattern already exists in this codebase and should be the template: the nRF52
 CAD flag protocol at `nrf52_main.cpp:390-394` and `:1332-1338` (atomics plus symmetric
@@ -419,15 +473,16 @@ reaches `SX126xWaitOnBusy()` → `delay(1)` → `vTaskDelay()` **with the tick f
 
 ## 3. Refuted claims — do not re-investigate
 
-| Claim                                                                                                  | Refuting evidence                                                                                                                               |
-| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| The `(BOARD_E22_S3)` guard is a hard build error; two default envs do not compile                      | `pio run -e E22_1262_S3-DevKitC-1-N16R8` → **SUCCESS** (93 s). PlatformIO strips the quotes; the macro reaches the compiler unquoted. See N-10. |
-| `snprintf(value, 100, …)` on `char value[40]` (`web_functions.cpp:1660`) is an error-severity overflow | Source is `char node_mcp17t[16][16]` — max 16 bytes. Rule violation (bound must be `sizeof(dst)`), **not** a memory-safety bug.                 |
-| `snprintf(val, 160, …)` in `extudp_functions.cpp:195` overflows                                        | `char val[160+1]`, and an explicit guard above caps dst ≤ 9 and msg ≤ 150. Safe.                                                                |
-| `[nrf52]` triple declaration is a glob-order race                                                      | ConfigParser merges option-by-option. `pio project config` output is deterministic. See C-05.                                                   |
-| `MAX_APRS_FRAME_SIZE 340` vs 255-byte parser buffers is exploitable                                    | All six callers traced; none can supply more than 255 bytes today. **Latent**, not live.                                                        |
-| The concept's "218 commands"                                                                           | 217 arms / 227 verbs. See C-08.                                                                                                                 |
-| `-Wall -Wextra` produces an unmanageable warning backlog                                               | Measured: **9 warnings total**, 4 in `src/`. The June audit's `-Werror` exception rests on a backlog that does not exist.                       |
+| Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The `(BOARD_E22_S3)` guard is a hard build error; two default envs do not compile                                               | `pio run -e E22_1262_S3-DevKitC-1-N16R8` → **SUCCESS** (93 s). PlatformIO strips the quotes; the macro reaches the compiler unquoted. See N-10.                                                                                                                                                                                                                     |
+| `snprintf(value, 100, …)` on `char value[40]` (`web_functions.cpp:1660`) is an error-severity overflow                          | Source is `char node_mcp17t[16][16]` — max 16 bytes. Rule violation (bound must be `sizeof(dst)`), **not** a memory-safety bug.                                                                                                                                                                                                                                     |
+| `snprintf(val, 160, …)` in `extudp_functions.cpp` overflows (cited `:195` pre-rebase; `val` is now declared at `:225`)          | `char val[160+1]`, and an explicit guard above caps dst ≤ 9 and msg ≤ 150. Safe.                                                                                                                                                                                                                                                                                    |
+| `[nrf52]` triple declaration is a glob-order race                                                                               | ConfigParser merges option-by-option. `pio project config` output is deterministic. See C-05.                                                                                                                                                                                                                                                                       |
+| `MAX_APRS_FRAME_SIZE 340` vs 255-byte parser buffers is exploitable                                                             | All six callers traced; none can supply more than 255 bytes today. **Latent**, not live.                                                                                                                                                                                                                                                                            |
+| The nRF52 SX126x `"LORA"` task runs at priority 2 and preempts `loop()` (claimed by C-01 in the first version of this document) | `board.cpp:44` defines `TASK_PRIO_NORMAL` as the macro `1`; `#ifndef` cannot see the core's `= 2` enum. `board.cpp:498` therefore creates the task at priority 1, same as `loop_task` (`main.cpp:88`, `TASK_PRIO_LOW = 1`), and `configUSE_TIME_SLICING` is 0. The real priority-2 path is the FreeRTOS timer service task on a 1 KB stack. See the corrected C-01. |
+| The concept's "218 commands"                                                                                                    | 217 arms / 227 verbs. See C-08.                                                                                                                                                                                                                                                                                                                                     |
+| `-Wall -Wextra` produces an unmanageable warning backlog                                                                        | Measured: **9 warnings total**, 4 in `src/`. The June audit's `-Werror` exception rests on a backlog that does not exist.                                                                                                                                                                                                                                           |
 
 ---
 

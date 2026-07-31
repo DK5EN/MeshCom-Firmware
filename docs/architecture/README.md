@@ -9,16 +9,18 @@ Version `SOURCE_VERSION 4.35p`, `FLASH_VERSION 20260712`.
 
 ## Documents
 
-| #   | Document                                                         | Answers                                                                                                  |
-| --- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 01  | [System Overview](01-system-overview.md)                         | Is this spaghetti code, or a core with modules? Where is the kernel?                                     |
-| 02  | [Build System & Variants](02-build-and-variants.md)              | How do 30 board variants map onto one source tree?                                                       |
-| 03  | [Dependencies](03-dependencies.md)                               | What is outdated, what breaks on upgrade, which hardware is at risk?                                     |
-| 04  | [Complexity & Duplication](04-complexity-and-duplication.md)     | Where is the code tangled, duplicated, or unmaintainable?                                                |
-| 05  | [Rewrite vs. Refactor](05-rewrite-vs-refactor.md)                | Does a 1:1 port make sense? What is the cheaper path to the same goal?                                   |
-| 06  | [Test Strategy](06-test-strategy.md)                             | How do we get an oracle that makes before/after comparison possible?                                     |
-| 07  | [Verification Infrastructure](07-verification-infrastructure.md) | What can be observed, driven and asserted today — and what hooks and bench setup should be added?        |
-| 08  | [Defect Catalogue & Remediation Plan](08-defect-catalogue.md)    | What is actually broken, in what order do we fix it, and how does each fix become one commit and one PR? |
+| #   | Document                                                         | Answers                                                                                                                     |
+| --- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 01  | [System Overview](01-system-overview.md)                         | Is this spaghetti code, or a core with modules? Where is the kernel?                                                        |
+| 02  | [Build System & Variants](02-build-and-variants.md)              | How do 30 board variants map onto one source tree?                                                                          |
+| 03  | [Dependencies](03-dependencies.md)                               | What is outdated, what breaks on upgrade, which hardware is at risk?                                                        |
+| 04  | [Complexity & Duplication](04-complexity-and-duplication.md)     | Where is the code tangled, duplicated, or unmaintainable?                                                                   |
+| 05  | [Rewrite vs. Refactor](05-rewrite-vs-refactor.md)                | Does a 1:1 port make sense? What is the cheaper path to the same goal?                                                      |
+| 06  | [Test Strategy](06-test-strategy.md)                             | How do we get an oracle that makes before/after comparison possible?                                                        |
+| 07  | [Verification Infrastructure](07-verification-infrastructure.md) | What can be observed, driven and asserted today — and what hooks and bench setup should be added?                           |
+| 08  | [Defect Catalogue & Remediation Plan](08-defect-catalogue.md)    | What is actually broken, in what order do we fix it, and how does each fix become one commit and one PR?                    |
+| 09  | [Concurrency & Core-Ownership Map](09-concurrency-map.md)        | Which core, task or ISR touches which state — so atomics sit exactly where there is real concurrency, and nowhere else      |
+| 10  | [Buffer & Type Inventory](10-buffer-inventory.md)                | Every buffer, its size, its bounds and the input channel that reaches it — and how to make overflow structurally impossible |
 
 Documents 01–05 describe the system as it is. 06 and 07 describe how to make changes to it
 verifiable: 06 is the strategy (which layers, why), 07 is the build-out (existing

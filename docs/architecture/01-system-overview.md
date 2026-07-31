@@ -144,7 +144,10 @@ different programs are being maintained in one file.
 > polling, all already radio-independent. The real blocker is a differing **concurrency
 > model**, not a differing API: on ESP32 `OnRxDone` runs in `loopTask` (`checkRX` at
 > `esp32_main.cpp:3778`, called from `esp32loop()` at `:2217`); on nRF52 it runs in the
-> SX126x FreeRTOS task at priority 2, preempting `loop()`. CAD is synchronous on one side and
+> FreeRTOS **timer service task** at priority 2 (not the SX126x `"LORA"` task — that runs at
+> priority 1, same as `loop()`; see
+> [08 C-01](08-defect-catalogue.md#c-01--onrxdone-does-not-run-in-interrupt-context--verified-nrf52-half-corrected-2026-07-31)),
+> preempting `loop()` on a 1 KB stack. CAD is synchronous on one side and
 > asynchronous on the other. See
 > [08 C-02](08-defect-catalogue.md#c-02--the-radio-interface-recommendation-is-10-oversized-and-mis-targeted--verified).
 > The cheap, real version is to extract the ~221 radio-independent shared lines into a
