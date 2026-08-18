@@ -3268,8 +3268,16 @@ void sendMessage(char *msg_text, int len)
 
     int iulng=0;
 
-    for(int iu=ispos; iu<=len_check; iu++)
+    // Loop is driven by ii, the real source-consumption index (advances by
+    // up to 12 per multi-byte %-escape), not by a decoupled counter.
+    while(ii < len_check)
     {
+        // Bound every destination write: never let 'in' reach or pass the
+        // last byte of msg_text_checked, which must stay NUL (buffer is
+        // used as a C string afterwards).
+        if(in >= (int)sizeof(msg_text_checked)-1)
+            break;
+
         if(memcmp(msg_text_check+ii, "%C2", 3) == 0)
             iulng=6;
         if(memcmp(msg_text_check+ii, "%EF", 3) == 0)
@@ -3291,6 +3299,12 @@ void sendMessage(char *msg_text, int len)
         {
             for(int is=1;is<iulng;is=is+3)
             {
+                if(ii+is+1 >= (int)sizeof(msg_text_check))
+                    break;
+
+                if(in >= (int)sizeof(msg_text_checked)-1)
+                    break;
+
                 if(msg_text_check[ii+is] >= 'A')
                     ib = (msg_text_check[ii+is] - 'A') + 10;
                 else
