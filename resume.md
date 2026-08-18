@@ -265,6 +265,8 @@ Project skills, in `.claude/commands/`:
 | **N-03** stack overflow         | `93bb68d0` | index bounds computed per packet size; 3 nRF52 targets built                                                                                                                                                   |
 | **TEST-38** CI build gate       | `399d6522` | YAML parsed, env extraction and report filter run locally; release workflow left untouched                                                                                                                     |
 | **TEST-37/39** native harness   | `3fb2c917` | 11/11 green **plus mutation probe** proving the suite can fail                                                                                                                                                 |
+| **N-08** millis() rollover      | `0ccebe8d` | 25 deadline comparisons (21 found + 4 in reversed form) converted to the safe subtraction idiom; native regression test added; 4 boards built, RAM unchanged, flash +16..+64 B                                 |
+| **N-13** over-sync (partial)    | `4a250602` | 3 of 14 candidates fixed (`scanFlag` deleted, `displayMux` dropped on ESP32, `ch_util_rx_start` platform-split); 4 boards built, ESP32 RAM -16 B / flash -108..-120 B; remaining ~10 candidates deferred       |
 
 **Verification discipline applied throughout** — worth recording, because it caught real
 errors in our own work:
@@ -305,17 +307,27 @@ Each one standalone commit and PR. All verified against the source; details in d
 
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
-`SEC-03`–`SEC-06`, `BUG-07`, `BUG-10`–`BUG-13`, `CONC-14`–`CONC-19`, `N-08` (`millis()`
-rollover: 33 unsafe assignments + 11 unsafe comparisons still remain), `N-09` (11 ×
-`while(true);`), `N-14`–`N-16`.
+`SEC-03`–`SEC-06`, `BUG-07`, `BUG-10`–`BUG-13`, `CONC-14`–`CONC-19`, `N-14`–`N-16`.
+
+~~`N-08`~~ **FIXED** 2026-08-18 — 25 deadline comparisons converted to the safe subtraction
+idiom (`0ccebe8d`).
+
+~~`N-09`~~ **CORRECTED, no live hazard** 2026-08-18 — all 11 `while(true);` sit inside a
+`/* ... */` block comment that has never been active since the file's creation (Aug 2025);
+`lora_init()` unconditionally returns true and its result is never read. No code change; see
+the STATUS box on N-09 in `08-defect-catalogue.md`.
 
 `CONC-14` is the root fix that resolves `CONC-15`/`16`/`17`/`18`.
 
 ### 3.5 Then — Wave 3, structural (propose upstream as a plan first)
 
-`N-13` (remove the 14 over-synchronisations, delete the dead `scanFlag`), `DRY-20`–`DRY-25`,
-`SIMP-26`–`SIMP-30`, `ALT-31`–`ALT-35`, `STATE-28`, and the corrected C-02 extraction of the
-~221 genuinely shared, radio-independent loop lines.
+~~`N-13`~~ **PARTIALLY FIXED** 2026-08-18 — `scanFlag` deleted, `displayMux` dropped on ESP32,
+`ch_util_rx_start` platform-split (`4a250602`). ~10 remaining candidates
+(`is_receiving`, `ch_util_tx_start`/`rx_accum`/`tx_accum`, `transmissionState`, the
+`pendingDisplay*` fields) deliberately deferred — same category, each worth its own pass.
+
+`DRY-20`–`DRY-25`, `SIMP-26`–`SIMP-30`, `ALT-31`–`ALT-35`, `STATE-28`, and the corrected C-02
+extraction of the ~221 genuinely shared, radio-independent loop lines.
 
 ### 3.6 Deferred, with explicit triggers
 
