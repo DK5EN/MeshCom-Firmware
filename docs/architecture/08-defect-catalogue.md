@@ -637,37 +637,49 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 
 ### Wave 0 — enablement (no behaviour change, no hardware)
 
-| #   | Item                                                                                                                   | Evidence              |
-| --- | ---------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| 0.1 | CI: build all 32 envs on PR and push                                                                                   | `TEST-38`             |
-| 0.2 | `-Wall -Wextra` on firmware targets (currently only safeboot), fix the 4 warnings, then `-Werror` on `build_src_flags` | F6, C-17              |
-| 0.3 | `-Wundef` + convert `BOARD_*` to flags with separate name macros                                                       | N-10                  |
-| 0.4 | Pin `nordicnrf52`                                                                                                      | 02 B-04               |
-| 0.5 | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                                                      | `TEST-37`, C-14, C-03 |
+| #       | Item                                                                                                                   | Evidence              | Status                                             |
+| ------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------- |
+| 0.1     | CI: build all 32 envs on PR and push                                                                                   | `TEST-38`             | done — CI build gate                               |
+| 0.2     | `-Wall -Wextra` on firmware targets (currently only safeboot), fix the 4 warnings, then `-Werror` on `build_src_flags` | F6, C-17              | open                                               |
+| ~~0.3~~ | `-Wundef` + convert `BOARD_*` to flags with separate name macros                                                       | N-10                  | **DONE** 2026-08-18 — see STATUS box on N-10 below |
+| 0.4     | Pin `nordicnrf52`                                                                                                      | 02 B-04               | open                                               |
+| 0.5     | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                                                      | `TEST-37`, C-14, C-03 | done — native test harness                         |
 
 ### Wave 1 — RF-reachable criticals (each a standalone PR)
 
-| #   | Item                                   | ID              | Size        |
-| --- | -------------------------------------- | --------------- | ----------- |
-| 1.1 | `printfdeb` non-literal format string  | `SEC-02`        | 1 line      |
-| 1.2 | CONF zero-fill overflow                | `N-03`          | delete loop |
-| 1.3 | `{MCP}` password bypass                | `N-01`/`SEC-01` | small       |
-| 1.4 | `{SET}` unauthenticated routing change | `N-02`          | small       |
-| 1.5 | `memcpy` length underflow chain        | `N-04`/`BUG-08` | small       |
-| 1.6 | mheard heap over-read                  | `N-05`          | 1 line      |
-| 1.7 | web `t_io` bound check                 | `N-06`          | 2 lines     |
-| 1.8 | BLE command gate                       | `N-07`          | small       |
+| #       | Item                                   | ID              | Size        | Status                                                   |
+| ------- | -------------------------------------- | --------------- | ----------- | -------------------------------------------------------- |
+| 1.1     | `printfdeb` non-literal format string  | `SEC-02`        | 1 line      | **DONE** 2026-08-18                                      |
+| 1.2     | CONF zero-fill overflow                | `N-03`          | delete loop | **DONE** 2026-08-18                                      |
+| ~~1.3~~ | `{MCP}` password bypass                | `N-01`/`SEC-01` | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
+| ~~1.4~~ | `{SET}` unauthenticated routing change | `N-02`          | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
+| 1.5     | `memcpy` length underflow chain        | `N-04`/`BUG-08` | small       | **DONE** 2026-08-18                                      |
+| 1.6     | mheard heap over-read                  | `N-05`          | 1 line      | **DONE** 2026-08-18                                      |
+| 1.7     | web `t_io` bound check                 | `N-06`          | 2 lines     | **DONE** 2026-08-18                                      |
+| ~~1.8~~ | BLE command gate                       | `N-07`          | small       | ACCEPTED / WONTFIX 2026-08-18 — bonding breaks app fleet |
+
+**Wave 1 is closed** — all 8 items done or deliberately accepted as risk. See the Standing risk
+box in `resume.md` for what "done" means here (fixed locally, not yet upstream).
 
 ### Wave 2 — remaining prior-verdict Track A
 
-`SEC-03` … `SEC-06`, `BUG-07`, `BUG-10` … `BUG-13`, `CONC-14` … `CONC-19`, `N-08`, `N-09`,
-`N-14`, `N-15`, `N-16`. `CONC-14` is the root fix that resolves `CONC-15`/`16`/`17`/`18`.
+**Done, 2026-08-18:** `N-08` (millis() rollover), `N-09` (corrected, no live hazard — see
+STATUS box below), `SEC-03`, `SEC-04`, `SEC-05`, `SEC-06`, `BUG-07`, `BUG-10`, `BUG-12`,
+`BUG-13`, `CONC-14`.
+
+**Still open:** `BUG-11`, `CONC-15` … `CONC-19`, `N-14`, `N-15`, `N-16`. `CONC-14`'s fix is
+claimed by the prior verdict to resolve `CONC-15`/`16`/`17`/`18` at the root, but that was
+**not re-verified** when `CONC-14` was fixed — treat all four as open until checked
+individually.
 
 ### Wave 3 — structural (propose upstream as a plan first)
 
-`N-13` (remove 14 over-synchronisations, delete `scanFlag`), `DRY-20` … `DRY-25`,
-`SIMP-26` … `SIMP-30`, `ALT-31` … `ALT-35`, `STATE-28`, plus the corrected C-02 extraction
-of ~221 radio-independent shared loop lines.
+~~`N-13`~~ **PARTIALLY DONE** 2026-08-18 — 3 of 14 over-synchronisations removed (`scanFlag`
+deleted, `displayMux` dropped on ESP32, `ch_util_rx_start` platform-split); see the STATUS box
+on N-13 above for the ~10 deliberately deferred candidates.
+
+`DRY-20` … `DRY-25`, `SIMP-26` … `SIMP-30`, `ALT-31` … `ALT-35`, `STATE-28`, plus the
+corrected C-02 extraction of ~221 radio-independent shared loop lines.
 
 ### Deferred, with triggers
 
@@ -677,5 +689,5 @@ of ~221 radio-independent shared loop lines.
 | Arduino 2.0.14 → 2.0.17 on the four lagging boards (C-04) | with Wave 0's CI matrix in place                           |
 | LVGL 8 → 9                                                | never, unless the T-Deck UI is rewritten for other reasons |
 | Radio interface / HAL                                     | only after C-02's cheap extraction proves the seam         |
-| Licensing (N-11)                                          | maintainer decision, not an engineering task               |
+| ~~Licensing (N-11)~~                                      | **CLOSED** 2026-08-18 — risk accepted, maintainer decision |
 | `FLASH_VERSION` migration (N-12)                          | before any change to `meshcom_settings` layout             |
