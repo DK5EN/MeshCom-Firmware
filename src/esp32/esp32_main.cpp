@@ -863,7 +863,7 @@ void esp32setup()
     #endif
 
     // if Node not set --> WifiAP Mode on
-    if(memcmp(meshcom_settings.node_call, "XX0XXX", 6) == 0 || meshcom_settings.node_call[0] == 0x00 || memcmp(meshcom_settings.node_call, "none", 4) == 0)
+    if(isNodeUnconfigured(meshcom_settings.node_call))
     {
         bWIFIAP = true;
         printlndeb("[INIT]...WIFIAP starting...");
@@ -999,7 +999,7 @@ void esp32setup()
         #endif
     }
 
-    if(memcmp(meshcom_settings.node_ssid, "XX0XXX", 6) == 0)
+    if(memcmp(meshcom_settings.node_ssid, DEFAULT_CALL_PREFIX, 6) == 0)
     {
         snprintf(meshcom_settings.node_ssid, sizeof(meshcom_settings.node_ssid), (char*)"none");
         snprintf(meshcom_settings.node_pwd, sizeof(meshcom_settings.node_pwd), (char*)"none");
@@ -1610,7 +1610,7 @@ void esp32setup()
 
     if(meshcom_settings.node_call[0] == 0x00)
     {
-        snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", (char*)"XX0XXX-00");
+        snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", (char*)DEFAULT_CALL);
     }
 
     // Create the BLE Device & WiFiAP

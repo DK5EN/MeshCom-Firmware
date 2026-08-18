@@ -2,6 +2,31 @@
 #define SOURCE_VERSION_SUB "p"
 #define SOURCE_VERSION_WEB_SUB "p"
 
+// Werkseinstellung des Rufzeichens und der zugehoerige "Node ist noch nicht
+// konfiguriert"-Test. Beides stand bisher als Literal an fuenf Stellen in drei
+// Images (esp32_main, nrf52_main, safeboot) und wurde dort unterschiedlich
+// geprueft -- safeboot testete vier Formen, die Mains drei, und der Default wurde
+// an einer weiteren Stelle erneut als Literal hingeschrieben. Aendert sich die
+// Werkseinstellung, muss das genau einmal hier passieren. ALT-34.
+#define DEFAULT_CALL "XX0XXX-00"
+#define DEFAULT_CALL_PREFIX "XX0XXX"
+
+// true, wenn das Rufzeichen noch die Werkseinstellung ist (oder leer/"none").
+// Der 6-Zeichen-Praefixtest deckt "XX0XXX-00" mit ab -- die vier Formen, die
+// safeboot einzeln geprueft hat, sind damit vollstaendig abgedeckt.
+#ifdef __cplusplus
+inline bool isNodeUnconfigured(const char *call)
+{
+    if (call == nullptr || call[0] == 0x00)
+        return true;
+    if (__builtin_memcmp(call, DEFAULT_CALL_PREFIX, 6) == 0)
+        return true;
+    if (__builtin_memcmp(call, "none", 4) == 0)
+        return true;
+    return false;
+}
+#endif
+
 #define FLASH_VERSION 20260724
 
 //Hardware Types
