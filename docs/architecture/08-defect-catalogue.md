@@ -718,13 +718,59 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 
 ### Wave 0 — enablement (no behaviour change, no hardware)
 
-| #       | Item                                                                                                                   | Evidence              | Status                                             |
-| ------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------- |
-| 0.1     | CI: build all 32 envs on PR and push                                                                                   | `TEST-38`             | done — CI build gate                               |
-| 0.2     | `-Wall -Wextra` on firmware targets (currently only safeboot), fix the 4 warnings, then `-Werror` on `build_src_flags` | F6, C-17              | open                                               |
-| ~~0.3~~ | `-Wundef` + convert `BOARD_*` to flags with separate name macros                                                       | N-10                  | **DONE** 2026-08-18 — see STATUS box on N-10 below |
-| 0.4     | Pin `nordicnrf52`                                                                                                      | 02 B-04               | open                                               |
-| 0.5     | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                                                      | `TEST-37`, C-14, C-03 | done — native test harness                         |
+| #       | Item                                                                                       | Evidence              | Status                                                |
+| ------- | ------------------------------------------------------------------------------------------ | --------------------- | ----------------------------------------------------- |
+| 0.1     | CI: build all 32 envs on PR and push                                                       | `TEST-38`             | done — CI build gate                                  |
+| ~~0.2~~ | `-Wall -Wextra` on firmware targets, fix the warnings, then `-Werror` on `build_src_flags` | F6, C-17              | **DONE (ESP32)** 2026-08-18 — see STATUS box below    |
+| ~~0.3~~ | `-Wundef` + convert `BOARD_*` to flags with separate name macros                           | N-10                  | **DONE** 2026-08-18 — see STATUS box on N-10 below    |
+| 0.4     | Pin `nordicnrf52`                                                                          | 02 B-04               | open — nRF52-only, wartet auf angeschlossene Hardware |
+| 0.5     | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                          | `TEST-37`, C-14, C-03 | done — native test harness                            |
+
+> **STATUS 2026-08-18 — 0.2 DONE fuer ESP32.**
+>
+> Ausgangslage war anders als hier notiert: `-Wall -Wextra` stand bereits im
+> `[esp32]`-Block (`build_flags`), galt also laengst fuer alle ESP32-Targets — die
+> Notiz "currently only safeboot" war veraltet. Was fehlte, war das Aufraeumen der
+> Warnungen und das Scharfschalten.
+>
+> Gemessen auf `heltec_wifi_lora_32_V3` (Clean-Build): genau **3 Warnungen in `src/`** —
+> 2x `-Wclobbered` in `src/Regexp.cpp:297` (`pattern`/`index` werden nach dem
+> `setjmp()` noch veraendert; folgenlos, weil der Fehlerpfad beide nicht mehr liest,
+> per `volatile` jetzt aber explizit garantiert) und 1x `-Wmisleading-indentation` in
+> `src/net_console.cpp:287` (`s_listen_fd = -1;` stand ungeschuetzt hinter dem `if`;
+> Verhalten war zufaellig korrekt, die Form ist es nicht). Alle uebrigen Warnungen
+> stammen aus `.pio/libdeps` (TinyGPSPlus, BMx280MI, OneWire) und sind nicht unsere.
+>
+> Scharfgeschaltet wurde deshalb ueber `build_src_flags` (nur `src/`), nicht ueber
+> `build_flags` — sonst brechen die Drittanbieter-Warnungen den Build:
+> `-Wformat=2 -Wno-missing-field-initializers -Werror`.
+>
+> `-Wformat=2` ist bewusst dabei: es haette die SEC-02-Fundstelle sofort gemeldet.
+> `-Wno-missing-field-initializers` (aus `-Wextra`) musste raus, weil es die
+> idiomatische ESP-IDF-Strukturinitialisierung trifft (`i2s_driver_config_t` in
+> `src/esp32/esp32_audio.cpp:540`, brach `t_deck`/`t_deck_plus`); die Restfelder sind
+> IDF-versionsabhaengig und bewusst 0.
+>
+> **Reichweite — wichtig, weil kleiner als "alle ESP32-Targets":** die Flags haengen am
+> `[esp32]`-Block und gelten damit exakt fuer die **23 Envs mit `extends = esp32`**.
+> Alle 23 wurden gebaut, alle SUCCESS.
+>
+> Nicht abgedeckt, weil ohne `extends = esp32` (erben weder `-Wall -Wextra` noch
+> `build_src_flags`, bauen unveraendert):
+>
+> - ESP32, aber eigener `build_flags`-Block: `t_deck_pro`, `t5_epaper`,
+>   `vision-master-e213`, `vision-master-e290`, `wireless-paper` — hier fehlt schon
+>   `-Wall -Wextra`, deshalb waere `-Werror` allein wirkungslos. Diese fuenf bleiben
+>   Rest von 0.2.
+> - nRF52: `wiscore_rak4631`, `heltec_t114`, `t_echo` — bewusst offen bis Hardware
+>   angeschlossen ist, dann zusammen mit 0.4.
+> - `esp32-safeboot`: vorbestehend defekt, von dieser Aenderung nachweislich nicht
+>   betroffen (kein `extends = esp32`); scheitert an einem Toolchain-Fehler des
+>   Tasmota-Platform-Forks (`FRAMEWORK_DIR` = None in `arduino.py`), nicht an einer
+>   Warnung. `esp32-S3-safeboot` baut sauber.
+>
+> Auf Hardware (Heltec V3) geflasht und geprueft: kein Boot-Loop, Webserver HTTP 200,
+> BLE verbindet.
 
 ### Wave 1 — RF-reachable criticals (each a standalone PR)
 

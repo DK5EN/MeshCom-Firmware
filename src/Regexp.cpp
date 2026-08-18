@@ -294,7 +294,14 @@ init: /* using goto's to optimize tail recursion */
 
 // functions below written by Nick Gammon ...
 
-char MatchState::Match (/*const*/ char * pattern, unsigned int index)
+// pattern/index werden nach dem setjmp() noch veraendert (index-Klemmung,
+// pattern++ bei '^'). Nicht-volatile lokale Variablen haben nach einem longjmp()
+// einen unbestimmten Wert -> -Wclobbered. Hier ist das folgenlos, weil der
+// Fehlerpfad direkt ueber rtn zurueckkehrt und beide nicht mehr liest; volatile
+// macht die Garantie aber explizit statt sie vom Codefluss abhaengig zu lassen.
+// Top-Level-volatile an Parametern aendert die Funktionssignatur nicht, die
+// Deklaration in Regexp.h bleibt unveraendert gueltig.
+char MatchState::Match (/*const*/ char * volatile pattern, volatile unsigned int index)
 {
   // set up for throwing errors
   char rtn = setjmp (regexp_error_return);
