@@ -863,6 +863,43 @@ candidates outside the original list — not part of N-13, deliberately left for
 `DRY-20` … `DRY-25`, `SIMP-26` … `SIMP-30`, `ALT-31` … `ALT-35`, `STATE-28`, plus the
 corrected C-02 extraction of ~221 radio-independent shared loop lines.
 
+> **STATUS 2026-08-19 — Track-B-Durchgang fuer ESP32/Heltec V3.**
+>
+> Abgearbeitet, jeweils ein Commit, jeweils gebaut und auf echter Hardware geflasht
+> und geprueft (kein Boot-Loop, Webserver HTTP 200, BLE verbindet):
+>
+> | ID                           | Ergebnis                                                                                                                                                                                                                      |
+> | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | `SIMP-29`                    | **DONE** — `src/idf_component.yml.orig` (byte-identische Dublette) und `src/code_review/` (Audit-Bericht im kompilierten Quellbaum) entfernt                                                                                  |
+> | `SIMP-30`                    | **DONE** — doppeltes `extern strSOFTSERAPP_ID` entfernt; HDOP-Zwillinge auf `fposinfo_hdop` zusammengelegt. Das war ein **echter Defekt**: mehrere Pfade setzten nur den int, Display und Webseite lasen verschiedene Quellen |
+> | `DRY-25`                     | **DONE** — I2C-Bus-Reset-Guard zentral als `MC_I2C_NEEDS_BUS_RESET`. Echter Defekt: `bmx280.cpp:131/143` liessen `BOARD_E22_S3` aus, genau an den zwei Stellen, die den Sensor adressieren                                    |
+> | `ALT-33`                     | **DONE** — die zwei byte-identischen Zweige (`ENABLE_XML`/`ENABLE_SBUFFER`) zusammengelegt                                                                                                                                    |
+> | `ALT-34`                     | **DONE** — `DEFAULT_CALL`/`isNodeUnconfigured()` einmal in `configuration_global.h`, benutzt von allen drei Images                                                                                                            |
+> | `ALT-35`                     | **DONE** — `bDisplayDirty` von `bOneButton` getrennt; das Flag bedeutet wieder ausschliesslich "Taste gedrueckt"                                                                                                              |
+> | `iWrite`/`iRead`/`loraWrite` | **DONE** — N-13-Klasse, auf ESP32 ueber `ring_index_t` entatomisiert; Ring unter Last geprueft (`--sendpos`, drei `RADIO_TX`)                                                                                                 |
+>
+> **`STATE-28` — das gemeldete Live-Beispiel ist REFUTED.** Der Befund nennt
+> `esp32_main.cpp` als Beleg: `bGATEWAY=false` beim Boot ohne Loeschen des
+> persistierten `0x1000`-Bits, angeblich "`--info`/JSON-Export widersprechen dem
+> Flash". Nachgeprueft: **beide** Ausgaben lesen den Bool (`command_functions.cpp:4996`
+> und `:5368`), es gibt also gar keine widerspruechliche Ausgabe. Bleibt der Effekt,
+> dass das Gateway beim naechsten Boot mit vorhandenen Zugangsdaten wieder angeht --
+> das ist absichtserhaltend und gewollt: der Benutzerwunsch "Gateway an" ueberlebt
+> eine Phase ohne WLAN. Das Bit zu loeschen waere die schlechtere Variante, weil der
+> Benutzer das Gateway nach dem Nachtragen der Zugangsdaten neu einschalten muesste.
+> Der uebrige Befund (zwei Wahrheitsquellen, ~94 Update-Stellen) bleibt als Epic offen.
+>
+> **Bewusst nicht angefasst — Epics, die der Katalog selbst "propose to upstream first"
+> nennt und die gegen die Projektregel "minimal changes, kein Refactoring grosser
+> Teile" laufen:** `SIMP-26` (commandAction, ~4860 Zeilen), `SIMP-27`
+> (loop_functions.cpp aufteilen), `DRY-20` (zwei Batterie-Implementierungen),
+> `DRY-24` (59 Toggles), `ALT-31` (Retransmit-Statusbyte), `ALT-32` (Display-Capability-
+> Makros), `DRY-23` (enqueueTx/nextMsgId). `DRY-21`/`DRY-22` sind nRF52-seitig.
+>
+> **`BUG-09` ist bereits behoben** — der fehlende Clamp in `addBLEComToOutBuffer` kam
+> mit `4e5ef591` (N-04) mit; `loop_functions.cpp:593` klemmt auf 245, Laengenbyte und
+> `memcpy` sind seitdem konsistent. Nie als geschlossen vermerkt, hiermit nachgeholt.
+
 ### Deferred, with triggers
 
 | Item                                                      | Trigger to revisit                                                                                            |
