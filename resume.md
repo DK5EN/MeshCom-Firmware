@@ -267,6 +267,13 @@ Project skills, in `.claude/commands/`:
 | **TEST-37/39** native harness   | `3fb2c917` | 11/11 green **plus mutation probe** proving the suite can fail                                                                                                                                                 |
 | **N-08** millis() rollover      | `0ccebe8d` | 25 deadline comparisons (21 found + 4 in reversed form) converted to the safe subtraction idiom; native regression test added; 4 boards built, RAM unchanged, flash +16..+64 B                                 |
 | **N-13** over-sync (partial)    | `4a250602` | 3 of 14 candidates fixed (`scanFlag` deleted, `displayMux` dropped on ESP32, `ch_util_rx_start` platform-split); 4 boards built, ESP32 RAM -16 B / flash -108..-120 B; remaining ~10 candidates deferred       |
+| **SEC-03** BLE 0x55 OOB read    | `c342f07e` | `ssid_len`/`pwd_len` bounded against declared frame length, VLAs replaced with fixed buffers                                                                                                                   |
+| **BUG-07** BLE 0xA0 underflow   | `e69f88f5` | `msg_len < 2` gate before subtraction                                                                                                                                                                          |
+| **SEC-04** URL-decode overrun   | `5d2cf889` | loop redriven by real source consumption, every destination write bounded                                                                                                                                      |
+| **SEC-05/06/BUG-12** UDP OOB    | `f368a7c3` | read capped at `UDP_TX_BUF_SIZE-1`, zero-scan loop bound fixed; one commit per prior verdict's own grouping                                                                                                    |
+| **BUG-10** handleACK gate       | `7b968884` | `size < 12` check before the 12-byte `memcpy`                                                                                                                                                                  |
+| **BUG-13** APRS trailer bound   | `0aa28f42` | `inext+4 > rsize` check added, matches existing malformed-frame handling                                                                                                                                       |
+| **CONC-14** nRF52 BLE queue     | `a441ece6` | BLE callback now enqueues instead of calling `readPhoneCommand()` inline, mirrors ESP32's `bleQueue` exactly; `CONC-15`/`16`/`17`/`18` not re-verified as resolved                                             |
 
 **Verification discipline applied throughout** — worth recording, because it caught real
 errors in our own work:
@@ -307,7 +314,7 @@ Each one standalone commit and PR. All verified against the source; details in d
 
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
-`SEC-03`–`SEC-06`, `BUG-07`, `BUG-10`–`BUG-13`, `CONC-14`–`CONC-19`, `N-14`–`N-16`.
+`BUG-11`, `CONC-15`–`CONC-19`, `N-14`–`N-16`.
 
 ~~`N-08`~~ **FIXED** 2026-08-18 — 25 deadline comparisons converted to the safe subtraction
 idiom (`0ccebe8d`).
@@ -317,7 +324,29 @@ idiom (`0ccebe8d`).
 `lora_init()` unconditionally returns true and its result is never read. No code change; see
 the STATUS box on N-09 in `08-defect-catalogue.md`.
 
-`CONC-14` is the root fix that resolves `CONC-15`/`16`/`17`/`18`.
+~~`SEC-03`~~ **FIXED** 2026-08-18 — BLE 0x55 Wi-Fi config: `ssid_len`/`pwd_len` bounded against
+the declared frame length, VLAs replaced with fixed buffers (`c342f07e`).
+
+~~`SEC-04`~~ **FIXED** 2026-08-18 — URL-decode loop into `msg_text_checked[200]` rewritten to
+be driven by real source consumption, every destination write bounded (`5d2cf889`).
+
+~~`SEC-05`~~/~~`SEC-06`~~/~~`BUG-12`~~ **FIXED** 2026-08-18 — UDP/external-UDP receive
+off-by-one and zero-scan over-read, one combined commit per the prior verdict's own grouping
+(`f368a7c3`).
+
+~~`BUG-07`~~ **FIXED** 2026-08-18 — BLE 0xA0 text-command length underflow gated on
+`msg_len < 2` (`e69f88f5`).
+
+~~`BUG-10`~~ **FIXED** 2026-08-18 — `handleACK` gated on `size < 12` before the 12-byte
+`memcpy` (`7b968884`).
+
+~~`BUG-13`~~ **FIXED** 2026-08-18 — APRS trailer/FCS read bounded against `rsize`, matching
+the existing malformed-frame convention (`0aa28f42`).
+
+~~`CONC-14`~~ **FIXED** 2026-08-18 — nRF52 BLE receive callback now enqueues instead of
+calling `readPhoneCommand()` inline, mirroring ESP32's `bleQueue` design exactly (`a441ece6`).
+`CONC-15`/`16`/`17`/`18` were **not** re-verified as resolved by this root fix — treat as
+still open until checked individually.
 
 ### 3.5 Then — Wave 3, structural (propose upstream as a plan first)
 
@@ -331,15 +360,15 @@ extraction of the ~221 genuinely shared, radio-independent loop lines.
 
 ### 3.6 Deferred, with explicit triggers
 
-| Item                                                                          | Revisit when                                                                              |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Arduino 3.x migration                                                         | Wave 0 has delivered a RAM baseline and a CI gate                                         |
-| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                               | the CI matrix is in place                                                                 |
-| Radio interface / HAL                                                         | only after C-02's cheap extraction proves the seam                                        |
-| LVGL 8 → 9                                                                    | never, unless the T-Deck UI is rewritten anyway                                           |
-| Licensing (`N-11`: GPL-3.0 libs statically linked into MIT-licensed firmware) | maintainer decision, not an engineering task                                              |
-| `FLASH_VERSION` migration (`N-12`)                                            | **before** any change to the `meshcom_settings` layout                                    |
-| Hardware bench (2 × Heltec V3)                                                | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
+| Item                                                                            | Revisit when                                                                              |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Arduino 3.x migration                                                           | Wave 0 has delivered a RAM baseline and a CI gate                                         |
+| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                                 | the CI matrix is in place                                                                 |
+| Radio interface / HAL                                                           | only after C-02's cheap extraction proves the seam                                        |
+| LVGL 8 → 9                                                                      | never, unless the T-Deck UI is rewritten anyway                                           |
+| ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned | closed                                                                                    |
+| `FLASH_VERSION` migration (`N-12`)                                              | **before** any change to the `meshcom_settings` layout                                    |
+| Hardware bench (2 × Heltec V3)                                                  | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
 
 ### 3.6a Sizing — input for the G12 decision
 
@@ -372,7 +401,6 @@ natural unit to decide about, rather than "everything".
 | G12 | All at once, or spread over weeks?                                                                                                                                                  | **open** — sizing now possible from doc 08 §5               |
 | —   | Split the 5 historical bundled commits into one-per-finding? (`e957b964` = D1+D2+D5+A1, `b2854586` = A1+B1+B5+C2, `4123eac0` = A1+A2+B2+C3, `3457a295` = A1+D3, `8009aa19` = C1+B3) | **open** — needed only if those go upstream as separate PRs |
 | —   | When to open the first upstream PRs                                                                                                                                                 | **open**                                                    |
-| —   | `N-11` licensing                                                                                                                                                                    | **open**                                                    |
 
 ---
 

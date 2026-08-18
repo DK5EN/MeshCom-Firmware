@@ -488,6 +488,10 @@ Also: an external contributor patched `lib/TinyGSM/` in place, invisible to `lib
 Not a code defect, but it is the kind of thing that surfaces at the worst moment. Needs a
 decision, not a fix.
 
+> **STATUS 2026-08-18 — AKZEPTIERT (Maintainer-Entscheidung).**
+> Das Lizenzrisiko wird angenommen, kein Aenderungsauftrag daraus abgeleitet. Der Befund
+> bleibt technisch gueltig und ist hier unveraendert dokumentiert.
+
 ### N-12 — `FLASH_VERSION` neither migrates nor resets — **CONFIRMED** — High
 
 The version check runs _after_ `init_flash()` and is not followed by a re-read, so the old
