@@ -3,22 +3,23 @@
 Working document for picking the campaign back up. Records **what we set out to do**,
 **how we decided to get there**, and **exactly where we stand**.
 
-Last updated 2026-07-31. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-18. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
 > ### Standing risk — read first
 >
-> **Six RF- or network-reachable critical defects are catalogued and currently unfixed in
-> shipped firmware.** They are `N-01` (`{MCP}` remote command reachable without a valid
-> password), `N-02` (`{SET}` changes mesh routing with no authentication), `N-04`
-> (`memcpy` with a length near `SIZE_MAX` from one received frame), `N-05` (heap over-read
-> that is rebroadcast over the air), `N-06` (unbounded array index from a web parameter),
-> `N-07` (BLE command channel unauthenticated and ungated). Details and fixes:
+> **Status 2026-08-18.** Of the eight RF- or network-reachable defects, **four are now fixed on
+> this branch** — `N-03` (CONF zero-fill), `N-04` (BLE length underflow), `N-05` (mheard heap
+> over-read), `N-06` (web `t_io` index) — plus `SEC-02` (format string). None are upstream yet,
+> so **the shipped fleet still runs all of them**.
+>
+> **Three remain deliberately unfixed**, accepted by maintainer decision on 2026-08-18:
+> `N-01` (`{MCP}` password bypass), `N-02` (`{SET}` unauthenticated routing change) and `N-07`
+> (BLE command channel unauthenticated). `N-01`/`N-02` are accepted as risk. `N-07` because the
+> effective fix is BLE bonding, which disconnects every existing phone app until the user
+> re-pairs — an upstream decision, not a branch decision. Rationale in
 > [`docs/architecture/08-defect-catalogue.md` §2](docs/architecture/08-defect-catalogue.md).
 >
-> Two others of the same class have been fixed on this branch — `SEC-02` (`1cbcf8c9`) and
-> `N-03` (`93bb68d0`) — but are **not yet upstream**, so the fleet still runs them.
->
-> This is the reason the campaign exists. It is not a backlog to groom at leisure.
+> Getting the four fixes upstream is now the highest-value open item in this campaign.
 
 ---
 
@@ -278,12 +279,12 @@ errors in our own work:
 
 ### 3.2 Immediately next — Wave 0, no hardware needed
 
-| #   | Step                                                                                                                                                                                                                             | Refs            |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| 0.4 | Pin `nordicnrf52` to an exact version (currently unpinned → CI and local build against different cores)                                                                                                                          | doc 02 B-04     |
-| 0.2 | Add `-Wall -Wextra` to the **9 of 34 environments** that lack it (all three nRF52 boards, `t5_epaper`, `t_deck_pro`, both Vision-Master, `wireless-paper`); then fix the resulting warnings; then `-Werror` on `build_src_flags` | doc 08 Wave 0.2 |
-| 0.3 | Add `-Wundef`; convert `BOARD_*` to flags with separate name macros                                                                                                                                                              | `N-10`          |
-| 0.6 | Extend the native suite: CSMA timing math, `via_functions`, `compress_functions` (the latter already surfaces two `-Wsign-compare` warnings)                                                                                     | doc 08 Wave 0.5 |
+| #       | Step                                                                                                                                                                                                                                                                                                                                               | Refs            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 0.4     | Pin `nordicnrf52` to an exact version (currently unpinned → CI and local build against different cores)                                                                                                                                                                                                                                            | doc 02 B-04     |
+| 0.2     | Add `-Wall -Wextra` to the **9 of 34 environments** that lack it (all three nRF52 boards, `t5_epaper`, `t_deck_pro`, both Vision-Master, `wireless-paper`); then fix the resulting warnings; then `-Werror` on `build_src_flags`                                                                                                                   | doc 08 Wave 0.2 |
+| ~~0.3~~ | **DONE** 2026-08-18 — zwoelf Guards auf `defined()` (zwei davon nur ueber `-Wundef` gefunden, `aht20.cpp` ist ISO-8859 und wird von `grep` ohne `-a` uebersprungen). `-Wundef` NICHT im Build aktiviert: 10.317 Treffer, davon 2 aus `src/`. Regressionsschutz stattdessen als CI-Job `macro-guards`. `BOARD_*`-Stringmakros bewusst unangetastet. | `N-10`          |
+| 0.6     | Extend the native suite: CSMA timing math, `via_functions`, `compress_functions` (the latter already surfaces two `-Wsign-compare` warnings)                                                                                                                                                                                                       | doc 08 Wave 0.5 |
 
 The measured warning volume where the flags _are_ active is **9 in the whole build, 4 in
 `src/`** — so `-Werror` is nearly free. A June audit rejected it as CRITICAL on the
@@ -293,14 +294,14 @@ assumption of a large existing backlog; that backlog does not exist.
 
 Each one standalone commit and PR. All verified against the source; details in doc 08 §2.
 
-| ID     | Item                                                                                                   | Size    |
-| ------ | ------------------------------------------------------------------------------------------------------ | ------- |
-| `N-01` | `{MCP}` password is a character-set membership test — five spaces pass for any password under 14 chars | small   |
-| `N-02` | `{SET}` changes mesh routing with **no authentication and no range check**                             | small   |
-| `N-04` | `memcpy` with length near `SIZE_MAX` from one 252–255 byte frame                                       | small   |
-| `N-05` | mheard heap over-read that is **rebroadcast over the air**                                             | 1 line  |
-| `N-06` | unbounded array index from a web parameter                                                             | 2 lines |
-| `N-07` | BLE command channel unauthenticated and ungated                                                        | small   |
+| ID         | Item                                                                       | Size |
+| ---------- | -------------------------------------------------------------------------- | ---- |
+| ~~`N-01`~~ | ACCEPTED / WONTFIX 2026-08-18 — risk accepted, not fixed                   | —    |
+| ~~`N-02`~~ | ACCEPTED / WONTFIX 2026-08-18 — risk accepted, not fixed                   | —    |
+| ~~`N-04`~~ | **FIXED** 2026-08-18 — branch-aware producer clamp + consumer bounds check | done |
+| ~~`N-05`~~ | **FIXED** 2026-08-18 — both memcpy lengths now source-derived              | done |
+| ~~`N-06`~~ | **FIXED** 2026-08-18 — bank/digit validation at all three sites            | done |
+| ~~`N-07`~~ | ACCEPTED / WONTFIX 2026-08-18 — bonding would break the app fleet          | —    |
 
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
