@@ -3,7 +3,7 @@
 Working document for picking the campaign back up. Records **what we set out to do**,
 **how we decided to get there**, and **exactly where we stand**.
 
-Last updated 2026-08-18. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-19. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
 > ### Standing risk — read first
 >
@@ -11,6 +11,11 @@ Last updated 2026-08-18. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 > this branch** — `N-03` (CONF zero-fill), `N-04` (BLE length underflow), `N-05` (mheard heap
 > over-read), `N-06` (web `t_io` index) — plus `SEC-02` (format string). None are upstream yet,
 > so **the shipped fleet still runs all of them**.
+>
+> **Achtung bei `SEC-02`:** der Fix allein ist nicht vollstaendig. `d36fb66f` hat als
+> Nebenwirkung jeden BLE-Verbindungsaufbau verhindert (`N-18`, auf Hardware per Bisect
+> gefunden, behoben mit `bd10b636`). Wer `SEC-02` upstream einreicht, muss **beide** Commits
+> zusammen nehmen — sonst liefert man eine tote BLE-Verbindung aus.
 >
 > **Three remain deliberately unfixed**, accepted by maintainer decision on 2026-08-18:
 > `N-01` (`{MCP}` password bypass), `N-02` (`{SET}` unauthenticated routing change) and `N-07`
@@ -280,7 +285,7 @@ Project skills, in `.claude/commands/`:
 | **N-17** boot-time WDT trip     | `6c084c83` | new finding, found flashing real hardware: `startNetwork()`'s blocking WiFi scan ran before the first watchdog feed, boot-looped a gateway-configured Heltec V3; `esp_task_wdt_reset()` added at 4 points; reproduced and fixed on real hardware, pre-existing, unrelated to today's other fixes                                                                                                                                                                                                                                                                                                                            |
 | **N-18** BLE-Verbindungsaufbau  | `bd10b636` | **Regression aus unserem eigenen SEC-02-Fix** (`d36fb66f`), auf Hardware per Bisect gefunden: `Serial.printf("%s", temp)` laesst `Print::printf` bei fast jeder Log-Zeile `malloc()`en (64-Byte-Stackpuffer); der Heap-Churn liess NimBLE (`MSYS1_BLOCK_COUNT=4`) keine mbufs fuer den Verbindungsaufbau finden, der Node beantwortete `CONNECT_IND` nicht mehr (Central: `0x3e` / `le-connection-abort-by-local`, auf dem Node feuerte weder `onConnect` noch `onDisconnect`). Fix: `Serial.write()` — SEC-02-Eigenschaft bleibt, ohne Allokation. Bisect gegen **pristine `upstream/dev`**, nicht gegen den Session-Start |
 | **BATT-01** Loop-Stall          | `b44fe712` | `read_batt()` blockierte die Hauptschleife ~100 ms alle ~500 ms (`delay(100)` fuer die ADC-Teiler-Einschwingzeit, Heltec-V3/V4/Stick-Zweig); auf Hardware gemessen, jetzt ueber zwei Aufrufe verteilt statt blockierend. Unabhaengig von N-18 und **nicht** dessen Ursache                                                                                                                                                                                                                                                                                                                                                  |
-| **0.2** `-Werror` fuer `src/`   | (this)     | `-Wall -Wextra` galt schon; 3 `src/`-Warnungen behoben (`Regexp.cpp` `-Wclobbered` via `volatile`, `net_console.cpp` `-Wmisleading-indentation`), dann `-Wformat=2 -Wno-missing-field-initializers -Werror` auf `build_src_flags` im `[esp32]`-Block. 22/23 ESP32-Envs SUCCESS (`esp32-safeboot` vorbestehend defekt, erbt die Flags nicht). nRF52 offen bis Hardware da ist                                                                                                                                                                                                                                                |
+| **0.2** `-Werror` fuer `src/`   | `deba2ad8` | `-Wall -Wextra` galt schon; 3 `src/`-Warnungen behoben (`Regexp.cpp` `-Wclobbered` via `volatile`, `net_console.cpp` `-Wmisleading-indentation`), dann `-Wformat=2 -Wno-missing-field-initializers -Werror` auf `build_src_flags` im `[esp32]`-Block. Reichweite sind die 23 Envs mit `extends = esp32`, alle 23 SUCCESS. Nicht erfasst: die fuenf ESP32-Envs ohne `extends` (`t_deck_pro`, `t5_epaper`, `vision-master-e213`/`e290`, `wireless-paper`) -- dort fehlt schon `-Wall -Wextra` -- sowie die drei nRF52-Boards. `esp32-safeboot` erbt die Flags nicht und ist vorbestehend defekt                               |
 
 **Verification discipline applied throughout** — worth recording, because it caught real
 errors in our own work:
