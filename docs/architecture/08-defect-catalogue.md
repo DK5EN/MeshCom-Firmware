@@ -659,6 +659,81 @@ before the fix — none of today's other fixes caused this.
 native` green; `heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`, `t_deck_pro` build clean.
 > RAM unchanged, flash +28 B.
 
+### N-18 — der SEC-02-Fix verhinderte jeden BLE-Verbindungsaufbau — **VERIFIED (auf echter Hardware, per Bisect)** — Critical
+
+Kein Befund aus dem Review von 2026-07-31 und nicht aus `fable-verdict.md`, sondern eine
+**Regression aus unserem eigenen Fix**: `d36fb66f` (SEC-02) hat den BLE-Verbindungsaufbau
+auf ESP32 vollstaendig unbrauchbar gemacht. Gefunden am 2026-08-18 beim Bisect gegen
+pristine `upstream/dev`, behoben mit `bd10b636`.
+
+SEC-02 ersetzte in `printfdeb()` (`src/printfdeb_functions.cpp`)
+
+```c
+Serial.printf(temp);            // unsicher: temp wird erneut als Format-String geparst
+Serial.printf("%s", temp);      // der Fix -- sicher, aber teuer
+```
+
+Die Sicherheitsaussage ist korrekt. Der Nebeneffekt war es nicht: `Serial` ist auf ESP32
+ueber `net_console.h:76` (`#define Serial MSerial`) letztlich `Print::printf`. Diese
+Funktion formatiert in einen **64-Byte-Stackpuffer** und `malloc()`t fuer jede laengere
+Ausgabe. Vorher wurden die `%`-Direktiven im fertigen Text ein zweites Mal geparst und die
+Ausgabe war meist kurz genug fuer die 64 Byte — **es gab keine Allokation**. Der
+Sicherheitsfix hat sie also erst eingefuehrt, und zwar bei nahezu jeder Log-Zeile.
+
+Dieser Heap-Churn liess NimBLE keine mbufs mehr fuer den Verbindungsaufbau finden (der
+Build nutzt `-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4` statt der Standard-12). Der Node
+beantwortete `CONNECT_IND` nicht mehr.
+
+**Diagnostisch wichtig, weil es in die Irre fuehrt:** der Central sieht
+`LE Connection Complete: Success`. Das beweist **nichts** ueber die Gegenstelle — dieses
+Event erzeugt der Central lokal, sobald er `CONNECT_IND` gesendet hat. Danach lief
+`LE Read Remote Used Features` in den Timeout und der Central brach nach ~250 ms mit
+`Connection Failed to be Established (0x3e)` ab; BlueZ meldete das als
+`le-connection-abort-by-local`, was nach einem Fehler auf der Central-Seite aussieht. Auf
+dem Node feuerte weder `onConnect` noch `onDisconnect`, weil der NimBLE-Host nie von einer
+Verbindung erfuhr.
+
+> **STATUS 2026-08-18 — BEHOBEN** (`bd10b636`). `Serial.write((const uint8_t*)temp, len)`
+> statt `Serial.printf("%s", temp)`: der Text wird nicht erneut als Format-String
+> interpretiert (SEC-02-Eigenschaft bleibt vollstaendig erhalten) und es wird nicht mehr
+> allokiert.
+>
+> Nachweiskette auf echter Hardware (Heltec V3 gegen einen BlueZ-Central):
+> pristine `upstream/dev` (`8114d7ae`) verbindet — `9b07ea1d` (Commit vor SEC-02) verbindet —
+> `d36fb66f` (SEC-02) 3/3 Fehlversuche — `d36fb66f` mit **nur** dem SEC-02-Hunk revertiert
+> verbindet wieder (isoliert den Commit) — HEAD inklusive aller 62 Commits plus Fix
+> verbindet. Builds `heltec_wifi_lora_32_V3` + `wiscore_rak4631` SUCCESS, native Tests 15/15.
+>
+> **Lehre fuer kuenftige Bisects:** der Startpunkt einer Sitzung ist keine bekannt-gute
+> Referenz. `da3f7330` (Sitzungsbeginn) schlug ebenfalls fehl und fuehrte zunaechst zu dem
+> falschen Schluss "liegt nicht an uns" — er war Commit 43 von 62 ueber `upstream/dev`. Erst
+> der Merge-Base war die echte Referenz.
+>
+> **Regel daraus:** `printf("%s", bereits_formatiert)` nie auf einem heissen Pfad. Fuer
+> fertige Strings `write()` benutzen — sicher _und_ allokationsfrei.
+
+### BATT-01 — `read_batt()` blockiert die Hauptschleife ~100 ms alle ~500 ms — **VERIFIED (auf echter Hardware)** — Medium
+
+Ebenfalls neu, gefunden 2026-08-18 bei der Instrumentierung waehrend der N-18-Suche.
+Vorbestehend (zuletzt angefasst 2026-08-03, `c78adcc5`), unabhaengig von N-18.
+
+Der Heltec-V3/V4/Stick-Zweig von `read_batt()` (`src/batt_function_old.cpp`) schaltet den
+ADC-Spannungsteiler ein und wartet dessen Einschwingzeit mit einem blockierenden
+`delay(100)` ab. Aufgerufen wird die Funktion ueber den `BattTimeWait`-Zweig in
+`esp32loop()` alle ~500 ms — die Hauptschleife steht damit dauerhaft rund ein Fuenftel der
+Zeit still. Auf Hardware gemessen: `[DBGSTALL] seg read_batt took 100617 us`,
+`loop gap 107000 us`, reproduzierbar im 500–600-ms-Takt.
+
+> **STATUS 2026-08-18 — BEHOBEN** (`b44fe712`). Einschwingzeit ueber zwei Aufrufe verteilt
+> statt zu blockieren: erster Aufruf schaltet den Teiler frei und merkt sich den
+> Zeitstempel, spaetere Aufrufe messen erst nach echten >=100 ms; bis dahin gilt der zuletzt
+> gemessene Wert. Messverhalten und Ergebniswert unveraendert, die Messkadenz geht von 500 ms
+> auf 1000 ms. Nach dem Fix verschwinden die Stall-Meldungen vollstaendig.
+>
+> **Abgrenzung:** war **nicht** die Ursache von N-18 — nach diesem Fix allein trat der
+> BLE-Fehler unveraendert auf. Der Stall ist fuer sich genommen real und wurde deshalb
+> behoben.
+
 ---
 
 ## 3. Refuted claims — do not re-investigate
@@ -860,8 +935,11 @@ not actual defects (`transmissionState`, the `pendingDisplay*` fields); see the 
 N-13 above. `iWrite`/`iRead`/`loraWrite` surfaced during re-verification as further same-class
 candidates outside the original list — not part of N-13, deliberately left for a future pass.
 
-`DRY-20` … `DRY-25`, `SIMP-26` … `SIMP-30`, `ALT-31` … `ALT-35`, `STATE-28`, plus the
-corrected C-02 extraction of ~221 radio-independent shared loop lines.
+**Offen:** `DRY-20`–`DRY-24`, `SIMP-26`, `SIMP-27`, `ALT-31`, `ALT-32`, `STATE-28` (Epic-Teil),
+plus the corrected C-02 extraction of ~221 radio-independent shared loop lines.
+
+**Erledigt 2026-08-19 (ESP32/Heltec V3):** ~~`DRY-25`~~, ~~`SIMP-29`~~, ~~`SIMP-30`~~,
+~~`ALT-33`~~, ~~`ALT-34`~~, ~~`ALT-35`~~ — siehe STATUS-Box unten.
 
 > **STATUS 2026-08-19 — Track-B-Durchgang fuer ESP32/Heltec V3.**
 >
