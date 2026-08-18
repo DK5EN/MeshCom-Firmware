@@ -285,7 +285,10 @@ void stopNetConsole()
 
     // stop
     if(s_listen_fd >= 0)
-        ::close(s_listen_fd); s_listen_fd = -1;
+    {
+        ::close(s_listen_fd);
+    }
+    s_listen_fd = -1;
 
     if (s_mutex && xSemaphoreTake(s_mutex, portMAX_DELAY) == pdTRUE)
     {
