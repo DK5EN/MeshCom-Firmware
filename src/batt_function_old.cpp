@@ -487,31 +487,54 @@ float read_batt(void)
 		*/
 		const float factor = ADC_MULTIPLIER;
 		/**/
-		
-		//V3.1
-		//digitalWrite(ADC_CTRL_PIN, LOW);
-		digitalWrite(ADC_CTRL_PIN, HIGH);
 
-		delay(100);
-		int analogValue = analogRead(vbat_pin);
-		
-		//V3.1 digitalWrite(ADC_CTRL_PIN, HIGH);
-		digitalWrite(ADC_CTRL_PIN, LOW);
+		// Divider needs ~100 ms to settle after being enabled. Das bisherige
+		// blockierende delay(100) haelt dabei die komplette Hauptschleife an --
+		// alle ~500 ms (die BattTimeWait-Kadenz), gemessen ~100,6 ms pro Aufruf.
+		// Spread the settle across two read_batt() calls instead of blocking:
+		// arm+enable on one call (return the previous cached value), read+disable
+		// on the next call once >=100 ms has actually elapsed.
+		static bool dividerArmed = false;
+		static uint32_t dividerArmedAt = 0;
+		static float cachedRaw = 0.0;
 
-		float floatVoltage = factor * analogValue;
-		uint16_t voltage = (int)(floatVoltage);
-
-		if(bDEBUG && bDisplayCont)
+		if (!dividerArmed)
 		{
-			printdeb("[readBatteryVoltage] ADC : ");
-			printlndeb(analogValue);
-			printdeb("[readBatteryVoltage] Float : ");
-			printfdeb("%.3f\n", floatVoltage);
-			printdeb("[readBatteryVoltage] milliVolts : ");
-			printlndeb(voltage);
+			//V3.1
+			//digitalWrite(ADC_CTRL_PIN, LOW);
+			digitalWrite(ADC_CTRL_PIN, HIGH);
+			dividerArmedAt = millis();
+			dividerArmed = true;
+			raw = cachedRaw;
 		}
+		else if ((uint32_t)(millis() - dividerArmedAt) >= 100)
+		{
+			int analogValue = analogRead(vbat_pin);
 
-		raw = floatVoltage;
+			//V3.1 digitalWrite(ADC_CTRL_PIN, HIGH);
+			digitalWrite(ADC_CTRL_PIN, LOW);
+			dividerArmed = false;
+
+			float floatVoltage = factor * analogValue;
+			uint16_t voltage = (int)(floatVoltage);
+
+			if(bDEBUG && bDisplayCont)
+			{
+				printdeb("[readBatteryVoltage] ADC : ");
+				printlndeb(analogValue);
+				printdeb("[readBatteryVoltage] Float : ");
+				printfdeb("%.3f\n", floatVoltage);
+				printdeb("[readBatteryVoltage] milliVolts : ");
+				printlndeb(voltage);
+			}
+
+			raw = floatVoltage;
+			cachedRaw = floatVoltage;
+		}
+		else
+		{
+			raw = cachedRaw;
+		}
 
 		#elif defined(BOARD_TBEAM_1W)
 
