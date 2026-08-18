@@ -603,7 +603,7 @@ void nrf52setup()
 
     // if Node not set --> WifiAP Mode on
     /* NRF52 no WiFi
-    if(memcmp(meshcom_settings.node_call, "XX0XXX", 6) == 0 || meshcom_settings.node_call[0] == 0x00 || memcmp(meshcom_settings.node_call, "none", 4) == 0)
+    if(isNodeUnconfigured(meshcom_settings.node_call))
     {
         bWIFIAP = true;
         bWEBSERVER = true;
