@@ -367,7 +367,7 @@ void sendUBX_CFG_CFG() {  // Binäres Paket senden
 String readUBX() {
   startTimeout = millis() + 500;
   ver = "";
-  while (millis() < startTimeout) {
+  while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
     #else
@@ -388,7 +388,7 @@ String readUBX() {
 String readUBXbin() {
   startTimeout = millis() + 500;
   ver = "";
-    while (millis() < startTimeout) {
+    while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
       int c = Serial1.read();
@@ -411,14 +411,14 @@ String readUBXbin() {
 void WaitPause() {
   startTimeout = millis() + 1000;
   #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  while ((!Serial1.available()) && (millis() < startTimeout)) { delay(5); } // auf Block von Zeichen warten
+  while ((!Serial1.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
   #else
-  while ((!GPSSerial.available()) && (millis() < startTimeout)) { delay(5); } // auf Block von Zeichen warten
+  while ((!GPSSerial.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
   #endif
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...wait");
   startTimeout = millis() + 50;  // für Serial Sync Zeichenblock lesen und Pause von 50ms abwarten
-  while (millis() < startTimeout) {
+  while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     if (Serial1.available()) {
       Serial1.read();
@@ -596,7 +596,7 @@ bool GPSprobe() {
     ver = ver + char(GPSSerial.read());
   #endif
 
-    if (millis() > startTimeout) { // RC-Buffer muss nach WAIT_DURATION leer sein
+    if ((int32_t)(millis() - startTimeout) > 0) { // RC-Buffer muss nach WAIT_DURATION leer sein
       Serial.printf("[GPS_ERR] wait stop NMEA timeout!\n");
       return false;
     }

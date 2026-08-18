@@ -583,7 +583,7 @@ float getTempForNTC()
 {
     static float temperature = 0.0f;
     static uint32_t check_temperature = 0;
-    if (millis() > check_temperature) {
+    if ((int32_t)(millis() - check_temperature) > 0) {
         analogSetAttenuation(ADC_11db); // bis <2,2V
         float voltage = analogReadMilliVolts(NTC_PIN);
         uint16_t raw = analogReadRaw(NTC_PIN);
@@ -2761,7 +2761,7 @@ void esp32loop()
             }
 
             // check every 15 minuten to check telemetry via serial interface is ok
-            if ((lTELE_TIMER + (15 * 60 * 1000)) < millis())
+            if ((int32_t)(millis() - (lTELE_TIMER + (15 * 60 * 1000))) > 0)
             {
                 printfdeb("[SOFTSER] Reset Node, XML not working\n");
                 delay(1000);
@@ -3243,7 +3243,7 @@ void esp32loop()
     #if not defined(BOARD_T_DECK_PRO)
     if(DisplayOffWait > 0)
     {
-        if (millis() > DisplayOffWait)
+        if ((int32_t)(millis() - DisplayOffWait) > 0)
         {
             DisplayOffWait = 0;
             if(bDisplayOff)
@@ -3264,7 +3264,7 @@ void esp32loop()
     // rebootAuto
     if(rebootAuto > 0)
     {
-        if (millis() > rebootAuto)
+        if ((int32_t)(millis() - rebootAuto) > 0)
         {
             rebootAuto = 0;
 
@@ -3765,7 +3765,7 @@ void esp32loop()
 
     if(meshcom_settings.node_pingtime > 29 && meshcom_settings.node_pingcall[0] != 0x00 && meshcom_settings.node_pingcount > 0)
     {
-        if((resendPing + meshcom_settings.node_pingtime * 1000) < millis())
+        if((int32_t)(millis() - (resendPing + meshcom_settings.node_pingtime * 1000)) > 0)
         {
             if(bPingSend)
             {
@@ -3805,7 +3805,7 @@ void esp32loop()
     //    the normal budget, and skips RING_STATUS_EXT_PENDING. It touches only the
     //    ring (no CAD/TX/RX/RadioLib). A requeued retry becomes a READY slot that
     //    externalRadioTxStep() submits with a fresh ownership token.
-    if((retransmit_timer + (1000 * 2)) < millis())
+    if((int32_t)(millis() - (retransmit_timer + (1000 * 2))) > 0)
     {
         updateRetransmissionStatus();
         retransmit_timer = millis();
