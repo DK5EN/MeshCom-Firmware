@@ -403,12 +403,35 @@ including **both** platforms' `rebootAuto` (`esp32_main.cpp:3173`, `nrf52_main.c
 and `DisplayOffWait` (`:3153`, `:2000`). After 49.7 days of uptime the scheduled reboot
 either never fires or fires immediately. Mesh nodes run for months.
 
+> **STATUS 2026-08-18 — BEHOBEN.** 25 direkte Vergleiche (21 aus der urspruenglichen
+> Fundstellenliste plus 4 in umgekehrter Schreibweise `(X) < millis()`, die derselbe
+> Grep-Lauf nicht erfasst hatte) mechanisch auf `(int32_t)(millis() - X) <op> 0`
+> umgeformt -- dieselbe Subtraktionstechnik, die im Code bereits an ~70 Stellen fuer
+> Intervallvergleiche etabliert ist. Die Zuweisungen (`X = millis() + N`) waren bereits
+> sicher und blieben unveraendert. Regressionstest `test/test_millis_rollover/`
+> bildet den Ueberlaufmechanismus nach; die Aufrufstellen selbst sind wegen
+> Hardware-Abhaengigkeiten nicht nativ testbar. Vier Boards sauber gebaut
+> (`heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`, `t_deck_pro`), RAM
+> unveraendert, Flash +16..+64 Byte je Board.
+
 ### N-09 — 11 × `while (true);` hard hang — **VERIFIED** — High
 
 `src/t-deck-pro/peri_lora.cpp:48–114`. The 2026-06-26 audit mandated a fix and explicitly
 pre-rejected the T-Deck-Pro exemption in writing ("_trotz T-Deck-Pro: geteilter
 Code-Pfad_"). `code-audit-fixes-20260627.md:70` then used that exemption and marked the row
 ✅ done. `t_deck_pro` is in `default_envs` and ships as a CI release artifact.
+
+> **STATUS 2026-08-18 — KORRIGIERT, KEIN LIVE-BEFUND.** Re-verifiziert gegen den aktuellen
+> Baum: der gesamte Koerper von `lora_init()` -- einschliesslich aller elf `while (true);` --
+> steckt in einem einzigen `/* ... */`-Blockkommentar, der seit dem einzigen Commit dieser
+> Datei (`462da95f`, 2025-08-02) existiert. Die Funktion tut nur `return true;` und
+> `peri_init_st[E_PERI_LORA]` (`tdeck_pro.cpp:509`) wird nirgends gelesen. Die elf Haenger
+> sind also seit ueber einem Jahr toter Code, nicht die vom 2026-06-26-Audit angenommene
+> aktive Gefahr. **Bewusst kein Code-Fix**: eine Aenderung an totem, auskommentiertem Code
+> haette keine Laufzeitwirkung; das Reaktivieren des ganzen `lora_init()`-Pfads waere eine
+> eigene, deutlich groessere Entscheidung (T-Deck-Pro-LoRa-Init ueber RadioLib scharfschalten)
+> und liegt ausserhalb dieses Befunds. Severity von High auf **keine** korrigiert. Erneut
+> aufgreifen, falls `lora_init()` jemals aus dem Kommentar geholt wird.
 
 ### N-10 — board identity macros are arithmetic on product names — **VERIFIED** — Medium
 
@@ -491,6 +514,26 @@ And `displayMux` is worse than redundant: `queueDisplayText` (`lora_functions.cp
 copies an `aprsMessage` containing **seven Arduino `String`s** — seven heap allocations —
 inside `portENTER_CRITICAL(&displayMux)`, i.e. with interrupts disabled and a cross-core
 spinlock held. On nRF52 the same code runs under `taskENTER_CRITICAL()`.
+
+> **STATUS 2026-08-18 — BEHOBEN (drei von 14 Kandidaten, Umfang bewusst begrenzt).**
+> `scanFlag` geloescht (bestaetigt: null Leser, null Schreiber im gesamten Baum).
+> `displayMux`-Spinlock auf ESP32 an allen drei Stellen entfernt — Schreiber
+> (`queueDisplayText`/`queueDisplayPosition`, `lora_functions.cpp`) und Leser
+> (`flushDeferredDisplayUpdates`, `esp32_main.cpp`, bislang nicht als eigene
+> Fundstelle erfasst — schuetzte exakt dieselben Felder wie die zwei Schreiber und
+> war daher ebenso ueberfluessig); nRF52s `taskENTER_CRITICAL()` unveraendert.
+> `ch_util_rx_start` auf einen plattformbedingten Typ umgestellt: einfacher Wrapper
+> ohne Atomics auf ESP32, `std::atomic` unveraendert auf nRF52 — der Schreibpfad
+> (`OnHeaderDetect`) wird auf ESP32 nie als Radio-Callback registriert.
+>
+> **Restbefund (bewusst nicht angefasst):** die uebrigen ~10 Kandidaten
+> (`is_receiving`, `ch_util_tx_start`, `ch_util_rx_accum`, `ch_util_tx_accum`,
+> `transmissionState`, die `pendingDisplay*`-Felder) sind dieselbe Kategorie, aber
+> jeweils eigene Pruefung wert — dieser Umbau blieb auf die drei am eindeutigsten
+> toten bzw. unnoetig gesperrten Stellen begrenzt, um den Diff schmal zu halten.
+> Vier Boards sauber gebaut (`heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`,
+> `t_deck_pro`); ESP32-Boards RAM -16 Byte / Flash -108..-120 Byte, `wiscore_rak4631`
+> unveraendert (nRF52-Pfad nicht beruehrt).
 
 ### N-14 — nRF52 TX ring is multi-writer with no mutual exclusion — **CONFIRMED** — High
 
