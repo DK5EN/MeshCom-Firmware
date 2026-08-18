@@ -523,6 +523,13 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 		case 0xA0: {
 			// length 1B - Msg ID 1B - Text
 
+			if(msg_len < 2)
+			{
+				// malformed frame: declared length too short for the length+type
+				// header, avoid unsigned underflow of txt_msg_len_phone below
+				break;
+			}
+
 			txt_msg_len_phone = msg_len - 2;	// now zero escape for lora TX
 
 			// Spin-wait removed: readPhoneCommand now runs in Main Loop,
