@@ -550,17 +550,38 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 			// 1B - SSID Length - SSID - 1B PWD Length - PWD
 
 			DEBUG_MSG("BLE", "Wifi Setting from phone");
-			
+
 			uint8_t ssid_len = conf_data[2];
+
+			// bound ssid_len against the declared frame length before reading
+			// the pwd length byte that follows the SSID field
+			if((unsigned)(4 + ssid_len) > msg_len)
+			{
+				break;
+			}
+
 			uint8_t pwd_len = conf_data[ssid_len + 3];
+
+			// bound the full frame (len+type+ssid_len+SSID+pwd_len+PWD) against
+			// the declared frame length before touching the password bytes
+			if((unsigned)(4 + ssid_len + pwd_len) > msg_len)
+			{
+				break;
+			}
 
 			if(ssid_len > 0 && pwd_len > 0)
 			{
-				char ssid_arr [ssid_len +1] = {0};
-				char pwd_arr [pwd_len +1] = {0};
+				// fixed-size buffers matching meshcom_settings.node_ssid/node_pwd;
+				// avoids VLAs sized directly from untrusted input and clamps the
+				// copy length to the destination capacity
+				char ssid_arr [sizeof(meshcom_settings.node_ssid)] = {0};
+				char pwd_arr [sizeof(meshcom_settings.node_pwd)] = {0};
 
-				memcpy(ssid_arr, conf_data + 3, ssid_len);
-				memcpy(pwd_arr, conf_data + (4 + ssid_len), pwd_len);
+				uint8_t ssid_copy_len = (ssid_len < sizeof(ssid_arr) - 1) ? ssid_len : (sizeof(ssid_arr) - 1);
+				uint8_t pwd_copy_len = (pwd_len < sizeof(pwd_arr) - 1) ? pwd_len : (sizeof(pwd_arr) - 1);
+
+				memcpy(ssid_arr, conf_data + 3, ssid_copy_len);
+				memcpy(pwd_arr, conf_data + (4 + ssid_len), pwd_copy_len);
 
 				String s_SSID = ssid_arr;
 				String s_PWD = pwd_arr;
