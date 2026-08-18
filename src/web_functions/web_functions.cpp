@@ -1286,7 +1286,7 @@ void sub_content_messages()
         { // Data Message (JSON)
           // memcpy(toPhoneBuff, BLEtoPhoneBuff[iRead]+1, blelen);
         }
-        else
+        else if (blelen >= 4 && (size_t)(blelen - 4) <= sizeof(toPhoneBuff))
         { // Text Message and Position
             uint8_t tbuffer[5];
             unsigned long unix_time = 0;
