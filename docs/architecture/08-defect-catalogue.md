@@ -215,6 +215,12 @@ unauthenticated, unattributable.
 
 ### N-01 — `{MCP}` remote command: password check is a character-set membership test — **VERIFIED** — Critical, RF
 
+> **STATUS 2026-08-18 — AKZEPTIERT / WONTFIX (Maintainer-Entscheidung).**
+> Als Sicherheitsrisiko angenommen und bewusst nicht gefixt.
+> Der Befund bleibt technisch gueltig und ist hier unveraendert dokumentiert;
+> er wird auf `v4.35p` nicht behoben. Erneut aufgreifen nur, wenn die Begruendung
+> unten entfaellt.
+
 `src/loop_functions.cpp:2126-2140` (was `:2057` pre-rebase)
 
 ```c
@@ -252,6 +258,12 @@ rejecting an unset password. Regression test: five spaces must fail against a 6-
 password.
 
 ### N-02 — `{SET}` mutates mesh routing with no authentication — **VERIFIED** — Critical, RF
+
+> **STATUS 2026-08-18 — AKZEPTIERT / WONTFIX (Maintainer-Entscheidung).**
+> Als Sicherheitsrisiko angenommen und bewusst nicht gefixt.
+> Der Befund bleibt technisch gueltig und ist hier unveraendert dokumentiert;
+> er wird auf `v4.35p` nicht behoben. Erneut aufgreifen nur, wenn die Begruendung
+> unten entfaellt.
 
 `src/loop_functions.cpp:2190-2196` (was `:2121` pre-rebase)
 
@@ -307,7 +319,23 @@ messages page. Immediate hard fault.
 **Fix:** clamp in `addBLEOutBuffer` (`len > UDP_TX_BUF_SIZE-4`), and bounds-check `blelen`
 before the subtraction.
 
+> **STATUS 2026-08-18 — BEHOBEN.** `addBLEOutBuffer()` klemmt jetzt zweigabhaengig
+> (`UDP_TX_BUF_SIZE-4` im Zeitstempel-Zweig, volle 255 im `'D'`/JSON-Zweig, der kein `+4`
+> anhaengt), und der Konsument in `web_functions.cpp` prueft `blelen` vor jeder Subtraktion.
+> Zusaetzlich klemmt `addBLEComToOutBuffer()` seine Laenge jetzt tatsaechlich auf 245 --
+> bisher wurde der Fehler nur geloggt und danach unveraendert kopiert.
+>
+> **Restbefund (neu, nicht behoben):** `src/phone_commands.cpp` liest dasselbe Laengenbyte
+> in `sendToPhone()` (`:72`, `:84`) und `sendComToPhone()` (`:145`, `:151`) und rechnet
+> `blelen-1` bzw. `blelen+2` ohne eigene Pruefung. Der Produzenten-Clamp schliesst den ueber
+> HF erreichbaren Pfad, aber diese Konsumenten haben keine unabhaengige Absicherung. Kleiner
+> Folge-Fix, bewusst nicht in denselben Commit gezogen, um den Upstream-Diff schmal zu halten.
+
 ### N-05 — heap over-read is rebroadcast over the air — **VERIFIED** — High, RF
+
+> **STATUS 2026-08-18 — BEHOBEN.** Beide `memcpy` in `updateHeyPath()` leiten ihre Laenge
+> jetzt aus der Quelle ab (`ipc` bzw. neu `icallsize`), nicht mehr aus `sizeof(dest)`.
+> `ipc` wird zusaetzlich gegen negative Werte geklemmt.
 
 `src/mheard_functions.cpp:526` and `:532` (unchanged by the rebase)
 
@@ -328,6 +356,10 @@ then displayed, JSON-exported to the phone, and used to build **outgoing HEY pat
 
 ### N-06 — unbounded array index from a web parameter — **VERIFIED** — Critical, LAN
 
+> **STATUS 2026-08-18 — BEHOBEN.** Alle drei Stellen (`mcpio`, `mcpout`, `mcpname`) pruefen
+> jetzt Bank `A`/`B` und Ziffer `0`-`7`, bevor der Index gebildet wird; ungueltige Eingabe
+> liefert `WS_RETURNCODE_FAIL` ohne Schreibzugriff.
+
 `src/web_functions/web_setup.cpp:500`, `:527` and `:550` — **three sites**, not one (was cited as `:551` pre-rebase)
 
 ```c
@@ -343,6 +375,12 @@ followed by `save_settings()`.
 **Fix:** validate `t_io < 16` and reject otherwise.
 
 ### N-07 — BLE command channel is unauthenticated and ungated — **VERIFIED** — Critical, BLE range
+
+> **STATUS 2026-08-18 — AKZEPTIERT / WONTFIX (Maintainer-Entscheidung).**
+> Der wirksame Fix ist BLE-Bonding/Verschluesselung (`setSecurityAuth`, `WRITE_ENC`/`READ_ENC`, `setSecurityPasskey(bt_code)` -- alle drei sind im Code bewusst deaktiviert). Einschalten trennt jede bestehende Phone-App, bis der Nutzer neu koppelt. Diese Entscheidung gehoert zum Upstream-Projekt, nicht in diesen Branch.
+> Der Befund bleibt technisch gueltig und ist hier unveraendert dokumentiert;
+> er wird auf `v4.35p` nicht behoben. Erneut aufgreifen nur, wenn die Begruendung
+> unten entfaellt.
 
 `esp32_main.cpp:1596` `setSecurityAuth(false,false,false)`; the `WRITE_ENC` / `READ_ENC`
 properties are commented out a few lines below; the `if(hasMsgFromPhone)` dispatch calls
@@ -373,6 +411,30 @@ Code-Pfad_"). `code-audit-fixes-20260627.md:70` then used that exemption and mar
 ✅ done. `t_deck_pro` is in `default_envs` and ships as a CI release artifact.
 
 ### N-10 — board identity macros are arithmetic on product names — **VERIFIED** — Medium
+
+> **STATUS 2026-08-18 — BEHOBEN.** **Zwoelf** Guards (nicht zehn) nutzen jetzt
+> `defined(BOARD_E22_S3)`. Die zwei zusaetzlichen sitzen in `src/aht20.cpp:45,70` und waren
+> in jeder bisherigen Grep-Verifikation unsichtbar: die Datei ist **ISO-8859-kodiert**, BSD-`grep`
+> behandelt sie ohne `-a` als Binaerdatei und ueberspringt sie stillschweigend. Aufgedeckt hat
+> sie erst ein `-Wundef`-Testlauf. Konsequenz fuer den Rest der Kampagne: **jede Grep-Prueffung
+> ueber `src/` braucht `-a`**, sonst ist sie fuer `aht20.cpp` wertlos.
+>
+> Verhaltensgleichheit gegengeprueft: `pio project metadata` liefert
+> `BOARD_E22_S3=esp32-s3-devkitc-1-n16r8` — die Anfuehrungszeichen werden also tatsaechlich
+> verschluckt, der alte Ausdruck war `0-0-0-1-0 = -1` und damit **wahr**. Der Fix ist fuer alle
+> Boards verhaltensneutral (gegen die anderslautende Behauptung eines Sub-Agenten geprueft).
+>
+> **`-Wundef` wurde bewusst NICHT im Build aktiviert.** Gemessen an
+> `heltec_wifi_lora_32_V3` + `E22_1262_S3`: 10.317 `-Wundef`-Treffer, davon **2 aus `src/`**,
+> der Rest aus ESP-IDF-/Arduino-Headern. `build_src_flags` hilft nicht, weil die Warnungen aus
+> den eingebundenen Headern stammen, nicht aus unseren Uebersetzungseinheiten. Das haette die
+> drei echten Bestandswarnungen zugeschuettet und den Weg zu `-Werror` (Wave 0.2) verbaut.
+>
+> Als Regressionsschutz stattdessen ein CI-Job `macro-guards` in
+> `.github/workflows/ci-build.yml`, der genau die fehlerhafte Schreibweise sucht (mit `-a`).
+> Beidseitig selbstgetestet: findet auf dem aktuellen Baum nichts, schlaegt bei der alten Form an.
+>
+> `bmx280.cpp:131,143` bleiben unveraendert — Folgeaufgabe.
 
 `platformio.ini` writes `-D BOARD_E22_S3="esp32-s3-devkitc-1-n16r8"`; PlatformIO's ini
 parser **consumes the quotes**, so the compiler receives an identifier sequence
