@@ -97,7 +97,7 @@ void getMeshComUDP()
   
   if (packetSize > 0)
   {
-    int len = Udp.read(incomingPacket, UDP_TX_BUF_SIZE);
+    int len = Udp.read(incomingPacket, UDP_TX_BUF_SIZE - 1);
 
     if (len > 0)
     {
@@ -118,7 +118,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
     // if more than n values are 00 we might have received a faulty message
     uint8_t zerocount = 0;
 
-    for (int i = 0; i < packetSize; i+=2)
+    for (int i = 0; i + 1 < packetSize; i+=2)
     {
       if (inc_udp_buffer[i] == 0x00 && inc_udp_buffer[i + 1] == 0x00)
       {
