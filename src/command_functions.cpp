@@ -611,6 +611,33 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    #if defined(NRF52_SERIES)
+    // --dfu: in den UF2-Bootloader neu starten, das Board meldet sich dann als
+    // USB-Laufwerk (RAK4631) und laesst sich per Datei-Kopie flashen.
+    //
+    // Warum das existiert: der UF2-Bootloader wird sonst nur per Doppeldruck auf
+    // Reset oder per 1200-Baud-Touch auf der USB-CDC erreicht. Beides faellt aus,
+    // wenn die CDC-Verbindung haengt -- dann bleibt nur physischer Zugriff aufs
+    // Geraet. Ueber diesen Befehl geht es auch per BLE oder Netz-Konsole.
+    //
+    // Der eigentliche Sprung passiert verzoegert im Loop (bEnterDfu), damit die
+    // Quittung noch rausgeht; ein Reset direkt hier verschluckt sie.
+    if(commandCheck(msg_text+2, (char*)"dfu") == 0)
+    {
+        if(ble)
+        {
+            addBLECommandBack((char*)"--dfu now");
+        }
+
+        printfdeb("...starte in den UF2-Bootloader, Board meldet sich als USB-Laufwerk\n");
+
+        bEnterDfu = true;
+        rebootAuto = millis() + 2000;   // 2 s, damit BLE/Seriell die Quittung noch senden
+
+        return;
+    }
+    else
+    #endif
     if(commandCheck(msg_text+2, (char*)"reboot") == 0)
     {
         if(ble)
@@ -693,6 +720,9 @@ void commandAction(char *umsg_text, bool ble)
 //        else
         {
             printfdeb("MeshCom %-4.4s%-1.1s commands\n--setcall  set callsign (OE0XXX-1)\n--operatorname set first name/none\n--setctry 0-99 set RX/RX-LoRa-Parameter\n--reboot   Node reboot\n", SOURCE_VERSION, SOURCE_VERSION_SUB);
+            #if defined(NRF52_SERIES)
+            printfdeb("--dfu      reboot into UF2 bootloader (node appears as USB drive)\n");
+            #endif
             delay(100);
 
             printlndeb("--setssid  WLAN SSID/none\n--setpwd   WLAN PASSWORD/none\n--setownip 255.255.255.255\n--setowngw 255.255.255.255\n--setownms mask:255.255.255.255\n--setowndns 255.255.255.255\n--setownntp 255.255.255.255\n--wifiap on/off WLAN AP\n--extudp  on/off\n--extudpip 255.255.255.255/none\n");
