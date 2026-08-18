@@ -21,6 +21,10 @@
 
 #include "via_functions.h"
 
+#if defined(ESP32)
+#include "esp_task_wdt.h"
+#endif
+
 #if defined(BOARD_T_ETH_ELITE) || defined(BOARD_T_CONNECT_PRO)
 #include "esp32/esp32_eth.h"
 extern EspETH neth;
@@ -565,6 +569,10 @@ void sendMeshComUDP()
   if (bDEBUG)
       printlndeb("[WIFI]...WiFi full radio reset");
 
+  #if defined(ESP32)
+  esp_task_wdt_reset();   // about to block on mode transitions + a full-channel scan below
+  #endif
+
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
   delay(1000);
@@ -574,8 +582,16 @@ void sendMeshComUDP()
   hasIPaddress=false;
   meshcom_settings.node_hasIPaddress = hasIPaddress;
 
+  #if defined(ESP32)
+  esp_task_wdt_reset();   // WiFi.scanNetworks() below is a blocking, unbounded all-channel scan
+  #endif
+
   // Scan for AP with best RSSI
 	int nrAps = WiFi.scanNetworks();
+
+  #if defined(ESP32)
+  esp_task_wdt_reset();
+  #endif
   int best_rssi = -200;
   int best_idx = -1;
   for (int i = 0; i < nrAps; ++i)
@@ -642,7 +658,10 @@ void sendMeshComUDP()
     else
       WiFi.begin(meshcom_settings.node_ssid, meshcom_settings.node_pwd, WiFi.channel(best_idx), WiFi.BSSID(best_idx),true);
   }
-  
+
+  #if defined(ESP32)
+  esp_task_wdt_reset();
+  #endif
   delay(500);
 
   printfdeb("[WIFI]...power: %i RSSI:%i\n", WiFi.getTxPower(), WiFi.RSSI());
