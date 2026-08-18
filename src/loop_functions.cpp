@@ -531,8 +531,12 @@ unsigned long getUnixClock()
  */
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
 {
-    if (len > UDP_TX_BUF_SIZE)
-        len = UDP_TX_BUF_SIZE-4; // just for safety
+    // Das Laengenbyte unten ist ein uint8_t. Im Nicht-'D'-Zweig kommen noch 4 Byte
+    // Zeitstempel dazu, dort muss also len+4 hineinpassen; im 'D'-Zweig (JSON) wird
+    // len unveraendert abgelegt und darf die vollen 255 nutzen.
+    uint16_t maxlen = (buffer[0] != 'D') ? (UDP_TX_BUF_SIZE - 4) : UDP_TX_BUF_SIZE;
+    if (len > maxlen)
+        len = maxlen;
 
     //first two bytes are always the message length
     memcpy(BLEtoPhoneBuff[toPhoneWrite] + 1, buffer, len);
@@ -586,6 +590,7 @@ void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
     if (len > 245)
     {
         printfdeb("[ERR]...BLE out-buffer to long <%i> <%-245.245s>\n", len, buffer);
+        len = 245; // clamp - length byte and destination buffer both size to this
     }
 
     //first two bytes are always the message length
