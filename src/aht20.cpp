@@ -42,7 +42,7 @@ void setupAHT20(bool bInit)
     if(!bAHT20ON)
 		return;
 		
-    #if defined(BOARD_TBEAM_V3) || defined(BOARD_E22_S3)
+    #if MC_I2C_NEEDS_BUS_RESET
         Wire.end();
         Wire.begin(I2C_SDA, I2C_SCL);
     #endif
@@ -67,7 +67,7 @@ bool loopAHT20()
 	if(!aht20_found)
 		return false;
 
-    #if defined(BOARD_TBEAM_V3) || defined(BOARD_E22_S3)
+    #if MC_I2C_NEEDS_BUS_RESET
         Wire.end();
         Wire.begin(I2C_SDA, I2C_SCL);
     #endif
