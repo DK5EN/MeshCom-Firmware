@@ -319,6 +319,32 @@ Each one standalone commit and PR. All verified against the source; details in d
 | ~~`N-06`~~ | **FIXED** 2026-08-18 — bank/digit validation at all three sites            | done |
 | ~~`N-07`~~ | ACCEPTED / WONTFIX 2026-08-18 — bonding would break the app fleet          | —    |
 
+### 3.35 Track B — ESP32/Heltec-V3-Durchgang (2026-08-19)
+
+Alles, was sich am angeschlossenen Heltec V3 umsetzen und verifizieren liess, ist
+abgearbeitet — je ein Commit, je gebaut, geflasht und auf Hardware geprueft
+(kein Boot-Loop, Webserver HTTP 200, BLE verbindet):
+
+- ~~`SIMP-29`~~ tote Dateien aus `src/` entfernt (`00ab394b`)
+- ~~`SIMP-30`~~ doppeltes extern + HDOP-Zwillinge — **echter Defekt**, Display und
+  Webseite lasen verschiedene Quellen (`f85b3d7f`)
+- ~~`DRY-25`~~ I2C-Bus-Reset-Guard zentralisiert — **echter Defekt**, `BOARD_E22_S3`
+  fehlte an den zwei Stellen, die den Sensor adressieren (`741f9af4`)
+- ~~`ALT-33`~~ byte-identische Ringgroessen-Zweige zusammengelegt (`627527e6`)
+- ~~`ALT-34`~~ `DEFAULT_CALL`/`isNodeUnconfigured()` einmal zentral (`bfc61e28`)
+- ~~`ALT-35`~~ `bDisplayDirty` von `bOneButton` getrennt (`10d40be0`)
+- ~~`iWrite`/`iRead`/`loraWrite`~~ N-13-Klasse auf ESP32 entatomisiert, Ring unter
+  Last geprueft (`26304b1e`)
+- ~~`BUG-09`~~ war bereits mit `4e5ef591` behoben, nur nie vermerkt
+
+`STATE-28`s gemeldetes Live-Beispiel ist **refuted** — beide Ausgaben lesen den
+Bool, es gibt keine widerspruechliche Anzeige; das Wiederanspringen des Gateways
+ist absichtserhaltend. Der Epic-Teil bleibt offen.
+
+Bewusst nicht angefasst, weil Epics und gegen die Projektregel "minimal changes":
+`SIMP-26`, `SIMP-27`, `DRY-20`, `DRY-23`, `DRY-24`, `ALT-31`, `ALT-32`.
+`DRY-21`/`DRY-22` sind nRF52-seitig. Details: STATUS-Box Wave 3 in doc 08.
+
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
 `CONC-15`–`CONC-18`, `N-14`–`N-16` — **auf ESP32 alle sieben einzeln nachgeprueft und
