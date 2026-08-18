@@ -846,12 +846,11 @@ int WZ_GPS_Loop() {
         updateGPSdata = false;
 
         posinfo_satcount = gpsData.satellites;
-        posinfo_hdop = gpsData.hdop;
         fposinfo_hdop= gpsData.hdop;
 
         bool has_gnss_location=false;
 
-        if ((posinfo_hdop < 6.0) && (posinfo_satcount > 5))
+        if ((fposinfo_hdop < 6.0) && (posinfo_satcount > 5))
         {
             has_gnss_location = true;
             posinfo_fix = true;

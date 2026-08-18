@@ -3002,7 +3002,7 @@ void esp32loop()
 
             posinfo_fix = false;
             posinfo_satcount = 0;
-            posinfo_hdop = 0;
+            fposinfo_hdop = 0.0;
         }
         else
         {

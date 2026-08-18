@@ -5300,7 +5300,7 @@ void sendGpsJson()
     pdoc["ALT"] = meshcom_settings.node_alt;
     pdoc["SAT"] = (int)posinfo_satcount;
     pdoc["SFIX"] = posinfo_fix;
-    pdoc["HDOP"] = posinfo_hdop;
+    pdoc["HDOP"] = (int)fposinfo_hdop;
     pdoc["RATE"] = (int)posinfo_interval;
     pdoc["NEXT"] = (int)(((posinfo_timer + (posinfo_interval * 1000)) - millis()) / 1000);
     pdoc["DIST"] = posinfo_distance;
