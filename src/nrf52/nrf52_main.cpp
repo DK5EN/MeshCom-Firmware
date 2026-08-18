@@ -2007,7 +2007,7 @@ void nrf52loop()
 
     if(DisplayOffWait > 0)
     {
-        if (millis() > DisplayOffWait)
+        if ((int32_t)(millis() - DisplayOffWait) > 0)
         {
             DisplayOffWait = 0;
             if(bDisplayOff)
@@ -2026,7 +2026,7 @@ void nrf52loop()
     // rebootAuto
     if(rebootAuto > 0)
     {
-        if (millis() > rebootAuto)
+        if ((int32_t)(millis() - rebootAuto) > 0)
         {
             rebootAuto = 0;
 
@@ -2339,7 +2339,7 @@ void nrf52loop()
 
     if(meshcom_settings.node_pingtime > 29)
     {
-        if((resendPing + meshcom_settings.node_pingtime * 1000) < millis())
+        if((int32_t)(millis() - (resendPing + meshcom_settings.node_pingtime * 1000)) > 0)
         {
             resendPing = millis();
 
@@ -2478,14 +2478,14 @@ String ver = "";
 void WaitPause() {
   startTimeout = millis() + 1000;
   #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  while ((!Serial1.available()) && (millis() < startTimeout)) { delay(5); } // auf Block von Zeichen warten
+  while ((!Serial1.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
   #else
-  while ((!Serial1.available()) && (millis() < startTimeout)) { delay(5); } // auf Block von Zeichen warten
+  while ((!Serial1.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
   #endif
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...wait");
   startTimeout = millis() + 50;  // für Serial Sync Zeichenblock lesen und Pause von 50ms abwarten
-  while (millis() < startTimeout) {
+  while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     if (Serial1.available()) {
       Serial1.read();
@@ -2546,7 +2546,7 @@ void sendUBX_SET_GNSS() {  // Binäres Paket senden
 String readUBXbin() {
   startTimeout = millis() + 500;
   ver = "";
-    while (millis() < startTimeout) {
+    while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
       int c = Serial1.read();
