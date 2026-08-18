@@ -392,6 +392,20 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
             return 0x00;
         }
 
+        // Trailer (hw + mod + 2-byte FCS = 4 bytes) must fully fit within rsize
+        if((inext + 4) > rsize)
+        {
+            if(bLORADEBUG)
+            {
+                Serial.printf("APRS decode - Packet discarded, wrong APRS-protocol - Trailer (HW/MOD/FCS) truncated!\n");
+
+                if(rsize < 255)
+                    printAsciiBuffer(RcvBuffer, rsize);
+            }
+
+            return 0x00;
+        }
+
         //Serial.printf("rsize:%i inext:%i HW:%02X MOD:%02X FCS1:%02X FCS2:%02X fcs:%i\n", rsize, inext, RcvBuffer[inext], RcvBuffer[inext+1], RcvBuffer[inext+2], RcvBuffer[inext+3], (unsigned int)(RcvBuffer[inext+2] << 8) | RcvBuffer[inext+3]);
 
         aprsmsg.msg_source_hw = RcvBuffer[inext];
