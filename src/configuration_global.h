@@ -79,6 +79,18 @@
 #define ALIVERESET_INTERVAL 2 * 10 * 30    // 1/2 Stunde
 #define BLEBLINK_INTERVAL 3000             // BLEBLINK interval in milliseconds
 
+// Auf diesen Boards muss der I2C-Bus vor einem Sensorzugriff neu aufgesetzt
+// werden (Wire.end() + Wire.begin()), sonst haengt der Bus. Die Bedingung stand
+// bisher an neun Stellen in vier Sensordateien einzeln -- und war bereits
+// auseinandergelaufen: bmx280.cpp fragte an zwei Stellen nur BOARD_TBEAM_V3 ab
+// und liess BOARD_E22_S3 aus. Einmal zentral definiert, damit das nicht wieder
+// driften kann. DRY-25.
+#if defined(BOARD_TBEAM_V3) || defined(BOARD_E22_S3)
+#define MC_I2C_NEEDS_BUS_RESET 1
+#else
+#define MC_I2C_NEEDS_BUS_RESET 0
+#endif
+
 #if defined(ENABLE_XML)
 #define MAX_MHEARD 50                      // max count of messages in mheard ringbuffer
 #define MAX_MHPATH 50                      // max count of messages in mhpath ringbuffer
