@@ -180,10 +180,34 @@ extern float BATTexp12;
 extern float BATexp12pre;
 extern float BATexp2;
 
+// Ring-Indizes: gleiche Begruendung wie bei is_receiving_t/ch_util_ulong_t weiter
+// unten. Auf ESP32 laufen alle Schreiber und Leser dieser Indizes in loopTask --
+// lora_functions ueber OnRxDone()/checkRX() aus esp32loop(), udp_functions und
+// web_functions gepollt aus derselben Schleife. Die beiden ESP32-ISRs
+// (setFlagReceive/setFlagSent) fassen ausschliesslich receiveFlag/transmittedFlag
+// an, keinen Ring-Index. Damit ist hier nichts zu synchronisieren.
+// nRF52 erreicht OnRxDone ueber die FreeRTOS-Timer-Task (Prio 2) -- echte
+// Nebenlaeufigkeit, dort bleibt std::atomic. Fortsetzung von N-13.
+#if defined(ESP32)
+struct ring_index_t {
+    uint8_t v = 0;
+    ring_index_t() = default;
+    ring_index_t(uint8_t nv) : v(nv) {}
+    ring_index_t &operator=(uint8_t nv) { v = nv; return *this; }
+    operator uint8_t() const { return v; }
+    ring_index_t &operator++() { ++v; return *this; }
+    ring_index_t operator++(int) { ring_index_t t = *this; ++v; return t; }
+    uint8_t load() const { return v; }
+    void store(uint8_t nv) { v = nv; }
+};
+#else
+using ring_index_t = std::atomic<uint8_t>;
+#endif
+
 // RINGBUFFER for incoming UDP lora packets for lora TX
 extern unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5];
-extern std::atomic<uint8_t> iWrite;
-extern std::atomic<uint8_t> iRead;
+extern ring_index_t iWrite;
+extern ring_index_t iRead;
 extern int iRetransmit;
 extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
@@ -211,7 +235,7 @@ extern int ComToPhoneWrite;
 extern int ComToPhoneRead;
 
 extern uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5]; //Ringbuffer for received msg_id deduplication
-extern std::atomic<uint8_t> loraWrite;   // counter for ringbuffer
+extern ring_index_t loraWrite;   // counter for ringbuffer
 
 // is_receiving: same reasoning as ch_util_rx_start_t below -- on ESP32, OnRxDone()/OnTxDone()
 // and friends run synchronously off the esp32loop() -> checkRX() call chain (no ISR, no

@@ -390,8 +390,8 @@ int iWriteOwn=0;
 
 // RINGBUFFER for incoming UDP lora packets for lora TX
 unsigned char ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5] = {0};
-std::atomic<uint8_t> iWrite{0};
-std::atomic<uint8_t> iRead{0};
+ring_index_t iWrite{0};
+ring_index_t iRead{0};
 int iRetransmit=-1;
 
 // FIX: Per-slot retry counter for retransmit cap
@@ -399,7 +399,7 @@ uint8_t retryCount[MAX_RING] = {0};
 
 // RINGBUFFER for incomming LoRa RX msg_id
 uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5] = {0};
-std::atomic<uint8_t> loraWrite{0};   // counter for ringbuffer
+ring_index_t loraWrite{0};   // counter for ringbuffer
 
 // RINGBUFFER RAW LoRa RX
 unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5] = {0};
