@@ -80,6 +80,7 @@ extern float fBattFaktor;
 
 extern bool bDisplayTrack;
 extern bool bOneButton;
+extern bool bDisplayDirty;   // ALT-35: Render-Anforderung, unabhaengig vom Tastendruck
 
 extern bool bGPSON;
 extern bool bGPSAutosymbol;
