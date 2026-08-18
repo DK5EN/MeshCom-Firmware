@@ -305,7 +305,7 @@ void getExternUDP()
     
     if (packetExtSize > 0)
     {
-      len = UdpExtern.read(incomingExtPacket, UDP_TX_BUF_SIZE);
+      len = UdpExtern.read(incomingExtPacket, UDP_TX_BUF_SIZE - 1);
     }
   }
 
