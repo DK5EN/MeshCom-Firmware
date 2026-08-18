@@ -128,18 +128,14 @@ portMUX_TYPE displayMux = portMUX_INITIALIZER_UNLOCKED;
 // Queue display text update for main loop execution
 static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-#if defined(ESP32)
-    portENTER_CRITICAL(&displayMux);
-#elif defined(BOARD_RAK4630)
+#if defined(BOARD_RAK4630)
     taskENTER_CRITICAL();
 #endif
     pendingDisplayMsg = aprsmsg;
     pendingDisplayRssi = rssi;
     pendingDisplaySnr = snr;
     bPendingDisplayText = true;
-#if defined(ESP32)
-    portEXIT_CRITICAL(&displayMux);
-#elif defined(BOARD_RAK4630)
+#if defined(BOARD_RAK4630)
     taskEXIT_CRITICAL();
 #endif
 }
@@ -147,18 +143,14 @@ static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t s
 // Queue display position update for main loop execution
 static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
-#if defined(ESP32)
-    portENTER_CRITICAL(&displayMux);
-#elif defined(BOARD_RAK4630)
+#if defined(BOARD_RAK4630)
     taskENTER_CRITICAL();
 #endif
     pendingDisplayMsg = aprsmsg;
     pendingDisplayRssi = rssi;
     pendingDisplaySnr = snr;
     bPendingDisplayPos = true;
-#if defined(ESP32)
-    portEXIT_CRITICAL(&displayMux);
-#elif defined(BOARD_RAK4630)
+#if defined(BOARD_RAK4630)
     taskEXIT_CRITICAL();
 #endif
 }
