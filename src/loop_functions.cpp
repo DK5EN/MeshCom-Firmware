@@ -3372,7 +3372,7 @@ void sendMessage(char *msg_text, int len)
             {
                 char cId[4] = {0};
                 snprintf(cId, sizeof(cId), "%03i", meshcom_settings.node_msgid);
-                char cnewMsg[10];
+                char cnewMsg[64];
                 snprintf(cnewMsg, sizeof(cnewMsg), "{mcp}%c%s%c%s%c%s", cId[0], strMsg.substring(5, 7).c_str(), cId[1], strMsg.substring(7, 9).c_str(), cId[2], strMsg.substring(9).c_str());
                 strMsg = cnewMsg;
             }
