@@ -235,6 +235,9 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
     if(payload[0] != MSG_TYPE_ACK)
         return false;
 
+    if(size < 12)
+        return false;
+
     uint8_t print_buff[30];
 
     if(bDisplayLog)
