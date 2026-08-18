@@ -433,7 +433,7 @@ unsigned long csma_timeout = CSMA_BASE_0;
 int rx_irq_defer_count = 0;
 
 // Channel utilization tracking (10s window)
-std::atomic<unsigned long> ch_util_rx_start{0};   // timestamp when RX started
+ch_util_rx_start_t ch_util_rx_start{0};   // timestamp when RX started
 std::atomic<unsigned long> ch_util_tx_start{0};   // timestamp when TX started
 std::atomic<unsigned long> ch_util_rx_accum{0};   // accumulated RX airtime (ms) in current window
 std::atomic<unsigned long> ch_util_tx_accum{0};   // accumulated TX airtime (ms) in current window

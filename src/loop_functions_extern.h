@@ -1,4 +1,6 @@
-// (C) 2023 OE1KBC Kurt Baumann, OE1KFR Rainer 
+#pragma once
+
+// (C) 2023 OE1KBC Kurt Baumann, OE1KFR Rainer
 // (C) 2016, 2017, 2018, 2018, 2019, 2020 OE1KBC Kurt Baumann
 //
 // 20230326: Version 4.00: START
@@ -227,7 +229,21 @@ extern portMUX_TYPE displayMux;
 #endif
 
 // Channel utilization tracking (10s window)
-extern std::atomic<unsigned long> ch_util_rx_start;
+#if defined(ESP32)
+// ESP32 never registers OnHeaderDetect as a radio callback (see esp32_main.cpp),
+// so ch_util_rx_start has no writer reachable from an ISR or any concurrent task
+// on this platform -- no atomic needed. N-13.
+struct ch_util_rx_start_t {
+    unsigned long v = 0;
+    ch_util_rx_start_t() = default;
+    ch_util_rx_start_t(unsigned long nv) : v(nv) {}
+    ch_util_rx_start_t &operator=(unsigned long nv) { v = nv; return *this; }
+    unsigned long exchange(unsigned long nv) { unsigned long old = v; v = nv; return old; }
+};
+#else
+using ch_util_rx_start_t = std::atomic<unsigned long>;
+#endif
+extern ch_util_rx_start_t ch_util_rx_start;
 extern std::atomic<unsigned long> ch_util_tx_start;
 extern std::atomic<unsigned long> ch_util_rx_accum;
 extern std::atomic<unsigned long> ch_util_tx_accum;

@@ -476,10 +476,7 @@ unsigned long inoReceiveTimeOutTime = 0;
 std::atomic<bool> transmittedFlag{false};
 std::atomic<bool> bEnableInterruptTransmit{false};
 
-// flag to indicate that a packet was detected or CAD timed out
-std::atomic<bool> scanFlag{false};
-
-// flag to indicate one second 
+// flag to indicate one second
 unsigned long retransmit_timer = 0;
 
 // blink frequency for board_led
@@ -1801,7 +1798,6 @@ void esp32_write_ble(uint8_t confBuff[300], uint8_t conf_len)
 // the local-radio loop and the external-radio path flush pending RX displays.
 static void flushDeferredDisplayUpdates()
 {
-    portENTER_CRITICAL(&displayMux);
     bool _pendText = bPendingDisplayText;
     bool _pendPos = bPendingDisplayPos;
     struct aprsMessage _msg;
@@ -1814,7 +1810,6 @@ static void flushDeferredDisplayUpdates()
         bPendingDisplayText = false;
         bPendingDisplayPos = false;
     }
-    portEXIT_CRITICAL(&displayMux);
     if(_pendText) sendDisplayText(_msg, _rssi, _snr);
     if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
 }
