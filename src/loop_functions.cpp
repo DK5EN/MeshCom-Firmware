@@ -114,6 +114,8 @@ bool bDisplayRetx = false;
 unsigned long DisplayOffWait = 0;
 bool bDisplayTrack = false;
 bool bOneButton = false;
+// ALT-35: getrennt von bOneButton -- "Anzeige neu aufbauen", nicht "Taste gedrueckt".
+bool bDisplayDirty = false;
 bool bGPSON = false;
 bool bGPSAutosymbol = false;
 bool bGPSUBLOX = false;
@@ -1336,9 +1338,10 @@ void sendDisplayTrack()
     iDisplayType=9;
 
     // nur alle 15 sekunden
-    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton)
+    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton || bDisplayDirty)
     {
-        bOneButton = false;
+        bOneButton    = false;
+        bDisplayDirty = false;
 
         sendDisplayMainline();
 
@@ -1543,9 +1546,10 @@ void sendDisplayTime()
         snprintf(cstatus, sizeof(cstatus),  "%-4.4s%-1.1s ", SOURCE_VERSION, SOURCE_VERSION_SUB);
 
     // nur alle 15 sekunden
-    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton)
+    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton || bDisplayDirty)
     {
-        bOneButton = false;
+        bOneButton    = false;
+        bDisplayDirty = false;
 
         #ifdef BOARD_T_ECHO
         snprintf(msg_text, sizeof(msg_text), "%02i:%02i:%02i   %s", meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, cbatt);
@@ -1920,7 +1924,7 @@ void mainStartTimeLoop()
                     {
                         epaper_display.clear();          // physischer Voll-Clear (weiss)
                         if(bDisplayTrack)
-                            bOneButton = true;           // Track-Seite sofort aufbauen
+                            bDisplayDirty = true;        // Track-Seite sofort aufbauen (kein Tastendruck)
                         else
                             sendDisplayHead(true);       // normale Info-Seite wiederherstellen
                     }
@@ -1972,7 +1976,7 @@ void mainStartTimeLoop()
                     // letzten Track-Render geaendert. Quelle eines Updates auf der GPS-losen WP:
                     // Phone-App/BLE (phone_commands.cpp), empfangenes Mesh-Pos-Paket bzw. manuelles
                     // --setlat/--setlon (command_functions.cpp) - oder, auf GPS-Modulen, ein Fix.
-                    // Die Track-Seite wird beim Einschalten (bOneButton aus dem Track-Transition-
+                    // Die Track-Seite wird beim Einschalten (bDisplayDirty aus dem Track-Transition-
                     // Handler weiter oben) und bei jedem echten Positionsupdate fuer ~10 s gezeigt
                     // und blendet danach AUTOMATISCH zurueck auf die Normalansicht (neueste
                     // Nachricht; ersatzweise Info-/Statusseite). Grund: auf der GPS-losen WP aendern
@@ -1993,7 +1997,7 @@ void mainStartTimeLoop()
                                      || (meshcom_settings.node_lat != wpTrackLat)
                                      || (meshcom_settings.node_lon != wpTrackLon);
 
-                    if(DisplayOffWait == 0 && (wpPosUpdated || bOneButton))
+                    if(DisplayOffWait == 0 && (wpPosUpdated || bOneButton || bDisplayDirty))
                     {
                         // echtes Positionsupdate (oder erstmaliger Aufbau): Track-/WX-Seite zeichnen
                         // und den 10s-Rueckblende-Timer (neu) starten.
@@ -2001,7 +2005,7 @@ void mainStartTimeLoop()
                         wpTrackLon     = meshcom_settings.node_lon;
                         wpTrackInit    = true;
                         wpTrackShownAt = millis();
-                        bOneButton     = true;   // erzwingt sofortigen Aufbau (umgeht das 15s-Raster in sendDisplayTrack)
+                        bDisplayDirty  = true;   // erzwingt sofortigen Aufbau (umgeht das 15s-Raster in sendDisplayTrack)
 
                         if(iDisplayChange > 10)
                             sendDisplayWX(); // Show WX
