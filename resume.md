@@ -267,6 +267,7 @@ Project skills, in `.claude/commands/`:
 | **TEST-37/39** native harness   | `3fb2c917` | 11/11 green **plus mutation probe** proving the suite can fail                                                                                                                                                 |
 | **N-08** millis() rollover      | `0ccebe8d` | 25 deadline comparisons (21 found + 4 in reversed form) converted to the safe subtraction idiom; native regression test added; 4 boards built, RAM unchanged, flash +16..+64 B                                 |
 | **N-13** over-sync (partial)    | `4a250602` | 3 of 14 candidates fixed (`scanFlag` deleted, `displayMux` dropped on ESP32, `ch_util_rx_start` platform-split); 4 boards built, ESP32 RAM -16 B / flash -108..-120 B; remaining ~10 candidates deferred       |
+| **N-13** over-sync (rest)       | `d66683d3` | 4 more candidates fixed (`is_receiving`, `ch_util_tx_start`/`rx_accum`/`tx_accum` platform-split); 2 confirmed not real defects (`transmissionState`, `pendingDisplay*`); original 14-item list now closed     |
 | **SEC-03** BLE 0x55 OOB read    | `c342f07e` | `ssid_len`/`pwd_len` bounded against declared frame length, VLAs replaced with fixed buffers                                                                                                                   |
 | **BUG-07** BLE 0xA0 underflow   | `e69f88f5` | `msg_len < 2` gate before subtraction                                                                                                                                                                          |
 | **SEC-04** URL-decode overrun   | `5d2cf889` | loop redriven by real source consumption, every destination write bounded                                                                                                                                      |
@@ -274,6 +275,8 @@ Project skills, in `.claude/commands/`:
 | **BUG-10** handleACK gate       | `7b968884` | `size < 12` check before the 12-byte `memcpy`                                                                                                                                                                  |
 | **BUG-13** APRS trailer bound   | `0aa28f42` | `inext+4 > rsize` check added, matches existing malformed-frame handling                                                                                                                                       |
 | **CONC-14** nRF52 BLE queue     | `a441ece6` | BLE callback now enqueues instead of calling `readPhoneCommand()` inline, mirrors ESP32's `bleQueue` exactly; `CONC-15`/`16`/`17`/`18` not re-verified as resolved                                             |
+| **BUG-11** `{mcp}` truncation   | `22e84a09` | `cnewMsg[10]` → `[64]`, local `{mcp}` reformat no longer silently truncates the command/password                                                                                                               |
+| **CONC-19** net_console mutex   | `8faee027` | `stopNetConsole()` no longer recreates the live mutex; takes it before teardown instead, matching the file's existing pattern                                                                                  |
 
 **Verification discipline applied throughout** — worth recording, because it caught real
 errors in our own work:
@@ -314,7 +317,7 @@ Each one standalone commit and PR. All verified against the source; details in d
 
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
-`BUG-11`, `CONC-15`–`CONC-19`, `N-14`–`N-16`.
+`CONC-15`–`CONC-18`, `N-14`–`N-16`.
 
 ~~`N-08`~~ **FIXED** 2026-08-18 — 25 deadline comparisons converted to the safe subtraction
 idiom (`0ccebe8d`).
@@ -348,27 +351,38 @@ calling `readPhoneCommand()` inline, mirroring ESP32's `bleQueue` design exactly
 `CONC-15`/`16`/`17`/`18` were **not** re-verified as resolved by this root fix — treat as
 still open until checked individually.
 
+~~`BUG-11`~~ **FIXED** 2026-08-18 — `cnewMsg[10]` → `[64]`, local `{mcp}` reformat no longer
+silently truncates the command/password (`22e84a09`).
+
+~~`CONC-19`~~ **FIXED** 2026-08-18 — `net_console.cpp`'s `stopNetConsole()` no longer
+recreates the live mutex without holding it; takes the existing mutex before teardown instead,
+matching the file's own established pattern (`8faee027`).
+
 ### 3.5 Then — Wave 3, structural (propose upstream as a plan first)
 
-~~`N-13`~~ **PARTIALLY FIXED** 2026-08-18 — `scanFlag` deleted, `displayMux` dropped on ESP32,
-`ch_util_rx_start` platform-split (`4a250602`). ~10 remaining candidates
-(`is_receiving`, `ch_util_tx_start`/`rx_accum`/`tx_accum`, `transmissionState`, the
-`pendingDisplay*` fields) deliberately deferred — same category, each worth its own pass.
+~~`N-13`~~ **FULLY RESOLVED** 2026-08-18 — first pass (`4a250602`): `scanFlag` deleted,
+`displayMux` dropped on ESP32, `ch_util_rx_start` platform-split. Second pass (`d66683d3`):
+`is_receiving`, `ch_util_tx_start`/`rx_accum`/`tx_accum` platform-split. `transmissionState`
+and the `pendingDisplay*` fields confirmed **not actual defects** (plain `volatile`, never
+atomic; already resolved by the first pass's `displayMux` removal, respectively) — the
+original 14-item list is closed. `iWrite`/`iRead`/`loraWrite` surfaced as further same-class
+candidates during re-verification but were never part of this list — deliberately left open,
+not yet scoped.
 
 `DRY-20`–`DRY-25`, `SIMP-26`–`SIMP-30`, `ALT-31`–`ALT-35`, `STATE-28`, and the corrected C-02
 extraction of the ~221 genuinely shared, radio-independent loop lines.
 
 ### 3.6 Deferred, with explicit triggers
 
-| Item                                                                            | Revisit when                                                                              |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Arduino 3.x migration                                                           | Wave 0 has delivered a RAM baseline and a CI gate                                         |
-| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                                 | the CI matrix is in place                                                                 |
-| Radio interface / HAL                                                           | only after C-02's cheap extraction proves the seam                                        |
-| LVGL 8 → 9                                                                      | never, unless the T-Deck UI is rewritten anyway                                           |
-| ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned | closed                                                                                    |
-| `FLASH_VERSION` migration (`N-12`)                                              | **before** any change to the `meshcom_settings` layout                                    |
-| Hardware bench (2 × Heltec V3)                                                  | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
+| Item                                                                                     | Revisit when                                                                              |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Arduino 3.x migration                                                                    | Wave 0 has delivered a RAM baseline and a CI gate                                         |
+| Arduino 2.0.14 → 2.0.17 on the 4 lagging boards                                          | the CI matrix is in place                                                                 |
+| Radio interface / HAL                                                                    | only after C-02's cheap extraction proves the seam                                        |
+| LVGL 8 → 9                                                                               | never, unless the T-Deck UI is rewritten anyway                                           |
+| ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned          | closed                                                                                    |
+| `FLASH_VERSION` migration (`N-12`) — re-verified 2026-08-18, still deferred (see doc 08) | **before** any change to the `meshcom_settings` layout                                    |
+| Hardware bench (2 × Heltec V3)                                                           | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
 
 ### 3.6a Sizing — input for the G12 decision
 
