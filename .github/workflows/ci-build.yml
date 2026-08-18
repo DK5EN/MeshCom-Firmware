@@ -136,7 +136,6 @@ jobs:
           key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'variants/*/platformio.ini') }}
           restore-keys: |
             pio-${{ runner.os }}-${{ matrix.env }}-
-            pio-${{ runner.os }}-
 
       - name: PlatformIO Core installieren
         run: pip install --upgrade platformio intelhex
