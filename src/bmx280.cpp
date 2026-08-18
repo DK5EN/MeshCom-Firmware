@@ -166,7 +166,7 @@ void setupBMX280(bool bNewStart)
 	fPress = 0.0;	
 	fHum = 0.0;
 		
-	#if defined(BOARD_TBEAM_V3) || (BOARD_E22_S3)
+	#if defined(BOARD_TBEAM_V3) || defined(BOARD_E22_S3)
 		Wire.end();
 		Wire.begin(I2C_SDA, I2C_SCL);
 	#endif
@@ -210,7 +210,7 @@ bool loopBMX280(void)
 	if(!bmx_found)
 		return false;
 
-	#if defined(BOARD_TBEAM_V3) || (BOARD_E22_S3)
+	#if defined(BOARD_TBEAM_V3) || defined(BOARD_E22_S3)
 		Wire.end();
 		Wire.begin(I2C_SDA, I2C_SCL);
 	#endif

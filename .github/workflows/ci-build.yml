@@ -65,6 +65,29 @@ jobs:
           echo "::notice::${{ steps.collect.outputs.count }} Environments werden gebaut"
           echo '${{ steps.collect.outputs.envs }}'
 
+  macro-guards:
+    name: Board-Makro-Guards
+    runs-on: ubuntu-latest
+    # Ersetzt -Wundef als Regressionsschutz fuer N-10. -Wundef selbst ist im Build
+    # unbrauchbar: es meldet ~10.300 Treffer aus den ESP-IDF-/Arduino-Headern und nur
+    # eine Handvoll aus src/. Dieser Grep prueft genau die eine Fehlerform.
+    #
+    # Falsch: #if defined(BOARD_A) || (BOARD_B)   -> BOARD_B ist ein Makro auf den
+    #         Produktnamen; der Praeprozessor rechnet ueber die Namensbestandteile
+    #         und der Guard stimmt nur zufaellig.
+    # Richtig: #if defined(BOARD_A) || defined(BOARD_B)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bare BOARD_*-Makros in #if suchen
+        run: |
+          # -a: src/aht20.cpp ist ISO-8859-kodiert und wird sonst als Binaerdatei
+          # uebersprungen -- genau so sind zwei Fundstellen jahrelang durchgerutscht.
+          if grep -ran --include='*.cpp' --include='*.h' -E '#if.*\|\|[[:space:]]*\(BOARD_' src/; then
+            echo "::error::Bare BOARD_*-Makro in einem #if. Bitte defined(BOARD_x) verwenden."
+            exit 1
+          fi
+          echo "OK - keine blanken BOARD_*-Makros in #if-Ausdruecken."
+
   unit-tests:
     name: Unit-Tests (nativ)
     runs-on: ubuntu-latest
