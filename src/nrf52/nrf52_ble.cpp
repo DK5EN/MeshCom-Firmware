@@ -31,6 +31,19 @@ extern uint8_t dmac[6];
 extern bool config_to_phone_prepare;
 extern bool conffin_sent;
 
+// FreeRTOS queue holding raw BLE payloads handed from the BLE stack's
+// RX callback (adafruit_ble_task context) to the Main Loop task, which
+// drains it in nrf52loop() (src/nrf52/nrf52_main.cpp). readPhoneCommand()/
+// commandAction()/save_settings() must not run inline in the BLE callback
+// concurrently with the Main Loop; this mirrors the ESP32 bleQueue design
+// (CONC-14). Non-static: nrf52_main.cpp references it via extern.
+struct BleQueueItem {
+	uint8_t data[MAX_MSG_LEN_PHONE];
+	size_t length;
+};
+
+QueueHandle_t bleQueue = NULL;
+
 // Create device name
 char helper_string[256] = {0};
 
@@ -65,6 +78,10 @@ bool g_ble_uart_is_connected = false;
  */
 void init_ble(void)
 {
+	// Create the BLE RX queue before starting BLE so the RX callback can
+	// enqueue into it as soon as connections are possible (CONC-14).
+	bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
+
 	// Config the peripheral connection with maximum bandwidth
 	// more SRAM required by SoftDevice
 	// Note: All config***() function must be called before begin()
@@ -247,11 +264,12 @@ void bleuart_rx_callback(uint16_t conn_handle)
 	g_task_event_type |= BLE_DATA;
 	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
 
-	// Forward data from Mobile to our peripheral
-	uint8_t conf_data[MAX_MSG_LEN_PHONE] = {0};
-	g_ble_uart.read(conf_data, MAX_MSG_LEN_PHONE);
-
-	readPhoneCommand(conf_data);
+	// Forward data from Mobile to our peripheral: enqueue for processing
+	// in the Main Loop task instead of calling readPhoneCommand() here,
+	// inline in the BLE stack's callback context (CONC-14).
+	BleQueueItem item = {};
+	item.length = g_ble_uart.read(item.data, MAX_MSG_LEN_PHONE);
+	xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
 
 	// Disconnect if app-layer auth failed
 	if(ble_disconnect_requested)

@@ -244,6 +244,17 @@ unsigned long cad_start_time = 0;
 bool g_meshcom_initialized;
 bool init_flash_done=false;
 
+// FreeRTOS queue of raw BLE payloads, filled by bleuart_rx_callback() in
+// nrf52_ble.cpp (BLE task context) and drained below in nrf52loop() so
+// readPhoneCommand()/commandAction()/save_settings() run in the Main Loop
+// task instead of inline in the BLE callback (CONC-14). Struct layout must
+// stay in sync with the definition in nrf52_ble.cpp.
+struct BleQueueItem {
+    uint8_t data[MAX_MSG_LEN_PHONE];
+    size_t length;
+};
+extern QueueHandle_t bleQueue;
+
 bool bPosFirst = true;
 bool bHeyFirst = true;
 
@@ -1516,6 +1527,14 @@ void nrf52loop()
     #endif
 
     btn.tick();
+
+    // BLE Queue: process data from the BLE task in Main Loop context (CONC-14)
+    {
+        BleQueueItem bleItem;
+        while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+            readPhoneCommand(bleItem.data);
+        }
+    }
 
     // check if message from phone to send
     if(hasMsgFromPhone)
