@@ -627,6 +627,38 @@ removed globally on a platform-specific premise.
 `Radio.Send()` inside `taskENTER_CRITICAL()` (`lora_functions.cpp:1685`, `:1726`, `:1787`)
 reaches `SX126xWaitOnBusy()` → `delay(1)` → `vTaskDelay()` **with the tick frozen**.
 
+### N-17 — ESP32 `startNetwork()` can trip the task watchdog before its first feed — **VERIFIED (on real hardware)** — High
+
+Not from the 2026-07-31 review or `fable-verdict.md` — found 2026-08-18 flashing a Heltec V3
+with today's fixes for hardware verification, reproduced deterministically, root-caused with
+debug instrumentation on real hardware, and fixed same-day. Recorded here because it is a real,
+previously-undetected production defect, independent of every other finding in this document.
+
+`esp_task_wdt_add(NULL)` runs once, early in `esp32setup()` (`esp32_main.cpp:606`).
+`esp_task_wdt_reset()` runs exactly once in the entire codebase — the first line of
+`esp32loop()` (`esp32_main.cpp:1815`). `startNetwork()` (`udp_functions.cpp:490`) runs
+synchronously **inside** `esp32setup()`, before `esp32loop()` ever starts feeding the watchdog,
+and blocks on `WiFi.mode()` transitions (1.2 s of `delay()`) and an unbounded
+`WiFi.scanNetworks()` call. On a board with `bGATEWAY`/`bEXTUDP`/`bWEBSERVER`/`bNETCONSOLE`
+active and a real WiFi SSID configured, this synchronous block can exceed the default task
+watchdog timeout — `task_wdt: Task watchdog got triggered ... loopTask`, `abort()`, reboot,
+repeat, forever.
+
+**Verified mechanism, not inferred**: debug-instrumented build on a Heltec V3 printed
+`[DBG] pre-startNetwork` every boot but never the paired `post-startNetwork` — the watchdog
+fired mid-scan, before `startNetwork()` could return. Confirmed pre-existing: `git diff
+da3f7330..<pre-fix HEAD> -- src/udp_functions.cpp` shows zero hunks touching `startNetwork()`
+before the fix — none of today's other fixes caused this.
+
+> **STATUS 2026-08-18 — BEHOBEN.** `esp_task_wdt_reset()` (guarded `#if defined(ESP32)`) added
+> at four points inside `startNetwork()`: before the WiFi mode-reset/delay sequence, immediately
+> before and after `WiFi.scanNetworks()`, and before the final settle `delay(500)`. Feeds the
+> watchdog through the legitimately slow boot work without changing its behaviour. Verified on
+> real hardware: clean boot, WiFi connected, IP obtained, UDP gateway/HMAC console/ext-UDP all
+> started, no watchdog/abort/reboot markers over an extended observation window. `pio test -e
+native` green; `heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`, `t_deck_pro` build clean.
+> RAM unchanged, flash +28 B.
+
 ---
 
 ## 3. Refuted claims — do not re-investigate
