@@ -91,14 +91,12 @@
 #define MC_I2C_NEEDS_BUS_RESET 0
 #endif
 
-#if defined(ENABLE_XML)
-#define MAX_MHEARD 50                      // max count of messages in mheard ringbuffer
-#define MAX_MHPATH 50                      // max count of messages in mhpath ringbuffer
-#define MAX_RING 20                        // max count of messages in ringbuffer
-#define MAX_DEDUP_RING 60                  // dedup ring for received msg_ids (separate from TX ring)
-#define MAX_LOG 20                         // max count of messages in ringbuffer
-#define MAX_RING_UDP 20                    // size of Ringbuffer for UDP TX messages received from LoRa
-#elif defined(ENABLE_SBUFFER)
+// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle sechs Konstanten setzen --
+// wer eine vergisst, bekommt keinen stillen Fehlwert, sondern einen Compile-Fehler,
+// weil die Konstanten Array-Groessen sind. ALT-33.
+#if defined(ENABLE_XML) || defined(ENABLE_SBUFFER)
+// ENABLE_XML und ENABLE_SBUFFER hatten bis 2026-08-18 zwei byte-identische Zweige
+// nebeneinander; zusammengelegt, damit sie nicht auseinanderlaufen koennen.
 #define MAX_MHEARD 50                      // max count of messages in mheard ringbuffer
 #define MAX_MHPATH 50                      // max count of messages in mhpath ringbuffer
 #define MAX_RING 20                        // max count of messages in ringbuffer
