@@ -469,6 +469,104 @@ natural unit to decide about, rather than "everything".
 
 ---
 
+## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
+
+Angeschlossen ist jetzt ein **RAK4631** statt des Heltec V3. Der Heltec haengt nicht mehr
+am USB (`/dev/cu.usbserial-0001` weg). Hier steht alles, was zum Weitermachen noetig ist.
+
+### Board-Identitaet
+
+|                 |                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| Port            | `/dev/cu.usbmodem2101`                                                                            |
+| USB             | `WisCore RAK4631 Board`, VID `0x239A`, PID **`0x8029` = Applikation** (Bootloader waere `0x0029`) |
+| Rufzeichen      | **DK5EN-90** (vom Benutzer gesetzt, hat das Flashen ueberlebt)                                    |
+| Node-ID         | `48A4690D` → BLE-Name **`MC-690d-DK5EN-90`**                                                      |
+| Firmware jetzt  | unser Branch, `build: Aug 19 2026 / 00:47:55`, `Flash-Version 20260724`                           |
+| Firmware vorher | `build: Mar 24 2026`, `Flash-Version 20260324` (vor der ganzen Kampagne)                          |
+| BTCODE          | 100000                                                                                            |
+| Peripherie      | **nur LoRa.** Kein Ethernet-Kabel, kein WLAN. Hoert DK5EN-98 ueber Funk                           |
+
+### Wie das Board geflasht wurde (der Weg, der funktioniert hat)
+
+```bash
+pio run -e wiscore_rak4631
+pio run -e wiscore_rak4631 --target upload --upload-port /dev/cu.usbmodem2101
+# -> "Device programmed."
+```
+
+`adafruit-nrfutil` ueber serielles DFU. **Kein Doppeldruck auf Reset noetig.** Der Uploader
+macht den 1200-Baud-Touch selbst.
+
+### DFU-Modus — was NICHT funktioniert hat, und warum
+
+- **Doppeldruck auf Reset:** das Board rebootet (Port re-enumeriert), meldet sich aber immer
+  wieder als Applikation (`0x8029`). Es erscheint **kein** `/Volumes/RAK4631`. Mehrfach
+  probiert, auch mit laufendem Watcher auf `/Volumes`.
+- **1200-Baud-Touch von Hand:** loest ebenfalls nur einen Reset aus, kein Laufwerk. Grund:
+  der Adafruit-Core ruft dabei `enterSerialDfu()` auf, nicht `enterUf2Dfu()` — das ist der
+  **Serial-only-DFU-Modus ohne Massenspeicher**. Genau den braucht `adafruit-nrfutil` aber,
+  deshalb klappt der Upload-Weg oben.
+- Ergebnis: **der UF2-Laufwerk-Weg ist an diesem Board bisher nicht erreichbar.** Die
+  UF2-Datei liegt trotzdem gebaut unter
+  `.pio/build/wiscore_rak4631/firmware.uf2` (Rezept in `CLAUDE.md`), falls das Laufwerk
+  doch mal auftaucht.
+
+### Fallstricke, die Zeit gekostet haben
+
+1. **PlatformIO meldet `SUCCESS`, auch wenn das DFU-Upload fehlschlaegt.** Der erste Versuch
+   brach mit `PortNotOpenError` ab — und darunter stand trotzdem `1 succeeded`. Nur
+   `Device programmed.` im Log beweist, dass wirklich geschrieben wurde.
+2. **Die alte Firmware hatte einen haengenden CDC-RX-Pfad:** Lesen ging, aber _jedes_
+   Schreiben auf den Port liess ihn danach minutenlang verstummen. Deshalb schlug der erste
+   Upload fehl und `--setcall` kam nie beim Parser an. **Mit unserer neuen Firmware ist das
+   weg** — `--info` antwortet zuverlaessig. Ob das an unserem printfdeb-Fix (`bd10b636`,
+   `Serial.write` statt `Print::printf` mit `malloc` pro Zeile) liegt, ist plausibel, aber
+   nicht bewiesen.
+3. **`flash_reset()` verliert die Einstellungen NICHT** — entgegen der ersten Lesart. Die
+   Reihenfolge in `nrf52_main.cpp:508-533` ist: `init_flash()` laedt die Settings in den
+   RAM, `flash_reset()` schreibt nur die _Datei_ mit Defaults neu, danach schreibt
+   `save_settings()` den weiterhin gefuellten RAM-Stand zurueck. Rufzeichen, BTCODE, ATXT,
+   NAME, CTRY haben den Versionswechsel 20260324 → 20260724 unveraendert ueberstanden.
+4. **Kein Ethernet ist der Normalzustand** dieses Boards. `Failed to configure Ethernet
+using FIX/DHCP` + `GATEWAY 4.0 RUNNING ETH no connect` beim Boot sind **kein** Defekt;
+   der Boot dauert dadurch ~18 s laenger, haengt aber nicht.
+
+### Neu gebaut, aber auf Hardware noch ungetestet
+
+`--dfu` (Commit `7bac915a`, nur nRF52): startet ueber `enterUf2Dfu()` in den
+UF2-Bootloader, erreichbar per BLE/Seriell/Netz-Konsole. Der Sprung ist um 2 s verzoegert
+(Flag `bEnterDfu` ueber den `rebootAuto`-Pfad), damit die Quittung noch rausgeht. Damit
+sollte sich das Laufwerk kuenftig auch ohne physischen Zugriff erzeugen lassen — **das ist
+der erste Test fuer morgen**, denn ueber den Doppeldruck kam dieses Board nie in den
+UF2-Modus.
+
+### Offener Punkt: BLE vom Pi aus
+
+`mcapp.local` ist sauber von DK5EN-98 getrennt (`{"success":true,"message":"Disconnected"}`),
+findet **DK5EN-90 aber nicht** im Scan — nur DK5EN-98 taucht auf (und das mit `rssi: 0`).
+Der Benutzer kommt per BLE an das Board heran, der Pi offenbar nicht: vermutlich schlicht
+ausser Reichweite, weil der RAK woanders liegt. Morgen zuerst klaeren, bevor BLE-Tests am
+RAK geplant werden.
+
+### Was am nRF52 noch zu tun ist
+
+Alles aus Wave 2, das auf ESP32 geschlossen wurde, ist hier **offen und unveraendert
+gueltig** — auf nRF52 erreicht `OnRxDone` ueber die FreeRTOS-Timer-Task (Prio 2) echte
+Nebenlaeufigkeit:
+
+- `CONC-15`, `CONC-16`, `CONC-18` — Ring-Indizes ohne gegenseitigen Ausschluss
+- `CONC-17` — zerrissene Settings-Kopie in `nrf52_ble.cpp:319`
+- `N-14` — TX-Ring mit mehreren Schreibern ohne Mutex
+- `N-15` — global entfernter Guard, der nur auf ESP32 korrekt ist (`phone_commands.cpp:529`)
+- `N-16` — `Radio.Send()` innerhalb `taskENTER_CRITICAL()`
+- `DRY-21` — `nrf_eth.cpp` dupliziert `udp_functions.cpp`, inklusive abweichendem ACK-Code
+  (`0x01` statt `0x02`). **Ohne Ethernet-Kabel nicht am Geraet testbar**
+- `DRY-22` — `checkSerialCommand()` doppelt und auseinandergelaufen
+- Wave 0.4 — `nordicnrf52` auf eine feste Version pinnen
+- Wave 0.2-Rest — `-Wall -Wextra` + `-Werror` fuer die nRF52-Targets nachziehen
+- `N-12` — `FLASH_VERSION`-Migration, weiter aufgeschoben
+
 ## 4. State of the repository
 
 - Branch `v4.35p_prio`, rebased onto `upstream/dev`, **0 commits behind upstream**.
