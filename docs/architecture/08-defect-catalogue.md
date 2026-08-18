@@ -503,6 +503,35 @@ nRF52.
 
 This is the highest-risk item for any fleet-wide settings change.
 
+> **STATUS 2026-08-18 — RE-VERIFIZIERT, BEWUSST KEIN CODE-FIX.** Mechanismus gegen den
+> aktuellen Baum bestaetigt: `src/nrf52/nrf52_flash.cpp:38-41` hat einen
+> `init_flash_done`-Guard, der den zweiten `init_flash()`-Aufruf nach
+> `flash_reset()` (ausgeloest durch Versions-Mismatch oder `--cleanflash`) sofort
+> zurueckkehren laesst, ohne neu von Flash zu lesen. `save_settings()`
+> (nrf52_main.cpp:533) schreibt dadurch die **unveraenderte RAM-Kopie** zurueck --
+> nur `node_fversion` wird aktualisiert -- waehrend das Log "FLASH cleared new
+> version" meldet. Auf ESP32 hat `init_flash()` (esp32_flash.cpp:14) keinen
+> solchen Guard und liest nach `clear_flash()` tatsaechlich frische Defaults.
+>
+> Struct-Layouts erneut verglichen: `esp32_flash.h:85-88` vs.
+> `nrf52/WisBlock-API.h:250-253` haben `node_mcp17io`/`node_mcp17t`/`node_mcp17out`/
+> `node_mcp17in` in **unterschiedlicher Reihenfolge**, nRF52 hat zusaetzliche Felder
+> (`send_repeat_time`, `auto_join`) ohne ESP32-Aequivalent, und die Datumsfelder
+> sitzen an unterschiedlichen Stellen relativ zu `node_opwd`/`node_ossid`. Die
+> nRF52-Integritaetspruefung besteht aus genau zwei Marker-Bytes
+> (`valid_mark_1=0xAA`, `valid_mark_2=0x55`/`0x57`) -- eine Layout-Verschiebung
+> waere fuer diese Pruefung unsichtbar.
+>
+> **Bewusst kein Fix in dieser Session.** Der isolierte Bug (der
+> `init_flash_done`-Guard) waere als Einzeiler entfernbar, aber ohne gespeichertes
+> Task-Handle fuer Re-Entranz-Pruefung von `InternalFS.begin()` und ohne
+> Struct-Vereinheitlichung zwischen den Plattformen waere ein "kleiner" Fix hier
+> genau die Art Aenderung, die das Projekt unter Zero-Tolerance-Regel ausschliesst
+> -- nicht ohne Hardware-Verifikation auf beiden Plattformen testbar, und das
+> eigentliche Risiko (Layout-Mismatch, schwache Integritaetspruefung) bliebe
+> unangetastet. Bleibt wie zuvor: **Trigger fuer erneutes Aufgreifen ist eine
+> dedizierte Struct-Vereinheitlichung, nicht ein Gelegenheits-Fix.**
+
 ### N-13 — over-synchronisation: atomics and locks where there is no concurrency — **VERIFIED**
 
 Direct answer to the project goal _"atomics exactly where there is genuine concurrent
@@ -530,14 +559,34 @@ spinlock held. On nRF52 the same code runs under `taskENTER_CRITICAL()`.
 > ohne Atomics auf ESP32, `std::atomic` unveraendert auf nRF52 — der Schreibpfad
 > (`OnHeaderDetect`) wird auf ESP32 nie als Radio-Callback registriert.
 >
-> **Restbefund (bewusst nicht angefasst):** die uebrigen ~10 Kandidaten
-> (`is_receiving`, `ch_util_tx_start`, `ch_util_rx_accum`, `ch_util_tx_accum`,
-> `transmissionState`, die `pendingDisplay*`-Felder) sind dieselbe Kategorie, aber
-> jeweils eigene Pruefung wert — dieser Umbau blieb auf die drei am eindeutigsten
-> toten bzw. unnoetig gesperrten Stellen begrenzt, um den Diff schmal zu halten.
 > Vier Boards sauber gebaut (`heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`,
 > `t_deck_pro`); ESP32-Boards RAM -16 Byte / Flash -108..-120 Byte, `wiscore_rak4631`
 > unveraendert (nRF52-Pfad nicht beruehrt).
+>
+> **STATUS 2026-08-18 (Fortsetzung, Commit `d66683d3`) — vier weitere Kandidaten
+> behoben.** `is_receiving`, `ch_util_tx_start`, `ch_util_rx_accum`, `ch_util_tx_accum`
+> re-verifiziert und auf denselben plattformbedingten Wrapper wie `ch_util_rx_start`
+> umgestellt (einfacher Typ ohne Atomics auf ESP32, `std::atomic` unveraendert auf
+> nRF52) — alle vier werden auf ESP32 ausschliesslich ueber die synchrone
+> `esp32loop() -> checkRX() -> OnRxDone()`/`OnTxDone()`-Kette angefasst. Jede
+> Wrapper-Methode wurde gegen die tatsaechlichen Aufrufstellen in `lora_functions.cpp`
+> und `esp32_main.cpp` geprueft, bevor sie ergaenzt wurde.
+>
+> Die beiden verbleibenden Namen aus der urspruenglichen Liste sind **kein
+> Restbefund mehr**: `transmissionState` ist ein einfaches `volatile int`, nie atomar
+> oder gesperrt — kein Fix noetig. Die `pendingDisplay*`-Felder waren bereits durch
+> das Entfernen von `displayMux` in der ersten Runde geloest, keine eigene
+> Synchronisation mehr vorhanden.
+>
+> **Damit ist die urspruengliche 14er-Liste vollstaendig abgearbeitet** (3 geloescht/
+> umgestellt in Runde 1, 4 umgestellt in Runde 2, 2 als kein echter Befund bestaetigt).
+> `iWrite`/`iRead`/`loraWrite` (Ringpuffer-Indizes) wurden bei der Re-Verifikation
+> zusaetzlich als moegliche Kandidaten derselben Kategorie gefunden, waren aber nicht
+> Teil der urspruenglichen Liste und sind bewusst nicht angefasst — eigene Pruefung
+> noetig.
+>
+> heltec_wifi_lora_32_V3 und wiscore_rak4631 sauber gebaut; ESP32-Flash weitere
+> -168 Byte, nRF52 unveraendert.
 
 ### N-14 — nRF52 TX ring is multi-writer with no mutual exclusion — **CONFIRMED** — High
 
@@ -664,30 +713,32 @@ box in `resume.md` for what "done" means here (fixed locally, not yet upstream).
 ### Wave 2 — remaining prior-verdict Track A
 
 **Done, 2026-08-18:** `N-08` (millis() rollover), `N-09` (corrected, no live hazard — see
-STATUS box below), `SEC-03`, `SEC-04`, `SEC-05`, `SEC-06`, `BUG-07`, `BUG-10`, `BUG-12`,
-`BUG-13`, `CONC-14`.
+STATUS box below), `SEC-03`, `SEC-04`, `SEC-05`, `SEC-06`, `BUG-07`, `BUG-10`, `BUG-11`,
+`BUG-12`, `BUG-13`, `CONC-14`, `CONC-19`.
 
-**Still open:** `BUG-11`, `CONC-15` … `CONC-19`, `N-14`, `N-15`, `N-16`. `CONC-14`'s fix is
-claimed by the prior verdict to resolve `CONC-15`/`16`/`17`/`18` at the root, but that was
-**not re-verified** when `CONC-14` was fixed — treat all four as open until checked
-individually.
+**Still open:** `CONC-15` … `CONC-18`, `N-14`, `N-15`, `N-16`. `CONC-14`'s fix is claimed by
+the prior verdict to resolve `CONC-15`/`16`/`17`/`18` at the root, but that was **not
+re-verified** when `CONC-14` was fixed — treat all four as open until checked individually.
 
 ### Wave 3 — structural (propose upstream as a plan first)
 
-~~`N-13`~~ **PARTIALLY DONE** 2026-08-18 — 3 of 14 over-synchronisations removed (`scanFlag`
-deleted, `displayMux` dropped on ESP32, `ch_util_rx_start` platform-split); see the STATUS box
-on N-13 above for the ~10 deliberately deferred candidates.
+~~`N-13`~~ **DONE** 2026-08-18 — all 14 originally-identified over-synchronisation candidates
+resolved across two commits (3 in the first pass, 4 more in a second pass), 2 confirmed as
+not actual defects (`transmissionState`, the `pendingDisplay*` fields); see the STATUS box on
+N-13 above. `iWrite`/`iRead`/`loraWrite` surfaced during re-verification as further same-class
+candidates outside the original list — not part of N-13, deliberately left for a future pass.
 
 `DRY-20` … `DRY-25`, `SIMP-26` … `SIMP-30`, `ALT-31` … `ALT-35`, `STATE-28`, plus the
 corrected C-02 extraction of ~221 radio-independent shared loop lines.
 
 ### Deferred, with triggers
 
-| Item                                                      | Trigger to revisit                                         |
-| --------------------------------------------------------- | ---------------------------------------------------------- |
-| Arduino 3.x migration                                     | after Wave 0 gives a RAM baseline and a CI gate            |
-| Arduino 2.0.14 → 2.0.17 on the four lagging boards (C-04) | with Wave 0's CI matrix in place                           |
-| LVGL 8 → 9                                                | never, unless the T-Deck UI is rewritten for other reasons |
-| Radio interface / HAL                                     | only after C-02's cheap extraction proves the seam         |
-| ~~Licensing (N-11)~~                                      | **CLOSED** 2026-08-18 — risk accepted, maintainer decision |
-| `FLASH_VERSION` migration (N-12)                          | before any change to `meshcom_settings` layout             |
+| Item                                                      | Trigger to revisit                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Arduino 3.x migration                                     | after Wave 0 gives a RAM baseline and a CI gate                                                               |
+| Arduino 2.0.14 → 2.0.17 on the four lagging boards (C-04) | with Wave 0's CI matrix in place                                                                              |
+| LVGL 8 → 9                                                | never, unless the T-Deck UI is rewritten for other reasons                                                    |
+| Radio interface / HAL                                     | only after C-02's cheap extraction proves the seam                                                            |
+| ~~Licensing (N-11)~~                                      | **CLOSED** 2026-08-18 — risk accepted, maintainer decision                                                    |
+| `FLASH_VERSION` migration (N-12)                          | re-verified 2026-08-18, still deferred — see STATUS box above; before any change to `meshcom_settings` layout |
+| `iWrite`/`iRead`/`loraWrite` ring-buffer indices          | same-class N-13 candidates found during re-verification, not yet scoped                                       |
