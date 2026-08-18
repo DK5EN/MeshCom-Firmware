@@ -281,14 +281,16 @@ void stopNetConsole()
 {
     if (!s_started) return;
     s_started        = false;
-    s_mutex          = xSemaphoreCreateMutex();
     s_server_pending = false;   // open socket on next loopNetConsole() call
 
     // stop
     if(s_listen_fd >= 0)
         ::close(s_listen_fd); s_listen_fd = -1;
 
-    teardownClient();
+    if (s_mutex && xSemaphoreTake(s_mutex, portMAX_DELAY) == pdTRUE)
+    {
+        teardownClient();
+    }
 
     s_hwSerial.println("[CON ]...HMAC console stopped.");
 }
