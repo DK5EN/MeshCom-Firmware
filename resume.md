@@ -321,7 +321,23 @@ Each one standalone commit and PR. All verified against the source; details in d
 
 ### 3.4 Then — Wave 2, remaining prior-verdict Track A
 
-`CONC-15`–`CONC-18`, `N-14`–`N-16`.
+`CONC-15`–`CONC-18`, `N-14`–`N-16` — **auf ESP32 alle sieben einzeln nachgeprueft und
+geschlossen (2026-08-18), ohne Codeaenderung; auf nRF52 alle offen.**
+
+Der Katalog verlangte hier ausdruecklich, `CONC-15`/`16`/`17`/`18` nicht auf die Behauptung
+des Vorgutachtens hin abzuhaken ("resolved at the root by CONC-14"), sondern einzeln zu
+pruefen. Ergebnis: auf ESP32 ist keiner ein Defekt — aber aus einem anderen Grund als
+behauptet. `CONC-14` war ein nRF52-Fix und hat auf ESP32 nichts geaendert; tragend ist
+`C-01`. Der gemeldete Mechanismus ("Radio-Task rennt gegen Loop-Task") existiert auf ESP32
+nicht: `OnRxDone` laeuft synchron in `loopTask`, die einzige weitere Task im Heltec-V3-Build
+(`authTask`) fasst keinen Ring an, die ISRs nur `receiveFlag`/`transmittedFlag`, die
+NimBLE-Callbacks nur `xQueueSend`, und der Webserver ist ein gepollter `WiFiServer` ohne
+eigene Task. Alle Schreiber und Leser der Phone- und UDP-Ringe liegen damit in derselben
+Task. `N-14`/`N-16` sind nRF52-only, `N-15` sagt im eigenen Befundtext "True on ESP32".
+
+Vollstaendiger Nachweis inkl. Gueltigkeitsbedingung (was den Befund wieder oeffnen wuerde):
+STATUS-Box unter Wave 2 in [`08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md).
+**Damit ist Wave 2 fuer ESP32 leer** — der Rest wartet auf angeschlossene nRF52-Hardware.
 
 ~~`N-08`~~ **FIXED** 2026-08-18 — 25 deadline comparisons converted to the safe subtraction
 idiom (`0ccebe8d`).

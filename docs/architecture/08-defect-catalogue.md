@@ -794,9 +794,63 @@ box in `resume.md` for what "done" means here (fixed locally, not yet upstream).
 STATUS box below), `SEC-03`, `SEC-04`, `SEC-05`, `SEC-06`, `BUG-07`, `BUG-10`, `BUG-11`,
 `BUG-12`, `BUG-13`, `CONC-14`, `CONC-19`.
 
-**Still open:** `CONC-15` … `CONC-18`, `N-14`, `N-15`, `N-16`. `CONC-14`'s fix is claimed by
-the prior verdict to resolve `CONC-15`/`16`/`17`/`18` at the root, but that was **not
-re-verified** when `CONC-14` was fixed — treat all four as open until checked individually.
+**Still open:** `CONC-15` … `CONC-18`, `N-14`, `N-15`, `N-16` — **auf nRF52**. Fuer ESP32
+einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
+
+> **STATUS 2026-08-18 — ESP32 einzeln nachgeprueft: kein offener Wave-2-Punkt mehr.**
+>
+> Der Katalog verlangte hier ausdruecklich, `CONC-15`/`16`/`17`/`18` **nicht** auf die
+> Behauptung des Vorgutachtens hin abzuhaken ("resolved at the root by CONC-14"), sondern
+> einzeln zu pruefen. Genau das ist jetzt geschehen — mit dem Ergebnis, dass auf ESP32
+> keiner der vier ein Defekt ist, aber aus einem anderen Grund als behauptet.
+>
+> `CONC-14` war ein **nRF52**-Fix (`a441ece6`, `nrf52_ble.cpp`); er hat auf ESP32 gar nichts
+> geaendert, weil ESP32 die Queue-Entkopplung schon immer hatte. Tragend ist stattdessen
+> `C-01`: der gemeldete Mechanismus aller drei Ring-Findings lautet "Radio-Task rennt gegen
+> Loop-Task" — diese Praemisse gilt auf ESP32 nicht.
+>
+> Nachgewiesen am Build `heltec_wifi_lora_32_V3`:
+>
+> - **Genau eine** zusaetzliche Task existiert in diesem Build: `authTask`
+>   (`net_console.cpp:383`, Core 1, Prio 1). Sie fasst **keinen** Ring an und ruft kein
+>   `commandAction` — nur HMAC-Handshake, dann `s_fd`/`s_authenticated` unter dem Mutex.
+>   Die Tasks in `t-deck-pro/`, `t5-epaper/` und `esp32_audio.cpp` sind per `src_filter`
+>   bzw. `ENABLE_AUDIO` nicht Teil dieses Builds.
+> - `OnRxDone()` laeuft synchron in `loopTask`: `esp32loop()` → `checkRX()`
+>   (`esp32_main.cpp:2272`) → `OnRxDone()` (`:3918`). Der Extern-Radio-Pfad liefert RX
+>   ebenfalls synchron waehrend `poll()` (`external_radio_glue.cpp:164`), auch aus der Loop.
+> - Die ESP32-ISRs `setFlagReceive`/`setFlagSent` (`esp32_main.cpp:490`, `:506`) fassen
+>   ausschliesslich `receiveFlag`/`transmittedFlag` an (beide weiterhin `std::atomic<bool>`) —
+>   keinen Ring-Index.
+> - Die NimBLE-Host-Task erreicht die Ringe nicht: `CharacteristicCallbacks::onWrite` macht
+>   nur `xQueueSend(bleQueue, …)`; die Server-Callbacks setzen nur Flags.
+> - Der Webserver hat keine eigene Task: `CommonWebServer : public WiFiServer`
+>   (`web_commonServer.h:18`), gepollt aus `loopWebserver()` (`esp32_main.cpp:3727`). Der
+>   `toPhoneRead`-Zugriff in `web_functions.cpp:1264` liegt damit ebenfalls in `loopTask`.
+>
+> Damit liegen **alle** Schreiber und Leser von `toPhoneWrite`/`toPhoneRead`
+> (`addBLEOutBuffer`, `sendToPhone`) und `udpWrite`/`udpRead` (`addUdpOutBuffer`,
+> `sendMeshComUDP`) auf ESP32 in derselben Task. Kein Interleaving moeglich:
+>
+> - `CONC-15` (`toPhoneWrite/Read`) — **kein Defekt auf ESP32**
+> - `CONC-16` (`udpWrite/Read`) — **kein Defekt auf ESP32**
+> - `CONC-18` (`sendToPhone` TOCTOU) — **kein Defekt auf ESP32**
+> - `CONC-17` — betrifft `nrf52_ble.cpp:319`, auf ESP32 gar nicht vorhanden
+> - `N-14` (nRF52-TX-Ring), `N-16` (`taskENTER_CRITICAL` + `Radio.Send()`) — nRF52-only
+> - `N-15` — sagt im eigenen Befundtext "True on ESP32"; der entfernte Guard ist auf ESP32
+>   korrekt, der Defekt liegt auf nRF52
+>
+> **Bewusst kein Code geaendert.** Atomics oder Locks hier waeren genau die
+> Ueber-Synchronisation, die `N-13` gerade entfernt hat.
+>
+> **Gueltigkeitsbedingung** (bei Verletzung neu bewerten): sobald auf ESP32 eine weitere
+> Task eingefuehrt wird, die `addBLEOutBuffer`/`addUdpOutBuffer`/`sendToPhone` erreicht —
+> etwa ein asynchroner Webserver, ein eigener Task fuer das Extern-Radio-Transport oder ein
+> BLE-Callback, der `readPhoneCommand` wieder inline aufruft — fallen `CONC-15`/`16`/`18`
+> auf ESP32 sofort zurueck auf "offen".
+>
+> Auf nRF52 bleiben alle sieben offen und unveraendert gueltig; dort ist `OnRxDone` ueber die
+> FreeRTOS-Timer-Task (Prio 2) erreichbar. Abzuarbeiten, sobald ein nRF52 angeschlossen ist.
 
 ### Wave 3 — structural (propose upstream as a plan first)
 
