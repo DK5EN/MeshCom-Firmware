@@ -1,11 +1,58 @@
 # Release Notes -- MeshCom Firmware v4.35* (2026-03-22)
 
+## Upstream-Sync 2026-08-18 (dev)
 
+Rebase auf aktuellen upstream/dev (HEAD 8114d7ae). 29 neue Commits aus upstream
+seit 2026-07-12:
+
+- Externe Radio-Anbindung ueber TCP (PR #1072, makrohard) -- der mit Abstand
+  groesste Block (19 Commits, ~2.480 Zeilen Produktivcode plus ~2.160 Zeilen
+  Host-Tests). Neue Libraries
+  `lib/external_radio_protocol`, `lib/external_radio_tcp`,
+  `lib/external_radio_txq`, ESP32-Glue in `src/esp32/external_radio_glue.cpp/.h`,
+  Protokoll-Doku `docs/external-radio-protocol.md`. Umfasst Frame-Protokoll und
+  Stream-Parser, TCP-Transport, asynchrone TX-Queue mit Slot-Ownership,
+  RX-Callback, Channel-Busy-/Retransmit-Behandlung und Config-Sync nach dem
+  Country-Setup. Beruehrt auch `lora_functions.cpp/.h`, `lora_setchip.cpp/.h`,
+  `esp32_main.cpp`, `nrf52_main.cpp`, `loop_functions.cpp`,
+  `command_functions.cpp`. Der Firmware-Build ist opt-in
+  (`[env:esp32-external-radio]`, nicht in `default_envs`), die Host-Tests laufen
+  in der neuen `[env:native_extradio]`.
+- v4.35p Softser Watchdog-Timer -- HEY-Intervall wird bei `ENABLE_SOFTSER` um
+  10 Minuten verlaengert (`esp32_main.cpp`).
+- v4.35p neues Kommando `--setlog on/off` inkl. Korrektur der Kommando-Maske
+  (`command_functions.cpp`).
+- v4.35p neues Laendersetting PL (Polen).
+- v4.35p RAK/WisBlock GPS TRACK MODE und GPS SAT-INFO (`nrf52_main.cpp`).
+- v4.35p `E22_1262-DevKitC` mit `ENABLE_GPS`; HELTEC_V3 `ADC_FACTOR` angepasst.
+- Update `batt_functions.cpp` und `loop_functions.cpp` (Minor-Fixes).
+
+Konflikt beim Rebase in `src/esp32/esp32_main.cpp`: Upstream hat im Trickle-HEY
+Zweig ein `extra_hey_time` (10 Minuten Zuschlag bei `ENABLE_SOFTSER`) auf die
+alte, nicht wraparound-sichere Bedingung `(heyinfo_timer + trickle_interval_ms +
+extra_hey_time) < millis()` addiert. Aufgeloest durch Uebernahme beider
+Aenderungen: der Zuschlag bleibt, die Pruefung bleibt unsere wraparound-sichere
+Form `(uint32_t)(millis() - heyinfo_timer) >= (trickle_interval_ms +
+extra_hey_time)`.
+
+Nachzug nach dem Rebase in `platformio.ini`: Upstream hat die lose Datei
+`test/compress_functions.*` nach `test/test_compress/` verschoben und drei
+weitere Suiten unter `test/test_external_radio_*` angelegt. Damit zog unsere
+`[env:native]` diese Suiten mit ein und `pio test -e native` (unser CI-Gate)
+brach beim Linken ab. Behoben mit `test_filter = test_regex_call` -- upstreams
+Suiten laufen in `env:native_extradio`, unsere Env bleibt auf unsere eigenen
+Host-Tests beschraenkt.
+
+Unsere uebernommenen Commits: keine. Alle 35 lokalen Commits sauber appliziert
+(1 Konflikt manuell aufgeloest, siehe oben).
+
+---
 
 ## Upstream-Sync 2026-07-12 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD 2832e192). Grosser Sync, 63 neue
 Commits aus upstream seit 2026-06-26:
+
 - TBEAM 1W Deepsleep deaktiviert; Wireless Paper Deepsleep-Pfad an Vision
   Master E213 angeglichen (Stego-Lab, PR #1050).
 - E218 GPS aktiviert; NCount-Fix "from Hey only >= 4.35p" (mehrere Commits).
@@ -33,6 +80,7 @@ Unsere uebernommenen Commits: keine. Alle 26 lokalen Commits sauber appliziert
 ## Upstream-Sync 2026-06-26 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD d3af8986). Neue Aenderungen aus upstream:
+
 - Heltec E213: neues Board (ESP32-S3 + SX1262 + 2.13" E-Ink, PR #1021, Stego-Lab)
 - v4.35p minor (PR #1020)
 - v4.35p default settings (PR #1018)
@@ -50,6 +98,7 @@ kein Konflikt.
 
 Rebase auf aktuellen upstream/dev (HEAD 871da1ad). Grosser Sync mit umfangreichen
 Source-Aenderungen (59 Dateien, +4077/-1629). Neue Aenderungen aus upstream:
+
 - via/routing-Ueberarbeitung -- mehrere Commits "v4.35p via/routing" und
   "routing, optical" (`via_functions.cpp/.h`, `loop_functions.cpp`,
   `lora_functions.cpp`, `udp_functions.cpp`).
@@ -75,6 +124,7 @@ Einziger Konflikt: `FLASH_VERSION` in `configuration_global.h` -- auf upstream-W
 ## Upstream-Sync 2026-05-31 (dev)
 
 Rebase auf aktuellen upstream/dev (HEAD eba328b4). Neue Aenderungen aus upstream:
+
 - v4.35p web_function (4a0fe3e2) -- Labels "APRS Symbol" und "APRS Group" in der
   Web-Setup-Seite (`web_functions.cpp`, `sub_page_setup`) vertauscht; reine
   UI-Korrektur, keine Logik-Aenderung.
@@ -100,6 +150,7 @@ sowohl `oe1kbc_v4.35p` als auch der neue `oe1kbc_tls` Branch gemerged wurden.
 `oe1kbc_v4.35p` ist nun in `dev` enthalten und liegt 19 Commits zurueck.
 
 Rebase auf aktuellen upstream/dev (HEAD 9c9e1908). Neue Aenderungen aus upstream:
+
 - v4.35p tlsconsole + iram reduction (67311a4c)
 - Lazy ssl_context allocation -- Heap-Reduktion auf Low-RAM Nodes (e6ce9f20, von DH1FR)
 - v4.35p tls disable (431cbb1f)
@@ -123,6 +174,7 @@ Saubere zweizeilige Form uebernommen, Inhalt identisch.
 ## Upstream-Sync 2026-05-09 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD aa457d8). Neue Aenderungen aus upstream:
+
 - v4.35p.04.08 mh distance (760c368)
 - v4.35p.04.08 mh corr (aa457d8)
 
@@ -133,6 +185,7 @@ Unsere uebernommenen Commits: keine.
 ## Upstream-Sync 2026-04-19 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD b531a17). Neue Aenderungen aus upstream:
+
 - v4.35p t_echo (f79df08)
 - v4.35p wireless_tracker (2648c7d)
 - v4.35p SX1262 min power -9dBm -- 27 variant configs angepasst (546ad01)
@@ -161,6 +214,7 @@ Betroffen ist nur `E22-DevKitC`. Alle anderen 6 Standardtargets (Heltec V3, T-Be
 ## Upstream-Sync 2026-04-17 (oe1kbc_v4.35p)
 
 Rebase auf aktuellen upstream (HEAD 95bd4c4). Neue Aenderungen aus upstream:
+
 - download_meshcom.py Update
 - GPS SoftSerial Anpassungen
 - release.md Update
@@ -192,6 +246,7 @@ Umfassende Offline-Analyse von MeshCom Serial-Monitor Logs. Erzeugt strukturiert
 Overview, Active Nodes, Message Types, Hop Distribution, Loops, Channel Utilization, ACK Analysis, CRC Errors, Ring Status, Missing ACKs, Dedup, State Machine, Additional, CRC Detail, CAD Attempt Distribution, CAD Storm, Ring Overflow, Dropped Packets, High Hop Packets, Priority Distribution, Trickle HEY, High Water Marks
 
 **Erweiterte Analyse (neu):**
+
 - **HEAP Monitoring** -- Trend, Stabilitaetsbewertung (Leak-Erkennung), Low/High Watermark
 - **Starvation Events** -- Radio Silent (>20s), Stuck States, Ring Zombies, Prio-1 Starvation
 - **Server Connection** -- OeVSV Heartbeat-Gaps, WiFi Events, UDP Resets
@@ -220,6 +275,7 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 ## Supported Hardware
 
 ### ESP DevKits + E22 LoRa Modul
+
 - E22-DevKitC.bin (433 MHz)
 - E22_XML-DevKitC.bin (433 MHz)
 - E22_1268_S3-DevKitC.bin (433 MHz)
@@ -227,10 +283,12 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 - E22_1262_S3-DevKitC.bin (868 MHz)
 
 ### ESP32 Lora-Aprs
+
 - esp32-loraprs-e22
 - esp32-loraprs-ra01
 
 ### HELTEC
+
 - heltec_wifi_lora_32_V2.bin
 - heltec_wifi_lora_32_V3.bin
 - heltec_wifi_lora_32_V4.bin
@@ -239,7 +297,9 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 - heltec_t114.zip, .uf2
 
 ### Lilygo
+
 #### TBEAM
+
 - ttgo-lora32-v21.bin
 - ttgo_tbeam.bin
 - ttgo_tbeam_SX1262.bin
@@ -248,24 +308,30 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 - ttgo_tbeam_1W.bin
 
 #### E-PAPER
+
 - vision-master-e290.bin
 - vision-master-e213.bin
 
 #### T-DECK
+
 - t_deck.bin
 - t_deck_plus.bin
 - t_deck_pro.bin
 
 #### T-Echo
+
 - t_echo.zip, .uf2
 
 #### T3 S3
+
 - T3_S3_V13.bin
 
 #### T_CONNECT_PRO
+
 - t_connect_pro.bin
 
 ### RAK Wisblock
+
 - wiscore_rak4631.zip, .uf2
 
 ### Newer version > v4.35 able to upgrade via OTA-Flasher.
