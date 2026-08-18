@@ -786,8 +786,7 @@ void nrf52setup()
 
     posinfo_fix = false;
     posinfo_satcount = 0;
-    posinfo_hdop = 0;
-    fposinfo_hdop = 0;
+    fposinfo_hdop = 0.0;
 
     // Try to initialize!
     #if defined(LPS33)
@@ -1674,8 +1673,7 @@ void nrf52loop()
             {
                 posinfo_fix = false;
                 posinfo_satcount = 0;
-                posinfo_hdop = 0;
-                fposinfo_hdop = 0;
+                fposinfo_hdop = 0.0;
                 posinfo_interval = POSINFO_INTERVAL;
             }
         }
@@ -2633,8 +2631,7 @@ unsigned int getGPS(void)
         Serial.printf("newData:%i SAT:%d Fix:%d UPD:%d VAL:%d HDOP:%i\n", newData, tinyGPSPlus.satellites.value(), tinyGPSPlus.sentencesWithFix(), tinyGPSPlus.location.isUpdated(), tinyGPSPlus.location.isValid(), tinyGPSPlus.hdop.value());
 
     posinfo_satcount = tinyGPSPlus.satellites.value();
-    posinfo_hdop = tinyGPSPlus.hdop.value();
-    fposinfo_hdop = tinyGPSPlus.hdop.value();;
+    fposinfo_hdop = tinyGPSPlus.hdop.value();
 
     bool has_gnss_location=false;
 

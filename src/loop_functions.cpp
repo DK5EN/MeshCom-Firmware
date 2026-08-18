@@ -461,7 +461,6 @@ double posinfo_last_direction = 0.0;
 unsigned int posinfo_last_rate = POSINFO_INTERVAL;  // seconds
 
 uint32_t posinfo_satcount = 0;
-int posinfo_hdop = 0;
 float fposinfo_hdop = 0.0;
 bool posinfo_fix = false;
 bool posinfo_shot=false;
@@ -2581,7 +2580,7 @@ void init_loop_function()
 {
     posinfo_last_direction = 0.0;
     posinfo_satcount = 0;
-    posinfo_hdop = 0;
+    fposinfo_hdop = 0.0;
     posinfo_fix = false;
 
     meshcom_settings.node_vbus = 0.0f;
