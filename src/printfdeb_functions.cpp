@@ -116,10 +116,17 @@ int printfdeb(const char *uformat, ...)
     bDEBUGLNG = false; // wieder deaktivieren
 
     // SEC-02: temp enthaelt bereits substituierten Text — u.a. ueber Funk empfangene
-    // Nutzdaten, die per %s eingesetzt wurden. Wird temp als Format-String uebergeben,
-    // parst printf darin enthaltene %-Direktiven ein zweites Mal (%s/%n) ohne passende
-    // varargs -> Stack-Leseszugriffe bzw. Schreibzugriff. Immer als Argument uebergeben.
-    Serial.printf("%s", temp);
+    // Nutzdaten, die per %s eingesetzt wurden. Diese duerfen NICHT erneut als
+    // Format-String geparst werden (%s/%n ohne passende varargs -> Stack-Lesezugriffe
+    // bzw. Schreibzugriff).
+    //
+    // Serial.printf("%s", temp) waere dagegen ebenfalls sicher, formatiert den fertigen
+    // String aber ein zweites Mal: Print::printf nutzt intern nur 64 Byte Stack und
+    // malloc()t fuer alles Darueber — also bei fast jeder Log-Zeile. Dieser Heap-Churn
+    // liess NimBLE (MSYS1_BLOCK_COUNT=4) keine mbufs mehr fuer den Verbindungsaufbau
+    // finden: der Node beantwortete CONNECT_IND nicht mehr, der Central brach den
+    // Verbindungsaufbau mit 0x3e ab. Direkt schreiben ist sicher UND allokationsfrei.
+    Serial.write((const uint8_t*)temp, (size_t)len);
 
     if(temp != loc_buf){
         free(temp);
