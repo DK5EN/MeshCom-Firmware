@@ -425,7 +425,7 @@ int ComToPhoneRead=0;
 bool hasMsgFromPhone = false;
 
 // LoRa RX/TX sequence control
-std::atomic<bool> is_receiving{false};  // flag to store we are receiving a lora packet.
+is_receiving_t is_receiving{false};  // flag to store we are receiving a lora packet.
 std::atomic<bool> tx_is_active{false};  // flag to store we are transmitting  a lora packet.
 
 int cad_attempt = 0;
@@ -434,9 +434,9 @@ int rx_irq_defer_count = 0;
 
 // Channel utilization tracking (10s window)
 ch_util_rx_start_t ch_util_rx_start{0};   // timestamp when RX started
-std::atomic<unsigned long> ch_util_tx_start{0};   // timestamp when TX started
-std::atomic<unsigned long> ch_util_rx_accum{0};   // accumulated RX airtime (ms) in current window
-std::atomic<unsigned long> ch_util_tx_accum{0};   // accumulated TX airtime (ms) in current window
+ch_util_ulong_t ch_util_tx_start{0};   // timestamp when TX started
+ch_util_ulong_t ch_util_rx_accum{0};   // accumulated RX airtime (ms) in current window
+ch_util_ulong_t ch_util_tx_accum{0};   // accumulated TX airtime (ms) in current window
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 

@@ -212,7 +212,22 @@ extern int ComToPhoneRead;
 extern uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5]; //Ringbuffer for received msg_id deduplication
 extern std::atomic<uint8_t> loraWrite;   // counter for ringbuffer
 
-extern std::atomic<bool> is_receiving;   // flag to store we are receiving a lora packet.
+// is_receiving: same reasoning as ch_util_rx_start_t below -- on ESP32, OnRxDone()/OnTxDone()
+// and friends run synchronously off the esp32loop() -> checkRX() call chain (no ISR, no
+// second task touches this flag there), so the atomic is unnecessary overhead. nRF52
+// registers these as real interrupt callbacks -- genuine concurrency, keep std::atomic. N-13.
+#if defined(ESP32)
+struct is_receiving_t {
+    bool v = false;
+    is_receiving_t() = default;
+    is_receiving_t(bool nv) : v(nv) {}
+    is_receiving_t &operator=(bool nv) { v = nv; return *this; }
+    operator bool() const { return v; }
+};
+#else
+using is_receiving_t = std::atomic<bool>;
+#endif
+extern is_receiving_t is_receiving;   // flag to store we are receiving a lora packet.
 extern std::atomic<bool> tx_is_active;   // flag to store we are transmitting  a lora packet.
 
 extern int cad_attempt;
@@ -240,13 +255,27 @@ struct ch_util_rx_start_t {
     ch_util_rx_start_t &operator=(unsigned long nv) { v = nv; return *this; }
     unsigned long exchange(unsigned long nv) { unsigned long old = v; v = nv; return old; }
 };
+
+// Same reasoning for the accumulators/timestamps below: on ESP32 they are only touched
+// from OnRxDone()/OnTxDone()/checkRX(), all called synchronously from esp32loop() -- no
+// ISR, no second task. nRF52 runs these as real interrupt callbacks, keep std::atomic.
+struct ch_util_ulong_t {
+    unsigned long v = 0;
+    ch_util_ulong_t() = default;
+    ch_util_ulong_t(unsigned long nv) : v(nv) {}
+    ch_util_ulong_t &operator=(unsigned long nv) { v = nv; return *this; }
+    operator unsigned long() const { return v; }
+    unsigned long exchange(unsigned long nv) { unsigned long old = v; v = nv; return old; }
+    unsigned long fetch_add(unsigned long nv) { unsigned long old = v; v += nv; return old; }
+};
 #else
 using ch_util_rx_start_t = std::atomic<unsigned long>;
+using ch_util_ulong_t = std::atomic<unsigned long>;
 #endif
 extern ch_util_rx_start_t ch_util_rx_start;
-extern std::atomic<unsigned long> ch_util_tx_start;
-extern std::atomic<unsigned long> ch_util_rx_accum;
-extern std::atomic<unsigned long> ch_util_tx_accum;
+extern ch_util_ulong_t ch_util_tx_start;
+extern ch_util_ulong_t ch_util_rx_accum;
+extern ch_util_ulong_t ch_util_tx_accum;
 
 
 // Trickle-HEY state
