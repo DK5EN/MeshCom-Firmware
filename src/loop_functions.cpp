@@ -114,6 +114,7 @@ bool bDisplayRetx = false;
 unsigned long DisplayOffWait = 0;
 bool bDisplayTrack = false;
 bool bOneButton = false;
+bool bEnterDfu = false;   // --dfu: beim naechsten faelligen rebootAuto in den UF2-Bootloader statt Neustart
 // ALT-35: getrennt von bOneButton -- "Anzeige neu aufbauen", nicht "Taste gedrueckt".
 bool bDisplayDirty = false;
 bool bGPSON = false;

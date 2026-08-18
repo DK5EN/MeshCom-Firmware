@@ -2050,8 +2050,18 @@ void nrf52loop()
             #ifdef ESP32
                 ESP.restart();
             #endif
-            
+
             #if defined NRF52_SERIES
+                // dfuAuto: --dfu wants den UF2-Bootloader statt eines normalen
+                // Neustarts. Beides laeuft ueber denselben verzoegerten Pfad, damit
+                // die Quittung noch ueber BLE bzw. Seriell rausgeht, bevor der Reset
+                // kommt -- ein Reset direkt in commandAction() verschluckt sie.
+                if(bEnterDfu)
+                {
+                    bEnterDfu = false;
+                    enterUf2Dfu();      // setzt GPREGRET und resettet -> UF2-Laufwerk
+                }
+
                 NVIC_SystemReset();     // resets the device
             #endif
         }
