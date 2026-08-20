@@ -7,7 +7,7 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 
-#if not defined(BOARD_RAK4630)
+#if !defined(NRF52_SERIES)
 #include <esp_adc_cal.h>
 #endif
 
@@ -66,7 +66,7 @@ uint32_t vbat_pin = ADC_PIN;
 uint32_t vbat_pin = ADC_PIN;
 #endif
 
-#if defined(BOARD_RAK4630) || defined(BOARD_T_ECHO)
+#if defined(NRF52_SERIES)
 //nothing
 #else
 
