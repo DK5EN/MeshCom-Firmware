@@ -1,6 +1,14 @@
 #include "configuration.h"
 
-#ifndef BOARD_RAK4630
+// ESP-IDF ADC calibration API (esp_adc_cal.h) and analogReadMilliVolts() are
+// ESP32-Arduino-core-only. The previous `#ifndef BOARD_RAK4630` guard only
+// worked for wiscore_rak4631 by coincidence of a platformio.ini section-name
+// collision (see Wave 0.2 notes) that leaked BOARD_RAK4630 into every other
+// nRF52 variant's build; on a correctly isolated build it left heltec_t114
+// and t_echo trying to compile ESP-IDF headers. loop_ADCFunctions() is only
+// ever called from src/esp32/esp32_main.cpp, so gating on ESP32 directly
+// keeps every board's compiled behavior identical to before.
+#if defined(ESP32)
 
 #include "loop_functions_extern.h"
 

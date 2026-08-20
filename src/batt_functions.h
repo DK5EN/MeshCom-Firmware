@@ -37,7 +37,7 @@ int wpBattHistory(float* out, int maxn);   // letzte Spannungs-Rohwerte, neueste
 	#include "nrf52/t_echo_utilities.h"
 #endif
 
-#if not defined(BOARD_RAK4630)
+#if !defined(NRF52_SERIES)
 	#include <esp_adc_cal.h>
 #endif
 
