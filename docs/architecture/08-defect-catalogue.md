@@ -734,6 +734,51 @@ Zeit still. Auf Hardware gemessen: `[DBGSTALL] seg read_batt took 100617 us`,
 > BLE-Fehler unveraendert auf. Der Stall ist fuer sich genommen real und wurde deshalb
 > behoben.
 
+### CFG-01 — `[nrf52]`-Sektion kollidiert namensgleich ueber alle drei `variants/*/platformio.ini` — **VERIFIED (reproduziert per Clean-Build)** — Medium (Build-Isolation), Symptome bereits behoben
+
+Neu, gefunden 2026-08-20 beim Versuch, Wave 0.2 (`-Werror`) auch fuer `heltec_t114`/`t_echo`
+zu aktivieren.
+
+`platformio.ini:14` laedt `extra_configs = variants/*/platformio.ini`. Jede der drei
+nRF52-Varianten-Dateien deklariert eine Sektion `[nrf52]` mit demselben Namen
+(`variants/wiscore_rak4631/platformio.ini:1`, `variants/heltec_t114/platformio.ini:1`,
+`variants/t_echo/platformio.ini:1`). Solange nur `wiscore_rak4631`s `[nrf52]`-Sektion
+zusaetzliche Keys trug (`build_src_filter`, `build_flags` inkl. `-D BOARD_RAK4630=...`),
+gewannen deren Werte fuer alle drei `env:*`, die per `extends = nrf52` darauf verweisen —
+`heltec_t114` und `t_echo` bekamen `BOARD_RAK4630` in ihre Compile-Kommandos gemischt,
+obwohl keines der beiden das WisBlock-RAK-Board ist (verifiziert per `-v`-Build-Log-Diff
+zwischen gestashtem und aktuellem Baum, mit vollstaendig geleertem `.pio/build/`).
+
+Das blieb unbemerkt, weil drei Stellen `#ifndef BOARD_RAK4630` als Proxy fuer "ist ESP32"
+benutzten (`adc_functions.cpp:3`, `batt_functions.h:40`, `batt_function_old.cpp:10`/`:69`
+— siehe C-Symptome unten) — mit dem geleakten Define kam dort nie echter ESP-IDF-Code
+(`esp_adc_cal.h`) zum Tragen, die Boards "bauten einfach durch".
+
+**Symptome behoben (Commit `b0c3d8c0`):** die drei Guards von `BOARD_RAK4630` auf die
+tatsaechliche Plattform umgestellt (`defined(ESP32)` bzw. `!defined(NRF52_SERIES)`, im
+selben File bereits als Diskriminator etabliert). Dabei zusaetzlich gefunden:
+`batt_function_old.cpp:69` nahm `BOARD_T_ECHO` bereits explizit aus dem
+ESP-IDF-Kalibrierungstyp-Block aus, aber nie `BOARD_HELTEC_T114` — jemand hatte das
+Problem fuer `t_echo` offenbar schon einmal von Hand gepatcht, nur unvollstaendig. Fuer
+alle Boards verifiziert bit-identisch zum vorherigen (durch den Leak maskierten)
+Verhalten.
+
+**Root cause NICHT behoben.** Die Sektionskollision selbst ist gefaehrlicher als ihre drei
+bekannten Symptome: JEDE kuenftige Aenderung an einer `[nrf52]`- oder `[esp32]`-Sektion in
+einer `variants/*/platformio.ini` kann auf dieselbe Art in andere Boards derselben Familie
+durchsickern, abhaengig davon, welche Datei zuletzt geladen wird und welche Keys sie neu
+definiert — aus dem Diff einer einzelnen Datei nicht ersichtlich.
+
+**Fix (nicht in dieser Session):** jede Sektion eindeutig benennen
+(`[nrf52_rak4631]`, `[nrf52_t114]`, `[nrf52_techo]`; analog fuer `[esp32]`, falls die ESP32-
+Varianten-Dateien dieselbe Kollision haben — nicht separat geprueft) und `extends`
+entsprechend anpassen. Sollte mit allen betroffenen Boards am Bankarbeitsplatz verifiziert
+werden, nicht blind.
+
+**Trigger fuer erneutes Aufgreifen:** `heltec_t114` oder `t_echo` an Hardware verfuegbar
+(dann Wave 0.2-Rest dort nachholen), oder die naechste Aenderung an einer
+`[nrf52]`/`[esp32]`-Sektion in `variants/*/platformio.ini`.
+
 ---
 
 ## 3. Refuted claims — do not re-investigate
@@ -793,13 +838,13 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 
 ### Wave 0 — enablement (no behaviour change, no hardware)
 
-| #       | Item                                                                                       | Evidence              | Status                                                |
-| ------- | ------------------------------------------------------------------------------------------ | --------------------- | ----------------------------------------------------- |
-| 0.1     | CI: build all 32 envs on PR and push                                                       | `TEST-38`             | done — CI build gate                                  |
-| ~~0.2~~ | `-Wall -Wextra` on firmware targets, fix the warnings, then `-Werror` on `build_src_flags` | F6, C-17              | **DONE (ESP32)** 2026-08-18 — see STATUS box below    |
-| ~~0.3~~ | `-Wundef` + convert `BOARD_*` to flags with separate name macros                           | N-10                  | **DONE** 2026-08-18 — see STATUS box on N-10 below    |
-| 0.4     | Pin `nordicnrf52`                                                                          | 02 B-04               | open — nRF52-only, wartet auf angeschlossene Hardware |
-| 0.5     | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                          | `TEST-37`, C-14, C-03 | done — native test harness                            |
+| #       | Item                                                                                       | Evidence              | Status                                                              |
+| ------- | ------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------- |
+| 0.1     | CI: build all 32 envs on PR and push                                                       | `TEST-38`             | done — CI build gate                                                |
+| ~~0.2~~ | `-Wall -Wextra` on firmware targets, fix the warnings, then `-Werror` on `build_src_flags` | F6, C-17              | **DONE (ESP32)** 2026-08-18 — see STATUS box below                  |
+| ~~0.3~~ | `-Wundef` + convert `BOARD_*` to flags with separate name macros                           | N-10                  | **DONE** 2026-08-18 — see STATUS box on N-10 below                  |
+| ~~0.4~~ | Pin `nordicnrf52`                                                                          | 02 B-04               | **DONE** 2026-08-20 — auf `10.12.0` gepinnt, alle drei nRF52-Boards |
+| 0.5     | `[env:native]` + Unity + `Arduino.h` shim, explicit board profile                          | `TEST-37`, C-14, C-03 | done — native test harness                                          |
 
 > **STATUS 2026-08-18 — 0.2 DONE fuer ESP32.**
 >
@@ -846,6 +891,20 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 >
 > Auf Hardware (Heltec V3) geflasht und geprueft: kein Boot-Loop, Webserver HTTP 200,
 > BLE verbindet.
+
+> **STATUS 2026-08-20 — 0.2 fuer `wiscore_rak4631` DONE, `heltec_t114`/`t_echo` deckten
+> `CFG-01` auf (siehe eigener Befund unten).**
+>
+> Vor dem Gate 20 echte Warnungen in `src/` gemessen (nicht die ~33.000 `-Wunused-parameter`
+> aus SVCALL-Makro-Expansionen in den Nordic-SoftDevice-Headern — Drittanbieter, via
+> `-Wno-unused-parameter` in `build_src_flags` ausgeklammert, analog zum
+> `-Wno-missing-field-initializers`-Muster oben). Alle 20 behoben (`(void)`-Casts bzw.
+> `int`→`size_t`), `-Wformat=2 -Wno-unused-parameter -Werror` scharfgeschaltet. Details und
+> Dateiliste: Commit `a3a30ef0`.
+>
+> Derselbe Versuch fuer `heltec_t114`/`t_echo` legte einen unabhaengigen Befund frei
+> (`CFG-01`) und wurde deshalb fuer diese zwei Boards zurueckgestellt — nicht ohne
+> angeschlossene Hardware sauber verifizierbar.
 
 ### Wave 1 — RF-reachable criticals (each a standalone PR)
 
