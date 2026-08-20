@@ -2706,16 +2706,34 @@ void checkSerialCommand(void)
         if(Serial.available() > 0)
         {
             char rd = (char)Serial.read();
-            printdeb(rd);   // echo to USB + net console via MSerial
-            strText[iTxtPos] = rd;
-            if(iTxtPos < (int)sizeof(strText) - 1)
+            // Drop NUL bytes: UART RX noise (e.g. unpowered USB-UART bridge on battery
+            // supply) delivers 0x00 which strlen() cannot see and wedges the parser
+            // (DRY-22 — ported from the ESP32 copy of this function).
+            if(rd != 0x00)
             {
-                iTxtPos++;
+                printdeb(rd);   // echo to USB + net console via MSerial
+                strText[iTxtPos] = rd;
+                if(iTxtPos < (int)sizeof(strText) - 1)
+                {
+                    iTxtPos++;
+                }
             }
         }
     }
 
     iTxtLen = strlen(strText);
+
+    // Self-healing: normally every stored byte is non-NUL, so strlen == iTxtPos.
+    // A stray NUL in the buffer breaks that invariant and would block command
+    // processing forever (early return below never reaches the memset). Discard.
+    // (DRY-22 — ported from the ESP32 copy of this function.)
+    if(iTxtLen != iTxtPos)
+    {
+        memset(strText, 0x00, sizeof(strText));
+        iTxtPos = 0;
+        return;
+    }
+
     if(iTxtLen == 0)
         return;
 
