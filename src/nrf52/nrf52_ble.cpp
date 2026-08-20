@@ -300,6 +300,17 @@ BLEService init_settings_characteristic(void)
 	return lora_service;
 }
 
+// CONC-17: settings_rx_callback() runs in the BLE stack's task context, which
+// can be preempted mid-memcpy by the FreeRTOS timer-service task that drives
+// OnRxDone (priority 2, see C-01/09-concurrency-map.md) — a torn copy of
+// meshcom_settings could put a beacon on the air with a spliced callsign or
+// frequency. The callback stages the incoming struct into this private
+// buffer (no shared state touched) and only sets a flag; applyPendingBleSettings(),
+// called once per Main Loop iteration, does the actual copy into
+// meshcom_settings under a short critical section.
+static s_meshcom_settings s_pendingBleSettings;
+static volatile bool s_bBleSettingsPending = false;
+
 /**
  * Callback if data has been sent from the connected client
  * @param conn_hdl
@@ -334,26 +345,10 @@ void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *da
 			return;
 		}
 
-		// Save new LoRa settings
-		memcpy((void *)&meshcom_settings, data, sizeof(s_meshcom_settings));
-
-		// Save new settings
-		save_settings();
-
-		// Update settings
-		g_lora_data.write((void *)&meshcom_settings, sizeof(s_meshcom_settings));
-
-		// Inform connected device about new settings
-		g_lora_data.notify((void *)&meshcom_settings, sizeof(s_meshcom_settings));
-
-        /*KBC
-        if (meshcom_settings.resetRequest)
-		{
-			API_LOG("SETT", "Initiate reset");
-			delay(1000);
-			sd_nvic_SystemReset();
-		}
-        */
+		// CONC-17: stage only, apply from the Main Loop (see comment above
+		// s_pendingBleSettings)
+		memcpy((void *)&s_pendingBleSettings, data, sizeof(s_meshcom_settings));
+		s_bBleSettingsPending = true;
 
 		// Notify task about the event
 		if (g_task_sem != NULL)
@@ -363,6 +358,41 @@ void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *da
 			xSemaphoreGive(g_task_sem);
 		}
 	}
+}
+
+/**
+ * @brief Apply a settings write staged by settings_rx_callback(), if any.
+ * Must be called from the Main Loop task only (CONC-17).
+ */
+void applyPendingBleSettings(void)
+{
+	if (!s_bBleSettingsPending)
+		return;
+	s_bBleSettingsPending = false;
+
+	// Short, non-blocking copy — safe to run with interrupts masked, unlike
+	// the delay()-based patterns fixed under N-16.
+	taskENTER_CRITICAL();
+	memcpy((void *)&meshcom_settings, &s_pendingBleSettings, sizeof(s_meshcom_settings));
+	taskEXIT_CRITICAL();
+
+	// Save new settings
+	save_settings();
+
+	// Update settings
+	g_lora_data.write((void *)&meshcom_settings, sizeof(s_meshcom_settings));
+
+	// Inform connected device about new settings
+	g_lora_data.notify((void *)&meshcom_settings, sizeof(s_meshcom_settings));
+
+	/*KBC
+	if (meshcom_settings.resetRequest)
+	{
+		API_LOG("SETT", "Initiate reset");
+		delay(1000);
+		sd_nvic_SystemReset();
+	}
+	*/
 }
 
 #endif

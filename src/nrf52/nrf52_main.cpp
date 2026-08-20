@@ -1535,6 +1535,9 @@ void nrf52loop()
         }
     }
 
+    // Apply a settings write staged by settings_rx_callback(), if any (CONC-17)
+    applyPendingBleSettings();
+
     // check if message from phone to send
     if(hasMsgFromPhone)
     {
