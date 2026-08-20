@@ -5015,7 +5015,7 @@ void addRingPointer(volatile int &pWrite, volatile int &pRead, int iMAX, const c
             if (pRead >= iMAX) // if the buffer is full we start at index 0 -> take care of overwriting!
                 pRead = 0;
 
-            if(bLORADEBUG && strcmp(bufName, "raw_rx") != 0 && strcmp(bufName, "phone") != 0)
+            if(bLORADEBUG && strcmp(bufName, "raw_rx") != 0 && strcmp(bufName, "phone") != 0 && strcmp(bufName, "udp") != 0)
             {
                 printfdeb("[MC-DBG] RING_OVERFLOW buf=%s\n", bufName);
             }

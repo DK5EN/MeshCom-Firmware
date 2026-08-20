@@ -424,13 +424,35 @@ void sendMeshComUDP()
     {
         if(!udp_is_busy)
         {
-            uint16_t msg_len = (uint16_t)ringBufferUDPout[udpRead][0];
+            // CONC-16: snapshot the slot before the (comparatively slow) UDP
+            // send touches it. addUdpOutBuffer() (CONC-16) can wrap the ring
+            // and overwrite this exact slot from OnRxDone (nRF52 timer-
+            // service task, see C-01) while Udp.write()/endPacket() below are
+            // still running; everything from here on reads udpSnapshot, never
+            // the live ring again.
+            //
+            // Sized past the source slot (UDP_TX_BUF_SIZE+20): the convBuffer
+            // copy below reads from offset 1+36 for msg_len bytes, which can
+            // run past what the producer actually wrote for a large msg_len
+            // (pre-existing in ringBufferUDPout too, not introduced here) --
+            // zero-filled so that tail is deterministic instead of reading
+            // adjacent stack memory.
+            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64] = {0};
+            int mySlot = udpRead;
+#if defined(NRF52_SERIES)
+            taskENTER_CRITICAL();
+#endif
+            memcpy(udpSnapshot, ringBufferUDPout[mySlot], sizeof(ringBufferUDPout[0]));
+#if defined(NRF52_SERIES)
+            taskEXIT_CRITICAL();
+#endif
+            uint16_t msg_len = (uint16_t)udpSnapshot[0];
 
             // send it over UDP
 
             Udp.beginPacket(node_hostip , UDP_PORT);
 
-            if (!Udp.write(ringBufferUDPout[udpRead] + 1, msg_len))
+            if (!Udp.write(udpSnapshot + 1, msg_len))
             {
                 if(bDisplayCont)
                   printlndeb("[ERROR]...Sending UDP Packet failed");
@@ -455,12 +477,12 @@ void sendMeshComUDP()
 
             Udp.endPacket();
 
-            memcpy(convBuffer, ringBufferUDPout[udpRead] + 1 + 36, msg_len);
+            memcpy(convBuffer, udpSnapshot + 1 + 36, msg_len);
 
             if(convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40)
             {
               struct aprsMessage aprsmsg;
-              
+
               // print which message type we got
               decodeAPRS(convBuffer, msg_len, aprsmsg);
 
@@ -471,12 +493,26 @@ void sendMeshComUDP()
               }
             }
 
-            // zero out sent buffer
-            memset(ringBufferUDPout[udpRead], 0, UDP_TX_BUF_SIZE);
-
-            udpRead++;
-            if (udpRead >= MAX_RING_UDP) 
-                udpRead = 0;
+            // zero out sent buffer and advance the read pointer under the same
+            // lock as the writer's addRingPointer() (CONC-16). Guard against a
+            // writer having already force-advanced udpRead past us via the
+            // ring-full eviction path in addRingPointer() while we were
+            // sending — extremely narrow (needs the ring to wrap completely
+            // during one synchronous Udp.write()/endPacket()), but skipping
+            // the advance in that case avoids a double-advance.
+#if defined(NRF52_SERIES)
+            taskENTER_CRITICAL();
+#endif
+            if (udpRead == mySlot)
+            {
+                memset(ringBufferUDPout[mySlot], 0, UDP_TX_BUF_SIZE);
+                udpRead++;
+                if (udpRead >= MAX_RING_UDP)
+                    udpRead = 0;
+            }
+#if defined(NRF52_SERIES)
+            taskEXIT_CRITICAL();
+#endif
 
         }
         else
@@ -1054,6 +1090,14 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     if (len > UDP_TX_BUF_SIZE)
         len = UDP_TX_BUF_SIZE; // just for safety
 
+    // CONC-16: udpWrite/udpRead are plain ints, same class as CONC-15.
+    // addUdpOutBuffer() is reachable from OnRxDone via addNodeData()
+    // (lora_functions.cpp) — the FreeRTOS timer-service task on nRF52,
+    // priority 2, see C-01 — while sendMeshComUDP() drains the same ring
+    // from the Main Loop task.
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
     // first byte is always the message length
     // LoRa/Internal messages send to UDP TX
     ringBufferUDPout[udpWrite][0] = len;
@@ -1063,7 +1107,10 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     //DEBUG_MSG_VAL("UDP", udpWrite, "UDP Ringbuf added El.:");
     //neth.printBuffer(ringBufferUDPout[udpWrite], len + 1);
 
-    addRingPointer(udpWrite, udpRead, MAX_RING_UDP);
+    addRingPointer(udpWrite, udpRead, MAX_RING_UDP, "udp");
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
 }
 
 void sendKEEP()
