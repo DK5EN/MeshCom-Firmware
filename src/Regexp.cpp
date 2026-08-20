@@ -35,6 +35,7 @@ int capture_to_close (MatchState *ms) {
 
 //static const
 char *classend (MatchState *ms, /*const*/ char *p) {
+  (void)ms;
   switch (*p++) {
     case REGEXP_ESC: {
       if (*p == '\0')

@@ -313,6 +313,7 @@ BLEService init_settings_characteristic(void)
  */
 void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len)
 {
+	(void)conn_hdl;
 	API_LOG("SETT", "Settings received");
 
 	delay(1000);

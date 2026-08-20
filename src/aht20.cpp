@@ -37,6 +37,7 @@ float fAHT20Hum = 0.0;
 
 void setupAHT20(bool bInit)
 {
+    (void)bInit;
     aht20_found = false;
 
     if(!bAHT20ON)
@@ -81,7 +82,7 @@ bool loopAHT20()
 
     if(bWXDEBUG)
     {	
-        Serial.printf("Temperature (AHT20): %.1f °C\n", fAHT20Temp);        
+        Serial.printf("Temperature (AHT20): %.1f ï¿½C\n", fAHT20Temp);        
         Serial.printf("Humidity (AHT20): %.1f %%rH\n", fAHT20Hum);
     }
 

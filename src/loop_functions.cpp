@@ -2619,6 +2619,7 @@ void initAnalogPin()
 
 void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
+    (void)snr;
     //printfdeb("bPosDisplay:%i DisplayOffWait:%i bSetDisplay:%i pageHold:%i bDisplayTrack:%i bDisplayIsOff:%i\n", bPosDisplay, DisplayOffWait, bSetDisplay, pageHold, bDisplayTrack, bDisplayIsOff);
 
     if(!bPosDisplay)

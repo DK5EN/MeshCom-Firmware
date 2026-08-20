@@ -46,6 +46,7 @@ float fAltidude = 0;
 
 void setupBMP390(bool bInit)
 {
+    (void)bInit;
     bmp3_found = false;
 
     if(!bBMP3ON)
