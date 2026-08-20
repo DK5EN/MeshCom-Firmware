@@ -3,7 +3,7 @@
 Working document for picking the campaign back up. Records **what we set out to do**,
 **how we decided to get there**, and **exactly where we stand**.
 
-Last updated 2026-08-20. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-21. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
 > ### Standing risk — read first
 >
@@ -551,22 +551,59 @@ RAK geplant werden.
 
 ### Was am nRF52 noch zu tun ist
 
-Alles aus Wave 2, das auf ESP32 geschlossen wurde, ist hier **offen und unveraendert
-gueltig** — auf nRF52 erreicht `OnRxDone` ueber die FreeRTOS-Timer-Task (Prio 2) echte
-Nebenlaeufigkeit:
+**Stand 2026-08-21** — sechs der sieben Wave-2-Nebenlaeufigkeitsbefunde sind auf
+`wiscore_rak4631` behoben und gebaut (Details im nächsten Abschnitt). Noch offen:
 
-- `CONC-15`, `CONC-16`, `CONC-18` — Ring-Indizes ohne gegenseitigen Ausschluss
-- `CONC-17` — zerrissene Settings-Kopie in `nrf52_ble.cpp:319`
-- `N-14` — TX-Ring mit mehreren Schreibern ohne Mutex
-- `N-15` — global entfernter Guard, der nur auf ESP32 korrekt ist (`phone_commands.cpp:529`)
-- `N-16` — `Radio.Send()` innerhalb `taskENTER_CRITICAL()`
+- `N-14` — TX-Ring mit mehreren Schreibern ohne Mutex. **Bewusst nicht in dieser Session
+  gefixt** — Re-Verifikation zeigte einen groesseren Scope als katalogisiert (elf
+  Aufrufer schreiben den Ring-Slot selbst, nicht `addTxRingEntry()`; ein sauberer Fix
+  braucht eine "Slot reservieren, dann schreiben"-Umkehr an allen elf Stellen). Details:
+  STATUS-Box zu `N-14` in `08-defect-catalogue.md`.
 - `DRY-21` — `nrf_eth.cpp` dupliziert `udp_functions.cpp`, inklusive abweichendem ACK-Code
   (`0x01` statt `0x02`). **Ohne Ethernet-Kabel nicht am Geraet testbar**
-- `DRY-22` — `checkSerialCommand()` doppelt und auseinandergelaufen
-- ~~Wave 0.4~~ — **DONE 2026-08-20**
-- Wave 0.2-Rest — **teilweise DONE 2026-08-20**, nur `wiscore_rak4631`; `heltec_t114`/`t_echo` offen (siehe `CFG-01`)
+- Wave 0.2-Rest — nur `wiscore_rak4631` erledigt; `heltec_t114`/`t_echo` offen (siehe `CFG-01`)
 - `N-12` — `FLASH_VERSION`-Migration, weiter aufgeschoben
-- `CFG-01` (neu, 2026-08-20) — root cause weiter unten
+- `CFG-01` — root cause (Sektionskollision) weiter unten, nur die drei bekannten Symptome
+  sind behoben
+
+~~`CONC-15`~~/~~`CONC-16`~~/~~`CONC-18`~~ (Ring-Indizes), ~~`CONC-17`~~ (zerrissene
+Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert),
+~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
+(`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
+
+### 2026-08-20/21 — nRF52-Konkurrenz-Durchgang auf `wiscore_rak4631`
+
+Mit angeschlossener Hardware, je ein Commit, je gebaut (`pio run` ueber alle 32 Envs
+gruen bis auf das vorbestehend kaputte `esp32-safeboot`), `pio test -e native` gruen:
+
+- ~~`N-16`~~ (`cc79611b`) — `Radio.Send()` in `doTX()` (drei Fundstellen) von
+  `taskENTER_CRITICAL()` auf `vTaskSuspendAll()`/`xTaskResumeAll()` umgestellt: der Guard
+  sollte vor dem FreeRTOS-Timer-Service-Task schuetzen (echter Task-Kontext, keine ISR),
+  aber `taskENTER_CRITICAL()` friert dabei den Tick ein, den `SX126xWaitOnBusy()`s
+  `delay(1)`-Schleife zum Zurueckkehren braucht.
+- ~~`CONC-17`~~ (`bb97b87c`) — `settings_rx_callback()` kopiert nicht mehr live in
+  `meshcom_settings`; staged in einen privaten Puffer, `applyPendingBleSettings()` wendet
+  die Kopie einmal pro `nrf52loop()`-Durchlauf unter kurzem Lock an.
+- ~~`N-04`-Restbefund~~ (`6268667a`) — `blelen==0` in `sendToPhone()`/`sendComToPhone()`
+  fuehrte zu `uint8_t`-Unterlauf; abgefangen.
+- ~~`CONC-15`~~/~~`CONC-18`~~ (`ed9116f6`) — `addBLEOutBuffer()` schreibt Ring-Slot und
+  Index unter Lock; `sendToPhone()` snapshot't Laenge/Status/Payload in einem Rutsch statt
+  spaeter erneut aus dem live Ring zu lesen. `sendComToPhone()` bewusst nicht angefasst
+  (Schreiber und Leser laufen bereits beide im Main Loop, keine Nebenlaeufigkeit).
+- ~~`CONC-16`~~ (`ca574ef7`) — dieselbe Behandlung fuer `udpWrite`/`udpRead`. Auf
+  `wiscore_rak4631`/`heltec_t114` per `--gc-sections` nicht gelinkt (Gateway/UDP-Pfad dort
+  nicht erreichbar) — nur auf ESP32 tatsaechlich verifizierbar, dort sind die neuen Locks
+  No-ops. Auf echter nRF52-Hardware mit Ethernet ungeprueft (`DRY-21`).
+- ~~`DRY-22`~~ (`9b6c5224`) — `checkSerialCommand()`-Drift (NUL-Byte-Schutz,
+  Self-Healing-Invarianzpruefung) von ESP32 nach nRF52 portiert.
+- ~~`N-15`~~ — kein Code-Fix noetig, bereits durch `CONC-14` (2026-08-18) geschlossen; nie
+  re-verifiziert, jetzt nachgeholt.
+
+**Noch nicht auf echter Hardware getestet** — der aktuelle Uebergabepunkt: alle sieben
+Commits sind gebaut, aber `wiscore_rak4631` war waehrend dieser Session nicht am
+USB angeschlossen (`ls /dev/cu.*` zeigte kein `usbmodem`). Naechster Schritt: Board
+anschliessen, flashen, `--dfu` verifizieren (aus `7bac915a`, ebenfalls noch ungetestet),
+dann Boot/BLE/LoRa-TX-RX pruefen.
 
 ### 2026-08-20 — Wave 0.4/0.2 auf wiscore_rak4631, `CFG-01` neu gefunden
 
