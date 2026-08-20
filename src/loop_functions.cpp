@@ -540,13 +540,24 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
     if (len > maxlen)
         len = maxlen;
 
+    // CONC-15: toPhoneWrite/toPhoneRead are plain ints. addBLEOutBuffer() is
+    // reachable from OnRxDone (the FreeRTOS timer-service task on nRF52,
+    // priority 2, see C-01) while sendToPhone() drains the same ring from the
+    // Main Loop task. Snapshot the target slot before the critical section so
+    // the debug print below (kept outside the lock — it can call into
+    // Serial/heap) still reports the slot this call actually wrote.
+    uint8_t debugSlot = (uint8_t)toPhoneWrite;
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
+
     //first two bytes are always the message length
     memcpy(BLEtoPhoneBuff[toPhoneWrite] + 1, buffer, len);
 
     if(buffer[0] != 'D')
     {
         unsigned long unix_time = getUnixClock();
-        
+
         //printfdeb("UNIX TME:%lu\n", unix_time);
 
         uint8_t tbuffer[5];
@@ -561,15 +572,19 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
     else
         BLEtoPhoneBuff[toPhoneWrite][0] = len;
 
-    if(bBLEDEBUG)
-    {
-        printfdeb("<%02X>BLEtoPhone RingBuff added len=%i to element: %u\n", buffer[0], len, toPhoneWrite);
-        printBuffer(BLEtoPhoneBuff[toPhoneWrite], len + 1 + 4);
-    }
-
     //printfdeb("toPhone write:%i read:%i max:%i ", toPhoneWrite, toPhoneRead, MAX_RING);
 
     addRingPointer(toPhoneWrite, toPhoneRead, MAX_RING, "phone");
+
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
+
+    if(bBLEDEBUG)
+    {
+        printfdeb("<%02X>BLEtoPhone RingBuff added len=%i to element: %u\n", buffer[0], len, debugSlot);
+        printBuffer(BLEtoPhoneBuff[debugSlot], len + 1 + 4);
+    }
 
     //printfdeb("next write:%i read:%i max:%i\n", toPhoneWrite, toPhoneRead, MAX_RING);
 

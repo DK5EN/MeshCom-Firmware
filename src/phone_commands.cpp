@@ -64,36 +64,58 @@ void sendToPhone()
 		// we need to insert the first byte text msg flag
 		uint8_t toPhoneBuff [MAX_MSG_LEN_PHONE] = {0};
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
-		uint8_t blelen = BLEtoPhoneBuff[toPhoneRead][0];
+		uint8_t blelen;
+		uint8_t statusByte;
+		// CONC-18: snapshot the slot's length/status/payload bytes under a
+		// single lock, instead of reading blelen here and memcpy-ing from the
+		// live ring further down. addBLEOutBuffer() (CONC-15) can wrap the
+		// ring and overwrite this exact slot from OnRxDone (nRF52 timer-
+		// service task, see C-01) in the gap between the two; a snapshot
+		// buffer makes what follows immune to that regardless of timing.
+		uint8_t ringSnapshot[MAX_MSG_LEN_PHONE];
+#if defined(NRF52_SERIES)
+		taskENTER_CRITICAL();
+#endif
+		blelen = BLEtoPhoneBuff[toPhoneRead][0];
+		statusByte = BLEtoPhoneBuff[toPhoneRead][1];
+		if(blelen > 0)
+			memcpy(ringSnapshot, BLEtoPhoneBuff[toPhoneRead]+1, blelen);
+		// Advance the read pointer here, still under the lock: the slot's
+		// content is already captured above, and this keeps the index update
+		// atomic with addBLEOutBuffer()'s writer-side overflow check
+		// (addRingPointer(), CONC-15) instead of racing it later.
+		toPhoneRead++;
+		if (toPhoneRead >= MAX_RING)
+			toPhoneRead = 0;
+#if defined(NRF52_SERIES)
+		taskEXIT_CRITICAL();
+#endif
 
 		// N-04 residual: the producer clamp only closed the RF-reachable path;
 		// blelen==0 here would underflow to 255 below and memcpy past the
-		// actual payload. Skip and advance past the slot instead.
+		// actual payload.
 		if(blelen == 0)
 		{
-			toPhoneRead++;
-			if (toPhoneRead >= MAX_RING)
-				toPhoneRead = 0;
 			ble_busy_flag = false;
 			return;
 		}
 
 		//Mheard
-		if(BLEtoPhoneBuff[toPhoneRead][1] == 0x91)
+		if(statusByte == 0x91)
 		{
-			memcpy(toPhoneBuff, BLEtoPhoneBuff[toPhoneRead]+1, blelen-1);
+			memcpy(toPhoneBuff, ringSnapshot, blelen-1);
 		}
-		else 
+		else
 		// Data Message (JSON)
-		if(BLEtoPhoneBuff[toPhoneRead][1] == 0x44)
-		{		
-			memcpy(toPhoneBuff, BLEtoPhoneBuff[toPhoneRead]+1, blelen);	
-		} 
+		if(statusByte == 0x44)
+		{
+			memcpy(toPhoneBuff, ringSnapshot, blelen);
+		}
 		else
 		// Text Message and Position
 		{
 			toPhoneBuff[0] = 0x40;
-			memcpy(toPhoneBuff+1, BLEtoPhoneBuff[toPhoneRead]+1, blelen);
+			memcpy(toPhoneBuff+1, ringSnapshot, blelen);
 		}
 
 		// send to phone
@@ -106,10 +128,6 @@ void sendToPhone()
 		#else
 			g_ble_uart.write(toPhoneBuff, blelen + 2);
 		#endif
-
-		toPhoneRead++;
-		if (toPhoneRead >= MAX_RING)
-			toPhoneRead = 0;
 
 		if(bBLEDEBUG)
 		{
