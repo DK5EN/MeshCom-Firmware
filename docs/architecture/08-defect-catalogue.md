@@ -325,11 +325,13 @@ before the subtraction.
 > Zusaetzlich klemmt `addBLEComToOutBuffer()` seine Laenge jetzt tatsaechlich auf 245 --
 > bisher wurde der Fehler nur geloggt und danach unveraendert kopiert.
 >
-> **Restbefund (neu, nicht behoben):** `src/phone_commands.cpp` liest dasselbe Laengenbyte
-> in `sendToPhone()` (`:72`, `:84`) und `sendComToPhone()` (`:145`, `:151`) und rechnet
-> `blelen-1` bzw. `blelen+2` ohne eigene Pruefung. Der Produzenten-Clamp schliesst den ueber
-> HF erreichbaren Pfad, aber diese Konsumenten haben keine unabhaengige Absicherung. Kleiner
-> Folge-Fix, bewusst nicht in denselben Commit gezogen, um den Upstream-Diff schmal zu halten.
+> **Restbefund — BEHOBEN 2026-08-20** (Commit `6268667a`). `src/phone_commands.cpp` las
+> dasselbe Laengenbyte in `sendToPhone()` und `sendComToPhone()` und rechnete `blelen-1`
+> ohne eigene Pruefung; `blelen==0` haette zu `uint8_t`-Unterlauf (255) und einem
+> Ueberlesen des Ring-Slots gefuehrt. Beide Funktionen brechen jetzt direkt nach dem Lesen
+> von `blelen` bei `blelen==0` ab (Read-Pointer wird trotzdem weitergeschaltet). Im selben
+> Zug (Commit `ed9116f6`) wurde `sendToPhone()` zusaetzlich auf einen Snapshot-Puffer
+> umgestellt, siehe `CONC-18`.
 
 ### N-05 — heap over-read is rebroadcast over the air — **VERIFIED** — High, RF
 
@@ -622,10 +624,37 @@ True on ESP32 (`bleQueue` defers). **False on nRF52**, where `api_functions.cpp:
 `readPhoneCommand` directly in the Bluefruit callback task at priority 2. The guard was
 removed globally on a platform-specific premise.
 
+> **STATUS 2026-08-20 — RE-VERIFIZIERT, BEREITS GESCHLOSSEN (kein Code-Fix noetig).**
+> `api_functions.cpp:254` existiert in dieser Form nicht mehr — die Datei enthaelt keinen
+> Aufruf von `readPhoneCommand` oder Bezug auf `bleQueue`. Der zitierte Direktaufruf war der
+> Mechanismus vor `CONC-14` (`a441ece6`, 2026-08-18): `bleuart_rx_callback()`
+> (`nrf52_ble.cpp:260-281`) enqueued jetzt einen `BleQueueItem` (`xQueueSend(bleQueue, ...)`),
+> und `readPhoneCommand()` wird ausschliesslich beim Drainen dieser Queue in `nrf52loop()`
+> aufgerufen (`nrf52_main.cpp:1531-1536`) — also im Main Loop, exakt wie der entfernte
+> Guard-Kommentar es voraussetzt. `CONC-14` war als BLE-spezifischer Fix eingecheckt, hat
+> N-15 aber als Nebenwirkung mitgeschlossen; das war zuvor nicht nachgeprueft (siehe
+> `resume.md` §3.4: "`CONC-15`/`16`/`17`/`18` were **not** re-verified... treat as still
+> open" — dieser Satz galt faelschlich auch fuer N-15). Gueltigkeitsbedingung: sobald ein
+> zweiter Empfangspfad `readPhoneCommand` wieder inline statt ueber `bleQueue` aufruft
+> (z.B. `settings_rx_callback`, das aber ohnehin nicht `readPhoneCommand` nutzt), erneut
+> pruefen.
+
 ### N-16 — blocking work inside critical sections on nRF52 — **CONFIRMED** — High
 
 `Radio.Send()` inside `taskENTER_CRITICAL()` (`lora_functions.cpp:1685`, `:1726`, `:1787`)
 reaches `SX126xWaitOnBusy()` → `delay(1)` → `vTaskDelay()` **with the tick frozen**.
+
+> **STATUS 2026-08-20 — BEHOBEN** (`cc79611b`). Alle drei Fundstellen (`doTX()`, Track-Beacon/
+> APRS/ACK-Retransmit) von `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()` auf
+> `vTaskSuspendAll()`/`xTaskResumeAll()` umgestellt. Nachgewiesen: `RadioOnRxTimeoutIrq` (der
+> Callback, vor dem der Guard tatsaechlich schuetzen sollte) laeuft ueber Adafruits
+> `SoftwareTimer` (`nrf52832/timer.cpp:62`, wraps `xTimerCreate`/`xTimerStart`) auf dem
+> FreeRTOS Timer-Service-Task — echter Task-Kontext, keine ISR. `vTaskSuspendAll()` sperrt
+> Task-Scheduling und haelt diesen Task damit fern, laesst Interrupts und den Tick aber
+> laufen, sodass `delay(1)` in `SX126xWaitOnBusy()` (`sx126x-board.cpp:138-152`) weiterhin
+> zurueckkehren kann. `wiscore_rak4631` und `heltec_wifi_lora_32_V3` gebaut, RAM/Flash von
+> `wiscore_rak4631` unveraendert. Auf Hardware noch zu pruefen (kein natives Repro moeglich,
+> Timing-/Scheduler-Verhalten).
 
 ### N-17 — ESP32 `startNetwork()` can trip the task watchdog before its first feed — **VERIFIED (on real hardware)** — High
 
@@ -928,8 +957,11 @@ box in `resume.md` for what "done" means here (fixed locally, not yet upstream).
 STATUS box below), `SEC-03`, `SEC-04`, `SEC-05`, `SEC-06`, `BUG-07`, `BUG-10`, `BUG-11`,
 `BUG-12`, `BUG-13`, `CONC-14`, `CONC-19`.
 
-**Still open:** `CONC-15` … `CONC-18`, `N-14`, `N-15`, `N-16` — **auf nRF52**. Fuer ESP32
-einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
+**Still open:** `N-14` — **auf nRF52**, siehe eigene STATUS-Box (Scope groesser als
+urspruenglich katalogisiert, bewusst nicht in dieser Session angefasst). `CONC-15`/`16`/`18`,
+`N-16` **BEHOBEN** 2026-08-20, `N-15` als bereits geschlossen re-verifiziert, `CONC-17`
+**BEHOBEN** 2026-08-20 — siehe die jeweiligen Fundstellen oben und die STATUS-Box unten. Fuer
+ESP32 einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
 
 > **STATUS 2026-08-18 — ESP32 einzeln nachgeprueft: kein offener Wave-2-Punkt mehr.**
 >
@@ -986,6 +1018,55 @@ einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
 > Auf nRF52 bleiben alle sieben offen und unveraendert gueltig; dort ist `OnRxDone` ueber die
 > FreeRTOS-Timer-Task (Prio 2) erreichbar. Abzuarbeiten, sobald ein nRF52 angeschlossen ist.
 
+> **STATUS 2026-08-20 — nRF52-Durchgang: sechs von sieben behoben, `N-14` bewusst
+> zurueckgestellt (Scope-Fund).**
+>
+> Mit angeschlossenem `wiscore_rak4631` einzeln abgearbeitet, gleiches Muster wie beim
+> ESP32-Nachweis oben — kurzer `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()` nur um den
+> tatsaechlichen Ring-Zugriff, Debug-Ausgaben (koennen `malloc()`en,
+> `printfdeb_functions.cpp:65) bewusst ausserhalb des Locks:
+>
+> - `CONC-17` (Commit `bb97b87c`) — `settings_rx_callback()` kopiert nicht mehr live in
+>   `meshcom_settings`, sondern staged in einen privaten Puffer; `applyPendingBleSettings()`
+>   wendet die Kopie einmal pro `nrf52loop()`-Durchlauf unter Lock an.
+> - `CONC-15`/`CONC-18` (Commit `ed9116f6`) — `addBLEOutBuffer()` schreibt Ring-Slot und
+>   Index-Vorschub jetzt unter Lock; `sendToPhone()` snapshot't Laenge/Status/Payload in
+>   einem Rutsch statt spaeter erneut aus dem live Ring zu lesen (schliesst die TOCTOU).
+>   `sendComToPhone()`/`ComToPhoneWrite`/`ComToPhoneRead` bewusst nicht angefasst: alle
+>   Aufrufer von `addBLEComToOutBuffer()` laufen bereits im Main Loop (verifiziert), keine
+>   Nebenlaeufigkeit vorhanden.
+> - `CONC-16` (Commit `ca574ef7`) — dieselbe Behandlung fuer `udpWrite`/`udpRead`
+>   (`addUdpOutBuffer()`/`sendMeshComUDP()`). Auf `wiscore_rak4631`/`heltec_t114` per
+>   `--gc-sections` nicht gelinkt (Gateway/UDP-Pfad fuer diese Boards nicht erreichbar) —
+>   nur auf ESP32 tatsaechlich verifizierbar gebaut, dort sind die neuen Locks No-ops. Auf
+>   echter nRF52-Hardware mit Ethernet ungeprueft (kein Kabel am Bankarbeitsplatz, `DRY-21`).
+> - `N-16` (Commit `cc79611b`) — siehe eigene STATUS-Box oben.
+> - `N-15` — kein Code-Fix noetig, bereits durch `CONC-14` geschlossen; siehe eigene
+>   STATUS-Box oben.
+>
+> **`N-14` bewusst nicht gefixt — Scope ist groesser als der Katalog-Eintrag nahelegt.**
+> Re-Verifikation zeigte: der TX-Ring-Schreibpfad ist NICHT in `addTxRingEntry()` gekapselt.
+> Jeder der elf Aufrufer (`lora_functions.cpp:274,705,877,907,919,996,1000,1045,1139`;
+> `loop_functions.cpp:642,3441,3458,3530,3975,4067` u.a.) schreibt selbst zuerst
+> `ringBuffer[iWrite][0]=…`, `ringBuffer[iWrite][1]=…`, `memcpy(ringBuffer[iWrite]+2,…)`
+> und ruft **danach** `addTxRingEntry()` auf, das `iWrite` **erneut** liest, statt den beim
+> Aufrufer schon verwendeten Wert entgegenzunehmen. Ein Lock allein um
+> `addTxRingEntry()` haette die eigentliche Rennbedingung (zwei Aufrufer schreiben in
+> denselben, noch nicht fortgeschalteten Slot) nicht geschlossen — das Payload-Schreiben
+> liegt ausserhalb der Funktion. Mindestens ein Aufrufer (`loop_functions.cpp:4198`,
+> "beacon") liest `iWrite` zusaetzlich **vor** dem Aufruf in eine lokale Variable
+> (`savedAckSlot`) und verwendet sie **nach** `addTxRingEntry()` fuer einen Nachtrag
+> (`ringBuffer[savedAckSlot][1]=0xFF`) — ein korrekter Fix muesste diese gesamte
+> Aufrufer-Sequenz pro Fundstelle unter denselben Lock nehmen, nicht nur die Funktion selbst.
+> Ein sauberer Fix braucht vermutlich eine "Slot reservieren, dann schreiben"-Umkehr der
+> Aufrufreihenfolge (`int slot = reserveTxSlot(); ringBuffer[slot][...] = ...;
+finalizeTxRingEntry(slot, source);`), was **alle elf Aufrufer** aendert und die
+> bestehende Prioritaets-Overflow-Logik (die aktuell VOR dem Fortschalten entscheidet, ob
+> der neue Eintrag ueberhaupt angenommen wird) mit umbauen muss. Das ist eine eigene,
+> sorgfaeltig zu verifizierende Session wert, keine kleine Ergaenzung zu den sechs Fixes
+> oben. **Trigger fuer erneutes Aufgreifen:** dedizierte Session mit Hardware-Verifikation
+> pro geaenderter Aufrufstelle.
+
 ### Wave 3 — structural (propose upstream as a plan first)
 
 ~~`N-13`~~ **DONE** 2026-08-18 — all 14 originally-identified over-synchronisation candidates
@@ -994,8 +1075,9 @@ not actual defects (`transmissionState`, the `pendingDisplay*` fields); see the 
 N-13 above. `iWrite`/`iRead`/`loraWrite` surfaced during re-verification as further same-class
 candidates outside the original list — not part of N-13, deliberately left for a future pass.
 
-**Offen:** `DRY-20`–`DRY-24`, `SIMP-26`, `SIMP-27`, `ALT-31`, `ALT-32`, `STATE-28` (Epic-Teil),
-plus the corrected C-02 extraction of ~221 radio-independent shared loop lines.
+**Offen:** `DRY-20`, `DRY-21`, `DRY-23`, `DRY-24`, `SIMP-26`, `SIMP-27`, `ALT-31`, `ALT-32`,
+`STATE-28` (Epic-Teil), plus the corrected C-02 extraction of ~221 radio-independent shared
+loop lines. ~~`DRY-22`~~ **BEHOBEN** 2026-08-20 (Commit `9b6c5224`) — siehe STATUS-Box.
 
 **Erledigt 2026-08-19 (ESP32/Heltec V3):** ~~`DRY-25`~~, ~~`SIMP-29`~~, ~~`SIMP-30`~~,
 ~~`ALT-33`~~, ~~`ALT-34`~~, ~~`ALT-35`~~ — siehe STATUS-Box unten.
@@ -1036,6 +1118,17 @@ plus the corrected C-02 extraction of ~221 radio-independent shared loop lines.
 > **`BUG-09` ist bereits behoben** — der fehlende Clamp in `addBLEComToOutBuffer` kam
 > mit `4e5ef591` (N-04) mit; `loop_functions.cpp:593` klemmt auf 245, Laengenbyte und
 > `memcpy` sind seitdem konsistent. Nie als geschlossen vermerkt, hiermit nachgeholt.
+
+> **STATUS 2026-08-20 — `DRY-22` BEHOBEN** (Commit `9b6c5224`). `checkSerialCommand()`
+> existiert doppelt (ESP32/nRF52) und war auseinandergelaufen: die ESP32-Fassung hatte
+> zwei Fixes, die nie nach nRF52 portiert wurden — NUL-Byte-Drop beim Lesen (UART-Rauschen
+> liefert 0x00, das `strlen()` nicht sieht und den Parser haengen laesst) und eine
+> Self-Healing-Invarianzpruefung (`strlen(strText) == iTxtPos`, sonst blockiert ein
+> verirrtes NUL-Byte die Kommandoverarbeitung fuer immer). Beide 1:1 nach
+> `nrf52_main.cpp:checkSerialCommand()` portiert. Der `#ifndef DISABLE_NET_CONSOLE`-Block
+> (Telnet/Netzkonsole) bleibt bewusst aussen vor — alle drei nRF52-Boards definieren
+> `DISABLE_NET_CONSOLE`, keine Drift dort. `wiscore_rak4631` gebaut, RAM unveraendert,
+> Flash +32 B.
 
 ### Deferred, with triggers
 
