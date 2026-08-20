@@ -1801,9 +1801,16 @@ bool doTX()
                 if((uint32_t)(millis() - track_to_meshcom_timer) >= 1000 * 60 * 5)
                 {
                     #if defined BOARD_RAK4630
-                        taskENTER_CRITICAL();
+                        // N-16: taskENTER_CRITICAL() masks interrupts, including the
+                        // tick — SX126xWaitOnBusy() inside Radio.Send() calls delay(1)
+                        // in a loop, which needs the tick to ever return, so the old
+                        // critical section could hang forever. vTaskSuspendAll() only
+                        // blocks task scheduling, which is enough to keep the FreeRTOS
+                        // timer-service task (OnRxDone, priority 2, see C-01) from
+                        // touching the radio mid-send, without freezing the tick.
+                        vTaskSuspendAll();
                         Radio.Send(lora_tx_buffer, sendlng);
-                        taskEXIT_CRITICAL();
+                        xTaskResumeAll();
                     #else
                         #ifndef BOARD_T5_EPAPER
                         #ifdef RADIO_CTRL
@@ -1842,9 +1849,11 @@ bool doTX()
                 // you can transmit C-string or Arduino string up to
                 // 256 characters long
                 #if defined BOARD_RAK4630
-                    taskENTER_CRITICAL();
+                    // N-16, see the "track" send above for why vTaskSuspendAll()
+                    // replaces taskENTER_CRITICAL() here.
+                    vTaskSuspendAll();
                     Radio.Send(lora_tx_buffer, sendlng);
-                    taskEXIT_CRITICAL();
+                    xTaskResumeAll();
                 #else
                     #ifndef BOARD_T5_EPAPER
                     #ifdef RADIO_CTRL
@@ -1903,9 +1912,11 @@ bool doTX()
                     // you can transmit C-string or Arduino string up to
                     // 256 characters long
                     #if defined BOARD_RAK4630
-                        taskENTER_CRITICAL();
+                        // N-16, see the "track" send above for why vTaskSuspendAll()
+                        // replaces taskENTER_CRITICAL() here.
+                        vTaskSuspendAll();
                         Radio.Send(lora_tx_buffer, sendlng);
-                        taskEXIT_CRITICAL();
+                        xTaskResumeAll();
                     #else
                         #ifndef BOARD_T5_EPAPER
                         #ifdef RADIO_CTRL
