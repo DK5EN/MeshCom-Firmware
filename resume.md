@@ -3,7 +3,7 @@
 Working document for picking the campaign back up. Records **what we set out to do**,
 **how we decided to get there**, and **exactly where we stand**.
 
-Last updated 2026-08-19. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-20. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
 > ### Standing risk — read first
 >
@@ -300,12 +300,12 @@ errors in our own work:
 
 ### 3.2 Immediately next — Wave 0, no hardware needed
 
-| #          | Step                                                                                                                                                                                                                                                                                                                                                                       | Refs            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| 0.4        | Pin `nordicnrf52` to an exact version (currently unpinned → CI and local build against different cores)                                                                                                                                                                                                                                                                    | doc 02 B-04     |
-| 0.2 (Rest) | **ESP32-Kern DONE** 2026-08-18 (23 Envs mit `extends = esp32`, `-Wformat=2 -Wno-missing-field-initializers -Werror` auf `build_src_flags`). Offen bleiben die Envs ohne `extends = esp32`, denen schon `-Wall -Wextra` fehlt: `t_deck_pro`, `t5_epaper`, `vision-master-e213`, `vision-master-e290`, `wireless-paper` — plus die drei nRF52-Boards, sobald Hardware da ist | doc 08 Wave 0.2 |
-| ~~0.3~~    | **DONE** 2026-08-18 — zwoelf Guards auf `defined()` (zwei davon nur ueber `-Wundef` gefunden, `aht20.cpp` ist ISO-8859 und wird von `grep` ohne `-a` uebersprungen). `-Wundef` NICHT im Build aktiviert: 10.317 Treffer, davon 2 aus `src/`. Regressionsschutz stattdessen als CI-Job `macro-guards`. `BOARD_*`-Stringmakros bewusst unangetastet.                         | `N-10`          |
-| 0.6        | Extend the native suite: CSMA timing math, `via_functions`, `compress_functions` (the latter already surfaces two `-Wsign-compare` warnings)                                                                                                                                                                                                                               | doc 08 Wave 0.5 |
+| #          | Step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Refs            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| ~~0.4~~    | **DONE 2026-08-20** — `nordicnrf52` auf `10.12.0` gepinnt (alle drei nRF52-Boards: `wiscore_rak4631`, `heltec_t114`, `t_echo`); vorher `platform = nordicnrf52` ohne Version, lokal waren 10.12.0 und 10.3.0 gleichzeitig installiert                                                                                                                                                                                                                                                                                             | doc 02 B-04     |
+| 0.2 (Rest) | **wiscore_rak4631 DONE 2026-08-20** (`-Wformat=2 -Wno-unused-parameter -Werror` auf `build_src_flags`, 20 echte src/-Warnungen vorher behoben). `heltec_t114`/`t_echo` bewusst nicht mit angefasst — deckte `CFG-01` auf (`[nrf52]`-Sektionskollision, siehe unten), nicht ohne angeschlossene Hardware fuer diese zwei Boards sauber verifizierbar. Weiterhin offen: die Envs ohne `extends = esp32`, denen schon `-Wall -Wextra` fehlt: `t_deck_pro`, `t5_epaper`, `vision-master-e213`, `vision-master-e290`, `wireless-paper` | doc 08 Wave 0.2 |
+| ~~0.3~~    | **DONE** 2026-08-18 — zwoelf Guards auf `defined()` (zwei davon nur ueber `-Wundef` gefunden, `aht20.cpp` ist ISO-8859 und wird von `grep` ohne `-a` uebersprungen). `-Wundef` NICHT im Build aktiviert: 10.317 Treffer, davon 2 aus `src/`. Regressionsschutz stattdessen als CI-Job `macro-guards`. `BOARD_*`-Stringmakros bewusst unangetastet.                                                                                                                                                                                | `N-10`          |
+| 0.6        | Extend the native suite: CSMA timing math, `via_functions`, `compress_functions` (the latter already surfaces two `-Wsign-compare` warnings)                                                                                                                                                                                                                                                                                                                                                                                      | doc 08 Wave 0.5 |
 
 The measured warning volume where the flags _are_ active is **9 in the whole build, 4 in
 `src/`** — so `-Werror` is nearly free. A June audit rejected it as CRITICAL on the
@@ -563,9 +563,52 @@ Nebenlaeufigkeit:
 - `DRY-21` — `nrf_eth.cpp` dupliziert `udp_functions.cpp`, inklusive abweichendem ACK-Code
   (`0x01` statt `0x02`). **Ohne Ethernet-Kabel nicht am Geraet testbar**
 - `DRY-22` — `checkSerialCommand()` doppelt und auseinandergelaufen
-- Wave 0.4 — `nordicnrf52` auf eine feste Version pinnen
-- Wave 0.2-Rest — `-Wall -Wextra` + `-Werror` fuer die nRF52-Targets nachziehen
+- ~~Wave 0.4~~ — **DONE 2026-08-20**
+- Wave 0.2-Rest — **teilweise DONE 2026-08-20**, nur `wiscore_rak4631`; `heltec_t114`/`t_echo` offen (siehe `CFG-01`)
 - `N-12` — `FLASH_VERSION`-Migration, weiter aufgeschoben
+- `CFG-01` (neu, 2026-08-20) — root cause weiter unten
+
+### 2026-08-20 — Wave 0.4/0.2 auf wiscore_rak4631, `CFG-01` neu gefunden
+
+`nordicnrf52` gepinnt (alle drei nRF52-Boards), `-Werror` fuer `wiscore_rak4631` aktiviert
+(20 echte src/-Warnungen vorher behoben, siehe Commit `a3a30ef0`). Der Versuch, dasselbe fuer
+`heltec_t114`/`t_echo` zu tun, deckte einen eigenstaendigen, groesseren Befund auf:
+
+> **`CFG-01` — `[nrf52]`-Sektion kollidiert namensgleich ueber alle drei
+> `variants/*/platformio.ini`.** `platformio.ini:14` laedt sie per
+> `extra_configs = variants/*/platformio.ini`; jede der drei Dateien deklariert ihre
+> eigene `[nrf52]`-Sektion mit demselben Namen. Solange nur `wiscore_rak4631`s Sektion
+> zusaetzliche Keys (`build_flags`, `build_src_flags`) trug, gewann sie fuer alle drei
+> Envs — `heltec_t114` und `t_echo` bekamen dadurch **`BOARD_RAK4630` in ihre Compile-Flags
+> gemischt**, obwohl sie das WisBlock-RAK-Board gar nicht sind. Das blieb unbemerkt, weil
+> `#ifndef BOARD_RAK4630` an drei Stellen (`adc_functions.cpp`, `batt_functions.h`,
+> `batt_function_old.cpp`) als Proxy fuer "ist ESP32" benutzt wurde — mit dem geleakten
+> Define kam dort nie echter ESP-IDF-Code (`esp_adc_cal.h`) zum Tragen. Sobald
+> `heltec_t114`/`t_echo` eine eigene, isolierte `[nrf52]`-Sektion bekommen (z.B. durch
+> Hinzufuegen von `build_flags`, wie im `-Werror`-Versuch geschehen), verschwindet das
+> geleakte Define, und die drei Stellen versuchen echten ESP-IDF-Code auf nRF52 zu
+> uebersetzen → Build bricht.
+>
+> **Behoben (Commit `b0c3d8c0`):** die drei Guards von `BOARD_RAK4630` auf die tatsaechliche
+> Plattform umgestellt (`defined(ESP32)` bzw. `!defined(NRF52_SERIES)`), dabei auch einen
+> zweiten, unabhaengigen Bug gefunden — `batt_function_old.cpp:69` nahm `BOARD_T_ECHO`
+> bereits explizit aus dem ESP-IDF-Typenblock aus, aber nie `BOARD_HELTEC_T114` (jemand
+> hatte das Problem fuer `t_echo` schon einmal von Hand gepatcht, nur unvollstaendig).
+> Damit ist der **Symptom-Level** (die drei falschen Guards) gefixt und fuer alle Boards
+> verifiziert bit-identisch zum vorherigen Verhalten.
+>
+> **Root cause NICHT behoben** — die `[nrf52]`-Sektionskollision selbst steht noch offen.
+> Sie ist gefaehrlich, weil sie sich nicht auf diese drei Stellen beschraenkt: JEDE
+> zukuenftige Aenderung an einer Sektion `[nrf52]`/`[esp32]` in einer `variants/*/platformio.ini`
+> kann auf dieselbe Art in andere Boards derselben Familie durchsickern, abhaengig davon,
+> welche Datei zuletzt geladen wird und welche Keys sie definiert — nicht offensichtlich aus
+> dem Diff einer einzelnen Datei ersichtlich. Sauberer Fix waere, jede Sektion eindeutig zu
+> benennen (`[nrf52_rak4631]`, `[nrf52_t114]`, `[nrf52_techo]`) und `extends` entsprechend
+> anzupassen — angefasst nur mit allen drei Boards am Bankarbeitsplatz, nicht heute.
+>
+> **Trigger fuer erneutes Aufgreifen:** sobald `heltec_t114` oder `t_echo` an Hardware
+> verfuegbar sind (fuer Wave 0.2-Rest dort), oder bei der naechsten Aenderung an einer
+> `[nrf52]`/`[esp32]`-Sektion in `variants/*/platformio.ini`.
 
 ## 4. State of the repository
 
