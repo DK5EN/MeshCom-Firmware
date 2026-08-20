@@ -232,6 +232,8 @@ static int findAndStopRingSlot(uint32_t msgId)
  */
 static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 {
+    (void)rssi;
+    (void)snr;
     if(payload[0] != MSG_TYPE_ACK)
         return false;
 

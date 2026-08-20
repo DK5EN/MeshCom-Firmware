@@ -320,6 +320,7 @@ void getExternUDP()
 
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
+  (void)bUDP;
   #ifdef ESP32
     if(bWIFIAP)
       return;

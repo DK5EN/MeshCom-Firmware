@@ -2549,7 +2549,7 @@ void sendUBX_MON_VER() {  // Binäres Paket senden
   if(iGPSDEBUG >= 2)
     Serial.println("[GPS ]...Sende UBX_MON_VER");
 
-  for (int i = 0; i < sizeof(UBX_MON_VER_RAK); i++)
+  for (size_t i = 0; i < sizeof(UBX_MON_VER_RAK); i++)
   {
     Serial1.write(UBX_MON_VER_RAK[i]);
   }
@@ -2562,7 +2562,7 @@ void sendUBX_SET_GNSS() {  // Binäres Paket senden
   if(iGPSDEBUG >= 2)
     Serial.println("[GPS ]...Sende UBX_SET_GNSS");
 
-  for (int i = 0; i < sizeof(ubx_cfg_gnss); i++)
+  for (size_t i = 0; i < sizeof(ubx_cfg_gnss); i++)
   {
     Serial1.write(ubx_cfg_gnss[i]);
   }
