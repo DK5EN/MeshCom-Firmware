@@ -66,6 +66,18 @@ void sendToPhone()
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
 		uint8_t blelen = BLEtoPhoneBuff[toPhoneRead][0];
 
+		// N-04 residual: the producer clamp only closed the RF-reachable path;
+		// blelen==0 here would underflow to 255 below and memcpy past the
+		// actual payload. Skip and advance past the slot instead.
+		if(blelen == 0)
+		{
+			toPhoneRead++;
+			if (toPhoneRead >= MAX_RING)
+				toPhoneRead = 0;
+			ble_busy_flag = false;
+			return;
+		}
+
 		//Mheard
 		if(BLEtoPhoneBuff[toPhoneRead][1] == 0x91)
 		{
@@ -134,11 +146,21 @@ void sendComToPhone()
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
 		uint8_t blelen = BLEComToPhoneBuff[ComToPhoneRead][0];
 
+		// N-04 residual: see sendToPhone() above.
+		if(blelen == 0)
+		{
+			ComToPhoneRead++;
+			if (ComToPhoneRead >= MAX_RING)
+				ComToPhoneRead = 0;
+			ble_busy_flag = false;
+			return;
+		}
+
 		//Mheard
 		if(BLEComToPhoneBuff[ComToPhoneRead][1] == 0x91)
 		{
 			memcpy(ComToPhoneBuff, BLEComToPhoneBuff[ComToPhoneRead]+1, blelen-1);
-		} else 
+		} else
 		// Data Message (JSON)
 		if(BLEComToPhoneBuff[ComToPhoneRead][1] == 0x44)
 		{
