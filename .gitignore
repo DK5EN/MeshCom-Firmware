@@ -9,6 +9,7 @@
 .vscode
 .*
 !/.gitignore
+!/.github/
 
 # User-specific files
 *.rsuser
