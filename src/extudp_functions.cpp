@@ -296,6 +296,32 @@ void getExternUDP()
   if(!hasExternIPaddress)
     return;
 
+#ifdef MC_TEST_HOOKS
+  // N-20-Soak-Instrumentierung (compile-gated, Produktionsbuilds unberuehrt):
+  // sequenznummerierter Takt an den EXTUDP-Peer alle 500 ms. Eine Luecke in
+  // seq zeigt von aussen praezise, WANN der Sendepfad stockte; der Abgleich
+  // mit der Serial-Echo-Probe unterscheidet "Netz weg, Loop lebt" von
+  // "Loop-Task haengt". Bewusst im normalen Loop-Kontext gesendet -- der
+  // Takt IST die Last auf genau dem Socket-Pfad, den der Kabel-Flap trifft.
+  {
+    static uint32_t hb_seq = 0;
+    static unsigned long hb_last = 0;
+    if((unsigned long)(millis() - hb_last) >= 500)
+    {
+      hb_last = millis();
+      char hb[80];
+      int hlen = snprintf(hb, sizeof(hb), "{\"type\":\"hb\",\"seq\":%lu,\"ms\":%lu}",
+                          (unsigned long)hb_seq++, (unsigned long)millis());
+      if(hlen > 0)
+      {
+        UdpExtern.beginPacket(apip, EXTERN_PORT);
+        UdpExtern.write((const uint8_t *)hb, (size_t)hlen);
+        UdpExtern.endPacket();
+      }
+    }
+  }
+#endif
+
   int len=0;
 
   if(bEXTUDP && (int)strlen(meshcom_settings.node_extern) > 7)
