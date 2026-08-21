@@ -107,6 +107,11 @@ jobs:
         run: pip install --upgrade platformio
       - name: Tests ausfuehren
         run: pio test -e native
+      # Das Test-Orakel (doc 08 §4): Korpus-Differential (golden.txt-Fence),
+      # Spec-Vektoren aus doc 11 und Interop-Vektoren. Ohne diesen Schritt
+      # liefe die gesamte Decoder-Absicherung nur lokal.
+      - name: Orakel-Tests ausfuehren (native_aprs)
+        run: pio test -e native_aprs
 
   build:
     name: ${{ matrix.env }}
