@@ -2380,7 +2380,15 @@ void nrf52loop()
                     startWIFI();
             #endif
 
-            if(bWEBSERVER)
+            // N-20-Falle: ohne initialisiertes Ethernet (Setup ueberspringt die
+            // HW-Initialisierung, wenn weder Gateway noch Webserver aktiv sind,
+            // oder es ist keine RAK13800 gesteckt) blockieren W5100S-Socket-Ops
+            // (UdpExtern.begin()/sendExternHeartbeat()) den Loop-Task unbegrenzt
+            // -- Node wirkt tot, Konsole ohne Echo, nur 1200-Baud-Touch hilft.
+            // Reproduziert 2026-08-22: --extudp on bei Gateway/Webserver off
+            // friert den Loop ab dem naechsten Durchlauf dauerhaft ein (auch
+            // nach jedem Reboot, da gespeichert). Deshalb: Start nur mit IP.
+            if(bWEBSERVER && neth.hasIPaddress)
             {
                 bSPI_ETH_Active = true;
                 startWebserver();
@@ -2388,7 +2396,7 @@ void nrf52loop()
                 if(bPendingRadioRx) { bPendingRadioRx = false; startRadioReceive(); }
             }
 
-            if(bEXTUDP)
+            if(bEXTUDP && neth.hasIPaddress)
             {
                 bSPI_ETH_Active = true;
                 startExternUDP();
