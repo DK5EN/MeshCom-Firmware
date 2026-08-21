@@ -2055,14 +2055,36 @@ void nrf52loop()
             #endif
 
             #if defined NRF52_SERIES
-                // dfuAuto: --dfu wants den UF2-Bootloader statt eines normalen
+                // dfuAuto: --dfu will den UF2-Bootloader statt eines normalen
                 // Neustarts. Beides laeuft ueber denselben verzoegerten Pfad, damit
                 // die Quittung noch ueber BLE bzw. Seriell rausgeht, bevor der Reset
                 // kommt -- ein Reset direkt in commandAction() verschluckt sie.
+                //
+                // N-19: enterUf2Dfu() (reset_mcu() in cores/nRF5/wiring.c) haengt
+                // aus diesem Loop-Task -- auf Hardware reproduziert: --dfu liess das
+                // Board mit stehender CPU zurueck (USB-Deskriptor blieb App-PID, kein
+                // Reset). Derselbe reset_mcu()-Pfad funktioniert aus dem TinyUSB-Task
+                // (1200-Baud-Touch), und NVIC_SystemReset() funktioniert aus genau
+                // diesem Loop-Pfad (--reboot) -- verdaechtig ist sd_softdevice_disable()
+                // im Loop-Kontext. Deshalb hier ohne SD-Disable: GPREGRET per
+                // SoftDevice-SVC setzen (bei aktivem SoftDevice erlaubt, das BLE-Init
+                // laeuft auf nRF52 immer) und den bewaehrten NVIC_SystemReset()
+                // nehmen; der Bootloader liest GPREGRET beim Start und bleibt im
+                // UF2-Modus (USB-Laufwerk).
                 if(bEnterDfu)
                 {
                     bEnterDfu = false;
-                    enterUf2Dfu();      // setzt GPREGRET und resettet -> UF2-Laufwerk
+                    sd_power_gpregret_clr(0, 0xFF);
+                    sd_power_gpregret_set(0, 0x57);   // DFU_MAGIC_UF2_RESET (cores/nRF5/wiring.c)
+                    uint32_t gpr = 0;
+                    sd_power_gpregret_get(0, &gpr);
+                    printfdeb("...GPREGRET=0x%02lX (0x57 -> UF2-Bootloader)\n", (unsigned long)gpr);
+                    // Ack/Log noch ueber die CDC rausschreiben, bevor der Reset die
+                    // USB-Verbindung kappt. Ohne flush+Wartezeit kam das Board in
+                    // einem Hardware-Test trotz korrekt gesetztem GPREGRET als App
+                    // statt als Bootloader zurueck.
+                    Serial.flush();
+                    delay(300);
                 }
 
                 NVIC_SystemReset();     // resets the device
