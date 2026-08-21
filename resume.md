@@ -574,6 +574,48 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (dritter Durchgang) — `N-21` aufgeklaert: kein USB-Bug, sondern eingefrorener Loop-Task (= `N-20`)
+
+Auftrag: "investigate: the CDC host→board direction died mid-session while
+board→host kept streaming". Ergebnis nach einem Tag Hardware-Instrumentierung
+(acht Firmware-Iterationen auf dem RAK4631, jeweils per Serial-DFU geflasht):
+
+- **USB vollstaendig entlastet.** EP0 (Touch), Line-State (DTR kam an, `ls=0x03`
+  im "toten" Fenster), Bulk-OUT (Bytes erreichten den FIFO), Suspend-Flag (`sus=0`),
+  TX-FIFO (`awr=256` — leer, es schrieb niemand mehr): alle Schichten einzeln auf der
+  Hardware geprueft, alle gesund.
+- **Tatsaechliche Ursache: der Loop-Task friert ein** — per Herzschlag-Breadcrumbs
+  (Marken je Loop-Abschnitt, Freeze-Meldung aus dem Timer-Task ueber rohes
+  `tud_cdc_n_write`) auf zwei Abschnitte eingegrenzt: Gateway-Block
+  (`getUDP()`/`sendUDP()`, ≥20 s) und posinfo/heyinfo/telemetry (>2 min am Stueck).
+  Beide enden in W5100S-Socket-/SPI-Operationen der RAK13800-Bibliothek — auf diesem
+  Gateway-konfigurierten Board ohne Ethernet-Hardware/Link liefern SPI-Reads Muell,
+  die Statusschleifen der Bibliothek kehren nichtdeterministisch nicht zurueck.
+  "RX tot, TX lebt" = `checkSerialCommand()` laeuft nicht mehr, waehrend die
+  `OnRxDone`-Debugzeilen aus dem Timer-Service-Task weiterstroemen. `N-21` ist damit
+  als Duplikat von `N-20` geschlossen; `N-20` auf High hochgestuft und mit den
+  Fundstellen praezisiert (beide STATUS-Boxen im Defektkatalog neu geschrieben).
+- **Ein echter Fix committet (`1855cb3e`):** die printfdeb-Familie blockiert nicht
+  mehr endlos in `Adafruit_USBD_CDC::write()`, wenn der TX-FIFO voll ist und nicht
+  abfliesst (begrenzte 20-ms-Wartezeit, dann verwerfen; printfdeb schreibt chunked
+  nur noch, was der FIFO frei hat). Das war der Verstaerker, der aus einem
+  Loop-Freeze zusaetzlich einen Timer-Task-Freeze machte ("voll stumm").
+- **Zwei teure Lektionen, im Katalog festgehalten:** (1) "seriell tot bei lebendem
+  USB-Deskriptor" zuerst als Loop-Freeze pruefen, nicht als USB-Problem — ein
+  Herzschlag-Breadcrumb kostet Minuten, die USB-Schichten-Forensik kostete Stunden.
+  (2) LittleFS-Schreibzugriffe aus dem Timer-Service-Task crashen das Board
+  reproduzierbar in einen Boot-Loop (waehrend der Untersuchung selbst ausgeloest;
+  Rettung per Touch im Boot-Fenster) — Dateisystem nur aus dem Loop-Task.
+- Der W5100S-Blockade-Fix selbst steht noch aus (Fix-Richtungen im Katalog unter
+  `N-20`); die gesamte Diagnose-Instrumentierung wurde nach der Untersuchung wieder
+  entfernt (git checkout), es verbleibt nur der printfdeb-Fix.
+- Zweites Board (Heltec V3, DK5EN-91, `/dev/cu.usbserial-0001`) steht seit heute am
+  Bench bereit, wurde fuer diese Diagnose aber nicht mehr gebraucht.
+
+Abschluss-Zustand: RAK4631 geflasht (sauberer Stand + printfdeb-Fix), Boot sauber,
+Rufzeichen DK5EN-90 intakt, `--info` beantwortet. Builds wiscore_rak4631 (-Werror),
+t_echo, heltec_t114, heltec_wifi_lora_32_V3 SUCCESS; `pio test -e native` 15/15.
+
 ### 2026-08-21 (zweiter Durchgang) — `esp32-safeboot` gefixt, `N-19` gefixt, `N-20`/`N-21` neu
 
 Zwei Auftraege: den vorbestehend kaputten `esp32-safeboot`-Build reparieren und den
@@ -614,6 +656,9 @@ zwei neue Befunde dokumentiert:
   gefixt. Praktische Folge fuer Bench-Arbeit: wenn CDC-RX tot ist, bleibt der
   1200-Baud-Touch der verlaessliche Fernweg in den Serial-DFU-Bootloader (heute zweimal
   als Rettung genutzt), danach `pio run -e wiscore_rak4631 --target upload`.
+  _(Ueberholt: am selben Nachmittag als Duplikat von `N-20` aufgeklaert — kein
+  USB-Defekt, der Loop-Task war eingefroren; siehe den Abschnitt zum dritten
+  Durchgang.)_
 
 Verifikation des Durchgangs: `wiscore_rak4631` (mit `-Werror`), `t_echo`, `heltec_t114`
 SUCCESS; `pio test -e native` 15/15; Hardware nach Abschluss gesund (LoRa-RX/TX laufen).

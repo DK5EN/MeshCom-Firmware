@@ -854,47 +854,79 @@ umgeht die Funktion, statt sie zu reparieren.
 
 ---
 
-### N-20 — Ethernet-Init blockiert Setup und Loop auf Gateway-Nodes ohne Link — **VERIFIED (auf echter Hardware)** — Medium
+### N-20 — Netzwerk-Pfade (W5100S) frieren den Loop-Task ein auf Gateway-Nodes ohne Ethernet-Hardware/Link — **VERIFIED (auf echter Hardware, root cause per Breadcrumbs eingegrenzt)** — High
 
-Neu, gefunden 2026-08-21 als Stoerfaktor bei der N-19-Verifikation. Vorbestehend
-(`nrf_eth.cpp`, "Initialize Ethernet"), unabhaengig von allen Fixes dieser Kampagne.
+Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
+nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,
+unabhaengig von allen Fixes dieser Kampagne. **Schluckt N-21** (siehe dort): die
+"CDC-Tod"-Symptome sind in Wahrheit dieser eingefrorene Loop-Task.
 
-Auf einem als Gateway konfigurierten RAK4631 **ohne** Ethernet-Link zwei belegte
-Auspraegungen:
+Auf einem als Gateway konfigurierten RAK4631 (`bGATEWAY`, `bEXTUDP`, Webserver on)
+**ohne** funktionierende Ethernet-Hardware/Link belegt:
 
-1. **Setup-Blockade, nichtdeterministisch:** Ein Boot blieb nach der Boot-Zeile
-   `Initialize Ethernet` **minutenlang** stehen — keine Loop-Ausgaben, keine
-   Kommando-Verarbeitung, LoRa-Zustandsmaschine nicht gestartet. Der 1200-Baud-Touch
-   (TinyUSB-Task) funktionierte weiterhin und hat das Board ferngerettet. Der naechste
-   Boot mit identischer Firmware lief in Sekunden durch (`Failed to configure Ethernet
-using FIX/DHCP`).
-2. **Periodische Loop-Stalls:** Im Betrieb wiederholt sich `Initialize Ethernet` etwa
-   alle 60–70 s aus der Loop heraus und blockiert sie dabei **8–12 s** (belegt per
-   `RX_TIMEOUT_FIRE delta=12426…13920` statt normal `4582`). In diesen Fenstern werden
-   serielle Kommandos und LoRa-Verarbeitung verzoegert.
+1. **Setup-Blockade, nichtdeterministisch:** Ein Boot blieb nach `Initialize Ethernet`
+   (`nrf_eth.cpp`, `startETH()` → `Ethernet.begin(mac, 10000UL)`) **minutenlang**
+   stehen; der naechste Boot mit identischer Firmware lief in Sekunden durch.
+2. **Periodische Loop-Stalls 8–12 s** etwa alle 60–70 s (belegt per
+   `RX_TIMEOUT_FIRE delta=12426…13920` statt normal `4582`) — der
+   `resetDHCP()`-Pfad aus `sendUDP()` (nach `MAX_ERR_UDP_TX` Fehlversuchen) laeuft in
+   dasselbe blockierende `startETH()`.
+3. **Minutenlange bis dauerhafte Loop-Freezes im Betrieb**, per
+   Breadcrumb-Instrumentierung (Loop-Herzschlag + Abschnittsmarken, Freeze-Meldung aus
+   dem Timer-Service-Task ueber rohe `tud_cdc_n_write`) zwei Fundstellen benannt:
+   - **Gateway-Block 1** (`neth.getUDP()`/`sendUDP()`-Abschnitt in `nrf52loop()`):
+     ≥20 s Freeze beobachtet.
+   - **posinfo/heyinfo/telemetry-Abschnitt**: ueber **2 Minuten** durchgehend
+     eingefroren (Meldung alle 5 s mit unveraendertem Herzschlag), danach voll stumm.
+     Beide Abschnitte enden in W5100S-Socket-/SPI-Operationen der RAK13800-Bibliothek;
+     auf abwesender/linkloser Hardware liefern SPI-Reads Muell und die internen
+     Statuswarteschleifen der Bibliothek kehren nichtdeterministisch nicht zurueck.
 
-Nicht gefixt (DRY-21-Umfeld; braucht Ethernet-Hardware fuer einen sauberen Fix-Beweis).
-Workaround fuer Bench-Tests: Kommandos ausserhalb der Stall-Fenster senden.
+**Folgewirkungen des eingefrorenen Loop-Tasks** (alles 2026-08-21 einzeln belegt):
+serielle Kommandoverarbeitung tot (`checkSerialCommand()` laeuft nicht), keine Echos,
+LoRa-TX-Ring wird nicht bedient — waehrend `OnRxDone`-Debugzeilen (Timer-Service-Task)
+weiter stroemen ("TX lebt, RX tot") und BLE (SoftDevice) weiterlaeuft. Der
+1200-Baud-Touch (TinyUSB-Task) funktioniert in jedem beobachteten Freeze-Zustand und
+bleibt der verlaessliche Fernrettungsweg.
 
-### N-21 — USB-CDC-RX-Richtung stirbt im Betrieb, TX laeuft weiter — **VERIFIED (auf echter Hardware)** — Medium
+**Verstaerker (gefixt, `1855cb3e`):** war der CDC-TX-FIFO im Freeze-Moment voll,
+blockierte jeder weitere `printfdeb()` aus dem Timer-Task in
+`Adafruit_USBD_CDC::write()` endlos → auch die Timer-Task-Ausgaben starben ("voll
+stumm"). Die printfdeb-Familie wartet jetzt begrenzt (20 ms) und verwirft dann.
 
-Neu, live beobachtet 2026-08-21. Vorbestehend — dieselbe Symptomklasse, die `--dfu`
-(Commit `7bac915a`) urspruenglich motiviert hat; diesmal mit klarerem Befund:
+**Nicht gefixt:** die W5100S-Blockaden selbst. Fix-Richtungen: Netzwerk-Abschnitte an
+`hasETHHardware`/Link-Status koppeln statt sie auf Muell-SPI laufen zu lassen;
+Timeouts in den RAK13800-Statusschleifen. Braucht fuer den sauberen Beweis einmal
+echte Ethernet-Hardware (DRY-21-Umfeld). Workaround fuer Bench-Tests: Node nicht als
+Gateway/EXTUDP konfigurieren, oder Kommandos ausserhalb der Stall-Fenster senden.
 
-Nach einem erfolgreichen `--info` (Echo + vollstaendige Antwort) starb die
-**Host→Board-Richtung** der USB-CDC innerhalb von ~1 Minute: keine Echos mehr, keine
-Kommando-Verarbeitung — waehrend die **Board→Host-Richtung** unveraendert weiterlief
-(LoRa-Debug-Ausgaben stroemten weiter). Reproduziert mit drei Sendemethoden (`printf`
-auf frischem fd, persistentem fd, `pyserial`-Session). Ein aelterer Vorfall (2026-08-19,
-im `7bac915a`-Commit-Text) zeigte zusaetzlich tote TX-Richtung nach ~24 h Uptime; auch
-dort blieb der 1200-Baud-Touch funktionsfaehig (Control-Endpoint, unabhaengig vom
-CDC-Datenpfad).
+### N-21 — ~~USB-CDC-RX-Richtung stirbt im Betrieb~~ → kein USB-Defekt, Symptom von N-20 — **RESOLVED als Duplikat (auf echter Hardware bewiesen)** — Medium
 
-Root cause offen (Kandidat: TinyUSB-RX-FIFO/Endpoint-Wedge, evtl. im Zusammenspiel mit
-den N-20-Loop-Stalls, waehrend derer die CDC nicht gelesen wird). Nicht gefixt.
-**Betriebsfolge:** `--dfu` per Seriell setzt lebende CDC-RX voraus; bei totem RX bleibt
-der 1200-Baud-Touch (Serial-DFU-Bootloader) der verlaesslichste Fernweg — heute zweimal
-als Rettung verifiziert.
+Beobachtet 2026-08-21 ("CDC-RX tot, TX lebt weiter"; dieselbe Symptomklasse
+motivierte `--dfu` in `7bac915a`). Die Untersuchung am selben Tag hat den USB-Stack
+vollstaendig entlastet — jede Schicht einzeln auf der Hardware geprueft:
+
+- **EP0/Control-Pfad:** 1200-Baud-Touch (SET_LINE_CODING + Line-State-Callback)
+  funktionierte in jedem beobachteten "toten" Zustand, mehrfach als Fernrettung genutzt.
+- **Line-State:** Uebergangs-Ring (Dateisystem-Postmortem) zeigte DTR-Drops und
+  -Asserts, die sauber ankamen und verarbeitet wurden; im "toten" Fenster stand
+  `conn=1 ls=0x03 sus=0 mnt=1` — CDC-Klassenzustand voellig gesund.
+- **Bulk-OUT:** Host-Bytes erreichten den RX-FIFO auch im toten Zustand (300-Byte-Probe
+  fuellte `avail>=200` und loeste den Test-Watchdog aus).
+- **Suspend-Flag, Endpoint-Wedge, macOS-Treiber:** alle als Ursache ausgeschlossen
+  (Telemetrie `sus=0`, `awr=256` — TX-FIFO leer, es schrieb schlicht niemand mehr).
+
+Tatsaechliche Ursache: **der Loop-Task war eingefroren** (W5100S-Pfade, siehe N-20) —
+`checkSerialCommand()` lief nicht mehr (RX "tot"), waehrend die
+`OnRxDone`-Debugzeilen aus dem Timer-Service-Task weiterliefen (TX "lebt").
+Kein CDC-, TinyUSB- oder Treiber-Bug. Fix = Fix von N-20; der Verstaerker
+(blockierendes `write()` bei vollem FIFO) ist mit `1855cb3e` entschaerft.
+
+Lehre fuer kuenftige Diagnosen: "seriell tot bei lebendem USB-Deskriptor" zuerst als
+Loop-Freeze pruefen (Herzschlag-Breadcrumb), nicht als USB-Problem. Und: LittleFS-
+Schreibzugriffe aus dem Timer-Service-Task crashen das Board reproduzierbar in einen
+Boot-Loop (waehrend der Untersuchung selbst ausgeloest und behoben) — Dateisystem nur
+aus dem Loop-Task anfassen.
 
 ---
 
