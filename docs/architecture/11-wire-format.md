@@ -280,8 +280,15 @@ and `src/udp_functions.cpp:144`):
   BEAT — one datagram per 30 s heartbeat is the liveness signal mc-chat's
   softnodes build their connected-check on.
 
-Datagrams with more than `MAX_ZEROS` = 6 consecutive zero bytes are
-discarded as corrupt.
+Datagrams whose **trailing** zero-run exceeds `MAX_ZEROS` = 6 bytes are
+discarded as corrupt — with two precision caveats a mock must know
+(`udp_functions.cpp:122–136`, clone `nrf_eth.cpp:210ff`): the counter scans
+non-overlapping 2-byte-aligned pairs and **resets on any non-zero pair**, so
+only a zero-run at the _end_ of the datagram (aligned to even offsets)
+trips the check; a 7+ zero-byte run in the middle of an otherwise valid
+datagram passes real firmware. The mock server
+(`tools/mock/meshcom_server.py`) deliberately implements the stricter
+any-run reading — stricter than firmware is safe for a test double.
 
 ---
 
