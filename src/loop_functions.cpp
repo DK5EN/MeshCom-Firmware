@@ -3270,8 +3270,23 @@ void sendMessage(char *msg_text, int len)
     int ii=0;
     int in=0;
     unsigned int ib=0;
+    // N-22: der Loop-Task-Stack auf nRF52 ist 4 KB (LOOP_STACK_SZ im
+    // Adafruit-Core, nicht per Build-Flag ueberschreibbar). Der Pfad
+    // checkSerialCommand() -> sendMessage() -> sendExtern() lief mit
+    // Stack-Watermark 0 (auf Hardware gemessen, 2026-08-21) und zerstoerte
+    // Nachbar-RAM — Absturz Sekunden spaeter (SREQ). Grosse Puffer deshalb
+    // in BSS; sendMessage() laeuft auf nRF52 ausschliesslich im Loop-Task
+    // (Aufrufer: checkSerialCommand, hasMsgFromPhone-Zweig in nrf52loop,
+    // getExtern — alle Loop-Kontext). Gleiches Muster wie Commit 1951aa7d
+    // in sendExtern(). Die memset()-Aufrufe direkt darunter initialisieren
+    // beide Puffer ohnehin bei jedem Aufruf.
+#if defined(NRF52_SERIES)
+    static char msg_text_check[200];
+    static char msg_text_checked[200];
+#else
     char msg_text_check[200];
     char msg_text_checked[200];
+#endif
     int len_check=len;
     if(len_check > (int)sizeof(msg_text_check)-1)
         len_check = sizeof(msg_text_check)-1;
@@ -3409,7 +3424,13 @@ void sendMessage(char *msg_text, int len)
         }
     }
 
+    // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
+    // encodeAPRS() beschreibt den Puffer bei jedem Aufruf vollstaendig.
+#if defined(NRF52_SERIES)
+    static uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
+#else
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
+#endif
 
     struct aprsMessage aprsmsg;
 
