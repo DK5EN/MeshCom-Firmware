@@ -574,6 +574,29 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-22 (dreizehnter Durchgang) — QA-Welle 2: Testsuite-Audit (fable-review) umgesetzt
+
+/fable-review ueber die gesamte Testsuite: 6 Finder-Winkel, adversariale
+Verifikation, Verdict `docs/review/2026-08-22-testsuite-verdict.md` (8
+bestaetigte Findings, 6 widerlegte Claims mit Beweis), zwei Fix-Wellen,
+unabhaengiger Fable-Advisor APPROVED (Literale handgerechnet, Gate frisch
+gefahren). Kernpunkte (`30ef55d7`):
+
+- Golden-Fence gehaertet: Regenerations-Laeufe schlagen IMMER fehl;
+  canonical() um appoff/srccall/srclast/pathcnt erweitert (f004/f005
+  zeigen jetzt das vorher unsichtbare app_offline-Bit); Roundtrip prueft
+  byte5-Flags (Mesh maskiert wegen bMESH-Encoder-Semantik).
+- txring: defensive Laengen-Invariante (len 0/>255 -> -1) + Randtests.
+- Shims: BOARD_HARDWARE-ODR-Fix in 4 TUs, millis-Uhr uint32_t (Wrap
+  physisch), substring-Swap-Semantik, millis-Leck geschlossen.
+- Mock ent-zirkularisiert: CONF/DATA gegen handgerechnete Byte-Literale,
+  Expiry-Test, Suite 6s->2.8s, README-Claims korrigiert.
+- Dokumentiert ohne Aenderung: test_compress inert (upstream),
+  external_radio-Spiegel-Suiten (upstream), Mock-Routing-Annahme.
+
+Suite-Staende: native_aprs 31/31, native 15/15, Mock 14/14, CI traegt
+beide native Envs + Ressourcen-Delta.
+
 ### 2026-08-22 (zwoelfter Durchgang) — QA-Welle 1: Orakel in CI, TX-Ring nativ getestet (fand sofort N-24), Mock-Server, Ressourcen-Waechter
 
 Orchestrierte Welle auf Benutzerauftrag ("i really don't trust the code, we
