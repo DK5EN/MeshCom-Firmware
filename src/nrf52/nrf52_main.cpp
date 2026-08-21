@@ -1959,9 +1959,19 @@ void nrf52loop()
                     else
                     {
                         Serial.print(getTimeString());
-                        Serial.println(" [MAIN] initethDHCP");
+                        Serial.println(" [MAIN] resetDHCP (retry)");
 
-                        neth.initethDHCP();
+                        // N-20: initethDHCP() wuerde den W5100S bei jedem
+                        // Retry per initETH_HW() hardware-resetten — danach
+                        // braucht die PHY-Aushandlung mehrere Sekunden und der
+                        // Link-Check in startETH() sieht dauerhaft LinkOFF:
+                        // ein einmal gezogenes Kabel verbindet nie wieder (auf
+                        // Hardware beobachtet). Das volle HW-Init ist nur beim
+                        // Boot noetig (Setup); hier reicht resetDHCP() ohne
+                        // PHY-Reset — der Link-Zustand ist dann echt, und bei
+                        // LinkOFF bricht startETH() sofort ab statt 10 s zu
+                        // blocken.
+                        neth.resetDHCP();
                     }
                 }
             }
