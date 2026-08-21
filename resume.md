@@ -574,6 +574,44 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (fuenfter Durchgang) — `N-20`-Soak bestanden, `DRY-21`+convBuffer+`CONC-16`-Rest gefixt, `N-22` neu, Test-Orakel Stufe 1
+
+- **`N-20`-Soak-Test bestanden:** Kabel 12:01 gezogen, 12:06 gesteckt — kein Freeze,
+  kein Reboot (Uptime lief durch), DHCP automatisch neu bezogen, KEEP/Webserver danach
+  wieder aktiv. `N-20`-Hauptfix damit vollstaendig verifiziert.
+- **`DRY-21` (Drift) gefixt (`07d1360f`):** ACK-Level 0x02 fuer eigene Nachrichten aus
+  der ESP32-Kopie nach `nrf_eth.cpp` portiert (App sah auf nRF52-Gateways nie den
+  vollen Bestaetigungs-Status); Debug-Zeile angeglichen. Zusammenlegung der beiden
+  Dateien bleibt Upstream-Epic.
+- **convBuffer-Ueberlesen gefixt (`623c4c0e`):** der im CONC-16-Commit dokumentierte
+  Nebenbefund, beide Fundstellen (APRS-Laenge `msg_len-36` statt Gesamtlaenge; auf
+  nRF52 war es bei `msg_len > 239` ein echtes Out-of-bounds-Read).
+- **`CONC-16`-Rest gefixt (`9117c3c6`):** die "auf nRF52 nicht gelinkt"-Annahme des
+  urspruenglichen Fixes war falsch — `sendUDP()` in `nrf52_main.cpp` las den UDP-Ring
+  ungeschuetzt, waehrend `addUdpOutBuffer()` aus dem Timer-Task schreibt. Jetzt
+  Snapshot unter Lock + Eviction-Guard, auf dem Gateway live verifiziert.
+- **`N-22` neu (Katalog):** EXTUDP crasht den nRF52-Ethernet-Gateway reproduzierbar
+  ~2–4 s nach jedem eigenen Nachrichtenversand (Soft-Reset via SoftDevice-Fault-
+  Handler, `RESETREAS=0x4`). Per Toggle isoliert (`--extudp off` → stabil), root cause
+  offen (eigene Session). **Workaround aktiv: `--extudp off` auf dem Bench-RAK** —
+  EXTUDP war dort vorher an (`EXT IP 192.168.68.64`). Die Diagnose kostete mehrere
+  Fehlzuweisungs-Runden (der Crash sah erst wie ein Fehler des frischen
+  Snapshot-Codes aus; Breadcrumbs + Bisect auf HEAD + RESETREAS klaerten es).
+- **`RESETREAS`-Bootzeile (`6003e90c`):** eine Zeile Boot-Log, die kuenftig sofort
+  Absturz von Spannungsproblem unterscheidet.
+- **Test-Orakel Ausbaustufe 1 (`f1802030`, doc 08 §4):** `MC_TEST_HOOKS`-Capture-Hook
+  in `OnRxDone()` (Hex-Dump akzeptierter Frames, Gegenpol zum CRC_PAYLOAD-Dump);
+  `[env:native_aprs]` kompiliert `decodeAPRS()`/`encodeAPRS()` nativ (Minimal-Shim
+  `test/support/nrf52/WisBlock-API.h`); `test_aprs_decode` mit zwei on-air
+  mitgeschnittenen Fremd-Frames als Interop-Vektoren (Sollwerte von Hand aus den
+  Roh-Bytes). `pio test -e native_aprs` 3/3. Offen: Differential-Lauf (Mechanismus 1),
+  breiterer Vektor-Korpus, Wire-Format-Dokument.
+
+Abschluss-Zustand: RAK4631 mit normalem Build (ohne Capture-Hook) geflasht, Gateway
+am OE-Server (KEEP, NTP, Webserver HTTP 200), EXTUDP off (N-22-Workaround). Alle
+Builds gruen (wiscore -Werror, t_echo, heltec_t114, heltec_wifi_lora_32_V3), native
+15/15, native_aprs 3/3.
+
 ### 2026-08-21 (vierter Durchgang) — Ethernet-Kabel am RAK, `N-20`-Hauptfix, Dual-Node-Funktest
 
 Benutzer hat ein Ethernet-Kabel an den RAK4631 (RAK13800-Modul war die ganze Zeit

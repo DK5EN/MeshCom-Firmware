@@ -866,11 +866,13 @@ umgeht die Funktion, statt sie zu reparieren.
 > W5100S bei jedem Versuch und haette mit dem Link-Check eine Endlosschleife aus
 > PHY-Reset und LinkOFF ergeben (auf Hardware beobachtet). Verifiziert: ohne Link
 > "link OFF - skip DHCP" in <=3 s bei responsivem Loop; mit Link DHCP-IP,
-> KEEP-Heartbeats zum OE-Server, Webserver HTTP 200. **Noch offen:** Soak-Test
-> Kabel ziehen/stecken im laufenden Betrieb; die exakte Fundstelle des
-> "mark=5"-Freezes (posinfo/heyinfo/telemetry-Abschnitt) ist weiterhin unbenannt;
-> die W5100S-Bibliotheks-Warteschleifen selbst (Socket-Ops, `maintain()`) sind
-> ungehaertet.
+> KEEP-Heartbeats zum OE-Server, Webserver HTTP 200. **Soak-Test bestanden
+> (2026-08-21, 12:01–12:06):** Kabel im Betrieb gezogen und nach 5 min wieder
+> gesteckt — kein Freeze, kein Reboot (Uptime lief durch), DHCP automatisch neu
+> bezogen, KEEP-Heartbeats und Webserver danach wieder aktiv. **Noch offen:** die
+> exakte Fundstelle des "mark=5"-Freezes (posinfo/heyinfo/telemetry-Abschnitt) ist
+> weiterhin unbenannt; die W5100S-Bibliotheks-Warteschleifen selbst (Socket-Ops,
+> `maintain()`) sind ungehaertet.
 
 Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
 nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,
@@ -944,6 +946,34 @@ Schreibzugriffe aus dem Timer-Service-Task crashen das Board reproduzierbar in e
 Boot-Loop (waehrend der Untersuchung selbst ausgeloest und behoben) — Dateisystem nur
 aus dem Loop-Task anfassen.
 
+### N-22 — EXTUDP crasht den nRF52-Gateway nach jedem Nachrichtenversand (Soft-Reset) — **VERIFIED (auf echter Hardware, per Toggle isoliert)** — High
+
+Neu, gefunden 2026-08-21 nachmittags bei der Verifikation von `DRY-21`/`623c4c0e` —
+erst erreichbar, seit der Bench-RAK4631 echtes Ethernet mit Link hat. Vorbestehend,
+durch Ausschluss von allen Kampagnen-Fixes getrennt (Crash reproduziert auf exakt
+`623c4c0e` UND auf Vorstaenden; Breadcrumbs in `sendUDP()`/`getUDP()` blieben stumm —
+der Absturz liegt VOR beiden).
+
+Symptom: RAK4631 als Gateway (`bGATEWAY`, `bEXTUDP` on, `EXT IP 192.168.68.64`,
+Ethernet verbunden) rebootet **reproduzierbar ~2–4 s nach jedem eigenen
+Nachrichtenversand** (`::{9999}…` ueber Seriell). Letzte Ausgabe vor dem Reset:
+`[EXT] Out:`-JSON + BLE-Ringpuffer-Dump; danach `RESETREAS=0x00000004` (SREQ — der
+Weg des SoftDevice-Fault-Handlers nach einem App-Absturz). Kein Watchdog, kein
+Lockup-Bit.
+
+**Isolation per Toggle:** `--extudp off` → identische Nachricht laeuft sauber durch
+(TX-UDP decodiert, TX-LoRa raus, 30 s stabil, zweifach wiederholt). `--extudp on` →
+Reboot. Der Absturz liegt damit im EXTUDP-Pfad (`extudp_functions.cpp` /
+`getExternUDP()`/`flushExternQueue()`/`sendExtern()` auf dem W5100S-Unterbau) —
+root cause nicht weiter eingegrenzt (eigene Session; Kandidaten: Verarbeitung der
+ICMP-Port-Unreachable-Antwort eines toten EXT-Peers, Puffer im JSON-Pfad,
+Socket-Zustand des zweiten UDP-Sockets).
+
+**Workaround aktiv:** auf dem Bench-RAK ist `--extudp off` gesetzt (2026-08-21).
+**EXTUDP auf nRF52-Ethernet-Gateways bis zur Untersuchung nicht einschalten.**
+Boot-Log zeigt seit `6003e90c` die Reset-Ursache (`[BOOT] RESETREAS=…`), was
+kuenftige Vorfaelle dieser Klasse sofort als Absturz ausweist.
+
 ---
 
 ## 3. Refuted claims — do not re-investigate
@@ -962,6 +992,29 @@ aus dem Loop-Task anfassen.
 ---
 
 ## 4. What replaces the golden-vector plan
+
+> **STATUS 2026-08-21 — erster Ausbau umgesetzt.**
+>
+> - **Mechanismus 2 (Capture-Pfad): DONE.** `OnRxDone()` (`lora_functions.cpp`)
+>   dumpt akzeptierte Frames als Hex hinter `-D MC_TEST_HOOKS` (`[MC-TEST]
+RX_FRAME len rssi snr hex=…`) — der Gegenpol zum bestehenden
+>   `CRC_PAYLOAD`-Dump der verworfenen Frames, am Seam den nur akzeptierte
+>   Frames erreichen (beide Plattformen). Compile-Gate bewusst: der Dump laeuft
+>   im Radio-Callback-Kontext und ist fuer Produktionsbuilds zu teuer.
+> - **Native Decoder-Umgebung: DONE.** `[env:native_aprs]` kompiliert
+>   `aprs_functions.cpp` (decode+encode) auf dem Host; noetig war nur ein
+>   Minimal-Shim `test/support/nrf52/WisBlock-API.h` (die 9 von aprs_functions
+>   gelesenen Settings-Felder) plus eine Handvoll Link-Stubs im Test. Damit ist
+>   die Voraussetzung fuer Mechanismus 1 (differentielles Testen) geschaffen:
+>   Prae- und Post-Fix-Decoder koennen jetzt beide nativ gebaut werden.
+> - **Mechanismus 3 (Vektoren), erster Bestand:** `test/test_aprs_decode/` haelt
+>   on-air mitgeschnittene Frames FREMDER Nodes als Interop-Vektoren — encodiert
+>   von fremder Firmware, Sollwerte von Hand aus den Roh-Bytes gelesen (nicht aus
+>   dem Pruefling). `pio test -e native_aprs`.
+> - **Offen:** Mechanismus 1 als eingerichteter Differential-Lauf (zwei
+>   Decoder-Staende in einem Binary); Vektor-Korpus verbreitern (mehr
+>   Frame-Typen: HEY/`@`, ACK, DM mit `{NNN`); Spezifikations-Vektoren aus einem
+>   noch zu schreibenden Wire-Format-Dokument.
 
 C-03 removed the oracle. The zero-tolerance requirement needs a real one. Three
 mechanisms, in ascending cost:
@@ -1178,6 +1231,13 @@ ESP32 einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
 >   `--gc-sections` nicht gelinkt (Gateway/UDP-Pfad fuer diese Boards nicht erreichbar) —
 >   nur auf ESP32 tatsaechlich verifizierbar gebaut, dort sind die neuen Locks No-ops. Auf
 >   echter nRF52-Hardware mit Ethernet ungeprueft (kein Kabel am Bankarbeitsplatz, `DRY-21`).
+>   **Korrektur 2026-08-21:** die "nicht gelinkt"-Aussage war falsch — der Schreiber
+>   `addUdpOutBuffer()` laeuft via `addNodeData()` auch auf nRF52 (aus `OnRxDone`,
+>   Timer-Service-Task), der nRF52-Leser ist `sendUDP()` in `nrf52_main.cpp` und las
+>   ungeschuetzt. **Rest behoben** (`9117c3c6`): Snapshot unter Lock + Eviction-Guard,
+>   auf dem RAK4631-Gateway mit Ethernet live verifiziert. Der im `ca574ef7`-Commit nur
+>   dokumentierte **convBuffer-Ueberlesen-Nebenbefund ist ebenfalls behoben**
+>   (`623c4c0e`, beide Fundstellen: APRS-Laenge `msg_len-36` statt Gesamtlaenge).
 > - `N-16` (Commit `cc79611b`) — siehe eigene STATUS-Box oben.
 > - `N-15` — kein Code-Fix noetig, bereits durch `CONC-14` geschlossen; siehe eigene
 >   STATUS-Box oben.
@@ -1213,9 +1273,12 @@ not actual defects (`transmissionState`, the `pendingDisplay*` fields); see the 
 N-13 above. `iWrite`/`iRead`/`loraWrite` surfaced during re-verification as further same-class
 candidates outside the original list — not part of N-13, deliberately left for a future pass.
 
-**Offen:** `DRY-20`, `DRY-21`, `DRY-23`, `DRY-24`, `SIMP-26`, `SIMP-27`, `ALT-31`, `ALT-32`,
+**Offen:** `DRY-20`, `DRY-23`, `DRY-24`, `SIMP-26`, `SIMP-27`, `ALT-31`, `ALT-32`,
 `STATE-28` (Epic-Teil), plus the corrected C-02 extraction of ~221 radio-independent shared
 loop lines. ~~`DRY-22`~~ **BEHOBEN** 2026-08-20 (Commit `9b6c5224`) — siehe STATUS-Box.
+`DRY-21`: die **Verhaltens-Drift ist behoben** (`07d1360f`, 2026-08-21 — ACK-Level 0x02
+fuer eigene Nachrichten aus der ESP32-Kopie portiert, Debug-Zeile angeglichen); die
+Zusammenlegung von `nrf_eth.cpp` und `udp_functions.cpp` bleibt als Upstream-Epic offen.
 
 **Erledigt 2026-08-19 (ESP32/Heltec V3):** ~~`DRY-25`~~, ~~`SIMP-29`~~, ~~`SIMP-30`~~,
 ~~`ALT-33`~~, ~~`ALT-34`~~, ~~`ALT-35`~~ — siehe STATUS-Box unten.
