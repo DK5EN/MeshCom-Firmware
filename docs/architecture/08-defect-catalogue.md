@@ -1060,6 +1060,21 @@ RX_FRAME len rssi snr hex=…`) — der Gegenpol zum bestehenden
 >   geht als `MH`-JSON zum Phone; der `0x91`-Binaer-Zweig in den Sendern hat
 >   keinen Produzenten mehr (Legacy). Quirk dokumentiert: jede Notification
 >   traegt 2 Bytes ueber die Nutzlaenge hinaus (`blelen + 2`).
+> - **§2-Quervalidierung (Server-UDP): DONE (2026-08-21 nachts)** — doc 11 §2
+>   gegen die zweite unabhaengige Implementierung `mc-chat/meshcom_mock/`
+>   (Softnodes live am OE- und DL-Server) und die Upstream-Spezifikation
+>   `icssw-org/MeshCom-Reflector` quergeprueft. Ergebnisse eingearbeitet:
+>   msg_id-Komposition `(gw_id<<10)|counter` mit Wrap bei 1000 (drei
+>   Clamp-Stellen `loop_functions.cpp:3131ff` — deshalb nicht 1024);
+>   BEAT-Binnenstruktur (`BEAT+0x00+len+call[+0x01+len+status]`, Server
+>   antwortet auf JEDES KEEP); DATA-Trailer "03" = ASCII-Modulationsziffern
+>   (Upstream-Spec-Fehler "PAYLOAD_LEN" dokumentiert); **CONF ist
+>   nRF52-only** (ESP32-getUDP hat keinen CONF-Zweig — Plattform-Divergenz
+>   im DRY-21-Klon); Ack-Format exakt `%-9.9s:ack%03i`; `{NNN` ohne
+>   schliessende Klammer (nur `{pong}{NNN}` mit); neues §1.7
+>   Steuer-Payloads ({CET}/{SET}/{MCP}/{ping}); neues §5 INTERLINK-Abgrenzung
+>   (Port 1985, Server-zu-Server-Feed, Firmware spricht es nicht; mcmap
+>   konsumiert ausschliesslich darueber).
 > - **Offen:** — (Orakel-Plan vollstaendig umgesetzt).
 
 C-03 removed the oracle. The zero-tolerance requirement needs a real one. Three
