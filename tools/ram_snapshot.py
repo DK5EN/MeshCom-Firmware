@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+Deprecated: use tools/resource_watch.py instead (any env, baseline+delta
+reporting, no hardcoded target list -- see defect C-12). This script is kept
+working for backward compatibility but is no longer the preferred tool.
+
 MeshCom RAM/Flash snapshot extractor.
 
 Runs `pio run -e <env>` for each target and parses the memory summary lines

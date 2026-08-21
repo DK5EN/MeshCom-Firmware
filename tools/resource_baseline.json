@@ -1,0 +1,30 @@
+{
+  "heltec_t114": {
+    "date": "2026-08-21",
+    "flash_total": 815104,
+    "flash_used": 508168,
+    "ram_total": 235520,
+    "ram_used": 84028
+  },
+  "heltec_wifi_lora_32_V3": {
+    "date": "2026-08-21",
+    "flash_total": 3403776,
+    "flash_used": 1383325,
+    "ram_total": 327680,
+    "ram_used": 112076
+  },
+  "t_echo": {
+    "date": "2026-08-21",
+    "flash_total": 815104,
+    "flash_used": 533540,
+    "ram_total": 248832,
+    "ram_used": 90028
+  },
+  "wiscore_rak4631": {
+    "date": "2026-08-21",
+    "flash_total": 815104,
+    "flash_used": 577864,
+    "ram_total": 248832,
+    "ram_used": 85612
+  }
+}
