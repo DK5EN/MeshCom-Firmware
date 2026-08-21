@@ -513,16 +513,11 @@ static void test_clear_slot_first(void)
     TEST_ASSERT_EQUAL_UINT8(RING_STATUS_READY, ringBuffer[slot][1]);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(f.bytes, &ringBuffer[slot][2], f.len);
 
-    // Bytes zwischen Nutzlast-Ende und dem memset-Limit (Index UDP_TX_BUF_SIZE)
-    // sind genullt.
-    for (int i = 2 + f.len; i <= UDP_TX_BUF_SIZE; i++)
+    // GEFIXT (TXRING-CLEARSLOT-GAP): clearSlotFirst putzt jetzt den GESAMTEN
+    // Slot (sizeof statt UDP_TX_BUF_SIZE+1) -- alle Bytes vom Nutzlast-Ende
+    // bis zum Slot-Ende sind genullt, auch die frueher vergessenen letzten 4.
+    for (int i = 2 + f.len; i < (int)sizeof(ringBuffer[0]); i++)
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBuffer[slot][i], "sollte genullt sein");
-
-    // TXRING-CLEARSLOT-GAP: die letzten 4 Byte des Slots (Index
-    // UDP_TX_BUF_SIZE+1 .. UDP_TX_BUF_SIZE+4) bleiben trotz clearSlotFirst=true
-    // beim Alt-Muster 0xFF -- aktuelles (nicht gefixtes) Verhalten.
-    for (int i = UDP_TX_BUF_SIZE + 1; i < UDP_TX_BUF_SIZE + 5; i++)
-        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0xFF, ringBuffer[slot][i], "TXRING-CLEARSLOT-GAP");
 }
 
 // ----------------------------------------------------- Test 9: N-14-Regression + Stress

@@ -233,7 +233,10 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     r = iRead;
 
     if(clearSlotFirst)
-        memset(ringBuffer[w], 0x00, UDP_TX_BUF_SIZE+1);
+        // sizeof statt UDP_TX_BUF_SIZE+1: der Slot ist UDP_TX_BUF_SIZE+5 Byte
+        // gross -- das alte Limit liess die letzten 4 Byte ungeputzt
+        // (TXRING-CLEARSLOT-GAP, von test_txring gefunden).
+        memset(ringBuffer[w], 0x00, sizeof(ringBuffer[0]));
 
     ringBuffer[w][0] = (uint8_t)len;
     ringBuffer[w][1] = ring_status;
