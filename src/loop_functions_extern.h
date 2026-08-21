@@ -214,6 +214,12 @@ extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
 extern uint32_t ringEnqueueTime[MAX_RING];     // millis() timestamp when enqueued
 
+// N-14: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
+// (ein Default darf pro Parameter nur einmal je Uebersetzungseinheit stehen);
+// diese Zeile deckt nur TUs ab, die ausschliesslich dieses Extern-Header ziehen.
+int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
+                    const char* source, int retryCountIn, bool clearSlotFirst);
+
 extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;

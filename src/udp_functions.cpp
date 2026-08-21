@@ -351,12 +351,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 // store last message to compare later on
                 insertOwnTx(aprsmsg.msg_id);
 
-                ringBuffer[iWrite][0] = size;
-                ringBuffer[iWrite][1] = 0xFF; // no retransmission for UDP relay messages
-                memcpy(ringBuffer[iWrite] + 2, convBuffer, size);
-
-                retryCount[iWrite] = 0;
-                addTxRingEntry("udp_rx");
+                addTxRingEntry(convBuffer, (uint16_t)size, 0xFF, "udp_rx", 0); // 0xFF no retransmission for UDP relay messages
 
                 addLoraRxBuffer(aprsmsg.msg_id, true);
 

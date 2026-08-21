@@ -468,12 +468,7 @@ int NrfETH::getUDP()
                   // store last message to compare later on
                   insertOwnTx(aprsmsg.msg_id);
 
-                  ringBuffer[iWrite][0] = size;
-                  ringBuffer[iWrite][1] = RING_STATUS_DONE; // fire-and-forget, no retransmission for UDP relay
-                  memcpy(ringBuffer[iWrite] + 2, convBuffer, size);
-
-                  retryCount[iWrite] = 0;
-                  addTxRingEntry("udp_rx");
+                  addTxRingEntry(convBuffer, size, RING_STATUS_DONE, "udp_rx", 0); // fire-and-forget, no retransmission for UDP relay
 
                   addLoraRxBuffer(aprsmsg.msg_id, true);
 
