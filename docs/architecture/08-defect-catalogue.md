@@ -1102,6 +1102,28 @@ N-20-BACKLOG-Box).
 
 ---
 
+### N-24 — Indirekte Prio-Eviction verwaiste einen belegten TX-Ring-Slot — **FIXED (`cf74e08e`, von der neuen Testsuite gefunden)** — High
+
+Gefunden am Entstehungstag der nativen TX-Ring-Suite (`test/test_txring/`,
+QA-Welle 2026-08-22): die beiden Ueberlauf-Pfade in `addTxRingEntry()`
+stimmten sich nicht ab. Die Prio-Eviction raeumt den Slot mit der
+schlechtesten Prioritaet IRGENDWO im Fenster; der anschliessende unbedingte
+"ring full: advance read pointer"-Block prueft nur die Index-Kollision.
+Raeumte die Eviction einen Mittel-Slot, blieb der Slot an `iRead` belegt,
+`iRead` wurde trotzdem darueber hinweggeschoben — eine gueltige, nie
+gesendete Nachricht (moeglicherweise CRITICAL) fiel dauerhaft aus dem
+Scan-Fenster von `getNextTxSlot()`, ohne `stat_drop_count`-Buchung.
+Vorbestehend (identisch vor dem N-14-Umbau); deterministisch reproduziert
+im Test `test_n24_indirekte_eviction_verwaist_keinen_slot`.
+
+Fix: raeumt die Eviction einen Slot ungleich `iRead`, zieht der Eintrag von
+`iRead` in den freigewordenen Slot um (Slot-memcpy + Seitenarrays), der
+`iRead`-Slot wird geleert und regulaer weitergerueckt. Preis: FIFO-Rang-
+Verlust innerhalb gleicher Prioritaet, akzeptiert gegen Totalverlust.
+Nebenfund ebenfalls gefixt (`a0bcd9da`): `clearSlotFirst` putzte nur 256
+von 260 Slot-Bytes. Beleg fuer den Zweck der QA-Welle: die erste native
+Suite ueber dem Ring fand am ersten Tag einen echten High-Defekt.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
