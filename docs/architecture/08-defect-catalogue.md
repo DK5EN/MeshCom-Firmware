@@ -873,6 +873,29 @@ umgeht die Funktion, statt sie zu reparieren.
 > exakte Fundstelle des "mark=5"-Freezes (posinfo/heyinfo/telemetry-Abschnitt) ist
 > weiterhin unbenannt; die W5100S-Bibliotheks-Warteschleifen selbst (Socket-Ops,
 > `maintain()`) sind ungehaertet.
+>
+> **BACKLOG (2026-08-22): W5100S-Warteschleifen-Haertung + Fault-Injection-Test.**
+> Restrisiko: Link-Verlust MITTEN in einer Socket-Operation (`beginPacket`/
+> `write`/`endPacket` in `sendUDP()`, `parsePacket` in `getUDP()`, interne
+> Status-Polls der RAK13800-Bibliothek) kann den Loop-Task weiterhin
+> nichtdeterministisch haengen lassen — der bestandene Soak-Test war EIN
+> Durchlauf mit EINEM Timing. Testrezept (das reine "UDP-Frames zum Node
+> senden waehrend unplug/replug" reicht nicht):
+>
+> 1. **Bidirektionale Dauerlast**, damit der Flap eine aktive Socket-Op
+>    trifft: Mesh-Nachrichten im 1–2-s-Takt (Gateway laedt jede per DATA
+>    hoch), EXTUDP on (zusaetzlicher Sendepfad), Server-Rueckverkehr
+>    (BEAT/GATE) laeuft mit.
+> 2. **Viele Flaps mit zufaelliger Phase**: Kabel ≥20-mal ziehen/stecken,
+>    Haltezeiten variieren (2 s bis 2 min) — der historische Haenger war
+>    nichtdeterministisch (ein Boot hing minutenlang, der naechste lief).
+> 3. **Loop-Alive-Monitor** parallel auf Serial: periodisches Kommando-Echo
+>    (z. B. `--pos` alle 10 s); Stall > 5 s = Befund. Nach dem Lauf
+>    `RESETREAS` pruefen (0x4 = Absturz statt Haenger).
+>
+> Haertungsrichtung bleibt wie dokumentiert: Netzwerk-Abschnitte an
+> `Ethernet.linkStatus()` koppeln, bevor Socket-Ops laufen; Timeouts um die
+> RAK13800-Statusschleifen (Bibliotheks-Fork oder Wrapper).
 
 Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
 nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,
