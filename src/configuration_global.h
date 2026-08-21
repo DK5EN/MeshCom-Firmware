@@ -27,7 +27,7 @@ inline bool isNodeUnconfigured(const char *call)
 }
 #endif
 
-#define FLASH_VERSION 20260724
+#define FLASH_VERSION 20260821
 
 //Hardware Types
 #define TLORA_V2 1
