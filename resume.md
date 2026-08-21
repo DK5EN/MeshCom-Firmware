@@ -599,11 +599,48 @@ gruen bis auf das vorbestehend kaputte `esp32-safeboot`), `pio test -e native` g
 - ~~`N-15`~~ — kein Code-Fix noetig, bereits durch `CONC-14` (2026-08-18) geschlossen; nie
   re-verifiziert, jetzt nachgeholt.
 
-**Noch nicht auf echter Hardware getestet** — der aktuelle Uebergabepunkt: alle sieben
-Commits sind gebaut, aber `wiscore_rak4631` war waehrend dieser Session nicht am
-USB angeschlossen (`ls /dev/cu.*` zeigte kein `usbmodem`). Naechster Schritt: Board
-anschliessen, flashen, `--dfu` verifizieren (aus `7bac915a`, ebenfalls noch ungetestet),
-dann Boot/BLE/LoRa-TX-RX pruefen.
+**Auf Hardware getestet, 2026-08-21 — alle sieben Commits verifiziert.** `wiscore_rak4631`
+angeschlossen, geflasht (`Device programmed.`), Rufzeichen/BTCODE/Settings haben den Flash
+ueberlebt. Ueber ~90 s Laufzeit beobachtet:
+
+- Boot sauber, kein Boot-Loop, BLE initialisiert (`MC-690d-DK5EN-90`), kein Ethernet-Kabel
+  (erwartetes `Failed to configure Ethernet` bleibt ohne Folgen).
+- Reale LoRa-RX empfangen, dedupliziert, ueber `RELAY_QUEUED`/`RING_WRITE` in den TX-Ring
+  gestellt.
+- Reale LoRa-TX gesendet (`CAD_SCAN` → `TX-LoRa` → `OnTXDone` → zurueck nach
+  `RX_LISTEN`) — **durchlaeuft direkt den N-16-Fix** (`Radio.Send()` unter
+  `vTaskSuspendAll()`), zweimal beobachtet (einmal vor, einmal nach dem `--dfu`-Vorfall
+  unten), beide Male sauber ohne Haenger.
+- `--info` ueber Seriell beantwortet korrekt (Rufzeichen, Batterie 4.25 V/100 %,
+  Flash-Version, Frequenz) — **durchlaeuft den DRY-22-Fix**
+  (`checkSerialCommand()`).
+- `CONC-17`/`CONC-15`/`CONC-18`: kein Crash/Hang ueber die gesamte Laufzeit; direkte
+  BLE-Settings-Schreib-Verifikation (Telefon-App) nicht durchgefuehrt, keine App zur Hand.
+- `CONC-16`: auf `wiscore_rak4631` nicht gelinkt (siehe Commit-Notiz), daher auf diesem
+  Board nicht pruefbar.
+
+> **Neuer Befund — `--dfu` haengt sich auf, statt in den UF2-Bootloader zu wechseln.**
+> `--dfu` gesendet (Befehl aus `7bac915a`, gestern committet, dort selbst als "auf
+> Hardware noch ungetestet" vermerkt). Ergebnis: die serielle Konsole verstummte
+> vollstaendig (fuenf verschiedene Leseversuche ueber ~50 s: `cat`, `stty`+`cat`,
+> `pio device monitor`, `pyserial` mit gesetztem DTR/RTS, verlaengertes passives
+> Lauschen — durchweg 0 Bytes), aber der USB-Deskriptor zeigte weiterhin die
+> Applikations-PID `0x8029` (`ioreg`), nie die Bootloader-PID `0x0029`, und
+> `/Volumes/RAK4631` erschien nie. Weder normaler Betrieb noch Bootloader — das Board war
+> haengengeblieben. Ein einzelner Tastendruck auf Reset (durch den Benutzer, kein
+> physischer Zugriff meinerseits) hat es vollstaendig zurueckgeholt: wieder
+> Applikations-PID, serielle Konsole sofort wieder aktiv, RX/TX/Settings unveraendert
+> intakt — kein Datenverlust, kein Soft-Bricking.
+>
+> `enterUf2Dfu()` (`cores/nRF5/wiring.c:98`) ruft `sd_softdevice_disable()` vor
+> `NVIC_SystemReset()` auf; ob genau das der Haenger-Punkt ist, ist nicht verifiziert —
+> nur das Symptom (kein Reset, kein Bootloader, stumme Konsole) ist belegt. Der
+> aufrufende Codepfad in `nrf52loop()` (`bEnterDfu`-Zweig, `rebootAuto`) liegt ausserhalb
+> jeder in dieser Session neu eingefuehrten Critical Section — der Fund ist also nicht
+> durch die heutigen Aenderungen verursacht, sondern ein vorbestehender, jetzt zum ersten
+> Mal beobachteter Bug in gestrigem `7bac915a`. **`--dfu` bis zur Untersuchung nicht
+> verwenden** — physischer Reset bleibt der einzige verifiziert funktionierende Weg in
+> den Bootloader diese Session.
 
 ### 2026-08-20 — Wave 0.4/0.2 auf wiscore_rak4631, `CFG-01` neu gefunden
 
