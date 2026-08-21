@@ -574,6 +574,40 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (vierter Durchgang) — Ethernet-Kabel am RAK, `N-20`-Hauptfix, Dual-Node-Funktest
+
+Benutzer hat ein Ethernet-Kabel an den RAK4631 (RAK13800-Modul war die ganze Zeit
+bestueckt!) und einen Heltec V3 als zweiten Bench-Node angeschlossen.
+
+- **Heltec V3 eingerichtet:** aktueller Kampagnen-Build geflasht (vorher Juli-Build
+  mit Restkonfiguration als `DK5EN-98` — Rufzeichen-Duplikat zur Produktion!),
+  Rufzeichen `DK5EN-91` gesetzt, `--loradebug on`, WLAN ORBI63 verbunden
+  (192.168.68.69, Webserver on, **Gateway bewusst off** — die Produktion `DK5EN-98`
+  bleibt der einzige Cloud-Gateway). Achtung Bench-Eigenheit: jedes Oeffnen des
+  seriellen Ports resettet den Heltec (CP2102-Autoreset); Kommandos erst nach
+  `CLIENT STARTED` senden.
+- **Dual-Node-Funktest** (Gruppe `9999` + DM-Matrix an -12/-90/-91/-98/-99):
+  Gruppen-Nachrichten beider Nodes mit Gateway-ACK; DMs an `DK5EN-98` direkt
+  geackt, an `DK5EN-99` via Mesh-Relay ueber -98 geackt, `DK5EN-12` offline (kein
+  ACK, erwartbar). Bench-Paar hoert sich mit −18…−20 dBm (Saettigung — die einzige
+  Anomalie, ein nicht dekodiertes ACK 91→90-Richtung, ist damit erklaerbar);
+  `DK5EN-98` bei −54…−59 dBm; Fern-Nodes (DL2JA-2, OE1XAR-33) −109…−112 dBm.
+  Beim ersten Anlauf war der RAK-Loop komplett eingefroren (N-20, Gateway-Config
+  ohne Link) — Zeitstempel stand, TX-Ring 19/20 voll, das erzeugte ACK an -91
+  wurde nie gesendet.
+- **`N-20`-Hauptfix (`780df254`):** `startETH()` prueft den Link (begrenzt 3 s
+  wartend, PHY-Aushandlung nach HW-Reset!) VOR dem blockierenden
+  `Ethernet.begin(10 s)`; der periodische Reconnect nutzt `resetDHCP()` statt
+  `initethDHCP()` (das alte volle HW-Init resettete den PHY bei jedem Versuch —
+  mit Link-Check waere das eine Endlosschleife gewesen, auf Hardware beobachtet
+  und behoben). Verifiziert ohne Link (skip in <=3 s, Loop responsiv) und mit
+  Link (DHCP-IP 192.168.68.68, KEEP-Heartbeats zum OE-Server, NTP-Sync,
+  Webserver HTTP 200). **Offen: Soak-Test Kabel ziehen/stecken im Betrieb.**
+- **Kosmetik-Fix (`ec033cb8`):** `Ethernet.localIP()` wurde als Roh-Integer
+  geloggt ("1145350336"), jetzt dezimal.
+- RAK-Konfiguration wieder im Originalzustand: Gateway on, EXTUDP on,
+  Webserver on — als Gateway am OE-Server-Backend verbunden.
+
 ### 2026-08-21 (dritter Durchgang) — `N-21` aufgeklaert: kein USB-Bug, sondern eingefrorener Loop-Task (= `N-20`)
 
 Auftrag: "investigate: the CDC host→board direction died mid-session while
