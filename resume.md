@@ -574,6 +574,36 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-22 (zwoelfter Durchgang) — QA-Welle 1: Orakel in CI, TX-Ring nativ getestet (fand sofort N-24), Mock-Server, Ressourcen-Waechter
+
+Orchestrierte Welle auf Benutzerauftrag ("i really don't trust the code, we
+must have automated testing"), alle Streams committed + gepusht:
+
+- **CI (`7609f589`):** native_aprs (das komplette Orakel) laeuft jetzt im
+  Unit-Test-Job — lief vorher nur lokal.
+- **TX-Ring nativ testbar (`6eb6929e`):** Verbatim-Extraktion des Ring-Kerns
+  nach `src/txring_functions.cpp` (freigegeben), `test/test_txring/` mit 11
+  Tests (Prio-Klassifizierung komplett, Overflow/Eviction/Drop, Wrap,
+  N-14-Invarianten, 200-Schritte-Stress mit Torn-Write-Pruefung).
+  **Die Suite fand am ersten Tag einen echten High-Defekt: N-24** —
+  indirekte Eviction verwaiste einen belegten Slot (nie gesendete, ggf.
+  CRITICAL-Nachricht unsichtbar + unbilanziert). **Gefixt `cf74e08e`**
+  (Umzug des iRead-Eintrags in den freigeraeumten Slot, unter dem
+  N-14-Lock), Nebenfund clearSlotFirst-Luecke gefixt `a0bcd9da`. Bench-
+  Smoke nach Extraktion UND nach Fix (DM + Heltec-ACK ueber Funk+Server).
+- **Mock-MeshCom-Server (`a55bd404`):** `tools/mock/` — Server-Testdouble
+  fuer Port 1990 (KEEP-Registry, byte-genaues BEAT, DATA-Validierung mit
+  GATE-Redistribution, CONF-TLV-Builder), 12 stdlib-unittest-Faelle mit
+  echten Korpus-Frames. Dabei doc-11-Praezisierung: MAX_ZEROS prueft nur
+  den ABSCHLIESSENDEN 2-Byte-alignten Null-Lauf (in §2.2 eingearbeitet).
+- **Ressourcen-Waechter (`4d8cb787`):** `tools/resource_watch.py` +
+  `tools/resource_baseline.json` (4 Envs geseedet) + CI-Schritt
+  (Report-only, ::warning bei Wachstum/Headroom-Schwelle). Ersetzt
+  ram_snapshot.py (C-12).
+
+Offen in dieser Welle: /fable-review ueber die Testsuite + Umsetzung der
+Findings (Welle 2, laeuft an).
+
 ### 2026-08-22 (elfter Durchgang) — N-20-Fault-Injection-Soak BESTANDEN, Mock-Peer als Testrig
 
 Kabel-Flap-Soak nach dem Backlog-Rezept, Benutzer zog/steckte das Kabel:
