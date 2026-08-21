@@ -778,6 +778,34 @@ int NrfETH::startETH()
 
   printlndeb("\nInitialize Ethernet"); // start the Ethernet connection.
 
+  // N-20: Ohne Link ist Ethernet.begin() ein blockierender DHCP-Versuch gegen
+  // ein totes Kabel (10 s Timeout, in der W5100S-Bibliothek nichtdeterministisch
+  // auch deutlich laenger) — und dieser Pfad laeuft nicht nur im Setup, sondern
+  // periodisch aus nrf52loop() (initethDHCP/resetDHCP alle MAX_HB_RX_TIME).
+  // Der Link-Status ist ein einzelnes SPI-Registerlesen: erst pruefen und nur
+  // bei vorhandenem Link den blockierenden Teil starten.
+  //
+  // Wichtig: die Aufrufer laufen ueber initETH_HW(), das den W5100S per
+  // Hardware-Reset neu startet — die PHY-Aushandlung braucht danach 1–3 s.
+  // Deshalb begrenzt auf LinkON warten (max. 3 s in 100-ms-Schritten) statt
+  // sofort abzubrechen; ein Sofort-Check meldet nach dem Reset immer LinkOFF
+  // und wuerde die Wiederverbindung dauerhaft verhindern (auf Hardware
+  // beobachtet). Nur das explizite LinkOFF bricht ab — Unknown (z.B. Modul
+  // fehlt/liefert Muell) laeuft in den bestehenden Pfad samt
+  // EthernetNoHardware-Erkennung.
+  EthernetLinkStatus elink = Ethernet.linkStatus();
+  uint32_t linkWait = millis();
+  while (elink == LinkOFF && (uint32_t)(millis() - linkWait) < 3000)
+  {
+    delay(100);
+    elink = Ethernet.linkStatus();
+  }
+  if (elink == LinkOFF)
+  {
+    printlndeb("Ethernet link OFF - skip DHCP");
+    return 2;
+  }
+
   if (Ethernet.begin(macaddr, 10000UL) == 0)
   {
     printlndeb("Failed to configure Ethernet using FIX/DHCP");
