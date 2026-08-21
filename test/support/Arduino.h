@@ -88,6 +88,12 @@ public:
     explicit String(unsigned int v) : s_(std::to_string(v)) {}
     explicit String(long v) : s_(std::to_string(v)) {}
     explicit String(char c) : s_(1, c) {}
+    String(double v, unsigned char decimals)
+    {
+        char buf[33];
+        snprintf(buf, sizeof(buf), "%.*f", (int)decimals, v);
+        s_ = buf;
+    }
 
     unsigned int length() const { return (unsigned int)s_.size(); }
     const char *c_str() const { return s_.c_str(); }

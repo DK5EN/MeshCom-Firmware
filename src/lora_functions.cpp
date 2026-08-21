@@ -1208,8 +1208,23 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                         // GATEWAY action before MESH
                         // and not MESHed from another Gateways
+                        bool bHeyReportAppended = false;
                         if(bGATEWAY && (!aprsmsg.msg_server || aprsmsg.payload_type == '@'))  // HEY always send to Server
                         {
+                            if(aprsmsg.payload_type == '@')
+                            {
+                                // append own signal report (NCT,RSSI,SNR) before UDP out, so the
+                                // server gets the same report the mesh gets — the relay path below
+                                // skips its append (RcvBuffer is re-encoded there anyway)
+                                appendHeySignalReport(aprsmsg, rssi, snr, getMheardCount());
+                                bHeyReportAppended = true;
+
+                                memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
+                                size = encodeAPRS(RcvBuffer, aprsmsg);
+                                if(size + 2 > UDP_TX_BUF_SIZE)
+                                    size = UDP_TX_BUF_SIZE - 2;
+                            }
+
                             addNodeData(RcvBuffer, size, rssi, snr);
                         }
 
@@ -1270,15 +1285,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     aprsmsg.msg_source_path.concat(meshcom_settings.node_call);
                                 }
 
-                                if(aprsmsg.payload_type == '@')
-                                {
-                                    aprsmsg.msg_payload.concat(String(getMheardCount()));
-                                    aprsmsg.msg_payload.concat(',');
-                                    aprsmsg.msg_payload.concat(String(rssi*-1.0, 0));
-                                    aprsmsg.msg_payload.concat(',');
-                                    aprsmsg.msg_payload.concat(String(snr));
-                                    aprsmsg.msg_payload.concat(';');
-                                }
+                                if(aprsmsg.payload_type == '@' && !bHeyReportAppended)
+                                    appendHeySignalReport(aprsmsg, rssi, snr, getMheardCount());
                                 
                                 memset(RcvBuffer, 0x00, UDP_TX_BUF_SIZE);
 
