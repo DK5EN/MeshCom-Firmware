@@ -44,8 +44,16 @@ typedef bool boolean;
 // Header-only (C++17 inline variables), damit keine separate
 // Uebersetzungseinheit noetig ist — `pio test` wuerde sie nicht zuverlaessig
 // einsammeln.
-
-inline unsigned long mc_test_clock_ms = 0;
+//
+// Verdict Finding 6: uint32_t statt unsigned long. Auf dem nativen 64-Bit-
+// Build ist `unsigned long` 8 Byte breit -- ein Ueberlauf bei 2^32 fand
+// bislang gar nicht in der Uhr selbst statt, sondern taeuschend aehnlich nur
+// durch die Kuerzung beim Vergleich mit TEST_ASSERT_EQUAL_UINT32 (4 Byte).
+// Echte Zeitlogik nahe UINT32_MAX (auf der Hardware ist millis() 32 Bit breit)
+// wurde damit gegen ein Artefakt der Assert-Kuerzung getestet, nicht gegen
+// einen echten Wrap. Mit uint32_t als Speichertyp wickelt die Addition in
+// mc_test_advance_millis() selbst physisch um.
+inline uint32_t mc_test_clock_ms = 0;
 
 inline unsigned long mc_test_millis(void) { return mc_test_clock_ms; }
 inline void mc_test_set_millis(unsigned long ms) { mc_test_clock_ms = ms; }
@@ -156,6 +164,15 @@ public:
     }
     String substring(unsigned int from, unsigned int to) const
     {
+        // Verdict Finding 8d: echtes Arduino WString.cpp vertauscht from/to,
+        // wenn from>to ist (statt "" zu liefern, wie dieser Shim es vorher
+        // tat) -- hier nachgezogen, damit der Shim dasselbe Verhalten zeigt.
+        if (from > to)
+        {
+            unsigned int tmp = from;
+            from = to;
+            to = tmp;
+        }
         if (from >= s_.size() || to <= from)
             return String();
         if (to > s_.size())

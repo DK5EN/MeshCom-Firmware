@@ -24,7 +24,7 @@ bool bDisplayInfo = false;
 bool bDisplayCont = false;
 bool bLORADEBUG = false;
 bool bMESH = true;
-uint8_t BOARD_HARDWARE = 9;   // RAK4631 (wie auf der Bench)
+int BOARD_HARDWARE = 9;   // RAK4631 (wie auf der Bench) -- int statt uint8_t: ODR-Begruendung siehe test_txring.cpp (Verdict Finding 4)
 int getMOD(void) { return 3; }
 void printAsciiBuffer(unsigned char *buf, int len) { (void)buf; (void)len; }
 

@@ -217,6 +217,20 @@ void advanceIReadPastEmpty(void)
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst)
 {
+    // Verdict Finding 3: defensive Invariante. Alle heutigen Aufrufer sind auf
+    // <=255 begrenzt -- encodeAPRS() klemmt intern auf UDP_TX_BUF_SIZE, der
+    // Radio-Empfang liefert hoechstens die Modul-Obergrenze von 255 Byte, und
+    // der Retransmit-Pfad liest die Laenge aus einem uint8 -- aber diese
+    // Grenze lebt bislang ausschliesslich in den Aufrufern und wird am
+    // einzigen Engpass (hier) nicht erzwungen. Ein kuenftiger Aufrufer mit
+    // len > UDP_TX_BUF_SIZE wuerde per memcpy in den Nachbarslot schreiben,
+    // und die Kuerzung auf (uint8_t)len beim Ablegen in ringBuffer[w][0]
+    // koennte den Eintrag zusaetzlich als kurz/leer tarnen. len==0 waere ein
+    // funktionsloser Ring-Eintrag. Beides wird hier abgewiesen, bevor der Ring
+    // ueberhaupt beruehrt wird.
+    if(len == 0 || len > UDP_TX_BUF_SIZE)
+        return -1;
+
     int w, r, queued;
     uint8_t msgType, prio;
     uint32_t mid;

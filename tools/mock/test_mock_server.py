@@ -191,6 +191,37 @@ class TestDataHeaderValidation(ServerTestCase):
                 gate, _addr = self.sock_b.recvfrom(4096)
                 self.assertEqual(gate, b"GATE" + frame)
 
+    def test_accepts_hand_written_header_literal_via_raw_socket(self) -> None:
+        """Finding 5: every other DATA test builds its datagram through
+        mock_client.build_data() and lets the server parse it -- a shared
+        encoder/decoder bug (e.g. a wrong field width both sides agree on)
+        could drift together and never be caught. This test bypasses
+        build_data() entirely: the 36-byte header is hand-assembled here
+        and sent via a plain socket.sendto(), so only the server's parser
+        (parse_data_header / DATA_HEADER_LEN) is exercised.
+
+        doc 11 sec 2.1 layout, widths 4+8+9+4+1+4+4+2 = 36:
+          "DATA" + %08X gw_id + %-9.9s callsign + %-4.4s version + %-1.1s sub
+                 + %4i rssi + %4i snr + 2 ASCII modulation digits
+        """
+        header = (
+            b"DATA"  # 4B  indicator
+            b"1A2B3C4D"  # 8B  %08X gateway_id
+            b"OE0XXX-1 "  # 9B  %-9.9s callsign: "OE0XXX-1" (8) + 1 pad space
+            b"4.35"  # 4B  %-4.4s version
+            b"p"  # 1B  %-1.1s sub
+            b" -80"  # 4B  %4i rssi = -80  (" -80")
+            b"   7"  # 4B  %4i snr  =   7  ("   7")
+            b"03"  # 2B  2 ASCII modulation digits
+        )
+        self.assertEqual(len(header), srv.DATA_HEADER_LEN)
+
+        frame = load_corpus_frame("f001")
+        self.sock_a.sendto(header + frame, self.server_addr)  # raw socket, not cli.build_data
+
+        gate, _addr = self.sock_b.recvfrom(4096)
+        self.assertEqual(gate, b"GATE" + frame)
+
     def test_rejects_wrong_length_header(self) -> None:
         short_data = b"DATA1234567"  # 11 bytes, far short of the 36-byte header
         self.sock_a.sendto(short_data, self.server_addr)
@@ -260,20 +291,105 @@ class TestConfBuilder(ServerTestCase):
 
         self.assertEqual(datagram, bytes(expected))
 
-    def test_send_conf_delivers_same_bytes(self) -> None:
+    def test_send_conf_matches_hand_written_literal(self) -> None:
+        """Finding 5: the old version of this test only compared the
+        received bytes against send_conf()'s own return value -- a
+        tautological round-trip of the same bytes object over loopback that
+        can never fail even if build_conf_datagram() and the server both
+        drift together. This version derives the expected datagram by hand
+        from doc 11 sec 2.2's TLV layout and checks BOTH the builder output
+        and the bytes actually placed on the wire against it.
+
+        Field values: callsign="OE0XXX-1" (8B), shortname="XX1" (3B),
+        lat=473512340 (positive), lon=-164712345 (negative, exercises two's
+        complement), alt=1234.
+
+        int32 LE encoding worked out by hand:
+          lat   473512340 = 0x1c393994 (BE) -> LE bytes 94 39 39 1c
+          lon  -164712345 -> unsigned32 = 2**32 + lon = 4130254951
+                            = 0xf62eb067 (BE) -> LE bytes 67 b0 2e f6
+          alt         1234 = 0x000004d2 (BE) -> LE bytes d2 04 00 00
+        """
+        literal = (
+            b"CONF"
+            + b"\x00\x08OE0XXX-1"  # 0x00, len=8, "OE0XXX-1"
+            + b"\x01\x03XX1"  # 0x01, len=3, "XX1"
+            + b"\x02\x94\x39\x39\x1c"  # 0x02, lat  473512340 LE
+            + b"\x03\x67\xb0\x2e\xf6"  # 0x03, lon -164712345 LE
+            + b"\x04\xd2\x04\x00\x00"  # 0x04, alt        1234 LE
+        )
+
+        # 1) the builder's output must equal the hand-written literal.
+        built = srv.build_conf_datagram(
+            "OE0XXX-1", "XX1", 473512340, -164712345, 1234
+        )
+        self.assertEqual(built, literal)
+
+        # 2) the bytes actually sent over the wire by the server must equal
+        #    it too -- this is what the tautological version never checked.
         sock = free_udp_socket()
         self.addCleanup(sock.close)
         addr = sock.getsockname()
 
-        sent = self.server.send_conf(addr, "DK5EN-90", "DK5", 1, -1, 100)
+        sent = self.server.send_conf(addr, "OE0XXX-1", "XX1", 473512340, -164712345, 1234)
         received, _addr = sock.recvfrom(4096)
 
-        self.assertEqual(received, sent)
-        self.assertTrue(received.startswith(b"CONF"))
+        self.assertEqual(sent, literal)
+        self.assertEqual(received, literal)
 
 
 # ---------------------------------------------------------------------------
-# 6. KEEP parsing edge case: callsign shorter than 9 chars, space-padded
+# 6. Registry expiry (_expire_clients / registry_ttl)
+# ---------------------------------------------------------------------------
+
+
+class TestRegistryExpiry(unittest.TestCase):
+    def test_expired_client_removed_and_not_forwarded_to(self) -> None:
+        server = srv.MockMeshComServer(
+            "127.0.0.1", 0, callsign="MOCK-SRV", verbose=False, registry_ttl=0.2
+        )
+        server.start()
+        self.addCleanup(server.stop)
+        addr = ("127.0.0.1", server.port)
+
+        sock_a = free_udp_socket()
+        self.addCleanup(sock_a.close)
+        sock_a.sendto(cli.build_keep(0x11111111, "NODE-A"), addr)
+        sock_a.recvfrom(4096)  # BEAT
+        wait_until(lambda: len(server.clients) == 1)
+
+        # _expire_clients() runs lazily, at the top of _handle_datagram, on
+        # every received packet -- there is no background timer. Poll past
+        # the 0.2s TTL by sending harmless traffic (too short to be a valid
+        # KEEP/DATA, but still long enough to run the expiry sweep) until
+        # the registry (the documented accessor: server.clients) empties,
+        # capped at ~1s.
+        def a_expired() -> bool:
+            sock_a.sendto(b"\x00", addr)
+            return len(server.clients) == 0
+
+        self.assertTrue(wait_until(a_expired, timeout=1.0, interval=0.05))
+        self.assertEqual(len(server.clients), 0)
+
+        # Register a fresh client B and confirm the (now-expired) A gets
+        # nothing when B sends DATA -- the registry no longer has an entry
+        # to forward it to.
+        sock_b = free_udp_socket()
+        self.addCleanup(sock_b.close)
+        sock_b.sendto(cli.build_keep(0x22222222, "NODE-B"), addr)
+        sock_b.recvfrom(4096)  # BEAT
+        wait_until(lambda: len(server.clients) == 1)
+
+        frame = load_corpus_frame("f001")
+        sock_b.sendto(cli.build_data(0x22222222, "NODE-B", frame), addr)
+
+        sock_a.settimeout(0.3)
+        with self.assertRaises(socket.timeout):
+            sock_a.recvfrom(4096)
+
+
+# ---------------------------------------------------------------------------
+# 7. KEEP parsing edge case: callsign shorter than 9 chars, space-padded
 # ---------------------------------------------------------------------------
 
 
