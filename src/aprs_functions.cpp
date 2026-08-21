@@ -1121,6 +1121,19 @@ uint16_t encodeAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], struct aprsMessage &apr
     return inext;
 }
 
+// Append the per-hop HEY signal report "NCT,RSSI,SNR;" to a '@' payload.
+// NCT = mheard neighbour count, RSSI as positive number, SNR in dB.
+// Used by the mesh relay path and the gateway UDP upload (same wire format).
+void appendHeySignalReport(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr, int mheard_count)
+{
+    aprsmsg.msg_payload.concat(String(mheard_count));
+    aprsmsg.msg_payload.concat(',');
+    aprsmsg.msg_payload.concat(String(rssi*-1.0, 0));
+    aprsmsg.msg_payload.concat(',');
+    aprsmsg.msg_payload.concat(String(snr));
+    aprsmsg.msg_payload.concat(';');
+}
+
 // OE1KBC-17>APLT00-1,WIDE1-1,qAS,OE3CGG-10:!4807.01N/01619.20E[(T-ECHO by F4AVI)
 uint16_t encodeLoRaAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], char cSourceCall[10], double lat, char lat_c, double lon, char lon_c, int alt)
 {
