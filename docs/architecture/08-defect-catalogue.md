@@ -946,7 +946,27 @@ Schreibzugriffe aus dem Timer-Service-Task crashen das Board reproduzierbar in e
 Boot-Loop (waehrend der Untersuchung selbst ausgeloest und behoben) — Dateisystem nur
 aus dem Loop-Task anfassen.
 
-### N-22 — EXTUDP crasht den nRF52-Gateway nach jedem Nachrichtenversand (Soft-Reset) — **VERIFIED (auf echter Hardware, per Toggle isoliert)** — High
+### N-22 — ~~EXTUDP crasht den nRF52-Gateway~~ → Stack-Overflow im Loop-Task auf dem Nachrichtenpfad — **FIXED (`9ce62aa0`, auf echter Hardware gemessen und verifiziert)** — High
+
+> **STATUS 2026-08-21 (abends): GEFIXT, root cause gemessen.** Kein EXTUDP-Logik-Bug:
+> der Loop-Task auf nRF52 hat 4 KB Stack (`LOOP_STACK_SZ` im Adafruit-Core, hart
+> codiert), und der Pfad `checkSerialCommand()` → `sendMessage()` → `sendExtern()`
+> erreichte `uxTaskGetStackHighWaterMark(NULL) == 0` — Stack vollstaendig
+> aufgebraucht, Nachbar-RAM ueberschrieben, Crash Sekunden spaeter. EXTUDP war nur
+> der Ausloeser, weil `sendExtern()` die Pfadtiefe ueber die Kante schob; das
+> Nebensymptom "JSON-Datagramme kommen trotz rc=1-Sendekette nie an" gehoerte zum
+> selben Schadensbild. Eingrenzung: Peer-Verhalten per stillem Live-Listener
+> ausgeschlossen, Socket-Lebenszyklus instrumentiert (alle rc ok), dann
+> Watermark-Messung. Fix nach dem `1951aa7d`-Muster: die grossen Puffer des Pfads
+> auf nRF52 in BSS (`sendMessage()`: 200+200+300 B; `checkSerialCommand()`: 600 B) —
+> Watermark am selben Punkt danach **248 Woerter (~1 KB) frei**. Verifiziert auf dem
+> Gateway mit EXTUDP on: mehrere Nachrichten ohne Crash, `[EXT] Out`/`TX-UDP`/
+> `TX-LoRa` laufen, Datagramme kommen beim Peer an (nc-Listener). **Workaround
+> aufgehoben:** EXTUDP ist auf dem Bench-RAK wieder on, EXT IP wieder
+> 192.168.68.64. Merkposten fuer Upstream: `LOOP_STACK_SZ` ist mit 4 KB fuer diese
+> Firmware knapp bemessen — jede weitere Vertiefung des Nachrichtenpfads (weitere
+> `printfdeb`-Frames à ~900 B!) kann die Kante erneut reissen; `uxTaskGetStackHighWaterMark`
+> gehoert in kuenftige Bench-Diagnosen.
 
 Neu, gefunden 2026-08-21 nachmittags bei der Verifikation von `DRY-21`/`623c4c0e` —
 erst erreichbar, seit der Bench-RAK4631 echtes Ethernet mit Link hat. Vorbestehend,
@@ -969,10 +989,10 @@ root cause nicht weiter eingegrenzt (eigene Session; Kandidaten: Verarbeitung de
 ICMP-Port-Unreachable-Antwort eines toten EXT-Peers, Puffer im JSON-Pfad,
 Socket-Zustand des zweiten UDP-Sockets).
 
-**Workaround aktiv:** auf dem Bench-RAK ist `--extudp off` gesetzt (2026-08-21).
-**EXTUDP auf nRF52-Ethernet-Gateways bis zur Untersuchung nicht einschalten.**
-Boot-Log zeigt seit `6003e90c` die Reset-Ursache (`[BOOT] RESETREAS=…`), was
-kuenftige Vorfaelle dieser Klasse sofort als Absturz ausweist.
+**Workaround (historisch, aufgehoben):** `--extudp off` war vom Nachmittag bis zum
+Fix gesetzt. Boot-Log zeigt seit `6003e90c` die Reset-Ursache
+(`[BOOT] RESETREAS=…`), was kuenftige Vorfaelle dieser Klasse sofort als Absturz
+ausweist — und bei genau dieser Diagnose der Schluessel war.
 
 ---
 
