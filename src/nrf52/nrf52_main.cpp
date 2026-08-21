@@ -949,6 +949,7 @@ void nrf52setup()
 
     Serial.println("[INIT]...CLIENT STARTED");
 
+
     Radio.SetModem(MODEM_LORA);
 
     Serial.printf("[INIT]...Radio-Sync: %04X\n", Radio.GetSyncWord());
@@ -2845,19 +2846,23 @@ void sendUDP()
 
         if(!neth.udp_is_busy)
         {
-            uint16_t msg_len = ringBufferUDPout[udpRead][0];
-            
-            
-            if(msg_len != 23)
-            {
-                //Serial.printf("UDP TX out:%i len:%i\n", udpRead, msg_len);
-                //DEBUG_MSG_VAL("UDP", udpRead, "UDP TX out:");
-                //printBuffer(ringBufferUDPout[udpRead] + 1, msg_len);
-            }
-            
+            // CONC-16 (nRF52-Leser): der Schreiber addUdpOutBuffer() laeuft
+            // ueber addNodeData() im Timer-Service-Task (OnRxDone, siehe
+            // C-01) und kann diesen Slot per Ring-voll-Eviction ueberholen,
+            // waehrend hier gesendet wird. Laenge und Payload deshalb als
+            // Snapshot unter kurzem Lock lesen und den Index-Advance unten
+            // gegen ein zwischenzeitliches Vorruecken sichern — gleiche
+            // Behandlung wie sendMeshComUDP() in udp_functions.cpp (ESP32).
+            // Snapshot bewusst groesser als der Quell-Slot und nullgefuellt
+            // (siehe dortige Begruendung).
+            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64] = {0};
+            int mySlot = udpRead;
+            /*BISECT*/ memcpy(udpSnapshot, ringBufferUDPout[mySlot], sizeof(ringBufferUDPout[0]));
+
+            uint16_t msg_len = udpSnapshot[0];
 
             // send it over UDP
-            if (!neth.sendUDP(ringBufferUDPout[udpRead] + 1, msg_len))
+            if (!neth.sendUDP(udpSnapshot + 1, msg_len))
             {
                 Serial.printf("Sending UDP Packet failed <%i>!\n", msg_len);
 
@@ -2888,7 +2893,7 @@ void sendUDP()
                 // aktiv — Schreiber ist addUdpOutBuffer() via addNodeData(),
                 // auf Hardware am TX-UDP-Log verifiziert.)
                 uint16_t aprs_len = (msg_len > 36) ? (uint16_t)(msg_len - 36) : 0;
-                memcpy(convBuffer, ringBufferUDPout[udpRead] + 1 + 36, aprs_len);
+                memcpy(convBuffer, udpSnapshot + 1 + 36, aprs_len);
 
                 if(aprs_len > 0 && (convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40))
                 {
@@ -2912,12 +2917,17 @@ void sendUDP()
                 }
             }
 
-            // zero out sent buffer
-            memset(ringBufferUDPout[udpRead], 0, UDP_TX_BUF_SIZE);
-
-            udpRead++;
-            if (udpRead >= MAX_RING_UDP) 
-                udpRead = 0;
+            // zero out sent buffer and advance the read pointer under the same
+            // lock as the writer's addRingPointer() (CONC-16). Guard against a
+            // writer having already force-advanced udpRead past us via the
+            // ring-full eviction path while we were sending.
+            /*BISECT*/ if (udpRead == mySlot)
+            {
+                memset(ringBufferUDPout[mySlot], 0, UDP_TX_BUF_SIZE);
+                udpRead++;
+                if (udpRead >= MAX_RING_UDP)
+                    udpRead = 0;
+            }
 
         }
         else
