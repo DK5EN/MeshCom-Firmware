@@ -530,7 +530,8 @@ macht den 1200-Baud-Touch selbst.
    NAME, CTRY haben den Versionswechsel 20260324 → 20260724 unveraendert ueberstanden.
 4. **Kein Ethernet ist der Normalzustand** dieses Boards. `Failed to configure Ethernet
 using FIX/DHCP` + `GATEWAY 4.0 RUNNING ETH no connect` beim Boot sind **kein** Defekt;
-   der Boot dauert dadurch ~18 s laenger, haengt aber nicht.
+   der Boot dauert dadurch ~18 s laenger. (Ueberholt am 2026-08-21 nachmittags: die Init
+   **kann** doch haengen und blockiert die Loop periodisch — siehe `N-20`.)
 
 ### Neu gebaut, aber auf Hardware noch ungetestet
 
@@ -539,7 +540,9 @@ UF2-Bootloader, erreichbar per BLE/Seriell/Netz-Konsole. Der Sprung ist um 2 s v
 (Flag `bEnterDfu` ueber den `rebootAuto`-Pfad), damit die Quittung noch rausgeht. Damit
 sollte sich das Laufwerk kuenftig auch ohne physischen Zugriff erzeugen lassen — **das ist
 der erste Test fuer morgen**, denn ueber den Doppeldruck kam dieses Board nie in den
-UF2-Modus.
+UF2-Modus. _(Nachtrag 2026-08-21: der Test schlug fehl (`N-19`), der Befehl wurde am
+selben Tag repariert und zweimal end-to-end verifiziert — siehe den Abschnitt zum
+zweiten Durchgang.)_
 
 ### Offener Punkt: BLE vom Pi aus
 
@@ -571,10 +574,55 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (zweiter Durchgang) — `esp32-safeboot` gefixt, `N-19` gefixt, `N-20`/`N-21` neu
+
+Zwei Auftraege: den vorbestehend kaputten `esp32-safeboot`-Build reparieren und den
+`--dfu`-Haenger (`N-19`) auf der angeschlossenen Hardware untersuchen. Beides erledigt,
+zwei neue Befunde dokumentiert:
+
+- **`esp32-safeboot` gefixt (`e0f28bef`)** — kein Firmware-Bug, sondern
+  Paket-Ping-Pong: Tasmota-Fork und Mainline-`espressif32` teilen sich das
+  `framework-arduinoespressif32`-Verzeichnis; nach jedem Mainline-Build stuerzte der
+  naechste Tasmota-Build vor dem Compile ab (`TypeError ... NoneType` in
+  `arduino.py:555`, `get_package_dir()` liefert `None`) und heilte sich erst beim
+  zweiten Aufruf. Deterministisch reproduziert, Fix per pre-Skript
+  `tools/ensure_tasmota_framework.py` in beiden Safeboot-Envs (raeumt das fremde
+  Verzeichnis weg und installiert das Tasmota-Paket vor dem Builder). Alle vier
+  Flip-Richtungen verifiziert. **Keine Hardware noetig** — die Binaries selbst sind
+  unveraendert (`safeboot.bin`/`safeboot-s3.bin` nach den Verifikationsbuilds per
+  `git checkout` zurueckgesetzt).
+- **`N-19` gefixt (`b03b9a27`)** — `--dfu` haengt nicht mehr. Eingrenzung per
+  Ausschluss auf Hardware: `--reboot` (blankes `NVIC_SystemReset()` aus demselben
+  Loop-Pfad) funktioniert, der 1200-Baud-Touch (`reset_mcu()` aus dem TinyUSB-Task)
+  funktioniert — verdaechtig bleibt `sd_softdevice_disable()` im Loop-Kontext. Fix:
+  GPREGRET per SoftDevice-SVC setzen (`sd_power_gpregret_clr/set(0, 0x57)`) und in den
+  bewaehrten `NVIC_SystemReset()` durchfallen; `Serial.flush()` + `delay(300)` vor dem
+  Reset ist funktional noetig (ohne Wartezeit bootete das Board trotz korrektem
+  GPREGRET-Readback in die App). Zweimal in Folge verifiziert: `--dfu` → Bootloader-PID
+  `0x29` + `/Volumes/RAK4631`; Rueckweg per `firmware.uf2`-Kopie → App laeuft. Der
+  komplette Fern-Flash-Zyklus ohne physischen Zugriff ist damit bewiesen.
+- **`N-20` neu** — die Ethernet-Init blockiert auf Gateway-Nodes ohne Link
+  nichtdeterministisch: einmal blieb das Setup **minutenlang** nach
+  `Initialize Ethernet` stehen (Loop nie gestartet, Fernrettung per 1200-Baud-Touch),
+  und im Betrieb wiederholt sich die Init alle ~60–70 s aus der Loop und blockiert sie
+  je 8–12 s (`RX_TIMEOUT_FIRE delta=12426…13920` statt `4582`). Die Aussage vom
+  2026-08-21-Vormittag, der Ethernet-Fehlpfad "haengt nicht", ist damit ueberholt.
+  Nicht gefixt (Details: `08-defect-catalogue.md`).
+- **`N-21` neu** — die Host→Board-Richtung der USB-CDC starb im Test binnen ~1 min nach
+  einem erfolgreichen `--info`, waehrend Board→Host weiterlief; mit drei Sendemethoden
+  belegt. Vorbestehende Symptomklasse (motivierte `--dfu` urspruenglich). Nicht
+  gefixt. Praktische Folge fuer Bench-Arbeit: wenn CDC-RX tot ist, bleibt der
+  1200-Baud-Touch der verlaessliche Fernweg in den Serial-DFU-Bootloader (heute zweimal
+  als Rettung genutzt), danach `pio run -e wiscore_rak4631 --target upload`.
+
+Verifikation des Durchgangs: `wiscore_rak4631` (mit `-Werror`), `t_echo`, `heltec_t114`
+SUCCESS; `pio test -e native` 15/15; Hardware nach Abschluss gesund (LoRa-RX/TX laufen).
+
 ### 2026-08-20/21 — nRF52-Konkurrenz-Durchgang auf `wiscore_rak4631`
 
 Mit angeschlossener Hardware, je ein Commit, je gebaut (`pio run` ueber alle 32 Envs
-gruen bis auf das vorbestehend kaputte `esp32-safeboot`), `pio test -e native` gruen:
+gruen bis auf das vorbestehend kaputte `esp32-safeboot` — am 2026-08-21 gefixt,
+`e0f28bef`), `pio test -e native` gruen:
 
 - ~~`N-16`~~ (`cc79611b`) — `Radio.Send()` in `doTX()` (drei Fundstellen) von
   `taskENTER_CRITICAL()` auf `vTaskSuspendAll()`/`xTaskResumeAll()` umgestellt: der Guard
@@ -640,7 +688,8 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 > durch die heutigen Aenderungen verursacht, sondern ein vorbestehender, jetzt zum ersten
 > Mal beobachteter Bug in gestrigem `7bac915a`. **`--dfu` bis zur Untersuchung nicht
 > verwenden** — physischer Reset bleibt der einzige verifiziert funktionierende Weg in
-> den Bootloader diese Session.
+> den Bootloader diese Session. _(Ueberholt: am Nachmittag desselben Tages gefixt,
+> `b03b9a27` — siehe den Abschnitt zum zweiten Durchgang.)_
 
 ### 2026-08-20 — Wave 0.4/0.2 auf wiscore_rak4631, `CFG-01` neu gefunden
 
