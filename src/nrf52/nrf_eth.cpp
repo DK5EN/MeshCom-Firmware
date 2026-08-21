@@ -824,8 +824,12 @@ int NrfETH::startETH()
     return 2;
   }
 
-  printdeb("Ethernet.localIP(): ");
-  printlndeb(Ethernet.localIP());
+  // IPAddress dezimal ausgeben — printlndeb(Ethernet.localIP()) lief ueber die
+  // implizite uint32_t-Konvertierung in die int-Ueberladung und druckte den
+  // Roh-Integer (z.B. "1145350336" statt "192.168.68.68").
+  printfdeb("Ethernet.localIP(): %i.%i.%i.%i\n",
+            Ethernet.localIP()[0], Ethernet.localIP()[1],
+            Ethernet.localIP()[2], Ethernet.localIP()[3]);
 
   if (Ethernet.localIP() != IPAddress(0, 0, 0, 0))
   {
