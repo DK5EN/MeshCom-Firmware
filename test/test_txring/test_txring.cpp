@@ -330,10 +330,14 @@ static void test_overflow_mit_eviction(void)
 // und ohne stat_drop_count-Buchung verworfen (erst ein spaeteres, volles
 // Ring-Wrap ueberschreibt den Slot wieder physisch).
 //
-// Dieser Test fixiert das AKTUELLE Verhalten (keine Logikaenderung, siehe
-// Auftrag) und dokumentiert den Fund als Regressionsanker fuer eine
-// kuenftige Entscheidung, ob das gewollt ist.
-static void test_fund_verwaister_slot_bei_indirekter_eviction(void)
+// GEFIXT (N-24): der Eviction-Pfad zieht den Eintrag von iRead in den
+// soeben freigewordenen Slot um (Payload + Seitenarrays), leert iRead und
+// laesst advanceIReadPastEmpty() regulaer weiterruecken -- kein belegter
+// Slot faellt mehr aus dem Fenster, kein stiller Verlust. Preis: der
+// umgezogene Eintrag verliert seinen FIFO-Rang innerhalb gleicher
+// Prioritaet. Dieser Test fixiert das GEFIXTE Verhalten und schlaegt fehl,
+// falls einer der beiden Ueberlauf-Pfade wieder auseinanderlaeuft.
+static void test_n24_indirekte_eviction_verwaist_keinen_slot(void)
 {
     // Slot 0: CRITICAL (beste Prio, bleibt bei der Eviction-Auswahl unangetastet)
     BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
@@ -368,24 +372,25 @@ static void test_fund_verwaister_slot_bei_indirekter_eviction(void)
     int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "orphantrigger");
     TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
 
-    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[5][0]);   // Slot 5: korrekt entleert
+    // Der Drop traf ausschliesslich das BACKGROUND-Stueck (gebucht) --
+    // und der CRITICAL-Eintrag von Slot 0 ist nach Slot 5 UMGEZOGEN.
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[5][0]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ack.bytes, &ringBuffer[5][2], ack.len);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[5]);
 
-    // TXRING-ORPHAN-SLOT: Slot 0 traegt weiterhin die volle, unveraenderte
-    // CRITICAL-Payload -- aber iRead ist ueber ihn hinweg auf 1 gesprungen.
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[0][0]);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(ack.bytes, &ringBuffer[0][2], ack.len);
+    // Slot 0 ist geleert, iRead regulaer auf den ersten belegten Slot (1)
+    // weitergerueckt, iWrite steht auf 0 -- kein belegter Slot liegt mehr
+    // ausserhalb des Fensters [iRead, iWrite).
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
     TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iRead);
     TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
 
-    // Konsequenz: getNextTxSlot() sieht Slot 0 nicht mehr, obwohl er die
-    // hoechste Prioritaet (CRITICAL) traegt und nie gesendet wurde.
-    int next = getNextTxSlot();
-    TEST_ASSERT_NOT_EQUAL(0, next);
+    // getNextTxSlot() findet den umgezogenen CRITICAL-Eintrag (Slot 5) --
+    // die nie gesendete Nachricht bleibt sichtbar und gewinnt die Auswahl.
+    TEST_ASSERT_EQUAL_INT(5, getNextTxSlot());
 
-    // Kein Zaehler erfasst diesen Verlust: weder LOW noch CRITICAL wurden
-    // fuer Slot 0 in stat_drop_count gebucht (nur der tatsaechlich
-    // entleerte Slot 5 / BACKGROUND, s.o.).
+    // Kein unbilanzierter Verlust: CRITICAL wurde nie als Drop gebucht.
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
 }
 
@@ -558,11 +563,16 @@ static void test_n14_stress_randomisiert(void)
         return (lcg >> 8) & 0x7FFFFFFFUL;
     };
 
-    static uint8_t shadowLen[MAX_RING];
-    static uint16_t shadowOff[MAX_RING];
-    static uint16_t shadowPayloadLen[MAX_RING];
-    static uint8_t shadowMarker[MAX_RING];
-    memset(shadowLen, 0, sizeof(shadowLen));
+    // Schatten-Buchhaltung MARKER-basiert statt Slot-basiert: der N-24-Fix
+    // darf Eintraege bei indirekter Eviction zwischen Slots UMZIEHEN, eine
+    // Slot-gebundene Schattenkopie wuerde danach falsch vergleichen. Der
+    // Marker wird zusaetzlich als msg_id kodiert (Ring-Offset [3] = LSB der
+    // LE-msg_id) -- damit ist er fuer JEDEN belegten Slot an fester Stelle
+    // ablesbar, egal wohin der Eintrag gewandert ist.
+    static uint8_t markerKnown[256];
+    static uint16_t markerOff[256];
+    static uint16_t markerPayloadLen[256];
+    memset(markerKnown, 0, sizeof(markerKnown));
 
     static const char *dests[] = {"*", "9999", "DK5EN-91"};
 
@@ -577,15 +587,16 @@ static void test_n14_stress_randomisiert(void)
         int typeSel = (int)(nextRand() % 5);
         uint8_t ringStatus = RING_STATUS_READY;
         BuiltFrame f;
+        uint32_t mid = (uint32_t)marker; // Marker in der msg_id, s. o.
         switch (typeSel)
         {
-            case 0: f = buildFrame(MSG_TYPE_ACK, nextRand(), 0x00, nullptr, nullptr, payload, payloadLen); break;
-            case 1: f = buildFrame(MSG_TYPE_POSITION, nextRand(), 0x00, nullptr, nullptr, payload, payloadLen); break;
-            case 2: f = buildFrame(MSG_TYPE_HEY, nextRand(), 0x00, nullptr, nullptr, payload, payloadLen); break;
-            case 3: f = buildFrame(MSG_TYPE_TEXT, nextRand(), 0x14, "DK5EN-90",
+            case 0: f = buildFrame(MSG_TYPE_ACK, mid, 0x00, nullptr, nullptr, payload, payloadLen); break;
+            case 1: f = buildFrame(MSG_TYPE_POSITION, mid, 0x00, nullptr, nullptr, payload, payloadLen); break;
+            case 2: f = buildFrame(MSG_TYPE_HEY, mid, 0x00, nullptr, nullptr, payload, payloadLen); break;
+            case 3: f = buildFrame(MSG_TYPE_TEXT, mid, 0x14, "DK5EN-90",
                                     dests[nextRand() % 3], payload, payloadLen); break;
             default:
-                f = buildFrame(MSG_TYPE_TEXT, nextRand(), 0x14, "DK5EN-90", "DK5EN-91", payload, payloadLen);
+                f = buildFrame(MSG_TYPE_TEXT, mid, 0x14, "DK5EN-90", "DK5EN-91", payload, payloadLen);
                 ringStatus = RING_STATUS_DONE; // Relay-Pfad
                 break;
         }
@@ -594,15 +605,17 @@ static void test_n14_stress_randomisiert(void)
 
         if (slot >= 0)
         {
-            shadowLen[slot] = 1;
-            shadowOff[slot] = f.payload_ring_offset;
-            shadowPayloadLen[slot] = f.payload_len;
-            shadowMarker[slot] = marker;
+            markerKnown[marker] = 1;
+            markerOff[marker] = f.payload_ring_offset;
+            markerPayloadLen[marker] = f.payload_len;
         }
 
         // Invariante: Indizes bleiben im gueltigen Bereich.
         TEST_ASSERT_TRUE((uint8_t)iWrite < MAX_RING);
         TEST_ASSERT_TRUE((uint8_t)iRead < MAX_RING);
+
+        int w = (uint8_t)iWrite;
+        int r = (uint8_t)iRead;
 
         for (int s = 0; s < MAX_RING; s++)
         {
@@ -612,21 +625,23 @@ static void test_n14_stress_randomisiert(void)
             char ctx[64];
             snprintf(ctx, sizeof(ctx), "iter=%d slot=%d", iter, s);
 
-            // KEIN inActiveRange()-Check hier: TXRING-ORPHAN-SLOT (siehe
-            // test_fund_verwaister_slot_bei_indirekter_eviction) zeigt, dass
-            // ein belegter Slot bei indirekter Eviction ausserhalb von
-            // [iRead,iWrite) landen KANN -- das ist aktuelles, dokumentiertes
-            // Verhalten, keine hier zu pruefende Invariante.
+            // Invariante (seit dem N-24-Fix wieder haltbar): jeder belegte
+            // Slot liegt im aktiven Fenster [iRead, iWrite) -- kein Eintrag
+            // faellt durch indirekte Eviction aus dem Scan-Bereich.
+            bool inWindow = (w > r) ? (s >= r && s < w)
+                                    : (w < r ? (s >= r || s < w) : false);
+            TEST_ASSERT_TRUE_MESSAGE(inWindow, ctx);
 
-            // Belegter Slot muss aus einem getrackten Enqueue stammen (kein
-            // Inhalt ohne bekannte Herkunft).
-            TEST_ASSERT_TRUE_MESSAGE(shadowLen[s] != 0, ctx);
+            // Belegter Slot muss aus einem getrackten Enqueue stammen: der
+            // Marker steht als msg_id-LSB an fester Position [3].
+            uint8_t m = ringBuffer[s][3];
+            TEST_ASSERT_TRUE_MESSAGE(markerKnown[m] != 0, ctx);
 
             // Kein "torn write": die gesamte Nutzlast-Region traegt exakt EIN
-            // Muster (das des zuletzt in diesen Slot geschriebenen Enqueues).
-            for (uint16_t i = 0; i < shadowPayloadLen[s]; i++)
+            // Muster -- auch nach einem N-24-Umzug des Eintrags.
+            for (uint16_t i = 0; i < markerPayloadLen[m]; i++)
             {
-                TEST_ASSERT_EQUAL_UINT8_MESSAGE(shadowMarker[s], ringBuffer[s][shadowOff[s] + i], ctx);
+                TEST_ASSERT_EQUAL_UINT8_MESSAGE(m, ringBuffer[s][markerOff[m] + i], ctx);
             }
         }
     }
@@ -640,7 +655,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_prioritaets_klassifizierung);
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);
-    RUN_TEST(test_fund_verwaister_slot_bei_indirekter_eviction);
+    RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
     RUN_TEST(test_overflow_drop);
     RUN_TEST(test_get_next_tx_slot);
     RUN_TEST(test_retry_count_in);
