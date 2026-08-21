@@ -574,6 +574,38 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (achter Durchgang) — Orakel-Rest geschlossen: Spec-Vektoren + BLE-Vertiefung; Branch gepusht
+
+Auf Benutzerwunsch zuerst gepusht: `v4.35p_prio` → `origin` (DK5EN-Fork,
+`28798e48..656dd563`), danach die beiden letzten Orakel-Offenpunkte:
+
+- **Spec-abgeleitete Vektoren (`test/test_aprs_spec/`):** Frames Byte fuer
+  Byte aus doc 11 konstruiert — eigener Builder, eigene FCS-Summe, bewusst
+  unabhaengig von `encodeAPRS()`, damit Dokument und Code gegeneinander
+  antreten. Abgedeckt: alle 16 Byte-5-Flag-Kombinationen + Hop-Nibble,
+  FCS-Regel, Gruppen-/Sonderziele (9999/100001/`*`/`H`), Trailer-Optionalitaet
+  beim Decoder, FW-Sub-Platzhalter 0x7E/0x00→`#`, 0x41-Klassifikation VOR der
+  Mindestlaengen-Pruefung, elf Verwurfregeln (FCS, Regex, "DE"-Verbot,
+  fehlende Terminatoren, FW 1..34), Encoder byte-genau gegen den Builder.
+  `pio test -e native_aprs` jetzt 13/13 — **keine Abweichung Dokument↔Code.**
+- **BLE-Kapitel vertieft (doc 11 §4):** Hello-Handshake komplett
+  (`04 10 20 30` offen bzw. 36-Byte-Frame mit SHA-256 ueber die
+  6-stellige PIN, `phone_commands.cpp:307ff`; falscher Hash → Disconnect;
+  Querabgleich `MCProxy/config_loader.py:120`), Post-Hello-Config-Burst
+  (`config_cmds[]` → 0x44-JSONs → MHeard → `CONFFIN` nach 3-s-Settle, einmal
+  pro Hello) und alle 15 `0x44`-Schemata als Tabelle (I, SE, S1, SW, S2, SN,
+  W, G, SA, IO, TM, AN, MH, CONFFIN). **Korrektur:** MHeard geht als
+  `MH`-JSON zum Phone; der `0x91`-Binaer-Zweig hat keinen Produzenten mehr
+  (Legacy). Quirk dokumentiert: jede Notification traegt `blelen+2` Bytes.
+- **Umnummerierung:** das Wire-Format-Dokument kollidierte mit
+  `09-concurrency-map.md` und heisst jetzt `11-wire-format.md`; Verweise in
+  Katalog, resume, Tests und Architektur-README nachgezogen; die
+  "known gaps"-Zeile (fehlende Wire-Format-Spec) geschlossen.
+
+Damit ist der Orakel-Plan aus doc 08 §4 vollstaendig umgesetzt: Capture-Hook,
+native Umgebung, Interop-Vektoren, Differential-Runner + Korpus,
+Wire-Format-Dokument, Spec-Vektoren.
+
 ### 2026-08-21 (siebter Durchgang) — Test-Orakel komplett: Differential-Runner, 13-Frame-Korpus, Wire-Format-Dokument
 
 Alle drei offenen Orakel-Punkte umgesetzt (Freigaben vom Benutzer: Umfang
@@ -590,7 +622,7 @@ Alle drei offenen Orakel-Punkte umgesetzt (Freigaben vom Benutzer: Umfang
   0x41-Binaer-ACKs sind entgegen erster Annahme on-air (Layout
   `lora_functions.cpp:1078ff`) — der Korpus hat den Doku-Entwurf korrigiert,
   bevor er committet war.
-- **Wire-Format-Dokument:** `docs/architecture/09-wire-format.md` (englisch,
+- **Wire-Format-Dokument:** `docs/architecture/11-wire-format.md` (englisch,
   fuer Mock-Services von mc-chat/MCProxy/mcmap): LoRa-Frame byte-genau mit
   annotiertem Real-Beispiel, Server-UDP (KEEP/DATA-36-Byte-Header,
   GATE/CONF-TLV/BEAT), EXTUDP-JSON, BLE-Phone-Protokoll (GATT-UUIDs,
@@ -925,6 +957,7 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 | **What is broken, in what order, with what evidence** | `docs/architecture/08-defect-catalogue.md`            |
 | Which core/task touches which state (goal G8)         | `docs/architecture/09-concurrency-map.md`             |
 | Every buffer, its size and its bounds (goal G7)       | `docs/architecture/10-buffer-inventory.md`            |
+| Wire format: LoRa / server UDP / EXTUDP / BLE         | `docs/architecture/11-wire-format.md`                 |
 | The 39 pre-existing findings                          | `fable-verdict.md` (repo root)                        |
 | Raw evidence behind 08/09/10                          | `docs/review/2026-07-31/`                             |
 
@@ -943,10 +976,10 @@ documents as current and these as provenance.
 
 Recorded so they are not mistaken for completeness.
 
-| Gap                                                                                                                                                   | Impact                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **No wire-format specification.** The on-air protocol is named the highest-risk contract in five places and is written down nowhere.                  | Blocks spec-derived test vectors (§2.3 item 3) — the only kind that can catch a _pre-existing_ decode bug. |
-| **No persistence/flash-migration document.** `FLASH_VERSION` does not migrate, and there are two incompatible `meshcom_settings` layouts (`N-12`).    | A field change to the settings struct is currently unsafe on nRF52.                                        |
-| **No boot/OTA document.** One `ota_0` slot means no rollback by construction; five boards have no remote update at all.                               | Unknown recovery path after a bad update.                                                                  |
-| Existing German design docs (`docs/README_LORA_TRX.md`, `docs/adr-*.md`, `docs/prio-talk-flood-networking.md`, ~180 KB) are not linked from this set. | Duplication risk; some of it already answers questions asked above.                                        |
-| `tools/ram_snapshot.py` hardcodes 7 targets, so "RAM baseline across all envs" is not executable as written (`08` C-12).                              | Baseline is partial.                                                                                       |
+| Gap                                                                                                                                                                                               | Impact                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| ~~No wire-format specification.~~ **Closed 2026-08-21:** `docs/architecture/11-wire-format.md` covers LoRa, server UDP, EXTUDP JSON and BLE; spec-derived vectors exist (`test/test_aprs_spec/`). | —                                                                   |
+| **No persistence/flash-migration document.** `FLASH_VERSION` does not migrate, and there are two incompatible `meshcom_settings` layouts (`N-12`).                                                | A field change to the settings struct is currently unsafe on nRF52. |
+| **No boot/OTA document.** One `ota_0` slot means no rollback by construction; five boards have no remote update at all.                                                                           | Unknown recovery path after a bad update.                           |
+| Existing German design docs (`docs/README_LORA_TRX.md`, `docs/adr-*.md`, `docs/prio-talk-flood-networking.md`, ~180 KB) are not linked from this set.                                             | Duplication risk; some of it already answers questions asked above. |
+| `tools/ram_snapshot.py` hardcodes 7 targets, so "RAM baseline across all envs" is not executable as written (`08` C-12).                                                                          | Baseline is partial.                                                |
