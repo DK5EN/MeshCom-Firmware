@@ -383,15 +383,23 @@ int NrfETH::getUDP()
                       print_buff[4]=(msg_counter >> 24) & 0xFF;
                       print_buff[5]=0x01;  // ACK
                       print_buff[6]=0x00;
-                      
-                      if(bDisplayInfo)
-                          printfdeb("\n[UDP-MSGID] ack_msg_id:%02X%02X%02X%02X\n", print_buff[1], print_buff[2], print_buff[3], print_buff[4]);
 
                       int iackcheck = checkOwnTx(msg_counter);
                       if(iackcheck >= 0)
                       {
                           own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                          // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
+                          // dort bekommt die App fuer die eigene Nachricht den ACK-Level
+                          // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,
+                          // die App zeigte auf nRF52-Gateways nie den vollen ACK-Status.
+                          print_buff[5]=0x02;  // 02...ACK
                       }
+
+                      // DRY-21: Debug-Ausgabe wie in der ESP32-Kopie — nach dem
+                      // checkOwnTx (damit der ACK-Level stimmt) und mit der msg_id in
+                      // MSB-Reihenfolge statt verdreht.
+                      if(bDisplayInfo)
+                          printfdeb("[UDP-MSGID] ack_msg_id:%02X%02X%02X%02X ACK...%02X\n", print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5]);
 
                       addBLEOutBuffer(print_buff, 7);
 
