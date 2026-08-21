@@ -1031,10 +1031,22 @@ RX_FRAME len rssi snr hex=…`) — der Gegenpol zum bestehenden
 >   on-air mitgeschnittene Frames FREMDER Nodes als Interop-Vektoren — encodiert
 >   von fremder Firmware, Sollwerte von Hand aus den Roh-Bytes gelesen (nicht aus
 >   dem Pruefling). `pio test -e native_aprs`.
-> - **Offen:** Mechanismus 1 als eingerichteter Differential-Lauf (zwei
->   Decoder-Staende in einem Binary); Vektor-Korpus verbreitern (mehr
->   Frame-Typen: HEY/`@`, ACK, DM mit `{NNN`); Spezifikations-Vektoren aus einem
->   noch zu schreibenden Wire-Format-Dokument.
+> - **Mechanismus 1: DONE (`a14eaada`, 2026-08-21 abends)** — als
+>   Snapshot-Differential: `test_aprs_corpus` vergleicht die kanonische
+>   decodeAPRS()-Ausgabe jedes Korpus-Frames gegen die eingecheckte
+>   `golden.txt`; der git-Diff der Golden-Datei ist das Review-Artefakt.
+>   Dazu Roundtrip-Pruefung decode→encode→decode je Frame.
+> - **Korpus verbreitert: DONE** — 13 Frames, alle Haupttypen (Position auch
+>   mit Track-Flag, Text, Gruppen, DM mit `{NNN`, Text-ACK, kompakter
+>   12-Byte-Binaer-ACK `0x41` — Neufund: diese SIND on-air, Layout
+>   `lora_functions.cpp:1078ff` —, HEY, 4-Hop-Pfade, Fremd-Encoder inkl.
+>   MCProxy-BLE-Pfad und IV3OEP aus Italien).
+> - **Wire-Format-Dokument: DONE** — `docs/architecture/09-wire-format.md`
+>   (englisch): LoRa-Frame, Server-UDP (KEEP/DATA/GATE/CONF/BEAT), EXTUDP-JSON
+>   und BLE-Phone-Protokoll, mit Byte-annotierten Real-Beispielen und
+>   file:line-Ankern; Zweck: Mock-Services fuer mc-chat/MCProxy/mcmap.
+> - **Offen:** Spezifikations-Vektoren, die aus doc 09 statt aus Mitschnitten
+>   abgeleitet sind; BLE-Kapitel-Vertiefung (Hello-Handshake, 0x44-JSON-Schemata).
 
 C-03 removed the oracle. The zero-tolerance requirement needs a real one. Three
 mechanisms, in ascending cost:

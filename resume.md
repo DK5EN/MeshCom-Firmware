@@ -574,6 +574,35 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (siebter Durchgang) — Test-Orakel komplett: Differential-Runner, 13-Frame-Korpus, Wire-Format-Dokument
+
+Alle drei offenen Orakel-Punkte umgesetzt (Freigaben vom Benutzer: Umfang
+"alles inkl. BLE", Sprache Englisch, Testverkehr ueber MCProxy+Bench erlaubt):
+
+- **Differential-Runner (`a14eaada`):** `test_aprs_corpus` als Snapshot-Fence —
+  kanonische decodeAPRS()-Ausgabe je Korpus-Frame gegen eingecheckte
+  `golden.txt`, Regeneration nur bewusst per `APRS_GOLDEN_UPDATE=1`, plus
+  Roundtrip decode→encode→decode. `pio test -e native_aprs` 5/5.
+- **Korpus:** 13 on-air-Frames, Traffic-Mix gezielt erzeugt (MCProxy
+  `POST /api/send` ueber die Produktions-Node, Bench-Heltec-DMs/Pos/HEY,
+  echter Mesh-Verkehr). Abgedeckt: alle Frame-Typen inkl. DM mit `{NNN`,
+  Text-ACK und kompaktem 12-Byte-Binaer-ACK. **Neufund dabei:** die
+  0x41-Binaer-ACKs sind entgegen erster Annahme on-air (Layout
+  `lora_functions.cpp:1078ff`) — der Korpus hat den Doku-Entwurf korrigiert,
+  bevor er committet war.
+- **Wire-Format-Dokument:** `docs/architecture/09-wire-format.md` (englisch,
+  fuer Mock-Services von mc-chat/MCProxy/mcmap): LoRa-Frame byte-genau mit
+  annotiertem Real-Beispiel, Server-UDP (KEEP/DATA-36-Byte-Header,
+  GATE/CONF-TLV/BEAT), EXTUDP-JSON, BLE-Phone-Protokoll (GATT-UUIDs,
+  `@`-Notifications, Kommando-Frames 0x10..0xF0; Querabgleich gegen MCProxys
+  `ble_protocol.py`). Ehrliche Luecken markiert (Hello-Handshake, 0x44-JSON).
+- mc-chat (`rpizero.local`) erreichbar, `/api/send` aber hinter Auth —
+  aktiver mc-chat-Verkehr nicht erzeugt; Interlink-Frames kamen passiv
+  ueber den Server-Pfad herein.
+- Abschluss: Capture-Flag entfernt, RAK mit normalem Build geflasht
+  (Gateway+EXTUDP on am OE-Server), alle Builds gruen, native 15/15,
+  native_aprs 5/5.
+
 ### 2026-08-21 (sechster Durchgang) — `N-22` gefixt: Stack-Overflow im Loop-Task, kein EXTUDP-Bug
 
 Root cause gemessen statt geraten: `uxTaskGetStackHighWaterMark(NULL) == 0` am
