@@ -477,14 +477,21 @@ void sendMeshComUDP()
 
             Udp.endPacket();
 
-            memcpy(convBuffer, udpSnapshot + 1 + 36, msg_len);
+            // Der Slot enthaelt msg_len Bytes ab Offset 1: 36 Byte UDP-Header,
+            // danach der APRS-Frame. msg_len Bytes ab Offset 1+36 zu kopieren
+            // las immer 36 Bytes ueber das tatsaechlich Geschriebene hinaus
+            // und gab decodeAPRS() eine um 36 zu grosse Laenge (der im
+            // CONC-16-Commit dokumentierte Nebenbefund). Die wahre
+            // APRS-Laenge ist msg_len-36.
+            uint16_t aprs_len = (msg_len > 36) ? (uint16_t)(msg_len - 36) : 0;
+            memcpy(convBuffer, udpSnapshot + 1 + 36, aprs_len);
 
-            if(convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40)
+            if(aprs_len > 0 && (convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40))
             {
               struct aprsMessage aprsmsg;
 
               // print which message type we got
-              decodeAPRS(convBuffer, msg_len, aprsmsg);
+              decodeAPRS(convBuffer, aprs_len, aprsmsg);
 
               // print aprs message
               if(bDisplayInfo)

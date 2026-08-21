@@ -2879,15 +2879,23 @@ void sendUDP()
             }
             else
             {
-                // UDP DATA Header 36 byte
-                memcpy(convBuffer, ringBufferUDPout[udpRead] + 1 + 36, msg_len);
+                // UDP DATA Header 36 byte. Der Slot enthaelt msg_len Bytes ab
+                // Offset 1 (Header + APRS-Frame); msg_len Bytes ab Offset 1+36
+                // zu kopieren las 36 Bytes ueber das Geschriebene hinaus — bei
+                // msg_len > 239 sogar ueber das Slot-Ende (Slot ist
+                // UDP_TX_BUF_SIZE+20). Wahre APRS-Laenge ist msg_len-36.
+                // (Nebenbefund aus dem CONC-16-Commit; auf nRF52-Gateways
+                // aktiv — Schreiber ist addUdpOutBuffer() via addNodeData(),
+                // auf Hardware am TX-UDP-Log verifiziert.)
+                uint16_t aprs_len = (msg_len > 36) ? (uint16_t)(msg_len - 36) : 0;
+                memcpy(convBuffer, ringBufferUDPout[udpRead] + 1 + 36, aprs_len);
 
-                if(convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40)
+                if(aprs_len > 0 && (convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40))
                 {
                     struct aprsMessage aprsmsg;
-                    
+
                     // print which message type we got
-                    decodeAPRS(convBuffer, msg_len, aprsmsg);
+                    decodeAPRS(convBuffer, aprs_len, aprsmsg);
 
                     // print aprs message
                     if(bDisplayVia)
