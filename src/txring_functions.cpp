@@ -296,6 +296,27 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                      ((uint32_t)ringBuffer[worst_slot][4] << 8)  |  (uint32_t)ringBuffer[worst_slot][3];
             stat_drop_count[worst_prio]++;
             ringBuffer[worst_slot][0] = 0; // Mark as empty
+
+            // N-24 (TXRING-ORPHAN-SLOT): liegt der geraeumte Slot NICHT am
+            // Lesezeiger, bleibt der Slot an iRead belegt -- der unbedingte
+            // Ueberlauf-Fortschalter unten schoebe iRead trotzdem darueber
+            // hinweg, und der Eintrag (moeglicherweise CRITICAL, nie
+            // gesendet) waere dauerhaft unsichtbar und unbilanziert.
+            // Fix: den Eintrag von iRead in den soeben freigewordenen Slot
+            // umziehen (Payload + Seitenarrays), iRead-Slot leeren -- danach
+            // raeumt advanceIReadPastEmpty() den Lesezeiger regulaer weiter
+            // und der Fortschalter unten trifft keinen belegten Slot mehr.
+            // Preis: der umgezogene Eintrag verliert seinen FIFO-Rang
+            // innerhalb gleicher Prioritaet (getNextTxSlot tie-breakt nach
+            // Scan-Reihenfolge ab iRead) -- akzeptiert gegen Totalverlust.
+            if (worst_slot != r && ringBuffer[r][0] > 0)
+            {
+                memcpy(ringBuffer[worst_slot], ringBuffer[r], sizeof(ringBuffer[0]));
+                ringPriority[worst_slot]    = ringPriority[r];
+                ringEnqueueTime[worst_slot] = ringEnqueueTime[r];
+                retryCount[worst_slot]      = retryCount[r];
+                ringBuffer[r][0] = 0;
+            }
             advanceIReadPastEmpty();
         }
         else
