@@ -323,6 +323,25 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
+#ifdef MC_TEST_HOOKS
+    // Testfang-Hook (Katalog doc 08 §4, Mechanismus 2): akzeptierte Frames als
+    // Hex-Dump — das Gegenstueck zum CRC_PAYLOAD-Dump der VERWORFENEN Frames
+    // in checkRX (esp32_main.cpp). OnRxDone ist auf beiden Plattformen der
+    // erste Punkt, den nur akzeptierte Frames erreichen. Nur in
+    // Capture-Builds einkompiliert (-D MC_TEST_HOOKS): der Dump laeuft im
+    // Radio-Callback-Kontext (nRF52: Timer-Service-Task mit 1-KB-Stack,
+    // deshalb statischer Puffer) und ist fuer Produktionsbuilds zu teuer.
+    if(bLORADEBUG)
+    {
+        static char mc_test_hex[2*255 + 1];
+        uint16_t mc_dlen = (size > 255) ? 255 : size;
+        for(uint16_t mi = 0; mi < mc_dlen; mi++)
+            snprintf(&mc_test_hex[mi*2], 3, "%02X", payload[mi]);
+        printfdeb("[MC-TEST] RX_FRAME len=%u rssi=%d snr=%d hex=%s\n",
+                  (unsigned)mc_dlen, (int)rssi, (int)snr, mc_test_hex);
+    }
+#endif
+
     // Debug I: OnRxDone timing — capture start time
     unsigned long _onrxdone_start = millis();
 
