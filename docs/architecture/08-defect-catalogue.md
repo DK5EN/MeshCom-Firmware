@@ -854,7 +854,23 @@ umgeht die Funktion, statt sie zu reparieren.
 
 ---
 
-### N-20 — Netzwerk-Pfade (W5100S) frieren den Loop-Task ein auf Gateway-Nodes ohne Ethernet-Hardware/Link — **VERIFIED (auf echter Hardware, root cause per Breadcrumbs eingegrenzt)** — High
+### N-20 — Netzwerk-Pfade (W5100S) frieren den Loop-Task ein auf Gateway-Nodes ohne Ethernet-Hardware/Link — **Hauptausloeser GEFIXT (`780df254`), Rest offen** — High
+
+> **STATUS 2026-08-21 (abends): Hauptausloeser gefixt, auf Hardware mit RAK13800
+> verifiziert (`780df254`).** Zwei Aenderungen: (1) `startETH()` prueft den
+> Link-Status VOR dem blockierenden `Ethernet.begin(mac, 10000UL)` — begrenzt auf
+> LinkON wartend (max. 3 s, die PHY-Aushandlung nach dem HW-Reset braucht mehrere
+> Sekunden; ein Sofort-Check meldete dauerhaft LinkOFF und verhinderte jede
+> Wiederverbindung). (2) Der periodische Reconnect in `nrf52loop()` ruft
+> `resetDHCP()` statt `initethDHCP()` — das alte volle HW-Init resettete den
+> W5100S bei jedem Versuch und haette mit dem Link-Check eine Endlosschleife aus
+> PHY-Reset und LinkOFF ergeben (auf Hardware beobachtet). Verifiziert: ohne Link
+> "link OFF - skip DHCP" in <=3 s bei responsivem Loop; mit Link DHCP-IP,
+> KEEP-Heartbeats zum OE-Server, Webserver HTTP 200. **Noch offen:** Soak-Test
+> Kabel ziehen/stecken im laufenden Betrieb; die exakte Fundstelle des
+> "mark=5"-Freezes (posinfo/heyinfo/telemetry-Abschnitt) ist weiterhin unbenannt;
+> die W5100S-Bibliotheks-Warteschleifen selbst (Socket-Ops, `maintain()`) sind
+> ungehaertet.
 
 Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
 nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,
