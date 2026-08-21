@@ -42,7 +42,7 @@ verified defect backlog and the order of work.
 > - **C-04** — four boards run Arduino 2.0.14, not 2.0.17. 03's headline is false for them.
 > - **C-05** — 02's finding B-01 proposes a change that would **break two shipping boards**.
 >
-> Prior art the concept missed entirely: `fable-verdict.md` (repo root, 2026-07-12) holds 39
+> Prior art the concept missed entirely: `docs/code-audit-20260712.md` (2026-07-12) holds 39
 > already-verified findings, essentially all still open.
 
 ## Reproducing the metrics

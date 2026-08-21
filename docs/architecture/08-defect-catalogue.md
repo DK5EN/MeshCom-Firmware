@@ -19,7 +19,7 @@ decision-relevant claim against the real source, the real toolchain, and the rea
 
 ## 0. Prior art — this is not a fresh start
 
-`fable-verdict.md` (repo root, 2026-07-12) already holds **39 verified findings**
+`docs/code-audit-20260712.md` (2026-07-12) already holds **39 verified findings**
 (`SEC-01` … `TEST-39`) against this same branch. The `docs/architecture/` concept
 (01–07) was written without reading it and re-derived its structural half while missing
 its security and concurrency halves entirely.
@@ -654,7 +654,7 @@ removed globally on a platform-specific premise.
 > aufgerufen (`nrf52_main.cpp:1531-1536`) — also im Main Loop, exakt wie der entfernte
 > Guard-Kommentar es voraussetzt. `CONC-14` war als BLE-spezifischer Fix eingecheckt, hat
 > N-15 aber als Nebenwirkung mitgeschlossen; das war zuvor nicht nachgeprueft (siehe
-> `resume.md` §3.4: "`CONC-15`/`16`/`17`/`18` were **not** re-verified... treat as still
+> `docs/BACKLOG.md` §3.4: "`CONC-15`/`16`/`17`/`18` were **not** re-verified... treat as still
 > open" — dieser Satz galt faelschlich auch fuer N-15). Gueltigkeitsbedingung: sobald ein
 > zweiter Empfangspfad `readPhoneCommand` wieder inline statt ueber `bleQueue` aufruft
 > (z.B. `settings_rx_callback`, das aber ohnehin nicht `readPhoneCommand` nutzt), erneut
@@ -679,7 +679,7 @@ reaches `SX126xWaitOnBusy()` → `delay(1)` → `vTaskDelay()` **with the tick f
 
 ### N-17 — ESP32 `startNetwork()` can trip the task watchdog before its first feed — **VERIFIED (on real hardware)** — High
 
-Not from the 2026-07-31 review or `fable-verdict.md` — found 2026-08-18 flashing a Heltec V3
+Not from the 2026-07-31 review or `docs/code-audit-20260712.md` — found 2026-08-18 flashing a Heltec V3
 with today's fixes for hardware verification, reproduced deterministically, root-caused with
 debug instrumentation on real hardware, and fixed same-day. Recorded here because it is a real,
 previously-undetected production defect, independent of every other finding in this document.
@@ -711,7 +711,7 @@ native` green; `heltec_wifi_lora_32_V3`, `wiscore_rak4631`, `t_deck`, `t_deck_pr
 
 ### N-18 — der SEC-02-Fix verhinderte jeden BLE-Verbindungsaufbau — **VERIFIED (auf echter Hardware, per Bisect)** — Critical
 
-Kein Befund aus dem Review von 2026-07-31 und nicht aus `fable-verdict.md`, sondern eine
+Kein Befund aus dem Review von 2026-07-31 und nicht aus `docs/code-audit-20260712.md`, sondern eine
 **Regression aus unserem eigenen Fix**: `d36fb66f` (SEC-02) hat den BLE-Verbindungsaufbau
 auf ESP32 vollstaendig unbrauchbar gemacht. Gefunden am 2026-08-18 beim Bisect gegen
 pristine `upstream/dev`, behoben mit `bd10b636`.
@@ -1329,7 +1329,7 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 | ~~1.8~~ | BLE command gate                       | `N-07`          | small       | ACCEPTED / WONTFIX 2026-08-18 — bonding breaks app fleet |
 
 **Wave 1 is closed** — all 8 items done or deliberately accepted as risk. See the Standing risk
-box in `resume.md` for what "done" means here (fixed locally, not yet upstream).
+box in `docs/BACKLOG.md` for what "done" means here (fixed locally, not yet upstream).
 
 ### Wave 2 — remaining prior-verdict Track A
 

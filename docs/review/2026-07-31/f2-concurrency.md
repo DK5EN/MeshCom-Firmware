@@ -24,11 +24,11 @@ states — is:
 
 Consequences, both directions:
 
-* Almost every `std::atomic` and `volatile` in the LoRa path is **dead weight on ESP32** and
+- Almost every `std::atomic` and `volatile` in the LoRa path is **dead weight on ESP32** and
   **necessary but insufficient on nRF52**.
-* `portMUX_TYPE displayMux` (`src/lora_functions.cpp:122`) protects nothing on ESP32 — both sides
+- `portMUX_TYPE displayMux` (`src/lora_functions.cpp:122`) protects nothing on ESP32 — both sides
   are `loopTask` — while costing a heap-allocating 7×`String` struct copy with interrupts disabled.
-* The heavy, unprotected, genuinely-concurrent state is the **TX ring `ringBuffer[iWrite]` on
+- The heavy, unprotected, genuinely-concurrent state is the **TX ring `ringBuffer[iWrite]` on
   nRF52**, and the **NimBLE connection flags across cores 0/1 on ESP32**.
 
 Counts (see tables): **9 RACE**, **4 OK (correctly protected)**, **14 OVER-SYNCHRONISED**,
@@ -44,43 +44,44 @@ source" or "prior art's fix does not close the hole".
 Board JSON sets `-DARDUINO_RUNNING_CORE=1` and `-DARDUINO_EVENT_RUNNING_CORE=1`
 (`~/.platformio/platforms/espressif32@6.13.0/boards/heltec_wifi_lora_32_V3.json:11-12`).
 
-| Context | Core | Prio | Stack | Entry point |
-| --- | --- | --- | --- | --- |
-| `loopTask` → `loop()` → `esp32loop()` | **1** | 1 | 8192 B (`ARDUINO_LOOP_STACK_SIZE`) | `framework-arduinoespressif32/cores/esp32/main.cpp:71`; `src/main.cpp:52`; `src/esp32/esp32_main.cpp:1743` |
-| LoRa DIO1 GPIO ISR — `setFlagReceive` / `setFlagSent` | **1** (registered from `esp32setup()` on `loopTask`) | GPIO ISR (IDF level 1, shared handler) | shared GPIO ISR stack | `src/esp32/esp32_main.cpp:487`, `:503`; registered `:1420`, `:1459-1462`, `:1498`, `:2058`, `:2287`, `:3737` |
-| NimBLE host task — `MyServerCallbacks::onConnect/onDisconnect/onPassKeyDisplay/onAuthenticationComplete`, `CharacteristicCallbacks::onWrite` | **0** (`CONFIG_BT_NIMBLE_PINNED_TO_CORE 0`, `NimBLE-Arduino/src/nimconfig.h:196`) | NimBLE host default | **3072 B** (`platformio.ini:156`) | `src/esp32/esp32_main.cpp:303-355` |
-| BT controller tasks | 0 | very high | lib | IDF |
-| `con_auth` (net-console HMAC handshake) | **1** (explicit) | 1 | 3072 B | `src/net_console.cpp:378` |
-| WiFi / lwIP `tcpip_task` / `wifi` | 0 (IDF default) | 18–23 | IDF | IDF |
-| Arduino event task (`WiFi.onEvent` consumers) | **1** (`ARDUINO_EVENT_RUNNING_CORE=1`) | — | — | framework |
-| `audio play task` (T-Deck / T-Deck-Pro only) | **1** | **50** | 16 KB | `src/esp32/esp32_audio.cpp:104` |
-| `lora_task` (T5-ePaper only) | **unpinned** | `configMAX_PRIORITIES-2` = 23 | 3 KB | `src/t5-epaper/peri_lora.cpp:171` |
-| `gps_task` (T5-ePaper, T-Deck-Pro) | **unpinned** | `configMAX_PRIORITIES-1` = 24 | 3 KB | `src/t5-epaper/peri_gps.cpp:77`, `src/t-deck-pro/peri_gps.cpp:78` |
-| `a7682_handle` (T-Deck-Pro modem) | unpinned | 20 | 3 KB | `src/t-deck-pro/tdeck_pro.cpp:381` |
-| `btn_task` (T5-ePaper) | unpinned | 20 | 3 KB | `src/t5-epaper/t5epaper_main.cpp:671` |
-| GPS RX-edge ISR `handleRxInterrupt` | 1 | GPIO ISR | — | `src/gps_functions.cpp:182`; attached/detached only inside `detectBaudrate()` (`:202`, `:204`) |
-| Web server | **no task** — synchronous `WiFiServer`, polled from `loopTask` | — | — | `src/web_functions/web_commonServer.h:18`, `src/web_functions/web_functions.cpp:25` |
+| Context                                                                                                                                      | Core                                                                              | Prio                                   | Stack                              | Entry point                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `loopTask` → `loop()` → `esp32loop()`                                                                                                        | **1**                                                                             | 1                                      | 8192 B (`ARDUINO_LOOP_STACK_SIZE`) | `framework-arduinoespressif32/cores/esp32/main.cpp:71`; `src/main.cpp:52`; `src/esp32/esp32_main.cpp:1743`   |
+| LoRa DIO1 GPIO ISR — `setFlagReceive` / `setFlagSent`                                                                                        | **1** (registered from `esp32setup()` on `loopTask`)                              | GPIO ISR (IDF level 1, shared handler) | shared GPIO ISR stack              | `src/esp32/esp32_main.cpp:487`, `:503`; registered `:1420`, `:1459-1462`, `:1498`, `:2058`, `:2287`, `:3737` |
+| NimBLE host task — `MyServerCallbacks::onConnect/onDisconnect/onPassKeyDisplay/onAuthenticationComplete`, `CharacteristicCallbacks::onWrite` | **0** (`CONFIG_BT_NIMBLE_PINNED_TO_CORE 0`, `NimBLE-Arduino/src/nimconfig.h:196`) | NimBLE host default                    | **3072 B** (`platformio.ini:156`)  | `src/esp32/esp32_main.cpp:303-355`                                                                           |
+| BT controller tasks                                                                                                                          | 0                                                                                 | very high                              | lib                                | IDF                                                                                                          |
+| `con_auth` (net-console HMAC handshake)                                                                                                      | **1** (explicit)                                                                  | 1                                      | 3072 B                             | `src/net_console.cpp:378`                                                                                    |
+| WiFi / lwIP `tcpip_task` / `wifi`                                                                                                            | 0 (IDF default)                                                                   | 18–23                                  | IDF                                | IDF                                                                                                          |
+| Arduino event task (`WiFi.onEvent` consumers)                                                                                                | **1** (`ARDUINO_EVENT_RUNNING_CORE=1`)                                            | —                                      | —                                  | framework                                                                                                    |
+| `audio play task` (T-Deck / T-Deck-Pro only)                                                                                                 | **1**                                                                             | **50**                                 | 16 KB                              | `src/esp32/esp32_audio.cpp:104`                                                                              |
+| `lora_task` (T5-ePaper only)                                                                                                                 | **unpinned**                                                                      | `configMAX_PRIORITIES-2` = 23          | 3 KB                               | `src/t5-epaper/peri_lora.cpp:171`                                                                            |
+| `gps_task` (T5-ePaper, T-Deck-Pro)                                                                                                           | **unpinned**                                                                      | `configMAX_PRIORITIES-1` = 24          | 3 KB                               | `src/t5-epaper/peri_gps.cpp:77`, `src/t-deck-pro/peri_gps.cpp:78`                                            |
+| `a7682_handle` (T-Deck-Pro modem)                                                                                                            | unpinned                                                                          | 20                                     | 3 KB                               | `src/t-deck-pro/tdeck_pro.cpp:381`                                                                           |
+| `btn_task` (T5-ePaper)                                                                                                                       | unpinned                                                                          | 20                                     | 3 KB                               | `src/t5-epaper/t5epaper_main.cpp:671`                                                                        |
+| GPS RX-edge ISR `handleRxInterrupt`                                                                                                          | 1                                                                                 | GPIO ISR                               | —                                  | `src/gps_functions.cpp:182`; attached/detached only inside `detectBaudrate()` (`:202`, `:204`)               |
+| Web server                                                                                                                                   | **no task** — synchronous `WiFiServer`, polled from `loopTask`                    | —                                      | —                                  | `src/web_functions/web_commonServer.h:18`, `src/web_functions/web_functions.cpp:25`                          |
 
 Notes:
-* **No `AsyncWebServer`/AsyncTCP in the main firmware.** `ESPAsyncWebServer` + `CONFIG_ASYNC_TCP_RUNNING_CORE=1`
+
+- **No `AsyncWebServer`/AsyncTCP in the main firmware.** `ESPAsyncWebServer` + `CONFIG_ASYNC_TCP_RUNNING_CORE=1`
   appear only in the two `*-safeboot` envs (`platformio.ini:174-182`, `:212-222`), which build a
   **separate image** (`build_src_filter = +<safeboot/*>`). No shared state with the main firmware.
-* No `xTimerCreate` / `esp_timer_create` in the ESP32 main firmware. `lib/Timeout/Timeout.h` is a
+- No `xTimerCreate` / `esp_timer_create` in the ESP32 main firmware. `lib/Timeout/Timeout.h` is a
   `millis()` polling helper, not a timer.
-* Only ONE `xTaskCreate*` in ESP32 common code: `con_auth`. Everything else is board-specific.
+- Only ONE `xTaskCreate*` in ESP32 common code: `con_auth`. Everything else is board-specific.
 
 ### nRF52 — `wiscore_rak4631` (nRF52840, 1 core, SoftDevice S140)
 
-| Context | Core | Prio | Stack | Entry point |
-| --- | --- | --- | --- | --- |
-| `loop_task` → `loop()` → `nrf52loop()` | single | **1** (`TASK_PRIO_LOW`) | 256×4 words = 4 KB | `framework-arduinoadafruitnrf52/cores/nRF5/main.cpp:83`; `src/nrf52/nrf52_main.cpp` |
-| **`LORA` task** — runs `OnRxDone`, `OnTxDone`, `OnTxTimeout`, `OnRxTimeout`, `OnRxError`, `OnCadDone`, `OnHeaderDetect` | single | **2** (`TASK_PRIO_NORMAL`) → **preempts loop** | 4096 words = 16 KB | `SX126x-Arduino/src/boards/mcu/board.cpp:474,498`; callbacks wired `src/nrf52/nrf52_main.cpp:939-946` |
-| DIO1 GPIO ISR `RadioOnDioIrq` | single | ISR | — | `SX126x-Arduino/src/boards/sx126x/sx126x-board.cpp:115`; body `radio.cpp:1340` |
-| Bluefruit callback task (`ada_callback`) — `bleuart_rx_callback`, `settings_rx_callback`, `connect_callback`, `disconnect_callback` | single | **2** (`TASK_PRIO_NORMAL`) → **preempts loop** | 256×3 words = 3 KB | `cores/nRF5/main.cpp:86`; handlers `src/nrf52/api_functions.cpp:205,226,243,296` |
-| Bluefruit SoftDevice event task | single | 3 (`TASK_PRIO_HIGH`) | lib | Bluefruit |
-| FreeRTOS timer-service task — `periodic_wakeup(TimerHandle_t)` | single | `configTIMER_TASK_PRIORITY` (2) | `configTIMER_TASK_STACK_DEPTH` | timer created `src/nrf52/api_functions.cpp:341`; callback `src/nrf52/WisBlock-API.cpp:34` |
-| SX126x `TxTimeoutTimer` / `RxTimeoutTimer` → `RadioOnTxTimeoutIrq` etc. | single | timer task (2) | as above | `SX126x-Arduino/src/boards/mcu/nrf52832/timer.cpp:41` (10 `SoftwareTimer` slots) |
-| Button GPIO ISR `interruptHandle2` | single | ISR | — | `src/nrf52/nrf52_main.cpp:333`; attached `:1033` |
+| Context                                                                                                                             | Core   | Prio                                           | Stack                          | Entry point                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `loop_task` → `loop()` → `nrf52loop()`                                                                                              | single | **1** (`TASK_PRIO_LOW`)                        | 256×4 words = 4 KB             | `framework-arduinoadafruitnrf52/cores/nRF5/main.cpp:83`; `src/nrf52/nrf52_main.cpp`                   |
+| **`LORA` task** — runs `OnRxDone`, `OnTxDone`, `OnTxTimeout`, `OnRxTimeout`, `OnRxError`, `OnCadDone`, `OnHeaderDetect`             | single | **2** (`TASK_PRIO_NORMAL`) → **preempts loop** | 4096 words = 16 KB             | `SX126x-Arduino/src/boards/mcu/board.cpp:474,498`; callbacks wired `src/nrf52/nrf52_main.cpp:939-946` |
+| DIO1 GPIO ISR `RadioOnDioIrq`                                                                                                       | single | ISR                                            | —                              | `SX126x-Arduino/src/boards/sx126x/sx126x-board.cpp:115`; body `radio.cpp:1340`                        |
+| Bluefruit callback task (`ada_callback`) — `bleuart_rx_callback`, `settings_rx_callback`, `connect_callback`, `disconnect_callback` | single | **2** (`TASK_PRIO_NORMAL`) → **preempts loop** | 256×3 words = 3 KB             | `cores/nRF5/main.cpp:86`; handlers `src/nrf52/api_functions.cpp:205,226,243,296`                      |
+| Bluefruit SoftDevice event task                                                                                                     | single | 3 (`TASK_PRIO_HIGH`)                           | lib                            | Bluefruit                                                                                             |
+| FreeRTOS timer-service task — `periodic_wakeup(TimerHandle_t)`                                                                      | single | `configTIMER_TASK_PRIORITY` (2)                | `configTIMER_TASK_STACK_DEPTH` | timer created `src/nrf52/api_functions.cpp:341`; callback `src/nrf52/WisBlock-API.cpp:34`             |
+| SX126x `TxTimeoutTimer` / `RxTimeoutTimer` → `RadioOnTxTimeoutIrq` etc.                                                             | single | timer task (2)                                 | as above                       | `SX126x-Arduino/src/boards/mcu/nrf52832/timer.cpp:41` (10 `SoftwareTimer` slots)                      |
+| Button GPIO ISR `interruptHandle2`                                                                                                  | single | ISR                                            | —                              | `src/nrf52/nrf52_main.cpp:333`; attached `:1033`                                                      |
 
 Priority ordering that matters: **Bluefruit(2) == LORA(2) > loop(1)**. Both callback contexts
 preempt the loop; between themselves they round-robin (`configUSE_TIME_SLICING`).
@@ -96,74 +97,74 @@ Where ESP32 and nRF52 differ, both are given.
 
 ### LoRa radio / TX ring
 
-| Object | file:line | Writers | Readers | Protection | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `receiveFlag` | `esp32/esp32_main.cpp:461` | DIO1 ISR (core 1) | `loopTask`, also written by loop `:2214` and `:2077,:3742` | `std::atomic<bool>` seq_cst | **OK** (per-variable) |
-| `transmittedFlag` | `:469` | DIO1 ISR | `loopTask` (+ written `:2231`) | atomic | OK |
-| `bEnableInterruptReceive` / `bEnableInterruptTransmit` | `:462`, `:470` | `loopTask` | DIO1 ISR | atomic | **RACE as a pair** — see F2-7 |
-| `scanFlag` | `:473` | **nobody** | **nobody** | atomic | **OVER-SYNC / dead** — F2-6 |
-| `transmissionState` | `:459` | `loopTask` (`doTX`) | `loopTask` | `volatile int` | OVER-SYNC (ESP32) |
-| `ringBuffer[MAX_RING][…]` | `loop_functions.cpp:383` | ESP32: `loopTask` only (16 sites). nRF52: **`LORA` task** (`lora_functions.cpp:262,980,1014,1169,1927`) **+ `loop_task`** (`loop_functions.cpp:3218,3629,3767,3848,3926,4005,4275,4292`; `udp_functions.cpp:350`; `nrf_eth.cpp:463`) | same | none | ESP32 **single**; nRF52 **RACE** — F2-4 |
-| `iWrite` / `iRead` | `loop_functions.cpp:384-385` | same as above | same | `std::atomic<uint8_t>` | ESP32 **OVER-SYNC**; nRF52 **RACE** (atomicity ≠ mutual exclusion) — F2-4 |
-| `ringPriority[]`, `ringEnqueueTime[]`, `retryCount[]` | `loop_functions.cpp:388`, `lora_functions.cpp` | as `ringBuffer` | as `ringBuffer` | none | ESP32 single; nRF52 **RACE** |
-| `ringBufferLoraRX[]` + `loraWrite` | `loop_functions.cpp:392-393` | ESP32 loop; nRF52 `LORA` task **+ loop** (`addLoraRxBuffer` from `OnRxDone` and from GW ACK) | `is_new_packet`, `checkOwnRx`, `checkServerRx` | `loraWrite` atomic; slot bytes unprotected | ESP32 OVER-SYNC; nRF52 **RACE** (small) |
-| `is_receiving` | `loop_functions.cpp:421` | ESP32: `loopTask` (`:2355`, `:3709`, `:3866`, `OnRxDone`); nRF52: `LORA` task | ESP32 loop; nRF52 loop `:1329` | atomic | ESP32 **OVER-SYNC**; nRF52 OK-ish (load/store gate is TOCTOU, F2-17) |
-| `tx_is_active` | `:422` | ESP32 loop; nRF52 `doTX`(loop) + `OnTxDone`(LORA) | loop | atomic | ESP32 **OVER-SYNC**; nRF52 OK |
-| `cad_in_progress`, `cad_done_flag`, `cad_double_check`, `cad_channel_busy` | `nrf52/nrf52_main.cpp:235-238` | nRF52: `OnCadDone`(LORA), `OnRxDone/OnRxError/OnRxTimeout`(LORA), loop | loop | atomic **+** `taskENTER_CRITICAL` snapshot (`nrf52_main.cpp:1332-1338`) | **OK** (nRF52); **not compiled on ESP32** |
-| `cad_attempt`, `csma_timeout`, `rx_irq_defer_count` | `loop_functions.cpp:425-427` | nRF52: `OnRxDone` (`lora_functions.cpp:402,1242`), `csma_reset()`(both ctx), loop | both | none | ESP32 single; nRF52 **RACE (benign-ish)** — F2-15 |
-| `ch_util_rx_start` | `loop_functions.cpp:429` | nRF52 `OnHeaderDetect` only | `OnRxDone`, `OnRxError`, `OnRxTimeout` | atomic | ESP32 **OVER-SYNC + dead** (`esp32_main.cpp:3775` says it is never set); nRF52 OK |
-| `ch_util_tx_start` | `:430` | ESP32 loop only; nRF52 loop only | loop | atomic | **OVER-SYNC** both |
-| `ch_util_rx_accum` / `ch_util_tx_accum` | `:431-432` | ESP32 loop (`checkRX`, `OnRxDone`); nRF52 LORA task | loop (`.exchange(0)`) | atomic RMW (`fetch_add`, `exchange`) | ESP32 **OVER-SYNC**; nRF52 **OK** (correct RMW usage) |
-| `pendingDisplayMsg` (7 × `String`), `pendingDisplayRssi/Snr`, `bPendingDisplayText/Pos` | `lora_functions.cpp:109-118` | `queueDisplayText/Position` `:126,:145` — ESP32 loop, nRF52 LORA task | ESP32 `esp32_main.cpp:1944-1957`; nRF52 `nrf52_main.cpp:1254-1270` | `portMUX_TYPE displayMux` / `taskENTER_CRITICAL` | ESP32 **OVER-SYNC + dangerous** — F2-2; nRF52 **OK but dangerous** — F2-1 |
-| `bSetLoRaAPRS` | `loop_functions.cpp:86` (`volatile bool`) | ESP32 loop; nRF52 `doTX`(loop) + `OnTxDone/OnTxTimeout`(LORA) | both | `volatile` | ESP32 **OVER-SYNC**; nRF52 RACE (benign, single-core, no tearing) |
-| `bSPI_ETH_Active`, `bPendingRadioRx` | `lora_functions.cpp:114-115` | loop (`nrf52_main.cpp:1879,1891,2276,2301,2309,2318`) | `LORA` task (`lora_functions.cpp:341,1970,1977`) | `volatile` only | nRF52 **RACE (advisory guard)** — F2-19 |
-| `onrxdone_max_ms`, `onrxdone_warn_count` | `lora_functions.cpp:105-106` | nRF52 `LORA` task (`:1229,:1232`) | loop (`nrf52_main.cpp:1289-1291`, reset to 0) | none | nRF52 **RACE (stats corruption)** |
-| `iReceiveTimeOutTime` | `esp32_main.cpp:465` / extern | nRF52 `LORA` task (`lora_functions.cpp:401,1241,1982`) + loop | both, as a timer base | none | nRF52 **RACE (benign)** |
-| `bLED_GREEN/RED/BLUE/ORANGE` | `esp32_main.cpp:161-169`, extern | nRF52 `LORA` task (`lora_functions.cpp:386`), `phone_commands.cpp:88` | loop LED block | none | nRF52 RACE (cosmetic) |
-| `RcvBuffer[UDP_TX_BUF_SIZE*2]` | `loop_functions_extern.h:147` | `OnRxDone` (`lora_functions.cpp:407,1162,1213`) | `OnRxDone`, `addNodeData`, `queueExtern` | none | ESP32 single; nRF52 **single (LORA task only)** — fine |
-| `lora_tx_buffer` | `lora_functions.cpp:97` | `doTX` (loop) | `doTX`, radio | none | single (loop) |
-| `stat_tx_count[]`, `stat_drop_count[]`, `stat_latency_*`, `stat_queue_hwm`, `stat_preempt_count`, `stat_csma_hwm_attempts` | `loop_functions_extern.h:236-244` | `addTxRingEntry`/`doTX`/`csma_reset` — nRF52 both contexts | loop print block | none | nRF52 **RACE (stats only)** |
+| Object                                                                                                                     | file:line                                      | Writers                                                                                                                                                                                                                              | Readers                                                            | Protection                                                              | Verdict                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `receiveFlag`                                                                                                              | `esp32/esp32_main.cpp:461`                     | DIO1 ISR (core 1)                                                                                                                                                                                                                    | `loopTask`, also written by loop `:2214` and `:2077,:3742`         | `std::atomic<bool>` seq_cst                                             | **OK** (per-variable)                                                             |
+| `transmittedFlag`                                                                                                          | `:469`                                         | DIO1 ISR                                                                                                                                                                                                                             | `loopTask` (+ written `:2231`)                                     | atomic                                                                  | OK                                                                                |
+| `bEnableInterruptReceive` / `bEnableInterruptTransmit`                                                                     | `:462`, `:470`                                 | `loopTask`                                                                                                                                                                                                                           | DIO1 ISR                                                           | atomic                                                                  | **RACE as a pair** — see F2-7                                                     |
+| `scanFlag`                                                                                                                 | `:473`                                         | **nobody**                                                                                                                                                                                                                           | **nobody**                                                         | atomic                                                                  | **OVER-SYNC / dead** — F2-6                                                       |
+| `transmissionState`                                                                                                        | `:459`                                         | `loopTask` (`doTX`)                                                                                                                                                                                                                  | `loopTask`                                                         | `volatile int`                                                          | OVER-SYNC (ESP32)                                                                 |
+| `ringBuffer[MAX_RING][…]`                                                                                                  | `loop_functions.cpp:383`                       | ESP32: `loopTask` only (16 sites). nRF52: **`LORA` task** (`lora_functions.cpp:262,980,1014,1169,1927`) **+ `loop_task`** (`loop_functions.cpp:3218,3629,3767,3848,3926,4005,4275,4292`; `udp_functions.cpp:350`; `nrf_eth.cpp:463`) | same                                                               | none                                                                    | ESP32 **single**; nRF52 **RACE** — F2-4                                           |
+| `iWrite` / `iRead`                                                                                                         | `loop_functions.cpp:384-385`                   | same as above                                                                                                                                                                                                                        | same                                                               | `std::atomic<uint8_t>`                                                  | ESP32 **OVER-SYNC**; nRF52 **RACE** (atomicity ≠ mutual exclusion) — F2-4         |
+| `ringPriority[]`, `ringEnqueueTime[]`, `retryCount[]`                                                                      | `loop_functions.cpp:388`, `lora_functions.cpp` | as `ringBuffer`                                                                                                                                                                                                                      | as `ringBuffer`                                                    | none                                                                    | ESP32 single; nRF52 **RACE**                                                      |
+| `ringBufferLoraRX[]` + `loraWrite`                                                                                         | `loop_functions.cpp:392-393`                   | ESP32 loop; nRF52 `LORA` task **+ loop** (`addLoraRxBuffer` from `OnRxDone` and from GW ACK)                                                                                                                                         | `is_new_packet`, `checkOwnRx`, `checkServerRx`                     | `loraWrite` atomic; slot bytes unprotected                              | ESP32 OVER-SYNC; nRF52 **RACE** (small)                                           |
+| `is_receiving`                                                                                                             | `loop_functions.cpp:421`                       | ESP32: `loopTask` (`:2355`, `:3709`, `:3866`, `OnRxDone`); nRF52: `LORA` task                                                                                                                                                        | ESP32 loop; nRF52 loop `:1329`                                     | atomic                                                                  | ESP32 **OVER-SYNC**; nRF52 OK-ish (load/store gate is TOCTOU, F2-17)              |
+| `tx_is_active`                                                                                                             | `:422`                                         | ESP32 loop; nRF52 `doTX`(loop) + `OnTxDone`(LORA)                                                                                                                                                                                    | loop                                                               | atomic                                                                  | ESP32 **OVER-SYNC**; nRF52 OK                                                     |
+| `cad_in_progress`, `cad_done_flag`, `cad_double_check`, `cad_channel_busy`                                                 | `nrf52/nrf52_main.cpp:235-238`                 | nRF52: `OnCadDone`(LORA), `OnRxDone/OnRxError/OnRxTimeout`(LORA), loop                                                                                                                                                               | loop                                                               | atomic **+** `taskENTER_CRITICAL` snapshot (`nrf52_main.cpp:1332-1338`) | **OK** (nRF52); **not compiled on ESP32**                                         |
+| `cad_attempt`, `csma_timeout`, `rx_irq_defer_count`                                                                        | `loop_functions.cpp:425-427`                   | nRF52: `OnRxDone` (`lora_functions.cpp:402,1242`), `csma_reset()`(both ctx), loop                                                                                                                                                    | both                                                               | none                                                                    | ESP32 single; nRF52 **RACE (benign-ish)** — F2-15                                 |
+| `ch_util_rx_start`                                                                                                         | `loop_functions.cpp:429`                       | nRF52 `OnHeaderDetect` only                                                                                                                                                                                                          | `OnRxDone`, `OnRxError`, `OnRxTimeout`                             | atomic                                                                  | ESP32 **OVER-SYNC + dead** (`esp32_main.cpp:3775` says it is never set); nRF52 OK |
+| `ch_util_tx_start`                                                                                                         | `:430`                                         | ESP32 loop only; nRF52 loop only                                                                                                                                                                                                     | loop                                                               | atomic                                                                  | **OVER-SYNC** both                                                                |
+| `ch_util_rx_accum` / `ch_util_tx_accum`                                                                                    | `:431-432`                                     | ESP32 loop (`checkRX`, `OnRxDone`); nRF52 LORA task                                                                                                                                                                                  | loop (`.exchange(0)`)                                              | atomic RMW (`fetch_add`, `exchange`)                                    | ESP32 **OVER-SYNC**; nRF52 **OK** (correct RMW usage)                             |
+| `pendingDisplayMsg` (7 × `String`), `pendingDisplayRssi/Snr`, `bPendingDisplayText/Pos`                                    | `lora_functions.cpp:109-118`                   | `queueDisplayText/Position` `:126,:145` — ESP32 loop, nRF52 LORA task                                                                                                                                                                | ESP32 `esp32_main.cpp:1944-1957`; nRF52 `nrf52_main.cpp:1254-1270` | `portMUX_TYPE displayMux` / `taskENTER_CRITICAL`                        | ESP32 **OVER-SYNC + dangerous** — F2-2; nRF52 **OK but dangerous** — F2-1         |
+| `bSetLoRaAPRS`                                                                                                             | `loop_functions.cpp:86` (`volatile bool`)      | ESP32 loop; nRF52 `doTX`(loop) + `OnTxDone/OnTxTimeout`(LORA)                                                                                                                                                                        | both                                                               | `volatile`                                                              | ESP32 **OVER-SYNC**; nRF52 RACE (benign, single-core, no tearing)                 |
+| `bSPI_ETH_Active`, `bPendingRadioRx`                                                                                       | `lora_functions.cpp:114-115`                   | loop (`nrf52_main.cpp:1879,1891,2276,2301,2309,2318`)                                                                                                                                                                                | `LORA` task (`lora_functions.cpp:341,1970,1977`)                   | `volatile` only                                                         | nRF52 **RACE (advisory guard)** — F2-19                                           |
+| `onrxdone_max_ms`, `onrxdone_warn_count`                                                                                   | `lora_functions.cpp:105-106`                   | nRF52 `LORA` task (`:1229,:1232`)                                                                                                                                                                                                    | loop (`nrf52_main.cpp:1289-1291`, reset to 0)                      | none                                                                    | nRF52 **RACE (stats corruption)**                                                 |
+| `iReceiveTimeOutTime`                                                                                                      | `esp32_main.cpp:465` / extern                  | nRF52 `LORA` task (`lora_functions.cpp:401,1241,1982`) + loop                                                                                                                                                                        | both, as a timer base                                              | none                                                                    | nRF52 **RACE (benign)**                                                           |
+| `bLED_GREEN/RED/BLUE/ORANGE`                                                                                               | `esp32_main.cpp:161-169`, extern               | nRF52 `LORA` task (`lora_functions.cpp:386`), `phone_commands.cpp:88`                                                                                                                                                                | loop LED block                                                     | none                                                                    | nRF52 RACE (cosmetic)                                                             |
+| `RcvBuffer[UDP_TX_BUF_SIZE*2]`                                                                                             | `loop_functions_extern.h:147`                  | `OnRxDone` (`lora_functions.cpp:407,1162,1213`)                                                                                                                                                                                      | `OnRxDone`, `addNodeData`, `queueExtern`                           | none                                                                    | ESP32 single; nRF52 **single (LORA task only)** — fine                            |
+| `lora_tx_buffer`                                                                                                           | `lora_functions.cpp:97`                        | `doTX` (loop)                                                                                                                                                                                                                        | `doTX`, radio                                                      | none                                                                    | single (loop)                                                                     |
+| `stat_tx_count[]`, `stat_drop_count[]`, `stat_latency_*`, `stat_queue_hwm`, `stat_preempt_count`, `stat_csma_hwm_attempts` | `loop_functions_extern.h:236-244`              | `addTxRingEntry`/`doTX`/`csma_reset` — nRF52 both contexts                                                                                                                                                                           | loop print block                                                   | none                                                                    | nRF52 **RACE (stats only)**                                                       |
 
 ### BLE / phone
 
-| Object | file:line | Writers | Readers | Protection | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `bleQueue` (5 × `BleQueueItem`) | `esp32/esp32_main.cpp:277,1578` | NimBLE task core 0 (`:359`) | `loopTask` core 1 (`:2775`) | FreeRTOS queue, non-blocking both sides | **OK** — the one genuinely correct cross-core primitive |
-| `deviceConnected` | `esp32_main.cpp:282` | NimBLE task **core 0** (`:305,:316`) | `loopTask` **core 1** (`:2728,:2741,:2762`) | none, plain `bool` | **RACE (cross-core)** — F2-8 |
-| `g_ble_conn_handle` | `:284` | NimBLE core 0 (`:308`) | `loopTask` core 1 (`:2736` → `pServer->disconnect()`) | none, plain `uint16_t` | **RACE (cross-core)** — F2-8 |
-| `config_to_phone_prepare`, `conffin_sent` | `:289-290` | NimBLE core 0 (`:306-307`), `loopTask` (`:2752,:2809,:2846`), `readPhoneCommand` | `loopTask` | none | **RACE (cross-core)** — F2-8 |
-| `oldDeviceConnected` | `:283` | `loopTask` only | `loopTask` | none | single |
-| `BLEtoPhoneBuff[]`, `toPhoneWrite`, `toPhoneRead` | `loop_functions.cpp:409-411` | `addBLEOutBuffer` (`:525`) — ESP32 loop; **nRF52 `LORA` task + Bluefruit callback task + loop** | `sendToPhone` (`phone_commands.cpp:50`) — loop | none, plain `int` | ESP32 single; **nRF52 RACE** — F2-5 (= verdict CONC-15, **NOT FIXED**) |
-| `BLEComToPhoneBuff[]`, `ComToPhoneWrite/Read` | `loop_functions.cpp:414-416` | `addBLEComToOutBuffer` — nRF52 Bluefruit callback task via `readPhoneCommand`/`commandAction` | loop | none | **nRF52 RACE** |
-| `ringBufferUDPout[]`, `udpWrite`, `udpRead` | `loop_functions.cpp:404-406` | `addNodeData` from `OnRxDone` — nRF52 `LORA` task | `sendUDP`/loop | none, plain `int` | ESP32 single; **nRF52 RACE** — F2-5 (= CONC-16, **NOT FIXED**) |
-| `textbuff_phone`, `txt_msg_len_phone`, `hasMsgFromPhone` | `phone_commands.cpp:22-23`, `loop_functions.cpp:417` | ESP32 `loopTask` (via `bleQueue`); **nRF52 Bluefruit callback task** (`api_functions.cpp:254`) | `loopTask` (`esp32_main.cpp:2781`, `nrf52_main.cpp`) | none | ESP32 single; **nRF52 RACE** — F2-11 |
-| `meshcom_settings` (≈400 B struct with `char[40]`, `double`, `float`) | `esp32/esp32_flash.h:236`, `nrf52/WisBlock-API.h:382` | ESP32: loop only. **nRF52: Bluefruit callback task (`api_functions.cpp:319` `memcpy` + `save_settings()`), plus `readPhoneCommand` writes (`phone_commands.cpp:517-519`)**, plus loop | **everything**, incl. `LORA` task (`encodeAPRS`, `checkMesh`, `node_call` compares) | none | ESP32 single; **nRF52 RACE (torn multi-word)** — F2-12 (= CONC-17, **NOT FIXED**) |
-| `isPhoneReady` | `loop_functions.cpp:434` | nRF52 callbacks (`api_functions.cpp:214,231`), loop | `OnRxDone` (`lora_functions.cpp:891,1041`), loop | none | nRF52 RACE (benign `int`) |
-| `g_ble_uart_is_connected` | `esp32_main.cpp:527` | loop; nRF52 callbacks | `sendToPhone`, `addBLEComToOutBuffer` | none | nRF52 RACE |
-| `ble_busy_flag` | `phone_commands.cpp:33` | `sendToPhone`/`sendComToPhone` | same | none — used as a lock, plain `bool` | RACE (TOCTOU lock) |
-| `g_task_event_type` | `nrf52/WisBlock-API.cpp:24` (`volatile uint16_t`) | `\|=` from Bluefruit callback task (`nrf52_ble.cpp:247,342`) and `api_wake_loop` (`api_functions.cpp:285`) | loop | `volatile` only | **RACE (lost RMW)** — F2-9 |
-| `g_task_sem` | `WisBlock-API.cpp:18` | give from callback task; take with `portMAX_DELAY` in `api_wait_wake` (`api_functions.cpp:262`) and `xSemaphoreTake(g_task_sem,10)` (`nrf52_main.cpp:854`) | — | binary semaphore | OK (but see F2-13) |
+| Object                                                                | file:line                                             | Writers                                                                                                                                                                               | Readers                                                                             | Protection                              | Verdict                                                                           |
+| --------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------- |
+| `bleQueue` (5 × `BleQueueItem`)                                       | `esp32/esp32_main.cpp:277,1578`                       | NimBLE task core 0 (`:359`)                                                                                                                                                           | `loopTask` core 1 (`:2775`)                                                         | FreeRTOS queue, non-blocking both sides | **OK** — the one genuinely correct cross-core primitive                           |
+| `deviceConnected`                                                     | `esp32_main.cpp:282`                                  | NimBLE task **core 0** (`:305,:316`)                                                                                                                                                  | `loopTask` **core 1** (`:2728,:2741,:2762`)                                         | none, plain `bool`                      | **RACE (cross-core)** — F2-8                                                      |
+| `g_ble_conn_handle`                                                   | `:284`                                                | NimBLE core 0 (`:308`)                                                                                                                                                                | `loopTask` core 1 (`:2736` → `pServer->disconnect()`)                               | none, plain `uint16_t`                  | **RACE (cross-core)** — F2-8                                                      |
+| `config_to_phone_prepare`, `conffin_sent`                             | `:289-290`                                            | NimBLE core 0 (`:306-307`), `loopTask` (`:2752,:2809,:2846`), `readPhoneCommand`                                                                                                      | `loopTask`                                                                          | none                                    | **RACE (cross-core)** — F2-8                                                      |
+| `oldDeviceConnected`                                                  | `:283`                                                | `loopTask` only                                                                                                                                                                       | `loopTask`                                                                          | none                                    | single                                                                            |
+| `BLEtoPhoneBuff[]`, `toPhoneWrite`, `toPhoneRead`                     | `loop_functions.cpp:409-411`                          | `addBLEOutBuffer` (`:525`) — ESP32 loop; **nRF52 `LORA` task + Bluefruit callback task + loop**                                                                                       | `sendToPhone` (`phone_commands.cpp:50`) — loop                                      | none, plain `int`                       | ESP32 single; **nRF52 RACE** — F2-5 (= verdict CONC-15, **NOT FIXED**)            |
+| `BLEComToPhoneBuff[]`, `ComToPhoneWrite/Read`                         | `loop_functions.cpp:414-416`                          | `addBLEComToOutBuffer` — nRF52 Bluefruit callback task via `readPhoneCommand`/`commandAction`                                                                                         | loop                                                                                | none                                    | **nRF52 RACE**                                                                    |
+| `ringBufferUDPout[]`, `udpWrite`, `udpRead`                           | `loop_functions.cpp:404-406`                          | `addNodeData` from `OnRxDone` — nRF52 `LORA` task                                                                                                                                     | `sendUDP`/loop                                                                      | none, plain `int`                       | ESP32 single; **nRF52 RACE** — F2-5 (= CONC-16, **NOT FIXED**)                    |
+| `textbuff_phone`, `txt_msg_len_phone`, `hasMsgFromPhone`              | `phone_commands.cpp:22-23`, `loop_functions.cpp:417`  | ESP32 `loopTask` (via `bleQueue`); **nRF52 Bluefruit callback task** (`api_functions.cpp:254`)                                                                                        | `loopTask` (`esp32_main.cpp:2781`, `nrf52_main.cpp`)                                | none                                    | ESP32 single; **nRF52 RACE** — F2-11                                              |
+| `meshcom_settings` (≈400 B struct with `char[40]`, `double`, `float`) | `esp32/esp32_flash.h:236`, `nrf52/WisBlock-API.h:382` | ESP32: loop only. **nRF52: Bluefruit callback task (`api_functions.cpp:319` `memcpy` + `save_settings()`), plus `readPhoneCommand` writes (`phone_commands.cpp:517-519`)**, plus loop | **everything**, incl. `LORA` task (`encodeAPRS`, `checkMesh`, `node_call` compares) | none                                    | ESP32 single; **nRF52 RACE (torn multi-word)** — F2-12 (= CONC-17, **NOT FIXED**) |
+| `isPhoneReady`                                                        | `loop_functions.cpp:434`                              | nRF52 callbacks (`api_functions.cpp:214,231`), loop                                                                                                                                   | `OnRxDone` (`lora_functions.cpp:891,1041`), loop                                    | none                                    | nRF52 RACE (benign `int`)                                                         |
+| `g_ble_uart_is_connected`                                             | `esp32_main.cpp:527`                                  | loop; nRF52 callbacks                                                                                                                                                                 | `sendToPhone`, `addBLEComToOutBuffer`                                               | none                                    | nRF52 RACE                                                                        |
+| `ble_busy_flag`                                                       | `phone_commands.cpp:33`                               | `sendToPhone`/`sendComToPhone`                                                                                                                                                        | same                                                                                | none — used as a lock, plain `bool`     | RACE (TOCTOU lock)                                                                |
+| `g_task_event_type`                                                   | `nrf52/WisBlock-API.cpp:24` (`volatile uint16_t`)     | `\|=` from Bluefruit callback task (`nrf52_ble.cpp:247,342`) and `api_wake_loop` (`api_functions.cpp:285`)                                                                            | loop                                                                                | `volatile` only                         | **RACE (lost RMW)** — F2-9                                                        |
+| `g_task_sem`                                                          | `WisBlock-API.cpp:18`                                 | give from callback task; take with `portMAX_DELAY` in `api_wait_wake` (`api_functions.cpp:262`) and `xSemaphoreTake(g_task_sem,10)` (`nrf52_main.cpp:854`)                            | —                                                                                   | binary semaphore                        | OK (but see F2-13)                                                                |
 
 ### Net console / external UDP
 
-| Object | file:line | Writers | Readers | Protection | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `s_fd` | `net_console.cpp:53` | `authTask` core 1 (`:211`), `teardownClient` (`:113`) | `MeshSerialClass::write` (loop), `netConsoleRead` (`:402`), `netConsoleAvailable` (`:421`), `loopNetConsole` (`:345`) | mutex on writes; **`recv()` reads are unguarded** | **RACE** — F2-10 |
-| `s_mutex` | `:54` | `startNetConsole` (`:275`), **`stopNetConsole` (`:284`)** | everything | — | **RACE** — F2-10 (= CONC-19, **NOT FIXED**) |
-| `s_authenticated`, `s_peek_valid`, `s_peek_byte` | `:57,61,62` | `authTask` core 1, loop | loop, `authTask` | partial mutex; `s_authenticated` read outside lock (`:235,:249,:388`) | RACE (mild) |
-| `s_hs_running`, `s_server_pending` | `:56,58` | loop + `authTask` | loop | `volatile` | RACE (mild) |
-| `externQueue[2]` | `extudp_functions.cpp:57` | `queueExtern` (`:507`) — nRF52 `LORA` task | `flushExternQueue` (`:524`) — loop | `used` is `std::atomic<bool>` with correct release/acquire, **but producer never checks it** | **RACE** — F2-14 |
-| `externQueueWrite` | `:58` | producer only | producer only | none | single |
+| Object                                           | file:line                 | Writers                                                   | Readers                                                                                                               | Protection                                                                                   | Verdict                                     |
+| ------------------------------------------------ | ------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `s_fd`                                           | `net_console.cpp:53`      | `authTask` core 1 (`:211`), `teardownClient` (`:113`)     | `MeshSerialClass::write` (loop), `netConsoleRead` (`:402`), `netConsoleAvailable` (`:421`), `loopNetConsole` (`:345`) | mutex on writes; **`recv()` reads are unguarded**                                            | **RACE** — F2-10                            |
+| `s_mutex`                                        | `:54`                     | `startNetConsole` (`:275`), **`stopNetConsole` (`:284`)** | everything                                                                                                            | —                                                                                            | **RACE** — F2-10 (= CONC-19, **NOT FIXED**) |
+| `s_authenticated`, `s_peek_valid`, `s_peek_byte` | `:57,61,62`               | `authTask` core 1, loop                                   | loop, `authTask`                                                                                                      | partial mutex; `s_authenticated` read outside lock (`:235,:249,:388`)                        | RACE (mild)                                 |
+| `s_hs_running`, `s_server_pending`               | `:56,58`                  | loop + `authTask`                                         | loop                                                                                                                  | `volatile`                                                                                   | RACE (mild)                                 |
+| `externQueue[2]`                                 | `extudp_functions.cpp:57` | `queueExtern` (`:507`) — nRF52 `LORA` task                | `flushExternQueue` (`:524`) — loop                                                                                    | `used` is `std::atomic<bool>` with correct release/acquire, **but producer never checks it** | **RACE** — F2-14                            |
+| `externQueueWrite`                               | `:58`                     | producer only                                             | producer only                                                                                                         | none                                                                                         | single                                      |
 
 ### Misc
 
-| Object | file:line | Writers | Readers | Protection | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `gKeyNum` | `nrf52/nrf52_main.cpp:320` | GPIO ISR `interruptHandle2` (`:333`) | loop (`:1542,:1553,:1655`), loop also writes (`:1538,:1550,:1655`) | **none — not even `volatile`** | **RACE** — F2-16 |
-| `pulseTimes[]`, `pulseIndex`, `lastMicros` | `gps_functions.cpp:172-175` | `handleRxInterrupt` ISR | `detectBaudrate` | `volatile` | **OK** (single core, init-time only) |
-| `displayMux` | `lora_functions.cpp:122` | — | — | spinlock | ESP32 **OVER-SYNC** |
-| `audioSemaphore` | `esp32/esp32_audio.cpp:26` | binary sem used as mutex | audio task prio 50 core 1 | binary semaphore | pre-existing exception (audit 20260626 item 24) |
-| `xSemaphore` (T-Deck TFT) | `t-deck/tdeck_main.cpp:47` | `portMAX_DELAY` take at `:401` | — | binary semaphore as mutex | pre-existing exception |
+| Object                                     | file:line                   | Writers                              | Readers                                                            | Protection                     | Verdict                                         |
+| ------------------------------------------ | --------------------------- | ------------------------------------ | ------------------------------------------------------------------ | ------------------------------ | ----------------------------------------------- |
+| `gKeyNum`                                  | `nrf52/nrf52_main.cpp:320`  | GPIO ISR `interruptHandle2` (`:333`) | loop (`:1542,:1553,:1655`), loop also writes (`:1538,:1550,:1655`) | **none — not even `volatile`** | **RACE** — F2-16                                |
+| `pulseTimes[]`, `pulseIndex`, `lastMicros` | `gps_functions.cpp:172-175` | `handleRxInterrupt` ISR              | `detectBaudrate`                                                   | `volatile`                     | **OK** (single core, init-time only)            |
+| `displayMux`                               | `lora_functions.cpp:122`    | —                                    | —                                                                  | spinlock                       | ESP32 **OVER-SYNC**                             |
+| `audioSemaphore`                           | `esp32/esp32_audio.cpp:26`  | binary sem used as mutex             | audio task prio 50 core 1                                          | binary semaphore               | pre-existing exception (audit 20260626 item 24) |
+| `xSemaphore` (T-Deck TFT)                  | `t-deck/tdeck_main.cpp:47`  | `portMAX_DELAY` take at `:401`       | —                                                                  | binary semaphore as mutex      | pre-existing exception                          |
 
 ---
 
@@ -192,12 +193,12 @@ current buffer too small, calls `realloc`. newlib's `__malloc_lock` on this port
 the allocator then walks the free list. With BASEPRI masked, the SysTick and all SoftDevice
 application-priority interrupts are blocked for the whole allocation. On a fragmented heap this is
 tens to hundreds of microseconds ×7. During that window the SoftDevice cannot service its radio
-timeslot bookkeeping → BLE connection supervision timeouts, and the DIO1 edge for the *next* LoRa
+timeslot bookkeeping → BLE connection supervision timeouts, and the DIO1 edge for the _next_ LoRa
 packet is delayed, which is exactly the blind-window the surrounding code was written to avoid.
 
 **Fix.** Do not copy `String`s under a lock. Either (a) keep a preallocated
 `char pendingDisplay[…]` flat buffer and `memcpy` the already-encoded frame (`RcvBuffer`), decoding
-in the loop; or (b) reserve the `String`s once at boot (`reserve(N)`) *outside* the lock and copy
+in the loop; or (b) reserve the `String`s once at boot (`reserve(N)`) _outside_ the lock and copy
 only into the reserved capacity; or (c) replace the lock with a single-producer/single-consumer
 `xQueueSend`/`xQueueReceive` of a POD struct, exactly like `bleQueue`.
 
@@ -211,9 +212,9 @@ only into the reserved capacity; or (c) replace the lock with a single-producer/
 The comment says "RACE-01 fix: spinlock protects `pendingDisplayMsg` struct copy between **ISR** and
 main loop". On ESP32 there is no ISR on either side:
 
-* Producer: `queueDisplayText` ← `OnRxDone` ← `checkRX` (`esp32_main.cpp:3778`) ← `esp32loop`
+- Producer: `queueDisplayText` ← `OnRxDone` ← `checkRX` (`esp32_main.cpp:3778`) ← `esp32loop`
   (`:2205`). `loopTask`, core 1.
-* Consumer: `esp32loop` `:1944-1957`. `loopTask`, core 1.
+- Consumer: `esp32loop` `:1944-1957`. `loopTask`, core 1.
 
 Same task. The lock can never be contended, and the flags can never be observed mid-update.
 Meanwhile `portENTER_CRITICAL(&displayMux)` disables interrupts on core 1 and the enclosed
@@ -275,7 +276,7 @@ chip to sleep. `taskENTER_CRITICAL(); Radio.Send(...)` → `SX126xWakeup` → `S
 1000 × `vTaskDelay(1)` with the tick frozen. The task manipulates its own state-list entry 1000
 times with the scheduler's invariants violated. Best case: the SPI command sequence is issued
 while BUSY is still high and the SX1262 silently drops it → the packet is never transmitted and
-`TxTimeoutTimer` fires 
+`TxTimeoutTimer` fires
 later. Worst case: FreeRTOS list corruption on the delayed list.
 
 **Fix.** The critical section is there to keep the `LORA` task out. Use the same tool the CAD path
@@ -292,7 +293,7 @@ API inside `taskENTER_CRITICAL()`.
 **Severity: HIGH.**
 
 `docs/code-audit-fixes-20260627.md:33` records C1 as "`iWrite/iRead` → `std::atomic<uint8_t>` ✅ done"
-and `fable-verdict.md:171` frames the remaining work as "indices/paths that fix did not cover".
+and `docs/code-audit-20260712.md:171` frames the remaining work as "indices/paths that fix did not cover".
 Both understate the problem: **making the indices atomic does not make the enqueue atomic.** The
 enqueue is:
 
@@ -303,9 +304,10 @@ memcpy(ringBuffer[iWrite]+2, …, size); // read iWrite  again
 addTxRingEntry(...);                   // ringPriority[w], ringEnqueueTime[w], then iWrite = w+1
 ```
 
-Nothing prevents two contexts from loading the *same* `iWrite`.
+Nothing prevents two contexts from loading the _same_ `iWrite`.
 
 **Concrete interleaving (nRF52).**
+
 1. `loop_task` (prio 1) is in `sendMessage()` (`loop_functions.cpp:3218`): it has executed
    `ringBuffer[iWrite][0]=aprsmsg.msg_len;` with `iWrite == 5` and is inside the `memcpy` at `:3219`.
 2. A LoRa packet arrives. `LORA` task (prio 2) preempts mid-`memcpy`.
@@ -342,7 +344,7 @@ with more atomics.
 Ring pointer helper `src/loop_functions.cpp:4710` still takes `volatile int&`.
 **Severity: MED-HIGH.** **Status: prior art claims these are open; confirmed still open.**
 
-`fable-verdict.md:43-44` (CONC-15, CONC-16) describes exactly this. Verified at HEAD `1ba101f4`:
+`docs/code-audit-20260712.md:43-44` (CONC-15, CONC-16) describes exactly this. Verified at HEAD `1ba101f4`:
 unchanged. Additionally `ComToPhoneWrite` (`addBLEComToOutBuffer`, `loop_functions.cpp:593-602`)
 has the same shape and is **not** listed in the verdict — on nRF52 it is written from the Bluefruit
 callback task (`readPhoneCommand` → `commandAction` → `addBLECommandBack`) while the loop task
@@ -376,10 +378,13 @@ read "CAD flags are atomic on ESP32" and believe the CAD path is synchronised.
 **Severity: MED-HIGH.**
 
 ISR:
+
 ```
 if(bEnableInterruptReceive) receiveFlag = true;
 ```
+
 Loop:
+
 ```
 bEnableInterruptReceive = false;
 receiveFlag = false;
@@ -389,13 +394,13 @@ bEnableInterruptReceive = true;
 
 **Interleaving A (spurious flag).** ISR evaluates `bEnableInterruptReceive` → true. Loop then
 executes both stores (`gate=false`, `flag=false`). ISR resumes and stores `receiveFlag = true`.
-The loop now enters `checkRX()` on the *next* iteration with no packet in the FIFO;
+The loop now enters `checkRX()` on the _next_ iteration with no packet in the FIFO;
 `radio.readData()` returns an error and the code takes the `RX_OTHER_ERROR` path, restarting RX
 unnecessarily. Observable as `[MC-DBG] RX_OTHER_ERROR code=…` bursts.
 
 **Interleaving B (lost edge).** Loop sets `bEnableInterruptReceive = false` at `:2144` before
 `radio.startReceive()`; DIO1 rises during the reconfiguration; ISR sees the gate closed and drops
-the edge. This one is *partially* mitigated by the deliberate `digitalRead(LORA_DIO1) == HIGH`
+the edge. This one is _partially_ mitigated by the deliberate `digitalRead(LORA_DIO1) == HIGH`
 recovery at `:2167-2173`, `:2293-2300`, `:3741-3746` — good defensive engineering, worth keeping —
 but the recovery only covers level-still-high, not a pulse that has already fallen.
 
@@ -421,7 +426,7 @@ The affected objects are plain, non-`volatile`, non-atomic:
 `bool deviceConnected`, `uint16_t g_ble_conn_handle`, `bool config_to_phone_prepare`,
 `bool conffin_sent`.
 
-The project got the *data* path right (`bleQueue`, `:359`/`:2775`) and then left the *control* path
+The project got the _data_ path right (`bleQueue`, `:359`/`:2775`) and then left the _control_ path
 unsynchronised.
 
 **Failure scenario 1 (stale handle → disconnect of the wrong link).** Phone A disconnects and
@@ -475,19 +480,19 @@ and `exchange(0, std::memory_order_acquire)` on the loop's consume. One-line cha
 
 **File:** `src/net_console.cpp:284` (`s_mutex = xSemaphoreCreateMutex();` inside `stopNetConsole`),
 `:291` (`teardownClient()` called without holding the mutex), `:109-118` (asymmetric
-lock protocol — the function *gives* a mutex its caller took), `:288-289` (missing braces),
+lock protocol — the function _gives_ a mutex its caller took), `:288-289` (missing braces),
 `:402`, `:421`, `:345` (`::recv(s_fd, …)` with no lock), `:208`, `:348` (`portMAX_DELAY`), `:378`
 (`authTask` pinned to core 1 prio 1).
-**Severity: MED.** **Status: `fable-verdict.md:47,209-214` describes this precisely; confirmed
+**Severity: MED.** **Status: `docs/code-audit-20260712.md:47,209-214` describes this precisely; confirmed
 unchanged at HEAD.**
 
 Beyond the verdict's description, two additions:
 
-* **Unlocked `recv` on a mutable fd.** `netConsoleRead()` (`:402`) and `netConsoleAvailable()`
-  (`:421`) call `::recv(s_fd, …)` with no mutex, while `authTask` on the *same core, same priority*
+- **Unlocked `recv` on a mutable fd.** `netConsoleRead()` (`:402`) and `netConsoleAvailable()`
+  (`:421`) call `::recv(s_fd, …)` with no mutex, while `authTask` on the _same core, same priority_
   can round-robin in and execute `if (s_fd >= 0) ::close(s_fd); s_fd = fd;` (`:210-211`). lwIP
   reuses small fd numbers aggressively; a console read can land on a freshly-opened UDP mesh socket.
-* **`s_hs_running` is never cleared by `stopNetConsole`**, so after `--extser off` / `--extser on`
+- **`s_hs_running` is never cleared by `stopNetConsole`**, so after `--extser off` / `--extser on`
   during a handshake, every subsequent connection is rejected with "auth already in progress" until
   reboot.
 
@@ -502,7 +507,7 @@ with the same mutex (`xSemaphoreTake(..., 0)` is fine — a missed poll is harml
 
 **File:** `src/nrf52/api_functions.cpp:243-263` (`bleuart_rx_callback` → `readPhoneCommand(conf_data)`
 at `:254`); the contradicted comment is `src/phone_commands.cpp:528-529`.
-**Severity: MED-HIGH.** **Status: CONC-14 in `fable-verdict.md:176`; confirmed NOT fixed.**
+**Severity: MED-HIGH.** **Status: CONC-14 in `docs/code-audit-20260712.md:176`; confirmed NOT fixed.**
 
 The comment reads:
 
@@ -520,7 +525,7 @@ documentation-induced regression and should be called out as such in the fix.
 enters `readPhoneCommand` case `0xA0` (`phone_commands.cpp:527-546`): it sets
 `txt_msg_len_phone = msg_len-2`, writes `textbuff_phone`, then sets `hasMsgFromPhone = true`. If it
 is preempted between the `txt_msg_len_phone` store and the `memcpy` — or if the loop task was
-already past `if(hasMsgFromPhone)` from a *previous* message — the loop executes
+already past `if(hasMsgFromPhone)` from a _previous_ message — the loop executes
 `sendMessage(textbuff_phone, txt_msg_len_phone)` (`esp32_main.cpp:2784` equivalent in
 `nrf52_main.cpp`) with a **new length against an old buffer**, transmitting whatever bytes follow
 the shorter previous message, including heap contents past the terminator.
@@ -536,7 +541,7 @@ nRF52 BLE entries in the ownership map.
 **File:** `src/nrf52/api_functions.cpp:296-347`; `delay(1000)` at `:300`;
 `memcpy((void*)&meshcom_settings, data, sizeof(s_meshcom_settings))` at `:319`; `save_settings()`
 at `:322`.
-**Severity: MED-HIGH.** **Status: CONC-17 in `fable-verdict.md`; confirmed NOT fixed.**
+**Severity: MED-HIGH.** **Status: CONC-17 in `docs/code-audit-20260712.md`; confirmed NOT fixed.**
 
 `s_meshcom_settings` (`src/esp32/esp32_flash.h:8+`) is a ~400-byte struct with `char node_call[10]`,
 `double node_lat/node_lon`, `float`s and `int`s. The `memcpy` is a plain byte copy from a prio-2
@@ -628,7 +633,7 @@ the other findings.
 
 More consequentially, `csma_timeout` is a plain `unsigned long` written by `OnRxDone` and read by
 the loop's `if((millis() - iReceiveTimeOutTime) >= csma_timeout)` at `nrf52_main.cpp:1295`. A torn
-read is impossible (32-bit aligned, single core) but a *stale* read is not — the loop can use the
+read is impossible (32-bit aligned, single core) but a _stale_ read is not — the loop can use the
 previous backoff for one iteration. Benign, but it should be documented rather than accidental.
 
 **Fix.** For the stats, accept the imprecision but say so in a comment. For `csma_timeout` /
@@ -669,6 +674,7 @@ looked at.
 if(is_receiving) return -1;
 is_receiving = true;
 ```
+
 Load then store, not `compare_exchange`. On ESP32 both accesses are in `loopTask`, so it cannot
 misfire today — but the shape is a trap for anyone who later moves `checkRX` into a task (which the
 T5-ePaper port has already done, `src/t5-epaper/peri_lora.cpp:208`). Use
@@ -692,7 +698,7 @@ The real issue: with `bLORADEBUG` on, `OnRxDone` performs dozens of `printfdeb` 
 priority-2 task. On nRF52 that is TinyUSB CDC, which can block when the host is not draining;
 on ESP32 the same function routes through `MeshSerialClass::write` → `xSemaphoreTake(s_mutex, 0)` →
 `::send()` (`net_console.cpp:246-258`). The `ONRXDONE_TIME` / `ONRXDONE_SLOW` instrumentation added
-to *measure* callback duration is itself the dominant contributor to that duration.
+to _measure_ callback duration is itself the dominant contributor to that duration.
 
 Also note `LORA_ISR_DEBUG` (guarding `:331,:337,:358,:364,:372`) is **defined nowhere in the repo**
 (`docs/architecture/07-verification-infrastructure.md:527` V-03 says the same). Consequence for this
@@ -712,7 +718,7 @@ compiled out.
 the `LORA` task before `startRadioReceive()`. Between the test at `lora_functions.cpp:341` and the
 SPI transaction inside `startRadioReceive()` there is no exclusion — the guard is a TOCTOU.
 
-It happens to work only because the `LORA` task has *higher* priority than the loop task, so the
+It happens to work only because the `LORA` task has _higher_ priority than the loop task, so the
 loop can never preempt the `LORA` task into the middle of a radio transaction. That invariant is
 established by a third-party library (`board.cpp:498`, `TASK_PRIO_NORMAL`) and is stated nowhere in
 this repo. If the RAK13800 driver ever yields inside a transaction while `bSPI_ETH_Active` is still
@@ -769,22 +775,22 @@ and nothing else. `OnRxDone`/`OnTxDone`/`OnRxError`/`OnRxTimeout` are called onl
 into shared state is `xQueueSend(bleQueue, …)` (`:359`). Therefore anything not named
 `receiveFlag`/`transmittedFlag`/`bEnableInterrupt*` and not written by NimBLE is `loopTask`-only.
 
-| Object | file:line | Why it is single-context on ESP32 | Action |
-| --- | --- | --- | --- |
-| `std::atomic<bool> scanFlag` | `esp32_main.cpp:473` | **Zero readers, zero writers** anywhere in the tree. ESP32 CAD uses blocking `radio.scanChannel()` (`:2380`). | **Delete.** Correct the audit trail (`code-audit-fixes-20260627.md:29`). |
-| `std::atomic<bool> is_receiving` | `loop_functions.cpp:421` | writers `:2355`, `:3709`, `:3866`, `OnRxDone`; readers `:3192`, `:3314`, `:3706`, `:2299` — all `loopTask` | plain `bool` on ESP32 |
-| `std::atomic<bool> tx_is_active` | `:422` | written in `doTX` and `OnTxDone`, both `loopTask` | plain `bool` on ESP32 |
-| `std::atomic<unsigned long> ch_util_rx_start` | `:429` | **never written on ESP32** — the code says so itself at `esp32_main.cpp:3775` | remove from ESP32 build |
-| `std::atomic<unsigned long> ch_util_tx_start` | `:430` | written `:2038`, `:2427`; read `:2031` — all `loopTask` | plain |
-| `std::atomic<unsigned long> ch_util_rx_accum` / `ch_util_tx_accum` | `:431-432` | `fetch_add` from `checkRX`/`OnRxDone` (loop), `exchange` from `esp32loop:1969` (loop) | plain |
-| `std::atomic<uint8_t> iWrite` / `iRead` | `:384-385` | all 16 enqueue sites and `doTX` are `loopTask` on ESP32 | plain on ESP32; **keep on nRF52 and add a real lock there** (F2-4) |
-| `std::atomic<uint8_t> loraWrite` | `:393` | `addLoraRxBuffer` called only from `OnRxDone` / GW-ACK path = `loopTask` | plain on ESP32 |
-| `portMUX_TYPE displayMux` + both critical sections | `lora_functions.cpp:122,129,138,148,157`; `esp32_main.cpp:1944,1957` | producer and consumer are both `loopTask` | **Delete on ESP32** — and it is actively harmful (F2-2) |
-| `volatile bool bPendingDisplayText` / `bPendingDisplayPos` | `lora_functions.cpp:109-110` | set in `queueDisplay*` (loop), cleared in `esp32loop` (loop) | plain `bool` on ESP32 |
-| `volatile int transmissionState` | `esp32_main.cpp:459` | written by `doTX` (loop), read at `:2251` (loop). The ISR never touches it. | plain `int` on ESP32 |
-| `volatile bool bSetLoRaAPRS` | `loop_functions.cpp:86` | all five ESP32 accesses (`:1098,:1758,:2268,:2271`) are `loopTask` | plain on ESP32; keep `volatile` on nRF52 |
-| `volatile bool bSPI_ETH_Active` / `bPendingRadioRx` | `lora_functions.cpp:114-115` | nRF52-only feature (W5100S); ESP32 never sets them | `#if defined(BOARD_RAK4630)` |
-| `taskENTER_CRITICAL()` around `cad_channel_busy = …; cad_done_flag.store(release)` | `nrf52/nrf52_main.cpp:390-394` | both are already `std::atomic`; the store pair is only ever read as a snapshot under the *reader's* critical section at `:1332-1338` | the critical section here is redundant with the atomics **or** the atomics are redundant with the critical section — pick one; currently paying for both |
+| Object                                                                             | file:line                                                            | Why it is single-context on ESP32                                                                                                    | Action                                                                                                                                                   |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `std::atomic<bool> scanFlag`                                                       | `esp32_main.cpp:473`                                                 | **Zero readers, zero writers** anywhere in the tree. ESP32 CAD uses blocking `radio.scanChannel()` (`:2380`).                        | **Delete.** Correct the audit trail (`code-audit-fixes-20260627.md:29`).                                                                                 |
+| `std::atomic<bool> is_receiving`                                                   | `loop_functions.cpp:421`                                             | writers `:2355`, `:3709`, `:3866`, `OnRxDone`; readers `:3192`, `:3314`, `:3706`, `:2299` — all `loopTask`                           | plain `bool` on ESP32                                                                                                                                    |
+| `std::atomic<bool> tx_is_active`                                                   | `:422`                                                               | written in `doTX` and `OnTxDone`, both `loopTask`                                                                                    | plain `bool` on ESP32                                                                                                                                    |
+| `std::atomic<unsigned long> ch_util_rx_start`                                      | `:429`                                                               | **never written on ESP32** — the code says so itself at `esp32_main.cpp:3775`                                                        | remove from ESP32 build                                                                                                                                  |
+| `std::atomic<unsigned long> ch_util_tx_start`                                      | `:430`                                                               | written `:2038`, `:2427`; read `:2031` — all `loopTask`                                                                              | plain                                                                                                                                                    |
+| `std::atomic<unsigned long> ch_util_rx_accum` / `ch_util_tx_accum`                 | `:431-432`                                                           | `fetch_add` from `checkRX`/`OnRxDone` (loop), `exchange` from `esp32loop:1969` (loop)                                                | plain                                                                                                                                                    |
+| `std::atomic<uint8_t> iWrite` / `iRead`                                            | `:384-385`                                                           | all 16 enqueue sites and `doTX` are `loopTask` on ESP32                                                                              | plain on ESP32; **keep on nRF52 and add a real lock there** (F2-4)                                                                                       |
+| `std::atomic<uint8_t> loraWrite`                                                   | `:393`                                                               | `addLoraRxBuffer` called only from `OnRxDone` / GW-ACK path = `loopTask`                                                             | plain on ESP32                                                                                                                                           |
+| `portMUX_TYPE displayMux` + both critical sections                                 | `lora_functions.cpp:122,129,138,148,157`; `esp32_main.cpp:1944,1957` | producer and consumer are both `loopTask`                                                                                            | **Delete on ESP32** — and it is actively harmful (F2-2)                                                                                                  |
+| `volatile bool bPendingDisplayText` / `bPendingDisplayPos`                         | `lora_functions.cpp:109-110`                                         | set in `queueDisplay*` (loop), cleared in `esp32loop` (loop)                                                                         | plain `bool` on ESP32                                                                                                                                    |
+| `volatile int transmissionState`                                                   | `esp32_main.cpp:459`                                                 | written by `doTX` (loop), read at `:2251` (loop). The ISR never touches it.                                                          | plain `int` on ESP32                                                                                                                                     |
+| `volatile bool bSetLoRaAPRS`                                                       | `loop_functions.cpp:86`                                              | all five ESP32 accesses (`:1098,:1758,:2268,:2271`) are `loopTask`                                                                   | plain on ESP32; keep `volatile` on nRF52                                                                                                                 |
+| `volatile bool bSPI_ETH_Active` / `bPendingRadioRx`                                | `lora_functions.cpp:114-115`                                         | nRF52-only feature (W5100S); ESP32 never sets them                                                                                   | `#if defined(BOARD_RAK4630)`                                                                                                                             |
+| `taskENTER_CRITICAL()` around `cad_channel_busy = …; cad_done_flag.store(release)` | `nrf52/nrf52_main.cpp:390-394`                                       | both are already `std::atomic`; the store pair is only ever read as a snapshot under the _reader's_ critical section at `:1332-1338` | the critical section here is redundant with the atomics **or** the atomics are redundant with the critical section — pick one; currently paying for both |
 
 Net: **14 objects** can drop their synchronisation on ESP32, including the one spinlock in the
 codebase. Two of them (`scanFlag`, `ch_util_rx_start`) are dead on ESP32 entirely.
@@ -792,7 +798,7 @@ codebase. Two of them (`scanFlag`, `ch_util_rx_start`) are dead on ESP32 entirel
 Counter-note, so this is not read as "remove all the atomics": `receiveFlag`, `transmittedFlag`,
 `bEnableInterruptReceive`, `bEnableInterruptTransmit` **must stay atomic** (genuine ISR↔task), and
 `iWrite`/`iRead`/`loraWrite`/`cad_*` **must stay atomic on nRF52** — but atomicity there is
-necessary and *not sufficient* (F2-4).
+necessary and _not sufficient_ (F2-4).
 
 ---
 
@@ -803,14 +809,15 @@ necessary and *not sufficient* (F2-4).
 The section (lines 92-121) is **directionally right and mechanically wrong in one important place**.
 
 **Accurate:**
-* "423 externs, 260 in one header" — matches (`src/loop_functions_extern.h` is 377 lines with ~260
+
+- "423 externs, 260 in one header" — matches (`src/loop_functions_extern.h` is 377 lines with ~260
   `extern` declarations).
-* "Only 12 of 423 globals are `std::atomic`" — matches the count in `loop_functions_extern.h`
+- "Only 12 of 423 globals are `std::atomic`" — matches the count in `loop_functions_extern.h`
   (`iWrite`, `iRead`, `loraWrite`, `is_receiving`, `tx_is_active`, `cad_in_progress`,
   `cad_done_flag`, `cad_double_check`, `ch_util_rx_start/tx_start/rx_accum/tx_accum` = 12), plus
   five more that are file-local (`esp32_main.cpp:461-473`) and `cad_channel_busy`
   (`nrf52_main.cpp:236`) and `externQueueEntry::used`.
-* "one `portMUX_TYPE` (`displayMux`), one mutex (`net_console.cpp`), one queue (`bleQueue`, 5 slots)"
+- "one `portMUX_TYPE` (`displayMux`), one mutex (`net_console.cpp`), one queue (`bleQueue`, 5 slots)"
   — exactly right.
 
 **Overstated — the sentence that most needs correcting:**
@@ -823,7 +830,7 @@ Two errors in one sentence.
 1. **"the radio ISR callback"** — there is no such thing on ESP32. The ESP32 ISR is nine lines
    long and touches only atomics; every function named `On*Done` runs in `loopTask`. The doc's own
    pipeline diagram (line 32) labels `OnRxDone()` as reached "|IRQ|" from the radio, which is true
-   for nRF52 and false for ESP32. This mislabelling is *load-bearing*: it is the reason
+   for nRF52 and false for ESP32. This mislabelling is _load-bearing_: it is the reason
    `displayMux` exists on ESP32 at all (F2-2), and it is why `queueDisplayText` was designed as a
    deferred-work queue on a platform where the work was never in an ISR to begin with.
 2. **"Everything else … is unsynchronised"** — true as stated, but it implies the exposure is
@@ -853,41 +860,41 @@ Also: line 89 claims 12 `std::atomic<*>` in the type table. That is the count in
 
 The concurrency-adjacent claims are **accurate and, if anything, understated**:
 
-* **V-03** (line 527): "`LORA_ISR_DEBUG` guards 5 ISR-path traces in `lora_functions.cpp` but is
+- **V-03** (line 527): "`LORA_ISR_DEBUG` guards 5 ISR-path traces in `lora_functions.cpp` but is
   defined nowhere." Confirmed. The doc rates the cost as "document + test env". It is worse than
-  that: one of the five guarded blocks is the *only* consumer of `_overwrite` at
+  that: one of the five guarded blocks is the _only_ consumer of `_overwrite` at
   `lora_functions.cpp:328-333`, the nRF52 RX double-buffer collision detector. With
   `LORA_ISR_DEBUG` undefined, the firmware computes whether it just clobbered an in-flight RX
   buffer and then throws the answer away. Recommend upgrading V-03 and pulling that specific
   counter out from behind the macro into an always-on `stat_` counter.
-* Line 61-62 calls these "the earliest ISR-path transitions" — same mislabel as 01: on ESP32 they
+- Line 61-62 calls these "the earliest ISR-path transitions" — same mislabel as 01: on ESP32 they
   are not on an ISR path at all, and on nRF52 they are in the `LORA` task, not the ISR. Cosmetic,
   but it propagates the same wrong mental model.
-* The doc has **no section on concurrency verification**, which is the real gap. There is no
+- The doc has **no section on concurrency verification**, which is the real gap. There is no
   stress test that exercises simultaneous LoRa RX + BLE write + UDP on nRF52, which is the exact
   configuration in which F2-4, F2-11 and F2-12 manifest. Given that the bench (line 495) is
   "ESP32-S3 + SX1262 ×2", and given that essentially every finding in this report is nRF52-specific,
   the bench as configured **cannot observe this class of bug at all**. That is worth stating
-  explicitly in §"Coverage gaps": *the hardware bench validates the MCU family with the least
-  concurrency exposure.*
+  explicitly in §"Coverage gaps": _the hardware bench validates the MCU family with the least
+  concurrency exposure._
 
-### Prior art cross-check (`docs/code-audit-*.md`, `fable-verdict.md`)
+### Prior art cross-check (`docs/code-audit-*.md`, `docs/code-audit-20260712.md`)
 
 Issues a doc claims are fixed, that are **not** fixed or **not** actually addressed in current source:
 
-| Claim | Source | Reality at `1ba101f4` |
-| --- | --- | --- |
-| "B2 `scanFlag` → `std::atomic<bool>` ✅ done" | `code-audit-fixes-20260627.md:29` | Applied to a variable with **no readers and no writers** (`esp32_main.cpp:473`). The ESP32 CAD path is `radio.scanChannel()`. Item is vacuous. — F2-6 |
-| "C1 `iWrite/iRead` → `std::atomic<uint8_t>` ✅ done" and "Correctness depends on every TU seeing the atomic type — verified via a clean full build" | `code-audit-fixes-20260627.md:33,101-102` | The atomics are in place and the build check is sound, but the **enqueue sequence remains a multi-writer non-atomic RMW on nRF52** (`ringBuffer[iWrite][…]` × 3 + `addTxRingEntry`). The audit closed "RACE-04: volatile ring indices" while the actual defect — no mutual exclusion around slot fill — is untouched. — F2-4 |
-| "RACE-05: `std::atomic` usage — PASS" | `src/code_review/code-audit-20260508.md:205` | The usage that exists is well-formed, but the audit did not check whether load/modify/store sequences *around* the atomics are atomic. `advanceIReadPastEmpty` (`lora_functions.cpp:1479-1487`), `iRead = iReadBeforeAdvance` (`:1704,1745,1813`), `iWrite++; if(iWrite>=MAX) iWrite=0;` (`nrf_eth.cpp:641-643`, dead code) are all non-atomic RMW on atomics. |
-| "RACE-01 externQueue `used` flag → atomic ✅" | `code-audit-20260626.md:87-125` | `used` is now correctly `std::atomic<bool>` with release/acquire, **but the producer never reads it**, so the slot can be overwritten while in flight. — F2-14 |
-| "RACE-01 fix: spinlock protects `pendingDisplayMsg` struct copy between ISR and main loop" | in-source comment, `lora_functions.cpp:120` | The premise is false on ESP32 (no ISR on either side) and the implementation is harmful (heap allocation with interrupts disabled) on both. — F2-1, F2-2 |
-| "Spin-wait removed: `readPhoneCommand` now runs in Main Loop, no cross-core conflict with `sendToPhone()` possible" | in-source comment, `phone_commands.cpp:528-529` | True on ESP32, **false on nRF52** (`api_functions.cpp:254`). A guard was removed on the strength of a platform-specific claim stated as universal. — F2-11 |
-| "B4 `pulseTimes` ISR race — already `volatile`, no change" | `code-audit-fixes-20260627.md:31` | Correct for `gps_functions.cpp`. But the same pattern in `nrf52_main.cpp:320` (`gKeyNum`, ISR-written, no `volatile`) was never examined. — F2-16 |
-| CONC-14 / 15 / 16 / 17 / 19 "CONFIRMED" | `fable-verdict.md:43-47,176-214` | All five confirmed still open, verbatim, at HEAD. No regression; recording so the next pass does not re-derive them. |
+| Claim                                                                                                                                               | Source                                          | Reality at `1ba101f4`                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "B2 `scanFlag` → `std::atomic<bool>` ✅ done"                                                                                                       | `code-audit-fixes-20260627.md:29`               | Applied to a variable with **no readers and no writers** (`esp32_main.cpp:473`). The ESP32 CAD path is `radio.scanChannel()`. Item is vacuous. — F2-6                                                                                                                                                                                                          |
+| "C1 `iWrite/iRead` → `std::atomic<uint8_t>` ✅ done" and "Correctness depends on every TU seeing the atomic type — verified via a clean full build" | `code-audit-fixes-20260627.md:33,101-102`       | The atomics are in place and the build check is sound, but the **enqueue sequence remains a multi-writer non-atomic RMW on nRF52** (`ringBuffer[iWrite][…]` × 3 + `addTxRingEntry`). The audit closed "RACE-04: volatile ring indices" while the actual defect — no mutual exclusion around slot fill — is untouched. — F2-4                                   |
+| "RACE-05: `std::atomic` usage — PASS"                                                                                                               | `src/code_review/code-audit-20260508.md:205`    | The usage that exists is well-formed, but the audit did not check whether load/modify/store sequences _around_ the atomics are atomic. `advanceIReadPastEmpty` (`lora_functions.cpp:1479-1487`), `iRead = iReadBeforeAdvance` (`:1704,1745,1813`), `iWrite++; if(iWrite>=MAX) iWrite=0;` (`nrf_eth.cpp:641-643`, dead code) are all non-atomic RMW on atomics. |
+| "RACE-01 externQueue `used` flag → atomic ✅"                                                                                                       | `code-audit-20260626.md:87-125`                 | `used` is now correctly `std::atomic<bool>` with release/acquire, **but the producer never reads it**, so the slot can be overwritten while in flight. — F2-14                                                                                                                                                                                                 |
+| "RACE-01 fix: spinlock protects `pendingDisplayMsg` struct copy between ISR and main loop"                                                          | in-source comment, `lora_functions.cpp:120`     | The premise is false on ESP32 (no ISR on either side) and the implementation is harmful (heap allocation with interrupts disabled) on both. — F2-1, F2-2                                                                                                                                                                                                       |
+| "Spin-wait removed: `readPhoneCommand` now runs in Main Loop, no cross-core conflict with `sendToPhone()` possible"                                 | in-source comment, `phone_commands.cpp:528-529` | True on ESP32, **false on nRF52** (`api_functions.cpp:254`). A guard was removed on the strength of a platform-specific claim stated as universal. — F2-11                                                                                                                                                                                                     |
+| "B4 `pulseTimes` ISR race — already `volatile`, no change"                                                                                          | `code-audit-fixes-20260627.md:31`               | Correct for `gps_functions.cpp`. But the same pattern in `nrf52_main.cpp:320` (`gKeyNum`, ISR-written, no `volatile`) was never examined. — F2-16                                                                                                                                                                                                              |
+| CONC-14 / 15 / 16 / 17 / 19 "CONFIRMED"                                                                                                             | `docs/code-audit-20260712.md:43-47,176-214`     | All five confirmed still open, verbatim, at HEAD. No regression; recording so the next pass does not re-derive them.                                                                                                                                                                                                                                           |
 
 Genuinely fixed and correct (do not re-open): **B3** — the nRF52 CAD flags are now `std::atomic`
-*and* snapshotted under `taskENTER_CRITICAL` on both sides (`nrf52_main.cpp:390-394`, `:1332-1338`).
+_and_ snapshotted under `taskENTER_CRITICAL` on both sides (`nrf52_main.cpp:390-394`, `:1332-1338`).
 That is the one place in this codebase where a shared-state protocol is fully correct, and it is a
 good template for the F2-4 fix.
 
@@ -895,9 +902,9 @@ good template for the F2-4 fix.
 
 ## Summary counts
 
-| Verdict | Count | Objects |
-| --- | --- | --- |
-| **RACE** | 9 classes | TX ring on nRF52 (`ringBuffer`+`iWrite`/`iRead`/`ringPriority`/`ringEnqueueTime`/`retryCount`); phone/UDP ring indices (`toPhoneWrite/Read`, `udpWrite/Read`, `ComToPhoneWrite/Read`); NimBLE connection flags across cores 0/1; `(bEnableInterruptReceive, receiveFlag)` pair; `g_task_event_type`; `meshcom_settings` + `textbuff_phone` on nRF52; `net_console` fd/mutex; `externQueue` slot reuse; `gKeyNum` |
-| **OK** (correctly protected) | 4 | `bleQueue`; nRF52 CAD flag set (atomics + symmetric critical sections); `ch_util_*_accum` RMW on nRF52; `pulseTimes`/`pulseIndex` |
-| **OVER-SYNCHRONISED** | 14 | `scanFlag` (dead), `is_receiving`, `tx_is_active`, `ch_util_rx_start` (dead on ESP32), `ch_util_tx_start`, `ch_util_rx_accum`, `ch_util_tx_accum`, `iWrite`, `iRead`, `loraWrite`, `displayMux` + both critical sections, `bPendingDisplayText/Pos`, `transmissionState`, `bSetLoRaAPRS` — all ESP32 |
-| **single-context, unmarked** | remainder (~380 of the 423 externs on ESP32; far fewer on nRF52) | fine as-is |
+| Verdict                      | Count                                                            | Objects                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RACE**                     | 9 classes                                                        | TX ring on nRF52 (`ringBuffer`+`iWrite`/`iRead`/`ringPriority`/`ringEnqueueTime`/`retryCount`); phone/UDP ring indices (`toPhoneWrite/Read`, `udpWrite/Read`, `ComToPhoneWrite/Read`); NimBLE connection flags across cores 0/1; `(bEnableInterruptReceive, receiveFlag)` pair; `g_task_event_type`; `meshcom_settings` + `textbuff_phone` on nRF52; `net_console` fd/mutex; `externQueue` slot reuse; `gKeyNum` |
+| **OK** (correctly protected) | 4                                                                | `bleQueue`; nRF52 CAD flag set (atomics + symmetric critical sections); `ch_util_*_accum` RMW on nRF52; `pulseTimes`/`pulseIndex`                                                                                                                                                                                                                                                                                |
+| **OVER-SYNCHRONISED**        | 14                                                               | `scanFlag` (dead), `is_receiving`, `tx_is_active`, `ch_util_rx_start` (dead on ESP32), `ch_util_tx_start`, `ch_util_rx_accum`, `ch_util_tx_accum`, `iWrite`, `iRead`, `loraWrite`, `displayMux` + both critical sections, `bPendingDisplayText/Pos`, `transmissionState`, `bSetLoRaAPRS` — all ESP32                                                                                                             |
+| **single-context, unmarked** | remainder (~380 of the 423 externs on ESP32; far fewer on nRF52) | fine as-is                                                                                                                                                                                                                                                                                                                                                                                                       |

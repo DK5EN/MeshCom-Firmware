@@ -1,10 +1,10 @@
 # F3 — Buffer & Type Safety
 
 Repo: `.`, branch `v4.35p_prio`, HEAD `1ba101f4`.
-Baseline docs read: `docs/codequality-rules.md`, `fable-verdict.md` (2026-07-12), `docs/code-audit-fixes-20260627.md`,
+Baseline docs read: `docs/codequality-rules.md`, `docs/code-audit-20260712.md` (2026-07-12), `docs/code-audit-fixes-20260627.md`,
 `docs/code-audit-20260626.md`.
 
-**Verification of prior claims:** none of the buffer-related findings in `fable-verdict.md`
+**Verification of prior claims:** none of the buffer-related findings in `docs/code-audit-20260712.md`
 (SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, BUG-07, BUG-08, BUG-09, BUG-10, BUG-11, BUG-12, BUG-13)
 have been fixed in the tree. All were re-checked line by line and are still live. They are listed
 below only where this angle adds new impact (e.g. BUG-08 turns out to be the trigger for a

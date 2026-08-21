@@ -1,7 +1,10 @@
-# Resume — MeshCom Firmware Hardening Campaign
+# Backlog — MeshCom Firmware Hardening Campaign
 
 Working document for picking the campaign back up. Records **what we set out to do**,
-**how we decided to get there**, and **exactly where we stand**.
+**how we decided to get there**, and **exactly where we stand**. Open work lives in
+§3.2; §3.1 is the done-list kept for evidence.
+
+_(Previously `resume.md` in the repository root.)_
 
 Last updated 2026-08-21. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
@@ -22,7 +25,7 @@ Last updated 2026-08-21. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 > (BLE command channel unauthenticated). `N-01`/`N-02` are accepted as risk. `N-07` because the
 > effective fix is BLE bonding, which disconnects every existing phone app until the user
 > re-pairs — an upstream decision, not a branch decision. Rationale in
-> [`docs/architecture/08-defect-catalogue.md` §2](docs/architecture/08-defect-catalogue.md).
+> [`docs/architecture/08-defect-catalogue.md` §2](architecture/08-defect-catalogue.md).
 >
 > Getting the four fixes upstream is now the highest-value open item in this campaign.
 
@@ -34,7 +37,7 @@ Do this **in order** before touching anything. Skipping step 2 is the trap that 
 cost one wrong conclusion in this campaign.
 
 1. **Orient.** Read this file, then
-   [`docs/architecture/08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md).
+   [`docs/architecture/08-defect-catalogue.md`](architecture/08-defect-catalogue.md).
    Read `08` before `01`–`07`; those predate the adversarial review and carry correction
    boxes.
 
@@ -125,7 +128,7 @@ So the harness comes **first**, and every fix afterwards carries its own evidenc
 
 The first version of the concept (docs 01–07) was reviewed by 8 independent finders. It
 contained errors that would have sent work in the wrong direction. The corrections are in
-[`docs/architecture/08-defect-catalogue.md` §1](docs/architecture/08-defect-catalogue.md);
+[`docs/architecture/08-defect-catalogue.md` §1](architecture/08-defect-catalogue.md);
 the ones that changed the plan:
 
 | ID   | What was wrong                                                                                                                                                | Consequence for the plan                                                               |
@@ -146,16 +149,16 @@ the ones that changed the plan:
 > service task**, which reaches `OnRxDone` via `RadioOnRxTimeoutIrq → RadioBgIrqProcess`
 > and runs it on a **1 KB** stack. The conclusion (nRF52 has real preemption of the main
 > loop; ESP32 does not) survives — the mechanism does not.
-> Authoritative: [`docs/architecture/09-concurrency-map.md`](docs/architecture/09-concurrency-map.md).
+> Authoritative: [`docs/architecture/09-concurrency-map.md`](architecture/09-concurrency-map.md).
 
-**Prior art the first concept missed entirely:** `fable-verdict.md` (repo root, 2026-07-12)
+**Prior art the first concept missed entirely:** `docs/code-audit-20260712.md` (2026-07-12)
 holds **39 already-verified findings** (`SEC-01` … `TEST-39`). Essentially all are still
 open. The campaign adopts those IDs rather than re-deriving them.
 
 ### 2.3 Answers to the open questions
 
 **G5 — should we rewrite 1:1?** **No.** Reasoning in
-[`docs/architecture/05-rewrite-vs-refactor.md`](docs/architecture/05-rewrite-vs-refactor.md).
+[`docs/architecture/05-rewrite-vs-refactor.md`](architecture/05-rewrite-vs-refactor.md).
 Short version: the tests needed to validate a rewrite must exist _before_ the rewrite, so
 the first work item is identical either way — and once the harness exists, incremental
 work is strictly cheaper and shippable. The corrected reasoning (per C-02) is that the
@@ -263,8 +266,8 @@ Project skills, in `.claude/commands/`:
 | Dependency inventory (G4)       | `4a18ae82` | doc 03 — every "latest" checked against upstream release tags                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Rewrite decision (G5)           | `4a18ae82` | doc 05                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **Adversarial review**          | `4a18ae82` | 8 independent finders → verification → doc 08; every decision-relevant claim re-derived by the orchestrator                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Concurrency / core map (G8)     | see §4     | [`09-concurrency-map.md`](docs/architecture/09-concurrency-map.md) — **13 correctness-affecting races, 9 benign, 5 correctly protected, 16 over-synchronised, 3 dead**. Supersedes the earlier 9/4/14 figures.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Buffer/type audit (G7)          | see §4     | [`10-buffer-inventory.md`](docs/architecture/10-buffer-inventory.md) — 2 critical, 3 high, 1 medium-high, 11 medium, 12 low(-medium), 2 already fixed; type findings T3-1…T3-9                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Concurrency / core map (G8)     | see §4     | [`09-concurrency-map.md`](architecture/09-concurrency-map.md) — **13 correctness-affecting races, 9 benign, 5 correctly protected, 16 over-synchronised, 3 dead**. Supersedes the earlier 9/4/14 figures.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Buffer/type audit (G7)          | see §4     | [`10-buffer-inventory.md`](architecture/10-buffer-inventory.md) — 2 critical, 3 high, 1 medium-high, 11 medium, 12 low(-medium), 2 already fixed; type findings T3-1…T3-9                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Rebase onto `upstream/dev` (G9) | —          | 35 upstream commits integrated, 30 of ours preserved, 0 behind; only conflict was `FLASH_VERSION` (upstream newer, ours dropped as empty)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **SEC-02** format string        | `1cbcf8c9` | native before/after repro; both MCU families built; RAM unchanged, flash +8 B / +16 B                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **N-03** stack overflow         | `93bb68d0` | index bounds computed per packet size; 3 nRF52 targets built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -367,7 +370,7 @@ eigene Task. Alle Schreiber und Leser der Phone- und UDP-Ringe liegen damit in d
 Task. `N-14`/`N-16` sind nRF52-only, `N-15` sagt im eigenen Befundtext "True on ESP32".
 
 Vollstaendiger Nachweis inkl. Gueltigkeitsbedingung (was den Befund wieder oeffnen wuerde):
-STATUS-Box unter Wave 2 in [`08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md).
+STATUS-Box unter Wave 2 in [`08-defect-catalogue.md`](architecture/08-defect-catalogue.md).
 **Damit ist Wave 2 fuer ESP32 leer** — der Rest wartet auf angeschlossene nRF52-Hardware.
 
 ~~`N-08`~~ **FIXED** 2026-08-18 — 25 deadline comparisons converted to the safe subtraction
@@ -1101,7 +1104,7 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 | Which core/task touches which state (goal G8)         | `docs/architecture/09-concurrency-map.md`             |
 | Every buffer, its size and its bounds (goal G7)       | `docs/architecture/10-buffer-inventory.md`            |
 | Wire format: LoRa / server UDP / EXTUDP / BLE         | `docs/architecture/11-wire-format.md`                 |
-| The 39 pre-existing findings                          | `fable-verdict.md` (repo root)                        |
+| The 39 pre-existing findings                          | `docs/code-audit-20260712.md`                         |
 | Raw evidence behind 08/09/10                          | `docs/review/2026-07-31/`                             |
 
 > **Read `08` before acting on `01`–`07`.** Those were written before the adversarial
@@ -1109,7 +1112,7 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 
 `docs/review/2026-07-31/` holds the nine unedited reports from the review that produced
 `08`, `09` and `10` — eight independent finder angles plus the reconciliation against
-`fable-verdict.md`. They are archived so every claim in the distilled documents stays
+`docs/code-audit-20260712.md`. They are archived so every claim in the distilled documents stays
 traceable to its source, and so a later session can see what was examined and found
 _harmless_ without re-deriving it. They are a snapshot of 2026-07-31 and were written
 before the rebase: **their line numbers are stale by construction.** Treat the distilled

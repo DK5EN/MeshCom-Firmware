@@ -16,7 +16,7 @@ carried over unverified.
 Baseline: branch `v4.35p_prio` @ `3fb2c917`. Reference targets `heltec_wifi_lora_32_V3` (ESP32-S3,
 2 cores) and `wiscore_rak4631` (nRF52840, 1 core, SoftDevice S140). Cross-references:
 [08 §1 C-01](08-defect-catalogue.md), [08 §2 N-13 … N-16](08-defect-catalogue.md),
-`fable-verdict.md` CONC-14 … CONC-19.
+`docs/code-audit-20260712.md` CONC-14 … CONC-19.
 
 ---
 
@@ -357,7 +357,7 @@ enqueue lock. Independently: pull the double-buffer overwrite counter out from b
 `src/nrf52/nrf52_ble.cpp:243-254` (`bleuart_rx_callback` → `readPhoneCommand`), `:296-322`
 (`settings_rx_callback`: `delay(1000)` at `:300`, `memcpy` at `:319`, `save_settings()` at `:322`);
 the contradicted comment is `src/phone_commands.cpp:528-529`. Cross-ref
-[08 N-15](08-defect-catalogue.md), `fable-verdict.md` CONC-14 / CONC-17.
+[08 N-15](08-defect-catalogue.md), `docs/code-audit-20260712.md` CONC-14 / CONC-17.
 
 Both handlers are dispatched through `ada_callback` (`BLECharacteristic.cpp:539`,
 `BLEUart.cpp:104,118`) and therefore run in the Bluefruit `Callback` task at **priority 2**, which
@@ -404,7 +404,7 @@ F2-11 and F2-12. Remove the `delay(1000)`.
 
 `src/loop_functions.cpp:407-408` (`udpWrite`, `udpRead`), `:412-413` (`toPhoneWrite`, `toPhoneRead`);
 declared `src/loop_functions_extern.h:191`, `:198`. The ring-pointer helper
-`src/loop_functions.cpp:4972` still takes `volatile int&`. Cross-ref `fable-verdict.md` CONC-15 /
+`src/loop_functions.cpp:4972` still takes `volatile int&`. Cross-ref `docs/code-audit-20260712.md` CONC-15 /
 CONC-16 — **confirmed still open**.
 
 Producers run in the radio context (`addBLEOutBuffer` from `OnRxDone`, nine sites in
@@ -507,7 +507,7 @@ and the consumer copies the entry out (or clears `used` only for the index it sn
 function _gives_ a mutex its caller took), `:288-289` (missing braces:
 `if(s_listen_fd >= 0) ::close(s_listen_fd); s_listen_fd = -1;`), `:345`, `:402`, `:421`
 (`::recv(s_fd, …)` with no lock), `:378` (`authTask` pinned to core 1, prio 1).
-Cross-ref `fable-verdict.md` CONC-19 — **confirmed unchanged**.
+Cross-ref `docs/code-audit-20260712.md` CONC-19 — **confirmed unchanged**.
 
 Beyond the verdict's description:
 
@@ -882,7 +882,7 @@ against `1ba101f4`, before the rebase onto `upstream/dev`; `git diff --stat 1ba1
    confirmed. It should additionally note (a) `g_task_event_type` as a third dead variable, (b)
    `ble_busy_flag`, and (c) that the removal must be gated on the board, not on `ESP32`, because of
    the T5-ePaper / T-Deck-Pro unpinned tasks (F2-20).
-7. **`fable-verdict.md` CONC-14 … CONC-19** — all six re-verified as still open at `3fb2c917`. No
+7. **`docs/code-audit-20260712.md` CONC-14 … CONC-19** — all six re-verified as still open at `3fb2c917`. No
    contradiction. CONC-18 (`sendToPhone` TOCTOU) is listed there as "CONFIRMED (finder)"; this
    review finds the _writer_ side is what races (`addBLEOutBuffer` from the radio context), while
    `sendToPhone` itself is loop-only — so CONC-18 is a symptom of CONC-15 rather than an independent
