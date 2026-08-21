@@ -263,6 +263,19 @@ and `src/udp_functions.cpp:144`):
   0x04 <int32 LE>                    altitude
   ```
 
+  **The TLV order is a hard wire-contract, not a convention** — the firmware
+  parser is offset arithmetic, not a general TLV scanner
+  (`nrf_eth.cpp:532–581`): the callsign TLV (`0x00`) must come **first** or
+  the entire datagram is discarded; the shortname TLV must immediately
+  follow it, and it is **effectively mandatory whenever coordinates are
+  sent** — the coordinate offset is computed as
+  `2 + call_len + short_len + 2` (`:557`), which adds the two shortname
+  header bytes even when the TLV is absent, so omitting it misaligns the
+  `0x02/0x03/0x04` reads by two bytes and the coordinates are silently
+  dropped; lat/lon/alt must then appear contiguously in exactly that
+  order, 5 bytes each. A mock server must emit all five TLVs in the listed
+  order (`tools/mock/meshcom_server.py` does).
+
 - **`BEAT`** — server heartbeat response; the node only checks the 4-byte
   indicator and refreshes its link-alive timestamp (`last_upd_timer`). If no
   server traffic arrives for `MAX_HB_RX_TIME` = 65 s, the gateway re-runs

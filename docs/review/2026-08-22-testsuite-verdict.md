@@ -18,14 +18,17 @@ verified against the code before it landed here.
 
 ## Advisor notes (post-review, informational)
 
-- The txring len clamp rejects silently; a debug log would aid diagnosis
-  of the (currently unreachable) path.
-- `APRS_GOLDEN_UPDATE=0` still counts as update mode (getenv != nullptr) —
-  harmless since update mode now fails loud.
-- The micros() shim does not wrap like hardware micros — pre-existing.
-- Firmware CONF parser assumes shortname TLV precedes lat/lon/alt
-  (nrf_eth.cpp:558 offset arithmetic) — pre-existing quirk, doc-11 note
-  candidate.
+- ~~The txring len clamp rejects silently~~ — DONE (bLORADEBUG-gated
+  RING_REJECT line, before the lock).
+- ~~`APRS_GOLDEN_UPDATE=0` still counts as update mode~~ — DONE
+  (value-checked: unset, empty and "0" all mean normal mode).
+- The micros() shim does not wrap like hardware micros — pre-existing,
+  still open (no natively-tested micros user yet).
+- ~~Firmware CONF parser TLV-ordering quirk~~ — DONE, documented in doc 11
+  §2.2 (verified sharper than first stated: callsign TLV must be first or
+  the datagram is discarded; shortname is effectively mandatory when
+  coordinates are sent, because the offset arithmetic adds its header
+  bytes even when absent).
 
 ## Finding 1: APRS_GOLDEN_UPDATE neuters the fence silently
 

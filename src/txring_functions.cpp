@@ -229,7 +229,15 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     // funktionsloser Ring-Eintrag. Beides wird hier abgewiesen, bevor der Ring
     // ueberhaupt beruehrt wird.
     if(len == 0 || len > UDP_TX_BUF_SIZE)
+    {
+        // Advisory-Punkt aus dem Testsuite-Audit: nicht stumm verwerfen --
+        // wir stehen hier VOR dem Lock, printfdeb ist erlaubt. Faellt diese
+        // Zeile je im Feld, hat ein neuer Aufrufer die Invariante verletzt.
+        if(bLORADEBUG)
+            printfdeb("[MC-DBG] RING_REJECT len=%u src=%s (0 oder > %d)\n",
+                      (unsigned)len, source, UDP_TX_BUF_SIZE);
         return -1;
+    }
 
     int w, r, queued;
     uint8_t msgType, prio;
