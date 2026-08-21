@@ -949,6 +949,16 @@ void nrf52setup()
 
     Serial.println("[INIT]...CLIENT STARTED");
 
+    // Reset-Ursache loggen (POWER->RESETREAS, vom Core beim Start gesichert):
+    // 0x1 Reset-Pin, 0x2 Watchdog, 0x4 Soft-Reset (SREQ — auch der Weg, den
+    // der SoftDevice-Fault-Handler nach einem App-Absturz nimmt), 0x8 Lockup.
+    // Unterscheidet nach einem unerwarteten Reboot sofort Absturz von
+    // Spannungsproblem — haette die N-22-Diagnose erheblich verkuerzt.
+    {
+        extern uint32_t readResetReason(void);
+        Serial.printf("[BOOT] RESETREAS=0x%08lX\n", (unsigned long)readResetReason());
+    }
+
 
     Radio.SetModem(MODEM_LORA);
 
