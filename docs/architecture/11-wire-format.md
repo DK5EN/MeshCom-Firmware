@@ -183,9 +183,11 @@ consumes them in `loop_functions.cpp` and marks them no-retransmission
 Gateway nodes exchange UDP datagrams with the MeshCom server
 (`meshcom.oevsv.at` / OE and DL hamnet servers). Port: `UDP_PORT 1990`
 (`src/configuration_global.h:86`). Implementations: `src/udp_functions.cpp`
-(ESP32/WiFi) and `src/nrf52/nrf_eth.cpp` (nRF52/W5100S Ethernet) — the two
-are a documented DRY-21 code clone, but they are **not** feature-identical
-on the receive side (see §2.2, CONF).
+(ESP32/WiFi) and `src/nrf52/nrf_eth.cpp` (nRF52/W5100S Ethernet). The
+DRY-21 clone covers only the **server → node receive path** (`getUDP()`);
+the encode side (`sendKEEP()`/`addNodeData()`) is compiled once for both
+platforms (nRF52 calls into `udp_functions.cpp`, `nrf52_main.cpp:2963`).
+The cloned receive paths are **not** feature-identical (see §2.2, CONF).
 
 An upstream spec for this layer exists:
 [icssw-org/MeshCom-Reflector](https://github.com/icssw-org/MeshCom-Reflector),
@@ -309,9 +311,18 @@ terminator. Message example (captured):
 ```
 
 `src_type` is `node` (own traffic), `lora` (received frames) or `udp`
-(server-gated frames). Position frames additionally produce a
-`"type":"tele"` datagram with sensor fields. Received LoRa frames are
-forwarded with their real `rssi`/`snr`.
+(server-gated frames). Received LoRa frames are forwarded with their real
+`rssi`/`snr`. Consumer-relevant edge rules (all `sendExtern()`):
+
+- The position schema's longitude fields are **`long`/`long_dir`** —
+  not `lon` (`:412–413`).
+- Position frames additionally produce a `"type":"tele"` companion datagram
+  with sensor fields — but only for `src_type` `node` and `lora`, never for
+  server-gated (`udp`) frames (`:448,468`).
+- Text frames addressed to group `100001` produce **no** msg datagram at all
+  (`:495`).
+- HEY/weather frames (`0x40`) are never forwarded — the type dispatch ends
+  in `else return` (`:530`).
 
 **Peer → node** (`getExtern()`, `:218`): JSON commands —
 
@@ -341,11 +352,13 @@ sets. The phone opens with a **hello write** on `…0002`
 
 ```
 open hello:  04 10 20 30                       (len, type 0x10, magic 0x20 0x30)
-PIN hello:   24 10 20 30 <32-byte SHA-256>     (len 0x24 = 36)
+PIN hello:   24 10 20 30 <32-byte SHA-256>     (len 0x24 = 36; firmware accepts msg_len >= 35, phone_commands.cpp:321)
 ```
 
-MCProxy sends exactly the open form (`BLE_HELLO_BYTES = b"\x04\x10\x20\x30"`,
-`MCProxy/src/mcapp/config_loader.py:120`). If the node has a BLE PIN
+MCProxy's live implementation builds exactly these forms
+(`build_hello_bytes()`, `MCProxy/ble_service/src/ble_adapter.py:335–345`;
+the identical-looking constant in `mcapp/config_loader.py` is dead code —
+cite the adapter). If the node has a BLE PIN
 configured (`--btcode`, `meshcom_settings.bt_code` in 1..999999), the hello
 must instead carry the SHA-256 hash of the PIN formatted as a zero-padded
 6-digit decimal string (`hash_pin()`, `phone_commands.cpp:227`); a missing or
@@ -403,24 +416,52 @@ Framing (`sendToPhone()`/`sendComToPhone()`, `src/phone_commands.cpp:50–220`):
 the first ring byte is a status/type byte, then:
 
 - **Data frames (text/position)**: prefix byte `0x40` (`'@'`) + the **raw
-  LoRa frame of §1** + a 4-byte little-endian unix timestamp appended by the
-  firmware. So a notification starts `40 3A …` (text) or `40 21 …`
-  (position). MCProxy footer view (little-endian):
-  `zero, hw, mod, fcs(H), fw, lasthw, fw_sub, 0x7E, time_ms(I)`.
-- **ACK frames**: `40 41 <orig_msg_id ×4 LE> <ack_level> 00 <time ×4>`.
-  `ack_level`: `0x00` node-level ack, `0x01` heard/gateway ack, `0x02`
-  "own message confirmed" (server/gateway confirmed a message this node
-  originated — see `src/udp_functions.cpp:277–284`).
+  LoRa frame of §1** + a 4-byte **BIG-endian** unix timestamp appended by
+  the firmware (`addBLEOutBuffer()`, `src/loop_functions.cpp:563–568` —
+  MSB first). So a notification starts `40 3A …` (text) or `40 21 …`
+  (position) and ends `… 7E <time ×4 BE> <pad>`. A well-formed data
+  notification has `0x7E` at offset −6 — a free integrity gate before
+  trusting the trailer fields.
+- **ACK frames**: `40 41 <orig_msg_id ×4 LE> <ack_level> 00 <time ×4 BE>
+<pad>` — **13 bytes on the wire**. `ack_level`: `0x00` node-level ack,
+  `0x01` heard/gateway ack, `0x02` "own message confirmed" — emitted both
+  when a matched `:ack`/`:rej` arrives over RF
+  (`src/lora_functions.cpp:868–896`) and via the server path
+  (`src/udp_functions.cpp:277–284`).
 - **`0x44`**: JSON message (§4.2 schemas), sent unprefixed: `44 {…}`.
-- **Command replies**: plain ASCII responses to `--…` commands are sent
-  `0x40`-prefixed like text frames (`addBLECommandBack()`).
+- **Command replies**: responses to `--…` commands are **full §1 text
+  frames** (`addBLECommandBack()`, `src/loop_functions.cpp:635–655`:
+  source path `response`, destination `*`, encoded via `encodeAPRS()`) and
+  travel the same `40 3A` data path — not bare ASCII.
 - The senders still contain a `0x91` MHeard-binary branch, but no producer
   enqueues `0x91` records anymore — MHeard data travels as `MH` JSON.
   Treat `0x91` as legacy; a mock phone need not implement it.
 
-Quirk a mock phone must tolerate: both senders transmit `blelen + 2` bytes
-(`phone_commands.cpp:129,203`), so every notification carries two trailing
-bytes (usually `00 00`) beyond the logical payload.
+**Trailing pad bytes — count depends on the branch.** Both senders transmit
+`blelen + 2` bytes (`phone_commands.cpp:129,203`), but `blelen` means
+different things: on the data/ACK path the ring length already includes the
+4-byte timestamp and the `0x40` prefix is written into byte 0, so exactly
+**one** pad byte follows the timestamp; on the `0x44` JSON path the payload
+starts at byte 0, so **two** pad bytes follow the JSON. A mock node that
+emits two pads on data frames shifts every trailer field by one.
+(`sendComToPhone`'s non-JSON text branch frames differently again,
+`phone_commands.cpp:188–193` — currently dead: every producer on that ring
+is `0x44`.)
+
+**Size ceilings** (a mock must respect all three): `0x44` register JSON is
+producer-clamped at **245 bytes** (`addBLEComToOutBuffer`,
+`src/loop_functions.cpp:607–611` — the binding limit, before any MTU);
+data-path ring entries are clamped at `UDP_TX_BUF_SIZE − 4` = 251
+(`:539`). ATT MTU is **not uniform across the bench**: nRF52 pins 250
+(`Bluefruit.configPrphConn(250)`, `src/nrf52/nrf52_ble.cpp:91`), ESP32
+NimBLE defaults to 255. The firmware never splits a notification across
+writes — oversized content is truncated at the source, not fragmented.
+
+**Which frames reach BLE**: from RF, only text (`0x3A`) and position
+(`0x21`) frames are forwarded to the phone; HEY/weather (`0x40`) is not.
+The server GATE path however forwards all three types
+(`udp_functions.cpp:171`), so `40 40` notifications occur on gateway nodes
+only.
 
 ### 4.4 Phone → node writes
 
@@ -436,9 +477,26 @@ Command frames are `[len][type][payload…]` (`phone_commands.cpp:248–300`):
 
 Position frames (`0x70/0x80/0x90`) carry a save flag at offset 6
 (`0x0A` = persist, `0x0B` = don't — periodic app positions use the latter).
-Plain ASCII `--…` command strings are also accepted over BLE and dispatched
-through the same `commandAction()` as the serial console; text messages
-(`::…`/`{call}…` syntax) go through `sendMessage()`.
+
+**Text message syntax (0xA0)**: the phone sends `{dst}text` for a DM/group
+message or bare `text` for broadcast — **without** any leading colon; the
+firmware prepends the `:` itself when the payload does not start with `--`
+(`phone_commands.cpp:583–588`). The `::…` double-colon form exists only on
+the serial console. `--…` command strings are dispatched through the same
+`commandAction()` as the serial console.
+
+**Hard limits in `sendMessage()` a sender must pre-validate** (the firmware
+enforces them silently — no error reaches the phone):
+
+- Total `{dst}text` longer than **160 characters** → dropped
+  (`src/loop_functions.cpp:3388`, debug-log only).
+- The closing `}` must appear at index ≤ 10, i.e. **dst ≤ 9 characters**
+  (`:3396`). A longer destination is not an error: the message goes out as
+  a **broadcast** with the braces left in the payload — an intended DM
+  becomes public.
+- `0x95` accepts only symbol table ids `/` (0x2F) and `\` (0x5C)
+  (`phone_commands.cpp:552`); anything else is silently ignored while the
+  ASCII `--symid` path accepts more.
 
 Settings written over BLE are staged and applied from the main loop
 (`applyPendingBleSettings()`, CONC-17) — a mock phone must not assume the
