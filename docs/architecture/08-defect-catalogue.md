@@ -935,6 +935,23 @@ umgeht die Funktion, statt sie zu reparieren.
 > damit zu. Die Bibliotheks-Warteschleifen (Ops auf initialisiertem Chip bei
 > Link-Verlust mitten in der Operation) bleiben der offene Rest dieses
 > Backlogs.
+>
+> **Fault-Injection-Soak durchgefuehrt (2026-08-22, BESTANDEN):** Testaufbau
+> exakt nach obigem Rezept — Mock-Peer auf dem Mac (Harness nach doc 11 §3:
+> Listener :1799, DM-Injektor alle 10 s mit Heltec-ACK-Rueckverkehr,
+> Serial-Echo-Probe alle 10 s) plus compile-gated 500-ms-Sequenz-Heartbeat
+> aus dem Loop-Task (`MC_TEST_HOOKS` in `getExternUDP()`, eingecheckt,
+> in Produktionsbuilds nicht enthalten). Ergebnis ueber 5 Kabel-Flaps
+> (Haltezeiten 4–16 s, mitten im Verkehr): **der Loop-Task blockierte
+> keinen einzigen Takt** — waehrend jeder Unplug-Phase lief die
+> Heartbeat-Sequenz im exakten 500-ms-Raster weiter (verlorene seq ==
+> Fensterdauer/0,5 s), Serial-Echo-Stalls: 0, seq-Luecken ausserhalb der
+> Fenster: 0, kein Reboot (Uptime durchgehend), Reconnect nach Replug
+> automatisch. Zusammen mit dem 5-Minuten-Soak vom 21.08. ist die
+> Testverpflichtung dieses Backlogs erfuellt; die W5100S-internen
+> Warteschleifen bleiben als theoretisches Restrisiko dokumentiert
+> (Upstream-Bibliotheks-Thema), ein Blocking wurde unter Last nicht mehr
+> beobachtet.
 
 Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
 nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,

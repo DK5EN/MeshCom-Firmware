@@ -574,6 +574,22 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-22 (elfter Durchgang) — N-20-Fault-Injection-Soak BESTANDEN, Mock-Peer als Testrig
+
+Kabel-Flap-Soak nach dem Backlog-Rezept, Benutzer zog/steckte das Kabel:
+Harness auf dem Mac (drei Kanaele: EXTUDP-Listener :1799, DM-Injektor alle
+10 s mit echtem Heltec-ACK-Rueckverkehr, Serial-Echo-Probe) plus
+compile-gateter 500-ms-Sequenz-Heartbeat aus dem Loop (`MC_TEST_HOOKS` in
+`getExternUDP()`, als Test-Infrastruktur eingecheckt). Ergebnis ueber 5
+Flaps (4–16 s, mitten im Verkehr): Loop-Task blockierte keinen einzigen
+Takt (Heartbeat lief in jeder Unplug-Phase im exakten 500-ms-Raster
+weiter), 0 Serial-Stalls, 0 seq-Luecken, kein Reboot, Auto-Reconnect.
+N-20-Testverpflichtung damit erfuellt (zusammen mit dem 5-min-Soak vom
+21.08.); W5100S-Bibliotheks-Warteschleifen bleiben dokumentiertes
+Rest-Thema fuer Upstream. Nebenbei: Mac-DHCP-Lease war gewandert — EXT IP
+von .64 auf .58 umgestellt und gespeichert. RAK laeuft wieder mit
+Produktionsbuild (Hook nicht einkompiliert, per ELF-strings verifiziert).
+
 ### 2026-08-22 (zehnter Durchgang) — Fix-Welle CFG-01 + N-12 + N-14; Neufund N-23 (Brick-Falle) gefixt
 
 Orchestrierte Welle (3 Scouts, 3 Implementer, Gate + Bench durch den
