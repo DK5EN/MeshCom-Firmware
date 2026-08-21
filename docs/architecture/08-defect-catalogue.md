@@ -808,7 +808,21 @@ werden, nicht blind.
 (dann Wave 0.2-Rest dort nachholen), oder die naechste Aenderung an einer
 `[nrf52]`/`[esp32]`-Sektion in `variants/*/platformio.ini`.
 
-### N-19 — `--dfu` haengt sich auf, statt in den UF2-Bootloader zu wechseln — **VERIFIED (auf echter Hardware)** — High
+### N-19 — `--dfu` haengt sich auf, statt in den UF2-Bootloader zu wechseln — **FIXED (`b03b9a27`, auf echter Hardware verifiziert)** — High
+
+> **STATUS 2026-08-21: GEFIXT.** `enterUf2Dfu()` wird nicht mehr gerufen. Stattdessen
+> setzt der `bEnterDfu`-Zweig GPREGRET selbst per SoftDevice-SVC
+> (`sd_power_gpregret_clr/set(0, 0x57)` — bei aktivem SoftDevice erlaubt) und faellt in
+> den bewaehrten `NVIC_SystemReset()` durch. Eingrenzung per Ausschluss auf Hardware:
+> derselbe `reset_mcu()`-Pfad funktioniert aus dem TinyUSB-Task (1200-Baud-Touch, zweimal
+> live als Fernrettung genutzt), und `NVIC_SystemReset()` funktioniert aus exakt diesem
+> Loop-Pfad (`--reboot` getestet: Echo, Port weg, Neu-Enumeration) — uebrig bleibt
+> `sd_softdevice_disable()` im Loop-Kontext als Verdaechtiger (Core-Interna nicht weiter
+> seziert). Wichtig: `Serial.flush()` + `delay(300)` vor dem Reset ist funktional noetig —
+> ohne Wartezeit kam das Board trotz Readback `GPREGRET==0x57` als App statt als
+> Bootloader zurueck. Verifikation: `--dfu` zweimal in Folge → Bootloader-PID `0x29`,
+> `/Volumes/RAK4631` gemountet; Rueckweg beide Male per `firmware.uf2`-Kopie → App laeuft.
+> Der komplette Fern-Flash-Zyklus, fuer den der Befehl gebaut wurde, ist damit bewiesen.
 
 Neu, gefunden 2026-08-21 beim ersten Hardware-Test von `--dfu` (Commit `7bac915a`,
 2026-08-19 committet, dort selbst als "auf Hardware noch ungetestet" vermerkt — dies ist
@@ -830,16 +844,57 @@ durch `N-16`/`CONC-15`/`CONC-16`/`CONC-17` verursacht.
 
 **Recovery verifiziert:** ein einzelner physischer Tastendruck auf Reset holt das Board
 vollstaendig zurueck — wieder Applikations-PID, serielle Konsole sofort wieder aktiv,
-RX/TX/Settings unveraendert intakt. Kein Datenverlust, kein Soft-Bricking. Physischer
-Reset bleibt damit der einzige verifiziert funktionierende Weg in den Bootloader.
+RX/TX/Settings unveraendert intakt. Kein Datenverlust, kein Soft-Bricking. (Stand vor
+dem Fix; inzwischen sind `--dfu` und der 1200-Baud-Touch als Fernwege verifiziert, siehe
+STATUS-Box.)
 
-**Fix (nicht in dieser Session):** root cause noch offen — braucht entweder
-Instrumentierung vor dem `enterUf2Dfu()`-Aufruf (letzte `printfdeb()`-Zeile, dann
-Reset-Verhalten beobachten) oder Vergleich gegen ein bekannt funktionierendes
-UF2-DFU-Beispiel des Adafruit-Cores, um zu sehen, ob `sd_softdevice_disable()` aus diesem
-Aufrufkontext ueberhaupt zulaessig ist.
+**Fix:** siehe STATUS-Box oben (`b03b9a27`). Die exakte Core-interne Ursache des
+`sd_softdevice_disable()`-Haengers aus dem Loop-Task bleibt unverifiziert — der Fix
+umgeht die Funktion, statt sie zu reparieren.
 
-**`--dfu` bis zur Untersuchung nicht verwenden.**
+---
+
+### N-20 — Ethernet-Init blockiert Setup und Loop auf Gateway-Nodes ohne Link — **VERIFIED (auf echter Hardware)** — Medium
+
+Neu, gefunden 2026-08-21 als Stoerfaktor bei der N-19-Verifikation. Vorbestehend
+(`nrf_eth.cpp`, "Initialize Ethernet"), unabhaengig von allen Fixes dieser Kampagne.
+
+Auf einem als Gateway konfigurierten RAK4631 **ohne** Ethernet-Link zwei belegte
+Auspraegungen:
+
+1. **Setup-Blockade, nichtdeterministisch:** Ein Boot blieb nach der Boot-Zeile
+   `Initialize Ethernet` **minutenlang** stehen — keine Loop-Ausgaben, keine
+   Kommando-Verarbeitung, LoRa-Zustandsmaschine nicht gestartet. Der 1200-Baud-Touch
+   (TinyUSB-Task) funktionierte weiterhin und hat das Board ferngerettet. Der naechste
+   Boot mit identischer Firmware lief in Sekunden durch (`Failed to configure Ethernet
+using FIX/DHCP`).
+2. **Periodische Loop-Stalls:** Im Betrieb wiederholt sich `Initialize Ethernet` etwa
+   alle 60–70 s aus der Loop heraus und blockiert sie dabei **8–12 s** (belegt per
+   `RX_TIMEOUT_FIRE delta=12426…13920` statt normal `4582`). In diesen Fenstern werden
+   serielle Kommandos und LoRa-Verarbeitung verzoegert.
+
+Nicht gefixt (DRY-21-Umfeld; braucht Ethernet-Hardware fuer einen sauberen Fix-Beweis).
+Workaround fuer Bench-Tests: Kommandos ausserhalb der Stall-Fenster senden.
+
+### N-21 — USB-CDC-RX-Richtung stirbt im Betrieb, TX laeuft weiter — **VERIFIED (auf echter Hardware)** — Medium
+
+Neu, live beobachtet 2026-08-21. Vorbestehend — dieselbe Symptomklasse, die `--dfu`
+(Commit `7bac915a`) urspruenglich motiviert hat; diesmal mit klarerem Befund:
+
+Nach einem erfolgreichen `--info` (Echo + vollstaendige Antwort) starb die
+**Host→Board-Richtung** der USB-CDC innerhalb von ~1 Minute: keine Echos mehr, keine
+Kommando-Verarbeitung — waehrend die **Board→Host-Richtung** unveraendert weiterlief
+(LoRa-Debug-Ausgaben stroemten weiter). Reproduziert mit drei Sendemethoden (`printf`
+auf frischem fd, persistentem fd, `pyserial`-Session). Ein aelterer Vorfall (2026-08-19,
+im `7bac915a`-Commit-Text) zeigte zusaetzlich tote TX-Richtung nach ~24 h Uptime; auch
+dort blieb der 1200-Baud-Touch funktionsfaehig (Control-Endpoint, unabhaengig vom
+CDC-Datenpfad).
+
+Root cause offen (Kandidat: TinyUSB-RX-FIFO/Endpoint-Wedge, evtl. im Zusammenspiel mit
+den N-20-Loop-Stalls, waehrend derer die CDC nicht gelesen wird). Nicht gefixt.
+**Betriebsfolge:** `--dfu` per Seriell setzt lebende CDC-RX voraus; bei totem RX bleibt
+der 1200-Baud-Touch (Serial-DFU-Bootloader) der verlaesslichste Fernweg — heute zweimal
+als Rettung verifiziert.
 
 ---
 
@@ -949,7 +1004,9 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 > - `esp32-safeboot`: vorbestehend defekt, von dieser Aenderung nachweislich nicht
 >   betroffen (kein `extends = esp32`); scheitert an einem Toolchain-Fehler des
 >   Tasmota-Platform-Forks (`FRAMEWORK_DIR` = None in `arduino.py`), nicht an einer
->   Warnung. `esp32-S3-safeboot` baut sauber.
+>   Warnung. `esp32-S3-safeboot` baut sauber. _(Am 2026-08-21 gefixt, `e0f28bef`:
+>   Paket-Verzeichnis-Kollision mit der Mainline-Plattform, behoben per pre-Skript
+>   `tools/ensure_tasmota_framework.py` in beiden Safeboot-Envs.)_
 >
 > Auf Hardware (Heltec V3) geflasht und geprueft: kein Boot-Loop, Webserver HTTP 200,
 > BLE verbindet.
