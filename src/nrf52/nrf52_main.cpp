@@ -2792,7 +2792,11 @@ void checkSerialCommand(void)
             msg_text[sizeof(msg_text) - 1] = '\0';
 
             int inext=0;
-            char msg_buffer[600];
+            // N-22: 600 B vom knappen 4-KB-Loop-Task-Stack in BSS verlagert —
+            // checkSerialCommand() laeuft nur im Loop-Task, und der Pfad
+            // ueber sendMessage() -> sendExtern() lief mit Watermark 0
+            // (Details: STATUS-Box N-22 im Defektkatalog).
+            static char msg_buffer[600];
             iTxtLen = strlen(strText);
             for(int itx=0; itx<iTxtLen; itx++)
             {
