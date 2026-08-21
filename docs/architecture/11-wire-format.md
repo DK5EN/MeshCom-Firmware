@@ -256,10 +256,75 @@ with the same layout). Device name: `MC-<id>-<CALLSIGN>`. An independent,
 field-tested implementation of this layer exists in
 `MCProxy/src/mcapp/ble_protocol.py` and was used to cross-check this section.
 
-### 4.1 Node → phone notifications
+### 4.1 Hello handshake and app-layer PIN
 
-Framing (`sendToPhone()`, `src/phone_commands.cpp:95–130`): the first ring
-byte is a status/type byte, then:
+After GATT connect the node stays silent — every notification path is gated
+on `isPhoneReady` (`src/phone_commands.cpp:62,160`), which only a valid hello
+sets. The phone opens with a **hello write** on `…0002`
+(`readPhoneCommand()`, `phone_commands.cpp:307–362`):
+
+```
+open hello:  04 10 20 30                       (len, type 0x10, magic 0x20 0x30)
+PIN hello:   24 10 20 30 <32-byte SHA-256>     (len 0x24 = 36)
+```
+
+MCProxy sends exactly the open form (`BLE_HELLO_BYTES = b"\x04\x10\x20\x30"`,
+`MCProxy/src/mcapp/config_loader.py:120`). If the node has a BLE PIN
+configured (`--btcode`, `meshcom_settings.bt_code` in 1..999999), the hello
+must instead carry the SHA-256 hash of the PIN formatted as a zero-padded
+6-digit decimal string (`hash_pin()`, `phone_commands.cpp:227`); a missing or
+wrong hash makes the firmware drop the BLE connection
+(`ble_disconnect_requested`). With `bt_code == 0` the open hello is accepted.
+
+A valid hello sets `isPhoneReady = 1` and queues the **config burst**
+(§4.2). The phone is expected to send its `0x20` timestamp write after the
+hello (the node uses it to set its clock when it has no better source).
+
+### 4.2 Post-hello config burst
+
+On hello the main loop runs a fixed command list with BLE output enabled
+(`config_cmds[]`, `src/nrf52/nrf52_main.cpp:268` /
+`src/esp32/esp32_main.cpp:297`):
+
+```
+--info --seset --wifiset --nodeset --wx --pos --aprsset --io --tel [--analogset (ESP32 only)]
+```
+
+plus `sendMheard()` (one `MH` JSON per MHeard entry from the last 12 h).
+Each command emits one or two `0x44` JSON notifications (§4.3). After a 3 s
+settle and once both notification rings have drained, the node sends
+`{"TYP":"CONFFIN"}` exactly once (`nrf52_main.cpp:1707–1748`,
+`sendConfigFinish()`, `src/command_functions.cpp:5513`). The burst happens
+once per genuine hello — a mock phone that reconnects without a new hello
+gets no re-send, and a mock node must reproduce the burst-then-CONFFIN order
+(MCProxy's cache hydration depends on it,
+`MCProxy/src/mcapp/ble_hydration_tests.py`).
+
+`0x44` JSON schemas (producers in `src/command_functions.cpp`; all objects
+carry `"TYP"` as discriminator):
+
+| TYP       | source command | fields                                                                                                                                                     |
+| --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `I`       | `--info`       | FWVER, CALL, ID (gateway id), HWID, MAXV, BLE ("long"/"short"), BATP, BATV, GCB0…GCB5 (groups), CTRY, BOOST, BPIN                                          |
+| `SE`+`S1` | `--seset`      | SE: BME, BMP, BMP3, BMP3F, AHT, AHTF, BMXF, 680, 680F, 811, 811F, SS, LPS33, OW, OWPIN, OWF, USERPIN · S1: INA226, SHUNT, IMAX, SAMP, SHT, SHTF, 226, 226F |
+| `SW`+`S2` | `--wifiset`    | SW: SSID, IP, GW, AP, DNS, SUB · S2: OWNIP, OWNGW, OWNMS, OWNDNS, OWNNTP, EUDP, EUDPIP, TXPOW                                                              |
+| `SN`      | `--nodeset`    | GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM                                                 |
+| `W`       | `--wx`         | TEMP, TOFFI, TOUT, TOFFO, HUM, PRES, QNH, ALT, GAS, CO2, VBUS, VSHUNT, VAMP, VPOW                                                                          |
+| `G`       | `--pos`        | LAT, LON (signed decimal degrees), ALT, SAT, SFIX, HDOP, RATE, NEXT, DIST, DIRn, DIRo, DATE                                                                |
+| `SA`      | `--aprsset`    | ATXT, SYMID, SYMCD, NAME                                                                                                                                   |
+| `IO`      | `--io`         | MCP23017, AxOUT, AxVAL, BxOUT, BxVAL (bit strings)                                                                                                         |
+| `TM`      | `--tel`        | PARM, UNIT, FORMAT, EQNS, VALES, PTIME                                                                                                                     |
+| `AN`      | `--analogset`  | ESP32 only: APN, AFC, AK, AFL, ACK, ADC, ADCRAW, ADCE1, ADCE2, ADCSL, ADCOF, ADCAT                                                                         |
+| `MH`      | (MHeard)       | CALL, DATE, TIME, PLT (payload type byte), HW, MOD, RSSI, SNR, DIST, PL, MESH, NCNT                                                                        |
+| `CONFFIN` | `--conffin`    | no further fields                                                                                                                                          |
+
+`MH` records are also pushed live as each frame updates the MHeard table
+(`updateMheard()`, `src/mheard_functions.cpp:331`).
+
+### 4.3 Node → phone notifications
+
+Framing (`sendToPhone()`/`sendComToPhone()`, `src/phone_commands.cpp:50–220`):
+the first ring byte is a status/type byte, then:
 
 - **Data frames (text/position)**: prefix byte `0x40` (`'@'`) + the **raw
   LoRa frame of §1** + a 4-byte little-endian unix timestamp appended by the
@@ -270,15 +335,23 @@ byte is a status/type byte, then:
   `ack_level`: `0x00` node-level ack, `0x01` heard/gateway ack, `0x02`
   "own message confirmed" (server/gateway confirmed a message this node
   originated — see `src/udp_functions.cpp:277–284`).
-- **`0x44`**: JSON data message to the app (passed through unprefixed).
-- **`0x91`**: MHeard list records (unprefixed, binary).
+- **`0x44`**: JSON message (§4.2 schemas), sent unprefixed: `44 {…}`.
+- **Command replies**: plain ASCII responses to `--…` commands are sent
+  `0x40`-prefixed like text frames (`addBLECommandBack()`).
+- The senders still contain a `0x91` MHeard-binary branch, but no producer
+  enqueues `0x91` records anymore — MHeard data travels as `MH` JSON.
+  Treat `0x91` as legacy; a mock phone need not implement it.
 
-### 4.2 Phone → node writes
+Quirk a mock phone must tolerate: both senders transmit `blelen + 2` bytes
+(`phone_commands.cpp:129,203`), so every notification carries two trailing
+bytes (usually `00 00`) beyond the logical payload.
 
-Command frames are `[len][type][payload…]` (`phone_commands.cpp:255–300`):
+### 4.4 Phone → node writes
+
+Command frames are `[len][type][payload…]` (`phone_commands.cpp:248–300`):
 
 ```
-0x10  hello/config request        0x20  timestamp from phone
+0x10  hello (see §4.1)            0x20  timestamp from phone (4B LE unix)
 0x50  callsign  (1B len + chars)  0x55  WiFi: 1B len SSID + 1B len PWD
 0x70  latitude  (4B float)        0x80  longitude (4B float)
 0x90  altitude  (4B int)          0x95  APRS symbols
@@ -294,14 +367,6 @@ through the same `commandAction()` as the serial console; text messages
 Settings written over BLE are staged and applied from the main loop
 (`applyPendingBleSettings()`, CONC-17) — a mock phone must not assume the
 settings notification arrives synchronously with the write.
-
-### 4.3 Coverage note
-
-The hello/config handshake (`0x10` response sequence: node sends its settings
-blob and group list to the app) and the `0x44` JSON schemas are only
-partially described here; `MCProxy/src/mcapp/ble_protocol.py` and
-`src/phone_commands.cpp:255ff` are the sources to consult when mocking those
-flows in depth.
 
 ---
 

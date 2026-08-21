@@ -1,10 +1,10 @@
 // Spec-abgeleitete Vektoren fuer decodeAPRS()/encodeAPRS() — Mechanismus 3
 // des Test-Orakels: die Frames hier sind NICHT mitgeschnitten, sondern Byte
-// fuer Byte aus docs/architecture/09-wire-format.md §1 konstruiert (eigener
+// fuer Byte aus docs/architecture/11-wire-format.md §1 konstruiert (eigener
 // Builder, eigene FCS-Summe nach §1.3). Weicht Decoder oder Encoder vom
 // Dokument ab, schlaegt die Suite fehl — Dokument und Code fechten es hier aus.
 //
-// Abgedeckt (Kapitelverweise = doc 09):
+// Abgedeckt (Kapitelverweise = doc 11):
 //   §1.1 Layout, LE-msg_id, Trailer optional beim Decoder / Pflicht beim Encoder
 //   §1.2 Byte-5-Flags + Hop-Nibble (alle Kombinationen der 4 Flag-Bits)
 //   §1.3 FCS = 16-bit-Bytesumme bis inkl. HW+MOD, big-endian; Fehlsumme -> Verwurf
@@ -42,7 +42,7 @@ void tearDown(void) {}
 
 // ------------------------------------------------------------------ Builder
 //
-// Baut ein Frame streng nach doc 09 §1.1 — bewusst unabhaengig von
+// Baut ein Frame streng nach doc 11 §1.1 — bewusst unabhaengig von
 // encodeAPRS(), damit Decoder UND Encoder gegen dieselbe dritte Instanz
 // (das Dokument) geprueft werden.
 
@@ -318,7 +318,7 @@ static void test_spec_verwurfregeln(void)
 
 static void test_spec_encoder_bytegenau(void)
 {
-    // encodeAPRS() muss exakt das Layout aus doc 09 §1.1 schreiben —
+    // encodeAPRS() muss exakt das Layout aus doc 11 §1.1 schreiben —
     // verglichen wird gegen den unabhaengigen Builder dieses Tests.
     struct aprsMessage m;
     initAPRS(m, ':');

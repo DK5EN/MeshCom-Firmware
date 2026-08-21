@@ -1041,12 +1041,26 @@ RX_FRAME len rssi snr hex=…`) — der Gegenpol zum bestehenden
 >   12-Byte-Binaer-ACK `0x41` — Neufund: diese SIND on-air, Layout
 >   `lora_functions.cpp:1078ff` —, HEY, 4-Hop-Pfade, Fremd-Encoder inkl.
 >   MCProxy-BLE-Pfad und IV3OEP aus Italien).
-> - **Wire-Format-Dokument: DONE** — `docs/architecture/09-wire-format.md`
+> - **Wire-Format-Dokument: DONE** — `docs/architecture/11-wire-format.md`
 >   (englisch): LoRa-Frame, Server-UDP (KEEP/DATA/GATE/CONF/BEAT), EXTUDP-JSON
 >   und BLE-Phone-Protokoll, mit Byte-annotierten Real-Beispielen und
 >   file:line-Ankern; Zweck: Mock-Services fuer mc-chat/MCProxy/mcmap.
-> - **Offen:** Spezifikations-Vektoren, die aus doc 09 statt aus Mitschnitten
->   abgeleitet sind; BLE-Kapitel-Vertiefung (Hello-Handshake, 0x44-JSON-Schemata).
+> - **Mechanismus 3, Ausbaustufe (Spec-Vektoren): DONE (2026-08-21 spaet)** —
+>   `test/test_aprs_spec/`: Frames Byte fuer Byte aus doc 11 konstruiert
+>   (eigener Builder, eigene FCS-Summe, unabhaengig vom Encoder). Abgedeckt:
+>   alle 16 Byte-5-Flag-Kombinationen, FCS-Regel, Gruppen-/Sonderziele,
+>   Trailer-Optionalitaet, FW-Sub-Platzhalter, 0x41-Klassifikation VOR der
+>   Mindestlaenge, elf Verwurfregeln, Encoder byte-genau. 13/13 gruen —
+>   keine Abweichung Dokument<->Code gefunden.
+> - **BLE-Kapitel-Vertiefung: DONE (2026-08-21 spaet)** — doc 11 §4 jetzt mit
+>   Hello-Handshake inkl. PIN-Auth (SHA-256 ueber "%06u"-PIN,
+>   `phone_commands.cpp:307ff`), Post-Hello-Config-Burst (`config_cmds[]` +
+>   MHeard + CONFFIN-Reihenfolge) und allen 15 `0x44`-JSON-Schemata (TYP
+>   I/SE/S1/SW/S2/SN/W/G/SA/IO/TM/AN/MH/CONFFIN). Korrektur dabei: MHeard
+>   geht als `MH`-JSON zum Phone; der `0x91`-Binaer-Zweig in den Sendern hat
+>   keinen Produzenten mehr (Legacy). Quirk dokumentiert: jede Notification
+>   traegt 2 Bytes ueber die Nutzlaenge hinaus (`blelen + 2`).
+> - **Offen:** — (Orakel-Plan vollstaendig umgesetzt).
 
 C-03 removed the oracle. The zero-tolerance requirement needs a real one. Three
 mechanisms, in ascending cost:
