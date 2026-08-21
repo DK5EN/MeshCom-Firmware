@@ -423,6 +423,51 @@ static void test_overflow_drop(void)
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[MAX_RING - 1][0]);
 }
 
+// ----------------------------------------------------- Test 5b: Laengen-Klammer
+//
+// Verdict Finding 3: addTxRingEntry() wies len==0/len>UDP_TX_BUF_SIZE bisher
+// nirgends zurueck -- die Grenze lebte nur in den Aufrufern. Diese Tests
+// fixieren die neue defensive Klammer an genau den beiden ungueltigen Raendern
+// und am gueltigen Maximum (UDP_TX_BUF_SIZE == 255 Byte muss weiterhin passen,
+// [2..2+255) liegt innerhalb des 260-Byte-Slots).
+
+static void test_len_null_wird_abgewiesen(void)
+{
+    BuiltFrame f = buildAckFrame();
+    int slot = addTxRingEntry(f.bytes, 0, RING_STATUS_READY, "t5b-null");
+
+    TEST_ASSERT_EQUAL_INT(-1, slot);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]); // Ring unangetastet
+}
+
+static void test_len_ueber_max_wird_abgewiesen(void)
+{
+    static uint8_t big[UDP_TX_BUF_SIZE + 1];
+    memset(big, 0xAA, sizeof(big));
+
+    int slot = addTxRingEntry(big, UDP_TX_BUF_SIZE + 1, RING_STATUS_READY, "t5b-over");
+
+    TEST_ASSERT_EQUAL_INT(-1, slot);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]); // Ring unangetastet
+}
+
+static void test_len_exakt_max_wird_enqueued(void)
+{
+    static uint8_t exact[UDP_TX_BUF_SIZE];
+    memset(exact, 0x5A, sizeof(exact));
+
+    int slot = addTxRingEntry(exact, UDP_TX_BUF_SIZE, RING_STATUS_READY, "t5b-exact");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)UDP_TX_BUF_SIZE, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(exact, &ringBuffer[slot][2], UDP_TX_BUF_SIZE);
+    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
+}
+
 // ----------------------------------------------------- Test 6: getNextTxSlot
 
 static void test_get_next_tx_slot(void)
@@ -651,6 +696,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);
     RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
+    RUN_TEST(test_len_null_wird_abgewiesen);
+    RUN_TEST(test_len_ueber_max_wird_abgewiesen);
+    RUN_TEST(test_len_exakt_max_wird_enqueued);
     RUN_TEST(test_overflow_drop);
     RUN_TEST(test_get_next_tx_slot);
     RUN_TEST(test_retry_count_in);

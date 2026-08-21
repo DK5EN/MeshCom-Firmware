@@ -86,7 +86,27 @@ test**; these are reported, not silently patched into the mock:
    catches trailing zero runs.
 
 No other discrepancies against doc 11 §2 were found; the `KEEP`/`DATA`
-header layouts, the `BEAT` TLV, the `GATE` envelope, and the `CONF` TLV
-(including the little-endian `int32` lat/lon/alt encoding confirmed against
+header layouts, the `GATE` envelope, and the `CONF` TLV (including the
+little-endian `int32` lat/lon/alt encoding confirmed against
 `src/nrf52/nrf_eth.cpp:497-587`) all matched firmware and the independent
 `mc-chat/meshcom_mock/` implementation byte-for-byte.
+
+**`BEAT` is a partial exception to that "byte-for-byte" claim.** The
+firmware side only ever parses the 4-byte `"BEAT"` indicator itself
+(`src/nrf52/nrf_eth.cpp`, `src/udp_functions.cpp`) — it never reads the
+TLV body this mock and the tests build. The TLV shape (`0x00 <len>
+<callsign> [0x01 <len> <status>]`) is not specified by doc 11 §2 at all;
+it comes from live-capture, decoded by mc-chat's `decoder.py`
+(`_decode_beat_struct`, see doc 11 §2.2). So "matches firmware" is true
+only for the indicator; "matches the observed wire shape" is the accurate
+claim for the rest of the `BEAT` datagram, and that's what this mock and
+`test_mock_server.py`'s byte-exact `BEAT` assertions actually verify.
+
+**Mock-only assumption beyond doc 11: `DATA` → `GATE` broadcast routing.**
+Doc 11 §2 specifies the *wire shape* of `DATA` and `GATE` but says nothing
+about server-side routing policy. This mock's choice — forward every valid
+`DATA` frame as `GATE` to all *other* registered clients, never back to the
+sender — is a mock assumption, not a documented or verified real-server
+behavior. Real-server routing semantics (dedup, group filtering, etc.)
+remain unmocked; acceptable for a wire-shape test double, but do not read
+`TestDataRedistribution` as proof of real-server routing policy.

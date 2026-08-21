@@ -101,6 +101,11 @@ static void test_shim_uhr_ist_steuerbar(void)
     TEST_ASSERT_EQUAL_UINT32(1000, millis());
     mc_test_advance_millis(500);
     TEST_ASSERT_EQUAL_UINT32(1500, millis());
+    // Verdict Finding 8a: Shim-Uhr auf 0 zuruecksetzen -- dieser Test liess
+    // sie zuvor bei 1500 stehen und beeinflusste damit jeden spaeter in
+    // dieser Suite laufenden Test, der sich (unbewusst) auf millis()==0 beim
+    // Start verlaesst.
+    mc_test_set_millis(0);
 }
 
 static void test_shim_zufall_ist_deterministisch(void)
