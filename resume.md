@@ -574,6 +574,27 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (sechster Durchgang) — `N-22` gefixt: Stack-Overflow im Loop-Task, kein EXTUDP-Bug
+
+Root cause gemessen statt geraten: `uxTaskGetStackHighWaterMark(NULL) == 0` am
+tiefsten Punkt des Pfads `checkSerialCommand()` → `sendMessage()` → `sendExtern()` —
+der 4-KB-Loop-Task-Stack (LOOP_STACK_SZ im Adafruit-Core, hart codiert) war
+vollstaendig aufgebraucht, Nachbar-RAM wurde zerstoert, Crash Sekunden spaeter.
+EXTUDP war nur der Ausloeser (schob die Pfadtiefe ueber die Kante); auch das
+Nebensymptom "Datagramme kommen trotz rc=1 nie an" gehoerte dazu. Vorher per
+Experiment ausgeschlossen: Peer-Verhalten (Crash auch gegen stillen Live-Listener
+auf dem Mac), Socket-Lebenszyklus (begin/beginPacket/write/endPacket alle ok).
+
+Fix (`9ce62aa0`, Muster `1951aa7d`): grosse Puffer des Pfads auf nRF52 in BSS —
+`sendMessage()` 200+200+300 B (läuft auf nRF52 nur im Loop-Task, Aufrufer
+auditiert), `checkSerialCommand()` 600 B. Watermark danach am selben Punkt
+**248 Woerter (~1 KB) frei**; mehrere Nachrichten mit EXTUDP on ohne Crash,
+JSON-Datagramme kommen beim Peer an. **Workaround aufgehoben: EXTUDP wieder on,
+EXT IP wieder 192.168.68.64 — Original-Konfiguration vollstaendig
+wiederhergestellt.** Merkposten fuer Upstream in der N-22-STATUS-Box: die 4 KB
+sind fuer diese Firmware knapp; jeder zusaetzliche `printfdeb`-Frame im Pfad
+kostet ~900 B Stack.
+
 ### 2026-08-21 (fuenfter Durchgang) — `N-20`-Soak bestanden, `DRY-21`+convBuffer+`CONC-16`-Rest gefixt, `N-22` neu, Test-Orakel Stufe 1
 
 - **`N-20`-Soak-Test bestanden:** Kabel 12:01 gezogen, 12:06 gesteckt — kein Freeze,
