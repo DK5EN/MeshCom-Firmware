@@ -7,6 +7,7 @@
 #MESHCOM ignored 
 .pio
 .vscode
+build_output.txt
 .*
 !/.gitignore
 !/.github/

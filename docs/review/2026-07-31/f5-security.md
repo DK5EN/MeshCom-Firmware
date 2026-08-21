@@ -84,7 +84,7 @@ IP (the brief states this is common for MeshCom gateways).
 - **File:** `src/loop_functions.cpp:2057-2071` (check), `:2042` (entry), `:2101` (`commandAction`)
 - **Severity:** critical
 - **Attacker position:** RF range. Unauthenticated, unattributable.
-- **Relation to prior art:** extends `fable-verdict.md` **SEC-01**, which found only the
+- **Relation to prior art:** extends `docs/code-audit-20260712.md` **SEC-01**, which found only the
   _empty-password_ path (all-`0x00` `cpasswd` → loop body never runs → `bpass` stays `true`).
   **Verified still unfixed.** The mechanism below is new: it defeats a node that _has_ configured a
   password, so SEC-01's proposed fix (`if(!bpass || cpasswd[0]==0x00) return;`) does **not** close it.
@@ -420,7 +420,7 @@ interface rather than `INADDR_ANY`. Also raise the 14-character ceiling
 (`command_functions.cpp:2993`, `:3007`) — 14 characters is a weak key for a network-exposed shell
 and forbids a passphrase entirely.
 
-**Related, verified still unfixed:** `fable-verdict.md` **CONC-19** —
+**Related, verified still unfixed:** `docs/code-audit-20260712.md` **CONC-19** —
 `stopNetConsole()` (`src/net_console.cpp:274-288`) still does `s_mutex = xSemaphoreCreateMutex();`
 without holding the old mutex (leaking it), then calls `teardownClient()`, which does an
 unmatched `xSemaphoreGive()`. Also `if(s_listen_fd >= 0) ::close(s_listen_fd); s_listen_fd = -1;`
@@ -600,7 +600,7 @@ statement that the parser accepts frames larger than its own working buffers —
 caller with a larger read buffer turns this into remote stack corruption, and the parser is exactly
 the code most likely to be reused for a new transport.
 
-`fable-verdict.md` **BUG-13** notes the trailing-field over-read in the same function but not this
+`docs/code-audit-20260712.md` **BUG-13** notes the trailing-field over-read in the same function but not this
 buffer/limit mismatch.
 
 **Fix.** Either bound the payload loop (`if(iConcat1 >= (int)sizeof(cConcat1)-1) break;`) or, better,
@@ -790,7 +790,7 @@ reach it. At minimum, delete the misleading comment at `:3031`.
 - **Attacker position:** anyone who can send a UDP datagram to port 1990 — LAN, HAMNET, or the
   internet if the node is port-forwarded or on a public IP.
 - **Applies to:** nRF52 builds with the Ethernet (W5100S) module active. `nrf_eth.cpp` is a diverged
-  copy of `udp_functions.cpp` (`fable-verdict.md` DRY-21); **the ESP32 copy does not have this bug**,
+  copy of `udp_functions.cpp` (`docs/code-audit-20260712.md` DRY-21); **the ESP32 copy does not have this bug**,
   which is exactly the divergence risk DRY-21 predicted.
 
 ```c

@@ -84,7 +84,7 @@ The hex is visibly bit-damaged: `…45 23 23 4D 65 73 68 43 6F 6D AF 42 B5 B9 30
 The JSON in 06 lines 137–149 was then hand-built from that corrupt frame
 (`"msg_source_call": "DL7OSX-1"`, `"lat": 48.4072` ← `4824.43N`, `"lon": 11.74` ←
 `01144.40E`, `"alt": 1657` ← `A=001657`) with `"msg_fcs": "0D21"` and `"max_hop": 2`
-borrowed from the *other*, unrelated packet. **The single illustrative vector in the plan is
+borrowed from the _other_, unrelated packet. **The single illustrative vector in the plan is
 a corrupt frame annotated with another frame's header fields.** Any extractor built to that
 spec would generate ~1821 such artefacts and a test suite would happily go green on them.
 
@@ -136,8 +136,8 @@ Two further circularity problems the doc does not surface:
    decoder already accepts. (Confirming this: `grep -c "discarded, wrong FCS" *.log` = **0**
    across all 17 logs.)
 2. **Lossy projection.** `printBuffer_aprs` emits `msg_len, payload_type, msg_id, max_hop,
-   msg_server, msg_track, msg_mesh, source_path, destination_path, payload, source_hw,
-   source_mod, fcs, fw_version, fw_sub_version, last_hw`. It does **not** emit `lat`, `lon`,
+msg_server, msg_track, msg_mesh, source_path, destination_path, payload, source_hw,
+source_mod, fcs, fw_version, fw_sub_version, last_hw`. It does **not** emit `lat`, `lon`,
    `alt` — the three fields 06's JSON example asserts on. Those come from `decodeAPRSPOS()`
    (`src/aprs_functions.cpp:531`), whose output is not in the log stream at all. To fill them
    you must re-parse the payload text, i.e. run `decodeAPRSPOS` — the second function under
@@ -153,10 +153,10 @@ Two further circularity problems the doc does not surface:
   and the answer is frozen into the vector file with a rationale field. ~30–60 hand-checked
   vectors covering the three payload types (`@` 12 140, `:` 7 774, `!` 5 731 occurrences)
   beat 1821 auto-generated ones.
-- **A real capture path.** Add a `MC_TEST_HOOKS`-gated hex dump of the *accepted* frame
+- **A real capture path.** Add a `MC_TEST_HOOKS`-gated hex dump of the _accepted_ frame
   immediately before `decodeAPRS()` at `lora_functions.cpp:455`, tagged with the same
   `msg_id` the `MH-LoRa:` line carries. Then hex↔decode pairing is by key, not adjacency,
-  and it covers good frames. Note this is a *new* capture campaign — the existing 17 logs
+  and it covers good frames. Note this is a _new_ capture campaign — the existing 17 logs
   cannot be retro-fitted.
 - **Explicit labelling.** Every vector derived from current output must carry
   `"oracle": "current-behaviour"` so nobody mistakes the suite for a correctness proof.
@@ -173,33 +173,33 @@ Legend for "instrumentation present": ✅ marker exists and is reachable in the 
 environment · ⚠️ exists but wrong marker / wrong quantity / partly unreachable · ❌ not
 reachable in the stated environment.
 
-| #  | Can it fail?                       | Why / why not                                                                                                                                                                                                                                                                                             | Instrumentation present?                                                                                                             |
-| -- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 1  | **No — cannot be built**           | 0 hex↔decode pairs exist (measured). If built from `MH-LoRa:` lines the expected value *is* the decoder's output → detects regressions only, never a pre-existing bug.                                                                                                                                     | ❌ no good-frame hex dump exists anywhere in the firmware except `bDEBUG`-gated `printBuffer` for *undecodable* frames (`lora_functions.cpp:687,1209`) |
-| 2  | **Weakly**                         | Round-trip identity passes whenever decode/encode are inverse-consistent, including when both are wrong the same way. And `encodeAPRS` recomputes FCS (`aprs_functions.cpp:1085` `aprsmsg.msg_fcs = FCS_SUMME`) → the FCS field's round-trip is tautological by construction.                              | ✅ native, no markers needed                                                                                                          |
-| 3  | **Partly**                         | The named markers `CRC_ERROR`/`ERR_PAYLOAD` are emitted at `esp32_main.cpp:3813/3857`, in `checkRX()` **before** `OnRxDone()`. `--inject` calls `OnRxDone` → those markers are structurally unreachable via the hook. The `no RX_DEDUP_ADD` half is falsifiable.                                            | ⚠️ 1 of 3 named markers reachable via `--inject`                                                                                      |
-| 4  | **Yes**                            | Genuinely falsifiable — but note `--inject` supplies `size` itself, so the test controls the parameter under test; the vector must deliberately pass `size` > true frame length.                                                                                                                          | ✅                                                                                                                                    |
-| 5  | **Yes**                            | `RX_DEDUP_DUP` (`lora_functions.cpp:1343`) + absence of `RELAY_QUEUED` (`:1181`). `expect_dut_not` is the load-bearing half. Best scenario in the catalogue.                                                                                                                                              | ✅ both `bLORADEBUG`-gated, both observed in field logs (12 823 / 4330)                                                               |
-| 6  | **Yes, if not hard-coded**         | `MAX_DEDUP_RING` = **100** on S3/RAK4630, **70** native, **60** XML/SBUFFER, **10** TBEAM (`configuration_global.h:83,90,98,105,113`). A test hard-coding 71 or 101 is wrong on the other target.                                                                                                        | ✅                                                                                                                                    |
-| 7  | **Yes**                            | `RELAY_QUEUED` present/absent.                                                                                                                                                                                                                                                                            | ✅                                                                                                                                    |
-| 8  | **Yes**                            | `RELAY_LOOP_BLOCKED` (`lora_functions.cpp:1119`). Only **3** occurrences in 25 645 field frames → high-value, near-untested path.                                                                                                                                                                          | ✅                                                                                                                                    |
-| 9  | **Yes, after H-03**                | `RING_OVERFLOW` (`:1593`), `RING_DROP_PRIO` (`:1555`), `RING_DROP_NEW` (`:1571`) all exist. **All three have 0 occurrences in all 17 logs** — no field baseline. `--dump ring` does not exist yet. `MAX_RING` = 20 (S3) vs 30 (native) vs 10 (TBEAM).                                                     | ⚠️ markers ✅, `--dump ring` ❌ (proposed only)                                                                                        |
-| 10 | **Yes**                            | `RING_PRIO` at write (`:1524`), `RING_TX_READ` at read (`:1647`) — ordering observable.                                                                                                                                                                                                                    | ✅                                                                                                                                    |
-| 11 | **No, as specified**               | The doc asserts on "`TX_GATE_ENTER` → `TX_START` deltas". `TX_GATE_ENTER` (`esp32_main.cpp:2340`) fires **after** the backoff has already elapsed — the gate is entered *because* `(millis()-iReceiveTimeOutTime) >= csma_timeout` (`:2069`). The delta to `TX_START` (`:2434`) is IRQ-poll + 1–2 CAD scans (~30–100 ms), compared against a 3000–5850 ms expectation. Wrong quantity. | ⚠️ correct marker exists but is not the one named — see F7-6                                                                          |
-| 12 | **No**                             | Even with `MC_TEST_SEED`, the PRNG *stream position* at any TX depends on how many prior draws happened. There are **10 sites** that consume a draw via `csma_compute_timeout*`/`csma_reset` (`lora_functions.cpp:402,1242,1983,2085`; `esp32_main.cpp:2062,2224,2322,2361,2415,2465`), driven by every RX, CAD result and timeout — i.e. by ambient RF. Backoff value is also unprinted on the CAD-free path. | ❌ claim in 07 §2.1 is wrong                                                                                                          |
-| 13 | **Yes**                            | `CAD_BUSY` (`esp32_main.cpp:2470`) + absence of `TX_START`.                                                                                                                                                                                                                                               | ✅                                                                                                                                    |
-| 14 | **No**                             | `CAD_FALSE_POSITIVE` (`esp32_main.cpp:2405`) fires when scan #1 says busy and scan #2 says free — the firmware disagreeing with **itself**, not with ground truth. And `--spectrum` cannot corroborate: `sx126x_spectral_scan` does `radio.beginFSK()` + `uploadPatch()` and must `radio.begin()` + `lora_setchip_meshcom()` to return to LoRa (`src/spectral_scan.cpp:53,62,93`) — it cannot run concurrently with RX on the same radio. | ⚠️ marker exists, correlation unmeasurable                                                                                           |
-| 15 | **Yes**                            | `RETRANSMIT` (`:1906`), `ACK_RECEIVED` (`:448`). Rare in the field (13 / 25) → real coverage gain.                                                                                                                                                                                                        | ✅                                                                                                                                    |
-| 16 | **Yes**                            | `RETRANSMIT_GIVEUP` (`:1895`) exists but has **0** occurrences in all 17 logs — never observed. Needs a forced-failure setup (driver powered down mid-exchange).                                                                                                                                          | ✅                                                                                                                                    |
-| 17 | **Broken instrument**              | `ONRXDONE_STATS` is emitted only under `bLORADEBUG` (`esp32_main.cpp:1976`) — the same flag that makes `printfdeb` do a blocking `Serial.printf` inside the radio path, inflating the number it reports. Measured in the field with debug on: **2593 / 27 605 = 9.4 %** of `ONRXDONE_TIME` samples exceed 50 ms; max observed **1209 ms**. Also the counters reset on every emit (`:1978-1979`), so a harness matching "a line with `warn=0`" passes on ~93 % of windows regardless. | ⚠️ V-05 applies directly and the doc does not connect it to this scenario                                                            |
-| 18 | **Not as stated**                  | `RX_IRQ_STALE` occurs **2302×** in normal field traffic — it is a routine deferral, not a fault. "No accumulation" has no threshold. `RX_IRQ_STALE_EARLY` (`esp32_main.cpp:2109`) has **0** occurrences ever.                                                                                             | ⚠️ needs a rate bound, not a presence check                                                                                          |
-| 19 | **Yes**                            | Real round-trip through NVS (`save_settings()`, `src/esp32/esp32_flash.cpp:280`, ~60 `preferences.put*` calls).                                                                                                                                                                                            | ✅                                                                                                                                    |
-| 20 | **No — tautological**              | `--lora` prints `getFreq()/getPower()/getBW()/getSF()/getCR()` (`command_functions.cpp:4211-4212`). All read `meshcom_settings.node_*` (`src/lora_setchip.cpp:81,96,117,126`) — the *same* struct `--txsf/--txbw/--txcr` wrote. The SX1262 registers are never read back. If `lora_setchip_meshcom()` silently failed to program the chip, this test still passes. | ❌ asserts a variable equals itself                                                                                                   |
-| 21 | **Not automatable as written**     | "phone app" is not a harness. Also `MAX_MSG_LEN_PHONE` = 300 (`src/phone_commands.cpp:22`) vs `UDP_TX_BUF_SIZE` = 255 (`configuration_global.h:64`) — "arrives intact" is undefined for the 256–300 range.                                                                                                 | ❌                                                                                                                                    |
-| 22 | **No — manual procedure**          | No assertion, no exit code. Belongs in a release checklist, not a scenario catalogue.                                                                                                                                                                                                                     | ❌                                                                                                                                    |
-| 23 | **Not as stated**                  | The heap line is printed only **when the value changed** (`esp32_main.cpp:3286-3291`), so the series is irregular, not a 60 s grid. "Does not trend down" has no threshold, no window, no slope bound.                                                                                                     | ⚠️ needs a quantified criterion                                                                                                       |
-| 24 | **Yes, but self-contradictory**    | Falsifiable via `tools/ram_snapshot.py` diff. But "unchanged" is the wrong predicate — and 07 §3 itself requires a RAM/flash snapshot diff to prove `MC_TEST_HOOKS` is inert, which this scenario would flag as a failure. Needs a tolerance and a release-vs-release baseline.                             | ✅ tooling exists                                                                                                                     |
-| 25 | **Yes**                            | Real. Note the count: `platformio.ini` + `variants/*/platformio.ini` define **34** `[env:…]`, of which 2 are the safeboot bootloader envs (`esp32-safeboot`, `esp32-S3-safeboot`) that the Heltec V3 upload command depends on. The matrix must build 34, not 32.                                          | ✅                                                                                                                                    |
+| #   | Can it fail?                    | Why / why not                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Instrumentation present?                                                                                                                               |
+| --- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **No — cannot be built**        | 0 hex↔decode pairs exist (measured). If built from `MH-LoRa:` lines the expected value _is_ the decoder's output → detects regressions only, never a pre-existing bug.                                                                                                                                                                                                                                                                                                               | ❌ no good-frame hex dump exists anywhere in the firmware except `bDEBUG`-gated `printBuffer` for _undecodable_ frames (`lora_functions.cpp:687,1209`) |
+| 2   | **Weakly**                      | Round-trip identity passes whenever decode/encode are inverse-consistent, including when both are wrong the same way. And `encodeAPRS` recomputes FCS (`aprs_functions.cpp:1085` `aprsmsg.msg_fcs = FCS_SUMME`) → the FCS field's round-trip is tautological by construction.                                                                                                                                                                                                        | ✅ native, no markers needed                                                                                                                           |
+| 3   | **Partly**                      | The named markers `CRC_ERROR`/`ERR_PAYLOAD` are emitted at `esp32_main.cpp:3813/3857`, in `checkRX()` **before** `OnRxDone()`. `--inject` calls `OnRxDone` → those markers are structurally unreachable via the hook. The `no RX_DEDUP_ADD` half is falsifiable.                                                                                                                                                                                                                     | ⚠️ 1 of 3 named markers reachable via `--inject`                                                                                                       |
+| 4   | **Yes**                         | Genuinely falsifiable — but note `--inject` supplies `size` itself, so the test controls the parameter under test; the vector must deliberately pass `size` > true frame length.                                                                                                                                                                                                                                                                                                     | ✅                                                                                                                                                     |
+| 5   | **Yes**                         | `RX_DEDUP_DUP` (`lora_functions.cpp:1343`) + absence of `RELAY_QUEUED` (`:1181`). `expect_dut_not` is the load-bearing half. Best scenario in the catalogue.                                                                                                                                                                                                                                                                                                                         | ✅ both `bLORADEBUG`-gated, both observed in field logs (12 823 / 4330)                                                                                |
+| 6   | **Yes, if not hard-coded**      | `MAX_DEDUP_RING` = **100** on S3/RAK4630, **70** native, **60** XML/SBUFFER, **10** TBEAM (`configuration_global.h:83,90,98,105,113`). A test hard-coding 71 or 101 is wrong on the other target.                                                                                                                                                                                                                                                                                    | ✅                                                                                                                                                     |
+| 7   | **Yes**                         | `RELAY_QUEUED` present/absent.                                                                                                                                                                                                                                                                                                                                                                                                                                                       | ✅                                                                                                                                                     |
+| 8   | **Yes**                         | `RELAY_LOOP_BLOCKED` (`lora_functions.cpp:1119`). Only **3** occurrences in 25 645 field frames → high-value, near-untested path.                                                                                                                                                                                                                                                                                                                                                    | ✅                                                                                                                                                     |
+| 9   | **Yes, after H-03**             | `RING_OVERFLOW` (`:1593`), `RING_DROP_PRIO` (`:1555`), `RING_DROP_NEW` (`:1571`) all exist. **All three have 0 occurrences in all 17 logs** — no field baseline. `--dump ring` does not exist yet. `MAX_RING` = 20 (S3) vs 30 (native) vs 10 (TBEAM).                                                                                                                                                                                                                                | ⚠️ markers ✅, `--dump ring` ❌ (proposed only)                                                                                                        |
+| 10  | **Yes**                         | `RING_PRIO` at write (`:1524`), `RING_TX_READ` at read (`:1647`) — ordering observable.                                                                                                                                                                                                                                                                                                                                                                                              | ✅                                                                                                                                                     |
+| 11  | **No, as specified**            | The doc asserts on "`TX_GATE_ENTER` → `TX_START` deltas". `TX_GATE_ENTER` (`esp32_main.cpp:2340`) fires **after** the backoff has already elapsed — the gate is entered _because_ `(millis()-iReceiveTimeOutTime) >= csma_timeout` (`:2069`). The delta to `TX_START` (`:2434`) is IRQ-poll + 1–2 CAD scans (~30–100 ms), compared against a 3000–5850 ms expectation. Wrong quantity.                                                                                               | ⚠️ correct marker exists but is not the one named — see F7-6                                                                                           |
+| 12  | **No**                          | Even with `MC_TEST_SEED`, the PRNG _stream position_ at any TX depends on how many prior draws happened. There are **10 sites** that consume a draw via `csma_compute_timeout*`/`csma_reset` (`lora_functions.cpp:402,1242,1983,2085`; `esp32_main.cpp:2062,2224,2322,2361,2415,2465`), driven by every RX, CAD result and timeout — i.e. by ambient RF. Backoff value is also unprinted on the CAD-free path.                                                                       | ❌ claim in 07 §2.1 is wrong                                                                                                                           |
+| 13  | **Yes**                         | `CAD_BUSY` (`esp32_main.cpp:2470`) + absence of `TX_START`.                                                                                                                                                                                                                                                                                                                                                                                                                          | ✅                                                                                                                                                     |
+| 14  | **No**                          | `CAD_FALSE_POSITIVE` (`esp32_main.cpp:2405`) fires when scan #1 says busy and scan #2 says free — the firmware disagreeing with **itself**, not with ground truth. And `--spectrum` cannot corroborate: `sx126x_spectral_scan` does `radio.beginFSK()` + `uploadPatch()` and must `radio.begin()` + `lora_setchip_meshcom()` to return to LoRa (`src/spectral_scan.cpp:53,62,93`) — it cannot run concurrently with RX on the same radio.                                            | ⚠️ marker exists, correlation unmeasurable                                                                                                             |
+| 15  | **Yes**                         | `RETRANSMIT` (`:1906`), `ACK_RECEIVED` (`:448`). Rare in the field (13 / 25) → real coverage gain.                                                                                                                                                                                                                                                                                                                                                                                   | ✅                                                                                                                                                     |
+| 16  | **Yes**                         | `RETRANSMIT_GIVEUP` (`:1895`) exists but has **0** occurrences in all 17 logs — never observed. Needs a forced-failure setup (driver powered down mid-exchange).                                                                                                                                                                                                                                                                                                                     | ✅                                                                                                                                                     |
+| 17  | **Broken instrument**           | `ONRXDONE_STATS` is emitted only under `bLORADEBUG` (`esp32_main.cpp:1976`) — the same flag that makes `printfdeb` do a blocking `Serial.printf` inside the radio path, inflating the number it reports. Measured in the field with debug on: **2593 / 27 605 = 9.4 %** of `ONRXDONE_TIME` samples exceed 50 ms; max observed **1209 ms**. Also the counters reset on every emit (`:1978-1979`), so a harness matching "a line with `warn=0`" passes on ~93 % of windows regardless. | ⚠️ V-05 applies directly and the doc does not connect it to this scenario                                                                              |
+| 18  | **Not as stated**               | `RX_IRQ_STALE` occurs **2302×** in normal field traffic — it is a routine deferral, not a fault. "No accumulation" has no threshold. `RX_IRQ_STALE_EARLY` (`esp32_main.cpp:2109`) has **0** occurrences ever.                                                                                                                                                                                                                                                                        | ⚠️ needs a rate bound, not a presence check                                                                                                            |
+| 19  | **Yes**                         | Real round-trip through NVS (`save_settings()`, `src/esp32/esp32_flash.cpp:280`, ~60 `preferences.put*` calls).                                                                                                                                                                                                                                                                                                                                                                      | ✅                                                                                                                                                     |
+| 20  | **No — tautological**           | `--lora` prints `getFreq()/getPower()/getBW()/getSF()/getCR()` (`command_functions.cpp:4211-4212`). All read `meshcom_settings.node_*` (`src/lora_setchip.cpp:81,96,117,126`) — the _same_ struct `--txsf/--txbw/--txcr` wrote. The SX1262 registers are never read back. If `lora_setchip_meshcom()` silently failed to program the chip, this test still passes.                                                                                                                   | ❌ asserts a variable equals itself                                                                                                                    |
+| 21  | **Not automatable as written**  | "phone app" is not a harness. Also `MAX_MSG_LEN_PHONE` = 300 (`src/phone_commands.cpp:22`) vs `UDP_TX_BUF_SIZE` = 255 (`configuration_global.h:64`) — "arrives intact" is undefined for the 256–300 range.                                                                                                                                                                                                                                                                           | ❌                                                                                                                                                     |
+| 22  | **No — manual procedure**       | No assertion, no exit code. Belongs in a release checklist, not a scenario catalogue.                                                                                                                                                                                                                                                                                                                                                                                                | ❌                                                                                                                                                     |
+| 23  | **Not as stated**               | The heap line is printed only **when the value changed** (`esp32_main.cpp:3286-3291`), so the series is irregular, not a 60 s grid. "Does not trend down" has no threshold, no window, no slope bound.                                                                                                                                                                                                                                                                               | ⚠️ needs a quantified criterion                                                                                                                        |
+| 24  | **Yes, but self-contradictory** | Falsifiable via `tools/ram_snapshot.py` diff. But "unchanged" is the wrong predicate — and 07 §3 itself requires a RAM/flash snapshot diff to prove `MC_TEST_HOOKS` is inert, which this scenario would flag as a failure. Needs a tolerance and a release-vs-release baseline.                                                                                                                                                                                                      | ✅ tooling exists                                                                                                                                      |
+| 25  | **Yes**                         | Real. Note the count: `platformio.ini` + `variants/*/platformio.ini` define **34** `[env:…]`, of which 2 are the safeboot bootloader envs (`esp32-safeboot`, `esp32-S3-safeboot`) that the Heltec V3 upload command depends on. The matrix must build 34, not 32.                                                                                                                                                                                                                    | ✅                                                                                                                                                     |
 
 **Summary: of 25 scenarios, 12 are genuinely falsifiable as written (2, 4, 5, 6, 7, 8, 10,
 13, 15, 16, 19, 25); 6 are falsifiable only after a correction (3, 9, 11, 18, 23, 24); 7
@@ -211,7 +211,7 @@ Every marker named in 07 §1.1 exists in `src/`. Two caveats the doc misses:
 
 - **`RX_BUF_SWITCH` / `RX_BUF_OVERWRITE` / `RX_RESTART_EARLY` / `CAD_ABORT_BY_RX` and the
   early `[MC-SM] RX_LISTEN -> RX_PROCESS`** live at `lora_functions.cpp:331, 337, 358, 364,
-  371` — all inside `#if defined BOARD_RAK4630` (opens `:305`, closes `:375`) **and** inside
+371` — all inside `#if defined BOARD_RAK4630` (opens `:305`, closes `:375`) **and** inside
   `#ifdef LORA_ISR_DEBUG`. They are nRF52-only. 07 §1.1 lists "RX buffers — double-buffer
   discipline, no overwrite under load" as an assertable property of the bench, and 07 §3
   proposes `-D LORA_ISR_DEBUG` in `[env:heltec_wifi_lora_32_V3-test]`. **On the Heltec V3
@@ -233,7 +233,7 @@ them: `RING_OVERFLOW`, `RING_DROP_NEW`, `RING_DROP_PRIO`, `RETRANSMIT_GIVEUP`, `
 **Target:** 06 §"What already exists that helps" item 1, 06 §Layer 2, 07 §1.5, 07 §7
 scenarios 1–2, 07 §10 step 4.
 **Severity: critical.** Layers 2–4 and the "before/after comparison" premise of
-[05](05-rewrite-vs-refactor.md) all rest on this.
+[05](../../architecture/05-rewrite-vs-refactor.md) all rest on this.
 
 **Argument.** The plan's foundational asset is described as "17 captured sessions with raw
 frame hex + decoded interpretation" and "**a golden-vector corpus you already own**". The
@@ -249,6 +249,7 @@ The doc's own example pairs `…172422.log:363` (17:26:21.918, CRC-failed, rssi 
 `MH-LoRa:` line from 17:24:32.263 — different frame, 109 s apart.
 
 **Corrected plan.** Replace 07 §10 step 4 with:
+
 1. Add a `MC_TEST_HOOKS`-gated hex dump of the accepted frame immediately before
    `decodeAPRS()` at `lora_functions.cpp:455`, keyed by `msg_id`.
 2. Run a fresh capture session (a few hours of live traffic yields thousands of frames).
@@ -268,9 +269,10 @@ asserts field-by-field"), 06 line 160 ("**Then the oracle exists.**").
 `decode_new(x) == decode_today(x)`. Every current decode defect is promoted to
 specification, and the suite will go green over it forever. This is precisely the failure
 mode the audit brief names — "golden files regenerated from current behaviour" — and 06
-presents it as *the* solution to the before/after problem without noting the limitation once.
+presents it as _the_ solution to the before/after problem without noting the limitation once.
 
 Three compounding factors:
+
 - The corpus is self-selecting: `decodeAPRS` returns `0x00` on FCS mismatch
   (`aprs_functions.cpp:414-430`), so only frames the current decoder already accepts ever
   produce an `MH-LoRa:` line. 0 `"discarded, wrong FCS"` lines in 17 logs.
@@ -284,7 +286,7 @@ Three compounding factors:
 **Corrected plan.** Add to 06 §Layer 2, before the build steps:
 
 > **Oracle caveat.** `MH-LoRa:` is `printBuffer_aprs()` of the struct `decodeAPRS()`
-> produced. Vectors derived from it pin *current* behaviour: they catch regressions, not
+> produced. Vectors derived from it pin _current_ behaviour: they catch regressions, not
 > pre-existing defects, and they cannot cover frames the current decoder rejects. Tag every
 > such vector `"oracle": "current-behaviour"`.
 
@@ -312,7 +314,7 @@ setFlagReceive()  (ISR, esp32_main.cpp:487 — sets an atomic flag only)
 
 Calling `OnRxDone()` from the serial-command context is **correct for context**: on ESP32
 `setFlagReceive` is a bare flag-setter (`esp32_main.cpp:487-498`) and `OnRxDone` already runs
-in the loop task, same as `checkSerialCommand()`. So H-01 does *not* skip IRQ context in any
+in the loop task, same as `checkSerialCommand()`. So H-01 does _not_ skip IRQ context in any
 meaningful way on this board. What it skips is everything in `checkRX` above the call:
 
 - `radio.readData()` and the RadioLib `state` dispatch — so `CRC_ERROR` (`:3813`),
@@ -347,12 +349,12 @@ dispatch instead, which would cover the CRC/error branches (~10 extra lines).
 `ENABLE_TBEAM` / else. A `platform = native` build defines none of them and falls into the
 `#else` (ESP32-classic) branch. Measured by preprocessing:
 
-| configuration                            | MHEARD | MHPATH | RING   | DEDUP_RING | LOG | RING_UDP |
-| ---------------------------------------- | -----: | -----: | -----: | ---------: | --: | -------: |
-| **native (no macros)**                   | **30** | **40** | **30** |     **70** |  20 |       25 |
-| ESP32-S3 / RAK4630 — *both bench boards* | **80** |**100** | **20** |    **100** |  10 |       20 |
-| `ENABLE_XML` / `ENABLE_SBUFFER`          |     50 |     50 |     20 |         60 |  20 |       20 |
-| `ENABLE_TBEAM`                           |     10 |     10 |     10 |         10 |  10 |       10 |
+| configuration                            | MHEARD |  MHPATH |   RING | DEDUP_RING | LOG | RING_UDP |
+| ---------------------------------------- | -----: | ------: | -----: | ---------: | --: | -------: |
+| **native (no macros)**                   | **30** |  **40** | **30** |     **70** |  20 |       25 |
+| ESP32-S3 / RAK4630 — _both bench boards_ | **80** | **100** | **20** |    **100** |  10 |       20 |
+| `ENABLE_XML` / `ENABLE_SBUFFER`          |     50 |      50 |     20 |         60 |  20 |       20 |
+| `ENABLE_TBEAM`                           |     10 |      10 |     10 |         10 |  10 |       10 |
 
 Every dimension differs. A native `updateMheard()` test would exercise `MAX_MHEARD` = 30 — a
 value used by neither Heltec V3 nor RAK4631. Scenario 6 needs 71 ids natively and 101 on the
@@ -365,7 +367,7 @@ Same problem one level up: `src/loop_functions.h:9-13` is `#ifdef ESP32 → esp3
 and pulls `LoRaWan-Arduino.h`, `nrf_nvic.h`, `mbed.h`, `rtos.h`, `bluefruit.h`, `NimBLE*`,
 `ArduinoJson.h` (`src/nrf52/WisBlock-API.h:49-139`). Verified: the first native compile error
 is `WisBlock-API.h:50: fatal error: 'LoRaWan-Arduino.h' file not found`. So the native env
-must pick a platform *and* a variant, and neither choice is currently declared anywhere.
+must pick a platform _and_ a variant, and neither choice is currently declared anywhere.
 
 **Corrected plan.** Add to 06 §Layer 1:
 
@@ -376,14 +378,14 @@ must pick a platform *and* a variant, and neither choice is currently declared a
 > it, and the ring tests should be parameterised over at least the S3 and the `#else` profile
 > — otherwise 15 of 32 environments are covered by nothing.
 
-### F7-5: The Layer-1 blocker is misdiagnosed — but it is *cheaper* than the doc claims
+### F7-5: The Layer-1 blocker is misdiagnosed — but it is _cheaper_ than the doc claims
 
 **Target:** 06 §Layer 1 ("The blocker is not the algorithms — it is `#include
 <configuration.h>` and `loop_functions_extern.h`"), 06 effort table ("~5–8 sessions").
 **Severity: minor (accuracy), positive for the plan.**
 
 **Argument.** I built the shim and measured the real closure. `configuration.h` and
-`loop_functions_extern.h` are *not* the blockers — `loop_functions_extern.h` needs only a
+`loop_functions_extern.h` are _not_ the blockers — `loop_functions_extern.h` needs only a
 `portMUX_TYPE` typedef. The actual blockers, none of which 06 mentions, are:
 
 1. `loop_functions.h:12` → `nrf52/WisBlock-API.h` on any build without `ESP32` defined;
@@ -394,9 +396,9 @@ With `-DESP32`, one ~45-line `Arduino.h` (a `String` over `std::string`), a ~5-l
 `Print.h`/`Stream`, a ~10-line `WiFi.h`, and a `portMUX_TYPE` typedef, **both files compile
 clean**. Measured link closure (`nm -u`, C++ symbols demangled, libc/libstdc++ removed):
 
-| file                 | globals to define                                                                                          | functions to stub                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `aprs_functions.cpp` | `bDisplayCont`, `bDisplayInfo`, `bLORADEBUG`, `bMESH`, `BOARD_HARDWARE`, `meshcom_settings`, `MSerial` (7) | `checkRegexCall(String)`, `getMOD()`, `printAsciiBuffer(uint8_t*,int)` (3)               |
+| file                 | globals to define                                                                                                                 | functions to stub                                                                                                                   |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `aprs_functions.cpp` | `bDisplayCont`, `bDisplayInfo`, `bLORADEBUG`, `bMESH`, `BOARD_HARDWARE`, `meshcom_settings`, `MSerial` (7)                        | `checkRegexCall(String)`, `getMOD()`, `printAsciiBuffer(uint8_t*,int)` (3)                                                          |
 | `via_functions.cpp`  | `bDisplayCont`, `bDisplayInfo`, `bGATEWAY`, `bMESH`, `bVIA`, `meshcom_settings`, `mheardCalls`, `mheardEpoch`, `mheardNCount` (9) | `getTimeString()`, `getUnixClock()`, `is_equ(const char*,const char*)`, `printfdeb(const char*,...)`, `printlndeb(const char*)` (5) |
 
 That is ~16 globals and ~8 stubs for both files together. **This is 1–2 sessions, not 5–8**,
@@ -415,8 +417,8 @@ assert exact slot selection and exact retry timing"), 07 §3 H-02, 07 §7 scenar
 07 §10 step 2, V-02.
 **Severity: major.**
 
-**Argument, part 1 — stream position.** Seeding fixes the *sequence*, not the *position in
-it*. `random()` is drawn at exactly one place (`lora_functions.cpp:2076`) but reached from
+**Argument, part 1 — stream position.** Seeding fixes the _sequence_, not the _position in
+it_. `random()` is drawn at exactly one place (`lora_functions.cpp:2076`) but reached from
 **10 call sites**, every one of which is triggered by an ambient event:
 
 `lora_functions.cpp:402` (OnRxDone, ACK path) · `:1242` (OnRxDone tail) · `:1983`
@@ -436,7 +438,7 @@ task today, so this is currently benign — but it makes H-02 fragile against an
 of radio work to its own task, and the doc should say so.
 
 **Argument, part 2 — wrong marker.** Scenario 11 asserts on "`TX_GATE_ENTER` → `TX_START`
-deltas". `TX_GATE_ENTER` (`esp32_main.cpp:2340`) is only reached *after* the backoff expired
+deltas". `TX_GATE_ENTER` (`esp32_main.cpp:2340`) is only reached _after_ the backoff expired
 (`:2069`: `if((uint32_t)(millis() - iReceiveTimeOutTime) >= csma_timeout)`). The
 `TX_GATE_ENTER`→`TX_START` interval is IRQ-register polling plus one or two `radio.scanChannel()`
 calls (`:2380`, `:2399`) — tens of milliseconds — and would be compared against a 3000–5850 ms
@@ -449,15 +451,16 @@ immediately followed by `TX_GATE_ENTER` (`meshcom_2026-03-23_194521.log`). It is
 frequent marker in the corpus (59 908 occurrences), so the data is already there.
 
 **Corrected plan.**
+
 - Scenario 11 → assert on `RX_TIMEOUT_FIRE wait=` against
   `[base, base + slots×CSMA_SLOT_SIZE]` per priority. Fully falsifiable, needs **no radio and
   no second node** — demote it from "2-node bench" to `--inject`/single-board.
 - Scenario 12 → either delete, or move it to the host-side `FakeRadio`/`FakeClock` layer
-  (06 Layer 3) where the event sequence *is* controllable and exact-sequence assertions are
+  (06 Layer 3) where the event sequence _is_ controllable and exact-sequence assertions are
   meaningful. On the bench, assert distribution: N samples of `wait=`, check the values are
   a subset of `{base + k×35 | k ∈ 0..slots}` and that all `slots+1` values occur.
 - V-02 stays valid as written (`randomSeed()` really is never called), but its consequence
-  should read "makes the *distribution* reproducible", not "exact values".
+  should read "makes the _distribution_ reproducible", not "exact values".
 
 ### F7-7: Scenario 20 asserts a variable against itself
 
@@ -474,8 +477,8 @@ actually applied" — is exactly the one it cannot detect: if `lora_setchip_mesh
 an error and left the chip at its previous SF, `--lora` would still report the new value.
 
 **Corrected plan.** Either (a) add a `MC_TEST_HOOKS`-gated `--lorahw` that reads back via
-RadioLib getters / register reads and prints both values, then assert equality of *chip* and
-*settings*; or (b) make it a 2-node on-air test: set node A to SF11, node B to SF12, assert
+RadioLib getters / register reads and prints both values, then assert equality of _chip_ and
+_settings_; or (b) make it a 2-node on-air test: set node A to SF11, node B to SF12, assert
 node B receives nothing, then re-match and assert it does. Option (b) needs no firmware
 change and is genuinely falsifiable.
 
@@ -489,9 +492,9 @@ also a robustness bug in shipping firmware.
 
 **Argument.** `printfdeb()` (`src/printfdeb_functions.cpp:39-124`) does
 `vsnprintf(temp, …, nformat, arg)` at `:96` and then, at `:118`, `Serial.printf(temp);` —
-passing the *already-substituted* result back in as a format string. Any `%` that arrived via
+passing the _already-substituted_ result back in as a format string. Any `%` that arrived via
 a `%s` argument is re-interpreted as a conversion specifier on the second pass. The `%%`
-handling at `:48-59` operates on the *format* string only and cannot see argument content.
+handling at `:48-59` operates on the _format_ string only and cannot see argument content.
 
 This is directly reachable from the air: `printBuffer_aprs()` (`loop_functions.cpp:2953`)
 passes `aprsmsg.msg_payload.c_str()` through `%s`, and payloads are peer-controlled. **672 of
@@ -512,6 +515,7 @@ contain at least one `;`**. A CSV parse of the event stream will mis-field on ~6
 lines. The separator is not stable.
 
 **Corrected plan.**
+
 - Change `:118` to `Serial.print(temp);` (or `Serial.printf("%s", temp)`). One line, fixes the
   injection, and it is a prerequisite for trusting any bench result. Add an `--inject` vector
   with `%n%s%999999f` in the payload as the regression test.
@@ -528,11 +532,11 @@ lines. The separator is not stable.
 **Argument.** 07 §1.2 warns "reflashing config on every test wears flash. Prefer `--save`-based
 snapshots and restore". But `--save` **is** the flash write: `save_settings()`
 (`src/esp32/esp32_flash.cpp:280+`) issues ~60 `preferences.put*` calls into NVS. §4.4 then
-prescribes `--cleanflash` + config block + `--save` at the start of *each session*. The advice
+prescribes `--cleanflash` + config block + `--save` at the start of _each session_. The advice
 is self-cancelling, and no scenario measures the cost.
 
 **Corrected plan.** State the actual mechanism (ESP-IDF NVS skips writes of unchanged values,
-so a repeated identical `--save` is cheap; a *changing* config block is not). Add a scenario
+so a repeated identical `--save` is cheap; a _changing_ config block is not). Add a scenario
 tracking NVS wear over a long soak, and prefer configuring via commands **without** `--save`
 for per-test setup, reserving `--save` for the once-per-session baseline.
 
@@ -575,10 +579,10 @@ cannot both be satisfied.
 
 **Corrected plan.** Scenario 17 → assert "**no** `ONRXDONE_STATS` line in the run has
 `warn > 0`" (all windows, not the last one), and record the debug-on baseline (9.4 %, max
-1209 ms) as the known-current number so the assertion starts as a *documented failure* rather
+1209 ms) as the known-current number so the assertion starts as a _documented failure_ rather
 than a false green. Better: make the budget measurable with the stream off — buffer
 `onrxdone_max_ms` and expose it via H-05 counters, which are read on demand outside the radio
-path. Scenario 24 → assert against the *release* build of the previous commit, with an
+path. Scenario 24 → assert against the _release_ build of the previous commit, with an
 explicit tolerance, and exclude `MC_TEST_HOOKS` builds.
 
 ### F7-12: `pio test` cannot upload to the Heltec V3 — the custom upload command targets the wrong binary
@@ -621,7 +625,7 @@ it does not run at all.
    the repo already relies on this in `variants/t_deck/platformio.ini:9-10`.
 
 3. **No `test_*` configuration exists.** `grep` for `test_port|test_speed|test_framework|
-   test_build_src|test_ignore|test_filter` across `platformio.ini` and all
+test_build_src|test_ignore|test_filter` across `platformio.ini` and all
    `variants/*/platformio.ini` returns **0 hits**. 07 §5's snippet is aspirational, not a diff.
    Its `test_port = /dev/cu.usbserial-XXXX` is also the wrong device class — see (4).
 
@@ -632,7 +636,7 @@ it does not run at all.
    out** (`variants/heltec_wifi_lora_32_V3/platformio.ini:27-28`), so `Serial` binds to UART0
    (TX 43 / RX 44), and `Serial.begin(MONITOR_SPEED)` runs at `esp32_main.cpp:608` with a
    5-second `while (!Serial …)` block at `:615-617`. Unity results at 115200 on UART0 are
-   readable — the transport is fine, the *upload* is what is broken.
+   readable — the transport is fine, the _upload_ is what is broken.
 
 **Flash headroom is not a blocker — the doc's only unexamined worry is the one that is fine.**
 `partitions-4MB-safeboot.csv` gives `app` (ota_0) at offset `768K = 0xC0000`, size
@@ -670,7 +674,7 @@ variants".
 
 Ordered by consequence. None appear in 06 or 07.
 
-1. **`millis()` rollover / 49.7-day wrap — surveyed, and the code is *mostly* safe with a
+1. **`millis()` rollover / 49.7-day wrap — surveyed, and the code is _mostly_ safe with a
    real broken minority.** The dominant idiom `(uint32_t)(millis() - timer) >= x` is used at
    **70 sites** and is correct: I checked the declarations and every primary loop timer
    (`posinfo_timer`, `csma_timeout`, `iReceiveTimeOutTime`, `heyinfo_timer`,
@@ -684,7 +688,7 @@ Ordered by consequence. None appear in 06 or 07.
    `X = millis() + N` feeding 17 comparison sites `millis() > X` / `millis() < X`**, which is
    not rollover-safe. Verified examples compiled for the Heltec V3:
    - `src/esp32/esp32_main.cpp:3171-3173` — `if(rebootAuto > 0) { if (millis() > rebootAuto)
-     { … ESP.restart(); } }`, with `rebootAuto = millis() + 5 * 1000;` set at **21 sites** in
+{ … ESP.restart(); } }`, with `rebootAuto = millis() + 5 * 1000;` set at **21 sites** in
      `src/command_functions.cpp` (e.g. `:1538, 1558, 2110`). Near the wrap the deadline wraps
      to a small value and the reboot fires immediately instead of after 5 s.
    - `src/esp32/esp32_main.cpp:3151-3153` — `if (millis() > DisplayOffWait)`, set at
@@ -695,7 +699,7 @@ Ordered by consequence. None appear in 06 or 07.
      with `startTimeout = millis() + 500;`. Across the wrap the condition is false on entry
      and the GPS autobaud wait windows silently collapse to zero.
    - `src/clock.cpp:72` with `:118-119` — `u32Next_m = u32Start_m + 1000; … if (millis() >
-     u32Next_m)`.
+u32Next_m)`.
    - `src/esp32/esp32_main.cpp:3008` — `(millis() > 100000 && millis() < 130000 && bPosFirst)`,
      an absolute-uptime window that re-opens after every wrap.
 
@@ -712,16 +716,17 @@ Ordered by consequence. None appear in 06 or 07.
    which 07 §3 rates "optional, lower priority" — is exactly what enables it. The cheap
    permanent fix is to convert the 17 comparison sites to the subtraction form the rest of the
    codebase already uses.
+
 2. **Format-string / hostile-payload robustness.** See F7-8. Inject payloads containing `%n`,
    `%s`, `%99999f`, `;`, `\n`, `\0`, 8-bit and UTF-8 bytes, and a 255-byte payload with no
    terminator. Assert: no crash, event stream stays parseable, no field bleeds across markers.
 3. **Watchdog and forced recovery.** `esp_task_wdt_add(NULL)` at `esp32_main.cpp:603`,
    `esp_task_wdt_reset()` at `:1745`, and a TX watchdog printing `[MC-WDT] TX_WATCHDOG fired
-   after %lums` at `:2035`. No scenario exercises either. **Test:** stall the TX path (H-01
+after %lums` at `:2035`. No scenario exercises either. **Test:** stall the TX path (H-01
    plus a hook that suppresses `OnTxDone`) and assert `[MC-WDT] TX_WATCHDOG` fires within
    `TX_WATCHDOG_MS` (15 000, `configuration_global.h:144`) and the node returns to RX.
 4. **OTA and rollback.** `src/safeboot/ElegantOTA.cpp` (`Update.begin()` at `:79, 89, 156,
-   166`) and `esp_ota_set_boot_partition(partition)` at `command_functions.cpp:617`. Nothing
+166`) and `esp_ota_set_boot_partition(partition)` at `command_functions.cpp:617`. Nothing
    in the catalogue covers upload of a corrupt image, power loss mid-write, or whether a bad
    image can be rolled back. `esp_ota_mark_app_valid_cancel_rollback` does not appear in
    `src/` — worth confirming whether rollback is armed at all. The Heltec V3's two-image

@@ -1,6 +1,6 @@
-# F0 — Orchestrator reconciliation against the existing `fable-verdict.md`
+# F0 — Orchestrator reconciliation against the existing `docs/code-audit-20260712.md`
 
-Prior art: `fable-verdict.md` at repo root, dated **2026-07-12**, branch `v4.35p_prio`,
+Prior art: `docs/code-audit-20260712.md`, dated **2026-07-12**, branch `v4.35p_prio`,
 39 findings (SEC-01 … TEST-39), method identical to this review (8 finders → adversarial
 verification).
 
@@ -29,19 +29,19 @@ verdict and address the earlier `docs/code-audit-*` series, not these IDs.
 
 ### Verified still open (orchestrator, structural items only — SEC/BUG/CONC left to finders)
 
-| ID       | Claim                                                        | Current source                                                                                   | Status |
-| -------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------ |
-| SIMP-29  | dead files in `src/`                                         | `src/idf_component.yml.orig` present and byte-identical to `src/idf_component.yml`; `src/code_review/code-audit-20260508.md` still in the compiled tree | OPEN |
-| SIMP-30  | `strSOFTSERAPP_ID` declared twice                            | `src/loop_functions_extern.h:319` and `:322`                                                     | OPEN |
-| SIMP-30  | int/float HDOP twins                                         | `src/loop_functions_extern.h:274` `int posinfo_hdop`, `:275` `float fposinfo_hdop`               | OPEN |
-| DRY-21   | nRF52 ETH ACK code diverged (0x01 vs 0x02)                   | `src/udp_functions.cpp:273` `0x01`, `:280` upgrade to `0x02`; `src/nrf52/nrf_eth.cpp:384` still `0x01` | OPEN |
-| DRY-22   | `checkSerialCommand()` duplicated                            | `src/esp32/esp32_main.cpp:3872` and `src/nrf52/nrf52_main.cpp:2515`                              | OPEN |
-| DRY-25   | I2C bus-reset guard uses `(BOARD_E22_S3)` without `defined()`| 10 sites — see escalation below                                                                   | OPEN, **worse than reported** |
-| STATE-28 | `bGATEWAY` forced false without clearing the persisted bit   | set from `node_sset & 0x1000` at `esp32_main.cpp:768`, forced `false` at `:881` and `:888`       | OPEN |
-| ALT-35   | `bOneButton` hijacked as display-dirty flag                  | `src/loop_functions.cpp:1875` and `:1956` (verdict cited one site at `:1939`; now **two**)       | OPEN, grown |
-| TEST-36  | zero runnable tests                                          | `test/` holds `compress_functions.cpp/.h` + a header; no Unity harness                            | OPEN |
-| TEST-37  | no native test environment                                   | `grep 'platform *= *native'` across all `platformio.ini` → empty                                  | OPEN |
-| TEST-38  | CI builds on tags only                                       | `.github/workflows/meshcom-ci.yml` → `on: push: tags: '*'`                                        | OPEN |
+| ID       | Claim                                                         | Current source                                                                                                                                          | Status                        |
+| -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| SIMP-29  | dead files in `src/`                                          | `src/idf_component.yml.orig` present and byte-identical to `src/idf_component.yml`; `src/code_review/code-audit-20260508.md` still in the compiled tree | OPEN                          |
+| SIMP-30  | `strSOFTSERAPP_ID` declared twice                             | `src/loop_functions_extern.h:319` and `:322`                                                                                                            | OPEN                          |
+| SIMP-30  | int/float HDOP twins                                          | `src/loop_functions_extern.h:274` `int posinfo_hdop`, `:275` `float fposinfo_hdop`                                                                      | OPEN                          |
+| DRY-21   | nRF52 ETH ACK code diverged (0x01 vs 0x02)                    | `src/udp_functions.cpp:273` `0x01`, `:280` upgrade to `0x02`; `src/nrf52/nrf_eth.cpp:384` still `0x01`                                                  | OPEN                          |
+| DRY-22   | `checkSerialCommand()` duplicated                             | `src/esp32/esp32_main.cpp:3872` and `src/nrf52/nrf52_main.cpp:2515`                                                                                     | OPEN                          |
+| DRY-25   | I2C bus-reset guard uses `(BOARD_E22_S3)` without `defined()` | 10 sites — see escalation below                                                                                                                         | OPEN, **worse than reported** |
+| STATE-28 | `bGATEWAY` forced false without clearing the persisted bit    | set from `node_sset & 0x1000` at `esp32_main.cpp:768`, forced `false` at `:881` and `:888`                                                              | OPEN                          |
+| ALT-35   | `bOneButton` hijacked as display-dirty flag                   | `src/loop_functions.cpp:1875` and `:1956` (verdict cited one site at `:1939`; now **two**)                                                              | OPEN, grown                   |
+| TEST-36  | zero runnable tests                                           | `test/` holds `compress_functions.cpp/.h` + a header; no Unity harness                                                                                  | OPEN                          |
+| TEST-37  | no native test environment                                    | `grep 'platform *= *native'` across all `platformio.ini` → empty                                                                                        | OPEN                          |
+| TEST-38  | CI builds on tags only                                        | `.github/workflows/meshcom-ci.yml` → `on: push: tags: '*'`                                                                                              | OPEN                          |
 
 ### DRY-20 is marked RESOLVED in the verdict but is not resolved
 
@@ -56,7 +56,7 @@ Current counts (re-derived 2026-07-30, 30 variants):
 - (verdict counted 12 / 15 across 27 variants — the split has grown, not shrunk)
 
 `docs/architecture/04-complexity-and-duplication.md` reports the same 13/17 split
-independently. **Action: the `RESOLVED` label in `fable-verdict.md` must be corrected to
+independently. **Action: the `RESOLVED` label in `docs/code-audit-20260712.md` must be corrected to
 OPEN, or it will be read as done.**
 
 ## DRY-25 re-derived: the guard works, but by arithmetic on the board's product name
@@ -88,7 +88,7 @@ but PlatformIO's ini parser **consumes the quotes**. The real compiler invocatio
 -DBOARD_E22_S3=esp32-s3-devkitc-1-n16r8
 ```
 
-i.e. an *identifier sequence*, not a string literal. Passing the quoted form by hand does
+i.e. an _identifier sequence_, not a string literal. Passing the quoted form by hand does
 produce a hard error, which is what the first repro showed — but that form never reaches
 the compiler.
 
@@ -150,7 +150,7 @@ without `defined()` silently does arithmetic on a product name. Today only `BOAR
 is used that way, but nothing prevents the next one — and `-Wall -Wextra` does not warn.
 
 This is direct, mechanical evidence for the concept's `#ifdef`-instead-of-HAL critique
-([01 §2](../../docs/architecture/01-system-overview.md)) and belongs in the
+([01 §2](../../architecture/01-system-overview.md)) and belongs in the
 "mechanical enforcement" proposal: `-Wundef` plus a rule that board identity is a flag
 (`-D BOARD_E22_S3=1`) and the human-readable name is a separate string macro.
 
@@ -188,13 +188,13 @@ Affected sites (10, four files — the verdict listed `aht20.cpp:45`, `bmp390.cp
 `bmx280.cpp:131,143,169,213`, `sht21.cpp:41,68`; the actual current set differs and
 **includes `rtc_functions.cpp`, which the verdict missed**):
 
-| File                      | Lines            |
-| ------------------------- | ---------------- |
-| `src/aht20.cpp`           | 45               |
-| `src/bmp390.cpp`          | 54, 84           |
-| `src/bmx280.cpp`          | 169, 213         |
-| `src/rtc_functions.cpp`   | 28, 71, 83, 99   |
-| `src/sht21.cpp`           | 41, 68           |
+| File                    | Lines          |
+| ----------------------- | -------------- |
+| `src/aht20.cpp`         | 45             |
+| `src/bmp390.cpp`        | 54, 84         |
+| `src/bmx280.cpp`        | 169, 213       |
+| `src/rtc_functions.cpp` | 28, 71, 83, 99 |
+| `src/sht21.cpp`         | 41, 68         |
 
 (`bmx280.cpp:131,143` now use plain `#ifdef BOARD_TBEAM_V3` — those two were changed since
 the verdict, so the E22_S3 board is silently missing the workaround there.)
@@ -204,7 +204,7 @@ Both affected environments — `E22_1262_S3-DevKitC-1-N16R8` and
 `build_src_filter` (they inherit `[esp32]`'s `+<*>`), and therefore compile all four files.
 
 **REFUTED — do not re-investigate.** Both predicted outcomes were wrong. The build
-succeeds *and* the workaround does apply. The quoted macro form used in this repro is not
+succeeds _and_ the workaround does apply. The quoted macro form used in this repro is not
 what PlatformIO passes to the compiler; see the corrected section above. Refuting evidence:
 `pio run -e E22_1262_S3-DevKitC-1-N16R8` → SUCCESS, and `pio run -v` shows
 `-DBOARD_E22_S3=esp32-s3-devkitc-1-n16r8` (unquoted).
@@ -212,14 +212,14 @@ what PlatformIO passes to the compiler; see the corrected section above. Refutin
 ## Implication for the concept
 
 The concept's framing — "the project needs a test oracle before it can safely change
-anything" — is *strengthened*, not weakened, by this reconciliation. There is already a
+anything" — is _strengthened_, not weakened, by this reconciliation. There is already a
 verified, ID'd backlog of 39 defects that nobody has been able to land, and at least one
 of them is a build-guard error in two default environments that no automated check would
 catch.
 
 `docs/architecture/` must therefore:
 
-1. cite `fable-verdict.md` as the standing defect backlog and not re-derive it,
+1. cite `docs/code-audit-20260712.md` as the standing defect backlog and not re-derive it,
 2. record fix status per ID rather than re-discovering findings,
 3. correct the DRY-20 `RESOLVED` label,
 4. treat "land the existing 39" as a first-class workstream alongside "build the harness",

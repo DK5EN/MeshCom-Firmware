@@ -1,4 +1,44 @@
-# Release Notes -- MeshCom Firmware v4.35* (2026-03-22)
+# Release Notes -- MeshCom Firmware v4.35p
+
+Firmware `4.35p`, `FLASH_VERSION 20260821` (`src/configuration_global.h`).
+Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
+[`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35p.08.21-stability (2026-08-21)
+
+Qualitaets-Release auf Basis der offiziellen MeshCom 4.35p (upstream `dev`,
+Merge-Base `8114d7ae`). **Kein Feature-Release und kein On-Air-Change** -- ein Node
+mit diesem Build verhaelt sich gegenueber Mesh, Nachrichten und Apps wie das
+offizielle 4.35p. Geaendert wurden Stabilitaet, Robustheit, Eingabe-Haertung und
+die Testinfrastruktur; dazu einige kleine Diagnose- und Wartungshilfen
+(`--dfu` fuer den UF2-Bootloader, Reset-Ursache beim Boot, Entwickler-Tools).
+
+Schwerpunkte:
+
+- **Eingabe-Haertung** auf allen drei Empfangspfaden -- LoRa/APRS, BLE und
+  UDP/Netz. Format-String-Auswertung empfangener Texte im Debug-Logger,
+  Laengenpruefungen der BLE-Konfigurations- und Textnachrichten, URL-Decode,
+  UDP-Off-by-One, APRS-Trailer/FCS.
+- **Crash- und Freeze-Fixes**, gefunden auf echter Hardware: Stack-Overflow im
+  Loop-Task, Watchdog-Trip beim Boot mit Gateway-Konfiguration, eingefrorener
+  Loop bei EXTUDP/Webserver ohne initialisiertes Ethernet, W5100S-Warteschleifen.
+- **Nebenlaeufigkeit**: TX-Ring-Enqueue vollstaendig unter einem Lock,
+  Snapshot-Lesen des UDP-Rings, BLE-Callback auf dem nRF52 entkoppelt.
+- **Zeitrobustheit**: `millis()`-Wraparound-sichere Vergleiche an 25 Stellen.
+- **Testinfrastruktur**: native Host-Suiten (`native`, `native_aprs`,
+  `native_extradio`), Test-Orakel mit Frame-Korpus, Mock-MeshCom-Server,
+  Ressourcen-Waechter mit RAM/Flash-Baseline, CI-Build-Gate ueber alle
+  `default_envs`.
+
+Die vollstaendige Auflistung mit Referenz auf die jeweiligen Findings steht in
+[`docs/CHANGELOG-stability.md`](docs/CHANGELOG-stability.md). Die Befunde selbst
+sind in [`docs/architecture/08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md)
+und [`docs/code-audit-fixes-20260627.md`](docs/code-audit-fixes-20260627.md)
+dokumentiert; offene Punkte in [`docs/BACKLOG.md`](docs/BACKLOG.md).
+
+---
 
 ## Upstream-Sync 2026-08-18 (dev)
 
@@ -274,26 +314,32 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 
 ## Supported Hardware
 
+Dateinamen wie im GitHub-Release. Massgeblich sind `default_envs` in
+`platformio.ini` und die Artefaktliste in `.github/workflows/meshcom-ci.yml`.
+
 ### ESP DevKits + E22 LoRa Modul
 
 - E22-DevKitC.bin (433 MHz)
 - E22_XML-DevKitC.bin (433 MHz)
-- E22_1268_S3-DevKitC.bin (433 MHz)
+- E22_1268_S3-DevKitC-1-N16R8.bin (433 MHz)
 - E22_1262-DevKitC.bin (868 MHz)
-- E22_1262_S3-DevKitC.bin (868 MHz)
+- E22_1262_S3-DevKitC-1-N16R8.bin (868 MHz)
 
 ### ESP32 Lora-Aprs
 
-- esp32-loraprs-e22
-- esp32-loraprs-ra01
+- esp32-loraprs-e22.bin
+- esp32-loraprs-ra01.bin
 
 ### HELTEC
 
 - heltec_wifi_lora_32_V2.bin
 - heltec_wifi_lora_32_V3.bin
 - heltec_wifi_lora_32_V4.bin
-- heltec_wireless_stick_v3.bin
+- heltec_wireless_stick.bin
 - heltec_wireless_tracker.bin
+- wireless-paper.bin
+- vision-master-e290.bin
+- vision-master-e213.bin
 - heltec_t114.zip, .uf2
 
 ### Lilygo
@@ -304,13 +350,8 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 - ttgo_tbeam.bin
 - ttgo_tbeam_SX1262.bin
 - ttgo_tbeam_SX1268.bin
-- ttgo_tbeam_supreme_l76k.bin
-- ttgo_tbeam_1W.bin
-
-#### E-PAPER
-
-- vision-master-e290.bin
-- vision-master-e213.bin
+- ttgo_tbeam_supreme.bin
+- T-Beam-1W.bin
 
 #### T-DECK
 
@@ -333,6 +374,19 @@ Mit zwei Logfiles: zusaetzliche Cross-Correlation Analyse.
 ### RAK Wisblock
 
 - wiscore_rak4631.zip, .uf2
+
+### Safeboot / OTA
+
+- safeboot.bin, safeboot-s3.bin
+- bootloader.bin, bootloader-s3.bin
+- partitions.bin, otadata.bin
+
+### Gebaut, aber nicht im Release
+
+- `T-ETH-ELITE_1262` -- steht in `default_envs` und wird im CI gebaut, ist aber
+  nicht in der Artefaktliste des Release-Workflows.
+- `t5_epaper`, `vision-master-e213-preview`, `esp32-external-radio` -- Opt-in,
+  nicht in `default_envs`.
 
 ### Newer version > v4.35 able to upgrade via OTA-Flasher.
 

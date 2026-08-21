@@ -265,7 +265,7 @@ costs one afternoon to resolve.
 **This is the finding I would fix first, because unlike the others it is not "write a document" — it
 is "the document exists and the concept did not read it".**
 
-`fable-verdict.md` (40 KB, repository root) is dated **2026-07-12**, reviews branch **`v4.35p_prio`**
+`docs/code-audit-20260712.md` (40 KB) is dated **2026-07-12**, reviews branch **`v4.35p_prio`**
 — the same branch the concept baselines on, eighteen days earlier — and contains a severity-ranked,
 individually-verified backlog of 39 findings with stable IDs, file:line evidence, failure scenarios
 and proposed actions. Its security half:
@@ -328,7 +328,7 @@ prioritisation is wrong: 01 §1 notes that only 12 of 423 globals are atomic and
 
 **Remedy — two things, in this order.**
 
-1. **Triage `fable-verdict.md` now, before writing anything.** Mark each of the 39 findings
+1. **Triage `docs/code-audit-20260712.md` now, before writing anything.** Mark each of the 39 findings
    open/fixed/won't-fix against the current tree, and land SEC-02 (one line) immediately. SEC-01
    should be handled as a coordinated disclosure with the upstream maintainers — the document itself
    says so, and it affects deployed nodes, not just this branch. Then link the triaged document from
@@ -604,20 +604,20 @@ Everything below exists, is relevant, and appears in none of the eight documents
 line and a link — collectively they are the difference between "documentation set" and "index of the
 project".
 
-| Artefact                                                                                            | What it is                                                                                                                                                             | Action                                                                                     |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `src/web_functions/Web-API_documentation.txt`                                                       | 134 lines of REST API docs (`/setparam/?…`, ~40 parameters). Self-described as "not yet finished or stable". The only written external-interface contract in the repo. | Link from the new `08`; convert to Markdown; state its stability.                          |
-| `extras/decode_meshcom.py`                                                                          | Independent 136-LOC Python decoder of the on-air format over UDP 1798                                                                                                  | Conformance oracle for `08` and for 06 Layer 2                                             |
-| `extras/SpectrumScan.py`                                                                            | Host-side companion to `--spectrum` / `src/spectral_scan.cpp`                                                                                                          | One line in 07 §1.6                                                                        |
-| *(`fable-verdict.md`, `v435p_updates/`, `src/code_review/` and `adr-totp-remote-led.md` are covered |
-| in the table in the next section — see F8-5 and F8-16 for the two that matter most.)*               |
-| `data/*.mp3` (12 files)                                                                             | Audio assets for T-Deck — but **no environment uploads them**: no `board_build.filesystem`, no `uploadfs` step, and the 4 MB table has no SPIFFS partition at all      | Dead payload. Either wire up the filesystem upload or delete; say which in the new `10`    |
-| `tools/ensure_safeboot.py`                                                                          | **Dead code** — referenced by no environment, and looks for `safeboot.bin` in the S3 build dir where `custom_filename` produces `safeboot-s3`                          | Delete or wire up; note in the new `10`                                                    |
-| `config/lv_conf.h`                                                                                  | A third LVGL config alongside `src/t-deck/lv_conf.h` and `variants/*/lv_conf.h`                                                                                        | Name which one is authoritative in 02                                                      |
-| `tools/meshcom_monitor/` (17 logs)                                                                  | 06 uses it well; 07 uses it well                                                                                                                                       | **Already covered** — no action                                                            |
-| `tools/loganalyse.sh` (85 KB!)                                                                      | Referenced in 07 §1.5 as one table row. It is the largest tool in the repo by a factor of two.                                                                         | Deserves a sentence on what it can assert                                                  |
-| `boards/*.json` (11 board definitions)                                                              | PlatformIO board definitions checked into the repo; CI downloads a 12th at build time from a third-party GitHub raw URL (`.github/workflows/meshcom-ci.yml`)           | Name in the new `16`; the CI download is an unpinned external dependency and belongs in 03 |
-| `test/compress_functions.cpp`                                                                       | 06 and 05 both list it as a Phase-1 extraction target. Its only call site (`command_functions.cpp:244–255`) is commented out with `/* TEST`. **It is dead code.**      | Correct 05/06: it is not a test target, it is a deletion candidate                         |
+| Artefact                                                                                                       | What it is                                                                                                                                                             | Action                                                                                     |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `src/web_functions/Web-API_documentation.txt`                                                                  | 134 lines of REST API docs (`/setparam/?…`, ~40 parameters). Self-described as "not yet finished or stable". The only written external-interface contract in the repo. | Link from the new `08`; convert to Markdown; state its stability.                          |
+| `extras/decode_meshcom.py`                                                                                     | Independent 136-LOC Python decoder of the on-air format over UDP 1798                                                                                                  | Conformance oracle for `08` and for 06 Layer 2                                             |
+| `extras/SpectrumScan.py`                                                                                       | Host-side companion to `--spectrum` / `src/spectral_scan.cpp`                                                                                                          | One line in 07 §1.6                                                                        |
+| *(`docs/code-audit-20260712.md`, `v435p_updates/`, `src/code_review/` and `adr-totp-remote-led.md` are covered |
+| in the table in the next section — see F8-5 and F8-16 for the two that matter most.)*                          |
+| `data/*.mp3` (12 files)                                                                                        | Audio assets for T-Deck — but **no environment uploads them**: no `board_build.filesystem`, no `uploadfs` step, and the 4 MB table has no SPIFFS partition at all      | Dead payload. Either wire up the filesystem upload or delete; say which in the new `10`    |
+| `tools/ensure_safeboot.py`                                                                                     | **Dead code** — referenced by no environment, and looks for `safeboot.bin` in the S3 build dir where `custom_filename` produces `safeboot-s3`                          | Delete or wire up; note in the new `10`                                                    |
+| `config/lv_conf.h`                                                                                             | A third LVGL config alongside `src/t-deck/lv_conf.h` and `variants/*/lv_conf.h`                                                                                        | Name which one is authoritative in 02                                                      |
+| `tools/meshcom_monitor/` (17 logs)                                                                             | 06 uses it well; 07 uses it well                                                                                                                                       | **Already covered** — no action                                                            |
+| `tools/loganalyse.sh` (85 KB!)                                                                                 | Referenced in 07 §1.5 as one table row. It is the largest tool in the repo by a factor of two.                                                                         | Deserves a sentence on what it can assert                                                  |
+| `boards/*.json` (11 board definitions)                                                                         | PlatformIO board definitions checked into the repo; CI downloads a 12th at build time from a third-party GitHub raw URL (`.github/workflows/meshcom-ci.yml`)           | Name in the new `16`; the CI download is an unpinned external dependency and belongs in 03 |
+| `test/compress_functions.cpp`                                                                                  | 06 and 05 both list it as a Phase-1 extraction target. Its only call site (`command_functions.cpp:244–255`) is commented out with `/* TEST`. **It is dead code.**      | Correct 05/06: it is not a test target, it is a deletion candidate                         |
 
 **Dismissed in one line, deliberately:** `include/` (contains only a stock `README`); `.vscode/`;
 `build_output.txt` (stray 175-byte artefact); `otadata.bin` (covered by F8-3); the `Fonts/`,
@@ -638,7 +638,7 @@ because no artefact in the repository records which findings are open.
 | `MEM-` `BND-` `RACE-` `STAB-` `COMP-` `STK-`        | `docs/codequality-rules.md`         | rule IDs, cited as normative |
 | bare ordinals ("Nr 1…20")                           | nine `docs/code-audit-*.md`         | per-audit, not stable        |
 | `A1`–`D5`                                           | `docs/code-audit-fixes-20260627.md` | work-items                   |
-| `SEC-` `BUG-` `CONC-` `DRY-` `SIMP-` `ALT-` `TEST-` | `fable-verdict.md`                  | 39, stable, with verdicts    |
+| `SEC-` `BUG-` `CONC-` `DRY-` `SIMP-` `ALT-` `TEST-` | `docs/code-audit-20260712.md`       | 39, stable, with verdicts    |
 
 The same live defect therefore appears under three different names — non-atomic ring indices is
 `RACE-04` _and_ `C1` _and_ `CONC-15/16`. Nobody can answer "how many open issues does this codebase
@@ -658,7 +658,7 @@ point-in-time reports with incompatible IDs and stale verdicts.
 
 **Remedy — one generated artefact, not another report.** `docs/defect-index.md`: one row per finding,
 columns _stable ID · aliases in the other namespaces · severity · current status (open/fixed/won't-fix)
-· fixing commit · regression test_. Seed it from `fable-verdict.md`, which is the only namespace that
+· fixing commit · regression test_. Seed it from `docs/code-audit-20260712.md`, which is the only namespace that
 is already stable and verdict-bearing, and back-fill the audits into it. Then 06 can legitimately say
 "the backlog is `defect-index.md`", and the "test per fixed bug" rule becomes checkable — the empty
 `regression test` column _is_ the work queue for Layer 2.
@@ -735,7 +735,7 @@ Currency verified against the source, not against the documents' own claims.
 | `docs/prio-talk-flood-networking.md`          | **not linked**                          | **Upgrade — this is a real protocol contract**: the only written record of the 9 relay-stop conditions, hop-decrement-before-relay, which types relay (`0x3A`/`0x21`/`0x40`, never ACK), fire-and-forget `RING_STATUS_DONE`, originator-only retransmit (`MAX_RETRANSMIT 3`, ~40 s). Constants verified exact. **Breaks:** its "dedup wraps after 60–100" is now false (ladder is 100/60/60/70/10); all `lora_functions.cpp:NNN` refs stale; §Szenario 3 contains inline _retracted_ reasoning, so stopping early yields the wrong conclusion. | **Correction pass, then promote** — it is the backbone of `13`                                                   |
 | `docs/hey-supp.md`                            | **not linked**                          | trickle constants live at `configuration_global.h:181–184`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Link from `13`                                                                                                   |
 | `docs/adr-totp-remote-led.md`                 | **not linked**                          | **No.** `totp` has zero occurrences in `src/` — describes code that does not exist                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Mark rejected/reverted, or delete                                                                                |
-| `fable-verdict.md` (40 KB, root)              | **not linked**                          | **Live.** 2026-07-12, same branch. SEC-01 (Critical) and SEC-02 (High) **verified still open** in the current tree                                                                                                                                                                                                                                                                                                                                                                                                                             | **Triage now**; land SEC-02 (one line); coordinate SEC-01 with upstream; then make it the backlog 06 refers to   |
+| `docs/code-audit-20260712.md` (40 KB)         | **not linked**                          | **Live.** 2026-07-12, same branch. SEC-01 (Critical) and SEC-02 (High) **verified still open** in the current tree                                                                                                                                                                                                                                                                                                                                                                                                                             | **Triage now**; land SEC-02 (one line); coordinate SEC-01 with upstream; then make it the backlog 06 refers to   |
 | `docs/code-review.md`                         | **not linked**                          | **Actively misleading.** Contains a _reversed_ decision presented as settled: "bewusst `volatile int` statt `std::atomic`" was overturned by commit `8009aa19`. Following it re-introduces the bug. Also one wrong finding (MEM-01 calls a file-scope global a stack array).                                                                                                                                                                                                                                                                   | Add a superseded banner or delete; fold live items into the defect index                                         |
 | `docs/codequality-rules.md`                   | **linked (01 §4)** — cited as normative | **No date, no version, no branch**, yet nine audits cite it. Generic ESP32 ruleset: `portMUX_TYPE`/`IRAM_ATTR`/`esp_task_wdt`/NVS stated unconditionally with **no nRF52 equivalent**, on a project with three nRF52 targets. Rules dead or permanently violated: `-Werror` (0 hits), Rule 17's `#ifdef NATIVE_BUILD` (0 hits), Rule 20 prescribes an `sdkconfig` that does not exist, "no `^` pinning" vs 10+ `@^` deps.                                                                                                                      | Version-stamp it, add an nRF52 applicability column, retire the dead rules — **before** 01 cites it as normative |
 | `docs/code-audit-*.md` (9 files)              | linked as a glob                        | Stale verdicts — the 2026-05-08 headline "None fully closed" is wrong; ~half its CRITICALs are closed                                                                                                                                                                                                                                                                                                                                                                                                                                          | Supersede with the defect index (F8-16)                                                                          |
@@ -823,7 +823,7 @@ gap is that they describe the code and not the _contracts_, the _fleet_, or the 
 
 Eighteen documents is more than eight, so the ordering matters.
 
-**Before any of them: triage `fable-verdict.md` and land SEC-02.** It is one line, the finding is
+**Before any of them: triage `docs/code-audit-20260712.md` and land SEC-02.** It is one line, the finding is
 verified, and the code path is reachable from received traffic. Writing architecture documentation
 above an open Critical is the wrong order of work.
 
@@ -844,7 +844,7 @@ If only four documents are then written:
 that most directly serve "x-ray vision for a new contributor", and both are cheap. `17` is nearly
 free because it should be generated. `12` should be written before, not after, the first fuzz
 campaign — and the fuzz campaign should exist, which the concept does not currently propose, despite
-two of `fable-verdict`'s High findings being ones a short fuzz run would have produced.
+two of `docs/code-audit-20260712.md`'s High findings being ones a short fuzz run would have produced.
 
 ## Meta-observation on the set as it stands
 
@@ -861,13 +861,13 @@ findings fall into five buckets:
   budget) — the boundaries the design must respect.
 - **The project rather than the program** (F8-11 ownership, F8-12 board runbook, F8-18 glossary).
 - **What was already written down** (F8-5, F8-7, F8-16) — the set was produced without an inventory
-  of existing documentation, so it re-derived the structural half of `fable-verdict.md`, missed its
+  of existing documentation, so it re-derived the structural half of `docs/code-audit-20260712.md`, missed its
   security half, and never found the ADR series hiding behind a file called `README_LORA_TRX.md`.
 
 That last bucket is the cheapest to fix and the most embarrassing to leave: roughly 180 KB of
 relevant, largely accurate German-language design documentation already exists in this repository and
 the architecture set links none of it. **The first action is not to write document 08. It is to spend
-an hour reading `docs/` and `fable-verdict.md`, then decide what still needs writing.** My estimate
+an hour reading `docs/` and `docs/code-audit-20260712.md`, then decide what still needs writing.** My estimate
 after doing exactly that: `08`, `09`, `10`, `11` and `18` genuinely do not exist in any form; `13`,
 `14` and `12` are substantially pre-written and need curation, correction and a link; `15`, `16` and
 `17` are new but small.
