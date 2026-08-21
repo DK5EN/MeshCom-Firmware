@@ -808,6 +808,39 @@ werden, nicht blind.
 (dann Wave 0.2-Rest dort nachholen), oder die naechste Aenderung an einer
 `[nrf52]`/`[esp32]`-Sektion in `variants/*/platformio.ini`.
 
+### N-19 — `--dfu` haengt sich auf, statt in den UF2-Bootloader zu wechseln — **VERIFIED (auf echter Hardware)** — High
+
+Neu, gefunden 2026-08-21 beim ersten Hardware-Test von `--dfu` (Commit `7bac915a`,
+2026-08-19 committet, dort selbst als "auf Hardware noch ungetestet" vermerkt — dies ist
+genau dieser erste Test).
+
+`--dfu` ueber Seriell gesendet. Ergebnis: die serielle Konsole verstummte vollstaendig
+(fuenf unabhaengige Leseversuche ueber ~50 s — `cat`, `stty`+`cat`, `pio device monitor`,
+`pyserial` mit gesetztem DTR/RTS, verlaengertes passives Lauschen — durchweg 0 Bytes), der
+USB-Deskriptor zeigte aber weiterhin die Applikations-PID `0x8029` (`ioreg`), nie die
+Bootloader-PID `0x0029`, und `/Volumes/RAK4631` erschien nie. Weder normaler Betrieb noch
+Bootloader — das Board haengt zwischen beiden Zustaenden.
+
+`enterUf2Dfu()` (`cores/nRF5/wiring.c:98` im Adafruit-Core) ruft `sd_softdevice_disable()`
+vor `NVIC_SystemReset()` auf; ob genau das der Haenger-Punkt ist, ist **nicht verifiziert**
+— nur das Symptom ist belegt. Der aufrufende Codepfad (`bEnterDfu`-Zweig in `nrf52loop()`,
+`nrf52_main.cpp`, ueber den bestehenden `rebootAuto`-Mechanismus) liegt ausserhalb jeder in
+der Session vom 2026-08-20/21 neu eingefuehrten Critical Section — der Fund ist also nicht
+durch `N-16`/`CONC-15`/`CONC-16`/`CONC-17` verursacht.
+
+**Recovery verifiziert:** ein einzelner physischer Tastendruck auf Reset holt das Board
+vollstaendig zurueck — wieder Applikations-PID, serielle Konsole sofort wieder aktiv,
+RX/TX/Settings unveraendert intakt. Kein Datenverlust, kein Soft-Bricking. Physischer
+Reset bleibt damit der einzige verifiziert funktionierende Weg in den Bootloader.
+
+**Fix (nicht in dieser Session):** root cause noch offen — braucht entweder
+Instrumentierung vor dem `enterUf2Dfu()`-Aufruf (letzte `printfdeb()`-Zeile, dann
+Reset-Verhalten beobachten) oder Vergleich gegen ein bekannt funktionierendes
+UF2-DFU-Beispiel des Adafruit-Cores, um zu sehen, ob `sd_softdevice_disable()` aus diesem
+Aufrufkontext ueberhaupt zulaessig ist.
+
+**`--dfu` bis zur Untersuchung nicht verwenden.**
+
 ---
 
 ## 3. Refuted claims — do not re-investigate
