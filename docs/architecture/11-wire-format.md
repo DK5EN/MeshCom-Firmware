@@ -54,6 +54,18 @@ The trailer fields after the FCS (FW, LASTHW, FW-sub, 0x7E) are parsed
 must tolerate their absence, encoders must always write all of them
 (`encodeAPRS()` does).
 
+**msg_id composition.** The 32-bit msg_id is not opaque: firmware nodes build
+it as `((gw_id & 0x3FFFFF) << 10) | (counter & 0x3FF)` — 22 bits of the
+node's gateway id (MAC-derived), low 10 bits a per-node message counter
+(`src/loop_functions.cpp:3119` and five sibling sites). The counter wraps at
+**1000, not 1024**: every site that advances `node_msgid` clamps it to 999
+(`loop_functions.cpp:3131–3133`), because the ack-request suffix `{NNN` is
+rendered `%03i` from the same counter — 1000..1023 would have no 3-digit
+representation and a peer's `:ackNNN` would match the wrong message. A mock
+node must reproduce both the composition and the 0..999 wrap
+(cross-validated against `mc-chat/meshcom_mock/protocol.py`, which documents
+the same constraint independently).
+
 ### 1.2 Byte 5 — flags + hop
 
 `src/aprs_functions.cpp:160–172` (decode), `:1025–1037` (encode):
@@ -86,18 +98,27 @@ itself.
 - Destination: `*` = broadcast; a numeric group (`9999`, `20`, …); or a
   callsign for a direct message (DM). Non-group destinations must pass the
   callsign regex too.
-- HEY beacons are `0x40` frames with destination `H` and payload like `R0;`
-  (trickle neighbor discovery); weather frames share type `0x40` with other
-  destinations.
+- HEY beacons are `0x40` frames with destination `H` (`HG` from gateways) and
+  payload like `R0;` (trickle neighbor discovery); weather frames share type
+  `0x40` with other destinations. Each hop that handles a HEY appends a signal
+  report `NCT,RSSI,SNR;` to the payload (`appendHeySignalReport`,
+  `src/aprs_functions.cpp`) — mesh relays before re-transmitting, gateways
+  before the UDP upload — e.g. `R0;5,118,7;` (5 neighbors, −118 dBm, +7 dB).
 
 ### 1.5 Acknowledgements
 
-- A DM requests an ack by appending `{NNN` to its payload, where `NNN` is the
-  sender's 3-digit message counter (`sendMessage()`,
-  `src/loop_functions.cpp:3445–3450`).
+- A DM requests an ack by appending `{NNN` to its payload — **no closing
+  brace** — where `NNN` is the sender's 3-digit message counter
+  (`sendMessage()`, `src/loop_functions.cpp:3454`). One firmware path does
+  emit a closing brace: `{pong}{NNN}` replies (`:3208`) — parsers should
+  accept `{NNN` with an optional trailing `}`.
 - The addressed node answers with a normal **text frame** (`0x3A`) whose
-  payload is `<destcall> :ackNNN` (or `:rejNNN`), e.g.
-  `DK5EN-98,DK5EN-91>DK5EN-90:DK5EN-90 :ack063`.
+  payload is built `%-9.9s:ack%03i` (`src/loop_functions.cpp:4198`) — the
+  destination callsign space-padded/truncated to **exactly 9 characters**,
+  then `:ackNNN` (or `:rejNNN`), e.g.
+  `DK5EN-98,DK5EN-91>DK5EN-90:DK5EN-90 :ack063` (the space is the padding).
+  Parsers should match `:ack[0-9]+` anywhere in the payload rather than
+  assume a separator.
 - Additionally, gateways emit a **compact 12-byte binary ack** for
   broadcast/group/WLNK/SOTA messages (`src/lora_functions.cpp:1078–1095`,
   captured on air as corpus frames `f008`/`f009`):
@@ -141,6 +162,20 @@ AB                                       LASTHW: 0x80 flag | hw 0x2B
 7E                                       end marker
 ```
 
+### 1.7 Control payloads in text frames
+
+Some `0x3A` text payloads are control traffic, not chat. The receiving node
+consumes them in `loop_functions.cpp` and marks them no-retransmission
+(`:3527`, ring status `0xFF`):
+
+| Prefix                     | Meaning                                                                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{CET}YYYY-MM-DD HH:MM:SS` | Server time sync (`:2228`). Accepted only when the node has no RTC, no GPS fix and no valid NTP time; years ≤ 2023 are ignored.                                         |
+| `{SET}N;M;`                | Server sets the node's hop budgets: `max_hop_text` and `max_hop_pos`, parsed `%d;%d;` (`:2219`).                                                                        |
+| `{MCP}…` / `{mcp}…`        | Remote IO switching (`:2141`): payload carries a 3-digit sequence check derived from the frame's own `msg_id & 0x3FF`, a password checked against `node_passwd`, and `A | B<n> ON/OFF`mapped to`--setout`. |
+| `{ping}` / `{pong}`        | Connectivity test with RSSI/SNR display echo (`:2115`).                                                                                                                 |
+| `:ackNNN` / `:rejNNN`      | Text-level acknowledgement (§1.5).                                                                                                                                      |
+
 ---
 
 ## 2. Server UDP protocol (port 1990)
@@ -149,7 +184,25 @@ Gateway nodes exchange UDP datagrams with the MeshCom server
 (`meshcom.oevsv.at` / OE and DL hamnet servers). Port: `UDP_PORT 1990`
 (`src/configuration_global.h:86`). Implementations: `src/udp_functions.cpp`
 (ESP32/WiFi) and `src/nrf52/nrf_eth.cpp` (nRF52/W5100S Ethernet) — the two
-are a documented DRY-21 code clone.
+are a documented DRY-21 code clone, but they are **not** feature-identical
+on the receive side (see §2.2, CONF).
+
+An upstream spec for this layer exists:
+[icssw-org/MeshCom-Reflector](https://github.com/icssw-org/MeshCom-Reflector),
+`protocolls/refelctor_connections.md` (typo in the upstream path). Treat it
+as informational only — it contains known factual errors (DATA row labeled
+`BEAT`; DATA byte 34 described as a 1-byte binary payload length where the
+firmware actually writes two ASCII modulation digits; `LOGN` length given as
+5 for a 4-char tag), catalogued with evidence in
+`mc-chat/doc/proto-deviations.md`. Where spec, firmware and live traffic
+disagree, the firmware wins. The spec's reflector side (`LOGN`/`CONN`,
+port 6901, server ↔ reflector) is out of scope here — nodes never speak it.
+
+This section is cross-validated against a second independent implementation:
+`mc-chat/meshcom_mock/` (softnodes live-connected to the OE and DL servers;
+`protocol.py` builds KEEP/DATA/positions, `decoder.py` parses everything the
+servers send). Its empirical record: 800+ positions and 7000+ chat messages
+decoded with the 36-byte DATA assumption, zero outer-framing failures.
 
 ### 2.1 Node → server
 
@@ -174,21 +227,31 @@ the raw LoRa frame of §1 —
 <raw LoRa frame bytes>
 ```
 
+The trailing two bytes are **ASCII modulation digits**, hardcoded to `"03"`
+by the firmware (mode 3 = SF11/CR 4:6/BW 250 kHz; snprintf literal,
+`udp_functions.cpp:1077–1079`) — not a binary payload-length byte as the
+upstream spec claims. The LoRa frame always begins at offset 36; a decoder
+that trusted the spec's length-byte reading would find `0x30` (`'0'`) where
+the frame type belongs and decode nothing.
+
 The node also sends its **own** transmissions to the server through the same
 envelope (with rssi/snr 0).
 
 ### 2.2 Server → node
 
 The first 4 bytes of each datagram are an indicator
-(`UDP_MSG_INDICATOR_LEN 4`; parsing: `getUDP()`, `src/nrf52/nrf_eth.cpp:212` /
-`src/udp_functions.cpp` equivalent):
+(`UDP_MSG_INDICATOR_LEN 4`; parsing: `getUDP()`, `src/nrf52/nrf_eth.cpp:255`
+and `src/udp_functions.cpp:144`):
 
 - **`GATE`** + raw LoRa frame — a frame the gateway shall transmit on LoRa.
   The node decodes it (§1), appends itself to the source path, sets
   `msg_app_offline` (0x20) and re-encodes before transmitting; acks embedded
   in such frames (`:ackNNN`) are forwarded to the BLE app with ack level
-  `0x02` when they confirm the node's own message.
-- **`CONF`** + config TLV sequence (`nrf_eth.cpp:505–587`):
+  `0x02` when they confirm the node's own message. Server control payloads
+  (§1.7: `{CET}`, `{SET}`, …) arrive as `GATE`-wrapped text frames.
+- **`CONF`** + config TLV sequence — **nRF52 only** (`nrf_eth.cpp:497–587`;
+  the ESP32 `getUDP()` mentions CONF in a comment but has no code branch for
+  it — only GATE and BEAT are handled, `udp_functions.cpp:148–151,382`):
 
   ```
   0x00 <len> <callsign bytes>        assigned callsign ("longname")
@@ -198,9 +261,22 @@ The first 4 bytes of each datagram are an indicator
   0x04 <int32 LE>                    altitude
   ```
 
-- **`BEAT`** — server heartbeat response; the node only refreshes its
-  link-alive timestamp (`last_upd_timer`). If no server traffic arrives for
-  `MAX_HB_RX_TIME` = 65 s, the gateway re-runs DHCP/reconnect.
+- **`BEAT`** — server heartbeat response; the node only checks the 4-byte
+  indicator and refreshes its link-alive timestamp (`last_upd_timer`). If no
+  server traffic arrives for `MAX_HB_RX_TIME` = 65 s, the gateway re-runs
+  DHCP/reconnect. The datagram does carry structure beyond the indicator —
+  observed on the OE/DL servers and parsed by mc-chat
+  (`meshcom_mock/decoder.py:_decode_beat_struct`):
+
+  ```
+  "BEAT" + 0x00 + <call_len 1B> + <callsign>
+         [+ 0x01 + <status_len 1B> + <status bytes>]     (optional)
+  ```
+
+  The firmware ignores everything after the indicator, but a mock **server**
+  should emit the full form, and the server answers **every** KEEP with a
+  BEAT — one datagram per 30 s heartbeat is the liveness signal mc-chat's
+  softnodes build their connected-check on.
 
 Datagrams with more than `MAX_ZEROS` = 6 consecutive zero bytes are
 discarded as corrupt.
@@ -370,12 +446,38 @@ settings notification arrives synchronously with the write.
 
 ---
 
-## 5. Reference vectors
+## 5. Adjacent protocol: INTERLINK (not spoken by the firmware)
+
+Listed here to prevent confusion, not as part of the firmware wire format.
+**INTERLINK** is the icssw.org **server-to-server feed** on UDP port 1985 —
+a consumer-facing alternative to running a BLE/EXTUDP connection to a
+physical node. Framing:
+
+```
+register   client → server:  "DNCLOUD" + <code>, NUL-padded to 50 bytes, re-sent ~70 s
+heartbeat  server → client:  "HBMASTER" (8 bytes)
+data       server → client:  "DNCDATA" + <JSON string> + 0x00
+bye        client → server:  "DNCBYE" + <code>, same 50-byte framing (ack: "HBGOODBYE")
+```
+
+The firmware has no code for any of this; nodes reach the servers only via
+§2. Authoritative implementations: `mc-chat/meshcom_mock/interlink.py`
+(origin) and `mcmap/proxy/src/interlink/` (port of it, with framing notes on
+the server-side `DNCDATA-M`/`-D` mode suffix). mcmap consumes the mesh
+exclusively through INTERLINK plus HTTP scrapers — it speaks none of the
+four firmware layers directly, so its mocks need §1 (frame semantics inside
+the JSON) but not §2–§4 framing.
+
+---
+
+## 6. Reference vectors
 
 - `test/test_aprs_corpus/corpus.txt` — captured on-air frames (hex)
 - `test/test_aprs_corpus/golden.txt` — frozen `decodeAPRS()` field output
 - `test/test_aprs_decode/test_aprs_decode.cpp` — hand-verified interop
   vectors (expected values read from raw bytes, not from the decoder)
+- `test/test_aprs_spec/test_aprs_spec.cpp` — vectors constructed from §1 of
+  this document, independent of the encoder
 - Regenerating golden after a deliberate decoder change:
   `APRS_GOLDEN_UPDATE=1 pio test -e native_aprs` — review the git diff of
   `golden.txt`; it _is_ the behavior change.
@@ -383,4 +485,7 @@ settings notification arrives synchronously with the write.
 Provenance: frames captured 2026-08-21 on 433.175 MHz (EU8 preset,
 BW 250 kHz, SF 11, CR 4/6) with the `MC_TEST_HOOKS` hook; encoders observed
 on the air include this firmware (RAK4631, Heltec V3), other MeshCom 4.35
-devices (T-Beam), and gateway-emitted server frames.
+devices (T-Beam), and gateway-emitted server frames. Cross-validation:
+§4 (BLE) against `MCProxy/src/mcapp/ble_protocol.py`; §2 (server UDP)
+against `mc-chat/meshcom_mock/` (softnodes live on the OE and DL servers)
+and the upstream MeshCom-Reflector spec, 2026-08-21.

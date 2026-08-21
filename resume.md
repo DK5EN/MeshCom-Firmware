@@ -574,6 +574,44 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-21 (neunter Durchgang) — §2-Quervalidierung gegen mc-chat-Softnodes und Upstream-Reflector-Spec
+
+Auf Benutzerauftrag: doc 11 §2 (Server-UDP) gegen die zweite unabhaengige
+Implementierung validiert — `mc-chat/meshcom_mock/` (Softnodes live am OE-
+und DL-Server; `protocol.py`, `decoder.py`, `node.py`) plus die dort
+referenzierte Upstream-Spec `icssw-org/MeshCom-Reflector`
+(`protocolls/refelctor_connections.md`, Fehlerkatalog in
+`mc-chat/doc/proto-deviations.md`). Jede uebernommene Aussage gegen den
+Firmware-Code verifiziert. Neu in doc 11:
+
+- **§1:** msg_id-Komposition `((gw_id&0x3FFFFF)<<10)|(counter&0x3FF)`, Wrap
+  bei **1000** (Clamp auf 999 an drei Stellen, `loop_functions.cpp:3131ff`;
+  Grund: 3-stelliges `{NNN`-Suffix); Ack-Text exakt `%-9.9s:ack%03i`
+  (`:4198`, Space = Padding); `{NNN` ohne schliessende Klammer, nur
+  `{pong}{NNN}` mit (`:3454` vs `:3208`); neues **§1.7** Steuer-Payloads
+  {CET} (Zeit nur ohne RTC/GPS/NTP), {SET}N;M; (setzt max_hop_text/pos!),
+  {MCP} (Fernwirken mit Passwort+Lfd-Check), {ping}/{pong} — alle ohne
+  Retransmission (`:3527`).
+- **§2:** Upstream-Spec referenziert inkl. dreier dokumentierter
+  Spec-Fehler (DATA-Byte 34/35 sind ASCII-Modulationsziffern "03", kein
+  Laengenbyte); BEAT-Binnenstruktur `BEAT+0x00+len+call[+0x01+len+status]`
+  (Firmware ignoriert sie, Mock-Server muss sie senden; Server antwortet
+  auf jedes KEEP); **CONF ist nRF52-only** — ESP32-`getUDP()` hat nur
+  GATE/BEAT-Zweige (`udp_functions.cpp:148ff`), der Kommentar nennt CONF,
+  Code fehlt: Plattform-Divergenz im DRY-21-Klon.
+- **Neues §5:** INTERLINK-Abgrenzung — icssw Server-zu-Server-Feed, UDP
+  1985, `DNCLOUD`/`HBMASTER`/`DNCDATA`+JSON/`DNCBYE`; Firmware spricht es
+  nicht; mcmap (`/Users/martinwerner/WebDev/mcmap`, `proxy/src/interlink/`)
+  konsumiert den Mesh ausschliesslich darueber (+HTTP-Scraper), mc-chat
+  `meshcom_mock/interlink.py` ist die Ursprungs-Implementierung.
+- Referenzvektoren-Kapitel nach §6, test_aprs_spec dort ergaenzt.
+
+Nebenbefund fuer den Benutzer (mc-chat-Repo, nicht von uns geaendert):
+`mc-chat/doc/MeshCom-IoT-Mock.md` §13 Punkt 10 behauptet Counter-Wrap bei
+1024 ("modulo-1000 was incorrect") — das widerspricht sowohl der Firmware
+als auch mc-chats eigenem, neuerem `protocol.py` (Wrap 1000, ausfuehrlich
+begruendet). Die Doku-Zeile ist veraltet.
+
 ### 2026-08-21 (achter Durchgang) — Orakel-Rest geschlossen: Spec-Vektoren + BLE-Vertiefung; Branch gepusht
 
 Auf Benutzerwunsch zuerst gepusht: `v4.35p_prio` → `origin` (DK5EN-Fork,
