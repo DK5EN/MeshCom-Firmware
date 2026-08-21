@@ -169,6 +169,18 @@ jobs:
           echo "::notice title=${{ matrix.env }} Warnungen::${warn} in src/"
           grep '^src/.*warning:' build.log | sort -u | head -20 || true
 
+      # Ressourcen-Waechter (Report-only): Delta gegen die eingecheckte
+      # Baseline; ::warning bei Wachstum ueber Schwelle oder schwindendem
+      # Headroom. Baseline bewusst aktualisieren mit:
+      #   python3 tools/resource_watch.py update --env <env> --log build.log
+      - name: Ressourcen-Delta gegen Baseline
+        if: always()
+        run: |
+          [ -f build.log ] || exit 0
+          python3 tools/resource_watch.py check \
+            --env "${{ matrix.env }}" --log build.log \
+            --baseline tools/resource_baseline.json || true
+
   result:
     name: Build-Gate
     needs: [build, unit-tests]
