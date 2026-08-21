@@ -494,7 +494,19 @@ decision, not a fix.
 > Das Lizenzrisiko wird angenommen, kein Aenderungsauftrag daraus abgeleitet. Der Befund
 > bleibt technisch gueltig und ist hier unveraendert dokumentiert.
 
-### N-12 — `FLASH_VERSION` neither migrates nor resets — **CONFIRMED** — High
+### N-12 — `FLASH_VERSION` neither migrates nor resets — **Teil-FIX (`14e826b8`), Struct-Vereinheitlichung bleibt offen** — High
+
+> **STATUS 2026-08-22: die zwei nRF52-lokalen Defekte GEFIXT (`14e826b8`,
+> Hardware-verifiziert).** (a) `flash_reset()` invalidiert jetzt
+> `init_flash_done` — `--cleanflash`/Version-Mismatch liefert echte Defaults
+> (Bench: Call `XX0XXX-00` nach Reset, vorher kamen die alten Werte zurueck).
+> (b) Groessen-Check: Datei muss exakt `sizeof(s_meshcom_settings)` sein,
+> sonst In-Place-Reset auf Defaults (ersetzt die alte Format+Reboot-Schleife);
+> Bestandsdateien bestehen den Check (Boot mit Bestandsdaten geprueft).
+> Blinder Fleck dokumentiert: sizeof-neutrale Layout-Tauschungen — Layout-
+> Aenderungen muessen FLASH_VERSION erhoehen. **Weiter offen (unveraendert):**
+> die zwei inkompatiblen Struct-Layouts ESP32/nRF52 — Vereinheitlichung samt
+> Migration bleibt das eigene Upstream-Vorhaben.
 
 The version check runs _after_ `init_flash()` and is not followed by a re-read, so the old
 RAM copy is written straight back — while the log prints `FLASH cleared new version`.
@@ -590,7 +602,16 @@ spinlock held. On nRF52 the same code runs under `taskENTER_CRITICAL()`.
 > heltec_wifi_lora_32_V3 und wiscore_rak4631 sauber gebaut; ESP32-Flash weitere
 > -168 Byte, nRF52 unveraendert.
 
-### N-14 — nRF52 TX ring is multi-writer with no mutual exclusion — **CONFIRMED** — High
+### N-14 — nRF52 TX ring is multi-writer with no mutual exclusion — **FIXED (`efb2381b`, auf Hardware verifiziert)** — High
+
+> **STATUS 2026-08-22: GEFIXT.** Reserve-und-Kopiere-Umbau: `addTxRingEntry()`
+> uebernimmt den gesamten Enqueue (Slot-Wahl, Payload-Kopie, Prio/Overflow,
+> iWrite/iRead) unter `taskENTER_CRITICAL` (nur nRF52; ESP32 per C-01
+> single-context, lock-frei); alle 16 Aufrufstellen schreiben nicht mehr
+> selbst in den Ring, Debug-Ausgaben laufen nach dem Lock. Bench-verifiziert
+> fuer alle drei Kontextklassen: Loop-Enqueue (DM), Timer-Task-ACK,
+> Timer-Task-Relay — Slots, Prios und msg_id-Matches korrekt. Restrisiko
+> des Beacon-Nachtrags (READY→DONE-Zweischritt) im Code quantifiziert.
 
 `iWrite` is loaded three times across `ringBuffer[iWrite][0]=…; memcpy(ringBuffer[iWrite]+2,…); addTxRingEntry()`.
 Two writers can interleave mid-`memcpy`, both fill the same slot, and a spliced frame goes
@@ -763,7 +784,18 @@ Zeit still. Auf Hardware gemessen: `[DBGSTALL] seg read_batt took 100617 us`,
 > BLE-Fehler unveraendert auf. Der Stall ist fuer sich genommen real und wurde deshalb
 > behoben.
 
-### CFG-01 — `[nrf52]`-Sektion kollidiert namensgleich ueber alle drei `variants/*/platformio.ini` — **VERIFIED (reproduziert per Clean-Build)** — Medium (Build-Isolation), Symptome bereits behoben
+### CFG-01 — `[nrf52]`-Sektion kollidiert namensgleich ueber alle drei `variants/*/platformio.ini` — **FIXED (`24122ed4`)** — Medium (Build-Isolation)
+
+> **STATUS 2026-08-22: Root cause GEFIXT.** Die sechs Keys stehen jetzt genau
+> einmal als `[nrf52_base]` in der Root-platformio.ini; die drei Env-Sections
+> extenden sie explizit. Beweis der Verhaltensgleichheit: `pio project
+metadata` vor/nach fuer alle drei Envs bitgleich (defines/includes/Flags);
+> Clean-Builds gruen (t114/t_echo bauen dabei mit dem mitgeerbten `-Werror` —
+> der Wave-0.2-Rest fuer diese Boards war durch den Merge faktisch laengst
+> aktiv). Die absichtlich weiter geerbten RAK-Anteile (BOARD_RAK4630,
+> wiscore-Quellfilter samt nie gebautem t_echo-PIN_LED3-Init) sind im
+> Root-Kommentar dokumentiert; ihre Entkopplung bleibt ein eigenes Vorhaben
+> mit t114/t_echo-Hardware.
 
 Neu, gefunden 2026-08-20 beim Versuch, Wave 0.2 (`-Werror`) auch fuer `heltec_t114`/`t_echo`
 zu aktivieren.
@@ -896,6 +928,13 @@ umgeht die Funktion, statt sie zu reparieren.
 > Haertungsrichtung bleibt wie dokumentiert: Netzwerk-Abschnitte an
 > `Ethernet.linkStatus()` koppeln, bevor Socket-Ops laufen; Timeouts um die
 > RAK13800-Statusschleifen (Bibliotheks-Fork oder Wrapper).
+>
+> **Erster Teil umgesetzt (2026-08-22, `b62976c9`/N-23):** der Loop-seitige
+> `startWebserver()`/`startExternUDP()`-Restart laeuft nur noch bei
+> `neth.hasIPaddress` — die Socket-Op-auf-uninitialisiertem-Chip-Falle ist
+> damit zu. Die Bibliotheks-Warteschleifen (Ops auf initialisiertem Chip bei
+> Link-Verlust mitten in der Operation) bleiben der offene Rest dieses
+> Backlogs.
 
 Neu gefunden 2026-08-21 (als Stoerfaktor bei der N-19-Verifikation), am selben Tag
 nachmittags per Instrumentierung auf die Loop-Abschnitte eingegrenzt. Vorbestehend,
@@ -1016,6 +1055,33 @@ Socket-Zustand des zweiten UDP-Sockets).
 Fix gesetzt. Boot-Log zeigt seit `6003e90c` die Reset-Ursache
 (`[BOOT] RESETREAS=…`), was kuenftige Vorfaelle dieser Klasse sofort als Absturz
 ausweist — und bei genau dieser Diagnose der Schluessel war.
+
+### N-23 — `--extudp on` ohne Gateway/Webserver brickt den nRF52-Node dauerhaft — **FIXED (`b62976c9`, auf Hardware reproduziert und verifiziert)** — High
+
+Neu gefunden 2026-08-22 bei der Bench-Verifikation des N-12-Fixes (nach
+`--cleanflash` wurden die Restore-Kommandos in der Reihenfolge `--extudp on`
+vor `--gateway on` gesendet — der Node fror nach dem ersten Kommando ein und
+blieb es ueber Reboots und Neuflashes hinweg).
+
+Mechanismus: Setup initialisiert die Ethernet-Hardware nur bei
+`bGATEWAY || bWEBSERVER` (`nrf52_main.cpp:1074`). Der 15-Minuten-Restart-Block
+im Loop laeuft aber bei `bWEBSERVER || bEXTUDP` und feuert wegen
+`web_timer == 0` sofort im ersten Durchlauf — `startExternUDP()` traf den
+NICHT initialisierten W5100S, dessen Socket-Ops (`UdpExtern.begin()` /
+`sendExternHeartbeat()`) nie zurueckkehren. Loop-Task tot (kein Echo, kein
+Netz), und weil `bEXTUDP` gespeichert war, wiederholte sich das bei jedem
+Boot: eine **persistente Konfigurations-Falle**, die nur der
+1200-Baud-Touch + Neuflash + Fix durchbrach. Diagnose-Merkposten: Setup lief
+bis "[EXT]...now sending" durch, danach Stille — der Haenger sass in
+`sendExternHeartbeat()`. Ein Bisect (N-14-Aenderungen gestasht) entlastete
+den parallelen Ring-Umbau eindeutig.
+
+Fix: `startWebserver()`/`startExternUDP()` im Loop-Restart-Block nur noch bei
+`neth.hasIPaddress`. Verifiziert: exakt die Brick-Konfiguration bootet und
+antwortet; mit Gateway on danach voller Betrieb. Dies ist der erste Teil des
+N-20-Backlogs (Netzwerk-Pfade an Link-/HW-Status koppeln); die
+W5100S-Bibliotheks-Warteschleifen selbst bleiben ungehaertet (siehe
+N-20-BACKLOG-Box).
 
 ---
 
@@ -1326,7 +1392,10 @@ ESP32 einzeln nachgeprueft und geschlossen, siehe STATUS-Box.
 > - `N-15` — kein Code-Fix noetig, bereits durch `CONC-14` geschlossen; siehe eigene
 >   STATUS-Box oben.
 >
-> **`N-14` bewusst nicht gefixt — Scope ist groesser als der Katalog-Eintrag nahelegt.**
+> **`N-14` inzwischen GEFIXT (`efb2381b`, 2026-08-22) — siehe eigene STATUS-Box
+> oben. Die folgende Scope-Analyse bleibt als Begruendung des gewaehlten
+> Umbaus (kompletter Enqueue in einer Funktion statt Lock um `addTxRingEntry`)
+> stehen:**
 > Re-Verifikation zeigte: der TX-Ring-Schreibpfad ist NICHT in `addTxRingEntry()` gekapselt.
 > Jeder der elf Aufrufer (`lora_functions.cpp:274,705,877,907,919,996,1000,1045,1139`;
 > `loop_functions.cpp:642,3441,3458,3530,3975,4067` u.a.) schreibt selbst zuerst

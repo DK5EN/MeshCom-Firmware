@@ -574,6 +574,42 @@ Settings-Kopie), ~~`N-15`~~ (bereits durch `CONC-14` geschlossen, re-verifiziert
 ~~`N-16`~~ (`Radio.Send()` in `taskENTER_CRITICAL()`) und ~~`DRY-22`~~
 (`checkSerialCommand()`-Drift) sind erledigt — siehe naechster Abschnitt.
 
+### 2026-08-22 (zehnter Durchgang) — Fix-Welle CFG-01 + N-12 + N-14; Neufund N-23 (Brick-Falle) gefixt
+
+Orchestrierte Welle (3 Scouts, 3 Implementer, Gate + Bench durch den
+Orchestrator). Vier Commits, alle Hardware-verifiziert am RAK4631
+(+ Heltec V3 fuer den ESP32-Pfad):
+
+- **CFG-01 (`24122ed4`):** kollidierende `[nrf52]`-Sections → eine explizite
+  `[nrf52_base]` in der Root-platformio.ini. Beweis: `pio project metadata`
+  vor/nach bitgleich fuer alle drei Envs. Design-Erkenntnis: der Leak ist
+  verhaltenstragend (BOARD_RAK4630 schaltet 60+ Stellen; t_echo kompiliert
+  wiscores variant.cpp) — deshalb explizit gemacht statt entfernt.
+  Nebenbefund: t114/t_echo bauen laengst mit -Werror (geerbter
+  build_src_flags) — Wave-0.2-Rest faktisch erledigt.
+- **N-12 Teil-Fix (`14e826b8`):** flash_reset() invalidiert init_flash_done
+  (--cleanflash liefert echte Defaults, am Geraet bewiesen: XX0XXX-00);
+  Groessen-Check der Settings-Datei mit In-Place-Recovery statt
+  Format+Reboot. Struct-Vereinheitlichung bleibt Upstream-Epic.
+- **N-23 NEU + FIXED (`b62976c9`):** bei der Bench-Verifikation gefunden:
+  `--extudp on` ohne Gateway/Webserver brickt den Node dauerhaft
+  (startExternUDP auf uninitialisiertem W5100S im sofort feuernden
+  15-Minuten-Block; gespeicherte Config → Falle ueberlebt Reboots und
+  Neuflashes; Rettung nur per 1200-Baud-Touch). Fix: Start nur bei
+  neth.hasIPaddress. Erster Teil des N-20-Backlogs.
+- **N-14 (`efb2381b`):** TX-Ring-Enqueue komplett in addTxRingEntry() unter
+  taskENTER_CRITICAL (nRF52), 16 Aufrufstellen umgestellt, Rueckgabe
+  Slot/-1. Bench: Loop-Enqueue (DM 91→90, Prio CRITICAL korrekt),
+  Timer-Task-ACK (:ack091 mit msg_id-Match zurueck an 91), Timer-Task-Relay
+  (90 relayt 91er-HEY mit Signal-Report). Wichtig: der Boot-Haenger waehrend
+  der Verifikation war NICHT N-14 (Bisect mit gestashten N-14-Dateien →
+  identischer Haenger) sondern N-23.
+
+Bench-Endzustand: RAK DK5EN-90 als Gateway am OE-Server (IP .68, KEEP/NTP),
+EXTUDP → 192.168.68.64, Webserver on, Gruppen restauriert; Heltec DK5EN-91
+mit neuem Build. Gate: wiscore (-Werror), heltec V3, t114, t_echo gruen;
+native 15/15, native_aprs 17/17.
+
 ### 2026-08-21 (neunter Durchgang) — §2-Quervalidierung gegen mc-chat-Softnodes und Upstream-Reflector-Spec
 
 Auf Benutzerauftrag: doc 11 §2 (Server-UDP) gegen die zweite unabhaengige
