@@ -206,7 +206,11 @@ static void test_corpus_gegen_golden(void)
 {
     loadCorpus();
 
-    bool update = (getenv("APRS_GOLDEN_UPDATE") != nullptr);
+    // Wert-Pruefung statt blosser Existenz (Advisory-Punkt aus dem Audit):
+    // APRS_GOLDEN_UPDATE=0 oder leer zaehlt NICHT als Update-Modus.
+    const char *upd_env = getenv("APRS_GOLDEN_UPDATE");
+    bool update = (upd_env != nullptr && upd_env[0] != '\0' &&
+                   strcmp(upd_env, "0") != 0);
 
     // Ist-Zeilen erzeugen
     static char actual[MAX_FRAMES][CANON_MAX];
