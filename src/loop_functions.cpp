@@ -3150,11 +3150,7 @@ void sendPing(char msg_call[10])
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    ringBuffer[iWrite][0] = aprsmsg.msg_len;
-    ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-    memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
-    addTxRingEntry("phone_msg");
+    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
 
     if(!bPingSend)
     {
@@ -3231,11 +3227,7 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    ringBuffer[iWrite][0] = aprsmsg.msg_len;
-    ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-    memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
-    addTxRingEntry("phone_msg");
+    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
 }
 
 void sendMessage(char *msg_text, int len)
@@ -3519,30 +3511,28 @@ void sendMessage(char *msg_text, int len)
     if (iWrite == iRead) {   // ring full: about to overwrite an unread slot
         Serial.printf("[RING] overflow, slot %d dropped\n", (int)iWrite);
     }
-    ringBuffer[iWrite][0]=aprsmsg.msg_len;
-    memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-    
-    if (ringBuffer[iWrite][2] == 0x3A) // only Messages
+    // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
+    // Slot wird erst in addTxRingEntry() unter Lock gewaehlt/beschrieben.
+    uint8_t user_msg_status;
+    if (msg_buffer[0] == 0x3A) // only Messages
     {
         if(aprsmsg.msg_payload.startsWith("{CET}") || aprsmsg.msg_payload.startsWith("{MCP}") || aprsmsg.msg_payload.startsWith("{SET}"))
-            ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
+            user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
         else
-            ringBuffer[iWrite][1] = 0x00; // retransmission Status ...0xFF no retransmission
+            user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
     }
     else
     {
-        ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-    }   
+        user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission
+    }
 
-    if(bDisplayRetx)
+    int w = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
+
+    if(bDisplayRetx && w >= 0)
     {
-        int w = iWrite;
         unsigned int ring_msg_id = (ringBuffer[w][6]<<24) | (ringBuffer[w][5]<<16) | (ringBuffer[w][4]<<8) | ringBuffer[w][3];
         printfdeb("einfügen retid:%i status:%02X lng;%02X msg-id: %c-%08X\n", w, ringBuffer[w][1], ringBuffer[w][0], ringBuffer[w][2], ring_msg_id);
     }
-
-    retryCount[iWrite] = 0;
-    addTxRingEntry("user_msg");
 
     /*
     iWrite++;
@@ -3930,11 +3920,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         }
 
         // local LoRa-APRS position-messages send to LoRa TX
-        ringBuffer[iWrite][0]=ilng;
-        ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
-        memcpy(ringBuffer[iWrite]+2, msg_buffer, ilng);
-
-        addTxRingEntry("user_pos");
+        addTxRingEntry(msg_buffer, (uint16_t)ilng, 0xFF, "user_pos"); // 0xFF no retransmission
 
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
@@ -4068,11 +4054,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         }
 
         // local position-messages send to LoRa TX
-        ringBuffer[iWrite][0]=aprsmsg.msg_len;
-        ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
-        memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
-        addTxRingEntry("user_wx");
+        addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "user_wx"); // 0xFF no retransmission
 
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
@@ -4149,11 +4131,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     }
 
     // local position-messages send to LoRa TX
-    ringBuffer[iWrite][0]=aprsmsg.msg_len;
-    ringBuffer[iWrite][1]=0xFF;    // Status byte for retransmission 0xFF no retransmission
-    memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
-    addTxRingEntry("user_hey");
+    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "user_hey"); // 0xFF no retransmission
 
     /*
     iWrite++;
@@ -4226,14 +4204,22 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
         printfdeb("");
     }
 
-    int savedAckSlot = iWrite;
-    ringBuffer[iWrite][0]=aprsmsg.msg_len;
-    ringBuffer[iWrite][1]=0x00;  // temp READY (0x00) so getMessagePriority parses destination correctly
-    memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
+    // Status kann nicht vorab auf 0xFF (DONE) gesetzt werden: getMessagePriority()
+    // liest innerhalb von addTxRingEntry() das Status-Byte und stuft eine TEXT-
+    // Nachricht mit Status DONE als "Relay" (MSG_PRIO_NORMAL) statt als echte
+    // Ziel-Message (MSG_PRIO_CRITICAL) ein. Also mit temp-READY (0x00) einreihen,
+    // damit die Prio-Klassifizierung den Zielrufzeichen-Pfad parst, und danach
+    // per zurueckgegebenem Slot auf DONE setzen. Restrisiko des Nachtrags:
+    // preemptet der Timer-Service-Task GENAU zwischen den beiden Statements UND
+    // ist der Ring voll UND waehlt dessen Eviction ausgerechnet diesen frisch
+    // als HIGH/CRITICAL eingestuften Slot als niedrigste Prio, traefe das 0xFF
+    // einen fremden Eintrag. Akzeptiert: alle drei Bedingungen zusammen sind
+    // praktisch ausgeschlossen, und das Fenster ist strikt kleiner als das der
+    // alten Vorab-iWrite-Schreibsequenz (N-14).
+    int savedAckSlot = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0x00, "beacon");
 
-    addTxRingEntry("beacon");
-
-    ringBuffer[savedAckSlot][1]=0xFF;   // no retransmission (set after priority is recorded)
+    if(savedAckSlot >= 0)
+        ringBuffer[savedAckSlot][1]=0xFF;   // no retransmission (set after priority is recorded)
 
     /*
     iWrite++;
@@ -4309,11 +4295,7 @@ void sendHey()
     {
         // Master RingBuffer for transmission
         // local messages send to LoRa TX
-        ringBuffer[iWrite][0] = aprsmsg.msg_len;
-        ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-        memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
-        addTxRingEntry("auto_pos");
+        addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "auto_pos"); // 0xFF no retransmission
 
         /*
         iWrite++;
@@ -4593,12 +4575,8 @@ void sendTelemetry(int ID)
         {
             // Master RingBuffer for transmission
             // local messages send to LoRa TX
-            ringBuffer[iWrite][0] = aprsmsg.msg_len;
-            ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-            memcpy(ringBuffer[iWrite]+2, msg_buffer, aprsmsg.msg_len);
-
             if(!bDisplayTrack)
-                addTxRingEntry("phone_msg");
+                addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
         }
 
         // send value messages to Lora-APRS
@@ -4610,11 +4588,7 @@ void sendTelemetry(int ID)
 
             // Master RingBuffer for transmission
             // local messages send to LoRa TX
-            ringBuffer[iWrite][0] = tlng;
-            ringBuffer[iWrite][1] = 0xFF; // retransmission Status ...0xFF no retransmission
-            memcpy(ringBuffer[iWrite]+2, msg_buffer, tlng);
-
-            addTxRingEntry("phone_raw");
+            addTxRingEntry(msg_buffer, tlng, 0xFF, "phone_raw"); // 0xFF no retransmission
         }
     }
 }

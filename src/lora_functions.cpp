@@ -295,12 +295,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
             {
                 print_buff[5]--;
 
-                ringBuffer[iWrite][0]=12;
-                ringBuffer[iWrite][1]=RING_STATUS_DONE; // no retransmission
-                memcpy(ringBuffer[iWrite]+2, print_buff, 12);
-
-                retryCount[iWrite] = 0;
-                addTxRingEntry("rx_ack_fwd");
+                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_ack_fwd", 0);
 
                 if(bDisplayInfo)
                 {
@@ -1097,17 +1092,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
                                                 print_buff[11]=0x00;     // msg always 0x00 at the end
                                                 
-                                                ringBuffer[iWrite][0]=12;
-                                                ringBuffer[iWrite][1]=RING_STATUS_DONE; // no retransmission
-                                                memcpy(ringBuffer[iWrite]+2, print_buff, 12);
-
-                                                addTxRingEntry("rx_dm_ack_gw");
-
-                                                /*
-                                                iWrite++;
-                                                if(iWrite >= MAX_RING)
-                                                    iWrite=0;
-                                                */
+                                                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_dm_ack_gw");
 
                                                 if(bDisplayInfo)
                                                 {
@@ -1131,17 +1116,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 print_buff[3]=(msg_counter >> 16) & 0xFF;
                                                 print_buff[4]=(msg_counter >> 24) & 0xFF;
 
-                                                ringBuffer[iWrite][0]=12;
-                                                ringBuffer[iWrite][1]=RING_STATUS_DONE; // no retransmission
-                                                memcpy(ringBuffer[iWrite]+2, print_buff, 12);
-
-                                                addTxRingEntry("rx_dm_ack_new");
-
-                                                /*
-                                                iWrite++;
-                                                if(iWrite >= MAX_RING)
-                                                    iWrite=0;
-                                                */
+                                                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_dm_ack_new");
 
                                                 mid = (print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
                                                 
@@ -1295,24 +1270,20 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(size + 2 > UDP_TX_BUF_SIZE)
                                     size = UDP_TX_BUF_SIZE - 2;
 
-                                memset(ringBuffer[iWrite], 0x00, UDP_TX_BUF_SIZE+1);
-
-                                ringBuffer[iWrite][0]=size;
-                                memcpy(ringBuffer[iWrite]+2, RcvBuffer, size);
-
                                 // FIX: Relay messages are fire-and-forget.
                                 // Only the ORIGINATING node should retransmit.
-                                ringBuffer[iWrite][1] = RING_STATUS_DONE; // no retransmission for ANY relay message
-
                                 if(bLORADEBUG)
                                 {
-                                    unsigned int relay_msg_id = (ringBuffer[iWrite][6]<<24) | (ringBuffer[iWrite][5]<<16) | (ringBuffer[iWrite][4]<<8) | ringBuffer[iWrite][3];
+                                    // Werte aus RcvBuffer statt aus dem Ring lesen: der Slot wird
+                                    // erst innerhalb von addTxRingEntry() unter Lock gewaehlt/beschrieben.
+                                    unsigned int relay_msg_id = (RcvBuffer[4]<<24) | (RcvBuffer[3]<<16) | (RcvBuffer[2]<<8) | RcvBuffer[1];
                                     printfdeb("[MC-DBG] RELAY_QUEUED msg_id=%08X type=%02X len=%d\n",
-                                        relay_msg_id, ringBuffer[iWrite][2], size);
+                                        relay_msg_id, RcvBuffer[0], size);
                                 }
 
-                                retryCount[iWrite] = 0;
-                                addTxRingEntry("rx_relay");
+                                // no retransmission for ANY relay message; Slot vorher komplett
+                                // nullen (Alt-Verhalten: memset des ganzen Rings vor dem Schreiben)
+                                addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true);
 
                                 /*
                                 if(bDisplayInfo)
@@ -1629,40 +1600,78 @@ static void advanceIReadPastEmpty(void)
 }
 
 /**
- * Log + advance TX ring buffer write pointer.
- * Replaces direct addRingPointer(iWrite, iRead, MAX_RING, "tx") calls.
- * @param source  Short label for the calling code path (e.g. "rx_relay", "udp")
+ * TX-Ring: kompletter Enqueue-Vorgang (Slot-Wahl, Payload-Kopie, Prio/Overflow,
+ * iWrite/iRead-Fortschritt) in EINER Funktion unter EINEM Lock.
+ * N-14: bisher schrieb der Aufrufer selbst nach ringBuffer[iWrite][...] und
+ * rief danach diese Funktion auf, die iWrite erneut gelesen hat — zwei
+ * gleichzeitige Schreiber (Main-Loop und, auf nRF52, der FreeRTOS-Timer-
+ * Service-Task via OnRxDone) konnten sich denselben Slot teilen und ein
+ * zusammengewuerfelter Frame ging auf Sendung. Jetzt liefert der Aufrufer nur
+ * noch den fertigen Frame; Slot-Wahl und -Schreiben passieren atomar hier.
+ *
+ * Lock nur auf nRF52 (taskENTER_CRITICAL/EXIT_CRITICAL, siehe
+ * phone_commands.cpp:76-92): auf ESP32 laeuft dieser Pfad ausschliesslich im
+ * Main-Loop-Kontext (kein zweiter Schreiber, C-01) und portENTER_CRITICAL
+ * braucht ohnehin einen portMUX_TYPE, den es hier nicht gibt — deshalb bleibt
+ * ESP32 lock-frei. Innerhalb der kritischen Sektion: keine printfdeb/Serial-
+ * Aufrufe, kein Yield (printfdeb mallociert oberhalb 64B, siehe
+ * printf-malloc-starves-nimble) — alle Debug-Werte werden hier nur
+ * eingesammelt, die Ausgabe erfolgt erst nach taskEXIT_CRITICAL().
+ *
+ * @param frame          Fertig kodierter Frame (ohne Laenge-/Status-Byte)
+ * @param len            Frame-Laenge in Byte
+ * @param ring_status    Status-Byte fuer den Slot (RING_STATUS_*)
+ * @param source         Kurzes Label fuer Debug-Ausgabe (z.B. "rx_relay")
+ * @param retryCountIn   retryCount[Slot] setzen; -1 (Default) = unangetastet
+ *                        lassen (manche Aufrufstellen haben retryCount nie
+ *                        zurueckgesetzt — Alt-Verhalten bewusst beibehalten)
+ * @param clearSlotFirst true = Slot vor dem Schreiben komplett nullen (nur
+ *                        der rx_relay-Aufruf tat das bisher selbst)
+ * @return Slot-Index (>=0) oder -1, wenn die Overflow-Logik den neuen
+ *         Eintrag verworfen hat (Ring voll, keine niedrigere Prio zum
+ *         Verdraengen vorhanden)
  */
-void addTxRingEntry(const char* source)
+int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
+                    const char* source, int retryCountIn, bool clearSlotFirst)
 {
-    int w = iWrite;
-    int r = iRead;
+    int w, r, queued;
+    uint8_t msgType, prio;
+    uint32_t mid;
+    bool droppedNew = false, droppedOld = false, ringOverflowAdvance = false;
+    int dropSlot = -1;
+    uint8_t dropPrio = 0, dropType = 0;
+    uint32_t dropId = 0, newLostId = 0;
 
-    if(bLORADEBUG)
-    {
-        uint32_t mid = ((uint32_t)ringBuffer[w][6] << 24) |
-                       ((uint32_t)ringBuffer[w][5] << 16) |
-                       ((uint32_t)ringBuffer[w][4] << 8)  |
-                        (uint32_t)ringBuffer[w][3];
-        int queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
-        if(bLORADEBUG)
-            printfdeb("[MC-DBG] RING_WRITE slot=%d type=%02X status=%02X "
-                      "len=%d msg_id=%08X queued=%d/%d src=%s\n",
-                      w, ringBuffer[w][2], ringBuffer[w][1],
-                      ringBuffer[w][0], mid, queued, MAX_RING, source);
-    }
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
+
+    w = iWrite;
+    r = iRead;
+
+    if(clearSlotFirst)
+        memset(ringBuffer[w], 0x00, UDP_TX_BUF_SIZE+1);
+
+    ringBuffer[w][0] = (uint8_t)len;
+    ringBuffer[w][1] = ring_status;
+    memcpy(ringBuffer[w]+2, frame, len);
+
+    if(retryCountIn >= 0)
+        retryCount[w] = (uint8_t)retryCountIn;
+
+    msgType = ringBuffer[w][2];
+    mid = ((uint32_t)ringBuffer[w][6] << 24) | ((uint32_t)ringBuffer[w][5] << 16) |
+          ((uint32_t)ringBuffer[w][4] << 8)  |  (uint32_t)ringBuffer[w][3];
+    queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
 
     // Assign priority and enqueue timestamp
     ringPriority[w] = getMessagePriority(w);
     ringEnqueueTime[w] = millis();
+    prio = ringPriority[w];
 
     // Track queue depth for high-water mark
-    int queued_now = (w >= r) ? (w - r) : (MAX_RING - r + w);
-    if(queued_now + 1 > stat_queue_hwm)
-        stat_queue_hwm = queued_now + 1;
-
-    if(bLORADEBUG)
-        printfdeb("[MC-DBG] RING_PRIO slot=%d prio=%d\n", w, ringPriority[w]);
+    if(queued + 1 > stat_queue_hwm)
+        stat_queue_hwm = queued + 1;
 
     // Priority-aware overflow: when queue is full, drop lowest-priority oldest entry
     int nextWrite = w + 1;
@@ -1670,7 +1679,6 @@ void addTxRingEntry(const char* source)
     if(nextWrite == r && ringBuffer[r][0] > 0)
     {
         // Find the oldest entry of the lowest priority in the queue
-        uint8_t new_prio = ringPriority[w];
         int worst_slot = -1;
         uint8_t worst_prio = 0;
         int scan = r;
@@ -1694,18 +1702,15 @@ void addTxRingEntry(const char* source)
             if(scan >= MAX_RING) scan = 0;
         }
 
-        if(worst_slot >= 0 && new_prio < worst_prio)
+        if(worst_slot >= 0 && prio < worst_prio)
         {
             // Drop the lowest-priority entry to make room
-            uint32_t lost_id = ((uint32_t)ringBuffer[worst_slot][6] << 24) |
-                               ((uint32_t)ringBuffer[worst_slot][5] << 16) |
-                               ((uint32_t)ringBuffer[worst_slot][4] << 8)  |
-                                (uint32_t)ringBuffer[worst_slot][3];
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] RING_DROP_PRIO slot=%d prio=%d type=%02X "
-                          "msg_id=%08X replaced_by_prio=%d src=%s\n",
-                          worst_slot, worst_prio, ringBuffer[worst_slot][2],
-                          lost_id, new_prio, source);
+            droppedOld = true;
+            dropSlot = worst_slot;
+            dropPrio = worst_prio;
+            dropType = ringBuffer[worst_slot][2];
+            dropId = ((uint32_t)ringBuffer[worst_slot][6] << 24) | ((uint32_t)ringBuffer[worst_slot][5] << 16) |
+                     ((uint32_t)ringBuffer[worst_slot][4] << 8)  |  (uint32_t)ringBuffer[worst_slot][3];
             stat_drop_count[worst_prio]++;
             ringBuffer[worst_slot][0] = 0; // Mark as empty
             advanceIReadPastEmpty();
@@ -1713,35 +1718,58 @@ void addTxRingEntry(const char* source)
         else
         {
             // New packet is same or lower priority than everything in queue — drop it
-            uint32_t lost_id = ((uint32_t)ringBuffer[w][6] << 24) |
-                               ((uint32_t)ringBuffer[w][5] << 16) |
-                               ((uint32_t)ringBuffer[w][4] << 8)  |
-                                (uint32_t)ringBuffer[w][3];
-            if(bLORADEBUG)
-                printfdeb("[MC-DBG] RING_DROP_NEW slot=%d prio=%d type=%02X "
-                          "msg_id=%08X (queue full, no lower prio to evict)\n",
-                          w, new_prio, ringBuffer[w][2], lost_id);
-            stat_drop_count[new_prio]++;
+            droppedNew = true;
+            newLostId = mid;
+            stat_drop_count[prio]++;
             ringBuffer[w][0] = 0; // Don't enqueue
-            return; // Don't advance write pointer
         }
     }
 
-    // advance tx ring write pointer — inlined addRingPointer (C1): the helper
-    // takes volatile int& and cannot bind to the now-atomic iWrite/iRead.
-    uint8_t txWnext = (uint8_t)(iWrite + 1);
-    if (txWnext >= MAX_RING)
-        txWnext = 0;
-    iWrite = txWnext;
-    if (iRead == txWnext)   // ring full: advance read pointer past the overwritten slot
+    int resultSlot = -1;
+    if(!droppedNew)
     {
-        uint8_t txRnext = (uint8_t)(txWnext + 1);
-        if (txRnext >= MAX_RING)
-            txRnext = 0;
-        iRead = txRnext;
-        if (bLORADEBUG)
+        // advance tx ring write pointer — inlined addRingPointer (C1): the helper
+        // takes volatile int& and cannot bind to the now-atomic iWrite/iRead.
+        uint8_t txWnext = (uint8_t)(iWrite + 1);
+        if (txWnext >= MAX_RING)
+            txWnext = 0;
+        iWrite = txWnext;
+        if (iRead == txWnext)   // ring full: advance read pointer past the overwritten slot
+        {
+            uint8_t txRnext = (uint8_t)(txWnext + 1);
+            if (txRnext >= MAX_RING)
+                txRnext = 0;
+            iRead = txRnext;
+            ringOverflowAdvance = true;
+        }
+        resultSlot = w;
+    }
+
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
+
+    // ---- Ab hier ausserhalb des Locks: nur noch Debug-Ausgabe ----
+    if(bLORADEBUG)
+    {
+        printfdeb("[MC-DBG] RING_WRITE slot=%d type=%02X status=%02X "
+                  "len=%d msg_id=%08X queued=%d/%d src=%s\n",
+                  w, msgType, ring_status, (int)len, mid, queued, MAX_RING, source);
+        printfdeb("[MC-DBG] RING_PRIO slot=%d prio=%d\n", w, prio);
+
+        if(droppedOld)
+            printfdeb("[MC-DBG] RING_DROP_PRIO slot=%d prio=%d type=%02X "
+                      "msg_id=%08X replaced_by_prio=%d src=%s\n",
+                      dropSlot, dropPrio, dropType, dropId, prio, source);
+        if(droppedNew)
+            printfdeb("[MC-DBG] RING_DROP_NEW slot=%d prio=%d type=%02X "
+                      "msg_id=%08X (queue full, no lower prio to evict)\n",
+                      w, prio, msgType, newLostId);
+        if(ringOverflowAdvance)
             printfdeb("[MC-DBG] RING_OVERFLOW buf=tx\n");
     }
+
+    return resultSlot;
 }
 
 /**@brief our Lora TX sequence — priority-based slot selection
@@ -2092,22 +2120,22 @@ bool updateRetransmissionStatus()
                     printfdeb("");
                 }
 
-                // Copy message to new slot BEFORE clearing original (len must still be valid)
-                memcpy(ringBuffer[iWrite], ringBuffer[ircheck], size + 2);
+                // ready for doTX (text messages) or fire-and-forget, wie zuvor
+                uint8_t retransmitStatus = (ringBuffer[ircheck][2] == MSG_TYPE_TEXT)
+                                            ? RING_STATUS_READY : RING_STATUS_DONE;
 
-                if (ringBuffer[iWrite][2] == MSG_TYPE_TEXT) // text messages
-                    ringBuffer[iWrite][1] = RING_STATUS_READY;  // ready for doTX; timer starts after send
-                else
-                    ringBuffer[iWrite][1] = RING_STATUS_DONE;
-
-                // Transfer and increment retry count
-                retryCount[iWrite] = retryCount[ircheck] + 1;
+                // Quelle ist ircheck, Ziel wird erst innerhalb der Funktion (unter
+                // Lock) gewaehlt — ircheck != iWrite im Normalfall (iWrite zeigt auf
+                // einen leeren Slot); selbst im theoretischen Gleichstand ist
+                // memcpy(dst==src) hier folgenlos (Quelle == Ziel-Byte fuer Byte).
+                // Original erst NACH dem Kopieren freigeben, damit die Payload beim
+                // Kopiervorgang garantiert noch gueltig ist.
+                addTxRingEntry(&ringBuffer[ircheck][2], (uint16_t)size, retransmitStatus,
+                                "retransmit", retryCount[ircheck] + 1);
 
                 // Mark original as done and free slot (after copy, so len is correct in new slot)
                 ringBuffer[ircheck][1] = RING_STATUS_DONE;
                 ringBuffer[ircheck][0] = 0;  // free slot so getNextTxSlot skips it
-
-                addTxRingEntry("retransmit");
 
                 return true;
             }
