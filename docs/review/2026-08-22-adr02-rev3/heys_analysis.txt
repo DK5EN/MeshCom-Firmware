@@ -1,0 +1,204 @@
+HEY frames (24h): 96074
+hours covered: 25, min/h=1340, max/h=9377, avg/h=3842
+  08-21 14:00 3203
+  08-21 15:00 4034
+  08-21 16:00 4153
+  08-21 17:00 1903
+  08-21 18:00 3951
+  08-21 19:00 3728
+  08-21 20:00 3144
+  08-21 21:00 2785
+  08-21 22:00 3342
+  08-21 23:00 3712
+  08-22 00:00 3455
+  08-22 01:00 3472
+  08-22 02:00 3418
+  08-22 03:00 3616
+  08-22 04:00 9377
+  08-22 05:00 3787
+  08-22 06:00 3991
+  08-22 07:00 4417
+  08-22 08:00 4310
+  08-22 09:00 4367
+  08-22 10:00 4200
+  08-22 11:00 4034
+  08-22 12:00 4263
+  08-22 13:00 4072
+  08-22 14:00 1340
+distinct HEY origins (24h): 1323
+fleet size (nodes DB): 1430
+
+origins reporting nct==0: 202 (15.3%)  nct>0: 1121
+origins with gw=1: 240
+
+== NCNT (nct) distribution over reporting origins (latest frame) ==
+    0 (unbek.) | ##############################              202  (15.3%)
+             1 | ########################################    265  (20.0%)
+             2 | ############################                188  (14.2%)
+             3 | #########################                   167  (12.6%)
+           4-5 | ##########################                  174  (13.2%)
+           6-8 | ######################                      145  (11.0%)
+          9-12 | ##############                               94  ( 7.1%)
+         13-20 | ########                                     53  ( 4.0%)
+         21-40 | #####                                        35  ( 2.6%)
+         41-79 |                                               0  ( 0.0%)
+         80-98 |                                               0  ( 0.0%)
+    99 (Kappe) |                                               0  ( 0.0%)
+
+nct>0: n=1121 min=1 p25=2 median=3 p75=7 p90=11 max=36
+
+== Path length distribution (1=Selbstupload des GW, 2=direkt gehoert, >=3 relayed) ==
+             1 | ########################################  61264  (63.8%)
+             2 | ############                              19058  (19.8%)
+             3 | ######                                     9404  ( 9.8%)
+             4 | ###                                        4357  ( 4.5%)
+             5 | #                                          1982  ( 2.1%)
+             6 |                                               9  ( 0.0%)
+
+== TOP 25 RELAYS (Auftreten als Zwischenhop in HEY-Pfaden, 24h) ==
+   DB0HOB-12 relays= 1164 nct_own=  26 gw=0 fw=4.35p hw=TBEAM V1.2
+    DB0TVI-1 relays= 1120 nct_own=  14 gw=0 fw=4.35p hw=EBYTE E22
+   OE3XIA-12 relays=  803 nct_own=  27 gw=0 fw=4.35p hw=TBEAM V1.1
+   IQ5ARI-13 relays=  705 nct_own=  22 gw=0 fw=4.35p hw=TLORA V2.1.6
+    DB0FTS-1 relays=  635 nct_own=  12 gw=0 fw=4.35p hw=HELTEC STICK V3
+   DB0IBH-90 relays=  609 nct_own=  14 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IR5UDV-10 relays=  607 nct_own=  12 gw=0 fw=4.35p hw=TLORA V2.1.6
+   DB0RVB-99 relays=  588 nct_own=  14 gw=0 fw=4.35d hw=HELTEC V3
+   IU5CZN-10 relays=  489 nct_own=   - gw=- fw=4.35p hw=TLORA V2.1.6
+   IQ5ARI-11 relays=  481 nct_own=  15 gw=0 fw=4.35p hw=HELTEC V3
+   IZ5TRQ-11 relays=  421 nct_own=  16 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IW4CVV-24 relays=  372 nct_own=   7 gw=0 fw=4.35k hw=TLORA V2.1.6
+   IU5RCZ-12 relays=  364 nct_own=  17 gw=0 fw=4.35p hw=TBEAM V1.1
+   IU5SNJ-12 relays=  357 nct_own=   7 gw=0 fw=4.35p hw=TLORA V2.1.6
+   DO0MIH-01 relays=  344 nct_own=  16 gw=0 fw=4.35p hw=HELTEC V3
+   OE3MIF-12 relays=  341 nct_own=   - gw=- fw=? hw=?
+    DB0ND-22 relays=  323 nct_own=   - gw=- fw=? hw=?
+   IW0UTD-11 relays=  317 nct_own=   9 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IW5EIV-11 relays=  306 nct_own=  24 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IZ5IOM-13 relays=  272 nct_own=  27 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IK5ZXH-98 relays=  271 nct_own=   8 gw=0 fw=4.35p hw=HELTEC V3
+   IR5ZYQ-10 relays=  271 nct_own=  12 gw=0 fw=4.35p hw=TLORA V2.1.6
+   IZ5YYF-12 relays=  234 nct_own=  22 gw=0 fw=4.35f hw=TLORA V2.1.6
+   IZ5RWI-12 relays=  232 nct_own=  10 gw=0 fw=4.35p hw=TLORA V2.1.6
+   DL0FHC-13 relays=  225 nct_own=   3 gw=0 fw=4.35p hw=TBEAM V1.1
+
+== TOP 15 GATEWAYS/last-hops (wer meldet die meisten fremden Frames) ==
+   DB0HWR-12 reports= 2470
+   IQ5ARI-11 reports=  747
+    DB0TVI-1 reports=  684
+   DB0HOB-12 reports=  619
+    DB0KH-11 reports=  616
+     DO7GH-0 reports=  558
+   IK5XMK-12 reports=  545
+    OE3GHB-1 reports=  514
+   DO1IJB-13 reports=  490
+   OE3XIA-12 reports=  475
+    DD7MH-55 reports=  449
+    DB0ED-99 reports=  449
+   OE3XHU-22 reports=  445
+   OE3MIF-12 reports=  435
+   DB0RVB-99 reports=  408
+
+paths with repeated callsign (LOOPS): 104 (0.11%)
+   DH9JH-10,DB0HWR-12,DL4VAC-1,DB0HWR-12 ts 1787324941
+   DH9JH-10,DB0HWR-12,DL4VAC-1,DB0HWR-12 ts 1787337206
+   DB0MGN-1,DB0DOL-1,DB0TVI-1,DB0FTS-1,DB0TVI-1 ts 1787338032
+   DM2FK-99,DB0RVB-99,DB0TVI-1,DG1RTK-99,DB0TVI-1 ts 1787338401
+   IQ5BL-13,IK5ZXH-98,IK5NWZ-12,IW5EIA-12,IK5NWZ-12 ts 1787338716
+   DB0NH-3,DB0FTS-1,DB0TVI-1,DF2AP-97,DB0TVI-1 ts 1787338745
+   DH9JH-10,DB0HWR-12,DL4VAC-1,DB0HWR-12 ts 1787339433
+   DH9JH-10,DB0HWR-12,DL4VAC-1,DB0HWR-12 ts 1787341199
+
+msg_ids seen more than once: 18252, with span>60s: 6486, span>300s: 3449, span>900s: 1455
+longest spans (s): [80321, 79840, 79662, 79648, 78869, 72217, 72180, 72140, 72127, 72120]
+
+== Kopien pro msg_id (im Feed sichtbare Duplikate desselben Frames) ==
+             1 | ########################################  38108  (67.2%)
+             2 | ###########                               10251  (18.1%)
+             3 | ###                                        3176  ( 5.6%)
+             4 | ##                                         1658  ( 2.9%)
+             5 | #                                          1114  ( 2.0%)
+             6 | ##                                         1535  ( 2.7%)
+             7 |                                             429  ( 0.8%)
+             8 |                                             228  ( 0.4%)
+             9 |                                             107  ( 0.2%)
+            10 |                                              41  ( 0.1%)
+unique msg_ids: 56674, frames: 96074, feed DUP/NEW ratio: 0.70
+
+nodes with observed 'hears' neighbors: 508
+
+== known_ratio: Anteil der Nachbarn mit bekanntem nct (Qualitaetsgate 3.1) ==
+            0% | #                                             7  ( 1.4%)
+          <25% |                                               0  ( 0.0%)
+        25-49% |                                               0  ( 0.0%)
+        50-74% | ####                                         32  ( 6.3%)
+        75-99% | ############                                110  (21.7%)
+          100% | ########################################    359  (70.7%)
+nodes passing gate (known_ratio >= 50%): 501/508 (98.6%)
+
+== Importance-Verteilung (Sim auf beobachteter Topologie, konservativ unbekannt=1.0) ==
+          <0.5 | ########################################    154  (30.3%)
+         0.5-1 | ############################                106  (20.9%)
+           1-2 | ###################################         136  (26.8%)
+           2-3 | ################                             60  (11.8%)
+           3-5 | ##########                                   38  ( 7.5%)
+           5-8 | ###                                          10  ( 2.0%)
+          8-12 | #                                             4  ( 0.8%)
+         12-20 |                                               0  ( 0.0%)
+          >=20 |                                               0  ( 0.0%)
+median=0.95 p90=3.11 max=9.24
+nodes at/over IMP_CAP=8: 4 (0.8%)
+
+== slot_start-Verteilung (nur Nodes die das 50%-Gate passieren) ==
+     slot 0..2 | #                                             4  ( 0.8%)
+     slot 1..3 | #                                             4  ( 0.8%)
+     slot 2..4 | #                                             8  ( 1.6%)
+     slot 3..5 | ###                                          22  ( 4.4%)
+     slot 4..6 | #######                                      52  (10.4%)
+     slot 5..7 | ###############                             111  (22.2%)
+     slot 6..8 | ########################################    300  (59.9%)
+
+== slot_start-Verteilung OHNE Gate (alle Nodes, heutige Datenlage) ==
+     slot 0..2 | #                                             4  ( 0.8%)
+     slot 1..3 | #                                             4  ( 0.8%)
+     slot 2..4 | #                                             8  ( 1.6%)
+     slot 3..5 | ###                                          22  ( 4.3%)
+     slot 4..6 | #######                                      52  (10.2%)
+     slot 5..7 | ##############                              111  (21.9%)
+     slot 6..8 | ########################################    307  (60.4%)
+
+nodes at cap (>=8) under conservative rule but <2.0 if unknowns skipped: 0
+
+== Fleet firmware distribution (nodes DB) ==
+         '4.35p'  1118  (78.2%)
+         '4.35k'    75  (5.2%)
+         '4.35f'    51  (3.6%)
+         '4.35h'    35  (2.4%)
+         '4.35o'    32  (2.2%)
+         '4.35d'    28  (2.0%)
+             '?'    24  (1.7%)
+         '4.35i'    24  (1.7%)
+         '4.35c'    11  (0.8%)
+         '4.35e'     9  (0.6%)
+         '4.35n'     9  (0.6%)
+         '4.35a'     6  (0.4%)
+         '4.35j'     3  (0.2%)
+         '4.35m'     3  (0.2%)
+         '4.35 '     1  (0.1%)
+
+== Fleet hardware distribution (top 15) ==
+          'TLORA V2.1.6'   458  (32.0%)
+             'HELTEC V3'   288  (20.1%)
+            'TBEAM V1.2'   231  (16.2%)
+            'TBEAM V1.1'   131  (9.2%)
+             'EBYTE E22'    73  (5.1%)
+              'T-DECK +'    42  (2.9%)
+               'RAK4631'    33  (2.3%)
+                     '?'    26  (1.8%)
+       'HELTEC STICK V3'    25  (1.7%)
+             'T-BEAM 1W'    23  (1.6%)
+         'TBEAM SUPREME'    19  (1.3%)
+        'HELTEC Tracker'    15  (1.0%)
+           'HELTEC E290'    14  (1.0%)
+           'HELTEC V2.1'    14  (1.0%)
+                'T-DECK'    13  (0.9%)

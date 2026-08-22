@@ -1,0 +1,89 @@
+3-value relay segments: 38767 from 397 distinct relays
+relay mheard: min=1 median=5 p90=14 max=35
+relays reporting mheard >= cap-1 (saturation candidates): {10: 96, 30: 6}
+
+importance percentiles: {10: 0.17, 25: 0.34, 50: 0.95, 75: 1.77, 90: 3.11, 95: 3.95, 99: 6.52}
+
+== slot_start distribution with IMP_CAP=8.0 ==
+     slot 0..2 | #                                             4  ( 0.8%)
+     slot 1..3 | #                                             4  ( 0.8%)
+     slot 2..4 | #                                             8  ( 1.6%)
+     slot 3..5 | ###                                          22  ( 4.3%)
+     slot 4..6 | #######                                      52  (10.2%)
+     slot 5..7 | ##############                              111  (21.9%)
+     slot 6..8 | ########################################    307  (60.4%)
+
+== slot_start distribution with IMP_CAP=4.0 ==
+     slot 0..2 | ########                                     38  ( 7.5%)
+     slot 1..3 | ####                                         17  ( 3.3%)
+     slot 2..4 | #######                                      35  ( 6.9%)
+     slot 3..5 | #########                                    44  ( 8.7%)
+     slot 4..6 | ##############                               67  (13.2%)
+     slot 5..7 | ########################                    116  (22.8%)
+     slot 6..8 | ########################################    191  (37.6%)
+
+== slot_start distribution with IMP_CAP=3.0 ==
+     slot 0..2 | ####################                         72  (14.2%)
+     slot 1..3 | #######                                      26  ( 5.1%)
+     slot 2..4 | ##########                                   36  ( 7.1%)
+     slot 3..5 | #############                                48  ( 9.4%)
+     slot 4..6 | #######################                      84  (16.5%)
+     slot 5..7 | ##########################                   95  (18.7%)
+     slot 6..8 | ########################################    147  (28.9%)
+
+== slot_start distribution with IMP_CAP=2.0 ==
+     slot 0..2 | ########################################    134  (26.4%)
+     slot 1..3 | ##########                                   32  ( 6.3%)
+     slot 2..4 | ##########                                   35  ( 6.9%)
+     slot 3..5 | ###################                          65  (12.8%)
+     slot 4..6 | ###############                              51  (10.0%)
+     slot 5..7 | #############################                96  (18.9%)
+     slot 6..8 | ############################                 95  (18.7%)
+
+== TOP 20 relays: real load vs simulated importance/slot (CAP=8 vs CAP=3) ==
+   DB0HOB-12 load= 1164 imp= 6.74 rank=  5/508 slots(cap8)=1..3 slots(cap3)=0..2
+    DB0TVI-1 load= 1120 imp= 3.64 rank= 33/508 slots(cap8)=3..5 slots(cap3)=0..2
+   OE3XIA-12 load=  803 imp= 9.24 rank=  1/508 slots(cap8)=0..2 slots(cap3)=0..2
+   IQ5ARI-13 load=  705 imp= 5.63 rank= 10/508 slots(cap8)=2..4 slots(cap3)=0..2
+    DB0FTS-1 load=  635 imp= 5.64 rank=  9/508 slots(cap8)=2..4 slots(cap3)=0..2
+   DB0IBH-90 load=  609 imp= 3.82 rank= 29/508 slots(cap8)=3..5 slots(cap3)=0..2
+   IR5UDV-10 load=  607 imp= 3.27 rank= 44/508 slots(cap8)=4..6 slots(cap3)=0..2
+   DB0RVB-99 load=  588 imp= 2.85 rank= 57/508 slots(cap8)=4..6 slots(cap3)=0..2
+   IU5CZN-10 load=  489 imp= 0.66 rank=304/508 slots(cap8)=6..8 slots(cap3)=5..7
+   IQ5ARI-11 load=  481 imp= 5.02 rank= 14/508 slots(cap8)=2..4 slots(cap3)=0..2
+   IZ5TRQ-11 load=  421 imp= 4.54 rank= 18/508 slots(cap8)=3..5 slots(cap3)=0..2
+   IW4CVV-24 load=  372 imp= 8.58 rank=  3/508 slots(cap8)=0..2 slots(cap3)=0..2
+   IU5RCZ-12 load=  364 imp= 3.83 rank= 28/508 slots(cap8)=3..5 slots(cap3)=0..2
+   IU5SNJ-12 load=  357 imp= 1.31 rank=181/508 slots(cap8)=5..7 slots(cap3)=3..5
+   DO0MIH-01 load=  344 imp= 1.82 rank=124/508 slots(cap8)=5..7 slots(cap3)=2..4
+   OE3MIF-12 load=  341 imp= 4.20 rank= 22/508 slots(cap8)=3..5 slots(cap3)=0..2
+    DB0ND-22 load=  323 imp= 8.92 rank=  2/508 slots(cap8)=0..2 slots(cap3)=0..2
+   IW0UTD-11 load=  317 imp= 1.39 rank=171/508 slots(cap8)=5..7 slots(cap3)=3..5
+   IW5EIV-11 load=  306 imp= 6.33 rank=  7/508 slots(cap8)=1..3 slots(cap3)=0..2
+   IZ5IOM-13 load=  272 imp= 4.56 rank= 17/508 slots(cap8)=3..5 slots(cap3)=0..2
+top-20 load relays in slots<=2: cap8=8/20, cap3=17/20
+
+== msg_id Zeitspannen (Erst- bis Letztauftreten) ==
+         1-59s | ########################################  11742  (64.3%)
+       60-299s | ##########                                 3054  (16.7%)
+       5-10min | ####                                       1221  ( 6.7%)
+      10-15min | ###                                         779  ( 4.3%)
+      15-30min | ##                                          534  ( 2.9%)
+      30-60min |                                              55  ( 0.3%)
+   >1h (Wrap?) | ###                                         867  ( 4.8%)
+echte Zombie-Kandidaten (10-60min): 1368
+
+spike hour frames: 9377 (prev hour: 3616)
+top origins in spike hour (count, prev-hour count):
+     IU4KCH-26  5912 (prev 9)
+      DH9JH-10    92 (prev 110)
+      DJ0JJ-12    49 (prev 44)
+     OE3XIA-12    45 (prev 24)
+     DB0HOB-12    38 (prev 43)
+     IZ5IOM-13    33 (prev 28)
+      DF2SI-12    30 (prev 16)
+      IR5AY-12    29 (prev 1)
+     DL0HHA-12    24 (prev 31)
+     DG7FDL-12    23 (prev 11)
+      DO1MH-12    23 (prev 49)
+     DB0HRF-12    22 (prev 24)
