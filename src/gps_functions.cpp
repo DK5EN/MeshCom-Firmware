@@ -47,8 +47,14 @@ static HardwareSerial GPSSerial(1);  // UART1
 
 GPSData gpsData;
 
-// Baudrate-Erkennung: Viele Module starten mit 9600, manche mit 38400/115200
-static const unsigned long GPS_BAUDS[] = {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
+// Baudrate-Erkennung: Viele Module starten mit 9600, manche mit 38400/115200.
+// Die Reihenfolge ist nach Haeufigkeit sortiert, nicht numerisch: seit der
+// Scan bei der ersten gueltigen NMEA-Pruefsumme abbricht (N-25/S5) bestimmt
+// sie unmittelbar die Dauer der GPS-Initialisierung. 9600 ist die Vorgabe
+// der meisten Module, 38400 stellt SetupL76K()/SetupUBLOX() selbst ein.
+// Fuer das Ergebnis ist die Reihenfolge unerheblich -- die Pruefsumme
+// entscheidet, nicht die Position.
+static const unsigned long GPS_BAUDS[] = {9600, 38400, 115200, 57600, 19200, 4800, 2400, 1200};
 static const size_t   GPS_BAUD_COUNT = sizeof(GPS_BAUDS) / sizeof(GPS_BAUDS[0]);
 int GPS_BAUDS_RX[GPS_BAUD_COUNT];
 
@@ -66,20 +72,126 @@ const int WAIT_DURATION = 2000;   // max. Wartedauer
 
 #if defined(GPS_BAUDRATE_SOFTCHECK)
 
+// ---------------------------------------------------------------------------
+// NMEA-Rahmenpruefung fuer die Baudratenerkennung (N-25/S5, B-15)
+//
+// Ein NMEA-0183-Satz hat die Form  $<payload>*HH<CR><LF>.  HH ist das XOR
+// aller Zeichen zwischen '$' und '*', hexadezimal in Grossbuchstaben.
+//
+// Der Pruefer laeuft ueber den ROHEN Bytestrom, nicht ueber den gefilterten:
+// der Zeichenfilter der Erkennung laesst '.' und '-' nicht durch, beide
+// kommen in jedem realen Satz vor ($GPRMC,064829.00,...). Ueber dem
+// gefilterten Strom koennte die Pruefsumme nie stimmen.
+//
+// Zweck: Rauschen von einem Modul unterscheiden. Die alte Erkennung nahm
+// schlicht die Baudrate mit den meisten passenden Zeichen (Argmax ohne
+// Mindestanzahl, Befund B-15). Da GPS_RX_PIN ohne Pull-up als INPUT
+// konfiguriert wird, "erkennt" ein einziges Rauschbyte auf einem Board ohne
+// angeschlossenes Modul eine Phantom-Baudrate.
+// ---------------------------------------------------------------------------
+
+#define NMEA_MAX_PAYLOAD 82   // NMEA-0183: max. 82 Zeichen je Satz
+
+struct NMEAframeCheck
+{
+    uint8_t  state;    // 0 = wartet auf '$', 1 = Nutzlast, 2 = Hex hoch, 3 = Hex tief
+    uint8_t  sum;      // laufendes XOR ueber die Nutzlast
+    uint8_t  want;     // aus dem Rahmen gelesene Soll-Pruefsumme
+    uint16_t len;      // Laenge der Nutzlast
+};
+
+static void nmeaCheckReset(struct NMEAframeCheck *nc)
+{
+    nc->state = 0;
+    nc->sum = 0;
+    nc->want = 0;
+    nc->len = 0;
+}
+
+static int nmeaHexVal(char ch)
+{
+    if(ch >= '0' && ch <= '9') return ch - '0';
+    if(ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+    if(ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+    return -1;
+}
+
+/// @return true, sobald ein vollstaendiger Satz mit gueltiger Pruefsumme endet
+static bool nmeaCheckFeed(struct NMEAframeCheck *nc, char ch)
+{
+    // '$' beginnt immer einen neuen Satz, egal in welchem Zustand
+    if(ch == '$')
+    {
+        nc->state = 1;
+        nc->sum = 0;
+        nc->len = 0;
+        return false;
+    }
+
+    switch(nc->state)
+    {
+        case 1:
+            if(ch == '*')
+            {
+                // leere Nutzlast ist kein Satz
+                if(nc->len == 0)
+                    nc->state = 0;
+                else
+                    nc->state = 2;
+            }
+            else if(ch == 0x0D || ch == 0x0A || nc->len >= NMEA_MAX_PAYLOAD)
+            {
+                nc->state = 0;   // abgebrochener oder ueberlanger Satz
+            }
+            else
+            {
+                nc->sum = nc->sum ^ (uint8_t)ch;
+                nc->len++;
+            }
+            break;
+
+        case 2:
+        {
+            int v = nmeaHexVal(ch);
+            if(v < 0) { nc->state = 0; break; }
+            nc->want = (uint8_t)(v << 4);
+            nc->state = 3;
+            break;
+        }
+
+        case 3:
+        {
+            int v = nmeaHexVal(ch);
+            nc->state = 0;
+            if(v < 0) break;
+            nc->want = (uint8_t)(nc->want | v);
+            return nc->want == nc->sum;
+        }
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
 unsigned long detectBaudrate()
 {
     #if defined(GPS_BAUDRATE_SETFIX)
         return GPS_BAUDRATE_SETFIX;
     #endif
 
-    unsigned long detectedBaud=0;
+    int ipos = -1;      // Index der Baudrate mit gueltigem NMEA-Satz
+    uint32_t tScan = millis();
 
+    // Vollstaendig zuruecksetzen: der Scan bricht jetzt vorzeitig ab, sonst
+    // stuenden in den restlichen Eintraegen die Zaehlerstaende des letzten
+    // Durchlaufs (--gps reset ruft erneut hier herein).
     for(int iGpsBaud=0; iGpsBaud < (int)GPS_BAUD_COUNT; iGpsBaud++)
-    {
         GPS_BAUDS_RX[iGpsBaud] = 0;
 
-        detectedBaud =  GPS_BAUDS[iGpsBaud];
-
+    for(int iGpsBaud=0; iGpsBaud < (int)GPS_BAUD_COUNT && ipos < 0; iGpsBaud++)
+    {
         #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
         Serial1.begin(GPS_BAUDS[iGpsBaud]);
         Serial1.flush();
@@ -93,20 +205,26 @@ unsigned long detectBaudrate()
         NMEAlineIndex = 0;
         memset(msg_text, 0x00, maxNMEAline);
 
+        struct NMEAframeCheck nmeaCheck;
+        nmeaCheckReset(&nmeaCheck);
+        bool bFrameOK = false;
+
         // N-25: Eine Fütterung pro Baudstufe genügt -- das Fenster unten ist
         // hart auf 1500 ms begrenzt, der Watchdog löst erst nach 5 s aus.
         meshcom_wdt_feed();
 
-        // 1,5 Sekunden lang auf gueltige NMEA-Daten warten
-        while (millis() - start < 1500)
+        // Bis zu 1,5 Sekunden auf einen vollstaendigen NMEA-Satz warten.
+        // Liegt einer vor, endet das Fenster sofort -- es gibt nichts mehr
+        // zu entscheiden.
+        while ((millis() - start < 1500) && !bFrameOK)
         {
             // Die innere Schleife war unbegrenzt: bei einem dauerhaft
             // sendenden Modul bleibt available() beliebig lange wahr. Sie
             // erbt jetzt dasselbe 1500-ms-Fenster wie die äußere.
             #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-            while (Serial1.available() && (millis() - start < 1500))
+            while (Serial1.available() && (millis() - start < 1500) && !bFrameOK)
             #else
-            while (GPSSerial.available() && (millis() - start < 1500))
+            while (GPSSerial.available() && (millis() - start < 1500) && !bFrameOK)
             #endif
             {
                 #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -115,7 +233,11 @@ unsigned long detectBaudrate()
                 c = char(GPSSerial.read());
                 #endif
 
-                
+                // Pruefsumme ueber den ROHEN Strom -- der Filter unten laesst
+                // '.' und '-' nicht durch, beide stehen in jedem realen Satz.
+                if(nmeaCheckFeed(&nmeaCheck, c))
+                    bFrameOK = true;
+
                 // A-Z 0-9 $ , * CR LF
                 if((c >='A' && c <='Z') || (c >='0' && c<= '9') || c=='!' || c=='$' || c=='*' || c==',' || c=='\\' || c==0x0A || c==0x0D)
                 {
@@ -135,43 +257,39 @@ unsigned long detectBaudrate()
         }
 
         if(iGPSDEBUG >= 2 && GPS_BAUDS_RX[iGpsBaud] > 0)
-          Serial.printf("[GPS ]...%lu baud --> %i chars\n", GPS_BAUDS[iGpsBaud], GPS_BAUDS_RX[iGpsBaud]);
+          Serial.printf("[GPS ]...%lu baud --> %i chars%s\n", GPS_BAUDS[iGpsBaud], GPS_BAUDS_RX[iGpsBaud],
+                        bFrameOK ? " (NMEA ok)" : "");
 
         #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
         Serial1.end();
         #else
         GPSSerial.end();
         #endif
-    }
 
-    int itxt = 0;
-    int ipos = -1;
+        if(bFrameOK)
+            ipos = iGpsBaud;
+    }
 
     gpsDetected = false;
 
-    for(int iGpsBaud=0; iGpsBaud < (int)GPS_BAUD_COUNT; iGpsBaud++)
-    {
-        if(GPS_BAUDS_RX[iGpsBaud] > itxt)
-        {
-          itxt = GPS_BAUDS_RX[iGpsBaud];
-          ipos = iGpsBaud;
-        }
-    }
-
     if(ipos >= 0)
     {
-        Serial.printf("[GPS ]...found with %lu baud (%i chars)\n", GPS_BAUDS[ipos], itxt);
+        Serial.printf("[GPS ]...found with %lu baud (%i chars, NMEA-Pruefsumme gueltig, %lu ms)\n",
+                      GPS_BAUDS[ipos], GPS_BAUDS_RX[ipos], (unsigned long)(millis() - tScan));
 
         gpsDetected = true;
 
-        detectedBaud = GPS_BAUDS[ipos];
-
-        return detectedBaud;
+        return GPS_BAUDS[ipos];
     }
 
-    detectedBaud = 0;
-    
-    return detectedBaud;
+    // Kein einziger Satz mit gueltiger Pruefsumme: kein Modul, falsch
+    // verkabelt oder stumm. Frueher lieferte hier der Argmax ueber die
+    // Zeichenzaehler eine Phantom-Baudrate (B-15) und der Aufrufer lief in
+    // GPSprobe() gegen nichts.
+    Serial.printf("[GPS ]...keine gueltige NMEA-Sequenz auf %d Baudraten (%lu ms)\n",
+                  (int)GPS_BAUD_COUNT, (unsigned long)(millis() - tScan));
+
+    return 0;
 }
 #else
 
