@@ -1,16 +1,20 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.21-stability` (2026-08-21), based on official MeshCom 4.35p
+Release: `v4.35p.08.22-stability` (2026-08-22), based on official MeshCom 4.35p
 (upstream `dev`, merge-base `8114d7ae`).
+
+> **`v4.35p.08.21-stability` has been withdrawn and deleted.** It put any node
+> with GPS enabled into a permanent boot loop (item 81 below). If you installed
+> it, update — and note that an affected node can only be recovered over USB.
 
 ## About this release
 
 MeshCom is a wonderful project, and this release exists because we use it every
 day and want it to be as dependable as the idea deserves. Everything below is
 the result of a long, careful quality pass over the 4.35p codebase: reading the
-code, testing on real hardware (Heltec V3 and WisBlock RAK4631 on the bench,
-soak tests over hours), and improving what we found — always in the smallest
-way that works.
+code, testing on real hardware (Heltec V3, T-Beam v1.2 and WisBlock RAK4631 on
+the bench, soak tests over hours), and improving what we found — always in the
+smallest way that works.
 
 Three things this release is **not**:
 
@@ -36,6 +40,65 @@ The items below reference the engineering logs in this repository:
 [docs/code-audit-fixes-20260627.md](code-audit-fixes-20260627.md) (IDs like
 A1, B2, C3), where the findings are documented with evidence. Every fix is one
 focused commit in this repository's history.
+
+## New in v4.35p.08.22-stability
+
+This release exists to correct a defect we introduced ourselves in 08.21, plus
+two sensor fixes and a build fix found while testing it. Everything below was
+verified on real hardware for this release, not carried over.
+
+81. **The GPS boot loop is fixed (N-25).** Arming the ESP32 task watchdog at
+    the very start of `esp32setup()` — our own change in 08.21 — exposed a
+    ~16-second block that upstream has always had but never watched: the GPS
+    baud-rate scan, which runs from the main loop and never feeds the
+    watchdog. Any node with `--gps on` aborted two or three baud steps in and
+    rebooted, forever, because the setting is persisted before the crash.
+    There was no command window, so the node could not be reached over the
+    air, by BLE, or over the network console — only a USB reflash recovered
+    it. Reproduced on a Heltec V3 and confirmed fixed there, with the crash
+    backtrace decoded against its own ELF. Four parts: the watchdog is armed
+    at the **end** of setup rather than the start (which also removes the
+    USB-CDC boot wait, the display timeouts and eleven `while(true);` error
+    paths from the watched region); the GPS init path feeds the watchdog
+    behind a single helper that compiles to nothing on nRF52; the scan stops
+    at the first NMEA sentence with a **valid checksum** instead of running
+    all eight baud rates; and the baud table is ordered by likelihood.
+82. **The baud scan no longer invents a baud rate (B-15).** It used to pick
+    whichever rate produced the most characters, with no minimum — and the GPS
+    RX pin is configured as an input with no pull-up. A single noise byte in
+    the matched character set could therefore "detect" a rate on a board with
+    no module attached, after which the probe ran against nothing. Detection
+    now requires a complete, checksum-valid sentence; if none arrives, the
+    node says so. Verified on a second Heltec V3 with no GPS fitted.
+83. **GPS detection is dramatically faster.** Stopping at the first valid
+    sentence, and trying 38400 before 9600 because `SetupUBLOX()` switches
+    modules to 38400 permanently on first init, took detection from
+    **12 000 ms to 321 ms** on a Heltec V3 and as low as 24 ms on a T-Beam.
+84. **The dead second baud-detection implementation was removed (A-1…A-4).**
+    `gps_functions.cpp` carried an unreachable interrupt-based variant, which
+    is how the two implementations had silently drifted apart — it contained
+    two `return -1` statements from a function returning `unsigned long`
+    (wrapping to 4294967295, a value the caller's `> 0` test accepts) and a
+    regression of our own. The reason it was unreachable turned out to be a
+    single unconditional `#define` overriding a per-variant option in 15
+    board configurations. Flash size is byte-identical before and after,
+    which is the proof that only dead code went.
+85. **The BME680 driver no longer mistakes an I2C acknowledgement for a chip
+    ID (N-27).** BME280, BMP280 and BME680 share addresses 0x76 and 0x77, and
+    only `begin()` reads the chip ID — but its return value was discarded and
+    the sensor was marked present based on the address alone. A board with a
+    BME280 reported `BME680: on (found)` and then logged a read failure on
+    every cycle, forever. Verified both ways: on a board with a BME280 at
+    0x76, and on one with nothing at either address.
+86. **`--bmx off` now turns off the BME680 as its help text always
+    promised (N-28).** It cleared BMP280, BME280 and BMP390 but never the
+    BME680, so following the help and then enabling a BMx280 produced
+    "can't be used together" and left the node with no sensor at all.
+87. **Flashing targets the board you asked for.** The per-board upload
+    commands carried no `--port`, so `esptool` chose one itself; with two
+    boards attached, `pio run --target upload` could flash or disturb the
+    wrong one. `--upload-port` had no effect because PlatformIO only forwards
+    it through `$UPLOAD_PORT`, which was absent. All 27 commands now pass it.
 
 ## Input handling — RF, BLE, and network paths
 
