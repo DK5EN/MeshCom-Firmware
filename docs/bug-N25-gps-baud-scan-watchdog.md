@@ -1,6 +1,10 @@
 # N-25 — GPS baud scan trips the task watchdog and boot-loops the node
 
-**Status:** VERIFIED by code reading + two field logs (same board, our build vs. upstream build), then re-verified by an eight-angle adversarial review. **Not yet fixed.**
+**Status:** VERIFIED by code reading + two field logs (same board, our build vs. upstream build), then
+re-verified by an eight-angle adversarial review — and since **2026-08-22 reproduced and fixed on the
+bench**. Waves 0, 1 and 2 are landed (`dae2d863` S1, `f20b922d` S4, `7bd313bd` S5+B-15); GPS detection
+on a Heltec V3 drops from 12 000 ms to 2120 ms. **Waves 3–6 remain open**, as do hardware checks §8.4
+and §8.5. Bench record and open-item run book: `docs/gps-sensor-bench-20260822.md`.
 **Severity:** Critical — permanent boot loop, node unusable, no recovery window, recoverable only by reflashing.
 **Class:** regression introduced on this branch (`v4.35p_prio`), not an upstream defect.
 **Reported:** 2026-08-21, T-Beam Supreme (`ttgo_tbeam_supreme`, ESP32-S3), field unit.
@@ -91,6 +95,25 @@ flash-mapped text, `0x4037/0x4038xxxx` is IRAM. That is the limit of what the ra
 
 **The backtrace is not load-bearing** — the print sequence pins the fault exactly (§3.4). It is
 recorded so a decoded version can be attached if the unit is reflashed with a retained ELF.
+
+> **Decoded 2026-08-22 on a second board.** The defect was reproduced on a Heltec V3 with a u-blox
+> module, and that crash's backtrace was symbolised against its own ELF (SHA256 `7778525e3221dfae`).
+> It confirms the reading above exactly:
+>
+> | Frame        | Symbol                                             |
+> | ------------ | -------------------------------------------------- |
+> | `0x40377d9e` | `panic_abort` — `esp_system/panic.c:408`           |
+> | `0x4038111d` | `esp_system_abort` — `esp_system.c:137`            |
+> | `0x403870cd` | `abort` — `newlib/abort.c:46`                      |
+> | `0x4206371c` | `task_wdt_isr` — `esp_system/task_wdt.c:176`       |
+> | `0x40379db1` | `_xt_lowint1` — `xtensa_vectors.S:1118`            |
+> | `0x420f0783` | `cpu_ll_waiti` (inlined into `esp_pm_impl_waiti`)  |
+> | `0x42063ed9` | `esp_vApplicationIdleHook` — `freertos_hooks.c:63` |
+> | `0x4038259c` | `prvIdleTask` — `freertos/tasks.c:4099`            |
+>
+> The second stack is the interrupted `IDLE0`; the starved task is `loopTask` on CPU 1, as the panic
+> header says. The addresses differ from the field capture because it is a different build — the
+> structure is identical.
 
 > **Actionable:** `variants/ttgo_tbeam_supreme/platformio.ini:4` already sets
 > `monitor_filters = esp32_exception_decoder`, so any capture taken through `pio device monitor` on
@@ -458,6 +481,18 @@ Required:
 7. **RAM/flash delta** recorded for `ttgo_tbeam_supreme`, `heltec_wifi_lora_32_V3`, `wiscore_rak4631`.
 
 **Capture every verification through `pio device monitor`** so a crash decodes (§2).
+
+> **Status as of 2026-08-22** — full record in `docs/gps-sensor-bench-20260822.md`.
+>
+> | Item | Status                                                                                                                                                                                                         |
+> | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | 1    | **Not done.** No native coverage claimed. The timing property is evidenced by hardware capture only.                                                                                                           |
+> | 2    | **Substituted.** The reported Supreme was not on the bench. Reproduced and verified on a Heltec V3 with a u-blox module, same failure signature, decoded backtrace. Supreme builds clean; not run on hardware. |
+> | 3    | **Passed** for `--gps reset` (2309 ms) and `--gps off` + `--gps on` (2249 ms), no abort. Button press **deferred**.                                                                                            |
+> | 4    | **Deferred** — no board without a module on the bench. This is the direct test of the B-15 fix and must not be dropped.                                                                                        |
+> | 5    | **Deferred** — battery available, test not run.                                                                                                                                                                |
+> | 6    | **Passed.** `wiscore_rak4631` builds; flashed and run on a RAK4631. nRF52 arms no task watchdog at all, so this path is unaffected; its own GPS defect is catalogued separately as N-26.                       |
+> | 7    | **Recorded.** V3 +456 B flash, Supreme +456 B, RAK4631 +16 B. RAM unchanged on all three.                                                                                                                      |
 
 **Recovery procedure for a boot-looping node** — establish before any hardware wave starts, per
 `CLAUDE.md`: ESP32 boards via `esptool` erase + reflash (`tools/esp32_erase.sh`); nRF52 via
