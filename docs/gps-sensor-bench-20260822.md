@@ -199,10 +199,11 @@ Boot vollständig aus, bevor 38400 an die Reihe kam.
 Trigger A (Reboot mit persistiertem `--gps on`) auf diesem dritten Board
 mehrfach durchlaufen: kein `task_wdt`, kein `abort()`, der Node kommt jedes Mal hoch.
 
-Der Empfänger arbeitet — NMEA mit gültiger Prüfsumme, Zeit und Datum werden
-dekodiert, 4–5 Satelliten sichtbar. Einen 3D-Fix hat er am Prüfplatz nicht
-erreicht; der Heltec V3 daneben hat zeitgleich 9 Satelliten bei HDOP 0,9. Das
-ist Antennenlage, kein Firmware-Befund.
+Der Empfänger arbeitet. Zunächst nur Zeit und Datum aus gültigen NMEA-Sätzen
+und 4–5 sichtbare Satelliten ohne Positions-Fix — nach rund acht Minuten am
+selben Platz dann `fix:yes`, 8 Satelliten, HDOP 1,1. Das war Kaltstartzeit, kein
+Firmware-Befund; der Heltec V3 daneben lag zeitgleich bei 9 Satelliten und
+HDOP 0,9.
 
 ### 4.3 WiFi
 
@@ -273,7 +274,7 @@ Bewusst zurückgestellt, nicht stillschweigend übersprungen.
 | 3   | **§8.5 — Batteriestart ohne USB** auf einem Board mit `ARDUINO_USB_CDC_ON_BOOT=1`. Der eigentliche B-7-Fall, den Welle 0 behebt.                                                                                                               | Akku vorhanden, Test verschoben                           |
 | 4   | **§8.3, Tastendruck** auf einem laufenden Node — der dritte Trigger. `--gps reset` und `--gps on` sind geprüft.                                                                                                                                | Handgriff am Gerät                                        |
 | 5   | ~~T-Beam mit GPS und WiFi~~ — **erledigt**, siehe Abschnitt 4                                                                                                                                                                                  | —                                                         |
-| 5a  | **T-Beam ohne 3D-Fix am Prüfplatz.** Empfänger arbeitet, 4–5 Satelliten, kein Positions-Fix. Draussen oder mit besserer Antennenlage nachholen.                                                                                                | Standort, nicht Firmware                                  |
+| 5a  | ~~T-Beam ohne 3D-Fix am Prüfplatz~~ — **erledigt**, Fix nach rund acht Minuten Kaltstart: 8 Satelliten, HDOP 1,1                                                                                                                               | —                                                         |
 | 6   | **Welle 3** — tote ISR-Variante und A-1…A-9 löschen, inklusive unseres `pulseIndex + 1`-Regresses                                                                                                                                              | zurückgestellt                                            |
 | 7   | **Welle 4** — S2, die vier unbegrenzten Schleifen (B-1, B-2, B-6, B-10) und der AP-Zweig B-13                                                                                                                                                  | zurückgestellt                                            |
 | 8   | **Welle 5** — Coredump-Partition (A-7). Ohne sie gibt es weiterhin `error=257` statt eines Dumps.                                                                                                                                              | zurückgestellt, braucht OTA-Test                          |
