@@ -1605,6 +1605,17 @@ void commandAction(char *umsg_text, bool ble)
 
         gpsInitDone = false;
 
+        // A-9 ist hier WIDERLEGT und braucht kein bReturn: der Zweig kehrt
+        // sofort zurueck und erreicht den bReturn-Konsumenten am Ende von
+        // commandAction() gar nicht erst. Ein "wrong command" kann also nicht
+        // entstehen -- auf Hardware gegengeprueft, das Log enthaelt keines.
+        // Ein bReturn = true waere hier ein toter Store.
+        //
+        // Was bleibt: ueber BLE gibt dieser Zweig keine Rueckmeldung, weil er
+        // kein addBLECommandBack() ruft. Auf der seriellen Konsole ist die
+        // GPS-Init-Ausgabe die Rueckmeldung. Welcher Text an die App gehen
+        // soll, ist eine Produktentscheidung und nicht Teil einer
+        // Aufraeumwelle.
         return;
     }
     else
