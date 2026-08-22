@@ -1,10 +1,24 @@
 # ADR 02: Netzwichtigkeits-basierter Relay-Backoff (NC-Importance)
 
-**Status:** Draft
+**Status:** Draft (Rev. 2)
 
-**Datum:** 2026-03-16
+**Datum:** 2026-03-16, ueberarbeitet 2026-08-22
 
 **Autor:** Martin DK5EN
+
+---
+
+## Revisionen
+
+| Rev | Datum | Aenderung |
+|-----|-------|-----------|
+| 1 | 2026-03-16 | Erstfassung: Importance-Formel, Slot-Mapping, Deployment-Stufen |
+| 2 | 2026-08-22 | Codestand-Abgleich gegen v4.35p (inkl. Korrektur der Base-Angabe in 5.3: 4500 statt 4000 ms, und Zeitfenster in 5.2: 1 h statt 12 h): Abschnitt "Datenqualitaet des NC" (Kap. Kontext), Qualitaetsgate (3.1), Slot-Spreizung und Zeitanker (4.7), Ausbaustufe "Importance v2" aus der HEY-Pfadtabelle (Kap. 8), vier neue Risiken, verworfene Alternative 7, korrigierter Status von Stufe 2 und 3 |
+
+**Rev. 2 aendert keine Entscheidung aus Rev. 1.** Formel, Slot-Mechanik und
+Deployment-Reihenfolge bleiben unveraendert. Ergaenzt werden ausschliesslich
+der Abgleich mit dem tatsaechlichen Codestand, Absicherungen fuer den Rollout
+und eine spaetere Ausbaustufe.
 
 ---
 
@@ -170,6 +184,39 @@ Ein Node mit NC_self=10 kann zwei voellig verschiedene Rollen haben:
 
 NC_self sagt nur "ich hoere X Stationen". Erst die **NC_reported-Werte der Nachbarn**
 (via HEY-Payload empfangen) zeigen, ob diese Stationen auf uns angewiesen sind oder nicht.
+
+### Datenqualitaet des NC (Codestand v4.35p, geprueft 2026-08-22)
+
+Die Importance-Formel ist nur so gut wie die NC-Werte, die in sie hineinlaufen.
+Abgleich gegen den tatsaechlichen Code:
+
+| Aspekt | Befund | Fundstelle |
+|--------|--------|------------|
+| NC_self | Anzahl Rufzeichen mit Aktivitaet in der **letzten Stunde**, Schluessel ist `msg_source_last` (= letzter Hop) — also echte Direktnachbarn, keine Mehr-Hop-Stationen | `mheard_functions.cpp:556`, `lora_functions.cpp:568` |
+| Saettigung | `MAX_MHEARD` = 80 (ESP32-S3/nRF52840), 50 (XML/SBUFFER), 30 (ESP32 klassisch), **10 (T-Beam)**. Ueber dem Limit ist NC systematisch zu klein | `configuration_global.h:172ff` |
+| Kappung im Positions-Payload | `/N` wird bei **99** gekappt | `loop_functions.cpp:3753-3759` |
+| Kanal 1: Position | `/N<nn>` wird als `aprspos.ncnt` geparst und in `mheardNCount[]` abgelegt | `aprs_functions.cpp:905`, `lora_functions.cpp:648`/`:676` |
+| Kanal 2: HEY | `R<NC>;` wird in `updateHeyPath()` geparst — **nur wenn der HEY-Originator bereits in `mheardCalls[]` steht** | `mheard_functions.cpp:420-446` |
+| Wer meldet nie? | Knoten ohne Positionsaussendung **und** ohne HEY melden keinen NC. Fuer sie bleibt `mheardNCount[i] == 0` | — |
+| 0 ist mehrdeutig | `0` heisst "nicht bekannt", ist aber nicht von einem echten 0 unterscheidbar (existiert nicht: wer gehoert wird, hat NC_self >= 1) | siehe Kap. 3 |
+| Fenster-Inkonsistenz | `getMheardCount()` nutzt **1 h**, der Entwurf von `getNetImportance()` nutzte in Rev. 1 **12 h** — zwei verschiedene Nachbar-Populationen fuer zwei Werte, die zusammengehoeren. In Rev. 2 auf 1 h korrigiert | `mheard_functions.cpp:556`, Kap. 5.2 |
+| Persistenz | `mheardNCount[]` wird in Flash geschrieben und ueberlebt Reboots — nach Standortwechsel wird mit NC-Werten vom alten QTH gerechnet | `mheard_functions.cpp:178` |
+| Symmetrie | mheard misst, **wen ich hoere** — nicht, wer mich hoert. Asymmetrische Links (Hub mit guter Antenne, schwacher Leaf-TX) ueberschaetzen die eigene Wichtigkeit | — |
+| Vertrauen | NC_reported ist eine unauthentifizierte **Selbstauskunft** des Nachbarn | — |
+
+**Konsequenzen fuer die Implementierung (verbindlich):**
+
+1. **Ein Zeitfenster fuer beide Werte.** `getNetImportance()` verwendet dasselbe
+   1-h-Fenster wie `getMheardCount()`. Andernfalls traegt ein Nachbar zur
+   Importance bei, der im eigenen gemeldeten NC gar nicht mehr auftaucht.
+2. **Saettigung als Datenfehler behandeln.** Erreicht `getMheardCount()` den
+   Wert `MAX_MHEARD`, ist der NC eine Untergrenze, kein Messwert. Auf Boards mit
+   `MAX_MHEARD <= 10` (T-Beam, Entwicklerboard) ist die Importance-Rechnung nicht
+   belastbar — dort greift das Qualitaetsgate aus 3.1 praktisch immer.
+3. **Die Kappung bei 99 ist unkritisch**, weil `1/99` ohnehin gegen null geht.
+4. **Asymmetrie bleibt unbehandelt** in Stufe 1. Eine Absicherung waere, einen
+   Nachbarn nur dann zu zaehlen, wenn belegt ist, dass er uns ebenfalls hoert
+   (eigenes Rufzeichen in seinem HEY-Pfad bzw. Signal-Report). Siehe Kap. 8.
 
 ---
 
@@ -390,6 +437,40 @@ Importance = 1/5 + 1/3 + 1/8 + 1/7 + 1/4 + 1/10
 Der Wert sinkt von 3.66 auf 1.15 sobald die NC_reported-Daten vorliegen.
 Im Uebergangszustand sendet der Node "zu frueh" — das ist sicher, nur nicht optimal.
 
+#### 3.1 Qualitaetsgate: differenzieren nur bei belastbarer Datenlage
+
+Die konservative Annahme "unbekannt = 1.0" ist pro Nachbar richtig, kollabiert
+aber, wenn sie fuer **alle** Nachbarn gleichzeitig gilt — genau der Zustand einer
+gemischten Flotte am Rollout-Tag:
+
+```
+Alle Nachbarn unbekannt  →  jeder Beitrag 1.0
+                         →  Importance = NC_self
+                         →  jeder halbwegs vernetzte Node landet in Slots 0..2
+                         →  keine Differenzierung
+                         →  ABER: Jitterfenster nur noch 3 Slots statt 10
+                         →  mehr Kollisionen als im Ist-Zustand
+```
+
+Das ist die einzige Konstellation, in der Stufe 1 **schlechter** ist als der
+Status quo: die Ordnungswirkung faellt aus, die Entzerrungswirkung des vollen
+10-Slot-Jitters aber auch. Deshalb ein explizites Gate:
+
+```cpp
+// Anteil der aktiven Nachbarn mit bekanntem NC_reported
+//   known_ratio < RELAY_IMP_MIN_KNOWN  →  alte Berechnung (voller 0..9 Jitter)
+//   known_ratio >= RELAY_IMP_MIN_KNOWN →  Importance-Slots
+#define RELAY_IMP_MIN_KNOWN_PCT  50   // Prozent
+```
+
+Damit ist der Rollout **selbst-gatend**: solange zu wenige Nachbarn NC melden,
+verhaelt sich der Node exakt wie heute. Erst wenn genug Nachbarn neue Firmware
+haben, schaltet die Differenzierung von selbst zu — ohne Feature-Flag, ohne
+koordinierten Stichtag, und ohne dass ein einzelner frueher Node sich selbst
+faelschlich in die vorderen Slots setzt.
+
+Der Schwellwert gehoert in die Feldvalidierung: 50 % ist eine Schaetzung.
+
 ### 4. Slot-basierte Importance-Differenzierung
 
 #### 4.1 Grundprinzip: Base bleibt, Slots differenzieren
@@ -554,6 +635,46 @@ aller Priority-Baender:
 Alle Priority-Baender verwenden einheitlich 10 Slots. Die Differenzierung
 erfolgt ausschliesslich ueber die Base-Timeouts (3000/3000/4500/5500/5500ms).
 
+#### 4.7 Spreizung und Zeitanker (Rev. 2)
+
+Zwei Punkte, die den erwartbaren Effekt der Slot-Differenzierung begrenzen und
+in Rev. 1 fehlten.
+
+**a) Ist die Spreizung breit genug?**
+
+6 Slots Vorsprung sind 210 ms. Dem stehen gegenueber: ein CAD-Scan von ~28 ms
+(so ist `CSMA_SLOT_SIZE = 35` in `configuration_global.h:221` begruendet),
+TX-Switch, Timer-Granularitaet der Hauptschleife und Paketlaufzeiten von
+300–1000 ms. Die Argumentation aus 4.5 bleibt richtig — der Hub muss nur
+**beginnen**, nicht fertig werden — aber der Sicherheitsabstand ist duenn.
+
+Option fuer die Feldvalidierung: `RELAY_TOTAL_SLOTS` **nur fuer das Relay-Band**
+auf 16–20 erhoehen (Spreizung 560–700 ms), Base und alle anderen Baender
+unveraendert. Kosten: das Relay-Backoff-Fenster waechst von 4500..4850 ms auf
+bis zu 4500..5200 ms, im 4-Hop-Fall also bis zu +1,4 s Ende-zu-Ende-Latenz.
+
+Das ist eine echte Abwaegung, keine freie Verbesserung — deshalb als
+Tuning-Parameter im Feldtest zu messen, nicht vorab zu setzen.
+
+**b) Der Backoff-Timer hat keinen globalen Nullpunkt.**
+
+Der Backoff laeuft gegen `iReceiveTimeOutTime`, das bei **jedem** RX-Ende neu
+gesetzt wird (`lora_functions.cpp:1338`, ESP32-Pendants in `esp32_main.cpp`).
+Daraus folgt:
+
+- Alle Nodes, die dieselbe Nachricht M gehoert haben, starten ihren Timer am
+  selben Ereignis (Ende von M) — genau dort wirkt die Slot-Ordnung wie gedacht.
+- Nodes, die dazwischen **anderen** Verkehr hoeren, verschieben ihren Anker.
+  In einem Kanal mit 66 % CAD-Busy passiert das haeufig.
+- Bei Hidden-Node-Konstellationen (A und B hoeren M, aber nicht einander)
+  wuerfelt sich die Reihenfolge ohnehin neu.
+
+Die Slot-Differenzierung ist damit ein **statistischer** Vorteil ueber viele
+Nachrichten, keine Garantie pro Einzelnachricht. Das ist fuer den Zweck
+ausreichend — Suppression (Stufe 2) muss nur haeufiger die Blaetter treffen als
+die Hubs, nicht immer. Die Feldmetrik muss entsprechend ueber Stunden mitteln,
+nicht Einzelfaelle bewerten.
+
 ### 5. Betroffener Code
 
 #### 5.1 Neue Konstanten
@@ -563,8 +684,10 @@ erfolgt ausschliesslich ueber die Base-Timeouts (3000/3000/4500/5500/5500ms).
 ```cpp
 // NC-Importance Relay-Slot-Steuerung
 #define RELAY_IMP_CAP            8    // Importance-Obergrenze fuer Slot-Mapping
-#define RELAY_TOTAL_SLOTS       10    // Gesamtanzahl Relay-Slots (0..9)
+#define RELAY_TOTAL_SLOTS       10    // Gesamtanzahl Relay-Slots (0..9), siehe 4.7a
 #define RELAY_JITTER_WIDTH       3    // Breite des Slot-Fensters pro Node
+#define RELAY_IMP_MIN_KNOWN_PCT 50    // Qualitaetsgate (3.1): Mindestanteil der
+                                      // aktiven Nachbarn mit bekanntem NC_reported
 ```
 
 #### 5.2 Importance-Berechnung
@@ -588,7 +711,9 @@ float getNetImportance()
     {
         if(mheardCalls[i][0] != 0x00)
         {
-            if((mheardEpoch[i] + 60*60*12) > now)   // aktiv (letzte 12h)
+            if((mheardEpoch[i] + 60*60) > now)      // aktiv (letzte Stunde,
+                                                   // gleiches Fenster wie
+                                                   // getMheardCount())
             {
                 int nc_reported = mheardNCount[i];   // NC_reported des Nachbarn
                 if(nc_reported > 0)
@@ -600,6 +725,29 @@ float getNetImportance()
     }
     return importance;
 }
+
+/**
+ * Anteil der aktiven Nachbarn (letzte Stunde) mit bekanntem NC_reported,
+ * in Prozent. Basis fuer das Qualitaetsgate aus 3.1.
+ */
+int getNetImportanceKnownPct()
+{
+    int total = 0, known = 0;
+    unsigned long now = getUnixClock();
+
+    for(int i = 0; i < MAX_MHEARD; i++)
+    {
+        if(mheardCalls[i][0] != 0x00 && (mheardEpoch[i] + 60*60) > now)
+        {
+            total++;
+            if(mheardNCount[i] > 0)
+                known++;
+        }
+    }
+    if(total == 0)
+        return 0;          // keine Nachbarn -> kein Grund zu differenzieren
+    return (known * 100) / total;
+}
 ```
 
 #### 5.3 Anpassung CSMA-Backoff
@@ -607,11 +755,23 @@ float getNetImportance()
 **Datei:** `src/lora_functions.cpp` — Funktion `csma_compute_timeout_prio()`
 
 Nur der `MSG_PRIO_NORMAL`-Case (Relays) wird angepasst.
-Die Base bleibt `CSMA_PRIO_BASE_3` (4000ms), nur die Slot-Berechnung aendert sich:
+Die Base bleibt `CSMA_PRIO_BASE_3` (4500ms), nur die Slot-Berechnung aendert sich.
+Das Qualitaetsgate aus 3.1 steht vor der Importance-Rechnung: ist die Datenlage
+zu duenn, bleibt alles beim bisherigen Verhalten.
 
 ```cpp
 case MSG_PRIO_NORMAL:   // Relay
 {
+    // Qualitaetsgate (3.1): zu wenige Nachbarn mit bekanntem NC_reported
+    // -> alte Berechnung mit vollem 0..9-Jitter, keine Differenzierung
+    if(getNetImportanceKnownPct() < RELAY_IMP_MIN_KNOWN_PCT)
+    {
+        base = CSMA_PRIO_BASE_3;
+        if(attempt >= 2) base = base * 2 / 3;
+        else if(attempt >= 1) base = base * 5 / 6;
+        return base + (unsigned long)random(0, CSMA_PRIO_SLOTS_3 + 1) * CSMA_SLOT_SIZE;
+    }
+
     float imp = getNetImportance();
     float imp_capped = (imp > (float)RELAY_IMP_CAP) ? (float)RELAY_IMP_CAP : imp;
     float imp_ratio = imp_capped / (float)RELAY_IMP_CAP;   // 0.0 .. 1.0
@@ -660,6 +820,109 @@ Position, HEY — alles wie bisher. Die Retry-Reduktion und Rapid-fire-Logik
 
 RAM: Keine zusaetzlichen Variablen. Nutzt bestehende `mheardNCount[]` und `mheardEpoch[]`.
 
+### 8. Ausbaustufe: Importance v2 aus der HEY-Pfadtabelle (Rev. 2)
+
+**Status:** Ausbaustufe, **nicht** Teil von Stufe 1. Erst umsetzen, wenn Stufe 1
+im Feld vermessen ist.
+
+#### 8.1 Warum ueberhaupt eine zweite Quelle
+
+`NC_reported` ist eine **Selbstauskunft** des Nachbarn und nur verfuegbar, wenn
+der Nachbar Position oder HEY sendet. Die HEY-Pfadtabelle dagegen ist **lokal
+beobachtete Evidenz** und braucht kein Vertrauen: sie zeigt, ueber welche
+Nachbarn wir welche entfernten Knoten tatsaechlich erreichen.
+
+#### 8.2 Was in der Pfadtabelle steht (`updateHeyPath()`, `mheard_functions.cpp:382-553`)
+
+| Eigenschaft | Wert |
+|-------------|------|
+| Schluessel | **Originator** der HEY-Bake (`mh_sourcecallsign`), nicht der letzte Hop |
+| Inhalt | Relay-Kette **ohne** Originator: `"r1,r2,…,rLast"` — `rLast` ist der Direktnachbar, ueber den der Knoten erreicht wird |
+| Aufnahmekriterium | nur **relayte** HEYs (`if(ips <= 0) return;` — direkt gehoerte Baken haben keine Kette) |
+| Konfliktregel | der **kuerzeste** bekannte Pfad gewinnt (Init `0x7F`, laengere werden verworfen) |
+| Gateway-Markierung | Bit `0x80` in `mheardPathLen[]`, gesetzt wenn `destination_path == "HG"` |
+| Alterung | 12 h |
+| Persistenz | Flash (`mheard_functions.cpp:205-208`) |
+| Groesse | `MAX_MHPATH` = 100 (S3/nRF52), 50 (XML/SBUFFER), 40 (ESP32 klassisch), 10 (T-Beam) |
+
+Wichtige Konsequenz aus dem Aufnahmekriterium: Direktnachbarn stehen in
+`mheardCalls[]`, Mehr-Hop-Knoten in `mheardPathCalls[]`. Die beiden Tabellen
+ueberschneiden sich nicht — genau deshalb ist die Pfadtabelle die Zwei-Hop-Sicht,
+die der Importance-Formel heute fehlt.
+
+#### 8.3 v2a — Verifizierte Redundanz statt gemeldeter
+
+Fuer jeden Direktnachbarn A:
+
+```
+Kommt A in irgendeiner gespeicherten Kette als Zwischenhop vor,
+deren letzter Hop NICHT A ist?
+
+  ja   →  A ist auch ueber einen anderen meiner Nachbarn erreichbar
+          →  A haengt nicht an mir  →  kleiner Beitrag
+  nein →  A erreiche ich nur direkt  →  A haengt wahrscheinlich an mir
+          →  voller Beitrag
+```
+
+Das ist inhaltlich `Sigma(1/NC_reported)` — aber gemessen statt geglaubt, und es
+funktioniert auch fuer Nachbarn, die **nie** einen NC melden (alte Firmware,
+Position abgeschaltet). Genau die Luecke aus Kap. 3.
+
+#### 8.4 v2b — Bridge-Erkennung (Artikulationspunkt)
+
+Alle Originatoren der Pfadtabelle nach ihrem **letzten Hop** gruppieren:
+
+- Zwei oder mehr grosse, **disjunkte** Gruppen → wir sitzen zwischen Clustern,
+  die sich sonst nicht sehen → netztragend im eigentlichen Sinn.
+- Stark **ueberlappende** Gruppen → wir sind redundant, unabhaengig davon, wie
+  viele Pfade wir gelernt haben.
+
+Das ist die Metrik, die "netztragendes Element" tatsaechlich abbildet —
+Betweenness statt Grad.
+
+#### 8.5 v2c — Gateway-Gewichtung
+
+Ueber Bit `0x80` ist bekannt, welche Originatoren Gateways sind. Ein Nachbar,
+fuer den wir der einzige bekannte Weg zu einem Gateway sind, wiegt schwerer als
+einer mit drei Gateway-Pfaden. Im Flutnetz ist die Gateway-Richtung die, in der
+Verlust am meisten kostet.
+
+#### 8.6 Kaskade mit Fallback
+
+Pro Nachbar, in dieser Reihenfolge:
+
+1. In fremder Kette gefunden (v2a) → verifiziert redundant, Beitrag klein.
+2. Sonst `NC_reported > 0` → `1/NC_reported` wie in Kap. 1.
+3. Sonst konservativ `1.0` wie in Kap. 3, plus Qualitaetsgate aus 3.1.
+
+Optional oben drauf: Bridge-Bonus (v2b) und Gateway-Gewicht (v2c).
+Die Slot-Mechanik aus Kap. 4 bleibt unveraendert — v2 ersetzt nur die Quelle
+des Importance-Werts, nicht seine Verwendung.
+
+#### 8.7 Grenzen (vor der Umsetzung zu klaeren)
+
+- **Wir drosseln die Datenquelle selbst.** Trickle unterdrueckt laut
+  `docs/hey-supp.md` im Mittel 53 % der eigenen HEYs (bis 75 % bei OE3XWJ).
+  Ausgerechnet gut vernetzte Knoten senden am seltensten Baken — ihre Pfade
+  lernt niemand. Die Pfadtabelle ist dort duenn, wo das Netz dicht ist.
+- **SHORTPATH zerstoert v2a.** Default ist `bSHORTPATH = false`
+  (`loop_functions.cpp:166`), aber pro Knoten per `--shortpath` schaltbar
+  (`command_functions.cpp:581`). Dann bleibt nur `Origin,letztesRelay` — die
+  Bridge-Gruppierung (v2b) funktioniert weiter, die Zwischenhop-Verifikation
+  (v2a) nicht. v2a braucht deshalb zwingend den Fallback aus 8.6.
+- **Der kuerzeste Pfad klebt 12 Stunden.** Ein einmal gelernter kurzer Pfad wird
+  nie durch einen laengeren ersetzt, nur durch Ablauf. Nach Ausfall eines Relais
+  rechnen wir bis zu 12 h mit einem Weg, den es nicht mehr gibt. Plus
+  Flash-Persistenz ueber Reboots und Standortwechsel hinweg.
+- **Rechenkosten.** Ein String-Scan ueber 100 x 50 Byte pro Relay-Entscheidung
+  ist inakzeptabel. Der Wert wird **einmal pro Pfadtabellen-Update** gerechnet
+  und als Integer gecached — die Topologie aendert sich in Minuten, nicht in
+  Millisekunden.
+- **Saettigung auch hier.** `MAX_MHPATH` ist auf allen Boards kleiner als die
+  85–124 beobachteten H00-Knoten (Kommentar in `configuration_global.h:181`).
+  Die Gruppierung in v2b arbeitet also auf einer Stichprobe, nicht auf der
+  vollstaendigen Nachbarschaft.
+
 ---
 
 ## Risiko-Analyse
@@ -707,6 +970,52 @@ Nachbar-NC-Werte koennen bis zu 15 Minuten alt sein (Trickle-Imax).
 In der Praxis aendert sich die Topologie selten so schnell, dass dies ein
 Problem darstellt. Bei Topologie-Aenderungen resettet Trickle auf 30s, sodass
 neue NC-Werte schnell verbreitet werden.
+
+### Risiko: Gemischte Flotte kollabiert die Differenzierung
+
+Beim Rollout melden die meisten Nachbarn noch keinen NC_reported. Alle Beitraege
+sind dann `1.0`, die Importance entspricht NC_self, und praktisch jeder Node
+landet in den vorderen Slots — bei gleichzeitig auf 3 Slots verengtem Jitter.
+Das ist der einzige Zustand, in dem Stufe 1 schlechter waere als der Status quo.
+
+**Gegenmassnahme:** Qualitaetsgate aus 3.1 — unterhalb einer Mindestquote
+bekannter NC_reported-Werte wird die alte Berechnung mit vollem 0..9-Jitter
+verwendet. Damit ist das Risiko konstruktiv ausgeschlossen, nicht nur
+unwahrscheinlich.
+
+### Risiko: NC-Saettigung durch MAX_MHEARD
+
+Auf Boards mit kleinem `MAX_MHEARD` (T-Beam: 10, ESP32 klassisch: 30) ist NC_self
+eine Untergrenze. Betroffene Knoten unterschaetzen sowohl den eigenen gemeldeten
+NC als auch die Anzahl der Summanden in der Importance. Die BergLog-Daten zeigen
+denselben Effekt historisch bei `MAX_MHEARD = 20`.
+
+**Gegenmassnahme:** Saettigung (`getMheardCount() == MAX_MHEARD`) im Log
+kenntlich machen und bei der Feldauswertung als "nicht belastbar" behandeln.
+Eine automatische Korrektur ist nicht moeglich — der Wert oberhalb des Puffers
+ist schlicht nicht bekannt.
+
+### Risiko: Stale NC-Werte aus dem Flash nach Standortwechsel
+
+`mheardNCount[]` und die Pfadtabelle werden persistiert
+(`mheard_functions.cpp:178`, `:205-208`). Nach einem Reboot an einem anderen QTH
+rechnet der Node mit der Nachbarschaft des alten Standorts weiter, bis die
+Eintraege altern (1 h bzw. 12 h).
+
+**Gegenmassnahme:** offen. Denkbar waere ein Verwerfen der NC-Werte bei
+signifikanter Positionsaenderung; das ist eine eigene Entscheidung und nicht
+Teil dieses ADRs.
+
+### Risiko: Link-Asymmetrie
+
+mheard misst, wen wir hoeren — nicht, wer uns hoert. Ein Knoten mit sehr guter
+Empfangslage, aber schwacher Abstrahlung, ueberschaetzt seine Wichtigkeit und
+belegt zu Unrecht die vorderen Slots. Der Schaden ist begrenzt (er sendet zu
+frueh, nicht zu oft), verschiebt aber die Ordnung.
+
+**Gegenmassnahme:** Bidirektionalitaetsnachweis — einen Nachbarn nur voll
+zaehlen, wenn das eigene Rufzeichen in dessen HEY-Pfad oder Signal-Report
+auftaucht. Gehoert in die Ausbaustufe (Kap. 8), nicht in Stufe 1.
 
 ### Risiko: Alle Nodes unbekannt (Kaltstart)
 
@@ -795,6 +1104,26 @@ Die saubere Trennung: Base bleibt fuer alle gleich, nur die Slot-Position
 wird durch Importance bestimmt. So bleibt die Retry-Reduktion wirksam und
 die Importance-Differenzierung ist bei jedem Attempt gleich stark.
 
+### 7. Anzahl gelernter HEY-Pfade als Wichtigkeitsmass
+
+Naheliegend, weil die Groesse der Pfadtabelle (`mheardPathCalls[]`) ohne
+Zusatzaufwand verfuegbar ist: "wer viele Pfade gelernt hat, traegt das Netz".
+
+**Verworfen weil:** das exakt derselbe Denkfehler ist wie NC_self, nur eine
+Ebene hoeher. Viele gelernte Pfade messen **Empfangsguete** — Antenne, Lage,
+Verkehrsaufkommen in Hoerweite. Der maximal redundante Stadtknoten lernt die
+meisten Pfade und soll gerade **spaet** senden; der Bergknoten mit drei
+abhaengigen Talstationen lernt wenige und ist das netztragende Element.
+
+Dazu kommt Saettigung: `MAX_MHPATH` ist auf jedem Board kleiner als die 85–124
+beobachteten H00-Knoten (`configuration_global.h:181`). Ein Wert, der bei den
+interessantesten Knoten am Anschlag steht, kann sie nicht unterscheiden.
+
+**Was stattdessen zaehlt:** nicht die Anzahl der Eintraege, sondern ihre
+**Struktur** — ueber welche Nachbarn die Pfade laufen und ob sich diese Mengen
+ueberlappen. Das ist Kap. 8 (Importance v2), und es ist ein Betweenness-Mass,
+kein Grad-Mass.
+
 ---
 
 ## Voraussetzungen und Deployment-Reihenfolge
@@ -850,6 +1179,16 @@ einer Gegenstelle haben oft keine Nachrichten erhalten. Bestaetigt die Analyse o
 Suppression ohne Importance-Backoff storniert die falschen Nodes (Hubs statt Blaetter),
 wodurch abhaengige Knoten ausgehungert werden.
 
+**Codestand 2026-08-22 (geprueft):** Im aktuellen Baum existiert **kein**
+Suppressionspfad mehr. `is_new_packet()` (`lora_functions.cpp:1427`) filtert
+ausschliesslich den RX-Pfad; ein bereits in den TX-Ring eingereihtes Relay wird
+bei Duplikat-Empfang nirgends storniert (`txring_functions.cpp` kennt keinen
+Cancel-Pfad). Die in `docs/hey-supp.md` beschriebene Trickle-Suppression betrifft
+nur **eigene HEY-Beacons**, keine Relays. Stufe 2 ist damit keine Reaktivierung
+eines Schalters, sondern eine Neuimplementierung — inklusive der Frage, wie ein
+Slot im Ring sicher storniert wird, ohne mit dem laufenden CAD/TX-Zustand oder
+einem `RING_STATUS_EXT_PENDING`-Slot zu kollidieren.
+
 **Erst mit aktivem Importance-Backoff ist Suppression sicher.** Der Hub sendet zuerst
 (Stufe 1). Die Blaetter und redundanten Nodes senden spaeter und hoeren dabei den
 Hub als Duplikat → Suppression storniert ihre Relays → korrekte Richtung.
@@ -858,14 +1197,22 @@ Ohne Stufe 1 wuerde Suppression den Hub stornieren (falsche Richtung).
 
 ### Stufe 3: Dedup-Ring vergroessern
 
-**Aktuell:** `MAX_DEDUP_RING = 60` Slots, rotiert bei 4,2 msg/min alle ~6,5 Minuten.
+**Aktuell (Stand 2026-08-22, teilweise erledigt):** `MAX_DEDUP_RING` wurde
+boardabhaengig bereits angehoben — 100 (ESP32-S3/nRF52840), 70 (ESP32 klassisch),
+60 (XML/SBUFFER), 10 (T-Beam), siehe `configuration_global.h:175ff`. Bei
+4,2 msg/min rotiert der groesste Ring damit nach ~24 Minuten, der ESP32-Ring nach
+~17 Minuten.
 
 **Problem:** Multi-Hop-Relays koennen bis zu 13 Minuten brauchen (Felddaten). Nach
 Dedup-Rotation wird die Nachricht als "neu" akzeptiert → Zombie-Relay.
 
-**Empfehlung:** `MAX_DEDUP_RING` auf 200-256 erhoehen (~50 Minuten Speicher). Kostet
-~1 KB RAM, eliminiert Zombie-Nachrichten. Ohne diese Aenderung werden Importance-Backoff
-und Suppression durch Zombie-Relays teilweise unterlaufen.
+**Empfehlung:** weiter auf 200-256 erhoehen (~50 Minuten Speicher), soweit der
+RAM des jeweiligen Boards es zulaesst. Kostet ~1 KB RAM, eliminiert
+Zombie-Nachrichten. Ohne diese Aenderung werden Importance-Backoff und
+Suppression durch Zombie-Relays teilweise unterlaufen. Die beobachteten
+Multi-Hop-Laufzeiten von bis zu 13 Minuten liegen bereits jetzt in der
+Groessenordnung der Rotationszeit — auf T-Beam (10 Slots) ist der Ring
+funktional wirkungslos.
 
 ### Zusammenfassung der Abhaengigkeiten
 
@@ -889,17 +1236,29 @@ Reihenfolge storniert die falschen Nodes und hungert abhaengige Blaetter/Bridges
 - [ ] **Stufe 2 — Relay-Suppression (commit 60ea7d8) erst NACH Stufe 1 aktivieren.** War implementiert, wurde wieder entfernt: Leaf Nodes mit nur einer Gegenstelle erhielten keine Nachrichten. Bestaetigt die Abhaengigkeit — Suppression darf erst mit aktivem Importance-Backoff reaktiviert werden.
 - [ ] **Stufe 3 — Dedup-Ring vergroessern:** `MAX_DEDUP_RING` von 60 auf 200-256 erhoehen. Aktuell rotiert der Ring alle ~6,5 Minuten — Zombie-Nachrichten (bis 13 Min Multi-Hop) unterlaufen sowohl Suppression als auch Importance-Backoff.
 
+### Datenqualitaet (Rev. 2, vor Stufe 1 zu erledigen)
+- [x] **Zeitfenster vereinheitlicht:** `getNetImportance()` nutzt im Entwurf (5.2) jetzt dasselbe 1-h-Fenster wie `getMheardCount()` (`mheard_functions.cpp:556`). Bei der Implementierung sicherstellen, dass beide Stellen zusammen geaendert werden.
+- [ ] **Qualitaetsgate implementieren** (3.1): unterhalb `RELAY_IMP_MIN_KNOWN_PCT` bekannter NC_reported-Werte auf die alte Berechnung mit vollem 0..9-Jitter zurueckfallen.
+- [ ] **Saettigung loggen:** `getMheardCount() == MAX_MHEARD` als "NC nicht belastbar" markieren, damit die Feldauswertung betroffene Knoten aussortieren kann.
+
 ### Parameter-Tuning
 - [ ] IMP_CAP-Wert festlegen: 8.0 ist Schaetzung, sollte an realen Topologien validiert werden. BergLog-Daten zeigen NC=20 als typischen Hub-Wert — bei Σ(1/NC_reported) mit gemischten Nachbarn koennte IMP_CAP hoeher angesetzt werden.
 - [ ] RELAY_JITTER_WIDTH: 3 Slots Fensterbreite — gut fuer Entzerrung? Oder 2 fuer schaerfere Trennung?
 - [ ] Float vs. Integer: ESP32 hat Hardware-FPU, aber Coding-Style im Projekt ist ueberwiegend Integer
+- [ ] `RELAY_IMP_MIN_KNOWN_PCT`: 50 % ist Schaetzung (3.1)
+- [ ] `RELAY_TOTAL_SLOTS` fuer das Relay-Band: bei 10 belassen oder auf 16-20 erhoehen? Breitere Spreizung (560-700 ms statt 210 ms) gegen bis zu +1,4 s Ende-zu-Ende-Latenz bei 4 Hops (4.7a)
 
 ### Funktionale Erweiterungen
 - [ ] Soll Importance auch fuer Position-Relays gelten, oder nur Text/Broadcast-Relays?
+- [ ] **Importance v2** (Kap. 8): verifizierte Redundanz aus der HEY-Pfadtabelle, Bridge-Erkennung, Gateway-Gewichtung — erst nach Vermessung von Stufe 1.
+- [ ] **Bidirektionalitaetsnachweis** gegen Link-Asymmetrie: Nachbar nur voll zaehlen, wenn das eigene Rufzeichen in dessen HEY-Pfad/Signal-Report auftaucht.
+- [ ] **Stale NC nach Standortwechsel:** sollen persistierte NC-/Pfad-Daten bei signifikanter Positionsaenderung verworfen werden?
 - [ ] Logging: Soll Importance periodisch im Web-UI oder auf der seriellen Konsole angezeigt werden?
 - [x] **Critical-Slots erhoehen:** Erledigt — alle Priority-Baender verwenden jetzt einheitlich 10 Slots.
 - [x] **Background-Slots reduzieren:** Erledigt — alle Priority-Baender verwenden jetzt einheitlich 10 Slots.
 
 ### Feld-Validierung
+- [ ] **Zeitanker-Effekt messen** (4.7b): Wie oft starten co-hoerende Nodes ihren Backoff wirklich am selben Ereignis? Bestimmt, wie stark die Ordnungswirkung in der Praxis ueberhaupt sein kann.
+- [ ] **Auswertung ueber Stunden mitteln**, nicht Einzelnachrichten bewerten — die Slot-Ordnung ist ein statistischer Vorteil, keine Garantie pro Nachricht (4.7b).
 - [ ] **BergLog-Wiederholung mit aktiver Suppression + Importance:** Die BergLog-Daten (2026-03-13/14) wurden ohne Suppression und ohne Importance aufgezeichnet. Erst ein erneuter Test mit beiden Mechanismen zeigt den kombinierten Effekt.
 - [ ] **Metriken fuer Vergleich definieren:** DUP/NEW-Ratio, CAD-Busy-Rate, Relay-TX-Anzahl pro Knoten, Zombie-Nachricht-Zaehler, ACK-Laufzeit. Zielwerte: DUP/NEW < 0.5, CAD-Busy < 30%, keine Zombies.
