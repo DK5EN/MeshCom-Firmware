@@ -329,7 +329,66 @@ jetzt mit genau diesem Portnamen ab, statt sich selbst ein Board zu suchen.
 
 ---
 
-## 7. Offene Punkte — Laufplan
+## 7. OTA-Update und die Settings-Persistenz
+
+Bis hierher war jeder Flash dieser Sitzung ueber USB gelaufen. Das OTA-Verfahren
+selbst war ungeprueft -- fuer ein Release, das Leuten "einfach die firmware.bin
+per OTA einspielen" empfiehlt, eine Luecke.
+
+### 7.1 Wer kann OTA, wer nicht
+
+| Board                    | OTA                   | Beleg                                                            |
+| ------------------------ | --------------------- | ---------------------------------------------------------------- |
+| Heltec V3 (`DK5EN-93`)   | **ja**, `webflash.py` | zweimal durchgefuehrt, Node kommt jeweils sauber zurueck         |
+| T-Beam v1.2 (`DK5EN-92`) | **ja**, `webflash.py` | SX1276 und GPS nach dem Update unauffaellig                      |
+| RAK4631 (`DK5EN-90`)     | **nein, gar nicht**   | `--ota-update` liegt in `#ifdef ESP32`, keine safeboot-Partition |
+
+Auf dem RAK auf Hardware nachgeprueft: `--ota-update` antwortet
+`...wrong command --ota-update`, und der Endpunkt, den das Werkzeug anspricht,
+liefert `HTTP 422`. Die Schaltflaeche in der Web-Oberflaeche ist korrekt
+`#ifdef ESP32`-geschuetzt (`web_functions.cpp:1088-1094`, dort allerdings
+doppelt gesetzt), Benutzer sehen sie also gar nicht erst. nRF52 wird ueber UF2
+oder serielles DFU aktualisiert -- das ist Absicht, keine Luecke im Test.
+
+Nebenbefund beim Einrichten: `--wifiap off` schien nicht zu halten. Es ist
+kein Fehler -- `esp32_main.cpp:870` erzwingt den AP-Modus, solange das
+Rufzeichen noch der Vorgabewert ist, damit ein unkonfigurierter Node immer
+erreichbar bleibt. Erst ein echtes Rufzeichen laesst ihn in den Station-Modus
+wechseln.
+
+### 7.2 Die Ruecksetz-Regression
+
+Beim OTA-Test bestaetigt: `FLASH_VERSION` ist ein Datum und wurde direkt gegen
+`node_fversion` verglichen. Damit hat **jedes** Release mit neuem Datum die
+Konfiguration jedes aktualisierenden Knotens geloescht, auch ohne jede
+Aenderung an `struct s_meshcom_settings`.
+
+Belegt an `cf7a6676`: der Commit zog `FLASH_VERSION` von 20260724 auf 20260821
+und fasste weder `esp32_flash.h` noch `WisBlock-API.h` an.
+
+Getrennt in Build-Kennung (`FLASH_VERSION`) und Layout-Generation
+(`FLASH_STRUCT_VERSION`, steht auf 20260724 -- die letzte echte
+Layout-Aenderung `6e7c012a`). Nur die Generation entscheidet ueber das
+Loeschen; `flashLayoutCompatible()` schuetzt Knoten, die nach alter Semantik
+20260821 gespeichert haben.
+
+Auf Hardware, Einstellungen jeweils erhalten:
+
+```
+Heltec V3, OTA 1   [INIT]...FLASH layout 20260821 ok, build 20260822
+Heltec V3, OTA 2   [INIT]...FLASH layout 20260724 ok, build 20260822
+T-Beam,    OTA     [INIT]...FLASH layout 20260821 ok, build 20260822
+RAK4631,   DFU     Rufzeichen und Ethernet-Konfiguration erhalten
+```
+
+> **Nicht im Release `v4.35p.08.22-stability`.** Dieser Fix ist nach der
+> Veroeffentlichung entstanden und bewusst zurueckgestellt; er geht mit dem
+> naechsten Release raus. Das veroeffentlichte Binary vergleicht weiterhin
+> `FLASH_VERSION`.
+
+---
+
+## 8. Offene Punkte — Laufplan
 
 Bewusst zurückgestellt, nicht stillschweigend übersprungen.
 
@@ -353,7 +412,7 @@ Bewusst zurückgestellt, nicht stillschweigend übersprungen.
 
 ---
 
-## 8. Was nicht geprüft wurde
+## 9. Was nicht geprüft wurde
 
 - **Keine native Testabdeckung** für den Scan. Abschnitt 8 des Bug-Dokuments
   begründet, warum das ein eigenes Projekt wäre; die Zeiteigenschaft ist hier
