@@ -1124,6 +1124,104 @@ Nebenfund ebenfalls gefixt (`a0bcd9da`): `clearSlotFirst` putzte nur 256
 von 260 Slot-Bytes. Beleg fuer den Zweck der QA-Welle: die erste native
 Suite ueber dem Ring fand am ersten Tag einen echten High-Defekt.
 
+### N-25 — GPS-Baudscan loest den Task-Watchdog aus und schickt den Knoten in den Boot-Loop — **FIXED (`dae2d863`, `f20b922d`, `7bd313bd`, auf echter Hardware reproduziert und verifiziert)** — Critical
+
+Vollstaendige Analyse: `docs/bug-N25-gps-baud-scan-watchdog.md`. Kurzfassung:
+`4c21cb49` (Audit-Befund C3) abonnierte den Task-Watchdog in der ersten Zeile
+von `esp32setup()`. `WZ_GPS_Init()` laeuft aber aus `esp32loop()`
+(`esp32_main.cpp:2706`) und blockiert dort ohne eine einzige Fuetterung rund
+16 s (acht Baudraten x 1500 ms, dazu `GPSprobe()` mit unbegrenztem
+`readUBX()`-Schwanz). Bei `CONFIG_ESP_TASK_WDT_TIMEOUT_S=5` bricht der Knoten
+zwei bis drei Baudstufen nach Scan-Beginn ab. Da `--gps on` vor dem Absturz
+persistiert wird, wiederholt sich das bei jedem Boot: Dauer-Boot-Loop, kein
+Kommandofenster, Rettung nur per Reflash.
+
+Am 2026-08-22 auf einem Heltec V3 mit u-blox-Modul (RX=47/TX=48) exakt
+reproduziert: Abbruch 4,9 s nach Scan-Beginn nach 1200/2400/4800 Baud. Der
+gegen die passende ELF symbolisierte Backtrace bestaetigt Abschnitt 2 des
+Dokuments — `panic_abort` <- `esp_system_abort` <- `abort` <- `task_wdt_isr`,
+der zweite Stack ist der unterbrochene `IDLE0`. Damit ist der Befund auf einem
+zweiten Board unabhaengig belegt, nicht mehr nur auf der gemeldeten Supreme.
+
+Fix in drei Schritten: S1 verschiebt die Subskription ans Ende von
+`esp32setup()`; S4 fuettert den GPS-Init-Pfad ueber den einzigen Helfer
+`src/watchdog_feed.h` (ausserhalb ESP32 ein No-op); S5 bricht den Scan bei der
+ersten gueltigen NMEA-Pruefsumme ab und ersetzt den Argmax ohne Mindestanzahl
+(B-15). Erkennungsdauer auf dem Heltec V3 von 12 000 ms auf 2120 ms.
+
+Offen und ausdruecklich zurueckgestellt, nicht stillschweigend uebersprungen:
+Welle 3 (A-1 bis A-9, tote ISR-Variante), Welle 4 (S2, die vier unbegrenzten
+Schleifen B-1/B-2/B-6/B-10 und der AP-Zweig B-13), Welle 5 (Coredump-
+Partition), Welle 6 (B-1 bis B-15 als Katalogeintraege). Ebenso offen die
+Hardware-Pruefungen 8.4 (Board mit `--gps on` ohne Modul) und 8.5
+(Batteriestart ohne USB) — siehe `docs/gps-sensor-bench-20260822.md`.
+
+### N-26 — RAK-GPS-Pfad merkt sich das Fehlschlagen der Erkennung nicht — **VERIFIED (auf echter Hardware, Kontrollfall gegen Upstream)** — Medium
+
+`nrf52_main.cpp:729-784` probiert fuer `ENABLE_RAK_GPS` fest 9600, dann 38400
+Baud. Schlaegt `myGPS.begin(Serial1)` in beiden Faellen fehl, wird
+`"GPS: speed not found"` gedruckt — und danach **bedingungslos** `SetupUBLOX()`
+gerufen (`:781`). Es gibt keine Variable, die den Fehlschlag festhaelt, und
+keinen fruehen Ausstieg. Der Knoten sendet `UBX_SET_GNSS` und `UBX_MON_VER` ins
+Leere und druckt ein leeres `[GPS_VER]`.
+
+Das ist die nRF52-Entsprechung zu B-15: dort wird eine Phantom-Baudrate
+erkannt, hier wird das Nicht-Erkennen gar nicht erst vermerkt. `gpsDetected`
+wird auf diesem Pfad nie gesetzt.
+
+Kosten: auf einem RAK4631 ohne GPS-Modul rund 9 s Boot-Zeit
+(2 s Power-Cycle `WB_IO2`, 2 x ~3,3 s Probe, ~2 s `SetupUBLOX()` inklusive
+`WaitPause()`), gemessen am 2026-08-22 auf DK5EN-90. Kein Absturz: auf nRF52
+ist ueberhaupt kein Task-Watchdog scharf, N-25 trifft diesen Pfad also nicht.
+
+Nebenbefund derselben Stelle: zweimal `while (!Serial1);` ohne Zeitgrenze
+(`:741`, `:760`) — dieselbe Form wie N-09. Auf dem Adafruit-nRF52-Core liefert
+`Uart::operator bool()` konstant `true`, die Schleifen sind daher heute inert.
+
+Der Pfad ist **nicht** unser Regress: Upstream-Release `v4.35p.08.20`
+(`wiscore_rak4631.zip`) auf demselben Board zeigt Zeile fuer Zeile dasselbe
+Verhalten. Ebenso wenig ist es ein Firmware-Defekt, dass auf diesem Board kein
+GPS gefunden wurde — `--showi2c` meldet unter beiden Firmwares
+`no devices found`, das Modul ist schlicht nicht erreichbar.
+
+Dritte Kopie derselben Logik: `sendUBXCommand()`, `WaitPause()`, `startTimeout`
+und `ver` existieren in `nrf52_main.cpp:2546-2580` ein zweites Mal neben den
+Originalen in `gps_functions.cpp`. Genau der Driftmechanismus aus A-1.
+
+### N-27 — BME680-Treiber haelt ein blosses I2C-ACK fuer eine Chip-Erkennung — **VERIFIED (auf echter Hardware)** — Medium
+
+`bme680.cpp:62-89` prueft mit `Wire.beginTransmission(0x76)` /
+`endTransmission()`, ob unter der Adresse ueberhaupt jemand antwortet, und
+setzt daraufhin `bme680_found = true`. Der anschliessende `bme.begin(...)`
+(`:95`, `:98`) wird **ohne Auswertung des Rueckgabewerts** gerufen. `begin()`
+liest aber die Chip-ID und ist genau die Stelle, die einen BME680 von einem
+BME280/BMP280 unterscheidet — 0x76 und 0x77 teilen sich alle drei Chips, wie
+der Kommentar in `:48` selbst festhaelt.
+
+Folge auf einem Board mit BME280 an 0x76 und `--680 on`: der Node meldet
+`[INIT]...BME680 sensor found at 0x76`, `--wx` zeigt `BME680: on (found)`, und
+jeder Lesezyklus druckt `Failed to complete reading :(` — dauerhaft, ohne dass
+irgendetwas den Zustand zurueckstellt. Am 2026-08-22 auf einem Heltec V3 mit
+BME280 an 0x76 reproduziert.
+
+Fix-Richtung: `bme680_found` aus dem Rueckgabewert von `bme.begin()` speisen,
+nicht aus dem Adress-ACK, und bei `false` den Sensor abschalten statt in
+`getBME680()` in eine Endlos-Fehlermeldung zu laufen.
+
+### N-28 — `--help` verspricht `--bmx off` fuer BME680, der Handler kann das nicht — **VERIFIED** — Low, UX
+
+`command_functions.cpp:752` druckt `--bmx BME/BMP/680 off`. Der Handler
+`:1894` behandelt `bmx off`, `bme off` und `bmp off` gemeinsam und loescht
+`bBMPON`, `bBMEON`, `bBMP3ON` — **nicht** `bBME680ON`. Zum Abschalten des
+BME680 gibt es einen eigenen Zweig `680 off` (`:1930`).
+
+Praktische Folge, am 2026-08-22 auf dem Heltec V3 beobachtet: nach `--bmx off`
+gefolgt von `--bme on` antwortet der Node
+`BME680 and BMx280 can't be used together!` und aktiviert den BME280 nicht.
+Der Benutzer hat exakt das getan, was die Hilfe sagt, und der Node bleibt ohne
+Sensor. Entweder die Hilfe korrigieren oder `bmx off` zusaetzlich `680 off`
+ausfuehren lassen.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
