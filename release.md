@@ -8,6 +8,12 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ## Stability-Release v4.35p.08.22-stability (2026-08-22)
 
+> **Nach der Veroeffentlichung entstanden, NICHT in diesem Release:** die
+> Trennung von `FLASH_VERSION` (Build-Kennung) und `FLASH_STRUCT_VERSION`
+> (Layout-Generation). Das veroeffentlichte Binary vergleicht weiterhin das
+> Build-Datum und loescht daher beim naechsten Datumssprung die Einstellungen.
+> Der Fix liegt auf dem Branch und geht mit dem naechsten Release raus.
+
 Korrektur-Release auf `v4.35p.08.21-stability`. **Wer 08.21 installiert hat,
 sollte aktualisieren**: dieser Stand hatte einen Defekt, der jeden Node mit
 aktiviertem GPS in einen dauerhaften Boot-Loop schickte. Das Release 08.21
