@@ -13,9 +13,11 @@ I2C-Sensorik prüfen.
 ## 1. Ergebnis in einem Satz
 
 N-25 ist auf einem zweiten Board unabhängig reproduziert und durch die Wellen 0,
-1 und 2 behoben; die Erkennungsdauer fällt von 12 000 ms auf 2120 ms. Auf dem
-RAK4631 ist kein GPS-Modul erreichbar — das ist kein Regress unserer Firmware,
-der Upstream-Release verhält sich identisch.
+1 und 2 behoben; die Erkennungsdauer fällt von 12 000 ms auf 123–362 ms. Der
+T-Beam v1.2 ist als dritte Plattform in Betrieb genommen und durchläuft genau
+die Sequenz, an der die gemeldete Supreme starb — WiFi-Verbindung, dann
+GPS-Init — ohne Abbruch. Auf dem RAK4631 ist kein GPS-Modul erreichbar; das ist
+kein Regress unserer Firmware, der Upstream-Release verhält sich identisch.
 
 ---
 
@@ -81,13 +83,13 @@ unverändert: 12,0 s Scan, 15,3 s bis `UBLOX erkannt`. Modul ist ein u-blox auf
  18.505  [GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 2140 ms)
 ```
 
-| Messung                    | vorher    | nachher     |
-| -------------------------- | --------- | ----------- |
-| Baudratenerkennung, Boot 1 | 12 000 ms | **2120 ms** |
-| Baudratenerkennung, Boot 2 | 12 000 ms | **2140 ms** |
-| `--gps reset` im Betrieb   | Absturz   | **2309 ms** |
-| `--gps off` + `--gps on`   | Absturz   | **2249 ms** |
-| `WZ_GPS_Init()` gesamt     | Absturz   | ~4,9 s      |
+| Messung                    | vorher    | Welle 2     | + Umsortierung (`f190aad3`) |
+| -------------------------- | --------- | ----------- | --------------------------- |
+| Baudratenerkennung, Boot 1 | 12 000 ms | **2120 ms** | **321 ms**                  |
+| Baudratenerkennung, Boot 2 | 12 000 ms | **2140 ms** | **362 ms**                  |
+| `--gps reset` im Betrieb   | Absturz   | **2309 ms** | —                           |
+| `--gps off` + `--gps on`   | Absturz   | **2249 ms** | —                           |
+| `WZ_GPS_Init()` gesamt     | Absturz   | ~4,9 s      | ~2,8 s                      |
 
 Die 14 bzw. 23 Zeichen im 9600-Fenster sind reines Rauschen des auf 38400
 sendenden Moduls — genau der Fall, den der alte Argmax nicht von einem Modul
@@ -168,30 +170,128 @@ nRF52 ist überhaupt kein Task-Watchdog scharf.
 
 ---
 
-## 4. Offene Punkte — Laufplan
+## 4. T-Beam v1.2 (`DK5EN-92`) — neue Plattform
 
-Bewusst zurückgestellt, nicht stillschweigend übersprungen.
+Vorher nie geprüft. Board: ESP32-D0WDQ6-V3, 4 MB Flash, 4 MB PSRAM, AXP2101-PMU,
+SH1106-OLED, u-blox-GPS an RX=34/TX=12. Flash vollständig gelöscht
+(`esptool erase_flash`), dann frisch bespielt und als `DK5EN-92` konfiguriert
+(`-90` und `-98` waren auf der Luft belegt).
 
-| #   | Punkt                                                                                                                                                  | Woran es hängt                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| 1   | **§8.4 — Board mit `--gps on` und ohne Modul.** Muss den Scan zu Ende führen und darf **keine** Phantom-Baudrate melden. Direkter Test des B-15-Fixes. | Board ohne GPS am Platz; auf dem nächsten Board einplanen |
-| 2   | **§8.4 auf dem RAK** — deckt B-15 nicht ab, der RAK hat seinen eigenen Pfad (N-26)                                                                     | GPS-Modul am RAK prüfen                                   |
-| 3   | **§8.5 — Batteriestart ohne USB** auf einem Board mit `ARDUINO_USB_CDC_ON_BOOT=1`. Der eigentliche B-7-Fall, den Welle 0 behebt.                       | Akku vorhanden, Test verschoben                           |
-| 4   | **§8.3, Tastendruck** auf einem laufenden Node — der dritte Trigger. `--gps reset` und `--gps on` sind geprüft.                                        | Handgriff am Gerät                                        |
-| 5   | **T-Beam mit GPS und WiFi** — bisher ungetestete Plattform                                                                                             | steht als nächstes an                                     |
-| 6   | **Welle 3** — tote ISR-Variante und A-1…A-9 löschen, inklusive unseres `pulseIndex + 1`-Regresses                                                      | zurückgestellt                                            |
-| 7   | **Welle 4** — S2, die vier unbegrenzten Schleifen (B-1, B-2, B-6, B-10) und der AP-Zweig B-13                                                          | zurückgestellt                                            |
-| 8   | **Welle 5** — Coredump-Partition (A-7). Ohne sie gibt es weiterhin `error=257` statt eines Dumps.                                                      | zurückgestellt, braucht OTA-Test                          |
-| 9   | **Welle 6** — B-1…B-15 als Katalogeinträge                                                                                                             | zurückgestellt                                            |
-| 10  | **N-26/N-27/N-28 beheben**                                                                                                                             | aufgenommen, nicht behoben                                |
+### 4.1 Welche Variante
+
+Drei Envs bauen für dieses Board und unterscheiden sich nur im Funkchip. Statt
+zu raten: `ttgo_tbeam` (SX127X) geflasht und den Init gelesen —
+`[LoRa]...SX1276 Chip Initializing ... success`. Damit ist `ttgo_tbeam` die
+richtige Variante, `ttgo_tbeam_SX1262` und `ttgo_tbeam_SX1268` sind ausgeschlossen.
+
+### 4.2 GPS
+
+| Fall                                           | Dauer bis `found with ...`  |
+| ---------------------------------------------- | --------------------------- |
+| Erstkontakt, Modul ab Werk 9600, 9600 zuerst   | 535 ms                      |
+| Reboot danach (Modul jetzt 38400), 9600 zuerst | 1956 ms                     |
+| Reboot, 38400 zuerst (`f190aad3`)              | **180 / 123 / 107 / 24 ms** |
+
+Der mittlere Wert ist der Grund für `f190aad3`: `SetupUBLOX()` stellt das Modul
+beim ersten Init dauerhaft auf 38400, das 9600-Fenster lief danach bei jedem
+Boot vollständig aus, bevor 38400 an die Reihe kam.
+
+Trigger A (Reboot mit persistiertem `--gps on`) auf diesem dritten Board
+mehrfach durchlaufen: kein `task_wdt`, kein `abort()`, der Node kommt jedes Mal hoch.
+
+Der Empfänger arbeitet — NMEA mit gültiger Prüfsumme, Zeit und Datum werden
+dekodiert, 4–5 Satelliten sichtbar. Einen 3D-Fix hat er am Prüfplatz nicht
+erreicht; der Heltec V3 daneben hat zeitgleich 9 Satelliten bei HDOP 0,9. Das
+ist Antennenlage, kein Firmware-Befund.
+
+### 4.3 WiFi
+
+Erst nach `--webserver on` baut der Node überhaupt eine Station-Verbindung auf.
+`--setssid` und `--setpwd` allein genügen nicht: solange weder Webserver noch
+Gateway aktiv sind, wird `startNetwork()` nicht betreten und im Log erscheint
+keine einzige `[WIFI]`-Zeile. Wer die Zugangsdaten setzt und auf eine Verbindung
+wartet, wartet vergeblich, ohne eine Fehlermeldung zu sehen.
+
+Danach verbindet der Node sauber: Kanal 9, RSSI -55 dBm, IP per DHCP.
+
+### 4.4 Der eigentliche Feldfall
+
+Ein Boot mit WiFi **und** GPS ist genau die Sequenz, an der die gemeldete
+Supreme starb — im Feldlog folgt auf `[WIFI]...connecting` der GPS-Init und dann
+der Abbruch. Auf dem T-Beam:
+
+```
+267.163  CLIENT SETUP
+273.463  [WIFI]...SSID: <ssid> CHAN: 9 RSSI: -55
+273.463  [WIFI]...connecting to CHAN: 9
+274.478  [GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 123 ms)
+276.909  [GPS ]...UBLOX erkannt
+276.909  [WIFI]...connect OK
+276.909  [WIFI]...now listening at IP ..., UDP port 1990
+```
+
+9,7 s vom Reset bis zum verbundenen Node, kein `task_wdt`. `startNetwork()` ist
+der N-17-Pfad; auch der bleibt unter dem scharf geschalteten Watchdog unauffällig.
+
+### 4.5 Sensorik
+
+`--showi2c` findet nur `0x34` (AXP2101-PMU) und `0x3C` (SH1106-OLED). Kein
+externer Sensor an diesem Board.
 
 ---
 
-## 5. Was nicht geprüft wurde
+## 5. Zwischenfall: das falsche Board in den Download-Modus versetzt
+
+Festgehalten als Warnung, nicht als Anekdote.
+
+`upload_command` in `variants/*/platformio.ini` trug **keinen** `--port`. Damit
+sucht sich `esptool` den Port selbst. Bei zwei gleichzeitig angeschlossenen
+ESP32-Boards griff ein `pio run -e heltec_wifi_lora_32_V3 --target upload` auf
+dem Weg den Port des T-Beam ab und schob diesen in den ROM-Download-Modus
+(`rst:0x1 (POWERON_RESET), boot:0x3 (DOWNLOAD_BOOT)`). Der Heltec-Flash gelang;
+der T-Beam war anschliessend still — der USB-Serial-Wandler meldete sich
+weiterhin, der ESP32 nicht mehr, und auch ein EN-Impuls half nicht. Erst
+Abziehen und Wiederanstecken der USB-Versorgung brachte ihn zurück.
+
+`--upload-port` half nicht dagegen: ohne `$UPLOAD_PORT` im Kommando hat der
+Schalter keine Wirkung, PlatformIO reicht ihn nirgendwohin.
+
+Behoben: alle 27 `upload_command`-Zeilen tragen jetzt `--port "$UPLOAD_PORT"`.
+Verifiziert über eine Fehlprobe — `--upload-port /dev/cu.NOSUCHPORT` bricht
+jetzt mit genau diesem Portnamen ab, statt sich selbst ein Board zu suchen.
+
+---
+
+## 6. Offene Punkte — Laufplan
+
+Bewusst zurückgestellt, nicht stillschweigend übersprungen.
+
+| #   | Punkt                                                                                                                                                                                                                                          | Woran es hängt                                            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | **§8.4 — Board mit `--gps on` und ohne Modul.** Muss den Scan zu Ende führen und darf **keine** Phantom-Baudrate melden. Direkter Test des B-15-Fixes.                                                                                         | Board ohne GPS am Platz; auf dem nächsten Board einplanen |
+| 2   | **§8.4 auf dem RAK** — deckt B-15 nicht ab, der RAK hat seinen eigenen Pfad (N-26)                                                                                                                                                             | GPS-Modul am RAK prüfen                                   |
+| 3   | **§8.5 — Batteriestart ohne USB** auf einem Board mit `ARDUINO_USB_CDC_ON_BOOT=1`. Der eigentliche B-7-Fall, den Welle 0 behebt.                                                                                                               | Akku vorhanden, Test verschoben                           |
+| 4   | **§8.3, Tastendruck** auf einem laufenden Node — der dritte Trigger. `--gps reset` und `--gps on` sind geprüft.                                                                                                                                | Handgriff am Gerät                                        |
+| 5   | ~~T-Beam mit GPS und WiFi~~ — **erledigt**, siehe Abschnitt 4                                                                                                                                                                                  | —                                                         |
+| 5a  | **T-Beam ohne 3D-Fix am Prüfplatz.** Empfänger arbeitet, 4–5 Satelliten, kein Positions-Fix. Draussen oder mit besserer Antennenlage nachholen.                                                                                                | Standort, nicht Firmware                                  |
+| 6   | **Welle 3** — tote ISR-Variante und A-1…A-9 löschen, inklusive unseres `pulseIndex + 1`-Regresses                                                                                                                                              | zurückgestellt                                            |
+| 7   | **Welle 4** — S2, die vier unbegrenzten Schleifen (B-1, B-2, B-6, B-10) und der AP-Zweig B-13                                                                                                                                                  | zurückgestellt                                            |
+| 8   | **Welle 5** — Coredump-Partition (A-7). Ohne sie gibt es weiterhin `error=257` statt eines Dumps.                                                                                                                                              | zurückgestellt, braucht OTA-Test                          |
+| 9   | **Welle 6** — B-1…B-15 als Katalogeinträge                                                                                                                                                                                                     | zurückgestellt                                            |
+| 10  | **N-26/N-27/N-28 beheben**                                                                                                                                                                                                                     | aufgenommen, nicht behoben                                |
+| 11  | **WiFi ohne Webserver meldet nichts** (Abschnitt 4.3). Zugangsdaten gesetzt, aber ohne `--webserver on`/`--gateway on` wird `startNetwork()` nie betreten — kommentarlos. Entweder Hinweis ausgeben oder in der Hilfe erwähnen.                | neuer Befund, nicht behoben                               |
+| 12  | **`[GPS_VER]` bleibt auf dem T-Beam leer.** Auf dem Heltec V3 liefert `UBX_MON_VER` eine vollständige Versionszeile, auf dem T-Beam nichts — dort wird das Modul unmittelbar davor auf 38400 umgestellt. Vermutlich ein Rennen, nicht geprüft. | Beobachtung, nicht untersucht                             |
+
+---
+
+## 7. Was nicht geprüft wurde
 
 - **Keine native Testabdeckung** für den Scan. Abschnitt 8 des Bug-Dokuments
   begründet, warum das ein eigenes Projekt wäre; die Zeiteigenschaft ist hier
   ausschliesslich per Hardware-Mitschnitt belegt.
 - **Die gemeldete T-Beam Supreme** stand nicht auf der Bank. Verifiziert wurde
   auf einem Heltec V3 mit demselben Fehlerbild; die Supreme wurde nur gebaut.
-- **L76K** wurde nicht geprüft — das Modul hier ist ein u-blox.
+- **L76K** wurde nicht geprüft — beide geprüften Module sind u-blox. Der
+  L76K-Zweig in `GPSprobe()` ist damit auf dieser Bank unbelegt.
+- **Der Funkbetrieb** des T-Beam wurde nicht geprüft. Der SX1276 initialisiert
+  und hört zu; ob er sendet und empfängt, wurde nicht gemessen.
