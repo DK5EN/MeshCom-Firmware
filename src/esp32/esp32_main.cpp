@@ -603,8 +603,6 @@ float getTempForNTC()
 
 void esp32setup()
 {
-    esp_task_wdt_add(NULL);
-
     ///< Initialize T5-EPAPER GUI
     ///< delay for ESP32-S3 nativ USB [OE3WAS]
     ///< um Terminal verbinden zu können
@@ -614,10 +612,13 @@ void esp32setup()
 // 1.1.1??   pinMode(45,OUTPUT);
 // 1.1.1??    digitalWrite(45, LOW);
 
-    // Wartet maximal 3 Sekunden auf den seriellen Monitor
+    // Wartet maximal 5 Sekunden auf den seriellen Monitor.
+    // Achtung: delay() füttert den Task-Watchdog NICHT -- nur
+    // esp_task_wdt_reset() tut das. Diese Schleife ist nur deshalb
+    // unkritisch, weil esp32setup() bewusst nicht überwacht wird (N-25/S1).
     unsigned long startTime = millis();
     while (!Serial && (millis() - startTime < 5000)) {
-        delay(10); // Verhindert das Auslösen des Watchdog-Timers
+        delay(10);
     }
 
     #if defined(HAS_TFT_CONNECT)
@@ -1775,6 +1776,14 @@ void esp32setup()
             digitalWrite(RELAY_SWITCH, HIGH);
     #endif
 
+    // N-25/S1: Der Task-Watchdog wird erst hier scharf geschaltet, nicht am
+    // Anfang von esp32setup(). setup() führt legitim sekundenlange
+    // Einmal-Initialisierung aus (USB-CDC-Wartezeit, Display-Timeouts,
+    // MCU811, die while(true)-Fehlerpfade der Peripherie-Init). Diese zu
+    // überwachen war nie Sinn der Maßnahme -- sie hätte diagnostizierbare
+    // Hänger in einen anonymen Boot-Loop verwandelt. Bewacht wird ab jetzt
+    // ausschließlich esp32loop(), das sich in :esp32loop() selbst füttert.
+    esp_task_wdt_add(NULL);
 }
 
 // BLE TX Function -> Node to Client
