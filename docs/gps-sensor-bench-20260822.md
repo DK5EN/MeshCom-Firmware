@@ -241,7 +241,73 @@ externer Sensor an diesem Board.
 
 ---
 
-## 5. Zwischenfall: das falsche Board in den Download-Modus versetzt
+## 5. Heltec V3 ohne GPS-Modul (`DK5EN-91`) — §8.4 und §8.3
+
+Zweites Heltec-V3-Board, kein GPS angeschlossen. Das ist der direkte Test des
+B-15-Fixes und zugleich der letzte offene Trigger aus §8.3.
+
+### 5.1 Drei Firmware-Stände auf demselben nackten Board
+
+| Stand                                           | Verhalten                                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| vor dem Fix (Flash-Version 20260724, war drauf) | **Abbruch nach 5,09 s, Boot-Loop**                                                                 |
+| Upstream `v4.35p.08.20`                         | Scan läuft 12 s durch, `[GPS_ERR] Erkennung fehlgeschlagen`, kein Absturz (kein Watchdog upstream) |
+| unser Stand (`f190aad3`)                        | `keine gueltige NMEA-Sequenz auf 8 Baudraten (12000 ms)`, dann `[GPS_ERR]`. Kein Abbruch.          |
+
+Der Fall **ohne** Modul ist vor dem Fix schlimmer als der mit Modul: der Scan
+findet nirgends etwas, läuft also in die volle Länge, und die Debug-Ausgabe je
+Baudstufe hängt an `GPS_BAUDS_RX[iGpsBaud] > 0`. Ohne empfangene Zeichen druckt
+sie nichts. Der Betreiber sieht `[GPS ]...Init GPIO RX=47 TX=48` und danach
+unmittelbar den Watchdog — keine einzige Zeile dazwischen, die sagt, woran es
+liegt.
+
+### 5.2 Was dieser Test NICHT zeigt
+
+B-15 beschreibt eine Phantom-Baudrate, die entsteht, wenn ein einzelnes
+Rauschbyte im passenden Zeichenbereich auf dem ungezogenen `GPS_RX_PIN` landet.
+Genau dieser Auslöser trat hier **nicht** auf: der Pin las auf allen acht
+Baudraten null Zeichen. Deshalb meldete auch der alte Argmax korrekt einen
+Fehlschlag — auf demselben Board mit Upstream-Firmware nachgeprüft.
+
+Belegt ist damit: der neue Code meldet keine Phantom-Baudrate und stürzt nicht
+ab. **Nicht** belegt ist, dass er einen verrauschten Pin übersteht. Für diesen
+Nachweis müsste Rauschen eingekoppelt werden — offener Punkt.
+
+Zum Vergleich: auf dem Board **mit** Modul zählte das 9600-Fenster 14 bis 23
+"passende" Zeichen, obwohl das Modul auf 38400 sendet. Das ist der Mechanismus
+aus B-15, aber dort mit einer Quelle. Ein wirklich freier Eingang war auf dieser
+Bank still.
+
+### 5.3 Trigger C — Tastendruck
+
+`onebutton_functions.cpp:210` bildet den Dreifachklick auf `--gps on` plus
+`--track on` ab. Ausgeführt auf dem Board ohne Modul, der Callback trieb also
+einen vollen Scan:
+
+```
+727.581  [GPS ]...Init GPIO RX=47 TX=48
+739.601  [GPS ]...keine gueltige NMEA-Sequenz auf 8 Baudraten (12001 ms)
+739.602  [GPS_ERR] Erkennung fehlgeschlagen (Timeout oder kein Signal)
+```
+
+Kein `task_wdt`, kein `abort()`, kein Neustart — Laufzeit des Knotens
+durchgehend über 12 Minuten, letzter Boot bei 25,7 s. Damit sind alle drei
+Trigger aus §8.3 abgehakt. Vor dem Fix starb dasselbe Board an derselben
+Sequenz nach 5,09 s.
+
+Der Dreifachklick selbst schreibt nichts ins Log — die Zeile `TripleClick` hängt
+an `bDisplayCont`. Der GPS-Init ist der Beleg, dass der Handler lief.
+
+### 5.4 Nebenbefund: `--webserver`-Flash über den festgenagelten Port
+
+Der Wechsel auf unseren Stand lief über
+`pio run --target upload --upload-port /dev/cu.usbserial-0001` bei gleichzeitig
+angeschlossenem T-Beam und RAK. Beide blieben unbehelligt — der Fix aus
+Abschnitt 6 wirkt auch im Feld, nicht nur in der Fehlprobe.
+
+---
+
+## 6. Zwischenfall: das falsche Board in den Download-Modus versetzt
 
 Festgehalten als Warnung, nicht als Anekdote.
 
@@ -263,29 +329,30 @@ jetzt mit genau diesem Portnamen ab, statt sich selbst ein Board zu suchen.
 
 ---
 
-## 6. Offene Punkte — Laufplan
+## 7. Offene Punkte — Laufplan
 
 Bewusst zurückgestellt, nicht stillschweigend übersprungen.
 
-| #   | Punkt                                                                                                                                                                                                                                          | Woran es hängt                                            |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| 1   | **§8.4 — Board mit `--gps on` und ohne Modul.** Muss den Scan zu Ende führen und darf **keine** Phantom-Baudrate melden. Direkter Test des B-15-Fixes.                                                                                         | Board ohne GPS am Platz; auf dem nächsten Board einplanen |
-| 2   | **§8.4 auf dem RAK** — deckt B-15 nicht ab, der RAK hat seinen eigenen Pfad (N-26)                                                                                                                                                             | GPS-Modul am RAK prüfen                                   |
-| 3   | **§8.5 — Batteriestart ohne USB** auf einem Board mit `ARDUINO_USB_CDC_ON_BOOT=1`. Der eigentliche B-7-Fall, den Welle 0 behebt.                                                                                                               | Akku vorhanden, Test verschoben                           |
-| 4   | **§8.3, Tastendruck** auf einem laufenden Node — der dritte Trigger. `--gps reset` und `--gps on` sind geprüft.                                                                                                                                | Handgriff am Gerät                                        |
-| 5   | ~~T-Beam mit GPS und WiFi~~ — **erledigt**, siehe Abschnitt 4                                                                                                                                                                                  | —                                                         |
-| 5a  | ~~T-Beam ohne 3D-Fix am Prüfplatz~~ — **erledigt**, Fix nach rund acht Minuten Kaltstart: 8 Satelliten, HDOP 1,1                                                                                                                               | —                                                         |
-| 6   | **Welle 3** — tote ISR-Variante und A-1…A-9 löschen, inklusive unseres `pulseIndex + 1`-Regresses                                                                                                                                              | zurückgestellt                                            |
-| 7   | **Welle 4** — S2, die vier unbegrenzten Schleifen (B-1, B-2, B-6, B-10) und der AP-Zweig B-13                                                                                                                                                  | zurückgestellt                                            |
-| 8   | **Welle 5** — Coredump-Partition (A-7). Ohne sie gibt es weiterhin `error=257` statt eines Dumps.                                                                                                                                              | zurückgestellt, braucht OTA-Test                          |
-| 9   | **Welle 6** — B-1…B-15 als Katalogeinträge                                                                                                                                                                                                     | zurückgestellt                                            |
-| 10  | **N-26/N-27/N-28 beheben**                                                                                                                                                                                                                     | aufgenommen, nicht behoben                                |
-| 11  | **WiFi ohne Webserver meldet nichts** (Abschnitt 4.3). Zugangsdaten gesetzt, aber ohne `--webserver on`/`--gateway on` wird `startNetwork()` nie betreten — kommentarlos. Entweder Hinweis ausgeben oder in der Hilfe erwähnen.                | neuer Befund, nicht behoben                               |
-| 12  | **`[GPS_VER]` bleibt auf dem T-Beam leer.** Auf dem Heltec V3 liefert `UBX_MON_VER` eine vollständige Versionszeile, auf dem T-Beam nichts — dort wird das Modul unmittelbar davor auf 38400 umgestellt. Vermutlich ein Rennen, nicht geprüft. | Beobachtung, nicht untersucht                             |
+| #   | Punkt                                                                                                                                                                                                                                                                                                                       | Woran es hängt                   |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1   | ~~§8.4 — Board mit `--gps on` und ohne Modul~~ — **erledigt**, Abschnitt 5. Scan läuft durch, keine Phantom-Baudrate, kein Absturz.                                                                                                                                                                                         | —                                |
+| 1a  | **B-15 mit verrauschtem Eingang.** Abschnitt 5.2: der freie `GPS_RX_PIN` las null Zeichen, der eigentliche Auslöser von B-15 wurde also nie erzeugt. Belegt ist "meldet keine Phantom-Baudrate", nicht "übersteht Rauschen". Dafür müsste Rauschen eingekoppelt werden.                                                     | Messaufbau, nicht vorhanden      |
+| 2   | **§8.4 auf dem RAK** — deckt B-15 nicht ab, der RAK hat seinen eigenen Pfad (N-26)                                                                                                                                                                                                                                          | GPS-Modul am RAK fehlt           |
+| 3   | **§8.5 — Batteriestart ohne USB.** Auf dieser Bank **nicht durchführbar**: dem Heltec V3 ist `ARDUINO_USB_CDC_ON_BOOT=1` auskommentiert, der klassische T-Beam hat kein natives USB, der RAK ist nRF52. Es braucht Supreme, V4, wireless_tracker, T3_S3_V1_3, t_deck*, t5_epaper, T-ETH-ELITE oder vision-master-e213/e290. | passendes Board                  |
+| 4   | ~~§8.3, Tastendruck~~ — **erledigt**, Abschnitt 5.3. Dreifachklick auf PRG, voller 12-s-Scan aus dem Callback, kein Abbruch.                                                                                                                                                                                                | —                                |
+| 5   | ~~T-Beam mit GPS und WiFi~~ — **erledigt**, siehe Abschnitt 4                                                                                                                                                                                                                                                               | —                                |
+| 5a  | ~~T-Beam ohne 3D-Fix am Prüfplatz~~ — **erledigt**, Fix nach rund acht Minuten Kaltstart: 8 Satelliten, HDOP 1,1                                                                                                                                                                                                            | —                                |
+| 6   | **Welle 3** — tote ISR-Variante und A-1…A-9 löschen, inklusive unseres `pulseIndex + 1`-Regresses                                                                                                                                                                                                                           | zurückgestellt                   |
+| 7   | **Welle 4** — S2, die vier unbegrenzten Schleifen (B-1, B-2, B-6, B-10) und der AP-Zweig B-13                                                                                                                                                                                                                               | zurückgestellt                   |
+| 8   | **Welle 5** — Coredump-Partition (A-7). Ohne sie gibt es weiterhin `error=257` statt eines Dumps.                                                                                                                                                                                                                           | zurückgestellt, braucht OTA-Test |
+| 9   | **Welle 6** — B-1…B-15 als Katalogeinträge                                                                                                                                                                                                                                                                                  | zurückgestellt                   |
+| 10  | **N-26/N-27/N-28 beheben**                                                                                                                                                                                                                                                                                                  | aufgenommen, nicht behoben       |
+| 11  | **WiFi ohne Webserver meldet nichts** (Abschnitt 4.3). Zugangsdaten gesetzt, aber ohne `--webserver on`/`--gateway on` wird `startNetwork()` nie betreten — kommentarlos. Entweder Hinweis ausgeben oder in der Hilfe erwähnen.                                                                                             | neuer Befund, nicht behoben      |
+| 12  | **`[GPS_VER]` bleibt auf dem T-Beam leer.** Auf dem Heltec V3 liefert `UBX_MON_VER` eine vollständige Versionszeile, auf dem T-Beam nichts — dort wird das Modul unmittelbar davor auf 38400 umgestellt. Vermutlich ein Rennen, nicht geprüft.                                                                              | Beobachtung, nicht untersucht    |
 
 ---
 
-## 7. Was nicht geprüft wurde
+## 8. Was nicht geprüft wurde
 
 - **Keine native Testabdeckung** für den Scan. Abschnitt 8 des Bug-Dokuments
   begründet, warum das ein eigenes Projekt wäre; die Zeiteigenschaft ist hier
