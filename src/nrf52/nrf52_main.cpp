@@ -511,21 +511,25 @@ void nrf52setup()
     if(meshcom_settings.node_cleanflash == 1)
         bClear = true;
 
-    if(meshcom_settings.node_fversion != FLASH_VERSION || bClear)
+    // Geloescht wird nur bei echter Layout-Aenderung, nicht bei jedem neuen
+    // Build-Datum. Siehe configuration_global.h.
+    if(!flashLayoutCompatible(meshcom_settings.node_fversion) || bClear)
     {
-        Serial.printf("[INIT]...FLASH cleared new version %i\n", FLASH_VERSION);
+        Serial.printf("[INIT]...FLASH cleared, Settings-Layout %i -> %i\n",
+                      meshcom_settings.node_fversion, FLASH_STRUCT_VERSION);
 
         flash_reset();
     }
     else
     {
-        Serial.printf("[INIT]...FLASH version %i\n", meshcom_settings.node_fversion);
+        Serial.printf("[INIT]...FLASH layout %i ok, build %i\n",
+                      meshcom_settings.node_fversion, FLASH_VERSION);
     }
 
     if(bClear)
         init_flash();
 
-    meshcom_settings.node_fversion = FLASH_VERSION;
+    meshcom_settings.node_fversion = FLASH_STRUCT_VERSION;
     meshcom_settings.node_mversion = MODUL_HARDWARE;
     meshcom_settings.node_cleanflash = 0;
     snprintf(meshcom_settings.node_fwversion, sizeof(meshcom_settings.node_fwversion), "%-4.4s%-1.1s", SOURCE_VERSION, SOURCE_VERSION_SUB);

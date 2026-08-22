@@ -27,7 +27,54 @@ inline bool isNodeUnconfigured(const char *call)
 }
 #endif
 
-#define FLASH_VERSION 20260821
+// ---------------------------------------------------------------------------
+// Settings-Persistenz: Build-Kennung und Layout-Generation sind ZWEI Dinge
+//
+// FLASH_VERSION ist die Build-/Release-Kennung. Sie wird pro Release
+// hochgezogen, wird in --info angezeigt und ist rein informativ.
+//
+// FLASH_STRUCT_VERSION benennt die Generation des Settings-Layouts, also den
+// Aufbau von struct s_meshcom_settings. Sie wird NUR hochgezogen, wenn sich
+// dieses Layout tatsaechlich aendert -- Feld hinzugefuegt, entfernt, Typ oder
+// Reihenfolge geaendert.
+//
+// Nur FLASH_STRUCT_VERSION entscheidet ueber clear_flash(). Vorher wurde
+// FLASH_VERSION verglichen: damit hat JEDES Release mit neuem Datum die
+// Konfiguration jedes aktualisierenden Knotens geloescht -- Rufzeichen, WLAN,
+// Sensoren --, auch wenn sich am Layout nichts geaendert hatte. Genau das ist
+// beim Sprung 20260724 -> 20260821 passiert: dieser Commit hat esp32_flash.h
+// nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
+//
+// Letzte echte Layout-Aenderung: 6e7c012a (2026-07-24), node_pingmax,
+// node_pingcount und node_pingduration kamen hinzu. Daher 20260724.
+#define FLASH_VERSION 20260822
+#define FLASH_STRUCT_VERSION 20260724
+
+// Bestandsschutz. Diese Staende tragen dasselbe Layout wie
+// FLASH_STRUCT_VERSION, haben aber wegen der alten Semantik noch ihr
+// Build-Datum in node_fversion stehen. Sie duerfen nicht zurueckgesetzt
+// werden, nur weil sich die Bedeutung des Feldes geaendert hat.
+//
+// Die Liste waechst NICHT weiter: ab dieser Version speichert der Knoten
+// FLASH_STRUCT_VERSION in node_fversion, nicht mehr das Datum.
+#define FLASH_STRUCT_LEGACY_COUNT 1
+static const int FLASH_STRUCT_LEGACY[FLASH_STRUCT_LEGACY_COUNT] = { 20260821 };
+
+/// @return true, wenn der gespeicherte Wert dasselbe Settings-Layout meint
+///         wie dieser Build -- dann darf NICHT geloescht werden.
+static inline bool flashLayoutCompatible(int stored)
+{
+    if (stored == FLASH_STRUCT_VERSION)
+        return true;
+
+    for (int i = 0; i < FLASH_STRUCT_LEGACY_COUNT; i++)
+    {
+        if (stored == FLASH_STRUCT_LEGACY[i])
+            return true;
+    }
+
+    return false;
+}
 
 //Hardware Types
 #define TLORA_V2 1
