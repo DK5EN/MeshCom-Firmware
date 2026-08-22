@@ -47,14 +47,24 @@ static HardwareSerial GPSSerial(1);  // UART1
 
 GPSData gpsData;
 
-// Baudrate-Erkennung: Viele Module starten mit 9600, manche mit 38400/115200.
-// Die Reihenfolge ist nach Haeufigkeit sortiert, nicht numerisch: seit der
-// Scan bei der ersten gueltigen NMEA-Pruefsumme abbricht (N-25/S5) bestimmt
-// sie unmittelbar die Dauer der GPS-Initialisierung. 9600 ist die Vorgabe
-// der meisten Module, 38400 stellt SetupL76K()/SetupUBLOX() selbst ein.
-// Fuer das Ergebnis ist die Reihenfolge unerheblich -- die Pruefsumme
-// entscheidet, nicht die Position.
-static const unsigned long GPS_BAUDS[] = {9600, 38400, 115200, 57600, 19200, 4800, 2400, 1200};
+// Baudrate-Erkennung. Die Reihenfolge ist nach Trefferwahrscheinlichkeit
+// sortiert, nicht numerisch: seit der Scan bei der ersten gueltigen
+// NMEA-Pruefsumme abbricht (N-25/S5), bestimmt sie unmittelbar die Dauer der
+// GPS-Initialisierung. Fuer das ERGEBNIS ist sie unerheblich -- es entscheidet
+// die Pruefsumme, nicht die Position.
+//
+// 38400 steht vorn, obwohl 9600 die Werkseinstellung der meisten Module ist.
+// Grund ist der Lebenszyklus, nicht die Verbreitung: SetupL76K() und
+// SetupUBLOX() stellen das Modul beim ersten erfolgreichen Init auf 38400 und
+// speichern das im Modul-Flash. Ab dann laeuft das Modul dauerhaft auf 38400.
+// 9600 trifft also genau einmal zu -- beim allerersten Kontakt --, 38400 bei
+// jedem weiteren Boot.
+//
+// Auf der Bank gemessen (T-Beam, 2026-08-22, u-blox): mit 9600 vorn
+// 535 ms beim Erstkontakt, aber 1956 ms bei jedem Reboot danach, weil das
+// 9600-Fenster voll auslaeuft, bevor 38400 drankommt. Mit 38400 vorn kehrt
+// sich das um -- und Reboots sind der haeufigere Fall.
+static const unsigned long GPS_BAUDS[] = {38400, 9600, 115200, 57600, 19200, 4800, 2400, 1200};
 static const size_t   GPS_BAUD_COUNT = sizeof(GPS_BAUDS) / sizeof(GPS_BAUDS[0]);
 int GPS_BAUDS_RX[GPS_BAUD_COUNT];
 
