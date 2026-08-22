@@ -1913,6 +1913,21 @@ void commandAction(char *umsg_text, bool ble)
         meshcom_settings.node_sset = meshcom_settings.node_sset & 0x7E7F;   // BME280/BMP280 off
         meshcom_settings.node_sset3 = meshcom_settings.node_sset3 & 0x7FEF;   // BMP390 off
 
+        // N-28: "--bmx" ist das Sammelkommando, und die Hilfe sagt seit jeher
+        // "--bmx BME/BMP/680 off". Der BME680 wurde davon aber nie erfasst.
+        // Folge: wer der Hilfe folgte und danach "--bme on" gab, bekam
+        // "BME680 and BMx280 can't be used together!" und stand ohne Sensor da.
+        // Nur das Sammelkommando raeumt mit auf -- "--bme off" und "--bmp off"
+        // meinen weiterhin genau ihren Chip. Kollateralschaden gibt es keinen:
+        // BME680 und BMx280 teilen sich die Adressen und koennen ohnehin nie
+        // gleichzeitig aktiv sein.
+        if(commandCheck(msg_text+2, (char*)"bmx off") == 0)
+        {
+            bBME680ON = false;
+            bme680_found = false;
+            meshcom_settings.node_sset2 &= ~0x0004;   // BME680 off
+        }
+
         if(ble)
         {
             bSensSetting = true;
