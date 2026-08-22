@@ -273,7 +273,6 @@ void init_batt(void)
 	digitalWrite(36, LOW);
 
 	#define ADC_CTRL_PIN 37
-	#define BATTERY_SAMPLES 20
 
 	pinMode(vbat_pin, INPUT);
 	pinMode(ADC_CTRL_PIN, OUTPUT);
@@ -291,7 +290,6 @@ void init_batt(void)
 #if defined(BOARD_HELTEC_T114)
 
 	#define ADC_CTRL_PIN 6
-	#define BATTERY_SAMPLES 20
 
 	pinMode(vbat_pin, INPUT);
 	pinMode(ADC_CTRL_PIN, OUTPUT);

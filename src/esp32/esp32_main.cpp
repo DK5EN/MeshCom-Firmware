@@ -3319,6 +3319,12 @@ void esp32loop()
                 {
                     global_batt = 0;
                     global_proz = 0;
+
+                    // Ohne PMU gibt es keine Messung. Ohne diese Zeile wuerde
+                    // PositionToAPRS() jetzt dauerhaft "/B=000" senden und damit
+                    // "Akku leer" behaupten, wo in Wahrheit "nicht messbar" gilt --
+                    // genau die Falschmeldung, die der /B=000-Fix beseitigen soll.
+                    battProbeState = BATT_PROBE_NONE;
                 }
 
                 if(bDisplayCont && BattWaitCounter > 20)
