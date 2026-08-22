@@ -3665,7 +3665,12 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
             else
                 snprintf(calt, sizeof(calt), "/A=%05i", alt);
         }
-        snprintf(cbatt, sizeof(cbatt), "/B=%i", global_proz);
+        // /B= immer senden wenn Batterie-Hardware vorhanden ist, auch bei 0 Prozent
+        // (leerer Tag wuerde sonst "kein Akku bestueckt" bedeuten statt "leer")
+        if(battHardwarePresent())
+        {
+            snprintf(cbatt, sizeof(cbatt), "/B=%03d", global_proz);
+        }
         snprintf(cinaU, sizeof(cinaU), "/U=%.2f", meshcom_settings.node_vbus);
         snprintf(cinaI, sizeof(cinaI), "/I=%.1f", meshcom_settings.node_vcurrent);
 
@@ -3676,7 +3681,9 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
     }
     else
     {
-        if(global_proz > 0)
+        // /B= immer senden wenn Batterie-Hardware vorhanden ist, auch bei 0 Prozent
+        // (leerer Tag wuerde sonst "kein Akku bestueckt" bedeuten statt "leer")
+        if(battHardwarePresent())
         {
             snprintf(cbatt, sizeof(cbatt), "/B=%03d", global_proz);
         }
