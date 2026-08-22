@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <configuration.h>
 #include "printfdeb_functions.h"
+#include "batt_functions.h"
 
 #ifndef USE_NEW_BATT
 
@@ -16,6 +17,15 @@ int global_proz = 0;
 
 unsigned long BattTimeWait = 0;
 unsigned long BattTimeAPP = 0;
+
+// Compile-Zeit-Fallback: bisheriges hartcodiertes Verhalten dieses Pfads (HIGH=Teiler ein,
+// LOW=Teiler aus). Siehe batt_functions.h fuer die Begruendung der Probe.
+batt_probe_t battProbeState = BATT_PROBE_ACTIVE_HIGH;
+
+bool battHardwarePresent(void)
+{
+	return battProbeState != BATT_PROBE_NONE;   // fail-safe: nur bei positiv erkanntem "kein Teiler" false
+}
 
 #if defined(NRF52_SERIES)
 
@@ -204,6 +214,51 @@ void VextOFF(void)  // Vext default OFF
 }
 #endif
 
+#if defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4)
+// battProbeState startet bewusst NICHT auf BATT_PROBE_UNKNOWN (Compile-Zeit-Fallback oben),
+// daher braucht das "einmalig ausfuehren"-Gating ein eigenes Flag statt eines Vergleichs
+// gegen battProbeState.
+static bool battProbeDone = false;
+
+// Einmalige ADC_CTRL_PIN-Polaritaets-Probe (siehe Begruendung in batt_functions.h). Wird aus
+// init_batt() aufgerufen, das battProbeDone-Flag sorgt dafuer, dass sie trotz mehrfachem
+// init_batt()-Aufruf (z.B. nach --batt factor Befehl) nur einmal laeuft.
+static void battProbeADCPolarity(uint32_t ctrlPin, uint32_t vbatPin)
+{
+	int countsHigh = 0;
+	int countsLow  = 0;
+
+	digitalWrite(ctrlPin, HIGH);
+	delay(100);   // Teiler braucht ~100ms zum Einschwingen (wie im Heltec-Zweig von read_batt())
+	for (int i = 0; i < 8; i++) { countsHigh += analogRead(vbatPin); }
+	countsHigh /= 8;
+
+	digitalWrite(ctrlPin, LOW);
+	delay(100);
+	for (int i = 0; i < 8; i++) { countsLow += analogRead(vbatPin); }
+	countsLow /= 8;
+
+	if (countsHigh >= BATT_PROBE_MIN_COUNTS && countsHigh > countsLow)
+	{
+		battProbeState = BATT_PROBE_ACTIVE_HIGH;
+		digitalWrite(ctrlPin, LOW);    // Ruhezustand: Teiler getrennt (Strom sparen)
+	}
+	else if (countsLow >= BATT_PROBE_MIN_COUNTS && countsLow > countsHigh)
+	{
+		battProbeState = BATT_PROBE_ACTIVE_LOW;
+		digitalWrite(ctrlPin, HIGH);   // Ruhezustand: Teiler getrennt (Strom sparen)
+	}
+	else
+	{
+		battProbeState = BATT_PROBE_NONE;   // kein Teiler bestueckt -> keine Batteriehardware
+	}
+
+	printfdeb("[INIT]...ADC_CTRL_PIN probe: high=%d;low=%d;-> %s\n", countsHigh, countsLow,
+		(battProbeState == BATT_PROBE_ACTIVE_HIGH) ? "active HIGH" :
+		(battProbeState == BATT_PROBE_ACTIVE_LOW)  ? "active LOW"  : "keine Batteriehardware (kein Teiler)");
+}
+#endif
+
 /**
  * @brief Initialize the battery analog input
  *
@@ -224,6 +279,12 @@ void init_batt(void)
 	pinMode(ADC_CTRL_PIN, OUTPUT);
 
 	analogReadResolution(12);
+
+	if (!battProbeDone)
+	{
+		battProbeADCPolarity(ADC_CTRL_PIN, vbat_pin);
+		battProbeDone = true;
+	}
 #endif
 
 // geht für HELTEC V3/V4 und für V3.2  wichtig für Display
@@ -500,9 +561,12 @@ float read_batt(void)
 
 		if (!dividerArmed)
 		{
-			//V3.1
-			//digitalWrite(ADC_CTRL_PIN, LOW);
-			digitalWrite(ADC_CTRL_PIN, HIGH);
+			// Polaritaet kommt aus der einmaligen Probe in init_batt() (battProbeState);
+			// Fallback (Probe noch nicht gelaufen / nichts gefunden) = active HIGH, bisheriges Verhalten.
+			if (battProbeState == BATT_PROBE_ACTIVE_LOW)
+				digitalWrite(ADC_CTRL_PIN, LOW);
+			else
+				digitalWrite(ADC_CTRL_PIN, HIGH);
 			dividerArmedAt = millis();
 			dividerArmed = true;
 			raw = cachedRaw;
@@ -511,8 +575,10 @@ float read_batt(void)
 		{
 			int analogValue = analogRead(vbat_pin);
 
-			//V3.1 digitalWrite(ADC_CTRL_PIN, HIGH);
-			digitalWrite(ADC_CTRL_PIN, LOW);
+			if (battProbeState == BATT_PROBE_ACTIVE_LOW)
+				digitalWrite(ADC_CTRL_PIN, HIGH);   // Teiler wieder trennen (Strom sparen)
+			else
+				digitalWrite(ADC_CTRL_PIN, LOW);    // Teiler wieder trennen (Strom sparen)
 			dividerArmed = false;
 
 			float floatVoltage = factor * analogValue;
