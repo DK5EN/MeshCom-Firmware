@@ -2,9 +2,8 @@
 
 **Status:** VERIFIED by code reading + two field logs (same board, our build vs. upstream build), then
 re-verified by an eight-angle adversarial review — and since **2026-08-22 reproduced and fixed on the
-bench**. Waves 0, 1 and 2 are landed (`dae2d863` S1, `f20b922d` S4, `7bd313bd` S5+B-15); GPS detection
-on a Heltec V3 drops from 12 000 ms to 2120 ms. **Waves 3–6 remain open**, as do hardware checks §8.4
-and §8.5. Bench record and open-item run book: `docs/gps-sensor-bench-20260822.md`.
+bench**. Waves 0 to 3 are landed (`dae2d863` S1, `f20b922d` S4, `7bd313bd` S5+B-15, `f190aad3` reorder, wave 3 cleanup); GPS detection
+on a Heltec V3 drops from 12 000 ms to 2120 ms. **Waves 4–6 remain open**; §8.3 and §8.4 passed on hardware, §8.5 needs a board this bench does not have. Bench record and open-item run book: `docs/gps-sensor-bench-20260822.md`.
 **Severity:** Critical — permanent boot loop, node unusable, no recovery window, recoverable only by reflashing.
 **Class:** regression introduced on this branch (`v4.35p_prio`), not an upstream defect.
 **Reported:** 2026-08-21, T-Beam Supreme (`ttgo_tbeam_supreme`, ESP32-S3), field unit.
@@ -511,15 +510,15 @@ not claim verification that did not happen.
 > **Waves 1, 2 and 3 all own `src/gps_functions.cpp`. They MUST run strictly serially.** Only waves 4
 > and 5 may run alongside wave 3. One shared file is enough to corrupt a wave.
 
-| Wave | Serial? | Goal                                                               | Exclusive files                                                                                                     | Gate                                                                               |
-| ---- | ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| 0    | —       | **S1**: move `esp_task_wdt_add(NULL)` to the end of `esp32setup()` | `src/esp32/esp32_main.cpp`                                                                                          | both MCU families build; hardware §8.5 (battery boot, no USB) passes               |
-| 1    | **A**   | **S4 (emergency)**: feed the watchdog across the GPS scan          | `src/gps_functions.cpp`                                                                                             | hardware §8.2 passes — the reported unit boots. Duration still ~16 s **by design** |
-| 2    | **A**   | **S5**: early exit on a checksum-valid NMEA sentence; fix B-15     | `src/gps_functions.cpp`                                                                                             | hardware §8.2 **and** §8.4; typical GPS init < 3 s, measured and recorded          |
-| 3    | **A**   | **A-1…A-9**: delete or repair the dead ISR variant and the drifts  | `src/gps_functions.cpp`                                                                                             | no behaviour change on any live path; both families build                          |
-| 4    | —       | **S2**: bound B-2, B-6, B-10, B-1; close B-13                      | `src/spectral_scan.cpp`, `src/web_functions/`, `src/Displays/`, `src/udp_functions.cpp`, `src/extudp_functions.cpp` | each bound has a test or a documented hardware check                               |
-| 5    | —       | **S6**: `coredump` partition                                       | `partitions-4MB-safeboot.csv`, `partitions-16MB-safeboot.csv`                                                       | **hardware flash + OTA test required** — see the warning below                     |
-| 6    | —       | **S3** + fold the §6 inventory into the defect catalogue           | `docs/architecture/08-defect-catalogue.md`, `docs/BACKLOG.md`                                                       | catalogue carries B-1…B-15 with IDs; no code change                                |
+| Wave | Serial? | Goal                                                               | Exclusive files                                                                                                     | Gate                                                                                  |
+| ---- | ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 0    | —       | **S1**: move `esp_task_wdt_add(NULL)` to the end of `esp32setup()` | `src/esp32/esp32_main.cpp`                                                                                          | both MCU families build; hardware §8.5 (battery boot, no USB) passes                  |
+| 1    | **A**   | **S4 (emergency)**: feed the watchdog across the GPS scan          | `src/gps_functions.cpp`                                                                                             | hardware §8.2 passes — the reported unit boots. Duration still ~16 s **by design**    |
+| 2    | **A**   | **S5**: early exit on a checksum-valid NMEA sentence; fix B-15     | `src/gps_functions.cpp`                                                                                             | hardware §8.2 **and** §8.4; typical GPS init < 3 s, measured and recorded             |
+| 3    | **A**   | ~~**A-1…A-9**~~ — **DONE** (`WAVE3`), see §10 for per-item status  | `src/gps_functions.cpp`, `src/command_functions.cpp` (comment only)                                                 | **passed**: 8 envs build, flash byte-identical, both GPS boards unchanged on hardware |
+| 4    | —       | **S2**: bound B-2, B-6, B-10, B-1; close B-13                      | `src/spectral_scan.cpp`, `src/web_functions/`, `src/Displays/`, `src/udp_functions.cpp`, `src/extudp_functions.cpp` | each bound has a test or a documented hardware check                                  |
+| 5    | —       | **S6**: `coredump` partition                                       | `partitions-4MB-safeboot.csv`, `partitions-16MB-safeboot.csv`                                                       | **hardware flash + OTA test required** — see the warning below                        |
+| 6    | —       | **S3** + fold the §6 inventory into the defect catalogue           | `docs/architecture/08-defect-catalogue.md`, `docs/BACKLOG.md`                                                       | catalogue carries B-1…B-15 with IDs; no code change                                   |
 
 Wave 0 goes first deliberately: one line, it removes the largest class of exposure, and it de-risks
 every hardware step that follows.
@@ -538,6 +537,17 @@ the gate itself — a subagent's self-report is not verification.
 ---
 
 ## 10. Adjacent defects in the GPS file
+
+> **Status 2026-08-22 — wave 3 landed.** A-1/A-2/A-3/A-4 are resolved by deleting the dead branch.
+> A-5 was already fixed in wave 1. A-6 and A-8 are documented in place, deliberately without a
+> behaviour change. **A-9 is refuted** — see below and §11.
+>
+> **New finding while doing it:** `GPS_BAUDRATE_SOFTCHECK` is a _per-variant_ option — 15
+> `variants/*/configuration.h` set or comment it. But `gps_functions.cpp:24` defined it
+> **unconditionally**, overriding every one of them. The variants that deliberately comment it out
+> (`E22-DevKitC`, `E22_*`, `esp32-loraprs-*`, `ttgo-lora32-v21`) never got the ISR path they asked
+> for. That is why A-1's branch was dead on _all_ boards, not just most. The 15 variant defines are
+> now inert and can be removed in a separate pass.
 
 Not the reported crash. Recorded so they are fixed or deleted deliberately rather than rediscovered.
 
@@ -585,12 +595,27 @@ table — **unverified**; do not assert it either way.
 `--gps on`/`--gps reset` on those boards re-enters `Serial1.begin()` without closing the previous
 instance. Whether the nRF52 UARTE tolerates a double-begin is not answerable from this repo.
 
-**A-9 — `--gps reset` returns without setting `bReturn`** (`command_functions.cpp:1608`), so the user
-likely gets no acknowledgement. UX only; not traced to the consumer.
+**A-9 — REFUTED.** The claim was that `--gps reset` returns without setting `bReturn`, so the user
+gets no acknowledgement. Traced to the consumer on 2026-08-22, which the original entry explicitly
+had not done: `bReturn` is only read at `command_functions.cpp:5296`, at the very end of
+`commandAction()`, and its sole effect is to _suppress_ the `...wrong command` message. The
+`gps reset` branch `return`s long before that point, so `bReturn` is never read and no spurious
+error can be produced. Confirmed on hardware — the capture contains zero `wrong command` lines
+across repeated `--gps reset`. Setting `bReturn = true` there would be a dead store.
+
+What does survive, smaller and different from the claim: the branch calls no
+`addBLECommandBack()`, so a phone issuing `--gps reset` over BLE gets no response at all. On the
+serial console the GPS init output serves as the acknowledgement. Which string should go to the
+app is a product decision, not cleanup-wave work.
 
 ---
 
 ## 11. Refuted during review — do not re-investigate
+
+- **"`--gps reset` gives no acknowledgement because `bReturn` is unset" (A-9).** Refuted on
+  2026-08-22 by tracing the consumer and checking a hardware capture. `bReturn` is read only at
+  `command_functions.cpp:5296` and only suppresses `...wrong command`; the branch returns before
+  reaching it. No spurious error is possible and no capture contains one. See §10.
 
 - **"A plain `grep` skips `gps_functions.cpp` because of its encoding."** False. `file` reports plain
   UTF-8 and `grep -rn` finds `:22` from the repo root. The first draft's wrong conclusion came from

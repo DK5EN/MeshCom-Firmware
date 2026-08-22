@@ -1124,7 +1124,7 @@ Nebenfund ebenfalls gefixt (`a0bcd9da`): `clearSlotFirst` putzte nur 256
 von 260 Slot-Bytes. Beleg fuer den Zweck der QA-Welle: die erste native
 Suite ueber dem Ring fand am ersten Tag einen echten High-Defekt.
 
-### N-25 — GPS-Baudscan loest den Task-Watchdog aus und schickt den Knoten in den Boot-Loop — **FIXED (`dae2d863`, `f20b922d`, `7bd313bd`, auf echter Hardware reproduziert und verifiziert)** — Critical
+### N-25 — GPS-Baudscan loest den Task-Watchdog aus und schickt den Knoten in den Boot-Loop — **FIXED (Wellen 0 bis 3, auf echter Hardware reproduziert und verifiziert)** — Critical
 
 Vollstaendige Analyse: `docs/bug-N25-gps-baud-scan-watchdog.md`. Kurzfassung:
 `4c21cb49` (Audit-Befund C3) abonnierte den Task-Watchdog in der ersten Zeile
@@ -1149,8 +1149,14 @@ Fix in drei Schritten: S1 verschiebt die Subskription ans Ende von
 ersten gueltigen NMEA-Pruefsumme ab und ersetzt den Argmax ohne Mindestanzahl
 (B-15). Erkennungsdauer auf dem Heltec V3 von 12 000 ms auf 2120 ms.
 
+Welle 3 hat die tote ISR-Variante geloescht (A-1 bis A-4); dabei kam heraus, dass
+`gps_functions.cpp:24` die Variantenoption `GPS_BAUDRATE_SOFTCHECK` aus 15
+`variants/*/configuration.h` unbedingt ueberschrieben hat -- der zweite Zweig
+war deshalb auf ALLEN Boards unerreichbar, nicht nur auf den meisten. A-9 wurde
+dabei widerlegt. Flash-Groesse danach byteidentisch, was den toten Code belegt.
+
 Offen und ausdruecklich zurueckgestellt, nicht stillschweigend uebersprungen:
-Welle 3 (A-1 bis A-9, tote ISR-Variante), Welle 4 (S2, die vier unbegrenzten
+Welle 4 (S2, die vier unbegrenzten
 Schleifen B-1/B-2/B-6/B-10 und der AP-Zweig B-13), Welle 5 (Coredump-
 Partition), Welle 6 (B-1 bis B-15 als Katalogeintraege). Ebenso offen die
 Hardware-Pruefungen 8.4 (Board mit `--gps on` ohne Modul) und 8.5

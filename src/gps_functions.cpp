@@ -21,7 +21,20 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 
-#define GPS_BAUDRATE_SOFTCHECK        // GPS Baudratenermittlung wird mit Software Loop geprüft
+// A-1/A-4: Hier stand ein unbedingtes "#define GPS_BAUDRATE_SOFTCHECK".
+// Das Makro ist eigentlich eine Variantenoption -- 15 variants/*/configuration.h
+// setzen oder kommentieren es --, aber diese Zeile hat die Wahl jeder Variante
+// ueberschrieben. Der #else-Zweig (Baudratenerkennung ueber Flankenmessung im
+// ISR) war damit auf ALLEN Boards unerreichbar und ist entfallen; die
+// Software-Schleife ist jetzt der einzige Weg. Zwei Implementierungen, von
+// denen eine nie uebersetzt wird, sind genau der Mechanismus, ueber den die
+// beiden Varianten auseinandergedriftet sind (Befunde A-2 und A-3).
+//
+// Die Defines in den Varianten sind dadurch wirkungslos geworden und koennen
+// gesondert entfernt werden.
+//
+// GPS_BAUDRATE_SETFIX wird jetzt unbedingt ausgewertet (A-4). Vorher lag der
+// vorzeitige return nur im SOFTCHECK-Zweig; der andere kannte SETFIX nicht.
 
 #include <TinyGPSPlus.h>
 
@@ -80,7 +93,6 @@ uint32_t startTimeout;
 
 const int WAIT_DURATION = 2000;   // max. Wartedauer
 
-#if defined(GPS_BAUDRATE_SOFTCHECK)
 
 // ---------------------------------------------------------------------------
 // NMEA-Rahmenpruefung fuer die Baudratenerkennung (N-25/S5, B-15)
@@ -301,82 +313,6 @@ unsigned long detectBaudrate()
 
     return 0;
 }
-#else
-
-//=======================================================================================
-const int SAMPLE_COUNT = 50;      // Anzahl der zu messenden Signalflanken
-const int SAMPLE_DURATION = 5000; // max. Messdauer 5s
-volatile unsigned long pulseTimes[SAMPLE_COUNT];
-volatile int pulseIndex = 0;
-volatile unsigned long lastMicros = 0;
-volatile unsigned long currentMicros = 0;
-volatile unsigned long duration = 0;
-volatile unsigned long startWait = 0;
-
-/**
- * @brief ISR für detectBaudrate
- */
-void IRAM_ATTR handleRxInterrupt() {
-  currentMicros = micros();
-  duration = currentMicros - lastMicros;
-  
-  if (pulseIndex + 1 < SAMPLE_COUNT && duration > 2) {
-    pulseIndex = pulseIndex+1;
-    pulseTimes[pulseIndex] = duration;
-  }
-  lastMicros = currentMicros;
-}
-
-/**
- * @brief detect Baudrate durch Messung der Zeit zwischen RX-Flanken
- * @return long = detected Baudrate
- */
-unsigned long detectBaudrate() {
-  pulseIndex = 0;
-  lastMicros = micros();
-
-  // Messung: warten, bis genügend Flanken gemessen wurden oder Timeout
-  attachInterrupt(GPS_RX_PIN, handleRxInterrupt, CHANGE);
-  startWait = millis();
-  while (pulseIndex < SAMPLE_COUNT && (millis() - startWait < SAMPLE_DURATION)) { delay(10); }
-  detachInterrupt(GPS_RX_PIN);
-
-  // Auswertung
-  Serial.printf("[GPS ]...messured %u\n", pulseIndex);
-  long minDiff = 1000000;
-  if (pulseIndex < 5) return -1; // Zu wenig Daten empfangen
-  unsigned long minDuration = minDiff;
-  for (int i = 1; i < pulseIndex; i++) {  // Suche nach dem kürzesten Puls (entspricht 1 Bit)
-    if (pulseTimes[i] < minDuration && pulseTimes[i] > 2) { // Rauschfilter > 2µs, ist zwar schon in der Erfassung
-      minDuration = pulseTimes[i];
-    }
-  }
- 
-  // Mapping auf Standard-Baudraten
-  long calculatedBaud = minDiff / minDuration;
-  if(iGPSDEBUG >= 2)
-    Serial.printf("[GPS ]...1st attempt: %lu Baud of %i\n", calculatedBaud, GPS_BAUD_COUNT);
-
-  long bestMatch = 0;
-  if ((calculatedBaud > (GPS_BAUDS[GPS_BAUD_COUNT-1]+1000)) || (calculatedBaud < (GPS_BAUDS[0]-100)) )
-  {
-     return -1;
-  }
-  
-  for (long b : GPS_BAUDS)
-  {
-    long diff = abs(calculatedBaud - b);
-    if (diff < minDiff)
-    {
-      minDiff = diff;
-      bestMatch = b;
-    }
-  }
-
-  return bestMatch;
-}
-
-#endif
 /* 9600 
 unsigned long new_baud = 9600;
 // B5 62 06 00 14 00 01 00 00 00 D0 08 00 00 80 25 00 00 07 00 02 00 00 00 00 00 A1 AF
@@ -852,6 +788,13 @@ void WZ_GPS_Reset() {
  * @brief automatische Baudrate Erkennung, L76K | UBLOX Erkennung, jeweils Parameter bei jedem Start setzen:
  * 
  */
+// A-6: gpsDetected hat drei Schreiber -- detectBaudrate(), WZ_GPS_Init() und den
+// "--gps off"-Zweig in command_functions.cpp. Deklariert ist es in
+// loop_functions.cpp. Das ist redundant, aber heute widerspruchsfrei: die
+// Erkennung setzt es, der Aufrufer bestaetigt oder verwirft es, das Kommando
+// schaltet ab. Bewusst nicht zusammengefasst -- eine Umstellung auf einen
+// einzigen Schreiber beruehrt den Kommandopfad und gehoert nicht in eine
+// Aufraeumwelle ohne Verhaltensaenderung.
 void WZ_GPS_Init()
 {
   if(gpsInitDone)
@@ -865,7 +808,14 @@ void WZ_GPS_Init()
   
   #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
   Serial1.setPins(GPS_RX_PIN, GPS_TX_PIN);
-  //Serial1.end();  // vorsorglich schließen, damit Interrupt nicht gestört wird
+  // A-8: Der ESP32-Zweig unten schliesst den Port vorsorglich, dieser nicht --
+  // das Serial1.end() ist hier auskommentiert. Folge: "--gps on" und
+  // "--gps reset" betreten auf T114/T-Echo Serial1.begin() erneut, ohne die
+  // vorherige Instanz zu schliessen. Ob die nRF52-UARTE ein doppeltes begin()
+  // vertraegt, ist aus diesem Repo nicht zu beantworten und wurde nicht auf
+  // Hardware geprueft -- deshalb bleibt das Verhalten unveraendert und ist
+  // hier nur benannt. Wer eines der beiden Boards auf der Bank hat: Re-Init
+  // mehrfach ausloesen und pruefen, ob der Empfang danach noch laeuft.
   #else
   pinMode(GPS_RX_PIN, INPUT);
   pinMode(GPS_TX_PIN, OUTPUT);
