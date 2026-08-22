@@ -1194,7 +1194,7 @@ Dritte Kopie derselben Logik: `sendUBXCommand()`, `WaitPause()`, `startTimeout`
 und `ver` existieren in `nrf52_main.cpp:2546-2580` ein zweites Mal neben den
 Originalen in `gps_functions.cpp`. Genau der Driftmechanismus aus A-1.
 
-### N-27 — BME680-Treiber haelt ein blosses I2C-ACK fuer eine Chip-Erkennung — **VERIFIED (auf echter Hardware)** — Medium
+### N-27 — BME680-Treiber haelt ein blosses I2C-ACK fuer eine Chip-Erkennung — **FIXED (auf echter Hardware reproduziert und verifiziert)** — Medium
 
 `bme680.cpp:62-89` prueft mit `Wire.beginTransmission(0x76)` /
 `endTransmission()`, ob unter der Adresse ueberhaupt jemand antwortet, und
@@ -1210,11 +1210,26 @@ jeder Lesezyklus druckt `Failed to complete reading :(` — dauerhaft, ohne dass
 irgendetwas den Zustand zurueckstellt. Am 2026-08-22 auf einem Heltec V3 mit
 BME280 an 0x76 reproduziert.
 
-Fix-Richtung: `bme680_found` aus dem Rueckgabewert von `bme.begin()` speisen,
-nicht aus dem Adress-ACK, und bei `false` den Sensor abschalten statt in
-`getBME680()` in eine Endlos-Fehlermeldung zu laufen.
+Fix: `bme680_found` wird jetzt aus dem Rueckgabewert von `bme.begin()` gespeist,
+nicht aus dem Adress-ACK. Schlaegt `begin()` fehl, meldet der Node das im
+Klartext samt Adresse, gibt den Hinweis auf `--bme on` / `--bmp on`, setzt
+`bBME680ON = false` (Laufzeit, nicht gespeichert -- wie der bestehende
+Konflikt-Zweig) und kehrt zurueck, bevor Oversampling, Filter und Gasheizer
+konfiguriert werden. Die liefen bisher auch nach einem fehlgeschlagenen
+`begin()`.
 
-### N-28 — `--help` verspricht `--bmx off` fuer BME680, der Handler kann das nicht — **VERIFIED** — Low, UX
+Auf Hardware verifiziert (Heltec V3, BME280 an 0x76):
+
+vorher: "[INIT]...BME680 sensor found at 0x76", --wx zeigt "BME680: on (found)",
+danach dauerhaft "Failed to complete reading :(" in jedem Zyklus
+nachher: "[INIT]...BME680 an 0x76 antwortet, ist aber keiner (Chip-ID passt
+nicht) - BME680 aus", --wx zeigt "BME680: off",
+null "Failed to complete reading" im gesamten Mitschnitt
+
+Der positive Pfad bleibt unberuehrt: "--bme on" auf demselben Board meldet
+"BME280 startet" und liefert 25,9 Grad C, 37,2 %rH, 963,0 hPa.
+
+### N-28 — `--help` verspricht `--bmx off` fuer BME680, der Handler kann das nicht — **FIXED (auf echter Hardware verifiziert)** — Low, UX
 
 `command_functions.cpp:752` druckt `--bmx BME/BMP/680 off`. Der Handler
 `:1894` behandelt `bmx off`, `bme off` und `bmp off` gemeinsam und loescht
@@ -1225,8 +1240,19 @@ Praktische Folge, am 2026-08-22 auf dem Heltec V3 beobachtet: nach `--bmx off`
 gefolgt von `--bme on` antwortet der Node
 `BME680 and BMx280 can't be used together!` und aktiviert den BME280 nicht.
 Der Benutzer hat exakt das getan, was die Hilfe sagt, und der Node bleibt ohne
-Sensor. Entweder die Hilfe korrigieren oder `bmx off` zusaetzlich `680 off`
-ausfuehren lassen.
+Sensor.
+
+Fix: `--bmx off` raeumt jetzt zusaetzlich `bBME680ON`, `bme680_found` und das
+gespeicherte Bit `node_sset2 & 0x0004` ab -- damit stimmt die Hilfe, ohne dass
+sie geaendert werden musste. `--bme off` und `--bmp off` teilen sich zwar den
+Zweig, meinen aber weiterhin genau ihren eigenen Chip; nur das Sammelkommando
+raeumt mit auf. Kollateralschaden gibt es keinen, weil BME680 und BMx280 sich
+die Adressen teilen und ohnehin nie gleichzeitig aktiv sein koennen.
+
+Auf Hardware verifiziert: nach `--680 on` (das wegen N-27 zur Laufzeit
+scheitert, dessen gespeichertes Bit aber gesetzt bleibt) probiert der Node es
+bei jedem Boot erneut. Nach `--bmx off` und Neustart erscheint keine einzige
+BME680-Zeile mehr -- das gespeicherte Bit ist weg.
 
 ## 3. Refuted claims — do not re-investigate
 
