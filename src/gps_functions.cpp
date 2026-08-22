@@ -14,6 +14,8 @@
 
 #include "gps_functions.h"
 
+#include "watchdog_feed.h"
+
 #include <clock.h>
 
 #include <loop_functions.h>
@@ -91,13 +93,20 @@ unsigned long detectBaudrate()
         NMEAlineIndex = 0;
         memset(msg_text, 0x00, maxNMEAline);
 
-         // 2 Sekunden lang auf gueltige NMEA-Daten warten
+        // N-25: Eine Fütterung pro Baudstufe genügt -- das Fenster unten ist
+        // hart auf 1500 ms begrenzt, der Watchdog löst erst nach 5 s aus.
+        meshcom_wdt_feed();
+
+        // 1,5 Sekunden lang auf gueltige NMEA-Daten warten
         while (millis() - start < 1500)
         {
+            // Die innere Schleife war unbegrenzt: bei einem dauerhaft
+            // sendenden Modul bleibt available() beliebig lange wahr. Sie
+            // erbt jetzt dasselbe 1500-ms-Fenster wie die äußere.
             #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-            while (Serial1.available())
+            while (Serial1.available() && (millis() - start < 1500))
             #else
-            while (GPSSerial.available())
+            while (GPSSerial.available() && (millis() - start < 1500))
             #endif
             {
                 #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -368,6 +377,11 @@ String readUBX() {
   startTimeout = millis() + 500;
   ver = "";
   while ((int32_t)(millis() - startTimeout) < 0) {
+    // N-25/B-9: Das Timeout wird bei JEDEM empfangenen Byte neu gesetzt.
+    // Gegen ein dauerhaft sendendes Modul hat diese Schleife daher keine
+    // obere Schranke; ohne Fütterung reboot der Knoten mitten in der
+    // GPS-Erkennung. Die Schranke selbst gehört noch gezogen (S2).
+    meshcom_wdt_feed();
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
     #else
@@ -389,6 +403,7 @@ String readUBXbin() {
   startTimeout = millis() + 500;
   ver = "";
     while ((int32_t)(millis() - startTimeout) < 0) {
+    meshcom_wdt_feed();   // N-25/B-9: gleiches gleitendes Timeout wie readUBX()
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
       int c = Serial1.read();
@@ -409,6 +424,7 @@ String readUBXbin() {
 
 
 void WaitPause() {
+  meshcom_wdt_feed();   // N-25: die erste Schleife wartet bis zu 1000 ms
   startTimeout = millis() + 1000;
   #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
   while ((!Serial1.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
@@ -419,6 +435,7 @@ void WaitPause() {
     Serial.printf("[GPS ]...wait");
   startTimeout = millis() + 50;  // für Serial Sync Zeichenblock lesen und Pause von 50ms abwarten
   while ((int32_t)(millis() - startTimeout) < 0) {
+    meshcom_wdt_feed();   // N-25: 50-ms-Timeout wird pro Byte neu gesetzt
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     if (Serial1.available()) {
       Serial1.read();
@@ -595,6 +612,8 @@ bool GPSprobe() {
   while (GPSSerial.available()) {  // clear RX-Buffer
     ver = ver + char(GPSSerial.read());
   #endif
+
+    meshcom_wdt_feed();   // N-25: bis zu WAIT_DURATION = 2000 ms
 
     if ((int32_t)(millis() - startTimeout) > 0) { // RC-Buffer muss nach WAIT_DURATION leer sein
       Serial.printf("[GPS_ERR] wait stop NMEA timeout!\n");
