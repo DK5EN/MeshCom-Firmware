@@ -6,7 +6,115 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.08.22-stability (2026-08-22)
+
+Korrektur-Release auf `v4.35p.08.21-stability`. **Wer 08.21 installiert hat,
+sollte aktualisieren**: dieser Stand hatte einen Defekt, der jeden Node mit
+aktiviertem GPS in einen dauerhaften Boot-Loop schickte. Das Release 08.21
+wurde deshalb geloescht.
+
+`FLASH_VERSION` bleibt bewusst auf `20260821`. Ein Bump wuerde in
+`esp32_main.cpp:732` die gespeicherten Einstellungen jedes aktualisierenden
+Knotens loeschen -- Rufzeichen, WLAN-Zugangsdaten, Sensorkonfiguration. Die
+Settings-Struktur hat sich nicht geaendert, also gibt es keinen Grund dafuer.
+
+### N-25 -- GPS-Baudscan loest den Task-Watchdog aus (Critical)
+
+Unser eigener Regress, eingefuehrt mit `4c21cb49` (Audit-Befund C3): der
+Task-Watchdog wurde in der ersten Zeile von `esp32setup()` abonniert.
+`WZ_GPS_Init()` laeuft aber aus `esp32loop()` und blockiert dort rund 16 s ohne
+eine einzige Fuetterung -- acht Baudraten zu je 1500 ms, dazu `GPSprobe()` mit
+unbegrenztem `readUBX()`-Schwanz. Bei einem Timeout von 5 s bricht der Knoten
+zwei bis drei Baudstufen nach Scan-Beginn ab. Da `--gps on` vor dem Absturz
+persistiert wird, wiederholt sich das bei jedem Boot: kein Kommandofenster,
+keine Rettung ueber Funk, BLE oder Netzkonsole -- nur Reflash ueber USB.
+
+Vier Aenderungen:
+
+- **S1** -- die Watchdog-Subskription wandert ans Ende von `esp32setup()`.
+  Setup fuehrt legitim sekundenlange Einmal-Initialisierung aus; sie zu
+  ueberwachen war nie Sinn von C3 und hat elf diagnostizierbare Haenger in
+  anonyme Boot-Loops verwandelt.
+- **S4** -- der GPS-Init-Pfad fuettert den Watchdog, hinter dem einzigen
+  Helfer `src/watchdog_feed.h`, der ausserhalb von ESP32 zu nichts kompiliert.
+- **S5** -- der Scan bricht bei der ersten NMEA-Sequenz mit gueltiger
+  Pruefsumme ab, statt immer alle acht Baudraten zu durchlaufen und danach per
+  Argmax die mit den meisten Zeichen zu waehlen. Der alte Argmax hatte keine
+  Mindestanzahl (Befund B-15) und konnte aus einem einzelnen Rauschbyte eine
+  Phantom-Baudrate erfinden.
+- Die Baudratentabelle ist nach Trefferwahrscheinlichkeit sortiert. `SetupUBLOX()`
+  stellt Module beim ersten Init dauerhaft auf 38400; mit 9600 vorn lief das
+  9600-Fenster danach bei jedem Boot voll aus.
+
+Gemessen, Heltec V3 mit u-blox: **Erkennung von 12 000 ms auf 321 ms**, auf
+einem T-Beam bis herunter auf 24 ms.
+
+Zusaetzlich die Aufraeumwelle im selben File: die tote ISR-Variante der
+Baudratenerkennung ist entfallen (A-1 bis A-4), inklusive zweier `return -1`
+aus einer `unsigned long`-Funktion und unseres eigenen
+`pulseIndex + 1`-Regresses. Dabei kam heraus, dass `gps_functions.cpp:24` die
+Variantenoption `GPS_BAUDRATE_SOFTCHECK` aus 15 `configuration.h` unbedingt
+ueberschrieben hat -- der zweite Zweig war auf ALLEN Boards unerreichbar. Die
+Flash-Groesse ist vorher und nachher byteidentisch, was den toten Code belegt.
+
+Volle Analyse: [`docs/bug-N25-gps-baud-scan-watchdog.md`](docs/bug-N25-gps-baud-scan-watchdog.md).
+Messprotokoll der Bankpruefung: [`docs/gps-sensor-bench-20260822.md`](docs/gps-sensor-bench-20260822.md).
+
+### N-27 -- BME680-Treiber haelt ein I2C-ACK fuer eine Chip-Erkennung (Medium)
+
+`setupBME680()` setzte `bme680_found` aus dem blossen Adress-ACK und verwarf
+den Rueckgabewert von `bme.begin()` -- dabei ist genau das die Stelle, die die
+Chip-ID liest. 0x76 und 0x77 teilen sich BME280, BMP280 und BME680. Auf einem
+Board mit BME280 meldete der Node `BME680: on (found)` und druckte in jedem
+Lesezyklus `Failed to complete reading :(`.
+
+### N-28 -- `--bmx off` konnte den BME680 nicht abschalten (Low, UX)
+
+Die Hilfe sagt seit jeher `--bmx BME/BMP/680 off`, der Handler loeschte aber
+nur BMP280/BME280/BMP390. Wer der Hilfe folgte und danach `--bme on` gab, bekam
+`BME680 and BMx280 can't be used together!` und stand ohne Sensor da.
+
+### Build -- Upload-Port festgenagelt
+
+Die 27 `upload_command`-Zeilen in `variants/*/platformio.ini` trugen kein
+`--port`, `esptool` suchte sich den Port also selbst. Mit zwei angeschlossenen
+Boards flasht `pio run --target upload` dann potenziell das falsche. `--upload-port`
+war wirkungslos, weil PlatformIO es nur ueber `$UPLOAD_PORT` weiterreicht.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **Heltec V3** mit u-blox-GPS und BME280 -- Boot-Loop auf dem alten Stand
+  reproduziert und hier als behoben bestaetigt; GPS-Neuinitialisierung per
+  Kommando und per Dreifachklick; 36 Minuten Dauerlauf mit GPS und Sensor;
+  Sensortyp korrekt bestimmt.
+- **Heltec V3, zweites Geraet, ohne GPS-Modul** -- Scan laeuft zu Ende, meldet
+  ehrlich einen Fehlschlag und erfindet keine Baudrate.
+- **T-Beam v1.2** (ESP32-D0WDQ6, AXP2101, SX1276, u-blox) -- neu in Betrieb
+  genommen. Boot mit WLAN-Verbindung und GPS-Init im selben Durchlauf, also
+  genau die Sequenz, an der es vorher scheiterte.
+- **WisBlock RAK4631** (nRF52) -- geflasht und betrieben. Auf nRF52 ist
+  ueberhaupt kein Task-Watchdog scharf, der Defekt trifft diesen Pfad nicht.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **T-Beam Supreme.** `ttgo_tbeam_supreme.bin` ist wieder im Release -- der
+  Grund fuer das Zurueckhalten war dieser GPS-Defekt, und der ist behoben. Auf
+  einem Supreme verifiziert wurde es aber nicht. Konkrete Luecke: der Supreme
+  traegt ein **L76K**, beide Module auf der Bank waren u-blox. Der
+  L76K-Zweig in `GPSprobe()` ist von keinem Test beruehrt.
+- **Batteriestart ohne USB-Host.** Auf dieser Bank nicht durchfuehrbar: dem
+  Heltec V3 ist `ARDUINO_USB_CDC_ON_BOOT=1` auskommentiert, der klassische
+  T-Beam hat kein natives USB.
+- **Der Phantom-Baudraten-Fall mit verrauschtem Eingang.** Belegt ist, dass
+  keine Phantom-Baudrate gemeldet wird; der freie Eingang las null Zeichen, der
+  eigentliche Ausloeser liess sich also nicht erzeugen.
+
+---
+
 ## Stability-Release v4.35p.08.21-stability (2026-08-21)
+
+> **Zurueckgezogen.** Dieses Release hatte den oben beschriebenen Defekt N-25
+> und wurde geloescht. Nicht mehr installieren.
 
 Qualitaets-Release auf Basis der offiziellen MeshCom 4.35p (upstream `dev`,
 Merge-Base `8114d7ae`). **Kein Feature-Release und kein On-Air-Change** -- ein Node
@@ -383,10 +491,11 @@ Dateinamen wie im GitHub-Release. Massgeblich sind `default_envs` in
 
 ### Gebaut, aber nicht im Release
 
-- `T-ETH-ELITE_1262` -- steht in `default_envs` und wird im CI gebaut, ist aber
-  nicht in der Artefaktliste des Release-Workflows.
 - `t5_epaper`, `vision-master-e213-preview`, `esp32-external-radio` -- Opt-in,
   nicht in `default_envs`.
+
+`T-ETH-ELITE_1262` steht zwar nicht in der Artefaktliste des Release-Workflows,
+wird aber seit 08.21 von Hand mitveroeffentlicht und ist im Release enthalten.
 
 ### Newer version > v4.35 able to upgrade via OTA-Flasher.
 
