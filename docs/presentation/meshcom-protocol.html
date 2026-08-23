@@ -1,0 +1,2524 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeshCom Protocol Presentation</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --text-primary: #e0e7ff;
+      --text-secondary: #94a3b8;
+      --accent: #6366f1;
+      --accent-dark: #4f46e5;
+      --accent-light: #818cf8;
+      --border: #334155;
+
+      --font-display: 'IBM Plex Mono', monospace;
+      --font-body: 'Inter', sans-serif;
+
+      --type-xl: 3.5rem;
+      --type-lg: 2.5rem;
+      --type-md: 1.5rem;
+      --type-sm: 1rem;
+      --type-xs: 0.875rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --text-primary: #e0e7ff;
+        --text-secondary: #94a3b8;
+      }
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #f1f5f9;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --accent: #4f46e5;
+        --accent-dark: #4338ca;
+        --accent-light: #6366f1;
+        --border: #cbd5e1;
+      }
+    }
+
+    :root[data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #f1f5f9;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --accent: #4f46e5;
+      --accent-dark: #4338ca;
+      --accent-light: #6366f1;
+      --border: #cbd5e1;
+    }
+
+    :root[data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --text-primary: #e0e7ff;
+      --text-secondary: #94a3b8;
+      --accent: #6366f1;
+      --accent-dark: #4f46e5;
+      --accent-light: #818cf8;
+      --border: #334155;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      line-height: 1.6;
+    }
+
+    .presentation {
+      display: flex;
+      flex-direction: column;
+      scroll-snap-type: y mandatory;
+    }
+
+    .slide {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 2rem;
+      scroll-snap-align: start;
+      animation: fadeIn 0.8s ease-out;
+      position: relative;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide-content {
+      max-width: 900px;
+      width: 100%;
+    }
+
+    /* Slide 1: Introduction */
+    .slide-intro {
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    .intro-header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .protocol-title {
+      font-family: var(--font-display);
+      font-size: var(--type-xl);
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      text-wrap: balance;
+      letter-spacing: -0.02em;
+    }
+
+    .intro-subtitle {
+      font-size: var(--type-lg);
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 3rem;
+      text-wrap: balance;
+    }
+
+    .protocol-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    .comparison-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .comparison-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-primary);
+      transform: translateY(-4px);
+    }
+
+    .card-label {
+      font-family: var(--font-display);
+      font-size: var(--type-xs);
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: var(--type-md);
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .card-description {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      font-size: 0.95rem;
+    }
+
+    .accent-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .broadcast-banner {
+      background: var(--accent);
+      color: #0f172a;
+      padding: 1.5rem 2rem;
+      border-radius: 8px;
+      margin-top: 2rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: var(--type-md);
+      font-family: var(--font-display);
+    }
+
+    /* Slide 2: Hardware Platforms */
+    .slide-hardware {
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .section-eyebrow {
+      font-family: var(--font-display);
+      font-size: var(--type-xs);
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: var(--type-lg);
+      color: var(--text-primary);
+      font-weight: 700;
+      margin-bottom: 2.5rem;
+      text-wrap: balance;
+    }
+
+    .platforms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .platform-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .platform-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .platform-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .platform-chip {
+      font-size: var(--type-xs);
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      display: inline-block;
+      font-family: var(--font-display);
+    }
+
+    .frequency-note {
+      background: var(--bg-secondary);
+      border-left: 3px solid var(--accent);
+      padding: 1.5rem;
+      border-radius: 4px;
+      margin-top: 2rem;
+    }
+
+    .frequency-note-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+      font-size: var(--type-sm);
+    }
+
+    .frequency-detail {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* Slide 3: Regional Configuration */
+    .slide-regional {
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .config-card {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .config-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+
+    .region-code {
+      font-family: var(--font-display);
+      font-size: var(--type-md);
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .config-detail {
+      display: flex;
+      justify-content: space-between;
+      margin: 0.75rem 0;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .config-label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .config-value {
+      color: var(--text-primary);
+      font-weight: 600;
+      font-family: var(--font-display);
+    }
+
+    .comparison-intro {
+      background: var(--accent);
+      color: #0f172a;
+      padding: 1.5rem 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      font-weight: 500;
+      font-size: var(--type-sm);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .protocol-title {
+        font-size: 2.5rem;
+      }
+
+      .intro-subtitle {
+        font-size: 1.75rem;
+      }
+
+      .protocol-comparison {
+        grid-template-columns: 1fr;
+      }
+
+      .config-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .slide {
+        padding: 2rem 1rem;
+      }
+
+      .platforms-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Scroll indicator */
+    .scroll-hint {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: var(--type-xs);
+      color: var(--text-secondary);
+      pointer-events: none;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 0.5;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
+    /* Slide 4: Flood Network Animation */
+    .slide-network {
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .animation-container {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem;
+      margin-top: 2rem;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
+    }
+
+    .network-node {
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+    }
+
+    .node-circle {
+      fill: var(--bg-secondary);
+      stroke: var(--border);
+      stroke-width: 2;
+    }
+
+    .node-circle.sending {
+      fill: #ec4899;
+      stroke: #ec4899;
+    }
+
+    .node-circle.receiving {
+      fill: var(--accent);
+      stroke: var(--accent);
+      animation: pulse-node 0.6s ease-out;
+    }
+
+    .node-circle.gateway {
+      fill: #10b981;
+      stroke: #10b981;
+    }
+
+    .node-circle.mesh {
+      fill: #f59e0b;
+      stroke: #f59e0b;
+    }
+
+    @keyframes pulse-node {
+      0% {
+        r: 20;
+        opacity: 1;
+      }
+      100% {
+        r: 28;
+        opacity: 0;
+      }
+    }
+
+    .node-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-anchor: middle;
+      fill: var(--text-primary);
+      font-family: var(--font-display);
+    }
+
+    .node-role {
+      font-size: 9px;
+      fill: var(--text-secondary);
+      text-anchor: middle;
+      font-family: var(--font-body);
+    }
+
+    .signal-wave {
+      stroke: var(--accent);
+      stroke-width: 2;
+      fill: none;
+      stroke-dasharray: 5,5;
+      animation: wave-propagate 1.2s ease-out forwards;
+    }
+
+    @keyframes wave-propagate {
+      0% {
+        r: 0;
+        opacity: 1;
+      }
+      100% {
+        r: 80;
+        opacity: 0;
+      }
+    }
+
+    .arrow-internet {
+      stroke: #10b981;
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrowhead-internet);
+      animation: arrow-animate 1.5s ease-in-out;
+    }
+
+    .arrow-mesh {
+      stroke: #f59e0b;
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrowhead-mesh);
+      animation: arrow-animate 1.8s ease-in-out;
+    }
+
+    @keyframes arrow-animate {
+      0% {
+        stroke-dashoffset: 50;
+        opacity: 0;
+      }
+      20% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        stroke-dashoffset: 0;
+        opacity: 0;
+      }
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-sending {
+      background: #ec4899;
+    }
+
+    .legend-receiving {
+      background: var(--accent);
+    }
+
+    .legend-gateway {
+      background: #10b981;
+    }
+
+    .legend-mesh {
+      background: #f59e0b;
+    }
+
+    .legend-text {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    .explanation {
+      background: var(--bg-secondary);
+      border-left: 3px solid var(--accent);
+      padding: 1.5rem;
+      border-radius: 4px;
+      margin-top: 2rem;
+    }
+
+    .explanation-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+      font-size: var(--type-sm);
+    }
+
+    .explanation-text {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 768px) {
+      .animation-container {
+        padding: 1.5rem;
+        min-height: 300px;
+      }
+
+      .legend {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Slide 5: HeyFrames */
+    .slide-heyframes {
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    .heyframe-info {
+      background: var(--accent);
+      color: #0f172a;
+      padding: 1.5rem 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      font-weight: 500;
+      font-size: var(--type-sm);
+    }
+
+    .functions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .function-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .function-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-primary);
+      transform: translateY(-4px);
+    }
+
+    .function-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .function-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+      font-size: var(--type-sm);
+    }
+
+    .function-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .heyframe-structure {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+
+    .structure-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      font-size: var(--type-sm);
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .frame-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .frame-row:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .frame-label {
+      font-family: var(--font-display);
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    .frame-content {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .signal-indicator {
+      display: inline-block;
+      padding: 0.4rem 0.8rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .topology-example {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin-top: 2rem;
+      text-align: center;
+    }
+
+    .topology-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      font-size: var(--type-sm);
+    }
+
+    .node-with-neighbors {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .central-node {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      font-weight: 600;
+      font-family: var(--font-display);
+    }
+
+    .neighbor-nodes {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      max-width: 400px;
+    }
+
+    .neighbor-node {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      font-weight: 500;
+      font-size: 0.8rem;
+      font-family: var(--font-display);
+      border: 1px solid var(--accent);
+    }
+
+    .topology-label {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-top: 1rem;
+      font-style: italic;
+    }
+
+    /* Slide 6: Message Transmission */
+    .slide-messages {
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    .animation-tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .animation-tab {
+      padding: 1rem 1.5rem;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .animation-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .animation-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .animation-container-msg {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      margin-bottom: 2rem;
+      min-height: 450px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .message-types-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .message-type-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .message-type-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-primary);
+      transform: translateY(-4px);
+    }
+
+    .message-type-header {
+      font-family: var(--font-display);
+      font-size: var(--type-sm);
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .message-format {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      color: var(--accent-light);
+      margin: 0.75rem 0;
+      word-break: break-all;
+    }
+
+    .message-details {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      margin-top: 1rem;
+    }
+
+    .behavior-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+
+    .behavior-title {
+      font-family: var(--font-display);
+      font-size: var(--type-sm);
+      color: var(--text-primary);
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .behavior-item {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .behavior-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .behavior-label {
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.5rem;
+      font-family: var(--font-display);
+    }
+
+    .behavior-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .condition-list {
+      background: var(--bg-primary);
+      border-left: 3px solid var(--accent);
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .condition-list li {
+      margin: 0.5rem 0;
+    }
+
+    @media (max-width: 768px) {
+      .message-types-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Slide 7: Technical Details */
+    .slide-technical {
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .technical-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .technical-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .technical-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-primary);
+      transform: translateY(-4px);
+    }
+
+    .tech-title {
+      font-family: var(--font-display);
+      font-size: var(--type-sm);
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tech-content {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .tech-code {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.75rem;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      color: var(--accent-light);
+      margin: 0.75rem 0;
+      overflow-x: auto;
+    }
+
+    .priority-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .priority-table thead {
+      background: var(--bg-primary);
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .priority-table thead th {
+      padding: 0.75rem;
+      text-align: left;
+      color: var(--accent);
+      font-weight: 600;
+      font-family: var(--font-display);
+    }
+
+    .priority-table tbody td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .priority-table tbody tr:hover {
+      background: var(--bg-primary);
+    }
+
+    .prio-1 { color: #dc2626; font-weight: 600; }
+    .prio-2 { color: #f97316; font-weight: 600; }
+    .prio-3 { color: #3b82f6; font-weight: 600; }
+    .prio-4 { color: #84cc16; font-weight: 600; }
+    .prio-5 { color: #94a3b8; font-weight: 600; }
+
+    .buffer-diagram {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      color: var(--accent-light);
+      overflow-x: auto;
+    }
+
+    .note-box {
+      background: var(--bg-primary);
+      border-left: 3px solid #f59e0b;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .note-box strong {
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 768px) {
+      .technical-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="presentation">
+    <!-- Slide 1: Introduction -->
+    <section class="slide slide-intro">
+      <div class="slide-content">
+        <div class="intro-header">
+          <div class="protocol-title">MeshCom</div>
+          <div class="intro-subtitle">Protokoll Grundlagen</div>
+        </div>
+
+        <div class="protocol-comparison">
+          <div class="comparison-card">
+            <div class="card-label"><span class="accent-dot"></span>Orientierung</div>
+            <div class="card-title">AX.25 Basis</div>
+            <div class="card-description">
+              MeshCom baut auf den Grundprinzipien des bewährten AX.25 Protokolls auf und adaptiert diese für moderne LoRa-Hardware.
+            </div>
+          </div>
+
+          <div class="comparison-card">
+            <div class="card-label"><span class="accent-dot"></span>Verwandtschaft</div>
+            <div class="card-title">LoRa APRS</div>
+            <div class="card-description">
+              Ähnlich wie LoRa APRS nutzt MeshCom ein Broadcast-Modell statt zentralisierter Verbindungen.
+            </div>
+          </div>
+        </div>
+
+        <div class="broadcast-banner">
+          ⚡ Flutnetzwerk — Broadcast statt verbindungsorientiert
+        </div>
+
+        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+          <div style="color: var(--text-secondary); font-size: var(--type-xs); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Der Unterschied</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div>
+              <div style="color: var(--text-secondary); font-size: var(--type-xs); margin-bottom: 0.5rem;">Packet Radio</div>
+              <div style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.8;">Verbindungen auf- und abbauend, Punkt-zu-Punkt orientiert</div>
+            </div>
+            <div>
+              <div style="color: var(--accent); font-size: var(--type-xs); margin-bottom: 0.5rem;">✓ MeshCom</div>
+              <div style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.8;">Broadcast-basiert, Flutnetzwerk, dezentral und robust</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Weitere Informationen:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md" style="color: var(--accent); text-decoration: none;">Wire Format Dokumentation</a> — Paketaufbau und Protokoll-Details</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md" style="color: var(--accent); text-decoration: none;">Flood Network Analyse</a> — Netzwerk-Funktionsweise und Optimierungen</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 2: Hardware Platforms -->
+    <section class="slide slide-hardware">
+      <div class="slide-content">
+        <div class="section-eyebrow">Hardware</div>
+        <div class="section-title">Plattformen & LoRa Module</div>
+
+        <div class="platforms-grid">
+          <div class="platform-card">
+            <div class="platform-name">Heltec V3</div>
+            <span class="platform-chip">ESP32 + LoRa</span>
+          </div>
+          <div class="platform-card">
+            <div class="platform-name">TTGO T-Beam</div>
+            <span class="platform-chip">ESP32 + GPS</span>
+          </div>
+          <div class="platform-card">
+            <div class="platform-name">TTGO T-Deck</div>
+            <span class="platform-chip">ESP32 + Display</span>
+          </div>
+          <div class="platform-card">
+            <div class="platform-name">T-Deck Plus</div>
+            <span class="platform-chip">ESP32 + erweitert</span>
+          </div>
+          <div class="platform-card">
+            <div class="platform-name">WisBlock RAK4631</div>
+            <span class="platform-chip">nRF52840 + LoRa</span>
+          </div>
+          <div class="platform-card">
+            <div class="platform-name">T-Beam Supreme</div>
+            <span class="platform-chip">ESP32-S3 + GPS</span>
+          </div>
+        </div>
+
+        <div class="frequency-note">
+          <div class="frequency-note-title">📡 Standard Verbreitungsfrequenz</div>
+          <div class="frequency-detail">
+            433 MHz ist die Hauptfrequenz. Je nach Region und Regulierung werden unterschiedliche Bandwidth- und Spreading-Factor-Konfigurationen verwendet.
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Hardware & Varianteninfo:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/02-build-and-variants.md" style="color: var(--accent); text-decoration: none;">Build & Variants</a> — Hardware-Plattformen und Konfiguration</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 3: Regional Configuration -->
+    <section class="slide slide-regional">
+      <div class="slide-content">
+        <div class="section-eyebrow">Konfiguration</div>
+        <div class="section-title">Regionale Frequenzbänder</div>
+
+        <div class="comparison-intro">
+          Unterschiedliche Länder und Regionen verwenden verschiedene LoRa-Parameter zur Einhaltung lokaler Funkbestimmungen.
+        </div>
+
+        <div class="config-grid">
+          <div class="config-card">
+            <div class="region-code">EU8</div>
+            <div class="config-detail">
+              <span class="config-label">Frequenz</span>
+              <span class="config-value">433 MHz</span>
+            </div>
+            <div class="config-detail">
+              <span class="config-label">Spreading Factor</span>
+              <span class="config-value">SF11</span>
+            </div>
+            <div class="config-detail">
+              <span class="config-label">Bandbreite</span>
+              <span class="config-value">250 kHz</span>
+            </div>
+          </div>
+
+          <div class="config-card">
+            <div class="region-code">GB</div>
+            <div class="config-detail">
+              <span class="config-label">Frequenz</span>
+              <span class="config-value">433 MHz</span>
+            </div>
+            <div class="config-detail">
+              <span class="config-label">Spreading Factor</span>
+              <span class="config-value">SF11</span>
+            </div>
+            <div class="config-detail">
+              <span class="config-label">Bandbreite</span>
+              <span class="config-value">125 kHz</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--accent);">
+          <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+            Der Unterschied in der Bandbreite (250 kHz vs. 125 kHz) beeinflusst die Datenrate und Reichweite. Größere Bandbreiten ermöglichen höhere Datenraten, während kleinere Bandbreiten die Reichweite verbessern.
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Regionale LoRa-Konfiguration:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/configuration_global.h" style="color: var(--accent); text-decoration: none;">Globale Konfiguration</a> — LoRa-Parameter pro Region</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 4: Flood Network Animation -->
+    <section class="slide slide-network">
+      <div class="slide-content">
+        <div class="section-eyebrow">Netzwerk-Funktionsweise</div>
+        <div class="section-title">Flutnetzwerk & Transportsicherung</div>
+
+        <!-- Network Animation Tabs -->
+        <div class="animation-tabs">
+          <button class="animation-tab active" onclick="switchNetworkMode('broadcast')">Broadcast Flood</button>
+          <button class="animation-tab" onclick="switchNetworkMode('relay')">Mesh Relay & Repeat</button>
+        </div>
+
+        <div class="animation-container">
+          <svg viewBox="0 0 800 350" xmlns="http://www.w3.org/2000/svg" id="networkAnimation">
+            <defs>
+              <marker id="arrowhead-internet" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#10b981" />
+              </marker>
+              <marker id="arrowhead-mesh" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#f59e0b" />
+              </marker>
+            </defs>
+
+            <!-- Sending Node (Sender) -->
+            <g class="network-node">
+              <circle class="node-circle sending" cx="100" cy="150" r="20" />
+              <text class="node-label" x="100" y="155">TX</text>
+              <text class="node-role" x="100" y="175">Sender</text>
+            </g>
+
+            <!-- Receiving Node 1 (Mesh) -->
+            <g class="network-node">
+              <circle class="node-circle" cx="300" cy="80" r="20" />
+              <text class="node-label" x="300" y="85">N2</text>
+              <text class="node-role" x="300" y="105">Mesh</text>
+            </g>
+
+            <!-- Receiving Node 2 (Gateway) -->
+            <g class="network-node">
+              <circle class="node-circle" cx="400" cy="180" r="20" />
+              <text class="node-label" x="400" y="185">GW</text>
+              <text class="node-role" x="400" y="205">Gateway</text>
+            </g>
+
+            <!-- Receiving Node 3 (Standard) -->
+            <g class="network-node">
+              <circle class="node-circle" cx="300" cy="280" r="20" />
+              <text class="node-label" x="300" y="285">N3</text>
+              <text class="node-role" x="300" y="305">Empfänger</text>
+            </g>
+
+            <!-- Internet Cloud -->
+            <g class="network-node">
+              <ellipse cx="650" cy="180" rx="40" ry="30" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="5,5"/>
+              <text class="node-label" x="650" y="185">Internet</text>
+            </g>
+
+            <!-- Initial broadcast waves (will be created by JavaScript) -->
+          </svg>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color legend-sending"></div>
+            <div class="legend-text">Sender</div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-receiving"></div>
+            <div class="legend-text">Empfängt Nachricht</div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-gateway"></div>
+            <div class="legend-text">Gateway (Internet)</div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-mesh"></div>
+            <div class="legend-text">Mesh (Wiederholt)</div>
+          </div>
+        </div>
+
+        <div class="explanation">
+          <div class="explanation-title">Keine Transportsicherung — Flutnetzwerk-Prinzip</div>
+          <div class="explanation-text">
+            MeshCom nutzt ein Broadcast-Modell ohne klassische Transportsicherung (Handshakes, ACKs). Jede Nachricht wird von allen empfangenen Knoten gehört. Knoten mit aktiviertem Gateway leiten die Nachricht ins Internet weiter. Knoten mit aktiviertem Mesh wiederholen die Nachricht, um die Reichweite zu vergrößern.
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Flood Network Detailaudi:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/lora_functions.cpp" style="color: var(--accent); text-decoration: none;">Relay & Dedup Logik</a> — Implementierung der Weiterleitung</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md" style="color: var(--accent); text-decoration: none;">Prio-Talk Analyse</a> — Detaillierte Flood-Network-Analyse</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 5: HeyFrames -->
+    <section class="slide slide-heyframes">
+      <div class="slide-content">
+        <div class="section-eyebrow">Nachbarschaftserkennung</div>
+        <div class="section-title">HeyFrames</div>
+
+        <div class="heyframe-info">
+          HeyFrames sind spezielle Kontrollframes, die regelmäßig von jedem Knoten versendet werden, um die Netzwerk-Topologie abzubilden und Nachbarknoten zu identifizieren.
+        </div>
+
+        <div class="functions-grid">
+          <div class="function-card">
+            <div class="function-icon">👋</div>
+            <div class="function-title">Nachbarn identifizieren</div>
+            <div class="function-description">
+              Jeder Knoten kann durch HeyFrames alle erreichbaren Nachbarknoten in Reichweite erkennen.
+            </div>
+          </div>
+
+          <div class="function-card">
+            <div class="function-icon">📊</div>
+            <div class="function-title">Signalreport</div>
+            <div class="function-description">
+              RSSI (Received Signal Strength Indicator) und SNR (Signal-to-Noise Ratio) werden gemessen und übertragen.
+            </div>
+          </div>
+
+          <div class="function-card">
+            <div class="function-icon">🔗</div>
+            <div class="function-title">Topologie-Info</div>
+            <div class="function-description">
+              Jeder Knoten sendet mit, wie viele Nachbarn er selbst hat — ermöglicht indirekte Netzwerk-Einsicht.
+            </div>
+          </div>
+
+          <div class="function-card">
+            <div class="function-icon">🔄</div>
+            <div class="function-title">Regelmäßiges Update</div>
+            <div class="function-description">
+              HeyFrames werden in definierten Intervallen versendet, um die Netzwerk-Karte aktuell zu halten.
+            </div>
+          </div>
+        </div>
+
+        <div class="heyframe-structure">
+          <div class="structure-title">HeyFrame Aufbau</div>
+
+          <div class="frame-row">
+            <div class="frame-label">Sender-Kennung</div>
+            <div class="frame-content">
+              Eindeutige ID des Knotens, der das HeyFrame versendet (z. B. CallSign oder Device ID)
+            </div>
+          </div>
+
+          <div class="frame-row">
+            <div class="frame-label">RSSI</div>
+            <div class="frame-content">
+              Empfangene Signalstärke bei Empfängern
+              <div class="signal-indicator">z. B. -85 dBm</div>
+            </div>
+          </div>
+
+          <div class="frame-row">
+            <div class="frame-label">SNR</div>
+            <div class="frame-content">
+              Signal-zu-Rausch-Verhältnis für Qualitätsassessment
+              <div class="signal-indicator">z. B. 7.5 dB</div>
+            </div>
+          </div>
+
+          <div class="frame-row">
+            <div class="frame-label">Nachbarzahl</div>
+            <div class="frame-content">
+              Anzahl der Nachbarknoten, die dieser Knoten erreichen kann — gibt Hinweise auf die lokale Dichte und Netzwerk-Topologie
+            </div>
+          </div>
+
+          <div class="frame-row">
+            <div class="frame-label">Datenrate</div>
+            <div class="frame-content">
+              Aktuelle LoRa-Parameter und Kommunikationsrate dieses Knotens
+            </div>
+          </div>
+        </div>
+
+        <div class="topology-example">
+          <div class="topology-title">Beispiel: Netzwerk-Topologie eines Knotens</div>
+          <div class="node-with-neighbors">
+            <div class="central-node">N1</div>
+            <div class="neighbor-nodes">
+              <div class="neighbor-node">N2</div>
+              <div class="neighbor-node">N3</div>
+              <div class="neighbor-node">N4</div>
+              <div class="neighbor-node">N5</div>
+            </div>
+            <div class="topology-label">Knoten N1 hat 4 Nachbarn • Jeder Nachbar meldet seine eigene Nachbarzahl</div>
+          </div>
+        </div>
+
+        <!-- TODO: Screenshots from http://dk5en-98.local -->
+        <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 1rem 1.5rem; border-radius: 4px; margin-top: 2rem; font-size: 0.9rem;">
+          <div style="color: #333; font-weight: 600; margin-bottom: 0.5rem;">⚠️ TODO: Echtzeit-Screenshots einbauen</div>
+          <div style="color: #555; line-height: 1.6;">
+            Screenshots von <code style="background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 2px;">http://dk5en-98.local</code> hinzufügen:
+            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+              <li>HeyFrames auf dem Draht (Netzwerk-Capture/Logs)</li>
+              <li>HeyFrames Darstellung in der WebGUI</li>
+              <li>Topologie-Visualisierung aus der WebGUI</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 HeyFrames & Neighbor Discovery:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/hey-supp.md" style="color: var(--accent); text-decoration: none;">Trickle HEY Suppression</a> — Adaptive HEY-Frequenz (RFC 6206)</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/mheard_functions.cpp" style="color: var(--accent); text-decoration: none;">MHeard Logik</a> — Nachbar-Verwaltung</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 6: Message Transmission -->
+    <section class="slide slide-messages">
+      <div class="slide-content">
+        <div class="section-eyebrow">Nachrichtenübertragung</div>
+        <div class="section-title">Broadcast, DM & Wiederholung</div>
+
+        <!-- Message Animation Tabs -->
+        <div class="animation-tabs">
+          <button class="animation-tab active" onclick="switchMessageMode('broadcast')">Broadcast & Gruppe</button>
+          <button class="animation-tab" onclick="switchMessageMode('dm')">Persönliche Nachricht</button>
+        </div>
+
+        <div class="animation-container-msg" id="messageAnimation">
+          <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" id="messageSvg">
+            <defs>
+              <marker id="arrowhead-msg" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="var(--accent, #6366f1)" />
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="message-types-grid">
+          <div class="message-type-card">
+            <div class="message-type-header">Broadcast (Gruppe 262)</div>
+            <div class="message-format">OE1ABC-12>262:{text}</div>
+            <div class="message-details">
+              Nachricht an Gruppe 262 wird von allen Knoten empfangen und weitergeleitet, wenn Mesh aktiviert ist. Weitergeleitet mit max_hop=4, dekrementiert bei jedem Relay.
+            </div>
+          </div>
+
+          <div class="message-type-card">
+            <div class="message-type-header">Persönliche Nachricht (DM)</div>
+            <div class="message-format">OE1ABC-12>OE9XYZ:Beispiel Text, 73{987</div>
+            <div class="message-details">
+              Direkt an OE9XYZ adressiert. Die <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px;">{987</code> ist die 3-stellige ACK-Anfrage-Nummer (Nachrichtenzähler 0-999) <strong>ohne schließende Klammer</strong>.
+            </div>
+          </div>
+        </div>
+
+        <div class="behavior-section">
+          <div class="behavior-title">Relaying & Wiederholung</div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">📡 Mesh-Weiterleitung (Relay)</div>
+            <div class="behavior-description">
+              Jeder Knoten leitet empfangene Nachrichten einmal weiter (RING_STATUS_DONE = Fire-and-Forget). **Nicht weitergeleitet wird, wenn:**
+            </div>
+            <ul class="condition-list">
+              <li>Hop-Count = 0 (bereits dekrementiert vor dem Relay)</li>
+              <li>Schleife erkannt (eigenes Rufzeichen im Quellpfad)</li>
+              <li>Doppelte msg_id im Dedup-Ring (zirkulärer Puffer, kein Timeout)</li>
+              <li>Server-Flag gesetzt (Gateway hat bereits ins Internet weitergeleitet)</li>
+              <li>Nachrichtentyp nicht weiterleibbar (nur TEXT, POSITION, HEY)</li>
+              <li>Mesh deaktiviert (Knoten als Endpunkt konfiguriert)</li>
+            </ul>
+          </div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">🔁 Wiederholung durch Originator</div>
+            <div class="behavior-description">
+              **Nur der Ursprungsknoten wiederholt** TEXT-Nachrichten automatisch — bis zu **3 Versuche** im Abstand von ca. **40 Sekunden**. Nach 3 Versuchen stoppt die Wiederholung automatisch.
+            </div>
+          </div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">❌ Was cancelt das Relay?</div>
+            <div class="behavior-description">
+              Ein eingerichtetes Relay wird <strong>nicht storniert</strong>, selbst wenn ein anderer Knoten das Paket zuerst weitergeleitet. Grund: Das System muss ohne Topologie-Wissen funktionieren (Brückenknoten-Szenario). Stattdessen unterdrückt der Dedup-Ring <strong>neu eingereihte Relays</strong>.
+            </div>
+          </div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">✅ ACK-Behandlung</div>
+            <div class="behavior-description">
+              ACK-Frames werden <strong>nicht gemasht</strong>. Eine Nachricht mit ACK-Anfrage <code>{NNN</code> wird normal weitergeleitet, die ACK-Antwort <code>:ackNNN</code> aber direkt nur an den Sender gesendet (kein Mesh).
+            </div>
+          </div>
+        </div>
+
+        <div class="behavior-section" style="margin-top: 2rem;">
+          <div class="behavior-title">ACK-Format im Detail</div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">ACK-Anfrage im DM (z. B. Nachricht 987)</div>
+            <div class="behavior-description">
+              Sender hängt an das Ende: <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px; color: var(--accent-light);">{987</code><br/>
+              Diese Nummer ist der 3-stellige Nachrichtenzähler des Senders (0-999). <strong>Keine schließende Klammer!</strong>
+            </div>
+          </div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">ACK-Antwort vom Empfänger</div>
+            <div class="behavior-description">
+              Antwort wird mit Format <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px; color: var(--accent-light);">:ack987</code> gesendet.<br/>
+              Bereich: 0-999, wird mit %03i formatiert (3-stellig, führende Nullen).
+            </div>
+          </div>
+
+          <div class="behavior-item">
+            <div class="behavior-label">Gateway kompakter ACK</div>
+            <div class="behavior-description">
+              Gateways senden zusätzlich einen **12-Byte binären ACK** für Broadcast/Gruppe Nachrichten. Dieser ACK wird <strong>nicht weitergeleitet</strong> (nur Gateways versenden ihn).
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Nachrichtenformat & ACK-Logik:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/loop_functions.cpp" style="color: var(--accent); text-decoration: none;">Message Handling</a> — Versand und ACK-Verarbeitung</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md#15-acknowledgements" style="color: var(--accent); text-decoration: none;">ACK-Format</a> — Bestätigungsformat und Wiederholung</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 7: Technical Details -->
+    <section class="slide slide-technical">
+      <div class="slide-content">
+        <div class="section-eyebrow">Interne Architektur</div>
+        <div class="section-title">Puffer, Message IDs & Prioritäten</div>
+
+        <div class="technical-grid">
+          <div class="technical-card">
+            <div class="tech-title">🔌 LoRa TX-Puffer (Ring Buffer)</div>
+            <div class="tech-content">
+              <strong>ringBuffer[MAX_RING]</strong> — zirkulärer Puffer mit 30 Slots
+              <div class="tech-code">
+Slot 0: [Länge|Status|Type|MsgID|Payload...]
+Slot 1: [Länge|Status|Type|MsgID|Payload...]
+...
+Slot 29: [Länge|Status|Type|MsgID|Payload...]
+              </div>
+              <strong>Status pro Slot:</strong><br/>
+              • RING_STATUS_READY — bereit zum Senden<br/>
+              • RING_STATUS_DONE — bereits gesendet<br/>
+              • RING_STATUS_RESERVED — in Benutzung
+            </div>
+          </div>
+
+          <div class="technical-card">
+            <div class="tech-title">🆔 Message ID Aufbau</div>
+            <div class="tech-content">
+              <strong>32-bit msg_id Zusammensetzung:</strong>
+              <div class="tech-code">
+((gw_id & 0x3FFFFF) << 10) | (counter & 0x3FF)
+              </div>
+              <strong>Top 22 Bits:</strong> Gateway-ID (von MAC abgeleitet)<br/>
+              <strong>Low 10 Bits:</strong> Nachrichtenzähler 0-999<br/><br/>
+              ⚠️ <strong>Wichtig:</strong> Zähler wraps bei 999, nicht 1024 (für {NNN} Format)
+            </div>
+          </div>
+
+          <div class="technical-card">
+            <div class="tech-title">📊 Dedup-Ring</div>
+            <div class="tech-content">
+              <strong>ringBufferLoraRX[MAX_DEDUP_RING]</strong> — speichert empfangene msg_ids<br/><br/>
+              <strong>Funktionsweise:</strong><br/>
+              ✓ Verhindert doppelte Verarbeitung<br/>
+              ✓ Zirkulärer Puffer ohne Timeout<br/>
+              ✓ Alte Einträge werden beim Wrap-Around überschrieben<br/><br/>
+              ⚠️ Hält verlorene Duplikate länger als nötig (beeinflusst Brückenszenarien)
+            </div>
+          </div>
+
+          <div class="technical-card">
+            <div class="tech-title">⚡ Prioritätssystem (5 Stufen)</div>
+            <div class="tech-content">
+              <table class="priority-table">
+                <thead>
+                  <tr>
+                    <th>Prio</th>
+                    <th>Typ</th>
+                    <th>CSMA Timeout</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="prio-1">1</span></td>
+                    <td>ACK / DM</td>
+                    <td>3000ms</td>
+                  </tr>
+                  <tr>
+                    <td><span class="prio-2">2</span></td>
+                    <td>Gruppe / Broadcast</td>
+                    <td>3000ms</td>
+                  </tr>
+                  <tr>
+                    <td><span class="prio-3">3</span></td>
+                    <td>Mesh-Relay</td>
+                    <td>4500ms</td>
+                  </tr>
+                  <tr>
+                    <td><span class="prio-4">4</span></td>
+                    <td>Position</td>
+                    <td>5500ms</td>
+                  </tr>
+                  <tr>
+                    <td><span class="prio-5">5</span></td>
+                    <td>HEY</td>
+                    <td>5500ms</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="note-box">
+          <strong>TODO — Firmware Details:</strong> Wir benötigen genaue Informationen zu:<br/>
+          • Wie wird MAX_RETRANSMIT (3x) für DMs gesteuert? Welche Bedingungen canceln Retries?<br/>
+          • Wie funktioniert RING_STATUS_DONE Behandlung bei Relays? Wann wird ein Slot freigegeben?<br/>
+          • CAD (Channel Activity Detection) Parameter — timeouts, Backoff-Strategie bei Kanal belegt<br/>
+          • Slot-Vergabe (Phase 3) — ist das implementiert oder noch in Planung?
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ff9800; border-radius: 4px;">
+          <div style="color: #333; font-weight: 600; margin-bottom: 0.5rem; font-family: var(--font-display); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">⚠️ TODO: Nächste Folie (8) — Mesh Control</div>
+          <div style="color: #555; line-height: 1.6; font-size: 0.9rem;">
+            Folie zeigt Mesh-Steuerung basierend auf ADR-02 (Rev. 3):<br/>
+            • <strong>Stadt-Node:</strong> 10+ Nachbarn, alle sind auch gut vernetzt → kann meshen optional<br/>
+            • <strong>Berg-Node (Brücke):</strong> nur 2 Nachbarn aber jeder hat NC=1-2 → Essentieller Relay, MUSS meshen<br/>
+            • Netzwichtigkeit-Formel: Importance = Σ(1/NC_reported)<br/>
+            • Importance-basierter Relay-Backoff (CSMA-Priorisierung)<br/>
+            Daten aus 24-h Live-Produktionsnetz (96.074 HEY-Frames, 1.430 Nodes)
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
+          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Ring Buffer Architektur</div>
+          <div class="buffer-diagram">
+iRead (Leseziger)  ──→  [DONE|DONE|READY|READY|...|RESERVED|DONE]  ←── iWrite (Schreibzeiger)
+                         Prio↓  Prio↑   Prio↑  Prio↓        |
+                         FIFO-Entnahme nach Priorität       └─ Neue Pakete hier eingefügt
+          </div>
+          <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.75rem;">
+            <strong>getNextTxSlot():</strong> Scannt den Ring nach höchster belegter Priorität. Bei gleicher Priorität: ältester Eintrag zuerst (FIFO).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 8: Netzwichtigkeit & Neighbour Count -->
+    <section class="slide" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);">
+      <div class="slide-content">
+        <div class="section-eyebrow">Intelligente Relay-Priorisierung</div>
+        <div class="section-title">Netzwichtigkeit & Neighbour Count</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+          <!-- Stadt Node -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
+            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🏙️ Stadt-Node</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
+              Mein NC: 10 Nachbarn<br/>
+              Nachbarn melden: NC 8-12<br/><br/>
+              <strong style="color: var(--text-primary);">Importance:</strong> 1/10 + 1/9 + 1/11 + ... ≈ 1,1
+            </div>
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1rem; font-family: var(--font-display); font-size: 0.85rem; color: var(--accent-light); margin-top: 1rem;">
+              <div style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">CSMA Backoff</div>
+              <div style="font-size: 1.5rem; color: var(--accent);">5500ms</div>
+              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">Kann entspannen, andere hören uns auch</div>
+            </div>
+          </div>
+
+          <!-- Berg Node (Brücke) -->
+          <div style="background: var(--bg-secondary); border: 2px solid #f59e0b; border-radius: 8px; padding: 2rem;">
+            <div style="font-family: var(--font-display); font-size: 1.3rem; color: #f59e0b; font-weight: 700; margin-bottom: 1rem;">⛏️ Berg-Node (Brücke)</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
+              Mein NC: 2 Nachbarn<br/>
+              Nachbarn melden: NC 1, 2<br/><br/>
+              <strong style="color: var(--text-primary);">Importance:</strong> 1/1 + 1/2 = 1,5
+            </div>
+            <div style="background: var(--bg-primary); border: 2px solid #f59e0b; border-radius: 4px; padding: 1rem; font-family: var(--font-display); font-size: 0.85rem; color: #f59e0b; margin-top: 1rem;">
+              <div style="color: #f59e0b; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; font-weight: 700;">CSMA Backoff</div>
+              <div style="font-size: 1.5rem; color: #f59e0b;">3000ms</div>
+              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">Muss schnell senden — bin essentielles Relay!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formel -->
+        <div style="background: var(--bg-primary); border-left: 3px solid var(--accent); padding: 1.5rem; border-radius: 4px; margin-top: 2rem; font-family: var(--font-display); font-size: 0.9rem;">
+          <div style="color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">Netzwichtigkeit-Formel</div>
+          <div style="color: var(--accent-light); line-height: 2;">
+            Importance = Σ (1 / NC_reported[i])
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
+              Je kleiner die Nachbaranzahl meiner Nachbarn, desto wichtiger bin ich für sie
+            </div>
+          </div>
+        </div>
+
+        <!-- Auswirkungen -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
+          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Auswirkung auf CSMA-Backoff</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+            <div style="text-align: center;">
+              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">High Importance</div>
+              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">3000ms</div>
+              <div style="color: var(--text-secondary); font-size: 0.75rem;">Hub-Knoten</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Normal</div>
+              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">4500ms</div>
+              <div style="color: var(--text-secondary); font-size: 0.75rem;">Standard Relay</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Low Importance</div>
+              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">5500ms</div>
+              <div style="color: var(--text-secondary); font-size: 0.75rem;">Redundante Knoten</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 ADR-02 Netzwichtigkeit:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md" style="color: var(--accent); text-decoration: none;">ADR-02: Netzwichtigkeits-basierter Relay-Backoff</a> — Vollständige Spezifikation mit Produktionsdaten</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 9: Mögliche Erweiterungen -->
+    <section class="slide" style="background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);">
+      <div class="slide-content">
+        <div class="section-eyebrow">Künftige Verbesserungen</div>
+        <div class="section-title">Erweiterungsoptionen</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+          <!-- Transportsicherung für DM -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
+            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🛡️ DM-Transportsicherung</div>
+
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1.5rem;">
+              <strong style="color: var(--text-primary);">Idee:</strong> Persönliche Nachrichten mit zuverlässigem Transport
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-size: 0.9rem;">
+              <div style="color: var(--accent); font-weight: 700; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Funktionsweise</div>
+              <div style="color: var(--text-secondary); line-height: 1.7;">
+                ✓ ACK-basiertes Retransmit (bereits vorhanden)<br/>
+                ✓ Spiegeln über Server wenn verfügbar<br/>
+                ✓ Offline-Buffering auf TX-Knoten<br/>
+                ✓ Erhöhte Retry-Rate wenn kein ACK
+              </div>
+            </div>
+
+            <div style="background: var(--bg-primary); border-left: 3px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+              <strong style="color: #f59e0b;">⚠️ Voraussetzung:</strong> Empfänger muss erreichbar &amp; eingeschaltet sein. Keine Garantie wenn Zielknoten offline.
+            </div>
+          </div>
+
+          <!-- Mesh Learning Phase -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
+            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">📚 Mesh Learning Phase</div>
+
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1.5rem;">
+              <strong style="color: var(--text-primary);">Idee:</strong> 30-60 Min. vor Mesh-Aktivierung observieren
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-size: 0.9rem;">
+              <div style="color: var(--accent); font-weight: 700; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Learning Phase</div>
+              <div style="color: var(--text-secondary); line-height: 1.7;">
+                1. HEY-Nachrichten sammeln<br/>
+                2. Nachbar-Topologie aufbauen<br/>
+                3. NC-Werte analysieren<br/>
+                4. Importance berechnen<br/>
+                5. Mesh aktivieren oder passiv bleiben
+              </div>
+            </div>
+
+            <div style="background: var(--bg-primary); border-left: 3px solid #10b981; padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+              <strong style="color: #10b981;">✓ Ergebnis:</strong> Knoten kennt seine Rolle: Stadt-Node (redundant) oder Berg-Node (essentiell).
+            </div>
+          </div>
+        </div>
+
+        <!-- Umgebungstypen -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
+          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Abhängig vom Umfeld</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; font-size: 0.9rem;">
+            <!-- Pure LoRa -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
+              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">🏜️ Pure LoRa Mesh</div>
+              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
+                Nur Funk-Verbindungen<br/>
+                Knoten=Relays<br/>
+                Learning Phase essentiell<br/>
+                Hub-Knoten müssen meshen
+              </div>
+            </div>
+
+            <!-- Mixed Mode -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
+              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">🌐 Mixed Mode</div>
+              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
+                Funk + Internet Gateway<br/>
+                Server kennt Topologie<br/>
+                Learning Phase optional<br/>
+                Gateways koordinieren
+              </div>
+            </div>
+
+            <!-- Cloud Mesh -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
+              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">☁️ Cloud-Managed</div>
+              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
+                Server steuert Mesh aktiv<br/>
+                Adaptive Relaying<br/>
+                Keine Learning Phase<br/>
+                Zentrale Intelligenz
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Learning Phase Timeline -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-primary); border-left: 3px solid var(--accent); border-radius: 4px;">
+          <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Learning Phase Timeline</div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; font-size: 0.85rem;">
+            <div style="text-align: center;">
+              <div style="font-weight: 600; color: var(--text-primary);">0-10 Min</div>
+              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Startup<br/>HEY sammeln</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-weight: 600; color: var(--text-primary);">10-30 Min</div>
+              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Topologie<br/>aufbauen</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-weight: 600; color: var(--text-primary);">30-60 Min</div>
+              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Analyse<br/>Importance calc</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-weight: 600; color: var(--accent);">60+ Min</div>
+              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Mesh aktiv<br/>oder passiv</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Weitere Referenzen:</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md#15-acknowledgements" style="color: var(--accent); text-decoration: none;">Wire Format ACK</a> — ACK-basierte Transportsicherung</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md" style="color: var(--accent); text-decoration: none;">ADR-02</a> — Netzwichtigkeits-Konzept</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 10: Live-Daten & Produktionsevidenz -->
+    <section class="slide" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);">
+      <div class="slide-content">
+        <div class="section-eyebrow">Produktionsevidenz</div>
+        <div class="section-title">Live-Daten von MeshMap</div>
+
+        <!-- Live Stats -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.5rem; margin-top: 2rem;">
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Aktive Knoten</div>
+            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">1.446</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">weltweit (23.8.2026)</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">HEY-Frames (24h)</div>
+            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">92.014</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">Ø 3.834/Stunde</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Gateway-Abdeckung</div>
+            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">66,4%</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">959 Gateways</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Netzwerk-Links</div>
+            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">2.421</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">Nachbarverbindungen</div>
+          </div>
+        </div>
+
+        <!-- Load/Ameisen-Algorithmus -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
+          <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🐜 Load-Metrik (Ameisen-Algorithmus mit Pheromonen)</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div>
+              <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
+                <strong style="color: var(--text-primary);">Was ist Load?</strong><br/>
+                Aus HEY-Pfaden abgeleitete Relay-Häufigkeit. Knoten mit hohem Load tragen viele Nachrichten.
+              </div>
+              <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
+                <strong style="color: var(--text-primary);">Pheromon-Spuren:</strong><br/>
+                Jede HEY-Weiterleitung hinterlässt eine "Spur" — stark begangene Pfade werden visuell stärker.
+              </div>
+            </div>
+
+            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-family: var(--font-display); font-size: 0.9rem;">
+              <div style="color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Top-Relays (Quellen-Diversität)</div>
+              <div style="color: var(--accent-light); line-height: 2;">
+                1. IQ5ARI-11 → IK4DCV-12: 201 Quellen<br/>
+                2. OE3XIA-12 → OE3GHB-1: 187 Quellen<br/>
+                3. DB0TVI-1 → DB0RVB-99: 187 Quellen<br/>
+                4. DB0FTS-1 → DO8TBO-11: 183 Quellen
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screenshot TODOs -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ff9800; border-radius: 4px;">
+          <div style="color: #333; font-weight: 700; margin-bottom: 1rem; font-family: var(--font-display); text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em;">📸 TODO: MeshMap Screenshots mit Playwright</div>
+          <div style="color: #555; line-height: 1.8; font-size: 0.9rem;">
+            <strong>1. Wien — Netzbildender Zentralknoten</strong><br/>
+            Zeigt einen dominanten Hub-Knoten mit hohem Load, der das Netz zusammenhält. Viele Knoten sind abhängig von diesem einen Relay.
+            <br/><br/>
+
+            <strong>2. Florenz, Italien — Stadt-Cluster</strong><br/>
+            Viele Knoten dicht beieinander (Importance niedrig). Redundante Last-Verteilung, kein einzelner kritischer Knoten. Zeigt das Stadt-Node-Szenario.
+            <br/><br/>
+
+            <strong>3. Thüringer Wald — Berg-Infrastruktur</strong><br/>
+            Hochleistungs-Knoten (33 dBm, große Antennen) auf Bergen verbinden mehrere Täler. Zeigt Load-Konzentration durch Topografie und wie Berg-Nodes netzbildend sind.
+            <br/><br/>
+
+            <strong>Fokus:</strong> Load-Metriken, Pheromon-Spuren, NC-Werte und visuelle Unterschiede zwischen Hub-, Stadt- und Berg-Szenarien.
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
+          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Live Daten:</div>
+          <div><a href="https://meshmap.oevsv.at" style="color: var(--accent); text-decoration: none;">MeshMap OEVSV</a> — Live Netzwerk-Topologie und Load-Metriken</div>
+          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md#produktionsevidenz-24-h-live-netz-rev-3" style="color: var(--accent); text-decoration: none;">ADR-02 Produktionsevidenz</a> — 24h Analysedaten (96.074 HEY-Frames)</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="scroll-hint">↓ Scrollen für mehr</div>
+
+  <script>
+    let currentMessageMode = 'broadcast';
+    let currentNetworkMode = 'broadcast';
+    let messageAnimationRunning = false;
+    let networkAnimationRunning = false;
+
+    function switchMessageMode(mode) {
+      currentMessageMode = mode;
+      messageAnimationRunning = false;
+
+      // Update tabs
+      document.querySelectorAll('.animation-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Clear and redraw
+      drawMessageAnimation(mode);
+    }
+
+    function drawMessageAnimation(mode) {
+      const svg = document.getElementById('messageSvg');
+      svg.innerHTML = '';
+
+      // Styles
+      const styleNS = 'http://www.w3.org/2000/svg';
+
+      if (mode === 'broadcast') {
+        drawBroadcastAnimation(svg);
+      } else if (mode === 'dm') {
+        drawDMAnimation(svg);
+      }
+    }
+
+    function drawBroadcastAnimation(svg) {
+      const ns = 'http://www.w3.org/2000/svg';
+
+      // Node 1 (Sender)
+      const g1 = document.createElementNS(ns, 'g');
+      g1.innerHTML = `
+        <circle cx="100" cy="200" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="205" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N1</text>
+        <text x="100" y="250" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Sender</text>
+      `;
+      svg.appendChild(g1);
+
+      // Gateway (Server Connection)
+      const gw = document.createElementNS(ns, 'g');
+      gw.innerHTML = `
+        <circle cx="450" cy="80" r="35" fill="#10b981" stroke="#10b981" stroke-width="2"/>
+        <text x="450" y="85" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">GW</text>
+        <text x="450" y="130" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Gateway</text>
+      `;
+      svg.appendChild(gw);
+
+      // Internet Cloud
+      const cloud = document.createElementNS(ns, 'g');
+      cloud.innerHTML = `
+        <ellipse cx="750" cy="80" rx="50" ry="40" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="5,5"/>
+        <text x="750" y="85" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#e0e7ff">Internet</text>
+      `;
+      svg.appendChild(cloud);
+
+      // Node 2 (Receiver)
+      const g2 = document.createElementNS(ns, 'g');
+      g2.innerHTML = `
+        <circle cx="100" cy="320" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="325" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N2</text>
+        <text x="100" y="370" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Empfänger</text>
+      `;
+      svg.appendChild(g2);
+
+      // Node 3 (Receiver)
+      const g3 = document.createElementNS(ns, 'g');
+      g3.innerHTML = `
+        <circle cx="800" cy="320" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="800" y="325" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N3</text>
+        <text x="800" y="370" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Empfänger</text>
+      `;
+      svg.appendChild(g3);
+
+      // Add label
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', '450');
+      label.setAttribute('y', '350');
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-family', 'Inter');
+      label.setAttribute('font-size', '12');
+      label.setAttribute('fill', '#94a3b8');
+      label.textContent = 'Broadcast zu Gruppe 262 → alle Knoten hören es → relayed zu Gateway → ins Internet';
+      svg.appendChild(label);
+
+      // Start animation loop
+      animateBroadcast();
+    }
+
+    function drawDMAnimation(svg) {
+      const ns = 'http://www.w3.org/2000/svg';
+
+      // Node 1 (Sender)
+      const g1 = document.createElementNS(ns, 'g');
+      g1.innerHTML = `
+        <circle cx="100" cy="100" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">OE1</text>
+        <text x="100" y="150" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Sender</text>
+      `;
+      svg.appendChild(g1);
+
+      // Gateway (Server Connection)
+      const gw = document.createElementNS(ns, 'g');
+      gw.innerHTML = `
+        <circle cx="450" cy="100" r="35" fill="#10b981" stroke="#10b981" stroke-width="2"/>
+        <text x="450" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">GW</text>
+        <text x="450" y="150" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Gateway</text>
+      `;
+      svg.appendChild(gw);
+
+      // MeshCom Server
+      const server = document.createElementNS(ns, 'g');
+      server.innerHTML = `
+        <rect x="700" y="70" width="80" height="60" rx="4" fill="none" stroke="#6366f1" stroke-width="2"/>
+        <text x="740" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#6366f1">Server</text>
+        <text x="740" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">(UDP 1990)</text>
+      `;
+      svg.appendChild(server);
+
+      // Node 2 (Receiver - same Gateway)
+      const g2 = document.createElementNS(ns, 'g');
+      g2.innerHTML = `
+        <circle cx="100" cy="280" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="285" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">OE9</text>
+        <text x="100" y="330" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Zielknoten</text>
+      `;
+      svg.appendChild(g2);
+
+      // Add label
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', '450');
+      label.setAttribute('y', '360');
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-family', 'Inter');
+      label.setAttribute('font-size', '12');
+      label.setAttribute('fill', '#94a3b8');
+      label.textContent = 'OE1ABC→OE9XYZ mit {987} → Server verteilt via UDP → ACK über selben Weg';
+      svg.appendChild(label);
+
+      // Start animation loop
+      animateDM();
+    }
+
+    function animateBroadcast() {
+      if (currentMessageMode !== 'broadcast') return;
+
+      const svg = document.getElementById('messageSvg');
+
+      // Broadcast from N1
+      setTimeout(() => {
+        addMessageArrow(svg, 100, 200, 450, 80, '#6366f1', 'Broadcast 262');
+      }, 200);
+
+      // Relay to N2
+      setTimeout(() => {
+        addMessageArrow(svg, 450, 80, 100, 320, '#f59e0b', 'Relay');
+      }, 1200);
+
+      // Relay to N3
+      setTimeout(() => {
+        addMessageArrow(svg, 450, 80, 800, 320, '#f59e0b', 'Relay');
+      }, 1800);
+
+      // Gateway to Internet
+      setTimeout(() => {
+        addMessageArrow(svg, 450, 80, 750, 80, '#10b981', 'Internet');
+      }, 2400);
+
+      // Restart
+      setTimeout(() => animateBroadcast(), 4000);
+    }
+
+    function animateDM() {
+      if (currentMessageMode !== 'dm') return;
+
+      const svg = document.getElementById('messageSvg');
+
+      // DM from OE1 to Gateway
+      setTimeout(() => {
+        addMessageArrow(svg, 100, 100, 450, 100, '#6366f1', 'DM {987}');
+      }, 200);
+
+      // Gateway to Server
+      setTimeout(() => {
+        addMessageArrow(svg, 450, 100, 700, 100, '#10b981', 'UDP');
+      }, 1000);
+
+      // Server to GW (via broadcast)
+      setTimeout(() => {
+        addMessageArrow(svg, 740, 130, 450, 135, '#6366f1', 'GATE');
+      }, 1800);
+
+      // GW to OE9
+      setTimeout(() => {
+        addMessageArrow(svg, 450, 135, 100, 280, '#f59e0b', 'Relay');
+      }, 2400);
+
+      // ACK from OE9
+      setTimeout(() => {
+        addMessageArrow(svg, 100, 280, 450, 100, '#10b981', ':ack987', true);
+      }, 3200);
+
+      // Restart
+      setTimeout(() => animateDM(), 4500);
+    }
+
+    function addMessageArrow(svg, x1, y1, x2, y2, color, label, isAck = false) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', '5,5');
+      line.setAttribute('opacity', '0');
+      svg.appendChild(line);
+
+      // Animate
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 0.05;
+        if (progress >= 1) {
+          clearInterval(interval);
+          line.remove();
+          return;
+        }
+        const cx = x1 + (x2 - x1) * progress;
+        const cy = y1 + (y2 - y1) * progress;
+        line.setAttribute('opacity', '1');
+        line.setAttribute('x2', cx);
+        line.setAttribute('y2', cy);
+      }, 30);
+
+      // Label
+      const labelEl = document.createElementNS(ns, 'text');
+      labelEl.setAttribute('x', (x1 + x2) / 2 + 20);
+      labelEl.setAttribute('y', (y1 + y2) / 2 - 10);
+      labelEl.setAttribute('font-family', 'IBM Plex Mono');
+      labelEl.setAttribute('font-size', '10');
+      labelEl.setAttribute('font-weight', '600');
+      labelEl.setAttribute('fill', color);
+      labelEl.textContent = label;
+      svg.appendChild(labelEl);
+
+      setTimeout(() => labelEl.remove(), 1000);
+    }
+
+    // Initialize on load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        drawMessageAnimation('broadcast');
+      });
+    } else {
+      drawMessageAnimation('broadcast');
+    }
+
+    function switchNetworkMode(mode) {
+      currentNetworkMode = mode;
+      networkAnimationRunning = false;
+
+      // Update tabs
+      document.querySelectorAll('.animation-tabs .animation-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Clear and redraw
+      drawNetworkAnimation(mode);
+    }
+
+    function drawNetworkAnimation(mode) {
+      const svg = document.getElementById('networkAnimation');
+      svg.innerHTML = '';
+
+      if (mode === 'broadcast') {
+        drawBroadcastFlood(svg);
+      } else if (mode === 'relay') {
+        drawMeshRelay(svg);
+      }
+    }
+
+    function drawBroadcastFlood(svg) {
+      const ns = 'http://www.w3.org/2000/svg';
+
+      // Sender node
+      const sender = document.createElementNS(ns, 'g');
+      sender.innerHTML = `
+        <circle cx="100" cy="150" r="25" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">TX</text>
+        <text x="100" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Sender</text>
+      `;
+      svg.appendChild(sender);
+
+      // Receiver nodes
+      const receivers = [
+        { x: 300, y: 60, id: 'N1', role: 'Empfänger' },
+        { x: 500, y: 80, id: 'N2', role: 'Empfänger' },
+        { x: 300, y: 250, id: 'N3', role: 'Empfänger' },
+        { x: 500, y: 270, id: 'N4', role: 'Empfänger' }
+      ];
+
+      receivers.forEach(r => {
+        const node = document.createElementNS(ns, 'g');
+        node.innerHTML = `
+          <circle cx="${r.x}" cy="${r.y}" r="20" fill="#e0e7ff" stroke="#334155" stroke-width="1"/>
+          <text x="${r.x}" y="${r.y + 4}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" font-weight="600" fill="#0f172a">${r.id}</text>
+          <text x="${r.x}" y="${r.y + 30}" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">${r.role}</text>
+        `;
+        svg.appendChild(node);
+      });
+
+      // Label
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', '400');
+      label.setAttribute('y', '330');
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-family', 'Inter');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('fill', '#94a3b8');
+      label.textContent = 'Broadcast: Alle Knoten in Reichweite hören die Nachricht gleichzeitig (Flutnetzwerk)';
+      svg.appendChild(label);
+
+      animateBroadcastFlood();
+    }
+
+    function drawMeshRelay(svg) {
+      const ns = 'http://www.w3.org/2000/svg';
+
+      // Sender
+      const sender = document.createElementNS(ns, 'g');
+      sender.innerHTML = `
+        <circle cx="100" cy="150" r="25" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
+        <text x="100" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">TX</text>
+        <text x="100" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Sender</text>
+      `;
+      svg.appendChild(sender);
+
+      // Mesh Relay node
+      const relay = document.createElementNS(ns, 'g');
+      relay.innerHTML = `
+        <circle cx="300" cy="150" r="22" fill="#f59e0b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="300" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">RX</text>
+        <text x="300" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Mesh Relay</text>
+      `;
+      svg.appendChild(relay);
+
+      // Repeated reach
+      const reach = [
+        { x: 500, y: 60, id: 'N5', role: 'Neu erreichbar' },
+        { x: 500, y: 240, id: 'N6', role: 'Neu erreichbar' },
+        { x: 650, y: 150, id: 'N7', role: 'Neu erreichbar' }
+      ];
+
+      reach.forEach(r => {
+        const node = document.createElementNS(ns, 'g');
+        node.innerHTML = `
+          <circle cx="${r.x}" cy="${r.y}" r="20" fill="#10b981" stroke="#10b981" stroke-width="1"/>
+          <text x="${r.x}" y="${r.y + 4}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" font-weight="600" fill="#0f172a">${r.id}</text>
+          <text x="${r.x}" y="${r.y + 30}" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">${r.role}</text>
+        `;
+        svg.appendChild(node);
+      });
+
+      // Label
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', '400');
+      label.setAttribute('y', '330');
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-family', 'Inter');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('fill', '#94a3b8');
+      label.textContent = 'Mesh-Relay: Knoten mit Mesh-Flag wiederholen Nachricht → Reichweite vergrößert sich';
+      svg.appendChild(label);
+
+      animateMeshRelay();
+    }
+
+    function animateBroadcastFlood() {
+      if (currentNetworkMode !== 'broadcast') return;
+
+      const svg = document.getElementById('networkAnimation');
+      const ns = 'http://www.w3.org/2000/svg';
+
+      // Draw signal arrows from sender to each receiver
+      const targets = [
+        { x: 300, y: 60 },
+        { x: 500, y: 80 },
+        { x: 300, y: 250 },
+        { x: 500, y: 270 }
+      ];
+
+      targets.forEach((target, idx) => {
+        setTimeout(() => {
+          // Draw animated dashed line from sender to receiver
+          addNetworkArrow(svg, 100, 150, target.x, target.y, '#6366f1', 'Broadcast');
+
+          // Highlight receiver
+          setTimeout(() => {
+            const circles = svg.querySelectorAll('circle');
+            circles.forEach(c => {
+              if (c.getAttribute('cx') == target.x && c.getAttribute('cy') == target.y) {
+                c.setAttribute('fill', '#6366f1');
+                c.setAttribute('stroke', '#6366f1');
+              }
+            });
+          }, 300);
+        }, 400 + idx * 200);
+      });
+
+      setTimeout(() => animateBroadcastFlood(), 4000);
+    }
+
+    function animateMeshRelay() {
+      if (currentNetworkMode !== 'relay') return;
+
+      const svg = document.getElementById('networkAnimation');
+
+      // Sender to relay
+      setTimeout(() => {
+        addNetworkArrow(svg, 100, 150, 300, 150, '#6366f1', 'TX→RX');
+
+        // Highlight relay
+        setTimeout(() => {
+          const circles = svg.querySelectorAll('circle');
+          circles.forEach(c => {
+            if (c.getAttribute('cx') == '300' && c.getAttribute('cy') == '150') {
+              c.setAttribute('fill', '#dc2626');
+              c.setAttribute('stroke', '#dc2626');
+            }
+          });
+        }, 300);
+      }, 200);
+
+      // Relay to new nodes
+      const newReach = [
+        { x: 500, y: 60, label: 'Relay→N5' },
+        { x: 500, y: 240, label: 'Relay→N6' },
+        { x: 650, y: 150, label: 'Relay→N7' }
+      ];
+
+      newReach.forEach((target, idx) => {
+        setTimeout(() => {
+          addNetworkArrow(svg, 300, 150, target.x, target.y, '#f59e0b', 'Repeat');
+
+          setTimeout(() => {
+            const circles = svg.querySelectorAll('circle');
+            circles.forEach(c => {
+              if (c.getAttribute('cx') == target.x && c.getAttribute('cy') == target.y) {
+                c.setAttribute('fill', '#10b981');
+                c.setAttribute('stroke', '#10b981');
+              }
+            });
+          }, 300);
+        }, 1200 + idx * 300);
+      });
+
+      setTimeout(() => animateMeshRelay(), 4500);
+    }
+
+    function addNetworkArrow(svg, x1, y1, x2, y2, color, label) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', '5,5');
+      line.setAttribute('opacity', '0');
+      svg.appendChild(line);
+
+      // Animate line
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 0.05;
+        if (progress >= 1) {
+          clearInterval(interval);
+          line.remove();
+          return;
+        }
+        const cx = x1 + (x2 - x1) * progress;
+        const cy = y1 + (y2 - y1) * progress;
+        line.setAttribute('opacity', '1');
+        line.setAttribute('x2', cx);
+        line.setAttribute('y2', cy);
+      }, 30);
+
+      // Label
+      const labelEl = document.createElementNS(ns, 'text');
+      labelEl.setAttribute('x', (x1 + x2) / 2 + 15);
+      labelEl.setAttribute('y', (y1 + y2) / 2 - 10);
+      labelEl.setAttribute('font-family', 'IBM Plex Mono');
+      labelEl.setAttribute('font-size', '9');
+      labelEl.setAttribute('font-weight', '600');
+      labelEl.setAttribute('fill', color);
+      labelEl.textContent = label;
+      svg.appendChild(labelEl);
+
+      setTimeout(() => labelEl.remove(), 1000);
+    }
+
+    // Initialize network animation
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        drawNetworkAnimation('broadcast');
+      });
+    } else {
+      drawNetworkAnimation('broadcast');
+    }
+  </script>
+</body>
+</html>
