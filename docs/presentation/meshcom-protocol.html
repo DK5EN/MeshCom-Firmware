@@ -1,2524 +1,1181 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MeshCom Protocol Presentation</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap">
-  <style>
-    :root {
-      --bg-primary: #0f172a;
-      --bg-secondary: #1e293b;
-      --text-primary: #e0e7ff;
-      --text-secondary: #94a3b8;
-      --accent: #6366f1;
-      --accent-dark: #4f46e5;
-      --accent-light: #818cf8;
-      --border: #334155;
-
-      --font-display: 'IBM Plex Mono', monospace;
-      --font-body: 'Inter', sans-serif;
-
-      --type-xl: 3.5rem;
-      --type-lg: 2.5rem;
-      --type-md: 1.5rem;
-      --type-sm: 1rem;
-      --type-xs: 0.875rem;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --bg-primary: #0f172a;
-        --bg-secondary: #1e293b;
-        --text-primary: #e0e7ff;
-        --text-secondary: #94a3b8;
-      }
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root:not([data-theme="dark"]) {
-        --bg-primary: #f8fafc;
-        --bg-secondary: #f1f5f9;
-        --text-primary: #1e293b;
-        --text-secondary: #64748b;
-        --accent: #4f46e5;
-        --accent-dark: #4338ca;
-        --accent-light: #6366f1;
-        --border: #cbd5e1;
-      }
-    }
-
-    :root[data-theme="light"] {
-      --bg-primary: #f8fafc;
-      --bg-secondary: #f1f5f9;
-      --text-primary: #1e293b;
-      --text-secondary: #64748b;
-      --accent: #4f46e5;
-      --accent-dark: #4338ca;
-      --accent-light: #6366f1;
-      --border: #cbd5e1;
-    }
-
-    :root[data-theme="dark"] {
-      --bg-primary: #0f172a;
-      --bg-secondary: #1e293b;
-      --text-primary: #e0e7ff;
-      --text-secondary: #94a3b8;
-      --accent: #6366f1;
-      --accent-dark: #4f46e5;
-      --accent-light: #818cf8;
-      --border: #334155;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      height: 100%;
-      width: 100%;
-      scroll-behavior: smooth;
-      overflow-x: hidden;
-    }
-
-    body {
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-family: var(--font-body);
-      line-height: 1.6;
-    }
-
-    .presentation {
-      display: flex;
-      flex-direction: column;
-      scroll-snap-type: y mandatory;
-    }
-
-    .slide {
-      min-height: 100vh;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4rem 2rem;
-      scroll-snap-align: start;
-      animation: fadeIn 0.8s ease-out;
-      position: relative;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .slide-content {
-      max-width: 900px;
-      width: 100%;
-    }
-
-    /* Slide 1: Introduction */
-    .slide-intro {
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-    }
-
-    .intro-header {
-      text-align: center;
-      margin-bottom: 3rem;
-    }
-
-    .protocol-title {
-      font-family: var(--font-display);
-      font-size: var(--type-xl);
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 1rem;
-      text-wrap: balance;
-      letter-spacing: -0.02em;
-    }
-
-    .intro-subtitle {
-      font-size: var(--type-lg);
-      color: var(--text-secondary);
-      font-weight: 500;
-      margin-bottom: 3rem;
-      text-wrap: balance;
-    }
-
-    .protocol-comparison {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 3rem;
-    }
-
-    .comparison-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .comparison-card:hover {
-      border-color: var(--accent);
-      background: var(--bg-primary);
-      transform: translateY(-4px);
-    }
-
-    .card-label {
-      font-family: var(--font-display);
-      font-size: var(--type-xs);
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-
-    .card-title {
-      font-size: var(--type-md);
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 1rem;
-    }
-
-    .card-description {
-      color: var(--text-secondary);
-      line-height: 1.8;
-      font-size: 0.95rem;
-    }
-
-    .accent-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      margin-right: 0.5rem;
-      vertical-align: middle;
-    }
-
-    .broadcast-banner {
-      background: var(--accent);
-      color: #0f172a;
-      padding: 1.5rem 2rem;
-      border-radius: 8px;
-      margin-top: 2rem;
-      text-align: center;
-      font-weight: 600;
-      font-size: var(--type-md);
-      font-family: var(--font-display);
-    }
-
-    /* Slide 2: Hardware Platforms */
-    .slide-hardware {
-      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-    }
-
-    .section-eyebrow {
-      font-family: var(--font-display);
-      font-size: var(--type-xs);
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-
-    .section-title {
-      font-family: var(--font-display);
-      font-size: var(--type-lg);
-      color: var(--text-primary);
-      font-weight: 700;
-      margin-bottom: 2.5rem;
-      text-wrap: balance;
-    }
-
-    .platforms-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .platform-card {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.5rem;
-      transition: all 0.3s ease;
-    }
-
-    .platform-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
-    }
-
-    .platform-name {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.5rem;
-    }
-
-    .platform-chip {
-      font-size: var(--type-xs);
-      color: var(--text-secondary);
-      background: var(--bg-secondary);
-      padding: 0.4rem 0.8rem;
-      border-radius: 4px;
-      display: inline-block;
-      font-family: var(--font-display);
-    }
-
-    .frequency-note {
-      background: var(--bg-secondary);
-      border-left: 3px solid var(--accent);
-      padding: 1.5rem;
-      border-radius: 4px;
-      margin-top: 2rem;
-    }
-
-    .frequency-note-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.75rem;
-      font-size: var(--type-sm);
-    }
-
-    .frequency-detail {
-      color: var(--text-secondary);
-      font-size: 0.95rem;
-      line-height: 1.7;
-    }
-
-    /* Slide 3: Regional Configuration */
-    .slide-regional {
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-    }
-
-    .config-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .config-card {
-      background: var(--bg-secondary);
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .config-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-    }
-
-    .region-code {
-      font-family: var(--font-display);
-      font-size: var(--type-md);
-      color: var(--accent);
-      font-weight: 700;
-      margin-bottom: 1rem;
-    }
-
-    .config-detail {
-      display: flex;
-      justify-content: space-between;
-      margin: 0.75rem 0;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .config-label {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-    }
-
-    .config-value {
-      color: var(--text-primary);
-      font-weight: 600;
-      font-family: var(--font-display);
-    }
-
-    .comparison-intro {
-      background: var(--accent);
-      color: #0f172a;
-      padding: 1.5rem 2rem;
-      border-radius: 8px;
-      margin-bottom: 2rem;
-      font-weight: 500;
-      font-size: var(--type-sm);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .protocol-title {
-        font-size: 2.5rem;
-      }
-
-      .intro-subtitle {
-        font-size: 1.75rem;
-      }
-
-      .protocol-comparison {
-        grid-template-columns: 1fr;
-      }
-
-      .config-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .slide {
-        padding: 2rem 1rem;
-      }
-
-      .platforms-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Reduced motion */
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-
-    /* Scroll indicator */
-    .scroll-hint {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: var(--type-xs);
-      color: var(--text-secondary);
-      pointer-events: none;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% {
-        opacity: 0.5;
-      }
-      50% {
-        opacity: 1;
-      }
-    }
-
-    /* Slide 4: Flood Network Animation */
-    .slide-network {
-      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-    }
-
-    .animation-container {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 3rem;
-      margin-top: 2rem;
-      min-height: 400px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    svg {
-      width: 100%;
-      height: 100%;
-      filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
-    }
-
-    .network-node {
-      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
-    }
-
-    .node-circle {
-      fill: var(--bg-secondary);
-      stroke: var(--border);
-      stroke-width: 2;
-    }
-
-    .node-circle.sending {
-      fill: #ec4899;
-      stroke: #ec4899;
-    }
-
-    .node-circle.receiving {
-      fill: var(--accent);
-      stroke: var(--accent);
-      animation: pulse-node 0.6s ease-out;
-    }
-
-    .node-circle.gateway {
-      fill: #10b981;
-      stroke: #10b981;
-    }
-
-    .node-circle.mesh {
-      fill: #f59e0b;
-      stroke: #f59e0b;
-    }
-
-    @keyframes pulse-node {
-      0% {
-        r: 20;
-        opacity: 1;
-      }
-      100% {
-        r: 28;
-        opacity: 0;
-      }
-    }
-
-    .node-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-anchor: middle;
-      fill: var(--text-primary);
-      font-family: var(--font-display);
-    }
-
-    .node-role {
-      font-size: 9px;
-      fill: var(--text-secondary);
-      text-anchor: middle;
-      font-family: var(--font-body);
-    }
-
-    .signal-wave {
-      stroke: var(--accent);
-      stroke-width: 2;
-      fill: none;
-      stroke-dasharray: 5,5;
-      animation: wave-propagate 1.2s ease-out forwards;
-    }
-
-    @keyframes wave-propagate {
-      0% {
-        r: 0;
-        opacity: 1;
-      }
-      100% {
-        r: 80;
-        opacity: 0;
-      }
-    }
-
-    .arrow-internet {
-      stroke: #10b981;
-      stroke-width: 2;
-      fill: none;
-      marker-end: url(#arrowhead-internet);
-      animation: arrow-animate 1.5s ease-in-out;
-    }
-
-    .arrow-mesh {
-      stroke: #f59e0b;
-      stroke-width: 2;
-      fill: none;
-      marker-end: url(#arrowhead-mesh);
-      animation: arrow-animate 1.8s ease-in-out;
-    }
-
-    @keyframes arrow-animate {
-      0% {
-        stroke-dashoffset: 50;
-        opacity: 0;
-      }
-      20% {
-        opacity: 1;
-      }
-      80% {
-        opacity: 1;
-      }
-      100% {
-        stroke-dashoffset: 0;
-        opacity: 0;
-      }
-    }
-
-    .legend {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1.5rem;
-      margin-top: 2.5rem;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .legend-color {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .legend-sending {
-      background: #ec4899;
-    }
-
-    .legend-receiving {
-      background: var(--accent);
-    }
-
-    .legend-gateway {
-      background: #10b981;
-    }
-
-    .legend-mesh {
-      background: #f59e0b;
-    }
-
-    .legend-text {
-      font-size: 0.9rem;
-      color: var(--text-primary);
-    }
-
-    .explanation {
-      background: var(--bg-secondary);
-      border-left: 3px solid var(--accent);
-      padding: 1.5rem;
-      border-radius: 4px;
-      margin-top: 2rem;
-    }
-
-    .explanation-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.75rem;
-      font-size: var(--type-sm);
-    }
-
-    .explanation-text {
-      color: var(--text-secondary);
-      font-size: 0.95rem;
-      line-height: 1.7;
-    }
-
-    @media (max-width: 768px) {
-      .animation-container {
-        padding: 1.5rem;
-        min-height: 300px;
-      }
-
-      .legend {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    /* Slide 5: HeyFrames */
-    .slide-heyframes {
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-    }
-
-    .heyframe-info {
-      background: var(--accent);
-      color: #0f172a;
-      padding: 1.5rem 2rem;
-      border-radius: 8px;
-      margin-bottom: 2rem;
-      font-weight: 500;
-      font-size: var(--type-sm);
-    }
-
-    .functions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .function-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.5rem;
-      transition: all 0.3s ease;
-    }
-
-    .function-card:hover {
-      border-color: var(--accent);
-      background: var(--bg-primary);
-      transform: translateY(-4px);
-    }
-
-    .function-icon {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-
-    .function-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.75rem;
-      font-size: var(--type-sm);
-    }
-
-    .function-description {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.7;
-    }
-
-    .heyframe-structure {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      margin-top: 2rem;
-    }
-
-    .structure-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 1.5rem;
-      font-size: var(--type-sm);
-      font-family: var(--font-display);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .frame-row {
-      display: grid;
-      grid-template-columns: 150px 1fr;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .frame-row:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    .frame-label {
-      font-family: var(--font-display);
-      font-weight: 600;
-      color: var(--accent);
-      font-size: 0.9rem;
-    }
-
-    .frame-content {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.6;
-    }
-
-    .signal-indicator {
-      display: inline-block;
-      padding: 0.4rem 0.8rem;
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-family: var(--font-display);
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-    }
-
-    .topology-example {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      margin-top: 2rem;
-      text-align: center;
-    }
-
-    .topology-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 1.5rem;
-      font-size: var(--type-sm);
-    }
-
-    .node-with-neighbors {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .central-node {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #0f172a;
-      font-weight: 600;
-      font-family: var(--font-display);
-    }
-
-    .neighbor-nodes {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      max-width: 400px;
-    }
-
-    .neighbor-node {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--accent-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #0f172a;
-      font-weight: 500;
-      font-size: 0.8rem;
-      font-family: var(--font-display);
-      border: 1px solid var(--accent);
-    }
-
-    .topology-label {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      margin-top: 1rem;
-      font-style: italic;
-    }
-
-    /* Slide 6: Message Transmission */
-    .slide-messages {
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-    }
-
-    .animation-tabs {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 2rem;
-      border-bottom: 2px solid var(--border);
-    }
-
-    .animation-tab {
-      padding: 1rem 1.5rem;
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-family: var(--font-display);
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
-    }
-
-    .animation-tab:hover {
-      color: var(--text-primary);
-    }
-
-    .animation-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-
-    .animation-container-msg {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 3rem 2rem;
-      margin-bottom: 2rem;
-      min-height: 450px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .message-types-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    .message-type-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .message-type-card:hover {
-      border-color: var(--accent);
-      background: var(--bg-primary);
-      transform: translateY(-4px);
-    }
-
-    .message-type-header {
-      font-family: var(--font-display);
-      font-size: var(--type-sm);
-      color: var(--accent);
-      font-weight: 700;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .message-format {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1rem;
-      font-family: var(--font-display);
-      font-size: 0.85rem;
-      color: var(--accent-light);
-      margin: 0.75rem 0;
-      word-break: break-all;
-    }
-
-    .message-details {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.7;
-      margin-top: 1rem;
-    }
-
-    .behavior-section {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      margin-top: 2rem;
-    }
-
-    .behavior-title {
-      font-family: var(--font-display);
-      font-size: var(--type-sm);
-      color: var(--text-primary);
-      font-weight: 700;
-      margin-bottom: 1.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .behavior-item {
-      margin-bottom: 1.5rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .behavior-item:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    .behavior-label {
-      color: var(--accent);
-      font-weight: 600;
-      font-size: 0.95rem;
-      margin-bottom: 0.5rem;
-      font-family: var(--font-display);
-    }
-
-    .behavior-description {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.6;
-    }
-
-    .condition-list {
-      background: var(--bg-primary);
-      border-left: 3px solid var(--accent);
-      padding: 1rem;
-      border-radius: 4px;
-      margin-top: 0.75rem;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-    }
-
-    .condition-list li {
-      margin: 0.5rem 0;
-    }
-
-    @media (max-width: 768px) {
-      .message-types-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Slide 7: Technical Details */
-    .slide-technical {
-      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-    }
-
-    .technical-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .technical-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.5rem;
-      transition: all 0.3s ease;
-    }
-
-    .technical-card:hover {
-      border-color: var(--accent);
-      background: var(--bg-primary);
-      transform: translateY(-4px);
-    }
-
-    .tech-title {
-      font-family: var(--font-display);
-      font-size: var(--type-sm);
-      color: var(--accent);
-      font-weight: 700;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .tech-content {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.7;
-    }
-
-    .tech-code {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 0.75rem;
-      font-family: var(--font-display);
-      font-size: 0.8rem;
-      color: var(--accent-light);
-      margin: 0.75rem 0;
-      overflow-x: auto;
-    }
-
-    .priority-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-      font-size: 0.85rem;
-    }
-
-    .priority-table thead {
-      background: var(--bg-primary);
-      border-bottom: 2px solid var(--accent);
-    }
-
-    .priority-table thead th {
-      padding: 0.75rem;
-      text-align: left;
-      color: var(--accent);
-      font-weight: 600;
-      font-family: var(--font-display);
-    }
-
-    .priority-table tbody td {
-      padding: 0.5rem 0.75rem;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-secondary);
-    }
-
-    .priority-table tbody tr:hover {
-      background: var(--bg-primary);
-    }
-
-    .prio-1 { color: #dc2626; font-weight: 600; }
-    .prio-2 { color: #f97316; font-weight: 600; }
-    .prio-3 { color: #3b82f6; font-weight: 600; }
-    .prio-4 { color: #84cc16; font-weight: 600; }
-    .prio-5 { color: #94a3b8; font-weight: 600; }
-
-    .buffer-diagram {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1rem;
-      margin-top: 1rem;
-      font-family: var(--font-display);
-      font-size: 0.8rem;
-      color: var(--accent-light);
-      overflow-x: auto;
-    }
-
-    .note-box {
-      background: var(--bg-primary);
-      border-left: 3px solid #f59e0b;
-      padding: 1rem;
-      border-radius: 4px;
-      margin-top: 1.5rem;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-    }
-
-    .note-box strong {
-      color: var(--text-primary);
-    }
-
-    @media (max-width: 768px) {
-      .technical-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeshCom — Protokoll, Grenzen, Vorschlag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#0f172a; --bg2:#1a2436; --bg3:#243046; --line:#334155; --line2:#3f4d66;
+  --fg:#e6ecff; --fg2:#9fb0cc; --fg3:#7488a8;
+  --acc:#818cf8; --acc2:#6366f1; --acc-dim:#312e81;
+  --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa; --mag:#e879f9;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
+    --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
+    --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
+    --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf;
+    --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#fbfcfe; --bg2:#f1f4f9; --bg3:#e6ebf3; --line:#d3dbe6; --line2:#c0cad9;
+  --fg:#111a2b; --fg2:#4a5a72; --fg3:#6b7c94;
+  --acc:#4f46e5; --acc2:#4338ca; --acc-dim:#e0e7ff;
+  --ok:#059669; --warn:#b45309; --bad:#dc2626; --info:#2563eb; --mag:#a21caf;
+  --sh:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ---------- chrome ---------- */
+#bar{position:fixed;top:0;left:0;right:0;height:3px;background:transparent;z-index:60}
+#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc2),var(--mag));transition:width .25s ease}
+#hud{position:fixed;bottom:1.1rem;right:1.2rem;z-index:60;display:flex;gap:.45rem;align-items:center;
+  font-family:var(--mono);font-size:.75rem;color:var(--fg2);background:color-mix(in srgb,var(--bg2) 88%,transparent);
+  border:1px solid var(--line);border-radius:999px;padding:.35rem .5rem;backdrop-filter:blur(8px);box-shadow:var(--sh)}
+#hud button{font:inherit;color:var(--fg2);background:transparent;border:0;cursor:pointer;padding:.15rem .45rem;border-radius:999px;line-height:1}
+#hud button:hover{color:var(--fg);background:var(--bg3)}
+#hud #pos{min-width:3.6em;text-align:center;letter-spacing:.04em}
+#toc{position:fixed;inset:0;z-index:70;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(10px);
+  display:none;padding:3rem 2rem;overflow:auto}
+#toc.on{display:block}
+#toc ol{max-width:760px;margin:0 auto;list-style:none;counter-reset:t}
+#toc li{counter-increment:t}
+#toc a{display:flex;gap:1rem;align-items:baseline;padding:.6rem .8rem;border-radius:8px;color:var(--fg);text-decoration:none;border:1px solid transparent}
+#toc a:hover{background:var(--bg2);border-color:var(--line)}
+#toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);color:var(--acc);font-size:.8rem;min-width:2em}
+#toc a small{color:var(--fg3);font-weight:400}
+#toc h2{max-width:760px;margin:0 auto 1.5rem;font-family:var(--mono);font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc)}
+
+/* ---------- slide scaffold ---------- */
+.deck{scroll-snap-type:y proximity}
+.slide{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3.6rem 1.75rem 3.4rem;scroll-snap-align:start;position:relative;border-bottom:1px solid var(--line)}
+.slide:nth-child(even){background:var(--bg2)}
+.inner{width:100%;max-width:1080px}
+.num{position:absolute;top:1.6rem;right:1.9rem;font-family:var(--mono);font-size:.72rem;color:var(--fg3);letter-spacing:.1em}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:.5rem}
+h1{font-family:var(--mono);font-size:clamp(2.4rem,6vw,4rem);font-weight:700;letter-spacing:-.03em;line-height:1.05;text-wrap:balance}
+h2{font-family:var(--mono);font-size:clamp(1.4rem,3vw,1.95rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin-bottom:1rem;text-wrap:balance}
+h3{font-size:1rem;font-weight:600;margin-bottom:.6rem}
+.lead{font-size:clamp(.97rem,1.5vw,1.09rem);color:var(--fg2);max-width:62ch;text-wrap:pretty}
+p+p{margin-top:.8rem}
+strong{color:var(--fg);font-weight:600}
+a{color:var(--acc)}
+
+/* ---------- primitives ---------- */
+.grid{display:grid;gap:.85rem}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem}
+.slide:nth-child(even) .card{background:var(--bg)}
+.slide:nth-child(odd) .card{background:var(--bg2)}
+.card h3{font-family:var(--mono);font-size:.73rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:.55rem}
+.card p,.card li{font-size:.855rem;color:var(--fg2);line-height:1.55}
+.card ul{margin:.4rem 0 0 1.05rem}
+.card li{margin:.25rem 0}
+.card.hot{border-color:var(--warn)} .card.hot h3{color:var(--warn)}
+.card.good{border-color:var(--ok)} .card.good h3{color:var(--ok)}
+.card.cold{border-color:var(--info)} .card.cold h3{color:var(--info)}
+.mono,code{font-family:var(--mono);font-size:.87em}
+code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;padding:.1em .38em;color:var(--fg)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.7rem .85rem;overflow-x:auto;font-family:var(--mono);font-size:.76rem;line-height:1.55;color:var(--fg2)}
+pre b{color:var(--acc);font-weight:600}
+pre em{color:var(--warn);font-style:normal}
+.big{font-family:var(--mono);font-size:clamp(1.4rem,3vw,2rem);font-weight:700;color:var(--acc);line-height:1;letter-spacing:-.02em}
+.stat{text-align:center;padding:.7rem .6rem}
+.stat .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);margin-bottom:.45rem}
+.stat .s{font-size:.76rem;color:var(--fg3);margin-top:.4rem}
+.kv{display:flex;justify-content:space-between;gap:1rem;padding:.32rem 0;border-bottom:1px solid var(--line);font-size:.83rem}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--fg2)}
+.kv span:last-child{font-family:var(--mono);font-weight:600;text-align:right}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;font-family:var(--mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);padding:.35rem .55rem;border-bottom:1px solid var(--line2)}
+td{padding:.33rem .55rem;border-bottom:1px solid var(--line);color:var(--fg2);vertical-align:top;line-height:1.5}
+tbody tr:last-child td{border-bottom:0}
+td.m,th.m{font-family:var(--mono)}
+.note{border-left:3px solid var(--acc);background:var(--bg3);border-radius:0 8px 8px 0;padding:.7rem .95rem;font-size:.845rem;color:var(--fg2);line-height:1.55}
+.note.warn{border-color:var(--warn)} .note.bad{border-color:var(--bad)} .note.ok{border-color:var(--ok)}
+.note b{color:var(--fg)}
+.tag{display:inline-block;font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+  padding:.2em .6em;border-radius:999px;border:1px solid currentColor;font-weight:600;vertical-align:middle}
+.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)} .t-info{color:var(--info)} .t-acc{color:var(--acc)}
+.cite{font-family:var(--mono);font-size:.66rem;color:var(--fg3);margin-top:.45rem;line-height:1.45}
+.cite b{color:var(--fg2);font-weight:500}
+details.deep{margin-top:.9rem;border:1px solid var(--line);border-radius:8px;background:var(--bg3);overflow:hidden}
+details.deep>summary{cursor:pointer;padding:.7rem 1rem;font-family:var(--mono);font-size:.74rem;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--fg2);list-style:none;user-select:none}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:'▸ ';color:var(--acc)}
+details.deep[open]>summary::before{content:'▾ '}
+details.deep>summary:hover{color:var(--fg);background:var(--bg2)}
+details.deep .body{padding:0 1rem 1rem;font-size:.87rem;color:var(--fg2)}
+details.deep .body>*+*{margin-top:.7rem}
+figure{margin:0}
+figure img{width:auto;max-width:100%;max-height:40vh;height:auto;display:block;margin:0 auto;border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);background:var(--bg2)}
+.tight figure img{max-height:28vh}
+figcaption{font-size:.75rem;color:var(--fg3);margin-top:.45rem;line-height:1.5}
+figcaption b{color:var(--fg2)}
+.flow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-family:var(--mono);font-size:.8rem}
+.flow .n{border:1px solid var(--line2);border-radius:6px;padding:.35rem .6rem;background:var(--bg3);white-space:nowrap}
+.flow .a{color:var(--fg3)}
+ul.plain{list-style:none;margin:0}
+ul.plain li{position:relative;padding-left:1.3rem;margin:.3rem 0;font-size:.845rem;color:var(--fg2);line-height:1.55}
+ul.plain li::before{content:'—';position:absolute;left:0;color:var(--acc)}
+ul.plain li.no::before{content:'✕';color:var(--bad);font-size:.8em}
+ul.plain li.yes::before{content:'✓';color:var(--ok)}
+.sep{height:1px;background:var(--line);margin:1rem 0}
+.scale{display:flex;flex-wrap:wrap;gap:.1rem;margin-top:.6rem;font-family:var(--mono);font-size:.6rem}
+.scale i{flex:1 1 0;min-width:56px;text-align:center;padding:.3rem .2rem;color:#0b1020;font-style:normal;font-weight:600;line-height:1.2}
+.scale i:first-child{border-radius:4px 0 0 4px} .scale i:last-child{border-radius:0 4px 4px 0;color:#fff}
+.scale i:nth-child(n+5){color:#fff}
+
+/* frame byte strip */
+.bytes{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--mono);font-size:.68rem}
+.by{border:1px solid var(--line2);border-radius:4px;padding:.4rem .45rem;background:var(--bg3);text-align:center;flex:0 0 auto}
+.by u{display:block;text-decoration:none;color:var(--fg3);font-size:.62rem;letter-spacing:.04em}
+.by b{display:block;color:var(--fg);font-weight:600;margin-top:.15rem;white-space:nowrap}
+.by.v{flex:1 1 90px;border-style:dashed}
+.by.hi{border-color:var(--acc);background:var(--acc-dim)}
+.by.hi b,.by.hi u{color:var(--acc)}
+
+@media (max-width:900px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .slide{padding:4.5rem 1.1rem 4rem}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media print{
+  #bar,#hud,#toc{display:none}
+  .slide{min-height:auto;page-break-after:always;border:0;padding:1.5rem}
+  details.deep{break-inside:avoid} details.deep>.body{display:block!important}
+}
+</style>
 </head>
 <body>
-  <div class="presentation">
-    <!-- Slide 1: Introduction -->
-    <section class="slide slide-intro">
-      <div class="slide-content">
-        <div class="intro-header">
-          <div class="protocol-title">MeshCom</div>
-          <div class="intro-subtitle">Protokoll Grundlagen</div>
-        </div>
-
-        <div class="protocol-comparison">
-          <div class="comparison-card">
-            <div class="card-label"><span class="accent-dot"></span>Orientierung</div>
-            <div class="card-title">AX.25 Basis</div>
-            <div class="card-description">
-              MeshCom baut auf den Grundprinzipien des bewährten AX.25 Protokolls auf und adaptiert diese für moderne LoRa-Hardware.
-            </div>
-          </div>
-
-          <div class="comparison-card">
-            <div class="card-label"><span class="accent-dot"></span>Verwandtschaft</div>
-            <div class="card-title">LoRa APRS</div>
-            <div class="card-description">
-              Ähnlich wie LoRa APRS nutzt MeshCom ein Broadcast-Modell statt zentralisierter Verbindungen.
-            </div>
-          </div>
-        </div>
-
-        <div class="broadcast-banner">
-          ⚡ Flutnetzwerk — Broadcast statt verbindungsorientiert
-        </div>
-
-        <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);">
-          <div style="color: var(--text-secondary); font-size: var(--type-xs); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Der Unterschied</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-            <div>
-              <div style="color: var(--text-secondary); font-size: var(--type-xs); margin-bottom: 0.5rem;">Packet Radio</div>
-              <div style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.8;">Verbindungen auf- und abbauend, Punkt-zu-Punkt orientiert</div>
-            </div>
-            <div>
-              <div style="color: var(--accent); font-size: var(--type-xs); margin-bottom: 0.5rem;">✓ MeshCom</div>
-              <div style="color: var(--text-primary); font-size: 0.95rem; line-height: 1.8;">Broadcast-basiert, Flutnetzwerk, dezentral und robust</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Weitere Informationen:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md" style="color: var(--accent); text-decoration: none;">Wire Format Dokumentation</a> — Paketaufbau und Protokoll-Details</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md" style="color: var(--accent); text-decoration: none;">Flood Network Analyse</a> — Netzwerk-Funktionsweise und Optimierungen</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 2: Hardware Platforms -->
-    <section class="slide slide-hardware">
-      <div class="slide-content">
-        <div class="section-eyebrow">Hardware</div>
-        <div class="section-title">Plattformen & LoRa Module</div>
-
-        <div class="platforms-grid">
-          <div class="platform-card">
-            <div class="platform-name">Heltec V3</div>
-            <span class="platform-chip">ESP32 + LoRa</span>
-          </div>
-          <div class="platform-card">
-            <div class="platform-name">TTGO T-Beam</div>
-            <span class="platform-chip">ESP32 + GPS</span>
-          </div>
-          <div class="platform-card">
-            <div class="platform-name">TTGO T-Deck</div>
-            <span class="platform-chip">ESP32 + Display</span>
-          </div>
-          <div class="platform-card">
-            <div class="platform-name">T-Deck Plus</div>
-            <span class="platform-chip">ESP32 + erweitert</span>
-          </div>
-          <div class="platform-card">
-            <div class="platform-name">WisBlock RAK4631</div>
-            <span class="platform-chip">nRF52840 + LoRa</span>
-          </div>
-          <div class="platform-card">
-            <div class="platform-name">T-Beam Supreme</div>
-            <span class="platform-chip">ESP32-S3 + GPS</span>
-          </div>
-        </div>
-
-        <div class="frequency-note">
-          <div class="frequency-note-title">📡 Standard Verbreitungsfrequenz</div>
-          <div class="frequency-detail">
-            433 MHz ist die Hauptfrequenz. Je nach Region und Regulierung werden unterschiedliche Bandwidth- und Spreading-Factor-Konfigurationen verwendet.
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Hardware & Varianteninfo:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/02-build-and-variants.md" style="color: var(--accent); text-decoration: none;">Build & Variants</a> — Hardware-Plattformen und Konfiguration</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 3: Regional Configuration -->
-    <section class="slide slide-regional">
-      <div class="slide-content">
-        <div class="section-eyebrow">Konfiguration</div>
-        <div class="section-title">Regionale Frequenzbänder</div>
-
-        <div class="comparison-intro">
-          Unterschiedliche Länder und Regionen verwenden verschiedene LoRa-Parameter zur Einhaltung lokaler Funkbestimmungen.
-        </div>
-
-        <div class="config-grid">
-          <div class="config-card">
-            <div class="region-code">EU8</div>
-            <div class="config-detail">
-              <span class="config-label">Frequenz</span>
-              <span class="config-value">433 MHz</span>
-            </div>
-            <div class="config-detail">
-              <span class="config-label">Spreading Factor</span>
-              <span class="config-value">SF11</span>
-            </div>
-            <div class="config-detail">
-              <span class="config-label">Bandbreite</span>
-              <span class="config-value">250 kHz</span>
-            </div>
-          </div>
-
-          <div class="config-card">
-            <div class="region-code">GB</div>
-            <div class="config-detail">
-              <span class="config-label">Frequenz</span>
-              <span class="config-value">433 MHz</span>
-            </div>
-            <div class="config-detail">
-              <span class="config-label">Spreading Factor</span>
-              <span class="config-value">SF11</span>
-            </div>
-            <div class="config-detail">
-              <span class="config-label">Bandbreite</span>
-              <span class="config-value">125 kHz</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--accent);">
-          <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
-            Der Unterschied in der Bandbreite (250 kHz vs. 125 kHz) beeinflusst die Datenrate und Reichweite. Größere Bandbreiten ermöglichen höhere Datenraten, während kleinere Bandbreiten die Reichweite verbessern.
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Regionale LoRa-Konfiguration:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/configuration_global.h" style="color: var(--accent); text-decoration: none;">Globale Konfiguration</a> — LoRa-Parameter pro Region</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 4: Flood Network Animation -->
-    <section class="slide slide-network">
-      <div class="slide-content">
-        <div class="section-eyebrow">Netzwerk-Funktionsweise</div>
-        <div class="section-title">Flutnetzwerk & Transportsicherung</div>
-
-        <!-- Network Animation Tabs -->
-        <div class="animation-tabs">
-          <button class="animation-tab active" onclick="switchNetworkMode('broadcast')">Broadcast Flood</button>
-          <button class="animation-tab" onclick="switchNetworkMode('relay')">Mesh Relay & Repeat</button>
-        </div>
-
-        <div class="animation-container">
-          <svg viewBox="0 0 800 350" xmlns="http://www.w3.org/2000/svg" id="networkAnimation">
-            <defs>
-              <marker id="arrowhead-internet" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                <polygon points="0 0, 10 3, 0 6" fill="#10b981" />
-              </marker>
-              <marker id="arrowhead-mesh" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                <polygon points="0 0, 10 3, 0 6" fill="#f59e0b" />
-              </marker>
-            </defs>
-
-            <!-- Sending Node (Sender) -->
-            <g class="network-node">
-              <circle class="node-circle sending" cx="100" cy="150" r="20" />
-              <text class="node-label" x="100" y="155">TX</text>
-              <text class="node-role" x="100" y="175">Sender</text>
-            </g>
-
-            <!-- Receiving Node 1 (Mesh) -->
-            <g class="network-node">
-              <circle class="node-circle" cx="300" cy="80" r="20" />
-              <text class="node-label" x="300" y="85">N2</text>
-              <text class="node-role" x="300" y="105">Mesh</text>
-            </g>
-
-            <!-- Receiving Node 2 (Gateway) -->
-            <g class="network-node">
-              <circle class="node-circle" cx="400" cy="180" r="20" />
-              <text class="node-label" x="400" y="185">GW</text>
-              <text class="node-role" x="400" y="205">Gateway</text>
-            </g>
-
-            <!-- Receiving Node 3 (Standard) -->
-            <g class="network-node">
-              <circle class="node-circle" cx="300" cy="280" r="20" />
-              <text class="node-label" x="300" y="285">N3</text>
-              <text class="node-role" x="300" y="305">Empfänger</text>
-            </g>
-
-            <!-- Internet Cloud -->
-            <g class="network-node">
-              <ellipse cx="650" cy="180" rx="40" ry="30" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="5,5"/>
-              <text class="node-label" x="650" y="185">Internet</text>
-            </g>
-
-            <!-- Initial broadcast waves (will be created by JavaScript) -->
-          </svg>
-        </div>
-
-        <div class="legend">
-          <div class="legend-item">
-            <div class="legend-color legend-sending"></div>
-            <div class="legend-text">Sender</div>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color legend-receiving"></div>
-            <div class="legend-text">Empfängt Nachricht</div>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color legend-gateway"></div>
-            <div class="legend-text">Gateway (Internet)</div>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color legend-mesh"></div>
-            <div class="legend-text">Mesh (Wiederholt)</div>
-          </div>
-        </div>
-
-        <div class="explanation">
-          <div class="explanation-title">Keine Transportsicherung — Flutnetzwerk-Prinzip</div>
-          <div class="explanation-text">
-            MeshCom nutzt ein Broadcast-Modell ohne klassische Transportsicherung (Handshakes, ACKs). Jede Nachricht wird von allen empfangenen Knoten gehört. Knoten mit aktiviertem Gateway leiten die Nachricht ins Internet weiter. Knoten mit aktiviertem Mesh wiederholen die Nachricht, um die Reichweite zu vergrößern.
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Flood Network Detailaudi:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/lora_functions.cpp" style="color: var(--accent); text-decoration: none;">Relay & Dedup Logik</a> — Implementierung der Weiterleitung</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md" style="color: var(--accent); text-decoration: none;">Prio-Talk Analyse</a> — Detaillierte Flood-Network-Analyse</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 5: HeyFrames -->
-    <section class="slide slide-heyframes">
-      <div class="slide-content">
-        <div class="section-eyebrow">Nachbarschaftserkennung</div>
-        <div class="section-title">HeyFrames</div>
-
-        <div class="heyframe-info">
-          HeyFrames sind spezielle Kontrollframes, die regelmäßig von jedem Knoten versendet werden, um die Netzwerk-Topologie abzubilden und Nachbarknoten zu identifizieren.
-        </div>
-
-        <div class="functions-grid">
-          <div class="function-card">
-            <div class="function-icon">👋</div>
-            <div class="function-title">Nachbarn identifizieren</div>
-            <div class="function-description">
-              Jeder Knoten kann durch HeyFrames alle erreichbaren Nachbarknoten in Reichweite erkennen.
-            </div>
-          </div>
-
-          <div class="function-card">
-            <div class="function-icon">📊</div>
-            <div class="function-title">Signalreport</div>
-            <div class="function-description">
-              RSSI (Received Signal Strength Indicator) und SNR (Signal-to-Noise Ratio) werden gemessen und übertragen.
-            </div>
-          </div>
-
-          <div class="function-card">
-            <div class="function-icon">🔗</div>
-            <div class="function-title">Topologie-Info</div>
-            <div class="function-description">
-              Jeder Knoten sendet mit, wie viele Nachbarn er selbst hat — ermöglicht indirekte Netzwerk-Einsicht.
-            </div>
-          </div>
-
-          <div class="function-card">
-            <div class="function-icon">🔄</div>
-            <div class="function-title">Regelmäßiges Update</div>
-            <div class="function-description">
-              HeyFrames werden in definierten Intervallen versendet, um die Netzwerk-Karte aktuell zu halten.
-            </div>
-          </div>
-        </div>
-
-        <div class="heyframe-structure">
-          <div class="structure-title">HeyFrame Aufbau</div>
-
-          <div class="frame-row">
-            <div class="frame-label">Sender-Kennung</div>
-            <div class="frame-content">
-              Eindeutige ID des Knotens, der das HeyFrame versendet (z. B. CallSign oder Device ID)
-            </div>
-          </div>
-
-          <div class="frame-row">
-            <div class="frame-label">RSSI</div>
-            <div class="frame-content">
-              Empfangene Signalstärke bei Empfängern
-              <div class="signal-indicator">z. B. -85 dBm</div>
-            </div>
-          </div>
-
-          <div class="frame-row">
-            <div class="frame-label">SNR</div>
-            <div class="frame-content">
-              Signal-zu-Rausch-Verhältnis für Qualitätsassessment
-              <div class="signal-indicator">z. B. 7.5 dB</div>
-            </div>
-          </div>
-
-          <div class="frame-row">
-            <div class="frame-label">Nachbarzahl</div>
-            <div class="frame-content">
-              Anzahl der Nachbarknoten, die dieser Knoten erreichen kann — gibt Hinweise auf die lokale Dichte und Netzwerk-Topologie
-            </div>
-          </div>
-
-          <div class="frame-row">
-            <div class="frame-label">Datenrate</div>
-            <div class="frame-content">
-              Aktuelle LoRa-Parameter und Kommunikationsrate dieses Knotens
-            </div>
-          </div>
-        </div>
-
-        <div class="topology-example">
-          <div class="topology-title">Beispiel: Netzwerk-Topologie eines Knotens</div>
-          <div class="node-with-neighbors">
-            <div class="central-node">N1</div>
-            <div class="neighbor-nodes">
-              <div class="neighbor-node">N2</div>
-              <div class="neighbor-node">N3</div>
-              <div class="neighbor-node">N4</div>
-              <div class="neighbor-node">N5</div>
-            </div>
-            <div class="topology-label">Knoten N1 hat 4 Nachbarn • Jeder Nachbar meldet seine eigene Nachbarzahl</div>
-          </div>
-        </div>
-
-        <!-- TODO: Screenshots from http://dk5en-98.local -->
-        <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 1rem 1.5rem; border-radius: 4px; margin-top: 2rem; font-size: 0.9rem;">
-          <div style="color: #333; font-weight: 600; margin-bottom: 0.5rem;">⚠️ TODO: Echtzeit-Screenshots einbauen</div>
-          <div style="color: #555; line-height: 1.6;">
-            Screenshots von <code style="background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 2px;">http://dk5en-98.local</code> hinzufügen:
-            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
-              <li>HeyFrames auf dem Draht (Netzwerk-Capture/Logs)</li>
-              <li>HeyFrames Darstellung in der WebGUI</li>
-              <li>Topologie-Visualisierung aus der WebGUI</li>
-            </ul>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 HeyFrames & Neighbor Discovery:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/hey-supp.md" style="color: var(--accent); text-decoration: none;">Trickle HEY Suppression</a> — Adaptive HEY-Frequenz (RFC 6206)</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/mheard_functions.cpp" style="color: var(--accent); text-decoration: none;">MHeard Logik</a> — Nachbar-Verwaltung</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 6: Message Transmission -->
-    <section class="slide slide-messages">
-      <div class="slide-content">
-        <div class="section-eyebrow">Nachrichtenübertragung</div>
-        <div class="section-title">Broadcast, DM & Wiederholung</div>
-
-        <!-- Message Animation Tabs -->
-        <div class="animation-tabs">
-          <button class="animation-tab active" onclick="switchMessageMode('broadcast')">Broadcast & Gruppe</button>
-          <button class="animation-tab" onclick="switchMessageMode('dm')">Persönliche Nachricht</button>
-        </div>
-
-        <div class="animation-container-msg" id="messageAnimation">
-          <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" id="messageSvg">
-            <defs>
-              <marker id="arrowhead-msg" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                <polygon points="0 0, 10 3, 0 6" fill="var(--accent, #6366f1)" />
-              </marker>
-            </defs>
-          </svg>
-        </div>
-
-        <div class="message-types-grid">
-          <div class="message-type-card">
-            <div class="message-type-header">Broadcast (Gruppe 262)</div>
-            <div class="message-format">OE1ABC-12>262:{text}</div>
-            <div class="message-details">
-              Nachricht an Gruppe 262 wird von allen Knoten empfangen und weitergeleitet, wenn Mesh aktiviert ist. Weitergeleitet mit max_hop=4, dekrementiert bei jedem Relay.
-            </div>
-          </div>
-
-          <div class="message-type-card">
-            <div class="message-type-header">Persönliche Nachricht (DM)</div>
-            <div class="message-format">OE1ABC-12>OE9XYZ:Beispiel Text, 73{987</div>
-            <div class="message-details">
-              Direkt an OE9XYZ adressiert. Die <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px;">{987</code> ist die 3-stellige ACK-Anfrage-Nummer (Nachrichtenzähler 0-999) <strong>ohne schließende Klammer</strong>.
-            </div>
-          </div>
-        </div>
-
-        <div class="behavior-section">
-          <div class="behavior-title">Relaying & Wiederholung</div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">📡 Mesh-Weiterleitung (Relay)</div>
-            <div class="behavior-description">
-              Jeder Knoten leitet empfangene Nachrichten einmal weiter (RING_STATUS_DONE = Fire-and-Forget). **Nicht weitergeleitet wird, wenn:**
-            </div>
-            <ul class="condition-list">
-              <li>Hop-Count = 0 (bereits dekrementiert vor dem Relay)</li>
-              <li>Schleife erkannt (eigenes Rufzeichen im Quellpfad)</li>
-              <li>Doppelte msg_id im Dedup-Ring (zirkulärer Puffer, kein Timeout)</li>
-              <li>Server-Flag gesetzt (Gateway hat bereits ins Internet weitergeleitet)</li>
-              <li>Nachrichtentyp nicht weiterleibbar (nur TEXT, POSITION, HEY)</li>
-              <li>Mesh deaktiviert (Knoten als Endpunkt konfiguriert)</li>
-            </ul>
-          </div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">🔁 Wiederholung durch Originator</div>
-            <div class="behavior-description">
-              **Nur der Ursprungsknoten wiederholt** TEXT-Nachrichten automatisch — bis zu **3 Versuche** im Abstand von ca. **40 Sekunden**. Nach 3 Versuchen stoppt die Wiederholung automatisch.
-            </div>
-          </div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">❌ Was cancelt das Relay?</div>
-            <div class="behavior-description">
-              Ein eingerichtetes Relay wird <strong>nicht storniert</strong>, selbst wenn ein anderer Knoten das Paket zuerst weitergeleitet. Grund: Das System muss ohne Topologie-Wissen funktionieren (Brückenknoten-Szenario). Stattdessen unterdrückt der Dedup-Ring <strong>neu eingereihte Relays</strong>.
-            </div>
-          </div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">✅ ACK-Behandlung</div>
-            <div class="behavior-description">
-              ACK-Frames werden <strong>nicht gemasht</strong>. Eine Nachricht mit ACK-Anfrage <code>{NNN</code> wird normal weitergeleitet, die ACK-Antwort <code>:ackNNN</code> aber direkt nur an den Sender gesendet (kein Mesh).
-            </div>
-          </div>
-        </div>
-
-        <div class="behavior-section" style="margin-top: 2rem;">
-          <div class="behavior-title">ACK-Format im Detail</div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">ACK-Anfrage im DM (z. B. Nachricht 987)</div>
-            <div class="behavior-description">
-              Sender hängt an das Ende: <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px; color: var(--accent-light);">{987</code><br/>
-              Diese Nummer ist der 3-stellige Nachrichtenzähler des Senders (0-999). <strong>Keine schließende Klammer!</strong>
-            </div>
-          </div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">ACK-Antwort vom Empfänger</div>
-            <div class="behavior-description">
-              Antwort wird mit Format <code style="background: var(--bg-primary); padding: 0.2rem 0.4rem; border-radius: 2px; color: var(--accent-light);">:ack987</code> gesendet.<br/>
-              Bereich: 0-999, wird mit %03i formatiert (3-stellig, führende Nullen).
-            </div>
-          </div>
-
-          <div class="behavior-item">
-            <div class="behavior-label">Gateway kompakter ACK</div>
-            <div class="behavior-description">
-              Gateways senden zusätzlich einen **12-Byte binären ACK** für Broadcast/Gruppe Nachrichten. Dieser ACK wird <strong>nicht weitergeleitet</strong> (nur Gateways versenden ihn).
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Nachrichtenformat & ACK-Logik:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/src/loop_functions.cpp" style="color: var(--accent); text-decoration: none;">Message Handling</a> — Versand und ACK-Verarbeitung</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md#15-acknowledgements" style="color: var(--accent); text-decoration: none;">ACK-Format</a> — Bestätigungsformat und Wiederholung</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 7: Technical Details -->
-    <section class="slide slide-technical">
-      <div class="slide-content">
-        <div class="section-eyebrow">Interne Architektur</div>
-        <div class="section-title">Puffer, Message IDs & Prioritäten</div>
-
-        <div class="technical-grid">
-          <div class="technical-card">
-            <div class="tech-title">🔌 LoRa TX-Puffer (Ring Buffer)</div>
-            <div class="tech-content">
-              <strong>ringBuffer[MAX_RING]</strong> — zirkulärer Puffer mit 30 Slots
-              <div class="tech-code">
-Slot 0: [Länge|Status|Type|MsgID|Payload...]
-Slot 1: [Länge|Status|Type|MsgID|Payload...]
-...
-Slot 29: [Länge|Status|Type|MsgID|Payload...]
-              </div>
-              <strong>Status pro Slot:</strong><br/>
-              • RING_STATUS_READY — bereit zum Senden<br/>
-              • RING_STATUS_DONE — bereits gesendet<br/>
-              • RING_STATUS_RESERVED — in Benutzung
-            </div>
-          </div>
-
-          <div class="technical-card">
-            <div class="tech-title">🆔 Message ID Aufbau</div>
-            <div class="tech-content">
-              <strong>32-bit msg_id Zusammensetzung:</strong>
-              <div class="tech-code">
-((gw_id & 0x3FFFFF) << 10) | (counter & 0x3FF)
-              </div>
-              <strong>Top 22 Bits:</strong> Gateway-ID (von MAC abgeleitet)<br/>
-              <strong>Low 10 Bits:</strong> Nachrichtenzähler 0-999<br/><br/>
-              ⚠️ <strong>Wichtig:</strong> Zähler wraps bei 999, nicht 1024 (für {NNN} Format)
-            </div>
-          </div>
-
-          <div class="technical-card">
-            <div class="tech-title">📊 Dedup-Ring</div>
-            <div class="tech-content">
-              <strong>ringBufferLoraRX[MAX_DEDUP_RING]</strong> — speichert empfangene msg_ids<br/><br/>
-              <strong>Funktionsweise:</strong><br/>
-              ✓ Verhindert doppelte Verarbeitung<br/>
-              ✓ Zirkulärer Puffer ohne Timeout<br/>
-              ✓ Alte Einträge werden beim Wrap-Around überschrieben<br/><br/>
-              ⚠️ Hält verlorene Duplikate länger als nötig (beeinflusst Brückenszenarien)
-            </div>
-          </div>
-
-          <div class="technical-card">
-            <div class="tech-title">⚡ Prioritätssystem (5 Stufen)</div>
-            <div class="tech-content">
-              <table class="priority-table">
-                <thead>
-                  <tr>
-                    <th>Prio</th>
-                    <th>Typ</th>
-                    <th>CSMA Timeout</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><span class="prio-1">1</span></td>
-                    <td>ACK / DM</td>
-                    <td>3000ms</td>
-                  </tr>
-                  <tr>
-                    <td><span class="prio-2">2</span></td>
-                    <td>Gruppe / Broadcast</td>
-                    <td>3000ms</td>
-                  </tr>
-                  <tr>
-                    <td><span class="prio-3">3</span></td>
-                    <td>Mesh-Relay</td>
-                    <td>4500ms</td>
-                  </tr>
-                  <tr>
-                    <td><span class="prio-4">4</span></td>
-                    <td>Position</td>
-                    <td>5500ms</td>
-                  </tr>
-                  <tr>
-                    <td><span class="prio-5">5</span></td>
-                    <td>HEY</td>
-                    <td>5500ms</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div class="note-box">
-          <strong>TODO — Firmware Details:</strong> Wir benötigen genaue Informationen zu:<br/>
-          • Wie wird MAX_RETRANSMIT (3x) für DMs gesteuert? Welche Bedingungen canceln Retries?<br/>
-          • Wie funktioniert RING_STATUS_DONE Behandlung bei Relays? Wann wird ein Slot freigegeben?<br/>
-          • CAD (Channel Activity Detection) Parameter — timeouts, Backoff-Strategie bei Kanal belegt<br/>
-          • Slot-Vergabe (Phase 3) — ist das implementiert oder noch in Planung?
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ff9800; border-radius: 4px;">
-          <div style="color: #333; font-weight: 600; margin-bottom: 0.5rem; font-family: var(--font-display); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">⚠️ TODO: Nächste Folie (8) — Mesh Control</div>
-          <div style="color: #555; line-height: 1.6; font-size: 0.9rem;">
-            Folie zeigt Mesh-Steuerung basierend auf ADR-02 (Rev. 3):<br/>
-            • <strong>Stadt-Node:</strong> 10+ Nachbarn, alle sind auch gut vernetzt → kann meshen optional<br/>
-            • <strong>Berg-Node (Brücke):</strong> nur 2 Nachbarn aber jeder hat NC=1-2 → Essentieller Relay, MUSS meshen<br/>
-            • Netzwichtigkeit-Formel: Importance = Σ(1/NC_reported)<br/>
-            • Importance-basierter Relay-Backoff (CSMA-Priorisierung)<br/>
-            Daten aus 24-h Live-Produktionsnetz (96.074 HEY-Frames, 1.430 Nodes)
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
-          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Ring Buffer Architektur</div>
-          <div class="buffer-diagram">
-iRead (Leseziger)  ──→  [DONE|DONE|READY|READY|...|RESERVED|DONE]  ←── iWrite (Schreibzeiger)
-                         Prio↓  Prio↑   Prio↑  Prio↓        |
-                         FIFO-Entnahme nach Priorität       └─ Neue Pakete hier eingefügt
-          </div>
-          <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.75rem;">
-            <strong>getNextTxSlot():</strong> Scannt den Ring nach höchster belegter Priorität. Bei gleicher Priorität: ältester Eintrag zuerst (FIFO).
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 8: Netzwichtigkeit & Neighbour Count -->
-    <section class="slide" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);">
-      <div class="slide-content">
-        <div class="section-eyebrow">Intelligente Relay-Priorisierung</div>
-        <div class="section-title">Netzwichtigkeit & Neighbour Count</div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-          <!-- Stadt Node -->
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
-            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🏙️ Stadt-Node</div>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
-              Mein NC: 10 Nachbarn<br/>
-              Nachbarn melden: NC 8-12<br/><br/>
-              <strong style="color: var(--text-primary);">Importance:</strong> 1/10 + 1/9 + 1/11 + ... ≈ 1,1
-            </div>
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1rem; font-family: var(--font-display); font-size: 0.85rem; color: var(--accent-light); margin-top: 1rem;">
-              <div style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">CSMA Backoff</div>
-              <div style="font-size: 1.5rem; color: var(--accent);">5500ms</div>
-              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">Kann entspannen, andere hören uns auch</div>
-            </div>
-          </div>
-
-          <!-- Berg Node (Brücke) -->
-          <div style="background: var(--bg-secondary); border: 2px solid #f59e0b; border-radius: 8px; padding: 2rem;">
-            <div style="font-family: var(--font-display); font-size: 1.3rem; color: #f59e0b; font-weight: 700; margin-bottom: 1rem;">⛏️ Berg-Node (Brücke)</div>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
-              Mein NC: 2 Nachbarn<br/>
-              Nachbarn melden: NC 1, 2<br/><br/>
-              <strong style="color: var(--text-primary);">Importance:</strong> 1/1 + 1/2 = 1,5
-            </div>
-            <div style="background: var(--bg-primary); border: 2px solid #f59e0b; border-radius: 4px; padding: 1rem; font-family: var(--font-display); font-size: 0.85rem; color: #f59e0b; margin-top: 1rem;">
-              <div style="color: #f59e0b; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; font-weight: 700;">CSMA Backoff</div>
-              <div style="font-size: 1.5rem; color: #f59e0b;">3000ms</div>
-              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">Muss schnell senden — bin essentielles Relay!</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Formel -->
-        <div style="background: var(--bg-primary); border-left: 3px solid var(--accent); padding: 1.5rem; border-radius: 4px; margin-top: 2rem; font-family: var(--font-display); font-size: 0.9rem;">
-          <div style="color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">Netzwichtigkeit-Formel</div>
-          <div style="color: var(--accent-light); line-height: 2;">
-            Importance = Σ (1 / NC_reported[i])
-            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
-              Je kleiner die Nachbaranzahl meiner Nachbarn, desto wichtiger bin ich für sie
-            </div>
-          </div>
-        </div>
-
-        <!-- Auswirkungen -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
-          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Auswirkung auf CSMA-Backoff</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
-            <div style="text-align: center;">
-              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">High Importance</div>
-              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">3000ms</div>
-              <div style="color: var(--text-secondary); font-size: 0.75rem;">Hub-Knoten</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Normal</div>
-              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">4500ms</div>
-              <div style="color: var(--text-secondary); font-size: 0.75rem;">Standard Relay</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem;">Low Importance</div>
-              <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent);">5500ms</div>
-              <div style="color: var(--text-secondary); font-size: 0.75rem;">Redundante Knoten</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 ADR-02 Netzwichtigkeit:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md" style="color: var(--accent); text-decoration: none;">ADR-02: Netzwichtigkeits-basierter Relay-Backoff</a> — Vollständige Spezifikation mit Produktionsdaten</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 9: Mögliche Erweiterungen -->
-    <section class="slide" style="background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);">
-      <div class="slide-content">
-        <div class="section-eyebrow">Künftige Verbesserungen</div>
-        <div class="section-title">Erweiterungsoptionen</div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-          <!-- Transportsicherung für DM -->
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
-            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🛡️ DM-Transportsicherung</div>
-
-            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1.5rem;">
-              <strong style="color: var(--text-primary);">Idee:</strong> Persönliche Nachrichten mit zuverlässigem Transport
-            </div>
-
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-size: 0.9rem;">
-              <div style="color: var(--accent); font-weight: 700; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Funktionsweise</div>
-              <div style="color: var(--text-secondary); line-height: 1.7;">
-                ✓ ACK-basiertes Retransmit (bereits vorhanden)<br/>
-                ✓ Spiegeln über Server wenn verfügbar<br/>
-                ✓ Offline-Buffering auf TX-Knoten<br/>
-                ✓ Erhöhte Retry-Rate wenn kein ACK
-              </div>
-            </div>
-
-            <div style="background: var(--bg-primary); border-left: 3px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
-              <strong style="color: #f59e0b;">⚠️ Voraussetzung:</strong> Empfänger muss erreichbar &amp; eingeschaltet sein. Keine Garantie wenn Zielknoten offline.
-            </div>
-          </div>
-
-          <!-- Mesh Learning Phase -->
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 2rem;">
-            <div style="font-family: var(--font-display); font-size: 1.3rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">📚 Mesh Learning Phase</div>
-
-            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1.5rem;">
-              <strong style="color: var(--text-primary);">Idee:</strong> 30-60 Min. vor Mesh-Aktivierung observieren
-            </div>
-
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-size: 0.9rem;">
-              <div style="color: var(--accent); font-weight: 700; margin-bottom: 0.75rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Learning Phase</div>
-              <div style="color: var(--text-secondary); line-height: 1.7;">
-                1. HEY-Nachrichten sammeln<br/>
-                2. Nachbar-Topologie aufbauen<br/>
-                3. NC-Werte analysieren<br/>
-                4. Importance berechnen<br/>
-                5. Mesh aktivieren oder passiv bleiben
-              </div>
-            </div>
-
-            <div style="background: var(--bg-primary); border-left: 3px solid #10b981; padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
-              <strong style="color: #10b981;">✓ Ergebnis:</strong> Knoten kennt seine Rolle: Stadt-Node (redundant) oder Berg-Node (essentiell).
-            </div>
-          </div>
-        </div>
-
-        <!-- Umgebungstypen -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
-          <div style="font-family: var(--font-display); font-size: 0.9rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Abhängig vom Umfeld</div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; font-size: 0.9rem;">
-            <!-- Pure LoRa -->
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
-              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">🏜️ Pure LoRa Mesh</div>
-              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
-                Nur Funk-Verbindungen<br/>
-                Knoten=Relays<br/>
-                Learning Phase essentiell<br/>
-                Hub-Knoten müssen meshen
-              </div>
-            </div>
-
-            <!-- Mixed Mode -->
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
-              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">🌐 Mixed Mode</div>
-              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
-                Funk + Internet Gateway<br/>
-                Server kennt Topologie<br/>
-                Learning Phase optional<br/>
-                Gateways koordinieren
-              </div>
-            </div>
-
-            <!-- Cloud Mesh -->
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
-              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">☁️ Cloud-Managed</div>
-              <div style="color: var(--text-secondary); line-height: 1.7; font-size: 0.85rem;">
-                Server steuert Mesh aktiv<br/>
-                Adaptive Relaying<br/>
-                Keine Learning Phase<br/>
-                Zentrale Intelligenz
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Learning Phase Timeline -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-primary); border-left: 3px solid var(--accent); border-radius: 4px;">
-          <div style="font-family: var(--font-display); font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Learning Phase Timeline</div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; font-size: 0.85rem;">
-            <div style="text-align: center;">
-              <div style="font-weight: 600; color: var(--text-primary);">0-10 Min</div>
-              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Startup<br/>HEY sammeln</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="font-weight: 600; color: var(--text-primary);">10-30 Min</div>
-              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Topologie<br/>aufbauen</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="font-weight: 600; color: var(--text-primary);">30-60 Min</div>
-              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Analyse<br/>Importance calc</div>
-            </div>
-            <div style="text-align: center;">
-              <div style="font-weight: 600; color: var(--accent);">60+ Min</div>
-              <div style="color: var(--text-secondary); margin-top: 0.25rem;">Mesh aktiv<br/>oder passiv</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Weitere Referenzen:</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md#15-acknowledgements" style="color: var(--accent); text-decoration: none;">Wire Format ACK</a> — ACK-basierte Transportsicherung</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md" style="color: var(--accent); text-decoration: none;">ADR-02</a> — Netzwichtigkeits-Konzept</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Slide 10: Live-Daten & Produktionsevidenz -->
-    <section class="slide" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);">
-      <div class="slide-content">
-        <div class="section-eyebrow">Produktionsevidenz</div>
-        <div class="section-title">Live-Daten von MeshMap</div>
-
-        <!-- Live Stats -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.5rem; margin-top: 2rem;">
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
-            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Aktive Knoten</div>
-            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">1.446</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">weltweit (23.8.2026)</div>
-          </div>
-
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
-            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">HEY-Frames (24h)</div>
-            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">92.014</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">Ø 3.834/Stunde</div>
-          </div>
-
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
-            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Gateway-Abdeckung</div>
-            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">66,4%</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">959 Gateways</div>
-          </div>
-
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; text-align: center;">
-            <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">Netzwerk-Links</div>
-            <div style="font-family: var(--font-display); font-size: 2.5rem; color: var(--accent); font-weight: 700;">2.421</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">Nachbarverbindungen</div>
-          </div>
-        </div>
-
-        <!-- Load/Ameisen-Algorithmus -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
-          <div style="font-family: var(--font-display); font-size: 1.2rem; color: var(--accent); font-weight: 700; margin-bottom: 1rem;">🐜 Load-Metrik (Ameisen-Algorithmus mit Pheromonen)</div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-            <div>
-              <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; margin-bottom: 1rem;">
-                <strong style="color: var(--text-primary);">Was ist Load?</strong><br/>
-                Aus HEY-Pfaden abgeleitete Relay-Häufigkeit. Knoten mit hohem Load tragen viele Nachrichten.
-              </div>
-              <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8;">
-                <strong style="color: var(--text-primary);">Pheromon-Spuren:</strong><br/>
-                Jede HEY-Weiterleitung hinterlässt eine "Spur" — stark begangene Pfade werden visuell stärker.
-              </div>
-            </div>
-
-            <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; font-family: var(--font-display); font-size: 0.9rem;">
-              <div style="color: var(--accent); font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">Top-Relays (Quellen-Diversität)</div>
-              <div style="color: var(--accent-light); line-height: 2;">
-                1. IQ5ARI-11 → IK4DCV-12: 201 Quellen<br/>
-                2. OE3XIA-12 → OE3GHB-1: 187 Quellen<br/>
-                3. DB0TVI-1 → DB0RVB-99: 187 Quellen<br/>
-                4. DB0FTS-1 → DO8TBO-11: 183 Quellen
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Screenshot TODOs -->
-        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ff9800; border-radius: 4px;">
-          <div style="color: #333; font-weight: 700; margin-bottom: 1rem; font-family: var(--font-display); text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em;">📸 TODO: MeshMap Screenshots mit Playwright</div>
-          <div style="color: #555; line-height: 1.8; font-size: 0.9rem;">
-            <strong>1. Wien — Netzbildender Zentralknoten</strong><br/>
-            Zeigt einen dominanten Hub-Knoten mit hohem Load, der das Netz zusammenhält. Viele Knoten sind abhängig von diesem einen Relay.
-            <br/><br/>
-
-            <strong>2. Florenz, Italien — Stadt-Cluster</strong><br/>
-            Viele Knoten dicht beieinander (Importance niedrig). Redundante Last-Verteilung, kein einzelner kritischer Knoten. Zeigt das Stadt-Node-Szenario.
-            <br/><br/>
-
-            <strong>3. Thüringer Wald — Berg-Infrastruktur</strong><br/>
-            Hochleistungs-Knoten (33 dBm, große Antennen) auf Bergen verbinden mehrere Täler. Zeigt Load-Konzentration durch Topografie und wie Berg-Nodes netzbildend sind.
-            <br/><br/>
-
-            <strong>Fokus:</strong> Load-Metriken, Pheromon-Spuren, NC-Werte und visuelle Unterschiede zwischen Hub-, Stadt- und Berg-Szenarien.
-          </div>
-        </div>
-
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-primary); border-top: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem;">
-          <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">📖 Live Daten:</div>
-          <div><a href="https://meshmap.oevsv.at" style="color: var(--accent); text-decoration: none;">MeshMap OEVSV</a> — Live Netzwerk-Topologie und Load-Metriken</div>
-          <div><a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md#produktionsevidenz-24-h-live-netz-rev-3" style="color: var(--accent); text-decoration: none;">ADR-02 Produktionsevidenz</a> — 24h Analysedaten (96.074 HEY-Frames)</div>
-        </div>
-      </div>
-    </section>
+<div id="bar"><i></i></div>
+<nav id="hud">
+  <button id="btoc" title="Übersicht (Taste U)">☰</button>
+  <button id="bprev" title="Zurück (←)">←</button>
+  <span id="pos">1/18</span>
+  <button id="bnext" title="Weiter (→)">→</button>
+  <button id="btheme" title="Hell/Dunkel (T)">◐</button>
+</nav>
+<div id="toc"><h2>Übersicht — Taste U schließt</h2><ol id="toclist"></ol></div>
+<main class="deck">
+<!-- 01 ---------------------------------------------------------------- -->
+<section class="slide" id="s1"><span class="num">01</span><div class="inner">
+  <div class="eyebrow">MeshCom · Protokoll-Grundlagen &amp; ein Vorschlag</div>
+  <h1>Ein Netz ohne Routen</h1>
+  <p class="lead" style="margin-top:1rem">Wie MeshCom heute Nachrichten verteilt, warum es dabei bewusst nichts über Wege lernt — und was wir gewinnen, wenn ein Knoten anfängt, seine Umgebung zu <em>bewerten</em>, statt sie nur zu fluten.</p>
+
+  <div class="grid g3" style="margin-top:1.05rem">
+    <div class="card cold"><h3>Woher</h3><p>AX.25 und Packet Radio, über APRS und LoRa-APRS. Der Rahmen ist geerbt — die Transportsicherung ist unterwegs verloren gegangen.</p></div>
+    <div class="card"><h3>Wo wir stehen</h3><p>Reines Flutnetz. Kein Routing, keine gelernten Pfade, keine Ende-zu-Ende-Zusage. Das ist kein Versehen, sondern Konstruktion.</p></div>
+    <div class="card good"><h3>Wohin</h3><p>Nachbarn nach ihrer Abhängigkeit gewichten statt alle gleich behandeln — und persönliche Nachrichten endlich absichern.</p></div>
   </div>
 
-  <div class="scroll-hint">↓ Scrollen für mehr</div>
+  <div class="note" style="margin-top:.9rem">
+    <b>Datenstand dieser Präsentation:</b> Firmware <code>v4.35p</code> (Branch <code>v4.35p_prio</code>), Live-Netzdaten von
+    <a href="https://meshmap.oevsv.at">meshmap.oevsv.at</a> vom <b>23.08.2026</b>. Jede Verhaltensaussage ist gegen den Quellcode geprüft;
+    Belegstellen stehen klein unter der jeweiligen Aussage. Aufklappbare Blöcke <span class="mono">▸ Für Entwickler</span> enthalten die Details.
+  </div>
+</div></section>
 
-  <script>
-    let currentMessageMode = 'broadcast';
-    let currentNetworkMode = 'broadcast';
-    let messageAnimationRunning = false;
-    let networkAnimationRunning = false;
+<!-- 02 ---------------------------------------------------------------- -->
+<section class="slide" id="s2"><span class="num">02</span><div class="inner">
+  <div class="eyebrow">Herkunft</div>
+  <h2>Woher wir kommen — und was wir dabei verloren haben</h2>
 
-    function switchMessageMode(mode) {
-      currentMessageMode = mode;
-      messageAnimationRunning = false;
+  <div class="grid g4">
+    <div class="card"><h3>1 · AX.25</h3>
+      <p><b>Verbindungsorientiert.</b> I-Frames mit Sendefolgenummern N(S)/N(R), Quittung per RR, Wiederholung per REJ und T1-Timer.</p>
+      <p style="margin-top:.6rem"><span class="tag t-ok">Transportsicherung</span></p>
+    </div>
+    <div class="card"><h3>2 · Packet Radio</h3>
+      <p><b>Digipeater mit Wegliste.</b> Der Operator trägt die Zwischenstationen von Hand ins Adressfeld ein. Der Weg ist bekannt — weil ihn ein Mensch bestimmt.</p>
+      <p style="margin-top:.6rem"><span class="tag t-info">Expliziter Pfad</span></p>
+    </div>
+    <div class="card"><h3>3 · APRS</h3>
+      <p><b>Nur noch UI-Frames.</b> Unbestätigter Rundruf. Statt Weglisten ein Hop-Budget: <code>WIDE2-2</code> wird von jedem Digi heruntergezählt.</p>
+      <p style="margin-top:.6rem"><span class="tag t-bad">Sicherung entfällt</span></p>
+    </div>
+    <div class="card"><h3>4 · LoRa-APRS</h3>
+      <p><b>Ein Hop zum iGate.</b> LoRa als Modulation, der iGate speist ins Internet. Meist gar kein Funk-Relay mehr.</p>
+      <p style="margin-top:.6rem"><span class="tag t-info">Stern statt Netz</span></p>
+    </div>
+  </div>
 
-      // Update tabs
-      document.querySelectorAll('.animation-tab').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      event.target.classList.add('active');
+  <div class="grid g2" style="margin-top:.85rem;align-items:center">
+    <div>
+      <h3 style="font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)">Was MeshCom übernommen hat</h3>
+      <ul class="plain">
+        <li class="yes">Den Rundruf als Grundmodus — jede Nachricht geht an alle in Reichweite</li>
+        <li class="yes">Das Hop-Budget als einzige Ausbreitungsgrenze (<code>max_hop</code> statt <code>WIDE2-2</code>)</li>
+        <li class="yes">Die mitwachsende Pfadliste im Frame — jeder Relay hängt sein Rufzeichen an</li>
+        <li class="yes">Das Gateway ins Internet, direkt aus dem iGate-Gedanken</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad)">Was auf dem Weg verloren ging</h3>
+      <ul class="plain">
+        <li class="no">Sendefolgenummern und ein Fenster — also die Erkennung, dass etwas fehlt</li>
+        <li class="no">Eine Quittung, auf die sich der Sender verlassen kann</li>
+        <li class="no">Ein Retransmit, das die Schicht selbst verantwortet</li>
+        <li class="no">Jedes Wissen über den Weg — bei APRS bestimmte ihn wenigstens noch ein Mensch</li>
+      </ul>
+    </div>
+  </div>
 
-      // Clear and redraw
-      drawMessageAnimation(mode);
+  <div class="note warn" style="margin-top:.85rem">
+    <b>Der rote Faden dieses Vortrags:</b> Die Transportsicherung, die uns bei persönlichen Nachrichten heute fehlt, gab es in AX.25 seit 1984.
+    Sie ist nicht an MeshCom gescheitert — sie wurde auf dem Weg über APRS bewusst weggelassen, weil Baken keine brauchen.
+    Persönliche Nachrichten sind aber keine Baken.
+  </div>
+</div></section>
+
+<!-- 03 ---------------------------------------------------------------- -->
+<section class="slide" id="s3"><span class="num">03</span><div class="inner">
+  <div class="eyebrow">Die physikalische Ebene</div>
+  <h2>Ein Kanal, geteilt durch alle</h2>
+
+  <div class="grid g2">
+    <div>
+      <div class="card">
+        <h3>Region EU8 — der Normalfall im DACH-Raum</h3>
+        <div class="kv"><span>Frequenz</span><span>433,175 MHz</span></div>
+        <div class="kv"><span>Spreading Factor</span><span>SF11</span></div>
+        <div class="kv"><span>Bandbreite</span><span>250 kHz</span></div>
+        <div class="kv"><span>Coding Rate</span><span>4/6</span></div>
+        <div class="kv"><span>Präambel</span><span>8 Symbole</span></div>
+        <div class="cite">Beleg: <b>lora_setchip.cpp:337-354</b> · <b>variants/*/configuration.h</b> (in 10 Varianten identisch)</div>
+      </div>
+      <div class="note" style="margin-top:1rem;font-size:.85rem">
+        Insgesamt kennt die Firmware <b>17 Regionen-Presets</b> (EU, UK, ON, EA, LA, 868, 915, MAN, EU8, UK8, US, VR2, 435, 436, 442, PL, none).
+        Ein Preset namens „GB“ existiert nicht — Großbritannien läuft als <b>UK / UK8 auf 439,9125 MHz mit SF10 und 125 kHz</b>.
+      </div>
+    </div>
+
+    <div>
+      <div class="card hot">
+        <h3>Was das für die Zeit auf dem Kanal bedeutet</h3>
+        <div class="kv"><span>Symboldauer bei SF11 / 250 kHz</span><span>8,19 ms</span></div>
+        <div class="kv"><span>Kurze Textnachricht (~50 B)</span><span>≈ 0,66 s</span></div>
+        <div class="kv"><span>Maximales Frame (255 B)</span><span>≈ 2,5 s</span></div>
+        <div class="kv"><span>TX-Watchdog</span><span>15 s</span></div>
+        <p style="margin-top:.9rem">Eine einzige Nachricht mit <code>max_hop=4</code> belegt den Kanal nicht einmal, sondern <b>einmal je weiterleitendem Nachbarn und Hop</b>.
+        Genau daraus entsteht der ganze Rest dieses Vortrags.</p>
+        <div class="cite">Airtime nach Semtech-Formel gerechnet; die Firmware selbst berechnet keine Airtime und erzwingt keinen Duty-Cycle. Der ETSI-1-%-Hinweis steht nur als Kommentar im Code (<b>lora_setchip.cpp:781</b>).</div>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <h3>Hardware</h3>
+        <p>Die Firmware baut aktuell <b>30 Ziele</b>. Verbreitet sind Heltec V3 (ESP32-S3/SX1262), TTGO T-Beam (drei Revisionen mit SX1276 / SX1262 / SX1268),
+        T-Deck und T-Deck Plus (ESP32-S3), T-Beam Supreme (ESP32-S3) und WisBlock RAK4631 (nRF52840).</p>
+        <p style="margin-top:.5rem">Die Board-Klasse ist kein Kosmetikum: <b>sie bestimmt, wie viele Nachbarn und wie viele Duplikate ein Knoten überhaupt merken kann.</b> Dazu später mehr.</p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 04 ---------------------------------------------------------------- -->
+<section class="slide" id="s4"><span class="num">04</span><div class="inner">
+  <div class="eyebrow">Heutiger Betrieb</div>
+  <h2>Drei Arten, eine Nachricht loszuschicken</h2>
+
+  <div class="grid g3">
+    <div class="card">
+      <h3>Broadcast — an alle</h3>
+      <pre style="font-size:.76rem">Ziel: <b>*</b>
+Priorität: 2 (HIGH)
+CSMA-Basis: 3000 ms
+Hop-Budget: 4</pre>
+      <p style="margin-top:.7rem">Das Ziel ist wörtlich das Sternchen. Jeder Knoten in Reichweite zeigt die Nachricht an und leitet sie weiter, wenn Mesh aktiv ist.</p>
+      <div class="cite"><b>loop_functions.cpp:3378</b> (Default-Ziel) · <b>txring_functions.cpp:94-95</b></div>
+    </div>
+
+    <div class="card">
+      <h3>Gruppe — an eine Nummer</h3>
+      <pre style="font-size:.76rem">Ziel: <b>262</b>  (1 … 99999)
+Priorität: 2 (HIGH)
+Abo: bis zu <b>6</b> Gruppen
+Kommando: --setgrc</pre>
+      <p style="margin-top:.7rem">Ein Knoten <b>zeigt</b> nur abonnierte Gruppen an — <b>weitergeleitet werden aber alle</b>. Das Abo ist ein Anzeigefilter, keine Netzfunktion.</p>
+      <div class="cite"><b>aprs_functions.cpp:27-91</b> (CheckGroup / CheckOwnGroup) · Relay-Gate <b>lora_functions.cpp:1206</b> kennt das Abo nicht</div>
+    </div>
+
+    <div class="card cold">
+      <h3>Persönlich (DM) — an ein Rufzeichen</h3>
+      <pre style="font-size:.76rem">Ziel: <b>OE1ABC-12</b>
+Priorität: 1 (CRITICAL)
+CSMA-Basis: 3000 ms
+Quittung: <b>{987</b> angehängt</pre>
+      <p style="margin-top:.7rem">Exakter Byte-Vergleich inklusive SSID, Groß-/Kleinschreibung zählt. <code>DK5EN</code> erreicht <code>DK5EN-98</code> <b>nicht</b>. Nur die DM bekommt eine Quittungsanforderung.</p>
+      <div class="cite"><b>lora_functions.cpp:813</b> (strcmp) · <b>loop_functions.cpp:3407-3446</b></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1.05rem">
+    <div class="note">
+      <b>Grenzen, die man beim Tippen merkt:</b> Der eingegebene Text darf höchstens <b>160 Zeichen</b> lang sein, ein Ziel in geschweiften Klammern höchstens <b>9 Zeichen</b>.
+      Wird das Ziel länger, greift die Klammer-Erkennung nicht und die Nachricht geht <b>versehentlich als Broadcast</b> hinaus.
+      <div class="cite"><b>loop_functions.cpp:3378-3391</b></div>
+    </div>
+    <div class="note warn">
+      <b>Häufiges Missverständnis:</b> „262“ ist <em>kein</em> Broadcast, sondern eine Gruppe. Der echte Broadcast ist das Zeichen <code>*</code>.
+      Wer an 262 sendet, erreicht alle Knoten in Funkreichweite — aber angezeigt wird es nur bei denen, die 262 abonniert haben
+      oder gar keine Gruppe eingetragen haben.
+    </div>
+  </div>
+</div></section>
+
+<!-- 05 ---------------------------------------------------------------- -->
+<section class="slide" id="s5"><span class="num">05</span><div class="inner">
+  <div class="eyebrow">Auf der Luftschnittstelle</div>
+  <h2>Was wirklich gesendet wird</h2>
+
+  <div class="bytes">
+    <div class="by hi"><u>0</u><b>Typ</b></div>
+    <div class="by"><u>1–4</u><b>msg_id (LE)</b></div>
+    <div class="by hi"><u>5</u><b>Flags + Hop</b></div>
+    <div class="by v"><u>6 …</u><b>Quellpfad &gt;</b></div>
+    <div class="by v"><u>…</u><b>Ziel</b></div>
+    <div class="by v"><u>…</u><b>Nutzlast \0</b></div>
+    <div class="by"><u>+1</u><b>HW</b></div>
+    <div class="by"><u>+1</u><b>MOD</b></div>
+    <div class="by"><u>+2</u><b>FCS (BE)</b></div>
+    <div class="by"><u>+1</u><b>FW</b></div>
+    <div class="by hi"><u>+1</u><b>LASTHW</b></div>
+    <div class="by"><u>+1</u><b>FW-Sub</b></div>
+    <div class="by"><u>+1</u><b>0x7E</b></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1.05rem">
+    <div class="card">
+      <h3>Byte 5 — das ganze „Protokoll“ auf acht Bit</h3>
+      <table><tbody>
+        <tr><td class="m">Bit 7</td><td>war schon bei einem Server/Gateway</td></tr>
+        <tr><td class="m">Bit 6</td><td>Tracking</td></tr>
+        <tr><td class="m">Bit 5</td><td>App offline</td></tr>
+        <tr><td class="m">Bit 4</td><td>Sender hat Mesh aktiv</td></tr>
+        <tr><td class="m">Bit 0–3</td><td><b>verbleibendes Hop-Budget</b> — Text 4, Position 2</td></tr>
+      </tbody></table>
+      <div class="cite"><b>aprs_functions.cpp:1025-1037</b> / <b>:160-172</b> · Defaults <b>configuration_global.h:209-210</b></div>
+    </div>
+
+    <div class="card">
+      <h3>Ein echtes Paket, mitgeschnitten am 21.08.2026</h3>
+      <pre style="font-size:.72rem">21                     <em>!</em> Position
+AB 13 F1 E9            msg_id 0xE9F113AB
+91                     Server|Mesh, Hop = <b>1</b>
+"DL2JA-1,DL2JA-2&gt;"     Quellpfad: Ursprung, dann Relay
+2A 21                  Ziel "<b>*</b>" + Terminator
+"4825.35N\01147.19E-…" Nutzlast
+2B                     HW 43 = Heltec V3
+88                     MOD 8, Land 8
+13 2F                  FCS (Bytesumme, kein CRC)
+23 AB 70 7E            FW 4.35, LASTHW, 'p', Ende</pre>
+      <div class="cite">433,175 MHz, SF11/BW250/CR4-6, RSSI −109 dBm · <b>docs/architecture/11-wire-format.md §1.6</b></div>
+    </div>
+  </div>
+
+  <details class="deep"><summary>Für Entwickler — msg_id, FCS und die 999er-Grenze</summary><div class="body">
+    <p>Die <b>msg_id</b> ist nicht undurchsichtig, sondern zusammengesetzt:
+    <code>((gw_id &amp; 0x3FFFFF) &lt;&lt; 10) | (counter &amp; 0x3FF)</code> — 22 Bit aus der MAC abgeleitete Geräte-ID, 10 Bit Zähler.</p>
+    <p>Der Zähler läuft aber nur bis <b>999</b>, nicht bis 1023, obwohl das Feld 10 Bit breit ist. Grund: Die Quittungsanforderung
+    <code>{NNN</code> wird mit <code>%03i</code> formatiert und hätte für 1000–1023 keine dreistellige Darstellung.
+    Nebenwirkung: nach 1000 eigenen Sendungen wiederholen sich die msg_ids eines Knotens — bei der Zombie-Analyse muss man das herausrechnen.</p>
+    <p>Die <b>FCS</b> ist eine 16-Bit-<em>Bytesumme</em> über alles bis einschließlich MOD-Byte, big-endian abgelegt — <b>kein CRC</b>.
+    Sie erkennt Einzelbitfehler, aber keine Vertauschungen.</p>
+    <p class="cite">Belege: <b>loop_functions.cpp:3119</b> ff. (Komposition), <b>:3449-3451</b> (Wrap bei 999), <b>aprs_functions.cpp:1094-1097</b> (FCS)</p>
+  </div></details>
+</div></section>
+<!-- 06 ---------------------------------------------------------------- -->
+<section class="slide" id="s6"><span class="num">06</span><div class="inner">
+  <div class="eyebrow">Der Kern</div>
+  <h2>MeshCom kennt kein Routing</h2>
+
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <svg viewBox="0 0 380 260" style="width:100%;height:auto" role="img" aria-label="Vergleich: geroutetes Netz gegen Flutnetz">
+        <style>
+          .rt{fill:none;stroke:var(--line2);stroke-width:1.4}
+          .rt-on{stroke:var(--ok);stroke-width:2.6}
+          .fl{fill:none;stroke:var(--acc);stroke-width:1.8;opacity:.55}
+          .nd{fill:var(--bg3);stroke:var(--line2);stroke-width:1.6}
+          .nd-s{fill:var(--mag);stroke:var(--mag)}
+          .nd-d{fill:var(--ok);stroke:var(--ok)}
+          .nd-r{fill:var(--acc);stroke:var(--acc)}
+          .lb{font-family:var(--mono);font-size:8px;fill:var(--fg2);text-anchor:middle}
+          .hd{font-family:var(--mono);font-size:9px;fill:var(--fg3);text-anchor:middle;letter-spacing:.08em}
+          .pulse{fill:none;stroke:var(--acc);stroke-width:1.6;opacity:0}
+          @keyframes rip{0%{r:6;opacity:.85}100%{r:58;opacity:0}}
+          .pulse{animation:rip 2.8s ease-out infinite}
+          .p2{animation-delay:.45s}.p3{animation-delay:.9s}
+        </style>
+        <defs><clipPath id="rp"><rect x="194" y="0" width="186" height="200"/></clipPath></defs>
+        <text class="hd" x="95" y="14">GEROUTET (z. B. IP)</text>
+        <path class="rt" d="M28 60 L95 40 M28 60 L70 105 M95 40 L162 60 M70 105 L120 130 M120 130 L162 60 M95 40 L120 130 M28 60 L95 95"/>
+        <path class="rt rt-on" d="M28 60 L95 40 L162 60"/>
+        <circle class="nd nd-s" cx="28" cy="60" r="7"/><text class="lb" x="28" y="80">A</text>
+        <circle class="nd nd-r" cx="95" cy="40" r="7"/>
+        <circle class="nd nd-d" cx="162" cy="60" r="7"/><text class="lb" x="162" y="80">B</text>
+        <circle class="nd" cx="70" cy="105" r="6"/><circle class="nd" cx="120" cy="130" r="6"/><circle class="nd" cx="95" cy="95" r="6"/>
+        <text class="lb" x="95" y="160" style="fill:var(--ok)">ein Weg wird gewählt</text>
+        <text class="lb" x="95" y="174">Tabelle · Next-Hop · Metrik</text>
+
+        <line x1="190" y1="8" x2="190" y2="200" stroke="var(--line)" stroke-width="1"/>
+
+        <text class="hd" x="285" y="14">MESHCOM (FLUTNETZ)</text>
+        <path class="fl" d="M218 60 L285 40 M218 60 L260 105 M285 40 L352 60 M260 105 L310 130 M310 130 L352 60 M285 40 L310 130 M218 60 L285 95 M285 95 L310 130 M285 95 L352 60"/>
+        <g clip-path="url(#rp)"><circle class="pulse" cx="218" cy="60"/><circle class="pulse p2" cx="218" cy="60"/><circle class="pulse p3" cx="218" cy="60"/></g>
+        <circle class="nd nd-s" cx="218" cy="60" r="7"/><text class="lb" x="218" y="80">A</text>
+        <circle class="nd nd-r" cx="285" cy="40" r="7"/><circle class="nd nd-r" cx="260" cy="105" r="6"/>
+        <circle class="nd nd-r" cx="310" cy="130" r="6"/><circle class="nd nd-r" cx="285" cy="95" r="6"/>
+        <circle class="nd nd-d" cx="352" cy="60" r="7"/><text class="lb" x="352" y="80">B</text>
+        <text class="lb" x="285" y="160" style="fill:var(--acc)">jeder wiederholt genau einmal</text>
+        <text class="lb" x="285" y="174">kein Ziel-Wissen · nur Hop-Budget</text>
+      </svg>
+    </div>
+
+    <div>
+      <p class="lead" style="font-size:1.02rem">Es gibt im gesamten Quellcode <b>keine Routing-Tabelle, keine Next-Hop-Auswahl und keine Metrik</b>.
+      Die einzige Stelle, an der die Weiterleitung überhaupt auf das Zielrufzeichen schaut, prüft eine einzige Frage:
+      <em>„Bin ich selbst gemeint?“</em> — wenn ja, konsumieren; wenn nein, wiederholen.</p>
+      <pre style="margin-top:1rem;font-size:.74rem">if (Ziel != mein Rufzeichen
+    &amp;&amp; checkMesh(...)          <em>// Mesh eingeschaltet?</em>
+    &amp;&amp; bMeshDestination) {     <em>// kein Ping/Pong</em>
+      if (max_hop &gt; 0) { max_hop--; sende(); }
+}</pre>
+      <div class="cite">Das ist der komplette Weiterleitungsentscheid: <b>lora_functions.cpp:1206-1215</b></div>
+
+      <div class="note bad" style="margin-top:.9rem">
+        <b>Auch der „Ping“ ist keine Wegprüfung.</b> <code>{ping}</code> und <code>{pong}</code> werden von jedem
+        Zwischenknoten ausdrücklich <b>vom Fluten ausgenommen</b> — sie funktionieren nur zwischen direkten Funknachbarn, über genau einen Hop,
+        und werden auch vom Absender nicht wiederholt. Ein erfolgreicher Ping sagt: „wir hören uns direkt“. Er sagt nichts über einen Weg.
+        <div class="cite"><b>lora_functions.cpp:944-954</b> setzt <code>bMeshDestination = false</code></div>
+      </div>
+    </div>
+  </div>
+
+  <details class="deep"><summary>Für Entwickler — die neun Bedingungen, die ein Relay stoppen (Zeilennummern auf Stand v4.35p)</summary><div class="body">
+    <table><thead><tr><th>#</th><th>Bedingung</th><th class="m">Stelle</th></tr></thead><tbody>
+      <tr><td>1</td><td>Hop-Budget aufgebraucht (Dekrement <em>vor</em> dem Einreihen)</td><td class="m">lora_functions.cpp:1209 / :1215</td></tr>
+      <tr><td>2</td><td>Schleife — eigenes Rufzeichen steht schon im Quellpfad</td><td class="m">lora_functions.cpp:1220-1230</td></tr>
+      <tr><td>3</td><td>msg_id liegt schon im Dedup-Ring</td><td class="m">lora_functions.cpp:734, :1427-1456</td></tr>
+      <tr><td>4</td><td>an mich selbst adressiert</td><td class="m">lora_functions.cpp:813, :1206</td></tr>
+      <tr><td>5</td><td>Pfad zu lang (nur auf Gateways)</td><td class="m">lora_functions.cpp:1157, :1168-1170</td></tr>
+      <tr><td>6</td><td>Typ nicht weiterleitbar (TEXT / POSITION / HEY; ACK läuft separat)</td><td class="m">lora_functions.cpp:758</td></tr>
+      <tr><td>7</td><td>Mesh abgeschaltet</td><td class="m">via_functions.cpp:49-92</td></tr>
+      <tr><td>8</td><td>TX-Ring voll und die Nachricht hat zu niedrige Priorität</td><td class="m">txring_functions.cpp:284-354</td></tr>
+      <tr><td>9</td><td>Ping/Pong — explizit ausgenommen</td><td class="m">lora_functions.cpp:944-954</td></tr>
+    </tbody></table>
+    <p><b>Korrektur gegenüber <code>docs/prio-talk-flood-networking.md</code>:</b> Die dortige Bedingung „Server-Flag blockiert das Relay“ trifft heute
+    nicht mehr zu. <code>msg_server</code> steuert nur noch, ob ein Gateway ein Paket <em>ins Internet</em> einspeist — die Funk-Weiterleitung
+    hält es nicht auf. Ausserdem ist die Ring-Logik nach <code>txring_functions.cpp</code> ausgezogen.</p>
+    <p><b>Es gibt einen inaktiven Sonderfall:</b> <code>via_functions.cpp</code> enthält ein statisches VIA-Gate im Stil klassischer Digipeater.
+    Es ist per Default aus (<code>bVIA = false</code>), muss von Hand konfiguriert werden und lernt nichts. Der einzige dynamische Ansatz
+    darin — den Nachbarn mit der größten Nachbarzahl als Zwischenhop zu wählen — ist auskommentiert („22.07.2026 – zum Test entfernt“).</p>
+  </div></details>
+</div></section>
+
+<!-- 07 ---------------------------------------------------------------- -->
+<section class="slide" id="s7"><span class="num">07</span><div class="inner">
+  <div class="eyebrow">Ein verbreitetes Missverständnis</div>
+  <h2>Der „Source Path“ ist keine gelernte Route</h2>
+
+  <div class="grid g2" style="align-items:start;gap:1.6rem">
+    <figure>
+      <img src="assets/node-path.webp" alt="Path Information im WebGUI von DK5EN-98 mit Source-Path-Einträgen">
+      <figcaption><b>Live vom Knoten DK5EN-98</b>, 23.08.2026 18:18 — Menüpunkt „Path“ im WebGUI.</figcaption>
+    </figure>
+
+    <div>
+      <p>Die Anzeige sieht aus wie eine Routing-Tabelle. Sie ist keine. Was dort steht, ist das <b>Protokoll einer bereits erfolgten Reise</b>:
+      Wie ein einzelnes HEY-Bakenpaket dieses Absenders zufällig zu mir gefunden hat.</p>
+
+      <div class="card" style="margin-top:.85rem">
+        <h3>Was <code>3G/DB0HOB-12,DB0ED-99</code> bedeutet</h3>
+        <table><tbody>
+          <tr><td class="m" style="color:var(--acc)">3</td><td>Anzahl Rufzeichen im Pfad des zuletzt gehörten HEY — also die zurückgelegte Hop-Zahl</td></tr>
+          <tr><td class="m" style="color:var(--acc)">G</td><td><b>Der Ursprungsknoten dieses HEY ist ein Gateway.</b> Kein Hinweis darauf, dass der Weg über ein Gateway lief. Leerzeichen statt G heißt: kein Gateway.</td></tr>
+          <tr><td class="m" style="color:var(--acc)">DB0…</td><td>die Rufzeichen, die das Paket angehängt haben</td></tr>
+        </tbody></table>
+        <div class="cite">Format: <b>web_functions.cpp:993</b> · Gateway-Bit gesetzt in <b>mheard_functions.cpp:542-543</b></div>
+      </div>
+
+      <div class="note bad" style="margin-top:.85rem">
+        <b>Entscheidend:</b> Diese Tabelle wird <b>ausschließlich aus HEY-Baken</b> gefüllt, altert nach 12 Stunden — und
+        <b>keine einzige Stelle der Sende- oder Weiterleitungslogik liest sie jemals</b>. Alle Zugriffe im gesamten Baum sind
+        Anzeige: Konsole, T-Deck-Display, WebGUI, SD-Persistenz. Für die nächste Nachricht ändert sie exakt nichts.
+        <div class="cite">Struktur <b>mheard_functions.cpp:32-38</b>, gefüllt nur von <b>updateHeyPath()</b> (<b>:382-554</b>), aufgerufen nur bei HEY (<b>lora_functions.cpp:698</b>)</div>
+      </div>
+
+      <p style="margin-top:1rem;font-size:.92rem;color:var(--fg2)">Und selbst wenn man sie läse: Ein Pfad, den ein Paket <em>gestern</em> genommen hat,
+      ist keine Zusage, dass er <em>morgen</em> noch existiert. Genau deshalb halten wir es für den falschen Ansatzpunkt — der bessere kommt auf Folie 13.</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- 08 ---------------------------------------------------------------- -->
+<section class="slide" id="s8"><span class="num">08</span><div class="inner">
+  <div class="eyebrow">Zwei Schalter, vier Rollen</div>
+  <h2>Gateway = ON, Mesh = ON</h2>
+
+  <div class="grid g2">
+    <div class="card cold"><h3>Gateway — die Brücke ins Internet</h3>
+      <ul class="plain">
+        <li>Schickt gehörte Pakete per UDP an den MeshCom-Server (Port <b>1990</b>)</li>
+        <li>Legt Pakete vom Server zurück auf LoRa</li>
+        <li>Setzt dabei das <b>Server-Bit</b>, damit kein zweites Gateway dasselbe Paket erneut einspeist</li>
+        <li>Sagt es seinen Nachbarn — dazu Folie 13</li>
+      </ul>
+      <div class="kv" style="margin-top:.8rem"><span>Werkszustand</span><span style="color:var(--bad)">AUS</span></div>
+      <div class="kv"><span>Kommando</span><span>--gateway on</span></div>
+      <div class="cite"><b>udp_functions.cpp:1149-1178</b> · <b>lora_functions.cpp:1184, 1212-1213</b></div>
+    </div>
+
+    <div class="card good"><h3>Mesh — die Verlängerung per Funk</h3>
+      <ul class="plain">
+        <li>Wiederholt fremde Pakete einmal, solange Hop-Budget übrig ist</li>
+        <li><b>Betrifft nur das Weiterleiten.</b> Empfangen, Anzeigen und eigenes Senden laufen unverändert weiter</li>
+        <li>Mesh=AUS macht aus dem Knoten einen Endpunkt, keinen tauben Knoten</li>
+      </ul>
+      <div class="kv" style="margin-top:.8rem"><span>Werkszustand</span><span style="color:var(--ok)">AN</span></div>
+      <div class="kv"><span>Kommando</span><span>--mesh on / off</span></div>
+      <div class="cite"><b>via_functions.cpp:49-92</b> · Gate <b>lora_functions.cpp:1206</b></div>
+    </div>
+  </div>
+
+  <table style="margin-top:1rem">
+    <thead><tr><th>Gateway</th><th>Mesh</th><th>Was der Knoten tut</th><th>Typische Rolle</th></tr></thead>
+    <tbody>
+      <tr><td class="m" style="color:var(--ok)">AN</td><td class="m" style="color:var(--ok)">AN</td><td>Volle Brücke Funk ↔ Internet <b>und</b> Funk-Relay</td><td>Klassischer Standort-Knoten auf dem Berg</td></tr>
+      <tr><td class="m" style="color:var(--ok)">AN</td><td class="m" style="color:var(--bad)">AUS</td><td>Speist ein und aus, <b>verlängert die Funkstrecke aber nicht</b></td><td>iGate im dichten Stadtgebiet</td></tr>
+      <tr><td class="m" style="color:var(--bad)">AUS</td><td class="m" style="color:var(--ok)">AN</td><td>Reines Funk-Relay ohne Internet — <b>Werkszustand</b></td><td>Der Normalfall zu Hause</td></tr>
+      <tr><td class="m" style="color:var(--bad)">AUS</td><td class="m" style="color:var(--bad)">AUS</td><td>Empfängt und sendet nur für sich selbst</td><td>Insel · Handgerät · Testaufbau</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note warn" style="margin-top:.9rem">
+    <b>Woher weiß ein Knoten, dass er selbst Internet hat?</b> Aus dem WLAN-Status und einer gültigen IP — plus einer Fehlerzählung beim UDP-Senden.
+    Der Server schickt zwar einen Heartbeat (<code>BEAT</code>), aber <b>keine Stelle im Code wertet dessen Ausbleiben aus</b>. Ein Gateway,
+    dessen Serververbindung stillschweigend tot ist, hält sich weiterhin für ein Gateway.
+    <div class="cite"><b>udp_functions.cpp:915-928, 455-463</b>; <code>last_upd_timer</code> wird nur zur Diagnoseausgabe genutzt (<b>command_functions.cpp:5124</b>)</div>
+  </div>
+</div></section>
+<!-- 09 ---------------------------------------------------------------- -->
+<section class="slide" id="s9"><span class="num">09</span><div class="inner">
+  <div class="eyebrow">Wer darf zuerst?</div>
+  <h2>Die Prioritätenmatrix</h2>
+
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <table>
+        <thead><tr><th>Prio</th><th>Was</th><th class="m">Basis</th><th class="m">Slots</th></tr></thead>
+        <tbody>
+          <tr><td class="m" style="color:var(--bad);font-weight:700">1</td><td>ACK und persönliche Nachricht</td><td class="m">3000 ms</td><td class="m">10 × 35 ms</td></tr>
+          <tr><td class="m" style="color:var(--warn);font-weight:700">2</td><td>Gruppe und Broadcast</td><td class="m">3000 ms</td><td class="m">10 × 35 ms</td></tr>
+          <tr><td class="m" style="color:var(--info);font-weight:700">3</td><td><b>Mesh-Relay</b> (fremde Pakete)</td><td class="m">4500 ms</td><td class="m">10 × 35 ms</td></tr>
+          <tr><td class="m" style="color:var(--ok);font-weight:700">4</td><td>Position</td><td class="m">5500 ms</td><td class="m">10 × 35 ms</td></tr>
+          <tr><td class="m" style="color:var(--fg3);font-weight:700">5</td><td>HEY-Bake</td><td class="m">5500 ms</td><td class="m">10 × 35 ms</td></tr>
+        </tbody>
+      </table>
+      <div class="cite"><b>configuration_global.h:259-277</b> · Zuweisung <b>txring_functions.cpp:46-109</b></div>
+
+      <div class="note" style="margin-top:.85rem">
+        <b>So wird der Backoff gerechnet:</b><br>
+        <code>Basis + Zufall(0…10) × 35 ms</code><br>
+        Ab dem 2. Versuch <code>Basis × 5/6</code>, ab dem 3. <code>Basis × 2/3</code>, ab dem 4. nur noch <b>100 ms Rapid-Fire</b>, bis der Kanal frei ist.
+        <div class="cite"><b>lora_functions.cpp:2153-2174</b></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card"><h3>Der Sendepuffer</h3>
+        <p>Kein FIFO. <code>getNextTxSlot()</code> nimmt <b>zuerst die höchste Priorität</b>, und erst bei Gleichstand den ältesten Eintrag.
+        Läuft der Ring voll, wird nicht blind verworfen: der <b>älteste Eintrag der niedrigsten Priorität</b> weicht — es sei denn, das Neue ist selbst das Unwichtigste, dann fliegt es raus.</p>
+        <div class="kv" style="margin-top:.7rem"><span>ESP32 klassisch</span><span>30 Slots</span></div>
+        <div class="kv"><span>ESP32-S3 / RAK4631</span><span>20 Slots</span></div>
+        <div class="kv"><span>T-Deck (XML/SBUFFER)</span><span>20 Slots</span></div>
+        <div class="cite"><b>txring_functions.cpp:117-160, 284-354</b> · <b>configuration_global.h:169-201</b></div>
+      </div>
+
+      <div class="card hot" style="margin-top:1rem"><h3>Der Kanal ist meistens belegt</h3>
+        <p>Vor jedem Senden prüft CAD den Kanal, bei Belegung ein zweites Mal gegen Fehlalarme. <b>Es gibt keine Obergrenze für CAD-Versuche</b> —
+        eine Nachricht bleibt im Ring, bis der Kanal frei ist. Verworfen wird sie nur durch den vollen Ring oder das Ende ihres Wiederholbudgets.</p>
+        <div class="big" style="margin-top:.8rem">66 %</div>
+        <p style="margin-top:.3rem">aller Sendeversuche fanden den Kanal belegt — gemessen an 5 Knoten über 16 h, bis zu 27 CAD-Wiederholungen für ein Paket.</p>
+        <div class="cite">Felddaten „BergLog“ 2026-03-13/14, 856.000 Logzeilen · <b>docs/adr-nc-importance-backoff.md</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn" style="margin-top:.9rem">
+    <b>Das eigentliche Problem steckt in Prio 3.</b> Ein Blattknoten mit einem einzigen Nachbarn und ein Bergknoten mit 26 Nachbarn
+    bekommen für ihr Relay <b>exakt dieselbe Verteilung</b>: 4500 ms plus Würfel. Wer zuerst sendet, entscheidet der Zufall — nicht,
+    wie viele Stationen von dieser Sendung profitieren würden.
+  </div>
+</div></section>
+
+<!-- 10 ---------------------------------------------------------------- -->
+<section class="slide" id="s10"><span class="num">10</span><div class="inner">
+  <div class="eyebrow">Zähigkeit</div>
+  <h2>Wiederholen: dreimal, alle 40 Sekunden</h2>
+
+  <div class="grid g3">
+    <div class="card good"><h3>Wer wiederholt</h3>
+      <p><b>Nur der Ursprungsknoten.</b> Ein weitergeleitetes Paket wird grundsätzlich mit dem Status <code>DONE</code> eingereiht —
+      genau einmal gesendet, kein Timer, keine zweite Chance. Fire and forget.</p>
+      <div class="cite"><b>lora_functions.cpp:1283</b></div>
+    </div>
+    <div class="card"><h3>Was wiederholt wird</h3>
+      <p><b>Nur Textnachrichten.</b> Positionen, HEY-Baken und ACKs werden sofort auf <code>DONE</code> gesetzt. Innerhalb von Text
+      trifft es DM, Gruppe und Broadcast gleichermaßen.</p>
+      <div class="cite"><b>lora_functions.cpp:1754-1758</b></div>
+    </div>
+    <div class="card"><h3>Wie oft</h3>
+      <div class="big">3 × 40 s</div>
+      <p style="margin-top:.5rem">20 Ticks à 2 s je Versuch, maximal <b>120 s</b> insgesamt. Danach ist Schluss.</p>
+      <div class="cite"><b>lora_functions.cpp:1739, 1766-1770</b></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1.05rem">
+    <div class="note ok">
+      <b>Gute Nachricht — die Quittung greift wirklich.</b> Trifft ein passendes <code>:ackNNN</code> ein, wird der Ringpuffer-Slot
+      sofort auf <code>DONE</code> gesetzt, die Länge genullt und der Wiederholzähler zurückgesetzt. Weitere Versuche unterbleiben.
+      Das war lange unklar und ist hiermit belegt.
+      <div class="cite"><code>findAndStopRingSlot()</code> — <b>lora_functions.cpp:201-228</b>, aufgerufen aus <b>:286-290</b> und <b>:880-890</b></div>
+    </div>
+    <div class="note bad">
+      <b>Schlechte Nachricht — das Aufgeben ist stumm.</b> Nach dem dritten erfolglosen Versuch wird der Slot einfach freigegeben.
+      Es geht <b>keine Meldung an App oder Display</b>. Der Nutzer sieht nur ein Häkchen, das nie kommt — und kann nicht unterscheiden,
+      ob die Nachricht ankam und die Quittung verloren ging, oder ob sie nie ankam.
+      <div class="cite"><b>lora_functions.cpp:1773-1788</b> — kein <code>addBLEOutBuffer</code> in diesem Zweig</div>
+    </div>
+  </div>
+
+  <details class="deep"><summary>Für Entwickler — warum ein einmal eingereihtes Relay nicht mehr storniert wird</summary><div class="body">
+    <p>Hört ein Knoten dasselbe Paket von einem Nachbarn, <b>bevor</b> er sein eigenes Relay gesendet hat, verhindert der Dedup-Ring
+    nur ein <em>erneutes Einreihen</em>. Ein bereits im Ring liegendes Relay wird <b>nicht</b> zurückgezogen.</p>
+    <p>Das ist Absicht: Der Knoten weiß nicht, ob er eine Brücke zwischen zwei sonst getrennten Gruppen ist. Zöge er sein Relay zurück,
+    weil links jemand schneller war, erreichte die Nachricht rechts womöglich niemanden mehr. Genau daran ist die erste Umsetzung der
+    Relay-Suppression (<code>commit 60ea7d8</code>) im Feld gescheitert — Blattknoten hörten gar nichts mehr, sie wurde zurückgenommen.</p>
+    <p>Die einzige Stornierungslogik im Code (<b>lora_functions.cpp:464-483</b>) betrifft ausdrücklich <em>nicht</em> Relays: sie prüft
+    <code>status != DONE &amp;&amp; status != READY</code> und stoppt damit nur die eigene Wiederholschleife, sobald ein fremdes Relay als
+    stille Bestätigung gehört wird.</p>
+  </div></details>
+</div></section>
+
+<!-- 11 ---------------------------------------------------------------- -->
+<section class="slide" id="s11"><span class="num">11</span><div class="inner">
+  <div class="eyebrow">Die Quittung</div>
+  <h2><span class="mono">{987</span> und <span class="mono">:ack987</span></h2>
+
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <div class="card"><h3>Die Anforderung</h3>
+        <pre style="font-size:.78rem">DK5EN-98&gt;OE1ABC-12:Servus, 73<b>{987</b></pre>
+        <ul class="plain" style="margin-top:.7rem">
+          <li>Dreistellig, <b>ohne schließende Klammer</b></li>
+          <li>Dieselbe Nummer wie die unteren Bits der msg_id (0…999)</li>
+          <li><b>Nur bei echten DMs.</b> Gruppe und Broadcast bekommen keine</li>
+        </ul>
+        <div class="cite"><b>loop_functions.cpp:3442-3446</b></div>
+      </div>
+
+      <div class="card" style="margin-top:1rem"><h3>Die Antwort</h3>
+        <pre style="font-size:.78rem">OE1ABC-12&gt;DK5EN-98:DK5EN-98 <b>:ack987</b></pre>
+        <ul class="plain" style="margin-top:.7rem">
+          <li>Ein ganz normales Text-Frame, Priorität 1</li>
+          <li>Ziel auf exakt 9 Zeichen aufgefüllt, dann <code>:ackNNN</code></li>
+          <li><b>Wird durch das Mesh geflutet</b> wie jede andere Nachricht — erreicht den Absender also auch über mehrere Hops</li>
+        </ul>
+        <div class="cite"><b>loop_functions.cpp:4164-4245</b>, Format <code>%-9.9s:ack%03i</code></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="note bad">
+        <b>Hier bricht es.</b> Der Empfänger sendet seine Quittung <b>genau einmal</b> und wiederholt sie nie
+        (Status <code>DONE</code>, kein Timer). Geht dieses eine Paket auf dem Rückweg verloren — Kollision, ein Zwischenknoten mit
+        Mesh=AUS, Hop-Budget knapp, asymmetrische Reichweite —, dann erfährt der Absender <b>nie</b>, dass seine Nachricht
+        angekommen ist. Obwohl sie ankam.
+        <div class="cite"><b>loop_functions.cpp:4226-4229</b></div>
+      </div>
+
+      <p style="margin:1.1rem 0 .6rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)">Wo eine DM heute verschwinden kann</p>
+      <ul class="plain">
+        <li class="no">TX-Ring voll — verdrängt nach Priorität, ohne jede Meldung</li>
+        <li class="no">Hop-Budget aufgebraucht, bevor das Ziel erreicht ist</li>
+        <li class="no">Die Quittung geht auf dem Rückweg verloren (kein Retry)</li>
+        <li class="no"><code>own_msg_id[]</code> überläuft — eine spät eintreffende Quittung findet ihren Eintrag nicht mehr</li>
+        <li class="no">Empfänger ausgeschaltet — <b>niemand hebt die Nachricht auf</b></li>
+        <li class="no">Der Schleifenschutz kappt in ungünstiger Topologie den einzigen Rückweg</li>
+      </ul>
+      <div class="cite">Reihenfolge der Belege: txring_functions.cpp:284-354 · lora_functions.cpp:1209 · loop_functions.cpp:4226 · :755-757 · — · lora_functions.cpp:1220-1229</div>
+    </div>
+  </div>
+
+  <div class="note warn" style="margin-top:.9rem">
+    <b>Und nirgends wird etwas aufgehoben.</b> Weder im Knoten noch auf dem Server gibt es eine Warteschlange für Nachrichten an
+    abwesende Empfänger. Es existieren nur zwei kurze Ringe im Arbeitsspeicher — Sendepuffer und Duplikatspeicher.
+    Verpasst der Empfänger das Zeitfenster von zwei Minuten, ist die Nachricht endgültig weg.
+  </div>
+</div></section>
+<!-- 12 ---------------------------------------------------------------- -->
+<section class="slide" id="s12"><span class="num">12</span><div class="inner">
+  <div class="eyebrow">Was ein Knoten heute schon weiß</div>
+  <h2>Die HEY-Bake und die Nachbarschaft</h2>
+
+  <div class="grid g2" style="align-items:start;gap:1.6rem">
+    <figure>
+      <img src="assets/node-mheard.webp" alt="MHeard-Liste im WebGUI von DK5EN-98">
+      <figcaption><b>DK5EN-98, 23.08.2026 18:18.</b> Pro Nachbar: Typ, Hardware, Modulation, RSSI, SNR, Entfernung,
+      <b>NCNT</b> und Position. Angezeigt werden Nachbarn der letzten 3 Stunden.</figcaption>
+    </figure>
+
+    <div>
+      <div class="card"><h3>Die ganze Nutzlast einer HEY-Bake</h3>
+        <pre style="font-size:.8rem">R<b>21</b>;</pre>
+        <p style="margin-top:.6rem">Mehr steht nicht drin. <b>Die eigene Nachbarzahl, sonst nichts.</b> Keine Position, keine Hardware, kein eigenes Statusfeld —
+        diese Angaben reisen im generischen Rahmen jedes Pakets mit.</p>
+        <p style="margin-top:.5rem">Jeder Knoten, der die Bake weiterreicht, hängt seinen eigenen Messwert an:
+        <code>R21;9,71,-7;12,65,-9;</code> — je Hop ein Schnappschuss aus Nachbarzahl, RSSI und SNR.</p>
+        <div class="cite"><b>loop_functions.cpp:4273</b> · <code>appendHeySignalReport()</code> <b>aprs_functions.cpp:1124-1135</b></div>
+      </div>
+
+      <div class="card good" style="margin-top:1rem"><h3>Trickle ist längst aktiv — kein Papier</h3>
+        <p>Die HEY-Rate ist nicht fix. Nach RFC 6206 startet sie bei <b>30 s</b>, verdoppelt sich bis <b>15 min</b> und wird ganz
+        unterdrückt, sobald der Knoten <b>2 konsistente</b> Nachbar-Baken gehört hat.</p>
+        <div class="kv" style="margin-top:.7rem"><span>Gemessene Einsparung</span><span>53 % (29–75 %)</span></div>
+        <div class="kv"><span>Im eingeschwungenen Zustand</span><span>&gt; 90 %</span></div>
+        <div class="cite">Implementierung <b>esp32_main.cpp:3180-3222</b> / <b>nrf52_main.cpp:1864-1892</b> · Feldmessung <b>docs/hey-supp.md</b>, 5 Knoten, 9,5 h</div>
+      </div>
+
+      <div class="note warn" style="margin-top:1rem">
+        <b>NCNT hat eine Decke.</b> Gezählt werden Nachbarn der letzten Stunde — höchstens aber so viele, wie die Board-Klasse Plätze hat:
+        <b>80</b> auf ESP32-S3 und RAK4631, <b>30</b> auf klassischem ESP32, <b>50</b> auf T-Deck. In der Produktion melden Spitzenknoten
+        wie DK7WK-12 und DB0KH-11 exakt den Maximalwert — ihr wahrer Wert liegt höher.
+        <div class="cite"><b>mheard_functions.cpp:556-572</b> · <b>configuration_global.h:172-201</b></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 13 ---------------------------------------------------------------- -->
+<section class="slide" id="s13"><span class="num">13</span><div class="inner">
+  <div class="eyebrow">Der Vorschlag</div>
+  <h2>Sich die Umgebung ansehen, bevor man sie flutet</h2>
+
+  <p class="lead">Ameisen wählen keinen Weg, sie riechen ihn: Wo viele gelaufen sind, liegt Duftstoff, und der zieht weitere an.
+  Das Gegenteil von Routing: <b>lokale Regeln, globale Ordnung</b> — für ein Flutnetz die richtige Denkweise. Nur <em>riechen</em> kann unser Knoten heute nichts.</p>
+
+  <div class="grid g2" style="margin-top:.85rem;align-items:start">
+    <div class="card hot"><h3>Was wir gern hätten — und was fehlt</h3>
+      <p>Die Duftspur wäre: <b>Wie viel Verkehr läuft tatsächlich über diesen Nachbarn?</b></p>
+      <p style="margin-top:.6rem">Im Knoten existiert dafür <b>kein einziger Zähler</b>. Die MHeard-Tabelle ist ein Schnappschuss —
+      jeder neue Empfang überschreibt den alten, nichts summiert sich. Die einzigen Zähler im System sind globale Sendestatistiken
+      pro Prioritätsklasse, nicht pro Nachbar.</p>
+      <p style="margin-top:.6rem">Diese Last-Metrik gibt es heute <b>nur serverseitig</b> in der MeshMap. Sie müsste im Knoten neu gebaut werden —
+      es ist nichts da, das man nur freischalten müsste.</p>
+      <div class="cite">Geprüft: mheard_functions.cpp, txring_functions.cpp, via_functions.cpp — keine Per-Nachbar-Häufigkeit</div>
+    </div>
+
+    <div class="card good"><h3>Was der Knoten stattdessen heute schon messen kann</h3>
+      <p>Nicht „wo läuft viel“, sondern <b>„wie allein wäre mein Nachbar ohne mich“</b>. Diese Zahl liegt seit v4.35n
+      in jeder HEY-Bake: die Nachbarzahl, die der Nachbar selbst meldet.</p>
+      <pre style="margin-top:.7rem;font-size:.85rem">Netzwichtigkeit = Σ  1 / NC<sub>Nachbar i</sub></pre>
+      <ul class="plain" style="margin-top:.6rem">
+        <li>Nachbar meldet <b>1</b> → er hängt zu 100 % an mir → Beitrag <b>1,0</b></li>
+        <li>Nachbar meldet <b>20</b> → er hat reichlich Alternativen → Beitrag <b>0,05</b></li>
+      </ul>
+      <p style="margin-top:.6rem">Der Sprung von 1 auf 2 halbiert den Beitrag — „einziger Weg“ gegen „eine Alternative“ ist der Unterschied,
+      der zählt. Von 10 auf 11 ändert sich fast nichts. Genau so soll es sein.</p>
+      <div class="cite"><b>docs/adr-nc-importance-backoff.md</b> — ADR 02, Rev. 3</div>
+    </div>
+  </div>
+
+  <div class="grid g4" style="margin-top:1.05rem">
+    <div class="card stat"><div class="k">Knoten im Netz</div><div class="big">1.446</div><div class="s">Stand 23.08.2026</div></div>
+    <div class="card stat"><div class="k">HEY-Frames / 24 h</div><div class="big">93.050</div><div class="s">Ø 3.877 pro Stunde</div></div>
+    <div class="card stat"><div class="k">Aktive Verbindungen</div><div class="big">2.436</div><div class="s">3-Stunden-Fenster</div></div>
+    <div class="card stat"><div class="k">Melden genau 1 Nachbarn</div><div class="big">20 %</div><div class="s">Median über alle: 3</div></div>
+  </div>
+
+  <div class="note warn" style="margin-top:.9rem">
+    <b>Ehrlich bleiben — zweimal.</b>
+    Erstens: Das Ameisenbild ist <b>unsere Erzählebene</b>. Im ADR 02 kommen weder „Ameise“ noch „Pheromon“ vor; dort steht eine
+    Abhängigkeitsformel, keine Verstärkung erfolgreicher Pfade.
+    Zweitens: Die Last-Zahlen der MeshMap sind <b>beobachtete HEY-Meldungen</b> — höchstens eine je gesendetem Frame netzweit, verzerrt
+    durch das Wettrennen der Gateways ans Internet und durch Trickle-Unterdrückung in dichten Gebieten.
+    <b>Das ist keine Kanalauslastung und keine Airtime.</b> Ein niedriger Wert kann „ruhiges Segment“ heißen — oder nur, dass ein anderes Gateway schneller war.
+  </div>
+</div></section>
+
+<!-- 14 ---------------------------------------------------------------- -->
+<section class="slide" id="s14"><span class="num">14</span><div class="inner">
+  <div class="eyebrow">Die entscheidende Unterscheidung</div>
+  <h2>Hängt mein Nachbar am Internet — oder nur am Funk?</h2>
+
+  <p class="lead">Für die Frage „muss ich weiterleiten?“ macht das den ganzen Unterschied. Ein Nachbar mit Gateway hat einen zweiten Weg
+  in die Welt; ein reiner Funknachbar hat nur mich. Die gute Nachricht: <b>diese Information wird bereits gesendet.</b></p>
+
+  <div class="grid g2" style="margin-top:1.05rem;align-items:start">
+    <div>
+      <div class="card cold"><h3>Das Signal steckt im Zielfeld der HEY-Bake</h3>
+        <pre style="font-size:.82rem">Gateway:      …&gt;<b>HG</b>@   R21;
+Reiner Node:  …&gt;<b>H</b>@    R7;</pre>
+        <p style="margin-top:.7rem">Ein Buchstabe. Gesetzt beim Bauen der eigenen Bake, direkt aus dem eigenen Gateway-Schalter.
+        Der Empfänger merkt sich das als Bit <code>0x80</code> in seiner Pfadtabelle — und zeigt es als das <b>„G“</b> an, das wir auf Folie 07 gesehen haben.</p>
+        <div class="cite">Senden: <b>loop_functions.cpp:4266-4269</b> · Auswerten: <b>mheard_functions.cpp:542-543</b> · Anzeigen: <b>web_functions.cpp:993</b></div>
+      </div>
+
+      <div class="note bad" style="margin-top:1rem">
+        <b>Genutzt wird es heute für nichts.</b> Das Gateway-Bit fließt in die Anzeige und in sonst keine Entscheidung.
+        Weder Backoff noch Weiterleitung noch Wiederholung schauen es an.
+      </div>
+    </div>
+
+    <div>
+      <div class="card"><h3>Was man damit tun könnte</h3>
+        <ul class="plain">
+          <li>Ein Nachbar <b>ohne</b> Gateway, der wenige Nachbarn meldet, wiegt schwer — er hängt wirklich an mir</li>
+          <li>Ein Nachbar <b>mit</b> Gateway hat einen unabhängigen zweiten Weg; sein Beitrag zu meiner Wichtigkeit darf kleiner ausfallen</li>
+          <li>Bin ich der <b>einzige</b> Weg meiner Nachbarschaft zu irgendeinem Gateway, bin ich unverzichtbar — egal wie klein ich bin</li>
+        </ul>
+      </div>
+
+      <div class="note warn" style="margin-top:1rem">
+        <b>Grenzen, die man mitsagen muss:</b>
+        <ul class="plain" style="margin-top:.4rem">
+          <li>Die Angabe ist nur so frisch wie die letzte gehörte Bake — durch Trickle unter Umständen 15 Minuten alt</li>
+          <li>Sie reist <b>nur</b> im HEY. Text- und Positionspakete tragen kein Gateway-Bit</li>
+          <li>Ein Gateway, dessen Serververbindung stumm gestorben ist, meldet weiter „HG“ (siehe Folie 08)</li>
+        </ul>
+      </div>
+
+      <div class="note" style="margin-top:1rem">
+        <b>Einordnung:</b> ADR 02 behandelt diese Unterscheidung in Stufe 1 <b>nicht</b>. Verwandt ist die geplante Ausbaustufe „Importance v2“,
+        die über die HEY-Pfadtabelle gewichtet, ob wir der einzige bekannte Weg zu einem Gateway sind. Der Gedanke, den <b>Direktnachbarn</b>
+        selbst nach Gateway/Nicht-Gateway zu unterscheiden, ist <b>neu und noch nicht spezifiziert</b>.
+      </div>
+    </div>
+  </div>
+</div></section>
+<!-- 15 ---------------------------------------------------------------- -->
+<section class="slide" id="s15"><span class="num">15</span><div class="inner">
+  <div class="eyebrow">Szenario 1 von 3</div>
+  <h2>Die Stadt — viel Verkehr, wenig Verantwortung</h2>
+
+  <div class="grid g2" style="align-items:start;gap:1.6rem">
+    <figure>
+      <img src="assets/map-florenz.webp" alt="MeshCom-Karte Florenz und Prato mit dicht vermaschten Verbindungen">
+      <figcaption><b>Florenz / Prato, 23.08.2026.</b> Einfärbung nach beobachteter HEY-Last. Fast jeder Knoten sieht fast jeden.
+      <div class="scale" aria-label="Farbskala Verbindungslast">
+        <i style="background:#b8bcc4">nicht beob.</i><i style="background:#bcd9f2">1 Quelle</i><i style="background:#74b0e2">2–3</i><i style="background:#2f6fd0">4–7</i><i style="background:#6b3fd0">8–15</i><i style="background:#c828d8">16+ Quellen</i>
+      </div>
+      <span style="display:block;margin-top:.4rem">Gezählt werden <b>verschiedene Quellstationen</b>, deren Baken über diesen Abschnitt liefen — nicht Pakete und nicht Kanalzeit.</span></figcaption>
+    </figure>
+
+    <div>
+      <div class="grid g2" style="gap:.8rem">
+        <div class="card stat"><div class="k">Knoten in der Toskana</div><div class="big">53</div><div class="s">davon 22 Gateways</div></div>
+        <div class="card stat"><div class="k">Ø SNR im Cluster</div><div class="big">−7,7</div><div class="s">dB — kurze, gute Strecken</div></div>
+      </div>
+
+      <div class="card" style="margin-top:1rem"><h3>Der Kronzeuge: IU5CZN-10</h3>
+        <div class="kv"><span>Reale Relay-Arbeit</span><span>Rang 9 von 508</span></div>
+        <div class="kv"><span>Zwischenhop-Auftritte / 24 h</span><span>489</span></div>
+        <div class="kv"><span>Netzwichtigkeit</span><span style="color:var(--ok)">0,66 — Rang 304</span></div>
+        <p style="margin-top:.8rem">Dieser Knoten trägt <b>sehr viel Verkehr</b> und ist trotzdem <b>fast entbehrlich</b>: Bis auf eine
+        Quelle haben alle seine Nachbarn zwischen 7 und 31 andere Stationen, die sie ebenfalls hören.</p>
+        <div class="cite">Leaderboard aus 24 h Produktionsdaten, <b>docs/adr-nc-importance-backoff.md</b>, Rev. 3</div>
+      </div>
+
+      <div class="note ok" style="margin-top:1rem">
+        <b>Das ist kein Fehler der Formel — das ist ihr Sinn.</b> „Viel Last“ und „wichtig fürs Netz“ sind zwei verschiedene Dinge.
+        Wer den Kanal nach Last priorisiert, bevorzugt genau die Knoten, deren Sendung ohnehin jemand anders wiederholt hätte.
+        Der Stadtknoten darf ruhig warten.
+      </div>
+
+      <div class="note" style="margin-top:.8rem">
+        <b>Wirkung im Backoff:</b> Netzwichtigkeit 0,66 landet in den Slots 5–7 →
+        <span class="mono">4675–4745 ms</span>. Ein Bergknoten startet bei <span class="mono">4500 ms</span>.
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 16 ---------------------------------------------------------------- -->
+<section class="slide tight" id="s16"><span class="num">16</span><div class="inner">
+  <div class="eyebrow">Szenario 2 und 3 von 3</div>
+  <h2>Der Berg und der Stern</h2>
+
+  <div class="grid g2" style="gap:1.4rem;align-items:start">
+    <div>
+      <figure>
+        <img src="assets/map-thueringen.webp" alt="MeshCom-Karte Thüringer Wald mit DB0TVI-1 als Brücke">
+        <figcaption><b>Thüringer Wald — DB0TVI-1</b> „Grosser Inselsberg“, 962 m. Verbindet Täler, die einander nicht hören.</figcaption>
+      </figure>
+      <div class="card" style="margin-top:.9rem">
+        <div class="kv"><span>Knoten in der Region</span><span>45 · 20 Gateways</span></div>
+        <div class="kv"><span>Verbindungen (aktiv)</span><span>78 (30)</span></div>
+        <div class="kv"><span>Eigene Nachbarzahl</span><span>14</span></div>
+        <div class="kv"><span>Zwischenhop-Auftritte / 24 h</span><span>1.120 — Rang 2</span></div>
+        <div class="kv"><span>Netzwichtigkeit</span><span style="color:var(--warn)">3,64 — Rang 33</span></div>
+        <p style="margin-top:.7rem;font-size:.88rem;color:var(--fg2)">Nur 14 Nachbarn — aber die meisten davon haben kaum Alternativen.
+        Auf drei seiner Abschnitte hängen <b>188, 176 und 159 verschiedene Quellstationen</b>. Fällt er aus, zerfällt die Region.</p>
+      </div>
+    </div>
+
+    <div>
+      <figure>
+        <img src="assets/map-wien.webp" alt="MeshCom-Karte Wien mit OE3XIA-12 als zentralem Sternknoten">
+        <figcaption><b>Wien — OE3XIA-12</b> am Exelberg. Ein Stern: nahezu alle lastreichen Strecken laufen durch diesen einen Punkt.</figcaption>
+      </figure>
+      <div class="card hot" style="margin-top:.9rem">
+        <div class="kv"><span>Knoten in der Region</span><span>60 · 33 Gateways</span></div>
+        <div class="kv"><span>Verbindungen (aktiv)</span><span>75 (24)</span></div>
+        <div class="kv"><span>Eigene Nachbarzahl</span><span>27</span></div>
+        <div class="kv"><span>Zwischenhop-Auftritte / 24 h</span><span>803 — Rang 3</span></div>
+        <div class="kv"><span>Netzwichtigkeit</span><span style="color:var(--bad)">9,24 — <b>Rang 1</b></span></div>
+        <p style="margin-top:.7rem;font-size:.88rem;color:var(--fg2)">Viele Nachbarn <b>und</b> viele davon abhängig. Der höchste
+        Wichtigkeitswert im gesamten vermessenen Netz. Genau so ein Knoten darf nicht hinter einem Blatt in der Warteschlange stehen.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:.95rem">
+    <b>Der Punkt, auf den alle drei Szenarien hinauslaufen:</b> Die eigene Nachbarzahl allein sagt es nicht.
+    Ein Stadtknoten und ein Bergknoten können beide 10 Nachbarn haben — der eine kommt auf Wichtigkeit 1,0, der andere auf 7,2.
+    Den Unterschied macht nicht, <em>wie viele</em> mich hören, sondern <b>wie allein die wären, die mich hören</b>.
+    <div class="cite">Live-Zahlen: mcmap-Abfrage 23.08.2026 · Wichtigkeits- und Rangwerte: 24-h-Simulation über 508 Empfängerknoten, ADR 02 Rev. 3</div>
+  </div>
+</div></section>
+
+<!-- 17 ---------------------------------------------------------------- -->
+<section class="slide" id="s17"><span class="num">17</span><div class="inner">
+  <div class="eyebrow">Die zweite Baustelle</div>
+  <h2>Persönliche Nachrichten brauchen eine Transportsicherung</h2>
+
+  <p class="lead">Baken dürfen verloren gehen — die nächste kommt in 15 Minuten. Eine persönliche Nachricht darf das nicht.
+  Heute kann der Absender nicht unterscheiden, ob sie nie ankam oder ob nur die Quittung verloren ging.</p>
+
+  <div class="grid g3" style="margin-top:1.05rem">
+    <div class="card hot"><h3>Was heute fehlt</h3>
+      <ul class="plain">
+        <li class="no">Die Quittung wird <b>nie wiederholt</b> — ein verlorenes Paket, und der Nachweis ist weg</li>
+        <li class="no">Das Scheitern nach 3 Versuchen wird <b>nicht gemeldet</b></li>
+        <li class="no">Späte Quittungen finden ihren Eintrag nicht mehr, wenn <code>own_msg_id[]</code> übergelaufen ist</li>
+        <li class="no"><b>Niemand hebt etwas auf</b> — weder Knoten noch Server</li>
+      </ul>
+    </div>
+    <div class="card"><h3>Was eine Sicherung leisten muss</h3>
+      <ul class="plain">
+        <li>Zustellnachweis, der <b>einen einzelnen Paketverlust übersteht</b></li>
+        <li>Drei klar unterscheidbare Zustände für den Nutzer: <b>zugestellt · gescheitert · noch offen</b></li>
+        <li>Duplikaterkennung beim Empfänger, damit Wiederholungen nicht doppelt erscheinen</li>
+        <li>Eine Chance für Empfänger, die gerade aus sind</li>
+      </ul>
+    </div>
+    <div class="card good"><h3>Lösungsrichtung — in dieser Reihenfolge</h3>
+      <ul class="plain">
+        <li><b>1.</b> Die Quittung selbst wiederholen, wie das Original: 3 × 40 s statt einmal</li>
+        <li><b>2.</b> Endzustand an App und Display melden, auch das Scheitern</li>
+        <li><b>3.</b> Den Nachweis-Speicher von Baken und Positionen entkoppeln, damit er nicht überläuft</li>
+        <li><b>4.</b> Ablage am Gateway für abwesende Empfänger — der Server sieht ohnehin schon alles</li>
+        <li><b>5.</b> Erst danach über Sequenznummern und Fenster reden</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="note ok">
+      <b>Die ersten drei Schritte sind billig.</b> Sie brauchen kein neues Wire-Format, keine Flag-Bits, keine Abstimmung mit anderen
+      Implementierungen — sie ändern nur, wie lange die Firmware an einer bereits definierten Quittung festhält und was sie dem
+      Nutzer darüber sagt. Abwärtskompatibel in beide Richtungen.
+    </div>
+    <div class="note warn">
+      <b>Schritt 4 ist eine Grundsatzentscheidung.</b> Eine Ablage am Gateway macht MeshCom teilweise vom Server abhängig — genau das,
+      was ein Funknetz eigentlich vermeiden will. Sie gehört diskutiert, nicht nebenbei eingebaut.
+      Und sie hilft nur dort, wo Gateways stehen.
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:.85rem">
+    <b>Zurück zum Anfang:</b> Sendefolgenummer, Quittung mit Wiederholung und ein Timer, der aufgibt und es sagt — das ist genau das,
+    was AX.25 im verbindungsorientierten Modus seit 1984 mitbringt. Wir müssen es nicht erfinden. Wir müssen nur entscheiden,
+    dass persönliche Nachrichten es verdienen.
+  </div>
+</div></section>
+
+<!-- 18 ---------------------------------------------------------------- -->
+<section class="slide" id="s18"><span class="num">18</span><div class="inner">
+  <div class="eyebrow">Zusammenfassung</div>
+  <h2>In Stufen, mit Notausschalter, gegen Messwerte</h2>
+
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <table>
+        <thead><tr><th>Stufe</th><th>Inhalt</th><th>Ändert Verhalten?</th></tr></thead>
+        <tbody>
+          <tr><td class="m">0</td><td>Nur beobachten: Wichtigkeit rechnen und loggen</td><td><span class="tag t-ok">nein</span></td></tr>
+          <tr><td class="m">0.5</td><td>Duplikatspeicher vergrößern (Ziel 200–256)</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
+          <tr><td class="m">S</td><td>Sturmschutz: Rate-Limit je Quelle</td><td><span class="tag t-info">ja</span></td></tr>
+          <tr><td class="m">1a</td><td>Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
+          <tr><td class="m">1b</td><td>Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
+          <tr><td class="m">1c</td><td>Optional auch Positions-Relays</td><td><span class="tag t-warn">ja</span></td></tr>
+          <tr><td class="m">2</td><td>Relay-Unterdrückung — erst nach vermessener Stufe 1</td><td><span class="tag t-bad">ja, heikel</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note ok" style="margin-top:1rem;font-size:.86rem">
+        <b>Notausschalter:</b> <code>--impslot off</code> schaltet die Differenzierung jederzeit ab, unabhängig vom Qualitäts-Gate.
+        <code>auto</code> überlässt die Entscheidung dem Gate: mindestens 60 % der Nachbarn mit bekannter Nachbarzahl,
+        eigene Tabelle nicht übergelaufen, Knoten mindestens eine Stunde in Betrieb.
+      </div>
+    </div>
+
+    <div>
+      <p style="font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-bottom:.7rem">Was wir dazusagen müssen</p>
+      <ul class="plain">
+        <li class="no"><b>Der Hebel ist kleiner als er klingt.</b> Die Differenzierung wirkt zunächst nur auf Text-Relays — 3 bis 41 pro Stunde
+          gegenüber rund 3.800 Baken und 3.800 Positionen. Das sind unter 1 % des Relay-Volumens, bis Stufe 1c kommt.</li>
+        <li class="no"><b>Ein einzelner Knoten kann alles überfahren.</b> Am 22.08.2026 sendete IU4KCH-26 in einer Stunde <b>5.912</b> Baken
+          (Vorstunde: 9). Gegen so etwas hilft keine Backoff-Reihenfolge, sondern nur die eigene Stufe S.</li>
+        <li class="no"><b>Unterdrückung ist schon einmal schiefgegangen.</b> <code>commit 60ea7d8</code> lief produktiv, hungerte Blattknoten aus
+          und wurde zurückgenommen. Deshalb steht sie hinten und bekommt eigene Schutzregeln.</li>
+        <li class="no"><b>„Wenige Segmente tragen das Netz“ stimmt nur halb.</b> Über 7 Tage entfallen auf die lastreichsten 10 % der
+          Abschnitte rund <b>25 %</b> des beobachteten Verkehrs — deutlich, aber keine Handvoll Flaschenhälse.</li>
+      </ul>
+
+      <div class="sep"></div>
+
+      <div class="grid g3" style="gap:.7rem">
+        <div class="card stat"><div class="k">Belegbasis</div><div class="big" style="font-size:1.5rem">96.074</div><div class="s">HEY-Frames / 24 h</div></div>
+        <div class="card stat"><div class="k">Vermessen</div><div class="big" style="font-size:1.5rem">508</div><div class="s">Empfängerknoten</div></div>
+        <div class="card stat"><div class="k">Netzgröße</div><div class="big" style="font-size:1.5rem">1.446</div><div class="s">Knoten gesamt</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="note">
+      <b>Die zwei Sätze, die hängen bleiben sollen:</b><br>
+      1 — Ein Knoten soll nicht senden, weil er darf, sondern weil ihn jemand braucht.<br>
+      2 — Eine persönliche Nachricht ist keine Bake und darf nicht wie eine behandelt werden.
+    </div>
+    <div class="note" style="font-size:.82rem">
+      <b>Weiterlesen:</b>
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md">ADR 02 — Netzwichtigkeits-Backoff</a> ·
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md">Wire Format</a> ·
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md">Flood-Networking-Analyse</a> ·
+      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/hey-supp.md">Trickle-HEY-Suppression</a> ·
+      <a href="https://meshmap.oevsv.at">MeshCom Map</a>
+      <div class="cite" style="margin-top:.6rem">Alle Code-Belege gegen Branch <b>v4.35p_prio</b>, Stand 23.08.2026.</div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var bar = document.querySelector('#bar i');
+  var pos = document.getElementById('pos');
+  var toc = document.getElementById('toc');
+  var list = document.getElementById('toclist');
+  var cur = 0;
+
+  slides.forEach(function(s, i){
+    var t = s.querySelector('h1, h2');
+    var e = s.querySelector('.eyebrow');
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + s.id;
+    a.innerHTML = '<span>' + (t ? t.textContent.trim() : 'Folie ' + (i+1)) +
+                  (e ? ' <small>· ' + e.textContent.trim() + '</small>' : '') + '</span>';
+    a.addEventListener('click', function(){ toc.classList.remove('on'); });
+    li.appendChild(a); list.appendChild(li);
+  });
+
+  function render(){
+    pos.textContent = (cur + 1) + '/' + slides.length;
+    bar.style.width = (slides.length < 2 ? 100 : (cur / (slides.length - 1)) * 100) + '%';
+  }
+
+  // which slide fills most of the viewport
+  function sync(){
+    var best = 0, bestArea = -1;
+    for (var i = 0; i < slides.length; i++){
+      var r = slides[i].getBoundingClientRect();
+      var a = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+      if (a > bestArea){ bestArea = a; best = i; }
     }
+    if (best !== cur){ cur = best; render(); }
+  }
+  var ticking = false;
+  addEventListener('scroll', function(){
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function(){ sync(); ticking = false; });
+  }, { passive: true });
 
-    function drawMessageAnimation(mode) {
-      const svg = document.getElementById('messageSvg');
-      svg.innerHTML = '';
+  function go(i){
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides[cur].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    render();
+  }
 
-      // Styles
-      const styleNS = 'http://www.w3.org/2000/svg';
+  document.getElementById('bnext').onclick = function(){ go(cur + 1); };
+  document.getElementById('bprev').onclick = function(){ go(cur - 1); };
+  document.getElementById('btoc').onclick  = function(){ toc.classList.toggle('on'); };
 
-      if (mode === 'broadcast') {
-        drawBroadcastAnimation(svg);
-      } else if (mode === 'dm') {
-        drawDMAnimation(svg);
-      }
+  // theme: system -> dark -> light -> system
+  var root = document.documentElement;
+  function readTheme(){ try { return localStorage.getItem('mc-theme'); } catch(e){ return null; } }
+  function writeTheme(v){ try { v ? localStorage.setItem('mc-theme', v) : localStorage.removeItem('mc-theme'); } catch(e){} }
+  var t0 = readTheme();
+  if (t0 === 'dark' || t0 === 'light') root.setAttribute('data-theme', t0);
+  document.getElementById('btheme').onclick = function(){
+    var c = root.getAttribute('data-theme');
+    var n = c === 'dark' ? 'light' : (c === 'light' ? null : 'dark');
+    if (n) root.setAttribute('data-theme', n); else root.removeAttribute('data-theme');
+    writeTheme(n);
+  };
+
+  addEventListener('keydown', function(ev){
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    var tag = (ev.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    switch (ev.key){
+      case 'ArrowRight': case 'ArrowDown': case 'PageDown': case ' ':
+        ev.preventDefault(); go(cur + 1); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+        ev.preventDefault(); go(cur - 1); break;
+      case 'Home': ev.preventDefault(); go(0); break;
+      case 'End':  ev.preventDefault(); go(slides.length - 1); break;
+      case 'u': case 'U': toc.classList.toggle('on'); break;
+      case 't': case 'T': document.getElementById('btheme').click(); break;
+      case 'Escape': toc.classList.remove('on'); break;
     }
-
-    function drawBroadcastAnimation(svg) {
-      const ns = 'http://www.w3.org/2000/svg';
-
-      // Node 1 (Sender)
-      const g1 = document.createElementNS(ns, 'g');
-      g1.innerHTML = `
-        <circle cx="100" cy="200" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="205" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N1</text>
-        <text x="100" y="250" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Sender</text>
-      `;
-      svg.appendChild(g1);
-
-      // Gateway (Server Connection)
-      const gw = document.createElementNS(ns, 'g');
-      gw.innerHTML = `
-        <circle cx="450" cy="80" r="35" fill="#10b981" stroke="#10b981" stroke-width="2"/>
-        <text x="450" y="85" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">GW</text>
-        <text x="450" y="130" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Gateway</text>
-      `;
-      svg.appendChild(gw);
-
-      // Internet Cloud
-      const cloud = document.createElementNS(ns, 'g');
-      cloud.innerHTML = `
-        <ellipse cx="750" cy="80" rx="50" ry="40" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="5,5"/>
-        <text x="750" y="85" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#e0e7ff">Internet</text>
-      `;
-      svg.appendChild(cloud);
-
-      // Node 2 (Receiver)
-      const g2 = document.createElementNS(ns, 'g');
-      g2.innerHTML = `
-        <circle cx="100" cy="320" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="325" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N2</text>
-        <text x="100" y="370" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Empfänger</text>
-      `;
-      svg.appendChild(g2);
-
-      // Node 3 (Receiver)
-      const g3 = document.createElementNS(ns, 'g');
-      g3.innerHTML = `
-        <circle cx="800" cy="320" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="800" y="325" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">N3</text>
-        <text x="800" y="370" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Empfänger</text>
-      `;
-      svg.appendChild(g3);
-
-      // Add label
-      const label = document.createElementNS(ns, 'text');
-      label.setAttribute('x', '450');
-      label.setAttribute('y', '350');
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('font-family', 'Inter');
-      label.setAttribute('font-size', '12');
-      label.setAttribute('fill', '#94a3b8');
-      label.textContent = 'Broadcast zu Gruppe 262 → alle Knoten hören es → relayed zu Gateway → ins Internet';
-      svg.appendChild(label);
-
-      // Start animation loop
-      animateBroadcast();
-    }
-
-    function drawDMAnimation(svg) {
-      const ns = 'http://www.w3.org/2000/svg';
-
-      // Node 1 (Sender)
-      const g1 = document.createElementNS(ns, 'g');
-      g1.innerHTML = `
-        <circle cx="100" cy="100" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">OE1</text>
-        <text x="100" y="150" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Sender</text>
-      `;
-      svg.appendChild(g1);
-
-      // Gateway (Server Connection)
-      const gw = document.createElementNS(ns, 'g');
-      gw.innerHTML = `
-        <circle cx="450" cy="100" r="35" fill="#10b981" stroke="#10b981" stroke-width="2"/>
-        <text x="450" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">GW</text>
-        <text x="450" y="150" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Gateway</text>
-      `;
-      svg.appendChild(gw);
-
-      // MeshCom Server
-      const server = document.createElementNS(ns, 'g');
-      server.innerHTML = `
-        <rect x="700" y="70" width="80" height="60" rx="4" fill="none" stroke="#6366f1" stroke-width="2"/>
-        <text x="740" y="105" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#6366f1">Server</text>
-        <text x="740" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">(UDP 1990)</text>
-      `;
-      svg.appendChild(server);
-
-      // Node 2 (Receiver - same Gateway)
-      const g2 = document.createElementNS(ns, 'g');
-      g2.innerHTML = `
-        <circle cx="100" cy="280" r="30" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="285" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#0f172a">OE9</text>
-        <text x="100" y="330" text-anchor="middle" font-family="Inter" font-size="11" fill="#94a3b8">Zielknoten</text>
-      `;
-      svg.appendChild(g2);
-
-      // Add label
-      const label = document.createElementNS(ns, 'text');
-      label.setAttribute('x', '450');
-      label.setAttribute('y', '360');
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('font-family', 'Inter');
-      label.setAttribute('font-size', '12');
-      label.setAttribute('fill', '#94a3b8');
-      label.textContent = 'OE1ABC→OE9XYZ mit {987} → Server verteilt via UDP → ACK über selben Weg';
-      svg.appendChild(label);
-
-      // Start animation loop
-      animateDM();
-    }
-
-    function animateBroadcast() {
-      if (currentMessageMode !== 'broadcast') return;
-
-      const svg = document.getElementById('messageSvg');
-
-      // Broadcast from N1
-      setTimeout(() => {
-        addMessageArrow(svg, 100, 200, 450, 80, '#6366f1', 'Broadcast 262');
-      }, 200);
-
-      // Relay to N2
-      setTimeout(() => {
-        addMessageArrow(svg, 450, 80, 100, 320, '#f59e0b', 'Relay');
-      }, 1200);
-
-      // Relay to N3
-      setTimeout(() => {
-        addMessageArrow(svg, 450, 80, 800, 320, '#f59e0b', 'Relay');
-      }, 1800);
-
-      // Gateway to Internet
-      setTimeout(() => {
-        addMessageArrow(svg, 450, 80, 750, 80, '#10b981', 'Internet');
-      }, 2400);
-
-      // Restart
-      setTimeout(() => animateBroadcast(), 4000);
-    }
-
-    function animateDM() {
-      if (currentMessageMode !== 'dm') return;
-
-      const svg = document.getElementById('messageSvg');
-
-      // DM from OE1 to Gateway
-      setTimeout(() => {
-        addMessageArrow(svg, 100, 100, 450, 100, '#6366f1', 'DM {987}');
-      }, 200);
-
-      // Gateway to Server
-      setTimeout(() => {
-        addMessageArrow(svg, 450, 100, 700, 100, '#10b981', 'UDP');
-      }, 1000);
-
-      // Server to GW (via broadcast)
-      setTimeout(() => {
-        addMessageArrow(svg, 740, 130, 450, 135, '#6366f1', 'GATE');
-      }, 1800);
-
-      // GW to OE9
-      setTimeout(() => {
-        addMessageArrow(svg, 450, 135, 100, 280, '#f59e0b', 'Relay');
-      }, 2400);
-
-      // ACK from OE9
-      setTimeout(() => {
-        addMessageArrow(svg, 100, 280, 450, 100, '#10b981', ':ack987', true);
-      }, 3200);
-
-      // Restart
-      setTimeout(() => animateDM(), 4500);
-    }
-
-    function addMessageArrow(svg, x1, y1, x2, y2, color, label, isAck = false) {
-      const ns = 'http://www.w3.org/2000/svg';
-      const line = document.createElementNS(ns, 'line');
-      line.setAttribute('x1', x1);
-      line.setAttribute('y1', y1);
-      line.setAttribute('x2', x2);
-      line.setAttribute('y2', y2);
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', '2');
-      line.setAttribute('stroke-dasharray', '5,5');
-      line.setAttribute('opacity', '0');
-      svg.appendChild(line);
-
-      // Animate
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 0.05;
-        if (progress >= 1) {
-          clearInterval(interval);
-          line.remove();
-          return;
-        }
-        const cx = x1 + (x2 - x1) * progress;
-        const cy = y1 + (y2 - y1) * progress;
-        line.setAttribute('opacity', '1');
-        line.setAttribute('x2', cx);
-        line.setAttribute('y2', cy);
-      }, 30);
-
-      // Label
-      const labelEl = document.createElementNS(ns, 'text');
-      labelEl.setAttribute('x', (x1 + x2) / 2 + 20);
-      labelEl.setAttribute('y', (y1 + y2) / 2 - 10);
-      labelEl.setAttribute('font-family', 'IBM Plex Mono');
-      labelEl.setAttribute('font-size', '10');
-      labelEl.setAttribute('font-weight', '600');
-      labelEl.setAttribute('fill', color);
-      labelEl.textContent = label;
-      svg.appendChild(labelEl);
-
-      setTimeout(() => labelEl.remove(), 1000);
-    }
-
-    // Initialize on load
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        drawMessageAnimation('broadcast');
-      });
-    } else {
-      drawMessageAnimation('broadcast');
-    }
-
-    function switchNetworkMode(mode) {
-      currentNetworkMode = mode;
-      networkAnimationRunning = false;
-
-      // Update tabs
-      document.querySelectorAll('.animation-tabs .animation-tab').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      event.target.classList.add('active');
-
-      // Clear and redraw
-      drawNetworkAnimation(mode);
-    }
-
-    function drawNetworkAnimation(mode) {
-      const svg = document.getElementById('networkAnimation');
-      svg.innerHTML = '';
-
-      if (mode === 'broadcast') {
-        drawBroadcastFlood(svg);
-      } else if (mode === 'relay') {
-        drawMeshRelay(svg);
-      }
-    }
-
-    function drawBroadcastFlood(svg) {
-      const ns = 'http://www.w3.org/2000/svg';
-
-      // Sender node
-      const sender = document.createElementNS(ns, 'g');
-      sender.innerHTML = `
-        <circle cx="100" cy="150" r="25" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">TX</text>
-        <text x="100" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Sender</text>
-      `;
-      svg.appendChild(sender);
-
-      // Receiver nodes
-      const receivers = [
-        { x: 300, y: 60, id: 'N1', role: 'Empfänger' },
-        { x: 500, y: 80, id: 'N2', role: 'Empfänger' },
-        { x: 300, y: 250, id: 'N3', role: 'Empfänger' },
-        { x: 500, y: 270, id: 'N4', role: 'Empfänger' }
-      ];
-
-      receivers.forEach(r => {
-        const node = document.createElementNS(ns, 'g');
-        node.innerHTML = `
-          <circle cx="${r.x}" cy="${r.y}" r="20" fill="#e0e7ff" stroke="#334155" stroke-width="1"/>
-          <text x="${r.x}" y="${r.y + 4}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" font-weight="600" fill="#0f172a">${r.id}</text>
-          <text x="${r.x}" y="${r.y + 30}" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">${r.role}</text>
-        `;
-        svg.appendChild(node);
-      });
-
-      // Label
-      const label = document.createElementNS(ns, 'text');
-      label.setAttribute('x', '400');
-      label.setAttribute('y', '330');
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('font-family', 'Inter');
-      label.setAttribute('font-size', '11');
-      label.setAttribute('fill', '#94a3b8');
-      label.textContent = 'Broadcast: Alle Knoten in Reichweite hören die Nachricht gleichzeitig (Flutnetzwerk)';
-      svg.appendChild(label);
-
-      animateBroadcastFlood();
-    }
-
-    function drawMeshRelay(svg) {
-      const ns = 'http://www.w3.org/2000/svg';
-
-      // Sender
-      const sender = document.createElementNS(ns, 'g');
-      sender.innerHTML = `
-        <circle cx="100" cy="150" r="25" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/>
-        <text x="100" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">TX</text>
-        <text x="100" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Sender</text>
-      `;
-      svg.appendChild(sender);
-
-      // Mesh Relay node
-      const relay = document.createElementNS(ns, 'g');
-      relay.innerHTML = `
-        <circle cx="300" cy="150" r="22" fill="#f59e0b" stroke="#f59e0b" stroke-width="2"/>
-        <text x="300" y="155" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0f172a">RX</text>
-        <text x="300" y="190" text-anchor="middle" font-family="Inter" font-size="10" fill="#94a3b8">Mesh Relay</text>
-      `;
-      svg.appendChild(relay);
-
-      // Repeated reach
-      const reach = [
-        { x: 500, y: 60, id: 'N5', role: 'Neu erreichbar' },
-        { x: 500, y: 240, id: 'N6', role: 'Neu erreichbar' },
-        { x: 650, y: 150, id: 'N7', role: 'Neu erreichbar' }
-      ];
-
-      reach.forEach(r => {
-        const node = document.createElementNS(ns, 'g');
-        node.innerHTML = `
-          <circle cx="${r.x}" cy="${r.y}" r="20" fill="#10b981" stroke="#10b981" stroke-width="1"/>
-          <text x="${r.x}" y="${r.y + 4}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" font-weight="600" fill="#0f172a">${r.id}</text>
-          <text x="${r.x}" y="${r.y + 30}" text-anchor="middle" font-family="Inter" font-size="9" fill="#94a3b8">${r.role}</text>
-        `;
-        svg.appendChild(node);
-      });
-
-      // Label
-      const label = document.createElementNS(ns, 'text');
-      label.setAttribute('x', '400');
-      label.setAttribute('y', '330');
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('font-family', 'Inter');
-      label.setAttribute('font-size', '11');
-      label.setAttribute('fill', '#94a3b8');
-      label.textContent = 'Mesh-Relay: Knoten mit Mesh-Flag wiederholen Nachricht → Reichweite vergrößert sich';
-      svg.appendChild(label);
-
-      animateMeshRelay();
-    }
-
-    function animateBroadcastFlood() {
-      if (currentNetworkMode !== 'broadcast') return;
-
-      const svg = document.getElementById('networkAnimation');
-      const ns = 'http://www.w3.org/2000/svg';
-
-      // Draw signal arrows from sender to each receiver
-      const targets = [
-        { x: 300, y: 60 },
-        { x: 500, y: 80 },
-        { x: 300, y: 250 },
-        { x: 500, y: 270 }
-      ];
-
-      targets.forEach((target, idx) => {
-        setTimeout(() => {
-          // Draw animated dashed line from sender to receiver
-          addNetworkArrow(svg, 100, 150, target.x, target.y, '#6366f1', 'Broadcast');
-
-          // Highlight receiver
-          setTimeout(() => {
-            const circles = svg.querySelectorAll('circle');
-            circles.forEach(c => {
-              if (c.getAttribute('cx') == target.x && c.getAttribute('cy') == target.y) {
-                c.setAttribute('fill', '#6366f1');
-                c.setAttribute('stroke', '#6366f1');
-              }
-            });
-          }, 300);
-        }, 400 + idx * 200);
-      });
-
-      setTimeout(() => animateBroadcastFlood(), 4000);
-    }
-
-    function animateMeshRelay() {
-      if (currentNetworkMode !== 'relay') return;
-
-      const svg = document.getElementById('networkAnimation');
-
-      // Sender to relay
-      setTimeout(() => {
-        addNetworkArrow(svg, 100, 150, 300, 150, '#6366f1', 'TX→RX');
-
-        // Highlight relay
-        setTimeout(() => {
-          const circles = svg.querySelectorAll('circle');
-          circles.forEach(c => {
-            if (c.getAttribute('cx') == '300' && c.getAttribute('cy') == '150') {
-              c.setAttribute('fill', '#dc2626');
-              c.setAttribute('stroke', '#dc2626');
-            }
-          });
-        }, 300);
-      }, 200);
-
-      // Relay to new nodes
-      const newReach = [
-        { x: 500, y: 60, label: 'Relay→N5' },
-        { x: 500, y: 240, label: 'Relay→N6' },
-        { x: 650, y: 150, label: 'Relay→N7' }
-      ];
-
-      newReach.forEach((target, idx) => {
-        setTimeout(() => {
-          addNetworkArrow(svg, 300, 150, target.x, target.y, '#f59e0b', 'Repeat');
-
-          setTimeout(() => {
-            const circles = svg.querySelectorAll('circle');
-            circles.forEach(c => {
-              if (c.getAttribute('cx') == target.x && c.getAttribute('cy') == target.y) {
-                c.setAttribute('fill', '#10b981');
-                c.setAttribute('stroke', '#10b981');
-              }
-            });
-          }, 300);
-        }, 1200 + idx * 300);
-      });
-
-      setTimeout(() => animateMeshRelay(), 4500);
-    }
-
-    function addNetworkArrow(svg, x1, y1, x2, y2, color, label) {
-      const ns = 'http://www.w3.org/2000/svg';
-      const line = document.createElementNS(ns, 'line');
-      line.setAttribute('x1', x1);
-      line.setAttribute('y1', y1);
-      line.setAttribute('x2', x2);
-      line.setAttribute('y2', y2);
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', '2');
-      line.setAttribute('stroke-dasharray', '5,5');
-      line.setAttribute('opacity', '0');
-      svg.appendChild(line);
-
-      // Animate line
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 0.05;
-        if (progress >= 1) {
-          clearInterval(interval);
-          line.remove();
-          return;
-        }
-        const cx = x1 + (x2 - x1) * progress;
-        const cy = y1 + (y2 - y1) * progress;
-        line.setAttribute('opacity', '1');
-        line.setAttribute('x2', cx);
-        line.setAttribute('y2', cy);
-      }, 30);
-
-      // Label
-      const labelEl = document.createElementNS(ns, 'text');
-      labelEl.setAttribute('x', (x1 + x2) / 2 + 15);
-      labelEl.setAttribute('y', (y1 + y2) / 2 - 10);
-      labelEl.setAttribute('font-family', 'IBM Plex Mono');
-      labelEl.setAttribute('font-size', '9');
-      labelEl.setAttribute('font-weight', '600');
-      labelEl.setAttribute('fill', color);
-      labelEl.textContent = label;
-      svg.appendChild(labelEl);
-
-      setTimeout(() => labelEl.remove(), 1000);
-    }
-
-    // Initialize network animation
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        drawNetworkAnimation('broadcast');
-      });
-    } else {
-      drawNetworkAnimation('broadcast');
-    }
-  </script>
+  });
+
+  if (location.hash){
+    var i = slides.findIndex(function(s){ return '#' + s.id === location.hash; });
+    if (i >= 0) cur = i;
+  }
+  render(); sync();
+})();
+</script>
 </body>
 </html>
