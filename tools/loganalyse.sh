@@ -398,9 +398,9 @@ grep "MH-LoRa:" "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{pr
 section "STATE_MACHINE"
 
 echo "MC_SM_TOTAL: $(grep -c 'MC-SM' "$LOGFILE" 2>/dev/null; true)"
-echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -vc 'rc=0' 2>/dev/null; true)"
-
-grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | head -10 || true
+echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -v 'rc=0' | grep -vc 'TX_PREPARE -> IDLE rc=-1' 2>/dev/null; true)"
+echo "MC_SM_CSMA_BACKOFF: $(grep -c 'TX_PREPARE -> IDLE rc=-1' "$LOGFILE" 2>/dev/null; true)"
+grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | grep -v 'TX_PREPARE -> IDLE rc=-1' | head -10 || true
 
 # ─── 13. ADDITIONAL CHECKS ───
 section "ADDITIONAL"
