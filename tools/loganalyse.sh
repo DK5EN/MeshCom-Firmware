@@ -1003,7 +1003,8 @@ if grep -q '\[MC-STAT\]' "$LOGFILE"; then
     echo ""
     echo "--- Priority drops ---"
     grep 'RING_DROP_PRIO\|RING_DROP_NEW' "$LOGFILE" | wc -l | awk '{printf "  Total priority drops: %d\n", $1}'
-    (grep 'RING_DROP_PRIO' "$LOGFILE" | grep -oE 'prio=[0-9]' | sort | uniq -c | sort -rn) || true
+    echo "--- Dropped packets by prio+type ---"
+    (grep -E 'RING_DROP_(PRIO|NEW)' "$LOGFILE" | grep -oE 'prio=[0-9]+ type=[0-9A-Fa-f]+' | sort | uniq -c | sort -rn) || true
 else
     echo "  No [MC-STAT] data found (priority queue not active or no data yet)"
 fi
