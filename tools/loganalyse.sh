@@ -17,7 +17,25 @@ if [ $# -lt 1 ] || [ ! -f "$1" ]; then
     exit 1
 fi
 
-LOGFILE="$1"
+# ─── Input normalization (TOOL-04) ───
+# Firmware serial captures can contain stray non-UTF8 bytes (RF/UART noise).
+# Under a UTF-8 locale these abort awk mid-file ("towc: multibyte conversion
+# failure"), silently truncating every awk-based section. normalize_log strips
+# input to printable ASCII (plus tab/newline) under LC_ALL=C into a temp file
+# and echoes its path. Temp files are removed on exit.
+_NORMALIZED_TMPS=""
+cleanup_normalized_tmps() { [ -n "$_NORMALIZED_TMPS" ] && rm -f $_NORMALIZED_TMPS; }
+trap cleanup_normalized_tmps EXIT
+
+normalize_log() {
+    _src="$1"
+    _tmp="$(mktemp "${TMPDIR:-/tmp}/loganalyse.XXXXXX")"
+    _NORMALIZED_TMPS="$_NORMALIZED_TMPS $_tmp"
+    LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" > "$_tmp"
+    echo "$_tmp"
+}
+
+LOGFILE="$(normalize_log "$1")"
 
 # ─── Helper ───
 section() { echo ""; echo "=== $1 ==="; }
@@ -898,7 +916,7 @@ END {
 
 # ─── 20. CROSS-LOG CORRELATION ───
 if [ $# -ge 2 ] && [ -f "$2" ]; then
-    LOGFILE2="$2"
+    LOGFILE2="$(normalize_log "$2")"
     section "CROSS_CORRELATION"
 
     echo "LOG1: $LOGFILE"

@@ -27,6 +27,7 @@ from pathlib import Path
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 SCRIPT: Path = REPO_ROOT / "tools" / "loganalyse.sh"
 FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_sm_sample.txt"
+CORRUPT_FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_corrupt_byte.txt"
 
 
 class TestLoganalyse(unittest.TestCase):
@@ -149,6 +150,31 @@ class TestLoganalyse(unittest.TestCase):
                 "H19 is a payload telemetry token, not a hop; it must not "
                 f"appear in HOP_DISTRIBUTION.\nsection:\n{hop}"
             ),
+        )
+
+    # ------------------------------------------------------------------
+    # TOOL-04: stray non-UTF8 bytes must be stripped -- not passed through,
+    # and not aborting awk mid-file (which silently truncates later sections).
+    # Fixture: a 0xA0 byte on line 1, distinctive callsign DK9ZZ-7 after it.
+    # Captured as bytes because the pre-fix output may contain the raw byte.
+    # ------------------------------------------------------------------
+
+    def test_tool04_sanitizes_corrupt_bytes(self) -> None:
+        result = subprocess.run(
+            ["bash", str(SCRIPT), str(CORRUPT_FIXTURE)],
+            capture_output=True,
+            cwd=str(REPO_ROOT),
+        )
+        self.assertNotIn(
+            b"\xa0",
+            result.stdout,
+            msg="The 0xA0 corruption byte must be stripped from the output.",
+        )
+        text = result.stdout.decode("utf-8", "replace")
+        self.assertIn(
+            "DK9ZZ-7",
+            text,
+            msg="Lines after the corrupt byte must still be processed (no awk truncation).",
         )
 
 
