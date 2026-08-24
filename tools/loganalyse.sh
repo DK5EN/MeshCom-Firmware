@@ -31,7 +31,44 @@ normalize_log() {
     _src="$1"
     _tmp="$(mktemp "${TMPDIR:-/tmp}/loganalyse.XXXXXX")"
     _NORMALIZED_TMPS="$_NORMALIZED_TMPS $_tmp"
-    LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" > "$_tmp"
+    # TOOL-05: detect the raw firmware timestamp format
+    #   [EPOCHDAY.HHh.MMm.SSs.mmm]  and convert to serial_monitor format
+    #   YYYY-MM-DD HH:MM:SS.mmm  (epoch day -> date via pure-awk Gregorian
+    #   math; no `date` call, so identical on macOS/BSD and Linux/GNU).
+    # Byte sanitizing (TOOL-04) runs in both branches.
+    if LC_ALL=C grep -qE '^\[[0-9]+\.[0-9]+h\.[0-9]+m\.[0-9]+s\.[0-9]+\]' "$_src"; then
+        LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" | LC_ALL=C awk '
+        function civil(days,   z, era, doe, yoe, y, doy, mp, d, m) {
+            # days since 1970-01-01 -> Y-M-D (proleptic Gregorian, Hinnant)
+            z = days + 719468
+            era = int((z >= 0 ? z : z - 146096) / 146097)
+            doe = z - era * 146097
+            yoe = int((doe - int(doe/1460) + int(doe/36524) - int(doe/146096)) / 365)
+            y = yoe + era * 400
+            doy = doe - (365*yoe + int(yoe/4) - int(yoe/100))
+            mp = int((5*doy + 2) / 153)
+            d = doy - int((153*mp + 2) / 5) + 1
+            m = (mp < 10 ? mp + 3 : mp - 9)
+            return sprintf("%04d-%02d-%02d", (m <= 2 ? y + 1 : y), m, d)
+        }
+        BEGIN { last = "1970-01-01 00:00:00.000" }
+        {
+            if (match($0, /^\[[0-9]+\.[0-9]+h\.[0-9]+m\.[0-9]+s\.[0-9]+\]/)) {
+                hdr = substr($0, 2, RLENGTH - 2)
+                rest = substr($0, RLENGTH + 1); sub(/^ /, "", rest)
+                split(hdr, a, ".")
+                hh = a[2]; sub(/h$/, "", hh)
+                mm = a[3]; sub(/m$/, "", mm)
+                ss = a[4]; sub(/s$/, "", ss)
+                last = civil(a[1] + 0) " " hh ":" mm ":" ss "." a[5]
+                print last "  " rest
+            } else {
+                print last "  " $0
+            }
+        }' > "$_tmp"
+    else
+        LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" > "$_tmp"
+    fi
     echo "$_tmp"
 }
 
