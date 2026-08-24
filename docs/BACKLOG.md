@@ -470,6 +470,34 @@ natural unit to decide about, rather than "everything".
 | —   | Split the 5 historical bundled commits into one-per-finding? (`e957b964` = D1+D2+D5+A1, `b2854586` = A1+B1+B5+C2, `4123eac0` = A1+A2+B2+C3, `3457a295` = A1+D3, `8009aa19` = C1+B3) | **open** — needed only if those go upstream as separate PRs |
 | —   | When to open the first upstream PRs                                                                                                                                                 | **open**                                                    |
 
+### 3.8 Tooling backlog — `loganalyse.sh` / `logauswertung` skill (found 2026-08-24)
+
+Found while running `/logauswertung` on a 3-node DG0OPK mesh test (DG0OPK-11/-12/-13, ~29.5 h each).
+These are **analysis-tooling** defects — they corrupt the _conclusions_ drawn from a log, not firmware
+behaviour. The run initially produced a **false FEHLER verdict** on the State Machine and a **misleading
+priority-drop breakdown**, and silently truncated the first pass at ~71 % of the file. Full evidence,
+root cause, fix, and verification per item: [`bug-loganalyse-toolchain-20260824.md`](bug-loganalyse-toolchain-20260824.md).
+
+| ID      | Type        | Sev.   | Location                                        | Item                                                                          | Status     |
+| ------- | ----------- | ------ | ----------------------------------------------- | ----------------------------------------------------------------------------- | ---------- |
+| TOOL-01 | BUG         | Medium | `tools/loganalyse.sh:401`                       | CSMA backoff (`TX_PREPARE→IDLE rc=-1`) counted as State-Machine errors        | `893ba656` |
+| TOOL-02 | BUG         | Medium | `tools/loganalyse.sh:1006`                      | Priority-drop breakdown double-counts via `replaced_by_prio=` substring       | `a67bf6cb` |
+| TOOL-03 | BUG         | Low    | `tools/loganalyse.sh:182,185,188`               | Hop regex `H[0-9]{2}` matches telemetry payload (`H19/B=…`)                   | `9226b65c` |
+| TOOL-04 | BUG         | High   | `tools/loganalyse.sh` (all awk sections)        | One corrupt byte aborts awk mid-file → sections silently truncated (no error) | `5f51627e` |
+| TOOL-05 | ENHANCEMENT | Medium | `tools/loganalyse.sh` (arg handling)            | Auto-detect + convert raw firmware bracket timestamp format                   | `4bdf27a6` |
+| TOOL-06 | DOC         | Low    | `.claude/skills/logauswertung/SKILL.md` §12,§15 | "any rc!=0 is a bug" is wrong; align with TOOL-01/02                          | local\*    |
+
+**DONE 2026-08-24** via `/orchestrate-waves` — Wave 1 (TOOL-01/02/03 + harness, three Sonnet writers),
+Wave 2 (TOOL-04/05, orchestrator-direct: pure-awk Gregorian date math). Each fix carries a regression
+test (red before, green after); suite `python3 -m unittest discover -s tools/mock -p 'test_loganalyse.py'`
+→ 5/5. End-to-end re-verified on the real raw DG0OPK log. Full record + deviations: the Resolution
+section of [`bug-loganalyse-toolchain-20260824.md`](bug-loganalyse-toolchain-20260824.md).
+
+\*TOOL-06 edits the git-ignored `.claude/…/SKILL.md` (`.gitignore` rule `.*`) — applied on disk, no
+commit. CI wiring was deliberately deferred (test is local-only). The `git add -p`-based per-id split
+of the shared harness was not possible (interactive staging disabled), so the harness is one commit
+(`b7a54f2f`) after the three fixes it validates.
+
 ---
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
