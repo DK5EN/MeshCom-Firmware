@@ -28,6 +28,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 SCRIPT: Path = REPO_ROOT / "tools" / "loganalyse.sh"
 FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_sm_sample.txt"
 CORRUPT_FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_corrupt_byte.txt"
+RAW_FIXTURE: Path = REPO_ROOT / "tools" / "testdata" / "loganalyse_raw_sample.txt"
 
 
 class TestLoganalyse(unittest.TestCase):
@@ -175,6 +176,31 @@ class TestLoganalyse(unittest.TestCase):
             "DK9ZZ-7",
             text,
             msg="Lines after the corrupt byte must still be processed (no awk truncation).",
+        )
+
+    # ------------------------------------------------------------------
+    # TOOL-05: raw firmware timestamps [EPOCHDAY.HHh.MMm.SSs.mmm] must be
+    # auto-detected and converted to serial_monitor format so all
+    # time-based sections parse. Epoch day 20688 -> 2026-08-23.
+    # ------------------------------------------------------------------
+
+    def test_tool05_converts_raw_bracket_format(self) -> None:
+        result = subprocess.run(
+            ["bash", str(SCRIPT), str(RAW_FIXTURE)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+        )
+        out = result.stdout
+        self.assertIn(
+            "2026-08-23",
+            out,
+            msg="Raw [EPOCHDAY.HHh...] timestamps must convert (day 20688 -> 2026-08-23).",
+        )
+        self.assertIn(
+            "MC_SM_CSMA_BACKOFF: 2",
+            out,
+            msg="After conversion, downstream sections must parse (2 backoff lines).",
         )
 
 
