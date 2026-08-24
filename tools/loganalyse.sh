@@ -179,13 +179,13 @@ grep "RX-LoRa-All:" "$LOGFILE" | grep -v 'H@R\|HG@R\|\*!' | head -20 || true
 section "HOP_DISTRIBUTION"
 
 echo "--- MH-LoRa (Empfangen) ---"
-grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- RX-LoRa2 (Akzeptiert) ---"
-grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- TX-LoRa (Gesendet) ---"
-grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 # ─── 5. LOOPS ───
 section "LOOPS"
