@@ -2220,7 +2220,27 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     {
         char cset[30];
         snprintf(cset, sizeof(cset), "%s", aprsmsg.msg_payload.c_str());
-        sscanf(cset+5, "%d;%d;", &meshcom_settings.max_hop_text, &meshcom_settings.max_hop_pos);
+
+        // Ohne Bereichspruefung landete ein Tippfehler wie {SET}44;2; direkt im
+        // Hop-Feld der ausgesendeten Pakete. Byte 5 einer ACK fuehrt max_hop in
+        // 7 Bit, der Weiterleitungspfad dekrementiert nur und begrenzt nicht
+        // nach oben -- ein solcher Knoten wuerde das Netz mit Paketen fluten,
+        // die 44 statt 4 Relaissprunge weit laufen.
+        //
+        // Wie bisher wird jedes Feld einzeln uebernommen, sobald sscanf es
+        // gelesen hat ({SET}4; setzt weiterhin nur max_hop_text). Neu ist
+        // ausschliesslich, dass Werte ausserhalb 0..MAX_HOP_LIMIT den
+        // bisherigen Wert stehen lassen, statt ihn zu ueberschreiben.
+        int iHopText = meshcom_settings.max_hop_text;
+        int iHopPos  = meshcom_settings.max_hop_pos;
+
+        int iParsed = sscanf(cset+5, "%d;%d;", &iHopText, &iHopPos);
+
+        if(iParsed >= 1 && iHopText >= 0 && iHopText <= MAX_HOP_LIMIT)
+            meshcom_settings.max_hop_text = iHopText;
+
+        if(iParsed >= 2 && iHopPos >= 0 && iHopPos <= MAX_HOP_LIMIT)
+            meshcom_settings.max_hop_pos = iHopPos;
 
         return;
     }
