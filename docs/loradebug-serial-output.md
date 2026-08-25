@@ -265,11 +265,35 @@ gehörten Standort kann das die Konsole sättigen. Der RAM-Preis liegt bei
 
 | Tool                                         | Beschreibung                                                                                      |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `tools/meshlogger.py <host> --hours 48`      | Langzeit-Mitschnitt der Netzkonsole (Port 2323) auf Platte, schaltet die Debugflags selbst        |
 | `tools/serial_monitor.py --port COMx`        | Live-Monitoring mit Alerts                                                                        |
 | `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs                                                                |
 | `tools/loganalyse.sh <logfile>`              | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL)                                              |
 | `tools/logharvest.py <logdir>`               | erntet Testkorpora aus Logs (CRC-Dumps, ACK-Frames, Re-Enkodier-Vektoren, `[MC-TEST]`-Mitschnitt) |
 | `tools/traceharvest.py <logdir>`             | erntet Entscheidungsfolgen (Dedup, TX-Priorität, ACK) für das Layer-B-Replay                      |
+
+### Langzeit-Mitschnitt
+
+`logharvest.py` und `traceharvest.py` brauchen Logs von Stunden bis Tagen —
+ein Vordergrund-`nc` oder eine SSH-Sitzung liefert die nicht.
+`tools/meshlogger.py` haengt sich dafuer an die Netzkonsole, setzt einmalig
+`--loradebug on` und `--txcapture on` (beide ueberleben einen Reboot im Flash)
+und stellt den vorgefundenen Zustand am Ende wieder her. Geschrieben wird
+`<outdir>/YYYY-MM-DD.log` mit dem Zeitstempelpraefix von `serial_monitor.py`,
+das beide Harvester kennen; `<outdir>/status.txt` traegt jede Minute den
+Fortschritt nach. Rund 200 B/s bei gesetzten Debugflags, also ~36 MB fuer 48 h.
+
+```
+screen -dmS meshlog python3 tools/meshlogger.py dk5en-98.local --hours 48 \
+    --outdir ~/meshlog/dk5en-98
+```
+
+> **Die Konsole nimmt genau EINEN Client.** `net_console.cpp` schliesst den
+> alten Socket, sobald sich ein neuer Client anmeldet — wer sich waehrend
+> eines Mitschnitts verbindet, wirft den Logger hinaus, der sich nach 5 s neu
+> verbindet und seinerseits den Menschen hinauswirft. Um die Konsole zu
+> uebernehmen, ohne den Lauf zu beenden: `touch <outdir>/PAUSE` anlegen und
+> nach Gebrauch wieder loeschen.
 
 ---
 
