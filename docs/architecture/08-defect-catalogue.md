@@ -1286,9 +1286,28 @@ BME680-Zeile mehr -- das gespeicherte Bit ist weg.
 >   `printfdeb()` ~900 Byte Stack (nRF52-Timer-Task hat 1 KB) und ~48 ms
 >   Serial-Zeit im RX-Pfad; auf der TX-Seite saesse er zwischen CAD und
 >   `startTransmit()`. Ueber einen SPSC-Ring entkoppelt kostet die Erfassung
->   nur ein `memcpy`. Preis: 768 B Ring + 511 B Hex-Puffer (RAK4631
->   +1.400 B RAM, +1.616 B Flash). Verworfene Frames meldet
->   `[MC-TEST] CAPTURE_DROPPED n=…`.
+>   nur ein `memcpy`. Preis: 768 B Ring (RAK4631 +1.400 B RAM, +1.616 B Flash).
+>   `[MC-TEST] CAPTURE_DROPPED n=… serial_bytes=…` meldet BEIDE Verlustquellen:
+>   Frames, fuer die im Ring kein Platz war, und Bytes, die `printfdeb()` auf
+>   nRF52 verworfen hat, weil der USB-CDC-Puffer voll blieb. Die zweite Zahl
+>   gehoert neben die erste — ein Frame kann sauber durch den Ring laufen und
+>   trotzdem unvollstaendig im Log landen.
+>
+> - **Layer-B-Replay: DONE (2026-08-25).** `tools/traceharvest.py` erntet die
+>   Entscheidungsfolge laufender Knoten aus der `[MC-DBG]`-Ausgabe; drei Suiten
+>   fahren sie gegen den echten Code nach, nicht gegen eine Nachbildung:
+>
+>   | Suite                | Was nachgefahren wird                  | Ergebnis                                                             |
+>   | -------------------- | -------------------------------------- | -------------------------------------------------------------------- |
+>   | `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5.647 Urteile + 6.869 Slotbelegungen, 0 Abweichungen                 |
+>   | `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen ueber alle fuenf Prioritaetsklassen, 0 Abweichungen |
+>   | `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs, 0 wuerden verworfen                      |
+>
+>   Voraussetzung dafuer war die Herausloesung von `dedup_functions.{h,cpp}`
+>   aus `lora_functions.cpp`/`loop_functions.cpp` (reine Verschiebung, wie
+>   zuvor `txring_functions.cpp`) und von `ring_index.h` aus
+>   `loop_functions_extern.h`. Alle drei Suiten sind mutationsgeprueft: eine
+>   gezielte Aenderung am jeweiligen Code faerbt sie rot.
 >
 > - **Feldkorpus: DONE (2026-08-25).** `tools/logharvest.py` erntet
 >   `test/test_aprs_fuzz/` (500 CRC-verworfene + 500 ACK-Frames, byte-exakt)

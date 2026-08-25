@@ -37,3 +37,10 @@ inline int printlndeb(String str) { (void)str; return 0; }
 inline int printdeb(String str) { (void)str; return 0; }
 
 inline int printfdeb(const char *format, ...) { (void)format; return 0; }
+
+// Nativ gibt es keinen USB-CDC-Pfad, der verwerfen koennte. Damit der Test fuer
+// den Mitschnitt-Ring die Meldung trotzdem pruefen kann, ist der Wert hier
+// setzbar -- inline-Variable (C++17), also eine Definition fuer alle
+// Uebersetzungseinheiten, ohne dass die uebrigen Suiten etwas beisteuern muessen.
+inline unsigned long g_testDroppedBytes = 0;
+inline unsigned long printfdebDroppedBytes(void) { return g_testDroppedBytes; }

@@ -5,6 +5,7 @@
 #include "txring_functions.h"
 #include "ack_functions.h"
 #include "capture_functions.h"
+#include "dedup_functions.h"
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -1431,38 +1432,7 @@ void OnRxError(void)
     is_receiving = false;
 }
 
-/**@brief Function to check if we have a Lora packet already received
- */
-bool is_new_packet(uint8_t compBuffer[4])
-{
-    for(int ib=0; ib<MAX_DEDUP_RING; ib++)
-    {
-            if (memcmp(compBuffer, ringBufferLoraRX[ib], 4) == 0)
-            {
-                if(bLORADEBUG)
-                {
-                    uint32_t dup_id = (uint32_t)compBuffer[0] |
-                                      ((uint32_t)compBuffer[1] << 8) |
-                                      ((uint32_t)compBuffer[2] << 16) |
-                                      ((uint32_t)compBuffer[3] << 24);
-                    if(bLORADEBUG)
-                        printfdeb("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n",dup_id, ib);
-                }
-                return false;
-            }
-    }
-
-    if(bLORADEBUG)
-    {
-        uint32_t new_id = (uint32_t)compBuffer[0] |
-                          ((uint32_t)compBuffer[1] << 8) |
-                          ((uint32_t)compBuffer[2] << 16) |
-                          ((uint32_t)compBuffer[3] << 24);
-        if(bLORADEBUG)
-            printfdeb("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", new_id);
-    }
-    return true;
-}
+// is_new_packet() ist nach dedup_functions.cpp gewandert (reine Verschiebung).
 
 //////////////////////////////////////////////////////////////////////////
 // LoRa TX functions

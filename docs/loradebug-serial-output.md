@@ -225,13 +225,24 @@ Bytes selbst.
 ```
 [MC-TEST] RX_FRAME len=64 rssi=-85 snr=0 hex=40F1A125A183444A384D45482D34332C...
 [MC-TEST] TX_FRAME len=70 hex=3A100310E9444A384D45482D382C444A384D45482D3431...
-[MC-TEST] CAPTURE_DROPPED n=3
+[MC-TEST] CAPTURE_DROPPED n=3 serial_bytes=512
 ```
 
-`CAPTURE_DROPPED` zählt Frames, für die im Ringpuffer kein Platz war. Die Zahl
-gehört zur Auswertung: der Mitschnitt wird genau dann lückenhaft, wenn der
-Kanal voll ist — also in den Kollisionslagen, um derentwillen man ihn
-einschaltet.
+`CAPTURE_DROPPED` meldet **beide** Verlustquellen, und beide gehören zur
+Auswertung:
+
+| Feld           | Bedeutung                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| `n`            | Frames, für die im Ringpuffer kein Platz war                                                                   |
+| `serial_bytes` | Bytes, die `printfdeb()` verworfen hat, weil der USB-CDC-Sendepuffer voll blieb (nur nRF52; auf ESP32 immer 0) |
+
+Gemeldet wird jeweils der **Zuwachs** seit der letzten Meldung, nicht der
+Gesamtstand. Ein Frame kann sauber durch den Ring laufen und trotzdem
+unvollständig im Log landen — deshalb reicht die erste Zahl allein nicht.
+
+Beide werden genau dann groß, wenn der Kanal ausgelastet ist — also in den
+Kollisionslagen, um derentwillen man mitschneidet. Ein Mitschnitt ohne diese
+Zahlen behauptet Vollständigkeit, die er nicht hat.
 
 Erfasst wird im Radio-Callback bzw. zwischen CAD und `startTransmit()`; dort
 wird nur kopiert. Ausgegeben wird aus dem Loop (`captureDrain()` in
@@ -253,3 +264,28 @@ gehörten Standort kann das die Konsole sättigen. Der RAM-Preis liegt bei
 | `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs                                                                |
 | `tools/loganalyse.sh <logfile>`              | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL)                                              |
 | `tools/logharvest.py <logdir>`               | erntet Testkorpora aus Logs (CRC-Dumps, ACK-Frames, Re-Enkodier-Vektoren, `[MC-TEST]`-Mitschnitt) |
+| `tools/traceharvest.py <logdir>`             | erntet Entscheidungsfolgen (Dedup, TX-Priorität, ACK) für das Layer-B-Replay                      |
+
+---
+
+## Layer-B-Replay
+
+Die `[MC-DBG]`-Zeilen sind nicht nur zum Lesen da. `tools/traceharvest.py`
+macht aus ihnen Traces, die drei native Suiten gegen den **echten** Code
+nachfahren — nicht gegen eine Nachbildung:
+
+| Suite                | fährt nach                             | Umfang                                        |
+| -------------------- | -------------------------------------- | --------------------------------------------- |
+| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5.647 Urteile, 6.869 Slotbelegungen           |
+| `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen, alle fünf Prioritätsklassen |
+| `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs                    |
+
+Weicht eine Suite ab, hat sich der Code vom Feldverhalten entfernt. Das ist
+der Grund, die Logs aufzuheben:
+
+```
+uv run tools/traceharvest.py <logdir>
+pio test -e native_dedup
+pio test -e native_aprs -f test_txprio_replay
+pio test -e native -f test_ack_replay
+```
