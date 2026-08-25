@@ -25,6 +25,7 @@
 static auto& s_hwSerial = Serial;
 
 #include "printfdeb_functions.h"
+#include "printfdeb_format.h"
 
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
@@ -79,53 +80,8 @@ unsigned long printfdebDroppedBytes(void)
 int printfdeb(const char *uformat, ...)
 {
     char nformat[300];
-    memset(nformat,0x00, sizeof(nformat));
 
-    int inn=0;
-
-    for(int in=0; in<(int)strlen(uformat); in++)
-    {
-        if(uformat[in] == '%')
-        {
-            if(uformat[in+1] == '%')
-            {
-                if(inn < (int)sizeof(nformat)-3)
-                {
-                    nformat[inn] = '%';
-                    inn++;
-                    nformat[inn] = '%';
-                    inn++;
-                }
-            }
-        }
-
-        if(!bDEBUGCSV)
-        {
-            if(uformat[in] == ';')
-            {
-                if(uformat[in-1] == ' ' || uformat[in+1] == ' ')
-                {
-                    continue;
-                }
-                else
-                {
-                    if(inn < (int)sizeof(nformat)-2)
-                    {
-                        nformat[inn] = ' ';
-                        inn++;
-                        continue;
-                    }
-                }
-            }
-        }
-        
-
-        if(inn < (int)sizeof(nformat)-2)
-        {
-            nformat[inn] = uformat[in];
-            inn++;
-        }
-    }
+    printfdebRewriteFormat(uformat, nformat, sizeof(nformat), bDEBUGCSV);
 
     char loc_buf[600];
     char * temp = loc_buf;

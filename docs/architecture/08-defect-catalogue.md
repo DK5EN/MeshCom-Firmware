@@ -1254,6 +1254,110 @@ scheitert, dessen gespeichertes Bit aber gesetzt bleibt) probiert der Node es
 bei jedem Boot erneut. Nach `--bmx off` und Neustart erscheint keine einzige
 BME680-Zeile mehr -- das gespeicherte Bit ist weg.
 
+### N-29 — ESP32 meldet fuer JEDEN empfangenen Frame 255 Byte — **FIXED (2026-08-25, auf echter Hardware gefunden und verifiziert)** — High
+
+`checkRX()` (`esp32_main.cpp`) rief
+
+```c
+size_t ibytes = UDP_TX_BUF_SIZE;          // 255
+state = radio.readData(payload, ibytes);
+```
+
+RadioLib nimmt `len` **per Wert** und schreibt die tatsaechliche Laenge nicht
+zurueck; in `SX126x::readData()` dient sie nur als obere Schranke, gefuellt wird
+`getPacketLength()`. `SX126x.h` sagt das ausdruecklich: _"getPacketLength method
+must be called BEFORE calling readData!"_. `ibytes` blieb also fuer jedes Paket
+255, und `OnRxDone(payload, 255, …)` bekam hinter dem echten Frame den
+uninitialisierten Stackinhalt von `checkRX()` mitgeliefert.
+
+Gefunden hat das der Mitschnitt aus §4 bei seinem ersten Lauf auf echter
+Hardware (DK5EN-98, Heltec V3, 2026-08-25, 5 min): **12 von 12** `RX_FRAME`
+meldeten `len=255` bei tatsaechlich 48-133 Byte, jeweils gefolgt von demselben
+Stackmuster. Die drei `TX_FRAME` derselben Sitzung meldeten ihre echte Laenge —
+der Sendepfad kennt sie.
+
+Zwei Folgen, beide gemessen:
+
+1. **Kanalauslastung war um Faktor 1,8-4,1 zu hoch.** `checkRX()` bucht
+   `radio.getTimeOnAir(ibytes)`. Im Mitschnitt stand nach jedem Empfang exakt
+   `rx=2476ms` — die Sendedauer eines 255-Byte-Pakets bei SF11/BW250/CR4:6/
+   Praeambel 8. Die echten Frames der Sitzung lagen bei 608 ms (48 B) bis
+   1394 ms (133 B), im Mittel rund 900 ms. Die Gegenprobe steht in derselben
+   Zeile: `tx=701ms` passt auf das Byte zum 60-Byte-TX-Frame, weil der TX-Pfad
+   die richtige Laenge kennt. Das gemeldete `util=18%` entsprach real rund 7 %.
+
+   Damit sind alle ESP32-Auslastungszahlen dieser Firmware zu hoch, und sie sind
+   **nicht mit nRF52-Zahlen vergleichbar**: dort liefert der Radio-Callback die
+   Laenge, `Radio.TimeOnAir(MODEM_LORA, size)` rechnet mit dem echten Wert.
+
+2. **Diagnose- und Korpusausgaben trugen ~190 Byte RAM-Inhalt pro Frame.**
+   Betrifft `CRC_PAYLOAD[…]`, `ERR_PAYLOAD[…]` und den `[MC-TEST]`-Mitschnitt.
+   Alle 500 Datensaetze in `test/test_aprs_fuzz/crc_corpus.txt` sind deshalb
+   exakt 255 Byte lang. Als Fuzz-Korpus bleiben sie brauchbar (der Parser sieht
+   echte Bitfehler), als _byte-exakte Frames_ waren sie nie das, was
+   `logharvest.py` verspricht. Ein aus Logs nach diesem Fix geerntetes Korpus
+   ist es.
+
+Nicht betroffen: der Weiterleitungspfad. `decodeAPRS()` gewinnt die Laenge aus
+dem Frame zurueck, `lora_functions.cpp` setzt danach `size = aprsmsg.msg_len`.
+Der 255-Byte-`memcpy` nach `RcvBuffer` lag ebenfalls innerhalb der Puffergrenzen
+(`payload[UDP_TX_BUF_SIZE+10]`). `isPlausibleAckFrame()` pruefte `size` nur als
+Untergrenze (`< 12`), verwarf also nichts faelschlich — die Laengenpruefung war
+auf ESP32 aber wirkungslos, und `ACK_REJECT … len=255` zeigte in der Triage nie
+die wahre Laenge.
+
+Fix: Laenge vor `readData()` mit `radio.getPacketLength()` vom Chip lesen, auf
+`UDP_TX_BUF_SIZE` deckeln, und `ibytes == 0` nicht mehr als Frame behandeln
+(neu: `[MC-DBG] CHECKRX zero_length`).
+
+Verifikation auf Hardware: siehe die Mitschnitte vor/nach dem Flashen in der
+Commit-Beschreibung.
+
+### N-30 — `printfdeb()` verdoppelt jedes `%%` — **FIXED (2026-08-25)** — Low, betrifft jede Logzeile mit Prozentzeichen
+
+Der `%%`-Zweig der Format-Vorverarbeitung schrieb zwei Prozentzeichen und fiel
+anschliessend in die allgemeine Kopie, die dasselbe `%` erneut anhaengte; der
+naechste Schleifendurchlauf haengte das zweite `%` ebenfalls noch einmal an. Aus
+`%%` wurden `%%%%`, und `vsnprintf` machte daraus zwei Prozentzeichen:
+
+```
+[MC-DBG] CHANNEL_UTIL rx=178272ms tx=4936ms util=18%%
+...BATT 100 %%
+```
+
+Kosmetisch, aber es trifft jede Ausgabe mit Prozentzeichen und damit auch die
+Logauswertung (`tools/loganalyse.sh`, `tools/logharvest.py`).
+
+Fix: `%%` wird als Paar geschrieben und das zweite `%` mitverbraucht. Die
+Umbaulogik liegt jetzt in `src/printfdeb_format.h`, damit sie ohne Arduino
+nativ pruefbar ist (`test/test_printfdeb_format`, 13 Faelle) — dieselbe Trennung
+wie bei `isPlausibleAckFrame()` in `ack_functions.h`. Mitgefixt: bei einem
+fuehrenden `;` las die alte Schleife `uformat[in-1]` vor den Puffer.
+
+### N-31 — `--info` gibt WLAN-PSK, Web- und Konsolenpasswort im Klartext an die offene Netzkonsole — **FIXED (2026-08-25)** — High, LAN
+
+`commandAction()` druckte `node_passwd`, `node_webpwd` und `node_pwd`
+unmaskiert. Diese Ausgabe laeuft ueber `printfdeb()` und damit nicht nur auf die
+serielle Schnittstelle, sondern auch auf die Netzkonsole (Port 2323,
+`net_console.h`). Ist `node_passwd` leer — Auslieferungszustand —, verlangt die
+Konsole **keine** Authentisierung (`net_console.h`: _"If node_passwd is empty no
+authentication is required"_).
+
+Am laufenden Knoten nachgestellt (DK5EN-98, 2026-08-25): `nc dk5en-98.local
+2323`, dann `--info`, und das WLAN-PSK des Heimnetzes steht auf dem Schirm. Wer
+im selben WLAN ist, braucht dafuer nichts weiter als den Hostnamen. Dieselbe
+Ausgabe steht in jedem Logmitschnitt, der von so einem Knoten geteilt wird.
+
+Fix: `maskSecret()` (`src/mask_secret.h`) ersetzt ein gesetztes Passwort durch
+`***`; leer bleibt leer, damit weiterhin ablesbar ist, **ob** eins gesetzt ist.
+Angewendet auf alle drei Stellen in `--info` und auf die WLAN-Fehlerzeile in
+`udp_functions.cpp`. Die Settings-JSON an die App (`nsetdoc["WSPWD"]`) bleibt
+unberuehrt — sie muss den Wert tragen, damit die App ihn anzeigen und aendern
+kann. Nativ geprueft in `test/test_mask_secret` (6 Faelle).
+
+Unabhaengig davon bleibt richtig, was `net_console.h` empfiehlt: `--passwd`
+setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
@@ -1292,6 +1396,16 @@ BME680-Zeile mehr -- das gespeicherte Bit ist weg.
 >   nRF52 verworfen hat, weil der USB-CDC-Puffer voll blieb. Die zweite Zahl
 >   gehoert neben die erste — ein Frame kann sauber durch den Ring laufen und
 >   trotzdem unvollstaendig im Log landen.
+>
+>   **Erster Lauf auf echter Hardware, 2026-08-25** (DK5EN-98, Heltec V3, 5 min
+>   ueber die Netzkonsole auf Port 2323): 15 Frames erfasst (12 RX, 3 TX),
+>   `CAPTURE_DROPPED` nicht ein einziges Mal — der Ring haelt bei dieser
+>   Kanallast durch. `tools/logharvest.py` verarbeitet den Mitschnitt ohne
+>   Nacharbeit zu `capture_corpus.txt`. Beim allerersten Lauf fand der
+>   Mitschnitt N-29: alle 12 RX-Frames meldeten `len=255`, die drei TX-Frames
+>   ihre echte Laenge. Genau dafuer ist der Pfad da — die dekodierte
+>   Logausgabe konnte diesen Fehler nicht zeigen, weil `decodeAPRS()` die
+>   Laenge aus dem Frame zurueckgewinnt.
 >
 > - **Layer-B-Replay: DONE (2026-08-25).** `tools/traceharvest.py` erntet die
 >   Entscheidungsfolge laufender Knoten aus der `[MC-DBG]`-Ausgabe; drei Suiten

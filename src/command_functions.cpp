@@ -5012,7 +5012,7 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...Flash-Version %i\n", meshcom_settings.node_fversion);
 
             printfdeb("...NOMSGALL %s ...MESH %s ...BUTTON (%i) %s ...SOFTSER %s ... SOFTSERREAD %s\n...PASSWD <%s>\n",
-                (bNoMSGtoALL?"on":"off"), (bMESH?"on":"off"), ibt, (bButtonCheck?"on":"off"), (bSOFTSERON?"on":"off"), (bSOFTSERREAD?"on":"off"), meshcom_settings.node_passwd);
+                (bNoMSGtoALL?"on":"off"), (bMESH?"on":"off"), ibt, (bButtonCheck?"on":"off"), (bSOFTSERON?"on":"off"), (bSOFTSERREAD?"on":"off"), maskSecret(meshcom_settings.node_passwd));
 
             printfdeb("...DEBUG %s ...DEBUG %s\n", (bDEBUGCSV?"csv":"man"), (bDEBUGEN?"en":"de"));
 
@@ -5086,7 +5086,7 @@ void commandAction(char *umsg_text, bool ble)
 
             #ifndef BOARD_T_ECHO
             printfdeb("\n...Webserver  %s", (bWEBSERVER?"on":"off"));
-            printfdeb(" / Webpwd <%s>", meshcom_settings.node_webpwd);
+            printfdeb(" / Webpwd <%s>", maskSecret(meshcom_settings.node_webpwd));
             printfdeb(" / Gateway %s %s\n", (bGATEWAY?"on":"off"), (bGATEWAY_NOPOS?"nopos":""));
 
             #if defined(ESP32) && !defined(DISABLE_TLS_CONSOLE)
@@ -5109,7 +5109,7 @@ void commandAction(char *umsg_text, bool ble)
                         printfdeb("...SSID <>");
 
                     if(strlen(meshcom_settings.node_pwd) > 0)
-                        printfdeb(" / PASSWORD <%s>\n", meshcom_settings.node_pwd);
+                        printfdeb(" / PASSWORD <%s>\n", maskSecret(meshcom_settings.node_pwd));
                     else
                         printfdeb(" / PASSWORD <>\n");
                 }

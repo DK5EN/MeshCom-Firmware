@@ -172,6 +172,11 @@ Alle 30 Sekunden:
 
 Wird alle 10 Sekunden ausgegeben — unabhängig von `bLORADEBUG`.
 
+> Bis 2026-08-25 war `rx` auf ESP32 um Faktor 1,8–4,1 zu hoch: `checkRX()` buchte
+> die Sendedauer eines 255-Byte-Pakets für **jeden** Empfang, weil RadioLib die
+> tatsächliche Paketlänge nicht zurückschreibt (N-29). Ältere ESP32-Logs sind
+> deshalb nicht mit nRF52-Logs vergleichbar — dort stimmte die Zahl immer.
+
 ```
 [MC-HWM] uptime=3600s queue_hwm=3/8 csma_hwm=4 trickle=120000ms
 ```

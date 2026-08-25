@@ -600,7 +600,7 @@ void sendMeshComUDP()
 
     if(strcmp(meshcom_settings.node_ssid, "none") == 0)
     {
-      printfdeb("[WIFI]...ST no ssid<%s> pwd<%s> not connected\n", meshcom_settings.node_ssid, meshcom_settings.node_pwd);
+      printfdeb("[WIFI]...ST no ssid<%s> pwd<%s> not connected\n", meshcom_settings.node_ssid, maskSecret(meshcom_settings.node_pwd));
       return false;
     }
   }
