@@ -3,6 +3,7 @@
 
 #include "printfdeb_functions.h"
 #include "txring_functions.h"
+#include "ack_functions.h"
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -240,6 +241,18 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
     if(size < 12)
         return false;
+
+    // Plausibilitaetspruefung vor jeder weiteren Verarbeitung: 0x41 ist als
+    // ASCII der Buchstabe 'A', ohne diese Pruefung laeuft jedes Bruchstueck,
+    // das damit beginnt, durch den ACK-Pfad und wird mit Prio 1 weitergesendet.
+    // Begruendung und Feldmessung siehe ack_functions.h.
+    if(!isPlausibleAckFrame(payload, size, MAX_HOP_LIMIT))
+    {
+        if(bLORADEBUG)
+            printfdeb("[MC-DBG] ACK_REJECT b5=%02X len=%u\n", payload[5], (unsigned)size);
+
+        return false;
+    }
 
     uint8_t print_buff[30];
 
