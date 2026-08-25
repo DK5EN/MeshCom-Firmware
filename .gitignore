@@ -8,6 +8,16 @@
 .pio
 .vscode
 build_output.txt
+
+# Serielle Mitschnitte (tools/serial_monitor.py). Enthalten --info-Ausgaben und
+# damit WLAN-PSK sowie Node- und Webserver-Passwort im Klartext: bis 2026-08-25
+# druckte --info sie unmaskiert (N-31), aeltere Mitschnitte tragen sie also
+# weiterhin. Ausserdem RX/TX-Rohframes und Positionsdaten. Nie einchecken.
+#
+# Die Dateien tragen heute .log und fallen damit schon unter das generische
+# *.log weiter unten -- das ist Visual-Studio-Beiwerk und traegt nicht, sobald
+# ein Mitschnitt anders heisst. Deshalb hier explizit das ganze Verzeichnis.
+tools/meshcom_monitor/
 .*
 !/.gitignore
 !/.github/
