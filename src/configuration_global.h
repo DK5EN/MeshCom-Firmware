@@ -208,6 +208,9 @@ static inline bool flashLayoutCompatible(int stored)
 
 #define MAX_HOP_TEXT_DEFAULT 4             // max hop set on text-message
 #define MAX_HOP_POS_DEFAULT 2              // max hop set on pos-message
+#define MAX_HOP_LIMIT 7                    // obere Schranke fuer {SET} und ACK-Plausibilitaet
+                                           // (Byte 5 einer ACK fuehrt max_hop in 7 Bit; im Feld
+                                           //  beobachtet: gueltige ACKs 0..4, Textpakete bis 5)
 
 #define RECEIVE_TIMEOUT 4500               // [SX126x] 4.5sec
 #define RADIOLIB_SX126X_CAD 0x07           // 0x00...length off    0x07...32-bit detect
