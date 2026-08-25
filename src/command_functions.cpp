@@ -1,5 +1,6 @@
 //2025-09-16 23:036
 #include "command_functions.h"
+#include "capture_functions.h"
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "printfdeb_functions.h"
@@ -737,7 +738,7 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             printlndeb("--symid  set prim/sec Sym-Table\n--symcd  set table column\n--aprscomment  set APRS Comment/none\n--showI2C\n");
             delay(100);
-            printlndeb("--debug    on/off\n--bledebug on/off\n--loradebug on/off\n--gpsdebug  on/off\n--softserdebug  on/off\n--wxdebug   on/off\n--display   on/off\n--setinfo   on/off\n--volt on/off   show battery voltage\n--proz on/off    show battery proz.\n");
+            printlndeb("--debug    on/off\n--bledebug on/off\n--loradebug on/off\n--txcapture on/off\n--gpsdebug  on/off\n--softserdebug  on/off\n--wxdebug   on/off\n--display   on/off\n--setinfo   on/off\n--volt on/off   show battery voltage\n--proz on/off    show battery proz.\n");
             delay(100);
 #if defined(WP_DISP)
             printlndeb("--rotate 0/90/180/270  E-Ink Display drehen (persistent, board-uebergreifend)\n");
@@ -2577,6 +2578,43 @@ void commandAction(char *umsg_text, bool ble)
         if(ble)
         {
             addBLECommandBack((char*)"--loradebug on");
+        }
+
+        save_settings();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"txcapture on") == 0)
+    {
+        // Rohframe-Mitschnitt der SENDESEITE (siehe capture_functions.h).
+        // Eigener Schalter statt an bLORADEBUG gehaengt: die Empfangsseite
+        // will man oft dauerhaft mitlaufen lassen, die Sendeseite nur fuer
+        // gezielte Interop-Messungen -- und sie kostet je Frame eine weitere
+        // ~550 Zeichen lange Logzeile.
+        bTXCAPTURE=true;
+
+        meshcom_settings.node_sset4 = meshcom_settings.node_sset4 | 0x0008;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--txcapture on");
+        }
+
+        save_settings();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"txcapture off") == 0)
+    {
+        bTXCAPTURE=false;
+
+        meshcom_settings.node_sset4 &= ~0x0008;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--txcapture off");
         }
 
         save_settings();

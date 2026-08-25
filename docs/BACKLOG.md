@@ -169,8 +169,9 @@ API, which a rewrite would not resolve either.
 
 1. **Differential testing** — compile pre-fix and post-fix logic into one native binary and
    assert they agree. A true before/after comparison needing no external oracle.
-2. **A real capture path** — add a hex dump of _accepted_ frames behind `MC_TEST_HOOKS`
-   (today only CRC-failed frames are dumped), then re-capture on the bench.
+2. **A real capture path** — DONE (2026-08-25). `captureFrame()`/`captureDrain()`
+   (`src/capture_functions.cpp`) dump _accepted_ frames as raw bytes, RX under
+   `--loradebug on`, TX under the new `--txcapture on`. No longer a compile gate.
 3. **Hand-authored specification vectors** — written from the spec, not from the decoder's
    output. Only these can catch a _pre-existing_ bug; the other two are regression fences.
 

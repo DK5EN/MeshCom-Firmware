@@ -3,6 +3,7 @@
 // 20230326: Version 4.00: START
 
 #include "configuration.h"
+#include "capture_functions.h"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -587,6 +588,7 @@ void nrf52setup()
     bDEBUGCSV = meshcom_settings.node_sset4 & 0x0001;
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
+    bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
 
     bDisplayInfo = bLORADEBUG;
 

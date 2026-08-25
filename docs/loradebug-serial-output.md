@@ -1,13 +1,16 @@
 # LoRa Debug Ausgaben (`--loradebug on`)
 
 Aktivierung via seriellem Kommando oder BLE:
+
 ```
 --loradebug on
 --loradebug off
 ```
 
 `--loradebug on` setzt intern **drei Flags gleichzeitig**:
-- `bLORADEBUG = true` — alle `[MC-DBG]`/`[MC-SM]` Zeilen
+
+- `bLORADEBUG = true` — alle `[MC-DBG]`/`[MC-SM]` Zeilen sowie der
+  Rohframe-Mitschnitt der Empfangsseite (`[MC-TEST] RX_FRAME`, s.u.)
 - `bDisplayInfo = true` — MH-LoRa / RX-LoRa2 / TX-LoRa Pakete werden ausgegeben
 - `bDisplayRetx = true` — Retransmission-Statuszeilen werden ausgegeben
 
@@ -34,16 +37,19 @@ Jeder Zustandswechsel des LoRa-Automaten:
 ## Empfangspfad
 
 ### Chip-Werte nach Empfang
+
 ```
 [LoRa]...Received packet: RSSI:  -110 dBm / SNR:  -5 dB / Frequency error:  234 Hz
 ```
-| Feld | Bedeutung |
-|---|---|
-| RSSI | Empfangspegel in dBm (typisch -80 bis -130) |
-| SNR | Signal-Rausch-Abstand in dB |
+
+| Feld            | Bedeutung                                                                          |
+| --------------- | ---------------------------------------------------------------------------------- |
+| RSSI            | Empfangspegel in dBm (typisch -80 bis -130)                                        |
+| SNR             | Signal-Rausch-Abstand in dB                                                        |
 | Frequency error | Frequenzabweichung in Hz: <1000 Hz = Kollision, >3000 Hz = falsches Gerät/Frequenz |
 
 ### Puffer & Timing
+
 ```
 [MC-DBG] RX_BUF_SWITCH buf=1          Doppelpuffer-Wechsel (RAK4630)
 [MC-DBG] RX_BUF_OVERWRITE buf=1       WARNUNG: Puffer noch in Verwendung!
@@ -72,21 +78,25 @@ OnRxError                              CRC-/Header-Fehler
 ## TX-Pfad / CSMA
 
 ### CSMA-Backoff-Timer
+
 ```
 [MC-DBG] RX_TIMEOUT_FIRE ts=123456 wait=4675 delta=4680
 ```
-| Feld | Bedeutung |
-|---|---|
-| `wait` | Berechnete CSMA-Wartezeit in ms (adaptiv nach Kanalauslastung) |
-| `delta` | Tatsächlich gewartet in ms |
+
+| Feld    | Bedeutung                                                      |
+| ------- | -------------------------------------------------------------- |
+| `wait`  | Berechnete CSMA-Wartezeit in ms (adaptiv nach Kanalauslastung) |
+| `delta` | Tatsächlich gewartet in ms                                     |
 
 Typische `wait`-Werte je nach `cad_attempt`:
+
 - Versuch 0: ~4675 ms
 - Versuch 1: ~3087 ms
 - Versuch 2: ~2087 ms
 - Versuch ≥3: ~35 ms (Notfall-TX)
 
 ### TX-Gate und CAD
+
 ```
 [MC-DBG] RX_TIMEOUT_DEFERRED src=receiveFlag    Paket kam kurz vor TX → aufgeschoben
 [MC-DBG] TX_GATE_ENTER qlen=2 cad_attempt=0     TX-Gate betreten; 2 Pakete in Queue
@@ -105,18 +115,21 @@ Typische `wait`-Werte je nach `cad_attempt`:
 ## Ring-Buffer (TX-Queue)
 
 Alle 30 Sekunden:
+
 ```
 [MC-DBG] RING_STATUS queued=1 pending=2 retrying=0 done=3 iW=5 iR=4 dedup=7/16
 ```
-| Feld | Bedeutung |
-|---|---|
-| `queued` | Neu eingereiht, noch nicht gesendet |
-| `pending` | Gesendet, ACK ausstehend |
-| `retrying` | Wiederholungsversuch läuft |
-| `done` | Fertig (ACK erhalten oder kein Retry nötig) |
-| `dedup=7/16` | 7 von 16 Dedup-Slots belegt |
+
+| Feld         | Bedeutung                                   |
+| ------------ | ------------------------------------------- |
+| `queued`     | Neu eingereiht, noch nicht gesendet         |
+| `pending`    | Gesendet, ACK ausstehend                    |
+| `retrying`   | Wiederholungsversuch läuft                  |
+| `done`       | Fertig (ACK erhalten oder kein Retry nötig) |
+| `dedup=7/16` | 7 von 16 Dedup-Slots belegt                 |
 
 ### Einzelereignisse
+
 ```
 [MC-DBG] RING_WRITE slot=2 type=3A status=01 ...    Slot beschrieben
 [MC-DBG] RING_PRIO slot=2 prio=1                    Priorität zugewiesen
@@ -156,11 +169,13 @@ Alle 30 Sekunden:
 ```
 [MC-DBG] CHANNEL_UTIL rx=1200ms tx=300ms util=15%
 ```
+
 Wird alle 10 Sekunden ausgegeben — unabhängig von `bLORADEBUG`.
 
 ```
 [MC-HWM] uptime=3600s queue_hwm=3/8 csma_hwm=4 trickle=120000ms
 ```
+
 Alle 30 Minuten: Maximale Queue-Tiefe, maximale CAD-Versuche, Trickle-Intervall.
 
 ---
@@ -168,6 +183,7 @@ Alle 30 Minuten: Maximale Queue-Tiefe, maximale CAD-Versuche, Trickle-Intervall.
 ## APRS-Protokoll-Fehler
 
 Nur sichtbar wenn `bLORADEBUG=true`:
+
 ```
 APRS decode - Packet discarded, wrong APRS-protocol - size <8> to short!
 APRS decode - Source-CallSign Error [DK?ABC]
@@ -176,6 +192,7 @@ APRS decode - Packet discarded, wrong APRS-protocol - bSourceEndOk (>) missing!
 APRS decode - Packet discarded, wrong APRS-protocol - PayloadEnd (0x00) missing!
 APRS decode - Packet (47) discarded, wrong FCS <0012>:<0013> wrong! <...>
 ```
+
 Nach jedem Fehler folgt bei Paketen < 255 Byte ein Hex-Dump (`printAsciiBuffer`).
 
 ---
@@ -193,10 +210,46 @@ RX-LoRa-All: ...                                       Rohempfang vor Filterung
 
 ---
 
+## Rohframe-Mitschnitt `[MC-TEST]`
+
+Die Zeilen oben zeigen Frames **dekodiert** — also das Ergebnis unseres
+Parsers. Ein Frame, den der Decoder falsch liest, steht falsch geparst im Log;
+nichts darin verrät, was wirklich auf dem Kanal lag. Der Mitschnitt liefert die
+Bytes selbst.
+
+| Kommando                 | Wirkung                                                               |
+| ------------------------ | --------------------------------------------------------------------- |
+| `--loradebug on`         | schaltet zusätzlich den **Empfangs**-Mitschnitt ein                   |
+| `--txcapture on` / `off` | schaltet den **Sende**-Mitschnitt (eigener Schalter, überlebt Reboot) |
+
+```
+[MC-TEST] RX_FRAME len=64 rssi=-85 snr=0 hex=40F1A125A183444A384D45482D34332C...
+[MC-TEST] TX_FRAME len=70 hex=3A100310E9444A384D45482D382C444A384D45482D3431...
+[MC-TEST] CAPTURE_DROPPED n=3
+```
+
+`CAPTURE_DROPPED` zählt Frames, für die im Ringpuffer kein Platz war. Die Zahl
+gehört zur Auswertung: der Mitschnitt wird genau dann lückenhaft, wenn der
+Kanal voll ist — also in den Kollisionslagen, um derentwillen man ihn
+einschaltet.
+
+Erfasst wird im Radio-Callback bzw. zwischen CAD und `startTransmit()`; dort
+wird nur kopiert. Ausgegeben wird aus dem Loop (`captureDrain()` in
+`main.cpp`), ein Frame je Durchlauf. Details und Begründung in
+`src/capture_functions.h`.
+
+**Kosten:** eine ~550 Zeichen lange Zeile je Frame. Bei 115200 Baud sind das
+rund 48 ms Sendezeit auf der seriellen Schnittstelle — auf einem stark
+gehörten Standort kann das die Konsole sättigen. Der RAM-Preis liegt bei
+1.400 Byte (RAK4631).
+
+---
+
 ## Analyse-Tools
 
-| Tool | Beschreibung |
-|---|---|
-| `tools/serial_monitor.py --port COMx` | Live-Monitoring mit Alerts |
-| `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs |
-| `tools/loganalyse.sh <logfile>` | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL) |
+| Tool                                         | Beschreibung                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `tools/serial_monitor.py --port COMx`        | Live-Monitoring mit Alerts                                                                        |
+| `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs                                                                |
+| `tools/loganalyse.sh <logfile>`              | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL)                                              |
+| `tools/logharvest.py <logdir>`               | erntet Testkorpora aus Logs (CRC-Dumps, ACK-Frames, Re-Enkodier-Vektoren, `[MC-TEST]`-Mitschnitt) |
