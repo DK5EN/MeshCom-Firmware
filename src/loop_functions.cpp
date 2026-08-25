@@ -7,6 +7,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "dedup_functions.h"
 #include "mheard_functions.h"
 #include "command_functions.h"
 
@@ -399,8 +400,7 @@ int iRetransmit=-1;
 uint8_t retryCount[MAX_RING] = {0};
 
 // RINGBUFFER for incomming LoRa RX msg_id
-uint8_t ringBufferLoraRX[MAX_DEDUP_RING][5] = {0};
-ring_index_t loraWrite{0};   // counter for ringbuffer
+// ringBufferLoraRX/loraWrite liegen jetzt in dedup_functions.cpp.
 
 // RINGBUFFER RAW LoRa RX
 unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5] = {0};
@@ -657,59 +657,8 @@ void addBLECommandBack(char text[UDP_TX_BUF_SIZE])
     addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
 }
 
-/**@brief Function adding messages into outgoing UDP ringbuffer
- * 
- */
-void addLoraRxBuffer(unsigned int msg_id, bool bserver)
-{
-    // RACE-03 fix: local copy for atomic index — write buffer content first,
-    // then atomically update index so readers see complete entries
-    uint8_t slot = loraWrite.load();
-
-    if(bLORADEBUG)
-        printfdeb("[MC-DBG] RX_DEDUP_ADD msg_id=%08X srv=%d slot=%d/%d\n",
-                      msg_id, bserver, slot, MAX_DEDUP_RING);
-
-    // byte 0-3 msg_id
-    ringBufferLoraRX[slot][3] = msg_id >> 24;
-    ringBufferLoraRX[slot][2] = msg_id >> 16;
-    ringBufferLoraRX[slot][1] = msg_id >> 8;
-    ringBufferLoraRX[slot][0] = msg_id;
-    ringBufferLoraRX[slot][4] = bserver ? 1 : 0;
-
-    uint8_t next = slot + 1;
-    if (next >= MAX_DEDUP_RING)
-        next = 0;
-    loraWrite.store(next);
-}
-
-int checkOwnRx(uint8_t compBuffer[4])
-{
-    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
-    {
-        if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
-            return ilo;
-    }
-
-    return -1;
-}
-
-bool checkServerRx(uint8_t compBuffer[4])
-{
-    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
-    {
-        if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
-        {
-            // MSG wurde von einem anderen GW gesendet
-            if(ringBufferLoraRX[ilo][4] == 1)
-                return true;
-
-            break;
-        }
-    }
-
-    return false;
-}
+// addLoraRxBuffer()/checkOwnRx()/checkServerRx() sind nach
+// dedup_functions.cpp gewandert (reine Verschiebung).
 
 int checkOwnTx(unsigned int msg_id)
 {

@@ -14,6 +14,13 @@
 
 bool bTXCAPTURE = false;
 
+// Der RX-Mitschnitt haengt an bLORADEBUG (lora_functions.cpp). Hier nur
+// deklariert statt ueber loop_functions_extern.h gezogen: dieses Modul soll
+// nativ ohne den ganzen Loop-Header uebersetzbar bleiben. Der Typ muss exakt
+// zur Definition in loop_functions.cpp passen (bool) -- eine abweichende
+// Deklaration waere ein ODR-Verstoss.
+extern bool bLORADEBUG;
+
 // 768 Byte: ~9 typische Positionsbaken (45-130 Byte) oder 2 Maximalframes.
 // Kleiner macht den Mitschnitt in Kollisionslagen loechrig, groesser kostet
 // RAM, den nRF52 nicht hat.
@@ -30,6 +37,9 @@ static uint8_t cap_ring[CAPTURE_RING_BYTES];
 static std::atomic<uint16_t> cap_head{0};   // naechste Schreibposition
 static std::atomic<uint16_t> cap_tail{0};   // naechste Leseposition
 static std::atomic<uint32_t> cap_dropped{0};
+
+// Nur vom Konsumenten (Loop) angefasst, deshalb kein Atomic noetig.
+static unsigned long cap_serial_last = 0;
 
 // Produzenten sind ZWEI: OnRxDone() und doTX(). Auf nRF52 laufen die in
 // verschiedenen Tasks (Timer-Service bzw. Loop), der Radio-Callback kann
@@ -131,9 +141,27 @@ bool captureFormatNext(char *out, size_t outsz)
         // Verluste auch dann melden, wenn der Ring gerade leergelaufen ist --
         // sonst bliebe die Meldung genau in der Lage aus, die sie erzeugt hat.
         uint32_t lost = cap_dropped.exchange(0, std::memory_order_relaxed);
-        if(lost == 0)
+
+        // Zweite Verlustquelle, unabhaengig vom Ring: printfdeb() verwirft auf
+        // nRF52 Ausgabe, wenn der USB-CDC-Puffer voll bleibt. Ein Frame kann
+        // also sauber durch den Ring laufen und trotzdem unvollstaendig oder
+        // gar nicht im Log landen. Beide Zahlen gehoeren nebeneinander, sonst
+        // erklaert die eine die Luecken, die die andere gerissen hat.
+        unsigned long ser_now = printfdebDroppedBytes();
+        unsigned long ser_new = ser_now - cap_serial_last;   // Ueberlauf: modulo, korrekt
+        cap_serial_last = ser_now;
+
+        // Bei abgeschaltetem Mitschnitt nicht melden -- der Zaehlerstand ist
+        // oben trotzdem nachgezogen, damit das Einschalten keinen Rueckstau
+        // aus der Zeit davor meldet.
+        if(!bLORADEBUG && !bTXCAPTURE)
             return false;
-        snprintf(out, outsz, "[MC-TEST] CAPTURE_DROPPED n=%lu", (unsigned long)lost);
+
+        if(lost == 0 && ser_new == 0)
+            return false;
+
+        snprintf(out, outsz, "[MC-TEST] CAPTURE_DROPPED n=%lu serial_bytes=%lu",
+                 (unsigned long)lost, ser_new);
         return true;
     }
 

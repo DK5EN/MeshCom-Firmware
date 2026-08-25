@@ -9,6 +9,7 @@
 #include <debugconf.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include "dedup_functions.h"
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>

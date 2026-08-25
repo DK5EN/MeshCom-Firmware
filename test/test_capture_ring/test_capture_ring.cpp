@@ -21,9 +21,13 @@
 
 #include <Arduino.h>
 #include <configuration.h>
+#include <printfdeb_functions.h>   // Shim aus test/support: g_testDroppedBytes
 #include <capture_functions.h>
 
-void setUp(void) {}
+// capture_functions.cpp gated die Verlustmeldung auf den aktiven Mitschnitt.
+bool bLORADEBUG = true;
+
+void setUp(void) { g_testDroppedBytes = 0; }
 void tearDown(void) {}
 
 #define LINE_MAX (2 * UDP_TX_BUF_SIZE + 96)
@@ -165,7 +169,7 @@ static void test_ueberlauf_wird_gezaehlt_und_gemeldet(void)
     // Ring leer -> jetzt muss die Verlustmeldung kommen.
     TEST_ASSERT_TRUE_MESSAGE(captureFormatNext(line, sizeof(line)),
                              "Verlustmeldung fehlt");
-    TEST_ASSERT_EQUAL_STRING("[MC-TEST] CAPTURE_DROPPED n=1", line);
+    TEST_ASSERT_EQUAL_STRING("[MC-TEST] CAPTURE_DROPPED n=1 serial_bytes=0", line);
 
     // ... und danach Ruhe.
     TEST_ASSERT_FALSE(captureFormatNext(line, sizeof(line)));
@@ -217,6 +221,52 @@ static void test_zu_kleiner_puffer_haengt_den_ring_nicht_auf(void)
     TEST_ASSERT_FALSE(captureFormatNext(line, sizeof(line)));
 }
 
+// Zweite Verlustquelle: printfdeb() verwirft auf nRF52 Ausgabe, wenn der
+// USB-CDC-Puffer voll bleibt. Ein sauber durch den Ring gelaufener Frame kann
+// so trotzdem unvollstaendig im Log landen -- die Zahl muss deshalb neben der
+// Ringverlustzahl stehen, und sie muss als Zuwachs gemeldet werden, nicht als
+// Gesamtstand seit dem Start.
+static void test_serielle_verluste_werden_als_zuwachs_gemeldet(void)
+{
+    drainAll();
+
+    char line[LINE_MAX];
+
+    g_testDroppedBytes = 4096;
+    TEST_ASSERT_TRUE(captureFormatNext(line, sizeof(line)));
+    TEST_ASSERT_EQUAL_STRING("[MC-TEST] CAPTURE_DROPPED n=0 serial_bytes=4096", line);
+
+    // Kein weiterer Zuwachs -> keine Wiederholung. Der Gesamtstand bleibt ja
+    // stehen; gemeldet wird nur, was seit der letzten Meldung dazukam.
+    TEST_ASSERT_FALSE_MESSAGE(captureFormatNext(line, sizeof(line)),
+                              "Gesamtstand statt Zuwachs gemeldet");
+
+    g_testDroppedBytes = 4096 + 512;
+    TEST_ASSERT_TRUE(captureFormatNext(line, sizeof(line)));
+    TEST_ASSERT_EQUAL_STRING("[MC-TEST] CAPTURE_DROPPED n=0 serial_bytes=512", line);
+}
+
+// Bei abgeschaltetem Mitschnitt gehoert die Meldung nicht ins Log -- der
+// Zaehlerstand muss aber mitlaufen, sonst meldet das Einschalten den ganzen
+// Rueckstau seit dem Systemstart.
+static void test_ohne_mitschnitt_keine_meldung(void)
+{
+    drainAll();
+
+    bLORADEBUG = false;
+    bTXCAPTURE = false;
+    g_testDroppedBytes = 10000;
+
+    char line[LINE_MAX];
+    TEST_ASSERT_FALSE(captureFormatNext(line, sizeof(line)));
+
+    bLORADEBUG = true;
+    g_testDroppedBytes = 10000 + 64;
+    TEST_ASSERT_TRUE(captureFormatNext(line, sizeof(line)));
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("[MC-TEST] CAPTURE_DROPPED n=0 serial_bytes=64", line,
+                                     "nur der Zuwachs seit dem Einschalten zaehlt");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -229,5 +279,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_ueberlauf_wird_gezaehlt_und_gemeldet);
     RUN_TEST(test_leere_und_ungueltige_eingaben);
     RUN_TEST(test_zu_kleiner_puffer_haengt_den_ring_nicht_auf);
+    RUN_TEST(test_serielle_verluste_werden_als_zuwachs_gemeldet);
+    RUN_TEST(test_ohne_mitschnitt_keine_meldung);
     return UNITY_END();
 }

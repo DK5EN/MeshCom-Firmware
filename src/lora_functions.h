@@ -9,7 +9,7 @@
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
 void OnRxTimeout(void);
 void OnRxError(void);
-bool is_new_packet(uint8_t compBuffer[4]);
+// is_new_packet() wird jetzt in dedup_functions.h deklariert.
 
 void StartReceiveAgain();
 

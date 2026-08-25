@@ -67,6 +67,15 @@ static bool cdcReady(size_t need)
 static inline bool cdcReady(size_t) { return true; }
 #endif
 
+unsigned long printfdebDroppedBytes(void)
+{
+#if defined(NRF52_SERIES)
+    return g_cdcTxDropped;
+#else
+    return 0;   // kein verwerfender Pfad -- cdcReady() ist hier immer true
+#endif
+}
+
 int printfdeb(const char *uformat, ...)
 {
     char nformat[300];

@@ -13,6 +13,7 @@
 #include <atomic>
 #include <configuration.h>
 #include "capture_functions.h"
+#include "dedup_functions.h"
 #include <RadioLib.h>
 
 #include <Wire.h>               

@@ -119,6 +119,7 @@ void sendHeartbeat();
 #include <lora_setchip.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include "dedup_functions.h"
 #include <command_functions.h>
 #include <aprs_functions.h>
 #include <batt_functions.h>
