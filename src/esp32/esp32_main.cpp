@@ -3902,8 +3902,27 @@ int checkRX(bool bRadio)
     is_receiving=true;
 
     uint8_t payload[UDP_TX_BUF_SIZE+10];
-    
-    size_t ibytes = UDP_TX_BUF_SIZE;
+
+    // Die echte Paketlaenge muss VOR readData() vom Chip gelesen werden.
+    // RadioLib nimmt `len` per WERT und schreibt die tatsaechliche Laenge NICHT
+    // zurueck -- es dient nur als obere Schranke (SX126x::readData, dokumentiert
+    // in SX126x.h: "getPacketLength method must be called BEFORE calling
+    // readData!"). Wer hier UDP_TX_BUF_SIZE uebergibt, bekommt fuer JEDES Paket
+    // 255 heraus, egal wie kurz der Frame war: readData fuellt nur die echten
+    // Bytes, der Rest von `payload` bleibt uninitialisierter Stackinhalt.
+    //
+    // Am Mitschnitt eines laufenden Knotens gemessen (DK5EN-98, 25.08.2026):
+    // jedes RX_FRAME meldete len=255 bei tatsaechlich 48-133 Byte, gefolgt von
+    // immer demselben Stackmuster. Zwei Folgen davon:
+    //   - Kanalauslastung: getTimeOnAir(255) buchte fuer JEDEN Empfang 2476 ms
+    //     statt der echten 608-1394 ms -- rx war um Faktor 1,8-4,1 zu hoch.
+    //   - Korpus/Diagnose: CRC_PAYLOAD- und Mitschnitt-Dumps hingen ~190 Byte
+    //     RAM-Inhalt an jeden Frame.
+    // Auf nRF52 tritt das nicht auf, dort liefert der Radio-Callback die Laenge.
+    size_t ibytes = radio.getPacketLength();
+
+    if(ibytes > UDP_TX_BUF_SIZE)
+        ibytes = UDP_TX_BUF_SIZE;
 
     state = radio.readData(payload, ibytes);
 
@@ -3966,9 +3985,19 @@ int checkRX(bool bRadio)
 
         // RX channel utilization: calculate airtime from packet length
         // (ESP32 has no OnHeaderDetect, so ch_util_rx_start is never set)
-        ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
+        if(ibytes > 0)
+        {
+            ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
 
-        OnRxDone(payload, (uint16_t)ibytes, saved_rssi, saved_snr);
+            OnRxDone(payload, (uint16_t)ibytes, saved_rssi, saved_snr);
+        }
+        else
+        if(bLORADEBUG)
+        {
+            // Laenge 0 heisst: der Chip hat nichts im Puffer. Frueher lief das
+            // als 255-Byte-Frame aus uninitialisiertem Stack weiter.
+            printlndeb("[MC-DBG] CHECKRX zero_length");
+        }
     }
     else
     if (state == RADIOLIB_ERR_CRC_MISMATCH)
