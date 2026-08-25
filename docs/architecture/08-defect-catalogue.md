@@ -1273,12 +1273,28 @@ BME680-Zeile mehr -- das gespeicherte Bit ist weg.
 
 > **STATUS 2026-08-21 — erster Ausbau umgesetzt.**
 >
-> - **Mechanismus 2 (Capture-Pfad): DONE.** `OnRxDone()` (`lora_functions.cpp`)
->   dumpt akzeptierte Frames als Hex hinter `-D MC_TEST_HOOKS` (`[MC-TEST]
-RX_FRAME len rssi snr hex=…`) — der Gegenpol zum bestehenden
+> - **Mechanismus 2 (Capture-Pfad): DONE, seit 2026-08-25 zur Laufzeit
+>   schaltbar.** `OnRxDone()` (`lora_functions.cpp`) und `doTX()` reichen die
+>   Rohbytes an `captureFrame()` (`src/capture_functions.cpp`); ausgegeben wird
+>   `[MC-TEST] RX_FRAME len rssi snr hex=…` bzw. `TX_FRAME len hex=…` aus dem
+>   Loop-Kontext (`captureDrain()` in `main.cpp`). Gegenpol zum
 >   `CRC_PAYLOAD`-Dump der verworfenen Frames, am Seam den nur akzeptierte
->   Frames erreichen (beide Plattformen). Compile-Gate bewusst: der Dump laeuft
->   im Radio-Callback-Kontext und ist fuer Produktionsbuilds zu teuer.
+>   Frames erreichen (beide Plattformen).
+>
+>   Das frueher noetige Compile-Gate `-D MC_TEST_HOOKS` ist entfallen: nicht
+>   der Dump war zu teuer, sondern sein Ort. Direkt im Radio-Callback braucht
+>   `printfdeb()` ~900 Byte Stack (nRF52-Timer-Task hat 1 KB) und ~48 ms
+>   Serial-Zeit im RX-Pfad; auf der TX-Seite saesse er zwischen CAD und
+>   `startTransmit()`. Ueber einen SPSC-Ring entkoppelt kostet die Erfassung
+>   nur ein `memcpy`. Preis: 768 B Ring + 511 B Hex-Puffer (RAK4631
+>   +1.400 B RAM, +1.616 B Flash). Verworfene Frames meldet
+>   `[MC-TEST] CAPTURE_DROPPED n=…`.
+>
+> - **Feldkorpus: DONE (2026-08-25).** `tools/logharvest.py` erntet
+>   `test/test_aprs_fuzz/` (500 CRC-verworfene + 500 ACK-Frames, byte-exakt)
+>   und `test/test_aprs_reencode/` (3.000 Re-Enkodier-Vektoren) aus
+>   Produktionslogs. `[env:native_aprs_fuzz]` faehrt beides unter
+>   ASan/UBSan.
 > - **Native Decoder-Umgebung: DONE.** `[env:native_aprs]` kompiliert
 >   `aprs_functions.cpp` (decode+encode) auf dem Host; noetig war nur ein
 >   Minimal-Shim `test/support/nrf52/WisBlock-API.h` (die 9 von aprs_functions
@@ -1342,9 +1358,11 @@ mechanisms, in ascending cost:
    decoder into one native binary and assert they agree on a large corpus of generated and
    captured frames. This is a true before/after comparison and needs no external oracle —
    it directly encodes "we did not change behaviour we did not mean to change".
-2. **A real capture path.** Add a hex dump of **accepted** frames (currently only CRC-failed
-   frames are dumped) behind `MC_TEST_HOOKS`, then re-capture on the bench. That produces
-   the corpus 06 assumed already existed. Cheap — one `printfdeb` next to the existing one.
+2. **A real capture path.** Dump **accepted** frames as raw bytes, not just the CRC-failed
+   ones. Implemented 2026-08-25 as `src/capture_functions.cpp` (`--loradebug on` for RX,
+   `--txcapture on` for TX), buffered through an SPSC ring so the copy stays out of the
+   radio callback and out of the CAD-to-transmit window. That produces the corpus 06
+   assumed already existed.
 3. **Hand-authored specification vectors.** For the frame layouts documented in a future
    wire-format document, write vectors from the _specification_, not from the decoder's
    output. Only these can catch a pre-existing decode bug; the other two are regression

@@ -4,6 +4,7 @@
 #include "printfdeb_functions.h"
 #include "txring_functions.h"
 #include "ack_functions.h"
+#include "capture_functions.h"
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -332,24 +333,19 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-#ifdef MC_TEST_HOOKS
     // Testfang-Hook (Katalog doc 08 §4, Mechanismus 2): akzeptierte Frames als
-    // Hex-Dump — das Gegenstueck zum CRC_PAYLOAD-Dump der VERWORFENEN Frames
+    // Rohbytes — das Gegenstueck zum CRC_PAYLOAD-Dump der VERWORFENEN Frames
     // in checkRX (esp32_main.cpp). OnRxDone ist auf beiden Plattformen der
-    // erste Punkt, den nur akzeptierte Frames erreichen. Nur in
-    // Capture-Builds einkompiliert (-D MC_TEST_HOOKS): der Dump laeuft im
-    // Radio-Callback-Kontext (nRF52: Timer-Service-Task mit 1-KB-Stack,
-    // deshalb statischer Puffer) und ist fuer Produktionsbuilds zu teuer.
+    // erste Punkt, den nur akzeptierte Frames erreichen.
+    //
+    // Frueher hing das hinter `-D MC_TEST_HOOKS` und druckte hier direkt, was
+    // in keinem Produktionsbuild lief: der Dump saesse im Radio-Callback
+    // (nRF52: Timer-Service-Task, 1 KB Stack) und printfdeb() braucht davon
+    // allein ~900 Byte, dazu ~48 ms Serial-Zeit mitten im RX-Pfad.
+    // captureFrame() kopiert nur; ausgegeben wird aus dem Loop
+    // (captureDrain() in main.cpp), siehe capture_functions.h.
     if(bLORADEBUG)
-    {
-        static char mc_test_hex[2*255 + 1];
-        uint16_t mc_dlen = (size > 255) ? 255 : size;
-        for(uint16_t mi = 0; mi < mc_dlen; mi++)
-            snprintf(&mc_test_hex[mi*2], 3, "%02X", payload[mi]);
-        printfdeb("[MC-TEST] RX_FRAME len=%u rssi=%d snr=%d hex=%s\n",
-                  (unsigned)mc_dlen, (int)rssi, (int)snr, mc_test_hex);
-    }
-#endif
+        captureFrame('R', payload, size, rssi, snr);
 
     // Debug I: OnRxDone timing — capture start time
     unsigned long _onrxdone_start = millis();
@@ -1552,6 +1548,19 @@ bool doTX()
         // decision. Two rollback paths (CAD wait, APRS chip-switch failure)
         // restore the slot and retry on the next call.
         // For rollback: we restore ringBuffer[save_read][0] = sendlng.
+
+        // Testfang-Hook TX (siehe capture_functions.h): die Bytes, die dieser
+        // Knoten gleich auf den Kanal legt. Ohne diese Seite zeigt der
+        // Mitschnitt nur, was empfangen wurde -- ob unser eigenes
+        // Re-Enkodieren auf dem Relay-Pfad (Hop-Dekrement, Pfadanhang)
+        // byte-treu ist, laesst sich daraus nicht pruefen.
+        //
+        // Nur puffern, nicht drucken: diese Stelle liegt zwischen der
+        // CAD-Entscheidung "Kanal frei" und startTransmit(); eine halbe
+        // Sekunde Serial-Ausgabe dazwischen wuerde die Kanalmessung
+        // entwerten, auf der der Sendezeitpunkt beruht.
+        if(bTXCAPTURE && sendlng > 0)
+            captureFrame('T', lora_tx_buffer, (uint16_t)sendlng, 0, 0);
 
         // we can now tx the message
         if (TX_ENABLE == 1)

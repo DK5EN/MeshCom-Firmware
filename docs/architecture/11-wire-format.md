@@ -3,7 +3,7 @@
 Status: **descriptive reference**, written 2026-08-21 against firmware 4.35p
 (branch `v4.35p_prio`). This document describes what the code actually does,
 with `file:line` anchors into this repository and byte-level examples taken
-from frames captured on the air (433.175 MHz, `MC_TEST_HOOKS` capture hook in
+from frames captured on the air (433.175 MHz, raw-frame capture hook in
 `OnRxDone()`, see doc 08 §4). It is not an upstream-normative specification;
 where the wire format is ambiguous, the decoder in `src/aprs_functions.cpp`
 is the authority this document follows.
@@ -12,7 +12,17 @@ Purpose: precise enough to implement **mock services and test doubles** for
 `mc-chat`, `MCProxy` and `mcmap` — a fake node, a fake gateway, a fake server,
 and a fake BLE peripheral. Machine-readable companion vectors live in
 `test/test_aprs_corpus/corpus.txt` (raw frames) and `golden.txt` (decoded
-fields), regression-fenced by `pio test -e native_aprs`.
+fields), regression-fenced by `pio test -e native_aprs`. A larger field corpus
+harvested from production logs (`tools/logharvest.py`) lives in
+`test/test_aprs_fuzz/` and `test/test_aprs_reencode/`, fenced by
+`pio test -e native_aprs_fuzz`.
+
+The re-encode vectors are worth singling out as evidence for §1.1 and §1.3:
+across 2.422 distinct frames heard in 32,7 h from eleven different hardware ids
+and two firmware generations, `encodeAPRS()` reproduces the sender's byte-sum
+**every time**, and the frame length in all but one case. That one is a sender
+that omits the `0x7E` end marker — which is why the trailer is described below
+as "parsed if present".
 
 Layers covered:
 
@@ -561,7 +571,8 @@ the JSON) but not §2–§4 framing.
   `golden.txt`; it _is_ the behavior change.
 
 Provenance: frames captured 2026-08-21 on 433.175 MHz (EU8 preset,
-BW 250 kHz, SF 11, CR 4/6) with the `MC_TEST_HOOKS` hook; encoders observed
+BW 250 kHz, SF 11, CR 4/6) with the raw-frame capture hook
+(`src/capture_functions.cpp`, `--loradebug on` / `--txcapture on`); encoders observed
 on the air include this firmware (RAK4631, Heltec V3), other MeshCom 4.35
 devices (T-Beam), and gateway-emitted server frames. Cross-validation:
 §4 (BLE) against `MCProxy/src/mcapp/ble_protocol.py`; §2 (server UDP)
