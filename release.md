@@ -7,6 +7,45 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Upstream-Sync 2026-08-27 (dev)
+
+Upstream hat beide eingereichten PRs uebernommen. `upstream/dev` steht auf
+`fc83554e`.
+
+- **PR #1102** -- `Stabilitaets- und Speichersicherheits-Fixes aus dem
+Feldbetrieb`: 82 Firmware-Aenderungen, 64 Dateien, +3.213/-1.113. Upstream
+  hat sie als Squash `0cac4aea` gemergt (Merge-Commit `d4dee351`).
+- **PR #1103** -- `fix(ble): FWDATE-Puffer zu klein`: `char cfwdate[20]` fasst
+  `__DATE__ " " __TIME__` nicht (21 Byte noetig), `snprintf` schnitt die letzte
+  Sekundenstelle ab. Ein Byte-Fix an Upstreams eigenem Code, gefunden von
+  unserem `-Wformat-truncation`-Gate (Commit `2d7f56b1`, Merge `fc83554e`).
+
+Damit liegt der gesamte Firmware-Anteil dieses Forks in `dev`.
+
+**Integriert per Merge, nicht per Rebase.** `dev` traegt unsere 82 Commits als
+einen einzigen Squash. Beim Replay der Einzel-Commits darauf bleiben nur
+Residuen uebrig: Commits, deren Message einen Fix beschreibt, deren Diff aber
+nur noch Loeschungen enthaelt -- verifiziert an
+`fix: stack overflow in sendExtern()`, das zu 8 Loeschungen geschrumpft waere.
+`git log -p` und `git blame` haetten ab dann falsche Auskunft gegeben. Der
+Merge (`ee26403d`) erhaelt die Historie; der resultierende Baum ist
+bit-identisch zum Stand davor (Tree `bc849071`), `dev` bringt nichts Neues mit.
+
+Konflikte in 12 Dateien, alle zugunsten dieses Branches aufgeloest -- es sind
+genau die Stellen, an denen der PR bewusst vom Fork abweicht:
+
+| Datei                        | Abweichung                                          |
+| ---------------------------- | --------------------------------------------------- |
+| `platformio.ini`             | `[env:native*]`, `-Werror`, Safeboot-Framework-Hook |
+| 10 Dateien unter `src/`      | Kommentare mit Verweisen auf `docs/` und `test/`    |
+| `src/txring_functions.cpp`   | zusaetzlich der `NATIVE_BUILD`-Block                |
+| `src/configuration_global.h` | `FLASH_VERSION 20260827` statt Upstream-Datum       |
+
+Unsere uebernommenen Commits: 82 (der gesamte Firmware-Anteil).
+Verifiziert: alle 7 Targets bauen mit `-Werror` sauber.
+
+---
+
 ## Stability-Release v4.35p.08.27-stability (2026-08-27)
 
 Sechs behobene Defekte, ein neues Diagnosewerkzeug und eine Testschicht, die
