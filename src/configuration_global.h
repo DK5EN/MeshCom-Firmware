@@ -47,7 +47,7 @@ inline bool isNodeUnconfigured(const char *call)
 //
 // Letzte echte Layout-Aenderung: 6e7c012a (2026-07-24), node_pingmax,
 // node_pingcount und node_pingduration kamen hinzu. Daher 20260724.
-#define FLASH_VERSION 20260822
+#define FLASH_VERSION 20260827
 #define FLASH_STRUCT_VERSION 20260724
 
 // Bestandsschutz. Diese Staende tragen dasselbe Layout wie

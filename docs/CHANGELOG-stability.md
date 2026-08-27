@@ -1,11 +1,12 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.22-stability` (2026-08-22), based on official MeshCom 4.35p
+Release: `v4.35p.08.27-stability` (2026-08-27), based on official MeshCom 4.35p
 (upstream `dev`, merge-base `8114d7ae`).
 
 > **`v4.35p.08.21-stability` has been withdrawn and deleted.** It put any node
-> with GPS enabled into a permanent boot loop (item 81 below). If you installed
-> it, update — and note that an affected node can only be recovered over USB.
+> with GPS enabled into a permanent boot loop (item 81 below). If you still have
+> it installed, update — and note that an affected node can only be recovered
+> over USB.
 
 ## About this release
 
@@ -22,12 +23,15 @@ Three things this release is **not**:
   maintained by the ICSSW team at
   [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware),
   and that is where the project lives and grows.
-- **It is not a feature release.** A node running this build behaves like
+- **It is not a feature release.** A node running this build interoperates with
   official 4.35p on the air and toward the apps. The changes are about
   stability, robustness, input hardening, and the test infrastructure to keep
-  it that way; the only additions are a few small maintenance and diagnostic
-  aids (a bootloader-entry command, a boot-time reset-reason log, developer
-  tooling) — nothing that changes meshing, messaging, or the user experience.
+  it that way; the additions are maintenance and diagnostic aids (a
+  bootloader-entry command, a boot-time reset-reason log, a raw-frame capture
+  switch, developer tooling). Three fixes do change what a node puts on the air
+  or how it reports itself, and every one of them is a correction rather than a
+  feature — they are listed under **What changes on the air** below, so that
+  nobody meets them by surprise.
 - **It is not a fork in spirit.** The changes are deliberately small and
   surgical, and they are offered back upstream as individual pull requests, as
   many of our earlier improvements already have been. This release simply
@@ -40,6 +44,198 @@ The items below reference the engineering logs in this repository:
 [docs/code-audit-fixes-20260627.md](code-audit-fixes-20260627.md) (IDs like
 A1, B2, C3), where the findings are documented with evidence. Every fix is one
 focused commit in this repository's history.
+
+## What changes on the air
+
+Almost everything in this changelog is invisible from outside the node. Three
+items in this release are not, and they are listed here so that nobody has to
+discover them by surprise:
+
+- **`/B=000` is now transmitted** when the battery is measured and empty (item
+  90). Previously nothing was sent below one percent, which made "empty" and
+  "no battery fitted" indistinguishable. A missing `/B=` tag now means the node
+  has no battery hardware to report.
+- **Implausible frames in the ACK path are no longer relayed** (item 91).
+  Measured against 8741 field frames, this drops 5.7% of what reached that
+  path — not one of which acknowledged a message the node had actually heard.
+  They were previously re-transmitted into the mesh at priority 1.
+- **ESP32 channel-utilisation figures drop sharply** (item 94), because they
+  were computed from a fixed 255-byte length. Nothing about the radio changed;
+  the number is simply correct now. Expect roughly 7% where the same node used
+  to report 18%.
+
+## New in v4.35p.08.27-stability
+
+Six defects fixed, one new diagnostic, and a test layer that replays real field
+traces through the shipping code instead of through a re-implementation of it.
+
+88. **Updating a node no longer erases its configuration.** The reset condition
+    was `node_fversion != FLASH_VERSION`, and `FLASH_VERSION` is a date that is
+    raised for every release. Every update therefore discarded the stored
+    callsign, WiFi credentials, and sensor and network settings of every node —
+    even when the layout of `struct s_meshcom_settings` had not changed at all.
+    That is exactly what happened on the 20260724 → 20260821 step: the commit
+    that raised the number touched neither flash header. Build identity and
+    layout generation are now two separate things. `FLASH_VERSION` remains the
+    release stamp shown in `--info`; `FLASH_STRUCT_VERSION` names the settings
+    layout and is the only value `clear_flash()` looks at. It stands at
+    20260724, the last real layout change. Nodes that stored 20260821 under the
+    old semantics are grandfathered in and are not reset. Verified by updating
+    three nodes — Heltec V3 and T-Beam over OTA, RAK4631 over DFU — each
+    keeping its callsign and network configuration. `--flash-reset` still
+    resets, as it should.
+89. **The battery divider polarity is measured at boot instead of guessed at
+    compile time.** The switch for the battery voltage divider was chosen by
+    `#if defined(BOARD_HELTEC_V31) || defined(BOARD_WIRELESS_PAPER)` — and
+    `BOARD_HELTEC_V31` is defined **nowhere** in the tree, neither in a
+    variant's `configuration.h` nor in any build flag. The active-LOW branch
+    was therefore unreachable in every image ever built, and every Heltec V3
+    was driven active-HIGH regardless of whether the board is really a 3.0 or a
+    3.1. The polarity is now probed once at boot. The signature is unambiguous
+    and was measured on the device: enable=HIGH gives 902–906 counts,
+    enable=LOW gives 1–4, and the threshold sits at 50. On a board that was
+    already correct the change is a no-op, confirmed on a Heltec V3 with a real
+    battery. The compile-time value stays as the seed and the fallback, so
+    boards where the probe cannot run behave exactly as before.
+90. **An empty battery is now distinguishable from no battery, on the air.**
+    `mv_to_percent()` clamps to zero below `BAT_MIN_VOLTAGE`, and the `/B=` tag
+    was only written `if(global_proz > 0)` — so a nearly empty pack reported
+    nothing at all, and the battery graph went blank precisely when it
+    mattered. A survey across 1230 stations found real nodes that report
+    battery only in a six-hour window per day, purely because the pack crosses
+    the 3.3 V line. The two `/B=` producers in `PositionToAPRS()` also
+    disagreed with each other: the INA226 branch wrote `/B=%i` unchecked, the
+    normal branch `/B=%03d` above zero. Both now write the tag whenever battery
+    hardware is present. A transmitted `/B=000` means "measured, and the pack is
+    empty"; a missing tag means "this node has no battery to report". Decoding
+    is unaffected — the receiver reads the field with `sscanf("%d")`, so all
+    three spellings yield the same integer. Fixed in the same pass: the PMU
+    failure path on ESP32 zeroed both values without marking them unmeasurable,
+    which would have made a T-Beam with a dead PMU claim an empty battery
+    forever.
+91. **Text fragments were being accepted as ACKs and flooded into the mesh.**
+    `handleACK()` checked only `payload[0] == 0x41` and a minimum length. 0x41
+    is the ASCII letter `A`, so any fragment of a text or position packet
+    beginning with it ran through ACK processing: bytes 1–4 were taken as its
+    message id, it entered the dedup ring, it was queued for transmission at
+    priority 1 — evicting a heartbeat from a full queue — and it was relayed.
+    Byte 5 is the reliable discriminator: radio ACKs are generated only as
+    `0x80 | max_hop` and are only ever decremented on the relay path. Measured
+    over 32.7 hours and 8741 frames on three field nodes, three independent
+    criteria separate the populations identically, and **not one** of the 506
+    implausible frames acknowledged a message the node had actually heard. The
+    check lives as a pure function in `ack_functions.h` so it is testable
+    without hardware, and a rejected frame is logged as `ACK_REJECT` rather
+    than dropped silently, so the filter stays measurable in the field.
+92. **`{SET}` range-checks max_hop.** `sscanf` wrote both values straight into
+    the settings. A typo such as `{SET}44;2;` put 44 into the hop field of every
+    packet the node sent — and the relay path only checks `(byte5 & 0x7F) > 0`
+    before decrementing, so nothing bounded it from above. Values outside
+    0…`MAX_HOP_LIMIT` now leave the previous setting standing. The old leniency
+    is intact: each field is still applied as soon as `sscanf` has read it, so
+    `{SET}4;` still sets only `max_hop_text`.
+93. **New: raw frame capture at runtime (`--txcapture`).** Until now the log
+    showed frames only **decoded** — the output of our own parser. A frame the
+    decoder reads wrongly appears wrongly in the log, and nothing in it reveals
+    what was actually on the channel. `captureFrame()` now copies raw frames
+    into a 768-byte ring and `captureDrain()` prints them from the loop.
+    Receive follows `--loradebug`; transmit has its own new switch,
+    `--txcapture on/off`, which is persisted. The ring is not incidental:
+    dumping directly from the radio callback needs about 900 B of stack — the
+    nRF52 timer task has 1 KB — and would put roughly 48 ms of serial time into
+    the RX path, or, on the transmit side, sit between the CAD "channel free"
+    decision and `startTransmit()` and invalidate the very measurement the send
+    timing rests on. Decoupled through the ring, capture costs one `memcpy`.
+    Dropped frames are reported as `[MC-TEST] CAPTURE_DROPPED n= serial_bytes=`,
+    because a capture goes patchy exactly when the channel is busy — the
+    situation you switched it on for. Cost on RAK4631: +1400 B RAM,
+    +1616 B flash.
+94. **ESP32 channel utilisation was overstated by a factor of 1.8 to 4.1
+    (N-29).** Found by the new capture on its first run on real hardware.
+    `checkRX()` passed `UDP_TX_BUF_SIZE` (255) to `radio.readData()` as the
+    length — but RadioLib takes that by value and never writes the real length
+    back; it is an upper bound only, and the SX126x header says plainly that
+    `getPacketLength()` must be called first. Every receive therefore reported
+    255 bytes, with uninitialised stack content behind the actual frame, and
+    `checkRX()` booked `getTimeOnAir(255)` into the channel-load statistic. The
+    log showed exactly `rx=2476ms` after every single receive — the airtime of
+    a 255-byte packet at SF11/BW250/CR4:6. The real frames ran 608 ms (48 B) to
+    1394 ms (133 B). The counter-check sits in the same log line: `tx=701ms`
+    matches the 60-byte transmit frame to the byte, because the transmit path
+    knows its own length. A reported `util=18%` was really about 7%. Every
+    ESP32 utilisation figure this firmware has ever printed was too high, and
+    none of them were ever comparable with nRF52 figures, where the radio
+    callback supplies the length. The length is now read from the chip before
+    `readData()`, capped at `UDP_TX_BUF_SIZE`, and a zero-length read is no
+    longer treated as a frame.
+95. **`%%` was doubled in every log line containing a percent sign (N-30).**
+    The `%%` branch wrote two percent signs and then fell through into the
+    general copy, which appended the same one again; the next pass appended the
+    second one once more. `util=18%%` and `BATT 100 %%` in the field were this.
+    It broke `loganalyse.sh` and `logharvest.py` along with the logs. The
+    rewrite logic now lives in `src/printfdeb_format.h` so it can be tested
+    without Arduino — the same separation as `isPlausibleAckFrame()` — and a
+    leading `;` no longer reads one byte before the buffer.
+96. **`--info` printed passwords in clear text to the open network console
+    (N-31).** `node_passwd`, `node_webpwd` and `node_pwd` were printed unmasked.
+    That output goes through `printfdeb()` and therefore also over TCP port
+    2323, which requires no authentication at all unless `node_passwd` is set.
+    Reproduced end to end: `nc <node> 2323`, then `--info`, and the WiFi PSK is
+    on screen — and in every log capture anyone shares. A set password now
+    prints as `***`; empty stays empty, so it remains readable _whether_ one is
+    set. The settings JSON sent to the app is untouched, since it needs the
+    real value to display and change it. This does not replace `--passwd`; it
+    takes the most rewarding find away from an open port.
+97. **The shipping code is now replayed against real field traces.**
+    `tools/traceharvest.py` harvests the decision sequence of running nodes from
+    their debug output — 48 node-hours across four field stations — and feeds it
+    to the actual functions rather than a model of them: `is_new_packet()` and
+    `addLoraRxBuffer()` against 5647 verdicts and 6869 slot assignments,
+    `getMessagePriority()` against 505 classifications covering all five
+    classes, and `isPlausibleAckFrame()` against 30 ACKs the field nodes
+    actually honoured. Zero deviations in all three. The ACK suite answers the
+    question a retrofitted filter always raises — does it cut into healthy
+    traffic? — by replaying frames whose _effect_ is logged, each of which
+    closed a waiting ring slot. It does not cut. All three suites are
+    mutation-checked, so it is demonstrated that they test anything at all.
+98. **The dedup ring stays at 100 — measured, not assumed.** An analysis report
+    recommended raising it to 300. The counter-check over the same 48 node-hours
+    counted every message id that was evicted and then re-flooded: 112
+    returners, of which exactly **one** was a genuine duplicate. 96 were id
+    reuse — a different message carrying the same id, clustering at 180–210
+    minutes apart. A larger ring buys that one frame; from 500 upwards it starts
+    discarding legitimate messages (52 of them at 500, 96 at 1000). The
+    diagnosis in the report was right — the window is about 38 minutes against a
+    longest observed packet lifetime of 36.7 minutes, so there is no margin —
+    but almost nothing falls through it, and 1 kB of RAM for one event in 48
+    node-hours is not a trade. The measurement is written down where the
+    constant is defined, and the replay test makes any change to the number fail
+    loudly.
+99. **An interop oracle and a fuzz corpus, both built from real traffic.**
+    `tools/logharvest.py` harvested 8965 distinct CRC-rejected frames, 2981 ACK
+    frames and 42110 re-encode vectors out of 2.83 million log lines from
+    production nodes. `test_aprs_reencode` rebuilds frames from the logged
+    fields and compares length and byte sum against the values computed by the
+    **sender** — not circular, because the decoder reads that checksum out of
+    the frame and rejects the frame if it does not match the wire bytes.
+    `encodeAPRS()` reproduces the byte sum of 2422 distinct real frames without
+    a single exception, across eleven hardware ids and two firmware
+    generations. The one length deviation comes from a sender that omits the
+    0x7E end marker; it is documented behaviour and frozen as the expected
+    number. `test_aprs_fuzz` puts 500 genuinely corrupted frames through the
+    decoder under AddressSanitizer and UndefinedBehaviorSanitizer, plus a fill
+    differential that catches any read past the end of a frame.
+100.  **`tools/meshlogger.py` records a node's network console to disk** for days
+      at a time, so a rare event can be caught without sitting at a terminal. The
+      console serves one client at a time, so the tool honours a `PAUSE` file and
+      hands the port over on request.
+101.  **`tools/loganalyse.sh` was itself audited and fixed (TOOL-01…06).** It
+      counted CSMA backoff as a state-machine error, mis-attributed drop reasons
+      to the wrong bucket, took the hop count from the wrong field, choked on
+      stray bytes in its input, and could not read raw firmware logs without hand
+      editing. It now reads them directly, and a regression suite covers the
+      three counting bugs. A verdict from a broken instrument is worth nothing;
+      several conclusions in this release rest on this tool.
 
 ## New in v4.35p.08.22-stability
 

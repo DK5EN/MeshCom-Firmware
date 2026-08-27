@@ -1,18 +1,324 @@
 # Release Notes -- MeshCom Firmware v4.35p
 
-Firmware `4.35p`, `FLASH_VERSION 20260821` (`src/configuration_global.h`).
+Firmware `4.35p`, `FLASH_VERSION 20260827`, `FLASH_STRUCT_VERSION 20260724`
+(`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
 
 ---
 
+## Stability-Release v4.35p.08.27-stability (2026-08-27)
+
+Sechs behobene Defekte, ein neues Diagnosewerkzeug und eine Testschicht, die
+echte Feldmitschnitte durch den ausgelieferten Code nachfaehrt statt durch eine
+Nachbildung.
+
+`FLASH_VERSION` steht jetzt auf `20260827`. Das ist ab diesem Release
+gefahrlos: die Ruecksetzbedingung haengt seit dem ersten Punkt unten an
+`FLASH_STRUCT_VERSION` (unveraendert `20260724`), nicht mehr am Build-Datum.
+Aktualisierende Knoten behalten Rufzeichen, WLAN-Zugangsdaten und
+Sensorkonfiguration; auf beiden MCU-Familien nachgemessen.
+
+### Was sich auf dem Draht aendert
+
+Fast alles in diesem Release ist von aussen unsichtbar. Drei Punkte sind es
+nicht, und sie stehen hier, damit sie niemanden ueberraschen:
+
+- **`/B=000` wird jetzt gesendet**, wenn die Batterie gemessen und leer ist.
+  Bisher ging unterhalb von einem Prozent gar nichts raus -- "leer" und "keine
+  Batterie bestueckt" waren nicht unterscheidbar. Ein fehlendes `/B=`-Tag heisst
+  ab jetzt: dieser Knoten hat keine Batteriehardware zu melden.
+- **Unplausible Frames im ACK-Pfad werden nicht mehr weitergesendet.** Gegen
+  8741 Feldframes gemessen sind das 5,7 % dessen, was diesen Pfad erreicht --
+  und kein einziger davon quittierte eine Nachricht, die der Knoten tatsaechlich
+  gehoert hatte. Bisher wurden sie mit Prioritaet 1 ins Mesh zurueckgesendet.
+- **Die ESP32-Kanalauslastung faellt deutlich**, weil sie aus einer festen
+  Laenge von 255 Byte gerechnet wurde. Am Funk hat sich nichts geaendert, die
+  Zahl stimmt jetzt bloss. Wo derselbe Knoten `util=18%` meldete, sind real rund
+  7 % zu erwarten.
+
+### Settings-Persistenz -- jedes Release hat die Konfiguration geloescht (Critical)
+
+Die Ruecksetzbedingung lautete `node_fversion != FLASH_VERSION`, und
+`FLASH_VERSION` ist ein Datum, das pro Release hochgezogen wird. Damit hat
+JEDES Release die gespeicherte Konfiguration jedes aktualisierenden Knotens
+verworfen -- Rufzeichen, WLAN-Zugangsdaten, Sensor- und Netzeinstellungen --,
+auch wenn sich am Aufbau von `struct s_meshcom_settings` nichts geaendert hatte.
+Nachweisbar am Sprung `20260724` -> `20260821`: der Commit hat weder
+`src/esp32/esp32_flash.h` noch `src/nrf52/WisBlock-API.h` angefasst, alle Knoten
+wurden trotzdem zurueckgesetzt.
+
+Build-Kennung und Layout-Generation sind jetzt getrennt. `FLASH_VERSION` bleibt
+die Release-Kennung und ist rein informativ (`--info`); `FLASH_STRUCT_VERSION`
+benennt die Generation des Settings-Layouts und ist der einzige Wert, ueber den
+`clear_flash()` entscheidet. Sie steht auf `20260724`, der letzten echten
+Layout-Aenderung. Knoten, die nach der alten Semantik `20260821` gespeichert
+haben, geniessen Bestandsschutz und werden nicht zurueckgesetzt. Die Logzeile
+benennt beides getrennt:
+
+    [INIT]...FLASH layout 20260821 ok, build 20260827
+
+`--flash-reset` setzt weiterhin zurueck.
+
+### Batterie -- ADC_CTRL-Polaritaet wird gemessen statt geraten
+
+Der Umschalter fuer den Spannungsteiler wurde per Compile-Zeit-Test gewaehlt:
+
+    #if defined(BOARD_HELTEC_V31) || defined(BOARD_WIRELESS_PAPER)
+
+`BOARD_HELTEC_V31` ist im gesamten Baum NIRGENDS definiert -- weder in einer
+`variants/*/configuration.h` noch in `platformio.ini` noch in `build_flags`. Der
+active-LOW-Zweig war damit in jedem je gebauten Image unerreichbar, und jeder
+Heltec V3 wurde active-HIGH angesteuert, unabhaengig davon, ob die Platine real
+eine 3.0 oder eine 3.1 ist.
+
+Die Polaritaet wird jetzt einmalig beim Boot gemessen. Die Signatur ist
+eindeutig und am Geraet nachgemessen: ein durchgeschalteter Teiler liefert
+dreistellige Rohwerte, ein getrennter Pin einstellige (enable=HIGH 902-906
+Counts, enable=LOW 1-4 Counts, Schwelle 50). Auf einem Board mit bereits
+korrekter Polaritaet ist die Aenderung ein No-op -- auf einem Heltec V3 mit
+realem Akku bestaetigt. Der Compile-Zeit-Wert bleibt als Startwert und
+Rueckfallebene erhalten.
+
+Daraus faellt zum ersten Mal die Unterscheidung "kein Teiler bestueckt" gegen
+"Akku leer" ab, auf der der naechste Punkt aufbaut.
+
+### Batterie -- `/B=` auch bei 0 Prozent senden
+
+`mv_to_percent()` klemmt unterhalb `BAT_MIN_VOLTAGE` auf 0, und das `/B=`-Tag
+wurde nur `if(global_proz > 0)` geschrieben. Ein fast leerer Akku meldete damit
+gar nichts -- der Batteriegraph wird genau dann leer, wenn man ihn braucht. Aus
+einer Netzmessung ueber 1230 Stationen: eine reale Station meldet Batterie in
+einem Sechs-Stunden-Fenster pro Tag und sonst nie, nur weil der Pack die
+3,3-V-Linie kreuzt.
+
+Die beiden `/B=`-Erzeuger in `PositionToAPRS()` waren sich zudem uneinig: der
+INA226-Zweig schrieb `/B=%i` voellig ungeprueft, der normale Zweig `/B=%03d` nur
+oberhalb 0. Beide schreiben das Tag jetzt, sobald Batteriehardware erkannt ist.
+Ein gesendetes `/B=000` heisst "gemessen, und der Akku ist leer"; ein fehlendes
+Tag heisst "dieser Knoten hat keine Batterie zu melden". Rueckwaertskompatibel:
+der Empfaenger liest das Feld mit `sscanf("%d")`, alle drei Schreibweisen
+ergeben denselben Integer.
+
+Mitbehoben: der PMU-Ausfallpfad in `esp32_main.cpp` setzte beide Werte auf 0,
+ohne sie als "nicht messbar" zu kennzeichnen. Ohne diesen Zusatz haette ein
+T-Beam mit defekter PMU ab sofort dauerhaft `/B=000` gesendet und damit "Akku
+leer" behauptet, wo "keine Messung moeglich" gilt.
+
+### ACK-Pfad -- Textbruchstuecke wurden als ACK ins Mesh geflutet (High)
+
+`handleACK()` prueft bisher nur `payload[0] == 0x41` und eine Mindestlaenge.
+0x41 ist als ASCII der Buchstabe `A` -- jedes Bruchstueck eines Text- oder
+Positionspakets, das damit beginnt, lief dadurch durch die ACK-Verarbeitung:
+Bytes 1..4 galten als seine `msg_id`, es landete im Dedup-Ring, wurde mit
+Prioritaet 1 in die Sendequeue geschrieben, warf dabei einen Heartbeat aus der
+vollen Queue und wurde schliesslich ins Mesh weitergesendet.
+
+Byte 5 ist der belastbare Diskriminator: Funk-ACKs entstehen ausschliesslich als
+`(0x80 | max_hop)` und werden auf dem Weiterleitungspfad nur dekrementiert.
+Feldmessung ueber 32,7 h und 8741 Frames im ACK-Pfad, drei Knoten:
+
+| Byte 5            | Anzahl        | Byte 10/11 == 01 00 | Feld 6..9 real gehoert |
+| ----------------- | ------------- | ------------------- | ---------------------- |
+| 0x80..0x84        | 8235 (94,2 %) | 99,6 %              | 58,9 %                 |
+| 0x80\|Hops 5..116 | 221 (2,5 %)   | 0,0 %               | 0,0 %                  |
+| Bit 7 = 0         | 285 (3,3 %)   | 0,0 %               | 0,0 %                  |
+
+Kein einziger der 506 unplausiblen Frames quittierte eine Nachricht, die der
+Knoten tatsaechlich gehoert hatte. Besonders relevant ist die mittlere Gruppe:
+eine reine Server-Bit-Pruefung haette sie durchgelassen, und ausgerechnet diese
+Frames fuehren Hop-Budgets bis 116. Die Pruefung sitzt als reine Funktion in
+`ack_functions.h`, damit sie ohne Hardware testbar ist; ein verworfener Frame
+wird als `ACK_REJECT` protokolliert statt still fallengelassen.
+
+### {SET} -- max_hop ohne jede Bereichspruefung
+
+`sscanf` schrieb die Werte direkt in `meshcom_settings`. Ein Tippfehler wie
+`{SET}44;2;` landete damit ungeprueft im Hop-Feld jedes ausgesendeten Pakets --
+und der Weiterleitungspfad prueft nur `(byte5 & 0x7F) > 0` und dekrementiert,
+nach oben war nichts begrenzt. Werte ausserhalb `0..MAX_HOP_LIMIT` lassen den
+bisherigen Wert jetzt stehen. Die bisherige Nachsichtigkeit bleibt: jedes Feld
+wird einzeln uebernommen, sobald `sscanf` es gelesen hat.
+
+### Neu -- `--txcapture`, Rohframe-Mitschnitt zur Laufzeit
+
+Bisher zeigte das Log Frames nur DEKODIERT, also das Ergebnis unseres eigenen
+Parsers. Ein Frame, den der Decoder falsch liest, steht falsch geparst im Log;
+nichts darin verraet, was auf dem Kanal lag.
+
+`captureFrame()` legt Rohframes jetzt in einen byteorientierten Ring (768 B),
+`captureDrain()` gibt sie aus dem Loop aus. Empfang haengt an `--loradebug`,
+Senden am neuen Schalter `--txcapture on/off` (persistiert). Der Ring ist kein
+Beiwerk: direkt im Radio-Callback braucht `printfdeb()` rund 900 B Stack -- der
+nRF52-Timer-Task hat 1 KB -- und rund 48 ms Serial-Zeit im RX-Pfad. Auf der
+TX-Seite saesse er zwischen CAD-Entscheidung "Kanal frei" und `startTransmit()`
+und wuerde die Kanalmessung entwerten, auf der der Sendezeitpunkt beruht.
+Entkoppelt kostet die Erfassung ein `memcpy`.
+
+Verworfene Frames meldet `[MC-TEST] CAPTURE_DROPPED n= serial_bytes=` -- der
+Mitschnitt wird genau dann lueckenhaft, wenn der Kanal voll ist, also in den
+Kollisionslagen, um derentwillen man ihn einschaltet. Kosten auf RAK4631:
++1400 B RAM, +1616 B Flash.
+
+### N-29 -- `checkRX()` meldete fuer JEDEN Empfang 255 Byte (High)
+
+Vom neuen Mitschnitt bei seinem allerersten Lauf auf echter Hardware gefunden.
+
+    size_t ibytes = UDP_TX_BUF_SIZE;          // 255
+    state = radio.readData(payload, ibytes);
+
+RadioLib nimmt `len` per WERT und schreibt die tatsaechliche Laenge nicht
+zurueck; sie ist nur eine obere Schranke. `SX126x.h` sagt das ausdruecklich:
+"getPacketLength method must be called BEFORE calling readData!". `ibytes` blieb
+also immer 255, und hinter dem echten Frame lag der uninitialisierte
+Stackinhalt.
+
+Folge 1, Kanalauslastung um Faktor 1,8-4,1 zu hoch: `checkRX()` bucht
+`getTimeOnAir(ibytes)`. Nach jedem Empfang stand exakt `rx=2476ms` im Log -- die
+Sendedauer eines 255-Byte-Pakets bei SF11/BW250/CR4:6. Die echten Frames lagen
+bei 608 ms (48 B) bis 1394 ms (133 B). Die Gegenprobe steht in derselben Zeile:
+`tx=701ms` passt aufs Byte zum 60-Byte-TX-Frame, denn der Sendepfad kennt seine
+Laenge. Aus `util=18%` wurden real rund 7 %. Alle ESP32-Auslastungszahlen dieser
+Firmware sind zu hoch und waren nie mit nRF52-Zahlen vergleichbar.
+
+Folge 2, Diagnose und Korpus: `CRC_PAYLOAD`, `ERR_PAYLOAD` und der Mitschnitt
+hingen rund 190 Byte RAM-Inhalt an jeden Frame.
+
+Die Laenge wird jetzt vor `readData()` mit `radio.getPacketLength()` vom Chip
+gelesen, auf `UDP_TX_BUF_SIZE` gedeckelt, und `ibytes == 0` gilt nicht mehr als
+Frame.
+
+### N-30 -- `printfdeb()` verdoppelte jedes `%%`
+
+Der `%%`-Zweig schrieb zwei Prozentzeichen und fiel dann in die allgemeine
+Kopie, die dasselbe Zeichen erneut anhaengte. Sichtbar als `util=18%%` und
+`BATT 100 %%`. Trifft jede Logzeile mit Prozentzeichen und damit auch
+`loganalyse.sh` und `logharvest.py`. Die Umbaulogik liegt jetzt in
+`src/printfdeb_format.h`, damit sie ohne Arduino nativ pruefbar ist. Mitgefixt:
+bei fuehrendem `;` las die alte Schleife vor den Puffer.
+
+### N-31 -- `--info` gab Passwoerter im Klartext an die offene Netzkonsole
+
+`node_passwd`, `node_webpwd` und `node_pwd` wurden unmaskiert gedruckt. Diese
+Ausgabe laeuft ueber `printfdeb()` und damit auch auf Port 2323 -- und die
+Konsole verlangt ohne gesetztes `node_passwd` keine Authentisierung.
+Nachgestellt: `nc <node> 2323`, dann `--info`, und das WLAN-PSK steht auf dem
+Schirm. Dieselbe Ausgabe steht in jedem geteilten Logmitschnitt.
+
+`maskSecret()` ersetzt ein gesetztes Passwort durch `***`; leer bleibt leer,
+damit ablesbar bleibt OB eins gesetzt ist. Die Settings-JSON an die App bleibt
+unberuehrt, sie muss den Wert zum Anzeigen und Aendern tragen. Das ersetzt nicht
+`--passwd`, es nimmt dem offenen Port den lohnendsten Fund.
+
+### Tests -- Replay gegen 48 Knotenstunden Feldmitschnitt
+
+`tools/traceharvest.py` erntet die Entscheidungsfolge laufender Knoten aus der
+`[MC-DBG]`-Ausgabe und fuettert sie dem echten Code, keiner Nachbildung:
+
+| Suite                | Gegenstand                             | Umfang                            | Abweichungen |
+| -------------------- | -------------------------------------- | --------------------------------- | ------------ |
+| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5647 Urteile, 6869 Slotbelegungen | 0            |
+| `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen, 5 Klassen       | 0            |
+| `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs        | 0            |
+
+Der ACK-Filter ist juenger als diese Logs, es gibt also kein geloggtes Urteil
+zum Abgleich. Stattdessen wird eine WIRKUNG genutzt: auf jeden dieser Frames
+folgte ein `ACK_RECEIVED`, das einen wartenden Ringslot geschlossen hat. Damit
+ist die Frage beantwortbar, die ein nachtraeglich eingezogener Filter immer
+aufwirft -- schneidet er ins Fleisch? Er tut es nicht. Alle drei Suiten sind
+mutationsgeprueft.
+
+Dazu `test_aprs_reencode` als Interop-Orakel: `encodeAPRS()` reproduziert die
+Bytesumme von 2422 verschiedenen real gehoerten Frames AUSNAHMSLOS, ueber elf
+Hardware-IDs und zwei Firmware-Generationen. Kein Zirkelschluss -- die
+Pruefsumme stammt vom Absender, der Decoder verwirft den Frame, wenn sie nicht
+zu den Wire-Bytes passt. `test_aprs_fuzz` schickt 500 real beschaedigte Frames
+unter ASan und UBSan durch den Parser, mit Fuell-Differential gegen Lesen ueber
+das Frame-Ende hinaus.
+
+### Dedup-Ring bleibt bei 100 -- gemessen, nicht geschaetzt
+
+Ein Auswertungsbericht empfahl 100 -> 300. Gegenprobe an denselben 48
+Knotenstunden: 112 Rueckkehrer, davon genau **ein** echtes Duplikat, 96
+`msg_id`-Wiederverwendungen (eine ANDERE Nachricht mit gleicher ID, Haeufung bei
+180-210 min Abstand) und 15 nicht aufloesbare Faelle.
+
+| Ring        | zusaetzlich abgefangen | faelschlich verworfen | Bilanz |
+| ----------- | ---------------------- | --------------------- | ------ |
+| 150/200/300 | 1                      | 1                     | +-0    |
+| 500         | 1                      | 52                    | -51    |
+| 1000        | 1                      | 96                    | -95    |
+
+Die Diagnose des Berichts stimmt: das Fenster liegt bei rund 38 min gegen eine
+laengste beobachtete Paketlebensdauer von 36,7 min, also ohne Reserve. Nur
+faellt durch diese Luecke praktisch nichts. 1 kB RAM fuer ein Ereignis in 48
+Knotenstunden ist kein Geschaeft. Die Messung steht als Begruendung im Code, und
+`test_dedup_replay` laesst eine Aenderung der Zahl absichtlich auffliegen.
+
+### Werkzeuge
+
+- `tools/meshlogger.py` schneidet die Netzkonsole eines Knotens ueber Tage auf
+  Platte mit. Die Konsole bedient einen Client zur Zeit, deshalb gibt das Tool
+  den Port auf eine `PAUSE`-Datei hin frei.
+- `tools/loganalyse.sh` wurde selbst geprueft und korrigiert (TOOL-01 bis
+  TOOL-06): CSMA-Backoff wurde als State-Machine-Fehler gezaehlt, die
+  Drop-Aufschluesselung landete im falschen Topf, die Hop-Extraktion las das
+  falsche Feld, Stoerbytes in der Eingabe brachten es zum Straucheln, und
+  Rohlogs mussten von Hand vorbereitet werden. Es liest sie jetzt direkt, und
+  eine Regressionssuite deckt die drei Zaehlfehler ab. Ein Urteil aus einem
+  kaputten Messgeraet ist nichts wert -- mehrere Aussagen dieses Release ruhen
+  auf diesem Werkzeug.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Die Nachweise stammen jeweils aus dem Lauf zu der Aenderung, die sie belegen --
+nicht aus einem einzelnen Abschlusslauf des fertigen Baums. Fuer den
+Release-Stand selbst stehen der Vollbau aller Environments und die native
+Testsuite.
+
+- **Heltec V3** -- OTA-Update von `20260821`, Settings unveraendert
+  (`FLASH layout 20260821 ok, build 20260827`), zweite OTA im eingeschwungenen
+  Zustand ebenfalls ohne Loeschung. ADC_CTRL-Probe `high=971 low=0 -> active
+HIGH`, BATT 4.14 V / 90 %, Roh-ADC-Streuung +/-1, Positions-Beacon ausgeloest
+  und gesendet (TX_START/TX_DONE), kein `task_wdt`-Ereignis. Rohframe-Mitschnitt
+  ueber die Netzkonsole auf Port 2323, fuenf Minuten -- der Lauf, der N-29
+  aufgedeckt hat.
+- **T-Beam v1.2** (ESP32-D0WDQ6, AXP2101, SX1276) -- OTA-Update, Rufzeichen und
+  WLAN-Zugangsdaten erhalten. AXP2101-Batteriepfad unveraendert, BATT 4.15 V /
+  100 %, kein `task_wdt`. Der PMU-Ausfallzweig greift dort erwartungsgemaess
+  nicht.
+- **WisBlock RAK4631** (nRF52) -- DFU-Update, Rufzeichen und
+  Ethernet-Konfiguration erhalten, Flash-Version danach `20260724`.
+
+Dazu 6 native Environments mit 220 Testfaellen und der Vollbau aller
+Release-Environments.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **Der Batterie-Nullpunkt am realen Akku.** `/B=000` ist aus der Logik und aus
+  Tests belegt, aber kein Pack auf der Bank war leer genug, um die Meldung im
+  Feld auszuloesen.
+- **Der INA226-Zweig** von `PositionToAPRS()`. Auf der Bank stand kein Board mit
+  INA226; die Aenderung dort ist eine Formatangleichung von `%i` auf `%03d`.
+- **Die `--txcapture`-Sendeseite ueber ein echtes Radio.** Der Empfangspfad hat
+  auf dem Heltec V3 Frames geliefert, der TX-Mitschnitt ist im selben Lauf mit
+  drei Frames aufgetreten, aber nicht systematisch gegen einen Zweitempfaenger
+  gehalten.
+- **Boards ausserhalb der drei genannten.** Sie bauen aus derselben Quelle und
+  erben jede Verbesserung, standen aber nicht auf der Bank -- inklusive T-Beam
+  Supreme und aller nRF52-Boards ausser dem RAK4631.
+- **Batteriestart ohne USB-Host**, unveraendert seit dem letzten Release nicht
+  durchfuehrbar.
+
+---
+
 ## Stability-Release v4.35p.08.22-stability (2026-08-22)
 
-> **Nach der Veroeffentlichung entstanden, NICHT in diesem Release:** die
-> Trennung von `FLASH_VERSION` (Build-Kennung) und `FLASH_STRUCT_VERSION`
-> (Layout-Generation). Das veroeffentlichte Binary vergleicht weiterhin das
-> Build-Datum und loescht daher beim naechsten Datumssprung die Einstellungen.
-> Der Fix liegt auf dem Branch und geht mit dem naechsten Release raus.
+> **Nachtrag:** Das Binary dieses Release vergleicht noch das Build-Datum und
+> loescht daher beim naechsten Datumssprung die Einstellungen. Die Trennung von
+> `FLASH_VERSION` (Build-Kennung) und `FLASH_STRUCT_VERSION` (Layout-Generation)
+> ist mit `v4.35p.08.27-stability` veroeffentlicht; ein Update von hier dorthin
+> behaelt die Konfiguration.
 
 Korrektur-Release auf `v4.35p.08.21-stability`. **Wer 08.21 installiert hat,
 sollte aktualisieren**: dieser Stand hatte einen Defekt, der jeden Node mit
