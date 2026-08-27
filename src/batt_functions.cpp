@@ -55,10 +55,6 @@ batt_probe_t battProbeState = BATT_PROBE_ACTIVE_LOW;
 batt_probe_t battProbeState = BATT_PROBE_ACTIVE_HIGH;
 #endif
 
-// battProbeState startet bewusst NICHT auf BATT_PROBE_UNKNOWN (siehe oben), daher braucht das
-// "einmalig ausfuehren"-Gating ein eigenes Flag statt eines Vergleichs gegen battProbeState.
-static bool battProbeDone = false;
-
 bool battHardwarePresent(void)
 {
 	return battProbeState != BATT_PROBE_NONE;   // fail-safe: nur bei positiv erkanntem "kein Teiler" false
@@ -66,6 +62,11 @@ bool battHardwarePresent(void)
 
 
 #if defined(ADC_CTRL_PIN)
+// battProbeState startet bewusst NICHT auf BATT_PROBE_UNKNOWN (siehe oben), daher braucht das
+// "einmalig ausfuehren"-Gating ein eigenes Flag statt eines Vergleichs gegen battProbeState.
+// Nur hier deklariert: ohne ADC_CTRL_PIN gibt es keine Probe und das Flag waere ungenutzt.
+static bool battProbeDone = false;
+
 // Einmalige Polaritaets-Probe (siehe Begruendung in batt_functions.h). Wird lazy beim ersten
 // ADC_BATT_ON() aufgerufen (also beim Boot, aus init_batt()) und danach nie wieder (battProbeDone).
 static void battProbeADCPolarity(void)
