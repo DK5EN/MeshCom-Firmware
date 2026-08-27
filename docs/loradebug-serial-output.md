@@ -305,8 +305,8 @@ nachfahren — nicht gegen eine Nachbildung:
 
 | Suite                | fährt nach                             | Umfang                                        |
 | -------------------- | -------------------------------------- | --------------------------------------------- |
-| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5.647 Urteile, 6.869 Slotbelegungen           |
-| `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen, alle fünf Prioritätsklassen |
+| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 8.813 Urteile, 10.652 Slotbelegungen          |
+| `test_txprio_replay` | `getMessagePriority()`                 | 729 Einstufungen, alle fünf Prioritätsklassen |
 | `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs                    |
 
 Weicht eine Suite ab, hat sich der Code vom Feldverhalten entfernt. Das ist

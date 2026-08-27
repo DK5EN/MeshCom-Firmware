@@ -1407,14 +1407,27 @@ setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
 >   Logausgabe konnte diesen Fehler nicht zeigen, weil `decodeAPRS()` die
 >   Laenge aus dem Frame zurueckgewinnt.
 >
+>   **Dauerlauf, 2026-08-25 22:10 bis 2026-08-27 22:10** (DK5EN-98 mit dem
+>   N-29-Fix, 48 h ueber Port 2323 mitgeschnitten, `tools/meshlogger.py` auf
+>   dem rpizero): 444.129 Zeilen / 36,3 MB, 0 Reconnects, keine Luecke in der
+>   Stundenverteilung. Daraus 15.344 `[MC-TEST]`-Frames, davon **0 abgeschnitten
+>   und 0 vom Ring verworfen** -- der 768-B-Ring haelt ueber zwei Tage
+>   Kanallast durch, nicht nur ueber fuenf Minuten. 15.286 verschiedene Frames,
+>   500 davon liegen als `capture_corpus.txt` im Baum; damit laeuft
+>   `test_capture_corpus_robust` erstmals gegen echte Bytes statt sich
+>   mangels Korpus zu ueberspringen. Die Laengen im Mitschnitt liegen zwischen
+>   12 und 159 B (Mittel 81), **kein einziger 255-B-Satz** -- gegen 457 von 500
+>   im `crc_corpus.txt` der Knoten ohne den Fix. Genau das war der Grund,
+>   diesen Knoten zu loggen.
+>
 > - **Layer-B-Replay: DONE (2026-08-25).** `tools/traceharvest.py` erntet die
 >   Entscheidungsfolge laufender Knoten aus der `[MC-DBG]`-Ausgabe; drei Suiten
 >   fahren sie gegen den echten Code nach, nicht gegen eine Nachbildung:
 >
 >   | Suite                | Was nachgefahren wird                  | Ergebnis                                                             |
 >   | -------------------- | -------------------------------------- | -------------------------------------------------------------------- |
->   | `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5.647 Urteile + 6.869 Slotbelegungen, 0 Abweichungen                 |
->   | `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen ueber alle fuenf Prioritaetsklassen, 0 Abweichungen |
+>   | `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 8.813 Urteile + 10.652 Slotbelegungen, 0 Abweichungen                |
+>   | `test_txprio_replay` | `getMessagePriority()`                 | 729 Einstufungen ueber alle fuenf Prioritaetsklassen, 0 Abweichungen |
 >   | `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs, 0 wuerden verworfen                      |
 >
 >   Voraussetzung dafuer war die Herausloesung von `dedup_functions.{h,cpp}`

@@ -336,16 +336,16 @@ damit ablesbar bleibt OB eins gesetzt ist. Die Settings-JSON an die App bleibt
 unberuehrt, sie muss den Wert zum Anzeigen und Aendern tragen. Das ersetzt nicht
 `--passwd`, es nimmt dem offenen Port den lohnendsten Fund.
 
-### Tests -- Replay gegen 48 Knotenstunden Feldmitschnitt
+### Tests -- Replay gegen ueber 90 Knotenstunden Feldmitschnitt
 
 `tools/traceharvest.py` erntet die Entscheidungsfolge laufender Knoten aus der
 `[MC-DBG]`-Ausgabe und fuettert sie dem echten Code, keiner Nachbildung:
 
-| Suite                | Gegenstand                             | Umfang                            | Abweichungen |
-| -------------------- | -------------------------------------- | --------------------------------- | ------------ |
-| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 5647 Urteile, 6869 Slotbelegungen | 0            |
-| `test_txprio_replay` | `getMessagePriority()`                 | 505 Einstufungen, 5 Klassen       | 0            |
-| `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs        | 0            |
+| Suite                | Gegenstand                             | Umfang                             | Abweichungen |
+| -------------------- | -------------------------------------- | ---------------------------------- | ------------ |
+| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 8813 Urteile, 10652 Slotbelegungen | 0            |
+| `test_txprio_replay` | `getMessagePriority()`                 | 729 Einstufungen, 5 Klassen        | 0            |
+| `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs         | 0            |
 
 Der ACK-Filter ist juenger als diese Logs, es gibt also kein geloggtes Urteil
 zum Abgleich. Stattdessen wird eine WIRKUNG genutzt: auf jeden dieser Frames
@@ -355,12 +355,12 @@ aufwirft -- schneidet er ins Fleisch? Er tut es nicht. Alle drei Suiten sind
 mutationsgeprueft.
 
 Dazu `test_aprs_reencode` als Interop-Orakel: `encodeAPRS()` reproduziert die
-Bytesumme von 2422 verschiedenen real gehoerten Frames AUSNAHMSLOS, ueber elf
-Hardware-IDs und zwei Firmware-Generationen. Kein Zirkelschluss -- die
-Pruefsumme stammt vom Absender, der Decoder verwirft den Frame, wenn sie nicht
-zu den Wire-Bytes passt. `test_aprs_fuzz` schickt 500 real beschaedigte Frames
-unter ASan und UBSan durch den Parser, mit Fuell-Differential gegen Lesen ueber
-das Frame-Ende hinaus.
+Bytesumme von 2650 verschiedenen real gehoerten Frames AUSNAHMSLOS, ueber
+neunzehn gemeldete Hardware-IDs und zwei Firmware-Generationen. Kein
+Zirkelschluss -- die Pruefsumme stammt vom Absender, der Decoder verwirft den
+Frame, wenn sie nicht zu den Wire-Bytes passt. `test_aprs_fuzz` schickt 500 real
+beschaedigte Frames unter ASan und UBSan durch den Parser, mit
+Fuell-Differential gegen Lesen ueber das Frame-Ende hinaus.
 
 ### Dedup-Ring bleibt bei 100 -- gemessen, nicht geschaetzt
 
