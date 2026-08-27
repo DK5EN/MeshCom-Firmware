@@ -1,7 +1,15 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.27-stability` (2026-08-27), based on official MeshCom 4.35p
-(upstream `dev`, merge-base `8114d7ae`).
+Release: `v4.35p.08.27.2-stability` (2026-08-27), based on official MeshCom
+4.35p, upstream `dev` at `fc83554e` — the state **after** upstream merged this
+fork's changes.
+
+**Items 1-103 below are now in official MeshCom.** The ICSSW maintainers merged
+[PR #1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) (82 changes)
+and [PR #1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103) into
+upstream `dev` on 27 August 2026. This document is kept as the record of what
+was done and why; it is no longer a list of differences from the official
+firmware.
 
 > **`v4.35p.08.21-stability` has been withdrawn and deleted.** It put any node
 > with GPS enabled into a permanent boot loop (item 81 below). If you still have
@@ -63,6 +71,31 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35p.08.27.2-stability
+
+A rebase-and-repackage release. The base moved from merge-base `8114d7ae` to
+upstream `dev` at `fc83554e`, so this build also carries everything upstream
+added in between: SD-card offline map tiles for the T-Deck Plus, the T-Echo
+BME280 fix, the extended Mheard JSON (per-hop RSSI/SNR in the HEY link chain,
+originating callsign, gateway identifier), the build date in the Info JSON, and
+the new BLE TYPE `I` field `FWDATE`. Two items are ours:
+
+102. **`FWDATE` was truncated by one character.** Upstream's new BLE TYPE `I`
+     field is built with `snprintf(cfwdate, sizeof(cfwdate), "%s %s", __DATE__,
+__TIME__)` into a `char cfwdate[20]`. `__DATE__` is 11 characters
+     (`Mmm dd yyyy`), the separator 1, `__TIME__` 8, the terminator 1 — 21
+     bytes. `snprintf` truncated silently, so the last digit of the seconds was
+     lost from every reported build timestamp. The buffer is now 24 bytes. Found
+     by `-Wformat-truncation`, which the default warning level does not enable;
+     returned upstream as PR #1103 and merged.
+
+103. **A probe flag was declared outside the block that uses it.** In
+     `batt_functions.cpp` the one-shot guard `battProbeDone` for the ADC_CTRL
+     polarity probe (item 89) sat outside `#if defined(ADC_CTRL_PIN)`, while
+     every use of it sits inside. On boards without that pin — E22-DevKitC,
+     t_deck, t_deck_plus — it compiled as an unused variable. Declaration moved
+     into the block. No behaviour change on any board.
 
 ## New in v4.35p.08.27-stability
 

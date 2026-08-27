@@ -7,6 +7,93 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.08.27.2-stability (2026-08-27)
+
+Kein Entwicklungs-Release. Dieses Paket verschiebt die Basis des Forks von
+`8114d7ae` (18. August) auf **`upstream/dev` vom 27. August (`fc83554e`)** --
+also auf den Stand, **nachdem** Upstream unsere Aenderungen uebernommen hat.
+
+### Der eigentliche Punkt
+
+**Der gesamte Code-Anteil dieses Forks liegt jetzt im offiziellen MeshCom.**
+Die ICSSW-Maintainer haben am 27. August beide eingereichten Pull Requests
+gemergt:
+
+- **PR #1102** -- 82 Stabilitaets- und Speichersicherheits-Aenderungen aus
+  fuenf Monaten Feldbetrieb. 64 Dateien, +3.213/-1.113. Uebernommen als Squash
+  `0cac4aea` (Merge `d4dee351`).
+- **PR #1103** -- Puffergroesse im neuen FWDATE-Feld von Upstream selbst
+  (`2d7f56b1`, Merge `fc83554e`).
+
+Damit ist der Zweck dieses Forks erfuellt: die Verbesserungen sind nicht mehr
+"unsere", sie stehen im offiziellen Baum und wirken auch ohne dieses Paket.
+
+### Was aus dem Upstream dazukommt
+
+Alles, was das ICSSW-Team und weitere Beitragende zwischen `8114d7ae` und
+`fc83554e` ergaenzt haben -- 26 Dateien, +702/-4.021:
+
+- **SD-Karten-Offlinekarten fuer das T-Deck Plus**, mit dynamischen Kartensaetzen,
+  Zoom-Bereichserkennung pro Kartensatz, Auto-Zoom-Rueckfall bei fehlenden
+  Kacheln, Nachladen an der Kachelgrenze und mehreren Marker-Korrekturen. Die
+  fuenf einkompilierten Kartenblobs (Europa, Deutschland, Oesterreich, Wien,
+  Wien-Umgebung -- rund 3.850 Zeilen generiertes C) entfallen zugunsten der
+  Kacheln auf der Karte.
+- **T-Echo BME280 repariert** -- richtige I2C-Pins, bedingte Adressbehandlung
+  fuer BMP280 gegen BME280, ungenutzter zweiter I2C-Bus aus der Variante
+  entfernt.
+- **Mheard-JSON erweitert** -- die Linkkette der HEY-Bake traegt jetzt RSSI/SNR
+  pro Hop, dazu Ursprungsrufzeichen und Gateway-Kennung. `serializeJson`
+  bekommt die Puffergroesse statt einer gemessenen Laenge.
+- **Info-JSON traegt das Build-Datum** (`FLASH_VERSION`).
+- **Neues BLE-TYPE-`I`-Feld `FWDATE`**, damit Apps Sub-Releases unterscheiden
+  koennen. `FWVER` bleibt unveraendert.
+
+### Was von uns dazukommt
+
+- **`FWDATE` wurde abgeschnitten.** Upstreams neues Feld legte `char cfwdate[20]`
+  fuer `__DATE__ " " __TIME__` an -- noetig sind 21 Byte. `snprintf` kuerzte
+  still die letzte Sekundenstelle. Gefunden vom `-Wformat-truncation`-Gate,
+  behoben und als PR #1103 zurueckgegeben.
+- **Bauhygiene:** ein Sondierungs-Flag im Batteriecode stand ausserhalb des
+  `#if defined(ADC_CTRL_PIN)`-Blocks, der es benutzt -- auf Boards ohne diesen
+  Pin eine ungenutzte Variable.
+
+### Was sich auf dem Draht aendert
+
+Gegenueber `v4.35p.08.27-stability` nichts. Die drei dort angekuendigten
+Aenderungen (`/B=000`, unplausible ACK-Frames werden nicht weitergesendet,
+korrigierte ESP32-Kanalauslastung) sind unveraendert und liegen jetzt auch im
+offiziellen Upstream.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Nichts Neues. Dies ist ein Rebase- und Verpackungs-Release; die Bench-Ergebnisse
+hinter den eigenen Aenderungen sind die von `v4.35p.08.27-stability` und gelten
+unveraendert weiter (OTA Heltec V3 mit erhaltener Konfiguration, OTA T-Beam v1.2,
+DFU RAK4631 mit erhaltenem Rufzeichen und Ethernet-Konfiguration).
+
+Geprueft wurde hier:
+
+- Alle 32 Release-Umgebungen bauen sauber.
+- Die sieben Haupt-Targets bauen mit `-Werror` auf `src/` ohne eine einzige
+  Warnung aus eigenem Code.
+- Der Baum ist gegenueber `v4.35p.08.27-stability` in allem ausser den oben
+  gelisteten Upstream-Ergaenzungen unveraendert -- per Tree-Hash belegt, nicht
+  per Durchsicht.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **Upstreams neuer T-Deck- und T-Echo-Code hatte hier keine Bankzeit.** Weder
+  ein T-Deck Plus mit SD-Karte noch ein T-Echo mit BME280 steht zur Verfuegung.
+  Der Code baut sauber und wird mitgeliefert, aber niemand auf dieser Seite hat
+  ihn laufen sehen.
+- Alle Punkte aus `v4.35p.08.27-stability` bleiben offen: Batterie-Nullpunkt am
+  echten Akku, INA226-Zweig, `--txcapture`-Sendeseite gegen einen zweiten
+  Empfaenger, L76K-GPS-Module, Boot am Akku ohne USB-Host.
+
+---
+
 ## Upstream-Sync 2026-08-27 (dev)
 
 Upstream hat beide eingereichten PRs uebernommen. `upstream/dev` steht auf
