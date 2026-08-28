@@ -99,11 +99,27 @@ Zeichen, `DIST` vierstellig mit Nachkommastelle.
 | 6             | 156                  | 258                  | 259                          | **`blelen+2` läuft über → Datensatz verloren**  |
 | 7             | 156                  | 269                  | 270                          | **`blelen+2` läuft über → Datensatz verloren**  |
 
-Zur Einordnung von `PL = 5`: dort greift die Klemmung noch nicht, und der Überlauf auch
-nicht. Ob der Rahmen ankommt, hängt am ausgehandelten ATT-MTU. Belegt ist aus dem
-`I`-Register, dass 247-Byte-Schreibvorgänge vollständig ankommen; für 250 Byte fehlt der
-Beleg in beide Richtungen. Sicher falsch ist erst `PL ≥ 6` — dort ist es unabhängig vom MTU
-kaputt.
+Zur Einordnung von `PL = 5`: dort greift weder die Klemmung noch der Überlauf. Ob der
+Rahmen ankommt, hängt am ausgehandelten ATT-MTU — und der ist inzwischen gemessen:
+
+```
+[INFO] ble_service.src.ble_adapter: Negotiated ATT MTU for this BLE connection: 255 bytes
+```
+
+255 MTU heißt 252 Byte nutzbare Notification-Nutzlast, und geschrieben werden
+`json_len + 3`. Daraus ergibt sich die vollständige Staffelung:
+
+| JSON-Länge | Schreiblänge | Wirkung bei MTU 255                          |
+| ---------- | ------------ | -------------------------------------------- |
+| ≤ 249      | ≤ 252        | kommt vollständig an                         |
+| 250 – 252  | 253 – 255    | über der Nutzlast → JSON abgeschnitten       |
+| ≥ 253      | 0 bzw. 1     | `blelen + 2` läuft über → Datensatz verloren |
+
+`PL = 5` (247 Zeichen, 250 geschrieben) kommt damit auf **dieser** Verbindung noch durch.
+Verlassen sollte man sich darauf nicht: der MTU wird je Verbindung ausgehandelt, und die
+Firmware fragt ihn nirgends ab (siehe [`I`-Issue](issue-ble-i-register-mtu-20260828.md)
+§3.1). Ein Gegenüber mit kleinerem MTU verschiebt die Staffelung nach unten. Unabhängig
+vom MTU kaputt ist `PL ≥ 6`.
 
 Der Anteil der drei Felder am Dokument: bei `PL = 2` sind es 58 von 214 Zeichen, bei
 `PL = 7` bereits 113 von 269. `PP` allein ist bei sieben Hops mit 81 Zeichen das größte

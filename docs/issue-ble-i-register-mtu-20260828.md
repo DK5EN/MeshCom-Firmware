@@ -104,9 +104,30 @@ nicht. Derselbe Vergleich gegen 298 steht in allen Registerbauern in
 
 **Wichtige Einordnung zur Rahmenlänge:** die 247 Byte aus dem Log sind `blelen + 2` mit
 `blelen = 245` und damit **konstant**, sobald das Dokument ≥ 244 Zeichen ist. Sie beweisen
-die Überschreitung, sagen aber nichts über deren Höhe aus. Der ATT-MTU ist hier nicht die
-bindende Grenze — 247 Byte kommen empirisch vollständig an. Bindend ist die firmware-eigene
-245er-Klemmung.
+die Überschreitung, sagen aber nichts über deren Höhe aus.
+
+Der ATT-MTU ist hier nicht die bindende Grenze. Gemessen auf der betroffenen Verbindung:
+
+```
+[INFO] ble_service.src.ble_adapter: Negotiated ATT MTU for this BLE connection: 255 bytes
+```
+
+255 Byte MTU heißt 252 Byte nutzbare Notification-Nutzlast — die 247 geschriebenen Byte
+kommen also vollständig an. Bindend ist allein die firmware-eigene 245er-Klemmung.
+
+### 3.1 Nebenbefund: die Klemmen ignorieren den ausgehandelten MTU
+
+Die Zahlen 245 und 255 stehen fest im Code; der Kommentar an beiden Schreibstellen
+(`phone_commands.cpp:66` und `:164`, ebenso `web_functions.cpp:1279`) nennt als Begründung
+"MTU=247 bytes". Der tatsächlich ausgehandelte Wert wird nirgends abgefragt — ein `grep`
+über `src/` findet MTU ausschließlich in diesen Kommentaren.
+
+Auf der hier gemessenen Verbindung (255) geht das gut. Ein Gegenüber, das einen kleineren
+MTU aushandelt, bekommt dagegen **jeden** großen Rahmen abgeschnitten, unabhängig von
+diesem Issue: bei MTU 185 etwa liegt die nutzbare Nutzlast bei 182 Byte, also weit unter
+den 245, die die Firmware zu schreiben bereit ist. Sauber wäre, die Schreiblänge aus dem
+ausgehandelten MTU abzuleiten, statt sie zu raten. Das ist ein eigener Punkt und nicht Teil
+der Sofortmaßnahme — es erklärt aber, warum die Grenze überhaupt so unklar im Code steht.
 
 ---
 
