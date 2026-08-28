@@ -146,3 +146,10 @@ Measure every step with the harness before and after; do not stack changes.
 Still open on the map: neighbour tiles beyond the 2x2 window are not needed (viewport < tile), but
 a station further away than the viewport is simply not drawn; map panning (handover §4.5) is not
 implemented.
+
+## 6. Tile format (note for tomorrow)
+
+PNG decode is 55-60 % of every map compose (~95 ms per 256x256 tile, lodepng on the S3). Candidates:
+raw RGB565 tiles (no decoder, 128 KB each, ~770 MB for the Europe set), a decoded-tile LRU cache in
+PSRAM (do in any case), 8-bit palette PNG, or QOI. Details and trade-offs in
+[`RESUME.md`](RESUME.md).
