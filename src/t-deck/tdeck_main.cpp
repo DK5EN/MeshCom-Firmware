@@ -349,7 +349,12 @@ void setupLvgl()
 
     lv_group_set_default(lv_group_create());
 
-    lv_disp_draw_buf_init( &draw_buf, buf, NULL, LVGL_BUFFER_SIZE );
+    // G07: der 4. Parameter ist size_in_px_cnt, nicht die Byte-Groesse
+    // (lv_hal_disp.h:223). LVGL_BUFFER_SIZE ist TFT_WIDTH*TFT_HEIGHT*sizeof(lv_color_t),
+    // also das Doppelte der Pixelzahl. Bisher folgenlos, weil full_refresh=1 und
+    // buf2==NULL die Teilbild-Pfade nie erreicht haben -- mit der Umstellung unten
+    // waere es ein Ueberlauf von rund 150 KB.
+    lv_disp_draw_buf_init( &draw_buf, buf, NULL, TFT_WIDTH * TFT_HEIGHT );
 
     /*Initialize the display*/
     static lv_disp_drv_t disp_drv;
@@ -360,9 +365,16 @@ void setupLvgl()
     disp_drv.ver_res = TFT_WIDTH;
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf;
-#ifdef BOARD_HAS_PSRAM
-    disp_drv.full_refresh = 1;
-#endif
+    // P1: full_refresh=1 hat JEDE Invalidierung zu einem Vollbild gemacht --
+    // 320*240*2 B ueber SPI, gemessen 36,65 ms, rund dreimal pro Sekunde schon im
+    // Leerlauf (11 % der Wanduhrzeit, blockierend, unter gehaltenem SPI-Semaphor,
+    // das auch SD und LoRa fronted). Eine Uhrziffer kostete damit ein komplettes
+    // Bild. Mit Teilbild-Auffrischung zeichnet LVGL nur das invalidierte Rechteck.
+    //
+    // Nicht der Weg: LV_DISP_DEF_REFR_PERIOD anheben. Gemessen 16 ms -> 40 ms,
+    // Ergebnis 184 -> 189 Flushes je 60 s, also wirkungslos. Die Rate kommt von
+    // der Invalidierungshaeufigkeit, nicht von der Sollperiode.
+    disp_drv.full_refresh = 0;
     lv_disp_drv_register( &disp_drv );
 
     /*Initialize the  input device driver*/

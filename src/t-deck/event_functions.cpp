@@ -890,6 +890,14 @@ void tabview_event_cb(lv_event_t * e)
     if(lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
         int tab_idx = lv_tabview_get_tab_act(tv);
 
+        // Ohne full_refresh zeichnet LVGL nur an, was sich selbst als schmutzig
+        // meldet. Der Tabinhalt wechselt hier komplett, aber nicht jedes Widget
+        // meldet sich -- die Karte etwa zeigt dieselbe Kachel wie zuvor. Ohne
+        // das hier blieben Reste des alten Tabs stehen.
+        lv_obj_t *scr = lv_scr_act();
+        if(scr != NULL)
+            lv_obj_invalidate(scr);
+
         switch (tab_idx)
         {
             case 0: // MSG

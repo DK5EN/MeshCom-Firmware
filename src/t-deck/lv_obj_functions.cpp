@@ -321,6 +321,19 @@ static void tdeck_set_tab_menu_visible(bool show)
     {
         lv_obj_add_flag(tab_bar, LV_OBJ_FLAG_HIDDEN);
         tab_menu_visible = false;
+
+        // Ohne full_refresh invalidiert lv_obj_add_flag(HIDDEN) nur die Flaeche
+        // des Drawers selbst. Was darunter zum Vorschein kommt, wird nur dann
+        // neu gezeichnet, wenn es sich selbst als schmutzig meldet. Die meisten
+        // Tabs tun das beilaeufig, weil sich beim Wechsel Beschriftungen und
+        // Werte aendern -- die Karte nicht: sie zeigt dieselbe Kachel wie zuvor
+        // und meldet nichts an. Ergebnis war ein scheinbar haengender
+        // Karten-Tab, dessen Inhalt nur dort auftauchte, wo der Cursor
+        // vorbeigezogen ist. Einmal den ganzen Schirm anfordern ist hier
+        // billig: das passiert nur bei Bedienung, nicht periodisch.
+        lv_obj_t *scr = lv_scr_act();
+        if(scr != NULL)
+            lv_obj_invalidate(scr);
     }
 
     update_tab_button_state(show);
@@ -1870,6 +1883,35 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
     lv_obj_align(map_ta, LV_ALIGN_CENTER, 1, 0);
     lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
     */
+
+    // Sichtfenster auf den eigenen Standort zentrieren.
+    //
+    // map_ta ist SDMAP_TILE_PX gross (256x256), der sichtbare Tab-Bereich aber
+    // nur rund LV_VER_RES*0.72 hoch. Der Ueberstand wird zu einem Scrollbereich,
+    // und die Kachel sass bisher starr an dessen Anfang. Je nachdem, wo in der
+    // Kachel die eigene Position liegt, stand der blaue Punkt damit unterhalb
+    // der Sichtkante -- man sah einen beliebigen Ausschnitt und beim Zoomen
+    // wanderte er scheinbar quer durch Europa. Das war nie ein Kachelfehler:
+    // sdmap_refresh() hat stets die richtige Kachel geladen.
+    //
+    // x/y sind bereits die Pixelposition innerhalb der Kachel (sdmap_project),
+    // also genuegt es, den Scrollbereich so zu setzen, dass sie mittig steht.
+    // LVGL begrenzt den Wert selbst auf den gueltigen Bereich, an den
+    // Kachelraendern rutscht der Punkt also nur so weit aus der Mitte, wie es
+    // die Kachel erzwingt.
+    if(bHome && map_ta != NULL)
+    {
+        lv_obj_t *viewport = lv_obj_get_parent(map_ta);
+        if(viewport != NULL)
+        {
+            lv_coord_t vw = lv_obj_get_width(viewport);
+            lv_coord_t vh = lv_obj_get_height(viewport);
+            lv_obj_scroll_to(viewport,
+                             (lv_coord_t)(x - vw / 2),
+                             (lv_coord_t)(y - vh / 2),
+                             LV_ANIM_OFF);
+        }
+    }
 }
 
 /**
@@ -1916,6 +1958,16 @@ void refresh_map(int iMap)
             }
         }
     }
+
+    // Ohne full_refresh zeichnet LVGL nur invalidierte Flaechen. sdmap_refresh()
+    // invalidiert ueber lv_img_set_src() nur dann, wenn tatsaechlich eine neue
+    // Kachel geladen wurde -- beim blossen Tabwechsel auf dieselbe Kachel also
+    // nicht. Die Kartenflaeche blieb dadurch ungezeichnet und tauchte nur dort
+    // auf, wo der Trackball-Cursor sie beim Vorbeiziehen invalidiert hat.
+    // Unter full_refresh=1 war das folgenlos, weil ohnehin jedes Bild komplett
+    // neu gemalt wurde. Deshalb hier explizit anfordern.
+    if(map_ta != NULL)
+        lv_obj_invalidate(map_ta);
 }
 
 /**
