@@ -227,7 +227,7 @@ void startAudio()
  */
 bool setupSD()
 {
-    if (SD.begin(TDECK_SDCARD_CS, SPI, 20000000U)) {   // EXPERIMENT: was 800000U
+    if (SD.begin(TDECK_SDCARD_CS, SPI, 20000000U)) {   // was 800000U; 40 MHz measured identical (read path ~1.3 MB/s, decode dominates)
         uint8_t cardType = SD.cardType();
         if (cardType == CARD_NONE) {
             Serial.println("[INIT]...No SD_MMC card attached");

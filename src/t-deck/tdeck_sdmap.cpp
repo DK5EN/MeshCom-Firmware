@@ -170,6 +170,8 @@ int sdmap_view_h() { return sdmap_viewH; }
 
 // Load one tile PNG from the active set and decode it to RGBA32. Returns NULL if the
 // tile does not exist or cannot be decoded; the caller frees the buffer.
+static uint32_t sdmap_tReadMs = 0, sdmap_tDecodeMs = 0, sdmap_bytesRead = 0;   // per compose, for the log line
+
 static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned * w, unsigned * h)
 {
     char path[64];
@@ -190,8 +192,11 @@ static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned *
         f.close();
         return nullptr;
     }
+    uint32_t tr = millis();
     size_t readLen = f.read(pngRaw, fsize);
     f.close();
+    sdmap_tReadMs += millis() - tr;
+    sdmap_bytesRead += fsize;
     if (readLen != fsize)
     {
         Serial.println("[ SDMAP ]...Lesefehler beim Kachel-Import");
@@ -199,7 +204,9 @@ static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned *
         return nullptr;
     }
     unsigned char * rgba32 = nullptr;
+    uint32_t td = millis();
     unsigned err = lodepng_decode32(&rgba32, w, h, pngRaw, fsize);
+    sdmap_tDecodeMs += millis() - td;
     free(pngRaw);
     if (err)
     {
@@ -217,6 +224,7 @@ static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned *
 bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
 {
     uint32_t t0 = millis();
+    sdmap_tReadMs = 0; sdmap_tDecodeMs = 0; sdmap_bytesRead = 0;
     sdmap_lastLat = lat;
     sdmap_lastLon = lon;
 
@@ -344,8 +352,9 @@ bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
         if (nMissing == nTiles) lv_obj_clear_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
         else                    lv_obj_add_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
     }
-    Serial.printf("[ SDMAP ]...Karte zusammengesetzt: zoom %d, Kacheln %d (fehlend %d), %dx%d px, %lu ms\n",
-                  sdmap_zoom, nTiles, nMissing, vw, vh, (unsigned long)(millis() - t0));
+    Serial.printf("[ SDMAP ]...Karte zusammengesetzt: zoom %d, Kacheln %d (fehlend %d), %dx%d px, %lu ms (read %lu ms / %lu KB, decode %lu ms)\n",
+                  sdmap_zoom, nTiles, nMissing, vw, vh, (unsigned long)(millis() - t0),
+                  (unsigned long)sdmap_tReadMs, (unsigned long)(sdmap_bytesRead / 1024), (unsigned long)sdmap_tDecodeMs);
     return true;
 }
 
