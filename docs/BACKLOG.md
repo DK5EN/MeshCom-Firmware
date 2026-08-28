@@ -6,7 +6,7 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-Last updated 2026-08-21. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-28. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
 
 > ### Standing risk — read first
 >
@@ -498,6 +498,310 @@ section of [`bug-loganalyse-toolchain-20260824.md`](bug-loganalyse-toolchain-202
 commit. CI wiring was deliberately deferred (test is local-only). The `git add -p`-based per-id split
 of the shared harness was not possible (interactive staging disabled), so the harness is one commit
 (`b7a54f2f`) after the three fixes it validates.
+
+### 3.8a Headless configurability — GUI-only settings block automated tests (found 2026-08-28)
+
+Found while bringing a **T-Deck Plus** (`DK5EN-14`, ESP32-S3 16 MB / 8 MB PSRAM) up from a virgin
+flash over USB serial. Goal: every setting a node needs to reach a usable state must be reachable
+**over USB serial alone**, so hardware tests can be automated without a human touching the display.
+
+Callsign, SSID and password all set fine over serial. The node still refused to go online —
+`[WIFI]...disabled by Settings (node_wifion=false)` — and no serial command can clear that flag.
+Enabling WLAN on a T-Deck currently requires physically tapping an unlabelled icon button in the
+Setup tab. On a headless build (`t_deck` variants aside, any board without that GUI) the flag is
+unreachable entirely.
+
+| ID    | Type | Sev.   | Location                                                  | Item                                                                                                                                                                                         | Status |
+| ----- | ---- | ------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| HL-01 | GAP  | High   | `t-deck/event_functions.cpp:277`; `command_functions.cpp` | `node_wifion` is assigned in exactly one place — the `btn_wifi` GUI handler. No `--wifi on/off`. A serially provisioned node can never join a WLAN.                                          | open   |
+| HL-02 | BUG  | Medium | `esp32/esp32_flash.h:239` vs `esp32/esp32_flash.cpp:204`  | Struct default is `node_wifion = true`, but the load uses `preferences.getBool("node_wifion", false)`. On virgin NVS the load default wins → every freshly flashed node boots with WLAN off. | open   |
+| HL-03 | GAP  | Low    | `t-deck/event_functions.cpp` (`btn_soundon`)              | `audio_set_mute()` has no serial equivalent.                                                                                                                                                 | open   |
+| HL-04 | GAP  | Low    | `t-deck/event_functions.cpp` (`btn_persist_*`)            | `node_persist_to_flash`, `node_persist_to_sd`, `node_immediate_save` are GUI-only.                                                                                                           | open   |
+
+**Verified as already serial-complete** (checked handler-by-handler against the command table, so the
+fix does not need to touch them): `btn_gps` → `--gps on/off`, `btn_track` → `--track on/off`,
+`btn_webserver` → `--webserver on/off`, `btn_wifiap` → `--wifiap on/off`, `btn_mesh` → `--mesh on/off`,
+`btn_noallmsg` → `--nomsgall on/off`. Each GUI handler literally calls `commandAction()` with that
+string.
+
+GPS round-trip proven on hardware over serial — `--gps off` → `--pos` reports `...GPS: off`,
+`--gps on` → `...GPS: on`. So **only WLAN is missing**, not "WLAN and GPS".
+
+**Acceptance for HL-01:** with the device freshly flashed and reachable only over
+`/dev/cu.usbmodem*`, this sequence must bring it online with no display interaction:
+
+```
+--setcall <call>
+--setssid <ssid>
+--setpwd <pwd>
+--wifi on
+```
+
+`--info` must then report `hasIpAddress: yes`. The `btn_wifi` handler must be reduced to calling
+that same command, so GUI and serial cannot drift apart — the pattern `btn_gps` and `btn_mesh`
+already follow.
+
+---
+
+### 3.8b T-Deck Plus bring-up — open issues (`DK5EN-14`, from 2026-08-28)
+
+**In progress.** Device handed over by the upstream FW maintainer, who was tracking a heap defect
+on the T-Deck at the time:
+
+> "Ich suche gerade im T-DECK seit zwei tagen einen HEAP Fehler .. und heute auch ohne KI gefunden.
+> Das Hirn muss immer trainiert werden" — "wenn ein fehler bekannt ist kann man dass schon
+> reparieren. Die versteckten fehler sind das Thema"
+
+So the target is not the known defect but the **class** of defect: what else in the T-Deck GUI path
+has the same shape. Bring-up record and serial quirks: §3.8a.
+
+| ID    | Type  | Sev.   | Location                            | Item                                                                                    | Status      |
+| ----- | ----- | ------ | ----------------------------------- | --------------------------------------------------------------------------------------- | ----------- |
+| TD-01 | BUG   | High   | `udp_functions.cpp:629-698`         | WLAN association fails on ~50 % of boots; BSSID pinning prevents fallback to the 2nd AP | open        |
+| TD-02 | NOFIX | —      | —                                   | "Constant reboots" not reproducible — caused by the host opening the USB port           | closed      |
+| TD-03 | BUG   | High   | `src/t-deck/*` (unknown)            | Heap defect reported by maintainer; needs long-run instrumentation to localise          | in progress |
+| TD-04 | TASK  | Medium | `tdeck_sdmap.cpp`; SD card          | Install Europe map tiles from `download.tiles.coalition.space`                          | in progress |
+| TD-05 | PERF  | Medium | `lv_obj_functions.cpp` (4313 lines) | GUI is sluggish — cause unidentified                                                    | in progress |
+| TD-06 | TEST  | High   | `tools/`                            | Automated test harness driving the device over serial + net console                     | in progress |
+
+#### TD-01 — WLAN association, and the "wrong access point?" question
+
+**It does not pick the wrong AP.** `startNetwork()` scans all channels, selects the strongest RSSI
+(`udp_functions.cpp:650`), and that is consistently the nearer Orbi. Measured over four boots:
+
+| Boot | AP `5A:…:8B` | AP `46:…:86` | Chosen | Result                             |
+| ---- | ------------ | ------------ | ------ | ---------------------------------- |
+| 1    | −72 dBm      | −94 dBm      | `5A`   | connect OK, `192.168.68.71`        |
+| 2    | −78 dBm      | −93 dBm      | `5A`   | 6× `connection error`, radio reset |
+| 3    | −74 dBm      | (n/a)        | `5A`   | connect OK, `192.168.68.71`        |
+| 4    | −74 dBm      | −88 dBm      | `5A`   | 6× error, reset, 6× error, gave up |
+
+Two findings instead:
+
+1. **The association fails at a signal level that should work.** Six retries at −73/−74 dBm, twice.
+   Not a range problem in the usual sense.
+2. **BSSID pinning removes the fallback.** `WiFi.begin(ssid, pwd, channel, BSSID, true)`
+   (`udp_functions.cpp:696-698`) locks onto one BSSID. When that AP refuses, the supplicant cannot
+   try the second Orbi — even though both carry the same SSID. On failure the node waits **5 minutes**
+   before the next attempt. Softening the pin to SSID-only after the first failed pass is the
+   obvious mitigation.
+
+Also noted: both APs advertise **channel 3** — co-channel, same SSID. And the recovery path emits
+`E (…) wifi:timeout when WiFi un-init, type=4` from the IDF during "full radio reset", i.e. the
+reset path itself is not clean.
+
+**Operator answers (2026-08-28), which narrow this considerably:**
+
+- Orbi runs **WPA2/WPA3 Personal**, 2.4 + 5 GHz, 80 MHz channel width.
+- **`DK5EN-98` — a Heltec V3 — sits on the same SSID and connects without trouble** (verified live:
+  `192.168.68.56`, `hasIpAddress: yes`, net console reachable on 2323).
+
+Same SoC family, same firmware version, same `startNetwork()` code path, same AP, same security
+mode. So **WPA2/WPA3 transition is not the sole cause** — if it were, the Heltec would fail too.
+That points at something T-Deck-specific: RF (antenna, or self-interference from display backlight,
+OPI PSRAM and audio amp) or boot-time ordering, not the association logic as such.
+
+**Refinement:** the node is _not_ permanently offline. `192.168.68.71` answered ping some minutes
+after the capture ended, so the 5-minute retry does succeed. The correct statement of the defect is
+therefore **"association fails during boot and only recovers on a later retry"**, not "cannot
+connect". That also means the observable symptom is a node that is silently absent from the network
+for the first ~5 minutes after every power-on — bad for a headless test rig, and the reason TD-06
+needs it fixed.
+
+Next step: log RSSI side by side on both nodes at the same location, to separate "T-Deck hears
+worse" from "T-Deck associates worse".
+
+#### TD-02 — the reboots were ours
+
+Audible restarts during bring-up were **not** a device fault. The T-Deck Plus uses the ESP32-S3
+USB-Serial/JTAG peripheral: **every host port open triggers `rst:0x15 (USB_UART_CHIP_RESET)`**, and
+each boot plays the startup tone. Roughly ten tool invocations produced roughly ten audible boots.
+
+Counter-evidence, so this is not chased again: **240 s of uninterrupted serial observation produced
+exactly one reset — the one at t=0.3 s from our own connect.** No panic, no `Guru Meditation`, no
+watchdog, no brownout, no backtrace. Heap flat across the window (95 936 → 95 884 B free, min-ever
+90 252 B, largest block 81 908 B, both `(mon)` samples identical to within 52 B).
+
+To observe without perturbing: enable `--netconsole on` and watch TCP 2323 (`tools/hmac_connect.py`),
+which does not reset the device.
+
+#### TD-03 — heap defect
+
+Not yet localised. The 4-minute window above is far too short to prove anything; it only rules out a
+fast leak. Needs a long soak with `[HEAP]` sampling (the `(mon)` line already emits free / min-ever /
+largest-block) against a device that is actually exercising the GUI, LoRa RX and the SD map path.
+`tools/meshlogger.py` can record it for days over the net console.
+
+#### TD-04 — Europe map on SD
+
+Card present and healthy: **SDHC, 30 436 MB**, mounts under MeshCom (the LilyGo factory firmware
+failed on the same card, so this was never a card fault). Currently `/maps` is absent and the node
+logs `[ SDMAP ]...Ordner /maps nicht gefunden!` plus repeated
+`[ SDMAP ]...Keine Kachel fuer diese Position in  gefunden (Zoom 0 bis 0 geprueft)`. Tiles to come
+from `https://download.tiles.coalition.space/`. Needs: expected directory layout, tile format and
+zoom range that `tdeck_sdmap.cpp` actually reads — verify against the code before downloading a
+large tile set.
+
+#### TD-05 — GUI latency
+
+Unquantified so far. `lv_obj_functions.cpp` is 4313 lines and builds the whole widget tree; the LVGL
+tick/refresh path, the SD map lookups on the draw path, and `Print::printf` heap churn (see
+`printf malloc` note in the campaign memory) are the first three suspects. Measure before changing.
+
+#### TD-06 — automated tests
+
+Serial control is nearly complete (§3.8a); `--wifi on/off` (HL-01) is the missing piece that would
+let a test bring a virgin node fully online unattended. Planned instruments: USB serial for
+provisioning and assertions, net console 2323 for non-perturbing observation, and a second node
+(`DK5EN-98`) to watch what `DK5EN-14` actually transmits.
+
+#### Explicitly out of scope
+
+The 869 MHz band-check defect found during bring-up (empty interval at `LORA_BANDWIDTH 250`,
+`command_functions.cpp:4254`) is **not being fixed**: this deployment is 433 MHz only and will never
+transmit on 869 MHz. Recorded here so the finding is not rediscovered and mistaken for new.
+
+---
+
+### 3.8c T-Deck GUI review — stage 1 findings (2026-08-28)
+
+`/code-review medium` over `src/t-deck/` against [`codequality-rules.md`](codequality-rules.md),
+carrying forward the defect classes from [`code-audit-20260626.md`](code-audit-20260626.md).
+**16 findings, 3 HIGH.** Full evidence, reproduction and fix direction:
+[`review-tdeck-gui-20260828.md`](review-tdeck-gui-20260828.md).
+
+Stage 2 (`/fable-review`, adversarial verification with advisor gating) still to run — the operator
+chose the two-stage route. **No code changed yet, and no regression tests exist for any of these.**
+
+| ID  | Sev.    | Location                    | Item                                                      | Topic | Status       |
+| --- | ------- | --------------------------- | --------------------------------------------------------- | ----- | ------------ |
+| G01 | HIGH    | `lv_obj_functions.cpp:1777` | Dangling LVGL pointers → use-after-free in PSRAM heap     | TD-03 | verified     |
+| G02 | HIGH    | `lv_obj_functions.cpp:1723` | `ic <= MAX_MAP` reads past `strMaps[5]`                   | —     | verified     |
+| G03 | HIGH    | `lv_obj_functions.cpp:3570` | Hemisphere signs swapped; S/W stations plotted N/E        | —     | verified     |
+| G04 | MEDIUM  | `lv_obj_functions.cpp:183`  | Up to 5 000 Arduino `String` blocks on the internal heap  | TD-03 | verified     |
+| G05 | MEDIUM  | `tdeck_main.cpp:600`        | SD I/O + PNG decode + ~870 ms `delay()` in LVGL `read_cb` | TD-05 | not verified |
+| G06 | MEDIUM  | `tdeck_main.cpp:262`        | `addMessage()` blocks the main loop 2 s (8 s at boot)     | TD-05 | not verified |
+| G07 | MEDIUM  | `tdeck_main.cpp:351`        | Draw-buffer size passed in bytes, not pixels              | —     | not verified |
+| G08 | MEDIUM  | `tdeck_main.cpp:337`        | Unchecked `malloc` fallback → NULL deref at boot          | —     | not verified |
+| G09 | MEDIUM  | `tdeck_sdmap.cpp:216`       | Unbounded allocation from SD-supplied file size           | TD-04 | not verified |
+| G10 | MEDIUM  | `tdeck_sdmap.cpp:52`        | Active set clamped to compile-time, not discovered, count | TD-04 | not verified |
+| G11 | MEDIUM  | `tdeck_sdmap.cpp:186`       | Stale tile state suppresses retry after a failed load     | TD-04 | not verified |
+| G12 | MEDIUM  | `event_functions.cpp:598`   | `memcmp` reads 49 B past `node_passwd[15]`                | —     | not verified |
+| G13 | MEDIUM  | `event_functions.cpp:652`   | Uninitialised `iNewPower` persisted to flash              | —     | not verified |
+| G14 | MEDIUM  | `lv_obj_functions.cpp:4290` | Timestamp format mismatch makes clock restore dead code   | —     | not verified |
+| G15 | LOW/MED | `tdeck_main.cpp:113`        | Binary semaphore as SPI mutex, `portMAX_DELAY`            | —     | not verified |
+| G16 | LOW     | `lv_obj_functions.cpp:3642` | `millis()` wraparound comparison (STAB-05)                | —     | not verified |
+
+**This answers TD-03 with two candidate mechanisms**, both on the internal heap rather than PSRAM —
+which is why PSRAM telemetry looked healthy during bring-up while free internal heap sat at ~95 KB.
+G01 is a use-after-free whose correct pattern already exists twenty lines further down in the same
+function; G04 is unbounded `String` accumulation. Either would match the maintainer's report.
+
+**G09/G10/G11 gate TD-04:** fix them before populating a 30 GB card, since G09 makes every tile
+change cost ~256 KB of transient internal heap and G10 can make a correctly populated card look
+empty.
+
+---
+
+### 3.8d MHeard `MOD` byte — country nibble collides with the "not from last hop" marker (2026-08-28)
+
+External wire-contract report from DK5EN (MCProxy/McApp side), verified against this tree on
+2026-08-28: [`~/WebDev/MCProxy/doc/2026-08-28_1700-firmware-mod-nibble-handover.md`](../../MCProxy/doc/2026-08-28_1700-firmware-mod-nibble-handover.md).
+**Two defects, both confirmed at the cited lines.** No code changed yet, no regression test exists.
+
+Not a crash — a data-loss and ambiguity defect in a field that already has downstream consumers
+(BLE MHeard register → MCApp, web UI, `--mheard` dump). Low impact today, but the wire cannot
+express the difference, so it is silently unfixable downstream. Decide before more consumers read
+the field.
+
+| ID    | Sev.   | Location                          | Item                                                               | Status   |
+| ----- | ------ | --------------------------------- | ------------------------------------------------------------------ | -------- |
+| MH-01 | MEDIUM | `lora_functions.cpp:587`          | `\| 0xF0` marker overwrites the country nibble; `0xF` == `PL` (15) | verified |
+| MH-02 | LOW    | `aprs_functions.cpp:126, 448/454` | Absent optional trailing fields keep the **receiver's** hw/fw      | verified |
+
+**MH-01.** `msg_source_mod` packs two nibbles: low = `getMOD()` (range 3..8,
+`lora_setchip.cpp:169-191`), high = `node_country` (`aprs_functions.cpp:113`, and identically
+`lora_functions.cpp:1232`, `udp_functions.cpp:224`/`:314`, `nrf52/nrf_eth.cpp`). Writing the MHeard
+register (`lora_functions.cpp:585-587`), the "modulation did not come from the last hop" marker is
+stamped **into the country nibble** by forcing it to `0xF`. But `strCountry[15]` is `"PL"`
+(`lora_setchip.cpp:62`) and `--country` accepts 0..15 — it rejects only index 16 `"none"`
+(`command_functions.cpp:4163`). Consequences:
+
+- `mh_mod >> 4 == 0xF` is ambiguous — "station is in PL" or "provenance unknown". Nothing on the
+  wire separates them.
+- Every entry taking the `else` branch **loses the sender's real country permanently**.
+- A genuine PL node arrives as `mh_mod = 0xF3` and is indistinguishable from a marked entry.
+
+Reaches: `web_functions.cpp:939`, `mheard_functions.cpp:725` (both already decode the two nibbles),
+and BLE `mhdoc["MOD"]` (`mheard_functions.cpp:337`, re-emitted at `:678`). The value also
+round-trips through the stored MHeard table, so a marked entry stays marked for the life of the
+slot.
+
+_Fix direction (reporter's preference, smallest change):_ mark the **modulation** nibble instead —
+`mheardLine.mh_mod = aprsmsg.msg_source_mod & 0xF0;`. `0` is outside the valid `getMOD()` range
+3..8, so it reads as "unset" to every existing consumer, and the country survives. Alternative: add
+a `bool mh_mod_from_last` to `struct mheardLine` (`aprs_structures.h:78`, internal) and leave
+`mh_mod` unmodified — but the BLE register is already tight against `BLE_JSON_PAYLOAD_MAX` (244),
+so export a key only if a consumer needs it. There is no spare bit in the byte; both nibbles are
+fully used.
+
+**MH-02.** `decodeAPRS` opens with `initAPRS(aprsmsg, 0x00)` (`aprs_functions.cpp:126`), which fills
+the struct with **this node's own** identity (`:111-117`), including
+`msg_last_hw = 0x80 | BOARD_HARDWARE`. `msg_source_fw_version` and `msg_last_hw` are then overwritten
+from the frame **only if those bytes are present** (`:446-456`). A frame ending after the FCS
+therefore keeps our own values, so:
+
+1. `mheardLine.mh_hw = aprsmsg.msg_last_hw & 0x7F` (`lora_functions.cpp:582`) records **our own
+   board type** as the heard station's hardware.
+2. The `0x80` test always passes, so MH-01's marker never fires for exactly the old frames it exists
+   to mark.
+3. The pre-4.35 discard gate (`aprs_functions.cpp:486`, `> 0 && < 35`) cannot fire — the defaulted
+   value is our own version, ≥ 35.
+
+Fully initialised memory, not corruption — a defaulting choice. _Fix direction:_ after `initAPRS` in
+`decodeAPRS`, reset the two **optional** fields to the sentinel `0` ("not supplied by sender"); `0`
+is already what the fw-version gate expects, and `mh_hw == 0` reads as "unknown hardware" instead of
+a wrong board type.
+
+**Order matters:** MH-02 is what makes MH-01's `else` branch reachable at all for legacy frames.
+Fixing MH-01 alone leaves the marker mostly dead; fixing MH-02 alone increases how often the country
+nibble gets destroyed. Take both in one wave, two commits.
+
+DK5EN offered a before/after on the `MOD` byte from `DK5EN-98` (mcapp.local) — every MHeard frame is
+logged there, so verification on hardware is cheap. Per §2.5 a native regression test over
+`decodeAPRS` + the MHeard write path is the primary gate.
+
+---
+
+### 3.8e T-Deck GUI review — stage 2 verdict (2026-08-28)
+
+`/fable-review`, seven blind finders + verification. Full document:
+[`tdeck-gui-verdict.md`](tdeck-gui-verdict.md). **No code changed.**
+
+**TD-03 (heap) now has a leading candidate, and stage 1's was refuted.**
+
+- **H1** (`lv_obj_functions.cpp:2770`) — the rendered message list is never trimmed while the model
+  is. Each broadcast on the **open** group tab costs ~250 B internal + ~1.9 KB PSRAM permanently;
+  the ~95 KB internal pool is gone at ~390 messages → `abort()`, with PSRAM still reading healthy.
+  **It heals on any tab switch**, which is why it resists interactive debugging.
+- **C2** (`esp32_audio.cpp:115`) — a second, independent mechanism on the same pool: the audio
+  semaphore is released before playback starts, so two messages inside one sound free the MP3
+  decoder buffers under the reading task.
+- **G01 refuted as the cause** — real UAF, but PSRAM-only, immediate rather than monotonic, and
+  needs a human zooming. Keep the fix, drop the theory. **G04 overstated ~2×** (String SSO).
+
+**TD-05 (sluggish GUI) is answered.** `full_refresh = 1` + single buffer + non-DMA `pushColors` at
+27 MHz = **~45 ms blocking SPI on every invalidation**, including the 1 Hz clock tick, holding the
+bus that also fronts SD and LoRa. `LV_ANIM_ON` scroll multiplies it to 200-300 ms per message.
+
+**Scope lesson.** The whole concurrency cluster (C1-C5) lives in `src/esp32/esp32_audio.cpp`, so
+stage 1's `src/t-deck/` file scope could not reach it — yet that task is spawned by every incoming
+mesh text message, and it is created at priority 50 against a `configMAX_PRIORITIES` of 25, silently
+clamped to the highest task priority in the system.
+
+**Correction affecting TD-06.** Both fork workflows are `disabled_manually`; `ci-build.yml` does not
+exist upstream. The native suites run **nowhere automatically** — every "green" claim in the docs is
+a manual local run. `src/t-deck/` has 0 % coverage.
 
 ---
 
