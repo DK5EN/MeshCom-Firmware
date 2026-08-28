@@ -125,7 +125,7 @@ extern "C" void tdeck_dbg_redrawlog(bool on)
     s_redrawlog_on = on;
 }
 
-static bool s_flushfix_on = false;
+static bool s_flushfix_on = true;    // partial refresh needs the lost-flush mitigation
 extern "C" void tdeck_dbg_flushfix(bool on) { s_flushfix_on = on; Serial.printf("[FLUSHFIX];%d\n", on ? 1 : 0); }
 extern "C" bool tdeck_dbg_flushfix_enabled(void) { return s_flushfix_on; }
 

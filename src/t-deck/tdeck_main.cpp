@@ -396,9 +396,7 @@ void setupLvgl()
     disp_drv.ver_res = TFT_WIDTH;
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf;
-#ifdef BOARD_HAS_PSRAM
-    disp_drv.full_refresh = 1;
-#endif
+    disp_drv.full_refresh = 0;   // EXPERIMENT: partial refresh, no other changes
     disp_drv.monitor_cb = tdeck_dbg_monitor_cb;
     disp_drv.render_start_cb = tdeck_dbg_render_start_cb;
     lv_disp_drv_register( &disp_drv );
