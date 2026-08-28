@@ -69,6 +69,53 @@ unannounced — pending an explicit decision on how to produce the stimulus.
 Prediction to be tested: `int_largest` falls by ~250 B per received message while
 `msg_list_children` grows without bound and `active_tab_bubbles` stops at 50.
 
+## Run 2 — H1 experiment (60 messages to group 9999)
+
+Stimulus: `DK5EN-93` (Heltec V3) sent 60 messages `{9999}H1-Test nn/60` over LoRa to `DK5EN-14`,
+one every 10 s. The first message switched the active tab to 9999, so every subsequent one took the
+`index == msg_active_tab_index` fast path in `msg_tabs_add_message()` — exactly the H1 path.
+
+| Sample  | `msg_list_children` (view) | `active_tab_bubbles` (model) | internal free | PSRAM free |
+| ------- | -------------------------- | ---------------------------- | ------------- | ---------- |
+| pre     | 1                          | 1                            | 77 648        | 7 994 471  |
+| after10 | 9                          | 9                            |               |            |
+| after20 | 19                         | 19                           |               |            |
+| after30 | 26                         | 26                           |               |            |
+| after40 | 35                         | 35                           |               |            |
+| after50 | 48                         | 48                           | 94 800        | 7 864 931  |
+| after60 | **56**                     | **50**                       | 92 468        | 7 839 003  |
+| post    | **60**                     | **50**                       | 91 072        | 7 828 855  |
+
+### H1 mechanism: CONFIRMED
+
+The model stops at exactly **50** (`MSG_TAB_MAX_MESSAGES`) while the view keeps growing — 56, then 60. The prediction was derived from code reading and the measurement matches it precisely, including
+the cap value. `lv_obj_clean(msg_list)` is genuinely unreachable from the fast path.
+
+### H1 failure mode: REFUTED as stated
+
+The verdict claimed ~250 B of **internal** heap per message and `abort()` at ~390 messages. The
+measurement does not support that:
+
+- **Internal free heap did not decline.** It went 77 648 → 91 072 across the run, i.e. _up_.
+- **Largest internal free block never moved**: 65 524 at every single sample. The metric chosen as
+  "discriminating" is insensitive here — a large internal region simply is not being touched.
+- **PSRAM declined by 165 616 B over 60 messages = 2 760 B per message**, close to the predicted
+  ~1.9 KB of LVGL objects but landing in the pool the verdict said was _not_ the problem.
+
+So the leak is real, unbounded and worth fixing — but it consumes **PSRAM**, and at 7.8 MB free that
+is roughly 2 800 messages of headroom, not 390. The "internal pool exhaustion → abort" story does not
+survive measurement. This is the correction the whole instrument-first approach was for.
+
+Caveat: the window is confounded — the run began right after a tab switch freed the previous tab's
+objects, and unrelated mesh traffic continued throughout. The PSRAM slope is clear and monotonic; the
+internal-heap _non_-slope is the load-bearing observation, and it is unambiguous.
+
+### Side observation: message loss at 10 s spacing
+
+Sent vs. arrived: 10/9, 20/19, 30/26, 40/35. Five of forty missing by the fourth sample. The
+operator confirms LoRa needs ~20 s spacing at these parameters. Worth connecting to G06: the node's
+main loop stalls ~2 s at a time, and during those windows LoRa RX is not serviced.
+
 ## Map pipeline — works
 
 ```
