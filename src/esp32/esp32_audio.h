@@ -39,5 +39,6 @@ void play_cw(const char character, int volume);
 void play_cw_start();
 void play_function(void *parameter);
 void audio_set_mute(bool mute);
+bool audio_play_tone(const char *what);
 
 #endif

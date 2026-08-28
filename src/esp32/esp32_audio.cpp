@@ -17,6 +17,7 @@
 #include <driver/i2s.h>
 #include <esp32/esp32_flash.h>
 #include <t-deck/tdeck_extern.h>
+#include <cstring>
 
 #include <loop_functions_extern.h>
 
@@ -29,6 +30,25 @@ SemaphoreHandle_t audioSemaphore;
 i2s_port_t i2s_num = I2S_NUM;
 
 TaskHandle_t xHandle = NULL;
+
+/**
+ * library callback: informational / status text from the Audio library
+ * (this is also where the library reports its internal errors, e.g.
+ * failed connections or decode problems -- there is no separate
+ * error-only callback in this library version)
+ */
+void audio_info(const char *info)
+{
+    printfdeb("[AUDIO];info;%s\n", info);
+}
+
+/**
+ * library callback: end of mp3 playback
+ */
+void audio_eof_mp3(const char *info)
+{
+    printfdeb("[AUDIO];eof;%s\n", info);
+}
 
 /**
  * initializes audio
@@ -86,8 +106,15 @@ bool play_file_from_sd(const char *filename, int volume)
         if (SD.exists(strAudioWithType.c_str()))
         {
             audio.setVolume(volume);
-                audio.connecttoFS(SD, strAudioWithType.c_str());
-            
+            if (!audio.connecttoFS(SD, strAudioWithType.c_str()))
+            {
+                printfdeb("[AUDIO];err;connect;%s\n", strAudioWithType.c_str());
+                xSemaphoreGive(audioSemaphore);
+                return false;
+            }
+
+            printfdeb("[AUDIO];play;file;%s;vol;%d\n", strAudioWithType.c_str(), volume);
+
             if (bDEBUG)
                 printfdeb("[AUDIO]..playing %s in background\n", strAudioWithType.c_str());
 
@@ -119,9 +146,10 @@ bool play_file_from_sd(const char *filename, int volume)
         else
         {
             printfdeb("[AUDIO]..file %s not found on SD\n", filename);
+            printfdeb("[AUDIO];err;missing;%s\n", filename);
 
             xSemaphoreGive(audioSemaphore);
-            
+
             return false;
         }
     }
@@ -168,7 +196,13 @@ bool play_file_from_sd_blocking(const char *filename, int volume)
     {
         audio.setVolume(volume);
         if (xSemaphoreTake(audioSemaphore, pdMS_TO_TICKS(500)) == pdTRUE) {
-            audio.connecttoFS(SD, strAudioWithType.c_str());
+            if (!audio.connecttoFS(SD, strAudioWithType.c_str()))
+            {
+                printfdeb("[AUDIO];err;connect;%s\n", strAudioWithType.c_str());
+                xSemaphoreGive(audioSemaphore);
+                return false;
+            }
+            printfdeb("[AUDIO];play;file;%s;vol;%d\n", strAudioWithType.c_str(), volume);
             xSemaphoreGive(audioSemaphore);
         }
 
@@ -189,6 +223,7 @@ bool play_file_from_sd_blocking(const char *filename, int volume)
     else
     {
         printfdeb("[AUDIO]..file %s not found on SD\n", filename);
+        printfdeb("[AUDIO];err;missing;%s\n", filename);
         return false;
     }
 }
@@ -543,7 +578,38 @@ void audio_set_mute(bool mute) {
         
         // Re-apply pinout to Audio lib
         audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-        audio.setVolume(12); 
+        audio.setVolume(12);
+    }
+}
+
+/**
+ * single entry point for serial "play tone" commands
+ * "start" -> CW start tone, "msg" -> CW message-received tone,
+ * anything else -> play that file from SD
+ */
+bool audio_play_tone(const char *what)
+{
+    if (meshcom_settings.node_mute)
+    {
+        printlndeb("[AUDIO];err;mute");
+        return false;
+    }
+
+    if (strcmp(what, "start") == 0)
+    {
+        printlndeb("[AUDIO];play;start");
+        play_cw_start();
+        return true;
+    }
+    else if (strcmp(what, "msg") == 0)
+    {
+        printlndeb("[AUDIO];play;msg");
+        play_cw('r');
+        return true;
+    }
+    else
+    {
+        return play_file_from_sd(what, 20);
     }
 }
 

@@ -72,10 +72,13 @@ unsigned long rebootAuto = 0;
 // libs for T-Deck view refresh
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
+#include <t-deck/tdeck_debug.h>
+#include <esp32/esp32_audio.h>
 #ifdef HEAP_TEST
 #include <SPIFFS.h>
 #endif
 #endif
+#include "test_inject.h"
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -797,6 +800,12 @@ void commandAction(char *umsg_text, bool ble)
                 defined(SX1262_V3) || defined(USING_SX1262) || defined(BOARD_RAK4630)
                 delay(100);
                 printlndeb("--setboostedgain    on/off  enable/disable boosted rx gain");
+            #endif
+            delay(100);
+            printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            delay(100);
+            printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>");
             #endif
         }
 
@@ -4482,6 +4491,80 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // --- UI test hooks (T-Deck) and message injection -----------------------
+    // --injectmsg <dst> <text>: enqueue a text message as if received via LoRa
+    if(commandCheck(msg_text+2, (char*)"injectmsg ") == 0)
+    {
+        char dst[32] = {0};
+        const char *p = msg_text + 12;
+        while(*p == ' ') p++;
+        unsigned int di = 0;
+        while(*p && *p != ' ' && di < sizeof(dst) - 1) dst[di++] = *p++;
+        while(*p == ' ') p++;
+        char text[220] = {0};
+        snprintf(text, sizeof(text), "%s", p);
+        size_t tl = strlen(text);
+        while(tl > 0 && (text[tl-1] == '\n' || text[tl-1] == '\r')) text[--tl] = 0;
+        inject_text_message(dst, text, NULL, -60, 8);
+        return;
+    }
+    else
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    if(commandCheck(msg_text+2, (char*)"redrawlog on") == 0)
+    {
+        tdeck_dbg_redrawlog(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"redrawlog off") == 0)
+    {
+        tdeck_dbg_redrawlog(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"uistat") == 0)
+    {
+        tdeck_dbg_uistat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tab list") == 0)
+    {
+        tdeck_dbg_tab_list();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tab ") == 0)
+    {
+        int idx = -1;
+        sscanf(msg_text+6, "%d", &idx);
+        tdeck_dbg_tab(idx);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"drawer on") == 0)
+    {
+        tdeck_dbg_drawer(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"drawer off") == 0)
+    {
+        tdeck_dbg_drawer(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"playtone ") == 0)
+    {
+        char what[64] = {0};
+        snprintf(what, sizeof(what), "%s", msg_text+11);
+        size_t wl = strlen(what);
+        while(wl > 0 && (what[wl-1] == '\n' || what[wl-1] == '\r' || what[wl-1] == ' ')) what[--wl] = 0;
+        audio_play_tone(what);
+        return;
+    }
+    else
+#endif
     if(commandCheck(msg_text+2, (char*)"instreset") == 0)
     {
         instrument_reset();

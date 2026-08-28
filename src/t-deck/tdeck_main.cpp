@@ -34,6 +34,7 @@ using namespace ace_button;
 #include <lvgl.h>
 #include "lv_obj_functions.h"
 #include "lv_obj_functions_extern.h"
+#include "tdeck_debug.h"
 #include <loop_functions_extern.h>
 #include <batt_functions.h>
 
@@ -367,6 +368,8 @@ void setupLvgl()
 #ifdef BOARD_HAS_PSRAM
     disp_drv.full_refresh = 1;
 #endif
+    disp_drv.monitor_cb = tdeck_dbg_monitor_cb;
+    disp_drv.render_start_cb = tdeck_dbg_render_start_cb;
     lv_disp_drv_register( &disp_drv );
 
     /*Initialize the  input device driver*/
