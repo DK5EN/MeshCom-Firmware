@@ -1,8 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.27.2-stability` (2026-08-27), based on official MeshCom
+Release: `v4.35p.08.28-stability` (2026-08-28), based on official MeshCom
 4.35p, upstream `dev` at `fc83554e` — the state **after** upstream merged this
-fork's changes.
+fork's changes, plus the BLE frame-size fixes in items 104-106.
 
 **Items 1-103 below are now in official MeshCom.** The ICSSW maintainers merged
 [PR #1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) (82 changes)
@@ -71,6 +71,64 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35p.08.28-stability
+
+Three defects in the BLE-to-phone frame path. Item 104 was actively breaking
+node identity in the field; 105 and 106 were latent. All three share one root
+cause: the size limit a builder checks is not the limit that applies.
+
+104. **The BLE `I` register no longer fitted in a frame, so apps lost the node's
+     identity entirely.** Upstream `82db3d41` changed `FWDATE` from the integer
+     `FLASH_VERSION` to the string `__DATE__ " " __TIME__` — 14 characters more.
+     `command_functions.cpp:4996` checks the document against
+     `MAX_MSG_LEN_PHONE - 2` (298), but the clamp that actually applies is in
+     `addBLEComToOutBuffer()` (`loop_functions.cpp:608`) at 245 bytes, so 244
+     characters of JSON. Past that the firmware cuts mid-value and the result is
+     not a shortened object but an unparseable one: `CALL`, `ID` and `HWID` go
+     with it. Measured on a gateway in service: 59 dropped registers in 9.5
+     hours, one per reconciliation cycle, from the moment the firmware came up.
+     `FWDATE` carries `FLASH_VERSION` again. The key name is unchanged; only the
+     type moves from string to number. Note that a node with all six group-call
+     slots filled is **still** 13 characters over — that case predates the
+     regression and needs `GCB0`…`GCB5` sent as an array, which apps can see.
+
+105. **Mheard records could be lost silently at high hop counts.** The `PP` link
+     chain grows about 11 characters per relay. `addBLEOutBuffer()`
+     (`loop_functions.cpp:537`) clamps `'D'` frames at 255 rather than 245, and
+     `sendToPhone()` computes the write length in a `uint8_t`
+     (`phone_commands.cpp:126`): at 253 characters of JSON, `blelen + 2` wraps
+     to 0 or 1 on ESP32/ESP8266 and the frame goes out as a zero- or one-byte
+     write, with no log line. nRF52 is unaffected — there the expression is
+     promoted to `int`. At the default hop setting the record sits near 214
+     characters, but `{SET}` allows up to `MAX_HOP_LIMIT`. The builder now
+     measures before serialising and drops the most expensive optional field
+     first — `PP`, then `DIST`, which is recomputable from both stations'
+     coordinates — and logs the omission. A record without `PP` is still fully
+     usable; a byte-truncated one is not parseable at all.
+
+106. **The HEY link chain was unbounded on input.** `appendHeySignalReport()`
+     (`aprs_functions.cpp:1127`) appended to whatever payload arrived off the
+     air. Regular operation is bounded by `MAX_HOP_LIMIT`, a malformed or
+     hostile `@` packet is not, and the re-encode downstream then truncates the
+     frame on a byte boundary — mid-group, which `updateHeyPath()` cannot parse.
+     The function now stops appending once the next group would exceed
+     `HEY_PATH_PAYLOAD_MAX`, sized so the longest legitimate chain never reaches
+     it. Ending the chain loses less than cutting it.
+
+Supporting changes: two named constants (`BLE_JSON_PAYLOAD_MAX`,
+`HEY_PATH_PAYLOAD_MAX`) replace numbers that were previously scattered and
+unexplained; four new cases in `test_hey_report`, two red without the fix and
+two guard tests pinning down what must not change; and two issue reports under
+`docs/`, one per defect, addressed to the authors of the code in question with
+the arithmetic, code references and fix proposals.
+
+Not fixed here, and stated in the reports: the `blelen + 2` overflow itself
+(this release only stops the Mheard path from reaching it), the 14
+`serializeJson(doc, buf, measureJson(doc))` call sites that leave no room for
+the terminator, the `MAX_MSG_LEN_PHONE - 2` check in every register builder,
+the fact that the firmware never reads the negotiated ATT MTU, and the schema
+asymmetry between the live Mheard builder and the `--mheard` table dump.
 
 ## New in v4.35p.08.27.2-stability
 

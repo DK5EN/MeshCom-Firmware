@@ -1,9 +1,98 @@
 # Release Notes -- MeshCom Firmware v4.35p
 
-Firmware `4.35p`, `FLASH_VERSION 20260827`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35p`, `FLASH_VERSION 20260828`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35p.08.28-stability (2026-08-28)
+
+Ein Hotfix-Release. Drei Defekte im BLE-Rahmenpfad zum Telefon, einer davon
+aktiv im Feld, dazu die Regressionstests.
+
+### Das I-Register kam nicht mehr an
+
+Upstream-Commit `82db3d41` hat den Wert von `FWDATE` im BLE-Register `I` von
+der Ganzzahl `FLASH_VERSION` auf den String `__DATE__ " " __TIME__` umgestellt.
+Das sind 14 Zeichen mehr, und damit ueberschreitet das Dokument die Grenze, die
+die Firmware sich selbst setzt.
+
+Die Grenze ist leicht zu uebersehen, weil die Zahl, gegen die der Registerbauer
+prueft, nicht die ist, die greift: `command_functions.cpp` vergleicht gegen
+`MAX_MSG_LEN_PHONE - 2` (298), waehrend die wirksame Klemmung eine Ebene tiefer
+in `addBLEComToOutBuffer()` bei 245 Byte sitzt -- abzueglich der Typkennung also
+244 Zeichen JSON. Darueber schneidet die Firmware mitten im Wert ab. Das
+Ergebnis ist kein verkuerztes, sondern ein syntaktisch kaputtes Objekt: die App
+verliert nicht das letzte Feld, sondern alle, also auch `CALL`, `ID` und `HWID`
+und damit die gesamte Knotenidentitaet.
+
+Auf dem eigenen Gateway gemessen: **59 verworfene Register in 9,5 Stunden**,
+eines je Abgleichzyklus, ab dem Moment des Firmware-Starts. Nach dem Fix: null.
+
+`FWDATE` traegt wieder `FLASH_VERSION`. Der Schluesselname bleibt, nur der Typ
+wechselt von String auf Zahl -- und `FLASH_VERSION` ist der Wert, der pro
+Release gepflegt wird, waehrend `__DATE__`/`__TIME__` die Uhrzeit des jeweiligen
+Compilerlaufs ist.
+
+**Nicht vollstaendig geloest:** ein Knoten mit allen sechs belegten
+Gruppenruf-Slots liegt weiterhin 13 Zeichen darueber und war das auch schon vor
+`82db3d41`. Die dauerhafte Loesung waere `GCB0..GCB5` als Array (spart 34-41
+Zeichen), das ist aber eine fuer Apps sichtbare Kontraktaenderung und gehoert
+abgestimmt statt still gemacht.
+
+### Mheard-Datensaetze konnten spurlos verschwinden
+
+Die `PP`-Linkkette im Mheard-JSON waechst je Relais um rund 11 Zeichen. Beim
+Standard-Hopwert liegt der Datensatz bei ~214 Zeichen und faellt nicht auf.
+`{SET}` laesst bis 7 Hops zu, und dort kippt der Pfad ohne jede Spur:
+`addBLEOutBuffer()` klemmt `'D'`-Rahmen erst bei 255 statt bei 245, und die
+Schreiblaenge wird in einem `uint8_t` gerechnet. Ab 253 Zeichen JSON wird aus
+`blelen + 2` auf ESP32 eine 0 bzw. 1 -- der Rahmen geht als Null- oder
+Ein-Byte-Schreibvorgang raus und ist weg, ohne Logzeile. nRF52 ist nicht
+betroffen, dort wird derselbe Ausdruck nach `int` promoviert.
+
+Der Bauer misst jetzt vor dem Serialisieren und opfert im Zweifel das teuerste
+optionale Feld: erst `PP`, dann `DIST` (aus den Koordinaten beider Stationen
+nachrechenbar). Ein Datensatz ohne `PP` ist weiter voll brauchbar, ein auf
+Byteebene abgeschnittener ist unparsebar. Das Weglassen wird gemeldet.
+
+Zusaetzlich ist die Kette an der Quelle begrenzt: `appendHeySignalReport()`
+haengt nichts mehr an, sobald die naechste Gruppe `HEY_PATH_PAYLOAD_MAX`
+sprengen wuerde. Der Wert ist so bemessen, dass die laengste REGULAERE Kette ihn
+nie beruehrt -- ein von der Luft kommendes, ueberlanges `@`-Paket dagegen schon.
+
+### Ausserdem
+
+- Zwei benannte Konstanten ersetzen verstreute Zahlen: `BLE_JSON_PAYLOAD_MAX`
+  (244) und `HEY_PATH_PAYLOAD_MAX`.
+- Vier neue Faelle in `test_hey_report`. Zwei sind ohne den Fix rot, zwei sind
+  Schutztests, die festhalten, was sich NICHT aendern darf: eine Kette ueber die
+  volle Hoptiefe und der Fall genau an der Kante.
+- Zwei Issue-Reports unter `docs/`, einer je Defekt, an die jeweiligen Autoren
+  adressiert -- mit Rechnung, Code-Referenzen und Loesungsvorschlaegen.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **Heltec V3** (`heltec_wifi_lora_32_V3`) -- per WiFi-OTA auf einen Knoten im
+  Live-Betrieb geflasht, Einstellungen unveraendert. Die verworfenen
+  `I`-Register hoeren mit dem Neustart auf und sind ueber die folgenden
+  Abgleichzyklen nicht wiedergekommen.
+- **Alle 32 Release-Umgebungen** bauen sauber.
+- **Native-Suiten** `native`, `native_aprs`, `native_dedup`, `native_capture`:
+  93 Faelle gruen.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die BLE-Fixes sind nur auf Heltec V3 verifiziert. Der `uint8_t`-Ueberlauf
+  betraf nRF52 ohnehin nie.
+- Der Fall `PL >= 6` wurde nicht auf echter Hardware provoziert -- der Beleg ist
+  die Rechnung plus der Fail-soft-Pfad, nicht ein Feldversuch.
+- Ein Knoten mit allen sechs belegten Gruppenruf-Slots wurde nicht getestet;
+  fuer den ist das `I`-Register weiterhin zu gross.
+- Alles uebrige entspricht `v4.35p.08.27.2-stability`, inklusive der dort
+  genannten Luecken.
 
 ---
 
