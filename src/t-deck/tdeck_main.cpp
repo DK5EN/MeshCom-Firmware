@@ -349,7 +349,11 @@ void setupLvgl()
 
     lv_group_set_default(lv_group_create());
 
-    lv_disp_draw_buf_init( &draw_buf, buf, NULL, LVGL_BUFFER_SIZE );
+    // G07: the 4th parameter is size_in_px_cnt, not a byte count
+    // (lv_hal_disp.h:223). LVGL_BUFFER_SIZE is TFT_WIDTH*TFT_HEIGHT*sizeof(lv_color_t),
+    // i.e. twice the pixel count. Harmless while full_refresh=1 and buf2==NULL keep
+    // the partial-render paths unreachable; with partial refresh it is a ~150 KB overflow.
+    lv_disp_draw_buf_init( &draw_buf, buf, NULL, TFT_WIDTH * TFT_HEIGHT );
 
     /*Initialize the display*/
     static lv_disp_drv_t disp_drv;
