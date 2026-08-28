@@ -40,5 +40,6 @@ void play_cw_start();
 void play_function(void *parameter);
 void audio_set_mute(bool mute);
 bool audio_play_tone(const char *what);
+extern int audio_dbg_mode;
 
 #endif

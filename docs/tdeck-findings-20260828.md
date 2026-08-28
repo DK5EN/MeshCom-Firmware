@@ -1,83 +1,135 @@
-# T-Deck Plus — measured findings (2026-08-28, evening session)
+# T-Deck Plus — measured findings (session 2026-08-28/29)
 
 Successor to [`tdeck-handover.md`](tdeck-handover.md). Everything here was measured on DK5EN-14
-over USB serial with `tools/bench/tdeck_harness.py`; nothing is from reading code alone. Raw logs
-are `tools/bench/tdeck_run_*.log` (untracked), JSON summaries in the session scratchpad.
+over USB serial with `tools/bench/tdeck_harness.py` plus the operator's eyes where the panel had to
+be read; nothing is from reading code alone. Raw logs: `tools/bench/runs/tdeck_run_*.log`
+(untracked). Research companion: [`tdeck-lvgl-agent-guide.md`](tdeck-lvgl-agent-guide.md).
 
 ## 0. Exec summary
 
-| Topic                   | Status                                                                                                                                                                                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Laggy UI (P1)           | **Cause located.** `update_header_batt_indicator()` rewrites two header labels every 500 ms from `esp32loop()`; with `full_refresh=1` each rewrite is a 57 ms full-screen SPI push. Idle: 2.5 repaints/s, 193 kpx/s.                             |
-| Partial refresh         | **Works without band-aids** for tabs, drawer and incoming messages on an awake display. Idle pixel traffic 14x lower (13.9 kpx/s), mean refresh 7.7 ms.                                                                                            |
-| "Messages don't redraw" | **Not reproduced** on an awake display: `msg_tabs_add_message()` invalidates the whole tab area itself. Leading hypothesis (H-R3): the display **wake path** (`setBrightness()` -> `tft.init()` = software reset) never invalidates the screen. |
-| Heap                    | ~575 B internal + ~2.6 KB PSRAM per received message over the first 20 messages. 120-message run pending (see §4).                                                                                                                                |
-| Audio                   | Built-in tones play and are logged; missing file is now an explicit `[AUDIO];err;missing`. Empty `node_audio_msg` produces a misleading `file / not found` line on every message before the CW fallback.                                         |
-| Boot                    | Device ignores serial for ~11 s after `CLIENT STARTED` (map tile load + LoRa init). Boot messages block 2 s each in `addMessage()`.                                                                                                                |
+| Topic                   | Status                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Messages don't redraw" | **Root cause found and a mitigation verified (0/30 -> 30/30).** The first display transfer after an SD-card access on the shared SPI bus is lost by the panel. The message path does an SD lookup for the tone file and flushes the new bubble ~100 ms later, in the same loop pass. Not an LVGL invalidation problem at all. |
+| Laggy UI (P1)           | Cause located: `update_header_batt_indicator()` rewrites two header labels every 500 ms unconditionally; with `full_refresh=1` each rewrite is a 57 ms full-screen SPI push (2.5/s idle).                                                                                                                                     |
+| Partial refresh         | Works without band-aid invalidates once the SPI mitigation is in place. Idle pixel traffic 14x lower, mean refresh 7.7 ms.                                                                                                                                                                                                    |
+| Sound blocks the UI     | Measured: loop stall 1.10 s per message tone (`play_cw('r')` runs synchronously on the loop task, `i2s_write` blocking) vs 93 ms idle.                                                                                                                                                                                        |
+| Heap                    | 120 injected messages cost **40.8 KB internal heap, linear, no plateau** (~340 B/msg): `msg_list` children never trimmed (121 rendered vs 50 in the model), `persisted_msgs` = 120 dead entries. Internal heap gone after ~370 messages — a credible face for the maintainer's report.                                        |
+| Display wake / sleep    | Refuted as a cause: the operator's failures happened with the display lit; the wake path was never involved.                                                                                                                                                                                                                  |
+| Panel readback          | `tft.readRect()` returns a constant (MISO not driven); `--screencrc` is **not a valid instrument** on this hardware. Verdicts built on it are void.                                                                                                                                                                           |
+| Boot                    | Fully mirrored to serial now; 8 boot messages block 2 s each (16 s), device ignores serial ~11 s after `CLIENT STARTED`.                                                                                                                                                                                                      |
 
-## 1. Instrumentation now in the firmware (commit `6fa0c581`, `15ab3897`)
+## 1. The lost-flush defect
 
-| Command                        | Output                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `--redrawlog on/off`           | `[REDRAW];ms;..;obj;..;cls;..;area;x1;y1;x2;y2;ra;..;bt;pc,pc,..[;name;..]` per invalidation, `[REFR]`/`[REFRSTART]` per refresh |
-| `--uistat`                     | tab, drawer, object count, msg_list children, inv/refr totals, heap                             |
-| `--tab list` / `--tab <n>`     | tab names; switch tab                                                                           |
-| `--drawer on/off`              | open/close the tab drawer                                                                       |
-| `--injectmsg <dst> <text>`     | queue a text message exactly like the LoRa RX path (same deferred slot, same tone)              |
-| `--playtone start/msg/<file>`  | built-in tones or SD file, explicit errors                                                      |
+### Symptom
 
-The invalidation trace is a 6-line weak hook in `lib/lvgl/src/core/lv_obj_pos.c`
-(`lv_obj_invalidate_area`); the backtrace uses `esp_backtrace_get_next_frame`. Host side
-symbolizes with `xtensa-esp32s3-elf-addr2line`.
+Incoming message: tone plays, bubble does not appear. Opening the drawer (full-screen invalidate)
+or moving the cursor (small invalidates) reveals it. Same for the map: the tile "emerges" only where
+the cursor passes. `full_refresh=1` hid it because the battery header repaints the whole screen
+500 ms later.
 
-## 2. Baseline (`full_refresh=1`, commit `15ab3897`)
+### What was ruled out, with the measurement that ruled it out
 
-Run `run1.json`, idle 60 s, tab 0, display awake.
+| Candidate                            | Evidence against                                                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Missing LVGL invalidation            | `[REDRAW]` trace: `msg_tabs_add_message()` invalidates the tab area, a 76 800 px refresh follows every message                    |
+| Wrong render / stale scroll          | CRC of message rows in the flushed buffer identical to a forced re-render 4 s later (6/6); ASCII frame dump shows the new bubbles |
+| Scroll position                      | `scroll_bottom = 0` after every message, last bubble inside the list box                                                          |
+| Display sleep / `tft.init()` on wake | Operator: display lit throughout; `[TFT];sleeping;0` at every flush                                                               |
+| Audio task starving the loop         | Muted messages: ~44/45 displayed                                                                                                  |
+| Raw SPI transfer unreliable          | `--blink` probe: 20/20 alternating full frames, also under a WiFi ping flood                                                      |
+| SPI clock margin (40 MHz)            | At 20 MHz the normal path still fails 0/30                                                                                        |
+| WiFi association retry               | 4 of 5 early failures happened with WiFi connected and idle                                                                       |
+| Concurrent SPI task                  | RadioLib has no task; audio task only runs when a file plays; scheduler-suspend experiment hung the device and was discarded      |
 
-| Metric                      | Value                                              |
-| --------------------------- | -------------------------------------------------- |
-| Refreshes / s               | 2.52, every one 76 800 px (full screen)            |
-| Mean / max refresh          | 56.9 ms / 61 ms (`monitor_cb`, render + flush)     |
-| Flush (`INSTR-FLUSH`)       | avg 36.7 ms, max 36.8 ms                           |
-| Invalidations / s           | 32                                                 |
-| Top invalidator (100 %)     | `update_header_batt_indicator()` <- `tdeck_update_batt_label()` <- `esp32loop()` (`esp32_main.cpp:3386`): two `lv_label_set_text` + one `lv_obj_set_style_text_color` per tick, unconditionally, even when the text is unchanged |
-| Loop (`INSTR-LOOP`)         | avg 6.6 ms, max 74 ms                              |
-| Tabs 0-7                    | all repaint, 384-691 kpx per switch                |
-| Drawer                      | 384 kpx per toggle                                 |
-| Injected messages           | all displayed; 3-6 refreshes, 70-140 invalidations each |
+### What isolated it
 
-## 3. Experiment: `full_refresh=0`, nothing else (branch `tdeck-partial-refresh-trace`)
+Split of the unmuted message path with runtime switches (`--audiodbg`), 10 messages each, operator
+counting bubbles:
 
-Run `run_partial.json`, idle 30 s.
+| Variant                                               | Displayed  |
+| ----------------------------------------------------- | ---------- |
+| normal: `SD.exists()` for the tone file + `play_cw()` | 0 / 30     |
+| tone only, no SD access (`--audiodbg 1`)              | ~5 / 10    |
+| **SD lookup only, tone skipped (`--audiodbg 2`)**     | **0 / 10** |
+| muted (neither)                                       | ~44 / 45   |
+| `--sdtest` 400 ms _before_ the message                | 3 / 4      |
 
-| Metric                 | full_refresh=1 | full_refresh=0 | Factor |
-| ---------------------- | -------------- | -------------- | ------ |
-| px / s idle            | 193 280        | 13 859         | 14x    |
-| Mean refresh           | 56.9 ms        | 7.7 ms         | 7.4x   |
-| Max refresh            | 61 ms          | 13 ms          |        |
-| Tabs repainted         | 8/8            | 8/8 (19-269 kpx) |      |
-| Drawer repainted       | 6/6            | 6/6 (85-95 kpx)  |      |
-| Injected msgs displayed| 4/4            | 4/4            |        |
+The `[BUS]` snapshot taken right before the lost flushes shows SPI2's clock register holding the
+SD library's 800 kHz divider (`0x00249005`) instead of the display's (`0x00041001`): the frame is
+the first display transaction after another bus user reconfigured the shared peripheral. The lost
+frames were clocked at full speed (same 145-178 ms wire time as good ones), so the corruption is in
+something TFT_eSPI programs only once, not the divider itself. The "3/4" row shows why it looks
+random: the 500 ms header flush usually re-arms the bus in between; only a flush that follows the SD
+access _immediately_ is lost — exactly what the message path (lookup, then render+flush in the same
+loop pass) and the map path (tile read, then flush) do.
 
-Trace after an injected message (partial build): `msg_tabs_add_message()`
-(`lv_obj_functions.cpp:2354`) -> `lv_obj_clear_flag` invalidates area 5,40-314,193 (the whole tab
-content), followed by a 76 800 px refresh and three partial ones. The message path announces
-itself correctly. **§3.2 of the handover is not reproduced with the display awake.**
+### Mitigation, verified
 
-## 4. Open hypotheses and their tests
+One throw-away display transaction (`startWrite; writecommand(NOP); endWrite`) before the real
+transfer in `disp_flush()` (`--flushfix on`):
 
-| ID   | Claim                                                                                                                                  | Test                                                                                       | Status  |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------- |
-| H-R3 | After `tft_off()` (DISPOFF+SLPIN, 30 s timeout) the wake path `setBrightness()` -> `tft.init()` (SWRST) leaves the panel content undefined and nothing invalidates the LVGL screen; `full_refresh=1` masked it via the 500 ms battery tick | `sleep` scenario: `--tft off`, inject, `--tft on`, expect no full refresh; `--screencrc` before/after vs forced repaint | pending |
-| H-P1a| Idle repaint rate is set by the battery header, not by widget count                                                                    | confirmed by backtrace (100 % of idle invalidations)                                       | confirmed |
-| H-H1 | Internal-heap growth per message is unbounded (no trim) -> maintainer's heap report                                                    | 120-message injection, `--heap` before/after, look for plateau at the 50/60 trim          | running |
-| H-A1 | I2S output path intact, only file decode fails                                                                                          | built-in tones audible and logged                                                          | confirmed |
+| Run                                     | Displayed |
+| --------------------------------------- | --------- |
+| SD-only path, fix on, 20 MHz            | 10 / 10   |
+| SD-only path, fix on, replay            | 10 / 10   |
+| normal path (SD + tone), fix on, 20 MHz | 10 / 10   |
+| normal path, fix on, **40 MHz**         | 10 / 10   |
 
-## 5. Bench facts learned
+All in order, each bubble immediately after its tone. Cost: one 1-byte SPI transaction per flush.
 
-- Opening the USB port resets the device; the harness holds one session and waits until
-  `--uistat` answers (~11 s after `CLIENT STARTED`).
-- The firmware echoes the command without a newline, so replies arrive glued
-  (`--uistat[UISTAT];...`); the parser skips to the first `[`.
-- `__builtin_return_address(0)` inside the invalidate hook always points at `lv_obj_invalidate`;
-  the ESP-IDF backtrace walker is needed to reach user code.
+### Open: the exact register
+
+Which TFT_eSPI-initialised SPI2 field the Arduino SD path clobbers is not yet identified
+(candidates: `misc`/CS setup-hold, dummy/addr bits, the S3 `SPI_UPDATE` requirement). Snapshot
+`GPSPI2` fully (not only `clock/user/ctrl`) before a lost and a good flush to find it; then the
+proper fix is to re-program that field in `disp_flush` instead of the NOP transaction, or to give
+the SD card its own bus mutex discipline (paper §4).
+
+## 2. Instrumentation in the firmware (all default off, no behaviour change)
+
+| Command                       | Output / effect                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--redrawlog on/off`          | `[REDRAW]` per invalidation with 8-frame backtrace, `[REFRSTART]`, `[REFR]`, `[FLUSH]` with area, sleep state and CRC32 (whole + message rows), `[BUS]` before full flushes |
+| `--uistat`                    | tab, drawer, objects, msg_list children, inv/refr totals, heap, tft state, scroll_y/bottom, list geometry                                                                   |
+| `--tab list/<n>`, `--drawer`  | navigation                                                                                                                                                                  |
+| `--injectmsg <dst> <text>`    | message as if received via LoRa                                                                                                                                             |
+| `--playtone start/msg/<file>` | tones with explicit errors (ignores mute)                                                                                                                                   |
+| `--mute on/off`               | `node_mute` + I2S driver install/uninstall                                                                                                                                  |
+| `--audiodbg 0/1/2`            | normal / skip SD lookup / skip tone in the message path                                                                                                                     |
+| `--sdtest`                    | one `SD.exists()` on the shared bus                                                                                                                                         |
+| `--flushfix on/off`           | the NOP-transaction mitigation                                                                                                                                              |
+| `--invalidate`, `--reflush`   | force a re-render / push the current buffer again                                                                                                                           |
+| `--framedump`                 | ASCII dump of the next full frame (every 4th px)                                                                                                                            |
+| `--blink <n>`                 | alternate normal/inverted full frames (transfer probe)                                                                                                                      |
+| `--tft on/off/state`          | display sleep/wake                                                                                                                                                          |
+| `--screencrc`                 | **void on this hardware** (constant readback)                                                                                                                               |
+
+Harness: `tools/bench/tdeck_harness.py --scenario all` (boot, idle, tabs, drawer, inject, audio,
+audio_stall, sleep, screen, heap; `--heap-count`, `--inject-count`, `--inject-spacing`). The
+`sleep`/`screen` verdicts depend on `--screencrc` and must be treated as void until a readback
+exists.
+
+## 3. Baseline numbers (`full_refresh=1`, 40 MHz)
+
+| Metric               | Value                                                 |
+| -------------------- | ----------------------------------------------------- |
+| Idle refreshes       | 2.52/s, every one 76 800 px, mean 56.9 ms             |
+| Idle invalidations   | 32/s, 100 % from `update_header_batt_indicator()`     |
+| Loop                 | avg 6.6 ms, max 74 ms; 1.10 s during the message tone |
+| Partial refresh idle | 13 859 px/s, mean refresh 7.7 ms                      |
+| Heap per message     | ~340 B internal + ~2.7 KB PSRAM, unbounded            |
+
+## 4. Recommended order of work
+
+1. Make the flush mitigation permanent in `disp_flush` (or identify the clobbered register and fix it
+   properly); keep `--flushfix` as the switch to demonstrate the defect.
+2. Switch to `full_refresh=0` (branch `tdeck-partial-refresh-trace`) — verified to render tabs, drawer
+   and messages correctly with the mitigation.
+3. Battery header: only `lv_label_set_text` when the text changes (kills the idle repaint).
+4. Route `play_cw()` off the loop task, fix the audio task priority (paper §6).
+5. Trim the rendered message list with the model; drop `persisted_msgs`.
+6. Tone-file lookup: resolve once at boot, not per message (removes the SD access from the message
+   path altogether).
+7. Boot: replace the 2 s busy-wait per boot message.
+
+Measure every step with the harness before and after; do not stack changes.

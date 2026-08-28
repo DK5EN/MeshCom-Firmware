@@ -73,6 +73,7 @@ unsigned long rebootAuto = 0;
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
 #include <t-deck/tdeck_debug.h>
+#include <SD.h>
 #include <esp32/esp32_audio.h>
 #ifdef HEAP_TEST
 #include <SPIFFS.h>
@@ -4551,6 +4552,76 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"drawer off") == 0)
     {
         tdeck_dbg_drawer(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"flushfix on") == 0)
+    {
+        tdeck_dbg_flushfix(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"flushfix off") == 0)
+    {
+        tdeck_dbg_flushfix(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"framedump") == 0)
+    {
+        tdeck_dbg_framedump_arm(true);   // dumps at the next full-screen flush
+        tdeck_dbg_invalidate();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"blink ") == 0)
+    {
+        int n = 10;
+        sscanf(msg_text+8, "%d", &n);
+        tdeck_dbg_blink(n);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"reflush") == 0)
+    {
+        tdeck_dbg_reflush();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"invalidate") == 0)
+    {
+        tdeck_dbg_invalidate();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"sdtest") == 0)
+    {
+        unsigned long t0 = millis();
+        bool ex = SD.exists("/mc_probe_does_not_exist");
+        Serial.printf("[SDTEST];exists;%d;t_ms;%lu\n", ex ? 1 : 0, (unsigned long)(millis() - t0));
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"audiodbg ") == 0)
+    {
+        sscanf(msg_text+11, "%d", &audio_dbg_mode);
+        Serial.printf("[AUDIO];dbg;mode;%d\n", audio_dbg_mode);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mute on") == 0)
+    {
+        meshcom_settings.node_mute = true;
+        audio_set_mute(true);
+        Serial.println("[AUDIO];mute;1");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mute off") == 0)
+    {
+        meshcom_settings.node_mute = false;
+        audio_set_mute(false);
+        Serial.println("[AUDIO];mute;0");
         return;
     }
     else

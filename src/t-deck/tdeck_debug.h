@@ -21,6 +21,14 @@ extern "C" {
 /* Runtime gate for the [REDRAW]/[REFR]/[REFRSTART] log lines. Off by default;
  * inv_total/refr_total counters keep accumulating regardless of the gate. */
 void tdeck_dbg_redrawlog(bool on);
+bool tdeck_dbg_redrawlog_enabled(void);
+void tdeck_dbg_flushfix(bool on);
+void tdeck_dbg_reflush(void);
+void tdeck_dbg_blink(int n);
+void tdeck_dbg_framedump_arm(bool on);
+bool tdeck_dbg_framedump_armed(void);
+void tdeck_dbg_invalidate(void);
+bool tdeck_dbg_flushfix_enabled(void);
 
 /* One-shot UI/heap/counter snapshot, see brief for the exact field list. */
 void tdeck_dbg_uistat(void);

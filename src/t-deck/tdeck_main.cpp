@@ -35,6 +35,7 @@ using namespace ace_button;
 #include "lv_obj_functions.h"
 #include "lv_obj_functions_extern.h"
 #include "tdeck_debug.h"
+#include <soc/spi_struct.h>
 #include <loop_functions_extern.h>
 #include <batt_functions.h>
 
@@ -464,15 +465,119 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
 
     if ( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE ) {
         INSTR_T0(_instr_flush_t0);          // TEMPORARY -- see src/instrument.h
+        // EXPERIMENT (flushfix): no other task may run while the transfer is on the wire.
+        if(tdeck_dbg_redrawlog_enabled() && w == (uint32_t)TFT_HEIGHT && h == (uint32_t)TFT_WIDTH) {
+            // EXPERIMENT: bus state right before a full-screen transfer.
+            Serial.printf("[BUS];sd_cs;%d;lora_cs;%d;tft_cs;%d;tft_dc;%d;spi2_clock;%08lx;spi2_user;%08lx;spi2_ctrl;%08lx\n",
+                          digitalRead(TDECK_SDCARD_CS), digitalRead(LORA_CS), digitalRead(TDECK_TFT_CS), digitalRead(TDECK_TFT_DC),
+                          (unsigned long)GPSPI2.clock.val, (unsigned long)GPSPI2.user.val, (unsigned long)GPSPI2.ctrl.val);
+        }
+        // EXPERIMENT (flushfix): one throw-away display transaction before the real one,
+        // so that the SPI peripheral state left behind by another bus user (SD card at
+        // 800 kHz) is re-armed before the frame goes out.
+        if(tdeck_dbg_flushfix_enabled()) {
+            tft.startWrite();
+            tft.writecommand(0x00);         // NOP
+            tft.endWrite();
+        }
         tft.startWrite();
         tft.setAddrWindow( area->x1, area->y1, w, h );
         tft.pushColors( ( uint16_t * )&color_p->full, w * h, false );
         tft.endWrite();
         INSTR_FLUSH(_instr_flush_t0);       // TEMPORARY
+        if(tdeck_dbg_framedump_armed() && w == (uint32_t)TFT_HEIGHT && h == (uint32_t)TFT_WIDTH) {
+            // One-shot ASCII dump of the full frame: every 4th row, every 4th column.
+            // ' ' dark, '.' dim, '+' mid, '#' bright (luminance from RGB565, byte-swapped).
+            tdeck_dbg_framedump_arm(false);
+            const uint8_t * pb = (const uint8_t *)&color_p->full;
+            Serial.printf("[FRAME];begin;w;%lu;h;%lu;step;4\n", (unsigned long)w, (unsigned long)h);
+            char line[TFT_HEIGHT / 4 + 8];
+            for(uint32_t y = 0; y < h; y += 4) {
+                int o = 0;
+                for(uint32_t x = 0; x < w; x += 4) {
+                    uint32_t i = (y * w + x) * 2;
+                    uint16_t raw = ((uint16_t)pb[i] << 8) | pb[i + 1];
+                    uint32_t r = (raw >> 11) & 0x1f, g = (raw >> 5) & 0x3f, b = raw & 0x1f;
+                    uint32_t lum = r * 2 + g + b * 2;            /* 0..188 */
+                    line[o++] = lum < 30 ? ' ' : lum < 80 ? '.' : lum < 140 ? '+' : '#';
+                }
+                line[o] = 0;
+                Serial.printf("[FRAME];%03lu;%s\n", (unsigned long)y, line);
+            }
+            Serial.println("[FRAME];end");
+        }
+        if(tdeck_dbg_redrawlog_enabled()) {
+            // CRC32 of the flushed pixels: tells whether two flushes carried the same content.
+            uint32_t crc = 0xFFFFFFFFu, crcm = 0xFFFFFFFFu;
+            const uint8_t * pb = (const uint8_t *)&color_p->full;
+            for(uint32_t row = 0; row < h; row++) {
+                int y = area->y1 + (int)row;
+                bool in_msg = (y >= 40 && y <= 193);           // message-list rows only
+                const uint8_t * pr = pb + row * w * 2;
+                for(uint32_t n = 0; n < w * 2; n++) {
+                    uint8_t b = pr[n];
+                    crc ^= b;
+                    for(int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+                    if(in_msg) {
+                        crcm ^= b;
+                        for(int k = 0; k < 8; k++) crcm = (crcm >> 1) ^ (0xEDB88320u & (0u - (crcm & 1u)));
+                    }
+                }
+            }
+            Serial.printf("[FLUSH];ms;%lu;area;%d;%d;%d;%d;px;%lu;sleeping;%d;bl;%u;crc;%08lx;crcm;%08lx\n",
+                          (unsigned long)millis(), (int)area->x1, (int)area->y1, (int)area->x2, (int)area->y2,
+                          (unsigned long)(w * h), tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level,
+                          (unsigned long)(crc ^ 0xFFFFFFFFu), (unsigned long)(crcm ^ 0xFFFFFFFFu));
+        }
         lv_disp_flush_ready( disp );
 
         xSemaphoreGive( xSemaphore );
     }
+}
+
+// EXPERIMENT: transfer-reliability probe. Pushes the current frame and its inverted
+// copy alternately, `n` times, 500 ms apart. A lost transfer shows as a skipped toggle.
+void tdeck_dbg_blink(int n)
+{
+    lv_disp_t * d = lv_disp_get_default();
+    if(d == NULL || d->driver == NULL || d->driver->draw_buf == NULL) { Serial.println("[BLINK];err;nodisp"); return; }
+    uint16_t * src = (uint16_t *)d->driver->draw_buf->buf1;
+    static uint16_t * scratch = NULL;
+    const uint32_t npx = TFT_WIDTH * TFT_HEIGHT;
+    if(scratch == NULL) scratch = (uint16_t *)ps_malloc(npx * 2);
+    if(src == NULL || scratch == NULL) { Serial.println("[BLINK];err;nobuf"); return; }
+    for(uint32_t i = 0; i < npx; i++) scratch[i] = src[i] ^ 0xFFFF;
+    for(int k = 0; k < n; k++) {
+        uint16_t * p = (k & 1) ? src : scratch;
+        uint32_t t0 = micros();
+        if ( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE ) {
+            tft.startWrite();
+            tft.setAddrWindow( 0, 0, TFT_HEIGHT, TFT_WIDTH );
+            tft.pushColors( p, npx, false );
+            tft.endWrite();
+            xSemaphoreGive( xSemaphore );
+        }
+        Serial.printf("[BLINK];%d;%s;us;%lu\n", k, (k & 1) ? "normal" : "inverted", (unsigned long)(micros() - t0));
+        delay(500);
+    }
+    Serial.println("[BLINK];done");
+}
+
+// EXPERIMENT: push the current LVGL draw buffer to the panel again without rendering.
+void tdeck_dbg_reflush(void)
+{
+    lv_disp_t * d = lv_disp_get_default();
+    if(d == NULL || d->driver == NULL || d->driver->draw_buf == NULL) { Serial.println("[REFLUSH];err;nodisp"); return; }
+    lv_color_t * b = (lv_color_t *)d->driver->draw_buf->buf1;
+    if(b == NULL) { Serial.println("[REFLUSH];err;nobuf"); return; }
+    if ( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE ) {
+        tft.startWrite();
+        tft.setAddrWindow( 0, 0, TFT_HEIGHT, TFT_WIDTH );
+        tft.pushColors( ( uint16_t * )&b->full, TFT_WIDTH * TFT_HEIGHT, false );
+        tft.endWrite();
+        xSemaphoreGive( xSemaphore );
+    }
+    Serial.printf("[REFLUSH];ok;px;%lu\n", (unsigned long)(TFT_WIDTH * TFT_HEIGHT));
 }
 
 /**

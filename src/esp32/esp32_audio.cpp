@@ -75,6 +75,9 @@ void init_audio()
 /**
  * play a supported file from SD in the background
  */
+// EXPERIMENT: 0 = normal, 1 = skip the SD lookup (act as if the file is missing), 2 = skip the tone.
+int audio_dbg_mode = 0;
+
 bool play_file_from_sd(const char *filename, int volume)
 {
     if (meshcom_settings.node_mute)
@@ -89,6 +92,11 @@ bool play_file_from_sd(const char *filename, int volume)
     if(!bSDDected)
     {
         return false;
+    }
+
+    if (audio_dbg_mode == 1)
+    {
+        return false;                       // EXPERIMENT: no SD access at all
     }
 
     if (xSemaphoreTake(audioSemaphore, 0) == pdTRUE)
@@ -280,6 +288,11 @@ void playTone(int duration_ms, int volume_percent) {
  */
 void play_cw(const char character, int volume)
 {
+    if (audio_dbg_mode == 2)
+    {
+        printlndeb("[AUDIO];dbg;tone skipped");
+        return;                             // EXPERIMENT: no tone
+    }
     if (meshcom_settings.node_mute)
     {
         if (bDEBUG)
@@ -589,28 +602,30 @@ void audio_set_mute(bool mute) {
  */
 bool audio_play_tone(const char *what)
 {
-    if (meshcom_settings.node_mute)
-    {
-        printlndeb("[AUDIO];err;mute");
-        return false;
-    }
-
+    // Test command: deliberately ignores node_mute so the tone path can be exercised in isolation.
+    bool saved_mute = meshcom_settings.node_mute;
+    if (saved_mute)
+        audio_set_mute(false);          // re-installs the I2S driver
+    bool result;
     if (strcmp(what, "start") == 0)
     {
         printlndeb("[AUDIO];play;start");
         play_cw_start();
-        return true;
+        result = true;
     }
     else if (strcmp(what, "msg") == 0)
     {
         printlndeb("[AUDIO];play;msg");
         play_cw('r');
-        return true;
+        result = true;
     }
     else
     {
-        return play_file_from_sd(what, 20);
+        result = play_file_from_sd(what, 20);
     }
+    if (saved_mute)
+        audio_set_mute(true);
+    return result;
 }
 
 #endif

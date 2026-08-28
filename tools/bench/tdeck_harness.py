@@ -516,16 +516,11 @@ def scenario_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str
                 bt_counts[key] = bt_counts.get(key, 0) + 1
         top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:8]
         sym_map = symbolize(sorted({a for key, _ in top_bt for a in key}), args.elf) if top_bt else {}
-        # Panel-level check: fingerprint now vs after a forced full repaint.
-        crc_after = _screencrc(session)
-        session.send("--drawer on")
-        time.sleep(0.6)
-        session.send("--drawer off")
-        time.sleep(0.8)
-        crc_forced = _screencrc(session)
-        panel_updated = (
-            crc_after is not None and crc_forced is not None and crc_after == crc_forced
-        )
+        # NOTE: --screencrc readback returns a constant on this hardware (MISO not
+        # driven by the panel), so no panel-level fingerprint is taken here.
+        panel_updated = None
+        crc_after = None
+        crc_forced = None
         post = get_uistat(session)
         msg_list = post.get("msg_list") if post else None
         refr_total = post.get("refr_total") if post else None

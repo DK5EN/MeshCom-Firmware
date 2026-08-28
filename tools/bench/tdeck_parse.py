@@ -292,7 +292,7 @@ _UISTAT_REQUIRED = {
     "heap_min",
     "psram_free",
 }
-_UISTAT_OPTIONAL = {"tft_sleeping", "bl"}
+_UISTAT_OPTIONAL = {"tft_sleeping", "bl", "scroll_y", "scroll_bottom", "ml_y1", "ml_y2", "last_y1", "last_y2", "scr_h"}
 
 
 def _parse_uistat(parts: List[str]) -> Optional[Dict[str, Any]]:

@@ -125,6 +125,21 @@ extern "C" void tdeck_dbg_redrawlog(bool on)
     s_redrawlog_on = on;
 }
 
+static bool s_flushfix_on = false;
+extern "C" void tdeck_dbg_flushfix(bool on) { s_flushfix_on = on; Serial.printf("[FLUSHFIX];%d\n", on ? 1 : 0); }
+extern "C" bool tdeck_dbg_flushfix_enabled(void) { return s_flushfix_on; }
+
+extern "C" void tdeck_dbg_invalidate(void) { lv_obj_t * scr = lv_scr_act(); if(scr) lv_obj_invalidate(scr); Serial.println("[INVALIDATE];ok"); }
+
+static bool s_framedump_armed = false;
+extern "C" void tdeck_dbg_framedump_arm(bool on) { s_framedump_armed = on; if(on) Serial.println("[FRAME];armed"); }
+extern "C" bool tdeck_dbg_framedump_armed(void) { return s_framedump_armed; }
+
+extern "C" bool tdeck_dbg_redrawlog_enabled(void)
+{
+    return s_redrawlog_on;
+}
+
 /* Strong override of the weak hook declared in lib/lvgl/src/core/lv_obj_pos.c. */
 /* Walk the Xtensa call stack from inside the hook. Frames 0..2 are this
  * helper, the hook and lv_obj_invalidate_area(); everything after that is the
@@ -212,17 +227,26 @@ extern "C" void tdeck_dbg_uistat(void)
     int drawer = drawer_is_open() ? 1 : 0;
     uint32_t objs = count_objs_recursive(lv_scr_act());
     int msg_list_children = (msg_list != NULL) ? (int)lv_obj_get_child_cnt(msg_list) : -1;
+    lv_obj_t * last = (msg_list != NULL && msg_list_children > 0) ? lv_obj_get_child(msg_list, -1) : NULL;
 
     Serial.printf("[UISTAT];tab;%d;drawer;%d;objs;%lu;msg_list;%d;inv_total;%lu;refr_total;%lu;"
                   "last_refr_px;%lu;last_refr_ms;%lu;redrawlog;%d;heap_free;%lu;heap_min;%lu;psram_free;%lu;"
-                  "tft_sleeping;%d;bl;%u\n",
+                  "tft_sleeping;%d;bl;%u;scroll_y;%ld;scroll_bottom;%ld;"
+                  "ml_y1;%d;ml_y2;%d;last_y1;%d;last_y2;%d;scr_h;%d\n",
                   active_tab, drawer, (unsigned long)objs, msg_list_children,
                   (unsigned long)s_inv_total, (unsigned long)s_refr_total,
                   (unsigned long)s_last_refr_px, (unsigned long)s_last_refr_ms,
                   s_redrawlog_on ? 1 : 0,
                   (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getMinFreeHeap(),
                   (unsigned long)ESP.getFreePsram(),
-                  tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level);
+                  tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level,
+                  (long)((msg_list != NULL) ? lv_obj_get_scroll_y(msg_list) : -1),
+                  (long)((msg_list != NULL) ? lv_obj_get_scroll_bottom(msg_list) : -1),
+                  (msg_list != NULL) ? (int)msg_list->coords.y1 : -1,
+                  (msg_list != NULL) ? (int)msg_list->coords.y2 : -1,
+                  (last != NULL) ? (int)last->coords.y1 : -1,
+                  (last != NULL) ? (int)last->coords.y2 : -1,
+                  (int)lv_disp_get_ver_res(NULL));
 }
 
 extern "C" void tdeck_dbg_tab_list(void)
