@@ -31,5 +31,8 @@ void sdmap_project(double lat, double lon, int16_t * x, int16_t * y);
 
 // Prueft, ob lat/lon in der aktuell geladenen Kachel liegt.
 bool sdmap_in_current_tile(double lat, double lon);
+void sdmap_project_view(double lat, double lon, int16_t * x, int16_t * y);
+int  sdmap_view_w();
+int  sdmap_view_h();
 
 #endif

@@ -24,6 +24,7 @@ void tdeck_dbg_redrawlog(bool on);
 bool tdeck_dbg_redrawlog_enabled(void);
 void tdeck_dbg_flushfix(bool on);
 void tdeck_dbg_reflush(void);
+void tdeck_dbg_mapzoom(int dir);
 void tdeck_dbg_blink(int n);
 void tdeck_dbg_framedump_arm(bool on);
 bool tdeck_dbg_framedump_armed(void);

@@ -4582,6 +4582,33 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    if(commandCheck(msg_text+2, (char*)"injectpos ") == 0)
+    {
+        // --injectpos <call> <lat> <lon>   (decimal degrees, negative = S / W)
+        char call[16] = {0};
+        double lat = 0.0, lon = 0.0;
+        if(sscanf(msg_text+12, "%15s %lf %lf", call, &lat, &lon) == 3)
+        {
+            tdeck_add_pos_point(String(call), fabs(lat), lat < 0 ? 'S' : 'N', fabs(lon), lon < 0 ? 'W' : 'E');
+            Serial.printf("[INJECTPOS];ok;%s;%.5f;%.5f\n", call, lat, lon);
+        }
+        else
+            Serial.println("[INJECTPOS];err;usage");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mapzoom in") == 0)
+    {
+        tdeck_dbg_mapzoom(1);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"mapzoom out") == 0)
+    {
+        tdeck_dbg_mapzoom(-1);
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"reflush") == 0)
     {
         tdeck_dbg_reflush();

@@ -133,3 +133,16 @@ exists.
 7. Boot: replace the 2 s busy-wait per boot message.
 
 Measure every step with the harness before and after; do not stack changes.
+
+## 5. Map (2026-08-29, early morning)
+
+| Item                                | Result                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Own position not centred, "jumps"   | Cause: one 256 px tile in a 294x182 tab that scrolled. Fix: `sdmap_refresh()` composes a viewport-sized image from the 1-4 tiles that intersect it, own position at the centre by construction; `sdmap_project_view()` places every station in viewport pixels. `[MAP]` line reports `center_err`; 0/0 at zoom 3-9 in both directions (harness `--mapzoom`). Tab scrolling disabled, scroll bars gone. |
+| Zoom keys                           | `g` / `h` on the map tab (SYM+I / SYM+O and touch buttons unchanged); all five entry points now call one `tdeck_map_zoom(dir)` (was 4 copies, handover A1).                                                                                                                                                                                                                                            |
+| Reboot on zoom-out with other nodes | G01 confirmed: `add_map_point()` deleted a station's objects, then returned early for an off-screen station without NULLing the slot; the next refresh deleted the freed object (`Guru Meditation LoadProhibited` in `_lv_obj_get_ext_draw_size`). Fix: NULL the slots. Reproducer `--injectpos` x4 + 36 zoom steps: crashes at step 7 without the fix, clean with it.                                 |
+| Tile load time                      | SD card was mounted at 800 kHz: 1.6-4.5 s per zoom. At 20 MHz (`SD.begin(..., 20000000)`, experiment): 0.33-0.79 s; the rest is PNG decode (~170 ms/tile). A decoded-tile cache would make zoom-back instant.                                                                                                                                                                                          |
+
+Still open on the map: neighbour tiles beyond the 2x2 window are not needed (viewport < tile), but
+a station further away than the viewport is simply not drawn; map panning (handover §4.5) is not
+implemented.

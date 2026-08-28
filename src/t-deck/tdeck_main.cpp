@@ -227,7 +227,7 @@ void startAudio()
  */
 bool setupSD()
 {
-    if (SD.begin(TDECK_SDCARD_CS, SPI, 800000U)) {
+    if (SD.begin(TDECK_SDCARD_CS, SPI, 20000000U)) {   // EXPERIMENT: was 800000U
         uint8_t cardType = SD.cardType();
         if (cardType == CARD_NONE) {
             Serial.println("[INIT]...No SD_MMC card attached");
@@ -734,47 +734,27 @@ static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
                 bSPEC=true;
             }
 
+            // g / h on the map tab: zoom in / out (no SYM needed)
+            if(lv_tabview_get_tab_act(tv) == 3 && (act_key == 0x67 || act_key == 0x47)) // g
+            {
+                tdeck_map_zoom(1);
+                bSPEC=true;
+            }
+            if(lv_tabview_get_tab_act(tv) == 3 && (act_key == 0x68 || act_key == 0x48)) // h
+            {
+                tdeck_map_zoom(-1);
+                bSPEC=true;
+            }
+
             if(act_key == 0x2b) // SYM + O -> Zoom raus (wie Touch-Button)
             {
-                if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
-                {
-                    sdmap_lastKnownLat = gpsData.latitude;
-                    sdmap_lastKnownLon = gpsData.longitude;
-                }
-
-                if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
-                {
-                    sdmap_lastKnownLat = meshcom_settings.node_lat;
-                    sdmap_lastKnownLon = meshcom_settings.node_lon;
-                }
-
-                sdmap_zoom_out();
-                sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
-                refresh_map(meshcom_settings.node_map);
-                add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
-
+                tdeck_map_zoom(-1);
                 bSPEC=true;
             }
 
             if(act_key == 0x2d) // SYM + I -> Zoom rein (wie Touch-Button)
             {
-                if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
-                {
-                    sdmap_lastKnownLat = gpsData.latitude;
-                    sdmap_lastKnownLon = gpsData.longitude;
-                }
-
-                if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
-                {
-                    sdmap_lastKnownLat = meshcom_settings.node_lat;
-                    sdmap_lastKnownLon = meshcom_settings.node_lon;
-                }
-
-                sdmap_zoom_in();
-                sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
-                refresh_map(meshcom_settings.node_map);
-                add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
-
+                tdeck_map_zoom(1);
                 bSPEC=true;
             }
 

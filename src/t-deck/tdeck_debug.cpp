@@ -12,6 +12,10 @@
 
 #include "tdeck_debug.h"
 #include "lv_obj_functions.h"
+#include "lv_obj_functions_extern.h"
+#include "tdeck_sdmap.h"
+#include <loop_functions_extern.h>
+#include <esp32/esp32_flash.h>
 #include "tdeck_helpers.h"
 #include "tdeck_extern.h"
 #include <Arduino.h>
@@ -134,6 +138,12 @@ extern "C" void tdeck_dbg_invalidate(void) { lv_obj_t * scr = lv_scr_act(); if(s
 static bool s_framedump_armed = false;
 extern "C" void tdeck_dbg_framedump_arm(bool on) { s_framedump_armed = on; if(on) Serial.println("[FRAME];armed"); }
 extern "C" bool tdeck_dbg_framedump_armed(void) { return s_framedump_armed; }
+
+extern "C" void tdeck_dbg_mapzoom(int dir)
+{
+    tdeck_map_zoom(dir);
+    Serial.printf("[MAPZOOM];%s;zoom;%d\n", dir > 0 ? "in" : "out", sdmap_get_zoom());
+}
 
 extern "C" bool tdeck_dbg_redrawlog_enabled(void)
 {

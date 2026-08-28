@@ -1775,16 +1775,19 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
     {
         if(map_point_call[ip] == callsign)
         {
+            // G01: the slot must not keep a pointer to a deleted object -- the
+            // off-screen early return below leaves the slot as it is, and the next
+            // refresh would delete it again (use-after-free, reboot on zoom).
             if(map_point[ip] != NULL)
             {
                 lv_obj_del(map_point[ip]);
-
-                delay(19);
+                map_point[ip] = NULL;
             }
 
             if(map_point_label[ip] != NULL)
             {
                 lv_obj_del(map_point_label[ip]);
+                map_point_label[ip] = NULL;
             }
 
             ipoint = ip;
@@ -1798,15 +1801,13 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
     lv_coord_t x = 0;
     lv_coord_t y = 0;
 
-    if (!sdmap_in_current_tile(dlat, dlon))
+    int16_t sx = 0, sy = 0;
+    sdmap_project_view(dlat, dlon, &sx, &sy);
+    if (sx < -10 || sy < -10 || sx > sdmap_view_w() + 10 || sy > sdmap_view_h() + 10)
     {
-        // Station liegt nicht in der aktuell sichtbaren Kachel - keinen Punkt zeichnen
+        // Station liegt ausserhalb des sichtbaren Kartenausschnitts - keinen Punkt zeichnen
         return;
     }
-
-    
-    int16_t sx = 0, sy = 0;
-    sdmap_project(dlat, dlon, &sx, &sy);
     x = (lv_coord_t)sx;
     y = (lv_coord_t)sy;
 
@@ -1848,7 +1849,7 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
    
     map_point[ipoint] = lv_obj_create(map_ta);
     lv_obj_set_size(map_point[ipoint],10, 10);
-    lv_obj_set_pos(map_point[ipoint], x, y);
+    lv_obj_set_pos(map_point[ipoint], x - 5, y - 5);      // dot centred on the position
     if(bHome)
         lv_obj_set_style_bg_color(map_point[ipoint] , (lv_color_t)LV_COLOR_MAKE(0, 0, 255), 0);
     else
@@ -1861,7 +1862,18 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
     lv_label_set_text(map_point_label[ipoint], callsign.c_str());
     lv_obj_set_style_text_font(map_point_label[ipoint], &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(map_point_label[ipoint], lv_color_black(), 0);
-    lv_obj_set_pos(map_point_label[ipoint], x - 5, y + 11);
+    lv_obj_set_pos(map_point_label[ipoint], x - 5, y + 6);
+
+    // The composed map image (sdmap_refresh) has the own position at its centre by
+    // construction; report the residual so the harness can verify it.
+    if(bHome)
+    {
+        int vw = sdmap_view_w(), vh = sdmap_view_h();
+        Serial.printf("[MAP];zoom;%d;home_px;%d;%d;view;%d;%d;map_pos;%d;%d;center_err;%d;%d\n",
+                      sdmap_get_zoom(), (int)x, (int)y, vw, vh,
+                      (int)lv_obj_get_x(map_ta), (int)lv_obj_get_y(map_ta),
+                      (int)(x - vw / 2), (int)(y - vh / 2));
+    }
 
     // MAP screen
     /*
@@ -1888,6 +1900,29 @@ void init_map()
 
     map_point_count = 0;
 
+}
+
+/**
+ * zoom the SD map in (dir > 0) or out (dir < 0) around the own position.
+ * Single implementation for the keyboard, the touch buttons and --mapzoom.
+ */
+void tdeck_map_zoom(int dir)
+{
+    if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
+    {
+        sdmap_lastKnownLat = gpsData.latitude;
+        sdmap_lastKnownLon = gpsData.longitude;
+    }
+    if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
+    {
+        sdmap_lastKnownLat = meshcom_settings.node_lat;
+        sdmap_lastKnownLon = meshcom_settings.node_lon;
+    }
+    if (dir > 0) sdmap_zoom_in();
+    else         sdmap_zoom_out();
+    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+    refresh_map(meshcom_settings.node_map);
+    add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
 }
 
 /**
@@ -1943,17 +1978,24 @@ void set_map(int iMap)
                 sdmap_lastKnownLat = gpsData.latitude;
                 sdmap_lastKnownLon = gpsData.longitude;
             }
+            {
+                lv_obj_t *vp = lv_obj_get_parent(map_ta);
+                if(vp != NULL)
+                {
+                    lv_obj_clear_flag(vp, LV_OBJ_FLAG_SCROLLABLE);
+                    lv_obj_set_scrollbar_mode(vp, LV_SCROLLBAR_MODE_OFF);
+                }
+            }
             sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
-            map_x[iMap] = SDMAP_TILE_PX;
-            map_y[iMap] = SDMAP_TILE_PX;
+            map_x[iMap] = sdmap_view_w();
+            map_y[iMap] = sdmap_view_h();
             break;
         }
     }
 
-    lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_align(map_ta, LV_ALIGN_TOP_LEFT);
+    lv_obj_set_pos(map_ta, 0, 0);
     lv_obj_set_size(map_ta, map_x[iMap], map_y[iMap]);
-    lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
     lv_obj_clean(map_ta);   // entfernt WIRKLICH alle Kind-Objekte (Punkte + Labels), auch verwaiste
     for(int im = 0; im < MAX_POINTS; im++)
     {

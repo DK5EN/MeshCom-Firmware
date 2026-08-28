@@ -835,23 +835,7 @@ void btn_event_handler_zoomin(lv_event_t * e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     {
-        if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
-        {
-            sdmap_lastKnownLat = gpsData.latitude;
-            sdmap_lastKnownLon = gpsData.longitude;
-        }
-
-        if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
-        {
-            sdmap_lastKnownLat = meshcom_settings.node_lat; // gpsData.latitude;
-            sdmap_lastKnownLon = meshcom_settings.node_lon; // gpsData.longitude;
-        }
-
-        
-        sdmap_zoom_in();
-        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
-        refresh_map(meshcom_settings.node_map);
-        add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
+        tdeck_map_zoom(1);
     }
 }
 
@@ -862,23 +846,7 @@ void btn_event_handler_zoomout(lv_event_t * e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     {
-        if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
-        {
-            sdmap_lastKnownLat = gpsData.latitude;
-            sdmap_lastKnownLon = gpsData.longitude;
-        }
-
-        if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
-        {
-            sdmap_lastKnownLat = meshcom_settings.node_lat; // gpsData.latitude;
-            sdmap_lastKnownLon = meshcom_settings.node_lon; // gpsData.longitude;
-        }
-        
-        
-        sdmap_zoom_out();
-        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
-        refresh_map(meshcom_settings.node_map);
-        add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
+        tdeck_map_zoom(-1);
     }
 }
 
