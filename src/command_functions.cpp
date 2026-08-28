@@ -805,7 +805,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             delay(100);
-            printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>");
+            printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
             #endif
         }
 
@@ -4551,6 +4551,30 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"drawer off") == 0)
     {
         tdeck_dbg_drawer(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tft on") == 0)
+    {
+        tdeck_dbg_tft(1);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tft off") == 0)
+    {
+        tdeck_dbg_tft(0);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tft state") == 0)
+    {
+        tdeck_dbg_tft(2);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"screencrc") == 0)
+    {
+        tdeck_dbg_screencrc();
         return;
     }
     else

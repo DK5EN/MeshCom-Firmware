@@ -34,6 +34,15 @@ bool tdeck_dbg_tab(int idx);
 /* Opens/closes the tab drawer to match the requested state. */
 void tdeck_dbg_drawer(bool open);
 
+/* Display sleep/wake control: 1 = tft_on(), 0 = tft_off(), 2 = state only.
+ * Always prints a [TFT] status line, see brief for the exact field list. */
+void tdeck_dbg_tft(int mode);
+
+/* Reads back the panel frame memory (8 horizontal bands) and prints a CRC32
+ * fingerprint per band plus a non-black pixel count, see brief for the exact
+ * field list. */
+void tdeck_dbg_screencrc(void);
+
 /* lv_disp_drv_t callbacks, wired up in tdeck_main.cpp:setupLvgl(). */
 void tdeck_dbg_monitor_cb(lv_disp_drv_t * disp_drv, uint32_t time_ms, uint32_t px);
 void tdeck_dbg_render_start_cb(lv_disp_drv_t * disp_drv);

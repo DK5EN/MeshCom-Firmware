@@ -30,6 +30,15 @@ authoritative list):
     [INSTR-FLUSH];n;<n>;total_us;<n>;avg_us;<n>;max_us;<n>
     [INSTR-LOOP];n;<n>;total_us;<n>;avg_us;<n>;max_us;<n>
     [INSTR-GUI];msg_list_children;<n>;active_tab_bubbles;<n>;persisted_msgs;<n>;map_points;<i>
+    [TFT];sleeping;<0|1>;bl;<n>;timer_age_ms;<n>
+    [SCREEN];ms;<n>;crc;<hex0>,<hex1>,...,<hex7>;nonblack;<n>;total;76800;t_ms;<n>[;sleeping;1]
+    [SCREEN];err;<reason>
+    [BOOT];msg;<text>
+    [BOOT];audio;file;<name>   [BOOT];audio;cw   [BOOT];audio;none
+    [BOOT];init;sd;<0|1>;touch;<0|1>;kb;<0|1>;psram_buf;<0|1>;t_ms;<n>
+
+[UISTAT] also accepts two optional trailing fields, tft_sleeping;<0|1> and
+bl;<n> -- older firmware omits them, newer firmware appends them.
 
 Every parsed record is a dict with a "kind" key (the bracket tag, without
 brackets, e.g. "REDRAW", "UISTAT", "INSTR-HEAP"). Records whose device line
@@ -269,29 +278,116 @@ def _parse_instr_heap(parts: List[str]) -> Optional[Dict[str, Any]]:
     return {"kind": "INSTR-HEAP", "tag": tag, **d}
 
 
+_UISTAT_REQUIRED = {
+    "tab",
+    "drawer",
+    "objs",
+    "msg_list",
+    "inv_total",
+    "refr_total",
+    "last_refr_px",
+    "last_refr_ms",
+    "redrawlog",
+    "heap_free",
+    "heap_min",
+    "psram_free",
+}
+_UISTAT_OPTIONAL = {"tft_sleeping", "bl"}
+
+
+def _parse_uistat(parts: List[str]) -> Optional[Dict[str, Any]]:
+    d = _kv_ints(parts)
+    if d is None:
+        return None
+    keys = set(d.keys())
+    if not _UISTAT_REQUIRED <= keys:
+        return None
+    if not keys <= (_UISTAT_REQUIRED | _UISTAT_OPTIONAL):
+        return None
+    return {"kind": "UISTAT", **d}
+
+
+def _parse_screen(parts: List[str]) -> Optional[Dict[str, Any]]:
+    if not parts:
+        return None
+    if parts[0] == "err":
+        reason = ";".join(parts[1:]) if len(parts) > 1 else ""
+        return {"kind": "SCREEN", "variant": "err", "reason": reason}
+
+    # variant "crc": ms,<n>,crc,<h0>,...,<h7>,nonblack,<n>,total,<n>,t_ms,<n>[,sleeping,1]
+    i = 0
+
+    def _need(tag: str) -> str:
+        nonlocal i
+        if i >= len(parts) or parts[i] != tag:
+            raise ValueError(f"expected {tag!r}")
+        val = parts[i + 1]
+        i += 2
+        return val
+
+    try:
+        ms = int(_need("ms"))
+        crc_raw = _need("crc")
+        crc = crc_raw.split(",")
+        if len(crc) != 8 or not all(crc):
+            return None
+        nonblack = int(_need("nonblack"))
+        total = int(_need("total"))
+        t_ms = int(_need("t_ms"))
+        sleeping: Optional[int] = None
+        if i < len(parts) and parts[i] == "sleeping":
+            sleeping = int(_need("sleeping"))
+        if i != len(parts):
+            return None
+    except (ValueError, IndexError):
+        return None
+
+    return {
+        "kind": "SCREEN",
+        "variant": "crc",
+        "ms": ms,
+        "crc": crc,
+        "nonblack": nonblack,
+        "total": total,
+        "t_ms": t_ms,
+        "sleeping": sleeping,
+    }
+
+
+def _parse_boot(parts: List[str]) -> Optional[Dict[str, Any]]:
+    if not parts:
+        return None
+    variant = parts[0]
+    if variant == "msg":
+        text = ";".join(parts[1:])
+        return {"kind": "BOOT", "variant": "msg", "text": text}
+    if variant == "audio":
+        if len(parts) == 2 and parts[1] in ("cw", "none"):
+            return {"kind": "BOOT", "variant": "audio", "what": parts[1], "file": None}
+        if len(parts) == 3 and parts[1] == "file":
+            return {"kind": "BOOT", "variant": "audio", "what": "file", "file": parts[2]}
+        return None
+    if variant == "init":
+        d = _kv_ints(parts[1:])
+        if d is None:
+            return None
+        required = {"sd", "touch", "kb", "psram_buf", "t_ms"}
+        if set(d.keys()) != required:
+            return None
+        return {"kind": "BOOT", "variant": "init", **d}
+    return None
+
+
 _DISPATCH = {
     "REDRAW": _parse_redraw,
     "REFR": lambda p: _kv_check(p, "REFR", {"ms", "px", "t_ms"}, exact=True),
     "REFRSTART": lambda p: _kv_check(p, "REFRSTART", {"ms", "areas"}, exact=True),
-    "UISTAT": lambda p: _kv_check(
-        p,
-        "UISTAT",
-        {
-            "tab",
-            "drawer",
-            "objs",
-            "msg_list",
-            "inv_total",
-            "refr_total",
-            "last_refr_px",
-            "last_refr_ms",
-            "redrawlog",
-            "heap_free",
-            "heap_min",
-            "psram_free",
-        },
-        exact=True,
+    "UISTAT": _parse_uistat,
+    "TFT": lambda p: _kv_check(
+        p, "TFT", {"sleeping", "bl", "timer_age_ms"}, exact=True
     ),
+    "SCREEN": _parse_screen,
+    "BOOT": _parse_boot,
     "TAB": _parse_tab,
     "DRAWER": _parse_drawer,
     "INJECT": _parse_inject,

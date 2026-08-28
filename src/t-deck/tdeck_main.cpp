@@ -51,6 +51,7 @@ AceButton           button;
 SemaphoreHandle_t   xSemaphore = NULL;
 
 bool kbDected = false;
+static bool s_lvglDrawBufPsram = false;
 
 void addMessage(const char*);
 bool checkKb();
@@ -123,7 +124,9 @@ void initTDeck()
     tft.begin();
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
-    
+    // tft.begin() returns void -- the library gives no failure signal to check.
+    Serial.println("[INIT]...TFT: OK");
+
     //! Touch
     Wire.begin(I2C_SDA, I2C_SCL);
     //scanDevices(&Wire);
@@ -196,12 +199,24 @@ void initTDeck()
 
     snprintf(buf, 40, "(build: %s / %s)", __DATE__, __TIME__);
     addMessage(buf);
+
+    Serial.printf("[BOOT];init;sd;%d;touch;%d;kb;%d;psram_buf;%d;t_ms;%lu\n",
+                  bSDDected ? 1 : 0,
+                  bTouchDected ? 1 : 0,
+                  kbDected ? 1 : 0,
+                  s_lvglDrawBufPsram ? 1 : 0,
+                  (unsigned long)millis());
 }
 
 void startAudio()
 {
-    if (!play_file_from_sd(meshcom_settings.node_audio_start.c_str(), 12))
+    if (play_file_from_sd(meshcom_settings.node_audio_start.c_str(), 12))
     {
+        Serial.printf("[BOOT];audio;file;%s\n", meshcom_settings.node_audio_start.c_str());
+    }
+    else
+    {
+        Serial.println("[BOOT];audio;cw");
         play_cw_start();
     }
 }
@@ -252,6 +267,7 @@ bool setupSD()
             return true;
         }
     }
+    Serial.println("[INIT]...SD.begin() failed (no card detected or mount error)");
     return false;
 }
 
@@ -260,6 +276,7 @@ bool setupSD()
  */
 void addMessage(const char *str)
 {
+    Serial.printf("[BOOT];msg;%s\n", str);
     tdeck_add_system_message(str);
     uint32_t run = millis() + 2000;
     while ((int32_t)(millis() - run) < 0)
@@ -334,9 +351,22 @@ void setupLvgl()
     static lv_color_t *buf = (lv_color_t *)ps_malloc(LVGL_BUFFER_SIZE);
     if (buf == NULL)
     {
-        Serial.println("[INIT] FATAL: LVGL buffer PSRAM allocation failed!");
+        Serial.println("[INIT]...LVGL draw buffer: PSRAM allocation failed, falling back to internal RAM");
         // Fallback to internal RAM if PSRAM fails
         buf = (lv_color_t *)malloc(LVGL_BUFFER_SIZE);
+        if (buf == NULL)
+        {
+            Serial.println("[INIT]...LVGL draw buffer: FAIL (internal RAM allocation failed too)");
+        }
+        else
+        {
+            Serial.println("[INIT]...LVGL draw buffer: internal");
+        }
+    }
+    else
+    {
+        s_lvglDrawBufPsram = true;
+        Serial.println("[INIT]...LVGL draw buffer: PSRAM");
     }
 
 
@@ -383,6 +413,10 @@ void setupLvgl()
         indev_touchpad.read_cb = touchpad_read;
         touch_indev = lv_indev_drv_register( &indev_touchpad );
     }
+    else
+    {
+        Serial.println("[INIT]...Touch indev: SKIPPED (not detected)");
+    }
 
     /*Register a mouse input device*/
     static lv_indev_drv_t indev_mouse;
@@ -409,6 +443,10 @@ void setupLvgl()
         indev_keypad.read_cb = keypad_read;
         kb_indev = lv_indev_drv_register(&indev_keypad);
         lv_indev_set_group(kb_indev, lv_group_get_default());
+    }
+    else
+    {
+        Serial.println("[INIT]...Keyboard registered: SKIPPED (not detected)");
     }
 }
 

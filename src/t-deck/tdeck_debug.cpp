@@ -12,15 +12,22 @@
 
 #include "tdeck_debug.h"
 #include "lv_obj_functions.h"
+#include "tdeck_helpers.h"
+#include "tdeck_extern.h"
 #include <Arduino.h>
 #include <lvgl.h>
 #include <esp_debug_helpers.h>
 #include <soc/cpu.h>
+#include <TFT_eSPI.h>
 
 /* Globals owned by lv_obj_functions.cpp (see lv_obj_functions.cpp:87,106,110). */
 extern lv_obj_t *tv;
 extern lv_obj_t *msg_list;
 extern lv_obj_t *map_ta;
+
+/* Globals owned by tdeck_main.cpp. */
+extern TFT_eSPI tft;
+extern SemaphoreHandle_t xSemaphore;
 
 namespace {
 
@@ -88,6 +95,27 @@ bool drawer_is_open()
     lv_obj_t * btns = lv_tabview_get_tab_btns(tv);
     if(btns == NULL) return false;
     return !lv_obj_has_flag(btns, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* ---- [SCREEN] frame-memory readback ---- */
+const int SCREEN_W = 320;
+const int SCREEN_BAND_H = 30;
+const int SCREEN_BANDS = 8;
+const uint32_t SCREEN_BAND_PIXELS = SCREEN_W * SCREEN_BAND_H;
+const uint32_t SCREEN_TOTAL_PIXELS = SCREEN_BAND_PIXELS * SCREEN_BANDS;
+
+/* Table-less CRC32 (reflected, polynomial 0xEDB88320) -- a fingerprint only,
+ * two readbacks are compared bit-for-bit so any correct CRC32 works here. */
+uint32_t crc32_update(uint32_t crc, const uint8_t * data, size_t len)
+{
+    crc = ~crc;
+    for(size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for(int k = 0; k < 8; k++) {
+            crc = (crc >> 1) ^ ((crc & 1u) ? 0xEDB88320u : 0u);
+        }
+    }
+    return ~crc;
 }
 
 } // namespace
@@ -186,13 +214,15 @@ extern "C" void tdeck_dbg_uistat(void)
     int msg_list_children = (msg_list != NULL) ? (int)lv_obj_get_child_cnt(msg_list) : -1;
 
     Serial.printf("[UISTAT];tab;%d;drawer;%d;objs;%lu;msg_list;%d;inv_total;%lu;refr_total;%lu;"
-                  "last_refr_px;%lu;last_refr_ms;%lu;redrawlog;%d;heap_free;%lu;heap_min;%lu;psram_free;%lu\n",
+                  "last_refr_px;%lu;last_refr_ms;%lu;redrawlog;%d;heap_free;%lu;heap_min;%lu;psram_free;%lu;"
+                  "tft_sleeping;%d;bl;%u\n",
                   active_tab, drawer, (unsigned long)objs, msg_list_children,
                   (unsigned long)s_inv_total, (unsigned long)s_refr_total,
                   (unsigned long)s_last_refr_px, (unsigned long)s_last_refr_ms,
                   s_redrawlog_on ? 1 : 0,
                   (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getMinFreeHeap(),
-                  (unsigned long)ESP.getFreePsram());
+                  (unsigned long)ESP.getFreePsram(),
+                  tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level);
 }
 
 extern "C" void tdeck_dbg_tab_list(void)
@@ -228,6 +258,78 @@ extern "C" void tdeck_dbg_drawer(bool open)
         if(drawer_is_open()) tdeck_toggle_tab_menu();
     }
     Serial.printf("[DRAWER];%d\n", drawer_is_open() ? 1 : 0);
+}
+
+extern "C" void tdeck_dbg_tft(int mode)
+{
+    if(mode == 1) {
+        tft_on();
+    }
+    else if(mode == 0) {
+        tft_off();
+    }
+    /* mode == 2 (or anything else): state only, no action taken. */
+
+    Serial.printf("[TFT];sleeping;%d;bl;%u;timer_age_ms;%lu\n",
+                  tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level,
+                  (unsigned long)(millis() - tdeck_tft_timer));
+}
+
+extern "C" void tdeck_dbg_screencrc(void)
+{
+    static uint16_t * s_band_buf = NULL;
+    if(s_band_buf == NULL) {
+        s_band_buf = (uint16_t *)ps_malloc(SCREEN_BAND_PIXELS * sizeof(uint16_t));
+        if(s_band_buf == NULL) {
+            s_band_buf = (uint16_t *)malloc(SCREEN_BAND_PIXELS * sizeof(uint16_t));
+        }
+        if(s_band_buf == NULL) {
+            Serial.println("[SCREEN];err;nomem");
+            return;
+        }
+    }
+
+    uint32_t start_ms = millis();
+    uint32_t band_crc[SCREEN_BANDS];
+    uint32_t nonblack = 0;
+    bool was_sleeping = tft_is_sleeping;
+
+    if(xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
+        /* Keep other SPI slaves off the shared MISO line, as the wake path does. */
+        digitalWrite(TDECK_SDCARD_CS, HIGH);
+#ifdef LORA_CS
+        digitalWrite(LORA_CS, HIGH);
+#endif
+
+        for(int band = 0; band < SCREEN_BANDS; band++) {
+            memset(s_band_buf, 0, SCREEN_BAND_PIXELS * sizeof(uint16_t));
+            tft.readRect(0, band * SCREEN_BAND_H, SCREEN_W, SCREEN_BAND_H, s_band_buf);
+
+            band_crc[band] = crc32_update(0, (const uint8_t *)s_band_buf,
+                                           SCREEN_BAND_PIXELS * sizeof(uint16_t));
+            for(uint32_t i = 0; i < SCREEN_BAND_PIXELS; i++) {
+                if(s_band_buf[i] != 0x0000) nonblack++;
+            }
+        }
+
+        xSemaphoreGive(xSemaphore);
+    }
+    else {
+        Serial.println("[SCREEN];err;sem_timeout");
+        return;
+    }
+
+    uint32_t elapsed = millis() - start_ms;
+
+    Serial.printf("[SCREEN];ms;%lu;crc;", (unsigned long)start_ms);
+    for(int band = 0; band < SCREEN_BANDS; band++) {
+        Serial.printf("%s%08lx", band ? "," : "", (unsigned long)band_crc[band]);
+    }
+    Serial.printf(";nonblack;%lu;total;%lu;t_ms;%lu",
+                  (unsigned long)nonblack, (unsigned long)SCREEN_TOTAL_PIXELS,
+                  (unsigned long)elapsed);
+    if(was_sleeping) Serial.print(";sleeping;1");
+    Serial.print("\n");
 }
 
 #endif /* BOARD_T_DECK || BOARD_T_DECK_PLUS */

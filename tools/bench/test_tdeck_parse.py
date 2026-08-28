@@ -118,6 +118,27 @@ class TestUistat(unittest.TestCase):
         # exact key-set required; a short line must not silently half-parse
         self.assertIsNone(parse_line("[UISTAT];tab;2;drawer;0"))
 
+    def test_uistat_with_tft_sleeping_and_bl(self) -> None:
+        line = (
+            "[UISTAT];tab;2;drawer;0;objs;140;msg_list;12;inv_total;900;"
+            "refr_total;300;last_refr_px;4096;last_refr_ms;9;redrawlog;1;"
+            "heap_free;180000;heap_min;150000;psram_free;2000000;"
+            "tft_sleeping;1;bl;0"
+        )
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        assert rec is not None
+        self.assertEqual(rec["tft_sleeping"], 1)
+        self.assertEqual(rec["bl"], 0)
+
+    def test_uistat_unknown_extra_field_is_none(self) -> None:
+        line = (
+            "[UISTAT];tab;2;drawer;0;objs;140;msg_list;12;inv_total;900;"
+            "refr_total;300;last_refr_px;4096;last_refr_ms;9;redrawlog;1;"
+            "heap_free;180000;heap_min;150000;psram_free;2000000;bogus;1"
+        )
+        self.assertIsNone(parse_line(line))
+
 
 class TestTab(unittest.TestCase):
     def test_tab_line(self) -> None:
@@ -238,6 +259,105 @@ class TestInstr(unittest.TestCase):
                 "active_tab_bubbles": 5,
                 "persisted_msgs": 12,
                 "map_points": 3,
+            },
+        )
+
+
+class TestTft(unittest.TestCase):
+    def test_tft_sleeping(self) -> None:
+        rec = parse_line("[TFT];sleeping;1;bl;0;timer_age_ms;5230")
+        self.assertEqual(
+            rec, {"kind": "TFT", "sleeping": 1, "bl": 0, "timer_age_ms": 5230}
+        )
+
+    def test_tft_awake(self) -> None:
+        rec = parse_line("[TFT];sleeping;0;bl;255;timer_age_ms;0")
+        self.assertEqual(
+            rec, {"kind": "TFT", "sleeping": 0, "bl": 255, "timer_age_ms": 0}
+        )
+
+    def test_tft_missing_field_is_none(self) -> None:
+        self.assertIsNone(parse_line("[TFT];sleeping;1;bl;0"))
+
+
+class TestScreen(unittest.TestCase):
+    def test_screen_crc(self) -> None:
+        line = (
+            "[SCREEN];ms;12345;crc;0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8;"
+            "nonblack;500;total;76800;t_ms;42"
+        )
+        rec = parse_line(line)
+        self.assertEqual(
+            rec,
+            {
+                "kind": "SCREEN",
+                "variant": "crc",
+                "ms": 12345,
+                "crc": ["0x1", "0x2", "0x3", "0x4", "0x5", "0x6", "0x7", "0x8"],
+                "nonblack": 500,
+                "total": 76800,
+                "t_ms": 42,
+                "sleeping": None,
+            },
+        )
+
+    def test_screen_crc_with_sleeping(self) -> None:
+        line = (
+            "[SCREEN];ms;1;crc;0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8;"
+            "nonblack;0;total;76800;t_ms;1;sleeping;1"
+        )
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        assert rec is not None
+        self.assertEqual(rec["sleeping"], 1)
+
+    def test_screen_crc_wrong_count_is_none(self) -> None:
+        line = "[SCREEN];ms;1;crc;0x1,0x2,0x3;nonblack;0;total;76800;t_ms;1"
+        self.assertIsNone(parse_line(line))
+
+    def test_screen_err(self) -> None:
+        rec = parse_line("[SCREEN];err;capture_failed")
+        self.assertEqual(rec, {"kind": "SCREEN", "variant": "err", "reason": "capture_failed"})
+
+
+class TestBoot(unittest.TestCase):
+    def test_boot_msg(self) -> None:
+        rec = parse_line("[BOOT];msg;starting up")
+        self.assertEqual(rec, {"kind": "BOOT", "variant": "msg", "text": "starting up"})
+
+    def test_boot_msg_with_embedded_semicolons(self) -> None:
+        rec = parse_line("[BOOT];msg;sd;ok;touch;ok")
+        self.assertEqual(
+            rec, {"kind": "BOOT", "variant": "msg", "text": "sd;ok;touch;ok"}
+        )
+
+    def test_boot_audio_file(self) -> None:
+        rec = parse_line("[BOOT];audio;file;startup.wav")
+        self.assertEqual(
+            rec, {"kind": "BOOT", "variant": "audio", "what": "file", "file": "startup.wav"}
+        )
+
+    def test_boot_audio_cw(self) -> None:
+        rec = parse_line("[BOOT];audio;cw")
+        self.assertEqual(rec, {"kind": "BOOT", "variant": "audio", "what": "cw", "file": None})
+
+    def test_boot_audio_none(self) -> None:
+        rec = parse_line("[BOOT];audio;none")
+        self.assertEqual(rec, {"kind": "BOOT", "variant": "audio", "what": "none", "file": None})
+
+    def test_boot_init(self) -> None:
+        line = "[BOOT];init;sd;1;touch;1;kb;0;psram_buf;1;t_ms;1234"
+        rec = parse_line(line)
+        self.assertEqual(
+            rec,
+            {
+                "kind": "BOOT",
+                "variant": "init",
+                "sd": 1,
+                "touch": 1,
+                "kb": 0,
+                "psram_buf": 1,
+                "t_ms": 1234,
             },
         )
 

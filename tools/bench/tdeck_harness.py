@@ -28,14 +28,19 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 try:
     import serial  # pyserial
 except ImportError:  # pragma: no cover - exercised only when pyserial is missing
     serial = None  # type: ignore[assignment]
 
-from tdeck_parse import heap_delta, parse_line, redraw_summary, refr_summary
+from tdeck_parse import (
+    heap_delta,
+    parse_line,
+    redraw_summary,
+    refr_summary,
+)
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"
 DEFAULT_BAUD = 115200
@@ -290,6 +295,14 @@ def get_uistat(session: TDeckSession, timeout: float = 2.0) -> Optional[Dict[str
     return parse_line(m.string)
 
 
+def get_screencrc(session: TDeckSession, timeout: float = 2.0) -> Optional[Dict[str, Any]]:
+    idx = session.send("--screencrc")
+    m = session.wait_for(r"\[SCREEN\]", timeout, since=idx)
+    if not m:
+        return None
+    return parse_line(m.string)
+
+
 def _parsed_range(session: TDeckSession, start: int, end: int) -> List[Dict[str, Any]]:
     raw = session.records_range(start, end)
     out = []
@@ -313,6 +326,13 @@ def _short_sym(sym: str) -> str:
     func = func.split("(", 1)[0]
     loc = re.sub(r"\s*\(discriminator \d+\)", "", loc)
     return f"{func} {loc.rsplit('/', 1)[-1]}"
+
+
+def _screencrc(session: TDeckSession) -> Optional[List[str]]:
+    idx = session.send("--screencrc")
+    m = session.wait_for(r"\[SCREEN\];ms;", 4.0, since=idx)
+    rec = parse_line(m.string) if m else None
+    return rec.get("crc") if rec else None
 
 
 def scenario_idle(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
@@ -496,6 +516,16 @@ def scenario_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str
                 bt_counts[key] = bt_counts.get(key, 0) + 1
         top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:8]
         sym_map = symbolize(sorted({a for key, _ in top_bt for a in key}), args.elf) if top_bt else {}
+        # Panel-level check: fingerprint now vs after a forced full repaint.
+        crc_after = _screencrc(session)
+        session.send("--drawer on")
+        time.sleep(0.6)
+        session.send("--drawer off")
+        time.sleep(0.8)
+        crc_forced = _screencrc(session)
+        panel_updated = (
+            crc_after is not None and crc_forced is not None and crc_after == crc_forced
+        )
         post = get_uistat(session)
         msg_list = post.get("msg_list") if post else None
         refr_total = post.get("refr_total") if post else None
@@ -521,6 +551,9 @@ def scenario_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str
                 "msg_list": msg_list,
                 "msg_list_growth": growth,
                 "inv_count": rsum["total"],
+                "panel_updated": panel_updated,
+                "crc_after": crc_after,
+                "crc_forced": crc_forced,
                 "top_backtraces": [
                     {"count": cnt, "frames": [_short_sym(sym_map.get(a, a)) for a in key]}
                     for key, cnt in top_bt
@@ -566,12 +599,69 @@ def scenario_audio(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     return {"ok": ok, "results": results}
 
 
+def _instr_loop_and_flush(lines: Sequence[str]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    loop = None
+    flush = None
+    for line in lines:
+        rec = parse_line(line)
+        if rec and rec.get("kind") == "INSTR-LOOP" and loop is None:
+            loop = rec
+        elif rec and rec.get("kind") == "INSTR-FLUSH" and flush is None:
+            flush = rec
+    return loop, flush
+
+
+def scenario_audio_stall(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Does audio playback starve the main loop / LVGL? Operator report: UI freezes
+    while a tone plays, so this scenario is expected to FAIL today -- it must
+    measure, not pass.
+    """
+    # with audio playing
+    reset_idx = session.send("--instreset")
+    session.wait_for(r"\[INSTR", 2.0, since=reset_idx)
+    play_idx = session.send("--playtone msg")
+    play_seen = session.wait_for(r"\[AUDIO\];play;msg", 2.0, since=play_idx) is not None
+    time.sleep(2.5)
+    instr_idx = session.send("--instr")
+    instr_lines = session.collect(1.0, since=instr_idx)
+    loop_with_audio, flush_with_audio = _instr_loop_and_flush(instr_lines)
+
+    # control: idle, no audio
+    reset2_idx = session.send("--instreset")
+    session.wait_for(r"\[INSTR", 2.0, since=reset2_idx)
+    time.sleep(2.5)
+    instr2_idx = session.send("--instr")
+    instr2_lines = session.collect(1.0, since=instr2_idx)
+    loop_idle, flush_idle = _instr_loop_and_flush(instr2_lines)
+
+    loop_max_us_with_audio = loop_with_audio.get("max_us") if loop_with_audio else None
+    loop_max_us_idle = loop_idle.get("max_us") if loop_idle else None
+    ratio = (
+        loop_max_us_with_audio / loop_max_us_idle
+        if (loop_max_us_with_audio is not None and loop_max_us_idle)
+        else None
+    )
+    ok = loop_max_us_with_audio is not None and loop_max_us_with_audio < 100000
+
+    return {
+        "ok": ok,
+        "play_seen": play_seen,
+        "loop_with_audio": loop_with_audio,
+        "flush_with_audio": flush_with_audio,
+        "loop_idle": loop_idle,
+        "flush_idle": flush_idle,
+        "loop_max_us_with_audio": loop_max_us_with_audio,
+        "loop_max_us_idle": loop_max_us_idle,
+        "ratio": ratio,
+    }
+
+
 def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     idx0 = session.send("--heap h0")
     m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
     h0 = parse_line(m0.string) if m0 else None
 
-    for i in range(20):
+    for i in range(args.heap_count):
         t_start = time.monotonic()
         session.send(f"--injectmsg 9999 heap probe {i}")
         elapsed = time.monotonic() - t_start
@@ -590,15 +680,183 @@ def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     return {"ok": ok, "h0": h0, "h1": h1, "delta": delta}
 
 
+def _top_backtraces(
+    records: Iterable[Optional[Dict[str, Any]]], elf: str, limit: int = 8
+) -> List[Dict[str, Any]]:
+    """Group REDRAW;obj records by full backtrace, symbolized, most-common first.
+
+    Shared by scenario_inject-style reporting and scenario_sleep.
+    """
+    bt_counts: Dict[Tuple[str, ...], int] = {}
+    for rec in records:
+        if rec and rec.get("kind") == "REDRAW" and rec.get("variant") == "obj":
+            key = tuple(rec.get("bt") or ())
+            bt_counts[key] = bt_counts.get(key, 0) + 1
+    top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:limit]
+    addrs = sorted({a for key, _ in top_bt for a in key})
+    sym_map = symbolize(addrs, elf) if addrs else {}
+    return [
+        {"count": cnt, "frames": [_short_sym(sym_map.get(a, a)) for a in key]}
+        for key, cnt in top_bt
+    ]
+
+
+def scenario_boot(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """H-R3 support scenario: inspect what the device logged during its own boot.
+
+    Sends no commands -- purely inspects the lines already recorded since the
+    session opened (index 0), i.e. everything from CLIENT STARTED onward.
+    """
+    raw_lines = [l for _, _, l in session.records_since(0)]
+    parsed = [parse_line(l) for l in raw_lines]
+
+    boot_msgs = [r["text"] for r in parsed if r and r.get("kind") == "BOOT" and r.get("variant") == "msg"]
+    audio_recs = [r for r in parsed if r and r.get("kind") == "BOOT" and r.get("variant") == "audio"]
+    audio_outcome = audio_recs[-1] if audio_recs else None
+    init_recs = [r for r in parsed if r and r.get("kind") == "BOOT" and r.get("variant") == "init"]
+    init_summary = init_recs[-1] if init_recs else None
+    # Pre-existing freeform "[INIT]...text" debug lines (sensor/subsystem init
+    # logging predating this instrumentation) -- not a parsed [BOOT];init
+    # record, just raw text worth keeping around for a human to skim.
+    init_log_lines = [l for l in raw_lines if "[INIT]" in l]
+    fail_lines = [l for l in raw_lines if "FAIL" in l]
+
+    ok = init_summary is not None and not fail_lines
+    return {
+        "ok": ok,
+        "boot_msgs": boot_msgs,
+        "audio_outcome": audio_outcome,
+        "init_summary": init_summary,
+        "init_log_lines": init_log_lines,
+        "fail_lines": fail_lines,
+    }
+
+
+def scenario_screen(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Sanity-check --screencrc readback stability, and that the map tab renders content."""
+    crc_a = get_screencrc(session)
+    time.sleep(1.0)
+    crc_b = get_screencrc(session)
+    readback_stable = bool(crc_a and crc_b and crc_a.get("crc") == crc_b.get("crc"))
+
+    session.send("--tab 3")
+    time.sleep(0.5)
+    map_crc = get_screencrc(session)
+    map_has_content = bool(map_crc and map_crc.get("nonblack", 0) > 1000)
+
+    return {
+        "ok": readback_stable and map_has_content,
+        "crc_a": crc_a,
+        "crc_b": crc_b,
+        "readback_stable": readback_stable,
+        "map_crc": map_crc,
+        "map_has_content": map_has_content,
+    }
+
+
+def scenario_sleep(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """H-R3 core hypothesis test: after display wake, is the screen repainted?
+
+    S0 = screen content while awake; S1 = screen content right after wake
+    (with an inject fired while asleep to give the device something to want
+    to redraw); S2 = screen content after a forced full repaint (drawer
+    open/close). If S1 == S2 the post-wake screen already matches what a
+    full repaint produces -- the wake path is fine. If S1 != S2 the device
+    is showing stale content after wake and only a forced repaint fixes it.
+    """
+    # a. establish a known-good baseline while the display is awake.
+    session.send("--tab 0")
+    time.sleep(0.3)
+    tft_on_idx = session.send("--tft on")
+    session.wait_for(r"\[TFT\]", 2.0, since=tft_on_idx)
+    s0 = get_screencrc(session)
+
+    # b. put the display to sleep.
+    off_idx = session.send("--tft off")
+    tft_off_acked = session.wait_for(r"\[TFT\];sleeping;1\b", 2.0, since=off_idx) is not None
+
+    # c. while asleep, inject a message and see whether anything tries to redraw.
+    session.send("--redrawlog on")
+    time.sleep(0.1)
+    inject_idx = session.send("--injectmsg 9999 sleep probe")
+    inject_ok = session.wait_for(r"\[INJECT\];ok", 2.0, since=inject_idx) is not None
+    asleep_lines = session.collect(1.5, since=inject_idx)
+    asleep_parsed = [parse_line(l) for l in asleep_lines]
+    refr_px_while_asleep = [r["px"] for r in asleep_parsed if r and r.get("kind") == "REFR"]
+
+    # d. wake the display and observe the repaint (or lack of one).
+    wake_idx = session.send("--tft on")
+    tft_on_acked = session.wait_for(r"\[TFT\];sleeping;0\b", 2.0, since=wake_idx) is not None
+    wake_lines = session.collect(1.5, since=wake_idx)
+    session.send("--redrawlog off")
+    time.sleep(0.1)
+
+    wake_parsed = [parse_line(l) for l in wake_lines]
+    refr_after_wake = [r for r in wake_parsed if r and r.get("kind") == "REFR"]
+    full_refresh_after_wake = any(r["px"] == 76800 for r in refr_after_wake)
+    max_px_after_wake = max((r["px"] for r in refr_after_wake), default=0)
+    redraw_after_wake = [
+        r for r in wake_parsed if r and r.get("kind") == "REDRAW" and r.get("variant") == "obj"
+    ]
+    redraw_count_after_wake = len(redraw_after_wake)
+    top_backtraces_after_wake = _top_backtraces(redraw_after_wake, args.elf)
+
+    # e. S1, then force a known-good repaint (drawer open/close) and take S2.
+    s1 = get_screencrc(session)
+    drawer_on_idx = session.send("--drawer on")
+    session.wait_for(r"\[DRAWER\];1\b", 1.0, since=drawer_on_idx)
+    drawer_off_idx = session.send("--drawer off")
+    session.wait_for(r"\[DRAWER\];0\b", 1.0, since=drawer_off_idx)
+    session.collect(1.0)
+    s2 = get_screencrc(session)
+
+    # f. verdict.
+    screen_changed_by_wake = bool(s0 and s1 and s0.get("crc") != s1.get("crc"))
+    wake_matches_forced_repaint = bool(s1 and s2 and s1.get("crc") == s2.get("crc"))
+    ok = wake_matches_forced_repaint
+
+    return {
+        "ok": ok,
+        "s0": s0,
+        "s1": s1,
+        "s2": s2,
+        "tft_off_acked": tft_off_acked,
+        "tft_on_acked": tft_on_acked,
+        "inject_ok": inject_ok,
+        "refr_px_while_asleep": refr_px_while_asleep,
+        "screen_changed_by_wake": screen_changed_by_wake,
+        "wake_matches_forced_repaint": wake_matches_forced_repaint,
+        "full_refresh_after_wake": full_refresh_after_wake,
+        "max_px_after_wake": max_px_after_wake,
+        "redraw_count_after_wake": redraw_count_after_wake,
+        "top_backtraces_after_wake": top_backtraces_after_wake,
+    }
+
+
 SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]]] = {
+    "boot": scenario_boot,
     "idle": scenario_idle,
     "tabs": scenario_tabs,
     "drawer": scenario_drawer,
     "inject": scenario_inject,
     "audio": scenario_audio,
+    "audio_stall": scenario_audio_stall,
+    "sleep": scenario_sleep,
+    "screen": scenario_screen,
     "heap": scenario_heap,
 }
-SCENARIO_ORDER = ["idle", "tabs", "drawer", "inject", "audio", "heap"]
+SCENARIO_ORDER = [
+    "boot",
+    "idle",
+    "tabs",
+    "drawer",
+    "inject",
+    "audio",
+    "audio_stall",
+    "sleep",
+    "screen",
+    "heap",
+]
 
 
 # --------------------------------------------------------------------------
@@ -614,7 +872,14 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
     for name, result in summary.items():
         verdict = "PASS" if result.get("ok") else "FAIL"
         print(f"\n[{name}] {verdict}")
-        if name == "idle":
+        if name == "boot":
+            for msg in result.get("boot_msgs", []):
+                print(f"  msg: {msg}")
+            print(f"  audio: {result.get('audio_outcome')}")
+            print(f"  init: {result.get('init_summary')}")
+            if result.get("fail_lines"):
+                print(f"  FAIL lines: {len(result['fail_lines'])}")
+        elif name == "idle":
             print(
                 f"  refr/s={result['refr'].get('refreshes_per_second', 0):.2f}  "
                 f"px/s={result['refr'].get('px_per_second', 0):.0f}  "
@@ -643,13 +908,36 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 print(
                     f"  msg {row['i']}: ok={row['inject_ok']} refr={row['refr_seen']} "
                     f"refr_delta={row.get('refr_delta')} inv={row.get('inv_count')} "
-                    f"displayed={row['displayed']} msg_list={row['msg_list']}"
+                    f"displayed={row['displayed']} panel={row.get('panel_updated')} msg_list={row['msg_list']}"
                 )
                 for bt in row.get("top_backtraces", [])[:4]:
                     print(f"      {bt['count']:4d}  " + " <- ".join(bt["frames"]))
         elif name == "audio":
             for row in result.get("results", []):
                 print(f"  {row['what']!r}: passed={row['passed']}")
+        elif name == "audio_stall":
+            ratio = result.get("ratio")
+            ratio_str = f"{ratio:.1f}" if ratio is not None else "None"
+            print(
+                f"  loop_max_us_with_audio={result.get('loop_max_us_with_audio')}  "
+                f"loop_max_us_idle={result.get('loop_max_us_idle')}  "
+                f"ratio={ratio_str}"
+            )
+        elif name == "sleep":
+            print(
+                f"  screen_changed_by_wake={result.get('screen_changed_by_wake')}  "
+                f"wake_matches_forced_repaint={result.get('wake_matches_forced_repaint')}  "
+                f"full_refresh_after_wake={result.get('full_refresh_after_wake')}  "
+                f"max_px_after_wake={result.get('max_px_after_wake')}  "
+                f"redraw_count_after_wake={result.get('redraw_count_after_wake')}"
+            )
+            for bt in result.get("top_backtraces_after_wake", [])[:4]:
+                print(f"    {bt['count']:4d}  " + " <- ".join(bt["frames"]))
+        elif name == "screen":
+            print(
+                f"  readback_stable={result.get('readback_stable')}  "
+                f"map_has_content={result.get('map_has_content')}"
+            )
         elif name == "heap":
             print(f"  delta={result.get('delta')}")
     print()
@@ -671,6 +959,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="which scenario(s) to run (default: all)",
     )
     p.add_argument("--port", default=DEFAULT_PORT, help=f"serial port (default: {DEFAULT_PORT})")
+    p.add_argument("--heap-count", type=int, default=20, help="injections in the heap scenario (default: 20)")
     p.add_argument("--elf", default=DEFAULT_ELF, help=f"firmware ELF for symbolization (default: {DEFAULT_ELF})")
     p.add_argument(
         "--boot-timeout",
