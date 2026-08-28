@@ -4,6 +4,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "printfdeb_functions.h"
+#include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
 #include "mheard_functions.h"
 #include "udp_functions.h"
@@ -4461,6 +4462,41 @@ void commandAction(char *umsg_text, bool ble)
     }
     //
     ///////////////////////////////////////////////////////////////////////////
+#if INSTRUMENT_ENABLED
+    ///////////////////////////////////////////////////////////////////////////
+    // TEMPORARY measurement commands -- see src/instrument.h. Removed together
+    // with the rest of the scaffolding before the upstream PR.
+    //
+    // Order matters: commandCheck() is a prefix match, so "heap " (tagged form)
+    // must be tested before the bare "heap".
+    else
+    if(commandCheck(msg_text+2, (char*)"heap ") == 0)
+    {
+        instrument_report_heap(msg_text + 7);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"heap") == 0)
+    {
+        instrument_report_heap("-");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"instreset") == 0)
+    {
+        instrument_reset();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"instr") == 0)
+    {
+        instrument_report_heap("instr");
+        instrument_report_timing();
+        instrument_report_gui();
+        return;
+    }
+    ///////////////////////////////////////////////////////////////////////////
+#endif
     else
     if(commandCheck(msg_text+2, (char*)"lora") == 0)
     {

@@ -13,6 +13,7 @@
 #include "tdeck_main.h"
 #include "tdeck_extern.h"
 #include "tdeck_helpers.h"
+#include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include <esp32/esp32_flash.h>
 #include <mheard_functions.h>
 #include <time_functions.h>
@@ -417,12 +418,14 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
     uint32_t h = ( area->y2 - area->y1 + 1 );
 
     if ( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE ) {
+        INSTR_T0(_instr_flush_t0);          // TEMPORARY -- see src/instrument.h
         tft.startWrite();
         tft.setAddrWindow( area->x1, area->y1, w, h );
         tft.pushColors( ( uint16_t * )&color_p->full, w * h, false );
         tft.endWrite();
+        INSTR_FLUSH(_instr_flush_t0);       // TEMPORARY
         lv_disp_flush_ready( disp );
-        
+
         xSemaphoreGive( xSemaphore );
     }
 }

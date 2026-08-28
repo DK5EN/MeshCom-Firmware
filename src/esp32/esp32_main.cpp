@@ -14,6 +14,7 @@
 #include <configuration.h>
 #include "capture_functions.h"
 #include "dedup_functions.h"
+#include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include <RadioLib.h>
 
 #include <Wire.h>               
@@ -1832,6 +1833,10 @@ static void flushDeferredDisplayUpdates()
 
 void esp32loop()
 {
+    // TEMPORARY -- measures the period between successive loop entries, so a
+    // stall is caught regardless of which call site blocked. See src/instrument.h
+    INSTR_LOOPTICK();
+
     esp_task_wdt_reset();
 
     #if not defined(BOARD_T_DECK_PRO)

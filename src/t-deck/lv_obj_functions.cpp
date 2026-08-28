@@ -18,6 +18,7 @@
 #include "tdeck_extern.h"
 #include "lv_obj_functions_extern.h"
 #include "tdeck_helpers.h"
+#include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include <loop_functions_extern.h>
 #include <math.h>
 #include <cstring>
@@ -194,6 +195,29 @@ static unsigned long last_flush_millis = 0;
 // Default flush interval: 5 minutes. For longer tests we also immediately
 // flush each incoming message so persisted state is always on flash.
 static const unsigned long FLUSH_INTERVAL_MS = 5UL * 60UL * 1000UL; // 5 minutes
+
+#if INSTRUMENT_ENABLED
+/* TEMPORARY -- measurement accessors, see src/instrument.h. These live here
+ * because msg_list, msg_tab_entries and persisted_msgs are file-local to this
+ * translation unit. Removed together with the rest of the scaffolding. */
+uint32_t instrument_msg_list_children(void)
+{
+    return (msg_list != NULL) ? (uint32_t)lv_obj_get_child_cnt(msg_list) : 0u;
+}
+
+uint32_t instrument_persisted_msg_count(void)
+{
+    return (uint32_t)persisted_msgs.size();
+}
+
+uint32_t instrument_active_tab_bubble_count(void)
+{
+    if (msg_active_tab_index < 0 || (size_t)msg_active_tab_index >= msg_tab_entries.size())
+        return 0u;
+
+    return (uint32_t)msg_tab_entries[(size_t)msg_active_tab_index].bubbles.size();
+}
+#endif
 
 static void msg_flush_timer_cb(lv_timer_t *t);
 static lv_timer_t *msg_flush_timer = NULL;
