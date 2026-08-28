@@ -116,6 +116,48 @@ Sent vs. arrived: 10/9, 20/19, 30/26, 40/35. Five of forty missing by the fourth
 operator confirms LoRa needs ~20 s spacing at these parameters. Worth connecting to G06: the node's
 main loop stalls ~2 s at a time, and during those windows LoRa RX is not serviced.
 
+## Run 3 — C2 experiment (audio race), 2026-08-28 19:46
+
+Setup: 30 s tone on SD, message tone configured, audio unmuted. Two messages from `DK5EN-93` 20 s
+apart, so the second lands while the first tone is still playing — the window in which
+`connecttoFS()` -> `setDefaults()` frees the MP3 decoder buffers under the reading audio task.
+
+| Sample                  | int_free   | int_largest |
+| ----------------------- | ---------- | ----------- |
+| Round 1, before         | 83 104     | 69 620      |
+| Round 1, during         | 60 292     | 49 140      |
+| Round 1, after tone     | 66 416     | 53 236      |
+| Round 2, before         | 64 460     | 53 236      |
+| Round 2, during         | 61 012     | 49 140      |
+| **Round 2, after tone** | **63 744** | **53 236**  |
+
+### C2 internal-heap leak: REFUTED
+
+Round 1 looked alarming — 16 688 B of internal heap not returned, largest free block down exactly
+16 384 B. **Round 2 settles it: 716 B unreturned and `int_largest` back to precisely the same
+53 236 B.** So round 1's shortfall was a **one-time initialisation cost of the audio subsystem**, not
+a per-playback leak. No crash, no `Guru Meditation`, no reboot in either round.
+
+C2 remains a genuine code defect — the semaphore really is released before playback and the free
+really can race the read — but it does **not** explain the maintainer's reported heap defect. With
+H1 shown to be PSRAM-only and C2 shown to be leak-free, **that defect is still unlocated.**
+
+### Caveat that invalidates part of run 2
+
+The H1 stimulus used the message body `H1-Test nn/60` — **13 characters, which is exactly Arduino
+`String`'s SSO limit**, so those bodies never allocated on the heap at all. That is very likely why
+run 2 saw no internal-heap movement from `persisted_msgs`. The G04 internal-heap component is
+therefore **not** disproved by run 2; it was never exercised. A retest needs message bodies well
+over 13 characters.
+
+### Operator observation: the tone was noise, not a sine
+
+Most likely our own fault, not the firmware's: the file was mono / 22 050 Hz / 32 kbps, while the
+I2S path is configured `.sample_rate = 16000`, `I2S_BITS_PER_SAMPLE_16BIT`,
+`.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT` (stereo) in `esp32_audio.cpp:524-539`. A standard
+stereo 44.1 kHz / 128 kbps file is staged as `c2test2.mp3` to confirm before treating this as a
+defect.
+
 ## Map pipeline — works
 
 ```
