@@ -14,6 +14,8 @@
 #include "lv_obj_functions.h"
 #include <Arduino.h>
 #include <lvgl.h>
+#include <esp_debug_helpers.h>
+#include <soc/cpu.h>
 
 /* Globals owned by lv_obj_functions.cpp (see lv_obj_functions.cpp:87,106,110). */
 extern lv_obj_t *tv;
@@ -96,6 +98,23 @@ extern "C" void tdeck_dbg_redrawlog(bool on)
 }
 
 /* Strong override of the weak hook declared in lib/lvgl/src/core/lv_obj_pos.c. */
+/* Walk the Xtensa call stack from inside the hook. Frames 0..2 are this
+ * helper, the hook and lv_obj_invalidate_area(); everything after that is the
+ * interesting part (lv_obj_invalidate -> LVGL setter -> user code). */
+static int __attribute__((noinline)) collect_backtrace(uint32_t * out, int max)
+{
+    esp_backtrace_frame_t f;
+    esp_backtrace_get_start(&f.pc, &f.sp, &f.next_pc);
+    int n = 0;
+    int skip = 2;                       /* hook, lv_obj_invalidate_area */
+    while(n < max && f.next_pc != 0) {
+        if(!esp_backtrace_get_next_frame(&f)) break;
+        if(skip > 0) { skip--; continue; }
+        out[n++] = esp_cpu_process_stack_pc(f.pc);
+    }
+    return n;
+}
+
 extern "C" void lv_obj_invalidate_hook(const lv_obj_t * obj, const lv_area_t * area, void * ret_addr)
 {
     s_inv_total++;
@@ -121,18 +140,20 @@ extern "C" void lv_obj_invalidate_hook(const lv_obj_t * obj, const lv_area_t * a
     const char * cls = classify_obj(obj);
     const char * name = known_name(obj);
 
-    if(name != NULL) {
-        Serial.printf("[REDRAW];ms;%lu;obj;0x%08lx;cls;%s;area;%d;%d;%d;%d;ra;0x%08lx;name;%s\n",
-                      (unsigned long)now, (unsigned long)(uintptr_t)obj, cls,
-                      (int)area->x1, (int)area->y1, (int)area->x2, (int)area->y2,
-                      (unsigned long)(uintptr_t)ret_addr, name);
-    }
-    else {
-        Serial.printf("[REDRAW];ms;%lu;obj;0x%08lx;cls;%s;area;%d;%d;%d;%d;ra;0x%08lx\n",
-                      (unsigned long)now, (unsigned long)(uintptr_t)obj, cls,
-                      (int)area->x1, (int)area->y1, (int)area->x2, (int)area->y2,
-                      (unsigned long)(uintptr_t)ret_addr);
-    }
+    uint32_t bt[8];
+    int nbt = collect_backtrace(bt, 8);
+    char btbuf[8 * 11 + 1];
+    int off = 0;
+    for(int k = 0; k < nbt; k++)
+        off += snprintf(btbuf + off, sizeof(btbuf) - off, "%s0x%08lx", k ? "," : "", (unsigned long)bt[k]);
+    if(nbt == 0) snprintf(btbuf, sizeof(btbuf), "-");
+
+    Serial.printf("[REDRAW];ms;%lu;obj;0x%08lx;cls;%s;area;%d;%d;%d;%d;ra;0x%08lx;bt;%s",
+                  (unsigned long)now, (unsigned long)(uintptr_t)obj, cls,
+                  (int)area->x1, (int)area->y1, (int)area->x2, (int)area->y2,
+                  (unsigned long)(uintptr_t)ret_addr, btbuf);
+    if(name != NULL) Serial.printf(";name;%s", name);
+    Serial.print("\n");
 }
 
 extern "C" void tdeck_dbg_monitor_cb(lv_disp_drv_t * disp_drv, uint32_t time_ms, uint32_t px)

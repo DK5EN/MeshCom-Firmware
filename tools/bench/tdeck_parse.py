@@ -124,6 +124,10 @@ def _parse_redraw(parts: List[str]) -> Optional[Dict[str, Any]]:
         x1, y1, x2, y2 = (int(v) for v in parts[i + 1 : i + 5])
         i += 5
         ra = _need("ra")
+        bt: List[str] = []
+        if i < len(parts) and parts[i] == "bt":
+            raw_bt = _need("bt")
+            bt = [a for a in raw_bt.split(",") if a and a != "-"]
         name: Optional[str] = None
         if i < len(parts):
             name = _need("name")
@@ -140,6 +144,7 @@ def _parse_redraw(parts: List[str]) -> Optional[Dict[str, Any]]:
         "cls": cls,
         "area": (x1, y1, x2, y2),
         "ra": ra,
+        "bt": bt,
         "name": name,
     }
 
@@ -315,8 +320,12 @@ def parse_line(line: str) -> Optional[Dict[str, Any]]:
     merely starts with '[' but isn't one of ours) yields None.
     """
     line = line.strip()
-    if not line.startswith("["):
+    # The firmware echoes the command without a newline, so a reply can arrive
+    # glued to it ("--uistat[UISTAT];..."). Skip anything before the first '['.
+    lb = line.find("[")
+    if lb == -1:
         return None
+    line = line[lb:]
     end = line.find("]")
     if end == -1:
         return None

@@ -30,9 +30,40 @@ class TestRedraw(unittest.TestCase):
                 "cls": "lv_label",
                 "area": (0, 0, 100, 20),
                 "ra": "0x420081AB",
+                "bt": [],
                 "name": "msg_list",
             },
         )
+
+    def test_redraw_obj_with_backtrace_and_name(self) -> None:
+        line = (
+            "[REDRAW];ms;7;obj;0x3d828224;cls;label;area;219;-1;267;32;"
+            "ra;0x4207c5e8;bt;0x42001111,0x42002222,0x42003333;name;tv"
+        )
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        assert rec is not None
+        self.assertEqual(rec["bt"], ["0x42001111", "0x42002222", "0x42003333"])
+        self.assertEqual(rec["name"], "tv")
+
+    def test_redraw_obj_with_empty_backtrace(self) -> None:
+        line = "[REDRAW];ms;7;obj;0x1;cls;label;area;0;0;1;1;ra;0x2;bt;-"
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        assert rec is not None
+        self.assertEqual(rec["bt"], [])
+
+    def test_line_glued_to_command_echo(self) -> None:
+        line = (
+            "--uistat[UISTAT];tab;0;drawer;0;objs;164;msg_list;1;inv_total;842;"
+            "refr_total;21;last_refr_px;76800;last_refr_ms;57;redrawlog;0;"
+            "heap_free;87300;heap_min;85712;psram_free;8005535"
+        )
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        assert rec is not None
+        self.assertEqual(rec["kind"], "UISTAT")
+        self.assertEqual(rec["objs"], 164)
 
     def test_redraw_obj_without_name(self) -> None:
         line = "[REDRAW];ms;1;obj;0x1;cls;lv_btn;area;1;2;3;4;ra;0x2"

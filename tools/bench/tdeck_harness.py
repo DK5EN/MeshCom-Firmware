@@ -39,7 +39,8 @@ from tdeck_parse import heap_delta, parse_line, redraw_summary, refr_summary
 
 DEFAULT_PORT = "/dev/cu.usbmodem1101"
 DEFAULT_BAUD = 115200
-DEFAULT_ELF = ".pio/build/t_deck_plus/firmware.elf"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ELF = str(REPO_ROOT / ".pio/build/t_deck_plus/firmware.elf")
 BOOT_MARKER = "CLIENT STARTED"
 
 
@@ -98,6 +99,15 @@ class TDeckSession:
             raise TimeoutError(
                 f"boot marker {BOOT_MARKER!r} not seen within {self.boot_timeout}s"
             )
+        # The T-Deck ignores serial for ~10 s after CLIENT STARTED while the GUI
+        # and SD come up. Poll --uistat until the firmware answers.
+        deadline = time.monotonic() + 60.0
+        while time.monotonic() < deadline:
+            idx = self.send("--uistat")
+            if self.wait_for(r"\[UISTAT\]", 2.0, since=idx) is not None:
+                time.sleep(1.0)
+                return
+        raise TimeoutError("device never answered --uistat within 60s after boot")
 
     def close(self) -> None:
         self._stop.set()
@@ -218,9 +228,10 @@ def find_addr2line() -> Optional[str]:
     """Locate xtensa-esp32s3-elf-addr2line under ~/.platformio/packages, if present."""
     home = Path.home()
     patterns = [
-        home / ".platformio/packages/toolchain-xtensa-esp-elf*/bin/xtensa-esp32s3-elf-addr2line",
-        home / ".platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-addr2line",
         home / ".platformio/packages/toolchain-xtensa-esp32s3*/bin/xtensa-esp32s3-elf-addr2line",
+        home / ".platformio/packages/toolchain-xtensa-esp-elf*/bin/xtensa-esp32s3-elf-addr2line",
+        home / ".platformio/packages/toolchain-xtensa-esp-elf*/bin/xtensa-esp32-elf-addr2line",
+        home / ".platformio/packages/toolchain-xtensa-esp-elf*/bin/xtensa-esp-elf-addr2line",
     ]
     for pat in patterns:
         matches = sorted(glob.glob(str(pat)))
@@ -248,7 +259,7 @@ def symbolize(
         return result
     try:
         proc = subprocess.run(
-            [tool, "-pfiaC", "-e", elf, *uniq],
+            [tool, "-pfaC", "-e", elf, *uniq],
             capture_output=True,
             text=True,
             timeout=20,
@@ -294,6 +305,16 @@ def _parsed_range(session: TDeckSession, start: int, end: int) -> List[Dict[str,
 # --------------------------------------------------------------------------
 
 
+def _short_sym(sym: str) -> str:
+    """'func(args) at /long/path/file.cpp:123' -> 'func file.cpp:123'."""
+    if " at " not in sym:
+        return sym
+    func, loc = sym.split(" at ", 1)
+    func = func.split("(", 1)[0]
+    loc = re.sub(r"\s*\(discriminator \d+\)", "", loc)
+    return f"{func} {loc.rsplit('/', 1)[-1]}"
+
+
 def scenario_idle(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     pre = get_uistat(session)
     idx = session.send("--instreset")
@@ -317,7 +338,16 @@ def scenario_idle(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
 
     top_cls_name = sorted(rsum["by_cls_name"].items(), key=lambda kv: -kv[1])[:10]
     top_ra = sorted(rsum["by_ra"].items(), key=lambda kv: -kv[1])[:10]
-    addrs = [ra for ra, _ in top_ra if ra]
+    # Group by full backtrace: the ra alone is usually lv_obj_invalidate itself.
+    bt_counts: Dict[Tuple[str, ...], int] = {}
+    bt_objs: Dict[Tuple[str, ...], set] = {}
+    for rec in parsed:
+        if rec and rec.get("kind") == "REDRAW" and rec.get("variant") == "obj":
+            key = tuple(rec.get("bt") or ())
+            bt_counts[key] = bt_counts.get(key, 0) + 1
+            bt_objs.setdefault(key, set()).add(rec.get("obj"))
+    top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:10]
+    addrs = sorted({ra for ra, _ in top_ra if ra} | {a for key, _ in top_bt for a in key})
     sym_map = symbolize(addrs, args.elf) if addrs else {}
 
     flush = None
@@ -347,6 +377,14 @@ def scenario_idle(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
         ],
         "top10_invalidators_by_ra": [
             {"ra": ra, "symbol": sym_map.get(ra, ra), "count": cnt} for ra, cnt in top_ra
+        ],
+        "top10_invalidators_by_backtrace": [
+            {
+                "count": cnt,
+                "objects": len(bt_objs.get(key, ())),
+                "frames": [sym_map.get(a, a) for a in key],
+            }
+            for key, cnt in top_bt
         ],
     }
 
@@ -435,31 +473,62 @@ def scenario_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str
 
     results = []
     ok = True
+    prev_refr_total = prev.get("refr_total") if prev else None
     for i in range(args.inject_count):
         t_start = time.monotonic()
+        session.send("--redrawlog on")
+        time.sleep(0.15)
         idx = session.send(f"--injectmsg 9999 bench inject {i}")
         inject_ok = session.wait_for(r"\[INJECT\];ok", 2.0, since=idx) is not None
         refr_seen = session.wait_for(r"\[REFR\]", 1.5, since=idx) is not None
-        audio_lines = [l for _, _, l in session.records_since(idx) if l.startswith("[AUDIO]")]
+        time.sleep(0.5)
+        end = session.length()
+        session.send("--redrawlog off")
+        time.sleep(0.15)
+        window = [l for _, _, l in session.records_since(idx)[: end - idx]]
+        audio_lines = [l for l in window if "[AUDIO]" in l]
+        parsed = [parse_line(l) for l in window]
+        rsum = redraw_summary(parsed)
+        bt_counts: Dict[Tuple[str, ...], int] = {}
+        for rec in parsed:
+            if rec and rec.get("kind") == "REDRAW" and rec.get("variant") == "obj":
+                key = tuple(rec.get("bt") or ())
+                bt_counts[key] = bt_counts.get(key, 0) + 1
+        top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:8]
+        sym_map = symbolize(sorted({a for key, _ in top_bt for a in key}), args.elf) if top_bt else {}
         post = get_uistat(session)
         msg_list = post.get("msg_list") if post else None
+        refr_total = post.get("refr_total") if post else None
         growth = (
             msg_list - prev_msg_list
             if (msg_list is not None and prev_msg_list is not None)
             else None
         )
-        displayed = inject_ok and refr_seen
+        refr_delta = (
+            refr_total - prev_refr_total
+            if (refr_total is not None and prev_refr_total is not None)
+            else None
+        )
+        repainted = refr_seen or (refr_delta is not None and refr_delta > 0)
+        displayed = inject_ok and repainted
         results.append(
             {
                 "i": i,
                 "inject_ok": inject_ok,
                 "refr_seen": refr_seen,
+                "refr_delta": refr_delta,
                 "displayed": displayed,
                 "msg_list": msg_list,
                 "msg_list_growth": growth,
+                "inv_count": rsum["total"],
+                "top_backtraces": [
+                    {"count": cnt, "frames": [_short_sym(sym_map.get(a, a)) for a in key]}
+                    for key, cnt in top_bt
+                ],
                 "audio_lines": audio_lines,
             }
         )
+        prev_refr_total = refr_total
         if not displayed:
             ok = False
         prev_msg_list = msg_list
@@ -555,6 +624,8 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
             for row in result.get("top10_invalidators_by_class", [])[:5]:
                 print(f"    {row['count']:5d}  {row['cls']}/{row['name']}")
+            for row in result.get("top10_invalidators_by_backtrace", [])[:5]:
+                print(f"    {row['count']:5d}  x{row['objects']} objs  " + " <- ".join(row["frames"]))
         elif name == "tabs":
             for row in result.get("per_tab", []):
                 print(
@@ -571,8 +642,11 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             for row in result.get("results", []):
                 print(
                     f"  msg {row['i']}: ok={row['inject_ok']} refr={row['refr_seen']} "
+                    f"refr_delta={row.get('refr_delta')} inv={row.get('inv_count')} "
                     f"displayed={row['displayed']} msg_list={row['msg_list']}"
                 )
+                for bt in row.get("top_backtraces", [])[:4]:
+                    print(f"      {bt['count']:4d}  " + " <- ".join(bt["frames"]))
         elif name == "audio":
             for row in result.get("results", []):
                 print(f"  {row['what']!r}: passed={row['passed']}")
