@@ -1,5 +1,9 @@
 # T-Deck Plus campaign — interim status (2026-08-28)
 
+> **Superseded for handover purposes by [`tdeck-handover.md`](tdeck-handover.md).** That document is
+> the entry point for the fix team: goal, the three blocking problems, the full item list, and the
+> state of the deliberately dirty working tree. This file remains as the session record.
+
 Resumption point. Records **what is done, what is in flight, and what is open**, so the next session
 starts from this file instead of re-deriving context.
 
