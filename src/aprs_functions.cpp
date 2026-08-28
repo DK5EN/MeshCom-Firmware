@@ -1126,6 +1126,17 @@ uint16_t encodeAPRS(uint8_t msg_buffer[UDP_TX_BUF_SIZE], struct aprsMessage &apr
 // Used by the mesh relay path and the gateway UDP upload (same wire format).
 void appendHeySignalReport(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr, int mheard_count)
 {
+    // Die Kette waechst mit jedem Relais um bis zu HEY_REPORT_GROUP_MAX Zeichen.
+    // Regulaer begrenzt MAX_HOP_LIMIT die Zahl der Gruppen, ein von der
+    // Luftschnittstelle hereingereichtes '@'-Paket mit ueberlanger Nutzlast aber
+    // nicht. Ohne Schranke waechst der re-encodierte Rahmen ueber
+    // UDP_TX_BUF_SIZE, wo lora_functions.cpp ihn auf Byteebene kappt -- also
+    // mitten in einer Gruppe, was updateHeyPath() nicht mehr parsen kann. Die
+    // Kette hier zu beenden ist der verlustaermere Weg: was bereits drinsteht,
+    // bleibt gueltig.
+    if (aprsmsg.msg_payload.length() + HEY_REPORT_GROUP_MAX > HEY_PATH_PAYLOAD_MAX)
+        return;
+
     aprsmsg.msg_payload.concat(String(mheard_count));
     aprsmsg.msg_payload.concat(',');
     aprsmsg.msg_payload.concat(String(rssi*-1.0, 0));

@@ -94,6 +94,78 @@ static void test_report_roundtrip(void)
     TEST_ASSERT_EQUAL_STRING("HG", d.msg_destination_call.c_str());
 }
 
+// ---- Laengenschranke HEY_PATH_PAYLOAD_MAX ---------------------------------
+// Die Kette waechst je Relais um bis zu HEY_REPORT_GROUP_MAX Zeichen. Regulaer
+// begrenzt MAX_HOP_LIMIT die Zahl der Gruppen, ein von der Luft kommendes
+// '@'-Paket mit ueberlanger Nutzlast aber nicht. Ohne Schranke waechst der
+// re-encodierte Rahmen ueber UDP_TX_BUF_SIZE und wird dort auf Byteebene
+// gekappt -- mitten in einer Gruppe, was updateHeyPath() nicht mehr parsen kann.
+
+// Eine regulaere Kette ueber die volle Hop-Tiefe darf die Schranke NICHT
+// beruehren: sonst kuerzt der Fix gueltige Pfade.
+static void test_report_volle_hoptiefe_bleibt_unangetastet(void)
+{
+    struct aprsMessage m;
+    initAPRS(m, '@');
+    m.msg_payload = "R80;";
+
+    // unguenstigste regulaere Gruppe: "80,128,-128;" (12 Zeichen)
+    for(int hop = 0; hop < MAX_HOP_LIMIT; hop++)
+        appendHeySignalReport(m, -128, -128, 80);
+
+    // 4 + 7*12 = 88 Zeichen, alle sieben Gruppen sind angehaengt
+    TEST_ASSERT_EQUAL_size_t(4u + (size_t)MAX_HOP_LIMIT * 12u, m.msg_payload.length());
+    TEST_ASSERT_TRUE(m.msg_payload.length() <= HEY_PATH_PAYLOAD_MAX);
+}
+
+// Direkt unterhalb der Schranke wird noch angehaengt.
+static void test_report_schranke_untere_kante(void)
+{
+    struct aprsMessage m;
+    initAPRS(m, '@');
+    m.msg_payload = String('x', 0);
+    while(m.msg_payload.length() < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX))
+        m.msg_payload.concat('x');
+
+    const unsigned before = m.msg_payload.length();
+    appendHeySignalReport(m, -95, -3, 0);
+
+    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() > before,
+                             "genau an der Kante muss noch angehaengt werden");
+}
+
+// Ein Zeichen darueber wird nicht mehr angehaengt -- und die vorhandene Kette
+// bleibt unveraendert, statt abgeschnitten zu werden.
+static void test_report_schranke_kappt_nicht_sondern_beendet(void)
+{
+    struct aprsMessage m;
+    initAPRS(m, '@');
+    m.msg_payload = "R80;";
+    while(m.msg_payload.length() < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX + 1))
+        m.msg_payload.concat('x');
+
+    const String before = m.msg_payload;
+    appendHeySignalReport(m, -95, -3, 0);
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(before.c_str(), m.msg_payload.c_str(),
+                                     "ueber der Schranke darf nichts angehaengt und nichts gekappt werden");
+}
+
+// Auch wiederholte Aufrufe treiben die Nutzlast nicht ueber die Schranke --
+// der Fall, den ein fehlerhaft geflutetes '@'-Paket ausloesen wuerde.
+static void test_report_bleibt_beschraenkt(void)
+{
+    struct aprsMessage m;
+    initAPRS(m, '@');
+    m.msg_payload = "R80;";
+
+    for(int i = 0; i < 50; i++)
+        appendHeySignalReport(m, -128, -128, 80);
+
+    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() <= HEY_PATH_PAYLOAD_MAX,
+                             "Nutzlast muss unter HEY_PATH_PAYLOAD_MAX bleiben");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -102,5 +174,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_report_negativer_snr);
     RUN_TEST(test_report_kette);
     RUN_TEST(test_report_roundtrip);
+    RUN_TEST(test_report_volle_hoptiefe_bleibt_unangetastet);
+    RUN_TEST(test_report_schranke_untere_kante);
+    RUN_TEST(test_report_schranke_kappt_nicht_sondern_beendet);
+    RUN_TEST(test_report_bleibt_beschraenkt);
     return UNITY_END();
 }

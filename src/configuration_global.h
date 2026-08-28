@@ -212,6 +212,16 @@ static inline bool flashLayoutCompatible(int stored)
                                            // (Byte 5 einer ACK fuehrt max_hop in 7 Bit; im Feld
                                            //  beobachtet: gueltige ACKs 0..4, Textpakete bis 5)
 
+// Obergrenze fuer die HEY-Link-Kette ('@'-Nutzlast). appendHeySignalReport()
+// haengt je Relais eine Gruppe "<ncnt>,<rssi>,<snr>;" an -- unguenstigst
+// "80,-128,-128;", also HEY_REPORT_GROUP_MAX Zeichen. Bei regulaerem Betrieb
+// begrenzt MAX_HOP_LIMIT die Zahl der Gruppen; ein fehlerhaft oder boeswillig
+// ueberlanges '@'-Paket von der Luftschnittstelle ist dadurch nicht begrenzt.
+// Der Wert deckt die laengste regulaere Kette ab ("R<ncnt>;" + MAX_HOP_LIMIT
+// Gruppen), damit die Schranke nie einen gueltigen Pfad kuerzt.
+#define HEY_REPORT_GROUP_MAX 14
+#define HEY_PATH_PAYLOAD_MAX (8 + MAX_HOP_LIMIT * HEY_REPORT_GROUP_MAX)
+
 #define RECEIVE_TIMEOUT 4500               // [SX126x] 4.5sec
 #define RADIOLIB_SX126X_CAD 0x07           // 0x00...length off    0x07...32-bit detect
 #define RADIOLIB_SX126X_DETMIN  10         // default 10
@@ -298,6 +308,17 @@ static inline bool flashLayoutCompatible(int stored)
 
 // BLE Settings
 #define MAX_MSG_LEN_PHONE 300
+
+// Nutzbare JSON-Nutzlast eines BLE-Rahmens zum Telefon, in Zeichen.
+//
+// NICHT MAX_MSG_LEN_PHONE-2: das ist die Pruefung, die in den Registerbauern
+// sichtbar ist, aber nie greift. Wirksam ist die Klemmung in
+// addBLEComToOutBuffer() bei 245 Byte, abzueglich 1 Byte Typkennung (0x44).
+// addBLEOutBuffer() laesst im 'D'-Zweig zwar 255 zu, dort rechnet
+// sendToPhone() die Schreiblaenge aber in einem uint8_t aus: ab 253 Zeichen
+// JSON laeuft blelen+2 auf ESP32/ESP8266 ueber und der Rahmen geht ohne
+// Meldung verloren. 244 ist damit die Zahl, die auf beiden Pfaden traegt.
+#define BLE_JSON_PAYLOAD_MAX 244
 #define PAIRING_PIN "000000"    // Pairing PIN for BLE Connection
 
 #define BLE_TEST 0

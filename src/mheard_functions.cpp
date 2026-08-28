@@ -352,6 +352,27 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     // updateMheardPath() unten schon fuer die eigene Pfadtabelle auswertet (| 0x80).
     mhdoc["GW"] = (mheardLine.mh_destinationpath == "HG") ? 1 : 0;
 
+    // Fail-soft statt Abschneiden. PP waechst linear mit der Hop-Zahl (rund 11
+    // Zeichen je Relais) und ist bei tiefen Ketten das groesste Einzelfeld des
+    // Registers. Mit MAX_HOP_POS_DEFAULT=2 bleibt der Datensatz bei ~214 Zeichen,
+    // {SET} laesst aber bis MAX_HOP_LIMIT zu: bei PL=6 sind es ~258, und dann
+    // laeuft in sendToPhone() blelen+2 auf ESP32 ueber und der Rahmen geht ohne
+    // eine einzige Logzeile verloren.
+    //
+    // Ein Datensatz ohne PP ist weiterhin voll brauchbar, ein auf Byteebene
+    // abgeschnittener ist unparsebar -- also das teuerste optionale Feld opfern,
+    // nicht das Objekt. DIST als zweite Stufe, weil es sich aus den Koordinaten
+    // beider Stationen jederzeit nachrechnen laesst.
+    if(measureJson(mhdoc) > BLE_JSON_PAYLOAD_MAX)
+    {
+        printfdeb("[WARN]...MH JSON <%s> zu gross (%u), PP entfaellt\n",
+                  mheardLine.mh_callsign.c_str(), (unsigned)measureJson(mhdoc));
+        mhdoc.remove("PP");
+    }
+
+    if(measureJson(mhdoc) > BLE_JSON_PAYLOAD_MAX)
+        mhdoc.remove("DIST");
+
     // send to Phone
     uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
     bleBuffer[0] = 0x44;
