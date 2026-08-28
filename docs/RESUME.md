@@ -11,7 +11,7 @@ Last session: 2026-08-28 evening to 2026-08-29 ~01:30. Read this, then
 | `tdeck-partial-refresh-trace` | `e6620133` | `v4.35p_prio` + `full_refresh=0` + flush mitigation **on** + map fixes (centring, stitching, g/h keys, G01 UAF) + SD 20 MHz. | **DK5EN-14 runs this build** |
 | `tdeck-partial-refresh-wip`   | `3a7aa2f5` | The previous team's partial-refresh attempt, parked. Superseded; can be deleted.                                             |                              |
 
-Nothing is pushed. Working tree clean.
+Both branches are pushed to `origin`. Working tree clean.
 
 ## What is fixed (verified on hardware)
 
@@ -38,6 +38,17 @@ Nothing is pushed. Working tree clean.
 - Boot: 2 s busy-wait per boot message (8 messages = 16 s).
 - Exact SPI2 register clobbered by the SD library (the NOP transaction works around it).
 - Handover §4.2 items not touched: G02 (`ic <= MAX_MAP`), G03, K2, F1, C3, C4, G08, G10-G16, H2.
+
+## Decisions taken (2026-08-29 01:40)
+
+- **PR scope:** partial refresh (`full_refresh=0`) **and** the flush mitigation together — complete
+  work, not half of it. The mitigation becomes permanent code in `disp_flush()` (no switch).
+- **Review flaws in the PR:** the measured/confirmed ones and the trivial ones (G01, G02, G07, A1,
+  `connecttoFS()` return check, C1 audio task priority if trivially safe); everything else stays in
+  `BACKLOG.md`.
+- **SD at 20 MHz goes into the PR, gated to `BOARD_T_DECK_PLUS`** (the only hardware we can test;
+  no other cards available). If it comes back from the field, we will see.
+- **Tile file format** is the open question for tomorrow (see below); not part of this PR.
 
 ## Tomorrow's plan (as agreed)
 
