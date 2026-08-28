@@ -173,6 +173,32 @@ full-screen flush, so one incoming message serialises into ~200-300 ms of blocki
   `sdmap_refresh` free-ordering is correct; ring indices in `add_map_point` are in range;
   ~a dozen globals are single-writer by construction.
 
+## Corrections entered after the verdict was written (2026-08-28, later)
+
+**G09's severity was overstated, and stage 1's phrasing was wrong.** Stage 1 said "even the success
+path costs ~256 KB of internal heap transiently, on every tile change". That is false.
+`CONFIG_SPIRAM_USE_MALLOC=1` with `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096` [V] means allocations
+**≤ 4 KB always go to internal RAM, and everything larger is served from PSRAM**. The raw PNG
+(9-51 KB measured) and the `lodepng_decode32` output (256 KB) are both far above the threshold, so
+they land in **PSRAM**, not the internal pool.
+
+What survives of G09: the allocation is still unbounded and unvalidated against SD-supplied file
+size, so crafted or corrupt content under `/maps/**` can exhaust the 8 MB PSRAM. Fix it, but as an
+input-validation issue, not as an internal-heap issue.
+
+**This does not touch H1 or G04.** Arduino `String` buffers, `HeaderEventData` and
+`DeleteEventData` are all well under 4 KB, so they do land on the internal heap. The asymmetry
+argument holds exactly where it was made.
+
+**Tile format verified against real data.** A 5 995-tile `all Europe` z0-z9 set was downloaded from
+`download.tiles.coalition.space` and inspected: ZIP entries are `<z>/<x>/<y>.png`, and the tiles are
+**256 x 256** [V] — matching `SDMAP_TILE_PX`, so the projection in `sdmap_project()` is correct and
+no rescaling is needed. Caveat: they are 8-bit **RGBA truecolor**, not palette PNGs, despite the
+downloader's "Optimize tiles (8-bit PNG)" switch being on. Actual size 153.3 MB against the tool's
+own estimate of 31.5 MB — **the estimator is 4.9x low**, which matters when sizing a full set.
+
+---
+
 ## Status
 
 **No code changed. No regression tests exist for any of this.** Per the campaign rule every fix
