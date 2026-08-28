@@ -508,8 +508,13 @@ flash over USB serial. Goal: every setting a node needs to reach a usable state 
 Callsign, SSID and password all set fine over serial. The node still refused to go online —
 `[WIFI]...disabled by Settings (node_wifion=false)` — and no serial command can clear that flag.
 Enabling WLAN on a T-Deck currently requires physically tapping an unlabelled icon button in the
-Setup tab. On a headless build (`t_deck` variants aside, any board without that GUI) the flag is
-unreachable entirely.
+Setup tab.
+
+**Correction (2026-08-28, later): this is a T-Deck-only defect, not a general headless one.** The
+gate in `udp_functions.cpp:545` sits inside `#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)`,
+so on every other board `node_wifion` is never consulted and SSID + password alone bring the node
+online. Verified by provisioning a Heltec V3 (`DK5EN-93`) over serial only: it reached DHCP without
+any GUI interaction. The earlier claim that "any board without that GUI" is affected was wrong.
 
 | ID    | Type | Sev.   | Location                                                  | Item                                                                                                                                                                                         | Status |
 | ----- | ---- | ------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
@@ -610,6 +615,47 @@ needs it fixed.
 
 Next step: log RSSI side by side on both nodes at the same location, to separate "T-Deck hears
 worse" from "T-Deck associates worse".
+
+#### TD-01 update (2026-08-28, later) — reproduced on a second board; not RF, not T-Deck-specific
+
+A Heltec V3 (`DK5EN-93`, ESP32-S3, 8 MB flash, no PSRAM) was flashed with the same firmware and put
+on the same SSID, at the same location. It reproduces the defect exactly:
+
+```
+[WIFI]...SSID: ORBI63 CHAN: 3 RSSI: -47 BSSID: 5A:AF:97:2E:2B:8B
+[WIFI]...power: 80 RSSI:-50
+[WIFI]...ssid<ORBI63> connection error      (x6)
+[WIFI]...no connection at boot — full radio reset and retrying
+[WIFI]...ssid<ORBI63> connection error      (x6)
+[WIFI]...SET but no Wifi connect ...please wait for next try (5 min)
+   ... 5 minutes later ...
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.66, UDP port 1990
+```
+
+**This kills three earlier hypotheses at once:**
+
+- **Not signal strength.** −47 dBm is excellent. Twelve consecutive association failures at that
+  level are not a link-budget problem.
+- **Not T-Deck RF.** The Heltec sees the same AP **22-28 dB stronger** than the T-Deck does
+  (−47/−50 vs −72/−78 — a real and separately interesting hardware difference), and still fails.
+- **Not "the T-Deck associates worse".** Same failure, same count, same recovery on the 5-minute
+  retry, on a board with no PSRAM, no display and no LVGL.
+
+**Restated defect:** on ESP32 nodes running this firmware against this AP, **boot-time association
+fails reliably, and only the delayed retry succeeds**. Every node is therefore absent from the
+network for about five minutes after each power-on. That is the real cost, and it is much larger
+than "the T-Deck has a bad antenna".
+
+**Leading hypothesis, not yet tested:** BLE/WiFi coexistence. Both share the single 2.4 GHz radio;
+NimBLE begins advertising during boot, and the failures cluster in exactly that window while the
+successful attempt happens minutes later when advertising has settled. The next experiment is to
+disable BLE at boot on one node and see whether the first association then succeeds. Alternative
+candidates not yet excluded: the BSSID-pinned `WiFi.begin()` issued immediately after
+`WiFi.scanNetworks()`, and WPA2/WPA3-transition PMF negotiation.
+
+**Consequence for TD-06:** an automated test rig cannot assume a node is reachable after boot. Either
+the defect is fixed, or the harness waits out the 5-minute retry on every power cycle.
 
 #### TD-02 — the reboots were ours
 
