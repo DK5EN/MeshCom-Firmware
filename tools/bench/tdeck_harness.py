@@ -579,7 +579,10 @@ def scenario_audio(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     ok = True
     for what, pattern in cases:
         idx = session.send(f"--playtone {what}")
-        m = session.wait_for(pattern, 3.0, since=idx)
+        # Audio requests are queued and played one after another in the audio
+        # task; a result line can arrive only after the tones queued before it
+        # have finished (start 1.5 s + msg 1.1 s), so wait longer than that.
+        m = session.wait_for(pattern, 8.0, since=idx)
         passed = m is not None
         results.append(
             {

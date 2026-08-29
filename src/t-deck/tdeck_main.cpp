@@ -114,9 +114,12 @@ void initTDeck()
     buttonConfig->setFeature(ButtonConfig::kFeatureLongPress);
 
     //! Add mutex to allow multitasking access
-    xSemaphore = xSemaphoreCreateBinary();
+    // Mutex, kein binaeres Semaphor: der Audio-Task (Prio 3) haelt den Bus
+    // waehrend SD-Zugriffen, loopTask (Prio 1) waehrend disp_flush() --
+    // Prioritaetsvererbung verhindert, dass ein wartender Audio-Task den
+    // Flush verhungern laesst.
+    xSemaphore = xSemaphoreCreateMutex();
     assert(xSemaphore);
-    xSemaphoreGive( xSemaphore );
 
     //! TFT
     #if TFT_BL !=  TDECK_BL_PIN
@@ -211,15 +214,10 @@ void initTDeck()
 
 void startAudio()
 {
-    if (play_file_from_sd(meshcom_settings.node_audio_start.c_str(), 12))
-    {
-        Serial.printf("[BOOT];audio;file;%s\n", meshcom_settings.node_audio_start.c_str());
-    }
-    else
-    {
-        Serial.println("[BOOT];audio;cw");
-        play_cw_start();
-    }
+    // Nur einreihen; ob die Datei existiert, entscheidet der Audio-Task
+    // (Ersatz: CW-Startkennung). Die Startsequenz wartet nicht auf den Ton.
+    Serial.printf("[BOOT];audio;queued;%s\n", meshcom_settings.node_audio_start.c_str());
+    audio_play_file_or_cw(meshcom_settings.node_audio_start.c_str(), 12, AUDIO_CW_START);
 }
 
 /**

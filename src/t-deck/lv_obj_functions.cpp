@@ -4042,13 +4042,9 @@ static void msg_focus_and_alert(bool bWithAudio)
         if (bDEBUG)
             Serial.println("[TDECK]...msg_focus_and_alert: Playing audio...");
 
-        if (!play_file_from_sd(meshcom_settings.node_audio_msg.c_str(), 12))
-        {
-            play_cw('r');
-        }
-        
-        if (bDEBUG)
-            Serial.println("[TDECK]...msg_focus_and_alert: Audio finished.");
+        // Einreihen, nicht abspielen: die SD-Suche und der Ton laufen im
+        // Audio-Task, loopTask (LVGL) steht dafuer nicht mehr 1.1 s still.
+        audio_play_file_or_cw(meshcom_settings.node_audio_msg.c_str(), 12, 'r');
     }
 }
 
