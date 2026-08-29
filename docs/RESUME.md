@@ -2,7 +2,7 @@
 
 Last session: 2026-08-29, 08:00 to ~13:30 (branch `tdeck-partial-refresh-trace`, HEAD after the
 wrap-up commit; everything pushed to `origin`, working tree clean). 33 commits today. The campaign
-backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-22); read its "What the scouting settled"
+backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-34); read its "What the scouting settled"
 table before re-deriving anything. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
 
@@ -86,9 +86,16 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 4. Automated integration/regression harnesses over USB serial on all four platforms (RAK has no
    harness yet; T-Deck 13 scenarios, OLED 7).
 
-- **WiFi (decided 2026-08-29 evening):** TM-20 (non-blocking `startNetwork()`) **ships in the PR**
-  — tested, and the 7 s freeze it removes loses LoRa frames on every ESP32 node every 5 minutes
-  while unconnected. TM-24 (roaming / SSID-only join) stays out until confirmed.
+- **WiFi (revised 2026-08-29 late, reverses the evening decision):** TM-20 (non-blocking
+  `startNetwork()`, all boot delays removed) **stays OUT of the PR.** It feels good on the bench,
+  but without the waits the station no longer hears the beacons of every nearby AP and can
+  associate with the weakest BSSID of a mesh WLAN — shipped as is it would break nodes behind
+  multi-AP WLANs. The 7 s freeze it removes is real, so it goes upstream only together with a
+  scan/selection policy. That policy is **TM-34**, a separate research track (BACKLOG §3.8f):
+  (a) driver capabilities, (b) scan/wait/select-best-AP options, (c) log output for the
+  WiFi-stalls-the-node case (blocks even LoRa RX), (d) SSID-only association, (e) re-connecting,
+  (f) roaming, (g) band/AP steering. TM-34 absorbs TM-24 and the TD-01/TM-11 confirmation run;
+  findings doc first, then its own bench protocol and its own PR.
 - **TD-03 heap defect: high priority, next run.** RAK boot profile + harness needed for platform
   parity (TM-25/26). Screen CRC on Heltec and T-Beam (TM-27; T-Deck has no readback). TM-06/07
   lower priority (cumbersome, no longer highest). Full automation low priority — the manual
@@ -100,10 +107,12 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 
 ## Next session, in order
 
-1. TD-01 confirmation run (24 boots, SSID-only) -> fix (TM-11), then re-run both harnesses.
+1. TD-03 heap defect (`msg_list` never trimmed, H1/C2) — highest priority per the operator.
+   TD-01 confirmation run moves into TM-34 (WiFi research track).
 2. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
 3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
 4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
-   (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, WiFi bring-up, Heltec
-   OLED, header labels, UP-01) — no instrumentation, tools, tests or docs. German per-file
-   description. Decide whether the Heltec OLED and WiFi changes go in the same PR or separate ones.
+   (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header
+   labels, UP-01) — **no WiFi changes (TM-20/TM-24 -> TM-34)**, no instrumentation, tools, tests
+   or docs. German per-file description. Decide whether the Heltec OLED change goes in the same
+   PR or a separate one.
