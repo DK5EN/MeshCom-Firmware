@@ -4562,6 +4562,24 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    if(commandCheck(msg_text+2, (char*)"balledge on") == 0)
+    {
+        tdeck_dbg_balledge(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"balledge off") == 0)
+    {
+        tdeck_dbg_balledge(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"balledges") == 0)
+    {
+        tdeck_dbg_balledges(strstr(msg_text, "reset") != NULL);
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"ball ") == 0)
     {
         // --ball <up|down|left|right|click> <n>

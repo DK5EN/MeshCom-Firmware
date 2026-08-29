@@ -74,6 +74,53 @@ static lv_obj_t *trackball_cursor_obj = NULL;
 static uint32_t trackball_cursor_visible_until_ms = 0;
 static const uint32_t TRACKBALL_CURSOR_SHOW_TIME_MS = 750;
 
+// TM-18: Trackball-Flanken im Interrupt zaehlen. mouse_read() laeuft alle
+// 10 ms und verglich bisher nur den Pegel mit dem letzten Pegel: zwei
+// Flanken innerhalb eines Intervalls ergaben keinen Schritt, drei einen.
+// Im Flankenmodus (Default) verbraucht mouse_read() die gezaehlten Flanken,
+// hoechstens BALL_MAX_STEPS_PER_READ pro Achse und Aufruf; der Rest bleibt
+// stehen und wird im naechsten Aufruf abgearbeitet. `--balledge on/off`
+// schaltet zum Vergleich auf den alten Pegelvergleich zurueck; die Zaehler
+// laufen in beiden Modi (`--balledges`).
+#define BALL_MAX_STEPS_PER_READ 4
+static volatile uint32_t s_ball_edges[4] = {0, 0, 0, 0};       // right, up, left, down (Reihenfolge dir_pins)
+static volatile uint32_t s_ball_edges_total[4] = {0, 0, 0, 0};
+static uint32_t s_ball_events_total = 0;
+static bool s_ball_edge_mode = true;
+static portMUX_TYPE s_ball_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static void IRAM_ATTR ball_isr(void *arg)
+{
+    int i = (int)(intptr_t)arg;
+    s_ball_edges[i]++;
+    s_ball_edges_total[i]++;
+}
+
+extern "C" void tdeck_dbg_balledge(bool on)
+{
+    s_ball_edge_mode = on;
+    Serial.printf("[BALLEDGE];mode;%s\n", on ? "edge" : "level");
+}
+
+extern "C" void tdeck_dbg_balledges(bool reset)
+{
+    Serial.printf("[BALLEDGE];mode;%s;edges;r;%lu;u;%lu;l;%lu;d;%lu;pending;%lu;%lu;%lu;%lu;events;%lu\n",
+                  s_ball_edge_mode ? "edge" : "level",
+                  (unsigned long)s_ball_edges_total[0], (unsigned long)s_ball_edges_total[1],
+                  (unsigned long)s_ball_edges_total[2], (unsigned long)s_ball_edges_total[3],
+                  (unsigned long)s_ball_edges[0], (unsigned long)s_ball_edges[1],
+                  (unsigned long)s_ball_edges[2], (unsigned long)s_ball_edges[3],
+                  (unsigned long)s_ball_events_total);
+    if (reset)
+    {
+        portENTER_CRITICAL(&s_ball_mux);
+        for (int i = 0; i < 4; i++) { s_ball_edges[i] = 0; s_ball_edges_total[i] = 0; }
+        s_ball_events_total = 0;
+        portEXIT_CRITICAL(&s_ball_mux);
+    }
+}
+
+
 /**
  * initialization of T-Deck hardware
  */
@@ -106,6 +153,11 @@ void initTDeck()
     pinMode(TDECK_TBOX_G02, INPUT_PULLUP);
     pinMode(TDECK_TBOX_G03, INPUT_PULLUP);
     pinMode(TDECK_TBOX_G04, INPUT_PULLUP);
+    // TM-18: jede Flanke zaehlen, nicht nur den Pegel alle 10 ms vergleichen
+    attachInterruptArg(TDECK_TBOX_G02, ball_isr, (void *)(intptr_t)0, CHANGE);   // right
+    attachInterruptArg(TDECK_TBOX_G01, ball_isr, (void *)(intptr_t)1, CHANGE);   // up
+    attachInterruptArg(TDECK_TBOX_G04, ball_isr, (void *)(intptr_t)2, CHANGE);   // left
+    attachInterruptArg(TDECK_TBOX_G03, ball_isr, (void *)(intptr_t)3, CHANGE);   // down
 
     button.init();
     ButtonConfig *buttonConfig = button.getButtonConfig();
@@ -600,7 +652,16 @@ extern "C" bool tdeck_dbg_inject_key(uint32_t code)
 
 extern "C" void tdeck_dbg_inject_ball(int dir, int n)
 {
-    if (dir >= 0 && dir < 5)
+    if (dir < 0 || dir >= 5)
+        return;
+    if (dir < 4 && s_ball_edge_mode)
+    {
+        portENTER_CRITICAL(&s_ball_mux);
+        s_ball_edges[dir] += n;
+        s_ball_edges_total[dir] += n;
+        portEXIT_CRITICAL(&s_ball_mux);
+    }
+    else
         s_dbg_ball_pending[dir] += n;
 }
 
@@ -851,20 +912,42 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
     }
 
     uint8_t pos = 10;
+    int steps_this_read = 0;
     for (int i = 0; i < 5; i++) {
         bool dir = digitalRead(dir_pins[i]);
-        // Bench-Harness: ein eingereihter Schritt wirkt wie eine Flanke
-        if (s_dbg_ball_pending[i] > 0)
+        int steps = 0;
+        if (i < 4 && s_ball_edge_mode)
         {
-            s_dbg_ball_pending[i]--;
-            dir = !last_dir[i];
+            // Flankenmodus: gezaehlte Flanken verbrauchen, Pegel nur mitfuehren
+            portENTER_CRITICAL(&s_ball_mux);
+            uint32_t n = s_ball_edges[i];
+            if (n > BALL_MAX_STEPS_PER_READ) n = BALL_MAX_STEPS_PER_READ;
+            s_ball_edges[i] -= n;
+            portEXIT_CRITICAL(&s_ball_mux);
+            steps = (int)n;
+            last_dir[i] = dir;
         }
-        if (dir != last_dir[i])
+        else
+        {
+            // Pegelvergleich (alter Weg, Taste immer so)
+            // Bench-Harness: ein eingereihter Schritt wirkt wie eine Flanke
+            if (s_dbg_ball_pending[i] > 0)
+            {
+                s_dbg_ball_pending[i]--;
+                dir = !last_dir[i];
+            }
+            if (dir != last_dir[i])
+            {
+                last_dir[i] = dir;
+                steps = 1;
+            }
+        }
+        for (int k = 0; k < steps; k++)
         {
             if (!meshcom_settings.node_keyboardlock)
                 tft_on();
-
-            last_dir[i] = dir;
+            s_ball_events_total++;
+            steps_this_read++;
             switch (i) {
             case 0:
                 if (last_x < (lv_disp_get_hor_res(NULL) - mouse_cursor_icon.header.w)) {
@@ -903,8 +986,8 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
     const uint32_t now_ms = millis();
     if(activity_detected)
     {
-        Serial.printf("[BALL];x;%d;y;%d;btn;%d;ms;%lu\n", (int)last_x, (int)last_y,
-                      left_button_down ? 1 : 0, (unsigned long)now_ms);
+        Serial.printf("[BALL];x;%d;y;%d;btn;%d;steps;%d;ms;%lu\n", (int)last_x, (int)last_y,
+                      left_button_down ? 1 : 0, steps_this_read, (unsigned long)now_ms);
         trackball_cursor_visible_until_ms = now_ms + TRACKBALL_CURSOR_SHOW_TIME_MS;
         if(trackball_cursor_obj != NULL)
             lv_obj_clear_flag(trackball_cursor_obj, LV_OBJ_FLAG_HIDDEN);

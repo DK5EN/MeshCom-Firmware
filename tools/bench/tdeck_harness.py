@@ -980,7 +980,7 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
 
     # -- trackball: move the cursor away from the screen edge (it starts at
     # 0/0 and mouse_read() clamps at the borders), then walk a square.
-    session.send("--tab 0")
+    session.send(f"--tab {args.input_tab}")
     time.sleep(0.5)
     session.send("--ball right 14")
     time.sleep(0.5)
@@ -994,24 +994,44 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
         idx = session.send(f"--ball {direction} {n}")
         session.wait_for(r"\[BALL\];inject;", 2.0, since=idx)
         time.sleep(0.3 + 0.02 * n)
+        # One [BALL] line per indev read with activity; in edge mode a read
+        # consumes up to 4 counted edges, so a line carries `steps;k`. The
+        # contract: the steps add up to the request, and the cursor moved
+        # exactly 10 px per step along one axis (no lost, no doubled edges).
         events = []
+        steps_total = 0
         for _, _, l in session.records_since(idx):
-            m = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;(\d)", l)
+            m = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;(\d)(?:;steps;(\d+))?", l)
             if m:
                 events.append((int(m.group(1)), int(m.group(2))))
+                steps_total += int(m.group(4)) if m.group(4) else 1
         lat = _latency_ms(session, idx, r"\[BALL\];x;", r"\[REFR\]")
+        refr_ms = []
+        for _, _, l in session.records_since(idx):
+            m = re.search(r"\[REFR\];.*?;ms;(\d+)", l)
+            if m:
+                refr_ms.append(float(m.group(1)))
         session.send("--redrawlog off")
         time.sleep(0.1)
-        # every event must move the cursor by exactly one 10 px step on one axis
-        steps_ok = 0
-        for (x0, y0), (x1, y1) in zip(events, events[1:]):
-            if abs(x1 - x0) + abs(y1 - y0) == 10:
-                steps_ok += 1
+        moved = 0
+        if len(events) >= 2:
+            (x0, y0), (x1, y1) = events[0], events[-1]
+            moved = abs(x1 - x0) + abs(y1 - y0)
+        # displacement between first and last line misses the first line's own
+        # steps; count them from that line's step field
+        first_steps = 0
+        for _, _, l in session.records_since(idx):
+            m = re.search(r"\[BALL\];.*steps;(\d+)", l)
+            if m:
+                first_steps = int(m.group(1))
+                break
+        moved_expected = 10 * (steps_total - first_steps)
         ball_results.append({
-            "dir": direction, "requested": n, "events": len(events),
-            "steps_exact": steps_ok, "first": events[0] if events else None,
-            "last": events[-1] if events else None,
+            "dir": direction, "requested": n, "steps": steps_total, "events": len(events),
+            "moved_px": moved, "moved_expected_px": moved_expected,
+            "first": events[0] if events else None, "last": events[-1] if events else None,
             "latency_p50_ms": _pct(lat, 0.5), "latency_p95_ms": _pct(lat, 0.95),
+            "refr_ms_p50": _pct(refr_ms, 0.5), "refr_ms_max": max(refr_ms) if refr_ms else None,
             "repaints": len(lat),
         })
 
@@ -1020,9 +1040,9 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     # key consumed and at least one repaint after the burst is.
     keys_ok = len(key_lines) == len(text) and len(key_lat) >= 1
     ball_ok = all(
-        r["events"] == r["requested"]
+        r["steps"] == r["requested"]
         and r["repaints"] == r["events"]
-        and r["steps_exact"] == max(0, r["events"] - 1)
+        and r["moved_px"] == r["moved_expected_px"]
         for r in ball_results
     )
     ok = keys_ok and ball_ok
@@ -1342,8 +1362,10 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
             for b in result.get("ball", []):
                 print(
-                    f"    ball {b['dir']:5s}: events={b['events']}/{b['requested']} exact_steps={b['steps_exact']} "
+                    f"    ball {b['dir']:5s}: steps={b['steps']}/{b['requested']} reads={b['events']} "
+                    f"moved={b['moved_px']}/{b['moved_expected_px']}px "
                     f"repaints={b['repaints']} latency p50={b['latency_p50_ms']} p95={b['latency_p95_ms']} ms "
+                    f"refr p50={b.get('refr_ms_p50')} max={b.get('refr_ms_max')} ms "
                     f"{b['first']}->{b['last']}"
                 )
         elif name == "nav":
@@ -1465,6 +1487,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
+    p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")
     p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")
     p.add_argument("--out", default="summary.json", help="output JSON summary path (default: summary.json)")
     args = p.parse_args(argv)

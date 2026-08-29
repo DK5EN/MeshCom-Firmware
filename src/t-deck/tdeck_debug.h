@@ -54,6 +54,8 @@ void tdeck_dbg_key(const char *text);            /* --key <text>          */
 void tdeck_dbg_ball(const char *dir, int n);     /* --ball <dir> <n>      */
 bool tdeck_dbg_inject_key(uint32_t code);        /* implemented in tdeck_main.cpp */
 void tdeck_dbg_inject_ball(int dir, int n);      /* implemented in tdeck_main.cpp */
+void tdeck_dbg_balledge(bool on);                /* --balledge on/off: edge counting vs level compare */
+void tdeck_dbg_balledges(bool reset);            /* --balledges [reset]: print (and clear) the counters */
 
 /* Display sleep/wake control: 1 = tft_on(), 0 = tft_off(), 2 = state only.
  * Always prints a [TFT] status line, see brief for the exact field list. */
