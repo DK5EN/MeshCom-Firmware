@@ -789,9 +789,20 @@ def scenario_map(session: TDeckSession, args: argparse.Namespace) -> Dict[str, A
 
     stations = []
     inject_ok = True
-    for i, (km, bearing) in enumerate(MAP_STATIONS[: args.map_stations], start=1):
+    # Beyond the ten table entries the extra stations sit within 1 km on a
+    # spiral, i.e. inside the viewport at the default zoom -- off-screen
+    # stations take no marker slot, so only on-screen ones can push the ring
+    # past MAX_POINTS (30) into the slot-recycling branch of add_map_point()
+    # (UP-02). --map-stations 40 recycles a handful of slots.
+    plan = list(MAP_STATIONS[: args.map_stations])
+    for i in range(len(plan), args.map_stations):
+        k = i - len(MAP_STATIONS)
+        plan.append((0.1 + 0.03 * k, (k * 47) % 360))
+    session.send("--instreset")
+    time.sleep(0.2)
+    for i, (km, bearing) in enumerate(plan, start=1):
         slat, slon = _offset(lat, lon, km, bearing)
-        call = f"DK5EN-{i:02d}"
+        call = f"DK5EM-{i:02d}"  # not DK5EN: DK5EN-14 is the bench node itself
         idx = session.send(f"--injectpos {call} {slat:.5f} {slon:.5f}")
         m = session.wait_for(r"\[INJECTPOS\];(ok|err)|" + CRASH_PATTERN, 6.0, since=idx)
         ok = m is not None and "INJECTPOS];ok" in m.string
@@ -801,6 +812,14 @@ def scenario_map(session: TDeckSession, args: argparse.Namespace) -> Dict[str, A
         if not ok:
             inject_ok = False
         time.sleep(0.6)
+
+    idx = session.send("--instr")
+    m_loop = session.wait_for(r"\[INSTR-LOOP\];", 2.0, since=idx)
+    m_gui = session.wait_for(r"\[INSTR-GUI\];", 2.0, since=idx)
+    loop_rec = parse_line(m_loop.string) if m_loop else None
+    gui_rec = parse_line(m_gui.string) if m_gui else None
+    inject_loop_max_us = loop_rec.get("max_us") if loop_rec else None
+    map_points_after = gui_rec.get("map_points") if gui_rec else None
 
     zoom_in = _sweep(session, "in", 12)
     zoom_out = _sweep(session, "out", 24)
@@ -827,6 +846,8 @@ def scenario_map(session: TDeckSession, args: argparse.Namespace) -> Dict[str, A
         "ok": ok,
         "home": {"lat": lat, "lon": lon},
         "stations": stations,
+        "inject_loop_max_us": inject_loop_max_us,
+        "map_points_after": map_points_after,
         "zoom_min": min(zooms) if zooms else None,
         "zoom_max": max(zooms) if zooms else None,
         "steps": steps,
@@ -1436,6 +1457,10 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                     f"off_centre={result.get('off_centre_steps')}  "
                     f"compose_ms_max={result.get('compose_ms_max')}  crashed={result.get('crashed')}"
                 )
+                print(
+                    f"  inject window: loop_max_us={result.get('inject_loop_max_us')}  "
+                    f"map_points={result.get('map_points_after')}"
+                )
                 for x in st:
                     print(f"    {x['call']} {x['km']:6.1f} km @{x['bearing']:3d}: ok={x['ok']}")
         elif name == "input":
@@ -1578,7 +1603,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=3.0,
         help="inject scenario seconds between messages (default: 3)",
     )
-    p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10)")
+    p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10; 40 recycles marker slots)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
     p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")
     p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")

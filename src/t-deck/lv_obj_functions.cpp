@@ -1827,9 +1827,11 @@ void add_map_point(String callsign, double dlat, double dlon, bool bHome)
 
         if(map_point[map_point_count] != NULL)
         {
+            // UP-02: no delay here -- this runs on the LoRa RX path
+            // (OnRxDone -> tdeck_add_pos_point) and 30x inside refresh_map();
+            // the lost-flush symptom it papered over is covered by the
+            // NULL-immediately fix (G01) and the bus mitigation.
             lv_obj_del(map_point[map_point_count]);
-
-            delay(10);
         }
 
         if(map_point_label[map_point_count] != NULL)

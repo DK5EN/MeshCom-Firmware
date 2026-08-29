@@ -39,6 +39,7 @@ T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev
 | TM-05        | Closed by analysis: all SPI2 users except the (mutex-guarded) audio task run on loopTask            | —                                                                                                |
 | ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                |
 | TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)       |
+| UP-02 | Last `delay()` out of `add_map_point()` (LoRa RX path, 30x in `refresh_map()`) | harness `map --map-stations 40`: recycle branch wraps, 40/40, no crash; loop max unchanged (noise) |
 
 Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
 direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
@@ -111,7 +112,8 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 1. ~~TD-03 heap defect~~ **fixed 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario;
    before 60 / after 50 children, saturated view costs -584 B PSRAM per 20 messages). TD-01
    confirmation run moves into TM-34 (WiFi research track, parallel session).
-2. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
+2. ~~UP-02~~ **fixed 2026-08-29** (`add_map_point()` delay-free; `map --map-stations 40`).
+3. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
 3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
 4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
    (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header

@@ -38,6 +38,9 @@ bleBuffer+1, measureJson(mhdoc)+1)` lets the document, not the buffer, set the w
   deletion instead of once per bus hand-over.
 - **Fix:** drop both delays; the NULL-immediately fix (UP-04) plus the bus mitigation cover the
   original symptom. Folds into timing campaign TM-05/TM-08 (`BACKLOG.md` §3.8f).
+- **Status 2026-08-29: FIXED.** The G01 hunk had already removed the `delay(40)` pair on our tree;
+  the remaining `delay(10)` in the slot-recycling branch is gone too. Verified with
+  `tdeck_harness.py --scenario map --map-stations 40` (recycle branch reached, 40/40, no crash).
 
 ## Finding UP-03: map projection scales x and y differently
 
