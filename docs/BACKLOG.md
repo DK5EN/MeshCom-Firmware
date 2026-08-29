@@ -945,8 +945,8 @@ native suites are the only gate MeshCom code passes through, so upstream changes
 areas get a test added at merge time.
 
 **Plan agreed 2026-08-29:** (1) docs, commit, push; (2) tag and delete stale branches (§4);
-(3) `/fable-review` on `fc83554e..upstream/dev`; (4) merge `upstream/dev` into
-`tdeck-partial-refresh-trace`, map conflict resolved for our composition, Kurt's G01 hunk kept;
+(3) `/fable-review` on `fc83554e..upstream/dev`; (4) **done 2026-08-29** — `upstream/dev` merged into
+`tdeck-partial-refresh-trace` (resolution in the merge commit message; native 45/45, four targets build);
 (5) bench-verify on DK5EN-14; (6) T-Deck PR built from `upstream/dev` per §4, UP-01 fix included.
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58

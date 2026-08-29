@@ -55,9 +55,8 @@ Both branches are pushed to `origin`. Working tree clean.
 Upstream state and branch model: `BACKLOG.md` §3.8g and §4.1. Short form:
 
 1. Docs, commit, push. 2. Tag + delete stale branches (§4.2). 3. `/fable-review` on
-   `fc83554e..upstream/dev` (UP-01..04). 4. `git merge upstream/dev` into this branch: map
-   conflict -> our composition (UP-03), keep Kurt's G01 NULLing (UP-04). 5. Bench-verify on
-   DK5EN-14. 6. Layer the T-Deck fixes as small commits, then build `pr/tdeck-ui` from
+   `fc83554e..upstream/dev` (UP-01..04). 4. **done** — `upstream/dev`
+   merged (merge commit on this branch, resolution in its message; four targets + native green). 5. Bench-verify on DK5EN-14. 6. Layer the T-Deck fixes as small commits, then build `pr/tdeck-ui` from
    `upstream/dev` (firmware files only, one commit, German description) — include the UP-01
    `serializeJson` bound fix with a native regression test, like #1102.
 
