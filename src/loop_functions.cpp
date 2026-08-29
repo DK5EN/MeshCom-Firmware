@@ -379,7 +379,11 @@ U8G2 *u8g2;
     DISPLAY_MODEL u8g2_1(U8G2_R0, U8X8_PIN_NONE);  //RESET CLOCK DATA
     DISPLAY_MODEL u8g2_2(U8G2_R0, U8X8_PIN_NONE);
 #else
-    U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2_1(U8G2_R0);
+    // TM-22: Vollbild-Puffer (_F_) auch fuer den SSD1306, wie beim SH1106 --
+    // im Seitenmodus (_1_) kostete ein Bild 8 I2C-Transfers und jedes Bild
+    // musste komplett neu gezeichnet werden; mit dem Puffer im RAM kann
+    // sendDisplay1306() ein unveraendertes Bild ueberspringen (TM-10).
+    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0);
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0);
 #endif
 #endif
@@ -740,6 +744,47 @@ int pageHold=PAGE_MAX-1;
 bool bOledLog = false;
 uint32_t oled_last_frame_us = 0;
 uint32_t oled_frames = 0;
+uint32_t oled_skipped = 0;          // TM-10: Bilder, die unveraendert waren und nicht gesendet wurden
+uint32_t oled_last_crc = 0;         // TM-27: CRC32 des zuletzt gezeichneten Bildpuffers
+static bool oled_last_crc_valid = false;
+
+#if !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+// CRC32 (IEEE, bitweise) ueber den U8g2-Bildpuffer: 1 KB fuer 128x64, ~50 us.
+static uint32_t oledBufferCrc(void)
+{
+    const uint8_t *p = u8g2->getBufferPtr();
+    size_t n = (size_t)u8g2->getBufferTileHeight() * (size_t)u8g2->getBufferTileWidth() * 8u;
+    uint32_t crc = 0xFFFFFFFFu;
+    for(size_t i = 0; i < n; i++)
+    {
+        crc ^= p[i];
+        for(int k = 0; k < 8; k++)
+            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+    }
+    return ~crc;
+}
+
+// TM-10: true, wenn der gerade gezeichnete Puffer dem zuletzt gesendeten Bild
+// entspricht -- nur im Vollbild-Modus (_F_), im Seitenmodus liegt nie das
+// ganze Bild im RAM und es wird immer gesendet. Merkt sich die CRC (TM-27).
+static bool oledFrameUnchanged(void)
+{
+    if(u8g2->getBufferTileHeight() * 8 < u8g2->getDisplayHeight())
+        return false;
+    uint32_t crc = oledBufferCrc();
+    bool same = oled_last_crc_valid && crc == oled_last_crc;
+    oled_last_crc = crc;
+    oled_last_crc_valid = true;
+    return same;
+}
+#endif
+
+// Nach jedem Zeichnen am Display vorbei an sendDisplay1306() (DisplayPong,
+// Track-Seite, clearDisplay beim Start) muss das naechste Bild wieder gesendet werden.
+void oledInvalidate(void)
+{
+    oled_last_crc_valid = false;
+}
 
 bool bSetDisplay = false;
 bool bShowHead = false;;
@@ -1057,6 +1102,7 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 
         INSTR_T0(t_oled);                 // OLED frame push time -> [INSTR-FLUSH]
         uint32_t t_oled_us = micros();
+        bool oled_skip = false;
         u8g2->firstPage();
         do
         {
@@ -1117,18 +1163,32 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 
             }
 
+            if(oledFrameUnchanged())    // TM-10: Bild identisch -> Transfer sparen
+            {
+                oled_skip = true;
+                oled_skipped++;
+                if(bOledLog)
+                    Serial.printf("[OLED];skip;n;%lu;crc;%08lx;page;%d\n", (unsigned long)oled_skipped,
+                                  (unsigned long)oled_last_crc, pagePointer);
+                break;
+            }
         } while (u8g2->nextPage());
-        INSTR_FLUSH(t_oled);
-        oled_last_frame_us = micros() - t_oled_us;
-        oled_frames++;
-        if(bOledLog)
-            Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d\n", (unsigned long)oled_last_frame_us,
-                          (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz);
+        if(!oled_skip)
+        {
+            INSTR_FLUSH(t_oled);
+            oled_last_frame_us = micros() - t_oled_us;
+            oled_frames++;
+            if(bOledLog)
+                Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d;crc;%08lx;skipped;%lu\n", (unsigned long)oled_last_frame_us,
+                              (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz,
+                              (unsigned long)oled_last_crc, (unsigned long)oled_skipped);
+        }
 
         #else
         
         INSTR_T0(t_oled);                 // OLED frame push time -> [INSTR-FLUSH]
         uint32_t t_oled_us = micros();
+        bool oled_skip = false;
         u8g2->firstPage();
         do
         {
@@ -1165,13 +1225,26 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 
             }
 
+            if(oledFrameUnchanged())    // TM-10: Bild identisch -> Transfer sparen
+            {
+                oled_skip = true;
+                oled_skipped++;
+                if(bOledLog)
+                    Serial.printf("[OLED];skip;n;%lu;crc;%08lx;page;%d\n", (unsigned long)oled_skipped,
+                                  (unsigned long)oled_last_crc, pagePointer);
+                break;
+            }
         } while (u8g2->nextPage());
-        INSTR_FLUSH(t_oled);
-        oled_last_frame_us = micros() - t_oled_us;
-        oled_frames++;
-        if(bOledLog)
-            Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d\n", (unsigned long)oled_last_frame_us,
-                          (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz);
+        if(!oled_skip)
+        {
+            INSTR_FLUSH(t_oled);
+            oled_last_frame_us = micros() - t_oled_us;
+            oled_frames++;
+            if(bOledLog)
+                Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d;crc;%08lx;skipped;%lu\n", (unsigned long)oled_last_frame_us,
+                              (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz,
+                              (unsigned long)oled_last_crc, (unsigned long)oled_skipped);
+        }
         
         #endif
 
@@ -1193,7 +1266,7 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 // Bench-Harness: Seitenzustand des OLED in einer Zeile
 void oledStat()
 {
-    Serial.printf("[OLEDSTAT];page;%d;last;%d;hold;%d;lines;%d;info;%d;track;%d;off;%d;isoff;%d;type;%d;frames;%lu;last_us;%lu;posdisp;%d;offwait_ms;%ld;u8g2;%d\n",
+    Serial.printf("[OLEDSTAT];page;%d;last;%d;hold;%d;lines;%d;info;%d;track;%d;off;%d;isoff;%d;type;%d;frames;%lu;last_us;%lu;posdisp;%d;offwait_ms;%ld;u8g2;%d;crc;%08lx;skipped;%lu\n",
                   pagePointer, pageLastPointer, pageHold,
                   (pagePointer >= 0 && pagePointer < PAGE_MAX) ? pageLastLineAnz[pagePointer] : -1,
                   bDisplayInfo ? 1 : 0, bDisplayTrack ? 1 : 0, bDisplayOff ? 1 : 0, bDisplayIsOff ? 1 : 0,
@@ -1205,7 +1278,7 @@ void oledStat()
     #else
                   -1
     #endif
-                  );
+                  , (unsigned long)oled_last_crc, (unsigned long)oled_skipped);
 }
 
 void sendDisplayHead(bool bInit)
@@ -3086,6 +3159,7 @@ void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
         return;
 
     u8g2->clearDisplay();
+    oledInvalidate();
     u8g2->firstPage();
 
     do
@@ -3962,6 +4036,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
                 char cvers[20];
 
                 u8g2->clearDisplay();
+                oledInvalidate();
                 u8g2->firstPage();
 
                 do

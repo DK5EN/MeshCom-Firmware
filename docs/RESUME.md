@@ -40,6 +40,7 @@ T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev
 | ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                |
 | TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)       |
 | UP-02 | Last `delay()` out of `add_map_point()` (LoRa RX path, 30x in `refresh_map()`) | harness `map --map-stations 40`: recycle branch wraps, 40/40, no crash; loop max unchanged (noise) |
+| TM-22/10/27 | SSD1306 full-buffer, frame CRC, unchanged frames skipped (`oledFrameUnchanged()`) | OLED harness 8/8 Heltec V3 + T-Beam; blank CRC `0xefb5af2e` both; repeat page -> skip |
 
 Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
 direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
@@ -57,15 +58,17 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
 - **Tile format on the SD card** — parked as low priority by decision (2026-08-29): stability and
   functionality first, optimisation later. Options and the `[SDMAP]` read/decode split stay in
   `tdeck-findings-20260828.md`.
-- **T-Beam display** (TM-22): already on hardware I2C (37.8 ms/frame), but the SSD1306 variant is
-  still page mode and there is no dirty flag (TM-10).
+- **OLED (TM-22/TM-10/TM-27) fixed 2026-08-29:** SSD1306 full-buffer on the `#else` ladder (no
+  bench node for that half), frame-buffer CRC per push, identical frames skipped. OLED harness 8/8
+  on Heltec V3 and T-Beam (`display` CRC round trip, `dirty`). Frame push stays ~32/36 ms — that
+  is 1 KB at 400 kHz; further savings need partial updates, not a faster bus.
 
 ## Harnesses (run from `tools/bench/runs/` so the raw logs land there)
 
 - `python3 tools/bench/tdeck_harness.py --list` — 14 scenarios (boot, idle, tabs, drawer, inject,
   audio, audio_stall, sleep, screen, map, nav, input, heap, trim). All 14 green on DK5EN-14.
-- `python3 tools/bench/oled_harness.py --list [--port …]` — 7 scenarios (boot, pos, inject, pages,
-  display, track, timing) for every U8g2 board. 7/7 on Heltec V3 and T-Beam.
+- `python3 tools/bench/oled_harness.py --list [--port …]` — 8 scenarios (boot, pos, inject, pages,
+  display, track, timing, dirty) for every U8g2 board. 8/8 on Heltec V3 and T-Beam.
 - `tools/bench/experiments/rolltest.py` — operator trackball roll test (edge vs level mode).
 - Both harnesses wait for `[BOOT];ready`, accept `--scenario a,b --skip c`, and switch the panel on.
 - Opening a port reboots every ESP32 node; the RAK needs `dtr=True`; the T-Deck ignores serial for
@@ -113,7 +116,8 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
    before 60 / after 50 children, saturated view costs -584 B PSRAM per 20 messages). TD-01
    confirmation run moves into TM-34 (WiFi research track, parallel session).
 2. ~~UP-02~~ **fixed 2026-08-29** (`add_map_point()` delay-free; `map --map-stations 40`).
-3. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
+3. ~~TM-22/TM-10/TM-27~~ **fixed 2026-08-29** (full-buffer SSD1306, CRC skip, `[OLED];crc`; OLED
+   harness 8/8 on both boards).
 3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
 4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
    (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header

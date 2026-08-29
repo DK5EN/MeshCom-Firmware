@@ -105,6 +105,7 @@ int count_char(String s, char c);
 void addRingPointer(volatile int &toWrite, volatile int &toRead, int iMAX, const char* bufName = "?");
 
 void oledStat();
+void oledInvalidate();
 extern bool bOledLog;
 bool is_equ(const char* buf1, const char* buf2);
 int is_pos(const char* buf, const char* comp_buf);

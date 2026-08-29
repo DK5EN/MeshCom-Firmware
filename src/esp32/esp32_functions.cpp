@@ -334,6 +334,7 @@ void startDisplay(char line1[20], char line2[20], char line3[20])
         return;
 
     u8g2->clearDisplay();
+    oledInvalidate();
     u8g2->firstPage();
 
     do

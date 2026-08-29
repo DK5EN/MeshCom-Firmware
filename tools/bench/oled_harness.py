@@ -48,7 +48,7 @@ def oledstat(s: OledSession) -> Optional[Dict[str, int]]:
     out: Dict[str, int] = {}
     for k, v in zip(parts[0::2], parts[1::2]):
         try:
-            out[k] = int(v)
+            out[k] = int(v, 16) if k == "crc" else int(v)
         except ValueError:
             pass
     return out
@@ -57,9 +57,10 @@ def oledstat(s: OledSession) -> Optional[Dict[str, int]]:
 def frames_since(s: OledSession, idx: int) -> List[Dict[str, int]]:
     out = []
     for _, _, l in s.records_since(idx):
-        m = re.search(r"\[OLED\];frame;us;(\d+);n;(\d+);page;(-?\d+);last;(-?\d+);lines;(\d+)", l)
+        m = re.search(r"\[OLED\];frame;us;(\d+);n;(\d+);page;(-?\d+);last;(-?\d+);lines;(\d+)(?:;crc;([0-9a-fA-F]+);skipped;(\d+))?", l)
         if m:
-            out.append({"us": int(m[1]), "n": int(m[2]), "page": int(m[3]), "last": int(m[4]), "lines": int(m[5])})
+            out.append({"us": int(m[1]), "n": int(m[2]), "page": int(m[3]), "last": int(m[4]), "lines": int(m[5]),
+                        "crc": int(m[6], 16) if m[6] else None, "skipped": int(m[7]) if m[7] else None})
     return out
 
 
@@ -75,6 +76,7 @@ def step(s: OledSession, cmd: str, ack: str, settle: float = 1.2) -> Dict[str, A
         "ack_line": m.string.strip()[:100] if m else None,
         "frames": len(fr), "frame_us_max": max((f["us"] for f in fr), default=None),
         "page_after": fr[-1]["page"] if fr else None, "crashed": crashed,
+        "crc_after": fr[-1]["crc"] if fr else None,
     }
 
 
@@ -179,8 +181,52 @@ def scenario_display(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]
             steps.append(st)
     s.send("--oledlog off")
     flags_ok = all(st["acked"] for st in steps)
-    ok = (flags_ok and not any(st["crashed"] for st in steps) and all(st["frames"] >= 1 for st in steps))
-    return {"ok": ok, "steps": steps, "flags_ok": flags_ok}
+    # TM-27: the frame-buffer CRC is the screen-content assertion the T-Deck
+    # cannot make. Every "off" frame is the blank buffer (one CRC, 0xefb5af2e
+    # for 128x64), every "on" frame differs from it (content restored). The
+    # "on" frames are not required to be identical: the head page carries a
+    # clock. Only asserted when the firmware reports a CRC at all.
+    on_crcs = [st["crc_after"] for st in steps if st["cmd"] == "--display on"]
+    off_crcs = [st["crc_after"] for st in steps if st["cmd"] == "--display off"]
+    crc_seen = all(c is not None for c in on_crcs + off_crcs) and bool(on_crcs)
+    crc_ok = (not crc_seen) or (len(set(off_crcs)) == 1 and not (set(on_crcs) & set(off_crcs)))
+    ok = (flags_ok and not any(st["crashed"] for st in steps) and all(st["frames"] >= 1 for st in steps) and crc_ok)
+    return {"ok": ok, "steps": steps, "flags_ok": flags_ok, "crc_seen": crc_seen, "crc_ok": crc_ok,
+            "on_crcs": on_crcs, "off_crcs": off_crcs}
+
+
+def scenario_dirty(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-10: unchanged frames are not pushed. Two parts: (1) an idle window
+    of --dirty-seconds must push no frame at all; (2) two --display on in
+    quick succession draw the same head page twice, the second must be
+    reported as [OLED];skip (the page carries a clock, so a pair straddling a
+    second boundary legitimately differs -- up to three pairs are tried).
+    Fails on firmware without the skipped counter."""
+    st0 = oledstat(s)
+    time.sleep(args.dirty_seconds)
+    st1 = oledstat(s)
+    have = bool(st0 and st1) and "skipped" in st0 and "skipped" in st1
+    frames_delta = (st1["frames"] - st0["frames"]) if have else None
+    skipped_delta = (st1["skipped"] - st0["skipped"]) if have else None
+
+    s.send("--oledlog on"); time.sleep(0.2)
+    pairs = []
+    skip_seen = False
+    for _ in range(3):
+        s.send("--display on"); time.sleep(0.25)
+        idx = s.send("--display on")
+        m = s.wait_for(r"\[OLED\];(skip|frame)", 2.0, since=idx)
+        kind = m.group(1) if m else None
+        pairs.append(kind)
+        if kind == "skip":
+            skip_seen = True
+            break
+        time.sleep(0.6)
+    s.send("--oledlog off")
+    ok = have and frames_delta == 0 and skip_seen
+    return {"ok": ok, "seconds": args.dirty_seconds, "have_skipped": have,
+            "frames_delta": frames_delta, "skipped_delta": skipped_delta, "pairs": pairs,
+            "skip_seen": skip_seen, "stat0": st0, "stat1": st1}
 
 
 def _gps_on(s: OledSession) -> Optional[bool]:
@@ -234,8 +280,9 @@ def scenario_timing(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
 SCENARIOS = {
     "boot": scenario_boot, "pages": scenario_pages, "inject": scenario_inject, "pos": scenario_pos,
     "display": scenario_display, "track": scenario_track, "timing": scenario_timing,
+    "dirty": scenario_dirty,
 }
-ORDER = ["boot", "pos", "inject", "pages", "display", "track", "timing"]
+ORDER = ["boot", "pos", "inject", "pages", "display", "track", "timing", "dirty"]
 HELP = {
     "boot": "boot log, display init (Wire1 ack), ready time, crash markers",
     "pages": "button clicks through the message ring, a frame per click",
@@ -244,6 +291,7 @@ HELP = {
     "display": "--display off/on x3, both must redraw, off flag follows",
     "track": "triple click: track (GPS) page on and off",
     "timing": "OLED frame push avg/max and loop max over a window",
+    "dirty": "TM-10: no frame pushed over an idle window; a repeated identical page is skipped",
 }
 
 
@@ -258,6 +306,8 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 print(f"  {st['cmd']:32s} acked={st['acked']} frames={st['frames']} max_us={st['frame_us_max']} page={st['page_after']}{extra}")
             if name == "pages":
                 print(f"  pages_seen={r.get('pages_seen')}")
+            if name == "display":
+                print(f"  crc_seen={r.get('crc_seen')} crc_ok={r.get('crc_ok')} on={[hex(c) if c is not None else None for c in r.get('on_crcs', [])]} off={[hex(c) if c is not None else None for c in r.get('off_crcs', [])]}")
             if name == "inject":
                 print(f"  ring last {r.get('last_before')} -> {r.get('last_after')}")
         elif name == "pos":
@@ -268,6 +318,8 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 st = r[k]; print(f"  {k}: acked={st['acked']} frames={st['frames']} track={st['oledstat'].get('track') if st.get('oledstat') else None}")
         elif name == "timing":
             print(f"  flush n={r.get('flush_n')} avg_us={r.get('flush_avg_us')} max_us={r.get('flush_max_us')}  loop max_us={r.get('loop_max_us')}")
+        elif name == "dirty":
+            print(f"  {r.get('seconds')}s idle: frames_delta={r.get('frames_delta')} skipped_delta={r.get('skipped_delta')} have_skipped={r.get('have_skipped')}  repeat-on pairs={r.get('pairs')} skip_seen={r.get('skip_seen')}")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -281,6 +333,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--inject-count", type=int, default=4)
     p.add_argument("--inject-spacing", type=float, default=2.0)
     p.add_argument("--timing-seconds", type=float, default=30.0)
+    p.add_argument("--dirty-seconds", type=float, default=15.0, help="idle window of the dirty scenario (default 15 s)")
     p.add_argument("--flush-budget-us", type=int, default=60000, help="OLED frame push budget (default 60 ms)")
     p.add_argument("--loop-budget-us", type=int, default=250000, help="loop max budget (default 250 ms)")
     p.add_argument("--out", default="oled_summary.json")
