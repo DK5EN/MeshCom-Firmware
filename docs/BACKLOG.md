@@ -6,7 +6,7 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-Last updated 2026-08-28. Branch `v4.35p_prio`, rebased onto `upstream/dev`.
+Last updated 2026-08-29 (§3.8f timing campaign added). Branch `v4.35p_prio`, rebased onto `upstream/dev`; T-Deck work on `tdeck-partial-refresh-trace`.
 
 > ### Standing risk — read first
 >
@@ -850,6 +850,68 @@ exist upstream. The native suites run **nowhere automatically** — every "green
 a manual local run. `src/t-deck/` has 0 % coverage.
 
 ---
+
+### 3.8f Timing campaign — bus contention and loop stalls, all platforms (2026-08-29)
+
+Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root cause
+(`tdeck-findings-20260828.md` §1). Goal of the campaign: fix every timing defect of the
+"shared bus / blocked loop task" class once, across T-Deck Plus, Heltec V3, T-Beam and RAK4631.
+**Nothing below is changed in code yet.** Each row was verified against the tree on
+`tdeck-partial-refresh-trace` (`064a89b3`); re-verify file:line after the upstream merge.
+
+#### What the scouting settled
+
+| Lead                            | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-Deck tone freeze (~1.1 s)     | **Not a bus problem.** `msg_focus_and_alert()` (`lv_obj_functions.cpp:4045-4047`) falls back to `play_cw('r')`, which runs synchronously on `loopTask` (`esp32_audio.cpp:289-477`, `i2s_write` per ms, morse `.-.` = ~1100 ms). I2S is on pins 5/6/7, not SPI2. The only bus touch is `SD.exists()` on SPI2 per message (`esp32_audio.cpp:114`). Fix is task placement, not the NOP mitigation.                                                   |
+| T-Deck tone via SD file         | **Is a bus path.** When the tone file exists, `play_file_from_sd()` spawns `play_function` at priority 50 (clamped to 24, `esp32_audio.cpp:139-144`) which streams from SD on SPI2 while `loopTask` flushes the TFT — no shared mutex. This is the C1/C2 cluster from §3.8e and the one audio path that _can_ produce lost flushes.                                                                                                               |
+| Heltec V3 slow refresh          | **Always full redraw, on bit-banged I2C.** `loop_functions.cpp:364-365`: V3/V4 (and Stick V3, T-Beam V3) use `U8G2_*_1_SW_I2C` — 1-page buffer, 8 passes of 128 B per frame, software I2C at ~100 kHz, on pins 17/18. No dirty flag, no partial update; pushed on every message and every 5 s status tick. Heltec V2 and RAK use `_F_HW_I2C`. Not shared with sensors (Wire on 41/42); no bus contention — the cost is the transport itself.      |
+| T-Deck WiFi association (TD-01) | **Not bus-related.** Reproduced on a Heltec V3 (no SD, no TFT, no LVGL) with identical failure count and recovery. Leading hypothesis unchanged: BLE/WiFi coexistence — NimBLE advertising starts (`esp32_main.cpp:1642-1719`) before `startNetwork()` (`:1752`). Decisive test still not run.                                                                                                                                                    |
+| LoRa on the shared bus          | **Plausible lost-flush source on T-Deck only.** SX1262 shares SPI2 with TFT and SD (`variants/t_deck_plus/configuration.h:103`); DIO1 ISR sets a flag, `startReceive`/`readData`/`startTransmit` run from the loop with no bus mutex (`lora_functions.cpp:335, 405, 1569, 1612, 1680`). Heltec V3 and T-Beam have the radio on a dedicated SPI. RAK4631 shares SPI with the W5100S, guarded by `bSPI_ETH_Active` (`lora_functions.cpp:121, 402`). |
+| GPS                             | **Not a contributor.** UART only; drained on a 3 s timer in `WZ_GPS_Loop()` (`gps_functions.cpp:862-880`); no display calls in the GPS path; map refresh is user-driven; N25 baud-scan watchdog fixed on this branch.                                                                                                                                                                                                                             |
+| Synchronisation in place        | One binary `xSemaphore` (`tdeck_main.cpp:52,117`) taken only by `disp_flush()`, `tdeck_dbg_blink()`, `tdeck_dbg_reflush()`. SD, LoRa, audio, touch never take it. No SPI/I2C arbitration anywhere else in the tree.                                                                                                                                                                                                                               |
+
+#### Items
+
+| ID    | Board(s)                          | Type | Sev.   | Location                                                | Item                                                                                                                                                                                                                                                               | Status |
+| ----- | --------------------------------- | ---- | ------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| TM-01 | T-Deck                            | BUG  | High   | `esp32_audio.cpp:289-477`, `lv_obj_functions.cpp:4045`  | `play_cw()` blocks `loopTask` ~1.1 s per message. Move tone generation off the loop task (queue + audio task) or make `playTone()` non-blocking; harness `audio_stall` scenario must drop from 1.10 s to <100 ms.                                                  | open   |
+| TM-02 | T-Deck                            | BUG  | High   | `esp32_audio.cpp:139-144`                               | `play_function` created at priority 50 (clamped to 24, above everything). Set to a sane priority (3); handover C1.                                                                                                                                                 | open   |
+| TM-03 | T-Deck                            | BUG  | High   | `esp32_audio.cpp:102-160`                               | `audioSemaphore` released before playback starts (C2); second message inside one sound frees decoder buffers under the reader. Hold until the task ends.                                                                                                           | open   |
+| TM-04 | T-Deck                            | PERF | Medium | `esp32_audio.cpp:114,203`                               | `SD.exists()` on SPI2 per message. Resolve tone file once at boot; removes the SD access from the message path (RESUME §4.6).                                                                                                                                      | open   |
+| TM-05 | T-Deck                            | BUG  | High   | `tdeck_main.cpp:52`, SD/LoRa/audio call sites           | SPI2 has no arbitration: SD (map compose, tone streaming), SX1262 and TFT interleave freely. Either one bus mutex with the audio/SD/LoRa paths taking it, or SPI transactions per user; NOP mitigation stays as belt-and-braces until then.                        | open   |
+| TM-06 | T-Deck                            | TEST | High   | `src/test_inject.*`, `command_functions.cpp:4509`       | LoRa harness: `--injectmsg` bypasses the radio. Need (a) raw-frame RX injection through `checkRX`/`decodeAPRS`, (b) `--loratx <n> <ms>` burst, (c) harness scenario correlating `[FLUSH]` CRC with LoRa SPI activity, (d) a second node (`DK5EN-98`) as RF source. | open   |
+| TM-07 | T-Deck                            | TEST | Medium | `tdeck_main.cpp:469`, `instrument.*`                    | SPI transaction tracing: log which bus user (TFT/SD/LoRa) ran between two flushes and the SPI2 `user/ctrl/clock` registers; identifies the clobbered register (RESUME open item) so the NOP can be replaced by a proper re-arm.                                    | open   |
+| TM-08 | T-Deck                            | PERF | Medium | `lv_obj_functions.cpp` (`update_header_batt_indicator`) | Header labels rewritten every 500 ms unconditionally; only `lv_label_set_text` on change (RESUME §4.3).                                                                                                                                                            | open   |
+| TM-09 | Heltec V3/V4, Stick V3, T-Beam V3 | PERF | High   | `loop_functions.cpp:364-374`                            | OLED on `_1_SW_I2C`: switch to `_F_HW_I2C` on a hardware `Wire` instance (V2/RAK already do), set `setBusClock(400000)`. Expected ~10x faster frame; measure with `[INSTR-FLUSH]` before/after.                                                                    | open   |
+| TM-10 | Heltec V3, T-Beam                 | PERF | Medium | `loop_functions.cpp:1050-1110`, `esp32_main.cpp:3003`   | Full 8-page redraw on every message and every 5 s tick; add a dirty flag and skip the push when the frame is unchanged (compare buffer hash). Partial update (`updateDisplayArea`) only if TM-09 is not enough.                                                    | open   |
+| TM-11 | all ESP32                         | BUG  | High   | `udp_functions.cpp:529-747`, `esp32_main.cpp:1642-1752` | TD-01 decisive experiment: boot with BLE advertising disabled (or started after `startNetwork()`), 10 power cycles each way. If it flips, fix ordering / coexistence; else test BSSID-pinned `WiFi.begin()` without pin and PMF.                                   | open   |
+| TM-12 | RAK4631                           | TEST | Medium | `nrf52_main.cpp`                                        | No loop-period instrumentation on nRF52 (`INSTRUMENT_ENABLED=0`). Port `[INSTR-LOOP]` so the W5100S/SX1262 SPI sharing (`bSPI_ETH_Active`) can be measured, not assumed.                                                                                           | open   |
+| TM-13 | all                               | TEST | Medium | `src/instrument.*`, `tools/bench/`                      | Per-subsystem stall attribution: wrap SD, LoRa, audio, display, GPS entry points with an `INSTR_SECTION(name)` and report max per section; makes every later fix measurable on all boards.                                                                         | open   |
+| TM-14 | T-Deck                            | TEST | Low    | `gps_functions.cpp:862`                                 | GPS control experiment (`--gps on/off`, same injected load, compare `[INSTR-LOOP]` tails) — closes the GPS question with data rather than by reading.                                                                                                              | open   |
+| TM-15 | T-Deck                            | PERF | Low    | `esp32_main.cpp` boot messages                          | 2 s busy-wait per boot message (8 = 16 s); replace with non-blocking sequencing (RESUME §4.7).                                                                                                                                                                     | open   |
+
+#### Bench fleet (scanned 2026-08-29, all four live on USB)
+
+| Port                            | USB bridge (VID:PID, serial)                            | Board                                                     | Call     | Env                      | Open-port behaviour                                                               |
+| ------------------------------- | ------------------------------------------------------- | --------------------------------------------------------- | -------- | ------------------------ | --------------------------------------------------------------------------------- |
+| `/dev/cu.usbmodem1101`          | Espressif USB-JTAG `303a:1001`, MAC `e0:72:a1:ad:65:e0` | T-Deck Plus, GPS RX44/TX43, SD, TFT                       | DK5EN-14 | `t_deck_plus`            | Reboots on every open; wait for `CLIENT STARTED` (+~11 s)                         |
+| `/dev/cu.usbserial-0001`        | CP2102 `10c4:ea60`, serial `0001`                       | Heltec V3, SSD1306 OLED, ext. GPS RX47/TX48               | DK5EN-93 | `heltec_wifi_lora_32_V3` | Rebooted on open even with dtr/rts low; `-b 460800` safest                        |
+| `/dev/cu.usbserial-573C0005841` | CH9102 `1a86:55d4`, serial `573C000584`                 | T-Beam v1.2 (AXP2101), SX1276, SH1106 OLED, GPS RX34/TX12 | DK5EN-92 | `ttgo_tbeam`             | Rebooted on open; 921600 flash baud fails, use 460800                             |
+| `/dev/cu.usbmodem201301`        | RAKwireless `239a:8029`, serial `230D6EBB3266D20E`      | RAK4631 (nRF52840), no display, W5100S gateway            | DK5EN-90 | `wiscore_rak4631`        | Does **not** reset on open; needs `dtr=True` or it stays silent; `--info` answers |
+
+All four run 4.35p (RAK build Aug 22 2026, `Flash-Version 20260724`). The three ESP32 boards join
+`ORBI63`; the T-Deck saw it at -80 dBm, Heltec -53, T-Beam -56 at the same desk (TD-01 hardware
+note holds). Query helper: `tools/bench/serial_session.py PORT [--wait-boot] --info`.
+
+#### Order of work (proposal)
+
+1. **Instruments first** (TM-13, TM-07, TM-12, TM-06) — every fix below must show up as a number.
+2. **T-Deck audio** (TM-01, TM-02, TM-03, TM-04) — the visible freeze; independent of the bus.
+3. **T-Deck bus** (TM-05, then retire the NOP once TM-07 names the register).
+4. **Heltec/T-Beam OLED** (TM-09, then TM-10 only if needed) — one-line constructor change, largest win per line.
+5. **WiFi** (TM-11) — one experiment decides the direction.
+6. TM-08, TM-14, TM-15 as filler.
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 

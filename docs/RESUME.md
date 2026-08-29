@@ -64,6 +64,12 @@ Both branches are pushed to `origin`. Working tree clean.
 4. Local branch: the harness and every remote-control command layered on top of the PR content.
 5. Commit and push.
 
+## Timing campaign (2026-08-29)
+
+Scouted, not started: `BACKLOG.md` §3.8f (TM-01 … TM-15) — audio freeze, SPI2 arbitration, LoRa
+harness, Heltec/T-Beam OLED on software I2C, TD-01 experiment, RAK instrumentation. Read the
+"What the scouting settled" table there before re-deriving any of it.
+
 ## Open decision: tile format on the SD card
 
 Decoding a 256x256 PNG with lodepng costs ~95 ms per tile on the S3; a zoom step touches 2-4 tiles.
