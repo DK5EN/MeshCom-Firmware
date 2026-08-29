@@ -2019,6 +2019,10 @@ void tft_on()
 {
     if (bDEBUG)
         Serial.println("[TDECK]...tft_on: called");
+    // Bench-Harness: Zustandswechsel des Panels protokollieren (nur wenn es
+    // tatsaechlich dunkel war -- tft_on() kommt bei jedem Tastendruck).
+    if (tft_is_sleeping || current_brightness_level == 0)
+        Serial.printf("[TFT];on;ms;%lu;was_sleeping;%d\n", (unsigned long)millis(), tft_is_sleeping ? 1 : 0);
     // Ensure we have a valid brightness to restore
     if(pre_sleep_brightness_level == 0) pre_sleep_brightness_level = BRIGHTNESS_STEPS;
 
@@ -2065,6 +2069,8 @@ void tft_off()
         tft.writecommand(TFT_DISPOFF);
         tft.writecommand(TFT_SLPIN);
         tft_is_sleeping = true;
+        Serial.printf("[TFT];off;ms;%lu;idle_ms;%lu\n", (unsigned long)millis(),
+                      (unsigned long)(millis() - tdeck_tft_timer));
     }
 
     // always turn off keyboard backlight

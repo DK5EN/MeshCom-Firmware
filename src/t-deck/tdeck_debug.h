@@ -43,6 +43,18 @@ bool tdeck_dbg_tab(int idx);
 /* Opens/closes the tab drawer to match the requested state. */
 void tdeck_dbg_drawer(bool open);
 
+/* Scrolls the page of tab idx by dy pixels (dy > 0 = scroll down). Prints
+ * [SCROLL];tab;idx;dy;N;y;before;after;bottom;remaining. */
+bool tdeck_dbg_scroll(int idx, int dy);
+
+/* Input injection for the bench harness. Keys go through keypad_get_key()
+ * (the I2C keyboard path), trackball steps through mouse_read() (the GPIO
+ * edge path), so the whole LVGL indev chain is exercised. */
+void tdeck_dbg_key(const char *text);            /* --key <text>          */
+void tdeck_dbg_ball(const char *dir, int n);     /* --ball <dir> <n>      */
+bool tdeck_dbg_inject_key(uint32_t code);        /* implemented in tdeck_main.cpp */
+void tdeck_dbg_inject_ball(int dir, int n);      /* implemented in tdeck_main.cpp */
+
 /* Display sleep/wake control: 1 = tft_on(), 0 = tft_off(), 2 = state only.
  * Always prints a [TFT] status line, see brief for the exact field list. */
 void tdeck_dbg_tft(int mode);

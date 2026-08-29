@@ -19,6 +19,7 @@
 #include "tdeck_helpers.h"
 #include "tdeck_extern.h"
 #include <Arduino.h>
+#include <string.h>
 #include <lvgl.h>
 #include <esp_debug_helpers.h>
 #include <soc/cpu.h>
@@ -281,6 +282,62 @@ extern "C" bool tdeck_dbg_tab(int idx)
 
     Serial.printf("[TAB];set;%d;inv_delta;%lu;\n", idx, (unsigned long)delta);
     return true;
+}
+
+extern "C" bool tdeck_dbg_scroll(int idx, int dy)
+{
+    if(tv == NULL || idx < 0 || idx >= TAB_COUNT) {
+        Serial.println("[SCROLL];err;range");
+        return false;
+    }
+    lv_obj_t *content = lv_tabview_get_content(tv);
+    lv_obj_t *page = content ? lv_obj_get_child(content, idx) : NULL;
+    if(page == NULL) {
+        Serial.println("[SCROLL];err;page");
+        return false;
+    }
+    int before = (int)lv_obj_get_scroll_y(page);
+    // lv_obj_scroll_by() klemmt nicht: Ziel auf [0, before + bottom] begrenzen,
+    // sonst blaettert der Test ins Leere und "unten" ist nie erreicht.
+    int room_below = (int)lv_obj_get_scroll_bottom(page);
+    int target = before + dy;                       // dy > 0 = nach unten blaettern
+    if (target > before + room_below) target = before + room_below;
+    if (target < 0) target = 0;
+    lv_obj_scroll_to_y(page, target, LV_ANIM_OFF);
+    int after = (int)lv_obj_get_scroll_y(page);
+    Serial.printf("[SCROLL];tab;%d;dy;%d;y;%d;%d;bottom;%d\n", idx, dy, before, after,
+                  (int)lv_obj_get_scroll_bottom(page));
+    return true;
+}
+
+extern "C" void tdeck_dbg_key(const char *text)
+{
+    // Tastatureingabe einreihen; \n = Enter (0x0d), \b = Backspace (0x08).
+    int n = 0;
+    for (const char *c = text; *c; c++)
+    {
+        uint32_t code = (uint8_t)*c;
+        if (*c == '\\' && c[1] == 'n') { code = 0x0d; c++; }
+        else if (*c == '\\' && c[1] == 'b') { code = 0x08; c++; }
+        if (tdeck_dbg_inject_key(code)) n++;
+    }
+    Serial.printf("[KEY];inject;%d\n", n);
+}
+
+extern "C" void tdeck_dbg_ball(const char *dir, int n)
+{
+    int d = -1;
+    if (strcmp(dir, "right") == 0) d = 0;
+    else if (strcmp(dir, "up") == 0) d = 1;
+    else if (strcmp(dir, "left") == 0) d = 2;
+    else if (strcmp(dir, "down") == 0) d = 3;
+    else if (strcmp(dir, "click") == 0) d = 4;
+    if (d < 0 || n < 1 || n > 200) {
+        Serial.println("[BALL];err;usage");
+        return;
+    }
+    tdeck_dbg_inject_ball(d, n);
+    Serial.printf("[BALL];inject;%s;%d\n", dir, n);
 }
 
 extern "C" void tdeck_dbg_drawer(bool open)

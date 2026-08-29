@@ -1833,6 +1833,25 @@ static void flushDeferredDisplayUpdates()
 
 void esp32loop()
 {
+    // Boot-Ende-Marke fuer den Bench-Harness: die Netzwerkphase ist vorbei,
+    // sobald WLAN verbunden ist (node_hasIPaddress), der Verbindungsversuch
+    // aufgegeben wurde (bAllStarted, nach Reset und Wiederholung) oder gar kein
+    // Netzwerkdienst konfiguriert ist. Bis dahin blinken die Kopfzeilen-Icons
+    // und Befehle werden verzoegert bearbeitet.
+    // Nicht nur bAllStarted: das bleibt false, wenn WLAN schon in setup()
+    // verbunden hat (iWlanWait == 0 und IP vorhanden -> der Zweig, der es auf
+    // true setzt, laeuft nie).
+    static bool s_bootReadyLogged = false;
+    if (!s_bootReadyLogged)
+    {
+        bool network_wanted = bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE;
+        if (!network_wanted || bAllStarted || meshcom_settings.node_hasIPaddress)
+        {
+            s_bootReadyLogged = true;
+            printfdeb("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
+                      meshcom_settings.node_hasIPaddress ? 1 : 0);
+        }
+    }
     // TEMPORARY -- measures the period between successive loop entries, so a
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();

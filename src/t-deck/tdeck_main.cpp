@@ -579,9 +579,38 @@ void tdeck_dbg_reflush(void)
 /**
  * Read key value from esp32c3
  */
+// Bench-Harness: eingereihte Tasten und Trackball-Schritte (tdeck_debug.h).
+#define DBG_KEY_RING 32
+static volatile uint32_t s_dbg_key_ring[DBG_KEY_RING];
+static volatile uint8_t  s_dbg_key_head = 0, s_dbg_key_tail = 0;
+static volatile int      s_dbg_ball_pending[5] = {0, 0, 0, 0, 0};
+
+extern "C" bool tdeck_dbg_inject_key(uint32_t code)
+{
+    uint8_t next = (uint8_t)((s_dbg_key_head + 1) % DBG_KEY_RING);
+    if (next == s_dbg_key_tail)
+        return false;                       // Ring voll
+    s_dbg_key_ring[s_dbg_key_head] = code;
+    s_dbg_key_head = next;
+    return true;
+}
+
+extern "C" void tdeck_dbg_inject_ball(int dir, int n)
+{
+    if (dir >= 0 && dir < 5)
+        s_dbg_ball_pending[dir] += n;
+}
+
 static uint32_t keypad_get_key(void)
 {
     char key_ch = 0;
+    if (s_dbg_key_tail != s_dbg_key_head)   // eingereihte Taste zuerst
+    {
+        uint32_t code = s_dbg_key_ring[s_dbg_key_tail];
+        s_dbg_key_tail = (uint8_t)((s_dbg_key_tail + 1) % DBG_KEY_RING);
+        Serial.printf("[KEY];%02lx;ms;%lu;src;inject\n", (unsigned long)code, (unsigned long)millis());
+        return code;
+    }
     Wire.requestFrom(0x55, 1);
     while (Wire.available() > 0) {
         key_ch = Wire.read();
@@ -596,6 +625,8 @@ static uint32_t keypad_get_key(void)
 
     }
 
+    if (key_ch != 0)
+        Serial.printf("[KEY];%02x;ms;%lu;src;kbd\n", (unsigned)(uint8_t)key_ch, (unsigned long)millis());
     return key_ch;
 }
 
@@ -819,6 +850,12 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
     uint8_t pos = 10;
     for (int i = 0; i < 5; i++) {
         bool dir = digitalRead(dir_pins[i]);
+        // Bench-Harness: ein eingereihter Schritt wirkt wie eine Flanke
+        if (s_dbg_ball_pending[i] > 0)
+        {
+            s_dbg_ball_pending[i]--;
+            dir = !last_dir[i];
+        }
         if (dir != last_dir[i])
         {
             if (!meshcom_settings.node_keyboardlock)
@@ -863,6 +900,8 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
     const uint32_t now_ms = millis();
     if(activity_detected)
     {
+        Serial.printf("[BALL];x;%d;y;%d;btn;%d;ms;%lu\n", (int)last_x, (int)last_y,
+                      left_button_down ? 1 : 0, (unsigned long)now_ms);
         trackball_cursor_visible_until_ms = now_ms + TRACKBALL_CURSOR_SHOW_TIME_MS;
         if(trackball_cursor_obj != NULL)
             lv_obj_clear_flag(trackball_cursor_obj, LV_OBJ_FLAG_HIDDEN);

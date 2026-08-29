@@ -4555,6 +4555,36 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    if(commandCheck(msg_text+2, (char*)"key ") == 0)
+    {
+        // --key <text>   inject keyboard characters (\n = Enter, \b = Backspace)
+        tdeck_dbg_key(msg_text+6);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ball ") == 0)
+    {
+        // --ball <up|down|left|right|click> <n>
+        char dir[8] = {0};
+        int n = 0;
+        if(sscanf(msg_text+7, "%7s %d", dir, &n) == 2)
+            tdeck_dbg_ball(dir, n);
+        else
+            Serial.println("[BALL];err;usage");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"scroll ") == 0)
+    {
+        // --scroll <tab> <dy>   dy > 0 scrolls down, < 0 up
+        int tab = 0, dy = 0;
+        if(sscanf(msg_text+9, "%d %d", &tab, &dy) == 2)
+            tdeck_dbg_scroll(tab, dy);
+        else
+            Serial.println("[SCROLL];err;usage");
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"flushfix on") == 0)
     {
         tdeck_dbg_flushfix(true);

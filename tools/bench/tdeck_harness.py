@@ -20,6 +20,7 @@ bench tools' style; this one is self-contained (no import from either).
 from __future__ import annotations
 
 import argparse
+import math
 import glob
 import json
 import re
@@ -47,6 +48,7 @@ DEFAULT_BAUD = 115200
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ELF = str(REPO_ROOT / ".pio/build/t_deck_plus/firmware.elf")
 BOOT_MARKER = "CLIENT STARTED"
+READY_MARKER = "[BOOT];ready"
 
 
 # --------------------------------------------------------------------------
@@ -70,10 +72,13 @@ class TDeckSession:
         baud: int = DEFAULT_BAUD,
         boot_timeout: float = 40.0,
         log_path: Optional[Path] = None,
+        ready_timeout: float = 60.0,
     ) -> None:
         self.port = port
         self.baud = baud
         self.boot_timeout = boot_timeout
+        self.ready_timeout = ready_timeout
+        self.boot_ready_ms: Optional[int] = None
         self.log_path = log_path or Path(
             f"tdeck_run_{time.strftime('%Y%m%d-%H%M%S')}.log"
         )
@@ -107,12 +112,32 @@ class TDeckSession:
         # The T-Deck ignores serial for ~10 s after CLIENT STARTED while the GUI
         # and SD come up. Poll --uistat until the firmware answers.
         deadline = time.monotonic() + 60.0
+        answered = False
         while time.monotonic() < deadline:
             idx = self.send("--uistat")
             if self.wait_for(r"\[UISTAT\]", 2.0, since=idx) is not None:
-                time.sleep(1.0)
-                return
-        raise TimeoutError("device never answered --uistat within 60s after boot")
+                answered = True
+                break
+        if not answered:
+            raise TimeoutError("device never answered --uistat within 60s after boot")
+        # Answering --uistat is not the end of initialisation: the WiFi attempt
+        # (up to ~15 s, plus one radio reset and retry) still runs, the header
+        # icons blink and commands are serviced late. The firmware prints
+        # [BOOT];ready;ms;<millis> once bAllStarted is true; wait for it, but
+        # tolerate its absence (older firmware) after ready_timeout.
+        m = self.wait_for(re.escape(READY_MARKER), self.ready_timeout, since=0)
+        self.boot_ready_ms = None
+        if m:
+            mm = re.search(r"ready;ms;(\d+)", m.string)
+            self.boot_ready_ms = int(mm.group(1)) if mm else None
+        if m is None:
+            self._write_raw_log(
+                f"## no {READY_MARKER} within {self.ready_timeout}s -- continuing anyway"
+            )
+        # The panel goes dark TDECK_TFT_TIMEOUT (30 s) after the last key or
+        # touch, serial traffic does not count; switch it on for the eye tests.
+        self.send("--tft on")
+        time.sleep(1.0)
 
     def close(self) -> None:
         self._stop.set()
@@ -654,6 +679,364 @@ def scenario_audio_stall(session: TDeckSession, args: argparse.Namespace) -> Dic
     }
 
 
+# --------------------------------------------------------------------------
+# map: foreign stations at growing distances, full zoom sweeps
+# --------------------------------------------------------------------------
+
+CRASH_PATTERN = r"Guru Meditation|rst:0x|Backtrace:|abort\(\)|assert failed"
+
+# Distances in km and bearings in degrees for the injected stations; at the
+# default zoom the near ones share the viewport with the own position, the far
+# ones are outside it and only come into view when zooming out.
+MAP_STATIONS = [
+    (0.3, 45), (0.8, 135), (1.5, 225), (3.0, 315), (6.0, 20),
+    (12.0, 110), (25.0, 200), (60.0, 290), (150.0, 60), (400.0, 240),
+]
+
+
+def _own_position(session: TDeckSession) -> Optional[Tuple[float, float]]:
+    """--pos prints '...LAT: 48.4076 N' / '...LON: 11.7386 E'."""
+    idx = session.send("--pos")
+    if session.wait_for(r"LON:", 4.0, since=idx) is None:
+        return None
+    lat = lon = None
+    for _, _, l in session.records_since(idx):
+        m = re.search(r"LAT:\s*([0-9.]+)\s*([NS])", l)
+        if m:
+            lat = float(m.group(1)) * (-1 if m.group(2) == "S" else 1)
+        m = re.search(r"LON:\s*([0-9.]+)\s*([EW])", l)
+        if m:
+            lon = float(m.group(1)) * (-1 if m.group(2) == "W" else 1)
+    if lat is None or lon is None or (lat == 0.0 and lon == 0.0):
+        return None
+    return lat, lon
+
+
+def _offset(lat: float, lon: float, km: float, bearing_deg: float) -> Tuple[float, float]:
+    b = math.radians(bearing_deg)
+    dlat = km * math.cos(b) / 111.0
+    dlon = km * math.sin(b) / (111.0 * max(0.1, math.cos(math.radians(lat))))
+    return lat + dlat, lon + dlon
+
+
+def _zoom_step(session: TDeckSession, direction: str) -> Dict[str, Any]:
+    session.send("--tft on")            # keep the panel lit for the eye test
+    time.sleep(0.1)
+    idx = session.send(f"--mapzoom {direction}")
+    m = session.wait_for(r"\[MAPZOOM\];|" + CRASH_PATTERN, 10.0, since=idx)
+    step: Dict[str, Any] = {"dir": direction, "acked": False, "zoom": None, "crash": None,
+                            "center_err": None, "compose_ms": None}
+    if m is None:
+        return step
+    if "MAPZOOM" not in m.string:
+        step["crash"] = m.string.strip()[:120]
+        return step
+    step["acked"] = True
+    step["zoom"] = int(m.string.strip().split(";")[-1])
+    # the centring line and the compose line follow the zoom ack
+    time.sleep(1.2)
+    for _, _, l in session.records_since(idx):
+        mm = re.search(r"\[MAP\];zoom;(\d+);.*center_err;(-?\d+);(-?\d+)", l)
+        if mm:
+            step["center_err"] = (int(mm.group(2)), int(mm.group(3)))
+        mm = re.search(r"Karte zusammengesetzt: zoom (\d+), Kacheln (\d+) \(fehlend (\d+)\).*?, (\d+) ms", l)
+        if mm:
+            step["compose_ms"] = int(mm.group(4))
+            step["tiles"] = int(mm.group(2))
+            step["tiles_missing"] = int(mm.group(3))
+    return step
+
+
+def _sweep(session: TDeckSession, direction: str, max_steps: int) -> List[Dict[str, Any]]:
+    """Zoom in one direction until the reported zoom stops changing (bound reached)."""
+    steps: List[Dict[str, Any]] = []
+    last = None
+    for _ in range(max_steps):
+        st = _zoom_step(session, direction)
+        steps.append(st)
+        if st["crash"] or not st["acked"]:
+            break
+        if st["zoom"] == last:
+            break
+        last = st["zoom"]
+    return steps
+
+
+def scenario_map(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """The real map test: ten foreign stations at 0.3-400 km around the own
+    position (some outside the current viewport), then a full zoom-in sweep to
+    the map set's upper bound and a full zoom-out sweep to its lower bound.
+    Verdict: every injection acknowledged, every zoom step acknowledged, no
+    crash, own position centred (center_err 0/0) at every zoom level, both
+    bounds reached. Whether the red dots are drawn is the operator's eye test.
+    """
+    home = _own_position(session)
+    if home is None:
+        return {"ok": False, "reason": "no own position (--pos gave 0/0 or no answer)"}
+    lat, lon = home
+
+    session.send("--tft on")
+    session.send("--tab 3")
+    time.sleep(2.0)
+    before = get_uistat(session)
+
+    stations = []
+    inject_ok = True
+    for i, (km, bearing) in enumerate(MAP_STATIONS[: args.map_stations], start=1):
+        slat, slon = _offset(lat, lon, km, bearing)
+        call = f"DK5EN-{i:02d}"
+        idx = session.send(f"--injectpos {call} {slat:.5f} {slon:.5f}")
+        m = session.wait_for(r"\[INJECTPOS\];(ok|err)|" + CRASH_PATTERN, 6.0, since=idx)
+        ok = m is not None and "INJECTPOS];ok" in m.string
+        stations.append({"call": call, "km": km, "bearing": bearing, "lat": round(slat, 5),
+                         "lon": round(slon, 5), "ok": ok,
+                         "line": m.string.strip()[:100] if m else None})
+        if not ok:
+            inject_ok = False
+        time.sleep(0.6)
+
+    zoom_in = _sweep(session, "in", 12)
+    zoom_out = _sweep(session, "out", 24)
+    zoom_back = _sweep(session, "in", 24)
+    steps = zoom_in + zoom_out + zoom_back
+
+    crashed = next((st["crash"] for st in steps if st["crash"]), None)
+    all_acked = all(st["acked"] for st in steps)
+    zooms = [st["zoom"] for st in steps if st["zoom"] is not None]
+    centred = [st for st in steps if st["center_err"] is not None]
+    off_centre = [st for st in centred if st["center_err"] != (0, 0)]
+    after = get_uistat(session)
+
+    ok = (
+        inject_ok
+        and crashed is None
+        and all_acked
+        and len(zooms) >= 2
+        and max(zooms) > min(zooms)
+        and len(centred) > 0
+        and not off_centre
+    )
+    return {
+        "ok": ok,
+        "home": {"lat": lat, "lon": lon},
+        "stations": stations,
+        "zoom_min": min(zooms) if zooms else None,
+        "zoom_max": max(zooms) if zooms else None,
+        "steps": steps,
+        "steps_total": len(steps),
+        "steps_acked": sum(1 for st in steps if st["acked"]),
+        "centring_lines": len(centred),
+        "off_centre_steps": [(st["dir"], st["zoom"], st["center_err"]) for st in off_centre],
+        "compose_ms_max": max((st["compose_ms"] for st in steps if st["compose_ms"] is not None), default=None),
+        "crashed": crashed,
+        "uistat_before": before,
+        "uistat_after": after,
+    }
+
+
+# --------------------------------------------------------------------------
+# nav: drawer -> tab -> drawer over every tab, scroll the settings page
+# --------------------------------------------------------------------------
+
+TAB_COUNT = 8
+SETTINGS_TAB = 7
+
+
+def _acked_step(session: TDeckSession, cmd: str, ack_pattern: str, timeout: float = 2.0) -> Dict[str, Any]:
+    """Send one console command with the redraw log on; report ack, repaint
+    and crash lines for it."""
+    session.send("--tft on")            # panel darkens 30 s after the last key; keep the eye test lit
+    session.send("--redrawlog on")
+    time.sleep(0.1)
+    idx = session.send(cmd)
+    ack = session.wait_for(ack_pattern + "|" + CRASH_PATTERN, timeout, since=idx)
+    refr = session.wait_for(r"\[REFR\]", 1.0, since=idx)
+    session.collect(0.4)
+    end = session.length()
+    session.send("--redrawlog off")
+    time.sleep(0.1)
+    parsed = _parsed_range(session, idx, end)
+    fsum = refr_summary(parsed, window_seconds=1.5)
+    crashed = ack is not None and re.search(CRASH_PATTERN, ack.string) is not None
+    return {
+        "cmd": cmd,
+        "acked": ack is not None and not crashed,
+        "ack_line": ack.string.strip()[:120] if ack else None,
+        "repainted": refr is not None,
+        "refr_count": fsum["count"],
+        "px": fsum["sum_px"],
+        "crashed": crashed,
+    }
+
+
+def scenario_nav(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Operator's navigation pattern: open the drawer, pick the tab, close the
+    drawer -- over all eight tabs -- and on the (long) settings page scroll to
+    the bottom and back to the top. Every step must be acknowledged and
+    repainted, nothing may crash, and the settings page must actually move."""
+    session.send("--tft on")
+    steps: List[Dict[str, Any]] = []
+    for i in range(TAB_COUNT):
+        steps.append(_acked_step(session, "--drawer on", r"\[DRAWER\];1\b"))
+        steps.append(_acked_step(session, f"--tab {i}", r"\[TAB\];set;"))
+        steps.append(_acked_step(session, "--drawer off", r"\[DRAWER\];0\b"))
+        if i == SETTINGS_TAB:
+            for direction in (+1, -1):
+                last_y = None
+                for _ in range(40):
+                    st = _acked_step(session, f"--scroll {SETTINGS_TAB} {direction * 120}", r"\[SCROLL\];")
+                    steps.append(st)
+                    if st["crashed"] or not st["acked"]:
+                        break
+                    m = re.search(r"y;(-?\d+);(-?\d+);bottom;(-?\d+)", st["ack_line"] or "")
+                    y_after = int(m.group(2)) if m else None
+                    st["scroll_y"] = y_after
+                    if y_after is None or y_after == last_y:
+                        break                       # bound reached
+                    last_y = y_after
+        if any(st["crashed"] for st in steps[-3:]):
+            break
+    scroll_ys = [st["scroll_y"] for st in steps if st.get("scroll_y") is not None]
+    crashed = next((st["ack_line"] for st in steps if st["crashed"]), None)
+    not_acked = [st["cmd"] for st in steps if not st["acked"]]
+    not_repainted = [st["cmd"] for st in steps if st["acked"] and not st["repainted"]]
+    post = get_uistat(session)
+    ok = (
+        crashed is None
+        and not not_acked
+        and not not_repainted
+        and len(scroll_ys) >= 2
+        and max(scroll_ys) > 0
+        and scroll_ys[-1] == 0
+    )
+    return {
+        "ok": ok,
+        "steps_total": len(steps),
+        "steps_acked": sum(1 for st in steps if st["acked"]),
+        "not_acked": not_acked,
+        "not_repainted": not_repainted,
+        "settings_scroll_max": max(scroll_ys) if scroll_ys else None,
+        "settings_scroll_final": scroll_ys[-1] if scroll_ys else None,
+        "crashed": crashed,
+        "steps": steps,
+        "uistat_after": post,
+    }
+
+
+# --------------------------------------------------------------------------
+# input: keyboard and trackball through the LVGL indev chain
+# --------------------------------------------------------------------------
+
+def _latency_ms(session: TDeckSession, since: int, event_pat: str, until_pat: str) -> List[float]:
+    """For every event line matching event_pat after `since`, the time to the
+    next line matching until_pat (a repaint), in ms, from the host timestamps."""
+    recs = session.records_since(since)
+    out: List[float] = []
+    pending: Optional[float] = None
+    for _, t_mono, line in recs:
+        if re.search(event_pat, line):
+            pending = t_mono
+        elif pending is not None and re.search(until_pat, line):
+            out.append((t_mono - pending) * 1000.0)
+            pending = None
+    return out
+
+
+def _pct(values: Sequence[float], q: float) -> Optional[float]:
+    if not values:
+        return None
+    v = sorted(values)
+    k = min(len(v) - 1, int(round(q * (len(v) - 1))))
+    return round(v[k], 1)
+
+
+def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Keyboard and trackball tests. Keys are injected into keypad_get_key()
+    (the I2C keyboard path) on the chat tab, trackball steps into mouse_read()
+    (the GPIO edge path); the firmware logs every consumed [KEY]/[BALL] event
+    and the redraw log shows the repaint. Verdict: every injected key and
+    every trackball step is consumed and followed by a repaint; the
+    event-to-repaint latency is reported (p50/p95), and the trackball's
+    cursor must move by exactly one step per event -- the "not smooth"
+    symptom is an event that is swallowed or a repaint that lags."""
+    session.send("--tft on")
+    session.send("--tab 1")               # chat input tab
+    time.sleep(1.0)
+
+    # -- keyboard
+    text = args.input_text
+    session.send("--redrawlog on")
+    time.sleep(0.1)
+    idx = session.send(f"--key {text}")
+    session.wait_for(r"\[KEY\];inject;", 2.0, since=idx)
+    time.sleep(0.5 + 0.05 * len(text))
+    key_lines = [l for _, _, l in session.records_since(idx) if re.search(r"\[KEY\];[0-9a-f]{2};", l)]
+    key_lat = _latency_ms(session, idx, r"\[KEY\];[0-9a-f]{2};", r"\[REFR\]")
+    session.send("--redrawlog off")
+    time.sleep(0.1)
+    # clear what we typed
+    session.send("--key " + "\\b" * len(text))
+    time.sleep(0.5)
+
+    # -- trackball: move the cursor away from the screen edge (it starts at
+    # 0/0 and mouse_read() clamps at the borders), then walk a square.
+    session.send("--tab 0")
+    time.sleep(0.5)
+    session.send("--ball right 14")
+    time.sleep(0.5)
+    session.send("--ball down 8")
+    time.sleep(0.5)
+    ball_results = []
+    for direction, n in (("right", args.input_ball_steps), ("down", args.input_ball_steps),
+                         ("left", args.input_ball_steps), ("up", args.input_ball_steps)):
+        session.send("--redrawlog on")
+        time.sleep(0.1)
+        idx = session.send(f"--ball {direction} {n}")
+        session.wait_for(r"\[BALL\];inject;", 2.0, since=idx)
+        time.sleep(0.3 + 0.02 * n)
+        events = []
+        for _, _, l in session.records_since(idx):
+            m = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;(\d)", l)
+            if m:
+                events.append((int(m.group(1)), int(m.group(2))))
+        lat = _latency_ms(session, idx, r"\[BALL\];x;", r"\[REFR\]")
+        session.send("--redrawlog off")
+        time.sleep(0.1)
+        # every event must move the cursor by exactly one 10 px step on one axis
+        steps_ok = 0
+        for (x0, y0), (x1, y1) in zip(events, events[1:]):
+            if abs(x1 - x0) + abs(y1 - y0) == 10:
+                steps_ok += 1
+        ball_results.append({
+            "dir": direction, "requested": n, "events": len(events),
+            "steps_exact": steps_ok, "first": events[0] if events else None,
+            "last": events[-1] if events else None,
+            "latency_p50_ms": _pct(lat, 0.5), "latency_p95_ms": _pct(lat, 0.95),
+            "repaints": len(lat),
+        })
+
+    # Keys are consumed one per indev read (10 ms); several land inside one
+    # refresh period, so "one repaint per key" is not the contract -- every
+    # key consumed and at least one repaint after the burst is.
+    keys_ok = len(key_lines) == len(text) and len(key_lat) >= 1
+    ball_ok = all(
+        r["events"] == r["requested"]
+        and r["repaints"] == r["events"]
+        and r["steps_exact"] == max(0, r["events"] - 1)
+        for r in ball_results
+    )
+    ok = keys_ok and ball_ok
+    return {
+        "ok": ok,
+        "keys_sent": len(text),
+        "keys_consumed": len(key_lines),
+        "key_repaints": len(key_lat),
+        "key_latency_p50_ms": _pct(key_lat, 0.5),
+        "key_latency_p95_ms": _pct(key_lat, 0.95),
+        "ball": ball_results,
+    }
+
+
 def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     idx0 = session.send("--heap h0")
     m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
@@ -841,6 +1224,9 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "audio_stall": scenario_audio_stall,
     "sleep": scenario_sleep,
     "screen": scenario_screen,
+    "map": scenario_map,
+    "nav": scenario_nav,
+    "input": scenario_input,
     "heap": scenario_heap,
 }
 SCENARIO_ORDER = [
@@ -853,6 +1239,9 @@ SCENARIO_ORDER = [
     "audio_stall",
     "sleep",
     "screen",
+    "map",
+    "nav",
+    "input",
     "heap",
 ]
 
@@ -931,6 +1320,39 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
             for bt in result.get("top_backtraces_after_wake", [])[:4]:
                 print(f"    {bt['count']:4d}  " + " <- ".join(bt["frames"]))
+        elif name == "map":
+            if result.get("reason"):
+                print(f"  {result['reason']}")
+            else:
+                st = result.get("stations", [])
+                print(
+                    f"  home={result.get('home')}  stations_ok={sum(1 for x in st if x['ok'])}/{len(st)}  "
+                    f"zoom={result.get('zoom_min')}..{result.get('zoom_max')}  "
+                    f"steps={result.get('steps_acked')}/{result.get('steps_total')}  "
+                    f"centring_lines={result.get('centring_lines')}  "
+                    f"off_centre={result.get('off_centre_steps')}  "
+                    f"compose_ms_max={result.get('compose_ms_max')}  crashed={result.get('crashed')}"
+                )
+                for x in st:
+                    print(f"    {x['call']} {x['km']:6.1f} km @{x['bearing']:3d}: ok={x['ok']}")
+        elif name == "input":
+            print(
+                f"  keys={result.get('keys_consumed')}/{result.get('keys_sent')} repaints={result.get('key_repaints')} "
+                f"latency p50={result.get('key_latency_p50_ms')} p95={result.get('key_latency_p95_ms')} ms"
+            )
+            for b in result.get("ball", []):
+                print(
+                    f"    ball {b['dir']:5s}: events={b['events']}/{b['requested']} exact_steps={b['steps_exact']} "
+                    f"repaints={b['repaints']} latency p50={b['latency_p50_ms']} p95={b['latency_p95_ms']} ms "
+                    f"{b['first']}->{b['last']}"
+                )
+        elif name == "nav":
+            print(
+                f"  steps={result.get('steps_acked')}/{result.get('steps_total')}  "
+                f"not_acked={result.get('not_acked')}  not_repainted={result.get('not_repainted')}  "
+                f"settings_scroll_max={result.get('settings_scroll_max')}  "
+                f"settings_scroll_final={result.get('settings_scroll_final')}  crashed={result.get('crashed')}"
+            )
         elif name == "screen":
             print(
                 f"  readback_stable={result.get('readback_stable')}  "
@@ -946,16 +1368,74 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
 # --------------------------------------------------------------------------
 
 
+SCENARIO_HELP = {
+    "boot": "inspect the boot log (version, audio outcome, errors)",
+    "idle": "redraw/invalidation rate over an idle window",
+    "tabs": "switch through all tabs, repaint per tab",
+    "drawer": "open/close the tab drawer three times",
+    "inject": "inject messages via --injectmsg, bubble must be drawn",
+    "audio": "start/msg tones and a missing file via --playtone",
+    "audio_stall": "loop stall while a tone plays (must stay < 100 ms)",
+    "sleep": "display off/on with a message in between",
+    "screen": "panel readback probe (void on this hardware) + map content",
+    "map": "10 stations at 0.3-400 km, full zoom sweeps, centring, crash watch",
+    "nav": "drawer -> tab -> drawer over all tabs, scroll the settings page",
+    "input": "keyboard keys and trackball steps through the LVGL indev chain",
+    "heap": "heap delta over N injected messages",
+}
+
+EPILOG = """\
+scenario selection:
+  --scenario all                 every scenario in the standard order
+  --scenario map                 one scenario
+  --scenario audio,audio_stall   several, comma separated (run in the given order)
+  --scenario all --skip sleep    everything but the named ones
+  --list                         print the scenarios and what each one checks
+
+examples:
+  python3 tools/bench/tdeck_harness.py --list
+  python3 tools/bench/tdeck_harness.py --scenario all --out runs/all.json
+  python3 tools/bench/tdeck_harness.py --scenario map --map-stations 10
+  python3 tools/bench/tdeck_harness.py --scenario input --input-ball-steps 20
+  python3 tools/bench/tdeck_harness.py --scenario inject --inject-count 20 --inject-spacing 2
+
+Opening the serial port reboots the T-Deck; every run starts with a fresh
+boot, waits for CLIENT STARTED, then for [BOOT];ready (the network phase
+settled), switches the panel on and only then runs the scenarios. The raw
+device log of the run lands in tdeck_run_<timestamp>.log in the current
+directory (use tools/bench/runs/); the machine-readable verdicts in --out.
+"""
+
+
+def _list_scenarios() -> None:
+    print("scenarios (standard order):")
+    for name in SCENARIO_ORDER:
+        print(f"  {name:12s} {SCENARIO_HELP.get(name, '')}")
+
+
+def _select_scenarios(spec: str, skip: str) -> List[str]:
+    wanted = SCENARIO_ORDER if spec.strip() == "all" else [x.strip() for x in spec.split(",") if x.strip()]
+    skipped = {x.strip() for x in skip.split(",") if x.strip()}
+    unknown = [x for x in wanted + sorted(skipped) if x not in SCENARIOS]
+    if unknown:
+        raise SystemExit(f"unknown scenario(s): {', '.join(unknown)} -- see --list")
+    return [x for x in wanted if x not in skipped]
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="T-Deck Plus host-side automated regression/measurement harness."
+        description="T-Deck Plus host-side automated regression/measurement harness "
+                    "(UI, map, audio, input) over the USB console.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
         "--scenario",
-        choices=["all", *SCENARIO_ORDER],
         default="all",
-        help="which scenario(s) to run (default: all)",
+        help="scenario name, comma-separated list, or 'all' (default: all)",
     )
+    p.add_argument("--skip", default="", help="comma-separated scenarios to leave out")
+    p.add_argument("--list", action="store_true", help="list the scenarios and exit")
     p.add_argument("--port", default=DEFAULT_PORT, help=f"serial port (default: {DEFAULT_PORT})")
     p.add_argument("--heap-count", type=int, default=20, help="injections in the heap scenario (default: 20)")
     p.add_argument("--elf", default=DEFAULT_ELF, help=f"firmware ELF for symbolization (default: {DEFAULT_ELF})")
@@ -964,6 +1444,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=float,
         default=40.0,
         help="seconds to wait for the CLIENT STARTED boot marker (default: 40)",
+    )
+    p.add_argument(
+        "--ready-timeout",
+        type=float,
+        default=60.0,
+        help="seconds to wait for [BOOT];ready after CLIENT STARTED (default: 60)",
     )
     p.add_argument(
         "--idle-seconds", type=float, default=60.0, help="idle scenario window length (default: 60)"
@@ -977,14 +1463,22 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=3.0,
         help="inject scenario seconds between messages (default: 3)",
     )
+    p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10)")
+    p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
+    p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")
     p.add_argument("--out", default="summary.json", help="output JSON summary path (default: summary.json)")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    if args.list:
+        _list_scenarios()
+        raise SystemExit(0)
+    args.scenarios = _select_scenarios(args.scenario, args.skip)
+    return args
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
 
-    session = TDeckSession(port=args.port, boot_timeout=args.boot_timeout)
+    session = TDeckSession(port=args.port, boot_timeout=args.boot_timeout, ready_timeout=args.ready_timeout)
     try:
         session.open()
     except TimeoutError as e:
@@ -994,7 +1488,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR: could not open session on {args.port}: {e}", file=sys.stderr)
         return 2
 
-    order = SCENARIO_ORDER if args.scenario == "all" else [args.scenario]
+    order = args.scenarios
     summary: Dict[str, Dict[str, Any]] = {}
     overall_ok = True
     try:
