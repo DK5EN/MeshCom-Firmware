@@ -856,8 +856,9 @@ a manual local run. `src/t-deck/` has 0 % coverage.
 Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root cause
 (`tdeck-findings-20260828.md` §1). Goal of the campaign: fix every timing defect of the
 "shared bus / blocked loop task" class once, across T-Deck Plus, Heltec V3, T-Beam and RAK4631.
-**Nothing below is changed in code yet.** Each row was verified against the tree on
-`tdeck-partial-refresh-trace` (`064a89b3`); re-verify file:line after the upstream merge.
+**State 2026-08-29 evening:** TM-01..05, 08, 09, 12, 15, 18, 20, 21 done and verified on hardware;
+TM-11 measured with a candidate fix; open: TM-06, 07, 10, 13, 14, 16 (rest), 17, 19, 22. file:line
+references are from the morning scouting; re-verify before touching.
 
 #### What the scouting settled
 
@@ -896,6 +897,7 @@ Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root ca
 | TM-18 | T-Deck | PERF | Medium | `tdeck_main.cpp` `mouse_read()` | Trackball "not smooth": GPIO levels are polled every 10 ms (`LV_INDEV_DEF_READ_PERIOD`) and compared to the last level, 10 px per edge. Edges faster than the poll collapse (odd count -> one step, even count -> none). Injected steps are perfect (input scenario: 40/40, p95 30 ms), so the loss is at the edge sampling. Measure with an ISR edge counter vs consumed events under a real roll, then count edges in the ISR and consume them in `mouse_read()`. | **FIXED** — ISR edge counting, consumed in `mouse_read()`; measured on DK5EN-14: old level compare lost ~75 % of edges on fast rolls (186 -> 40, 224 -> 57), edge mode 0 lost, pending 0, repaint p50 8 ms on tab 0 and map. `--balledge off` restores the old path for A/B. |
 | TM-20 | all ESP32 | BUG | High | `udp_functions.cpp` `startNetwork()`, `esp32_main.cpp` retry path | **FIXED** — WiFi bring-up froze loopTask ~7 s (delay 1000+200+500, sync `scanNetworks()`) plus `delay(1500)` on the boot retry, and again on every 5-minute retry while unconnected (LoRa RX unserviced on any ESP32 gateway without AP). Now async scan, no delays; measured on DK5EN-14: no gap > 0.7 s in the boot log, loop max 26 ms. Trackball edges banked during a stall are discarded, not replayed. | FIXED |
 | TM-21 | all ESP32 | PERF | Low | `esp32_main.cpp` (`if(bWEBSERVER && iWlanWait == 0) startWebserver();`), `web_functions.cpp:81` | With `--debug on` and no IP (AP unreachable, after the 5-min give-up) every loop pass prints `[WEB]...no ip set` — ~125 lines/s (10 630 in 100 s on DK5EN-93). Pre-existing; print once per state change. | **FIXED** — logged once per state in `startWebserver()`, latch reset when an IP is present |
+| TM-22 | T-Beam (all `_HW_I2C` OLED boards) | PERF | Medium | `loop_functions.cpp:379-380` (`#else` branch) | T-Beam is already on `Wire` hardware I2C (37.8 ms/frame, DK5EN-92, SH1106 `_F_`), but the SSD1306 variant still uses `_1_HW_I2C` page mode (8 transfers/frame) and no explicit `setBusClock(400000)`. Same treatment as TM-09; plus TM-10 dirty flag so unchanged frames are not pushed at all. | open |
 | TM-19 | T-Deck | TEST | Low | `tools/bench/tdeck_harness.py` | Harness gaps: touch injection (none), real-roll trackball capture (TM-18), audible confirmation of tones (operator only). | open |
 
 #### Bench fleet (scanned 2026-08-29, all four live on USB)

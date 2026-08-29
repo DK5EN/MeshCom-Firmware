@@ -1,107 +1,78 @@
-# RESUME — T-Deck Plus, pick up here
+# RESUME — pick up here
 
-Last session: 2026-08-28 evening to 2026-08-29 ~01:30. Read this, then
-[`tdeck-findings-20260828.md`](tdeck-findings-20260828.md) for the measurements.
+Last session: 2026-08-29, 08:00 to ~13:30 (branch `tdeck-partial-refresh-trace`, HEAD after the
+wrap-up commit; everything pushed to `origin`, working tree clean). 33 commits today. The campaign
+backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-22); read its "What the scouting settled"
+table before re-deriving anything. Upstream state, review verdict and branch model: §3.8g, §4.1,
+[`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
 
 ## Where things stand
 
-| Branch                        | HEAD       | Contents                                                                                                                     | Device state                 |
-| ----------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `v4.35p_prio`                 | `afc6a54f` | G07 fix, all serial test hooks + host harness, diagnostics (default off), docs. `full_refresh=1`, flush mitigation **off**.  | —                            |
-| `tdeck-partial-refresh-trace` | `e6620133` | `v4.35p_prio` + `full_refresh=0` + flush mitigation **on** + map fixes (centring, stitching, g/h keys, G01 UAF) + SD 20 MHz. | **DK5EN-14 runs this build** |
-| `tdeck-partial-refresh-wip`   | `3a7aa2f5` | The previous team's partial-refresh attempt, parked. Superseded; can be deleted.                                             |                              |
+| Branch                        | Contents                                                                                                                                                       | Device state                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `tdeck-partial-refresh-trace` | Working branch. `v4.35p_prio` + upstream `dev` `2cb6bb4d` merged + all of today's fixes and instrumentation. 0 behind `upstream/dev` as of 2026-08-29.         | **All four bench nodes run this build** |
+| `v4.35p_prio`                 | Fork main (docs, tools, tests, debug code). Behind the trace branch; merge the trace branch back into it when the T-Deck work is declared done.                | —                                       |
+| archive tags                  | `archive/pre-rebase-20260827{,-2}`, `archive/tdeck-partial-refresh-wip-20260828`, `archive/claude-flood-network-20260822` — the deleted branches, on `origin`. |                                         |
 
-Both branches are pushed to `origin`. Working tree clean.
+Bench fleet (all on USB, port names can move — match by USB serial; table in `BACKLOG.md` §3.8f):
+T-Deck Plus `DK5EN-14` `/dev/cu.usbmodem1101`, Heltec V3 `DK5EN-93` `/dev/cu.usbserial-0001`,
+T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev/cu.usbmodem201301`.
 
-## What is fixed (verified on hardware)
+## Fixed today, verified on hardware
 
-1. **Incoming messages not drawn** — first TFT flush after an SD access on the shared SPI bus is
-   lost by the panel; NOP transaction before each flush (`disp_flush`, `--flushfix`). 0/30 -> 30/30.
-2. **Map: own position not centred / jumping** — viewport-sized image composed from the tiles that
-   intersect it, position at the centre by construction. `center_err 0/0` at every zoom level.
-3. **Map: reboot on zoom-out with other stations** — G01 use-after-free in `add_map_point()`
-   (slots not NULLed after `lv_obj_del`). Reproducer crashes at step 7 without the fix, clean with it.
-4. **Map: tile loading 1.6-4.5 s** — SD card was mounted at 800 kHz; now 20 MHz (0.33-0.79 s).
-   40 MHz measured identical: the read path is ~1.3 MB/s either way, PNG decode dominates.
-5. **Zoom keys `g`/`h`**, one `tdeck_map_zoom()` for all five entry points (handover A1).
-6. **G07** draw-buffer size in pixels (prerequisite for partial refresh).
-7. **Partial refresh** (`full_refresh=0`) works with 1+2 in place: idle pixel traffic 14x lower.
-8. Boot fully mirrored to serial; `[AUDIO]` errors explicit; `connecttoFS()` return checked.
+| Item         | What                                                                                                | Measured                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| UP-01        | `serializeJson` bound = buffer size, not JSON length (`bleJsonFrame()` + native test)               | native 50/50                                                                                     |
+| TM-01..04    | Audio task + queue; loopTask never blocks on audio; player SD reads under the bus mutex             | `audio_stall` 1 552 ms -> 23 ms                                                                  |
+| TM-15        | Boot messages without the 2 s pump                                                                  | `CLIENT STARTED` 17.8 -> 4.6 s                                                                   |
+| TM-18        | Trackball edges counted in an ISR (old level compare lost ~75 % of a fast roll)                     | edges == steps, 0 backlog, repaint p50 8 ms; operator: "feels good now"                          |
+| TM-20        | `startNetwork()` non-blocking (async scan, no delays, no `delay(1500)` retry)                       | no loop gap > 0.7 s at boot, loop max 26 ms; was ~7 s frozen, also every 5 min while unconnected |
+| TM-09        | Heltec V3/V4/Stick OLED on `Wire1` hardware I2C, 400 kHz (`-D U8X8_HAVE_2ND_HW_I2C=1` is mandatory) | frame push 579 ms -> 34.5 ms, loop max 645 -> 39 ms                                              |
+| TM-08        | T-Deck header labels/colours written only on change                                                 | idle invalidations 36.9/s -> 7.0/s                                                               |
+| TM-21        | `[WEB]...no ip set` once per state                                                                  | was ~125 lines/s with debug on                                                                   |
+| TM-12        | Loop/heap instrument on the RAK4631                                                                 | loop avg 99.7 / max 104 ms (paced), heap 111 832 free                                            |
+| TM-05        | Closed by analysis: all SPI2 users except the (mutex-guarded) audio task run on loopTask            | —                                                                                                |
+| ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                |
 
-## What is measured but not yet fixed
+Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
+direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
 
-- Idle repaint driver: `update_header_batt_indicator()` rewrites labels every 500 ms unconditionally.
-- Message tone: `play_cw('r')` blocks the loop task 1.10 s per message (paper §6: move off loopTask,
-  fix audio task priority 50->3).
-- Heap: ~340 B internal per message, unbounded (`msg_list` never trimmed, `persisted_msgs` dead).
-- Tone-file lookup on SD per message (remove: resolve once at boot).
-- Boot: 2 s busy-wait per boot message (8 messages = 16 s).
-- Exact SPI2 register clobbered by the SD library (the NOP transaction works around it).
-- Handover §4.2 items not touched: G02 (`ic <= MAX_MAP`), G03, K2, F1, C3, C4, G08, G10-G16, H2.
+## Measured, not fixed — decisions pending
 
-## Decisions taken (2026-08-29 01:40)
+- **TD-01 / TM-11 (WiFi first join fails).** 12 boots per arm on DK5EN-14, same hour: baseline
+  4/12, BLE advertising deferred 3/12 (**BLE hypothesis refuted**), join by SSID only 8/12. Every
+  failure logs `[WIFI];event;disconnected;reason;2` (= `AUTH_EXPIRE`). Candidate fix: SSID-only join
+  - patient retry instead of the 10-poll give-up. Needs a 24-boot confirmation first
+    (`BENCH_WIFI_NO_BSSID=1` build, `scratchpad/bootloop.py` pattern — 75 s per boot).
+- **Tile format on the SD card** (raw RGB565 vs PNG vs QOI, PSRAM LRU cache) — unchanged since
+  yesterday, decide with the `[SDMAP]` read/decode split.
+- **T-Beam display** (TM-22): already on hardware I2C (37.8 ms/frame), but the SSD1306 variant is
+  still page mode and there is no dirty flag (TM-10).
 
-- **PR scope:** partial refresh (`full_refresh=0`) **and** the flush mitigation together — complete
-  work, not half of it. The mitigation becomes permanent code in `disp_flush()` (no switch).
-- **Review flaws in the PR:** the measured/confirmed ones and the trivial ones (G01, G02, G07, A1,
-  `connecttoFS()` return check, C1 audio task priority if trivially safe); everything else stays in
-  `BACKLOG.md`.
-- **SD at 20 MHz goes into the PR, gated to `BOARD_T_DECK_PLUS`** (the only hardware we can test;
-  no other cards available). If it comes back from the field, we will see.
-- **Tile file format** is the open question for tomorrow (see below); not part of this PR.
+## Harnesses (run from `tools/bench/runs/` so the raw logs land there)
 
-## Plan for 2026-08-29 (agreed; supersedes the earlier list)
+- `python3 tools/bench/tdeck_harness.py --list` — 13 scenarios (boot, idle, tabs, drawer, inject,
+  audio, audio_stall, sleep, screen, map, nav, input, heap). All 13 green on DK5EN-14.
+- `python3 tools/bench/oled_harness.py --list [--port …]` — 7 scenarios (boot, pos, inject, pages,
+  display, track, timing) for every U8g2 board. 7/7 on Heltec V3 and T-Beam.
+- `tools/bench/experiments/rolltest.py` — operator trackball roll test (edge vs level mode).
+- Both harnesses wait for `[BOOT];ready`, accept `--scenario a,b --skip c`, and switch the panel on.
+- Opening a port reboots every ESP32 node; the RAK needs `dtr=True`; the T-Deck ignores serial for
+  ~11 s after `CLIENT STARTED`; the Heltec prints `;`-less lines unless `--debug csv`.
 
-Upstream state and branch model: `BACKLOG.md` §3.8g and §4.1. Short form:
+## Firmware bench hooks added today (fork-only, all default-off or log-only)
 
-1. Docs, commit, push. 2. Tag + delete stale branches (§4.2). 3. `/fable-review` on
-   `fc83554e..upstream/dev` (UP-01..04). 4. **done** — `upstream/dev`
-   merged (merge commit on this branch, resolution in its message; four targets + native green). 5. Bench-verify on DK5EN-14. 6. Layer the T-Deck fixes as small commits, then build `pr/tdeck-ui` from
-   `upstream/dev` (firmware files only, one commit, German description) — UP-01 fix is in
-   (`b586daee`, `src/ble_json_frame.h` + `test_ble_json_frame`) and belongs in the PR.
+`--btn click|double|triple`, `--oledstat`, `--oledlog on/off`, `--injectpos` on OLED boards,
+`--scroll <tab> <dy>`, `--key <text>`, `--ball <dir> <n>`, `--balledge on/off`, `--balledges
+[reset]`, `[TFT];on/off`, `[KEY]`, `[BALL]`, `[OLED];frame`, `[WIFI];event;…`, `[BOOT];ready`.
+Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 
-Not in the PR: `d26e39d5` instrumentation, `src/t-deck/tdeck_debug.*`, `src/test_inject.*`,
-`--` test commands, `lib/lvgl` hook, `tools/bench/*`, docs. #1103 is dead upstream (`FWDATE`
-key removed); a build date for the app needs a new proposal within the 244-byte frame.
+## Next session, in order
 
-## Open decision: tile format on the SD card
-
-Decoding a 256x256 PNG with lodepng costs ~95 ms per tile on the S3; a zoom step touches 2-4 tiles.
-Options, cheapest first:
-
-- **Raw RGB565 tiles** (`.565`, 131 072 B each, no decoder, `memcpy` into the composed image):
-  ~0 ms decode, 128 KB/tile on the card (PNG is ~35-50 KB). The 5 909-tile Europe set would grow
-  from ~150 MB to ~770 MB — fine on a 30 GB card. Converter is a 20-line Python script; the
-  downloader can emit both.
-- **Decoded-tile LRU cache in PSRAM** (4-9 tiles x 128 KB): zoom-back and small moves instant,
-  first load unchanged. Independent of the file format; do it in any case.
-- **8-bit palette PNG** (pngquant): lodepng still decodes but ~2-3x less filter/inflate work;
-  smaller files. Middle ground if card space matters.
-- QOI: fast decoder (~10 ms/tile), files ~PNG size; needs a new decoder in the tree.
-
-Measure with the `[SDMAP]` `read/decode` split before choosing.
-
-## Bench facts
-
-- DK5EN-14 on `/dev/cu.usbmodem1101`; opening the port resets it; wait until `--uistat` answers
-  (~11 s after `CLIENT STARTED`). Harness: `tools/bench/tdeck_harness.py --scenario all`.
-- `--screencrc` is void (panel does not drive MISO). Panel truth = operator's eyes; LVGL truth =
-  `[FLUSH]` CRC / `--framedump`.
-- Eye tests: one yes/no per run. Scratch scripts of this session are in the session scratchpad
-  only; the reusable ones should move into the harness (`map` scenario, crash reproducer).
-
-## Audio wave done (2026-08-29 morning)
-
-TM-01..04 fixed in `49c482e1`: one audio task (prio 3) with a queue, loopTask never blocks on
-audio, SD reads of the player under the TFT bus mutex. Harness `audio_stall` 1 552 -> 23 ms, all
-13 scenarios pass (map, nav, input added today; `--list` for the page). Debug hooks added:
-`--scroll <tab> <dy>`, `--key <text>`, `--ball <dir> <n>`, `[BOOT];ready`, `[TFT];on/off`,
-`[KEY]`, `[BALL]`. Next: TM-16 boot time (29 s), TM-18 trackball edge loss, then the PR.
-
-TM-09 done (Heltec OLED 579 -> 34 ms per frame, hardware I2C on Wire1) and the OLED harness
-(`tools/bench/oled_harness.py`, 7 scenarios, Heltec V3 + T-Beam green) are in; T-Deck harness
-boot/inject/input/map green on the same build.
-
-Campaign backlog: `BACKLOG.md` §3.8f (TM-01 … TM-19, verdict table, bench fleet, harness state),
-upstream sync and branch model §3.8g / §4.1, review verdict
-`review/2026-08-29-upstream-sync-verdict.md`.
+1. TD-01 confirmation run (24 boots, SSID-only) -> fix (TM-11), then re-run both harnesses.
+2. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
+3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
+4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
+   (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, WiFi bring-up, Heltec
+   OLED, header labels, UP-01) — no instrumentation, tools, tests or docs. German per-file
+   description. Decide whether the Heltec OLED and WiFi changes go in the same PR or separate ones.
