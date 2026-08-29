@@ -41,6 +41,7 @@ T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev
 | TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)         |
 | UP-02        | Last `delay()` out of `add_map_point()` (LoRa RX path, 30x in `refresh_map()`)                      | harness `map --map-stations 40`: recycle branch wraps, 40/40, no crash; loop max unchanged (noise) |
 | TM-22/10/27  | SSD1306 full-buffer, frame CRC, unchanged frames skipped (`oledFrameUnchanged()`)                   | OLED harness 8/8 Heltec V3 + T-Beam; blank CRC `0xefb5af2e` both; repeat page -> skip              |
+| TM-33 (a) | GT911 `begin()` retried 5x / 100 ms on the T-Deck (upstream #64 `touch: failed`) | boot scenario: `touch;1;touch_tries;1`; failure path not reproducible on the bench |
 
 Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
 direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
@@ -133,8 +134,9 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 2. ~~UP-02~~ **fixed 2026-08-29** (`add_map_point()` delay-free; `map --map-stations 40`).
 3. ~~TM-22/TM-10/TM-27~~ **fixed 2026-08-29** (full-buffer SSD1306, CRC skip, `[OLED];crc`; OLED
    harness 8/8 on both boards).
-4. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
-5. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
+4. ~~TM-33 (a)~~ **fixed 2026-08-29** (GT911 retry; (b)/(c) open).
+5. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
+6. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
    (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header
    labels, UP-01) — **no WiFi changes (TM-20/TM-24 -> TM-34)**, no instrumentation, tools, tests
    or docs. German per-file description. Decide whether the Heltec OLED change goes in the same

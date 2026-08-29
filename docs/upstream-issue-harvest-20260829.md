@@ -169,6 +169,10 @@ touch is dead for the rest of the session; there is no retry and, without a rese
 force GT911 address selection. That is a plausible mechanism for the reporter's race. Cheap fix to
 try: retry `begin()` a few times, or drive INT during reset.
 
+**Fixed on our branch 2026-08-29 (TM-33 a):** `begin()` retried up to five times, 100 ms apart;
+`touch_tries` on the `[BOOT];init` line. Verified for the good path only (bench node answers on
+attempt 1); the weak-battery failure is not reproducible here.
+
 ### 4.5 T-Deck GUI defects closed without verification — #690 (karamo)
 
 Four items, self-closed with _"Verbesserungen wurden durchgeführt und ich schließe mal hier ab"_ — no

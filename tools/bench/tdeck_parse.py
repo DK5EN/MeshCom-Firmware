@@ -372,7 +372,9 @@ def _parse_boot(parts: List[str]) -> Optional[Dict[str, Any]]:
         if d is None:
             return None
         required = {"sd", "touch", "kb", "psram_buf", "t_ms"}
-        if set(d.keys()) != required:
+        optional = {"touch_tries"}  # TM-33 (a): GT911 begin() attempts, firmware >= 2026-08-29
+        keys = set(d.keys())
+        if not required <= keys or not keys <= required | optional:
             return None
         return {"kind": "BOOT", "variant": "init", **d}
     return None

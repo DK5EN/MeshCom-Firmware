@@ -47,6 +47,7 @@ using namespace ace_button;
 
 TFT_eSPI            tft;
 TouchDrvGT911       touch;
+static const int    TDECK_TOUCH_INIT_TRIES = 5;   // TM-33 (a): begin() retries, 100 ms apart
 
 AceButton           button;
 SemaphoreHandle_t   xSemaphore = NULL;
@@ -188,7 +189,22 @@ void initTDeck()
     //scanDevices(&Wire);
     touch.setPins(-1, TDECK_TOUCH_INT);
 
-    bTouchDected = touch.begin(Wire);
+    // TM-33 (a) / upstream #64 ("touch: failed" at boot, then dead for the
+    // session): the GT911 has no reset line on the T-Deck, and a controller
+    // that does not answer on I2C yet after power-on (weak battery, slow rail)
+    // failed the single begin() for good. begin() itself probes both addresses
+    // back-to-back; what was missing is a retry spaced in time. Only a panel
+    // that really is absent pays the full wait.
+    int touch_tries = 0;
+    do
+    {
+        touch_tries++;
+        bTouchDected = touch.begin(Wire);
+        if (!bTouchDected && touch_tries < TDECK_TOUCH_INIT_TRIES)
+            delay(100);
+    } while (!bTouchDected && touch_tries < TDECK_TOUCH_INIT_TRIES);
+    if (touch_tries > 1)
+        Serial.printf("[INIT]...touch: %s after %d attempts\n", bTouchDected ? "OK" : "ERROR", touch_tries);
     if (bTouchDected)
     {
         touch.setMaxCoordinates(320, 240);
@@ -256,9 +272,9 @@ void initTDeck()
     snprintf(buf, 40, "(build: %s / %s)", __DATE__, __TIME__);
     addMessage(buf);
 
-    Serial.printf("[BOOT];init;sd;%d;touch;%d;kb;%d;psram_buf;%d;t_ms;%lu\n",
+    Serial.printf("[BOOT];init;sd;%d;touch;%d;touch_tries;%d;kb;%d;psram_buf;%d;t_ms;%lu\n",
                   bSDDected ? 1 : 0,
-                  bTouchDected ? 1 : 0,
+                  bTouchDected ? 1 : 0, touch_tries,
                   kbDected ? 1 : 0,
                   s_lvglDrawBufPsram ? 1 : 0,
                   (unsigned long)millis());

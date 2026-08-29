@@ -361,6 +361,17 @@ class TestBoot(unittest.TestCase):
             },
         )
 
+    def test_boot_init_touch_tries(self) -> None:
+        # TM-33 (a): firmware from 2026-08-29 adds the GT911 begin() attempt count
+        line = "[BOOT];init;sd;1;touch;1;touch_tries;3;kb;1;psram_buf;1;t_ms;3799"
+        rec = parse_line(line)
+        self.assertIsNotNone(rec)
+        self.assertEqual(rec["touch_tries"], 3)
+        self.assertEqual(rec["touch"], 1)
+
+    def test_boot_init_rejects_unknown_key(self) -> None:
+        self.assertIsNone(parse_line("[BOOT];init;sd;1;touch;1;bogus;3;kb;1;psram_buf;1;t_ms;1"))
+
 
 class TestUnknown(unittest.TestCase):
     def test_unrelated_log_line(self) -> None:
