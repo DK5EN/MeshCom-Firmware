@@ -20,6 +20,12 @@ per step; the operator reports one yes/no per run.
 | `blinktest.py`, `blink2.py` | `--blink` transfer probe (alternating inverted frames), with/without WiFi flood       |
 | `one.py`                    | one message, then optional extra commands (`--reflush`, `--invalidate`)               |
 | `monitor.py`                | 15-minute crash monitor: prints Guru/backtrace/reset events                           |
+| `bootloop.py`               | TM-34 WiFi arms: N power cycles by port-open, one CSV row of WiFi facts per boot      |
 
 `maptest.py` and `crashtest.py` are folded into the `map` scenario of `tdeck_harness.py`
 (2026-08-29); the flush-loss scripts are kept as the record of the defect hunt.
+
+`bootloop.py` is the TM-34 runner, not a scratch script: it owns the port for
+`--boots × --seconds` (24 × 75 s ≈ 30 min per arm), so check nothing else is on the node first
+(`lsof /dev/cu.usbmodem1101`). `--parse-only <logs>` re-reduces existing logs without hardware.
+Arms, metrics and acceptance bars: `docs/wifi-findings-20260829.md` §10.

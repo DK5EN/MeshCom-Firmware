@@ -25,22 +25,22 @@ T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev
 
 ## Fixed today, verified on hardware
 
-| Item         | What                                                                                                | Measured                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| UP-01        | `serializeJson` bound = buffer size, not JSON length (`bleJsonFrame()` + native test)               | native 50/50                                                                                     |
-| TM-01..04    | Audio task + queue; loopTask never blocks on audio; player SD reads under the bus mutex             | `audio_stall` 1 552 ms -> 23 ms                                                                  |
-| TM-15        | Boot messages without the 2 s pump                                                                  | `CLIENT STARTED` 17.8 -> 4.6 s                                                                   |
-| TM-18        | Trackball edges counted in an ISR (old level compare lost ~75 % of a fast roll)                     | edges == steps, 0 backlog, repaint p50 8 ms; operator: "feels good now"                          |
-| TM-20        | `startNetwork()` non-blocking (async scan, no delays, no `delay(1500)` retry)                       | no loop gap > 0.7 s at boot, loop max 26 ms; was ~7 s frozen, also every 5 min while unconnected |
-| TM-09        | Heltec V3/V4/Stick OLED on `Wire1` hardware I2C, 400 kHz (`-D U8X8_HAVE_2ND_HW_I2C=1` is mandatory) | frame push 579 ms -> 34.5 ms, loop max 645 -> 39 ms                                              |
-| TM-08        | T-Deck header labels/colours written only on change                                                 | idle invalidations 36.9/s -> 7.0/s                                                               |
-| TM-21        | `[WEB]...no ip set` once per state                                                                  | was ~125 lines/s with debug on                                                                   |
-| TM-12        | Loop/heap instrument on the RAK4631                                                                 | loop avg 99.7 / max 104 ms (paced), heap 111 832 free                                            |
-| TM-05        | Closed by analysis: all SPI2 users except the (mutex-guarded) audio task run on loopTask            | —                                                                                                |
-| ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                |
-| TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)       |
-| UP-02 | Last `delay()` out of `add_map_point()` (LoRa RX path, 30x in `refresh_map()`) | harness `map --map-stations 40`: recycle branch wraps, 40/40, no crash; loop max unchanged (noise) |
-| TM-22/10/27 | SSD1306 full-buffer, frame CRC, unchanged frames skipped (`oledFrameUnchanged()`) | OLED harness 8/8 Heltec V3 + T-Beam; blank CRC `0xefb5af2e` both; repeat page -> skip |
+| Item         | What                                                                                                | Measured                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| UP-01        | `serializeJson` bound = buffer size, not JSON length (`bleJsonFrame()` + native test)               | native 50/50                                                                                       |
+| TM-01..04    | Audio task + queue; loopTask never blocks on audio; player SD reads under the bus mutex             | `audio_stall` 1 552 ms -> 23 ms                                                                    |
+| TM-15        | Boot messages without the 2 s pump                                                                  | `CLIENT STARTED` 17.8 -> 4.6 s                                                                     |
+| TM-18        | Trackball edges counted in an ISR (old level compare lost ~75 % of a fast roll)                     | edges == steps, 0 backlog, repaint p50 8 ms; operator: "feels good now"                            |
+| TM-20        | `startNetwork()` non-blocking (async scan, no delays, no `delay(1500)` retry)                       | no loop gap > 0.7 s at boot, loop max 26 ms; was ~7 s frozen, also every 5 min while unconnected   |
+| TM-09        | Heltec V3/V4/Stick OLED on `Wire1` hardware I2C, 400 kHz (`-D U8X8_HAVE_2ND_HW_I2C=1` is mandatory) | frame push 579 ms -> 34.5 ms, loop max 645 -> 39 ms                                                |
+| TM-08        | T-Deck header labels/colours written only on change                                                 | idle invalidations 36.9/s -> 7.0/s                                                                 |
+| TM-21        | `[WEB]...no ip set` once per state                                                                  | was ~125 lines/s with debug on                                                                     |
+| TM-12        | Loop/heap instrument on the RAK4631                                                                 | loop avg 99.7 / max 104 ms (paced), heap 111 832 free                                              |
+| TM-05        | Closed by analysis: all SPI2 users except the (mutex-guarded) audio task run on loopTask            | —                                                                                                  |
+| ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                  |
+| TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)         |
+| UP-02        | Last `delay()` out of `add_map_point()` (LoRa RX path, 30x in `refresh_map()`)                      | harness `map --map-stations 40`: recycle branch wraps, 40/40, no crash; loop max unchanged (noise) |
+| TM-22/10/27  | SSD1306 full-buffer, frame CRC, unchanged frames skipped (`oledFrameUnchanged()`)                   | OLED harness 8/8 Heltec V3 + T-Beam; blank CRC `0xefb5af2e` both; repeat page -> skip              |
 
 Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
 direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
@@ -54,7 +54,9 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
   auto-reconnect, channel+BSSID pinned at join — while the bench WLAN is a steering mesh (router +
   satellite). Fix direction decided: join by SSID only, let the driver roam,
   `WiFi.setAutoReconnect(true)`, keep the ping watchdog as last resort. Confirm with a 24-boot run
-  (`BENCH_WIFI_NO_BSSID=1` build, `scratchpad/bootloop.py` pattern, 75 s per boot) before shipping.
+  (`BENCH_WIFI_NO_BSSID=1` build, `tools/bench/experiments/bootloop.py`, 75 s per boot) before
+  shipping. _Revised 2026-08-29 by TM-34: "no auto-reconnect" is wrong — it is on by default; the
+  pin is what stops the driver choosing another AP. See `wifi-findings-20260829.md` §6._
 - **Tile format on the SD card** — parked as low priority by decision (2026-08-29): stability and
   functionality first, optimisation later. Options and the `[SDMAP]` read/decode split stay in
   `tdeck-findings-20260828.md`.
@@ -101,6 +103,14 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   WiFi-stalls-the-node case (blocks even LoRa RX), (d) SSID-only association, (e) re-connecting,
   (f) roaming, (g) band/AP steering. TM-34 absorbs TM-24 and the TD-01/TM-11 confirmation run;
   findings doc first, then its own bench protocol and its own PR.
+  **Desk half delivered 2026-08-29:** [`wifi-findings-20260829.md`](wifi-findings-20260829.md)
+  answers (a)-(g) from the driver source and `sdkconfig`, with fix plan F1-F9 (§9) and bench arms
+  A0-A5 (§10); runner `tools/bench/experiments/bootloop.py`. **No bench arm has been run yet.**
+  Four things it changes: the pin — not the missing wait — is the defect (full-channel scan plus
+  sort-by-signal is the driver doing our job better, and on every reconnect); `setAutoReconnect`
+  was already `true`, so TM-24's premise is wrong and the real problem is three restart owners
+  fighting; the largest `loopTask` blocker left is `hostByName()` at up to 31 s, not WiFi bring-up;
+  and **TM-20 should not be reverted** — it ships together with the selection fix, in one PR.
 - **TD-03 heap defect: fixed 2026-08-29, goes into the PR.** RAK boot profile + harness needed for platform
   parity (TM-25/26). Screen CRC on Heltec and T-Beam (TM-27; T-Deck has no readback). TM-06/07
   lower priority (cumbersome, no longer highest). Full automation low priority — the manual
@@ -115,11 +125,16 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 1. ~~TD-03 heap defect~~ **fixed 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario;
    before 60 / after 50 children, saturated view costs -584 B PSRAM per 20 messages). TD-01
    confirmation run moves into TM-34 (WiFi research track, parallel session).
+   TM-34 desk half done ([`wifi-findings-20260829.md`](wifi-findings-20260829.md)); the bench half
+   needs DK5EN-14. Run arm **A5 first** — a WPA2-only test SSID on the Orbi, one router setting —
+   it decides whether `AUTH_EXPIRE` is WPA3-SAE or band steering, and that changes what F1-F4 have
+   to survive. Then A0/A1/A2: `python3 ../experiments/bootloop.py --arm A0 --boots 24` from
+   `tools/bench/runs/`.
 2. ~~UP-02~~ **fixed 2026-08-29** (`add_map_point()` delay-free; `map --map-stations 40`).
 3. ~~TM-22/TM-10/TM-27~~ **fixed 2026-08-29** (full-buffer SSD1306, CRC skip, `[OLED];crc`; OLED
    harness 8/8 on both boards).
-3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
-4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
+4. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
+5. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
    (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header
    labels, UP-01) — **no WiFi changes (TM-20/TM-24 -> TM-34)**, no instrumentation, tools, tests
    or docs. German per-file description. Decide whether the Heltec OLED change goes in the same
