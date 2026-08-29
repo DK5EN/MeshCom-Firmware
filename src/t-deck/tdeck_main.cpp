@@ -82,7 +82,7 @@ static const uint32_t TRACKBALL_CURSOR_SHOW_TIME_MS = 750;
 // stehen und wird im naechsten Aufruf abgearbeitet. `--balledge on/off`
 // schaltet zum Vergleich auf den alten Pegelvergleich zurueck; die Zaehler
 // laufen in beiden Modi (`--balledges`).
-#define BALL_MAX_STEPS_PER_READ 4
+#define BALL_MAX_STEPS_PER_READ 8
 static volatile uint32_t s_ball_edges[4] = {0, 0, 0, 0};       // right, up, left, down (Reihenfolge dir_pins)
 static volatile uint32_t s_ball_edges_total[4] = {0, 0, 0, 0};
 static uint32_t s_ball_events_total = 0;
@@ -919,11 +919,15 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
         if (i < 4 && s_ball_edge_mode)
         {
             // Flankenmodus: gezaehlte Flanken verbrauchen, Pegel nur mitfuehren
+            // Alle gezaehlten Flanken abholen; mehr als BALL_MAX_STEPS_PER_READ
+            // pro Aufruf werden verworfen, nicht nachgeholt: sonst laeuft der
+            // Cursor nach einem Stillstand der Schleife (z.B. WLAN-Scan) noch
+            // sekundenlang die waehrenddessen gerollten Flanken ab.
             portENTER_CRITICAL(&s_ball_mux);
             uint32_t n = s_ball_edges[i];
-            if (n > BALL_MAX_STEPS_PER_READ) n = BALL_MAX_STEPS_PER_READ;
-            s_ball_edges[i] -= n;
+            s_ball_edges[i] = 0;
             portEXIT_CRITICAL(&s_ball_mux);
+            if (n > BALL_MAX_STEPS_PER_READ) n = BALL_MAX_STEPS_PER_READ;
             steps = (int)n;
             last_dir[i] = dir;
         }

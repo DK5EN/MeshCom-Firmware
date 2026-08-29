@@ -991,9 +991,19 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
                          ("left", args.input_ball_steps), ("up", args.input_ball_steps)):
         session.send("--redrawlog on")
         time.sleep(0.1)
-        idx = session.send(f"--ball {direction} {n}")
+        # inject like a hand rolls: a few edges per indev read, not the whole
+        # request in one 10 ms read (mouse_read() consumes at most
+        # BALL_MAX_STEPS_PER_READ per read and discards the rest -- that is
+        # the stall protection, see TM-18)
+        idx = session.length()
+        remaining = n
+        while remaining > 0:
+            chunk = min(3, remaining)
+            session.send(f"--ball {direction} {chunk}")
+            remaining -= chunk
+            time.sleep(0.06)
         session.wait_for(r"\[BALL\];inject;", 2.0, since=idx)
-        time.sleep(0.3 + 0.02 * n)
+        time.sleep(0.4)
         # One [BALL] line per indev read with activity; in edge mode a read
         # consumes up to 4 counted edges, so a line carries `steps;k`. The
         # contract: the steps add up to the request, and the cursor moved

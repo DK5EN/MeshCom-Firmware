@@ -3773,9 +3773,7 @@ void esp32loop()
                                     printfdeb("[ETH]...no connection at boot — reset and retrying");
                                 #else
                                     printfdeb("[WIFI]...no connection at boot — full radio reset and retrying");
-                                    WiFi.disconnect(true, true);
-                                    WiFi.mode(WIFI_OFF);
-                                    delay(1500);
+                                    // Reset und Scan macht startNetwork() selbst, ohne delay(1500)
                                 #endif
 
                                 startNetwork();  // sets iWlanWait = 1, triggers doWiFiConnect() polling

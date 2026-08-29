@@ -526,6 +526,11 @@ void sendMeshComUDP()
 }
 
 
+// Asynchroner WLAN-Scan (startNetwork -> doWiFiConnect)
+static bool s_wifiScanPending = false;
+static int  s_wifiScanPolls = 0;
+static void wifiBeginFromScan(int nrAps);
+
  bool startNetwork()
  {
   #if defined(HAS_ETHERNET)
@@ -608,29 +613,33 @@ void sendMeshComUDP()
   if (bDEBUG)
       printlndeb("[WIFI]...WiFi full radio reset");
 
-  #if defined(ESP32)
-  esp_task_wdt_reset();   // about to block on mode transitions + a full-channel scan below
-  #endif
-
+  // Nicht blockieren: frueher standen hier delay(1000) + delay(200), ein
+  // synchroner Kanalscan (~4-5 s) und delay(500) -- rund 7 s, in denen
+  // loopTask stand (LVGL, LoRa-Empfang, Serial). Auf dem T-Deck sichtbar als
+  // Haenger nach dem Start und bei jedem Wiederholungsversuch. Jetzt: Reset,
+  // asynchronen Scan starten, zurueck; doWiFiConnect() (1-s-Takt der
+  // Hauptschleife) holt das Scanergebnis ab und ruft WiFi.begin().
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
-  delay(1000);
   WiFi.mode(WIFI_STA);
-  delay(200);
-
   hasIPaddress=false;
   meshcom_settings.node_hasIPaddress = hasIPaddress;
 
-  #if defined(ESP32)
-  esp_task_wdt_reset();   // WiFi.scanNetworks() below is a blocking, unbounded all-channel scan
-  #endif
+  WiFi.scanDelete();
+  WiFi.scanNetworks(true);          // async, Ergebnis ueber WiFi.scanComplete()
+  s_wifiScanPending = true;
+  s_wifiScanPolls = 0;
 
-  // Scan for AP with best RSSI
-	int nrAps = WiFi.scanNetworks();
+  iWlanWait = 1;
 
-  #if defined(ESP32)
-  esp_task_wdt_reset();
-  #endif
+  return true;
+}
+
+// Scanergebnis auswerten und die Verbindung starten: staerkste BSSID der
+// konfigurierten SSID, sonst Verbindungsversuch ohne BSSID (verstecktes oder
+// gerade nicht sichtbares WLAN). Logik unveraendert aus startNetwork().
+static void wifiBeginFromScan(int nrAps)
+{
   int best_rssi = -200;
   int best_idx = -1;
   for (int i = 0; i < nrAps; ++i)
@@ -698,20 +707,30 @@ void sendMeshComUDP()
       WiFi.begin(meshcom_settings.node_ssid, meshcom_settings.node_pwd, WiFi.channel(best_idx), WiFi.BSSID(best_idx),true);
   }
 
-  #if defined(ESP32)
-  esp_task_wdt_reset();
-  #endif
-  delay(500);
-
+  WiFi.scanDelete();
   printfdeb("[WIFI]...power: %i RSSI:%i\n", WiFi.getTxPower(), WiFi.RSSI());
-
-  iWlanWait = 1;
-
-  return true;
 }
 
 bool doWiFiConnect()
 {
+  if(s_wifiScanPending)
+  {
+    int n = WiFi.scanComplete();
+    if(n == WIFI_SCAN_RUNNING)
+    {
+      if(++s_wifiScanPolls <= 10)          // ein Scan dauert 3-5 s
+      {
+        printdeb("s");
+        return false;
+      }
+      printlndeb("\n[WIFI]...scan timeout, connecting without BSSID");
+      n = 0;
+    }
+    s_wifiScanPending = false;
+    wifiBeginFromScan(n < 0 ? 0 : n);
+    iWlanWait = 1;                         // Verbindungszaehler beginnt jetzt
+  }
+
   if(iWlanWait == 1)
     printdeb("[WIFI]...Wait connect ");
 
