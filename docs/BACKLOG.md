@@ -899,6 +899,7 @@ references are from the morning scouting; re-verify before touching.
 | TM-21 | all ESP32 | PERF | Low | `esp32_main.cpp` (`if(bWEBSERVER && iWlanWait == 0) startWebserver();`), `web_functions.cpp:81` | With `--debug on` and no IP (AP unreachable, after the 5-min give-up) every loop pass prints `[WEB]...no ip set` — ~125 lines/s (10 630 in 100 s on DK5EN-93). Pre-existing; print once per state change. | **FIXED** — logged once per state in `startWebserver()`, latch reset when an IP is present |
 | TM-22 | T-Beam (all `_HW_I2C` OLED boards) | PERF | Medium | `loop_functions.cpp:379-380` (`#else` branch) | T-Beam is already on `Wire` hardware I2C (37.8 ms/frame, DK5EN-92, SH1106 `_F_`), but the SSD1306 variant still uses `_1_HW_I2C` page mode (8 transfers/frame) and no explicit `setBusClock(400000)`. Same treatment as TM-09; plus TM-10 dirty flag so unchanged frames are not pushed at all. | open |
 | TM-19 | T-Deck | TEST | Low | `tools/bench/tdeck_harness.py` | Harness gaps: touch injection (none), real-roll trackball capture (TM-18), audible confirmation of tones (operator only). | open |
+| TM-23 | T-Deck | PERF | Low | `tdeck_sdmap.cpp`, tile set on SD | Tile format / decoded-tile PSRAM cache (RGB565, QOI, palette PNG; ~95 ms lodepng per tile). **Parked by decision 2026-08-29: stability and functionality first.** Options in `tdeck-findings-20260828.md` §5. | parked |
 
 #### Bench fleet (scanned 2026-08-29, all four live on USB)
 

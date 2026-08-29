@@ -183,18 +183,29 @@ def scenario_display(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]
     return {"ok": ok, "steps": steps, "flags_ok": flags_ok}
 
 
+def _gps_on(s: OledSession) -> Optional[bool]:
+    idx = s.send("--pos")
+    m = s.wait_for(r"\.\.\.GPS: (on|off)", 4.0, since=idx)
+    return (m.group(1) == "on") if m else None
+
+
 def scenario_track(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
     """Triple click toggles the track (GPS) page on and off; the track flag in
-    --oledstat must follow and each toggle must redraw."""
+    --oledstat must follow and each toggle must redraw. The firmware's triple
+    click also switches GPS itself (--gps on/off, persisted) -- the GPS state
+    found before the test is restored afterwards."""
+    gps_before = _gps_on(s)
     s.send("--oledlog on"); time.sleep(0.2)
     on = step(s, "--btn triple", r"\[BTN\];triple", settle=2.0); on["oledstat"] = oledstat(s)
     off = step(s, "--btn triple", r"\[BTN\];triple", settle=2.0); off["oledstat"] = oledstat(s)
     s.send("--oledlog off")
+    if gps_before is True:
+        s.send("--gps on"); time.sleep(0.5)
     ok = (on["acked"] and off["acked"] and not (on["crashed"] or off["crashed"])
           and bool(on["oledstat"] and on["oledstat"].get("track") == 1)
           and bool(off["oledstat"] and off["oledstat"].get("track") == 0)
           and on["frames"] >= 1 and off["frames"] >= 1)
-    return {"ok": ok, "on": on, "off": off}
+    return {"ok": ok, "on": on, "off": off, "gps_before": gps_before}
 
 
 def scenario_timing(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
@@ -298,6 +309,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     st0 = oledstat(s)
     track_was_on = bool(st0 and st0.get("track") == 1)
     if track_was_on:
+        # --track off/on only touch the page mode, not GPS (unlike the triple click)
         print("=== node boots in track mode: --track off for the run, restored at the end ===", file=sys.stderr)
         s.send("--track off"); time.sleep(1.5)
     try:

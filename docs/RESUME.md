@@ -14,6 +14,11 @@ table before re-deriving anything. Upstream state, review verdict and branch mod
 | `v4.35p_prio`                 | Fork main (docs, tools, tests, debug code). Behind the trace branch; merge the trace branch back into it when the T-Deck work is declared done.                | —                                       |
 | archive tags                  | `archive/pre-rebase-20260827{,-2}`, `archive/tdeck-partial-refresh-wip-20260828`, `archive/claude-flood-network-20260822` — the deleted branches, on `origin`. |                                         |
 
+Bench node settings (decided 2026-08-29): Heltec `--debug off`, GPS on, BME280 on; T-Beam track
+off, GPS on; T-Deck as is. Mind that the firmware's triple click (`--btn triple`, OLED harness
+`track` scenario) switches GPS off together with the track page -- the harness restores the GPS
+state it found since the wrap-up commit; check `--pos` after any manual triple click.
+
 Bench fleet (all on USB, port names can move — match by USB serial; table in `BACKLOG.md` §3.8f):
 T-Deck Plus `DK5EN-14` `/dev/cu.usbmodem1101`, Heltec V3 `DK5EN-93` `/dev/cu.usbserial-0001`,
 T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev/cu.usbmodem201301`.
@@ -44,8 +49,9 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
   failure logs `[WIFI];event;disconnected;reason;2` (= `AUTH_EXPIRE`). Candidate fix: SSID-only join
   - patient retry instead of the 10-poll give-up. Needs a 24-boot confirmation first
     (`BENCH_WIFI_NO_BSSID=1` build, `scratchpad/bootloop.py` pattern — 75 s per boot).
-- **Tile format on the SD card** (raw RGB565 vs PNG vs QOI, PSRAM LRU cache) — unchanged since
-  yesterday, decide with the `[SDMAP]` read/decode split.
+- **Tile format on the SD card** — parked as low priority by decision (2026-08-29): stability and
+  functionality first, optimisation later. Options and the `[SDMAP]` read/decode split stay in
+  `tdeck-findings-20260828.md`.
 - **T-Beam display** (TM-22): already on hardware I2C (37.8 ms/frame), but the SSD1306 variant is
   still page mode and there is no dirty flag (TM-10).
 
