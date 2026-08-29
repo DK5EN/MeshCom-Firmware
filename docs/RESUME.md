@@ -57,8 +57,8 @@ Upstream state and branch model: `BACKLOG.md` §3.8g and §4.1. Short form:
 1. Docs, commit, push. 2. Tag + delete stale branches (§4.2). 3. `/fable-review` on
    `fc83554e..upstream/dev` (UP-01..04). 4. **done** — `upstream/dev`
    merged (merge commit on this branch, resolution in its message; four targets + native green). 5. Bench-verify on DK5EN-14. 6. Layer the T-Deck fixes as small commits, then build `pr/tdeck-ui` from
-   `upstream/dev` (firmware files only, one commit, German description) — include the UP-01
-   `serializeJson` bound fix with a native regression test, like #1102.
+   `upstream/dev` (firmware files only, one commit, German description) — UP-01 fix is in
+   (`b586daee`, `src/ble_json_frame.h` + `test_ble_json_frame`) and belongs in the PR.
 
 Not in the PR: `d26e39d5` instrumentation, `src/t-deck/tdeck_debug.*`, `src/test_inject.*`,
 `--` test commands, `lib/lvgl` hook, `tools/bench/*`, docs. #1103 is dead upstream (`FWDATE`
