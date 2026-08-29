@@ -1963,7 +1963,7 @@ void set_map(int iMap)
     if(bDEBUG)
         Serial.printf("[ MAP ]...set to %i - %s\n", iMap, getMap(iMap).c_str());
 
-        switch (iMap)
+    switch (iMap)
     {
         case 0:
         case 1:

@@ -5201,22 +5201,6 @@ void commandAction(char *umsg_text, bool ble)
 
             idoc["TYP"] = "I";
             idoc["FWVER"] = fwver;
-            // Build-Datum als eigener Schluessel: FWVER traegt nur "4.35 p", damit sind
-            // Sub-Releases fuer die App nicht unterscheidbar. FWVER selbst bleibt
-            // unveraendert, damit bestehende Apps weiter damit rechnen koennen.
-            //
-            // Als Zahl (FLASH_VERSION), nicht als __DATE__ " " __TIME__: der
-            // Zeitstempel-String kostet 14 Zeichen mehr und hat das Dokument ueber
-            // die wirksame Rahmengrenze gehoben. Wirksam ist nicht die Pruefung
-            // unten gegen MAX_MSG_LEN_PHONE-2 (298), sondern die Klemmung in
-            // addBLEComToOutBuffer() bei 245 Byte, also 244 Zeichen JSON. Darueber
-            // schneidet die Firmware mitten im Wert ab und die App bekommt kein
-            // unvollstaendiges, sondern ein unparsebares Objekt -- damit faellt die
-            // gesamte Knotenidentitaet aus, nicht nur das letzte Feld.
-            // FLASH_VERSION ist ausserdem der Wert, der pro Release gepflegt wird;
-            // __DATE__/__TIME__ ist die Uhrzeit des jeweiligen Compilerlaufs und
-            // damit fuer "welchen Stand habe ich geflasht?" unbrauchbar.
-            idoc["FWDATE"] = FLASH_VERSION;
             idoc["CALL"] = meshcom_settings.node_call;
             idoc["ID"] = _GW_ID;
             idoc["HWID"] = BOARD_HARDWARE;
