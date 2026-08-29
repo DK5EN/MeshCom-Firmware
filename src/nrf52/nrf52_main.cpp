@@ -1139,6 +1139,17 @@ void nrf52setup()
 void nrf52loop()
 {
     INSTR_LOOPTICK();
+
+    // TM-25: Boot-Marke fuer den Bench-Harness, wie [BOOT];ready auf dem ESP32.
+    // Auf dem nRF52 ist die Netzwerkphase (W5100S/DHCP) am Ende von setup()
+    // bereits synchron abgeschlossen -- die Marke faellt beim ersten Loop-Durchlauf.
+    static bool s_bootReadyLogged = false;
+    if (!s_bootReadyLogged)
+    {
+        s_bootReadyLogged = true;
+        Serial.printf("[BOOT];ready;ms;%lu;ip;%d;eth;%d\n", (unsigned long)millis(),
+                      neth.hasIPaddress ? 1 : 0, neth.hasETHHardware ? 1 : 0);
+    }
     #if defined(HAS_TFT_114) or defined(BOARD_T_ECHO)
     if(bDEEP_SLEEP)
     {
@@ -1158,7 +1169,7 @@ void nrf52loop()
     {
         bMyClock = false;
 
-        loopRTC();
+        { INSTR_SECTION("rtc"); loopRTC(); }
 
         if(!posinfo_fix) // GPS hat Vorang zur RTC
         {
@@ -1188,6 +1199,7 @@ void nrf52loop()
 
     if(meshcom_settings.node_hasIPaddress)
     {
+        INSTR_SECTION("eth_state");
         strTime = "none";
 
         extern bool btimeClient;
@@ -1234,6 +1246,7 @@ void nrf52loop()
 
     if(bMyClock)
     {
+        INSTR_SECTION("clock");
         MyClock.CheckEvent();
         
         if(MyClock.Year() > 2023)
@@ -1305,6 +1318,7 @@ void nrf52loop()
             bPendingDisplayPos = false;
         }
         taskEXIT_CRITICAL();
+        INSTR_SECTION("display_rx");
         if(_pendText) sendDisplayText(_msg, _rssi, _snr);
         if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
     }
@@ -1332,6 +1346,7 @@ void nrf52loop()
 
     if(iReceiveTimeOutTime > 0)
     {
+        INSTR_SECTION("lora_rx_timeout");
         if((uint32_t)(millis() - iReceiveTimeOutTime) >= (uint32_t)csma_timeout)
         {
             if(bLORADEBUG)
@@ -1367,6 +1382,7 @@ void nrf52loop()
 
     if(iReceiveTimeOutTime == 0 && is_receiving == false && tx_is_active == false)
     {
+        INSTR_SECTION("lora_sm");
         int _w = iWrite;
         int _r = iRead;
         if (_w != _r)
@@ -1417,7 +1433,9 @@ void nrf52loop()
                         Serial.printf("[MC-DBG] CAD_FALSE_POSITIVE\n");
                     // Channel free — transmit
                     csma_reset();
-                    if(doTX())
+                    bool _tx_ok;
+                    { INSTR_SECTION("lora_tx"); _tx_ok = doTX(); }
+                    if(_tx_ok)
                     {
                         ch_util_tx_start = millis();
                         if(bLORADEBUG)
@@ -1502,6 +1520,7 @@ void nrf52loop()
     #if defined(ENABLE_GPS)
     if(bGPSON)
     {
+        INSTR_SECTION("gps_init");
         WZ_GPS_Init();
     }
     #endif
@@ -1510,6 +1529,7 @@ void nrf52loop()
     #if defined(ENABLE_SOFTSER)
     if(bSOFTSERON)
     {
+        INSTR_SECTION("softser");
         // check every 5 seconds to ready next telemetry via serial interface
         if ((uint32_t)(millis() - softser_refresh_timer) >= 5000 && softserFunktion == 0)
         {
@@ -1551,16 +1571,17 @@ void nrf52loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
-            readPhoneCommand(bleItem.data);
+            { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data); }
         }
     }
 
     // Apply a settings write staged by settings_rx_callback(), if any (CONC-17)
-    applyPendingBleSettings();
+    { INSTR_SECTION("ble_settings"); applyPendingBleSettings(); }
 
     // check if message from phone to send
     if(hasMsgFromPhone)
     {
+        INSTR_SECTION("phone_msg");
         if(memcmp(textbuff_phone, ":", 1) == 0)
             sendMessage(textbuff_phone, txt_msg_len_phone);
 
@@ -1590,6 +1611,7 @@ void nrf52loop()
 
     if(gKeyNum == 1)
     {
+        INSTR_SECTION("key1");
         Serial.println("gKeyNum == 1");
 
         //getTEMP();
@@ -1601,6 +1623,7 @@ void nrf52loop()
 
     if(gKeyNum == 2)
     {
+        INSTR_SECTION("key2");
         //TEST Serial.println("gKeyNum == 2");
 
         #if defined(ENABLE_RAK_GPS)
@@ -1638,7 +1661,7 @@ void nrf52loop()
 
                 if(gpsDetected)
                 {
-                    igps = WZ_GPS_Loop();
+                    { INSTR_SECTION("gps"); igps = WZ_GPS_Loop(); }
 
                     if(iGPSDEBUG > 0)
                     {
@@ -1707,6 +1730,7 @@ void nrf52loop()
 
     if(gKeyNum == 3)
     {
+        INSTR_SECTION("key3");
         Serial.println("Right button pressed");
 
         gKeyNum = 0;
@@ -1774,6 +1798,7 @@ void nrf52loop()
     int incnt = getMheardCount();
     if(ncnt_hold != incnt)
     {
+        INSTR_SECTION("pos_timer");
         // minimal alle 60 sec
         if((uint32_t)(millis() - posinfo_timer_min) >= 60000)
         {
@@ -1831,11 +1856,11 @@ void nrf52loop()
                 else
                     node_lon_c='E';
 
-                sendPosition(posinfo_interval, node_lat, node_lat_c, node_lon, node_lon_c, meshcom_settings.node_alt, meshcom_settings.node_press, meshcom_settings.node_hum, meshcom_settings.node_temp, meshcom_settings.node_temp2, meshcom_settings.node_gas_res, meshcom_settings.node_co2, meshcom_settings.node_press_alt, meshcom_settings.node_press_asl);
+                { INSTR_SECTION("pos_tx"); sendPosition(posinfo_interval, node_lat, node_lat_c, node_lon, node_lon_c, meshcom_settings.node_alt, meshcom_settings.node_press, meshcom_settings.node_hum, meshcom_settings.node_temp, meshcom_settings.node_temp2, meshcom_settings.node_gas_res, meshcom_settings.node_co2, meshcom_settings.node_press_alt, meshcom_settings.node_press_asl); }
             }
             else
             {
-                sendPosition(posinfo_interval, meshcom_settings.node_lat, meshcom_settings.node_lat_c, meshcom_settings.node_lon, meshcom_settings.node_lon_c, meshcom_settings.node_alt, meshcom_settings.node_press, meshcom_settings.node_hum, meshcom_settings.node_temp, meshcom_settings.node_temp2, meshcom_settings.node_gas_res, meshcom_settings.node_co2, meshcom_settings.node_press_alt, meshcom_settings.node_press_asl);
+                { INSTR_SECTION("pos_tx"); sendPosition(posinfo_interval, meshcom_settings.node_lat, meshcom_settings.node_lat_c, meshcom_settings.node_lon, meshcom_settings.node_lon_c, meshcom_settings.node_alt, meshcom_settings.node_press, meshcom_settings.node_hum, meshcom_settings.node_temp, meshcom_settings.node_temp2, meshcom_settings.node_gas_res, meshcom_settings.node_co2, meshcom_settings.node_press_alt, meshcom_settings.node_press_asl); }
             }
 
             posinfo_shot=false;
@@ -1888,7 +1913,7 @@ void nrf52loop()
         }
         else
         {
-            sendHey();
+            { INSTR_SECTION("hey_tx"); sendHey(); }
         }
 
         trickle_interval_ms = min(trickle_interval_ms * 2, TRICKLE_IMAX_S * 1000UL);
@@ -1901,6 +1926,7 @@ void nrf52loop()
     unsigned long akt_timer = meshcom_settings.node_parm_time;
     if(akt_timer < 5 || akt_timer > 120)
     {
+        INSTR_SECTION("akt_timer");
         akt_timer = TELEMETRY_INTERVAL;
     }
     
@@ -1913,7 +1939,7 @@ void nrf52loop()
     {
         bHeyFirst = false;
         
-        sendTelemetry(SOFTSER_APP_ID);
+        { INSTR_SECTION("telemetry"); sendTelemetry(SOFTSER_APP_ID); }
 
         telemetry_timer = millis();
     }
@@ -1921,15 +1947,17 @@ void nrf52loop()
     // get UDP & send UDP message from ringBufferOut if there is one to tx
     if(bGATEWAY)
     {
+        INSTR_SECTION("gateway");
         int bUDPReceived = false;
 
         // check if we received a UDP packet
         if (neth.hasIPaddress)
         {
             bSPI_ETH_Active = true;   // SPI guard: Ethernet owns bus
+            INSTR_SECTION("eth_udp");
             if(neth.getUDP() == 1)  // 1...no udp-paket received
             {
-                sendUDP();
+                { INSTR_SECTION("eth_udp_tx"); sendUDP(); }
             }
             else
             {
@@ -2010,7 +2038,7 @@ void nrf52loop()
                             Serial.println(" [MAIN] checkDHCP");
                         }
                         
-                        neth.checkDHCP();
+                        { INSTR_SECTION("eth_dhcp"); neth.checkDHCP(); }
                     }
                 }
 
@@ -2025,7 +2053,10 @@ void nrf52loop()
     if (((uint32_t)(millis() - temphum_timer) >= TEMPHUM_INTERVAL))
     {
         if(shtc3_found)
+        {
+            INSTR_SECTION("shtc3");
             getTEMP();
+        }
 
         temphum_timer = millis();
     }
@@ -2036,6 +2067,7 @@ void nrf52loop()
 
     if(bLPS33)
     {
+        INSTR_SECTION("lps33");
         // DRUCK
         if (((uint32_t)(millis() - druck_timer) >= DRUCK_INTERVAL))
         {
@@ -2053,10 +2085,11 @@ void nrf52loop()
 
     #endif
 
-    mainStartTimeLoop();
+    { INSTR_SECTION("display_tick"); mainStartTimeLoop(); }
 
     if(DisplayOffWait > 0)
     {
+        INSTR_SECTION("display_off");
         if ((int32_t)(millis() - DisplayOffWait) > 0)
         {
             DisplayOffWait = 0;
@@ -2076,6 +2109,7 @@ void nrf52loop()
     // rebootAuto
     if(rebootAuto > 0)
     {
+        INSTR_SECTION("reboot_auto");
         if ((int32_t)(millis() - rebootAuto) > 0)
         {
             rebootAuto = 0;
@@ -2122,7 +2156,7 @@ void nrf52loop()
         }
     }
 
-    checkSerialCommand();
+    { INSTR_SECTION("serial_cmd"); checkSerialCommand(); }
 
     if(BattTimeWait == 0)
         BattTimeWait = millis() - 31000;
@@ -2358,7 +2392,7 @@ void nrf52loop()
                 Serial.printf(" [UDP] sending Heartbeat\n");
             }
 
-            sendHeartbeat();
+            { INSTR_SECTION("eth_heartbeat"); sendHeartbeat(); }
 
             hb_timer = millis();
         }

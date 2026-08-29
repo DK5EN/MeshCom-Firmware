@@ -162,8 +162,12 @@ def capture_one(port, baud, seconds, settle):
     s.port = port
     s.baudrate = baud
     s.timeout = 0.2
-    # Defaults asserted: the auto-reset circuit / CDC line state reboots the node
-    # on open. Do not clear dtr/rts here -- the reset is the point.
+    # Measured 2026-08-29 on the T-Deck Plus (ESP32-S3 USB-JTAG): with DTR/RTS
+    # asserted at open the node does NOT reset (24/24 "no reset marker"); with
+    # both cleared -- as tdeck_harness.TDeckSession does -- it reboots with
+    # rst:0x15 USB_UART_CHIP_RESET. Same for the CP2102/CH9102 boards.
+    s.dtr = False
+    s.rts = False
     s.open()
     buf = bytearray()
     end = time.time() + seconds

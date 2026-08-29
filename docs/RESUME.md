@@ -122,6 +122,24 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   own harness scenarios and a frame instrument.
 - Tile format (TM-23) parked; upstream sync stays merge + net-diff review each time.
 
+## 2026-08-29 late session (TM-30/31/32, TM-13, TM-25/26, A5)
+
+- **TM-32 fixed** (settings plausibility at load, native 10/10, bench-verified with `--flashpoke`),
+  **TM-13 done** (`INSTR_SECTION`, `[INSTR-SECT]`, gap attribution), **TM-25/26 done** (RAK ready
+  marker, boot profile, `rak_harness.py`). **TM-35 new**: RAK gateway `getUDP()` blocks the loop
+  1.6–3.3 s every ~20 s, `sendHey()` 0.7–1.4 s.
+- **TM-30** instrumented (`tdeck_harness.py --scenario uptime`), run pending on DK5EN-14.
+- **TM-31** instrument built (`gwflood.py`, `--srvip` hook); blocked: UDP from the Heltec never
+  reaches the Mac (see BACKLOG row). Needs `sudo tcpdump` or the Orbi isolation check.
+- **TM-34 arms**: A0/A5 first attempt **void** — `bootloop.py` opened the port with DTR/RTS asserted,
+  which does not reset the T-Deck Plus (24/24 "no reset marker"); fixed (dtr/rts False). A5 (24
+  boots on `ORBI63_Guest`, WPA2) re-run: **24/24 first joins, got_ip median 9.6 s, 0 disconnects**
+  (`tools/bench/runs/bootloop_A5_20260829-230435/summary.txt`) vs 4/12 on WPA2/WPA3 `ORBI63` —
+  the first-join failure is WPA3-SAE, not steering; the WiFi fix must force WPA2-PSK.
+  **A0 needs the ORBI63 password to switch DK5EN-14 back** — the node is on the guest SSID now.
+- Firmware bench hooks added (fork-only): `--flashpoke <field> <value>`, `--srvip <ip>`,
+  `[BOOT];ready` on nRF52, `[INSTR-SECT]`/`[INSTR-GAPS]`/`[INSTR-LOOP];gap`.
+
 ## Next session, in order
 
 1. ~~TD-03 heap defect~~ **fixed 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario;

@@ -1,6 +1,10 @@
 #include <Arduino.h>
 
 #include "esp32_flash.h"
+#include <settings_sanitize.h>
+#include <lora_setchip.h>
+
+void save_settings(void);
 
 #include <Preferences.h>
 
@@ -11,6 +15,32 @@ Preferences preferences;
 s_meshcom_settings meshcom_settings;
 
 // Get LoRa parameter
+// TM-32: Plausibilitaet der geladenen Radio-Parameter (Marker und Groesse
+// prueft N-12, den Inhalt bisher niemand). Korrekturen werden geloggt.
+static void sanitize_log(const char *field, const char *oldv, const char *newv)
+{
+    Serial.printf("[FLASH]...sanitized %s: %s -> %s\n", field, oldv, newv);
+}
+
+void sanitize_loaded_settings(void)
+{
+    RadioLimits lim = { TX_POWER_MIN, TX_POWER_MAX, 400.0f, 960.0f, 0, 0, max_country };
+    RadioParams p = { meshcom_settings.node_power, meshcom_settings.node_freq, meshcom_settings.node_bw,
+                      meshcom_settings.node_sf, meshcom_settings.node_cr, meshcom_settings.node_country };
+    int fixed = sanitize_radio_params(p, lim, sanitize_log);
+    if(fixed > 0)
+    {
+        meshcom_settings.node_power = p.power;
+        meshcom_settings.node_freq = p.freq;
+        meshcom_settings.node_bw = p.bw;
+        meshcom_settings.node_sf = p.sf;
+        meshcom_settings.node_cr = p.cr;
+        meshcom_settings.node_country = p.country;
+        Serial.printf("[FLASH]...%d radio setting(s) out of range, reset to default\n", fixed);
+        save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
+    }
+}
+
 void init_flash(void)
 {
     Serial.println("[INIT]...init_flash");
@@ -124,6 +154,10 @@ void init_flash(void)
     meshcom_settings.node_gcb[5] = preferences.getInt("node_gcb5", 0);
 
     meshcom_settings.node_country = preferences.getInt("node_ctry");    // 0...EU  1...UK, 2...IT, 3...US, ..... 18...868, 19...915
+
+    // TM-32 (upstream #661/#57): Radio-Parameter auf Plausibilitaet pruefen,
+    // bevor sie in radio.setOutputPower() & Co. landen. Sentinels bleiben.
+    sanitize_loaded_settings();
 
     meshcom_settings.node_track_freq = preferences.getFloat("node_track", 0);
     meshcom_settings.node_preamplebits = preferences.getInt("node_pream", 32);

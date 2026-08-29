@@ -1235,6 +1235,92 @@ def scenario_boot(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     }
 
 
+def scenario_uptime(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-30 / upstream #1083: touch (input) latency that grows with uptime.
+    Every --uptime-step seconds: a trackball input probe (event -> repaint
+    latency from the host timestamps of [BALL] and the next [REFR]), --uistat,
+    --heap and --instr (loop max, per-section max, gap lines) -- one row per
+    step. The verdict is the trend: fails if the last row's input latency or
+    loop max exceeds --uptime-growth x the first row's, or on a crash marker."""
+    rows: List[Dict[str, Any]] = []
+    t_start = time.monotonic()
+    session.send("--tab 0")
+    time.sleep(0.5)
+    for step in range(args.uptime_steps):
+        idx0 = session.send("--instreset")
+        session.wait_for(r"\[INSTR\][; ]reset", 2.0, since=idx0)
+        remaining = args.uptime_step
+        while remaining > 0:
+            chunk = min(remaining, 30.0)
+            session.collect(chunk)
+            remaining -= chunk
+        session.send("--tft on")
+        time.sleep(0.3)
+        session.send("--redrawlog on")
+        time.sleep(0.2)
+        lat_ms: List[float] = []
+        for d in ("down", "up"):
+            idx = session.send(f"--ball {d} 5")
+            session.wait_for(r"\[REFR\]", 2.0, since=idx)
+            recs = session.records_since(idx)
+            t_b = next((t for t, _, l in recs if "[BALL]" in l), None)
+            t_r = next((t for t, _, l in recs if "[REFR]" in l and t_b is not None and t >= t_b), None)
+            if t_b is not None and t_r is not None:
+                lat_ms.append((t_r - t_b) * 1000.0)
+            time.sleep(0.5)
+        session.send("--redrawlog off")
+        time.sleep(0.2)
+        st = get_uistat(session)
+        idxh = session.send("--heap up")
+        mh = session.wait_for(r"\[INSTR-HEAP\];up;", 2.0, since=idxh)
+        heap = parse_line(mh.string) if mh else None
+        idxi = session.send("--instr")
+        session.wait_for(r"\[INSTR-GUI\]|\[INSTR-GAPS\]", 3.0, since=idxi)
+        session.collect(0.5)
+        lines = [l for _, _, l in session.records_since(idxi)]
+        loop = next((l for l in lines if "[INSTR-LOOP]" in l and "gap" not in l), None)
+        mloop = re.search(r"max_us[; ](\d+)", loop or "")
+        sects: Dict[str, int] = {}
+        for l in lines:
+            ms = re.search(r"\[INSTR-SECT\][; ](\w+).*max_us[; ](\d+)", l)
+            if ms:
+                sects[ms.group(1)] = int(ms.group(2))
+        gaps = [l.strip()[:100] for _, _, l in session.records_since(idx0) if "[INSTR-LOOP]" in l and "gap" in l]
+        crash = [l for _, _, l in session.records_since(idx0) if re.search(CRASH_PATTERN, l)]
+        rows.append({
+            "step": step,
+            "uptime_s": round(time.monotonic() - t_start),
+            "input_lat_ms": round(max(lat_ms), 1) if lat_ms else None,
+            "input_probes": len(lat_ms),
+            "loop_max_us": int(mloop.group(1)) if mloop else None,
+            "worst_section": max(sects.items(), key=lambda kv: kv[1])[0] if sects else None,
+            "worst_section_us": max(sects.values()) if sects else None,
+            "gaps": gaps[:5],
+            "msg_list": st.get("msg_list") if st else None,
+            "int_free": heap.get("int_free") if heap else None,
+            "psram_free": heap.get("psram_free") if heap else None,
+            "crash": crash[:3],
+        })
+        if crash:
+            break
+    first, last = rows[0], rows[-1]
+
+    def grew(key: str) -> Optional[bool]:
+        a, b = first.get(key), last.get(key)
+        if a is None or b is None or a == 0:
+            return None
+        return b > a * args.uptime_growth
+
+    ok = (
+        len(rows) == args.uptime_steps
+        and not last["crash"]
+        and grew("input_lat_ms") is not True
+        and grew("loop_max_us") is not True
+    )
+    return {"ok": ok, "rows": rows, "steps": args.uptime_steps, "step_s": args.uptime_step,
+            "input_lat_grew": grew("input_lat_ms"), "loop_max_grew": grew("loop_max_us")}
+
+
 def scenario_displaycmd(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     """TM-33 (b) / upstream #690: the user command --display off/on must drive
     the TFT (it used to be the U8g2 path only, a no-op on the T-Deck).
@@ -1372,6 +1458,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "sleep": scenario_sleep,
     "screen": scenario_screen,
     "displaycmd": scenario_displaycmd,
+    "uptime": scenario_uptime,
     "map": scenario_map,
     "nav": scenario_nav,
     "input": scenario_input,
@@ -1517,6 +1604,13 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
         elif name == "heap":
             print(f"  delta={result.get('delta')}")
+        elif name == "uptime":
+            print(f"  steps={result.get('steps')} x {result.get('step_s')}s  input_lat_grew={result.get('input_lat_grew')} loop_max_grew={result.get('loop_max_grew')}")
+            for row in result.get("rows", []):
+                print(f"  t={row['uptime_s']:5d}s lat_ms={row['input_lat_ms']} loop_max_us={row['loop_max_us']} worst={row['worst_section']}:{row['worst_section_us']} "
+                      f"msg_list={row['msg_list']} int_free={row['int_free']} psram_free={row['psram_free']} gaps={len(row['gaps'])} crash={bool(row['crash'])}")
+                for g in row["gaps"][:3]:
+                    print(f"      {g}")
         elif name == "displaycmd":
             for row in result.get("steps", []):
                 print(f"  {row['cmd']:16s} marker={row['marker_seen']} sleeping={row['sleeping']} want={row['want']} ok={row['ok']}")
@@ -1552,6 +1646,7 @@ SCENARIO_HELP = {
     "heap": "heap delta over N injected messages",
     "trim": "TD-03: active-tab message view capped at 50 over N injected messages",
     "displaycmd": "TM-33 (b): --display off/on drives the TFT (sleeping 1/0 via --tft state)",
+    "uptime": "TM-30: input latency / loop max / heap per step over a long uptime (not in all)",
 }
 
 EPILOG = """\
@@ -1609,6 +1704,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--port", default=DEFAULT_PORT, help=f"serial port (default: {DEFAULT_PORT})")
     p.add_argument("--heap-count", type=int, default=20, help="injections in the heap scenario (default: 20)")
     p.add_argument("--trim-count", type=int, default=60, help="injections in the trim scenario (default: 60, limit is 50)")
+    p.add_argument("--uptime-steps", type=int, default=7, help="probe rounds in the uptime scenario (default: 7)")
+    p.add_argument("--uptime-step", type=float, default=300.0, help="seconds between probes in the uptime scenario (default: 300)")
+    p.add_argument("--uptime-growth", type=float, default=2.0, help="uptime: fail if last/first exceeds this factor (default: 2.0)")
     p.add_argument("--elf", default=DEFAULT_ELF, help=f"firmware ELF for symbolization (default: {DEFAULT_ELF})")
     p.add_argument(
         "--boot-timeout",

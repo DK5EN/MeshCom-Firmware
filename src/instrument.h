@@ -58,6 +58,25 @@ void instrument_report_gui(void);
 /** Zero the accumulators. A measurement run starts here. */
 void instrument_reset(void);
 
+/** TM-13: per-subsystem stall attribution. A section is a named scope in the
+ *  main loop (lora_rx, gps, udp, lvgl, ...); its duration is accumulated per
+ *  name and reported as [INSTR-SECT], and a loop gap over the threshold names
+ *  the longest section of that iteration ([INSTR-LOOP];gap;...;in;<name>).
+ *  `name` must be a string literal: slots are keyed by pointer identity. */
+void instrument_note_section(const char *name, uint32_t us);
+
+struct InstrSection
+{
+    const char *name;
+    uint32_t    t0;
+    InstrSection(const char *n) : name(n), t0(micros()) {}
+    ~InstrSection() { instrument_note_section(name, (uint32_t)(micros() - t0)); }
+};
+
+#define INSTR_CAT2(a, b)     a##b
+#define INSTR_CAT(a, b)      INSTR_CAT2(a, b)
+#define INSTR_SECTION(name)  InstrSection INSTR_CAT(_instr_sec_, __LINE__)(name)
+
 #define INSTR_T0(v)      uint32_t v = micros()
 #define INSTR_FLUSH(v)   instrument_note_flush((uint32_t)(micros() - (v)))
 #define INSTR_LOOPTICK() instrument_note_loop_tick()
@@ -67,5 +86,6 @@ void instrument_reset(void);
 #define INSTR_T0(v)      do {} while (0)
 #define INSTR_FLUSH(v)   do {} while (0)
 #define INSTR_LOOPTICK() do {} while (0)
+#define INSTR_SECTION(name) do {} while (0)
 
 #endif

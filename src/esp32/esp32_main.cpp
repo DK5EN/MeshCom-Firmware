@@ -1834,6 +1834,7 @@ static void flushDeferredDisplayUpdates()
         bPendingDisplayText = false;
         bPendingDisplayPos = false;
     }
+    INSTR_SECTION("display_rx");
     if(_pendText) sendDisplayText(_msg, _rssi, _snr);
     if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
 }
@@ -2329,7 +2330,7 @@ void esp32loop()
                 // DIO triggered while reception is ongoing
                 // that means we got a packet
 
-                checkRX(bRadio);
+                { INSTR_SECTION("lora_rx"); checkRX(bRadio); }
 
                 // FIX BUG #2: checkRX() now restarts RX internally.
                 // Remove redundant interrupt rewiring that would double-reconfigure.
@@ -2776,6 +2777,7 @@ void esp32loop()
     // check WiFI connected with Ping every 30 sec
     if(meshcom_settings.node_netmode == 0 && (uint32_t)(millis() - wifi_active_timer) >= 30000)
     {
+        INSTR_SECTION("wifi_ping");
         if(!checkWifiPing())
         {
             if(ifalseping > 0)
@@ -2920,7 +2922,7 @@ void esp32loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
-            readPhoneCommand(bleItem.data);
+            { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data); }
         }
     }
 
@@ -3065,7 +3067,7 @@ void esp32loop()
             #if defined (ENABLE_GPS)
                 if(gpsDetected)
                 {
-                    igps = WZ_GPS_Loop();
+                    { INSTR_SECTION("gps"); igps = WZ_GPS_Loop(); }
                     
                     if(iGPSDEBUG > 0)
                     {
@@ -3320,7 +3322,7 @@ void esp32loop()
     }
 
     if(meshcom_settings.node_pingcall[0] == 0x00 || meshcom_settings.node_pingtime == 0 || meshcom_settings.node_pingcount == 0)
-        mainStartTimeLoop();
+        { INSTR_SECTION("display_tick"); mainStartTimeLoop(); }
 
     #if not defined(BOARD_T_DECK_PRO)
     if(DisplayOffWait > 0)
@@ -3690,9 +3692,7 @@ void esp32loop()
     // WIFI Gateway functions
     if(bGATEWAY && meshcom_settings.node_hasIPaddress)
     {
-        getMeshComUDP();
-
-        sendMeshComUDP();
+        { INSTR_SECTION("udp"); getMeshComUDP(); sendMeshComUDP(); }
 
         // heartbeat
         if ((uint32_t)(millis() - hb_timer) >= (HEARTBEAT_INTERVAL * 1000))
@@ -3776,7 +3776,7 @@ void esp32loop()
                     }
                     else
                     {
-                        doWiFiConnect();
+                        { INSTR_SECTION("wifi_connect"); doWiFiConnect(); }
 
                         if(iWlanWait > 15)
                         {
@@ -3877,7 +3877,7 @@ void esp32loop()
         tft_off();
     }
 
-    lv_task_handler();
+    { INSTR_SECTION("lvgl"); lv_task_handler(); }
 
     #endif
 

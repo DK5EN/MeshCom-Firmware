@@ -4792,6 +4792,67 @@ void commandAction(char *umsg_text, bool ble)
         instrument_reset();
         return;
     }
+    #if defined(ESP32)
+    else
+    if(commandCheck(msg_text+2, (char*)"srvip ") == 0)
+    {
+        // TM-31 bench hook: MeshCom server override (0.0.0.0 clears), RAM only,
+        // takes effect at the next startMeshComUDP() (--reboot or WiFi restart).
+        extern IPAddress bench_srvip;
+        IPAddress ip;
+        if(ip.fromString(msg_text+8))
+        {
+            bench_srvip = ip;
+            Serial.printf("[SRVIP];%s;set\n", ip.toString().c_str());
+            // Re-run the UDP bring-up now so the override takes effect without a
+            // reboot (the override lives in RAM only). Keyed on the driver state,
+            // not on hasIPaddress: after the boot retry gave up, a driver-side
+            // reconnect is never harvested (TM-34 F3 blind window, seen live
+            // 2026-08-29: got_ip at 53 s, no startMeshComUDP() until the 5-min
+            // restart) -- this hook doubles as the manual harvest for the bench.
+            if(WiFi.status() == WL_CONNECTED)
+            {
+                extern WiFiUDP Udp;
+                Udp.stop();
+                startMeshComUDP();
+            }
+            else
+                Serial.println("[SRVIP];note;WiFi not connected, applies at the next bring-up");
+        }
+        else
+            Serial.println("[SRVIP];err;usage --srvip a.b.c.d");
+        return;
+    }
+    #endif
+    else
+    if(commandCheck(msg_text+2, (char*)"flashpoke ") == 0)
+    {
+        // TM-32 bench hook: write a raw (possibly out-of-range) radio value to
+        // the settings and save -- the next boot must report [FLASH]...sanitized.
+        char field[16] = {0};
+        float fval = 0;
+        if(sscanf(msg_text+12, "%15s %f", field, &fval) == 2)
+        {
+            bool ok = true;
+            if(strcmp(field, "sf") == 0) meshcom_settings.node_sf = (int)fval;
+            else if(strcmp(field, "cr") == 0) meshcom_settings.node_cr = (int)fval;
+            else if(strcmp(field, "bw") == 0) meshcom_settings.node_bw = fval;
+            else if(strcmp(field, "power") == 0) meshcom_settings.node_power = (int)fval;
+            else if(strcmp(field, "freq") == 0) meshcom_settings.node_freq = fval;
+            else if(strcmp(field, "country") == 0) meshcom_settings.node_country = (int)fval;
+            else ok = false;
+            if(ok)
+            {
+                save_settings();
+                Serial.printf("[FLASHPOKE];%s;%g;saved\n", field, (double)fval);
+            }
+            else
+                Serial.println("[FLASHPOKE];err;unknown field (sf|cr|bw|power|freq|country)");
+        }
+        else
+            Serial.println("[FLASHPOKE];err;usage --flashpoke <field> <value>");
+        return;
+    }
     else
     if(commandCheck(msg_text+2, (char*)"instr") == 0)
     {

@@ -39,6 +39,44 @@ static uint64_t s_loop_us    = 0;
 static uint32_t s_loop_max   = 0;
 static uint32_t s_loop_last  = 0;
 
+/* TM-13: sections, keyed by the literal's address. */
+#define INSTR_SECTION_SLOTS 16
+static const uint32_t INSTR_GAP_REPORT_US = 250000;   /* a loop gap this long names its section */
+struct SectionStat { const char *name; uint32_t n; uint64_t us; uint32_t max; };
+static SectionStat  s_sect[INSTR_SECTION_SLOTS];
+static const char  *s_iter_worst_name = NULL;    /* longest section since the last tick */
+static uint32_t     s_iter_worst_us   = 0;
+static uint32_t     s_iter_sect_us    = 0;       /* time inside any section since the last tick */
+static uint32_t     s_gap_reports     = 0;
+
+void instrument_note_section(const char *name, uint32_t us)
+{
+    int i;
+    for (i = 0; i < INSTR_SECTION_SLOTS; i++)
+    {
+        if (s_sect[i].name == name)
+            break;
+        if (s_sect[i].name == NULL)
+        {
+            s_sect[i].name = name;
+            break;
+        }
+    }
+    if (i < INSTR_SECTION_SLOTS)
+    {
+        s_sect[i].n++;
+        s_sect[i].us += us;
+        if (us > s_sect[i].max)
+            s_sect[i].max = us;
+    }
+    s_iter_sect_us += us;
+    if (us > s_iter_worst_us)
+    {
+        s_iter_worst_us = us;
+        s_iter_worst_name = name;
+    }
+}
+
 void instrument_note_flush(uint32_t us)
 {
     s_flush_n++;
@@ -61,9 +99,26 @@ void instrument_note_loop_tick(void)
         s_loop_us += d;
         if (d > s_loop_max)
             s_loop_max = d;
+        if (d > INSTR_GAP_REPORT_US)
+        {
+            /* Attribute the gap: the longest section of that iteration, or
+             * "unattributed" when no instrumented section ran (the blocker
+             * is outside every section -- that is a finding too). */
+            s_gap_reports++;
+            /* sections_ms << gap ms means the blocker sits in code no
+             * INSTR_SECTION covers yet -- add one there. */
+            printfdeb("[INSTR-LOOP];gap;ms;%lu;in;%s;section_ms;%lu;sections_ms;%lu\n",
+                      (unsigned long)(d / 1000),
+                      s_iter_worst_name != NULL ? s_iter_worst_name : "unattributed",
+                      (unsigned long)(s_iter_worst_us / 1000),
+                      (unsigned long)(s_iter_sect_us / 1000));
+        }
     }
 
     s_loop_last = now;
+    s_iter_worst_us = 0;
+    s_iter_worst_name = NULL;
+    s_iter_sect_us = 0;
 }
 
 void instrument_reset(void)
@@ -71,6 +126,11 @@ void instrument_reset(void)
     s_flush_n = 0; s_flush_us = 0; s_flush_max = 0;
     s_loop_n  = 0; s_loop_us  = 0; s_loop_max  = 0;
     s_loop_last = 0;
+    for (int i = 0; i < INSTR_SECTION_SLOTS; i++)
+    {
+        s_sect[i].n = 0; s_sect[i].us = 0; s_sect[i].max = 0;   /* keep the name: slot order is stable */
+    }
+    s_gap_reports = 0;
     printfdeb("[INSTR];reset\n");
 }
 
@@ -113,6 +173,20 @@ void instrument_report_timing(void)
               (unsigned)s_loop_us,
               (unsigned)loop_avg,
               (unsigned)s_loop_max);
+
+    /* TM-13: one line per instrumented section that ran since the reset. */
+    for (int i = 0; i < INSTR_SECTION_SLOTS && s_sect[i].name != NULL; i++)
+    {
+        if (s_sect[i].n == 0)
+            continue;
+        printfdeb("[INSTR-SECT];%s;n;%u;total_us;%u;avg_us;%u;max_us;%u\n",
+                  s_sect[i].name,
+                  (unsigned)s_sect[i].n,
+                  (unsigned)s_sect[i].us,
+                  (unsigned)(s_sect[i].us / s_sect[i].n),
+                  (unsigned)s_sect[i].max);
+    }
+    printfdeb("[INSTR-GAPS];n;%u;threshold_ms;%u\n", (unsigned)s_gap_reports, (unsigned)(INSTR_GAP_REPORT_US / 1000));
 }
 
 void instrument_report_gui(void)

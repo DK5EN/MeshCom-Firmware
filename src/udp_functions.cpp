@@ -55,6 +55,9 @@ IPAddress node_dns = IPAddress(0,0,0,0);
 IPAddress node_ntp = IPAddress(0,0,0,0);
 
 IPAddress node_hostip = IPAddress(0,0,0,0);
+// TM-31 bench hook (fork-only): --srvip <a.b.c.d> points the gateway at a test
+// server (tools/mock/meshcom_server.py) instead of the built-in names.
+IPAddress bench_srvip = IPAddress(0,0,0,0);
 
 String s_node_ip = "";
 String s_node_hostip = "";
@@ -1072,6 +1075,14 @@ void startMeshComUDP()
           WiFi.hostByName("pool.ntp.org", ntpServer);
           timeClient.setPoolServerIP(ntpServer);
         }
+      }
+
+      // TM-31 bench hook: after the server selection, so it is not overwritten
+      if(bench_srvip != IPAddress(0,0,0,0))
+      {
+        node_hostip = bench_srvip;
+        s_node_hostip = node_hostip.toString();
+        printfdeb("[WIFI]...BENCH srvip override -> %s\n", s_node_hostip.c_str());
       }
 
       // gateway activity
