@@ -1720,7 +1720,14 @@ void esp32setup()
     else
         pAdvertising->enableScanResponse(false);
     
+    #if defined(BENCH_BLE_ADV_LATE)
+    // TM-11 experiment: advertising starts in esp32loop() once [BOOT];ready
+    // fired (WiFi joined or given up) -- TD-01 hypothesis: BLE advertising
+    // during the first association attempt makes it fail.
+    printfdeb("[BLE ]...advertising deferred until the network phase settled (BENCH_BLE_ADV_LATE)\n");
+    #else
     pAdvertising->start();
+    #endif
  
     printfdeb("[BLE ]...Waiting a client connection to notify...\n");
     
@@ -1855,6 +1862,10 @@ void esp32loop()
             // von --debug csv entfernen und der Harness faende die Marke nicht.
             Serial.printf("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
                           (hasIPaddress || meshcom_settings.node_hasIPaddress) ? 1 : 0);
+            #if defined(BENCH_BLE_ADV_LATE)
+            NimBLEDevice::getAdvertising()->start();
+            Serial.printf("[BLE ];advertising;started;ms;%lu\n", (unsigned long)millis());
+            #endif
         }
     }
     // TEMPORARY -- measures the period between successive loop entries, so a

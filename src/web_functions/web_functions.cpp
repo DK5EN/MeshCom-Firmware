@@ -56,6 +56,11 @@ bool bMDNSOK=true;
  */
 void startWebserver()
 {
+    // esp32loop() calls this every pass while iWlanWait == 0; without an IP
+    // the debug line came out ~125 times per second (TM-21). Log the state
+    // once, again only after it changed.
+    static bool s_noIpLogged = false;
+
     if (bweb_server_running)
         return;
     #ifdef HAS_ETHERNET
@@ -63,10 +68,11 @@ void startWebserver()
         {
             if (strlen(meshcom_settings.node_ip) < 7 && !bWIFIAP)
             {
-                if(bDEBUG)
+                if(bDEBUG && !s_noIpLogged)
                 {
                     Serial.print("[WEB]...no ip set :");
                     Serial.println(meshcom_settings.node_ip);
+                    s_noIpLogged = true;
                 }
 
                 stopWebserver();
@@ -76,16 +82,19 @@ void startWebserver()
     #else
         if (strlen(meshcom_settings.node_ip) < 7 && !bWIFIAP)
         {
-            if(bDEBUG)
+            if(bDEBUG && !s_noIpLogged)
             {
                 Serial.print("[WEB]...no ip set :");
                 Serial.println(meshcom_settings.node_ip);
+                s_noIpLogged = true;
             }
 
             stopWebserver();
             return;
         }
     #endif
+
+    s_noIpLogged = false;               // IP is set now; log again if it goes away
 
 #ifdef ESP32
     // Check if WiFi is actually connected or AP is active before trying to start MDNS
