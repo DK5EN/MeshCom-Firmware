@@ -44,11 +44,14 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
 
 ## Measured, not fixed — decisions pending
 
-- **TD-01 / TM-11 (WiFi first join fails).** 12 boots per arm on DK5EN-14, same hour: baseline
-  4/12, BLE advertising deferred 3/12 (**BLE hypothesis refuted**), join by SSID only 8/12. Every
-  failure logs `[WIFI];event;disconnected;reason;2` (= `AUTH_EXPIRE`). Candidate fix: SSID-only join
-  - patient retry instead of the 10-poll give-up. Needs a 24-boot confirmation first
-    (`BENCH_WIFI_NO_BSSID=1` build, `scratchpad/bootloop.py` pattern — 75 s per boot).
+- **TD-01 / TM-11 / TM-24 (WiFi first join fails).** 12 boots per arm on DK5EN-14, same hour:
+  baseline 4/12, BLE advertising deferred 3/12 (**BLE hypothesis refuted**), join by SSID only
+  8/12. Every failure logs `[WIFI];event;disconnected;reason;2` (= `AUTH_EXPIRE`). Root cause named
+  in the evening (TM-24): **the firmware has no roaming** — no 802.11k/v/r in the SDK build, no
+  auto-reconnect, channel+BSSID pinned at join — while the bench WLAN is a steering mesh (router +
+  satellite). Fix direction decided: join by SSID only, let the driver roam,
+  `WiFi.setAutoReconnect(true)`, keep the ping watchdog as last resort. Confirm with a 24-boot run
+  (`BENCH_WIFI_NO_BSSID=1` build, `scratchpad/bootloop.py` pattern, 75 s per boot) before shipping.
 - **Tile format on the SD card** — parked as low priority by decision (2026-08-29): stability and
   functionality first, optimisation later. Options and the `[SDMAP]` read/decode split stay in
   `tdeck-findings-20260828.md`.
