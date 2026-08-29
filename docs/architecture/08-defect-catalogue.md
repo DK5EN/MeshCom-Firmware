@@ -1358,6 +1358,21 @@ kann. Nativ geprueft in `test/test_mask_secret` (6 Faelle).
 Unabhaengig davon bleibt richtig, was `net_console.h` empfiehlt: `--passwd`
 setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
 
+## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
+
+Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
+last merge base (`BACKLOG.md` §3.8g). Findings land here so they are not rediscovered. Full
+evidence per finding: [`docs/review/2026-08-29-upstream-sync-verdict.md`](../review/2026-08-29-upstream-sync-verdict.md).
+
+| ID    | Found      | Upstream range       | File:line (upstream/dev)                                      | Finding                                                                                                       | Sev.   | Status                       |
+| ----- | ---------- | -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------- |
+| UP-01 | 2026-08-29 | `fc83554e..2cb6bb4d` | `mheard_functions.cpp:348,351,656,658`                        | `serializeJson` bound is `measureJson()+1`, not `sizeof(bleBuffer)-1`; 15 B headroom at worst case (284/299)  | Medium | open — fix in next PR + test |
+| UP-02 | 2026-08-29 | `fc83554e..2cb6bb4d` | `t-deck/lv_obj_functions.cpp:1757,1765`                       | `delay(40)` x2 in `add_map_point()`, on the `OnRxDone` path; `refresh_map()` up to 30 x 80 ms in one callback | High   | open — TM-05/TM-08           |
+| UP-03 | 2026-08-29 | `fc83554e..2cb6bb4d` | `t-deck/tdeck_sdmap.cpp:304-305`, `lv_obj_functions.cpp:1470` | x scaled by 320-32, y by 256, image zoomed 1.25x: y markers wrong at every zoom; magic numbers                | High   | superseded by `db298c49`     |
+| UP-04 | 2026-08-29 | `fc83554e..2cb6bb4d` | `t-deck/lv_obj_functions.cpp:1758,1766`                       | G01 (`map_point` NULLing) fixed upstream, same as ours                                                        | —      | keep upstream hunk           |
+| UP-05 | 2026-08-29 | `fc83554e..2cb6bb4d` | `command_functions.cpp:4961-4990`                             | `I` register 239/244 chars with six group calls; next key truncates it                                        | Low    | watch                        |
+| UP-06 | 2026-08-29 | pre-existing         | `regex_functions.cpp:9`, `aprs_functions.cpp:194,292`         | Callsign regex `[0-9]+` unbounded: 119-char callsigns pass validation and reach `MAX_CALL_LEN` consumers      | Medium | open — trace consumers, PR   |
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
@@ -1372,6 +1387,16 @@ setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
 | `-Wall -Wextra` produces an unmanageable warning backlog                                                                        | Measured: **9 warnings total**, 4 in `src/`. The June audit's `-Werror` exception rests on a backlog that does not exist.                                                                                                                                                                                                                                           |
 
 ---
+
+### Refuted 2026-08-29 (upstream sync review)
+
+- "UP-01 overflows `bleBuffer` today" — worst case 284 <= 299 bytes with the current 13 keys
+  (compiled probe, ArduinoJson 7.4.3). Latent, not live.
+- "`delay(40)` in `add_map_point()` runs in interrupt context" — `OnRxDone` runs on the loop task
+  on ESP32 (C-01). RX critical path, not ISR.
+- "`map_no_data_label` width 320 is dead code" — live, a panel-width literal.
+- "`mh_sourcecallsign` / `mh_destinationpath` dangling after the revert" — still used in
+  `updateMheardPath()`.
 
 ## 4. What replaces the golden-vector plan
 
