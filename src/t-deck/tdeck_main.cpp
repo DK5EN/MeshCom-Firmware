@@ -277,7 +277,10 @@ void addMessage(const char *str)
 {
     Serial.printf("[BOOT];msg;%s\n", str);
     tdeck_add_system_message(str);
-    uint32_t run = millis() + 2000;
+    // LVGL kurz laufen lassen, damit die Blase sichtbar wird -- nicht 2 s
+    // warten: sechs Startmeldungen kosteten 12 s Bootzeit (TM-15), und die
+    // Meldungen bleiben ohnehin als System-Blasen in der Nachrichtenliste.
+    uint32_t run = millis() + 100;
     while ((int32_t)(millis() - run) < 0)
     {
         lv_task_handler();
