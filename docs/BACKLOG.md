@@ -913,6 +913,37 @@ note holds). Query helper: `tools/bench/serial_session.py PORT [--wait-boot] --i
 5. **WiFi** (TM-11) — one experiment decides the direction.
 6. TM-08, TM-14, TM-15 as filler.
 
+### 3.8g Upstream sync 2026-08-29 — state of `dev`, incoming review, branch model
+
+Fetched 2026-08-29: `upstream/dev` = `2cb6bb4d` (14 commits past our base `fc83554e`, PRs
+#1104-#1112). Net delta is small — **5 files, +18/-43** — most of the churn is same-day add/remove.
+
+**Our PRs.** #1102 (`0cac4aea`, stability, 64 files) is merged and intact: no upstream commit has
+touched any of its files since. #1103 (`FWDATE` buffer) is dead: `322f1514` removed the `FWDATE`
+key altogether instead of fixing the frame budget (`issue-ble-i-register-mtu-20260828.md` still
+applies to the root cause). DL9SAU's #1090/#1091/#1093 were reverted on 08-28 (#1105-#1107);
+#1092 survives.
+
+**Incoming review (net diff, read line by line; `/fable-review` verification pending):**
+
+| ID    | File                                      | Finding                                                                                                                                                                                                                                                    | Action                                                                                                                             |
+| ----- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| UP-01 | `mheard_functions.cpp` (2 sites)          | Revert of #1090 restored `serializeJson(mhdoc, bleBuffer+1, measureJson(mhdoc)+1)`: the bound is the JSON's own length, not `sizeof(bleBuffer)`. Overflow path is back; hard to trigger with default config after the field revert, reachable via `{SET}`. | **Fix in our next PR** (2 lines, like #1102), with a native regression test.                                                       |
+| UP-02 | `lv_obj_functions.cpp` map-point loop     | `delay(19)` -> `delay(40)`, twice, on `loopTask` inside the map draw path: 40 ms per station, blocking.                                                                                                                                                    | Fold into the timing campaign (§3.8f); replaced by our map composition anyway.                                                     |
+| UP-03 | `tdeck_sdmap.cpp`, `lv_obj_functions.cpp` | Tile offset `* SDMAP_TILE_PX` replaced by `* 320 - 32`, `lv_img_set_zoom(map_ta, 320)`: hand-tuned scaling of a 256 px tile to work around the centring defect.                                                                                            | Conflicts with `db298c49` (viewport composition, `center_err 0/0`). Ours wins in the merge; argue with the numbers in the PR text. |
+| UP-04 | `lv_obj_functions.cpp`                    | `map_point[ip] = NULL; map_point_label[ip] = NULL;` after `lv_obj_del` — Kurt fixed G01 independently, same intent as ours.                                                                                                                                | Keep his hunk; drop ours from the PR scope.                                                                                        |
+
+**Process rule from here on:** every `git merge upstream/dev` into fork main is preceded by a
+review of the _net_ diff since the last merge base (`git diff <base> upstream/dev`), findings
+filed as `UP-nn` here and in `08-defect-catalogue.md`. Upstream has no CI and no tests; our
+native suites are the only gate MeshCom code passes through, so upstream changes in covered
+areas get a test added at merge time.
+
+**Plan agreed 2026-08-29:** (1) docs, commit, push; (2) tag and delete stale branches (§4);
+(3) `/fable-review` on `fc83554e..upstream/dev`; (4) merge `upstream/dev` into
+`tdeck-partial-refresh-trace`, map conflict resolved for our composition, Kurt's G01 hunk kept;
+(5) bench-verify on DK5EN-14; (6) T-Deck PR built from `upstream/dev` per §4, UP-01 fix included.
+
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
 Angeschlossen ist jetzt ein **RAK4631** statt des Heltec V3. Der Heltec haengt nicht mehr
@@ -1521,14 +1552,43 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 
 ## 4. State of the repository
 
-- Branch `v4.35p_prio`, rebased onto `upstream/dev`, **0 commits behind upstream**.
-- 5 campaign commits on top; `3fb2c917` (the test harness) is **not yet pushed**, the rest are.
-- Working tree state: see `git status`. **This document, `docs/architecture/09` and `10`, and
-  `docs/review/` are part of the deliverable — if they are untracked, commit them before
-  any `git clean` or rebase.**
-- Code divergence from upstream: ~195 insertions / 131 deletions across 17 files.
-- `pio run` unaffected by the harness — `native` is deliberately not in `default_envs`.
-- Pre-rebase safety SHA: `9a4dd1b1` (also still on `origin` history via reflog).
+### 4.1 Branch model (decided 2026-08-29)
+
+```
+upstream/dev --merge--> v4.35p_prio (fork main) --branch--> topic branch (tdeck-...)
+      ^                        |                                  |
+      |                        |<------------- merge back --------+
+      +---- PR <-- pr/<topic> <+  (built from upstream/dev + firmware files only, 1 commit)
+```
+
+- **`v4.35p_prio` is fork main and the permanent home of everything**: docs, `tools/`, `test/`,
+  `src/instrument.*`, `src/test_inject.*`, `src/t-deck/tdeck_debug.*`, the bench harness. It
+  tracks upstream by **merge, never rebase** (icssw-org squash-merges; a rebase turns our merged
+  fixes into deletion-only commits — memory `merge-not-rebase-after-upstream-squash`).
+- **Topic branches** off fork main for active work; merged back when done, then deleted.
+- **PR branches are built, not branched**: `git checkout -b pr/<topic> upstream/dev`, then
+  `git checkout v4.35p_prio -- <firmware files>`, cut the four couplings (memory
+  `firmware-only-pr-coupling`), squash to one commit with the German per-file description. No
+  docs, tools, tests or debug code in a PR. After upstream squash-merges, `git merge upstream/dev`
+  into fork main sees identical content and the surrounding debug hooks survive.
+- **Debug code rule:** new instrumentation goes into the dedicated files above with one-line
+  hooks in production code — that keeps the conflict surface with upstream refactors minimal.
+  For v5 the durable path is to offer the instrumentation upstream as a default-off compile
+  option in its own PR once the T-Deck PR has landed.
+
+### 4.2 Branches as of 2026-08-29
+
+| Branch                                             | State                                   | Decision                                                          |
+| -------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| `v4.35p_prio`                                      | fork main, +204/-14 vs `upstream/dev`   | keep                                                              |
+| `tdeck-partial-refresh-trace`                      | fork main + 7 T-Deck commits            | keep until merged back                                            |
+| `tdeck-partial-refresh-wip`                        | superseded, local only                  | tag `archive/tdeck-partial-refresh-wip-20260828`, delete          |
+| `pr/firmware-only`, `pr/fwdate-buffer`             | merged upstream (#1102, #1103), ahead 0 | delete local + origin (GitHub keeps `refs/pull/*`)                |
+| `backup/v4.35p_prio-pre-rebase*-20260827`          | pre-rebase snapshots, local only        | tags `archive/pre-rebase-20260827{,-2}`, pushed, branches deleted |
+| `origin/claude/flood-network-priority-send-5m073l` | all commits in fork main by content     | tag `archive/claude-flood-network-20260822`, delete               |
+| `master`, `gh-pages`                               | fork mirror / pages                     | ignore                                                            |
+
+Archive tags are pushed to `origin`; nothing is deleted before its tag exists on the remote.
 
 ## 5. Where to read what
 

@@ -50,25 +50,20 @@ Both branches are pushed to `origin`. Working tree clean.
   no other cards available). If it comes back from the field, we will see.
 - **Tile file format** is the open question for tomorrow (see below); not part of this PR.
 
-## Tomorrow's plan (as agreed)
+## Plan for 2026-08-29 (agreed; supersedes the earlier list)
 
-1. `git fetch upstream` / new upstream `dev`; **merge, not rebase** (icssw-org squash-merges our PRs,
-   see memory `merge-not-rebase-after-upstream-squash`).
-2. Layer the fixes on top in this order, each a small commit, operator test after each:
-   flush mitigation (made permanent, no switch) -> G07 -> map centring/stitching -> G01 -> g/h keys
-   -> SD 20 MHz -> `full_refresh=0` (decide) -> review flaws from handover §4.2 that we fix.
-3. PR against upstream `DEV` (German description, per-file rationale): UI + map fixes + review flaws.
-   **Not** in the PR: `d26e39d5` instrumentation (`git revert` or `INSTRUMENT_ENABLED=0`),
-   `src/t-deck/tdeck_debug.*`, `src/test_inject.*`, `--` test commands, `lib/lvgl` hook,
-   `tools/bench/*`, docs.
-4. Local branch: the harness and every remote-control command layered on top of the PR content.
-5. Commit and push.
+Upstream state and branch model: `BACKLOG.md` §3.8g and §4.1. Short form:
 
-## Timing campaign (2026-08-29)
+1. Docs, commit, push. 2. Tag + delete stale branches (§4.2). 3. `/fable-review` on
+   `fc83554e..upstream/dev` (UP-01..04). 4. `git merge upstream/dev` into this branch: map
+   conflict -> our composition (UP-03), keep Kurt's G01 NULLing (UP-04). 5. Bench-verify on
+   DK5EN-14. 6. Layer the T-Deck fixes as small commits, then build `pr/tdeck-ui` from
+   `upstream/dev` (firmware files only, one commit, German description) — include the UP-01
+   `serializeJson` bound fix with a native regression test, like #1102.
 
-Scouted, not started: `BACKLOG.md` §3.8f (TM-01 … TM-15) — audio freeze, SPI2 arbitration, LoRa
-harness, Heltec/T-Beam OLED on software I2C, TD-01 experiment, RAK instrumentation. Read the
-"What the scouting settled" table there before re-deriving any of it.
+Not in the PR: `d26e39d5` instrumentation, `src/t-deck/tdeck_debug.*`, `src/test_inject.*`,
+`--` test commands, `lib/lvgl` hook, `tools/bench/*`, docs. #1103 is dead upstream (`FWDATE`
+key removed); a build date for the app needs a new proposal within the 244-byte frame.
 
 ## Open decision: tile format on the SD card
 
