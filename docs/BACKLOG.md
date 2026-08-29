@@ -895,6 +895,7 @@ Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root ca
 | TM-17 | all ESP32 | BUG | Low | `esp32_main.cpp:3745-3776`, `udp_functions.cpp:737` | `bAllStarted` never becomes true when WiFi joins inside `startNetwork()` (iWlanWait=0 and IP set -> the loop branch that sets it is skipped). Only effect found: the `bHeyFirst && bAllStarted` early HEY/telemetry never fires on a clean boot. Ready marker deliberately does not rely on it. | open |
 | TM-18 | T-Deck | PERF | Medium | `tdeck_main.cpp` `mouse_read()` | Trackball "not smooth": GPIO levels are polled every 10 ms (`LV_INDEV_DEF_READ_PERIOD`) and compared to the last level, 10 px per edge. Edges faster than the poll collapse (odd count -> one step, even count -> none). Injected steps are perfect (input scenario: 40/40, p95 30 ms), so the loss is at the edge sampling. Measure with an ISR edge counter vs consumed events under a real roll, then count edges in the ISR and consume them in `mouse_read()`. | **FIXED** — ISR edge counting, consumed in `mouse_read()`; measured on DK5EN-14: old level compare lost ~75 % of edges on fast rolls (186 -> 40, 224 -> 57), edge mode 0 lost, pending 0, repaint p50 8 ms on tab 0 and map. `--balledge off` restores the old path for A/B. |
 | TM-20 | all ESP32 | BUG | High | `udp_functions.cpp` `startNetwork()`, `esp32_main.cpp` retry path | **FIXED** — WiFi bring-up froze loopTask ~7 s (delay 1000+200+500, sync `scanNetworks()`) plus `delay(1500)` on the boot retry, and again on every 5-minute retry while unconnected (LoRa RX unserviced on any ESP32 gateway without AP). Now async scan, no delays; measured on DK5EN-14: no gap > 0.7 s in the boot log, loop max 26 ms. Trackball edges banked during a stall are discarded, not replayed. | FIXED |
+| TM-21 | all ESP32 | PERF | Low | `esp32_main.cpp` (`if(bWEBSERVER && iWlanWait == 0) startWebserver();`), `web_functions.cpp:81` | With `--debug on` and no IP (AP unreachable, after the 5-min give-up) every loop pass prints `[WEB]...no ip set` — ~125 lines/s (10 630 in 100 s on DK5EN-93). Pre-existing; print once per state change. | open |
 | TM-19 | T-Deck | TEST | Low | `tools/bench/tdeck_harness.py` | Harness gaps: touch injection (none), real-roll trackball capture (TM-18), audible confirmation of tones (operator only). | open |
 
 #### Bench fleet (scanned 2026-08-29, all four live on USB)
@@ -909,6 +910,14 @@ Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root ca
 All four run 4.35p (RAK build Aug 22 2026, `Flash-Version 20260724`). The three ESP32 boards join
 `ORBI63`; the T-Deck saw it at -80 dBm, Heltec -53, T-Beam -56 at the same desk (TD-01 hardware
 note holds). Query helper: `tools/bench/serial_session.py PORT [--wait-boot] --info`.
+
+**Cross-board regression 2026-08-29 (after TM-01..04, TM-15, TM-18, TM-20, UP-01, upstream merge):**
+Heltec V3 (`DK5EN-93`), T-Beam v1.2 (`DK5EN-92`), RAK4631 (`DK5EN-90`) flashed from
+`tdeck-partial-refresh-trace`; 100 s boot observation each: no reset loops, no crash markers,
+LoRa init OK, `--info` answers, BLE up, WiFi path unchanged in behaviour (TD-01 first-join failure
+on all, then the 5-min wait). Over-the-air: `--sendpos` from T-Beam, Heltec and RAK received by
+every other node (LoRa debug on, `MH-LoRa` lines), T-Deck TX evidenced by `DK5EN-14` in the
+Heltec and RAK `--mheard` lists. Only finding: TM-21 (`[WEB]` debug spam, pre-existing).
 
 **Harness state 2026-08-29** (`tools/bench/tdeck_harness.py --list`): boot, idle, tabs, drawer,
 inject, audio, audio_stall, sleep, screen, **map** (10 stations 0.3-400 km, full zoom sweeps,
