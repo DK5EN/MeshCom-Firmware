@@ -86,12 +86,15 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 4. Automated integration/regression harnesses over USB serial on all four platforms (RAK has no
    harness yet; T-Deck 13 scenarios, OLED 7).
 
-- **WiFi changes stay out of the PR for now** (decision): TM-24 roaming fix not started. Note:
-  TM-20 (non-blocking `startNetwork()`, async scan) is already on the branch and tested (boot
-  timeline, four-node regression) — decide explicitly whether it ships in the PR or is held with
-  the other WiFi work.
-- **E290 Wireless Paper hardware arrives the week of 2026-09-01** — e-paper redraw is the next
-  display target (WP_DISP code paths, `PAGE_MAX 10`, browse loop in `singleClick()`); needs its
+- **WiFi (decided 2026-08-29 evening):** TM-20 (non-blocking `startNetwork()`) **ships in the PR**
+  — tested, and the 7 s freeze it removes loses LoRa frames on every ESP32 node every 5 minutes
+  while unconnected. TM-24 (roaming / SSID-only join) stays out until confirmed.
+- **TD-03 heap defect: high priority, next run.** RAK boot profile + harness needed for platform
+  parity (TM-25/26). Screen CRC on Heltec and T-Beam (TM-27; T-Deck has no readback). TM-06/07
+  lower priority (cumbersome, no longer highest). Full automation low priority — the manual
+  procedure is `automation-runner-runbook.md` (TM-29).
+- **E290 Wireless Paper hardware arrives the week of 2026-09-01** (TM-28, delayed until it is
+  here) — e-paper redraw is the next display target (WP_DISP code paths, `PAGE_MAX 10`, browse loop in `singleClick()`); needs its
   own harness scenarios and a frame instrument.
 - Tile format (TM-23) parked; upstream sync stays merge + net-diff review each time.
 
