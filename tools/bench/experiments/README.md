@@ -21,4 +21,5 @@ per step; the operator reports one yes/no per run.
 | `one.py`                    | one message, then optional extra commands (`--reflush`, `--invalidate`)               |
 | `monitor.py`                | 15-minute crash monitor: prints Guru/backtrace/reset events                           |
 
-These should be folded into `tdeck_harness.py` scenarios (`map`, `mapcrash`, `flushloss`).
+`maptest.py` and `crashtest.py` are folded into the `map` scenario of `tdeck_harness.py`
+(2026-08-29); the flush-loss scripts are kept as the record of the defect hunt.

@@ -89,3 +89,11 @@ Measure with the `[SDMAP]` `read/decode` split before choosing.
   `[FLUSH]` CRC / `--framedump`.
 - Eye tests: one yes/no per run. Scratch scripts of this session are in the session scratchpad
   only; the reusable ones should move into the harness (`map` scenario, crash reproducer).
+
+## Audio wave done (2026-08-29 morning)
+
+TM-01..04 fixed in `49c482e1`: one audio task (prio 3) with a queue, loopTask never blocks on
+audio, SD reads of the player under the TFT bus mutex. Harness `audio_stall` 1 552 -> 23 ms, all
+13 scenarios pass (map, nav, input added today; `--list` for the page). Debug hooks added:
+`--scroll <tab> <dy>`, `--key <text>`, `--ball <dir> <n>`, `[BOOT];ready`, `[TFT];on/off`,
+`[KEY]`, `[BALL]`. Next: TM-16 boot time (29 s), TM-18 trackball edge loss, then the PR.
