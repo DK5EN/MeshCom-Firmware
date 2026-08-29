@@ -27,8 +27,8 @@
 #pragma once
 
 #if !defined(INSTRUMENT_ENABLED)
-  #if defined(ESP32)
-    #define INSTRUMENT_ENABLED 1
+  #if defined(ESP32) || defined(NRF52_SERIES)
+    #define INSTRUMENT_ENABLED 1      /* nRF52 since TM-12: loop period + heap, no PSRAM fields */
   #else
     #define INSTRUMENT_ENABLED 0
   #endif

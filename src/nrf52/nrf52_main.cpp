@@ -6,6 +6,7 @@
 #include "capture_functions.h"
 
 #include <Arduino.h>
+#include "instrument.h"
 #include <SPI.h>
 
 #include <debugconf.h>
@@ -1137,6 +1138,7 @@ void nrf52setup()
 
 void nrf52loop()
 {
+    INSTR_LOOPTICK();
     #if defined(HAS_TFT_114) or defined(BOARD_T_ECHO)
     if(bDEEP_SLEEP)
     {

@@ -526,6 +526,33 @@ void sendMeshComUDP()
 }
 
 
+#if defined(ESP32)
+// TD-01 Diagnose: Grund des Verbindungsabbruchs aus dem WLAN-Treiber. Ohne
+// diese Zahl sind "connection error" und "no AP found", "auth fail" und
+// "4-way handshake timeout" nicht zu unterscheiden.
+static bool s_wifiEventHooked = false;
+static void wifiEventLog(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  switch(event)
+  {
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      Serial.printf("[WIFI];event;disconnected;reason;%d;ms;%lu\n", (int)info.wifi_sta_disconnected.reason, (unsigned long)millis());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      Serial.printf("[WIFI];event;connected;ms;%lu\n", (unsigned long)millis());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      Serial.printf("[WIFI];event;got_ip;ms;%lu\n", (unsigned long)millis());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_AUTHMODE_CHANGE:
+      Serial.printf("[WIFI];event;authmode;%d;ms;%lu\n", (int)info.wifi_sta_authmode_change.new_mode, (unsigned long)millis());
+      break;
+    default:
+      break;
+  }
+}
+#endif
+
 // Asynchroner WLAN-Scan (startNetwork -> doWiFiConnect)
 static bool s_wifiScanPending = false;
 static int  s_wifiScanPolls = 0;
@@ -619,6 +646,13 @@ static void wifiBeginFromScan(int nrAps);
   // Haenger nach dem Start und bei jedem Wiederholungsversuch. Jetzt: Reset,
   // asynchronen Scan starten, zurueck; doWiFiConnect() (1-s-Takt der
   // Hauptschleife) holt das Scanergebnis ab und ruft WiFi.begin().
+  #if defined(ESP32)
+  if(!s_wifiEventHooked)
+  {
+    WiFi.onEvent(wifiEventLog);
+    s_wifiEventHooked = true;
+  }
+  #endif
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
@@ -664,6 +698,12 @@ static void wifiBeginFromScan(int nrAps)
      }
   }
 
+  #if defined(BENCH_WIFI_NO_BSSID)
+  // TM-11 experiment: never pin channel/BSSID, let the driver pick the AP
+  if(best_idx != -1)
+    printfdeb("[WIFI]...BENCH_WIFI_NO_BSSID: joining by SSID only\n");
+  best_idx = -1;
+  #endif
   if(best_idx == -1)
   {
     // ESP32 - force connecting (in case of hidden ssid or out of range atm)

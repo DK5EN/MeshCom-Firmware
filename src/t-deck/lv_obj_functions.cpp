@@ -2082,6 +2082,30 @@ void tft_off()
 }
 
 
+// TM-08: the header is refreshed every 500 ms; with partial refresh every
+// lv_label_set_text() / style write invalidates its area even when nothing
+// changed -- that was the idle repaint driver (2.5 full flushes/s with
+// full_refresh=1). Only touch the object when the value differs.
+static void label_set_if_changed(lv_obj_t *obj, const char *text)
+{
+    if(obj == NULL || text == NULL)
+        return;
+    const char *cur = lv_label_get_text(obj);
+    if(cur != NULL && strcmp(cur, text) == 0)
+        return;
+    lv_label_set_text(obj, text);
+}
+
+static void text_color_set_if_changed(lv_obj_t *obj, lv_color_t color)
+{
+    if(obj == NULL)
+        return;
+    lv_color_t cur = lv_obj_get_style_text_color(obj, LV_PART_MAIN);
+    if(cur.full == color.full)
+        return;
+    lv_obj_set_style_text_color(obj, color, LV_PART_MAIN);
+}
+
 static void update_header_sat_indicator(void)
 {
     if(header_sat_label == NULL || header_sat_icon == NULL)
@@ -2090,8 +2114,8 @@ static void update_header_sat_indicator(void)
     // If GPS was turned off via the command/UI show the icon as 'off' (white)
     if(!bGPSON)
     {
-        lv_label_set_text(header_sat_label, "0");
-        lv_obj_set_style_text_color(header_sat_icon, lv_color_white(), LV_PART_MAIN);
+        label_set_if_changed(header_sat_label, "0");
+        text_color_set_if_changed(header_sat_icon, lv_color_white());
         lv_obj_add_flag(header_sat_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN);
         return;
@@ -2099,12 +2123,12 @@ static void update_header_sat_indicator(void)
 
     char sat_text[8];
     snprintf(sat_text, sizeof(sat_text), "%u", (unsigned int)posinfo_satcount);
-    lv_label_set_text(header_sat_label, sat_text);
+    label_set_if_changed(header_sat_label, sat_text);
 
     // Show green when we have a fix OR at least some satellites visible, red when GPS on but no sats/fix
     lv_color_t icon_color = (posinfo_fix || posinfo_satcount > 0) ? lv_palette_main(LV_PALETTE_GREEN)
                                                                          : lv_palette_main(LV_PALETTE_RED);
-    lv_obj_set_style_text_color(header_sat_icon, icon_color, LV_PART_MAIN);
+    text_color_set_if_changed(header_sat_icon, icon_color);
     lv_obj_clear_flag(header_sat_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN);
 }
@@ -2119,16 +2143,16 @@ static void update_header_batt_indicator(float batt, int proz)
 
     if(usb_powered)
     {
-        lv_label_set_text(header_batt_label, "USB");
-        lv_label_set_text(header_batt_icon, LV_SYMBOL_USB);
-        lv_obj_set_style_text_color(header_batt_icon, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+        label_set_if_changed(header_batt_label, "USB");
+        label_set_if_changed(header_batt_icon, LV_SYMBOL_USB);
+        text_color_set_if_changed(header_batt_icon, lv_palette_main(LV_PALETTE_ORANGE));
         return;
     }
 
     int clamped_proz = clamp_int(proz, 0, 100);
     char percent_text[8];
     snprintf(percent_text, sizeof(percent_text), "%d%%", clamped_proz);
-    lv_label_set_text(header_batt_label, percent_text);
+    label_set_if_changed(header_batt_label, percent_text);
 
     const char *icon = LV_SYMBOL_BATTERY_EMPTY;
     lv_color_t icon_color = lv_palette_main(LV_PALETTE_LIGHT_GREEN);
@@ -2150,8 +2174,8 @@ static void update_header_batt_indicator(float batt, int proz)
         icon = LV_SYMBOL_BATTERY_1;
     }
 
-    lv_label_set_text(header_batt_icon, icon);
-    lv_obj_set_style_text_color(header_batt_icon, icon_color, LV_PART_MAIN);
+    label_set_if_changed(header_batt_icon, icon);
+    text_color_set_if_changed(header_batt_icon, icon_color);
 }
 
 /* WiFi / Bluetooth status in header
@@ -2175,8 +2199,8 @@ static void update_header_wifi_indicator(void)
             if (bDEBUG)
                 Serial.printf("[TDECK]...update_header_wifi_indicator: node_wifion=false, WiFi.status=%d, ssid='%s'\n", (int)WiFi.status(), meshcom_settings.node_ssid);
             
-            lv_obj_set_style_text_color(header_wifi_icon, lv_color_white(), LV_PART_MAIN);
-            lv_label_set_text(header_wifi_icon, LV_SYMBOL_WIFI);
+            text_color_set_if_changed(header_wifi_icon, lv_color_white());
+            label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
             lv_obj_add_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
             return;
         }
@@ -2189,8 +2213,8 @@ static void update_header_wifi_indicator(void)
 
     if(is_connected || is_ap_active)
     {
-        lv_obj_set_style_text_color(header_wifi_icon, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
-        lv_label_set_text(header_wifi_icon, LV_SYMBOL_WIFI);
+        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREEN));
+        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
         lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
         return;
     }
@@ -2199,15 +2223,15 @@ static void update_header_wifi_indicator(void)
     // Only if global switch is ON (which we checked above, but double check logic)
     if (bWIFIAP || bWEBSERVER || (strlen(meshcom_settings.node_ssid) > 1))
     {
-        lv_obj_set_style_text_color(header_wifi_icon, lv_palette_main(LV_PALETTE_LIME), LV_PART_MAIN);  //ex lv_palette_main(LV_PALETTE_RED)
-        lv_label_set_text(header_wifi_icon, LV_SYMBOL_WIFI);
+        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_LIME));  //ex lv_palette_main(LV_PALETTE_RED)
+        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
         lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
     }
     else
     {
         // Not enabled/configured -> White
-        lv_obj_set_style_text_color(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN); //ex lv_color_white()
-        lv_label_set_text(header_wifi_icon, LV_SYMBOL_WIFI);
+        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
+        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
         lv_obj_add_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
     }
 }
@@ -2217,8 +2241,8 @@ static void update_header_bt_indicator(void)
     if(header_bt_icon == NULL)
         return;
     // Always render the icon glyph in white
-    lv_obj_set_style_text_color(header_bt_icon, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN); //ex lv_color_white()
-    lv_label_set_text(header_bt_icon, LV_SYMBOL_BLUETOOTH);
+    text_color_set_if_changed(header_bt_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
+    label_set_if_changed(header_bt_icon, LV_SYMBOL_BLUETOOTH);
 
     /* KBC
     // Ensure a square touch/visual area for the icon
@@ -2236,7 +2260,7 @@ static void update_header_bt_indicator(void)
     if (deviceConnected)
     {
         // Connected: blue logo
-        lv_obj_set_style_text_color(header_bt_icon, lv_palette_main(LV_PALETTE_LIME), LV_PART_MAIN); //ex lv_color_make(0x00, 0x00, 0xff)
+        text_color_set_if_changed(header_bt_icon, lv_palette_main(LV_PALETTE_LIME)); //ex lv_color_make(0x00, 0x00, 0xff)
     }
     else
     {
@@ -3606,13 +3630,13 @@ void tdeck_update_time_label()
         meshcom_settings.node_date_second);
 
     if(btn_time_label != NULL)
-        lv_label_set_text(btn_time_label, cTime);
+        label_set_if_changed(btn_time_label, cTime);
     if(btn_time_label1 != NULL)
-        lv_label_set_text(btn_time_label1, cTime);
+        label_set_if_changed(btn_time_label1, cTime);
     if(btn_time_label2 != NULL)
-        lv_label_set_text(btn_time_label2, cTime);
+        label_set_if_changed(btn_time_label2, cTime);
     if(btn_time_label4 != NULL)
-        lv_label_set_text(btn_time_label4, cTime);
+        label_set_if_changed(btn_time_label4, cTime);
 
     if(header_time_label != NULL)
     {
@@ -3620,7 +3644,7 @@ void tdeck_update_time_label()
         snprintf(header_time, sizeof(header_time), "%02i:%02i",
             meshcom_settings.node_date_hour,
             meshcom_settings.node_date_minute);
-        lv_label_set_text(header_time_label, header_time);
+        label_set_if_changed(header_time_label, header_time);
     }
 
     // update_header_locator_label();

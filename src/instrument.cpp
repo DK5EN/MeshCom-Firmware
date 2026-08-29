@@ -12,7 +12,13 @@
 
 #if INSTRUMENT_ENABLED
 
+#if defined(ESP32)
 #include <esp_heap_caps.h>
+#else
+#include <malloc.h>
+extern int dbgHeapTotal(void);   // nrf52_main.cpp: __HeapLimit - __HeapBase
+extern int dbgHeapUsed(void);    // mallinfo().uordblks
+#endif
 #include "printfdeb_functions.h"
 
 /* Provided by src/t-deck/lv_obj_functions.cpp, which owns these objects.
@@ -73,6 +79,7 @@ void instrument_report_heap(const char *tag)
     /* All four internal figures are MALLOC_CAP_INTERNAL on purpose. The
      * largest-free-block is the discriminating one: fragmentation starves
      * allocations while the free total still looks healthy. */
+#if defined(ESP32)
     printfdeb("[INSTR-HEAP];%s;int_free;%u;int_min;%u;int_largest;%u;psram_free;%u;psram_largest;%u\n",
               (tag && *tag) ? tag : "-",
               (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
@@ -80,6 +87,14 @@ void instrument_report_heap(const char *tag)
               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
               (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+#else
+    {
+        struct mallinfo mi = mallinfo();
+        int total = dbgHeapTotal();
+        printfdeb("[INSTR-HEAP];%s;int_free;%d;int_min;%d;int_largest;%d;psram_free;0;psram_largest;0\n",
+                  tag, total - (int)mi.uordblks, -1, (int)mi.fordblks);
+    }
+#endif
 }
 
 void instrument_report_timing(void)
