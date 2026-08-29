@@ -49,6 +49,9 @@ before the sum runs out.
   to inspect the problem destroys the evidence.
 
 - **Fix:** trim the view on the fast path, mirroring the model trim.
+- **Status 2026-08-29: FIXED** — `msg_list_trim_view()` after `msg_list_append_bubble()` on the
+  fast path; regression scenario `trim` in `tools/bench/tdeck_harness.py` (before: 60 children,
+  after: 50, on DK5EN-14). See BACKLOG §3.8b TD-03.
 
 ## Finding C1: audio task created above the priority ceiling
 

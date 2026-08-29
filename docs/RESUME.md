@@ -38,6 +38,7 @@ T-Beam v1.2 `DK5EN-92` `/dev/cu.usbserial-573C0005841`, RAK4631 `DK5EN-90` `/dev
 | TM-12        | Loop/heap instrument on the RAK4631                                                                 | loop avg 99.7 / max 104 ms (paced), heap 111 832 free                                            |
 | TM-05        | Closed by analysis: all SPI2 users except the (mutex-guarded) audio task run on loopTask            | —                                                                                                |
 | ready marker | `[BOOT];ready;ms;N;ip;X` (raw `Serial.printf`; `printfdeb` strips `;` outside `--debug csv`)        | ready 9-11 s on all ESP32 boards with WiFi joined                                                |
+| TD-03 / H1   | Active-tab message view trimmed like the model (`msg_list_trim_view()`, 50 bubbles)                 | harness `trim`: 60 -> 50 children; saturated view -584 B PSRAM / 20 msgs (was 2 760 B/msg)       |
 
 Cross-board regression after all of it: Heltec V3, T-Beam, RAK4631 boot clean, LoRa TX/RX in every
 direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regression").
@@ -60,8 +61,8 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
 
 ## Harnesses (run from `tools/bench/runs/` so the raw logs land there)
 
-- `python3 tools/bench/tdeck_harness.py --list` — 13 scenarios (boot, idle, tabs, drawer, inject,
-  audio, audio_stall, sleep, screen, map, nav, input, heap). All 13 green on DK5EN-14.
+- `python3 tools/bench/tdeck_harness.py --list` — 14 scenarios (boot, idle, tabs, drawer, inject,
+  audio, audio_stall, sleep, screen, map, nav, input, heap, trim). All 14 green on DK5EN-14.
 - `python3 tools/bench/oled_harness.py --list [--port …]` — 7 scenarios (boot, pos, inject, pages,
   display, track, timing) for every U8g2 board. 7/7 on Heltec V3 and T-Beam.
 - `tools/bench/experiments/rolltest.py` — operator trackball roll test (edge vs level mode).
@@ -96,7 +97,7 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   WiFi-stalls-the-node case (blocks even LoRa RX), (d) SSID-only association, (e) re-connecting,
   (f) roaming, (g) band/AP steering. TM-34 absorbs TM-24 and the TD-01/TM-11 confirmation run;
   findings doc first, then its own bench protocol and its own PR.
-- **TD-03 heap defect: high priority, next run.** RAK boot profile + harness needed for platform
+- **TD-03 heap defect: fixed 2026-08-29, goes into the PR.** RAK boot profile + harness needed for platform
   parity (TM-25/26). Screen CRC on Heltec and T-Beam (TM-27; T-Deck has no readback). TM-06/07
   lower priority (cumbersome, no longer highest). Full automation low priority — the manual
   procedure is `automation-runner-runbook.md` (TM-29).
@@ -107,8 +108,9 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 
 ## Next session, in order
 
-1. TD-03 heap defect (`msg_list` never trimmed, H1/C2) — highest priority per the operator.
-   TD-01 confirmation run moves into TM-34 (WiFi research track).
+1. ~~TD-03 heap defect~~ **fixed 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario;
+   before 60 / after 50 children, saturated view costs -584 B PSRAM per 20 messages). TD-01
+   confirmation run moves into TM-34 (WiFi research track, parallel session).
 2. TM-22/TM-10: T-Beam SSD1306 to full-buffer, dirty flag for OLED pushes (Heltec + T-Beam).
 3. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
 4. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only

@@ -254,6 +254,7 @@ static void msg_tabs_clear_all(void);
 static void msg_render_active_tab(void);
 static void msg_list_show_hint(const char *text);
 static void msg_list_append_bubble(const MsgBubble &bubble);
+static void msg_list_trim_view(void);
 
 struct HeaderEventData
 {
@@ -2582,6 +2583,28 @@ static void msg_flush_timer_cb(lv_timer_t *t)
     }
 }
 
+// TD-03 / H1: die Ansicht (msg_list) auf dieselbe Obergrenze wie das Modell
+// (msg_tabs_trim_history) kuerzen. Der Schnellpfad in msg_tabs_add_message()
+// haengt neue Bubbles nur an; ohne diesen Schnitt wuchs die Ansicht des
+// gerade offenen Tabs unbegrenzt (2 760 B PSRAM pro Nachricht, tdeck-baseline
+// Run 2). lv_obj_del() loest LV_EVENT_DELETE aus, das HeaderEventData und
+// DeleteEventData der Bubble freigibt.
+static void msg_list_trim_view(void)
+{
+    if(msg_list == NULL)
+        return;
+
+    while(lv_obj_get_child_cnt(msg_list) > MSG_TAB_MAX_MESSAGES)
+    {
+        lv_obj_t *oldest = lv_obj_get_child(msg_list, 0);
+        if(oldest == NULL)
+            break;
+        if(oldest == msg_list_hint_label)
+            msg_list_hint_label = NULL;
+        lv_obj_del(oldest);
+    }
+}
+
 static void msg_tabs_trim_history(std::vector<MsgBubble> &bubbles)
 {
     if(bubbles.size() <= MSG_TAB_MAX_MESSAGES)
@@ -2862,8 +2885,9 @@ static void msg_tabs_add_message(const String &group, const MsgBubble &bubble)
     {
         if (index == msg_active_tab_index)
         {
-            // Already active, just append to view
+            // Already active, just append to view -- and trim it like the model
             msg_list_append_bubble(bubble);
+            msg_list_trim_view();
 
             lv_obj_t *last = lv_obj_get_child(msg_list, -1);
             if(last != NULL)

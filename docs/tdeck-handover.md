@@ -168,13 +168,13 @@ Severity is the reviewers'; **Status is what measurement actually established.**
 
 ### 4.1 Measured
 
-| ID    | Where                        | What                                                                                               | Status                                                                                              |
-| ----- | ---------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| P1    | `tdeck_main.cpp:363,414-428` | `full_refresh=1` + non-DMA flush: 36.65 ms x ~3/s = 11.5 % duty, blocking, holds the SPI semaphore | measured; partial-refresh fix in tree, causes §3.2                                                  |
-| TD-01 | `udp_functions.cpp:629-698`  | Boot association fails; only the 5-minute retry succeeds. Node offline ~5 min after every power-on | reproduced on **two** boards, at −47 dBm. Not RF. Leading untested hypothesis: BLE/WiFi coexistence |
-| H1    | `lv_obj_functions.cpp:2770`  | Rendered message list never trimmed while the model is (view 60 vs model 50)                       | confirmed; **PSRAM** 2 760 B/msg, ~2 800 msgs headroom — not the internal-heap defect               |
-| C2    | `esp32_audio.cpp:115`        | Audio semaphore released before playback; decoder buffers can be freed under the reading task      | race is real in code; **no per-playback leak measured** (two rounds, full recovery)                 |
-| G07   | `tdeck_main.cpp:351`         | Draw buffer size passed in bytes, not pixels                                                       | fixed in tree (mandatory for partial refresh)                                                       |
+| ID    | Where                        | What                                                                                               | Status                                                                                                                       |
+| ----- | ---------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| P1    | `tdeck_main.cpp:363,414-428` | `full_refresh=1` + non-DMA flush: 36.65 ms x ~3/s = 11.5 % duty, blocking, holds the SPI semaphore | measured; partial-refresh fix in tree, causes §3.2                                                                           |
+| TD-01 | `udp_functions.cpp:629-698`  | Boot association fails; only the 5-minute retry succeeds. Node offline ~5 min after every power-on | reproduced on **two** boards, at −47 dBm. Not RF. Leading untested hypothesis: BLE/WiFi coexistence                          |
+| H1    | `lv_obj_functions.cpp:2770`  | Rendered message list never trimmed while the model is (view 60 vs model 50)                       | **FIXED 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario, 60 -> 50 children on DK5EN-14); was PSRAM 2 760 B/msg |
+| C2    | `esp32_audio.cpp:115`        | Audio semaphore released before playback; decoder buffers can be freed under the reading task      | race is real in code; **no per-playback leak measured** (two rounds, full recovery)                                          |
+| G07   | `tdeck_main.cpp:351`         | Draw buffer size passed in bytes, not pixels                                                       | fixed in tree (mandatory for partial refresh)                                                                                |
 
 ### 4.2 Verified by reading, not yet fixed
 

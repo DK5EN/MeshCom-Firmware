@@ -1098,6 +1098,70 @@ def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     return {"ok": ok, "h0": h0, "h1": h1, "delta": delta}
 
 
+MSG_TAB_MAX_MESSAGES = 50  # mirrors lv_obj_functions.cpp; the view must never hold more
+
+
+def scenario_trim(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-03 / H1 regression: the rendered list of the active tab is capped.
+
+    Injects --trim-count messages into one group while that group's tab is the
+    active one (the fast path in msg_tabs_add_message appends to the view
+    without re-rendering), samples [UISTAT] msg_list after every message and
+    fails if the child count ever exceeds MSG_TAB_MAX_MESSAGES. Heap is sampled
+    before and after so the PSRAM cost per message is visible in the report.
+    """
+    session.send("--tab 0")
+    time.sleep(0.3)
+    idx0 = session.send("--heap h0")
+    m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
+    h0 = parse_line(m0.string) if m0 else None
+
+    samples: List[Optional[int]] = []
+    inject_fail = 0
+    for i in range(args.trim_count):
+        idx = session.send(f"--injectmsg 9999 trim probe {i}")
+        if session.wait_for(r"\[INJECT\];ok", 2.0, since=idx) is None:
+            inject_fail += 1
+        time.sleep(0.2)
+        st = get_uistat(session)
+        if st is None:  # one probe miss is a serial artefact, not a finding
+            st = get_uistat(session)
+        samples.append(st.get("msg_list") if st else None)
+
+    idx1 = session.send("--heap h1")
+    m1 = session.wait_for(r"\[INSTR-HEAP\];h1;", 2.0, since=idx1)
+    h1 = parse_line(m1.string) if m1 else None
+
+    seen = [v for v in samples if v is not None]
+    max_children = max(seen) if seen else None
+    final_children = seen[-1] if seen else None
+    expected_final = min(args.trim_count, MSG_TAB_MAX_MESSAGES)
+    missed = args.trim_count - len(seen)
+    ok = (
+        inject_fail == 0
+        and samples
+        and samples[-1] is not None
+        and missed <= args.trim_count // 10
+        and max_children is not None
+        and max_children <= MSG_TAB_MAX_MESSAGES
+        and final_children == expected_final
+    )
+    return {
+        "ok": ok,
+        "count": args.trim_count,
+        "inject_fail": inject_fail,
+        "probe_missed": missed,
+        "max_children": max_children,
+        "final_children": final_children,
+        "expected_final": expected_final,
+        "limit": MSG_TAB_MAX_MESSAGES,
+        "samples": samples,
+        "h0": h0,
+        "h1": h1,
+        "delta": heap_delta(h0, h1),
+    }
+
+
 def _top_backtraces(
     records: Iterable[Optional[Dict[str, Any]]], elf: str, limit: int = 8
 ) -> List[Dict[str, Any]]:
@@ -1265,6 +1329,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "nav": scenario_nav,
     "input": scenario_input,
     "heap": scenario_heap,
+    "trim": scenario_trim,
 }
 SCENARIO_ORDER = [
     "boot",
@@ -1280,6 +1345,7 @@ SCENARIO_ORDER = [
     "nav",
     "input",
     "heap",
+    "trim",
 ]
 
 
@@ -1399,6 +1465,14 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
         elif name == "heap":
             print(f"  delta={result.get('delta')}")
+        elif name == "trim":
+            print(
+                f"  count={result.get('count')} max_children={result.get('max_children')} "
+                f"final={result.get('final_children')} expected={result.get('expected_final')} "
+                f"limit={result.get('limit')} inject_fail={result.get('inject_fail')} "
+                f"probe_missed={result.get('probe_missed')}"
+            )
+            print(f"  delta={result.get('delta')}")
     print()
 
 
@@ -1421,6 +1495,7 @@ SCENARIO_HELP = {
     "nav": "drawer -> tab -> drawer over all tabs, scroll the settings page",
     "input": "keyboard keys and trackball steps through the LVGL indev chain",
     "heap": "heap delta over N injected messages",
+    "trim": "TD-03: active-tab message view capped at 50 over N injected messages",
 }
 
 EPILOG = """\
@@ -1477,6 +1552,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--list", action="store_true", help="list the scenarios and exit")
     p.add_argument("--port", default=DEFAULT_PORT, help=f"serial port (default: {DEFAULT_PORT})")
     p.add_argument("--heap-count", type=int, default=20, help="injections in the heap scenario (default: 20)")
+    p.add_argument("--trim-count", type=int, default=60, help="injections in the trim scenario (default: 60, limit is 50)")
     p.add_argument("--elf", default=DEFAULT_ELF, help=f"firmware ELF for symbolization (default: {DEFAULT_ELF})")
     p.add_argument(
         "--boot-timeout",
