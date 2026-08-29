@@ -76,6 +76,25 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
 [reset]`, `[TFT];on/off`, `[KEY]`, `[BALL]`, `[OLED];frame`, `[WIFI];event;…`, `[BOOT];ready`.
 Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 
+## Priorities as set by the operator (2026-08-29 evening)
+
+1. T-Deck: UI performance, mouse pointer, stability, code quality (incl. handover §4.2 review
+   flaws and TD-03 heap: `msg_list` never trimmed, H1/C2 in `tdeck-gui-verdict.md`).
+2. OLED redraw on Heltec V3 and T-Beam (TM-22, TM-10).
+3. Boot time on all four platforms: T-Beam, T-Deck, RAK nRF52, Heltec V3 (TM-16; RAK not yet
+   profiled).
+4. Automated integration/regression harnesses over USB serial on all four platforms (RAK has no
+   harness yet; T-Deck 13 scenarios, OLED 7).
+
+- **WiFi changes stay out of the PR for now** (decision): TM-24 roaming fix not started. Note:
+  TM-20 (non-blocking `startNetwork()`, async scan) is already on the branch and tested (boot
+  timeline, four-node regression) — decide explicitly whether it ships in the PR or is held with
+  the other WiFi work.
+- **E290 Wireless Paper hardware arrives the week of 2026-09-01** — e-paper redraw is the next
+  display target (WP_DISP code paths, `PAGE_MAX 10`, browse loop in `singleClick()`); needs its
+  own harness scenarios and a frame instrument.
+- Tile format (TM-23) parked; upstream sync stays merge + net-diff review each time.
+
 ## Next session, in order
 
 1. TD-01 confirmation run (24 boots, SSID-only) -> fix (TM-11), then re-run both harnesses.
