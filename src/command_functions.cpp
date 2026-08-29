@@ -4494,6 +4494,62 @@ void commandAction(char *umsg_text, bool ble)
     else
     // --- UI test hooks (T-Deck) and message injection -----------------------
     // --injectmsg <dst> <text>: enqueue a text message as if received via LoRa
+    // --injectpos <call> <lat> <lon>   (decimal degrees, negative = S / W)
+    // T-Deck: station onto the map; every other display board: position page
+    // on the OLED via the same deferred-display path a LoRa frame takes.
+    if(commandCheck(msg_text+2, (char*)"injectpos ") == 0)
+    {
+        char call[16] = {0};
+        double lat = 0.0, lon = 0.0;
+        if(sscanf(msg_text+12, "%15s %lf %lf", call, &lat, &lon) == 3)
+        {
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            tdeck_add_pos_point(String(call), fabs(lat), lat < 0 ? 'S' : 'N', fabs(lon), lon < 0 ? 'W' : 'E');
+            Serial.printf("[INJECTPOS];ok;%s;%.5f;%.5f\n", call, lat, lon);
+            #else
+            inject_position(call, lat, lon, -60, 6);
+            #endif
+        }
+        else
+            Serial.println("[INJECTPOS];err;usage");
+        return;
+    }
+    else
+    // --btn click|double|triple|long : drive the OneButton handlers (OLED pages)
+    if(commandCheck(msg_text+2, (char*)"btn ") == 0)
+    {
+        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+        const char *what = msg_text + 6;
+        if(strncmp(what, "click", 5) == 0)       { singleClick(); Serial.println("[BTN];click"); }
+        else if(strncmp(what, "double", 6) == 0) { doubleClick(); Serial.println("[BTN];double"); }
+        else if(strncmp(what, "triple", 6) == 0) { tripleClick(); Serial.println("[BTN];triple"); }
+        else Serial.println("[BTN];err;usage (click|double|triple)");   // long = deepsleep, not for the bench
+        #else
+        Serial.println("[BTN];err;no button on this board");
+        #endif
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"oledstat") == 0)
+    {
+        oledStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"oledlog on") == 0)
+    {
+        bOledLog = true;
+        Serial.println("[OLED];log;1");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"oledlog off") == 0)
+    {
+        bOledLog = false;
+        Serial.println("[OLED];log;0");
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"injectmsg ") == 0)
     {
         char dst[32] = {0};
@@ -4627,21 +4683,6 @@ void commandAction(char *umsg_text, bool ble)
         int n = 10;
         sscanf(msg_text+8, "%d", &n);
         tdeck_dbg_blink(n);
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"injectpos ") == 0)
-    {
-        // --injectpos <call> <lat> <lon>   (decimal degrees, negative = S / W)
-        char call[16] = {0};
-        double lat = 0.0, lon = 0.0;
-        if(sscanf(msg_text+12, "%15s %lf %lf", call, &lat, &lon) == 3)
-        {
-            tdeck_add_pos_point(String(call), fabs(lat), lat < 0 ? 'S' : 'N', fabs(lon), lon < 0 ? 'W' : 'E');
-            Serial.printf("[INJECTPOS];ok;%s;%.5f;%.5f\n", call, lat, lon);
-        }
-        else
-            Serial.println("[INJECTPOS];err;usage");
         return;
     }
     else

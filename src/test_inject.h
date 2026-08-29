@@ -38,6 +38,11 @@
 // Returns true on success, false on failure.
 bool inject_text_message(const char *dst, const char *text, const char *src_call, int16_t rssi, int8_t snr);
 
+// Queue a position beacon (APRS '!' payload, decimal degrees, negative = S/W)
+// as if received via LoRa: feeds sendDisplayPosition() -> OLED position page
+// on every non-T-Deck display board. Prints [INJECTPOS];ok / ;err.
+bool inject_position(const char *call, double lat, double lon, int16_t rssi, int8_t snr);
+
 #else
 
 // MC_INJECT_HOOKS=0: compiled out. Callers may call this unconditionally --
@@ -46,5 +51,10 @@ inline bool inject_text_message(const char *, const char *, const char *, int16_
 {
     return false;
 }
+inline bool inject_position(const char *, double, double, int16_t, int8_t)
+{
+    return false;
+}
+
 
 #endif // MC_INJECT_HOOKS

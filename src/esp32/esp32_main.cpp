@@ -1845,11 +1845,16 @@ void esp32loop()
     if (!s_bootReadyLogged)
     {
         bool network_wanted = bGATEWAY || bEXTUDP || bWEBSERVER || bNETCONSOLE;
-        if (!network_wanted || bAllStarted || meshcom_settings.node_hasIPaddress)
+        // hasIPaddress (global) kippt bei "now listening at IP"; die Kopie in
+        // meshcom_settings wird erst spaeter nachgezogen -- beide pruefen.
+        extern bool hasIPaddress;
+        if (!network_wanted || bAllStarted || hasIPaddress || meshcom_settings.node_hasIPaddress)
         {
             s_bootReadyLogged = true;
-            printfdeb("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
-                      meshcom_settings.node_hasIPaddress ? 1 : 0);
+            // Serial.printf, nicht printfdeb: das wuerde die Semikolons ausserhalb
+            // von --debug csv entfernen und der Harness faende die Marke nicht.
+            Serial.printf("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
+                          (hasIPaddress || meshcom_settings.node_hasIPaddress) ? 1 : 0);
         }
     }
     // TEMPORARY -- measures the period between successive loop entries, so a

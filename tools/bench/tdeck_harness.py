@@ -79,6 +79,11 @@ class TDeckSession:
         self.boot_timeout = boot_timeout
         self.ready_timeout = ready_timeout
         self.boot_ready_ms: Optional[int] = None
+        # the "is the console alive" probe after CLIENT STARTED; boards without
+        # the T-Deck GUI answer --oledstat instead (see oled_harness.py)
+        self.probe_cmd = "--uistat"
+        self.probe_pattern = r"\[UISTAT\]"
+        self.wake_cmd: Optional[str] = "--tft on"
         self.log_path = log_path or Path(
             f"tdeck_run_{time.strftime('%Y%m%d-%H%M%S')}.log"
         )
@@ -114,21 +119,22 @@ class TDeckSession:
         deadline = time.monotonic() + 60.0
         answered = False
         while time.monotonic() < deadline:
-            idx = self.send("--uistat")
-            if self.wait_for(r"\[UISTAT\]", 2.0, since=idx) is not None:
+            idx = self.send(self.probe_cmd)
+            if self.wait_for(self.probe_pattern, 2.0, since=idx) is not None:
                 answered = True
                 break
         if not answered:
-            raise TimeoutError("device never answered --uistat within 60s after boot")
+            raise TimeoutError(f"device never answered {self.probe_cmd} within 60s after boot")
         # Answering --uistat is not the end of initialisation: the WiFi attempt
         # (up to ~15 s, plus one radio reset and retry) still runs, the header
         # icons blink and commands are serviced late. The firmware prints
         # [BOOT];ready;ms;<millis> once bAllStarted is true; wait for it, but
         # tolerate its absence (older firmware) after ready_timeout.
-        m = self.wait_for(re.escape(READY_MARKER), self.ready_timeout, since=0)
+        # printfdeb() drops the semicolons outside --debug csv; accept both
+        m = self.wait_for(r"\[BOOT\][; ]ready", self.ready_timeout, since=0)
         self.boot_ready_ms = None
         if m:
-            mm = re.search(r"ready;ms;(\d+)", m.string)
+            mm = re.search(r"ready[; ]ms[; ](\d+)", m.string)
             self.boot_ready_ms = int(mm.group(1)) if mm else None
         if m is None:
             self._write_raw_log(
@@ -136,7 +142,8 @@ class TDeckSession:
             )
         # The panel goes dark TDECK_TFT_TIMEOUT (30 s) after the last key or
         # touch, serial traffic does not count; switch it on for the eye tests.
-        self.send("--tft on")
+        if self.wake_cmd:
+            self.send(self.wake_cmd)
         time.sleep(1.0)
 
     def close(self) -> None:

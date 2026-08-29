@@ -354,18 +354,21 @@ int dzeile[maxdisplines] = {8, 21, 31, 41, 51, 61, 0};
 #if !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
 
 #include <U8g2lib.h>
+#include "instrument.h"
 
 U8G2 *u8g2;
 
 #if defined(BOARD_HELTEC)
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0, 16, 15, 4);
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, 16, 15, 4);
-#elif defined(BOARD_HELTEC_V3) || defined(BOARD_HELTEC_V4)
-    U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2_1(U8G2_R0, 18, 17, 21);
-    U8G2_SH1106_128X64_NONAME_1_SW_I2C u8g2_2(U8G2_R0, 18, 17, 21);
-#elif defined(BOARD_STICK_V3)
-    U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2_1(U8G2_R0, 18, 17, 21);
-    U8G2_SH1106_128X64_NONAME_1_SW_I2C u8g2_2(U8G2_R0, 18, 17, 21);
+#elif defined(BOARD_HELTEC_V3) || defined(BOARD_HELTEC_V4) || defined(BOARD_STICK_V3)
+    // Hardware-I2C auf Wire1 (SDA_PIN/SCL_PIN werden vor begin() mit
+    // Wire1.setPins() gesetzt, siehe esp32_functions.cpp) statt Software-
+    // Bitbanging mit 1-Seiten-Puffer: ein Bild kostete 579 ms auf dem
+    // Hauptschleifen-Task (gemessen DK5EN-93, [INSTR-FLUSH]), jetzt einige ms.
+    // Wire selbst haengt auf diesen Boards an den Sensoren (I2C_SDA/I2C_SCL).
+    U8G2_SSD1306_128X64_NONAME_F_2ND_HW_I2C u8g2_1(U8G2_R0, 21);
+    U8G2_SH1106_128X64_NONAME_F_2ND_HW_I2C u8g2_2(U8G2_R0, 21);
 #elif defined(BOARD_RAK4630)
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0);  //RESET CLOCK DATA
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0);  //RESET CLOCK DATA
@@ -733,6 +736,11 @@ int pageLastPointer=0;
 int pagePointer=0;
 int pageHold=PAGE_MAX-1;
 
+// Bench-Harness: Bildaufbau-Zeit des OLED und Seitenzustand (--oledstat, --oledlog)
+bool bOledLog = false;
+uint32_t oled_last_frame_us = 0;
+uint32_t oled_frames = 0;
+
 bool bSetDisplay = false;
 bool bShowHead = false;;
 
@@ -1047,6 +1055,8 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
         #elif defined (BOARD_STICK_V3)
         // extra source
 
+        INSTR_T0(t_oled);                 // OLED frame push time -> [INSTR-FLUSH]
+        uint32_t t_oled_us = micros();
         u8g2->firstPage();
         do
         {
@@ -1108,9 +1118,17 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
             }
 
         } while (u8g2->nextPage());
+        INSTR_FLUSH(t_oled);
+        oled_last_frame_us = micros() - t_oled_us;
+        oled_frames++;
+        if(bOledLog)
+            Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d\n", (unsigned long)oled_last_frame_us,
+                          (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz);
 
         #else
         
+        INSTR_T0(t_oled);                 // OLED frame push time -> [INSTR-FLUSH]
+        uint32_t t_oled_us = micros();
         u8g2->firstPage();
         do
         {
@@ -1148,6 +1166,12 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
             }
 
         } while (u8g2->nextPage());
+        INSTR_FLUSH(t_oled);
+        oled_last_frame_us = micros() - t_oled_us;
+        oled_frames++;
+        if(bOledLog)
+            Serial.printf("[OLED];frame;us;%lu;n;%lu;page;%d;last;%d;lines;%d\n", (unsigned long)oled_last_frame_us,
+                          (unsigned long)oled_frames, pagePointer, pageLastPointer, pageLineAnz);
         
         #endif
 
@@ -1164,6 +1188,24 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
     }
 
     #endif
+}
+
+// Bench-Harness: Seitenzustand des OLED in einer Zeile
+void oledStat()
+{
+    Serial.printf("[OLEDSTAT];page;%d;last;%d;hold;%d;lines;%d;info;%d;track;%d;off;%d;isoff;%d;type;%d;frames;%lu;last_us;%lu;posdisp;%d;offwait_ms;%ld;u8g2;%d\n",
+                  pagePointer, pageLastPointer, pageHold,
+                  (pagePointer >= 0 && pagePointer < PAGE_MAX) ? pageLastLineAnz[pagePointer] : -1,
+                  bDisplayInfo ? 1 : 0, bDisplayTrack ? 1 : 0, bDisplayOff ? 1 : 0, bDisplayIsOff ? 1 : 0,
+                  iDisplayType, (unsigned long)oled_frames, (unsigned long)oled_last_frame_us,
+                  bPosDisplay ? 1 : 0,
+                  DisplayOffWait > 0 ? (long)((int32_t)(DisplayOffWait - millis())) : 0L,
+    #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+                  u8g2 != NULL ? 1 : 0
+    #else
+                  -1
+    #endif
+                  );
 }
 
 void sendDisplayHead(bool bInit)

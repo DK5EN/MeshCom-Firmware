@@ -98,6 +98,10 @@ audio, SD reads of the player under the TFT bus mutex. Harness `audio_stall` 1 5
 `--scroll <tab> <dy>`, `--key <text>`, `--ball <dir> <n>`, `[BOOT];ready`, `[TFT];on/off`,
 `[KEY]`, `[BALL]`. Next: TM-16 boot time (29 s), TM-18 trackball edge loss, then the PR.
 
+TM-09 done (Heltec OLED 579 -> 34 ms per frame, hardware I2C on Wire1) and the OLED harness
+(`tools/bench/oled_harness.py`, 7 scenarios, Heltec V3 + T-Beam green) are in; T-Deck harness
+boot/inject/input/map green on the same build.
+
 Campaign backlog: `BACKLOG.md` §3.8f (TM-01 … TM-19, verdict table, bench fleet, harness state),
 upstream sync and branch model §3.8g / §4.1, review verdict
 `review/2026-08-29-upstream-sync-verdict.md`.

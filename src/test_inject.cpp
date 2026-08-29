@@ -34,6 +34,7 @@
 #if MC_INJECT_HOOKS
 
 #include <Arduino.h>
+#include <math.h>
 #include <string.h>
 
 #include <loop_functions.h>         // meshcom_settings, aprsMessage, sendDisplayText() decl
@@ -147,4 +148,53 @@ bool inject_text_message(const char *dst, const char *text, const char *src_call
     return true;
 }
 
+
+bool inject_position(const char *call, double lat, double lon, int16_t rssi, int8_t snr)
+{
+    String strSrc = (call != nullptr) ? String(call) : String("");
+    strSrc.trim();
+    if(strSrc.length() == 0)
+        strSrc = kDefaultSrcCall;
+    if(lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0)
+    {
+        Serial.printf("[INJECTPOS];err;range\n");
+        return false;
+    }
+    if(bPendingDisplayPos || bPendingDisplayText)
+    {
+        Serial.printf("[INJECTPOS];err;queue full\n");
+        return false;
+    }
+    // APRS position: ddmm.mmN/dddmm.mmE# -- exactly what decodeAPRSPOS() parses
+    double alat = fabs(lat), alon = fabs(lon);
+    int latd = (int)alat, lond = (int)alon;
+    double latm = (alat - latd) * 60.0, lonm = (alon - lond) * 60.0;
+    char payload[40];
+    snprintf(payload, sizeof(payload), "%02d%05.2f%c/%03d%05.2f%c#",
+             latd, latm, lat < 0 ? 'S' : 'N', lond, lonm, lon < 0 ? 'W' : 'E');
+
+    struct aprsMessage aprsmsg;
+    initAPRS(aprsmsg, '!');
+    aprsmsg.msg_id = nextInjectMsgId();
+    aprsmsg.msg_len = (uint16_t)strlen(payload);
+    aprsmsg.msg_source_path = strSrc;
+    aprsmsg.msg_source_call = strSrc;
+    aprsmsg.msg_source_last = strSrc;
+    aprsmsg.msg_last_path_cnt = 1;
+    aprsmsg.msg_destination_path = "*";
+    aprsmsg.msg_destination_call = "*";
+    aprsmsg.msg_payload = payload;
+#if defined(BOARD_RAK4630)
+    taskENTER_CRITICAL();
+#endif
+    pendingDisplayMsg = aprsmsg;
+    pendingDisplayRssi = rssi;
+    pendingDisplaySnr = snr;
+    bPendingDisplayPos = true;
+#if defined(BOARD_RAK4630)
+    taskEXIT_CRITICAL();
+#endif
+    Serial.printf("[INJECTPOS];ok;%s;%.5f;%.5f;%s\n", strSrc.c_str(), lat, lon, payload);
+    return true;
+}
 #endif // MC_INJECT_HOOKS
