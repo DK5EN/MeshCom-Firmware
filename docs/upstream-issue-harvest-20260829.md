@@ -183,6 +183,8 @@ verification, no version. **Two of them are still true on our branch, verified b
   sets `bDisplayOff` / `bDisplayIsOff` and calls `sendDisplayHead()`; that is the U8g2 path.
   `grep bDisplayOff src/t-deck/` returns **nothing** — the TFT backlight is never touched by this
   command.
+  **Fixed on our branch 2026-08-29 (TM-33 b):** the command now calls `tft_on()`/`tft_off()` on the
+  T-Deck; harness scenario `displaycmd` (before 0/4, after 4/4).
 - **`SET > WIFI` shows OFF while WiFi is connected — confirmed.** `lv_obj_functions.cpp:4015-4023`
   drives the switch from `meshcom_settings.node_wifion`, the stored _intent_ flag, not the
   association state. A node whose WiFi came up because gateway/webserver/netconsole forced it

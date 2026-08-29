@@ -888,6 +888,13 @@ void commandAction(char *umsg_text, bool ble)
         save_settings();
 
         sendDisplayHead(false);
+
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+        // TM-33 (b) / upstream #690: sendDisplayHead() is the U8g2 path and a
+        // no-op on the T-Deck -- the command never touched the TFT. Now it
+        // wakes the panel; keys and touch keep waking it as before.
+        tft_on();
+        #endif
     }
     else
     if(commandCheck(msg_text+2, (char*)"display off") == 0)
@@ -907,6 +914,10 @@ void commandAction(char *umsg_text, bool ble)
         save_settings();
 
         sendDisplayHead(false);
+
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+        tft_off();      // TM-33 (b): backlight off + panel sleep, like the 30 s timeout
+        #endif
     }
     else
     if(commandCheck(msg_text+2, (char*)"deepsleep") == 0)

@@ -1235,6 +1235,31 @@ def scenario_boot(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     }
 
 
+def scenario_displaycmd(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-33 (b) / upstream #690: the user command --display off/on must drive
+    the TFT (it used to be the U8g2 path only, a no-op on the T-Deck).
+    --display off -> [TFT];off and --tft state reports sleeping;1;
+    --display on -> [TFT];on and sleeping;0. Runs twice. --display on is sent
+    last so the persisted display flag is left cleared."""
+    def state() -> Optional[int]:
+        idx = session.send("--tft state")
+        m = session.wait_for(r"\[TFT\];sleeping;(\d)", 2.0, since=idx)
+        return int(m.group(1)) if m else None
+
+    session.send("--tft on")
+    time.sleep(0.5)
+    steps = []
+    for _ in range(2):
+        for cmd, marker, want in (("--display off", r"\[TFT\];off", 1), ("--display on", r"\[TFT\];on", 0)):
+            idx = session.send(cmd)
+            seen = session.wait_for(marker, 3.0, since=idx) is not None
+            time.sleep(0.8)
+            st = state()
+            steps.append({"cmd": cmd, "marker_seen": seen, "sleeping": st, "want": want, "ok": seen and st == want})
+    ok = all(s["ok"] for s in steps)
+    return {"ok": ok, "steps": steps}
+
+
 def scenario_screen(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     """Sanity-check --screencrc readback stability, and that the map tab renders content."""
     crc_a = get_screencrc(session)
@@ -1346,6 +1371,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "audio_stall": scenario_audio_stall,
     "sleep": scenario_sleep,
     "screen": scenario_screen,
+    "displaycmd": scenario_displaycmd,
     "map": scenario_map,
     "nav": scenario_nav,
     "input": scenario_input,
@@ -1367,6 +1393,7 @@ SCENARIO_ORDER = [
     "input",
     "heap",
     "trim",
+    "displaycmd",
 ]
 
 
@@ -1490,6 +1517,9 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             )
         elif name == "heap":
             print(f"  delta={result.get('delta')}")
+        elif name == "displaycmd":
+            for row in result.get("steps", []):
+                print(f"  {row['cmd']:16s} marker={row['marker_seen']} sleeping={row['sleeping']} want={row['want']} ok={row['ok']}")
         elif name == "trim":
             print(
                 f"  count={result.get('count')} max_children={result.get('max_children')} "
@@ -1521,6 +1551,7 @@ SCENARIO_HELP = {
     "input": "keyboard keys and trackball steps through the LVGL indev chain",
     "heap": "heap delta over N injected messages",
     "trim": "TD-03: active-tab message view capped at 50 over N injected messages",
+    "displaycmd": "TM-33 (b): --display off/on drives the TFT (sleeping 1/0 via --tft state)",
 }
 
 EPILOG = """\
