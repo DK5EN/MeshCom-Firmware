@@ -97,3 +97,7 @@ audio, SD reads of the player under the TFT bus mutex. Harness `audio_stall` 1 5
 13 scenarios pass (map, nav, input added today; `--list` for the page). Debug hooks added:
 `--scroll <tab> <dy>`, `--key <text>`, `--ball <dir> <n>`, `[BOOT];ready`, `[TFT];on/off`,
 `[KEY]`, `[BALL]`. Next: TM-16 boot time (29 s), TM-18 trackball edge loss, then the PR.
+
+Campaign backlog: `BACKLOG.md` §3.8f (TM-01 … TM-19, verdict table, bench fleet, harness state),
+upstream sync and branch model §3.8g / §4.1, review verdict
+`review/2026-08-29-upstream-sync-verdict.md`.
