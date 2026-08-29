@@ -3,6 +3,7 @@
 #include <loop_functions_extern.h>
 #include <debugconf.h>
 #include <ArduinoJson.h>
+#include <ble_json_frame.h>
 #include <time_functions.h>
 #include <mheard_functions.h>
 
@@ -366,10 +367,11 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     // send to Phone
     uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
     bleBuffer[0] = 0x44;
-    serializeJson(mhdoc, bleBuffer+1, measureJson(mhdoc)+1);
+    // Schranke ist der Puffer, nicht die JSON-Laenge (UP-01, BND-03)
+    uint16_t frame_len = bleJsonFrame(mhdoc, bleBuffer, sizeof(bleBuffer));
 
     if(isPhoneReady == 1)
-        addBLEOutBuffer(bleBuffer, measureJson(mhdoc)+1);
+        addBLEOutBuffer(bleBuffer, frame_len);
 
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 
@@ -674,9 +676,10 @@ void sendMheard()
                 // send to Phone
                 uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
                 bleBuffer[0] = 0x44;
-                serializeJson(mhdoc, bleBuffer+1, measureJson(mhdoc)+1);
+                // Schranke ist der Puffer, nicht die JSON-Laenge (UP-01, BND-03)
+                uint16_t frame_len = bleJsonFrame(mhdoc, bleBuffer, sizeof(bleBuffer));
 
-                addBLEComToOutBuffer(bleBuffer, measureJson(mhdoc)+1);
+                addBLEComToOutBuffer(bleBuffer, frame_len);
             }
         }
     }
