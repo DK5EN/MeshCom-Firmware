@@ -1562,7 +1562,12 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     // first byte is always the message length
     // LoRa/Internal messages send to UDP TX
     ringBufferUDPout[udpWrite][0] = len;
-    memcpy(ringBufferUDPout[udpWrite] + 1, buffer, len + 1);
+    // WF-01: len statt len+1. Gesendet werden ohnehin nur msg_len == len Bytes
+    // (sendMeshComUDP liest die Laenge aus Byte 0), das zusaetzliche Byte war
+    // ein Lesezugriff ein Byte hinter der Nutzlast des Aufrufers. Bei allen
+    // heutigen Aufrufern liegt es noch im Puffer (>= 20 Byte Reserve), also
+    // latent, nicht akut -- aber es gibt keinen Grund, es zu lesen.
+    memcpy(ringBufferUDPout[udpWrite] + 1, buffer, len);
 
     //printfdeb("UDP out Ringbuffer added element: %u\n", udpWrite);
     //DEBUG_MSG_VAL("UDP", udpWrite, "UDP Ringbuf added El.:");
