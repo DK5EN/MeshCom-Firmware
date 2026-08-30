@@ -1,9 +1,10 @@
 # RESUME — pick up here
 
-Last session: 2026-08-29, 08:00 to ~13:30 (branch `tdeck-partial-refresh-trace`, HEAD after the
-wrap-up commit; everything pushed to `origin`, working tree clean). 33 commits today. The campaign
-backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-34); read its "What the scouting settled"
-table before re-deriving anything. Upstream state, review verdict and branch model: §3.8g, §4.1,
+Last session: 2026-08-30, ~09:00 to ~11:45 — **Wave W (WiFi, TM-34) shipped and pushed**, report in
+[`wifi-report-20260830.md`](wifi-report-20260830.md) (German, before/after 0/24 → 24/24). Branch
+`tdeck-partial-refresh-trace`, everything on `origin`, working tree clean. The campaign backlog is
+[`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-36); read its "What the scouting settled" table before
+re-deriving anything. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
 
 ## Where things stand
@@ -204,20 +205,17 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,
 TM-30 (not reproduced). The A0 arm (24 boots, `ORBI63`, fixed runner) runs in a separate session.
 
-1. **Wave W shipped 2026-08-30 (see section above); remaining: A4p0 arm result, overnight soak, BACKLOG/RESUME after the soak.** Original plan — after A0 is in: F1+F2 (driver-owned selection, SSID-only,
-   `persistent(false)`), **plus WPA2-PSK forced on WPA2/WPA3 APs** (A5 proved the first-join
-   `AUTH_EXPIRE` is SAE), then F3 (event-driven `got_ip`, no blind window — seen live on the Heltec),
-   F4 (watchdog grace), F5 (`[WIFI];stall`), F6 (DNS off `loopTask`), F7. Instrumentation:
-   `[WIFI];assoc` (SSID/BSSID/chan/RSSI/auth at every `got_ip` and disconnect), `[WIFI];link`
-   60-s heartbeat, `--wifistat`, `--wifidrop`; soak runner over 12–24 h on T-Deck, T-Beam, Heltec
-   in parallel; acceptance per `wifi-findings-20260829.md` §10. SNR is not available on ESP32.
-2. **TM-35** (RAK gateway `getUDP()` 1.6–3.3 s / `sendHey()` 0.7–1.4 s loop stalls) — bound the
-   W5100S socket calls; `rak_harness.py --scenario instr` is the gate.
+1. **Wave W done 2026-08-30** — TM-34 fix plan F1–F7 + WPA2-PSK on WPA2/WPA3 APs, TM-17,
+   HL-01/02, TM-33 (c), `[WIFI]`/`[ETH]` instrumentation; see the section above and
+   [`wifi-report-20260830.md`](wifi-report-20260830.md). **The soak evaluation is parked as TM-36**
+   (operator decision: finish the rest of the backlog first); the soak itself keeps running in the
+   background and its `summary.txt` waits in `tools/bench/runs/wifisoak_W_20260830-112600/`.
+2. **TM-35** (RAK gateway loop stalls) — instrumented in Wave W; the `getUDP()` stall did not
+   reproduce in 600 s (loop max 314 ms = NTP round trip). Decide: accept, or async NTP on the
+   shared gateway socket; `rak_harness.py --scenario instr --instr-seconds 600` is the gate.
 3. **TM-31** — unblock the LAN path (`sudo tcpdump -ni en0 udp port 1990` on the Mac / Orbi client
    isolation; fallback: RAK as the gateway under test), then run `gwflood.py`.
-4. **TM-17** (`bAllStarted` on a clean join, folds into F3), **TM-33 (c)** (WiFi switch shows the
-   intent flag, folds into W), **HL-01/02** (`node_wifion` GUI-only) — all WiFi-adjacent, take
-   them inside Wave W.
+4. ~~TM-17, TM-33 (c), HL-01/02~~ — done inside Wave W (2026-08-30).
 5. **TM-28** E290 Wireless Paper when the hardware is here (week of 2026-09-01): frame instrument,
    OLED-harness scenarios, `[OLED];crc` for e-paper.
 6. Lower: TM-06/07 (LoRa raw injection + SPI trace), TM-14, TM-19, TM-29, Wave 0.6 (native suite),
