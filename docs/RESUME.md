@@ -35,7 +35,7 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 wifisoak_night_*/{tdeck,heltec,tbeam}.log`, then **restore `--gps on` on all three nodes**
    and note it here. Do not open the three ports before the soak ends.
 5. **TM-28** — E290 Wireless Paper hardware arrives the week of 2026-09-01.
-6. Small follow-ups, all filed: nine scratch scripts in `tools/bench/experiments/` still
+6. Small follow-ups, all filed: **BAT-01** (Heltec V3 shows a jumping battery % with no battery attached -- floating ADC divider, no no-battery detection on non-PMU boards; §3.8n, with tonight's 3.7-4.9 V log evidence); nine scratch scripts in `tools/bench/experiments/` still
    inject group `9999` (list in runbook §2.6); nRF52 `CONF` indicator unknown to ESP32 and
    the nRF52 internet path has no per-country case (`bench-country-servers.md`); env
    `E22_XML-DevKitC` does not build at HEAD (`command_functions.cpp:~5012` uses `WiFi`
