@@ -1,10 +1,16 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 to ~11:45 — **Wave W (WiFi, TM-34) shipped and pushed**, report in
-[`wifi-report-20260830.md`](wifi-report-20260830.md) (German, before/after 0/24 → 24/24). Branch
-`tdeck-partial-refresh-trace`, everything on `origin`, working tree clean. The campaign backlog is
-[`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-36); read its "What the scouting settled" table before
-re-deriving anything. Upstream state, review verdict and branch model: §3.8g, §4.1,
+Last session: 2026-08-30, ~09:00 to ~14:15 — Wave W (WiFi, TM-34) in the morning, then **TM-35
+(async NTP), TM-31 (UDP instrument, gateway relay fix, upstream #568 answered), TM-16 (boot time),
+TM-11/TD-01 closed, HL-03/HL-04**. All pushed (`df861d58`), working tree clean, branch
+`tdeck-partial-refresh-trace`. The WLAN report is
+[`wifi-report-20260830.md`](wifi-report-20260830.md) (German, before/after 0/24 → 24/24). The
+campaign backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-37); read its "What the scouting
+settled" table before re-deriving anything.
+
+**Bench state when we stopped:** all four nodes run the current build; the T-Deck's `node_mute` was
+left at 1, the persist flags at 0, as found. No background runs are alive — the 14-h WiFi soak
+(TM-36) died at ~12:17 when the TM-31 work took the Heltec and T-Beam ports. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
 
 ## Where things stand
@@ -50,7 +56,9 @@ direction between the four nodes, `--info` OK (BACKLOG §3.8f "Cross-board regre
 
 ## Measured, not fixed — decisions pending
 
-- **TD-01 / TM-11 / TM-24 (WiFi first join fails).** 12 boots per arm on DK5EN-14, same hour:
+- **TD-01 / TM-11 / TM-24 — CLOSED 2026-08-30** (24/24 first joins, `got_ip` median 10.4 s, 0
+  disconnects; see the late-session section below). Kept here only as the record of how it was
+  found. 12 boots per arm on DK5EN-14, same hour:
   baseline 4/12, BLE advertising deferred 3/12 (**BLE hypothesis refuted**), join by SSID only
   8/12. Every failure logs `[WIFI];event;disconnected;reason;2` (= `AUTH_EXPIRE`). Root cause named
   in the evening (TM-24): **the firmware has no roaming** — no 802.11k/v/r in the SDK build, no
@@ -131,8 +139,10 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   1.6–3.3 s every ~20 s, `sendHey()` 0.7–1.4 s.
 - **TM-30 not reproduced** (35 min `uptime` run on DK5EN-14: latency, loop max and heap flat, no
   crash) — the scenario stays as the regression gate for #1083.
-- **TM-31** instrument built (`gwflood.py`, `--srvip` hook); blocked: UDP from the Heltec never
-  reaches the Mac (see BACKLOG row). Needs `sudo tcpdump` or the Orbi isolation check.
+- **TM-31** instrument built (`gwflood.py`, `--srvip` hook); appeared blocked because UDP from the
+  Heltec never seemed to reach the Mac. _Superseded 2026-08-30: no tcpdump and no Orbi change were
+  needed — the LAN was fine and the verdict came from a blind instrument. See the late-session
+  section below._
 - **TM-34 arms**: A0/A5 first attempt **void** — `bootloop.py` opened the port with DTR/RTS asserted,
   which does not reset the T-Deck Plus (24/24 "no reset marker"); fixed (dtr/rts False). A5 (24
   boots on `ORBI63_Guest`, WPA2) re-run: **24/24 first joins, got_ip median 9.6 s, 0 disconnects**
@@ -328,22 +338,41 @@ pos|text|mixed` covers the 0x3A case #568 reports, and the measurement above is 
 
 ## Next session, in order
 
-Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,
-TM-30 (not reproduced). The A0 arm (24 boots, `ORBI63`, fixed runner) runs in a separate session.
+Done 2026-08-29/30: Wave W (TM-34 F1–F7 + WPA2-PSK, TM-17, HL-01/02, TM-33 (c)), TD-03, UP-02,
+TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26, TM-30 (not reproduced), **TM-35, TM-31, TM-16,
+TM-11/TD-01, HL-03/HL-04**.
 
-1. **Wave W done 2026-08-30** — TM-34 fix plan F1–F7 + WPA2-PSK on WPA2/WPA3 APs, TM-17,
-   HL-01/02, TM-33 (c), `[WIFI]`/`[ETH]` instrumentation; see the section above and
-   [`wifi-report-20260830.md`](wifi-report-20260830.md). **The soak evaluation is parked as TM-36**
-   (operator decision: finish the rest of the backlog first); the soak itself keeps running in the
-   background and its `summary.txt` waits in `tools/bench/runs/wifisoak_W_20260830-112600/`.
-2. **TM-35** (RAK gateway loop stalls) — instrumented in Wave W; the `getUDP()` stall did not
-   reproduce in 600 s (loop max 314 ms = NTP round trip). Decide: accept, or async NTP on the
-   shared gateway socket; `rak_harness.py --scenario instr --instr-seconds 600` is the gate.
-3. **TM-31** — unblock the LAN path (`sudo tcpdump -ni en0 udp port 1990` on the Mac / Orbi client
-   isolation; fallback: RAK as the gateway under test), then run `gwflood.py`.
-4. ~~TM-17, TM-33 (c), HL-01/02~~ — done inside Wave W (2026-08-30).
-5. **TM-28** E290 Wireless Paper when the hardware is here (week of 2026-09-01): frame instrument,
+1. **TM-36 — restart the WiFi soak.** The 14-h run died at ~12:17 when the TM-31 work took the
+   Heltec and T-Beam ports; ~51 min survived (checked in: 5 drops, reconnect median 4.0 s, 0
+   unsolicited disconnects, 0 stalls). It needs all three USB ports exclusively, so start it when
+   nothing else will touch the bench:
+   `cd tools/bench/runs && nohup python3 ../experiments/wifisoak.py … &`, reduce with
+   `wifisoak.py --parse-only`.
+2. **TM-37 — a dropped outgoing message is silent.** Filed this session on the operator's question.
+   `sendMessage()` ignores the `addTxRingEntry()` return value, so a message lost to a full TX ring
+   never reaches the air and the sender is never told. Minimum: act on the return value and push a
+   failure notice to phone + display. Wanted: a back-pressure warning at a high-water mark so the
+   person stops typing. `test_txring_flood` already pins the ring policy, so the change is testable
+   natively; bench check is `gwflood.py` with a parallel send burst.
+3. **TM-31 leftovers — policy, not defects.** Tail-drop vs head-drop on a full queue, and whether
+   `MAX_RING = 20` (~6 min of buffered airtime at bench drain rate) is right for a gateway. Both are
+   pinned by tests, so either change is a reviewable diff. Same file as TM-37.
+4. **TM-28** E290 Wireless Paper when the hardware is here (week of 2026-09-01): frame instrument,
    OLED-harness scenarios, `[OLED];crc` for e-paper.
-6. Lower: TM-06/07 (LoRa raw injection + SPI trace), TM-14, TM-19, TM-29, Wave 0.6 (native suite),
-   Wave 2 on nRF52 (CONC-15..18, N-14..16), UP-05/06.
-7. Then the PRs (operator decision, not now): T-Deck PR, OLED PR, WiFi PR — per BACKLOG §4.1.
+5. **TD-05** GUI latency on the T-Deck — cause still unidentified; leads G05/G06 in §3.8f (SD + PNG
+   decode with an ~870 ms `delay()` in the LVGL `read_cb`, `addMessage()` blocking 2 s / 8 s at
+   boot). **TD-04** Europe map tiles on SD. **TD-06** full serial+net test rig.
+6. **Upstream sync**: UP-03 (ours wins the merge, two hunks merged silently — check by hand),
+   UP-04 (keep his hunk, drop ours from the PR), UP-05 (watch), UP-06 (trace consumers, small PR +
+   test).
+7. Lower: TM-06/07 (LoRa raw injection + SPI trace), TM-14, TM-19, TM-23 (tile format, parked),
+   TM-29, Wave 0.6 (native suite), Wave 2 on nRF52 (CONC-15..18, N-14..16).
+8. Then the PRs (operator decision, not now): T-Deck PR, OLED PR, WiFi PR — per BACKLOG §4.1.
+   Note TM-20 ships only together with the WiFi selection policy, and Kurt owns review/merge
+   upstream.
+
+## Gates that were green when we stopped
+
+`pio test -e native` 70/70 · `pio test -e native_aprs` 50/50 · `test_tdeck_parse` 56/56 ·
+T-Deck harness 15/15 · RAK harness boot/info/instr PASS · OLED harness Heltec 8/8 · builds:
+t_deck_plus, t_deck_pro, heltec_wifi_lora_32_V3, ttgo_tbeam, wiscore_rak4631, T-ETH-ELITE_1262.
