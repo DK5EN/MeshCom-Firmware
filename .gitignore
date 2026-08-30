@@ -416,3 +416,10 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 *.bak
+
+# Stdout der Bench-Runner (tools/bench/*.py, experiments/*.py), umgeleitet beim
+# Start: `... > runs/<name>.out`. Reiner Mitschnitt des Laufs -- die Auswertung
+# steht im .json bzw. summary.txt/summary.csv daneben, und genau die sind
+# eingecheckt (Konvention in tools/bench/runs/). Die .out-Dateien waechsen mit
+# jedem Lauf nach und haben in der Historie nichts verloren.
+tools/bench/runs/*.out
