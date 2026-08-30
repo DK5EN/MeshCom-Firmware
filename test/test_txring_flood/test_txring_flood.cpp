@@ -290,6 +290,33 @@ static void test_text_kommt_durch_wo_position_faellt(void)
     TEST_ASSERT_TRUE(addTxRingEntry(txt.bytes, txt.len, RING_STATUS_READY, "udp_rx") >= 0);
 }
 
+// ---- 6b: der Gateway-Relay-Pfad klassifiziert Text als NORMAL, nicht HIGH --
+//
+// getMeshComUDPpacket() reiht mit Status 0xFF ein (== RING_STATUS_DONE, "keine
+// Wiederholung"), und getMessagePriority() liest genau dieses Byte als
+// "weitergeleitet" -> MSG_PRIO_NORMAL statt der pfadbasierten Broadcast-Stufe
+// MSG_PRIO_HIGH. Auf der Bank sichtbar als "replaced_by_prio=3" in jeder
+// RING_DROP_PRIO-Zeile des gemischten Laufs (gwflood_mixed_20260830.json).
+//
+// Fuer #568 aendert das nichts an der Rangfolge -- NORMAL (3) schlaegt
+// Position (4) weiterhin -- aber wer die Bankausgabe liest, darf sich an der 3
+// nicht stossen, und wer den Statuswert des Relay-Pfads aendert, verschiebt
+// damit ungewollt die Prioritaet des gesamten UDP-Verkehrs.
+
+static void test_relay_text_ist_normal_und_schlaegt_position_trotzdem(void)
+{
+    fillWithPositions(0xB000);
+
+    BuiltFrame txt = buildBroadcastTextFrame(0xB0FF0001UL, "BBS listing 3/7");
+    int slot = addTxRingEntry(txt.bytes, txt.len, RING_STATUS_DONE, "udp_rx");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);   // nicht HIGH
+    TEST_ASSERT_TRUE(MSG_PRIO_NORMAL < MSG_PRIO_LOW);               // schlaegt Position
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);                   // Position geraeumt
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
+}
+
 // ---- 7: die Ringgroesse ist eine bewusste Entscheidung ---------------------
 //
 // MAX_RING bestimmt, wie lange ein Gateway eine Flut puffern kann, bevor es
@@ -315,6 +342,7 @@ int main(int, char **)
     RUN_TEST(test_ack_kommt_auch_im_flood_durch);
     RUN_TEST(test_flut_ohne_abfluss_nimmt_max_ring_minus_eins_an);
     RUN_TEST(test_text_kommt_durch_wo_position_faellt);
+    RUN_TEST(test_relay_text_ist_normal_und_schlaegt_position_trotzdem);
     RUN_TEST(test_ringgroesse_ist_dokumentiert);
     return UNITY_END();
 }

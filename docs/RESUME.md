@@ -257,9 +257,28 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   radiated 4 minutes late is indistinguishable from lost, and downstream dedup windows will discard
   it anyway.
 
-- Open on TM-31: the sweep uses corpus frame **f001, a position beacon**. Upstream #568 is about
-  **text messages** (0x3A, ~128 B), and the 0x3A path never had the early insert — so #568's own
-  timing question still needs a text-frame variant of the injector.
+- **TM-31 text vs position, measured** (`gwflood_mixed_20260830.json`, 15 text + 15 position frames
+  alternating, gaps 8/4/2/1/0.5 s, 300 s settle): **text 15/15 radiated, position 9/15** -- and the
+  ring-drop lines say why: 5x `RING_DROP_PRIO ... prio=4 type=21 ... replaced_by_prio=3`, i.e. the
+  arriving text frames evicted queued positions, plus 2x the node's own HEY evicted by positions and
+  2x HEY tail-dropped. So the priority ladder does what it should under a real flood: text survives,
+  positions are sacrificed, and the node's own background traffic goes first. `--assert-relay`
+  passed (31/30 queued). Note the class: a UDP-relayed text is enqueued with status `0xFF` =
+  `RING_STATUS_DONE`, so `getMessagePriority()` reads it as a _relay_ -> `MSG_PRIO_NORMAL` (3), not
+  the path-based broadcast `MSG_PRIO_HIGH` (2). NORMAL still beats position (4), so the conclusion
+  holds -- but whoever changes the relay path's status byte moves the priority of all UDP traffic.
+- **Regression tests added** (`pio test -e native_aprs`): `test_txring_flood` (8) pins the queue-full
+  policy -- equal priority is tail-drop, higher priority is head-drop, text evicts positions, a
+  position evicts HEY, ACK always gets in, a 30-frame flood accepts exactly `MAX_RING-1`, and
+  `MAX_RING == 20` is pinned so changing the buffering horizon is deliberate. `test_gwflood_frames`
+  (6) runs the real `decodeAPRS()` over the injector's checked-in fixture
+  (`test/support/gwflood_frames.txt`, regenerate with `gwflood.py --frame mixed --dump-frames`), so
+  a malformed injector can no longer masquerade as a gateway that drops everything.
+- Open on TM-31 (policy, not defects): tail-drop vs head-drop on a full queue and whether
+  `MAX_RING = 20` (~6 min of buffered airtime at the bench drain rate) is right for a gateway. Both
+  are now pinned by tests, so a change is a reviewable diff rather than a silent behaviour shift.
+  The former open point -- "the sweep only injects position beacons" -- is closed: `--frame
+pos|text|mixed` covers the 0x3A case #568 reports, and the measurement above is its answer.
 
 ## Next session, in order
 
