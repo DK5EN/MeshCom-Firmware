@@ -1,0 +1,197 @@
+{
+  "extudp": {
+    "ok": true,
+    "port": "/dev/cu.usbserial-0001",
+    "pre_state": {
+      "answered_lines": 47,
+      "call": "DK5EN-93",
+      "uptime_ms": 18122,
+      "ip": "192.168.68.66",
+      "extudp": false,
+      "ext_ip": "\ufffd",
+      "gateway": "off",
+      "debug": "on",
+      "build": "Aug 30 2026 / 21:43:31"
+    },
+    "position": {
+      "lat": 48.4075,
+      "lon": 11.738,
+      "has_position": true,
+      "gps": "on"
+    },
+    "node_ip": "192.168.68.66",
+    "host_ip": "192.168.68.58",
+    "ext_started": "[EXT]...now listening at IP 192.168.68.66, UDP port 1799",
+    "rebooted_to_apply": false,
+    "baseline_uptime_ms": 26266,
+    "peer_call": null,
+    "send": [
+      {
+        "trigger": "sendpos",
+        "datagram": "{\"src_type\":\"node\",\"type\":\"pos\",\"src\":\"DK5EN-93\",\"msg\":\"\",\"lat\":48.4075,\"lat_dir\":\"N\",\"long\":11.738,\"long_dir\":\"E\",\"aprs_symbol\":\"#\",\"aprs_symbol_group\":\"/\",\"hw_id\":43,\"msg_id\":\"EA25A247\",\"alt\":1640,\"",
+        "datagram_bytes": 258,
+        "out_lines": 1,
+        "suppressed_by_fl01": false,
+        "ok": true
+      },
+      {
+        "trigger": "own_msg",
+        "datagram": "{\"src_type\":\"node\",\"type\":\"msg\",\"src\":\"DK5EN-93\",\"dst\":\"TEST\",\"msg\":\"tm43 19103{584\",\"msg_id\":\"EA25A248\",\"firmware\":\"4.35\",\"fw_sub\":\"p\",\"rssi\":0,\"snr\":0}",
+        "datagram_bytes": 153,
+        "out_lines": 1,
+        "suppressed_by_fl01": false,
+        "ok": true
+      }
+    ],
+    "receive": [
+      {
+        "case": "msg_to_txring",
+        "inc_line": "[EXT] Inc: {\"type\":\"msg\",\"dst\":\"TEST\",\"msg\":\"tm43 rx 19103\"}",
+        "echo_datagram": "{\"src_type\":\"node\",\"type\":\"msg\",\"src\":\"DK5EN-93\",\"dst\":\"TEST\",\"msg\":\"tm43 rx 19103{586\",\"msg_id\":\"EA25A24A\",\"firmware\":\"4.35\",\"fw_sub\":\"p\",\"rssi\":0,\"snr\":0}",
+        "tx_evidence": [],
+        "hwm": {
+          "n": 1,
+          "min": 956,
+          "max": 956,
+          "len_max": 49
+        },
+        "ok": true
+      },
+      {
+        "case": "tele",
+        "accepted": false,
+        "refused_real_sensors": true,
+        "line": "[EXT] tele ignored: real sensor hardware detected on this node",
+        "beacon_datagram": null,
+        "beacon_suppressed_by_fl01": false,
+        "beacon_inapplicable_no_position": false,
+        "ok": true
+      }
+    ],
+    "reject": [
+      {
+        "vector": "broken_json",
+        "bytes": 33,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] deserializeJson() failed: IncompleteInput"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "missing_dst",
+        "bytes": 31,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] missing dst/msg"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "missing_msg",
+        "bytes": 27,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] missing dst/msg"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "dst_too_long",
+        "bytes": 54,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] invalid lengths dst:10 msg:12"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "msg_too_long",
+        "bytes": 187,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] invalid lengths dst:4 msg:151"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "truncated_mid_json",
+        "bytes": 25,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] deserializeJson() failed: IncompleteInput"
+        ],
+        "ok": true
+      },
+      {
+        "vector": "full_255_byte_datagram",
+        "bytes": 255,
+        "attempts": 1,
+        "seen_by_node": true,
+        "log": [
+          "[EXT] deserializeJson() failed: IncompleteInput"
+        ],
+        "ok": true
+      }
+    ],
+    "inbound_alive_after_vectors": true,
+    "echo_after_reject": true,
+    "soak": {
+      "seconds": 122.1,
+      "datagrams_sent_to_node": 40,
+      "of_which_valid_messages": 10,
+      "datagrams_from_node": 25,
+      "console_lines": 702,
+      "inbound_seen": 40,
+      "heartbeats": 0,
+      "heartbeat_gaps": [],
+      "boot_lines": []
+    },
+    "hwm": {
+      "tx": {
+        "n": 15,
+        "min": 956,
+        "max": 956,
+        "len_max": 259
+      },
+      "rx": {
+        "n": 50,
+        "min": 956,
+        "max": 956,
+        "len_max": 254
+      }
+    },
+    "live": {
+      "uptime_start_ms": 26266,
+      "uptime_end_ms": 183336,
+      "uptime_monotonic": true,
+      "crash_lines": [],
+      "unexpected_boot_lines": [],
+      "console_echoes": true,
+      "ok": true
+    },
+    "post_state": {
+      "answered_lines": 50,
+      "call": "DK5EN-93",
+      "uptime_ms": 183336,
+      "ip": "192.168.68.66",
+      "extudp": true,
+      "ext_ip": "192.168.68.58",
+      "gateway": "off",
+      "debug": "on",
+      "build": "Aug 30 2026 / 21:43:31"
+    },
+    "restore": {
+      "extudp": false,
+      "ext_ip": "\ufffd",
+      "debug": "on",
+      "matches_pre": true
+    }
+  }
+}
