@@ -171,7 +171,13 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   RAK harness boot/info/instr/mheard PASS (`lora` needs `--peer-port`, as before). T-Beam OLED
   `dirty` failed 3/3 **while the other nodes were boot-looping** (LoRa boot beacons flip the
   page) — re-run with the bench quiet before reading it as a regression.
-- Open: A4p0 comparison arm (SAE left to the driver) running; overnight `wifisoak.py` on all
+- **A4p0 (SAE kept): 24/24 addressed by 19.7 s, all SAE, but every second boot +4.5 s (silent SAE
+  retry) — the A0 0/24 was pin + SAE together. Policy 1 (WPA2-PSK) stays default.**
+- **Hook stall found and fixed:** `WiFi.getMode()` in the 60-s link heartbeat, called every loop
+  pass, blocked `loopTask` 2.7–2.9 s per boot while the driver scanned (`[INSTR-LOOP];gap … in;lvgl`
+  in every A4p1/A4p0 boot, absent in A0/A5). Loop hooks now use STA_START/STOP events only. Rule:
+  never call `esp_wifi_*` / `WiFi.getMode()` from the loop unless connected. A4p1b re-measures.
+- Open: A4p1b arm (hook fix) running; overnight `wifisoak.py` on all
   three boards; WPA3-only APs cannot associate with policy 1 (no PMF) — documented trade, an
   adaptive fallback (SAE first, PMF off after 2x `AUTH_EXPIRE`) would cost ~9 s on every boot.
 

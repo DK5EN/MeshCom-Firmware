@@ -587,6 +587,7 @@ struct WifiStall
 };
 
 static bool s_wifiInitDone = false;
+static volatile bool s_wifiStaUp = false;         // STA_START..STA_STOP (kein esp_wifi_*-Aufruf noetig)
 static volatile bool s_wifiGotIpPending = false;  // vom Ereignis-Task gesetzt, von loopTask abgeholt
 static volatile bool s_wifiRestartWanted = false; // resetMeshComUDP(): 5-min-Pfad sofort
 static volatile uint32_t s_wifiLastEventMs = 0;
@@ -647,6 +648,12 @@ static void wifiEventLog(WiFiEvent_t event, WiFiEventInfo_t info)
       break;
     case ARDUINO_EVENT_WIFI_STA_AUTHMODE_CHANGE:
       Serial.printf("[WIFI];event;authmode;%d;ms;%lu\n", (int)info.wifi_sta_authmode_change.new_mode, (unsigned long)millis());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_START:
+      s_wifiStaUp = true;
+      break;
+    case ARDUINO_EVENT_WIFI_STA_STOP:
+      s_wifiStaUp = false;
       break;
     default:
       break;
@@ -1036,7 +1043,7 @@ void wifiRequestRestart()
 // (dieselbe Aktion wie Watchdog-Stufe 1). Keine Konfigurationsaenderung.
 void wifiDrop()
 {
-  if(WiFi.getMode() != WIFI_MODE_STA)
+  if(!s_wifiStaUp || bWIFIAP)
   {
     Serial.println("[WIFI];drop;err;not in STA mode");
     return;
@@ -1046,10 +1053,14 @@ void wifiDrop()
   wifiBegin();
 }
 
+// Waehrend der Treiber scannt (Aufbau, Auto-Reconnect) blockiert jeder
+// esp_wifi_*-Aufruf loopTask bis zum Scanende (gemessen: 2.9 s Loop-Luecke
+// durch WiFi.getMode() im 1. Wurf). Deshalb hier nur Zustand aus Ereignissen
+// und esp_wifi_sta_get_ap_info() nur im verbundenen Zustand.
 void wifiLinkLog(const char *tag)
 {
   unsigned long now = millis();
-  if(WiFi.getMode() == WIFI_MODE_STA && WiFi.status() == WL_CONNECTED)
+  if(s_wifiStaUp && WiFi.status() == WL_CONNECTED)
   {
     wifi_ap_record_t ap;
     if(esp_wifi_sta_get_ap_info(&ap) != ESP_OK)
@@ -1062,8 +1073,8 @@ void wifiLinkLog(const char *tag)
   }
   else
   {
-    Serial.printf("[WIFI];%s;down;mode;%d;status;%d;down_s;%lu;last_reason;%d;got_ip_n;%lu;ip;%d;ms;%lu\n",
-      tag, (int)WiFi.getMode(), (int)WiFi.status(),
+    Serial.printf("[WIFI];%s;down;sta;%d;status;%d;down_s;%lu;last_reason;%d;got_ip_n;%lu;ip;%d;ms;%lu\n",
+      tag, s_wifiStaUp ? 1 : 0, (int)WiFi.status(),
       (unsigned long)(s_wifiLastDiscMs ? (now - s_wifiLastDiscMs) / 1000 : 0),
       s_wifiLastReason, (unsigned long)s_wifiGotIpCount, hasIPaddress ? 1 : 0, now);
   }
@@ -1083,9 +1094,9 @@ void wifiStat()
 void wifiLinkHeartbeat()
 {
   static unsigned long s_last = 0;
-  if(WiFi.getMode() == WIFI_MODE_NULL)
-    return;
   if(s_last != 0 && (uint32_t)(millis() - s_last) < 60000)
+    return;
+  if(!s_wifiStaUp && !hasIPaddress)
     return;
   s_last = millis();
   wifiLinkLog("link");
@@ -1101,10 +1112,12 @@ bool checkWifiPing()
   if(!hasIPaddress)
     return true;
 
-  if(WiFi.getMode() == WIFI_MODE_NULL)
+  if(!s_wifiStaUp)
   {
     // Funk absichtlich aus (T-Deck WLAN-Schalter, --wifi off): kein Watchdog,
-    // sonst wuerde Stufe 1 den Funk wieder einschalten.
+    // sonst wuerde Stufe 1 den Funk wieder einschalten. Bewusst kein
+    // WiFi.getMode(): jeder esp_wifi_*-Aufruf wartet auf den WiFi-Task und
+    // blockiert loopTask, solange der Treiber scannt (bis ~3 s).
     Udp.stop();
     hasIPaddress = false;
     meshcom_settings.node_hasIPaddress = hasIPaddress;
