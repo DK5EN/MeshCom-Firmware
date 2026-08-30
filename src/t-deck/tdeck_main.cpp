@@ -530,6 +530,11 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
     uint32_t w = ( area->x2 - area->x1 + 1 );
     uint32_t h = ( area->y2 - area->y1 + 1 );
 
+    // TM-41: --disptest owns the panel while it runs. Report the area as done
+    // (LVGL must not stall) but push nothing -- the whole screen is repainted
+    // from lv_obj_invalidate() when the test hands the panel back.
+    if(tdeck_dbg_disptest_running()) { lv_disp_flush_ready( disp ); return; }
+
     if ( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE ) {
         INSTR_T0(_instr_flush_t0);          // TEMPORARY -- see src/instrument.h
         // EXPERIMENT (flushfix): no other task may run while the transfer is on the wire.

@@ -1799,9 +1799,13 @@ static void lora_mode_send()
 
     Serial.printf("%s %i", sendtxt, len);
 
+    // BP-01: origin GUI -- a QRS/QRT/QTA/QRV is written into the on-screen
+    // message view (TDeck_pro_lora_disp()), where received texts appear.
+    setMsgOrigin(ORIGIN_GUI);
     sendMessage(sendtxt, len);
+    setMsgOrigin(ORIGIN_NONE);
 
-    scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen 
+    scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen
 }
 
 static void lora_mode_send_event(lv_event_t * e)

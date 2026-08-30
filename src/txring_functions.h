@@ -20,6 +20,12 @@ uint8_t getMessagePriority(int slot);
 int getNextTxSlot(void);
 void advanceIReadPastEmpty(void);
 
+// BP-01 (BACKLOG) / TM-37: current fill level of the TX ring, same arithmetic
+// as the local `queued` inside addTxRingEntry(). Read-only; the back-pressure
+// state machine (src/backpressure.h) needs the depth from outside this file,
+// both after an enqueue and on the per-loop drain check.
+int txRingDepth(void);
+
 // TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
 // transmit. addTxRingEntry() below is one of the two choke points; doTX()
 // in lora_functions.cpp (the only caller of Radio.Send()/startTransmit())

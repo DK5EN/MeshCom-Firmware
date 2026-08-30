@@ -217,6 +217,27 @@ void advanceIReadPastEmpty(void)
 }
 
 /**
+ * BP-01 (BACKLOG) / TM-37: current TX-ring fill level.
+ *
+ * Identical arithmetic to the `queued` local inside addTxRingEntry() -- that
+ * value lives inside the lock and is not readable from outside. The
+ * back-pressure state machine needs the depth twice: right after an enqueue
+ * (to decide QRS/QRT/QTA) and once per loop pass (to close an episode with
+ * QRV when the ring drained without a new user message).
+ *
+ * Deliberately lock-free: both indices are read once each into locals, so the
+ * worst a concurrent OnRxDone enqueue on nRF52 can do is make the answer one
+ * entry stale. A stale depth costs at most one notice arriving one message
+ * late; taking the critical section on every loop pass would not.
+ */
+int txRingDepth(void)
+{
+    int w = (int)(uint8_t)iWrite;
+    int r = (int)(uint8_t)iRead;
+    return (w >= r) ? (w - r) : (MAX_RING - r + w);
+}
+
+/**
  * TX-Ring: kompletter Enqueue-Vorgang (Slot-Wahl, Payload-Kopie, Prio/Overflow,
  * iWrite/iRead-Fortschritt) in EINER Funktion unter EINEM Lock.
  * N-14: bisher schrieb der Aufrufer selbst nach ringBuffer[iWrite][...] und

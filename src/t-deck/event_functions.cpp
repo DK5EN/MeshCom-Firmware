@@ -711,8 +711,12 @@ void btn_event_handler_send(lv_event_t * e)
             message_text[iml] = 0x00;
         }
 
+        // BP-01: origin GUI -- a QRS/QRT/QTA/QRV lands in the on-screen
+        // message list (addMessage()), the same place a received text goes.
+        setMsgOrigin(ORIGIN_GUI);
         sendMessage(message_text, iml);
-        
+        setMsgOrigin(ORIGIN_NONE);
+
         lv_textarea_set_text(text_input, "");
         lv_tabview_set_act(tv, 0, LV_ANIM_ON);
     }

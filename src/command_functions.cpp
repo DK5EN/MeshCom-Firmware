@@ -4618,6 +4618,15 @@ void commandAction(char *umsg_text, bool ble)
         ethDrop();
         return;
     }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
+        extern bool bUDPLOG;
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
     #endif
     #if defined(ESP32)
     else
@@ -4820,6 +4829,16 @@ void commandAction(char *umsg_text, bool ble)
         int n = 10;
         sscanf(msg_text+8, "%d", &n);
         tdeck_dbg_blink(n);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"disptest") == 0)
+    {
+        // TM-41: --disptest [full|invert|colors|square|circle|triangle] [stride]
+        char phase[16] = {0};
+        int stride = 0;
+        sscanf(msg_text+10, "%15s %d", phase, &stride);
+        tdeck_dbg_disptest(phase, stride);
         return;
     }
     else

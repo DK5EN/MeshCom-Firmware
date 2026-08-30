@@ -36,6 +36,10 @@ authoritative list):
     [BOOT];msg;<text>
     [BOOT];audio;file;<name>   [BOOT];audio;cw   [BOOT];audio;none
     [BOOT];init;sd;<0|1>;touch;<0|1>;kb;<0|1>;psram_buf;<0|1>;t_ms;<n>
+    [DISPTEST];begin;phase;<s>;stride;<n>;w;<n>;h;<n>;steps;<n>;ms;<n>
+    [DISPTEST];step;<phase>;n;<i>;crc;<hex8>;px;<n>;ms;<n>
+    [DISPTEST];end;steps;<n>;ms;<n>
+    [DISPTEST];err;<reason>[;<detail>]
 
 [UISTAT] also accepts two optional trailing fields, tft_sleeping;<0|1> and
 bl;<n> -- older firmware omits them, newer firmware appends them.
@@ -380,7 +384,55 @@ def _parse_boot(parts: List[str]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _parse_disptest(parts: List[str]) -> Optional[Dict[str, Any]]:
+    if not parts:
+        return None
+    variant = parts[0]
+    if variant == "err":
+        return {
+            "kind": "DISPTEST",
+            "variant": "err",
+            "reason": parts[1] if len(parts) > 1 else "",
+            "detail": ";".join(parts[2:]) if len(parts) > 2 else None,
+        }
+    if variant == "begin":
+        if len(parts) != 13 or parts[1] != "phase":
+            return None
+        d = _kv_ints(parts[3:])
+        if d is None or set(d.keys()) != {"stride", "w", "h", "steps", "ms"}:
+            return None
+        return {"kind": "DISPTEST", "variant": "begin", "phase": parts[2], **d}
+    if variant == "end":
+        d = _kv_ints(parts[1:])
+        if d is None or set(d.keys()) != {"steps", "ms"}:
+            return None
+        return {"kind": "DISPTEST", "variant": "end", **d}
+    if variant == "step":
+        # step,<phase>,n,<i>,crc,<hex8>,px,<n>,ms,<n>
+        if len(parts) != 10 or parts[2] != "n" or parts[4] != "crc":
+            return None
+        d = _kv_ints([parts[2], parts[3]] + parts[6:])
+        if d is None or set(d.keys()) != {"n", "px", "ms"}:
+            return None
+        crc_raw = parts[5]
+        if len(crc_raw) != 8:
+            return None
+        try:
+            crc = int(crc_raw, 16)
+        except ValueError:
+            return None
+        return {
+            "kind": "DISPTEST",
+            "variant": "step",
+            "phase": parts[1],
+            "crc": crc,
+            **d,
+        }
+    return None
+
+
 _DISPATCH = {
+    "DISPTEST": _parse_disptest,
     "REDRAW": _parse_redraw,
     "REFR": lambda p: _kv_check(p, "REFR", {"ms", "px", "t_ms"}, exact=True),
     "REFRSTART": lambda p: _kv_check(p, "REFRSTART", {"ms", "areas"}, exact=True),
@@ -512,3 +564,212 @@ def heap_delta(
     if not first or not last:
         return {}
     return {k: last[k] - first[k] for k in _HEAP_KEYS if k in first and k in last}
+
+
+# --------------------------------------------------------------------------
+# TM-41 [DISPTEST]: host-side reference renderer
+# --------------------------------------------------------------------------
+#
+# The T-Deck panel does not drive MISO, so --screencrc cannot say what is on
+# the glass (docs/tdeck-findings-20260828.md). --disptest therefore CRC32s the
+# exact byte block it hands to tft.pushColors() and prints one CRC per frame;
+# the functions below re-render those frames here and produce the CRC the
+# device must have printed. Both sides must rasterise identically, so the
+# geometry is integer-only and defined once, here and in
+# src/t-deck/tdeck_debug.cpp (dt_render()), in doubled pixel coordinates:
+#
+#     X = 2*x - (W-1),  Y = 2*y - (H-1)      centre is exactly (0, 0)
+#
+#     square   |X| <= 2h and |Y| <= 2h                 (h = 1..160 px)
+#     circle   X*X + Y*Y <= (2r)*(2r)                  (r = 1..200 px)
+#     triangle all three integer edge functions >= 0   (vertices on r = 100 px)
+#
+# A frame is 320x240 RGB565, row-major, high byte first -- LV_COLOR_16_SWAP=1
+# plus pushColors(..., swap=False) put the memory byte order straight on the
+# wire, so the CRC is over the bytes the panel actually received.
+
+import zlib
+from math import isqrt
+
+DISPTEST_W = 320
+DISPTEST_H = 240
+DISPTEST_PX = DISPTEST_W * DISPTEST_H
+DISPTEST_SQUARE_MAX = 160
+DISPTEST_CIRCLE_MAX = 200
+DISPTEST_TRI_STEPS = 24
+DISPTEST_TRI_TURNS = 3
+DISPTEST_TRI_FRAMES = DISPTEST_TRI_STEPS * DISPTEST_TRI_TURNS * 2
+DISPTEST_TRI_R2 = 200
+
+# round(1024 * sin(2*pi*i/24)); literal copy of DT_SIN24 in tdeck_debug.cpp
+DISPTEST_SIN24 = (
+    0, 265, 512, 724, 887, 989, 1024, 989,
+    887, 724, 512, 265, 0, -265, -512, -724,
+    -887, -989, -1024, -989, -887, -724, -512, -265,
+)
+
+DISPTEST_BARS = (0xFFFF, 0xF800, 0xFFE0, 0x07E0, 0x07FF, 0x001F, 0xF81F, 0x0000)
+DISPTEST_FILLS = (0xF800, 0xFFE0, 0x07E0, 0x001F, 0xF81F)
+DISPTEST_PHASES = ("invert", "colors", "square", "circle", "triangle")
+
+
+def _dt_sin(i: int) -> int:
+    return DISPTEST_SIN24[i % DISPTEST_TRI_STEPS]
+
+
+def _dt_cos(i: int) -> int:
+    return DISPTEST_SIN24[(i + 6) % DISPTEST_TRI_STEPS]
+
+
+def _px_row(colour: int) -> bytes:
+    return bytes(((colour >> 8) & 0xFF, colour & 0xFF)) * DISPTEST_W
+
+
+def _ceil_div(p: int, q: int) -> int:
+    """ceil(p/q) for q > 0, integers only."""
+    return -((-p) // q)
+
+
+def _x_range(x_lo: int, x_hi: int) -> Tuple[int, int]:
+    """Doubled-coordinate span [x_lo, x_hi] -> inclusive pixel column range."""
+    off = DISPTEST_W - 1
+    return (
+        max(0, _ceil_div(x_lo + off, 2)),
+        min(DISPTEST_W - 1, (x_hi + off) // 2),
+    )
+
+
+def disptest_steps(phase: str, stride: int = 1) -> int:
+    """Number of frames the firmware emits for one phase at this stride."""
+    stride = max(1, int(stride))
+    if phase == "invert":
+        return 2
+    if phase == "colors":
+        return 10
+    if phase == "square":
+        return _ceil_div(DISPTEST_SQUARE_MAX, stride)
+    if phase == "circle":
+        return _ceil_div(DISPTEST_CIRCLE_MAX, stride)
+    if phase == "triangle":
+        return DISPTEST_TRI_FRAMES
+    raise ValueError(f"unknown disptest phase: {phase!r}")
+
+
+def disptest_triangle_vertices(i: int) -> List[Tuple[int, int]]:
+    """The three doubled-coordinate vertices of triangle frame i, wound so that
+    'inside' is 'every edge function >= 0' -- same order as dt_render()."""
+    half = DISPTEST_TRI_FRAMES // 2
+    a = (i if i < half else DISPTEST_TRI_FRAMES - 1 - i) % DISPTEST_TRI_STEPS
+    v = []
+    for k in range(3):
+        ai = a + (DISPTEST_TRI_STEPS // 3) * k
+        v.append(((DISPTEST_TRI_R2 * _dt_cos(ai)) >> 10,
+                  (DISPTEST_TRI_R2 * _dt_sin(ai)) >> 10))
+    area2 = (v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) - (v[1][1] - v[0][1]) * (v[2][0] - v[0][0])
+    if area2 < 0:
+        v[1], v[2] = v[2], v[1]
+    return v
+
+
+def _disptest_spans(phase: str, i: int, stride: int) -> Dict[int, Tuple[int, int]]:
+    """Inclusive [x0, x1] pixel span of the foreground shape, per row.
+
+    Span form of the per-pixel inside-tests in dt_render(): both describe the
+    same pixel set (test_tdeck_parse.py checks that against a brute-force
+    reference), the spans are just fast enough to run 500 frames in Python.
+    """
+    spans: Dict[int, Tuple[int, int]] = {}
+    if phase == "square":
+        h2 = 2 * min(DISPTEST_SQUARE_MAX, (i + 1) * stride)
+        y0 = max(0, _ceil_div(DISPTEST_H - 1 - h2, 2))
+        y1 = min(DISPTEST_H - 1, (DISPTEST_H - 1 + h2) // 2)
+        x0, x1 = _x_range(-h2, h2)
+        for y in range(y0, y1 + 1):
+            spans[y] = (x0, x1)
+        return spans
+    if phase == "circle":
+        r4 = (2 * min(DISPTEST_CIRCLE_MAX, (i + 1) * stride)) ** 2
+        for y in range(DISPTEST_H):
+            yy = 2 * y - (DISPTEST_H - 1)
+            rem = r4 - yy * yy
+            if rem < 0:
+                continue
+            d = isqrt(rem)
+            x0, x1 = _x_range(-d, d)
+            if x0 <= x1:
+                spans[y] = (x0, x1)
+        return spans
+    if phase == "triangle":
+        v = disptest_triangle_vertices(i)
+        for y in range(DISPTEST_H):
+            yy = 2 * y - (DISPTEST_H - 1)
+            lo, hi = -10**9, 10**9
+            empty = False
+            for k in range(3):
+                vx1, vy1 = v[k]
+                vx2, vy2 = v[(k + 1) % 3]
+                dx, dy = vx2 - vx1, vy2 - vy1
+                # edge function: dx*(Y-vy1) - dy*(X-vx1) = a*X + c, a = -dy
+                a = -dy
+                c = dx * (yy - vy1) + dy * vx1
+                if a > 0:
+                    lo = max(lo, _ceil_div(-c, a))
+                elif a < 0:
+                    hi = min(hi, c // (-a))
+                elif c < 0:
+                    empty = True
+                    break
+            if empty or lo > hi:
+                continue
+            x0, x1 = _x_range(lo, hi)
+            if x0 <= x1:
+                spans[y] = (x0, x1)
+        return spans
+    return spans
+
+
+def disptest_frame(phase: str, i: int, stride: int = 1) -> bytes:
+    """The exact byte block --disptest hands to tft.pushColors() for one step."""
+    stride = max(1, int(stride))
+    if i < 0 or i >= disptest_steps(phase, stride):
+        raise ValueError(f"step {i} out of range for phase {phase!r} at stride {stride}")
+
+    if phase == "invert":
+        band = DISPTEST_H // 8
+        rows = []
+        for y in range(DISPTEST_H):
+            c = DISPTEST_BARS[y // band]
+            rows.append(_px_row((~c) & 0xFFFF if i == 1 else c))
+        return b"".join(rows)
+
+    if phase == "colors":
+        c = DISPTEST_FILLS[i % 5]
+        if i >= 5:
+            c = (~c) & 0xFFFF
+        return _px_row(c) * DISPTEST_H
+
+    bg, fg = (0xFFFF, 0x0000) if phase == "square" else (0x0000, 0xFFFF)
+    frame = bytearray(_px_row(bg) * DISPTEST_H)
+    fg_row = _px_row(fg)
+    for y, (x0, x1) in _disptest_spans(phase, i, stride).items():
+        off = y * DISPTEST_W * 2
+        frame[off + 2 * x0 : off + 2 * (x1 + 1)] = fg_row[: 2 * (x1 - x0 + 1)]
+    return bytes(frame)
+
+
+def disptest_crc(phase: str, i: int, stride: int = 1) -> int:
+    """CRC32 (zlib/IEEE, the polynomial crc32_update() uses) of one frame."""
+    return zlib.crc32(disptest_frame(phase, i, stride))
+
+
+def disptest_expected(
+    phase: str = "full", stride: int = 1
+) -> List[Tuple[str, int, int]]:
+    """(phase, step index, expected CRC32) for every frame of a --disptest run."""
+    stride = max(1, int(stride))
+    phases = DISPTEST_PHASES if phase in ("full", "", None) else (phase,)
+    out: List[Tuple[str, int, int]] = []
+    for p in phases:
+        for i in range(disptest_steps(p, stride)):
+            out.append((p, i, disptest_crc(p, i, stride)))
+    return out

@@ -37,6 +37,7 @@ except ImportError:  # pragma: no cover - exercised only when pyserial is missin
     serial = None  # type: ignore[assignment]
 
 from tdeck_parse import (
+    disptest_expected,
     heap_delta,
     parse_line,
     redraw_summary,
@@ -1450,6 +1451,98 @@ def scenario_sleep(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     }
 
 
+def scenario_disptest(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-41: colour/geometry sequence, asserted on the push path.
+
+    --screencrc is void on this panel (MISO not driven), so the device cannot
+    be asked what the glass shows. --disptest instead CRC32s exactly the byte
+    block it hands to tft.pushColors() for every frame and prints it; this
+    scenario re-renders the same frames with tdeck_parse.disptest_* (the same
+    integer rasterisers) and compares CRC by CRC. A pass means the right
+    pixels reached the panel; whether they light up is for an operator's eye.
+    """
+    phase = args.disptest_phase
+    stride = max(1, args.disptest_stride)
+
+    expected = disptest_expected(phase, stride)
+    idx = session.send(f"--disptest {phase} {stride}")
+
+    begin = session.wait_for(r"\[DISPTEST\];(begin|err)", 15.0, since=idx)
+    if begin is None:
+        return {"ok": False, "reason": "no [DISPTEST];begin -- firmware without --disptest?"}
+    begin_rec = parse_line(begin.string)
+    if begin_rec and begin_rec.get("variant") == "err":
+        return {"ok": False, "reason": f"device refused: {begin_rec.get('reason')}", "begin": begin_rec}
+
+    # 250 ms/frame is ~6x the measured cost and still bounds the wait.
+    timeout = 30.0 + 0.25 * len(expected)
+    t0 = time.monotonic()
+    end = session.wait_for(r"\[DISPTEST\];end", timeout, since=idx)
+    wall_s = time.monotonic() - t0
+    lines = session.records_since(idx)
+    steps = [
+        r
+        for r in (parse_line(l) for _, _, l in lines)
+        if r and r.get("kind") == "DISPTEST" and r.get("variant") == "step"
+    ]
+    end_rec = parse_line(end.string) if end else None
+
+    mismatches: List[Dict[str, Any]] = []
+    for i, (want_phase, want_n, want_crc) in enumerate(expected):
+        got = steps[i] if i < len(steps) else None
+        if got is None:
+            mismatches.append({"i": i, "phase": want_phase, "n": want_n, "why": "missing"})
+            continue
+        if got["phase"] != want_phase or got["n"] != want_n:
+            mismatches.append(
+                {
+                    "i": i,
+                    "phase": want_phase,
+                    "n": want_n,
+                    "why": "out of order",
+                    "got": f"{got['phase']}/{got['n']}",
+                }
+            )
+            continue
+        if got["crc"] != want_crc:
+            mismatches.append(
+                {
+                    "i": i,
+                    "phase": want_phase,
+                    "n": want_n,
+                    "why": "crc",
+                    "want": f"{want_crc:08x}",
+                    "got": f"{got['crc']:08x}",
+                }
+            )
+
+    step_ms = sorted(r["ms"] for r in steps)
+    device_ms = end_rec["ms"] if end_rec else None
+    fps = (len(steps) / (device_ms / 1000.0)) if device_ms else None
+    wrong_px = sorted({r["px"] for r in steps if r["px"] != 320 * 240})
+
+    return {
+        "ok": bool(end_rec) and not mismatches and len(steps) == len(expected),
+        "phase": phase,
+        "stride": stride,
+        "steps_expected": len(expected),
+        "steps_seen": len(steps),
+        "steps_ok": len(expected) - len(mismatches),
+        "mismatches": mismatches[:10],
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "begin": begin_rec,
+        "end": end_rec,
+        "device_ms": device_ms,
+        "wall_s": round(wall_s, 1),
+        "fps": round(fps, 1) if fps else None,
+        "step_ms_min": step_ms[0] if step_ms else None,
+        "step_ms_p50": step_ms[len(step_ms) // 2] if step_ms else None,
+        "step_ms_max": step_ms[-1] if step_ms else None,
+        "wrong_px": wrong_px,
+    }
+
+
 SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]]] = {
     "boot": scenario_boot,
     "idle": scenario_idle,
@@ -1460,6 +1553,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "audio_stall": scenario_audio_stall,
     "sleep": scenario_sleep,
     "screen": scenario_screen,
+    "disptest": scenario_disptest,
     "displaycmd": scenario_displaycmd,
     "uptime": scenario_uptime,
     "map": scenario_map,
@@ -1478,6 +1572,7 @@ SCENARIO_ORDER = [
     "audio_stall",
     "sleep",
     "screen",
+    "disptest",
     "map",
     "nav",
     "input",
@@ -1600,6 +1695,23 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 f"settings_scroll_max={result.get('settings_scroll_max')}  "
                 f"settings_scroll_final={result.get('settings_scroll_final')}  crashed={result.get('crashed')}"
             )
+        elif name == "disptest":
+            if result.get("reason"):
+                print(f"  {result['reason']}")
+            else:
+                print(
+                    f"  phase={result.get('phase')} stride={result.get('stride')}  "
+                    f"steps={result.get('steps_ok')}/{result.get('steps_expected')} ok  "
+                    f"seen={result.get('steps_seen')}  device_ms={result.get('device_ms')}  "
+                    f"fps={result.get('fps')}"
+                )
+                print(
+                    f"  step ms min/p50/max={result.get('step_ms_min')}/"
+                    f"{result.get('step_ms_p50')}/{result.get('step_ms_max')}  "
+                    f"wrong_px={result.get('wrong_px')}"
+                )
+                for m in result.get("mismatches", []):
+                    print(f"    MISMATCH {m}")
         elif name == "screen":
             print(
                 f"  readback_stable={result.get('readback_stable')}  "
@@ -1643,6 +1755,7 @@ SCENARIO_HELP = {
     "audio_stall": "loop stall while a tone plays (must stay < 100 ms)",
     "sleep": "display off/on with a message in between",
     "screen": "panel readback probe (void on this hardware) + map content",
+    "disptest": "TM-41: colour/geometry sequence, every pushed frame CRC-checked",
     "map": "10 stations at 0.3-400 km, full zoom sweeps, centring, crash watch",
     "nav": "drawer -> tab -> drawer over all tabs, scroll the settings page",
     "input": "keyboard keys and trackball steps through the LVGL indev chain",
@@ -1666,6 +1779,7 @@ examples:
   python3 tools/bench/tdeck_harness.py --scenario map --map-stations 10
   python3 tools/bench/tdeck_harness.py --scenario input --input-ball-steps 20
   python3 tools/bench/tdeck_harness.py --scenario inject --inject-count 20 --inject-spacing 2
+  python3 tools/bench/tdeck_harness.py --scenario disptest --disptest-phase circle
 
 Opening the serial port reboots the T-Deck; every run starts with a fresh
 boot, waits for CLIENT STARTED, then for [BOOT];ready (the network phase
@@ -1734,6 +1848,18 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=float,
         default=3.0,
         help="inject scenario seconds between messages (default: 3)",
+    )
+    p.add_argument(
+        "--disptest-phase",
+        default="full",
+        choices=["full", "invert", "colors", "square", "circle", "triangle"],
+        help="disptest phase to run (default: full = all five)",
+    )
+    p.add_argument(
+        "--disptest-stride",
+        type=int,
+        default=1,
+        help="disptest square/circle growth in pixels per step (default: 1)",
     )
     p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10; 40 recycles marker slots)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")

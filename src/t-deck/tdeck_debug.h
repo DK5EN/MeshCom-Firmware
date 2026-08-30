@@ -66,6 +66,19 @@ void tdeck_dbg_tft(int mode);
  * field list. */
 void tdeck_dbg_screencrc(void);
 
+/* TM-41 colour/geometry display test, verified driver-side.
+ * phase: "" or "full" = the whole sequence, else one of
+ *        invert|colors|square|circle|triangle.
+ * stride: pixels per growth step of the square/circle phases (<= 0 -> 1).
+ * Runs synchronously on the loop task, bypasses LVGL (see
+ * tdeck_dbg_disptest_running()) and prints one [DISPTEST];step line with the
+ * CRC32 of exactly the bytes handed to tft.pushColors() per frame. */
+void tdeck_dbg_disptest(const char *phase, int stride);
+
+/* True while tdeck_dbg_disptest() owns the panel; disp_flush() drops its
+ * transfer (and reports the area done) for as long as this is set. */
+bool tdeck_dbg_disptest_running(void);
+
 /* lv_disp_drv_t callbacks, wired up in tdeck_main.cpp:setupLvgl(). */
 void tdeck_dbg_monitor_cb(lv_disp_drv_t * disp_drv, uint32_t time_ms, uint32_t px);
 void tdeck_dbg_render_start_cb(lv_disp_drv_t * disp_drv);

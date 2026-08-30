@@ -285,6 +285,24 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
           bool bUDPtoLoraSend = !bSrcUnconfigured;
 
+          // TM-39: raw & unconditional (printfdeb needs --debug and strips ';'
+          // outside csv) -- classify by the same {SET}/{CET} prefixes the
+          // dispatch below matches; everything else in a GATE frame is a
+          // relayed mesh frame (position/text/hey) going back down to LoRa.
+          {
+            const char *gwRxType = "DATA";
+            if(msg_type_b == 0x3A)
+            {
+              if(memcmp(aprsmsg.msg_payload.c_str(), "{SET}", 5) == 0)
+                gwRxType = "SET";
+              else if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}", 5) == 0)
+                gwRxType = "CET";
+            }
+            // DATA (a relayed mesh frame) is high-rate on a busy gateway: only with --udplog
+            if(gwRxType[0] != 'D' || bUDPLOG)
+              Serial.printf("[GW];rx;type;%s;len;%d;ms;%lu\n", gwRxType, packetSize, (unsigned long)millis());
+          }
+
           if(msg_type_b == 0x21)
           {
             sendDisplayPosition(aprsmsg, 99, 0);
@@ -469,6 +487,9 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
         if(bDisplayInfo)
           printlndeb("[BEAT]...Heartbeat from server received");
 
+        // TM-39: raw & unconditional
+        Serial.printf("[GW];rx;type;BEAT;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
+
         /**
          * TODO check HB accordingly to format not only BEAT at beginning
          * 15:16:08  <UDP_ETH> UDP Packet received with length: 22
@@ -480,6 +501,8 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
       else
       {
         DEBUG_MSG("ERROR", "Received udp message without indicator");
+        // TM-39: raw & unconditional
+        Serial.printf("[GW];rx;type;OTHER;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
         last_upd_timer = millis();
         hb_warn_logged = false;
       }
@@ -1442,6 +1465,7 @@ void startMeshComUDP()
       // F6: Zielnamen bestimmen; aufgeloest wird asynchron (wifiDnsPoll),
       // Literal-IPs sofort, ein Name pro Boot nur einmal.
       const char *srv_host = NULL;
+      const char *srv_path = NULL;   // TM-39: "hamnet" or "inet", matches the printlndeb text below
       const char *ntp_host = NULL;
       IPAddress ntp_literal(0,0,0,0);
 
@@ -1452,17 +1476,20 @@ void startMeshComUDP()
         {
           printlndeb("[WIFI]...Internet (no HAMNET) UDP-DEST meshcom.dig-italia.it");
           srv_host = "meshcom.dig-italia.it";
+          srv_path = "inet";
         }
         else
         if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
         {
           printlndeb("[WIFI]...Hamnet UDP-DEST meshcom.hamnet.cloud");
           srv_host = "meshcom.hamnet.cloud";
+          srv_path = "hamnet";
         }
         else
         {
           printlndeb("[WIFI]...Hamnet UDP-DEST 44.143.8.143");
           srv_host = "44.143.8.143";
+          srv_path = "hamnet";
         }
 
         if(strlen(meshcom_settings.node_ntp) >= 7)
@@ -1487,11 +1514,13 @@ void startMeshComUDP()
         {
           printlndeb("[WIFI]...Internet UDP-DEST meshcom.dig-italia.it");
           srv_host = "meshcom.dig-italia.it";
+          srv_path = "inet";
         }
         else
         {
           printlndeb("[WIFI]...Internet UDP-DEST meshcom.oevsv.at");
           srv_host = "meshcom.oevsv.at";
+          srv_path = "inet";
         }
 
         if(strlen(meshcom_settings.node_ntp) >= 7)
@@ -1508,6 +1537,11 @@ void startMeshComUDP()
 
       if(ntp_host == NULL)
         timeClient.setPoolServerIP(ntp_literal);
+
+      // TM-39: raw & unconditional, once per (re)connect -- before this the
+      // host is not chosen yet, so there is nothing to log.
+      Serial.printf("[GW];srv;%.2s;host;%s;path;%s;ms;%lu\n",
+                     meshcom_settings.node_gwsrv, srv_host, srv_path, (unsigned long)millis());
 
       wifiDnsStart(&s_dnsSrv, srv_host);
       if(ntp_host != NULL)
@@ -1640,6 +1674,11 @@ void sendKEEP()
   }
 
   addUdpOutBuffer(hb_buffer, hb_buffer_size);
+
+  // TM-39: raw & unconditional. "ok" reflects the ring enqueue only --
+  // addUdpOutBuffer() has no failure path -- not confirmed on-wire delivery;
+  // that is tracked separately by --udpstat's tx/tx_fail counters.
+  Serial.printf("[GW];keep;tx;ok;1;ms;%lu\n", (unsigned long)millis());
 }
 
 /**@brief Function to write our additional data into the UDP tx buffer

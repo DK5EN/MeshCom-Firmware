@@ -1,16 +1,41 @@
 #!/usr/bin/env python3
 """Unit tests for tools/bench/tdeck_parse.py -- one case per firmware line shape.
 
-Run with either:
-    python3 -m pytest tools/bench/test_tdeck_parse.py -q
-    python3 -m unittest tools/bench/test_tdeck_parse.py
+Run from this directory (tdeck_parse is imported by plain module name, so the
+repo root is not a valid cwd) with either:
+    cd tools/bench && python3 -m pytest test_tdeck_parse.py -q
+    cd tools/bench && python3 -m unittest test_tdeck_parse
 """
 
 from __future__ import annotations
 
 import unittest
 
-from tdeck_parse import heap_delta, parse_line, redraw_summary, refr_summary
+import math
+import zlib
+
+from tdeck_parse import (
+    DISPTEST_BARS,
+    DISPTEST_CIRCLE_MAX,
+    DISPTEST_FILLS,
+    DISPTEST_H,
+    DISPTEST_PHASES,
+    DISPTEST_PX,
+    DISPTEST_SIN24,
+    DISPTEST_SQUARE_MAX,
+    DISPTEST_TRI_FRAMES,
+    DISPTEST_TRI_STEPS,
+    DISPTEST_W,
+    disptest_crc,
+    disptest_expected,
+    disptest_frame,
+    disptest_steps,
+    disptest_triangle_vertices,
+    heap_delta,
+    parse_line,
+    redraw_summary,
+    refr_summary,
+)
 
 
 class TestRedraw(unittest.TestCase):
@@ -457,6 +482,227 @@ class TestHeapDelta(unittest.TestCase):
     def test_none_inputs(self) -> None:
         self.assertEqual(heap_delta(None, {"heap_free": 1}), {})
         self.assertEqual(heap_delta({"heap_free": 1}, None), {})
+
+
+# --------------------------------------------------------------------------
+# TM-41 [DISPTEST]
+# --------------------------------------------------------------------------
+
+
+def _brute_frame(phase: str, i: int, stride: int = 1) -> bytes:
+    """Per-pixel reference: a literal transcription of dt_render() in
+    src/t-deck/tdeck_debug.cpp. Slow (0.3 s a frame), so it is only used to
+    prove that the span renderer in tdeck_parse.py picks the same pixels."""
+    w, h_res = DISPTEST_W, DISPTEST_H
+    bg, fg = 0x0000, 0xFFFF
+    h = r4 = 0
+    v = [(0, 0)] * 3
+    if phase == "square":
+        bg, fg = 0xFFFF, 0x0000
+        h = 2 * min(DISPTEST_SQUARE_MAX, (i + 1) * stride)
+    elif phase == "circle":
+        r = min(DISPTEST_CIRCLE_MAX, (i + 1) * stride)
+        r4 = (2 * r) * (2 * r)
+    elif phase == "triangle":
+        v = disptest_triangle_vertices(i)
+    elif phase == "colors":
+        c = DISPTEST_FILLS[i % 5]
+        bg = (~c) & 0xFFFF if i >= 5 else c
+    out = bytearray()
+    for y in range(h_res):
+        yy = 2 * y - (h_res - 1)
+        rbg = bg
+        if phase == "invert":
+            rbg = DISPTEST_BARS[y // (h_res // 8)]
+            if i == 1:
+                rbg = (~rbg) & 0xFFFF
+        for x in range(w):
+            xx = 2 * x - (w - 1)
+            if phase == "square":
+                inside = abs(xx) <= h and abs(yy) <= h
+            elif phase == "circle":
+                inside = xx * xx + yy * yy <= r4
+            elif phase == "triangle":
+                inside = True
+                for k in range(3):
+                    (vx1, vy1), (vx2, vy2) = v[k], v[(k + 1) % 3]
+                    if (vx2 - vx1) * (yy - vy1) - (vy2 - vy1) * (xx - vx1) < 0:
+                        inside = False
+                        break
+            else:
+                inside = False
+            c = fg if inside else rbg
+            out += bytes(((c >> 8) & 0xFF, c & 0xFF))
+    return bytes(out)
+
+
+class TestDispTestParse(unittest.TestCase):
+    def test_begin(self) -> None:
+        rec = parse_line(
+            "[DISPTEST];begin;phase;full;stride;1;w;320;h;240;steps;516;ms;12345"
+        )
+        self.assertEqual(
+            rec,
+            {
+                "kind": "DISPTEST",
+                "variant": "begin",
+                "phase": "full",
+                "stride": 1,
+                "w": 320,
+                "h": 240,
+                "steps": 516,
+                "ms": 12345,
+            },
+        )
+
+    def test_step(self) -> None:
+        rec = parse_line("[DISPTEST];step;circle;n;17;crc;0a1b2c3d;px;76800;ms;38")
+        self.assertEqual(
+            rec,
+            {
+                "kind": "DISPTEST",
+                "variant": "step",
+                "phase": "circle",
+                "n": 17,
+                "crc": 0x0A1B2C3D,
+                "px": 76800,
+                "ms": 38,
+            },
+        )
+
+    def test_step_glued_to_command_echo(self) -> None:
+        rec = parse_line("--disptest full 1[DISPTEST];step;invert;n;0;crc;ffffffff;px;76800;ms;40")
+        assert rec is not None
+        self.assertEqual(rec["crc"], 0xFFFFFFFF)
+        self.assertEqual(rec["phase"], "invert")
+
+    def test_end_and_err(self) -> None:
+        self.assertEqual(
+            parse_line("[DISPTEST];end;steps;516;ms;23456"),
+            {"kind": "DISPTEST", "variant": "end", "steps": 516, "ms": 23456},
+        )
+        self.assertEqual(
+            parse_line("[DISPTEST];err;phase;wobble"),
+            {"kind": "DISPTEST", "variant": "err", "reason": "phase", "detail": "wobble"},
+        )
+
+    def test_malformed_lines_are_none(self) -> None:
+        for line in (
+            "[DISPTEST]",
+            "[DISPTEST];step;circle;n;17;crc;0a1b2c3d;px;76800",       # short
+            "[DISPTEST];step;circle;n;17;crc;xyz;px;76800;ms;38",      # crc not hex
+            "[DISPTEST];step;circle;n;17;crc;0a1b2c3;px;76800;ms;38",  # crc too short
+            "[DISPTEST];step;circle;i;17;crc;0a1b2c3d;px;76800;ms;38",  # wrong key
+            "[DISPTEST];end;steps;516",
+            "[DISPTEST];begin;phase;full;stride;1;w;320;h;240;steps;516",
+        ):
+            self.assertIsNone(parse_line(line), line)
+
+
+class TestDispTestRender(unittest.TestCase):
+    def test_sin_table_matches_its_formula(self) -> None:
+        self.assertEqual(len(DISPTEST_SIN24), DISPTEST_TRI_STEPS)
+        for i, v in enumerate(DISPTEST_SIN24):
+            self.assertEqual(v, round(1024 * math.sin(2 * math.pi * i / DISPTEST_TRI_STEPS)), i)
+
+    def test_step_counts(self) -> None:
+        self.assertEqual([disptest_steps(p) for p in DISPTEST_PHASES], [2, 10, 160, 200, 144])
+        self.assertEqual(disptest_steps("square", 4), 40)
+        self.assertEqual(disptest_steps("circle", 7), 29)     # ceil(200/7)
+        self.assertEqual(disptest_steps("triangle", 4), 144)  # stride does not apply
+        with self.assertRaises(ValueError):
+            disptest_steps("wobble")
+
+    def test_frame_size_and_solid_fill_crc(self) -> None:
+        """The five fills are the byte-order anchor: red must be f8,00 per pixel."""
+        frame = disptest_frame("colors", 0)
+        self.assertEqual(len(frame), DISPTEST_PX * 2)
+        self.assertEqual(frame, b"\xf8\x00" * DISPTEST_PX)
+        self.assertEqual(disptest_crc("colors", 0), zlib.crc32(b"\xf8\x00" * DISPTEST_PX))
+
+    def test_inverted_pass_is_the_complement(self) -> None:
+        for i in range(5):
+            a = disptest_frame("colors", i)
+            b = disptest_frame("colors", i + 5)
+            self.assertEqual(bytes(x ^ 0xFF for x in a[:2]), b[:2])
+            self.assertEqual(b, bytes(x ^ 0xFF for x in a[:2]) * DISPTEST_PX)
+
+    def test_invert_pass_is_bars_then_complement(self) -> None:
+        a = disptest_frame("invert", 0)
+        b = disptest_frame("invert", 1)
+        self.assertEqual(b, bytes(x ^ 0xFF for x in a))
+        band = DISPTEST_H // 8
+        for k, colour in enumerate(DISPTEST_BARS):
+            off = (k * band) * DISPTEST_W * 2
+            self.assertEqual(a[off : off + 2], bytes(((colour >> 8) & 0xFF, colour & 0xFF)))
+
+    def test_growth_starts_at_the_centre_and_ends_full_screen(self) -> None:
+        # first step: a 2x2 block of foreground at the exact centre
+        self.assertEqual(disptest_frame("square", 0).count(b"\x00\x00"), 4)
+        self.assertEqual(disptest_frame("circle", 0).count(b"\xff\xff"), 4)
+        # last step: the shape covers every pixel
+        self.assertEqual(disptest_frame("square", 159), b"\x00\x00" * DISPTEST_PX)
+        self.assertEqual(disptest_frame("circle", 199), b"\xff\xff" * DISPTEST_PX)
+        # ... and only there: one step earlier a corner is still background
+        self.assertNotEqual(disptest_frame("circle", 198)[:2], b"\xff\xff")
+
+    def test_shapes_are_point_symmetric_about_the_centre(self) -> None:
+        for phase, i in (("square", 40), ("circle", 60)):
+            frame = disptest_frame(phase, i)
+            rows = [frame[y * DISPTEST_W * 2 : (y + 1) * DISPTEST_W * 2] for y in range(DISPTEST_H)]
+            for y, row in enumerate(rows):
+                mirror = rows[DISPTEST_H - 1 - y]
+                px = [row[2 * x : 2 * x + 2] for x in range(DISPTEST_W)]
+                self.assertEqual(
+                    b"".join(reversed(px)), mirror, f"{phase} step {i} row {y}"
+                )
+
+    def test_triangle_rotates_three_turns_each_way(self) -> None:
+        v0 = disptest_triangle_vertices(0)
+        # one full turn later the vertex set repeats
+        self.assertEqual(sorted(v0), sorted(disptest_triangle_vertices(DISPTEST_TRI_STEPS)))
+        # the two halves are mirror images in time: frame 71 (last clockwise)
+        # and frame 72 (first counter-clockwise) share an angle index
+        self.assertEqual(
+            sorted(disptest_triangle_vertices(71)), sorted(disptest_triangle_vertices(72))
+        )
+        self.assertEqual(len(disptest_expected("triangle")), DISPTEST_TRI_FRAMES)
+        # vertices sit on the r=100 px circle (200 in doubled coordinates)
+        for vx, vy in v0:
+            self.assertLessEqual(abs(math.hypot(vx, vy) - 200), 1.5)
+
+    def test_span_renderer_matches_the_firmware_pixel_test(self) -> None:
+        """The contract with dt_render(): same pixels, one CRC per frame."""
+        for phase, i, stride in (
+            ("invert", 1, 1),
+            ("colors", 7, 1),
+            ("square", 0, 1),
+            ("square", 39, 4),
+            ("circle", 5, 1),
+            ("circle", 49, 4),
+            ("triangle", 0, 1),
+            ("triangle", 5, 1),
+            ("triangle", 143, 1),
+        ):
+            with self.subTest(phase=phase, i=i, stride=stride):
+                self.assertEqual(disptest_frame(phase, i, stride), _brute_frame(phase, i, stride))
+
+    def test_expected_covers_the_whole_sequence_in_order(self) -> None:
+        exp = disptest_expected("full", 1)
+        self.assertEqual(len(exp), 516)
+        self.assertEqual([p for p, _, _ in exp[:2]], ["invert", "invert"])
+        self.assertEqual(exp[-1][0], "triangle")
+        self.assertEqual([n for _, n, _ in exp[2:12]], list(range(10)))
+        # every CRC is the CRC of that frame, and the growth frames all differ
+        self.assertEqual(exp[3][2], disptest_crc("colors", 1))
+        square = [c for p, _, c in exp if p == "square"]
+        self.assertEqual(len(set(square)), len(square))
+
+    def test_out_of_range_step_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            disptest_frame("square", 160)
+        with self.assertRaises(ValueError):
+            disptest_frame("colors", -1)
 
 
 if __name__ == "__main__":

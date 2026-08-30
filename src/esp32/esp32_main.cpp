@@ -1877,6 +1877,11 @@ void esp32loop()
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();
 
+    // BP-01: close a back-pressure episode with QRV once the TX ring has
+    // drained, even when no further user message arrives to observe it. Two
+    // ring-index reads and a compare; it emits at most once per episode.
+    bpPollDrain();
+
     esp_task_wdt_reset();
 
     #if not defined(BOARD_T_DECK_PRO)
@@ -2936,7 +2941,13 @@ void esp32loop()
             printfdeb("[LOOP] hasMsgFromPhone\n");
         
         if(memcmp(textbuff_phone, ":", 1) == 0)
+        {
+            // BP-01: tag the origin so the back-pressure notice goes back to
+            // the phone that just typed, and never over the air.
+            setMsgOrigin(ORIGIN_BLE);
             sendMessage(textbuff_phone, txt_msg_len_phone);
+            setMsgOrigin(ORIGIN_NONE);
+        }
 
         if(memcmp(textbuff_phone, "-", 1) == 0)
             commandAction(textbuff_phone, isPhoneReady, true);
@@ -4232,7 +4243,10 @@ void checkSerialCommand(void)
 
             if(strText[0] == ':' && strText[1] == ':')
             {
+                // BP-01: origin serial -- the notice comes back on the console.
+                setMsgOrigin(ORIGIN_SERIAL);
                 sendMessage(msg_buffer, inext);
+                setMsgOrigin(ORIGIN_NONE);
             }
             else
                 if(strText[0] == '-' && strText[1] == '-')

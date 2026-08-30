@@ -1,6 +1,6 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Wave 1 (see the first section below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
+Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Waves 1 and 2 (see the first two sections below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
 (async NTP), TM-31 (UDP instrument, gateway relay fix, upstream #568 answered), TM-16 (boot time),
 TM-11/TD-01 closed, HL-03/HL-04**. All pushed (`df861d58`), working tree clean, branch
 `tdeck-partial-refresh-trace`. The WLAN report is
@@ -12,6 +12,37 @@ settled" table before re-deriving anything.
 left at 1, the persist flags at 0, as found. No background runs are alive — the 14-h WiFi soak
 (TM-36) died at ~12:17 when the TM-31 work took the Heltec and T-Beam ports. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
+
+## 2026-08-30 late: Wave 2 (BP-01, CS-03, TM-39, TM-40, TM-41)
+
+All verified on the bench; all four nodes run this build (`--gateway off` everywhere, Heltec
+`srv OE`, `--udplog off`).
+
+- **BP-01 / TM-37** -- `src/backpressure.h` (pure state machine, 18 cases), origin tag set by
+  every user-message caller (serial `::`, BLE, web GUI, EXTUDP, T-Deck GUI), notices back on that
+  transport only, `[BP];notice;<Q>;depth;N;max;M` / `[BP];refuse` raw lines. Texts are
+  "Q-code - meaning" (operator note during the gate). QRV closes at depth 0, not 1 -- depth 1
+  flapped QRS/QRV/QRS 400 ms apart on the bench. DK5EN-93: 22-message burst -> QRS at 2, QRT at
+  16/20, five refusals, QRV after the drain (16 s for 2 frames).
+- **CS-03** -- `GET /config.json` (Content-Disposition, 107 fields on the Heltec, 2.1 kB) and
+  `POST /config` (bounded body reader, layout/value/crc checks, reboot after save). Excluded from
+  the file: msg-id counters and live sensor readings (would rewind dedup / never byte-stable).
+  GPS lat/lon/alt still drift on a GPS node, so "second export byte-identical" holds only with
+  GPS off. Findings: E22-DevKitC DRAM headroom ~1.7 kB (a 6 kB static buffer failed to link, the
+  config buffer is heap for one request); with an empty `node_webpwd` the file (WLAN password
+  included) is one unauthenticated GET away -- same class as the setup page, now concentrated.
+- **TM-39** -- OE and DL are the same server today (`meshcom.oevsv.at`); IT is
+  `meshcom.dig-italia.it` (DNS 1.7 s vs 61 ms). Every KEEP answered by a 20-byte BEAT on all
+  three. `[GW];rx;type;DATA` is gated behind `--udplog` (per relayed frame otherwise). The nRF52
+  has `[UDP];rx/tx` + `--udplog` now (TM-38 follow-up closed).
+- **TM-40** -- live OTA PASS on DK5EN-92 (`tools/bench/runs/ota_20260830-201649/`). The tool
+  matches `TBEAM_AXP2101` against env `ttgo_tbeam` by prefix.
+- **TM-41** -- 516/516 frame CRCs on the T-Deck at stride 1 (12.2 fps); the loop-task watchdog
+  must be fed per frame.
+- Open follow-ups filed in BACKLOG: nRF52 `CONF` indicator vs ESP32, nRF52 internet path without
+  per-country case, the 9 scratch scripts still on group 9999, PT-01's 8 parser findings.
+- **TM-38 real run is still yours** (AP power cycle, see `docs/bench-ap-reboot.md`; set
+  `--gateway on` on the three ESP32 nodes first).
 
 ## 2026-08-30 evening: Wave 1 of the intake campaign (`/orchestrate-waves`)
 

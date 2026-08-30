@@ -147,6 +147,17 @@ operator to power-cycle the access points and writes `summary.txt` on its own. F
 prerequisites (`--gateway on` on the three ESP32 nodes) and pass criteria:
 [`bench-ap-reboot.md`](bench-ap-reboot.md).
 
+### 2.8 OTA regression, country-server probe, T-Deck display test (TM-40, TM-39, TM-41)
+
+- OTA: `python3 tools/bench/ota_regression.py --port <port> --env <env> --ip <ip> --settings-check`
+  per WiFi node -- [`bench-ota-regression.md`](bench-ota-regression.md).
+- Country servers: `cd tools/bench/runs && python3 ../experiments/srvprobe.py --port <port>` --
+  [`bench-country-servers.md`](bench-country-servers.md).
+- T-Deck display: `python3 tools/bench/tdeck_harness.py --scenario disptest` --
+  [`tdeck-display-test.md`](tdeck-display-test.md).
+- Back-pressure (BP-01): `::{TEST}...` burst on the console, assert `[BP];notice;QRS|QRT|QRV` and
+  `[BP];refuse` lines; QTA needs relay load (`gwflood.py`) on top.
+
 ## 3. Run record
 
 Per run, keep: branch + SHA, date/time, per-harness JSON, the raw `*_run_*.log` files, the numbers

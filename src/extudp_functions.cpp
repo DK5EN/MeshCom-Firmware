@@ -300,7 +300,19 @@ void getExtern(unsigned char incoming[], int len)
   
   snprintf(val,160, ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
 
+  // BP-01: tag the origin so a QRS/QRT/QTA goes back on this socket and
+  // nowhere else. Cleared right after -- everything that does not set this
+  // (relay, ACK, beacon) is never refused.
+  // NATIVE_BUILD: setMsgOrigin() lives in loop_functions.cpp, which the
+  // getExtern() host test does not link (build_src_filter, env:native_extern).
+  // The tag has no effect on a parser test either way.
+#ifndef NATIVE_BUILD
+  setMsgOrigin(ORIGIN_EXTUDP);
+#endif
   sendMessage(val, strlen(val));
+#ifndef NATIVE_BUILD
+  setMsgOrigin(ORIGIN_NONE);
+#endif
 }
 
 // PT-01: getExternUDP() only reads the UdpExtern socket (guarded above) and
@@ -682,6 +694,42 @@ void flushExternQueue()
 void  sendExternHeartbeat()
 {
 
+}
+
+// BP-01 (BACKLOG) / TM-37: the EXTUDP reply path for a back-pressure notice.
+//
+// A message that came in through getExtern() gets its QRS/QRT/QTA/QRV back on
+// the same socket -- never over the air. Its own tiny JSON object rather than
+// sendExtern(): sendExtern() re-serializes a decoded APRS frame, and there is
+// no frame here. A notice is not a message; it carries no msg_id and must
+// never be mistaken for one by the peer, hence the distinct type "notice".
+void sendExternNotice(const char *code, const char *text)
+{
+  #ifdef ESP32
+    if(bWIFIAP)
+      return;
+  #endif
+
+  if(!bEXTUDP)
+    return;
+
+  if(!hasExternIPaddress)
+    return;
+
+  char c_json[160];
+  int json_len = snprintf(c_json, sizeof(c_json),
+                          "{\"src_type\":\"node\",\"type\":\"notice\",\"code\":\"%s\",\"msg\":\"%s\"}",
+                          code, text);
+
+  if(json_len <= 0)
+    return;
+
+  if(json_len > (int)sizeof(c_json) - 1)
+    json_len = (int)sizeof(c_json) - 1;
+
+  UdpExtern.beginPacket(apip, EXTERN_PORT);
+  UdpExtern.write((const uint8_t *)c_json, (size_t)json_len);
+  UdpExtern.endPacket();
 }
 
 void resetExternUDP()

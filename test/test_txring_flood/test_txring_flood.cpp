@@ -33,6 +33,7 @@
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
 #include <aprs_functions.h>
+#include <backpressure.h>          // BP-01: die Schwellen gegen den ECHTEN Ring
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp ------------
@@ -336,6 +337,97 @@ static void test_ringgroesse_ist_dokumentiert(void)
     TEST_ASSERT_TRUE(MAX_RING <= 255);   // iWrite/iRead sind 8 Bit
 }
 
+// ---- 8: BP-01 -- txRingDepth() ist der Ring, nicht eine zweite Buchfuehrung -
+//
+// Der Rueckmeldepfad an den Absender (QRS/QRT/QTA/QRV) haengt komplett an
+// txRingDepth(). Wenn diese Zahl vom tatsaechlichen Fuellstand abweicht, warnt
+// der Knoten zum falschen Zeitpunkt -- oder gar nicht. Also gegen den echten
+// Ring gemessen, nicht gegen eine Nachbildung.
+
+static void test_txringdepth_folgt_dem_echten_ring(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, txRingDepth());
+
+    for (int i = 0; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildPositionFrame(0xC000 + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
+        TEST_ASSERT_EQUAL_INT(i + 1, txRingDepth());
+    }
+
+    // Abfluss: doTX() leert einen Slot und schiebt den Lesezeiger nach.
+    ringBuffer[0][0] = 0;
+    advanceIReadPastEmpty();
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 2, txRingDepth());
+}
+
+// Die 80-%-Schwelle, an der der Knoten aufhoert, lokale Nutzernachrichten
+// anzunehmen -- gefahren vom echten Ring, nicht von einer Zahlenreihe. Auf
+// dieser Env ist MAX_RING 20, die Schwelle also 16; die Arithmetik selbst
+// (10/20/30) steht in test_backpressure.
+static void test_backpressure_qrt_an_der_echten_80_prozent_marke(void)
+{
+    BackPressure bp(MAX_RING);
+    const int threshold = bp.refuseThreshold();
+
+    TEST_ASSERT_EQUAL_INT((MAX_RING * 4) / 5, threshold);
+    TEST_ASSERT_TRUE_MESSAGE(threshold < MAX_RING - 1, "Schwelle muss unter der Ueberlaufkante liegen");
+
+    int qrs_count = 0;
+    int qrt_count = 0;
+    bool refused_before_threshold = false;
+
+    for (int i = 0; i < threshold; i++)
+    {
+        BuiltFrame f = buildPositionFrame(0xD000 + (uint32_t)i);
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_msg");
+        TEST_ASSERT_TRUE(slot >= 0);
+
+        if (bp.refusing())
+            refused_before_threshold = true;
+
+        switch (bp.onSend(txRingDepth(), slot < 0))
+        {
+            case BP_NOTICE_QRS: qrs_count++; break;
+            case BP_NOTICE_QRT: qrt_count++; break;
+            default: break;
+        }
+    }
+
+    TEST_ASSERT_FALSE_MESSAGE(refused_before_threshold, "unterhalb 80 % darf nichts abgewiesen werden");
+    TEST_ASSERT_EQUAL_INT(threshold, txRingDepth());
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrs_count, "genau ein QRS pro Episode");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrt_count, "genau ein QRT, beim Erreichen der Schwelle");
+    TEST_ASSERT_TRUE_MESSAGE(bp.refusing(), "ab 80 % werden lokale Nutzernachrichten abgewiesen");
+}
+
+// Und die Gegenprobe am oberen Ende: der Ring verwirft (RING_DROP_NEW, Fall 1
+// oben), txRingDepth() bleibt stehen, und daraus wird ein QTA -- die einzige
+// Stelle, an der der Absender erfaehrt, dass seine Nachricht weg ist.
+static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
+{
+    BackPressure bp(MAX_RING);
+
+    fillWithPositions(0xE000);
+    bp.onSend(txRingDepth(), false);
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, txRingDepth());
+
+    BuiltFrame neu = buildPositionFrame(0xE0FF0001UL);
+    int slot = addTxRingEntry(neu.bytes, neu.len, RING_STATUS_READY, "user_msg");
+
+    TEST_ASSERT_EQUAL_INT(-1, slot);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_RING - 1, txRingDepth(), "ein verworfener Frame veraendert die Tiefe nicht");
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(txRingDepth(), slot < 0));
+
+    // Abfluss bis in das Ruheband -> genau ein QRV schliesst die Episode.
+    memset(ringBuffer, 0, sizeof(ringBuffer));
+    iRead = 0;
+    iWrite = 0;
+    TEST_ASSERT_EQUAL_INT(0, txRingDepth());
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(txRingDepth()));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth()));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -347,5 +439,8 @@ int main(int, char **)
     RUN_TEST(test_text_kommt_durch_wo_position_faellt);
     RUN_TEST(test_relay_text_ist_normal_und_schlaegt_position_trotzdem);
     RUN_TEST(test_ringgroesse_ist_dokumentiert);
+    RUN_TEST(test_txringdepth_folgt_dem_echten_ring);
+    RUN_TEST(test_backpressure_qrt_an_der_echten_80_prozent_marke);
+    RUN_TEST(test_backpressure_qta_wenn_der_echte_ring_verwirft);
     return UNITY_END();
 }

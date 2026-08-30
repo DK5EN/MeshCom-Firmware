@@ -1,0 +1,13 @@
+srvprobe srvprobe_20260830-193907
+
+country  host                   path  keep  gw_rx  udp_rx  ntp   answer_gap  hb_warn  resets
+-------  ---------------------  ----  ----  -----  ------  ----  ----------  -------  ------
+OE       meshcom.oevsv.at       inet  7     7      6       -     1           0        0     
+DL       meshcom.oevsv.at       inet  7     7      6       ok:1  3           0        0     
+IT       meshcom.dig-italia.it  inet  7     7      6       ok:1  1           0        0     
+
+Verdicts:
+- DL and OE resolve to the same host (meshcom.oevsv.at) -- confirms the internet-path asymmetry read from udp_functions.cpp: on this WLAN (non-HAMNET) a DL-configured node is not special-cased and lands on the Austrian server, same as OE.
+- IT resolves to its own host (meshcom.dig-italia.it), distinct from OE/DL.
+
+Node restored to --gateway off / --gateway srv OE / --udplog off: confirmed by --info.

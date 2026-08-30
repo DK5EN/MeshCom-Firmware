@@ -22,6 +22,7 @@
 #include <string.h>
 #include <lvgl.h>
 #include <esp_debug_helpers.h>
+#include <esp_task_wdt.h>
 #include <soc/cpu.h>
 #include <TFT_eSPI.h>
 
@@ -421,6 +422,270 @@ extern "C" void tdeck_dbg_screencrc(void)
                   (unsigned long)elapsed);
     if(was_sleeping) Serial.print(";sleeping;1");
     Serial.print("\n");
+}
+
+/* ------------------------------------------------------------------------
+ * TM-41 [DISPTEST]: colour and geometry sequence, verified driver-side.
+ *
+ * The panel does not drive MISO, so tdeck_dbg_screencrc() cannot say what is
+ * on the glass (docs/tdeck-findings-20260828.md). The assertion therefore
+ * sits on the push path instead: every step renders a full frame into a RAM
+ * buffer, CRC32s exactly the bytes that are then handed to tft.pushColors(),
+ * and prints that CRC. tools/bench/tdeck_parse.py re-renders the same frames
+ * with the same integer rasterisers and compares. That proves which pixels
+ * were sent to the panel -- not that the glass shows them.
+ *
+ * Frame layout: 320x240 landscape, row-major, RGB565 big-endian on the wire.
+ * LV_COLOR_16_SWAP=1 (variants/t_deck_plus/lv_conf.h) plus
+ * pushColors(..., swap=false) means memory byte order == wire byte order, so
+ * the buffer is filled high byte first, exactly like the LVGL draw buffer.
+ *
+ * Geometry runs in doubled pixel coordinates X = 2x-(W-1), Y = 2y-(H-1): the
+ * screen centre is then exactly (0,0) and every inside-test is integer-exact
+ * and reproducible in Python, which is what makes the CRCs assertable.
+ * ------------------------------------------------------------------------ */
+
+namespace {
+
+const int      DT_W  = 320;                     /* hor_res, see setupLvgl()  */
+const int      DT_H  = 240;                     /* ver_res                   */
+const uint32_t DT_PX = (uint32_t)DT_W * DT_H;
+const uint32_t DT_BYTES = DT_PX * 2;
+
+/* Growth phases stop exactly when the shape covers the last pixel:
+ * square: |X| <= 2h with |X| <= 319 -> h = 160.
+ * circle: X^2+Y^2 <= (2r)^2 with the corner at 319^2+239^2 = 158882 -> r = 200. */
+const int DT_SQUARE_MAX = 160;
+const int DT_CIRCLE_MAX = 200;
+const int DT_TRI_STEPS  = 24;                   /* 15 deg per step           */
+const int DT_TRI_TURNS  = 3;                    /* 3 clockwise + 3 counter   */
+const int DT_TRI_FRAMES = DT_TRI_STEPS * DT_TRI_TURNS * 2;
+const int DT_TRI_R2     = 200;                  /* vertex radius, doubled    */
+
+/* round(1024 * sin(2*pi*i/24)) -- the same literal table lives in
+ * tools/bench/tdeck_parse.py; no float ever enters the rasteriser. */
+const int DT_SIN24[DT_TRI_STEPS] = {
+       0,  265,  512,  724,  887,  989, 1024,  989,
+     887,  724,  512,  265,    0, -265, -512, -724,
+    -887, -989, -1024, -989, -887, -724, -512, -265
+};
+
+const uint16_t DT_BARS[8] = {
+    0xFFFF, 0xF800, 0xFFE0, 0x07E0, 0x07FF, 0x001F, 0xF81F, 0x0000
+};
+const uint16_t DT_FILLS[5] = { 0xF800, 0xFFE0, 0x07E0, 0x001F, 0xF81F };
+
+enum dt_phase_t { DT_INVERT = 0, DT_COLORS, DT_SQUARE, DT_CIRCLE, DT_TRIANGLE, DT_PHASES };
+const char * const DT_PHASE_NAME[DT_PHASES] = { "invert", "colors", "square", "circle", "triangle" };
+
+volatile bool s_disptest_running = false;
+
+int dt_mod24(int v) { int m = v % DT_TRI_STEPS; return (m < 0) ? m + DT_TRI_STEPS : m; }
+int dt_sin(int i)   { return DT_SIN24[dt_mod24(i)]; }
+int dt_cos(int i)   { return DT_SIN24[dt_mod24(i + 6)]; }
+
+int dt_steps(int phase, int stride)
+{
+    switch(phase) {
+        case DT_INVERT:   return 2;
+        case DT_COLORS:   return 10;
+        case DT_SQUARE:   return (DT_SQUARE_MAX + stride - 1) / stride;
+        case DT_CIRCLE:   return (DT_CIRCLE_MAX + stride - 1) / stride;
+        case DT_TRIANGLE: return DT_TRI_FRAMES;
+        default:          return 0;
+    }
+}
+
+/* One frame, rendered pixel by pixel: the inside-tests below are the contract
+ * the host side re-implements, so they stay deliberately naive. */
+void dt_render(uint8_t * fb, int phase, int i, int stride)
+{
+    uint16_t bg = 0x0000, fg = 0xFFFF;
+    int      h = 0, r4 = 0;
+    int      vx[3] = {0, 0, 0}, vy[3] = {0, 0, 0};
+
+    if(phase == DT_SQUARE) {
+        bg = 0xFFFF; fg = 0x0000;                       /* black square on white */
+        h = (i + 1) * stride;
+        if(h > DT_SQUARE_MAX) h = DT_SQUARE_MAX;
+        h *= 2;                                         /* doubled coordinates   */
+    }
+    else if(phase == DT_CIRCLE) {
+        int r = (i + 1) * stride;                       /* white circle on black */
+        if(r > DT_CIRCLE_MAX) r = DT_CIRCLE_MAX;
+        r4 = (2 * r) * (2 * r);
+    }
+    else if(phase == DT_TRIANGLE) {
+        /* first half clockwise (angle index up), second half counter-clockwise */
+        int a = (i < DT_TRI_FRAMES / 2) ? dt_mod24(i) : dt_mod24(DT_TRI_FRAMES - 1 - i);
+        for(int k = 0; k < 3; k++) {
+            int ai = a + (DT_TRI_STEPS / 3) * k;        /* 120 deg apart */
+            vx[k] = (DT_TRI_R2 * dt_cos(ai)) >> 10;     /* arithmetic shift: floor */
+            vy[k] = (DT_TRI_R2 * dt_sin(ai)) >> 10;
+        }
+        /* pin the winding so "inside" is always "all edge functions >= 0" */
+        int area2 = (vx[1] - vx[0]) * (vy[2] - vy[0]) - (vy[1] - vy[0]) * (vx[2] - vx[0]);
+        if(area2 < 0) {
+            int tx = vx[1], ty = vy[1];
+            vx[1] = vx[2]; vy[1] = vy[2];
+            vx[2] = tx;    vy[2] = ty;
+        }
+    }
+    else if(phase == DT_COLORS) {
+        uint16_t c = DT_FILLS[i % 5];
+        if(i >= 5) c = (uint16_t)~c;                    /* complementary pass */
+        bg = c;
+    }
+
+    for(int y = 0; y < DT_H; y++) {
+        int       Y   = 2 * y - (DT_H - 1);
+        uint8_t * row = fb + (uint32_t)y * DT_W * 2;
+        uint16_t  rbg = bg;
+
+        if(phase == DT_INVERT) {
+            rbg = DT_BARS[y / (DT_H / 8)];              /* eight colour bars  */
+            if(i == 1) rbg = (uint16_t)~rbg;            /* ... and inverted   */
+        }
+
+        for(int x = 0; x < DT_W; x++) {
+            int  X = 2 * x - (DT_W - 1);
+            bool inside = false;
+
+            if(phase == DT_SQUARE) {
+                int ax = X < 0 ? -X : X, ay = Y < 0 ? -Y : Y;
+                inside = (ax <= h) && (ay <= h);
+            }
+            else if(phase == DT_CIRCLE) {
+                inside = (X * X + Y * Y) <= r4;
+            }
+            else if(phase == DT_TRIANGLE) {
+                inside = true;
+                for(int k = 0; k < 3 && inside; k++) {
+                    int k2 = (k + 1) % 3;
+                    int e = (vx[k2] - vx[k]) * (Y - vy[k]) - (vy[k2] - vy[k]) * (X - vx[k]);
+                    if(e < 0) inside = false;
+                }
+            }
+
+            uint16_t c = inside ? fg : rbg;
+            row[2 * x]     = (uint8_t)(c >> 8);         /* big endian on the wire */
+            row[2 * x + 1] = (uint8_t)(c & 0xFF);
+        }
+    }
+}
+
+void dt_push(const uint8_t * fb)
+{
+    if(xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
+        tft.startWrite();
+        tft.setAddrWindow(0, 0, DT_W, DT_H);
+        tft.pushColors((uint16_t *)fb, DT_PX, false);
+        tft.endWrite();
+        xSemaphoreGive(xSemaphore);
+    }
+}
+
+/* Table-driven CRC32, same polynomial/init/final as crc32_update() above --
+ * the bitwise version costs ~15 ms per full frame, which would dominate the
+ * measured frame time. Table lives on the heap for the run only. */
+uint32_t dt_crc32(const uint32_t * tab, const uint8_t * d, uint32_t n)
+{
+    uint32_t c = 0xFFFFFFFFu;
+    for(uint32_t i = 0; i < n; i++)
+        c = tab[(c ^ d[i]) & 0xFFu] ^ (c >> 8);
+    return c ^ 0xFFFFFFFFu;
+}
+
+} // namespace
+
+extern "C" bool tdeck_dbg_disptest_running(void)
+{
+    return s_disptest_running;
+}
+
+extern "C" void tdeck_dbg_disptest(const char * phase_name, int stride)
+{
+    int first = 0, last = DT_PHASES - 1;
+
+    if(phase_name != NULL && phase_name[0] != 0 && strcmp(phase_name, "full") != 0) {
+        int sel = -1;
+        for(int p = 0; p < DT_PHASES; p++)
+            if(strcmp(phase_name, DT_PHASE_NAME[p]) == 0) sel = p;
+        if(sel < 0) {
+            Serial.printf("[DISPTEST];err;phase;%s\n", phase_name);
+            return;
+        }
+        first = last = sel;
+    }
+
+    if(stride <= 0) stride = 1;
+    if(stride > 64) stride = 64;
+
+    uint8_t *  fb  = (uint8_t *)ps_malloc(DT_BYTES);
+    uint32_t * tab = (uint32_t *)malloc(256 * sizeof(uint32_t));
+    if(fb == NULL || tab == NULL) {
+        free(fb);
+        free(tab);
+        Serial.println("[DISPTEST];err;nomem");
+        return;
+    }
+    for(int i = 0; i < 256; i++) {
+        uint32_t c = (uint32_t)i;
+        for(int k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+        tab[i] = c;
+    }
+
+    int total = 0;
+    for(int p = first; p <= last; p++) total += dt_steps(p, stride);
+
+    /* Wake the panel and restart the sleep timeout: the sequence runs longer
+     * than TDECK_TFT_TIMEOUT and blocks the loop that would call tft_off(). */
+    tft_on();
+
+    Serial.printf("[DISPTEST];begin;phase;%s;stride;%d;w;%d;h;%d;steps;%d;ms;%lu\n",
+                  (first == last) ? DT_PHASE_NAME[first] : "full", stride, DT_W, DT_H,
+                  total, (unsigned long)millis());
+
+    s_disptest_running = true;
+    uint32_t t_start = millis();
+
+    for(int p = first; p <= last; p++) {
+        int n = dt_steps(p, stride);
+        for(int i = 0; i < n; i++) {
+            uint32_t t0 = millis();
+            dt_render(fb, p, i, stride);
+            uint32_t crc = dt_crc32(tab, fb, DT_BYTES);
+            dt_push(fb);
+            Serial.printf("[DISPTEST];step;%s;n;%d;crc;%08lx;px;%lu;ms;%lu\n",
+                          DT_PHASE_NAME[p], i, (unsigned long)crc,
+                          (unsigned long)DT_PX, (unsigned long)(millis() - t0));
+            /* The whole sequence runs inside one loop() iteration, so the
+             * Arduino loop task never reaches its own esp_task_wdt_reset():
+             * without these two the TWDT aborts the node after 5 s (seen on
+             * the bench at square step 61). delay() feeds the idle task on
+             * this core, esp_task_wdt_reset() the loop task's own subscription. */
+            esp_task_wdt_reset();
+            delay(1);
+        }
+    }
+
+    uint32_t elapsed = millis() - t_start;
+    s_disptest_running = false;
+    free(fb);
+    free(tab);
+
+    /* Hand the panel back to LVGL: without a forced repaint the screen would
+     * keep the last test frame (the skipped flushes were reported as done). */
+    lv_obj_t * scr = lv_scr_act();
+    if(scr != NULL) lv_obj_invalidate(scr);
+    uint32_t run = millis() + 300;
+    while((int32_t)(millis() - run) < 0) {
+        lv_task_handler();
+        delay(5);
+    }
+    tft_on();
+
+    Serial.printf("[DISPTEST];end;steps;%d;ms;%lu\n", total, (unsigned long)elapsed);
 }
 
 #endif /* BOARD_T_DECK || BOARD_T_DECK_PLUS */

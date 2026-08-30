@@ -7,6 +7,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "txring_functions.h"
 #include "dedup_functions.h"
 #include "beacon_rate.h"
 #include "mheard_functions.h"
@@ -3326,6 +3327,133 @@ void SendPong(String msg_call, unsigned int msg_id)
     addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
 }
 
+// ===========================================================================
+// BP-01 (BACKLOG) / TM-37 — back-pressure to the sender, in Q-codes.
+//
+// Until now sendMessage() threw addTxRingEntry()'s return value away: a user
+// could type into a full ring and the message vanished without a word. The
+// state machine lives in src/backpressure.h (Arduino-free, unit-tested in
+// test/test_backpressure); everything below is only the wiring — which
+// transport gets told, and when.
+//
+// Two rules the operator set that shape this code:
+//   * the notice goes back on the transport the message came from and NEVER
+//     over the air — a notice that is radiated adds to the congestion it
+//     reports, so nothing here ever touches addTxRingEntry()/sendMessage().
+//   * only locally originated user messages are refused. Relay traffic, ACKs
+//     and beacons never pass through sendMessage() and never set an origin,
+//     so the node stays a working relay while the flooding user is throttled.
+// ===========================================================================
+
+// Thresholds come from MAX_RING, which differs per board (10 / 20 / 30,
+// configuration_global.h) — a hardcoded 16 would warn at 160 % on a T-Beam.
+static BackPressure bp_state(MAX_RING);
+
+// Set by each caller immediately before sendMessage(), cleared right after.
+static MsgOrigin bp_origin = ORIGIN_NONE;
+
+// The transport the episode's warnings went to. Needed because the QRV that
+// closes an episode is usually emitted from the drain poll, long after
+// bp_origin was cleared. "on the same transport the warnings went to".
+static MsgOrigin bp_episode_origin = ORIGIN_NONE;
+
+void setMsgOrigin(MsgOrigin origin)
+{
+    bp_origin = origin;
+}
+
+MsgOrigin getMsgOrigin(void)
+{
+    return bp_origin;
+}
+
+/**
+ * Put one notice in front of the operator, on their own transport.
+ *
+ * The raw [BP];notice; line is unconditional and deliberately Serial.printf,
+ * not printfdeb/DEBUG_MSG: those compile away with debug off, and the bench
+ * has to be able to assert the notice regardless of which transport (or
+ * none) carried it.
+ */
+static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
+{
+    if(notice == BP_NOTICE_NONE)
+        return;
+
+    Serial.printf("[BP];notice;%s;depth;%d;max;%d;ms;%lu\n",
+                  bpNoticeCode(notice), txRingDepth(), (int)MAX_RING,
+                  (unsigned long)millis());
+
+    const char *text = bpNoticeText(notice);
+
+    switch(origin)
+    {
+        case ORIGIN_SERIAL:
+            Serial.printf("\n%s\n", text);
+            break;
+
+        case ORIGIN_BLE:
+        case ORIGIN_WEB:
+            // Both land in BLEtoPhoneBuff via addBLECommandBack(): the phone
+            // app drains it in sendToPhone(), the web GUI reads the same ring
+            // for its message list (web_functions.cpp ~1293). Framed exactly
+            // like any other response the app displays (msg_id = millis(),
+            // msg_app_offline -> never announced, never retransmitted).
+            //
+            // If the transport dropped off meanwhile, skip the notice rather
+            // than queue it — a QRV that arrives with the next connect is
+            // noise, not information.
+            if((origin == ORIGIN_BLE && g_ble_uart_is_connected) ||
+               (origin == ORIGIN_WEB && bWEBSERVER))
+            {
+                char bp_text[UDP_TX_BUF_SIZE];
+                snprintf(bp_text, sizeof(bp_text), "%s", text);
+                addBLECommandBack(bp_text);
+            }
+            break;
+
+        case ORIGIN_EXTUDP:
+            sendExternNotice(bpNoticeCode(notice), text);
+            break;
+
+        case ORIGIN_GUI:
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            addMessage(text);
+            #elif defined(BOARD_T_DECK_PRO)
+            TDeck_pro_lora_disp(String("node"), String(text));
+            #endif
+            break;
+
+        case ORIGIN_NONE:
+        default:
+            break;
+    }
+}
+
+/// Route a notice: to the sender that just spoke, else to the one the episode
+/// was opened for. Also remembers the transport for the closing QRV.
+static void bpRoute(BpNotice notice)
+{
+    if(notice == BP_NOTICE_NONE)
+        return;
+
+    if(notice == BP_NOTICE_QRV)
+    {
+        bpEmitNotice(notice, bp_episode_origin);
+        bp_episode_origin = ORIGIN_NONE;
+        return;
+    }
+
+    MsgOrigin target = (bp_origin != ORIGIN_NONE) ? bp_origin : bp_episode_origin;
+    bp_episode_origin = target;
+    bpEmitNotice(notice, target);
+}
+
+void bpPollDrain(void)
+{
+    bpRoute(bp_state.poll(txRingDepth()));
+}
+
 void sendMessage(char *msg_text, int len)
 {
     if(memcmp(msg_text, "-", 1) == 0)
@@ -3334,6 +3462,23 @@ void sendMessage(char *msg_text, int len)
             printfdeb("COMMAND:%s\n", msg_text);
 
         commandAction(msg_text, false);
+        return;
+    }
+
+    // BP-01: refuse a locally originated user message while the ring sits in
+    // the QRT band. Checked here, before any of the side effects below
+    // (node_msgid++, save_settings(), insertOwnTx(), addLoraRxBuffer()) — a
+    // message that is never enqueued must not consume a message id either.
+    // An untagged caller (origin NONE) is never refused; that is what keeps
+    // relay/ACK/beacon traffic flowing through a congested node.
+    if(bp_origin != ORIGIN_NONE && bp_state.refusing())
+    {
+        Serial.printf("[BP];refuse;depth;%d;max;%d;ms;%lu\n",
+                      txRingDepth(), (int)MAX_RING, (unsigned long)millis());
+
+        // One notice per state transition, not one per refused message
+        // (TM-21) — the latch inside the state machine sees to that.
+        bpRoute(bp_state.onRefuse());
         return;
     }
 
@@ -3629,6 +3774,12 @@ void sendMessage(char *msg_text, int len)
         unsigned int ring_msg_id = (ringBuffer[w][6]<<24) | (ringBuffer[w][5]<<16) | (ringBuffer[w][4]<<8) | ringBuffer[w][3];
         printfdeb("einfügen retid:%i status:%02X lng;%02X msg-id: %c-%08X\n", w, ringBuffer[w][1], ringBuffer[w][0], ringBuffer[w][2], ring_msg_id);
     }
+
+    // BP-01: this is the return value sendMessage() used to throw away.
+    // w < 0 means the ring dropped the frame (RING_DROP_NEW) -- the message is
+    // gone and the sender has to be told (QTA). Otherwise the new depth
+    // decides between silence, QRS and QRT.
+    bpRoute(bp_state.onSend(txRingDepth(), w < 0));
 
     /*
     iWrite++;

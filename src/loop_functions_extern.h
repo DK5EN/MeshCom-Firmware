@@ -200,6 +200,28 @@ extern uint32_t ringEnqueueTime[MAX_RING];     // millis() timestamp when enqueu
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst);
 
+// BP-01 (BACKLOG) / TM-37: back-pressure to the sender, in Q-codes.
+//
+// sendMessage() has no transport parameter, so the only way it can answer on
+// the transport a message came in on is a tag the caller sets immediately
+// before the call and clears right after. Relay, ACK and beacon paths never
+// go through sendMessage() and never set this -- so a station on the air can
+// never push this node into "not accepting".
+#include "backpressure.h"
+
+void setMsgOrigin(MsgOrigin origin);
+MsgOrigin getMsgOrigin(void);
+
+// Per-loop drain check. Closes a back-pressure episode with QRV once the ring
+// has emptied again, even when no further user message arrives to observe it.
+void bpPollDrain(void);
+
+// BP-01: the EXTUDP reply path for a notice -- a one-line JSON on the same
+// socket the message arrived on. Defined in extudp_functions.cpp; declared
+// here rather than in extudp_functions.h so the whole BP contract sits in one
+// place. No-op unless bEXTUDP and a peer address are set.
+void sendExternNotice(const char *code, const char *text);
+
 extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;

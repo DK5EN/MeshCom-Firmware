@@ -29,6 +29,15 @@ NtpAsync timeClient(Udp);   // TM-35: non-blocking, reply harvested in getUDP()
 
 bool btimeClient = false;
 
+// TM-38 follow-up / TM-39: the ESP32 side's bUDPLOG (udp_functions.cpp,
+// --udplog on/off there) is declared inside "#if defined(ESP32)" in both
+// udp_functions.cpp and udp_functions.h, so it does not exist as a symbol
+// in the nRF52 build at all -- a plain "extern bool bUDPLOG;" here fails to
+// link. Same name, same default, own definition; see the report for the
+// 4-line nRF52 command-table hook that would let an operator flip it (no
+// such command exists yet -- command_functions.cpp is not in this file set).
+bool bUDPLOG = false;
+
 // byte macaddr[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEC}; // Set the MAC address, do not repeat in a network.
 uint8_t macaddr[6] = {0};
 
@@ -293,6 +302,16 @@ bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
   uint32_t d = (uint32_t)(millis() - t0);
   if(d > s_ethUdpTxMaxMs) s_ethUdpTxMaxMs = d;
   if(!ok) s_ethUdpTxFail++;
+
+  // TM-38 follow-up: per-datagram parity marker, see getUDP() above.
+  // nRF52's IPAddress (Adafruit core) has no toString() -- format by octet,
+  // same pattern as startUDP()/getMyMac() elsewhere in this file.
+  if(bUDPLOG)
+    Serial.printf("[UDP];tx;ip;%d.%d.%d.%d;port;%u;len;%u;ok;%d;ms;%lu\n",
+                   udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3],
+                   (unsigned)UDP_PORT, (unsigned)rx_buf_size,
+                   ok ? 1 : 0, (unsigned long)millis());
+
   return ok;
 }
 
@@ -338,6 +357,16 @@ int NrfETH::getUDP()
     // read the packet
     { EthStall st("udp_read"); Udp.read(inc_udp_buffer, UDP_TX_BUF_SIZE); } // Read the packet into packetBufffer.
     s_ethUdpRx++;
+
+    // TM-38 follow-up: per-datagram parity marker with the ESP32/RAK-WiFi
+    // [UDP];rx (udp_functions.cpp getMeshComUDP()). Gated by the same
+    // bUDPLOG flag -- default false here too, but nRF52 has no --udplog
+    // command yet (command_functions.cpp is not in this file set); see the
+    // report for the 4-line command-table hook needed to toggle it.
+    if(bUDPLOG)
+      Serial.printf("[UDP];rx;ip;%d.%d.%d.%d;port;%u;len;%d;ms;%lu\n",
+                     remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3],
+                     (unsigned)remote_port, packetSize, (unsigned long)millis());
     { uint32_t d = (uint32_t)(millis() - t0); if(d > s_ethUdpRxMaxMs) s_ethUdpRxMaxMs = d; }
 
     // TM-35: the NTP reply shares this socket with the gateway traffic
@@ -457,6 +486,24 @@ int NrfETH::getUDP()
             if(bDEBUG)
             {
               printfdeb("RX-UDP Check-payload (%i):%02X \n", size, msg_type_b);
+            }
+
+            // TM-39: raw & unconditional (printfdeb needs --debug and strips
+            // ';' outside csv) -- classify by the same {SET}/{CET} prefixes
+            // the dispatch below matches; everything else in a GATE frame is
+            // a relayed mesh frame (position/text/hey) going back down to LoRa.
+            {
+              const char *gwRxType = "DATA";
+              if(msg_type_b == 0x3A)
+              {
+                if(memcmp(aprsmsg.msg_payload.c_str(), "{SET}", 5) == 0)
+                  gwRxType = "SET";
+                else if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}", 5) == 0)
+                  gwRxType = "CET";
+              }
+              // DATA (a relayed mesh frame) is high-rate on a busy gateway: only with --udplog
+              if(gwRxType[0] != 'D' || bUDPLOG)
+                Serial.printf("[GW];rx;type;%s;len;%d;ms;%lu\n", gwRxType, packetSize, (unsigned long)millis());
             }
 
             if(msg_type_b == 0x3A)
@@ -619,6 +666,14 @@ int NrfETH::getUDP()
           printfdeb("[CONF] received from server\n");
         }
 
+        // TM-39: raw & unconditional. CONF (server-pushed callsign/lat/lon/alt)
+        // is an nRF52-only indicator -- the ESP32/RAK-WiFi getMeshComUDPpacket()
+        // only recognizes GATE and BEAT, so a CONF frame there falls into the
+        // OTHER bucket instead. Not part of the SET/CET/BEAT/DATA/OTHER
+        // taxonomy asked for; kept as its own type so rx-by-type sums match
+        // total RX on this platform.
+        Serial.printf("[GW];rx;type;CONF;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
+
         last_upd_timer = millis();
 
         had_initial_udp_conn = true;
@@ -721,6 +776,9 @@ int NrfETH::getUDP()
           printfdeb(" [BEAT] Heartbeat from server\n");
         }
 
+        // TM-39: raw & unconditional
+        Serial.printf("[GW];rx;type;BEAT;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
+
         last_upd_timer = millis();
         
         /**
@@ -732,6 +790,8 @@ int NrfETH::getUDP()
       else
       {
         printfdeb("[ERROR] Received udp message without indicator\n");
+        // TM-39: raw & unconditional
+        Serial.printf("[GW];rx;type;OTHER;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
         last_upd_timer = millis();
       }
 
@@ -1041,14 +1101,17 @@ void NrfETH::startUDP()
   }
   else
   {
+    const char *srv_path = NULL;   // TM-39: "hamnet" or "inet", matches the printlndeb text below
+
     if (local_addr[0] == 44 || meshcom_settings.node_hamnet_only)
     {
       if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
       {
         if(bDisplayCont)
           printlndeb("[UDP-DEST] Setting I-NET UDP-DEST 145.239.75.155");
-          
+
         udp_dest_addr = IPAddress(145, 239, 75, 155);
+        srv_path = "inet";
 
         timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
       }
@@ -1059,6 +1122,7 @@ void NrfETH::startUDP()
           printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.148.230.197");
 
         udp_dest_addr = IPAddress(44, 148, 230, 197);
+        srv_path = "hamnet";
 
         //DEBUG_MSG("NTP", "Setting Hamnet NTP");
         timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
@@ -1069,6 +1133,7 @@ void NrfETH::startUDP()
           printlndeb("[UDP-DEST] Setting Hamnet UDP-DEST 44.143.8.143");
 
         udp_dest_addr = IPAddress(44, 143, 8, 143);
+        srv_path = "hamnet";
 
         //DEBUG_MSG("NTP", "Setting Hamnet NTP");
         timeClient.setPoolServerIP(IPAddress(44, 143, 0, 9));
@@ -1081,6 +1146,7 @@ void NrfETH::startUDP()
 
       //DEBUG_MSG("UDP-DEST", "Setting I-NET UDP-DEST 213.47.219.169");
       udp_dest_addr = IPAddress(89, 185, 97, 38);
+      srv_path = "inet";
 
       //DEBUG_MSG("NTP", "Setting I-NET 3.at.pool.ntp.org NTP");
       timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
@@ -1088,6 +1154,13 @@ void NrfETH::startUDP()
 
     snprintf(sn, sizeof(sn), "%i.%i.%i.%i", udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3]);
     s_node_hostip = sn;
+
+    // TM-39: raw & unconditional, once per (re)connect. nRF52 has no DNS
+    // resolver on this path -- host is always the literal dotted-quad IP,
+    // never a hostname (unlike the ESP32 [GW];srv, which logs a hostname
+    // for IT/DL and only falls back to a literal for the else-case).
+    Serial.printf("[GW];srv;%.2s;host;%s;path;%s;ms;%lu\n",
+                   meshcom_settings.node_gwsrv, s_node_hostip.c_str(), srv_path, (unsigned long)millis());
 
     Udp.begin(LOCAL_PORT); // Start UDP.
 

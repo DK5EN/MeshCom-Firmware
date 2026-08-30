@@ -1144,6 +1144,11 @@ void nrf52loop()
 {
     INSTR_LOOPTICK();
 
+    // BP-01: close a back-pressure episode with QRV once the TX ring has
+    // drained, even when no further user message arrives to observe it. Two
+    // ring-index reads and a compare; it emits at most once per episode.
+    bpPollDrain();
+
     // TM-25: Boot-Marke fuer den Bench-Harness, wie [BOOT];ready auf dem ESP32.
     // Auf dem nRF52 ist die Netzwerkphase (W5100S/DHCP) am Ende von setup()
     // bereits synchron abgeschlossen -- die Marke faellt beim ersten Loop-Durchlauf.
@@ -1587,7 +1592,13 @@ void nrf52loop()
     {
         INSTR_SECTION("phone_msg");
         if(memcmp(textbuff_phone, ":", 1) == 0)
+        {
+            // BP-01: tag the origin so the back-pressure notice goes back to
+            // the phone that just typed, and never over the air.
+            setMsgOrigin(ORIGIN_BLE);
             sendMessage(textbuff_phone, txt_msg_len_phone);
+            setMsgOrigin(ORIGIN_NONE);
+        }
 
         if(memcmp(textbuff_phone, "-", 1) == 0)
             commandAction(textbuff_phone, isPhoneReady, true);
@@ -2881,7 +2892,10 @@ void checkSerialCommand(void)
 
             if(strText[0] == ':' && strText[1] == ':')
             {
+                // BP-01: origin serial -- the notice comes back on the console.
+                setMsgOrigin(ORIGIN_SERIAL);
                 sendMessage(msg_buffer, inext);
+                setMsgOrigin(ORIGIN_NONE);
             }
             else
                 if(strText[0] == '-' && strText[1] == '-')
