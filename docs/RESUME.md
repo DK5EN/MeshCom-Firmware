@@ -14,7 +14,7 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 1. **TM-38 real run — DONE 2026-08-30 22:19, PASS on all four boards** (run dir
    `tools/bench/runs/apreboot_ap1_20260830-220423/`, verdict table in `summary.txt`, row status
    in BACKLOG §3.8f). ESP32 recovery ~97-99 s after t0 (Orbi reboot time), RAK Ethernet +9.6 s;
-   no watchdog, no reboot, no command. One follow-up lead: the RAK printed
+   no watchdog, no reboot, no command. Follow-up filed as **TM-44** (§3.8f/l): the RAK printed
    `[ETH];stall;ntp;ms;1609` during the outage — the TM-35 stall marker's first real catch
    (1.6 s loop block at the ntp site with the WAN dead, DNS suspect, once). Gateways restored
    to off on the three ESP32 nodes afterwards. ~~Original instructions:~~ `docs/bench-ap-reboot.md`: set
