@@ -1,0 +1,58 @@
+apreboot ap1  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_ap1_20260830-220423
+started            2026-08-30 22:04:23
+windows            settle 180.0 s / cycle 180.0 s / recovery 600.0 s
+outage t0          2026-08-30 22:08:49  (first down edge: heltec 200:BEACON_TIMEOUT)
+verdict            PASS
+
+== tdeck (esp32)   PASS
+marker       before t0   after t0
+link_up              5   +96.4 s
+got_ip               6   +97.6 s
+ntp_ok               0   n/a (no NTP before t0)
+udp_tx              17   +3.5 s
+udp_rx               8   +97.8 s
+reboots after t0        0
+rst:0x / [BOOT];ready   1 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+
+== heltec (esp32)   PASS
+marker       before t0   after t0
+link_up              5   +96.4 s
+got_ip               6   +98.0 s
+ntp_ok               1   +102.1 s
+udp_tx              18   +3.9 s
+udp_rx               8   +98.2 s
+reboots after t0        0
+rst:0x / [BOOT];ready   0 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+
+== tbeam (esp32)   PASS
+marker       before t0   after t0
+link_up              5   +97.8 s
+got_ip               6   +99.0 s
+ntp_ok               1   +162.0 s
+udp_tx              18   +4.3 s
+udp_rx               8   +99.2 s
+reboots after t0        0
+rst:0x / [BOOT];ready   1 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+
+== rak (rak)   PASS
+marker       before t0   after t0
+link_up              4   +9.6 s
+got_ip               4   +7.6 s
+ntp_ok               0   +193.9 s
+udp_tx               0   n/a (no marker on this platform)
+udp_rx               3   +7.6 s
+reboots after t0        0
+rst:0x / [BOOT];ready   0 / 0
+[WIFI];watchdog         0
+stall lines             1  max 1609 ms at ntp  >500 ms: 1
+commands after t0       none
+
