@@ -145,12 +145,42 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 - Firmware bench hooks added (fork-only): `--flashpoke <field> <value>`, `--srvip <ip>`,
   `[BOOT];ready` on nRF52, `[INSTR-SECT]`/`[INSTR-GAPS]`/`[INSTR-LOOP];gap`.
 
+## 2026-08-30 Wave W (TM-34 WiFi fix, TM-35 parity instrumentation)
+
+- **WiFi bring-up rewritten on all ESP32 boards** (`udp_functions.cpp`, `esp32_main.cpp`): driver
+  owns AP selection (`ALL_CHANNEL_SCAN` + sort-by-signal, `persistent(false)`), SSID-only
+  `begin()`, **WPA2-PSK forced on WPA2/WPA3 APs** via `esp_wifi_disable_pmf_config()` (SAE needs
+  PMF; `WIFI_SAE_POLICY` 1 = default), `got_ip` harvested by event (no blind window, no boot radio
+  reset), watchdog 180 s grace -> reconnect -> 360 s radio reset, async DNS off `loopTask`,
+  `[WIFI];stall/assoc/link`, `--wifistat`, `--wifidrop`, `--wifi on/off` (HL-01), HL-02 default.
+- **Arm A4p1 on WPA2/WPA3 `ORBI63`: T-Deck 24/24 first joins (`got_ip` median 14.2 s uptime, 0
+  disconnects, 0 stalls), Heltec 12/12 (11.2 s), T-Beam 12/12 (10.6 s)** — baseline A0 was 0/24
+  at 55.8 s. `[WIFI];assoc … pmf;0;wpa3;0` on every join = WPA2-PSK negotiated. `--wifidrop`
+  reconnect 4.0 s. Runs in `tools/bench/runs/bootloop_A4p1_*`.
+- `got_ip` median <= 6 s from bring-up is **not** met as measured from power-on: bring-up starts at
+  ~5 s (T-Deck) and our diagnostic scan costs ~5 s before `begin()`; the driver join itself is
+  ~4 s. The scan is log-only now (dwell 300 ms x 13 channels) — shortening or dropping it is the
+  lever if 14 s matters; not done, keep the field diagnosis unless the operator decides.
+- **RAK parity (TM-35)**: `[ETH];stall;<site>` on every W5100S socket/DHCP/link call,
+  `[ETH];event;link|got_ip|dhcp|reset`, `[ETH];link` heartbeat, `--ethstat`, `--ethdrop`
+  (= `resetDHCP()`, 126 ms on the bench). The 1.6–3.3 s `getUDP()` stall did not show in a 2-min
+  window (`udp_rx` max 1 ms) — the marker names it when it recurs. Fix still open.
+- Soak runner `tools/bench/experiments/wifisoak.py` (held-open sessions, `--wifidrop` every
+  10 min, per-event CSV, reconnect distribution, `--parse-only`). Reducer verified on a smoke log.
+- Gates: native 60/60, `test_tdeck_parse` 56/56, all four boards build, OLED harness Heltec 8/8,
+  RAK harness boot/info/instr/mheard PASS (`lora` needs `--peer-port`, as before). T-Beam OLED
+  `dirty` failed 3/3 **while the other nodes were boot-looping** (LoRa boot beacons flip the
+  page) — re-run with the bench quiet before reading it as a regression.
+- Open: A4p0 comparison arm (SAE left to the driver) running; overnight `wifisoak.py` on all
+  three boards; WPA3-only APs cannot associate with policy 1 (no PMF) — documented trade, an
+  adaptive fallback (SAE first, PMF off after 2x `AUTH_EXPIRE`) would cost ~9 s on every boot.
+
 ## Next session, in order
 
 Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,
 TM-30 (not reproduced). The A0 arm (24 boots, `ORBI63`, fixed runner) runs in a separate session.
 
-1. **Wave W (WiFi, TM-34 fix plan)** — after A0 is in: F1+F2 (driver-owned selection, SSID-only,
+1. **Wave W shipped 2026-08-30 (see section above); remaining: A4p0 arm result, overnight soak, BACKLOG/RESUME after the soak.** Original plan — after A0 is in: F1+F2 (driver-owned selection, SSID-only,
    `persistent(false)`), **plus WPA2-PSK forced on WPA2/WPA3 APs** (A5 proved the first-join
    `AUTH_EXPIRE` is SAE), then F3 (event-driven `got_ip`, no blind window — seen live on the Heltec),
    F4 (watchdog grace), F5 (`[WIFI];stall`), F6 (DNS off `loopTask`), F7. Instrumentation:

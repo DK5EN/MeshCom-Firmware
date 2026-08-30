@@ -38,6 +38,113 @@ String s_node_ip;
 String s_node_hostip;
 String strSource_call;
 
+// ---- TM-35 / N-20 instrumentation ------------------------------------------
+#if !defined(ETH_STALL_MS)
+  #define ETH_STALL_MS 50
+#endif
+
+struct EthStall
+{
+  const char *site;
+  uint32_t t0;
+  EthStall(const char *s) : site(s), t0(millis()) {}
+  ~EthStall()
+  {
+    uint32_t d = (uint32_t)(millis() - t0);
+    if(d >= ETH_STALL_MS)
+      Serial.printf("[ETH];stall;%s;ms;%lu;task;%s\n", site, (unsigned long)d, pcTaskGetName(NULL));
+  }
+};
+
+static int      s_ethLinkState = -1;      // -1 unknown, 0 down, 1 up
+static uint32_t s_ethLinkSinceMs = 0;     // last link edge
+static uint32_t s_ethLinkDowns = 0;
+static uint32_t s_ethGotIpCount = 0;
+static uint32_t s_ethLastGotIpMs = 0;
+static uint32_t s_ethDhcpRenews = 0;
+static uint32_t s_ethDhcpFails = 0;
+static uint32_t s_ethResets = 0;          // resetDHCP()/--ethdrop
+static uint32_t s_ethUdpRx = 0;
+static uint32_t s_ethUdpTxFail = 0;
+static uint32_t s_ethUdpRxMaxMs = 0;
+static uint32_t s_ethUdpTxMaxMs = 0;
+extern NrfETH neth;
+
+// Link-Zustand aus dem W5100S-Register (ein SPI-Lesen). Kante -> Ereignis.
+void ethLinkPoll()
+{
+  if(!neth.hasETHHardware)
+    return;
+  static uint32_t s_last = 0;
+  if(s_last != 0 && (uint32_t)(millis() - s_last) < 1000)
+    return;
+  s_last = millis();
+
+  EthernetLinkStatus st;
+  { EthStall x("link"); st = Ethernet.linkStatus(); }
+  int up = (st == LinkOFF) ? 0 : 1;   // Unknown zaehlt wie bisher (hasETHlink) als up
+  if(up != s_ethLinkState)
+  {
+    if(s_ethLinkState != -1 && up == 0)
+      s_ethLinkDowns++;
+    s_ethLinkState = up;
+    s_ethLinkSinceMs = millis();
+    Serial.printf("[ETH];event;link;%s;ip;%d;ms;%lu\n", up ? "up" : "down", neth.hasIPaddress ? 1 : 0, (unsigned long)millis());
+  }
+}
+
+static void ethLinkLog(const char *tag)
+{
+  unsigned long now = millis();
+  IPAddress ip = Ethernet.localIP();
+  Serial.printf("[ETH];%s;%s;link;%d;link_age_s;%lu;ip;%d.%d.%d.%d;dest;%s;hb_age_s;%lu;got_ip_n;%lu;downs;%lu;renews;%lu;renew_fail;%lu;resets;%lu;rx_n;%lu;rx_max_ms;%lu;tx_fail;%lu;tx_max_ms;%lu;ms;%lu\n",
+    tag, neth.hasIPaddress ? "up" : "down", s_ethLinkState,
+    (unsigned long)(s_ethLinkSinceMs ? (now - s_ethLinkSinceMs) / 1000 : 0),
+    ip[0], ip[1], ip[2], ip[3], s_node_hostip.c_str(),
+    (unsigned long)(neth.last_upd_timer ? (now - neth.last_upd_timer) / 1000 : 0),
+    (unsigned long)s_ethGotIpCount, (unsigned long)s_ethLinkDowns,
+    (unsigned long)s_ethDhcpRenews, (unsigned long)s_ethDhcpFails, (unsigned long)s_ethResets,
+    (unsigned long)s_ethUdpRx, (unsigned long)s_ethUdpRxMaxMs,
+    (unsigned long)s_ethUdpTxFail, (unsigned long)s_ethUdpTxMaxMs, now);
+}
+
+void ethLinkHeartbeat()
+{
+  if(!neth.hasETHHardware)
+    return;
+  static uint32_t s_last = 0;
+  if(s_last != 0 && (uint32_t)(millis() - s_last) < 60000)
+    return;
+  s_last = millis();
+  ethLinkLog("link");
+}
+
+void ethStat()
+{
+  ethLinkLog("stat");
+  Serial.printf("[ETH];stat;hw;%d;hasip;%d;busy;%d;last_got_ip_ms;%lu;stall_ms;%d\n",
+    neth.hasETHHardware ? 1 : 0, neth.hasIPaddress ? 1 : 0, neth.udp_is_busy ? 1 : 0,
+    (unsigned long)s_ethLastGotIpMs, (int)ETH_STALL_MS);
+}
+
+// Bench-/Feldhaken: der Wiederherstellungspfad der Firmware (resetDHCP: UDP
+// stoppen, DHCP erneuern, UDP neu starten), mit Zeit. Kein Kabel-Ereignis --
+// das kann nur der Operator ausloesen (N-20-Soak).
+void ethDrop()
+{
+  if(!neth.hasETHHardware)
+  {
+    Serial.println("[ETH];drop;err;no ETH hardware");
+    return;
+  }
+  uint32_t t0 = millis();
+  Serial.printf("[ETH];drop;ms;%lu\n", (unsigned long)t0);
+  neth.hasIPaddress = false;
+  int rc = neth.resetDHCP();
+  Serial.printf("[ETH];drop;done;rc;%d;took_ms;%lu;ip;%d;ms;%lu\n", rc, (unsigned long)(millis() - t0), neth.hasIPaddress ? 1 : 0, (unsigned long)millis());
+}
+// ------------------------------------------------------------------------------
+
 String NrfETH::getNodeIP()
 {
   return s_node_ip;
@@ -167,6 +274,8 @@ void NrfETH::initethDHCP()
  */
 bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
 {
+  EthStall st("udp_tx");
+  uint32_t t0 = millis();
   Udp.beginPacket(udp_dest_addr, UDP_PORT);
   
   if(bDEBUG)
@@ -180,15 +289,11 @@ bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
     Udp.write(buffer[i]);
   }
 
-  if(Udp.endPacket())
-  {
-    return true;
-  }
-  else
-  {
-    return false;
-  } 
-
+  bool ok = Udp.endPacket();
+  uint32_t d = (uint32_t)(millis() - t0);
+  if(d > s_ethUdpTxMaxMs) s_ethUdpTxMaxMs = d;
+  if(!ok) s_ethUdpTxFail++;
+  return ok;
 }
 
 /**@brief Method to check UDP packets
@@ -216,7 +321,9 @@ int NrfETH::getUDP()
 
   udp_is_busy = true;   //setting the busy flag
 
-  int packetSize = Udp.parsePacket(); // If there's data available, read a packet.
+  int packetSize;
+  uint32_t t0 = millis();
+  { EthStall st("udp_rx"); packetSize = Udp.parsePacket(); } // If there's data available, read a packet.
 
   // HEARTBEAT keine Ausgabe
   //if(packetSize != 22 && packetSize > 0 && bDEBUG)
@@ -226,7 +333,9 @@ int NrfETH::getUDP()
   if (packetSize <= UDP_TX_BUF_SIZE && packetSize > 0)
   {
     // read the packet
-    Udp.read(inc_udp_buffer, UDP_TX_BUF_SIZE); // Read the packet into packetBufffer.
+    { EthStall st("udp_read"); Udp.read(inc_udp_buffer, UDP_TX_BUF_SIZE); } // Read the packet into packetBufffer.
+    s_ethUdpRx++;
+    { uint32_t d = (uint32_t)(millis() - t0); if(d > s_ethUdpRxMaxMs) s_ethUdpRxMaxMs = d; }
 
     // if more than n values are 00 we might have received a faulty message
     uint8_t zerocount = 0;
@@ -657,6 +766,7 @@ void NrfETH::fillUDP_RING_BUFFER(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_b
  */
 bool NrfETH::hasETHlink()
 {
+  EthStall st("link");
   if (Ethernet.linkStatus() == LinkON)
   {
     DEBUG_MSG("ETH", "Has Link UP");
@@ -721,8 +831,10 @@ void NrfETH::getMyMac()
  */
 int NrfETH::resetDHCP()
 {
+  s_ethResets++;
+  Serial.printf("[ETH];event;reset;ms;%lu\n", (unsigned long)millis());
   // stop UDP
-  Udp.stop();
+  { EthStall st("udp_stop"); Udp.stop(); }
 
   //restart ETH HW Board
   //digitalWrite(WB_IO2, LOW); // disable power supply.
@@ -758,6 +870,7 @@ int NrfETH::resetDHCP()
  */
 void NrfETH::initETH_HW()
 {
+  EthStall st("hw_init");
   pinMode(WB_IO2, OUTPUT);
   digitalWrite(WB_IO2, HIGH); // Enable power supply.
 
@@ -810,7 +923,9 @@ int NrfETH::startETH()
     return 2;
   }
 
-  if (Ethernet.begin(macaddr, 10000UL) == 0)
+  int dhcp_rc;
+  { EthStall st("dhcp_begin"); dhcp_rc = Ethernet.begin(macaddr, 10000UL); }
+  if (dhcp_rc == 0)
   {
     printlndeb("Failed to configure Ethernet using FIX/DHCP");
     if (Ethernet.hardwareStatus() == EthernetNoHardware) // Check for Ethernet hardware present.
@@ -853,6 +968,9 @@ int NrfETH::startETH()
     snprintf(meshcom_settings.node_subnet, sizeof(meshcom_settings.node_subnet), "%i.%i.%i.%i", Ethernet.subnetMask()[0], Ethernet.subnetMask()[1], Ethernet.subnetMask()[2], Ethernet.subnetMask()[3]);
 
     hasIPaddress = true;
+    s_ethGotIpCount++;
+    s_ethLastGotIpMs = millis();
+    Serial.printf("[ETH];event;got_ip;%s;ms;%lu\n", meshcom_settings.node_ip, (unsigned long)millis());
 
     // update phone status
     if (isPhoneReady == 1)
@@ -873,7 +991,12 @@ int NrfETH::startETH()
  */
 int NrfETH::checkDHCP()
 {
-  int rc = Ethernet.maintain();
+  int rc;
+  { EthStall st("dhcp_maintain"); rc = Ethernet.maintain(); }
+  if(rc == 2 || rc == 4) s_ethDhcpRenews++;
+  else if(rc == 1 || rc == 3) s_ethDhcpFails++;
+  if(rc != 0)
+    Serial.printf("[ETH];event;dhcp;rc;%d;ms;%lu\n", rc, (unsigned long)millis());
 
   switch (rc)
   {
@@ -973,6 +1096,7 @@ String NrfETH::udpUpdateTimeClient()
   if(!btimeClient)
     return "none";
 
+  EthStall st("ntp");
   if(!timeClient.update())
   {
 

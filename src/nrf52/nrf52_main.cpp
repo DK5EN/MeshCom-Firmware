@@ -1950,6 +1950,10 @@ void nrf52loop()
         INSTR_SECTION("gateway");
         int bUDPReceived = false;
 
+        // TM-35 / N-20 instrumentation: link edges and the 60-s heartbeat
+        ethLinkPoll();
+        ethLinkHeartbeat();
+
         // check if we received a UDP packet
         if (neth.hasIPaddress)
         {

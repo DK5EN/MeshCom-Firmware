@@ -14,6 +14,17 @@ String udpGetDateClient();
 // WIFI checks
 bool checkWifiPing();
 
+#if defined(ESP32)
+// TM-34: event-driven bring-up, watchdog, DNS and instrumentation (udp_functions.cpp)
+bool wifiHarvestGotIp();     // apply a driver-side got_ip (startMeshComUDP); true when UDP is ready
+bool wifiTrulyOffline();     // 5-min path may cycle the radio only when this is true
+void wifiRequestRestart();   // force the next 5-min evaluation to restart (resetMeshComUDP)
+void wifiDnsPoll();          // apply resolved server/NTP addresses
+void wifiLinkHeartbeat();    // [WIFI];link every 60 s
+void wifiStat();             // --wifistat
+void wifiDrop();             // --wifidrop
+#endif
+
 // MeshCom UDP functions
 void getMeshComUDP();
 void getMeshComUDPpacket(unsigned char inc_udp_buffer[500], int packetSize);

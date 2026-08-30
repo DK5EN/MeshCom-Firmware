@@ -235,7 +235,7 @@ void init_flash(void)
     meshcom_settings.node_persist_to_sd = preferences.getBool("node_persd", false);
     meshcom_settings.node_immediate_save = preferences.getBool("node_immsave", false);
     meshcom_settings.node_kbl_sync = preferences.getBool("node_kblsync", false);
-    meshcom_settings.node_wifion = preferences.getBool("node_wifion", false);
+    meshcom_settings.node_wifion = preferences.getBool("node_wifion", true);   // HL-02: struct default is true
     #endif
 
     meshcom_settings.node_wifi_power = preferences.getInt("node_wifip", 60);

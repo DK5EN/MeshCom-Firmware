@@ -4546,6 +4546,61 @@ void commandAction(char *umsg_text, bool ble)
         oledStat();
         return;
     }
+    #if defined(NRF52_SERIES)
+    else
+    if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
+    {
+        extern void ethStat();
+        ethStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
+    {
+        // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
+        extern void ethDrop();
+        ethDrop();
+        return;
+    }
+    #endif
+    #if defined(ESP32)
+    else
+    if(commandCheck(msg_text+2, (char*)"wifistat") == 0)
+    {
+        wifiStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"wifidrop") == 0)
+    {
+        // TM-34 bench hook: driver-side disconnect + re-select, no config change
+        wifiDrop();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"wifi on") == 0 || commandCheck(msg_text+2, (char*)"wifi off") == 0)
+    {
+        // HL-01: the WLAN intent flag was GUI-only on the T-Deck
+        bool on = (commandCheck(msg_text+2, (char*)"wifi on") == 0);
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+        meshcom_settings.node_wifion = on;
+        save_settings();
+        Serial.printf("[WIFI];wifion;%d\n", on ? 1 : 0);
+        if(on)
+            startNetwork();
+        else
+        {
+            WiFi.disconnect(true, true);
+            WiFi.mode(WIFI_OFF);
+            { extern bool hasIPaddress; hasIPaddress = false; }
+            meshcom_settings.node_hasIPaddress = false;
+        }
+        #else
+        Serial.printf("[WIFI];wifion;n/a;note;only the T-Deck gates WLAN on node_wifion (requested %d)\n", on ? 1 : 0);
+        #endif
+        return;
+    }
+    #endif
     else
     if(commandCheck(msg_text+2, (char*)"oledlog on") == 0)
     {

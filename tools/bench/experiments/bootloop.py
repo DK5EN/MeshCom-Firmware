@@ -44,7 +44,9 @@ except ImportError:  # --parse-only does not need it
 DEFAULT_PORT = "/dev/cu.usbmodem1101"  # DK5EN-14, T-Deck Plus
 SEP = r"[;\s]"
 
-RE_RESET = re.compile(r"ESP-ROM:|rst:0x")
+# CLIENT SETUP: the Heltec V3 (CP2102) loses the ROM banner on the port open,
+# the first line captured is the sketch's own setup banner -- still a fresh boot.
+RE_RESET = re.compile(r"ESP-ROM:|rst:0x|CLIENT SETUP")
 RE_SCAN_AP = re.compile(
     r"\[WIFI\]\.\.\.SSID:\s*(?P<ssid>\S+)\s+CHAN:\s*(?P<chan>\d+)\s+"
     r"RSSI:\s*(?P<rssi>-?\d+)\s+BSSID:\s*(?P<bssid>[0-9A-Fa-f:]{17})"

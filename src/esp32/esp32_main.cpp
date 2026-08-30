@@ -3768,37 +3768,29 @@ void esp32loop()
                 {
                     if(iWlanWait == 0)
                     {
-                        // restart WEB-Client
-                        if(bWEBSERVER)
-                            stopWebserver();
+                        // 5-min path (F3): cycle the radio only when the driver
+                        // is truly idle -- never while it is still reconnecting
+                        // on its own (a driver-side join is harvested below).
+                        if(wifiTrulyOffline())
+                        {
+                            // restart WEB-Client
+                            if(bWEBSERVER)
+                                stopWebserver();
 
-                        startNetwork();
+                            startNetwork();
+                        }
                     }
                     else
                     {
                         { INSTR_SECTION("wifi_connect"); doWiFiConnect(); }
 
-                        if(iWlanWait > 15)
+                        if(iWlanWait > 20)
                         {
+                            // F3: stop the 1-s polling; the driver keeps
+                            // retrying (auto-reconnect) and got_ip is harvested
+                            // from the loop. No radio reset at boot (TM-34 §8).
                             iWlanWait = 0;
-
-                            if (!bAllStarted)
-                            {
-                                // First boot failure — full radio power-cycle and retry
-                                #if defined(HAST_ETHERNET)
-                                    printfdeb("[ETH]...no connection at boot — reset and retrying");
-                                #else
-                                    printfdeb("[WIFI]...no connection at boot — full radio reset and retrying");
-                                    // Reset und Scan macht startNetwork() selbst, ohne delay(1500)
-                                #endif
-
-                                startNetwork();  // sets iWlanWait = 1, triggers doWiFiConnect() polling
-                            }
-                            else
-                            {
-                                printfdeb("[WIFI]...SET but no Wifi connect ...please wait for next try (5 min)");
-                            }
-
+                            printfdeb("[WIFI]...no join within 20 s, driver keeps retrying");
                             bAllStarted=true;
                         }
                     }
@@ -3810,6 +3802,14 @@ void esp32loop()
                 }
             #endif
         }
+
+        #ifndef BOARD_RAK4630
+        // F3: harvest a driver-side (re)connect at any time (TM-17: bAllStarted)
+        if(iWlanWait == 0 && wifiHarvestGotIp())
+            bAllStarted=true;
+        wifiDnsPoll();
+        wifiLinkHeartbeat();
+        #endif
 
         if(bWEBSERVER && iWlanWait == 0)
         {
