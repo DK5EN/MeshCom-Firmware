@@ -3,8 +3,9 @@
 Last session: 2026-08-30, ~09:00 morning through ~23:00 night. Morning/afternoon: Wave W (WiFi,
 TM-34), TM-35, TM-31, TM-16, TM-11/TD-01, HL-01..04 (see the dated sections below). Evening/night:
 the `/orchestrate-waves` intake campaign — Waves 1-3, five commits, all detailed in the sections
-below. **HEAD `7b65233a`, pushed to `origin/tdeck-partial-refresh-trace`, working tree clean**
-(only untracked run artefacts under `tools/bench/runs/`). All four bench nodes run the HEAD build.
+below. **Everything is pushed to `origin/tdeck-partial-refresh-trace`, working tree clean** (only
+untracked run artefacts under `tools/bench/runs/`); the last code commit is `7b65233a`, this
+hand-over doc sits on top. All four bench nodes run the `7b65233a` build.
 
 ## Pick up here — for the next agent
 
