@@ -143,21 +143,25 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
 
 ## Next session, in order
 
-1. ~~TD-03 heap defect~~ **fixed 2026-08-29** (`msg_list_trim_view()`, harness `trim` scenario;
-   before 60 / after 50 children, saturated view costs -584 B PSRAM per 20 messages). TD-01
-   confirmation run moves into TM-34 (WiFi research track, parallel session).
-   TM-34 desk half done ([`wifi-findings-20260829.md`](wifi-findings-20260829.md)); the bench half
-   needs DK5EN-14. Run arm **A5 first** — a WPA2-only test SSID on the Orbi, one router setting —
-   it decides whether `AUTH_EXPIRE` is WPA3-SAE or band steering, and that changes what F1-F4 have
-   to survive. Then A0/A1/A2: `python3 ../experiments/bootloop.py --arm A0 --boots 24` from
-   `tools/bench/runs/`.
-2. ~~UP-02~~ **fixed 2026-08-29** (`add_map_point()` delay-free; `map --map-stations 40`).
-3. ~~TM-22/TM-10/TM-27~~ **fixed 2026-08-29** (full-buffer SSD1306, CRC skip, `[OLED];crc`; OLED
-   harness 8/8 on both boards).
-4. ~~TM-33 (a)/(b)~~ **fixed 2026-08-29** (GT911 retry, `--display` on the TFT; (c) WiFi switch -> TM-34).
-5. TM-06/TM-07: LoRa raw-frame injection + SPI register trace to retire the NOP mitigation.
-6. Then the PR: build `pr/tdeck-ui` from `upstream/dev` per BACKLOG §4.1 — firmware files only
-   (audio wave, flush mitigation, G07, map composition, g/h keys, SD 20 MHz, Heltec OLED, header
-   labels, UP-01) — **no WiFi changes (TM-20/TM-24 -> TM-34)**, no instrumentation, tools, tests
-   or docs. German per-file description. Decide whether the Heltec OLED change goes in the same
-   PR or a separate one.
+Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,
+TM-30 (not reproduced). The A0 arm (24 boots, `ORBI63`, fixed runner) runs in a separate session.
+
+1. **Wave W (WiFi, TM-34 fix plan)** — after A0 is in: F1+F2 (driver-owned selection, SSID-only,
+   `persistent(false)`), **plus WPA2-PSK forced on WPA2/WPA3 APs** (A5 proved the first-join
+   `AUTH_EXPIRE` is SAE), then F3 (event-driven `got_ip`, no blind window — seen live on the Heltec),
+   F4 (watchdog grace), F5 (`[WIFI];stall`), F6 (DNS off `loopTask`), F7. Instrumentation:
+   `[WIFI];assoc` (SSID/BSSID/chan/RSSI/auth at every `got_ip` and disconnect), `[WIFI];link`
+   60-s heartbeat, `--wifistat`, `--wifidrop`; soak runner over 12–24 h on T-Deck, T-Beam, Heltec
+   in parallel; acceptance per `wifi-findings-20260829.md` §10. SNR is not available on ESP32.
+2. **TM-35** (RAK gateway `getUDP()` 1.6–3.3 s / `sendHey()` 0.7–1.4 s loop stalls) — bound the
+   W5100S socket calls; `rak_harness.py --scenario instr` is the gate.
+3. **TM-31** — unblock the LAN path (`sudo tcpdump -ni en0 udp port 1990` on the Mac / Orbi client
+   isolation; fallback: RAK as the gateway under test), then run `gwflood.py`.
+4. **TM-17** (`bAllStarted` on a clean join, folds into F3), **TM-33 (c)** (WiFi switch shows the
+   intent flag, folds into W), **HL-01/02** (`node_wifion` GUI-only) — all WiFi-adjacent, take
+   them inside Wave W.
+5. **TM-28** E290 Wireless Paper when the hardware is here (week of 2026-09-01): frame instrument,
+   OLED-harness scenarios, `[OLED];crc` for e-paper.
+6. Lower: TM-06/07 (LoRa raw injection + SPI trace), TM-14, TM-19, TM-29, Wave 0.6 (native suite),
+   Wave 2 on nRF52 (CONC-15..18, N-14..16), UP-05/06.
+7. Then the PRs (operator decision, not now): T-Deck PR, OLED PR, WiFi PR — per BACKLOG §4.1.
