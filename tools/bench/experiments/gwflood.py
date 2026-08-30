@@ -10,14 +10,24 @@ Setup (all on the bench LAN, run from tools/bench/runs/):
     LoRa transmission prints `TX-LoRa ... x<msg_id>`;
   * the observer (default T-Beam DK5EN-92, USB) gets --loradebug on so every
     reception prints `RX-LoRa2 ... x<msg_id>`;
-  * for every inter-arrival in --gaps the server sends --per-gap GATE frames
-    (corpus frame f001, a foreign position beacon, with a fresh msg_id and a
-    recomputed FCS per frame) to the gateway and records the send time.
+  * for every inter-arrival in --gaps the server sends --per-gap GATE frames to
+    the gateway and records the send time. --frame picks what is injected:
+      pos    corpus frame f001, a foreign position beacon (MSG_PRIO_LOW)
+      text   a broadcast text frame built on corpus f002, --text-bytes long
+             (MSG_PRIO_HIGH) -- the class #568 is actually about
+      mixed  alternating, which is what a real gateway sees
+    Every frame gets a fresh msg_id and a recomputed FCS. The exact bytes are
+    checked in as test/support/gwflood_frames.txt (--dump-frames) and decoded
+    by the real decodeAPRS() in test_gwflood_frames, so a malformed injector
+    cannot masquerade as a gateway that drops everything.
 
-Per gap the report gives ingress / gateway TX / observer RX counts and the
-ingress-to-TX latency -- the number #568 never had.
+The report attributes a loss to a stage: ingress -> [UDP];rx seen at the socket
+-> RING_WRITE src=udp_rx queued -> RING_DROP_* -> TX-LoRa -> observer RX, plus
+the ingress-to-air latency, per inter-arrival and per frame kind. --assert-relay
+turns the run into a regression gate for the UDP->LoRa self-dedup (TM-31).
 
   python3 ../experiments/gwflood.py --gaps 8,4,2,1,0.5 --per-gap 6
+  python3 ../experiments/gwflood.py --frame mixed --settle 300 --assert-relay
 """
 import argparse
 import json
@@ -36,19 +46,88 @@ sys.path.insert(0, str(HERE.parent.parent / "mock"))  # tools/mock
 from tdeck_harness import TDeckSession  # noqa: E402
 from meshcom_server import MockMeshComServer  # noqa: E402
 
+# On-air captured MeshCom frames, verbatim from test/test_aprs_corpus/corpus.txt.
+# Layout: [0] type, [1:5] msg_id little-endian, [5] flags/hop, then the ASCII
+# body "SRCPATH>DEST<type>payload", a 0x00 terminator and two trailing bytes,
+# then the 2-byte FCS and a 4-byte trailer. The FCS is the plain byte sum of
+# everything before it -- verified against all 12 FCS-carrying corpus frames.
+#
+# f001: position beacon (0x21) -- MSG_PRIO_LOW, the class that loses a ring
+#       contest against other positions (test_txring_flood).
 F001 = bytes.fromhex(
     "21AB13F1E991444C324A412D312C444C324A412D323E2A21343832352E33354E5C30313134372E3139452D"
     "4D61727A6C696E67235765726E65722F523D393B002B88132F23AB707E"
 )
-FCS_AT = 66   # sum of bytes [0:66] big-endian at [66:68], trailer 23 AB 70 7E follows
+# f002: broadcast text (0x3A, dest "*") -- MSG_PRIO_HIGH, the class upstream
+#       #568 is actually about (a BBS listing sent to a gateway).
+F002 = bytes.fromhex(
+    "3AA425886AB04F45315841522D36322C444B3459552D37372C444C324A412D322C444B35454E2D39313E2A"
+    "3A7B4345547D323032362D30382D32312031303A35373A323800008811CC00AB237E"
+)
+
+FCS_TAIL_LEN = 6      # 2 bytes FCS + 4 bytes trailer
+TEXT_TRAILER = bytes.fromhex("00AB237E")
 
 
-def frame_with_id(msg_id: int) -> bytes:
+def _with_fcs(b: bytearray) -> bytes:
+    """Recompute the FCS in place. It sits FCS_TAIL_LEN bytes from the end and
+    covers everything before it."""
+    at = len(b) - FCS_TAIL_LEN
+    b[at:at + 2] = (sum(b[:at]) & 0xFFFF).to_bytes(2, "big")
+    return bytes(b)
+
+
+def pos_frame_with_id(msg_id: int) -> bytes:
     b = bytearray(F001)
     b[1:5] = msg_id.to_bytes(4, "little")
-    fcs = sum(b[:FCS_AT]) & 0xFFFF
-    b[FCS_AT:FCS_AT + 2] = fcs.to_bytes(2, "big")
-    return bytes(b)
+    return _with_fcs(b)
+
+
+# body of f002 up to and including the "…>*:" separator, i.e. everything the
+# firmware parses as source path + destination before the payload starts
+_TEXT_HEAD = F002[:F002.index(b">*:") + 3]
+
+
+def text_frame_with_id(msg_id: int, payload: bytes) -> bytes:
+    """Build a broadcast text frame (0x3A) carrying `payload`.
+
+    Head, terminator bytes and trailer are f002's verbatim, so the source path
+    and destination are a real on-air combination; only the msg_id and the
+    payload change. #568's frames were ~128 bytes, which the default payload
+    length reproduces.
+    """
+    b = bytearray(_TEXT_HEAD)
+    b[1:5] = msg_id.to_bytes(4, "little")
+    b += payload
+    b += b"\x00\x00\x88"          # payload terminator + the two f002 trailing bytes
+    b += b"\x00\x00"               # FCS placeholder
+    b += TEXT_TRAILER
+    return _with_fcs(b)
+
+
+# fixed cost of a text frame around its payload: head (type + msg_id + flags +
+# "SRCPATH>DEST:") + terminator + two trailing bytes + FCS + trailer
+TEXT_OVERHEAD = len(_TEXT_HEAD) + 3 + FCS_TAIL_LEN
+
+
+def text_payload(n: int, seq: int) -> bytes:
+    """A payload of exactly n printable bytes, distinguishable per frame."""
+    if n < 8:
+        n = 8
+    stem = f"BBS {seq:03d} "
+    filler = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz "
+    out = (stem + filler * ((n // len(filler)) + 1))[:n]
+    return out.encode("ascii")
+
+
+def frame_with_id(msg_id: int, kind: str = "pos", seq: int = 0, total_len: int = 128) -> bytes:
+    """One injectable frame. `total_len` is the whole on-air frame length and
+    only applies to text frames -- #568's messages were all ~128 bytes."""
+    if kind == "pos":
+        return pos_frame_with_id(msg_id)
+    if kind == "text":
+        return text_frame_with_id(msg_id, text_payload(total_len - TEXT_OVERHEAD, seq))
+    raise ValueError(f"unknown frame kind {kind!r}")
 
 
 def local_ip() -> str:
@@ -129,9 +208,48 @@ def main() -> int:
     ap.add_argument("--settle", type=float, default=180.0,
                     help="seconds to wait after the last frame -- the TX queue drains slowly, "
                          "a short settle counts still-queued frames as lost")
+    ap.add_argument("--frame", default="pos", choices=("pos", "text", "mixed"),
+                    help="pos = corpus f001 position beacon (MSG_PRIO_LOW); "
+                         "text = broadcast text like upstream #568 (MSG_PRIO_HIGH); "
+                         "mixed = alternating, which is what a real gateway sees")
+    ap.add_argument("--text-bytes", type=int, default=128,
+                    help="on-air length of a text frame (#568's were ~128 B)")
+    ap.add_argument("--assert-relay", action="store_true",
+                    help="exit non-zero unless every ingressed frame was queued for LoRa "
+                         "(TM-31 regression gate: the UDP->LoRa self-dedup returned 0 of 30)")
+    ap.add_argument("--dump-frames", metavar="FILE",
+                    help="write the injected frames as '<name> <hex>' and exit without touching "
+                         "the bench -- the fixture test/support/gwflood_frames.txt is generated "
+                         "this way and decoded natively by test_gwflood_frames")
     ap.add_argument("--out", default="gwflood.json")
     args = ap.parse_args()
     gaps = [float(x) for x in args.gaps.split(",") if x.strip()]
+
+    def kind_for(index: int) -> str:
+        if args.frame == "mixed":
+            return "text" if index % 2 else "pos"
+        return args.frame
+
+    if args.dump_frames:
+        with open(args.dump_frames, "w", encoding="utf-8") as fh:
+            fh.write("# Frames injected by tools/bench/experiments/gwflood.py (TM-31 / upstream\n"
+                     "# #568). Generated -- do not edit by hand:\n"
+                     "#   python3 tools/bench/experiments/gwflood.py --frame mixed \\\n"
+                     "#       --dump-frames test/support/gwflood_frames.txt\n"
+                     "# Format: <name> <hex>, same as test/test_aprs_corpus/corpus.txt.\n")
+            n = 0
+            for i in range(6):
+                for kind in ("pos", "text"):
+                    # every frame needs its own msg_id -- the gateway dedups on
+                    # it, and gwflood joins ingress/queue/TX/RX by it
+                    fr = frame_with_id(0x25298100 + n, kind, i, args.text_bytes)
+                    fh.write(f"g{kind}{i:02d} {fr.hex().upper()}\n")
+                    n += 1
+            for extra in (100, 160, 200):
+                fr = frame_with_id(0x252981F0 + extra, "text", extra, extra)
+                fh.write(f"gtextlen{extra} {fr.hex().upper()}\n")
+        print(f"written {args.dump_frames}", file=sys.stderr)
+        return 0
 
     host = local_ip()
     import logging
@@ -197,9 +315,11 @@ def main() -> int:
     for gap in gaps:
         for k in range(args.per_gap):
             msg_id = (base + n) & 0xFFFFFFFF
+            kind = kind_for(n)
             n += 1
-            server.send_gate(frame_with_id(msg_id), client_addr)
-            sent.append({"gap": gap, "k": k, "msg_id": msg_id, "t_send": time.monotonic()})
+            server.send_gate(frame_with_id(msg_id, kind, n, args.text_bytes), client_addr)
+            sent.append({"gap": gap, "k": k, "msg_id": msg_id, "kind": kind,
+                         "t_send": time.monotonic()})
             t_end = time.monotonic() + gap
             while time.monotonic() < t_end:
                 gw.collect(min(0.2, max(0.01, t_end - time.monotonic())))
@@ -236,6 +356,15 @@ def main() -> int:
 
     tx = ids_with_times(gw, idx_gw, "TX-LoRa")
     rx = ids_with_times(obs, idx_obs, "RX-LoRa2")
+    by_kind: Dict[str, Dict[str, int]] = {}
+    for row in sent:
+        k = by_kind.setdefault(row.get("kind", "pos"), {"ingress": 0, "tx": 0, "rx": 0})
+        k["ingress"] += 1
+        if row["msg_id"] in tx:
+            k["tx"] += 1
+        if row["msg_id"] in rx:
+            k["rx"] += 1
+
     groups: Dict[float, Dict[str, Any]] = {}
     for row in sent:
         g = groups.setdefault(row["gap"], {"gap_s": row["gap"], "ingress": 0, "tx": 0, "rx": 0, "tx_lat_s": []})
@@ -268,6 +397,8 @@ def main() -> int:
     print(f"total ingress {len(sent)}  udp_rx_seen {len(udp_rx_seen)}  queued {len(queued_udp)}"
           f"  ring_drops {len(ring_drops)}"
           f"  tx {len([r for r in sent if r['msg_id'] in tx])}  rx {len([r for r in sent if r['msg_id'] in rx])}")
+    for kind, k in sorted(by_kind.items()):
+        print(f"  by frame kind: {kind:5s} ingress {k['ingress']:3d}  tx {k['tx']:3d}  rx {k['rx']:3d}")
     for l in ring_drops[:12]:
         print("  " + l)
     for l in udpstat:
@@ -282,6 +413,18 @@ def main() -> int:
                    "udp_rx_seen": udp_rx_seen, "queued_udp": queued_udp, "udpstat": udpstat,
                    "ring_drops": ring_drops}, f, indent=2, default=str)
     print(f"written {args.out}")
+
+    if args.assert_relay:
+        # TM-31 regression gate. Every datagram that reached the socket must
+        # have been queued for LoRa; 0 of 30 was the UDP->LoRa self-dedup bug.
+        # TX and observer RX are deliberately NOT asserted: the radio drains
+        # slower than the injector feeds, so a frame still sitting in the ring
+        # is late, not lost -- that is what the table and --settle are for.
+        if len(queued_udp) < len(sent):
+            print(f"FAIL: {len(sent)} frames ingressed but only {len(queued_udp)} were queued "
+                  f"for LoRa (RING_WRITE src=udp_rx)", file=sys.stderr)
+            return 1
+        print(f"PASS: {len(queued_udp)}/{len(sent)} ingressed frames queued for LoRa")
     return 0
 
 
