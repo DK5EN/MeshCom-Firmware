@@ -181,6 +181,19 @@ jobs:
             --env "${{ matrix.env }}" --log build.log \
             --baseline tools/resource_baseline.json || true
 
+      # MEM-01, hartes Gate: statisches DRAM (.data+.bss) gegen die
+      # Linker-Grenze dram0_0_seg. Auf den classic-ESP32-Boards war am
+      # 2026-08-30 nur noch 0.5-1.7 kB Headroom -- der naechste statische
+      # Puffer scheitert sonst kommentarlos am Link. nRF52 hat kein .map,
+      # der Schritt ueberspringt es dann.
+      - name: DRAM-Headroom (dram0_0_seg)
+        if: always()
+        run: |
+          python3 tools/resource_watch.py dram \
+            --env "${{ matrix.env }}" \
+            --map ".pio/build/${{ matrix.env }}/firmware.map" \
+            --min-headroom 4096 --strict
+
   result:
     name: Build-Gate
     needs: [build, unit-tests]

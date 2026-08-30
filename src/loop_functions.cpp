@@ -3345,7 +3345,7 @@ void SendPong(String msg_call, unsigned int msg_id)
 //     so the node stays a working relay while the flooding user is throttled.
 // ===========================================================================
 
-// Thresholds come from MAX_RING, which differs per board (10 / 20 / 30,
+// Thresholds come from MAX_RING, which differs per board (10 / 20, MEM-01,
 // configuration_global.h) — a hardcoded 16 would warn at 160 % on a T-Beam.
 static BackPressure bp_state(MAX_RING);
 

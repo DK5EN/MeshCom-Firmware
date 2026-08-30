@@ -219,10 +219,17 @@ static inline bool flashLayoutCompatible(int stored)
 // ESP32 original (~160 KB DRAM) — reduced buffer sizes due to RAM constraints
 #define MAX_MHEARD 30                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
 #define MAX_MHPATH 40                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
-#define MAX_RING 30                        // max count of messages in ringbuffer
+// MEM-01 (2026-08-30): 30/25 -> 20/20, same as every other board. MAX_RING
+// feeds five static rings (ringBuffer, both BLE*toPhoneBuff, retry/prio) --
+// at 30 the classic-ESP32 dram0_0_seg had 0.5 kB (T-Beam) / 1.7 kB (E22)
+// headroom left and the next static buffer failed the link. TM-31 measured
+// that even a 20-slot ring saturates long before the radio drains it, so the
+// extra 10 slots only ever bought ~4 minutes of deeper backlog. BP-01's 80 %
+// threshold follows MAX_RING automatically.
+#define MAX_RING 20                        // max count of messages in ringbuffer (was 30, MEM-01)
 #define MAX_DEDUP_RING 70                  // dedup ring for received msg_ids (was 60)
 #define MAX_LOG 20                         // max count of messages in LOG-ringbuffer
-#define MAX_RING_UDP 25                    // size of Ringbuffer for UDP TX messages received from LoRa (was 20)
+#define MAX_RING_UDP 20                    // size of Ringbuffer for UDP TX messages received from LoRa (was 25, MEM-01)
 #endif
 
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message

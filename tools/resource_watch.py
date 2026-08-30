@@ -54,6 +54,14 @@ _FLASH_RE = re.compile(
 
 _PIO_BIN = Path.home() / ".platformio/penv/bin/pio"
 
+# MEM-01: static-DRAM headroom against the linker limit. On the classic-ESP32
+# boards (E22-DevKitC, ttgo_tbeam) dram0_0_seg (.data + .bss) was measured at
+# 1.7 kB / 0.5 kB headroom on 2026-08-30 -- the next static buffer anyone adds
+# fails the link with "DRAM segment data does not fit". These two lines exist
+# in every ESP32 map file; nRF52 builds emit no .map at all.
+_DRAM_SEG_RE = re.compile(r"dram0_0_seg\s+0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)")
+_BSS_END_RE = re.compile(r"\n\s*0x([0-9a-fA-F]+)\s+_bss_end\b")
+
 DEFAULT_BASELINE = Path(__file__).resolve().parent / "resource_baseline.json"
 
 
@@ -202,6 +210,57 @@ def cmd_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def parse_dram(map_text: str) -> dict[str, int] | None:
+    """Extract static-DRAM usage from an ESP32 linker map.
+
+    Returns {origin, length, bss_end, used, headroom} or None when the map
+    carries no dram0_0_seg (not an ESP32 map). Raises ParseError when the
+    segment exists but _bss_end does not -- that is a truncated map, not a
+    different platform.
+    """
+    seg = _DRAM_SEG_RE.search(map_text)
+    if seg is None:
+        return None
+    bss = _BSS_END_RE.search(map_text)
+    if bss is None:
+        raise ParseError("map has dram0_0_seg but no _bss_end symbol")
+    origin = int(seg.group(1), 16)
+    length = int(seg.group(2), 16)
+    used = int(bss.group(1), 16) - origin
+    return {
+        "origin": origin,
+        "length": length,
+        "bss_end": int(bss.group(1), 16),
+        "used": used,
+        "headroom": length - used,
+    }
+
+
+def cmd_dram(args: argparse.Namespace) -> int:
+    map_path = Path(args.map)
+    if not map_path.is_file():
+        # nRF52 envs emit no .map -- absence is not a finding.
+        print(f"::notice ::{args.env} no map file at {map_path}, DRAM check skipped")
+        return 0
+    try:
+        dram = parse_dram(map_path.read_text(errors="replace"))
+    except ParseError as e:
+        print(f"::error ::{args.env} {e}", file=sys.stderr)
+        return 1 if args.strict else 0
+    if dram is None:
+        print(f"::notice ::{args.env} map has no dram0_0_seg, DRAM check skipped")
+        return 0
+    body = (
+        f"{args.env} static DRAM (dram0_0_seg) {dram['used']}/{dram['length']} bytes, "
+        f"headroom {dram['headroom']} bytes (min {args.min_headroom})"
+    )
+    if dram["headroom"] < args.min_headroom:
+        print(f"::error ::{body} -- the next static buffer fails the link")
+        return 1 if args.strict else 0
+    print(f"::notice ::{body}")
+    return 0
+
+
 def cmd_snapshot(args: argparse.Namespace) -> int:
     envs = [e.strip() for e in args.envs.split(",") if e.strip()]
     baseline_path = Path(args.baseline)
@@ -315,6 +374,26 @@ def run_self_test() -> int:
     line, warn = format_notice("envX", near_full, near_full, 2.0, 10.0)
     check("low headroom -> warning", warn is True)
 
+    # parse_dram: real-world shape (values from the E22-DevKitC map, 2026-08-30)
+    sample_map = (
+        "dram0_0_seg      0x000000003ffbdb5c 0x000000000001e6a4 rw\n"
+        "                0x000000003ffdba58                _bss_end = ABSOLUTE (.)\n"
+    )
+    dram = parse_dram(sample_map)
+    check("dram parsed", dram is not None)
+    if dram is not None:
+        check("dram length", dram["length"] == 0x1E6A4)
+        check("dram used", dram["used"] == 0x3FFDBA58 - 0x3FFBDB5C)
+        check("dram headroom", dram["headroom"] == dram["length"] - dram["used"])
+
+    check("dram none on foreign map", parse_dram("no such segment here\n") is None)
+
+    try:
+        parse_dram("dram0_0_seg      0x3ffbdb5c 0x1e6a4 rw\n")
+        failures.append("dram map without _bss_end should raise ParseError")
+    except ParseError as e:
+        check("dram error names _bss_end", "_bss_end" in str(e))
+
     if failures:
         print(f"SELF-TEST FAILED ({len(failures)}): {', '.join(failures)}", file=sys.stderr)
         return 1
@@ -367,6 +446,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_snap.add_argument("--baseline", default=str(DEFAULT_BASELINE), help="baseline JSON path")
     p_snap.add_argument("--project-root", default=".", help="PlatformIO project root")
     p_snap.set_defaults(func=cmd_snapshot)
+
+    p_dram = sub.add_parser(
+        "dram", help="check static-DRAM (dram0_0_seg) headroom in an ESP32 linker map"
+    )
+    p_dram.add_argument("--env", required=True, help="PlatformIO env name (labeling only)")
+    p_dram.add_argument("--map", required=True, help=".pio/build/<env>/firmware.map")
+    p_dram.add_argument(
+        "--min-headroom", type=int, default=4096,
+        help="fail below this many bytes of dram0_0_seg headroom (default 4096)",
+    )
+    p_dram.add_argument(
+        "--strict", action="store_true",
+        help="exit 1 on failure (default: report-only)",
+    )
+    p_dram.set_defaults(func=cmd_dram)
 
     return parser
 
