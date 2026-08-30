@@ -342,6 +342,36 @@ Done 2026-08-29/30: Wave W (TM-34 F1–F7 + WPA2-PSK, TM-17, HL-01/02, TM-33 (c)
 TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26, TM-30 (not reproduced), **TM-35, TM-31, TM-16,
 TM-11/TD-01, HL-03/HL-04**.
 
+0. **New intake 2026-08-30 — the operator's list of 11 points is filed, not started.** Read
+   `BACKLOG.md` §3.8h (`CS-01`..`CS-03`: max-hop over serial + NVRAM, web drop-down, config
+   download/upload), §3.8i (`GW-01` HEY parity with `--gateway on`; `TLM-01`/`TLM-02` telemetry
+   definitions **parked** behind `TLM-03`, the soft-serial review) and §3.8f `TM-38`..`TM-42`
+   (AP-reboot recovery test, country servers, OTA in the regression, T-Deck colour/geometry
+   display test, group `TEST`). **Two decisions are waiting on the operator:** whether a server
+   `{SET}` may overwrite a persisted max-hop value (CS-01), and what the config-export hash
+   protects against plus whether secrets travel in the file (CS-03).
+
+0b. **FL-01 fixed this session (2026-08-30): a node could be driven to beacon at loop rate.**
+`sendPosition()`'s shot path (`--sendpos`, user button, and the unauthenticated EXTUDP
+telemetry injection) had no rate limit at all; the field evidence is 25 146 position frames in
+21 minutes from one station. `src/beacon_rate.h` + a 30 s floor in `sendPosition()`, native
+`test_beacon_rate` 6/6, `pio test -e native` 76/76, ESP32 + nRF52 build, **and proven on
+DK5EN-93**: the second `--sendpos` prints `[POS];shot;suppressed;since_ms;89;min_ms;30000`, and
+after a 34 s pause the next one prints `[POS];shot;resumed;suppressed;1` and goes out. DK5EN-93
+runs this build now, the other three bench nodes do not. `sendHey()` has the same missing floor
+and is still open. Detail and
+the two corrections to the mcmap finding: `BACKLOG.md` §3.8j.
+
+0c. **Third intake 2026-08-30 (§3.8k), plus one more fix.** New: `RX-01` (discard frames whose
+source callsign is still `XX0XXX` — seen relayed over four hops), `TX-01` (such a node must not
+transmit at all — the other half of RX-01, guard in `doTX()` plus `addTxRingEntry()`), `BP-01` (TX back-pressure to
+the sender as Q-code notices QRS/QRT/QTA plus QRV once the queue clears (only if a warning went out before), 80 % refusal for locally originated messages only —
+this is the design for `TM-37`, and it needs bench regressions on all four boards), `FL-02`
+(`sendHey()` needs the same 30 s floor as `FL-01`; 17 of 18 field events were `hey`).
+**`CS-04` fixed:** `getparam()` searched for `"/setparam/?"` and took the substring from the `=`
+instead of up to it — the whole read half of the Web-API was dead. Verified on DK5EN-93.
+The mcmap finding now carries the corrections in its §10.
+
 1. **TM-36 — restart the WiFi soak.** The 14-h run died at ~12:17 when the TM-31 work took the
    Heltec and T-Beam ports; ~51 min survived (checked in: 5 drops, reconnect median 4.0 s, 0
    unsolicited disconnects, 0 stalls). It needs all three USB ports exclusively, so start it when

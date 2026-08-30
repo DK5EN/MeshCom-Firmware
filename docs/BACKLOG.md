@@ -8,6 +8,12 @@ _(Previously `resume.md` in the repository root.)_
 
 Last updated 2026-08-30 late (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260830.md); §3.8f: TM-34 Wave W shipped — F1–F7 + WPA2-PSK on WPA2/WPA3 APs; **TM-35 async NTP** (loop max 314 → 145 ms, 0 gaps); **TM-31 UDP instrument + gateway relay fix** (0/30 → 30/30 queued) and upstream #568 answered; **TM-16 boot time** (T-Deck ready 14.9 → 10.9 s over 24 boots); **TM-11/TD-01 closed** 24/24; **HL-01..04** done; **TM-37 filed**). Branch `v4.35p_prio`, rebased onto `upstream/dev`; T-Deck work on `tdeck-partial-refresh-trace`.
 
+**Intake 2026-08-30 (operator list of 11 points), filed:** configuration surface in §3.8h (`CS-01` max-hop over serial + NVRAM, `CS-02` web drop-down, `CS-03` config download/upload); what the central server learns in §3.8i (`GW-01` HEY parity with `--gateway on`, `TLM-01`/`TLM-02` telemetry definitions **parked**, `TLM-03` soft-serial telemetry review); tests in §3.8f (`TM-38` AP-reboot recovery, `TM-39` country servers, `TM-40` OTA regression, `TM-41` T-Deck colour/geometry display test, `TM-42` group `TEST`).
+
+**Intake 2026-08-30 (second list), filed in §3.8j:** `FL-01` **beacon flood — fixed this session** (a node can be driven to originate position beacons at loop rate; the mcmap "replay burst" finding is a misreading, see the section), `PT-01` protocol-parser test coverage (six parsers have no test at all), `WF-01` trailing bytes on BLE/`KEEP` frames. Bench LoRa power set to 2 dBm on all four nodes (§3.8f bench table).
+
+**Intake 2026-08-30 (third list), filed in §3.8k:** `RX-01` discard frames from unconfigured nodes (`XX0XXX`, seen relayed over four hops), `TX-01` an unconfigured node refuses to transmit at all (the other half of RX-01), `BP-01` TX back-pressure to the sender as Q-code notices (QRS/QRT/QTA, plus QRV once the queue clears — the concrete design for `TM-37`), `FL-02` the same 30 s floor for `sendHey()`. `CS-04` (Web-API `/getparam/`) **fixed and verified on hardware**; the two corrections to the mcmap replay-burst finding are written back into `mcmap/docs/findings/interlink-frame-replay-bursts.md` §10.
+
 > ### Standing risk — read first
 >
 > **Status 2026-08-18.** Of the eight RF- or network-reachable defects, **four are now fixed on
@@ -871,6 +877,10 @@ Scouted 2026-08-29 with six read-only agents after the T-Deck lost-flush root ca
 **State 2026-08-29 evening:** TM-01..05, 08, 09, 12, 15, 18, 20, 21 done and verified on hardware;
 TM-11 measured with a candidate fix; open: TM-06, 07, 10, 13, 14, 16 (rest), 17, 19, 22, 25-34. **TM-20 stays out of the PR** (AP selection, see TM-34). file:line
 references are from the morning scouting; re-verify before touching.
+**Intake 2026-08-30 (operator list):** TM-38 (AP-reboot recovery test), TM-39 (country servers),
+TM-40 (OTA in the regression), TM-41 (T-Deck colour/geometry display test), TM-42 (group `TEST`)
+added below. The configuration-surface and server-data items from the same list are in §3.8h
+and §3.8i.
 
 #### What the scouting settled
 
@@ -925,9 +935,24 @@ references are from the morning scouting; re-verify before touching.
 | TM-34 | all ESP32 | RESEARCH | High | `udp_functions.cpp` `startNetwork()`, `wifiBeginFromScan()`, `doWiFiConnect()`, `checkWifiPing()`, `wifiEventLog()`; arduino-esp32 / ESP-IDF WiFi driver and `sdkconfig` of the framework build | **WiFi investigation — a separate research track, not part of the T-Deck PR (opened 2026-08-29 late).** Trigger: TM-20 removed every boot delay and the node now associates before it has heard all beacons — sometimes with the weakest AP (see TM-20). TM-24 (no roaming, BSSID pinned) and TD-01/TM-11 (`AUTH_EXPIRE` on first join) are the same problem seen from other sides. Questions to answer, each with evidence from the driver source/sdkconfig and a bench measurement, before any of it is coded: (a) **Driver capabilities** — which arduino-esp32 / ESP-IDF version is in the build, what the WiFi stack supports and what is compiled out (`CONFIG_WPA_11KV_SUPPORT`, 11r, `rm_enabled`/`btm_enabled`, `WIFI_FAST_SCAN` vs `WIFI_ALL_CHANNEL_SCAN`, `sort_method`, `threshold.rssi`, `scan_method`, PMF, band selection on the C3/S3 targets). (b) **Scan and selection** — options for scanning long enough to hear every AP of the SSID (passive vs active scan, per-channel dwell `scan_time`, full-channel scan) and then joining the best one without re-introducing a loop stall (async scan is already in place; what is missing is the wait/selection policy, not the blocking). (c) **Stall log** — the WiFi stack can stall the whole node, blocking even LoRa reception: add log output that names the stall (which call, how long, from which task — `[WIFI];stall;…`, loop-gap instrument correlated with `wifiEventLog()` events) so the field can report it and we can reproduce it. (d) **SSID-only association** — can we drop the BSSID+channel pin in `WiFi.begin()` and let the driver choose (the `BENCH_WIFI_NO_BSSID` experiment: 8/12 vs 4/12 first joins on DK5EN-14); what changes in AP selection when we do. (e) **Re-connecting** — `WiFi.setAutoReconnect()`, driver-side reconnect vs our `checkWifiPing()` -> full `startNetwork()` restart; who owns reconnect, and how the two must not fight. (f) **Roaming** — what the station can do without 11k/v/r (RSSI-threshold rescan, `esp_wifi_scan` while connected) and what needs the SDK options; behaviour against a steering mesh (ORBI63 router + satellite on the bench). (g) **Band and AP steering** — how the node reacts to BSS-transition requests and to APs that deauth/ignore a client to push it elsewhere; 2.4 GHz-only hardware against dual-band steering; whether pinning the mesh's 2.4 GHz BSSID is ever the right call. Deliverable: a findings doc (`docs/wifi-findings-<date>.md`) with one recommendation per question, then a fix plan with its own bench protocol (24-boot runs per arm, `scratchpad/bootloop.py` pattern) and its own PR — separate from the T-Deck PR. Absorbs TM-24 and the TD-01/TM-11 confirmation run. | **desk half done 2026-08-29** — [`wifi-findings-20260829.md`](wifi-findings-20260829.md) answers (a)-(g) from the driver source, `sdkconfig` and the prebuilt libraries, with a fix plan (F1-F9, §9) and a bench protocol (arms A0-A5, §10). Runner written: `tools/bench/experiments/bootloop.py` (parser verified against a real boot log). **Open: no bench arm has been run** — DK5EN-14 was occupied by the TD-03 harness. Headline findings: (1) our scan+best-RSSI+pin re-implements `WIFI_ALL_CHANNEL_SCAN`+sort-by-signal, worse and only once; (2) `setAutoReconnect` was already on — three restart owners fight instead; (3) the biggest remaining `loopTask` blocker is `hostByName()` at up to 31 s, not WiFi bring-up; (4) TM-20 should not be reverted, it ships with the policy fix. Next: run arm A5 (WPA2-only test SSID) first, it is the cheapest and decides SAE-vs-steering. **A5 run 2026-08-29 (bootloop.py, DTR/RTS fix): 24/24 first joins on the WPA2-only `ORBI63_Guest`, got_ip median 9.6 s / max 10.1 s, 0 disconnects** — vs 4/12 on the WPA2/WPA3 `ORBI63` (TM-11 A0). Same Orbi, same steering: the first-join `AUTH_EXPIRE` is the WPA3-SAE transition path, not band steering. F1–F4 must therefore include the security mode: force WPA2-PSK on WPA2/WPA3 APs (`setMinSecurity`/authmode threshold, or disable SAE) and re-measure A0 on `ORBI63` with the DTR/RTS-fixed runner (needs the ORBI63 password to switch DK5EN-14 back). **A0 run 2026-08-30 (`bootloop_A0_20260830-084907`): 0/24 first joins on WPA2/WPA3 `ORBI63`, got_ip median 55.8 s / max 56.5 s, 240 disconnects (216× `2:AUTH_EXPIRE`, 24× `202:AUTH_FAIL`); every boot pins the router BSSID `5A:AF:97:2E:2B:8B` (-68…-75 dBm, satellite `46:…:86` at -84…-94, both CHAN 3), fails 9 attempts incl. the firmware's radio-reset retry, and the driver's auto-reconnect lands the 10th at ~55.4 s — same radio as A5's guest VAP `5A:…:8C` at the same RSSI, so the 0/24 vs 24/24 gap is the security mode alone.** **Wave W shipped 2026-08-30 (F1–F7 + SAE policy + instrumentation, `udp_functions.cpp`/`esp32_main.cpp`/`command_functions.cpp`): driver-owned selection (`ALL_CHANNEL_SCAN` + sort-by-signal, `persistent(false)`, `setAutoReconnect(true)`), SSID-only `begin()`, our scan is log-only, `BENCH_WIFI_NO_BSSID` deleted; SAE: `esp_wifi_disable_pmf_config(WIFI_IF_STA)` after `begin(…, connect=false)` — SAE needs PMF, without it the station authenticates WPA2-PSK on a WPA2/WPA3 AP (`WIFI_SAE_POLICY` 0 driver default / 1 PMF off = default / 2 H2E+HnP; `[WIFI];assoc` logs the negotiated `pmf`/`wpa3` via `esp_wifi_sta_pmf_enabled()`/`esp_wifi_sta_prof_is_wpa3_internal()` from `libnet80211.a`); F3 `got_ip` flag set in the event handler and harvested in the loop (`wifiHarvestGotIp()`, also after the 20-s poll window, no boot radio reset, 5-min path only when `wifiTrulyOffline()`); F4 watchdog 180 s grace -> `disconnect(false,false)+begin()` -> 360 s radio reset; F5 `[WIFI];stall;<site>` (mode, disconnect, scan, begin, dns); F6 lwIP `dns_gethostbyname` async with cache and literal short-circuit (57 ms on the bench, was up to 31 s blocking); F7 dead branch deleted; `[WIFI];link` 60-s heartbeat, `--wifistat`, `--wifidrop`. **Arm A4p1 (all fixes, PMF off) on WPA2/WPA3 `ORBI63`: T-Deck 24/24 first joins, `got_ip` median 14.2 s / max 14.7 s uptime (bring-up starts at 5.2 s: diagnostic scan ~5 s + driver scan/join ~4 s), 0 disconnects, 0 stalls; Heltec 12/12, 11.2 s; T-Beam 12/12, 10.6 s** (`tools/bench/runs/bootloop_A4p1_*`). Baseline A0 was 0/24 at 55.8 s. All ESP32 boards SNR-less: RSSI only. Soak runner `tools/bench/experiments/wifisoak.py`. **A4p0 (same code, `WIFI_SAE_POLICY=0`, SAE kept): 24/24 addressed by 19.7 s, every join SAE (`pmf;1;wpa3;1`), 0 disconnects — but exactly every second boot needs a silent second SAE attempt (+4.5 s: `got_ip` 13.6–14.7 s vs 18.2–19.7 s, alternating), which the runner scores as 12/24 (its first-attempt rule). So the A0 0/24 was the BSSID pin _and_ SAE together; unpinned SAE works, WPA2-PSK is deterministic. Policy 1 stays the default (operator may flip it; policy 0 keeps WPA3-only APs). **Found and fixed in the same wave: the first `[WIFI];link` hook called `WiFi.getMode()` every loop pass — an `esp_wifi_*` API call waits for the WiFi task and blocked `loopTask` 2.7–2.9 s while the driver scanned (plus 1.1 s during the connect scan), in every A4p1/A4p0 boot. Loop hooks now use the STA_START/STA_STOP events (`s_wifiStaUp`) and never call the driver while it may be scanning. Rule: no `esp_wifi_*`/`WiFi.getMode()` from the main loop unless connected.** **A4p1b (hook fix, policy 1, `bootloop_A4p1b_*`): 24/24, `got_ip` median 14.1 s / max 14.6 s, 0 disconnects, 0 stalls; the 1.1 s connect-scan gap is gone.** What remains is one 2.6–3.5 s loop gap per boot at ~8.5 s uptime with `section_ms` 32 (outside every section, right after the GPS/UBLOX init) — pre-existing: the A0/A5 build predates the TM-13 gap reporter and A0 shows the same single scan-poll in that window, so it is a TM-16 boot-time lead, not WiFi. Open: overnight soak, WPA3-only APs will not associate with policy 1 (documented trade). |
 | TM-35 | RAK4631 (gateway) | BUG | High | `nrf52/nrf_eth.cpp` `getUDP()`, `nrf52_main.cpp` `sendHey()` | **Found by TM-13/TM-26 on 2026-08-29.** With the W5100S link up and the gateway registered, `neth.getUDP()` blocks the loop for 1.6 s about every 20 s (three 3.3 s stalls in 90 s before the sections were complete) and `sendHey()` for 0.7–1.4 s once after boot. Loop max 1.7–3.4 s vs a 100 ms paced loop. RX runs on the timer task on nRF52, but relay/TX, serial and BLE commands wait. Same family as N-20 (socket SPI paths). Measure first with `rak_harness.py --scenario instr`, then bound the W5100S socket calls. | **instrumented 2026-08-30 (Wave W parity)** — `nrf_eth.cpp`: `[ETH];stall;<site>;ms;N;task;X` (sites `udp_rx`, `udp_read`, `udp_tx`, `udp_stop`, `dhcp_begin`, `dhcp_maintain`, `link`, `hw_init`, `ntp`, threshold 50 ms), `[ETH];event;link up/down|got_ip|dhcp|reset`, `[ETH];link` 60-s heartbeat (link age, HB age, rx/tx max ms, renews, resets), `--ethstat`, `--ethdrop` (= `resetDHCP()`, timed: 126 ms on the bench). First 2-min window on DK5EN-90: `udp_rx` max 1 ms, `udp_tx` max 20 ms, no stall line — the 1.6–3.3 s `getUDP()` stall is not reproduced yet; the marker now names it when it occurs. `rak_harness.py --scenario instr` 2026-08-30: 60 s: one 803 ms gap in `hey_tx` (LoRa TX, not ETH); **600 s (`rak_instr600_20260830.json`): loop max 314 ms, 1 gap = the 15-min NTP round trip (`[ETH];stall;ntp;ms;213` in `eth_state`, NTPClient blocks up to 1 s by library design), 122 UDP RX with `udp_rx` max 5 ms / `udp_tx` max 32 ms, 0 `[ETH];stall` on the socket paths — the 1.6–3.3 s `getUDP()` stall is not reproduced in 12 min with the instrument in place.** Gate "loop max < 250 ms" fails only on the NTP round trip; bounding it means an async NTP on the shared gateway socket (note: `timeClient.begin()` re-binds the gateway `Udp` to port 1337 after `Udp.begin(1990)` — works because the server answers to the KEEP source port). Operator decision: accept the 15-min NTP block or build the async NTP. **DONE 2026-08-30 (async NTP built):** `src/ntp_async.{h,cpp}` -- `NtpAsync` sends the 48-byte request on the shared gateway socket and never waits; the reply is harvested by the normal receive path (`getUDP()` on nRF52, `getMeshComUDP()` on ESP32 offer every datagram to `tryConsume()` before parsing it as a MeshCom frame), with a 2.5 s timeout, 5 s/60 s backoff, mode-4/stratum/epoch validation and `[NTP];ok|timeout|txfail|kod` markers. This also removes a second defect: the stock `NTPClient::forceUpdate()` flushed _every_ queued datagram off the shared socket before sending, so each refresh could eat pending GATE/CONF frames. Both platforms wired, `NTPClient` no longer used. **Gate met:** `rak_harness.py --scenario instr --instr-seconds 600` (`rak_instr600_ntpasync_b_20260830.json`): **loop max 145 ms, 0 gaps > 250 ms** (was 314 ms / 1 gap), `eth_state` max 2.9 ms (was carrying the 213 ms NTP stall), and the 15-min refresh fell inside the window -- `[NTP];ok;epoch;1788084488;rtt;106`, 106 ms on the wire at zero loop cost. Native regression `test_ntp_async` 10/10 (non-blocking send, foreign datagrams left for the gateway, timeout backoff, server change, junk/kiss-of-death replies). A first 600 s window right after the flash showed two 1.7 s unattributed gaps in the boot/DHCP-retry window and 0.9 s `hey_tx` (LoRa TX) gaps -- both pre-existing families (N-20 / `sendHey`), absent from the steady-state run. |
 | TM-36 | all ESP32 | TEST | Medium | `tools/bench/experiments/wifisoak.py`, `tools/bench/runs/wifisoak_W_20260830-112600/` | **WiFi soak evaluation (deferred by operator decision 2026-08-30: the remaining backlog items come first).** The 14-h soak on T-Deck/Heltec/T-Beam (`--wifidrop` every 10 min, held-open USB sessions, detached `nohup`) was started 2026-08-30 11:26 but **died at ~12:17**, when the TM-31 bench work took the Heltec and T-Beam USB ports (`tbeam: serial error: ... multiple access on port?` in `summary.txt`). ~51 min of data survived and is checked in: 5 drops, reconnect median 3 989 ms / p90 4 123 / max 4 123, 0 unsolicited disconnects, 0 BSSID changes, 0 `[WIFI];stall`, link RSSI -61/-57/-54 (n=42). **A full soak has to be restarted on a free bench** — it needs all three ports exclusively, so nothing else may run on them. To do: read the final summary, reduce with `wifisoak.py --parse-only wifisoak_W_*/{tdeck,heltec,tbeam}.log`, report SSID/BSSID/channel/RSSI per association, reconnect-time distribution after drops, unsolicited disconnects with reasons, BSSID changes, `[WIFI];stall` > 500 ms, unexpected resets. Bars: 0 unexpected reboots, every drop recovered, no `stall` > 500 ms, watchdog never reaches stage 2 on a healthy WLAN. Do not conclude from < 6 h. Report: [`wifi-report-20260830.md`](wifi-report-20260830.md). | open — soak running, evaluation queued |
-| TM-37 | all | GAP | Medium | `loop_functions.cpp` `sendMessage()` (`user_msg`), `txring_functions.cpp` `addTxRingEntry()`, BLE/phone out path | **A dropped outgoing message is silent -- the sender is never told.** Confirmed 2026-08-30 while measuring TM-31: every outgoing frame, including the user's own, goes through the same 20-slot TX ring and is radiated one at a time, so three messages typed in quick succession are spooled and go out sequentially (bench drain under channel load: ~1 frame / 20 s; a quiet channel is much faster, the rate is set by airtime, CAD and channel occupancy). A user text is `MSG_PRIO_CRITICAL` (DM) or `MSG_PRIO_HIGH` (broadcast/group), so it normally evicts something lower -- but when the ring holds only equal-or-higher priority entries, `addTxRingEntry()` returns -1 (`RING_DROP_NEW`) and the message is gone. `sendMessage()` ignores that return value entirely; the only trace is a `[MC-DBG] RING_DROP_NEW` line that needs `--loradebug on`. The `[RING] overflow` print just above the call tests a different condition and goes to serial only. The phone/BLE user sees a message that looks sent and never was. | **open.** Wanted: feed the queue state back to the sender. Minimum -- act on the `addTxRingEntry()` return value in `sendMessage()` and push a failure notice to the phone (BLE out) plus the display, so 'not sent' is visible. Better -- a back-pressure warning before the loss: when the ring crosses a high-water mark, send the user a local notice ('queue full, wait') so they stop typing, and consider refusing the send instead of silently dropping. Note this is the same ring whose policy `test_txring_flood` pins, so the behaviour change is testable natively; a bench check is `gwflood.py` with a parallel `--sendmsg` burst. |
+| TM-37 | all | GAP | Medium | `loop_functions.cpp` `sendMessage()` (`user_msg`), `txring_functions.cpp` `addTxRingEntry()`, BLE/phone out path | **A dropped outgoing message is silent -- the sender is never told.** Confirmed 2026-08-30 while measuring TM-31: every outgoing frame, including the user's own, goes through the same 20-slot TX ring and is radiated one at a time, so three messages typed in quick succession are spooled and go out sequentially (bench drain under channel load: ~1 frame / 20 s; a quiet channel is much faster, the rate is set by airtime, CAD and channel occupancy). A user text is `MSG_PRIO_CRITICAL` (DM) or `MSG_PRIO_HIGH` (broadcast/group), so it normally evicts something lower -- but when the ring holds only equal-or-higher priority entries, `addTxRingEntry()` returns -1 (`RING_DROP_NEW`) and the message is gone. `sendMessage()` ignores that return value entirely; the only trace is a `[MC-DBG] RING_DROP_NEW` line that needs `--loradebug on`. The `[RING] overflow` print just above the call tests a different condition and goes to serial only. The phone/BLE user sees a message that looks sent and never was. | **open — design now specified as `BP-01` in §3.8k** (Q-code notices QRS/QRT/QTA plus a conditional QRV on recovery, 80 % refusal for locally originated messages only). Wanted: feed the queue state back to the sender. Minimum -- act on the `addTxRingEntry()` return value in `sendMessage()` and push a failure notice to the phone (BLE out) plus the display, so 'not sent' is visible. Better -- a back-pressure warning before the loss: when the ring crosses a high-water mark, send the user a local notice ('queue full, wait') so they stop typing, and consider refusing the send instead of silently dropping. Note this is the same ring whose policy `test_txring_flood` pins, so the behaviour change is testable natively; a bench check is `gwflood.py` with a parallel `--sendmsg` burst. |
+
+| TM-38 | all four bench nodes | TEST | High | `tools/bench/experiments/wifisoak.py`, `tools/bench/rak_harness.py`, `udp_functions.cpp` `checkWifiPing()`/`wifiWatchdog`, `ntp_async.*`, `nrf52/nrf_eth.cpp` `ethLinkPoll()` | **The AP-reboot test -- the network case no soak covers so far (operator list 2026-08-30, item 7).** All four bench nodes log locally and unattended for 15 minutes; while that runs, the operator power-cycles the access points. One AP carries the RAK4631's LAN cable, so the RAK loses its Ethernet link in the same moment. Pass condition: every node re-associates on its own, has an IP again, NTP time is valid again, and the UDP link to the central server is back (KEEP/DATA leaving, server traffic returning) -- with no reboot, no serial command and no manual touch. Different from TM-36: there the link is dropped driver-side (`--wifidrop`) while the AP stays up; here the AP itself is gone for tens of seconds, so DHCP lease, DNS, ARP and the server socket all have to come back. Instrument: one held-open USB session per board on the bench Mac (`wifisoak.py` without `--drop-every`, plus a serial capture for the RAK) -- the 2323 net console dies with the WLAN and cannot be the witness. Assert `[WIFI];link;up`, `[WIFI];watchdog`, the NTP markers, `[KEEP]`, and on the RAK the `[ETH]` link edges from TM-35. | open -- needs the operator at the AP |
+| TM-39 | all gateway-capable | TEST/BUG | High | `udp_functions.cpp:1418-1480`, `nrf52/nrf_eth.cpp:1040-1200`, `command_functions.cpp:2223` (`--gateway srv`) | **Do the three country servers answer UDP the same way? (operator list 2026-08-30, item 8.)** `--gateway srv OE\|DL\|IT` is the only selector; the destination is then chosen at bring-up: HAMNET (own IP 44.x or `--hamnet on`) -> `meshcom.dig-italia.it` for IT, `meshcom.hamnet.cloud` for DL, literal `44.143.8.143` otherwise; internet -> `meshcom.dig-italia.it` for IT and `meshcom.oevsv.at` for everything else. **Reading already shows one asymmetry:** on the internet path `DL` is not special-cased at all, so a node set to DL without a HAMNET address sends to the Austrian server. Whether that is intended is unknown. Test per country: register a gateway, then compare across OE/DL/IT what comes back -- KEEP/heartbeat answer, whether the server pushes messages down, whether `{SET}`/`{CET}` arrive, timing, and what the node does when the server is silent. | open |
+| TM-40 | ESP32 WiFi nodes | TEST | Medium | `tools/webflash.py`, `tools/ensure_safeboot.py`, `src/safeboot/`, `docs/automation-runner-runbook.md` | **OTA flashing belongs in the regression run (operator list 2026-08-30, item 10).** Every WiFi-capable node must prove it can be re-flashed over the air, unattended: safeboot partition reached, image uploaded, node reboots into the new build, `--info` reports the new version, WLAN and the UDP link come back, and the settings survive the update. Covers T-Deck Plus, Heltec V3 and T-Beam -- the RAK4631 has no WiFi, its update path stays UF2/DFU over USB and is out of scope here. Note the T-Beam needs `--webserver on` before the OTA endpoint exists (bench memory), and a failed OTA must leave the node bootable, which is exactly what safeboot is for. | open |
+| TM-41 | T-Deck Plus | TEST | Medium | `src/t-deck/tdeck_debug.cpp`, T-Deck flush path (`tdeck_main.cpp`), `tools/bench/tdeck_harness.py` | **Colour and geometry display test, driven blind by the harness (operator list 2026-08-30, item 11).** Sequence: invert the whole screen; full-screen fills red, yellow, green, blue, magenta in quick succession; one inverted pass over the same set so the complementary colours show; then a black square growing from the centre, one pixel per step, until the screen is full; then a white circle growing from the centre one pixel per step; then a triangle in the centre, rotating three times clockwise and three times counter-clockwise. **Verification is driver-side** (operator decision 2026-08-30): `--screencrc` is void on this panel (MISO not driven, constant readback -- `tdeck-findings-20260828.md`), so the assertion has to sit on the flush path -- CRC or pixel probe of the buffer actually handed to the panel, with full refresh for the fills because under partial refresh `draw_buf` only holds the last rectangle. That proves the right pixels were sent, not that the glass shows them; an operator may watch, but the test runs the whole sequence unattended either way. | open |
+| TM-42 | all | TEST | Low | `regex_functions.cpp:35`, `src/test_inject.*`, `tools/bench/`, `docs/automation-runner-runbook.md` | **Use group `TEST` for tests, not only `9999` (operator list 2026-08-30, item 9).** `TEST` and `TESTER` already pass `checkRegexCall()`, so the firmware accepts them as a destination today; the central server filters that group, so test traffic sent over LoRa or with `--gateway on` disturbs nobody. Work: make `TEST` the default destination of the frame injector and the bench scenarios (`test_inject.h:22` documents `9999` today), write the convention into the runbook, and prove it once end-to-end -- a `TEST` message sent from a gateway node leaves the node (own log) and does **not** show up on the map/dashboard. | open |
 
 #### Bench fleet (scanned 2026-08-29, all four live on USB)
+
+**LoRa TX power 2 dBm on all four, set 2026-08-30** (`--txpower 2`, takes effect at once via
+`lora_setchip_meshcom()`, persisted): T-Deck 22 -> 2, T-Beam 20 -> 2, Heltec -> 2, RAK -> 2.
+Read back with `--lora` on each node. **Production node: `DK5EN-98`** (operator, 2026-08-30) -- set to `--gateway off`, `--mesh off`,
+2 dBm over the web API (`/setparam/?gateway=off` etc., all three `returncode:0`), confirmed on
+its info page: `Gateway: off / Mesh: off / TX Power: 2 dBm (1.58 mW)`. **`DK5EN-93`** (bench
+Heltec, was itself registered as a gateway) is likewise `--gateway off`, `--mesh off`, 2 dBm.
+Both have to go back afterwards -- note the state before the test was: DK5EN-98 gateway on,
+mesh on, and DK5EN-93 gateway on, mesh off.
 
 | Port                            | USB bridge (VID:PID, serial)                            | Board                                                     | Call     | Env                      | Open-port behaviour                                                               |
 | ------------------------------- | ------------------------------------------------------- | --------------------------------------------------------- | -------- | ------------------------ | --------------------------------------------------------------------------------- |
@@ -1023,6 +1048,443 @@ areas get a test added at merge time.
 (3) `/fable-review` on `fc83554e..upstream/dev`; (4) **done 2026-08-29** — `upstream/dev` merged into
 `tdeck-partial-refresh-trace` (resolution in the merge commit message; native 45/45, four targets build);
 (5) bench-verify on DK5EN-14; (6) T-Deck PR built from `upstream/dev` per §4, UP-01 fix included.
+
+### 3.8h Configuration surface — max hop, and config backup/restore (intake 2026-08-30)
+
+From the operator list of 2026-08-30 (items 1-3). Same theme as the closed §3.8a: a setting is only
+usable if it is reachable **and** survives a reset — over serial, over the web GUI, and in NVRAM.
+The rule from HL-01/HL-03 holds for everything here: **the GUI calls `commandAction()` with the
+same command string**, so GUI and serial cannot drift apart.
+
+| ID    | Type | Sev.   | Location                                                                                                                   | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                               |
+| ----- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| CS-01 | GAP  | Medium | `command_functions.cpp`, `esp32/esp32_flash.cpp` (load/save), `esp32/esp32_main.cpp:935`, `nrf52/nrf52_main.cpp:602`       | **Serial command for the hop limit, persisted in NVRAM.** New `--maxhop <1..6>` setting `meshcom_settings.max_hop_text`. Scope decided 2026-08-30: **only the text hop count** is user-settable; `max_hop_pos` stays at its compile default (`MAX_HOP_POS_DEFAULT` = 2). Nothing persists today — the two fields live in the settings struct but the ESP32 NVS layer has no key for them at all, and **both platforms overwrite them with the compile-time defaults on every boot**, so even the nRF52 (which writes the whole struct to flash) discards the stored value at the next start. | open                                                                 |
+| CS-02 | GAP  | Medium | `web_functions/web_setup.cpp` (`webSetup_setParam`), `web_functions/web_functions.cpp:1074` (`<select>` precedent)         | **Max-Hop as a drop-down on the web Config page.** Offered values 4, 3, 2 — but the field must also **display 5 or 6** when the serial command set one of those, i.e. the current value is added to the list when it falls outside it. The handler goes through `commandAction("--maxhop <n>")` (CS-01), like every other parameter in `webSetup_setParam`; a `<select>` already exists for `country` and is the pattern to copy. The wider range on serial vs. the narrow one in the GUI is deliberate (operator, 2026-08-30).                                                              | open — depends on CS-01                                              |
+| CS-03 | GAP  | Medium | `web_functions/web_functions.cpp` (Config page), `esp32/esp32_flash.cpp`, `nrf52/nrf52_flash.cpp`, `command_functions.cpp` | **Config download/upload as JSON.** A download button on the Config page yields the node configuration as one JSON object; a later upload writes it back and the node reboots once with the restored config. The file must carry the **flash/NVRAM layout version**, so an import into an incompatible layout can be refused instead of half-applied, and a **hash**, so a hand-edited or corrupted file is rejected. This is the bulk form of the §3.8a goal — provisioning a node without a human at the display.                                                                          | open — two decisions open, see below                                 |
+| CS-04 | BUG  | Low    | `web_functions/web_functions.cpp` (HTTP GET parsing)                                                                       | **`/getparam/?<name>` is broken.** `/setparam/?gateway=off` works and answers `{"returncode":0, "gateway":"off"}`, but the matching read `/getparam/?gateway` answers `{"returncode":2, "ram/?gateway":""}` — the parameter name is cut out of the wrong offset of the URL, so every read is "parameter unknown". Found 2026-08-30 while setting DK5EN-98 remotely; the only working read-back today is scraping the info page.                                                                                                                                                              | **FIXED 2026-08-30** — two wrong literals in two lines, detail below |
+
+**CS-01, what the work actually is.** `max_hop_text` / `max_hop_pos` are members of
+`s_meshcom_settings` (`esp32_flash.h:209`, `WisBlock-API.h:375`), but `esp32_flash.cpp` neither
+reads nor writes them — there is no `preferences` key. On both platforms `setup()` assigns
+`MAX_HOP_TEXT_DEFAULT` / `MAX_HOP_POS_DEFAULT` unconditionally after the settings are loaded
+(`esp32_main.cpp:935`, `nrf52_main.cpp:602`), which is what makes the value effectively a
+compile-time constant today. So: add the NVS key plus load/save, turn the two assignments into a
+default that only applies when nothing valid is stored, add the command with a 1..6 clamp and a
+raw-`Serial.printf` marker so the bench harness can read it back, and cover the clamp in the
+native suite.
+
+**Open decision — precedence against the server.** `{SET}` from the central server changes
+`max_hop_text` / `max_hop_pos` at runtime today (`loop_functions.cpp:2283`, range-checked against
+`MAX_HOP_LIMIT` = 7 since this campaign). Once the operator's value is persistent the two can
+disagree. Proposal, needs the operator's OK: **`{SET}` keeps working at runtime but is never
+written to flash**, so a reboot restores the locally configured value and the server can still
+steer the network in an emergency. The alternatives are "server wins permanently" (persist it) or
+"local value locks the server out".
+
+**CS-03, what exists and what has to be invented.**
+
+- **There is no config version today.** The ESP32 stores every setting as its own NVS key in the
+  `Credentials` namespace (`esp32_flash.cpp`), so there is no struct version at all; the nRF52
+  writes the whole struct to a file behind a 2-byte marker plus a `sizeof` check (`N-12`) and has
+  exactly one legacy migration path. The export therefore needs an explicit, newly introduced
+  config-format version — the firmware version alone is not enough, because the layout changes
+  independently of it.
+- **There are partial JSON views already** — the phone/BLE settings frames (`TYP:"SN"`, `"AN"`, …
+  in `command_functions.cpp:5988ff`) are a good model for field naming, but none of them is
+  complete.
+- **Open decision — what the hash is for, and what goes into the file.** A plain hash
+  (CRC32/SHA-256) makes the file tamper-**evident** only: anyone who edits the JSON can recompute
+  it. Real forgery protection needs an HMAC over a secret the node knows — which one (web
+  password? BT code? a fleet key?) is undecided, and a per-node secret makes a config
+  non-transferable between nodes. Second half of the same decision: do secrets travel in the
+  export (`node_pwd` = WLAN password, `node_webpwd`, `bt_code`)? Including them makes the restore
+  complete and puts the WLAN password in clear into a downloadable file; excluding them means an
+  import cannot fully bring a node back.
+- **Acceptance:** export → import on a wiped node → export again must be identical, and an import
+  with a wrong version or a wrong hash must be refused with a visible reason and must not touch
+  NVRAM.
+
+---
+
+**CS-04, what was wrong.** `getparam()` (`web_functions/web_functions.cpp`) carried two defects in
+two consecutive lines, both reproduced live on `DK5EN-98` before the fix:
+
+1. it searched the request for `"/setparam/?"` instead of `"/getparam/?"`. `indexOf()` then returns
+   `-1`, and `substring(-1 + 11 = 10, …)` cut the name out of the wrong offset — `GET
+/getparam/?gateway HTTP/1.1` yielded the parameter name `ram/?gateway`, hence
+   `{"returncode":2, "ram/?gateway":""}` for every read;
+2. with a `=` present it took `substring(indexOf("="))`, i.e. the part **from** the equals sign,
+   while its own comment says it wants the name — `/getparam/?gateway=` yielded the name `=`.
+
+So the entire read half of the Web-API was dead while `/setparam/` worked; the web GUI never
+noticed because it renders values into its pages instead of calling `/getparam/`. Fixed by using
+the right literal and `substring(0, indexOf("="))`. **Verified on hardware** (DK5EN-93,
+192.168.68.66): `/getparam/?gateway` → `{"returncode":0, "gateway":"off"}`, `?mesh` → `"off"`,
+`?txpower` → `"2"`, and the trailing-`=` form now answers correctly too.
+
+---
+
+### 3.8i What the central server learns from a node (intake 2026-08-30)
+
+From the operator list of 2026-08-30 (items 4-6). Both threads are about the same question: the
+node holds information that never arrives at the central server.
+
+| ID     | Type | Sev.   | Location                                                                                           | Item                                                                                                                                                                                                                                                                                     | Status                                    |
+| ------ | ---- | ------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| GW-01  | BUG  | High   | `loop_functions.cpp:4334` (`sendHey()`), `lora_functions.cpp:1194-1211`, `aprs_functions.cpp:1127` | **HEY feature parity: with `--gateway on` the neighbours never reach the server.** Operator, 2026-08-30: the node's own web GUI shows the complete mheard list, but that information does not arrive at the central server; with `--gateway off` the HEY-path data shows up there again. | open — measure first, hypothesis below    |
+| TLM-01 | GAP  | Medium | `loop_functions.cpp` `sendTelemetry()`, `esp32_main.cpp:3313`, `nrf52_main.cpp:1943`               | **Telemetry definition over LoRa at regular intervals**, not only the values.                                                                                                                                                                                                            | **parked 2026-08-30** — blocked by TLM-03 |
+| TLM-02 | GAP  | Medium | same, plus `udp_functions.cpp` `addNodeData()`                                                     | **Telemetry definition over UDP at regular intervals**, not only the values.                                                                                                                                                                                                             | **parked 2026-08-30** — blocked by TLM-03 |
+| TLM-03 | BUG  | High   | `configuration_global.h:303`, `loop_functions.cpp:4402-4420`, `tinyxml_functions.cpp:230`          | **The soft-serial telemetry path has to be examined before either of the two.** Operator decision 2026-08-30. Finding below: on a node without a soft-serial measuring station the telemetry sender is dead code.                                                                        | open — precondition for TLM-01/02         |
+
+#### GW-01 — why a gateway may publish less than a plain node
+
+What the code says, read 2026-08-30 (not yet measured):
+
+- `sendHey()` builds the node's **own** HEY with payload `R<ncnt>;` and **no signal report** —
+  reports are appended by the _receiver_ (`appendHeySignalReport()`), never by the sender.
+- On a gateway that frame goes out twice: straight to the server via `addNodeData()`, **and** to
+  the LoRa TX ring.
+- A neighbouring gateway that hears the same HEY over the air appends its own `NCT,RSSI,SNR`
+  before uploading it (`lora_functions.cpp:1194`, "HEY always send to Server").
+- Both uploads carry the **same `msg_id`**. If the server keeps the first copy it sees, the
+  report-less self-upload wins over the enriched copies from the neighbours — the node is
+  registered, the link data is lost. With `--gateway off` the self-upload does not exist, so only
+  the enriched copies arrive. That matches the operator's observation exactly.
+- The receiving direction is fine: a gateway does append its own report to foreign HEYs before
+  uploading them, and the local mheard/HEY-path view is updated for **every** received copy
+  (`lora_functions.cpp:708`), including duplicates that the dedup gate at line 744 later drops —
+  which is why the web GUI looks complete while the server does not.
+
+**Decisive experiment before any code change:** DK5EN-93 as gateway, capture UDP-out with the
+TM-31 instrument and compare against what mcmap holds for the same `msg_id`; then repeat with
+`--gateway off`. Confirm or refute the dedup hypothesis first — the upload path itself is
+unconditional for `'@'`, so the loss is either at the server or in the copy that wins.
+
+Fix candidates once confirmed: (a) do not self-upload the own `'@'` frame and let the neighbours
+report it, exactly as `--gateway off` does — smallest change; (b) self-upload with an explicit own
+report group so the server sees a complete record; (c) upload mheard as its own record type —
+protocol change, needs the server side.
+
+#### TLM-03 — the telemetry sender is dead on a node without a measuring station
+
+- The periodic sender calls `sendTelemetry(SOFTSER_APP_ID)` on both platforms
+  (`esp32_main.cpp:3313`, `nrf52_main.cpp:1943`), and so do the manual commands
+  (`command_functions.cpp:3085`, `:3095`). `SOFTSER_APP_ID` is a compile-time `1`
+  (`configuration_global.h:303`).
+- `sendTelemetry()` therefore always takes its `ID == 1` branch, which **returns immediately
+  unless `node_parm_1` is non-empty** — and that field is written only by the soft-serial XML path
+  (`tinyxml_functions.cpp:230`). The `else` branch, the one that uses the node's own `node_parm`,
+  is unreachable in the shipped firmware.
+- Consequence: on a node without a soft-serial measuring station **nothing is sent at all** —
+  neither values nor `PARM`/`UNIT`/`EQNS` — while `--parm`, `--unit`, `--values` and `--ptime`
+  accept and persist settings that never go on air.
+- In that same branch the station callsign is `strSOFTSERAPP_ID`, which is empty without the XML
+  path — a telemetry frame under an empty callsign.
+- What already exists, and will decide TLM-01/02 once the path is alive: `sendTelemetry()` walks a
+  24-slot rotation (0 = `PARM`, 1 = `UNIT`, 2 = `EQNS`, 3 = `BITS`, 4…23 = values, then wrap), so
+  the definitions do go out — roughly every 6 h at the default `PTIME` of 15 min, and right after
+  a reboot because the counter is not persisted. The transport, however, is **exclusive**: a
+  gateway sends telemetry only over UDP, a non-gateway only over LoRa
+  (`loop_functions.cpp:4662-4674`). That exclusivity is the actual subject of items (4) and (5).
+
+---
+
+### 3.8j Beacon flood, parser test coverage, wire-format tails (intake 2026-08-30, second list)
+
+| ID    | Type | Sev.   | Location                                                                               | Item                                                                                                                                                    | Status                                                      |
+| ----- | ---- | ------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| FL-01 | BUG  | High   | `loop_functions.cpp` `sendPosition()`, `extudp_functions.cpp:211`, new `beacon_rate.h` | A node can be driven to originate position beacons at **loop rate** (~20/s). Measured in the field: 25 146 frames in 21 minutes from one station.       | **FIXED 2026-08-30** — 30 s floor on the shot path          |
+| PT-01 | TEST | High   | `test/`, all decode entry points                                                       | Protocol-parser test coverage audit: which parsers exist, which are tested, and whether the tests go past the happy path (overrun, control bytes, NUL). | inventory below; six parsers have no test at all            |
+| WF-01 | BUG  | Medium | `phone_commands.cpp:125,199`; `udp_functions.cpp:1599`, `:1565`                        | Frames carry trailing bytes past their own payload: BLE notifications send `blelen + 2`, the UDP `KEEP` frame includes its string terminator.           | site 3 **FIXED 2026-08-30**; sites 1+2 parked (wire format) |
+
+#### FL-01 — the replay bursts are not replays
+
+Trigger: [`mcmap docs/findings/interlink-frame-replay-bursts.md`](../../mcmap/docs/findings/interlink-frame-replay-bursts.md)
+(18 events, 18 callsigns, six hardware families, three firmware states). That report reads the
+signature as "a 1000-entry ring buffer is being replayed upstream of us" and concludes the cause
+cannot be located from mcmap's side. **Two of its premises are wrong, and correcting them puts the
+cause inside the node firmware.**
+
+Measured 2026-08-30 against the live `interlink` log (mcmap MCP, `logs_grep`), event
+`DL6MDF-11` / 2026-08-30 04:20 CEST:
+
+- **"Exactly 1000 distinct `msg_id`s" is not a buffer size — it is the node's whole ID space.**
+  `msg_id = (_GW_ID << 10) | (node_msgid & 0x3FF)` with `node_msgid` wrapping at 999
+  (`loop_functions.cpp:3088,3101`). A station that keeps sending visits all 1000 values and no
+  more. The gapless block `4AB16000`–`4AB163E7` is therefore evidence of **many sends**, not of a
+  1000-slot queue.
+- **The copies are not copies.** The 25 occurrences of `msg_id 4AB16000` arrive 50–51 s apart —
+  one per lap of the counter — and **their battery field differs from frame to frame** (88, 92,
+  88, 100, 91, 93, 100, 93, 87, 100 %). A replayed buffer cannot vary its own payload. Every
+  frame was freshly built, with a live ADC reading in it.
+- Consequently the finding's third argument ("the real counter is behind the burst") is void: the
+  counter is only 1000 wide, so _every_ ID is always inside the "already used" range.
+
+So the node originated ~25 000 position frames in 21 minutes — 1000 IDs × ~25 laps, ~20 frames/s
+— and uploaded each one to the server itself (`gw:1`, `rssi:0`, `snr:0` is what `addNodeData()`
+passes for a node's **own** frame, `udp_functions.cpp:1618`). Its regular cadence is one frame per
+30 minutes. Over LoRa such a rate is impossible (airtime), which is exactly why the frames carry
+no RF path — the flood went out over the node's own internet uplink.
+
+**The defect in the firmware.** `sendPosition()` has three trigger classes, and only two of them
+are rate-limited:
+
+| Trigger                                                        | `uintervall`  | Rate limit before this fix                                    |
+| -------------------------------------------------------------- | ------------- | ------------------------------------------------------------- |
+| Periodic beacon (`esp32_main.cpp:3221`, `nrf52_main.cpp:1859`) | interval      | yes — `posinfo_timer` plus a 30 s floor (`posinfo_timer_min`) |
+| Track / WX (`--sendtrack`, `--sendweather`)                    | 0xEEEE/0xFFFF | yes — SmartBeaconing, minimum 10 s                            |
+| **Shot: `--sendpos`, user button, EXTUDP telemetry injection** | 0x9999        | **none at all**                                               |
+
+The shot path fires exactly once per trigger, however often the trigger comes. The most exposed
+one is `handleExternTelemetry()` (`extudp_functions.cpp:211`): it beacons on **every accepted
+`{"type":"tele"}` datagram** on the EXTUDP port — an unauthenticated LAN interface. A sender at
+loop rate makes the node beacon at loop rate; an app or script looping `--sendpos` does the same.
+Identical in `upstream/dev` (verified `2cb6bb4d`), so this is not a fork regression.
+
+**Fix (this branch, 2026-08-30):** `src/beacon_rate.h` — `beaconShotAllowed()`, a pure,
+rollover-safe helper — plus a guard in `sendPosition()` that drops a shot beacon when the last
+own beacon is less than `BEACON_SHOT_MIN_MS` (30 s, the same floor the periodic path already
+keeps) ago, logging `[POS];shot;suppressed;since_ms;…`. The periodic and track paths are
+untouched. Native regression `test_beacon_rate` (6 cases: first shot, 400-trigger flood, exact
+boundary, regular cadence, `millis()` rollover, parameterised floor) — fails without the helper,
+green with it; `pio test -e native` 76/76; ESP32 and nRF52 targets build.
+
+**Proven on hardware** (DK5EN-93, Heltec V3, flashed with this build 2026-08-30): three
+`--sendpos` in a row → the first beacons, the second prints
+`[POS];shot;suppressed;since_ms;89;min_ms;30000`, the third is dropped silently; after a 34 s
+pause the next `--sendpos` prints `[POS];shot;resumed;suppressed;1` and beacons again. Both
+markers are raw `Serial.printf` (visible with `--debug off`, `;` not filtered), and only the
+**first** suppression per blocked window is printed — under a 20/s trigger storm the guard must
+not turn into a 20 lines/s log storm (TM-21's lesson).
+
+**Still open:** which trigger drove `DL6MDF-11` specifically is not decidable from the log — the
+node is not ours. The fix bounds every trigger, so it does not depend on that answer. Worth doing
+anyway: (a) the same floor question for `sendHey()` — 17 of the 18 field events are `hey`, and
+`sendHey()` has no shot-path guard either, only the trickle timer; (b) EXTUDP is unauthenticated
+and can drive node transmissions — that is a security property worth stating explicitly in
+`08-defect-catalogue.md`; (c) hand the two corrections above back to the mcmap finding so its
+"cause is upstream, not fixable from here" verdict gets revised.
+
+#### PT-01 — protocol parsers and what tests them
+
+Every place the firmware turns bytes from outside into structured data, and the suite that covers
+it. "Hostile" means the tests go past the happy path: truncation, oversize, control bytes, NUL
+inside a field.
+
+| Parser / entry point                                                | Input from                     | Test suite                                                                                                                                | Hostile input?                                  |
+| ------------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `decodeAPRS()` / `encodeAPRS()`                                     | LoRa air, server UDP           | `test_aprs_decode`, `test_aprs_spec`, `test_aprs_corpus` (36 on-air frames + golden), `test_aprs_reencode`, `test_aprs_fuzz` (ASan/UBSan) | **yes** — truncation, discard rules, CRC corpus |
+| `isPlausibleAckFrame()` (ACK)                                       | LoRa air                       | `test_ack_validate` (10), `test_ack_replay`, `test_aprs_fuzz`                                                                             | **yes** — field-measured split, fuzz corpus     |
+| `updateHeyPath()` / `appendHeySignalReport()`                       | LoRa air                       | `test_hey_report` (8)                                                                                                                     | partly — chain length bound covered             |
+| `is_new_packet()` (dedup ring)                                      | LoRa air, UDP                  | `test_dedup_replay` (trace replay)                                                                                                        | partly                                          |
+| TX ring (`addTxRingEntry`, priority, overflow)                      | internal                       | `test_txring` (14), `test_txring_flood` (8), `test_txprio_replay`, `test_gwflood_frames`                                                  | **yes** — len 0 / len > buffer rejected         |
+| External-radio bridge protocol                                      | TCP peer                       | `test_external_radio_protocol` (66), `_tcp` (37), `_txq` (23)                                                                             | **yes**                                         |
+| BLE JSON frame builder                                              | internal → phone               | `test_ble_json_frame` (5)                                                                                                                 | partly — bound = buffer size (UP-01)            |
+| Callsign / group validation (`checkRegexCall`)                      | LoRa air, commands             | `test_regex_call` (11)                                                                                                                    | partly — no length bound (UP-06, open)          |
+| Settings load plausibility (`sanitize_*`)                           | NVS / flash                    | `test_settings_sanitize` (10)                                                                                                             | **yes** — corrupt struct, missing terminator    |
+| NTP reply                                                           | network                        | `test_ntp_async` (10)                                                                                                                     | **yes**                                         |
+| Capture ring, `printfdeb` format, `mask_secret`                     | internal                       | `test_capture_ring` (10), `test_printfdeb_format` (13), `test_mask_secret` (6)                                                            | **yes**                                         |
+| **`decodeAPRSPOS()`** — position payload fields                     | LoRa air                       | **none**                                                                                                                                  | —                                               |
+| **`decodeMHeard()`** — mheard binary record                         | flash / BLE                    | **none**                                                                                                                                  | —                                               |
+| **`getExtern()` / `handleExternTelemetry()`** — EXTUDP JSON         | **unauthenticated LAN**        | **none**                                                                                                                                  | —                                               |
+| **Serial/BLE command parser** (`commandCheck`, `sscanf` chains)     | USB, BLE, net console, web GUI | **none**                                                                                                                                  | —                                               |
+| **`decodeTinyXML()`** — soft-serial measuring station               | UART                           | **none**                                                                                                                                  | —                                               |
+| **`checkVia()` / via chain**                                        | LoRa air                       | **none** (Wave 0.6 lists it)                                                                                                              | —                                               |
+| **UDP server frame indicators** (`GATE`/`BEAT`/`CONF`, `MAX_ZEROS`) | server                         | **none** directly (mock server exercises it end-to-end)                                                                                   | —                                               |
+| **Phone → node command frames** (`phone_commands.cpp:248+`)         | BLE                            | **none**                                                                                                                                  | —                                               |
+| **Web request / query parser** (`decodeURLPercentCoding`)           | HTTP                           | **none**                                                                                                                                  | —                                               |
+
+Order of work proposed (by exposure, not by effort): `getExtern()` and the phone→node command
+frames first — both are reachable without authentication from outside the node — then
+`decodeAPRSPOS()` and the UDP indicator path (RF/server reachable), then the command parser, then
+`decodeMHeard()`, `checkVia()` and TinyXML.
+
+**Test bar for each of them** (operator, 2026-08-30): not only the happy path. Every field gets a
+case with (a) a payload longer than the field, (b) the field truncated mid-way, (c) ASCII control
+characters inside the field, and (d) **an embedded NUL** — the C string terminator is the one byte
+that changes the meaning of every `strlen`/`snprintf`/`String` downstream, and the parsers here mix
+`String`, raw buffers and `sscanf` freely. `test_aprs_fuzz` already runs under ASan/UBSan and is
+the right pattern to copy.
+
+#### WF-01 — trailing bytes on the wire
+
+Three sites, verified by reading 2026-08-30:
+
+1. **BLE notifications carry 1–3 bytes past the payload.** Both senders transmit `blelen + 2`
+   bytes (`phone_commands.cpp:125` and `:199`) with the author's own comment
+   `// why do we need to add 2 bytes??`, but the branches copy different amounts: text/position
+   writes `1 + blelen` → **1** trailing byte; the `0x44` JSON branch writes `blelen` → **2**; the
+   legacy `0x91` branch writes `blelen - 1` → **3**. The buffers are zero-initialised, so today
+   those bytes read as `0x00`. Already described from the consumer side in
+   [`11-wire-format.md` §4.3](architecture/11-wire-format.md).
+2. **The UDP `KEEP` frame includes its string terminator** — `hb_buffer_size = strlen(keep_buffer)+1`
+   (`udp_functions.cpp:1599`), while the sibling `DATA` frame uses plain `strlen()`
+   (`:1635`). The format comment above it documents the `0x00` as intended, so this is a wire
+   fact, not obviously a slip — but the asymmetry between the two frame types is real.
+3. **`addUdpOutBuffer()` copies `len + 1` bytes** into the ring (`udp_functions.cpp:1565`) while
+   only `len` are transmitted: a one-byte over-read of the caller's buffer. In-bounds for every
+   caller today (both pass buffers with ≥ 20 bytes of slack), so latent, not live.
+
+**Operator decision 2026-08-30: only site (3) is changed.** (1) and (2) are the wire format that
+phone apps, MCProxy, mc-chat softnodes and the server parse today. Dropping the pad is a one-line
+change and a compatibility event — it needs a bench test against a real phone app (BLE pad) and
+against the mock plus a real country server (`KEEP`) before it ships. Both stay documented here
+and unchanged in the code. Site (3) is internal and now reads `memcpy(..., len)` instead of
+`len + 1` (`udp_functions.cpp:1565`): no wire effect, the sender has always transmitted `len`
+bytes.
+
+---
+
+### 3.8k Unconfigured-node traffic, TX back-pressure, HEY floor (intake 2026-08-30, third list)
+
+| ID    | Type | Sev.   | Location                                                                                                                   | Item                                                                                                                                                                         | Status                                           |
+| ----- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| RX-01 | GAP  | Medium | `lora_functions.cpp` (RX path after `decodeAPRS`), `udp_functions.cpp` (server → LoRa), `configuration_global.h:18`        | Discard every frame whose source callsign is still the factory default `XX0XXX` — unlicensed traffic, currently relayed across the whole mesh.                               | open                                             |
+| TX-01 | GAP  | Medium | `lora_functions.cpp:1447` (`doTX()`), `txring_functions.cpp` `addTxRingEntry()`, `configuration_global.h:18`               | **An unconfigured node must not transmit at all.** The other half of `RX-01`: stop the traffic at its source instead of only discarding it at every receiver.                | open                                             |
+| BP-01 | GAP  | High   | `loop_functions.cpp` `sendMessage()`, `txring_functions.cpp` `addTxRingEntry()`, `phone_commands.cpp`, `udp_functions.cpp` | Tell the sender when the TX queue is filling, refuse politely at 80 %, and say so when a message is dropped — as Q-code notices back on the transport the message came from. | open — **this is the concrete design for TM-37** |
+| FL-02 | BUG  | High   | `loop_functions.cpp` `sendHey()`, `command_functions.cpp:3285`                                                             | `sendHey()` has the same missing floor that `FL-01` closed for `sendPosition()`: the trickle path is bounded, the `--sendhey` command path is not.                           | open                                             |
+
+#### RX-01 — frames from unconfigured nodes
+
+Observed 2026-08-30 on the T-Deck's mheard/path view: `XX0XXX-00`, heard 16:21, path
+`4/DB0HOB-12,DL2JA-2,DK5EN-98` — a node that has never been configured is transmitting, and three
+relays carried it. A node with the factory callsign is by definition not identifying itself, so
+the traffic is not legal to relay in the first place; today the whole mesh forwards it, uploads it
+to the central server, and puts it in every neighbour's mheard list.
+
+`isNodeUnconfigured()` (`configuration_global.h:18`, ALT-34) is already the single place that
+answers "is this the factory default", covering `XX0XXX*`, empty and `none`. The work:
+
+- **Drop point:** in the RX path right after `decodeAPRS()` fills `aprsmsg.msg_source_call`, i.e.
+  **before** mheard, display, phone/BLE out, the gateway upload and the relay decision. One place,
+  shared by every board — `lora_functions.cpp` is common code, so "across all hardware platforms"
+  needs exactly one guard, not one per platform.
+- **Second door:** the server → LoRa path (`udp_functions.cpp`, `GATE` frames) must not radiate
+  such a frame either.
+- **Log:** one line per dropped frame **only** when serial debug is on, e.g.
+  `[RX];drop;unconfigured;call;XX0XXX-00;id;<msg_id>`, as a raw `Serial.printf` (`printfdeb`
+  filters `;` and is silent with `--debug off`, see the FL-01 marker note).
+- **Test:** `isNodeUnconfigured()` is a pure predicate and trivially unit-testable; the drop point
+  needs a decode-level case in the `test_aprs_*` family (frame with `XX0XXX-00` source → dropped,
+  same frame with a real callsign → passes) plus one bench check with the frame injector.
+
+**Both side questions are decided (operator, 2026-08-30).** (a) "Should such a node refuse to
+transmit at all" — yes, and it is **now its own item, `TX-01` below**. (b) "The node then no
+longer appears on the map" — **that is wanted, not a cost.** The callsign is not a legal
+identification in the first place, and every unconfigured node in the world carries the _same_
+one: on the map and in the database they do not appear as several nodes but collapse into one
+`XX0XXX-00` whose position, hardware and firmware jump between whichever of them was heard last.
+Suppressing them removes a phantom station, it does not hide a real one.
+
+Consequence to write into the bring-up documentation: "did my new node come up?" is answered
+**locally** — WiFi-AP mode, the web GUI, `--info` over USB — never by looking for it on the map.
+A node that is visible on the map has, by definition, already been given a callsign.
+
+#### TX-01 — an unconfigured node refuses to transmit
+
+`RX-01` keeps `XX0XXX` traffic from spreading; this one keeps it from existing. A node that has
+not been given a callsign is not identifying itself, so nothing it sends is legal to put on the
+air — and the node is the only place where that can be settled at the root. With both items in
+place the class is closed at both ends; either one alone is a partial fix.
+
+**Where the guard goes.** Two choke points, and the recommendation is to use both:
+
+- `doTX()` (`lora_functions.cpp:1447`) is the **only** function in the tree that calls
+  `Radio.Send()` (three branches inside it). A check there is the hard backstop — nothing reaches
+  the antenna, on every board, from one place. It is also the natural home: `doTX()` already
+  carries a `TX_ENABLE` compile-time gate, and this is its runtime sibling.
+- `addTxRingEntry()` in addition, so an unconfigured node does not even fill its ring. The `-1`
+  return path already exists and is exactly the signal `BP-01` will consume, so the phone can be
+  told **why** a message was refused instead of watching it disappear.
+- Note the `EXTERNAL_RADIO` build sends through the TCP bridge, not `Radio.Send()` — a
+  `doTX()`-only guard would miss it, the `addTxRingEntry()` guard would not.
+
+**What must keep working while the radio is silent:** everything needed to get the node
+configured. WiFi-AP provisioning already starts by itself in this state
+(`esp32_main.cpp:879`), and USB serial, the web GUI and BLE are untouched. Only the transmitter
+is off.
+
+**Make it visible, or it becomes a support case.** "My new node does nothing" is the predictable
+consequence, so: one line at boot, a line in `--info`, a hint on the display, and — when a send
+is actually attempted — one notice per state change rather than one per frame (TM-21's lesson,
+and the same channel `BP-01` builds).
+
+**Bench handle for the test:** `checkRegexCall()` accepts `XX0XXX-00` (the pattern matches it), so
+`--setcall XX0XXX-00` puts a bench node into the unconfigured state and a real callsign takes it
+back out — no NVS erase needed. Native: the predicate plus the guard's decision function. Bench:
+set the default callsign, then `--sendpos` and `--sendhey` must produce no TX marker and one
+notice; restore the callsign and TX must resume. Run it on all four boards, since the guard sits
+in shared code but `doTX()` has board-specific branches.
+
+**To decide when this is built:** does production/factory testing need a deliberate way to
+transmit while unconfigured (e.g. a command that arms TX for a few minutes)? If yes, it must be
+local-only — never reachable from the air or from the server.
+
+#### BP-01 — back-pressure to the sender, in Q-codes
+
+The queue state must reach the person who is typing, on **the transport the message came from**
+(BLE/phone, UDP, serial, web GUI) — never over the air, because a notice that is radiated adds to
+the very congestion it reports. Three states, with the matching Q-codes
+([Q-code list](https://en.wikipedia.org/wiki/Q_code)):
+
+| State                         | Q-code  | Standard meaning                         | Text                                           | Node behaviour                             |
+| ----------------------------- | ------- | ---------------------------------------- | ---------------------------------------------- | ------------------------------------------ |
+| Queue depth > 1               | **QRS** | "transmit more slowly"                   | `slow down, TX buffer is filling`              | still accepts                              |
+| Queue ≥ 80 % of `MAX_RING`    | **QRT** | "stop transmission"                      | `stopping to accept new messages, buffer full` | **refuses** new user messages              |
+| `addTxRingEntry()` dropped it | **QTA** | "cancel nr … as if it had not been sent" | `messages discarded, TX buffer full`           | message is gone, sender is told            |
+| Queue drained again           | **QRV** | "I am ready"                             | `ready again, TX buffer clear`                 | accepts again — **only after** QRS/QRT/QTA |
+
+**Scope of the refusal (operator, 2026-08-30): only locally originated user messages.** Relay
+traffic, ACKs and beacons keep flowing — the node stays a working relay for the network, only the
+flooding user is throttled. That also keeps the refusal out of the RF-reachable paths, so nobody
+outside can push a node into "not accepting" from the air.
+
+Design points that follow from the code:
+
+- Today `sendMessage()` ignores `addTxRingEntry()`'s return value entirely (that is TM-37); the
+  return already distinguishes "queued in slot n" from `-1` (`RING_DROP_NEW`). The depth is
+  computed inside `addTxRingEntry()` (`queued`), and `stat_queue_hwm` already tracks the high-water
+  mark — so all three thresholds are readable where the decision is made.
+- **`MAX_RING` is not the same on every board** — 20 on Heltec/T-Deck class, 10 on one, 30 on
+  another (`configuration_global.h:174-200`). 80 % must be computed from `MAX_RING`, never
+  hardcoded, or the T-Deck warns at a different fill level than the RAK.
+- **One notice per state transition, not per message** (TM-21's lesson): a QRS for every message
+  of a burst is itself a flood. Hysteresis is needed, e.g. re-arm QRS only after the queue has
+  fallen back below the threshold.
+- **QRV when it is over (operator, 2026-08-30): accepted, but conditional.** A fourth notice
+  **QRV** ("I am ready") goes out once the queue has cleared — **but only if at least one of QRS,
+  QRT or QTA was actually sent in this episode.** A node that was never under pressure never
+  announces that it is ready; QRV is the closing bracket of a warning, not a heartbeat.
+  Concretely: latch the highest notice sent (none → QRS → QRT → QTA), fire QRV exactly once when
+  the depth falls back into the quiet band, then clear the latch. One QRV per episode, on the same
+  transport the warnings went to — and if that transport is gone (phone disconnected meanwhile),
+  skip it rather than queue it.
+- The notice must carry the same `msg_id` semantics as any other message the app displays, so the
+  phone shows it in order; it must not be counted as a user message for retransmission.
+
+**Regression tests, on all four platforms** (explicit operator requirement):
+
+- Native: extend `test_txring_flood` (it already pins the ring's overflow policy) with the three
+  thresholds, the hysteresis, and the per-board `MAX_RING` arithmetic. Cheap and deterministic.
+- Bench: `tools/bench/experiments/gwflood.py` already produces a message burst; it needs to assert
+  the three notices come back in order on the same transport, on T-Deck Plus, Heltec V3, T-Beam and
+  RAK4631. The RAK is the interesting one — different `MAX_RING`, and its queue drains through the
+  W5100S gateway path (TM-35).
+
+#### FL-02 — the same floor for `sendHey()`
+
+`FL-01` closed the shot path of `sendPosition()`. `sendHey()` still has the identical hole: the
+periodic trickle path is bounded (`TRICKLE_IMIN_S` = 30 s), but `--sendhey`
+(`command_functions.cpp:3285`) calls `sendHey()` directly with no spacing check at all. This is not
+academic — **17 of the 18 field events in the mcmap finding are `hey`, only one is `pos`**, so the
+HEY path is the one that actually fired in the field.
+
+Fix: the same `beaconShotAllowed()` helper with its own last-sent timestamp and the same
+`BEACON_SHOT_MIN_MS`, applied to the command path only; the trickle scheduler keeps its own
+cadence and must not be double-gated. Extend `test_beacon_rate` with the HEY timestamp, and use
+the same bench proof (two `--sendhey` inside 30 s → the second prints the suppression marker).
+
+---
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
