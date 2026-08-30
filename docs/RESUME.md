@@ -177,7 +177,15 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   pass, blocked `loopTask` 2.7–2.9 s per boot while the driver scanned (`[INSTR-LOOP];gap … in;lvgl`
   in every A4p1/A4p0 boot, absent in A0/A5). Loop hooks now use STA_START/STOP events only. Rule:
   never call `esp_wifi_*` / `WiFi.getMode()` from the loop unless connected. A4p1b re-measures.
-- Open: A4p1b arm (hook fix) running; overnight `wifisoak.py` on all
+- **A4p1b (hook fix): T-Deck 24/24, `got_ip` median 14.1 s, 0 disconnects, 0 stalls.** The one
+  remaining 2.6–3.5 s loop gap per boot (~8.5 s uptime, `section_ms` 32 = outside every section,
+  right after GPS/UBLOX init) is pre-existing: the A0/A5 build predates the gap reporter and A0
+  shows the same single scan-poll in that window. TM-16 lead, not WiFi.
+- **TM-35 with the `[ETH]` instrument, 600 s:** loop max 314 ms = the 15-min NTP round trip
+  (`[ETH];stall;ntp;ms;213`), 122 UDP RX with `udp_rx` max 5 ms; the 1.6–3.3 s `getUDP()` stall
+  did not reproduce. Bounding NTP needs an async client on the shared gateway socket — operator
+  decision (BACKLOG TM-35).
+- Open: overnight `wifisoak.py` on all
   three boards; WPA3-only APs cannot associate with policy 1 (no PMF) — documented trade, an
   adaptive fallback (SAE first, PMF off after 2x `AUTH_EXPIRE`) would cost ~9 s on every boot.
 
