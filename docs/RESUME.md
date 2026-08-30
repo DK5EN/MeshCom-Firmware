@@ -128,7 +128,8 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   **TM-13 done** (`INSTR_SECTION`, `[INSTR-SECT]`, gap attribution), **TM-25/26 done** (RAK ready
   marker, boot profile, `rak_harness.py`). **TM-35 new**: RAK gateway `getUDP()` blocks the loop
   1.6–3.3 s every ~20 s, `sendHey()` 0.7–1.4 s.
-- **TM-30** instrumented (`tdeck_harness.py --scenario uptime`), run pending on DK5EN-14.
+- **TM-30 not reproduced** (35 min `uptime` run on DK5EN-14: latency, loop max and heap flat, no
+  crash) — the scenario stays as the regression gate for #1083.
 - **TM-31** instrument built (`gwflood.py`, `--srvip` hook); blocked: UDP from the Heltec never
   reaches the Mac (see BACKLOG row). Needs `sudo tcpdump` or the Orbi isolation check.
 - **TM-34 arms**: A0/A5 first attempt **void** — `bootloop.py` opened the port with DTR/RTS asserted,
