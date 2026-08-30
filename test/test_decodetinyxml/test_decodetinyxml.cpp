@@ -20,11 +20,12 @@
 //
 //   pio test -e native_xml
 //
-// Two real defects were found while writing this suite (both PT-01
-// findings, not fixed per policy -- see the two TEST_IGNORE_MESSAGE tests
-// below): an uninitialized-float read when a <VT> has no numeric text, and
-// meshcom_settings.node_utcoff being hardcoded to 0.0 regardless of the
-// parsed station timezone.
+// Two real defects were found while writing this suite (both PT-01 findings
+// 7 and 8, since fixed in src/tinyxml_functions.cpp -- see
+// test_vt_without_text_gets_zero_placeholder and
+// test_node_utcoff_converts_parsed_timezone below): an uninitialized-float
+// read when a <VT> has no numeric text, and meshcom_settings.node_utcoff
+// being hardcoded to 0.0 regardless of the parsed station timezone.
 
 #include <unity.h>
 
@@ -125,8 +126,9 @@ static void test_wellformed_multichannel_fills_all_globals(void)
     TEST_ASSERT_EQUAL_STRING("0077234567", strSOFTSERAPP_ID.c_str());
     TEST_ASSERT_EQUAL_STRING("DemoStationNetDL500", strSOFTSERAPP_NAME.c_str());
 
-    // raw timezone attribute, unmodified (String::replace(":", ".") in the
-    // source is commented out -- see the node_utcoff IGNORE test below)
+    // raw timezone attribute, unmodified -- see
+    // test_node_utcoff_converts_parsed_timezone below for the converted
+    // meshcom_settings.node_utcoff value derived from this string
     TEST_ASSERT_EQUAL_STRING("+01:00", strTELE_UTCOFF.c_str());
 
     TEST_ASSERT_EQUAL_STRING(
@@ -354,62 +356,79 @@ static void test_embedded_nul_truncates_parse_silently(void)
 }
 
 // ---------------------------------------------------------------------
-// PT-01 finding (real defect, not fixed): a <VT> element with no numeric
-// text (missing, self-closed, or non-numeric) makes tinyxml2's
-// QueryFloatText() return XML_NO_TEXT_NODE / XML_CAN_NOT_CONVERT_TEXT
-// *without touching its output parameter* -- confirmed against the
-// downloaded tinyxml2 directly: `float val; val = 987.65f;
-// vt->QueryFloatText(&val);` on an empty <VT> leaves val == 987.65
-// afterwards. src/tinyxml_functions.cpp:195-206 declares
-// `float val;` uninitialized right before the call and, on failure,
-// formats whatever was already on the stack straight into cval / into
-// strTELE_VALUES / meshcom_settings.node_values -- an uninitialized-read
-// that propagates into telemetry the node then relays over the mesh. The
-// exact leaked value is undefined behaviour (stack-dependent), so this
-// test does not assert a specific number; it demonstrates the code path
-// and stops short of a real (UB-dependent, flaky) assertion.
-static void test_vt_without_text_reads_uninitialized_float(void)
+// PT-01 finding 7, fixed: a <VT> element with no numeric text (missing,
+// self-closed, or non-numeric) makes tinyxml2's QueryFloatText() return
+// XML_NO_TEXT_NODE / XML_CAN_NOT_CONVERT_TEXT *without touching its output
+// parameter* -- confirmed against the downloaded tinyxml2 directly:
+// `float val; val = 987.65f; vt->QueryFloatText(&val);` on an empty <VT>
+// leaves val == 987.65 afterwards. decodeTinyXML() now checks the return
+// code and substitutes an explicit 0.0 placeholder instead of formatting
+// whatever was on the stack -- a plain skip would have shifted every later
+// channel's value out of positional alignment with strTELE_PARM, so this
+// pins both effects: the placeholder value itself, and that a *second*,
+// well-formed channel after the bad one still lines up correctly.
+static void test_vt_without_text_gets_zero_placeholder(void)
 {
+    Serial.clear();
+
     bool r = decodeTinyXML(String(
         "<StationDataList><StationData stationId=\"S1\" name=\"N1\" timezone=\"+00:00\">"
-        "<ChannelData channelId=\"0011\" name=\"Ch\" unit=\"U\">"
+        "<ChannelData channelId=\"0011\" name=\"Ch1\" unit=\"U\">"
         "<Values><VT t=\"2025-01-01T00:00:00\"></VT></Values>"
-        "</ChannelData></StationData></StationDataList>"));
+        "</ChannelData>"
+        "<ChannelData channelId=\"0022\" name=\"Ch2\" unit=\"U\">"
+        "<Values><VT t=\"2025-01-01T00:05:00\">1.5</VT></Values>"
+        "</ChannelData>"
+        "</StationData></StationDataList>"));
     TEST_ASSERT_TRUE(r);
 
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: decodeTinyXML() (src/tinyxml_functions.cpp ~197) calls "
-        "vt->QueryFloatText(&val) on an uninitialized `float val`; when a <VT> "
-        "has no numeric text tinyxml2 returns an error WITHOUT writing val, so "
-        "the stale stack value is formatted into cval/strTELE_VALUES/"
-        "meshcom_settings.node_values and relayed as telemetry. Not fixed here "
-        "(tests only, per brief) -- fix is to check the QueryFloatText() return "
-        "code and skip/zero the reading on failure.");
+    // placeholder for the empty <VT>, real value for the next channel --
+    // both entries present, so PARM/VALUES stay positionally paired
+    TEST_ASSERT_EQUAL_STRING("0.0,1.5", strTELE_VALUES.c_str());
+    TEST_ASSERT_EQUAL_STRING("11 Ch1,22 Ch2", strTELE_PARM.c_str());
+    TEST_ASSERT_EQUAL_STRING("T:0.0,1.5", meshcom_settings.node_values);
+
+    // one raw diagnostic line, not filtered by printfdeb/--debug
+    TEST_ASSERT_TRUE(Serial.captured().find("[TXML];vt;novalue") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------
-// PT-01 finding (real defect, not fixed): the station's parsed timezone
-// never reaches meshcom_settings.node_utcoff. strTELE_UTCOFF *is* filled
-// correctly from the "timezone" attribute (see test 1 above,
-// strTELE_UTCOFF == "+01:00") -- but src/tinyxml_functions.cpp:241-245
-// has the conversion (`strTELE_UTCOFF.replace(":", "."); node_utcoff =
-// strTELE_UTCOFF.toDouble();`) commented out and unconditionally does
-// `meshcom_settings.node_utcoff = 0.0;` instead. So node_utcoff is 0.0
-// after every call, regardless of what timezone the station reported.
-static void test_node_utcoff_ignores_parsed_timezone(void)
+// PT-01 finding 8, fixed: the station's parsed timezone now reaches
+// meshcom_settings.node_utcoff. strTELE_UTCOFF is filled from the
+// "timezone" attribute (see test 1 above); decodeTinyXML() converts it into
+// decimal hours ("+01:00" -> 1.0, "-03:30" -> -3.5), converting hours and
+// minutes separately rather than the old `replace(":", ".")` + toFloat()
+// approach, which would have produced -3.30 for -03:30, not -3.5. When the
+// attribute is absent (or unparseable), node_utcoff is left untouched
+// instead of being reset -- pinned here by re-parsing a document with no
+// timezone attribute after a good one and checking the prior value survives.
+static void test_node_utcoff_converts_parsed_timezone(void)
 {
     bool r = decodeTinyXML(String(kSampleDocument)); // timezone="+01:00" in the document
     TEST_ASSERT_TRUE(r);
-    TEST_ASSERT_EQUAL_STRING("+01:00", strTELE_UTCOFF.c_str()); // parsed correctly...
-    TEST_ASSERT_EQUAL_FLOAT(0.0f, meshcom_settings.node_utcoff); // ...but discarded
+    TEST_ASSERT_EQUAL_STRING("+01:00", strTELE_UTCOFF.c_str());
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, meshcom_settings.node_utcoff);
 
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: meshcom_settings.node_utcoff is hardcoded to 0.0 "
-        "(src/tinyxml_functions.cpp:245) regardless of the station's parsed "
-        "timezone -- the conversion of strTELE_UTCOFF into node_utcoff is "
-        "commented out (lines 241-244). strTELE_UTCOFF itself is correct "
-        "(\"+01:00\"); the numeric field the rest of the firmware reads never "
-        "sees it. Not fixed here (tests only, per brief).");
+    // half-hour, negative offset
+    bool r2 = decodeTinyXML(String(
+        "<StationDataList><StationData stationId=\"S2\" name=\"N2\" timezone=\"-03:30\">"
+        "<ChannelData channelId=\"0011\" name=\"Ch\" unit=\"U\">"
+        "<Values><VT t=\"2025-01-01T00:00:00\">5.0</VT></Values>"
+        "</ChannelData></StationData></StationDataList>"));
+    TEST_ASSERT_TRUE(r2);
+    TEST_ASSERT_EQUAL_STRING("-03:30", strTELE_UTCOFF.c_str());
+    TEST_ASSERT_EQUAL_FLOAT(-3.5f, meshcom_settings.node_utcoff);
+
+    // no timezone attribute at all: strTELE_UTCOFF comes back empty, and
+    // node_utcoff must stay at the previous good value (-3.5), not reset
+    bool r3 = decodeTinyXML(String(
+        "<StationDataList><StationData stationId=\"S3\" name=\"N3\">"
+        "<ChannelData channelId=\"0011\" name=\"Ch\" unit=\"U\">"
+        "<Values><VT t=\"2025-01-01T00:00:00\">7.0</VT></Values>"
+        "</ChannelData></StationData></StationDataList>"));
+    TEST_ASSERT_TRUE(r3);
+    TEST_ASSERT_EQUAL_STRING("", strTELE_UTCOFF.c_str());
+    TEST_ASSERT_EQUAL_FLOAT(-3.5f, meshcom_settings.node_utcoff);
 }
 
 int main(int argc, char **argv)
@@ -427,7 +446,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_nonxml_text_returns_false_and_preserves_state);
     RUN_TEST(test_truncated_xml_returns_false_and_preserves_state);
     RUN_TEST(test_embedded_nul_truncates_parse_silently);
-    RUN_TEST(test_vt_without_text_reads_uninitialized_float);
-    RUN_TEST(test_node_utcoff_ignores_parsed_timezone);
+    RUN_TEST(test_vt_without_text_gets_zero_placeholder);
+    RUN_TEST(test_node_utcoff_converts_parsed_timezone);
     return UNITY_END();
 }

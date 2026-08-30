@@ -16,6 +16,8 @@ Last updated 2026-08-30 late (WLAN-Bericht [`wifi-report-20260830.md`](wifi-repo
 
 **Intake 2026-08-30 (third list), filed in §3.8k:** `RX-01` discard frames from unconfigured nodes (`XX0XXX`, seen relayed over four hops), `TX-01` an unconfigured node refuses to transmit at all (the other half of RX-01), `BP-01` TX back-pressure to the sender as Q-code notices (QRS/QRT/QTA, plus QRV once the queue clears — the concrete design for `TM-37`), `FL-02` the same 30 s floor for `sendHey()`. `CS-04` (Web-API `/getparam/`) **fixed and verified on hardware**; the two corrections to the mcmap replay-burst finding are written back into `mcmap/docs/findings/interlink-frame-replay-bursts.md` §10.
 
+**Intake 2026-08-30 (fourth list), filed in §3.8l — TM-43 DONE the same night, UDP-01 stack question answered (424 B / 276 B free), and the run found + fixed `UDP-02` (ESP32 EXTUDP receive killed by one 255-byte datagram). PT-01: all eight parser findings fixed. §3.8m: `MEM-01` done (commit `861f2967`), `MEM-02` parked.** Original intake text: `UDP-01` — second-hand report that `--extudp on` kills a RAK4631; unreproduced, and the two defects with exactly this symptom (`N-22` stack overflow, `N-23` brick trap) are fixed both here **and** in `upstream/dev`, so the section lists what to ask the reporter before touching code. `TM-43` — the regression test the operator asked for: the RAK's UDP interface driven in both directions, send and receive, with node liveness as the assertion.
+
 > ### Standing risk — read first
 >
 > **Status 2026-08-18.** Of the eight RF- or network-reachable defects, **four are now fixed on
@@ -883,6 +885,8 @@ references are from the morning scouting; re-verify before touching.
 TM-40 (OTA in the regression), TM-41 (T-Deck colour/geometry display test), TM-42 (group `TEST`)
 added below. The configuration-surface and server-data items from the same list are in §3.8h
 and §3.8i.
+**Intake 2026-08-30 (fourth list):** TM-43 (RAK4631 EXTUDP send/receive regression test) is
+filed in §3.8l together with `UDP-01`, the report that prompted it.
 
 #### What the scouting settled
 
@@ -1308,8 +1312,9 @@ that changes the meaning of every `strlen`/`snprintf`/`String` downstream, and t
 `String`, raw buffers and `sscanf` freely. `test_aprs_fuzz` already runs under ASan/UBSan and is
 the right pattern to copy.
 
-**PT-01 findings (2026-08-30, all pinned as `TEST_IGNORE_MESSAGE` cases, none fixed yet -- each is a
-small follow-up item):**
+**PT-01 findings (2026-08-30). ALL EIGHT FIXED later the same day** -- each pinned case is a real
+assertion now (suites `native_parsers` 24/24, `native_extern` 32/32, `native_xml` 11/11, 0 skips);
+finding 6 additionally rejects a NUL in `dst`. The table stays as the record of what was wrong:
 
 | #   | Parser            | Finding                                                                                                                                                    |
 | --- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1503,6 +1508,189 @@ Fix: the same `beaconShotAllowed()` helper with its own last-sent timestamp and 
 `BEACON_SHOT_MIN_MS`, applied to the command path only; the trickle scheduler keeps its own
 cadence and must not be double-gated. Extend `test_beacon_rate` with the HEY timestamp, and use
 the same bench proof (two `--sendhey` inside 30 s → the second prints the suppression marker).
+
+### 3.8l EXTUDP on the RAK4631 — reported crash, and the missing UDP regression test (intake 2026-08-30, fourth list)
+
+| ID     | Board(s)                      | Type | Sev. | Location                                                                                                             | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Status                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ----------------------------- | ---- | ---- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UDP-01 | RAK4631 (nRF52840 + W5100S)   | BUG  | High | `src/extudp_functions.cpp`, `src/nrf52/nrf52_main.cpp:1086,2420,2429,2461`, `src/loop_functions.cpp` `sendMessage()` | **Second-hand report ("angeblich"): switching `--extudp on` on a RAK kills the node.** Two defects with exactly this symptom were found on this bench and fixed — `N-22` (loop-task stack overflow) and `N-23` (brick trap without Ethernet) — and **both fixes are also in `upstream/dev`**. So this is an old build, a third cause, or the silent-dead case below. Not reproduced yet.                                                                                                                                                                               | **answered in part 2026-08-30 (TM-43 run)** -- the inbound path measured: EXTUDP rx leaves 424 B of the 4 kB loop stack, the gateway UDP->LoRa path 276 B (run minimum) -- thin, but not N-22's zero. The reporter questions (version, trigger, crash vs freeze) still stand; UDP-02 below is a real candidate for the "silently dead" flavour and is fixed |
+| TM-43  | RAK4631, Heltec V3 as control | TEST | High | `tools/bench/rak_harness.py` (new `extudp` scenario + UDP peer helper), `test/test_getextern/`, env `native_extern`  | **Regression test that drives the RAK's UDP interface in both directions — send and receive (operator request 2026-08-30).** The EXTUDP transport has never had a hardware test; every EXTUDP defect so far was found by hand at the bench. The test must assert the node is still alive at the end, not just that datagrams flew.                                                                                                                                                                                                                                     | **DONE 2026-08-30** -- `extudp` scenario in `rak_harness.py` + `tools/bench/extudp_peer.py` (24 unit tests), `[EXT];rx/tx;stack_hwm` instrument, `test_getextern` 32 cases. RAK DK5EN-90: PASS, 601 s soak, 197/197 datagrams picked up, 0 resets. Heltec control: first run FAILED and found UDP-02; PASS after the fix. `docs/bench-extudp-regression.md` |
+| UDP-02 | ESP32 WiFi nodes              | BUG  | High | `src/extudp_functions.cpp` `getExternUDP()`                                                                          | **One 255-byte datagram permanently killed EXTUDP receive on ESP32** (found by the first TM-43 control run on DK5EN-93): `getExternUDP()` read only 254 of 255 bytes, arduino-esp32 `WiFiUdp::parsePacket()` returns 0 while an unread rx_buffer exists -- every later datagram silently ignored until reboot, sending kept working. RAK/`EthernetUDP` unaffected (its `parsePacket()` discards remainders itself). Fix: drain the remainder (`UdpExtern.flush()`, verified to free the buffer on both installed cores) + one `[EXT] oversized datagram drained` line. | **FIXED 2026-08-30** -- Heltec `extudp` scenario before 40 in / 0 picked up, after 40/40; analysis in `bench-extudp-regression.md` §6                                                                                                                                                                                                                       |
+
+#### UDP-01 — what the tree already knows about this symptom
+
+Twice on this bench, and both times real:
+
+- **`N-22` (2026-08-21, fixed `9ce62aa0`)** — RAK gateway with `--extudp on` reboots reproducibly
+  2–4 s after every message it sends itself, `RESETREAS=0x00000004` (app crash through the
+  SoftDevice fault handler). Root cause **measured**, not guessed: `uxTaskGetStackHighWaterMark(NULL)
+== 0` at the deepest point of `checkSerialCommand()` → `sendMessage()` → `sendExtern()`. The nRF52
+  loop task has a hard-coded 4 KB stack (`LOOP_STACK_SZ`, Adafruit core); EXTUDP was only the
+  trigger that pushed the path over the edge. Fix: the path's large buffers into BSS.
+- **`N-23` (2026-08-22, fixed `b62976c9`)** — `--extudp on` with gateway **and** webserver off bricks
+  the node permanently. Setup initialises the W5100S only under `bGATEWAY || bWEBSERVER`
+  (`nrf52_main.cpp:1086`), while the 15-minute restart block runs under `bWEBSERVER || bEXTUDP` and
+  fires on the first pass (`web_timer == 0`); `startExternUDP()` then hit uninitialised hardware and
+  never returned — loop task dead, console without echo, and because the flag is persisted, the same
+  after every reboot. Fix: both restarts gated on `neth.hasIPaddress`.
+
+**Both fixes are in `upstream/dev` as well** (checked 2026-08-30: the `#ifdef ESP32 / #else static
+char c_json[500]` block in `sendExtern()`, and the `if(bEXTUDP && neth.hasIPaddress)` gate in the
+loop restart block). "Upstream simply doesn't have the fix" is therefore ruled out, and nothing
+should be changed in the code before these four answers are in:
+
+1. **Firmware version and board** of the reporting node — the two fixes above are what separates a
+   current build from a mid-August one.
+2. **When** it dies: on `--extudp on` itself, on the first message the node sends, on the first
+   inbound datagram, or minutes later while idle. Those are three different suspects.
+3. **Crash or freeze:** the boot line `[BOOT] RESETREAS=` (`0x4` app crash, `0x2` watchdog, `0x8`
+   lockup) versus a console that stops echoing without a reboot — the latter is `N-23` class, a
+   blocked W5100S socket call, not a reset.
+4. **`--gateway` / `--webserver` state and whether `--extudpip` is set** — see the two open points
+   below, both depend on it.
+
+Two things on this branch still fit the report:
+
+- **The inbound path has never been stack-measured.** `N-22` measured the outbound path only. Inbound
+  is deeper: `getExternUDP()` (`extudp_functions.cpp:322`) → `getExtern()` (`:238`, `char val[161]`
+  plus an ArduinoJson `JsonDocument` on the stack) → `sendMessage()` → `sendExtern()`, i.e. the whole
+  `N-22` path with the JSON decoder stacked on top, called from the same 4 KB loop task
+  (`nrf52_main.cpp:2423`). One watermark print at that depth settles it the same way it settled
+  `N-22`. This is also why the operator's "send **and** receive" framing is the right one: the
+  receive direction is the untested half and the deeper one.
+- **EXTUDP on its own is silently dead, not crashed.** With gateway and webserver off the W5100S is
+  never initialised, so `startExternUDP()` never runs, `hasExternIPaddress` stays `false`, and both
+  `getExternUDP()` (`:329`) and the send path (`:603`) return early — no traffic in either direction
+  and no error message. Since the `N-23` fix that is safe, but invisible: a user who switches EXTUDP
+  on, sees nothing happen and reboots would describe it as "broken" too. Whether the setup gate at
+  `nrf52_main.cpp:1086` should become `bGATEWAY || bWEBSERVER || bEXTUDP` is an **open decision, not
+  a task** — it re-opens exactly the door `N-23` closed and must not be changed without the
+  hardware-present check and TM-43 in place.
+
+#### TM-43 — the regression test over the RAK's UDP interface
+
+Both directions, on real hardware, with **liveness as the actual assertion** — datagrams arriving is
+the easy half; the failure under investigation is the node dying while they do. Node: `DK5EN-90`,
+`/dev/cu.usbmodem201301`, env `wiscore_rak4631`, W5100S with link (bench fleet table in §3.8f).
+
+**Send direction (node → host, UDP :1799, `EXTERN_PORT` in `configuration_global.h:160`)**
+
+- Host binds UDP 1799 and configures the node over serial: `--extudpip <host-ip>`, `--extudp on`,
+  with `--gateway on` so Ethernet is actually up (the `N-23` order trap: gateway first).
+- Triggers, one at a time with the console captured: `--sendpos`, an own message
+  (`::{TEST}...`, group `TEST` per TM-42), and one frame received over LoRa from a second node.
+- Assert per trigger: a well-formed JSON datagram arrives at the host (`type`, `src_type` = `node` /
+  `lora`, payload matching what went out), and the console shows the matching `[EXT] Out:` line.
+  A trigger that logs `[EXT] Out:` but produces no datagram is the `N-22` side symptom and must fail
+  the run.
+
+**Receive direction (host → node)**
+
+- `{"type":"msg","dst":"TEST","msg":"..."}` → the node builds `:{TEST}...` and puts it in the TX ring
+  (`--debug on` marker plus the LoRa frame at a second node); this is the deep path from the UDP-01
+  notes and the one most likely to crash.
+- `{"type":"tele","temp":23.3,"hum":60,"press":1018.5}` → the values land in
+  `meshcom_settings.node_*` and the immediate beacon carries them (`handleExternTelemetry`,
+  `extudp_functions.cpp:167`). Only meaningful on a node without real sensor hardware — the function
+  refuses otherwise, and that refusal is itself a case.
+- Rejection cases, all of which must log and survive: broken JSON, missing `dst`/`msg`, `dst` longer
+  than 9, `msg` longer than 150, a datagram of the full `UDP_TX_BUF_SIZE` (255 B) and one truncated
+  mid-JSON.
+
+**Liveness — the part that catches the reported bug**
+
+- Green only if the node is still up at the end: uptime monotonically increasing across the run, no
+  `[BOOT] RESETREAS=` line after the start, no `HardFault` / assert (`rak_harness.py` already carries
+  the `CRASH` regex), and the console still echoes after the last case.
+- Soak tail: EXTUDP on with traffic in both directions for ≥ 10 minutes, then the same liveness
+  check. `N-22` crashed 2–4 s after a send, `N-23` on the first loop pass — 10 minutes covers both
+  classes with margin.
+- With `MC_TEST_HOOKS` the 500 ms sequence-numbered heartbeat (`extudp_functions.cpp:337`) gives the
+  host a gap-free clock: a gap in `seq` dates the stall to the millisecond and separates "network
+  gone, loop alive" from "loop task hung" — the instrument that settled `N-20`.
+
+**Where it goes**
+
+- New `extudp` scenario in `tools/bench/rak_harness.py` (holds the port, boot phases and crash regex
+  already), plus a small UDP peer helper beside it; runs land in `tools/bench/runs/` like every other
+  run.
+- Cheap half first, natively: `test/test_getextern` (`pio test -e native_extern`) already covers
+  `getExtern()` parsing — extend it with the rejection vectors above so hardware time is spent only
+  on transport and stack.
+- Run the same probe against a Heltec V3 as the **control**. `extudp_functions.cpp` is shared code;
+  if the sequence survives on ESP32 and kills the RAK, that is the 4 KB loop-task stack again and not
+  an EXTUDP logic bug — the exact discrimination that cost `N-22` several wrong turns.
+
+### 3.8m Memory budget — static-DRAM guard and the heap-ring proposal (2026-08-30)
+
+| ID     | Board(s)        | Type | Sev.   | Location                                                                                                                   | Item                                                                                                                                                                                                                                      | Status                                                                                    |
+| ------ | --------------- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| MEM-01 | classic ESP32   | GAP  | High   | `tools/resource_watch.py`, `.github/workflows/ci-build.yml`, `configuration_global.h`                                      | Static-DRAM guard rail (`dram` subcommand, hard CI gate at 4 kB headroom) and classic-ESP32 rings right-sized (`MAX_RING` 30→20, `MAX_RING_UDP` 25→20).                                                                                   | **DONE 2026-08-30**, commit `861f2967` — headroom E22 1,712→11,896 B, T-Beam 528→10,712 B |
+| MEM-02 | all (see risks) | GAP  | Medium | `src/loop_functions.cpp:403-435`, `src/loop_functions_extern.h:189-237`, `src/txring_functions.cpp:27` (NATIVE_BUILD twin) | **Move the five big static rings to one-time boot allocation** — frees ~28 kB of `dram0_0_seg` on classic ESP32. **Parked: risk assessment before any code (operator, 2026-08-30), and it ships only with the regression bar below met.** | **parked — risk assessment first**                                                        |
+
+#### MEM-02 — what would move, and the risks that must be assessed first
+
+The five rings, all defined in `loop_functions.cpp:403-435`, all `.bss` today
+(sizes at the post-MEM-01 classic-ESP32 dimensions; `UDP_TX_BUF_SIZE` 255,
+`MAX_MSG_LEN_PHONE` 300):
+
+| Ring                  | Dimensions           | Bytes | Written from                                                                 |
+| --------------------- | -------------------- | ----- | ---------------------------------------------------------------------------- |
+| `BLEtoPhoneBuff`      | `MAX_RING × 305`     | 6,100 | loop task                                                                    |
+| `BLEComToPhoneBuff`   | `MAX_RING × 305`     | 6,100 | loop task                                                                    |
+| `ringBuffer` (TX)     | `MAX_RING × 260`     | 5,200 | loop task + `OnRxDone` relay path                                            |
+| `ringBufferUDPout`    | `MAX_RING_UDP × 275` | 5,500 | **reachable from `OnRxDone` via `addNodeData()`** (`udp_functions.cpp:1616`) |
+| `ringbufferRAWLoraRX` | `MAX_LOG × 260`      | 5,200 | RX path                                                                      |
+
+Total ~28.1 kB. Mechanically the safe form is a pointer-to-array
+(`unsigned char (*ringBuffer)[UDP_TX_BUF_SIZE+5]`) allocated once in setup —
+indexing `ring[i][j]` stays byte-identical, only the symbol's type changes.
+
+**Risks, in order of bite (each needs an explicit verdict before implementation):**
+
+1. **PSRAM trap (T-Deck class).** With `CONFIG_SPIRAM_USE_MALLOC` a plain
+   `malloc` can land the ring in PSRAM, and `ringBufferUDPout` is reachable
+   from `OnRxDone` — PSRAM access from ISR context crashes the ESP32. The
+   allocation must be `heap_caps_malloc(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)`
+   on ESP32, and the assessment must confirm which contexts really touch each
+   ring on both platforms (the `OnRxDone` reachability comment at
+   `udp_functions.cpp:1616` is the known one; audit for others).
+2. **Init order.** Anything that touches a ring before the setup-time
+   allocation dereferences NULL — static constructors, early BLE callbacks,
+   the nRF52 timer task. Audit: no ring access before `init_ring_alloc()`
+   runs; allocation must precede radio/BLE init.
+3. **`sizeof` traps.** `sizeof(ringBuffer)` on the new pointer type is 4/8,
+   not 5,200 — today that idiom lives in three native test fixtures
+   (`test_txring`, `test_txring_flood:55,423`, `test_unconfigured:55`) and
+   must be hunted repo-wide (`memset(ring, 0, sizeof(ring))` compiles and
+   silently clears 8 bytes).
+4. **Zero-init semantics.** `= {0}` today; read paths assume zeroed status
+   bytes. The allocation must be `calloc`/`memset`, and the NATIVE_BUILD twin
+   definitions in `txring_functions.cpp:27` must move to the same alloc path —
+   otherwise the tests keep testing the static layout while hardware runs the
+   heap one.
+5. **OOM at boot** cannot realistically fire (~28 kB from a >100 kB heap at
+   boot) but must still be handled loudly: `[MEM];alloc;fail` + reboot, never
+   a silent NULL.
+6. **Upstream friction.** The type change in `loop_functions_extern.h`
+   touches every including file's recompile; the PR must stay mechanical
+   (pointer-to-array, one alloc function) to be reviewable.
+
+**Regression bar (must all pass before this merges — operator requirement):**
+
+- Native: the alloc path itself compiled and used in the native envs (not the
+  static twin), so `sizeof`/type traps surface in CI; the heap rings then also
+  sit behind ASan redzones in the `-fsanitize` envs, which is a strict
+  upgrade over static arrays for overflow detection. Full native gate green
+  (10 envs), plus a grep gate: zero remaining `sizeof(<ring symbol>)`.
+- Hardware, all four bench nodes: boot, cross-board LoRa TX/RX, BLE phone
+  connect + message, TM-31 `gwflood` (exercises `ringBufferUDPout` under
+  load), BP-01 burst incl. QRT at 16/20, one OTA (TM-40), and a ≥10-minute
+  soak with `[MEM];boot;heap_free` before/after showing the heap paid for it
+  and is stable (no creep). `resource_watch.py dram` documents the headroom
+  gain (~28 kB → classic ESP32 at roughly 40 kB headroom).
+- The `dram` CI gate stays at 4 kB — MEM-02 buys room, it does not retire the
+  guard.
 
 ---
 

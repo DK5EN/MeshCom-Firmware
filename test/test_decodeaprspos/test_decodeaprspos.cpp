@@ -165,45 +165,40 @@ static void test_abgeschnittener_payload_ohne_hemisphaere(void)
 
 // Ueberlanger Payload: 2000 Zeichen ohne 'N'/'S' -- die aeussere Schleife
 // (kein Abbruch ausser bei N/S oder ipt>10) darf dabei nicht abstuerzen oder
-// haengen, sondern muss linear terminieren.
+// haengen, sondern muss linear terminieren. Seit der PT-01-Finding-1-Fix
+// (siehe test_ipt_notbremse_ohne_hemisphaere_wird_abgelehnt unten) ist eine
+// solche Position ohne echtes Hemisphaerenbyte kein Erfolg mehr -- 0x00 statt
+// 0x01, initAPRSPOS()-Defaults bleiben stehen.
 static void test_ueberlanger_payload_ohne_hemisphaere_terminiert(void)
 {
     std::string huge(2000, '4');
     struct aprsPosition pos;
     uint16_t r = decodeAPRSPOS(String(huge), pos);
 
-    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_UINT16(0x00, r);
 }
 
-// PT-01 Finding: die "ipt>10"-Notbremse derselben Schleife ist KEINE
-// Erkennung von "kein N/S gefunden" -- sie liest das Byte an der aktuellen
-// Position unbesehen als lat_c/aprs_group, auch wenn dort gar kein 'N'/'S'
-// steht. Bei diesem Vektor (2000x '4', keine Hemisphaere im Frame) landet
-// lat_c auf '4' statt auf initAPRSPOS()s Default 0x00 -- der Aufrufer kann
-// "echtes N/S gelesen" und "Notbremse getroffen" nicht mehr unterscheiden,
-// und lat traegt einen 11-stelligen Fantasiewert (44444444444.0). Kein
-// Speicherfehler (decode_text[25] ist gross genug fuer die 11 gecappten
-// Ziffern), aber plausibel aussehende Falschdaten statt eines erkennbaren
-// Fehlschlags -- genau das Hostile-Input-Muster, das BACKLOG SS3.8j fuer
-// ueberlange Felder verlangt. Nicht behoben (Parser-Verhalten aendern ist
-// außerhalb dieses Auftrags) -- hier nur sichtbar gemacht.
-static void test_ipt_notbremse_liest_hemisphaere_ungeprueft(void)
+// PT-01 Finding 1 (FIXED): die "ipt>10"-Notbremse derselben Schleife ist
+// KEINE Erkennung von "kein N/S gefunden" -- sie las das Byte an der
+// aktuellen Position vormals unbesehen als lat_c/aprs_group, auch wenn dort
+// gar kein 'N'/'S' stand. decodeAPRSPOS() prueft jetzt das Byte am Cutoff:
+// steht dort kein echtes 'N'/'S' (bzw. 'W'/'E' in der Laengengrad-Schleife),
+// liefert die Funktion 0x00 und laesst alle Felder auf dem
+// initAPRSPOS()-Default -- statt eines plausibel aussehenden, aber
+// fabrizierten lat_c und eines 11-stelligen Fantasiewerts fuer lat. Bei
+// diesem Vektor (2000x '4', keine Hemisphaere im Frame) greift die Notbremse
+// in der Breitengrad-Schleife; die Laengengrad-Schleife wird dank des
+// fruehen return gar nicht erst erreicht.
+static void test_ipt_notbremse_ohne_hemisphaere_wird_abgelehnt(void)
 {
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: decodeAPRSPOS()'s ipt>10 bailout in the latitude "
-        "loop (src/aprs_functions.cpp ~L560) assigns lat_c/aprs_group from "
-        "whatever byte sits at the cutoff position without checking it is "
-        "actually 'N'/'S' -- an unterminated numeric run (>10 digits, no "
-        "real hemisphere byte) silently produces a plausible-looking but "
-        "fabricated lat_c and an 11-digit lat value instead of leaving the "
-        "initAPRSPOS() default. Not memory-unsafe, not fixed here.");
-
     std::string huge(2000, '4');
     struct aprsPosition pos;
-    decodeAPRSPOS(String(huge), pos);
+    uint16_t r = decodeAPRSPOS(String(huge), pos);
 
-    TEST_ASSERT_EQUAL_CHAR('4', pos.lat_c);   // NOT a real hemisphere byte
-    TEST_ASSERT_TRUE(pos.lat > 1.0e10);        // 11-digit fantasy value, not the initAPRSPOS() default 0.0
+    TEST_ASSERT_EQUAL_UINT16(0x00, r);
+    TEST_ASSERT_EQUAL_CHAR(0x00, pos.lat_c);       // initAPRSPOS()-Default, keine fabrizierte Hemisphaere
+    TEST_ASSERT_EQUAL_FLOAT(0.0, pos.lat);         // initAPRSPOS()-Default, kein 11-stelliger Fantasiewert
+    TEST_ASSERT_EQUAL_CHAR('/', pos.aprs_group);   // initAPRSPOS()-Default
 }
 
 // Ueberlanger Kommentartext: pos_atxt ist auf 25 Zeichen (ipt<25) gedeckelt,
@@ -253,7 +248,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_leerer_payload);
     RUN_TEST(test_abgeschnittener_payload_ohne_hemisphaere);
     RUN_TEST(test_ueberlanger_payload_ohne_hemisphaere_terminiert);
-    RUN_TEST(test_ipt_notbremse_liest_hemisphaere_ungeprueft);
+    RUN_TEST(test_ipt_notbremse_ohne_hemisphaere_wird_abgelehnt);
     RUN_TEST(test_ueberlanger_kommentartext_wird_gekappt);
     RUN_TEST(test_steuerzeichen_in_breitenangabe);
     return UNITY_END();

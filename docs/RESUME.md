@@ -1,6 +1,6 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Waves 1 and 2 (see the first two sections below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
+Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Waves 1-3 (see the first sections below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
 (async NTP), TM-31 (UDP instrument, gateway relay fix, upstream #568 answered), TM-16 (boot time),
 TM-11/TD-01 closed, HL-03/HL-04**. All pushed (`df861d58`), working tree clean, branch
 `tdeck-partial-refresh-trace`. The WLAN report is
@@ -12,6 +12,25 @@ settled" table before re-deriving anything.
 left at 1, the persist flags at 0, as found. No background runs are alive — the 14-h WiFi soak
 (TM-36) died at ~12:17 when the TM-31 work took the Heltec and T-Beam ports. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
+
+## 2026-08-30 night: TM-43, UDP-01 answered, UDP-02 found+fixed, all 8 parser findings fixed, MEM-01
+
+- **TM-43 done** -- `extudp` scenario (`rak_harness.py`) + `tools/bench/extudp_peer.py`; RAK
+  DK5EN-90 PASS (601 s soak, 197/197 datagrams, no reset); Heltec as ESP32 control. Not in
+  `--scenario all` (reconfigures the node); run by name. `docs/bench-extudp-regression.md`.
+- **UDP-01 answered** with the `[EXT];rx/tx;stack_hwm` instrument: EXTUDP inbound leaves 424 B of
+  the 4 kB nRF52 loop stack, the gateway UDP->LoRa path 276 B (run minimum) -- thin, not zero.
+  Reporter questions still open; see the §3.8l list before touching code.
+- **UDP-02 found by the control run, fixed:** one 255-byte datagram wedged ESP32 EXTUDP receive
+  permanently (`WiFiUdp` unread-buffer semantics); `flush()` drain + marker; Heltec before/after
+  0/40 -> 40/40 picked up.
+- **PT-01: all eight parser findings fixed**, every pinned `TEST_IGNORE` now a real assertion
+  (`native_parsers` 24, `native_extern` 32, `native_xml` 11, 0 skips). Notables: mheard date is
+  10 chars (`YYYY-MM-DD`), timezone `-03:30` converts to -3.5, NUL in `msg`/`dst` is rejected,
+  `val` sized 163 so max dst+msg ships complete, `"none"` is a legal message text again.
+- **MEM-01 done** (commit `861f2967`): `resource_watch.py dram` + hard CI gate at 4 kB;
+  classic-ESP32 rings 30/25 -> 20/20; headroom E22 11,896 B, T-Beam 10,712 B. **MEM-02**
+  (rings -> boot-time heap, ~28 kB) is parked in §3.8m pending the risk assessment.
 
 ## 2026-08-30 late: Wave 2 (BP-01, CS-03, TM-39, TM-40, TM-41)
 

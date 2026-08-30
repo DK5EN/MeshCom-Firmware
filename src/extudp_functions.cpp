@@ -242,7 +242,14 @@ void getExtern(unsigned char incoming[], int len)
       return;
   #endif
 
-    char val[160+1] = {0};
+  // PT-01 finding 5: the frame below is ":{" + dst + "}" + msg. dst is
+  // allowed up to 9 characters and msg up to 150, so the true maximum is
+  // 2 + 9 + 1 + 150 + NUL = 163 bytes. The old char[161] with a hard-coded
+  // snprintf() bound of 160 silently dropped the last 3 characters at both
+  // maxima. sendMessage() takes an explicit length and clamps at 199, and
+  // the frame body limit further downstream is UDP_TX_BUF_SIZE (255), so
+  // the full 162-character frame passes unchanged.
+  char val[2 + 9 + 1 + 150 + 1] = {0};
   struct aprsMessage aprsmsg;
 
   // Decode
@@ -254,7 +261,12 @@ void getExtern(unsigned char incoming[], int len)
 
   aprsmsg.msg_source_path="HOME";
   aprsmsg.msg_destination_path="*";
-  aprsmsg.msg_payload="none";
+  // PT-01 finding 4: msg_payload used to be pre-set to the literal "none" as
+  // an internal "nothing set yet" marker, which a later `== "none"` check
+  // then read back -- so a legitimate message whose text is exactly "none"
+  // was dropped. Presence is decided by the JSON itself below (a missing key
+  // yields a null variant), not by a magic payload value.
+  aprsmsg.msg_payload="";
 
   //Serial.printf("len:%i icomming:%s vgldst:%s vglmsg:%s\n", len, incoming, vgldst, vglmsg);
 
@@ -279,8 +291,23 @@ void getExtern(unsigned char incoming[], int len)
 // FIX — Null-Checks einfügen:
   const char* dst = inputJson["dst"];
   const char* msg = inputJson["msg"];
+  // The presence test (PT-01 finding 4): a key that is absent -- or holds
+  // anything but a string -- yields a null variant, hence a null pointer
+  // here. Presence is decided here and nowhere else; every value that does
+  // arrive, the string "none" included, is real payload.
   if(!dst || !msg) {
     Serial.println("[EXT] missing dst/msg");
+    return;
+  }
+  // PT-01 finding 6: an embedded \u0000 decodes to a real NUL byte inside
+  // the JSON string, but everything below reads the value as a C string --
+  // the strlen() checks, the Arduino String assignment and snprintf("%s")
+  // all stop at that byte, and the frame would ship silently shortened. A NUL
+  // cannot survive this pipeline, so reject the datagram like any other
+  // malformed input instead of truncating it in silence.
+  if(inputJson["dst"].as<JsonString>().size() != strlen(dst) ||
+     inputJson["msg"].as<JsonString>().size() != strlen(msg)) {
+    Serial.println("[EXT] NUL in payload");
     return;
   }
   if(strlen(dst) < 1 || strlen(dst) > 9 || strlen(msg) < 1 || strlen(msg) > 150) {
@@ -292,13 +319,10 @@ void getExtern(unsigned char incoming[], int len)
   
   //Serial.printf("aprsmsg.msg_destination_path:%s aprsmsg.msg_payload:%s\n", aprsmsg.msg_destination_path, aprsmsg.msg_payload);
 
-  if(aprsmsg.msg_payload == "none")
-  {
-    Serial.println("wrong JSON to send message");
-    return;
-  }
-  
-  snprintf(val,160, ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
+  // val is sized for the largest frame the checks above can let through, and
+  // snprintf() is bounded by that size -- no truncation is possible here any
+  // more (PT-01 finding 5).
+  snprintf(val, sizeof(val), ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
 
   // BP-01: tag the origin so a QRS/QRT/QTA goes back on this socket and
   // nowhere else. Cleared right after -- everything that does not set this
@@ -368,6 +392,24 @@ void getExternUDP()
     if (packetExtSize > 0)
     {
       len = UdpExtern.read(incomingExtPacket, UDP_TX_BUF_SIZE - 1);
+
+      // UDP-02 (docs/bench-extudp-regression.md §6): we read at most
+      // UDP_TX_BUF_SIZE-1 = 254 bytes, so a datagram of 255 bytes or more
+      // leaves a remainder in the socket. On arduino-esp32 that is fatal:
+      // WiFiUDP::parsePacket() returns 0 while an unread rx_buffer is still
+      // held, and the buffer is freed only once it has been read to the end
+      // -- one oversized datagram therefore kills EXTUDP receive until the
+      // next reboot, silently, while sending keeps working. Dropping the
+      // remainder keeps the socket usable; the part we did read is still
+      // handed to getExtern(), which rejects it like any other malformed
+      // input. WiFiUDP::flush() discards the held buffer; EthernetUDP
+      // (RAK/W5100S) never wedges in the first place -- its parsePacket()
+      // discards the remainder itself -- and its flush() is a no-op there.
+      if (packetExtSize > len)
+      {
+        UdpExtern.flush();
+        Serial.printf("[EXT] oversized datagram drained: %d of %d bytes read\n", len, packetExtSize);
+      }
     }
   }
 
@@ -377,6 +419,17 @@ void getExternUDP()
 
     getExtern(incomingExtPacket, len);
 
+    // UDP-01 (BACKLOG #3.8l) / TM-43: fork-only stack instrument. The inbound
+    // path getExternUDP() -> getExtern() (char val[163] + JsonDocument on the
+    // stack) -> sendMessage() -> sendExtern() is the DEEPEST EXTUDP path and
+    // the only one N-22 never measured; on nRF52 it runs in the 4 KB loop task
+    // (LOOP_STACK_SZ, Adafruit core). Printed right after the call returns, so
+    // the watermark still carries the low-water mark of that call. Raw
+    // Serial.printf on purpose: printfdeb() is gated on --debug and DEBUG_MSG
+    // compiles away entirely (memory debug-msg-compiles-away).
+    // Unit note: nRF52/FreeRTOS returns WORDS (x4 = bytes), ESP32 returns bytes.
+    Serial.printf("[EXT];rx;len;%d;stack_hwm;%u;ms;%lu\n", len,
+                  (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
   }
 }
 #endif // !NATIVE_BUILD
@@ -659,6 +712,12 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     Serial.printf("%s\n", c_json);
     Serial.printf("%s\n", c_tjson);
   }
+
+  // UDP-01 / TM-43, outbound counterpart of the [EXT];rx line above: this is
+  // the path N-22 measured (watermark 0 at its deepest point before the fix
+  // moved c_json/c_tjson into BSS on nRF52). Same line format, same units.
+  Serial.printf("[EXT];tx;len;%u;stack_hwm;%u;ms;%lu\n", (unsigned)strlen(c_json),
+                (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
 }
 
 void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)

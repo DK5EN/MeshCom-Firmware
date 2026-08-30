@@ -1073,6 +1073,14 @@ Fix gesetzt. Boot-Log zeigt seit `6003e90c` die Reset-Ursache
 (`[BOOT] RESETREAS=…`), was kuenftige Vorfaelle dieser Klasse sofort als Absturz
 ausweist — und bei genau dieser Diagnose der Schluessel war.
 
+> **Wiedermeldung 2026-08-30 (`UDP-01`, BACKLOG §3.8l):** ein Operator meldet aus zweiter Hand,
+> `--extudp on` toete einen RAK. Nicht reproduziert. Der Fix von N-22 (Puffer in BSS) steht
+> nachgeprueft sowohl auf diesem Branch als auch in `upstream/dev`; der **eingehende** Pfad
+> `getExternUDP()` → `getExtern()` (`char val[161]` + `JsonDocument` auf dem Stack) →
+> `sendMessage()` → `sendExtern()` ist allerdings tiefer als der hier gemessene und wurde nie
+> gemessen. Erste Massnahme dort ist dieselbe Watermark-Messung. Der Regressionstest ueber
+> beide Richtungen ist `TM-43`.
+
 ### N-23 — `--extudp on` ohne Gateway/Webserver brickt den nRF52-Node dauerhaft — **FIXED (`b62976c9`, auf Hardware reproduziert und verifiziert)** — High
 
 Neu gefunden 2026-08-22 bei der Bench-Verifikation des N-12-Fixes (nach
@@ -1099,6 +1107,14 @@ antwortet; mit Gateway on danach voller Betrieb. Dies ist der erste Teil des
 N-20-Backlogs (Netzwerk-Pfade an Link-/HW-Status koppeln); die
 W5100S-Bibliotheks-Warteschleifen selbst bleiben ungehaertet (siehe
 N-20-BACKLOG-Box).
+
+> **Wiedermeldung 2026-08-30 (`UDP-01`, BACKLOG §3.8l):** der Fix (`neth.hasIPaddress`-Gate)
+> steht auch in `upstream/dev`. Nebenwirkung, die zur Meldung passen kann: mit Gateway und
+> Webserver aus wird der W5100S nie initialisiert, also laeuft `startExternUDP()` nie,
+> `hasExternIPaddress` bleibt `false` und EXTUDP ist **lautlos tot** statt abgestuerzt — kein
+> Datagramm in beide Richtungen, keine Fehlermeldung. Ob das Setup-Gate
+> (`nrf52_main.cpp:1086`) um `bEXTUDP` erweitert werden soll, ist offen und darf nicht ohne
+> Hardware-Praesenzpruefung und `TM-43` angefasst werden — es ist genau diese Tuer.
 
 ---
 

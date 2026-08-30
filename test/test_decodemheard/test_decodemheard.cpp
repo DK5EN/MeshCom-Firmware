@@ -20,15 +20,16 @@
 //
 // decodeMHeard() scannt NUR die ersten 55 der 60 Puffer-Bytes (siehe
 // src/mheard_functions.cpp, `for(int iset=0; iset<55; iset++)`), und trennt
-// Felder ausschliesslich durch das naechste '|'. Zwei Eigenheiten daraus
-// werden unten gezielt geprueft, nicht nur der Wohlfall:
+// Felder ausschliesslich durch das naechste '|'. Zwei ehemalige PT-01-Findings
+// (jetzt behoben) werden unten gezielt geprueft, nicht nur der Wohlfall:
 //
-//   * Case 1/2 (mh_date/mh_time) haengen mit concat() an -- ein fehlendes
-//     '|' laesst sie ALLES bis zum Scan-Ende aufsaugen statt sauber
-//     abzubrechen.
-//   * Case 3 (mh_payload_type) wird bei JEDEM Byte ueberschrieben (kein
-//     concat()) -- ein Byte NACH dem eigentlichen Typbyte, aber VOR dem
-//     naechsten '|', ersetzt es wieder.
+//   * Case 1/2 (mh_date/mh_time) haengen mit concat() an; ohne bindendes '|'
+//     saugten sie vormals ALLES bis zum Scan-Ende auf. Beide sind jetzt auf
+//     ihre feste Encoder-Breite gedeckelt (mh_date 10 = "YYYY-MM-DD",
+//     mh_time 8 = "HH:MM:SS").
+//   * Case 3 (mh_payload_type) wurde vormals bei JEDEM Byte ueberschrieben
+//     (kein concat()) -- ein Byte NACH dem eigentlichen Typbyte, aber VOR dem
+//     naechsten '|', ersetzte es wieder. Jetzt gewinnt nur das erste Byte.
 //
 //   pio test -e native_parsers -f test_decodemheard
 
@@ -144,27 +145,18 @@ static void test_payload_type_text(void)
     TEST_ASSERT_EQUAL_CHAR(':', mh.mh_payload_type);
 }
 
-// PT-01 Finding: fehlt das '|' NACH dem Typbyte (Datensatz endet mitten im
-// Feld 4, wie es ein abgeschnittener/beschaedigter Ringbuffer-Slot koennte),
-// bleibt itype auf 3 stehen -- und case 3 schreibt (anders als case 1/2, die
-// concat()en) bei JEDEM weiteren Byte ueberschreibend auf mh_payload_type.
-// Die restlichen Slot-Bytes sind bei einem echten Ringbuffer-Eintrag exakt
-// dieselben Nullen wie initMheard()s memset() sie hinterlaesst -- das letzte
-// davon "gewinnt": mh_payload_type landet auf 0x00 statt auf dem
-// tatsaechlich gesendeten Typbyte '!'. Kein Speicherfehler (Slot ist 60 Byte,
-// die Schleife scannt nur 55), aber ein plausibel aussehendes Feld wird
-// durch einen abgeschnittenen Datensatz stillschweigend geloescht statt
-// erkennbar leer/ungueltig zu bleiben.
-static void test_fehlendes_pipe_nach_typbyte_loescht_es(void)
+// PT-01 Finding 2 (FIXED): fehlt das '|' NACH dem Typbyte (Datensatz endet
+// mitten im Feld 4, wie es ein abgeschnittener/beschaedigter Ringbuffer-Slot
+// koennte), bleibt itype auf 3 stehen. Case 3 nahm vormals (anders als case
+// 1/2, die concat()en) bei JEDEM weiteren Byte ueberschreibend das letzte
+// gescannte Byte -- bei einem echten Ringbuffer-Eintrag exakt die Nullen,
+// die initMheard()s memset() hinterlaesst, sodass mh_payload_type auf 0x00
+// statt auf dem tatsaechlich gesendeten Typbyte landete. decodeMHeard()
+// nimmt jetzt nur das ERSTE gescannte Byte des Feldes (Guard auf dem
+// initMheardLine()-Default 0x00) und laesst nachfolgende Bytes im selben
+// Feld unangetastet.
+static void test_fehlendes_pipe_nach_typbyte_behaelt_erstes_byte(void)
 {
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: decodeMHeard()'s case-3 handling (mh_payload_type, "
-        "src/mheard_functions.cpp ~L136) overwrites on every scanned byte "
-        "instead of stopping at the first one -- a record truncated right "
-        "after the type byte (no closing '|') loses it to the zero padding "
-        "that follows in a real ring-buffer slot. Not memory-unsafe, not "
-        "fixed here.");
-
     unsigned char slot[sizeof(mheardBuffer[0])];
     memset(slot, 0x00, sizeof(slot));
     // "20260830|101112|!" gefolgt von Nullen -- KEIN weiteres '|' im Slot.
@@ -173,27 +165,21 @@ static void test_fehlendes_pipe_nach_typbyte_loescht_es(void)
     struct mheardLine mh;
     decodeMHeard(slot, mh);
 
-    TEST_ASSERT_EQUAL_CHAR(0x00, mh.mh_payload_type);   // NICHT '!'
+    TEST_ASSERT_EQUAL_CHAR('!', mh.mh_payload_type);   // NICHT von der Nullpolsterung ueberschrieben
 }
 
-// PT-01 Finding: fehlt das '|' NACH dem Datum (case 1 haengt per concat()
-// an), saugt mh_date jedes weitere Byte im 55-Byte-Scanfenster auf --
-// einschliesslich eingebetteter NUL-Bytes aus der Nullpolsterung. Ein String
-// mit eingebetteten NUL ist fuer die Arduino-String-Klasse selbst
-// unproblematisch (laengenbasiert, kein C-String), aber jeder Aufrufer, der
-// mh_date.c_str() spaeter als C-String behandelt (z.B. fuer eine feste
-// Breite formatiert, siehe showMHeard()s "%-10.10s"), sieht nur das erste
-// Zeichen bis zum ersten eingebetteten NUL.
-static void test_fehlendes_pipe_nach_datum_haengt_alles_an(void)
+// PT-01 Finding 3 (FIXED): fehlt das '|' NACH dem Datum, haengte case 1 per
+// concat() vormals jedes weitere Byte im 55-Byte-Scanfenster an mh_date an --
+// einschliesslich eingebetteter NUL-Bytes aus der Nullpolsterung. mh_date ist
+// aber fest breit ("YYYY-MM-DD", siehe getDateString() in loop_functions.cpp,
+// dem einzigen Schreiber ueber updateMheard()s snprintf-Format; showMHeard()s
+// "%-10.10s"-Ausgabe bestaetigt die 10-Zeichen-Breite). decodeMHeard() deckelt
+// case 1 jetzt bei 10 Zeichen. Dieser Vektor liefert nur 8 Nutz-Zeichen
+// ("20260830") gefolgt von Nullpolsterung -- die ersten beiden Nullbytes
+// werden noch mitgenommen (Laenge 10), der Rest des 55-Byte-Fensters nicht
+// mehr.
+static void test_fehlendes_pipe_nach_datum_wird_bei_zehn_zeichen_gekappt(void)
 {
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: decodeMHeard()'s case-1 handling (mh_date, "
-        "src/mheard_functions.cpp ~L133) has no closing delimiter to stop "
-        "at if the record has no '|' at all -- it concatenates every byte "
-        "in the 55-byte scan window, including embedded NUL padding, into "
-        "mh_date instead of leaving it at the intended value. Not "
-        "memory-unsafe, not fixed here.");
-
     unsigned char slot[sizeof(mheardBuffer[0])];
     memset(slot, 0x00, sizeof(slot));
     memcpy(slot, "20260830", 8);   // kein '|' im ganzen Slot
@@ -201,7 +187,8 @@ static void test_fehlendes_pipe_nach_datum_haengt_alles_an(void)
     struct mheardLine mh;
     decodeMHeard(slot, mh);
 
-    TEST_ASSERT_EQUAL_size_t(55u, mh.mh_date.length());   // haette 8 sein sollen
+    TEST_ASSERT_EQUAL_size_t(10u, mh.mh_date.length());              // "YYYY-MM-DD"-Breite, NICHT 55
+    TEST_ASSERT_EQUAL_STRING("20260830", mh.mh_date.substring(0, 8).c_str());
 }
 
 // Datensatz mit fehlenden Endfeldern: date/time/type UND die ersten paar
@@ -239,8 +226,8 @@ static void test_datensatz_mit_fehlenden_endfeldern(void)
 }
 
 // Garbage-Bytes: ein Slot aus lauter 0xFF (kein einziges '|', keine
-// druckbaren ASCII-Zeichen) darf nicht abstuerzen. Dieselbe Konsequenz wie
-// beim fehlenden Pipe nach dem Datum (case 1 saugt alles auf), hier mit
+// druckbaren ASCII-Zeichen) darf nicht abstuerzen. Dieselbe 10-Zeichen-
+// Deckelung wie beim fehlenden Pipe nach dem Datum greift auch hier, mit
 // nicht-druckbaren statt Null-Bytes.
 static void test_garbage_bytes_stuerzt_nicht_ab(void)
 {
@@ -250,7 +237,7 @@ static void test_garbage_bytes_stuerzt_nicht_ab(void)
     struct mheardLine mh;
     decodeMHeard(slot, mh);   // darf nicht abstuerzen/haengen
 
-    TEST_ASSERT_EQUAL_size_t(55u, mh.mh_date.length());   // siehe Finding oben: alles landet in mh_date
+    TEST_ASSERT_EQUAL_size_t(10u, mh.mh_date.length());   // "YYYY-MM-DD"-Breite deckelt case 1, nicht 55
 }
 
 int main(int argc, char **argv)
@@ -260,8 +247,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_wohlgeformter_datensatz_alle_elf_felder);
     RUN_TEST(test_negativer_rssi_und_snr);
     RUN_TEST(test_payload_type_text);
-    RUN_TEST(test_fehlendes_pipe_nach_typbyte_loescht_es);
-    RUN_TEST(test_fehlendes_pipe_nach_datum_haengt_alles_an);
+    RUN_TEST(test_fehlendes_pipe_nach_typbyte_behaelt_erstes_byte);
+    RUN_TEST(test_fehlendes_pipe_nach_datum_wird_bei_zehn_zeichen_gekappt);
     RUN_TEST(test_datensatz_mit_fehlenden_endfeldern);
     RUN_TEST(test_garbage_bytes_stuerzt_nicht_ab);
     return UNITY_END();

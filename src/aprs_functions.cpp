@@ -559,6 +559,14 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     {
         if(PayloadBuffer.charAt(itxt) == 'N' || PayloadBuffer.charAt(itxt) == 'S' || ipt > 10)
         {
+            // ipt>10 alone is an overrun brake, not a hemisphere match --
+            // only accept the byte at the cut-off as lat_c/aprs_group when it
+            // really is 'N'/'S'. Otherwise reject the position (keep the
+            // initAPRSPOS() defaults) instead of reading a fabricated
+            // hemisphere/group byte and an 11-digit fantasy lat.
+            if(PayloadBuffer.charAt(itxt) != 'N' && PayloadBuffer.charAt(itxt) != 'S')
+                return 0x00;
+
             decode_text[ipt]=0x00;
 
             sscanf(decode_text, "%lf", &aprspos.lat);
@@ -587,6 +595,10 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     {
         if(PayloadBuffer.charAt(itxt) == 'W' || PayloadBuffer.charAt(itxt) == 'E' || ipt > 10)
         {
+            // Same overrun-vs-hemisphere check as the latitude loop above.
+            if(PayloadBuffer.charAt(itxt) != 'W' && PayloadBuffer.charAt(itxt) != 'E')
+                return 0x00;
+
             decode_text[ipt]=0x00;
 
             sscanf(decode_text, "%lf", &aprspos.lon);

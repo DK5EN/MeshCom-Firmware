@@ -155,6 +155,8 @@ prerequisites (`--gateway on` on the three ESP32 nodes) and pass criteria:
   [`bench-country-servers.md`](bench-country-servers.md).
 - T-Deck display: `python3 tools/bench/tdeck_harness.py --scenario disptest` --
   [`tdeck-display-test.md`](tdeck-display-test.md).
+- EXTUDP (TM-43): `cd tools/bench/runs && python3 ../rak_harness.py --scenario extudp --port <port> [--peer-port <port>] [--soak-seconds 600]` --
+  [`bench-extudp-regression.md`](bench-extudp-regression.md). Not part of `--scenario all`.
 - Back-pressure (BP-01): `::{TEST}...` burst on the console, assert `[BP];notice;QRS|QRT|QRV` and
   `[BP];refuse` lines; QTA needs relay load (`gwflood.py`) on top.
 

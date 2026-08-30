@@ -284,6 +284,134 @@ static void test_zu_langes_msg_wird_ohne_ueberlauf_verworfen(void)
     TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
 }
 
+// ------------------------------------- TM-43: Grenzwerte und Transportgroessen
+// Die sechs Ablehnungsvektoren aus BACKLOG #3.8l (TM-43) laufen am Bench als
+// UDP-Datagramme gegen die echte Node (tools/bench/extudp_peer.py,
+// rejection_vectors()); hier stehen die, die sich nativ am Parser pruefen
+// lassen -- gleiche Nutzlasten, ohne Hardwarezeit.
+
+static bool serialContains(const char *needle)
+{
+    return Serial.captured().find(needle) != std::string::npos;
+}
+
+static void test_dst_grenze_9_zeichen_wird_akzeptiert(void)
+{
+    // Genau AUF der Schranke (strlen(dst) > 9 verwirft): 9 Zeichen muessen
+    // durch. Der 10-Zeichen-Fall darueber ist bereits abgedeckt -- dieses
+    // Paar pinnt die Grenze von beiden Seiten, damit ein "> 9" -> ">= 9"
+    // Vertipper im Firmware-Code nicht unbemerkt bleibt.
+    callGetExtern(R"({"type":"msg","dst":"123456789","msg":"an der Grenze"})");
+
+    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_STRING(":{123456789}an der Grenze", g_sent_msg_text.c_str());
+}
+
+static void test_dst_grenze_10_zeichen_wird_verworfen_und_geloggt(void)
+{
+    callGetExtern(R"({"type":"msg","dst":"1234567890","msg":"eins zuviel"})");
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+    // TM-43: jeder Ablehnungsfall MUSS eine Spur auf der Konsole hinterlassen
+    // -- am Bench ist genau diese Zeile der Beweis, dass die Node das
+    // Datagramm gesehen und bewusst verworfen hat (statt zu sterben).
+    TEST_ASSERT_TRUE(serialContains("[EXT] invalid lengths"));
+}
+
+static void test_msg_grenze_150_zeichen_wird_akzeptiert(void)
+{
+    // 150 Zeichen mit kurzem dst: der Rahmen ":{A}" + 150 = 154 Zeichen passt
+    // vollstaendig in val[161] -- keine stille Kuerzung (anders als FUND 2,
+    // das dst UND msg gleichzeitig auf Maximum setzt).
+    std::string msg(150, 'M');
+    callGetExtern(std::string(R"({"type":"msg","dst":"A","msg":")") + msg + R"("})");
+
+    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_INT((int)(4 + 150), g_sent_msg_len);
+    TEST_ASSERT_EQUAL_STRING((":{A}" + msg).c_str(), g_sent_msg_text.c_str());
+}
+
+static void test_msg_grenze_151_zeichen_wird_verworfen_und_geloggt(void)
+{
+    std::string msg(151, 'M');
+    callGetExtern(std::string(R"({"type":"msg","dst":"A","msg":")") + msg + R"("})");
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+    TEST_ASSERT_TRUE(serialContains("[EXT] invalid lengths"));
+}
+
+static void test_volles_255_byte_datagramm_wird_wie_die_node_auf_254_gekuerzt(void)
+{
+    // Transportgrenze: getExternUDP() liest hoechstens UDP_TX_BUF_SIZE-1 = 254
+    // Bytes (extudp_functions.cpp: UdpExtern.read(incomingExtPacket,
+    // UDP_TX_BUF_SIZE - 1)) und setzt danach incomingExtPacket[len] = 0. Ein
+    // Datagramm von exakt 255 B -- der Vektor full_255_byte_datagram in
+    // tools/bench/extudp_peer.py -- verliert also sein letztes Byte, hier die
+    // schliessende Klammer. Erwartung: sauberer Parserfehler mit Logzeile,
+    // kein Ueberlauf, kein Absturz.
+    std::string head = R"({"type":"msg","dst":"TEST","msg":")";
+    std::string tail = R"("})";
+    std::string full = head + std::string(255 - head.size() - tail.size(), 'F') + tail;
+    TEST_ASSERT_EQUAL_INT(255, (int)full.size());
+
+    callGetExtern(full, 254);      // genau so viel, wie die Node lesen wuerde
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+    TEST_ASSERT_TRUE(serialContains("deserializeJson() failed"));
+}
+
+static void test_volles_254_byte_datagramm_wird_vollstaendig_verarbeitet(void)
+{
+    // Gegenprobe zum Fall darueber: 254 B sind die groesste Nutzlast, die
+    // ungekuerzt bei getExtern() ankommt. Mit einer msg innerhalb der
+    // 150-Zeichen-Schranke (Rest als ignoriertes Zusatzfeld) muss sie
+    // vollstaendig verarbeitet werden -- die Groesse allein darf nichts
+    // verwerfen.
+    std::string msg(150, 'M');
+    std::string head = std::string(R"({"type":"msg","dst":"TEST","msg":")") + msg
+                       + R"(","pad":")";
+    std::string tail = R"("})";
+    std::string full = head + std::string(254 - head.size() - tail.size(), 'P') + tail;
+    TEST_ASSERT_EQUAL_INT(254, (int)full.size());
+
+    callGetExtern(full, 254);
+
+    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_STRING((":{TEST}" + msg).c_str(), g_sent_msg_text.c_str());
+}
+
+static void test_mitten_im_json_abgeschnittenes_datagramm_wird_verworfen_und_geloggt(void)
+{
+    // TM-43-Vektor truncated_mid_json: die erste Haelfte eines gueltigen
+    // Rahmens, wie ihn ein abgerissener Sender schicken wuerde. Anders als
+    // test_len_kuerzer_als_puffer... traegt der Puffer hier auch physisch
+    // nichts mehr hinter len -- der Parser darf trotzdem nicht ueber das
+    // Pufferende hinauslaufen.
+    std::string full = R"({"type":"msg","dst":"TEST","msg":"truncated case"})";
+    std::string half = full.substr(0, full.size() / 2);
+
+    callGetExtern(half);
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_INT(0, g_sendPosition_calls);
+    TEST_ASSERT_TRUE(serialContains("deserializeJson() failed"));
+}
+
+static void test_fehlendes_dst_und_fehlendes_msg_werden_geloggt(void)
+{
+    // Die beiden uebrigen TM-43-Ablehnungsvektoren: das Verwerfen ist oben
+    // schon gepinnt, hier zusaetzlich die Logspur, auf die die Bench-Probe
+    // pro Vektor wartet.
+    callGetExtern(R"({"type":"msg","msg":"kein dst"})");
+    TEST_ASSERT_TRUE(serialContains("[EXT] missing dst/msg"));
+
+    Serial.clear();
+    callGetExtern(R"({"type":"msg","dst":"TEST"})");
+    TEST_ASSERT_TRUE(serialContains("[EXT] missing dst/msg"));
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+}
+
 // ------------------------------------------------ len wird respektiert
 
 static void test_len_kuerzer_als_puffer_bricht_den_parse_sauber_ab(void)
@@ -338,89 +466,74 @@ static void test_tele_numerisches_feld_als_json_string(void)
 }
 
 // ====================================================================
-// PT-01-Funde: echte Fehlverhalten, NICHT behoben (Brief-Regel 4) --
-// als fehlschlagende, ignorierte Faelle dokumentiert.
+// PT-01-Funde 4-6 -- in getExtern() behoben, hier als echte Assertions
+// gepinnt (vor dem Fix waren es TEST_IGNORE_MESSAGE-Faelle).
 // ====================================================================
 
-// FUND 1 -- Sentinel-Kollision: aprsmsg.msg_payload wird mit "none" als
-// "nichts gesetzt"-Marker initialisiert (extudp_functions.cpp:~248). Ein
-// legitimes JSON-Feld "msg":"none" landet nach der Zuweisung im selben
-// String und wird von der nachfolgenden Pruefung
-// `if(aprsmsg.msg_payload == "none")` als "kein Payload gesetzt"
-// missverstanden -- die Nachricht wird verworfen, obwohl dst und msg beide
-// gueltig, vorhanden und im Laengenlimit waren.
-static void test_FUND_msg_gleich_sentinel_none_wird_still_verworfen(void)
+// FUND 4 -- Sentinel-Kollision, BEHOBEN: aprsmsg.msg_payload wurde mit dem
+// Literal "none" als interner "nichts gesetzt"-Marker vorbelegt, den eine
+// spaetere Pruefung `if(aprsmsg.msg_payload == "none") return;` wieder
+// auslas. Eine legitime Nachricht mit genau dem Text "none" kollidierte
+// damit und wurde wortlos verworfen. Die Anwesenheit entscheidet jetzt
+// allein das JSON (fehlender Schluessel -> null-Variant -> Nullzeiger),
+// "none" ist damit gewoehnlicher Text und muss wie jeder andere raus.
+static void test_msg_gleich_none_ist_gueltiger_text_und_wird_gesendet(void)
 {
     callGetExtern(R"({"type":"msg","dst":"OE5BYE-1","msg":"none"})");
 
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: getExtern() (extudp_functions.cpp ~L242, ~L275) "
-        "initializes aprsmsg.msg_payload to the literal string \"none\" as its "
-        "own \"nothing set yet\" sentinel, then -- after validating and "
-        "assigning dst/msg from the JSON -- checks "
-        "`if(aprsmsg.msg_payload == \"none\") return;`. A legitimate JSON "
-        "message whose text is exactly \"none\" (dst and msg both present and "
-        "within the length limits) collides with that sentinel: "
-        "sendMessage() is never called, no error is logged beyond a "
-        "misleading \"wrong JSON to send message\" line, and the sender gets "
-        "no indication their message was dropped. Not fixed here (tests "
-        "only, per brief).");
+    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_STRING(":{OE5BYE-1}none", g_sent_msg_text.c_str());
+    TEST_ASSERT_EQUAL_INT((int)strlen(":{OE5BYE-1}none"), g_sent_msg_len);
 }
 
-// FUND 2 -- Stille Kuerzung bei kombinierter Maximallaenge: dst darf bis zu
-// 9 Zeichen, msg bis zu 150 Zeichen lang sein (je einzeln geprueft). Der
-// Ausgaberahmen ":{%s}%s" wird aber mit `snprintf(val, 160, ...)` in einen
-// char val[161] geschrieben. Bei maximaler dst- UND msg-Laenge braucht der
-// Rahmen 3+9+150 = 162 Zeichen -- mehr als die 159 Nutzzeichen, die
-// snprintf(...,160,...) schreiben darf. snprintf selbst ist bounds-sicher
-// (kein Speicherueberlauf), ABER: der Rueckgabewert wird nicht geprueft,
-// und die letzten Zeichen der Nachricht werden ersatzlos und ohne jede
-// Fehlermeldung abgeschnitten, bevor sendMessage() sie verschickt.
-static void test_FUND_maximale_dst_und_msg_laenge_kuerzt_still_im_val_puffer(void)
+// FUND 5 -- Stille Kuerzung bei kombinierter Maximallaenge, BEHOBEN: dst
+// darf bis zu 9 Zeichen, msg bis zu 150 Zeichen lang sein (je einzeln
+// geprueft), der Rahmen ":{dst}msg" braucht bei beiden Maxima aber
+// 2+9+1+150 = 162 Zeichen -- das alte `snprintf(val, 160, ...)` in einen
+// char val[161] konnte davon nur 159 schreiben und liess die letzten 3
+// Zeichen ersatzlos verschwinden. val ist jetzt auf das echte Maximum
+// dimensioniert (2+9+1+150+NUL = 163) und snprintf durch sizeof(val)
+// begrenzt: der Rahmen muss vollstaendig bei sendMessage() ankommen.
+static void test_maximale_dst_und_msg_laenge_kommt_vollstaendig_an(void)
 {
     std::string dst(9, '1');            // an der 9-Zeichen-Schranke
     std::string msg(150, 'M');          // an der 150-Zeichen-Schranke
     callGetExtern(std::string(R"({"type":"msg","dst":")") + dst + R"(","msg":")" + msg + R"("})");
 
-    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);   // sent -- just not all of msg, see below
+    const std::string expected = ":{" + dst + "}" + msg;
+    TEST_ASSERT_EQUAL_INT(162, (int)expected.size());   // 2 + 9 + 1 + 150
 
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: dst is allowed up to 9 chars and msg up to 150 chars "
-        "(each checked separately in getExtern()), but the \":{dst}msg\" "
-        "frame needs 3+len(dst)+len(msg) bytes -- 162 at both maxima -- and "
-        "`snprintf(val, 160, ...)` (extudp_functions.cpp ~L297, val is "
-        "char[161]) can write only 159 of them. snprintf's own size bound "
-        "keeps this memory-safe (no overrun), but its return value is never "
-        "checked: the last 3 characters of msg are silently dropped from the "
-        "sent frame, with no error surfaced to the caller or the LAN sender. "
-        "Not fixed here (tests only, per brief).");
+    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);
+    TEST_ASSERT_EQUAL_INT(162, g_sent_msg_len);         // nichts unterwegs verloren
+    TEST_ASSERT_EQUAL_STRING(expected.c_str(), g_sent_msg_text.c_str());
 }
 
-// FUND 3 -- Eingebettetes NUL im msg-Feld: \u0000 innerhalb der
-// JSON-Payload dekodiert korrekt zu einem rohen NUL-Byte, aber
-// inputJson["msg"] liefert einen C-String (const char*), und jede
-// nachfolgende Verarbeitung (strlen() fuer die Laengenpruefung, die
-// Arduino-String-Zuweisung aprsmsg.msg_payload = msg, und am Ende
-// snprintf("%s", ...)) terminiert an genau diesem Byte. Alles nach dem
-// eingebetteten NUL wird kommentarlos verschluckt -- exakt der
-// "eine Byte, das die Bedeutung jedes strlen/snprintf/String aendert"-Fall,
-// den der PT-01-Testmassstab (BACKLOG.md #3.8j) benennt.
-static void test_FUND_eingebettetes_nul_im_msg_kuerzt_still(void)
+// FUND 6 -- Eingebettetes NUL im msg-Feld, BEHOBEN: \u0000 innerhalb der
+// JSON-Payload dekodiert zu einem rohen NUL-Byte, aber inputJson["msg"]
+// liefert einen C-String, und jede nachfolgende Verarbeitung (strlen() fuer
+// die Laengenpruefung, die Arduino-String-Zuweisung, das abschliessende
+// snprintf("%s", ...)) terminiert an genau diesem Byte -- alles dahinter
+// wurde kommentarlos verschluckt. Ein NUL ueberlebt diese Kette nicht, also
+// wird das Datagramm jetzt komplett abgelehnt: die rohe JSON-Laenge
+// (JsonString::size()) wird gegen strlen() geprueft, eine Abweichung wird
+// verworfen und geloggt wie jeder andere Ablehnungsvektor.
+static void test_eingebettetes_nul_im_msg_wird_verworfen_und_geloggt(void)
 {
     callGetExtern(R"({"type":"msg","dst":"OE5BYE-1","msg":"ab\u0000cd"})");
 
-    TEST_ASSERT_EQUAL_INT(1, g_sendMessage_calls);   // sent -- just a truncated payload
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);   // abgelehnt, NICHT still gekuerzt
+    TEST_ASSERT_TRUE(serialContains("[EXT] NUL in payload"));
+}
 
-    TEST_IGNORE_MESSAGE(
-        "PT-01 finding: msg=\"ab\\u0000cd\" JSON-decodes to a 5-byte payload "
-        "(\"ab\", NUL, \"cd\"), but getExtern() reads inputJson[\"msg\"] as a "
-        "const char* and every step downstream -- the strlen() length check, "
-        "the Arduino String assignment aprsmsg.msg_payload = msg, and the "
-        "final snprintf(\"%s\",...) building val -- stops at the embedded "
-        "NUL. \"cd\" is silently dropped: sendMessage() ships "
-        "\":{OE5BYE-1}ab\" (13 bytes) instead of a frame carrying the "
-        "sender\'s full 5-byte payload, and nothing signals the truncation. "
-        "Not fixed here (tests only, per brief).");
+// Dieselbe Pruefung auf dem anderen Feld: ein NUL in dst wuerde das
+// Zielrufzeichen still verkuerzen (":{OE}" statt ":{OE5BYE-1}") und die
+// Nachricht fehlleiten -- faellt auf genau demselben Test heraus.
+static void test_eingebettetes_nul_im_dst_wird_verworfen_und_geloggt(void)
+{
+    callGetExtern(R"({"type":"msg","dst":"OE\u0000BYE-1","msg":"text"})");
+
+    TEST_ASSERT_EQUAL_INT(0, g_sendMessage_calls);
+    TEST_ASSERT_TRUE(serialContains("[EXT] NUL in payload"));
 }
 
 int main(int argc, char **argv)
@@ -450,6 +563,16 @@ int main(int argc, char **argv)
     RUN_TEST(test_zu_langes_dst_wird_verworfen);
     RUN_TEST(test_zu_langes_msg_wird_ohne_ueberlauf_verworfen);
 
+    // TM-43: Grenzwerte beidseitig und die Transportgroessen des Datagramms
+    RUN_TEST(test_dst_grenze_9_zeichen_wird_akzeptiert);
+    RUN_TEST(test_dst_grenze_10_zeichen_wird_verworfen_und_geloggt);
+    RUN_TEST(test_msg_grenze_150_zeichen_wird_akzeptiert);
+    RUN_TEST(test_msg_grenze_151_zeichen_wird_verworfen_und_geloggt);
+    RUN_TEST(test_volles_255_byte_datagramm_wird_wie_die_node_auf_254_gekuerzt);
+    RUN_TEST(test_volles_254_byte_datagramm_wird_vollstaendig_verarbeitet);
+    RUN_TEST(test_mitten_im_json_abgeschnittenes_datagramm_wird_verworfen_und_geloggt);
+    RUN_TEST(test_fehlendes_dst_und_fehlendes_msg_werden_geloggt);
+
     RUN_TEST(test_len_kuerzer_als_puffer_bricht_den_parse_sauber_ab);
     RUN_TEST(test_len_ignoriert_bytes_hinter_len);
 
@@ -457,9 +580,10 @@ int main(int argc, char **argv)
 
     RUN_TEST(test_tele_numerisches_feld_als_json_string);
 
-    RUN_TEST(test_FUND_msg_gleich_sentinel_none_wird_still_verworfen);
-    RUN_TEST(test_FUND_maximale_dst_und_msg_laenge_kuerzt_still_im_val_puffer);
-    RUN_TEST(test_FUND_eingebettetes_nul_im_msg_kuerzt_still);
+    RUN_TEST(test_msg_gleich_none_ist_gueltiger_text_und_wird_gesendet);
+    RUN_TEST(test_maximale_dst_und_msg_laenge_kommt_vollstaendig_an);
+    RUN_TEST(test_eingebettetes_nul_im_msg_wird_verworfen_und_geloggt);
+    RUN_TEST(test_eingebettetes_nul_im_dst_wird_verworfen_und_geloggt);
 
     return UNITY_END();
 }

@@ -140,9 +140,20 @@ void decodeMHeard(unsigned char u_mh_buffer[sizeof(mheardBuffer[0])], struct mhe
         {
             switch (itype)
             {
-                case 1: mheardLine.mh_date.concat(mh_buffer[iset]); break;
-                case 2: mheardLine.mh_time.concat(mh_buffer[iset]); break;
-                case 3: mheardLine.mh_payload_type = mh_buffer[iset]; break;
+                // mh_date/mh_time are fixed-width ("YYYY-MM-DD" / "HH:MM:SS",
+                // see getDateString()/getTimeString() in loop_functions.cpp,
+                // the only writer via updateMheard()'s snprintf format) --
+                // stop at that width instead of absorbing the rest of the
+                // 55-byte scan window (incl. NUL padding) when a truncated
+                // record has no closing '|'.
+                case 1: if(mheardLine.mh_date.length() < 10) mheardLine.mh_date.concat(mh_buffer[iset]); break;
+                case 2: if(mheardLine.mh_time.length() < 8) mheardLine.mh_time.concat(mh_buffer[iset]); break;
+                // Take only the first byte of the type field -- without a
+                // closing '|' the loop kept overwriting mh_payload_type with
+                // every subsequent byte (typically the zero padding that
+                // follows in a real ring-buffer slot), losing the type byte
+                // that was actually sent.
+                case 3: if(mheardLine.mh_payload_type == 0x00) mheardLine.mh_payload_type = mh_buffer[iset]; break;
                 case 4:
                 case 5:
                 case 6:
