@@ -185,6 +185,16 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   (`[ETH];stall;ntp;ms;213`), 122 UDP RX with `udp_rx` max 5 ms; the 1.6–3.3 s `getUDP()` stall
   did not reproduce. Bounding NTP needs an async client on the shared gateway socket — operator
   decision (BACKLOG TM-35).
+- **Gates after the hook fix:** T-Deck harness 15/15 PASS (`tdeck_w_20260830.json`), OLED
+  Heltec 8/8. T-Beam OLED `all` on a quiet bench: 6/8 — `display` and `dirty` fail on harness
+  sensitivities, not on firmware: the panel had already auto-switched off when `display` began
+  (first `--display off` draws 0 frames, `offwait_ms` 12952), and `dirty` landed on page 5 whose
+  content changes every draw (three `--display on` pairs, all `frame`, CRCs differ 250 ms apart;
+  yesterday's green run was on page 3). Standalone `dirty` is invalid by construction (starts at
+  5 s uptime, first frame inside the window). Harness fix: pin the page and wake the panel first.
+- **Overnight soak started 2026-08-30 11:26** (`tools/bench/runs/wifisoak_W_20260830-112600/`,
+  14 h, `--wifidrop` every 10 min on T-Deck/Heltec/T-Beam, detached `nohup`; interim
+  `summary.txt` every 10 min). Reduce with `wifisoak.py --parse-only wifisoak_W_*/{tdeck,heltec,tbeam}.log`.
 - Open: overnight `wifisoak.py` on all
   three boards; WPA3-only APs cannot associate with policy 1 (no PMF) — documented trade, an
   adaptive fallback (SAE first, PMF off after 2x `AUTH_EXPIRE`) would cost ~9 s on every boot.
