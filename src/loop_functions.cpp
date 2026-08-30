@@ -8,6 +8,7 @@
 
 #include "loop_functions.h"
 #include "dedup_functions.h"
+#include "beacon_rate.h"
 #include "mheard_functions.h"
 #include "command_functions.h"
 
@@ -483,6 +484,11 @@ int gps_refresh_track = 0;
 // Loop timers
 unsigned long posinfo_timer = 0;        // we check periodically to send GPS
 unsigned long posinfo_timer_min = 0;    // we check min. periodically to send GPS
+// Zeitpunkt des letzten selbst erzeugten Positions-Beacons und ob es ihn schon
+// gab -- Schranke fuer den Sofort-Pfad in sendPosition(), siehe beacon_rate.h.
+static unsigned long lastOwnPosTx = 0;
+static bool bHaveOwnPosTx = false;
+static unsigned long iShotSuppressed = 0;
 unsigned long heyinfo_timer = 0;        // we check periodically to send HEY
 int ncnt_hold = 0;
 
@@ -3920,6 +3926,35 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
     // position 0.0/0.0 no message sent
     if(lat == 0.0 && lon == 0.0)
         return;
+
+    // Mindestabstand fuer den Sofort-Pfad (0x9999: --sendpos, User-Button,
+    // EXTUDP-Telemetrie). Begruendung und Feldbefund: src/beacon_rate.h.
+    // Der periodische Pfad (uintervall == posinfo_interval) und die
+    // Track-/WX-Pfade (0xEEEE/0xFFFF) bleiben unberuehrt, sie tragen ihre
+    // eigene Kadenz.
+    if(uintervall == 0x9999 &&
+       !beaconShotAllowed(millis(), lastOwnPosTx, bHaveOwnPosTx, BEACON_SHOT_MIN_MS))
+    {
+        // Roher Serial.printf statt printfdeb: der Marker muss auch bei
+        // --debug off sichtbar sein, und ';' darf nicht gefiltert werden.
+        // Nur die ERSTE Unterdrueckung je Sperrfenster wird gemeldet -- unter
+        // einem Ausloeser-Sturm waeren es sonst 20 Zeilen/s (TM-21).
+        if(iShotSuppressed == 0)
+            Serial.printf("[POS];shot;suppressed;since_ms;%lu;min_ms;%lu\n",
+                          (unsigned long)(millis() - lastOwnPosTx),
+                          (unsigned long)BEACON_SHOT_MIN_MS);
+        iShotSuppressed++;
+        return;
+    }
+
+    if(uintervall == 0x9999 && iShotSuppressed > 0)
+    {
+        Serial.printf("[POS];shot;resumed;suppressed;%lu\n", (unsigned long)iShotSuppressed);
+        iShotSuppressed = 0;
+    }
+
+    lastOwnPosTx = millis();
+    bHaveOwnPosTx = true;
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
