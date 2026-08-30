@@ -280,6 +280,52 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   The former open point -- "the sweep only injects position beacons" -- is closed: `--frame
 pos|text|mixed` covers the 0x3A case #568 reports, and the measurement above is its answer.
 
+## 2026-08-30 late: TM-16 boot time, TM-11/TD-01 closed, HL-03/HL-04, TM-37 filed
+
+- **TM-16 done.** Two remaining boot costs measured on DK5EN-14 and cut:
+  1. `SetupUBLOX()` ended with `WaitPause()` + `sendUBX_MON_VER()` + `readUBXbin()`. The version
+     string feeds only a `[GPS_VER]` debug line (`ver` is file-local, no other reader),
+     `readUBXbin()` always runs into its 500 ms timeout because it only retriggers and never
+     returns early, and `WaitPause()` waits up to 1000 ms for the next character block. Now gated
+     on `iGPSDEBUG >= 2`: **SetupUBLOX 1 933 -> 899 ms**, GPS init total 3 503 -> 2 001 ms, module
+     configuration untouched.
+  2. `startNetwork()` ran a full `WiFi.scanNetworks()` before every `begin()` (3-5 s), but since
+     Wave W the driver picks the AP itself (`WiFi.begin(ssid, pwd, 0, NULL, false)`) and
+     `wifiLogScan()` only prints and discards. The scan is now skipped on the **first** bring-up
+     after reset (`[WIFI];scan;skipped;first_bringup`) and kept on every later one -- radio
+     restart, watchdog, i.e. after something went wrong -- so the field diagnosis survives exactly
+     where it is needed. Verified with `--wifi off` / `--wifi on`, which prints the AP list again.
+     `--wifistat` reports `bringups;N`.
+
+  **Measured over 24 boots** (`bootloop_TD01_close_20260830_20260830-134157/`): `got_ip` median
+  **10 394 ms** / max 10 437, ready median **10 949 ms** / max 11 399 -- against Wave W's 24-boot
+  baseline of `got_ip` median 14.1 s. Heltec ready 8.2 s, T-Beam 7.5 s, RAK boot/info PASS; GPS
+  still detects UBLOX and gets a fix on all of them. T-Deck harness 15/15.
+
+- **TM-11 / TD-01 closed.** The same 24-boot run is the confirmation: **24/24 first joins, 0
+  disconnects, 0 connection-error bursts, 0 `[WIFI];stall`.** Chain: 4/12 (TM-11 baseline) -> 0/24
+  at 55.8 s (arm A0, BSSID pin + SAE) -> 24/24 at 14.1 s (Wave W) -> 24/24 at 10.4 s (after TM-16).
+
+- **HL-03 done -- and it was the opposite of what the row said.** `--mute on/off` already existed;
+  the gap ran the other way: `btn_soundon` called `audio_set_mute()` and then `save_settings()`
+  **without touching** `meshcom_settings.node_mute`, so the GUI wrote the OLD value to flash, the
+  toggle did not survive a reset, and button and command disagreed about the state. The button now
+  goes through `commandAction("--mute on/off")` like every other switch on that page, and the
+  command itself now calls `save_settings()` -- it never persisted either.
+
+- **HL-04 done.** `--persistflash on/off`, `--persistsd on/off`, `--immediatesave on/off`, each
+  writing the field and saving, with `[PERSIST];flash|sd|immediate;<0/1>`. `--persistsd` also calls
+  `loadPosPersistence()` exactly as the GUI switch does -- without it the node keeps working from
+  the old store until the next reset. New `--persiststat` prints all four flags in one line.
+  Verified on hardware including survival across a reset.
+
+- **TM-37 filed** (operator question): every outgoing frame, the user's own included, goes through
+  the same 20-slot TX ring and is radiated one at a time, so messages typed in quick succession are
+  spooled. A user text is CRITICAL (DM) or HIGH (broadcast) and normally evicts something lower --
+  but when the ring holds only equal-or-higher priority entries, `addTxRingEntry()` returns -1 and
+  `sendMessage()` **ignores the return value**: the message is gone and the sender is never told.
+  Wanted: act on the return value, and warn the user before the loss when the queue fills.
+
 ## Next session, in order
 
 Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,

@@ -325,8 +325,19 @@ void btn_event_handler_setup_btn(lv_event_t * e)
             Serial.println("[TDECK]...btn_event_handler - btn_soundon pressed");
 
         // MUTE
-        audio_set_mute(! lv_obj_has_state(btn_soundon, LV_STATE_CHECKED));
-        save_settings();
+        // HL-03: der Schalter rief nur audio_set_mute() und liess
+        // meshcom_settings.node_mute unberuehrt -- gespeichert wurde also der
+        // ALTE Wert, und nach dem naechsten Reset stand der Ton wieder wie
+        // vorher. Ueber commandAction() geht er jetzt denselben Weg wie
+        // "--mute on/off" und wie alle anderen Schalter dieser Seite; Zustand
+        // und Persistenz koennen nicht mehr auseinanderlaufen.
+        // Knopf ist "Sound on": gedrueckt == Ton an == nicht stumm.
+        // commandAction() speichert selbst (wie bei --track/--gps), deshalb
+        // kein zweites save_settings() mehr.
+        if (lv_obj_has_state(btn_soundon, LV_STATE_CHECKED))
+            commandAction((char*)"--mute off", false);
+        else
+            commandAction((char*)"--mute on", false);
 
         return;
     }

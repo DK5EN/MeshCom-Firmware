@@ -802,6 +802,9 @@ static void wifiBegin()
 // Asynchroner WLAN-Scan: nur noch Protokoll der hoerbaren APs (Felddiagnose),
 // das Ergebnis geht nicht mehr in WiFi.begin().
 static bool s_wifiScanPending = false;
+// TM-16: Zaehler der Funk-Hochlaeufe seit dem Reset. Der erste laeuft ohne den
+// reinen Diagnose-Scan (siehe startNetwork()), jeder weitere mit.
+static uint16_t s_wifiBringupCount = 0;
 static int  s_wifiScanPolls = 0;
 
 static void wifiLogScan(int nrAps)
@@ -1017,10 +1020,30 @@ void wifiDnsPoll()
   meshcom_settings.node_hasIPaddress = hasIPaddress;
   s_wifiGotIpPending = false;
 
-  WiFi.scanDelete();
-  { WifiStall st("scan"); WiFi.scanNetworks(true); }   // async, Ergebnis ueber WiFi.scanComplete()
-  s_wifiScanPending = true;
-  s_wifiScanPolls = 0;
+  // TM-16 (Bootzeit): der Scan hier ist reine Diagnose. wifiLogScan() druckt nur
+  // die passenden APs und wirft das Ergebnis weg; die AP-Auswahl macht seit
+  // Welle W der Treiber selbst (wifiBegin() ruft WiFi.begin(ssid, pwd, 0, NULL,
+  // false) -- Kanal 0, kein BSSID). Er kostet damit 3-5 s vor JEDEM begin(),
+  // auch auf einem Knoten, bei dem nichts im Argen ist.
+  //
+  // Deshalb: beim ersten Hochlauf nach dem Reset ohne Scan direkt verbinden,
+  // ab dem zweiten (Funk-Neustart, Watchdog -- also nachdem etwas schiefging)
+  // wieder mit Scan. Die Felddiagnose bleibt genau dort erhalten, wo sie
+  // gebraucht wird, und ein gesunder Knoten ist ~4-5 s frueher online.
+  s_wifiBringupCount++;
+  if(s_wifiBringupCount == 1)
+  {
+    Serial.printf("[WIFI];scan;skipped;first_bringup;ms;%lu\n", (unsigned long)millis());
+    s_wifiScanPending = false;
+    wifiBegin();
+  }
+  else
+  {
+    WiFi.scanDelete();
+    { WifiStall st("scan"); WiFi.scanNetworks(true); }   // async, Ergebnis ueber WiFi.scanComplete()
+    s_wifiScanPending = true;
+    s_wifiScanPolls = 0;
+  }
 
   iWlanWait = 1;
 
@@ -1162,9 +1185,10 @@ void wifiLinkLog(const char *tag)
 void wifiStat()
 {
   wifiLinkLog("stat");
-  Serial.printf("[WIFI];stat;ssid;%s;localip;%s;hostip;%s;iWlanWait;%d;wd_stage;%d;policy;%d;scan_pending;%d;bringup_ms;%lu;last_got_ip_ms;%lu;last_disc_ms;%lu\n",
+  Serial.printf("[WIFI];stat;ssid;%s;localip;%s;hostip;%s;iWlanWait;%d;wd_stage;%d;policy;%d;scan_pending;%d;bringups;%u;bringup_ms;%lu;last_got_ip_ms;%lu;last_disc_ms;%lu\n",
     meshcom_settings.node_ssid, WiFi.localIP().toString().c_str(), s_node_hostip.c_str(),
     iWlanWait, (int)s_wifiWdStage, (int)WIFI_SAE_POLICY, s_wifiScanPending ? 1 : 0,
+    (unsigned)s_wifiBringupCount,
     (unsigned long)s_wifiBringupMs, (unsigned long)s_wifiLastGotIpMs, (unsigned long)s_wifiLastDiscMs);
 }
 
