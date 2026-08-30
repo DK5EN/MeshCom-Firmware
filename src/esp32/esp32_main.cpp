@@ -15,6 +15,7 @@
 #include "capture_functions.h"
 #include "dedup_functions.h"
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <RadioLib.h>
 
 #include <Wire.h>               
@@ -932,7 +933,10 @@ void esp32setup()
 
     bDisplayInfo = bLORADEBUG;
 
-    meshcom_settings.max_hop_text = MAX_HOP_TEXT_DEFAULT;
+    // CS-01: max_hop_text is user-settable (--maxhop) and comes out of NVS now;
+    // only a missing or out-of-range value falls back to the compile default.
+    // max_hop_pos stays a compile-time constant on purpose (operator, 2026-08-30).
+    meshcom_settings.max_hop_text = maxHopTextSanitize(meshcom_settings.max_hop_text);
     meshcom_settings.max_hop_pos = MAX_HOP_POS_DEFAULT;
 
 

@@ -83,6 +83,11 @@ unsigned long last_upd_timer = 0; // last time we got a HB
 extern bool hb_warn_logged;
 bool had_initial_udp_conn = false;  // indicator that we had already a udp connection
 
+// RX-01 (BACKLOG 3.8k), second door: shared with lora_functions.cpp, which
+// defines both (the primary RX-side guard lives there, in OnRxDone).
+extern uint32_t stat_rx_drop_unconfigured;
+void logRxDropUnconfigured(const char *call);
+
 uint8_t err_cnt_udp_tx = 0;    // counter on errors sending message via UDP
 
 // ---- TM-31 UDP instrument (fork-only) --------------------------------------
@@ -252,6 +257,16 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call.c_str());
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call.c_str());
 
+          // RX-01 (BACKLOG 3.8k), second door: a GATE frame whose APRS
+          // source call is still the factory default must not be radiated
+          // onto LoRa by this gateway. The primary guard sits on the LoRa
+          // RX side (lora_functions.cpp, OnRxDone), so this frame should
+          // never have reached the server in the first place -- this is
+          // belt-and-braces for an unpatched gateway elsewhere on the mesh.
+          bool bSrcUnconfigured = isUnconfiguredCall(source_call);
+          if(bSrcUnconfigured)
+              logRxDropUnconfigured(source_call);
+
           // TM-31: read the dedup gate BEFORE the position branch below inserts
           // this msg_id into the ring. It used to be evaluated after that insert,
           // so every UDP position frame deduplicated against the entry it had
@@ -268,7 +283,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
           };
           bool bUdpMsgIsNew = is_new_packet(udp_mid);
 
-          bool bUDPtoLoraSend = true;
+          bool bUDPtoLoraSend = !bSrcUnconfigured;
 
           if(msg_type_b == 0x21)
           {
@@ -571,8 +586,20 @@ void sendMeshComUDP()
               // print which message type we got
               decodeAPRS(convBuffer, aprs_len, aprsmsg);
 
+              // RX-01 (BACKLOG 3.8k), second door: this frame's UDP bytes
+              // were already handed to Udp.write()/endPacket() above -- by
+              // this point in the function the send has already happened,
+              // so this check cannot prevent it. It still counts/marks the
+              // leak (the primary guard in lora_functions.cpp's OnRxDone
+              // should have kept an unconfigured source out of
+              // ringBufferUDPout in the first place) and skips the debug
+              // print for it.
+              if(isUnconfiguredCall(aprsmsg.msg_source_call.c_str()))
+              {
+                logRxDropUnconfigured(aprsmsg.msg_source_call.c_str());
+              }
               // print aprs message
-              if(bDisplayInfo)
+              else if(bDisplayInfo)
               {
                 printBuffer_aprs((char*)"TX-UDP ", aprsmsg);
               }

@@ -37,6 +37,40 @@ uint8_t stat_queue_hwm;
 //////////////////////////////////////////////////////////////////////////
 // LoRa TX functions
 
+// TX-01 (BACKLOG 3.8k): counts and rate-limits the "this node has no
+// callsign yet, transmit refused" marker. Shared by both choke points --
+// addTxRingEntry() below (so an unconfigured node's ring never even fills)
+// and doTX() in lora_functions.cpp (the hard backstop at the only caller of
+// Radio.Send()/startTransmit()). Raw Serial.printf, not printfdeb/DEBUG_MSG
+// (stripped/compiled away with --debug off, see the FL-01 marker note) --
+// at most one line per 10 s, folding any elided refusals into the
+// "refused" count on the next line that does print (TM-21's lesson).
+uint32_t stat_tx_refuse_unconfigured = 0;
+
+void logTxRefuseUnconfigured(void)
+{
+    static bool s_have_marker = false;
+    static uint32_t s_last_marker_ms = 0;
+    static uint32_t s_refused_since_marker = 0;
+
+    stat_tx_refuse_unconfigured++;
+    s_refused_since_marker++;
+
+    uint32_t now = (uint32_t)millis();
+    // s_have_marker, not "s_last_marker_ms == 0": millis()==0 is a real,
+    // reachable timestamp (boot, and every native-test setUp()), and must
+    // not double as an "never printed yet" sentinel -- that would let a
+    // second refusal still at ms=0 bypass the floor.
+    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
+    {
+        Serial.printf("[TX];refuse;unconfigured;ms;%lu;refused;%lu\n",
+                      (unsigned long)now, (unsigned long)s_refused_since_marker);
+        s_have_marker = true;
+        s_last_marker_ms = now;
+        s_refused_since_marker = 0;
+    }
+}
+
 /**
  * Determine message priority from ring buffer slot content.
  * Ring buffer layout: [0]=len, [1]=status, [2]=payload_type, [3-6]=msg_id, [7]=flags, [8+]=path
@@ -217,6 +251,17 @@ void advanceIReadPastEmpty(void)
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst)
 {
+    // TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
+    // transmit at all -- refuse here so its ring never even fills, on top
+    // of the hard backstop in doTX() (lora_functions.cpp, the only caller
+    // of Radio.Send()/startTransmit()). Checked first, ahead of the length
+    // clamp below: this frame is not going anywhere either way.
+    if(isUnconfiguredCall(meshcom_settings.node_call))
+    {
+        logTxRefuseUnconfigured();
+        return -1;
+    }
+
     // Verdict Finding 3: defensive Invariante. Alle heutigen Aufrufer sind auf
     // <=255 begrenzt -- encodeAPRS() klemmt intern auf UDP_TX_BUF_SIZE, der
     // Radio-Empfang liefert hoechstens die Modul-Obergrenze von 255 Byte, und

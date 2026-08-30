@@ -489,6 +489,11 @@ unsigned long posinfo_timer_min = 0;    // we check min. periodically to send GP
 static unsigned long lastOwnPosTx = 0;
 static bool bHaveOwnPosTx = false;
 static unsigned long iShotSuppressed = 0;
+// Dasselbe fuer den Sofort-Pfad von sendHey() (FL-02) -- eigener Zeitstempel,
+// unabhaengig vom Positions-Pfad. Siehe sendHeyShot() unten und beacon_rate.h.
+static unsigned long lastOwnHeyTx = 0;
+static bool bHaveOwnHeyTx = false;
+static unsigned long iHeyShotSuppressed = 0;
 unsigned long heyinfo_timer = 0;        // we check periodically to send HEY
 int ncnt_hold = 0;
 
@@ -4431,6 +4436,40 @@ void sendHey()
             iWrite=0;
         */
     }
+}
+
+// Sofort-Pfad fuer sendHey() (FL-02): --sendhey ruft diese Funktion statt
+// sendHey() direkt auf, damit derselbe Mindestabstand gilt wie beim
+// Positions-Sofort-Pfad (siehe beacon_rate.h). Der periodische Trickle-
+// Scheduler (esp32_main.cpp/nrf52_main.cpp) ruft weiterhin sendHey() direkt
+// auf und bleibt unberuehrt -- sonst waere er doppelt gegated.
+bool sendHeyShot()
+{
+    if(!beaconShotAllowed(millis(), lastOwnHeyTx, bHaveOwnHeyTx, BEACON_SHOT_MIN_MS))
+    {
+        // Roher Serial.printf statt printfdeb: der Marker muss auch bei
+        // --debug off sichtbar sein, und ';' darf nicht gefiltert werden.
+        // Nur die ERSTE Unterdrueckung je Sperrfenster wird gemeldet -- unter
+        // einem Ausloeser-Sturm waeren es sonst 20 Zeilen/s (TM-21).
+        if(iHeyShotSuppressed == 0)
+            Serial.printf("[HEY];shot;suppressed;since_ms;%lu;min_ms;%lu\n",
+                          (unsigned long)(millis() - lastOwnHeyTx),
+                          (unsigned long)BEACON_SHOT_MIN_MS);
+        iHeyShotSuppressed++;
+        return false;
+    }
+
+    if(iHeyShotSuppressed > 0)
+    {
+        Serial.printf("[HEY];shot;resumed;suppressed;%lu\n", (unsigned long)iHeyShotSuppressed);
+        iHeyShotSuppressed = 0;
+    }
+
+    lastOwnHeyTx = millis();
+    bHaveOwnHeyTx = true;
+
+    sendHey();
+    return true;
 }
 
 // Telemetry with own Parameters

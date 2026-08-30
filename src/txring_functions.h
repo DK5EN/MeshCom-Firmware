@@ -20,4 +20,11 @@ uint8_t getMessagePriority(int slot);
 int getNextTxSlot(void);
 void advanceIReadPastEmpty(void);
 
+// TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
+// transmit. addTxRingEntry() below is one of the two choke points; doTX()
+// in lora_functions.cpp (the only caller of Radio.Send()/startTransmit())
+// is the other and shares this counter/marker via these declarations.
+extern uint32_t stat_tx_refuse_unconfigured;
+void logTxRefuseUnconfigured(void);
+
 #endif // _TXRING_FUNCTIONS_H_

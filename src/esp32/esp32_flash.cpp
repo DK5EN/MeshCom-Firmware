@@ -36,7 +36,15 @@ void sanitize_loaded_settings(void)
         meshcom_settings.node_sf = p.sf;
         meshcom_settings.node_cr = p.cr;
         meshcom_settings.node_country = p.country;
-        Serial.printf("[FLASH]...%d radio setting(s) out of range, reset to default\n", fixed);
+    }
+
+    // CS-01: derselbe Plausibilitaetspfad fuer das persistente Hop-Limit
+    if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
+        fixed++;
+
+    if(fixed > 0)
+    {
+        Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
         save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
     }
 }
@@ -154,6 +162,11 @@ void init_flash(void)
     meshcom_settings.node_gcb[5] = preferences.getInt("node_gcb5", 0);
 
     meshcom_settings.node_country = preferences.getInt("node_ctry");    // 0...EU  1...UK, 2...IT, 3...US, ..... 18...868, 19...915
+
+    // CS-01: Hop-Limit fuer Textnachrichten. Bis 2026-08-30 gab es keinen
+    // NVS-Key dafuer -- der Wert war faktisch eine Compile-Zeit-Konstante.
+    // max_hop_pos bleibt bewusst beim Default (esp32_main.cpp).
+    meshcom_settings.max_hop_text = preferences.getInt("max_hop_text", MAX_HOP_TEXT_DEFAULT);
 
     // TM-32 (upstream #661/#57): Radio-Parameter auf Plausibilitaet pruefen,
     // bevor sie in radio.setOutputPower() & Co. landen. Sentinels bleiben.
@@ -360,6 +373,10 @@ void save_settings(void)
 
     preferences.putInt("node_msgid", meshcom_settings.node_msgid);
     preferences.putInt("node_ackid", meshcom_settings.node_ackid);
+
+    // CS-01: Hop-Limit fuer Textnachrichten (--maxhop). max_hop_pos wird bewusst
+    // nicht gespeichert und bleibt beim Compile-Default.
+    preferences.putInt("max_hop_text", meshcom_settings.max_hop_text);
 
     preferences.putInt("node_power", meshcom_settings.node_power);
     preferences.putFloat("node_freq", meshcom_settings.node_freq);

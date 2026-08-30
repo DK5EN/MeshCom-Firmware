@@ -55,6 +55,9 @@ void printAsciiBuffer(unsigned char *buf, int len) { (void)buf; (void)len; }
 
 static void resetRing(void)
 {
+    // TX-01: the ring refuses an unconfigured node (XX0XXX, the shim default),
+    // so the fixture needs a real callsign before any enqueue.
+    strcpy(meshcom_settings.node_call, "DK5EN-90");
     memset(ringBuffer, 0, sizeof(ringBuffer));
     iWrite = 0;
     iRead = 0;

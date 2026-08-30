@@ -74,6 +74,7 @@ void sendPosition(unsigned long intervall, double lat, char lat_c, double lon, c
 void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2);
 void SendAckMessage(String dest_call, unsigned int iAckId);
 void sendHey();
+bool sendHeyShot();
 void sendTelemetry(int ID);
 
 unsigned int setSMartBeaconing(double flat, double flon);

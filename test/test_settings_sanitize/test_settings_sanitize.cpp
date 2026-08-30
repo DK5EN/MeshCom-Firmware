@@ -134,6 +134,36 @@ static void test_ohne_logger(void)
     TEST_ASSERT_EQUAL_INT(1, sanitize_radio_params(p, ESP32_LIMITS, NULL));
 }
 
+static void test_max_hop_text_plausibilitaet(void)
+{
+    // CS-01: eine alte Settings-Datei / ein fehlender NVS-Key liefert 0 --
+    // ohne diesen Pfad wuerde die Node mit Hop-Limit 0 senden.
+    int v = 0;
+    TEST_ASSERT_TRUE(sanitize_max_hop_text(v, capture_log));
+    TEST_ASSERT_EQUAL_INT(4, v);
+    TEST_ASSERT_EQUAL_INT(1, g_log_calls);
+    TEST_ASSERT_EQUAL_STRING("max_hop_text", g_last_field);
+
+    // 7 ist die on-air Obergrenze MAX_HOP_LIMIT, als Einstellung nicht erlaubt
+    v = 7;
+    TEST_ASSERT_TRUE(sanitize_max_hop_text(v, capture_log));
+    TEST_ASSERT_EQUAL_INT(4, v);
+
+    v = -3;
+    TEST_ASSERT_TRUE(sanitize_max_hop_text(v, NULL));
+    TEST_ASSERT_EQUAL_INT(4, v);
+
+    // gueltige Werte bleiben unangetastet und melden nichts
+    g_log_calls = 0;
+    for (int good = 1; good <= 6; good++)
+    {
+        v = good;
+        TEST_ASSERT_FALSE(sanitize_max_hop_text(v, capture_log));
+        TEST_ASSERT_EQUAL_INT(good, v);
+    }
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+}
+
 static void test_cstring_terminator(void)
 {
     char ok[10] = "DK5EN-14";
@@ -161,6 +191,7 @@ int main(int, char **)
     RUN_TEST(test_country_index);
     RUN_TEST(test_alles_muell_zaehlt_jedes_feld);
     RUN_TEST(test_ohne_logger);
+    RUN_TEST(test_max_hop_text_plausibilitaet);
     RUN_TEST(test_cstring_terminator);
     return UNITY_END();
 }

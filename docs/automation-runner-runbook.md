@@ -88,6 +88,65 @@ lists the other three bench calls. This should become `tools/bench/mesh_exchange
 - Ear: message tone and start tone actually audible (`audio` scenario only proves the queue).
 - Hand: `tools/bench/experiments/rolltest.py` — real trackball roll, expect `edges == events`.
 
+### 2.6 Test traffic goes to group `TEST` (TM-42)
+
+## Why `TEST`, not `9999`
+
+Group `9999` is a real, server-visible group: the central server relays anything sent to it onward
+to the map and dashboard like any other group traffic. Injected or beacon test messages sent to
+`9999` therefore show up where real operators look, even though nothing about the message is real.
+
+Group `TEST` (and `TESTER`) is different: `checkRegexCall()` in `src/regex_functions.cpp` already
+lists both as accepted destination callsigns (explicit literal matches, same class as `BOT GATE` or
+`WLNK-1`), so the firmware has always been willing to send and relay them — but the central server
+filters the `TEST` group, so traffic sent to it never reaches the map or dashboard. It is the
+correct default for anything that is not a real message: bench scenarios, the frame injector's
+smoke tests, ad-hoc `--injectmsg` probes at the console.
+
+`TEST`/`TESTER` are matched case-sensitively and as exact literals — `TESTX` or lowercase `test` do
+not get the same treatment and fall through to the general callsign regex, which rejects both (see
+`test/test_regex_call/test_regex_call.cpp`).
+
+## What changed
+
+- `src/test_inject.h` documents `TEST` as the destination group for `inject_text_message()`
+  instead of the old `9999` example. The function still takes `dst` as a mandatory argument with no
+  default — callers choose the group explicitly.
+- `tools/bench/tdeck_harness.py` and `tools/bench/oled_harness.py` each define a module-level
+  `TEST_GROUP = "TEST"` constant and use it everywhere they call `--injectmsg`.
+- `tools/bench/experiments/gwflood.py` is unaffected: it injects raw, pre-built LoRa frames over UDP
+  (destination `*`, broadcast, baked into the corpus-derived frame bytes) rather than calling
+  `--injectmsg` with a group, so there is no `9999` usage to move.
+- `0x9999` / `uintervall == 0x9999` in the position-beacon "send now" path
+  (`src/extudp_functions.cpp`, `src/beacon_rate.h`) is an unrelated sentinel value, not a
+  destination group, and is untouched by this change.
+
+## Proving it once, end to end
+
+On a node with `--gateway on`:
+
+```
+--injectmsg TEST hello
+```
+
+Expected:
+
+- the frame appears in the node's own console/log (it was queued and sent like any other message);
+- it does **not** appear on the map or dashboard, because the central server filters the `TEST`
+  group before it gets that far.
+
+This is a one-time hardware proof, not part of the automated bench scenarios (no hardware access in
+this wave — the ports were busy). See `docs/automation-runner-runbook.md` for how it fits into the
+regular bench run.
+
+### 2.7 AP-reboot recovery run (TM-38)
+
+Runs outside the Claude Code harness because the bench Mac loses its own WLAN for ~2 minutes:
+`tools/bench/experiments/apreboot.py start ...` detaches, holds all four USB ports, prompts the
+operator to power-cycle the access points and writes `summary.txt` on its own. Full procedure,
+prerequisites (`--gateway on` on the three ESP32 nodes) and pass criteria:
+[`bench-ap-reboot.md`](bench-ap-reboot.md).
+
 ## 3. Run record
 
 Per run, keep: branch + SHA, date/time, per-harness JSON, the raw `*_run_*.log` files, the numbers

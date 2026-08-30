@@ -131,7 +131,11 @@ bool decodeTinyXML(String document)
     if(bSOFTSERDEBUG)Serial.printf("Station timezone...%s\n", strTELE_UTCOFF.c_str());
 
     if(bSOFTSERDEBUG)Serial.print("  while ChannelData:");
+#ifndef NATIVE_BUILD
+    // Native Serial-Stub (test/support/Arduino.h) hat kein print(int) --
+    // dieser Debug-Zweig ist hardwareonly, siehe PT-01 native_xml.
     if(bSOFTSERDEBUG)Serial.print(station->ChildElementCount("ChannelData"));
+#endif
 
     XMLElement * channel = station->FirstChildElement("ChannelData");
 
@@ -168,7 +172,10 @@ bool decodeTinyXML(String document)
       if(bSOFTSERDEBUG)
       {
         Serial.print("   while values:");
+#ifndef NATIVE_BUILD
+        // Native Serial-Stub hat kein println(int) -- hardwareonly, siehe PT-01 native_xml.
         Serial.println(channel->ChildElementCount("Values"));
+#endif
       }
 
       XMLElement * values = channel->FirstChildElement("Values");
@@ -176,7 +183,10 @@ bool decodeTinyXML(String document)
       while(values != NULL)
       {
         if(bSOFTSERDEBUG)Serial.print("    while VT:");
+#ifndef NATIVE_BUILD
+        // Native Serial-Stub hat kein println(int) -- hardwareonly, siehe PT-01 native_xml.
         if(bSOFTSERDEBUG)Serial.println(values->ChildElementCount("VT"));
+#endif
 
         XMLElement * vt = values->LastChildElement("VT");
 
@@ -196,7 +206,10 @@ bool decodeTinyXML(String document)
 
           vt->QueryFloatText(&val);
 
+#ifndef NATIVE_BUILD
+          // Native Serial-Stub hat kein println(float) -- hardwareonly, siehe PT-01 native_xml.
           if(bSOFTSERDEBUG)Serial.println(val);
+#endif
 
           char cval[10];
           snprintf(cval, sizeof(cval), "%.1f", val);

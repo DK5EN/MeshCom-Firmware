@@ -1,6 +1,6 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 to ~14:15 — Wave W (WiFi, TM-34) in the morning, then **TM-35
+Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Wave 1 (see the first section below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
 (async NTP), TM-31 (UDP instrument, gateway relay fix, upstream #568 answered), TM-16 (boot time),
 TM-11/TD-01 closed, HL-03/HL-04**. All pushed (`df861d58`), working tree clean, branch
 `tdeck-partial-refresh-trace`. The WLAN report is
@@ -12,6 +12,49 @@ settled" table before re-deriving anything.
 left at 1, the persist flags at 0, as found. No background runs are alive — the 14-h WiFi soak
 (TM-36) died at ~12:17 when the TM-31 work took the Heltec and T-Beam ports. Upstream state, review verdict and branch model: §3.8g, §4.1,
 [`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
+
+## 2026-08-30 evening: Wave 1 of the intake campaign (`/orchestrate-waves`)
+
+Eight writer briefs on disjoint file sets, one gate, one commit. Everything below is verified on
+the bench unless marked otherwise; all four nodes run this build.
+
+- **RX-01 / TX-01** -- `isUnconfiguredCall()` (`configuration_global.h`); RX drop after
+  `decodeAPRS()` in `OnRxDone` and on the GATE-in path; TX refused in `addTxRingEntry()` and
+  `doTX()`. Markers `[RX];drop;unconfigured` / `[TX];refuse;unconfigured`, one line per 10 s.
+  Bench: `--setcall XX0XXX-00` + `--sendpos` on DK5EN-93 -> `[TX];refuse;unconfigured;refused;1`.
+  RX-01 can no longer be provoked from a bench node (TX-01 stops the sender) -- native predicate
+  tests only. `test_txring`/`test_txring_flood` fixtures now set a real callsign.
+- **FL-02** -- `sendHeyShot()` (own timestamp, `--sendhey` only; trickle untouched).
+  `[HEY];shot;suppressed;since_ms;1635;min_ms;30000` on Heltec, 3021 ms on the RAK.
+- **CS-01 / CS-02** -- `--maxhop <1..6>` persisted (NVS `max_hop_text`, nRF52 struct + sanitize
+  clamp), `[MAXHOP];text;N;pos;N`, web `<select>` 4/3/2 + current, `/setparam/?maxhop=`,
+  `/getparam/?maxhop`. Heltec kept 2 across a port-open reset; 7/0/9 rejected; RAK set 3.
+  Both restored to 4. `{SET}` still changes the value at runtime only (operator decision).
+- **PT-01** -- `native_parsers` (decodeAPRSPOS, decodeMHeard, checkVia; needs
+  `lib_ldf_mode = chain+`), `native_extern` (getExtern/handleExternTelemetry), `native_xml`
+  (decodeTinyXML, tinyxml2 lib). 58 cases, 8 skipped = real parser findings, listed in
+  BACKLOG §3.8j "PT-01 findings". `mheard_functions.cpp`, `extudp_functions.cpp`,
+  `tinyxml_functions.cpp` carry `#ifndef NATIVE_BUILD` guards only.
+- **TM-42** -- group `TEST` is the default of the injector doc and of `tdeck_harness.py` /
+  `oled_harness.py`; proof: `::{TEST}bench proof TM-42 191514` left DK5EN-93 with `--gateway on`
+  (`[UDP];tx` len 107 at 17:15:14Z) and is absent from mcmap, while 99099 traffic of the same
+  minute (17:15:06Z, 17:16:06Z) is there. Gateway switched back off. Nine scratch scripts in
+  `tools/bench/experiments/` still say `9999` (listed in the runbook §2.6, cosmetic).
+- **TM-38** -- `tools/bench/experiments/apreboot.py` (`start|status|stop|report`, detached via
+  double fork, all four ports, macOS notification + `say`, `--strict-udp`, `--require-ntp`),
+  14 unit tests, hardware smoke on all four nodes (verdict FAIL "no outage detected", as
+  expected). **The real run is yours:** `--gateway on` on T-Deck/Heltec/T-Beam first (they emit
+  no `[UDP];tx` with gateway off), then the start line in `docs/bench-ap-reboot.md`, cycle the
+  APs when the Mac says so, `report` afterwards. The RAK has no per-datagram UDP marker (its
+  `udp_rx` is derived from the `[ETH];link` heartbeat `rx_n` delta) -- a firmware marker in
+  `nrf_eth.cpp` is the open follow-up.
+- Gate: native 346 cases / 9 envs green, four boards built (Heltec flash +2.2 kB, RAK +0.9 kB)
+  and flashed.
+
+Wave 2 (not started): BP-01/TM-37 (Q-code back-pressure), CS-03 (config JSON export/import --
+note the web server reads no POST body today, `web_functions.cpp:~350`, so the upload needs a
+body reader first), TM-39 (country-server probe), TM-40 (OTA regression), TM-41 (T-Deck
+colour/geometry test on the flush path).
 
 ## Where things stand
 

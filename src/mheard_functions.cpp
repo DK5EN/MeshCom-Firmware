@@ -9,6 +9,15 @@
 
 #include "printfdeb_functions.h"
 
+// NATIVE_BUILD (pio test -e native_parsers, PT-01): these headers pull in
+// SD/SPI and the T-Deck LVGL UI chain. The BOARD_T_DECK*/BOARD_T_DECK_PRO
+// guards below already keep them out of any non-T-Deck firmware build, but
+// PlatformIO's Library Dependency Finder text-scans #include lines without
+// evaluating those macros, so it still tries (and fails) to pull lvgl into
+// the native test build. NATIVE_BUILD is never defined for a firmware
+// build, so this changes nothing there -- it only keeps the native test
+// binary, which never needs these headers, from tripping over the LDF scan.
+#ifndef NATIVE_BUILD
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <SD.h>
 #include <SPI.h>
@@ -19,6 +28,7 @@
 #if defined(BOARD_T_DECK_PRO)
 #include <t-deck-pro/tdeck_pro.h>
 #endif
+#endif // NATIVE_BUILD
 
 extern bool bDEBUG;
 

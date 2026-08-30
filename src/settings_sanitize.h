@@ -44,3 +44,9 @@ int sanitize_radio_params(RadioParams &p, const RadioLimits &lim, sanitize_log_f
  * can lose the terminator; strlen()/printf on it then reads past the field).
  * Returns true if a terminator had to be written. */
 bool sanitize_cstring(char *s, size_t n);
+
+/* CS-01: max_hop_text is loaded from flash on both platforms now (ESP32 NVS key
+ * "max_hop_text", nRF52 as part of the struct), so an old file or a wiped key
+ * hands over a 0 and a corrupt one anything at all. Resets both to the
+ * compile-time default (see maxhop.h). Returns true if the value was corrected. */
+bool sanitize_max_hop_text(int &v, sanitize_log_fn log);

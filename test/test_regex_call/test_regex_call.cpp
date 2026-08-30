@@ -50,6 +50,28 @@ static void test_akzeptiert_dienstkennungen(void)
     TEST_ASSERT_TRUE_MESSAGE(checkRegexCall("APRS2SOTA"), "APRS2SOTA");
 }
 
+// TM-42: "TEST" is the designated group for bench/injector traffic -- the
+// central server filters it, unlike group "9999". checkRegexCall() lists it
+// (and "TESTER") as explicit literal matches, same as "BOT GATE"/"WLNK-1"
+// above; this pins that they stay accepted and that lookalikes the code does
+// NOT list explicitly keep failing through the general callsign regex (no
+// digit in "TESTX", lowercase not in the regex's [A-Z] class).
+static void test_akzeptiert_gruppe_test(void)
+{
+    TEST_ASSERT_TRUE_MESSAGE(checkRegexCall("TEST"), "TEST muss als Zielgruppe akzeptiert werden");
+    TEST_ASSERT_TRUE_MESSAGE(checkRegexCall("TESTER"), "TESTER muss akzeptiert werden");
+}
+
+static void test_lehnt_test_variationen_ab(void)
+{
+    // Kein explizit gelisteter Sonderfall und faellt nicht unter die
+    // Rufzeichen-Regex (kein Ziffernanteil) -- muss abgelehnt werden.
+    TEST_ASSERT_FALSE_MESSAGE(checkRegexCall("TESTX"), "TESTX ist kein gelisteter Sonderfall und hat keine Ziffer");
+    // checkRegexCall() vergleicht "TEST" fallsensitiv (compareTo); Kleinschreibung
+    // ist nicht gelistet und die Regex kennt nur [A-Z].
+    TEST_ASSERT_FALSE_MESSAGE(checkRegexCall("test"), "Kleinschreibung wird nicht akzeptiert (fallsensitiv)");
+}
+
 static void test_lehnt_swl_kennung_de_ab(void)
 {
     // "DE" ist eine SWL-Kennung, kein sendeberechtigtes Rufzeichen.
@@ -144,6 +166,8 @@ int main(int, char **)
     RUN_TEST(test_akzeptiert_gaengige_rufzeichen);
     RUN_TEST(test_akzeptiert_ssid_suffix);
     RUN_TEST(test_akzeptiert_dienstkennungen);
+    RUN_TEST(test_akzeptiert_gruppe_test);
+    RUN_TEST(test_lehnt_test_variationen_ab);
     RUN_TEST(test_lehnt_swl_kennung_de_ab);
     RUN_TEST(test_lehnt_leeres_rufzeichen_ab);
     RUN_TEST(test_lehnt_offensichtlichen_unsinn_ab);

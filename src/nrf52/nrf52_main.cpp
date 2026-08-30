@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include "instrument.h"
+#include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <SPI.h>
 
 #include <debugconf.h>
@@ -599,7 +600,10 @@ void nrf52setup()
         strcpy(meshcom_settings.node_aprsmc, (char*)"APRSMC");  // default
     }
 
-    meshcom_settings.max_hop_text = MAX_HOP_TEXT_DEFAULT;
+    // CS-01: max_hop_text is user-settable (--maxhop) and survives in the settings
+    // file now; only a missing or out-of-range value falls back to the compile
+    // default. max_hop_pos stays a compile-time constant (operator, 2026-08-30).
+    meshcom_settings.max_hop_text = maxHopTextSanitize(meshcom_settings.max_hop_text);
     meshcom_settings.max_hop_pos = MAX_HOP_POS_DEFAULT;
 
     iButtonPin = BUTTON_PIN;

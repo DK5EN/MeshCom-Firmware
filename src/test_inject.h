@@ -19,8 +19,12 @@
 
 // Injects a text message as if it had just arrived over LoRa from src_call.
 //
-//   dst       Group number as a string (e.g. "9999"), or a callsign for a DM
-//             to this node.
+//   dst       Group number as a string, or a callsign for a DM to this node.
+//             Use group "TEST" for bench/scenario traffic: checkRegexCall()
+//             accepts it (and "TESTER") as a destination, and the central
+//             server filters that group, so it never reaches the map or
+//             dashboard. Group "9999" is a real, server-visible group -- do
+//             not use it for test traffic (see docs/automation-runner-runbook.md §2.6).
 //   text      Message payload (plain text). Must be non-empty and not exceed
 //             the injector's payload cap (see test_inject.cpp).
 //   src_call  Sender callsign to report as the source. NULL or "" defaults to

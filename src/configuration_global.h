@@ -25,6 +25,31 @@ inline bool isNodeUnconfigured(const char *call)
         return true;
     return false;
 }
+
+// RX-01/TX-01 (BACKLOG 3.8k): same "factory default" test as
+// isNodeUnconfigured() above, applied to a FRAME's source callsign instead
+// of this node's own. Prefix-only compare (first 6 bytes), so it matches
+// regardless of any "-SSID" suffix -- "XX0XXX-00", "XX0XXX-1" etc. all
+// match, same as isNodeUnconfigured() does for meshcom_settings.node_call.
+//
+// Not a straight call-through to isNodeUnconfigured(): that helper's
+// memcmp() reads a fixed 6 (or 4) bytes unconditionally, which is safe for
+// meshcom_settings.node_call (a fixed 10-byte buffer, its only caller) but
+// not for an arbitrary decoded frame's source call
+// (aprsmsg.msg_source_call.c_str()), which is not guaranteed to be that
+// long. strlen()-bound the compares first so a short/corrupt source call
+// cannot read past its own terminator.
+inline bool isUnconfiguredCall(const char *call)
+{
+    if (call == nullptr || call[0] == 0x00)
+        return true;
+    unsigned long clen = __builtin_strlen(call);
+    if (clen >= 6 && __builtin_memcmp(call, DEFAULT_CALL_PREFIX, 6) == 0)
+        return true;
+    if (clen == 4 && __builtin_memcmp(call, "none", 4) == 0)
+        return true;
+    return false;
+}
 #endif
 
 // ---------------------------------------------------------------------------

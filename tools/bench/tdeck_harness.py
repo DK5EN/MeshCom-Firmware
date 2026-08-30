@@ -49,6 +49,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ELF = str(REPO_ROOT / ".pio/build/t_deck_plus/firmware.elf")
 BOOT_MARKER = "CLIENT STARTED"
 READY_MARKER = "[BOOT];ready"
+# TM-42: group the central server filters, so injected test traffic never
+# reaches the map/dashboard. See docs/automation-runner-runbook.md §2.6.
+TEST_GROUP = "TEST"
 
 
 # --------------------------------------------------------------------------
@@ -530,7 +533,7 @@ def scenario_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str
         t_start = time.monotonic()
         session.send("--redrawlog on")
         time.sleep(0.15)
-        idx = session.send(f"--injectmsg 9999 bench inject {i}")
+        idx = session.send(f"--injectmsg {TEST_GROUP} bench inject {i}")
         inject_ok = session.wait_for(r"\[INJECT\];ok", 2.0, since=idx) is not None
         refr_seen = session.wait_for(r"\[REFR\]", 1.5, since=idx) is not None
         time.sleep(0.5)
@@ -1102,7 +1105,7 @@ def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
 
     for i in range(args.heap_count):
         t_start = time.monotonic()
-        session.send(f"--injectmsg 9999 heap probe {i}")
+        session.send(f"--injectmsg {TEST_GROUP} heap probe {i}")
         elapsed = time.monotonic() - t_start
         remaining = 3.0 - elapsed
         if remaining > 0:
@@ -1140,7 +1143,7 @@ def scenario_trim(session: TDeckSession, args: argparse.Namespace) -> Dict[str, 
     samples: List[Optional[int]] = []
     inject_fail = 0
     for i in range(args.trim_count):
-        idx = session.send(f"--injectmsg 9999 trim probe {i}")
+        idx = session.send(f"--injectmsg {TEST_GROUP} trim probe {i}")
         if session.wait_for(r"\[INJECT\];ok", 2.0, since=idx) is None:
             inject_fail += 1
         time.sleep(0.2)
@@ -1392,7 +1395,7 @@ def scenario_sleep(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     # c. while asleep, inject a message and see whether anything tries to redraw.
     session.send("--redrawlog on")
     time.sleep(0.1)
-    inject_idx = session.send("--injectmsg 9999 sleep probe")
+    inject_idx = session.send(f"--injectmsg {TEST_GROUP} sleep probe")
     inject_ok = session.wait_for(r"\[INJECT\];ok", 2.0, since=inject_idx) is not None
     asleep_lines = session.collect(1.5, since=inject_idx)
     asleep_parsed = [parse_line(l) for l in asleep_lines]

@@ -1,4 +1,5 @@
 #include "settings_sanitize.h"
+#include "maxhop.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -104,6 +105,17 @@ int sanitize_radio_params(RadioParams &p, const RadioLimits &lim, sanitize_log_f
     }
 
     return fixed;
+}
+
+bool sanitize_max_hop_text(int &v, sanitize_log_fn log)
+{
+    int fixed = maxHopTextSanitize(v);
+    if (fixed == v)
+        return false;
+
+    report_int(log, "max_hop_text", v, fixed);
+    v = fixed;
+    return true;
 }
 
 bool sanitize_cstring(char *s, size_t n)

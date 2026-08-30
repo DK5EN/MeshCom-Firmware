@@ -171,6 +171,40 @@ static uint32_t extractRingMsgId(int slot)
             (uint32_t)ringBuffer[slot][3];
 }
 
+// RX-01 (BACKLOG 3.8k): counts and rate-limits the "frame from an
+// unconfigured node, dropped" marker. Not static -- udp_functions.cpp's
+// GATE-in path (the "second door", server -> LoRa) shares this counter and
+// marker via a local extern declaration there. Raw Serial.printf, not
+// printfdeb/DEBUG_MSG (stripped/compiled away with --debug off, see the
+// FL-01 marker note) -- at most one line per 10 s, folding any elided drops
+// into the "dropped" count on the next line that does print (TM-21's
+// lesson).
+uint32_t stat_rx_drop_unconfigured = 0;
+
+void logRxDropUnconfigured(const char *call)
+{
+    static bool s_have_marker = false;
+    static uint32_t s_last_marker_ms = 0;
+    static uint32_t s_dropped_since_marker = 0;
+
+    stat_rx_drop_unconfigured++;
+    s_dropped_since_marker++;
+
+    uint32_t now = (uint32_t)millis();
+    // s_have_marker, not "s_last_marker_ms == 0": millis()==0 is a real,
+    // reachable timestamp (boot), and must not double as a "never printed
+    // yet" sentinel -- that would let a second drop still at ms=0 bypass
+    // the floor.
+    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
+    {
+        Serial.printf("[RX];drop;unconfigured;src;%s;ms;%lu;dropped;%lu\n",
+                      call, (unsigned long)now, (unsigned long)s_dropped_since_marker);
+        s_have_marker = true;
+        s_last_marker_ms = now;
+        s_dropped_since_marker = 0;
+    }
+}
+
 #if defined(EXTERNAL_RADIO)
 // The single in-flight external-radio TX ownership record. At most one ring
 // slot may be RING_STATUS_EXT_PENDING at a time (enforced by ExtTxq::begin).
@@ -540,6 +574,14 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         {
             if(bDisplayCont)
                 printfdeb("[LORA-ERROR]...%03i RCV:%s\n", size, RcvBuffer+6);
+        }
+        else if(isUnconfiguredCall(aprsmsg.msg_source_call.c_str()))
+        {
+            // RX-01 (BACKLOG 3.8k): a node still on the factory callsign is
+            // not identifying itself, so nothing it sends is legal to
+            // relay -- drop it here, before mheard, display, phone/BLE out,
+            // the gateway upload and the relay decision below.
+            logRxDropUnconfigured(aprsmsg.msg_source_call.c_str());
         }
         else
         {
@@ -1531,6 +1573,19 @@ bool doTX()
         // we can now tx the message
         if (TX_ENABLE == 1)
         {
+            // TX-01 (BACKLOG 3.8k): hard backstop -- an unconfigured node
+            // (factory callsign) must not transmit, no matter what made it
+            // into the ring. addTxRingEntry() already refuses to enqueue
+            // for such a node; this is the runtime sibling of TX_ENABLE at
+            // the only place in the tree that calls
+            // Radio.Send()/startTransmit(). Non-rollback: the slot was
+            // already marked consumed above, same as the TX-disabled and
+            // decode-failure drop paths below.
+            if(isUnconfiguredCall(meshcom_settings.node_call))
+            {
+                logTxRefuseUnconfigured();
+                return false;
+            }
 
 #ifndef BOARD_TLORA_OLV216
             if(lora_tx_buffer[0] == '<' && bDisplayTrack)
@@ -1715,7 +1770,7 @@ bool doTX()
             DEBUG_MSG("RADIO", "TX DISABLED");
         }
 
-        // Non-rollback drop paths (TX disabled or decode failure) — slot stays cleared
+        // Non-rollback drop paths (TX disabled, unconfigured node, or decode failure) — slot stays cleared
     }
 
     //#endif

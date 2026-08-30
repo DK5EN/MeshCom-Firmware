@@ -5,6 +5,13 @@
 #include <loop_functions.h>
 #include <debugconf.h>
 #include "ArduinoJson.h"
+
+// PT-01 (native_extern): none of the network transport below (SPI/WiFi/
+// Ethernet headers, the UdpExtern socket object, and every function that
+// touches it) is reachable from getExtern()/handleExternTelemetry(), which
+// is all this native build links and tests. Guarding it out keeps the
+// hardware/native code identical to before this file was ever built native.
+#ifndef NATIVE_BUILD
 #include <SPI.h>
 
 // WIFI and Ethernet
@@ -20,6 +27,7 @@
   #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
   #include <nrf52/nrf_eth.h>
 #endif
+#endif // !NATIVE_BUILD
 
 bool hasExternIPaddress = false;
 
@@ -28,6 +36,11 @@ String s_extern_node_ip = "";
 String strExtOutput;
 String str_ip;
 
+// PT-01: apip, extern_node_ip and UdpExtern below are only touched by the
+// outbound/socket functions guarded out of this native build -- neither
+// getExtern() nor handleExternTelemetry() reference them, and IPAddress
+// isn't available without the network headers guarded out above.
+#ifndef NATIVE_BUILD
 IPAddress apip;
 
 #ifdef BOARD_T_ETH_ELITE
@@ -40,6 +53,7 @@ IPAddress apip;
   IPAddress extern_node_ip;
   EthernetUDP UdpExtern;
 #endif
+#endif // !NATIVE_BUILD
 
 unsigned char incomingExtPacket[UDP_TX_BUF_SIZE];  // buffer for incoming packets
 int packetExtSize=0;
@@ -58,6 +72,11 @@ static struct externQueueEntry externQueue[MAX_EXTERN_QUEUE];
 static int externQueueWrite = 0;
 
 // Extern JSON UDP
+//
+// PT-01: startExternUDP() only sets up the UdpExtern socket (guarded above)
+// and is not part of the getExtern()/handleExternTelemetry() input path this
+// native build tests -- guarded out with it.
+#ifndef NATIVE_BUILD
 void startExternUDP()
 {
   #ifdef BOARD_T_ETH_ELITE
@@ -134,6 +153,7 @@ void startExternUDP()
 
   sendExternHeartbeat();
 }
+#endif // !NATIVE_BUILD
 
 
 
@@ -283,6 +303,10 @@ void getExtern(unsigned char incoming[], int len)
   sendMessage(val, strlen(val));
 }
 
+// PT-01: getExternUDP() only reads the UdpExtern socket (guarded above) and
+// hands the datagram to getExtern() below -- not part of what this native
+// build tests, guarded out with the socket it depends on.
+#ifndef NATIVE_BUILD
 void getExternUDP()
 {
   #ifdef ESP32
@@ -343,7 +367,15 @@ void getExternUDP()
 
   }
 }
+#endif // !NATIVE_BUILD
 
+// PT-01: sendExtern() (and everything below it -- queueExtern(),
+// flushExternQueue(), sendExternHeartbeat(), resetExternUDP(), strEsc())
+// is the outbound path to the EXTUDP peer: it decodes an APRS frame off the
+// mesh and re-serializes it as JSON onto UdpExtern (guarded above). None of
+// it is reachable from getExtern()/handleExternTelemetry(), the inbound
+// parser this native build tests, so it is guarded out with the socket.
+#ifndef NATIVE_BUILD
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
   (void)bUDP;
@@ -684,3 +716,4 @@ String strEsc(String strInput)
 
   return strExtOutput;
 }
+#endif // !NATIVE_BUILD

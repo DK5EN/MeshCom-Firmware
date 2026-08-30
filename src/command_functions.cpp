@@ -16,6 +16,7 @@
 #include "lora_setchip.h"
 #include "spectral_scan.h"
 #include "rtc_functions.h"
+#include "maxhop.h"
 #ifdef ESP32
 #include "net_console.h"
 #endif
@@ -115,6 +116,13 @@ int casecmp(const char *s1, const char *s2)
 		? -1
 		: (tolower(*s1) - tolower(*s2));
 }
+
+// CS-01: maxhop.h is Arduino-free (native test), configuration_global.h is not --
+// so the default is written down twice. It must not drift.
+static_assert(MAXHOP_TEXT_FALLBACK == MAX_HOP_TEXT_DEFAULT,
+              "maxhop.h MAXHOP_TEXT_FALLBACK and configuration_global.h MAX_HOP_TEXT_DEFAULT differ");
+static_assert(MAXHOP_TEXT_MAX < MAX_HOP_LIMIT,
+              "the serial --maxhop range must stay inside the on-air hop limit");
 
 int commandCheck(char *msg, char *command)
 {
@@ -754,6 +762,8 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--maxv    100%% battery voltage\n--track   on/off SmartBeaconing\n--gps on/off use GPS-CHIP\n--utcoff +/-99.9 set UTC-Offset\n−−settime yyyy.mm.dd hh:mm:ss\n");
             delay(100);
             printlndeb("--gps reset Factory reset\n--txpower 99 LoRa TX-power dBm\n--txfreq  999.999 LoRa TX-freqency MHz\n--txbw    999 LoRa TX-bandwith kHz\n--lora    Show LoRa setting\n");
+            delay(100);
+            printfdeb("--maxhop  %i-%i hop limit for text messages (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
             delay(100);
             printlndeb("--bmp on  use BMP280-CHIP\n--bme on  use BME280-CHIP\n--680 on  use BME680-CHIP\n--811 on  use CMCU811-CHIP\n--SS on  use SS\n--bmx BME/BMP/680 off\n");
             delay(100);
@@ -3282,7 +3292,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"sendhey") == 0)
     {
-        sendHey();
+        sendHeyShot();   // FL-02: 30 s floor on the command path, trickle keeps sendHey()
 
         if(ble)
         {
@@ -4237,6 +4247,49 @@ void commandAction(char *umsg_text, bool ble)
             rebootAuto = millis() + 15 * 1000; // 15 Sekunden
             #endif
         }
+
+        return;
+    }
+    else
+    // CS-01: Hop-Limit fuer Textnachrichten, persistent. "--maxhop <1..6>" setzt,
+    // "--maxhop" allein zeigt nur an. max_hop_pos ist bewusst nicht setzbar und
+    // bleibt beim Compile-Default (Operator, 2026-08-30).
+    if(commandCheck(msg_text+2, (char*)"maxhop ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
+        iVar = 0;
+        sscanf(_owner_c, "%d", &iVar);
+
+        if(!maxHopTextValid(iVar))
+        {
+            printfdeb("maxhop %i not between %i and %i\n", iVar, MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
+        }
+        else
+        {
+            meshcom_settings.max_hop_text = iVar;
+
+            printfdeb("set maxhop to %i\n", meshcom_settings.max_hop_text);
+
+            if(ble)
+            {
+                sendNodeSetting();
+            }
+
+            save_settings();
+        }
+
+        // Rohes Serial.printf: printfdeb() entfernt ausserhalb des CSV-Modus die
+        // Semikolons, die der Bench-Harness zum Auslesen braucht.
+        Serial.printf("[MAXHOP];text;%d;pos;%d\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"maxhop") == 0)
+    {
+        printfdeb("maxhop %i (pos %i)\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
+
+        Serial.printf("[MAXHOP];text;%d;pos;%d\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
 
         return;
     }
@@ -5557,6 +5610,10 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...APRSMC: %s\n...ATXT: %s\n...NAME: %s\n...BLE : %s\n...DISPLAY %s\n...CTRY %s\n...FREQ %.4f MHz TXPWR %i dBm RXBOOST %s\n",
                     meshcom_settings.node_aprsmc, meshcom_settings.node_atxt, meshcom_settings.node_name, (bBLElong?"long":"short"),  (bDisplayOff?"off":"on"),
                     getCountry(meshcom_settings.node_country).c_str() , getFreq(), getPower(), (bBOOSTEDGAIN?"on":"off"));
+
+            // CS-01: max_hop_text ist persistent und ueber --maxhop setzbar,
+            // max_hop_pos bleibt der Compile-Default.
+            printfdeb("...MAXHOP text %i / pos %i\n", meshcom_settings.max_hop_text, meshcom_settings.max_hop_pos);
 
             for(int ig=0;ig<6;ig++)
             {

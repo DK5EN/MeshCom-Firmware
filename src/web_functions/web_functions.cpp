@@ -15,6 +15,7 @@
 #include <rtc_functions.h>
 #include <time_functions.h>
 #include <spectral_scan.h>
+#include <maxhop.h>         // CS-02: drop-down values for the text hop limit
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -1083,6 +1084,25 @@ void sub_page_setup()
     web_client.println("<button onclick=\"setvalue('setctry', document.getElementById('country').value,false)\"><i class=\"btncheckmark\"></i></button>");
 
     _create_setup_textinput_element("txpower", "TX Power", String(meshcom_settings.node_power), "15", "txpower", 2, false, false);                    // create Textinput-Element including Label and Button
+
+    // CS-02: Max-Hop als Drop-down. Angeboten werden 4/3/2; hat --maxhop einen
+    // Wert ausserhalb dieser Liste gesetzt (1, 5, 6), steht er zusaetzlich drin,
+    // damit die Seite den echten Zustand zeigt statt ihn stillschweigend zu
+    // aendern. Die Liste baut maxhop.h, dieselbe Quelle wie die serielle Pruefung.
+    {
+        int hops[MAXHOP_OPTION_MAX];
+        int nhops = maxHopOptionList(meshcom_settings.max_hop_text, hops, MAXHOP_OPTION_MAX);
+
+        web_client.println("<label for=\"maxhop\">Max Hop</label>");
+        web_client.println("<select id=\"maxhop\" name=\"maxhop\">");
+        for (int ih = 0; ih < nhops; ih++)
+        {
+            web_client.printf("\t<option value=\"%i\" %s>%i</option>\n", hops[ih], (hops[ih] == meshcom_settings.max_hop_text) ? "selected" : "", hops[ih]);
+        }
+        web_client.println("</select>");
+        web_client.println("<button onclick=\"setvalue('maxhop', document.getElementById('maxhop').value,false)\"><i class=\"btncheckmark\"></i></button>");
+    }
+
     _create_setup_textinput_element("utcoffset", "UTC Offset", String(meshcom_settings.node_utcoff, 1).c_str(), "1.0", "utcoffset", 4, false, false); // create Textinput-Element including Label and Button
     _create_setup_textinput_element("maxv", "max. Voltage", String(meshcom_settings.node_maxv, 3), "4.125", "maxv", 5, false, false);                 // create Textinput-Element including Label and Button
 

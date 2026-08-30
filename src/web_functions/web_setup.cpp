@@ -118,7 +118,18 @@ void webSetup_setParam(setupStruct *setupData){
         setupData->returnValue = String(meshcom_settings.node_power);
         return;
     } else
-    
+
+    // CS-02: Hop-Limit fuer Textnachrichten. Wie jeder andere Parameter hier
+    // ueber commandAction(), damit GUI und serielle Konsole nicht auseinander
+    // laufen (HL-01/HL-03).
+    if(setupData->paramName.equals("maxhop")) {
+        snprintf(message_text, sizeof(message_text), "--maxhop %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (meshcom_settings.max_hop_text == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = String(meshcom_settings.max_hop_text);
+        return;
+    } else
+
     if(setupData->paramName.equals("utcoffset")) {
         snprintf(message_text, sizeof(message_text), "--utcoff %s", setupData->paramValue.c_str());
         commandAction(message_text, bPhoneReady);
@@ -677,7 +688,12 @@ void webSetup_getParam(setupStruct *setupData){
         setupData->returnValue = String(meshcom_settings.node_power);
         return;
     } else
-    
+
+    if(setupData->paramName.equals("maxhop")) {     // CS-02
+        setupData->returnValue = String(meshcom_settings.max_hop_text);
+        return;
+    } else
+
     if(setupData->paramName.equals("utcoffset")) {
         setupData->returnValue = String(meshcom_settings.node_utcoff, 1);
         return;

@@ -79,6 +79,47 @@ static void test_min_ms_is_honoured(void)
     TEST_ASSERT_TRUE (beaconShotAllowed(last,        last, true, 0));
 }
 
+// FL-02: derselbe Sofort-Pfad-Mindestabstand fuer sendHeyShot() (--sendhey).
+// sendHeyShot() selbst lebt in loop_functions.cpp und ist nativ nicht
+// uebersetzbar (Arduino-Abhaengigkeiten), aber sie ruft beaconShotAllowed()
+// mit ihrem EIGENEN Zeitstempel (lastOwnHeyTx) auf -- unabhaengig von
+// lastOwnPosTx des Positions-Pfades. Diese Tests bilden genau das mit zwei
+// getrennten Zustandsvariablen nach, so wie es in loop_functions.cpp steht.
+
+// Zwei --sendhey innerhalb von 30 s: der zweite wird unterdrueckt.
+static void test_hey_second_shot_within_window_suppressed(void)
+{
+    uint32_t lastOwnHeyTx = 200000;
+    bool bHaveOwnHeyTx = true;
+
+    TEST_ASSERT_FALSE(beaconShotAllowed(lastOwnHeyTx + 5000, lastOwnHeyTx, bHaveOwnHeyTx, BEACON_SHOT_MIN_MS));
+    TEST_ASSERT_FALSE(beaconShotAllowed(lastOwnHeyTx + BEACON_SHOT_MIN_MS - 1, lastOwnHeyTx, bHaveOwnHeyTx, BEACON_SHOT_MIN_MS));
+}
+
+// Nach 30 s ist der naechste --sendhey wieder erlaubt.
+static void test_hey_shot_after_window_allowed(void)
+{
+    uint32_t lastOwnHeyTx = 200000;
+    bool bHaveOwnHeyTx = true;
+
+    TEST_ASSERT_TRUE(beaconShotAllowed(lastOwnHeyTx + BEACON_SHOT_MIN_MS, lastOwnHeyTx, bHaveOwnHeyTx, BEACON_SHOT_MIN_MS));
+}
+
+// Der HEY-Zeitstempel ist eigenstaendig: ein kuerzlich gesendeter POS-Beacon
+// sperrt einen faelligen HEY-Sofort-Beacon nicht, und umgekehrt.
+static void test_hey_and_pos_timestamps_are_independent(void)
+{
+    uint32_t lastOwnPosTx = 100000;
+    uint32_t lastOwnHeyTx = 100000 - BEACON_SHOT_MIN_MS; // HEY-Fenster ist schon abgelaufen
+    uint32_t now = 100000;
+
+    // POS gerade erst gesendet -> ein weiterer POS-Sofort-Beacon ist gesperrt.
+    TEST_ASSERT_FALSE(beaconShotAllowed(now, lastOwnPosTx, true, BEACON_SHOT_MIN_MS));
+
+    // HEY-Fenster ist unabhaengig davon bereits wieder offen.
+    TEST_ASSERT_TRUE(beaconShotAllowed(now, lastOwnHeyTx, true, BEACON_SHOT_MIN_MS));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -88,5 +129,8 @@ int main(int, char **)
     RUN_TEST(test_regular_cadence_passes);
     RUN_TEST(test_millis_rollover);
     RUN_TEST(test_min_ms_is_honoured);
+    RUN_TEST(test_hey_second_shot_within_window_suppressed);
+    RUN_TEST(test_hey_shot_after_window_allowed);
+    RUN_TEST(test_hey_and_pos_timestamps_are_independent);
     return UNITY_END();
 }

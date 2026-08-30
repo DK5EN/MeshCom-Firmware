@@ -59,6 +59,13 @@ void sanitize_loaded_settings(void)
 		meshcom_settings.node_country = p.country;
 	}
 
+	// CS-01: max_hop_text liegt bereits in der Struktur (die ganze Struktur wird
+	// in die Datei geschrieben), aber eine alte Datei traegt dort eine 0, weil das
+	// Feld frueher bei jedem Boot ueberschrieben wurde. Plausibilitaet wie beim
+	// ESP32; max_hop_pos bleibt bewusst beim Compile-Default (nrf52_main.cpp).
+	if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
+		fixed++;
+
 	// Die Struktur wird roh aus der Datei gelesen -- ein fehlender Terminator
 	// laesst strlen()/printf ueber das Feld hinauslesen.
 	int strings = 0;
@@ -76,7 +83,7 @@ void sanitize_loaded_settings(void)
 
 	if(fixed > 0 || strings > 0)
 	{
-		Serial.printf("[FLASH]...%d radio setting(s), %d string(s) corrected\n", fixed, strings);
+		Serial.printf("[FLASH]...%d setting(s), %d string(s) corrected\n", fixed, strings);
 		save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
 	}
 }

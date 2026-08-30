@@ -28,6 +28,9 @@ from tdeck_harness import TDeckSession  # noqa: E402
 DEFAULT_PORT = "/dev/cu.usbserial-0001"      # Heltec V3 DK5EN-93
 CRASH = r"Guru Meditation|rst:0x|Backtrace:|abort\(\)|assert failed"
 PAGE_MAX = 6
+# TM-42: group the central server filters, so injected test traffic never
+# reaches the map/dashboard. See docs/automation-runner-runbook.md §2.6.
+TEST_GROUP = "TEST"
 
 
 class OledSession(TDeckSession):
@@ -122,7 +125,7 @@ def scenario_inject(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
     before = oledstat(s)
     steps = []
     for i in range(args.inject_count):
-        steps.append(step(s, f"--injectmsg 9999 oled bench {i}", r"\[INJECT\];ok", settle=args.inject_spacing))
+        steps.append(step(s, f"--injectmsg {TEST_GROUP} oled bench {i}", r"\[INJECT\];ok", settle=args.inject_spacing))
     s.send("--oledlog off")
     after = oledstat(s)
     advanced = before is not None and after is not None and after.get("last") != before.get("last")
@@ -261,7 +264,7 @@ def scenario_timing(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
     t_end = time.time() + args.timing_seconds
     i = 0
     while time.time() < t_end:
-        s.send(f"--injectmsg 9999 timing {i}"); i += 1
+        s.send(f"--injectmsg {TEST_GROUP} timing {i}"); i += 1
         time.sleep(5.0)
     idx = s.send("--instr")
     lines = s.collect(1.5, since=idx)
