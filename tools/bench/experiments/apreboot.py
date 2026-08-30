@@ -897,7 +897,18 @@ def default_runs_dir() -> Path:
 
 
 def newest_run(runs_dir: Path) -> Optional[Path]:
-    cands = sorted(p for p in runs_dir.glob(f"{RUN_PREFIX}_*") if p.is_dir())
+    """Newest by the trailing _YYYYMMDD-HHMMSS timestamp, not by name.
+
+    A plain name sort put apreboot_stoptest_190256 ahead of the live
+    apreboot_ap1_220423 (labels sort before timestamps ever compare) --
+    bitten on the bench during the first real TM-38 run, 2026-08-30.
+    Directories without a parseable timestamp sort oldest, then by mtime.
+    """
+    def key(p: Path) -> Tuple[str, float]:
+        m = re.search(r"_(\d{8}-\d{6})$", p.name)
+        return (m.group(1) if m else "", p.stat().st_mtime)
+
+    cands = sorted((p for p in runs_dir.glob(f"{RUN_PREFIX}_*") if p.is_dir()), key=key)
     return cands[-1] if cands else None
 
 

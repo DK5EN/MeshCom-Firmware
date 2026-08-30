@@ -243,6 +243,41 @@ class TranscriptTest(unittest.TestCase):
                             for f in by["tdeck"].fails), by["tdeck"].fails)
 
 
+class NewestRunTest(unittest.TestCase):
+    """Regression: the newest-run picker must sort by the timestamp suffix.
+
+    A plain name sort chose apreboot_stoptest_20260830-190256 over the LIVE
+    apreboot_ap1_20260830-220423 ("stoptest" > "ap1" lexically) -- bitten
+    during the first real TM-38 run: bare `status` reported the dead
+    stop-test while the armed runner was mid-RECOVERY.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.runs = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def mk(self, name: str) -> Path:
+        p = self.runs / name
+        p.mkdir()
+        return p
+
+    def test_timestamp_wins_over_label_sort(self):
+        self.mk("apreboot_stoptest_20260830-190256")
+        live = self.mk("apreboot_ap1_20260830-220423")
+        self.assertEqual(apreboot.newest_run(self.runs), live)
+
+    def test_unparseable_name_sorts_oldest(self):
+        self.mk("apreboot_scratch")
+        newest = self.mk("apreboot_x_20260830-220423")
+        self.assertEqual(apreboot.newest_run(self.runs), newest)
+
+    def test_empty_dir_gives_none(self):
+        self.assertIsNone(apreboot.newest_run(self.runs))
+
+
 class SpecTest(unittest.TestCase):
     def test_board_spec_kinds(self):
         self.assertEqual(apreboot.parse_board_spec("tdeck=/dev/cu.usbmodem1101"),
