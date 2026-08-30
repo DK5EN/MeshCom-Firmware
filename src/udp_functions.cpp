@@ -38,7 +38,7 @@ String grc_ids;
 
 #ifdef ESP32
 
-#include <NTPClient.h>
+#include "ntp_async.h"
 #include <time.h>
 
 // WIFI
@@ -70,7 +70,7 @@ extern bool hasExternIPaddress;
 
 WiFiUDP Udp;
 
-NTPClient timeClient(Udp);
+NtpAsync timeClient(Udp);   // TM-35: non-blocking, reply harvested in getMeshComUDP()
 
 unsigned char incomingPacket[UDP_TX_BUF_SIZE];  // buffer for incoming packets
 int packetSize=0;
@@ -84,6 +84,44 @@ extern bool hb_warn_logged;
 bool had_initial_udp_conn = false;  // indicator that we had already a udp connection
 
 uint8_t err_cnt_udp_tx = 0;    // counter on errors sending message via UDP
+
+// ---- TM-31 UDP instrument (fork-only) --------------------------------------
+// The receive path had no observable output at all: every DEBUG_MSG() compiles
+// away (DO_DEBUG 0) and the printfdeb() lines need --debug on, so "no datagram
+// arrives" could not be told apart from "nothing is logged". These counters are
+// always kept; --udplog on adds one line per datagram, --udpstat prints them.
+bool bUDPLOG = false;
+static uint32_t s_udpRxCount = 0;
+static uint32_t s_udpTxCount = 0;
+static uint32_t s_udpTxFail = 0;
+static uint32_t s_udpRxLastMs = 0;
+static uint32_t s_udpTxLastMs = 0;
+static IPAddress s_udpRxLastIp = IPAddress(0,0,0,0);
+static uint16_t s_udpRxLastPort = 0;
+static uint16_t s_udpRxLastLen = 0;
+
+void udpCountTx(bool ok)
+{
+  s_udpTxCount++;
+  s_udpTxLastMs = millis();
+  if(!ok)
+    s_udpTxFail++;
+}
+
+void udpPrintStat()
+{
+  Serial.printf("[UDPSTAT];bind;%u;ip;%s;dest;%s;rx;%lu;rx_last_ms;%lu;rx_from;%s;%u;rx_len;%u;tx;%lu;tx_fail;%lu;tx_last_ms;%lu\n",
+                (unsigned)LOCAL_PORT,
+                s_node_ip.c_str(),
+                s_node_hostip.c_str(),
+                (unsigned long)s_udpRxCount,
+                (unsigned long)s_udpRxLastMs,
+                s_udpRxLastIp.toString().c_str(), (unsigned)s_udpRxLastPort,
+                (unsigned)s_udpRxLastLen,
+                (unsigned long)s_udpTxCount,
+                (unsigned long)s_udpTxFail,
+                (unsigned long)s_udpTxLastMs);
+}
 
 
 void getMeshComUDP()
@@ -103,11 +141,31 @@ void getMeshComUDP()
   
   if (packetSize > 0)
   {
+    IPAddress remote_ip = Udp.remoteIP();
+    uint16_t remote_port = Udp.remotePort();
+
     int len = Udp.read(incomingPacket, UDP_TX_BUF_SIZE - 1);
 
     if (len > 0)
     {
       incomingPacket[len] = 0;
+
+      // TM-31: one always-kept counter set, one optional line per datagram
+      s_udpRxCount++;
+      s_udpRxLastMs = millis();
+      s_udpRxLastIp = remote_ip;
+      s_udpRxLastPort = remote_port;
+      s_udpRxLastLen = (uint16_t)len;
+
+      if(bUDPLOG)
+        Serial.printf("[UDP];rx;ip;%s;port;%u;len;%d;head;%02X%02X%02X%02X\n",
+                      remote_ip.toString().c_str(), (unsigned)remote_port, len,
+                      incomingPacket[0], len > 1 ? incomingPacket[1] : 0,
+                      len > 2 ? incomingPacket[2] : 0, len > 3 ? incomingPacket[3] : 0);
+
+      // TM-35: the NTP reply shares this socket with the gateway traffic
+      if(timeClient.tryConsume(remote_ip, remote_port, incomingPacket, len))
+        return;
 
       getMeshComUDPpacket(incomingPacket, len);
     }
@@ -193,6 +251,22 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call.c_str());
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call.c_str());
+
+          // TM-31: read the dedup gate BEFORE the position branch below inserts
+          // this msg_id into the ring. It used to be evaluated after that insert,
+          // so every UDP position frame deduplicated against the entry it had
+          // just written itself (RX_DEDUP_ADD slot N, 17 ms later RX_DEDUP_DUP
+          // slot N) and an ESP32 gateway never relayed it to LoRa: 0 of 30
+          // injected frames radiated, at every inter-arrival from 8 s down to
+          // 0.5 s. is_new_packet() has no side effects, only this early read
+          // moves. The nRF52 gateway path never had the early insert.
+          uint8_t udp_mid[4] = {
+              (uint8_t)(aprsmsg.msg_id),
+              (uint8_t)(aprsmsg.msg_id >> 8),
+              (uint8_t)(aprsmsg.msg_id >> 16),
+              (uint8_t)(aprsmsg.msg_id >> 24)
+          };
+          bool bUdpMsgIsNew = is_new_packet(udp_mid);
 
           bool bUDPtoLoraSend = true;
 
@@ -331,15 +405,8 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
             }
           }
 
-          // Check dedup ring first (same check that LoRa RX path uses)
-          uint8_t udp_mid[4] = {
-              (uint8_t)(aprsmsg.msg_id),
-              (uint8_t)(aprsmsg.msg_id >> 8),
-              (uint8_t)(aprsmsg.msg_id >> 16),
-              (uint8_t)(aprsmsg.msg_id >> 24)
-          };
-
-          if(is_new_packet(udp_mid))
+          // Dedup ring (same check the LoRa RX path uses), read above
+          if(bUdpMsgIsNew)
           {
             int icheck = checkOwnTx(aprsmsg.msg_id);
             if(icheck < 0)
@@ -355,7 +422,11 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 addTxRingEntry(convBuffer, (uint16_t)size, 0xFF, "udp_rx", 0); // 0xFF no retransmission for UDP relay messages
 
-                addLoraRxBuffer(aprsmsg.msg_id, true);
+                // TM-31: position frames were already entered into the dedup ring
+                // in the 0x21 branch above -- adding them again here would spend
+                // two ring slots per frame and halve the dedup window.
+                if(msg_type_b != 0x21)
+                    addLoraRxBuffer(aprsmsg.msg_id, true);
 
                 // add rcvMsg to BLE out Buff
                 // size message is int -> uint16_t buffer size
@@ -475,7 +546,14 @@ void sendMeshComUDP()
                 }
             }
 
-            Udp.endPacket();
+            {
+              bool tx_ok = Udp.endPacket() != 0;
+              udpCountTx(tx_ok);            // TM-31 instrument
+              if(bUDPLOG)
+                Serial.printf("[UDP];tx;ip;%s;port;%u;len;%u;ok;%d\n",
+                              node_hostip.toString().c_str(), (unsigned)UDP_PORT,
+                              (unsigned)msg_len, tx_ok ? 1 : 0);
+            }
 
             // Der Slot enthaelt msg_len Bytes ab Offset 1: 36 Byte UDP-Header,
             // danach der APRS-Frame. msg_len Bytes ab Offset 1+36 zu kopieren
@@ -1170,39 +1248,40 @@ bool checkWifiPing()
 
 String udpUpdateTimeClient()
 {
-  if(!timeClient.update())
+  // TM-35: ask for a refresh and return at once; the reply lands in getMeshComUDP()
+  timeClient.requestNow();
+  timeClient.loop();
+
+  if(!timeClient.isTimeSet())
   {
     printlndeb("TimeClient no update possible --> CPU-Mode");
-
-    /*
-    if(!timeClient.forceUpdate())
-    {
-      printlndeb("TimeClient no force update possible");
-      printlndeb("[WIFI-DBG] NTP update failed, will retry next cycle");
-    }
-    */
-
     return "none";
   }
-  else
-  {
-    if(bDisplayInfo)
-    {
-      printdeb("TimeClient now (UTC): ");
-      printlndeb(timeClient.getFormattedTime());
-    }
 
-    return timeClient.getFormattedTime();
+  if(bDisplayInfo)
+  {
+    printdeb("TimeClient now (UTC): ");
+    printlndeb(timeClient.getFormattedTime());
   }
+
+  return timeClient.getFormattedTime();
 }
 
 String udpGetTimeClient()
 {
+  timeClient.loop();
+
+  if(!timeClient.isTimeSet())
+    return "none";
+
   return timeClient.getFormattedTime();
 }
 
 String udpGetDateClient()
 {
+  if(!timeClient.isTimeSet())
+    return "none";
+
   return getDateTime(timeClient.getEpochTime());
 }
 

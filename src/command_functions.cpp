@@ -4571,6 +4571,21 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    if(commandCheck(msg_text+2, (char*)"udpstat") == 0)
+    {
+        // TM-31 bench hook: RX/TX counters of the MeshCom UDP socket
+        udpPrintStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // TM-31 bench hook: one [UDP];rx / [UDP];tx line per datagram
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"wifidrop") == 0)
     {
         // TM-34 bench hook: driver-side disconnect + re-select, no config change

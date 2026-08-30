@@ -16,7 +16,7 @@
 #include <lora_functions.h>
 #include <extudp_functions.h>
 
-#include <NTPClient.h>
+#include "ntp_async.h"
 #include <time.h>
 
 #include "printfdeb_functions.h"
@@ -25,7 +25,7 @@
 
 EthernetUDP Udp;
 
-NTPClient timeClient(Udp);
+NtpAsync timeClient(Udp);   // TM-35: non-blocking, reply harvested in getUDP()
 
 bool btimeClient = false;
 
@@ -332,10 +332,21 @@ int NrfETH::getUDP()
 
   if (packetSize <= UDP_TX_BUF_SIZE && packetSize > 0)
   {
+    IPAddress remote_ip = Udp.remoteIP();
+    uint16_t remote_port = Udp.remotePort();
+
     // read the packet
     { EthStall st("udp_read"); Udp.read(inc_udp_buffer, UDP_TX_BUF_SIZE); } // Read the packet into packetBufffer.
     s_ethUdpRx++;
     { uint32_t d = (uint32_t)(millis() - t0); if(d > s_ethUdpRxMaxMs) s_ethUdpRxMaxMs = d; }
+
+    // TM-35: the NTP reply shares this socket with the gateway traffic
+    if(timeClient.tryConsume(remote_ip, remote_port, inc_udp_buffer, packetSize))
+    {
+      memset(inc_udp_buffer, 0, UDP_TX_BUF_SIZE);
+      udp_is_busy = false;
+      return 0;
+    }
 
     // if more than n values are 00 we might have received a faulty message
     uint8_t zerocount = 0;
@@ -1083,6 +1094,7 @@ void NrfETH::startUDP()
     DEBUG_MSG("UDP_ETH", "UDP init successful!");
 
     timeClient.begin();
+    timeClient.setUpdateInterval(3600000);   // the 15-min caller drives it; this is the safety net
 
     btimeClient = true;
   }
@@ -1096,23 +1108,13 @@ String NrfETH::udpUpdateTimeClient()
   if(!btimeClient)
     return "none";
 
+  // TM-35: ask for a refresh and return at once; the reply lands in getUDP()
   EthStall st("ntp");
-  if(!timeClient.update())
-  {
+  timeClient.requestNow();
+  timeClient.loop();
 
-    printlndeb("TimeClient no update posible");
-
-    if(!timeClient.forceUpdate())
-    {
-      printlndeb("TimeClient no force update posible");
-
-      timeClient.end();
-      delay(2000);
-      timeClient.begin();
-  
-      return "none";
-    }    
-  }
+  if(!timeClient.isTimeSet())
+    return "none";
 
   if(bDisplayInfo)
   {
@@ -1128,6 +1130,11 @@ String NrfETH::udpGetTimeClient()
   if(!btimeClient)
     return "none";
 
+  timeClient.loop();
+
+  if(!timeClient.isTimeSet())
+    return "none";
+
   return timeClient.getFormattedTime();
 }
 
@@ -1135,7 +1142,10 @@ String NrfETH::udpGetDateClient()
 {
   if(!btimeClient)
     return "none";
-    
+
+  if(!timeClient.isTimeSet())
+    return "none";
+
   return getDateTime(timeClient.getEpochTime());
 }
 
@@ -1211,6 +1221,7 @@ void NrfETH::startFIXUDP()
   printlndeb(LOCAL_PORT);
 
   timeClient.begin();
+  timeClient.setUpdateInterval(3600000);   // the 15-min caller drives it; this is the safety net
 
   btimeClient = true;
 

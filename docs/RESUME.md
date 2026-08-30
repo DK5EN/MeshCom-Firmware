@@ -200,6 +200,67 @@ Build-flag experiments: `BENCH_BLE_ADV_LATE`, `BENCH_WIFI_NO_BSSID`.
   three boards; WPA3-only APs cannot associate with policy 1 (no PMF) — documented trade, an
   adaptive fallback (SAE first, PMF off after 2x `AUTH_EXPIRE`) would cost ~9 s on every boot.
 
+## 2026-08-30 afternoon: TM-35 async NTP, TM-31 unblocked + gateway defect
+
+- **TM-35 done.** `src/ntp_async.{h,cpp}` (`NtpAsync`) replaces `NTPClient` on both platforms: the
+  48-byte request goes out on the shared gateway socket and the call returns at once; the reply is
+  harvested by the normal receive path (`getUDP()` / `getMeshComUDP()` offer every datagram to
+  `tryConsume()` before parsing it as a MeshCom frame). 2.5 s timeout, 5 s/60 s backoff, mode-4 /
+  stratum / epoch validation, `[NTP];ok|timeout|txfail|kod` markers. It also removes a second
+  defect: `NTPClient::forceUpdate()` flushed _every_ queued datagram off the shared socket before
+  sending, so each refresh could eat pending GATE/CONF frames.
+  **Gate met:** RAK 600 s steady state `rak_instr600_ntpasync_b_20260830.json` — **loop max 145 ms,
+  0 gaps > 250 ms** (was 314 ms / 1 gap), `eth_state` max 2.9 ms (was carrying the 213 ms NTP
+  stall); the 15-min refresh fell inside the window at `[NTP];ok;epoch;1788084488;rtt;106`, i.e.
+  106 ms on the wire at zero loop cost. Native `test_ntp_async` 10/10.
+- **TM-31 unblocked — the LAN was never the problem.** The old "no datagram reaches the Mac"
+  verdict came from a blind instrument: the whole ESP32 UDP receive path logs only through
+  `DEBUG_MSG()` (compiled away, `DO_DEBUG 0`) and `printfdeb()` behind `--debug on`. New fork-only
+  instrument: `--udplog on/off` (`[UDP];rx`/`[UDP];tx` per datagram) and `--udpstat`
+  (`[UDPSTAT];bind;..;rx;..;tx;..;tx_fail;..`), counters always kept. Both directions measured
+  good: Mac -> Heltec 3/3, Heltec -> Mac 6/6 with `--srvip`. **No sudo tcpdump, no Orbi change.**
+- **TM-31 found a real gateway defect (ESP32 only), fixed.** `getMeshComUDPpacket()` evaluated the
+  dedup gate `is_new_packet()` _after_ the `msg_type_b == 0x21` branch had already inserted the
+  msg_id via `addLoraRxBuffer()` — so every UDP position frame deduplicated against the entry it
+  had just written itself (`RX_DEDUP_ADD slot N`, 17 ms later `RX_DEDUP_DUP slot N`) and an ESP32
+  gateway **never relayed a UDP position frame to LoRa**. Baseline `gwflood_instr_20260830.json`:
+  30 ingress, 36 `[UDP];rx` seen, **0 queued, 0 TX, 0 observer RX** at every inter-arrival from 8 s
+  to 0.5 s. Fix: read the dedup gate before that branch (`is_new_packet()` has no side effects),
+  and skip the now-redundant second insert on the queue path so the ring insert rate is unchanged.
+  The nRF52 gateway path never had the early insert. After the fix the injected frames radiate
+  (`TX-LoRa ... x02F9FE00/01/02`) and the T-Beam observer hears them (`RX-LoRa2 ... x02F9FE02`).
+- `gwflood.py` now enables `--udplog`, reports ingress / `[UDP];rx` seen / `RING_WRITE src=udp_rx`
+  queued / LoRa TX / observer RX so a loss is attributable to a stage, and falls back to a forced
+  `--reboot` for a node that does not reset when the port is opened (T-Beam v1.2).
+- **TM-31 result -- upstream #568 answered, with the mechanism named.** Definitive run
+  `gwflood_fixed_settle300_20260830.json` (30 frames, gaps 8/4/2/1/0.5 s, 300 s settle so the queue
+  can drain):
+
+  | gap  | in  | queued | tx  | rx  | ingress->air median | max   |
+  | ---- | --- | ------ | --- | --- | ------------------- | ----- |
+  | 8 s  | 6   | 6      | 6   | 3   | 78 s                | 226 s |
+  | 4 s  | 6   | 6      | 6   | 4   | 162 s               | 180 s |
+  | 2 s  | 6   | 6      | 6   | 5   | 241 s               | 291 s |
+  | 1 s  | 6   | 6      | 3   | 1   | 310 s               | 321 s |
+  | .5 s | 6   | 6      | 0   | 0   | --                  | --    |
+
+  **Nothing is lost at ingress** -- 30/30 datagrams reach the socket and 30/30 are queued. The
+  radio drains at roughly one frame per 20 s under bench channel load, so the ingress-to-air
+  latency climbs from 78 s to over 5 minutes. At 1 s and below the **20-slot TX ring saturates**
+  (`queued=19/20`) and the firmware then discards the arriving frame:
+  6x `RING_DROP_NEW ... prio=4 type=21 (queue full, no lower prio to evict)` (msg_ids
+  `...16/18/19/1A/1B/1C`, all in the 1 s and 0.5 s groups) plus 1x `RING_DROP_PRIO` that evicted the
+  node's **own** HEY (`type=40`) to make room. So a gateway fed faster than it can radiate does not
+  drop at the network edge -- it delays by minutes and then drops at the TX ring, and it starves
+  its own traffic while doing so. That matches #568 (the lost packet was the one on the shortest
+  inter-arrival) and our DG0OPK TX-queue-latency finding. From a user's point of view a message
+  radiated 4 minutes late is indistinguishable from lost, and downstream dedup windows will discard
+  it anyway.
+
+- Open on TM-31: the sweep uses corpus frame **f001, a position beacon**. Upstream #568 is about
+  **text messages** (0x3A, ~128 B), and the 0x3A path never had the early insert — so #568's own
+  timing question still needs a text-frame variant of the injector.
+
 ## Next session, in order
 
 Done in the 2026-08-29 waves: TD-03, UP-02, TM-22/10/27, TM-33 (a)/(b), TM-32, TM-13, TM-25/26,

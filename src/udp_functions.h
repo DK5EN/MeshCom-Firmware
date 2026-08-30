@@ -23,6 +23,11 @@ void wifiDnsPoll();          // apply resolved server/NTP addresses
 void wifiLinkHeartbeat();    // [WIFI];link every 60 s
 void wifiStat();             // --wifistat
 void wifiDrop();             // --wifidrop
+
+// TM-31: UDP path instrument (fork-only)
+extern bool bUDPLOG;         // --udplog on/off, one line per datagram
+void udpPrintStat();         // --udpstat
+void udpCountTx(bool ok);
 #endif
 
 // MeshCom UDP functions
