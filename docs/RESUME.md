@@ -1,17 +1,43 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 to ~14:15 plus the evening Waves 1-3 (see the first sections below) — Wave W (WiFi, TM-34) in the morning, then **TM-35
-(async NTP), TM-31 (UDP instrument, gateway relay fix, upstream #568 answered), TM-16 (boot time),
-TM-11/TD-01 closed, HL-03/HL-04**. All pushed (`df861d58`), working tree clean, branch
-`tdeck-partial-refresh-trace`. The WLAN report is
-[`wifi-report-20260830.md`](wifi-report-20260830.md) (German, before/after 0/24 → 24/24). The
-campaign backlog is [`BACKLOG.md`](BACKLOG.md) §3.8f (TM-01 … TM-37); read its "What the scouting
-settled" table before re-deriving anything.
+Last session: 2026-08-30, ~09:00 morning through ~23:00 night. Morning/afternoon: Wave W (WiFi,
+TM-34), TM-35, TM-31, TM-16, TM-11/TD-01, HL-01..04 (see the dated sections below). Evening/night:
+the `/orchestrate-waves` intake campaign — Waves 1-3, five commits, all detailed in the sections
+below. **HEAD `7b65233a`, pushed to `origin/tdeck-partial-refresh-trace`, working tree clean**
+(only untracked run artefacts under `tools/bench/runs/`). All four bench nodes run the HEAD build.
 
-**Bench state when we stopped:** all four nodes run the current build; the T-Deck's `node_mute` was
-left at 1, the persist flags at 0, as found. No background runs are alive — the 14-h WiFi soak
-(TM-36) died at ~12:17 when the TM-31 work took the Heltec and T-Beam ports. Upstream state, review verdict and branch model: §3.8g, §4.1,
-[`review/2026-08-29-upstream-sync-verdict.md`](review/2026-08-29-upstream-sync-verdict.md).
+## Pick up here — for the next agent
+
+Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority order:
+
+1. **TM-38 real run — needs the operator at the AP.** `docs/bench-ap-reboot.md`: set
+   `--gateway on` on T-Deck/Heltec/T-Beam first (no `[UDP];tx` otherwise), start
+   `tools/bench/experiments/apreboot.py`, cycle the APs on the prompt, `report` afterwards.
+   The runner survives the Mac losing WLAN; do not run it from inside a Claude session.
+2. **MEM-02 risk assessment** (BACKLOG §3.8m) — rings to boot-time heap, ~28 kB. Parked by
+   operator decision: assessment first (PSRAM/ISR trap, init order, `sizeof` traps,
+   zero-init), regression bar in the section. Do not implement before the verdicts are written.
+3. **UDP-01 reporter questions** (§3.8l) — firmware version, trigger, crash vs freeze,
+   gateway/webserver/extudpip state. Do not touch the W5100S setup gate
+   (`nrf52_main.cpp:1086`) before the answers; UDP-02 (fixed) may already explain the report
+   on ESP32 nodes.
+4. **TM-36** — restart the long WiFi soak (`wifisoak.py`, needs exclusive USB ports).
+5. **TM-28** — E290 Wireless Paper hardware arrives the week of 2026-09-01.
+6. Small follow-ups, all filed: nine scratch scripts in `tools/bench/experiments/` still
+   inject group `9999` (list in runbook §2.6); nRF52 `CONF` indicator unknown to ESP32 and
+   the nRF52 internet path has no per-country case (`bench-country-servers.md`); env
+   `E22_XML-DevKitC` does not build at HEAD (`command_functions.cpp:~5012` uses `WiFi`
+   without the headers in that variant — pre-existing); CS-03 secrets exposure when
+   `node_webpwd` is empty (operator decision); `GW-01` measure + `TLM-03` (intake items not
+   yet picked up).
+7. Then the upstream PR wave per BACKLOG §4.1 — operator decision on scope/timing; DK5EN
+   never merges upstream (Kurt reviews, [[upstream-no-self-merge]]).
+
+**Bench state at handover** (all four on USB, LoRa TX 2 dBm, all running HEAD): Heltec
+`DK5EN-93` — gateway off, `srv OE`, `--udplog off`, EXTUDP off, maxhop 4, DEBUG on; T-Beam
+`DK5EN-92` — webserver on, gateway off; T-Deck `DK5EN-14` — `node_mute` 1, persist flags 0;
+RAK `DK5EN-90` — gateway on (it is the bench gateway), EXTUDP on with `EXT IP 192.168.68.58`,
+maxhop 4. No background runs alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
 
 ## 2026-08-30 night: TM-43, UDP-01 answered, UDP-02 found+fixed, all 8 parser findings fixed, MEM-01
 
