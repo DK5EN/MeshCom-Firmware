@@ -14,7 +14,7 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 1. **TM-38 real run — DONE 2026-08-30 22:19, PASS on all four boards** (run dir
    `tools/bench/runs/apreboot_ap1_20260830-220423/`, verdict table in `summary.txt`, row status
    in BACKLOG §3.8f). ESP32 recovery ~97-99 s after t0 (Orbi reboot time), RAK Ethernet +9.6 s;
-   no watchdog, no reboot, no command. Follow-up filed as **TM-44** (§3.8f/l): the RAK printed
+   no watchdog, no reboot, no command. Follow-up filed as **TM-44 — DEFERRED by operator decision** (reasoning in the row: an unreachable-router gate creates worse failure modes than the 1.6 s block it removes): the RAK printed
    `[ETH];stall;ntp;ms;1609` during the outage — the TM-35 stall marker's first real catch
    (1.6 s loop block at the ntp site with the WAN dead, DNS suspect, once). Gateways restored
    to off on the three ESP32 nodes afterwards. ~~Original instructions:~~ `docs/bench-ap-reboot.md`: set
@@ -28,7 +28,12 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
    gateway/webserver/extudpip state. Do not touch the W5100S setup gate
    (`nrf52_main.cpp:1086`) before the answers; UDP-02 (fixed) may already explain the report
    on ESP32 nodes.
-4. **TM-36** — restart the long WiFi soak (`wifisoak.py`, needs exclusive USB ports).
+4. **TM-36 — RUNNING since 2026-08-30 22:42:46**: `wifisoak_night_20260830-224246/`, pid via
+   `pgrep -f wifisoak.py`, 9.1 h (ends ~07:49), drop every 600 s, T-Deck + Heltec + T-Beam,
+   **GPS OFF on all three (persisted!)** so NTP is exercised — `[NTP];ok` every 15 min is part
+   of what to check. The RAK is not in the soak. Analysis: `wifisoak.py --parse-only
+wifisoak_night_*/{tdeck,heltec,tbeam}.log`, then **restore `--gps on` on all three nodes**
+   and note it here. Do not open the three ports before the soak ends.
 5. **TM-28** — E290 Wireless Paper hardware arrives the week of 2026-09-01.
 6. Small follow-ups, all filed: nine scratch scripts in `tools/bench/experiments/` still
    inject group `9999` (list in runbook §2.6); nRF52 `CONF` indicator unknown to ESP32 and
