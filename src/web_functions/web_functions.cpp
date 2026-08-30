@@ -1934,10 +1934,24 @@ void setparam(String web_header)
  */
 void getparam(String web_header)
 {
-    web_header = web_header.substring(web_header.indexOf("/setparam/?") + 11, web_header.indexOf(" HTTP/1.1"));
+    // CS-04, zwei Fehler in zwei Zeilen -- beide auf DK5EN-98 nachgestellt:
+    //
+    //  1. Gesucht wurde "/setparam/?" statt "/getparam/?". indexOf() liefert
+    //     dann -1, und substring(-1+11 = 10, ...) schneidet den Namen aus der
+    //     falschen Stelle des Headers: aus "GET /getparam/?gateway HTTP/1.1"
+    //     wurde der Parametername "ram/?gateway" -> immer returncode 2.
+    //  2. Bei vorhandenem "=" wurde substring(indexOf("=")) genommen, also der
+    //     Teil AB dem Gleichheitszeichen. Der Kommentar sagt das Gegenteil
+    //     ("We only do need the parameter Name"): "/getparam/?gateway=" ergab
+    //     den Namen "=". Richtig ist substring(0, indexOf("=")).
+    //
+    // Damit war JEDES Lesen ueber die Web-API defekt, waehrend /setparam/
+    // funktionierte -- die Web-GUI faellt es nicht auf, weil sie ihre Werte aus
+    // den gerenderten Seiten nimmt, nicht ueber /getparam/.
+    web_header = web_header.substring(web_header.indexOf("/getparam/?") + 11, web_header.indexOf(" HTTP/1.1"));
     if (web_header.indexOf("=") > 0)
     {
-        web_header = web_header.substring(web_header.indexOf("=")); // maybe there is an unintended "=" or anything more. We only do need the parameter Name.
+        web_header = web_header.substring(0, web_header.indexOf("=")); // maybe there is an unintended "=" or anything more. We only do need the parameter Name.
     }
 
     web_header.trim();
