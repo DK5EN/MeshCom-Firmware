@@ -26,17 +26,22 @@ String hostname = "MeshCom-OTA";
 extern Preferences preferences;
 extern s_meshcom_settings meshcom_settings;
 
-bool updateInProgress = false;  // Flag to indicate if an update is in progress
+// TM-46: volatile -- written from the async_tcp task (OTA callbacks), read
+// from the Arduino loop task.
+volatile bool updateInProgress = false;  // Flag to indicate if an update is in progress
 
-unsigned int ota_timeout_timer = 0; // Timer to check if OTA was started. If not, reboot to app/ota partition
-unsigned int last_timer_update = 0; // Timer to update the last time the OTA was updated
-int wait_ota_timeout = 180 * 1000; // OTA Timeout in seconds
+// TM-46: explicit fallback-to-app rearm timestamp -- millis() at the last time
+// the window was (re)armed: at boot, on every OTA abort, and on OTA end. The
+// fallback fires when no update has been in progress for wait_ota_timeout ms
+// *since that arm*, not "the device has been up a while".
+volatile unsigned long fallback_armed_at = 0;
+int wait_ota_timeout = 180 * 1000; // OTA Timeout in ms
 boolean reboot_after_cancel = false; // Reboot after cancelling OTA if no update was started
 
 // TM-46: last time upload data actually arrived. Distinguishes an active
 // (still receiving chunks) upload from a stalled one -- only the latter gets
 // force-aborted by the fallback-to-app watchdog in loop().
-unsigned long last_ota_data_millis = 0;
+volatile unsigned long last_ota_data_millis = 0;
 const unsigned long OTA_STALL_TIMEOUT_MS = 30000; // TM-46: no data for this long => abort
  
 void startMDNS();
@@ -254,8 +259,7 @@ void wifiConnect() {
  void onOTAAbort(const char *reason)
  {
    updateInProgress = false;
-   ota_timeout_timer = millis();
-   last_timer_update = millis();
+   fallback_armed_at = millis();
    Serial.printf("[SAFEBOOT];ota;rearm;reason;%s\n", reason);
  }
 
@@ -264,8 +268,7 @@ void wifiConnect() {
    // TM-46: the session is over either way -- clear the in-progress flag and
    // re-arm the fallback timeout, matching the abort cleanup above.
    updateInProgress = false;
-   ota_timeout_timer = millis();
-   last_timer_update = millis();
+   fallback_armed_at = millis();
 
    // Log when OTA has finished
    if (success)
@@ -325,12 +328,11 @@ void wifiConnect() {
    });
  
    webServer.begin();
- 
-   ota_timeout_timer = millis();
-   last_timer_update = millis();
- 
+
+   fallback_armed_at = millis();
+
  }
- 
+
  void loop() {
    ElegantOTA.loop();
 
@@ -338,23 +340,27 @@ void wifiConnect() {
    // must be aborted -- otherwise updateInProgress stays true forever and the
    // fallback-to-app timeout below can never fire again. An ACTIVE upload
    // keeps refreshing last_ota_data_millis via onOTAProgress and is never hit.
-   if (updateInProgress && (millis() - last_ota_data_millis > OTA_STALL_TIMEOUT_MS))
+   // TM-46: SIGNED delta -- loop() races the async_tcp task: it can read
+   // millis() a moment BEFORE the upload callback stores a fresh (larger)
+   // last_ota_data_millis, and the unsigned difference then wraps to ~2^32,
+   // aborting a healthy upload seconds after it started (measured on the
+   // bench: abort;stalled in the same millisecond as the first progress
+   // callback). A negative delta stays negative in signed arithmetic.
+   if (updateInProgress && (long)(millis() - last_ota_data_millis) > (long)OTA_STALL_TIMEOUT_MS)
    {
      ElegantOTA.abortActiveUpdate("stalled");
    }
 
-   // Check if OTA was started. If not, reboot to app/ota partition
-   if((!updateInProgress && (ota_timeout_timer > wait_ota_timeout)) || reboot_after_cancel)
+   // Check if OTA was started. If not, reboot to app/ota partition.
+   // TM-46: this is elapsed time SINCE fallback_armed_at was last (re)armed,
+   // not raw uptime -- an abort or a finished OTA re-arms it, so a fresh
+   // wait_ota_timeout window always follows before this can fire. Signed
+   // delta for the same cross-task reason as the stall check above.
+   if((!updateInProgress && (long)(millis() - fallback_armed_at) > (long)wait_ota_timeout) || reboot_after_cancel)
    {
      Serial.println("OTA Start Timeout. Rebooting to app partition.");
      setBootPartition_APP();
      delay(1000);
      ESP.restart();
-   } 
-   
-   if (millis() - last_timer_update > 1000)
-   {
-     ota_timeout_timer = millis();
-     last_timer_update = millis();
    }
  }

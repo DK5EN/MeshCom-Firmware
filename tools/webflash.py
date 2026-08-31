@@ -104,6 +104,11 @@ def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optiona
     # HardWare[] table has entries like "TDECK+" (T-Deck Plus, conditional
     # table index 17); a class of only [A-Z0-9_-] silently truncated it to
     # "TDECK", which then collided with the plain T-Deck's "TDECK" entry.
+    # TM-46 retry case: after an aborted upload the node is still (or again) in
+    # safeboot and serves the OTA page instead of the app -- there is no
+    # hardware row to check against, but the OTA session is directly reachable.
+    if "<title>MeshCom OTA</title>" in body:
+        info["safeboot"] = "1"
     if m := re.search(r"Hardware</td><td>([A-Z0-9_+-]+)", body):
         info["hardware"] = m.group(1)
     if m := re.search(r"build: ([^<)]+)", body):
@@ -209,7 +214,15 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
         return OtaResult(ok=False, stage="not_reachable", fw_path=str(fw), fw_size=fw_size,
                           md5=md5, timings=timings, error=f"node not reachable at http://{host}/")
 
-    if not force and expect_hw and not hardware_matches(info.get("hardware"), expect_hw):
+    # TM-46 retry case: the node is already sitting in safeboot (aborted or
+    # stale OTA session). The app page -- and with it the hardware row -- is
+    # not available, and triggering safeboot again is pointless. Skip both and
+    # go straight to the (now self-cleaning, TM-46) OTA session.
+    in_safeboot = bool(info.get("safeboot"))
+    if in_safeboot:
+        phase("safeboot_resume", "")
+
+    if not in_safeboot and not force and expect_hw and not hardware_matches(info.get("hardware"), expect_hw):
         timings["total_s"] = time.monotonic() - t_all
         reported = info.get("hardware")
         hint = ""
@@ -222,13 +235,14 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
             error=f"hardware mismatch: node reports {reported!r}, "
                   f"expected {expect_hw!r}{hint} (--force to flash anyway)")
 
-    phase("trigger_safeboot", "callfunction/?otaupdate")
-    t = time.monotonic()
-    try:
-        get(f"http://{host}/callfunction/?otaupdate", 10.0)
-    except (urllib.error.URLError, OSError):
-        pass  # node reboots before answering; a dropped connection is the normal case
-    timings["trigger_safeboot_s"] = time.monotonic() - t
+    if not in_safeboot:
+        phase("trigger_safeboot", "callfunction/?otaupdate")
+        t = time.monotonic()
+        try:
+            get(f"http://{host}/callfunction/?otaupdate", 10.0)
+        except (urllib.error.URLError, OSError):
+            pass  # node reboots before answering; a dropped connection is the normal case
+        timings["trigger_safeboot_s"] = time.monotonic() - t
 
     phase("safeboot_wait", "")
     t = time.monotonic()
@@ -273,8 +287,17 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
     except (urllib.error.URLError, OSError) as e:
         timings["upload_s"] = time.monotonic() - t
         timings["total_s"] = time.monotonic() - t_all
+        # An HTTPError carries the safeboot's response body -- that is where
+        # Update.printError() lands, i.e. the actual reason. Do not drop it.
+        detail = ""
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                detail = " -- " + e.read().decode(errors="replace").strip()
+            except OSError:
+                pass
         return OtaResult(ok=False, stage="upload_failed", fw_path=str(fw), fw_size=fw_size,
-                          md5=md5, before=info, timings=timings, error=f"upload failed: {e}")
+                          md5=md5, before=info, timings=timings,
+                          error=f"upload failed: {e}{detail}")
     timings["upload_s"] = time.monotonic() - t
     if status != 200:
         timings["total_s"] = time.monotonic() - t_all
@@ -314,6 +337,11 @@ _FIXTURE_HELTEC_V3 = (
     "Meshcom 4.35p<br>(build: Aug 31 2026 12:00:00)\n"
 )
 
+_FIXTURE_SAFEBOOT = (
+    "<title>MeshCom OTA</title>\n"
+    "<h1>Safeboot OTA</h1>\n"
+)
+
 
 def run_self_test() -> int:
     """Offline parser checks (pattern: tools/resource_watch.py --self-test).
@@ -342,6 +370,15 @@ def run_self_test() -> int:
     check("heltec_v3 info parsed", heltec_v3 is not None)
     if heltec_v3 is not None:
         check("heltec_v3 hardware", heltec_v3.get("hardware") == "HELTEC_V3")
+        check("heltec_v3 not safeboot", heltec_v3.get("safeboot") is None)
+
+    # TM-46 retry case: the safeboot OTA page must be recognized so flash()
+    # can skip the (impossible) hardware check and the redundant trigger.
+    sb = node_info("fixture", get=fake_get(_FIXTURE_SAFEBOOT))
+    check("safeboot page parsed", sb is not None)
+    if sb is not None:
+        check("safeboot page detected", sb.get("safeboot") == "1")
+        check("safeboot page has no hardware", sb.get("hardware") is None)
 
     # ENV_HARDWARE must match what each env's own build reports (TM-47: was
     # "TDECK_PLUS", the *other* HardWare[] table's spelling -- BOARD_T_DECK_PLUS
@@ -409,6 +446,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         msg = {
             "firmware": f"Firmware: {detail}",
             "precheck": f"Checking node {detail} ...",
+            "safeboot_resume": "Node is already in safeboot (aborted session?) -- "
+                               "skipping hardware check and trigger ...",
             "trigger_safeboot": "Triggering safeboot (callfunction/?otaupdate) ...",
             "safeboot_wait": "Waiting for the safeboot web server ...",
             "ota_start": "Starting OTA session ...",

@@ -1,5 +1,25 @@
 # RESUME — pick up here
 
+## 2026-08-31 late evening: TM-46/47/48 fixed and bench-proven, TM-49 filed
+
+The OTA tooling wave (orchestrate-waves, one safeboot writer + one tool writer, plus two
+orchestrator follow-ups driven by bench evidence): **TM-47** webflash keeps the `+` in
+hardware strings, expects `TDECK+`, safeboot-resume path, `--self-test`; **TM-48** the
+safeboot WLAN join now uses the production TM-34 pattern (driver-picked AP, PMF-off,
+`[SAFEBOOT];wifi;pmf_off;rc;0` proven, ~170 kB/s at the -74 dBm desk link); **TM-46**
+aborted-upload recovery — central `abortActiveUpdate()`, onDisconnect hook with a session
+generation counter, explicit `fallback_armed_at`, and the decisive bench find: a
+cross-task unsigned-underflow race let the stall watchdog abort every healthy upload
+(fixed with signed deltas + volatile). Abort-retry proven twice on DK5EN-14 (kill 5 s into
+the upload -> immediate retry completes, no `--force`). **TM-49 filed (open, Medium)**: the
+ElegantOTA completion handler can see `hasError==false` after a disconnect (final frame
+never arrived) and switch boot partitions after a partial write — benign on the 16-MB
+T-Deck (slot validation), dangerous on 4-MB single-slot boards; needs a guard + bench
+proof before the next release. Safeboot serial on native-USB boards is visible only with
+the opt-in `ARDUINO_USB_CDC_ON_BOOT` flag (commented in the safeboot env, documented).
+Note: the fleet's OLD safeboots (93/92/98/90) predate these fixes — they update at the
+next full-layout USB flash, not via OTA.
+
 ## 2026-08-31 evening: Release v4.35p.08.31-stability published, fleet flashed
 
 **Release published**: [v4.35p.08.31-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31-stability)
