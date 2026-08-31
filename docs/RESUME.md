@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## 2026-08-31 night: BP-01 notice reframing, release v4.35p.08.31.2-stability
+
+**DJ8MEH RCA** (console log, 3x `[BP];refuse` invisible to the sender): messages 1-7 went
+out on UDP+HF, 8-10 were refused by BP-01 — correctly at first, but the QRT episode then
+ran 8 minutes on **phantom depth**: `txRingDepth()` is `iWrite-iRead` and counts freed
+holes behind a starved prio-5 entry pinning iRead (RING_STATUS showed queued=19 with 3-4
+real entries); QRV only closes at depth 0. Three fixes filed, none shipped yet: count
+occupied slots, age/promote starved background entries, QRV low-water band. **BP-01
+notice reframing shipped instead** (items 153-156 + TM-46/47/48 = second release cut):
+notices now arrive as a normal message from the node's own callsign — BLE/web frame via
+`bp_notice_frame.h` (was pseudo-sender "response" -> McApp spam class 9999), EXTUDP as a
+LoRa-shaped `type:"msg"` JSON via `extern_notice_json.h` (was `type:"notice"`, rendered
+by nobody). Two new native suites pin both framings (fails-before verified); gate
+445/445 in 12 envs. **Release
+[v4.35p.08.31.2-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31.2-stability)
+published** (39 assets, same recipe as the morning cut; safeboot bins byte-identical to
+the tracked ones — the 5286c294 bins were already built from the e5882a0f source state);
+the morning release object v4.35p.08.31-stability is **deleted, its tag kept** as a
+marker on a40b812e. Whole fleet (14/93/92/90/98) runs the BP-fix build from 8bdd5c23
+(same source as the release, docs-only delta). Still unconfirmed: McApp display of the
+new sender framing (the afternoon test ran against the old firmware). TM-49 remains open
+and is now stated in the release's Known gaps.
+
 ## 2026-08-31 late evening: TM-46/47/48 fixed and bench-proven, TM-49 filed
 
 The OTA tooling wave (orchestrate-waves, one safeboot writer + one tool writer, plus two
