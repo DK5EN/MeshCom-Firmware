@@ -1,5 +1,30 @@
 # RESUME — pick up here
 
+## 2026-08-31 late night: BP-02/03/04 shipped (backpressure RCA fixes)
+
+The three DJ8MEH-RCA fixes, implemented as advisor-gated waves (plan + both
+verdicts archived in `docs/archive/bp-rca-fixes-*.md`): **BP-02** (`e501e63c`)
+`txRingDepth()` counts occupied slots, all report sites unified, `RING_STATUS`
+carries `dist=`, both RING_ZOMBIE detectors ported (queued fallback for old
+logs); **BP-03** (`180917a1`) 2-s main-loop sweep `txRingAgeBackground()` drops
+BACKGROUND entries >180 s (`RING_DROP_STALE`), atomically under the nRF52 lock,
+deliberately NOT in `getNextTxSlot()` (runs on the timer task — the plan
+advisor's critical catch); **BP-04** (`fdda7f2a`) QRV closes in the water band
+(depth 1) after a 10-s hold, depth 0 immediate, time injected, anti-flap
+pinned. 11 new native cases, all fails-before-verified; every wave got a
+fresh Fable advisor gate (wave 1: one real rework, RING_TX_READ still printed
+the old distance). On top: **`test_bp_regression`** (native_aprs), the
+integrated DJ8MEH end-to-end replay over the real ring + real state machine —
+burst→QRT→drain-with-pinned-blocker→QRV in 10 s (field: 8 min), blocker
+age-out path, and an over-correction guard (QRT still fires at 80 %); each of
+the three fixes individually mutation-verified to turn the suite red. The
+full BP regression family runs as two commands (documented in the suite
+header; a single cross-env `pio test -f` call ERRORs on foreign suites
+instead of skipping them). NOT yet done: bench replay of the DJ8MEH burst on
+the new build, fleet not reflashed (still runs the 08.31.2 release build
+without these fixes), next release must mention the `queued`/`dist`
+log-semantics change and the stale-HEY on-air effect.
+
 ## 2026-08-31 night: BP-01 notice reframing, release v4.35p.08.31.2-stability
 
 **DJ8MEH RCA** (console log, 3x `[BP];refuse` invisible to the sender): messages 1-7 went
