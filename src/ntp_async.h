@@ -64,3 +64,42 @@ private:
     uint32_t _pendingSince = 0; // 0 = no request in flight
     uint16_t _fails = 0;
 };
+
+/**
+ * TM-45: on both platforms the reply to sendRequest() is only ever picked up
+ * by the gateway's receive path (getMeshComUDP() on ESP32, NrfETH::getUDP()
+ * on nRF52), which itself only runs while bGATEWAY is on. A non-gateway node
+ * therefore transmits every request fine and then always times out -- the
+ * reply sits unread in the socket. This is the harvest-only substitute for
+ * that path: poll the socket for at most one datagram, offer it to
+ * tryConsume(), and drop it either way. There is no gateway consumer to hand
+ * a non-NTP datagram to here, so silently discarding it is the point, not a
+ * bug.
+ *
+ * Templated (instead of a virtual UDP::parsePacket()/read()/remoteIP()/
+ * remotePort()) so it runs unchanged against the concrete WiFiUDP and
+ * EthernetUDP objects each platform already owns -- and against a plain
+ * mock in the native test, without widening the abstract UDP interface
+ * NtpAsync itself is built against.
+ *
+ * Caller contract: invoke this only when nothing else is draining the same
+ * socket this loop pass (i.e. the bGATEWAY-on branch did not just call
+ * getMeshComUDP()/getUDP()), or the two reads race for the same datagram.
+ */
+template <typename UdpT>
+void ntpHarvestReply(UdpT &udp, NtpAsync &client)
+{
+    int packetSize = udp.parsePacket();
+    if(packetSize <= 0)
+        return;
+
+    uint8_t buf[NTP_ASYNC_PACKET_SIZE + 16];
+    IPAddress remoteIp = udp.remoteIP();
+    uint16_t remotePort = udp.remotePort();
+
+    int len = udp.read(buf, (int)sizeof(buf));
+    if(len <= 0)
+        return;
+
+    client.tryConsume(remoteIp, remotePort, buf, len);
+}

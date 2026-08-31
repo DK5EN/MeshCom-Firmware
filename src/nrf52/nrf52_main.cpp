@@ -2065,6 +2065,14 @@ void nrf52loop()
             }
         }
     }
+    else if(neth.hasIPaddress)
+    {
+        // TM-45: the block above never runs while bGATEWAY is off, so it
+        // never reads the socket -- do only the NTP-reply harvest instead
+        // of the full gateway receive path (no double read: exactly one of
+        // the two branches runs per loop pass).
+        INSTR_SECTION("udp"); neth.harvestNTP();
+    }
 
     #if defined(SHTC3)
 

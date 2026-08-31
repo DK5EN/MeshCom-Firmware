@@ -329,6 +329,21 @@ int NrfETH::checkUDP()
 
 }
 
+/**@brief TM-45: harvest-only substitute for getUDP(), for a bGATEWAY-off
+ * node (nrf52_main.cpp only calls getUDP() from the bGATEWAY-on branch, so
+ * without this the reply to timeClient's own sendRequest() never gets
+ * read). Same socket, same NtpAsync instance -- but none of getUDP()'s
+ * GATE/CONF/BEAT parsing or gateway bookkeeping (last_upd_timer, [GW];rx,
+ * ...), since there is no gateway consumer for a non-NTP datagram here.
+ */
+void NrfETH::harvestNTP()
+{
+  if(!hasIPaddress)
+    return;
+
+  ntpHarvestReply(Udp, timeClient);
+}
+
 /**@brief Method to receive UDP packets
  */
 int NrfETH::getUDP()

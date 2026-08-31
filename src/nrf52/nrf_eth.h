@@ -49,6 +49,11 @@ class NrfETH {
 
     int getUDP();
 
+    // TM-45: harvest-only substitute for getUDP(), for a bGATEWAY-off node.
+    // Call this instead when nothing else is draining the socket this loop
+    // pass, so a non-gateway node's own NTP replies still get read.
+    void harvestNTP();
+
     void fillUDP_RING_BUFFER(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size);
 
     int lora_tx_msg_len;

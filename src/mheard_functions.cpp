@@ -38,7 +38,30 @@ double mheardLat[MAX_MHEARD];
 double mheardLon[MAX_MHEARD];
 int mheardAlt[MAX_MHEARD];
 unsigned long mheardEpoch[MAX_MHEARD];
+
+// NC-01 (BACKLOG SS3.8o): monotonic heard-time, parallel to mheardEpoch[].
+// mheardEpoch[] stays wall-clock-based (getUnixClock()) and unchanged for
+// display/JSON, but a node with no NTP/GPS has no valid wall clock --
+// getUnixClock() runs mktime() on unset date fields, which yields garbage
+// (up to (unsigned long)-1). Aging entries by mheardEpoch[]+window vs.
+// getUnixClock() then wraps and every entry looks stale, even ones just
+// heard (loop_functions.cpp NCNT tag stays 0 forever). mheardMillis[] ages
+// entries by millis() instead, which needs no wall clock. Declared uint32_t
+// (not unsigned long): millis() is a 32-bit counter on every real target
+// (nRF52840/ESP32 `unsigned long` is 4 bytes there), and the rollover-safe
+// subtraction below relies on that width -- on the native/x86_64 test host
+// `unsigned long` is 8 bytes, so an explicit uint32_t keeps the same
+// wraparound behaviour there too instead of silently losing it.
+uint32_t mheardMillis[MAX_MHEARD];
 int mheardNCount[MAX_MHEARD];
+
+// NC-01: aging windows in milliseconds, mirroring the epoch-second windows
+// they replace (1 h / 12 h) at every mheardMillis[] comparison below. Both
+// are far below the ~49.7 day uint32_t rollover, so plain rollover-safe
+// unsigned subtraction (see comparisons below) is correct with no extra
+// rollover handling.
+#define MHEARD_AGE_WINDOW_MS   (60UL*60UL*1000UL)         // 1 h -- getMheardCount()
+#define MHEARD_PRUNE_WINDOW_MS (60UL*60UL*12UL*1000UL)    // 12 h -- updateMheard()/sendMheard()/showMHeard()
 
 unsigned char mheardPathBuffer1[MAX_MHPATH][50]; //Ringbuffer for MHeard Sourcepath
 char mheardPathCalls[MAX_MHPATH][10]; //Ringbuffer for MHeard Key = Call
@@ -68,6 +91,7 @@ void initMheard()
         mheardLon[iset]=0;
         mheardAlt[iset]=0;
         mheardEpoch[iset]=0;
+        mheardMillis[iset]=0;
         mheardNCount[iset]=0;
     }
 
@@ -197,6 +221,9 @@ void saveMHeardPersistence()
         file.write((uint8_t*)mheardLat, sizeof(mheardLat));
         file.write((uint8_t*)mheardLon, sizeof(mheardLon));
         file.write((uint8_t*)mheardEpoch, sizeof(mheardEpoch));
+        // mheardMillis[] (NC-01) is intentionally NOT persisted: millis()
+        // resets to 0 every boot, so a saved monotonic stamp would be
+        // meaningless after a reboot. loadMHeardPersistence() re-derives it.
         file.write((uint8_t*)mheardNCount, sizeof(mheardNCount));
         file.close();
     #endif
@@ -256,8 +283,9 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     {
         if(mheardCalls[iset][0] != 0x00)
         {
-            // DELETE after 12h
-            if((mheardEpoch[iset]+(60*60*12)) < getUnixClock())   // mheard last 12 hours
+            // DELETE after 12h -- aged by millis(), not by the (possibly
+            // clockless) wall clock, see mheardMillis[] above (NC-01).
+            if((uint32_t)(millis() - mheardMillis[iset]) >= MHEARD_PRUNE_WINDOW_MS)
             {
                 mheardCalls[iset][0] = 0x00;
                 inext = iset;   // gerade frei geworden
@@ -323,6 +351,7 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
     memcpy(mheardCalls[ipos], mheardLine.mh_callsign.c_str(), icsize);
     
     mheardEpoch[ipos] = getUnixClock();
+    mheardMillis[ipos] = (uint32_t)millis();   // NC-01: monotonic heard-time
 
     if(bOld)
     {
@@ -605,7 +634,10 @@ int getMheardCount()
     {
         if(mheardCalls[iset][0] != 0x00)
         {
-            if((mheardEpoch[iset]+(60*60)) > getUnixClock())  // mheard count only last hour
+            // NC-01: aged by millis(), see mheardMillis[] above -- a node
+            // with no valid wall clock still counts its recently-heard
+            // neighbours (this is the /N tag in the position beacon).
+            if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_AGE_WINDOW_MS)  // mheard count only last hour
             {
                 imhcount++;
             }
@@ -639,7 +671,7 @@ void sendMheard()
     {
         if(mheardCalls[iset][0] != 0x00)
         {
-            if((mheardEpoch[iset]+(60*60*12)) > getUnixClock())  // mheard last 12 hours
+            if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
             {
                 initMheardLine(mheardLine);
 
@@ -717,7 +749,7 @@ void showMHeard()
     {
         if(mheardCalls[iset][0] != 0x00)
         {
-            if((mheardEpoch[iset]+(60*60*12)) > getUnixClock())  // mheard last 12 hours
+            if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
             {
                 printlndeb("|------------|------------|----------|-----|-----------------|-----|------|------|------|----|---|----|");
 
@@ -981,6 +1013,21 @@ void showPathTDECK()
 }
 #endif
 
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+// NC-01: is the wall clock (meshcom_settings.node_date_*) trustworthy right
+// now? Mirrors updateMheard()'s own "strYear.toInt() < 2025" guard -- a
+// node with no NTP/GPS boots with node_date_year unset (0, see
+// nrf52_main.cpp/esp32_main.cpp), never a real year >= 2025. Only needed at
+// SD-persistence load time (below), to decide how to seed mheardMillis[]
+// for entries restored from a previous boot; the millis()-based aging in
+// updateMheard()/getMheardCount()/sendMheard()/showMHeard() never calls
+// this. File-local: not a replacement for getUnixClock() callers elsewhere.
+static bool isWallClockValid()
+{
+    return meshcom_settings.node_date_year >= 2025;
+}
+#endif
+
 void loadMHeardPersistence()
 {
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
@@ -1012,6 +1059,40 @@ void loadMHeardPersistence()
         file.read((uint8_t*)mheardEpoch, sizeof(mheardEpoch));
         file.read((uint8_t*)mheardNCount, sizeof(mheardNCount));
         file.close();
+
+        // NC-01: mheardMillis[] was not in the file (see saveMHeardPersistence()) --
+        // millis() restarts at 0 every boot, so re-derive an initial age instead
+        // of leaving it at its zero-init value (which would read every restored
+        // entry as heard 0 ms ago AND as heard `now`, wrongly extending its
+        // 12h/1h lifetime by a full boot's worth of elapsed wall-clock time).
+        // If the wall clock is valid already (RTC battery, or a fast NTP/GPS
+        // fix before this runs), convert the saved epoch age into an
+        // equivalent millis() age. Otherwise -- no valid wall clock yet,
+        // exactly the NC-01 scenario -- treat every restored entry as just
+        // heard: an unverifiable age is safer treated as fresh (still shown,
+        // still counted) than silently dropped.
+        uint32_t loadMillis = (uint32_t)millis();
+        bool bWallClockValid = isWallClockValid();
+        unsigned long nowEpoch = bWallClockValid ? getUnixClock() : 0;
+        for(int i=0; i<MAX_MHEARD; i++)
+        {
+            if(mheardCalls[i][0] == 0x00)
+            {
+                mheardMillis[i] = 0;
+                continue;
+            }
+
+            if(bWallClockValid && nowEpoch > mheardEpoch[i])
+            {
+                unsigned long ageMs = (nowEpoch - mheardEpoch[i]) * 1000UL;
+                mheardMillis[i] = (ageMs < loadMillis) ? (loadMillis - (uint32_t)ageMs) : 0;
+            }
+            else
+            {
+                mheardMillis[i] = loadMillis;   // treat as just heard
+            }
+        }
+
         showMHeardTDECK();
     #endif
 }

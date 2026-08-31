@@ -38,6 +38,14 @@ void startMeshComUDP();
 void sendMeshComHeartbeat();
 void resetMeshComUDP();
 
+#if defined(ESP32)
+// TM-45: getMeshComUDP() (and the NTP-reply harvest it does as a side
+// effect) only runs from the bGATEWAY-on branch in esp32_main.cpp. Call
+// this instead from the bGATEWAY-off branch, so a non-gateway node's own
+// NTP replies still get read off the socket.
+void ntpHarvestUDP();
+#endif
+
 void addNodeData(uint8_t msg_buffer[300], uint16_t size, int16_t rssi, int8_t snr);
 void addUdpOutBuffer(uint8_t *buffer, uint16_t len); // function adds outgoing udp messages in the udp_out_ringbuffer
 void sendKEEP();

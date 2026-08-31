@@ -177,6 +177,26 @@ void getMeshComUDP()
   }
 }
 
+// TM-45: harvest-only substitute for getMeshComUDP(), for a bGATEWAY-off
+// node. Same socket, same NtpAsync instance -- but no GATE/CONF/BEAT
+// parsing and no gateway bookkeeping (last_upd_timer, [GW];rx, ...), since
+// there is no gateway consumer for a non-NTP datagram on this path.
+// esp32_main.cpp calls this only from the bGATEWAY-off branch, so it never
+// runs in the same loop pass as getMeshComUDP() -- one read of the socket
+// per pass either way.
+void ntpHarvestUDP()
+{
+  if(bWIFIAP)
+    return;
+
+  meshcom_settings.node_hasIPaddress = hasIPaddress;
+
+  if(!hasIPaddress)
+    return;
+
+  ntpHarvestReply(Udp, timeClient);
+}
+
 // UDP functions
 void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int packetSize)
 {

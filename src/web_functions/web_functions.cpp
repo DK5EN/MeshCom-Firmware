@@ -854,13 +854,13 @@ void deliver_scaffold(bool bget_password)
     // this function is used to load content depending on the navigation button pressed
     web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
-    web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+document.getElementById(\"sendcall\").value+\"&message=\"+encodeURI(document.getElementById(\"messagetext\").value),true);xhttp.send();document.getElementById(\"sendcall\").value=\"\"; document.getElementById(\"messagetext\").value=\"\";}\n");
+    web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();document.getElementById(\"sendcall\").value=\"\"; document.getElementById(\"messagetext\").value=\"\";}\n");
     // this functions is counting and displaying the amount of chars left that the user can use to write a message
     web_client.println("function updateCharsLeft() {let maxlength=149;if(document.getElementById(\"sendcall\").value.length>0) {maxlength-=(document.getElementById(\"sendcall\").value.length)+2;}let msglength=document.getElementById(\"messagetext\").value.length;if(msglength>maxlength){document.getElementById(\"messagetext\").value=document.getElementById(\"messagetext\").value.substring(0,maxlength);msglength=maxlength;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
     // this function is an ayncronous loader that is used to update the received messages without re-loading the whole page, it will re-call itself after a timeout as long as the message-page is displayed
     web_client.println("function updateMessages() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){if(document.getElementById(\"messages_panel\")!=null)document.getElementById(\"messages_panel\").innerHTML=decodeURIComponent(this.responseText);}};setTimeout(function(){xhttp.open(\"GET\",\"/?getmessages\",true);xhttp.send();},1000);}\n");
     //  this function sends a parameter:value request to the backend
-    web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+value).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
+    web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
     // this function invokes a function call to the backend passing the function name and an optional parameter (e.g. sendpos)
     web_client.println("function callfunction(functionname,functionparameter){fetch(\"/callfunction/?\"+functionname+\"=\"+functionparameter).then(function(response){return response.json();}).then(function (jsonResponse) {/*Nothing todo yet.*/})}\n");
     // CS-03: config restore. Lives here and not in the setup page, because the
@@ -1061,6 +1061,53 @@ void sub_page_login()
  */
 static int increment_mod(int i, int n) {
     return (i + 1) % n;
+}
+
+/**
+ * ###########################################################################################################################
+ * escapes a string for safe inclusion in HTML output (WEB-03a: mesh-derived strings such as
+ * message payloads, callsigns and paths are attacker-controlled and must not reach innerHTML raw)
+ */
+static String htmlEscape(const String &input)
+{
+    String out;
+    out.reserve(input.length());
+    for (unsigned int i = 0; i < input.length(); i++)
+    {
+        char c = input.charAt(i);
+        switch (c)
+        {
+            case '&':  out += "&amp;";  break;
+            case '<':  out += "&lt;";   break;
+            case '>':  out += "&gt;";   break;
+            case '"':  out += "&quot;"; break;
+            case '\'': out += "&#39;";  break;
+            default:   out += c;        break;
+        }
+    }
+    return out;
+}
+
+/**
+ * ###########################################################################################################################
+ * resolves the NTP server the node actually uses (WEB-01): own override if set, else the same
+ * default selection udp_functions.cpp:1495-1536 applies when connecting. No clean read-only
+ * extern exposes that resolved choice, so the selection is duplicated here (read-only mirror).
+ */
+static String getEffectiveNtpServer()
+{
+    if (strlen(meshcom_settings.node_ownntp) >= 7)
+        return String(meshcom_settings.node_ownntp);
+
+    IPAddress webNtpIp;
+    webNtpIp.fromString(meshcom_settings.node_ip);
+
+    bool bHamnet = (webNtpIp[0] == 44 || meshcom_settings.node_hamnet_only == 1);
+
+    if (bHamnet)
+        return (webNtpIp[1] == 143) ? "44.143.0.9 (default)" : "44.148.224.123 (default)";
+    else
+        return "pool.ntp.org (default)";
 }
 
 /**
@@ -1611,17 +1658,22 @@ void sub_content_messages()
                     if (msgtxt.indexOf('{') > 0)
                         msgtxt = aprsmsg.msg_payload.substring(0, msgtxt.indexOf('{'));
 
+                    // WEB-03a: mesh-derived strings (payload, path, callsigns) are attacker-controlled -- escape before HTML output
+                    String msgtxt_esc = htmlEscape(msgtxt);
+                    String msg_source_path_esc = htmlEscape(aprsmsg.msg_source_path);
+                    String msg_destination_path_esc = htmlEscape(aprsmsg.msg_destination_path);
+
                     // messages by others
                     if (is_equ(meshcom_settings.node_call, aprsmsg.msg_source_call.c_str()))
                     {
                         web_client.printf("<div class=\"message message-send\"><div>");
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
-                        web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", aprsmsg.msg_source_path.c_str(), aprsmsg.msg_source_path.c_str());
-                        web_client.printf("%s%s</p>", (char *)">", aprsmsg.msg_destination_path.c_str());
+                        web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
+                        web_client.printf("%s%s</p>", (char *)">", msg_destination_path_esc.c_str());
 
                         web_client.printf("<p class=\"font-small font-bold\">%s</p>", timestamp);
-                        web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt.c_str());
+                        web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt_esc.c_str());
                         web_client.printf("</div></div>");
                     }
                     // own messages
@@ -1630,11 +1682,11 @@ void sub_content_messages()
                         web_client.printf("<div class=\"message message-received\"><div>");
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
-                        web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", aprsmsg.msg_source_path.c_str(), aprsmsg.msg_source_path.c_str());
-                        web_client.printf("%s%s</p>", (char *)">", aprsmsg.msg_destination_path.c_str());
+                        web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
+                        web_client.printf("%s%s</p>", (char *)">", msg_destination_path_esc.c_str());
 
                         web_client.printf("<p class=\"font-small font-bold\">%s</p>", timestamp);
-                        web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt.c_str());
+                        web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt_esc.c_str());
                         web_client.printf("</div></div>");
                     }
                 }
@@ -1813,7 +1865,11 @@ void sub_page_info()
         if (bWIFIAP)
             web_client.printf("<tr><td>WiFi SSID</td><td>%s</td></tr>\n", cBLEName);
         else
+        {
             web_client.printf("<tr><td>WiFi SSID</td><td>%s</td></tr>\n", meshcom_settings.node_ssid);
+            // WEB-02: shows which AP the node associated with when several APs share the same SSID (mesh sets)
+            web_client.printf("<tr><td>WiFi BSSID</td><td>%s</td></tr>\n", WiFi.BSSIDstr().c_str());
+        }
 
         web_client.printf("<tr><td>WiFi AP</td><td>%s</td></tr>\n", (bWIFIAP ? "yes" : "no"));
         web_client.printf("<tr><td>WiFi RSSI</td><td>%i</td></tr>\n", WiFi.RSSI()); 
@@ -1837,7 +1893,7 @@ void sub_page_info()
         {
             web_client.printf("<tr><td>GW address</td><td>%s</td></tr>\n", meshcom_settings.node_gw);
             web_client.printf("<tr><td>DNS address</td><td>%s</td></tr>\n", meshcom_settings.node_dns);
-            web_client.printf("<tr><td>NTP address</td><td>%s</td></tr>\n", meshcom_settings.node_ownntp);
+            web_client.printf("<tr><td>NTP address</td><td>%s</td></tr>\n", getEffectiveNtpServer().c_str());
         }
     
     }

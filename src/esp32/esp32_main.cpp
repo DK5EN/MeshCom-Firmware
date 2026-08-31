@@ -3764,6 +3764,14 @@ void esp32loop()
         meshcom_settings.node_last_upd_timer = hb_timer;
 
     }
+    else if(meshcom_settings.node_hasIPaddress)
+    {
+        // TM-45: bGATEWAY is off, so the block above never runs and never
+        // reads the socket -- do only the NTP-reply harvest instead, not
+        // the full gateway receive path (no double read: exactly one of
+        // the two branches runs per loop pass).
+        INSTR_SECTION("udp"); ntpHarvestUDP();
+    }
 
     if(bEXTUDP)
     {
