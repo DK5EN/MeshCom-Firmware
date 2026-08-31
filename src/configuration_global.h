@@ -70,8 +70,14 @@ inline bool isUnconfiguredCall(const char *call)
 // beim Sprung 20260724 -> 20260821 passiert: dieser Commit hat esp32_flash.h
 // nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
 //
-// Letzte echte Layout-Aenderung: 6e7c012a (2026-07-24), node_pingmax,
-// node_pingcount und node_pingduration kamen hinzu. Daher 20260724.
+// FLASH_VERSION 20260828 ist der Release-Stempel v4.35p.08.28-stability --
+// rein informativ, loest kein clear_flash() aus.
+//
+// FLASH_STRUCT_VERSION bleibt 20260724: letzte echte Layout-Aenderung war
+// 6e7c012a (2026-07-24), node_pingmax, node_pingcount und node_pingduration
+// kamen hinzu. Alles seither (auch die neuen Features wie max_hop_text) nutzt
+// auf ESP32 eigene NVS-Keys bzw. freie Bits bestehender Felder und aendert
+// das Struct-Layout nicht.
 #define FLASH_VERSION 20260828
 #define FLASH_STRUCT_VERSION 20260724
 
