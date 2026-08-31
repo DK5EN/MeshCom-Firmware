@@ -1,57 +1,51 @@
 # RESUME — pick up here
 
-Last session: 2026-08-30, ~09:00 morning through ~23:00 night. Morning/afternoon: Wave W (WiFi,
-TM-34), TM-35, TM-31, TM-16, TM-11/TD-01, HL-01..04 (see the dated sections below). Evening/night:
-the `/orchestrate-waves` intake campaign — Waves 1-3, five commits, all detailed in the sections
-below. **Everything is pushed to `origin/tdeck-partial-refresh-trace`, working tree clean** (only
-untracked run artefacts under `tools/bench/runs/`); the last code commit is `7b65233a`, this
-hand-over doc sits on top. All four bench nodes run the `7b65233a` build.
+Last session: 2026-08-31, morning through afternoon. The full 3.8o/3.8p intake campaign was
+implemented via `/orchestrate-waves` (Waves 1+2: WEB-01..04, NC-01/02, MH-02, TM-45, TM-39-CONF,
+BAT-01/02, CHR-01/02, JSN-01, TD-07/08, ETH-01, CONF-01, CTY-01, PM-01, NTP-01, DOC-02 text,
+PRES-01/02, DOC-01/03/04), gated (438 native cases / 12 envs, 7 standard targets build), bench-
+proven where reachable ([NTP];ok rtt 37-89, NCNT 0->1 on DK5EN-90, "USB (no battery)" on
+DK5EN-93/-14, web NTP/BSSID rows live), and pushed. The bench regression caught and fixed one
+real gap (`--ntpsync` was a silent no-op with a GPS fix). **PR draft for the upstream
+follow-up lives in `docs/pr-draft-20260831.md`** (firmware-only, full per-change granularity,
+open cut questions in its Teil E). Last code commit `a3ae913f` (FLASH_VERSION comment),
+everything pushed to `origin/tdeck-partial-refresh-trace`, working tree clean. All four bench
+nodes run the final build.
 
 ## Pick up here — for the next agent
 
 Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority order:
 
-1. **TM-38 real run — DONE 2026-08-30 22:19, PASS on all four boards** (run dir
-   `tools/bench/runs/apreboot_ap1_20260830-220423/`, verdict table in `summary.txt`, row status
-   in BACKLOG §3.8f). ESP32 recovery ~97-99 s after t0 (Orbi reboot time), RAK Ethernet +9.6 s;
-   no watchdog, no reboot, no command. Follow-up filed as **TM-44 — DEFERRED by operator decision** (reasoning in the row: an unreachable-router gate creates worse failure modes than the 1.6 s block it removes): the RAK printed
-   `[ETH];stall;ntp;ms;1609` during the outage — the TM-35 stall marker's first real catch
-   (1.6 s loop block at the ntp site with the WAN dead, DNS suspect, once). Gateways restored
-   to off on the three ESP32 nodes afterwards. ~~Original instructions:~~ `docs/bench-ap-reboot.md`: set
-   `--gateway on` on T-Deck/Heltec/T-Beam first (no `[UDP];tx` otherwise), start
-   `tools/bench/experiments/apreboot.py`, cycle the APs on the prompt, `report` afterwards.
-   The runner survives the Mac losing WLAN; do not run it from inside a Claude session.
-2. **MEM-02 risk assessment** (BACKLOG §3.8m) — rings to boot-time heap, ~28 kB. Parked by
-   operator decision: assessment first (PSRAM/ISR trap, init order, `sizeof` traps,
-   zero-init), regression bar in the section. Do not implement before the verdicts are written.
-3. **UDP-01 reporter questions** (§3.8l) — firmware version, trigger, crash vs freeze,
-   gateway/webserver/extudpip state. Do not touch the W5100S setup gate
-   (`nrf52_main.cpp:1086`) before the answers; UDP-02 (fixed) may already explain the report
-   on ESP32 nodes.
-4. **TM-36 — DONE 2026-08-31, PASS on every bar** (9.1-h night soak
-   `wifisoak_night_20260830-224246/`, evaluated section below): 165/165 drops recovered,
-   reconnect median 4.0–4.5 s, 0 disconnects/watchdog/stalls/reboots. Report:
-   `docs/wifi-soak-report-20260831.md`; `wifi-report-20260830.md` §7.1 closes the loop.
-   **Side catch: NTP got 0 replies all night on all three boards — filed as TM-45** (the
-   reply harvest `getMeshComUDP()`/`neth.getUDP()` is gated on `bGATEWAY` on both platforms;
-   a gateway-off, GPS-off node never has valid time). **GPS restored `--gps on` on all three
-   nodes 2026-08-31 morning, verified by `--pos` (fix on each).**
-5. **TM-28** — E290 Wireless Paper hardware arrives the week of 2026-09-01.
-6. Small follow-ups, all filed: **BAT-01** (Heltec V3 shows a jumping battery % with no battery attached -- floating ADC divider, no no-battery detection on non-PMU boards; §3.8n, with tonight's 3.7-4.9 V log evidence); nine scratch scripts in `tools/bench/experiments/` still
-   inject group `9999` (list in runbook §2.6); nRF52 `CONF` indicator unknown to ESP32 and
-   the nRF52 internet path has no per-country case (`bench-country-servers.md`); env
-   `E22_XML-DevKitC` does not build at HEAD (`command_functions.cpp:~5012` uses `WiFi`
-   without the headers in that variant — pre-existing); CS-03 secrets exposure when
-   `node_webpwd` is empty (operator decision); `GW-01` measure + `TLM-03` (intake items not
-   yet picked up).
-7. Then the upstream PR wave per BACKLOG §4.1 — operator decision on scope/timing; DK5EN
-   never merges upstream (Kurt reviews, [[upstream-no-self-merge]]).
+1. **Upstream-PR vorbereiten** — `docs/pr-draft-20260831.md` Teil E abarbeiten: (E1) das
+   `full_refresh=0`-EXPERIMENT auf dem T-Deck zurückdrehen oder deklarieren, (E2) die 11
+   nativen Test-Envs aus dem PR-Schnitt halten, (E3) die "nicht für Upstream"-Kopfkommentare
+   in `instrument.*`/`test_inject.*`/`tdeck_debug.*` anpassen, (E5) Bedienungs-Anhang im Stil
+   von `command-changes-pr1102-1103.md` für die neuen Kommandos. DK5EN merged nie selbst
+   ([[upstream-no-self-merge]]).
+2. **TD-09 Tile-Cache** (§3.8p follow-ups) — flüssiges Karten-Pan; ohne Cache 0,33-0,79 s
+   pro Schritt. TD-07-Handtest auf DK5EN-14 steht ebenfalls aus (Skript im Wave-Report).
+3. **E22-01** (§3.8p, High) — Frame-Integrität unter Versorgungsspitzen, Konzept für
+   Operator-Review.
+4. **GW-01 / TLM-03** (§3.8i) — HEY-Parität mit Gateway on; Soft-Serial-Telemetrie-Review
+   (blockiert TLM-01/02).
+5. **MEM-02 risk assessment** (§3.8m, geparkt) und **UDP-01 reporter questions** (§3.8l) —
+   unverändert aus der letzten Übergabe.
+6. **TM-28** — E290 Wireless Paper Hardware kommt in der Woche ab 2026-09-01.
+7. Kleinvieh, alles gefiled: `ntpsync.py`-Live-Lauf; PM-01 boot-gecachtes Global (optional);
+   CONF-Koordinaten anwenden (eigenes Ticket); WEB-03 (c)-(e); WF-01 Sites 1+2; TM-44
+   (deferred), TM-06/07/14/19/29, TM-23 (von TD-09 abgelöst); BAT-02-Grenze dokumentiert
+   (stabil in-band floatender Teiler ist von einer vollen Zelle nicht unterscheidbar —
+   RAK-90 liest stabile 4,22 V, Erkennung greift dort nicht).
 
-**Bench state at handover** (all four on USB, LoRa TX 2 dBm, all running HEAD): Heltec
-`DK5EN-93` — gateway off, `srv OE`, `--udplog off`, EXTUDP off, maxhop 4, DEBUG on; T-Beam
-`DK5EN-92` — webserver on, gateway off; T-Deck `DK5EN-14` — `node_mute` 1, persist flags 0;
-RAK `DK5EN-90` — gateway on (it is the bench gateway), EXTUDP on with `EXT IP 192.168.68.58`,
-maxhop 4. No background runs alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
+**Bench state at handover** (all four on USB, LoRa TX 2 dBm, all running the final build):
+Heltec `DK5EN-93` — gateway off, GPS on (fix), DEBUG on; T-Beam `DK5EN-92` — webserver on,
+gateway off; T-Deck `DK5EN-14` — web UI live at dk5en-14.local; RAK `DK5EN-90` — bench
+gateway, EXTUDP on, time source NTP (first time ever valid without GPS). No background runs
+alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
+
+---
+
+## Frühere Übergaben (Historie)
 
 ## 2026-08-31 morning: TM-36 soak evaluated (PASS), TM-45 found, GPS restored
 
