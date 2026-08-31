@@ -1389,6 +1389,23 @@ evidence per finding: [`docs/review/2026-08-29-upstream-sync-verdict.md`](../rev
 | UP-05 | 2026-08-29 | `fc83554e..2cb6bb4d` | `command_functions.cpp:4961-4990`                             | `I` register 239/244 chars with six group calls; next key truncates it                                        | Low    | watch                                                                                                                                          |
 | UP-06 | 2026-08-29 | pre-existing         | `regex_functions.cpp:9`, `aprs_functions.cpp:194,292`         | Callsign regex `[0-9]+` unbounded: 119-char callsigns pass validation and reach `MAX_CALL_LEN` consumers      | Medium | open — trace consumers, PR                                                                                                                     |
 
+### N-30 — Stored XSS: Mesh-Nachrichtentext landet unescaped im Web-UI — **FIXED (`81cfc064`, Wave 1 2026-08-31)** — High, RF→LAN
+
+Jeder LoRa-/Mesh-Sender konnte Script im Browser des Operators ausfuehren: die
+Messages-Seite druckte `msg_payload`, `msg_source_path` und `msg_destination_path`
+roh in das HTML (`src/web_functions/web_functions.cpp:1624/1637` vor dem Fix), und
+der Client injiziert diese Antwort per `innerHTML` (`updateMessages()` im
+Scaffold-JS). Eine Textnachricht wie `<img src=x onerror=...>` reichte; die
+Session des Operators erreicht `/config.json` mit Klartext-Secrets (WLAN-Passwort,
+Web-Passwort, BT-Code). Ein aelteres Audit hatte dieselbe Klasse am JSON-Endpunkt
+markiert (`code-audit-20260508.md`, HIGH), der Messages-Pfad war nie erfasst.
+
+**Fix:** `htmlEscape()` (lokal in `web_functions.cpp`) auf alle mesh-stammenden
+Strings der Messages-Seite, inklusive des `aprs.fi`-Attributs; dazu
+`encodeURIComponent` statt `encodeURI` im Sende-JS (Nachricht **und** `tocall`)
+und fuer `setvalue`-Werte. Backlog WEB-03; Punkte (c)-(e) dort (Passwort in
+GET-URL, XHR-Races, `alert()`) bleiben offene Abwaegungen.
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
