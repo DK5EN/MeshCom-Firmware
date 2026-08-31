@@ -7,6 +7,59 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.08.31.3-stability (2026-08-31, dritter Schnitt)
+
+Ersetzt v4.35p.08.31.2-stability (Release-Objekt geloescht, Tag bleibt als
+Marker). `FLASH_VERSION` bleibt 20260831. Inhalt: die drei
+Backpressure-RCA-Fixes aus dem DJ8MEH-Feldvorfall (8-Minuten-Refuse-Episode
+auf Phantomtiefe) plus eine integrierte Regressions-Suite
+(Changelog-Items 157-160). Jeder Fix lief als eigene Welle mit
+unabhaengigem Fable-Advisor-Gate; Plan und beide Verdikte sind in
+`docs/archive/bp-rca-fixes-*.md` archiviert.
+
+### Was dazugekommen ist
+
+- **BP-02 -- ehrliche Ringtiefe.** `txRingDepth()` und alle Marker
+  (`RING_WRITE`/`RING_STATUS`/`TX_GATE_ENTER`/`TX_START`/`RING_TX_READ`)
+  zaehlen belegte Slots statt der Indexdistanz `iWrite-iRead`, die
+  freigegebene Loecher hinter einem ausgehungerten Eintrag am Lesezeiger
+  mitzaehlte (Feldlog: `queued=19` bei real 3-4). `RING_STATUS` traegt die
+  alte Distanz zusaetzlich als `dist=`; die RING_ZOMBIE-Detektoren in
+  `tools/serial_monitor.py` und `tools/loganalyse.sh` sind portiert
+  (queued-Fallback fuer alte Logs).
+- **BP-03 -- Stale-HEY-Alterung.** Ein 2-s-Sweep im Main-Loop verwirft
+  BACKGROUND-Eintraege (HEY, Prio 5) aelter als 3 min
+  (`RING_DROP_STALE`) -- der Feld-Blocker sass 10 min und pinnte die
+  Ringfront. Bewusst NICHT in `getNextTxSlot()` (laeuft auf nRF52 im
+  Timer-Task); auf nRF52 Check+Drop pro Slot atomar unter dem Ring-Lock,
+  EXT_PENDING ausgenommen, Rollover-sicher.
+- **BP-04 -- QRV im Wasserband.** Tiefe 0 schliesst sofort wie bisher;
+  Tiefe 1 schliesst nach 10 s ununterbrochenem Halt (explizites
+  Armed-Flag, Zeit injiziert, Header bleibt Arduino-frei). Der
+  Anti-Flap-Fall vom 08.30 ist als Regressionstest festgenagelt.
+- **test_bp_regression** (native_aprs): der Vorfall Ende-zu-Ende am echten
+  Ring plus echter Statemaschine -- Burst -> QRT -> Drain mit gepinntem
+  Blocker -> QRV in 10 s (Feld: 8 min), Blocker-Alterungspfad,
+  Gegenprobe QRT-Ausloesung. Jede der drei Fix-Regressionen einzeln per
+  Mutation verifiziert.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen; Native-Gate 459/459 in 12 Host-Envs.
+- Die Fleet (DK5EN-14/93/92/90 und Gateway DK5EN-98) laeuft diesen Build
+  (98 per Safeboot-OTA mit Build-Stamp-Verifikation, 92 per esptool
+  460800, 90 per DFU-Serial).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der originale Feldvorfall (DJ8MEH-Burst auf belastetem Kanal) wurde auf
+  Hardware mit dem neuen Build noch nicht nachprovoziert -- der Nachweis
+  lebt bisher im integrierten Native-Replay.
+- TM-49 bleibt offen (Safeboot-Completion nach Disconnect, Risiko auf
+  4-MB-Boards -- bei marginalem Link dort USB statt OTA).
+- Die McApp-Darstellung der .2-Notice-Rahmung ist weiterhin nicht am
+  Geraet bestaetigt.
+
 ## Stability-Release v4.35p.08.31.2-stability (2026-08-31, zweiter Schnitt)
 
 Nachzuegler-Release am selben Tag, ersetzt v4.35p.08.31-stability

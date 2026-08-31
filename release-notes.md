@@ -3,13 +3,22 @@
 
 ## What this release is
 
-**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 50 numbered changes (items 107–156), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 445 native test cases across 12 host environments and soak runs up to 9.1 hours.
+**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 54 numbered changes (items 107–160), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 459 native test cases across 12 host environments and soak runs up to 9.1 hours.
 
 Flash version `20260831`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
-### New in this second cut (`.2`, items 153–156)
+### New in this third cut (`.3`, items 157–160)
 
-This release supersedes this morning's `v4.35p.08.31-stability` and adds four fixes found the same afternoon:
+This release supersedes `v4.35p.08.31.2-stability` and adds the three back-pressure RCA fixes from the DJ8MEH field incident — a node that refused user messages for 8 minutes although its real send queue had drained after ~2 minutes — plus an integrated regression suite. Each fix went through an independent Fable advisor gate:
+
+- **Honest TX-ring depth** (BP-02): the depth that drives back-pressure now counts occupied slots instead of the raw index distance, which counted freed holes behind a priority-starved entry as still queued (field log: `queued=19` with 3–4 real). All debug markers report the honest number; `RING_STATUS` additionally carries the old distance as `dist=` and the log-analysis tools' zombie detectors were ported.
+- **Stale HEY entries age out** (BP-03): a starved neighbourhood report older than 3 minutes is dropped from the ring (`RING_DROP_STALE`) instead of pinning the read pointer indefinitely — the field blocker sat for 10 minutes.
+- **The refusal episode ends when the load is really gone** (BP-04): QRV closes after the queue sits in the water band (depth 1) for 10 uninterrupted seconds; a fully drained ring still closes immediately. Previously only an exactly-empty ring ended the episode, which a busy relay node rarely reaches.
+- **`test_bp_regression`**: the whole incident replayed end-to-end over the real ring and state machine, mutation-verified to catch each of the three fixes individually.
+
+### New in the second cut (`.2`, items 153–156)
+
+Found and fixed the same afternoon, after this morning's `v4.35p.08.31-stability`:
 
 - **Safeboot recovers from an aborted OTA upload** (TM-46): central abort handling with a session generation counter — an upload killed mid-transfer no longer leaves stale session state that turned every retry into HTTP 400. Includes a cross-task race fix in the stall watchdog that could abort healthy uploads. Proven twice on the bench (kill 5 s into the upload → immediate retry completes).
 - **Safeboot WiFi join uses the production join pattern** (TM-48): driver-picked AP selection and PMF-off — the same fix that got the main firmware onto WPA2/WPA3 transition APs.
@@ -20,8 +29,8 @@ The new safeboot ships in this release's `safeboot.bin`/`safeboot-s3.bin` and in
 
 ## Changelog and engineering rationale
 
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–156 for this release.
-- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
+- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–160 for this release.
+- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Built for the field: debug logs from any node
@@ -50,12 +59,13 @@ Each on-air-visible change, stated plainly (details in the changelog):
 8. `--maxhop 1..6` makes the text hop limit settable and persistent.
 9. Server CONF frames (callsign/shortname assignment) are understood on ESP32 and actually applied on both platforms, with source-IP guard and validation.
 10. **A gateway no longer self-uploads its own HEY beacon to the server.** The bare, report-less copy always arrived seconds before the neighbours' enriched copies of the same msg_id and could win over them server-side — the reason a gateway's neighbour data vanished from the server while `--gateway off` showed it. Measured against the server's interlink stream; with the fix, only enriched copies arrive, in both gateway states.
+11. **Queued HEY frames older than 3 minutes are dropped instead of transmitted** (`.3`): a neighbourhood report that could not get on air for that long has been superseded by fresher copies anyway. Text, position and ACK traffic never ages out. (For log readers: `RING_STATUS queued=` now reports really-occupied slots; the old index-distance value moved to the new `dist=` field.)
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 445 native test cases green across 12 host environments.
+- **All 32 release environments build clean**; 459 native test cases green across 12 host environments.
 - **Heltec V3** — WiFi/NTP/battery/OLED changes bench-proven; runs the GW-01 fix build, verified against the live server stream.
 - **T-Beam v1.2** — WiFi soak (9.1 h, 55/55 reconnects), gateway observer in the GW-01 measurement.
 - **T-Deck Plus** — full harness regression (boot, display CRC, map, nav, input, heap, trim, touch injection) PASS on this build.
@@ -84,11 +94,11 @@ These boards build cleanly from the same source and inherit every improvement, b
 - `--mheard` and the live BLE path still deliver two schemas under the same `TYP`.
 - The battery zero point on a real 2S pack, the INA226 branch and L76K GPS remain unverified.
 - **TM-49 (open):** the safeboot OTA completion handler can read a success status after a disconnect whose final frame never arrived, and switch boot partitions after a partial write — benign on 16-MB boards (slot validation catches it), risky on 4-MB single-slot boards. Until the guard lands: on 4-MB boards prefer USB flashing over OTA when the link is marginal.
-- The refusal-episode duration under load is longer than it should be: the TX-ring depth that drives back-pressure counts freed slots behind a starved low-priority entry (analyzed 2026-08-31 from a field log), so a node can keep refusing user messages for minutes after the real backlog drained. Fix scheduled.
+- The `.3` back-pressure fixes are proven native (459 cases, incl. the end-to-end incident replay) and run on the four-board bench plus the live gateway, but the original field incident has not yet been re-provoked on hardware with the new build.
 
 ## Installing
 
-- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
+- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
 - **Already running MeshCom 4.x with safeboot:** just OTA the `firmware.bin` for your board — via the node's OTA web page, or scripted: `python3 tools/webflash.py <YOUR-CALLSIGN>.local`
 - **RAK4631:** copy the `.uf2` onto the bootloader volume (double-tap reset), or `adafruit-nrfutil --verbose dfu serial --package wiscore_rak4631.zip -p <PORT> --singlebank --touch 1200`
 

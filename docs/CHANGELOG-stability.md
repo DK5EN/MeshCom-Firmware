@@ -75,6 +75,52 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## New in v4.35p.08.31.3-stability
+
+Third cut of the 2026-08-31 release, superseding `v4.35p.08.31.2-stability`:
+the three back-pressure RCA fixes from the DJ8MEH field incident (an 8-minute
+refusal episode on a phantom queue depth), plus an integrated regression
+suite. Every fix was implemented in an advisor-gated wave (independent Fable
+review per wave; plan and verdicts archived in
+`docs/archive/bp-rca-fixes-*.md`). `FLASH_VERSION` stays `20260831`; native
+suite now 459 test cases across the same 12 host environments.
+
+157. **TX-ring depth counts occupied slots, not index distance** (BP-02).
+     `txRingDepth()` and every report site (`RING_WRITE`, `RING_STATUS`,
+     `TX_GATE_ENTER`, `TX_START`, `RING_TX_READ`) previously used
+     `iWrite - iRead`, which counted freed holes behind a priority-starved
+     entry parked at the read pointer as still queued — the DJ8MEH log
+     showed `queued=19` with 3–4 slots really occupied, and the QRT episode
+     ran 8 minutes on that phantom number. `RING_STATUS` additionally
+     carries the old distance as a new trailing `dist=` field, and the
+     RING_ZOMBIE detectors in `tools/serial_monitor.py` and
+     `tools/loganalyse.sh` now key on `dist==0` (falling back to `queued==0`
+     for pre-BP-02 logs).
+158. **Stale BACKGROUND entries age out of the TX ring** (BP-03). A 2-second
+     main-loop sweep (`txRingAgeBackground()`) drops HEY entries (priority 5) older than `RING_BG_MAX_AGE_MS` (3 min) with a `RING_DROP_STALE`
+     marker and advances the read pointer. The DJ8MEH blocker — a starved
+     HEY relay pinned at the read pointer — sat for 10 minutes and only left
+     via a chance priority eviction. Deliberately not in `getNextTxSlot()`,
+     which also runs on the nRF52 timer task; on nRF52 each slot's
+     check-and-drop is atomic under the ring lock (the overflow evictor
+     relocates entries), external-radio EXT_PENDING slots are exempt, and
+     the age math survives the 49.7-day `millis()` rollover.
+159. **A QRT episode closes in the water band, not only at depth 0**
+     (BP-04). Depth 0 still closes immediately; depth 1 now closes after a
+     10-second uninterrupted hold (explicit armed flag, no magic-zero
+     sentinel; time injected so the state machine stays host-testable). A
+     relay node with steady background traffic rarely reaches exactly 0 and
+     previously kept refusing user messages long after the real backlog had
+     drained. The 2026-08-30 anti-flap case (depth 2 → 1 → 2 inside 400 ms)
+     is pinned as a regression test.
+160. **Integrated DJ8MEH regression suite** (`test_bp_regression`,
+     native_aprs). Replays the field incident end-to-end over the real ring
+     plus the real back-pressure state machine: burst → one QRS/one QRT →
+     refusals → drain with a pinned prio-5 blocker → QRV within 10 s (field:
+     8 min), the blocker age-out path, and an over-correction guard proving
+     QRT still fires at the 80 % threshold. Each of the three fixes was
+     mutation-verified to turn the suite red on its own.
+
 ## New in v4.35p.08.31.2-stability
 
 Second cut of the 2026-08-31 release, superseding `v4.35p.08.31-stability` the
