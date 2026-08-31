@@ -1,8 +1,15 @@
 #include <Arduino.h>
 
 #include "esp32_flash.h"
+#if !defined(MC_SAFEBOOT)
+// TM-32: der Sanitize-Pfad braucht Varianten-Konstanten (configuration.h via
+// lora_setchip.h), die der minimale Safeboot-Build nicht hat -- und kein Radio,
+// dessen Parameter zu plausibilisieren waeren.
 #include <settings_sanitize.h>
 #include <lora_setchip.h>
+#else
+#include <maxhop.h>   // MAXHOP_TEXT_FALLBACK, dependency-frei (siehe unten)
+#endif
 
 void save_settings(void);
 
@@ -17,6 +24,7 @@ s_meshcom_settings meshcom_settings;
 // Get LoRa parameter
 // TM-32: Plausibilitaet der geladenen Radio-Parameter (Marker und Groesse
 // prueft N-12, den Inhalt bisher niemand). Korrekturen werden geloggt.
+#if !defined(MC_SAFEBOOT)
 static void sanitize_log(const char *field, const char *oldv, const char *newv)
 {
     Serial.printf("[FLASH]...sanitized %s: %s -> %s\n", field, oldv, newv);
@@ -48,6 +56,7 @@ void sanitize_loaded_settings(void)
         save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
     }
 }
+#endif // !MC_SAFEBOOT
 
 void init_flash(void)
 {
@@ -165,12 +174,20 @@ void init_flash(void)
 
     // CS-01: Hop-Limit fuer Textnachrichten. Bis 2026-08-30 gab es keinen
     // NVS-Key dafuer -- der Wert war faktisch eine Compile-Zeit-Konstante.
-    // max_hop_pos bleibt bewusst beim Default (esp32_main.cpp).
+    // max_hop_pos bleibt bewusst beim Default (esp32_main.cpp). Im Safeboot
+    // kommt MAX_HOP_TEXT_DEFAULT (configuration_global.h) nicht mit --
+    // dort tut es der Spiegelwert aus maxhop.h.
+    #if defined(MC_SAFEBOOT)
+    meshcom_settings.max_hop_text = preferences.getInt("max_hop_text", MAXHOP_TEXT_FALLBACK);
+    #else
     meshcom_settings.max_hop_text = preferences.getInt("max_hop_text", MAX_HOP_TEXT_DEFAULT);
+    #endif
 
     // TM-32 (upstream #661/#57): Radio-Parameter auf Plausibilitaet pruefen,
     // bevor sie in radio.setOutputPower() & Co. landen. Sentinels bleiben.
+    #if !defined(MC_SAFEBOOT)
     sanitize_loaded_settings();
+    #endif
 
     meshcom_settings.node_track_freq = preferences.getFloat("node_track", 0);
     meshcom_settings.node_preamplebits = preferences.getInt("node_pream", 32);

@@ -1286,7 +1286,7 @@ void oledStat()
                   iDisplayType, (unsigned long)oled_frames, (unsigned long)oled_last_frame_us,
                   bPosDisplay ? 1 : 0,
                   DisplayOffWait > 0 ? (long)((int32_t)(DisplayOffWait - millis())) : 0L,
-    #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+    #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO)
                   u8g2 != NULL ? 1 : 0
     #else
                   -1

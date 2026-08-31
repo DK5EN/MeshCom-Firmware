@@ -1,8 +1,11 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.28-stability` (2026-08-28), based on official MeshCom
-4.35p, upstream `dev` at `fc83554e` — the state **after** upstream merged this
-fork's changes, plus the BLE frame-size fixes in items 104-106.
+Release: `v4.35p.08.31-stability` (2026-08-31), based on official MeshCom
+4.35p, upstream `dev` at `2cb6bb4d` — the state **after** upstream merged this
+fork's changes, plus items 104-152 below. The full engineering rationale for
+items 107-152, with per-change file references and measurements, is in the
+upstream PR draft
+[`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
 
 **Items 1-103 below are now in official MeshCom.** The ICSSW maintainers merged
 [PR #1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) (82 changes)
@@ -71,6 +74,229 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35p.08.31-stability
+
+The complete field campaign since the 08.28 hotfix: two `/orchestrate-waves`
+passes over a 4-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631 with
+W5100S Ethernet), 438 native test cases in 12 host environments, and soak runs
+up to 9.1 h. Every item below is written up with file references and
+measurements in [`docs/pr-draft-20260831.md`](pr-draft-20260831.md); the item
+IDs (WEB-03, TM-35, GW-01 ...) match the fork's engineering backlog. This
+release deliberately ships the full serial instrumentation (`[TAG];key;value`
+markers, `--debug`, `--udplog`, `--wifistat`, injection commands), so a field
+node can produce machine-readable debug logs for later analysis.
+
+### Security and memory safety
+
+107. **Stored XSS in the web message page fixed.** Received message texts,
+     callsigns and paths were printed into the HTML raw and injected via
+     `innerHTML` — any LoRa sender could run script in the operator's browser
+     session, which also reaches the configuration pages. All six mesh-origin
+     output sites are now HTML-escaped; the send path uses
+     `encodeURIComponent`, so `&`, `#`, `+` no longer break the query (WEB-03).
+108. **Three web JSON endpoints escaped nothing** — a `"` or `\` in a
+     percent-decoded query broke the response. They now stream through
+     `serializeJson()` (JSN-01).
+109. **EXTUDP JSON: double-escaping removed and four `serializeJson()` calls
+     re-bounded to the buffer size** — a too-long document previously overran
+     the buffer, reachable from any unauthenticated LoRa peer (JSN-01).
+110. **All 13 BLE register builders go through one fail-soft frame path**: it
+     is buffer-bounded, and over the phone budget it omits whole fields instead
+     of cutting mid-string into unparseable JSON. `BLE_JSON_PAYLOAD_MAX = 244`
+     is derived from the `blelen + 2` `uint8_t` overflow that silently dropped
+     frames at 253+ characters (JSN-01/UP-01).
+111. **Frames from unconfigured nodes (`XX0XXX...`) are discarded on RX, and an
+     unconfigured node does not transmit at all** — a factory callsign was
+     observed relayed over four hops. Guards sit before mheard/display/BLE/
+     gateway-upload/relay, plus a hard backstop in `doTX()` and the TX ring
+     (RX-01/TX-01).
+112. **Eight parser findings from the test campaign fixed** — among them:
+     `decodeAPRSPOS()` accepted any byte as hemisphere and 11-digit latitudes;
+     `decodeMHeard()` pulled NUL padding into the date field; the EXTUDP frame
+     buffer was 3 bytes short; empty `<VT>` telemetry formatted an
+     uninitialized stack float; timezone `-03:30` parsed as -3.30 (PT-01).
+113. **One 255-byte datagram no longer kills EXTUDP receive permanently** — on
+     arduino-esp32, a partially-read `rx_buffer` made `parsePacket()` return 0
+     until reboot, silently. The remainder is now flushed and the incident
+     reported (UDP-02).
+114. **`addUdpOutBuffer()` no longer reads one byte past the caller's
+     payload** (WF-01).
+115. **Settings are sanity-checked after loading from flash** — a corrupt
+     structure previously fed out-of-range values straight into
+     `radio.setOutputPower()` and friends; on nRF52 35 char fields are
+     additionally NUL-terminated (TM-32, upstream #661/#57).
+116. **Classic-ESP32 ring buffers resized to fit their RAM segment**
+     (`MAX_RING` 30→20, `MAX_RING_UDP` 25→20): at 30, the T-Beam had 0.5 kB of
+     `dram0_0_seg` left. A 20-slot ring still saturates long before the radio
+     drains (MEM-01).
+
+### Character-set hygiene
+
+117. **A UTF-8 allowlist filter runs at the two chokepoints that cover every
+     path** — RX in `decodeAPRS()`, TX in `encodePayloadAPRS()`. Control
+     characters, invalid/overlong UTF-8, encoded surrogates and bidi/zero-width
+     format characters are removed; umlauts and emoji pass. The recorded
+     third-party APRS interop corpus passes unchanged (CHR-01).
+118. **The APRS free text (`node_atxt`) additionally loses the structure
+     separators `{ } : ; , /` and is truncated UTF-8-safely** at the 25-byte
+     receive limit — at frame build time, so web setup, T-Deck GUI and flash
+     restore writers are all covered (CHR-02).
+
+### Time, clock and MHeard
+
+119. **NTP is asynchronous.** The stock client blocked the loop for up to 1 s
+     per refresh (nRF52: 1.6 s every ~20 s) and discarded waiting gateway
+     datagrams from the shared socket. The new client only sends; the regular
+     receive path harvests the reply, with strict validation and a
+     2.5 s / 5 s / 60 s retry ladder (TM-35).
+120. **A non-gateway node actually reads the NTP reply now.** The harvest ran
+     only under `--gateway on`; a gateway-off, GPS-off node sent one request
+     per minute forever and never got a clock — measured 0 of 545 replies in a
+     9.1-h soak. Both main loops now have a harvest-only branch (TM-45).
+121. **`--ntpsync`** forces an immediate synchronization with honest result
+     states, and works with an active GPS fix (NTP-01).
+122. **MHeard ages on the monotonic clock, not the wall clock.** Without
+     NTP/GPS, `getUnixClock()` returned garbage, every entry looked expired,
+     and the `/N` NCNT tag stayed 0 forever. All aging comparisons now use
+     rollover-safe `millis()` stamps; epoch stays for display (NC-01/NC-02).
+     Dead eviction logic in the MHeard table is repaired (MH-02).
+
+### Network
+
+123. **WiFi first join on WPA2/WPA3 transition APs fixed** — SAE without PMF
+     failed 24/24 boots on the bench AP (AUTH_EXPIRE); with the PMF-off policy
+     the station authenticates WPA2-PSK 24/24. Driver-owned AP selection,
+     event-driven `got_ip`, a staged watchdog, and async DNS instead of a
+     31-s `hostByName()` on the loop task (TM-34).
+124. **WiFi bring-up no longer blocks the main loop**; a healthy node is 4-5 s
+     earlier online (TM-20/TM-16).
+125. **An ESP32 gateway never relayed a UDP position frame to LoRa** — the
+     dedup gate was evaluated after its own ring insert, so every frame
+     deduplicated against itself: 0 of 30 injected frames radiated. The gate is
+     now read first; 30/30 after the fix (TM-31, answers upstream #568).
+126. **nRF52: link poll, heartbeat and DHCP renewal escaped the gateway
+     block** — a node with gateway off never renewed its DHCP lease (ETH-01).
+127. **nRF52 server choice: the DHCP path now honors the country split**
+     instead of always falling back to the OE default (CTY-01).
+128. **Server CONF frames are understood on ESP32 and actually applied on both
+     platforms** — shared TLV parser with strict length checks, source-IP
+     guard, regex validation, save, auto-reboot (TM-39/CONF-01).
+129. **`--nopmother`**: opt-in filter that keeps foreign direct messages away
+     from the EXTUDP peer; broadcast/group always passes. Default off — the
+     existing fleet behaves unchanged (PM-01).
+130. **A dropped outgoing message is no longer silent.** `sendMessage()` used
+     to discard the TX-ring return value. New Q-code episode model: QRS as the
+     queue grows, QRT at 80 % (locally originated user messages are refused
+     before message-ID consumption), QTA on drop, QRV once when the queue
+     clears — always on the transport the message came from, never on the air.
+     Relay, ACK and beacon traffic is never refused (BP-01/TM-37).
+131. **A gateway no longer self-uploads its own `'@'` HEY to the server.** The
+     bare copy (rssi/snr 0, no signal report) always arrived seconds before the
+     neighbours' enriched copies of the same msg_id; measured 2026-08-31
+     against the server's interlink stream (which carries every copy, no dedup),
+     a first-copy consumer loses the link data exactly when `--gateway on` is
+     set. With the fix, only the enriched neighbour copies reach the server —
+     parity with `--gateway off`; RF transmission and enrichment of foreign
+     HEYs are unchanged (GW-01).
+132. **Shot-path beacons have a 30-s floor** — `--sendpos`, the user button,
+     EXTUDP telemetry injection and `--sendhey`. Field evidence: 25,146
+     position frames in 21 minutes from one node. Periodic paths unchanged
+     (FL-01/FL-02).
+
+### Energy, web, commands
+
+133. **"No battery" is detected on ADC boards** — a floating divider measured
+     3,716-4,886 mV with 1.17 V jumps per half-second, shown as a jumping
+     percentage and beaconed as `/B=`. A hysteresis detector on the raw sample
+     now suppresses both; implemented in both battery implementations
+     (BAT-01/BAT-02).
+134. **`getparam()` — the read half of the web API — was completely dead**
+     (searched for `"/setparam/?"` and cut from the wrong side of `=`); fixed
+     (CS-04).
+135. **Config backup/restore**: `GET /config.json` exports the full
+     configuration, `POST /config` restores it all-or-nothing with per-value
+     range checks, layout version check and CRC-32. The file contains secrets
+     in plain text and the page says so (CS-03).
+136. **Web info page: real NTP server, BSSID line, honest battery** ("USB (no
+     battery)" instead of "0.000V (100%)") (WEB-01/WEB-02); `sendpos` from web
+     setup no longer toggles `--nomsgall` (WEB-04); the no-IP log flood
+     (~125 lines/s) prints once per state (TM-21).
+137. **`--maxhop <1..6>`** makes the text hop limit settable and persistent,
+     over serial and as a web-setup drop-down from the same rule source
+     (CS-01/CS-02).
+138. **`--help` matches reality**: parity from 95 to 145 commands, thematically
+     grouped, board-gated like their handlers; the U+2212 copy-paste trap in
+     `--settime` is gone (DOC-02).
+139. **GUI-only switches are reachable over serial**: `--wifi on/off` (whose
+     load-default bug booted freshly flashed nodes with WLAN off — fixed),
+     `--mute` persists, `--persistsd`/`--persistflash`/`--immediatesave`/
+     `--persiststat` (HL-01..04).
+140. **`--display off/on` now really darkens the T-Deck TFT** — backlight off
+     plus panel sleep, keys/touch wake as usual (TM-33b, upstream #690).
+
+### T-Deck / T-Deck Plus
+
+141. **Audio no longer blocks the main loop** — `play_cw()` stalled LVGL, LoRa
+     and serial for ~1.1 s per message. Audio runs in its own task (prio 3)
+     with a queue, and every SD access and `audio.loop()` holds a real SPI2 bus
+     mutex (TM-01..04).
+142. **GT911 touch init retries 5×** — the controller has no reset line, and a
+     single failed `begin()` used to be final (TM-33a, upstream #64).
+143. **The trackball counts edges in interrupts** — the old 10-ms level polling
+     lost ~75 % of the motion (TM-18).
+144. **The map pans**: `i/j/k/l` pan by a quarter viewport, `o` recenters,
+     `g/h` zoom; `sdmap_refresh()` composes the viewport from all intersecting
+     tiles (previously exactly one tile). Auto-recenter is gated on "user has
+     panned". Known limit, documented: without a tile cache a pan step costs
+     0.33-0.79 s (TD-07/TD-08).
+145. **Message-list trim, zoom use-after-free, draw-buffer size**: the active
+     tab's list view no longer grows unbounded (TD-03); a marker slot is nulled
+     after `lv_obj_del()` (a reboot in the PSRAM heap otherwise, G01);
+     `lv_disp_draw_buf_init()` gets pixels, not bytes (G07).
+146. **Idle and boot cost**: header indicators write only on change (36.9 → 7.0
+     invalidations/s), boot messages pump LVGL 100 ms instead of 2 s, SD clock
+     800 kHz → 20 MHz. T-Deck boot 14.9 → 10.9 s over 24 boots
+     (TM-08/TM-15/TM-16).
+147. **The lost-flush mechanism is instrumented and its register is named.**
+     The first TFT flush after an SD access on the shared SPI2 bus is lost; a
+     NOP throw-away transaction re-arms the bus (default on). New `--spitrace`
+     traces bus users and registers per flush; measurement 2026-08-31: the
+     clobbered register is **`GPSPI2.clock`, exclusively** (SD leaves
+     `00243002`/`00041001` behind, TFT runs `00001001`; `user`/`ctrl` never
+     change, LoRa activity changes nothing) — the NOP can become a targeted
+     clock re-arm (TM-05/TM-07).
+
+### OLED boards, nRF52, build
+
+148. **OLED: hardware I2C and a full-frame buffer** — software bit-banging cost
+     579 ms of loop stall per frame; now `Wire1` at 400 kHz (TM-09/TM-22), and
+     an unchanged frame is not re-sent (CRC-32 over the U8g2 buffer,
+     TM-10/TM-27).
+149. **nRF52 GPS version probe only in debug** — it cost every boot >0.5 s for
+     one debug line; `SetupUBLOX()` 1.93 → 1.33 s (TM-16).
+150. **`-Wformat=2 -Werror` for our own sources** on both platforms; libraries
+     build as before.
+151. **Every variant passes `--port "$UPLOAD_PORT"` to esptool** — with several
+     boards connected, esptool used to guess and flash the wrong device; and
+     safeboot builds repair their Tasmota-fork framework directory themselves.
+152. **Field instrumentation ships enabled** (`INSTRUMENT_ENABLED=1`,
+     `MC_INJECT_HOOKS=1`, fully compile-out-able): loop-period measurement with
+     stall attribution (~35 probe points), `[WIFI]`/`[ETH]`/`[GW]`/`[UDP]`/
+     `[NTP]` markers, `--wifistat`/`--ethstat`/`--udpstat`/`--udplog`,
+     `--heap`, `--instr`, and the injection/test block (`--injectmsg`,
+     `--injectpos`, `--injectraw` through the real RX path, `--loratx` bursts,
+     T-Deck key/trackball/touch injection, `--disptest`, `--spitrace`). No
+     marker is unthrottled; flood candidates are rate-limited or bound to their
+     `--...log` switches. This is what makes a field node debuggable: turn on
+     the relevant markers, capture the serial or TCP-2323 console, and the logs
+     can be analyzed offline. One deliberate exception: the RAM-tightest
+     variant `E22_XML-DevKitC` (classic ESP32 plus the soft-serial/XML stack,
+     already built without the network console) compiles out the two
+     bench-only modules — frame capture (`MC_CAPTURE=0`, ~1.4 kB static RAM)
+     and the injection hooks (`MC_INJECT_HOOKS=0`) — because the campaign's
+     additions had pushed that one link 648 bytes past `dram0_0_seg`. All
+     field markers and log switches remain available there.
 
 ## New in v4.35p.08.28-stability
 

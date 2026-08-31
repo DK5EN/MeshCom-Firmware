@@ -5179,7 +5179,9 @@ void commandAction(char *umsg_text, bool ble)
         instrument_reset();
         return;
     }
-    #if defined(ESP32)
+    #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
+    // DISABLE_NET_CONSOLE (E22_XML): kein WiFi-Include-Pfad und kein RAM-Budget
+    // fuer den Bench-Hook -- der Block entfaellt dort komplett.
     else
     if(commandCheck(msg_text+2, (char*)"srvip ") == 0)
     {

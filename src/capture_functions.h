@@ -42,9 +42,21 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// Wie MC_INJECT_HOOKS (test_inject.h): default einkompiliert, mit
+// -D MC_CAPTURE=0 vollstaendig herausgebaut. Gesetzt nur auf der
+// RAM-knappsten Variante (E22_XML, dieselbe die auch DISABLE_NET_CONSOLE
+// traegt) -- der Ring + Drain-Zeile kosten ~1,4 kB statisches DRAM.
+#ifndef MC_CAPTURE
+#define MC_CAPTURE 1
+#endif
+
 // Schaltet den TX-Mitschnitt: "--txcapture on/off", persistiert in
 // node_sset4 Bit 0x0008. Der RX-Mitschnitt haengt an bLORADEBUG.
+// Bleibt auch bei MC_CAPTURE=0 ein echtes Global, damit Kommando-Handler
+// und Settings-Laden unveraendert kompilieren (setzt dann ein totes Flag).
 extern bool bTXCAPTURE;
+
+#if MC_CAPTURE
 
 /**
  * @brief Legt einen Frame in den Mitschnittring.
@@ -80,3 +92,18 @@ bool captureFormatNext(char *out, size_t outsz);
  * die Loop-Latenz bei ~48 ms Serial-Zeit statt bei einem Vielfachen davon.
  */
 void captureDrain(void);
+
+#else // MC_CAPTURE=0: herausgebaut, Aufrufer kompilieren unveraendert
+
+inline void captureFrame(char, const uint8_t *, uint16_t, int16_t, int8_t)
+{
+}
+inline bool captureFormatNext(char *, size_t)
+{
+    return false;
+}
+inline void captureDrain(void)
+{
+}
+
+#endif // MC_CAPTURE

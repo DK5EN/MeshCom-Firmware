@@ -14,6 +14,8 @@
 
 bool bTXCAPTURE = false;
 
+#if MC_CAPTURE   // bTXCAPTURE oben bleibt immer definiert (siehe Header)
+
 // Der RX-Mitschnitt haengt an bLORADEBUG (lora_functions.cpp). Hier nur
 // deklariert statt ueber loop_functions_extern.h gezogen: dieses Modul soll
 // nativ ohne den ganzen Loop-Header uebersetzbar bleiben. Der Typ muss exakt
@@ -222,3 +224,5 @@ void captureDrain(void)
     if(captureFormatNext(line, sizeof(line)))
         printfdeb("%s\n", line);
 }
+
+#endif // MC_CAPTURE

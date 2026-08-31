@@ -1,9 +1,98 @@
 # Release Notes -- MeshCom Firmware v4.35p
 
-Firmware `4.35p`, `FLASH_VERSION 20260828`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35p`, `FLASH_VERSION 20260831`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35p.08.31-stability (2026-08-31)
+
+Die komplette Feldkampagne seit dem 08.28-Hotfix: 46 nummerierte Aenderungen
+(Changelog-Items 107-152), erarbeitet in zwei /orchestrate-waves-Durchgaengen
+auf der Vier-Board-Bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631 mit
+W5100S-Ethernet), abgesichert mit 438 nativen Testfaellen in 12 Host-Envs und
+Soak-Laeufen bis 9,1 h. Die vollstaendige Begruendung jeder Aenderung mit
+Dateiverweisen und Messwerten steht im PR-Entwurf fuer upstream
+(`docs/pr-draft-20260831.md`); das englische Changelog
+(`docs/CHANGELOG-stability.md`) traegt die nummerierte Liste.
+
+### Die Schwerpunkte
+
+- **Sicherheit:** Stored XSS in der Web-Nachrichtenseite (jeder LoRa-Absender
+  konnte Script im Browser des Operators ausfuehren), drei Web-JSON-Endpunkte
+  ohne Escaping, EXTUDP-Serialisierungs-Bounds, 13 BLE-Register-Builder auf
+  einen fail-soften Rahmenpfad umgestellt, Guards gegen unkonfigurierte
+  `XX0XXX`-Knoten (RX und TX), acht Parser-Befunde, Settings-Plausibilisierung
+  nach dem Flash-Laden.
+- **Zeit und Uhr:** NTP asynchron (kein 1-s-Blocker mehr) und -- der eigentliche
+  Befund -- die NTP-Antwort wurde auf Nicht-Gateways nie gelesen: ein Knoten
+  ohne Gateway und GPS bekam NIE eine gueltige Uhrzeit (9,1-h-Soak: 0 von 545
+  Antworten geerntet). Dazu `--ntpsync` und MHeard-Alterung ueber die monotone
+  Uhr statt der Wanduhr (der ewige NCNT-0-Fehler).
+- **WLAN:** Erstverbindung an WPA2/WPA3-Uebergangs-APs (24/24 Fehlschlaege ->
+  24/24 Erfolge), ereignisgetriebenes got_ip, asynchrones DNS, gestufter
+  Watchdog.
+- **Gateway:** Ein ESP32-Gateway relayte UDP-Positionsrahmen nie zu LoRa
+  (Selbst-Dedup, 0/30 -> 30/30, beantwortet upstream #568). Und GW-01: das
+  Gateway laedt seine eigene HEY nicht mehr selbst zum Server hoch -- die
+  nackte Eigenkopie traf per Draht immer Sekunden vor den angereicherten
+  Nachbar-Kopien derselben msg_id ein und konnte dort gewinnen; genau darum
+  fehlten die Nachbardaten eines Gateways am Server, waehrend `--gateway off`
+  sie zeigte. Gemessen am Interlink-Strom des Servers, vorher und nachher.
+- **Rueckstau:** Eine in einen vollen TX-Ring getippte Nachricht verschwindet
+  nicht mehr wortlos -- Q-Code-Meldungen (QRS/QRT/QTA/QRV) auf dem
+  Herkunfts-Transport, nie ueber die Luft.
+- **T-Deck:** Audio blockiert die Hauptschleife nicht mehr (~1,1 s pro
+  Nachricht), die Karte pannt (i/j/k/l/o, g/h), Trackball per Interrupt,
+  GT911-Retry, Boot 14,9 -> 10,9 s. Der Verlust des ersten TFT-Flushes nach
+  SD-Zugriff ist instrumentiert und das geclobberte Register benannt:
+  ausschliesslich `GPSPI2.clock` (via `--spitrace`); die NOP-Mitigation bleibt
+  vorerst drin.
+- **Bedienung:** `--maxhop`, Config-Export/-Import ueber die Web-API,
+  `--wifi`/`--mute`/Persist-Kommandos seriell, `--display` steuert das
+  T-Deck-Panel, `--help` mit 145 statt 95 Kommandos.
+
+### Feld-Debugging ist Absicht
+
+Dieses Release liefert die volle serielle Instrumentierung mit
+(`INSTRUMENT_ENABLED=1`, `MC_INJECT_HOOKS=1`): kompakte `[TAG];key;value`-
+Marker, zuschaltbar per `--debug`, `--udplog`, `--loradebug`, `--wifistat`,
+`--instr` usw., abgreifbar ueber USB oder die Netz-Konsole auf TCP 2323
+(`tools/meshlogger.py` fuer Langzeitmitschnitte). Dazu Injektions-Kommandos
+(`--injectmsg`, `--injectpos`, `--injectraw` durch den echten RX-Pfad,
+`--loratx`-Bursts, am T-Deck Tasten-/Trackball-/Touch-Injektion), damit sich
+Feldbefunde ohne zweite Station reproduzieren lassen. Ein Knoten im Feld kann
+damit Debug-Logs erzeugen, die wir anschliessend offline auswerten -- genau so
+sind alle Befunde dieses Releases entstanden. Einzige Ausnahme: die RAM-
+knappste Variante `E22_XML-DevKitC` (klassischer ESP32 plus SoftSerial/XML,
+schon bisher ohne Netz-Konsole) baut Mitschnitt-Ring und Injektions-Hooks
+nicht mit ein (`MC_CAPTURE=0`, `MC_INJECT_HOOKS=0`) -- die Kampagne hatte
+diesen einen Link 648 Byte ueber das DRAM-Segment geschoben. Alle Marker und
+Log-Schalter bleiben auch dort verfuegbar.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen sauber; 438 native Testfaelle in 12 Envs gruen.
+- Heltec V3: WLAN-/NTP-/Batterie-/OLED-Pfade auf der Bench; GW-01-Fix-Build
+  gegen den Live-Serverstrom verifiziert (nur noch angereicherte Kopien).
+- T-Beam v1.2: 9,1-h-WLAN-Soak (55/55 Reconnects, 0 unerklaerte Disconnects),
+  Beobachter-Gateway der GW-01-Messung.
+- T-Deck Plus: komplette Harness-Regression (Boot, Display-CRC, Karte, Nav,
+  Input, Heap, Trim, Touch-Injektion) PASS auf diesem Build; --injectraw und
+  --loratx live nachgewiesen; `[SPITRACE];clobber`-Messung.
+- RAK4631: ETH-01/CTY-01/NTP-Pfade auf der Bench, Bench-Gateway der Kampagne.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- T-Beam Supreme (L76K-GPS-Zweig ohne Test -- Bench-Module sind u-blox), alle
+  E22-/LoRaAPRS-/Vision-Master-/T3-/T-Connect-/T-Echo-/T114-/Wireless-Paper-
+  Varianten: bauen sauber, keine Bench-Zeit.
+- Batterie-Nullpunkt an einem echten 2S-Pack, INA226-Zweig.
+- CONF-Koordinaten werden geparst und geloggt, nicht angewandt.
+- T5-E-Paper baut weiterhin nicht (vorbestehender Include-Pfad-Fehler,
+  unabhaengig von diesen Aenderungen).
 
 ---
 
