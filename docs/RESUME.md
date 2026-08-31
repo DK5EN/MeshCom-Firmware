@@ -34,8 +34,12 @@ nodes run the final build.
 
 Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority order:
 
-1. **Upstream-PR vorbereiten** — `docs/pr-draft-20260831.md` Teil E abarbeiten: (E1) das
-   `full_refresh=0`-EXPERIMENT auf dem T-Deck zurückdrehen oder deklarieren, (E2) die 11
+1. **Upstream-PR vorbereiten** — `docs/pr-draft-20260831.md` Teil E abarbeiten (Entwurf
+   am 2026-08-31 abends um GW-01/4.9, C.3-Kommandos und das benannte TM-07-Register
+   aktualisiert): (E1) das
+   `full_refresh=0`-EXPERIMENT auf dem T-Deck zurückdrehen oder deklarieren — dank TM-07
+   kann der Flushfix-NOP jetzt durch ein gezieltes `GPSPI2.clock`-Re-Arm ersetzt
+   werden (Entscheidung offen), (E2) die 11
    nativen Test-Envs aus dem PR-Schnitt halten, (E3) die "nicht für Upstream"-Kopfkommentare
    in `instrument.*`/`test_inject.*`/`tdeck_debug.*` anpassen, (E5) Bedienungs-Anhang im Stil
    von `command-changes-pr1102-1103.md` für die neuen Kommandos. DK5EN merged nie selbst

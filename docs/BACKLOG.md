@@ -13,11 +13,17 @@ PM-01, NTP-01, DOC-02; Doku PRES-01/02, DOC-01/03/04), gate 438 native cases / 1
 7 standard targets build, bench proofs in the rows. Commits `81cfc064`, `b624bd33`,
 `a1191eaa`, `361ac9fe`, `d4f875e9`, `d8054454` (+ docs). **PR-Entwurf für den
 Upstream-Nachtrag: [`pr-draft-20260831.md`](pr-draft-20260831.md)** — offene
-Schnittfragen dort in Teil E. Offen bleiben: TD-09, E22-01, GW-01, TLM-01..03, MEM-02
+Schnittfragen dort in Teil E. 2026-08-31 nachmittags dazu: **GW-01 gefixt und belegt,
+TM-06/07/14/19 erledigt** (Commits `2a8d1ef9`, `4f703e82`; TM-07 hat das Register benannt:
+nur `GPSPI2.clock`). Offen bleiben: TD-09, E22-01, TLM-01..03, MEM-02
 (geparkt), TM-44 (deferred), UDP-01-Rückfragen, APRS-01, WF-01 Sites 1+2, TM-28 (Hardware
 ab 2026-09-01), WEB-03 (c)-(e). Aktuelle Übergabe: [`RESUME.md`](RESUME.md).
 
-Last updated 2026-08-30 night, at the push of `7b65233a` — the `/orchestrate-waves` intake
+Last updated 2026-08-31 evening, after the GW-01 + TM-06/07/14/19 campaign
+(`2a8d1ef9` wave 1: --injectraw/--loratx/--spitrace/--touch + harness scenarios;
+`4f703e82` wave 2: GW-01 fix (a) bench- and interlink-proven, TM-07 register named
+GPSPI2.clock, TM-14 measured, TM-19/06 bench-proven) and the pr-draft refresh.
+Previous update 2026-08-30 night, at the push of `7b65233a` — the `/orchestrate-waves` intake
 campaign shipped Waves 1-3 in five commits (`cea337ff` Wave 1, `5a903239` Wave 2, `861f2967`
 MEM-01, `7403a97d` TM-43, `7b65233a` PT-01 fixes + UDP-02); the wave paragraphs below and the
 §3.8f/h/j/k/l/m row statuses carry the detail, [`RESUME.md`](RESUME.md) the hand-over list.
