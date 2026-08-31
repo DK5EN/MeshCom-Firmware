@@ -1,5 +1,26 @@
 # RESUME — pick up here
 
+## 2026-08-31 night, cut 4: BP-05/06 notice policy, release v4.35p.08.31.4-stability
+
+The operator-triggered follow-up to the .3 fixes: the first real message
+through the new build showed QRS+QRV on a single send. A 5.5-min meshlogger
+capture on DK5EN-98 proved the gateway baseline sits at depth 1-4 (mode 2,
+three false QRS/QRV pairs in normal traffic). **BP-05** (`ebceef90`): QRS at
+depth >= 5, flat on every board (clamped below QRT), band 2-4 silent, QRV
+only after QRT/QTA — baseline capture pinned as regression test. **BP-06**
+(`687bb50b`): notices addressed to the triggering conversation (group chat /
+DM thread, sender-only, never on air) via bp_origin_dst/bp_episode_dst and a
+pure `bpPeekDst` for the parse-before-refuse path; advisor REWORK (3 edge
+cases) incorporated. Both waves Fable-gated. **Release
+[v4.35p.08.31.4-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31.4-stability)
+published** (items 161-162, 39 assets, gate 480/480 in 12 envs, 32/32 build
+envs); **v4.35p.08.31.3-stability stays** (no delete order). Doc-count
+lesson: the 477 in the first docs commit was stale (3 advisor tests landed
+after that run) — count from the FINAL gate output, tag moved once before
+publish. Fleet flash to .4 follows immediately after this entry. Still open:
+re-measure DK5EN-98 baseline on .4 (expect zero [BP] markers), re-provoke
+the DJ8MEH burst, TM-49.
+
 ## 2026-08-31 latest: release v4.35p.08.31.3-stability published, fleet on it
 
 **Release [v4.35p.08.31.3-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31.3-stability)
