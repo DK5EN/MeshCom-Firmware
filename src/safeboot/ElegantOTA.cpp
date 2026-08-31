@@ -66,6 +66,11 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         Serial.setDebugOutput(true);
       #endif
 
+      // TM-46: a prior upload that stalled or dropped its connection can leave
+      // Update.begin() still open. Clean that up before starting fresh instead
+      // of letting the begin() below fail with a stale-session 400.
+      abortActiveUpdate("stale_session");
+
       // Pre-OTA update callback
       if (preUpdateCallback != NULL) preUpdateCallback();
 
@@ -85,7 +90,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           _update_error_str.concat("\n");
           ELEGANTOTA_DEBUG_MSG(_update_error_str.c_str());
         }
-      #elif defined(ESP32)  
+      #elif defined(ESP32)
         if (!Update.begin(UPDATE_SIZE_UNKNOWN, mode == OTA_MODE_FILESYSTEM ? U_SPIFFS : U_FLASH)) {
           Serial.print("Failed to start update process\n");
           // Save error to string
@@ -231,11 +236,17 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         if (!index) {
           // Reset progress size on first frame
           _current_progress_size = 0;
+          // TM-46: a client that vanishes mid-transfer (dropped TCP connection)
+          // must not leave Update() running forever -- abort on disconnect.
+          request->onDisconnect([&]() {
+            abortActiveUpdate("client_disconnected");
+          });
         }
 
         // Write chunked data to the free sketch space
         if(len){
             if (Update.write(data, len) != len) {
+                abortActiveUpdate("write_failed");
                 return request->send(400, "text/plain", "Failed to write chunked data to free space");
             }
             _current_progress_size += len;
@@ -354,6 +365,21 @@ void ElegantOTAClass::onProgress(std::function<void(size_t current, size_t final
 
 void ElegantOTAClass::onEnd(std::function<void(bool success)> callable){
     postUpdateCallback = callable;
+}
+
+void ElegantOTAClass::onAbort(std::function<void(const char* reason)> callable){
+    abortUpdateCallback = callable;
+}
+
+// TM-46: centralizes every "give up on the current Update session" path
+// (stale session on a new /ota/start, a write failure, a dropped connection,
+// a stalled upload) so each one gets the same cleanup and the same log line.
+void ElegantOTAClass::abortActiveUpdate(const char* reason){
+    if (Update.isRunning()) {
+        Update.abort();
+        Serial.printf("[SAFEBOOT];ota;abort;reason;%s\n", reason);
+        if (abortUpdateCallback != NULL) abortUpdateCallback(reason);
+    }
 }
 
 

@@ -19,6 +19,7 @@ CLI usage:
     python3 tools/webflash.py --env ttgo_tbeam 192.168.1.90
     python3 tools/webflash.py --bin path/to/firmware.bin --expect-hw HELTEC_V3
     python3 tools/webflash.py --force                  # skip hardware check
+    python3 tools/webflash.py --self-test               # offline parser checks, no network
 
 Library usage (TM-40, tools/bench/ota_regression.py): import `flash()` and
 call it directly -- it returns a structured `OtaResult` and never calls
@@ -47,15 +48,21 @@ DEFAULT_ENV = "heltec_wifi_lora_32_V3"
 SAFEBOOT_POLL_S = 120
 REBOOT_POLL_S = 120
 
-# TM-40: PlatformIO env -> hardware string the firmware reports, both on the
-# web info page (`Hardware</td><td>%s`, src/web_functions/web_functions.cpp)
+# TM-40/TM-47: PlatformIO env -> hardware string the firmware reports, both on
+# the web info page (`Hardware</td><td>%s`, src/web_functions/web_functions.cpp)
 # and over serial (`getHardwareLong(BOARD_HARDWARE)` in
 # src/mheard_functions.cpp, the HardWare[] table). BOARD_HARDWARE values come
 # from `#define MODUL_HARDWARE ...` in each variant's configuration.h and the
 # numeric ids in src/configuration_global.h (TBEAM=4, HELTEC_V3=43,
-# T_DECK_PLUS=46 -> HardWare[] index 17 "TDECK_PLUS").
+# T_DECK_PLUS=46 -> HardWare[] index 17). mheard_functions.cpp actually keeps
+# TWO HardWare[] tables and picks one at compile time on
+# `#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)`; index 17 is
+# "TDECK+" in that conditional table and "TDECK_PLUS" in the default one used
+# by every other env. variants/t_deck_plus/platformio.ini defines
+# BOARD_T_DECK_PLUS, so its build takes the conditional table and reports
+# "TDECK+" -- match that here, not the default table's spelling.
 ENV_HARDWARE: dict[str, str] = {
-    "t_deck_plus": "TDECK_PLUS",
+    "t_deck_plus": "TDECK+",
     "heltec_wifi_lora_32_V3": "HELTEC_V3",
     "ttgo_tbeam": "TBEAM",
 }
@@ -66,6 +73,13 @@ def hardware_matches(reported: Optional[str], expected: str) -> bool:
     if not reported:
         return False
     return reported == expected or reported.startswith(expected + "_")
+
+
+def _normalize_hw(s: str) -> str:
+    """Formatting-insensitive form of a hardware string, e.g. 'TDECK+' and
+    'TDECK_PLUS' both fold to 'TDECKPLUS'. Used only to spot a likely
+    ENV_HARDWARE mapping bug (TM-47), not to decide the actual match."""
+    return re.sub(r"[^A-Z0-9]", "", s.upper().replace("+", "PLUS"))
 
 
 GetFn = Callable[[str, float], "tuple[int, str]"]
@@ -86,7 +100,11 @@ def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optiona
     if status != 200:
         return None
     info: dict[str, str] = {}
-    if m := re.search(r"Hardware</td><td>([A-Z0-9_-]+)", body):
+    # TM-47: character class must include '+' -- src/mheard_functions.cpp's
+    # HardWare[] table has entries like "TDECK+" (T-Deck Plus, conditional
+    # table index 17); a class of only [A-Z0-9_-] silently truncated it to
+    # "TDECK", which then collided with the plain T-Deck's "TDECK" entry.
+    if m := re.search(r"Hardware</td><td>([A-Z0-9_+-]+)", body):
         info["hardware"] = m.group(1)
     if m := re.search(r"build: ([^<)]+)", body):
         info["build"] = m.group(1).strip()
@@ -193,11 +211,16 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
 
     if not force and expect_hw and not hardware_matches(info.get("hardware"), expect_hw):
         timings["total_s"] = time.monotonic() - t_all
+        reported = info.get("hardware")
+        hint = ""
+        if reported and _normalize_hw(reported) == _normalize_hw(expect_hw):
+            hint = (" -- these differ only by formatting (e.g. 'TDECK+' vs 'TDECK_PLUS'), "
+                    "likely an ENV_HARDWARE mapping bug rather than the wrong board")
         return OtaResult(
             ok=False, stage="hardware_mismatch", fw_path=str(fw), fw_size=fw_size, md5=md5,
             before=info, timings=timings,
-            error=f"hardware mismatch: node reports {info.get('hardware')!r}, "
-                  f"expected {expect_hw!r} (--force to flash anyway)")
+            error=f"hardware mismatch: node reports {reported!r}, "
+                  f"expected {expect_hw!r}{hint} (--force to flash anyway)")
 
     phase("trigger_safeboot", "callfunction/?otaupdate")
     t = time.monotonic()
@@ -275,6 +298,84 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
                       before=info, after=new_info, timings=timings)
 
 
+# --- self-test --------------------------------------------------------
+
+
+# TM-47: minimal fragments of the app index page's info table
+# (src/web_functions/web_functions.cpp, ~line 1832 onward), just enough to
+# exercise node_info()'s three regexes -- not full pages.
+_FIXTURE_TDECK_PLUS = (
+    "<tr><td>Hardware</td><td>TDECK+</td></tr>\n"
+    "Meshcom 4.35p<br>(build: Aug 31 2026 12:00:00)\n"
+)
+
+_FIXTURE_HELTEC_V3 = (
+    "<tr><td>Hardware</td><td>HELTEC_V3</td></tr>\n"
+    "Meshcom 4.35p<br>(build: Aug 31 2026 12:00:00)\n"
+)
+
+
+def run_self_test() -> int:
+    """Offline parser checks (pattern: tools/resource_watch.py --self-test).
+    No network, no serial -- runs node_info() against embedded HTML
+    fragments and checks the ENV_HARDWARE lookups directly."""
+    failures: list[str] = []
+
+    def check(name: str, cond: bool) -> None:
+        if not cond:
+            failures.append(name)
+
+    def fake_get(body: str) -> GetFn:
+        return lambda url, timeout=5.0: (200, body)
+
+    # regression: node_info() must keep the '+' in "TDECK+", not truncate to
+    # "TDECK" (that value collides with the plain T-Deck's own HardWare[]
+    # entry, src/mheard_functions.cpp line 84/86, index 8).
+    tdeck_plus = node_info("fixture", get=fake_get(_FIXTURE_TDECK_PLUS))
+    check("tdeck_plus info parsed", tdeck_plus is not None)
+    if tdeck_plus is not None:
+        check("tdeck_plus hardware keeps '+'", tdeck_plus.get("hardware") == "TDECK+")
+        check("tdeck_plus version", tdeck_plus.get("version") == "4.35p")
+        check("tdeck_plus build", tdeck_plus.get("build") == "Aug 31 2026 12:00:00")
+
+    heltec_v3 = node_info("fixture", get=fake_get(_FIXTURE_HELTEC_V3))
+    check("heltec_v3 info parsed", heltec_v3 is not None)
+    if heltec_v3 is not None:
+        check("heltec_v3 hardware", heltec_v3.get("hardware") == "HELTEC_V3")
+
+    # ENV_HARDWARE must match what each env's own build reports (TM-47: was
+    # "TDECK_PLUS", the *other* HardWare[] table's spelling -- BOARD_T_DECK_PLUS
+    # is defined for this env, so the conditional table applies, index 17
+    # "TDECK+").
+    check("ENV_HARDWARE t_deck_plus", ENV_HARDWARE.get("t_deck_plus") == "TDECK+")
+    check("ENV_HARDWARE heltec_wifi_lora_32_V3",
+          ENV_HARDWARE.get("heltec_wifi_lora_32_V3") == "HELTEC_V3")
+
+    if tdeck_plus is not None:
+        check("tdeck_plus reported matches ENV_HARDWARE",
+              hardware_matches(tdeck_plus.get("hardware"), ENV_HARDWARE["t_deck_plus"]))
+    if heltec_v3 is not None:
+        check("heltec_v3 reported matches ENV_HARDWARE",
+              hardware_matches(heltec_v3.get("hardware"), ENV_HARDWARE["heltec_wifi_lora_32_V3"]))
+
+    # formatting-only mismatch hint: 'TDECK+' vs 'TDECK_PLUS' is not an
+    # actual hardware_matches() match, but should normalize equal so the
+    # error message can flag it as a likely ENV_HARDWARE bug.
+    check("TDECK+ vs TDECK_PLUS not a real match",
+          not hardware_matches("TDECK+", "TDECK_PLUS"))
+    check("TDECK+ vs TDECK_PLUS normalize equal",
+          _normalize_hw("TDECK+") == _normalize_hw("TDECK_PLUS"))
+    # a genuine mismatch (different board) must not trigger the hint
+    check("TBEAM vs HELTEC_V3 normalize differ",
+          _normalize_hw("TBEAM") != _normalize_hw("HELTEC_V3"))
+
+    if failures:
+        print(f"SELF-TEST FAILED ({len(failures)}): {', '.join(failures)}", file=sys.stderr)
+        return 1
+    print("SELF-TEST OK (all assertions passed)")
+    return 0
+
+
 # --- CLI ------------------------------------------------------------------
 
 
@@ -292,11 +393,15 @@ def build_parser() -> argparse.ArgumentParser:
                               "(default: looked up from --env via ENV_HARDWARE, "
                               "falling back to HELTEC_V3)")
     parser.add_argument("--force", action="store_true", help="skip the hardware check")
+    parser.add_argument("--self-test", action="store_true",
+                         help="run offline parser self-tests (no network, no serial) and exit")
     return parser
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.self_test:
+        return run_self_test()
     fw = resolve_firmware(args.env, args.bin)
     expect_hw = args.expect_hw or ENV_HARDWARE.get(args.env, "HELTEC_V3")
 

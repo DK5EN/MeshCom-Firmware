@@ -5,32 +5,39 @@
 
 #include "ElegantOTA.h"
 #include <WiFi.h>
- 
+#include <esp_wifi.h>
+
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
- 
+
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
- 
+
 #include <Preferences.h>
 #include "../configuration_global.h"
 #include "../esp32/esp32_flash.h"
- 
+
 #define TAG "SafeBoot"
- 
+
 const unsigned int port = 80;
 AsyncWebServer webServer(port);
 String hostname = "MeshCom-OTA";
- 
+
 extern Preferences preferences;
 extern s_meshcom_settings meshcom_settings;
- 
+
 bool updateInProgress = false;  // Flag to indicate if an update is in progress
- 
+
 unsigned int ota_timeout_timer = 0; // Timer to check if OTA was started. If not, reboot to app/ota partition
 unsigned int last_timer_update = 0; // Timer to update the last time the OTA was updated
 int wait_ota_timeout = 180 * 1000; // OTA Timeout in seconds
 boolean reboot_after_cancel = false; // Reboot after cancelling OTA if no update was started
+
+// TM-46: last time upload data actually arrived. Distinguishes an active
+// (still receiving chunks) upload from a stalled one -- only the latter gets
+// force-aborted by the fallback-to-app watchdog in loop().
+unsigned long last_ota_data_millis = 0;
+const unsigned long OTA_STALL_TIMEOUT_MS = 30000; // TM-46: no data for this long => abort
  
 void startMDNS();
  
@@ -74,6 +81,12 @@ void wifiConnect() {
     return;
   }
 
+   // TM-48: driver-managed join, same as production (udp_functions.cpp wifiInitOnce/wifiBegin)
+   WiFi.persistent(false);
+   WiFi.setAutoReconnect(true);
+   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+
    WiFi.mode(WIFI_STA);
    WiFi.disconnect(true);
 
@@ -111,79 +124,56 @@ void wifiConnect() {
   }
 
    delay(500);
- 
-   // Scan for AP with best RSSI
-   int nrAps = WiFi.scanNetworks();
-   int best_rssi = -200;
-   int best_idx = -1;
-   for (int i = 0; i < nrAps; ++i)
+
+   // TM-48: config-only begin, let the driver pick the AP -- no own scan,
+   // no BSSID/channel pin (see udp_functions.cpp wifiBegin() for the
+   // production pattern this mirrors).
+   // "empty" (production convention) and "none" (safeboot/flash-default
+   // convention) both mean "open network".
+   const char *wifi_pwd = pass;
+   if (strcmp(wifi_pwd, "empty") == 0 || strcmp(wifi_pwd, "none") == 0)
+     wifi_pwd = NULL;
+
+   Serial.printf("-> try connecting to SSID: %s \n", ssid);
+   WiFi.begin(ssid, wifi_pwd, 0, NULL, false); // configuration only, no connect yet
+
    {
-      
-      if(strcmp(WiFi.SSID(i).c_str(), ssid) == 0)
-      {
-         Serial.printf("SSID: %s CHAN: %d RSSI: %d BSSID: ", WiFi.SSID(i).c_str(), (int) WiFi.channel(i), (int) WiFi.RSSI(i));
-         uint8_t *bssid = WiFi.BSSID(i);
-         for (byte i = 0; i < 6; i++){
-           Serial.print(*bssid++, HEX);
-           if (i < 5) Serial.print(":");
-         }
-         Serial.println("");
-         if(WiFi.RSSI(i) > best_rssi)
-         {
-           best_rssi = WiFi.RSSI(i);
-           best_idx = i;
-         }
-      }
-   }	
- 
-   if(best_idx == -1)
-   {
-     // ESP32 - force connecting (in case of hidden ssid or out of range atm)
-     Serial.printf("-> try connecting to SSID: %s \n",ssid);	
-     WiFi.mode(WIFI_STA);
-     
-     if(strcmp(pass, "none") == 0)
-       WiFi.begin(ssid, NULL);
-     else
-       WiFi.begin(ssid, pass);
-   
+     esp_err_t rc = esp_wifi_disable_pmf_config(WIFI_IF_STA);
+     Serial.printf("[SAFEBOOT];wifi;pmf_off;rc;%d\n", (int)rc);
    }
-   else
-   {
-     // ESP32 - connecting to strongest ssid
-     Serial.printf("-> connecting to CHAN: %d BSSID: ",(int) WiFi.channel(best_idx));	
-     uint8_t *bssid = WiFi.BSSID(best_idx);
-     for (byte i = 0; i < 6; i++){
-       Serial.print(*bssid++, HEX);
-       if (i < 5) Serial.print(":");
-       }
-     Serial.println("");
-     WiFi.mode(WIFI_STA);
-     
-     if(strcmp(pass, "none") == 0)
-       WiFi.begin(ssid, NULL, WiFi.channel(best_idx), WiFi.BSSID(best_idx),true);
-     else
-       WiFi.begin(ssid, pass, WiFi.channel(best_idx), WiFi.BSSID(best_idx),true);
-   }
+
+   esp_wifi_connect();
    delay(500);
-  
-   
- 
+
    Serial.println("Connecting to WiFi");
- 
+
+   // TM-48: this is a one-shot bootloader join, so it stays blocking, but with
+   // more patience than a plain link-layer retry needs -- a WPA2/WPA3
+   // transition-mode negotiation can take longer than a few seconds, and the
+   // AP-mode fallback below makes the node unreachable from the LAN, so it
+   // must not trigger on a merely slow join.
    int iWlanWait = 0;
- 
+   bool wifiRetried = false;
+
    while(WiFi.status() != WL_CONNECTED)
    {
      delay(1000);
      iWlanWait++;
      Serial.print(".");
-     if(iWlanWait == 5) WiFi.reconnect();
- 
-     if(iWlanWait > 15)
+
+     if(!wifiRetried && iWlanWait >= 12)
      {
-       // Start AP
+       wifiRetried = true;
+       Serial.println();
+       Serial.println("[SAFEBOOT];wifi;retry;reason;no_connect_12s");
+       esp_wifi_connect();
+     }
+
+     if(iWlanWait > 25)
+     {
+       // Start AP -- last resort only, after the extended join patience above
        Serial.println("\nStarting AP");
+       Serial.println("[SAFEBOOT];wifi;fallback_ap;reason;join_timeout_25s");
        WiFi.mode(WIFI_AP);
        WiFi.softAP(hostname);
        delay(300);
@@ -191,7 +181,7 @@ void wifiConnect() {
        return;
      }
    }
- 
+
    Serial.println("\nConnected to WiFi");
    Serial.print("IP Address: ");
    Serial.println(WiFi.localIP());
@@ -242,29 +232,53 @@ void wifiConnect() {
  void onOTAStart() {
    // Log when OTA has started
    updateInProgress = true;
+   last_ota_data_millis = millis(); // TM-46: anchor the stall watchdog
    Serial.println("OTA update started!");
+   Serial.println("[SAFEBOOT];ota;start");
  }
- 
+
  void onOTAProgress(size_t current, size_t final) {
+   // TM-46: mark that data is still arriving, independent of the print throttle below
+   last_ota_data_millis = millis();
    // Log every 1 second
    if (millis() - ota_progress_millis > 1000) {
      ota_progress_millis = millis();
      Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
    }
  }
- 
+
+ // TM-46: fired by ElegantOTA whenever it aborts the active Update session
+ // (stale session, write failure, dropped connection, stalled upload).
+ // Clears updateInProgress and re-arms the fallback-to-app timeout so a dead
+ // client can never strand the node in safeboot forever.
+ void onOTAAbort(const char *reason)
+ {
+   updateInProgress = false;
+   ota_timeout_timer = millis();
+   last_timer_update = millis();
+   Serial.printf("[SAFEBOOT];ota;rearm;reason;%s\n", reason);
+ }
+
  void onOTAEnd(bool success)
  {
+   // TM-46: the session is over either way -- clear the in-progress flag and
+   // re-arm the fallback timeout, matching the abort cleanup above.
+   updateInProgress = false;
+   ota_timeout_timer = millis();
+   last_timer_update = millis();
+
    // Log when OTA has finished
    if (success)
    {
      Serial.println("OTA update finished successfully!");
+     Serial.println("[SAFEBOOT];ota;end;result;success");
      // Set next boot partition
      setBootPartition_APP();
    }
    else
    {
      Serial.println("There was an error during OTA update!");
+     Serial.println("[SAFEBOOT];ota;end;result;error");
    }
  }
  
@@ -289,6 +303,7 @@ void wifiConnect() {
    ElegantOTA.onStart(onOTAStart);
    ElegantOTA.onProgress(onOTAProgress);
    ElegantOTA.onEnd(onOTAEnd);
+   ElegantOTA.onAbort(onOTAAbort);
  
    // Start web server
    webServer.rewrite("/", "/update");
@@ -318,6 +333,16 @@ void wifiConnect() {
  
  void loop() {
    ElegantOTA.loop();
+
+   // TM-46: an upload in progress but stalled (no data for OTA_STALL_TIMEOUT_MS)
+   // must be aborted -- otherwise updateInProgress stays true forever and the
+   // fallback-to-app timeout below can never fire again. An ACTIVE upload
+   // keeps refreshing last_ota_data_millis via onOTAProgress and is never hit.
+   if (updateInProgress && (millis() - last_ota_data_millis > OTA_STALL_TIMEOUT_MS))
+   {
+     ElegantOTA.abortActiveUpdate("stalled");
+   }
+
    // Check if OTA was started. If not, reboot to app/ota partition
    if((!updateInProgress && (ota_timeout_timer > wait_ota_timeout)) || reboot_after_cancel)
    {

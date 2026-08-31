@@ -1,5 +1,23 @@
 # RESUME — pick up here
 
+## 2026-08-31 evening: Release v4.35p.08.31-stability published, fleet flashed
+
+**Release published**: [v4.35p.08.31-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31-stability)
+— 39 assets (list identical to 08.28), release-notes.md as body, CHANGELOG items 107-152
+(condensed from and linked to `pr-draft-20260831.md`), FLASH_VERSION 20260831
+(STRUCT unchanged). Full field instrumentation ships enabled; exception E22_XML
+(`MC_CAPTURE=0`, `MC_INJECT_HOOKS=0` — the campaign had pushed that link 648 B over
+`dram0_0_seg`). Five envs had been broken since 08.28 (never in a gate) and were fixed for
+the release: E22_XML DRAM, both safeboot envs (`MC_SAFEBOOT` guard around the TM-32
+sanitize path), t114/t_echo (`oledStat()` board guard). Gate: all 32 envs, 438/438 native.
+
+**Whole fleet runs the release build** (webflash OTA: 93, 92, 98; USB: 14 after two OTA
+failures, RAK-90 via DFU serial; each verified by build stamp). The T-Deck OTA failure is
+root-caused and filed: **TM-46** (safeboot leaves stale session state after an aborted
+upload -> HTTP 400 on retry; abort itself was correct — 2.17 MB image at the -74 dBm desk
+margin) and **TM-47** (`webflash.py` expects `TDECK_PLUS`, firmware reports `TDECK` —
+needless `--force`).
+
 ## 2026-08-31 afternoon: GW-01 + TM-06/07/14/19 campaign (both waves done)
 
 Wave 1 (three parallel writers, gated 438/438 native + 8 targets): TM-06 (a) `--injectraw`
