@@ -1880,9 +1880,10 @@ void esp32loop()
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();
 
-    // BP-01: close a back-pressure episode with QRV once the TX ring has
-    // drained, even when no further user message arrives to observe it. Two
-    // ring-index reads and a compare; it emits at most once per episode.
+    // BP-01/BP-04: close a back-pressure episode with QRV once the TX ring
+    // has drained, even when no further user message arrives to observe it.
+    // Since BP-02 an occupied-slot scan (O(MAX_RING)), since BP-04 with the
+    // water-band hold; it emits at most once per episode.
     bpPollDrain();
 
     esp_task_wdt_reset();

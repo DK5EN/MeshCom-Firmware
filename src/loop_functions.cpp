@@ -3477,7 +3477,7 @@ static void bpRoute(BpNotice notice)
 
 void bpPollDrain(void)
 {
-    bpRoute(bp_state.poll(txRingDepth()));
+    bpRoute(bp_state.poll(txRingDepth(), millis()));
 }
 
 void sendMessage(char *msg_text, int len)
@@ -3805,7 +3805,7 @@ void sendMessage(char *msg_text, int len)
     // w < 0 means the ring dropped the frame (RING_DROP_NEW) -- the message is
     // gone and the sender has to be told (QTA). Otherwise the new depth
     // decides between silence, QRS and QRT.
-    bpRoute(bp_state.onSend(txRingDepth(), w < 0));
+    bpRoute(bp_state.onSend(txRingDepth(), w < 0, millis()));
 
     /*
     iWrite++;

@@ -10,13 +10,20 @@
 //   * the refusal band (QRT holds until the ring is genuinely clear),
 //   * QTA when the ring actually threw a message away,
 //   * QRV exactly once, and only after QRS/QRT/QTA — never for a quiet node,
-//   * a full cycle re-arms the whole thing.
+//   * a full cycle re-arms the whole thing,
+//   * BP-04: depth 1 (the water band) needs QRV_HOLD_MS of uninterrupted
+//     quiet before QRV, so a phantom-depth episode (DJ8MEH 2026-08-31, an
+//     episode idling at depth 1 for 8 minutes) does not close on a single
+//     lucky sample. now_ms is passed by the caller, never read from a clock
+//     here -- Arduino-free, so the hysteresis itself is pinnable below.
 //
 //   pio test -e native -f test_backpressure
 
 #include <unity.h>
 
 #include <backpressure.h>
+
+#include <stdint.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -52,8 +59,8 @@ static void test_quiet_node_says_nothing(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(0, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(0, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
     TEST_ASSERT_FALSE(bp.refusing());
 }
@@ -65,10 +72,10 @@ static void test_no_qrv_without_a_preceding_notice(void)
     BackPressure bp(20);
 
     for(int i = 0; i < 50; i++)
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(0));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(0, (uint32_t)(1000 + i)));
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false, 2000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 2001));
 }
 
 // ---- QRS ------------------------------------------------------------------
@@ -77,8 +84,8 @@ static void test_qrs_fires_once_above_depth_one(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(2, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(2, false, 1001));
     TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
     TEST_ASSERT_FALSE(bp.refusing());
 }
@@ -88,6 +95,7 @@ static void test_single_qrs_per_episode_under_a_burst(void)
 {
     BackPressure bp(20);
     int qrs_count = 0;
+    uint32_t t = 1000;
 
     // Walk the whole band below the refusal threshold, twice over, the way a
     // burst does when the radio drains a slot between two enqueues.
@@ -95,7 +103,7 @@ static void test_single_qrs_per_episode_under_a_burst(void)
     {
         for(int depth = 2; depth < bp.refuseThreshold(); depth++)
         {
-            if(bp.onSend(depth, false) == BP_NOTICE_QRS)
+            if(bp.onSend(depth, false, t++) == BP_NOTICE_QRS)
                 qrs_count++;
         }
     }
@@ -109,11 +117,11 @@ static void test_qrt_at_the_threshold_and_refusal_band(void)
 {
     BackPressure bp(20);   // threshold 16
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(15, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(15, false, 1001));
     TEST_ASSERT_FALSE_MESSAGE(bp.refusing(), "one below the threshold still accepts");
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 1002));
     TEST_ASSERT_EQUAL_INT(BP_QRT, bp.state());
     TEST_ASSERT_TRUE(bp.refusing());
 }
@@ -123,26 +131,29 @@ static void test_qrt_without_preceding_qrs(void)
 {
     BackPressure bp(10);   // threshold 8
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(9, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(9, false, 1000));
     TEST_ASSERT_TRUE(bp.refusing());
 }
 
 // Hysteresis: once the node has said "stop", it stays stopped until the ring is
 // genuinely clear. Releasing at the threshold would flip accept/refuse on every
-// message and produce a notice per message.
+// message and produce a notice per message. Depths above the water band never
+// even touch the BP-04 hold (they disarm it and return immediately); only the
+// final CLEAR_DEPTH poll closes the episode, same as before BP-04.
 static void test_qrt_holds_until_the_quiet_band(void)
 {
     BackPressure bp(20);
+    uint32_t t = 1000;
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, t++));
 
     for(int depth = 15; depth > BackPressure::CLEAR_DEPTH; depth--)
     {
-        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(depth), "poll must stay silent above the quiet band");
+        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(depth, t++), "poll must stay silent above the quiet band");
         TEST_ASSERT_TRUE_MESSAGE(bp.refusing(), "QRT must hold all the way down to the quiet band");
     }
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(BackPressure::CLEAR_DEPTH));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(BackPressure::CLEAR_DEPTH, t));
     TEST_ASSERT_FALSE(bp.refusing());
 }
 
@@ -152,7 +163,7 @@ static void test_refusal_announces_once_per_episode(void)
     BackPressure bp(20);
     int qrt_count = 0;
 
-    if(bp.onSend(16, false) == BP_NOTICE_QRT)
+    if(bp.onSend(16, false, 1000) == BP_NOTICE_QRT)
         qrt_count++;
 
     for(int i = 0; i < 20; i++)
@@ -174,7 +185,7 @@ static void test_qta_on_drop_and_only_once(void)
 
     for(int i = 0; i < 6; i++)          // the bench saw 6x RING_DROP_NEW in one flood
     {
-        if(bp.onSend(19, true) == BP_NOTICE_QTA)
+        if(bp.onSend(19, true, (uint32_t)(1000 + i)) == BP_NOTICE_QTA)
             qta_count++;
     }
 
@@ -189,9 +200,9 @@ static void test_qta_outranks_qrt_and_is_not_followed_by_qrt(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(18, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(19, true));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(18, false, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(19, true, 1002));
 }
 
 // A drop while only QRS had been sent must still be reported.
@@ -199,8 +210,8 @@ static void test_qta_after_qrs(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(3, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(3, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1001));
 }
 
 // ---- QRV and re-arming ----------------------------------------------------
@@ -209,38 +220,42 @@ static void test_qrv_exactly_once_after_a_notice(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false));
-    // depth 1 is below the QRS line but not clear: no flapping QRS/QRV/QRS
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, 1000));
+    // depth 1 is below the QRS line but not clear: no flapping QRS/QRV/QRS.
+    // This only arms the BP-04 hold -- it was already NONE before BP-04 and
+    // stays NONE now, the hold just adds a reason on top.
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1002));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0, 1003));
 
     for(int i = 0; i < 10; i++)
-        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0), "QRV closes the episode, it does not repeat");
+        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0, (uint32_t)(1004 + i)), "QRV closes the episode, it does not repeat");
 }
 
 // The drain can also be observed by the next enqueue rather than by the poll.
+// depth 0 always closes immediately -- the BP-04 hold only guards depth 1.
 static void test_qrv_via_onsend_when_the_queue_drained(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false, 1001));
     TEST_ASSERT_TRUE(bp.refusing());
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.onSend(0, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.onSend(0, false, 1002));
     TEST_ASSERT_FALSE(bp.refusing());
 }
 
 static void test_full_cycle_rearms(void)
 {
     BackPressure bp(30);   // threshold 24
+    uint32_t t = 1000;
 
     for(int cycle = 0; cycle < 3; cycle++)
     {
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false));
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(24, false));
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(30, true));
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, t++));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(24, false, t++));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(30, true, t++));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
         TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
     }
@@ -251,12 +266,128 @@ static void test_reset_clears_the_episode(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 1000));
     bp.reset();
 
     TEST_ASSERT_FALSE(bp.refusing());
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
-    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0), "no QRV for an episode that was reset away");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0, 2000), "no QRV for an episode that was reset away");
+}
+
+// ---- BP-04: water-band hold (QRV_HOLD_MS) ---------------------------------
+//
+// DJ8MEH-RCA 2026-08-31: an episode idled at phantom ring depth 1 for
+// 8 minutes -- QRV only closes at CLEAR_DEPTH (0), so a node parked at depth
+// 1 never told the sender it was ready again. These pin the fix: depth 1
+// (the water band) must sit still for QRV_HOLD_MS before QRV, timed from the
+// caller-supplied now_ms, never from a clock read inside the header.
+
+// a) Wasserband: no QRV before quiet_since + QRV_HOLD_MS, exactly one QRV at
+// the deadline, and the episode is closed afterwards (latch empty -> NONE).
+static void test_qrv_water_band_needs_the_full_hold(void)
+{
+    BackPressure bp(20);
+    const uint32_t t0 = 1000;
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, t0));
+
+    const uint32_t t_quiet = t0 + 1000;   // some time later the ring drains to 1
+
+    // Kontrollrechnung: der Halt beginnt beim ersten poll(1, t_quiet) und muss
+    // bis t_quiet + QRV_HOLD_MS (10000) durchhalten.
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_quiet));                                        // arms
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_quiet + 1));                                     // far too early
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_quiet + 5000));                                  // still too early
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_quiet + BackPressure::QRV_HOLD_MS - 1));         // 1 ms short
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(1, t_quiet + BackPressure::QRV_HOLD_MS));              // exactly the deadline
+    TEST_ASSERT_FALSE(bp.refusing());
+
+    // Episode is closed: no second QRV, even though depth is still 1.
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_quiet + BackPressure::QRV_HOLD_MS + 1));
+}
+
+// b) A depth-2 sighting in between resets the hold's clock; QRV comes at the
+// new deadline, not at the old one.
+static void test_qrv_water_band_hold_restarts_on_a_deeper_sighting(void)
+{
+    BackPressure bp(20);
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 0));
+
+    const uint32_t t1 = 1000;
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t1));           // arms at t1
+
+    const uint32_t t2 = t1 + 3000;
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(2, t2));           // ring filled again -- disarms
+
+    const uint32_t t3 = t2 + 500;
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t3));           // re-arms at t3, not t1
+
+    // At the OLD deadline (t1 + QRV_HOLD_MS = 11000) the hold must still be
+    // running against t3, not t1: elapsed since t3 is only 11000 - 4500 =
+    // 6500 ms, well short of QRV_HOLD_MS. A header that forgot to reset
+    // quiet_since_ on the depth-2 sighting would fire QRV right here.
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t1 + BackPressure::QRV_HOLD_MS));
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t3 + BackPressure::QRV_HOLD_MS - 1));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(1, t3 + BackPressure::QRV_HOLD_MS));
+}
+
+// c) Anti-flap regression (2026-08-30 bench): depth 2 -> 1 -> 2 within 400 ms
+// flapped QRS/QRV/QRS before BP-04. The hold must swallow the dip: no QRV in
+// between, and going back to depth 2 must not produce a second QRS (latch).
+static void test_qrv_water_band_hold_covers_the_anti_flap_regression(void)
+{
+    BackPressure bp(20);
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(2, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1200));            // arms, 200 ms in -- nowhere near the hold
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1400));   // back up 400 ms after the QRS
+
+    TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.latch());
+}
+
+// d) F12: reset() during an armed hold must not leak a late QRV at the old
+// deadline once a fresh episode is running.
+static void test_reset_during_an_armed_hold_leaves_no_late_qrv(void)
+{
+    BackPressure bp(20);
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 0));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1000));   // arms the hold at 1000
+
+    bp.reset();
+
+    // Same wall-clock deadline the old (discarded) hold would have fired at.
+    // If reset() left quiet_armed_/quiet_since_ standing, this poll would
+    // wrongly produce an immediate QRV for an episode that was never
+    // re-opened (latch is NONE, nothing was ever announced).
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1000 + BackPressure::QRV_HOLD_MS));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
+    TEST_ASSERT_FALSE(bp.refusing());
+}
+
+// e) millis() rollover: the hold must survive the wrap through UINT32_MAX,
+// same as every other now_ms arithmetic in this codebase.
+static void test_qrv_water_band_hold_survives_millis_rollover(void)
+{
+    BackPressure bp(20);
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 0));
+
+    const uint32_t t_before_wrap = UINT32_MAX - 100UL;   // 4294967195
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_before_wrap));   // arms just before the wrap
+
+    // Kontrollrechnung (mod 2^32): quiet_since_ + (QRV_HOLD_MS - 1) wraps to
+    //   (4294967195 + 9999) - 4294967296 = 9898
+    // and quiet_since_ + QRV_HOLD_MS wraps to 9899.
+    const uint32_t t_after_wrap_short = 9898UL;   // elapsed == QRV_HOLD_MS - 1
+    const uint32_t t_after_wrap_full  = 9899UL;   // elapsed == QRV_HOLD_MS
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, t_after_wrap_short));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV,  bp.poll(1, t_after_wrap_full));
 }
 
 // ---- wording --------------------------------------------------------------
@@ -303,6 +434,12 @@ int main(int, char **)
     RUN_TEST(test_qrv_via_onsend_when_the_queue_drained);
     RUN_TEST(test_full_cycle_rearms);
     RUN_TEST(test_reset_clears_the_episode);
+
+    RUN_TEST(test_qrv_water_band_needs_the_full_hold);
+    RUN_TEST(test_qrv_water_band_hold_restarts_on_a_deeper_sighting);
+    RUN_TEST(test_qrv_water_band_hold_covers_the_anti_flap_regression);
+    RUN_TEST(test_reset_during_an_armed_hold_leaves_no_late_qrv);
+    RUN_TEST(test_qrv_water_band_hold_survives_millis_rollover);
 
     RUN_TEST(test_notice_wording);
 

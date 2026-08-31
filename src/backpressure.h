@@ -31,6 +31,8 @@
 
 #ifdef __cplusplus
 
+#include <stdint.h>
+
 /// Coarse state of the sender-facing back-pressure machine.
 enum BpState
 {
@@ -101,6 +103,17 @@ public:
     /// frame between two typed messages (depth 2 -> 1 -> 2, 400 ms apart).
     static const int CLEAR_DEPTH = 0;
 
+    /// How long depth must sit at QUIET_DEPTH (the water band, 1) before the
+    /// episode is allowed to close. DJ8MEH 2026-08-31: an episode idled at
+    /// phantom depth 1 for 8 minutes because the ring never quite reached 0;
+    /// a real drain reaches CLEAR_DEPTH and closes immediately regardless of
+    /// this hold, so the hold only guards against announcing "clear" while
+    /// the water band is still occupied. Anti-flap 2026-08-30 (depth
+    /// 2 -> 1 -> 2 inside 400 ms) needs only a few hundred ms of hold to stay
+    /// covered; the advisor called 5 s already defensible, 10 s more robust
+    /// against jitter, and 10 s is negligible against a multi-minute episode.
+    static const uint32_t QRV_HOLD_MS = 10000;
+
     explicit BackPressure(int max_ring) { configure(max_ring); }
 
     /// (Re)bind to a ring size and drop any running episode.
@@ -112,8 +125,10 @@ public:
 
     void reset()
     {
-        state_ = BP_QUIET;
-        latch_ = BP_NOTICE_NONE;
+        state_        = BP_QUIET;
+        latch_        = BP_NOTICE_NONE;
+        quiet_armed_  = false;
+        quiet_since_  = 0;
     }
 
     int maxRing() const { return max_ring_; }
@@ -143,10 +158,18 @@ public:
     /// Feed the outcome of one enqueue attempt.
     /// @param depth   ring depth *after* the attempt
     /// @param dropped true when addTxRingEntry() returned -1
-    BpNotice onSend(int depth, bool dropped)
+    /// @param now_ms  caller's millis(), injected so this header stays free
+    ///                of Arduino and pinnable in a host test
+    BpNotice onSend(int depth, bool dropped, uint32_t now_ms)
     {
         if(depth < 0)
             depth = 0;
+
+        // Any sighting above the water band means the ring is not (yet)
+        // draining; whatever quiet-hold timer might be running no longer
+        // applies and has to be re-armed from a fresh observation.
+        if(depth > QUIET_DEPTH)
+            quiet_armed_ = false;
 
         // A real drop is the most specific news there is, so it outranks the
         // plain threshold notice — and it always implies the refusal state.
@@ -173,22 +196,29 @@ public:
             return latchIfHigher(BP_NOTICE_QRS);
         }
 
-        // depth 1: below the QRS line, but not "clear" -- keep the episode open
-        return (depth <= CLEAR_DEPTH) ? enterQuiet() : BP_NOTICE_NONE;
+        // depth <= QUIET_DEPTH: either genuinely clear (closes immediately)
+        // or the water band (1), which the QRV_HOLD_MS hysteresis below
+        // guards. The latch/state decisions above are unchanged by that
+        // hold — only the closing of the episode is delayed.
+        return closeOrHold(depth, now_ms);
     }
 
     /// Cheap per-loop drain check. Only ever produces QRV: a queue that fills
     /// from relay traffic has no sender to warn, and QRV must not become a
     /// heartbeat, so nothing else is raised from here.
-    BpNotice poll(int depth)
+    /// @param now_ms caller's millis(), see onSend().
+    BpNotice poll(int depth, uint32_t now_ms)
     {
         if(depth < 0)
             depth = 0;
 
-        if(depth <= CLEAR_DEPTH)
-            return enterQuiet();
+        if(depth > QUIET_DEPTH)
+        {
+            quiet_armed_ = false;
+            return BP_NOTICE_NONE;
+        }
 
-        return BP_NOTICE_NONE;
+        return closeOrHold(depth, now_ms);
     }
 
 private:
@@ -216,9 +246,45 @@ private:
         return BP_NOTICE_NONE;
     }
 
+    /// depth is <= QUIET_DEPTH here (the caller has already re-armed the
+    /// hold on anything above it). CLEAR_DEPTH (0) means the ring is
+    /// genuinely empty and closes the episode right away, same as before
+    /// BP-04. QUIET_DEPTH (1, the water band) instead has to sit still for
+    /// QRV_HOLD_MS: the sentinel for "the hold is running" is the bool
+    /// quiet_armed_, never quiet_since_ == 0 -- millis() legitimately wraps
+    /// through 0, the same lesson as s_have_marker at the top of
+    /// txring_functions.cpp.
+    BpNotice closeOrHold(int depth, uint32_t now_ms)
+    {
+        if(depth <= CLEAR_DEPTH)
+        {
+            quiet_armed_ = false;
+            return enterQuiet();
+        }
+
+        if(!quiet_armed_)
+        {
+            quiet_armed_ = true;
+            quiet_since_ = now_ms;
+            return BP_NOTICE_NONE;
+        }
+
+        // Unsigned subtraction: correct even when now_ms has wrapped past
+        // quiet_since_ (millis() rollover at ~49.7 days).
+        if((uint32_t)(now_ms - quiet_since_) >= QRV_HOLD_MS)
+        {
+            quiet_armed_ = false;
+            return enterQuiet();
+        }
+
+        return BP_NOTICE_NONE;
+    }
+
     int      max_ring_;
     BpState  state_;
     BpNotice latch_;
+    bool     quiet_armed_;
+    uint32_t quiet_since_;
 };
 
 #endif // __cplusplus

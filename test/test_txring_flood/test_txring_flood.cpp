@@ -400,7 +400,7 @@ static void test_backpressure_qrt_an_der_echten_80_prozent_marke(void)
         if (bp.refusing())
             refused_before_threshold = true;
 
-        switch (bp.onSend(txRingDepth(), slot < 0))
+        switch (bp.onSend(txRingDepth(), slot < 0, millis()))
         {
             case BP_NOTICE_QRS: qrs_count++; break;
             case BP_NOTICE_QRT: qrt_count++; break;
@@ -423,7 +423,7 @@ static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
     BackPressure bp(MAX_RING);
 
     fillWithPositions(0xE000);
-    bp.onSend(txRingDepth(), false);
+    bp.onSend(txRingDepth(), false, millis());
     TEST_ASSERT_EQUAL_INT(MAX_RING - 1, txRingDepth());
 
     BuiltFrame neu = buildPositionFrame(0xE0FF0001UL);
@@ -431,15 +431,18 @@ static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
 
     TEST_ASSERT_EQUAL_INT(-1, slot);
     TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_RING - 1, txRingDepth(), "ein verworfener Frame veraendert die Tiefe nicht");
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(txRingDepth(), slot < 0));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(txRingDepth(), slot < 0, millis()));
 
     // Abfluss bis in das Ruheband -> genau ein QRV schliesst die Episode.
+    // Tiefe hier ist 0 (CLEAR_DEPTH, Ring komplett leer, iRead==iWrite), nicht
+    // das BP-04-Wasserband (Tiefe 1) -- CLEAR_DEPTH schliesst weiterhin sofort,
+    // ohne QRV_HOLD_MS abzuwarten, deshalb genuegt ein einzelnes poll().
     memset(ringBuffer, 0, sizeof(ringBuffer));
     iRead = 0;
     iWrite = 0;
     TEST_ASSERT_EQUAL_INT(0, txRingDepth());
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(txRingDepth()));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth()));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(txRingDepth(), millis()));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), millis()));
 }
 
 int main(int, char **)
