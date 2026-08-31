@@ -9,13 +9,23 @@ name: CI Build
 # Die Environment-Liste wird zur Laufzeit aus platformio.ini gelesen, damit eine
 # neue Variante nicht vergessen werden kann.
 
+# Doku-Commits (docs/, *.md) lösen keinen Build aus: kein Pfad davon geht in
+# die Firmware ein, und im August 2026 gingen dadurch tausende Runner-Minuten
+# an reine docs:-Pushes verloren. Kein Branch hat Required Checks, ein
+# übersprungener Lauf blockiert also nichts.
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   push:
     branches:
       - '**'
     tags-ignore:
       - '**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
 
 # Ein laufender Build für denselben Branch/PR wird abgebrochen, wenn nachgeschoben wird.
