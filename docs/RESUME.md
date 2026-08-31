@@ -155,7 +155,9 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 6. **TM-28** — E290 Wireless Paper Hardware kommt in der Woche ab 2026-09-01.
 7. Kleinvieh, alles gefiled: `ntpsync.py`-Live-Lauf; PM-01 boot-gecachtes Global (optional);
    CONF-Koordinaten anwenden (eigenes Ticket); WEB-03 (c)-(e); WF-01 Sites 1+2; TM-44
-   (deferred), TM-29, TM-23 (von TD-09 abgelöst) — TM-06/07/14/19 sind seit 2026-08-31
+   (deferred); TD-10 Backspace-Auto-Repeat (zurückgestellt, Konzept fertig:
+   [`tdeck-backspace-autorepeat-20260831.md`](tdeck-backspace-autorepeat-20260831.md)),
+   TM-29, TM-23 (von TD-09 abgelöst) — TM-06/07/14/19 sind seit 2026-08-31
    erledigt (siehe oben); BAT-02-Grenze dokumentiert
    (stabil in-band floatender Teiler ist von einer vollen Zelle nicht unterscheidbar —
    RAK-90 liest stabile 4,22 V, Erkennung greift dort nicht).
