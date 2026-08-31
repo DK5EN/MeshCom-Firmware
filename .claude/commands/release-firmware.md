@@ -94,6 +94,13 @@ pio run -e E22-DevKitC -e E22_1262-DevKitC -e E22_1262_S3-DevKitC-1-N16R8 \
 `t5_epaper` is deliberately NOT in the release (pre-existing include-path
 breakage; release-notes.md says so).
 
+Do NOT skip this step because "the envs were all built earlier this
+session": `.pio` outputs disappear between runs (observed 2026-08-31 —
+7 of 27 app images and both safeboot outputs gone within the hour, despite
+an exit-0 full build). If you think the outputs are current, the check is
+`ls .pio/build/*/firmware.bin | wc -l` == 27 plus the three nRF52 hex files
+plus both safeboot outputs — anything less means rebuild.
+
 **Safeboot check after the build:** the safeboot envs' post script
 (`tools/safeboot.py`) copies `safeboot.bin`/`safeboot-s3.bin` into the repo
 root, where they are **tracked in git**. The build is deterministic — if
