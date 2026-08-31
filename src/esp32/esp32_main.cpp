@@ -2046,6 +2046,10 @@ void esp32loop()
         if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
         {
             updateRetransmissionStatus();
+            // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring
+            // entries here, in the main-loop tick -- NOT in getNextTxSlot(),
+            // which also runs on the nRF52 timer task (Advisor F1).
+            txRingAgeBackground(millis());
 
             retransmit_timer = millis();
         }

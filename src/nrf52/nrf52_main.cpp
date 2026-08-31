@@ -1285,6 +1285,11 @@ void nrf52loop()
     if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
     {
         updateRetransmissionStatus();
+        // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring entries
+        // here, in the main-loop tick -- NOT in getNextTxSlot(), which also
+        // runs on the nRF52 timer task itself (Advisor F1, the critical
+        // finding this fix is named after).
+        txRingAgeBackground(millis());
 
         retransmit_timer = millis();
     }

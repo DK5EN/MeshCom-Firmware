@@ -259,6 +259,103 @@ int txRingDepth(void)
 }
 
 /**
+ * BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): sweep the whole ring and drop every
+ * BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
+ * (configuration_global.h). A priority-starved HEY parked at iRead behind a
+ * run of higher-priority traffic can sit for many minutes -- the DJ8MEH
+ * blocker sat 10 min -- and a neighbourhood report that stale is worthless
+ * on air. Tradeoff (a node's own HEY beacon ages out the same way) is
+ * documented at the RING_BG_MAX_AGE_MS definition.
+ *
+ * Deliberately its OWN function, not folded into getNextTxSlot() (Advisor
+ * F1, critical): getNextTxSlot() also runs on the nRF52 FreeRTOS timer task
+ * (OnRxDone -> csma_compute_timeout(), lora_functions.cpp) and under the
+ * EXTERNAL_RADIO bridge path -- neither may write the ring or call
+ * printf/printfdeb. This function is instead called once per 2s tick from
+ * the MAIN LOOP on both platforms (esp32_main.cpp/nrf52_main.cpp), right
+ * next to updateRetransmissionStatus() -- the same context that already
+ * frees slots today.
+ *
+ * Locking on nRF52: identical taskENTER_CRITICAL()/taskEXIT_CRITICAL()
+ * pattern as addTxRingEntry() above, and for the same reason (Advisor F2):
+ * the overflow-eviction path in addTxRingEntry() (see the N-24 comment
+ * further down) can RELOCATE an iRead entry's payload/side-arrays into a
+ * slot this sweep has already looked at or is about to look at, from the
+ * OTHER task, between an unlocked check and an unlocked drop. Every slot's
+ * occupancy/priority/age is therefore read and acted on ONCE, entirely
+ * inside a single critical section -- never decided beforehand and acted on
+ * after. No printfdeb/malloc/Serial call inside the lock (see
+ * printf-malloc-starves-nimble): dropped-slot details are collected into
+ * local arrays here and printed once, after taskEXIT_CRITICAL(). Ring size
+ * (MAX_RING, at most a few dozen) bounds both the loop and the local arrays.
+ *
+ * advanceIReadPastEmpty() runs once, inside the same critical section (same
+ * placement as its call inside addTxRingEntry() above), so the read pointer
+ * clears any run of newly-freed slots at the front in the same atomic step.
+ */
+void txRingAgeBackground(uint32_t now_ms)
+{
+    int dropSlot[MAX_RING];
+    uint32_t dropAgeS[MAX_RING];
+    uint32_t dropMsgId[MAX_RING];
+    int dropCount = 0;
+
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
+
+    for(int i = 0; i < MAX_RING; i++)
+    {
+        if(ringBuffer[i][0] == 0)
+            continue;
+        if(ringPriority[i] != MSG_PRIO_BACKGROUND)
+            continue;
+
+        uint32_t age_ms = (uint32_t)(now_ms - ringEnqueueTime[i]); // F8: rollover-safe cast
+        if(age_ms <= RING_BG_MAX_AGE_MS)
+            continue;
+
+#if defined(EXTERNAL_RADIO)
+        // Owned-slot invariant (F7, same as getNextTxSlot()/the overflow
+        // evictor above): a slot awaiting an async external-TX bridge result
+        // must never be reclaimed here, or a late TX_RESULT would corrupt
+        // whatever gets written into the reused slot next.
+        if(ringBuffer[i][1] == RING_STATUS_EXT_PENDING)
+            continue;
+#endif
+
+        uint32_t mid = ((uint32_t)ringBuffer[i][6] << 24) | ((uint32_t)ringBuffer[i][5] << 16) |
+                       ((uint32_t)ringBuffer[i][4] << 8)  |  (uint32_t)ringBuffer[i][3];
+
+        ringBuffer[i][0] = 0; // free the slot
+        retryCount[i] = 0;
+        stat_drop_count[MSG_PRIO_BACKGROUND]++;
+
+        if(dropCount < MAX_RING)
+        {
+            dropSlot[dropCount] = i;
+            dropAgeS[dropCount] = age_ms / 1000UL;
+            dropMsgId[dropCount] = mid;
+            dropCount++;
+        }
+    }
+
+    advanceIReadPastEmpty();
+
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
+
+    // ---- Ab hier ausserhalb des Locks: nur noch Debug-Ausgabe ----
+    if(bLORADEBUG)
+    {
+        for(int k = 0; k < dropCount; k++)
+            printfdeb("[MC-DBG] RING_DROP_STALE slot=%d age_s=%lu msg_id=%08X\n",
+                      dropSlot[k], (unsigned long)dropAgeS[k], dropMsgId[k]);
+    }
+}
+
+/**
  * TX-Ring: kompletter Enqueue-Vorgang (Slot-Wahl, Payload-Kopie, Prio/Overflow,
  * iWrite/iRead-Fortschritt) in EINER Funktion unter EINEM Lock.
  * N-14: bisher schrieb der Aufrufer selbst nach ringBuffer[iWrite][...] und

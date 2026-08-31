@@ -313,6 +313,15 @@ static inline bool flashLayoutCompatible(int stored)
 #define MSG_PRIO_LOW        4   // Position (0x21)
 #define MSG_PRIO_BACKGROUND 5   // HEY (0x40)
 
+// BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): max age (ms) a BACKGROUND (HEY,
+// prio 5) ring entry may sit unsent before txRingAgeBackground()
+// (txring_functions.cpp) drops it. Tradeoff accepted: a node's OWN HEY
+// beacon ages out the same way, and at trickle intervals up to 480 s the
+// next copy may follow minutes later -- but a neighbourhood report that
+// cannot be transmitted for 3 minutes is worthless on air, and the
+// DJ8MEH blocker that motivated this sat unsent for 10 minutes.
+#define RING_BG_MAX_AGE_MS 180000UL   // 3 min
+
 // Priority-dependent CSMA base timeouts (ms)
 #define CSMA_PRIO_BASE_1    3000   // ACK/DM
 #define CSMA_PRIO_BASE_2    3000   // Gruppen/Broadcast

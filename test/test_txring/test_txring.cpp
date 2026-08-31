@@ -752,6 +752,115 @@ static void test_bp02_dj8meh_szenario_prio5_am_lesezeiger(void)
     TEST_ASSERT_EQUAL_INT(1, txRingDepth());
 }
 
+// --------------------------------------------------------------- BP-03
+//
+// txRingAgeBackground() (txring_functions.cpp): sweeps the ring and drops
+// any BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
+// (configuration_global.h, 180000 ms). DJ8MEH-RCA Teil 2: a priority-
+// starved HEY parked at iRead can sit unsent for many minutes (10 min in
+// the field episode that motivated this) while getNextTxSlot() never picks
+// it -- txRingAgeBackground() is the only place that ever frees such a
+// slot, called from the main-loop 2s tick, NOT from getNextTxSlot() itself
+// (Advisor F1: that path also runs on the nRF52 timer task).
+//
+// Kontrollrechnung (fails-before): mit einem No-Op-Rumpf von
+// txRingAgeBackground() (Rueckkehr sofort nach Betreten, kein Sweep) --
+// probeweise so gegen diese Suite laufen lassen -- schlagen
+// test_bp03_stale_drop_und_lesezeiger_vorruecken und
+// test_bp03_rollover_sicher (zweite Haelfte) rot fehl: der Slot bleibt
+// belegt (ringBuffer[slot][0] != 0 statt 0), stat_drop_count[5] bleibt 0
+// statt 1, und iRead ruecht nicht vor. Verifiziert waehrend der Umsetzung,
+// Fix danach wiederhergestellt.
+
+static void test_bp03_stale_drop_und_lesezeiger_vorruecken(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildHeyFrame(0xAABBCCDDUL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp03stale");
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_BACKGROUND, ringPriority[slot]);
+    TEST_ASSERT_EQUAL_UINT8(1, (uint8_t)iWrite);
+
+    // Genau ueber der Grenze (Grenze selbst ist noch KEIN Drop, siehe ">").
+    mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS + 1UL);
+    txRingAgeBackground((uint32_t)millis());
+
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT8(0, retryCount[slot]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
+
+    // Der abgelaufene Eintrag sass allein am Lesezeiger -- advanceIReadPastEmpty()
+    // (innerhalb des Sweeps aufgerufen) muss iRead bis zu iWrite (leerer Ring)
+    // vorruecken.
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)iWrite, (uint8_t)iRead);
+}
+
+static void test_bp03_frischer_bg_bleibt(void)
+{
+    mc_test_set_millis(5000);
+    BuiltFrame f = buildHeyFrame();
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp03fresh");
+
+    // Exakt auf der Grenze (nicht darueber) -- Bedingung ist "> Grenze", also
+    // bleibt der Eintrag hier noch stehen.
+    mc_test_set_millis(5000UL + RING_BG_MAX_AGE_MS);
+    txRingAgeBackground((uint32_t)millis());
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead); // nichts geraeumt, iRead unveraendert
+}
+
+static void test_bp03_nicht_bg_altert_nie(void)
+{
+    mc_test_set_millis(1000);
+    BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo"); // -> MSG_PRIO_CRITICAL
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp03nonbg");
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+
+    // Weit jenseits der BACKGROUND-Alterungsgrenze -- ein Nicht-BG-Eintrag
+    // darf trotzdem nie altern.
+    mc_test_set_millis(1000UL + RING_BG_MAX_AGE_MS * 100UL);
+    txRingAgeBackground((uint32_t)millis());
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+}
+
+// Rollover-Fall (F8): ringEnqueueTime nahe UINT32_MAX, now nach dem Wrap.
+// Der Rollover-sichere Cast (uint32_t)(now_ms - ringEnqueueTime[i]) muss
+// sowohl "frisch bleibt" als auch "stale faellt" ueber den Wrap hinweg
+// korrekt berechnen -- eine vorzeichenbehaftete oder ungecastete Differenz
+// wuerde hier riesige/negative Werte liefern.
+static void test_bp03_rollover_sicher(void)
+{
+    mc_test_set_millis(UINT32_MAX - 100UL); // 4294967195
+    BuiltFrame f = buildHeyFrame(0xD00DD00DUL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp03wrap");
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)(UINT32_MAX - 100UL), ringEnqueueTime[slot]);
+
+    // now=50 (nach dem Wrap) -> Alter = 151 ms, weit unter der Grenze: bleibt.
+    mc_test_set_millis(50);
+    txRingAgeBackground((uint32_t)millis());
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)f.len, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_BACKGROUND]);
+
+    // now=179900 (weiter nach dem Wrap) -> Alter = 180001 ms > Grenze: faellt.
+    mc_test_set_millis(179900);
+    txRingAgeBackground((uint32_t)millis());
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[slot][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
+}
+
+// EXT_PENDING-Guard (F7): nur relevant/baubar unter EXTERNAL_RADIO, das
+// env:native_aprs NICHT setzt (siehe platformio.ini [env:native_aprs] --
+// build_flags definiert dort kein -D EXTERNAL_RADIO=1, anders als
+// [env:*_external_radio]). Ein #if-gated Test wuerde in diesem Env nie
+// laufen (toter Test) -- deshalb hier bewusst ausgelassen, siehe Wave-Report.
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -772,5 +881,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_n14_stress_randomisiert);
     RUN_TEST(test_bp02_tiefe_mit_loechern);
     RUN_TEST(test_bp02_dj8meh_szenario_prio5_am_lesezeiger);
+    RUN_TEST(test_bp03_stale_drop_und_lesezeiger_vorruecken);
+    RUN_TEST(test_bp03_frischer_bg_bleibt);
+    RUN_TEST(test_bp03_nicht_bg_altert_nie);
+    RUN_TEST(test_bp03_rollover_sicher);
     return UNITY_END();
 }
