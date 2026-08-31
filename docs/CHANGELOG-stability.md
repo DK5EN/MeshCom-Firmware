@@ -80,7 +80,7 @@ discover them by surprise:
 Fourth cut of the 2026-08-31 release: the back-pressure notice policy,
 recalibrated against a real gateway baseline, and notices that land in the
 conversation the sender is actually typing in. Both waves advisor-gated
-(Fable). `FLASH_VERSION` stays `20260831`; native suite now 477 test cases
+(Fable). `FLASH_VERSION` stays `20260831`; native suite now 480 test cases
 across the same 12 host environments.
 
 161. **QRS fires at depth 5 (fixed across all boards), QRV only after a

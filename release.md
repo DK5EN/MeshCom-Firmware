@@ -35,7 +35,7 @@ beide Wellen mit Fable-Advisor-Gate.
 
 ### Was fuer dieses Release auf Hardware geprueft wurde
 
-- Alle 32 Release-Envs bauen; Native-Gate 477/477 in 12 Host-Envs
+- Alle 32 Release-Envs bauen; Native-Gate 480/480 in 12 Host-Envs
   (inkl. Feldmessungs-Grundlast als Regressionstest).
 - Die Grundlast-Messung selbst stammt vom Live-Gateway DK5EN-98 mit dem
   .3-Build (5,5 min, tools/meshlogger.py ueber die 2323-Konsole).

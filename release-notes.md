@@ -3,7 +3,7 @@
 
 ## What this release is
 
-**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 56 numbered changes (items 107–162), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 477 native test cases across 12 host environments and soak runs up to 9.1 hours.
+**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 56 numbered changes (items 107–162), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 480 native test cases across 12 host environments and soak runs up to 9.1 hours.
 
 Flash version `20260831`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
@@ -72,7 +72,7 @@ Each on-air-visible change, stated plainly (details in the changelog):
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 477 native test cases green across 12 host environments.
+- **All 32 release environments build clean**; 480 native test cases green across 12 host environments.
 - **Heltec V3** — WiFi/NTP/battery/OLED changes bench-proven; runs the GW-01 fix build, verified against the live server stream.
 - **T-Beam v1.2** — WiFi soak (9.1 h, 55/55 reconnects), gateway observer in the GW-01 measurement.
 - **T-Deck Plus** — full harness regression (boot, display CRC, map, nav, input, heap, trim, touch injection) PASS on this build.
@@ -101,7 +101,7 @@ These boards build cleanly from the same source and inherit every improvement, b
 - `--mheard` and the live BLE path still deliver two schemas under the same `TYP`.
 - The battery zero point on a real 2S pack, the INA226 branch and L76K GPS remain unverified.
 - **TM-49 (open):** the safeboot OTA completion handler can read a success status after a disconnect whose final frame never arrived, and switch boot partitions after a partial write — benign on 16-MB boards (slot validation catches it), risky on 4-MB single-slot boards. Until the guard lands: on 4-MB boards prefer USB flashing over OTA when the link is marginal.
-- The `.3`/`.4` back-pressure changes are proven native (477 cases, incl. the end-to-end incident replay and the recorded gateway baseline) and the `.3` fixes ran on the four-board bench plus the live gateway, but the original field incident has not yet been re-provoked on hardware, and the `.4` notice policy has not yet had bench time at publish.
+- The `.3`/`.4` back-pressure changes are proven native (480 cases, incl. the end-to-end incident replay and the recorded gateway baseline) and the `.3` fixes ran on the four-board bench plus the live gateway, but the original field incident has not yet been re-provoked on hardware, and the `.4` notice policy has not yet had bench time at publish.
 
 ## Installing
 
