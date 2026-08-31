@@ -14,6 +14,7 @@
 #include <configuration.h>
 #include "capture_functions.h"
 #include "dedup_functions.h"
+#include "ntp_async.h"      // NTP-01: isPending() haelt das GPS-Gate fuer --ntpsync offen
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <RadioLib.h>
@@ -2625,7 +2626,12 @@ void esp32loop()
 
     // !posinfo_fix && !bNTPDateTimeValid
     // Time NTP
-    if(meshcom_settings.node_hasIPaddress && !posinfo_fix)
+    // NTP-01 Nachtrag (Bench-Regression): mit GPS-Fix lief dieser Block nie,
+    // ein manuelles --ntpsync setzte also nur _nextDueMs und nichts sendete.
+    // isPending() haelt den Pump offen, bis der manuelle Request ok/timeout
+    // gemeldet hat; danach schliesst das GPS-Gate wieder wie gehabt.
+    extern NtpAsync timeClient;
+    if(meshcom_settings.node_hasIPaddress && (!posinfo_fix || timeClient.isPending()))
     {
         strTime = "none";
 

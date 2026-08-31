@@ -5191,6 +5191,11 @@ void commandAction(char *umsg_text, bool ble)
         else
         {
             timeClient.requestNow();
+            // NTP-01 Nachtrag (Bench-Regression): mit GPS-Fix pumpt der
+            // 15-min-Block in esp32_main.cpp nicht -- ein Pump hier feuert
+            // den Send sofort, danach haelt dort (!posinfo_fix ||
+            // isPending()) den Block offen, bis ok/timeout gemeldet ist.
+            timeClient.loop();
             Serial.println("[NTPSYNC];requested");
         }
 
