@@ -125,6 +125,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 // MeshCom Common (ers32/nrf52) Funktions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include <test_inject.h>
 #include <command_functions.h>
 #include <phone_commands.h>
 #include <aprs_functions.h>
@@ -3381,6 +3382,12 @@ void esp32loop()
     }
 
     checkSerialCommand();
+
+    // TM-06: service --loratx / --injectraw with the radio idle -- OnRxDone()'s
+    // own exit points only fire on RX traffic, which would stall a staged
+    // burst or injection on a quiet bench.
+    if(tx_is_active == false && is_receiving == false)
+        test_inject_service();
 
     if(BattTimeWait == 0)
         BattTimeWait = millis() - 500;

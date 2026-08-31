@@ -40,6 +40,13 @@ authoritative list):
     [DISPTEST];step;<phase>;n;<i>;crc;<hex8>;px;<n>;ms;<n>
     [DISPTEST];end;steps;<n>;ms;<n>
     [DISPTEST];err;<reason>[;<detail>]
+    [INJ];raw;len;<bytes>;res;<n>
+    [INJ];raw;err;<reason>
+    [INJ];loratx;start;n;<n>;ms;<n>
+    [INJ];loratx;q;<i>;id;<hex>
+    [INJ];loratx;done;<queued>/<n>
+    [SPITRACE];flush;<seq>;users;T<c>,S<c>,L<c>;user;<hex>;ctrl;<hex>;clock;<hex>;chg;<none|list>
+    [TOUCH];inj;<tap|down|up>;x;<n>;y;<n>
 
 [UISTAT] also accepts two optional trailing fields, tft_sleeping;<0|1> and
 bl;<n> -- older firmware omits them, newer firmware appends them.
@@ -431,6 +438,103 @@ def _parse_disptest(parts: List[str]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _parse_inj(parts: List[str]) -> Optional[Dict[str, Any]]:
+    """[INJ];raw;... (--injectraw) and [INJ];loratx;... (--loratx)."""
+    if not parts:
+        return None
+    top = parts[0]
+    if top == "raw":
+        if len(parts) < 2:
+            return None
+        if parts[1] == "err":
+            reason = ";".join(parts[2:]) if len(parts) > 2 else ""
+            return {"kind": "INJ", "variant": "raw_err", "reason": reason}
+        if parts[1] == "len":
+            d = _kv_ints(parts[1:])
+            if d is None or set(d.keys()) != {"len", "res"}:
+                return None
+            return {"kind": "INJ", "variant": "raw_len", "len": d["len"], "res": d["res"]}
+        return None
+    if top == "loratx":
+        if len(parts) < 2:
+            return None
+        sub = parts[1]
+        if sub == "start":
+            d = _kv_ints(parts[2:])
+            if d is None or set(d.keys()) != {"n", "ms"}:
+                return None
+            return {"kind": "INJ", "variant": "loratx_start", "n": d["n"], "ms": d["ms"]}
+        if sub == "q":
+            if len(parts) != 5 or parts[3] != "id":
+                return None
+            try:
+                i = int(parts[2])
+            except ValueError:
+                return None
+            return {"kind": "INJ", "variant": "loratx_q", "i": i, "id": parts[4]}
+        if sub == "done":
+            if len(parts) != 3:
+                return None
+            queued_s, _, n_s = parts[2].partition("/")
+            if not n_s or not queued_s.isdigit() or not n_s.isdigit():
+                return None
+            return {
+                "kind": "INJ",
+                "variant": "loratx_done",
+                "queued": int(queued_s),
+                "n": int(n_s),
+            }
+        return None
+    return None
+
+
+def _parse_spitrace(parts: List[str]) -> Optional[Dict[str, Any]]:
+    if len(parts) != 12 or parts[0] != "flush":
+        return None
+    try:
+        seq = int(parts[1])
+    except ValueError:
+        return None
+    if parts[2] != "users" or parts[4] != "user" or parts[6] != "ctrl" or parts[8] != "clock" or parts[10] != "chg":
+        return None
+    users: Dict[str, int] = {}
+    for tok in parts[3].split(","):
+        if len(tok) < 2:
+            return None
+        try:
+            users[tok[0]] = int(tok[1:])
+        except ValueError:
+            return None
+    if set(users.keys()) != {"T", "S", "L"}:
+        return None
+    chg_raw = parts[11]
+    chg = [] if chg_raw == "none" else chg_raw.split(",")
+    return {
+        "kind": "SPITRACE",
+        "variant": "flush",
+        "seq": seq,
+        "users": users,
+        "user": parts[5],
+        "ctrl": parts[7],
+        "clock": parts[9],
+        "chg": chg,
+    }
+
+
+def _parse_touch(parts: List[str]) -> Optional[Dict[str, Any]]:
+    if len(parts) != 6 or parts[0] != "inj" or parts[2] != "x" or parts[4] != "y":
+        return None
+    what = parts[1]
+    if what not in ("tap", "down", "up"):
+        return None
+    try:
+        x = int(parts[3])
+        y = int(parts[5])
+    except ValueError:
+        return None
+    return {"kind": "TOUCH", "variant": "inj", "what": what, "x": x, "y": y}
+
+
 _DISPATCH = {
     "DISPTEST": _parse_disptest,
     "REDRAW": _parse_redraw,
@@ -459,6 +563,9 @@ _DISPATCH = {
         {"msg_list_children", "active_tab_bubbles", "persisted_msgs", "map_points"},
         exact=True,
     ),
+    "INJ": _parse_inj,
+    "SPITRACE": _parse_spitrace,
+    "TOUCH": _parse_touch,
 }
 
 

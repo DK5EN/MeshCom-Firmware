@@ -1,5 +1,16 @@
 # RESUME — pick up here
 
+## 2026-08-31 afternoon: GW-01 + TM-06/07/14/19 campaign (wave 1 committed, wave 2 running)
+
+Wave 1 (three parallel writers, gated 438/438 native + 8 targets): TM-06 (a) `--injectraw`
+(real RX path via OnRxDone recursion) + (b) `--loratx` burst; TM-07 `--spitrace` per-flush
+GPSPI2 register/user trace; TM-19 `--touch tap/down/up` through the LVGL indev path; harness
+scenarios `gps_experiment`, `flush_lora_correlation`, `touch_inject`. GW-01 **measured**
+(dual-node run + mcmap interlink): server stream has no HEY msg_id dedup, all copies arrive;
+the only gateway-on difference is the bare `gw:1` self-upload arriving first — consumer-side
+loss, fix (a) scheduled. Wave 2: fix (a), bench proofs on DK5EN-14 (touch/spitrace/inject),
+TM-14 measurement run. Details: BACKLOG §3.8f TM-06/07/14/19, §3.8i GW-01.
+
 Last session: 2026-08-31, morning through afternoon. The full 3.8o/3.8p intake campaign was
 implemented via `/orchestrate-waves` (Waves 1+2: WEB-01..04, NC-01/02, MH-02, TM-45, TM-39-CONF,
 BAT-01/02, CHR-01/02, JSN-01, TD-07/08, ETH-01, CONF-01, CTY-01, PM-01, NTP-01, DOC-02 text,

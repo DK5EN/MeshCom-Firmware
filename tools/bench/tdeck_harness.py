@@ -1543,6 +1543,341 @@ def scenario_disptest(session: TDeckSession, args: argparse.Namespace) -> Dict[s
     }
 
 
+# --------------------------------------------------------------------------
+# gps_experiment: TM-14 -- does GPS fix processing load the main loop?
+# --------------------------------------------------------------------------
+
+
+def _gps_state(session: TDeckSession, timeout: float = 4.0) -> Optional[bool]:
+    """--pos also prints '...GPS: on/off' (bGPSON); used to confirm --gps on/off took."""
+    idx = session.send("--pos")
+    if session.wait_for(r"GPS:", timeout, since=idx) is None:
+        return None
+    for _, _, l in session.records_since(idx):
+        m = re.search(r"GPS:\s*(on|off)", l)
+        if m:
+            return m.group(1) == "on"
+    return None
+
+
+def _loop_max_stats(max_values: Sequence[Optional[float]]) -> Dict[str, Any]:
+    vals = [v for v in max_values if v is not None]
+    return {
+        "samples": len(vals),
+        "p50_us": _pct(vals, 0.5),
+        "p90_us": _pct(vals, 0.9),
+        "p99_us": _pct(vals, 0.99),
+        "max_us": max(vals) if vals else None,
+        "over_50ms_count": sum(1 for v in vals if v > 50000),
+        "over_100ms_count": sum(1 for v in vals if v > 100000),
+    }
+
+
+def _gps_window_capture(
+    session: TDeckSession, window_seconds: float, load_count: int, label: str
+) -> Dict[str, Any]:
+    """Apply `load_count` --injectmsg messages (scenario_inject's own
+    TEST_GROUP / --injectmsg / "[INJECT];ok" pattern) evenly across
+    window_seconds, sampling [INSTR-LOOP] max_us in the sub-window before
+    each one via --instreset/--instr. The console has no per-iteration loop
+    trace, so this sub-window sampling is the finest granularity available;
+    the percentiles below are over those sub-window maxima, not over
+    individual loop() calls.
+    """
+    n = max(1, load_count)
+    sub = max(1.0, window_seconds / n)
+    samples: List[Dict[str, Any]] = []
+    inject_ok = 0
+    for i in range(n):
+        ridx = session.send("--instreset")
+        session.wait_for(r"\[INSTR\][; ]reset", 2.0, since=ridx)
+        iidx = session.send(f"--injectmsg {TEST_GROUP} {label} {i}")
+        if session.wait_for(r"\[INJECT\];ok", 2.0, since=iidx) is not None:
+            inject_ok += 1
+        settle = 1.0 if sub > 1.0 else 0.0
+        session.collect(max(0.0, sub - settle))
+        instr_idx = session.send("--instr")
+        m = session.wait_for(r"\[INSTR-LOOP\];", 2.0, since=instr_idx)
+        rec = parse_line(m.string) if m else None
+        samples.append(
+            {
+                "i": i,
+                "max_us": rec.get("max_us") if rec else None,
+                "avg_us": rec.get("avg_us") if rec else None,
+                "n": rec.get("n") if rec else None,
+            }
+        )
+    stats = _loop_max_stats([s["max_us"] for s in samples])
+    return {"inject_ok": inject_ok, "inject_total": n, "samples": samples, "stats": stats}
+
+
+def scenario_gps_experiment(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-14 A/B experiment: does GPS fix processing load the main loop?
+
+    Phase A: GPS on, a fixed injected message load spread across
+    --gps-window seconds (reusing scenario_inject's --injectmsg load
+    generator via args.inject_count), sampling [INSTR-LOOP] sub-window
+    maxima throughout. Phase B: --gps off, settle 10 s, then an identical
+    load + window. GPS is restored to on afterward regardless of outcome.
+    Reports p50/p90/p99/max and >50ms/>100ms tail counts per phase, plus a
+    plain verdict line comparing the tails.
+    """
+    session.send("--tab 0")
+    time.sleep(0.3)
+
+    session.send("--gps on")
+    time.sleep(0.5)
+    gps_on_confirmed = _gps_state(session)
+
+    phase_on = _gps_window_capture(session, args.gps_window, args.inject_count, "gpsA")
+
+    session.send("--gps off")
+    time.sleep(0.5)
+    gps_off_confirmed = _gps_state(session)
+    time.sleep(10.0)  # settle before phase B, per the TM-14 procedure
+
+    phase_off = _gps_window_capture(session, args.gps_window, args.inject_count, "gpsB")
+
+    session.send("--gps on")
+    time.sleep(0.5)
+    gps_restored_confirmed = _gps_state(session)
+
+    p99_on, p99_off = phase_on["stats"]["p99_us"], phase_off["stats"]["p99_us"]
+    tail_on, tail_off = phase_on["stats"]["over_100ms_count"], phase_off["stats"]["over_100ms_count"]
+    if p99_on is None or p99_off is None:
+        verdict = "inconclusive -- missing [INSTR-LOOP] samples in one or both phases"
+    elif p99_on > p99_off * 1.2 or tail_on > tail_off:
+        verdict = (
+            f"GPS ON tail is worse than GPS OFF (p99 {p99_on:.0f}us vs {p99_off:.0f}us, "
+            f">100ms count {tail_on} vs {tail_off}) -- GPS processing measurably loads the loop"
+        )
+    elif p99_off > p99_on * 1.2 or tail_off > tail_on:
+        verdict = (
+            f"GPS OFF tail is worse than GPS ON (p99 {p99_off:.0f}us vs {p99_on:.0f}us) -- "
+            f"unexpected direction, treat as noise/harness artefact rather than a GPS finding"
+        )
+    else:
+        verdict = "no clear difference between GPS on/off loop tails -- GPS processing does not measurably load the loop"
+
+    # gps_off_confirmed is the reported *state* (True = GPS still on), not a
+    # "did the confirmation succeed" flag -- only fail on the one state value
+    # that means the --gps off command visibly did not take (True); False
+    # (confirmed off, as wanted) and None (board doesn't report GPS state)
+    # are both fine.
+    ok = p99_on is not None and p99_off is not None and gps_off_confirmed is not True
+
+    return {
+        "ok": ok,
+        "window_seconds": args.gps_window,
+        "load_count": args.inject_count,
+        "gps_on_confirmed": gps_on_confirmed,
+        "gps_off_confirmed": gps_off_confirmed,
+        "gps_restored_confirmed": gps_restored_confirmed,
+        "phase_gps_on": phase_on,
+        "phase_gps_off": phase_off,
+        "verdict": verdict,
+    }
+
+
+# --------------------------------------------------------------------------
+# flush_lora_correlation: TM-06 (c) -- lost/suspect flushes vs LoRa SPI use
+# --------------------------------------------------------------------------
+
+
+def _force_redraws(session: TDeckSession, cycles: int, pause: float = 0.3) -> None:
+    """Drawer open/close is the harness's existing forced-full-repaint trick
+    (see scenario_sleep step e / _acked_step's --drawer usage); reused here
+    purely to keep TFT flushes happening throughout an observation window."""
+    for _ in range(cycles):
+        session.send("--drawer on")
+        time.sleep(pause)
+        session.send("--drawer off")
+        time.sleep(pause)
+
+
+def _flush_lora_observe(
+    session: TDeckSession, window_seconds: float, with_lora: bool, args: argparse.Namespace, label: str
+) -> Dict[str, Any]:
+    session.send("--spitrace on")
+    time.sleep(0.2)
+    reset_idx = session.send("--instreset")
+    session.wait_for(r"\[INSTR\][; ]reset", 2.0, since=reset_idx)
+    start = session.length()
+
+    lora_started: Optional[bool] = None
+    lora_done: Optional[bool] = None
+    if with_lora:
+        lidx = session.send(f"--loratx {args.loratx_count} {args.loratx_interval_ms}")
+        lora_started = session.wait_for(r"\[INJ\];loratx;start;", 3.0, since=lidx) is not None
+
+    cycles = max(1, int(window_seconds / (2 * args.flush_force_pause)))
+    _force_redraws(session, cycles, args.flush_force_pause)
+    remaining = window_seconds - cycles * 2 * args.flush_force_pause
+    if remaining > 0:
+        session.collect(remaining)
+
+    if with_lora:
+        lora_done = session.wait_for(r"\[INJ\];loratx;done;", 3.0, since=start) is not None
+
+    end = session.length()
+    session.send("--spitrace off")
+    time.sleep(0.2)
+    instr_idx = session.send("--instr")
+    m = session.wait_for(r"\[INSTR-FLUSH\];", 2.0, since=instr_idx)
+    flush_instr = parse_line(m.string) if m else None
+
+    recs = session.records_range(start, end)
+    spitrace: List[Dict[str, Any]] = []
+    lora_events: List[Tuple[float, str]] = []
+    for _, t_mono, l in recs:
+        rec = parse_line(l)
+        if rec and rec.get("kind") == "SPITRACE" and rec.get("variant") == "flush":
+            spitrace.append({**rec, "t_mono": t_mono})
+        elif rec and rec.get("kind") == "INJ" and rec.get("variant") == "loratx_q":
+            lora_events.append((t_mono, rec.get("id")))
+
+    window_start_t = recs[0][1] if recs else time.monotonic()
+    rows = []
+    for i, sp in enumerate(spitrace):
+        t0 = spitrace[i - 1]["t_mono"] if i > 0 else window_start_t
+        t1 = sp["t_mono"]
+        lora_between = [lid for (t, lid) in lora_events if t0 <= t <= t1]
+        l_users = sp["users"].get("L", 0)
+        chg = sp.get("chg") or []
+        rows.append(
+            {
+                "seq": sp.get("seq"),
+                "users": sp.get("users"),
+                "l_users": l_users,
+                "chg": chg,
+                "lora_between": lora_between,
+                "lora_activity": bool(lora_between) or l_users > 0,
+            }
+        )
+
+    with_l = [r for r in rows if r["lora_activity"]]
+    without_l = [r for r in rows if not r["lora_activity"]]
+
+    return {
+        "label": label,
+        "with_lora": with_lora,
+        "lora_started": lora_started,
+        "lora_done": lora_done,
+        "flush_instr": flush_instr,
+        "flush_count": len(rows),
+        "rows": rows,
+        "lora_activity_flushes": len(with_l),
+        "lora_activity_with_chg": sum(1 for r in with_l if r["chg"]),
+        "no_lora_activity_flushes": len(without_l),
+        "no_lora_activity_with_chg": sum(1 for r in without_l if r["chg"]),
+    }
+
+
+def scenario_flush_lora_correlation(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-06 (c): correlate TFT flush activity ([SPITRACE]) with LoRa SPI bus
+    traffic (--loratx) to see whether flushes that coincide with LoRa
+    activity are more often the ones with a changed register snapshot
+    (chg != none) than flushes with no LoRa activity nearby -- i.e. whether
+    LoRa bus sharing is visibly perturbing the panel's SPI state during a
+    flush. Runs once with --loratx running against forced redraws, once as a
+    control with the same forced redraws and no LoRa traffic.
+    """
+    session.send("--tab 0")
+    time.sleep(0.3)
+
+    lora_phase = _flush_lora_observe(session, args.flush_window, True, args, "loratx")
+    time.sleep(1.0)
+    control_phase = _flush_lora_observe(session, args.flush_window, False, args, "control")
+
+    def _rate(n: int, d: int) -> Optional[float]:
+        return round(n / d, 2) if d else None
+
+    lora_rate = _rate(lora_phase["lora_activity_with_chg"], lora_phase["lora_activity_flushes"])
+    control_rate = _rate(control_phase["lora_activity_with_chg"], control_phase["lora_activity_flushes"])
+
+    if lora_phase["flush_count"] == 0:
+        conclusion = "inconclusive -- no [SPITRACE] flush lines captured"
+    elif lora_phase["lora_activity_with_chg"] > 0 and lora_rate is not None and (
+        control_rate is None or lora_rate > control_rate
+    ):
+        conclusion = (
+            f"LoRa SPI activity coincides with register changes on "
+            f"{lora_phase['lora_activity_with_chg']}/{lora_phase['lora_activity_flushes']} flushes "
+            f"during --loratx vs {control_phase['lora_activity_with_chg']}/{control_phase['lora_activity_flushes']} "
+            f"in the control window -- suspect flushes correlate with LoRa bus sharing"
+        )
+    else:
+        conclusion = "no clear correlation between LoRa SPI activity and TFT register changes in this run"
+
+    ok = lora_phase["lora_started"] is not False and lora_phase["flush_count"] > 0
+
+    return {
+        "ok": ok,
+        "window_seconds": args.flush_window,
+        "loratx": {"n": args.loratx_count, "interval_ms": args.loratx_interval_ms},
+        "lora_phase": lora_phase,
+        "control_phase": control_phase,
+        "conclusion": conclusion,
+    }
+
+
+# --------------------------------------------------------------------------
+# touch_inject: TM-19 -- injected touch path sanity
+# --------------------------------------------------------------------------
+
+# 320x240 panel; centre and two off-centre points well away from the corners
+# where the drawer hamburger / status icons live, so a tap can't trigger
+# navigation and turn this into something other than an injection-path test.
+TOUCH_TAP_POINTS = [(160, 120), (160, 60), (80, 180)]
+
+
+def scenario_touch_inject(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TM-19: injection-path sanity for the emulated touch panel.
+
+    Each --touch tap/down/up must produce its [TOUCH];inj; ack, and a
+    display flush must follow within 2 s -- either [REFR] (the harness's
+    usual repaint signal) or, with --spitrace left on for the scenario, the
+    [SPITRACE] flush sequence advancing. PASS/FAIL is reported per
+    assertion: two per tap (ack + flush) plus one pair for a down/up press.
+    """
+    session.send("--tab 0")
+    time.sleep(0.3)
+    session.send("--spitrace on")
+    time.sleep(0.2)
+
+    flush_pattern = r"\[REFR\]|\[SPITRACE\];flush;"
+
+    def one(cmd: str, ack_pattern: str, label: str) -> Dict[str, Any]:
+        idx = session.send(cmd)
+        ack = session.wait_for(ack_pattern, 2.0, since=idx)
+        flush = session.wait_for(flush_pattern, 2.0, since=idx)
+        return {
+            "label": label,
+            "cmd": cmd,
+            "ack_seen": ack is not None,
+            "ack_line": ack.string.strip()[:120] if ack else None,
+            "flush_seen": flush is not None,
+            "passed": ack is not None and flush is not None,
+        }
+
+    results = []
+    points = TOUCH_TAP_POINTS[: max(1, min(args.touch_tap_count, len(TOUCH_TAP_POINTS)))]
+    for x, y in points:
+        results.append(one(f"--touch tap {x} {y}", rf"\[TOUCH\];inj;tap;x;{x};y;{y}", f"tap({x},{y})"))
+        time.sleep(0.3)
+
+    dx, dy = TOUCH_TAP_POINTS[0]
+    results.append(one(f"--touch down {dx} {dy}", rf"\[TOUCH\];inj;down;x;{dx};y;{dy}", f"down({dx},{dy})"))
+    time.sleep(0.2)
+    results.append(one("--touch up", r"\[TOUCH\];inj;up;", "up"))
+
+    session.send("--spitrace off")
+    time.sleep(0.1)
+
+    ok = all(r["passed"] for r in results)
+    return {"ok": ok, "results": results}
+
+
 SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]]] = {
     "boot": scenario_boot,
     "idle": scenario_idle,
@@ -1561,6 +1896,9 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "input": scenario_input,
     "heap": scenario_heap,
     "trim": scenario_trim,
+    "gps_experiment": scenario_gps_experiment,
+    "flush_lora_correlation": scenario_flush_lora_correlation,
+    "touch_inject": scenario_touch_inject,
 }
 SCENARIO_ORDER = [
     "boot",
@@ -1579,7 +1917,11 @@ SCENARIO_ORDER = [
     "heap",
     "trim",
     "displaycmd",
+    "touch_inject",
 ]
+# gps_experiment, flush_lora_correlation and uptime are long-running
+# measurement experiments (multi-minute A/B windows) -- opt in explicitly
+# with --scenario, same convention as "uptime" (see SCENARIO_HELP below).
 
 
 # --------------------------------------------------------------------------
@@ -1737,6 +2079,32 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 f"probe_missed={result.get('probe_missed')}"
             )
             print(f"  delta={result.get('delta')}")
+        elif name == "gps_experiment":
+            print(f"  window_s={result.get('window_seconds')} load={result.get('load_count')}")
+            for phase_key, tag in (("phase_gps_on", "GPS ON"), ("phase_gps_off", "GPS OFF")):
+                st = result.get(phase_key, {}).get("stats", {})
+                print(
+                    f"  {tag:8s} p50={st.get('p50_us')} p90={st.get('p90_us')} p99={st.get('p99_us')} "
+                    f"max={st.get('max_us')} us  >50ms={st.get('over_50ms_count')} >100ms={st.get('over_100ms_count')}"
+                )
+            print(f"  verdict: {result.get('verdict')}")
+        elif name == "flush_lora_correlation":
+            lp, cp = result.get("lora_phase", {}), result.get("control_phase", {})
+            print(
+                f"  loratx: activity_flushes={lp.get('lora_activity_flushes')} "
+                f"with_chg={lp.get('lora_activity_with_chg')}  flush_count={lp.get('flush_count')}"
+            )
+            print(
+                f"  control: activity_flushes={cp.get('lora_activity_flushes')} "
+                f"with_chg={cp.get('lora_activity_with_chg')}  flush_count={cp.get('flush_count')}"
+            )
+            print(f"  conclusion: {result.get('conclusion')}")
+        elif name == "touch_inject":
+            for row in result.get("results", []):
+                print(
+                    f"  {row['label']:14s} ack={row['ack_seen']} flush={row['flush_seen']} "
+                    f"passed={row['passed']}"
+                )
     print()
 
 
@@ -1763,6 +2131,9 @@ SCENARIO_HELP = {
     "trim": "TD-03: active-tab message view capped at 50 over N injected messages",
     "displaycmd": "TM-33 (b): --display off/on drives the TFT (sleeping 1/0 via --tft state)",
     "uptime": "TM-30: input latency / loop max / heap per step over a long uptime (not in all)",
+    "gps_experiment": "TM-14: A/B loop-time tails with GPS on vs off, fixed load (not in all)",
+    "flush_lora_correlation": "TM-06 (c): TFT flush vs LoRa SPI activity correlation (not in all)",
+    "touch_inject": "TM-19: injected touch tap/down/up ack + flush-follows sanity",
 }
 
 EPILOG = """\
@@ -1865,6 +2236,28 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
     p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")
     p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")
+    p.add_argument(
+        "--gps-window", type=float, default=120.0, help="gps_experiment: per-phase capture window seconds (default: 120)"
+    )
+    p.add_argument(
+        "--flush-window", type=float, default=60.0, help="flush_lora_correlation: per-phase capture window seconds (default: 60)"
+    )
+    p.add_argument(
+        "--flush-force-pause",
+        type=float,
+        default=0.3,
+        help="flush_lora_correlation: seconds between forced-redraw drawer toggles (default: 0.3)",
+    )
+    p.add_argument("--loratx-count", type=int, default=10, help="flush_lora_correlation: --loratx frame count (default: 10)")
+    p.add_argument(
+        "--loratx-interval-ms", type=int, default=500, help="flush_lora_correlation: --loratx inter-frame ms (default: 500)"
+    )
+    p.add_argument(
+        "--touch-tap-count",
+        type=int,
+        default=3,
+        help="touch_inject: number of tap positions to use, 1-3 (default: 3)",
+    )
     p.add_argument("--out", default="summary.json", help="output JSON summary path (default: summary.json)")
     args = p.parse_args(argv)
     if args.list:

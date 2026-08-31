@@ -23,6 +23,7 @@
 #include <RadioLib.h>
 #include <Wire.h>
 #include <SD.h>
+#include <string.h>
 #include "tdeck_sdmap.h"
 #include <gps_functions.h>
 
@@ -557,6 +558,11 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
         tft.pushColors( ( uint16_t * )&color_p->full, w * h, false );
         tft.endWrite();
         INSTR_FLUSH(_instr_flush_t0);       // TEMPORARY
+        // TM-07: post-transfer bus-register snapshot + SD/LoRa user counts
+        // since the previous flush, see tdeck_debug.h for the line format.
+        if(tdeck_dbg_spitrace_enabled()) {
+            tdeck_dbg_spitrace_flush();
+        }
         if(tdeck_dbg_framedump_armed() && w == (uint32_t)TFT_HEIGHT && h == (uint32_t)TFT_WIDTH) {
             // One-shot ASCII dump of the full frame: every 4th row, every 4th column.
             // ' ' dark, '.' dim, '+' mid, '#' bright (luminance from RGB565, byte-swapped).
@@ -684,6 +690,53 @@ extern "C" void tdeck_dbg_inject_ball(int dir, int n)
     }
     else
         s_dbg_ball_pending[dir] += n;
+}
+
+// Bench-Harness (TM-19): synthetic touch injection, consumed by
+// touchpad_read() before it polls the GT911 hardware. tap/down/up match the
+// --touch serial command (tdeck_debug.h).
+enum { TDECK_TOUCH_TAP = 0, TDECK_TOUCH_DOWN, TDECK_TOUCH_UP };
+#define TDECK_TOUCH_QUEUE 4
+struct tdeck_touch_cmd_t { uint8_t op; int16_t x, y; uint16_t dur_ms; };
+static volatile tdeck_touch_cmd_t s_touch_queue[TDECK_TOUCH_QUEUE];
+static volatile uint8_t           s_touch_q_head = 0, s_touch_q_tail = 0;
+
+// Injected press state consumed by touchpad_read(); s_touch_inj_auto_release
+// distinguishes a tap's timed release from a down/up held press.
+static bool     s_touch_inj_active = false;
+static bool     s_touch_inj_auto_release = false;
+static int16_t  s_touch_inj_x = 0, s_touch_inj_y = 0;
+static uint32_t s_touch_inj_release_ms = 0;
+
+extern "C" bool tdeck_touch_inject(const char *subcmd, int x, int y, int dur_ms)
+{
+    uint8_t op;
+    if      (strcmp(subcmd, "tap")  == 0) op = TDECK_TOUCH_TAP;
+    else if (strcmp(subcmd, "down") == 0) op = TDECK_TOUCH_DOWN;
+    else if (strcmp(subcmd, "up")   == 0) op = TDECK_TOUCH_UP;
+    else { Serial.println("[TOUCH];err;usage"); return false; }
+
+    if (op != TDECK_TOUCH_UP && (x < 0 || x >= 320 || y < 0 || y >= 240))
+    {
+        Serial.println("[TOUCH];err;range");
+        return false;
+    }
+
+    uint8_t next = (uint8_t)((s_touch_q_head + 1) % TDECK_TOUCH_QUEUE);
+    if (next == s_touch_q_tail)
+    {
+        Serial.println("[TOUCH];err;full");
+        return false;                        // Ring voll
+    }
+
+    // Field-by-field: a volatile struct has no implicit (volatile-qualified)
+    // copy assignment/constructor, so `queue[i] = cmd;` does not compile.
+    s_touch_queue[s_touch_q_head].op     = op;
+    s_touch_queue[s_touch_q_head].x      = (int16_t)x;
+    s_touch_queue[s_touch_q_head].y      = (int16_t)y;
+    s_touch_queue[s_touch_q_head].dur_ms = (uint16_t)((op == TDECK_TOUCH_TAP) ? ((dur_ms > 0) ? dur_ms : 50) : 0);
+    s_touch_q_head = next;
+    return true;
 }
 
 static uint32_t keypad_get_key(void)
@@ -1078,6 +1131,59 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
 static void touchpad_read( lv_indev_drv_t *indev_driver, lv_indev_data_t *data )
 {
     static int16_t x[5], y[5];
+
+    // TM-07: cheap SD/LoRa bus-user proxy, sampled once per indev tick.
+    // No-op unless --spitrace is armed (tdeck_debug.cpp).
+    tdeck_dbg_spitrace_poll();
+
+    // TM-19: drain queued synthetic touch commands (--touch), then let any
+    // active injected press/hold override the real GT911 poll below.
+    while (s_touch_q_tail != s_touch_q_head)
+    {
+        // Field-by-field: see tdeck_touch_inject() for why a volatile struct
+        // cannot be copy-constructed as a whole.
+        uint8_t  op      = s_touch_queue[s_touch_q_tail].op;
+        int16_t  cmd_x   = s_touch_queue[s_touch_q_tail].x;
+        int16_t  cmd_y   = s_touch_queue[s_touch_q_tail].y;
+        uint16_t dur_ms  = s_touch_queue[s_touch_q_tail].dur_ms;
+        s_touch_q_tail = (uint8_t)((s_touch_q_tail + 1) % TDECK_TOUCH_QUEUE);
+        switch (op)
+        {
+        case TDECK_TOUCH_TAP:
+            s_touch_inj_active = true;
+            s_touch_inj_auto_release = true;
+            s_touch_inj_x = cmd_x;
+            s_touch_inj_y = cmd_y;
+            s_touch_inj_release_ms = millis() + dur_ms;
+            Serial.printf("[TOUCH];inj;tap;x;%d;y;%d\n", (int)cmd_x, (int)cmd_y);
+            break;
+        case TDECK_TOUCH_DOWN:
+            s_touch_inj_active = true;
+            s_touch_inj_auto_release = false;
+            s_touch_inj_x = cmd_x;
+            s_touch_inj_y = cmd_y;
+            Serial.printf("[TOUCH];inj;down;x;%d;y;%d\n", (int)cmd_x, (int)cmd_y);
+            break;
+        case TDECK_TOUCH_UP:
+            s_touch_inj_active = false;
+            Serial.printf("[TOUCH];inj;up;x;%d;y;%d\n", (int)s_touch_inj_x, (int)s_touch_inj_y);
+            break;
+        default:
+            break;
+        }
+    }
+    if (s_touch_inj_active && s_touch_inj_auto_release &&
+        (int32_t)(millis() - s_touch_inj_release_ms) >= 0)
+    {
+        s_touch_inj_active = false;              // tap's timed release
+    }
+    if (s_touch_inj_active)
+    {
+        data->state = LV_INDEV_STATE_PR;
+        data->point.x = s_touch_inj_x;
+        data->point.y = s_touch_inj_y;
+        return;
+    }
 
     data->state =  LV_INDEV_STATE_REL;
     if (touch.isPressed())

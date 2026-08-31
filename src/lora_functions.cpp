@@ -78,6 +78,8 @@
 
 #include "softser_functions.h"
 
+#include "test_inject.h"   // TM-06: raw-inject drain / TX-burst ticker, serviced from OnRxDone()
+
 #include "via_functions.h"
 
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
@@ -495,6 +497,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
         iReceiveTimeOutTime = millis();
         csma_timeout = csma_compute_timeout(cad_attempt);
+
+        // TM-06: state above is fully settled -- safe point for
+        // test_inject_service() to recurse into OnRxDone() (see there).
+        test_inject_service();
+
         return;
     }
 
@@ -554,6 +561,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         
         // print which message type we got
         uint16_t msg_type_b_lora = decodeAPRS(RcvBuffer, size, aprsmsg);
+
+        // TM-06(a): no-op unless this call is draining a staged raw-inject
+        // frame (test_inject.cpp) -- see test_inject_service() below.
+        test_inject_raw_report(size, msg_type_b_lora);
 
         size = aprsmsg.msg_len;
 
@@ -1401,6 +1412,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     if(bLORADEBUG)
         printfdeb("[MC-SM] RX_PROCESS -> RX_LISTEN rc=0\n");
     is_receiving = false;
+
+    // TM-06: state above is fully settled -- safe point for
+    // test_inject_service() to recurse into OnRxDone() (see there).
+    test_inject_service();
 }
 
 /**@brief Function to be executed on Radio Rx Timeout event

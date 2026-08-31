@@ -850,9 +850,14 @@ void commandAction(char *umsg_text, bool ble)
             #endif
             delay(100);
             printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
+            delay(100);
+            printlndeb("--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)");
+            printlndeb("--loratx <n> <ms>  queue n test TX frames (max 20) at ms intervals (min 100)");
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             delay(100);
             printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
+            delay(100);
+            printlndeb("--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up");
             #endif
 
             // DOC-02: everything above predates this pass and is kept as it
@@ -4848,7 +4853,54 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    if(commandCheck(msg_text+2, (char*)"injectraw ") == 0)
+    {
+        // TM-06(a): feeds hex through the REAL RX path (OnRxDone -> decodeAPRS
+        // -> dedup/mheard/relay/display), unlike --injectmsg above. Markers:
+        // [INJ];raw;err;<reason> immediately on a bad command, or
+        // [INJ];raw;len;<bytes>;res;<decodeAPRS-return> once actually drained
+        // (see test_inject_service() in lora_functions.cpp).
+        test_inject_raw(msg_text + 12);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"loratx ") == 0)
+    {
+        // TM-06(b): non-blocking TX burst -- n frames (cap 20) at ms intervals
+        // (floor 100) into the normal TX ring, for LoRa SPI/TX bench work.
+        int n = 0, ms = 0;
+        if(sscanf(msg_text+9, "%d %d", &n, &ms) == 2)
+            test_inject_loratx(n, ms);
+        else
+            Serial.println("[INJ];loratx;err;usage");
+        return;
+    }
+    else
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    if(commandCheck(msg_text+2, (char*)"spitrace on") == 0)
+    {
+        tdeck_dbg_spitrace(true);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"spitrace off") == 0)
+    {
+        tdeck_dbg_spitrace(false);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"touch ") == 0)
+    {
+        // --touch tap <x> <y> [ms] | --touch down <x> <y> | --touch up
+        char subcmd[8] = {0};
+        int  x = 0, y = 0, ms = 0;
+        if(sscanf(msg_text+8, "%7s %d %d %d", subcmd, &x, &y, &ms) >= 1)
+            tdeck_touch_inject(subcmd, x, y, ms);
+        else
+            Serial.println("[TOUCH];err;usage");
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"redrawlog on") == 0)
     {
         tdeck_dbg_redrawlog(true);

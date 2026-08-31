@@ -83,6 +83,37 @@ bool tdeck_dbg_disptest_running(void);
 void tdeck_dbg_monitor_cb(lv_disp_drv_t * disp_drv, uint32_t time_ms, uint32_t px);
 void tdeck_dbg_render_start_cb(lv_disp_drv_t * disp_drv);
 
+/* TM-07: SPI2 bus-user trace across TFT/SD/LoRa on the shared bus.
+ * --spitrace on/off. Once armed, every disp_flush() (tdeck_main.cpp) emits
+ *   [SPITRACE];flush;<seq>;users;T<t>,S<s>,L<l>;user;<hex>;ctrl;<hex>;clock;<hex>;chg;<none|user,ctrl,clock>
+ * -- a post-transfer snapshot of GPSPI2.user/ctrl/clock plus how many bus
+ * users ran since the previous flush, and which of the three registers
+ * differ from the previous flush's post-snapshot ("chg").
+ *
+ * T is the disp_flush() count (normally 1: one line per flush). S/L are
+ * edge-counted PROXIES, not true SPI transaction counts, because the real
+ * choke points sit in files this module does not own (SD: tdeck_sdmap.cpp /
+ * esp32_audio.cpp, neither of which take xSemaphore before touching SD in
+ * the map-read path; LoRa: lora_functions.cpp). S counts falling edges of
+ * TDECK_SDCARD_CS; L counts rising edges of loop_functions_extern.h's
+ * is_receiving / tx_is_active. Both are sampled from tdeck_dbg_spitrace_poll(),
+ * called out of touchpad_read()'s ~30 ms LVGL indev tick -- a bus burst that
+ * starts and ends entirely between two polls is undercounted. */
+void tdeck_dbg_spitrace(bool on);
+bool tdeck_dbg_spitrace_enabled(void);
+void tdeck_dbg_spitrace_poll(void);          /* sampled every touchpad_read() tick */
+void tdeck_dbg_spitrace_flush(void);         /* called from disp_flush() after the real transfer */
+
+/* TM-19: synthetic touch injection through the real LVGL input path.
+ * subcmd is "tap" (press at x,y, release after dur_ms -- 0 means the 50 ms
+ * default), "down" (press-and-hold at x,y until "up"), or "up" (release the
+ * held point; x/y/dur_ms are ignored). Coordinates are LVGL screen
+ * coordinates (320x240 landscape). Returns false (and prints
+ * [TOUCH];err;...) on a bad subcmd, an out-of-range x/y, or a full queue.
+ * Implemented in tdeck_main.cpp, consumed by touchpad_read() before it polls
+ * the GT911 hardware. */
+bool tdeck_touch_inject(const char *subcmd, int x, int y, int dur_ms);
+
 #ifdef __cplusplus
 }
 #endif

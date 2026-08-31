@@ -24,6 +24,7 @@
 #include <esp_debug_helpers.h>
 #include <esp_task_wdt.h>
 #include <soc/cpu.h>
+#include <soc/spi_struct.h>
 #include <TFT_eSPI.h>
 
 /* Globals owned by lv_obj_functions.cpp (see lv_obj_functions.cpp:87,106,110). */
@@ -140,6 +141,86 @@ extern "C" void tdeck_dbg_invalidate(void) { lv_obj_t * scr = lv_scr_act(); if(s
 static bool s_framedump_armed = false;
 extern "C" void tdeck_dbg_framedump_arm(bool on) { s_framedump_armed = on; if(on) Serial.println("[FRAME];armed"); }
 extern "C" bool tdeck_dbg_framedump_armed(void) { return s_framedump_armed; }
+
+/* ---- TM-07 [SPITRACE]: SPI2 bus-user trace across TFT/SD/LoRa, see tdeck_debug.h ---- */
+static bool     s_spitrace_on = false;
+static uint32_t s_spi_seq = 0;
+static uint32_t s_spi_t_count = 0, s_spi_s_count = 0, s_spi_l_count = 0;
+static bool     s_spi_sd_cs_low = false;
+static bool     s_spi_lora_rx = false;
+static bool     s_spi_lora_tx = false;
+static bool     s_spi_snap_valid = false;
+static uint32_t s_spi_prev_user = 0, s_spi_prev_ctrl = 0, s_spi_prev_clock = 0;
+
+extern "C" void tdeck_dbg_spitrace(bool on)
+{
+    s_spitrace_on = on;
+    if(on) {
+        // Re-arm the S/L edge trackers on the current level so toggling this
+        // on mid-session cannot report a spurious edge on the first poll.
+        s_spi_seq = 0;
+        s_spi_t_count = s_spi_s_count = s_spi_l_count = 0;
+        s_spi_sd_cs_low = (digitalRead(TDECK_SDCARD_CS) == LOW);
+        s_spi_lora_rx = is_receiving;
+        s_spi_lora_tx = tx_is_active;
+        s_spi_snap_valid = false;
+    }
+    Serial.printf("[SPITRACE];%d\n", on ? 1 : 0);
+}
+
+extern "C" bool tdeck_dbg_spitrace_enabled(void)
+{
+    return s_spitrace_on;
+}
+
+extern "C" void tdeck_dbg_spitrace_poll(void)
+{
+    if(!s_spitrace_on) return;
+
+    bool sd_cs_low = (digitalRead(TDECK_SDCARD_CS) == LOW);
+    if(sd_cs_low && !s_spi_sd_cs_low) s_spi_s_count++;
+    s_spi_sd_cs_low = sd_cs_low;
+
+    bool lora_rx = is_receiving;
+    if(lora_rx && !s_spi_lora_rx) s_spi_l_count++;
+    s_spi_lora_rx = lora_rx;
+
+    bool lora_tx = tx_is_active;
+    if(lora_tx && !s_spi_lora_tx) s_spi_l_count++;
+    s_spi_lora_tx = lora_tx;
+}
+
+extern "C" void tdeck_dbg_spitrace_flush(void)
+{
+    if(!s_spitrace_on) return;
+
+    s_spi_t_count++;
+    s_spi_seq++;
+
+    uint32_t user = GPSPI2.user.val, ctrl = GPSPI2.ctrl.val, clock = GPSPI2.clock.val;
+
+    char chg[24];
+    if(!s_spi_snap_valid) {
+        snprintf(chg, sizeof(chg), "none");
+    }
+    else {
+        int  off = 0;
+        bool any = false;
+        if(user  != s_spi_prev_user)  { off += snprintf(chg + off, sizeof(chg) - off, "%suser",  any ? "," : ""); any = true; }
+        if(ctrl  != s_spi_prev_ctrl)  { off += snprintf(chg + off, sizeof(chg) - off, "%sctrl",  any ? "," : ""); any = true; }
+        if(clock != s_spi_prev_clock) { off += snprintf(chg + off, sizeof(chg) - off, "%sclock", any ? "," : ""); any = true; }
+        if(!any) snprintf(chg, sizeof(chg), "none");
+    }
+
+    Serial.printf("[SPITRACE];flush;%lu;users;T%lu,S%lu,L%lu;user;%08lx;ctrl;%08lx;clock;%08lx;chg;%s\n",
+                  (unsigned long)s_spi_seq, (unsigned long)s_spi_t_count, (unsigned long)s_spi_s_count,
+                  (unsigned long)s_spi_l_count, (unsigned long)user, (unsigned long)ctrl,
+                  (unsigned long)clock, chg);
+
+    s_spi_prev_user = user; s_spi_prev_ctrl = ctrl; s_spi_prev_clock = clock;
+    s_spi_snap_valid = true;
+    s_spi_t_count = s_spi_s_count = s_spi_l_count = 0;
+}
 
 extern "C" void tdeck_dbg_mapzoom(int dir)
 {
