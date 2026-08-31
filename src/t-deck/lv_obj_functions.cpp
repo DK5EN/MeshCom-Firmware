@@ -2142,7 +2142,11 @@ static void update_header_batt_indicator(float batt, int proz)
         return;
 
     const float usb_voltage_threshold = 4.2f;
-    const bool usb_powered = (batt > usb_voltage_threshold);
+    // BAT-01: batt==0.0f is the established "no reading" convention (grounded pin, or the
+    // ADC-path no-battery detection in batt_functions.cpp) -- without this, a genuinely
+    // absent battery fell through to the percent branch below and showed a misleading
+    // "100%"/full-battery icon (mv_to_percent() returns 100 for <1000 mV).
+    const bool usb_powered = (batt <= 0.0f) || (batt > usb_voltage_threshold);
 
     if(usb_powered)
     {
@@ -3616,7 +3620,9 @@ void tdeck_update_batt_label(float batt, int proz)
         snprintf(vChar, sizeof(vChar), "Batt: %.2fV (%i%%)", batt, proz);
     }
 
-    if(batt > 4.2)
+    // BAT-01: same batt<=0 convention as update_header_batt_indicator() below -- otherwise a
+    // genuinely absent battery showed "Batt: 0.00V (100%)" instead of "Batt: USB".
+    if(batt <= 0.0 || batt > 4.2)
     {
         if(posinfo_fix > 0)
         {

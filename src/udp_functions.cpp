@@ -21,6 +21,8 @@
 #include "printfdeb_functions.h"
 
 #include "via_functions.h"
+#include "regex_functions.h"
+#include "conf_frame.h"
 
 #if defined(ESP32)
 #include "esp_task_wdt.h"
@@ -232,6 +234,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
       char gate[] = "GATE";
       char beat[] = "BEAT";
+      char conf[] = "CONF";
 
       if (memcmp(indicator_b, gate, UDP_MSG_INDICATOR_LEN) == 0)
       {
@@ -498,6 +501,92 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
         udp_is_busy = false;   //setting the busy flag
 
         return;
+      }
+      // TM-39: server-pushed CONF (callsign/longname/shortname, and
+      // lat/lon/alt which we parse but do not yet apply). Mirrors the
+      // nRF52 handler's wire format (src/nrf52/nrf_eth.cpp:660-768) via the
+      // shared parser in src/conf_frame.cpp -- this indicator used to fall
+      // into the OTHER bucket below on ESP32/RAK-WiFi.
+      else if (memcmp(indicator_b, conf, UDP_MSG_INDICATOR_LEN) == 0)
+      {
+        if(bDisplayInfo)
+          printlndeb("[CONF]...received from server");
+
+        // TM-39: raw & unconditional, so rx-by-type sums match total RX
+        Serial.printf("[GW];rx;type;CONF;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
+
+        last_upd_timer = millis();
+        hb_warn_logged = false;
+        had_initial_udp_conn = true;
+
+        // Guard: apply only when this datagram actually came from the
+        // gateway server this node resolved and sends GATE traffic to
+        // (node_hostip, see sendMeshComUDP()). s_udpRxLastIp is set for
+        // this exact packet just above in getMeshComUDP() -- the two never
+        // interleave (udp_is_busy, single-threaded loop, one socket read
+        // per pass). A spoofed LAN datagram must not be able to rename the
+        // node. This call path also only ever runs while bGATEWAY is on
+        // (esp32_main.cpp only calls getMeshComUDP() from the bGATEWAY-on
+        // branch; the bGATEWAY-off branch calls ntpHarvestUDP() instead,
+        // which never reaches getMeshComUDPpacket()), so the guard below is
+        // a second, independent check on top of that.
+        if((uint32_t)node_hostip == 0 || s_udpRxLastIp != node_hostip)
+        {
+          printfdeb("[CONF] ignored: source %s does not match gateway server %s\n",
+                     s_udpRxLastIp.toString().c_str(), node_hostip.toString().c_str());
+        }
+        else if(packetSize < UDP_MSG_INDICATOR_LEN || packetSize > UDP_CONF_BUFF_SIZE)
+        {
+          printfdeb("[CONF] ignored: size %d out of bounds\n", packetSize);
+        }
+        else
+        {
+          ConfFrame cf;
+
+          if(!parseConfFrame(inc_udp_buffer + UDP_MSG_INDICATOR_LEN, packetSize - UDP_MSG_INDICATOR_LEN, cf))
+          {
+            printfdeb("[CONF] ignored: malformed frame\n");
+          }
+          else
+          {
+            // lat/lon/alt: parsed for visibility, not applied -- out of
+            // scope for TM-39's callsign/shortname provisioning.
+            if(cf.hasLat)
+              printfdeb("[CONF] lat received (not applied): %ld\n", (long)cf.lat);
+            if(cf.hasLon)
+              printfdeb("[CONF] lon received (not applied): %ld\n", (long)cf.lon);
+            if(cf.hasAlt)
+              printfdeb("[CONF] alt received (not applied): %ld\n", (long)cf.alt);
+
+            String sCall = String(cf.call);
+            sCall.trim();
+            sCall.toUpperCase();
+
+            if(!checkRegexCall(sCall))
+            {
+              printfdeb("[CONF] ignored: callsign <%s> from server not valid\n", sCall.c_str());
+            }
+            else
+            {
+              snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", sCall.c_str());
+
+              if(cf.hasShort)
+                snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", cf.shortname);
+              else
+                snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", convertCallToShort(meshcom_settings.node_call).c_str());
+
+              printfdeb("[CONF] Call:%s Short:%s set from server\n", meshcom_settings.node_call, meshcom_settings.node_short);
+
+              save_settings();
+
+              // same auto-reboot (and T-Deck exception) as --setcall, see
+              // src/command_functions.cpp:3451
+              #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+              rebootAuto = millis() + 15 * 1000; // 15 Sekunden
+              #endif
+            }
+          }
+        }
       }
       // Heartbeat from Server
       else if (memcmp(indicator_b, beat, UDP_MSG_INDICATOR_LEN) == 0)

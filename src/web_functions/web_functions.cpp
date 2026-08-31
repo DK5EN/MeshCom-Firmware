@@ -1830,7 +1830,13 @@ void sub_page_info()
     web_client.printf("<tr><td>Call</td><td>%s</td></tr>\n", meshcom_settings.node_call);
     web_client.printf("<tr><td>Hardware</td><td>%s</td></tr>\n", getHardwareLong(BOARD_HARDWARE).c_str());
     web_client.printf("<tr><td>UTC offset</td><td>%.1f [%s]</td></tr>\n", meshcom_settings.node_utcoff, cTimeSource);
-    web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV</td></tr>\n", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
+    // BAT-01: global_batt==0.0 is the established "no reading" convention (grounded pin, or
+    // the ADC-path no-battery detection in batt_functions.cpp) -- same check the on-device
+    // displays already use, see loop_functions.cpp.
+    if(global_batt == 0.0)
+        web_client.printf("<tr><td>Battery</td><td>USB (no battery)</td></tr>\n");
+    else
+        web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV</td></tr>\n", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
     web_client.printf("<tr><td>Settings</td><td>");
     web_client.printf("Gateway: %s<br>", (bGATEWAY ? "on" : "off"));
     web_client.printf("Analog: %s<br>", (bAnalogCheck ? "on" : "off"));
