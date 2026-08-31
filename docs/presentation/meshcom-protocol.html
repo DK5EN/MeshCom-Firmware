@@ -175,7 +175,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
 .cmp-timeline {
   width: 100%;
-  max-width: 980px;
+  max-width: 1080px;
   background: var(--bg2);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -222,7 +222,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 /* ---------- era text labels ---------- */
 .cmp-timeline .cmp-tl-era-lbl {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 11px;
   text-anchor: middle;
   fill: var(--fg3);
   letter-spacing: 0.04em;
@@ -258,7 +258,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
 .cmp-timeline .cmp-tl-ms-year {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   text-anchor: middle;
   fill: var(--fg3);
 }
@@ -268,7 +268,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
 .cmp-timeline .cmp-tl-ms-lbl {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   text-anchor: middle;
   fill: var(--fg2);
@@ -1095,110 +1095,182 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
   <div class="cmp-tl-svg-wrap">
     <!--
-      SVG viewBox: 0 0 960 290
+      SVG viewBox: 0 0 1360 290   (widened from 0 0 960 290 for PRES-02: seven new
+      milestones — two mesh siblings, five amateur-radio digimodes — pushed the old
+      four-point 254px-wide LoRa-Ära cluster (gaps as tight as 58px) past legible
+      density. Fix: viewBox width +42%, container max-width 980px -> 1080px, and
+      cmp-tl-era-lbl/-ms-year/-ms-lbl font-size bumped (9.5->11 / 10->12 / 11->13)
+      to hold the on-screen point size roughly constant despite the wider viewBox.
+      Every era band now uses even ~80-100px gaps; the old 58-72px pinch points
+      are gone. Above/below alternation (the existing zigzag stagger) continues
+      unchanged across all 15 points — that stagger, not rotated text, is what
+      keeps neighbouring labels from colliding.
       AXIS_Y = 150
       Above-connector: y1=141 -> y2=103   year at y=97  label at y=112
       Below-connector: y1=159 -> y2=210   year at y=224 label at y=238
-      Milestone x-positions:
-        0 X.25       x=75   above
-        1 Bell-202   x=152  below
-        2 AX.25      x=248  above
-        3 APRS       x=393  below
-        4 Semtech    x=628  above
-        5 SX1272/76  x=700  below
-        6 Alliance   x=758  above
-        7 MeshCom    x=882  below
+      Milestone x-positions (era Packet Radio 1976-2008, era LoRa-Ära 2012-2025, today):
+         0 X.25          x=70    above  packet
+         1 Bell-202      x=155   below  packet
+         2 AX.25         x=250   above  packet
+         3 APRS          x=355   below  packet
+         4 WSJT          x=455   above  packet   [PRES-02]
+         5 WSPR          x=555   below  packet   [PRES-02]
+         6 LoRa entsteht x=615   above  lora
+         7 WSJT-X        x=695   below  lora     [PRES-02]
+         8 SX1272/76     x=775   above  lora
+         9 Alliance      x=855   below  lora
+        10 FT8           x=935   above  lora     [PRES-02]
+        11 JS8Call GA    x=1015  below  lora     [PRES-02]
+        12 Meshtastic    x=1095  above  lora     [PRES-01]
+        13 MeshCore      x=1175  below  lora     [PRES-01]
+        14 MeshCom       x=1255  above  today
     -->
     <svg class="cmp-tl-svg"
-         viewBox="0 0 960 290"
+         viewBox="0 0 1360 290"
          preserveAspectRatio="xMidYMid meet"
          role="img"
-         aria-label="MeshCom Technologie-Zeitstrahl 1976 bis heute">
+         aria-label="MeshCom Technologie-Zeitstrahl 1976 bis heute, mit Digimode- und Mesh-Nebenlinie">
 
       <!-- LoRa-era background band -->
-      <rect class="cmp-tl-era-bg" x="613" y="10" width="278" height="268" rx="4"/>
+      <rect class="cmp-tl-era-bg" x="600" y="10" width="700" height="268" rx="4"/>
 
       <!-- Era colour strips under axis -->
-      <rect class="cmp-tl-strip-packet" x="68" y="152" width="547" height="4" rx="2"/>
-      <rect class="cmp-tl-strip-lora"   x="615" y="152" width="277" height="4" rx="2"/>
+      <rect class="cmp-tl-strip-packet" x="55" y="152" width="545" height="4" rx="2"/>
+      <rect class="cmp-tl-strip-lora"   x="600" y="152" width="710" height="4" rx="2"/>
 
       <!-- Era text labels (top) -->
-      <text class="cmp-tl-era-lbl" x="330" y="24">Packet Radio</text>
-      <text class="cmp-tl-era-lbl cmp-tl-era-lbl-lora"  x="752" y="24">LoRa-Ära</text>
+      <text class="cmp-tl-era-lbl" x="328" y="24">Packet Radio &amp; Digimodes</text>
+      <text class="cmp-tl-era-lbl cmp-tl-era-lbl-lora"  x="955" y="24">LoRa-Ära</text>
 
       <!-- Main axis line -->
-      <line class="cmp-tl-axis" x1="62" y1="150" x2="895" y2="150"/>
+      <line class="cmp-tl-axis" x1="55" y1="150" x2="1310" y2="150"/>
       <!-- left cap -->
-      <line class="cmp-tl-axis" x1="62" y1="144" x2="62" y2="156" stroke-width="1.5"/>
+      <line class="cmp-tl-axis" x1="55" y1="144" x2="55" y2="156" stroke-width="1.5"/>
       <!-- right arrow -->
-      <polyline class="cmp-tl-axis" points="890,145 898,150 890,155" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline class="cmp-tl-axis" points="1302,145 1312,150 1302,155" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
-      <!-- Milestone 0 : X.25 (CCITT)  x=75  above -->
+      <!-- Milestone 0 : X.25 (CCITT)  x=70  above -->
       <g class="cmp-tl-ms" data-ms="0">
-        <line class="cmp-tl-connector" x1="75" y1="141" x2="75" y2="103"/>
-        <text class="cmp-tl-ms-year" x="75" y="97">1976</text>
-        <text class="cmp-tl-ms-lbl"  x="75" y="112">X.25</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="75" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="70" y1="141" x2="70" y2="103"/>
+        <text class="cmp-tl-ms-year" x="70" y="97">1976</text>
+        <text class="cmp-tl-ms-lbl"  x="70" y="112">X.25</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="70" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 1 : Bell-202-Modem  x=152  below -->
+      <!-- Milestone 1 : Bell-202-Modem  x=155  below -->
       <g class="cmp-tl-ms" data-ms="1">
-        <line class="cmp-tl-connector" x1="152" y1="159" x2="152" y2="210"/>
-        <text class="cmp-tl-ms-year" x="152" y="224">1976</text>
-        <text class="cmp-tl-ms-lbl"  x="152" y="238">Bell-202</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="152" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="155" y1="159" x2="155" y2="210"/>
+        <text class="cmp-tl-ms-year" x="155" y="224">1976</text>
+        <text class="cmp-tl-ms-lbl"  x="155" y="238">Bell-202</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="155" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 2 : AX.25  x=248  above -->
+      <!-- Milestone 2 : AX.25  x=250  above -->
       <g class="cmp-tl-ms" data-ms="2">
-        <line class="cmp-tl-connector" x1="248" y1="141" x2="248" y2="103"/>
-        <text class="cmp-tl-ms-year" x="248" y="97">1982/84</text>
-        <text class="cmp-tl-ms-lbl"  x="248" y="112">AX.25</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="248" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="250" y1="141" x2="250" y2="103"/>
+        <text class="cmp-tl-ms-year" x="250" y="97">1982/84</text>
+        <text class="cmp-tl-ms-lbl"  x="250" y="112">AX.25</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="250" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 3 : APRS  x=393  below -->
+      <!-- Milestone 3 : APRS  x=355  below -->
       <g class="cmp-tl-ms" data-ms="3">
-        <line class="cmp-tl-connector" x1="393" y1="159" x2="393" y2="210"/>
-        <text class="cmp-tl-ms-year" x="393" y="224">1992</text>
-        <text class="cmp-tl-ms-lbl"  x="393" y="238">APRS</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="393" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="355" y1="159" x2="355" y2="210"/>
+        <text class="cmp-tl-ms-year" x="355" y="224">1992</text>
+        <text class="cmp-tl-ms-lbl"  x="355" y="238">APRS</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="355" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 4 : Semtech kauft Cycleo  x=628  above -->
+      <!-- Milestone 4 : WSJT  x=455  above  [PRES-02] -->
       <g class="cmp-tl-ms" data-ms="4">
-        <line class="cmp-tl-connector" x1="628" y1="141" x2="628" y2="103"/>
-        <text class="cmp-tl-ms-year" x="628" y="97">2012</text>
-        <text class="cmp-tl-ms-lbl"  x="628" y="112">LoRa entsteht</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="628" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="455" y1="141" x2="455" y2="103"/>
+        <text class="cmp-tl-ms-year" x="455" y="97">2001</text>
+        <text class="cmp-tl-ms-lbl"  x="455" y="112">WSJT</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="455" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 5 : LoRa-Chips SX1272/76  x=700  below -->
+      <!-- Milestone 5 : WSPR  x=555  below  [PRES-02] -->
       <g class="cmp-tl-ms" data-ms="5">
-        <line class="cmp-tl-connector" x1="700" y1="159" x2="700" y2="210"/>
-        <text class="cmp-tl-ms-year" x="700" y="224">2013</text>
-        <text class="cmp-tl-ms-lbl"  x="700" y="238">SX1272/76</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="700" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="555" y1="159" x2="555" y2="210"/>
+        <text class="cmp-tl-ms-year" x="555" y="224">2008</text>
+        <text class="cmp-tl-ms-lbl"  x="555" y="238">WSPR</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-packet" cx="555" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 6 : LoRa Alliance  x=758  above -->
+      <!-- Milestone 6 : Semtech kauft Cycleo  x=615  above -->
       <g class="cmp-tl-ms" data-ms="6">
-        <line class="cmp-tl-connector" x1="758" y1="141" x2="758" y2="103"/>
-        <text class="cmp-tl-ms-year" x="758" y="97">2015</text>
-        <text class="cmp-tl-ms-lbl"  x="758" y="112">Alliance</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="758" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="615" y1="141" x2="615" y2="103"/>
+        <text class="cmp-tl-ms-year" x="615" y="97">2012</text>
+        <text class="cmp-tl-ms-lbl"  x="615" y="112">LoRa entsteht</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="615" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 7 : MeshCom  x=882  below -->
+      <!-- Milestone 7 : WSJT-X  x=695  below  [PRES-02] -->
       <g class="cmp-tl-ms" data-ms="7">
-        <line class="cmp-tl-connector" x1="882" y1="159" x2="882" y2="210"/>
-        <text class="cmp-tl-ms-year" x="882" y="224">heute</text>
-        <text class="cmp-tl-ms-lbl"  x="882" y="238">MeshCom</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-today" cx="882" cy="150" r="5"/>
+        <line class="cmp-tl-connector" x1="695" y1="159" x2="695" y2="210"/>
+        <text class="cmp-tl-ms-year" x="695" y="224">2012</text>
+        <text class="cmp-tl-ms-lbl"  x="695" y="238">WSJT-X</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="695" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 8 : LoRa-Chips SX1272/76  x=775  above -->
+      <g class="cmp-tl-ms" data-ms="8">
+        <line class="cmp-tl-connector" x1="775" y1="141" x2="775" y2="103"/>
+        <text class="cmp-tl-ms-year" x="775" y="97">2013</text>
+        <text class="cmp-tl-ms-lbl"  x="775" y="112">SX1272/76</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="775" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 9 : LoRa Alliance  x=855  below -->
+      <g class="cmp-tl-ms" data-ms="9">
+        <line class="cmp-tl-connector" x1="855" y1="159" x2="855" y2="210"/>
+        <text class="cmp-tl-ms-year" x="855" y="224">2015</text>
+        <text class="cmp-tl-ms-lbl"  x="855" y="238">Alliance</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="855" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 10 : FT8  x=935  above  [PRES-02] -->
+      <g class="cmp-tl-ms" data-ms="10">
+        <line class="cmp-tl-connector" x1="935" y1="141" x2="935" y2="103"/>
+        <text class="cmp-tl-ms-year" x="935" y="97">2017</text>
+        <text class="cmp-tl-ms-lbl"  x="935" y="112">FT8</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="935" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 11 : JS8Call GA  x=1015  below  [PRES-02] -->
+      <g class="cmp-tl-ms" data-ms="11">
+        <line class="cmp-tl-connector" x1="1015" y1="159" x2="1015" y2="210"/>
+        <text class="cmp-tl-ms-year" x="1015" y="224">2019</text>
+        <text class="cmp-tl-ms-lbl"  x="1015" y="238">JS8Call</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1015" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 12 : Meshtastic (Repo-Start)  x=1095  above  [PRES-01] -->
+      <g class="cmp-tl-ms" data-ms="12">
+        <line class="cmp-tl-connector" x1="1095" y1="141" x2="1095" y2="103"/>
+        <text class="cmp-tl-ms-year" x="1095" y="97">2020</text>
+        <text class="cmp-tl-ms-lbl"  x="1095" y="112">Meshtastic</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1095" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 13 : MeshCore  x=1175  below  [PRES-01] -->
+      <g class="cmp-tl-ms" data-ms="13">
+        <line class="cmp-tl-connector" x1="1175" y1="159" x2="1175" y2="210"/>
+        <text class="cmp-tl-ms-year" x="1175" y="224">2025</text>
+        <text class="cmp-tl-ms-lbl"  x="1175" y="238">MeshCore</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1175" cy="150" r="5"/>
+      </g>
+
+      <!-- Milestone 14 : MeshCom  x=1255  above -->
+      <g class="cmp-tl-ms" data-ms="14">
+        <line class="cmp-tl-connector" x1="1255" y1="141" x2="1255" y2="103"/>
+        <text class="cmp-tl-ms-year" x="1255" y="97">heute</text>
+        <text class="cmp-tl-ms-lbl"  x="1255" y="112">MeshCom</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-today" cx="1255" cy="150" r="5"/>
       </g>
 
       <!-- Running marker — positioned by initCmpTimeline() via setAttribute -->
-      <g class="cmp-tl-runner-g" transform="translate(75,150)">
+      <g class="cmp-tl-runner-g" transform="translate(70,150)">
         <circle class="cmp-tl-runner-ring cmp-tl-rring-packet" r="11" cx="0" cy="0"/>
         <circle class="cmp-tl-runner-dot  cmp-tl-rdot-packet"  r="7"  cx="0" cy="0"/>
       </g>
@@ -1224,6 +1296,15 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   </div>
 
 </div><!-- .cmp-timeline -->
+</div>
+
+<div class="note" style="margin-top:.9rem;font-size:.82rem">
+  Zwei Ergänzungen zur Einordnung: <b>Meshtastic</b> (GitHub-Repository seit <b>01.02.2020</b>) und
+  <b>MeshCore</b> (GitHub-Repository seit <b>19.01.2025</b>) sind die beiden bekanntesten
+  Geschwisterprojekte im LoRa-Mesh-Raum — beide Daten primärquellenbelegt (Repository-Historie),
+  weil im Netz teils andere Gründungsdaten kursieren. Die fünf Digimode-Punkte (WSJT, WSPR, WSJT-X,
+  FT8, JS8Call) zeigen, dass Amateurfunk-Digimodes parallel zur LoRa-Ära weiterentwickelt wurden —
+  MeshCom entstand nicht im leeren Raum.
 </div>
 
 </div></section>
@@ -1473,6 +1554,32 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         <p style="margin-top:.5rem">Die Board-Klasse ist kein Kosmetikum: <b>sie bestimmt, wie viele Nachbarn und wie viele Duplikate ein Knoten überhaupt merken kann.</b> Dazu später mehr.</p>
       </div>
     </div>
+  </div>
+
+  <div class="note" style="margin-top:1rem;font-size:.82rem;line-height:1.6">
+    <b>Fußnote — Rechtsrahmen ISM/SRD vs. Amateurfunk:</b> Der lizenzfreie SRD/ISM-Teilbereich
+    <b>869,40–869,65 MHz</b> ist in Deutschland per BNetzA-Allgemeinzuteilung mit <b>500 mW ERP</b>
+    und <b>10 % Duty-Cycle</b> freigegeben — großzügiger als die meisten anderen 868-MHz-SRD-Kanäle.
+    Das ist ein anderer Rechtsrahmen als der Amateurfunk: Wer stattdessen mit Amateurfunk-Rufzeichen
+    sendet, unterliegt der Amateurfunkverordnung (AFuV), u. a. dem Verschlüsselungsverbot aus
+    <b>§ 16 Abs. 8</b>, das für ISM/SRD-Betrieb nicht gilt. Wortlaut:
+    <blockquote style="margin:.55rem 0 0;padding:.55rem .8rem;border-left:3px solid var(--line2);color:var(--fg2);font-style:normal">
+      „(8) Übertragungsverfahren müssen mit allgemein verfügbarer Technik oder mit entsprechenden
+      Kenntnissen und Fertigkeiten eine Wiederherstellung übertragener Inhalte zulassen. Der
+      Amateurfunkverkehr darf nicht zur Verschleierung des Inhalts kodiert oder verschlüsselt
+      werden; ausgenommen sind Steuersignale für Erd- und Weltraumfunkstellen des
+      Amateurfunkdienstes über Satelliten, ferner Steuersignale (einschließlich Remote-Betrieb) oder
+      von anderen fernbedienten oder automatisch arbeitenden Stationen.“
+    </blockquote>
+    <div class="cite">Quelle: BNetzA-Allgemeinzuteilung SRD860 (869,40–869,65 MHz, 500 mW ERP, 10 %
+      Duty-Cycle) · Amateurfunkverordnung (AFuV) § 16 Abs. 8, gesetze-im-internet.de/afuv_2005/__16.html
+      (Fassung mit Stand der letzten Änderung 23.06.2021, BGBl. I S. 1858)</div>
+    <p style="margin-top:.5rem">
+      Klarstellung: Ein „33-cm-Band“ gibt es in <b>ITU-Region 1</b> (Europa, Afrika, Naher Osten,
+      Nordasien inkl. Russland) <b>nicht</b> — das ist eine Verwechslung mit dem US-amerikanischen
+      33-cm-Amateurfunkband bei 902–928 MHz (ITU-Region 2). In Region 1 existiert dort keine
+      Amateurfunk-Zuteilung.
+    </p>
   </div>
 </div></section>
 
@@ -2680,21 +2787,35 @@ function initCmpTimeline(root) {
 
   /* ---- milestone data ---- */
   var MS = [
-    { x: 75,  year: '1976',    era: 'packet', title: 'X.25 (CCITT)',
+    { x: 70,   year: '1976',    era: 'packet', title: 'X.25 (CCITT)',
       desc: 'Erste international standardisierte Paketvermittlung.' },
-    { x: 152, year: '1976',    era: 'packet', title: 'Bell-202-Modem',
+    { x: 155,  year: '1976',    era: 'packet', title: 'Bell-202-Modem',
       desc: '1200 bps AFSK, Töne 1200/2200 Hz — Basis für Packet Radio.' },
-    { x: 248, year: '1982/84', era: 'packet', title: 'AX.25',
+    { x: 250,  year: '1982/84', era: 'packet', title: 'AX.25',
       desc: 'Amateurfunk-Sicherungsschicht (v1.1 1982, v2.0 1984; TAPR/ARRL).' },
-    { x: 393, year: '1992',    era: 'packet', title: 'APRS',
+    { x: 355,  year: '1992',    era: 'packet', title: 'APRS',
       desc: 'Bob Bruninga (WB4APR): Position, Status, Telemetrie über AX.25 — Basis von aprs.fi.' },
-    { x: 628, year: '2012',    era: 'lora',   title: 'Semtech kauft Cycleo',
+    { x: 455,  year: '2001',    era: 'packet', title: 'WSJT',
+      desc: 'Joe Taylor (K1JT): Schwache-Signal-Digimode für VHF/UHF/EME — Ursprung der WSJT-Softwarefamilie.' },
+    { x: 555,  year: '2008',    era: 'packet', title: 'WSPR',
+      desc: 'Bakenprotokoll für Ausbreitungsmessung im Sub-Watt-Bereich, ebenfalls K1JT.' },
+    { x: 615,  year: '2012',    era: 'lora',   title: 'Semtech kauft Cycleo',
       desc: 'LoRa entsteht kommerziell.' },
-    { x: 700, year: '2013',    era: 'lora',   title: 'LoRa-Chips SX1272/76',
+    { x: 695,  year: '2012',    era: 'lora',   title: 'WSJT-X',
+      desc: 'Nachfolgeprogramm von WSJT, spätere Heimat von FT8; Erstveröffentlichung 25.10.2012.' },
+    { x: 775,  year: '2013',    era: 'lora',   title: 'LoRa-Chips SX1272/76',
       desc: 'Chirp-Spread-Spectrum — hört unter dem Rauschen.' },
-    { x: 758, year: '2015',    era: 'lora',   title: 'LoRa Alliance',
+    { x: 855,  year: '2015',    era: 'lora',   title: 'LoRa Alliance',
       desc: 'Standardisierung.' },
-    { x: 882, year: 'heute',   era: 'today',  title: 'MeshCom',
+    { x: 935,  year: '2017',    era: 'lora',   title: 'FT8',
+      desc: '8-FSK-Digimode für sehr schwache Signale; veröffentlicht in WSJT-X 1.8.0 am 29.06.2017.' },
+    { x: 1015, year: '2019',    era: 'lora',   title: 'JS8Call GA',
+      desc: 'FT8-Ableger mit Freitext-Chat und Store-and-Forward; General-Availability-Release am 01.04.2019.' },
+    { x: 1095, year: '2020',    era: 'lora',   title: 'Meshtastic',
+      desc: 'Offenes LoRa-Mesh-Chat-Projekt; GitHub-Repository angelegt am 01.02.2020.' },
+    { x: 1175, year: '2025',    era: 'lora',   title: 'MeshCore',
+      desc: 'Jüngeres offenes LoRa-Mesh-Projekt; GitHub-Repository angelegt am 19.01.2025.' },
+    { x: 1255, year: 'heute',   era: 'today',  title: 'MeshCom',
       desc: 'APRS-Datenformat im LoRa-Umschlag, Fokus Chat.' }
   ];
   var AXIS_Y = 150;

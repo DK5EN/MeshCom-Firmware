@@ -180,3 +180,11 @@ does not reset itself while WiFi is still up; the reset path only fires when WiF
 the time of the check. **Not observed in this run** — all three servers answered every KEEP inside
 the window, so neither warning ever fired; a genuinely silent server (or a firewalled/blackholed
 one) remains untested here and would need a run against a server known to be down or unreachable.
+
+## Update 2026-08-31 — CTY-01: nRF52-DHCP-Pfad kennt jetzt den IT-Split
+
+Bis zur CTY-01-Behebung galt die Laenderunterscheidung auf nRF52 (Ethernet) nur im
+Fix-IP-Pfad (`startFIXUDP()`); der DHCP-Pfad (`startUDP()`) ging im Internet-Zweig
+immer auf `89.185.97.38`. Seit der Wave-A-Behebung hat `startUDP()` denselben Split
+wie `startFIXUDP()`: IT → `145.239.75.155`, sonst → `89.185.97.38`, inklusive der
+passenden NTP-Pool-Wahl. Die Tabellen oben beschreiben damit beide nRF52-Pfade.
