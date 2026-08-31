@@ -3,11 +3,18 @@
 
 ## What this release is
 
-**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 54 numbered changes (items 107–160), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 459 native test cases across 12 host environments and soak runs up to 9.1 hours.
+**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 56 numbered changes (items 107–162), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 477 native test cases across 12 host environments and soak runs up to 9.1 hours.
 
 Flash version `20260831`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
-### New in this third cut (`.3`, items 157–160)
+### New in this fourth cut (`.4`, items 161–162)
+
+The back-pressure notice policy, recalibrated against reality:
+
+- **No more "slow down" on every message** (BP-05): a field capture on the live gateway showed the ring baseline at depth 1–4 in perfectly normal operation — the old QRS threshold (depth > 1) sat right on it, so a single message triggered the warning. QRS now needs depth 5 (flat on every board), and QRV is only sent when the episode actually refused or dropped something; a "queue built and drained on its own" episode closes silently. The recorded baseline pattern is a regression test.
+- **Notices land in the right conversation** (BP-06): the QRS/QRT/QTA/QRV for a message into group 20 arrives addressed to `20`, a DM's notice arrives in that DM thread — visible only to the sender, never on air.
+
+### New in the third cut (`.3`, items 157–160)
 
 This release supersedes `v4.35p.08.31.2-stability` and adds the three back-pressure RCA fixes from the DJ8MEH field incident — a node that refused user messages for 8 minutes although its real send queue had drained after ~2 minutes — plus an integrated regression suite. Each fix went through an independent Fable advisor gate:
 
@@ -29,8 +36,8 @@ The new safeboot ships in this release's `safeboot.bin`/`safeboot-s3.bin` and in
 
 ## Changelog and engineering rationale
 
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–160 for this release.
-- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
+- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.4-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–162 for this release.
+- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.4-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Built for the field: debug logs from any node
@@ -65,7 +72,7 @@ Each on-air-visible change, stated plainly (details in the changelog):
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 459 native test cases green across 12 host environments.
+- **All 32 release environments build clean**; 477 native test cases green across 12 host environments.
 - **Heltec V3** — WiFi/NTP/battery/OLED changes bench-proven; runs the GW-01 fix build, verified against the live server stream.
 - **T-Beam v1.2** — WiFi soak (9.1 h, 55/55 reconnects), gateway observer in the GW-01 measurement.
 - **T-Deck Plus** — full harness regression (boot, display CRC, map, nav, input, heap, trim, touch injection) PASS on this build.
@@ -94,11 +101,11 @@ These boards build cleanly from the same source and inherit every improvement, b
 - `--mheard` and the live BLE path still deliver two schemas under the same `TYP`.
 - The battery zero point on a real 2S pack, the INA226 branch and L76K GPS remain unverified.
 - **TM-49 (open):** the safeboot OTA completion handler can read a success status after a disconnect whose final frame never arrived, and switch boot partitions after a partial write — benign on 16-MB boards (slot validation catches it), risky on 4-MB single-slot boards. Until the guard lands: on 4-MB boards prefer USB flashing over OTA when the link is marginal.
-- The `.3` back-pressure fixes are proven native (459 cases, incl. the end-to-end incident replay) and run on the four-board bench plus the live gateway, but the original field incident has not yet been re-provoked on hardware with the new build.
+- The `.3`/`.4` back-pressure changes are proven native (477 cases, incl. the end-to-end incident replay and the recorded gateway baseline) and the `.3` fixes ran on the four-board bench plus the live gateway, but the original field incident has not yet been re-provoked on hardware, and the `.4` notice policy has not yet had bench time at publish.
 
 ## Installing
 
-- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.3-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
+- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.4-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
 - **Already running MeshCom 4.x with safeboot:** just OTA the `firmware.bin` for your board — via the node's OTA web page, or scripted: `python3 tools/webflash.py <YOUR-CALLSIGN>.local`
 - **RAK4631:** copy the `.uf2` onto the bootloader volume (double-tap reset), or `adafruit-nrfutil --verbose dfu serial --package wiscore_rak4631.zip -p <PORT> --singlebank --touch 1200`
 

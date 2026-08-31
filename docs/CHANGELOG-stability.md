@@ -75,6 +75,34 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## New in v4.35p.08.31.4-stability
+
+Fourth cut of the 2026-08-31 release: the back-pressure notice policy,
+recalibrated against a real gateway baseline, and notices that land in the
+conversation the sender is actually typing in. Both waves advisor-gated
+(Fable). `FLASH_VERSION` stays `20260831`; native suite now 477 test cases
+across the same 12 host environments.
+
+161. **QRS fires at depth 5 (fixed across all boards), QRV only after a
+     refusal** (BP-05). A 5.5-minute normal-operation capture on the live
+     gateway showed the ring baseline sitting at depth 1–4 (mode 2) with
+     three false QRS/QRV pairs and no burst anywhere — the old QRS rule
+     (depth > 1) sat directly on that baseline, so every single message
+     triggered "slow down". QRS now needs depth ≥ 5 (flat on every ring
+     size, defensively clamped below the QRT threshold), the 2–4 band is
+     silent, and QRV is only sent when the episode actually refused (QRT)
+     or dropped (QTA) a message — a QRS-only episode closes silently. The
+     recorded baseline traffic pattern is pinned as a regression test.
+162. **Back-pressure notices are addressed to the conversation that
+     triggered them** (BP-06). A notice for a message into group 20 arrives
+     as a message to `20` and shows up in that group's chat; for a DM it
+     arrives in that DM thread — visible only to the sender, since notice
+     frames stay `msg_app_offline` (BLE) / app-only UDP datagrams and never
+     go on air. The refuse path, which rejects before parsing, uses a pure
+     destination peek (`bpPeekDst`, parity with the `iCall<11` extraction
+     including whitespace trim; 11 edge cases pinned natively). Serial and
+     the T-Deck GUI stay plain text.
+
 ## New in v4.35p.08.31.3-stability
 
 Third cut of the 2026-08-31 release, superseding `v4.35p.08.31.2-stability`:

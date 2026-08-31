@@ -7,6 +7,48 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.08.31.4-stability (2026-08-31, vierter Schnitt)
+
+Vierter Schnitt des Tages; v4.35p.08.31.3-stability bleibt bestehen.
+`FLASH_VERSION` bleibt 20260831. Inhalt: die Notice-Politik der
+Backpressure, an der Realitaet nachkalibriert (Changelog-Items 161-162),
+beide Wellen mit Fable-Advisor-Gate.
+
+### Was dazugekommen ist
+
+- **BP-05 -- QRS ab Tiefe 5, QRV nur nach Refusal.** Eine 5,5-min-Messung
+  auf dem Live-Gateway (DK5EN-98) zeigte Grundlast-Ringtiefe 1-4
+  (Modalwert 2) und drei falsche QRS/QRV-Paare im voellig normalen
+  Betrieb -- die alte QRS-Schwelle (Tiefe > 1) lag AUF der Grundlast,
+  jede einzelne Nachricht loeste "slow down" aus. Neu: QRS ab Tiefe 5
+  (fix auf allen Boards, defensiv unter der QRT-Schwelle geklemmt), das
+  Band 2-4 ist still, und QRV kommt nur noch, wenn die Episode wirklich
+  abgewiesen (QRT) oder verworfen (QTA) hat. Das aufgezeichnete
+  Grundlast-Muster ist als Regressionstest festgenagelt.
+- **BP-06 -- Notices landen im richtigen Chat.** Die Meldung zu einer
+  Nachricht in Gruppe 20 kommt als Nachricht an `20` (erscheint im
+  20er-Chat), bei einer DM im DM-Thread des Absenders -- nur fuer ihn
+  sichtbar, die Rahmen gehen nie on air. Der Refuse-Pfad (lehnt vor dem
+  Parsen ab) nutzt einen puren Ziel-Peek mit Paritaet zur echten
+  Extraktion (11 Grenzfaelle nativ festgenagelt). Serial und T-Deck-GUI
+  bleiben Klartext.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen; Native-Gate 477/477 in 12 Host-Envs
+  (inkl. Feldmessungs-Grundlast als Regressionstest).
+- Die Grundlast-Messung selbst stammt vom Live-Gateway DK5EN-98 mit dem
+  .3-Build (5,5 min, tools/meshlogger.py ueber die 2323-Konsole).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die .4-Notice-Politik hatte zum Publish noch keine Bench-Zeit auf
+  Hardware (Fleet-Flash folgt unmittelbar; erwartet: null [BP]-Marker im
+  Normalbetrieb, Nachmessung ausstehend).
+- Der originale DJ8MEH-Feldvorfall ist weiterhin nicht auf Hardware
+  nachprovoziert; TM-49 bleibt offen (4-MB-Boards: bei marginalem Link
+  USB statt OTA).
+
 ## Stability-Release v4.35p.08.31.3-stability (2026-08-31, dritter Schnitt)
 
 Ersetzt v4.35p.08.31.2-stability (Release-Objekt geloescht, Tag bleibt als
