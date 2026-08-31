@@ -2197,6 +2197,67 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
+<section class="slide"><span class="num"></span><div class="inner">
+  <div class="eyebrow">Der Vorschlag · Store-and-Forward</div>
+  <h2>Der Absender hebt auf — eine Outbox, die 24 Stunden nicht lockerlässt</h2>
+
+  <p class="lead">Kein Speichern im Mesh, kein Server-Postfach: Die Nachricht wartet beim <b>Absender</b>, bis der Empfänger
+  erreichbar ist. Zwischenknoten bleiben zustandslos — das Netz bleibt ephemeral, nur der Ursprung trägt Verantwortung.</p>
+
+  <div class="grid g3" style="margin-top:1.05rem">
+    <div class="card"><h3>Outbox am Absender</h3>
+      <ul class="plain">
+        <li><b>5 Slots</b>, max. 3 offene je Ziel-Rufzeichen, Haltezeit <b>1–72 h</b> (Default 24 h)</li>
+        <li>Einstellbar über WebGUI und Serial (<code>--storetime</code>, <code>--msgstore</code>)</li>
+        <li>Puffer in der WebGUI sichtbar: Zustand, Versuche, <b>Sent-at / Delivered-at</b></li>
+        <li>Zugestelltes bleibt gekürzt stehen — Nachweis statt Speicherfraß</li>
+        <li>Drei Endzustände, auch gemeldet: <b>zugestellt · gescheitert · offen</b></li>
+      </ul>
+    </div>
+    <div class="card"><h3>Zweistufiges Retry + Probe</h3>
+      <ul class="plain">
+        <li><b>L1</b> (existiert): 3 × 40 s, gleiche msg_id — schützt die Nachbarschaft</li>
+        <li><b>L2</b> (neu): +10 / +30 / +60 min, dann stündlich — aus der gemessenen
+          Hop-Latenz abgeleitet (30 s median, 286 s p99 <b>je Hop</b>)</li>
+        <li>Jeder Versuch mit <b>frischer msg_id</b> — Dedup-Ringe halten alte ~40 min fest</li>
+        <li>Vorher eine winzige <code>{prb}</code>-Probe statt 180 Byte auf einen toten Pfad</li>
+        <li>Empfänger erkennt Wiederholungen am <b>Inhalts-Hash</b>: quittiert erneut, zeigt nicht doppelt</li>
+      </ul>
+    </div>
+    <div class="card good"><h3>Quittung v2</h3>
+      <ul class="plain">
+        <li><code>:ackNNN;H=…;F=R</code> — kein neuer Frame-Typ, nur längere Nutzlast</li>
+        <li><b>H</b>: SHA-256-Hash über den zugestellten Inhalt — <b>Integritätsstempel</b>
+          (signieren, nicht verschlüsseln)</li>
+        <li><b>F=R</b> + Server-Bit der Quittung ⇒ <b>„HF only“-Badge</b>: nachweislich ohne
+          Internet-Gateway zugestellt — konservativ, nie zu viel behauptet</li>
+        <li>Die Quittung wird <b>3 × 40 s wiederholt</b> statt einmal gesendet</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="note ok">
+      <b>Abwärtskompatibel, im Code verifiziert.</b> Der alte Quittungs-Parser (<code>toInt()</code>) ignoriert den Suffix,
+      Apps sehen ohnehin nur das binäre 0x41 — und alte Knoten relayen <code>{prb}</code> als gewöhnlichen Text.
+      Hardware-Gate: nur ESP32-S3 und RAK4631 (~2 kB RAM); Classic-ESP32 hat 1,1 kB frei und bleibt außen vor.
+    </div>
+    <div class="note warn">
+      <b>Advisor-geprüft, ehrlich benannt.</b> Ein unabhängiger adversarialer Review fand 1 Blocker
+      (das geplante Struktur-Versions-Bump hätte die Settings der ganzen Flotte gelöscht) und 7 Major — alle eingearbeitet.
+      Offen bleibt: v1 hält die Outbox nur im RAM (Reboot verliert sie — und sagt es), und Vertraulichkeit gibt es auf
+      Amateurfunk-Frequenzen nicht. Integrität und Zustellnachweis gibt es.
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:.85rem;font-size:.82rem">
+    <b>Weiterlesen:</b>
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/tdeck-partial-refresh-trace/docs/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a> ·
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/tdeck-partial-refresh-trace/docs/review/advisor-dm-store-and-forward-20260830.md">Advisor-Review (Findings B1, M1–M7)</a>
+    <span class="cite" style="margin-left:.6rem">Stand 30.08.2026, Entwurf v2.</span>
+  </div>
+</div></section>
+
 <section class="slide" id="s18"><span class="num">18</span><div class="inner">
   <div class="eyebrow">Der Plan</div>
   <h2>Die Statistik gewinnen lassen — die Transportsicherung macht den Rest</h2>
