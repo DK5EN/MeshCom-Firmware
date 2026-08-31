@@ -5,6 +5,7 @@
 #include <loop_functions.h>
 #include <debugconf.h>
 #include "ArduinoJson.h"
+#include "extern_notice_json.h"
 
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
 // Ethernet headers, the UdpExtern socket object, and every function that
@@ -781,11 +782,11 @@ void  sendExternHeartbeat()
 // BP-01 (BACKLOG) / TM-37: the EXTUDP reply path for a back-pressure notice.
 //
 // A message that came in through getExtern() gets its QRS/QRT/QTA/QRV back on
-// the same socket -- never over the air. Its own tiny JSON object rather than
-// sendExtern(): sendExtern() re-serializes a decoded APRS frame, and there is
-// no frame here. A notice is not a message; it carries no msg_id and must
-// never be mistaken for one by the peer, hence the distinct type "notice".
-void sendExternNotice(const char *code, const char *text)
+// the same socket -- never over the air. The JSON shape lives in
+// extern_notice_json.h, where the native suite pins it
+// (test/test_extern_notice_json); msg_id is millis(), matching the BLE
+// notice framing in loop_functions.cpp.
+void sendExternNotice(const char *text)
 {
   #ifdef ESP32
     if(bWIFIAP)
@@ -798,19 +799,17 @@ void sendExternNotice(const char *code, const char *text)
   if(!hasExternIPaddress)
     return;
 
-  char c_json[160];
-  int json_len = snprintf(c_json, sizeof(c_json),
-                          "{\"src_type\":\"node\",\"type\":\"notice\",\"code\":\"%s\",\"msg\":\"%s\"}",
-                          code, text);
+  char c_json[300];
+  size_t json_len = externNoticeJson(c_json, sizeof(c_json),
+                                     meshcom_settings.node_call,
+                                     shortVERSION(), SOURCE_VERSION_SUB,
+                                     (unsigned int)millis(), text);
 
-  if(json_len <= 0)
+  if(json_len == 0)
     return;
 
-  if(json_len > (int)sizeof(c_json) - 1)
-    json_len = (int)sizeof(c_json) - 1;
-
   UdpExtern.beginPacket(apip, EXTERN_PORT);
-  UdpExtern.write((const uint8_t *)c_json, (size_t)json_len);
+  UdpExtern.write((const uint8_t *)c_json, json_len);
   UdpExtern.endPacket();
 }
 

@@ -8,6 +8,7 @@
 
 #include "loop_functions.h"
 #include "txring_functions.h"
+#include "bp_notice_frame.h"
 #include "dedup_functions.h"
 #include "beacon_rate.h"
 #include "mheard_functions.h"
@@ -3376,6 +3377,31 @@ MsgOrigin getMsgOrigin(void)
  * has to be able to assert the notice regardless of which transport (or
  * none) carried it.
  */
+/**
+ * BP notice to phone app / web GUI, framed under the node's own callsign.
+ *
+ * Not addBLECommandBack(): that frames with source "response", which is not
+ * a valid callsign — McApp files such senders under its spam class (group
+ * 9999) and the notice never reaches the operator. Command responses keep
+ * the "response" framing; only the back-pressure notices travel as
+ * <node_call>>*:<text>. The framing itself lives in bp_notice_frame.h,
+ * where the native suite pins it (test/test_bp_notice_frame).
+ */
+static void bpNoticeToPhone(const char *text)
+{
+    uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
+
+    struct aprsMessage aprsmsg;
+
+    bpNoticeFillFrame(aprsmsg, meshcom_settings.node_call, text, millis());
+
+    checkVia(aprsmsg);
+
+    encodeAPRS(msg_buffer, aprsmsg);
+
+    addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
+}
+
 static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
 {
     if(notice == BP_NOTICE_NONE)
@@ -3395,11 +3421,12 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
 
         case ORIGIN_BLE:
         case ORIGIN_WEB:
-            // Both land in BLEtoPhoneBuff via addBLECommandBack(): the phone
+            // Both land in BLEtoPhoneBuff via bpNoticeToPhone(): the phone
             // app drains it in sendToPhone(), the web GUI reads the same ring
-            // for its message list (web_functions.cpp ~1293). Framed exactly
-            // like any other response the app displays (msg_id = millis(),
-            // msg_app_offline -> never announced, never retransmitted).
+            // for its message list (web_functions.cpp ~1293). Framed under
+            // the node's own callsign (msg_id = millis(), msg_app_offline ->
+            // never announced, never retransmitted); see bpNoticeToPhone()
+            // for why not addBLECommandBack()'s "response" sender.
             //
             // If the transport dropped off meanwhile, skip the notice rather
             // than queue it — a QRV that arrives with the next connect is
@@ -3407,14 +3434,12 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
             if((origin == ORIGIN_BLE && g_ble_uart_is_connected) ||
                (origin == ORIGIN_WEB && bWEBSERVER))
             {
-                char bp_text[UDP_TX_BUF_SIZE];
-                snprintf(bp_text, sizeof(bp_text), "%s", text);
-                addBLECommandBack(bp_text);
+                bpNoticeToPhone(text);
             }
             break;
 
         case ORIGIN_EXTUDP:
-            sendExternNotice(bpNoticeCode(notice), text);
+            sendExternNotice(text);
             break;
 
         case ORIGIN_GUI:

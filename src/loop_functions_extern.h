@@ -216,11 +216,12 @@ MsgOrigin getMsgOrigin(void);
 // has emptied again, even when no further user message arrives to observe it.
 void bpPollDrain(void);
 
-// BP-01: the EXTUDP reply path for a notice -- a one-line JSON on the same
-// socket the message arrived on. Defined in extudp_functions.cpp; declared
-// here rather than in extudp_functions.h so the whole BP contract sits in one
-// place. No-op unless bEXTUDP and a peer address are set.
-void sendExternNotice(const char *code, const char *text);
+// BP-01: the EXTUDP reply path for a notice -- framed as a regular text
+// message from the node's own callsign on the same socket the message
+// arrived on. Defined in extudp_functions.cpp; declared here rather than in
+// extudp_functions.h so the whole BP contract sits in one place. No-op
+// unless bEXTUDP and a peer address are set.
+void sendExternNotice(const char *text);
 
 extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
 extern int RAWLoRaWrite;
