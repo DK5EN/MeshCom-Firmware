@@ -190,6 +190,31 @@ extern "C" void tdeck_dbg_spitrace_poll(void)
     s_spi_lora_tx = lora_tx;
 }
 
+extern "C" void tdeck_dbg_spitrace_note_sd(void)
+{
+    if(!s_spitrace_on) return;
+    s_spi_s_count++;
+}
+
+extern "C" void tdeck_dbg_spitrace_preflush(void)
+{
+    if(!s_spitrace_on || !s_spi_snap_valid) return;
+
+    uint32_t user = GPSPI2.user.val, ctrl = GPSPI2.ctrl.val, clock = GPSPI2.clock.val;
+    if(user == s_spi_prev_user && ctrl == s_spi_prev_ctrl && clock == s_spi_prev_clock)
+        return;
+
+    char chg[24];
+    int  off = 0;
+    bool any = false;
+    if(user  != s_spi_prev_user)  { off += snprintf(chg + off, sizeof(chg) - off, "%suser",  any ? "," : ""); any = true; }
+    if(ctrl  != s_spi_prev_ctrl)  { off += snprintf(chg + off, sizeof(chg) - off, "%sctrl",  any ? "," : ""); any = true; }
+    if(clock != s_spi_prev_clock) { off += snprintf(chg + off, sizeof(chg) - off, "%sclock", any ? "," : ""); any = true; }
+
+    Serial.printf("[SPITRACE];clobber;user;%08lx;ctrl;%08lx;clock;%08lx;chg;%s\n",
+                  (unsigned long)user, (unsigned long)ctrl, (unsigned long)clock, chg);
+}
+
 extern "C" void tdeck_dbg_spitrace_flush(void)
 {
     if(!s_spitrace_on) return;

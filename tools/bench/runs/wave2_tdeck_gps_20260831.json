@@ -1,0 +1,101 @@
+{
+  "gps_experiment": {
+    "ok": true,
+    "window_seconds": 120.0,
+    "load_count": 5,
+    "gps_on_confirmed": true,
+    "gps_off_confirmed": false,
+    "gps_restored_confirmed": true,
+    "phase_gps_on": {
+      "inject_ok": 5,
+      "inject_total": 5,
+      "samples": [
+        {
+          "i": 0,
+          "max_us": 107001,
+          "avg_us": 5933,
+          "n": 3914
+        },
+        {
+          "i": 1,
+          "max_us": 102001,
+          "avg_us": 5800,
+          "n": 4001
+        },
+        {
+          "i": 2,
+          "max_us": 100999,
+          "avg_us": 5880,
+          "n": 3949
+        },
+        {
+          "i": 3,
+          "max_us": 101000,
+          "avg_us": 5878,
+          "n": 3947
+        },
+        {
+          "i": 4,
+          "max_us": 119014,
+          "avg_us": 5905,
+          "n": 3933
+        }
+      ],
+      "stats": {
+        "samples": 5,
+        "p50_us": 102001,
+        "p90_us": 119014,
+        "p99_us": 119014,
+        "max_us": 119014,
+        "over_50ms_count": 5,
+        "over_100ms_count": 5
+      }
+    },
+    "phase_gps_off": {
+      "inject_ok": 5,
+      "inject_total": 5,
+      "samples": [
+        {
+          "i": 0,
+          "max_us": 677001,
+          "avg_us": 6414,
+          "n": 3623
+        },
+        {
+          "i": 1,
+          "max_us": 100001,
+          "avg_us": 6250,
+          "n": 3719
+        },
+        {
+          "i": 2,
+          "max_us": 100001,
+          "avg_us": 6272,
+          "n": 3703
+        },
+        {
+          "i": 3,
+          "max_us": 101001,
+          "avg_us": 6263,
+          "n": 3711
+        },
+        {
+          "i": 4,
+          "max_us": 100999,
+          "avg_us": 6251,
+          "n": 3716
+        }
+      ],
+      "stats": {
+        "samples": 5,
+        "p50_us": 100999,
+        "p90_us": 677001,
+        "p99_us": 677001,
+        "max_us": 677001,
+        "over_50ms_count": 5,
+        "over_100ms_count": 5
+      }
+    },
+    "verdict": "GPS OFF tail is worse than GPS ON (p99 677001us vs 119014us) -- unexpected direction, treat as noise/harness artefact rather than a GPS finding"
+  }
+}

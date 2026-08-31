@@ -4580,13 +4580,13 @@ void sendHey()
     // store last message to compare later on
     insertOwnTx(aprsmsg.msg_id);
 
-    if(bGATEWAY)
-    {
-	    // UDP out
-		addNodeData(msg_buffer, aprsmsg.msg_len, 0, 0);
-    }
+    // GW-01: no gateway self-upload of the own '@' HEY. The bare copy
+    // (rssi/snr 0, no signal report) always reached the server seconds before
+    // the neighbours' enriched copies of the same msg_id and could win over
+    // them there; with --gateway off the enriched copies alone carry the
+    // link data. Measured 2026-08-31, see docs/BACKLOG.md 3.8i.
 
-    // and also to LoRa
+    // to LoRa
     {
         // Master RingBuffer for transmission
         // local messages send to LoRa TX

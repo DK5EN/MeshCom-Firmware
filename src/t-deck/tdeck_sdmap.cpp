@@ -3,6 +3,7 @@
 #include <SD.h>
 #include <math.h>
 #include <loop_functions_extern.h>   // fuer bDEBUG
+#include "tdeck_debug.h"             // TM-07: tdeck_dbg_spitrace_note_sd()
 #include "lv_obj_functions_extern.h" // fuer map_no_data_label
 
 // lodepng-Funktionen direkt deklarieren statt lodepng.h einzubinden
@@ -199,6 +200,9 @@ static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned *
 {
     char path[64];
     snprintf(path, sizeof(path), "%s/%d/%d/%d.png", sdmap_dirs[sdmap_activeSet], zoom, tx, ty);
+    // TM-07: direct S count -- SD.exists() below already touches the shared
+    // SPI2 bus, and the CS-edge poll misses these bursts (tdeck_debug.h).
+    tdeck_dbg_spitrace_note_sd();
     if (!SD.exists(path))
         return nullptr;
     File f = SD.open(path, FILE_READ);

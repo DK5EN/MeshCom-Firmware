@@ -1,6 +1,6 @@
 # RESUME — pick up here
 
-## 2026-08-31 afternoon: GW-01 + TM-06/07/14/19 campaign (wave 1 committed, wave 2 running)
+## 2026-08-31 afternoon: GW-01 + TM-06/07/14/19 campaign (both waves done)
 
 Wave 1 (three parallel writers, gated 438/438 native + 8 targets): TM-06 (a) `--injectraw`
 (real RX path via OnRxDone recursion) + (b) `--loratx` burst; TM-07 `--spitrace` per-flush
@@ -8,8 +8,15 @@ GPSPI2 register/user trace; TM-19 `--touch tap/down/up` through the LVGL indev p
 scenarios `gps_experiment`, `flush_lora_correlation`, `touch_inject`. GW-01 **measured**
 (dual-node run + mcmap interlink): server stream has no HEY msg_id dedup, all copies arrive;
 the only gateway-on difference is the bare `gw:1` self-upload arriving first — consumer-side
-loss, fix (a) scheduled. Wave 2: fix (a), bench proofs on DK5EN-14 (touch/spitrace/inject),
-TM-14 measurement run. Details: BACKLOG §3.8f TM-06/07/14/19, §3.8i GW-01.
+loss, fix (a) scheduled. Wave 2 done: **GW-01 fix (a)** shipped (`sendHey()` self-upload removed) and proven —
+interlink shows only enriched `gw:0` records with gateway ON, parity with off. **TM-07
+register named: GPSPI2.clock, exclusively** (pre-transfer `[SPITRACE];clobber` snapshot +
+direct SD counter in tdeck_sdmap; LoRa changes nothing — the NOP can become a clock re-arm).
+**TM-14 measured**: GPS is not the loop-tail culprit (102/119 ms vs 101/677 ms with the
+outlier in the GPS-OFF window). **TM-19/TM-06 bench-proven** on DK5EN-14 (touch_inject PASS,
+injectraw res;58 via fixture frame, full standard harness PASS; --injectraw lines > ~256
+chars need paced serial writes). Bench restored (93/92 gateway+debug off, DK5EN-14/93 run
+the wave-2 build, 92/90 unchanged). Details: BACKLOG §3.8f TM-06/07/14/19, §3.8i GW-01.
 
 Last session: 2026-08-31, morning through afternoon. The full 3.8o/3.8p intake campaign was
 implemented via `/orchestrate-waves` (Waves 1+2: WEB-01..04, NC-01/02, MH-02, TM-45, TM-39-CONF,
@@ -37,21 +44,23 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
    pro Schritt. TD-07-Handtest auf DK5EN-14 steht ebenfalls aus (Skript im Wave-Report).
 3. **E22-01** (§3.8p, High) — Frame-Integrität unter Versorgungsspitzen, Konzept für
    Operator-Review.
-4. **GW-01 / TLM-03** (§3.8i) — HEY-Parität mit Gateway on; Soft-Serial-Telemetrie-Review
-   (blockiert TLM-01/02).
+4. **TLM-03** (§3.8i) — Soft-Serial-Telemetrie-Review (blockiert TLM-01/02). GW-01 ist
+   seit 2026-08-31 gefixt und belegt (fix a, siehe oben).
 5. **MEM-02 risk assessment** (§3.8m, geparkt) und **UDP-01 reporter questions** (§3.8l) —
    unverändert aus der letzten Übergabe.
 6. **TM-28** — E290 Wireless Paper Hardware kommt in der Woche ab 2026-09-01.
 7. Kleinvieh, alles gefiled: `ntpsync.py`-Live-Lauf; PM-01 boot-gecachtes Global (optional);
    CONF-Koordinaten anwenden (eigenes Ticket); WEB-03 (c)-(e); WF-01 Sites 1+2; TM-44
-   (deferred), TM-06/07/14/19/29, TM-23 (von TD-09 abgelöst); BAT-02-Grenze dokumentiert
+   (deferred), TM-29, TM-23 (von TD-09 abgelöst) — TM-06/07/14/19 sind seit 2026-08-31
+   erledigt (siehe oben); BAT-02-Grenze dokumentiert
    (stabil in-band floatender Teiler ist von einer vollen Zelle nicht unterscheidbar —
    RAK-90 liest stabile 4,22 V, Erkennung greift dort nicht).
 
-**Bench state at handover** (all four on USB, LoRa TX 2 dBm, all running the final build):
-Heltec `DK5EN-93` — gateway off, GPS on (fix), DEBUG on; T-Beam `DK5EN-92` — webserver on,
-gateway off; T-Deck `DK5EN-14` — web UI live at dk5en-14.local; RAK `DK5EN-90` — bench
-gateway, EXTUDP on, time source NTP (first time ever valid without GPS). No background runs
+**Bench state at handover** (all four on USB, LoRa TX 2 dBm; DK5EN-93 and DK5EN-14 run the
+2026-08-31 wave-2 build, 92/90 the previous one): Heltec `DK5EN-93` — gateway off, GPS on
+(fix), DEBUG on; T-Beam `DK5EN-92` — webserver on, gateway off, debug/udplog off; T-Deck
+`DK5EN-14` — web UI live at dk5en-14.local; RAK `DK5EN-90` — bench gateway, EXTUDP on, time
+source NTP (first time ever valid without GPS). No background runs
 alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
 
 ---

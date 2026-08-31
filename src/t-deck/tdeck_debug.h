@@ -104,6 +104,21 @@ bool tdeck_dbg_spitrace_enabled(void);
 void tdeck_dbg_spitrace_poll(void);          /* sampled every touchpad_read() tick */
 void tdeck_dbg_spitrace_flush(void);         /* called from disp_flush() after the real transfer */
 
+/* Pre-transfer snapshot, called from disp_flush() BEFORE the flushfix NOP:
+ * compares GPSPI2.user/ctrl/clock against the state the previous flush left
+ * behind and prints, only when something differs,
+ *   [SPITRACE];clobber;user;<hex>;ctrl;<hex>;clock;<hex>;chg;<user,ctrl,clock>
+ * with the FOREIGN (pre-NOP) values -- this is the line that names the
+ * register another bus user left behind, which the post-transfer snapshot in
+ * tdeck_dbg_spitrace_flush() can never see (the TFT has re-armed by then). */
+void tdeck_dbg_spitrace_preflush(void);
+
+/* Direct SD-access count from tdeck_sdmap.cpp's tile-read path -- the CS-edge
+ * proxy in tdeck_dbg_spitrace_poll() misses SD bursts while the map compose
+ * blocks the LVGL tick (measured 2026-08-31: S stayed 0 across zoom sweeps
+ * that demonstrably read tiles). Feeds the same S counter. */
+void tdeck_dbg_spitrace_note_sd(void);
+
 /* TM-19: synthetic touch injection through the real LVGL input path.
  * subcmd is "tap" (press at x,y, release after dur_ms -- 0 means the 50 ms
  * default), "down" (press-and-hold at x,y until "up"), or "up" (release the

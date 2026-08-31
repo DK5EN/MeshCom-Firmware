@@ -545,6 +545,13 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
                           digitalRead(TDECK_SDCARD_CS), digitalRead(LORA_CS), digitalRead(TDECK_TFT_CS), digitalRead(TDECK_TFT_DC),
                           (unsigned long)GPSPI2.clock.val, (unsigned long)GPSPI2.user.val, (unsigned long)GPSPI2.ctrl.val);
         }
+        // TM-07: pre-transfer snapshot -- must run BEFORE the flushfix NOP below,
+        // which re-arms the registers and would mask a foreign user's state.
+        // Prints [SPITRACE];clobber;... when a register differs from the state
+        // the previous flush left behind.
+        if(tdeck_dbg_spitrace_enabled()) {
+            tdeck_dbg_spitrace_preflush();
+        }
         // EXPERIMENT (flushfix): one throw-away display transaction before the real one,
         // so that the SPI peripheral state left behind by another bus user (SD card at
         // 800 kHz) is re-armed before the frame goes out.
