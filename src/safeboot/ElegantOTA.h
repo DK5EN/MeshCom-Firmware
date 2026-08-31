@@ -137,6 +137,11 @@ class ElegantOTAClass{
     String _update_error_str = "";
     unsigned long _current_progress_size;
 
+    // TM-46: bumped once per /ota/start so a late-arriving disconnect from a
+    // superseded upload (AsyncTCP can deliver it after a new session already
+    // began) can be told apart from a disconnect of the still-active one.
+    uint32_t _updateGeneration = 0;
+
     std::function<void()> preUpdateCallback = NULL;
     std::function<void(size_t current, size_t final)> progressUpdateCallback = NULL;
     std::function<void(bool success)> postUpdateCallback = NULL;

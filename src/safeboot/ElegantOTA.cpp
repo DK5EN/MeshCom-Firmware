@@ -71,6 +71,12 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       // of letting the begin() below fail with a stale-session 400.
       abortActiveUpdate("stale_session");
 
+      // TM-46: bump the session generation -- a disconnect captured under an
+      // older generation (e.g. a prior upload's connection that AsyncTCP only
+      // now gets around to reporting) can then be told apart from one
+      // belonging to this fresh session.
+      _updateGeneration++;
+
       // Pre-OTA update callback
       if (preUpdateCallback != NULL) preUpdateCallback();
 
@@ -238,8 +244,19 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           _current_progress_size = 0;
           // TM-46: a client that vanishes mid-transfer (dropped TCP connection)
           // must not leave Update() running forever -- abort on disconnect.
-          request->onDisconnect([&]() {
-            abortActiveUpdate("client_disconnected");
+          // Capture (by value) the generation this upload belongs to: AsyncTCP
+          // can deliver a killed client's disconnect late, after a fresh
+          // /ota/start has already superseded it: only abort if the captured
+          // generation is still the active one, else it's a stale event for a
+          // session that is already gone -- ignore it, don't kill the new one.
+          uint32_t gen = _updateGeneration;
+          request->onDisconnect([this, gen]() {
+            if (gen == _updateGeneration) {
+              abortActiveUpdate("client_disconnected");
+            } else {
+              Serial.printf("[SAFEBOOT];ota;disconnect_ignored;gen;%u/%u\n",
+                             (unsigned)gen, (unsigned)_updateGeneration);
+            }
           });
         }
 
