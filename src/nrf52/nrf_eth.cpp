@@ -22,6 +22,8 @@
 #include "printfdeb_functions.h"
 
 #include "via_functions.h"
+#include "regex_functions.h"
+#include "conf_frame.h"
 
 EthernetUDP Udp;
 
@@ -681,104 +683,82 @@ int NrfETH::getUDP()
           printfdeb("[CONF] received from server\n");
         }
 
-        // TM-39: raw & unconditional. CONF (server-pushed callsign/lat/lon/alt)
-        // is an nRF52-only indicator -- the ESP32/RAK-WiFi getMeshComUDPpacket()
-        // only recognizes GATE and BEAT, so a CONF frame there falls into the
-        // OTHER bucket instead. Not part of the SET/CET/BEAT/DATA/OTHER
-        // taxonomy asked for; kept as its own type so rx-by-type sums match
-        // total RX on this platform.
+        // TM-39: raw & unconditional, so rx-by-type sums match total RX.
+        // CONF (server-pushed callsign/lat/lon/alt) is not part of the
+        // SET/CET/BEAT/DATA/OTHER taxonomy; kept as its own type. Since
+        // b624bd33 the ESP32/RAK-WiFi getMeshComUDPpacket() recognizes CONF
+        // too (used to fall into OTHER there).
         Serial.printf("[GW];rx;type;CONF;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
 
         last_upd_timer = millis();
 
         had_initial_udp_conn = true;
 
-        /* Handling Config Messages (sticking for now without own method)
-         * first 4 bytes are 'CONF' (already checked at this point)
-         * 5th byte is an indicator which setting is coming:
-         * 0x00 -> Callsign - length of chars - chars - 0x01 - length - shortname
-         * CONF 0x00 LL bytes(rufzeichen) - 0x01 - shortname(3)
-         */
-
-        uint8_t config_buf[UDP_CONF_BUFF_SIZE] = {0};
-
-        if (packetSize <= UDP_CONF_BUFF_SIZE && packetSize >= UDP_MSG_INDICATOR_LEN)
+        // CONF-01: guard, parse and apply mirror the ESP32 handler
+        // (src/udp_functions.cpp, commit b624bd33) via the shared
+        // bounds-checked parseConfFrame() (src/conf_frame.cpp). Applied
+        // only when the datagram's source matches the resolved gateway
+        // server -- on nRF52 that is udp_dest_addr (the address
+        // startUDP()/startFIXUDP() set as GATE/BEAT/CONF destination and
+        // origin). remote_ip above was read fresh for this exact packet,
+        // so unlike the ESP32 side (which tracks a separate "last seen rx
+        // IP" across getUDP() calls) there is no staleness window here.
+        if (packetSize < UDP_MSG_INDICATOR_LEN || packetSize > UDP_CONF_BUFF_SIZE)
         {
-          memcpy(config_buf, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, packetSize - UDP_MSG_INDICATOR_LEN);
-          // fill rest of buffer with 0
-          // N-03: Laufindex startet beim Ende der Nutzdaten und laeuft bis zum
-          // Pufferende. Vorher lief i von 0..UDP_CONF_BUFF_SIZE-1 und wurde
-          // zusaetzlich um die Paketlaenge versetzt -> Schreibzugriff bis
-          // config_buf[packetSize-4+254], bei packetSize=255 also 251 Bytes
-          // hinter dem 255-Byte-Stackpuffer.
-          for (int i = packetSize - UDP_MSG_INDICATOR_LEN; i < UDP_CONF_BUFF_SIZE; i++)
-          {
-            config_buf[i] = 0x00;
-          }
-
-          // print the message
-          // printBuffer(config_buf, packetSize - UDP_MSG_INDICATOR_LEN);
-
-          // check which config arrived and proceed
-          if (config_buf[0] == 0x00)
-          {
-            // we got a callsign from server
-            int call_len = config_buf[1];
-            char call_arr[call_len + 1];
-            call_arr[call_len] = '\0';
-            memcpy(call_arr, config_buf + 2, call_len);
-            _longname = String(call_arr);
-            DEBUG_MSG("CONF", "Got callsign (longanme) from server: ");
-            printlndeb(_longname);
-            DEBUG_MSG("CONF", "Callsign Length: %d", call_len);
-
-            // shortname
-            int short_len=0;
-            if (config_buf[2 + call_len] == 0x01)
-            {
-              short_len = config_buf[2 + call_len + 1];
-              char short_arr[short_len + 1];
-              memcpy(short_arr, config_buf + (2 + call_len + 2), short_len);
-              short_arr[short_len] = '\0';
-              shortname = String(short_arr);
-              DEBUG_MSG_VAL("CONF", short_len, "Shortname received: ");
-              printlndeb(shortname);
-            }
-
-            int inpos= 2 + call_len + short_len + 2;
-
-            // lat
-            if (config_buf[inpos] == 0x02)
-            {
-              _lat=config_buf[inpos+1] | (config_buf[inpos+2] << 8) | (config_buf[inpos+3] << 16) | (config_buf[inpos+4] << 24);
-              DEBUG_MSG_VAL("CONF", _lat, "LAT received: ");
-              inpos=inpos+5;
-            }
-
-            // lon
-            if (config_buf[inpos] == 0x03)
-            {
-              _lon=config_buf[inpos+1] | (config_buf[inpos+2] << 8) | (config_buf[inpos+3] << 16) | (config_buf[inpos+4] << 24);
-              DEBUG_MSG_VAL("CONF", _lon, "LON received: ");
-              inpos=inpos+5;
-            }
-
-            // lat
-            if (config_buf[inpos] == 0x04)
-            {
-              _alt=config_buf[inpos+1] | (config_buf[inpos+2] << 8) | (config_buf[inpos+3] << 16) | (config_buf[inpos+4] << 24);
-              DEBUG_MSG_VAL("CONF", _alt, "ALT received: ");
-              inpos=inpos+5;
-            }
-          }
-          else
-          {
-            printfdeb("[ERROR] Incoming config message not known! Discarding!\n");
-          }
+          printfdeb("[CONF] ignored: size %d out of bounds\n", packetSize);
+        }
+        else if (!(remote_ip == udp_dest_addr))   // nRF52 IPAddress has no operator!=
+        {
+          printfdeb("[CONF] ignored: source %d.%d.%d.%d does not match gateway server %d.%d.%d.%d\n",
+                     remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3],
+                     udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3]);
         }
         else
         {
-            printfdeb("[ERROR] Incoming config message not known! Discarding!\n");
+          ConfFrame cf;
+
+          if (!parseConfFrame(inc_udp_buffer + UDP_MSG_INDICATOR_LEN, packetSize - UDP_MSG_INDICATOR_LEN, cf))
+          {
+            printfdeb("[CONF] ignored: malformed frame\n");
+          }
+          else
+          {
+            // lat/lon/alt: parsed for visibility, not applied -- same as
+            // the ESP32 side.
+            if(cf.hasLat)
+              printfdeb("[CONF] lat received (not applied): %ld\n", (long)cf.lat);
+            if(cf.hasLon)
+              printfdeb("[CONF] lon received (not applied): %ld\n", (long)cf.lon);
+            if(cf.hasAlt)
+              printfdeb("[CONF] alt received (not applied): %ld\n", (long)cf.alt);
+
+            String sCall = String(cf.call);
+            sCall.trim();
+            sCall.toUpperCase();
+
+            if (!checkRegexCall(sCall))
+            {
+              printfdeb("[CONF] ignored: callsign <%s> from server not valid\n", sCall.c_str());
+            }
+            else
+            {
+              snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", sCall.c_str());
+
+              if(cf.hasShort)
+                snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", cf.shortname);
+              else
+                snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", convertCallToShort(meshcom_settings.node_call).c_str());
+
+              printfdeb("[CONF] Call:%s Short:%s set from server\n", meshcom_settings.node_call, meshcom_settings.node_short);
+
+              save_settings();
+
+              // same auto-reboot as --setcall (src/command_functions.cpp:3452).
+              // No T-Deck exception needed here -- BOARD_T_DECK/BOARD_T_DECK_PLUS
+              // are ESP32-only board defines, never set in an nRF52 build.
+              rebootAuto = millis() + 15 * 1000; // 15 Sekunden
+            }
+          }
         }
       }
       else if (memcmp(indicator_b, beat, UDP_MSG_INDICATOR_LEN) == 0)
@@ -1156,15 +1136,31 @@ void NrfETH::startUDP()
     }
     else
     {
-      if(bDisplayCont)
-        printlndeb("[UDP-DEST] Setting I-NET UDP-DEST 89.185.97.38");
+      // CTY-01: mirrors the country split startFIXUDP() already has on its
+      // non-hamnet branch -- this path (DHCP, no hamnet) had none and always
+      // fell through to the OE default, regardless of node_gwsrv.
+      if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
+      {
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Internet UDP-DEST IT 145.239.75.155");
 
-      //DEBUG_MSG("UDP-DEST", "Setting I-NET UDP-DEST 213.47.219.169");
-      udp_dest_addr = IPAddress(89, 185, 97, 38);
-      srv_path = "inet";
+        udp_dest_addr = IPAddress(145, 239, 75, 155);
+        srv_path = "inet";
 
-      //DEBUG_MSG("NTP", "Setting I-NET 3.at.pool.ntp.org NTP");
-      timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
+        timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
+      }
+      else
+      {
+        if(bDisplayCont)
+          printlndeb("[UDP-DEST] Setting I-NET UDP-DEST OE 89.185.97.38");
+
+        //DEBUG_MSG("UDP-DEST", "Setting I-NET UDP-DEST 213.47.219.169");
+        udp_dest_addr = IPAddress(89, 185, 97, 38);
+        srv_path = "inet";
+
+        //DEBUG_MSG("NTP", "Setting I-NET 3.at.pool.ntp.org NTP");
+        timeClient.setPoolServerIP(IPAddress(162, 159, 200, 1));
+      }
     }
 
     snprintf(sn, sizeof(sn), "%i.%i.%i.%i", udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3]);

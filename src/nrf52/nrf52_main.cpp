@@ -1959,15 +1959,43 @@ void nrf52loop()
         telemetry_timer = millis();
     }
     
+    // ETH-01: link poll/heartbeat and the DHCP lease refresh must run
+    // whenever Ethernet is up, not only for bGATEWAY -- a gateway-off /
+    // webserver-on node (bWEBSERVER, see setup ~1086) has ETH hardware too
+    // and was never renewing its lease nor logging link state. Both
+    // functions already self-guard on neth.hasETHHardware (false when
+    // neither bGATEWAY nor bWEBSERVER is set), so hoisting them here is a
+    // no-op for nodes without ETH. Order: link edges/heartbeat first, then
+    // the DHCP renew check, then (below) either the gateway UDP get/send or
+    // the TM-45 NTP-only harvest -- exactly one of the latter two per pass.
+
+    // TM-35 / N-20 instrumentation: link edges and the 60-s heartbeat
+    ethLinkPoll();
+    ethLinkHeartbeat();
+
+    // DHCP refresh
+    if(neth.hasETHHardware && (uint32_t)(millis() - dhcp_timer) >= (uint32_t)(DHCP_REFRESH * 60000))
+    {
+        // no need on static IPs
+        if(!(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6))
+        {
+            if(bDEBUG)
+            {
+                Serial.print(getTimeString());
+                Serial.println(" [MAIN] checkDHCP");
+            }
+
+            { INSTR_SECTION("eth_dhcp"); neth.checkDHCP(); }
+        }
+
+        dhcp_timer = millis();
+    }
+
     // get UDP & send UDP message from ringBufferOut if there is one to tx
     if(bGATEWAY)
     {
         INSTR_SECTION("gateway");
         int bUDPReceived = false;
-
-        // TM-35 / N-20 instrumentation: link edges and the 60-s heartbeat
-        ethLinkPoll();
-        ethLinkHeartbeat();
 
         // check if we received a UDP packet
         if (neth.hasIPaddress)
@@ -2042,27 +2070,8 @@ void nrf52loop()
                     }
                 }
             }
-            
-            // DHCP refresh
-            if ((uint32_t)(millis() - dhcp_timer) >= (uint32_t)(DHCP_REFRESH * 60000))
-            {
-                if(neth.hasETHHardware)
-                {
-                    // no need on static IPs
-                    if(!(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6))
-                    {
-                        if(bDEBUG)
-                        {
-                            Serial.print(getTimeString());
-                            Serial.println(" [MAIN] checkDHCP");
-                        }
-                        
-                        { INSTR_SECTION("eth_dhcp"); neth.checkDHCP(); }
-                    }
-                }
-
-                dhcp_timer = millis();
-            }
+            // ETH-01: DHCP refresh moved above, ahead of this if(bGATEWAY)
+            // block, so it also runs when bGATEWAY is off.
         }
     }
     else if(neth.hasIPaddress)

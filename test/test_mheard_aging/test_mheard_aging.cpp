@@ -60,6 +60,15 @@
 // ---- Link-Stubs fuer aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
 // (siehe Datei-Kommentar oben -- bewusst kein #include von
 // parser_link_stubs.h, weil getUnixClock() hier anders sein muss)
+//
+// NC-02/MH-02 (BACKLOG SS3.8o) ergaenzen diese Suite um zwei weitere Faelle
+// (siehe unten): mheardCalls[]/mheardPathCalls[] werden hier per extern
+// direkt inspiziert, um zu pruefen, WELCHER Slot von einer Aktion betroffen
+// war (nicht bloss OB) -- mheard_functions.h externt diese Arrays bewusst
+// NICHT (das ist genau der Punkt von NC-02s mheardFreshMs()/
+// mheardPathFreshMs()-Helfern fuer Produktionscode in anderen Dateien), aber
+// ein Test darf direkt auf die vom selben TU (mheard_functions.cpp)
+// definierten globalen Arrays zugreifen.
 s_meshcom_settings meshcom_settings;
 bool bDisplayInfo = false;
 bool bDisplayCont = false;
@@ -92,6 +101,12 @@ String convertUNIXtoString(uint32_t timestamp) { (void)timestamp; return String(
 bool bGATEWAY = false;
 bool bVIA = false;
 
+// mheard_functions.cpp definiert diese Arrays (siehe Datei-Kommentar oben);
+// direkter extern-Zugriff hier ist testinterne Introspektion, keine
+// Wiederholung des NC-02-Antipatterns aus via_functions.cpp/web_functions.cpp.
+extern char mheardCalls[MAX_MHEARD][10];
+extern char mheardPathCalls[MAX_MHPATH][10];
+
 // ------------------------------------------------------------ Testaufbau
 
 // Baut eine wohlgeformte mheardLine mit einem gueltigen Datum (Jahr >= 2025,
@@ -112,6 +127,22 @@ static void buildLine(struct mheardLine &mh, const char *callsign)
     mh.mh_path_len = 0;
     mh.mh_mesh = 0;
     mh.mh_ncount = 0;
+}
+
+// Baut eine mheardLine fuer updateHeyPath() (NC-02 Pfad-Tabelle): ein
+// gueltiges Datum (siehe buildLine oben) und ein mh_sourcepath mit genau
+// einem Komma, damit updateHeyPath()s "ips = indexOf(',')+1 > 0"-Check
+// durchlaeuft und der Eintrag tatsaechlich in mheardPathCalls[]/
+// mheardPathEpoch[]/mheardPathMillis[] landet.
+static void buildPathLine(struct mheardLine &mh, const char *sourcecall)
+{
+    initMheardLine(mh);
+    mh.mh_date = "2026-08-31";
+    mh.mh_time = "12:00:00";
+    mh.mh_sourcecallsign = sourcecall;
+    mh.mh_sourcepath = String(sourcecall) + ",DB0XXX-12";
+    mh.mh_destinationpath = "";
+    mh.mh_path_len = 0;
 }
 
 void setUp(void)
@@ -210,6 +241,133 @@ static void test_millis_ueberlauf_ueber_fensterschwelle(void)
     TEST_ASSERT_EQUAL_INT(0, getMheardCount());
 }
 
+// ---------------------------------------------------- MH-02 (BACKLOG SS3.8o)
+//
+// updateMheard()s Eviction-Suche initialisierte `imin` mit -1 und wies ihm
+// im Vergleichs-Zweig (`if(mheardEpoch[iset] < ulmin) ulmin = ...`) nie einen
+// Wert zu -- der "evict den aeltesten Eintrag"-Zweig
+// (`if(imin >= 0) ipos=imin;`) war darum toter Code, Eviction fiel immer auf
+// den sequentiellen `mheardWrite`-Ring zurueck (Slot 0, 1, 2, ...).
+//
+// Test-Aufbau, um "evict Slot 0 (Ring)" von "evict Slot MAX_MHEARD-1 (echt
+// aeltester)" zu unterscheiden -- ausgenutzt wird updateMheard()s eigene
+// Slot-Suche (siehe Kommentar dort): bei leeren Slots wird `inext` in der
+// Scan-Schleife bei JEDEM freien Slot ueberschrieben (nicht nur beim
+// ersten), die Tabelle fuellt sich also von HINTEN nach VORNE. Der erste
+// Aufruf hier landet in Slot MAX_MHEARD-1 und bekommt den KLEINSTEN
+// millis()-Stempel (0) -- den groessten Age-Wert, wenn spaeter geprueft
+// wird. mheardWrite bleibt waehrenddessen bei 0 (der "inext"-Zweig fasst ihn
+// nicht an), darum evicted der Ring-Fallback deterministisch Slot 0.
+static void test_eviction_waehlt_monoton_aeltesten_eintrag(void)
+{
+    mc_test_set_millis(0);
+
+    struct mheardLine mh;
+    char callbuf[16];
+
+    // Fuellt MAX_MHEARD-1 Slots, je 1000ms auseinander -- die erste Eintragung
+    // ("AGE01", millis=0) landet in Slot MAX_MHEARD-1 und ist die aelteste;
+    // die letzte dieser Schleife ("AGE<N>") landet in Slot 1. Slot 0 bleibt frei.
+    for (int i = 1; i < MAX_MHEARD; i++)
+    {
+        snprintf(callbuf, sizeof(callbuf), "AGE%02d", i);
+        buildLine(mh, callbuf);
+        updateMheard(mh, 0);
+        mc_test_advance_millis(1000UL);
+    }
+
+    TEST_ASSERT_EQUAL_STRING("AGE01", mheardCalls[MAX_MHEARD - 1]);
+    TEST_ASSERT_EQUAL_STRING("", mheardCalls[0]);   // noch frei
+
+    // Belegt den letzten freien Slot (0) -- ab hier ist die Tabelle voll,
+    // dieser Eintrag ist der FRISCHESTE (groesster millis()-Stempel bisher).
+    buildLine(mh, "NEWFILL");
+    updateMheard(mh, 0);
+    TEST_ASSERT_EQUAL_STRING("NEWFILL", mheardCalls[0]);
+
+    // Alles bleibt weit unter dem 12h-Prune-Fenster (~30s Gesamtlaufzeit) --
+    // die folgende Eviction darf NICHT ueber die "DELETE after 12h"-Schiene
+    // laufen, sonst waere sie kein Beweis fuer MH-02.
+    mc_test_advance_millis(500UL);
+
+    // Tabelle voll, kein Slot frei/abgelaufen -> erzwingt den Eviction-Pfad.
+    // Vor dem Fix: `imin` bleibt -1, Ring-Fallback evicted Slot 0
+    // (mheardWrite==0), also "NEWFILL" -- der FRISCHESTE Eintrag, falsch.
+    // Nach dem Fix: `imin` zeigt auf Slot MAX_MHEARD-1 ("AGE01", der
+    // tatsaechlich aelteste), der wird evicted -- "NEWFILL" bleibt stehen.
+    buildLine(mh, "EVICTME");
+    updateMheard(mh, 0);
+
+    TEST_ASSERT_EQUAL_STRING("EVICTME", mheardCalls[MAX_MHEARD - 1]);
+    TEST_ASSERT_EQUAL_STRING("NEWFILL", mheardCalls[0]);
+}
+
+// ---------------------------------------------------- NC-02 (BACKLOG SS3.8o)
+//
+// mheardPathEpoch[]/getUnixClock() hat im PATH-Ringpuffer (updateHeyPath()s
+// "PATH DELETE after 12 Hours"-Check, showPath()) denselben Wrap-Hazard wie
+// NC-01 bei mheardEpoch[]/getMheardCount() -- behoben durch das parallele
+// mheardPathMillis[] + die exportierten mheardPathFreshMs()-Helfer. Deckt,
+// analog zu den beiden obigen NC-01-Faellen, "frisch trotz kaputter Wanduhr"
+// und "wird trotzdem korrekt aelter/geloescht" ab -- diesmal fuer die
+// PATH-Tabelle und ueber den echten updateHeyPath()-Code, nicht nur den
+// Helfer isoliert.
+// VOR NC-02 war der Delete-Check
+// `(mheardPathEpoch[iset]+(60*60*12)) < getUnixClock()`: bei der (hier
+// konstant kaputten) Wanduhr `mheardPathEpoch[iset]=getUnixClock()=ULONG_MAX`,
+// also `(ULONG_MAX+43200) < ULONG_MAX` == `43199 < ULONG_MAX` == IMMER wahr --
+// ein taufrischer Pfad-Eintrag wurde beim naechsten updateHeyPath()-Aufruf
+// geloescht, unabhaengig von der real seit dem Hoeren verstrichenen Zeit.
+static void test_pfad_frischer_eintrag_ueberlebt_naechsten_aufruf_trotz_kaputter_wanduhr(void)
+{
+    mc_test_set_millis(100000);
+
+    struct mheardLine mh;
+    buildPathLine(mh, "DK5EN-9");
+    updateHeyPath(mh);
+
+    // updateHeyPath()s eigene Slot-Suche (siehe dortiger Kommentar) setzt
+    // `inext` nur beim ERSTEN freien Slot -- der erste Aufruf landet also in
+    // Slot 0, deterministisch.
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", mheardPathCalls[0]);
+    TEST_ASSERT_TRUE(mheardPathFreshMs(0, 60UL * 60UL * 12UL * 1000UL));   // 12h-Fenster
+
+    // Nur 1s spaeter, weit unter dem 12h-Fenster -- ein zweiter, ANDERER
+    // Eintrag loest updateHeyPath()s Scan-Schleife (die "PATH DELETE after
+    // 12 Hours"-Pruefung) aus. Vor NC-02 haette diese den obigen Eintrag
+    // JETZT geloescht (s.o.), obwohl real nur 1s vergangen ist.
+    mc_test_advance_millis(1000UL);
+    buildPathLine(mh, "OE1XYZ-1");
+    updateHeyPath(mh);
+
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", mheardPathCalls[0]);   // ueberlebt
+}
+
+static void test_pfad_eintrag_ueber_zwoelf_stunden_gilt_nicht_mehr_als_frisch_und_wird_geloescht(void)
+{
+    mc_test_set_millis(0);
+
+    struct mheardLine mh;
+    buildPathLine(mh, "DK5EN-9");
+    updateHeyPath(mh);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", mheardPathCalls[0]);
+
+    // Direkter Beweis am exportierten Helfer (NC-02s Kern-Fix): die
+    // 12h-Grenze wirkt monoton, unabhaengig von getUnixClock() (hier
+    // konstant kaputt, siehe Datei-Kommentar).
+    mc_test_advance_millis(60UL * 60UL * 12UL * 1000UL + 1000UL);
+    TEST_ASSERT_FALSE(mheardPathFreshMs(0, 60UL * 60UL * 12UL * 1000UL));
+
+    // ... und der echte updateHeyPath()-Code nutzt das: ein zweiter,
+    // ANDERER Eintrag loest die Scan-Schleife aus, die den jetzt >12h alten
+    // Slot 0 als abgelaufen erkennt und leert -- vor NC-02 war dieser Check
+    // an mheardPathEpoch[]+12h vs. der kaputten getUnixClock() gebunden und
+    // haette (wrap-bedingt) selbst einen taufrischen Eintrag geloescht.
+    buildPathLine(mh, "OE1XYZ-1");
+    updateHeyPath(mh);
+    TEST_ASSERT_EQUAL_UINT8(0x00, (uint8_t)mheardPathCalls[0][0]);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -217,5 +375,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_ungueltige_wanduhr_frische_eintraege_zaehlen);
     RUN_TEST(test_eintrag_ueber_eine_stunde_alt_zaehlt_nicht_mehr);
     RUN_TEST(test_millis_ueberlauf_ueber_fensterschwelle);
+    RUN_TEST(test_eviction_waehlt_monoton_aeltesten_eintrag);
+    RUN_TEST(test_pfad_frischer_eintrag_ueberlebt_naechsten_aufruf_trotz_kaputter_wanduhr);
+    RUN_TEST(test_pfad_eintrag_ueber_zwoelf_stunden_gilt_nicht_mehr_als_frisch_und_wird_geloescht);
     return UNITY_END();
 }

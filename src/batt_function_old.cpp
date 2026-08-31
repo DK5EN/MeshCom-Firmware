@@ -22,14 +22,15 @@ unsigned long BattTimeAPP = 0;
 // LOW=Teiler aus). Siehe batt_functions.h fuer die Begruendung der Probe.
 batt_probe_t battProbeState = BATT_PROBE_ACTIVE_HIGH;
 
-#if defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4)
+#if defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4) || \
+	(defined(NRF52_SERIES) && not defined(BOARD_HELTEC_T114) && not defined(BOARD_T_ECHO))
 // max_batt is defined further down (near mv_to_percent(), in mV -- setMaxBatt() is always
 // called with node_maxv*1000). Forward-declared here so read_batt()'s HELTEC_V3/STICK_V3/
 // HELTEC_V4 branch (defined before max_batt in this file) can derive the detector's
 // plausible band from it.
 extern float max_batt;
 
-// ----- BAT-01: no-battery detection -----
+// ----- BAT-01/BAT-02: no-battery detection -----
 // Duplicated core, not shared: the canonical copy (with the full rationale -- floating
 // divider node, why raw/unfiltered samples, why the band is relative to max_batt, why
 // hysteresis) lives in batt_functions.h/.cpp (battDetectReset()/battDetectUpdate()). This
@@ -37,8 +38,10 @@ extern float max_batt;
 // batt_functions.h declares that detector inside "#if defined(USE_NEW_BATT)", so it is not
 // visible in this translation unit -- hence a minimal, algorithmically identical duplicate
 // here rather than a shared include. Keep any change to the algorithm/thresholds in sync
-// with the canonical copy. Scoped to HELTEC_V3/STICK_V3/HELTEC_V4 only: every other board
-// in this file (T-Echo, T114, TLORA_OLV216, TRACKER, T_CONNECT_PRO, ...) is untouched.
+// with the canonical copy. Scoped to HELTEC_V3/STICK_V3/HELTEC_V4 (BAT-01) and the plain
+// NRF52_SERIES board -- i.e. RAK4631/WisBlock, the only nRF52 target that reaches this guard
+// since BOARD_HELTEC_T114/BOARD_T_ECHO are excluded (BAT-02). Every other board in this file
+// (TLORA_OLV216, TRACKER, T_CONNECT_PRO, ...) is untouched.
 #define BATT_DETECT_MAX_DELTA_MV        250.0f   // see canonical copy for the measured-swing justification
 #define BATT_DETECT_MIN_BAND_FACTOR     0.55f    // fraction of max_batt -- see canonical copy
 #define BATT_DETECT_MAX_BAND_FACTOR     1.15f
@@ -120,9 +123,12 @@ static bool battDetected(void)
 
 bool battHardwarePresent(void)
 {
-#if defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4)
+#if defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4) || \
+	(defined(NRF52_SERIES) && not defined(BOARD_HELTEC_T114) && not defined(BOARD_T_ECHO))
 	// fail-safe: nur bei positiv erkanntem "kein Teiler" ODER positiv erkannter Abwesenheit
-	// (Laufzeit-Detektion, BAT-01) false.
+	// (Laufzeit-Detektion, BAT-01/BAT-02). battProbeState bleibt auf dem RAK4631-Pfad
+	// permanent BATT_PROBE_ACTIVE_HIGH (nur die Heltec-Probe in init_batt() aendert ihn),
+	// dort reduziert sich der Ausdruck also praktisch auf battDetected().
 	return battProbeState != BATT_PROBE_NONE && battDetected();
 #else
 	return battProbeState != BATT_PROBE_NONE;   // fail-safe: nur bei positiv erkanntem "kein Teiler" false
@@ -796,6 +802,20 @@ float read_batt(void)
 		// all done - millivolts computed directly in read path
 	#elif defined(NRF52_SERIES)
 		raw = raw * 1.25717;
+
+		// BAT-02: same runtime "no battery" detection as the Heltec V3/V4 branch (BAT-01),
+		// fed with this board's raw (unfiltered -- there is no inter-call smoothing on this
+		// path, just the intra-call multisample average above) mV sample. max_batt is in mV
+		// by the time this runs (nrf52_main.cpp calls setMaxBatt(node_maxv*1000) at boot when
+		// node_maxv is configured), same units as the Heltec copy, so no rescale needed here.
+		{
+			bool battPresentNow = battDetectFeed(raw,
+				max_batt*BATT_DETECT_MIN_BAND_FACTOR, max_batt*BATT_DETECT_MAX_BAND_FACTOR);
+
+			// dieselbe 0V/"USB"-Konvention wie ueberall sonst (loop_functions.cpp prueft
+			// global_batt==0.0), statt eine zweite Anzeige-Fallunterscheidung einzufuehren.
+			if (!battPresentNow) { raw = 0.0f; }
+		}
 	#elif defined(BOARD_TBEAM) || defined(BOARD_SX1268)
 		raw = raw * 10.7687;
 	#elif defined(BOARD_HELTEC)

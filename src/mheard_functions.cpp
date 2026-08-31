@@ -66,6 +66,13 @@ int mheardNCount[MAX_MHEARD];
 unsigned char mheardPathBuffer1[MAX_MHPATH][50]; //Ringbuffer for MHeard Sourcepath
 char mheardPathCalls[MAX_MHPATH][10]; //Ringbuffer for MHeard Key = Call
 unsigned long mheardPathEpoch[MAX_MHPATH];
+
+// NC-02 (BACKLOG SS3.8o): mheardMillis[]'s (NC-01, above) exact counterpart
+// for the path ringbuffer -- mheardPathEpoch[] has the identical
+// clockless-node hazard at updateHeyPath()'s PATH DELETE check and at
+// showPath(). Same uint32_t rationale as mheardMillis[] (rollover-safe
+// millis() width on native/x86_64).
+uint32_t mheardPathMillis[MAX_MHPATH];
 uint8_t mheardPathLen[MAX_MHPATH];
 
 uint8_t mheardWrite = 0;   // counter for ringbuffer
@@ -100,6 +107,7 @@ void initMheard()
         memset(mheardPathBuffer1[iset], 0x00, sizeof(mheardPathBuffer1[iset]));
         memset(mheardPathCalls[iset], 0x00, sizeof(mheardPathCalls[iset]));
         mheardPathEpoch[iset]=0;
+        mheardPathMillis[iset]=0;
         mheardPathLen[iset]=0;
     }
 
@@ -254,6 +262,9 @@ void savePathPersistence()
         file.write((uint8_t*)mheardPathCalls, sizeof(mheardPathCalls));
         file.write((uint8_t*)mheardPathBuffer1, sizeof(mheardPathBuffer1));
         file.write((uint8_t*)mheardPathEpoch, sizeof(mheardPathEpoch));
+        // mheardPathMillis[] (NC-02) is intentionally NOT persisted, same
+        // reasoning as mheardMillis[] in saveMHeardPersistence() above:
+        // millis() resets to 0 every boot. loadPathPersistence() re-derives it.
         file.write((uint8_t*)mheardPathLen, sizeof(mheardPathLen));
         file.close();
     #endif
@@ -275,8 +286,16 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
 
     int ipos=-1;
     int inext=-1;
-    
-    unsigned long ulmin = getUnixClock();
+
+    // MH-02 (BACKLOG SS3.8o): eviction candidate when the table is full and
+    // this callsign is new -- the entry with the largest monotonic age
+    // (millis() elapsed since last heard) is the oldest, so it is evicted
+    // first. Was tracked by mheardEpoch[] (wall clock) via `ulmin`, but
+    // `imin` was never assigned in the loop below, so this branch was dead
+    // (fell through to the sequential mheardWrite ring, see below). Ages by
+    // mheardMillis[] instead of mheardEpoch[], same clockless-node reason as
+    // NC-01: mheardEpoch[] can be garbage on a node with no valid wall clock.
+    uint32_t agemax = 0;
     int imin = -1;
 
     for(int iset=0; iset<MAX_MHEARD; iset++)
@@ -301,9 +320,11 @@ void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady)
                 }
                 else
                 {
-                    if(mheardEpoch[iset] < ulmin)
+                    uint32_t age = (uint32_t)(millis() - mheardMillis[iset]);
+                    if(age >= agemax)
                     {
-                        ulmin = mheardEpoch[iset];
+                        agemax = age;
+                        imin = iset;   // MH-02: oldest-so-far, evict this one if needed
                     }
                 }
             }
@@ -540,8 +561,10 @@ void updateHeyPath(struct mheardLine &mheardLine)
     {
         if(mheardPathCalls[iset][0] != 0x00)
         {
-            // PATH DELETE after 1 Hours
-            if((mheardPathEpoch[iset]+(60*60*12)) < getUnixClock())  // mheard last 12 hours
+            // PATH DELETE after 12 Hours -- aged by millis(), not by the
+            // (possibly clockless) wall clock (NC-02, mirrors mheardMillis[]
+            // above / NC-01).
+            if(!mheardPathFreshMs(iset, MHEARD_PRUNE_WINDOW_MS))
             {
                 mheardPathCalls[iset][0] = 0x00;
             }
@@ -618,12 +641,34 @@ void updateHeyPath(struct mheardLine &mheardLine)
         mheardPathLen[ipos] = mheardLine.mh_path_len;
     
     mheardPathEpoch[ipos] = getUnixClock();
+    mheardPathMillis[ipos] = (uint32_t)millis();   // NC-02: monotonic heard-time
 
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
     showPathTDECK();
     #endif
 
     savePathPersistence();
+}
+
+// NC-02: exported freshness helpers (see mheard_functions.h) -- give callers
+// outside this file (via_functions.cpp, web_functions.cpp) the same
+// rollover-safe millis()-age comparison used internally throughout this
+// file (NC-01), without externing mheardMillis[]/mheardPathMillis[] and
+// re-implementing the comparison at each call site.
+bool mheardFreshMs(int iset, uint32_t window_ms)
+{
+    if(iset < 0 || iset >= MAX_MHEARD)
+        return false;
+
+    return (uint32_t)(millis() - mheardMillis[iset]) < window_ms;
+}
+
+bool mheardPathFreshMs(int iset, uint32_t window_ms)
+{
+    if(iset < 0 || iset >= MAX_MHPATH)
+        return false;
+
+    return (uint32_t)(millis() - mheardPathMillis[iset]) < window_ms;
 }
 
 int getMheardCount()
@@ -787,7 +832,7 @@ void showPath()
     {
         if(mheardPathCalls[iset][0] != 0x00)
         {
-            if((mheardPathEpoch[iset]+(60*60*12)) > getUnixClock())  // path last 12 hours
+            if(mheardPathFreshMs(iset, MHEARD_PRUNE_WINDOW_MS))  // path last 12 hours (NC-02: millis(), not wall clock)
             {
                 printlndeb("|---------------------|-----------------------------------------------------------------|");
 
@@ -1126,6 +1171,32 @@ void loadPathPersistence()
         file.read((uint8_t*)mheardPathEpoch, sizeof(mheardPathEpoch));
         file.read((uint8_t*)mheardPathLen, sizeof(mheardPathLen));
         file.close();
+
+        // NC-02: mheardPathMillis[] was not in the file (see
+        // savePathPersistence()) -- re-derive it exactly the way
+        // loadMHeardPersistence() re-derives mheardMillis[] above.
+        uint32_t loadMillisPath = (uint32_t)millis();
+        bool bWallClockValidPath = isWallClockValid();
+        unsigned long nowEpochPath = bWallClockValidPath ? getUnixClock() : 0;
+        for(int i=0; i<MAX_MHPATH; i++)
+        {
+            if(mheardPathCalls[i][0] == 0x00)
+            {
+                mheardPathMillis[i] = 0;
+                continue;
+            }
+
+            if(bWallClockValidPath && nowEpochPath > mheardPathEpoch[i])
+            {
+                unsigned long ageMs = (nowEpochPath - mheardPathEpoch[i]) * 1000UL;
+                mheardPathMillis[i] = (ageMs < loadMillisPath) ? (loadMillisPath - (uint32_t)ageMs) : 0;
+            }
+            else
+            {
+                mheardPathMillis[i] = loadMillisPath;   // treat as just heard
+            }
+        }
+
         showPathTDECK();
     #endif
 }
