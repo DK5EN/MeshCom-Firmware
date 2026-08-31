@@ -6,10 +6,16 @@
 // operator wrote down in BACKLOG BP-01 is pinnable here, deterministically:
 //
 //   * the 80 %-of-MAX_RING threshold, computed per board (10 / 20 / 30),
+//   * BP-05 (operator decision 2026-08-31): QRS fires at a fixed depth of 5
+//     on every board, not at depth > 1 — the gateway field measurement
+//     DK5EN-98 showed baseline depth 1-4 in ordinary operation, and the old
+//     rule warned about that baseline three times in 5.5 minutes,
 //   * one QRS per episode under a burst, not one per message (TM-21),
 //   * the refusal band (QRT holds until the ring is genuinely clear),
 //   * QTA when the ring actually threw a message away,
-//   * QRV exactly once, and only after QRS/QRT/QTA — never for a quiet node,
+//   * QRV exactly once, and only if the episode reached QRT or QTA — a
+//     QRS-only episode (BP-05) closes silently, and a quiet node never gets
+//     one either,
 //   * a full cycle re-arms the whole thing,
 //   * BP-04: depth 1 (the water band) needs QRV_HOLD_MS of uninterrupted
 //     quiet before QRV, so a phantom-depth episode (DJ8MEH 2026-08-31, an
@@ -80,17 +86,28 @@ static void test_no_qrv_without_a_preceding_notice(void)
 
 // ---- QRS ------------------------------------------------------------------
 
-static void test_qrs_fires_once_above_depth_one(void)
+// BP-05 (operator decision 2026-08-31): the gateway field measurement
+// (DK5EN-98, 5.5 min of ordinary operation, no burst anywhere in the log)
+// showed baseline ring depth sitting at 1-4, mode 2 -- the old rule (QRS
+// above depth 1) warned about that baseline three times. QRS now fires only
+// at the fixed threshold of 5, never below it.
+static void test_qrs_fires_once_at_qrs_threshold(void)
 {
-    BackPressure bp(20);
+    BackPressure bp(20);   // qrsThreshold() == 5
 
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(1, false, 1000));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(2, false, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(3, false, 1002));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(4, false, 1003));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, 1004));
     TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
     TEST_ASSERT_FALSE(bp.refusing());
 }
 
 // TM-21's lesson: a QRS for every message of a burst is itself a flood.
+// Unaffected by BP-05: depths 2-4 are silent (below qrsThreshold()) and
+// depth 5 raises the one QRS the assertion below expects; the walk-twice
+// pattern still proves the latch, not the count, suppresses the repeat.
 static void test_single_qrs_per_episode_under_a_burst(void)
 {
     BackPressure bp(20);
@@ -115,9 +132,9 @@ static void test_single_qrs_per_episode_under_a_burst(void)
 
 static void test_qrt_at_the_threshold_and_refusal_band(void)
 {
-    BackPressure bp(20);   // threshold 16
+    BackPressure bp(20);   // threshold 16, qrsThreshold() 5
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(15, false, 1001));
     TEST_ASSERT_FALSE_MESSAGE(bp.refusing(), "one below the threshold still accepts");
 
@@ -208,23 +225,115 @@ static void test_qta_outranks_qrt_and_is_not_followed_by_qrt(void)
 // A drop while only QRS had been sent must still be reported.
 static void test_qta_after_qrs(void)
 {
+    BackPressure bp(20);   // qrsThreshold() 5
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1001));
+}
+
+// ---- BP-05: fixed QRS threshold, QRV only after QRT/QTA -------------------
+//
+// Operator decision 2026-08-31, driven by a DK5EN-98 gateway field
+// measurement (5.5 min of ordinary operation, no burst anywhere in the log):
+// baseline ring depth sat at 1-4 (mode 2) and the old QRS rule (depth > 1)
+// produced three false QRS/QRV pairs against that baseline. Fix: QRS now
+// fires at a fixed depth of 5 on every board, and QRV only closes an episode
+// that actually reached QRT or QTA -- a QRS-only episode (the queue merely
+// touched 5 and drained again without ever refusing) closes silently.
+
+// a) The field-measured baseline walk itself, replayed against the fix:
+// depths 1 -> 2 -> 3 -> 2 -> 4 -> 2 -> 1 must not raise a single notice --
+// this is exactly the pattern that produced three QRS/QRV pairs before.
+static void test_baseline_load_produces_no_notice(void)
+{
+    BackPressure bp(20);
+    const int depths[] = { 1, 2, 3, 2, 4, 2, 1 };
+    uint32_t t = 1000;
+
+    for(size_t i = 0; i < sizeof(depths) / sizeof(depths[0]); i++)
+    {
+        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(depths[i], false, t),
+                                      "gateway baseline (1-4) must not raise a notice");
+        t += 137;   // arbitrary spacing; the fix does not depend on timing
+    }
+
+    TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
+}
+
+// b) The threshold itself: nothing below it, exactly one QRS at it, nothing
+// new while climbing further (the existing latch, proven elsewhere).
+static void test_qrs_exactly_at_the_threshold(void)
+{
+    BackPressure bp(20);   // qrsThreshold() == 5
+    uint32_t t = 1000;
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(4, false, t++));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, t++));
+    TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
+
+    for(int depth = 6; depth <= 15; depth++)
+        TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(depth, false, t++),
+                                       "QRS already latched this episode, must not repeat");
+}
+
+// c) A QRS-only episode closes silently: no QRV, and the latch is really
+// cleared (not merely skipped) so the next episode can raise its own QRS.
+static void test_qrs_only_episode_closes_silently(void)
+{
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(3, false, 1000));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0, 1001),
+                                   "QRS-only episode never reached QRT/QTA, no QRV to give");
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
+    TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRS, bp.onSend(5, false, 2000),
+                                   "latch was cleared: the next episode can QRS again");
+}
+
+// d) The counterpart: an episode that reached QTA still gets its QRV --
+// QRV gating is about the *latch level*, not about which path opened it.
+static void test_qta_only_episode_gets_qrv(void)
+{
+    BackPressure bp(20);
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0, 1001));
+}
+
+// e) qrsThreshold() clamp, same style as refuseThreshold()'s: on a
+// pathologically small ring QRS_MIN_DEPTH (5) would collide with or exceed
+// refuseThreshold(), so it clamps to refuseThreshold() - 1 there; on every
+// real ring size it is a no-op and qrsThreshold() is the flat 5.
+static void test_qrs_threshold_clamp(void)
+{
+    BackPressure bp6(6);
+    TEST_ASSERT_EQUAL_INT(4, bp6.refuseThreshold());
+    TEST_ASSERT_EQUAL_INT_MESSAGE(3, bp6.qrsThreshold(), "clamped to refuseThreshold() - 1");
+
+    BackPressure bp20(20);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(5, bp20.qrsThreshold(), "unclamped on a real ring size");
 }
 
 // ---- QRV and re-arming ----------------------------------------------------
 
-static void test_qrv_exactly_once_after_a_notice(void)
+// BP-05: a QRS-only episode no longer gets a QRV (see
+// test_qrs_only_episode_closes_silently below), so this now has to open its
+// episode with QRT to still exercise "QRV exactly once" at all.
+static void test_qrv_exactly_once_after_a_qrt_episode(void)
 {
-    BackPressure bp(20);
+    BackPressure bp(20);   // threshold 16
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, 1000));
-    // depth 1 is below the QRS line but not clear: no flapping QRS/QRV/QRS.
-    // This only arms the BP-04 hold -- it was already NONE before BP-04 and
-    // stays NONE now, the hold just adds a reason on top.
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 1000));
+    // depth 1 is below the release line but not clear: no flapping
+    // QRT/QRV/QRT. This only arms the BP-04 hold -- it was already NONE
+    // before BP-04 and stays NONE now, the hold just adds a reason on top.
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1001));
+    // depth 2 sits in the BP-05 gap band (below qrsThreshold()) but still
+    // above the quiet band -- disarms the hold, changes nothing else, and
+    // the still-open QRT state keeps refusing.
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1002));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0, 1003));
 
@@ -247,12 +356,12 @@ static void test_qrv_via_onsend_when_the_queue_drained(void)
 
 static void test_full_cycle_rearms(void)
 {
-    BackPressure bp(30);   // threshold 24
+    BackPressure bp(30);   // threshold 24, qrsThreshold() 5
     uint32_t t = 1000;
 
     for(int cycle = 0; cycle < 3; cycle++)
     {
-        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(2, false, t++));
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(24, false, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(30, true, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(0, t++));
@@ -335,15 +444,19 @@ static void test_qrv_water_band_hold_restarts_on_a_deeper_sighting(void)
 }
 
 // c) Anti-flap regression (2026-08-30 bench): depth 2 -> 1 -> 2 within 400 ms
-// flapped QRS/QRV/QRS before BP-04. The hold must swallow the dip: no QRV in
-// between, and going back to depth 2 must not produce a second QRS (latch).
+// flapped QRS/QRV/QRS before BP-04. The bench depth (2) predates BP-05
+// (2026-08-31), which moved the QRS line to 5 -- 2 no longer raises QRS at
+// all (see test_baseline_load_produces_no_notice), so the dip is replayed
+// here at 5, the current QRS line, to keep exercising the same BP-04
+// mechanism: the hold must swallow the dip: no QRV in between, and going
+// back up must not produce a second QRS (latch).
 static void test_qrv_water_band_hold_covers_the_anti_flap_regression(void)
 {
     BackPressure bp(20);
 
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(2, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1200));            // arms, 200 ms in -- nowhere near the hold
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1400));   // back up 400 ms after the QRS
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1400));   // back up 400 ms after the QRS
 
     TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.latch());
@@ -418,7 +531,7 @@ int main(int, char **)
     RUN_TEST(test_quiet_node_says_nothing);
     RUN_TEST(test_no_qrv_without_a_preceding_notice);
 
-    RUN_TEST(test_qrs_fires_once_above_depth_one);
+    RUN_TEST(test_qrs_fires_once_at_qrs_threshold);
     RUN_TEST(test_single_qrs_per_episode_under_a_burst);
 
     RUN_TEST(test_qrt_at_the_threshold_and_refusal_band);
@@ -430,7 +543,13 @@ int main(int, char **)
     RUN_TEST(test_qta_outranks_qrt_and_is_not_followed_by_qrt);
     RUN_TEST(test_qta_after_qrs);
 
-    RUN_TEST(test_qrv_exactly_once_after_a_notice);
+    RUN_TEST(test_baseline_load_produces_no_notice);
+    RUN_TEST(test_qrs_exactly_at_the_threshold);
+    RUN_TEST(test_qrs_only_episode_closes_silently);
+    RUN_TEST(test_qta_only_episode_gets_qrv);
+    RUN_TEST(test_qrs_threshold_clamp);
+
+    RUN_TEST(test_qrv_exactly_once_after_a_qrt_episode);
     RUN_TEST(test_qrv_via_onsend_when_the_queue_drained);
     RUN_TEST(test_full_cycle_rearms);
     RUN_TEST(test_reset_clears_the_episode);

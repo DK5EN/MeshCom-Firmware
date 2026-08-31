@@ -133,6 +133,16 @@ static void drainAllSlotsExcept(int keep_slot)
 //    kommt nie -> Assert "QRV nach 10 s" rot.
 // Im Feld dauerte genau das 8 Minuten (Refuses 15:43:36-15:43:58, QRV erst
 // 15:51:22, ausgeloest durch zufaellige Eviction des Blockers).
+//
+// BP-05 2026-08-31 (Kontrollrechnung fuer diesen Testaufbau, MAX_RING 20):
+// der Blocker besetzt Slot 0 (Tiefe 1) VOR der Schleife; die Statemaschine
+// bekommt die Tiefe erst NACH jedem User-Enqueue zu sehen. Tiefe je
+// Iteration i (0-indiziert) = 1 (Blocker) + (i+1) (User) = i+2, also QRS
+// (Schwelle 5) beim 4. User-Enqueue (i=3, Tiefe 5) -- nicht bei Tiefe 2 wie
+// vor BP-05. Der einzige hier gepinnte Wert ist aber qrs_seen==1 (genau
+// einmal pro Episode), unabhaengig von der konkreten Tiefe, an der das
+// passiert -- dieser Assert war schon vor BP-05 tiefenunabhaengig und bleibt
+// unveraendert gueltig.
 static void test_dj8meh_episode_endet_nach_realem_drain(void)
 {
     BackPressure bp(MAX_RING);
@@ -228,9 +238,19 @@ static void test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort(void)
 
 // --------------------------------------------------------------------------
 // T3 — Gegenprobe gegen Ueberkorrektur: ein ECHTER Burst (keine Loecher)
-// muss QRT weiterhin genauso ausloesen wie im Feld (QRS bei Tiefe 2, QRT an
-// der 80-%-Schwelle, Refuses danach). Die ehrliche Tiefe darf den Schutz
-// nicht abschwaechen.
+// muss QRT weiterhin genauso ausloesen wie im Feld (QRT an der 80-%-Schwelle,
+// Refuses danach). Die ehrliche Tiefe darf den Schutz nicht abschwaechen.
+//
+// BP-05 2026-08-31: QRS feuert hier (ohne Blocker, Tiefe = Anzahl User-
+// Enqueues) erst bei Tiefe 5, nicht mehr bei Tiefe 2 -- die alte Formulierung
+// "QRS bei Tiefe 2 wie im Feldlog 15:42:15" ist damit obsolet: im Feldlog
+// selbst loeste genau diese Tiefe-2-Reaktion faelschlich QRS waehrend
+// normalen Betriebs aus (Grundlast 1-4, drei falsche QRS/QRV-Paare in
+// 5,5 Minuten), was ueberhaupt erst zur neuen, fixen Schwelle 5 gefuehrt hat.
+// Unter der neuen Schwelle bleibt ein ECHTER Burst (kein Loch, jede Tiefe
+// 1..threshold durchlaufen) trotzdem gleich fruh erkannt: QRS kommt beim
+// erstmaligen Erreichen von Tiefe 5, QRT weiterhin exakt an der
+// 80-%-Schwelle -- die Ueberkorrektur-Sorge dieses Tests bleibt entkraeftet.
 static void test_qrt_ausloesung_bleibt_intakt(void)
 {
     BackPressure bp(MAX_RING);
@@ -246,8 +266,8 @@ static void test_qrt_ausloesung_bleibt_intakt(void)
         if (n == BP_NOTICE_QRT) qrt_at_depth = d;
     }
     TEST_ASSERT_TRUE(bp.refusing());
-    TEST_ASSERT_EQUAL_INT_MESSAGE(2, qrs_at_depth,
-        "QRS weiterhin beim Aufbau (Tiefe 2), wie im Feldlog 15:42:15");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(5, qrs_at_depth,
+        "QRS weiterhin beim Aufbau, jetzt an der fixen BP-05-Schwelle (Tiefe 5)");
     TEST_ASSERT_EQUAL_INT_MESSAGE(bp.refuseThreshold(), qrt_at_depth,
         "QRT weiterhin exakt an der 80-%-Schwelle, wie im Feldlog 15:43:25");
     // Ein frisch belegter Ring darf NICHT vorzeitig schliessen: Tiefe ist

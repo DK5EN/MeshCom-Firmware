@@ -16,18 +16,30 @@
 // 30 depending on the board (configuration_global.h), so a fixed "16" would
 // warn at a different fill level on a T-Beam than on a RAK.
 //
-// Episode model (operator decision 2026-08-30):
-//   - QRS once when the queue starts to build (depth > 1),
+// Episode model (operator decision 2026-08-30, QRS threshold and QRV gating
+// revised 2026-08-31 after a gateway field measurement):
+//   - QRS once when the queue genuinely builds (depth >= 5, fixed across
+//     boards, independent of MAX_RING; the gateway baseline sits at 1-4).
+//     DK5EN-98 2026-08-31: a 5.5-minute normal-operation capture with no
+//     burst in sight showed baseline depth 1-4 (mode 2) and three false
+//     QRS/QRV pairs under the old rule (depth > 1, i.e. > QUIET_DEPTH),
+//     which sat directly on top of that baseline.
 //   - QRT once when it reaches 80 % of MAX_RING; new *locally originated user*
 //     messages are refused from then on (relay/ACK/beacon keep flowing),
 //   - QTA once when the ring actually threw a message away,
-//   - QRV exactly once when the depth falls back into the quiet band —
-//     and only if at least one of QRS/QRT/QTA was sent in this episode.
+//   - QRV exactly once when the depth falls back into the quiet band, and
+//     only if the episode reached QRT or QTA. It closes the episode
+//     silently otherwise (a QRS-only episode never gets a QRV) — operator
+//     decision 2026-08-31: a warning is only worth un-warning if something
+//     was actually refused or dropped; the sender who lost a message needs
+//     the all-clear most, a sender who was merely told "slow down" and then
+//     saw the queue drain on its own does not need a second notice for that.
 //     QRV is the closing bracket of a warning, not a heartbeat.
 // The latch runs none -> QRS -> QRT -> QTA and only ever moves upwards inside
 // an episode; that is the hysteresis that keeps a burst from producing one
-// notice per message (TM-21's lesson). Returning to the quiet band clears the
-// latch and re-arms the whole cycle.
+// notice per message (TM-21's lesson). Returning to the quiet band always
+// clears the latch and re-arms the whole cycle, whether or not it closed
+// with a QRV.
 
 #ifdef __cplusplus
 
@@ -114,6 +126,16 @@ public:
     /// against jitter, and 10 s is negligible against a multi-minute episode.
     static const uint32_t QRV_HOLD_MS = 10000;
 
+    /// Depth at which QRS ("slow down") fires — fixed across every board,
+    /// never a fraction of MAX_RING. Field measurement DK5EN-98 2026-08-31:
+    /// a 5.5-minute normal-operation capture on the gateway showed baseline
+    /// ring depth sitting at 1-4 (mode 2) with three false QRS/QRV pairs and
+    /// no burst anywhere in the log — the previous rule (depth > QUIET_DEPTH,
+    /// i.e. > 1) sat directly on top of that baseline. Operator decision
+    /// 2026-08-31: predictability before per-board scaling, so this is a flat
+    /// 5 on every ring size (10/20/30), not a percentage of MAX_RING.
+    static const int QRS_MIN_DEPTH = 5;
+
     explicit BackPressure(int max_ring) { configure(max_ring); }
 
     /// (Re)bind to a ring size and drop any running episode.
@@ -139,6 +161,21 @@ public:
     {
         int t = (max_ring_ * 4) / 5;
         return (t > QUIET_DEPTH + 1) ? t : (QUIET_DEPTH + 1);
+    }
+
+    /// QRS threshold, defensively clamped in the same style as
+    /// refuseThreshold(): on every real ring (10/20/30 -> refuseThreshold()
+    /// 8/16/24) QRS_MIN_DEPTH (5) sits well below that and this clamp is a
+    /// no-op. It exists only so a pathologically small ring cannot let QRS
+    /// collide with or overshoot QRT. Weaker guarantee than the
+    /// refuseThreshold() clamp: at max_ring <= 3 the interval
+    /// QUIET_DEPTH < qrs < refuse is empty and the clamp lands ON the water
+    /// band (QRS at depth 1) — no collision-free value exists there; no real
+    /// board is anywhere near that, and the episode still closes (silently).
+    int qrsThreshold() const
+    {
+        int t = QRS_MIN_DEPTH;
+        return (t < refuseThreshold()) ? t : (refuseThreshold() - 1);
     }
 
     BpState state() const { return state_; }
@@ -185,15 +222,31 @@ public:
             return latchIfHigher(BP_NOTICE_QRT);
         }
 
-        if(depth > QUIET_DEPTH)
+        if(depth >= qrsThreshold())
         {
             // Hysteresis: QRT is *not* released here. Once the node has said
             // "stop", it stays stopped until the ring is genuinely clear —
             // otherwise it would flip between accepting and refusing around
-            // the threshold and produce a notice per message.
+            // the threshold and produce a notice per message. The BP_QRS
+            // state itself is only ever entered from qrsThreshold() (5) up;
+            // an already-open QRT episode is untouched by this branch (the
+            // guard above keeps state_ at BP_QRT) and still only releases at
+            // the quiet band below, same as before.
             if(state_ != BP_QRT)
                 state_ = BP_QRS;
             return latchIfHigher(BP_NOTICE_QRS);
+        }
+
+        if(depth > QUIET_DEPTH)
+        {
+            // QUIET_DEPTH < depth < qrsThreshold() (2-4 on every real
+            // board): field-measured gateway baseline. BP-05 2026-08-31 —
+            // this band is silent, raises no notice and starts no episode.
+            // It does not touch state_ or the latch either: a QRT episode
+            // dipping through here on its way down must keep refusing
+            // (hysteresis, unchanged), and a quiet node passing through here
+            // stays quiet until it actually reaches qrsThreshold().
+            return BP_NOTICE_NONE;
         }
 
         // depth <= QUIET_DEPTH: either genuinely clear (closes immediately)
@@ -233,17 +286,18 @@ private:
     }
 
     /// Back in the quiet band: close the episode. QRV only if the episode
-    /// actually said something — a node that was never under pressure never
-    /// announces that it is ready.
+    /// reached QRT or worse (QTA included) — operator decision 2026-08-31:
+    /// a warning is only worth un-warning if something was actually refused
+    /// or dropped, and the sender who lost a message needs the all-clear
+    /// most. A QRS-only episode (the queue merely built past qrsThreshold()
+    /// and drained again without ever refusing) closes silently: the latch
+    /// is cleared either way, so the next episode can raise its own QRS.
     BpNotice enterQuiet()
     {
         state_ = BP_QUIET;
-        if(latch_ != BP_NOTICE_NONE)
-        {
-            latch_ = BP_NOTICE_NONE;
-            return BP_NOTICE_QRV;
-        }
-        return BP_NOTICE_NONE;
+        BpNotice closing = (latch_ >= BP_NOTICE_QRT) ? BP_NOTICE_QRV : BP_NOTICE_NONE;
+        latch_ = BP_NOTICE_NONE;
+        return closing;
     }
 
     /// depth is <= QUIET_DEPTH here (the caller has already re-armed the

@@ -3357,6 +3357,12 @@ static MsgOrigin bp_origin = ORIGIN_NONE;
 // The transport the episode's warnings went to. Needed because the QRV that
 // closes an episode is usually emitted from the drain poll, long after
 // bp_origin was cleared. "on the same transport the warnings went to".
+//
+// BP-05 note: a QRS-only episode now closes SILENTLY (enterQuiet() returns
+// NONE), so this is no longer cleared on that path -- the stale value is
+// harmless as long as every sendMessage() caller tags bp_origin (all eight
+// do today; each latching notice overwrites it before any QRV reads it).
+// If an untagged sendMessage() caller is ever added, revisit this.
 static MsgOrigin bp_episode_origin = ORIGIN_NONE;
 
 void setMsgOrigin(MsgOrigin origin)
