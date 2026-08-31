@@ -1,5 +1,19 @@
 # RESUME — pick up here
 
+## 2026-08-31 latest: release v4.35p.08.31.3-stability published, fleet on it
+
+**Release [v4.35p.08.31.3-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31.3-stability)
+published** (third cut of the day, items 157-160: BP-02/03/04 +
+test_bp_regression; 39 assets name-identical to the previous cuts, fresh
+32-env rebuild — the earlier "reuse the gate build" shortcut failed its own
+freshness check, 7 of 27 app images and both safeboot outputs had vanished
+from `.pio`, so the skill's full-rebuild step stays mandatory). Release
+object v4.35p.08.31.2-stability **deleted, tag kept** (same precedent as the
+morning). Whole fleet (14/93/92/90 + gateway 98, OTA build stamp 19:58:58)
+runs the BP-fix build. FLASH_VERSION stays 20260831; gate 459/459 in 12
+envs, 32/32 release envs. Still open: re-provoke the DJ8MEH burst on
+hardware, TM-49, McApp display confirmation of the .2 notice framing.
+
 ## 2026-08-31 late night: BP-02/03/04 shipped (backpressure RCA fixes)
 
 The three DJ8MEH-RCA fixes, implemented as advisor-gated waves (plan + both
