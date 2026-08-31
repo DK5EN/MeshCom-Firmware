@@ -28,12 +28,14 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
    gateway/webserver/extudpip state. Do not touch the W5100S setup gate
    (`nrf52_main.cpp:1086`) before the answers; UDP-02 (fixed) may already explain the report
    on ESP32 nodes.
-4. **TM-36 — RUNNING since 2026-08-30 22:42:46**: `wifisoak_night_20260830-224246/`, pid via
-   `pgrep -f wifisoak.py`, 9.1 h (ends ~07:49), drop every 600 s, T-Deck + Heltec + T-Beam,
-   **GPS OFF on all three (persisted!)** so NTP is exercised — `[NTP];ok` every 15 min is part
-   of what to check. The RAK is not in the soak. Analysis: `wifisoak.py --parse-only
-wifisoak_night_*/{tdeck,heltec,tbeam}.log`, then **restore `--gps on` on all three nodes**
-   and note it here. Do not open the three ports before the soak ends.
+4. **TM-36 — DONE 2026-08-31, PASS on every bar** (9.1-h night soak
+   `wifisoak_night_20260830-224246/`, evaluated section below): 165/165 drops recovered,
+   reconnect median 4.0–4.5 s, 0 disconnects/watchdog/stalls/reboots. Report:
+   `docs/wifi-soak-report-20260831.md`; `wifi-report-20260830.md` §7.1 closes the loop.
+   **Side catch: NTP got 0 replies all night on all three boards — filed as TM-45** (the
+   reply harvest `getMeshComUDP()`/`neth.getUDP()` is gated on `bGATEWAY` on both platforms;
+   a gateway-off, GPS-off node never has valid time). **GPS restored `--gps on` on all three
+   nodes 2026-08-31 morning, verified by `--pos` (fix on each).**
 5. **TM-28** — E290 Wireless Paper hardware arrives the week of 2026-09-01.
 6. Small follow-ups, all filed: **BAT-01** (Heltec V3 shows a jumping battery % with no battery attached -- floating ADC divider, no no-battery detection on non-PMU boards; §3.8n, with tonight's 3.7-4.9 V log evidence); nine scratch scripts in `tools/bench/experiments/` still
    inject group `9999` (list in runbook §2.6); nRF52 `CONF` indicator unknown to ESP32 and
@@ -50,6 +52,30 @@ wifisoak_night_*/{tdeck,heltec,tbeam}.log`, then **restore `--gps on` on all thr
 `DK5EN-92` — webserver on, gateway off; T-Deck `DK5EN-14` — `node_mute` 1, persist flags 0;
 RAK `DK5EN-90` — gateway on (it is the bench gateway), EXTUDP on with `EXT IP 192.168.68.58`,
 maxhop 4. No background runs alive. Production node `DK5EN-98`: gateway off, mesh off, 2 dBm.
+
+## 2026-08-31 morning: TM-36 soak evaluated (PASS), TM-45 found, GPS restored
+
+- **TM-36 done — the 9.1-h WiFi night soak passed every bar** (2026-08-30 22:42 →
+  2026-08-31 07:48, T-Deck/Heltec/T-Beam, `--wifidrop` every 600 s, GPS off, gateway off):
+  55/55 drops recovered per board (medians 4459/4016/4032 ms, worst max 5329 ms), 0
+  unsolicited disconnects, 0 watchdog actions, 0 `[WIFI];stall`, 0 unexpected resets (the one
+  "reset" each on T-Deck/T-Beam is the port-open reboot at t=0), `same_ip` 55/55/55, every
+  join WPA2-PSK, BSSID re-picks between the two Orbi radios after drops (14/6/13) as
+  designed. Consistent with the Wave-W 51-min fragment (3989/4123/4123). Report:
+  `docs/wifi-soak-report-20260831.md`; summary + events CSVs checked in under
+  `tools/bench/runs/wifisoak_night_20260830-224246/` (raw `.log`s stay untracked, 6 MB).
+- **TM-45 filed (Medium, both platforms)** — the soak was the first run with NTP as the only
+  clock, and NTP got **0 replies in 9.1 h** (545–548 timeouts per board, 60-s cadence):
+  since TM-35 the reply is harvested only by `getMeshComUDP()`/`neth.getUDP()`, and both sit
+  inside `if(bGATEWAY)` (`esp32_main.cpp:3708`, `nrf52_main.cpp:1963`) while the send path
+  is un-gated (`esp32_main.cpp:2628`). A gateway-off, GPS-off node never gets a valid wall
+  clock (feeds NC-01) and sends one NTP datagram per minute forever. Full analysis in the
+  soak report and the BACKLOG row.
+- **GPS back on** on T-Deck, Heltec, T-Beam (`--gps on`, persisted), verified with `--pos`:
+  all three have a fix (Heltec sat:7, T-Beam sat:8). Bench state otherwise unchanged.
+- Housekeeping: the 2026-08-30 late intake §3.8o (WEB-01/02/03, NC-01) was still uncommitted
+  and went in as its own commit; the docs-only CI `paths-ignore` edit to
+  `.github/workflows/ci-build.yml` is still uncommitted, operator decision pending.
 
 ## 2026-08-30 night: TM-43, UDP-01 answered, UDP-02 found+fixed, all 8 parser findings fixed, MEM-01
 

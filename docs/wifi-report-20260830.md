@@ -14,6 +14,8 @@ Ein MeshCom-Knoten auf ESP32 (T-Deck, Heltec V3, T-Beam) brauchte an einem moder
 er eine IP-Adresse hatte — in **0 von 24** Starts gelang der erste Versuch. Nach der Änderung
 gelingt der erste Versuch in **24 von 24** Starts (T-Deck), **12 von 12** (Heltec V3) und **12 von
 12** (T-Beam), ohne einen einzigen Verbindungsabbruch; die IP steht nach 10–14 s Betriebszeit.
+Der 9,1-h-Langzeit-Soak (§7.1) bestätigt das: 165/165 erzwungene Trennungen selbständig erholt,
+kein Absturz, kein Watchdog-Eingriff.
 
 Es war nicht ein Fehler, sondern **drei, die sich gegenseitig verdeckt haben**:
 
@@ -217,6 +219,24 @@ hörbar waren.
 
 Regressionsgates dazu: native Tests 60/60, T-Deck-Harness 15/15, OLED-Harness Heltec 8/8,
 RAK-Harness boot/info/instr/mheard, alle vier Boards gebaut.
+
+### 7.1 Langzeit-Soak TM-36 (Nachtlauf 2026-08-30/31) — bestanden
+
+Der abschließende Soak lief 9,1 h auf allen drei Boards gleichzeitig, mit einem erzwungenen
+`--wifidrop` alle 600 s (Details und Tabelle: [`wifi-soak-report-20260831.md`](wifi-soak-report-20260831.md)):
+
+- **165 von 165 Trennungen ohne Eingriff wiederverbunden** (55 je Board), Reconnect-Median
+  4,0–4,5 s, Maximum 5,3 s — deckungsgleich mit den 4,0 s der Einzelmessung oben.
+- 0 unaufgeforderte Abbrüche, 0 Watchdog-Aktionen, 0 `[WIFI];stall`, 0 unerwartete Reboots,
+  jede Wiederverbindung behielt ihre IP; jede Anmeldung WPA2-PSK (`pmf;0;wpa3;0`).
+- BSSID-Neuwahl zwischen Router und Mesh-Satellit funktioniert nach jedem Drop wie entworfen
+  (T-Deck 14, T-Beam 13, Heltec 6 Wechsel — der Heltec steht am nächsten am Router).
+
+Damit sind alle Messlatten aus Backlog-Zeile TM-36 erfüllt; der WLAN-Umbau aus diesem Bericht
+gilt als langzeit-verifiziert. **Nebenbefund** (vom WLAN unabhängig): NTP bekam die ganze Nacht
+keine einzige Antwort — die Antwort wird seit TM-35 nur im Gateway-Block des Hauptloops
+eingesammelt, Nicht-Gateway-Knoten ohne GPS haben damit nie eine gültige Uhr. Als **TM-45** im
+Backlog erfasst; Analyse im Soak-Bericht.
 
 ---
 

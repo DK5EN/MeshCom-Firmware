@@ -1,0 +1,826 @@
+board,wall,uptime_ms,kind,reason,bssid,chan,rssi,value,note
+tdeck,2026-08-30 22:42:46,0,reset,,,,,rst:0x15,
+tdeck,2026-08-30 22:42:51,5382,link,down,,,,,
+tdeck,2026-08-30 22:42:56,9834,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-71,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 22:42:57,10351,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-68,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 22:42:57,10404,ready,,,,,1,
+tdeck,2026-08-30 22:43:51,65382,link,up,5A:AF:97:2E:2B:8B,3,-69,age_s=55 ip=1,
+tdeck,2026-08-30 22:44:17,90551,drop,,,,,,
+tdeck,2026-08-30 22:44:17,90552,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 22:44:17,90553,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-68,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 22:44:20,94006,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 22:44:21,94635,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4084,live
+tdeck,2026-08-30 22:44:52,125383,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=30 ip=1,
+tdeck,2026-08-30 22:45:51,185383,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=90 ip=1,
+tdeck,2026-08-30 22:46:52,245386,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=150 ip=1,
+tdeck,2026-08-30 22:47:52,305390,link,up,5A:AF:97:2E:2B:8B,3,-71,age_s=210 ip=1,
+tdeck,2026-08-30 22:48:51,365395,link,up,5A:AF:97:2E:2B:8B,3,-71,age_s=270 ip=1,
+tdeck,2026-08-30 22:49:52,425397,link,up,5A:AF:97:2E:2B:8B,3,-70,age_s=330 ip=1,
+tdeck,2026-08-30 22:50:51,485400,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=390 ip=1,
+tdeck,2026-08-30 22:51:52,545402,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=450 ip=1,
+tdeck,2026-08-30 22:52:52,605407,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=510 ip=1,
+tdeck,2026-08-30 22:53:51,665412,link,up,5A:AF:97:2E:2B:8B,3,-83,age_s=570 ip=1,
+tdeck,2026-08-30 22:54:18,691420,drop,,,,,,
+tdeck,2026-08-30 22:54:18,691421,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 22:54:18,691422,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 22:54:21,694861,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 22:54:21,695405,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3985,live BSSID_CHANGE
+tdeck,2026-08-30 22:54:51,725416,link,up,46:AF:97:2E:2B:86,3,-75,age_s=30 ip=1,
+tdeck,2026-08-30 22:55:51,785418,link,up,46:AF:97:2E:2B:86,3,-77,age_s=90 ip=1,
+tdeck,2026-08-30 22:56:51,845419,link,up,46:AF:97:2E:2B:86,3,-77,age_s=150 ip=1,
+tdeck,2026-08-30 22:57:51,905419,link,up,46:AF:97:2E:2B:86,3,-77,age_s=210 ip=1,
+tdeck,2026-08-30 22:58:51,965419,link,up,46:AF:97:2E:2B:86,3,-75,age_s=270 ip=1,
+tdeck,2026-08-30 22:59:52,1025419,link,up,46:AF:97:2E:2B:86,3,-76,age_s=330 ip=1,
+tdeck,2026-08-30 23:00:51,1085420,link,up,46:AF:97:2E:2B:86,3,-74,age_s=390 ip=1,
+tdeck,2026-08-30 23:01:52,1145423,link,up,46:AF:97:2E:2B:86,3,-76,age_s=450 ip=1,
+tdeck,2026-08-30 23:02:51,1205428,link,up,46:AF:97:2E:2B:86,3,-74,age_s=510 ip=1,
+tdeck,2026-08-30 23:03:52,1265431,link,up,46:AF:97:2E:2B:86,3,-76,age_s=570 ip=1,
+tdeck,2026-08-30 23:04:18,1292301,drop,,,,,,
+tdeck,2026-08-30 23:04:18,1292302,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:04:18,1292303,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:04:22,1295751,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:04:23,1296501,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4200,live BSSID_CHANGE
+tdeck,2026-08-30 23:04:52,1325432,link,up,5A:AF:97:2E:2B:8B,3,-69,age_s=28 ip=1,
+tdeck,2026-08-30 23:05:52,1385437,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=88 ip=1,
+tdeck,2026-08-30 23:06:51,1445442,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=148 ip=1,
+tdeck,2026-08-30 23:07:52,1505445,link,up,5A:AF:97:2E:2B:8B,3,-67,age_s=208 ip=1,
+tdeck,2026-08-30 23:08:52,1565450,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=268 ip=1,
+tdeck,2026-08-30 23:09:52,1625454,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=328 ip=1,
+tdeck,2026-08-30 23:10:52,1685457,link,up,5A:AF:97:2E:2B:8B,3,-71,age_s=388 ip=1,
+tdeck,2026-08-30 23:11:51,1745458,link,up,5A:AF:97:2E:2B:8B,3,-69,age_s=448 ip=1,
+tdeck,2026-08-30 23:12:52,1805460,link,up,5A:AF:97:2E:2B:8B,3,-67,age_s=508 ip=1,
+tdeck,2026-08-30 23:13:52,1865463,link,up,5A:AF:97:2E:2B:8B,3,-72,age_s=568 ip=1,
+tdeck,2026-08-30 23:14:19,1893167,drop,,,,,,
+tdeck,2026-08-30 23:14:19,1893168,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:14:19,1893169,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:14:23,1896616,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:14:24,1897686,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-69,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4519,live
+tdeck,2026-08-30 23:14:51,1925467,link,up,5A:AF:97:2E:2B:8B,3,-72,age_s=27 ip=1,
+tdeck,2026-08-30 23:15:52,1985472,link,up,5A:AF:97:2E:2B:8B,3,-69,age_s=87 ip=1,
+tdeck,2026-08-30 23:16:52,2045473,link,up,5A:AF:97:2E:2B:8B,3,-69,age_s=147 ip=1,
+tdeck,2026-08-30 23:17:52,2105656,link,up,5A:AF:97:2E:2B:8B,3,-71,age_s=207 ip=1,
+tdeck,2026-08-30 23:18:52,2165661,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=267 ip=1,
+tdeck,2026-08-30 23:19:52,2225666,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=327 ip=1,
+tdeck,2026-08-30 23:20:52,2285670,link,up,5A:AF:97:2E:2B:8B,3,-68,age_s=387 ip=1,
+tdeck,2026-08-30 23:21:52,2345671,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=447 ip=1,
+tdeck,2026-08-30 23:22:52,2405674,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=507 ip=1,
+tdeck,2026-08-30 23:23:52,2465676,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=567 ip=1,
+tdeck,2026-08-30 23:24:20,2494098,drop,,,,,,
+tdeck,2026-08-30 23:24:20,2494099,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:24:20,2494100,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-69,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:24:24,2497552,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:24:25,2499090,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4992,live
+tdeck,2026-08-30 23:24:52,2525681,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=26 ip=1,
+tdeck,2026-08-30 23:25:52,2585682,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=86 ip=1,
+tdeck,2026-08-30 23:26:52,2645685,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=146 ip=1,
+tdeck,2026-08-30 23:27:52,2705689,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=206 ip=1,
+tdeck,2026-08-30 23:28:52,2765694,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=266 ip=1,
+tdeck,2026-08-30 23:29:52,2825699,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=326 ip=1,
+tdeck,2026-08-30 23:30:52,2885701,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=386 ip=1,
+tdeck,2026-08-30 23:31:52,2945702,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=446 ip=1,
+tdeck,2026-08-30 23:32:52,3005705,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=506 ip=1,
+tdeck,2026-08-30 23:33:52,3065706,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=566 ip=1,
+tdeck,2026-08-30 23:34:20,3094354,drop,,,,,,
+tdeck,2026-08-30 23:34:20,3094355,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:34:20,3094356,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-70,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:34:24,3097814,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:34:24,3098340,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3986,live BSSID_CHANGE
+tdeck,2026-08-30 23:34:52,3125710,link,up,46:AF:97:2E:2B:86,3,-74,age_s=27 ip=1,
+tdeck,2026-08-30 23:35:52,3185710,link,up,46:AF:97:2E:2B:86,3,-75,age_s=87 ip=1,
+tdeck,2026-08-30 23:36:52,3245711,link,up,46:AF:97:2E:2B:86,3,-75,age_s=147 ip=1,
+tdeck,2026-08-30 23:37:52,3305716,link,up,46:AF:97:2E:2B:86,3,-74,age_s=207 ip=1,
+tdeck,2026-08-30 23:38:52,3365720,link,up,46:AF:97:2E:2B:86,3,-75,age_s=267 ip=1,
+tdeck,2026-08-30 23:39:52,3425725,link,up,46:AF:97:2E:2B:86,3,-74,age_s=327 ip=1,
+tdeck,2026-08-30 23:40:52,3485729,link,up,46:AF:97:2E:2B:86,3,-74,age_s=387 ip=1,
+tdeck,2026-08-30 23:41:52,3545734,link,up,46:AF:97:2E:2B:86,3,-74,age_s=447 ip=1,
+tdeck,2026-08-30 23:42:52,3605734,link,up,46:AF:97:2E:2B:86,3,-76,age_s=507 ip=1,
+tdeck,2026-08-30 23:43:52,3665735,link,up,46:AF:97:2E:2B:86,3,-76,age_s=567 ip=1,
+tdeck,2026-08-30 23:44:21,3695083,drop,,,,,,
+tdeck,2026-08-30 23:44:21,3695084,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:44:21,3695085,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:44:25,3698530,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:44:25,3699105,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4022,live BSSID_CHANGE
+tdeck,2026-08-30 23:44:52,3725738,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=26 ip=1,
+tdeck,2026-08-30 23:45:52,3785740,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=86 ip=1,
+tdeck,2026-08-30 23:46:52,3845741,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=146 ip=1,
+tdeck,2026-08-30 23:47:52,3905741,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=206 ip=1,
+tdeck,2026-08-30 23:48:52,3965745,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=266 ip=1,
+tdeck,2026-08-30 23:49:52,4025745,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=326 ip=1,
+tdeck,2026-08-30 23:50:52,4085750,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=386 ip=1,
+tdeck,2026-08-30 23:51:52,4145755,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=446 ip=1,
+tdeck,2026-08-30 23:52:52,4205756,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=506 ip=1,
+tdeck,2026-08-30 23:53:52,4265758,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=566 ip=1,
+tdeck,2026-08-30 23:54:22,4296048,drop,,,,,,
+tdeck,2026-08-30 23:54:22,4296049,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-30 23:54:22,4296050,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-30 23:54:26,4299504,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-30 23:54:27,4301031,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4983,live
+tdeck,2026-08-30 23:54:52,4325759,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=24 ip=1,
+tdeck,2026-08-30 23:55:52,4385759,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=84 ip=1,
+tdeck,2026-08-30 23:56:52,4445764,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=144 ip=1,
+tdeck,2026-08-30 23:57:52,4505764,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=204 ip=1,
+tdeck,2026-08-30 23:58:52,4565768,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=264 ip=1,
+tdeck,2026-08-30 23:59:52,4625773,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=324 ip=1,
+tdeck,2026-08-31 00:00:52,4685778,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=384 ip=1,
+tdeck,2026-08-31 00:01:52,4745781,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=444 ip=1,
+tdeck,2026-08-31 00:02:52,4805783,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=504 ip=1,
+tdeck,2026-08-31 00:03:52,4865783,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=564 ip=1,
+tdeck,2026-08-31 00:04:23,4896670,drop,,,,,,
+tdeck,2026-08-31 00:04:23,4896671,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:04:23,4896672,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:04:26,4900113,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:04:27,4901080,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4410,live
+tdeck,2026-08-31 00:04:52,4925786,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=24 ip=1,
+tdeck,2026-08-31 00:05:52,4985787,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=84 ip=1,
+tdeck,2026-08-31 00:06:52,5045791,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=144 ip=1,
+tdeck,2026-08-31 00:07:52,5105794,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=204 ip=1,
+tdeck,2026-08-31 00:08:52,5165798,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=264 ip=1,
+tdeck,2026-08-31 00:09:52,5225801,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=324 ip=1,
+tdeck,2026-08-31 00:10:52,5285801,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=384 ip=1,
+tdeck,2026-08-31 00:11:52,5345802,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=444 ip=1,
+tdeck,2026-08-31 00:12:52,5405806,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=504 ip=1,
+tdeck,2026-08-31 00:13:52,5465807,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=564 ip=1,
+tdeck,2026-08-31 00:14:24,5497414,drop,,,,,,
+tdeck,2026-08-31 00:14:24,5497415,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:14:24,5497416,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:14:27,5500863,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:14:28,5502158,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4744,live
+tdeck,2026-08-31 00:14:52,5525809,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=23 ip=1,
+tdeck,2026-08-31 00:15:52,5585809,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=83 ip=1,
+tdeck,2026-08-31 00:16:52,5645813,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=143 ip=1,
+tdeck,2026-08-31 00:17:52,5705817,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=203 ip=1,
+tdeck,2026-08-31 00:18:52,5765820,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=263 ip=1,
+tdeck,2026-08-31 00:19:52,5825820,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=323 ip=1,
+tdeck,2026-08-31 00:20:52,5885824,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=383 ip=1,
+tdeck,2026-08-31 00:21:52,5945828,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=443 ip=1,
+tdeck,2026-08-31 00:22:52,6005829,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=503 ip=1,
+tdeck,2026-08-31 00:23:52,6065830,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=563 ip=1,
+tdeck,2026-08-31 00:24:24,6098206,drop,,,,,,
+tdeck,2026-08-31 00:24:24,6098207,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:24:24,6098208,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:24:28,6101658,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:24:29,6103266,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5060,live
+tdeck,2026-08-31 00:24:52,6125831,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=22 ip=1,
+tdeck,2026-08-31 00:25:52,6185832,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=82 ip=1,
+tdeck,2026-08-31 00:26:52,6245833,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=142 ip=1,
+tdeck,2026-08-31 00:27:52,6305838,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=202 ip=1,
+tdeck,2026-08-31 00:28:52,6365841,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=262 ip=1,
+tdeck,2026-08-31 00:29:52,6425845,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=322 ip=1,
+tdeck,2026-08-31 00:30:52,6485850,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=382 ip=1,
+tdeck,2026-08-31 00:31:52,6545851,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=442 ip=1,
+tdeck,2026-08-31 00:32:52,6605854,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=502 ip=1,
+tdeck,2026-08-31 00:33:52,6665859,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=562 ip=1,
+tdeck,2026-08-31 00:34:25,6698919,drop,,,,,,
+tdeck,2026-08-31 00:34:25,6698920,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:34:25,6698921,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:34:29,6702363,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:34:29,6703331,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4412,live
+tdeck,2026-08-31 00:34:52,6725862,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=22 ip=1,
+tdeck,2026-08-31 00:35:52,6785862,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=82 ip=1,
+tdeck,2026-08-31 00:36:52,6845866,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=142 ip=1,
+tdeck,2026-08-31 00:37:52,6905867,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=202 ip=1,
+tdeck,2026-08-31 00:38:52,6965869,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=262 ip=1,
+tdeck,2026-08-31 00:39:52,7025871,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=322 ip=1,
+tdeck,2026-08-31 00:40:52,7085875,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=382 ip=1,
+tdeck,2026-08-31 00:41:52,7145880,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=442 ip=1,
+tdeck,2026-08-31 00:42:52,7205880,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=502 ip=1,
+tdeck,2026-08-31 00:43:52,7265885,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=562 ip=1,
+tdeck,2026-08-31 00:44:26,7299754,drop,,,,,,
+tdeck,2026-08-31 00:44:26,7299755,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:44:26,7299756,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:44:29,7303212,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:44:31,7304406,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4652,live
+tdeck,2026-08-31 00:44:52,7325890,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=21 ip=1,
+tdeck,2026-08-31 00:45:52,7385893,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=81 ip=1,
+tdeck,2026-08-31 00:46:52,7445893,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=141 ip=1,
+tdeck,2026-08-31 00:47:52,7505897,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=201 ip=1,
+tdeck,2026-08-31 00:48:52,7565897,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=261 ip=1,
+tdeck,2026-08-31 00:49:52,7625897,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=321 ip=1,
+tdeck,2026-08-31 00:50:52,7685900,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=381 ip=1,
+tdeck,2026-08-31 00:51:52,7745904,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=441 ip=1,
+tdeck,2026-08-31 00:52:52,7805905,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=501 ip=1,
+tdeck,2026-08-31 00:53:52,7865906,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=561 ip=1,
+tdeck,2026-08-31 00:54:27,7900555,drop,,,,,,
+tdeck,2026-08-31 00:54:27,7900556,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 00:54:27,7900557,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 00:54:30,7904006,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 00:54:32,7905593,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5038,live
+tdeck,2026-08-31 00:54:52,7925911,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=20 ip=1,
+tdeck,2026-08-31 00:55:52,7985912,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=80 ip=1,
+tdeck,2026-08-31 00:56:52,8045915,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=140 ip=1,
+tdeck,2026-08-31 00:57:52,8105915,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=200 ip=1,
+tdeck,2026-08-31 00:58:52,8165920,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=260 ip=1,
+tdeck,2026-08-31 00:59:52,8225924,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=320 ip=1,
+tdeck,2026-08-31 01:00:52,8285929,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=380 ip=1,
+tdeck,2026-08-31 01:01:52,8345929,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=440 ip=1,
+tdeck,2026-08-31 01:02:52,8405932,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=500 ip=1,
+tdeck,2026-08-31 01:03:52,8465934,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=560 ip=1,
+tdeck,2026-08-31 01:04:28,8501427,drop,,,,,,
+tdeck,2026-08-31 01:04:28,8501428,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:04:28,8501429,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:04:31,8504879,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:04:33,8506478,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5051,live
+tdeck,2026-08-31 01:04:52,8525935,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=19 ip=1,
+tdeck,2026-08-31 01:05:52,8585935,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=79 ip=1,
+tdeck,2026-08-31 01:06:52,8645935,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=139 ip=1,
+tdeck,2026-08-31 01:07:52,8705935,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=199 ip=1,
+tdeck,2026-08-31 01:08:52,8765935,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=259 ip=1,
+tdeck,2026-08-31 01:09:52,8825940,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=319 ip=1,
+tdeck,2026-08-31 01:10:52,8885943,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=379 ip=1,
+tdeck,2026-08-31 01:11:52,8945944,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=439 ip=1,
+tdeck,2026-08-31 01:12:52,9005944,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=499 ip=1,
+tdeck,2026-08-31 01:13:52,9065949,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=559 ip=1,
+tdeck,2026-08-31 01:14:28,9102116,drop,,,,,,
+tdeck,2026-08-31 01:14:28,9102118,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:14:28,9102118,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:14:32,9105570,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:14:33,9106534,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4418,live
+tdeck,2026-08-31 01:14:52,9125954,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=19 ip=1,
+tdeck,2026-08-31 01:15:52,9185956,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=79 ip=1,
+tdeck,2026-08-31 01:16:52,9245959,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=139 ip=1,
+tdeck,2026-08-31 01:17:52,9305962,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=199 ip=1,
+tdeck,2026-08-31 01:18:52,9365965,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=259 ip=1,
+tdeck,2026-08-31 01:19:52,9425968,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=319 ip=1,
+tdeck,2026-08-31 01:20:52,9485968,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=379 ip=1,
+tdeck,2026-08-31 01:21:52,9545969,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=439 ip=1,
+tdeck,2026-08-31 01:22:52,9605972,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=499 ip=1,
+tdeck,2026-08-31 01:23:52,9665973,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=559 ip=1,
+tdeck,2026-08-31 01:24:29,9702828,drop,,,,,,
+tdeck,2026-08-31 01:24:29,9702829,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:24:29,9702830,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:24:32,9706272,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:24:34,9707629,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4801,live
+tdeck,2026-08-31 01:24:52,9725973,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=18 ip=1,
+tdeck,2026-08-31 01:25:52,9785974,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=78 ip=1,
+tdeck,2026-08-31 01:26:52,9845976,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=138 ip=1,
+tdeck,2026-08-31 01:27:52,9905979,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=198 ip=1,
+tdeck,2026-08-31 01:28:52,9965980,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=258 ip=1,
+tdeck,2026-08-31 01:29:52,10025982,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=318 ip=1,
+tdeck,2026-08-31 01:30:52,10085984,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=378 ip=1,
+tdeck,2026-08-31 01:31:52,10145986,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=438 ip=1,
+tdeck,2026-08-31 01:32:52,10205991,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=498 ip=1,
+tdeck,2026-08-31 01:33:52,10265994,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=558 ip=1,
+tdeck,2026-08-31 01:34:30,10303766,drop,,,,,,
+tdeck,2026-08-31 01:34:30,10303767,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:34:30,10303768,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:34:33,10307216,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:34:35,10308802,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5036,live
+tdeck,2026-08-31 01:34:52,10325999,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=17 ip=1,
+tdeck,2026-08-31 01:35:52,10386000,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=77 ip=1,
+tdeck,2026-08-31 01:36:52,10446005,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=137 ip=1,
+tdeck,2026-08-31 01:37:52,10506010,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=197 ip=1,
+tdeck,2026-08-31 01:38:52,10566012,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=257 ip=1,
+tdeck,2026-08-31 01:39:52,10626012,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=317 ip=1,
+tdeck,2026-08-31 01:40:52,10686014,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=377 ip=1,
+tdeck,2026-08-31 01:41:52,10746018,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=437 ip=1,
+tdeck,2026-08-31 01:42:52,10806023,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=497 ip=1,
+tdeck,2026-08-31 01:43:52,10866025,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=557 ip=1,
+tdeck,2026-08-31 01:44:31,10904501,drop,,,,,,
+tdeck,2026-08-31 01:44:31,10904502,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:44:31,10904503,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:44:34,10907947,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:44:35,10908944,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4443,live
+tdeck,2026-08-31 01:44:52,10926028,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=17 ip=1,
+tdeck,2026-08-31 01:45:52,10986033,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=77 ip=1,
+tdeck,2026-08-31 01:46:52,11046037,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=137 ip=1,
+tdeck,2026-08-31 01:47:52,11106038,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=197 ip=1,
+tdeck,2026-08-31 01:48:52,11166040,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=257 ip=1,
+tdeck,2026-08-31 01:49:52,11226043,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=317 ip=1,
+tdeck,2026-08-31 01:50:52,11286046,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=377 ip=1,
+tdeck,2026-08-31 01:51:52,11346050,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=437 ip=1,
+tdeck,2026-08-31 01:52:52,11406054,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=497 ip=1,
+tdeck,2026-08-31 01:53:52,11466059,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=557 ip=1,
+tdeck,2026-08-31 01:54:31,11505211,drop,,,,,,
+tdeck,2026-08-31 01:54:31,11505212,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 01:54:31,11505213,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 01:54:35,11508655,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 01:54:36,11509980,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4769,live
+tdeck,2026-08-31 01:54:52,11526061,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=16 ip=1,
+tdeck,2026-08-31 01:55:52,11586066,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=76 ip=1,
+tdeck,2026-08-31 01:56:52,11646070,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=136 ip=1,
+tdeck,2026-08-31 01:57:52,11706074,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=196 ip=1,
+tdeck,2026-08-31 01:58:52,11766076,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=256 ip=1,
+tdeck,2026-08-31 01:59:52,11826079,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=316 ip=1,
+tdeck,2026-08-31 02:00:52,11886084,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=376 ip=1,
+tdeck,2026-08-31 02:01:52,11946086,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=436 ip=1,
+tdeck,2026-08-31 02:02:52,12006087,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=496 ip=1,
+tdeck,2026-08-31 02:03:52,12066092,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=556 ip=1,
+tdeck,2026-08-31 02:04:32,12105936,drop,,,,,,
+tdeck,2026-08-31 02:04:32,12105937,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:04:32,12105938,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:04:36,12109379,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:04:37,12110968,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5032,live
+tdeck,2026-08-31 02:04:52,12126096,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=15 ip=1,
+tdeck,2026-08-31 02:05:52,12186100,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=75 ip=1,
+tdeck,2026-08-31 02:06:52,12246101,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=135 ip=1,
+tdeck,2026-08-31 02:07:52,12306105,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=195 ip=1,
+tdeck,2026-08-31 02:08:52,12366109,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=255 ip=1,
+tdeck,2026-08-31 02:09:52,12426113,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=315 ip=1,
+tdeck,2026-08-31 02:10:52,12486114,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=375 ip=1,
+tdeck,2026-08-31 02:11:52,12546117,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=435 ip=1,
+tdeck,2026-08-31 02:12:52,12606119,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=495 ip=1,
+tdeck,2026-08-31 02:13:52,12666124,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=555 ip=1,
+tdeck,2026-08-31 02:14:33,12706730,drop,,,,,,
+tdeck,2026-08-31 02:14:33,12706731,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:14:33,12706732,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:14:36,12710177,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:14:37,12711138,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4408,live
+tdeck,2026-08-31 02:14:52,12726129,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=14 ip=1,
+tdeck,2026-08-31 02:15:52,12786132,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=74 ip=1,
+tdeck,2026-08-31 02:16:52,12846132,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=134 ip=1,
+tdeck,2026-08-31 02:17:52,12906133,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=194 ip=1,
+tdeck,2026-08-31 02:18:52,12966133,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=254 ip=1,
+tdeck,2026-08-31 02:19:52,13026137,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=315 ip=1,
+tdeck,2026-08-31 02:20:52,13086140,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=375 ip=1,
+tdeck,2026-08-31 02:21:52,13146145,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=435 ip=1,
+tdeck,2026-08-31 02:22:52,13206146,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=495 ip=1,
+tdeck,2026-08-31 02:23:52,13266151,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=555 ip=1,
+tdeck,2026-08-31 02:24:34,13307640,drop,,,,,,
+tdeck,2026-08-31 02:24:34,13307641,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:24:34,13307642,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:24:37,13311091,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:24:38,13312110,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4470,live
+tdeck,2026-08-31 02:24:52,13326154,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=14 ip=1,
+tdeck,2026-08-31 02:25:52,13386156,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=74 ip=1,
+tdeck,2026-08-31 02:26:52,13446157,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=134 ip=1,
+tdeck,2026-08-31 02:27:52,13506161,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=194 ip=1,
+tdeck,2026-08-31 02:28:52,13566163,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=254 ip=1,
+tdeck,2026-08-31 02:29:52,13626166,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=314 ip=1,
+tdeck,2026-08-31 02:30:52,13686167,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=374 ip=1,
+tdeck,2026-08-31 02:31:52,13746169,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=434 ip=1,
+tdeck,2026-08-31 02:32:52,13806174,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=494 ip=1,
+tdeck,2026-08-31 02:33:52,13866179,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=554 ip=1,
+tdeck,2026-08-31 02:34:35,13908425,drop,,,,,,
+tdeck,2026-08-31 02:34:35,13908426,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:34:35,13908427,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:34:38,13911874,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:34:40,13913407,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4982,live
+tdeck,2026-08-31 02:34:53,13926179,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=12 ip=1,
+tdeck,2026-08-31 02:35:52,13986183,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=72 ip=1,
+tdeck,2026-08-31 02:36:53,14046185,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=132 ip=1,
+tdeck,2026-08-31 02:37:52,14106186,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=192 ip=1,
+tdeck,2026-08-31 02:38:52,14166190,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=252 ip=1,
+tdeck,2026-08-31 02:39:52,14226192,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=312 ip=1,
+tdeck,2026-08-31 02:40:52,14286193,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=372 ip=1,
+tdeck,2026-08-31 02:41:52,14346197,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=432 ip=1,
+tdeck,2026-08-31 02:42:52,14406197,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=492 ip=1,
+tdeck,2026-08-31 02:43:52,14466198,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=552 ip=1,
+tdeck,2026-08-31 02:44:36,14509299,drop,,,,,,
+tdeck,2026-08-31 02:44:36,14509300,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:44:36,14509301,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:44:39,14512750,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:44:41,14514295,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4996,live
+tdeck,2026-08-31 02:44:52,14526200,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=11 ip=1,
+tdeck,2026-08-31 02:45:52,14586202,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=71 ip=1,
+tdeck,2026-08-31 02:46:53,14646204,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=131 ip=1,
+tdeck,2026-08-31 02:47:52,14706204,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=191 ip=1,
+tdeck,2026-08-31 02:48:52,14766207,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=251 ip=1,
+tdeck,2026-08-31 02:49:52,14826213,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=311 ip=1,
+tdeck,2026-08-31 02:50:52,14886215,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=371 ip=1,
+tdeck,2026-08-31 02:51:52,14946217,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=431 ip=1,
+tdeck,2026-08-31 02:52:52,15006220,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=491 ip=1,
+tdeck,2026-08-31 02:53:52,15066220,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=551 ip=1,
+tdeck,2026-08-31 02:54:36,15110134,drop,,,,,,
+tdeck,2026-08-31 02:54:36,15110136,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 02:54:36,15110136,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 02:54:40,15113583,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 02:54:40,15114265,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4131,live
+tdeck,2026-08-31 02:54:52,15126225,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=11 ip=1,
+tdeck,2026-08-31 02:55:52,15186228,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=71 ip=1,
+tdeck,2026-08-31 02:56:52,15246229,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=131 ip=1,
+tdeck,2026-08-31 02:57:52,15306234,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=191 ip=1,
+tdeck,2026-08-31 02:58:52,15366234,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=251 ip=1,
+tdeck,2026-08-31 02:59:52,15426237,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=311 ip=1,
+tdeck,2026-08-31 03:00:52,15486239,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=371 ip=1,
+tdeck,2026-08-31 03:01:52,15546239,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=431 ip=1,
+tdeck,2026-08-31 03:02:52,15606239,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=491 ip=1,
+tdeck,2026-08-31 03:03:52,15666244,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=551 ip=1,
+tdeck,2026-08-31 03:04:37,15710956,drop,,,,,,
+tdeck,2026-08-31 03:04:37,15710957,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:04:37,15710958,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:04:41,15714399,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:04:42,15715340,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4384,live
+tdeck,2026-08-31 03:04:53,15726248,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=10 ip=1,
+tdeck,2026-08-31 03:05:52,15786253,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=70 ip=1,
+tdeck,2026-08-31 03:06:52,15846258,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=130 ip=1,
+tdeck,2026-08-31 03:07:52,15906259,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=190 ip=1,
+tdeck,2026-08-31 03:08:53,15966264,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=250 ip=1,
+tdeck,2026-08-31 03:09:53,16026269,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=310 ip=1,
+tdeck,2026-08-31 03:10:52,16086273,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=370 ip=1,
+tdeck,2026-08-31 03:11:52,16146277,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=430 ip=1,
+tdeck,2026-08-31 03:12:52,16206282,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=490 ip=1,
+tdeck,2026-08-31 03:13:53,16266286,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=550 ip=1,
+tdeck,2026-08-31 03:14:38,16311908,drop,,,,,,
+tdeck,2026-08-31 03:14:38,16311909,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:14:38,16311910,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:14:42,16315380,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:14:43,16316945,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5037,live
+tdeck,2026-08-31 03:14:52,16326287,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=9 ip=1,
+tdeck,2026-08-31 03:15:52,16386289,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=69 ip=1,
+tdeck,2026-08-31 03:16:53,16446294,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=129 ip=1,
+tdeck,2026-08-31 03:17:52,16506299,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=189 ip=1,
+tdeck,2026-08-31 03:18:53,16566301,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=249 ip=1,
+tdeck,2026-08-31 03:19:53,16626301,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=309 ip=1,
+tdeck,2026-08-31 03:20:53,16686303,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=369 ip=1,
+tdeck,2026-08-31 03:21:53,16746303,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=429 ip=1,
+tdeck,2026-08-31 03:22:53,16806306,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=489 ip=1,
+tdeck,2026-08-31 03:23:53,16866307,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=549 ip=1,
+tdeck,2026-08-31 03:24:39,16912443,drop,,,,,,
+tdeck,2026-08-31 03:24:39,16912444,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:24:39,16912445,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:24:42,16915882,assoc_connected,0,46:AF:97:2E:2B:86,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:24:43,16916445,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4002,live BSSID_CHANGE
+tdeck,2026-08-31 03:24:53,16926311,link,up,46:AF:97:2E:2B:86,3,-75,age_s=9 ip=1,
+tdeck,2026-08-31 03:25:53,16986315,link,up,46:AF:97:2E:2B:86,3,-75,age_s=69 ip=1,
+tdeck,2026-08-31 03:26:53,17046320,link,up,46:AF:97:2E:2B:86,3,-75,age_s=129 ip=1,
+tdeck,2026-08-31 03:27:53,17106322,link,up,46:AF:97:2E:2B:86,3,-74,age_s=189 ip=1,
+tdeck,2026-08-31 03:28:53,17166322,link,up,46:AF:97:2E:2B:86,3,-74,age_s=249 ip=1,
+tdeck,2026-08-31 03:29:53,17226324,link,up,46:AF:97:2E:2B:86,3,-74,age_s=309 ip=1,
+tdeck,2026-08-31 03:30:52,17286329,link,up,46:AF:97:2E:2B:86,3,-75,age_s=369 ip=1,
+tdeck,2026-08-31 03:31:53,17346332,link,up,46:AF:97:2E:2B:86,3,-74,age_s=429 ip=1,
+tdeck,2026-08-31 03:32:52,17406337,link,up,46:AF:97:2E:2B:86,3,-75,age_s=489 ip=1,
+tdeck,2026-08-31 03:33:52,17466337,link,up,46:AF:97:2E:2B:86,3,-75,age_s=549 ip=1,
+tdeck,2026-08-31 03:34:39,17512468,drop,,,,,,
+tdeck,2026-08-31 03:34:39,17512469,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:34:39,17512470,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:34:42,17515912,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:34:43,17516562,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4094,live BSSID_CHANGE
+tdeck,2026-08-31 03:34:52,17526343,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=9 ip=1,
+tdeck,2026-08-31 03:35:53,17586347,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=69 ip=1,
+tdeck,2026-08-31 03:36:53,17646349,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=129 ip=1,
+tdeck,2026-08-31 03:37:53,17706350,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=189 ip=1,
+tdeck,2026-08-31 03:38:53,17766353,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=249 ip=1,
+tdeck,2026-08-31 03:39:53,17826354,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=309 ip=1,
+tdeck,2026-08-31 03:40:53,17886355,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=369 ip=1,
+tdeck,2026-08-31 03:41:53,17946357,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=429 ip=1,
+tdeck,2026-08-31 03:42:53,18006360,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=489 ip=1,
+tdeck,2026-08-31 03:43:53,18066361,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=549 ip=1,
+tdeck,2026-08-31 03:44:40,18113372,drop,,,,,,
+tdeck,2026-08-31 03:44:40,18113373,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:44:40,18113374,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:44:43,18116827,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:44:44,18117758,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4386,live
+tdeck,2026-08-31 03:44:53,18126363,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=8 ip=1,
+tdeck,2026-08-31 03:45:53,18186368,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=68 ip=1,
+tdeck,2026-08-31 03:46:53,18246373,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=128 ip=1,
+tdeck,2026-08-31 03:47:53,18306373,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=188 ip=1,
+tdeck,2026-08-31 03:48:53,18366376,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=248 ip=1,
+tdeck,2026-08-31 03:49:53,18426377,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=308 ip=1,
+tdeck,2026-08-31 03:50:53,18486381,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=368 ip=1,
+tdeck,2026-08-31 03:51:53,18546383,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=428 ip=1,
+tdeck,2026-08-31 03:52:53,18606384,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=488 ip=1,
+tdeck,2026-08-31 03:53:53,18666386,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=548 ip=1,
+tdeck,2026-08-31 03:54:40,18714234,drop,,,,,,
+tdeck,2026-08-31 03:54:40,18714236,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 03:54:40,18714236,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 03:54:44,18717686,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 03:54:45,18718207,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3973,live BSSID_CHANGE
+tdeck,2026-08-31 03:54:53,18726388,link,up,46:AF:97:2E:2B:86,3,-73,age_s=8 ip=1,
+tdeck,2026-08-31 03:55:53,18786392,link,up,46:AF:97:2E:2B:86,3,-74,age_s=68 ip=1,
+tdeck,2026-08-31 03:56:53,18846395,link,up,46:AF:97:2E:2B:86,3,-74,age_s=128 ip=1,
+tdeck,2026-08-31 03:57:53,18906397,link,up,46:AF:97:2E:2B:86,3,-75,age_s=188 ip=1,
+tdeck,2026-08-31 03:58:53,18966401,link,up,46:AF:97:2E:2B:86,3,-75,age_s=248 ip=1,
+tdeck,2026-08-31 03:59:53,19026403,link,up,46:AF:97:2E:2B:86,3,-75,age_s=308 ip=1,
+tdeck,2026-08-31 04:00:53,19086407,link,up,46:AF:97:2E:2B:86,3,-75,age_s=368 ip=1,
+tdeck,2026-08-31 04:01:53,19146410,link,up,46:AF:97:2E:2B:86,3,-76,age_s=428 ip=1,
+tdeck,2026-08-31 04:02:53,19206413,link,up,46:AF:97:2E:2B:86,3,-75,age_s=488 ip=1,
+tdeck,2026-08-31 04:03:53,19266414,link,up,46:AF:97:2E:2B:86,3,-75,age_s=548 ip=1,
+tdeck,2026-08-31 04:04:41,19315035,drop,,,,,,
+tdeck,2026-08-31 04:04:41,19315036,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:04:41,19315037,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:04:45,19318495,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:04:46,19320040,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5005,live BSSID_CHANGE
+tdeck,2026-08-31 04:04:53,19326417,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=6 ip=1,
+tdeck,2026-08-31 04:05:53,19386420,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=66 ip=1,
+tdeck,2026-08-31 04:06:53,19446423,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=126 ip=1,
+tdeck,2026-08-31 04:07:53,19506427,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=186 ip=1,
+tdeck,2026-08-31 04:08:53,19566427,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=246 ip=1,
+tdeck,2026-08-31 04:09:53,19626429,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=306 ip=1,
+tdeck,2026-08-31 04:10:53,19686429,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=366 ip=1,
+tdeck,2026-08-31 04:11:53,19746433,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=426 ip=1,
+tdeck,2026-08-31 04:12:53,19806436,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=486 ip=1,
+tdeck,2026-08-31 04:13:53,19866436,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=546 ip=1,
+tdeck,2026-08-31 04:14:42,19915824,drop,,,,,,
+tdeck,2026-08-31 04:14:42,19915825,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:14:42,19915826,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:14:45,19919279,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:14:47,19920895,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5071,live
+tdeck,2026-08-31 04:14:53,19926441,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=5 ip=1,
+tdeck,2026-08-31 04:15:53,19986445,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=65 ip=1,
+tdeck,2026-08-31 04:16:53,20046445,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=125 ip=1,
+tdeck,2026-08-31 04:17:53,20106448,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=185 ip=1,
+tdeck,2026-08-31 04:18:53,20166452,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=245 ip=1,
+tdeck,2026-08-31 04:19:53,20226457,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=305 ip=1,
+tdeck,2026-08-31 04:20:53,20286459,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=365 ip=1,
+tdeck,2026-08-31 04:21:53,20346462,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=425 ip=1,
+tdeck,2026-08-31 04:22:53,20406466,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=485 ip=1,
+tdeck,2026-08-31 04:23:53,20466471,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=545 ip=1,
+tdeck,2026-08-31 04:24:43,20516662,drop,,,,,,
+tdeck,2026-08-31 04:24:43,20516663,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:24:43,20516664,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:24:46,20520108,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:24:47,20520804,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4142,live
+tdeck,2026-08-31 04:24:53,20526471,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=5 ip=1,
+tdeck,2026-08-31 04:25:53,20586471,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=65 ip=1,
+tdeck,2026-08-31 04:26:53,20646472,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=125 ip=1,
+tdeck,2026-08-31 04:27:53,20706472,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=185 ip=1,
+tdeck,2026-08-31 04:28:53,20766477,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=245 ip=1,
+tdeck,2026-08-31 04:29:53,20826477,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=305 ip=1,
+tdeck,2026-08-31 04:30:53,20886477,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=365 ip=1,
+tdeck,2026-08-31 04:31:53,20946478,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=425 ip=1,
+tdeck,2026-08-31 04:32:53,21006482,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=485 ip=1,
+tdeck,2026-08-31 04:33:53,21066483,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=545 ip=1,
+tdeck,2026-08-31 04:34:44,21117460,drop,,,,,,
+tdeck,2026-08-31 04:34:44,21117461,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:34:44,21117462,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:34:47,21120912,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:34:48,21122069,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4609,live
+tdeck,2026-08-31 04:34:53,21126485,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=4 ip=1,
+tdeck,2026-08-31 04:35:53,21186489,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=64 ip=1,
+tdeck,2026-08-31 04:36:53,21246489,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=124 ip=1,
+tdeck,2026-08-31 04:37:53,21306494,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=184 ip=1,
+tdeck,2026-08-31 04:38:53,21366499,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=244 ip=1,
+tdeck,2026-08-31 04:39:53,21426500,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=304 ip=1,
+tdeck,2026-08-31 04:40:53,21486500,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=364 ip=1,
+tdeck,2026-08-31 04:41:53,21546504,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=424 ip=1,
+tdeck,2026-08-31 04:42:53,21606507,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=484 ip=1,
+tdeck,2026-08-31 04:43:53,21666511,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=544 ip=1,
+tdeck,2026-08-31 04:44:45,21718320,drop,,,,,,
+tdeck,2026-08-31 04:44:45,21718321,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:44:45,21718322,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:44:48,21721759,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:44:49,21723138,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4818,live
+tdeck,2026-08-31 04:44:53,21726511,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=3 ip=1,
+tdeck,2026-08-31 04:45:53,21786515,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=63 ip=1,
+tdeck,2026-08-31 04:46:53,21846517,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=123 ip=1,
+tdeck,2026-08-31 04:47:53,21906518,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=183 ip=1,
+tdeck,2026-08-31 04:48:53,21966523,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=243 ip=1,
+tdeck,2026-08-31 04:49:53,22026526,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=303 ip=1,
+tdeck,2026-08-31 04:50:53,22086528,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=363 ip=1,
+tdeck,2026-08-31 04:51:53,22146533,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=423 ip=1,
+tdeck,2026-08-31 04:52:53,22206536,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=483 ip=1,
+tdeck,2026-08-31 04:53:53,22266541,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=543 ip=1,
+tdeck,2026-08-31 04:54:46,22319193,drop,,,,,,
+tdeck,2026-08-31 04:54:46,22319194,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 04:54:46,22319195,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 04:54:49,22322639,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 04:54:51,22324161,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4968,live
+tdeck,2026-08-31 04:54:53,22326546,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=2 ip=1,
+tdeck,2026-08-31 04:55:53,22386551,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=62 ip=1,
+tdeck,2026-08-31 04:56:53,22446552,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=122 ip=1,
+tdeck,2026-08-31 04:57:53,22506555,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=182 ip=1,
+tdeck,2026-08-31 04:58:53,22566560,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=242 ip=1,
+tdeck,2026-08-31 04:59:53,22626563,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=302 ip=1,
+tdeck,2026-08-31 05:00:53,22686566,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=362 ip=1,
+tdeck,2026-08-31 05:01:53,22746567,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=422 ip=1,
+tdeck,2026-08-31 05:02:53,22806570,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=482 ip=1,
+tdeck,2026-08-31 05:03:53,22866571,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=542 ip=1,
+tdeck,2026-08-31 05:04:46,22920002,drop,,,,,,
+tdeck,2026-08-31 05:04:46,22920003,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:04:46,22920004,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:04:50,22923446,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:04:51,22924222,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4220,live
+tdeck,2026-08-31 05:04:53,22926573,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=2 ip=1,
+tdeck,2026-08-31 05:05:53,22986578,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=62 ip=1,
+tdeck,2026-08-31 05:06:53,23046581,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=122 ip=1,
+tdeck,2026-08-31 05:07:53,23106584,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=182 ip=1,
+tdeck,2026-08-31 05:08:53,23166589,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=242 ip=1,
+tdeck,2026-08-31 05:09:53,23226590,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=302 ip=1,
+tdeck,2026-08-31 05:10:53,23286592,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=362 ip=1,
+tdeck,2026-08-31 05:11:53,23346594,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=422 ip=1,
+tdeck,2026-08-31 05:12:53,23406596,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=482 ip=1,
+tdeck,2026-08-31 05:13:53,23466600,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=542 ip=1,
+tdeck,2026-08-31 05:14:47,23520708,drop,,,,,,
+tdeck,2026-08-31 05:14:47,23520709,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:14:47,23520710,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:14:51,23524171,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:14:52,23525709,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5001,live
+tdeck,2026-08-31 05:14:53,23526601,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=0 ip=1,
+tdeck,2026-08-31 05:15:53,23586605,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=60 ip=1,
+tdeck,2026-08-31 05:16:53,23646607,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=120 ip=1,
+tdeck,2026-08-31 05:17:53,23706610,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=180 ip=1,
+tdeck,2026-08-31 05:18:53,23766611,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=240 ip=1,
+tdeck,2026-08-31 05:19:53,23826615,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=300 ip=1,
+tdeck,2026-08-31 05:20:53,23886616,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=360 ip=1,
+tdeck,2026-08-31 05:21:53,23946616,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=420 ip=1,
+tdeck,2026-08-31 05:22:53,24006616,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=480 ip=1,
+tdeck,2026-08-31 05:23:53,24066619,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=540 ip=1,
+tdeck,2026-08-31 05:24:48,24121419,drop,,,,,,
+tdeck,2026-08-31 05:24:48,24121420,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:24:48,24121421,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:24:51,24124866,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:24:53,24126384,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4965,live
+tdeck,2026-08-31 05:24:53,24126622,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=0 ip=1,
+tdeck,2026-08-31 05:25:53,24186622,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=60 ip=1,
+tdeck,2026-08-31 05:26:53,24246623,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=120 ip=1,
+tdeck,2026-08-31 05:27:53,24306623,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=180 ip=1,
+tdeck,2026-08-31 05:28:53,24366623,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=240 ip=1,
+tdeck,2026-08-31 05:29:53,24426627,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=300 ip=1,
+tdeck,2026-08-31 05:30:53,24486631,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=360 ip=1,
+tdeck,2026-08-31 05:31:53,24546634,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=420 ip=1,
+tdeck,2026-08-31 05:32:53,24606636,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=480 ip=1,
+tdeck,2026-08-31 05:33:53,24666641,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=540 ip=1,
+tdeck,2026-08-31 05:34:49,24722178,drop,,,,,,
+tdeck,2026-08-31 05:34:49,24722179,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:34:49,24722180,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:34:52,24725639,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:34:53,24726451,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4273,live
+tdeck,2026-08-31 05:34:53,24726645,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=0 ip=1,
+tdeck,2026-08-31 05:35:53,24786649,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=60 ip=1,
+tdeck,2026-08-31 05:36:53,24846653,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=120 ip=1,
+tdeck,2026-08-31 05:37:53,24906656,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=180 ip=1,
+tdeck,2026-08-31 05:38:53,24966659,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=240 ip=1,
+tdeck,2026-08-31 05:39:53,25026662,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=300 ip=1,
+tdeck,2026-08-31 05:40:53,25086663,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=360 ip=1,
+tdeck,2026-08-31 05:41:53,25146666,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=420 ip=1,
+tdeck,2026-08-31 05:42:53,25206675,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=480 ip=1,
+tdeck,2026-08-31 05:43:53,25266679,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=540 ip=1,
+tdeck,2026-08-31 05:44:49,25322782,drop,,,,,,
+tdeck,2026-08-31 05:44:49,25322783,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:44:49,25322784,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:44:53,25326228,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:44:53,25326680,link,down,,,,,
+tdeck,2026-08-31 05:44:53,25326826,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-76,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4044,live BSSID_CHANGE
+tdeck,2026-08-31 05:45:53,25386684,link,up,46:AF:97:2E:2B:86,3,-74,age_s=59 ip=1,
+tdeck,2026-08-31 05:46:53,25446685,link,up,46:AF:97:2E:2B:86,3,-75,age_s=119 ip=1,
+tdeck,2026-08-31 05:47:53,25506686,link,up,46:AF:97:2E:2B:86,3,-76,age_s=179 ip=1,
+tdeck,2026-08-31 05:48:53,25566686,link,up,46:AF:97:2E:2B:86,3,-74,age_s=239 ip=1,
+tdeck,2026-08-31 05:49:53,25626690,link,up,46:AF:97:2E:2B:86,3,-76,age_s=299 ip=1,
+tdeck,2026-08-31 05:50:53,25686694,link,up,46:AF:97:2E:2B:86,3,-76,age_s=359 ip=1,
+tdeck,2026-08-31 05:51:53,25746694,link,up,46:AF:97:2E:2B:86,3,-75,age_s=419 ip=1,
+tdeck,2026-08-31 05:52:53,25806697,link,up,46:AF:97:2E:2B:86,3,-74,age_s=479 ip=1,
+tdeck,2026-08-31 05:53:53,25866699,link,up,46:AF:97:2E:2B:86,3,-75,age_s=539 ip=1,
+tdeck,2026-08-31 05:54:50,25923432,drop,,,,,,
+tdeck,2026-08-31 05:54:50,25923433,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 05:54:50,25923434,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 05:54:53,25926701,link,down,,,,,
+tdeck,2026-08-31 05:54:53,25926899,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 05:54:54,25927687,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4255,live BSSID_CHANGE
+tdeck,2026-08-31 05:55:53,25986702,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=59 ip=1,
+tdeck,2026-08-31 05:56:53,26046703,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=119 ip=1,
+tdeck,2026-08-31 05:57:53,26106707,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=179 ip=1,
+tdeck,2026-08-31 05:58:53,26166707,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=239 ip=1,
+tdeck,2026-08-31 05:59:53,26226708,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=299 ip=1,
+tdeck,2026-08-31 06:00:53,26286713,link,up,5A:AF:97:2E:2B:8B,3,-73,age_s=359 ip=1,
+tdeck,2026-08-31 06:01:53,26346715,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=419 ip=1,
+tdeck,2026-08-31 06:02:53,26406719,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=479 ip=1,
+tdeck,2026-08-31 06:03:53,26466723,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=539 ip=1,
+tdeck,2026-08-31 06:04:51,26524217,drop,,,,,,
+tdeck,2026-08-31 06:04:51,26524218,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:04:51,26524219,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:04:53,26526726,link,down,,,,,
+tdeck,2026-08-31 06:04:54,26527676,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:04:56,26529210,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4993,live
+tdeck,2026-08-31 06:05:53,26586726,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=57 ip=1,
+tdeck,2026-08-31 06:06:53,26646730,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=117 ip=1,
+tdeck,2026-08-31 06:07:53,26706733,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=177 ip=1,
+tdeck,2026-08-31 06:08:53,26766733,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=237 ip=1,
+tdeck,2026-08-31 06:09:53,26826737,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=297 ip=1,
+tdeck,2026-08-31 06:10:53,26886739,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=357 ip=1,
+tdeck,2026-08-31 06:11:53,26946741,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=417 ip=1,
+tdeck,2026-08-31 06:12:53,27006745,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=477 ip=1,
+tdeck,2026-08-31 06:13:53,27066745,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=537 ip=1,
+tdeck,2026-08-31 06:14:51,27125091,drop,,,,,,
+tdeck,2026-08-31 06:14:51,27125092,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:14:51,27125093,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:14:53,27126745,link,down,,,,,
+tdeck,2026-08-31 06:14:55,27128548,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:14:55,27129137,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4046,live BSSID_CHANGE
+tdeck,2026-08-31 06:15:53,27186748,link,up,46:AF:97:2E:2B:86,3,-76,age_s=57 ip=1,
+tdeck,2026-08-31 06:16:53,27246753,link,up,46:AF:97:2E:2B:86,3,-76,age_s=117 ip=1,
+tdeck,2026-08-31 06:17:53,27306754,link,up,46:AF:97:2E:2B:86,3,-76,age_s=177 ip=1,
+tdeck,2026-08-31 06:18:53,27366756,link,up,46:AF:97:2E:2B:86,3,-75,age_s=237 ip=1,
+tdeck,2026-08-31 06:19:53,27426760,link,up,46:AF:97:2E:2B:86,3,-76,age_s=297 ip=1,
+tdeck,2026-08-31 06:20:53,27486763,link,up,46:AF:97:2E:2B:86,3,-75,age_s=357 ip=1,
+tdeck,2026-08-31 06:21:53,27546767,link,up,46:AF:97:2E:2B:86,3,-75,age_s=417 ip=1,
+tdeck,2026-08-31 06:22:53,27606767,link,up,46:AF:97:2E:2B:86,3,-76,age_s=477 ip=1,
+tdeck,2026-08-31 06:23:53,27666768,link,up,46:AF:97:2E:2B:86,3,-75,age_s=537 ip=1,
+tdeck,2026-08-31 06:24:52,27725765,drop,,,,,,
+tdeck,2026-08-31 06:24:52,27725766,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:24:52,27725767,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:24:53,27726769,link,down,,,,,
+tdeck,2026-08-31 06:24:56,27729227,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:24:56,27729927,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4162,live BSSID_CHANGE
+tdeck,2026-08-31 06:25:53,27786773,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=56 ip=1,
+tdeck,2026-08-31 06:26:53,27846775,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=116 ip=1,
+tdeck,2026-08-31 06:27:53,27906777,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=176 ip=1,
+tdeck,2026-08-31 06:28:53,27966777,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=236 ip=1,
+tdeck,2026-08-31 06:29:53,28026777,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=296 ip=1,
+tdeck,2026-08-31 06:30:53,28086780,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=356 ip=1,
+tdeck,2026-08-31 06:31:53,28146782,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=416 ip=1,
+tdeck,2026-08-31 06:32:53,28206782,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=476 ip=1,
+tdeck,2026-08-31 06:33:53,28266782,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=536 ip=1,
+tdeck,2026-08-31 06:34:53,28326597,drop,,,,,,
+tdeck,2026-08-31 06:34:53,28326598,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:34:53,28326599,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:34:53,28326782,link,down,,,,,
+tdeck,2026-08-31 06:34:56,28330059,assoc_connected,0,46:AF:97:2E:2B:86,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:34:57,28330704,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4107,live BSSID_CHANGE
+tdeck,2026-08-31 06:35:53,28386782,link,up,46:AF:97:2E:2B:86,3,-76,age_s=56 ip=1,
+tdeck,2026-08-31 06:36:53,28446787,link,up,46:AF:97:2E:2B:86,3,-75,age_s=116 ip=1,
+tdeck,2026-08-31 06:37:53,28506787,link,up,46:AF:97:2E:2B:86,3,-75,age_s=176 ip=1,
+tdeck,2026-08-31 06:38:53,28566788,link,up,46:AF:97:2E:2B:86,3,-75,age_s=236 ip=1,
+tdeck,2026-08-31 06:39:53,28626790,link,up,46:AF:97:2E:2B:86,3,-76,age_s=296 ip=1,
+tdeck,2026-08-31 06:40:53,28686794,link,up,46:AF:97:2E:2B:86,3,-74,age_s=356 ip=1,
+tdeck,2026-08-31 06:41:53,28746796,link,up,46:AF:97:2E:2B:86,3,-74,age_s=416 ip=1,
+tdeck,2026-08-31 06:42:53,28806796,link,up,46:AF:97:2E:2B:86,3,-76,age_s=476 ip=1,
+tdeck,2026-08-31 06:43:53,28866797,link,up,46:AF:97:2E:2B:86,3,-75,age_s=536 ip=1,
+tdeck,2026-08-31 06:44:53,28926797,link,up,46:AF:97:2E:2B:86,3,-75,age_s=596 ip=1,
+tdeck,2026-08-31 06:44:54,28927418,drop,,,,,,
+tdeck,2026-08-31 06:44:54,28927419,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:44:54,28927420,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:44:57,28930854,assoc_connected,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:44:58,28931416,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3998,live
+tdeck,2026-08-31 06:45:53,28986802,link,up,46:AF:97:2E:2B:86,3,-75,age_s=55 ip=1,
+tdeck,2026-08-31 06:46:53,29046807,link,up,46:AF:97:2E:2B:86,3,-71,age_s=115 ip=1,
+tdeck,2026-08-31 06:47:53,29106807,link,up,46:AF:97:2E:2B:86,3,-75,age_s=175 ip=1,
+tdeck,2026-08-31 06:48:53,29166812,link,up,46:AF:97:2E:2B:86,3,-74,age_s=235 ip=1,
+tdeck,2026-08-31 06:49:53,29226817,link,up,46:AF:97:2E:2B:86,3,-75,age_s=295 ip=1,
+tdeck,2026-08-31 06:50:53,29286820,link,up,46:AF:97:2E:2B:86,3,-72,age_s=355 ip=1,
+tdeck,2026-08-31 06:51:53,29346823,link,up,46:AF:97:2E:2B:86,3,-75,age_s=415 ip=1,
+tdeck,2026-08-31 06:52:53,29406826,link,up,46:AF:97:2E:2B:86,3,-75,age_s=475 ip=1,
+tdeck,2026-08-31 06:53:53,29466826,link,up,46:AF:97:2E:2B:86,3,-72,age_s=535 ip=1,
+tdeck,2026-08-31 06:54:53,29526826,link,up,46:AF:97:2E:2B:86,3,-71,age_s=595 ip=1,
+tdeck,2026-08-31 06:54:55,29528228,drop,,,,,,
+tdeck,2026-08-31 06:54:55,29528229,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 06:54:55,29528230,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 06:54:58,29531669,assoc_connected,0,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 06:54:59,29532205,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3977,live
+tdeck,2026-08-31 06:55:53,29586829,link,up,46:AF:97:2E:2B:86,3,-75,age_s=54 ip=1,
+tdeck,2026-08-31 06:56:53,29646830,link,up,46:AF:97:2E:2B:86,3,-76,age_s=114 ip=1,
+tdeck,2026-08-31 06:57:53,29706833,link,up,46:AF:97:2E:2B:86,3,-76,age_s=174 ip=1,
+tdeck,2026-08-31 06:58:53,29766838,link,up,46:AF:97:2E:2B:86,3,-75,age_s=234 ip=1,
+tdeck,2026-08-31 06:59:53,29826839,link,up,46:AF:97:2E:2B:86,3,-74,age_s=294 ip=1,
+tdeck,2026-08-31 07:00:53,29886844,link,up,46:AF:97:2E:2B:86,3,-76,age_s=354 ip=1,
+tdeck,2026-08-31 07:01:53,29946847,link,up,46:AF:97:2E:2B:86,3,-72,age_s=414 ip=1,
+tdeck,2026-08-31 07:02:53,30006850,link,up,46:AF:97:2E:2B:86,3,-75,age_s=474 ip=1,
+tdeck,2026-08-31 07:03:53,30066853,link,up,46:AF:97:2E:2B:86,3,-74,age_s=534 ip=1,
+tdeck,2026-08-31 07:04:53,30126858,link,up,46:AF:97:2E:2B:86,3,-76,age_s=594 ip=1,
+tdeck,2026-08-31 07:04:55,30129043,drop,,,,,,
+tdeck,2026-08-31 07:04:55,30129044,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 07:04:55,30129045,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 07:04:59,30132488,assoc_connected,0,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 07:04:59,30133089,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4046,live
+tdeck,2026-08-31 07:05:53,30186858,link,up,46:AF:97:2E:2B:86,3,-75,age_s=53 ip=1,
+tdeck,2026-08-31 07:06:53,30246860,link,up,46:AF:97:2E:2B:86,3,-74,age_s=113 ip=1,
+tdeck,2026-08-31 07:07:53,30306861,link,up,46:AF:97:2E:2B:86,3,-75,age_s=173 ip=1,
+tdeck,2026-08-31 07:08:53,30366861,link,up,46:AF:97:2E:2B:86,3,-73,age_s=233 ip=1,
+tdeck,2026-08-31 07:09:53,30426864,link,up,46:AF:97:2E:2B:86,3,-75,age_s=293 ip=1,
+tdeck,2026-08-31 07:10:53,30486865,link,up,46:AF:97:2E:2B:86,3,-75,age_s=353 ip=1,
+tdeck,2026-08-31 07:11:53,30546866,link,up,46:AF:97:2E:2B:86,3,-75,age_s=413 ip=1,
+tdeck,2026-08-31 07:12:53,30606871,link,up,46:AF:97:2E:2B:86,3,-73,age_s=473 ip=1,
+tdeck,2026-08-31 07:13:53,30666873,link,up,46:AF:97:2E:2B:86,3,-75,age_s=533 ip=1,
+tdeck,2026-08-31 07:14:53,30726875,link,up,46:AF:97:2E:2B:86,3,-75,age_s=593 ip=1,
+tdeck,2026-08-31 07:14:56,30729960,drop,,,,,,
+tdeck,2026-08-31 07:14:56,30729961,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 07:14:56,30729962,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 07:15:01,30734444,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 07:15:02,30735289,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=5329,live BSSID_CHANGE
+tdeck,2026-08-31 07:15:53,30786877,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=51 ip=1,
+tdeck,2026-08-31 07:16:53,30846879,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=111 ip=1,
+tdeck,2026-08-31 07:17:53,30906881,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=171 ip=1,
+tdeck,2026-08-31 07:18:53,30966881,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=231 ip=1,
+tdeck,2026-08-31 07:19:53,31026881,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=291 ip=1,
+tdeck,2026-08-31 07:20:53,31086886,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=351 ip=1,
+tdeck,2026-08-31 07:21:53,31146890,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=411 ip=1,
+tdeck,2026-08-31 07:22:53,31206893,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=471 ip=1,
+tdeck,2026-08-31 07:23:53,31266894,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=531 ip=1,
+tdeck,2026-08-31 07:24:53,31326896,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=591 ip=1,
+tdeck,2026-08-31 07:24:57,31330817,drop,,,,,,
+tdeck,2026-08-31 07:24:57,31330818,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 07:24:57,31330819,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 07:25:01,31334263,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 07:25:02,31335276,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4459,live
+tdeck,2026-08-31 07:25:53,31386897,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=51 ip=1,
+tdeck,2026-08-31 07:26:53,31446902,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=111 ip=1,
+tdeck,2026-08-31 07:27:53,31506906,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=171 ip=1,
+tdeck,2026-08-31 07:28:53,31566910,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=231 ip=1,
+tdeck,2026-08-31 07:29:53,31626914,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=291 ip=1,
+tdeck,2026-08-31 07:30:53,31686915,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=351 ip=1,
+tdeck,2026-08-31 07:31:53,31746915,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=411 ip=1,
+tdeck,2026-08-31 07:32:53,31806915,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=471 ip=1,
+tdeck,2026-08-31 07:33:53,31866916,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=531 ip=1,
+tdeck,2026-08-31 07:34:53,31926916,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=591 ip=1,
+tdeck,2026-08-31 07:34:58,31931685,drop,,,,,,
+tdeck,2026-08-31 07:34:58,31931686,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 07:34:58,31931687,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 07:35:01,31935131,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 07:35:03,31936359,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4674,live
+tdeck,2026-08-31 07:35:53,31986917,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=50 ip=1,
+tdeck,2026-08-31 07:36:53,32046917,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=110 ip=1,
+tdeck,2026-08-31 07:37:53,32106919,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=170 ip=1,
+tdeck,2026-08-31 07:38:53,32166924,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=230 ip=1,
+tdeck,2026-08-31 07:39:53,32226928,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=290 ip=1,
+tdeck,2026-08-31 07:40:53,32286928,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=350 ip=1,
+tdeck,2026-08-31 07:41:53,32346931,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=410 ip=1,
+tdeck,2026-08-31 07:42:53,32406931,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=470 ip=1,
+tdeck,2026-08-31 07:43:53,32466934,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=530 ip=1,
+tdeck,2026-08-31 07:44:53,32526937,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=590 ip=1,
+tdeck,2026-08-31 07:44:59,32532578,drop,,,,,,
+tdeck,2026-08-31 07:44:59,32532579,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tdeck,2026-08-31 07:44:59,32532580,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tdeck,2026-08-31 07:45:02,32536036,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-76,auth=7 phy=bgn pmf=0 wpa3=0,live
+tdeck,2026-08-31 07:45:04,32537553,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4975,live
+tdeck,2026-08-31 07:45:53,32586937,link,up,5A:AF:97:2E:2B:8B,3,-75,age_s=49 ip=1,
+tdeck,2026-08-31 07:46:53,32646939,link,up,5A:AF:97:2E:2B:8B,3,-76,age_s=109 ip=1,
+tdeck,2026-08-31 07:47:53,32706943,link,up,5A:AF:97:2E:2B:8B,3,-74,age_s=169 ip=1,

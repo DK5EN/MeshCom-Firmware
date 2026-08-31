@@ -1,0 +1,825 @@
+board,wall,uptime_ms,kind,reason,bssid,chan,rssi,value,note
+heltec,2026-08-30 22:42:49,2915,link,down,,,,,
+heltec,2026-08-30 22:42:53,6663,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-53,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 22:42:53,7193,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 22:42:54,7957,ready,,,,,1,
+heltec,2026-08-30 22:43:49,62915,link,up,5A:AF:97:2E:2B:8B,3,-50,age_s=55 ip=1,
+heltec,2026-08-30 22:44:17,90721,drop,,,,,,
+heltec,2026-08-30 22:44:17,90723,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 22:44:17,90723,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 22:44:20,94158,assoc_connected,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 22:44:21,94747,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4026,live BSSID_CHANGE
+heltec,2026-08-30 22:44:49,122920,link,up,46:AF:97:2E:2B:86,3,-72,age_s=28 ip=1,
+heltec,2026-08-30 22:45:49,182925,link,up,46:AF:97:2E:2B:86,3,-75,age_s=88 ip=1,
+heltec,2026-08-30 22:46:49,242928,link,up,46:AF:97:2E:2B:86,3,-76,age_s=148 ip=1,
+heltec,2026-08-30 22:47:49,302931,link,up,46:AF:97:2E:2B:86,3,-67,age_s=208 ip=1,
+heltec,2026-08-30 22:48:49,362935,link,up,46:AF:97:2E:2B:86,3,-71,age_s=268 ip=1,
+heltec,2026-08-30 22:49:49,422937,link,up,46:AF:97:2E:2B:86,3,-78,age_s=328 ip=1,
+heltec,2026-08-30 22:50:49,482939,link,up,46:AF:97:2E:2B:86,3,-78,age_s=388 ip=1,
+heltec,2026-08-30 22:51:49,542943,link,up,46:AF:97:2E:2B:86,3,-69,age_s=448 ip=1,
+heltec,2026-08-30 22:52:49,602946,link,up,46:AF:97:2E:2B:86,3,-72,age_s=508 ip=1,
+heltec,2026-08-30 22:53:49,662946,link,up,46:AF:97:2E:2B:86,3,-75,age_s=568 ip=1,
+heltec,2026-08-30 22:54:18,691594,drop,,,,,,
+heltec,2026-08-30 22:54:18,691596,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 22:54:18,691596,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-75,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 22:54:21,695027,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 22:54:22,695545,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3951,live BSSID_CHANGE
+heltec,2026-08-30 22:54:49,722948,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=27 ip=1,
+heltec,2026-08-30 22:55:49,782951,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=87 ip=1,
+heltec,2026-08-30 22:56:49,842952,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=147 ip=1,
+heltec,2026-08-30 22:57:49,902957,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=207 ip=1,
+heltec,2026-08-30 22:58:49,962957,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=267 ip=1,
+heltec,2026-08-30 22:59:49,1022959,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=327 ip=1,
+heltec,2026-08-30 23:00:49,1082962,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=387 ip=1,
+heltec,2026-08-30 23:01:49,1142965,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=447 ip=1,
+heltec,2026-08-30 23:02:49,1202965,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=507 ip=1,
+heltec,2026-08-30 23:03:49,1262965,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=567 ip=1,
+heltec,2026-08-30 23:04:19,1292490,drop,,,,,,
+heltec,2026-08-30 23:04:19,1292492,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:04:19,1292492,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:04:22,1295920,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-61,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:04:23,1296534,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4044,live
+heltec,2026-08-30 23:04:49,1322970,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=26 ip=1,
+heltec,2026-08-30 23:05:49,1382972,link,up,5A:AF:97:2E:2B:8B,3,-52,age_s=86 ip=1,
+heltec,2026-08-30 23:06:49,1442973,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=146 ip=1,
+heltec,2026-08-30 23:07:49,1502976,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=206 ip=1,
+heltec,2026-08-30 23:08:49,1562980,link,up,5A:AF:97:2E:2B:8B,3,-51,age_s=266 ip=1,
+heltec,2026-08-30 23:09:49,1622984,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=326 ip=1,
+heltec,2026-08-30 23:10:49,1682988,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=386 ip=1,
+heltec,2026-08-30 23:11:49,1742989,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=446 ip=1,
+heltec,2026-08-30 23:12:49,1802993,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=506 ip=1,
+heltec,2026-08-30 23:13:49,1862997,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=566 ip=1,
+heltec,2026-08-30 23:14:20,1893369,drop,,,,,,
+heltec,2026-08-30 23:14:20,1893371,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:14:20,1893371,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:14:23,1896805,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-51,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:14:24,1897416,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-50,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4047,live
+heltec,2026-08-30 23:14:49,1923002,link,up,5A:AF:97:2E:2B:8B,3,-51,age_s=25 ip=1,
+heltec,2026-08-30 23:15:49,1983004,link,up,5A:AF:97:2E:2B:8B,3,-52,age_s=85 ip=1,
+heltec,2026-08-30 23:16:49,2043005,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=145 ip=1,
+heltec,2026-08-30 23:17:49,2103007,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=205 ip=1,
+heltec,2026-08-30 23:18:49,2163010,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=265 ip=1,
+heltec,2026-08-30 23:19:49,2223012,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=325 ip=1,
+heltec,2026-08-30 23:20:49,2283016,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=385 ip=1,
+heltec,2026-08-30 23:21:49,2343020,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=445 ip=1,
+heltec,2026-08-30 23:22:49,2403025,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=505 ip=1,
+heltec,2026-08-30 23:23:49,2463025,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=565 ip=1,
+heltec,2026-08-30 23:24:20,2494291,drop,,,,,,
+heltec,2026-08-30 23:24:20,2494293,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:24:21,2494293,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-50,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:24:24,2497720,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:24:24,2498328,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4037,live
+heltec,2026-08-30 23:24:49,2523027,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=24 ip=1,
+heltec,2026-08-30 23:25:49,2583029,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=84 ip=1,
+heltec,2026-08-30 23:26:49,2643030,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=144 ip=1,
+heltec,2026-08-30 23:27:49,2703033,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=204 ip=1,
+heltec,2026-08-30 23:28:49,2763033,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=264 ip=1,
+heltec,2026-08-30 23:29:49,2823036,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=324 ip=1,
+heltec,2026-08-30 23:30:49,2883039,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=384 ip=1,
+heltec,2026-08-30 23:31:49,2943039,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=444 ip=1,
+heltec,2026-08-30 23:32:49,3003042,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=504 ip=1,
+heltec,2026-08-30 23:33:49,3063047,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=564 ip=1,
+heltec,2026-08-30 23:34:21,3094592,drop,,,,,,
+heltec,2026-08-30 23:34:21,3094594,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:34:21,3094594,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:34:24,3098019,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:34:25,3098588,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3996,live
+heltec,2026-08-30 23:34:49,3123051,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=24 ip=1,
+heltec,2026-08-30 23:35:49,3183056,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=84 ip=1,
+heltec,2026-08-30 23:36:49,3243057,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=144 ip=1,
+heltec,2026-08-30 23:37:49,3303057,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=204 ip=1,
+heltec,2026-08-30 23:38:49,3363058,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=264 ip=1,
+heltec,2026-08-30 23:39:49,3423059,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=324 ip=1,
+heltec,2026-08-30 23:40:49,3483061,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=384 ip=1,
+heltec,2026-08-30 23:41:49,3543065,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=444 ip=1,
+heltec,2026-08-30 23:42:49,3603066,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=504 ip=1,
+heltec,2026-08-30 23:43:49,3663069,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=564 ip=1,
+heltec,2026-08-30 23:44:22,3695321,drop,,,,,,
+heltec,2026-08-30 23:44:22,3695323,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:44:22,3695323,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:44:25,3698757,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-52,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:44:26,3699291,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3970,live
+heltec,2026-08-30 23:44:49,3723071,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=23 ip=1,
+heltec,2026-08-30 23:45:49,3783074,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=83 ip=1,
+heltec,2026-08-30 23:46:49,3843074,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=143 ip=1,
+heltec,2026-08-30 23:47:49,3903078,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=203 ip=1,
+heltec,2026-08-30 23:48:49,3963083,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=263 ip=1,
+heltec,2026-08-30 23:49:49,4023088,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=323 ip=1,
+heltec,2026-08-30 23:50:49,4083089,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=383 ip=1,
+heltec,2026-08-30 23:51:49,4143092,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=443 ip=1,
+heltec,2026-08-30 23:52:49,4203095,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=503 ip=1,
+heltec,2026-08-30 23:53:49,4263096,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=563 ip=1,
+heltec,2026-08-30 23:54:23,4296291,drop,,,,,,
+heltec,2026-08-30 23:54:23,4296293,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 23:54:23,4296293,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 23:54:26,4299715,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 23:54:27,4300372,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4081,live
+heltec,2026-08-30 23:54:49,4323097,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=22 ip=1,
+heltec,2026-08-30 23:55:49,4383102,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=82 ip=1,
+heltec,2026-08-30 23:56:49,4443105,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=142 ip=1,
+heltec,2026-08-30 23:57:49,4503109,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=202 ip=1,
+heltec,2026-08-30 23:58:49,4563111,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=262 ip=1,
+heltec,2026-08-30 23:59:49,4623114,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=322 ip=1,
+heltec,2026-08-31 00:00:49,4683114,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=382 ip=1,
+heltec,2026-08-31 00:01:49,4743117,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=442 ip=1,
+heltec,2026-08-31 00:02:49,4803117,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=502 ip=1,
+heltec,2026-08-31 00:03:49,4863121,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=562 ip=1,
+heltec,2026-08-31 00:04:23,4896908,drop,,,,,,
+heltec,2026-08-31 00:04:23,4896910,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:04:23,4896910,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:04:26,4900344,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:04:27,4900956,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4048,live
+heltec,2026-08-31 00:04:49,4923122,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=22 ip=1,
+heltec,2026-08-31 00:05:49,4983123,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=82 ip=1,
+heltec,2026-08-31 00:06:49,5043128,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=142 ip=1,
+heltec,2026-08-31 00:07:49,5103130,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=202 ip=1,
+heltec,2026-08-31 00:08:49,5163131,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=262 ip=1,
+heltec,2026-08-31 00:09:49,5223133,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=322 ip=1,
+heltec,2026-08-31 00:10:49,5283134,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=382 ip=1,
+heltec,2026-08-31 00:11:49,5343136,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=442 ip=1,
+heltec,2026-08-31 00:12:49,5403137,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=502 ip=1,
+heltec,2026-08-31 00:13:49,5463140,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=562 ip=1,
+heltec,2026-08-31 00:14:24,5497669,drop,,,,,,
+heltec,2026-08-31 00:14:24,5497671,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:14:24,5497671,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:14:27,5501091,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:14:28,5501755,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4086,live
+heltec,2026-08-31 00:14:49,5523143,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=21 ip=1,
+heltec,2026-08-31 00:15:49,5583145,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=81 ip=1,
+heltec,2026-08-31 00:16:49,5643149,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=141 ip=1,
+heltec,2026-08-31 00:17:49,5703150,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=201 ip=1,
+heltec,2026-08-31 00:18:49,5763154,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=261 ip=1,
+heltec,2026-08-31 00:19:49,5823154,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=321 ip=1,
+heltec,2026-08-31 00:20:49,5883158,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=381 ip=1,
+heltec,2026-08-31 00:21:49,5943160,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=441 ip=1,
+heltec,2026-08-31 00:22:49,6003164,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=501 ip=1,
+heltec,2026-08-31 00:23:49,6063168,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=561 ip=1,
+heltec,2026-08-31 00:24:25,6098466,drop,,,,,,
+heltec,2026-08-31 00:24:25,6098468,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:24:25,6098468,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:24:28,6101898,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:24:29,6102600,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4134,live
+heltec,2026-08-31 00:24:49,6123170,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=20 ip=1,
+heltec,2026-08-31 00:25:49,6183174,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=80 ip=1,
+heltec,2026-08-31 00:26:49,6243177,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=140 ip=1,
+heltec,2026-08-31 00:27:49,6303179,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=200 ip=1,
+heltec,2026-08-31 00:28:49,6363179,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=260 ip=1,
+heltec,2026-08-31 00:29:49,6423179,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=320 ip=1,
+heltec,2026-08-31 00:30:49,6483179,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=380 ip=1,
+heltec,2026-08-31 00:31:49,6543181,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=440 ip=1,
+heltec,2026-08-31 00:32:49,6603182,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=500 ip=1,
+heltec,2026-08-31 00:33:49,6663182,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=560 ip=1,
+heltec,2026-08-31 00:34:25,6699179,drop,,,,,,
+heltec,2026-08-31 00:34:25,6699181,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:34:25,6699181,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:34:29,6702608,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:34:29,6703285,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4106,live
+heltec,2026-08-31 00:34:49,6723186,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=19 ip=1,
+heltec,2026-08-31 00:35:49,6783191,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=79 ip=1,
+heltec,2026-08-31 00:36:49,6843191,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=139 ip=1,
+heltec,2026-08-31 00:37:49,6903196,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=199 ip=1,
+heltec,2026-08-31 00:38:49,6963199,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=259 ip=1,
+heltec,2026-08-31 00:39:49,7023200,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=319 ip=1,
+heltec,2026-08-31 00:40:49,7083206,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=379 ip=1,
+heltec,2026-08-31 00:41:49,7143209,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=439 ip=1,
+heltec,2026-08-31 00:42:49,7203209,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=499 ip=1,
+heltec,2026-08-31 00:43:49,7263212,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=559 ip=1,
+heltec,2026-08-31 00:44:26,7300039,drop,,,,,,
+heltec,2026-08-31 00:44:26,7300041,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:44:26,7300041,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:44:30,7303474,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:44:30,7304090,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4051,live
+heltec,2026-08-31 00:44:49,7323212,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=19 ip=1,
+heltec,2026-08-31 00:45:49,7383216,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=79 ip=1,
+heltec,2026-08-31 00:46:49,7443220,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=139 ip=1,
+heltec,2026-08-31 00:47:49,7503221,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=199 ip=1,
+heltec,2026-08-31 00:48:49,7563223,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=259 ip=1,
+heltec,2026-08-31 00:49:49,7623227,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=319 ip=1,
+heltec,2026-08-31 00:50:49,7683227,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=379 ip=1,
+heltec,2026-08-31 00:51:49,7743227,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=439 ip=1,
+heltec,2026-08-31 00:52:49,7803229,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=499 ip=1,
+heltec,2026-08-31 00:53:49,7863230,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=559 ip=1,
+heltec,2026-08-31 00:54:27,7900821,drop,,,,,,
+heltec,2026-08-31 00:54:27,7900823,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 00:54:27,7900823,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 00:54:30,7904248,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 00:54:31,7904800,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3979,live
+heltec,2026-08-31 00:54:49,7923231,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=18 ip=1,
+heltec,2026-08-31 00:55:49,7983233,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=78 ip=1,
+heltec,2026-08-31 00:56:50,8043237,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=138 ip=1,
+heltec,2026-08-31 00:57:49,8103241,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=198 ip=1,
+heltec,2026-08-31 00:58:49,8163242,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=258 ip=1,
+heltec,2026-08-31 00:59:49,8223246,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=318 ip=1,
+heltec,2026-08-31 01:00:49,8283252,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=378 ip=1,
+heltec,2026-08-31 01:01:49,8343254,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=438 ip=1,
+heltec,2026-08-31 01:02:50,8403258,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=498 ip=1,
+heltec,2026-08-31 01:03:49,8463260,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=558 ip=1,
+heltec,2026-08-31 01:04:28,8501707,drop,,,,,,
+heltec,2026-08-31 01:04:28,8501709,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:04:28,8501709,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:04:31,8505131,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:04:32,8505747,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4040,live
+heltec,2026-08-31 01:04:49,8523265,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=17 ip=1,
+heltec,2026-08-31 01:05:50,8583266,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=77 ip=1,
+heltec,2026-08-31 01:06:49,8643269,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=137 ip=1,
+heltec,2026-08-31 01:07:49,8703272,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=197 ip=1,
+heltec,2026-08-31 01:08:49,8763277,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=257 ip=1,
+heltec,2026-08-31 01:09:49,8823278,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=317 ip=1,
+heltec,2026-08-31 01:10:50,8883278,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=377 ip=1,
+heltec,2026-08-31 01:11:49,8943278,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=437 ip=1,
+heltec,2026-08-31 01:12:50,9003281,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=497 ip=1,
+heltec,2026-08-31 01:13:50,9063284,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=557 ip=1,
+heltec,2026-08-31 01:14:29,9102403,drop,,,,,,
+heltec,2026-08-31 01:14:29,9102405,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:14:29,9102405,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:14:32,9105835,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:14:33,9106452,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4049,live
+heltec,2026-08-31 01:14:49,9123286,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=16 ip=1,
+heltec,2026-08-31 01:15:50,9183289,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=76 ip=1,
+heltec,2026-08-31 01:16:49,9243291,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=136 ip=1,
+heltec,2026-08-31 01:17:49,9303293,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=196 ip=1,
+heltec,2026-08-31 01:18:50,9363297,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=256 ip=1,
+heltec,2026-08-31 01:19:50,9423297,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=316 ip=1,
+heltec,2026-08-31 01:20:50,9483301,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=376 ip=1,
+heltec,2026-08-31 01:21:50,9543305,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=436 ip=1,
+heltec,2026-08-31 01:22:49,9603309,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=496 ip=1,
+heltec,2026-08-31 01:23:49,9663310,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=556 ip=1,
+heltec,2026-08-31 01:24:29,9703134,drop,,,,,,
+heltec,2026-08-31 01:24:29,9703136,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:24:29,9703136,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:24:33,9706570,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:24:33,9707130,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3996,live
+heltec,2026-08-31 01:24:50,9723312,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=16 ip=1,
+heltec,2026-08-31 01:25:49,9783318,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=76 ip=1,
+heltec,2026-08-31 01:26:50,9843320,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=136 ip=1,
+heltec,2026-08-31 01:27:50,9903323,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=196 ip=1,
+heltec,2026-08-31 01:28:50,9963326,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=256 ip=1,
+heltec,2026-08-31 01:29:49,10023330,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=316 ip=1,
+heltec,2026-08-31 01:30:49,10083331,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=376 ip=1,
+heltec,2026-08-31 01:31:50,10143332,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=436 ip=1,
+heltec,2026-08-31 01:32:50,10203333,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=496 ip=1,
+heltec,2026-08-31 01:33:50,10263336,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=556 ip=1,
+heltec,2026-08-31 01:34:30,10304062,drop,,,,,,
+heltec,2026-08-31 01:34:30,10304064,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:34:30,10304064,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:34:34,10307486,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:34:34,10308114,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4052,live
+heltec,2026-08-31 01:34:50,10323339,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=15 ip=1,
+heltec,2026-08-31 01:35:50,10383342,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=75 ip=1,
+heltec,2026-08-31 01:36:50,10443345,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=135 ip=1,
+heltec,2026-08-31 01:37:50,10503350,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=195 ip=1,
+heltec,2026-08-31 01:38:49,10563350,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=255 ip=1,
+heltec,2026-08-31 01:39:49,10623354,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=315 ip=1,
+heltec,2026-08-31 01:40:49,10683354,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=375 ip=1,
+heltec,2026-08-31 01:41:49,10743357,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=435 ip=1,
+heltec,2026-08-31 01:42:49,10803357,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=495 ip=1,
+heltec,2026-08-31 01:43:50,10863361,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=555 ip=1,
+heltec,2026-08-31 01:44:31,10904787,drop,,,,,,
+heltec,2026-08-31 01:44:31,10904789,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:44:31,10904789,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:44:34,10908213,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:44:35,10908796,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4009,live
+heltec,2026-08-31 01:44:49,10923366,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=14 ip=1,
+heltec,2026-08-31 01:45:50,10983368,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=74 ip=1,
+heltec,2026-08-31 01:46:50,11043370,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=134 ip=1,
+heltec,2026-08-31 01:47:49,11103373,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=194 ip=1,
+heltec,2026-08-31 01:48:49,11163377,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=254 ip=1,
+heltec,2026-08-31 01:49:49,11223382,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=314 ip=1,
+heltec,2026-08-31 01:50:50,11283386,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=374 ip=1,
+heltec,2026-08-31 01:51:50,11343387,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=434 ip=1,
+heltec,2026-08-31 01:52:50,11403393,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=494 ip=1,
+heltec,2026-08-31 01:53:49,11463395,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=554 ip=1,
+heltec,2026-08-31 01:54:32,11505515,drop,,,,,,
+heltec,2026-08-31 01:54:32,11505517,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 01:54:32,11505517,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 01:54:35,11508938,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-58,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 01:54:36,11509491,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3976,live
+heltec,2026-08-31 01:54:49,11523396,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=13 ip=1,
+heltec,2026-08-31 01:55:50,11583399,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=73 ip=1,
+heltec,2026-08-31 01:56:50,11643399,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=133 ip=1,
+heltec,2026-08-31 01:57:50,11703399,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=193 ip=1,
+heltec,2026-08-31 01:58:50,11763399,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=253 ip=1,
+heltec,2026-08-31 01:59:49,11823401,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=313 ip=1,
+heltec,2026-08-31 02:00:50,11883405,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=373 ip=1,
+heltec,2026-08-31 02:01:50,11943407,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=433 ip=1,
+heltec,2026-08-31 02:02:50,12003412,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=493 ip=1,
+heltec,2026-08-31 02:03:50,12063415,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=553 ip=1,
+heltec,2026-08-31 02:04:32,12106260,drop,,,,,,
+heltec,2026-08-31 02:04:32,12106262,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:04:32,12106262,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:04:36,12109684,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:04:36,12110297,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4037,live
+heltec,2026-08-31 02:04:50,12123418,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=13 ip=1,
+heltec,2026-08-31 02:05:50,12183421,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=73 ip=1,
+heltec,2026-08-31 02:06:50,12243424,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=133 ip=1,
+heltec,2026-08-31 02:07:50,12303425,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=193 ip=1,
+heltec,2026-08-31 02:08:50,12363429,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=253 ip=1,
+heltec,2026-08-31 02:09:50,12423431,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=313 ip=1,
+heltec,2026-08-31 02:10:50,12483432,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=373 ip=1,
+heltec,2026-08-31 02:11:50,12543435,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=433 ip=1,
+heltec,2026-08-31 02:12:50,12603436,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=493 ip=1,
+heltec,2026-08-31 02:13:50,12663439,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=553 ip=1,
+heltec,2026-08-31 02:14:33,12707062,drop,,,,,,
+heltec,2026-08-31 02:14:33,12707064,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:14:33,12707064,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:14:37,12710493,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:14:37,12711072,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4010,live
+heltec,2026-08-31 02:14:50,12723441,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=12 ip=1,
+heltec,2026-08-31 02:15:50,12783444,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=72 ip=1,
+heltec,2026-08-31 02:16:50,12843445,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=132 ip=1,
+heltec,2026-08-31 02:17:50,12903446,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=192 ip=1,
+heltec,2026-08-31 02:18:50,12963446,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=252 ip=1,
+heltec,2026-08-31 02:19:50,13023446,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=312 ip=1,
+heltec,2026-08-31 02:20:50,13083447,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=372 ip=1,
+heltec,2026-08-31 02:21:50,13143451,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=432 ip=1,
+heltec,2026-08-31 02:22:50,13203452,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=492 ip=1,
+heltec,2026-08-31 02:23:50,13263453,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=552 ip=1,
+heltec,2026-08-31 02:24:34,13307967,drop,,,,,,
+heltec,2026-08-31 02:24:34,13307969,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:24:34,13307969,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:24:37,13311393,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:24:38,13311960,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3993,live
+heltec,2026-08-31 02:24:50,13323456,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=11 ip=1,
+heltec,2026-08-31 02:25:50,13383459,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=71 ip=1,
+heltec,2026-08-31 02:26:50,13443460,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=131 ip=1,
+heltec,2026-08-31 02:27:50,13503463,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=191 ip=1,
+heltec,2026-08-31 02:28:50,13563467,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=251 ip=1,
+heltec,2026-08-31 02:29:50,13623467,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=311 ip=1,
+heltec,2026-08-31 02:30:50,13683470,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=371 ip=1,
+heltec,2026-08-31 02:31:50,13743471,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=431 ip=1,
+heltec,2026-08-31 02:32:50,13803475,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=491 ip=1,
+heltec,2026-08-31 02:33:50,13863476,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=551 ip=1,
+heltec,2026-08-31 02:34:35,13908771,drop,,,,,,
+heltec,2026-08-31 02:34:35,13908773,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:34:35,13908773,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:34:38,13912198,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:34:39,13912742,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3971,live
+heltec,2026-08-31 02:34:50,13923480,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=10 ip=1,
+heltec,2026-08-31 02:35:50,13983483,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=70 ip=1,
+heltec,2026-08-31 02:36:50,14043487,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=130 ip=1,
+heltec,2026-08-31 02:37:50,14103487,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=190 ip=1,
+heltec,2026-08-31 02:38:50,14163491,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=250 ip=1,
+heltec,2026-08-31 02:39:50,14223493,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=310 ip=1,
+heltec,2026-08-31 02:40:50,14283496,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=370 ip=1,
+heltec,2026-08-31 02:41:50,14343497,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=430 ip=1,
+heltec,2026-08-31 02:42:50,14403501,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=490 ip=1,
+heltec,2026-08-31 02:43:50,14463501,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=550 ip=1,
+heltec,2026-08-31 02:44:36,14509620,drop,,,,,,
+heltec,2026-08-31 02:44:36,14509622,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:44:36,14509622,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:44:39,14513048,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:44:39,14513075,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3455,live
+heltec,2026-08-31 02:44:50,14523502,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=10 ip=1,
+heltec,2026-08-31 02:45:50,14583508,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=70 ip=1,
+heltec,2026-08-31 02:46:50,14643512,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=130 ip=1,
+heltec,2026-08-31 02:47:50,14703516,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=190 ip=1,
+heltec,2026-08-31 02:48:50,14763520,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=250 ip=1,
+heltec,2026-08-31 02:49:50,14823521,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=310 ip=1,
+heltec,2026-08-31 02:50:50,14883522,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=370 ip=1,
+heltec,2026-08-31 02:51:50,14943525,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=430 ip=1,
+heltec,2026-08-31 02:52:50,15003528,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=490 ip=1,
+heltec,2026-08-31 02:53:50,15063528,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=550 ip=1,
+heltec,2026-08-31 02:54:37,15110473,drop,,,,,,
+heltec,2026-08-31 02:54:37,15110475,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 02:54:37,15110475,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 02:54:40,15113906,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 02:54:41,15114436,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3963,live
+heltec,2026-08-31 02:54:50,15123531,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=9 ip=1,
+heltec,2026-08-31 02:55:50,15183534,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=69 ip=1,
+heltec,2026-08-31 02:56:50,15243556,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=129 ip=1,
+heltec,2026-08-31 02:57:50,15303559,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=189 ip=1,
+heltec,2026-08-31 02:58:50,15363560,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=249 ip=1,
+heltec,2026-08-31 02:59:50,15423560,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=309 ip=1,
+heltec,2026-08-31 03:00:50,15483564,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=369 ip=1,
+heltec,2026-08-31 03:01:50,15543567,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=429 ip=1,
+heltec,2026-08-31 03:02:50,15603571,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=489 ip=1,
+heltec,2026-08-31 03:03:50,15663575,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=549 ip=1,
+heltec,2026-08-31 03:04:38,15711314,drop,,,,,,
+heltec,2026-08-31 03:04:38,15711316,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:04:38,15711316,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:04:41,15714749,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:04:41,15715305,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3991,live
+heltec,2026-08-31 03:04:50,15723578,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=8 ip=1,
+heltec,2026-08-31 03:05:50,15783582,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=68 ip=1,
+heltec,2026-08-31 03:06:50,15843586,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=128 ip=1,
+heltec,2026-08-31 03:07:50,15903589,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=188 ip=1,
+heltec,2026-08-31 03:08:50,15963591,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=248 ip=1,
+heltec,2026-08-31 03:09:50,16023592,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=308 ip=1,
+heltec,2026-08-31 03:10:50,16083594,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=368 ip=1,
+heltec,2026-08-31 03:11:50,16143596,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=428 ip=1,
+heltec,2026-08-31 03:12:50,16203601,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=488 ip=1,
+heltec,2026-08-31 03:13:50,16263603,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=548 ip=1,
+heltec,2026-08-31 03:14:38,16312272,drop,,,,,,
+heltec,2026-08-31 03:14:38,16312274,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:14:38,16312274,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:14:42,16315708,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:14:42,16316305,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4033,live
+heltec,2026-08-31 03:14:50,16323607,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=7 ip=1,
+heltec,2026-08-31 03:15:50,16383611,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=67 ip=1,
+heltec,2026-08-31 03:16:50,16443617,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=127 ip=1,
+heltec,2026-08-31 03:17:50,16503618,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=187 ip=1,
+heltec,2026-08-31 03:18:50,16563621,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=247 ip=1,
+heltec,2026-08-31 03:19:50,16623622,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=307 ip=1,
+heltec,2026-08-31 03:20:50,16683623,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=367 ip=1,
+heltec,2026-08-31 03:21:50,16743623,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=427 ip=1,
+heltec,2026-08-31 03:22:50,16803626,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=487 ip=1,
+heltec,2026-08-31 03:23:50,16863627,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=547 ip=1,
+heltec,2026-08-31 03:24:39,16912821,drop,,,,,,
+heltec,2026-08-31 03:24:39,16912823,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:24:39,16912823,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:24:42,16916246,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:24:43,16916778,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3957,live
+heltec,2026-08-31 03:24:50,16923629,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=6 ip=1,
+heltec,2026-08-31 03:25:50,16983630,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=66 ip=1,
+heltec,2026-08-31 03:26:50,17043631,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=126 ip=1,
+heltec,2026-08-31 03:27:50,17103632,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=186 ip=1,
+heltec,2026-08-31 03:28:50,17163633,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=246 ip=1,
+heltec,2026-08-31 03:29:50,17223635,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=306 ip=1,
+heltec,2026-08-31 03:30:50,17283636,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=366 ip=1,
+heltec,2026-08-31 03:31:50,17343637,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=426 ip=1,
+heltec,2026-08-31 03:32:50,17403641,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=486 ip=1,
+heltec,2026-08-31 03:33:50,17463644,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=546 ip=1,
+heltec,2026-08-31 03:34:39,17512835,drop,,,,,,
+heltec,2026-08-31 03:34:39,17512837,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:34:39,17512837,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:34:42,17516263,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:34:43,17516861,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4026,live
+heltec,2026-08-31 03:34:50,17523650,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=6 ip=1,
+heltec,2026-08-31 03:35:50,17583654,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=66 ip=1,
+heltec,2026-08-31 03:36:50,17643658,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=126 ip=1,
+heltec,2026-08-31 03:37:50,17703661,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=186 ip=1,
+heltec,2026-08-31 03:38:50,17763662,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=246 ip=1,
+heltec,2026-08-31 03:39:50,17823664,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=306 ip=1,
+heltec,2026-08-31 03:40:50,17883668,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=366 ip=1,
+heltec,2026-08-31 03:41:50,17943669,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=426 ip=1,
+heltec,2026-08-31 03:42:50,18003673,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=486 ip=1,
+heltec,2026-08-31 03:43:50,18063674,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=546 ip=1,
+heltec,2026-08-31 03:44:40,18113723,drop,,,,,,
+heltec,2026-08-31 03:44:40,18113725,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:44:40,18113725,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:44:43,18117147,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:44:44,18117749,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4026,live
+heltec,2026-08-31 03:44:50,18123679,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=5 ip=1,
+heltec,2026-08-31 03:45:50,18183683,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=65 ip=1,
+heltec,2026-08-31 03:46:50,18243688,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=125 ip=1,
+heltec,2026-08-31 03:47:50,18303689,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=185 ip=1,
+heltec,2026-08-31 03:48:50,18363689,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=245 ip=1,
+heltec,2026-08-31 03:49:50,18423692,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=305 ip=1,
+heltec,2026-08-31 03:50:50,18483692,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=365 ip=1,
+heltec,2026-08-31 03:51:50,18543695,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=425 ip=1,
+heltec,2026-08-31 03:52:50,18603695,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=485 ip=1,
+heltec,2026-08-31 03:53:50,18663697,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=545 ip=1,
+heltec,2026-08-31 03:54:41,18714607,drop,,,,,,
+heltec,2026-08-31 03:54:41,18714609,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 03:54:41,18714609,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 03:54:44,18718034,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 03:54:45,18718611,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4004,live
+heltec,2026-08-31 03:54:50,18723699,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=5 ip=1,
+heltec,2026-08-31 03:55:50,18783703,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=65 ip=1,
+heltec,2026-08-31 03:56:50,18843706,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=125 ip=1,
+heltec,2026-08-31 03:57:50,18903706,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=185 ip=1,
+heltec,2026-08-31 03:58:50,18963709,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=245 ip=1,
+heltec,2026-08-31 03:59:50,19023715,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=305 ip=1,
+heltec,2026-08-31 04:00:50,19083716,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=365 ip=1,
+heltec,2026-08-31 04:01:50,19143716,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=425 ip=1,
+heltec,2026-08-31 04:02:50,19203719,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=485 ip=1,
+heltec,2026-08-31 04:03:50,19263721,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=545 ip=1,
+heltec,2026-08-31 04:04:42,19315433,drop,,,,,,
+heltec,2026-08-31 04:04:42,19315435,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:04:42,19315435,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:04:45,19318866,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:04:46,19319421,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3988,live
+heltec,2026-08-31 04:04:50,19323724,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=4 ip=1,
+heltec,2026-08-31 04:05:50,19383728,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=64 ip=1,
+heltec,2026-08-31 04:06:50,19443730,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=124 ip=1,
+heltec,2026-08-31 04:07:50,19503733,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=184 ip=1,
+heltec,2026-08-31 04:08:50,19563736,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=244 ip=1,
+heltec,2026-08-31 04:09:50,19623738,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=304 ip=1,
+heltec,2026-08-31 04:10:50,19683742,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=364 ip=1,
+heltec,2026-08-31 04:11:50,19743745,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=424 ip=1,
+heltec,2026-08-31 04:12:50,19803747,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=484 ip=1,
+heltec,2026-08-31 04:13:50,19863747,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=544 ip=1,
+heltec,2026-08-31 04:14:42,19916211,drop,,,,,,
+heltec,2026-08-31 04:14:42,19916213,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:14:42,19916213,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:14:46,19919635,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:14:46,19920200,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3989,live
+heltec,2026-08-31 04:14:50,19923752,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=3 ip=1,
+heltec,2026-08-31 04:15:50,19983753,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=63 ip=1,
+heltec,2026-08-31 04:16:50,20043768,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=123 ip=1,
+heltec,2026-08-31 04:17:50,20103771,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=183 ip=1,
+heltec,2026-08-31 04:18:50,20163773,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=243 ip=1,
+heltec,2026-08-31 04:19:50,20223773,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=303 ip=1,
+heltec,2026-08-31 04:20:50,20283775,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=363 ip=1,
+heltec,2026-08-31 04:21:50,20343775,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=423 ip=1,
+heltec,2026-08-31 04:22:50,20403780,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=483 ip=1,
+heltec,2026-08-31 04:23:50,20463784,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=543 ip=1,
+heltec,2026-08-31 04:24:43,20517058,drop,,,,,,
+heltec,2026-08-31 04:24:43,20517060,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:24:43,20517060,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:24:47,20520484,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:24:47,20521004,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3946,live
+heltec,2026-08-31 04:24:50,20523790,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=2 ip=1,
+heltec,2026-08-31 04:25:50,20583794,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=62 ip=1,
+heltec,2026-08-31 04:26:50,20643795,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=122 ip=1,
+heltec,2026-08-31 04:27:50,20703797,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=182 ip=1,
+heltec,2026-08-31 04:28:50,20763800,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=242 ip=1,
+heltec,2026-08-31 04:29:50,20823801,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=302 ip=1,
+heltec,2026-08-31 04:30:50,20883806,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=362 ip=1,
+heltec,2026-08-31 04:31:50,20943809,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=422 ip=1,
+heltec,2026-08-31 04:32:50,21003809,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=482 ip=1,
+heltec,2026-08-31 04:33:50,21063812,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=542 ip=1,
+heltec,2026-08-31 04:34:44,21117864,drop,,,,,,
+heltec,2026-08-31 04:34:44,21117866,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:34:44,21117866,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:34:47,21121288,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:34:48,21121865,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4001,live
+heltec,2026-08-31 04:34:50,21123817,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=1 ip=1,
+heltec,2026-08-31 04:35:50,21183819,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=61 ip=1,
+heltec,2026-08-31 04:36:50,21243822,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=121 ip=1,
+heltec,2026-08-31 04:37:50,21303825,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=181 ip=1,
+heltec,2026-08-31 04:38:50,21363826,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=241 ip=1,
+heltec,2026-08-31 04:39:50,21423829,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=301 ip=1,
+heltec,2026-08-31 04:40:50,21483831,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=361 ip=1,
+heltec,2026-08-31 04:41:50,21543834,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=421 ip=1,
+heltec,2026-08-31 04:42:50,21603838,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=481 ip=1,
+heltec,2026-08-31 04:43:50,21663842,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=541 ip=1,
+heltec,2026-08-31 04:44:45,21718734,drop,,,,,,
+heltec,2026-08-31 04:44:45,21718736,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:44:45,21718736,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:44:48,21722166,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:44:49,21722889,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4155,live
+heltec,2026-08-31 04:44:50,21723843,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=0 ip=1,
+heltec,2026-08-31 04:45:50,21783845,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=60 ip=1,
+heltec,2026-08-31 04:46:50,21843851,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=120 ip=1,
+heltec,2026-08-31 04:47:50,21903851,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=180 ip=1,
+heltec,2026-08-31 04:48:50,21963853,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=240 ip=1,
+heltec,2026-08-31 04:49:50,22023856,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=300 ip=1,
+heltec,2026-08-31 04:50:50,22083856,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=360 ip=1,
+heltec,2026-08-31 04:51:50,22143857,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=420 ip=1,
+heltec,2026-08-31 04:52:50,22203857,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=480 ip=1,
+heltec,2026-08-31 04:53:50,22263858,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=540 ip=1,
+heltec,2026-08-31 04:54:46,22319605,drop,,,,,,
+heltec,2026-08-31 04:54:46,22319607,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 04:54:46,22319607,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 04:54:49,22323045,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 04:54:50,22323564,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3959,live
+heltec,2026-08-31 04:54:50,22323861,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=0 ip=1,
+heltec,2026-08-31 04:55:50,22383863,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=60 ip=1,
+heltec,2026-08-31 04:56:50,22443866,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=120 ip=1,
+heltec,2026-08-31 04:57:50,22503871,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=180 ip=1,
+heltec,2026-08-31 04:58:50,22563871,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=240 ip=1,
+heltec,2026-08-31 04:59:50,22623872,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=300 ip=1,
+heltec,2026-08-31 05:00:50,22683876,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=360 ip=1,
+heltec,2026-08-31 05:01:50,22743881,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=420 ip=1,
+heltec,2026-08-31 05:02:50,22803886,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=480 ip=1,
+heltec,2026-08-31 05:03:50,22863890,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=540 ip=1,
+heltec,2026-08-31 05:04:47,22920432,drop,,,,,,
+heltec,2026-08-31 05:04:47,22920434,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:04:47,22920434,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:04:50,22923860,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:04:50,22923893,link,down,,,,,
+heltec,2026-08-31 05:04:51,22924448,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4016,live
+heltec,2026-08-31 05:05:50,22983896,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=59 ip=1,
+heltec,2026-08-31 05:06:50,23043898,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=119 ip=1,
+heltec,2026-08-31 05:07:50,23103901,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=179 ip=1,
+heltec,2026-08-31 05:08:50,23163903,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=239 ip=1,
+heltec,2026-08-31 05:09:50,23223907,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=299 ip=1,
+heltec,2026-08-31 05:10:50,23283910,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=359 ip=1,
+heltec,2026-08-31 05:11:50,23343912,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=419 ip=1,
+heltec,2026-08-31 05:12:50,23403915,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=479 ip=1,
+heltec,2026-08-31 05:13:50,23463918,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=539 ip=1,
+heltec,2026-08-31 05:14:47,23521127,drop,,,,,,
+heltec,2026-08-31 05:14:47,23521129,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:14:47,23521129,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:14:50,23523919,link,down,,,,,
+heltec,2026-08-31 05:14:51,23524553,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:14:52,23525256,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4129,live
+heltec,2026-08-31 05:15:50,23583921,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=58 ip=1,
+heltec,2026-08-31 05:16:50,23643923,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=118 ip=1,
+heltec,2026-08-31 05:17:50,23703923,link,up,5A:AF:97:2E:2B:8B,3,-49,age_s=178 ip=1,
+heltec,2026-08-31 05:18:50,23763925,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=238 ip=1,
+heltec,2026-08-31 05:19:50,23823928,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=298 ip=1,
+heltec,2026-08-31 05:20:50,23883929,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=358 ip=1,
+heltec,2026-08-31 05:21:50,23943929,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=418 ip=1,
+heltec,2026-08-31 05:22:50,24003933,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=478 ip=1,
+heltec,2026-08-31 05:23:50,24063934,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=538 ip=1,
+heltec,2026-08-31 05:24:48,24121835,drop,,,,,,
+heltec,2026-08-31 05:24:48,24121837,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:24:48,24121837,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:24:50,24123935,link,down,,,,,
+heltec,2026-08-31 05:24:51,24125260,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:24:52,24125908,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4073,live
+heltec,2026-08-31 05:25:50,24183938,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=58 ip=1,
+heltec,2026-08-31 05:26:50,24243942,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=118 ip=1,
+heltec,2026-08-31 05:27:50,24303943,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=178 ip=1,
+heltec,2026-08-31 05:28:50,24363943,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=238 ip=1,
+heltec,2026-08-31 05:29:50,24423947,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=298 ip=1,
+heltec,2026-08-31 05:30:50,24483947,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=358 ip=1,
+heltec,2026-08-31 05:31:50,24543949,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=418 ip=1,
+heltec,2026-08-31 05:32:50,24603950,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=478 ip=1,
+heltec,2026-08-31 05:33:50,24663954,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=538 ip=1,
+heltec,2026-08-31 05:34:49,24722610,drop,,,,,,
+heltec,2026-08-31 05:34:49,24722612,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:34:49,24722612,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:34:50,24723955,link,down,,,,,
+heltec,2026-08-31 05:34:52,24726035,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:34:53,24726611,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4001,live
+heltec,2026-08-31 05:35:50,24783957,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=57 ip=1,
+heltec,2026-08-31 05:36:50,24843959,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=117 ip=1,
+heltec,2026-08-31 05:37:50,24903960,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=177 ip=1,
+heltec,2026-08-31 05:38:50,24963961,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=237 ip=1,
+heltec,2026-08-31 05:39:50,25023965,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=297 ip=1,
+heltec,2026-08-31 05:40:50,25083966,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=357 ip=1,
+heltec,2026-08-31 05:41:50,25143969,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=417 ip=1,
+heltec,2026-08-31 05:42:50,25203970,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=477 ip=1,
+heltec,2026-08-31 05:43:50,25263971,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=537 ip=1,
+heltec,2026-08-31 05:44:49,25323217,drop,,,,,,
+heltec,2026-08-31 05:44:49,25323219,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:44:49,25323219,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:44:50,25323976,link,down,,,,,
+heltec,2026-08-31 05:44:53,25326643,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:44:53,25327186,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3969,live
+heltec,2026-08-31 05:45:50,25383977,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=56 ip=1,
+heltec,2026-08-31 05:46:50,25443982,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=116 ip=1,
+heltec,2026-08-31 05:47:50,25503983,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=176 ip=1,
+heltec,2026-08-31 05:48:50,25563984,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=236 ip=1,
+heltec,2026-08-31 05:49:50,25623988,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=296 ip=1,
+heltec,2026-08-31 05:50:50,25683992,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=356 ip=1,
+heltec,2026-08-31 05:51:50,25743996,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=416 ip=1,
+heltec,2026-08-31 05:52:50,25803999,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=476 ip=1,
+heltec,2026-08-31 05:53:50,25864004,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=536 ip=1,
+heltec,2026-08-31 05:54:50,25923880,drop,,,,,,
+heltec,2026-08-31 05:54:50,25923882,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 05:54:50,25923882,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 05:54:50,25924006,link,down,,,,,
+heltec,2026-08-31 05:54:54,25927304,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 05:54:54,25927978,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4098,live
+heltec,2026-08-31 05:55:50,25984010,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=56 ip=1,
+heltec,2026-08-31 05:56:50,26044013,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=116 ip=1,
+heltec,2026-08-31 05:57:50,26104013,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=176 ip=1,
+heltec,2026-08-31 05:58:50,26164016,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=236 ip=1,
+heltec,2026-08-31 05:59:50,26224017,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=296 ip=1,
+heltec,2026-08-31 06:00:50,26284020,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=356 ip=1,
+heltec,2026-08-31 06:01:50,26344021,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=416 ip=1,
+heltec,2026-08-31 06:02:50,26404025,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=476 ip=1,
+heltec,2026-08-31 06:03:50,26464029,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=536 ip=1,
+heltec,2026-08-31 06:04:50,26524033,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=596 ip=1,
+heltec,2026-08-31 06:04:51,26524653,drop,,,,,,
+heltec,2026-08-31 06:04:51,26524655,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:04:51,26524655,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:04:54,26528077,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:04:55,26528675,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4022,live
+heltec,2026-08-31 06:05:50,26584036,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=55 ip=1,
+heltec,2026-08-31 06:06:50,26644040,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=115 ip=1,
+heltec,2026-08-31 06:07:50,26704043,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=175 ip=1,
+heltec,2026-08-31 06:08:50,26764045,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=235 ip=1,
+heltec,2026-08-31 06:09:50,26824048,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=295 ip=1,
+heltec,2026-08-31 06:10:50,26884048,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=355 ip=1,
+heltec,2026-08-31 06:11:50,26944051,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=415 ip=1,
+heltec,2026-08-31 06:12:50,27004052,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=475 ip=1,
+heltec,2026-08-31 06:13:50,27064056,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=535 ip=1,
+heltec,2026-08-31 06:14:50,27124059,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=595 ip=1,
+heltec,2026-08-31 06:14:52,27125551,drop,,,,,,
+heltec,2026-08-31 06:14:52,27125553,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:14:52,27125553,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:14:55,27128978,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:14:56,27129548,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3997,live
+heltec,2026-08-31 06:15:50,27184060,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=54 ip=1,
+heltec,2026-08-31 06:16:50,27244061,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=114 ip=1,
+heltec,2026-08-31 06:17:50,27304063,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=174 ip=1,
+heltec,2026-08-31 06:18:50,27364065,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=234 ip=1,
+heltec,2026-08-31 06:19:50,27424067,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=294 ip=1,
+heltec,2026-08-31 06:20:50,27484070,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=354 ip=1,
+heltec,2026-08-31 06:21:50,27544072,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=414 ip=1,
+heltec,2026-08-31 06:22:50,27604076,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=474 ip=1,
+heltec,2026-08-31 06:23:50,27664077,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=534 ip=1,
+heltec,2026-08-31 06:24:50,27724083,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=594 ip=1,
+heltec,2026-08-31 06:24:53,27726222,drop,,,,,,
+heltec,2026-08-31 06:24:53,27726224,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:24:53,27726224,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:24:56,27729663,assoc_connected,0,46:AF:97:2E:2B:86,3,-73,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:24:56,27730226,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-72,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4004,live BSSID_CHANGE
+heltec,2026-08-31 06:25:50,27784085,link,up,46:AF:97:2E:2B:86,3,-72,age_s=53 ip=1,
+heltec,2026-08-31 06:26:50,27844089,link,up,46:AF:97:2E:2B:86,3,-72,age_s=113 ip=1,
+heltec,2026-08-31 06:27:50,27904090,link,up,46:AF:97:2E:2B:86,3,-73,age_s=173 ip=1,
+heltec,2026-08-31 06:28:50,27964093,link,up,46:AF:97:2E:2B:86,3,-72,age_s=233 ip=1,
+heltec,2026-08-31 06:29:50,28024098,link,up,46:AF:97:2E:2B:86,3,-72,age_s=293 ip=1,
+heltec,2026-08-31 06:30:50,28084101,link,up,46:AF:97:2E:2B:86,3,-72,age_s=353 ip=1,
+heltec,2026-08-31 06:31:50,28144101,link,up,46:AF:97:2E:2B:86,3,-74,age_s=413 ip=1,
+heltec,2026-08-31 06:32:50,28204103,link,up,46:AF:97:2E:2B:86,3,-72,age_s=473 ip=1,
+heltec,2026-08-31 06:33:50,28264103,link,up,46:AF:97:2E:2B:86,3,-71,age_s=533 ip=1,
+heltec,2026-08-31 06:34:50,28324107,link,up,46:AF:97:2E:2B:86,3,-72,age_s=593 ip=1,
+heltec,2026-08-31 06:34:53,28327087,drop,,,,,,
+heltec,2026-08-31 06:34:53,28327089,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:34:53,28327089,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-72,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:34:57,28330525,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:34:57,28331040,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3953,live BSSID_CHANGE
+heltec,2026-08-31 06:35:50,28384111,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=53 ip=1,
+heltec,2026-08-31 06:36:50,28444111,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=113 ip=1,
+heltec,2026-08-31 06:37:50,28504112,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=173 ip=1,
+heltec,2026-08-31 06:38:50,28564113,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=233 ip=1,
+heltec,2026-08-31 06:39:50,28624114,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=293 ip=1,
+heltec,2026-08-31 06:40:50,28684116,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=353 ip=1,
+heltec,2026-08-31 06:41:50,28744117,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=413 ip=1,
+heltec,2026-08-31 06:42:50,28804120,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=473 ip=1,
+heltec,2026-08-31 06:43:50,28864122,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=533 ip=1,
+heltec,2026-08-31 06:44:50,28924122,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=593 ip=1,
+heltec,2026-08-31 06:44:54,28927893,drop,,,,,,
+heltec,2026-08-31 06:44:54,28927895,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:44:54,28927895,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:44:57,28931318,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:44:58,28931925,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4032,live
+heltec,2026-08-31 06:45:50,28984123,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=52 ip=1,
+heltec,2026-08-31 06:46:50,29044128,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=112 ip=1,
+heltec,2026-08-31 06:47:50,29104132,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=172 ip=1,
+heltec,2026-08-31 06:48:50,29164135,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=232 ip=1,
+heltec,2026-08-31 06:49:50,29224137,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=292 ip=1,
+heltec,2026-08-31 06:50:50,29284139,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=352 ip=1,
+heltec,2026-08-31 06:51:50,29344139,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=412 ip=1,
+heltec,2026-08-31 06:52:50,29404142,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=472 ip=1,
+heltec,2026-08-31 06:53:50,29464144,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=532 ip=1,
+heltec,2026-08-31 06:54:50,29524148,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=592 ip=1,
+heltec,2026-08-31 06:54:55,29528703,drop,,,,,,
+heltec,2026-08-31 06:54:55,29528705,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 06:54:55,29528705,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 06:54:58,29532127,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 06:54:59,29532694,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3991,live
+heltec,2026-08-31 06:55:50,29584149,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=51 ip=1,
+heltec,2026-08-31 06:56:50,29644153,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=111 ip=1,
+heltec,2026-08-31 06:57:50,29704157,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=171 ip=1,
+heltec,2026-08-31 06:58:50,29764161,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=231 ip=1,
+heltec,2026-08-31 06:59:50,29824163,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=291 ip=1,
+heltec,2026-08-31 07:00:50,29884168,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=351 ip=1,
+heltec,2026-08-31 07:01:50,29944171,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=411 ip=1,
+heltec,2026-08-31 07:02:50,30004174,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=471 ip=1,
+heltec,2026-08-31 07:03:50,30064178,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=531 ip=1,
+heltec,2026-08-31 07:04:50,30124178,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=591 ip=1,
+heltec,2026-08-31 07:04:56,30129541,drop,,,,,,
+heltec,2026-08-31 07:04:56,30129543,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 07:04:56,30129543,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 07:04:59,30132975,assoc_connected,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 07:05:00,30133494,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3953,live BSSID_CHANGE
+heltec,2026-08-31 07:05:50,30184182,link,up,46:AF:97:2E:2B:86,3,-75,age_s=50 ip=1,
+heltec,2026-08-31 07:06:50,30244183,link,up,46:AF:97:2E:2B:86,3,-74,age_s=110 ip=1,
+heltec,2026-08-31 07:07:50,30304187,link,up,46:AF:97:2E:2B:86,3,-73,age_s=170 ip=1,
+heltec,2026-08-31 07:08:50,30364188,link,up,46:AF:97:2E:2B:86,3,-75,age_s=230 ip=1,
+heltec,2026-08-31 07:09:50,30424191,link,up,46:AF:97:2E:2B:86,3,-74,age_s=290 ip=1,
+heltec,2026-08-31 07:10:50,30484191,link,up,46:AF:97:2E:2B:86,3,-75,age_s=350 ip=1,
+heltec,2026-08-31 07:11:50,30544195,link,up,46:AF:97:2E:2B:86,3,-75,age_s=410 ip=1,
+heltec,2026-08-31 07:12:50,30604199,link,up,46:AF:97:2E:2B:86,3,-74,age_s=470 ip=1,
+heltec,2026-08-31 07:13:50,30664203,link,up,46:AF:97:2E:2B:86,3,-74,age_s=530 ip=1,
+heltec,2026-08-31 07:14:50,30724205,link,up,46:AF:97:2E:2B:86,3,-74,age_s=590 ip=1,
+heltec,2026-08-31 07:14:57,30730449,drop,,,,,,
+heltec,2026-08-31 07:14:57,30730451,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 07:14:57,30730451,assoc_disconnected,8,46:AF:97:2E:2B:86,3,-74,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 07:15:00,30733891,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 07:15:01,30734485,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4036,live BSSID_CHANGE
+heltec,2026-08-31 07:15:50,30784208,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=49 ip=1,
+heltec,2026-08-31 07:16:50,30844209,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=109 ip=1,
+heltec,2026-08-31 07:17:50,30904212,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=169 ip=1,
+heltec,2026-08-31 07:18:50,30964214,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=229 ip=1,
+heltec,2026-08-31 07:19:50,31024217,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=289 ip=1,
+heltec,2026-08-31 07:20:50,31084218,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=349 ip=1,
+heltec,2026-08-31 07:21:50,31144221,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=409 ip=1,
+heltec,2026-08-31 07:22:50,31204221,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=469 ip=1,
+heltec,2026-08-31 07:23:50,31264221,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=529 ip=1,
+heltec,2026-08-31 07:24:50,31324221,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=589 ip=1,
+heltec,2026-08-31 07:24:57,31331321,drop,,,,,,
+heltec,2026-08-31 07:24:57,31331323,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 07:24:58,31331323,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 07:25:01,31334753,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 07:25:02,31335347,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4026,live
+heltec,2026-08-31 07:25:50,31384224,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=48 ip=1,
+heltec,2026-08-31 07:26:50,31444228,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=108 ip=1,
+heltec,2026-08-31 07:27:50,31504230,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=168 ip=1,
+heltec,2026-08-31 07:28:50,31564230,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=228 ip=1,
+heltec,2026-08-31 07:29:50,31624232,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=288 ip=1,
+heltec,2026-08-31 07:30:50,31684236,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=348 ip=1,
+heltec,2026-08-31 07:31:50,31744236,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=408 ip=1,
+heltec,2026-08-31 07:32:50,31804238,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=468 ip=1,
+heltec,2026-08-31 07:33:50,31864238,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=528 ip=1,
+heltec,2026-08-31 07:34:50,31924238,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=588 ip=1,
+heltec,2026-08-31 07:34:58,31932200,drop,,,,,,
+heltec,2026-08-31 07:34:58,31932202,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 07:34:58,31932202,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 07:35:02,31935642,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 07:35:02,31936262,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4062,live
+heltec,2026-08-31 07:35:50,31984240,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=47 ip=1,
+heltec,2026-08-31 07:36:50,32044240,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=107 ip=1,
+heltec,2026-08-31 07:37:51,32104242,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=167 ip=1,
+heltec,2026-08-31 07:38:50,32164247,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=227 ip=1,
+heltec,2026-08-31 07:39:50,32224247,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=287 ip=1,
+heltec,2026-08-31 07:40:50,32284251,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=347 ip=1,
+heltec,2026-08-31 07:41:50,32344251,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=407 ip=1,
+heltec,2026-08-31 07:42:50,32404252,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=467 ip=1,
+heltec,2026-08-31 07:43:50,32464256,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=527 ip=1,
+heltec,2026-08-31 07:44:50,32524256,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=587 ip=1,
+heltec,2026-08-31 07:44:59,32533089,drop,,,,,,
+heltec,2026-08-31 07:44:59,32533092,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-31 07:44:59,32533092,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-31 07:45:03,32536531,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-31 07:45:03,32537123,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4034,live
+heltec,2026-08-31 07:45:50,32584257,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=47 ip=1,
+heltec,2026-08-31 07:46:50,32644261,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=107 ip=1,
+heltec,2026-08-31 07:47:50,32704264,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=167 ip=1,
