@@ -42,3 +42,4 @@ the operator with a macOS notification plus a spoken line when it is time to cut
 Regression tests: `python3 -m unittest tools/bench/experiments/test_apreboot.py` (synthetic
 transcripts plus the phase machine end to end against a fake serial port, no hardware). Operator
 runbook, pass criteria and prerequisites: `docs/bench-ap-reboot.md`.
+- `ntpsync.py` — NTP-01: triggert --ntpsync in Schleife, misst ok/timeout + rtt-Verteilung (--parse-only fuer alte Logs)
