@@ -3154,7 +3154,8 @@ void esp32loop()
             {
                 sdmap_boundary_timer = millis();
 
-                if (lv_tabview_get_tab_act(tv) == 3 && (gpsData.latitude != 0.0 || gpsData.longitude != 0.0))
+                // TD-07: kein Auto-Recenter, solange der Nutzer manuell gepannt hat
+                if (lv_tabview_get_tab_act(tv) == 3 && !tdeck_map_user_panned() && (gpsData.latitude != 0.0 || gpsData.longitude != 0.0))
                 {
                     if (!sdmap_in_current_tile(gpsData.latitude, gpsData.longitude))
                     {

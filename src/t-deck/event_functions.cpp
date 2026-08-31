@@ -895,9 +895,16 @@ void tabview_event_cb(lv_event_t * e)
                     sdmap_lastKnownLon = meshcom_settings.node_lon;
                 }
 
-                sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+                // TD-07: do not yank the view back to the own position on tab
+                // switch while the user has panned -- see tdeck_map_pan(). The
+                // own-position marker still gets repositioned either way (it
+                // must not fight the pan, but it must not go stale either);
+                // refresh_map() only moves marker widgets against whatever
+                // origin the last sdmap_refresh() set, it does not redraw tiles.
+                if (!tdeck_map_user_panned())
+                    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
                 refresh_map(meshcom_settings.node_map);
-                
+
                 break;
             case 4: // GPS
                 tdeck_refresh_track_view();

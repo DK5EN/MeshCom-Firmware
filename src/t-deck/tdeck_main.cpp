@@ -726,6 +726,56 @@ static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
     act_key = keypad_get_key();
     if (act_key != 0)
     {
+        bool bSPEC=false;
+
+        // Map-context keys (TD-08 fix): dispatched on the raw key, before the
+        // iKeyBoardType remaps below, so the symbol-input mode (type 4) can no
+        // longer eat them the way it already ate g/h. Map tab only (tab_act
+        // == 3) -- there is no text field there, so intercepting these seven
+        // keys ahead of the remap cannot affect typing on any other tab.
+        if(lv_tabview_get_tab_act(tv) == 3)
+        {
+            switch (act_key)
+            {
+                case 0x67: case 0x47: // g / G -> zoom in
+                    tdeck_map_zoom(1);
+                    bSPEC=true;
+                    break;
+                case 0x68: case 0x48: // h / H -> zoom out
+                    tdeck_map_zoom(-1);
+                    bSPEC=true;
+                    break;
+                case 0x69: case 0x49: // i / I -> pan up
+                    tdeck_map_pan(0, -(sdmap_view_h() / 4));
+                    bSPEC=true;
+                    break;
+                case 0x6a: case 0x4a: // j / J -> pan left
+                    tdeck_map_pan(-(sdmap_view_w() / 4), 0);
+                    bSPEC=true;
+                    break;
+                case 0x6b: case 0x4b: // k / K -> pan down
+                    tdeck_map_pan(0, sdmap_view_h() / 4);
+                    bSPEC=true;
+                    break;
+                case 0x6c: case 0x4c: // l / L -> pan right
+                    tdeck_map_pan(sdmap_view_w() / 4, 0);
+                    bSPEC=true;
+                    break;
+                case 0x6f: case 0x4f: // o / O -> recenter on own position
+                    tdeck_map_recenter();
+                    bSPEC=true;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if(bSPEC)
+        {
+            // Consumed above -- skip the remap and the rest of the special-key
+            // chain below for this key.
+        }
+        else
         if(iKeyBoardType == 2)
         {
             if(act_key >= 0x61 && act_key <= 0x7a)
@@ -822,7 +872,9 @@ static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
         if(!meshcom_settings.node_keyboardlock)
             tft_on();
 
-        bool bSPEC=false;
+        // NOTE: bSPEC is declared above, before the map-key dispatch (TD-08) --
+        // do not redeclare it here, or a map key already consumed above would
+        // be reset to "not special".
 
         if(lv_tabview_get_tab_act(tv) != 1 && lv_tabview_get_tab_act(tv) != 7)
         {
@@ -848,17 +900,8 @@ static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
                 bSPEC=true;
             }
 
-            // g / h on the map tab: zoom in / out (no SYM needed)
-            if(lv_tabview_get_tab_act(tv) == 3 && (act_key == 0x67 || act_key == 0x47)) // g
-            {
-                tdeck_map_zoom(1);
-                bSPEC=true;
-            }
-            if(lv_tabview_get_tab_act(tv) == 3 && (act_key == 0x68 || act_key == 0x48)) // h
-            {
-                tdeck_map_zoom(-1);
-                bSPEC=true;
-            }
+            // g/h/i/j/k/l/o on the map tab are dispatched earlier, ahead of the
+            // SYM remap -- see the switch at the top of this function (TD-08).
 
             if(act_key == 0x2b) // SYM + O -> Zoom raus (wie Touch-Button)
             {

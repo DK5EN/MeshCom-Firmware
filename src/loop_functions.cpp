@@ -25,6 +25,7 @@
 #include "printfdeb_functions.h"
 
 #include "via_functions.h"
+#include "charset_filter.h"
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -3875,7 +3876,17 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
 
     if(strcmp(meshcom_settings.node_atxt, "none") != 0 && meshcom_settings.node_atxt[0] != 0x00)
     {
-        snprintf(catxt,  sizeof(catxt), "%s", meshcom_settings.node_atxt);
+        // CHR-02: strip APRS structure separators and truncate on a UTF-8
+        // boundary at the same 25-byte cap decodeAPRSPOS() applies on
+        // receive (aprs_functions.cpp:632) -- otherwise a receiver's
+        // byte-counting parser can inherit a split multi-byte sequence.
+        char catxt_src[sizeof(meshcom_settings.node_atxt)];
+        snprintf(catxt_src, sizeof(catxt_src), "%s", meshcom_settings.node_atxt);
+        size_t iatxt = charset_filter_apply(catxt_src, strlen(catxt_src), CHARSET_FILTER_STRIP_SEPARATORS);
+        iatxt = charset_utf8_safe_truncate(catxt_src, iatxt, 25);
+        catxt_src[iatxt] = 0x00;
+
+        snprintf(catxt,  sizeof(catxt), "%s", catxt_src);
     }
 
     if(strcmp(meshcom_settings.node_name, "none") != 0 && meshcom_settings.node_name[0] != 0x00)

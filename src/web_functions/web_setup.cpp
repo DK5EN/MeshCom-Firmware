@@ -405,12 +405,21 @@ void webSetup_setParam(setupStruct *setupData){
     } else 
 
     if(setupData->paramName.equals("sendpos")) {
-        snprintf(message_text, sizeof(message_text), "--nomsgall %s", setupData->paramValue.c_str());
-        commandAction(message_text, bPhoneReady);
-        setupData->returnCode = (bNoMSGtoALL == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
-        setupData->returnValue = bNoMSGtoALL?"on":"off";
+        // WEB-04: this used to be a copy-paste of the nomsgall block above it
+        // and toggled bNoMSGtoALL instead of sending a position. sendpos is
+        // a one-shot action, not a settable parameter -- fire it the same
+        // way webFunctionCall()'s "sendpos" case does for the /callfunction/
+        // endpoint the web UI's "Send Position" button already uses
+        // (web_nodefunctioncalls.cpp), and report success once it has run.
+        if(bDisplayTrack) {
+            commandAction((char*)"--sendtrack", bPhoneReady);
+        } else {
+            commandAction((char*)"--sendpos", bPhoneReady);
+        }
+        setupData->returnCode = WS_RETURNCODE_OKAY;
+        setupData->returnValue = "sent";
         return;
-    } else 
+    } else
 
     if(setupData->paramName.equals("setssid")) {
         snprintf(message_text, sizeof(message_text), "--setssid %s", setupData->paramValue.c_str());

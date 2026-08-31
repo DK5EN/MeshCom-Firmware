@@ -1928,6 +1928,97 @@ void tdeck_map_zoom(int dir)
     add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
 }
 
+// TD-07: pan state. While s_map_user_panned is set, the four auto-recentre
+// call sites (tab switch to MAP, set_map(), tdeck_add_pos_point() on an own-
+// position beacon, the 30 s tile-boundary poll in esp32_main.cpp) must not
+// override the view centre the user panned to. sdmap_lastKnownLat/Lon keep
+// tracking the real GPS/own position throughout -- that is what the own-
+// position marker (add_map_point / refresh_map) draws from, so panning never
+// moves the GPS marker itself, only the viewport around it.
+static bool   s_map_user_panned = false;
+static double s_map_pan_lat = 0.0;
+static double s_map_pan_lon = 0.0;
+
+bool tdeck_map_user_panned()
+{
+    return s_map_user_panned;
+}
+
+/**
+ * pans the SD map by (dxPx, dyPx) screen pixels at the current zoom, keeping
+ * the pan centred wherever the user left it until tdeck_map_recenter() is
+ * called. Single implementation for the keyboard i/j/k/l keys.
+ */
+void tdeck_map_pan(int dxPx, int dyPx)
+{
+    double lat = s_map_user_panned ? s_map_pan_lat : sdmap_lastKnownLat;
+    double lon = s_map_user_panned ? s_map_pan_lon : sdmap_lastKnownLon;
+    if (lat == 0.0 && lon == 0.0)
+    {
+        lat = meshcom_settings.node_lat;
+        lon = meshcom_settings.node_lon;
+    }
+    sdmap_pan_latlon(&lat, &lon, dxPx, dyPx);
+    s_map_pan_lat = lat;
+    s_map_pan_lon = lon;
+    s_map_user_panned = true;
+
+    // PERF (TD-07, tile cache filed separately): sdmap_refresh() has no
+    // decoded-tile cache -- every call here re-reads and re-decodes every
+    // intersecting SD tile from scratch. Measured 0.33-0.79 s per recompose
+    // at 20 MHz SD clock (docs/tdeck-findings-20260828.md SS5), PNG decode
+    // dominating at ~170 ms/tile. Each pan keypress pays this cost; a held
+    // key repeats it per repeat event, so it is discrete-step usable but not
+    // smooth. Accepted for v1 per operator decision.
+    sdmap_refresh(map_ta, s_map_pan_lat, s_map_pan_lon);
+    refresh_map(meshcom_settings.node_map);
+    // The GPS/own-position marker always tracks the real position, never the
+    // pan point (TD-07 requirement: pan must not fight the marker draw).
+    add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
+}
+
+/**
+ * current SD map view centre: the panned point while the user has panned,
+ * the tracked own/GPS position otherwise. Used by call sites that redraw the
+ * viewport (e.g. on a map-set switch) so a pan survives them.
+ */
+static void tdeck_map_view_center(double * lat, double * lon)
+{
+    if (s_map_user_panned)
+    {
+        *lat = s_map_pan_lat;
+        *lon = s_map_pan_lon;
+    }
+    else
+    {
+        *lat = sdmap_lastKnownLat;
+        *lon = sdmap_lastKnownLon;
+    }
+}
+
+/**
+ * clears the pan and recentres the SD map on the own position, like the
+ * automatic recentre paths used to do unconditionally.
+ */
+void tdeck_map_recenter()
+{
+    s_map_user_panned = false;
+
+    if (gpsData.latitude != 0.0 || gpsData.longitude != 0.0)
+    {
+        sdmap_lastKnownLat = gpsData.latitude;
+        sdmap_lastKnownLon = gpsData.longitude;
+    }
+    if (sdmap_lastKnownLat == 0.0 && sdmap_lastKnownLon == 0.0)
+    {
+        sdmap_lastKnownLat = meshcom_settings.node_lat;
+        sdmap_lastKnownLon = meshcom_settings.node_lon;
+    }
+    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+    refresh_map(meshcom_settings.node_map);
+    add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
+}
+
 /**
  * redraws the map
  */
@@ -1989,7 +2080,13 @@ void set_map(int iMap)
                     lv_obj_set_scrollbar_mode(vp, LV_SCROLLBAR_MODE_OFF);
                 }
             }
-            sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+            // TD-07: a map-set switch still redraws (the tile set changed),
+            // but stays on the panned point instead of yanking back to GPS.
+            {
+                double centerLat, centerLon;
+                tdeck_map_view_center(&centerLat, &centerLon);
+                sdmap_refresh(map_ta, centerLat, centerLon);
+            }
             map_x[iMap] = sdmap_view_w();
             map_y[iMap] = sdmap_view_h();
             break;
@@ -3750,7 +3847,11 @@ void tdeck_add_pos_point(String callsign, double u_dlat, char lat_c, double u_dl
             sdmap_lastKnownLon = meshcom_settings.node_lon;
         }
 
-        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+        // TD-07: an incoming own-position beacon still updates the tracked
+        // GPS position above and the marker draw at the call site below, but
+        // must not snap the viewport back while the user has panned.
+        if (!tdeck_map_user_panned())
+            sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
     }
 
     #endif

@@ -16,6 +16,10 @@
 
 #include <unity.h>
 #include <string.h>
+#include <stdio.h>
+
+#include <Arduino.h>
+#include <configuration.h> // BLE_JSON_PAYLOAD_MAX -- test/support shim, see there
 
 #include <ble_json_frame.h>
 
@@ -155,6 +159,84 @@ static void test_schlechtester_heutiger_fall_passt_in_max_msg_len_phone(void)
     TEST_ASSERT_GREATER_THAN_UINT16(250, len);
 }
 
+// ---------------------------------------------------------- JSN-01: Escaping
+//
+// Web-Endpuenkte (web_functions.cpp) und die BLE-Registerbauer
+// (command_functions.cpp) bauen ihre JsonDocuments genauso -- doc["key"] =
+// value -- und verlassen sich auf denselben ArduinoJson-Serialisierer wie
+// bleJsonFrame() hier. Es gibt keinen separaten Escaper mehr zu testen (der
+// von EXTUDP, strEsc(), ist entfernt -- er escapte ein zweites Mal, nachdem
+// ArduinoJson es schon getan hatte). Dieser Test deckt also web_functions.cpp
+// und command_functions.cpp mit ab, nicht nur bleJsonFrame() selbst.
+
+static void test_sonderzeichen_im_wert_ueberleben_escape_und_reparse(void)
+{
+    JsonDocument doc;
+    doc["TYP"] = "X";
+    const char *tricky = "a\"b\\c\nd\te\rf";
+    doc["V"] = tricky;
+
+    uint8_t buf[128];
+    uint16_t len = bleJsonFrame(doc, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN_UINT16(0, len);
+
+    JsonDocument parsed;
+    DeserializationError err = deserializeJson(parsed, (const char *)buf + 1, len - 1);
+    TEST_ASSERT_FALSE(err);
+    TEST_ASSERT_EQUAL_STRING(tricky, parsed["V"] | "");
+}
+
+// ---------------------------------------------------------- JSN-01: Fail-Soft-Kuerzung
+
+static void test_fail_soft_kuerzt_optionale_felder_bleibt_gueltiges_json(void)
+{
+    // Absichtlich groesser als BLE_JSON_PAYLOAD_MAX, mit mehreren optionalen
+    // Feldern nach TYP -- wie ein realer Registerbauer, nur uebertrieben groß.
+    JsonDocument doc;
+    doc["TYP"] = "TM";
+    static char filler[6][64];
+    for (int i = 0; i < 6; i++)
+    {
+        memset(filler[i], 'a' + i, sizeof(filler[i]) - 1);
+        filler[i][sizeof(filler[i]) - 1] = 0;
+        char key[8];
+        snprintf(key, sizeof(key), "F%d", i);
+        doc[key] = filler[i];
+    }
+    TEST_ASSERT_GREATER_THAN_size_t(BLE_JSON_PAYLOAD_MAX, measureJson(doc));
+
+    uint8_t buf[512];
+    uint16_t len = bleJsonFrameFailSoft(doc, buf, sizeof(buf), BLE_JSON_PAYLOAD_MAX);
+
+    JsonDocument parsed;
+    DeserializationError err = deserializeJson(parsed, (const char *)buf + 1, len - 1);
+    TEST_ASSERT_FALSE(err);
+    TEST_ASSERT_EQUAL_STRING("TM", parsed["TYP"] | "");
+    // At least one optional field had to be dropped to fit the budget -- the
+    // old code would instead have cut the serialised bytes mid-string here.
+    TEST_ASSERT_LESS_THAN_size_t(7, parsed.as<JsonObject>().size());
+}
+
+static void test_fail_soft_behaelt_typ_wenn_es_allein_das_budget_sprengt(void)
+{
+    JsonDocument doc;
+    doc["TYP"] = "TM";
+    doc["EXTRA"] = "gets dropped";
+
+    uint8_t buf[128];
+    // payload_max kleiner als selbst {"TYP":"TM"} allein: die Schleife stoppt
+    // bei obj.size()==1 statt TYP zu entfernen, und bleJsonFrame() puffert
+    // trotzdem sicher (nie ein Speicherueberlauf), auch wenn das Ergebnis den
+    // angeforderten Budget-Wert ueberschreitet.
+    uint16_t len = bleJsonFrameFailSoft(doc, buf, sizeof(buf), 3);
+
+    JsonDocument parsed;
+    DeserializationError err = deserializeJson(parsed, (const char *)buf + 1, len - 1);
+    TEST_ASSERT_FALSE(err);
+    TEST_ASSERT_EQUAL_STRING("TM", parsed["TYP"] | "");
+    TEST_ASSERT_FALSE(parsed["EXTRA"].is<const char *>());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -163,5 +245,8 @@ int main(int, char **)
     RUN_TEST(test_kontrolle_alte_schranke_ueberschreibt_den_puffer);
     RUN_TEST(test_leerer_oder_zu_kleiner_puffer_schreibt_nichts);
     RUN_TEST(test_schlechtester_heutiger_fall_passt_in_max_msg_len_phone);
+    RUN_TEST(test_sonderzeichen_im_wert_ueberleben_escape_und_reparse);
+    RUN_TEST(test_fail_soft_kuerzt_optionale_felder_bleibt_gueltiges_json);
+    RUN_TEST(test_fail_soft_behaelt_typ_wenn_es_allein_das_budget_sprengt);
     return UNITY_END();
 }

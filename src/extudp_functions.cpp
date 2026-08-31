@@ -33,7 +33,6 @@ bool hasExternIPaddress = false;
 
 String s_extern_node_ip = "";
 
-String strExtOutput;
 String str_ip;
 
 // PT-01: apip, extern_node_ip and UdpExtern below are only touched by the
@@ -435,7 +434,7 @@ void getExternUDP()
 #endif // !NATIVE_BUILD
 
 // PT-01: sendExtern() (and everything below it -- queueExtern(),
-// flushExternQueue(), sendExternHeartbeat(), resetExternUDP(), strEsc())
+// flushExternQueue(), sendExternHeartbeat(), resetExternUDP())
 // is the outbound path to the EXTUDP peer: it decodes an APRS frame off the
 // mesh and re-serializes it as JSON onto UdpExtern (guarded above). None of
 // it is reachable from getExtern()/handleExternTelemetry(), the inbound
@@ -523,7 +522,6 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     sniprintf(_long_c, sizeof(_long_c), "%c", aprspos.lon_c);
 
     JsonDocument cJson;
-    int json_len = 0;
 
     // build the json with Arduino JSON
     cJson["src_type"] = src_type;
@@ -559,13 +557,14 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
 
     // clear the buffer
     memset(c_json, 0x00, sizeof(c_json));
-    // serialize the json
-    json_len = measureJson(cJson);
-    serializeJson(cJson, c_json, json_len + 1);
+    // JSN-01: bound by the buffer, not by measureJson() -- a document longer
+    // than c_json overflowed it (BND-03 pattern). serializeJson() stops at
+    // bufsize-1 and null-terminates; see src/ble_json_frame.h for the BLE
+    // counterpart of this same fix.
+    serializeJson(cJson, c_json, sizeof(c_json));
 
 
     JsonDocument ctJson;
-    int tjson_len = 0;
 
     // Telemtrie
     if(strcmp(src_type, "node") == 0)
@@ -583,9 +582,8 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
       ctJson["co2"] = meshcom_settings.node_co2;
 
       // clear the buffer
-      // serialize the json
-      tjson_len = measureJson(ctJson);
-      serializeJson(ctJson, c_tjson, tjson_len + 1);
+      // JSN-01: bound by the buffer, not by measureJson().
+      serializeJson(ctJson, c_tjson, sizeof(c_tjson));
 
     }
     if(strcmp(src_type, "lora") == 0)
@@ -604,9 +602,8 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
       ctJson["co2"] = aprspos.co2;
 
       // clear the buffer
-      // serialize the json
-      tjson_len = measureJson(ctJson);
-      serializeJson(ctJson, c_tjson, tjson_len + 1);
+      // JSN-01: bound by the buffer, not by measureJson().
+      serializeJson(ctJson, c_tjson, sizeof(c_tjson));
 
     }
   }
@@ -618,14 +615,15 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     if(aprsmsg.msg_destination_path != "100001")
     {
       JsonDocument cJson;
-      int json_len = 0;
 
       // build the json with Arduino JSON
       cJson["src_type"] = src_type;
       cJson["type"] = "msg";
       cJson["src"] = aprsmsg.msg_source_path.c_str();
       cJson["dst"] = aprsmsg.msg_destination_path.c_str();
-      cJson["msg"] = strEsc(aprsmsg.msg_payload).c_str();
+      // JSN-01: assign raw -- ArduinoJson escapes JSON strings on
+      // serializeJson() already; a separate escaper here double-escaped.
+      cJson["msg"] = aprsmsg.msg_payload.c_str();
       cJson["msg_id"] = _msgId;
       
       // add firmware version if not a node
@@ -644,9 +642,8 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
 
       // clear the buffer
       memset(c_json, 0x00, sizeof(c_json));
-      // serialize the json
-      json_len = measureJson(cJson);
-      serializeJson(cJson, c_json, json_len + 1);
+      // JSN-01: bound by the buffer, not by measureJson().
+      serializeJson(cJson, c_json, sizeof(c_json));
 
       }
   }
@@ -808,19 +805,9 @@ void resetExternUDP()
   }
 }
 
-String strEsc(String strInput)
-{
-  strExtOutput = "";
-  for(int ip=0; ip<(int)strInput.length(); ip++)
-  {
-    if(strInput.charAt(ip) == '"' || strInput.charAt(ip) == '\\')
-    {
-      strExtOutput.concat('\\');
-    }
-
-    strExtOutput.concat(strInput.charAt(ip));
-  }
-
-  return strExtOutput;
-}
+// JSN-01: strEsc() used to live here and hand-escaped '"'/'\\' before handing
+// the string to ArduinoJson, which escapes JSON strings itself on
+// serializeJson() -- the result was double-escaped ("\\\"" for a literal
+// quote). Removed; see the single former call site in sendExtern() above,
+// which now assigns the raw string straight into the JsonDocument.
 #endif // !NATIVE_BUILD

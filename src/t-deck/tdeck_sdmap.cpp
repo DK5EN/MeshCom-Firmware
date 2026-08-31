@@ -41,6 +41,29 @@ static double sdmap_lat2yf(double lat, int zoom)
     return (1.0 - asinh(tan(latRad)) / M_PI) / 2.0 * (double)(1 << zoom);
 }
 
+// Inverse of sdmap_lon2xf / sdmap_lat2yf (TD-07: needed to turn a pan step in
+// screen pixels back into a virtual centre lat/lon for sdmap_refresh()).
+static double sdmap_xf2lon(double xf, int zoom)
+{
+    return xf / (double)(1 << zoom) * 360.0 - 180.0;
+}
+
+static double sdmap_yf2lat(double yf, int zoom)
+{
+    double n = M_PI - 2.0 * M_PI * yf / (double)(1 << zoom);
+    return 180.0 / M_PI * atan(sinh(n));
+}
+
+// Shifts (*lat, *lon) by (dxPx, dyPx) screen pixels at the current zoom level
+// and writes the result back. Pure coordinate math, no SD/redraw.
+void sdmap_pan_latlon(double * lat, double * lon, int dxPx, int dyPx)
+{
+    double gx = sdmap_lon2xf(*lon, sdmap_zoom) * SDMAP_TILE_PX + dxPx;
+    double gy = sdmap_lat2yf(*lat, sdmap_zoom) * SDMAP_TILE_PX + dyPx;
+    *lon = sdmap_xf2lon(gx / SDMAP_TILE_PX, sdmap_zoom);
+    *lat = sdmap_yf2lat(gy / SDMAP_TILE_PX, sdmap_zoom);
+}
+
 bool sdmap_in_current_tile(double lat, double lon)
 {
     int xt = (int)sdmap_lon2xf(lon, sdmap_zoom);

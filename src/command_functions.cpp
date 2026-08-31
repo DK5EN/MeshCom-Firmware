@@ -9,6 +9,7 @@
 #include "mheard_functions.h"
 #include "udp_functions.h"
 #include "extudp_functions.h"
+#include "ble_json_frame.h"
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
 #include "configuration.h"
@@ -100,6 +101,31 @@ char msg_detail[100];
 bool bRxFromPhone = false;
 
 size_t json_len = 0;
+
+// JSN-01: shared sender for the BLE "register" builders below (TM/W/IO/I/SE/
+// S1/SW/S2/G/SN/AN/SA/CONFFIN). All thirteen call sites used to
+// serializeJson(doc, print_buff, measureJson(doc)) -- bounding the write by
+// the *document*, not by sizeof(print_buff), so a document longer than the
+// 350-byte scratch buffer overflowed it (the same BND-03 pattern
+// src/ble_json_frame.h exists to prevent). The result was then clamped to
+// MAX_MSG_LEN_PHONE-2 raw bytes, which can cut a multi-byte value mid-string
+// and hand the phone JSON it cannot parse
+// (docs/issue-ble-i-register-mtu-20260828.md).
+//
+// Fix: bleJsonFrameFailSoft() (src/ble_json_frame.h) bounds the ArduinoJson
+// write by the frame buffer itself (never overflows), and -- if the
+// *document* still does not fit the phone's real budget (BLE_JSON_PAYLOAD_MAX
+// -- see configuration_global.h for why that is the effective limit, not
+// MAX_MSG_LEN_PHONE-2) -- drops trailing optional fields and re-measures
+// instead of truncating serialised bytes.
+static void sendBleJsonRegister(JsonDocument &doc)
+{
+    memset(msg_buffer, 0, sizeof(msg_buffer));
+    msg_buffer[0] = 0x44;
+    uint16_t len = bleJsonFrameFailSoft(doc, msg_buffer, sizeof(msg_buffer), BLE_JSON_PAYLOAD_MAX);
+    if (len > 1)
+        addBLEComToOutBuffer(msg_buffer, len);
+}
 
 int casecmp(const char *s1, const char *s2)
 {
@@ -5329,21 +5355,7 @@ void commandAction(char *umsg_text, bool ble)
             tmdoc["VALES"] = meshcom_settings.node_values;
             tmdoc["PTIME"] = meshcom_settings.node_parm_time;
 
-            // reset print buffer
-            memset(print_buff, 0, sizeof(print_buff));
-
-            serializeJson(tmdoc, print_buff, measureJson(tmdoc));
-
-            json_len = strlen(print_buff);
-            if (json_len > MAX_MSG_LEN_PHONE - 2) {
-                json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-            }
-
-            memset(msg_buffer, 0, sizeof(msg_buffer));
-            msg_buffer[0] = 0x44;
-            memcpy(msg_buffer + 1, print_buff, json_len);
-
-            addBLEComToOutBuffer(msg_buffer, json_len + 1);
+            sendBleJsonRegister(tmdoc); // JSN-01
         }
 
         if(!bRxFromPhone)
@@ -5379,21 +5391,7 @@ void commandAction(char *umsg_text, bool ble)
             wdoc["VAMP"] = meshcom_settings.node_vcurrent;
             wdoc["VPOW"] = meshcom_settings.node_vpower;
              
-            // reset print buffer
-            memset(print_buff, 0, sizeof(print_buff));
-
-            serializeJson(wdoc, print_buff, measureJson(wdoc));
-
-            json_len = strlen(print_buff);
-            if (json_len > MAX_MSG_LEN_PHONE - 2) {
-                json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-            }
-
-            memset(msg_buffer, 0, sizeof(msg_buffer));
-            msg_buffer[0] = 0x44;
-            memcpy(msg_buffer + 1, print_buff, json_len);
-
-            addBLEComToOutBuffer(msg_buffer, json_len + 1);
+            sendBleJsonRegister(wdoc); // JSN-01
         }
 
         if(!bRxFromPhone)
@@ -5489,21 +5487,7 @@ void commandAction(char *umsg_text, bool ble)
             iodoc["BxOUT"] = iooutB;
             iodoc["BxVAL"] = iovalB;
 
-            // reset print buffer
-            memset(print_buff, 0, sizeof(print_buff));
-
-            serializeJson(iodoc, print_buff, measureJson(iodoc));
-
-            json_len = strlen(print_buff);
-            if (json_len > MAX_MSG_LEN_PHONE - 2) {
-                json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-            }
-
-            memset(msg_buffer, 0, sizeof(msg_buffer));
-            msg_buffer[0] = 0x44;
-            memcpy(msg_buffer + 1, print_buff, json_len);
-
-            addBLEComToOutBuffer(msg_buffer, json_len + 1);
+            sendBleJsonRegister(iodoc); // JSN-01
         }
 
         if(!bRxFromPhone)
@@ -5579,23 +5563,9 @@ void commandAction(char *umsg_text, bool ble)
             idoc["BOOST"] = bBOOSTEDGAIN;
             idoc["BPIN"] = meshcom_settings.bt_code;
 
-            // reset print buffer
-            memset(print_buff, 0, sizeof(print_buff));
-
-            serializeJson(idoc, print_buff, measureJson(idoc));
-
-            json_len = strlen(print_buff);
-            if (json_len > MAX_MSG_LEN_PHONE - 2) {
-                json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-            }
-
-            memset(msg_buffer, 0, sizeof(msg_buffer));
-            msg_buffer[0] = 0x44;
-            memcpy(msg_buffer + 1, print_buff, json_len);
-
-            addBLEComToOutBuffer(msg_buffer, json_len + 1);
+            sendBleJsonRegister(idoc); // JSN-01
         }
-        
+
         if(!bRxFromPhone)
         {
             int ibt = meshcom_settings.node_button_pin;
@@ -5826,21 +5796,7 @@ void commandAction(char *umsg_text, bool ble)
         sensdoc["OWPIN"] = meshcom_settings.node_owgpio;
         sensdoc["OWF"] = one_found;
         sensdoc["USERPIN"] = ibt;
-        // reset print buffer
-        memset(print_buff, 0, sizeof(print_buff));
-
-        serializeJson(sensdoc, print_buff, measureJson(sensdoc));
-
-        json_len = strlen(print_buff);
-        if (json_len > MAX_MSG_LEN_PHONE - 2) {
-            json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-        }
-
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        msg_buffer[0] = 0x44;
-        memcpy(msg_buffer + 1, print_buff, json_len);
-
-        addBLEComToOutBuffer(msg_buffer, json_len + 1);
+        sendBleJsonRegister(sensdoc); // JSN-01
 
         JsonDocument sensdoc1;
 
@@ -5854,21 +5810,7 @@ void commandAction(char *umsg_text, bool ble)
         sensdoc1["226"] = bINA226ON;
         sensdoc1["226F"] = ina226_found;
 
-        // reset print buffer
-        memset(print_buff, 0, sizeof(print_buff));
-
-        serializeJson(sensdoc1, print_buff, measureJson(sensdoc1));
-
-        json_len = strlen(print_buff);
-        if (json_len > MAX_MSG_LEN_PHONE - 2) {
-            json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-        }
-
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        msg_buffer[0] = 0x44;
-        memcpy(msg_buffer + 1, print_buff, json_len);
-
-        addBLEComToOutBuffer(msg_buffer, json_len + 1);
+        sendBleJsonRegister(sensdoc1); // JSN-01
 
         return;
     }
@@ -5896,22 +5838,8 @@ void commandAction(char *umsg_text, bool ble)
         swdoc["DNS"] = meshcom_settings.node_dns;
         swdoc["SUB"] = meshcom_settings.node_subnet;
 
-        // reset print buffer
-        memset(print_buff, 0, sizeof(print_buff));
+        sendBleJsonRegister(swdoc); // JSN-01
 
-        serializeJson(swdoc, print_buff, measureJson(swdoc));
-
-        json_len = strlen(print_buff);
-        if (json_len > MAX_MSG_LEN_PHONE - 2) {
-            json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-        }
-
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        msg_buffer[0] = 0x44;
-        memcpy(msg_buffer + 1, print_buff, json_len);
-
-        addBLEComToOutBuffer(msg_buffer, json_len + 1);
-        
         JsonDocument swdoc2;
 
         swdoc2["TYP"] = "S2";
@@ -5924,21 +5852,7 @@ void commandAction(char *umsg_text, bool ble)
         swdoc2["EUDPIP"] = meshcom_settings.node_extern;
         swdoc2["TXPOW"] = meshcom_settings.node_wifi_power;
 
-        // reset print buffer
-        memset(print_buff, 0, sizeof(print_buff));
-
-        serializeJson(swdoc2, print_buff, measureJson(swdoc2));
-
-        json_len = strlen(print_buff);
-        if (json_len > MAX_MSG_LEN_PHONE - 2) {
-            json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-        }
-
-        memset(msg_buffer, 0, sizeof(msg_buffer));
-        msg_buffer[0] = 0x44;
-        memcpy(msg_buffer + 1, print_buff, json_len);
-
-        addBLEComToOutBuffer(msg_buffer, json_len + 1);
+        sendBleJsonRegister(swdoc2); // JSN-01
 
         return;
     }
@@ -6001,23 +5915,10 @@ void sendGpsJson()
     pdoc["DIRo"] = (int)posinfo_last_direction;
     pdoc["DATE"] = getDateString() + " " + getTimeString();
 
-    // reset print buffer
-    memset(print_buff, 0, sizeof(print_buff));
-
-    serializeJson(pdoc, print_buff, measureJson(pdoc));
-
-    Serial.printf("GPS<%s>\n", print_buff);
-
-    json_len = strlen(print_buff);
-    if (json_len > MAX_MSG_LEN_PHONE - 2) {
-        json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-    }
-
-    memset(msg_buffer, 0, sizeof(msg_buffer));
-    msg_buffer[0] = 0x44;
-    memcpy(msg_buffer + 1, print_buff, json_len);
-
-    addBLEComToOutBuffer(msg_buffer, json_len + 1);
+    // JSN-01: sendBleJsonRegister() frames and sends in one call; log the
+    // JSON text it wrote into the shared msg_buffer (was print_buff).
+    sendBleJsonRegister(pdoc);
+    Serial.printf("GPS<%s>\n", (char *)msg_buffer + 1);
 }
 
 
@@ -6085,21 +5986,7 @@ void sendNodeSetting()
     nsetdoc["GWS"] = meshcom_settings.node_gwsrv;
     nsetdoc["ASYM"] = bGPSAutosymbol;
 
-    // reset print buffer
-    memset(print_buff, 0, sizeof(print_buff));
-
-    serializeJson(nsetdoc, print_buff, measureJson(nsetdoc));
-
-    json_len = strlen(print_buff);
-    if (json_len > MAX_MSG_LEN_PHONE - 2) {
-        json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-    }
-
-    memset(msg_buffer, 0, sizeof(msg_buffer));
-    msg_buffer[0] = 0x44;
-    memcpy(msg_buffer + 1, print_buff, json_len);
-
-    addBLEComToOutBuffer(msg_buffer, json_len + 1);
+    sendBleJsonRegister(nsetdoc); // JSN-01
 }
 
 void sendAnalogSetting()
@@ -6122,21 +6009,7 @@ void sendAnalogSetting()
     asetdoc["ADCOF"] = meshcom_settings.node_analog_offset;
     asetdoc["ADCAT"] = meshcom_settings.node_analog_atten;
 
-    // reset print buffer
-    memset(print_buff, 0, sizeof(print_buff));
-
-    serializeJson(asetdoc, print_buff, measureJson(asetdoc));
-
-    json_len = strlen(print_buff);
-    if (json_len > MAX_MSG_LEN_PHONE - 2) {
-        json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-    }
-
-    memset(msg_buffer, 0, sizeof(msg_buffer));
-    msg_buffer[0] = 0x44;
-    memcpy(msg_buffer + 1, print_buff, json_len);
-
-    addBLEComToOutBuffer(msg_buffer, json_len + 1);
+    sendBleJsonRegister(asetdoc); // JSN-01
 
     #endif
 
@@ -6159,21 +6032,7 @@ void sendAPRSset()
     aprsdoc["SYMCD"] = symcd;
     aprsdoc["NAME"] = meshcom_settings.node_name;
 
-    // reset print buffer
-    memset(print_buff, 0, sizeof(print_buff));
-
-    serializeJson(aprsdoc, print_buff, measureJson(aprsdoc));
-
-    json_len = strlen(print_buff);
-    if (json_len > MAX_MSG_LEN_PHONE - 2) {
-        json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-    }
-
-    memset(msg_buffer, 0, sizeof(msg_buffer));
-    msg_buffer[0] = 0x44;
-    memcpy(msg_buffer + 1, print_buff, json_len);
-
-    addBLEComToOutBuffer(msg_buffer, json_len + 1);
+    sendBleJsonRegister(aprsdoc); // JSN-01
 
 }
 
@@ -6186,19 +6045,5 @@ void sendConfigFinish()
 
     cdoc["TYP"] = "CONFFIN";
 
-    // reset print buffer
-    memset(print_buff, 0, sizeof(print_buff));
-
-    serializeJson(cdoc, print_buff, measureJson(cdoc));
-
-    json_len = strlen(print_buff);
-    if (json_len > MAX_MSG_LEN_PHONE - 2) {
-        json_len = MAX_MSG_LEN_PHONE - 2;  // 1 Byte Header + Null-Terminator
-    }
-
-    memset(msg_buffer, 0, sizeof(msg_buffer));
-    msg_buffer[0] = 0x44;
-    memcpy(msg_buffer + 1, print_buff, json_len);
-
-    addBLEComToOutBuffer(msg_buffer, json_len + 1);
+    sendBleJsonRegister(cdoc); // JSN-01
 }

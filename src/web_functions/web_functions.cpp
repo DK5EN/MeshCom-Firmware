@@ -17,6 +17,7 @@
 #include <spectral_scan.h>
 #include <maxhop.h>         // CS-02: drop-down values for the text hop limit
 #include <config_json.h>   // CS-03: config download/upload as one JSON object
+#include <ArduinoJson.h>    // JSN-01: call_function()/setparam()/getparam() JSON escaping
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -1219,7 +1220,7 @@ void sub_page_mheard()
     {
         if (mheardCalls[iset][0] != 0x00)
         {
-            if ((mheardEpoch[iset] + 60 * 60 * 3) > getUnixClock()) // 3h {
+            if (mheardFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
                 isShowing = true;
             decodeMHeard(mheardBuffer[iset], mheardLine);
             web_client.printf("<div class=\"cardlayout\">\n");
@@ -1274,7 +1275,7 @@ void sub_page_path()
     {
         if (mheardPathCalls[iset][0] != 0x00)
         {
-            if ((mheardPathEpoch[iset] + 60 * 60 * 3) > getUnixClock())
+            if (mheardPathFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
             { // 3h
                 isShowing = true;
                 unsigned long lt = mheardPathEpoch[iset] + (long)(meshcom_settings.node_utcoff * 3600.0);
@@ -2230,8 +2231,16 @@ void call_function(String web_header)
 
     webFunctionCall(&functionData); // try to execute that command
 
-    send_http_header(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON);                                              // send header, either 200 if command was executed or 422 if not
-    web_client.printf("{\"%s\":\"%s\"}\n\n", functionData.functionName.c_str(), functionData.returnCode == WF_RETURNCODE_OKAY ? "ok" : "failed"); // send JSON status response containting {"functionName":"ok|failed"}
+    send_http_header(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON); // send header, either 200 if command was executed or 422 if not
+
+    // JSN-01: functionName is percent-decoded, attacker-controlled query input
+    // and used to land here unescaped via a raw %s -- a '"' or '\' in it broke
+    // the response. Build through a JsonDocument instead: ArduinoJson escapes
+    // both the key and the value on serialise.
+    JsonDocument doc;
+    doc[functionData.functionName] = (functionData.returnCode == WF_RETURNCODE_OKAY) ? "ok" : "failed"; // {"functionName":"ok|failed"}
+    serializeJson(doc, web_client);
+    web_client.println();
 }
 
 /**
@@ -2264,8 +2273,16 @@ void setparam(String web_header)
         send_http_header(200, RESPONSE_TYPE_JSON);
     else
         send_http_header(422, RESPONSE_TYPE_JSON);
-    // build a json object literal and return it. Example:  {"returncode":1, "setcall":"AB1CDE-12"}    rembemer: keys have to be strings
-    web_client.printf("{\"returncode\":%i, \"%s\":\"%s\"}\n", setupData.returnCode, setupData.paramName.c_str(), setupData.returnValue.c_str());
+
+    // JSN-01: paramName/returnValue are unescaped user input (SSID, password,
+    // node_atxt free text, the static IP fields, ...) landing here via a raw
+    // %s -- a '"' broke the response. Build via ArduinoJson so both key and
+    // value are escaped on serialise. Example: {"returncode":1,"setcall":"AB1CDE-12"}
+    JsonDocument doc;
+    doc["returncode"] = setupData.returnCode;
+    doc[setupData.paramName] = setupData.returnValue;
+    serializeJson(doc, web_client);
+    web_client.println();
 }
 
 /**
@@ -2317,6 +2334,12 @@ void getparam(String web_header)
         send_http_header(200, RESPONSE_TYPE_JSON);
     else
         send_http_header(422, RESPONSE_TYPE_JSON);
-    // build a json object literal and return it. Example:  {"returncode":1, "setcall":"AB1CDE-12"}    rembemer: keys have to be strings
-    web_client.printf("{\"returncode\":%i, \"%s\":\"%s\"}\n", setupData.returnCode, setupData.paramName.c_str(), setupData.returnValue.c_str());
+
+    // JSN-01: same fix as setparam() above -- build via ArduinoJson instead
+    // of an unescaped %s. Example: {"returncode":1,"setcall":"AB1CDE-12"}
+    JsonDocument doc;
+    doc["returncode"] = setupData.returnCode;
+    doc[setupData.paramName] = setupData.returnValue;
+    serializeJson(doc, web_client);
+    web_client.println();
 }
