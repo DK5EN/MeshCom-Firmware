@@ -20,6 +20,8 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 
 **Intake 2026-08-30 (third list), filed in §3.8k:** `RX-01` discard frames from unconfigured nodes (`XX0XXX`, seen relayed over four hops), `TX-01` an unconfigured node refuses to transmit at all (the other half of RX-01), `BP-01` TX back-pressure to the sender as Q-code notices (QRS/QRT/QTA, plus QRV once the queue clears — the concrete design for `TM-37`), `FL-02` the same 30 s floor for `sendHey()`. `CS-04` (Web-API `/getparam/`) **fixed and verified on hardware**; the two corrections to the mcmap replay-burst finding are written back into `mcmap/docs/findings/interlink-frame-replay-bursts.md` §10.
 
+**Intake 2026-08-31 (operator list of 14 points), filed in §3.8p:** T-Deck map pan (`TD-07`), two presentation-timeline items (`PRES-01` Meshtastic/MeshCore + ISM footnote, `PRES-02` WSPR/WSJT-X/JS8Call), the character-set filter for message text and APRS free text (`CHR-01`, `CHR-02`), JSON validity in everything the node builds (`JSN-01`), `PM-01` (`NoPMOther` — the leak is EXTUDP, not BLE), the APRS-to-client research paper (`APRS-01`), four documentation deliverables (`DOC-01` main-loop stall page, `DOC-02` `--help` renewal, `DOC-03` CONF endianness/compatibility, `DOC-04` `config.json` register reference), `NTP-01` (cadence + report + `--ntpsync` + bench regression) and `E22-01` (frame integrity under supply spikes). **Three intake premises were corrected by the scouting** — foreign DMs are already blocked on BLE/web, TM-39 is a closed test item (the defect is `CONF-01`), and no low-voltage TX inhibit exists anywhere in the tree. Side findings: `WEB-04`, `TD-08`, `CTY-01`.
+
 **Intake 2026-08-30 (fourth list), filed in §3.8l — TM-43 DONE the same night, UDP-01 stack question answered (424 B / 276 B free), and the run found + fixed `UDP-02` (ESP32 EXTUDP receive killed by one 255-byte datagram). PT-01: all eight parser findings fixed. §3.8m: `MEM-01` done (commit `861f2967`), `MEM-02` parked.** Original intake text: `UDP-01` — second-hand report that `--extudp on` kills a RAK4631; unreproduced, and the two defects with exactly this symptom (`N-22` stack overflow, `N-23` brick trap) are fixed both here **and** in `upstream/dev`, so the section lists what to ask the reporter before touching code. `TM-43` — the regression test the operator asked for: the RAK's UDP interface driven in both directions, send and receive, with node liveness as the assertion.
 
 > ### Standing risk — read first
@@ -1722,12 +1724,746 @@ the other three bench nodes), and a general review of the page JavaScript was re
 
 **Wave-1 follow-ups (filed 2026-08-31, found during the fix wave):**
 
-| ID      | Board(s)        | Type | Sev.   | Location                                                                                                                        | Item                                                                                                                                                                                                                                                                                                                                                                                              | Status |
-| ------- | --------------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| NC-02   | all             | BUG  | Low    | `src/via_functions.cpp:125`, `src/web_functions/web_functions.cpp:1222`, `src/mheard_functions.cpp:544/790` (`mheardPathEpoch`) | Remaining wall-clock aging sites NOT converted by NC-01: the via list and the web mheard page still compare `mheardEpoch[i]+window > getUnixClock()`, and `mheardPathEpoch[]` has the identical hazard. Display-only impact (wrongly hidden/shown entries on clockless nodes), the beacon `/N` count is fixed. Convert to the `mheardMillis[]` pattern (needs a small exported helper or extern). | open   |
-| MH-02   | all             | BUG  | Low    | `src/mheard_functions.cpp:~300` (`updateMheard` eviction search)                                                                | Dead code: `imin` is initialized to `-1` and never assigned in the loop that computes `ulmin`, so the "evict the oldest entry" branch never runs — eviction always falls through to the sequential `mheardWrite` ring. Pre-existing, unrelated to NC-01; fix = actually assign `imin` where `ulmin` updates.                                                                                      | open   |
-| ETH-01  | nRF52 (RAK4631) | BUG  | Medium | `src/nrf52/nrf52_main.cpp:1963ff` (`if(bGATEWAY)` block)                                                                        | `ethLinkPoll()`/`ethLinkHeartbeat()` and the DHCP lease refresh are nested inside the `bGATEWAY` block — a gateway-off/webserver-on node (possible per `nrf52_main.cpp:1086`) never renews its DHCP lease and has no link-state instrumentation. Sibling of TM-45, larger gating question; found during the TM-45 fix.                                                                            | open   |
-| CONF-01 | nRF52 (RAK4631) | BUG  | Medium | `src/nrf52/nrf_eth.cpp:660-768`                                                                                                 | The nRF52 CONF handler parses the server-pushed callsign/shortname/coords into local `String`s only — it never applies them to `meshcom_settings`, never saves, never reboots. Server-side provisioning of an nRF52 gateway is therefore a silent no-op. Found during TM-39 ESP32-CONF recon.                                                                                                     | open   |
+| ID      | Board(s)        | Type | Sev.   | Location                                                                                                                        | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Status |
+| ------- | --------------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| NC-02   | all             | BUG  | Low    | `src/via_functions.cpp:125`, `src/web_functions/web_functions.cpp:1222`, `src/mheard_functions.cpp:544/790` (`mheardPathEpoch`) | Remaining wall-clock aging sites NOT converted by NC-01: the via list and the web mheard page still compare `mheardEpoch[i]+window > getUnixClock()`, and `mheardPathEpoch[]` has the identical hazard. Display-only impact (wrongly hidden/shown entries on clockless nodes), the beacon `/N` count is fixed. Convert to the `mheardMillis[]` pattern (needs a small exported helper or extern).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | open   |
+| MH-02   | all             | BUG  | Low    | `src/mheard_functions.cpp:~300` (`updateMheard` eviction search)                                                                | Dead code: `imin` is initialized to `-1` and never assigned in the loop that computes `ulmin`, so the "evict the oldest entry" branch never runs — eviction always falls through to the sequential `mheardWrite` ring. Pre-existing, unrelated to NC-01; fix = actually assign `imin` where `ulmin` updates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | open   |
+| ETH-01  | nRF52 (RAK4631) | BUG  | Medium | `src/nrf52/nrf52_main.cpp:1963ff` (`if(bGATEWAY)` block)                                                                        | `ethLinkPoll()`/`ethLinkHeartbeat()` and the DHCP lease refresh are nested inside the `bGATEWAY` block — a gateway-off/webserver-on node (possible per `nrf52_main.cpp:1086`) never renews its DHCP lease and has no link-state instrumentation. Sibling of TM-45, larger gating question; found during the TM-45 fix.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | open   |
+| CONF-01 | nRF52 (RAK4631) | BUG  | Medium | `src/nrf52/nrf_eth.cpp:668-780` (CONF branch), reference `src/udp_functions.cpp:533-586`                                        | The nRF52 CONF handler parses the server-pushed callsign/shortname/coords into local `String`s only — it never applies them to `meshcom_settings`, never saves, never reboots. Server-side provisioning of an nRF52 gateway is therefore a silent no-op. Found during TM-39 ESP32-CONF recon. **Enriched 2026-08-31 (intake point 11, §3.8p):** parse is correct and complete (callsign `:730`, shortname `:743`, lat/lon/alt `:753`/`:761`/`:769`); every later use of those locals is absent — apply, `save_settings()` and `rebootAuto` are all missing, block ends `:783`. The ESP32 path to mirror also has two safeguards the nRF52 side lacks entirely: the source-IP guard (`udp_functions.cpp:533`, apply only from the resolved server) and `checkRegexCall()` on the callsign (`:566`). No `FLASH_STRUCT_VERSION` bump and no fleet wipe — every target field already exists. No test covers the apply step on either platform. Endianness/compatibility documentation split out as `DOC-03`. | open   |
+
+---
+
+### 3.8p Intake 2026-08-31 (operator list of 14 points)
+
+Fourteen points handed over as a block, all of them backlog items — nothing in this section is
+implemented yet. Each point was scouted read-only before it was written down (14 parallel
+discovery agents, `/orchestrate-waves`), so every row below carries the file:line an implementer
+starts from. **Three of the fourteen premises did not survive the scouting** and are corrected in
+place: point 7 (foreign DMs are already blocked on BLE/web — the leak is EXTUDP), point 11 (TM-39
+is a closed test item; the defect is the open `CONF-01`), point 14 (there is no low-voltage TX
+inhibit anywhere in the tree, and the frame already carries an FCS the receiver checks). The
+corrections were put to the operator and the answers are recorded in the rows.
+
+Operator decisions taken during intake, binding for the rows below:
+
+- **Filter policy (points 4/5/6):** drop the offending characters silently, deliver the rest; log
+  the dropped bytes as hex in the debug log. Not a placeholder, not a whole-message reject.
+- **Charset rule:** mirror MCProxy 1:1, including its known gap (see `CHR-01`).
+- **Relay stays transparent:** filtering applies to what the node _outputs_ and to what it
+  _originates_ — a relayed foreign frame is passed on byte-identical.
+- **`NoPMOther` (point 7):** gate the EXTUDP path only; no Web-GUI checkbox, no T-Deck button
+  ("über BLE läuft schon alles richtig").
+- **Point 9 deliverable:** a self-contained HTML file under `docs/presentation/`, like
+  `meshcom-protocol.html`.
+- **Point 10:** the clean-ship vs. developer split is **not yet decided** — the help text and the
+  markdown are written without that separation for now (see `DOC-02` for why the fault line is not
+  where it looks).
+- **Point 11:** `CONF-01` stays the implementation row and is enriched below; the endianness and
+  compatibility documentation gets its own number (`DOC-03`).
+
+| ID      | Point | Board(s)                 | Type | Sev.   | Item                                                                               | Status |
+| ------- | ----- | ------------------------ | ---- | ------ | ---------------------------------------------------------------------------------- | ------ |
+| TD-07   | 1     | T-Deck / T-Deck Plus     | ENH  | Medium | Map pan on four keyboard keys (`i`/`j`/`k`/`l`) plus a recenter key                | open   |
+| PRES-01 | 2     | —                        | DOC  | Low    | Meshtastic and MeshCore on the deck timeline, with the ISM/amateur-radio footnote  | open   |
+| PRES-02 | 3     | —                        | DOC  | Low    | WSPR, WSJT-X and JS8Call on the deck timeline                                      | open   |
+| CHR-01  | 4     | all                      | ENH  | Medium | Restrict the displayable character set of message text, RX (LoRa + UDP) and TX     | open   |
+| JSN-01  | 5     | all                      | BUG  | High   | JSON the node builds must stay valid — escaping and buffer bounds                  | open   |
+| CHR-02  | 6     | all                      | ENH  | Medium | Same filter for the APRS free-text fields, without breaking the wire delimiters    | open   |
+| PM-01   | 7     | all with `--extudp on`   | ENH  | Medium | `NoPMOther`: stop handing foreign DMs to the EXTUDP client                         | open   |
+| APRS-01 | 8     | all (paper)              | DOC  | Medium | Research paper: forwarding received APRS data to YAAC / aprs.fi app / APRSdroid    | open   |
+| DOC-01  | 9     | all (page)               | DOC  | Medium | HTML timeline of the main loop with the confirmed stalls, upstream vs. this branch | open   |
+| DOC-02  | 10    | all                      | BUG  | Medium | `--help` is ~60 commands short, has one unusable line and lies on five others      | open   |
+| CONF-01 | 11    | nRF52 (RAK4631)          | BUG  | Medium | nRF52 CONF handler parses but never applies — **row enriched below**               | open   |
+| DOC-03  | 11    | nRF52 + ESP32            | DOC  | Medium | Endianness and settings-compatibility documentation for the CONF/country path      | open   |
+| DOC-04  | 12    | ESP32 + nRF52            | DOC  | Medium | Reference markdown for all 107/103 `config.json` registers                         | open   |
+| NTP-01  | 13    | ESP32 + nRF52            | ENH  | Medium | NTP cadence answered, report, `--ntpsync` command, bench regression                | open   |
+| E22-01  | 14    | E22 (classic ESP32 + S3) | BUG  | High   | Frame integrity under supply spikes / RF ingress — concept for operator review     | open   |
+
+Two defects and one divergence found by the scouts on the way, filed as follow-ups:
+
+| ID     | Board(s)             | Type | Sev. | Location                                      | Item                                                                                                                                                                                                                                                                                                                                                                           | Status |
+| ------ | -------------------- | ---- | ---- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| WEB-04 | ESP32 (web UI)       | BUG  | Low  | `src/web_functions/web_setup.cpp:407-412`     | The `sendpos` web parameter handler issues `"--nomsgall %s"` — a copy-paste of the block directly above it. Setting `sendpos` from the web UI therefore toggles the broadcast-display flag instead. Found while mapping the switch plumbing for `PM-01`; do not use that block as a template.                                                                                  | open   |
+| TD-08  | T-Deck / T-Deck Plus | BUG  | Low  | `src/t-deck/tdeck_main.cpp:774-817`           | `iKeyBoardType == 4` (the on-screen "sym" input mode, toggled at `event_functions.cpp:799-821`) remaps every `a`-`z` byte to a symbol **before** the map-tab dispatch at `:851-861` — so the existing `g`/`h` zoom shortcuts are already dead in that mode. Pre-existing, inherited by `TD-07`'s new keys.                                                                     | open   |
+| CTY-01 | nRF52 (RAK4631)      | BUG  | Low  | `src/nrf52/nrf_eth.cpp:1163` vs. `:1279-1292` | The two nRF52 server-selection paths disagree: `startFIXUDP()` (static IP) special-cases `IT` on the internet path (`145.239.75.155`, `:1287`), while `startUDP()` (DHCP — the path the bench RAK actually takes) has no country case at all and always uses `89.185.97.38`. `docs/bench-country-servers.md` only tabulates the DHCP path, so this divergence is undocumented. | open   |
+
+---
+
+#### TD-07 — map pan on four keys (point 1)
+
+**Decision:** `i` = up, `j` = left, `k` = down, `l` = right; a fifth key recenters on the own
+position, and the pan otherwise persists (operator choice; `o` is free and adjacent, the trackball
+click is the alternative).
+
+**Where the keys are dispatched.** `keypad_read()`, `src/t-deck/tdeck_main.cpp:722-908`, is the only
+global key hook — no other file registers an `LV_EVENT_KEY` handler. Raw bytes come from the I2C
+keyboard at `0x55` via `keypad_get_key()` (`:689-716`); the special-key if-chain at `:825-889`
+consumes a key by setting `bSPEC` instead of passing it to the focused widget. The map-tab gate
+already exists and is reused verbatim: `lv_tabview_get_tab_act(tv) == 3` (`:852`, `:857`; tab 3 =
+MAP per `tdeck_debug.h:55`). Tabs 1 and 7 are excluded from all special handling (`:827`).
+
+Bound today: `g`/`G` zoom in (`:852`), `h`/`H` zoom out (`:857`) — map tab only; `"` backlight lock
+(`:830`), `'` keyboard lock (`:839`), `+`/`-` zoom (`:863`/`:869`), `!` brightness (`:875`), `.`
+mute (`:881`) — everywhere except tabs 1 and 7. Every other unshifted letter is free.
+
+**What actually has to be built.** The map has no pan state at all. `sdmap_refresh(img, lat, lon)`
+(`src/t-deck/tdeck_sdmap.cpp:224-359`) recomputes `sdmap_originX`/`sdmap_originY` (`:165-166`) from
+the passed coordinates on every call (`:276-279`), and all four existing call sites pass the own
+position (live GPS → cached `sdmap_lastKnownLat/Lon` → configured `node_lat/lon`). So:
+
+1. New persistent view-centre state (a "panned" flag plus either a virtual lat/lon or a pixel
+   offset). Only the forward projection exists today (`sdmap_lon2xf`/`sdmap_lat2yf`, `:33-42`); a
+   lat/lon design needs new inverse-Mercator helpers, a pixel-offset design needs a new entry point
+   that bypasses the hard-coded recentre at `:276-279`.
+2. Gate the four auto-recentre sites so they stop fighting the pan: `event_functions.cpp:885-899`
+   (tab switch to MAP), `lv_obj_functions.cpp:1962-1996` (`set_map`), `lv_obj_functions.cpp:3742-3754`
+   (`tdeck_add_pos_point`, fires on an incoming own-position beacon), `esp32/esp32_main.cpp:3145-3170`
+   (30 s tile-boundary poll while the MAP tab is active).
+3. One shared `tdeck_map_pan(dx, dy)`, mirroring the `tdeck_map_zoom(dir)` consolidation
+   (`lv_obj_functions.cpp:1912-1929`, which replaced four copies per
+   `docs/tdeck-findings-20260828.md`) — the recentre logic is still copy-pasted in the four places
+   above and should be consolidated in the same move.
+4. Four new clauses next to the `g`/`h` block at `tdeck_main.cpp:851-861`, plus the recenter key.
+
+**Cost, and the open call on it.** There is no decoded-tile cache: `sdmap_refresh()` re-reads and
+re-decodes every intersecting tile from SD on every call (`sdmap_load_tile_rgba()`, `:175-219`, no
+memoization). Measured in `docs/tdeck-findings-20260828.md` §5: **0.33-0.79 s per recompose** at the
+current 20 MHz SD clock (`tdeck_main.cpp:296`), PNG decode dominating at ~170 ms/tile. Discrete
+step-per-keypress is usable; held-key/continuous panning would serialise those costs into
+multi-second stalls. **Open:** ship v1 at that latency, or make a small decoded-tile LRU in PSRAM
+(same `ps_malloc` already used for `sdmap_buf`) a prerequisite. The doc already names the cache as
+the missing piece ("a decoded-tile cache would make zoom-back instant").
+
+Off-map edges need no new handling — missing tiles are painted grey with a `map_no_data_label`
+(`tdeck_sdmap.cpp:248-255`, `:350-354`). Pan multiplies the SD-read-then-flush sequence, so the
+lost-flush mitigation (`s_flushfix_on`, default on, `tdeck_debug.cpp:134-136`) must be regression-
+tested under rapid repeated pan keypresses. `TD-08` (sym mode eats `a`-`z`) applies to the new keys
+too.
+
+#### PRES-01 — Meshtastic and MeshCore on the timeline (point 2)
+
+Deck: `docs/presentation/meshcom-protocol.html`, 4262 lines, self-contained (inline CSS/JS, one
+Google-Fonts link), German, no build step, no generator. **Neither Meshtastic nor MeshCore is
+mentioned anywhere in it today** — this is a pure addition.
+
+The timeline is two structures that must be edited in sync: hand-placed SVG (`:1093-1229`, one
+`<g class="cmp-tl-ms" data-ms="N">` per milestone, viewBox `0 0 960 290`, axis at y=150, entries
+alternating above/below) and the JS `MS[]` array (`:2681-2691`) that drives the detail card, the
+runner dot and the era colouring. Order is strictly left-to-right by `x`, and `data-ms="N"` must
+match the array index. Eight entries today: 1976 X.25 (x=75), 1976 Bell-202 (152), 1982/84 AX.25
+(248), 1992 APRS (393), 2012 Semtech/Cycleo (628), 2013 SX1272/76 (700), 2015 LoRa Alliance (758),
+heute MeshCom (882). There is no auto-layout — the axis spans x=62-895 and is already dense from
+628 on, so new entries mean recomputing existing `x` values by hand. A new era needs new CSS classes
+(`.cmp-tl-dot-*`, `.cmp-tl-rring-*`, `.cmp-tl-rdot-*`, `.cmp-tl-era-lbl-*`, around `:207-322`).
+
+**Dates, verified against primary sources (GitHub API / official texts), not blogs:**
+
+| Project    | Fact                                                                                        | Date       |
+| ---------- | ------------------------------------------------------------------------------------------- | ---------- |
+| Meshtastic | `meshtastic/firmware` repo created (first verifiable artifact), Kevin Hester "geeksville"   | 2020-02-01 |
+| Meshtastic | earliest tag `0.0.3`                                                                        | 2020-02-20 |
+| Meshtastic | licence GPL-3.0                                                                             | —          |
+| MeshCore   | repo created (id 919192489, formerly `ripplebiz/MeshCore`), first commit Scott Powell 01-24 | 2025-01-19 |
+| MeshCore   | first tagged releases (`companion-v1.0.0a/b/c`, `repeater`, `room-server`)                  | 2025-03-05 |
+| MeshCore   | licence MIT                                                                                 | —          |
+
+Two disagreements to handle honestly on the slide: secondary sources put the Meshtastic _idea_ in
+2019 (no primary evidence found), and Wikipedia dates MeshCore to "late 2024" against a repo created
+2025-01-19. Use the verifiable dates; mention the earlier claim only if the slide has room for the
+caveat. Liam Cottle is credited by the community for the MeshCore companion clients — unverified
+from commit data, so leave the attribution at Scott Powell or omit names.
+
+**The footnote.** Both projects are ISM-band, not amateur radio; on ISM they may encrypt, but they
+pay for it in power and duty cycle. Verified numbers (BNetzA Vfg 91/2025, implementing
+2006/771/EC as amended by (EU) 2025/105; harmonised standard ETSI EN 300 220-2 V3.2.1):
+
+- 868.0-868.6 MHz: **25 mW ERP**, LBT+AFA or **≤1 % duty cycle** (item 48).
+- 869.4-869.65 MHz — the Meshtastic `EU_868` default, centre 869.525 MHz: **500 mW ERP**, LBT+AFA
+  or **≤10 % duty cycle** (item 54).
+- Amateur 70 cm in DL, AFuV Anlage 1 row 18: Klasse A **750 W PEP**, Klasse E 75 W PEP, Klasse N
+  6.1 W ERP — and AFuV § 16 Abs. 8 verbatim: _"Der Amateurfunkverkehr darf nicht zur Verschleierung
+  des Inhalts kodiert oder verschlüsselt werden"_ (exception only for satellite/remote-station
+  control signals). Austria: AFV § 20 Abs. 5, _"Die Verwendung von Einrichtungen, die die
+  Verständlichkeit der Nachricht einschränken, ist nicht gestattet."_
+- **Do not claim a 33 cm band for DL/OE** — 902-928 MHz is an ITU Region 2 amateur allocation and
+  does not exist in Region 1; the AFuV table jumps from 430-440 MHz straight to 1240-1250 MHz.
+- Worth one line of nuance: both projects ship a _publicly known_ default key (Meshtastic's stock
+  `AQ==` on LongFast; MeshCore's documented public-channel key), so out of the box they are
+  encrypted but not confidential.
+
+Footnote mechanism: reuse the existing `.note.warn` callout (CSS `:110-112`, live example at
+`:2142` — which already carries the "Verschlüsselung ist auf Amateurfunk-Frequenzen ohnehin nicht
+zulässig" line this footnote extends) or the terser `.cite` line (CSS `:116`, example `:1284`).
+
+#### PRES-02 — WSPR, WSJT-X and JS8Call on the timeline (point 3)
+
+Same two-structure edit as `PRES-01`. Verified dates:
+
+| Mode / program | Fact                                                      | Date                           |
+| -------------- | --------------------------------------------------------- | ------------------------------ |
+| WSJT           | first release, Joe Taylor K1JT                            | 2001                           |
+| WSPR           | first release, K1JT                                       | 2008                           |
+| WSJT-X         | v0.1 r2695, first experimental build                      | 2012-10-25                     |
+| WSJT-X         | v1.0                                                      | 2013-05-30                     |
+| FT8            | announced in WSJT-X 1.8.0-rc1, Taylor K1JT + Franke K9AN  | 2017-06-29                     |
+| JS8Call        | proposed as "FT8Call" on the WSJT-X list                  | 2017-07 (exact day unverified) |
+| JS8Call        | experimental repo `jsherer/ft8call`, Jordan Sherer KN4CRD | 2018-03-05                     |
+| JS8Call        | 1.0.0-RC1                                                 | 2019-02-22                     |
+| JS8Call        | v1.0.0 general availability                               | 2019-04-01                     |
+
+Trap to avoid: Wikipedia's "since 2005 … open source" for WSJT is the **GPL licensing** date, not a
+release date. Layout consequence: five entries land between 1992 (x=393) and 2019, i.e. squarely in
+the stretch that is already dense from x=628; either the whole axis is re-spaced or the HF digital
+modes get their own lane/era band with its own colour classes.
+
+#### CHR-01 — displayable character set for message text (point 4)
+
+**Policy (operator):** drop the offending characters silently and deliver the rest; log what was
+dropped as hex in the debug log. **Rule (operator):** mirror MCProxy 1:1.
+
+MCProxy's rule lives in exactly one place, `MCProxy/src/mcapp/udp_handler.py:176-229`
+(`is_allowed_char`) plus `:232-237` (`strip_invalid_utf8`, decode with `errors="ignore"` — invalid
+UTF-8 is dropped, never repaired), and it runs on the **UDP receive path only** (port 1799, on the
+whole decoded datagram before JSON parsing), never on send and never on BLE ingress. Allowed:
+printable ASCII `0x20-0x7E`; a fixed literal set of umlauts/accented Latin letters plus `⁰`; the
+emoji glue codepoints `U+200D`, `U+FE0E`, `U+FE0F`, `U+20E3` and the flag-tag range
+`U+E0020-U+E007F`; and as the sole catch-all, any character whose Unicode general category starts
+with `S` (Symbol) or `P` (Punctuation) or whose name contains `EMOJI`. Rejected: surrogates
+`U+D800-U+DFFF`, noncharacters (`…FFFE`/`…FFFF`), the three Private Use Areas — and everything else,
+which is where all C0/C1 controls land, CR `0x0A`/`0x0D` and BEL `0x07` included. Rejection is
+per-character, silent, DEBUG-logged (`udp_handler.py:228`); the message is never dropped as a whole.
+Byte-length caps (150/159/160) are a separate, independent check (`MCProxy/src/mcapp/schemas.py`),
+mirrored client-side in `webapp/src/components/chat/ChatInput.vue:24-26`.
+
+**Known gap, mirrored deliberately:** that rule does **not** admit Japanese. Hiragana/Katakana/Kanji
+are Unicode category `Lo` (Letter), which no branch accepts — there is no CJK range and no
+Letter-category branch anywhere in either repo. The operator chose to mirror the rule as-is so node
+and proxy discard identically; widening both to category `L` is a separate decision, and would have
+to be made on the MCProxy side first. Note for whoever picks that up: the webapp has no message-body
+character filter at all (only `sanitizeDst` for the destination field and `stripRedundantPercentHex`
+for a firmware percent-encoding quirk), so it inherits whatever MCProxy passes through.
+
+**The implementation problem to solve first:** the MCProxy rule is expressed in terms of
+`unicodedata.category()`, which does not exist on the MCU. The real design task is an
+MCU-affordable approximation — codepoint ranges rather than a category table — that is pinned
+against MCProxy's own vectors (`MCProxy/src/mcapp/udp_parsing_tests.py:228-289` already asserts
+umlauts survive, PUA/invalid bytes/lone surrogates drop, and the ZWJ/keycap/VS/tag glue combos stay
+intact). Flash budget matters here: classic ESP32 is the constrained platform (see `APRS-01`).
+
+**Chokepoints (verified).** Two cover everything in scope:
+
+1. `decodeAPRS()` — `src/aprs_functions.cpp:122`, filter immediately after
+   `aprsmsg.msg_payload = cConcat1;` (`:380`). This one site covers **both** RX transports, because
+   LoRa RX (`lora_functions.cpp:556`) and UDP-from-server (`udp_functions.cpp:278`, `:719`,
+   `nrf52/nrf_eth.cpp:464`) call the same decoder. Note the asymmetry it fixes: the path fields just
+   above are already byte-range-checked (`<0x20 || >0x7E`, `:204` and `:302`) — only the payload is
+   unconstrained.
+2. `encodePayloadAPRS()` — `src/aprs_functions.cpp:1063-1070`, the single `memcpy` at `:1068` that
+   puts text on the wire. Covers every TX composer, since serial (`esp32_main.cpp:4256`,
+   `nrf52_main.cpp:2905`), BLE (`phone_commands.cpp:563-594` → `esp32_main.cpp:2948`), web
+   (`web_functions.cpp:2192`), T-Deck (`event_functions.cpp:717`) and T-Deck Pro
+   (`ui_deckpro.cpp:1805`) all converge on `sendMessage()` (`loop_functions.cpp:3457`) →
+   `encodeAPRS()`.
+
+`sendMessage()` itself is the optional third point: it is the earliest, transport-aware place to
+reject, and the back-pressure notice machinery next to it (`loop_functions.cpp:3378-3483`, `BP-01`)
+already knows how to tell the right sender something was refused.
+
+**The catch that must not be missed.** Several receive paths forward the _raw pre-decode wire bytes_
+and never go through `encodeAPRS()`: `addBLEOutBuffer(RcvBuffer, size)` (`lora_functions.cpp:986`,
+`:1067`, `:1186`), `addNodeData(RcvBuffer, …)` (`:1252`), `addTxRingEntry(RcvBuffer, …, "rx_relay")`
+(`:1335`) and the UDP relay at `udp_functions.cpp:479`. Those carry unfiltered bytes even with both
+chokepoints in place. Per the operator's relay decision, the split is: the paths that **deliver**
+(BLE out, EXTUDP, display, web list) must be rebuilt from the filtered `aprsmsg`; the paths that
+**relay** (`addTxRingEntry(… "rx_relay")`, `udp_functions.cpp:479`, and the gateway upload
+`addNodeData()`) keep passing the original bytes untouched.
+
+Do not conflate the filter with the three existing, unrelated transforms: `utf8ascii()`
+(`loop_functions.cpp:5188-5294`) is a display-only 2-byte UTF-8→Latin-1 downgrader that silently
+drops every 3- and 4-byte sequence; `htmlEscape()` (`web_functions.cpp:1071-1089`) is HTML output
+escaping (`WEB-03a`); `decodeURLPercentCoding()` (`web_functions.cpp:766`) and `sendMessage()`'s own
+`%C2/%E2/%EF/%F0` decoder (`loop_functions.cpp:3549-3600`) are input transport decoding.
+
+Length is safe in this direction — dropping only shrinks, so the latent
+`cConcat1[UDP_TX_BUF_SIZE=255]` vs. `MAX_APRS_FRAME_SIZE=340` margin
+(`docs/architecture/08-defect-catalogue.md:1417`) is not made worse. The hex log line belongs in
+`printBuffer_aprs()` (`loop_functions.cpp:3142-3147`), which already sees every RX and TX text frame
+(called from `lora_functions.cpp:567/570/609`, `udp_functions.cpp:343`, `loop_functions.cpp:3703`);
+`printAsciiBuffer()` (`:3078-3102`) is the existing precedent for a control-byte-aware dump. Tests:
+a pure-C++ module in the shape of `src/settings_sanitize.cpp` (`test/test_settings_sanitize`,
+`[env:native]`), which exists precisely because it has no Arduino dependency.
+
+#### CHR-02 — the same filter for APRS free text (point 6)
+
+Same rule, same policy, different fields — and a much tighter set of things it must not break.
+`decodeAPRS()`/`encodePayloadAPRS()` cover the message payload; this row covers the **position
+comment** `pos_atxt` (`decodeAPRSPOS()`, `src/aprs_functions.cpp:629-647`, 25-byte cap at `:632`),
+the configured comment `node_atxt` (`char[40]`, copied verbatim by `--atxt`/`--aprscomment`,
+`command_functions.cpp:3395-3413`) and the `@` weather/HEY payloads.
+
+**What the filter must not touch**, all verified with the code that depends on it:
+
+- `>` separates source path from destination path (`aprs_functions.cpp:196`, written `:1051`).
+- `,` separates callsigns inside a path (`:211-221`, `:309-314`).
+- The payload-type byte itself (`:` `0x3A`, `!` `0x21`, `@` `0x40`) terminates the destination path
+  (`:294`).
+- `{` + digits is the DM ACK-id trailer (appended `loop_functions.cpp:3687`, consumed
+  `lora_functions.cpp:906`, `udp_functions.cpp:406-459`); `:ack`/`:rej` anywhere in a payload is
+  read as an ACK signal (`lora_functions.cpp:905-908`).
+- `,` and `;` inside a HEY payload separate `count,rssi,snr` per hop
+  (`appendHeySignalReport()`, `aprs_functions.cpp:1152-1157`, consumed `mheard_functions.cpp:455`).
+- `/B= /A= /P= /H= /T= /O= /F= /Q= /G= /N= /C= /V= /Y=` are the position extension markers, scanned
+  byte-by-byte at `aprs_functions.cpp:656-1011`; `N`/`S` and `W`/`E` terminate the lat/lon numeric
+  fields (`:560`, `:596`).
+- Callsign and path fields are **already** ASCII-gated (`:204`, `:302`) plus `checkRegexCall()`
+  (`regex_functions.cpp:9`) — do not duplicate that.
+
+The one real hazard: those scanners count **bytes**, so the 25-byte comment cap at `:632` can cut a
+multi-byte UTF-8 sequence in half and hand a broken tail downstream. The filter must truncate on
+codepoint boundaries. And if receive behaviour changes at all, the pinned test
+`test_steuerzeichen_in_breitenangabe` (`test/test_decodeaprspos/test_decodeaprspos.cpp:226-238`,
+which asserts a control byte inside the latitude text is _tolerated_) has to be updated deliberately,
+not accidentally.
+
+#### JSN-01 — the JSON the node builds must stay valid (point 5)
+
+Two producers already do this correctly and are the reference: `out_add_jsonstr()`
+(`src/config_json.cpp:441-465` — escapes `"`, `\`, `\n`/`\r`/`\t` and every control byte as
+`\u%04x`, and fails soft by discarding the whole export rather than truncating it, `:427-436`,
+`:523-528`) and `escape_json()` (`src/t-deck/tdeck_helpers.cpp:149`, full RFC 8259). Four producers
+do not:
+
+1. **Web endpoints, no escaping at all.** `call_function()` `web_functions.cpp:2234`, `setparam()`
+   `:2268`, `getparam()` `:2321` build `{"%s":"%s"}` by `printf` from percent-decoded query-string
+   input and from config strings that mirror `node_atxt`, `node_name`, SSID/password and the static
+   IP fields. A single `"` breaks the response — no length threshold needed. This is the still-open
+   HIGH from `docs/code-audit-20260508.md:158` (line numbers have shifted since).
+2. **EXTUDP double-escapes.** `strEsc()` (`extudp_functions.cpp:811-822`) escapes `"` and `\` and
+   the string is then escaped again by ArduinoJson on serialize (`:628`) — the client receives
+   literal `\"`. Content corruption, and it inflates the string feeding (3).
+3. **EXTUDP buffer bound is the document, not the buffer.**
+   `serializeJson(cJson, c_json, measureJson(cJson) + 1)` into `char c_json[500]` at
+   `extudp_functions.cpp:564`, `:588`, `:609`, `:649`. This is exactly the antipattern that
+   `test/test_ble_json_frame`'s control case (`frame_bounded_by_document()`) exists to demonstrate —
+   here unfixed, on a path whose `msg` field is `aprsmsg.msg_payload`, i.e. reachable by any
+   unauthenticated LoRa peer.
+4. **Thirteen BLE register builders, same bound bug plus mid-string truncation.**
+   `serializeJson(doc, print_buff, measureJson(doc))` into `char print_buff[350]`
+   (`command_functions.cpp:95`) at `:5335, 5385, 5495, 5585, 5832, 5860, 5902, 5930, 6007, 6091,
+6128, 6165, 6192`; the result is then clamped to `MAX_MSG_LEN_PHONE-2` = 298 and clamped **again**
+   to 245 inside `addBLEComToOutBuffer()` (`loop_functions.cpp:625-629`). Both clamps cut after
+   serialisation, i.e. mid-string, producing JSON the phone cannot parse — with a live field trace in
+   `docs/issue-ble-i-register-mtu-20260828.md` (`json.decoder.JSONDecodeError … column 242`) and the
+   silently-dropped variant in `docs/issue-mh-json-size-budget-20260828.md`.
+
+Already fixed and to be copied: `src/ble_json_frame.h:20-25` bounds by `sizeof(buffer)` (`UP-01`,
+`b586daee`, regression-tested).
+
+Minimal fix set: one shared escaper instead of three inconsistent ones (plus zero in
+`web_functions.cpp`); `sizeof(buffer)` as the bound everywhere; drop `strEsc()`; replace mid-string
+truncation with the fail-soft "drop optional fields and re-measure" pattern already prototyped in
+`mheard_functions.cpp:409-412` and proposed in `docs/issue-ble-i-register-mtu-20260828.md` §5.2/5.3;
+and name the three unnamed limits (298/245/255) as one constant. Regression tests: extend the
+`test_ble_json_frame` canary pattern to the 13 command sites and to `sendExtern()` with a
+quote/backslash-heavy payload, plus a `setparam`/`getparam` case with a `"` in the value.
+
+Relationship to `CHR-01`: the character filter removes control bytes upstream and shrinks the blast
+radius, but it does **not** solve this — `"` and `\` are legal message characters and stay.
+
+#### PM-01 — `NoPMOther`: stop handing foreign DMs to the EXTUDP client (point 7)
+
+**Premise corrected.** Foreign DMs are _already_ not forwarded over BLE or to the web message list.
+`lora_functions.cpp:1047` forwards only `*` (gated by `bNoMSGtoALL`) or `CheckOwnGroup(destination)`;
+DMs addressed to the own call are handled in the separate branch at `:865`. `CheckGroup()`
+(`aprs_functions.cpp:27-50`) returns 0 for anything containing a non-digit, so a personal callsign
+can never match it. The UDP-from-server path has the same gate (`udp_functions.cpp:378`,
+`nrf52/nrf_eth.cpp:536`: `*` gated `||` own call `||` `CheckGroup > 0`). Verified directly in the
+tree, not taken from a report.
+
+**The path that does leak is EXTUDP.** `lora_functions.cpp:814` calls
+`queueExtern("lora", RcvBuffer, size, rssi, snr)` for **every** TEXT/POSITION/HEY frame, and it sits
+_before_ the destination is even extracted (`:858-859`). `sendExtern()`'s message branch
+(`extudp_functions.cpp:613-649`) suppresses only group `100001` (telemetry). So an `--extudp on`
+client — MCProxy, the webapp — sees every DM that crosses the air. That is the behaviour the
+operator observed.
+
+**Scope (operator decision):** gate EXTUDP only. The gateway upload to the central server
+(`addNodeData()`, `lora_functions.cpp:1252`) stays untouched — that is the gateway's job, not the
+client's view. No Web-GUI checkbox and no T-Deck button ("über BLE läuft schon alles richtig").
+
+**Build.** The destination is available at the gate: `aprsmsg` is already decoded at `:556`, so the
+condition can read `aprsmsg.msg_destination_call` at `:814` (or the equivalent check can sit inside
+`sendExtern()`'s message branch). Forward when the destination is the own call, `*`, or an own
+group; otherwise skip. Persist in a spare bit of `node_sset3` — free bits are `0x0001` (the retired
+`bMHONLY`, commented out at `esp32_main.cpp:816`/`nrf52_main.cpp:584`) and `0x8000`; use `0x8000`.
+**Pick the polarity so that the existing fleet's `0` means "filter active"**, since the new default
+is on and every deployed node reads `0`. Serial command `--nopmother on|off` in the shape of the
+`--nomsgall` blocks (`command_functions.cpp:1925-1939` / `:2027-2041`), help line near `:760`,
+`--info` near `:5615`, `nsetdoc["NOPMOTHER"]` near `:6083`; load next to `bNoMSGtoALL` at
+`esp32_main.cpp:817` / `nrf52_main.cpp:585`.
+
+**No `FLASH_STRUCT_VERSION` bump and no fleet wipe** — a new bit inside an existing `int` changes
+neither `sizeof(s_meshcom_settings)` nor any offset, which is what matters for the nRF52 raw-struct
+blob (`nrf52_flash.cpp:391`); ESP32 stores `node_sset3` as an NVS key/value
+(`esp32_flash.cpp:187`/`:465`) and simply reads `0` for the new bit. `config_json.cpp:147` already
+serialises the whole field, so backup/restore needs no change.
+
+**Nothing else breaks:** foreign DMs are never ACKed today (all ACK logic is inside the own-call
+branch at `:865`); dedup and relay run before the destination dispatch and key on `msg_id`;
+`updateMheard()` (`:739`) is unconditional, so the heard-station list stays complete. Do **not** copy
+`web_setup.cpp:407-412` as a template — see `WEB-04`.
+
+#### APRS-01 — research paper: node → YAAC / aprs.fi app / APRSdroid (point 8)
+
+Scope set by the operator: all three clients. Ground truth the paper starts from, all verified:
+
+**Nothing exists yet.** A whole-tree search for `>APRS`, `TCPIP`, `qAR`, `TNC2`, KISS and AGWPE finds
+exactly one hit outside third-party libraries — a comment in `src/softser_functions.cpp:325-329`
+showing the format of a TNC2 line the node _parses_ from an external sensor. There is no
+serialiser, no KISS framing, no AGWPE, and no APRS-IS text output anywhere. What the wire format
+actually is: MeshCom's own binary frame (`docs/architecture/11-wire-format.md` §1);
+`encodeStartAPRS()` (`aprs_functions.cpp:1024-1058`) builds `src>dst` plus a type byte _inside_ a
+6-byte binary header. `PositionToAPRS()` (`loop_functions.cpp:3807`) builds only the payload/comment
+portion. aprs.fi compatibility is claimed in the deck only via the central-server gateway path.
+
+**What the node holds to forward:** the mheard table — parallel arrays, not a struct array
+(`mheard_functions.cpp:34-68`), `MAX_MHEARD` 30 on classic ESP32 / 80 on ESP32-S3 and nRF52840 / 50
+XML / 10 T-Beam-dev (`configuration_global.h:191-229`), with last-known lat/lon/alt per heard station
+updated at `lora_functions.cpp:661-694`, pruned at 12 h by `millis()`, persisted to SD only on
+T-Deck. Plus the node's own position/sensor state.
+
+**Transports available:** BLE Nordic UART (`6E400001-…`, `esp32_main.cpp:1661-1696`; nRF52 pins ATT
+MTU to 250 at `nrf52_ble.cpp:91`), frame types `0x44` JSON — hard-clamped to 245 bytes including the
+type byte (`BLE_JSON_PAYLOAD_MAX`, `configuration_global.h:348`; clamp
+`loop_functions.cpp:621-627`) — `0x40` + raw frame + 4-byte big-endian timestamp, and a 13-byte ACK
+frame; and ext-UDP JSON on the fixed port 1799 (`EXTERN_PORT`, `configuration_global.h:161`), one
+peer via `--extudpip`, no authentication. The protocol is documented only in this repo's own
+reverse-engineered `docs/architecture/11-wire-format.md`, which says of itself that it is not
+upstream-normative.
+
+**Budget, and a prerequisite.** The newest RAM snapshot in the tree,
+`docs/ram-comparison-20260517.md`, predates `MEM-01` by 3.5 months — **a fresh snapshot is a
+prerequisite for any credible cost estimate.** What is known: classic ESP32 is the wall — E22-DevKitC
+`dram0_0` at 99.09 % and ttgo_tbeam `iram0_0` at 99.98 % (28 bytes free) in that snapshot; `MEM-01`
+(`861f2967`) then freed roughly 10 kB on both (headroom E22 1712 → 11896 B, T-Beam 528 → 10712 B) by
+cutting the classic-ESP32 rings, and added a 4 kB CI DRAM gate (`tools/resource_watch.py`).
+`MEM-02` (five static rings, ~28.1 kB, `loop_functions.cpp:403-435`) is parked. Candidates for "we
+cannot carry this": E22-DevKitC, ttgo_tbeam and its SX1262/SX1268 siblings, ttgo-lora32-v21,
+heltec V2 (all classic ESP32, 4-8 MB flash), and the RAK4631 (nRF52840, 796 kB flash already at
+69.5 %).
+
+**The paper must also answer the cheapest alternative first:** MCProxy already speaks both node
+protocols and runs on a Pi next to the node — a bridge on that side costs the firmware nothing.
+Only if the answer is "on the node" does the rest of the analysis (which protocol per client, where
+the serialiser lives, per-env flash/DRAM cost, unsupported platforms) become necessary.
+
+#### DOC-01 — HTML timeline of the main loop with the confirmed stalls (point 9)
+
+Deliverable: a self-contained HTML page in `docs/presentation/`, tab-switchable between
+"upstream dev" and "this branch", vertical axis, empty/filled circles for non-blocking vs. blocking
+calls, each with what it does, how long it blocks, and the LoRa-RX consequence.
+
+**First correction for whoever builds it:** `src/loop_functions.cpp` is _not_ the main loop — it is a
+5386-line support file. The loops are `esp32loop()` (`src/esp32/esp32_main.cpp:1846-3943`, 47 call
+sites, `delay(5)` at `:3942`) and `nrf52loop()` (`src/nrf52/nrf52_main.cpp:1143-2514`, 37 call sites,
+`delay(100)` at `:2511` plus `yield()`), dispatched from `src/main.cpp:53-75`. A stall on the RAK is
+measured against a ~100 ms floor, not against zero.
+
+**Instrumentation that produced the numbers:** `src/instrument.{h,cpp}` — `INSTR_LOOPTICK()` for the
+loop period, `INSTR_SECTION(name)` for up to 16 named sections (9 wired on ESP32, 33 on nRF52), an
+immediate report for any gap over 250 ms (`instrument.cpp:44`) naming the longest section of that
+iteration, printed by `--instr`. On by default on ESP32/nRF52 (`instrument.h:29-35`) and explicitly
+marked temporary scaffolding, not for upstream.
+
+**Measured before/after, all sourced:** TM-01..04 audio 1552 → 23 ms; TM-08 idle invalidations
+36.9 → 7.0/s; TM-09 OLED frame push 579 → 34.5 ms and loop max 645 → 39 ms; TM-11/TD-01 WiFi first
+join 0/24 → 24/24 with `got_ip` median 55.8 → 14.2 s; TM-15 boot 17.8 → 4.6 s; TM-16 `SetupUBLOX`
+1933 → 899 ms and ready 14.9 → 10.9 s over 24 boots; TM-20 no gap > 0.7 s, loop max 26 ms; TM-34 DNS
+up to 31 s → 22-93 ms async plus the removed `esp_wifi_get_mode()` gaps of 2.9 s and 1.1 s; TM-35
+`getUDP()` 1.6 s every ~20 s and loop max 1.7-3.4 s → 314 ms → 145 ms with 0 gaps > 250 ms; TM-45
+0 NTP successes and 545-548 timeouts per board in 9.1 h → success with 89 ms RTT; BATT-01 ~100 ms
+every 500 ms. Still open, no "after": TD-05/P1 — flush 36.7 ms mean, 184 flushes per 60 s ≈ 11.5 %
+duty, loop max 72 ms at idle. Mark as estimate/unverified: G05 (~870 ms in the LVGL `read_cb`), G06
+(`addMessage` 2 s, 8 s at boot), TM-30 (not reproduced).
+
+**The RX-loss model must be split by platform, not averaged.** ESP32: the DIO1 ISR only sets
+`receiveFlag` (`esp32_main.cpp:498-509`); the radio is re-armed only inside `checkRX()` (`:3946`,
+`readData()` then `startReceive()` around `:4009`), which runs from the loop — so any packet arriving
+after a completed RX_DONE while the loop is stalled is lost, and a stall before any packet costs
+nothing. nRF52: `OnRxDone` runs on the radio library's own task and re-arms immediately
+(`lora_functions.cpp:369`, `startRadioReceive()` `:435-439`) — _except_ while the W5100S owns the
+shared SPI (`bSPI_ETH_Active` → `bPendingRadioRx`, drained in the loop). On the RAK the loss window
+is therefore SPI contention with Ethernet, not a generic loop stall. **No experiment measures packets
+lost per second of stall** — the page must not invent that number.
+
+**The RAK "ETH link up, internet down" case the operator named** has no measured stall of its own.
+The two nearest items: TM-44 (deferred by operator decision) — a 1.6 s loop block at the `ntp` site
+while the WAN default gateway does not answer ARP, from the W5100S retry schedule; and ETH-01 (open)
+— link poll, heartbeat and DHCP renew all nested inside `if(bGATEWAY)`. Anything beyond those two
+belongs on the page as UNVERIFIED or not at all.
+
+#### DOC-02 — `--help` renewal and a command markdown (point 10)
+
+The parser is a single function, `commandAction()` (`src/command_functions.cpp:208-5977`), fed by
+every channel (serial, BLE, net console, web, T-Deck UI, button, MCP frames) — `phone_commands.cpp`
+is the binary BLE frame protocol, not a second parser. 292 live `commandCheck()` sites, ~230 distinct
+verbs. The help text is `:726-827`.
+
+**Two shipped bugs in the help text, worth fixing regardless of the rewrite:**
+
+- `:762` prints `−−settime yyyy.mm.dd hh:mm:ss` with **U+2212 MINUS SIGN**, not ASCII `--`. Visually
+  identical in most terminal fonts, but `commandAction()` requires `memcmp(sVar, "--", 2) == 0`
+  (`:222`), so copy-pasting that line yields "wrong command".
+- `:772-774` prints the T-Deck-only commands `--mute`, `--persistflash`, `--persistsd`,
+  `--immediatesave`, `--persiststat` with **no `#ifdef`** — every board advertises them, and only
+  T-Deck has them. Compare `--rotate` (`WP_DISP`-gated) and `--lps33` (`BOARD_RAK4630`-gated), which
+  do it correctly.
+
+**Missing from help** (roll-up; the full table is what the markdown has to carry): the entire bench
+surface (~48 commands), the whole ping subsystem (`--pingcall`, `--pingtime`, `--ping start|stop`,
+`--pingmax`), `--txsf` and `--txcr` (shipped, airtime-relevant, sitting right next to the documented
+`--txpower`/`--txfreq`/`--txbw`), `--cleanflash` (the documented recovery path for a bricked settings
+flash, per `docs/upstream-issue-harvest-20260829.md:49`), `--sendhey`/`--sendtele`/`--sendtrack`
+(only `--sendpos` is listed), `--netmode`, `--relay`, `--gps autosymbol|fixsymbol`, `--via` and
+`--viadebug`, `--debug csv|man|en|de`, `--setcont`, `--setlog`, `--setretx`, `--shortpath`,
+`--softser baud|rxpin|txpin|app0`, `--aht20`, `--sht21`, the INA226 group, most of `--analog`,
+`--batt factor`, `--board led`, `--tempoff`, `--setrtc`, `--setpress`, `--setublox`/`--setl76k`,
+`--wifitxpower`, `--webtimer`, `--io`/`--setio`/`--setout`, `--aprsmc`. **Listed but nonexistent:**
+`--SS on  use SS` (`:768`) — no matching `commandCheck` anywhere; a leftover from `83c0e3c9`.
+
+**The clean-ship / developer split does not fall where it looks.** `INSTRUMENT_ENABLED`
+(`src/instrument.h:29`) defaults to **1** on ESP32 and nRF52 and is never overridden in any
+`platformio.ini` — so every shipping board build today contains the whole bench surface. The split
+the operator wants is therefore either (a) documentation-only, keyed on "`INSTRUMENT_ENABLED`-gated"
+regardless of the current default, or (b) preceded by a real release environment carrying
+`-D INSTRUMENT_ENABLED=0`. Since the operator has explicitly **not** decided what ships clean, the
+first version of the help and the markdown are written without the split, and the markdown records
+the fault line so the split can be applied later. Fork-only and always-on: `--maxhop` (`CS-01`) is
+the only one; everything else fork-only is inside the bench block.
+
+Other things the markdown must record because they surprise readers: `commandCheck()` is a **prefix**
+compare (`:127`), so `--setinet` also matches `--setinet off`, and the order of the dispatch chain is
+load-bearing; `--help` over BLE is dead code (`:729-733`, the `else` is commented out), which is why
+phone apps never show it; `--setowndns` has two identical handlers (`:3780` and `:3848`, the second
+unreachable); `--setownms` (`:3822`) is missing the `else` that the rest of the chain uses; and three
+`commandCheck` blocks are inside `/* */` and are not commands at all (`--compress` `:257-270`,
+`--softser test0|test` `:3087-3110`, `--softser xml` `:3170-3178`).
+
+**No test asserts any of this.** `command_functions.cpp` is in no `[env:native*]` build, and there is
+no golden-output or list-consistency check — help and code are free to drift again. Existing docs are
+not a substitute: `docs/command-changes-pr1102-1103.md` covers two merged upstream PRs only and its
+line numbers have already drifted; `docs/loradebug-serial-output.md` documents log formats, not
+commands; the README has nothing.
+
+#### CONF-01 (enriched) and DOC-03 — nRF52 CONF apply, endianness and compatibility (point 11)
+
+**Premise corrected.** TM-39 is a test/instrumentation item and is `DONE 2026-08-30`; the serial
+command `--gateway srv OE|DL|IT` works correctly on **both** platforms (`command_functions.cpp:2233-2264`
+— writes `meshcom_settings.node_gwsrv`, calls `save_settings()`, reboots). The defect the operator
+described is the already-open `CONF-01`, whose row above stays the implementation line. What the
+scouting adds to it:
+
+The nRF52 `CONF` branch (`src/nrf52/nrf_eth.cpp:668-780`) parses correctly and then stops:
+callsign into a local `String _longname` (`:730`), shortname (`:743`), lat/lon/alt (`:753`, `:761`,
+`:769`). Grepping every later use of those variables in the file returns only those assignment lines
+— no write to `meshcom_settings`, no `save_settings()`, no `rebootAuto`; the block ends at `:783`.
+So: **parser present, apply missing, save missing, reboot missing.**
+
+The reference to mirror is the ESP32 path, `src/udp_functions.cpp:533-586`, which the nRF52 side also
+lacks the safeguards of: a source-IP guard so only the resolved server can provision (`:533`), a
+`checkRegexCall()` on the callsign (`:566`), then `snprintf` into `node_call` (`:571`) and
+`node_short` (`:575`), `save_settings()` (`:580`), and `rebootAuto = millis() + 15000` (`:585`, with
+the T-Deck exception). The parser itself is `src/conf_frame.{h,cpp}` with 12 native cases
+(`native_conf_frame`, `platformio.ini:315-329`). **No `FLASH_STRUCT_VERSION` bump is needed** — every
+target field already exists in the struct, so no fleet wipe. There is no test for the apply step on
+either platform.
+
+**`DOC-03`** is the documentation half, and there is a concrete set of facts to write down:
+
+- The CONF lat/lon/alt fields are **little-endian on the wire** — `nrf_eth.cpp:753-754` (byte 0 is
+  the LSB) and the ESP32 parser deliberately matched to it (`conf_frame.cpp:61-62`, with the intent
+  recorded in the comment at `:54-55`). Earlier documentation said big-endian; that was wrong.
+- There is **no `htonl`/`ntohl`/`htons`/`ntohs` anywhere in `src/`** — zero hits repo-wide. Nothing
+  is normalised to network byte order, and nothing needs to be: both MCUs are little-endian and the
+  struct never crosses architectures.
+- IP addresses are never stored packed — they live as dotted-quad ASCII (`node_ip[40]`, written at
+  `udp_functions.cpp:1478`, `nrf_eth.cpp:719`) and are constructed per-octet on the wire
+  (`IPAddress(145, 239, 75, 155)`), so there is no byte-order ambiguity. `node_gwsrv` is a 2-3 byte
+  ASCII string; `node_country`/`node_alt` are native `int`s that are never serialised.
+- The two platforms persist differently, and that is what actually constrains compatibility: ESP32
+  writes each field as an NVS key/value (`esp32_flash.cpp:542-543`), so field order and padding are
+  irrelevant there; nRF52 writes the **whole struct as a raw blob to LittleFS**
+  (`nrf52_flash.cpp:391`), so on that platform the struct shape is load-bearing and a layout change
+  without a `FLASH_STRUCT_VERSION` bump silently misreads old flash.
+- The nRF52 side never resolves a hostname — every destination is a literal IP compiled in — while
+  the ESP32 side resolves at connect time via async DNS. Together with `CTY-01` this belongs in the
+  same document.
+
+#### DOC-04 — reference markdown for the `config.json` registers (point 12)
+
+Producer `configExportJson()` (`src/config_json.cpp:467`), importer `configImportJson()` (`:571`),
+routes `GET /config.json` (`web_functions.cpp:407`, dispatch `:652`) and `POST /config` (`:471`,
+dispatch `:658`); the X-macro table `CFG_FIELD_LIST` (`config_json.cpp:88-190`) drives **both**
+directions, so it is the single backbone for the document. **107 keys on ESP32, 103 on nRF52**
+(101 common, 6 ESP32-only, 2 nRF52-only).
+
+Per key the markdown has to state: the C member, its type and array length, the import-time range
+(`lo..hi`, or `CFG_NORANGE` = unvalidated — which is the case for every bitmask, the MCP17 IO config
+and the group numbers), the stricter boot-time clamp where one exists, whether the field has a real
+reader, and whether it carries a secret. The two validation layers disagree in a way worth calling
+out: `node_bw` passes the importer with anything in `0..500`, but `sanitize_radio_params()`
+(`settings_sanitize.cpp:63-78`) only accepts `{0, 125, 250, 500}` (or `{0, 1, 2}` on nRF52) and
+silently corrects it on the next boot.
+
+**The leftover the operator asked for, found:** exactly one key has no reader anywhere outside
+export/import/flash — **`node_gpsbaud`**. GPS baud is auto-scanned via `GPS_BAUDS[]`
+(`gps_functions.cpp:218, 221, 542, 640, 842, 844, 1109`), never from the setting. Deletion candidate.
+
+Other facts the document must carry: four key/member name mismatches (`node_ssid`→`node_ossid`,
+`node_pwd`→`node_opwd`, `node_lssid`→`node_ssid`, `node_lpwd`→`node_pwd`); **five** secret-bearing
+fields, of which only three are documented in `config_json.h:40-44` (`node_lpwd`, `node_webpwd`,
+`bt_code`) — the undocumented two are `node_pwd`/`node_opwd` (staging WiFi password) and
+`node_passwd` (net-console password, masked on serial by `maskSecret()` but exported in clear); and
+that the whole export is served with **no login at all** whenever `node_webpwd` is empty
+(`web_functions.cpp:246`, `:306-307`), which is the `CS-03` finding. Also record the stale struct
+comment: `max_hop_text` sits below the "nicht im Flash" boundary in both structs
+(`esp32_flash.h:209`, `WisBlock-API.h:375`) yet is exported and has had an NVS key since `CS-01`.
+Finally, what is deliberately _not_ exported and therefore not restored: the flash/firmware version
+bookkeeping, `node_cleanflash`, the T-Deck UI block, the clock fields, and — by explicit gate
+decision (`config_json.cpp:214-219`) — `node_msgid`/`node_ackid` and the live sensor readings.
+
+Nothing in `docs/` covers this today; the only existing description is the comment block in
+`src/config_json.h:1-141`, and `src/web_functions/Web-API_documentation.txt` documents the older
+`/setparam/`/`/getparam/` API instead.
+
+#### NTP-01 — cadence, report, `--ntpsync`, regression (point 13)
+
+**(a) How often does it re-sync — 15 minutes, and not for the reason the code suggests.** The class
+default `_intervalMs` is 900000 ms (`ntp_async.h:62`) and every caller overrides it to 3600000 ms
+(`udp_functions.cpp:1241`, `nrf_eth.cpp:1185`, `:1312`) — but that hour never governs, because the
+15-minute caller gate (`esp32_main.cpp:2633`, `nrf52_main.cpp:1219`) calls `udpUpdateTimeClient()`,
+which unconditionally calls `timeClient.requestNow()` (`udp_functions.cpp:1434-1435`,
+`nrf_eth.cpp:1200-1201`), setting `_nextDueMs = millis()`. The effective interval is 15 minutes,
+driven from outside; the 1 h setting is dead. That contradiction is itself worth resolving.
+
+Retry policy (`ntp_async.cpp:3-6`, state machine `:67-104`): reply timeout 2500 ms, retry after
+5000 ms while fewer than 3 failures, 60000 ms from the third on — a fixed two-tier backoff, not
+exponential; `_fails` saturates at 0xFFFF and only resets on success, `begin()` or
+`setPoolServerIP()`. A kiss-of-death reply (stratum 0) forces the 60 s backoff and is consumed rather
+than handed to the MeshCom parser. The class has no link awareness; the caller gates on
+`node_hasIPaddress`, so with no IP the state machine is simply frozen. Both platforms use the same
+class — there is no separate nRF52 implementation.
+
+**(b) The report.** The old client was the stock `NTPClient` library (`platformio.ini:65`, still in
+`lib_deps` although unused). It blocked the caller for up to 1 s per refresh, and `forceUpdate()`
+drained the shared gateway socket, so a refresh could eat queued `GATE`/`CONF` datagrams. Replaced by
+commit `50528168` (2026-08-30 13:00:53 +0200). Evidence to cite: `docs/BACKLOG.md:946` — "RAK 600 s
+steady state: loop max 145 ms, 0 gaps > 250 ms (was 314 ms / 1 gap)" — with the artifacts
+`tools/bench/runs/rak_instr600_ntpasync_20260830.json` and `…_b_….json`. `upstream/dev` (HEAD
+`2cb6bb4d`, 2026-08-28) still runs the blocking client. Follow-ons to mention: TM-45 (fixed,
+`81cfc064`) and TM-44 (deferred). The report should also name the duplication introduced by the
+WEB-01 fix: `getEffectiveNtpServer()` (`web_functions.cpp:1097-1110`) re-implements the selection
+that really lives in `udp_functions.cpp:1515-1638`, and the comment there says so. And it should
+state who owns wall-clock time: `MyClock` (`src/clock.cpp:474`) is the single source of truth, fed by
+GPS > RTC > NTP, with NTP additionally disciplining the DS3231/PCF8563 on ESP32
+(`esp32_main.cpp:2688`, `:2755`).
+
+**(c) `--ntpsync`.** Call the already-public `NtpAsync::requestNow()` (`ntp_async.h:42`) on the
+global `timeClient` (`udp_functions.cpp:75` on ESP32, `nrf_eth.cpp:28` on nRF52) — both are
+file-scope globals reachable by `extern`, exactly like the existing `extern IPAddress bench_srvip`
+bench hook, whose command block (`command_functions.cpp:4996-5023`) is the template down to the
+fork-only comment style. **Caveat pinned by an existing test**
+(`test/test_ntp_async/test_main.cpp:212-237`): `requestNow()` does not cancel an in-flight request —
+if one is outstanding the new due time only takes effect after the ≤2.5 s timeout. The command must
+either report "already syncing" or document the wait.
+
+**(d) Regression.** Native already covers the class: `test_ntp_async` (10 cases) and
+`test_ntp_harvest` (4) under `[env:native]` (`platformio.ini:199`). Nothing covers the serial command
+parser at all, on any command. On the bench, **no scenario parses `[NTP];…` markers** — the TM-35 and
+TM-45 proofs were hand-grepped from raw logs. Add a `scenario_ntp` to `tools/bench/rak_harness.py`
+for the RAK plus an ESP32-side equivalent (there is no shared harness — ESP32 boards use
+`tdeck_harness.py`/`soak_harness.py`), driving `--ntpsync` and asserting on
+`[NTP];ok|timeout|txfail|kod`, documented in the shape of `docs/bench-extudp-regression.md`, results
+in `tools/bench/runs/`.
+
+#### E22-01 — frame integrity under supply spikes and RF ingress (point 14)
+
+**Premise corrected on three counts, and the operator's own observation is the load-bearing
+evidence.** There is no field report of this in the repository — the observation is the operator's:
+corrupted packets received over LoRa from E22 nodes with power-supply problems, and corrupted frames
+arriving from the central server that originated at such a node. Mechanism per the operator: voltage
+spikes and RF ingress into the regulator control loop flip bits; the send buffer is damaged.
+Explicitly **not** trackable through the battery reading.
+
+What the tree actually contains, all verified:
+
+1. `src/esp32/pa_control.cpp` is gated `BOARD_HELTEC_V4 && HELTEC_V4_HAS_PA` (`:9`) — it compiles to
+   nothing on every E22 environment. E22 boards drive the module's PA through RadioLib's RF switch:
+   `radio.setRfSwitchPins(E22_RXEN, E22_TXEN)` (`esp32_main.cpp:1163-1164`).
+2. **There is no low-voltage TX inhibit anywhere in the tree, for any board.** The only voltage
+   trigger that ever existed (`src/batt_functions.cpp:417-452`) sent the _whole node_ to
+   `esp_deep_sleep_start()` at `BAT_MIN_VOLTAGE`, and it has been commented out since upstream commit
+   `e0043a56` (2026-07-11, "TBEAM 1W deepsleep deactivated", upstream #1053). The only E22-specific
+   voltage code that is live is display cosmetics (`batt_functions.cpp:398-400`, `BatVoltage < 3.0 →
+0`).
+3. The brown-out detector is at the Arduino-ESP32 default (enabled) — no `BROWNOUT` or `sdkconfig`
+   override exists anywhere in the repo — and **nothing in `src/` reacts to it**, a gap already
+   recorded in `docs/review/2026-07-31/f7-testaudit.md:737`.
+
+**What the frame already protects, and what that implies.** Two independent checks sit between a
+sender and a receiver that would _display_ garbage:
+
+- The LoRa PHY CRC is on (`rf_crc = true`, `lora_setchip.cpp:58`; `radio.setCRC(icrc)` at `:806`).
+- The MeshCom frame carries its own FCS: a 16-bit **sum over all preceding bytes**, computed at
+  encode (`aprs_functions.cpp:1100-1111`) and verified at decode (`:417-443`), with a hard
+  `return 0x00` — frame discarded — on mismatch. The callsign comparison at `:430` only suppresses
+  the debug print, not the discard.
+
+So a corrupted frame that a peer or the central server actually _accepted_ passed both. That is the
+single most useful analytic constraint for the concept: corruption occurring after `encodeAPRS()` —
+in the ring, in the `memcpy` to `lora_tx_buffer`, or on the SPI write — would fail the FCS with
+probability ≈ 1 − 2⁻¹⁶ and be dropped by the receiver. Garbage that survives to the map therefore
+most likely entered **before or during** `encodeAPRS()`, i.e. in `aprsmsg`, in the source buffers, or
+in the settings the frame is built from (the callsign among them) — or the FCS was computed over
+already-damaged bytes. The concept has to test that hypothesis before it proposes a guard, because it
+decides where the guard belongs.
+
+**The chain, for reference:** `ringBuffer[MAX_RING][UDP_TX_BUF_SIZE+5]` (`txring_functions.cpp:27`) →
+`memcpy` into `lora_tx_buffer` (`lora_functions.cpp:104`, copy at `:1517`) →
+`radio.startTransmit(lora_tx_buffer, sendlng)` (`:1730`). The only check between them is a length
+clamp (`:1513-1514`). No CRC, no canary: `crc32_util.h` exists but is used solely by `config_json`,
+and the dedup ring keys on `msg_id`, not on content. A `startTransmit()` failure is rolled back and
+requeued (`:1731-1740`), so driver-reported failures are handled — silent RAM damage is not. On
+ESP32 every writer and reader of these buffers runs in `loopTask` (`src/ring_index.h:1-31`), so a
+data race is not the mechanism either.
+
+**The UDP question, answered:** the gateway's upload to the central server is built from `RcvBuffer`,
+i.e. from what the node _received_ (`lora_functions.cpp:502` → `addNodeData()` `:1252` →
+`ringBufferUDPout`), not from `lora_tx_buffer`. A corrupted transmit buffer does not, by this code
+path, also reach the server from the same node — it can only come back via a peer that heard the
+garbage and forwarded it. That matches the operator's second observation.
+
+**Concept to be written and reviewed before any code** (the operator reviews and releases it):
+
+1. Instrument first, because the mechanism is bit flips, not a threshold: a checksum or canary
+   computed at frame build and re-verified immediately before `startTransmit()`, and a second one
+   over the settings the frame is built from, so the concept can say _where_ the flip happened.
+2. Extend the FCS-mismatch path (`aprs_functions.cpp:428-443`) into a counter and a marker, so
+   damaged frames are countable in the field instead of only printed under `--loradebug`.
+3. Decide what a node does when the check fires: drop the frame, requeue it, rebuild it from
+   `aprsmsg`, or refuse to transmit until the next clean build — plus what it reports.
+4. Separately, the questions upstream leaves open: whether to react to the brown-out detector at all,
+   and whether to restore the deep-sleep guard `e0043a56` removed with a board-correct threshold
+   (upstream #962 open, plus #1053, #910, #940 — `docs/upstream-issue-harvest-20260829.md:205-210`).
+5. Hardware side, since the cause is supply-borne: the concept should say what is expected of the
+   power supply (decoupling, brown-out margin at TX current peaks) rather than treating it purely as
+   a firmware defect.
+
+Adjacent and already fixed, for contrast, not as the same defect: upstream #661 → `TM-32`
+(`docs/BACKLOG.md:943`, fixed 2026-08-29) — a brown-out corrupted the _stored settings_ on a RAK4631
+and the firmware applied out-of-range radio parameters on boot; `src/settings_sanitize.{h,cpp}` now
+range-checks them. Different board family, different memory, different symptom — but the same root
+cause class, and the reason a settings-side canary belongs in point 1 above.
 
 ---
 
