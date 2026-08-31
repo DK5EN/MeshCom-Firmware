@@ -3,14 +3,25 @@
 
 ## What this release is
 
-**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 46 numbered changes (items 107–152), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 438 native test cases across 12 host environments and soak runs up to 9.1 hours.
+**The complete field campaign since `v4.35p.08.28-stability`**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, HEY link-data parity for gateways, TX back-pressure to the sender, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio — 50 numbered changes (items 107–156), each verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 445 native test cases across 12 host environments and soak runs up to 9.1 hours.
 
 Flash version `20260831`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
+### New in this second cut (`.2`, items 153–156)
+
+This release supersedes this morning's `v4.35p.08.31-stability` and adds four fixes found the same afternoon:
+
+- **Safeboot recovers from an aborted OTA upload** (TM-46): central abort handling with a session generation counter — an upload killed mid-transfer no longer leaves stale session state that turned every retry into HTTP 400. Includes a cross-task race fix in the stall watchdog that could abort healthy uploads. Proven twice on the bench (kill 5 s into the upload → immediate retry completes).
+- **Safeboot WiFi join uses the production join pattern** (TM-48): driver-picked AP selection and PMF-off — the same fix that got the main firmware onto WPA2/WPA3 transition APs.
+- **`tools/webflash.py`** (TM-47): correct T-Deck hardware mapping (`TDECK+`), a safeboot-resume path, and `--self-test`.
+- **Back-pressure notices now reach the operator** (BP-01 follow-up): QRS/QRT/QTA/QRV arrive as a normal message from the node's own callsign, for the BLE/web app and UDP peers alike. The previous framing (pseudo-sender `response`, a distinct JSON type `notice`) was spam-classed or silently dropped by client apps, so the sender never learned why nothing was transmitted. The framing is pinned by native tests.
+
+The new safeboot ships in this release's `safeboot.bin`/`safeboot-s3.bin` and installs with a full USB flash; OTA only replaces the app image, so an already-installed safeboot stays as it is until the next full flash.
+
 ## Changelog and engineering rationale
 
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–152 for this release.
-- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
+- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–156 for this release.
+- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Built for the field: debug logs from any node
@@ -44,7 +55,7 @@ Each on-air-visible change, stated plainly (details in the changelog):
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 438 native test cases green across 12 host environments.
+- **All 32 release environments build clean**; 445 native test cases green across 12 host environments.
 - **Heltec V3** — WiFi/NTP/battery/OLED changes bench-proven; runs the GW-01 fix build, verified against the live server stream.
 - **T-Beam v1.2** — WiFi soak (9.1 h, 55/55 reconnects), gateway observer in the GW-01 measurement.
 - **T-Deck Plus** — full harness regression (boot, display CRC, map, nav, input, heap, trim, touch injection) PASS on this build.
@@ -72,10 +83,12 @@ These boards build cleanly from the same source and inherit every improvement, b
 - The `blelen + 2` overflow exists generically (the Mheard path no longer reaches it); the BLE `I` register with six group-call slots filled is still over the limit; the negotiated ATT MTU is never read. All reported upstream.
 - `--mheard` and the live BLE path still deliver two schemas under the same `TYP`.
 - The battery zero point on a real 2S pack, the INA226 branch and L76K GPS remain unverified.
+- **TM-49 (open):** the safeboot OTA completion handler can read a success status after a disconnect whose final frame never arrived, and switch boot partitions after a partial write — benign on 16-MB boards (slot validation catches it), risky on 4-MB single-slot boards. Until the guard lands: on 4-MB boards prefer USB flashing over OTA when the link is marginal.
+- The refusal-episode duration under load is longer than it should be: the TX-ring depth that drives back-pressure counts freed slots behind a starved low-priority entry (analyzed 2026-08-31 from a field log), so a node can keep refusing user messages for minutes after the real backlog drained. Fix scheduled.
 
 ## Installing
 
-- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
+- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.08.31.2-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
 - **Already running MeshCom 4.x with safeboot:** just OTA the `firmware.bin` for your board — via the node's OTA web page, or scripted: `python3 tools/webflash.py <YOUR-CALLSIGN>.local`
 - **RAK4631:** copy the `.uf2` onto the bootloader volume (double-tap reset), or `adafruit-nrfutil --verbose dfu serial --package wiscore_rak4631.zip -p <PORT> --singlebank --touch 1200`
 

@@ -75,6 +75,41 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## New in v4.35p.08.31.2-stability
+
+Second cut of the 2026-08-31 release, superseding `v4.35p.08.31-stability` the
+same day: the OTA-tooling wave (TM-46/47/48) and the back-pressure notice
+reframing (BP-01), on top of everything below. `FLASH_VERSION` stays
+`20260831`; native suite now 445 test cases across the same 12 host
+environments.
+
+153. **Safeboot recovers from an aborted OTA upload** (TM-46). A central
+     `abortActiveUpdate()` with an onDisconnect hook and a session generation
+     counter clears the stale session state that turned every retry after a
+     killed upload into HTTP 400 — plus a cross-task unsigned-underflow race
+     in the stall watchdog that could abort healthy uploads (signed deltas +
+     `volatile`). Abort-retry proven twice on the bench: kill 5 s into the
+     upload, immediate retry completes without `--force`.
+154. **The safeboot WiFi join uses the production join pattern** (TM-48):
+     driver-picked AP selection and PMF-off (`esp_wifi_disable_pmf_config`),
+     the same TM-34 fix that got the main firmware onto WPA2/WPA3 transition
+     APs. `[SAFEBOOT];wifi;pmf_off;rc;0` marker proven, ~170 kB/s at a
+     -74 dBm desk link.
+155. **`tools/webflash.py` handles the T-Deck family without `--force`**
+     (TM-47): hardware strings keep the `+` (expects `TDECK+`), a
+     safeboot-resume path picks up a node already sitting in safeboot, and
+     `--self-test` runs the parser checks offline.
+156. **Back-pressure notices arrive as normal messages from the node's own
+     callsign** (BP-01 follow-up). The BLE/web frame now carries the node
+     call as sender instead of the pseudo-sender `response` (which McApp
+     files under its spam class, group 9999); the EXTUDP datagram is now
+     shaped exactly like a text message received over LoRa (`src_type`
+     `lora`, `type` `msg`, numeric firmware version) instead of a distinct
+     `notice` type no client rendered. Both framings are extracted into
+     testable headers and pinned by two new native suites
+     (`test_bp_notice_frame`, `test_extern_notice_json`), verified
+     fails-before against both old framings.
+
 ## New in v4.35p.08.31-stability
 
 The complete field campaign since the 08.28 hotfix: two `/orchestrate-waves`

@@ -7,6 +7,67 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.08.31.2-stability (2026-08-31, zweiter Schnitt)
+
+Nachzuegler-Release am selben Tag, ersetzt v4.35p.08.31-stability
+(Release-Objekt geloescht, Tag bleibt als Marker stehen). `FLASH_VERSION`
+bleibt 20260831 -- rein informativ, keine Struktur-Aenderung. Inhalt: die
+OTA-Tooling-Welle vom Nachmittag plus die Backpressure-Notice-Umrahmung
+(Changelog-Items 153-156).
+
+### Was dazugekommen ist
+
+- **TM-46 -- Safeboot uebersteht einen abgebrochenen OTA-Upload.** Zentrales
+  `abortActiveUpdate()` mit onDisconnect-Hook und Session-Generationszaehler;
+  dazu die entscheidende Bench-Findung: ein Cross-Task-Race
+  (unsigned-Unterlauf) im Stall-Watchdog konnte gesunde Uploads abbrechen
+  (Fix: vorzeichenbehaftete Deltas + volatile). Abort-Retry zweimal auf
+  DK5EN-14 bewiesen (Kill 5 s nach Upload-Start -> sofortiger Retry laeuft
+  durch, kein `--force`).
+- **TM-48 -- Safeboot-WLAN-Join nach Produktionsmuster** (Treiber-gewaehlter
+  AP, PMF-off wie TM-34); `[SAFEBOOT];wifi;pmf_off;rc;0` belegt, ~170 kB/s am
+  -74-dBm-Schreibtisch-Link.
+- **TM-47 -- webflash.py:** Hardware-Strings behalten das `+` (`TDECK+`),
+  Safeboot-Resume-Pfad, `--self-test`.
+- **BP-01-Nachschliff -- Notices kommen als normale Nachricht vom eigenen
+  Rufzeichen an.** BLE/Web: Absender ist das Node-Call statt "response"
+  (landete in McApps Spam-Klasse 9999). EXTUDP: statt eigenem Typ "notice"
+  jetzt exakt die Form einer ueber LoRa empfangenen Textnachricht (src_type
+  "lora", type "msg", numerische Firmware-Version) -- der DJ8MEH-Vorfall vom
+  Nachmittag (drei stumm verworfene Nachrichten, RCA aus dem 2323-Log) hatte
+  gezeigt, dass keine Client-App die alte Form darstellt. Beide Rahmungen in
+  testbare Header extrahiert (`bp_notice_frame.h`, `extern_notice_json.h`)
+  und mit zwei neuen nativen Suiten festgenagelt (fails-before gegen beide
+  Altverhalten verifiziert).
+
+Die neuen Safeboot-Binaries (`safeboot.bin`, `safeboot-s3.bin`) liegen dem
+Release bei; sie kommen nur per USB-Vollflash auf die Boards -- OTA tauscht
+ausschliesslich das App-Image.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- TM-46/47/48: Abort-Retry zweimal auf DK5EN-14 (T-Deck Plus), WLAN-Join-
+  Marker und Durchsatz am Schreibtisch-Link; webflash-Runde ueber die Fleet
+  (DK5EN-98 per OTA mit Build-Stamp-Verifikation).
+- BP-01-Rahmung: nativ festgenagelt (445 Testfaelle, 12 Host-Envs); die
+  Fleet (14/93/92/90/98) laeuft den Build mit dem Fix.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Die McApp-Darstellung der neuen Notice-Rahmung nach dem Flash (der Test
+  vom Nachmittag lief gegen die alte Firmware); Bestaetigung am Geraet steht
+  aus.
+- TM-49 bleibt offen: der ElegantOTA-Completion-Handler kann nach einem
+  Disconnect `hasError==false` sehen und nach einem Teil-Write die
+  Boot-Partition umschalten -- auf 16-MB-Boards durch Slot-Validierung
+  harmlos, auf 4-MB-Single-Slot-Boards riskant. Guard + Bench-Beweis vor dem
+  naechsten Release; bis dahin auf 4-MB-Boards bei marginalem Link USB statt
+  OTA.
+- Der Backpressure-Phantomtiefen-Befund aus der DJ8MEH-RCA (txRingDepth
+  zaehlt freigegebene Loecher hinter einem ausgehungerten Prio-5-Eintrag,
+  QRT-Episode dadurch minutenlang zu lang) ist analysiert, aber noch nicht
+  gefixt.
+
 ## Stability-Release v4.35p.08.31-stability (2026-08-31)
 
 Die komplette Feldkampagne seit dem 08.28-Hotfix: 46 nummerierte Aenderungen
