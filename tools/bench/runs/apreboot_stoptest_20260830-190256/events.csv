@@ -1,0 +1,9 @@
+board,wall,uptime_ms,kind,reason,bssid,chan,rssi,value,note
+tdeck,2026-08-30 19:02:57,,reset,rst:0x15,,,,,
+tdeck,2026-08-30 19:03:04,,link_down,heartbeat,,,,7642,
+tdeck,2026-08-30 19:03:06,,link_up,connected,,,,9861,
+tdeck,2026-08-30 19:03:07,,got_ip,event,,,,10394,
+tdeck,2026-08-30 19:03:07,,got_ip,assoc,5A:AF:97:2E:2B:8B,3,-64,10394,
+tdeck,2026-08-30 19:03:07,10663,boot,ip=1,,,,10663,
+tdeck,2026-08-30 19:03:08,,command,--udplog on,,,,,
+tdeck,2026-08-30 19:03:08,,udplog_ack,1,,,,,

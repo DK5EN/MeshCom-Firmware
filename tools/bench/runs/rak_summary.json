@@ -1,0 +1,9 @@
+{
+  "info": {
+    "ok": true,
+    "answered_lines": 45,
+    "call_line": "...Call: <DK5EN-93> ...ID 433A8968 ...NODE 43 <HELTEC_V3> ...UTC-OFF 1.000000 [GPS]",
+    "hw_line": "...Call: <DK5EN-93> ...ID 433A8968 ...NODE 43 <HELTEC_V3> ...UTC-OFF 1.000000 [GPS]",
+    "gateway_line": "...Webserver  on / Webpwd <> / Gateway off "
+  }
+}

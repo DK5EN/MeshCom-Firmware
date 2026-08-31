@@ -1,0 +1,4 @@
+apreboot ap1  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_ap1_20260830-220423
+phase              DONE (recovery window elapsed)
+verdict            PASS
+see                /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_ap1_20260830-220423/summary.txt
