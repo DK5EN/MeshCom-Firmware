@@ -267,6 +267,13 @@ static void test_flut_ohne_abfluss_nimmt_max_ring_minus_eins_an(void)
     // zaehlt also auch den Eintrag mit, der gleich darauf verworfen wird. Ein
     // gemeldeter HWM von MAX_RING heisst im Feld deshalb "Ring war voll UND es
     // wurde verworfen", nicht "Ring war randvoll und es ging gerade noch".
+    //
+    // BP-02 (reviewed, unveraendert): `queued` in addTxRingEntry() zaehlt seit
+    // BP-02 belegte Slots statt Indexdistanz, und stat_queue_hwm bleibt
+    // `queued + 1` (belegt NACH dem Insert). Dieser Test erzeugt nie ein
+    // interiores Loch (reines sequentielles Fuellen, kein manuelles
+    // ringBuffer[i][0]=0 dazwischen) -- belegt-Zaehlung und Indexdistanz sind
+    // hier identisch, MAX_RING bleibt der korrekte erwartete Wert.
     TEST_ASSERT_EQUAL_UINT16((uint16_t)MAX_RING, stat_queue_hwm);
 
     // Der aelteste Frame (0x9000) steht unveraendert in Slot 0.
@@ -343,6 +350,13 @@ static void test_ringgroesse_ist_dokumentiert(void)
 // txRingDepth(). Wenn diese Zahl vom tatsaechlichen Fuellstand abweicht, warnt
 // der Knoten zum falschen Zeitpunkt -- oder gar nicht. Also gegen den echten
 // Ring gemessen, nicht gegen eine Nachbildung.
+//
+// BP-02 (reviewed, unveraendert): txRingDepth() zaehlt seit BP-02 belegte
+// Slots statt Indexdistanz (siehe txring_functions.cpp). Der einzige hier
+// entstehende Hohlraum ist Slot 0 an der Ringfront, den advanceIReadPastEmpty()
+// sofort ueberspringt -- kein interiores Loch bleibt zwischen iRead und
+// iWrite stehen, deshalb bleiben MAX_RING-1 und MAX_RING-2 unten die
+// richtigen erwarteten Werte unter beiden Zaehlweisen.
 
 static void test_txringdepth_folgt_dem_echten_ring(void)
 {

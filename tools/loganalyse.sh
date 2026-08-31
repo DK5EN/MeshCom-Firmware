@@ -1312,13 +1312,23 @@ function stddev(sum, sumsq, n) {
 }
 
 # ── Starvation: Ring zombies ──
+# BP-02: queued= in RING_STATUS is now the honest occupied-slot count
+# (was raw index distance iWrite-iRead, which counted holes freed behind a
+# priority-starved entry as still queued -- DJ8MEH-RCA 2026-08-31). The
+# zombie condition needs "ring actually drained", so prefer the new dist=
+# field (the old index-distance value, unaffected by the redefinition) when
+# present; fall back to queued==0 only for logs with no dist= field at all
+# (firmware built before BP-02).
 /RING_STATUS/ {
-    retrying = 0; queued = 0
+    retrying = 0; queued = 0; dist = -1
     if (match($0, /retrying=[0-9]+/))
         retrying = substr($0, RSTART+9, RLENGTH-9) + 0
     if (match($0, /queued=[0-9]+/))
         queued = substr($0, RSTART+7, RLENGTH-7) + 0
-    if (retrying > 0 && queued == 0) {
+    if (match($0, /dist=[0-9]+/))
+        dist = substr($0, RSTART+5, RLENGTH-5) + 0
+    ring_drained = (dist >= 0) ? (dist == 0) : (queued == 0)
+    if (retrying > 0 && ring_drained) {
         zombie_streak++
         if (zombie_streak == 3) {
             zombie_cnt++
@@ -1690,7 +1700,7 @@ END {
     }
 
     print ""
-    print "--- RING_ZOMBIES (retrying>0, queued==0, 3+ consecutive) ---"
+    print "--- RING_ZOMBIES (retrying>0, ring drained [dist==0, or queued==0 on pre-BP-02 logs], 3+ consecutive) ---"
     if (zombie_cnt > 0) {
         for (i = 1; i <= zombie_cnt && i <= 10; i++)
             printf "  ZOMBIE at %s\n", zombie_time[i]

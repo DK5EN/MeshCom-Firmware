@@ -217,24 +217,45 @@ void advanceIReadPastEmpty(void)
 }
 
 /**
- * BP-01 (BACKLOG) / TM-37: current TX-ring fill level.
+ * BP-01 (BACKLOG) / TM-37 / BP-02 (DJ8MEH-RCA): current TX-ring fill level.
  *
- * Identical arithmetic to the `queued` local inside addTxRingEntry() -- that
- * value lives inside the lock and is not readable from outside. The
- * back-pressure state machine needs the depth twice: right after an enqueue
- * (to decide QRS/QRT/QTA) and once per loop pass (to close an episode with
- * QRV when the ring drained without a new user message).
+ * Counts OCCUPIED slots (ringBuffer[i][0] > 0) from iRead up to (but not
+ * including) iWrite, wrapping over MAX_RING -- not the index distance
+ * iWrite-iRead. A priority-starved entry parked at iRead leaves behind
+ * freed holes (retransmitted-and-dropped, or evicted) between iRead and
+ * iWrite that the old index-distance arithmetic counted as still queued.
+ * DJ8MEH-RCA 2026-08-31: an 8-minute QRT episode ran on a phantom depth of
+ * 19 while only 3-4 slots were actually occupied, because QRV only closes
+ * at depth 0.
  *
- * Deliberately lock-free: both indices are read once each into locals, so the
- * worst a concurrent OnRxDone enqueue on nRF52 can do is make the answer one
- * entry stale. A stale depth costs at most one notice arriving one message
- * late; taking the critical section on every loop pass would not.
+ * Same occupied-slot counting style as the `queued` local inside
+ * addTxRingEntry() (that one excludes the slot being written, since it is
+ * computed before iWrite advances past it).
+ *
+ * Deliberately lock-free: both indices are read once each into locals. The
+ * occupied-count loop over up to MAX_RING slots is a read-only scan (no
+ * writes, no printf/malloc), so it stays cheap enough to keep lock-free.
+ * The worst a concurrent OnRxDone enqueue/evict on nRF52 can do mid-scan is
+ * make the answer stale by roughly the couple of slots that write touches
+ * (occupying or freeing a slot the scan has already passed or not yet
+ * reached) -- real, but irrelevant for a back-pressure notice threshold
+ * that only needs "about empty" vs. "still full", not an exact count.
  */
 int txRingDepth(void)
 {
     int w = (int)(uint8_t)iWrite;
     int r = (int)(uint8_t)iRead;
-    return (w >= r) ? (w - r) : (MAX_RING - r + w);
+    int depth = 0;
+    int i = r;
+    while(i != w)
+    {
+        if(ringBuffer[i][0] > 0)
+            depth++;
+        i++;
+        if(i >= MAX_RING)
+            i = 0;
+    }
+    return depth;
 }
 
 /**
@@ -336,7 +357,24 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     msgType = ringBuffer[w][2];
     mid = ((uint32_t)ringBuffer[w][6] << 24) | ((uint32_t)ringBuffer[w][5] << 16) |
           ((uint32_t)ringBuffer[w][4] << 8)  |  (uint32_t)ringBuffer[w][3];
-    queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
+    // BP-02: occupied-slot count from iRead up to (excluding) the slot just
+    // written at w -- i.e. the depth BEFORE this entry, same counting style
+    // as txRingDepth() above. Not index distance: holes freed by retransmit
+    // drops/evictions between iRead and w must not inflate this number (see
+    // txRingDepth() doc comment, DJ8MEH-RCA). Read-only loop under the lock,
+    // no printf/malloc.
+    {
+        int occ = 0, i = r;
+        while(i != w)
+        {
+            if(ringBuffer[i][0] > 0)
+                occ++;
+            i++;
+            if(i >= MAX_RING)
+                i = 0;
+        }
+        queued = occ;
+    }
 
     // Assign priority and enqueue timestamp
     ringPriority[w] = getMessagePriority(w);

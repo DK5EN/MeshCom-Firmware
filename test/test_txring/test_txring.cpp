@@ -690,6 +690,68 @@ static void test_n14_stress_randomisiert(void)
     }
 }
 
+// --------------------------------------------------------- Test 10/11: BP-02
+//
+// txRingDepth() zaehlte bisher die reine Indexdistanz iWrite-iRead, nicht
+// die tatsaechlich belegten Slots. Freigegebene Slots (Retransmit-Erfolg
+// oder Eviction) HINTER einem noch belegten Slot am Lesezeiger wurden von
+// der alten Arithmetik faelschlich als "noch in der Schlange" mitgezaehlt.
+//
+// DJ8MEH-RCA 2026-08-31: genau dieses Muster lief 8 Minuten mit
+// RING_STATUS queued=19 bei real 3-4 belegten Slots, weil QRV erst bei
+// Tiefe 0 schliesst.
+//
+// Kontrollrechnung (alte Arithmetik, Indexdistanz `(w>=r)?(w-r):(...)`):
+// 5 Enqueues fuellen Slots 0..4, iWrite=5, iRead=0 -> alte Tiefe = 5, IMMER,
+// unabhaengig davon, wie viele der 5 Slots danach wieder freigegeben werden.
+// Gegen die alte Implementierung (verifiziert: txRingDepth() vor dem Fix
+// probeweise auf `return (w>=r)?(w-r):(MAX_RING-r+w);` zurueckgesetzt und
+// diese Suite laufen lassen) schlagen beide Tests unten rot fehl --
+// "Expected 3 Was 5" bzw. "Expected 1 Was 5".
+
+static void test_bp02_tiefe_mit_loechern(void)
+{
+    for (int i = 0; i < 5; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0xA000 + i));
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp02holes");
+        TEST_ASSERT_EQUAL_INT(i, slot);
+    }
+    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    // Slots 1 und 3 freigeben (simuliert erfolgreiche Retransmits/Eviction) --
+    // Slots 0, 2, 4 bleiben belegt.
+    ringBuffer[1][0] = 0;
+    ringBuffer[3][0] = 0;
+
+    TEST_ASSERT_EQUAL_INT(3, txRingDepth());
+}
+
+// DJ8MEH-Szenario Teil 1: ein einzelner, prioritaets-ausgehungerter Eintrag
+// sitzt am Lesezeiger (iRead); alle Slots dahinter bis iWrite sind Loecher.
+// Die alte Indexdistanz-Arithmetik meldete hier weiterhin die volle
+// Enqueue-Anzahl (5) als Tiefe -- die ehrliche Zaehlung liefert 1.
+static void test_bp02_dj8meh_szenario_prio5_am_lesezeiger(void)
+{
+    for (int i = 0; i < 5; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0xB000 + i));
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "bp02dj8meh");
+        TEST_ASSERT_EQUAL_INT(i, slot);
+    }
+    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    // Slots 1..4 freigeben -- nur Slot 0 (am Lesezeiger) bleibt belegt, wie
+    // ein prioritaets-ausgehungerter Eintrag, der von getNextTxSlot() nie
+    // ausgewaehlt wird, waehrend alles dahinter laengst gesendet/verworfen ist.
+    for (int i = 1; i < 5; i++)
+        ringBuffer[i][0] = 0;
+
+    TEST_ASSERT_EQUAL_INT(1, txRingDepth());
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -708,5 +770,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_clear_slot_first);
     RUN_TEST(test_n14_zwei_aufrufe_verschiedene_slots);
     RUN_TEST(test_n14_stress_randomisiert);
+    RUN_TEST(test_bp02_tiefe_mit_loechern);
+    RUN_TEST(test_bp02_dj8meh_szenario_prio5_am_lesezeiger);
     return UNITY_END();
 }

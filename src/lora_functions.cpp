@@ -1545,9 +1545,11 @@ bool doTX()
                               ((uint32_t)ringBuffer[txSlot][5] << 16) |
                               ((uint32_t)ringBuffer[txSlot][4] << 8)  |
                                (uint32_t)ringBuffer[txSlot][3];
-            int tw = iWrite;
-            int tr = iRead;
-            int queued = (tw >= tr) ? (tw - tr) : (MAX_RING - tr + tw);
+            // BP-02: qlen/queued in TX markers is txRingDepth() (occupied
+            // slots), not the raw index distance -- this marker fires on
+            // every TX and would otherwise dominate a log with the old
+            // hole-counting number right next to an honest RING_STATUS.
+            int queued = txRingDepth();
             if(bLORADEBUG)
                 printfdeb("[MC-DBG] RING_TX_READ slot=%d prio=%d type=%02X status=%02X "
                           "len=%d msg_id=%08X retry=%d queued=%d/%d lat=%lums\n",

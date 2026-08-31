@@ -126,6 +126,7 @@ void sendHeartbeat();
 #include <aprs_functions.h>
 #include <batt_functions.h>
 #include <lora_functions.h>
+#include "txring_functions.h" // BP-02: txRingDepth() declaration
 #include <udp_functions.h>
 #include <web_functions/web_functions.h>
 #include <phone_commands.h>
@@ -1304,9 +1305,18 @@ void nrf52loop()
             }
             int w = iWrite;
             int r = iRead;
-            int queued = (w >= r) ? (w - r) : (MAX_RING - r + w);
-            Serial.printf("[MC-DBG] RING_STATUS queued=%d pending=%d retrying=%d done=%d iW=%d iR=%d\n",
-                queued, pending, retrying, done, w, r);
+            // BP-02: queued is now the honest occupied-slot count (the
+            // pending/retrying/done buckets above already scan every slot
+            // and partition it exactly) instead of the raw index distance --
+            // that distance counted freed holes left behind by a
+            // priority-starved entry parked at iRead as still queued
+            // (DJ8MEH-RCA: queued=19 vs. 3-4 real). The old arithmetic
+            // survives as `dist` below for anyone comparing against
+            // pre-BP-02 logs.
+            int queued = pending + retrying + done;
+            int dist = (w >= r) ? (w - r) : (MAX_RING - r + w);
+            Serial.printf("[MC-DBG] RING_STATUS queued=%d pending=%d retrying=%d done=%d iW=%d iR=%d dist=%d\n",
+                queued, pending, retrying, done, w, r, dist);
         }
     }
 
@@ -1408,11 +1418,13 @@ void nrf52loop()
             if(!_cad_ip && !_cad_df)
             {
                 // Start CAD scan
+                // BP-02: qlen is txRingDepth() (occupied slots), not the raw
+                // index distance -- see txRingDepth() doc comment.
                 if(bLORADEBUG)
                 {
                     Serial.printf("[MC-SM] IDLE -> TX_PREPARE rc=0\n");
                     Serial.printf("[MC-DBG] TX_GATE_ENTER qlen=%d cad_attempt=%d\n",
-                        (_w >= _r) ? (_w - _r) : (MAX_RING - _r + _w),
+                        txRingDepth(),
                         cad_attempt);
                 }
 
