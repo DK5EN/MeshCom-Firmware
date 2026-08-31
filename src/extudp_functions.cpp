@@ -786,7 +786,12 @@ void  sendExternHeartbeat()
 // extern_notice_json.h, where the native suite pins it
 // (test/test_extern_notice_json); msg_id is millis(), matching the BLE
 // notice framing in loop_functions.cpp.
-void sendExternNotice(const char *text)
+//
+// BP-06: dst is the destination of the message that triggered the notice
+// (group, DM call, or "*"), forwarded through from bp_origin_dst /
+// bp_episode_dst in loop_functions.cpp -- see externNoticeJson() for why a
+// DM dst is still safe here.
+void sendExternNotice(const char *text, const char *dst)
 {
   #ifdef ESP32
     if(bWIFIAP)
@@ -803,7 +808,7 @@ void sendExternNotice(const char *text)
   size_t json_len = externNoticeJson(c_json, sizeof(c_json),
                                      meshcom_settings.node_call,
                                      shortVERSION(), SOURCE_VERSION_SUB,
-                                     (unsigned int)millis(), text);
+                                     (unsigned int)millis(), text, dst);
 
   if(json_len == 0)
     return;

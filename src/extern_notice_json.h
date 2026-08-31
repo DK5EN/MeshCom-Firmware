@@ -17,6 +17,12 @@
 // distinct "notice" type (the first cut of this path) was invisible to it
 // (operator decision 2026-08-31).
 //
+// BP-06: "dst" is the target of the message that triggered the notice (a
+// group, a DM call, or "*"), not a hardcoded broadcast -- the notice reaches
+// the same peer view the triggering message was headed for. This datagram
+// never goes on the air regardless of dst, so a DM dst is safe: the DM
+// partner never sees it, only the sender's own EXTUDP peer does.
+//
 // Rueckgabe: Anzahl geschriebener Bytes; die Schranke ist die Puffergroesse,
 // nicht measureJson() (JSN-01, siehe ble_json_frame.h).
 static inline size_t externNoticeJson(char *out, size_t out_len,
@@ -24,7 +30,8 @@ static inline size_t externNoticeJson(char *out, size_t out_len,
                                       uint8_t fw_version,
                                       const char *fw_sub,
                                       unsigned int msg_id,
-                                      const char *text)
+                                      const char *text,
+                                      const char *dst)
 {
     if(out == nullptr || out_len == 0)
         return 0;
@@ -37,7 +44,7 @@ static inline size_t externNoticeJson(char *out, size_t out_len,
     cJson["src_type"] = "lora";
     cJson["type"] = "msg";
     cJson["src"] = node_call;
-    cJson["dst"] = "*";
+    cJson["dst"] = dst;
     // JSN-01: assign raw -- ArduinoJson escapes JSON strings on
     // serializeJson() already.
     cJson["msg"] = text;

@@ -3365,6 +3365,18 @@ static MsgOrigin bp_origin = ORIGIN_NONE;
 // If an untagged sendMessage() caller is ever added, revisit this.
 static MsgOrigin bp_episode_origin = ORIGIN_NONE;
 
+// BP-06: the destination of the message currently being handled in
+// sendMessage() -- a group, a DM call, or "*". Unlike bp_origin (set by the
+// caller before sendMessage(), cleared right after), this is set INSIDE
+// sendMessage() itself and simply stands until the next call overwrites it;
+// there is no caller-side set/clear pair to mirror, so no reset is needed.
+static char bp_origin_dst[12] = "*";
+
+// The destination the episode's warnings went to, latched exactly like
+// bp_episode_origin above -- the QRV that closes an episode reads this,
+// long after bp_origin_dst may have moved on to a different message.
+static char bp_episode_dst[12] = "*";
+
 void setMsgOrigin(MsgOrigin origin)
 {
     bp_origin = origin;
@@ -3393,13 +3405,13 @@ MsgOrigin getMsgOrigin(void)
  * <node_call>>*:<text>. The framing itself lives in bp_notice_frame.h,
  * where the native suite pins it (test/test_bp_notice_frame).
  */
-static void bpNoticeToPhone(const char *text)
+static void bpNoticeToPhone(const char *text, const char *dst)
 {
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
 
     struct aprsMessage aprsmsg;
 
-    bpNoticeFillFrame(aprsmsg, meshcom_settings.node_call, text, millis());
+    bpNoticeFillFrame(aprsmsg, meshcom_settings.node_call, text, millis(), dst);
 
     checkVia(aprsmsg);
 
@@ -3408,7 +3420,13 @@ static void bpNoticeToPhone(const char *text)
     addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
 }
 
-static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
+// BP-06: dst is the destination of the message that triggered the notice
+// (a group, a DM call, or "*") -- forwarded from bp_origin_dst /
+// bp_episode_dst in bpRoute() below. Serial and the T-Deck GUI stay plain
+// text and unaddressed (an operator watching the console/screen already
+// sees which target they typed into); only the BLE/web and EXTUDP paths,
+// which render into a per-destination chat view, need it.
+static void bpEmitNotice(BpNotice notice, MsgOrigin origin, const char *dst)
 {
     if(notice == BP_NOTICE_NONE)
         return;
@@ -3440,15 +3458,17 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
             if((origin == ORIGIN_BLE && g_ble_uart_is_connected) ||
                (origin == ORIGIN_WEB && bWEBSERVER))
             {
-                bpNoticeToPhone(text);
+                bpNoticeToPhone(text, dst);
             }
             break;
 
         case ORIGIN_EXTUDP:
-            sendExternNotice(text);
+            sendExternNotice(text, dst);
             break;
 
         case ORIGIN_GUI:
+            // dst intentionally ignored: the T-Deck screen/console already
+            // shows the operator which destination they just typed into.
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             addMessage(text);
             #elif defined(BOARD_T_DECK_PRO)
@@ -3463,7 +3483,8 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin)
 }
 
 /// Route a notice: to the sender that just spoke, else to the one the episode
-/// was opened for. Also remembers the transport for the closing QRV.
+/// was opened for. Also remembers the transport and destination for the
+/// closing QRV (BP-06: bp_episode_dst mirrors bp_episode_origin exactly).
 static void bpRoute(BpNotice notice)
 {
     if(notice == BP_NOTICE_NONE)
@@ -3471,14 +3492,24 @@ static void bpRoute(BpNotice notice)
 
     if(notice == BP_NOTICE_QRV)
     {
-        bpEmitNotice(notice, bp_episode_origin);
+        bpEmitNotice(notice, bp_episode_origin, bp_episode_dst);
         bp_episode_origin = ORIGIN_NONE;
+        snprintf(bp_episode_dst, sizeof(bp_episode_dst), "*");
         return;
     }
 
     MsgOrigin target = (bp_origin != ORIGIN_NONE) ? bp_origin : bp_episode_origin;
     bp_episode_origin = target;
-    bpEmitNotice(notice, target);
+
+    // Copy the dst only when the origin side is also being re-latched from
+    // the current sender (bp_origin set): with bp_origin == ORIGIN_NONE the
+    // episode keeps ITS opener's destination -- a future untagged
+    // sendMessage() caller must not clobber where the episode's QRV goes.
+    // (Semantic guard, not an aliasing concern -- the buffers are disjoint.)
+    if(bp_origin != ORIGIN_NONE)
+        snprintf(bp_episode_dst, sizeof(bp_episode_dst), "%s", bp_origin_dst);
+
+    bpEmitNotice(notice, target, bp_episode_dst);
 }
 
 void bpPollDrain(void)
@@ -3495,6 +3526,21 @@ void sendMessage(char *msg_text, int len)
 
         commandAction(msg_text, false);
         return;
+    }
+
+    // BP-06: peek the destination this message names before we know whether
+    // it will be refused below. ispos (the ':'/'::' skip that also produces
+    // bConsoleText) is not computed until after the refuse check, so this
+    // duplicates just that two-character skip rather than pulling ispos's
+    // computation forward for a value the refuse path is the only consumer
+    // of before ispos would otherwise exist. Read-only: msg_text itself is
+    // never touched. If the message is not refused, the authoritative
+    // strDestinationCall computed further below overwrites this.
+    {
+        const char *peek = msg_text;
+        if(peek[0] == ':')
+            peek += (peek[1] == ':') ? 2 : 1;
+        bpPeekDst(peek, bp_origin_dst, sizeof(bp_origin_dst));
     }
 
     // BP-01: refuse a locally originated user message while the ring sits in
@@ -3709,6 +3755,12 @@ void sendMessage(char *msg_text, int len)
     aprsmsg.msg_source_path = meshcom_settings.node_call;
     aprsmsg.msg_destination_path = strDestinationCall;  //Later FW insert PATH from HEY! collecting
     aprsmsg.msg_destination_call = strDestinationCall;  //Later FW insert PATH from HEY! collecting
+
+    // BP-06: now that strDestinationCall is authoritative (fully parsed,
+    // upper-cased, trimmed), overwrite the early peek from above the refuse
+    // check with it. Any QRS/QRT/QTA the ring state machine raises for THIS
+    // send, and the QRV that later closes the episode, go to this target.
+    snprintf(bp_origin_dst, sizeof(bp_origin_dst), "%.11s", strDestinationCall.c_str());
     aprsmsg.msg_payload = strMsg;
 
     // ACK add request only DM Calls

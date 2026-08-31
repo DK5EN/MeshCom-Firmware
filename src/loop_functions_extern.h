@@ -221,7 +221,10 @@ void bpPollDrain(void);
 // arrived on. Defined in extudp_functions.cpp; declared here rather than in
 // extudp_functions.h so the whole BP contract sits in one place. No-op
 // unless bEXTUDP and a peer address are set.
-void sendExternNotice(const char *text);
+//
+// BP-06: dst is the destination of the triggering message (group, DM call,
+// or "*"), not a hardcoded broadcast.
+void sendExternNotice(const char *text, const char *dst);
 
 extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
 extern int RAWLoRaWrite;

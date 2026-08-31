@@ -8,6 +8,10 @@
 // Pfads) war fuer McApp unsichtbar; ein Pseudo-Absender landet dort in der
 // Spam-Klasse (Gruppe 9999). Dieser Test nagelt jede Feldbelegung fest.
 //
+// BP-06: "dst" ist ab jetzt Parameter (Ziel der ausloesenden Nachricht), die
+// alte Rahmung nagelte ihn fest auf "*" -- die neuen dst-Faelle sind
+// fails-before gegen den Stand vor dieser Aenderung.
+//
 //   pio test -e native -f test_extern_notice_json
 
 #include <unity.h>
@@ -26,7 +30,8 @@ static void test_msg_shape_komplett(void)
     char out[300];
     size_t len = externNoticeJson(out, sizeof(out), "DK5EN-99", 35, "p",
                                   0xABCD1234u,
-                                  "QRS - slow down, TX buffer is filling");
+                                  "QRS - slow down, TX buffer is filling",
+                                  "*");
 
     TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
     TEST_ASSERT_EQUAL_UINT(strlen(out), (unsigned)len);
@@ -58,13 +63,48 @@ static void test_msg_id_format(void)
 {
     char out[300];
     size_t len = externNoticeJson(out, sizeof(out), "DK5EN-99", 35, "p",
-                                  0x2Au, "QRV - ready again, TX buffer clear");
+                                  0x2Au, "QRV - ready again, TX buffer clear",
+                                  "*");
     TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
 
     JsonDocument doc;
     TEST_ASSERT_EQUAL(DeserializationError::Ok,
                       deserializeJson(doc, out).code());
     TEST_ASSERT_EQUAL_STRING("0000002A", doc["msg_id"]);
+}
+
+// BP-06: ein Gruppenziel erscheint unveraendert als "dst" im JSON. Faellt
+// ohne den dst-Parameter durch (alte Rahmung nagelte "dst" auf "*") --
+// fails-before.
+static void test_dst_gruppe(void)
+{
+    char out[300];
+    size_t len = externNoticeJson(out, sizeof(out), "DK5EN-99", 35, "p",
+                                  0x2Au, "QRS - slow down, TX buffer is filling",
+                                  "20");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok,
+                      deserializeJson(doc, out).code());
+    TEST_ASSERT_EQUAL_STRING("20", doc["dst"]);
+}
+
+// BP-06: ein DM-Ziel erscheint ebenso unveraendert als "dst" -- das
+// Datagramm geht ohnehin nie on air, siehe extern_notice_json.h. fails-before.
+static void test_dst_dm(void)
+{
+    char out[300];
+    size_t len = externNoticeJson(out, sizeof(out), "DK5EN-99", 35, "p",
+                                  0x2Au, "QRT - stopping to accept new messages, "
+                                  "TX buffer full",
+                                  "DL7CL-7");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok,
+                      deserializeJson(doc, out).code());
+    TEST_ASSERT_EQUAL_STRING("DL7CL-7", doc["dst"]);
 }
 
 // Die Schranke ist die Puffergroesse (JSN-01): ein zu kleiner Puffer wird
@@ -76,7 +116,7 @@ static void test_puffer_schranke(void)
 
     size_t len = externNoticeJson(raw, 64, "DK5EN-99", 35, "p", 0x2Au,
                                   "QRT - stopping to accept new messages, "
-                                  "TX buffer full");
+                                  "TX buffer full", "*");
 
     TEST_ASSERT_LESS_OR_EQUAL_UINT(64, (unsigned)len);
     for(int i = 0; i < 8; i++)
@@ -88,9 +128,9 @@ static void test_degeneriert(void)
 {
     char out[8];
     TEST_ASSERT_EQUAL_UINT(0, (unsigned)externNoticeJson(nullptr, 300,
-                            "DK5EN-99", 35, "p", 1u, "x"));
+                            "DK5EN-99", 35, "p", 1u, "x", "*"));
     TEST_ASSERT_EQUAL_UINT(0, (unsigned)externNoticeJson(out, 0,
-                            "DK5EN-99", 35, "p", 1u, "x"));
+                            "DK5EN-99", 35, "p", 1u, "x", "*"));
 }
 
 int main(int argc, char **argv)
@@ -101,6 +141,8 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_msg_shape_komplett);
     RUN_TEST(test_msg_id_format);
+    RUN_TEST(test_dst_gruppe);
+    RUN_TEST(test_dst_dm);
     RUN_TEST(test_puffer_schranke);
     RUN_TEST(test_degeneriert);
     return UNITY_END();
