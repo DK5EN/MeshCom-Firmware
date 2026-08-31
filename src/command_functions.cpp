@@ -9,6 +9,7 @@
 #include "mheard_functions.h"
 #include "udp_functions.h"
 #include "extudp_functions.h"
+#include "ntp_async.h"
 #include "ble_json_frame.h"
 #include "i2c_scanner.h"
 #include "ArduinoJson.h"
@@ -785,19 +786,25 @@ void commandAction(char *umsg_text, bool ble)
 #endif
             printfdeb("--setgrc 9;..9;  set groups\n--nomsgall on/off  '*'-msg on display\n");
             delay(100);
-            printlndeb("--maxv    100%% battery voltage\n--track   on/off SmartBeaconing\n--gps on/off use GPS-CHIP\n--utcoff +/-99.9 set UTC-Offset\n−−settime yyyy.mm.dd hh:mm:ss\n");
+            printlndeb("--maxv    100%% battery voltage\n--track   on/off SmartBeaconing\n--gps on/off use GPS-CHIP\n--utcoff +/-99.9 set UTC-Offset\n--settime yyyy.mm.dd hh:mm:ss\n");
             delay(100);
             printlndeb("--gps reset Factory reset\n--txpower 99 LoRa TX-power dBm\n--txfreq  999.999 LoRa TX-freqency MHz\n--txbw    999 LoRa TX-bandwith kHz\n--lora    Show LoRa setting\n");
             delay(100);
             printfdeb("--maxhop  %i-%i hop limit for text messages (no value: show)\n", MAXHOP_TEXT_MIN, MAXHOP_TEXT_MAX);
             delay(100);
-            printlndeb("--bmp on  use BMP280-CHIP\n--bme on  use BME280-CHIP\n--680 on  use BME680-CHIP\n--811 on  use CMCU811-CHIP\n--SS on  use SS\n--bmx BME/BMP/680 off\n");
+            printlndeb("--bmp on  use BMP280-CHIP\n--bme on  use BME280-CHIP\n--680 on  use BME680-CHIP\n--811 on  use CMCU811-CHIP\n--bmx BME/BMP/680 off\n");
             delay(100);
             printlndeb("--onewire on/off  use DSxxxx\n--onewire gpio 99\n");
             delay(100);
-            // HL-03/HL-04: bis 2026-08-30 nur ueber die T-Deck-GUI erreichbar
+            // HL-03/HL-04: bis 2026-08-30 nur ueber die T-Deck-GUI erreichbar.
+            // DOC-02: these five commands are themselves gated
+            // BOARD_T_DECK/BOARD_T_DECK_PLUS in commandAction() (the whole
+            // block that also holds --tft/--screencrc/--playtone) -- this
+            // line used to advertise them on every board unconditionally.
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             printlndeb("--mute on/off  Ton stumm\n--persistflash on/off  Positionen ins Flash\n--persistsd on/off  Positionen auf SD\n--immediatesave on/off  sofort speichern\n--persiststat  Zustand der vier Schalter\n");
             delay(100);
+            #endif
             
             #ifdef BOARD_RAK4630
                 printfdeb("--lps33 on/off (RAK only)\n");
@@ -847,6 +854,75 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
             #endif
+
+            // DOC-02: everything above predates this pass and is kept as it
+            // was. Below closes the parity gap against the real command set
+            // in commandAction() -- grouped by topic, not by when it was
+            // added.
+            delay(100);
+            printlndeb("--txsf 6-12  LoRa spreading factor\n--txcr 5-8  LoRa coding rate 4/x\n--cleanflash  wipe settings flash (recovery)\n");
+            delay(100);
+            printlndeb("--sendhey  send HEY beacon now\n--sendtele  send telemetry now\n--sendtrack  send track/APRS beacon now\n");
+            delay(100);
+            printlndeb("--pingcall <call>  set ping target\n--pingtime 99  ping interval (s)\n--pingmax 99/max  ping count limit\n--ping start/stop  start/stop pinging\n");
+            delay(100);
+            #if defined(HAS_ETHERNET)
+            printlndeb("--netmode wifi/eth  select network interface\n");
+            delay(100);
+            #endif
+            #if defined(RELAY_SWITCH)
+            printlndeb("--relay on/off  mesh relay\n");
+            delay(100);
+            #endif
+            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n");
+            delay(100);
+            printlndeb("--debug csv/man/en/de  debug output format/language\n");
+            delay(100);
+            printlndeb("--setcont on/off\n--setlog on/off/<val>\n--setretx on/off\n--shortpath on/off\n");
+            delay(100);
+            printlndeb("--softser app0/baud/rxpin/txpin  softser wiring\n");
+            delay(100);
+            printlndeb("--aht20 on/off\n--sht21 on/off\n--390 on/off  use BMP390-CHIP\n--ina226 on/off\n--shunt 9.999  INA226 shunt ohms\n--imax 9.9  INA226 max current A\n--isamp 9  INA226 sample count\n");
+            delay(100);
+            printlndeb("--batt factor 9.9  battery ADC factor\n--tempoff in/out 9.9  temperature offset\n");
+            delay(100);
+            #if defined(ENABLE_RTC)
+            printlndeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
+            delay(100);
+            #endif
+            printlndeb("--setpress 999.9  set QNH reference\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
+            delay(100);
+            #ifdef BOARD_LED
+            printlndeb("--board led on/off  board LED\n");
+            delay(100);
+            #endif
+            printlndeb("--wifitxpower 2-20  WiFi TX power dBm\n--webtimer 0  reset web session timer\n--contrast 1-255  OLED contrast\n--button on/off  enable user-button check\n");
+            delay(100);
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printlndeb("--spiffs reset  format SPIFFS\n");
+            delay(100);
+            #endif
+            printlndeb("--io  show IO config\n--setio 99 in/out/pullup  MCP17 IO pin\n--setio clear\n--setout 99 on/off  MCP17 output\n");
+            delay(100);
+            printlndeb("--seset/--wifiset/--nodeset/--analogset/--tel/--aprsset  show that settings group\n--aprsmc <call>  set APRS MYCALL/none\n");
+            delay(100);
+            printlndeb("--posshot  one-shot position now\n--postime 99  position interval (s)\n--regex <call>  test callsign against the validator\n");
+            delay(100);
+            #if defined BOARD_T5_EPAPER
+            printlndeb("--t5 on/off  E-paper power\n");
+            delay(100);
+            #endif
+            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n--ntpsync  request an immediate NTP refresh now\n");
+            delay(100);
+
+            // DOC-02: INSTRUMENT_ENABLED (src/instrument.h) defaults to 1 on
+            // ESP32 and nRF52 and is never overridden in any platformio.ini
+            // env, so the ~50-command bench/instrument surface (--heap,
+            // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
+            // ... see src/instrument.h) ships in every board build today --
+            // there is no clean/dev split to advertise honestly here, so
+            // --help does not enumerate that block command by command.
+            printlndeb("(bench/instrument commands -- INSTRUMENT_ENABLED, on by default in every board build, see src/instrument.h -- not listed individually here)\n");
         }
 
         return;
@@ -2056,6 +2132,40 @@ void commandAction(char *umsg_text, bool ble)
         
         meshcom_settings.node_sset3 &= ~0x0002;
         
+        if(ble)
+        {
+            bNodeSetting = true;
+        }
+
+        bReturn = true;
+
+        save_settings();
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"nopmother on") == 0)
+    {
+        // PM-01 (BACKLOG.md "NoPMOther"): EXTUDP-only. Suppresses direct
+        // messages that are neither addressed to nor sent by this node from
+        // reaching the --extudp peer (filter site: extudp_functions.cpp
+        // sendExtern()). Free bit 0x8000 in node_sset3, no struct bump, no
+        // fleet wipe -- checked directly off node_sset3 at the filter site,
+        // so there is no separate cached global to keep in sync here.
+        meshcom_settings.node_sset3 |= 0x8000;
+
+        if(ble)
+        {
+            bNodeSetting = true;
+        }
+
+        bReturn = true;
+
+        save_settings();
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"nopmother off") == 0)
+    {
+        meshcom_settings.node_sset3 &= ~0x8000;
+
         if(ble)
         {
             bNodeSetting = true;
@@ -5050,6 +5160,43 @@ void commandAction(char *umsg_text, bool ble)
     }
     #endif
     else
+    if(commandCheck(msg_text+2, (char*)"ntpsync") == 0)
+    {
+        // NTP-01 bench hook: trigger an immediate NtpAsync refresh outside
+        // the normal 15-min caller cadence (esp32_main.cpp / nrf52_main.cpp
+        // both force requestNow() every 15 min, see docs/ntp-timing.md).
+        // Shared across both platforms: exactly one `timeClient` global is
+        // linked per build -- udp_functions.cpp on ESP32, nrf_eth.cpp on
+        // nRF52, both guarded by their own #ifdef -- so a plain extern
+        // resolves either way, same as bench_srvip above resolves only on
+        // ESP32. The class is non-blocking by design (src/ntp_async.h): this
+        // command only triggers the request, the outcome (ok/timeout/
+        // txfail/kod) prints asynchronously off the [NTP];... markers
+        // NtpAsync::loop()/tryConsume() already emit -- see
+        // tools/bench/experiments/ntpsync.py, which parses exactly those.
+        extern NtpAsync timeClient;
+
+        if(!meshcom_settings.node_hasIPaddress)
+        {
+            Serial.println("[NTPSYNC];err;no IP address");
+        }
+        else if(timeClient.isPending())
+        {
+            // requestNow() only rewrites _nextDueMs -- while a request is
+            // already in flight that has no effect until its own <=2.5s
+            // timeout (ntp_async.h::isPending() doc comment). Report it
+            // instead of silently doing nothing.
+            Serial.println("[NTPSYNC];busy;request already in flight");
+        }
+        else
+        {
+            timeClient.requestNow();
+            Serial.println("[NTPSYNC];requested");
+        }
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"flashpoke ") == 0)
     {
         // TM-32 bench hook: write a raw (possibly out-of-range) radio value to
@@ -5593,7 +5740,8 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast);
 
-            printfdeb("...EXTUDP %s ...EXT IP %s\n", (bEXTUDP?"on":"off"), meshcom_settings.node_extern);
+            printfdeb("...EXTUDP %s ...EXT IP %s ...NOPMOTHER %s\n", (bEXTUDP?"on":"off"), meshcom_settings.node_extern,
+                    ((meshcom_settings.node_sset3 & 0x8000)?"on":"off"));
 
             printfdeb("...BTCODE %06i\n", meshcom_settings.bt_code);
             printfdeb("...APRSMC: %s\n...ATXT: %s\n...NAME: %s\n...BLE : %s\n...DISPLAY %s\n...CTRY %s\n...FREQ %.4f MHz TXPWR %i dBm RXBOOST %s\n",
@@ -5982,6 +6130,7 @@ void sendNodeSetting()
     nsetdoc["MBW"] = getBW();
     nsetdoc["GWNPOS"] = bGATEWAY_NOPOS;
     nsetdoc["NOALL"] = bNoMSGtoALL;
+    nsetdoc["NOPMOTHER"] = (bool)(meshcom_settings.node_sset3 & 0x8000);
     nsetdoc["BLED"] = bUSER_BOARD_LED;
     nsetdoc["GWS"] = meshcom_settings.node_gwsrv;
     nsetdoc["ASYM"] = bGPSAutosymbol;

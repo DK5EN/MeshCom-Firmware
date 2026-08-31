@@ -41,6 +41,14 @@ public:
     // ask for a refresh at the next loop() call
     void requestNow() { _nextDueMs = millis(); }
 
+    // a request is currently outstanding. requestNow() does NOT cancel one
+    // in flight -- it only rewrites _nextDueMs, which loop() does not even
+    // look at while _pendingSince != 0 -- so a caller that wants to know
+    // whether calling requestNow() right now will have any effect before
+    // the in-flight request's own <=2.5 s timeout should check this first
+    // (see test/test_ntp_async/test_main.cpp for the ordering this reflects).
+    bool isPending() const { return _pendingSince != 0; }
+
     // offer a received datagram; returns true if it was our NTP reply
     bool tryConsume(IPAddress remoteIp, uint16_t remotePort, const uint8_t *buf, int len);
 

@@ -611,6 +611,32 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   // Text
   if(msg_type_b_lora == 0x3A)
   {
+    // PM-01 (BACKLOG.md "NoPMOther"): EXTUDP-only filter. Every TEXT frame
+    // that crosses this node -- received over LoRa (src_type "lora"), relayed
+    // by the central server (src_type "udp"), or sent by this node itself
+    // (src_type "node") -- funnels through here, which makes this the single
+    // choke point for what the EXTUDP peer (MCProxy, the webapp, ...) gets to
+    // see. A direct message that is neither addressed to nor sent by this
+    // node is none of that peer's business once the operator opts in.
+    // Broadcast ("*") and group traffic are never a DM and always pass,
+    // regardless of the setting -- CheckGroup() mirrors the numeric-only
+    // group check lora_functions.cpp/udp_functions.cpp use for the same
+    // distinction. Bit 0x8000 of node_sset3 is free; polarity is 0 = off
+    // (today's behaviour, every deployed node already reads 0) so the
+    // existing fleet forwards exactly as before, 1 = suppress -- an operator
+    // opts in with "--nopmother on".
+    bool bIsGroupOrAll = (aprsmsg.msg_destination_call == "*") ||
+                         (CheckGroup(aprsmsg.msg_destination_call) > 0);
+    bool bForOwnOrFromOwn = (aprsmsg.msg_destination_call == meshcom_settings.node_call) ||
+                            (aprsmsg.msg_source_call == meshcom_settings.node_call);
+
+    if((meshcom_settings.node_sset3 & 0x8000) && !bIsGroupOrAll && !bForOwnOrFromOwn)
+    {
+      Serial.printf("[EXT] pm dropped (NoPMOther): src;%s;dst;%s\n",
+                    aprsmsg.msg_source_call.c_str(), aprsmsg.msg_destination_call.c_str());
+      return;
+    }
+
     // no telemetry
     if(aprsmsg.msg_destination_path != "100001")
     {
