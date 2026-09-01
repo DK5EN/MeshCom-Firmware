@@ -2535,6 +2535,30 @@ cause class, and the reason a settings-side canary belongs in point 1 above.
 
 ---
 
+### 3.8q Upstream sync 2026-09-01 — PRs #1115, #1117, #1118 merged back
+
+Fetched 2026-09-01: `upstream/dev` = `898ff7e5`, three merges past our previous base
+`2cb6bb4d` — our firmware-only cut (#1115, merged 14:54Z), Kurt's `v4.35p compile`
+(#1117, `72fce319`), and our upload-port fix (#1118, merged 18:18Z, `5661dd69`).
+Merged into fork main as `8beaa8e5`; four conflicts, resolution in the merge commit
+message (three `platformio.ini` hunks and `variants/T-ETH-ELITE_1262/platformio.ini`
+to the upstream side — they are our own #1118; `docs/code-audit-20260508.md`
+rename/delete to ours). Gate: native 148/148, seven standard targets build.
+
+| ID    | Where                            | Finding                                                                                                                                                                                                                              | Sev. | Action                                                                                                 |
+| ----- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------------ |
+| UP-07 | `variants/*/platformio.ini` (9)  | `--port "$UPLOAD_PORT"` stands in **27** files here but only **18** upstream. #1117 landed a variant set that predates the full fix, so the fork is ahead on the remaining 9.                                                        | Low  | **Hold.** Do not PR before the `--port` question below is settled. See UP-08.                          |
+| UP-08 | `upload_command` in all variants | **Operator report 2026-09-01: `--port "$UPLOAD_PORT"` caused problems.** The concrete failure mode is not yet written down here. Until it is, the 27-file state is not established as correct — it is merely what fork main carries. | Open | Capture the failing invocation (board, host, `pio` command, error text) before any upstream follow-up. |
+
+**Why UP-07 is parked rather than filed as a PR.** Upstream is expected to move over the
+next days. Re-check the delta then instead of pushing a 9-file variant PR now: if Kurt's
+next `v4.35p compile` pass touches the same files, the diff resolves itself, and if UP-08
+turns out to be real the fork side is the one that needs changing, not upstream's.
+
+**Process reminder (from §3.8g):** the net diff since the last merge base gets reviewed at
+merge time, findings filed as `UP-nn` here. This sync's net diff is build configuration
+only — no `src/` change arrived — so no new native test was owed.
+
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
 Angeschlossen ist jetzt ein **RAK4631** statt des Heltec V3. Der Heltec haengt nicht mehr
@@ -3167,7 +3191,24 @@ upstream/dev --merge--> v4.35p_prio (fork main) --branch--> topic branch (tdeck-
   For v5 the durable path is to offer the instrumentation upstream as a default-off compile
   option in its own PR once the T-Deck PR has landed.
 
-### 4.2 Branches as of 2026-08-29
+### 4.2 Branches as of 2026-09-01
+
+| Branch                        | State                                               | Decision                                                    |
+| ----------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| `v4.35p_prio`                 | fork main, synced with `upstream/dev` `898ff7e5`    | keep — carries docs, `test/`, `tools/`, bench harness       |
+| `tdeck-partial-refresh-trace` | content fast-forwarded into `v4.35p_prio`           | tag `archive/tdeck-partial-refresh-trace-20260901`, deleted |
+| `pr-firmware-20260901`        | merged upstream (#1115), ahead 0                    | deleted local + origin                                      |
+| `pr-upload-port-20260901`     | merged upstream (#1118), ahead 0                    | deleted local + origin                                      |
+| `pr-20260901`                 | superseded full-fork squash, content in fork main   | deleted local + origin                                      |
+| `pr-1114-kiss`                | KISS/TCP v1.3, 8 commits, worktree `mc-pr1114-kiss` | keep — not upstream yet                                     |
+| `master`, `gh-pages`          | fork mirror / pages                                 | ignore                                                      |
+
+Between 2026-08-29 and 2026-09-01 `tdeck-partial-refresh-trace` had become the de-facto fork
+main — 154 commits ahead of `v4.35p_prio`, which held nothing it lacked. The sync restored the
+model of §4.1 by fast-forwarding `v4.35p_prio` onto it, so the branch named fork main is fork
+main again.
+
+### 4.2a Branches as of 2026-08-29 (historical)
 
 | Branch                                             | State                                   | Decision                                                          |
 | -------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
