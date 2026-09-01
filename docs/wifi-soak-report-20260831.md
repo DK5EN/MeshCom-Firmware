@@ -69,3 +69,75 @@ funktioniert:
 
 GPS auf allen drei Boards wieder eingeschaltet und per `--pos` verifiziert (Fix vorhanden:
 T-Deck, Heltec sat:7, T-Beam sat:8).
+
+---
+
+## Nachtrag: Nachtlauf 2026-08-31/09-01 — realer Router-Reboot, drei Plattformen
+
+Zweiter Soak in Folge, diesmal mit **realem Router-Neustart** statt erzwungener
+Treiber-Drops, und erstmals mit Gateway- und Ethernet-Knoten im Bild. Build
+`v4.35p.08.31.4-stability` (BP-02…06) auf allen dreien. Laufzeit 22:00–07:58 (~10 h).
+Rohdaten: `~/Downloads/dk5en-9?-soak-20260901/` und `meshcom_monitor/meshcom_2026-08-31_22*.log`.
+
+### Aufbau
+
+| Node                 | Rolle                 | Kanal                           | Werkzeug                      |
+| -------------------- | --------------------- | ------------------------------- | ----------------------------- |
+| DK5EN-98 (Heltec V3) | Gateway, WLAN         | Netconsole 2323                 | `tools/meshlogger.py` (nohup) |
+| DK5EN-90 (RAK4631)   | Node, W5100S-Ethernet | Serial USB (CDC-ACM)            | `tools/serial_monitor.py`     |
+| DK5EN-93 (Heltec V3) | Node, WLAN            | Serial USB (CP2102, `--no-dtr`) | `tools/serial_monitor.py`     |
+
+Der Router-Reboot (Orbi, geplant) kam um **05:35:28**.
+
+### Ergebnis in einem Satz
+
+**Bestanden auf allen drei Plattformen** — ein realer AP-Ausfall von 96 s wurde ohne
+Eingriff, ohne Reboot, ohne Absturz und ohne Watchdog überstanden; das Gateway blieb
+aus Server-Sicht lückenlos verfügbar (mcmap: 100 % Uptime, 0 Events — 96 s liegen
+unter der 3-min-Stille-Schwelle des Hubs).
+
+### WLAN-Sicht (DK5EN-93, Serial lückenlos)
+
+- 05:35:28 `reason 200` (Beacon-Timeout), dann 92 s lang `reason 201` (AP weg) im
+  3,4-s-Takt — der Treiber pollte selbstständig weiter.
+- 05:37:03 Reconnect auf **anderen BSSID und Kanal** (Orbi-Mesh 3→8), `got_ip` eine
+  Sekunde später, DNS neu aufgelöst, **NTP-Resync 3 s nach `got_ip`** (TM-45-Fix
+  bestätigt sich erneut unter realen Bedingungen).
+- Ganze Nacht: exakt ein Disconnect-Ereignis, 17 NTP-Syncs (adaptives Intervall bis
+  2,3 h), 0 unaufgeforderte Abbrüche, 0 Reboots.
+
+### Ethernet-Sicht (DK5EN-90, W5100S)
+
+- Stündliche DHCP-Renews (10×) fehlerfrei; beim Router-Boot 3 kurze Link-Downs,
+  danach Renew mit **neuer IP** — 0 Stack-Resets, 0 `tx_fail`, Gateway-Heartbeat
+  nahtlos wieder da.
+
+### Backpressure-Beobachtung (passiv)
+
+- **0 `[BP]`-Marker auf allen dreien.** Einschränkung ehrlich benannt: über Nacht gab
+  es keine lokalen User-Sends, die die Statemaschine füttern — die BP-05-Baseline-
+  Validierung bleibt die 3,5-min-Abendmessung. Belastbar ist: die 98 erreichte durch
+  Relay-Bursts **Tiefe bis 10/20** ohne jede Meldung.
+- **BP-03 im Feld nachgewiesen: 13× `RING_DROP_STALE` auf der 98**, alle bei
+  `age_s` 180–181 — ausgehungerte HEY-Relays altern auf die Sekunde genau aus dem
+  Ring, statt den Lesezeiger zu pinnen (der DJ8MEH-Mechanismus tritt damit unter
+  Live-Last nicht mehr auf).
+
+### Zwei Werkzeug-Befunde
+
+1. **meshlogger hält Zombie-TCP** (als TM-50 im Backlog): nach dem WLAN-Ausfall des
+   Zielknotens blieb die 2323-Verbindung halb offen — 2,4 h Lücke (05:35–07:59),
+   `reconnects=0`, Broken pipe erst beim Flag-Restore; das `--loradebug` der 98 wurde
+   dadurch nicht restauriert (am Morgen manuell nachgeholt). Fix: TCP-Keepalive oder
+   Read-Timeout + Reconnect. Die Serial-Redundanz hat den Datenverlust komplett
+   aufgefangen — genau dafür war sie aufgesetzt.
+2. **CP2102-Korrektur:** Der Port-Open auf der 93 rebootet das Board **doch** (Boot
+   bei `ms=2900` im Log belegt; der `rst:`-Banner läuft vor dem Reader-Attach durch
+   und entgeht deshalb dem Banner-Grep). `serial_monitor.py --no-dtr` verhindert den
+   Reset nicht — die Bench-Regel „CP2102-Open = Reboot einplanen" bleibt gültig.
+
+### Zustand nach dem Lauf
+
+`--loradebug off` auf 90 (Serial), 93 und 98 (jeweils 2323, um den CP2102-Reset zu
+vermeiden) wiederhergestellt; alle drei Aufzeichnungsprozesse sauber per `timeout`
+beendet.

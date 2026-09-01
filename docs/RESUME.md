@@ -1,5 +1,25 @@
 # RESUME — pick up here
 
+## 2026-09-01 morning: overnight soak 98/90/93 PASSED, documented
+
+Three-channel overnight soak (22:00-07:58, build v4.35p.08.31.4) with a REAL
+router reboot at 05:35 — full write-up appended to
+`docs/wifi-soak-report-20260831.md` (Nachtrag). Headlines: 93 (WLAN, gapless
+serial view) reconnected in 96 s onto a different BSSID/channel with NTP
+resync 3 s after got_ip; RAK-90 (W5100S) 3 link flaps, DHCP renew with new
+IP, 0 resets; gateway 98 hub-side 100 % uptime/0 events (96 s < the 3-min
+silence threshold). Zero reboots/crashes/watchdogs on all three. BP: 0
+`[BP]` markers (no user sends overnight — passive evidence only), depth
+peaked at 10/20 without a false warning, and **BP-03 field-proven: 13x
+RING_DROP_STALE at age_s 180-181** (noted on the BACKLOG BP-03 row). Two
+tool findings: **TM-50 filed** (meshlogger zombie TCP after target WLAN
+loss, 2.4-h gap, flags not restored — restored manually in the morning,
+loradebug off everywhere again), and the CP2102 correction (port-open DOES
+reboot the Heltec-93; the rst banner just precedes the reader attach —
+`--no-dtr` does not prevent it). Still open: BP-05/06 McApp sight check
+(burst -> QRS at depth 5 in the right chat), DJ8MEH burst re-provocation,
+TM-49, TM-50.
+
 ## 2026-08-31 night, cut 4: BP-05/06 notice policy, release v4.35p.08.31.4-stability
 
 The operator-triggered follow-up to the .3 fixes: the first real message
