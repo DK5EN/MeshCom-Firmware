@@ -3387,6 +3387,33 @@ MsgOrigin getMsgOrigin(void)
     return bp_origin;
 }
 
+// E5 (2026-09-01, operator finding): msg_id must stay unique across every BP
+// frame or the chat app's dedup filter swallows whichever of two notices
+// lands in the same millisecond. The BP-08 QTA path (Welle 2) emits two
+// frames from a single sendMessage() call -- the latched episode notice and
+// the NOT-SENT nack -- both drawing from this same counter via bpDeliver().
+// A plain "id = millis()" would very likely hand both the same value.
+//
+// No rollover problem: the bump is a plain uint32 addition, and a jump past
+// millis()'s current reading self-corrects on the next call once the clock
+// has genuinely caught back up past it.
+//
+// Non-static, unlike the rest of this file's BP-01 machinery:
+// extudp_functions.cpp (sendExternNotice()) needs it too, and
+// loop_functions_extern.h -- the shared declaration header -- is out of
+// scope for this wave (BP-07 Welle 1 file ownership); extudp_functions.cpp
+// forward-declares it locally instead of widening that header now.
+static uint32_t bp_last_msg_id = 0;
+
+uint32_t bpNextMsgId(void)
+{
+    uint32_t id = millis();
+    if(id <= bp_last_msg_id)
+        id = bp_last_msg_id + 1;
+    bp_last_msg_id = id;
+    return id;
+}
+
 /**
  * Put one notice in front of the operator, on their own transport.
  *
@@ -3411,7 +3438,7 @@ static void bpNoticeToPhone(const char *text, const char *dst)
 
     struct aprsMessage aprsmsg;
 
-    bpNoticeFillFrame(aprsmsg, meshcom_settings.node_call, text, millis(), dst);
+    bpNoticeFillFrame(aprsmsg, meshcom_settings.node_call, text, bpNextMsgId(), dst);
 
     checkVia(aprsmsg);
 
@@ -3420,23 +3447,19 @@ static void bpNoticeToPhone(const char *text, const char *dst)
     addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
 }
 
-// BP-06: dst is the destination of the message that triggered the notice
-// (a group, a DM call, or "*") -- forwarded from bp_origin_dst /
-// bp_episode_dst in bpRoute() below. Serial and the T-Deck GUI stay plain
-// text and unaddressed (an operator watching the console/screen already
-// sees which target they typed into); only the BLE/web and EXTUDP paths,
-// which render into a per-destination chat view, need it.
-static void bpEmitNotice(BpNotice notice, MsgOrigin origin, const char *dst)
+// BP-07: the transport switch, split out of bpEmitNotice() so bpEmitNack()
+// (below) can share it verbatim -- both a notice and a nack are, at this
+// point, just "some already-composed text going to some origin/dst"; only
+// the [BP] console marker in front of them differs by message class.
+//
+// BP-06: dst is the destination of the message that triggered the
+// notice/nack (a group, a DM call, or "*") -- forwarded from bp_origin_dst /
+// bp_episode_dst by the two callers below. Serial and the T-Deck GUI stay
+// plain text and unaddressed (an operator watching the console/screen
+// already sees which target they typed into); only the BLE/web and EXTUDP
+// paths, which render into a per-destination chat view, need it.
+static void bpDeliver(const char *text, MsgOrigin origin, const char *dst)
 {
-    if(notice == BP_NOTICE_NONE)
-        return;
-
-    Serial.printf("[BP];notice;%s;depth;%d;max;%d;ms;%lu\n",
-                  bpNoticeCode(notice), txRingDepth(), (int)MAX_RING,
-                  (unsigned long)millis());
-
-    const char *text = bpNoticeText(notice);
-
     switch(origin)
     {
         case ORIGIN_SERIAL:
@@ -3448,12 +3471,13 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin, const char *dst)
             // Both land in BLEtoPhoneBuff via bpNoticeToPhone(): the phone
             // app drains it in sendToPhone(), the web GUI reads the same ring
             // for its message list (web_functions.cpp ~1293). Framed under
-            // the node's own callsign (msg_id = millis(), msg_app_offline ->
-            // never announced, never retransmitted); see bpNoticeToPhone()
-            // for why not addBLECommandBack()'s "response" sender.
+            // the node's own callsign (msg_id via bpNextMsgId(), E5;
+            // msg_app_offline -> never announced, never retransmitted); see
+            // bpNoticeToPhone() for why not addBLECommandBack()'s "response"
+            // sender.
             //
-            // If the transport dropped off meanwhile, skip the notice rather
-            // than queue it — a QRV that arrives with the next connect is
+            // If the transport dropped off meanwhile, skip rather than queue
+            // it — a notice/nack that arrives with the next connect is
             // noise, not information.
             if((origin == ORIGIN_BLE && g_ble_uart_is_connected) ||
                (origin == ORIGIN_WEB && bWEBSERVER))
@@ -3480,6 +3504,50 @@ static void bpEmitNotice(BpNotice notice, MsgOrigin origin, const char *dst)
         default:
             break;
     }
+}
+
+static void bpEmitNotice(BpNotice notice, MsgOrigin origin, const char *dst)
+{
+    if(notice == BP_NOTICE_NONE)
+        return;
+
+    Serial.printf("[BP];notice;%s;depth;%d;max;%d;ms;%lu\n",
+                  bpNoticeCode(notice), txRingDepth(), (int)MAX_RING,
+                  (unsigned long)millis());
+
+    bpDeliver(bpNoticeText(notice), origin, dst);
+}
+
+// BP-07 (L1/L2): the per-message counterpart to bpEmitNotice() above --
+// "QRT NOT SENT - <text>" / "QTA NOT SENT - <text>", one per lost message,
+// never latched (unlike the episode notice). msg_text is the operator's own,
+// still-unrefused text (strMsg.c_str() at the refuse call site) -- truncated
+// and sanitized by bpNackCompose() (bp_notice_frame.h) before it goes out.
+static void bpEmitNack(BpNack n, MsgOrigin origin, const char *dst, const char *msg_text)
+{
+    if(n == BP_NACK_NONE)
+        return;
+
+    // [BP];nack; is its own marker, never [BP];notice; -- the Runbook's BP-01
+    // bench assertion greps for "notice;" specifically and must stay valid.
+    // E6: the message text is operator content and goes out only with
+    // bLORADEBUG on; the rest of the line is unconditional, same as every
+    // other [BP] marker. txt; is last because msg_text can itself contain
+    // semicolons -- a left-to-right parser stays intact either way.
+    if(bLORADEBUG)
+        Serial.printf("[BP];nack;%s;dst;%s;ms;%lu;txt;%s\n",
+                      bpNackCode(n), dst, (unsigned long)millis(), msg_text);
+    else
+        Serial.printf("[BP];nack;%s;dst;%s;ms;%lu\n",
+                      bpNackCode(n), dst, (unsigned long)millis());
+
+    // E2: framed exactly like the episode notices (msg_app_offline, msg_id
+    // via bpNextMsgId(), never a real one -- BP-01 refuses on purpose to
+    // consume none for a message that never went out).
+    char body[16 + BP_NACK_TEXT_MAX + 4];   // prefix (<=15) + text (<=120) + "..." (<=3) + NUL
+    bpNackCompose(body, sizeof(body), bpNackPrefix(n), msg_text);
+
+    bpDeliver(body, origin, dst);
 }
 
 /// Route a notice: to the sender that just spoke, else to the one the episode
@@ -3525,38 +3593,6 @@ void sendMessage(char *msg_text, int len)
             printfdeb("COMMAND:%s\n", msg_text);
 
         commandAction(msg_text, false);
-        return;
-    }
-
-    // BP-06: peek the destination this message names before we know whether
-    // it will be refused below. ispos (the ':'/'::' skip that also produces
-    // bConsoleText) is not computed until after the refuse check, so this
-    // duplicates just that two-character skip rather than pulling ispos's
-    // computation forward for a value the refuse path is the only consumer
-    // of before ispos would otherwise exist. Read-only: msg_text itself is
-    // never touched. If the message is not refused, the authoritative
-    // strDestinationCall computed further below overwrites this.
-    {
-        const char *peek = msg_text;
-        if(peek[0] == ':')
-            peek += (peek[1] == ':') ? 2 : 1;
-        bpPeekDst(peek, bp_origin_dst, sizeof(bp_origin_dst));
-    }
-
-    // BP-01: refuse a locally originated user message while the ring sits in
-    // the QRT band. Checked here, before any of the side effects below
-    // (node_msgid++, save_settings(), insertOwnTx(), addLoraRxBuffer()) — a
-    // message that is never enqueued must not consume a message id either.
-    // An untagged caller (origin NONE) is never refused; that is what keeps
-    // relay/ACK/beacon traffic flowing through a congested node.
-    if(bp_origin != ORIGIN_NONE && bp_state.refusing())
-    {
-        Serial.printf("[BP];refuse;depth;%d;max;%d;ms;%lu\n",
-                      txRingDepth(), (int)MAX_RING, (unsigned long)millis());
-
-        // One notice per state transition, not one per refused message
-        // (TM-21) — the latch inside the state machine sees to that.
-        bpRoute(bp_state.onRefuse());
         return;
     }
 
@@ -3735,6 +3771,42 @@ void sendMessage(char *msg_text, int len)
         }
     }
 
+    // BP-06: strDestinationCall is authoritative here (fully parsed,
+    // upper-cased, trimmed) -- set bp_origin_dst before the refuse check
+    // below so a refused message's nack is addressed to the target the
+    // sender actually named, not the "*" default.
+    snprintf(bp_origin_dst, sizeof(bp_origin_dst), "%.11s", strDestinationCall.c_str());
+
+    // BP-01/BP-07: refuse a locally originated user message while the ring
+    // sits in the QRT band. Grundentscheidung (bp-l1-l4-impl-plan.md): this
+    // check used to sit before the %-decode loop and the {ZIEL} parsing
+    // above, which is why bp_notice_frame.h used to carry its own
+    // second-guess parse of the raw, still-encoded text -- the authoritative
+    // parse (strMsg, strDestinationCall) happened only later. Moved to here,
+    // the check gets both fully decoded and side-effect free: no
+    // node_msgid++, no save_settings(), no insertOwnTx(), no
+    // addLoraRxBuffer() has happened yet, so a message that is never
+    // enqueued does not consume a message id either, and that second-guess
+    // parser is gone -- deleted, not superseded.
+    //
+    // Two consequences, both intended: an invalid-length message or a DM to
+    // the node's own call is now refused by the checks above BEFORE this
+    // one runs (the right reason: "buffer full" is the wrong explanation for
+    // a malformed message); and a message that IS going to be refused now
+    // runs through the decode loop first -- pure CPU, no side effects, BSS
+    // buffers on nRF52 (N-22), so the extra work is free.
+    //
+    // An untagged caller (origin NONE) is never refused; that is what keeps
+    // relay/ACK/beacon traffic flowing through a congested node.
+    if(bp_origin != ORIGIN_NONE && bp_state.refusing())
+    {
+        Serial.printf("[BP];refuse;depth;%d;max;%d;ms;%lu\n",
+                      txRingDepth(), (int)MAX_RING, (unsigned long)millis());
+
+        bpEmitNack(bp_state.onRefuse(), bp_origin, bp_origin_dst, strMsg.c_str());
+        return;   // Welle 3 (BP-09) macht daraus BP_SEND_REFUSED
+    }
+
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
     // encodeAPRS() beschreibt den Puffer bei jedem Aufruf vollstaendig.
 #if defined(NRF52_SERIES)
@@ -3756,11 +3828,6 @@ void sendMessage(char *msg_text, int len)
     aprsmsg.msg_destination_path = strDestinationCall;  //Later FW insert PATH from HEY! collecting
     aprsmsg.msg_destination_call = strDestinationCall;  //Later FW insert PATH from HEY! collecting
 
-    // BP-06: now that strDestinationCall is authoritative (fully parsed,
-    // upper-cased, trimmed), overwrite the early peek from above the refuse
-    // check with it. Any QRS/QRT/QTA the ring state machine raises for THIS
-    // send, and the QRV that later closes the episode, go to this target.
-    snprintf(bp_origin_dst, sizeof(bp_origin_dst), "%.11s", strDestinationCall.c_str());
     aprsmsg.msg_payload = strMsg;
 
     // ACK add request only DM Calls

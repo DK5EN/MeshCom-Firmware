@@ -779,13 +779,23 @@ void  sendExternHeartbeat()
 
 }
 
+// BP-07 (Welle 1, E5): msg_id has to come from the same counter every BP
+// frame draws from, or two frames landing in the same millisecond collide in
+// the chat app's dedup filter -- see the comment at bpNextMsgId()'s
+// definition in loop_functions.cpp. Declared locally rather than added to
+// loop_functions_extern.h: that shared header is out of scope for this wave
+// (BP-07 Welle 1 file ownership), and sendExternNotice()'s own signature
+// below must not change either, so the id is drawn from inside the function
+// rather than threaded in as a parameter.
+extern uint32_t bpNextMsgId(void);
+
 // BP-01 (BACKLOG) / TM-37: the EXTUDP reply path for a back-pressure notice.
 //
 // A message that came in through getExtern() gets its QRS/QRT/QTA/QRV back on
 // the same socket -- never over the air. The JSON shape lives in
 // extern_notice_json.h, where the native suite pins it
-// (test/test_extern_notice_json); msg_id is millis(), matching the BLE
-// notice framing in loop_functions.cpp.
+// (test/test_extern_notice_json); msg_id comes from bpNextMsgId() (E5),
+// matching the BLE notice framing in loop_functions.cpp.
 //
 // BP-06: dst is the destination of the message that triggered the notice
 // (group, DM call, or "*"), forwarded through from bp_origin_dst /
@@ -804,11 +814,23 @@ void sendExternNotice(const char *text, const char *dst)
   if(!hasExternIPaddress)
     return;
 
-  char c_json[300];
+  // BP-07: 300 -> 400. The nack text alone (bp_notice_frame.h,
+  // BP_NACK_TEXT_MAX) can run to 138 bytes ("QRT NOT SENT - " + 120 bytes +
+  // "..."); together with the JSON skeleton at the longest possible
+  // callsign/dst that left only 21 bytes of headroom at 300 -- see the
+  // length budget table in docs/bp-l1-l4-impl-plan.md. Same N-22 pattern as
+  // sendExtern() directly above: ESP32 stack (8 KB loop-task stack, already
+  // carries 2x500 there), nRF52 static BSS (4 KB loop-task stack).
+#ifdef ESP32
+  char c_json[400] = {0};
+#else
+  static char c_json[400];
+  memset(c_json, 0, sizeof(c_json));
+#endif
   size_t json_len = externNoticeJson(c_json, sizeof(c_json),
                                      meshcom_settings.node_call,
                                      shortVERSION(), SOURCE_VERSION_SUB,
-                                     (unsigned int)millis(), text, dst);
+                                     bpNextMsgId(), text, dst);
 
   if(json_len == 0)
     return;

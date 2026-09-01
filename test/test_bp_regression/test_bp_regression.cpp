@@ -168,8 +168,12 @@ static void test_dj8meh_episode_endet_nach_realem_drain(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrs_seen, "genau ein QRS pro Episode");
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrt_seen, "genau ein QRT pro Episode");
 
-    // Nachricht 8-10 des Feldlogs: Refuses, Notice weiterhin nur einmal.
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onRefuse());
+    // Nachricht 8-10 des Feldlogs: Refuses, Episoden-Notice weiterhin nur
+    // einmal (oben gepinnt) -- aber BP-07: onRefuse() ist jetzt BpNack, kein
+    // BpNotice mehr, und liefert bei JEDER Abweisung BP_NACK_QRT (nicht
+    // laenger latched). Das Feldlog selbst kannte diese Rueckmeldung noch
+    // nicht -- Luecke L1, siehe docs/backpressure-flow-control.md Kapitel 8.
+    TEST_ASSERT_EQUAL_INT(BP_NACK_QRT, bp.onRefuse());
 
     // Realer Drain: alles gesendet ausser dem prioritaets-ausgehungerten
     // Blocker -- exakt der Ringzustand 15:45-15:50 im Feldlog.
@@ -276,6 +280,64 @@ static void test_qrt_ausloesung_bleibt_intakt(void)
     TEST_ASSERT_TRUE(bp.refusing());
 }
 
+// --------------------------------------------------------------------------
+// T4 — BP-07 fails-before fuer Luecke L1 (bp-l1-l4-impl-plan.md, "Fails-
+// before-Nachweis fuer L1"): onRefuse() aendert die Rueckgabetyp-Signatur
+// (BpNotice -> BpNack), also kann kein Unit-Test auf der Statemaschine
+// allein den Vorher-Zustand woertlich nachbauen. Der ehrliche Fails-before
+// sitzt deshalb hier -- echter Ring, echte Statemaschine, verdrahtet wie
+// sendMessage() es ab BP-07 tut: erst bp.refusing() pruefen, nur wenn frei
+// tatsaechlich enqueuen, sonst onRefuse() nacken.
+//
+// BackPressure bp(10) statt bp(MAX_RING): die Statemaschine kennt nur ihre
+// eigene Schwelle, nicht die physische Ringgroesse dieser Env (hier 20) --
+// bp(10) emuliert das "MAX_RING 10, 13 lokale Sends" aus dem Plan (T-Beam-
+// Groesse) unabhaengig davon, auf welchem realen Ring die Nachrichten
+// tatsaechlich landen. refuseThreshold() = 8, qrsThreshold() = 5.
+//
+// 13 Sends ohne jeden Abfluss: Sends 1-8 werden enqueued (Tiefe erreicht 8
+// == Schwelle -> QRT beim 8.), Sends 9-13 treffen auf refusing() == true --
+// 5 Abweisungen, 5 Nacks (onRefuse() == BP_NACK_QRT bei jeder einzelnen),
+// 1 QRS (Tiefe 5), 1 QRT (Tiefe 8).
+//
+// Vorher (Stand vor BP-07): onRefuse() war BpNotice und lieferte konstant
+// BP_NOTICE_NONE (Befund L1, docs/backpressure-flow-control.md Kapitel 8) --
+// die 5 Abweisungen waeren identisch gewesen, aber 0 davon haetten je einen
+// Nack ausgeloest. Der Zaehler nacks == 0 waere hier rot gewesen.
+static void test_flood_13_into_10_yields_five_nacks(void)
+{
+    BackPressure bp(10);
+
+    int queued = 0, refused = 0, nacks = 0, qrs_seen = 0, qrt_seen = 0;
+    uint32_t id = 0xA0000000u;
+
+    for(int i = 0; i < 13; i++)
+    {
+        if(bp.refusing())
+        {
+            refused++;
+            if(bp.onRefuse() == BP_NACK_QRT)
+                nacks++;
+            continue;
+        }
+
+        int slot = enqueueUserText(id++);
+        TEST_ASSERT_GREATER_OR_EQUAL_INT(0, slot);
+        queued++;
+
+        BpNotice n = bp.onSend(txRingDepth(), slot < 0, millis());
+        if(n == BP_NOTICE_QRS) qrs_seen++;
+        if(n == BP_NOTICE_QRT) qrt_seen++;
+    }
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(8, queued, "8 von 13 muessen den Ring erreichen");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(5, refused, "die restlichen 5 muessen abgewiesen werden");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(5, nacks, "BP-07: jede Abweisung nackt, nicht nur die erste (fails-before: 0)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrs_seen, "QRS genau einmal pro Episode");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrt_seen, "QRT genau einmal pro Episode");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(8, txRingDepth(), "kein Abfluss in diesem Test -- 8 bleiben im Ring stehen");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -283,5 +345,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_dj8meh_episode_endet_nach_realem_drain);
     RUN_TEST(test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort);
     RUN_TEST(test_qrt_ausloesung_bleibt_intakt);
+    RUN_TEST(test_flood_13_into_10_yields_five_nacks);
     return UNITY_END();
 }

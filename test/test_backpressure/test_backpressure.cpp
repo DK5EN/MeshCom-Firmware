@@ -174,11 +174,19 @@ static void test_qrt_holds_until_the_quiet_band(void)
     TEST_ASSERT_FALSE(bp.refusing());
 }
 
-// The refusal must not silently re-announce itself per refused message.
+// BP-07: the EPISODE notice (bp.onSend()) must still not re-announce itself
+// per refused message -- that half of the name is unchanged. But onRefuse()
+// itself is no longer part of that latch: it is BpNack now, a DIFFERENT
+// vocabulary (backpressure.h), and it must fire BP_NACK_QRT for every single
+// refusal, not just the first. Before BP-07 onRefuse() returned BpNotice and
+// was provably always BP_NOTICE_NONE (docs/backpressure-flow-control.md
+// chapter 8, finding L1) -- this is the fixed contract, pinned both ways so
+// a regression on either half goes red.
 static void test_refusal_announces_once_per_episode(void)
 {
     BackPressure bp(20);
     int qrt_count = 0;
+    int nack_count = 0;
 
     if(bp.onSend(16, false, 1000) == BP_NOTICE_QRT)
         qrt_count++;
@@ -186,11 +194,48 @@ static void test_refusal_announces_once_per_episode(void)
     for(int i = 0; i < 20; i++)
     {
         TEST_ASSERT_TRUE(bp.refusing());
-        if(bp.onRefuse() == BP_NOTICE_QRT)
-            qrt_count++;
+        if(bp.onRefuse() == BP_NACK_QRT)
+            nack_count++;
     }
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrt_count, "QRT is one per state transition, not one per refused message");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, qrt_count, "QRT episode notice is one per state transition, not one per refused message");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(20, nack_count, "BP-07: onRefuse() nacks EVERY refused message, unlike the latched episode notice");
+}
+
+// A nack is per-message bookkeeping only -- it must not touch the episode
+// machinery. If it did, a burst of refusals could re-arm or disturb the
+// latch/state the episode notice depends on for its "once per transition"
+// guarantee above.
+static void test_onrefuse_does_not_touch_latch_or_state(void)
+{
+    BackPressure bp(20);
+
+    bp.onSend(16, false, 1000);   // opens the QRT episode
+    BpNotice latch_before = bp.latch();
+    BpState  state_before = bp.state();
+
+    for(int i = 0; i < 5; i++)
+        TEST_ASSERT_EQUAL_INT(BP_NACK_QRT, bp.onRefuse());
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(latch_before, bp.latch(), "onRefuse() must not move the episode latch");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(state_before, bp.state(), "onRefuse() must not move the episode state");
+}
+
+// Once the ring genuinely drains and the episode closes (QRV), refusing()
+// must go false -- and with it, the sender-facing reason to ever call
+// onRefuse() again. This is the state machine half of "no nack once quiet";
+// the wiring half (sendMessage() only calls onRefuse() while refusing() is
+// true) lives in loop_functions.cpp and is exercised end-to-end in
+// test/test_bp_regression.
+static void test_no_nack_reason_after_enter_quiet(void)
+{
+    BackPressure bp(20);
+
+    bp.onSend(16, false, 1000);
+    TEST_ASSERT_TRUE(bp.refusing());
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRV, bp.poll(BackPressure::CLEAR_DEPTH, 2000));
+    TEST_ASSERT_FALSE_MESSAGE(bp.refusing(), "episode closed: no more reason to refuse, hence no more nack");
 }
 
 // ---- QTA ------------------------------------------------------------------
@@ -538,6 +583,8 @@ int main(int, char **)
     RUN_TEST(test_qrt_without_preceding_qrs);
     RUN_TEST(test_qrt_holds_until_the_quiet_band);
     RUN_TEST(test_refusal_announces_once_per_episode);
+    RUN_TEST(test_onrefuse_does_not_touch_latch_or_state);
+    RUN_TEST(test_no_nack_reason_after_enter_quiet);
 
     RUN_TEST(test_qta_on_drop_and_only_once);
     RUN_TEST(test_qta_outranks_qrt_and_is_not_followed_by_qrt);

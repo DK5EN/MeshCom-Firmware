@@ -64,6 +64,43 @@ enum BpNotice
     BP_NOTICE_QRV  = 4   ///< closing bracket, never latched
 };
 
+/// Per-message outcome for a locally originated user message. Deliberately
+/// NOT a BpNotice value: BpNotice is the EPISODE vocabulary and its first
+/// four values double as the latch (one notice per state transition,
+/// TM-21). A nack is per message and is never latched -- every refused or
+/// dropped message gets its own, unlike the episode notice above it.
+enum BpNack
+{
+    BP_NACK_NONE = 0,
+    BP_NACK_QRT  = 1,   ///< refused before enqueue, ring sits in the QRT band
+    BP_NACK_QTA  = 2    ///< enqueue attempted, the ring threw the frame away
+};
+
+/// Q-code of a nack ("QRT", "QTA"), "" for BP_NACK_NONE.
+inline const char *bpNackCode(BpNack n)
+{
+    switch(n)
+    {
+        case BP_NACK_QRT: return "QRT";
+        case BP_NACK_QTA: return "QTA";
+        default:          return "";
+    }
+}
+
+/// Operator decision E1 (2026-09-01): one frame per lost message, the Q-code
+/// carried IN the text rather than as a separate field -- the episode notice
+/// above already owns the Q-code-in-text convention, and the app has no
+/// dedicated field to put it in either way (L5, still open).
+inline const char *bpNackPrefix(BpNack n)
+{
+    switch(n)
+    {
+        case BP_NACK_QRT: return "QRT NOT SENT - ";
+        case BP_NACK_QTA: return "QTA NOT SENT - ";
+        default:          return "";
+    }
+}
+
 /// Where a locally originated user message came from. Set immediately before
 /// sendMessage() by the caller and cleared right after; relay, ACK and beacon
 /// paths never set it, so they can never be refused.
@@ -187,10 +224,20 @@ public:
     /// True while locally originated user messages must be refused.
     bool refusing() const { return state_ == BP_QRT; }
 
-    /// A user message was refused because refusing() is true. Yields the QRT
-    /// text at most once per episode — the refusal itself is logged per event,
-    /// but the sender is told once per state transition, not once per message.
-    BpNotice onRefuse() { return latchIfHigher(BP_NOTICE_QRT); }
+    /// A user message was refused because refusing() is true. Always yields
+    /// BP_NACK_QRT: the refusal is per message, unlike the episode notice
+    /// above, which is latched. (Before BP-07 this returned
+    /// latchIfHigher(BP_NOTICE_QRT), which was provably always
+    /// BP_NOTICE_NONE — refusing() being true implies the latch already sits
+    /// at BP_NOTICE_QRT or higher, since the only two paths into BP_QRT
+    /// (onSend()'s threshold and drop branches) both latch to QRT or QTA
+    /// before refusing() can ever be observed true. See docs/
+    /// backpressure-flow-control.md chapter 8, finding L1.)
+    ///
+    /// The return type is deliberately constant. The method stays because
+    /// the call site reads cleanly and the state machine keeps ownership of
+    /// the decision even though today it never varies.
+    BpNack onRefuse() { return BP_NACK_QRT; }
 
     /// Feed the outcome of one enqueue attempt.
     /// @param depth   ring depth *after* the attempt

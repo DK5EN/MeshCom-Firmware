@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <aprs_functions.h>
 
@@ -41,82 +42,104 @@ static inline void bpNoticeFillFrame(struct aprsMessage &aprsmsg,
     aprsmsg.msg_app_offline = true; // Rückmeldungen niemals announcen
 }
 
-// BP-06: peek at the destination call/group a raw text-message argument
-// names, without touching the string and without any of sendMessage()'s
-// side effects. Mirrors the iCall<11 destination-call extraction in
-// sendMessage() (loop_functions.cpp, strDestinationCall) -- same leading
-// '{', same brace search bounded to the first 11 characters, same
-// uppercase + trim -- because the BP-01 refuse check runs BEFORE that
-// parsing happens: a message refused into QRT still needs its notice
-// addressed to the target the sender actually named.
+// BP-07: bytes, not characters -- see the length budget table in
+// docs/bp-l1-l4-impl-plan.md (section "src/bp_notice_frame.h"). Chosen so the
+// EXTUDP path (the tightest: 400-byte c_json, ~141-byte JSON skeleton with
+// the longest possible callsign/dst) still has three-digit headroom, while
+// BLE/Web (255-byte UDP_TX_BUF_SIZE) stay comfortably within budget too.
+#define BP_NACK_TEXT_MAX 120
+
+// BP-07 (L1/L2): compose the "<prefix><text>" body of a per-message nack --
+// "QRT NOT SENT - Hello World 17" -- for the transport that just had a
+// message refused or dropped. prefix is always one of the two hardcoded
+// literals from bpNackPrefix() (backpressure.h) and is copied verbatim;
+// text is the operator's own message and is truncated and sanitized:
 //
-// One DELIBERATE divergence: an empty or whitespace-only target ("{}" /
-// "{ }") yields "*" here, while sendMessage()'s String::trim() produces an
-// empty strDestinationCall -- a notice addressed to "" would land nowhere,
-// "*" at least reaches the broadcast view. (Advisor finding BP-06/2.)
+//  1. Never cuts mid UTF-8 sequence. text arrives already decoded (after the
+//     %-escape loop in sendMessage()), so umlauts and emoji are real
+//     multi-byte sequences; truncating at a fixed byte count can land inside
+//     one. Fix: once the BP_NACK_TEXT_MAX-byte cut point is chosen, back up
+//     over UTF-8 continuation bytes (10xxxxxx, 0x80..0xBF) until a lead byte
+//     or plain ASCII byte is reached.
+//  2. Replaces '"', '\' and every byte < 0x20 with a space. The EXTUDP path
+//     embeds this text in JSON; without this rule a text full of quotes
+//     could double in length when ArduinoJson escapes it and blow the
+//     datagram buffer. This keeps the byte count 1:1 through serialization.
 //
-// out_len-safe: writes at most out_len-1 characters plus a NUL. The valid
-// content under the iCall<11 rule is at most 9 characters ("OE1KBC-99"), so
-// a 10-or-more byte out buffer never truncates a real call/group.
-static inline void bpPeekDst(const char *raw, char *out, size_t out_len)
+// out_len-safe: writes at most out_len-1 bytes plus a NUL, even if out_len is
+// smaller than the prefix (defensive only -- every real caller sizes its
+// buffer for prefix + BP_NACK_TEXT_MAX + "...", see the plan's budget table).
+// Returns the number of bytes written, excluding the NUL; 0 if out/out_len
+// is invalid.
+static inline size_t bpNackCompose(char *out, size_t out_len,
+                                   const char *prefix, const char *text)
 {
     if(out == nullptr || out_len == 0)
-        return;
+        return 0;
 
-    if(raw == nullptr || raw[0] != '{')
-    {
-        snprintf(out, out_len, "*");
-        return;
-    }
+    out[0] = '\0';
 
-    int brace = -1;
-    for(int i = 1; i < 11 && raw[i] != '\0'; i++)
+    if(prefix == nullptr)
+        prefix = "";
+    if(text == nullptr)
+        text = "";
+
+    size_t room = out_len - 1;   // bytes available before the terminating NUL
+
+    // 1) Prefix, verbatim -- never sanitized, it is not operator text.
+    size_t prefix_len = strlen(prefix);
+    if(prefix_len > room)
+        prefix_len = room;
+    memcpy(out, prefix, prefix_len);
+    size_t written = prefix_len;
+    room -= prefix_len;
+
+    // 2) Text, truncated to BP_NACK_TEXT_MAX bytes (rule 1's boundary is
+    // applied once, below, after every clamp has already picked the final
+    // cut point -- reapplying it after a later clamp would be wrong, since a
+    // second clamp could itself land back inside a multi-byte sequence).
+    size_t text_len = strlen(text);
+    bool truncated = text_len > BP_NACK_TEXT_MAX;
+    size_t take = truncated ? BP_NACK_TEXT_MAX : text_len;
+
+    // The caller's buffer is the harder limit in a pathologically small
+    // out_len (test-only case, see out_len-safe above) -- clamp take (and
+    // drop the "..." first, then the text) to whatever room is left.
+    size_t suffix_len = truncated ? 3 : 0;   // "..."
+    if(take + suffix_len > room)
     {
-        if(raw[i] == '}')
+        if(room <= suffix_len)
         {
-            brace = i;
-            break;
+            take = 0;
+            suffix_len = (room >= 3) ? 3 : 0;
+        }
+        else
+        {
+            take = room - suffix_len;
         }
     }
 
-    if(brace < 0)
+    while(take > 0 && ((unsigned char)text[take] & 0xC0) == 0x80)
+        take--;
+
+    for(size_t i = 0; i < take; i++)
     {
-        snprintf(out, out_len, "*");
-        return;
+        char c = text[i];
+        if(c == '"' || c == '\\' || (unsigned char)c < 0x20)
+            c = ' ';
+        out[written++] = c;
+    }
+    room -= take;
+
+    if(suffix_len == 3 && room >= 3)
+    {
+        out[written++] = '.';
+        out[written++] = '.';
+        out[written++] = '.';
     }
 
-    int start = 1;
-    int end = brace; // exclusive
-
-    // isspace()-equivalent trim, matching String::trim() in the authoritative
-    // extraction (which strips tab/CR/LF too, not only 0x20) -- advisor
-    // finding BP-06/3. Plain ASCII checks, no <ctype.h> locale surprises.
-    while(start < end && (raw[start] == ' ' || raw[start] == '\t' ||
-                          raw[start] == '\r' || raw[start] == '\n'))
-        start++;
-    while(end > start && (raw[end - 1] == ' ' || raw[end - 1] == '\t' ||
-                          raw[end - 1] == '\r' || raw[end - 1] == '\n'))
-        end--;
-
-    int content_len = end - start;
-    if(content_len <= 0)
-    {
-        snprintf(out, out_len, "*");
-        return;
-    }
-
-    size_t max_copy = out_len - 1;
-    if((size_t)content_len > max_copy)
-        content_len = (int)max_copy;
-
-    for(int i = 0; i < content_len; i++)
-    {
-        char c = raw[start + i];
-        if(c >= 'a' && c <= 'z')
-            c = (char)(c - 'a' + 'A');
-        out[i] = c;
-    }
-    out[content_len] = '\0';
+    out[written] = '\0';
+    return written;
 }
 
 #endif // _BP_NOTICE_FRAME_H_

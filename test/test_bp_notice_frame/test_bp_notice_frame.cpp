@@ -1,7 +1,7 @@
 // Native Testsuite fuer bpNoticeFillFrame() -- den BLE/Web-Rahmen einer
 // BP-01-Notice (QRS/QRT/QTA/QRV) an die Phone-App bzw. Web-GUI -- und fuer
-// bpPeekDst(), den Praefix-Peek, der dem Refuse-Pfad in sendMessage() das
-// Ziel liefert, bevor die Nachricht ueberhaupt geparst ist.
+// bpNackCompose() (BP-07), den Textbauer fuer die Pro-Nachricht-Quittung
+// "QRT NOT SENT - <Text>" / "QTA NOT SENT - <Text>".
 //
 // Kontrakt (Operator-Entscheidung 2026-08-31): Absender ist das RUFZEICHEN
 // DES NODES, nicht der Pseudo-Absender "response" der Kommando-Antworten
@@ -12,6 +12,12 @@
 // DM-Call oder "*"), nicht mehr fest "*". msg_app_offline haelt den Rahmen
 // weiterhin lokal -- er geht nie on air, auch nicht bei einem DM-Ziel.
 //
+// BP-07: der frühere Ziel-Zweitparse (ein Klammer-Peek auf den noch
+// unkodierten Rohtext) ist ersatzlos entfallen -- der Refuse-Check in
+// sendMessage() laeuft jetzt HINTER der {ZIEL}-Parsung (Grundentscheidung,
+// bp-l1-l4-impl-plan.md), braucht also keinen Zweitparse mehr. Die
+// frueheren Testfaelle dafuer unten sind deshalb entfernt, nicht ersetzt.
+//
 //   pio test -e native_aprs -f test_bp_notice_frame
 
 #include <unity.h>
@@ -20,6 +26,7 @@
 
 #include <Arduino.h>
 #include <aprs_functions.h>
+#include <backpressure.h>
 #include <bp_notice_frame.h>
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
 
@@ -133,99 +140,149 @@ static void test_kein_response_absender(void)
                              "Absender 'response' landet in McApps Spam-Klasse (9999)");
 }
 
-// ---- bpPeekDst() -----------------------------------------------------------
-// Paritaet zur strDestinationCall-Extraktion in sendMessage() (iCall<11):
-// gleicher Klammer-Scan, gleiche Grenze, gleiches Trim/Upper.
+// ---- bpNackCompose() (BP-07) ------------------------------------------------
+// prefix + up to BP_NACK_TEXT_MAX bytes of text, "..." on truncation.
 
-static void test_peek_gruppe(void)
+static void test_nack_compose_kurzer_text(void)
 {
-    char out[12];
-    bpPeekDst("{20}Hallo", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("20", out);
+    char out[64];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT),
+                               "Hello World 17");
+
+    TEST_ASSERT_EQUAL_STRING("QRT NOT SENT - Hello World 17", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
 }
 
-static void test_peek_dm_call(void)
+// Genau BP_NACK_TEXT_MAX (120) Byte Text: passt vollstaendig, kein "..." --
+// die Kante zwischen "passt" und "wird gekuerzt".
+static void test_nack_compose_exakt_max_laenge(void)
 {
-    char out[12];
-    bpPeekDst("{OE1KBC-99}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("OE1KBC-99", out);
+    char text[BP_NACK_TEXT_MAX + 1];
+    memset(text, 'A', BP_NACK_TEXT_MAX);
+    text[BP_NACK_TEXT_MAX] = '\0';
+
+    char out[16 + BP_NACK_TEXT_MAX + 8];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QTA), text);
+
+    char expect[16 + BP_NACK_TEXT_MAX + 8];
+    snprintf(expect, sizeof(expect), "%s", bpNackPrefix(BP_NACK_QTA));
+    size_t p = strlen(expect);
+    memset(expect + p, 'A', BP_NACK_TEXT_MAX);
+    expect[p + BP_NACK_TEXT_MAX] = '\0';
+
+    TEST_ASSERT_EQUAL_STRING(expect, out);
+    TEST_ASSERT_EQUAL_UINT(strlen(expect), len);
 }
 
-static void test_peek_upper(void)
+// Ein Byte mehr als das Budget kippt die Kante: 120 Byte Text plus "...".
+static void test_nack_compose_zu_langer_text_bekommt_ellipse(void)
 {
-    char out[12];
-    bpPeekDst("{dl7cl-7}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("DL7CL-7", out);
+    char text[BP_NACK_TEXT_MAX + 2];
+    memset(text, 'B', BP_NACK_TEXT_MAX + 1);
+    text[BP_NACK_TEXT_MAX + 1] = '\0';
+
+    char out[16 + BP_NACK_TEXT_MAX + 8];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), text);
+
+    char expect[16 + BP_NACK_TEXT_MAX + 8];
+    snprintf(expect, sizeof(expect), "%s", bpNackPrefix(BP_NACK_QRT));
+    size_t p = strlen(expect);
+    memset(expect + p, 'B', BP_NACK_TEXT_MAX);
+    strcpy(expect + p + BP_NACK_TEXT_MAX, "...");
+
+    TEST_ASSERT_EQUAL_STRING(expect, out);
+    TEST_ASSERT_EQUAL_UINT(strlen(expect), len);
 }
 
-static void test_peek_ohne_klammer(void)
+// Regel 1: die 120-Byte-Kante faellt hier mitten in eine zweibytige
+// UTF-8-Sequenz ("Ä" = 0xC3 0x84, Lead-Byte an Index 119, Folgebyte an
+// Index 120) -- die Kuerzung muss auf die Codepoint-Grenze zurueckweichen
+// (Index 119, nur 119 volle Byte Text vor der Ellipse), nicht mitten
+// hineinschneiden.
+static void test_nack_compose_kuerzt_auf_utf8_codepoint_grenze(void)
 {
-    char out[12];
-    bpPeekDst("ohne Klammer", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
+    char text[BP_NACK_TEXT_MAX + 20];
+    memset(text, 'A', 119);
+    text[119] = (char)0xC3;   // "Ä" Lead-Byte, sitzt genau auf der Kante
+    text[120] = (char)0x84;   // Folgebyte
+    memset(text + 121, 'Z', 10);
+    text[131] = '\0';
+
+    char out[16 + BP_NACK_TEXT_MAX + 8];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), text);
+
+    char expect[16 + BP_NACK_TEXT_MAX + 8];
+    snprintf(expect, sizeof(expect), "%s", bpNackPrefix(BP_NACK_QRT));
+    size_t p = strlen(expect);
+    memset(expect + p, 'A', 119);
+    strcpy(expect + p + 119, "...");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, out,
+        "Kuerzung muss auf der Codepoint-Grenze zurueckweichen, nicht das Folgebyte kappen");
+    TEST_ASSERT_EQUAL_UINT(strlen(expect), len);
 }
 
-static void test_peek_unterminiert(void)
+// Regel 2: '"', '\' und jedes Steuerzeichen (< 0x20) werden zu einem
+// Leerzeichen -- Byte fuer Byte ersetzt, nicht entfernt (die Laenge bleibt
+// 1:1, siehe Kommentar am Helper: das haelt das EXTUDP-JSON-Escaping klein).
+static void test_nack_compose_ersetzt_anfuehrungszeichen_backslash_steuerzeichen(void)
 {
-    char out[12];
-    bpPeekDst("{20", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
+    char out[64];
+    const char text[] = { 'a', '"', 'b', '\\', 'c', 0x01, 'd', '\t', 'e', '\0' };
+
+    size_t len = bpNackCompose(out, sizeof(out), "QTA NOT SENT - ", text);
+
+    TEST_ASSERT_EQUAL_STRING("QTA NOT SENT - a b c d e", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
 }
 
-// Schliessende Klammer erst an Position 12 -- verletzt die iCall<11-Regel,
-// die auch die echte Ziel-Extraktion in sendMessage() durchsetzt.
-static void test_peek_ueberlang(void)
+// Leerer Text: nur das Praefix kommt heraus, kein "..." (nichts wurde gekuerzt).
+static void test_nack_compose_leerer_text(void)
 {
-    char out[12];
-    bpPeekDst("{12345678901}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
+    char out[64];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), "");
+
+    TEST_ASSERT_EQUAL_STRING("QRT NOT SENT - ", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
 }
 
-static void test_peek_trim(void)
+// text == nullptr: behandelt wie leerer Text, kein Absturz.
+static void test_nack_compose_text_nullptr(void)
 {
-    char out[12];
-    bpPeekDst("{ 20 }x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("20", out);
+    char out[64];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QTA), nullptr);
+
+    TEST_ASSERT_EQUAL_STRING("QTA NOT SENT - ", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
 }
 
-static void test_peek_leerstring(void)
+// out_len == 1: nur Platz fuer die terminierende NUL, kein Byte Inhalt.
+static void test_nack_compose_out_len_eins(void)
 {
-    char out[12];
-    bpPeekDst("", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
+    char out[1] = { 'x' };
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), "Hello");
+
+    TEST_ASSERT_EQUAL_STRING("", out);
+    TEST_ASSERT_EQUAL_UINT(0, len);
 }
 
-// Advisor BP-06/1: die REJECT-Kante der iCall<11-Regel exakt -- '}' an
-// Index 11 (10 Zeichen Inhalt) ist die erste abgelehnte Position. Die
-// Accept-Kante (Index 10, {OE1KBC-99}) pinnt test_peek_dm_call.
-static void test_peek_reject_kante(void)
+// out_len kleiner als das Praefix: das Praefix selbst wird gekappt, der Text
+// faellt komplett weg -- out_len-sicher heisst hier "nie ueberschreiben",
+// nicht "immer vollstaendig".
+static void test_nack_compose_out_len_kleiner_als_praefix(void)
 {
-    char out[12];
-    bpPeekDst("{1234567890}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
+    char out[5];   // "QRT NOT SENT - " ist 15 Byte lang
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), "Hello");
+
+    TEST_ASSERT_EQUAL_STRING("QRT ", out);
+    TEST_ASSERT_EQUAL_UINT(4, len);
 }
 
-// Advisor BP-06/2: leeres bzw. reines Leerzeichen-Ziel -> "*" (bewusste
-// Divergenz zur autoritativen Extraktion, die dort "" liefert -- eine
-// Notice an "" landet nirgends; dokumentiert am Helper).
-static void test_peek_leeres_ziel(void)
+// out == nullptr: no-op, kein Absturz.
+static void test_nack_compose_out_nullptr(void)
 {
-    char out[12];
-    bpPeekDst("{}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
-    bpPeekDst("{ }x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("*", out);
-}
-
-// Advisor BP-06/3: Trim entfernt wie String::trim() auch Tab/CR/LF, nicht
-// nur 0x20 -- "{\t20}x" muss "20" liefern, nicht "\t20".
-static void test_peek_trim_isspace(void)
-{
-    char out[12];
-    bpPeekDst("{\t20}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("20", out);
-    bpPeekDst("{20\r\n}x", out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("20", out);
+    size_t len = bpNackCompose(nullptr, 64, bpNackPrefix(BP_NACK_QRT), "Hello");
+    TEST_ASSERT_EQUAL_UINT(0, len);
 }
 
 int main(int argc, char **argv)
@@ -238,16 +295,15 @@ int main(int argc, char **argv)
     RUN_TEST(test_frame_roundtrip);
     RUN_TEST(test_frame_roundtrip_dm_ziel);
     RUN_TEST(test_kein_response_absender);
-    RUN_TEST(test_peek_gruppe);
-    RUN_TEST(test_peek_dm_call);
-    RUN_TEST(test_peek_upper);
-    RUN_TEST(test_peek_ohne_klammer);
-    RUN_TEST(test_peek_unterminiert);
-    RUN_TEST(test_peek_ueberlang);
-    RUN_TEST(test_peek_trim);
-    RUN_TEST(test_peek_leerstring);
-    RUN_TEST(test_peek_reject_kante);
-    RUN_TEST(test_peek_leeres_ziel);
-    RUN_TEST(test_peek_trim_isspace);
+    RUN_TEST(test_nack_compose_kurzer_text);
+    RUN_TEST(test_nack_compose_exakt_max_laenge);
+    RUN_TEST(test_nack_compose_zu_langer_text_bekommt_ellipse);
+    RUN_TEST(test_nack_compose_kuerzt_auf_utf8_codepoint_grenze);
+    RUN_TEST(test_nack_compose_ersetzt_anfuehrungszeichen_backslash_steuerzeichen);
+    RUN_TEST(test_nack_compose_leerer_text);
+    RUN_TEST(test_nack_compose_text_nullptr);
+    RUN_TEST(test_nack_compose_out_len_eins);
+    RUN_TEST(test_nack_compose_out_len_kleiner_als_praefix);
+    RUN_TEST(test_nack_compose_out_nullptr);
     return UNITY_END();
 }

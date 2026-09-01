@@ -133,6 +133,41 @@ static void test_degeneriert(void)
                             "DK5EN-99", 35, "p", 1u, "x", "*"));
 }
 
+// BP-07: das laengstmoegliche Nack-Nutzsignal -- "QRT NOT SENT - " (15 Byte)
+// + BP_NACK_TEXT_MAX (120 Byte) Text + "..." (3 Byte) = 138 Byte "msg" --
+// zusammen mit dem laengstmoeglichen Rufzeichen (9 Zeichen, "OE1KBC-99") und
+// Ziel (11 Zeichen, iCall<11-Grenze) muss noch in den 400-Byte EXTUDP-Puffer
+// passen (sendExternNotice(), extudp_functions.cpp -- 300 -> 400 fuer genau
+// diesen Fall, siehe das Laengenbudget in docs/bp-l1-l4-impl-plan.md).
+//
+// bpNackCompose() selbst lebt in bp_notice_frame.h, das <aprs_functions.h>
+// zieht -- unter env:native (diese Suite, ohne aprs_functions.cpp) nicht
+// linkbar. Das Nutzsignal wird deshalb von Hand nachgebaut, mit denselben
+// Konstanten (BP_NACK_TEXT_MAX, das Praefix-Literal), nicht ueber den Helper.
+#define BP07_NACK_TEXT_MAX 120
+static void test_worst_case_nack_laenge_passt_in_extudp_puffer(void)
+{
+    char msg[16 + BP07_NACK_TEXT_MAX + 4];
+    snprintf(msg, sizeof(msg), "QRT NOT SENT - ");
+    size_t p = strlen(msg);
+    memset(msg + p, 'A', BP07_NACK_TEXT_MAX);
+    strcpy(msg + p + BP07_NACK_TEXT_MAX, "...");
+    TEST_ASSERT_EQUAL_UINT(15 + 120 + 3, strlen(msg));
+
+    char out[400];
+    size_t len = externNoticeJson(out, sizeof(out), "OE1KBC-99", 35, "p",
+                                  0xFFFFFFFFu, msg, "OE1KBC-99");
+
+    TEST_ASSERT_GREATER_THAN_UINT_MESSAGE(0, (unsigned)len,
+        "kein abgeschnittenes JSON -- 0 heisst der 400-Byte Puffer war zu klein");
+    TEST_ASSERT_LESS_OR_EQUAL_UINT(sizeof(out), (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok,
+                      deserializeJson(doc, out).code());
+    TEST_ASSERT_EQUAL_STRING(msg, doc["msg"]);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -145,5 +180,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_dst_dm);
     RUN_TEST(test_puffer_schranke);
     RUN_TEST(test_degeneriert);
+    RUN_TEST(test_worst_case_nack_laenge_passt_in_extudp_puffer);
     return UNITY_END();
 }
