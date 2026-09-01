@@ -41,6 +41,8 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 
 **Intake 2026-08-30 (third list), filed in §3.8k:** `RX-01` discard frames from unconfigured nodes (`XX0XXX`, seen relayed over four hops), `TX-01` an unconfigured node refuses to transmit at all (the other half of RX-01), `BP-01` TX back-pressure to the sender as Q-code notices (QRS/QRT/QTA, plus QRV once the queue clears — the concrete design for `TM-37`), `FL-02` the same 30 s floor for `sendHey()`. `CS-04` (Web-API `/getparam/`) **fixed and verified on hardware**; the two corrections to the mcmap replay-burst finding are written back into `mcmap/docs/findings/interlink-frame-replay-bursts.md` §10.
 
+**Operator report 2026-09-01 (E22 on a fixed IP), filed in §3.8s:** "with a fixed IP no connection to the server, with DHCP no problem, and the node's web server is reachable either way" — plus, on being asked again, "it feels sluggish". Switching to a fixed IP silently swaps the resolver: the DHCP branch takes `WiFi.dnsIP()` from the router, the static branch takes `node_owndns` and falls back to the hard-coded literal **`8.8.8.8`** when it is empty (`NET-02`). The server is reached by name, so a resolver that cannot answer leaves `node_hostip` at `0.0.0.0` and the node emits **no** server traffic, while everything that needs no DNS keeps working. The operator cannot see any of it, because the setup page pre-fills the four network boxes with the node's **effective** values while their buttons write the **stored** ones — NTP is the only one of the five that is right (`NET-01`, the item that actually produced this ticket). On a fixed IP the node also reports itself online from its settings string rather than from the interface (`NET-03`), `--setowndns` has a dead duplicate handler with a wrong offset (`NET-04`), and the static address is only applied after a DHCP lease has been obtained (`NET-06`). The "sluggish" half is `NET-05`, blocking `hostByName()` with no retry — **already fixed here and upstream** by `f34fd2ae`, present in every released 4.35p build. All upstream, none of it ours. Root cause is established by code reading; the field case is **not yet confirmed** — two commands would settle it, doc §7. [`bug-static-ip-dns-20260901.md`](bug-static-ip-dns-20260901.md).
+
 **Field report 2026-09-01 (`OE5HWN-14`), filed in §3.8r:** the reported symptom (WX altitude wandering 179–308 m on a node that never moved) is the smallest part of it. The GPS UART is drained only every 3 s on ESP32 while the L76K sends ~140 B/s into a 256-byte ring, so ~165 B of NMEA is discarded **every cycle**; roughly 1 in 256 of the resulting spliced sentences passes the checksum and is committed as a real fix (`GPS-01`, `GPS-02` — observed once in the 22-minute log, predicted 1.7). Altitude is a single unfiltered sample and `--setalt` is a no-op while GPS is on (`GPS-03`); QNH is latched to the first fix after boot (`GPS-04`). Side findings from the same logs: the node reset twice in seven minutes and **no reset reason is ever printed** (`TM-51`, do this first), and the display path costs ~570 ms per update on the T-Beam Supreme (`TM-52`). An HDOP-weighted Kalman filter was requested during review and is **rejected on measurements** (`GPS-05a`/`GPS-05b`, doc §7.6) in favour of a scalar Kalman filter with **constant** `R` — 8 bytes, whose steady-state gain _is_ an EMA coefficient, and whose covariance recursion halves cold-start time (282 s vs 474 s) and gives GPS-04 a real convergence signal. All of it is upstream, none of it ours. [`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md).
 
 **Intake 2026-08-31 (operator list of 14 points), filed in §3.8p:** T-Deck map pan (`TD-07`), two presentation-timeline items (`PRES-01` Meshtastic/MeshCore + ISM footnote, `PRES-02` WSPR/WSJT-X/JS8Call), the character-set filter for message text and APRS free text (`CHR-01`, `CHR-02`), JSON validity in everything the node builds (`JSN-01`), `PM-01` (`NoPMOther` — the leak is EXTUDP, not BLE), the APRS-to-client research paper (`APRS-01`), four documentation deliverables (`DOC-01` main-loop stall page, `DOC-02` `--help` renewal, `DOC-03` CONF endianness/compatibility, `DOC-04` `config.json` register reference), `NTP-01` (cadence + report + `--ntpsync` + bench regression) and `E22-01` (frame integrity under supply spikes). **Three intake premises were corrected by the scouting** — foreign DMs are already blocked on BLE/web, TM-39 is a closed test item (the defect is `CONF-01`), and no low-voltage TX inhibit exists anywhere in the tree. Side findings: `WEB-04`, `TD-08`, `CTY-01`.
@@ -2631,6 +2633,78 @@ sample. The stalls are a separate defect (TM-52).
 **Upstream:** GPS-01/GPS-02 are good PR candidates (small, platform-symmetric, affect every ESP32
 node in the network). GPS-03/GPS-04 change `--setalt` semantics and go through §3.5 — propose as a
 plan first. GPS-05a/GPS-05b are not upstream-ready and must not be offered until they have evidence.
+
+### 3.8s Fixed IP loses the MeshCom server, and the web GUI cannot show why — operator report (2026-09-01)
+
+Full analysis, with every code site the claims rest on:
+[`bug-static-ip-dns-20260901.md`](bug-static-ip-dns-20260901.md).
+
+**Intake.** Chat thread, E22 node: "with a fixed IP I have no connection to the server, with DHCP
+it works without problems; in both cases I can reach the node's web server without problems", and
+on being asked again about the web interface, "yes, that's the odd part, but it feels sluggish".
+Netmask, gateway and DNS were reported as identical in both modes.
+
+**Root cause.** Switching to a fixed IP silently swaps the resolver. The DHCP branch takes
+`WiFi.dnsIP()` from the router; the static branch takes `node_owndns`, and if that string is
+shorter than seven characters it substitutes the hard-coded literal **`8.8.8.8`**
+(`udp_functions.cpp:1494-1497`, repeated at `:1508-1511`). The MeshCom server is reached by name
+(`meshcom.oevsv.at`), so a resolver that cannot answer leaves `node_hostip` at `0.0.0.0` and the
+node emits **no** server traffic at all, while the local web server — which needs no DNS — keeps
+working. `node_owndns` is consulted **only** in static mode, and the mode gate at `:1489` does not
+require a DNS at all.
+
+**Why the operator could not see it (NET-01, the item that produced this ticket).** The four "IP
+Network Settings" boxes are pre-filled from the node's **effective** values while their buttons
+write the **stored** ones — `web_functions.cpp:1432-1435`: `node_ip`/`node_subnet`/`node_gw`/`node_dns`
+in, `setownip`/`setownms`/`setowngw`/`setowndns` out. NTP at `:1436` is the only one of the five
+that shows the stored setting, added in the same commit as the wrong DNS box. So under DHCP the
+DNS box shows the router's address although `node_owndns` is empty, and "it says the same in both
+variants" is not evidence of anything. `/getparam/` returns the stored values (`web_setup.cpp:880-901`),
+i.e. page and API disagree — and the page never calls the API, which is the same blind spot CS-04
+was hiding behind (`web_functions.cpp:2333-2335`).
+
+**HAMNET corollary.** On 44.x the server name is chosen by `node_gwsrv` (`udp_functions.cpp:1581-1631`):
+OE gets the literal `44.143.8.143` and survives, `DL` gets `meshcom.hamnet.cloud` and `IT` gets
+`meshcom.dig-italia.it` and do not. A DL or IT HAMNET gateway on a fixed IP without OWNDNS is
+handed a resolver that is unreachable from HAMNET by definition **and** a server name it cannot
+resolve.
+
+**Not ours.** `git diff upstream/dev HEAD` over both files is empty; blame is Kurt (2025-01-15 …
+2026-06-09) and Luca Cireddu (2026-06-09). NET-05 is the single item this branch already fixed.
+
+| ID     | Where                                                                                                   | Finding                                                                                                                                                                                                                                             | Sev.   | Action                                                                                                          |
+| ------ | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| NET-01 | `web_functions.cpp:1432-1435`                                                                           | Setup page shows effective network values in the boxes that write the stored ones; NTP (`:1436`) is the only correct one. The GUI can never show whether a static setting exists.                                                                   | High   | Pass `node_own*` as `inputValue`, as NTP already does. **Do this first** — it makes every other fix verifiable. |
+| NET-02 | `udp_functions.cpp:1494-1497`, `:1508-1511`                                                             | Empty `node_owndns` on a fixed IP falls back to `8.8.8.8` without a word in the log. Fails on any site that blocks, hijacks or cannot route public DNS — and categorically on HAMNET.                                                               | High   | Fall back to `node_owngw` (already configured and validated), and log the substitution.                         |
+| NET-03 | `udp_functions.cpp:1522-1525`, `:1548`, `:1555-1562`                                                    | On a fixed IP `hasIPaddress` is derived from the settings string, not from the interface: a failed `WiFi.config()` is printed and ignored. `--info` reports `hasIpAddress: yes` (`command_functions.cpp:5919`), KEEP goes to `0.0.0.0`.             | Medium | Read `WiFi.localIP()` back after `WiFi.config()`; treat a `false` return as a bring-up failure.                 |
+| NET-04 | `command_functions.cpp:3921/3926`, `:3961`, `:3989/3994`; `udp_functions.cpp:1494-1497` vs `:1508-1511` | Two `--setowndns` handlers — the live one (`:3926`, offset `+12`) correct, the dead duplicate (`:3994`, offset `+11`) would have cut the first character off the address. `:3961` is missing its `else`. DNS block duplicated in the static branch. | Low    | Delete the dead handler and the duplicate block, restore the `else`.                                            |
+| NET-05 | released builds only, pre-`f34fd2ae`                                                                    | Server and NTP resolved with blocking `WiFi.hostByName()` (2 calls, up to 31 s each, in the loop task) and no retry after a failure — permanent until reboot. The "sluggish" half of the report.                                                    | Medium | **Already fixed here and upstream** (`f34fd2ae`, TM-34 Wave W). Nothing owed but a release.                     |
+| NET-06 | `udp_functions.cpp:1215-1246`                                                                           | The static address is applied only from the `got_ip` path, i.e. after a DHCP lease was obtained. On a network without a DHCP server a static node never applies its configuration.                                                                  | Low    | `WiFi.config()` before `WiFi.begin()` when a static configuration is stored. Needs bench proof first.           |
+
+**Confirmation still owed, on the reporter's node.** Two commands, in order: `--info` → the
+`...OWNDNS address:` line (`command_functions.cpp:5902-5908`) — empty confirms the mechanism; then
+the boot log after `[WIFI]...Internet UDP-DEST meshcom.oevsv.at` → `[WIFI];dns;…;ip;0.0.0.0` proves
+it is resolution and nothing else. A valid address there kills the hypothesis and sends the search
+to the two alternatives kept open in the doc's §8: a stored resolver that only answers the
+DHCP-assigned address (per-client access profiles, guest VLAN, Pi-hole ACL), or a duplicate address
+from a static IP inside the DHCP pool — the latter explains "sluggish" equally well, and `ping` with
+the node powered off settles it.
+
+**Operator workaround, independent of any firmware change:** `--setowndns <router IP>` + `--reboot`,
+or the same value in the GUI's DNS box **with the button pressed**, even when the box already shows
+the right address. Lower-risk alternative: stay on DHCP and pin the address by MAC in the router.
+
+**Tests owed with the fix** (`env:native_config`): empty `node_owndns` resolves to the gateway, not
+`8.8.8.8`; `--setowndns 1.2.3.4` stores `1.2.3.4`, not `.2.3.4` (pins the offset the dead handler got
+wrong); the rendered setup page carries the stored `node_own*`. Bench proof for NET-02/03 on
+`DK5EN-93`: fixed IP without OWNDNS, port 53 to `8.8.8.8` blocked at the AP, expect
+`[WIFI];dns;meshcom.oevsv.at;ip;0.0.0.0` and no KEEP; after the fix, resolution via the gateway and
+KEEP resuming.
+
+**Upstream:** NET-01 + NET-02 are good PR candidates — two files, a handful of lines, no behaviour
+change for any node that is not statically addressed, and they close a class of report rather than
+one node. NET-03 changes what `hasIpAddress` means and goes through §3.5 as a plan first. NET-04
+folds into either. NET-06 must not be offered before it has bench evidence.
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
