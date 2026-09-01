@@ -68,6 +68,14 @@ CONNECT_TIMEOUT = 10.0
 READ_TIMEOUT = 5.0
 BACKOFF_MIN = 5
 BACKOFF_MAX = 60
+# TM-50: read-silence watchdog. With the debug flags on the node emits
+# something at least every 10 s (CHANNEL_UTIL/ONRXDONE_STATS), without them
+# still KEEP/BEAT and relay traffic -- 90 s of silence therefore means the
+# TCP connection is a zombie (overnight soak 2026-09-01: the node's WLAN
+# outage killed its side of the session without a FIN ever reaching us; the
+# logger sat on recv() timeouts for 2.4 h without noticing). A false
+# positive on a genuinely mute node costs one harmless reconnect.
+STALL_TIMEOUT = 90.0
 
 stop_requested = False
 
@@ -93,6 +101,21 @@ class Console:
     def connect(self):
         self.sock = socket.create_connection((self.host, self.port), timeout=CONNECT_TIMEOUT)
         self.sock.settimeout(CONNECT_TIMEOUT)
+
+        # TM-50: belt and braces underneath the read-silence watchdog in
+        # main(). Keepalive probes make the kernel notice a peer that
+        # vanished without a FIN (WLAN outage) and turn later recv() calls
+        # into a hard error instead of endless timeouts. The tunables differ
+        # per platform (macOS: TCP_KEEPALIVE = idle; Linux: TCP_KEEPIDLE/
+        # KEEPINTVL/KEEPCNT), so each is set only where it exists.
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        for opt, val in (("TCP_KEEPIDLE", 30), ("TCP_KEEPINTVL", 10),
+                         ("TCP_KEEPCNT", 3), ("TCP_KEEPALIVE", 30)):
+            if hasattr(socket, opt):
+                try:
+                    self.sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, opt), val)
+                except OSError:
+                    pass
 
         # The server sends either "NONCE: <hex>" (password set) or "OK"
         # followed by the banner (no password).
@@ -178,6 +201,10 @@ def main():
     ap.add_argument("--minfree", type=int, default=500, help="stop below N MB free")
     ap.add_argument("--no-debug-flags", action="store_true",
                     help="do not switch the node, only record what it emits")
+    ap.add_argument("--stall-timeout", type=float, default=STALL_TIMEOUT,
+                    help="seconds of read silence before the connection is "
+                         "declared dead and re-opened (TM-50; default %.0f)"
+                         % STALL_TIMEOUT)
     args = ap.parse_args()
 
     outdir = args.outdir or os.path.expanduser("~/meshlog/" + args.host.split(".")[0])
@@ -231,8 +258,19 @@ def main():
                 console.send("--loradebug on")
                 flags_set = True
                 sink.write("[LOGGER] flags set (loradebug was: %s)" % prev_loradebug)
+            elif flags_set and not args.no_debug_flags:
+                # TM-50: the flags live in flash and survive a node reboot,
+                # but a reconnect can also follow paths where they do not
+                # (settings restored from backup, a fresh flash mid-run).
+                # Both commands are idempotent, so re-applying is free and
+                # keeps the recording verbose no matter why we reconnected.
+                console.send("--txcapture on")
+                time.sleep(1.0)
+                console.send("--loradebug on")
+                sink.write("[LOGGER] flags re-applied after reconnect")
 
             buf = rest
+            last_data = time.time()
             while not stop_requested and time.time() < deadline:
                 # recv() == b"" means the peer closed (node rebooted, WiFi
                 # gone). A timeout only means "quiet right now". Both yield an
@@ -248,7 +286,19 @@ def main():
                 if closed:
                     raise ConnectionError("peer closed the connection")
 
+                if not chunk and time.time() - last_data > args.stall_timeout:
+                    # TM-50: recv() timeouts alone never end -- a peer that
+                    # died without a FIN (node WLAN outage) leaves a half-open
+                    # socket that times out forever. Silence beyond the
+                    # watchdog is treated as a dead connection; the normal
+                    # reconnect path (close, backoff, re-apply flags) takes
+                    # over and counts it in reconnects=.
+                    raise ConnectionError(
+                        "no data for %.0f s -- assuming zombie connection"
+                        % (time.time() - last_data))
+
                 if chunk:
+                    last_data = time.time()
                     buf += chunk
                     while b"\n" in buf:
                         line, _, buf = buf.partition(b"\n")
@@ -300,18 +350,25 @@ def main():
             time.sleep(backoff)
             backoff = min(BACKOFF_MAX, backoff * 2)
 
-    # Clean up: restore the flags, reconnecting once more if necessary.
+    # Clean up: restore the flags. TM-50: two attempts -- the first send can
+    # hit a zombie socket the run ended on (Broken pipe was exactly how the
+    # 2026-09-01 incident surfaced, and the flags stayed on); the second
+    # attempt always starts from a fresh connection.
     if flags_set and not args.no_debug_flags:
-        try:
-            if console.sock is None:
-                console.connect()
-            console.send("--txcapture off")
-            time.sleep(1.0)
-            console.send("--loradebug " + prev_loradebug)
-            time.sleep(2.0)
-            sink.write("[LOGGER] flags restored (loradebug %s)" % prev_loradebug)
-        except (OSError, ConnectionError) as exc:
-            sink.write("[LOGGER] flags could NOT be restored: %s" % exc)
+        for attempt in (1, 2):
+            try:
+                if console.sock is None:
+                    console.connect()
+                console.send("--txcapture off")
+                time.sleep(1.0)
+                console.send("--loradebug " + prev_loradebug)
+                time.sleep(2.0)
+                sink.write("[LOGGER] flags restored (loradebug %s)" % prev_loradebug)
+                break
+            except (OSError, ConnectionError) as exc:
+                console.close()
+                if attempt == 2:
+                    sink.write("[LOGGER] flags could NOT be restored: %s" % exc)
 
     console.close()
     if reason == "running":
