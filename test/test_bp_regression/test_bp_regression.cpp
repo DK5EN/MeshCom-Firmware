@@ -252,9 +252,12 @@ static void test_dj8meh_blocker_altert_aus_und_qrv_kommt_sofort(void)
 // normalen Betriebs aus (Grundlast 1-4, drei falsche QRS/QRV-Paare in
 // 5,5 Minuten), was ueberhaupt erst zur neuen, fixen Schwelle 5 gefuehrt hat.
 // Unter der neuen Schwelle bleibt ein ECHTER Burst (kein Loch, jede Tiefe
-// 1..threshold durchlaufen) trotzdem gleich fruh erkannt: QRS kommt beim
-// erstmaligen Erreichen von Tiefe 5, QRT weiterhin exakt an der
-// 80-%-Schwelle -- die Ueberkorrektur-Sorge dieses Tests bleibt entkraeftet.
+// 1..threshold durchlaufen) trotzdem frueh erkannt: QRS kommt mit der
+// dritten eigenen Nachricht ab der Linie (QRS_MIN_USER_MSGS, 2026-09-01:
+// Tiefe 5, 6, 7 -> QRS bei 7; die Tiefe allein zaehlt Relay/ACK mit und
+// warnte einen Gateway-Absender schon bei seiner ersten Nachricht), QRT
+// weiterhin exakt an der 80-%-Schwelle -- die Ueberkorrektur-Sorge dieses
+// Tests bleibt entkraeftet.
 static void test_qrt_ausloesung_bleibt_intakt(void)
 {
     BackPressure bp(MAX_RING);
@@ -270,8 +273,8 @@ static void test_qrt_ausloesung_bleibt_intakt(void)
         if (n == BP_NOTICE_QRT) qrt_at_depth = d;
     }
     TEST_ASSERT_TRUE(bp.refusing());
-    TEST_ASSERT_EQUAL_INT_MESSAGE(5, qrs_at_depth,
-        "QRS weiterhin beim Aufbau, jetzt an der fixen BP-05-Schwelle (Tiefe 5)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(bp.qrsThreshold() + BackPressure::QRS_MIN_USER_MSGS - 1, qrs_at_depth,
+        "QRS weiterhin beim Aufbau: dritte eigene Nachricht ab der BP-05-Schwelle (Tiefe 7)");
     TEST_ASSERT_EQUAL_INT_MESSAGE(bp.refuseThreshold(), qrt_at_depth,
         "QRT weiterhin exakt an der 80-%-Schwelle, wie im Feldlog 15:43:25");
     // Ein frisch belegter Ring darf NICHT vorzeitig schliessen: Tiefe ist
