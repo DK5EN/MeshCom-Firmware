@@ -285,6 +285,52 @@ static void test_nack_compose_out_nullptr(void)
     TEST_ASSERT_EQUAL_UINT(0, len);
 }
 
+// M2: der erste Cut-Punkt (BP_NACK_TEXT_MAX=120) landet mitten in einem Lauf
+// verirrter UTF-8-Folgebytes (0x80, nie ein gueltiges Lead-Byte). Die alte
+// handgeschriebene Rueckwaertsschleife lief von diesem Punkt aus ueber JEDES
+// Folgebyte zurueck und landete, weil hier ALLE Bytes 0..119 Folgebytes sind,
+// bei take=0 -- der komplette Text ging verloren. charset_utf8_safe_truncate()
+// (M2-Fix) laeuft stattdessen VORWAERTS und behandelt jedes verirrte
+// Folgebyte als eigene 1-Byte-Einheit (wie charset_filter_apply()'s
+// Resync-Regel) -- der Text bleibt bis zur Kappungsgrenze erhalten.
+// fails-before (M2): der alte Code liefert hier einen leeren Text.
+static void test_nack_compose_verirrte_folgebytes_verlieren_text_nicht(void)
+{
+    char text[BP_NACK_TEXT_MAX + 11];
+    memset(text, (char)0x80, BP_NACK_TEXT_MAX + 5);   // durchgehend Folgebytes
+    memset(text + BP_NACK_TEXT_MAX + 5, 'Z', 5);
+    text[BP_NACK_TEXT_MAX + 10] = '\0';
+
+    char out[16 + BP_NACK_TEXT_MAX + 8];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), text);
+
+    char expect[16 + BP_NACK_TEXT_MAX + 8];
+    snprintf(expect, sizeof(expect), "%s", bpNackPrefix(BP_NACK_QRT));
+    size_t p = strlen(expect);
+    memset(expect + p, (char)0x80, BP_NACK_TEXT_MAX);
+    strcpy(expect + p + BP_NACK_TEXT_MAX, "...");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(expect, out,
+        "ein Lauf verirrter Folgebytes darf den Text nicht komplett loeschen");
+    TEST_ASSERT_EQUAL_UINT(strlen(expect), len);
+}
+
+// M3: kurzer, unter BP_NACK_TEXT_MAX liegender Text, aber out_len ist so
+// klein, dass der room-Clamp (nicht die 120-Byte-Regel) den Schnitt erzwingt.
+// Der alte Code entschied "truncated" VOR dem room-Clamp -- text_len(11) >
+// BP_NACK_TEXT_MAX(120) ist falsch, also blieb "..." aus, obwohl Text
+// verloren ging. fails-before (M3): der alte Code liefert "...Hello" ohne
+// Ellipse (5 Byte Text, room voll ausgenutzt), der neue raeumt bewusst Platz
+// fuer die Ellipse frei.
+static void test_nack_compose_kleiner_out_len_erzwingt_ellipse(void)
+{
+    char out[21];   // Praefix (15) + 5 Byte room: "He" + "..." passt exakt
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_QRT), "Hello World");
+
+    TEST_ASSERT_EQUAL_STRING("QRT NOT SENT - He...", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -305,5 +351,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_nack_compose_out_len_eins);
     RUN_TEST(test_nack_compose_out_len_kleiner_als_praefix);
     RUN_TEST(test_nack_compose_out_nullptr);
+    RUN_TEST(test_nack_compose_verirrte_folgebytes_verlieren_text_nicht);
+    RUN_TEST(test_nack_compose_kleiner_out_len_erzwingt_ellipse);
     return UNITY_END();
 }

@@ -1805,13 +1805,19 @@ static void lora_mode_send()
     int bp_rc = sendMessage(sendtxt, len);
     setMsgOrigin(ORIGIN_NONE);
 
-    // BP-09: only leave the send screen once the message actually went out.
-    // This screen never clears dm_keypad/input_keypad on send to begin with
-    // (unlike the T-Deck's text_input), so on REFUSED/DROPPED/INVALID the
-    // operator simply stays put with their typed text still in the field
-    // and can retry after the QRV instead of losing the attempt.
-    if(bp_rc == BP_SEND_OK)
-        scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen
+    // BP-07/BP-09 interaction: TDeck_pro_lora_disp() (called from the
+    // ORIGIN_GUI arm of bpEmitNotice()/bpDeliver() for a refusal, same as for
+    // a normal receive) writes its "QRT/QTA NOT SENT" receipt into
+    // lora_lab_buf, which lives on SCREEN1_1_ID -- the exact screen this
+    // switch used to be gated away from. Gating it on BP_SEND_OK left a
+    // refused send with no visible feedback: the operator stays on the send
+    // screen (SCREEN7_ID) and the receipt is written to a screen they never
+    // navigate to. So the switch must stay unconditional. This screen never
+    // clears dm_keypad/input_keypad on send to begin with (unlike the
+    // T-Deck's text_input), so no separate gating is needed to preserve the
+    // typed text on REFUSED/DROPPED/INVALID -- it simply stays in the field
+    // and the operator can retry after the QRV.
+    scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen
 }
 
 static void lora_mode_send_event(lv_event_t * e)

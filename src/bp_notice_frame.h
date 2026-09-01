@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <aprs_functions.h>
+#include <charset_filter.h>
 
 // BP-01: the notice frame for the phone app / web GUI, filled here rather
 // than inline in bpNoticeToPhone() (loop_functions.cpp) so the framing is
@@ -58,13 +59,18 @@ static inline void bpNoticeFillFrame(struct aprsMessage &aprsmsg,
 //  1. Never cuts mid UTF-8 sequence. text arrives already decoded (after the
 //     %-escape loop in sendMessage()), so umlauts and emoji are real
 //     multi-byte sequences; truncating at a fixed byte count can land inside
-//     one. Fix: once the BP_NACK_TEXT_MAX-byte cut point is chosen, back up
-//     over UTF-8 continuation bytes (10xxxxxx, 0x80..0xBF) until a lead byte
-//     or plain ASCII byte is reached.
+//     one. Fix (M2): charset_utf8_safe_truncate() (charset_filter.h) walks
+//     FORWARD off whole lead-byte sequences to find the cut point. An
+//     earlier hand-rolled version walked BACKWARD from the cut point over
+//     continuation bytes (10xxxxxx, 0x80..0xBF) instead -- on a run of stray
+//     continuation bytes (never a valid lead, so the loop never found one to
+//     stop at) that walked all the way to 0 and dropped the whole text.
 //  2. Replaces '"', '\' and every byte < 0x20 with a space. The EXTUDP path
 //     embeds this text in JSON; without this rule a text full of quotes
 //     could double in length when ArduinoJson escapes it and blow the
 //     datagram buffer. This keeps the byte count 1:1 through serialization.
+//     Unrelated to rule 1 (JSON escaping, not UTF-8 validity) and applied
+//     after the cut, to the bytes that survive it.
 //
 // out_len-safe: writes at most out_len-1 bytes plus a NUL, even if out_len is
 // smaller than the prefix (defensive only -- every real caller sizes its
@@ -94,33 +100,44 @@ static inline size_t bpNackCompose(char *out, size_t out_len,
     size_t written = prefix_len;
     room -= prefix_len;
 
-    // 2) Text, truncated to BP_NACK_TEXT_MAX bytes (rule 1's boundary is
-    // applied once, below, after every clamp has already picked the final
-    // cut point -- reapplying it after a later clamp would be wrong, since a
-    // second clamp could itself land back inside a multi-byte sequence).
+    // 2) Text: BP_NACK_TEXT_MAX is the length budget, room (whatever the
+    // caller's buffer has left after the prefix -- see out_len-safe above)
+    // is the harder limit in a pathologically small out_len. The smaller of
+    // the two is the tentative cut point.
     size_t text_len = strlen(text);
-    bool truncated = text_len > BP_NACK_TEXT_MAX;
-    size_t take = truncated ? BP_NACK_TEXT_MAX : text_len;
+    size_t cap = (text_len > BP_NACK_TEXT_MAX) ? BP_NACK_TEXT_MAX : text_len;
+    if(cap > room)
+        cap = room;
 
-    // The caller's buffer is the harder limit in a pathologically small
-    // out_len (test-only case, see out_len-safe above) -- clamp take (and
-    // drop the "..." first, then the text) to whatever room is left.
-    size_t suffix_len = truncated ? 3 : 0;   // "..."
-    if(take + suffix_len > room)
+    // M2: forward, UTF-8-safe cut at that tentative point -- see the rule 1
+    // comment above for why this replaced the old backward walk.
+    size_t take = charset_utf8_safe_truncate(text, text_len, cap);
+
+    // M3: decide whether the text was actually cut -- and therefore needs an
+    // ellipsis -- only now, against the FINAL take, after both the
+    // BP_NACK_TEXT_MAX budget and the room clamp have had their say. Basing
+    // this on text_len > BP_NACK_TEXT_MAX alone (the old bug) missed a cut
+    // forced purely by a small out_len: room shortened take, but truncated
+    // stayed false, so "..." never got appended even though bytes were lost.
+    bool truncated = take < text_len;
+    size_t suffix_len = 0;
+    if(truncated)
     {
-        if(room <= suffix_len)
+        if(room >= take + 3)
         {
-            take = 0;
-            suffix_len = (room >= 3) ? 3 : 0;
+            suffix_len = 3;
         }
-        else
+        else if(room >= 3)
         {
-            take = room - suffix_len;
+            // Room for "..." but not for take bytes AND "..." together --
+            // shrink take (back onto a UTF-8 boundary again, not a raw byte
+            // cut) rather than silently drop the ellipsis.
+            take = charset_utf8_safe_truncate(text, text_len, room - 3);
+            suffix_len = 3;
         }
+        // else: room < 3, no space even for "..." alone -- take already
+        // fits room from the cap clamp above, the ellipsis just stays off.
     }
-
-    while(take > 0 && ((unsigned char)text[take] & 0xC0) == 0x80)
-        take--;
 
     for(size_t i = 0; i < take; i++)
     {

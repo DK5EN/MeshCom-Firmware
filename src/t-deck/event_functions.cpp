@@ -717,17 +717,21 @@ void btn_event_handler_send(lv_event_t * e)
         int bp_rc = sendMessage(message_text, iml);
         setMsgOrigin(ORIGIN_NONE);
 
-        // BP-09: only clear the typed text (and switch back to the message
-        // tab) once it actually went out. On REFUSED/DROPPED/INVALID it
-        // stays in the field so the operator can resend after the QRV
-        // instead of retyping. The DM callsign field is left alone either
-        // way -- it names the target, not the attempt, and the operator may
-        // want to keep sending to the same station.
+        // BP-07/BP-09 interaction: a refusal writes its "QRT/QTA NOT SENT"
+        // receipt as a system bubble on the message tab (tdeck_add_system_message()
+        // -> msg_focus_and_alert(false), which never switches tabs on its own --
+        // see lv_obj_functions.cpp). So the tab switch below must stay
+        // unconditional, or a refused send is silently invisible to the
+        // operator. Only the typed-text clear is gated on BP_SEND_OK: on
+        // REFUSED/DROPPED/INVALID the text stays in the field so the operator
+        // can resend after the QRV instead of retyping. The DM callsign field
+        // is left alone either way -- it names the target, not the attempt,
+        // and the operator may want to keep sending to the same station.
         if(bp_rc == BP_SEND_OK)
         {
             lv_textarea_set_text(text_input, "");
-            lv_tabview_set_act(tv, 0, LV_ANIM_ON);
         }
+        lv_tabview_set_act(tv, 0, LV_ANIM_ON);
     }
     else if(code == LV_EVENT_VALUE_CHANGED)
     {

@@ -3410,6 +3410,14 @@ uint32_t bpNextMsgId(void)
     uint32_t id = millis();
     if(id <= bp_last_msg_id)
         id = bp_last_msg_id + 1;
+
+    // M8: id == 0 happens exactly once per ~49.7-day millis() rollover --
+    // bp_last_msg_id == 0xFFFFFFFF, the +1 above wraps to 0. checkOwnTx()
+    // (this file) treats msg_id == 0 as "no id" / never matches, so a BP
+    // frame with id 0 would silently fail its own-tx bookkeeping. Skip it.
+    if(id == 0)
+        id = 1;
+
     bp_last_msg_id = id;
     return id;
 }
@@ -3528,24 +3536,56 @@ static void bpEmitNack(BpNack n, MsgOrigin origin, const char *dst, const char *
     if(n == BP_NACK_NONE)
         return;
 
+    // E2: framed exactly like the episode notices (msg_app_offline, msg_id
+    // via bpNextMsgId(), never a real one -- BP-01 refuses on purpose to
+    // consume none for a message that never went out).
+    //
+    // H3: composed BEFORE the [BP];nack; marker below and logged instead of
+    // the raw msg_text. msg_text is operator content, unsanitized -- a real
+    // LF in it (e.g. EXTUDP {"msg":"a\nb"}) used to split the marker line in
+    // two and could forge a bogus [MC-DBG] marker inside it, misleading
+    // tools/serial_monitor.py and tools/loganalyse.sh. body has already been
+    // through bpNackCompose()'s control-byte-to-space rule (rule 2 in
+    // bp_notice_frame.h), so it cannot contain a raw LF or any other
+    // control byte.
+    // M1: on nRF52 the loop stack is 4 KB and this sits on the
+    // getExtern -> sendMessage path N-22 measured at watermark 0 (see the
+    // msg_text_check / msg_buffer comment above in sendMessage()) -- static
+    // moves it to BSS, same pattern as the rest of this file. bpEmitNack()
+    // is loop-context only (called from sendMessage(), never from an ISR or
+    // another task), so a static buffer here is not shared across contexts.
+#if defined(NRF52_SERIES)
+    static char body[16 + BP_NACK_TEXT_MAX + 4];   // prefix (<=15) + text (<=120) + "..." (<=3) + NUL
+#else
+    char body[16 + BP_NACK_TEXT_MAX + 4];
+#endif
+    bpNackCompose(body, sizeof(body), bpNackPrefix(n), msg_text);
+
     // [BP];nack; is its own marker, never [BP];notice; -- the Runbook's BP-01
     // bench assertion greps for "notice;" specifically and must stay valid.
     // E6: the message text is operator content and goes out only with
     // bLORADEBUG on; the rest of the line is unconditional, same as every
-    // other [BP] marker. txt; is last because msg_text can itself contain
+    // other [BP] marker. txt; is last because body can itself contain
     // semicolons -- a left-to-right parser stays intact either way.
     if(bLORADEBUG)
         Serial.printf("[BP];nack;%s;dst;%s;ms;%lu;txt;%s\n",
-                      bpNackCode(n), dst, (unsigned long)millis(), msg_text);
+                      bpNackCode(n), dst, (unsigned long)millis(), body);
     else
         Serial.printf("[BP];nack;%s;dst;%s;ms;%lu\n",
                       bpNackCode(n), dst, (unsigned long)millis());
 
-    // E2: framed exactly like the episode notices (msg_app_offline, msg_id
-    // via bpNextMsgId(), never a real one -- BP-01 refuses on purpose to
-    // consume none for a message that never went out).
-    char body[16 + BP_NACK_TEXT_MAX + 4];   // prefix (<=15) + text (<=120) + "..." (<=3) + NUL
-    bpNackCompose(body, sizeof(body), bpNackPrefix(n), msg_text);
+    // M4: mirror bpRoute()'s non-QRV latch below -- without this, a sender
+    // refused in the middle of an episode a DIFFERENT transport opened gets
+    // this loss notice but is never remembered for the closing QRV, so it
+    // never hears the all-clear. Same target-resolution and the same
+    // "only touch bp_episode_dst when bp_origin is set" guard as bpRoute()
+    // (its comment explains why: with bp_origin == ORIGIN_NONE the episode
+    // must keep ITS opener's destination, not a future untagged caller's).
+    if(bp_origin != ORIGIN_NONE)
+    {
+        bp_episode_origin = bp_origin;
+        snprintf(bp_episode_dst, sizeof(bp_episode_dst), "%s", bp_origin_dst);
+    }
 
     bpDeliver(body, origin, dst);
 }
@@ -3560,9 +3600,22 @@ static void bpRoute(BpNotice notice)
 
     if(notice == BP_NOTICE_QRV)
     {
-        bpEmitNotice(notice, bp_episode_origin, bp_episode_dst);
+        // M5: capture into locals and reset the globals BEFORE emitting, not
+        // after. bpEmitNotice() -> bpDeliver() can re-enter sendMessage() on
+        // a T-Deck: addMessage() (ORIGIN_GUI) spins lv_task_handler() for up
+        // to 100 ms and can dispatch the on-screen send button from within
+        // that spin, which runs sendMessage() -> bpRoute() again and
+        // freshly latches bp_episode_origin/bp_episode_dst for THAT send.
+        // Resetting the globals only after this outer call returns would
+        // then wipe the nested call's latch right after it set it.
+        MsgOrigin origin = bp_episode_origin;
+        char dst[sizeof(bp_episode_dst)];
+        snprintf(dst, sizeof(dst), "%s", bp_episode_dst);
+
         bp_episode_origin = ORIGIN_NONE;
         snprintf(bp_episode_dst, sizeof(bp_episode_dst), "*");
+
+        bpEmitNotice(notice, origin, dst);
         return;
     }
 
@@ -3775,7 +3828,16 @@ int sendMessage(char *msg_text, int len)
     // upper-cased, trimmed) -- set bp_origin_dst before the refuse check
     // below so a refused message's nack is addressed to the target the
     // sender actually named, not the "*" default.
-    snprintf(bp_origin_dst, sizeof(bp_origin_dst), "%.11s", strDestinationCall.c_str());
+    // M7 / BP-06/2: an empty or whitespace-only {} target (e.g. "{}Hallo",
+    // trim() above already strips the whitespace-only case to "") has
+    // nowhere for a notice to land -- fall back to "*", the deliberate rule
+    // the deleted bpPeekDst() used to enforce, lost when that second-guess
+    // parser was removed (BP-07 comment above). Only bp_origin_dst (the
+    // notice/nack destination) gets this fallback -- strDestinationCall
+    // itself, and therefore the actual outgoing message's destination, is
+    // untouched.
+    snprintf(bp_origin_dst, sizeof(bp_origin_dst), "%.11s",
+             (strDestinationCall.length() == 0) ? "*" : strDestinationCall.c_str());
 
     // BP-01/BP-07: refuse a locally originated user message while the ring
     // sits in the QRT band. Grundentscheidung (bp-l1-l4-impl-plan.md): this
@@ -3885,13 +3947,41 @@ int sendMessage(char *msg_text, int len)
 
     if(w < 0)
     {
-        // Symmetrie (Operatorentscheidung 2026-09-01, E4): was nicht auf HF geht,
-        // geht auch nicht ins Backbone. Kein Echo, kein UDP-Uplink, kein
-        // EXTUDP-Spiegel, keine Eigen-TX-/Dedup-Buchung -- nur die Rueckmeldung
-        // an den Absender. Die Nachricht ist vollstaendig nicht passiert.
-        bpRoute(bp_state.onSend(txRingDepth(), true, millis()));   // Episoden-QTA
-        bpEmitNack(BP_NACK_QTA, bp_origin, bp_origin_dst, strMsg.c_str());
-        return BP_SEND_DROPPED;
+        // H2: addTxRingEntry() returns -1 for three different reasons, only
+        // one of which is back-pressure -- (1) an unconfigured callsign
+        // (txring_functions.cpp:401, TX-01), (2) a length-invariant
+        // violation (len == 0 || len > UDP_TX_BUF_SIZE,
+        // txring_functions.cpp:423), (3) the ring's overflow logic found no
+        // lower-priority entry to evict (genuine back-pressure). Treating
+        // every -1 as (3) forced BP_QRT on an EMPTY ring for a
+        // factory-fresh node (reason 1) and printed "TX buffer full" for a
+        // message that was never even ring-eligible -- a wrong state
+        // transition with a wrong explanation, once per typed message.
+        // Distinguish (3) from (1)/(2) by depth: the ring is only actually
+        // under pressure once txRingDepth() has reached
+        // bp_state.refuseThreshold() (the same threshold onSend() itself
+        // gates its QRT/QRS decision on); (1) and (2) fire regardless of
+        // depth and typically on an empty or low ring.
+        if(txRingDepth() >= bp_state.refuseThreshold())
+        {
+            // Symmetrie (Operatorentscheidung 2026-09-01, E4): was nicht auf HF geht,
+            // geht auch nicht ins Backbone. Kein Echo, kein UDP-Uplink, kein
+            // EXTUDP-Spiegel, keine Eigen-TX-/Dedup-Buchung -- nur die Rueckmeldung
+            // an den Absender. Die Nachricht ist vollstaendig nicht passiert.
+            bpRoute(bp_state.onSend(txRingDepth(), true, millis()));   // Episoden-QTA
+            bpEmitNack(BP_NACK_QTA, bp_origin, bp_origin_dst, strMsg.c_str());
+            return BP_SEND_DROPPED;
+        }
+
+        // Reason (1) or (2): the ring is not under pressure, so this is not
+        // a back-pressure event -- no bp_state.onSend() call (no state
+        // transition), no nack (nothing to apologize for congestion-wise).
+        // Own marker, distinct from [BP];refuse;/[BP];nack;, so the
+        // bench/console can still tell "operator typed something the ring
+        // can never accept" apart from a real refuse/drop cycle.
+        Serial.printf("[BP];invalid;depth;%d;max;%d;ms;%lu\n",
+                      txRingDepth(), (int)MAX_RING, (unsigned long)millis());
+        return BP_SEND_INVALID;
     }
 
     // An APP als Anzeige retour senden

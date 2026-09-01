@@ -2178,10 +2178,10 @@ void send_message(String web_header)
 
         // BP-09: default outcome string, overridden below by the actual
         // sendMessage() result. The page's own sendMessage() JS (further
-        // below) fires the request and clears both input fields immediately
-        // without reading the response body, so this string currently has
-        // no consumer on the stock page -- it is here for any client (or
-        // future JS) that does look at it.
+        // below, search for "onreadystatechange") tests this response for
+        // "sendmessage ok" and only clears the input fields on a match, so
+        // a refused or dropped message leaves the operator's text on screen.
+        // Keep the four strings and that test in sync.
         const char *bp_result_text = "sendmessage ok";
 
         if (message.length() > 0)
