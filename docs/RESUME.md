@@ -29,7 +29,7 @@ plus 5 medium fixes; full detail in `docs/BACKLOG.md` (BP-07..BP-10 rows) and
 
 **L5 (a machine-readable marker instead of the text-prefix convention) is
 explicitly out of scope** and stays open — it needs a protocol change and
-app-side coordination (`docs/backpressure-flow-control.md` chapter 10).
+app-side coordination (`docs/backpressure-protocol.md` chapter 5).
 
 **Verified:** 530 native test cases across 11 host environments, and clean
 builds of all six affected boards (heltec_v3, wiscore_rak4631, ttgo_tbeam,

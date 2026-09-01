@@ -1,3 +1,12 @@
+> **ARCHIVIERT 2026-09-01.** Dieses Dokument ist die Entstehungsgeschichte:
+> Befundaufnahme (Luecken L1-L5), der durchgespielte 13-in-10-Flood und die
+> Planungsstaende. Es beschreibt teilweise Zustaende, die es nicht mehr gibt.
+>
+> **Der gueltige Stand steht in [`docs/backpressure-protocol.md`](../backpressure-protocol.md)**
+> — mit den gemessenen Werten aus dem Benchlauf statt der hier gerechneten Beispiele.
+> Einzig L5 (kein maschinenlesbares Merkmal) ist weiterhin offen und dort in Kapitel 5
+> als Vorschlag ausgearbeitet.
+
 # Rueckstau-Meldungen (BP-01 / Q-Codes) — Referenz fuer Nutzende und App-Entwicklung
 
 Stand: 2026-09-01, Firmware v4.35p.08.31.4-stability

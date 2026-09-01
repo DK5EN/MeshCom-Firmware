@@ -78,7 +78,7 @@ discover them by surprise:
 ## New since v4.35p.08.31.4-stability (not yet released)
 
 Four commits on `tdeck-partial-refresh-trace`, each advisor-gated (Fable),
-closing gaps L1-L4 from `docs/backpressure-flow-control.md` chapter 8: a
+closing gaps L1-L4 from `docs/backpressure-protocol.md` (gaps recorded in `docs/archive/backpressure-flow-control-20260901.md` chapter 8): a
 refused or dropped message now gets an app-visible receipt with its own text,
 and the text the operator typed survives a refusal on all three GUIs instead
 of vanishing. `FLASH_VERSION` stays `20260831`; native suite now 530 test
