@@ -3855,49 +3855,6 @@ void sendMessage(char *msg_text, int len)
         printfdeb("");
     }
 
-    // An APP als Anzeige retour senden
-    if(hasMsgFromPhone)
-    {
-        addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
-
-        if(bGATEWAY && meshcom_settings.node_hasIPaddress)
-        {
-            // set Info message send and Server reached, not on DM
-            if(!bDM && (aprsmsg.msg_destination_call == "*" || CheckGroup(strDestinationCall)))
-            {
-                uint8_t print_buff[8];
-
-                print_buff[0]=0x41;
-                print_buff[1]=aprsmsg.msg_id & 0xFF;
-                print_buff[2]=(aprsmsg.msg_id >> 8) & 0xFF;
-                print_buff[3]=(aprsmsg.msg_id >> 16) & 0xFF;
-                print_buff[4]=(aprsmsg.msg_id >> 24) & 0xFF;
-                print_buff[5]=0x01;     // 0x01 ... server reached
-                print_buff[6]=0x00;     // msg always 0x00 at the end
-                
-                addBLEOutBuffer(print_buff, (uint16_t)7);
-            }
-        }
-
-    }
-
-    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-    tdeck_add_MSG(aprsmsg, false);
-    #endif
-    
-    #if defined(BOARD_T_DECK_PRO)
-    String strCall="<"+aprsmsg.msg_source_call+"> "+aprsmsg.msg_destination_call;
-    TDeck_pro_lora_disp(strCall, aprsmsg.msg_payload);
-    #endif
-
-    // store last message to compare later on
-    insertOwnTx(aprsmsg.msg_id);
-
-    if(bGATEWAY && meshcom_settings.node_hasIPaddress)
-        addLoraRxBuffer(aprsmsg.msg_id, true);
-    else
-        addLoraRxBuffer(aprsmsg.msg_id, false);
-
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
     if (iWrite == iRead) {   // ring full: about to overwrite an unread slot
@@ -3926,11 +3883,64 @@ void sendMessage(char *msg_text, int len)
         printfdeb("einfügen retid:%i status:%02X lng;%02X msg-id: %c-%08X\n", w, ringBuffer[w][1], ringBuffer[w][0], ringBuffer[w][2], ring_msg_id);
     }
 
-    // BP-01: this is the return value sendMessage() used to throw away.
-    // w < 0 means the ring dropped the frame (RING_DROP_NEW) -- the message is
-    // gone and the sender has to be told (QTA). Otherwise the new depth
-    // decides between silence, QRS and QRT.
-    bpRoute(bp_state.onSend(txRingDepth(), w < 0, millis()));
+    if(w < 0)
+    {
+        // Symmetrie (Operatorentscheidung 2026-09-01, E4): was nicht auf HF geht,
+        // geht auch nicht ins Backbone. Kein Echo, kein UDP-Uplink, kein
+        // EXTUDP-Spiegel, keine Eigen-TX-/Dedup-Buchung -- nur die Rueckmeldung
+        // an den Absender. Die Nachricht ist vollstaendig nicht passiert.
+        bpRoute(bp_state.onSend(txRingDepth(), true, millis()));   // Episoden-QTA
+        bpEmitNack(BP_NACK_QTA, bp_origin, bp_origin_dst, strMsg.c_str());
+        return;   // Welle 3 (BP-09) macht daraus BP_SEND_DROPPED
+    }
+
+    // An APP als Anzeige retour senden
+    if(hasMsgFromPhone)
+    {
+        addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
+
+        if(bGATEWAY && meshcom_settings.node_hasIPaddress)
+        {
+            // set Info message send and Server reached, not on DM
+            if(!bDM && (aprsmsg.msg_destination_call == "*" || CheckGroup(strDestinationCall)))
+            {
+                uint8_t print_buff[8];
+
+                print_buff[0]=0x41;
+                print_buff[1]=aprsmsg.msg_id & 0xFF;
+                print_buff[2]=(aprsmsg.msg_id >> 8) & 0xFF;
+                print_buff[3]=(aprsmsg.msg_id >> 16) & 0xFF;
+                print_buff[4]=(aprsmsg.msg_id >> 24) & 0xFF;
+                print_buff[5]=0x01;     // 0x01 ... server reached
+                print_buff[6]=0x00;     // msg always 0x00 at the end
+
+                addBLEOutBuffer(print_buff, (uint16_t)7);
+            }
+        }
+
+    }
+
+    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    tdeck_add_MSG(aprsmsg, false);
+    #endif
+
+    #if defined(BOARD_T_DECK_PRO)
+    String strCall="<"+aprsmsg.msg_source_call+"> "+aprsmsg.msg_destination_call;
+    TDeck_pro_lora_disp(strCall, aprsmsg.msg_payload);
+    #endif
+
+    // store last message to compare later on
+    insertOwnTx(aprsmsg.msg_id);
+
+    if(bGATEWAY && meshcom_settings.node_hasIPaddress)
+        addLoraRxBuffer(aprsmsg.msg_id, true);
+    else
+        addLoraRxBuffer(aprsmsg.msg_id, false);
+
+    // BP-01/BP-08: the ring accepted the frame above (w < 0 already returned
+    // early), so this call always signals success -- the new depth after
+    // enqueuing decides between silence, QRS and QRT.
+    bpRoute(bp_state.onSend(txRingDepth(), false, millis()));
 
     /*
     iWrite++;
