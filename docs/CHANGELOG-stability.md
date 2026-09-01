@@ -1,8 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.08.31-stability` (2026-08-31), based on official MeshCom
+Release: `v4.35p.09.01-stability` (2026-09-01), based on official MeshCom
 4.35p, upstream `dev` at `2cb6bb4d` — the state **after** upstream merged this
-fork's changes, plus items 104-152 below. The full engineering rationale for
+fork's changes, plus items 104-166 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -75,188 +75,15 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## New since v4.35p.08.31.4-stability (not yet released)
+## New in v4.35p.09.01-stability
 
-Four commits on `tdeck-partial-refresh-trace`, each advisor-gated (Fable),
-closing gaps L1-L4 from `docs/backpressure-protocol.md` (gaps recorded in `docs/archive/backpressure-flow-control-20260901.md` chapter 8): a
-refused or dropped message now gets an app-visible receipt with its own text,
-and the text the operator typed survives a refusal on all three GUIs instead
-of vanishing. `FLASH_VERSION` stays `20260831`; native suite now 530 test
-cases across 11 host environments. Not yet tagged as a release.
-
-163. **A refused or dropped message finally gets an app-visible receipt with
-     its own text** (BP-07, closes L1 and L2). Root cause of L1: `onRefuse()`
-     called `latchIfHigher(BP_NOTICE_QRT)`, but `refusing()` is only ever
-     true once the state machine has already latched to QRT or QTA — so the
-     call provably always returned `BP_NOTICE_NONE`, and
-     `test_refusal_announces_once_per_episode` had stayed green because the
-     notice it counted came from the prior `onSend()`, not from any of the
-     twenty `onRefuse()` calls the test actually exercised. L2 was worse: a
-     message the ring dropped _after_ acceptance got no notice at all, ever.
-     Fix: a new, deliberately never-latched vocabulary (`BpNack`) separate
-     from the latched episode `BpNotice`, one frame per lost message —
-     `QRT NOT SENT - <text>` / `QTA NOT SENT - <text>` — truncated to 120
-     bytes on a UTF-8 codepoint boundary with quotes, backslashes and control
-     bytes sanitised before JSON escaping (unsanitised, a text full of quotes
-     could double in size on EXTUDP escaping and overflow the datagram). The
-     refusal check itself moved to run _after_ the message is decoded and the
-     `{ZIEL}` destination prefix is stripped, so the receipt can finally carry
-     the real typed text instead of a raw, still-percent-encoded fragment;
-     this deleted the ~60-line `bpPeekDst()` second-parser that existed only
-     because the check used to run too early, and — an intended side effect —
-     moved invalid-length and DM-to-self rejection ahead of the backpressure
-     check, since "TX buffer full" was never the right reason for a malformed
-     message. Every backpressure frame now draws its `msg_id` from a shared
-     monotonic counter instead of raw `millis()`, because the drop path emits
-     two frames from one `sendMessage()` call that would otherwise collide on
-     the same millisecond and lose one to the app's dedup filter. The console
-     marker's message-text field is gated on `bLORADEBUG`, keeping user
-     content out of the always-on multi-day 2323 log capture. New
-     integration case `test_flood_13_into_10_yields_five_nacks`: 13 sends
-     into a 10-slot ring, 8 accepted, 5 refused, 5 receipts — 0 receipts
-     before this fix.
-
-164. **A message the TX ring drops no longer echoes as sent, and a dropped
-     frame no longer reaches the backbone either** (BP-08, closes L3). The
-     app echo for a locally typed message used to go out _before_
-     `addTxRingEntry()` was even asked — a message the ring then discarded
-     looked successfully sent in the chat, and the drop notice arrived
-     afterward as an unrelated, unlinked line; on a gateway, the "server
-     reached" status frame even went out for a message that never left the
-     node. The ring write now runs first; on a drop the function returns
-     before the echo, before `insertOwnTx()`/`addLoraRxBuffer()`, and —
-     operator decision, bigger than the L3 fix itself — before the gateway's
-     UDP uplink to the central server. Previously that uplink ran
-     independently of the ring outcome: a message the ring discarded still
-     reached the server without a single RF neighbour ever hearing it, and
-     nobody was told about the asymmetry. A message now enters the network
-     whole or not at all; the sender gets `QTA NOT SENT - <text>` and knows
-     to retry. Concurrency reviewed: `doTX()` and `sendMessage()` both run
-     only from the main loop on both platforms, so there is no interleaving
-     window between the ring write and the buffered bookkeeping it now
-     precedes.
-165. **`sendMessage()` returns a result instead of `void`, so the operator's
-     typed text survives a refusal** (BP-09, closes L4). The T-Deck cleared
-     its input field and switched to the message list unconditionally after
-     every send call; on a refusal, the typed text was gone from both the
-     field and the list, with nothing to show for it. `BpSendResult` (0
-     accepted, -1 refused, -2 dropped, -3 invalid) now comes back from all
-     four `sendMessage()` signatures; the T-Deck, T-Deck Pro, and the web API
-     act on it — the first two clear their input only on success, the web API
-     answers `sendmessage refused`/`dropped`/`invalid` instead of a blanket
-     `ok`. Found beyond the original plan while implementing it: the web
-     GUI's own JavaScript cleared both input fields immediately after
-     `xhttp.send()`, without ever reading the response — the identical text
-     loss one layer up the stack, on a third surface. Clearing now waits for
-     `onreadystatechange` and only fires on `sendmessage ok`.
-166. **Independent advisor round finds and fixes three real regressions in
-     the three waves below** (BP-10). Seven finders on the `458af2b1..4f97f7f0`
-     diff, every finding re-verified by the orchestrator at the source.
-     BP-09's `BP_SEND_OK` gating had hidden the BP-07 receipt on both T-Decks
-     entirely — the tab switch never happened, so a refused message gave
-     zero visible feedback, worse than before BP-07 shipped; the tab switch
-     is unconditional again, only the input-field clear stays gated.
-     `addTxRingEntry()`'s single -1 return code had been read as backpressure
-     for all three of its causes, so a factory-fresh node forced a false QRT
-     cycle on an _empty_ ring for every typed message; the drop branch now
-     checks ring depth against the refuse threshold before deciding it was
-     backpressure at all. The `[BP];nack;` marker had been logging the raw
-     message text instead of the sanitised one, so an embedded LF could break
-     the console line that `tools/serial_monitor.py`/`loganalyse.sh` parse.
-     Five medium fixes rode along: a 140-byte buffer moved off the 4 KB nRF52
-     loop stack, the hand-rolled UTF-8 truncation was replaced with the
-     existing `charset_utf8_safe_truncate()` helper (the hand-rolled one could
-     delete an entire text on stray continuation bytes), the ellipsis
-     decision moved after the buffer clamp, a nack now respects the episode
-     latch so a QRV reaches everyone who was told about the loss, a
-     re-entrancy window in `bp_episode_origin` was closed, the `bpPeekDst`
-     empty-`{}` → `*` destination rule (lost when BP-07 deleted `bpPeekDst`)
-     was restored, and a 49.7-day `msg_id` rollover edge was closed. Most of
-     these are not natively testable — `loop_functions.cpp` is in no native
-     `build_src_filter` — so the bench run remains the only end-to-end proof.
-     Native suite 530 cases (from 528).
-
-## New in v4.35p.08.31.4-stability
-
-Fourth cut of the 2026-08-31 release: the back-pressure notice policy,
-recalibrated against a real gateway baseline, and notices that land in the
-conversation the sender is actually typing in. Both waves advisor-gated
-(Fable). `FLASH_VERSION` stays `20260831`; native suite now 480 test cases
-across the same 12 host environments.
-
-161. **QRS fires at depth 5 (fixed across all boards), QRV only after a
-     refusal** (BP-05). A 5.5-minute normal-operation capture on the live
-     gateway showed the ring baseline sitting at depth 1–4 (mode 2) with
-     three false QRS/QRV pairs and no burst anywhere — the old QRS rule
-     (depth > 1) sat directly on that baseline, so every single message
-     triggered "slow down". QRS now needs depth ≥ 5 (flat on every ring
-     size, defensively clamped below the QRT threshold), the 2–4 band is
-     silent, and QRV is only sent when the episode actually refused (QRT)
-     or dropped (QTA) a message — a QRS-only episode closes silently. The
-     recorded baseline traffic pattern is pinned as a regression test.
-162. **Back-pressure notices are addressed to the conversation that
-     triggered them** (BP-06). A notice for a message into group 20 arrives
-     as a message to `20` and shows up in that group's chat; for a DM it
-     arrives in that DM thread — visible only to the sender, since notice
-     frames stay `msg_app_offline` (BLE) / app-only UDP datagrams and never
-     go on air. The refuse path, which rejects before parsing, uses a pure
-     destination peek (`bpPeekDst`, parity with the `iCall<11` extraction
-     including whitespace trim; 11 edge cases pinned natively). Serial and
-     the T-Deck GUI stay plain text.
-
-## New in v4.35p.08.31.3-stability
-
-Third cut of the 2026-08-31 release, superseding `v4.35p.08.31.2-stability`:
-the three back-pressure RCA fixes from the DJ8MEH field incident (an 8-minute
-refusal episode on a phantom queue depth), plus an integrated regression
-suite. Every fix was implemented in an advisor-gated wave (independent Fable
-review per wave; plan and verdicts archived in
-`docs/archive/bp-rca-fixes-*.md`). `FLASH_VERSION` stays `20260831`; native
-suite now 459 test cases across the same 12 host environments.
-
-157. **TX-ring depth counts occupied slots, not index distance** (BP-02).
-     `txRingDepth()` and every report site (`RING_WRITE`, `RING_STATUS`,
-     `TX_GATE_ENTER`, `TX_START`, `RING_TX_READ`) previously used
-     `iWrite - iRead`, which counted freed holes behind a priority-starved
-     entry parked at the read pointer as still queued — the DJ8MEH log
-     showed `queued=19` with 3–4 slots really occupied, and the QRT episode
-     ran 8 minutes on that phantom number. `RING_STATUS` additionally
-     carries the old distance as a new trailing `dist=` field, and the
-     RING_ZOMBIE detectors in `tools/serial_monitor.py` and
-     `tools/loganalyse.sh` now key on `dist==0` (falling back to `queued==0`
-     for pre-BP-02 logs).
-158. **Stale BACKGROUND entries age out of the TX ring** (BP-03). A 2-second
-     main-loop sweep (`txRingAgeBackground()`) drops HEY entries (priority 5) older than `RING_BG_MAX_AGE_MS` (3 min) with a `RING_DROP_STALE`
-     marker and advances the read pointer. The DJ8MEH blocker — a starved
-     HEY relay pinned at the read pointer — sat for 10 minutes and only left
-     via a chance priority eviction. Deliberately not in `getNextTxSlot()`,
-     which also runs on the nRF52 timer task; on nRF52 each slot's
-     check-and-drop is atomic under the ring lock (the overflow evictor
-     relocates entries), external-radio EXT_PENDING slots are exempt, and
-     the age math survives the 49.7-day `millis()` rollover.
-159. **A QRT episode closes in the water band, not only at depth 0**
-     (BP-04). Depth 0 still closes immediately; depth 1 now closes after a
-     10-second uninterrupted hold (explicit armed flag, no magic-zero
-     sentinel; time injected so the state machine stays host-testable). A
-     relay node with steady background traffic rarely reaches exactly 0 and
-     previously kept refusing user messages long after the real backlog had
-     drained. The 2026-08-30 anti-flap case (depth 2 → 1 → 2 inside 400 ms)
-     is pinned as a regression test.
-160. **Integrated DJ8MEH regression suite** (`test_bp_regression`,
-     native_aprs). Replays the field incident end-to-end over the real ring
-     plus the real back-pressure state machine: burst → one QRS/one QRT →
-     refusals → drain with a pinned prio-5 blocker → QRV within 10 s (field:
-     8 min), the blocker age-out path, and an over-correction guard proving
-     QRT still fires at the 80 % threshold. Each of the three fixes was
-     mutation-verified to turn the suite red on its own.
-
-## New in v4.35p.08.31.2-stability
-
-Second cut of the 2026-08-31 release, superseding `v4.35p.08.31-stability` the
-same day: the OTA-tooling wave (TM-46/47/48) and the back-pressure notice
-reframing (BP-01), on top of everything below. `FLASH_VERSION` stays
-`20260831`; native suite now 445 test cases across the same 12 host
-environments.
+Everything since `v4.35p.08.31-stability`, in its final form: the complete TX
+back-pressure and receipt system (BP-01 through BP-10 — described here as it
+now stands, not as it grew), the OTA-tooling wave (TM-46/47/48), a meshlogger
+hardening from a real overnight incident (TM-50), and the removal of two
+repairs whose upstream feature no longer exists. `FLASH_VERSION` is
+`20260901`; native suite 485 test cases across 12 host environments;
+bench-verified on Heltec V3, T-Beam v1.2, T-Deck Plus and RAK4631.
 
 153. **Safeboot recovers from an aborted OTA upload** (TM-46). A central
      `abortActiveUpdate()` with an onDisconnect hook and a session generation
@@ -274,16 +101,153 @@ environments.
      (TM-47): hardware strings keep the `+` (expects `TDECK+`), a
      safeboot-resume path picks up a node already sitting in safeboot, and
      `--self-test` runs the parser checks offline.
-156. **Back-pressure notices arrive as normal messages from the node's own
-     callsign** (BP-01 follow-up). The BLE/web frame now carries the node
-     call as sender instead of the pseudo-sender `response` (which McApp
-     files under its spam class, group 9999); the EXTUDP datagram is now
-     shaped exactly like a text message received over LoRa (`src_type`
-     `lora`, `type` `msg`, numeric firmware version) instead of a distinct
-     `notice` type no client rendered. Both framings are extracted into
-     testable headers and pinned by two new native suites
-     (`test_bp_notice_frame`, `test_extern_notice_json`), verified
-     fails-before against both old framings.
+
+### The TX back-pressure and receipt system (BP-01 through BP-10)
+
+A node that cannot send tells the sender — honestly, in the right
+conversation, with the text that was lost. The system stands on an honest
+queue measurement, calibrated thresholds, and per-message receipts; it was
+built against two field incidents (the DJ8MEH 8-minute phantom refusal and a
+live-gateway baseline capture) and is pinned by integrated regression suites.
+
+156. **TX-ring depth counts occupied slots, not index distance** (BP-02).
+     `txRingDepth()` and every report site (`RING_WRITE`, `RING_STATUS`,
+     `TX_GATE_ENTER`, `TX_START`, `RING_TX_READ`) previously used
+     `iWrite - iRead`, which counted freed holes behind a priority-starved
+     entry parked at the read pointer as still queued — the DJ8MEH field log
+     showed `queued=19` with 3–4 slots really occupied, and a refusal
+     episode ran 8 minutes on that phantom number. `RING_STATUS`
+     additionally carries the old distance as a trailing `dist=` field, and
+     the RING_ZOMBIE detectors in `tools/serial_monitor.py` and
+     `tools/loganalyse.sh` key on `dist==0` (falling back to `queued==0` for
+     older logs).
+157. **Stale BACKGROUND entries age out of the TX ring** (BP-03). A 2-second
+     main-loop sweep (`txRingAgeBackground()`) drops HEY entries (priority 5) older than `RING_BG_MAX_AGE_MS` (3 min) with a `RING_DROP_STALE`
+     marker and advances the read pointer; the DJ8MEH blocker — a starved
+     HEY relay pinned at the read pointer — sat for 10 minutes and only left
+     via a chance priority eviction. Deliberately not in `getNextTxSlot()`,
+     which also runs on the nRF52 timer task; on nRF52 each slot's
+     check-and-drop is atomic under the ring lock, external-radio
+     EXT_PENDING slots are exempt, and the age math survives the 49.7-day
+     `millis()` rollover. Field-proven in the 2026-09-01 overnight soak: 13
+     stale drops, zero stuck rings.
+158. **A refusal episode ends when the load is really gone — and not
+     before** (BP-04). Depth 0 closes immediately; depth 1 (the water band)
+     closes after a 10-second uninterrupted hold (explicit armed flag, time
+     injected so the state machine stays host-testable). A relay node with
+     steady background traffic rarely reaches exactly 0 and previously kept
+     refusing user messages long after the real backlog had drained. The
+     2026-08-30 anti-flap case (depth 2 → 1 → 2 inside 400 ms) is pinned as
+     a regression test.
+159. **QRS fires at depth 5 (fixed across all boards), QRV only after a
+     refusal** (BP-05). A 5.5-minute normal-operation capture on the live
+     gateway showed the ring baseline sitting at depth 1–4 (mode 2) with
+     three false QRS/QRV pairs and no burst anywhere — the old QRS rule
+     (depth > 1) sat directly on that baseline, so every single message
+     triggered "slow down". QRS now needs depth ≥ 5 (flat on every ring
+     size, defensively clamped below the QRT threshold), the 2–4 band is
+     silent, and QRV is only sent when the episode actually refused (QRT)
+     or dropped (QTA) a message — a QRS-only episode closes silently. The
+     recorded baseline traffic pattern is pinned as a regression test.
+160. **Back-pressure notices are normal messages from the node's own
+     callsign, addressed to the conversation that triggered them** (BP-01,
+     BP-06). The BLE/web frame carries the node call as sender instead of
+     the pseudo-sender `response` (which McApp files under its spam class),
+     and the EXTUDP datagram is shaped exactly like a text message received
+     over LoRa (`src_type` `lora`, `type` `msg`, numeric firmware version)
+     instead of a distinct `notice` type no client rendered. A notice for a
+     message into group 20 arrives as a message to `20` and shows up in
+     that group's chat; for a DM it arrives in that DM thread — visible only
+     to the sender, since notice frames stay `msg_app_offline` (BLE) /
+     app-only UDP datagrams and never go on air. Serial and the T-Deck GUI
+     stay plain text. Both framings are extracted into testable headers and
+     pinned natively (`test_bp_notice_frame`, `test_extern_notice_json`).
+161. **Every refused or dropped message gets an app-visible receipt carrying
+     its own text** (BP-07). A deliberately never-latched per-message
+     vocabulary (`BpNack`), separate from the latched episode notice, sends
+     one frame per lost message — `QRT NOT SENT - <text>` /
+     `QTA NOT SENT - <text>` — truncated to 120 bytes on a UTF-8 codepoint
+     boundary (`charset_utf8_safe_truncate()`) with quotes, backslashes and
+     control bytes sanitised before JSON escaping, because an unsanitised
+     text full of quotes could double in size on EXTUDP escaping and
+     overflow the datagram. The refusal check runs after the message is
+     decoded and the `{ZIEL}` destination prefix is stripped, so the
+     receipt carries the real typed text — this deleted a ~60-line second
+     destination parser and moved invalid-length and DM-to-self rejection
+     ahead of the back-pressure check, since "TX buffer full" was never the
+     right reason for a malformed message. A ring drop is classified as
+     back-pressure only when the depth actually stands at the refuse
+     threshold — a factory-fresh node's drop no longer forces a false QRT
+     episode on an empty ring. Every back-pressure frame draws its `msg_id`
+     from a shared monotonic counter (49.7-day-rollover-safe) instead of
+     raw `millis()`, because the drop path emits two frames in the same
+     millisecond that would otherwise collide in the app's dedup filter; a
+     receipt also latches the episode, so the later all-clear (QRV) reaches
+     everyone who was told about a loss. The console marker logs the
+     sanitised text, gated on `bLORADEBUG`, keeping user content out of the
+     always-on multi-day 2323 log capture.
+162. **A message the TX ring drops no longer echoes as sent, and never
+     reaches the backbone** (BP-08). The app echo for a locally typed
+     message used to go out before the ring was even asked — a message the
+     ring then discarded looked successfully sent in the chat, and on a
+     gateway the UDP uplink to the central server ran independently of the
+     ring outcome: a discarded message still reached the server without a
+     single RF neighbour ever hearing it. The ring write now runs first; on
+     a drop the function returns before the echo, before
+     `insertOwnTx()`/`addLoraRxBuffer()`, and before the gateway uplink. A
+     message enters the network whole or not at all; the sender gets
+     `QTA NOT SENT - <text>` and knows to retry. Concurrency reviewed:
+     `doTX()` and `sendMessage()` both run only from the main loop on both
+     platforms.
+163. **`sendMessage()` returns a result, and the operator's typed text
+     survives a refusal on all three GUIs** (BP-09). `BpSendResult` (0
+     accepted, -1 refused, -2 dropped, -3 invalid) comes back from all four
+     `sendMessage()` signatures. The T-Deck and T-Deck Pro clear their
+     input field only on success while still switching to the message list,
+     so the receipt is visible either way; the web API answers
+     `sendmessage refused`/`dropped`/`invalid` instead of a blanket `ok`,
+     and the web GUI's JavaScript — which cleared both input fields
+     immediately after `xhttp.send()` without ever reading the response,
+     the identical text loss one layer up the stack — now waits for the
+     response and clears only on `sendmessage ok`. A 140-byte frame buffer
+     moved off the 4 KB nRF52 loop-task stack along the way.
+164. **The whole incident class is pinned by integrated regression suites.**
+     `test_bp_regression` (native_aprs) replays the DJ8MEH field incident
+     end-to-end over the real ring plus the real state machine: burst → one
+     QRS/one QRT → refusals → drain with a pinned prio-5 blocker → QRV
+     within 10 s (field: 8 min), the blocker age-out path, and an
+     over-correction guard proving QRT still fires at the 80 % threshold —
+     each ring/state fix mutation-verified to turn the suite red on its
+     own. `test_flood_13_into_10_yields_five_nacks` pins the receipt path:
+     13 sends into a 10-slot ring, 8 accepted, 5 refused, 5 receipts. The
+     gateway baseline capture and the anti-flap case are pinned as
+     regression tests alongside.
+
+### Housekeeping
+
+165. **Two repairs left the tree together with the upstream feature they
+     repaired.** Upstream reverted the extended Mheard JSON — the per-hop
+     `PP` link chain (#1105), `SRC`/`GW` (#1106) and the serializeJson
+     buffer guard (#1107) — and removed the string-typed `FWDATE` from the
+     BLE `I` register entirely; this tree follows both reverts. The
+     PP/DIST fail-soft in `updateMheard()` (item 105) removed a key that no
+     builder sets any more and is gone as dead code, and the `FWDATE`
+     buffer fix (item 102) and re-typing (item 104) are moot — the key no
+     longer exists on either side, the register carries `FWVER` alone. What
+     remains is only what still repairs live code: the HEY input bound
+     (item 106) and the buffer-bounded BLE JSON framing.
+166. **meshlogger detects a zombie TCP session after the target node drops
+     off WLAN** (TM-50). In the 2026-09-01 overnight soak a router reboot
+     killed the node side of the 2323 console session without a FIN; the
+     logger sat 2.4 hours on `recv()` timeouts (reconnects=0) and could not
+     restore the debug flags at the end (broken pipe, `loradebug` stayed
+     on). `tools/meshlogger.py` now runs a silence watchdog
+     (`--stall-timeout`, default 90 s) that lifts a mute connection into
+     the existing reconnect path, sets SO_KEEPALIVE with platform tunables
+     as a second line of defence, re-applies the flags idempotently after
+     every reconnect, and retries the end-restore once on a fresh
+     connection. `tools/bench/test_meshlogger.py` replays the incident
+     against a fake console server, verified fails-before.
 
 ## New in v4.35p.08.31-stability
 

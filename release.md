@@ -1,11 +1,100 @@
 # Release Notes -- MeshCom Firmware v4.35p
 
-Firmware `4.35p`, `FLASH_VERSION 20260831`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35p`, `FLASH_VERSION 20260901`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
 
 ---
+
+## Stability-Release v4.35p.09.01-stability (2026-09-01)
+
+Ersetzt v4.35p.08.31.4-stability (Release-Objekt geloescht, Tag bleibt als
+Marker). `FLASH_VERSION` steigt auf 20260901. Inhalt: der Endstand des
+Backpressure-Themas -- BP-07 bis BP-10 schliessen die Luecken L1-L4, damit
+ist das System komplett und wird ab jetzt als Ganzes berichtet, nicht mehr
+in Zwischenschritten --, dazu TM-50 (meshlogger-Zombie-TCP) und der Rueckbau
+zweier Reparaturen, deren Upstream-Feature nicht mehr existiert.
+Changelog-Items 153-166 fassen im CHANGELOG-stability.md jetzt alles seit
+v4.35p.08.31-stability konsolidiert zusammen (die Schnitt-Sektionen
+.2/.3/.4 sind dort eingedampft, da keiner dieser Schnitte mehr als
+GitHub-Release existiert).
+
+### Was dazugekommen ist
+
+- **BP-07 -- jede abgewiesene oder verworfene Nachricht bekommt eine
+  Quittung mit ihrem Text.** Eigenes, nie latchendes Vokabular (`BpNack`),
+  ein Rahmen pro verlorener Nachricht: `QRT NOT SENT - <text>` /
+  `QTA NOT SENT - <text>`, auf 120 Bytes an UTF-8-Codepoint-Grenze
+  gekuerzt, Anfuehrungszeichen/Backslashes/Steuerbytes vor dem
+  JSON-Escaping bereinigt. Die Refuse-Pruefung laeuft jetzt NACH dem
+  Dekodieren und dem Abstreifen des `{ZIEL}`-Praefixes -- die Quittung
+  traegt den echten getippten Text, der ~60-Zeilen-Zweitparser
+  (`bpPeekDst`) ist geloescht. Ein Ring-Drop gilt nur noch als
+  Backpressure, wenn die Tiefe wirklich an der Refuse-Schwelle steht --
+  ein fabrikneuer Knoten erzwingt keine falsche QRT-Episode mehr.
+  `msg_id` aller BP-Rahmen aus einem gemeinsamen monotonen Zaehler
+  (rolloverfest) statt `millis()`, sonst kollidieren die zwei Rahmen des
+  Drop-Pfads im Dedup-Filter der App.
+- **BP-08 -- ganz oder gar nicht.** Das App-Echo einer getippten Nachricht
+  ging bisher raus, BEVOR der Ring gefragt war -- eine verworfene
+  Nachricht sah im Chat wie gesendet aus, und auf einem Gateway lief der
+  UDP-Uplink zum Server unabhaengig vom Ring-Ergebnis: die Nachricht
+  erreichte den Server, ohne dass je ein RF-Nachbar sie gehoert haette.
+  Jetzt schreibt der Ring zuerst; bei einem Drop kehrt die Funktion vor
+  Echo, Buchhaltung und Gateway-Uplink zurueck, der Absender bekommt
+  `QTA NOT SENT - <text>`.
+- **BP-09 -- der getippte Text ueberlebt eine Abweisung.** `sendMessage()`
+  liefert `BpSendResult` (0/-1/-2/-3) aus allen vier Signaturen; T-Deck
+  und T-Deck Pro leeren das Eingabefeld nur bei Erfolg (der Tab-Wechsel
+  bleibt, damit die Quittung sichtbar ist), die Web-API antwortet
+  `sendmessage refused`/`dropped`/`invalid` statt pauschal `ok`, und das
+  Web-GUI-JavaScript leert die Felder erst nach der Antwort -- es hatte
+  denselben Textverlust eine Ebene hoeher noch einmal eingebaut.
+- **BP-10 -- unabhaengige Advisor-Runde ueber BP-07/08/09**, drei echte
+  Regressionen gefunden und behoben (T-Deck-Tab-Wechsel unterdrueckte die
+  Quittung komplett; Ring-Drop wurde pauschal als Backpressure gelesen;
+  nack-Marker loggte den unbereinigten Text), fuenf Medium-Fixes
+  (u. a. 140-Byte-Puffer vom nRF52-Loop-Stack, `charset_utf8_safe_truncate()`
+  statt Handgestricktem, nack latcht die Episode fuer das spaetere QRV).
+  Alles im Endstand oben bereits enthalten.
+- **TM-50 -- meshlogger erkennt Zombie-TCP.** Im Overnight-Soak toetete
+  ein Router-Reboot die Node-Seite der 2323-Session ohne FIN; der Logger
+  sass 2,4 h stumm auf recv()-Timeouts und konnte die Debug-Flags am Ende
+  nicht restaurieren. Neu: Stille-Watchdog (`--stall-timeout`, Default
+  90 s) in den bestehenden Reconnect-Pfad, SO_KEEPALIVE mit
+  Plattform-Tunables, idempotentes Flag-Re-Apply nach jedem Reconnect,
+  End-Restore mit einem Retry auf frischer Verbindung. Regressionstest
+  gegen einen Fake-Konsolen-Server, fails-before verifiziert.
+- **Rueckbau zu Upstream-Reverts.** Upstream hat das erweiterte
+  Mheard-JSON (PP-Link-Kette, SRC/GW) und das String-`FWDATE` im
+  BLE-I-Register wieder entfernt; dieser Baum zieht nach. Der tote
+  PP/DIST-Fail-Soft-Block in `updateMheard()` ist raus, die
+  FWDATE-Reparaturen sind mit dem Feld selbst gegenstandslos (das
+  Register traegt nur noch `FWVER`). Es bleibt nur, was lebenden Code
+  repariert: die HEY-Eingangsschranke und das puffer-begrenzte
+  BLE-JSON-Framing.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen; Native-Gate 485/485 in 12 Host-Envs
+  (inkl. DJ8MEH-Replay, Grundlast-Muster, Flood-Test 13-in-10).
+- Der BP-07..10-Build lief auf allen vier Bench-Boards: T-Deck Plus
+  (DK5EN-14, Quittung sichtbar, Text ueberlebt die Abweisung), Heltec V3
+  als Live-Gateway (dk5en-98) und Bench-Node (dk5en-93), T-Beam v1.2
+  (dk5en-92) und RAK4631 (dk5en-90).
+- Overnight-Soak 2026-09-01 (98/90/93): Recovery sauber, 0 falsche
+  BP-Marker im Normalbetrieb, 13 BP-03-Stale-Drops als Feldnachweis des
+  Age-Out.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der originale DJ8MEH-Feldvorfall ist weiterhin nicht End-to-End auf
+  Hardware nachprovoziert (nur nativ im Replay).
+- TM-49 bleibt offen: 4-MB-Boards bei marginalem Link per USB statt OTA
+  flashen.
+- Batterie-Nullpunkt am echten 2S-Pack, INA226-Zweig und L76K-GPS
+  unveraendert ungeprueft.
 
 ## Stability-Release v4.35p.08.31.4-stability (2026-08-31, vierter Schnitt)
 
