@@ -1,5 +1,45 @@
 # RESUME — pick up here
 
+## 2026-09-01 night: Release v4.35p.09.01.2-stability published
+
+`v4.35p.09.01.2-stability` is live on GitHub (39 assets, `--latest`), tagged at
+`d0d33824` on `v4.35p_prio`, `FLASH_VERSION` unchanged at `20260901` (same-day
+second cut, 08.27.2 precedent). The `v4.35p.09.01-stability` release object is
+deleted (tag kept as marker); GitHub now carries 09.01.2 + 08.28. Gate:
+**489/489 native test cases across all 12 host environments**; all 32 release
+envs built, safeboot bins deterministic (no diff against the tracked files).
+
+What shipped on top of 09.01 (changelog items 167-169):
+
+- **QRS_MIN_USER_MSGS (item 167).** Operator field report: "QRS - slow down"
+  far too sensitive even at buffer 5, fires on the first message. Root cause:
+  `txRingDepth()` counts relay/ACK/beacon traffic, so a gateway idling at
+  depth 4 warned the sender on their first own message. `onSend()` runs once
+  per locally typed message, so the state machine counts its own calls: QRS
+  needs three own messages in a row on a ring at/above `qrsThreshold()`; a
+  sighting below the line in `onSend()` or `poll()` restarts the count. QRT,
+  QTA, latch, hysteresis and QRV hold untouched. Eight lines in
+  `src/backpressure.h` (`341a25bd`), four new host cases, T3 in
+  `test_bp_regression` now expects QRS at depth 7 (`ab3c5b65`).
+- **Wireless Stick V3 ADC_MULTIPLIER 4.9245 -> 4.13** (upstream #1119,
+  OE3LCR, item 168) and the **upstream `dev` sync** with our PR #1118
+  (esptool upload protocol, `-Wall -Wextra` out of the nRF52 core build) and
+  OE1KBC's `v4.35p compile` (item 169).
+
+Hardware for this cut: only dk5en-98 (live gateway, Heltec V3) runs the
+build, OTA-flashed 21:52; the web GUI reports the new build string, nothing
+more was checked. No burst was driven against the three-messages rule on
+hardware. `tools/webflash.py` printed "node did not come back within 120s"
+right after "node up" on the final poll -- cosmetic race in the tool, worth
+a look.
+
+Deliberately still open: TM-49, L5, DJ8MEH incident not re-provoked on
+hardware, T-Deck partial-refresh targeted re-arm, `t5_epaper` not in the
+release. Not part of this release and left untouched in the working tree: an
+uncommitted edit to `docs/BACKLOG.md` and a new
+`docs/bug-GPS-uart-overflow-20260901.md` that appeared during the release
+run from outside this session.
+
 ## 2026-09-01 evening: Release v4.35p.09.01-stability published
 
 `v4.35p.09.01-stability` is live on GitHub (39 assets, `--latest`), tagged at
