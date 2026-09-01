@@ -56,11 +56,17 @@ static std::string g_sent_msg_text;
 static int g_sent_msg_len = -1;
 static int g_sendMessage_calls = 0;
 
-void sendMessage(char *msg_text, int len)
+// BP-09: sendMessage() now returns int (BpSendResult, backpressure.h); this
+// stub always reports success since getExtern()'s "msg" path (extudp_functions.cpp)
+// discards the return value anyway (E4: what doesn't go out on HF doesn't go
+// into the backbone either, but that decision is made inside sendMessage()
+// itself, not by this caller).
+int sendMessage(char *msg_text, int len)
 {
     g_sent_msg_text.assign(msg_text, msg_text + len);
     g_sent_msg_len = len;
     g_sendMessage_calls++;
+    return BP_SEND_OK;
 }
 
 // ---- Recording-Stub fuer sendPosition() ------------------------------------

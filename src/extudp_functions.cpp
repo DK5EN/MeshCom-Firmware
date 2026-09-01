@@ -333,7 +333,7 @@ void getExtern(unsigned char incoming[], int len)
 #ifndef NATIVE_BUILD
   setMsgOrigin(ORIGIN_EXTUDP);
 #endif
-  sendMessage(val, strlen(val));
+  (void)sendMessage(val, strlen(val));
 #ifndef NATIVE_BUILD
   setMsgOrigin(ORIGIN_NONE);
 #endif
@@ -782,12 +782,10 @@ void  sendExternHeartbeat()
 // BP-07 (Welle 1, E5): msg_id has to come from the same counter every BP
 // frame draws from, or two frames landing in the same millisecond collide in
 // the chat app's dedup filter -- see the comment at bpNextMsgId()'s
-// definition in loop_functions.cpp. Declared locally rather than added to
-// loop_functions_extern.h: that shared header is out of scope for this wave
-// (BP-07 Welle 1 file ownership), and sendExternNotice()'s own signature
-// below must not change either, so the id is drawn from inside the function
-// rather than threaded in as a parameter.
-extern uint32_t bpNextMsgId(void);
+// definition in loop_functions.cpp. Declared in loop_functions_extern.h
+// (pulled in transitively via extudp_functions.h), not locally: this
+// function's own signature below must not change either, so the id is
+// drawn from inside the function rather than threaded in as a parameter.
 
 // BP-01 (BACKLOG) / TM-37: the EXTUDP reply path for a back-pressure notice.
 //

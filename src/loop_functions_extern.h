@@ -212,6 +212,15 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
 void setMsgOrigin(MsgOrigin origin);
 MsgOrigin getMsgOrigin(void);
 
+// E5 (2026-09-01): msg_id must stay unique across every BP frame or the chat
+// app's dedup filter swallows whichever of two notices lands in the same
+// millisecond -- see the comment at the definition in loop_functions.cpp.
+// Welle 3 (BP-09) cleanup: this used to be a hand-written extern local to
+// extudp_functions.cpp because loop_functions_extern.h was out of scope for
+// that wave; a header declaration is compiler-checked against the
+// definition, the hand-written one was not.
+uint32_t bpNextMsgId(void);
+
 // Per-loop drain check. Closes a back-pressure episode with QRV once the ring
 // has emptied again, even when no further user message arrives to observe it.
 void bpPollDrain(void);

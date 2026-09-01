@@ -714,11 +714,20 @@ void btn_event_handler_send(lv_event_t * e)
         // BP-01: origin GUI -- a QRS/QRT/QTA/QRV lands in the on-screen
         // message list (addMessage()), the same place a received text goes.
         setMsgOrigin(ORIGIN_GUI);
-        sendMessage(message_text, iml);
+        int bp_rc = sendMessage(message_text, iml);
         setMsgOrigin(ORIGIN_NONE);
 
-        lv_textarea_set_text(text_input, "");
-        lv_tabview_set_act(tv, 0, LV_ANIM_ON);
+        // BP-09: only clear the typed text (and switch back to the message
+        // tab) once it actually went out. On REFUSED/DROPPED/INVALID it
+        // stays in the field so the operator can resend after the QRV
+        // instead of retyping. The DM callsign field is left alone either
+        // way -- it names the target, not the attempt, and the operator may
+        // want to keep sending to the same station.
+        if(bp_rc == BP_SEND_OK)
+        {
+            lv_textarea_set_text(text_input, "");
+            lv_tabview_set_act(tv, 0, LV_ANIM_ON);
+        }
     }
     else if(code == LV_EVENT_VALUE_CHANGED)
     {

@@ -1614,7 +1614,7 @@ void nrf52loop()
             // BP-01: tag the origin so the back-pressure notice goes back to
             // the phone that just typed, and never over the air.
             setMsgOrigin(ORIGIN_BLE);
-            sendMessage(textbuff_phone, txt_msg_len_phone);
+            (void)sendMessage(textbuff_phone, txt_msg_len_phone);
             setMsgOrigin(ORIGIN_NONE);
         }
 
@@ -2929,7 +2929,7 @@ void checkSerialCommand(void)
             {
                 // BP-01: origin serial -- the notice comes back on the console.
                 setMsgOrigin(ORIGIN_SERIAL);
-                sendMessage(msg_buffer, inext);
+                (void)sendMessage(msg_buffer, inext);
                 setMsgOrigin(ORIGIN_NONE);
             }
             else

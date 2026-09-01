@@ -101,6 +101,20 @@ inline const char *bpNackPrefix(BpNack n)
     }
 }
 
+/// Result of sendMessage() (Welle 3 / BP-09). Lets a caller keep the
+/// operator's typed text on screen instead of clearing an input field for a
+/// message that never actually went out -- a UI that always clears on
+/// return, the way sendMessage() used to be void, loses the text on every
+/// refusal, drop or invalid-length attempt with no way for the operator to
+/// resend it.
+enum BpSendResult
+{
+    BP_SEND_OK      =  0,
+    BP_SEND_REFUSED = -1,   ///< refused, BP_NACK_QRT
+    BP_SEND_DROPPED = -2,   ///< dropped by the ring, BP_NACK_QTA
+    BP_SEND_INVALID = -3    ///< length out of range, DM to own call
+};
+
 /// Where a locally originated user message came from. Set immediately before
 /// sendMessage() by the caller and cleared right after; relay, ACK and beacon
 /// paths never set it, so they can never be refused.

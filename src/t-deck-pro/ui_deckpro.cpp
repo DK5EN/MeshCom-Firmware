@@ -1802,10 +1802,16 @@ static void lora_mode_send()
     // BP-01: origin GUI -- a QRS/QRT/QTA/QRV is written into the on-screen
     // message view (TDeck_pro_lora_disp()), where received texts appear.
     setMsgOrigin(ORIGIN_GUI);
-    sendMessage(sendtxt, len);
+    int bp_rc = sendMessage(sendtxt, len);
     setMsgOrigin(ORIGIN_NONE);
 
-    scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen
+    // BP-09: only leave the send screen once the message actually went out.
+    // This screen never clears dm_keypad/input_keypad on send to begin with
+    // (unlike the T-Deck's text_input), so on REFUSED/DROPPED/INVALID the
+    // operator simply stays put with their typed text still in the field
+    // and can retry after the QRV instead of losing the attempt.
+    if(bp_rc == BP_SEND_OK)
+        scr_mgr_switch(SCREEN1_1_ID, false); // exit send screen
 }
 
 static void lora_mode_send_event(lv_event_t * e)

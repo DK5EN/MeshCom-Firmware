@@ -3399,10 +3399,10 @@ MsgOrigin getMsgOrigin(void)
 // has genuinely caught back up past it.
 //
 // Non-static, unlike the rest of this file's BP-01 machinery:
-// extudp_functions.cpp (sendExternNotice()) needs it too, and
-// loop_functions_extern.h -- the shared declaration header -- is out of
-// scope for this wave (BP-07 Welle 1 file ownership); extudp_functions.cpp
-// forward-declares it locally instead of widening that header now.
+// extudp_functions.cpp (sendExternNotice()) needs it too. Declared in
+// loop_functions_extern.h (Welle 3 / BP-09 cleanup -- that header was out of
+// scope for BP-07 Welle 1, which is why extudp_functions.cpp used to carry
+// its own hand-written extern for this instead).
 static uint32_t bp_last_msg_id = 0;
 
 uint32_t bpNextMsgId(void)
@@ -3585,7 +3585,7 @@ void bpPollDrain(void)
     bpRoute(bp_state.poll(txRingDepth(), millis()));
 }
 
-void sendMessage(char *msg_text, int len)
+int sendMessage(char *msg_text, int len)
 {
     if(memcmp(msg_text, "-", 1) == 0)
     {
@@ -3593,7 +3593,7 @@ void sendMessage(char *msg_text, int len)
             printfdeb("COMMAND:%s\n", msg_text);
 
         commandAction(msg_text, false);
-        return;
+        return BP_SEND_OK;
     }
 
     uint8_t ispos = 0;
@@ -3735,7 +3735,7 @@ void sendMessage(char *msg_text, int len)
     if(strMsg.length() < 1 || strMsg.length() > 160)
     {
         printfdeb("sendMessage wrong text length:%i\n", strMsg.length());
-        return;
+        return BP_SEND_INVALID;
     }
 
     bool bDM=false;
@@ -3767,7 +3767,7 @@ void sendMessage(char *msg_text, int len)
         if(strDestinationCall.compareTo(meshcom_settings.node_call) == 0)
         {
             printfdeb("[ERROR]...DM to own-all not allowed");
-            return;
+            return BP_SEND_INVALID;
         }
     }
 
@@ -3804,7 +3804,7 @@ void sendMessage(char *msg_text, int len)
                       txRingDepth(), (int)MAX_RING, (unsigned long)millis());
 
         bpEmitNack(bp_state.onRefuse(), bp_origin, bp_origin_dst, strMsg.c_str());
-        return;   // Welle 3 (BP-09) macht daraus BP_SEND_REFUSED
+        return BP_SEND_REFUSED;
     }
 
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
@@ -3891,7 +3891,7 @@ void sendMessage(char *msg_text, int len)
         // an den Absender. Die Nachricht ist vollstaendig nicht passiert.
         bpRoute(bp_state.onSend(txRingDepth(), true, millis()));   // Episoden-QTA
         bpEmitNack(BP_NACK_QTA, bp_origin, bp_origin_dst, strMsg.c_str());
-        return;   // Welle 3 (BP-09) macht daraus BP_SEND_DROPPED
+        return BP_SEND_DROPPED;
     }
 
     // An APP als Anzeige retour senden
@@ -3963,6 +3963,7 @@ void sendMessage(char *msg_text, int len)
     if(bConsoleText)
         addBLEOutBuffer(msg_buffer, aprsmsg.msg_len);
 
+    return BP_SEND_OK;
 }
 
 String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, char lat_c, double plon, char lon_c, int alt,  float press, float hum, float temp, float temp2, float gasres, float co2, int qfe, float qnh)

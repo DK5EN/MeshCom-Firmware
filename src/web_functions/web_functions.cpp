@@ -855,7 +855,17 @@ void deliver_scaffold(bool bget_password)
     // this function is used to load content depending on the navigation button pressed
     web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
-    web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();document.getElementById(\"sendcall\").value=\"\"; document.getElementById(\"messagetext\").value=\"\";}\n");
+    //
+    // BP-09: the input fields used to be cleared unconditionally, right after
+    // xhttp.send() and without ever looking at the answer -- so a message the
+    // node refused (QRT) or dropped (QTA) took the operator's typed text with
+    // it, exactly the loss BP-09 fixes on the T-Deck and T-Deck Pro. The clear
+    // now waits for the response and only fires on "sendmessage ok"; every
+    // other outcome (refused / dropped / invalid / failed) leaves the text in
+    // place so it can be resent after the QRV. updateCharsLeft() is called
+    // from the handler because the onclick chain has long since run its own
+    // call by the time the answer arrives.
+    web_client.println("function sendMessage() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200 && this.responseText.indexOf(\"sendmessage ok\")>=0){document.getElementById(\"sendcall\").value=\"\"; document.getElementById(\"messagetext\").value=\"\"; updateCharsLeft();}};xhttp.open(\"GET\",\"/?sendmessage&tocall=\"+encodeURIComponent(document.getElementById(\"sendcall\").value)+\"&message=\"+encodeURIComponent(document.getElementById(\"messagetext\").value),true);xhttp.send();}\n");
     // this functions is counting and displaying the amount of chars left that the user can use to write a message
     web_client.println("function updateCharsLeft() {let maxlength=149;if(document.getElementById(\"sendcall\").value.length>0) {maxlength-=(document.getElementById(\"sendcall\").value.length)+2;}let msglength=document.getElementById(\"messagetext\").value.length;if(msglength>maxlength){document.getElementById(\"messagetext\").value=document.getElementById(\"messagetext\").value.substring(0,maxlength);msglength=maxlength;}document.getElementById(\"indicator_charsleft\").innerHTML=maxlength-msglength;}\n");
     // this function is an ayncronous loader that is used to update the received messages without re-loading the whole page, it will re-call itself after a timeout as long as the message-page is displayed
@@ -2166,6 +2176,14 @@ void send_message(String web_header)
 
         tocall.toUpperCase();
 
+        // BP-09: default outcome string, overridden below by the actual
+        // sendMessage() result. The page's own sendMessage() JS (further
+        // below) fires the request and clears both input fields immediately
+        // without reading the response body, so this string currently has
+        // no consumer on the stock page -- it is here for any client (or
+        // future JS) that does look at it.
+        const char *bp_result_text = "sendmessage ok";
+
         if (message.length() > 0)
         {
             if (tocall.length() > 0)
@@ -2190,15 +2208,23 @@ void send_message(String web_header)
             {
                 hasMsgFromPhone = true;
                 setMsgOrigin(ORIGIN_WEB);   // BP-01: notice goes back to the web GUI
-                sendMessage(message_text, iml);
+                int bp_rc = sendMessage(message_text, iml);
                 setMsgOrigin(ORIGIN_NONE);
                 hasMsgFromPhone = false;
                 // Serial.print("Message send: ");
                 // Serial.println(message_text);
+
+                switch (bp_rc)
+                {
+                    case BP_SEND_REFUSED: bp_result_text = "sendmessage refused"; break;
+                    case BP_SEND_DROPPED: bp_result_text = "sendmessage dropped"; break;
+                    case BP_SEND_INVALID: bp_result_text = "sendmessage invalid"; break;
+                    default:              bp_result_text = "sendmessage ok";      break;
+                }
             }
         }
 
-        web_client.println("sendmessage ok");
+        web_client.println(bp_result_text);
     }
     else
     {
