@@ -41,6 +41,8 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 
 **Intake 2026-08-30 (third list), filed in §3.8k:** `RX-01` discard frames from unconfigured nodes (`XX0XXX`, seen relayed over four hops), `TX-01` an unconfigured node refuses to transmit at all (the other half of RX-01), `BP-01` TX back-pressure to the sender as Q-code notices (QRS/QRT/QTA, plus QRV once the queue clears — the concrete design for `TM-37`), `FL-02` the same 30 s floor for `sendHey()`. `CS-04` (Web-API `/getparam/`) **fixed and verified on hardware**; the two corrections to the mcmap replay-burst finding are written back into `mcmap/docs/findings/interlink-frame-replay-bursts.md` §10.
 
+**Field report 2026-09-01 (`OE5HWN-14`), filed in §3.8r:** the reported symptom (WX altitude wandering 179–308 m on a node that never moved) is the smallest part of it. The GPS UART is drained only every 3 s on ESP32 while the L76K sends ~140 B/s into a 256-byte ring, so ~165 B of NMEA is discarded **every cycle**; roughly 1 in 256 of the resulting spliced sentences passes the checksum and is committed as a real fix (`GPS-01`, `GPS-02` — observed once in the 22-minute log, predicted 1.7). Altitude is a single unfiltered sample and `--setalt` is a no-op while GPS is on (`GPS-03`); QNH is latched to the first fix after boot (`GPS-04`). Side findings from the same logs: the node reset twice in seven minutes and **no reset reason is ever printed** (`TM-51`, do this first), and the display path costs ~570 ms per update on the T-Beam Supreme (`TM-52`). An HDOP-weighted Kalman filter was requested during review and is **rejected on measurements** (`GPS-05a`/`GPS-05b`, doc §7.6) in favour of a scalar Kalman filter with **constant** `R` — 8 bytes, whose steady-state gain _is_ an EMA coefficient, and whose covariance recursion halves cold-start time (282 s vs 474 s) and gives GPS-04 a real convergence signal. All of it is upstream, none of it ours. [`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md).
+
 **Intake 2026-08-31 (operator list of 14 points), filed in §3.8p:** T-Deck map pan (`TD-07`), two presentation-timeline items (`PRES-01` Meshtastic/MeshCore + ISM footnote, `PRES-02` WSPR/WSJT-X/JS8Call), the character-set filter for message text and APRS free text (`CHR-01`, `CHR-02`), JSON validity in everything the node builds (`JSN-01`), `PM-01` (`NoPMOther` — the leak is EXTUDP, not BLE), the APRS-to-client research paper (`APRS-01`), four documentation deliverables (`DOC-01` main-loop stall page, `DOC-02` `--help` renewal, `DOC-03` CONF endianness/compatibility, `DOC-04` `config.json` register reference), `NTP-01` (cadence + report + `--ntpsync` + bench regression) and `E22-01` (frame integrity under supply spikes). **Three intake premises were corrected by the scouting** — foreign DMs are already blocked on BLE/web, TM-39 is a closed test item (the defect is `CONF-01`), and no low-voltage TX inhibit exists anywhere in the tree. Side findings: `WEB-04`, `TD-08`, `CTY-01`.
 
 **Intake 2026-08-30 (fourth list), filed in §3.8l — TM-43 DONE the same night, UDP-01 stack question answered (424 B / 276 B free), and the run found + fixed `UDP-02` (ESP32 EXTUDP receive killed by one 255-byte datagram). PT-01: all eight parser findings fixed. §3.8m: `MEM-01` done (commit `861f2967`), `MEM-02` parked.** Original intake text: `UDP-01` — second-hand report that `--extudp on` kills a RAK4631; unreproduced, and the two defects with exactly this symptom (`N-22` stack overflow, `N-23` brick trap) are fixed both here **and** in `upstream/dev`, so the section lists what to ask the reporter before touching code. `TM-43` — the regression test the operator asked for: the RAK's UDP interface driven in both directions, send and receive, with node liveness as the assertion.
@@ -2558,6 +2560,77 @@ turns out to be real the fork side is the one that needs changing, not upstream'
 **Process reminder (from §3.8g):** the net diff since the last merge base gets reviewed at
 merge time, findings filed as `UP-nn` here. This sync's net diff is build configuration
 only — no `src/` change arrived — so no new native test was owed.
+
+### 3.8r GPS/NMEA link is structurally lossy — field report `OE5HWN-14` (2026-09-01)
+
+Full analysis, with every log excerpt the claims rest on:
+[`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md).
+
+**Intake.** OE5HWN reported that the WX dashboard shows `OE5HWN-14` (T-Beam Supreme, 4.35p)
+wandering between 179 m and 308 m of altitude while the node never moved. Two `--gpsdebug`
+captures were supplied. The reported symptom is real but is the smallest part of what the logs
+contain.
+
+**Root cause.** `WZ_GPS_Loop()` is the only code that drains the GPS UART, and on ESP32 it runs
+once every 3 s (`GPS_REFRESH_INTERVAL 3`). The L76K sends GGA+RMC at 1 Hz ≈ 140 B/s into the
+256-byte Arduino default ring, so ~165 bytes are discarded by the ISR **every cycle**, on every
+stationary ESP32 node, permanently. The cut lands mid-sentence; the parser resyncs at the next
+`$` and splices the remains onto a later sentence. The 8-bit NMEA checksum catches almost all of
+it — but ~1 in 256 passes by chance and is committed as a real fix. Predicted ~1.7 false commits
+in the 22-minute log, observed exactly 1 (`lon:0.000000`, `Date: 2015.14.00`, with `fix:yes
+sat:7 hdop:2.7`). The nRF52 path in the same tree already polls at 1 s and does not overflow.
+
+**Not ours.** `git diff upstream/dev HEAD` over the whole GPS/altitude/QNH path is empty; every
+construct blames to Kurt, 2023-03-05 through 2026-04-23. Detail in the doc's §9.
+
+| ID      | Where                                                                        | Finding                                                                                                                                                                                                                                                  | Sev.   | Action                                                                                                                                                                  |
+| ------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GPS-01  | `esp32_main.cpp:3079`, `configuration_global.h:178`, `gps_functions.cpp:889` | GPS UART drained only every 3 s; 420 B of NMEA into a 256 B ring → ~165 B lost per cycle, always. nRF52 already polls at 1 s.                                                                                                                            | High   | Split `WZ_GPS_Feed()` (drain, every loop) from the evaluation (every 3 s). **Not** `setRxBufferSize` — see below.                                                       |
+| GPS-02  | `gps_functions.cpp:919`, `:959`, `:1009-1024`                                | No plausibility gate. `gpsData.valid` written, never read; the fix gate checks only sat/HDOP, which a damaged RMC leaves intact. Corrupt sample lands in persistent settings verbatim.                                                                   | High   | Gate on `isValid()` + `age()`; reject lat/lon exactly 0.0 and impossible dates.                                                                                         |
+| GPS-03  | `gps_functions.cpp:1022`, `command_functions.cpp:4131`                       | `node_alt` is one raw unfiltered sample, beaconed every 30 min. `--setalt` is silently overwritten by the next fix — the command is a no-op on any node with a GPS.                                                                                      | Medium | Scalar Kalman, constant `R`, `q`≈0.01 (τ≈400 s) — 8 B, measured 4.36→1.52 m RMS. **Not** a 5-sample median: that measures 2–5 %. Make `--setalt` sticky, then `--help`. |
+| GPS-04  | `bmx280.cpp:326` (+ `bme680.cpp`, `bmp390.cpp`)                              | QNH reference altitude latched to the first fix after boot, never corrected. An outlier at boot costs ~±7 hPa for the whole session — and this node rebooted twice in 7 minutes.                                                                         | Medium | Re-latch on `--setalt` and on the GPS-03 filter's convergence signal (`P` below threshold) — not on the first fix.                                                      |
+| TM-51   | boot path, both platforms                                                    | No reset reason is ever printed (`grep esp_reset_reason src/` → empty). `OE5HWN-14` reset at ~20:31:58 (proven three ways: `millis()` rollback, min-free-heap watermark rise, 32 s hole) and we cannot say why.                                          | Medium | **Do this first.** Three lines: `esp_reset_reason()` / `NRF_POWER->RESETREAS` in the boot banner.                                                                       |
+| TM-52   | `esp32_main.cpp:1844`, `:3365`                                               | Display section measures ~570 ms per update on the T-Beam Supreme, 39x in 17 min. Two fire at 7.5 s uptime, so it is not LoRa airtime. `setBusClock(400000)` is Heltec-only; the 100 kHz arithmetic is still 3x short of 570 ms.                         | Medium | Direct measurement inside the display path (sections around `clearDisplay` / `nextPage`), not more reading.                                                             |
+| GPS-05a | design item, no single site                                                  | Moving-node altitude, boards **without** pressure sensor: innovation gate + vertical-rate limit + speed-adaptive `q` (`gpsData.speed_kmh` is already parsed). Runs everywhere. The stationary case needs none of it — §7.4's filter is already GPS-only. | Low    | Use `bDisplayTrack` as the discriminator first; speed-adaptation is a refinement needing field validation. Doc §7.6.2.                                                  |
+| GPS-05b | design item, no single site                                                  | Moving-node altitude, boards **with** pressure sensor: baro/GPS complementary filter, mirroring mcmap's server-side `altSmoothed`. An upgrade, never a prerequisite. Runtime discriminator exists: `bBMPON`/`bBMEON`/`bBME680ON`.                        | Low    | Do not start before GPS-01 lands and TRACK-mode logs with pressure exist. Doc §7.6.                                                                                     |
+
+**Kalman-filter question (review, 2026-09-01) — answered with measurements, not argument.** The
+proposal was an HDOP-weighted Kalman filter on the altitude. **Rejected as specified**, on four
+counts, all measured against both field logs (doc §7.6): (1) HDOP is a weak predictor of the
+vertical error — `r(HDOP, |err|)` is +0.51 in one session and +0.20 in the other, and it is the
+wrong DOP anyway (vertical error scales with VDOP, which the node never receives because its own
+`$PCAS03` disables GSA — and enabling GSA adds ~70 B/s, making GPS-01 worse); (2) the HDOP term
+contributes nothing — the same filter with `R` fixed at the session median scores 1.57/1.97 m RMS
+against 1.59/1.95 m HDOP-weighted, i.e. identical to the third digit; (3) the dominant error is
+time-correlated, not white — autocorrelation is +0.98 at 3 s and only decays after 60–120 s, so a
+white-noise `R` makes the filter overconfident by construction; (4) an **8-byte filter with τ ≈ 400 s** matches or beats it (1.52/1.62 m RMS, worst sample 25.4 m → 2.6 m) with no tuning and
+no array. Above all: the two sessions' medians differ by **4.6 m** at the same antenna twenty
+minutes apart, so a within-session estimator improving scatter from 1.6 m to 1.5 m is invisible in
+the delivered quantity. **This also corrected GPS-03's own recommendation** — the first draft
+proposed a median over 5 fixes (15 s), which measures out at 2–5 % because the error is still
+~80 % correlated at 15 s. The window has to be minutes.
+
+**"And if the node only has a GPS?"** Nothing changes for the stationary case: **every measurement in §7.6 and §7.4 was computed from GPS altitude alone** — both field logs are GPS-only altitude series, no barometer was used anywhere. The 1.52/1.62 m result _is_ the GPS-only result. GPS-05b (baro fusion) is an upgrade for boards that carry a sensor, never a prerequisite, and the firmware already knows which case it is in at runtime (`bBMPON`/`bBMEON`/`bBME680ON`, `loop_functions_extern.h:90-95`). What stays genuinely hard is a **moving** node with no barometer — filed as GPS-05a, three sensor-free mechanisms (innovation gate, vertical-rate limit, speed-adaptive `q`). Honest limit stated in the doc: a correlated error cannot be averaged out while the true value is also changing, so outlier rejection and a rate bound are the deliverables there, not metre-level altitude.
+
+**Why not `setRxBufferSize(1024)`.** It would mask GPS-01 for 1 kB of static RAM per GPS board.
+Rejected on operator decision 2026-09-01: the RAM budget is the binding constraint on this tree
+(`MEM-01` guard, `MEM-02` parked, E22-DevKitC at ~1.7 kB DRAM headroom per `CS-03`). It also
+would not fix GPS-02 — a bigger buffer still delivers spliced sentences once the loop stalls
+long enough. The polling split costs zero RAM.
+
+**Cheapest falsification, before any code:** run a bench node in TRACK mode (`gps_refresh_intervall`
+= 1.0 s, `esp32_main.cpp:3076`) with `--gpsdebug 1` for two hours. The model predicts near-zero
+corrupt samples versus ~5 at the 3 s cadence. If TRACK shows the same rate, §4 of the doc is wrong
+and the GNSS module is the suspect instead.
+
+**Retraction carried in the doc (§4.3):** the first reading blamed the ~580 ms loop stalls, using
+the 38400 line rate instead of the 140 B/s data rate. At the real rate the ring holds 1.8 s and a
+580 ms stall does not overflow it — and there is no stall within five minutes of the corrupted
+sample. The stalls are a separate defect (TM-52).
+
+**Upstream:** GPS-01/GPS-02 are good PR candidates (small, platform-symmetric, affect every ESP32
+node in the network). GPS-03/GPS-04 change `--setalt` semantics and go through §3.5 — propose as a
+plan first. GPS-05a/GPS-05b are not upstream-ready and must not be offered until they have evidence.
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
