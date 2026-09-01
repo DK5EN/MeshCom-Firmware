@@ -1,5 +1,41 @@
 # RESUME — pick up here
 
+## 2026-09-01 evening: Release v4.35p.09.01-stability published
+
+`v4.35p.09.01-stability` is live on GitHub (39 assets, `--latest`), tagged at
+`b3cc03d5` on `tdeck-partial-refresh-trace`, `FLASH_VERSION 20260901`. The
+`v4.35p.08.31.4-stability` release object is deleted (tag kept as marker);
+GitHub now carries 09.01 + 08.28. Gate: **485/485 native test cases across
+all 12 host environments** — the "530 across 11" figure in the entry below
+was wrong and is corrected in all release docs. Bench (after the entry
+below was written): the BP-07..10 receipt build ran on all four bench boards
+— T-Deck Plus DK5EN-14, Heltec V3 dk5en-98 (live gateway) and dk5en-93,
+T-Beam dk5en-92, RAK4631 dk5en-90.
+
+Two decisions shaped this cut (operator, 2026-09-01):
+
+- **Final state only, no intermediate steps.** The changelog sections for
+  08.31.2/.3/.4 plus the unreleased section were collapsed into one
+  `## New in v4.35p.09.01-stability` section (items 153-166); the
+  back-pressure system is described as it stands, BP-10's corrections folded
+  in silently. release-notes.md carries no cut-by-cut history any more.
+  release.md keeps its journal chronology by design.
+- **No repairs for features upstream reverted.** Upstream reverted the
+  extended Mheard JSON (PP #1105, SRC/GW #1106, serializeJson guard #1107)
+  and removed the string `FWDATE` entirely (the `I` register carries `FWVER`
+  alone — both trees). Our tree followed the reverts via the merge already;
+  the one orphaned repair left, the PP/DIST fail-soft in `updateMheard()`
+  (item 105), is removed as dead code (`c2adc18d`). Kept, because they
+  repair live code: the HEY ingress bound (item 106), `bleJsonFrame`,
+  NC-01/02. The `--mheard`-vs-live two-schema known gap is gone with the
+  reverts and no longer listed.
+
+Deliberately still open: TM-49 (safeboot OTA completion guard — 4-MB boards
+flash via USB on marginal links), L5 (machine-readable back-pressure marker,
+needs protocol change), the DJ8MEH incident not re-provoked end-to-end on
+hardware, T-Deck partial-refresh targeted re-arm as follow-up, `t5_epaper`
+not in the release (pre-existing include-path breakage).
+
 ## 2026-09-01 afternoon: BP-07/08/09/10 shipped, closes L1-L4
 
 Four commits on `tdeck-partial-refresh-trace`, each advisor-gated (Fable),
