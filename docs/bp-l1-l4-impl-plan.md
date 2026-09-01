@@ -78,16 +78,6 @@ enum BpNack
     BP_NACK_QTA  = 2    ///< enqueue attempted, the ring threw the frame away
 };
 
-/// Result of sendMessage(), so a caller can keep the operator's typed text
-/// instead of clearing an input field for a message that never went out.
-enum BpSendResult
-{
-    BP_SEND_OK      =  0,
-    BP_SEND_REFUSED = -1,   ///< BP_NACK_QRT
-    BP_SEND_DROPPED = -2,   ///< BP_NACK_QTA
-    BP_SEND_INVALID = -3    ///< length out of range, DM to own call
-};
-
 inline const char *bpNackCode(BpNack n);     // "QRT" / "QTA" / ""
 inline const char *bpNackPrefix(BpNack n);   // siehe unten
 ```
@@ -213,7 +203,7 @@ if(bp_origin != ORIGIN_NONE && bp_state.refusing())
                   txRingDepth(), (int)MAX_RING, (unsigned long)millis());
 
     bpEmitNack(bp_state.onRefuse(), bp_origin, bp_origin_dst, strMsg.c_str());
-    return BP_SEND_REFUSED;
+    return;   // Welle 3 macht daraus BP_SEND_REFUSED
 }
 ```
 
@@ -252,7 +242,7 @@ if(w < 0)
     // an den Absender. Die Nachricht ist vollstaendig nicht passiert.
     bpRoute(bp_state.onSend(txRingDepth(), true, millis()));   // Episoden-QTA
     bpEmitNack(BP_NACK_QTA, bp_origin, bp_origin_dst, strMsg.c_str());
-    return BP_SEND_DROPPED;
+    return;   // Welle 3 macht daraus BP_SEND_DROPPED
 }
 
 ... Block 3791-3832 unveraendert hierher ...
@@ -301,7 +291,21 @@ ging — der Dedup-Platz war bisher verschenkt.
 
 ## BP-09 — L4: der getippte Text bleibt stehen
 
-`sendMessage()` gibt `int` zurueck statt `void`, Werte aus `BpSendResult`.
+`sendMessage()` gibt `int` zurueck statt `void`. Das Ergebnis-Enum wird **erst hier**
+angelegt, nicht schon in Welle 1 — solange `sendMessage()` `void` ist, waere es unbenutzt und
+ein `return BP_SEND_REFUSED;` wuerde nicht uebersetzen. In `src/backpressure.h`:
+
+```cpp
+/// Result of sendMessage(), so a caller can keep the operator's typed text
+/// instead of clearing an input field for a message that never went out.
+enum BpSendResult
+{
+    BP_SEND_OK      =  0,
+    BP_SEND_REFUSED = -1,   ///< refused, BP_NACK_QRT
+    BP_SEND_DROPPED = -2,   ///< dropped by the ring, BP_NACK_QTA
+    BP_SEND_INVALID = -3    ///< length out of range, DM to own call
+};
+```
 
 Betroffene Deklarationen:
 
