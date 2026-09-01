@@ -76,16 +76,27 @@ aus. Wer es nicht weiss, verlaesst sich auf eine Zustellung, die nie stattgefund
 
 Zustandsmeldungen ueber den Puffer, gelatcht: **eine pro Episode**, nicht eine pro Nachricht.
 
-| Code    | Ausloeser                                      | Nimmt der Node an?             | Text                                                    |
-| ------- | ---------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
-| **QRS** | Ringtiefe erreicht 5                           | ja                             | `QRS - slow down, TX buffer is filling`                 |
-| **QRT** | Ringtiefe erreicht 80 % von `MAX_RING` (16/20) | **nein**, lokal erzeugte Texte | `QRT - stopping to accept new messages, TX buffer full` |
-| **QTA** | Der Ring hat einen Frame verworfen             | nein                           | `QTA - message discarded, TX buffer full`               |
-| **QRV** | Tiefe 0, oder Tiefe 1 fuer 10 s ununterbrochen | ja                             | `QRV - ready again, TX buffer clear`                    |
+| Code    | Ausloeser                                                                 | Nimmt der Node an?             | Text                                                    |
+| ------- | ------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
+| **QRS** | Ringtiefe >= 5 **und** dritte eigene Nachricht in Folge auf so einem Ring | ja                             | `QRS - slow down, TX buffer is filling`                 |
+| **QRT** | Ringtiefe erreicht 80 % von `MAX_RING` (16/20)                            | **nein**, lokal erzeugte Texte | `QRT - stopping to accept new messages, TX buffer full` |
+| **QTA** | Der Ring hat einen Frame verworfen                                        | nein                           | `QTA - message discarded, TX buffer full`               |
+| **QRV** | Tiefe 0, oder Tiefe 1 fuer 10 s ununterbrochen                            | ja                             | `QRV - ready again, TX buffer clear`                    |
 
 QRS liegt bewusst bei festen 5 und nicht bei einem Anteil von `MAX_RING`: eine
 5,5-Minuten-Messung auf einem Gateway zeigte im Normalbetrieb eine Grundlast von Tiefe 1-4.
 Eine Schwelle darunter meldet staendig Stau, wo keiner ist.
+
+Die Tiefe allein reicht seit 2026-09-01 nicht mehr (`QRS_MIN_USER_MSGS`, Operatorentscheidung):
+sie zaehlt Relay-Frames, ACKs und Beacons mit, und auf einem Gateway mit Grundlast 4 bekam schon
+die **erste** getippte Nachricht ein QRS fuer einen Stau, den der Absender nicht gebaut hatte.
+`onSend()` wird genau einmal pro lokal erzeugter Nachricht aufgerufen und nie fuer Relay/ACK/
+Beacon, deshalb zaehlt die Zustandsmaschine dort die eigenen Nachrichten: QRS kommt erst mit der
+**dritten eigenen Nachricht**, die den Ring bei Tiefe >= 5 vorfindet. Faellt der Ring zwischendurch
+unter 5 (in `onSend()` oder im Drain-`poll()`), beginnt die Zaehlung von vorn. Wer so langsam
+tippt, dass die Funke zwischen zwei Nachrichten abarbeitet, bekommt kein QRS. QRT und QTA sind
+davon unberuehrt: Abweisen und Verwerfen sind echte Ereignisse und werden sofort gemeldet, auch
+bei der ersten Nachricht.
 
 ### Die Quittung
 
@@ -192,8 +203,10 @@ Auf der Konsole des Absenders:
    ... 10x refuse + 10x nack ...
 ```
 
-QRS bei Tiefe exakt 5, QRT bei exakt 16 — genau die Schwellen. Eine QRS und eine QRT fuer die
-ganze Episode, aber zehn Quittungen fuer zehn verlorene Nachrichten.
+QRS bei Tiefe exakt 5, QRT bei exakt 16 — genau die Schwellen (Stand Build `20260831`; seit
+2026-09-01 kaeme das QRS in diesem Lauf bei Tiefe 7, mit der dritten eigenen Nachricht ab der
+Linie, siehe `QRS_MIN_USER_MSGS` oben). Eine QRS und eine QRT fuer die ganze Episode, aber zehn
+Quittungen fuer zehn verlorene Nachrichten.
 
 **Der Funknachweis.** Von den 25 Nachrichten kamen bei DK5EN-90 und bei DK5EN-98 **genau
 01 bis 15** an und **keine einzige von 16 bis 25**. Zwei unabhaengige Empfaenger, Gateway auf

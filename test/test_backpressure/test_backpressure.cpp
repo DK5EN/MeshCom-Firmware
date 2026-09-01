@@ -10,6 +10,10 @@
 //     on every board, not at depth > 1 — the gateway field measurement
 //     DK5EN-98 showed baseline depth 1-4 in ordinary operation, and the old
 //     rule warned about that baseline three times in 5.5 minutes,
+//   * QRS_MIN_USER_MSGS (operator decision 2026-09-01): depth 5 alone is
+//     still mostly relay/ACK traffic on a gateway, so QRS additionally needs
+//     the sender's third own message on a ring that sits at/above the line;
+//     a dip below the line restarts that count,
 //   * one QRS per episode under a burst, not one per message (TM-21),
 //   * the refusal band (QRT holds until the ring is genuinely clear),
 //   * QTA when the ring actually threw a message away,
@@ -90,7 +94,8 @@ static void test_no_qrv_without_a_preceding_notice(void)
 // (DK5EN-98, 5.5 min of ordinary operation, no burst anywhere in the log)
 // showed baseline ring depth sitting at 1-4, mode 2 -- the old rule (QRS
 // above depth 1) warned about that baseline three times. QRS now fires only
-// at the fixed threshold of 5, never below it.
+// at the fixed threshold of 5, never below it -- and (2026-09-01,
+// QRS_MIN_USER_MSGS) only on the sender's third own message there.
 static void test_qrs_fires_once_at_qrs_threshold(void)
 {
     BackPressure bp(20);   // qrsThreshold() == 5
@@ -99,9 +104,84 @@ static void test_qrs_fires_once_at_qrs_threshold(void)
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(2, false, 1001));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(3, false, 1002));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(4, false, 1003));
-    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, 1004));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1004));   // 1st own msg at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(6, false, 1005));   // 2nd
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(7, false, 1006));   // 3rd: QRS
     TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
     TEST_ASSERT_FALSE(bp.refusing());
+}
+
+// QRS_MIN_USER_MSGS (operator decision 2026-09-01): a gateway idling at
+// depth 4 from relay/ACK traffic handed the very first typed message a QRS
+// for a queue the sender had not built. The first two own messages that
+// find the ring at/above the line stay silent; the third raises QRS.
+static void test_qrs_needs_three_own_messages_at_the_line(void)
+{
+    BackPressure bp(20);   // qrsThreshold() == 5
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(5, false, 1000),
+                                  "1st own message on a ring the mesh filled: silent");
+    TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(5, false, 1001),
+                                  "2nd own message: still silent");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRS, bp.onSend(5, false, 1002),
+                                  "3rd own message on a full ring: QRS");
+    TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
+}
+
+// The count is the sender's own run on a full ring: once the ring has been
+// seen below the line again, the run is over and starts from zero. A sender
+// whose messages drain between keystrokes never gets a QRS.
+static void test_qrs_own_message_count_restarts_below_the_line(void)
+{
+    BackPressure bp(20);   // qrsThreshold() == 5
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(6, false, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(4, false, 1002));   // radio drained: run over
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(5, false, 1003),
+                                  "count restarted: this is own message #1 again");
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(6, false, 1004));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(7, false, 1005));
+}
+
+// The drain poll sees the dip too: in the field the ring drains between two
+// typed messages while nothing is enqueued, so poll() must end the run the
+// same way onSend() does. A sighting at/above the line in poll() leaves the
+// count alone.
+static void test_qrs_own_message_count_restarts_via_poll(void)
+{
+    BackPressure bp(20);   // qrsThreshold() == 5
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1000));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(6, false, 1001));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(5, 1002));            // still at the line: count kept
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(4, 1003));            // drained below it: run over
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(5, false, 1004),
+                                  "poll() saw depth 4: this is own message #1 again");
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(6, false, 1005));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(7, false, 1006));
+}
+
+// QRT and QTA are real events (refused / lost message) and are NOT gated by
+// the own-message count: the first typed message into the refusal band or a
+// drop must still be reported at once. reset() clears the count like the rest
+// of the episode state.
+static void test_qrt_qta_and_reset_ignore_the_own_message_count(void)
+{
+    BackPressure bp(20);   // refuseThreshold() 16
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(16, false, 1000));
+    bp.reset();
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1001));
+    bp.reset();
+
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1002));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1003));
+    bp.reset();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.onSend(5, false, 1004),
+                                  "reset() cleared the count: own message #1 again");
 }
 
 // TM-21's lesson: a QRS for every message of a burst is itself a flood.
@@ -134,6 +214,8 @@ static void test_qrt_at_the_threshold_and_refusal_band(void)
 {
     BackPressure bp(20);   // threshold 16, qrsThreshold() 5
 
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 998));    // own msgs 1-2 at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 999));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(15, false, 1001));
     TEST_ASSERT_FALSE_MESSAGE(bp.refusing(), "one below the threshold still accepts");
@@ -272,6 +354,8 @@ static void test_qta_after_qrs(void)
 {
     BackPressure bp(20);   // qrsThreshold() 5
 
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 998));    // own msgs 1-2 at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 999));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(20, true, 1001));
 }
@@ -306,14 +390,17 @@ static void test_baseline_load_produces_no_notice(void)
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
 }
 
-// b) The threshold itself: nothing below it, exactly one QRS at it, nothing
-// new while climbing further (the existing latch, proven elsewhere).
+// b) The threshold itself: nothing below it, exactly one QRS at it (on the
+// third own message, QRS_MIN_USER_MSGS), nothing new while climbing further
+// (the existing latch, proven elsewhere).
 static void test_qrs_exactly_at_the_threshold(void)
 {
     BackPressure bp(20);   // qrsThreshold() == 5
     uint32_t t = 1000;
 
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(4, false, t++));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, t++));   // own msgs 1-2 at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, t++));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, t++));
     TEST_ASSERT_EQUAL_INT(BP_QRS, bp.state());
 
@@ -328,12 +415,16 @@ static void test_qrs_only_episode_closes_silently(void)
 {
     BackPressure bp(20);
 
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 998));    // own msgs 1-2 at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 999));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_NONE, bp.poll(0, 1001),
                                    "QRS-only episode never reached QRT/QTA, no QRV to give");
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.latch());
     TEST_ASSERT_EQUAL_INT(BP_QUIET, bp.state());
 
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1998));   // own msgs 1-2 of the next run
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1999));
     TEST_ASSERT_EQUAL_INT_MESSAGE(BP_NOTICE_QRS, bp.onSend(5, false, 2000),
                                    "latch was cleared: the next episode can QRS again");
 }
@@ -406,6 +497,8 @@ static void test_full_cycle_rearms(void)
 
     for(int cycle = 0; cycle < 3; cycle++)
     {
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, t++));   // own msgs 1-2 at the line
+        TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(5, false, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRT, bp.onSend(24, false, t++));
         TEST_ASSERT_EQUAL_INT(BP_NOTICE_QTA, bp.onSend(30, true, t++));
@@ -499,6 +592,8 @@ static void test_qrv_water_band_hold_covers_the_anti_flap_regression(void)
 {
     BackPressure bp(20);
 
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 998));    // own msgs 1-2 at the line
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 999));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS,  bp.onSend(5, false, 1000));
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(1, 1200));            // arms, 200 ms in -- nowhere near the hold
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(5, false, 1400));   // back up 400 ms after the QRS
@@ -577,6 +672,10 @@ int main(int, char **)
     RUN_TEST(test_no_qrv_without_a_preceding_notice);
 
     RUN_TEST(test_qrs_fires_once_at_qrs_threshold);
+    RUN_TEST(test_qrs_needs_three_own_messages_at_the_line);
+    RUN_TEST(test_qrs_own_message_count_restarts_below_the_line);
+    RUN_TEST(test_qrs_own_message_count_restarts_via_poll);
+    RUN_TEST(test_qrt_qta_and_reset_ignore_the_own_message_count);
     RUN_TEST(test_single_qrs_per_episode_under_a_burst);
 
     RUN_TEST(test_qrt_at_the_threshold_and_refusal_band);

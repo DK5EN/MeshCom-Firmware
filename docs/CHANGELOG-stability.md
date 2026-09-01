@@ -149,6 +149,12 @@ live-gateway baseline capture) and is pinned by integrated regression suites.
      silent, and QRV is only sent when the episode actually refused (QRT)
      or dropped (QTA) a message — a QRS-only episode closes silently. The
      recorded baseline traffic pattern is pinned as a regression test.
+     Depth alone still counts relay frames, ACKs and beacons, and on a
+     gateway idling at depth 4 the very first typed message got a QRS for a
+     queue the sender had not built — so QRS additionally needs the sender's
+     **third own message in a row** on a ring at/above the line
+     (`QRS_MIN_USER_MSGS`); a dip below 5, seen in `onSend()` or the drain
+     `poll()`, restarts that count. QRT and QTA are not gated by it.
 160. **Back-pressure notices are normal messages from the node's own
      callsign, addressed to the conversation that triggered them** (BP-01,
      BP-06). The BLE/web frame carries the node call as sender instead of
