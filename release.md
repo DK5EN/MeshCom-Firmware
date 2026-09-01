@@ -7,6 +7,74 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35p.09.01.2-stability (2026-09-01, zweiter Schnitt)
+
+Ersetzt v4.35p.09.01-stability vom Mittag (Release-Objekt geloescht, Tag
+bleibt als Marker). `FLASH_VERSION` bleibt 20260901 (gleicher Tag, Praezedenz
+08.27.2). Drei Dinge obendrauf: die QRS-Kalibrierung aus dem Feld (Item 167),
+der ADC-Multiplikator des Heltec Wireless Stick V3 aus Upstream (Item 168)
+und der Upstream-`dev`-Sync mit unserem PlatformIO-Upload-Fix (Item 169).
+Native-Gate 489/489 in 12 Host-Envs.
+
+### Was dazugekommen ist
+
+- **QRS erst mit der dritten eigenen Nachricht auf vollem Ring
+  (`QRS_MIN_USER_MSGS`).** Feldbefund vom Abend: "QRS -- slow down" war
+  auch mit der BP-05-Linie bei Tiefe 5 viel zu empfindlich und kam schon
+  bei der ersten Nachricht. Ursache: `txRingDepth()` zaehlt Relay-Frames,
+  ACKs und Beacons mit, ein Gateway mit Grundlast 4 gibt dem Absender fuer
+  seine erste Nachricht ein QRS fuer einen Stau, den er nicht gebaut hat.
+  `onSend()` laeuft genau einmal pro lokal getippter Nachricht und nie fuer
+  Relay/ACK/Beacon, also zaehlt die Zustandsmaschine dort ihre eigenen
+  Aufrufe: QRS kommt, wenn drei eigene Nachrichten in Folge den Ring bei
+  Tiefe >= 5 vorfinden. Faellt der Ring zwischendurch unter 5 (in `onSend()`
+  oder im Drain-`poll()`), beginnt die Zaehlung von vorn -- wer so tippt,
+  dass die Funke zwischendurch abarbeitet, ist nicht das Problem. QRT und
+  QTA bleiben ungegatet, Latch/Hysterese/QRV-Hold unveraendert. Acht
+  Zeilen in `src/backpressure.h`, `loop_functions.cpp` unangetastet. Vier
+  neue Host-Faelle, sieben bestehende um zwei stille Vorlaeufer ergaenzt,
+  der integrierte Burst-Test erwartet QRS jetzt bei Tiefe 7.
+- **Heltec Wireless Stick V3 misst seinen Akku wieder** (Upstream PR #1119,
+  OE3LCR, Issue #1116). `ADC_MULTIPLIER 4.9245` war vom Vision Master E213
+  uebernommen; Referenzmessung ergibt 4.13. Mit dem alten Wert fiel die
+  Messung aus dem Plausibilitaetsband von `battDetectUpdate()`, der Node
+  meldete "keine Batteriehardware" und liess `/B=` weg.
+- **PlatformIO-Upload ohne `upload_port` funktioniert, nRF52-Core-Warnungen
+  begraben keine echten mehr** (Upstream PR #1118, von uns).
+  `upload_protocol = custom` rief nie die Port-Erkennung auf, `$UPLOAD_PORT`
+  blieb leer; mit `esptool` laeuft sie vorher und `upload_command` bleibt
+  unser Befehl. `-Wall -Wextra` von `build_flags` nach `build_src_flags`
+  (nRF52- und ESP32-Basis): in `build_flags` trafen sie den Adafruit-Core
+  und die SoftDevice-Header, ueber 23.000 `-Wunused-parameter` pro
+  Vollbuild. Upstreams `v4.35p compile` (#1117) nimmt die Flags aus den
+  restlichen Varianten und das `--port` aus den T-Deck-Upload-Kommandos;
+  beide Baeume sind synchron.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen; Native-Gate 489/489 in 12 Host-Envs
+  (inkl. der vier neuen `QRS_MIN_USER_MSGS`-Faelle, DJ8MEH-Replay,
+  Grundlast-Muster, Flood-Test 13-in-10).
+- Heltec V3 dk5en-98 (Live-Gateway) laeuft diesen Build per OTA seit
+  21:52 Uhr; die Web-GUI meldet den neuen Build-String, mehr wurde am
+  Gateway nicht geprueft.
+- Alles aus dem 09.01-Abschnitt darunter gilt fuer den 09.01-Build, der
+  sich von diesem nur um eine Konstante in der Zustandsmaschine, den
+  Wireless-Stick-Pin-Wert und Build-System-Aenderungen unterscheidet.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Kein Burst gegen die neue Drei-Nachrichten-Regel auf Hardware; der
+  einzige Feldbefund ist die Beobachtung "QRS bei der ersten Nachricht",
+  die den Fix ausgeloest hat. T-Deck Plus, T-Beam und RAK4631 haben diesen
+  Build nicht gesehen.
+- Der Wireless-Stick-V3-Wert stammt aus OE3LCRs Referenzmessung, kein
+  eigenes Board auf dem Tisch.
+- Der originale DJ8MEH-Feldvorfall weiterhin nicht End-to-End auf
+  Hardware nachprovoziert; TM-49 offen (4-MB-Boards bei marginalem Link
+  per USB flashen); Batterie-Nullpunkt am 2S-Pack, INA226 und L76K-GPS
+  unveraendert ungeprueft.
+
 ## Stability-Release v4.35p.09.01-stability (2026-09-01)
 
 Ersetzt v4.35p.08.31.4-stability (Release-Objekt geloescht, Tag bleibt als

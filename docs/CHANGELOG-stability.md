@@ -75,6 +75,56 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## New in v4.35p.09.01.2-stability
+
+A same-day second cut on top of `v4.35p.09.01-stability`: one field-driven
+back-pressure calibration (the "slow down" warning no longer fires on a
+gateway's relay load), one battery-measurement fix from upstream for the
+Heltec Wireless Stick V3, and the upstream `dev` sync that carries this
+fork's own tooling PRs back in. `FLASH_VERSION` stays `20260901` (same-day
+cut, 08.27.2 precedent); native suite 489 test cases across 12 host
+environments. Only the live gateway (dk5en-98, Heltec V3) ran this build
+before publishing.
+
+167. **QRS ("slow down") needs the sender's third own message on a full
+     ring, not just the ring depth.** `txRingDepth()` counts relay frames,
+     ACKs and beacons, so a gateway idling at depth 4 handed the very first
+     typed message a QRS for a queue the sender had not built — even with the
+     BP-05 line at 5 the warning sat on top of the relay load and read as
+     "too sensitive" in the field. `onSend()` is called exactly once per
+     locally originated message and never for relay/ACK/beacon traffic, so
+     the state machine now counts its own calls: QRS fires when
+     `QRS_MIN_USER_MSGS` (3) own messages in a row find the ring at or above
+     `qrsThreshold()`; a sighting below the line — in `onSend()` or in the
+     drain `poll()` between two typed messages — restarts the count, so a
+     sender whose messages drain between keystrokes never gets one. QRT and
+     QTA are not gated by this (a refused or lost message is reported at
+     once), and latch, hysteresis and QRV hold are unchanged. Pinned by four
+     new host cases (third message fires, restart via `onSend()`, restart via
+     `poll()`, QRT/QTA/`reset()` exemption); the integrated burst regression
+     now expects QRS at depth 7.
+168. **Heltec Wireless Stick V3 measures its battery again** (upstream PR
+     #1119, OE3LCR, issue #1116). The variant carried `ADC_MULTIPLIER 4.9245`,
+     copied from the Vision Master E213; a reference measurement (Metrahit
+     TRMS, 4.093 V under load against a firmware reading of 4.88 V, 991 ADC
+     counts = 798.6 mV, real divider 5.125) gives 4.13. With the old value the
+     reading fell outside the `battDetectUpdate()` plausibility band
+     (1.15 × MAXV), so the node reported "no battery hardware", `BATT 0.00 V`
+     and omitted `/B=` from its APRS positions.
+169. **PlatformIO upload works on hosts without `upload_port`; nRF52 core
+     warnings no longer bury real ones** (upstream PR #1118, this fork).
+     `upload_protocol = custom` never runs the espressif32 builder's port
+     autodetect, so `$UPLOAD_PORT` in the variants' `upload_command` stayed
+     empty and esptool aborted; with `esptool` the autodetect (or an explicit
+     `--upload-port`) runs first and PlatformIO still substitutes our
+     `upload_command`. `-Wall -Wextra` moved from `build_flags` to
+     `build_src_flags` on the nRF52 and ESP32 bases: in `build_flags` they
+     also hit the Adafruit nRF52 core and SoftDevice headers and produced over
+     23,000 `-Wunused-parameter` warnings per full build. Upstream's
+     `v4.35p compile` (#1117) dropped the flags from the remaining variants
+     and the unused `--port` from the T-Deck upload commands; both trees are
+     in sync.
+
 ## New in v4.35p.09.01-stability
 
 Everything since `v4.35p.08.31-stability`, in its final form: the complete TX
