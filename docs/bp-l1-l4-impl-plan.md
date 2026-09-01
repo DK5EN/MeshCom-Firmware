@@ -307,10 +307,14 @@ enum BpSendResult
 };
 ```
 
-Betroffene Deklarationen:
+Betroffene Deklarationen (Scout-Vollerhebung 2026-09-01):
 
 - `src/loop_functions.h:71`
 - `src/nrf52/nrf52_ble.cpp:25` (eigenes `extern`)
+- `test/test_getextern/test_getextern.cpp:59` (Recording-Stub der nativen Suite)
+
+Keine C-Linkage-Falle: weder `loop_functions.h` noch `loop_functions_extern.h` stehen in einem
+`extern "C"`-Block, und keine `.c`-Einheit bindet sie ein.
 
 Alle `return;` in `sendMessage()` werden zu einem Wert:
 
@@ -514,11 +518,11 @@ Alle drei Schritte fassen `loop_functions.cpp` an, davon zwei denselben Funktion
 **keine parallelisierbare Welle**, sondern eine Kette. Ein Commit pro Welle, jeweils erst nach
 gruenem Gate.
 
-| Welle | Inhalt                                                                                                                                                                 | Exklusive Dateien                                                                                                                                                                                                                                                         |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | **BP-07** — `bpNextMsgId()`, `BpNack`/`BpSendResult`, `bpNackCompose()`, `bpDeliver()`-Abspaltung, Refuse-Check verschieben, `bpPeekDst()` loeschen, EXTUDP-Puffer 400 | `src/backpressure.h`, `src/bp_notice_frame.h`, `src/loop_functions.cpp`, `src/extudp_functions.cpp`, `test/test_backpressure/`, `test/test_bp_notice_frame/`, `test/test_extern_notice_json/`, `test/test_bp_regression/`                                                 |
-| 2     | **BP-08** — Echo hinter den Ringeintrag, Verwurfzweig, kein UDP-Uplink                                                                                                 | `src/loop_functions.cpp`                                                                                                                                                                                                                                                  |
-| 3     | **BP-09** — `sendMessage()` gibt `int` zurueck, acht Aufrufstellen                                                                                                     | `src/loop_functions.h`, `src/loop_functions.cpp`, `src/nrf52/nrf52_ble.cpp`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/web_functions/web_functions.cpp`, `src/t-deck/event_functions.cpp`, `src/t-deck-pro/ui_deckpro.cpp`, `src/extudp_functions.cpp` |
+| Welle | Inhalt                                                                                                                                                                 | Exklusive Dateien                                                                                                                                                                                                                                                                                 |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | **BP-07** — `bpNextMsgId()`, `BpNack`/`BpSendResult`, `bpNackCompose()`, `bpDeliver()`-Abspaltung, Refuse-Check verschieben, `bpPeekDst()` loeschen, EXTUDP-Puffer 400 | `src/backpressure.h`, `src/bp_notice_frame.h`, `src/loop_functions.cpp`, `src/extudp_functions.cpp`, `test/test_backpressure/`, `test/test_bp_notice_frame/`, `test/test_extern_notice_json/`, `test/test_bp_regression/`                                                                         |
+| 2     | **BP-08** — Echo hinter den Ringeintrag, Verwurfzweig, kein UDP-Uplink                                                                                                 | `src/loop_functions.cpp`                                                                                                                                                                                                                                                                          |
+| 3     | **BP-09** — `sendMessage()` gibt `int` zurueck, acht Aufrufstellen                                                                                                     | `src/loop_functions.h`, `src/loop_functions.cpp`, `src/nrf52/nrf52_ble.cpp`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/web_functions/web_functions.cpp`, `src/t-deck/event_functions.cpp`, `src/t-deck-pro/ui_deckpro.cpp`, `src/extudp_functions.cpp`, `test/test_getextern/` |
 
 Welle 1 laesst den Baum nicht rot zurueck: die Signaturaenderung an `onRefuse()` und ihre
 Aufrufstelle liegen beide in dieser Welle.
