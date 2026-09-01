@@ -3,15 +3,16 @@
 Stand: 2026-09-01, Firmware v4.35p.08.31.4-stability
 Quellen im Code: `src/backpressure.h`, `src/bp_notice_frame.h`, `src/extern_notice_json.h`,
 `src/loop_functions.cpp` (Abschnitt "BP-01 ... back-pressure to the sender")
-Geplante Aenderung: `docs/bp-l1-l4-impl-plan.md` (BP-07/08/09, noch nicht implementiert)
+Umsetzung: BP-07 `77b43d4b`, BP-08 `e8b82a02`, BP-09 `4f97f7f0`, Advisor-Nachzug BP-10 `3aecc90f`
+Plan und Review-Verdict: `docs/archive/bp-l1-l4-impl-plan-20260901.md`, `docs/archive/bp-advisor-verdict-20260901.md`
 
 Dieses Dokument beschreibt, was ein MeshCom-Node meldet, wenn sein Sendepuffer volllaeuft,
 in welcher Form diese Meldungen auf den einzelnen Transportwegen ankommen, und was eine
 Chat-App daraus an Flusssteuerung bauen kann. Es ist bewusst dreiteilig: Kapitel 1-4 fuer
 Nutzende, Kapitel 3-7 fuer App-Entwicklung, Kapitel 8-11 fuer Firmware- und App-Entscheidungen.
 
-Kapitel 1-8 beschreiben den **ausgelieferten Stand**. Kapitel 9 beschreibt eine **geplante,
-noch nicht implementierte** Aenderung und ist als solche gekennzeichnet.
+Alle Kapitel beschreiben den **ausgelieferten Stand**. L1 bis L4 aus Kapitel 8 sind behoben;
+**L5 ist weiterhin offen** — eine App erkennt eine Meldung nach wie vor nur am Textpraefix.
 
 ---
 
@@ -142,9 +143,8 @@ Wichtig fuer die Auslegung:
 
 - Das Echo bedeutet **nicht**, dass die Nachricht auf der Luft war. Dafuer sind die
   `0x41`-Statusframes da.
-- Im heutigen Stand bedeutet es genau genommen nur "der Node hat den Text geparst und
-  angenommen" — es geht raus, **bevor** der Sendepuffer ueberhaupt gefragt wurde (Luecke L3,
-  Kapitel 8). Nach BP-08 bedeutet es "die Nachricht liegt im Sendepuffer".
+- Es bedeutet "die Nachricht liegt im Sendepuffer". Bis BP-08 ging es raus, **bevor** der
+  Sendepuffer ueberhaupt gefragt wurde, und war damit schwaecher (Luecke L3, Kapitel 8).
 - **Bleibt das Echo aus, ist die Nachricht nicht angenommen worden.** Das ist heute der
   einzige zuverlaessige Weg, eine abgewiesene Nachricht zu erkennen — siehe Kapitel 11.
 
@@ -207,8 +207,8 @@ die Kombination:
 
 1. `msg_app_offline` gesetzt, **und**
 2. Absender gleich dem eigenen Node-Rufzeichen, **und**
-3. Nutztext beginnt mit `QRS - `, `QRT - `, `QTA - ` oder `QRV - ` — nach BP-07 zusaetzlich
-   `QRT NOT SENT - ` und `QTA NOT SENT - ` (Kapitel 9).
+3. Nutztext beginnt mit `QRS - `, `QRT - `, `QTA - `, `QRV - `, `QRT NOT SENT - ` oder
+   `QTA NOT SENT - ` (Kapitel 9).
 
 Das Textpraefix ist heute das einzige belastbare Unterscheidungsmerkmal. Das ist eine bekannte
 Schwaeche (Luecke L5, Kapitel 8) und bleibt auch nach BP-07/08/09 bestehen.
@@ -333,19 +333,20 @@ vorher noch der `0x41`-Status `0x01` ("server reached") an die App.
 
 ---
 
-## 8. Bekannte Luecken im aktuellen Stand
+## 8. Die Luecken, die zu BP-07/08/09 gefuehrt haben
 
-Diese Punkte sind verifiziert. **L1 bis L4 werden von BP-07/08/09 geschlossen**
-(`docs/bp-l1-l4-impl-plan.md`), L5 bleibt vorerst offen. Solange die Aenderung nicht
-ausgeliefert ist, sollte eine App nicht darauf bauen, ueber einen Verlust informiert zu werden.
+Der Befundstand, der zu BP-07/08/09 gefuehrt hat. L1 bis L4 sind behoben, L5 nicht.
 
-| Nr.    | Luecke                                                            | Status                 |
-| ------ | ----------------------------------------------------------------- | ---------------------- |
-| **L1** | Eine abgewiesene Nachricht erzeugt nie eine App-sichtbare Meldung | geplant: BP-07         |
-| **L2** | Die Meldung nennt die betroffene Nachricht nicht                  | geplant: BP-07         |
-| **L3** | Bei QTA sieht die Nachricht erfolgreich aus                       | geplant: BP-08         |
-| **L4** | Am T-Deck geht der getippte Text verloren                         | geplant: BP-09         |
-| **L5** | Meldungen sind nur am Textpraefix erkennbar                       | **offen, kein Termin** |
+| Nr.    | Luecke                                                            | Status                            |
+| ------ | ----------------------------------------------------------------- | --------------------------------- |
+| **L1** | Eine abgewiesene Nachricht erzeugt nie eine App-sichtbare Meldung | behoben, BP-07 `77b43d4b`         |
+| **L2** | Die Meldung nennt die betroffene Nachricht nicht                  | behoben, BP-07 `77b43d4b`         |
+| **L3** | Bei QTA sieht die Nachricht erfolgreich aus                       | behoben, BP-08 `e8b82a02`         |
+| **L4** | Der getippte Text geht bei einer Abweisung verloren               | behoben, BP-09 `4f97f7f0` + BP-10 |
+| **L5** | Meldungen sind nur am Textpraefix erkennbar                       | **offen, kein Termin**            |
+
+Die folgenden Beschreibungen halten den Zustand VOR der Behebung fest — sie erklaeren, warum
+die heutige Loesung so aussieht, wie sie aussieht.
 
 **L1 — Eine abgewiesene Nachricht erzeugt nie eine App-sichtbare Meldung.**
 `onRefuse()` ruft `latchIfHigher(BP_NOTICE_QRT)` auf. Der Abweisungszustand wird aber nur in
@@ -364,11 +365,12 @@ Das Echo an die App geht raus, bevor der Ringeintrag ueberhaupt versucht wird. D
 die Nachricht regulaer an; die QTA-Meldung kommt danach als eigenstaendige, unverknuepfte
 Zeile.
 
-**L4 — Am T-Deck geht der getippte Text verloren.**
-`event_functions.cpp:721` leert das Eingabefeld unbedingt nach `sendMessage()` und schaltet auf
-die Nachrichtenliste um. Bei Abweisung ist der Text weder in der Liste noch im Eingabefeld.
-Ursache ist, dass `sendMessage()` `void` zurueckgibt — kein Aufrufer kann auf den Ausgang
-reagieren.
+**L4 — Der getippte Text geht bei einer Abweisung verloren.**
+`event_functions.cpp` leerte das Eingabefeld unbedingt nach `sendMessage()` und schaltete auf
+die Nachrichtenliste um. Bei Abweisung war der Text weder in der Liste noch im Eingabefeld.
+Ursache war, dass `sendMessage()` `void` zurueckgab — kein Aufrufer konnte auf den Ausgang
+reagieren. Dasselbe galt fuer die Web-GUI, deren JavaScript beide Eingabefelder unmittelbar
+nach dem Absenden leerte, ohne die Antwort zu lesen.
 
 **L5 — Meldungen sind nur am Textpraefix erkennbar.**
 Kein eigenes Frameformat, kein Typfeld, kein Statusbyte. Eine Nutzernachricht, die zufaellig
@@ -377,24 +379,22 @@ Protokollaenderung und Abstimmung mit der App-Seite, siehe Kapitel 10.
 
 ---
 
-## 9. Geplante Aenderung BP-07 / BP-08 / BP-09
+## 9. Die Quittung fuer eine verlorene Nachricht
 
-Plan mit Dateien, Tests und Reihenfolge: `docs/bp-l1-l4-impl-plan.md`. Hier nur, was sich fuer
-Nutzende und fuer die App aendert. Vier Festlegungen des Operators vom 2026-09-01 sind
-eingearbeitet.
+Ausgeliefert mit BP-07/08/09 und dem Advisor-Nachzug BP-10.
 
-### Neu: eine Quittung pro verlorener Nachricht, in Echo-Form
+### Eine Quittung pro verlorener Nachricht, in Echo-Form
 
-Bisher gibt es nur ein Echo (angenommen) oder Stille (verloren). Neu tritt an die Stelle der
-Stille eine Zeile in derselben Form wie das Echo, die den Nachrichtentext nennt und den Grund
-als Q-Code voranstellt:
+Frueher gab es nur ein Echo (angenommen) oder Stille (verloren). An die Stelle der Stille tritt
+eine Zeile in derselben Form wie das Echo, die den Nachrichtentext nennt und den Grund als
+Q-Code voranstellt:
 
 ```
 QRT NOT SENT - Hello World 17      (abgewiesen, Puffer im QRT-Band)
 QTA NOT SENT - Hello World 17      (angenommen, dann vom Ring verworfen)
 ```
 
-Die gelatchte Episodenwarnung bleibt daneben unveraendert: eine QRS und eine QRT pro Episode,
+Die gelatchte Episodenwarnung besteht daneben unveraendert: eine QRS und eine QRT pro Episode,
 mit dem bisherigen Wortlaut. Sie ist die Vorwarnung, die NOT-SENT-Zeile ist die Quittung zur
 einzelnen Nachricht. **Pro verlorener Nachricht genau ein Frame.**
 
@@ -427,23 +427,24 @@ Echo:   Grp 20, "QRT NOT SENT - Hello World 18"
 Echo:   Grp 20, "QRV - ready again, TX buffer clear"
 ```
 
-Aus stillen Verlusten werden benannte. Die Regel bleibt einfach: **auf jede gesendete Nachricht
-kommt genau eine Zeile zurueck** — entweder das Echo oder die NOT-SENT-Quittung.
+Die Regel ist damit: **auf jede gesendete Nachricht kommt genau eine Zeile zurueck** — entweder
+das Echo oder die NOT-SENT-Quittung.
 
 ### Rahmung und Kuerzung
 
 Die NOT-SENT-Zeile ist **kein echtes Echo**, sondern eine Meldung in Echo-Form: gerahmt wie die
-bisherigen Q-Code-Meldungen (Kapitel 5 und 6), also `msg_app_offline = true` und
-`msg_id = millis()`. Sie traegt bewusst **keine reale `msg_id`** — im Abweisungsfall existiert
-gar keine, weil der Node fuer eine nicht gesendete Nachricht keine verbraucht.
+uebrigen Q-Code-Meldungen (Kapitel 5 und 6), also `msg_app_offline = true` und eine `msg_id`
+aus einem eigenen, streng steigenden Zaehler. Sie traegt bewusst **keine reale `msg_id`** — im
+Abweisungsfall existiert gar keine, weil der Node fuer eine nicht gesendete Nachricht keine
+verbraucht.
 
-Fuer die App heisst das: **nichts zu aendern**, das Frameformat ist bekannt. Und zugleich: die
-Zuordnung laeuft weiter ueber den Text, nicht ueber eine Kennung (Luecke L5 bleibt).
+Fuer die App heisst das: **am Frameformat aendert sich nichts**, es kommen nur mehr Meldungen.
+Und zugleich: die Zuordnung laeuft weiter ueber den Text, nicht ueber eine Kennung (L5).
 
 Der Nachrichtentext wird auf **120 Byte** gekuerzt, bei Kuerzung mit `...` markiert, auf allen
-Transportwegen gleich. Bindend ist dabei EXTUDP: das Datagramm hat rund 153 Byte Platz fuer den
-Text, BLE haette 237. Ein einheitlicher Wert sorgt dafuer, dass App und externer Client
-dasselbe sehen.
+Transportwegen gleich. Bindend ist EXTUDP: das Datagramm hat rund 153 Byte Platz fuer den Text,
+BLE haette 237. Ein einheitlicher Wert sorgt dafuer, dass App und externer Client dasselbe
+sehen.
 
 Drei Feinheiten, die beim Textvergleich in der App zaehlen:
 
@@ -453,61 +454,75 @@ Drei Feinheiten, die beim Textvergleich in der App zaehlen:
 - `"`, `\` und Steuerzeichen werden im gekuerzten Text durch Leerzeichen ersetzt, damit das
   EXTUDP-Datagramm beim JSON-Escapen nicht ueber seinen Puffer waechst.
 
-### Neue Konsolenzeile
+### Neue Konsolenzeilen
 
-`[BP];notice;` bleibt Zustandswechseln vorbehalten, die Quittung bekommt einen eigenen Marker.
-`txt;` steht als letztes Feld, weil der Nachrichtentext Semikolons enthalten kann:
+`[BP];notice;` bleibt Zustandswechseln vorbehalten. Die Quittung hat einen eigenen Marker;
+das `txt;`-Feld steht als letztes und erscheint **nur bei eingeschaltetem `bLORADEBUG`**, damit
+Langzeit-Mitschnitte der 2323-Konsole keine Nachrichteninhalte fuehren:
 
 ```
 [BP];refuse;depth;16;max;20;ms;102400
-[BP];nack;QRT;dst;20;ms;102400;txt;Hello World 17
+[BP];nack;QRT;dst;20;ms;102400                       (Default)
+[BP];nack;QRT;dst;20;ms;102400;txt;Hello World 17    (mit bLORADEBUG)
+```
+
+Dazu ein dritter Marker fuer den Fall, dass der Sendepuffer eine Nachricht aus einem anderen
+Grund als Rueckstau nicht annimmt — unkonfiguriertes Rufzeichen (TX-01) oder verletzte
+Laengen-Invariante. Das ist **kein** Rueckstau, erzeugt keinen Zustandswechsel und keine
+Quittung:
+
+```
+[BP];invalid;depth;0;max;20;ms;102400
 ```
 
 ### QTA sieht nicht mehr nach Erfolg aus
 
-Das Echo wandert hinter den Ringeintrag. Wird der Frame verworfen, kommt statt des Echos die
+Das Echo kommt nach dem Ringeintrag. Wird der Frame verworfen, kommt statt des Echos die
 Quittung — die Nachricht erscheint also gar nicht erst als vermeintlich gesendet im Verlauf.
 
 ### Ein verworfener Frame geht auch nicht ins Backbone
 
-Bisher lief der UDP-Uplink eines Gateways unabhaengig vom Ausgang des Ringeintrags: der
+Frueher lief der UDP-Uplink eines Gateways unabhaengig vom Ausgang des Ringeintrags: der
 LoRa-Ring konnte den Frame verwerfen, die Nachricht ging trotzdem an den zentralen Server.
 Operatorentscheidung 2026-09-01: **das ist unsymmetrisch. Was nicht ueber LoRa gesendet werden
 kann, geht auch nicht ins Backbone.** Eine Nachricht betritt das Netz entweder ganz oder gar
 nicht.
 
 Fuer Betreiber eines Gateways heisst das: eine lokal getippte Nachricht, deren Frame der
-TX-Ring verwirft, erscheint ab BP-08 nicht mehr im Netz. Der Absender bekommt
-`QTA NOT SENT - <Text>` und weiss, dass er wiederholen muss. Bisher ging sie ins Backbone,
-ohne dass die HF-Nachbarn sie hoerten und ohne dass es jemand erfuhr.
+TX-Ring verwirft, erscheint nicht mehr im Netz. Der Absender bekommt `QTA NOT SENT - <Text>`
+und weiss, dass er wiederholen muss.
 
 ### Der getippte Text bleibt stehen
 
-`sendMessage()` bekommt einen Rueckgabewert:
+`sendMessage()` hat einen Rueckgabewert:
 
-| Wert | Bedeutung                                    |
-| ---- | -------------------------------------------- |
-| `0`  | angenommen                                   |
-| `-1` | abgewiesen (QRT)                             |
-| `-2` | verworfen (QTA)                              |
-| `-3` | ungueltig (Laenge, DM an eigenes Rufzeichen) |
+| Wert | Bedeutung                                                              |
+| ---- | ---------------------------------------------------------------------- |
+| `0`  | angenommen                                                             |
+| `-1` | abgewiesen (QRT)                                                       |
+| `-2` | verworfen (QTA)                                                        |
+| `-3` | nicht sendbar: Laenge, DM ans eigene Rufzeichen, oder TX-01/Invariante |
 
-Am T-Deck wird das Eingabefeld dadurch nur noch bei `0` geleert — der abgewiesene Text steht
-weiter da und kann nach dem QRV erneut gesendet werden. Das Webinterface antwortet
-`sendmessage refused` statt `sendmessage ok`.
+Am T-Deck und am T-Deck Pro wird das Eingabefeld dadurch nur noch bei `0` geleert. Die
+Web-GUI leert ihre Felder erst, wenn die Antwort `sendmessage ok` lautet — sie antwortet sonst
+`sendmessage refused`, `sendmessage dropped` oder `sendmessage invalid`.
+
+**Wichtig fuer die Bedienung:** der Wechsel zur Nachrichtenansicht passiert weiterhin in jedem
+Fall. Waere er an den Erfolg gebunden, bliebe der Operator auf dem Eingabe-Tab stehen, waehrend
+die Quittung in die Nachrichtenliste geschrieben wird — und saehe von der Abweisung nichts.
 
 ---
 
 ## 10. Anforderungen an die Firmware aus App-Sicht
 
-| Anforderung                                                                     | Status                |
-| ------------------------------------------------------------------------------- | --------------------- |
-| Rueckmeldung fuer **jede** abgewiesene Nachricht, nicht nur pro Zustandswechsel | BP-07 deckt das ab    |
-| Bezug zur betroffenen Nachricht                                                 | BP-07, ueber den Text |
-| Kein erfolgreich aussehendes Echo fuer eine verworfene Nachricht                | BP-08 deckt das ab    |
-| Getippter Text ueberlebt eine Abweisung                                         | BP-09 deckt das ab    |
-| **Maschinenlesbares Merkmal fuer Rueckstaumeldungen**                           | **offen (L5)**        |
-| **Kennung statt Text, um die eigene Nachricht sicher zuzuordnen**               | **offen**             |
+| Anforderung                                                                     | Status                  |
+| ------------------------------------------------------------------------------- | ----------------------- |
+| Rueckmeldung fuer **jede** abgewiesene Nachricht, nicht nur pro Zustandswechsel | behoben, BP-07          |
+| Bezug zur betroffenen Nachricht                                                 | behoben, ueber den Text |
+| Kein erfolgreich aussehendes Echo fuer eine verworfene Nachricht                | behoben, BP-08          |
+| Getippter Text ueberlebt eine Abweisung                                         | behoben, BP-09          |
+| **Maschinenlesbares Merkmal fuer Rueckstaumeldungen**                           | **offen (L5)**          |
+| **Kennung statt Text, um die eigene Nachricht sicher zuzuordnen**               | **offen**               |
 
 Die beiden offenen Punkte gehoeren zusammen und brauchen eine Entscheidung auf der App-Seite.
 
@@ -516,14 +531,14 @@ normal echoen und direkt ein `0x41`-Frame mit einem neuen Statusbyte (etwa `0x03
 auf dieselbe `msg_id` schicken. Das verknuepft exakt die richtige Nachricht und passt in das
 bestehende Statusschema der App (`0x01` server reached, `0x02` ACK). Preis: es verbraucht eine
 Message-ID fuer etwas, das nie gesendet wurde — genau das, was BP-01 bewusst vermieden hat —
-und ohne App-Unterstuetzung sieht der Nutzer gar nichts. Deshalb ist es nicht Teil von
+und ohne App-Unterstuetzung sieht der Nutzer gar nichts. Deshalb war es nicht Teil von
 BP-07/08/09: die Textvariante wirkt sofort und ohne App-Release.
 
 ---
 
 ## 11. Empfohlene Flusssteuerung in der App
 
-### Mit dem heutigen Stand
+### Grundlage: die Q-Codes
 
 **QRS erkannt:** Sendetaste nicht sperren, aber einen dezenten Hinweis einblenden ("Node sendet
 gerade viel"). Wer jetzt weitertippt, kommt noch durch.
@@ -541,16 +556,17 @@ markieren. Das ist eine Heuristik, kein Beweis — es gibt heute keinen Bezug.
 laenger als wenige Sekunden aus, ist sie mit hoher Wahrscheinlichkeit abgewiesen worden. Das
 ist derzeit der einzige zuverlaessige Weg, eine abgewiesene Nachricht in der App zu erkennen.
 
-### Nach BP-07/08/09
+### Zusaetzlich seit BP-07/08/09
 
 Der Echo-Timeout bleibt als Rueckfallebene sinnvoll, ist aber nicht mehr die Hauptquelle. Neu
 moeglich:
 
-**Text abgleichen.** Eine Rueckmeldung mit dem Praefix `QRT - not sent` oder `QTA - not sent`
+**Text abgleichen.** Eine Rueckmeldung mit dem Praefix `QRT NOT SENT - ` oder `QTA NOT SENT - `
 nennt den Anfang des Nachrichtentextes. Die App kann ihn gegen ihre eigenen noch
 unbestaetigten Nachrichten in diesem Chat abgleichen und genau die als unzugestellt markieren —
-mit Wiederholen-Knopf statt einer allgemeinen Warnung. Auf die 48-Zeichen-Kuerzung und das
+mit Wiederholen-Knopf statt einer allgemeinen Warnung. Auf die 120-BYTE-Kuerzung und das
 angehaengte `...` achten: der Vergleich muss ein Praefixvergleich sein, kein Gleichheitstest.
+Bei Umlauten oder Emoji sind 120 Byte deutlich weniger als 120 Zeichen.
 
 **Sperre praeziser setzen.** Nach der ersten Rueckmeldung ist sicher, dass Nachrichten verloren
 gehen — nicht nur wahrscheinlich. Die Sendetaste kann bis zum QRV gesperrt und der Verlauf mit
@@ -564,14 +580,16 @@ und hinter eine bewusste Nutzeraktion.
 
 ## Anhang: Markerreferenz fuer die Logauswertung
 
-| Marker                                       | Bedeutung                                                       |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `[BP];notice;<code>;depth;N;max;M;ms;T`      | Zustandswechsel, eine Zeile pro Episode/Code                    |
-| `[BP];refuse;depth;N;max;M;ms;T`             | Eine Nachricht wurde abgewiesen                                 |
-| `[BP];nack;<code>;dst;D;ms;T;txt;<Text>`     | Quittung zu einer verlorenen Nachricht — **geplant, BP-07**     |
-| `[MC-DBG] RING_DROP_NEW slot=...`            | Ring hat den neuen Frame verworfen (QTA-Quelle)                 |
-| `[MC-DBG] RING_DROP_PRIO slot=...`           | Ring hat einen aelteren Frame niedrigerer Prioritaet verdraengt |
-| `[MC-DBG] RING_STATUS ... queued=N/M dist=D` | Ringtiefe (belegte Plaetze) und alte Indexdistanz               |
+| Marker                                       | Bedeutung                                                                         |
+| -------------------------------------------- | --------------------------------------------------------------------------------- |
+| `[BP];notice;<code>;depth;N;max;M;ms;T`      | Zustandswechsel, eine Zeile pro Episode/Code                                      |
+| `[BP];refuse;depth;N;max;M;ms;T`             | Eine Nachricht wurde abgewiesen                                                   |
+| `[BP];nack;<code>;dst;D;ms;T`                | Quittung zu einer verlorenen Nachricht                                            |
+| `[BP];nack;...;txt;<Text>`                   | dieselbe Zeile mit Text — nur bei eingeschaltetem `bLORADEBUG`                    |
+| `[BP];invalid;depth;N;max;M;ms;T`            | Sendepuffer hat abgelehnt, aber NICHT wegen Rueckstau (TX-01, Laengen-Invariante) |
+| `[MC-DBG] RING_DROP_NEW slot=...`            | Ring hat den neuen Frame verworfen (QTA-Quelle)                                   |
+| `[MC-DBG] RING_DROP_PRIO slot=...`           | Ring hat einen aelteren Frame niedrigerer Prioritaet verdraengt                   |
+| `[MC-DBG] RING_STATUS ... queued=N/M dist=D` | Ringtiefe (belegte Plaetze) und alte Indexdistanz                                 |
 
 Die `[BP];`-Zeilen sind bewusst unbedingtes `Serial.printf` und kein `DEBUG_MSG` — sie
 erscheinen auch mit abgeschaltetem Debug, damit die Bench sie unabhaengig vom Transport

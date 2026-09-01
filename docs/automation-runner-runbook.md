@@ -158,7 +158,15 @@ prerequisites (`--gateway on` on the three ESP32 nodes) and pass criteria:
 - EXTUDP (TM-43): `cd tools/bench/runs && python3 ../rak_harness.py --scenario extudp --port <port> [--peer-port <port>] [--soak-seconds 600]` --
   [`bench-extudp-regression.md`](bench-extudp-regression.md). Not part of `--scenario all`.
 - Back-pressure (BP-01): `::{TEST}...` burst on the console, assert `[BP];notice;QRS|QRT|QRV` and
-  `[BP];refuse` lines; QTA needs relay load (`gwflood.py`) on top.
+  `[BP];refuse` lines; QTA needs relay load (`gwflood.py`) on top. `[BP];notice;` stays reserved
+  for state transitions only (BP-07) — the assert above is still valid unchanged. A refused or
+  dropped message additionally gets its own per-message receipt line, `[BP];nack;<code>;dst;<dst>;ms;<t>`
+  (`<code>` is `QRT` or `QTA`), with `;txt;<text>` appended only when `bLORADEBUG` is on (BP-07,
+  E6 — keeps message content out of the always-on 2323 log capture by default). Below the refuse
+  threshold — ring depth under `bp_state.refuseThreshold()` — an `addTxRingEntry()` failure is not
+  backpressure at all (unconfigured callsign, length invariant) and produces no notice, no nack,
+  and no state transition, only `[BP];invalid;depth;N;max;M;ms;T` (BP-10, fixes a false QRT cycle
+  on a factory-fresh node's empty ring).
 
 ## 3. Run record
 

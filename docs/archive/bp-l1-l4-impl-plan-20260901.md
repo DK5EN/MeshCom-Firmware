@@ -1,5 +1,32 @@
 # Implementierungsplan BP-07 / BP-08 / BP-09 — Rueckmeldung fuer abgewiesene Nachrichten
 
+**Status: ARCHIVIERT 2026-09-01 — vollstaendig umgesetzt.** Vier Commits auf
+`tdeck-partial-refresh-trace`, jede Welle Fable-advisor-gegatet:
+
+- **BP-07** (`77b43d4b`) — L1 (`onRefuse()` war Dead Code) und L2 (kein
+  Notice fuer verworfene Nachrichten) behoben, neue `BpNack`-Quittung.
+- **BP-08** (`e8b82a02`) — L3 (Erfolgs-Echo vor dem Ringeintrag) behoben,
+  plus Operatorentscheidung E4 (kein UDP-Uplink fuer verworfene Frames).
+- **BP-09** (`4f97f7f0`) — L4 (`sendMessage()` void) behoben, Rueckgabewert
+  `BpSendResult` an drei Aufrufstellen ausgewertet.
+- **BP-10** (`3aecc90f`) — unabhaengiger Fable-Advisor-Durchlauf ueber den
+  gesamten Diff dieses Plans, drei echte Regressionen gefunden und behoben
+  (siehe `bp-advisor-verdict-20260901.md` im selben Verzeichnis).
+
+Ergebnis: **L1, L2, L3, L4 sind behoben.** Gate 530 native Tests / 11 Envs,
+6 Board-Builds. Nachweis nur per Code/Native-Gate — der geplante Benchlauf
+(DK5EN-93 Flood, Nachbarn-Empfang, DK5EN-14 Eingabefeld) steht noch aus, siehe
+`docs/RESUME.md`.
+
+**L5 (maschinenlesbares Merkmal statt Textpraefix) bleibt wie hier geplant
+offen** — braucht eine Protokollaenderung und eine Abstimmung mit der
+App-Seite.
+
+Vollstaendiger Umsetzungsstand: `docs/BACKLOG.md` (Zeilen BP-07..BP-10),
+`docs/CHANGELOG-stability.md` (Eintraege 163-166).
+
+---
+
 Datum: 2026-09-01
 Basis: v4.35p.08.31.4-stability, Branch `tdeck-partial-refresh-trace`
 Vorlauf: `docs/backpressure-flow-control.md` Kapitel 8 (Luecken L1-L5)

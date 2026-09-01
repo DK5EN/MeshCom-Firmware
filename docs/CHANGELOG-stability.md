@@ -75,6 +75,107 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## New since v4.35p.08.31.4-stability (not yet released)
+
+Four commits on `tdeck-partial-refresh-trace`, each advisor-gated (Fable),
+closing gaps L1-L4 from `docs/backpressure-flow-control.md` chapter 8: a
+refused or dropped message now gets an app-visible receipt with its own text,
+and the text the operator typed survives a refusal on all three GUIs instead
+of vanishing. `FLASH_VERSION` stays `20260831`; native suite now 530 test
+cases across 11 host environments. Not yet tagged as a release.
+
+163. **A refused or dropped message finally gets an app-visible receipt with
+     its own text** (BP-07, closes L1 and L2). Root cause of L1: `onRefuse()`
+     called `latchIfHigher(BP_NOTICE_QRT)`, but `refusing()` is only ever
+     true once the state machine has already latched to QRT or QTA — so the
+     call provably always returned `BP_NOTICE_NONE`, and
+     `test_refusal_announces_once_per_episode` had stayed green because the
+     notice it counted came from the prior `onSend()`, not from any of the
+     twenty `onRefuse()` calls the test actually exercised. L2 was worse: a
+     message the ring dropped _after_ acceptance got no notice at all, ever.
+     Fix: a new, deliberately never-latched vocabulary (`BpNack`) separate
+     from the latched episode `BpNotice`, one frame per lost message —
+     `QRT NOT SENT - <text>` / `QTA NOT SENT - <text>` — truncated to 120
+     bytes on a UTF-8 codepoint boundary with quotes, backslashes and control
+     bytes sanitised before JSON escaping (unsanitised, a text full of quotes
+     could double in size on EXTUDP escaping and overflow the datagram). The
+     refusal check itself moved to run _after_ the message is decoded and the
+     `{ZIEL}` destination prefix is stripped, so the receipt can finally carry
+     the real typed text instead of a raw, still-percent-encoded fragment;
+     this deleted the ~60-line `bpPeekDst()` second-parser that existed only
+     because the check used to run too early, and — an intended side effect —
+     moved invalid-length and DM-to-self rejection ahead of the backpressure
+     check, since "TX buffer full" was never the right reason for a malformed
+     message. Every backpressure frame now draws its `msg_id` from a shared
+     monotonic counter instead of raw `millis()`, because the drop path emits
+     two frames from one `sendMessage()` call that would otherwise collide on
+     the same millisecond and lose one to the app's dedup filter. The console
+     marker's message-text field is gated on `bLORADEBUG`, keeping user
+     content out of the always-on multi-day 2323 log capture. New
+     integration case `test_flood_13_into_10_yields_five_nacks`: 13 sends
+     into a 10-slot ring, 8 accepted, 5 refused, 5 receipts — 0 receipts
+     before this fix.
+
+164. **A message the TX ring drops no longer echoes as sent, and a dropped
+     frame no longer reaches the backbone either** (BP-08, closes L3). The
+     app echo for a locally typed message used to go out _before_
+     `addTxRingEntry()` was even asked — a message the ring then discarded
+     looked successfully sent in the chat, and the drop notice arrived
+     afterward as an unrelated, unlinked line; on a gateway, the "server
+     reached" status frame even went out for a message that never left the
+     node. The ring write now runs first; on a drop the function returns
+     before the echo, before `insertOwnTx()`/`addLoraRxBuffer()`, and —
+     operator decision, bigger than the L3 fix itself — before the gateway's
+     UDP uplink to the central server. Previously that uplink ran
+     independently of the ring outcome: a message the ring discarded still
+     reached the server without a single RF neighbour ever hearing it, and
+     nobody was told about the asymmetry. A message now enters the network
+     whole or not at all; the sender gets `QTA NOT SENT - <text>` and knows
+     to retry. Concurrency reviewed: `doTX()` and `sendMessage()` both run
+     only from the main loop on both platforms, so there is no interleaving
+     window between the ring write and the buffered bookkeeping it now
+     precedes.
+165. **`sendMessage()` returns a result instead of `void`, so the operator's
+     typed text survives a refusal** (BP-09, closes L4). The T-Deck cleared
+     its input field and switched to the message list unconditionally after
+     every send call; on a refusal, the typed text was gone from both the
+     field and the list, with nothing to show for it. `BpSendResult` (0
+     accepted, -1 refused, -2 dropped, -3 invalid) now comes back from all
+     four `sendMessage()` signatures; the T-Deck, T-Deck Pro, and the web API
+     act on it — the first two clear their input only on success, the web API
+     answers `sendmessage refused`/`dropped`/`invalid` instead of a blanket
+     `ok`. Found beyond the original plan while implementing it: the web
+     GUI's own JavaScript cleared both input fields immediately after
+     `xhttp.send()`, without ever reading the response — the identical text
+     loss one layer up the stack, on a third surface. Clearing now waits for
+     `onreadystatechange` and only fires on `sendmessage ok`.
+166. **Independent advisor round finds and fixes three real regressions in
+     the three waves below** (BP-10). Seven finders on the `458af2b1..4f97f7f0`
+     diff, every finding re-verified by the orchestrator at the source.
+     BP-09's `BP_SEND_OK` gating had hidden the BP-07 receipt on both T-Decks
+     entirely — the tab switch never happened, so a refused message gave
+     zero visible feedback, worse than before BP-07 shipped; the tab switch
+     is unconditional again, only the input-field clear stays gated.
+     `addTxRingEntry()`'s single -1 return code had been read as backpressure
+     for all three of its causes, so a factory-fresh node forced a false QRT
+     cycle on an _empty_ ring for every typed message; the drop branch now
+     checks ring depth against the refuse threshold before deciding it was
+     backpressure at all. The `[BP];nack;` marker had been logging the raw
+     message text instead of the sanitised one, so an embedded LF could break
+     the console line that `tools/serial_monitor.py`/`loganalyse.sh` parse.
+     Five medium fixes rode along: a 140-byte buffer moved off the 4 KB nRF52
+     loop stack, the hand-rolled UTF-8 truncation was replaced with the
+     existing `charset_utf8_safe_truncate()` helper (the hand-rolled one could
+     delete an entire text on stray continuation bytes), the ellipsis
+     decision moved after the buffer clamp, a nack now respects the episode
+     latch so a QRV reaches everyone who was told about the loss, a
+     re-entrancy window in `bp_episode_origin` was closed, the `bpPeekDst`
+     empty-`{}` → `*` destination rule (lost when BP-07 deleted `bpPeekDst`)
+     was restored, and a 49.7-day `msg_id` rollover edge was closed. Most of
+     these are not natively testable — `loop_functions.cpp` is in no native
+     `build_src_filter` — so the bench run remains the only end-to-end proof.
+     Native suite 530 cases (from 528).
+
 ## New in v4.35p.08.31.4-stability
 
 Fourth cut of the 2026-08-31 release: the back-pressure notice policy,

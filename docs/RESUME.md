@@ -1,5 +1,59 @@
 # RESUME — pick up here
 
+## 2026-09-01 afternoon: BP-07/08/09/10 shipped, closes L1-L4
+
+Four commits on `tdeck-partial-refresh-trace`, each advisor-gated (Fable),
+implementing `docs/bp-l1-l4-impl-plan.md` (now archived, see below): a
+refused or dropped message finally gets an app-visible receipt with its own
+text (`QRT NOT SENT - <text>` / `QTA NOT SENT - <text>`), and the operator's
+typed text survives a refusal on all three GUIs instead of vanishing. **BP-07**
+(`77b43d4b`): root-caused L1 — `onRefuse()` was dead code, provably always
+`BP_NOTICE_NONE`, because `refusing()` implies the latch already sits at QRT
+or higher — and closed L2 (a dropped-after-accept message got no notice at
+all) with a new, never-latched `BpNack` vocabulary; refuse-check moved past
+`{ZIEL}` parsing so the receipt carries the real text, `bpPeekDst()` deleted.
+**BP-08** (`e8b82a02`): closed L3 — the app echo used to fire before the ring
+was even asked, so a dropped message looked sent; echo moved behind the ring
+write, and (operator decision E4, bigger than L3) a dropped frame no longer
+reaches a gateway's UDP uplink either — a message enters the network whole or
+not at all. **BP-09** (`4f97f7f0`): closed L4 — `sendMessage()` returns
+`BpSendResult` instead of `void`; T-Deck, T-Deck Pro and the web API (plus,
+found beyond the plan, the web GUI's own JS) now keep the typed text on a
+refusal instead of clearing it unconditionally. **BP-10** (`3aecc90f`): an
+independent Fable advisor round over the whole `458af2b1..4f97f7f0` diff (7
+finders) found and fixed 3 real regressions the three waves above had caused
+or amplified — most seriously, BP-09's `BP_SEND_OK` gating had hidden the
+BP-07 receipt entirely on both T-Decks (worse than before BP-07 shipped) —
+plus 5 medium fixes; full detail in `docs/BACKLOG.md` (BP-07..BP-10 rows) and
+`docs/CHANGELOG-stability.md` (items 163-166).
+
+**L5 (a machine-readable marker instead of the text-prefix convention) is
+explicitly out of scope** and stays open — it needs a protocol change and
+app-side coordination (`docs/backpressure-flow-control.md` chapter 10).
+
+**Verified:** 530 native test cases across 11 host environments, and clean
+builds of all six affected boards (heltec_v3, wiscore_rak4631, ttgo_tbeam,
+t_deck, t_deck_plus, t_deck_pro).
+
+**NOT verified — no bench run yet, and one gap no bench run can close:**
+
+- `loop_functions.cpp`, where nearly all of this lives, is in no native
+  `build_src_filter`. Findings H2/H3/M1/M4/M5/M7 from the BP-10 advisor round
+  are therefore not natively testable at all; the planned bench run (DK5EN-93
+  flood + neighbour LoRa-receive proof + DK5EN-14 input-field check) is the
+  only end-to-end proof for the whole feature, and it has not run yet.
+- **E4 (a dropped frame no longer reaches a gateway's UDP uplink) has no bench
+  coverage, structurally.** Proving it needs an active gateway and an mcmap
+  comparison, but the planned bench runs require Gateway OFF on every
+  participating node (otherwise a message could reach neighbours over the
+  central server instead of over LoRa, and the LoRa-receive proof would be
+  worthless). E4 is covered only by code review and the native ring-write
+  ordering test; a later gateway-on bench run stays open.
+
+Archived: `docs/archive/bp-l1-l4-impl-plan-20260901.md` (the implementation
+plan) and `docs/archive/bp-advisor-verdict-20260901.md` (the BP-10 advisor
+verdict).
+
 ## 2026-09-01 morning: overnight soak 98/90/93 PASSED, documented
 
 Three-channel overnight soak (22:00-07:58, build v4.35p.08.31.4) with a REAL
