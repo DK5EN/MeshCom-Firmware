@@ -43,8 +43,15 @@ RE_CAD_GIVEUP = re.compile(r"\[MC-DBG\]\s+CAD_GIVEUP")
 RE_RETRANSMIT_GIVEUP = re.compile(r"\[MC-DBG\]\s+RETRANSMIT_GIVEUP")
 RE_WIFI_DBG = re.compile(r"\[WIFI-DBG\]\s+(.*)")
 RE_UDP_RESET = re.compile(r"resetMeshComUDP")
+# BP-02: queued= is now the honest occupied-slot count (was raw index
+# distance iWrite-iRead, which counted holes freed behind a
+# priority-starved entry as still queued -- DJ8MEH-RCA 2026-08-31). The
+# trailing dist=(\d+) group is the old index-distance value, present only
+# in logs from firmware built after BP-02; optional so this regex still
+# matches pre-BP-02 logs (no dist= field at all).
 RE_RING_STATUS = re.compile(
     r"\[MC-DBG\]\s+RING_STATUS\s+queued=(\d+)\s+pending=(\d+)\s+retrying=(\d+)\s+done=(\d+)"
+    r"(?:.*?\bdist=(\d+))?"
 )
 # RING_OVERFLOW buf=raw_rx is a normal cyclical buffer for the web UI — not a
 # real overflow.  The firmware reuses the oldest slot when the ring is full,
@@ -171,10 +178,11 @@ class Monitor:
         self.ring_last_pending: int = 0
         self.ring_last_retrying: int = 0
         self.ring_last_done: int = 0
+        self.ring_last_dist: int | None = None  # BP-02: None on pre-BP-02 logs
         self.ring_max_queued: int = 0
         self.ring_max_retrying: int = 0
         self.ring_max_done: int = 0
-        self.ring_zombie_streak: int = 0  # consecutive reports with retrying>0, queued==0
+        self.ring_zombie_streak: int = 0  # consecutive reports with retrying>0, ring drained
 
         # CSMA / adaptive wait tracking
         self.last_channel_util: int | None = None  # last reported util%
@@ -377,10 +385,20 @@ class Monitor:
             self.ring_last_pending = int(m.group(2))
             self.ring_last_retrying = int(m.group(3))
             self.ring_last_done = int(m.group(4))
+            self.ring_last_dist = int(m.group(5)) if m.group(5) is not None else None
             self.ring_max_queued = max(self.ring_max_queued, self.ring_last_queued)
             self.ring_max_retrying = max(self.ring_max_retrying, self.ring_last_retrying)
             self.ring_max_done = max(self.ring_max_done, self.ring_last_done)
-            if self.ring_last_retrying > 0 and self.ring_last_queued == 0:
+            # BP-02: zombie = retransmits stuck while the ring is actually
+            # drained. Prefer dist==0 (honest index-distance, unaffected by
+            # the queued= redefinition); fall back to the old
+            # queued==0 condition only for logs with no dist= field at all
+            # (firmware built before BP-02).
+            if self.ring_last_dist is not None:
+                ring_drained = self.ring_last_dist == 0
+            else:
+                ring_drained = self.ring_last_queued == 0
+            if self.ring_last_retrying > 0 and ring_drained:
                 self.ring_zombie_streak += 1
                 if self.ring_zombie_streak >= RING_ZOMBIE_CONSECUTIVE:
                     self._alert(

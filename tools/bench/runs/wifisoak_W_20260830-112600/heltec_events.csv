@@ -1,0 +1,51 @@
+board,wall,uptime_ms,kind,reason,bssid,chan,rssi,value,note
+heltec,2026-08-30 11:26:06,6036,link,down,,,,,
+heltec,2026-08-30 11:26:11,10838,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-60,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:26:11,11367,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:26:12,12180,ready,,,,,1,
+heltec,2026-08-30 11:27:06,66038,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=54 ip=1,
+heltec,2026-08-30 11:27:31,90747,drop,,,,,,
+heltec,2026-08-30 11:27:31,90748,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 11:27:31,90749,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 11:27:34,94176,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-63,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:27:35,94705,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-58,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3958,live
+heltec,2026-08-30 11:28:06,126043,link,up,5A:AF:97:2E:2B:8B,3,-53,age_s=31 ip=1,
+heltec,2026-08-30 11:29:06,186048,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=91 ip=1,
+heltec,2026-08-30 11:30:06,246050,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=151 ip=1,
+heltec,2026-08-30 11:31:06,306055,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=211 ip=1,
+heltec,2026-08-30 11:32:06,366057,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=271 ip=1,
+heltec,2026-08-30 11:33:06,426061,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=331 ip=1,
+heltec,2026-08-30 11:34:06,486064,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=391 ip=1,
+heltec,2026-08-30 11:35:06,546068,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=451 ip=1,
+heltec,2026-08-30 11:36:06,606072,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=511 ip=1,
+heltec,2026-08-30 11:37:06,666077,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=571 ip=1,
+heltec,2026-08-30 11:37:31,690761,drop,,,,,,
+heltec,2026-08-30 11:37:31,690762,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 11:37:31,690763,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-58,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 11:37:34,694188,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:37:35,694706,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3945,live
+heltec,2026-08-30 11:38:06,726081,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=31 ip=1,
+heltec,2026-08-30 11:39:06,786085,link,up,5A:AF:97:2E:2B:8B,3,-60,age_s=91 ip=1,
+heltec,2026-08-30 11:40:06,846088,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=151 ip=1,
+heltec,2026-08-30 11:41:06,906090,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=211 ip=1,
+heltec,2026-08-30 11:42:06,966093,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=271 ip=1,
+heltec,2026-08-30 11:43:06,1026095,link,up,5A:AF:97:2E:2B:8B,3,-66,age_s=331 ip=1,
+heltec,2026-08-30 11:44:06,1086096,link,up,5A:AF:97:2E:2B:8B,3,-64,age_s=391 ip=1,
+heltec,2026-08-30 11:45:06,1146098,link,up,5A:AF:97:2E:2B:8B,3,-61,age_s=451 ip=1,
+heltec,2026-08-30 11:46:06,1206102,link,up,5A:AF:97:2E:2B:8B,3,-61,age_s=511 ip=1,
+heltec,2026-08-30 11:47:06,1266105,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=571 ip=1,
+heltec,2026-08-30 11:47:32,1291637,drop,,,,,,
+heltec,2026-08-30 11:47:32,1291638,disconnected,8:ASSOC_LEAVE,,,,,our drop
+heltec,2026-08-30 11:47:32,1291639,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-57,auth=7 phy=bgn pmf=0 wpa3=0,cached
+heltec,2026-08-30 11:47:35,1295061,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-61,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:47:36,1295654,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-63,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4017,live
+heltec,2026-08-30 11:48:06,1326109,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=30 ip=1,
+heltec,2026-08-30 11:49:06,1386112,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=90 ip=1,
+heltec,2026-08-30 11:50:06,1446116,link,up,5A:AF:97:2E:2B:8B,3,-62,age_s=150 ip=1,
+heltec,2026-08-30 11:51:06,1506120,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=210 ip=1,
+heltec,2026-08-30 11:52:06,1566122,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=270 ip=1,
+heltec,2026-08-30 11:53:06,1626125,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=330 ip=1,
+heltec,2026-08-30 11:54:08,6161,link,down,,,,,
+heltec,2026-08-30 11:54:13,10947,assoc_connected,0,46:AF:97:2E:2B:86,3,-69,auth=7 phy=bgn pmf=0 wpa3=0,live
+heltec,2026-08-30 11:54:14,11523,assoc_got_ip,0,46:AF:97:2E:2B:86,3,-69,auth=7 phy=bgn pmf=0 wpa3=0,live BSSID_CHANGE
+heltec,2026-08-30 11:54:14,12305,ready,,,,,1,

@@ -1,0 +1,4 @@
+apreboot stoptest  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_stoptest_20260830-190256
+phase              DONE (stopped)
+verdict            FAIL
+see                /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_stoptest_20260830-190256/summary.txt

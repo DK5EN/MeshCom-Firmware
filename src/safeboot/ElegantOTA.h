@@ -113,7 +113,16 @@ class ElegantOTAClass{
     void onStart(std::function<void()> callable);
     void onProgress(std::function<void(size_t current, size_t final)> callable);
     void onEnd(std::function<void(bool success)> callable);
-    
+
+    // TM-46: fired whenever an in-progress Update session is aborted (stale
+    // session on a new /ota/start, a write failure, a dropped connection, or
+    // a stalled upload) so the caller can clear its own "update in progress"
+    // bookkeeping and re-arm any fallback timeout.
+    void onAbort(std::function<void(const char* reason)> callable);
+    // Aborts the active Update session, if any (no-op otherwise), and fires
+    // the onAbort callback. Safe to call unconditionally.
+    void abortActiveUpdate(const char* reason);
+
   private:
     ELEGANTOTA_WEBSERVER *_server;
 
@@ -128,9 +137,15 @@ class ElegantOTAClass{
     String _update_error_str = "";
     unsigned long _current_progress_size;
 
+    // TM-46: bumped once per /ota/start so a late-arriving disconnect from a
+    // superseded upload (AsyncTCP can deliver it after a new session already
+    // began) can be told apart from a disconnect of the still-active one.
+    uint32_t _updateGeneration = 0;
+
     std::function<void()> preUpdateCallback = NULL;
     std::function<void(size_t current, size_t final)> progressUpdateCallback = NULL;
     std::function<void(bool success)> postUpdateCallback = NULL;
+    std::function<void(const char* reason)> abortUpdateCallback = NULL;
 };
 
 extern ElegantOTAClass ElegantOTA;

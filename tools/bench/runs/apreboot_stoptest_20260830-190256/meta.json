@@ -1,0 +1,29 @@
+{
+  "label": "stoptest",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_stoptest_20260830-190256",
+  "started": 1788109376.905354,
+  "settle": 600.0,
+  "cycle_window": 60.0,
+  "recovery": 60.0,
+  "pid": 59705,
+  "require_ntp": false,
+  "boards": [
+    {
+      "name": "tdeck",
+      "port": "/dev/cu.usbmodem1101",
+      "kind": "esp32"
+    },
+    {
+      "name": "rak",
+      "port": "/dev/cu.usbmodem201301",
+      "kind": "rak"
+    }
+  ],
+  "prompt_ts": null,
+  "extra_fails": [
+    "run stopped before the recovery window ended"
+  ],
+  "warnings": [],
+  "t0": 1788109384.702105,
+  "verdict": "FAIL"
+}

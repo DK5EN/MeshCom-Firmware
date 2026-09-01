@@ -1,0 +1,782 @@
+{
+  "map": {
+    "ok": true,
+    "home": {
+      "lat": 48.4076,
+      "lon": 11.7384
+    },
+    "stations": [
+      {
+        "call": "DK5EM-01",
+        "km": 0.3,
+        "bearing": 45,
+        "lat": 48.40951,
+        "lon": 11.74128,
+        "ok": true,
+        "line": "--injectpos DK5EM-01 48.40951 11.74128\r[INJECTPOS];ok;DK5EM-01;48.40951;11.74128"
+      },
+      {
+        "call": "DK5EM-02",
+        "km": 0.8,
+        "bearing": 135,
+        "lat": 48.4025,
+        "lon": 11.74608,
+        "ok": true,
+        "line": "--injectpos DK5EM-02 48.40250 11.74608\r[INJECTPOS];ok;DK5EM-02;48.40250;11.74608"
+      },
+      {
+        "call": "DK5EM-03",
+        "km": 1.5,
+        "bearing": 225,
+        "lat": 48.39804,
+        "lon": 11.72401,
+        "ok": true,
+        "line": ".--injectpos DK5EM-03 48.39804 11.72401\r[INJECTPOS];ok;DK5EM-03;48.39804;11.72401"
+      },
+      {
+        "call": "DK5EM-04",
+        "km": 3.0,
+        "bearing": 315,
+        "lat": 48.42671,
+        "lon": 11.70961,
+        "ok": true,
+        "line": "--injectpo.s DK5EM-04 48.42671 11.70961\r[INJECTPOS];ok;DK5EM-04;48.42671;11.70961"
+      },
+      {
+        "call": "DK5EM-05",
+        "km": 6.0,
+        "bearing": 20,
+        "lat": 48.45839,
+        "lon": 11.76625,
+        "ok": true,
+        "line": "--injectpos DK5EM-05 48.45839 11.76625\r[INJECTPOS];ok;DK5EM-05;48.45839;11.76625"
+      },
+      {
+        "call": "DK5EM-06",
+        "km": 12.0,
+        "bearing": 110,
+        "lat": 48.37062,
+        "lon": 11.89143,
+        "ok": true,
+        "line": "--injectpos DK5EM-06 48.37062 11.89143\r[INJECTPOS];ok;DK5EM-06;48.37062;11.89143"
+      },
+      {
+        "call": "DK5EM-07",
+        "km": 25.0,
+        "bearing": 200,
+        "lat": 48.19596,
+        "lon": 11.62236,
+        "ok": true,
+        "line": "8.19596 11.62236\r[INJECTPOS];ok;DK5EM-07;48.19596;11.62236"
+      },
+      {
+        "call": "DK5EM-08",
+        "km": 60.0,
+        "bearing": 290,
+        "lat": 48.59248,
+        "lon": 10.97323,
+        "ok": true,
+        "line": "--injectpos DK5EM-08 48.59248 10.97323\r[INJECTPOS];ok;DK5EM-08;48.59248;10.97323"
+      },
+      {
+        "call": "DK5EM-09",
+        "km": 150.0,
+        "bearing": 60,
+        "lat": 49.08328,
+        "lon": 13.50137,
+        "ok": true,
+        "line": ".--injectpos DK5EM-09 49.08328 13.50137\r[INJECTPOS];ok;DK5EM-09;49.08328;13.50137"
+      },
+      {
+        "call": "DK5EM-10",
+        "km": 400.0,
+        "bearing": 240,
+        "lat": 46.6058,
+        "lon": 7.03716,
+        "ok": true,
+        "line": "--injectpos DK5EM-10 .46.60580 7.03716\r[INJECTPOS];ok;DK5EM-10;46.60580;7.03716"
+      },
+      {
+        "call": "DK5EM-11",
+        "km": 0.1,
+        "bearing": 0,
+        "lat": 48.4085,
+        "lon": 11.7384,
+        "ok": true,
+        "line": "--injectpos DK5EM-11 48.40850 11.73840\r[INJECTPOS];ok;DK5EM-11;48.40850;11.73840"
+      },
+      {
+        "call": "DK5EM-12",
+        "km": 0.13,
+        "bearing": 47,
+        "lat": 48.4084,
+        "lon": 11.73969,
+        "ok": true,
+        "line": "--injectpos DK5EM-12 48.40840 11.73969\r[INJECTPOS];ok;DK5EM-12;48.40840;11.73969"
+      },
+      {
+        "call": "DK5EM-13",
+        "km": 0.16,
+        "bearing": 94,
+        "lat": 48.4075,
+        "lon": 11.74057,
+        "ok": true,
+        "line": "--injectpos DK5EM-13 48.40750 11.74057\r[INJECTPOS];ok;DK5EM-13;48.40750;11.74057"
+      },
+      {
+        "call": "DK5EM-14",
+        "km": 0.19,
+        "bearing": 141,
+        "lat": 48.40627,
+        "lon": 11.74002,
+        "ok": true,
+        "line": "--injectpos DK5EM-14 48.40627 11.74002\r[INJECTPOS];ok;DK5EM-14;48.40627;11.74002"
+      },
+      {
+        "call": "DK5EM-15",
+        "km": 0.22,
+        "bearing": 188,
+        "lat": 48.40564,
+        "lon": 11.73798,
+        "ok": true,
+        "line": "--injectpos DK5EM-15 48.40564 11.73798\r[INJECTPOS];ok;DK5EM-15;48.40564;11.73798"
+      },
+      {
+        "call": "DK5EM-16",
+        "km": 0.25,
+        "bearing": 235,
+        "lat": 48.40631,
+        "lon": 11.73562,
+        "ok": true,
+        "line": ".73562\r[INJECTPOS];ok;DK5EM-16;48.40631;11.73562"
+      },
+      {
+        "call": "DK5EM-17",
+        "km": 0.28,
+        "bearing": 282,
+        "lat": 48.40812,
+        "lon": 11.73468,
+        "ok": true,
+        "line": "--injectpos DK5EM-17 48.40812 11.73468\r[INJECTPOS];ok;DK5EM-17;48.40812;11.73468"
+      },
+      {
+        "call": "DK5EM-18",
+        "km": 0.31,
+        "bearing": 329,
+        "lat": 48.40999,
+        "lon": 11.73623,
+        "ok": true,
+        "line": "8 48.40999 11.73623\r[INJECTPOS];ok;DK5EM-18;48.40999;11.73623"
+      },
+      {
+        "call": "DK5EM-19",
+        "km": 0.33999999999999997,
+        "bearing": 16,
+        "lat": 48.41054,
+        "lon": 11.73967,
+        "ok": true,
+        "line": "--injectpos DK5EM-19 48.41054 11.73967\r[INJECTPOS];ok;DK5EM-19;48.41054;11.73967"
+      },
+      {
+        "call": "DK5EM-20",
+        "km": 0.37,
+        "bearing": 63,
+        "lat": 48.40911,
+        "lon": 11.74287,
+        "ok": true,
+        "line": "--injectpos DK5EM-20 48.40911 11.74287\r[INJECTPOS];ok;DK5EM-20;48.40911;11.74287"
+      },
+      {
+        "call": "DK5EM-21",
+        "km": 0.4,
+        "bearing": 110,
+        "lat": 48.40637,
+        "lon": 11.7435,
+        "ok": true,
+        "line": "--injectpos DK5EM-21 48.40637 11.74350\r[INJECTPOS];ok;DK5EM-21;48.40637;11.74350"
+      },
+      {
+        "call": "DK5EM-22",
+        "km": 0.42999999999999994,
+        "bearing": 157,
+        "lat": 48.40403,
+        "lon": 11.74068,
+        "ok": true,
+        "line": "--injectpos DK5EM-22 48.40403 11.74068\r[INJECTPOS];ok;DK5EM-22;48.40403;11.74068"
+      },
+      {
+        "call": "DK5EM-23",
+        "km": 0.45999999999999996,
+        "bearing": 204,
+        "lat": 48.40381,
+        "lon": 11.73586,
+        "ok": true,
+        "line": "--injectpos DK5EM-23 48.40381 11.73586\r[INJECTPOS];ok;DK5EM-23;48.40381;11.73586"
+      },
+      {
+        "call": "DK5EM-24",
+        "km": 0.49,
+        "bearing": 251,
+        "lat": 48.40616,
+        "lon": 11.73211,
+        "ok": true,
+        "line": "--injectpos DK5EM-24 48.40616 11.73211\r[INJECTPOS];ok;DK5EM-24;48.40616;11.73211"
+      },
+      {
+        "call": "DK5EM-25",
+        "km": 0.52,
+        "bearing": 298,
+        "lat": 48.4098,
+        "lon": 11.73217,
+        "ok": true,
+        "line": "--injectpos DK5EM-25 48.40980 11.73217\r[INJECTPOS];ok;DK5EM-25;48.40980;11.73217"
+      },
+      {
+        "call": "DK5EM-26",
+        "km": 0.5499999999999999,
+        "bearing": 345,
+        "lat": 48.41239,
+        "lon": 11.73647,
+        "ok": true,
+        "line": "--injectpos DK5EM-26 48.41239 11.73647\r[INJECTPOS];ok;DK5EM-26;48.41239;11.73647"
+      },
+      {
+        "call": "DK5EM-27",
+        "km": 0.58,
+        "bearing": 32,
+        "lat": 48.41203,
+        "lon": 11.74257,
+        "ok": true,
+        "line": "--injectpos DK5EM-27 48.41203 11.74257\r[INJECTPOS];ok;DK5EM-27;48.41203;11.74257"
+      },
+      {
+        "call": "DK5EM-28",
+        "km": 0.61,
+        "bearing": 79,
+        "lat": 48.40865,
+        "lon": 11.74653,
+        "ok": true,
+        "line": "--injectpos DK5EM-28 48.40865 11.74653\r[INJECTPOS];ok;DK5EM-28;48.40865;11.74653"
+      },
+      {
+        "call": "DK5EM-29",
+        "km": 0.64,
+        "bearing": 126,
+        "lat": 48.40421,
+        "lon": 11.74543,
+        "ok": true,
+        "line": "M-29 48.40421 11.74543\r[INJECTPOS];ok;DK5EM-29;48.40421;11.74543"
+      },
+      {
+        "call": "DK5EM-30",
+        "km": 0.6699999999999999,
+        "bearing": 173,
+        "lat": 48.40161,
+        "lon": 11.73951,
+        "ok": true,
+        "line": "--injectpos DK5EM-30 48.40161 11.73951\r[INJECTPOS];ok;DK5EM-30;48.40161;11.73951"
+      },
+      {
+        "call": "DK5EM-31",
+        "km": 0.7,
+        "bearing": 220,
+        "lat": 48.40277,
+        "lon": 11.73229,
+        "ok": true,
+        "line": "--injectpos DK5EM-31 48.40277 11.73229\r[INJECTPOS];ok;DK5EM-31;48.40277;11.73229"
+      },
+      {
+        "call": "DK5EM-32",
+        "km": 0.73,
+        "bearing": 267,
+        "lat": 48.40726,
+        "lon": 11.72851,
+        "ok": true,
+        "line": "--injectpos DK5EM-32 48.40726 11.72851\r[INJECTPOS];ok;DK5EM-32;48.40726;11.72851"
+      },
+      {
+        "call": "DK5EM-33",
+        "km": 0.7599999999999999,
+        "bearing": 314,
+        "lat": 48.41236,
+        "lon": 11.73098,
+        "ok": true,
+        "line": "--injectpos DK5EM-33 48.41236 11.73098\r[INJECTPOS];ok;DK5EM-33;48.41236;11.73098"
+      },
+      {
+        "call": "DK5EM-34",
+        "km": 0.7899999999999999,
+        "bearing": 1,
+        "lat": 48.41472,
+        "lon": 11.73859,
+        "ok": true,
+        "line": "--injectpos DK5EM-34 48.41472 11.73859\r[INJECTPOS];ok;DK5EM-34;48.41472;11.73859"
+      },
+      {
+        "call": "DK5EM-35",
+        "km": 0.82,
+        "bearing": 48,
+        "lat": 48.41254,
+        "lon": 11.74667,
+        "ok": true,
+        "line": "--injectpos DK5EM-35 48.41254 11.74667\r[INJECTPOS];ok;DK5EM-35;48.41254;11.74667"
+      },
+      {
+        "call": "DK5EM-36",
+        "km": 0.85,
+        "bearing": 95,
+        "lat": 48.40693,
+        "lon": 11.74989,
+        "ok": true,
+        "line": "--injectpos DK5EM-36 48.40693 11.74989\r[INJECTPOS];ok;DK5EM-36;48.40693;11.74989"
+      },
+      {
+        "call": "DK5EM-37",
+        "km": 0.88,
+        "bearing": 142,
+        "lat": 48.40135,
+        "lon": 11.74575,
+        "ok": true,
+        "line": "--injectpos DK5EM-37 48.40135 11.74575\r[INJECTPOS];ok;DK5EM-37;48.40135;11.74575"
+      },
+      {
+        "call": "DK5EM-38",
+        "km": 0.9099999999999999,
+        "bearing": 189,
+        "lat": 48.3995,
+        "lon": 11.73647,
+        "ok": true,
+        "line": "--injectpos DK5EM-38 48.39950 11.73647\r[INJECTPOS];ok;DK5EM-38;48.39950;11.73647"
+      },
+      {
+        "call": "DK5EM-39",
+        "km": 0.94,
+        "bearing": 236,
+        "lat": 48.40286,
+        "lon": 11.72782,
+        "ok": true,
+        "line": "--injectpos DK5EM-39 48.40286 11.72782\r[INJECTPOS];ok;DK5EM-39;48.40286;11.72782"
+      },
+      {
+        "call": "DK5EM-40",
+        "km": 0.97,
+        "bearing": 283,
+        "lat": 48.40957,
+        "lon": 11.72557,
+        "ok": true,
+        "line": "--injectpos DK5EM-40 48.40957 11.72557\r[INJECTPOS];ok;DK5EM-40;48.40957;11.72557"
+      }
+    ],
+    "inject_loop_max_us": 153030,
+    "map_points_after": 11,
+    "zoom_min": 0,
+    "zoom_max": 9,
+    "steps": [
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 473,
+        "tiles": 3,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 721,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 751,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 646,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 333,
+        "tiles": 2,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 786,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 787,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 330,
+        "tiles": 2,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 644,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 749,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 719,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 472,
+        "tiles": 3,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 622,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 317,
+        "tiles": 2,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 385,
+        "tiles": 4,
+        "tiles_missing": 1
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 214,
+        "tiles": 6,
+        "tiles_missing": 5
+      },
+      {
+        "dir": "out",
+        "acked": true,
+        "zoom": 0,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 213,
+        "tiles": 6,
+        "tiles_missing": 5
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 1,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 386,
+        "tiles": 4,
+        "tiles_missing": 1
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 2,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 316,
+        "tiles": 2,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 3,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 621,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 4,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 473,
+        "tiles": 3,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 5,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 719,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 6,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 750,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 7,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 645,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 8,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 331,
+        "tiles": 2,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 787,
+        "tiles": 4,
+        "tiles_missing": 0
+      },
+      {
+        "dir": "in",
+        "acked": true,
+        "zoom": 9,
+        "crash": null,
+        "center_err": [
+          0,
+          0
+        ],
+        "compose_ms": 787,
+        "tiles": 4,
+        "tiles_missing": 0
+      }
+    ],
+    "steps_total": 27,
+    "steps_acked": 27,
+    "centring_lines": 27,
+    "off_centre_steps": [],
+    "compose_ms_max": 787,
+    "crashed": null,
+    "uistat_before": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 164,
+      "msg_list": 1,
+      "inv_total": 972,
+      "refr_total": 65,
+      "last_refr_px": 2072,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 112896,
+      "heap_min": 108300,
+      "psram_free": 8029807,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 0,
+      "scroll_bottom": -129,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 45,
+      "last_y2": 59,
+      "scr_h": 240
+    },
+    "uistat_after": {
+      "kind": "UISTAT",
+      "tab": 3,
+      "drawer": 0,
+      "objs": 220,
+      "msg_list": 1,
+      "inv_total": 25534,
+      "refr_total": 340,
+      "last_refr_px": 2072,
+      "last_refr_ms": 4,
+      "redrawlog": 0,
+      "heap_free": 111916,
+      "heap_min": 106828,
+      "psram_free": 8016399,
+      "tft_sleeping": 0,
+      "bl": 16,
+      "scroll_y": 0,
+      "scroll_bottom": -129,
+      "ml_y1": 45,
+      "ml_y2": 188,
+      "last_y1": 45,
+      "last_y2": 59,
+      "scr_h": 240
+    }
+  }
+}

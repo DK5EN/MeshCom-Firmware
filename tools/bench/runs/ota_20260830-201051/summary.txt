@@ -1,0 +1,34 @@
+ota_regression  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20260830-201051
+started            2026-08-30 20:10:51
+port               /dev/cu.usbserial-573C0005841
+env                ttgo_tbeam  expect_hw TBEAM
+target             http://192.168.68.70/
+firmware           /private/tmp/claude-501/-Users-martinwerner-WebDev-MeshCom-Firmware-DEV-Main/a17cb5bb-87fb-44d6-8971-c1c31ee78b96/scratchpad/tbeam_fw.bin  md5 c2f89efcf0b94330fe6c33e50e8fb38c
+ota                FAILED at hardware_mismatch  (hardware mismatch: node reports 'TBEAM_AXP2101', expected 'TBEAM' (--force to flash anyway))
+  timings          precheck_s=0.8s  total_s=0.8s
+field         before                    after
+build         Aug 30 2026 / 19:55:19    Aug 30 2026 / 19:55:19
+call          DK5EN-92                  DK5EN-92
+hardware      TBEAM_AXP2101             TBEAM_AXP2101
+hw_idx        12                        12
+lora_bw       250                       250
+lora_cr       6                         6
+lora_freq     433.1750                  433.1750
+lora_power    2                         2
+lora_sf       11                        11
+maxhop_pos    2                         2
+maxhop_text   4                         4
+node_id       E0D041B8                  E0D041B8
+version       4.35p                     4.35p
+webserver     on                        on
+wifi_localip  192.168.68.70             192.168.68.70
+wifi_ssid     ORBI63                    ORBI63
+resets after OTA   0
+[BOOT];ready seen  False
+WLAN rejoined      False
+  WARN safeboot did not print "OTA update finished successfully!" within 60s
+  WARN no [WIFI];event;got_ip seen after the OTA within 60s (checked again via --wifistat below)
+verdict            FAIL
+  !! OTA failed at stage hardware_mismatch: hardware mismatch: node reports 'TBEAM_AXP2101', expected 'TBEAM' (--force to flash anyway)
+  !! no [BOOT];ready seen after the OTA within 60s -- the app may not have come back up
+  !! post-flash hardware mismatch: 'TBEAM_AXP2101' != 'TBEAM'

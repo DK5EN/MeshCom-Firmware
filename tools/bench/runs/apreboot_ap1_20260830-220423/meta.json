@@ -1,0 +1,37 @@
+{
+  "label": "ap1",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_ap1_20260830-220423",
+  "started": 1788120263.024357,
+  "settle": 180.0,
+  "cycle_window": 180.0,
+  "recovery": 600.0,
+  "pid": 16120,
+  "require_ntp": false,
+  "prompt_ts": 1788120443.196279,
+  "boards": [
+    {
+      "name": "tdeck",
+      "port": "/dev/cu.usbmodem1101",
+      "kind": "esp32"
+    },
+    {
+      "name": "heltec",
+      "port": "/dev/cu.usbserial-0001",
+      "kind": "esp32"
+    },
+    {
+      "name": "tbeam",
+      "port": "/dev/cu.usbserial-573C0005841",
+      "kind": "esp32"
+    },
+    {
+      "name": "rak",
+      "port": "/dev/cu.usbmodem201301",
+      "kind": "rak"
+    }
+  ],
+  "warnings": [],
+  "extra_fails": [],
+  "t0": 1788120529.632533,
+  "verdict": "PASS"
+}

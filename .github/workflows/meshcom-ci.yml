@@ -140,4 +140,7 @@ jobs:
         .pio/build/esp32-safeboot/partitions.bin,
         otadata.bin"
 
-        bodyFile: "release.md"
+        # release-notes.md traegt AUSSCHLIESSLICH den Text des aktuellen
+        # Release. release.md ist das fortlaufende deutsche Journal ueber
+        # alle Releases und waere als Release-Body unbrauchbar lang.
+        bodyFile: "release-notes.md"

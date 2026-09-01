@@ -1,0 +1,73 @@
+board,wall,uptime_ms,kind,reason,bssid,chan,rssi,value,note
+tbeam,2026-08-30 11:26:00,0,reset,,,,,rst:0x1,
+tbeam,2026-08-30 11:26:06,5461,link,down,,,,,
+tbeam,2026-08-30 11:26:11,10087,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:26:11,10665,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:26:12,11672,ready,,,,,1,
+tbeam,2026-08-30 11:27:06,65492,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=54 ip=1,
+tbeam,2026-08-30 11:27:31,90419,drop,,,,,,
+tbeam,2026-08-30 11:27:31,90425,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tbeam,2026-08-30 11:27:31,90425,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tbeam,2026-08-30 11:27:35,93864,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:27:35,94445,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4026,live
+tbeam,2026-08-30 11:28:06,125497,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=31 ip=1,
+tbeam,2026-08-30 11:29:06,185501,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=91 ip=1,
+tbeam,2026-08-30 11:30:06,245501,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=151 ip=1,
+tbeam,2026-08-30 11:31:06,305505,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=211 ip=1,
+tbeam,2026-08-30 11:32:06,365507,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=271 ip=1,
+tbeam,2026-08-30 11:33:06,425511,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=331 ip=1,
+tbeam,2026-08-30 11:34:06,485515,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=391 ip=1,
+tbeam,2026-08-30 11:35:06,545520,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=451 ip=1,
+tbeam,2026-08-30 11:36:06,605524,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=511 ip=1,
+tbeam,2026-08-30 11:37:06,665528,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=571 ip=1,
+tbeam,2026-08-30 11:37:31,690427,drop,,,,,,
+tbeam,2026-08-30 11:37:31,690433,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tbeam,2026-08-30 11:37:31,690433,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tbeam,2026-08-30 11:37:35,693879,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:37:35,694416,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3989,live
+tbeam,2026-08-30 11:38:06,725532,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=31 ip=1,
+tbeam,2026-08-30 11:39:06,785536,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=91 ip=1,
+tbeam,2026-08-30 11:40:06,845541,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=151 ip=1,
+tbeam,2026-08-30 11:41:06,905544,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=211 ip=1,
+tbeam,2026-08-30 11:42:06,965548,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=271 ip=1,
+tbeam,2026-08-30 11:43:06,1025551,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=331 ip=1,
+tbeam,2026-08-30 11:44:06,1085555,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=391 ip=1,
+tbeam,2026-08-30 11:45:06,1145556,link,up,5A:AF:97:2E:2B:8B,3,-60,age_s=451 ip=1,
+tbeam,2026-08-30 11:46:06,1205557,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=511 ip=1,
+tbeam,2026-08-30 11:47:06,1265562,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=571 ip=1,
+tbeam,2026-08-30 11:47:32,1291303,drop,,,,,,
+tbeam,2026-08-30 11:47:32,1291308,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tbeam,2026-08-30 11:47:32,1291308,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tbeam,2026-08-30 11:47:36,1294745,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:47:36,1295426,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=4123,live
+tbeam,2026-08-30 11:48:06,1325562,link,up,5A:AF:97:2E:2B:8B,3,-59,age_s=30 ip=1,
+tbeam,2026-08-30 11:49:06,1385568,link,up,5A:AF:97:2E:2B:8B,3,-60,age_s=90 ip=1,
+tbeam,2026-08-30 11:50:06,1445573,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=150 ip=1,
+tbeam,2026-08-30 11:51:06,1505576,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=210 ip=1,
+tbeam,2026-08-30 11:52:06,1565577,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=270 ip=1,
+tbeam,2026-08-30 11:53:06,1625582,link,up,5A:AF:97:2E:2B:8B,3,-61,age_s=330 ip=1,
+tbeam,2026-08-30 11:54:06,1685584,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=390 ip=1,
+tbeam,2026-08-30 11:55:06,1745589,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=450 ip=1,
+tbeam,2026-08-30 11:56:06,1805589,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=510 ip=1,
+tbeam,2026-08-30 11:57:06,1865591,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=570 ip=1,
+tbeam,2026-08-30 11:57:33,1892134,drop,,,,,,
+tbeam,2026-08-30 11:57:33,1892139,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tbeam,2026-08-30 11:57:33,1892139,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tbeam,2026-08-30 11:57:36,1895585,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-55,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 11:57:37,1896105,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3971,live
+tbeam,2026-08-30 11:58:06,1925595,link,up,5A:AF:97:2E:2B:8B,3,-55,age_s=29 ip=1,
+tbeam,2026-08-30 11:59:06,1985598,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=89 ip=1,
+tbeam,2026-08-30 12:00:06,2045638,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=149 ip=1,
+tbeam,2026-08-30 12:01:06,2105638,link,up,5A:AF:97:2E:2B:8B,3,-58,age_s=209 ip=1,
+tbeam,2026-08-30 12:02:06,2165640,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=269 ip=1,
+tbeam,2026-08-30 12:03:06,2225644,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=329 ip=1,
+tbeam,2026-08-30 12:04:06,2285644,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=389 ip=1,
+tbeam,2026-08-30 12:05:06,2345644,link,up,5A:AF:97:2E:2B:8B,3,-56,age_s=449 ip=1,
+tbeam,2026-08-30 12:06:06,2405649,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=509 ip=1,
+tbeam,2026-08-30 12:07:06,2465650,link,up,5A:AF:97:2E:2B:8B,3,-57,age_s=569 ip=1,
+tbeam,2026-08-30 12:07:33,2492700,drop,,,,,,
+tbeam,2026-08-30 12:07:33,2492705,disconnected,8:ASSOC_LEAVE,,,,,our drop
+tbeam,2026-08-30 12:07:33,2492706,assoc_disconnected,8,5A:AF:97:2E:2B:8B,3,-56,auth=7 phy=bgn pmf=0 wpa3=0,cached
+tbeam,2026-08-30 12:07:37,2496150,assoc_connected,0,5A:AF:97:2E:2B:8B,3,-54,auth=7 phy=bgn pmf=0 wpa3=0,live
+tbeam,2026-08-30 12:07:37,2496679,assoc_got_ip,0,5A:AF:97:2E:2B:8B,3,-53,auth=7 phy=bgn pmf=0 wpa3=0 reconnect_ms=3979,live
+tbeam,2026-08-30 12:08:06,2525653,link,up,5A:AF:97:2E:2B:8B,3,-54,age_s=28 ip=1,

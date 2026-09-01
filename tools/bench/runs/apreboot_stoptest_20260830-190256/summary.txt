@@ -1,0 +1,36 @@
+apreboot stoptest  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_stoptest_20260830-190256
+started            2026-08-30 19:02:56
+windows            settle 600.0 s / cycle 60.0 s / recovery 60.0 s
+outage t0          none seen
+verdict            FAIL
+  !! no outage detected
+  !! run stopped before the recovery window ended
+
+== rak (rak)   FAIL
+marker       before t0   after t0
+link_up              0   -
+got_ip               0   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   0 / 0
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+
+== tdeck (esp32)   FAIL
+marker       before t0   after t0
+link_up              1   -
+got_ip               2   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   1 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+

@@ -1,0 +1,80 @@
+{
+  "port": "/dev/cu.usbserial-573C0005841",
+  "env": "ttgo_tbeam",
+  "host": null,
+  "ip": "192.168.68.70",
+  "target": "192.168.68.70",
+  "bin": "/private/tmp/claude-501/-Users-martinwerner-WebDev-MeshCom-Firmware-DEV-Main/a17cb5bb-87fb-44d6-8971-c1c31ee78b96/scratchpad/tbeam_fw.bin",
+  "expect_hardware": "TBEAM",
+  "started": "2026-08-30 20:10:51",
+  "rundir": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/ota_20260830-201051",
+  "before": {
+    "version": "4.35p",
+    "build": "Aug 30 2026 / 19:55:19",
+    "call": "DK5EN-92",
+    "node_id": "E0D041B8",
+    "hw_idx": "12",
+    "hardware": "TBEAM_AXP2101",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.70"
+  },
+  "ota_md5": "c2f89efcf0b94330fe6c33e50e8fb38c",
+  "ota": {
+    "ok": false,
+    "stage": "hardware_mismatch",
+    "error": "hardware mismatch: node reports 'TBEAM_AXP2101', expected 'TBEAM' (--force to flash anyway)",
+    "timings": {
+      "precheck_s": 0.8384479169617407,
+      "total_s": 0.8436482910183258
+    },
+    "before": {
+      "hardware": "TBEAM_AXP2101",
+      "build": "Aug 30 2026 / 19:55:22",
+      "version": "4.35p"
+    },
+    "after": null,
+    "md5": "c2f89efcf0b94330fe6c33e50e8fb38c",
+    "fw_size": 1599248
+  },
+  "boot_ready": false,
+  "wifi_rejoined": false,
+  "resets_after_ota": 0,
+  "after": {
+    "version": "4.35p",
+    "build": "Aug 30 2026 / 19:55:19",
+    "call": "DK5EN-92",
+    "node_id": "E0D041B8",
+    "hw_idx": "12",
+    "hardware": "TBEAM_AXP2101",
+    "webserver": "on",
+    "maxhop_text": "4",
+    "maxhop_pos": "2",
+    "lora_freq": "433.1750",
+    "lora_power": "2",
+    "lora_bw": "250",
+    "lora_sf": "11",
+    "lora_cr": "6",
+    "wifi_ssid": "ORBI63",
+    "wifi_localip": "192.168.68.70"
+  },
+  "settings_diffs": [],
+  "warnings": [
+    "safeboot did not print \"OTA update finished successfully!\" within 60s",
+    "no [WIFI];event;got_ip seen after the OTA within 60s (checked again via --wifistat below)"
+  ],
+  "fails": [
+    "OTA failed at stage hardware_mismatch: hardware mismatch: node reports 'TBEAM_AXP2101', expected 'TBEAM' (--force to flash anyway)",
+    "no [BOOT];ready seen after the OTA within 60s -- the app may not have come back up",
+    "post-flash hardware mismatch: 'TBEAM_AXP2101' != 'TBEAM'"
+  ],
+  "verdict": "FAIL",
+  "total_s": 193.29806685447693
+}

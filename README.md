@@ -2,15 +2,15 @@
 MeshCom is indeed an exciting project of the Institute of Citizen Science for Space & Wireless communication (www.icssw.org)  aimed at creating a resilient, text-based communication tool for amateur radio operators. It utilizes LORA™ modulation technology and the APRS protocol to establish a mesh network in the 70cm band. The main objectives of MeshCom are to realize a connected off-grid messaging system with low energy consumption and cost-effective hardware. The technical implementation is based on LORA™  radio modules, which can transmit messages, positions, measurements, and more over long distances with low transmit power. MeshCom modules can be connected to form a mesh network or establish a messaging network via MeshCom gateways, ideally connected through HAMNET.
 
 ## Basic functions:
--	Each Node is identified by a Amateur Radio Callsign (with optional SSID)
--	Short test messages can be sent to ALL (everybody), with ACK from Server/Gateway
--	Short text messages can be sent DIRECTLY to other Callsign, with End-toEnd Aknowledgement
--	Some Nodes can als be to configured to act as GATEWAY to HAMNET or INTERNET (wifi)
+-	Each Node is identified by an Amateur Radio Callsign (with optional SSID)
+-	Short text messages can be sent to ALL (everybody), with ACK from Server/Gateway
+-	Short text messages can be sent DIRECTLY to other Callsign, with End-to-End Acknowledgement
+-	Some Nodes can also be configured to act as GATEWAY to HAMNET or INTERNET (wifi)
 -	Each Node should act as a repeater for all other MESHCOM messages on air
--	Servers and Gateways might have some functionalities to avoid the transmission of redundant trafic
+-	Servers and Gateways might have some functionalities to avoid the transmission of redundant traffic
 -	Nodes will automatically send STATUS and POSITION messages
 -	NODES with optional Sensors will send WX-Data or TELEMETRY Data periodically
--	Messages will be diplayed on small OLED Display or via BT connected smartphone or tablet device or via USB connected serial console
+-	Messages will be displayed on small OLED Display or via BT connected smartphone or tablet device or via USB connected serial console
 
 The main goal is to have a selfbuilding and selfhealing Mesh-Network, that can be enhanced by other components of the Amateur Radio Service, like HAMNET (IP-Network), centralised or distributed Meshcom servers. This will increase coverage to all continents and enable interconnection to other modes and services (APRS, WINLINK, DMR, TETRA-SDS, SOTA-WATCH, POCSAG,VARA-AC, …) building an unified communication plattform.
 Particulary useful is Meshcom for Emergency Communication (EMCOM) in case of disaster or Blackout.
@@ -32,7 +32,8 @@ Bandwith: 250kHz
 CR: 4/6
 
 ## APRS-Protokoll: 
-Document: http://www.aprs.org/doc/APRS101.PDF
+Historical basis: APRS PROTOCOL REFERENCE Version 1.0, 2000 (http://www.aprs.org/doc/APRS101.PDF).
+Note that APRS101.PDF is a document from 2000 that is no longer maintained and does **not** describe the format MeshCom actually puts on the air — MeshCom deviates from it in several places (little-endian 32-bit message ID, flags/hop byte, hardware and modulation ID trailer, FCS). The corrected, up-to-date wire format reference for this firmware is [docs/architecture/11-wire-format.md](docs/architecture/11-wire-format.md), written byte-for-byte against the actual encoder/decoder in `src/aprs_functions.cpp` with examples from captured frames.<br/>
 Address: Call-SSID, Source, Target, DIGI1-5
 Telemetry: data, formula, units,…
 Weather: Temp, pressure, rain,…
@@ -50,10 +51,12 @@ The technical approach is based on the use of LORA radio modules which transmit 
 MeshCom 4.0 uses the APRS PROTOCOL REFERENCE for the source, destination, Digipeater and payload data as defined for APRS. (aprs101.pdf APRS PROTOCOL REFERENCE Version 1.0 2000, Page 12)
 MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für APRS definiert ist. (aprs101.pdf APRS PROTOCOL REFERENCE Version 1.0 2000, Seite 12)
 
+**Authoritative wire format documentation:** the APRS101 reference above is the historical starting point, but it is stale (last updated 2000) and MeshCom's actual frames differ from it. The precise, current byte-level specification of the LoRa on-air frame, the server UDP protocol, the EXTUDP JSON sideband and the BLE phone protocol is maintained in [docs/architecture/11-wire-format.md](docs/architecture/11-wire-format.md).
+
 ### Terms:
 - Identifier — APRS data type identifier
 - Message ID – 32-bit LSB->MSB unique value
-- MAX-HOP – max. 7 (mask 0x07) default 5 is used which allows another 4 transfers.
+- MAX-HOP – max. 7 (mask 0x07); default is 4 for text messages and 2 for position reports (see `MAX_HOP_TEXT_DEFAULT` / `MAX_HOP_POS_DEFAULT` in `src/configuration_global.h`).
   - 0x80 – ID as to whether this message has already been sent via the MQTT server
   - 0x40 – Identification that this message should be supplemented for each MeshClient with the call sign of the transmitting station. For measurement and control purposes.
 - Source Address — This field contains the callsign and SSID of the transmitting station
@@ -76,16 +79,16 @@ MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für AP
    - | ... only serves to show the separations here in the text
 
 #### Message elements
-- Medlution ID: ! @ ... text, position, weather message
+- Message type ID: ! @ ... text, position, weather message
 - MMMMMMMM Message ID 32-bit LSB->MSB
 - HH MAX-HOP 8-bit bit mask 0x07
 - Message via MQTT server bit mask 0x80
 - Insert path into mesh (with comma as separation) bit mask 0x40
 - 4800.00 latitude degrees/decimal x 100
-- 01600.00 Longidude degrees/decimal x 100
+- 01600.00 Longitude degrees/decimal x 100
 - N north / south char
 - / APRS SYMBOL group (/ or \) char
-- E E ast / West char
+- E East / West char
 - \# APRS SYMBOL char
 - BBB battery status in % int 0 - 100
 - /A=HHHH GPS sea level (m) int 0 - 9999
@@ -140,7 +143,7 @@ MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für AP
 ## Flashing Firmware
 Usually it is done via the upload button in VSCode directly. 
 ### ESP32 Via Command Line:
-- For this task the esptool is needed. You can either use the one from platform.io which is located at the `.platformio/tool-esptoolpy/esptool.py` in addition with the python venv, which is at: `.platformio/penv/bin/python`. The hidden `.platformio` directory is located in your User-Directory.<br/>
+- For this task the esptool is needed. You can either use the one from platform.io which is located at the `.platformio/packages/tool-esptoolpy/esptool.py` in addition with the python venv, which is at: `.platformio/penv/bin/python`. The hidden `.platformio` directory is located in your User-Directory.<br/>
 Otherwise if not already installed, install a recent python version. Then you need to get the esptool via Pip: `pip install esptool` <br/>
 - The firmware.bin, bootloader.bin and partition.bin file is written after compiling to the hidden `.pio/build` directory of the MeshCom-Firmware repo directory.<br/>
 
@@ -170,10 +173,14 @@ For an ESP-S3 like the Heltec V3, E290, etc:
 
 Ready build firmware can also be flashed via the online tool (Chrome, Edge, Opera):<br/>
 https://esptool.oevsv.at/<br/>
+Note that the online tool always flashes the **original (official) MeshCom firmware**, not the firmware from this repository. To run the firmware built here instead, download the matching `<board>.bin` (e.g. `heltec_wifi_lora_32_V3.bin`) from this repository's [Releases page](../../releases) — or build it yourself with `pio run -e <board>` — and flash it **via OTA** as described below: either through the OTA web page or scripted with `tools/webflash.py`. The initial full flash (bootloader, partitions, safeboot) done by the online tool is a fine starting point; the OTA update then only replaces the application firmware.<br/>
 
 ### OTA-Update:
 The safeboot.bin or safeboot-s3.bin contains the factory image which holds the OTA-Update firmware. To update via OTA after you have initially flashed the board, you can either enter the command `--ota-update` on the serial console or hit the OTA-Update Button in the webserver or in the phone app. The node then boots into the ota-firmware. If you had already configured your wifi credentials and had a connection to your wifi router, the node will try to connect again to that. Open the website via `<YOUR-NodeCALLSIGN>.local` or via its IP address. If there was no wifi configured upfront, the node then activates the AP mode and you can find a WiFi AP named `MeshCom-OTA` and the website of the OTA can either be accessed via the IP address: `192.168.4.1` or via `MeshCom-OTA.local`<br>
-If the upload fails it will always fall back to the OTA firmware.
+If the upload fails it will always fall back to the OTA firmware. If no OTA upload is started within 180 seconds, the node automatically reboots back into the regular firmware.
+
+For a fully scripted OTA update over WiFi there is `tools/webflash.py`: it triggers the reboot into the OTA firmware, waits for the OTA web server, uploads the firmware with MD5 verification and waits until the node is back up:<br/>
+`python3 tools/webflash.py <YOUR-NodeCALLSIGN>.local`
 
 #### Erasing the Firmware: 
 If you want to wipe the firmware on the node:<br/>
@@ -201,6 +208,17 @@ If you need to generate an uf2 from a hex file compiled you need the following P
 https://github.com/microsoft/uf2/blob/master/utils/uf2conv.py<br/>
 
 `./uf2conv.py <PATH_TO-HEX-FILE> -c -o firmware.uf2 -f 0xADA52840`
+
+### RAK4631: entering and leaving flash mode without touching the board
+The UF2 bootloader implements the "1200 baud touch": opening the USB-CDC serial port at **1200 baud** and closing it again reboots the module into the serial-DFU bootloader — no double-tap on the reset button needed. This is handled by the TinyUSB stack, so it even works when the application firmware is frozen, which makes it the universal remote rescue for a hung node:
+
+```
+python3 -c "import serial; s=serial.Serial('<SERIAL_PORT>', 1200); s.dtr=False; s.close()"
+```
+
+`adafruit-nrfutil` does this automatically when called with `--touch 1200` (see above), as does `pio run -e wiscore_rak4631 --target upload` — so normally you just flash while the app is running and never think about it.
+
+**Kicking it out of flash mode:** after a 1200-baud touch the module **stays** in the bootloader until something flashes or resets it. Anything you type into the serial port in this state is consumed by the bootloader and silently discarded — do not try to talk to the application. To leave DFU mode either complete a flash (`adafruit-nrfutil dfu serial ...` resets into the new firmware automatically) or press the reset button once. On macOS you can tell the two states apart without guessing: `ioreg -p IOUSB` shows the product name `WisCore RAK4631 Board` with `idProduct 0x8029` when the application is running.
 
 ### Updating the bootloader on RAK or erasing flash:
 Please follow the instructions here: https://icssw.org/en/rak-wisblock-anleitung/<br/>

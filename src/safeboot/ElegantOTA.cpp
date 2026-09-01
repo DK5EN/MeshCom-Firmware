@@ -66,6 +66,17 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         Serial.setDebugOutput(true);
       #endif
 
+      // TM-46: a prior upload that stalled or dropped its connection can leave
+      // Update.begin() still open. Clean that up before starting fresh instead
+      // of letting the begin() below fail with a stale-session 400.
+      abortActiveUpdate("stale_session");
+
+      // TM-46: bump the session generation -- a disconnect captured under an
+      // older generation (e.g. a prior upload's connection that AsyncTCP only
+      // now gets around to reporting) can then be told apart from one
+      // belonging to this fresh session.
+      _updateGeneration++;
+
       // Pre-OTA update callback
       if (preUpdateCallback != NULL) preUpdateCallback();
 
@@ -85,7 +96,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           _update_error_str.concat("\n");
           ELEGANTOTA_DEBUG_MSG(_update_error_str.c_str());
         }
-      #elif defined(ESP32)  
+      #elif defined(ESP32)
         if (!Update.begin(UPDATE_SIZE_UNKNOWN, mode == OTA_MODE_FILESYSTEM ? U_SPIFFS : U_FLASH)) {
           Serial.print("Failed to start update process\n");
           // Save error to string
@@ -231,11 +242,28 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         if (!index) {
           // Reset progress size on first frame
           _current_progress_size = 0;
+          // TM-46: a client that vanishes mid-transfer (dropped TCP connection)
+          // must not leave Update() running forever -- abort on disconnect.
+          // Capture (by value) the generation this upload belongs to: AsyncTCP
+          // can deliver a killed client's disconnect late, after a fresh
+          // /ota/start has already superseded it: only abort if the captured
+          // generation is still the active one, else it's a stale event for a
+          // session that is already gone -- ignore it, don't kill the new one.
+          uint32_t gen = _updateGeneration;
+          request->onDisconnect([this, gen]() {
+            if (gen == _updateGeneration) {
+              abortActiveUpdate("client_disconnected");
+            } else {
+              Serial.printf("[SAFEBOOT];ota;disconnect_ignored;gen;%u/%u\n",
+                             (unsigned)gen, (unsigned)_updateGeneration);
+            }
+          });
         }
 
         // Write chunked data to the free sketch space
         if(len){
             if (Update.write(data, len) != len) {
+                abortActiveUpdate("write_failed");
                 return request->send(400, "text/plain", "Failed to write chunked data to free space");
             }
             _current_progress_size += len;
@@ -354,6 +382,21 @@ void ElegantOTAClass::onProgress(std::function<void(size_t current, size_t final
 
 void ElegantOTAClass::onEnd(std::function<void(bool success)> callable){
     postUpdateCallback = callable;
+}
+
+void ElegantOTAClass::onAbort(std::function<void(const char* reason)> callable){
+    abortUpdateCallback = callable;
+}
+
+// TM-46: centralizes every "give up on the current Update session" path
+// (stale session on a new /ota/start, a write failure, a dropped connection,
+// a stalled upload) so each one gets the same cleanup and the same log line.
+void ElegantOTAClass::abortActiveUpdate(const char* reason){
+    if (Update.isRunning()) {
+        Update.abort();
+        Serial.printf("[SAFEBOOT];ota;abort;reason;%s\n", reason);
+        if (abortUpdateCallback != NULL) abortUpdateCallback(reason);
+    }
 }
 
 

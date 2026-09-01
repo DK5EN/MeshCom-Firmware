@@ -7,8 +7,20 @@
 #MESHCOM ignored 
 .pio
 .vscode
+build_output.txt
+
+# Serielle Mitschnitte (tools/serial_monitor.py). Enthalten --info-Ausgaben und
+# damit WLAN-PSK sowie Node- und Webserver-Passwort im Klartext: bis 2026-08-25
+# druckte --info sie unmaskiert (N-31), aeltere Mitschnitte tragen sie also
+# weiterhin. Ausserdem RX/TX-Rohframes und Positionsdaten. Nie einchecken.
+#
+# Die Dateien tragen heute .log und fallen damit schon unter das generische
+# *.log weiter unten -- das ist Visual-Studio-Beiwerk und traegt nicht, sobald
+# ein Mitschnitt anders heisst. Deshalb hier explizit das ganze Verzeichnis.
+tools/meshcom_monitor/
 .*
 !/.gitignore
+!/.github/
 
 # User-specific files
 *.rsuser
@@ -404,3 +416,21 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 *.bak
+
+# Stdout der Bench-Runner (tools/bench/*.py, experiments/*.py), umgeleitet beim
+# Start: `... > runs/<name>.out`. Reiner Mitschnitt des Laufs -- die Auswertung
+# steht im .json bzw. summary.txt/summary.csv daneben, und genau die sind
+# eingecheckt (Konvention in tools/bench/runs/). Die .out-Dateien waechsen mit
+# jedem Lauf nach und haben in der Historie nichts verloren.
+tools/bench/runs/*.out
+
+# Dieselben Runner-Artefakte in den Unterordnern je Lauf (runs/<name>/...).
+# Die Regel oben greift nur direkt in runs/, nicht eine Ebene tiefer.
+# Eingecheckt bleiben laut Konvention die Auswertungen: summary.txt/summary.csv,
+# *_events.csv, die .json-Dateien sowie PROMPT und status.txt (traegt das Verdict).
+tools/bench/runs/**/*.out
+tools/bench/runs/**/runner.err
+tools/bench/runs/**/runner.pid
+
+# Roh-Mitschnitt des Peer-Node, gleiche Begruendung wie bei *.out
+tools/bench/runs/*.log.peer
