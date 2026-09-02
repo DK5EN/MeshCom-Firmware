@@ -121,6 +121,7 @@ void sendHeartbeat();
 #include <lora_setchip.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include "setlog_lines.h"
 #include "dedup_functions.h"
 #include <command_functions.h>
 #include <aprs_functions.h>
@@ -1348,24 +1349,81 @@ void nrf52loop()
         if(_pendPos)  sendDisplayPosition(_msg, _rssi, _snr);
     }
 
-    // Channel utilization report (every 10s)
+    // Channel utilization report (every 10s). SL-05: the drain of the
+    // ch_util accumulators feeds stat_util_rx_5m/tx_5m for the STAT line
+    // (--setlog on), so the 10-s tick runs independent of bLORADEBUG; only
+    // the diagnostic prints stay behind the flag, unchanged.
     {
         static unsigned long ch_util_timer = 0;
-        if(bLORADEBUG && (millis() - ch_util_timer) > 10000)
+        if((millis() - ch_util_timer) > 10000)
         {
             unsigned long window = millis() - ch_util_timer;
             ch_util_timer = millis();
             unsigned long rx_ms = ch_util_rx_accum.exchange(0);
             unsigned long tx_ms = ch_util_tx_accum.exchange(0);
+            stat_util_rx_5m += (uint32_t)rx_ms;
+            stat_util_tx_5m += (uint32_t)tx_ms;
             unsigned int util = (unsigned int)((rx_ms + tx_ms) * 100 / window);
             if(util > 100) util = 100;
-            Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
-                rx_ms, tx_ms, util);
-            // ONRXDONE stats: report max and warn count, then reset
-            Serial.printf("[MC-DBG] ONRXDONE_STATS max=%lums warn=%u (>%dms)\n",
-                onrxdone_max_ms, onrxdone_warn_count, ONRXDONE_WARN_MS);
-            onrxdone_max_ms = 0;
-            onrxdone_warn_count = 0;
+            if(bLORADEBUG)
+            {
+                Serial.printf("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
+                    rx_ms, tx_ms, util);
+                // ONRXDONE stats: report max and warn count, then reset
+                Serial.printf("[MC-DBG] ONRXDONE_STATS max=%lums warn=%u (>%dms)\n",
+                    onrxdone_max_ms, onrxdone_warn_count, ONRXDONE_WARN_MS);
+                onrxdone_max_ms = 0;
+                onrxdone_warn_count = 0;
+            }
+        }
+    }
+
+    // SL-05 STAT tick (--setlog on / bDisplayLog): runs independent of
+    // bLORADEBUG so the interval counters never grow unbounded even when the
+    // block above never fires. Reset always, print only when enabled.
+    {
+        static uint32_t setlog_stat_timer = 0;
+        if((uint32_t)(millis() - setlog_stat_timer) >= PRIO_STAT_INTERVAL_S * 1000UL)
+        {
+            setlog_stat_timer = millis();
+
+            struct setlogStatFields f;
+            unsigned long stat_rx_ms = stat_util_rx_5m.exchange(0);
+            unsigned long stat_tx_ms = stat_util_tx_5m.exchange(0);
+            uint32_t util = (uint32_t)((stat_rx_ms + stat_tx_ms) * 100UL /
+                                        (PRIO_STAT_INTERVAL_S * 1000UL));
+            if(util > 100) util = 100;
+            f.util_pct = (uint8_t)util;
+            f.rx_ms = (uint32_t)stat_rx_ms;
+            f.tx_ms = (uint32_t)stat_tx_ms;
+            f.newid = stat_newid.exchange(0);
+            f.dup = stat_dup.exchange(0);
+            f.err = stat_rx_err.exchange(0);
+            f.txn = stat_txn.exchange(0);
+            f.txfail = stat_txfail.exchange(0);
+            f.ringmax = stat_ring_max.exchange(0);
+            f.ring_size = MAX_RING;
+            for(int i = 0; i < 5; i++)
+            {
+                f.drop[i] = stat_drop_count[i + 1];
+                stat_drop_count[i + 1] = 0;
+            }
+            f.mh = (uint16_t)getMheardCount();
+            f.heap = nrf52_getFreeHeap();
+            f.trk_interval_s = (uint32_t)(trickle_interval_ms / 1000UL);
+            f.trk_consistent = trickle_consistent_count;
+            f.fw_major = shortVERSION();
+            f.fw_sub = shortSUBVERSION();
+            f.flash = FLASH_VERSION;
+            f.up_s = millis() / 1000UL;
+            f.t_ms = millis();
+
+            if(bDisplayLog)
+            {
+                char buf[300];
+                setlogFormatStat(buf, sizeof(buf), &f);
+                printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+            }
         }
     }
 

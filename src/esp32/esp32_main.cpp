@@ -138,6 +138,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <mheard_functions.h>
 #include <time_functions.h>
 #include <clock.h>
+#include <setlog_lines.h> // SL-04/SL-05: --setlog on line formatters (Welle 0)
 #include <onewire_functions.h>
 #include <onebutton_functions.h>
 #include <adc_functions.h>
@@ -2125,10 +2126,14 @@ void esp32loop()
         // Deferred display update from OnRxDone (avoid I2C inside radio callback)
         flushDeferredDisplayUpdates();
 
-        // Channel utilization report (every 10s)
+        // Channel utilization report (every 10s). SL-05: the drain of
+        // ch_util_rx_accum/tx_accum below feeds stat_util_rx_5m/tx_5m for the
+        // 5-minute STAT line (--setlog on), so the 10-s tick itself must not
+        // depend on bLORADEBUG any more -- only the diagnostic prints still
+        // do, unchanged from before. The 10-s accumulation math is untouched.
         {
             static unsigned long ch_util_timer = 0;
-            if(bLORADEBUG && (millis() - ch_util_timer) > 10000)
+            if((millis() - ch_util_timer) > 10000)
             {
                 unsigned long window = millis() - ch_util_timer;
                 ch_util_timer = millis();
@@ -2136,13 +2141,18 @@ void esp32loop()
                 unsigned long tx_ms = ch_util_tx_accum.exchange(0);
                 unsigned int util = (unsigned int)((rx_ms + tx_ms) * 100 / window);
                 if(util > 100) util = 100;
-                printfdeb("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
-                    rx_ms, tx_ms, util);
-                // ONRXDONE stats: report max and warn count, then reset
-                printfdeb("[MC-DBG] ONRXDONE_STATS max=%lums warn=%u (>%dms)\n",
-                    onrxdone_max_ms, onrxdone_warn_count, ONRXDONE_WARN_MS);
-                onrxdone_max_ms = 0;
-                onrxdone_warn_count = 0;
+                stat_util_rx_5m.fetch_add((uint32_t)rx_ms);
+                stat_util_tx_5m.fetch_add((uint32_t)tx_ms);
+                if(bLORADEBUG)
+                {
+                    printfdeb("[MC-DBG] CHANNEL_UTIL rx=%lums tx=%lums util=%u%%\n",
+                        rx_ms, tx_ms, util);
+                    // ONRXDONE stats: report max and warn count, then reset
+                    printfdeb("[MC-DBG] ONRXDONE_STATS max=%lums warn=%u (>%dms)\n",
+                        onrxdone_max_ms, onrxdone_warn_count, ONRXDONE_WARN_MS);
+                    onrxdone_max_ms = 0;
+                    onrxdone_warn_count = 0;
+                }
             }
         }
 
@@ -2150,6 +2160,54 @@ void esp32loop()
         if((millis() - stat_prio_timer) > (unsigned long)(PRIO_STAT_INTERVAL_S * 1000UL))
         {
             stat_prio_timer = millis();
+
+            // SL-05: STAT line under --setlog on, independent of bLORADEBUG.
+            // Reads stat_drop_count[] before the existing (unconditional)
+            // memset further below resets it -- no second reset here. The
+            // interval counters are drained on every tick (so they never grow
+            // unbounded); only the print depends on bDisplayLog.
+            {
+                struct setlogStatFields f;
+                uint32_t rx5 = stat_util_rx_5m.exchange(0);
+                uint32_t tx5 = stat_util_tx_5m.exchange(0);
+                uint32_t util = 100UL * (rx5 + tx5) /
+                                (uint32_t)(PRIO_STAT_INTERVAL_S * 1000UL);
+                if(util > 100)
+                    util = 100;
+
+                f.util_pct       = (uint8_t)util;
+                f.rx_ms          = rx5;
+                f.tx_ms          = tx5;
+                f.newid          = stat_newid.exchange(0);
+                f.dup            = stat_dup.exchange(0);
+                f.err            = stat_rx_err.exchange(0);
+                f.txn            = stat_txn.exchange(0);
+                f.txfail         = stat_txfail.exchange(0);
+                f.ringmax        = stat_ring_max.exchange(0);
+                f.ring_size      = MAX_RING;
+                f.drop[0]        = stat_drop_count[1];
+                f.drop[1]        = stat_drop_count[2];
+                f.drop[2]        = stat_drop_count[3];
+                f.drop[3]        = stat_drop_count[4];
+                f.drop[4]        = stat_drop_count[5];
+                f.mh             = (uint16_t)getMheardCount();
+                f.heap           = (uint32_t)ESP.getFreeHeap();
+                f.trk_interval_s = trickle_interval_ms / 1000UL;
+                f.trk_consistent = trickle_consistent_count;
+                f.fw_major       = shortVERSION();
+                f.fw_sub         = shortSUBVERSION();
+                f.flash          = FLASH_VERSION;
+                f.up_s           = millis() / 1000UL;
+                f.t_ms           = millis();
+
+                if(bDisplayLog)
+                {
+                    char buf[300];
+                    setlogFormatStat(buf, sizeof(buf), &f);
+                    printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                }
+            }
+
             if(bLORADEBUG)
             {
                 printfdeb("[MC-STAT] t=%ds qmax=%d/%d\n",
@@ -2203,6 +2261,9 @@ void esp32loop()
             {
                 printfdeb("[MC-WDT] TX_WATCHDOG fired after %lums — forcing RX recovery\n",
                     millis() - _tx_s);
+
+                // SL-05: abort counter for the STAT block's txfail=.
+                stat_txfail.fetch_add(1);
 
                 ch_util_tx_start = 0;
                 transmittedFlag   = false;
@@ -4147,6 +4208,19 @@ int checkRX(bool bRadio)
 
         // RX channel utilization: CRC-failed packet still occupied the channel
         ch_util_rx_accum.fetch_add(radio.getTimeOnAir(ibytes) / 1000);  // us -> ms
+
+        // SL-04: CRC/RX error, platform-independent counter for the STAT
+        // block (SL-05) and the ERR line under --setlog on. checkRX() runs
+        // in loop() context here (called from esp32loop()), so a local
+        // stack buffer is unproblematic.
+        stat_rx_err.fetch_add(1);
+        if(bDisplayLog)
+        {
+            char buf[300];
+            setlogFormatErr(buf, sizeof(buf), saved_crc_rssi, saved_crc_snr,
+                            (uint16_t)ibytes, (int32_t)saved_crc_ferr, millis());
+            printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+        }
 
         // Diagnose-Output: RSSI/SNR + kompletter Payload-Hex-Dump
         if(bLORADEBUG)

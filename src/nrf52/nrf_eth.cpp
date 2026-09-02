@@ -24,6 +24,7 @@
 #include "via_functions.h"
 #include "regex_functions.h"
 #include "conf_frame.h"
+#include "setlog_lines.h"
 
 EthernetUDP Udp;
 
@@ -654,6 +655,14 @@ int NrfETH::getUDP()
                   insertOwnTx(aprsmsg.msg_id);
 
                   addTxRingEntry(convBuffer, size, RING_STATUS_DONE, "udp_rx", 0); // fire-and-forget, no retransmission for UDP relay
+
+                  if(bDisplayLog)
+                  {
+                      char buf[96];
+                      setlogFormatGwi(buf, sizeof(buf), aprsmsg.msg_id, aprsmsg.payload_type,
+                                       aprsmsg.max_hop, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
+                      printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                  }
 
                   addLoraRxBuffer(aprsmsg.msg_id, true);
 

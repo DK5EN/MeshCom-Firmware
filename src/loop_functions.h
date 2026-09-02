@@ -85,6 +85,7 @@ unsigned int setSMartBeaconing(double flat, double flon);
 String convertCallToShort(char callsign[10]);
 
 uint8_t shortVERSION();
+char shortSUBVERSION();
 
 double cround4(double dvar);
 double cround4abs(double dvar);

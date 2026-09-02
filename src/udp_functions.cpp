@@ -23,6 +23,7 @@
 #include "via_functions.h"
 #include "regex_functions.h"
 #include "conf_frame.h"
+#include "setlog_lines.h"
 
 #if defined(ESP32)
 #include "esp_task_wdt.h"
@@ -477,6 +478,14 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 insertOwnTx(aprsmsg.msg_id);
 
                 addTxRingEntry(convBuffer, (uint16_t)size, 0xFF, "udp_rx", 0); // 0xFF no retransmission for UDP relay messages
+
+                if(bDisplayLog)
+                {
+                    char buf[96];
+                    setlogFormatGwi(buf, sizeof(buf), aprsmsg.msg_id, aprsmsg.payload_type,
+                                     aprsmsg.max_hop, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
+                    printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                }
 
                 // TM-31: position frames were already entered into the dedup ring
                 // in the 0x21 branch above -- adding them again here would spend
