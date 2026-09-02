@@ -1,5 +1,32 @@
 # RESUME — pick up here
 
+## 2026-09-02 night: Release v4.35p.09.02-stability published — GPS/QNH path, --setlog lines, T-Deck key repeat
+
+`v4.35p.09.02-stability` is live on GitHub (39 assets, `--latest`), tagged at
+`53ecc696` on `v4.35p_prio`, `FLASH_VERSION 20260902`. Three worktree branches
+were merged in order setlog (`c98f1abc`) → GPS (`de522912`) → keyboard
+(`bda28bae`) after an upstream `dev` sync (`b4f3b400`, #1124); changelog items
+173/174/175 renumbered at merge, 176 is the upstream sync. Gates: 32 envs
+clean, native 568/568 in 12 host envs, tool tests 102. The four worktrees
+(`mc-gps`, `mc-keyrepeat`, `mc-setlog`, `mc-helmut`) and their branches are
+deleted; `mc-pr1114-kiss` stays.
+
+Deliberately still open (all in release-notes.md "Known gaps"):
+
+1. **`--setlog` bench** (plan Welle 3: RAK-90 + Heltec-93, 30 min) — no
+   hardware run yet.
+2. **GPS two-hour arms A/B/C** on DK5EN-14 — only 6.5 min bench + two
+   one-hour OE5HWN field logs exist (`gps-nmea-impl-plan-20260902.md` §6).
+3. **GPS-06 T-Deck pin fallback** unverified on hardware; OE5HWN has the
+   build (`firmware_t_deck_gps-kbd-test_20260902c.bin`, pre-merge tree).
+4. **PR cuts to upstream**: `docs/pr-gps-draft-20260902.md`,
+   `docs/pr-tdeck-keyrepeat-draft-20260902.md`; setlog has no draft yet.
+   Include the T-Deck pin note for Kurt ("Modul-TX an GPIO44").
+5. `tools/resource_baseline.json` is stale (deltas of +4 kB on unchanged
+   trees); refresh it from this release's build logs.
+6. OE5HWN's T-Deck Plus keyboard controller predates raw mode — nothing to
+   fix, `--info` now says `KBD raw-mode unknown` on such units.
+
 ## 2026-09-02: Code Quality 2.0 written, scanner extended, §3.8t filed — next is the four-wave audit (CQ-12)
 
 `docs/code-quality-2.0.md` (`e108fa98`) is the field-derived layer on top of
