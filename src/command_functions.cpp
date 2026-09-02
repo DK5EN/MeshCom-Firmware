@@ -2293,7 +2293,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setpress") == 0)
     {
-        fBaseAltidude = (float)meshcom_settings.node_alt;
+        // GPS-04/F9: nicht direkt schreiben -- baroBaseRelatch() zieht JEDE
+        // vorhandene Basishoehe nach (BMx280 und BME680), der direkte Griff
+        // auf fBaseAltidude liess die des BME680 stehen.
+        baroBaseRelatch((float)meshcom_settings.node_alt);
         fBasePress = meshcom_settings.node_press;
 
         printfdeb("\nBase Press set to: %.1f at %.1f m\n", fBasePress, fBaseAltidude);
@@ -4125,8 +4128,20 @@ void commandAction(char *umsg_text, bool ble)
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
         sscanf(_owner_c, "%d", &iVar);
 
+        // GPS-03/F7: Ein Tippfehler darf die Hoehe nicht auf 0 klemmen -- das
+        // hat frueher den Schaetzer auf 0 m geseedet UND die barometrische
+        // Referenz auf 0 m nachgezogen. Unbrauchbare Eingabe wird verworfen.
         if(iVar < 0 || iVar > 40000)
-            iVar = 0;
+        {
+            printfdeb("alt out of range (0..40000 m), ignored\n");
+
+            if(ble)
+            {
+                addBLECommandBack((char*)msg_text);
+            }
+
+            return;
+        }
 
         meshcom_settings.node_alt=iVar;
 

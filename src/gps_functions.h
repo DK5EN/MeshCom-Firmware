@@ -47,9 +47,6 @@ void WZ_GPS_Feed();
 void WZ_GPS_AltSeed(float alt);
 bool WZ_GPS_AltConverged();
 
-// GPS-02: samples rejected by the plausibility gate since boot
-uint16_t WZ_GPS_RejectCount();
-
 #endif // ENABLE_GPS
 
 // GPS-04: barometer reference altitude, independent of ENABLE_GPS.

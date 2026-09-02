@@ -380,6 +380,12 @@ Two consequences the dashboard hint does not account for:
 
 ## 7. Fix
 
+> **Implemented 2026-09-02.** The fix below was carried out as
+> [`gps-nmea-impl-plan-20260902.md`](gps-nmea-impl-plan-20260902.md) on
+> `feat-gps-nmea-20260902` (worktree `mc-gps`), reviewed with ten findings fixed —
+> [`review-verdict-gps-20260902.md`](review-verdict-gps-20260902.md). §8 below records
+> which of the items owed there now exist.
+
 ### 7.1 Rejected: raising the RX buffer
 
 `GPSSerial.setRxBufferSize(1024)` would mask GPS-01 for one static RAM kilobyte per GPS-bearing
@@ -638,19 +644,32 @@ moving GPS-only node is overselling.
 
 Per the working rules, no fix ships without a test that fails before and passes after.
 
-1. **Native, GPS-01:** feed a recorded NMEA stream through the parser with an injected 165-byte
-   gap every 420 bytes; assert the resulting fix stream contains a committed sample with
-   `lon == 0.0`. Fails on the current splice handling, passes with §7.3.
-2. **Native, GPS-02:** hand the position-commit path a sample with `lon == 0.0` / `month == 14`
-   and assert `meshcom_settings` is unchanged.
-3. **Native, GPS-03:** feed the §3.2 altitude sequence through the EMA and assert the filtered
-   output stays within ±3 m of the median (measured: worst sample 25.4 m raw → 2.6 m filtered).
-   A second case must assert the estimator is bypassed when `bDisplayTrack` is set.
-4. **Bench, GPS-01:** `DK5EN-14` (T-Deck Plus) or `DK5EN-92` (T-Beam) with `--gpsdebug 1` for two
-   hours, before and after. Assert zero samples with `lon == 0.0` and no `Date:` outside the
-   current month. Expected before: ~5 corrupt samples in 2 h; after: 0.
-5. **Bench, falsification:** the same node with TRACK on (1 s cadence) must show the artefacts at
-   a much lower rate even _before_ the fix. If it does not, §4.1 is wrong.
+1. **Native, GPS-01: not applicable, by design.** `WZ_GPS_Feed()`'s drain loop needs a
+   real `HardwareSerial` ring; the split from `WZ_GPS_Loop()` has no native seam. GPS-01's
+   proof is item 4 below, still open. What exists instead: 16 native cases in
+   `test/test_gps_filter/test_main.cpp` (`pio test -e native -f test_gps_filter`, all
+   passing) cover everything downstream of the drain — see item 2 and 3.
+2. **Native, GPS-02: exists.** `gpsSamplePlausible()` is exercised by
+   `test_plausible_akzeptiert_echten_fix`, `test_plausible_verwirft_nullinsel_und_kalender`
+   (the doc §3.1 splice verbatim: `lon == 0.0`, month 14, day 0, year 2015) and, added in
+   the review fix wave, `test_plausible_verwirft_hoehen_ausserhalb_des_bereichs` (garbage
+   altitude, F5) plus `test_datum_plausibilitaet` / `test_zeit_plausibilitaet` (the clock
+   write itself, F1 — not originally scoped here, found in review: a damaged RMC time term
+   reached `MyClock.setCurrentTime()` unchecked even with the position gate in place).
+3. **Native, GPS-03: exists, and stronger than specified.** Not an EMA — the plan settled
+   on a scalar Kalman filter (§7.4/§7.6). `test_doc_sequenz_gate_verwirft_genau_vier_samples`
+   feeds the §3.2 sequence from a converged 280 m state and asserts the exact per-sample
+   gate decision (the four samples >15 m below 280 reject, state moves <0.5 m, measured
+   0.23 m) — tightened by review finding F8 from a ±3 m bound that passed even with the
+   gate deleted. `test_feldserie_rms_verbessert_sich` /
+   `test_feldserie2_rms_verbessert_sich` run both full field logs (raw RMS ≥ 3.5 m /
+   4.08 m, converged-phase RMS ≤ 1.6 m / 0.9 m, measured 1.50 m / 0.71 m). TRACK bypass is
+   `bDisplayTrack` resetting the filter in `gps_functions.cpp`, asserted only via bench
+   (item 4) — no native seam for `bDisplayTrack` either. Full list:
+   `gps-nmea-impl-plan-20260902.md` §5.
+4. **Bench, GPS-01: pending.** `DK5EN-14` was not attached during the 2026-09-02
+   implementation session; arms A/B/C of the plan's §6 protocol have not run.
+5. **Bench, falsification: pending**, blocked on the same node.
 
 ---
 

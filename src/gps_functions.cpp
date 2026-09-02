@@ -100,6 +100,9 @@ static struct AltFilter s_alt;
 // Flanke "erstmals konvergiert seit dem letzten Seed" -- sie loest das
 // Nachziehen der barometrischen Referenzhoehe aus.
 static bool s_altConvergedOnce = false;
+// millis() der letzten in den Schaetzer eingespeisten Hoehe. 0 = unbekannt
+// (erste Auswertung nach dem Start/Reset), dann gilt die Nennkadenz.
+static uint32_t s_altLastMs = 0;
 
 unsigned long detectedBaud = 0;
 String ver = "";
@@ -830,7 +833,8 @@ void WZ_GPS_Init()
   // GPS-03: Neue Sitzung, neuer Schaetzer.
   altFilterReset(&s_alt);
   s_altConvergedOnce = false;
-  
+  s_altLastMs = 0;
+
   Serial.printf("[GPS ]...Init GPIO RX=%d TX=%d\n", GPS_RX_PIN, GPS_TX_PIN);
   
   #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -963,6 +967,13 @@ int WZ_GPS_Loop() {
         gpsData.valid      = gps.location.isValid();
         gpsData.latitude   = gps.location.lat();
         gpsData.longitude  = gps.location.lng();
+
+        // GPS-03/F6: isUpdated() muss VOR meters() gelesen werden -- der
+        // Zugriff auf den Wert loescht das Flag. updateGPSdata setzt jeder
+        // beliebige Satz; ohne diese Abfrage speist ein GGA mit Fixqualitaet 0
+        // oder leerem Hoehenfeld den alten Wert erneut in den Filter und
+        // schrumpft P auf einer Stichprobe ohne Informationsgehalt.
+        bool altNew        = gps.altitude.isUpdated();
         gpsData.altitude   = gps.altitude.meters();
         gpsData.satellites = gps.satellites.value();
         gpsData.hdop       = gps.hdop.hdop();
@@ -1005,7 +1016,7 @@ int WZ_GPS_Loop() {
         // kann die Pruefsumme zufaellig passieren und liefert dann Null-Insel
         // oder einen unmoeglichen Kalender. Solche Stichproben nehmen ab hier
         // den bestehenden Zweig ohne Fix.
-        bool bPlausible = gpsSamplePlausible(gpsData.latitude, gpsData.longitude,
+        bool bPlausible = gpsSamplePlausible(gpsData.latitude, gpsData.longitude, gpsData.altitude,
                                              (int)gpsData.year, (int)gpsData.month, (int)gpsData.day);
 
         if ((fposinfo_hdop < 6.0) && (posinfo_satcount > 5) && bPlausible)
@@ -1033,12 +1044,20 @@ int WZ_GPS_Loop() {
         if (WZ_GPS_HasFix() && has_gnss_location)
         {
             // time -> variables
-            if(gpsData.year > 2023)
+            //
+            // GPS-02/F1: Bei einem gespleissten RMC kann der Datumsteil heil
+            // durchkommen, waehrend der Zeitteil zerstoert ist ("1834" wird zu
+            // 00:18:34, "999999.99" zu h=99). mktime() nimmt beides
+            // widerspruchslos an -- nur eine eigene Bereichspruefung faengt es
+            // ab, bevor die Systemzeit verstellt wird.
+            if(gpsData.year > 2023 && gps.time.isValid()
+               && gpsDatePlausible((int)gpsData.year, (int)gpsData.month, (int)gpsData.day)
+               && gpsTimePlausible((int)gpsData.hour, (int)gpsData.minute, (int)gpsData.second))
             {
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, gpsData.year, gpsData.month, gpsData.day, gpsData.hour, gpsData.minute, gpsData.second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
             }
-                
+
             meshcom_settings.node_date_year = MyClock.Year();
             meshcom_settings.node_date_month = MyClock.Month();
             meshcom_settings.node_date_day = MyClock.Day();
@@ -1091,13 +1110,25 @@ int WZ_GPS_Loop() {
             {
                 altFilterReset(&s_alt);
                 s_altConvergedOnce = false;
+                s_altLastMs = 0;
 
                 meshcom_settings.node_alt = (int)gpsData.altitude;
             }
             else
             {
-                if(altFilterUpdate(&s_alt, (float)gpsData.altitude))
-                    meshcom_settings.node_alt = (int)lroundf(s_alt.x);
+                // GPS-03/F2: Das Prozessrauschen ist eine Rate. Die Auswertung
+                // laeuft auf nRF52 im Sekundentakt, auf ESP32 im
+                // Dreisekundentakt; ohne dt waere die Zeitkonstante dort ein
+                // Drittel. F6: nur eine WIRKLICH neue Hoehe darf einspeisen.
+                if(altNew)
+                {
+                    uint32_t nowMs = millis();
+                    uint32_t dtMs  = (s_altLastMs == 0) ? ALT_KF_DT_REF_MS : (nowMs - s_altLastMs);
+                    s_altLastMs    = nowMs;
+
+                    if(altFilterUpdate(&s_alt, (float)gpsData.altitude, dtMs))
+                        meshcom_settings.node_alt = (int)lroundf(s_alt.x);
+                }
 
                 // Flanke: erst ab hier ist die Hoehe gut genug, um die
                 // barometrische Referenz darauf festzunageln.
@@ -1123,7 +1154,12 @@ int WZ_GPS_Loop() {
         else
         {
             // time -> variables
-            if(gpsData.year > 2024)
+            // GPS-02/F1: gleiche Bereichspruefung wie im Fix-Zweig -- dieser
+            // Pfad nimmt gerade die Stichproben auf, die das
+            // Plausibilitaets-Gate verworfen hat.
+            if(gpsData.year > 2024 && gps.time.isValid()
+               && gpsDatePlausible((int)gpsData.year, (int)gpsData.month, (int)gpsData.day)
+               && gpsTimePlausible((int)gpsData.hour, (int)gpsData.minute, (int)gpsData.second))
             {
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, gpsData.year, gpsData.month, gpsData.day, gpsData.hour, gpsData.minute, gpsData.second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
@@ -1159,6 +1195,7 @@ void WZ_GPS_AltSeed(float alt)
 {
     altFilterSeed(&s_alt, alt);
     s_altConvergedOnce = false;
+    s_altLastMs        = 0;
 
     baroBaseRelatch(alt);
 }
@@ -1169,14 +1206,6 @@ void WZ_GPS_AltSeed(float alt)
 bool WZ_GPS_AltConverged()
 {
     return altFilterConverged(&s_alt);
-}
-
-/**
- * @brief GPS-02: Zahl der seit dem Start verworfenen Stichproben.
- */
-uint16_t WZ_GPS_RejectCount()
-{
-    return s_gpsRejectCount;
 }
 
 /**
@@ -1302,7 +1331,14 @@ bool baroBaseLatchAllowed()
     #if defined(ENABLE_GPS)
     // In TRACK laeuft kein Schaetzer (bewegter Knoten); dort gilt wie bisher
     // der erste Wert, sonst wuerde die Referenz nie gesetzt.
-    if(bGPSON && gpsDetected && !bDisplayTrack)
+    //
+    // GPS-04/F4: Zurueckgehalten wird nur, solange ein Fix vorliegt und der
+    // Schaetzer noch nicht konvergiert ist. Ohne WZ_GPS_HasFix() haelt ein
+    // abgeschatteter WX-Knoten, der nie fixt, fBaseAltidude fuer immer auf 0
+    // und meldet QFE als QNH -- vor dem Patch hat dort der gespeicherte
+    // node_alt gelatcht. Der erste getPressASL()-Aufruf faellt ausserdem auf
+    // t~60 s, also vor TTFF. Die Konvergenzflanke latcht spaeter nach.
+    if(bGPSON && gpsDetected && !bDisplayTrack && WZ_GPS_HasFix())
         return WZ_GPS_AltConverged();
     #endif
 

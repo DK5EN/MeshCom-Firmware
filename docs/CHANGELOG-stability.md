@@ -104,6 +104,31 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      native test environment (backlog CQ-06), so both are pinned by the
      scanner (`CQ2-C02a`, `CQ2-C12a` must return zero) and the builds only.
 
+173. **The GPS altitude and QNH path (GPS-01..04, field report `OE5HWN-14`).** The
+     GPS UART was drained only once every `gps_refresh_intervall` seconds while the
+     module streams continuously into a 256-byte ring, discarding most of every
+     cycle's NMEA and occasionally splicing two sentences into one that still
+     passes the checksum (observed: a fix with `lon:0.000000` and `Date:
+2015.14.00`); the node's reported altitude was a single unfiltered GPS sample
+     with several metres of noise; and the barometric QNH reference latched to
+     whichever fix happened to be first after boot and was never corrected. Fixed:
+     `WZ_GPS_Feed()` now drains the UART on every loop pass while `WZ_GPS_Loop()`
+     evaluates on its own timer; a plausibility gate (`gpsSamplePlausible()`,
+     `gpsTimePlausible()`, `gpsDatePlausible()`) rejects null-island, out-of-range,
+     and calendar-impossible samples before they reach persisted settings or the
+     system clock; a scalar Kalman filter with dt-scaled process noise
+     (`AltFilter`) replaces the raw altitude sample (measured 4.36→1.52 m RMS on
+     the field capture); and the QNH reference re-latches once the filter
+     converges, and on `--setalt` / `--setpress`, instead of only on the first fix.
+     `--setalt` with an out-of-range value is now rejected instead of silently
+     clamped to 0 m. Reviewed (`/fable-review`, ten findings, all fixed) before
+     landing. Cost: ~16 B additional static RAM on boards with `ENABLE_GPS`, 0 B
+     elsewhere. Bench verification (DK5EN-14) is still open — no bench node was
+     attached at the time of this entry; see `gps-nmea-impl-plan-20260902.md` and
+     `bug-GPS-uart-overflow-20260901.md`. _Numbering to be reconciled at merge —
+     item 173 is used by the `--setlog` instrumentation work on another worktree
+     of the same session._
+
 ## New in v4.35p.09.01.2-stability
 
 A same-day second cut on top of `v4.35p.09.01-stability`: one field-driven

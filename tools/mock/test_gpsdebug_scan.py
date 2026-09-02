@@ -140,6 +140,34 @@ class TestGpsdebugScan(unittest.TestCase):
         self.assertEqual(res.corrupt_date, 1)
         self.assertEqual(res.corrupt_samples, 1)
 
+    def test_capture_month_vote_ignores_impossible_dates(self) -> None:
+        # A corrupt date must not be allowed to vote for the reference month.
+        # Here the vote is 2 corrupt (2015.14) against 2 good (2026.09) -- a tie
+        # that Counter.most_common resolves by insertion order, i.e. in favour
+        # of the corrupt month, unless impossible dates are filtered out first.
+        # If they were, every good line of the capture would be reported as
+        # wrong-month and the two genuinely corrupt cycles as clean.
+        def cycle(date: str, lat: str) -> list[str]:
+            return [
+                "[GPS ]...fix:yes sat:6 hdop:2.0\n",
+                f"[GPS ]...Time <UTC>: 12:00:00 / Date: {date}\n",
+                f"[GPS ]...position  : lat:{lat} lon:14.100000 alt:250.0\n",
+            ]
+
+        lines = (
+            cycle("2015.14.00", "48.100000")
+            + cycle("2015.14.00", "48.100001")
+            + cycle("2026.09.01", "48.100002")
+            + cycle("2026.09.02", "48.100003")
+        )
+
+        res = gpsdebug_scan.parse_capture(lines)
+
+        self.assertEqual(res.capture_month, (2026, 9))
+        self.assertEqual(res.corrupt_date, 2, msg="only the two impossible dates are corrupt")
+        self.assertEqual(res.corrupt_samples, 2)
+        self.assertEqual(res.altitude_overall["n"], 2, msg="the two clean cycles keep their altitude")
+
     # ------------------------------------------------------------------
     # Altitude statistics, hand-computed independently (see module docstring)
     # ------------------------------------------------------------------

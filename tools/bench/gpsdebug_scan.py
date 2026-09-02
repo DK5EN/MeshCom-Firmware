@@ -45,7 +45,9 @@ that wall-clock host timestamp; without one, by sample index at the nominal
 `position` line has `lat == 0.0 or lon == 0.0`, or whose `Date:` line is
 calendar-impossible (month outside 1..12, day outside 1..31, year < 2024) or
 names a different month than the capture (`--month YYYY-MM`, default: the
-most common `year.month` among the file's `Date:` lines). One corrupted
+most common `year.month` among the file's calendar-POSSIBLE `Date:` lines --
+a corrupt date must never be able to win the vote and declare every good
+line of the capture wrong-month). One corrupted
 evaluation typically trips both symptoms at once (a spliced NMEA sentence
 corrupts the whole fix), so cycles are deduplicated: `corrupt_samples` is a
 per-cycle count, `corrupt_position` / `corrupt_date` are the raw per-line
@@ -159,12 +161,15 @@ class ScanResult:
     corrupt_examples: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _calendar_possible(year: int, month: int, day: int) -> bool:
+    """A date the NMEA parser could plausibly have produced -- mirrors
+    `gpsDatePlausible()` in src/gps_filter.cpp (month 1..12, day 1..31,
+    year >= 2024)."""
+    return 1 <= month <= 12 and 1 <= day <= 31 and year >= 2024
+
+
 def _bad_date(year: int, month: int, day: int, capture_month: tuple[int, int]) -> bool:
-    if not (1 <= month <= 12):
-        return True
-    if not (1 <= day <= 31):
-        return True
-    if year < 2024:
+    if not _calendar_possible(year, month, day):
         return True
     return (year, month) != capture_month
 
@@ -177,7 +182,13 @@ def _resolve_capture_month(lines: list[str], explicit: tuple[int, int] | None) -
         _, rest = strip_host_ts(raw.rstrip("\n"))
         m = RE_DATE.search(rest)
         if m:
-            votes[(int(m.group("year")), int(m.group("month")))] += 1
+            year, month, day = int(m.group("year")), int(m.group("month")), int(m.group("day"))
+            # A calendar-impossible date is corrupt by definition and must not
+            # get a vote: Counter.most_common breaks ties by insertion order, so
+            # a couple of corrupt lines early in a short capture would otherwise
+            # become the reference month and mark every good line wrong-month.
+            if _calendar_possible(year, month, day):
+                votes[(year, month)] += 1
     if not votes:
         return (0, 0)
     return votes.most_common(1)[0][0]
