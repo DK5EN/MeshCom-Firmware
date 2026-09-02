@@ -612,6 +612,26 @@ float getTempForNTC()
 //=======================================================================================
 
 
+// TM-51: name of the last reset cause for the boot banner. A field reboot without
+// this line is indistinguishable from a power cycle (see bug-GPS-uart-overflow §3.3).
+static const char* resetReasonName(esp_reset_reason_t r)
+{
+    switch (r)
+    {
+        case ESP_RST_POWERON:   return "POWERON";
+        case ESP_RST_EXT:       return "EXT";
+        case ESP_RST_SW:        return "SW";
+        case ESP_RST_PANIC:     return "PANIC";
+        case ESP_RST_INT_WDT:   return "INT_WDT";
+        case ESP_RST_TASK_WDT:  return "TASK_WDT";
+        case ESP_RST_WDT:       return "WDT";
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT:  return "BROWNOUT";
+        case ESP_RST_SDIO:      return "SDIO";
+        default:                return "UNKNOWN";
+    }
+}
+
 void esp32setup()
 {
     ///< Initialize T5-EPAPER GUI
@@ -712,6 +732,13 @@ void esp32setup()
     printlndeb("============");
     printlndeb("CLIENT SETUP");
     printlndeb("============");
+
+    // TM-51: reset cause, raw Serial.printf so it survives --debug off (nRF52 prints
+    // [BOOT] RESETREAS=... at the same point).
+    {
+        esp_reset_reason_t rr = esp_reset_reason();
+        Serial.printf("[BOOT] RESET_REASON=%d %s\n", (int)rr, resetReasonName(rr));
+    }
 
     lFreeHeap =  ESP.getFreeHeap();
     lFreePsram = ESP.getFreePsram();
@@ -3174,7 +3201,7 @@ void esp32loop()
             // aktuell geladene Kachel verlassen hat, und bei Bedarf nachladen -
             // nur solange der Kartenbildschirm auch tatsaechlich sichtbar ist.
             static unsigned long sdmap_boundary_timer = 0;
-            if ((sdmap_boundary_timer + 30000UL) < millis())
+            if ((uint32_t)(millis() - sdmap_boundary_timer) >= 30000UL)   // N-08 idiom, rollover-safe
             {
                 sdmap_boundary_timer = millis();
 

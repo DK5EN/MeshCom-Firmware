@@ -4301,26 +4301,28 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
     //strcat(strconcat, cname);
 
     char strconcat[100]={0};
-    strcpy(strconcat, cbatt);
-    strncat(strconcat, calt, sizeof(strconcat)-1);
-    strncat(strconcat, cncnt, sizeof(strconcat)-1);
-    strncat(strconcat, cpress, sizeof(strconcat)-1);
-    strncat(strconcat, chum, sizeof(strconcat)-1);
-    strncat(strconcat, ctemp, sizeof(strconcat)-1);
-    strncat(strconcat, ctemp2, sizeof(strconcat)-1);
-    strncat(strconcat, cqfe, sizeof(strconcat)-1);
-    strncat(strconcat, cqnh, sizeof(strconcat)-1);
-    strncat(strconcat, cgasres, sizeof(strconcat)-1);
-    strncat(strconcat, cco2, sizeof(strconcat)-1);
-    strncat(strconcat, cgrc, sizeof(strconcat)-1);
-    strncat(strconcat, csfpegel, sizeof(strconcat)-1);
-    strncat(strconcat, csfpegel2, sizeof(strconcat)-1);
-    strncat(strconcat, csftemp, sizeof(strconcat)-1);
-    strncat(strconcat, csfbatt, sizeof(strconcat)-1);
-    strncat(strconcat, cversion, sizeof(strconcat)-1);    
-    strncat(strconcat, cinaU, sizeof(strconcat)-1);   
-    strncat(strconcat, cinaI, sizeof(strconcat)-1);
-    strncat(strconcat, ctele, sizeof(strconcat)-1);
+    // C02: strncat(dst, src, sizeof(dst)-1) bounds the source, not the remaining room;
+    // the worst-case tag set (~111 B) overran strconcat[100]. Bound by the room left.
+    snprintf(strconcat, sizeof(strconcat), "%s", cbatt);
+    strncat(strconcat, calt, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cncnt, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cpress, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, chum, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, ctemp, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, ctemp2, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cqfe, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cqnh, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cgasres, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cco2, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cgrc, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, csfpegel, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, csfpegel2, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, csftemp, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, csfbatt, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cversion, sizeof(strconcat) - strlen(strconcat) - 1);    
+    strncat(strconcat, cinaU, sizeof(strconcat) - strlen(strconcat) - 1);   
+    strncat(strconcat, cinaI, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, ctele, sizeof(strconcat) - strlen(strconcat) - 1);
 
     // wenn die concatenation zu lang ist, dann catxt und cname löschen
     if((strlen(strconcat) + strlen(catxt) + strlen(cname)) > 100)

@@ -2,7 +2,8 @@
 """
 MeshCom mechanical code audit scanner.
 
-Runs grep-based checks against the rule categories in docs/codequality-rules.md.
+Runs grep-based checks against the rule categories in docs/codequality-rules.md
+and the field-derived patterns in docs/code-quality-2.0.md (rule ids CQ2-*).
 Outputs a JSON object with findings list and summary counts.
 
 Usage:
@@ -20,9 +21,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Each entry: (rule_id, severity, category, short_description, regex_pattern)
-# Patterns match against individual source lines. No multiline.
-CHECKS: list[tuple[str, str, str, str, str]] = [
+# Each entry: (rule_id, severity, category, short_description, regex_pattern[, exclude_regex])
+# Patterns match against individual source lines. No multiline. A line that also matches
+# the optional exclude_regex is not reported (used to whitelist the known-safe idiom).
+CHECKS: list[tuple] = [
     # Buffer Safety
     ("BND-01", "CRITICAL", "Buffer Safety",  "sprintf() — use snprintf",       r"\bsprintf\s*\("),
     ("BND-01", "HIGH",     "Buffer Safety",  "strcpy() — use strncpy",         r"\bstrcpy\s*\("),
@@ -44,6 +46,33 @@ CHECKS: list[tuple[str, str, str, str, str]] = [
     # Protocol / bounds
     ("BND-02", "MEDIUM",   "Buffer Safety",  "memcpy — verify length before call",
      r"\bmemcpy\s*\("),
+    # Code Quality 2.0 (docs/code-quality-2.0.md, Appendix). Pattern ids C01..C28 refer to Part A.
+    ("CQ2-C01a", "HIGH",     "Code Quality 2.0", "memcpy bounded by sizeof() of the destination (C01)",
+     r"memcpy\([^,]+,[^,]+,\s*sizeof\("),
+    ("CQ2-C01b", "CRITICAL", "Code Quality 2.0", "serializeJson bounded by measureJson (C01/C04)",
+     r"serializeJson\([^,]+,[^,]+,\s*measureJson"),
+    ("CQ2-C02a", "HIGH",     "Code Quality 2.0", "strncat with sizeof(dst)-1 bounds the source, not the room (C02)",
+     r"strncat\([^,]+,[^,]+,\s*sizeof\([^)]+\)\s*-\s*1\)"),
+    ("CQ2-C02b", "LOW",      "Code Quality 2.0", "uint8_t length variable: check every +/- on it (C02)",
+     r"\buint8_t\s+\w*len\w*\b"),
+    ("CQ2-C03",  "MEDIUM",   "Code Quality 2.0", "register builder checks MAX_MSG_LEN_PHONE-2, the binding clamp is 245 (C03)",
+     r"MAX_MSG_LEN_PHONE\s*-\s*2"),
+    ("CQ2-C08a", "HIGH",     "Code Quality 2.0", "blocking library call: must not run on loopTask/RX path (C08)",
+     r"scanNetworks\(\)|hostByName\(|forceUpdate\(|WiFi\.getMode\(|esp_wifi_get_"),
+    ("CQ2-C08b", "LOW",      "Code Quality 2.0", "delay() of 10 ms or more: name the task and the bound (C08)",
+     r"\bdelay\(\s*[0-9]{2,}\s*\)"),
+    ("CQ2-C12a", "HIGH",     "Code Quality 2.0", "millis() comparison not in (uint32_t)(now - t) >= X form (C12)",
+     r"[A-Za-z_\)]\s*[<>]=?\s*millis\(\)|millis\(\)\s*[<>]=?\s*[A-Za-z_]",
+     r"\((u?int32_t|long|int)\)"),
+    ("CQ2-C12b", "HIGH",     "Code Quality 2.0", "ageing against the wall clock (C12)",
+     r"Epoch\[[^]]*\]\s*\+\s*[0-9* ]+\s*>\s*getUnixClock\(\)"),
+    ("CQ2-C12c", "MEDIUM",   "Code Quality 2.0", "id minted from millis(): collides within 1 ms, 0 at rollover (C12)",
+     r"msg_id\s*=\s*(\(unsigned int\))?millis\(\)"),
+    ("CQ2-C14",  "HIGH",     "Code Quality 2.0", "secret in a printf without maskSecret (C14)",
+     r"(^|[^n])printf\w*\(.*(node_pwd|node_passwd|node_webpwd|bt_code)",
+     r"maskSecret"),
+    ("CQ2-C21",  "HIGH",     "Code Quality 2.0", "[&] capture registered on an async object (C21)",
+     r"\.on[A-Z][a-zA-Z]*\(\[&\]"),
 ]
 
 _SRC_SUFFIXES = {".cpp", ".c", ".h"}
@@ -99,12 +128,16 @@ def scan_file(fpath: Path, project_root: Path) -> list[dict]:
         return [{"error": str(exc), "file": str(fpath.relative_to(project_root))}]
 
     findings: list[dict] = []
-    for rule_id, severity, category, desc, pattern in CHECKS:
+    for check in CHECKS:
+        rule_id, severity, category, desc, pattern = check[:5]
+        exclude = re.compile(check[5]) if len(check) > 5 else None
         rx = re.compile(pattern)
         for lineno, line in enumerate(lines, 1):
             stripped = line.strip()
             # skip pure comment lines (// or /* style)
             if stripped.startswith("//") or stripped.startswith("*") or stripped.startswith("/*"):
+                continue
+            if exclude is not None and exclude.search(line):
                 continue
             if rx.search(line):
                 findings.append({
