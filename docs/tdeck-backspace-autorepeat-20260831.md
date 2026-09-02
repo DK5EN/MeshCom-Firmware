@@ -1,7 +1,10 @@
 # TD-10 — T-Deck: Auto-Repeat für Backspace (Taste halten = mehrfach löschen)
 
-**Status: ZURÜCKGESTELLT** (Operator-Entscheid 2026-08-31). Analyse abgeschlossen,
-Umsetzung auf Abruf. Backlog-Eintrag: `BACKLOG.md` §3.8p follow-ups, Zeile TD-10.
+**Status: IMPLEMENTIERT 2026-09-02** (erweitert von Backspace auf Backspace + Space +
+Alphatasten). Umsetzung, Protokoll-Verifikation gegen den LilyGo-Quelltext und
+Review-Fixes siehe
+[`tdeck-keyrepeat-impl-plan-20260902.md`](tdeck-keyrepeat-impl-plan-20260902.md).
+Backlog-Eintrag: `BACKLOG.md` §3.8p follow-ups, Zeile TD-10.
 
 **Wunsch (Operator):** "Bei der Tastatur wäre es nett, die Zurück-Taste so zu belegen,
 dass wenn man drauf bleibt, auch gleich mehrere Buchstaben gelöscht werden."
@@ -40,10 +43,25 @@ Die LilyGo-C3-Firmware (`Xinyuan-LilyGO/T-Deck`,
 | `0x03` | Raw-Mode an: jeder Request liefert 5 Bytes **Live-Matrixzustand** (Byte pro Spalte, Bit pro Zeile)   |
 | `0x04` | zurück in den normalen Zeichen-Modus                                                                 |
 
-Backspace liegt in der Matrix auf Spalte 4, Zeile 3 → Byte 4, Bit 3. Da die
-Backlight-Steuerung (`0x01`) auf den Geräten im Feld funktioniert, haben die
-Tastaturen dieselbe Firmware-Generation — Raw-Mode-Support ist damit für die Flotte
-plausibel, wird aber pro Gerät zur Laufzeit verifiziert (siehe §4).
+Backspace liegt in der Matrix auf Spalte 4, Zeile 3 → Byte 4, Bit 3.
+
+**Korrektur (2026-09-02):** Der ursprüngliche Schluss "Backlight (`0x01`) funktioniert
+im Feld, also funktioniert auch Raw-Mode (`0x03`)" ist **falsch** und wurde bei der
+Umsetzung verworfen. Ein Blick in die LilyGo-Historie zeigt zwei unabhängige
+Firmware-Generationen: `0x01` (Backlight) existiert bereits seit dem Commit vom
+2024-12-25, `0x03`/`0x04` (Raw-Mode) erst seit Commit `1eb6fb0e` vom 2025-06-11 — ein
+gutes halbes Jahr später. Dass ein Gerät die Backlight-Taste bedienen kann, sagt also
+nichts über Raw-Mode-Unterstützung aus; die beiden Kommandos sind nur formal
+benachbart. Der Support-Status wird deshalb ausschließlich zur Laufzeit pro Boot
+ermittelt (`kbd_raw_support`/`KbdRepeat.support` in `src/t-deck/kbd_repeat.h`, siehe
+Umsetzungsplan §2/§3.2), nie aus der Backlight-Fähigkeit abgeleitet.
+
+Bit-Polarität und Frame-Aufbau sind mittlerweile aus dem LilyGo-Quelltext verifiziert
+(nicht mehr nur vermutet wie in §5 unten): `onRequest` im Raw-Mode schreibt fünf Bytes,
+je eines pro Spalte, `val |= (lastValue[col][row] << row)` mit
+`lastValue = digitalRead(row) == LOW` bei aktiv gezogener Spalte — **Bit gesetzt =
+Taste gedrückt** (active-high im Frame). Details und die vollständige
+Matrix-Übersetzung: Umsetzungsplan §2/§3.2.
 
 ## 4. Vorgeschlagener Ansatz (~40-60 Zeilen, nur `tdeck_main.cpp`)
 
@@ -59,15 +77,27 @@ das nicht (altes Keyboard ignoriert `0x03`, liefert Müll/0xFF-Padding), wird Ra
 dauerhaft als "nicht unterstützt" markiert → Verhalten exakt wie heute, ein Zeichen
 pro Druck. Das kalibriert nebenbei die Bit-Polarität.
 
-## 5. Offene Punkte / Risiken
+## 5. Offene Punkte / Risiken (Stand 2026-09-02)
 
-- Bit-Polarität und Byte-Reihenfolge des Raw-Frames sind aus dem LilyGo-Quelltext
-  nicht eindeutig (active-low?) — einmal am Bench-Gerät DK5EN-14 messen.
-- Zeichen, die während des Raw-Fensters getippt würden, kämen erst nach dem
-  Rückschalten an — praktisch irrelevant, das Fenster existiert nur, solange der
-  Daumen auf Backspace liegt.
+- ~~Bit-Polarität und Byte-Reihenfolge des Raw-Frames sind aus dem LilyGo-Quelltext
+  nicht eindeutig (active-low?) — einmal am Bench-Gerät DK5EN-14 messen.~~ **Gelöst
+  ohne Bench-Messung:** aus dem Quelltext verifiziert (active-high, Byte = Spalte, Bit
+  = Zeile, siehe §3 oben und Umsetzungsplan §2). Die tatsächliche
+  Bench-Bestätigung an DK5EN-14 steht noch aus (Umsetzungsplan §7); bis dahin gilt der
+  Quelltext-Befund als Auslegung, nicht als Feldnachweis.
+- Zeichen, die während des Raw-Fensters getippt würden, kommen erst nach dem
+  Rückschalten an — akzeptiert, dokumentiert im Umsetzungsplan §3.5 ("Stale char after
+  0x04").
 - Repeat wirkt auf allen Tabs mit Textfeld gleich; auf Nicht-Text-Tabs ändert sich
-  nichts.
+  nichts. Bestätigt durch die Eligibility-Regeln im Umsetzungsplan §3.3 (Map-Tab-Tasten
+  und SYM-Kombinationen setzen `bSPEC` und öffnen kein Repeat-Fenster).
+- **Neu gelöst während der Umsetzung** (siehe Review-Verdikt,
+  [`review-verdict-tdeck-keyrepeat-20260902.md`](review-verdict-tdeck-keyrepeat-20260902.md)):
+  altes Keyboard liefert einen unentscheidbaren All-Zero-Frame statt der ursprünglich
+  angenommenen `0xFF`-Auffüllung (K1); nichts schaltet nach einem ESP32-Reset zurück in
+  den Zeichen-Modus (K2, jetzt beim Boot erzwungen); der Support-Status konnte nach
+  einem `YES`-Verdikt fälschlich wieder auf `NO` zurückfallen (K3); ein Fokuswechsel
+  während des Haltens lenkte die Wiederholung auf das falsche Feld um (K5).
 
 ## 6. Verworfene Alternativen
 

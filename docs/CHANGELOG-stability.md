@@ -103,6 +103,25 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      (N-08); it uses the rollover-safe delta now. Neither file is in a
      native test environment (backlog CQ-06), so both are pinned by the
      scanner (`CQ2-C02a`, `CQ2-C12a` must return zero) and the builds only.
+173. **T-Deck key auto-repeat** (TD-10, numbering reconciled at merge — other
+     worktrees in flight used 173 and 174 for unrelated items). Holding
+     Backspace, Space, or any alpha key on the T-Deck / T-Deck Plus keyboard
+     now repeats it through LVGL's existing keypad-repeat mechanism (400 ms
+     delay, 100 ms rate) instead of inserting exactly one character no matter
+     how long the key stays down — the keyboard MCU (I2C slave `0x55`)
+     delivers one character per matrix transition and no release event of its
+     own. A new state machine (`src/t-deck/kbd_repeat.h`) opens the stock
+     keyboard firmware's raw-mode 5-byte live-matrix window (I2C `0x03`/`0x04`)
+     for the duration of a hold, arming only when the frame shows the exact
+     matrix cell of the key that was pressed so a fast key-to-key transition
+     cannot bind the wrong key. A keyboard whose firmware predates raw mode
+     (LilyGo commit `1eb6fb0e`, 2025-06-11) degrades to today's
+     one-character-per-press behaviour automatically, at a cost of about 1 ms
+     of extra I2C per key press and no other functional change. 39 native test
+     cases (`test/test_kbd_repeat`); reviewed and fixed against six findings
+     (`docs/review-verdict-tdeck-keyrepeat-20260902.md`); operator bench proof
+     on DK5EN-14 is still outstanding
+     (`docs/tdeck-keyrepeat-impl-plan-20260902.md` §7).
 
 ## New in v4.35p.09.01.2-stability
 
