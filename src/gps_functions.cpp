@@ -62,6 +62,13 @@ no more in use
 static HardwareSerial GPSSerial(1);  // UART1
 #endif
 
+// GPS-06: Die wirksamen UART-Pins. Voreinstellung sind die Pins der Variante;
+// ein Board mit GPS_FALLBACK_RX_PIN/GPS_FALLBACK_TX_PIN (T-Deck ohne Plus)
+// wechselt in detectBaudrate() auf die Zweitbelegung, wenn auf der ersten kein
+// NMEA-Satz zu finden ist. Alle spaeteren begin()-Aufrufe nutzen diese Werte.
+static int8_t s_gpsRxPin = GPS_RX_PIN;
+static int8_t s_gpsTxPin = GPS_TX_PIN;
+
 GPSData gpsData;
 
 // Baudrate-Erkennung. Die Reihenfolge ist nach Trefferwahrscheinlichkeit
@@ -214,14 +221,11 @@ static bool nmeaCheckFeed(struct NMEAframeCheck *nc, char ch)
     return false;
 }
 
-unsigned long detectBaudrate()
+// Ein Durchlauf ueber alle Baudraten auf den aktuell wirksamen Pins.
+// Liefert den Index der ersten Baudrate mit gueltigem NMEA-Satz, sonst -1.
+static int gpsScanBauds()
 {
-    #if defined(GPS_BAUDRATE_SETFIX)
-        return GPS_BAUDRATE_SETFIX;
-    #endif
-
     int ipos = -1;      // Index der Baudrate mit gueltigem NMEA-Satz
-    uint32_t tScan = millis();
 
     // Vollstaendig zuruecksetzen: der Scan bricht jetzt vorzeitig ab, sonst
     // stuenden in den restlichen Eintraegen die Zaehlerstaende des letzten
@@ -235,7 +239,7 @@ unsigned long detectBaudrate()
         Serial1.begin(GPS_BAUDS[iGpsBaud]);
         Serial1.flush();
         #else
-        GPSSerial.begin(GPS_BAUDS[iGpsBaud], SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+        GPSSerial.begin(GPS_BAUDS[iGpsBaud], SERIAL_8N1, s_gpsRxPin, s_gpsTxPin);
         GPSSerial.flush();
         #endif
 
@@ -308,6 +312,58 @@ unsigned long detectBaudrate()
         if(bFrameOK)
             ipos = iGpsBaud;
     }
+
+    return ipos;
+}
+
+unsigned long detectBaudrate()
+{
+    #if defined(GPS_BAUDRATE_SETFIX)
+        return GPS_BAUDRATE_SETFIX;
+    #endif
+
+    uint32_t tScan = millis();
+
+    // Jede Erkennung beginnt auf den Pins der Variante -- auch "--gps reset"
+    // nach einem Umverdrahten.
+    s_gpsRxPin = GPS_RX_PIN;
+    s_gpsTxPin = GPS_TX_PIN;
+
+    int ipos = gpsScanBauds();
+
+    #if defined(GPS_FALLBACK_RX_PIN) && defined(GPS_FALLBACK_TX_PIN)
+    // GPS-06: Bis 4.35d hat der T-Deck ohne Plus per SoftwareSerial auf
+    // GPIO43 empfangen und auf GPIO44 gesendet; seit 4.35p (a672d18b) ist es
+    // umgekehrt, wie beim T-Deck Plus und in der LilyGo-Belegung. Ein selbst
+    // verdrahtetes Modul nach alter Belegung ist seither stumm. Ein zweiter
+    // Durchlauf auf der alten Belegung kostet einmalig bis zu 12 s und nur,
+    // wenn der erste nichts gefunden hat.
+    if(ipos < 0)
+    {
+        Serial.printf("[GPS ]...nichts auf RX=%d TX=%d, zweiter Versuch auf RX=%d TX=%d (Belegung bis 4.35d)\n",
+                      (int)GPS_RX_PIN, (int)GPS_TX_PIN, (int)GPS_FALLBACK_RX_PIN, (int)GPS_FALLBACK_TX_PIN);
+
+        s_gpsRxPin = GPS_FALLBACK_RX_PIN;
+        s_gpsTxPin = GPS_FALLBACK_TX_PIN;
+        pinMode(s_gpsRxPin, INPUT);
+        pinMode(s_gpsTxPin, OUTPUT);
+
+        ipos = gpsScanBauds();
+
+        if(ipos >= 0)
+        {
+            Serial.printf("[GPS ]...Modul auf RX=%d TX=%d gefunden -- bitte Draehte tauschen, Standard ist RX=%d TX=%d\n",
+                          (int)s_gpsRxPin, (int)s_gpsTxPin, (int)GPS_RX_PIN, (int)GPS_TX_PIN);
+        }
+        else
+        {
+            s_gpsRxPin = GPS_RX_PIN;
+            s_gpsTxPin = GPS_TX_PIN;
+            pinMode(s_gpsRxPin, INPUT);
+            pinMode(s_gpsTxPin, OUTPUT);
+        }
+    }
+    #endif
 
     gpsDetected = false;
 
@@ -863,7 +919,7 @@ void WZ_GPS_Init()
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     Serial1.begin(detectedBaud);
     #else
-    GPSSerial.begin(detectedBaud,SERIAL_8N1,GPS_RX_PIN,GPS_TX_PIN);
+    GPSSerial.begin(detectedBaud,SERIAL_8N1,s_gpsRxPin,s_gpsTxPin);
     #endif
 
     gpsDetected = true;
