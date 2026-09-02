@@ -36,6 +36,7 @@ using namespace ace_button;
 #include "lv_obj_functions.h"
 #include "lv_obj_functions_extern.h"
 #include "tdeck_debug.h"
+#include "kbd_repeat.h"
 #include <soc/spi_struct.h>
 #include <loop_functions_extern.h>
 #include <batt_functions.h>
@@ -775,6 +776,32 @@ static uint32_t keypad_get_key(void)
     return key_ch;
 }
 
+// TD-10: raw-mode I2C helpers for key auto-repeat -- same beginTransmission/
+// write/endTransmission pattern as setKeyboardBacklight() (tdeck_helpers.cpp).
+// 0x03 switches the C3 to bitmask-per-poll output, 0x04 back to one-char-
+// per-key; an old keyboard firmware ignores both silently.
+static void kbdRawMode(bool on)
+{
+    Wire.beginTransmission(0x55);
+    Wire.write(on ? 0x03 : 0x04);
+    Wire.endTransmission();
+}
+
+// Reads the 5-byte raw matrix frame; false unless exactly 5 bytes arrived
+// (a stale/short response is discarded rather than partially applied).
+static bool kbdRawRead(uint8_t *frame)
+{
+    uint8_t n = (uint8_t)Wire.requestFrom(0x55, KBD_RAW_FRAME_LEN);
+    if (n != KBD_RAW_FRAME_LEN)
+    {
+        while (Wire.available() > 0)
+            Wire.read();
+        return false;
+    }
+    for (uint8_t i = 0; i < KBD_RAW_FRAME_LEN; i++)
+        frame[i] = (uint8_t)Wire.read();
+    return true;
+}
 
 /**
  * Will be called by the library to read the mouse
@@ -782,6 +809,48 @@ static uint32_t keypad_get_key(void)
 static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
 {
     static uint32_t last_key = 0;
+    // TD-10: auto-repeat window state; support/probes persist across holds
+    // (per-boot verdict on this keyboard's firmware), the rest per-hold.
+    static KbdRepeat s_rep;
+
+    if (s_rep.active)
+    {
+        // A hold is in progress: keep reporting PR with the armed key for as
+        // long as the raw frame still shows it down, the window has not
+        // timed out, and the keyboard has not been locked meanwhile.
+        uint8_t f[KBD_RAW_FRAME_LEN] = {0, 0, 0, 0, 0};
+        uint32_t now = millis();
+        bool i2c_ok  = kbdRawRead(f);
+        bool held_ok = i2c_ok && kbdRepeatHold(&s_rep, f, now);
+        bool locked  = meshcom_settings.node_keyboardlock;
+
+        if (held_ok && !locked)
+        {
+            data->state = LV_INDEV_STATE_PR;
+            data->key = s_rep.key;
+            return;
+        }
+
+        const char *reason;
+        if (!i2c_ok)
+            reason = "i2c";
+        else if (locked)
+            reason = "lock";
+        else if ((uint32_t)(now - s_rep.since_ms) >= KBD_RAW_TIMEOUT_MS)
+            reason = "timeout";
+        else
+            reason = "release";
+
+        kbdRawMode(false);
+        Serial.printf("[KBD];repeat;key;%02x;held_ms;%lu;reason;%s\n",
+                      (unsigned)s_rep.key, (unsigned long)(now - s_rep.since_ms), reason);
+        last_key = s_rep.key;
+        kbdRepeatClear(&s_rep);
+        data->state = LV_INDEV_STATE_REL;
+        data->key = last_key;
+        return;
+    }
+
     uint32_t act_key ;
     act_key = keypad_get_key();
     if (act_key != 0)
@@ -988,6 +1057,48 @@ static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
                 #else
                 meshcom_settings.node_mute = !meshcom_settings.node_mute;
                 #endif
+            }
+        }
+
+        // TD-10: open a raw-mode repeat window for this key -- once armed,
+        // keypad_read() reports PR on every poll until it releases/times
+        // out/locks. Enter, Alt+C, SYM combos (all bSPEC), a locked keyboard
+        // and the SYM+M mute toggle (0x2e outside the message/status tabs,
+        // which does not set bSPEC) never open a window; once a keyboard
+        // has failed KBD_RAW_PROBE_MAX probes it is skipped for the rest
+        // of this boot.
+        uint32_t tab_act_now = lv_tabview_get_tab_act(tv);
+        bool eligible = !bSPEC && !meshcom_settings.node_keyboardlock
+                     && act_key != 0x00 && act_key != 0x0D && act_key != 0x0C
+                     && !(act_key == 0x2e && tab_act_now != 1 && tab_act_now != 7)
+                     && s_rep.support != KBD_RAW_NO;
+
+        if (eligible)
+        {
+            uint8_t f[KBD_RAW_FRAME_LEN] = {0, 0, 0, 0, 0};
+            kbdRawMode(true);
+            uint8_t supportBeforeProbe = s_rep.support;
+            if (!kbdRawRead(f))
+            {
+                // Short/failed read (old firmware answers a 1-byte key-mode
+                // reply to a 5-byte raw-mode request): treat it the same as
+                // the classic idle-high "0xFF" response so the probe budget
+                // still counts down, instead of leaving `support` UNKNOWN
+                // forever and paying three I2C transactions on every key
+                // press for the rest of this boot.
+                memset(f, 0xFF, KBD_RAW_FRAME_LEN);
+            }
+            bool armed = kbdRepeatArm(&s_rep, f, act_key, millis());
+            if (!armed)
+                kbdRawMode(false);             // degrade: one char per press, as today
+
+            // Printed on every probe while the verdict is still open, so at
+            // most KBD_RAW_PROBE_MAX-ish lines per boot; support legend:
+            // 0 = unknown (KBD_RAW_UNKNOWN), 1 = yes (KBD_RAW_YES), 2 = no (KBD_RAW_NO).
+            if (supportBeforeProbe == KBD_RAW_UNKNOWN)
+            {
+                Serial.printf("[KBD];rawprobe;%02x %02x %02x %02x %02x;key;%02x;support;%d\n",
+                              f[0], f[1], f[2], f[3], f[4], (unsigned)act_key, (int)s_rep.support);
             }
         }
 
