@@ -407,6 +407,18 @@ altitude min/median/max/RMS-vs-median, first-fix time, and per-30-min buckets. A
 C is the GPS-01/02 proof; the RMS of A vs C is the GPS-03 proof (§7.6 numbers are the
 reference).
 
+### 6.1 First run 2026-09-02 (DK5EN-14, arm C build, 6.5 min indoor)
+
+`tools/bench/runs/gpsdebug_C_tdeckplus_20260902-172220.log`, scanned with
+`tools/bench/gpsdebug_scan.py`: 147 evaluations, 128 fixes, 0 rejects, 0 corrupt samples,
+first fix 54 s after the port opened, `alt converged: 488 m` at evaluation 102 (256 s and
+88 accepted samples after the first fix; the model predicted 83 samples / 249 s). Raw
+altitude 469.0–504.8 m, median 490.3 m, RMS 6.46 m around the median while the filtered
+value stayed at 488 m. The node also confirmed raw mode on its keyboard
+(`[KBD];rawprobe;04 01 00 00 00;key;32;support;1`) and repeat windows of 0.8–1.2 s for
+Space, `d` and Backspace; the operator saw the repeated deletion on screen. Too short for
+the arm-A/B/C comparison; the two-hour runs remain open.
+
 ## 7. Risks
 
 - **`msg_text` sharing.** The NMEA echo reuses the global command buffer; the feed must
