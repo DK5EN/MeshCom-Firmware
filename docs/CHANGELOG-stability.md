@@ -103,6 +103,29 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      (N-08); it uses the rollover-safe delta now. Neither file is in a
      native test environment (backlog CQ-06), so both are pinned by the
      scanner (`CQ2-C02a`, `CQ2-C12a` must return zero) and the builds only.
+173. **`--setlog on` gained seven line kinds, closing the three questions the
+     2026-09-02 OE3 mountain-gateway night report had to leave open (signal
+     level, dedup window, queue latency).** The existing receive line now
+     appends `RSSI:`/`SNR:`/`DUP:`/`OWN:`/`t=` (byte-identical prefix); new
+     lines are `RLY` (relay decision with reason, ten codes), `TX` (own send
+     with wait time, queue depth and CAD-attempt count), `ERR`
+     (platform-independent RX error, previously ESP32-only under
+     `--loradebug`), `STAT` (five-minute channel utilisation, dedup, ring
+     high-water, drops and heap summary) and `GWI`/`GWU` (gateway inject and
+     upload, so multiplication across several co-visible gateways and the
+     upload-before-hop-decrement ordering are traceable per `msg_id`). All
+     seven hang exclusively off `bDisplayLog` (`--setlog on`), none off
+     `--loradebug`; RAM cost is under 64 bytes total (a handful of
+     `std::atomic` counters plus one `ringSource[MAX_RING]` byte), no new
+     buffers. Two behaviour notes: the 10-second channel-utilisation drain
+     that now also feeds the `STAT` line runs independent of `--loradebug`
+     (its own diagnostic prints are unchanged), and `stat_txn`/
+     `stat_rx_err`/the dedup counters count on every transmission, error and
+     reception regardless of the flag — only the line print depends on it.
+     Field reference: `.claude/skills/logauswertung/SKILL.md` §
+     "Zeilenreferenz `--setlog on`"; backlog entry §3.8v. Bench proof
+     (Welle 3, RAK4631 + Heltec V3 over 30 minutes) is still open — no bench
+     node was attached the evening this landed.
 
 ## New in v4.35p.09.01.2-stability
 
