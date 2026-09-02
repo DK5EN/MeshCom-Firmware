@@ -284,6 +284,26 @@ WZ_GPS_AltConverged(); return true;`. As specified in §3.4, a GPS node that nev
   declined" section rather than repeated here (re-seed dead zone under the field trace's
   AR(1) noise; float precision of the recursion).
 
+### 3.7 GPS-06 — T-Deck (non-Plus) GPS pin fallback (added 2026-09-02, field finding)
+
+Field log OE5HWN 2026-09-02, T-Deck without Plus with a self-wired GPS module: 4.35d fixes
+with 7 satellites at 38400 baud, the test build reports "keine gueltige NMEA-Sequenz auf 8
+Baudraten". Cause: until 4.35e the non-Plus variant defined `GPS_RX_PIN 43 / GPS_TX_PIN 44`
+and opened `SoftwareSerial GPS(GPS_RX_PIN, GPS_TX_PIN)`, so the ESP received on GPIO43.
+Upstream `a672d18b` (v4.35p, 2026-04-03) swapped the defines to `RX 44 / TX 43` and the
+hardware-UART code applies them in order — the LilyGo pinout and the Plus, but the reverse
+of what 4.35d did on this board. Every self-wired module that followed the old assignment
+has been silent since.
+
+Fix (`79037fd5`): `detectBaudrate()` scans on the variant pins first; only if that finds no
+valid NMEA sentence and the variant defines `GPS_FALLBACK_RX_PIN`/`GPS_FALLBACK_TX_PIN`
+(only `variants/t_deck`), it scans once more on the fallback pins. The effective pins live in
+`s_gpsRxPin`/`s_gpsTxPin` and feed every later `begin()`; a hit on the fallback pins logs
+`Modul auf RX=43 TX=44 gefunden -- bitte Draehte tauschen`. Every other board is unchanged.
+Worst case on a bare T-Deck with `--gps on`: +12 s at boot. Electrically the fallback only
+shortens the contention window (ESP TX and module TX on the same line during the first scan);
+swapping the wires remains the right fix and the log line says so.
+
 ## 4. File ownership and waves
 
 Worktree: `/Users/martinwerner/WebDev/mc-gps`, branch `feat-gps-nmea-20260902`, pinned
@@ -418,6 +438,21 @@ value stayed at 488 m. The node also confirmed raw mode on its keyboard
 (`[KBD];rawprobe;04 01 00 00 00;key;32;support;1`) and repeat windows of 0.8–1.2 s for
 Space, `d` and Backspace; the operator saw the repeated deletion on screen. Too short for
 the arm-A/B/C comparison; the two-hour runs remain open.
+
+### 6.2 Field logs OE5HWN 2026-09-02 (T-Deck Plus, T-Beam Supreme, one hour each)
+
+Scanned with `tools/bench/gpsdebug_scan.py`. T-Deck Plus: 1214 evaluations, 1214 fixes, 0
+rejects, 0 corrupt; raw altitude 256.3–282.2 m, median 271.1, RMS 4.6 m; half-hour medians
+273.2 → 267.5 (receiver drift, the filter followed: 272 m at convergence, `--pos` 267 m an
+hour later). T-Beam Supreme: 1161 evaluations, 0 rejects, 0 corrupt; raw 260.0–282.9 m,
+median 276.8, RMS 4.5 m; converged after 88 samples (model 83) at 280 m, re-latched at 276 m
+after a reboot; QNH 1020.2 hPa → 1019.9 hPa after the re-latch, Linz airport 1018.5 hPa.
+Terrain model at the position: 269 m. The 1.5–1.7 hPa residual cannot be an altitude error
+(the node would have to stand below the terrain); it is a BMP280 offset inside its datasheet
+accuracy. Capture caveat: on the S3's native USB the first ~256 B of boot output are retained
+and everything up to port-open is dropped, so a PuTTY log that "starts at boot" may not — the
+T-Deck Plus converged after 36 logged samples, impossible from a fresh seed, hence ≥ 47
+samples ran before the capture.
 
 ## 7. Risks
 

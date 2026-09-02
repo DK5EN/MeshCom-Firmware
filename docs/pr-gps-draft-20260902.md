@@ -26,6 +26,7 @@ src/command_functions.cpp
 src/bmx280.cpp
 src/bme680.cpp
 src/loop_functions_extern.h
+variants/t_deck/configuration.h
 ```
 
 `platformio.ini` (native `test_filter`-Env) wird beim Cut auf `upstream/dev` verworfen —
@@ -80,6 +81,21 @@ dt_ms)`, `altFilterConverged()`. Konstanten `ALT_KF_Q`, `ALT_KF_R`, `ALT_KF_P0`,
   (`fBaseAltidude`/`fBaseAltidude680`); `baroBaseLatchAllowed()` liefert `true`, solange
   kein Fix vorliegt oder kein GPS aktiv ist, und sonst erst, wenn der Hoehenfilter
   konvergiert ist (`WZ_GPS_AltConverged()`).
+
+### `variants/t_deck/configuration.h` + `detectBaudrate()` (GPS-06, T-Deck ohne Plus)
+
+Bis 4.35e hat der T-Deck ohne Plus per `SoftwareSerial GPS(GPS_RX_PIN=43, GPS_TX_PIN=44)`
+auf GPIO43 empfangen. `a672d18b` (v4.35p) hat die Defines auf `RX 44 / TX 43` gedreht und
+der Hardware-UART-Code wendet sie in richtiger Reihenfolge an -- das ist die
+LilyGo-Belegung und die des Plus, aber das Gegenteil von 4.35d auf diesem Board. Jedes
+selbst verdrahtete Modul nach alter Belegung ist seither stumm (Feldlog OE5HWN 2026-09-02:
+4.35d Fix mit 7 Satelliten, 4.35p "keine gueltige NMEA-Sequenz auf 8 Baudraten").
+`detectBaudrate()` scannt zuerst auf den Pins der Variante und nur bei Fehlschlag -- und
+nur, wenn die Variante `GPS_FALLBACK_RX_PIN`/`GPS_FALLBACK_TX_PIN` definiert (allein
+`variants/t_deck`) -- ein zweites Mal auf der alten Belegung. Die wirksamen Pins stehen in
+`s_gpsRxPin`/`s_gpsTxPin`, ein Treffer auf der Zweitbelegung wird mit der Bitte um
+Umverdrahten geloggt. Alle anderen Boards unveraendert; ein T-Deck ohne Modul zahlt
+einmalig bis zu 12 s beim Start.
 
 ### `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`
 

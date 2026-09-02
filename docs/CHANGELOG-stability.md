@@ -125,7 +125,17 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      landing. Cost: ~16 B additional static RAM on boards with `ENABLE_GPS`, 0 B
      elsewhere. Bench verification (DK5EN-14) is still open — no bench node was
      attached at the time of this entry; see `gps-nmea-impl-plan-20260902.md` and
-     `bug-GPS-uart-overflow-20260901.md`. _Numbering to be reconciled at merge —
+     `bug-GPS-uart-overflow-20260901.md`. Field logs from OE5HWN (T-Deck Plus and
+     T-Beam Supreme, one hour each) then showed 2375 evaluations without a single
+     corrupt sample, convergence after 88 samples as modelled, and the QNH
+     re-latch after a reboot. The same logs exposed a fourth defect on the T-Deck
+     **without** Plus (GPS-06): upstream `a672d18b` (v4.35p) swapped the GPS pin
+     defines to the LilyGo assignment (`RX 44 / TX 43`), which is the reverse of
+     what 4.35d's `SoftwareSerial(43, 44)` did on that board, so every self-wired
+     module following the old assignment went silent. `detectBaudrate()` now
+     re-scans once on the pre-4.35p pins when the variant defines a fallback
+     (only `variants/t_deck`), keeps the effective pins for every later
+     `begin()`, and logs a request to swap the wires. _Numbering to be reconciled at merge —
      item 173 is used by the `--setlog` instrumentation work on another worktree
      of the same session._
 
