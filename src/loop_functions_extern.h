@@ -140,6 +140,7 @@ extern bool bEXTUDP;
 extern bool bNETCONSOLE;
 
 extern float fBaseAltidude;
+extern float fBaseAltidude680;
 extern float fBasePress;
 
 extern unsigned long onewireTimeWait;
