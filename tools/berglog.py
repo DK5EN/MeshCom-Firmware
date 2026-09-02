@@ -1594,6 +1594,242 @@ def a15_health(nodes: list[NodeLog]) -> dict[str, Any]:
     return out
 
 
+#: Buckets for the relayer firmware split. "unknown" is a station that never
+#: originates a frame in these logs, so no FW string of its own was ever heard.
+CAD_BUCKETS: tuple[str, str, str] = ("CAD", "pre-CAD", "unknown")
+
+
+def originator_firmware(nodes: list[NodeLog]) -> dict[str, dict[str, Any]]:
+    """Firmware each station reports when it ORIGINATES a frame.
+
+    ``FW:vv:s`` on the wire describes the originator, never the relay that handed
+    the frame over, so the only way to learn a relayer's build is to catch it as
+    ``path[0]`` of one of its own frames. Stations that only ever relay stay
+    unknown -- OE3MIF-12 and OE3NRA-1 are the loud examples.
+    """
+    seen: dict[str, Counter] = defaultdict(Counter)
+    for node in nodes:
+        for rec in node.receptions:
+            if rec.path:
+                seen[rec.path[0]][(rec.fw_major, rec.fw_sub)] += 1
+    out: dict[str, dict[str, Any]] = {}
+    for call, counter in seen.items():
+        major, sub = counter.most_common(1)[0][0]
+        out[call] = {
+            "fw": f"{major}:{sub}",
+            "fw_cad": fw_is_cad(major, sub),
+            "originated_frames": sum(counter.values()),
+            "distinct_fw_seen": len(counter),
+        }
+    return out
+
+
+def _cad_bucket(entry: dict[str, Any] | None) -> str:
+    if entry is None:
+        return "unknown"
+    return "CAD" if entry["fw_cad"] else "pre-CAD"
+
+
+def _bucket_split(
+    pairs: Sequence[tuple[str, float]],
+) -> tuple[dict[str, dict[str, Any]], float]:
+    """Aggregate (bucket, weight) pairs into the three-bucket share table."""
+    counts: Counter = Counter()
+    weights: dict[str, float] = defaultdict(float)
+    for bucket, weight in pairs:
+        counts[bucket] += 1
+        weights[bucket] += weight
+    total_n = sum(counts.values())
+    total_w = sum(weights.values())
+    table = {
+        bucket: {
+            "copies": counts.get(bucket, 0),
+            "pct_copies": pct(counts.get(bucket, 0), total_n),
+            "airtime_s": round(weights.get(bucket, 0.0) / 1000.0, 1),
+            "pct_airtime": pct(weights.get(bucket, 0.0), total_w),
+        }
+        for bucket in CAD_BUCKETS
+    }
+    return table, round(sum(v["pct_copies"] for v in table.values()), 2)
+
+
+def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, Any]:
+    """Who actually keys up the relayed copies -- by the relay's OWN firmware."""
+    fw_of = originator_firmware(nodes)
+    receivers = [n for n in nodes if n.receptions]
+    per_node: dict[str, Any] = {}
+    pooled_pairs: list[tuple[str, float]] = []
+    pooled_first: list[tuple[str, float]] = []
+    pooled_relayer: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"copies": 0, "airtime_ms": 0.0, "nodes": set()}
+    )
+    pooled_direct = 0
+    pooled_first_direct = 0
+
+    for node in receivers:
+        relayed = [r for r in node.receptions if len(r.path) >= 2]
+        direct = len(node.receptions) - len(relayed)
+        agg: dict[str, dict[str, Any]] = defaultdict(lambda: {"copies": 0, "airtime_ms": 0.0})
+        pairs: list[tuple[str, float]] = []
+        for rec in relayed:
+            call = rec.last_hop
+            agg[call]["copies"] += 1
+            agg[call]["airtime_ms"] += rec.airtime_ms
+            bucket = _cad_bucket(fw_of.get(call))
+            pairs.append((bucket, rec.airtime_ms))
+            pooled_pairs.append((bucket, rec.airtime_ms))
+            entry = pooled_relayer[call]
+            entry["copies"] += 1
+            entry["airtime_ms"] += rec.airtime_ms
+            entry["nodes"].add(node.label)
+        total_copies = len(relayed)
+        total_air = sum(r.airtime_ms for r in relayed)
+        rows = []
+        for call, e in agg.items():
+            fw = fw_of.get(call)
+            rows.append(
+                {
+                    "relayer": call,
+                    "copies": e["copies"],
+                    "pct_copies": pct(e["copies"], total_copies),
+                    "airtime_s": round(e["airtime_ms"] / 1000.0, 1),
+                    "pct_airtime": pct(e["airtime_ms"], total_air),
+                    "fw_as_originator": fw["fw"] if fw else None,
+                    "cad": _cad_bucket(fw),
+                    "originated_frames": fw["originated_frames"] if fw else 0,
+                    "lh_hw": hw_name(
+                        Counter(r.last_hw for r in relayed if r.last_hop == call).most_common(1)[0][0]
+                    ),
+                }
+            )
+        rows.sort(key=lambda d: (-int(d["copies"]), str(d["relayer"])))
+
+        # (c) the first copy of every msg_id, when it arrived via a relay
+        first: dict[str, Reception] = {}
+        for rec in node.receptions:
+            cur = first.get(rec.msg_id)
+            if cur is None or rec.host < cur.host:
+                first[rec.msg_id] = rec
+        first_pairs: list[tuple[str, float]] = []
+        first_direct = 0
+        for rec in first.values():
+            if len(rec.path) < 2:
+                first_direct += 1
+                continue
+            bucket = _cad_bucket(fw_of.get(rec.last_hop))
+            first_pairs.append((bucket, rec.airtime_ms))
+            pooled_first.append((bucket, rec.airtime_ms))
+        pooled_direct += direct
+        pooled_first_direct += first_direct
+
+        split, sum_copies = _bucket_split(pairs)
+        first_split, first_sum = _bucket_split(first_pairs)
+        per_node[node.label] = {
+            "relayed_copies": total_copies,
+            "direct_copies": direct,
+            "relayed_airtime_s": round(total_air / 1000.0, 1),
+            "distinct_relayers": len(rows),
+            "rows": rows,
+            "summary": split,
+            "pct_sum": sum_copies,
+            "pct_sum_airtime": round(sum(v["pct_airtime"] for v in split.values()), 2),
+            "first_copy": {
+                "msg_ids": len(first),
+                "first_copy_direct_from_originator": first_direct,
+                "first_copy_relayed": len(first_pairs),
+                "summary": first_split,
+                "pct_sum": first_sum,
+            },
+        }
+
+    pooled_split, pooled_sum = _bucket_split(pooled_pairs)
+    pooled_first_split, pooled_first_sum = _bucket_split(pooled_first)
+
+    # (d) originator side, straight out of section 4b
+    origin_rows = []
+    for label in per_node:
+        block = res["04b_firmware"][label]
+        origin_rows.append(
+            {
+                "log": label,
+                "originator_cad_pct": block["cad_receptions_pct"],
+                "originator_precad_pct": block["precad_receptions_pct"],
+                "relayer_cad_pct": per_node[label]["summary"]["CAD"]["pct_copies"],
+                "relayer_precad_pct": per_node[label]["summary"]["pre-CAD"]["pct_copies"],
+                "relayer_unknown_pct": per_node[label]["summary"]["unknown"]["pct_copies"],
+                "relayer_precad_airtime_pct": per_node[label]["summary"]["pre-CAD"]["pct_airtime"],
+            }
+        )
+
+    # pre-CAD relayers by airtime, and the receiver each one dominates
+    pre_rows = []
+    for call, e in pooled_relayer.items():
+        fw = fw_of.get(call)
+        if fw is None or fw["fw_cad"]:
+            continue
+        best_label = None
+        best_share = 0.0
+        for label, block in per_node.items():
+            row = next((r for r in block["rows"] if r["relayer"] == call), None)
+            if row and row["pct_copies"] > best_share:
+                best_share = row["pct_copies"]
+                best_label = label
+        pre_rows.append(
+            {
+                "relayer": call,
+                "copies": e["copies"],
+                "airtime_s": round(e["airtime_ms"] / 1000.0, 1),
+                "fw": fw["fw"],
+                "hw": next(
+                    (
+                        r["lh_hw"]
+                        for block in per_node.values()
+                        for r in block["rows"]
+                        if r["relayer"] == call
+                    ),
+                    "unknown",
+                ),
+                "heard_by_logs": sorted(e["nodes"]),
+                "dominates": best_label,
+                "dominates_share_pct": best_share,
+            }
+        )
+    pre_rows.sort(key=lambda d: -float(d["airtime_s"]))
+
+    return {
+        "note": (
+            "The FW field on the wire belongs to the ORIGINATOR. A relayer's build is therefore "
+            "only knowable when that station also originates frames we heard; otherwise it is "
+            "'unknown'. Only receptions with a path of length >= 2 count here -- a path of length 1 "
+            "is the originator's own transmission, not a relay."
+        ),
+        "caveat": (
+            "OE1XAR-33 / OE1XAR-62 carry FW:00:# and would classify as pre-CAD, but they are the "
+            "server's Internet-injected time signal rather than radios. They originate only, so "
+            "they never appear in this relayer table."
+        ),
+        "per_node": per_node,
+        "pooled": {
+            "relayed_copies": len(pooled_pairs),
+            "direct_copies": pooled_direct,
+            "summary": pooled_split,
+            "pct_sum": pooled_sum,
+            "pct_sum_airtime": round(sum(v["pct_airtime"] for v in pooled_split.values()), 2),
+            "first_copy": {
+                "first_copy_relayed": len(pooled_first),
+                "first_copy_direct_from_originator": pooled_first_direct,
+                "summary": pooled_first_split,
+                "pct_sum": pooled_first_sum,
+            },
+        },
+        "originator_vs_relayer": origin_rows,
+        "pre_cad_relayers": pre_rows,
+        "relayers_without_own_firmware": sorted(
+            {r["relayer"] for b in per_node.values() for r in b["rows"] if r["cad"] == "unknown"}
+        ),
+    }
+
+
 def a16_own_echo(nodes: list[NodeLog]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for n in nodes:
@@ -3560,6 +3796,152 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     )
     A("")
 
+    # ---- 24 relayer firmware / CAD share ----
+    rf = res["24_relayer_firmware"]
+    A("## 24. Relayer firmware / CAD share")
+    A("")
+    A(rf["note"])
+    A("")
+    A(rf["caveat"])
+    A("")
+    unknown = rf["relayers_without_own_firmware"]
+    A(
+        f"{len(unknown)} relayers never originate a frame in these logs, so their build is not "
+        "observable: " + (", ".join(unknown) if unknown else "none") + "."
+    )
+    A("")
+    A("### (b) Pooled share of relayed traffic by the RELAY's own firmware")
+    A("")
+    pooled = rf["pooled"]
+    A(
+        md_table(
+            ["bucket", "copies", "% copies", "airtime s", "% airtime"],
+            [
+                [b, v["copies"], f"{v['pct_copies']:.2f}", v["airtime_s"], f"{v['pct_airtime']:.2f}"]
+                for b, v in pooled["summary"].items()
+            ],
+        )
+    )
+    A("")
+    A(
+        f"Column sums: {pooled['pct_sum']:.2f} % of copies, {pooled['pct_sum_airtime']:.2f} % of airtime "
+        f"over {pooled['relayed_copies']} relayed copies "
+        f"({pooled['direct_copies']} direct receptions are excluded -- those are the originator's own "
+        "transmission, not a relay)."
+    )
+    A("")
+    A("### (c) Pooled share of the FIRST copy of each msg_id -- who wins the race")
+    A("")
+    fc = pooled["first_copy"]
+    A(
+        md_table(
+            ["bucket", "first copies", "% first copies", "airtime s", "% airtime"],
+            [
+                [b, v["copies"], f"{v['pct_copies']:.2f}", v["airtime_s"], f"{v['pct_airtime']:.2f}"]
+                for b, v in fc["summary"].items()
+            ],
+        )
+    )
+    A("")
+    A(
+        f"Column sum {fc['pct_sum']:.2f} % over {fc['first_copy_relayed']} relayed first copies; a further "
+        f"{fc['first_copy_direct_from_originator']} first copies came straight from the originator and are "
+        "not attributable to a relay."
+    )
+    A("")
+    A("### (d) Originator firmware next to relayer firmware")
+    A("")
+    A(
+        md_table(
+            ["log", "originator CAD %", "originator pre-CAD %", "relayer CAD %", "relayer pre-CAD %", "relayer unknown %", "relayer pre-CAD airtime %"],
+            [
+                [
+                    r["log"],
+                    f"{r['originator_cad_pct']:.2f}",
+                    f"{r['originator_precad_pct']:.2f}",
+                    f"{r['relayer_cad_pct']:.2f}",
+                    f"{r['relayer_precad_pct']:.2f}",
+                    f"{r['relayer_unknown_pct']:.2f}",
+                    f"{r['relayer_precad_airtime_pct']:.2f}",
+                ]
+                for r in rf["originator_vs_relayer"]
+            ],
+        )
+    )
+    A("")
+    A("### Pre-CAD relayers ranked by airtime")
+    A("")
+    A(
+        md_table(
+            ["relayer", "copies", "airtime s", "fw", "hw (from LH byte)", "heard by", "dominates", "share of that log's relayed copies %"],
+            [
+                [
+                    r["relayer"],
+                    r["copies"],
+                    r["airtime_s"],
+                    r["fw"],
+                    r["hw"],
+                    ", ".join(r["heard_by_logs"]),
+                    r["dominates"],
+                    f"{r['dominates_share_pct']:.2f}",
+                ]
+                for r in rf["pre_cad_relayers"]
+            ],
+        )
+        if rf["pre_cad_relayers"]
+        else "none"
+    )
+    A("")
+    A("### (a) Per receiving node -- every direct relayer")
+    A("")
+    for label, block in rf["per_node"].items():
+        A(
+            f"**{label}** -- {block['relayed_copies']} relayed copies from {block['distinct_relayers']} "
+            f"relayers, {block['relayed_airtime_s']} s of airtime "
+            f"({block['direct_copies']} direct receptions excluded)"
+        )
+        A("")
+        A(
+            md_table(
+                ["relayer", "copies", "% copies", "airtime s", "% airtime", "fw as originator", "CAD", "own frames heard", "hw (from LH byte)"],
+                [
+                    [
+                        r["relayer"],
+                        r["copies"],
+                        f"{r['pct_copies']:.2f}",
+                        r["airtime_s"],
+                        f"{r['pct_airtime']:.2f}",
+                        r["fw_as_originator"] or "-",
+                        r["cad"],
+                        r["originated_frames"],
+                        r["lh_hw"],
+                    ]
+                    for r in block["rows"]
+                ],
+            )
+        )
+        A("")
+        A(f"Column sum: {block['pct_sum']:.2f} % of copies, {block['pct_sum_airtime']:.2f} % of airtime")
+        A("")
+        A(
+            md_table(
+                ["bucket", "copies", "% copies", "airtime s", "% airtime", "first copies", "% first copies"],
+                [
+                    [
+                        b,
+                        v["copies"],
+                        f"{v['pct_copies']:.2f}",
+                        v["airtime_s"],
+                        f"{v['pct_airtime']:.2f}",
+                        block["first_copy"]["summary"][b]["copies"],
+                        f"{block['first_copy']['summary'][b]['pct_copies']:.2f}",
+                    ]
+                    for b, v in block["summary"].items()
+                ],
+            )
+        )
+        A("")
+
     return "\n".join(p)
 
 
@@ -3705,6 +4087,29 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
         checks.append(
             {
                 "check": f"{n.label}: position beacons with /N field",
+                "cmd": cmd,
+                "shell": shell,
+                "script": str(script),
+                "match": shell.strip() == str(script),
+            }
+        )
+
+    # 10) relayed copies delivered by one named relayer (section 24)
+    for n in nodes:
+        block = res["24_relayer_firmware"]["per_node"].get(n.label)
+        if not block or not block["rows"]:
+            continue
+        call = block["rows"][0]["relayer"]
+        f = str(n.path)
+        cmd = (
+            f"grep ' \\[LOG\\] ' {f!r} | grep -v 'FCS:0000' | grep -oE ' [A-Z0-9,/-]+>' | "
+            f"tr -d ' >' | awk -F, 'NF>1 && $NF==\"{call}\"' | wc -l"
+        )
+        shell = run(cmd)
+        script = block["rows"][0]["copies"]
+        checks.append(
+            {
+                "check": f"{n.label}: relayed copies with last hop {call}",
                 "cmd": cmd,
                 "shell": shell,
                 "script": str(script),
@@ -3909,6 +4314,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "19_first_relayer": a19_first_relayer(receivers),
         "20_relay_latency": a20_relay_latency(receivers),
     }
+    res["24_relayer_firmware"] = a24_relayer_firmware(nodes, res)
     res["21_neighbour_count"] = a21_neighbour_count(nodes, res)
     res["22_wrap_culprits"] = a22_wrap_culprits(nodes, res)
     res["23_late_by_path"] = a23_late_by_path(nodes, res)
@@ -3943,6 +4349,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     for label, d in res["05_neighbours"].items():
         if d["rows"] and abs(d["pct_sum"] - 100.0) > 0.5:
             problems.append(f"05_neighbours[{label}] sums to {d['pct_sum']}")
+    for label, d in res["24_relayer_firmware"]["per_node"].items():
+        for key in ("pct_sum", "pct_sum_airtime"):
+            if d["rows"] and abs(d[key] - 100.0) > 0.5:
+                problems.append(f"24_relayer_firmware[{label}].{key} sums to {d[key]}")
+        if d["first_copy"]["first_copy_relayed"] and abs(d["first_copy"]["pct_sum"] - 100.0) > 0.5:
+            problems.append(
+                f"24_relayer_firmware[{label}].first_copy sums to {d['first_copy']['pct_sum']}"
+            )
     for label, d in res["19_first_relayer"].items():
         if d["rows"] and abs(d["pct_sum"] - 100.0) > 0.5:
             problems.append(f"19_first_relayer[{label}] sums to {d['pct_sum']}")

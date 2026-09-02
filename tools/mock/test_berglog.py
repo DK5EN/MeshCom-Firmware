@@ -132,6 +132,7 @@ class TestBerglog(unittest.TestCase):
         res: dict[str, Any] = {
             "01_overview": berglog.a01_overview(cls.nodes),
             "02_types": berglog.a02_types(cls.nodes),
+            "04b_firmware": berglog.a04b_firmware(cls.nodes),
             "03_hops": berglog.a03_hops(cls.nodes),
             "05_neighbours": berglog.a05_neighbours(cls.nodes),
             "06_redundancy": berglog.a06_redundancy(cls.nodes),
@@ -143,6 +144,7 @@ class TestBerglog(unittest.TestCase):
             "20_relay_latency": berglog.a20_relay_latency(cls.receivers),
         }
         res["22_wrap_culprits"] = berglog.a22_wrap_culprits(cls.nodes, res)
+        res["24_relayer_firmware"] = berglog.a24_relayer_firmware(cls.nodes, res)
         cls.res = res
 
     def _node(self, label: str) -> berglog.NodeLog:
@@ -359,6 +361,132 @@ class TestBerglog(unittest.TestCase):
                 got,
                 block["msg_ids"],
                 msg=f"{label}: every msg_id must have exactly one first copy",
+            )
+
+    # ------------------------------------------------------------------
+    # Section 24: the FW field describes the ORIGINATOR, so a relayer's build
+    # is only knowable when that station also originates frames we heard.
+    # Fixture A gives all three buckets: OE0BBB-2 / OE0CCC-3 originate on 35:p
+    # (CAD), OE0EEE-5 originates the 4-hop HEY on 35:k (pre-CAD), and
+    # OE0KKK-11 relays the wrap frame but never originates (unknown).
+    # ------------------------------------------------------------------
+
+    def test_originator_firmware_is_learned_from_path0_only(self) -> None:
+        fw = berglog.originator_firmware(self.nodes)
+        self.assertEqual(fw["OE0EEE-5"]["fw"], "35:k", msg="OE0EEE-5 originates the 4-hop HEY")
+        self.assertFalse(
+            fw["OE0EEE-5"]["fw_cad"],
+            msg="35:k predates CAD -- this is what keeps the pre-CAD bucket non-empty",
+        )
+        self.assertTrue(fw["OE0BBB-2"]["fw_cad"], msg="OE0BBB-2 originates on 35:p")
+        self.assertNotIn(
+            "OE0KKK-11",
+            fw,
+            msg="OE0KKK-11 only ever relays, so it must have no firmware of its own",
+        )
+
+    def test_relayer_firmware_counts_only_relayed_copies(self) -> None:
+        block = self.res["24_relayer_firmware"]["per_node"]
+        expected = {LABEL_A: (11, 3), LABEL_B: (7, 2)}
+        for label, (relayed, direct) in expected.items():
+            self.assertEqual(block[label]["relayed_copies"], relayed, msg=f"{label}: relayed copies")
+            self.assertEqual(
+                block[label]["direct_copies"],
+                direct,
+                msg=f"{label}: a path of length 1 is the originator's own transmission, not a relay",
+            )
+            self.assertEqual(
+                block[label]["relayed_copies"] + block[label]["direct_copies"],
+                len(self._node(label).receptions),
+                msg=f"{label}: relayed + direct must account for every reception",
+            )
+
+    def test_relayer_cad_buckets(self) -> None:
+        block = self.res["24_relayer_firmware"]["per_node"]
+        expected = {
+            LABEL_A: {"CAD": 8, "pre-CAD": 2, "unknown": 1},
+            LABEL_B: {"CAD": 4, "pre-CAD": 3, "unknown": 0},
+        }
+        for label, buckets in expected.items():
+            got = {b: v["copies"] for b, v in block[label]["summary"].items()}
+            self.assertEqual(got, buckets, msg=f"{label}: relayed copies per firmware bucket")
+        pooled = self.res["24_relayer_firmware"]["pooled"]["summary"]
+        self.assertEqual(
+            {b: v["copies"] for b, v in pooled.items()},
+            {"CAD": 12, "pre-CAD": 5, "unknown": 1},
+            msg="pooled buckets are the sum of both logs",
+        )
+
+    def test_relayer_first_copy_split(self) -> None:
+        block = self.res["24_relayer_firmware"]["per_node"]
+        expected = {
+            LABEL_A: (6, 3, {"CAD": 5, "pre-CAD": 0, "unknown": 1}),
+            LABEL_B: (4, 2, {"CAD": 3, "pre-CAD": 1, "unknown": 0}),
+        }
+        for label, (relayed, direct, buckets) in expected.items():
+            fc = block[label]["first_copy"]
+            self.assertEqual(fc["first_copy_relayed"], relayed, msg=f"{label}: relayed first copies")
+            self.assertEqual(
+                fc["first_copy_direct_from_originator"],
+                direct,
+                msg=f"{label}: first copies that came straight from the originator",
+            )
+            self.assertEqual(
+                {b: v["copies"] for b, v in fc["summary"].items()},
+                buckets,
+                msg=f"{label}: who wins the race, by the relay's own firmware",
+            )
+
+    def test_relayer_percentages_sum_to_100(self) -> None:
+        rf = self.res["24_relayer_firmware"]
+        for label, block in rf["per_node"].items():
+            for key in ("pct_sum", "pct_sum_airtime"):
+                self.assertAlmostEqual(
+                    block[key], 100.0, delta=0.5, msg=f"24[{label}].{key} = {block[key]}"
+                )
+            if block["first_copy"]["first_copy_relayed"]:
+                self.assertAlmostEqual(
+                    block["first_copy"]["pct_sum"],
+                    100.0,
+                    delta=0.5,
+                    msg=f"24[{label}].first_copy = {block['first_copy']['pct_sum']}",
+                )
+        self.assertAlmostEqual(rf["pooled"]["pct_sum"], 100.0, delta=0.5)
+        self.assertAlmostEqual(rf["pooled"]["pct_sum_airtime"], 100.0, delta=0.5)
+
+    def test_relayers_without_own_firmware_are_named(self) -> None:
+        rf = self.res["24_relayer_firmware"]
+        self.assertEqual(
+            rf["relayers_without_own_firmware"],
+            ["OE0KKK-11"],
+            msg="only the wrap relayer never originates in the fixtures",
+        )
+        pre = {r["relayer"]: r for r in rf["pre_cad_relayers"]}
+        self.assertEqual(
+            sorted(pre),
+            ["OE0EEE-5"],
+            msg="OE0EEE-5 is the only relayer that originates on a pre-CAD build",
+        )
+        self.assertEqual(pre["OE0EEE-5"]["fw"], "35:k")
+        self.assertEqual(
+            pre["OE0EEE-5"]["copies"], 5, msg="2 copies in log A plus 3 in log B"
+        )
+        self.assertIn(pre["OE0EEE-5"]["dominates"], (LABEL_A, LABEL_B))
+
+    def test_originator_vs_relayer_view(self) -> None:
+        rows = {r["log"]: r for r in self.res["24_relayer_firmware"]["originator_vs_relayer"]}
+        self.assertEqual(sorted(rows), [LABEL_A, LABEL_B])
+        for label, row in rows.items():
+            block = self.res["24_relayer_firmware"]["per_node"][label]
+            self.assertEqual(
+                row["relayer_cad_pct"],
+                block["summary"]["CAD"]["pct_copies"],
+                msg=f"{label}: the combined view must quote the same relayer share",
+            )
+            self.assertEqual(
+                row["originator_cad_pct"],
+                self.res["04b_firmware"][label]["cad_receptions_pct"],
+                msg=f"{label}: the originator share comes straight from section 4b",
             )
 
     # ------------------------------------------------------------------
