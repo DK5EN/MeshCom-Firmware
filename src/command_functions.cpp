@@ -774,7 +774,7 @@ void commandAction(char *umsg_text, bool ble)
 
             printlndeb("--btcode 999999 BT-Code\n--button gpio 99 User-Button PIN\n--analog gpio 99 Analog PIN\n--analog factor 9.9 Analog factor\n--analog check on/off\n");
             delay(100);
-            printfdeb("--pos      show lat/lon/alt/time info\n--weather  show temp/hum/press\n--sendpos  send pos info now\n--setlat   set latitude 44.12345\n--setlon   set logitude 016.12345\n--setalt   set altidude 9999m\n");
+            printfdeb("--pos      show lat/lon/alt/time info\n--weather  show temp/hum/press\n--sendpos  send pos info now\n--setlat   set latitude 44.12345\n--setlon   set logitude 016.12345\n--setalt   set altidude 9999m, with GPS: seeds the altitude filter, GPS keeps refining\n");
             delay(100);
             printlndeb("--symid  set prim/sec Sym-Table\n--symcd  set table column\n--aprscomment  set APRS Comment/none\n--showI2C\n");
             delay(100);
@@ -4129,6 +4129,12 @@ void commandAction(char *umsg_text, bool ble)
             iVar = 0;
 
         meshcom_settings.node_alt=iVar;
+
+        #ifdef ENABLE_GPS
+        WZ_GPS_AltSeed((float)iVar);
+        #else
+        baroBaseRelatch((float)iVar);
+        #endif
 
         printfdeb("set alt to %i m\n", meshcom_settings.node_alt);
 

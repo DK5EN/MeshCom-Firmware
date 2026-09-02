@@ -1687,6 +1687,8 @@ void nrf52loop()
         #if defined(ENABLE_GPS)
         if(bGPSON)
         {
+            if (gpsDetected) { INSTR_SECTION("gps_feed"); WZ_GPS_Feed(); }
+
             // gps refresh every sec
             if ((uint32_t)(millis() - gps_refresh_timer) >= 1000)
             {

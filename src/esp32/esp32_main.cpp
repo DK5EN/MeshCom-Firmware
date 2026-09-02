@@ -3103,6 +3103,10 @@ void esp32loop()
         gps_refresh_intervall = 1.0;
     }
 
+    #ifdef ENABLE_GPS
+    if (bGPSON && gpsDetected) { INSTR_SECTION("gps_feed"); WZ_GPS_Feed(); }
+    #endif
+
     if ((uint32_t)(millis() - gps_refresh_timer) >= ((unsigned long)gps_refresh_intervall * 1000))
     {
         #ifdef ENABLE_GPS

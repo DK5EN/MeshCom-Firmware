@@ -14,6 +14,10 @@
 
 #include "gps_functions.h"
 
+#include "gps_filter.h"
+
+#include "printfdeb_functions.h"
+
 #include "watchdog_feed.h"
 
 #include <clock.h>
@@ -86,6 +90,16 @@ bool updateGPSdata;
 #define maxNMEAline MAX_MSG_LEN_PHONE * 2
 int NMEAlineIndex = 0;
 char c;
+
+// GPS-02: Stichproben, die die Plausibilitaetspruefung verworfen hat.
+static uint16_t s_gpsRejectCount = 0;
+
+// GPS-03: Hoehenschaetzer. Der Zustand haelt zwischen den Auswertungen; die
+// Logik selbst liegt Arduino-frei in gps_filter.cpp.
+static struct AltFilter s_alt;
+// Flanke "erstmals konvergiert seit dem letzten Seed" -- sie loest das
+// Nachziehen der barometrischen Referenzhoehe aus.
+static bool s_altConvergedOnce = false;
 
 unsigned long detectedBaud = 0;
 String ver = "";
@@ -812,6 +826,10 @@ void WZ_GPS_Init()
   WZ_GPS_Reset();
 
   gpsInitDone = true;
+
+  // GPS-03: Neue Sitzung, neuer Schaetzer.
+  altFilterReset(&s_alt);
+  s_altConvergedOnce = false;
   
   Serial.printf("[GPS ]...Init GPIO RX=%d TX=%d\n", GPS_RX_PIN, GPS_TX_PIN);
   
@@ -863,24 +881,20 @@ void WZ_GPS_Init()
 
 
 /**
- * @brief Non-blocking GPS-Update. In jedem loop()-Durchlauf aufrufen.
+ * @brief GPS-01: UART leeren und in den Parser fuettern. In JEDEM
+ *        loop()-Durchlauf aufrufen.
  *
- * Liest alle verfuegbaren Bytes von der GPS-UART und fuettert 
- * in den TinyGPS++ Parser. Aktualisiert gpsData wenn neue Daten da sind.
+ * Der Ringpuffer der Arduino-UART fasst 256 Byte. Bei 38400 Baud liefert ein
+ * Modul das in rund 65 ms; die Auswertung in WZ_GPS_Loop() laeuft aber nur
+ * alle gps_refresh_intervall Sekunden. Wer erst dort liest, verliert den
+ * groessten Teil jeder Sekunde an Ueberlauf -- und ein Ueberlauf mitten im
+ * Satz erzeugt zusammengesetzte Zeilen, die die NMEA-Pruefsumme zufaellig
+ * passieren koennen. Deshalb ist das Leeren vom Auswerten getrennt.
  */
-int WZ_GPS_Loop() {
-
-    int igps = POSINFO_INTERVAL;
-
-    if(iGPSDEBUG > 2)
-    {
-      Serial.printf("[GPS ]...igps: %i\n", igps);
-    }
-
-    if (!gpsDetected) return igps;
-
-    NMEAlineIndex = 0;
-    memset(msg_text, 0x00, maxNMEAline);
+void WZ_GPS_Feed()
+{
+    if (!gpsDetected)
+        return;
 
     // Alle verfuegbaren Bytes lesen (non-blocking)
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
@@ -897,24 +911,54 @@ int WZ_GPS_Loop() {
 
         if (gps.encode(char(ic))) { updateGPSdata = true; }
 
+        // NMEA-Echo. msg_text ist der globale Kommandopuffer -- diese Schleife
+        // laeuft in jedem loop()-Durchlauf, ein memset() darauf waere nicht
+        // vertretbar. Ab Debugstufe 3 wird zeilenweise gesammelt und bei '\n'
+        // genau einmal ausgegeben; darunter bleiben msg_text und
+        // NMEAlineIndex vollstaendig unberuehrt.
         if(iGPSDEBUG > 2)
         {
-          // TODO: nicht einzeln ausgeben, sondern sammeln in LineBuffer
-          // und erst ausgeben, wenn ein Satz vollständig ist \r\n
-          if (NMEAlineIndex < (int)maxNMEAline-2) {
-              msg_text[NMEAlineIndex] = char(ic);
-              NMEAlineIndex++;
-          }
+            if(ic != '\r' && ic != '\n' && NMEAlineIndex < (int)(maxNMEAline) - 2)
+            {
+                msg_text[NMEAlineIndex] = char(ic);
+                NMEAlineIndex++;
+            }
+
+            if(ic == '\n' || NMEAlineIndex >= (int)(maxNMEAline) - 2)
+            {
+                if(NMEAlineIndex > 0)
+                {
+                    msg_text[NMEAlineIndex] = 0x00;
+                    Serial.printf("[GPS ]...NMEA: %s\n", msg_text);
+                }
+
+                NMEAlineIndex = 0;
+            }
         }
     }
+}
+
+/**
+ * @brief Auswertung des zuletzt Gelesenen. Laeuft auf dem eigenen Takt
+ *        (gps_refresh_intervall).
+ *
+ * Das Leeren der UART liegt in WZ_GPS_Feed(); hier wird nur noch bewertet,
+ * was der Parser inzwischen zusammengesetzt hat, sobald updateGPSdata gesetzt
+ * ist.
+ */
+int WZ_GPS_Loop() {
+
+    int igps = POSINFO_INTERVAL;
+
+    if(iGPSDEBUG > 2)
+    {
+      Serial.printf("[GPS ]...igps: %i\n", igps);
+    }
+
+    if (!gpsDetected) return igps;
 
     if (updateGPSdata)
     {
-        if(iGPSDEBUG > 2)
-        {
-            Serial.printf("[GPS ]...NMEABuffer size:%i\n%s\n", NMEAlineIndex, msg_text);
-        }
-
         // GPS-Daten in unsere Struktur uebertragen
         gpsData.valid      = gps.location.isValid();
         gpsData.latitude   = gps.location.lat();
@@ -956,16 +1000,36 @@ int WZ_GPS_Loop() {
 
         bool has_gnss_location=false;
 
-        if ((fposinfo_hdop < 6.0) && (posinfo_satcount > 5))
+        // GPS-02: HDOP und Satellitenzahl sagen nichts darueber aus, ob der
+        // Satz UNVERSEHRT ist. Ein aus zwei Haelften zusammengesetzter Satz
+        // kann die Pruefsumme zufaellig passieren und liefert dann Null-Insel
+        // oder einen unmoeglichen Kalender. Solche Stichproben nehmen ab hier
+        // den bestehenden Zweig ohne Fix.
+        bool bPlausible = gpsSamplePlausible(gpsData.latitude, gpsData.longitude,
+                                             (int)gpsData.year, (int)gpsData.month, (int)gpsData.day);
+
+        if ((fposinfo_hdop < 6.0) && (posinfo_satcount > 5) && bPlausible)
         {
             has_gnss_location = true;
             posinfo_fix = true;
         }
         else
         {
+            if((fposinfo_hdop < 6.0) && (posinfo_satcount > 5) && !bPlausible)
+            {
+                if(s_gpsRejectCount < 0xFFFF)
+                    s_gpsRejectCount++;
+
+                if(iGPSDEBUG > 0)
+                    printfdeb("[GPS ]...reject: lat:%.6lf lon:%.6lf date:%04d.%02d.%02d n:%u\n",
+                              gpsData.latitude, gpsData.longitude,
+                              (int)gpsData.year, (int)gpsData.month, (int)gpsData.day,
+                              (unsigned int)s_gpsRejectCount);
+            }
+
             posinfo_fix = false;
         }
-        
+
         if (WZ_GPS_HasFix() && has_gnss_location)
         {
             // time -> variables
@@ -1019,7 +1083,36 @@ int WZ_GPS_Loop() {
             else
                 meshcom_settings.node_lat_c='N';
 
-            meshcom_settings.node_alt = (int)gpsData.altitude;
+            // GPS-03: Die Rohhoehe eines Consumer-Empfaengers streut um
+            // mehrere Meter. Im Ruhezustand glaettet ein skalarer
+            // Kalman-Filter das; in TRACK bewegt sich der Knoten und eine
+            // Zeitkonstante von Minuten waere dort ein Fehler.
+            if(bDisplayTrack)
+            {
+                altFilterReset(&s_alt);
+                s_altConvergedOnce = false;
+
+                meshcom_settings.node_alt = (int)gpsData.altitude;
+            }
+            else
+            {
+                if(altFilterUpdate(&s_alt, (float)gpsData.altitude))
+                    meshcom_settings.node_alt = (int)lroundf(s_alt.x);
+
+                // Flanke: erst ab hier ist die Hoehe gut genug, um die
+                // barometrische Referenz darauf festzunageln.
+                if(!s_altConvergedOnce && altFilterConverged(&s_alt))
+                {
+                    s_altConvergedOnce = true;
+
+                    baroBaseRelatch(s_alt.x);
+
+                    if(iGPSDEBUG > 0)
+                        printfdeb("[GPS ]...alt converged: %d m (P=%.1f)\n",
+                                  (int)lroundf(s_alt.x), (double)s_alt.P);
+                }
+            }
+
             if(meshcom_settings.node_alt < 0)
                 meshcom_settings.node_alt = 0;
 
@@ -1056,9 +1149,40 @@ int WZ_GPS_Loop() {
 }
 
 /**
- * @brief 
- * 
- * @return true | false 
+ * @brief GPS-03: Hoehenschaetzer auf einen bekannten Wert setzen (--setalt).
+ *
+ * Der Wert ist ein Startpunkt, keine Festlegung: das GPS verfeinert danach
+ * weiter. Die barometrische Referenz wird sofort nachgezogen, weil der
+ * Bediener hier mehr weiss als der Empfaenger.
+ */
+void WZ_GPS_AltSeed(float alt)
+{
+    altFilterSeed(&s_alt, alt);
+    s_altConvergedOnce = false;
+
+    baroBaseRelatch(alt);
+}
+
+/**
+ * @brief GPS-03: true, sobald die Kovarianz unter ALT_KF_P_CONV liegt.
+ */
+bool WZ_GPS_AltConverged()
+{
+    return altFilterConverged(&s_alt);
+}
+
+/**
+ * @brief GPS-02: Zahl der seit dem Start verworfenen Stichproben.
+ */
+uint16_t WZ_GPS_RejectCount()
+{
+    return s_gpsRejectCount;
+}
+
+/**
+ * @brief
+ *
+ * @return true | false
  */
 bool WZ_GPS_HasFix() {
     return gpsInitDone && gpsData.valid && gpsData.age_ms < 5000;
@@ -1142,3 +1266,45 @@ void WZ_L76Kreset() {
 
 
 #endif // ENABLE_GPS
+
+// ---------------------------------------------------------------------------
+// GPS-04: barometrische Referenzhoehe
+//
+// Die Drucksensoren rechnen ihren Messwert mit einer Basishoehe auf
+// Meeresniveau um und nageln diese Basis beim ersten Aufruf fest. Mit GPS ist
+// der erste Wert der erste Rohfix -- also genau der schlechteste, den die
+// Sitzung zu bieten hat. Die beiden Helfer verschieben das: gelatcht wird
+// erst, wenn der Hoehenschaetzer konvergiert ist, und --setalt zieht die
+// Referenz sofort nach.
+//
+// Beide Funktionen sind auf JEDEM Board uebersetzt -- ein Board kann einen
+// Drucksensor ohne GPS haben. Ohne ENABLE_GPS erlaubt der Latch wie bisher
+// den ersten Wert.
+// ---------------------------------------------------------------------------
+
+void baroBaseRelatch(float alt)
+{
+    #if defined(ENABLE_BMX280)
+    fBaseAltidude = alt;
+    #endif
+
+    #if defined(ENABLE_BMX680)
+    fBaseAltidude680 = alt;
+    #endif
+
+    #if !defined(ENABLE_BMX280) && !defined(ENABLE_BMX680)
+    (void)alt;   // kein Drucksensor an Bord
+    #endif
+}
+
+bool baroBaseLatchAllowed()
+{
+    #if defined(ENABLE_GPS)
+    // In TRACK laeuft kein Schaetzer (bewegter Knoten); dort gilt wie bisher
+    // der erste Wert, sonst wuerde die Referenz nie gesetzt.
+    if(bGPSON && gpsDetected && !bDisplayTrack)
+        return WZ_GPS_AltConverged();
+    #endif
+
+    return true;
+}
