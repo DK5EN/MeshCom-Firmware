@@ -232,6 +232,12 @@ all-zero case.
   verdict never closes (§2, §3.2) — cannot spam the log on every key press. Legend:
   `0` = unknown, `1` = yes (`KBD_RAW_YES`), `2` = no (`KBD_RAW_NO`). This is the
   operator's evidence that the keyboard firmware has raw mode (or not).
+- `--info` prints `...KBD raw-mode yes|no|unknown ...KEYLOCK on|off` (T-Deck builds only,
+  `tdeck_kbd_raw_support_str()`), so the verdict can be read at any time, not only within
+  the first five presses after boot. Field evidence 2026-09-02 (OE5HWN, T-Deck Plus,
+  `tasten.log`): four presses, every probe answered `00 00 00 00 00`, verdict stayed
+  `unknown`, no repeat window ever opened — the pre-2025-06 controller firmware, exactly
+  the degradation path of §3.2. DK5EN-14 on the same binary answered `support;1`.
 - `[KBD];repeat;key;<hex>;held_ms;<n>;reason;<release|timeout|lock|i2c|focus>` — at the
   end of every hold. `held_ms` ≥ 400 proves LVGL had time to repeat. `focus` (K5)
   means a touch moved keypad focus mid-hold; `i2c` means the raw-mode read failed.

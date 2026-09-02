@@ -816,12 +816,24 @@ static bool kbdRawRead(uint8_t *frame)
 /**
  * Will be called by the library to read the mouse
  */
+// TD-10: auto-repeat window state; support/probes persist across holds
+// (per-boot verdict on this keyboard's firmware), the rest per-hold. File
+// scope so --info can report the verdict (tdeck_kbd_raw_support_str()).
+static struct KbdRepeat s_rep = {};
+
+const char *tdeck_kbd_raw_support_str(void)
+{
+    switch (s_rep.support)
+    {
+        case KBD_RAW_YES: return "yes";
+        case KBD_RAW_NO:  return "no";
+        default:          return "unknown";
+    }
+}
+
 static void keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
 {
     static uint32_t last_key = 0;
-    // TD-10: auto-repeat window state; support/probes persist across holds
-    // (per-boot verdict on this keyboard's firmware), the rest per-hold.
-    static struct KbdRepeat s_rep = {};
 
     if (s_rep.active)
     {

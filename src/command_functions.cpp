@@ -5799,6 +5799,14 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast);
 
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            // TD-10: raw-mode verdict of the keyboard controller. "no" or a
+            // lasting "unknown" after typing means the controller firmware
+            // predates raw mode and keys cannot auto-repeat on this unit.
+            printfdeb("...KBD raw-mode %s ...KEYLOCK %s\n", tdeck_kbd_raw_support_str(),
+                (meshcom_settings.node_keyboardlock?"on":"off"));
+            #endif
+
             printfdeb("...EXTUDP %s ...EXT IP %s ...NOPMOTHER %s\n", (bEXTUDP?"on":"off"), meshcom_settings.node_extern,
                     ((meshcom_settings.node_sset3 & 0x8000)?"on":"off"));
 

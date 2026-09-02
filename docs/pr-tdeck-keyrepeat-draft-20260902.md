@@ -68,6 +68,12 @@ das erwartete Bit nie tragen). Einziger messbarer Effekt: eine zusätzliche
 I2C-Transaktion (~1 ms) pro berechtigtem Tastendruck. Die Log-Zeile
 `[KBD];rawprobe;…;support;0` erscheint dabei bis zu `KBD_RAW_PROBE_MAX + 2`
 (= 5) mal pro Boot, dann nicht mehr.
+Damit der Befund auch spaeter ablesbar ist, zeigt `--info` auf T-Deck-Builds
+zusaetzlich `...KBD raw-mode yes|no|unknown ...KEYLOCK on|off`
+(`tdeck_kbd_raw_support_str()` in `tdeck_main.cpp`, deklariert in
+`tdeck_debug.h`). Feldbefund 2026-09-02 (OE5HWN, T-Deck Plus): jede Probe
+antwortete `00 00 00 00 00`, das Geraet tippt wie bisher ein Zeichen je Druck —
+alte Tastatur-Controller-Firmware, genau dieser Pfad.
 
 ## Kosten
 
