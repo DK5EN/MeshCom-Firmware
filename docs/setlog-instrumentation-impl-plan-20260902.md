@@ -1,8 +1,14 @@
 # Implementierungsplan SL-01..SL-07 — Messpunkte unter `--setlog on`
 
-**Status: ENTWURF 2026-09-02, noch nicht begonnen.** Umsetzung mit
-`/orchestrate-waves`; der Plan ist so geschnitten, dass jede Welle disjunkte
-Dateien hat und der Orchestrator die Hotspots selbst anfasst.
+**Status: FREIGEGEBEN 2026-09-02 (Operator), noch nicht begonnen.** Umsetzung
+mit `/orchestrate-waves` im eigenen Worktree `/Users/martinwerner/WebDev/mc-setlog`,
+Branch `feat-setlog-20260902`, Basis `v4.35p_prio` (Operator-Entscheid 2026-09-02:
+Fork-Basis, nicht `upstream/dev` — der Fork hat `env:native`, `test/support`,
+`tools/berglog.py`, `tools/ram_snapshot.py`; der PR wird danach als Patch auf
+`upstream/dev` geschnitten, siehe "PR-Verpackung"). Der Plan ist so geschnitten,
+dass jede Welle disjunkte Dateien hat und der Orchestrator die Hotspots selbst
+anfasst. **Abschnitt "Korrekturen 2026-09-02"** unten geht dem Rest vor, wo beides
+widerspricht.
 
 Herkunft: Nachtmessung der OE3-Bergknoten 1./2.09.2026
 (`docs/report-2026-09-02-oe3-bergknoten.htm`, Abschnitt "Debug-Flags") und
@@ -67,6 +73,64 @@ im Nachtbericht offen bleiben mussten:
 8. **Keine Verhaltensänderung.** Dieser Plan ist reine Instrumentierung. Die
    Fixes aus den Berichten (HEY-Hop-Budget, Dedup-Zeitalterung, bare-R-Parser,
    RX-01 auf nRF52) sind eigene PRs und werden hier nicht mitgenommen.
+
+## Korrekturen 2026-09-02 (Scout gegen `upstream/dev` @ `6a613547` und `v4.35p_prio` @ `16c0733f`)
+
+Alle sechs Zeilenarten haben ihre Stellen in `upstream/dev`; nichts davon ist
+Fork-only. Der Fork unterscheidet sich in den elf betroffenen `src/`-Dateien nur
+in `esp32_main.cpp` (+29/-1, TM-51-Banner, alle Zeilen ab ~733 um +27 verschoben)
+und `loop_functions.cpp` (+42/-21 bei ~4301, unterhalb aller SL-Stellen). Da der
+Worktree fork-basiert ist, gelten die `esp32_main.cpp`-Nummern dieses Plans
+(Fork-Stand); Agenten suchen ohnehin nach Symbol, nicht nach Zeile.
+
+| Plan sagt                                                                                               | Tatsächlich                                                                                                                                                                         | Folge                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cad_attempt` static in `nrf52_main.cpp:426` / ESP32 in `esp32_main.cpp:2511`, Getter `getCadAttempt()` | `cad_attempt` ist **global**: `src/loop_functions.cpp:445`, extern `loop_functions_extern.h:279`, beide Plattformen                                                                 | Kein Getter. SL-03 liest die Variable direkt.                                                                                                                                        |
+| Trickle-Zustand static in `nrf52_main.cpp:1927-1936`, Getter `getTrickleState()`                        | **global**: `trickle_interval_ms`, `trickle_consistent_count`, `trickle_last_neighbor_count` in `src/loop_functions.cpp:508-510`, extern `loop_functions_extern.h:328-330`          | Kein Getter. SL-05 liest direkt.                                                                                                                                                     |
+| nRF52 5-Minuten-Tick bei `nrf52_main.cpp:~1352`                                                         | **Es gibt keinen 5-Minuten-Tick auf nRF52.** `stat_prio_timer` / `[MC-STAT]` / `[MC-HWM]` kommen dort nicht vor; `:1351-1370` ist der 10-s-`CHANNEL_UTIL`-Block mit `Serial.printf` | Agent C legt einen eigenen `static uint32_t setlog_stat_timer` mit `PRIO_STAT_INTERVAL_S` an, Anker direkt nach dem `CHANNEL_UTIL`-Block.                                            |
+| nRF52-Heap: `dbgHeapFree()` / `mallinfo`                                                                | `nrf52_getFreeHeap()` in `src/nrf52/nrf52_main.cpp:76-79`, **static**; `dbgHeapFree` existiert nicht                                                                                | Agent C macht die Funktion nicht-static und deklariert sie in `src/nrf52/nrf52_main.h` (oder wo die anderen nrf52-Exporte stehen). ESP32 `ESP.getFreeHeap()` wie geplant.            |
+| `ch_util_rx_accum` in `loop_functions.cpp:431-434`                                                      | `:452-453`, extern `loop_functions_extern.h:323-324`                                                                                                                                | nur Zahl                                                                                                                                                                             |
+| `stat_drop_count[]` in `loop_functions.cpp:476`                                                         | `:514` (Definition), `txring_functions.cpp:33`, extern `loop_functions_extern.h:334`; Größe 6                                                                                       | `drop=` druckt 5 Prios wie geplant, Index 0..4 — Agent prüft, welcher Index welche Prio ist                                                                                          |
+| `skip_relay:`-Label an `lora_functions.cpp:1291`                                                        | Label an `:1356`; `:1291` ist das `goto`                                                                                                                                            | Der einzige `printfdeb` für RLY steht hinter dem Label an `:1356`                                                                                                                    |
+| `checkMesh()` in `via_functions.cpp:82-87`                                                              | `via_functions.cpp:50`                                                                                                                                                              | nur Zahl                                                                                                                                                                             |
+| `printBuffer_aprs(const char *msgSource, …)`                                                            | Signatur ist `char *msgSource`; `printBuffer_aprs` `:3144-3148`, `printBuffer_ack` `:3151-3157` (zwei Formate, Größe 7 und 12)                                                      | Neue Funktion nimmt `const char *`, alte bleibt                                                                                                                                      |
+| Längenlimit nur `loc_buf[600]`                                                                          | **zweites Limit:** `char nformat[300]` in `printfdeb_functions.cpp:82` — der **Formatstring** wird bei 300 Byte abgeschnitten                                                       | STAT-Formatstring unter 250 Zeichen halten (Schätzung ~180); Test in Welle 0 prüft `strlen(format) < 300` für jeden Formatierer                                                      |
+| `ringSource[]`                                                                                          | existiert nirgends — wie geplant neu                                                                                                                                                | —                                                                                                                                                                                    |
+| Welle-0-Gate `pio test -e native`                                                                       | existiert im Fork (`platformio.ini:188`, 12 native-Envs, 489 Fälle); **nicht** in `upstream/dev` (dort nur `native_extradio`)                                                       | Welle 0 trägt `test_setlog_lines` in `[env:native]` `test_filter` und `+<setlog_lines.cpp>` in dessen `build_src_filter` ein; `platformio.ini` gehört in Welle 0 dem Welle-0-Agenten |
+| Welle 2 Werkzeug/Doku                                                                                   | `tools/berglog.py`, `tools/mock/`, `tools/testdata/`, `.claude/skills/logauswertung/`, `docs/BACKLOG.md`, `docs/CHANGELOG-stability.md` sind **Fork-only**                          | Läuft im fork-basierten Worktree wie geplant; geht **nicht** in den Upstream-PR (siehe PR-Verpackung)                                                                                |
+| Bench Welle 3                                                                                           | Am 2026-09-02 abends ist **kein** Bench-Knoten angesteckt (`ls /dev/cu.*` leer)                                                                                                     | Welle 3 wartet auf RAK-90 + Heltec-93; Code-Wellen warten nicht                                                                                                                      |
+
+**Bestehende RX-Zeile, byteidentisch zu halten** (`src/loop_functions.cpp:3146-3148`):
+
+```
+"%s %s %03i %c x%08X H%02X S%i T%i M%02X %s>%s%c%s HW:%02i MOD:%01X/%01i FCS:%04X FW:%02i:%c LH:%02X\n"
+```
+
+ACK (`:3154`, Größe 7 / `:3156`, Größe 12):
+
+```
+"%s %s 007 %c x%02X%02X%02X%02X H%02X %02X\n"
+"%s %s 012 %c x%02X%02X%02X%02X H%02X x%02X%02X%02X%02X %02X %02X\n"
+```
+
+`msgSource` ist `"[LOG]"`, das erste `%s` `getTimeString()` = `HH:MM:SS`. Der
+Welle-0-Test vergleicht gegen diese Strings, nicht gegen eine Datei in
+`test/support/traces/`.
+
+**Nebenläufigkeit mit den anderen Worktrees (2026-09-02):** Der GPS-Worktree
+(`feat-gps-nmea-20260902`) ändert `esp32_main.cpp` und `nrf52_main.cpp` nur am
+GPS-Aufruf (ESP32 ~`:3092-3136`, nRF52 ~`:1691`) — disjunkt zu SL-04 (`~:4095-4128`)
+und SL-05 (`~:2123-2166`, nRF52 neuer Tick bei `~:1370`). `loop_functions_extern.h`
+bekommt aus beiden je ein extern; Merge-Reihenfolge in `v4.35p_prio` egal, Konflikte
+sind triviale Hunks. Der Tastatur-Worktree berührt nur `src/t-deck/`.
+
+**PR-Verpackung, präzisiert:** `git checkout -b pr-setlog-<datum> upstream/dev &&
+git diff v4.35p_prio...feat-setlog-20260902 -- src | git apply --3way`; `platformio.ini`,
+`test/`, `tools/`, `.claude/`, `docs/` bleiben im Fork. `git diff upstream/dev --stat`
+darf nur `src/setlog_lines.*`, `src/loop_functions.cpp`, `src/loop_functions_extern.h`,
+`src/txring_functions.*`, `src/lora_functions.cpp`, `src/esp32/esp32_main.cpp`,
+`src/nrf52/nrf52_main.cpp` (+ `.h`), `src/udp_functions.cpp`, `src/nrf52/nrf_eth.cpp`
+zeigen. Sieben Boards danach neu bauen.
 
 ## Die Zeilen im Einzelnen
 
