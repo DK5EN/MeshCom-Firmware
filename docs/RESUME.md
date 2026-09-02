@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## 2026-09-02: Code Quality 2.0 written, scanner extended, §3.8t filed — next is the four-wave audit (CQ-12)
+
+`docs/code-quality-2.0.md` (`e108fa98`) is the field-derived layer on top of
+`codequality-rules.md`: 28 code patterns C01..C28, 16 process patterns
+P01..P16, Part D review checklist, Part E gap table. `tools/code_audit_scan.py`
+carries the twelve grep-stable detectors as `CQ2-*`; `/code-audit` walks
+Part D. Four sites the checks found were fixed in the same commit (TM-51
+reset banner, `PositionToAPRS()` `strncat` bound, map-timer `millis()`,
+build skill parallelism); gate was three boards clean + 489/489 native.
+
+Backlog §3.8t (CQ-01..CQ-12) holds what the checks found and did not fix plus
+the enablement work. Order for the next session:
+
+1. **CQ-01** (`bt_code` in clear on serial and 2323) — one-line masking, do
+   first.
+2. **CQ-12** audit wave 1 (parsers and protocol) with `/code-audit --full
+--delta`; write `docs/code-audit-20260902.md`, triage into §3.8u.
+3. **CQ-06** native seam for `PositionToAPRS()` / `sendMessage()` before the
+   next fix touches either file again.
+
+Unreleased changelog items 170-172 are written; next release cut takes them
+as they stand.
+
 ## 2026-09-01 night: Release v4.35p.09.01.2-stability published
 
 `v4.35p.09.01.2-stability` is live on GitHub (39 assets, `--latest`), tagged at

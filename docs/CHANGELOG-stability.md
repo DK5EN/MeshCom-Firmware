@@ -75,6 +75,35 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## Unreleased (since v4.35p.09.01.2-stability)
+
+170. **Code Quality 2.0: the error patterns of the last two weeks, with detectors.**
+     `docs/code-quality-2.0.md` distils 49 coding sessions (2026-08-27 to
+     09-01), the fix wave since 2026-08-18 and the review documents into 28
+     code-defect and 16 process patterns — each with why it slipped past
+     review, a grep or check that finds the class, and the gap it exposes in
+     `codequality-rules.md`; a 26-point review checklist (Part D) and a table
+     of the bench pitfalls that cost the most time. Twelve of the detectors
+     are now rules `CQ2-*` in `tools/code_audit_scan.py` (optional whitelist
+     regex per rule), and `/code-audit` walks Part D in its contextual phase.
+     The build skill no longer tells a session to run `pio` in parallel.
+171. **ESP32 boot banner prints the reset cause** (TM-51). `[BOOT]
+RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
+     so it survives `--debug off`; nRF52 has printed `RESETREAS` since
+     2026-08-21. A field reboot (`OE5HWN-14`, proven by the `millis()`
+     rollback, the heap watermark and a 32 s hole) was undiagnosable
+     without it.
+172. **Two sites the new checks found.** `PositionToAPRS()` concatenated
+     nineteen tag strings with `strncat(dst, src, sizeof(dst)-1)`, which
+     bounds the source and not the room left — the full tag set (about
+     111 bytes) overran `strconcat[100]`, latent only because the length
+     budget check runs afterwards; every call is now bounded by the
+     remaining room. The T-Deck SD-map boundary timer compared
+     `timer + 30000 < millis()`, the form that latches after 49.7 days
+     (N-08); it uses the rollover-safe delta now. Neither file is in a
+     native test environment (backlog CQ-06), so both are pinned by the
+     scanner (`CQ2-C02a`, `CQ2-C12a` must return zero) and the builds only.
+
 ## New in v4.35p.09.01.2-stability
 
 A same-day second cut on top of `v4.35p.09.01-stability`: one field-driven
