@@ -27,6 +27,7 @@
 
 #include "via_functions.h"
 #include "charset_filter.h"
+#include "setlog_lines.h"
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -451,6 +452,22 @@ ch_util_rx_start_t ch_util_rx_start{0};   // timestamp when RX started
 ch_util_ulong_t ch_util_tx_start{0};   // timestamp when TX started
 ch_util_ulong_t ch_util_rx_accum{0};   // accumulated RX airtime (ms) in current window
 ch_util_ulong_t ch_util_tx_accum{0};   // accumulated TX airtime (ms) in current window
+
+// SL-05 -- Zaehler fuer die 5-Minuten-STAT-Zeile unter `--setlog on`.
+// std::atomic wie ch_util_*_accum daneben: geschrieben werden sie im
+// nRF52-Timer-Task (OnRxDone/OnRxError, SL-01/SL-04) und im LORA-Task/loop
+// (doTX, SL-03), gelesen und per exchange(0) zurueckgesetzt in loop().
+// Zusammen unter 30 Byte RAM (siehe Kostentabelle im Implementierungsplan).
+std::atomic<uint32_t> stat_newid{0};       // neue msg_id im Dedup-Ring
+std::atomic<uint32_t> stat_dup{0};         // erkannte Kopien
+std::atomic<uint32_t> stat_rx_err{0};      // RX-/CRC-Fehler
+std::atomic<uint32_t> stat_txn{0};         // eigene Sendungen
+std::atomic<uint32_t> stat_txfail{0};      // vom TX-Watchdog abgebrochen
+std::atomic<uint32_t> stat_util_rx_5m{0};  // RX-Luftzeit im 5-min-Fenster (ms)
+std::atomic<uint32_t> stat_util_tx_5m{0};  // TX-Luftzeit im 5-min-Fenster (ms)
+// Hochwasser von txRingDepth(); in addTxRingEntry() mitgefuehrt
+// (txring_functions.cpp), im STAT-Druck zurueckgesetzt.
+std::atomic<uint8_t> stat_ring_max{0};
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 
@@ -3154,6 +3171,41 @@ void printBuffer_ack(char *msgSource, uint8_t payload[UDP_TX_BUF_SIZE+10], int16
         printfdeb("%s %s 007 %c x%02X%02X%02X%02X H%02X %02X\n", getTimeString().c_str(), msgSource, payload[0], payload[4], payload[3], payload[2], payload[1], payload[5], payload[6]);
     else
         printfdeb("%s %s 012 %c x%02X%02X%02X%02X H%02X x%02X%02X%02X%02X %02X %02X\n", getTimeString().c_str(), msgSource, payload[0], payload[4], payload[3], payload[2], payload[1], payload[5], payload[9], payload[8], payload[7], payload[6], payload[10], payload[11]);
+}
+
+// SL-01 -- dieselben Zeilen wie printBuffer_aprs()/printBuffer_ack(), mit dem
+// Anhang " RSSI: SNR: DUP: OWN: t=" aus setlogFormatRxTail() VOR dem `\n`.
+//
+// Bewusst neue Funktionen statt einer Erweiterung der alten: printBuffer_aprs()
+// bedient auch "MH-LoRa" und "RX-UDP", wo weder Pegel noch Dedup-Verdikt
+// existieren, und Rahmenbedingung 7 des Implementierungsplans haelt die
+// bestehende Zeile byteidentisch. Der Formatstring ist deshalb wortwoertlich
+// derselbe wie oben, nur um `%s` vor dem `\n` verlaengert.
+//
+// `tail` liegt auf dem Stack des Aufrufers: OnRxDone() laeuft auf nRF52 im
+// FreeRTOS-Timer-Task mit 1 KB Stack.
+// 56 Byte sind das Maximum des Anhangs (45 Zeichen + NUL) plus Reserve; ein
+// zweiter Puffer entsteht nicht, printfdeb() wird wie bisher genau einmal
+// gerufen.
+void printBuffer_aprs_rx(const char *msgSource, struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr, bool dup, bool own_echo)
+{
+    char tail[56];
+    setlogFormatRxTail(tail, sizeof(tail), rssi, snr, dup, own_echo, (uint32_t)millis());
+
+    printfdeb("%s %s %03i %c x%08X H%02X S%i T%i M%02X %s>%s%c%s HW:%02i MOD:%01X/%01i FCS:%04X FW:%02i:%c LH:%02X%s\n", getTimeString().c_str(), msgSource, aprsmsg.msg_len, aprsmsg.payload_type, aprsmsg.msg_id, aprsmsg.max_hop,
+        aprsmsg.msg_server, aprsmsg.msg_track, aprsmsg.msg_mesh, aprsmsg.msg_source_path.c_str(), aprsmsg.msg_destination_path.c_str(), aprsmsg.payload_type, aprsmsg.msg_payload.c_str(),
+        aprsmsg.msg_source_hw, (aprsmsg.msg_source_mod>>4), (aprsmsg.msg_source_mod & 0xf), aprsmsg.msg_fcs, aprsmsg.msg_source_fw_version, aprsmsg.msg_source_fw_sub_version, aprsmsg.msg_last_hw, tail);
+}
+
+void printBuffer_ack_rx(const char *msgSource, uint8_t payload[UDP_TX_BUF_SIZE+10], int16_t size, int16_t rssi, int8_t snr, bool dup, bool own_echo)
+{
+    char tail[56];
+    setlogFormatRxTail(tail, sizeof(tail), rssi, snr, dup, own_echo, (uint32_t)millis());
+
+    if(size == 7)
+        printfdeb("%s %s 007 %c x%02X%02X%02X%02X H%02X %02X%s\n", getTimeString().c_str(), msgSource, payload[0], payload[4], payload[3], payload[2], payload[1], payload[5], payload[6], tail);
+    else
+        printfdeb("%s %s 012 %c x%02X%02X%02X%02X H%02X x%02X%02X%02X%02X %02X %02X%s\n", getTimeString().c_str(), msgSource, payload[0], payload[4], payload[3], payload[2], payload[1], payload[5], payload[9], payload[8], payload[7], payload[6], payload[10], payload[11], tail);
 }
 
 
