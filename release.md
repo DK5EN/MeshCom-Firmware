@@ -1,11 +1,107 @@
 # Release Notes -- MeshCom Firmware v4.35p
 
-Firmware `4.35p`, `FLASH_VERSION 20260901`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35p`, `FLASH_VERSION 20260902`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
 
 ---
+
+## Stability-Release v4.35p.09.02-stability (2026-09-02)
+
+Drei Teilsysteme aus parallelen Worktrees, jedes einzeln reviewt
+(`/fable-review`, Finder-Faecher plus adversarialer Verifizierer) und heute
+Abend in dieser Reihenfolge gemerged: `--setlog on`-Instrumentierung
+(Item 173), GPS-Hoehe/QNH-Pfad (Item 174), T-Deck Tasten-Auto-Repeat
+(Item 175). Dazu Code Quality 2.0 mit Detektoren und der Reset-Grund im
+ESP32-Bootbanner (170-172) und der Upstream-`dev`-Sync #1124 (176).
+`FLASH_VERSION` steigt auf 20260902. Native-Gate 568/568 in 12 Host-Envs,
+102 Tool-Tests.
+
+### Was dazugekommen ist
+
+- **GPS-Pfad (GPS-01..04, Feldmeldung OE5HWN-14).** Die GPS-UART wird in
+  jedem Schleifendurchlauf geleert statt alle 3 s; vorher gingen ~165 Byte
+  NMEA je Zyklus verloren und etwa jeder 256. zusammengesetzte Satz kam als
+  "Fix" mit `lon:0.000000` oder `Date: 2015.14.00` durch die Pruefsumme.
+  Ein Plausibilitaetsgatter verwirft Null-Insel, unmoegliche Kalenderdaten
+  und Uhrzeiten, Hoehen ausserhalb -500..10000 m, bevor sie Settings,
+  Beacon oder Systemuhr erreichen. Die gebeaconte Hoehe ist ein
+  Kalman-Schaetzwert (Zeitkonstante ~7 min, dt-skaliertes Prozessrauschen
+  fuer den 1-s-Takt auf nRF52), TRACK-Modus umgeht ihn; `--setalt` seedet
+  den Filter und lehnt Werte ausserhalb 0..40000 m ab statt auf 0 zu
+  klemmen. Die QNH-Referenzhoehe wird bei Konvergenz und bei
+  `--setalt`/`--setpress` nachgezogen, nicht mehr auf den ersten Fix nach
+  dem Boot festgenagelt. Feldlogs OE5HWN (T-Deck Plus, T-Beam Supreme, je
+  eine Stunde): 2375 Auswertungen ohne eine korrupte Stichprobe,
+  Konvergenz nach 88 Stichproben wie modelliert, QNH-Relatch nach Reboot.
+- **GPS-06: T-Deck ohne Plus, Pin-Fallback.** Seit Upstream `a672d18b`
+  (v4.35p) empfaengt der T-Deck auf GPIO44 und sendet auf GPIO43 (LilyGo-
+  und Plus-Belegung); bis 4.35d war es per `SoftwareSerial(43, 44)`
+  umgekehrt, selbst verdrahtete Module nach alter Belegung waren seither
+  stumm (Feldlog: 4.35d Fix mit 7 Satelliten, 4.35p "keine gueltige
+  NMEA-Sequenz auf 8 Baudraten"). `detectBaudrate()` scannt bei Fehlschlag
+  einmal auf der alten Belegung, merkt sich die wirksamen Pins fuer alle
+  spaeteren `begin()` und bittet im Log ums Umverdrahten. Nur
+  `variants/t_deck` definiert den Fallback.
+- **`--setlog on`: sieben Zeilenarten (SL-01..SL-07).** RX-Zeile mit
+  `RSSI:`/`SNR:`/`DUP:`/`OWN:`/`t=`, neu `RLY` (Relay-Entscheidung mit
+  Grund), `TX` (eigener Sendevorgang mit Wartezeit, Ringtiefe,
+  CAD-Versuchen), `ERR` (RX-Fehler auf beiden Plattformen), `STAT`
+  (5-Minuten-Kanalauslastung, Dedup, Ring-Hochwasser, Drops, Heap) und
+  `GWI`/`GWU` (Gateway-Inject/-Upload je `msg_id`). Alles haengt nur an
+  `bDisplayLog`, unter 64 Byte RAM, keine neuen Puffer; `tools/berglog.py`
+  liest die Zeilen (39 Tool-Tests). Review-Fixes S1-S9: ein einziger
+  Dedup-Lookup je Frame, Gateway-`newid`, Hop-Maske 0x20, kein `String`
+  je Zeile, gemeinsame STAT-Befuellung.
+- **T-Deck Tasten-Auto-Repeat (TD-10).** Backspace, Leertaste und
+  Buchstaben wiederholen sich beim Halten (400 ms, dann alle 100 ms) ueber
+  LVGLs Keypad-Repeat; dafuer wird das Raw-Mode-Fenster der
+  Tastatur-Controller-Firmware (I2C 0x03/0x04, 5-Byte-Matrix) fuer die Dauer
+  des Haltens geoeffnet und nur scharf geschaltet, wenn der Frame genau die
+  Matrixzelle der gedrueckten Taste zeigt. Controller ohne Raw-Mode
+  (LilyGo-Firmware vor 2025-06-12) verhalten sich wie bisher; `--info`
+  zeigt `...KBD raw-mode yes|no|unknown`. 39 native Faelle, Review-Fixes
+  K1-K7.
+- **Code Quality 2.0** (`docs/code-quality-2.0.md`, 28 Code- und 16
+  Prozessmuster mit Detektoren `CQ2-*` in `tools/code_audit_scan.py`),
+  ESP32-Bootbanner mit Reset-Grund (TM-51), zwei Fundstellen der Detektoren
+  behoben (`PositionToAPRS()`-`strncat`-Grenze, SD-Map-Timer
+  rollover-sicher).
+- **Upstream #1124 (OE3LCR):** die ADC-Polaritaetsprobe erkennt einen fest
+  anliegenden Spannungsteiler (Wireless Stick V3) als Batteriehardware.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Envs bauen; Native-Gate 568/568 in 12 Host-Envs, 102
+  Tool-Tests.
+- Der gemergte Baum selbst hat nur die Gates gesehen. Alle
+  Hardware-Befunde stammen vom Pre-Merge-Testbuild der GPS- und
+  Tastatur-Branches (`test-helmut-gps-kbd-20260902`, `df9d407e`); Delta zu
+  diesem Release: `--setlog`-Zeilen, T-Deck-Pin-Fallback, `--info`-Zeile,
+  Upstream #1124.
+- T-Deck Plus DK5EN-14 (Bank): GPS-Lauf 6,5 min, 128 Fixes, 0 Rejects,
+  Konvergenz nach 256 s (Modell 249 s); Tastatur `support;1`,
+  Haltefenster 0,8-1,2 s fuer Backspace, Leertaste und `d`, wiederholtes
+  Loeschen am Display gesehen.
+- T-Deck Plus und T-Beam Supreme OE5HWN (Feld, je eine Stunde): 1214 und
+  1161 Auswertungen, 0 Rejects, 0 korrupt; Supreme konvergiert nach 88
+  Stichproben bei 280 m, Relatch 276 m nach Reboot; QNH 1020,2 hPa gegen
+  Flughafen Linz 1018,5 hPa, Rest passt zu einem BMP280-Offset, nicht zu
+  einem Hoehenfehler. Die OE5HWN-Tastatur hat keinen Raw-Mode und tippt
+  wie bisher.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- `--setlog on` hat keinen Hardware-Lauf (Welle 3, RAK4631 + Heltec V3,
+  30 min, steht aus). Heltec V3, T-Beam und RAK4631 haben diesen Build
+  nicht gesehen.
+- Die GPS-Zwei-Stunden-Arme A/B/C sind nicht gelaufen; der Nachweis sind
+  6,5 min Bank plus zwei Feldstunden.
+- Der T-Deck-Pin-Fallback ist auf Hardware unverifiziert; der Build ging an
+  OE5HWNs selbst verdrahtetes Geraet, das Ergebnis war vor dem Schnitt
+  nicht da.
+- Kein nRF52-GPS-Knoten auf der Bank (T114/T-Echo, 1-s-Takt).
 
 ## Stability-Release v4.35p.09.01.2-stability (2026-09-01, zweiter Schnitt)
 

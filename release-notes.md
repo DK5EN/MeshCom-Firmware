@@ -3,48 +3,42 @@
 
 ## What this release is
 
-**The complete field campaign since `v4.35p.08.28-stability`, in its final form**: a stored XSS fix in the web UI, WiFi first-join on WPA2/WPA3 transition APs, asynchronous NTP that finally works on non-gateway nodes, "no battery" detection, config backup/restore, a T-Deck that pans its map and no longer stalls on audio, an OTA safeboot that survives an aborted upload — and, as the centerpiece, the **complete TX back-pressure and receipt system**: a node that cannot send now tells the sender, honestly, in the right conversation, with the text that was lost. 63 numbered changes (items 107–169), verified on a four-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631/Ethernet) with 489 native test cases across 12 host environments, soak runs up to 9.1 hours and an overnight field soak on three nodes.
+**Three field-driven subsystems on top of `v4.35p.09.01.2-stability`**, each from its own review-gated worktree and merged tonight: the **GPS altitude and QNH path** (the UART is drained on every loop pass instead of every 3 s, implausible fixes are rejected before they reach settings or the clock, the beaconed altitude is a Kalman estimate instead of one raw sample, and the barometric QNH reference re-latches when that estimate has converged); the **`--setlog on` instrumentation** (seven new log line kinds that make signal level, relay decisions, dedup, TX wait, errors and gateway inject/upload traceable per message id, so a mountain gateway's night can be read offline); and **T-Deck key auto-repeat** (Backspace, Space and the alpha keys repeat while held, on keyboards whose controller firmware has raw mode). Plus the Code Quality 2.0 pattern catalogue with detectors, the ESP32 reset-cause banner, and the upstream `dev` sync. Items 170–176 in the changelog; 568 native test cases across 12 host environments.
 
-**This second cut of the day** (`.2`, replaces `v4.35p.09.01-stability`) adds three things on top: the "slow down" warning now needs the sender's own third message on a full queue instead of firing on a gateway's relay load (item 167); the Heltec Wireless Stick V3 measures its battery again (upstream #1119, item 168); and the upstream `dev` sync with the PlatformIO upload fix (item 169). Only the live gateway ran this exact build before publishing — see verification below.
+**What the field said the same evening**: two nodes at OE5HWN ran the GPS build for an hour each — 2375 evaluations, not one corrupt sample (the old build produced a spliced sentence about once per 256), convergence after 88 samples as modelled, QNH re-latched after a reboot. The same logs exposed a fourth GPS defect on the **T-Deck without Plus** (a 4.35p pin swap that muted self-wired GPS modules, item 174/GPS-06), fixed in this release with a scan fallback; and one T-Deck Plus whose keyboard controller predates raw mode, which degrades to one character per press exactly as designed and now says so in `--info`.
 
-Flash version `20260901`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
+Flash version `20260902`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
-### Back-pressure, final state
+### GPS: altitude, QNH and the T-Deck pins (item 174)
 
-When a node's TX queue fills up, the sender used to learn nothing: messages vanished silently, the chat showed them as sent, and on a gateway they even reached the central server without ever going on air. Now:
+- **Nothing is lost between evaluations.** `WZ_GPS_Feed()` drains the GPS UART on every loop pass; the 256-byte ring used to overflow by ~165 bytes per 3-second cycle, and about one in 256 of the resulting spliced sentences passed the checksum as a "fix" with `lon:0.000000` or `Date: 2015.14.00`.
+- **A plausibility gate** rejects null island, out-of-range angles and altitudes, impossible calendar dates and clock times before a sample can reach persisted settings, the position beacon or the system clock. Rejects are counted and logged (`--gpsdebug on`).
+- **The beaconed altitude is an estimate, not a sample**: a scalar Kalman filter with time-scaled process noise (time constant about 7 minutes) replaces the raw value on a stationary node; TRACK mode bypasses it. `--setalt` seeds the filter and rejects out-of-range values instead of clamping to 0 m.
+- **QNH re-latches on convergence** and on `--setalt`/`--setpress`, not on whichever fix happened first after boot. A node that never fixes latches its persisted altitude as before.
+- **T-Deck without Plus, self-wired GPS module**: since upstream v4.35p the board receives on GPIO44 and sends on GPIO43 (the LilyGo and T-Deck Plus assignment); 4.35d did the reverse on this board, so modules wired for 4.35d went silent. The baud scan now retries once on the old pins and logs a request to swap the wires. Cost: up to 12 s at boot on a T-Deck with `--gps on` and no module.
 
-- **The queue measurement is honest**: depth counts occupied slots, not index distance — a phantom `queued=19` with 3–4 real entries drove an 8-minute refusal episode in the field. Stale queued neighbourhood reports (HEY, priority 5) age out after 3 minutes instead of pinning the queue indefinitely — field-proven in the overnight soak (13 stale drops, zero stuck rings).
-- **The thresholds are calibrated against a live gateway baseline**: "slow down" (QRS) fires at depth 5, not on the everyday depth 1–4 band — and only on the sender's **third own message in a row** that finds the queue that full, because the depth alone counts relay frames, ACKs and beacons and warned a gateway's operator on their very first message. Messages that drain between keystrokes restart the count. The all-clear (QRV) is only sent when the episode actually refused or dropped something, and the episode closes when the load is really gone (10-second hold in the water band), not only at an exactly-empty queue a busy relay rarely reaches.
-- **Every refused or dropped message gets a receipt with its own text** — `QRT NOT SENT - <text>` / `QTA NOT SENT - <text>` — as a normal message from the node's own callsign, in the conversation the sender was typing in (group notice in that group, DM notice in that DM thread), visible only to the sender and never on air.
-- **A message enters the network whole or not at all**: a dropped message no longer echoes as "sent" in the chat, and a gateway no longer uploads it to the central server when no RF neighbour ever heard it.
-- **The typed text survives a refusal on all three GUIs**: the T-Deck, T-Deck Pro and web GUI clear the input field only on success, so nothing the operator typed is lost.
-- The whole system is pinned by integrated regression suites: the field incident replayed end-to-end over the real queue and state machine, the recorded gateway baseline, and a flood test (13 sends into a 10-slot ring → 8 accepted, 5 refused, 5 receipts).
+### `--setlog on`: seven line kinds for offline analysis (item 173)
 
-### OTA tooling
+The receive line gains `RSSI:`/`SNR:`/`DUP:`/`OWN:`/`t=`; new lines `RLY` (relay decision with reason), `TX` (own send with wait time, queue depth, CAD attempts), `ERR` (RX error, both platforms), `STAT` (five-minute channel utilisation, dedup, ring high-water, drops, heap) and `GWI`/`GWU` (gateway inject and upload per `msg_id`). All hang off `--setlog on` only; under 64 bytes of RAM, no new buffers. `tools/berglog.py` parses them.
 
-- **Safeboot recovers from an aborted OTA upload** (TM-46): central abort handling with a session generation counter — an upload killed mid-transfer no longer leaves stale session state that turned every retry into HTTP 400. Includes a cross-task race fix in the stall watchdog that could abort healthy uploads. Proven twice on the bench (kill 5 s into the upload → immediate retry completes).
-- **Safeboot WiFi join uses the production join pattern** (TM-48): driver-picked AP selection and PMF-off — the same fix that got the main firmware onto WPA2/WPA3 transition APs.
-- **`tools/webflash.py`** (TM-47): correct T-Deck hardware mapping (`TDECK+`), a safeboot-resume path, and `--self-test`. **`tools/meshlogger.py`** (TM-50): a silence watchdog and keepalives detect a zombie console session after the target node drops off WLAN, instead of sitting mute for hours.
+### T-Deck key auto-repeat (item 175)
 
-The new safeboot ships in this release's `safeboot.bin`/`safeboot-s3.bin` and installs with a full USB flash; OTA only replaces the app image, so an already-installed safeboot stays as it is until the next full flash.
-
-### Following upstream's reverts
-
-Upstream removed the extended Mheard JSON (per-hop link chain, `SRC`/`GW`) and the string build date in the BLE `I` register again. This tree follows: the fields are gone, the `I` register carries `FWVER` alone, and the repairs this fork had shipped for those fields have been removed along with them. What stays is only what repairs live code (bounded HEY ingress, buffer-bounded BLE JSON framing).
+Holding Backspace, Space or an alpha key repeats it (400 ms delay, then every 100 ms) through LVGL's keypad-repeat mechanism, using the keyboard controller's raw-mode live-matrix window for the duration of the hold. Arms only when the raw frame shows the exact matrix cell of the pressed key. Controllers without raw mode (LilyGo firmware before 2025-06-12) keep today's one-character-per-press behaviour; `--info` prints `...KBD raw-mode yes|no|unknown` so a tester can tell which case a unit is.
 
 ## Changelog and engineering rationale
 
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.01.2-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 107–169 for this release (167–169 are new in this cut).
-- **[Engineering write-up / upstream PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.01.2-stability/docs/pr-draft-20260831.md)** — every change with file references, measurements and the reasoning, in the structure the upstream submission will use (German).
+- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/docs/CHANGELOG-stability.md)** — the numbered list, items 170–176 for this release.
+- **[GPS PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/docs/pr-gps-draft-20260902.md)** and **[T-Deck key-repeat PR draft](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/docs/pr-tdeck-keyrepeat-draft-20260902.md)** — file references, measurements and reasoning in the structure the upstream submissions will use (German). The `--setlog` design is in [`docs/setlog-instrumentation-impl-plan-20260902.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/docs/setlog-instrumentation-impl-plan-20260902.md).
+- **[Engineering write-up of the previous campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/docs/pr-draft-20260831.md)** — items 107–169 (back-pressure, WiFi, NTP, OTA), unchanged in this release.
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Built for the field: debug logs from any node
 
 This build deliberately ships the **full serial instrumentation** (`INSTRUMENT_ENABLED=1`, `MC_INJECT_HOOKS=1`), so a node in the field can produce machine-readable debug logs that we can analyze offline afterwards — that is how every finding in this release was measured, and it works the same on your kitchen-shelf gateway:
 
-- Markers are compact `[TAG];key;value` lines: `[WIFI]`, `[ETH]`, `[GW]`, `[UDP]`, `[NTP]`, `[INSTR-LOOP]`, `[SPITRACE]` and more. No marker floods: high-rate candidates are rate-limited or bound to their own switch.
-- Turn on what you need: `--debug on` (verbose), `--udplog on` (gateway UDP in/out), `--loradebug on` (RX/TX, dedup, TX-ring), `--wifistat`, `--ethstat`, `--udpstat`, `--instr`, `--heap`.
-- Capture the USB serial console — or the **network console on TCP port 2323** (ESP32 boards), which serves the same log over WiFi so the node can stay in place: `nc <node-ip> 2323`, or long-term with `tools/meshlogger.py` from this repository.
+- Markers are compact `[TAG];key;value` lines: `[WIFI]`, `[ETH]`, `[GW]`, `[UDP]`, `[NTP]`, `[INSTR-LOOP]`, `[SPITRACE]`, `[KBD]` and more. No marker floods: high-rate candidates are rate-limited or bound to their own switch.
+- Turn on what you need: `--setlog on` (the per-message line set of this release), `--gpsdebug on` (fix/position/reject/convergence every 3 s), `--debug on` (verbose), `--udplog on` (gateway UDP in/out), `--loradebug on` (RX/TX, dedup, TX-ring), `--wifistat`, `--ethstat`, `--udpstat`, `--instr`, `--heap`.
+- Capture the USB serial console — or the **network console on TCP port 2323** (ESP32 boards), which serves the same log over WiFi so the node can stay in place: `nc <node-ip> 2323`, or long-term with `tools/meshlogger.py` from this repository. Note for ESP32-S3 boards on native USB (T-Deck, T-Beam Supreme): output written before the port was opened is dropped after the first ~256 bytes, so a log that appears to start at boot may not — open the terminal first, then reboot.
 - Reproduce without a second station: `--injectmsg`/`--injectpos` push messages into the display pipeline, `--injectraw <hex>` runs a raw frame through the **real** receive path (decode, dedup, mheard, relay), `--loratx <n> <ms>` generates bounded TX bursts. T-Deck additionally: key, trackball and touch injection, `--disptest`, `--spitrace`.
 - Everything is off by default at runtime and can be compiled out entirely. (One exception: the RAM-tightest board, `E22_XML-DevKitC`, ships without the frame-capture ring and the injection hooks — its classic-ESP32 RAM segment cannot fit them. All markers and log switches are still there.)
 
@@ -66,49 +60,56 @@ Each on-air-visible change, stated plainly (details in the changelog):
 10. **A gateway no longer self-uploads its own HEY beacon to the server.** The bare, report-less copy always arrived seconds before the neighbours' enriched copies of the same msg_id and could win over them server-side — the reason a gateway's neighbour data vanished from the server while `--gateway off` showed it. Measured against the server's interlink stream; with the fix, only enriched copies arrive, in both gateway states.
 11. **Queued HEY frames older than 3 minutes are dropped instead of transmitted**: a neighbourhood report that could not get on air for that long has been superseded by fresher copies anyway. Text, position and ACK traffic never ages out. (For log readers: `RING_STATUS queued=` now reports really-occupied slots; the old index-distance value moved to the new `dist=` field.)
 12. **A message the TX queue drops never reaches the backbone**: a gateway uploads a locally typed message to the central server only when the queue accepted it for RF transmission.
-13. **Heltec Wireless Stick V3 positions carry `/B=` again**: with the corrected ADC multiplier (4.13 instead of 4.9245, upstream #1119) the battery reading is back inside the plausibility band, so the node no longer reports "no battery" and omits the tag.
+13. **Heltec Wireless Stick V3 positions carry `/B=` again**: with the corrected ADC multiplier (4.13 instead of 4.9245, upstream #1119) the battery reading is back inside the plausibility band, so the node no longer reports "no battery" and omits the tag. This release adds upstream #1124, which stops the divider probe from misreading the board's permanently connected divider as "no divider".
+14. **Position beacons of a stationary GPS node carry the filtered altitude**, and a spliced or implausible fix (null island, impossible date, altitude outside −500…10000 m) never becomes a beacon or a clock set. In TRACK mode the raw altitude is beaconed as before.
+15. **WX telemetry QNH on nodes with GPS and a pressure sensor** is computed against the converged altitude estimate (and against `--setalt`/`--setpress`), not against the first fix after boot. Expect a one-time QNH step of the size of your first-fix error, and the QNH to appear only after convergence (about 4–5 minutes after the first fix; QFE is shown as QNH until then).
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 489 native test cases green across 12 host environments.
-- **This `.2` cut on hardware**: only the live gateway **Heltec V3 dk5en-98** runs this exact build (OTA-flashed before publishing). The three boards below verified the `v4.35p.09.01-stability` build; the delta to this cut is one state-machine constant plus a Wireless Stick V3 pin constant and build-system changes, all covered by the native suite.
-- **Heltec V3** — WiFi/NTP/battery/OLED changes bench-proven; live gateway (dk5en-98) and bench node (dk5en-93) ran the back-pressure receipt build; overnight field soak clean.
-- **T-Beam v1.2** — WiFi soak (9.1 h, 55/55 reconnects); ran the back-pressure receipt build on the bench.
-- **T-Deck Plus** — full harness regression (boot, display CRC, map, nav, input, heap, trim, touch injection) PASS; the refusal-receipt and text-survival behavior (BP-07/09) verified on the device GUI.
-- **RAK4631 (WisBlock, W5100S Ethernet)** — ETH-01/CTY-01/NTP paths bench-proven; ran the back-pressure receipt build; bench gateway during the campaign.
+- **All 32 release environments build clean**; 568 native test cases green across 12 host environments; 102 tool tests green.
+- **The merged tree itself has only run through the gates.** Every hardware result below is from the pre-merge test build of the GPS and key-repeat branches (`test-helmut-gps-kbd-20260902`, `df9d407e`); the delta to this release is the `--setlog` line set, the T-Deck pin fallback, the `--info` verdict line and upstream #1124.
+- **T-Deck Plus (DK5EN-14, bench)** — GPS run of 6.5 minutes: 128 fixes, 0 rejects, 0 corrupt samples, altitude converged after 256 s (model: 249 s); keyboard raw mode confirmed (`support;1`), hold windows of 0.8–1.2 s for Backspace, Space and `d`, repeated deletion seen on screen.
+- **T-Deck Plus and T-Beam Supreme (OE5HWN, field, one hour each)** — 1214 and 1161 evaluations, 0 rejects, 0 corrupt samples; Supreme converged after 88 samples at 280 m, re-latched at 276 m after a reboot; QNH 1020.2 hPa against Linz airport 1018.5 hPa, the residual consistent with a BMP280 offset, not an altitude error. The OE5HWN T-Deck Plus keyboard controller has no raw mode: it typed one character per press, as designed.
+- **Heltec V3, T-Beam v1.2, RAK4631** — builds only in this cycle; the `--setlog` bench (RAK4631 + Heltec V3, 30 minutes) is still open. Their last bench time was the `v4.35p.09.01` back-pressure campaign.
 
 ### Built and shipped, not on our bench
 
 These boards build cleanly from the same source and inherit every improvement, but had no bench time here:
 
-- T-Beam Supreme (its L76K GPS branch is exercised by no test — our bench GPS modules are u-blox)
+- T-Deck without Plus (the pin fallback build went to OE5HWN's self-wired unit; the result was not in before this cut)
 - E22-DevKitC, E22_1262-DevKitC, E22_1262_S3-DevKitC-1-N16R8, E22_1268_S3-DevKitC-1-N16R8, E22_XML-DevKitC
 - esp32-loraprs-e22, esp32-loraprs-ra01
-- heltec_wifi_lora_32_V2, heltec_wifi_lora_32_V4, heltec_wireless_stick (the ADC fix is OE3LCR's reference measurement, not ours), heltec_wireless_tracker, wireless-paper
+- heltec_wifi_lora_32_V2, heltec_wifi_lora_32_V4, heltec_wireless_stick (both ADC fixes are OE3LCR's reference measurements, not ours), heltec_wireless_tracker, wireless-paper
 - vision-master-e213, vision-master-e290
 - ttgo-lora32-v21, ttgo_tbeam_SX1262, ttgo_tbeam_SX1268, T-Beam-1W
-- T3_S3_V13, t_connect_pro, t_deck, t_deck_pro, T-ETH-ELITE_1262
-- heltec_t114, t_echo
+- T3_S3_V13, t_connect_pro, t_deck_pro, T-ETH-ELITE_1262
+- heltec_t114, t_echo (the nRF52 GPS path evaluates at 1 s; the filter's time-scaled process noise covers it, no nRF52 GPS node was on the bench)
 
 (The T5 e-paper variant is not included: it does not build from the current tree for a pre-existing include-path reason unrelated to these changes.)
 
 ### Known gaps, stated plainly
 
-- **The T-Deck ships with partial refresh (`full_refresh = 0`) plus the flush-fix NOP mitigation** for the shared-SPI-bus lost-flush defect. The clobbered register is now identified (`GPSPI2.clock`, via `--spitrace`); replacing the NOP with a targeted re-arm is a follow-up. Map panning works but is step-wise without a tile cache (0.33–0.79 s per step).
+- **The `--setlog` line set has no hardware run yet.** Formatters and counters are pinned by 23 native cases and the log parser by 39 tool tests; the 30-minute two-node bench from the plan has not been executed.
+- **The GPS two-hour comparison arms (A/B/C) have not been run.** The proof so far is 6.5 minutes on the bench and two one-hour field logs; the claim "no more spliced samples" rests on 2500 evaluations, not on the planned 2-hour arms.
+- **The T-Deck pin fallback is unverified on hardware.** It builds and the scan logic is unchanged apart from the pin variables; the one unit that needs it is in the field.
+- **Key auto-repeat needs a keyboard controller with raw mode** (LilyGo controller firmware from 2025-06-12 on). Older controllers cannot be updated from the main firmware; `--info` shows `KBD raw-mode unknown` after typing on such a unit.
+- **`--wx` still prints `ALT asl: 0 m`** on nodes without a base pressure: pre-existing, untouched. There is no pressure-offset setting comparable to the temperature offset; a BMP280 that reads 1–2 hPa high shows in the QNH.
+- **The T-Deck ships with partial refresh (`full_refresh = 0`) plus the flush-fix NOP mitigation** for the shared-SPI-bus lost-flush defect. The clobbered register is identified (`GPSPI2.clock`, via `--spitrace`); replacing the NOP with a targeted re-arm is a follow-up. Map panning works but is step-wise without a tile cache (0.33–0.79 s per step).
 - **CONF coordinates** from the server are parsed and logged, not applied.
 - The `blelen + 2` length computation in `sendToPhone()` can still wrap on ESP32 for a JSON payload past 253 bytes; no current builder produces one, but the underlying arithmetic is unfixed. The BLE `I` register with six group-call slots filled is still over the frame limit, and the negotiated ATT MTU is never read. All reported upstream.
-- The battery zero point on a real 2S pack, the INA226 branch and L76K GPS remain unverified.
+- The battery zero point on a real 2S pack and the INA226 branch remain unverified. The L76K GPS branch (T-Beam Supreme) has now seen an hour of field data on this release's GPS code.
 - **TM-49 (open):** the safeboot OTA completion handler can read a success status after a disconnect whose final frame never arrived, and switch boot partitions after a partial write — benign on 16-MB boards (slot validation catches it), risky on 4-MB single-slot boards. Until the guard lands: on 4-MB boards prefer USB flashing over OTA when the link is marginal.
-- The back-pressure system is proven native (incl. the end-to-end incident replay and the recorded gateway baseline) and the receipt build ran on all four bench boards plus the live gateway; the queue age-out is field-proven in the overnight soak. The original DJ8MEH field incident itself has not been re-provoked end-to-end on hardware. The new three-own-messages rule for QRS (item 167) has host coverage and runs on the live gateway, but no burst has been driven against it on hardware yet — the field report that triggered it ("QRS on the first message at buffer 5") is the only observation so far.
+- The back-pressure system is proven native and the receipt build ran on all four bench boards plus the live gateway in the previous release; the three-own-messages rule for QRS (item 167) still has no hardware burst against it.
 
 ## Installing
 
-- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.01.2-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
+- **First install / full flash:** flash bootloader, partitions, otadata, safeboot, and firmware at the addresses listed in the [README](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35p.09.02-stability/README.md#flashing-firmware) (`bootloader.bin` for classic ESP32, `bootloader-s3.bin` for ESP32-S3).
 - **Already running MeshCom 4.x with safeboot:** just OTA the `firmware.bin` for your board — via the node's OTA web page, or scripted: `python3 tools/webflash.py <YOUR-CALLSIGN>.local`
 - **RAK4631:** copy the `.uf2` onto the bootloader volume (double-tap reset), or `adafruit-nrfutil --verbose dfu serial --package wiscore_rak4631.zip -p <PORT> --singlebank --touch 1200`
+- **T-Deck without Plus with your own GPS module:** wire the module's TX to GPIO44 and its RX to GPIO43 (the T-Deck Plus assignment). A module wired the 4.35d way still works through the fallback, at the cost of 12 s at boot, and the log asks you to swap.
 
 ## Upstream
 
-Everything here is written up for upstream: the PR draft linked above carries the full submission text. Items 1–103 of the changelog are already in official MeshCom (PRs [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102), [#1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103)). The MeshCom project deserves the finding **and** the fix, not a bug report thrown over the wall.
+Everything here is written up for upstream: the PR drafts linked above carry the submission text. Items 1–103 of the changelog are already in official MeshCom (PRs [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102), [#1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103)). The MeshCom project deserves the finding **and** the fix, not a bug report thrown over the wall.

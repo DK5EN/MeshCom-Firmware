@@ -1,8 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.09.01-stability` (2026-09-01), based on official MeshCom
-4.35p, upstream `dev` at `2cb6bb4d` — the state **after** upstream merged this
-fork's changes, plus items 104-166 below. The full engineering rationale for
+Release: `v4.35p.09.02-stability` (2026-09-02), based on official MeshCom
+4.35p, upstream `dev` at `c6e18940` — the state **after** upstream merged this
+fork's changes, plus items 104-176 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -75,7 +75,19 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased (since v4.35p.09.01.2-stability)
+## New in v4.35p.09.02-stability
+
+Three field-driven subsystems landed from parallel worktrees and were merged
+in this order: the `--setlog on` line set that answers the OE3 mountain-gateway
+questions (173), the GPS altitude/QNH path with its plausibility gate, Kalman
+altitude, QNH re-latch and the T-Deck pin fallback (174), and T-Deck key
+auto-repeat with the raw-mode verdict in `--info` (175). Items 170-172 are the
+Code Quality 2.0 work and the two sites its detectors found. `FLASH_VERSION`
+moves to `20260902`. Native suite 568 test cases across 12 host environments,
+102 tool tests. Bench this cycle: T-Deck Plus (GPS run, key repeat) on the
+pre-merge test build; field: OE5HWN's T-Deck Plus and T-Beam Supreme, one hour
+of GPS each on the same test build. The merged tree itself has only run through
+the gates.
 
 170. **Code Quality 2.0: the error patterns of the last two weeks, with detectors.**
      `docs/code-quality-2.0.md` distils 49 coding sessions (2026-08-27 to
@@ -184,6 +196,12 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      Because the probe line is capped at five presses per boot, `--info` now
      prints `...KBD raw-mode yes|no|unknown ...KEYLOCK on|off` on T-Deck builds
      (`docs/tdeck-keyrepeat-impl-plan-20260902.md` §3.6).
+176. **Upstream `dev` sync (#1124, OE3LCR): the battery divider probe
+     recognises a permanently connected divider.** On the Heltec Wireless
+     Stick V3 the ADC control pin does nothing; both probe readings are
+     plausible and nearly equal, which the probe used to read as "no
+     divider" and drop `/B=`. Such a pair now counts as battery hardware
+     present, polarity irrelevant. Two files, no fork-side change.
 
 ## New in v4.35p.09.01.2-stability
 
