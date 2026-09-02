@@ -90,6 +90,12 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 SCRIPT: Path = REPO_ROOT / "tools" / "berglog.py"
 FIXTURE_A: Path = REPO_ROOT / "tools" / "testdata" / "berglog_sample_a.txt"
 FIXTURE_B: Path = REPO_ROOT / "tools" / "testdata" / "berglog_sample_b.txt"
+FIXTURE_SETLOG_A: Path = (
+    REPO_ROOT / "tools" / "testdata" / "berglog_sample_setlog_a.txt"
+)
+FIXTURE_SETLOG_B: Path = (
+    REPO_ROOT / "tools" / "testdata" / "berglog_sample_setlog_b.txt"
+)
 
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 import berglog  # noqa: E402  (path is set up above)
@@ -208,9 +214,13 @@ class TestBerglog(unittest.TestCase):
         for label, (rx, undecodable, uniq) in expected.items():
             node = self._node(label)
             self.assertEqual(len(node.receptions), rx, msg=f"{label}: receptions")
-            self.assertEqual(len(node.undecodable), undecodable, msg=f"{label}: decode failures")
             self.assertEqual(
-                len({r.msg_id for r in node.receptions}), uniq, msg=f"{label}: unique msg_ids"
+                len(node.undecodable), undecodable, msg=f"{label}: decode failures"
+            )
+            self.assertEqual(
+                len({r.msg_id for r in node.receptions}),
+                uniq,
+                msg=f"{label}: unique msg_ids",
             )
 
     def test_fcs0000_lines_are_excluded_from_messages(self) -> None:
@@ -240,7 +250,10 @@ class TestBerglog(unittest.TestCase):
         )
 
     def test_message_type_split(self) -> None:
-        expected = {LABEL_A: {":": 9, "@": 3, "!": 2}, LABEL_B: {":": 6, "@": 2, "!": 1}}
+        expected = {
+            LABEL_A: {":": 9, "@": 3, "!": 2},
+            LABEL_B: {":": 6, "@": 2, "!": 1},
+        }
         for label, per_type in expected.items():
             node = self._node(label)
             got = {t: sum(1 for r in node.receptions if r.ptype == t) for t in ":@!"}
@@ -255,7 +268,9 @@ class TestBerglog(unittest.TestCase):
             ["OE0EEE-5", "OE0FFF-6", "OE0GGG-7", "OE0HHH-8", "OE0BBB-2"],
             msg="the 4-hop path must be split into its five callsigns",
         )
-        self.assertEqual(deep[0].dest, "H", msg="HEY destination of a non-gateway originator")
+        self.assertEqual(
+            deep[0].dest, "H", msg="HEY destination of a non-gateway originator"
+        )
 
     # ------------------------------------------------------------------
     # Cross-node view: one msg_id must be heard by both logs.
@@ -273,7 +288,9 @@ class TestBerglog(unittest.TestCase):
     def test_shared_msg_id_is_heard_by_both(self) -> None:
         ids_a = {r.msg_id for r in self._node(LABEL_A).receptions}
         ids_b = {r.msg_id for r in self._node(LABEL_B).receptions}
-        self.assertIn("11110001", ids_a & ids_b, msg="the text message must be in both logs")
+        self.assertIn(
+            "11110001", ids_a & ids_b, msg="the text message must be in both logs"
+        )
 
     # ------------------------------------------------------------------
     # Hop-counter wrap: max_hop is a 4-bit field, so H == 15 on a relayed
@@ -333,9 +350,15 @@ class TestBerglog(unittest.TestCase):
 
     def test_time_signal_beacons(self) -> None:
         ts = self.res["09_time_signal"]
-        self.assertEqual(ts["union_beacons"], 2, msg="two distinct {CET} beacons in the fixtures")
-        self.assertEqual(ts["per_node"][LABEL_A]["missed_count"], 0, msg="A heard both beacons")
-        self.assertEqual(ts["per_node"][LABEL_B]["missed_count"], 1, msg="B missed the second beacon")
+        self.assertEqual(
+            ts["union_beacons"], 2, msg="two distinct {CET} beacons in the fixtures"
+        )
+        self.assertEqual(
+            ts["per_node"][LABEL_A]["missed_count"], 0, msg="A heard both beacons"
+        )
+        self.assertEqual(
+            ts["per_node"][LABEL_B]["missed_count"], 1, msg="B missed the second beacon"
+        )
 
     # ------------------------------------------------------------------
     # Every percentage table must sum to 100 +- 0.5 (rounding slack only).
@@ -373,7 +396,9 @@ class TestBerglog(unittest.TestCase):
 
     def test_originator_firmware_is_learned_from_path0_only(self) -> None:
         fw = berglog.originator_firmware(self.nodes)
-        self.assertEqual(fw["OE0EEE-5"]["fw"], "35:k", msg="OE0EEE-5 originates the 4-hop HEY")
+        self.assertEqual(
+            fw["OE0EEE-5"]["fw"], "35:k", msg="OE0EEE-5 originates the 4-hop HEY"
+        )
         self.assertFalse(
             fw["OE0EEE-5"]["fw_cad"],
             msg="35:k predates CAD -- this is what keeps the pre-CAD bucket non-empty",
@@ -389,7 +414,9 @@ class TestBerglog(unittest.TestCase):
         block = self.res["24_relayer_firmware"]["per_node"]
         expected = {LABEL_A: (11, 3), LABEL_B: (7, 2)}
         for label, (relayed, direct) in expected.items():
-            self.assertEqual(block[label]["relayed_copies"], relayed, msg=f"{label}: relayed copies")
+            self.assertEqual(
+                block[label]["relayed_copies"], relayed, msg=f"{label}: relayed copies"
+            )
             self.assertEqual(
                 block[label]["direct_copies"],
                 direct,
@@ -409,7 +436,9 @@ class TestBerglog(unittest.TestCase):
         }
         for label, buckets in expected.items():
             got = {b: v["copies"] for b, v in block[label]["summary"].items()}
-            self.assertEqual(got, buckets, msg=f"{label}: relayed copies per firmware bucket")
+            self.assertEqual(
+                got, buckets, msg=f"{label}: relayed copies per firmware bucket"
+            )
         pooled = self.res["24_relayer_firmware"]["pooled"]["summary"]
         self.assertEqual(
             {b: v["copies"] for b, v in pooled.items()},
@@ -425,7 +454,9 @@ class TestBerglog(unittest.TestCase):
         }
         for label, (relayed, direct, buckets) in expected.items():
             fc = block[label]["first_copy"]
-            self.assertEqual(fc["first_copy_relayed"], relayed, msg=f"{label}: relayed first copies")
+            self.assertEqual(
+                fc["first_copy_relayed"], relayed, msg=f"{label}: relayed first copies"
+            )
             self.assertEqual(
                 fc["first_copy_direct_from_originator"],
                 direct,
@@ -442,7 +473,10 @@ class TestBerglog(unittest.TestCase):
         for label, block in rf["per_node"].items():
             for key in ("pct_sum", "pct_sum_airtime"):
                 self.assertAlmostEqual(
-                    block[key], 100.0, delta=0.5, msg=f"24[{label}].{key} = {block[key]}"
+                    block[key],
+                    100.0,
+                    delta=0.5,
+                    msg=f"24[{label}].{key} = {block[key]}",
                 )
             if block["first_copy"]["first_copy_relayed"]:
                 self.assertAlmostEqual(
@@ -474,7 +508,10 @@ class TestBerglog(unittest.TestCase):
         self.assertIn(pre["OE0EEE-5"]["dominates"], (LABEL_A, LABEL_B))
 
     def test_originator_vs_relayer_view(self) -> None:
-        rows = {r["log"]: r for r in self.res["24_relayer_firmware"]["originator_vs_relayer"]}
+        rows = {
+            r["log"]: r
+            for r in self.res["24_relayer_firmware"]["originator_vs_relayer"]
+        }
         self.assertEqual(sorted(rows), [LABEL_A, LABEL_B])
         for label, row in rows.items():
             block = self.res["24_relayer_firmware"]["per_node"][label]
@@ -498,7 +535,14 @@ class TestBerglog(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(FIXTURE_A), str(FIXTURE_B), "--out", str(out)],
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(FIXTURE_A),
+                    str(FIXTURE_B),
+                    "--out",
+                    str(out),
+                ],
                 capture_output=True,
                 text=True,
                 cwd=str(REPO_ROOT),
@@ -519,17 +563,464 @@ class TestBerglog(unittest.TestCase):
                 "OE0AAA-1",
                 msg="the CLI run must derive the same own call as the in-process run",
             )
-            self.assertEqual(data["07_cross_node"]["union_msg_ids"], 12, msg="union in the CLI output")
+            self.assertEqual(
+                data["07_cross_node"]["union_msg_ids"],
+                12,
+                msg="union in the CLI output",
+            )
 
             checks = data["_verification"]
             self.assertTrue(checks, msg="the verification block must not be empty")
             failed = [c["check"] for c in checks if not c["match"]]
-            self.assertEqual(failed, [], msg=f"shell cross-checks disagreed with the analyser: {failed}")
+            self.assertEqual(
+                failed,
+                [],
+                msg=f"shell cross-checks disagreed with the analyser: {failed}",
+            )
 
             md = md_path.read_text(encoding="utf-8")
-            self.assertNotIn("MISMATCH", md, msg="berg.md reports a failed verification row")
-            for heading in ("## 1. Overview per log", "## 22. Hop-counter wrap culprits"):
-                self.assertIn(heading, md, msg=f"berg.md is missing the section {heading!r}")
+            self.assertNotIn(
+                "MISMATCH", md, msg="berg.md reports a failed verification row"
+            )
+            for heading in (
+                "## 1. Overview per log",
+                "## 22. Hop-counter wrap culprits",
+            ):
+                self.assertIn(
+                    heading, md, msg=f"berg.md is missing the section {heading!r}"
+                )
+
+
+class TestBerglogSetlog(unittest.TestCase):
+    """Regression tests for SL-07 -- the `--setlog` SL-01..SL-06 instrumentation.
+
+    Fixture specification
+    ----------------------
+    ``berglog_sample_setlog_a.txt`` -- node OE0SLA-20, 30 lines, one of every new
+    line kind plus a deliberate mix of RX lines with and without the SL-01 tail
+    (``RSSI:``/``SNR:``/``DUP:``/``OWN:``/``t=``)::
+
+        msg_id    kind      note
+        20000001  RX (old)  direct from OE0SLB-21, no tail
+        20000001  RX (new)  2nd copy via OE0SLB-21,OE0SLC-22, RSSI:-95 SNR:6 DUP:d OWN:-
+        20000001  RX (new)  3rd copy, own-relay echo (OE0SLA-20 mid-path), DUP:d OWN:e
+        20000002  RX (new)  position, DUP:n
+        20000003  RX (old)  direct from OE0SLD-23, no tail
+        20000008  RX (new)  HEY, RSSI:-102 SNR:-2 (far/weak -> feeds the noise floor)
+        20000009  RX (new)  text, RSSI:-130 SNR:-25 (far/weak -> feeds the noise floor)
+        00000000  RX        FCS:0000 decode failure (unaffected by SL-01..06)
+
+        => 7 receptions (5 with the SL-01 tail, 2 without), 1 decode failure,
+           5 unique msg_ids, 2 copies (msg_id 20000001 seen 3x), matching the
+           2 receptions whose DUP: field reads 'd'.
+
+        RLY x6: reason tx x3 (types :, !, @), loop x1, nomesh x1, gwfilter x1
+        TX  x5: prio 1 (n1, wait 800), prio 2 (n3, waits 1200/1400/1600),
+                prio 3 (n1, wait 2200); src o (n1, 800), src r (n3, 1200/1400/2200),
+                src g (n1, 1600)
+        ERR x3: rssi/snr/len/ferr vary, duration_s 599.9 (00:00:00.100..00:10:00.000)
+        STAT x2: newid 40 then 55, heap 152000 -> 149500, fw 35p/20260201
+        GWI x2 (msg_id 20000010, 20000011), GWU x2
+
+    ``berglog_sample_setlog_b.txt`` -- node OE0SLM-30, 16 lines, sharing msg_id
+    20000001 (RX) and 20000010 (GWI) with fixture A::
+
+        msg_id    kind      note
+        20000001  RX (old)  direct-ish from OE0SLB-21, no tail (shared with A)
+        20000001  RX (new)  2nd copy, RSSI:-99 SNR:4 DUP:d
+        20000020  RX (new)  position, RSSI:-75 SNR:10 DUP:n
+
+        => 3 receptions (2 tailed), 2 unique msg_ids, 1 copy (matches DUP:d count 1)
+
+        RLY x2: tx x1, self x1
+        TX  x2: prio 1 (src r, wait 900), prio 2 (src o, wait 2100)
+        ERR x2, duration_s 599.85 (00:00:00.150..00:10:00.000)
+        STAT x2: newid 22 then 30, heap 160000 -> 158000
+        GWI x2: msg_id 20000010 (SHARED with A -- the gateway-multiplier case),
+                msg_id 20000012 (unique to B)
+
+        => gateway multiplier: msg_id 20000010 has 2 distinct GWI nodes (A, B);
+           20000011 and 20000012 have 1 each; mean 4/3 = 1.33.
+
+    Every number below is derived from that specification by hand (the same
+    arithmetic ``a25_setlog()`` performs), not by running the analyser first.
+    """
+
+    nodes: list[berglog.NodeLog] = []
+    a: berglog.NodeLog
+    b: berglog.NodeLog
+    res25: dict[str, Any] = {}
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.nodes = berglog.parse_logs([FIXTURE_SETLOG_A, FIXTURE_SETLOG_B])
+        cls.a = cls.nodes[0]
+        cls.b = cls.nodes[1]
+        cls.res25 = berglog.a25_setlog(cls.nodes, dedup_ring=100)
+
+    # ------------------------------------------------------------------
+    # Labels: both fixture stems start with "berglog", so the short label
+    # collides and both fall back to their full stem -- proves the existing
+    # clash-detection in assign_labels() also covers the new fixture pair.
+    # ------------------------------------------------------------------
+
+    def test_labels_fall_back_to_full_stem_on_clash(self) -> None:
+        self.assertEqual(
+            [n.label for n in self.nodes],
+            ["berglog_sample_setlog_a", "berglog_sample_setlog_b"],
+        )
+
+    # ------------------------------------------------------------------
+    # SL-01 backward compatibility: an RX line without the tail must parse
+    # exactly like before (rssi/snr/dup/own_echo/t_ms all None), and a mixed
+    # fixture of old- and new-style lines must give the SAME reception count
+    # a purely-old fixture would -- the tail is optional, not required.
+    # ------------------------------------------------------------------
+
+    def test_mixed_old_new_rx_lines_give_same_reception_count(self) -> None:
+        # 7 receptions total at A: 2 old-style (no tail) + 5 new-style (tail).
+        self.assertEqual(len(self.a.receptions), 7)
+        self.assertEqual(len(self.a.undecodable), 1)
+        tailed = [r for r in self.a.receptions if r.has_rx_tail]
+        untailed = [r for r in self.a.receptions if not r.has_rx_tail]
+        self.assertEqual(len(tailed), 5)
+        self.assertEqual(len(untailed), 2)
+        # every reception counts once regardless of which style produced it
+        self.assertEqual(len(tailed) + len(untailed), len(self.a.receptions))
+        # at B: 1 old-style + 2 new-style = 3
+        self.assertEqual(len(self.b.receptions), 3)
+        b_tailed = [r for r in self.b.receptions if r.has_rx_tail]
+        self.assertEqual(len(b_tailed), 2)
+
+    def test_old_style_rx_line_has_no_tail_fields(self) -> None:
+        old = [
+            r for r in self.a.receptions if r.msg_id == "20000001" and not r.has_rx_tail
+        ]
+        self.assertEqual(len(old), 1, msg="exactly one old-style copy of 20000001 at A")
+        r = old[0]
+        self.assertIsNone(r.rssi)
+        self.assertIsNone(r.snr)
+        self.assertIsNone(r.dup)
+        self.assertIsNone(r.own_echo)
+        self.assertIsNone(r.t_ms)
+
+    def test_new_style_rx_line_carries_dup_and_own_echo(self) -> None:
+        copies = sorted(
+            (r for r in self.a.receptions if r.msg_id == "20000001" and r.has_rx_tail),
+            key=lambda r: r.host,
+        )
+        self.assertEqual(len(copies), 2)
+        second, third = copies
+        self.assertEqual(
+            (second.rssi, second.snr, second.dup, second.own_echo),
+            (-95, 6, True, False),
+        )
+        self.assertEqual(
+            (third.rssi, third.snr, third.dup, third.own_echo), (-88, 9, True, True)
+        )
+
+    # ------------------------------------------------------------------
+    # a25_setlog: RSSI/SNR distribution and noise-floor estimate.
+    # ------------------------------------------------------------------
+
+    def test_rssi_snr_distribution(self) -> None:
+        rs = self.res25["per_node"]["berglog_sample_setlog_a"]["rssi_snr"]
+        self.assertEqual(rs["n"], 5)
+        self.assertEqual(rs["rssi_dbm"]["min"], -130.0)
+        self.assertEqual(rs["rssi_dbm"]["max"], -70.0)
+        self.assertEqual(rs["rssi_dbm"]["median"], -95.0)
+        self.assertAlmostEqual(rs["rssi_dbm"]["mean"], -97.0)
+        self.assertEqual(rs["snr_db"]["min"], -25.0)
+        self.assertEqual(rs["snr_db"]["max"], 11.0)
+        self.assertEqual(rs["snr_db"]["median"], 6.0)
+        # noise floor: two tailed receptions have SNR < 0 (-2 and -25), giving
+        # RSSI-SNR of -100 and -105 -- median -102.5
+        self.assertEqual(rs["noise_floor_estimate_dbm"], -102.5)
+        self.assertIn("SNR < 0", rs["noise_floor_method"])
+
+    def test_noise_floor_falls_back_when_no_snr_below_zero(self) -> None:
+        # B's two tailed receptions have SNR 4 and 10 -- neither is < 0, so the
+        # estimate must fall back to "all receptions" and say so.
+        rs = self.res25["per_node"]["berglog_sample_setlog_b"]["rssi_snr"]
+        self.assertEqual(rs["noise_floor_estimate_dbm"], -94.0)
+        self.assertIn("no SNR < 0", rs["noise_floor_method"])
+
+    # ------------------------------------------------------------------
+    # Copies vs DUP:d cross-check: the two independent methods must agree on
+    # these fixtures (both count 2 at A, 1 at B).
+    # ------------------------------------------------------------------
+
+    def test_copies_vs_dup_cross_check(self) -> None:
+        for label, expected in (
+            ("berglog_sample_setlog_a", 2),
+            ("berglog_sample_setlog_b", 1),
+        ):
+            cd = self.res25["per_node"][label]["copies_vs_dup"]
+            self.assertEqual(cd["dup_field_count"], expected, msg=label)
+            self.assertEqual(cd["copy_count_old_method"], expected, msg=label)
+
+    # ------------------------------------------------------------------
+    # SL-02 relay-reason histogram.
+    # ------------------------------------------------------------------
+
+    def test_relay_reason_histogram(self) -> None:
+        rr = self.res25["per_node"]["berglog_sample_setlog_a"]["relay_reasons"]
+        self.assertEqual(rr["total"], 6)
+        self.assertEqual(
+            rr["by_reason"], {"tx": 3, "loop": 1, "nomesh": 1, "gwfilter": 1}
+        )
+        self.assertEqual(
+            rr["by_reason_and_type"],
+            {
+                "tx/:": 1,
+                "tx/!": 1,
+                "tx/@": 1,
+                "loop/:": 1,
+                "nomesh/:": 1,
+                "gwfilter/:": 1,
+            },
+        )
+        rr_b = self.res25["per_node"]["berglog_sample_setlog_b"]["relay_reasons"]
+        self.assertEqual(rr_b["by_reason"], {"tx": 1, "self": 1})
+
+    # ------------------------------------------------------------------
+    # SL-03 TX wait-time distribution per prio and per src.
+    # ------------------------------------------------------------------
+
+    def test_tx_wait_by_prio(self) -> None:
+        tw = self.res25["per_node"]["berglog_sample_setlog_a"]["tx_wait"]
+        self.assertEqual(tw["total"], 5)
+        self.assertEqual(
+            tw["by_prio"]["1"],
+            {"n": 1, "median_ms": 800.0, "p90_ms": 800.0, "max_ms": 800},
+        )
+        self.assertEqual(
+            tw["by_prio"]["2"],
+            {"n": 3, "median_ms": 1400.0, "p90_ms": 1560.0, "max_ms": 1600},
+        )
+        self.assertEqual(
+            tw["by_prio"]["3"],
+            {"n": 1, "median_ms": 2200.0, "p90_ms": 2200.0, "max_ms": 2200},
+        )
+
+    def test_tx_wait_by_src(self) -> None:
+        tw = self.res25["per_node"]["berglog_sample_setlog_a"]["tx_wait"]
+        self.assertEqual(
+            tw["by_src"]["o"],
+            {"n": 1, "median_ms": 800.0, "p90_ms": 800.0, "max_ms": 800},
+        )
+        self.assertEqual(
+            tw["by_src"]["r"],
+            {"n": 3, "median_ms": 1400.0, "p90_ms": 2040.0, "max_ms": 2200},
+        )
+        self.assertEqual(
+            tw["by_src"]["g"],
+            {"n": 1, "median_ms": 1600.0, "p90_ms": 1600.0, "max_ms": 1600},
+        )
+
+    # ------------------------------------------------------------------
+    # SL-04 collision rate.
+    # ------------------------------------------------------------------
+
+    def test_collision_rate(self) -> None:
+        co = self.res25["per_node"]["berglog_sample_setlog_a"]["collision"]
+        self.assertEqual(co["err_count"], 3)
+        # duration_s = 599.9 s (00:00:00.100 .. 00:10:00.000);
+        # 3 / (599.9/3600) = 18.003 -> 18.0
+        self.assertAlmostEqual(co["err_per_hour"], 18.0, places=1)
+        # 3 ERR / (3 ERR + 7 RX) = 30 %
+        self.assertEqual(co["err_pct_of_rx_plus_err"], 30.0)
+
+        co_b = self.res25["per_node"]["berglog_sample_setlog_b"]["collision"]
+        self.assertEqual(co_b["err_count"], 2)
+        self.assertEqual(co_b["err_pct_of_rx_plus_err"], 40.0)  # 2 / (2 + 3)
+
+    # ------------------------------------------------------------------
+    # SL-05: channel util per 5 min, heap trend, fw, dedup window.
+    # ------------------------------------------------------------------
+
+    def test_channel_util_rows(self) -> None:
+        cu = self.res25["per_node"]["berglog_sample_setlog_a"]["channel_util_5min"]
+        self.assertEqual(
+            cu,
+            [
+                {
+                    "host": "2026-02-01 00:05:00.000",
+                    "util_pct": 12,
+                    "rx_ms": 15000,
+                    "tx_ms": 3000,
+                },
+                {
+                    "host": "2026-02-01 00:10:00.000",
+                    "util_pct": 15,
+                    "rx_ms": 18000,
+                    "tx_ms": 4200,
+                },
+            ],
+        )
+
+    def test_heap_trend_and_fw(self) -> None:
+        ht = self.res25["per_node"]["berglog_sample_setlog_a"]["heap_trend"]
+        self.assertEqual(
+            ht, {"first": 152000, "min": 149500, "last": 149500, "n_stat_lines": 2}
+        )
+        self.assertEqual(
+            self.res25["per_node"]["berglog_sample_setlog_a"]["fw"], "35p/20260201"
+        )
+
+    def test_dedup_window_estimate(self) -> None:
+        # newid 40 -> 100 * 300 / 40 = 750.0 s; newid 55 -> 100 * 300 / 55 = 545.5 s;
+        # median of the two unrounded values = 647.7 s
+        dw = self.res25["per_node"]["berglog_sample_setlog_a"]["dedup_window"]
+        self.assertEqual(dw["dedup_ring_assumed"], 100)
+        self.assertEqual(dw["window_s_per_interval"], [750.0, 545.5])
+        self.assertAlmostEqual(dw["window_s_median"], 647.7, places=1)
+
+        # A different --dedup-ring must scale the window linearly (board-dependent).
+        res_ring50 = berglog.a25_setlog(self.nodes, dedup_ring=50)
+        dw50 = res_ring50["per_node"]["berglog_sample_setlog_a"]["dedup_window"]
+        self.assertAlmostEqual(
+            dw50["window_s_median"], dw["window_s_median"] / 2.0, places=1
+        )
+
+    # ------------------------------------------------------------------
+    # SL-06: gateway multiplier across the two node logs.
+    # ------------------------------------------------------------------
+
+    def test_gateway_multiplier_across_nodes(self) -> None:
+        self.assertEqual(
+            self.res25["per_node"]["berglog_sample_setlog_a"]["gwu_count"], 2
+        )
+        self.assertEqual(
+            self.res25["per_node"]["berglog_sample_setlog_b"]["gwu_count"], 2
+        )
+
+        gm = self.res25["gateway_multiplier"]
+        rows = {r["msg_id"]: r for r in gm["rows"]}
+        self.assertEqual(
+            rows["20000010"],
+            {
+                "msg_id": "20000010",
+                "gwi_count": 2,
+                "gwi_nodes": 2,
+                "nodes": ["berglog_sample_setlog_a", "berglog_sample_setlog_b"],
+            },
+            msg="msg_id 20000010 was independently injected by both A and B",
+        )
+        self.assertEqual(rows["20000011"]["gwi_nodes"], 1)
+        self.assertEqual(rows["20000011"]["nodes"], ["berglog_sample_setlog_a"])
+        self.assertEqual(rows["20000012"]["gwi_nodes"], 1)
+        self.assertEqual(rows["20000012"]["nodes"], ["berglog_sample_setlog_b"])
+        # mean over [2, 1, 1]
+        self.assertAlmostEqual(gm["mean_gwi_nodes_per_msgid"], 4.0 / 3.0, places=2)
+
+    # ------------------------------------------------------------------
+    # Firmware without SL-01..06 must report the capability gap, never a
+    # misleading zero -- checked against the OLD fixtures (no [LOG] tail,
+    # no RLY/TX/ERR/STAT/GWI/GWU lines at all).
+    # ------------------------------------------------------------------
+
+    def test_pre_setlog_firmware_reports_not_in_firmware(self) -> None:
+        old_nodes = berglog.parse_logs([FIXTURE_A, FIXTURE_B])
+        res = berglog.a25_setlog(old_nodes, dedup_ring=100)
+        for label, block in res["per_node"].items():
+            for key in (
+                "rssi_snr",
+                "copies_vs_dup",
+                "relay_reasons",
+                "tx_wait",
+                "collision",
+                "channel_util_5min",
+                "heap_trend",
+                "fw",
+                "dedup_window",
+                "gwu_count",
+            ):
+                self.assertEqual(
+                    block[key],
+                    berglog.NOT_IN_FIRMWARE,
+                    msg=f"{label}.{key} must report the capability gap",
+                )
+        self.assertEqual(res["gateway_multiplier"], berglog.NOT_IN_FIRMWARE)
+
+    # ------------------------------------------------------------------
+    # End to end: the CLI must write section 25 into berg.md and every
+    # verify() cross-check (including the ones this fixture pair exercises
+    # differently -- unique msg_ids and redundant receptions, now that RLY/TX/
+    # GWI/GWU lines also carry an "x<8 hex>" id that must NOT be counted as an
+    # RX msg_id) must still agree with the shell pipelines.
+    # ------------------------------------------------------------------
+
+    def test_cli_writes_section_25_and_verification_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(FIXTURE_SETLOG_A),
+                    str(FIXTURE_SETLOG_B),
+                    "--out",
+                    str(out),
+                ],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO_ROOT),
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"CLI exited {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+            )
+            data = json.loads((out / "berg.json").read_text(encoding="utf-8"))
+            checks = data["_verification"]
+            self.assertTrue(checks)
+            failed = [c["check"] for c in checks if not c["match"]]
+            self.assertEqual(
+                failed,
+                [],
+                msg=f"shell cross-checks disagreed with the analyser: {failed}",
+            )
+            self.assertEqual(
+                data["07_cross_node"]["union_msg_ids"],
+                6,
+                msg="RX msg_ids only: {20000001,2,3,8,9} from A union {20000001,20000020} from B",
+            )
+
+            md = (out / "berg.md").read_text(encoding="utf-8")
+            self.assertIn("## 25. setlog instrumentation (SL-01..SL-06)", md)
+            self.assertIn("Gateway multiplier", md)
+            self.assertNotIn("MISMATCH", md)
+
+    def test_cli_with_explicit_dedup_ring_option(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(FIXTURE_SETLOG_A),
+                    "--out",
+                    str(out),
+                    "--dedup-ring",
+                    "200",
+                ],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO_ROOT),
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+            )
+            data = json.loads((out / "berg.json").read_text(encoding="utf-8"))
+            # a single log has no label clash, so assign_labels() keeps the
+            # short "berglog" label instead of falling back to the full stem.
+            dw = data["25_setlog"]["per_node"]["berglog"]["dedup_window"]
+            self.assertEqual(dw["dedup_ring_assumed"], 200)
+            # doubling the assumed ring size must double the window estimate
+            self.assertAlmostEqual(dw["window_s_median"], 647.7 * 2, places=0)
 
 
 if __name__ == "__main__":

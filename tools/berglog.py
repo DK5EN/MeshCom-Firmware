@@ -188,7 +188,9 @@ HARDWARE_TYPES: dict[int, str] = {
 }
 
 #: Firmware sub-version letters that already carry CSMA/CAD.
-CAD_FW_LETTERS: frozenset[str] = frozenset({"p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"})
+CAD_FW_LETTERS: frozenset[str] = frozenset(
+    {"p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
+)
 
 #: Callsigns of the Internet-injected server time signal.
 TIME_SIGNAL_CALLS: frozenset[str] = frozenset({"OE1XAR-33", "OE1XAR-62"})
@@ -208,30 +210,84 @@ BUCKET_MINUTES = 10
 # Regular expressions
 # --------------------------------------------------------------------------
 
-RE_PREFIX = re.compile(r"^(?P<host>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s\s(?P<rest>.*)$")
+RE_PREFIX = re.compile(
+    r"^(?P<host>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s\s(?P<rest>.*)$"
+)
+
+#: SL-01 -- optional tail appended to the RX line and both ACK lines by
+#: setlogFormatRxTail() (src/setlog_lines.cpp) under ``--setlog on``. Absent on
+#: older firmware, in which case the named groups all come back ``None`` --
+#: every caller must treat that as "not in this firmware", never as a parse
+#: failure.
+_RX_TAIL = (
+    r"(?: RSSI:(?P<rssi>-?\d+) SNR:(?P<snr>-?\d+) DUP:(?P<dup>[nd]) "
+    r"OWN:(?P<own>[-e]) t=(?P<tms>\d+))?"
+)
 
 RE_APRS = re.compile(
     r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] (?P<len>\d{3}) (?P<type>.) "
     r"x(?P<msgid>[0-9A-Fa-f]{8}) H(?P<hop>[0-9A-Fa-f]{2}) S(?P<s>\d) T(?P<t>\d) M(?P<m>[0-9A-Fa-f]{2}) "
     r"(?P<body>.*) HW:(?P<hw>\d+) MOD:(?P<modc>[0-9A-Fa-f])/(?P<modm>\d) "
-    r"FCS:(?P<fcs>[0-9A-Fa-f]{4}) FW:(?P<fwmaj>\d+):(?P<fwsub>.) LH:(?P<lh>[0-9A-Fa-f]{2})$"
+    r"FCS:(?P<fcs>[0-9A-Fa-f]{4}) FW:(?P<fwmaj>\d+):(?P<fwsub>.) LH:(?P<lh>[0-9A-Fa-f]{2})"
+    + _RX_TAIL
+    + r"$"
 )
 
 RE_ACK7 = re.compile(
     r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] 007 (?P<type>.) x(?P<msgid>[0-9A-Fa-f]{8}) "
-    r"H(?P<hop>[0-9A-Fa-f]{2}) (?P<b6>[0-9A-Fa-f]{2})$"
+    r"H(?P<hop>[0-9A-Fa-f]{2}) (?P<b6>[0-9A-Fa-f]{2})" + _RX_TAIL + r"$"
 )
 RE_ACK12 = re.compile(
     r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] 012 (?P<type>.) x(?P<msgid>[0-9A-Fa-f]{8}) "
-    r"H(?P<hop>[0-9A-Fa-f]{2}) x(?P<msgid2>[0-9A-Fa-f]{8}) (?P<b10>[0-9A-Fa-f]{2}) (?P<b11>[0-9A-Fa-f]{2})$"
+    r"H(?P<hop>[0-9A-Fa-f]{2}) x(?P<msgid2>[0-9A-Fa-f]{8}) (?P<b10>[0-9A-Fa-f]{2}) (?P<b11>[0-9A-Fa-f]{2})"
+    + _RX_TAIL
+    + r"$"
+)
+
+#: SL-02..SL-06 -- the six new ``[LOG]`` line kinds, formatted by
+#: src/setlog_lines.cpp (setlogFormatRly/Tx/Err/Stat/Gwi/Gwu). Each is its own
+#: keyword right after ``[LOG] ``, so dispatch is a plain regex ladder like
+#: the RX/ACK lines above.
+RE_RLY = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] RLY x(?P<msgid>[0-9A-Fa-f]{8}) (?P<type>\S) "
+    r"H(?P<hop>[0-9A-Fa-f]{2}) q=(?P<reason>\S+) prio=(?P<prio>-?\d+) slot=(?P<slot>-?\d+)$"
+)
+RE_TX = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] TX x(?P<msgid>[0-9A-Fa-f]{8}) (?P<type>\S) "
+    r"H(?P<hop>[0-9A-Fa-f]{2}) prio=(?P<prio>\d+) src=(?P<src>[org]) wait=(?P<wait>\d+) "
+    r"q=(?P<q>\d+) cad=(?P<cad>\d+) len=(?P<len>\d+) t=(?P<t>\d+)$"
+)
+RE_ERR = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] ERR rssi=(?P<rssi>-?\d+) snr=(?P<snr>-?\d+) "
+    r"len=(?P<len>\d+) ferr=(?P<ferr>-?\d+) t=(?P<t>\d+)$"
+)
+RE_STAT = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] STAT util=(?P<util>\d+) rx=(?P<rx>\d+) tx=(?P<tx>\d+) "
+    r"newid=(?P<newid>\d+) dup=(?P<dup>\d+) err=(?P<err>\d+) txn=(?P<txn>\d+) txfail=(?P<txfail>\d+) "
+    r"ringmax=(?P<ringmax>\d+)/(?P<ringsize>\d+) "
+    r"drop=(?P<d1>\d+)/(?P<d2>\d+)/(?P<d3>\d+)/(?P<d4>\d+)/(?P<d5>\d+) "
+    r"mh=(?P<mh>\d+) heap=(?P<heap>\d+) trk=(?P<trk>\d+)/(?P<trkc>\d+) "
+    r"fw=(?P<fwmaj>\d+)(?P<fwsub>\D)/(?P<flash>\d+) up=(?P<up>\d+) t=(?P<t>\d+)$"
+)
+RE_GWI = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] GWI x(?P<msgid>[0-9A-Fa-f]{8}) (?P<type>\S) "
+    r"H(?P<hop>[0-9A-Fa-f]{2}) from=(?P<from>\S+) t=(?P<t>\d+)$"
+)
+RE_GWU = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2}) \[LOG\] GWU x(?P<msgid>[0-9A-Fa-f]{8}) (?P<type>\S) "
+    r"H(?P<hop>[0-9A-Fa-f]{2}) t=(?P<t>\d+)$"
 )
 
 RE_INSTR = re.compile(
     r"^\[INSTR-LOOP\] gap ms (?P<gap>\d+) in (?P<section>\S+) "
     r"section_ms (?P<section_ms>\d+) sections_ms (?P<sections_ms>\d+)"
 )
-RE_HEAP = re.compile(r"^(?P<nodetime>\d{2}:\d{2}:\d{2});\[HEAP\];(?P<a>\d+);(?P<b>\d+);(?P<c>\d+);")
-RE_WRONGFW = re.compile(r"^APRS decode - Packet discarded, wrong FW-version <(?P<path>[^>]*)><(?P<ver>[^>]*)>")
+RE_HEAP = re.compile(
+    r"^(?P<nodetime>\d{2}:\d{2}:\d{2});\[HEAP\];(?P<a>\d+);(?P<b>\d+);(?P<c>\d+);"
+)
+RE_WRONGFW = re.compile(
+    r"^APRS decode - Packet discarded, wrong FW-version <(?P<path>[^>]*)><(?P<ver>[^>]*)>"
+)
 RE_NTP_OK = re.compile(r"^\[NTP\];ok;epoch;(?P<epoch>\d+);rtt;(?P<rtt>\d+)")
 RE_CET = re.compile(r"\{CET\}(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 
@@ -239,6 +295,22 @@ RE_CET = re.compile(r"\{CET\}(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 def fmt_dt(dt: datetime) -> str:
     """Host timestamp with millisecond precision, as the raw log writes it."""
     return dt.strftime("%Y-%m-%d %H:%M:%S.") + f"{dt.microsecond // 1000:03d}"
+
+
+def _rx_tail_fields(m: re.Match[str]) -> dict[str, Any]:
+    """Pull the optional SL-01 tail out of an RE_APRS/RE_ACK7/RE_ACK12 match.
+
+    All four values come back ``None`` together when the line predates SL-01 --
+    the regex's tail group is entirely optional, so partial matches cannot
+    happen.
+    """
+    return {
+        "rssi": int(m.group("rssi")) if m.group("rssi") is not None else None,
+        "snr": int(m.group("snr")) if m.group("snr") is not None else None,
+        "dup": (m.group("dup") == "d") if m.group("dup") is not None else None,
+        "own_echo": (m.group("own") == "e") if m.group("own") is not None else None,
+        "t_ms": int(m.group("tms")) if m.group("tms") is not None else None,
+    }
 
 
 def _semi_fields(rest: str) -> dict[str, str]:
@@ -307,6 +379,18 @@ class Reception:
     fw_sub: str
     last_hw_raw: int
     raw: str
+    # SL-01 -- optional RX tail (setlogFormatRxTail). ``None`` on every field
+    # means the capture predates --setlog's SL-01 instrumentation; that is a
+    # capability gap, not a parse failure, and callers report it as such.
+    rssi: int | None = None
+    snr: int | None = None
+    dup: bool | None = None
+    own_echo: bool | None = None
+    t_ms: int | None = None
+
+    @property
+    def has_rx_tail(self) -> bool:
+        return self.rssi is not None
 
     @property
     def origin(self) -> str:
@@ -372,6 +456,15 @@ class NodeLog:
     rx_udp_paths: list[str] = field(default_factory=list)
     wrong_fw: list[dict[str, Any]] = field(default_factory=list)
     unparsed: list[str] = field(default_factory=list)
+    # SL-02..SL-06 -- the six new `[LOG]` line kinds. Empty lists mean the
+    # capture predates that instrumentation; report sections must say so
+    # rather than rendering an empty table as if it were a zero count.
+    rly: list[dict[str, Any]] = field(default_factory=list)
+    tx: list[dict[str, Any]] = field(default_factory=list)
+    err: list[dict[str, Any]] = field(default_factory=list)
+    stat: list[dict[str, Any]] = field(default_factory=list)
+    gwi: list[dict[str, Any]] = field(default_factory=list)
+    gwu: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def duration_s(self) -> float:
@@ -407,7 +500,9 @@ def assign_labels(paths: Sequence[Path]) -> list[str]:
     """
     short = [path.stem.split("_")[0] for path in paths]
     clashes = {label for label in short if short.count(label) > 1}
-    return [path.stem if label in clashes else label for label, path in zip(short, paths)]
+    return [
+        path.stem if label in clashes else label for label, path in zip(short, paths)
+    ]
 
 
 def parse_logs(paths: Sequence[Path]) -> list[NodeLog]:
@@ -471,13 +566,25 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
                 fw_sub=am.group("fwsub"),
                 last_hw_raw=int(am.group("lh"), 16),
                 raw=raw,
+                rssi=int(am.group("rssi")) if am.group("rssi") is not None else None,
+                snr=int(am.group("snr")) if am.group("snr") is not None else None,
+                dup=(am.group("dup") == "d") if am.group("dup") is not None else None,
+                own_echo=(am.group("own") == "e")
+                if am.group("own") is not None
+                else None,
+                t_ms=int(am.group("tms")) if am.group("tms") is not None else None,
             )
             # decodeAPRS() leaves the struct at its initAPRS defaults when it bails, so
             # FCS 0000 (and, usually, msg_id 0 with an empty path) marks a decode failure.
             if msg_id == "00000000" or rec.fcs == "0000" or not path:
                 node.family["log-undecodable"] += 1
                 node.undecodable.append(
-                    {"host": fmt_dt(host), "type": ptype, "len": rec.msg_len, "raw": raw}
+                    {
+                        "host": fmt_dt(host),
+                        "type": ptype,
+                        "len": rec.msg_len,
+                        "raw": raw,
+                    }
                 )
                 return
             node.family["log-aprs"] += 1
@@ -487,7 +594,13 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
         if a7:
             node.family["log-ack7"] += 1
             node.acks.append(
-                {"host": fmt_dt(host), "size": 7, "type": a7.group("type"), "msg_id": a7.group("msgid").upper()}
+                {
+                    "host": fmt_dt(host),
+                    "size": 7,
+                    "type": a7.group("type"),
+                    "msg_id": a7.group("msgid").upper(),
+                    **_rx_tail_fields(a7),
+                }
             )
             return
         a12 = RE_ACK12.match(rest)
@@ -500,6 +613,111 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
                     "type": a12.group("type"),
                     "msg_id": a12.group("msgid").upper(),
                     "msg_id2": a12.group("msgid2").upper(),
+                    **_rx_tail_fields(a12),
+                }
+            )
+            return
+        rly = RE_RLY.match(rest)
+        if rly:
+            node.family["log-rly"] += 1
+            node.rly.append(
+                {
+                    "host": fmt_dt(host),
+                    "msg_id": rly.group("msgid").upper(),
+                    "type": rly.group("type"),
+                    "hop": int(rly.group("hop"), 16),
+                    "reason": rly.group("reason"),
+                    "prio": int(rly.group("prio")),
+                    "slot": int(rly.group("slot")),
+                }
+            )
+            return
+        txm = RE_TX.match(rest)
+        if txm:
+            node.family["log-tx"] += 1
+            node.tx.append(
+                {
+                    "host": fmt_dt(host),
+                    "msg_id": txm.group("msgid").upper(),
+                    "type": txm.group("type"),
+                    "hop": int(txm.group("hop"), 16),
+                    "prio": int(txm.group("prio")),
+                    "src": txm.group("src"),
+                    "wait_ms": int(txm.group("wait")),
+                    "q_depth": int(txm.group("q")),
+                    "cad": int(txm.group("cad")),
+                    "len": int(txm.group("len")),
+                    "t_ms": int(txm.group("t")),
+                }
+            )
+            return
+        errm = RE_ERR.match(rest)
+        if errm:
+            node.family["log-err"] += 1
+            node.err.append(
+                {
+                    "host": fmt_dt(host),
+                    "rssi": int(errm.group("rssi")),
+                    "snr": int(errm.group("snr")),
+                    "len": int(errm.group("len")),
+                    "ferr_hz": int(errm.group("ferr")),
+                    "t_ms": int(errm.group("t")),
+                }
+            )
+            return
+        statm = RE_STAT.match(rest)
+        if statm:
+            node.family["log-stat"] += 1
+            node.stat.append(
+                {
+                    "host": fmt_dt(host),
+                    "util_pct": int(statm.group("util")),
+                    "rx_ms": int(statm.group("rx")),
+                    "tx_ms": int(statm.group("tx")),
+                    "newid": int(statm.group("newid")),
+                    "dup": int(statm.group("dup")),
+                    "err": int(statm.group("err")),
+                    "txn": int(statm.group("txn")),
+                    "txfail": int(statm.group("txfail")),
+                    "ringmax": int(statm.group("ringmax")),
+                    "ring_size": int(statm.group("ringsize")),
+                    "drop": [int(statm.group(f"d{i}")) for i in range(1, 6)],
+                    "mh": int(statm.group("mh")),
+                    "heap": int(statm.group("heap")),
+                    "trk_interval_s": int(statm.group("trk")),
+                    "trk_consistent": int(statm.group("trkc")),
+                    "fw_major": int(statm.group("fwmaj")),
+                    "fw_sub": statm.group("fwsub"),
+                    "flash": int(statm.group("flash")),
+                    "up_s": int(statm.group("up")),
+                    "t_ms": int(statm.group("t")),
+                }
+            )
+            return
+        gwim = RE_GWI.match(rest)
+        if gwim:
+            node.family["log-gwi"] += 1
+            node.gwi.append(
+                {
+                    "host": fmt_dt(host),
+                    "msg_id": gwim.group("msgid").upper(),
+                    "type": gwim.group("type"),
+                    "hop": int(gwim.group("hop"), 16),
+                    "from_call": gwim.group("from"),
+                    "t_ms": int(gwim.group("t")),
+                }
+            )
+            return
+        gwum = RE_GWU.match(rest)
+        if gwum:
+            node.family["log-gwu"] += 1
+            node.gwu.append(
+                {
+                    "host": fmt_dt(host),
+                    "msg_id": gwum.group("msgid").upper(),
+                    "type": gwum.group("type"),
+                    "hop": int(gwum.group("hop"), 16),
+                    "t_ms": int(gwum.group("t")),
                 }
             )
             return
@@ -530,7 +748,12 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
             parts = body.split(";")
             f = _semi_fields(";".join(parts[2:]))
             node.eth_stall.append(
-                {"host": fmt_dt(host), "what": parts[1], "ms": int(f.get("ms", 0)), "task": f.get("task", "")}
+                {
+                    "host": fmt_dt(host),
+                    "what": parts[1],
+                    "ms": int(f.get("ms", 0)),
+                    "task": f.get("task", ""),
+                }
             )
         elif body.startswith("event;"):
             node.family["eth-event"] += 1
@@ -543,7 +766,9 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
             else:
                 state = ""
                 f = _semi_fields(";".join(parts[2:]))
-            node.eth_event.append({"host": fmt_dt(host), "what": what, "state": state, **f})
+            node.eth_event.append(
+                {"host": fmt_dt(host), "what": what, "state": state, **f}
+            )
         else:
             node.family["eth-other"] += 1
         return
@@ -553,7 +778,11 @@ def _classify(node: NodeLog, host: datetime, rest: str, raw: str) -> None:
         if nm:
             node.family["ntp-ok"] += 1
             node.ntp_ok.append(
-                {"host": fmt_dt(host), "epoch": int(nm.group("epoch")), "rtt": int(nm.group("rtt"))}
+                {
+                    "host": fmt_dt(host),
+                    "epoch": int(nm.group("epoch")),
+                    "rtt": int(nm.group("rtt")),
+                }
             )
         else:
             node.family["ntp-fail"] += 1
@@ -716,7 +945,9 @@ def a01_overview(nodes: list[NodeLog]) -> dict[str, Any]:
             "total_lines": n.total_lines,
             "line_families": dict(sorted(n.family.items())),
             "receptions": len(recs),
-            "receptions_per_hour": round(len(recs) / (n.duration_s / 3600.0), 1) if n.duration_s else 0.0,
+            "receptions_per_hour": round(len(recs) / (n.duration_s / 3600.0), 1)
+            if n.duration_s
+            else 0.0,
             "undecodable_log_lines": len(n.undecodable),
             "ack_frames": len(n.acks),
             "unique_msg_ids": len({r.msg_id for r in recs}),
@@ -742,14 +973,40 @@ def a02_types(nodes: list[NodeLog]) -> dict[str, Any]:
         rows: list[dict[str, Any]] = []
         for t in [":", "@", "!"]:
             rows.append(
-                {"type": t, "label": TYPE_LABEL[t], "count": counts.get(t, 0), "pct": pct(counts.get(t, 0), total)}
+                {
+                    "type": t,
+                    "label": TYPE_LABEL[t],
+                    "count": counts.get(t, 0),
+                    "pct": pct(counts.get(t, 0), total),
+                }
             )
         other = sum(v for k, v in counts.items() if k not in (":", "@", "!"))
-        rows.append({"type": "other", "label": "other decoded payload types", "count": other, "pct": pct(other, total)})
+        rows.append(
+            {
+                "type": "other",
+                "label": "other decoded payload types",
+                "count": other,
+                "pct": pct(other, total),
+            }
+        )
         ack7 = sum(1 for a in n.acks if a["size"] == 7)
         ack12 = sum(1 for a in n.acks if a["size"] == 12)
-        rows.append({"type": "ACK7", "label": "7-byte ACK frame", "count": ack7, "pct": pct(ack7, total)})
-        rows.append({"type": "ACK12", "label": "12-byte ACK frame", "count": ack12, "pct": pct(ack12, total)})
+        rows.append(
+            {
+                "type": "ACK7",
+                "label": "7-byte ACK frame",
+                "count": ack7,
+                "pct": pct(ack7, total),
+            }
+        )
+        rows.append(
+            {
+                "type": "ACK12",
+                "label": "12-byte ACK frame",
+                "count": ack12,
+                "pct": pct(ack12, total),
+            }
+        )
         rows.append(
             {
                 "type": "undecodable",
@@ -758,7 +1015,11 @@ def a02_types(nodes: list[NodeLog]) -> dict[str, Any]:
                 "pct": pct(len(n.undecodable), total),
             }
         )
-        out[n.label] = {"total_log_lines": total, "rows": rows, "pct_sum": round(sum(r["pct"] for r in rows), 2)}
+        out[n.label] = {
+            "total_log_lines": total,
+            "rows": rows,
+            "pct_sum": round(sum(r["pct"] for r in rows), 2),
+        }
     return out
 
 
@@ -821,22 +1082,37 @@ def a03_hops(nodes: list[NodeLog]) -> dict[str, Any]:
                     )
         total = len(n.receptions)
         out[n.label] = {
-            "hops_taken": {str(k): {"count": v, "pct": pct(v, total)} for k, v in sorted(taken.items())},
-            "max_hop_remaining": {str(k): {"count": v, "pct": pct(v, total)} for k, v in sorted(remaining.items())},
-            "initial_hop_limit": {str(k): {"count": v, "pct": pct(v, total)} for k, v in sorted(initial.items())},
-            "hops_taken_by_type": {t: dict(sorted(c.items())) for t, c in sorted(by_type.items())},
-            "mean_hops": round(statistics.fmean([r.hops for r in n.receptions]), 3) if n.receptions else 0.0,
+            "hops_taken": {
+                str(k): {"count": v, "pct": pct(v, total)}
+                for k, v in sorted(taken.items())
+            },
+            "max_hop_remaining": {
+                str(k): {"count": v, "pct": pct(v, total)}
+                for k, v in sorted(remaining.items())
+            },
+            "initial_hop_limit": {
+                str(k): {"count": v, "pct": pct(v, total)}
+                for k, v in sorted(initial.items())
+            },
+            "hops_taken_by_type": {
+                t: dict(sorted(c.items())) for t, c in sorted(by_type.items())
+            },
+            "mean_hops": round(statistics.fmean([r.hops for r in n.receptions]), 3)
+            if n.receptions
+            else 0.0,
             "max_hop_underflow_receptions": n_underflow,
             "path_len_gt4_receptions": sum(1 for r in n.receptions if len(r.path) > 4),
             "path_len_histogram": {
-                str(k): v for k, v in sorted(Counter(len(r.path) for r in n.receptions).items())
+                str(k): v
+                for k, v in sorted(Counter(len(r.path) for r in n.receptions).items())
             },
         }
-    out["_long_paths"] = sorted(long_paths, key=lambda d: (d["host"]))
+    out["_long_paths"] = sorted(long_paths, key=lambda d: d["host"])
     out["_long_path_summary"] = {
         "distinct_msgid_path_combinations": len(long_paths),
         "by_path_len": {
-            str(k): v for k, v in sorted(Counter(d["path_len"] for d in long_paths).items())
+            str(k): v
+            for k, v in sorted(Counter(d["path_len"] for d in long_paths).items())
         },
         "by_type": dict(Counter(d["type"] for d in long_paths)),
         "top_originators": Counter(d["origin"] for d in long_paths).most_common(15),
@@ -870,7 +1146,9 @@ def a04_talkers(nodes: list[NodeLog]) -> dict[str, Any]:
                     "receptions": len(recs),
                     "pct_of_receptions": pct(len(recs), total),
                     "unique_msg_ids": len({r.msg_id for r in recs}),
-                    "copies_per_msg": round(len(recs) / len({r.msg_id for r in recs}), 2),
+                    "copies_per_msg": round(
+                        len(recs) / len({r.msg_id for r in recs}), 2
+                    ),
                     "hw": hw,
                     "hw_name": hw_name(hw),
                     "fw": f"{fw[0]}:{fw[1]}",
@@ -901,7 +1179,13 @@ def a04b_firmware(nodes: list[NodeLog]) -> dict[str, Any]:
             key = f"{r.fw_major}:{r.fw_sub if r.fw_sub.strip() else '(space)'}"
             e = agg.setdefault(
                 key,
-                {"fw": key, "cad": fw_is_cad(r.fw_major, r.fw_sub), "receptions": 0, "airtime_ms": 0.0, "nodes": set()},
+                {
+                    "fw": key,
+                    "cad": fw_is_cad(r.fw_major, r.fw_sub),
+                    "receptions": 0,
+                    "airtime_ms": 0.0,
+                    "nodes": set(),
+                },
             )
             e["receptions"] += 1
             e["airtime_ms"] += r.airtime_ms
@@ -926,24 +1210,34 @@ def a04b_firmware(nodes: list[NodeLog]) -> dict[str, Any]:
             "pct_sum": round(sum(r["pct_receptions"] for r in rows), 2),
             "cad_receptions_pct": pct(cad_rx, total),
             "precad_receptions_pct": pct(total - cad_rx, total),
-            "cad_nodes": len({r.origin for r in n.receptions if fw_is_cad(r.fw_major, r.fw_sub)}),
-            "precad_nodes": len({r.origin for r in n.receptions if not fw_is_cad(r.fw_major, r.fw_sub)}),
+            "cad_nodes": len(
+                {r.origin for r in n.receptions if fw_is_cad(r.fw_major, r.fw_sub)}
+            ),
+            "precad_nodes": len(
+                {r.origin for r in n.receptions if not fw_is_cad(r.fw_major, r.fw_sub)}
+            ),
         }
     # network wide, over the union of the receivers
     all_recs = [r for n in nodes for r in n.receptions]
     fw_by_node: dict[str, Counter] = defaultdict(Counter)
     for r in all_recs:
-        fw_by_node[r.origin][f"{r.fw_major}:{r.fw_sub if r.fw_sub.strip() else '(space)'}"] += 1
+        fw_by_node[r.origin][
+            f"{r.fw_major}:{r.fw_sub if r.fw_sub.strip() else '(space)'}"
+        ] += 1
     node_fw = {call: c.most_common(1)[0][0] for call, c in fw_by_node.items()}
     inv: Counter = Counter(node_fw.values())
     out["_network_node_inventory"] = {
         "nodes_total": len(node_fw),
         "by_fw": dict(sorted(inv.items(), key=lambda kv: -kv[1])),
         "cad_nodes": sum(
-            1 for fw in node_fw.values() if fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
+            1
+            for fw in node_fw.values()
+            if fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
         ),
         "precad_nodes": sum(
-            1 for fw in node_fw.values() if not fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
+            1
+            for fw in node_fw.values()
+            if not fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
         ),
     }
     return out
@@ -975,10 +1269,16 @@ def a05_neighbours(nodes: list[NodeLog]) -> dict[str, Any]:
                     "unique_msg_ids": len({r.msg_id for r in recs}),
                     "lh_hw": lh,
                     "lh_hw_name": hw_name(lh),
-                    "lh_flag_set_pct": pct(sum(1 for r in recs if r.last_hw_flag) , len(recs)),
+                    "lh_flag_set_pct": pct(
+                        sum(1 for r in recs if r.last_hw_flag), len(recs)
+                    ),
                     "fw_as_originator": fw,
-                    "fw_cad": fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1]) if fw else None,
-                    "direct_origin_share_pct": pct(sum(1 for r in recs if r.hops == 0), len(recs)),
+                    "fw_cad": fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
+                    if fw
+                    else None,
+                    "direct_origin_share_pct": pct(
+                        sum(1 for r in recs if r.hops == 0), len(recs)
+                    ),
                     "airtime_s": round(sum(r.airtime_ms for r in recs) / 1000.0, 1),
                 }
             )
@@ -999,12 +1299,18 @@ def a06_redundancy(nodes: list[NodeLog]) -> dict[str, Any]:
         for r in n.receptions:
             by_id[r.msg_id].append(r)
         mult: Counter = Counter(len(v) for v in by_id.values())
-        relayers: Counter = Counter(len({r.last_hop for r in v}) for v in by_id.values())
+        relayers: Counter = Counter(
+            len({r.last_hop for r in v}) for v in by_id.values()
+        )
         total = len(n.receptions)
         uniq = len(by_id)
         # airtime split: first copy vs redundant copies, per type
-        air_by_type: dict[str, dict[str, float]] = defaultdict(lambda: {"first": 0.0, "redundant": 0.0})
-        cnt_by_type: dict[str, dict[str, int]] = defaultdict(lambda: {"first": 0, "redundant": 0})
+        air_by_type: dict[str, dict[str, float]] = defaultdict(
+            lambda: {"first": 0.0, "redundant": 0.0}
+        )
+        cnt_by_type: dict[str, dict[str, int]] = defaultdict(
+            lambda: {"first": 0, "redundant": 0}
+        )
         for mid, recs in by_id.items():
             ordered = sorted(recs, key=lambda r: r.host)
             t = ordered[0].ptype
@@ -1025,7 +1331,11 @@ def a06_redundancy(nodes: list[NodeLog]) -> dict[str, Any]:
                     "unique_msgs": c["first"],
                     "redundant_receptions": c["redundant"],
                     "receptions": c["first"] + c["redundant"],
-                    "copies_per_msg": round((c["first"] + c["redundant"]) / c["first"], 2) if c["first"] else 0.0,
+                    "copies_per_msg": round(
+                        (c["first"] + c["redundant"]) / c["first"], 2
+                    )
+                    if c["first"]
+                    else 0.0,
                     "airtime_total_s": round(tot_air / 1000.0, 1),
                     "airtime_first_s": round(a["first"] / 1000.0, 1),
                     "airtime_redundant_s": round(a["redundant"] / 1000.0, 1),
@@ -1042,7 +1352,9 @@ def a06_redundancy(nodes: list[NodeLog]) -> dict[str, Any]:
             "copies_per_msg_mean": round(total / uniq, 3) if uniq else 0.0,
             "multiplicity_histogram": {str(k): v for k, v in sorted(mult.items())},
             "multiplicity_max": max(mult) if mult else 0,
-            "distinct_relayers_histogram": {str(k): v for k, v in sorted(relayers.items())},
+            "distinct_relayers_histogram": {
+                str(k): v for k, v in sorted(relayers.items())
+            },
             "airtime_total_s": round(tot_air_all / 1000.0, 1),
             "airtime_redundant_s": round(red_air_all / 1000.0, 1),
             "pct_airtime_redundant": pct(red_air_all, tot_air_all),
@@ -1063,7 +1375,9 @@ def a06_redundancy(nodes: list[NodeLog]) -> dict[str, Any]:
 
 
 def a07_cross(receivers: list[NodeLog]) -> dict[str, Any]:
-    sets: dict[str, set[str]] = {n.label: {r.msg_id for r in n.receptions} for n in receivers}
+    sets: dict[str, set[str]] = {
+        n.label: {r.msg_id for r in n.receptions} for n in receivers
+    }
     type_of: dict[str, str] = {}
     origin_of: dict[str, str] = {}
     for n in receivers:
@@ -1087,11 +1401,15 @@ def a07_cross(receivers: list[NodeLog]) -> dict[str, Any]:
                 t: {
                     "heard": by_type_node.get(t, 0),
                     "union": by_type_union.get(t, 0),
-                    "delivery_pct": pct(by_type_node.get(t, 0), by_type_union.get(t, 0)),
+                    "delivery_pct": pct(
+                        by_type_node.get(t, 0), by_type_union.get(t, 0)
+                    ),
                 }
                 for t in sorted(by_type_union)
             },
-            "exclusive": sum(1 for m in sets[l] if all(m not in sets[o] for o in labels if o != l)),
+            "exclusive": sum(
+                1 for m in sets[l] if all(m not in sets[o] for o in labels if o != l)
+            ),
         }
     n_heard: Counter = Counter()
     for mid in union:
@@ -1101,7 +1419,10 @@ def a07_cross(receivers: list[NodeLog]) -> dict[str, Any]:
         "union_msg_ids": len(union),
         "per_node": per_node,
         "venn": dict(sorted(venn.items())),
-        "heard_by_n_nodes": {str(k): {"count": v, "pct": pct(v, len(union))} for k, v in sorted(n_heard.items())},
+        "heard_by_n_nodes": {
+            str(k): {"count": v, "pct": pct(v, len(union))}
+            for k, v in sorted(n_heard.items())
+        },
         "all_three": venn.get("+".join(sorted(labels)), 0),
         "exclusive_examples": {
             l: sorted(
@@ -1138,7 +1459,9 @@ def a08_timing(receivers: list[NodeLog]) -> dict[str, Any]:
                             (m[label_b] - m[label_a]).total_seconds()
                         )
     inter: dict[str, list[float]] = {}
-    inter_by_type: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    inter_by_type: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for n in receivers:
         by_id: dict[str, list[Reception]] = defaultdict(list)
         for r in n.receptions:
@@ -1158,9 +1481,12 @@ def a08_timing(receivers: list[NodeLog]) -> dict[str, Any]:
         "pairwise_offset_s": {k: stats_block(v) for k, v in sorted(pairwise.items())},
         "inter_arrival_s": {k: stats_block(v) for k, v in inter.items()},
         "inter_arrival_by_type_s": {
-            node: {t: stats_block(v) for t, v in sorted(d.items())} for node, d in inter_by_type.items()
+            node: {t: stats_block(v) for t, v in sorted(d.items())}
+            for node, d in inter_by_type.items()
         },
-        "inter_arrival_all_s": stats_block([v for vals in inter.values() for v in vals]),
+        "inter_arrival_all_s": stats_block(
+            [v for vals in inter.values() for v in vals]
+        ),
     }
 
 
@@ -1272,9 +1598,7 @@ def a10_dedup(nodes: list[NodeLog]) -> dict[str, Any]:
                         }
                     )
         # ring turnover proxy: NEW unique msg_ids per rolling window
-        firsts = sorted(
-            min(r.host for r in recs) for recs in by_id.values()
-        )
+        firsts = sorted(min(r.host for r in recs) for recs in by_id.values())
         win: dict[str, Any] = {}
         for minutes in (10, 20, 40):
             span = timedelta(minutes=minutes)
@@ -1286,7 +1610,9 @@ def a10_dedup(nodes: list[NodeLog]) -> dict[str, Any]:
                 counts.append(i - j + 1)
             win[str(minutes)] = {
                 "rolling_max_new_msg_ids": max(counts) if counts else 0,
-                "median_new_msg_ids": round(statistics.median(counts), 1) if counts else 0.0,
+                "median_new_msg_ids": round(statistics.median(counts), 1)
+                if counts
+                else 0.0,
                 "p90_new_msg_ids": round(quantile(counts, 0.9), 1) if counts else 0.0,
             }
         turnover[n.label] = win
@@ -1306,7 +1632,9 @@ def a10_dedup(nodes: list[NodeLog]) -> dict[str, Any]:
         "reappearance_count": len(reappear),
         "reappearance_by_node": dict(Counter(d["node"] for d in reappear)),
         "reappearance_by_type": dict(Counter(d["type"] for d in reappear)),
-        "reappearance_by_origin": Counter(d["origin"] for d in reappear).most_common(20),
+        "reappearance_by_origin": Counter(d["origin"] for d in reappear).most_common(
+            20
+        ),
         "gap_min_stats": stats_block([d["gap_min"] for d in reappear]),
         "late_copy_last_hop": late_relayer.most_common(20),
         "late_copy_relay_chain": late_prefix.most_common(20),
@@ -1326,7 +1654,13 @@ def a11_traffic(nodes: list[NodeLog]) -> dict[str, Any]:
         bucket_totals: list[int] = []
         for k, v in sorted(buckets.items()):
             rows.append(
-                {"bucket": k, "all": v["all"], "text": v.get(":", 0), "hey": v.get("@", 0), "pos": v.get("!", 0)}
+                {
+                    "bucket": k,
+                    "all": v["all"],
+                    "text": v.get(":", 0),
+                    "hey": v.get("@", 0),
+                    "pos": v.get("!", 0),
+                }
             )
             bucket_totals.append(v["all"])
         # rolling 60 min busiest window
@@ -1338,7 +1672,9 @@ def a11_traffic(nodes: list[NodeLog]) -> dict[str, Any]:
                 j += 1
             if i - j + 1 > best[0]:
                 best = (i - j + 1, hosts[j])
-        clock_hour: Counter = Counter(r.host.strftime("%Y-%m-%d %H") for r in n.receptions)
+        clock_hour: Counter = Counter(
+            r.host.strftime("%Y-%m-%d %H") for r in n.receptions
+        )
         per_node[n.label] = {
             "buckets_10min": rows,
             "bucket_stats": stats_block(bucket_totals),
@@ -1347,7 +1683,10 @@ def a11_traffic(nodes: list[NodeLog]) -> dict[str, Any]:
                 "window_start": fmt_dt(best[1]) if best[1] else None,
             },
             "busiest_clock_hour": (
-                {"hour": clock_hour.most_common(1)[0][0], "receptions": clock_hour.most_common(1)[0][1]}
+                {
+                    "hour": clock_hour.most_common(1)[0][0],
+                    "receptions": clock_hour.most_common(1)[0][1],
+                }
                 if clock_hour
                 else None
             ),
@@ -1463,8 +1802,13 @@ def a13_hey(nodes: list[NodeLog]) -> dict[str, Any]:
             "direct": direct,
             "relayed": relayed,
             "pct_relayed": pct(relayed, len(heys)),
-            "hop_histogram": {str(k): {"count": v, "pct": pct(v, len(heys))} for k, v in sorted(hop_hist.items())},
-            "mean_hops": round(statistics.fmean([r.hops for r in heys]), 3) if heys else 0.0,
+            "hop_histogram": {
+                str(k): {"count": v, "pct": pct(v, len(heys))}
+                for k, v in sorted(hop_hist.items())
+            },
+            "mean_hops": round(statistics.fmean([r.hops for r in heys]), 3)
+            if heys
+            else 0.0,
             "dest_histogram": dict(dest_hist),
             "gateway_hey_pct": pct(dest_hist.get("HG", 0), len(heys)),
             "airtime_s": round(sum(r.airtime_ms for r in heys) / 1000.0, 1),
@@ -1492,7 +1836,9 @@ def a13_hey(nodes: list[NodeLog]) -> dict[str, Any]:
     return {
         "per_node": per_node,
         "payload_grammar_seen": dict(grammar),
-        "relay_group_field_count_histogram": {str(k): v for k, v in sorted(group_field_counts.items())},
+        "relay_group_field_count_histogram": {
+            str(k): v for k, v in sorted(group_field_counts.items())
+        },
         "report_chain_matches_hops": match_total,
         "report_chain_short": mismatch_total,
         "report_chain_match_pct": pct(match_total, match_total + mismatch_total),
@@ -1518,9 +1864,16 @@ def a14_flags(nodes: list[NodeLog]) -> dict[str, Any]:
             sel = [r for r in n.receptions if r.ptype == t]
             rows[t] = {
                 "count": len(sel),
-                "S": {str(k): v for k, v in sorted(Counter(r.server for r in sel).items())},
-                "T": {str(k): v for k, v in sorted(Counter(r.track for r in sel).items())},
-                "M": {f"{k:02X}": v for k, v in sorted(Counter(r.mesh for r in sel).items())},
+                "S": {
+                    str(k): v for k, v in sorted(Counter(r.server for r in sel).items())
+                },
+                "T": {
+                    str(k): v for k, v in sorted(Counter(r.track for r in sel).items())
+                },
+                "M": {
+                    f"{k:02X}": v
+                    for k, v in sorted(Counter(r.mesh for r in sel).items())
+                },
                 "S1_pct": pct(sum(1 for r in sel if r.server), len(sel)),
                 "T1_pct": pct(sum(1 for r in sel if r.track), len(sel)),
                 "M01_pct": pct(sum(1 for r in sel if r.mesh == 1), len(sel)),
@@ -1534,9 +1887,19 @@ def a15_health(nodes: list[NodeLog]) -> dict[str, Any]:
     for n in nodes:
         eth_first = n.eth_link[0] if n.eth_link else {}
         eth_last = n.eth_link[-1] if n.eth_link else {}
-        counters = ["downs", "renews", "renew_fail", "resets", "tx_fail", "got_ip_n", "rx_n"]
+        counters = [
+            "downs",
+            "renews",
+            "renew_fail",
+            "resets",
+            "tx_fail",
+            "got_ip_n",
+            "rx_n",
+        ]
         trend = {
-            k: {"first": eth_first.get(k), "last": eth_last.get(k)} for k in counters if k in eth_last
+            k: {"first": eth_first.get(k), "last": eth_last.get(k)}
+            for k in counters
+            if k in eth_last
         }
         gaps = [i["gap_ms"] for i in n.instr]
         gap_hist: Counter = Counter()
@@ -1551,9 +1914,7 @@ def a15_health(nodes: list[NodeLog]) -> dict[str, Any]:
                 gap_hist["2.0-4.9 s"] += 1
             else:
                 gap_hist[">=5 s"] += 1
-        keep_gaps = [
-            (b - a).total_seconds() for a, b in zip(n.gw_keep, n.gw_keep[1:])
-        ]
+        keep_gaps = [(b - a).total_seconds() for a, b in zip(n.gw_keep, n.gw_keep[1:])]
         max_ms = [int(e["tx_max_ms"]) for e in n.eth_link if "tx_max_ms" in e]
         rx_max = [int(e["rx_max_ms"]) for e in n.eth_link if "rx_max_ms" in e]
         out[n.label] = {
@@ -1567,7 +1928,9 @@ def a15_health(nodes: list[NodeLog]) -> dict[str, Any]:
             "eth_stall_worst": sorted(n.eth_stall, key=lambda s: -s["ms"])[:5],
             "eth_events": dict(
                 Counter(
-                    f"{e['what']}:{e['state']}" if e.get("state") else f"{e['what']}:rc{e.get('rc', '?')}"
+                    f"{e['what']}:{e['state']}"
+                    if e.get("state")
+                    else f"{e['what']}:rc{e.get('rc', '?')}"
                     for e in n.eth_event
                 )
             ),
@@ -1669,7 +2032,9 @@ def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str,
     for node in receivers:
         relayed = [r for r in node.receptions if len(r.path) >= 2]
         direct = len(node.receptions) - len(relayed)
-        agg: dict[str, dict[str, Any]] = defaultdict(lambda: {"copies": 0, "airtime_ms": 0.0})
+        agg: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"copies": 0, "airtime_ms": 0.0}
+        )
         pairs: list[tuple[str, float]] = []
         for rec in relayed:
             call = rec.last_hop
@@ -1698,7 +2063,9 @@ def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str,
                     "cad": _cad_bucket(fw),
                     "originated_frames": fw["originated_frames"] if fw else 0,
                     "lh_hw": hw_name(
-                        Counter(r.last_hw for r in relayed if r.last_hop == call).most_common(1)[0][0]
+                        Counter(
+                            r.last_hw for r in relayed if r.last_hop == call
+                        ).most_common(1)[0][0]
                     ),
                 }
             )
@@ -1755,9 +2122,15 @@ def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str,
                 "originator_cad_pct": block["cad_receptions_pct"],
                 "originator_precad_pct": block["precad_receptions_pct"],
                 "relayer_cad_pct": per_node[label]["summary"]["CAD"]["pct_copies"],
-                "relayer_precad_pct": per_node[label]["summary"]["pre-CAD"]["pct_copies"],
-                "relayer_unknown_pct": per_node[label]["summary"]["unknown"]["pct_copies"],
-                "relayer_precad_airtime_pct": per_node[label]["summary"]["pre-CAD"]["pct_airtime"],
+                "relayer_precad_pct": per_node[label]["summary"]["pre-CAD"][
+                    "pct_copies"
+                ],
+                "relayer_unknown_pct": per_node[label]["summary"]["unknown"][
+                    "pct_copies"
+                ],
+                "relayer_precad_airtime_pct": per_node[label]["summary"]["pre-CAD"][
+                    "pct_airtime"
+                ],
             }
         )
 
@@ -1814,7 +2187,9 @@ def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str,
             "direct_copies": pooled_direct,
             "summary": pooled_split,
             "pct_sum": pooled_sum,
-            "pct_sum_airtime": round(sum(v["pct_airtime"] for v in pooled_split.values()), 2),
+            "pct_sum_airtime": round(
+                sum(v["pct_airtime"] for v in pooled_split.values()), 2
+            ),
             "first_copy": {
                 "first_copy_relayed": len(pooled_first),
                 "first_copy_direct_from_originator": pooled_first_direct,
@@ -1825,7 +2200,12 @@ def a24_relayer_firmware(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str,
         "originator_vs_relayer": origin_rows,
         "pre_cad_relayers": pre_rows,
         "relayers_without_own_firmware": sorted(
-            {r["relayer"] for b in per_node.values() for r in b["rows"] if r["cad"] == "unknown"}
+            {
+                r["relayer"]
+                for b in per_node.values()
+                for r in b["rows"]
+                if r["cad"] == "unknown"
+            }
         ),
     }
 
@@ -1835,7 +2215,10 @@ def a16_own_echo(nodes: list[NodeLog]) -> dict[str, Any]:
     for n in nodes:
         call = n.own_call
         if not call:
-            out[n.label] = {"own_call": None, "note": "no [LOG] lines - own callsign not derivable"}
+            out[n.label] = {
+                "own_call": None,
+                "note": "no [LOG] lines - own callsign not derivable",
+            }
             continue
         echoes = [r for r in n.receptions if call in r.path]
         penult = [r for r in echoes if len(r.path) >= 2 and r.path[-2] == call]
@@ -1851,7 +2234,8 @@ def a16_own_echo(nodes: list[NodeLog]) -> dict[str, Any]:
             "own_call_as_last_hop": len(self_last),
             "own_call_as_last_hop_lines": [r.raw for r in self_last],
             "echo_neighbours": [
-                {"neighbour": c, "echoes": v, "pct": pct(v, len(penult))} for c, v in by_neigh.most_common()
+                {"neighbour": c, "echoes": v, "pct": pct(v, len(penult))}
+                for c, v in by_neigh.most_common()
             ],
             "echo_airtime_s": round(sum(r.airtime_ms for r in echoes) / 1000.0, 1),
             "by_type": dict(Counter(r.ptype for r in echoes)),
@@ -1919,10 +2303,14 @@ def station_index(nodes: list[NodeLog]) -> dict[str, dict[str, Any]]:
         lh = lh_of[call].most_common(1)[0][0] if lh_of.get(call) else None
         fw = fw_of[call].most_common(1)[0][0] if fw_of.get(call) else None
         out[call] = {
-            "hw": hw_name(hw) if hw is not None else (f"{hw_name(lh)} (from LH byte)" if lh is not None else "unknown"),
+            "hw": hw_name(hw)
+            if hw is not None
+            else (f"{hw_name(lh)} (from LH byte)" if lh is not None else "unknown"),
             "hw_id": hw if hw is not None else lh,
             "fw": fw or "not observable (never originates)",
-            "fw_cad": fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1]) if fw else None,
+            "fw_cad": fw_is_cad(int(fw.split(":")[0]), fw.split(":")[1])
+            if fw
+            else None,
             "originates": fw is not None,
         }
     return out
@@ -1983,10 +2371,13 @@ def a19_first_relayer(receivers: list[NodeLog]) -> dict[str, Any]:
             "first_copy_relayed": len(grouped) - first_direct,
             "first_copy_direct_pct": pct(first_direct, len(grouped)),
             "first_copy_hop_histogram": {
-                str(k): {"count": v, "pct": pct(v, len(grouped))} for k, v in sorted(first_hops.items())
+                str(k): {"count": v, "pct": pct(v, len(grouped))}
+                for k, v in sorted(first_hops.items())
             },
             "lead_over_second_copy_s": stats_block(leads),
-            "lead_by_type_s": {t: stats_block(v) for t, v in sorted(by_type_lead.items())},
+            "lead_by_type_s": {
+                t: stats_block(v) for t, v in sorted(by_type_lead.items())
+            },
         }
     return out
 
@@ -2024,7 +2415,9 @@ def a20_relay_latency(receivers: list[NodeLog]) -> dict[str, Any]:
         out[n.label] = {
             "min_copies": RELAY_MIN_COPIES,
             "rows": rows,
-            "first_copy_multihop_histogram": {str(k): v for k, v in sorted(multihop_first.items())},
+            "first_copy_multihop_histogram": {
+                str(k): v for k, v in sorted(multihop_first.items())
+            },
             "first_copy_multihop_total": sum(multihop_first.values()),
         }
     return out
@@ -2112,9 +2505,15 @@ def a21_neighbour_count(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, 
             nc = [e["nc_median"] for e in entries]
             corr[label] = {
                 "n": len(entries),
-                "spearman_nc_vs_first_copy_rate": spearman(nc, [e["first_copy_rate_pct"] for e in entries]),
-                "spearman_nc_vs_median_delay": spearman(nc, [e["median_delay_behind_first_s"] for e in entries]),
-                "spearman_nc_vs_total_copies": spearman(nc, [float(e["total_copies"]) for e in entries]),
+                "spearman_nc_vs_first_copy_rate": spearman(
+                    nc, [e["first_copy_rate_pct"] for e in entries]
+                ),
+                "spearman_nc_vs_median_delay": spearman(
+                    nc, [e["median_delay_behind_first_s"] for e in entries]
+                ),
+                "spearman_nc_vs_total_copies": spearman(
+                    nc, [float(e["total_copies"]) for e in entries]
+                ),
             }
     pooled: list[tuple[float, float, float, float]] = []
     for label, entries in scatter.items():
@@ -2130,9 +2529,15 @@ def a21_neighbour_count(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, 
     corr["_pooled"] = (
         {
             "n": len(pooled),
-            "spearman_nc_vs_first_copy_rate": spearman([p[0] for p in pooled], [p[1] for p in pooled]),
-            "spearman_nc_vs_median_delay": spearman([p[0] for p in pooled], [p[2] for p in pooled]),
-            "spearman_nc_vs_total_copies": spearman([p[0] for p in pooled], [p[3] for p in pooled]),
+            "spearman_nc_vs_first_copy_rate": spearman(
+                [p[0] for p in pooled], [p[1] for p in pooled]
+            ),
+            "spearman_nc_vs_median_delay": spearman(
+                [p[0] for p in pooled], [p[2] for p in pooled]
+            ),
+            "spearman_nc_vs_total_copies": spearman(
+                [p[0] for p in pooled], [p[3] for p in pooled]
+            ),
         }
         if len(pooled) >= 3
         else {"n": len(pooled)}
@@ -2148,11 +2553,19 @@ def a21_neighbour_count(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, 
                 "log": n.label,
                 "own_call": n.own_call,
                 "nc_in_own_beacon_min": min(vals) if vals else None,
-                "nc_in_own_beacon_median": round(statistics.median(vals), 1) if vals else None,
+                "nc_in_own_beacon_median": round(statistics.median(vals), 1)
+                if vals
+                else None,
                 "nc_in_own_beacon_max": max(vals) if vals else None,
-                "distinct_direct_neighbours_in_log": len({r.last_hop for r in n.receptions}),
+                "distinct_direct_neighbours_in_log": len(
+                    {r.last_hop for r in n.receptions}
+                ),
                 "ratio_observed_over_reported": (
-                    round(len({r.last_hop for r in n.receptions}) / statistics.median(vals), 2)
+                    round(
+                        len({r.last_hop for r in n.receptions})
+                        / statistics.median(vals),
+                        2,
+                    )
                     if vals and statistics.median(vals)
                     else None
                 ),
@@ -2288,7 +2701,9 @@ def a23_late_by_path(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, Any
                 "culprit_delay_s": round(best_gap, 1),
                 "culprit_delay_min": round(best_gap / 60.0, 1),
                 "prefixes_observed": len(known) - 2,
-                "cluster": "slow (>= 20 min)" if d["gap_min"] >= LATE_CLUSTER_MIN else "fast (< 20 min)",
+                "cluster": "slow (>= 20 min)"
+                if d["gap_min"] >= LATE_CLUSTER_MIN
+                else "fast (< 20 min)",
                 "via_khactzc": "OE3KHA-20,OE3CZC-1" in d["path_again"],
             }
         )
@@ -2332,7 +2747,9 @@ def a23_late_by_path(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, Any
                 {
                     "callsign": call,
                     "in_delaying_segments": cnt,
-                    "median_segment_delay_min": round(statistics.median(member_delays[call]), 1),
+                    "median_segment_delay_min": round(
+                        statistics.median(member_delays[call]), 1
+                    ),
                     **describe(call),
                 }
             )
@@ -2368,6 +2785,223 @@ def a23_late_by_path(nodes: list[NodeLog], res: dict[str, Any]) -> dict[str, Any
 
 
 # --------------------------------------------------------------------------
+# SL-07 -- report sections for the `--setlog` instrumentation (SL-01..SL-06)
+# --------------------------------------------------------------------------
+
+#: Sentinel string used throughout section 25 wherever a capture carries none
+#: of a given line kind -- older firmware without that SL-0x instrumentation.
+#: A string (not an empty dict) so render_md and callers cannot mistake an
+#: absent capability for a genuine zero count.
+NOT_IN_FIRMWARE = "not in this firmware"
+
+
+def a25_setlog(nodes: list[NodeLog], dedup_ring: int = 100) -> dict[str, Any]:
+    """RSSI/dedup/relay/TX/collision/channel/gateway sections from SL-01..SL-06.
+
+    Every sub-block is computed per node and reports :data:`NOT_IN_FIRMWARE`
+    instead of a table when that node's capture carries none of the relevant
+    line kind -- the whole point of SL-01..SL-06 is that they are optional
+    additions a node may or may not have yet.
+    """
+    per_node: dict[str, Any] = {}
+    gwi_by_msgid: dict[str, list[str]] = defaultdict(list)
+    gwu_total: Counter = Counter()
+
+    for n in nodes:
+        block: dict[str, Any] = {}
+
+        # --- SL-01: RSSI/SNR distribution, noise floor, DUP: cross-check ---
+        tailed = [r for r in n.receptions if r.has_rx_tail]
+        if tailed:
+            rssi_vals = [float(r.rssi) for r in tailed if r.rssi is not None]
+            snr_vals = [float(r.snr) for r in tailed if r.snr is not None]
+            far = [
+                float(r.rssi - r.snr)
+                for r in tailed
+                if r.rssi is not None and r.snr is not None and r.snr < 0
+            ]
+            if far:
+                method = "median(RSSI - SNR) over receptions with SNR < 0 dB (weak/far signals, close to the noise floor)"
+            else:
+                far = [
+                    float(r.rssi - r.snr)
+                    for r in tailed
+                    if r.rssi is not None and r.snr is not None
+                ]
+                method = "median(RSSI - SNR) over all receptions (this capture has no SNR < 0 dB samples)"
+            block["rssi_snr"] = {
+                "n": len(tailed),
+                "rssi_dbm": stats_block(rssi_vals),
+                "snr_db": stats_block(snr_vals),
+                "noise_floor_estimate_dbm": round(statistics.median(far), 1)
+                if far
+                else None,
+                "noise_floor_method": method,
+            }
+            dup_field = sum(1 for r in tailed if r.dup is True)
+            copies_old = len(n.receptions) - len({r.msg_id for r in n.receptions})
+            block["copies_vs_dup"] = {
+                "dup_field_count": dup_field,
+                "copy_count_old_method": copies_old,
+                "note": (
+                    "old method = receptions - unique msg_ids (every extra sighting of an id "
+                    "counted, order-independent); new method = DUP:d, the is_new_packet() "
+                    "verdict recorded at receive time (SL-01). They need not match exactly: "
+                    "the old method also counts copies received AFTER the dedup ring evicted "
+                    "the id, which DUP: correctly reports as 'n' (new)."
+                ),
+            }
+        else:
+            block["rssi_snr"] = NOT_IN_FIRMWARE
+            block["copies_vs_dup"] = NOT_IN_FIRMWARE
+
+        # --- SL-02: relay-reason histogram ---
+        if n.rly:
+            by_reason: Counter = Counter()
+            by_reason_type: Counter = Counter()
+            for e in n.rly:
+                by_reason[e["reason"]] += 1
+                by_reason_type[(e["reason"], e["type"])] += 1
+            block["relay_reasons"] = {
+                "total": len(n.rly),
+                "by_reason": dict(sorted(by_reason.items(), key=lambda kv: -kv[1])),
+                "by_reason_and_type": {
+                    f"{reason}/{typ}": c
+                    for (reason, typ), c in sorted(
+                        by_reason_type.items(), key=lambda kv: -kv[1]
+                    )
+                },
+            }
+        else:
+            block["relay_reasons"] = NOT_IN_FIRMWARE
+
+        # --- SL-03: TX wait-time distribution per prio and per src ---
+        if n.tx:
+            by_prio: dict[int, list[int]] = defaultdict(list)
+            by_src: dict[str, list[int]] = defaultdict(list)
+            for e in n.tx:
+                by_prio[e["prio"]].append(e["wait_ms"])
+                by_src[e["src"]].append(e["wait_ms"])
+
+            def _wait_stats(vals: list[int]) -> dict[str, Any]:
+                return {
+                    "n": len(vals),
+                    "median_ms": round(statistics.median(vals), 1),
+                    "p90_ms": round(quantile(vals, 0.9), 1),
+                    "max_ms": max(vals),
+                }
+
+            block["tx_wait"] = {
+                "total": len(n.tx),
+                "by_prio": {str(k): _wait_stats(v) for k, v in sorted(by_prio.items())},
+                "by_src": {k: _wait_stats(v) for k, v in sorted(by_src.items())},
+            }
+        else:
+            block["tx_wait"] = NOT_IN_FIRMWARE
+
+        # --- SL-04: collision rate ---
+        if n.err:
+            hours = n.duration_s / 3600.0
+            block["collision"] = {
+                "err_count": len(n.err),
+                "err_per_hour": round(len(n.err) / hours, 2) if hours else 0.0,
+                "err_pct_of_rx_plus_err": pct(
+                    len(n.err), len(n.err) + len(n.receptions)
+                ),
+            }
+        else:
+            block["collision"] = NOT_IN_FIRMWARE
+
+        # --- SL-05: channel util per 5 min, heap trend, dedup window, fw ---
+        if n.stat:
+            block["channel_util_5min"] = [
+                {
+                    "host": e["host"],
+                    "util_pct": e["util_pct"],
+                    "rx_ms": e["rx_ms"],
+                    "tx_ms": e["tx_ms"],
+                }
+                for e in n.stat
+            ]
+            heap_vals = [e["heap"] for e in n.stat]
+            block["heap_trend"] = {
+                "first": heap_vals[0],
+                "min": min(heap_vals),
+                "last": heap_vals[-1],
+                "n_stat_lines": len(heap_vals),
+            }
+            fw_seen = sorted(
+                {f"{e['fw_major']}{e['fw_sub']}/{e['flash']}" for e in n.stat}
+            )
+            block["fw"] = fw_seen[0] if len(fw_seen) == 1 else fw_seen
+            windows = [
+                dedup_ring / (e["newid"] / 300.0) for e in n.stat if e["newid"] > 0
+            ]
+            block["dedup_window"] = {
+                "dedup_ring_assumed": dedup_ring,
+                "window_s_per_interval": [round(w, 1) for w in windows],
+                "window_s_median": round(statistics.median(windows), 1)
+                if windows
+                else None,
+                "note": (
+                    "window_s = dedup_ring / (newid / 300 s); dedup_ring is board-dependent "
+                    "(--dedup-ring, default 100), newid is the STAT interval's new-msg_id count "
+                    "reset every PRIO_STAT_INTERVAL_S (assumed 300 s here)."
+                ),
+            }
+        else:
+            block["channel_util_5min"] = NOT_IN_FIRMWARE
+            block["heap_trend"] = NOT_IN_FIRMWARE
+            block["fw"] = NOT_IN_FIRMWARE
+            block["dedup_window"] = NOT_IN_FIRMWARE
+
+        # --- SL-06: gateway upload count, feeding the cross-node multiplier below ---
+        block["gwu_count"] = len(n.gwu) if (n.gwi or n.gwu) else NOT_IN_FIRMWARE
+        for e in n.gwi:
+            gwi_by_msgid[e["msg_id"]].append(n.label)
+        gwu_total[n.label] = len(n.gwu)
+
+        per_node[n.label] = block
+
+    if gwi_by_msgid:
+        rows = [
+            {
+                "msg_id": mid,
+                "gwi_count": len(node_labels),
+                "gwi_nodes": len(set(node_labels)),
+                "nodes": sorted(set(node_labels)),
+            }
+            for mid, node_labels in sorted(gwi_by_msgid.items())
+        ]
+        gateway_multiplier: Any = {
+            "rows": rows,
+            "mean_gwi_nodes_per_msgid": round(
+                statistics.fmean([len(set(v)) for v in gwi_by_msgid.values()]), 2
+            ),
+            "gwu_total_by_node": dict(gwu_total),
+            "note": (
+                "gwi_nodes = distinct node logs that independently injected this msg_id from "
+                "the server into their own TX ring (SL-06 GWI); > 1 only shows up when several "
+                "gateways' logs are analysed together. gwu_count is the matching addNodeData() "
+                "upload count (SL-06 GWU)."
+            ),
+        }
+    else:
+        gateway_multiplier = NOT_IN_FIRMWARE
+
+    return {
+        "note": (
+            "Sections here come from the optional --setlog SL-01..SL-06 line kinds "
+            "(RSSI:/SNR:/DUP:/OWN: tail, RLY, TX, ERR, STAT, GWI, GWU). A node's capture "
+            "that predates that instrumentation reports 'not in this firmware' per sub-block "
+            "instead of a misleading zero."
+        ),
+        "per_node": per_node,
+        "gateway_multiplier": gateway_multiplier,
+    }
+
+
+# --------------------------------------------------------------------------
 # Markdown rendering
 # --------------------------------------------------------------------------
 
@@ -2390,7 +3024,9 @@ def md_table(headers: Sequence[str], rows: Iterable[Sequence[Any]]) -> str:
     return "\n".join(lines)
 
 
-def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog], cmds: list[str]) -> str:
+def render_md(
+    res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog], cmds: list[str]
+) -> str:
     labels = [n.label for n in nodes]
     rlabels = [n.label for n in receivers]
     o = res["01_overview"]
@@ -2432,7 +3068,19 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                 res["16_own_echo"][n.label].get("own_call_as_last_hop", 0),
             ]
         )
-    A(md_table(["log", "file", "derived own call", "receptions", "own relay echoed", "own call as last hop"], rows))
+    A(
+        md_table(
+            [
+                "log",
+                "file",
+                "derived own call",
+                "receptions",
+                "own relay echoed",
+                "own call as last hop",
+            ],
+            rows,
+        )
+    )
     A("")
     A("Beacon positions seen on air for these calls (`A=` is feet):")
     A("")
@@ -2512,7 +3160,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A(
             md_table(
                 ["type", "meaning", "count", "%"],
-                [[r["type"], r["label"], r["count"], f"{r['pct']:.2f}"] for r in t["rows"]],
+                [
+                    [r["type"], r["label"], r["count"], f"{r['pct']:.2f}"]
+                    for r in t["rows"]
+                ],
             )
         )
         A("")
@@ -2532,23 +3183,38 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     ):
         A(f"### {title}")
         A("")
-        allk = sorted({k for n in receivers for k in res["03_hops"][n.label][key]}, key=int)
+        allk = sorted(
+            {k for n in receivers for k in res["03_hops"][n.label][key]}, key=int
+        )
         rows = []
         for n in receivers:
             d = res["03_hops"][n.label][key]
-            rows.append([n.label] + [f"{d[k]['count']} ({d[k]['pct']:.1f}%)" if k in d else "-" for k in allk])
+            rows.append(
+                [n.label]
+                + [
+                    f"{d[k]['count']} ({d[k]['pct']:.1f}%)" if k in d else "-"
+                    for k in allk
+                ]
+            )
         A(md_table(["log"] + allk, rows))
         A("")
     A("### Mean hops taken")
     A("")
-    A(md_table(["log", "mean hops"], [[n.label, res["03_hops"][n.label]["mean_hops"]] for n in receivers]))
+    A(
+        md_table(
+            ["log", "mean hops"],
+            [[n.label, res["03_hops"][n.label]["mean_hops"]] for n in receivers],
+        )
+    )
     A("")
     A("### Hops taken by payload type")
     A("")
     for n in receivers:
         d = res["03_hops"][n.label]["hops_taken_by_type"]
         allk = sorted({k for c in d.values() for k in c}, key=int)
-        rows = [[TYPE_LABEL.get(t, t)] + [d[t].get(k, 0) for k in allk] for t in sorted(d)]
+        rows = [
+            [TYPE_LABEL.get(t, t)] + [d[t].get(k, 0) for k in allk] for t in sorted(d)
+        ]
         A(f"**{n.label}**")
         A("")
         A(md_table(["type"] + [str(k) for k in allk], rows))
@@ -2561,7 +3227,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A(
         md_table(
             ["log", "receptions with H >= 13"],
-            [[n.label, res["03_hops"][n.label]["max_hop_underflow_receptions"]] for n in receivers],
+            [
+                [n.label, res["03_hops"][n.label]["max_hop_underflow_receptions"]]
+                for n in receivers
+            ],
         )
     )
     A("")
@@ -2570,7 +3239,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
             md_table(
                 ["host", "node", "msg_id", "t", "H", "hops", "origin", "path", "text"],
                 [
-                    [r["host"], r["node"], r["msg_id"], r["type"], r["max_hop"], r["hops"], r["origin"], r["path"], r["text"]]
+                    [
+                        r["host"],
+                        r["node"],
+                        r["msg_id"],
+                        r["type"],
+                        r["max_hop"],
+                        r["hops"],
+                        r["origin"],
+                        r["path"],
+                        r["text"],
+                    ]
                     for r in uf["rows"]
                 ],
             )
@@ -2578,7 +3257,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     lp = res["03_hops"]["_long_paths"]
     ls = res["03_hops"]["_long_path_summary"]
-    A(f"### Packets with path length > 4 ({ls['distinct_msgid_path_combinations']} distinct msg_id/path combinations)")
+    A(
+        f"### Packets with path length > 4 ({ls['distinct_msgid_path_combinations']} distinct msg_id/path combinations)"
+    )
     A("")
     A(
         md_table(
@@ -2596,12 +3277,19 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("Path-length histogram of all receptions:")
     A("")
-    allk = sorted({k for n in receivers for k in res["03_hops"][n.label]["path_len_histogram"]}, key=int)
+    allk = sorted(
+        {k for n in receivers for k in res["03_hops"][n.label]["path_len_histogram"]},
+        key=int,
+    )
     A(
         md_table(
             ["log"] + [f"{k} calls" for k in allk],
             [
-                [n.label] + [res["03_hops"][n.label]["path_len_histogram"].get(k, 0) for k in allk]
+                [n.label]
+                + [
+                    res["03_hops"][n.label]["path_len_histogram"].get(k, 0)
+                    for k in allk
+                ]
                 for n in receivers
             ],
         )
@@ -2615,13 +3303,26 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     )
     A("")
     longest = [r for r in lp if r["path_len"] >= 6]
-    A(f"Every combination with path length >= 6 ({len(longest)} of {len(lp)}); the full list of all")
+    A(
+        f"Every combination with path length >= 6 ({len(longest)} of {len(lp)}); the full list of all"
+    )
     A("path length > 4 combinations is in `berg.json` under `03_hops._long_paths`.")
     A("")
     if longest:
         A(
             md_table(
-                ["first seen", "node", "msg_id", "t", "origin", "path", "len", "H left", "dest", "text"],
+                [
+                    "first seen",
+                    "node",
+                    "msg_id",
+                    "t",
+                    "origin",
+                    "path",
+                    "len",
+                    "H left",
+                    "dest",
+                    "text",
+                ],
                 [
                     [
                         r["host"],
@@ -2648,11 +3349,24 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     for n in receivers:
         t = res["04_talkers"][n.label]
-        A(f"**{n.label}** -- {t['distinct_originators']} distinct originators, top 25 by receptions")
+        A(
+            f"**{n.label}** -- {t['distinct_originators']} distinct originators, top 25 by receptions"
+        )
         A("")
         A(
             md_table(
-                ["origin", "rx", "% rx", "uniq msg", "copies/msg", "hw", "fw", "CAD", "airtime s", "types"],
+                [
+                    "origin",
+                    "rx",
+                    "% rx",
+                    "uniq msg",
+                    "copies/msg",
+                    "hw",
+                    "fw",
+                    "CAD",
+                    "airtime s",
+                    "types",
+                ],
                 [
                     [
                         r["origin"] + (" (TIME SIGNAL)" if r["time_signal"] else ""),
@@ -2677,7 +3391,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     for n in receivers:
         for r in res["04_talkers"][n.label]["time_signal"]:
             rows.append(
-                [n.label, r["origin"], r["receptions"], f"{r['pct_of_receptions']:.2f}", r["unique_msg_ids"], r["airtime_s"]]
+                [
+                    n.label,
+                    r["origin"],
+                    r["receptions"],
+                    f"{r['pct_of_receptions']:.2f}",
+                    r["unique_msg_ids"],
+                    r["airtime_s"],
+                ]
             )
     A(md_table(["log", "origin", "rx", "% of rx", "uniq msg", "airtime s"], rows))
     A("")
@@ -2685,16 +3406,28 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     # ---- 4b firmware ----
     A("## 4b. Firmware distribution")
     A("")
-    A("`FW:35:p` = 4.35p, first release with CSMA/CAD. Everything below `p` on major 35")
+    A(
+        "`FW:35:p` = 4.35p, first release with CSMA/CAD. Everything below `p` on major 35"
+    )
     A("and every major < 35 transmits without a channel check.")
     A("")
     for n in receivers:
         f = res["04b_firmware"][n.label]
-        A(f"**{n.label}** -- CAD receptions {f['cad_receptions_pct']:.2f} %, pre-CAD {f['precad_receptions_pct']:.2f} %")
+        A(
+            f"**{n.label}** -- CAD receptions {f['cad_receptions_pct']:.2f} %, pre-CAD {f['precad_receptions_pct']:.2f} %"
+        )
         A("")
         A(
             md_table(
-                ["fw", "CAD", "originator nodes", "rx", "% rx", "airtime s", "% airtime"],
+                [
+                    "fw",
+                    "CAD",
+                    "originator nodes",
+                    "rx",
+                    "% rx",
+                    "airtime s",
+                    "% airtime",
+                ],
                 [
                     [
                         r["fw"],
@@ -2724,16 +3457,30 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     # ---- 5 neighbours ----
     A("## 5. Direct RF neighbours / relay fan-out")
     A("")
-    A("`relayer` = last callsign in the path = the station whose transmission this node")
+    A(
+        "`relayer` = last callsign in the path = the station whose transmission this node"
+    )
     A("actually demodulated. `lh hw` is decoded from the `LH:` byte (low 7 bits).")
     A("")
     for n in receivers:
         d = res["05_neighbours"][n.label]
-        A(f"**{n.label}** -- {d['distinct_relayers']} direct neighbours, top 5 carry {d['top5_share_pct']:.1f} % of receptions")
+        A(
+            f"**{n.label}** -- {d['distinct_relayers']} direct neighbours, top 5 carry {d['top5_share_pct']:.1f} % of receptions"
+        )
         A("")
         A(
             md_table(
-                ["relayer", "rx", "%", "uniq msg", "lh hw", "fw as originator", "CAD", "direct-origin %", "airtime s"],
+                [
+                    "relayer",
+                    "rx",
+                    "%",
+                    "uniq msg",
+                    "lh hw",
+                    "fw as originator",
+                    "CAD",
+                    "direct-origin %",
+                    "airtime s",
+                ],
                 [
                     [
                         r["relayer"],
@@ -2742,7 +3489,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                         r["unique_msg_ids"],
                         r["lh_hw_name"],
                         r["fw_as_originator"] or "-",
-                        "-" if r["fw_cad"] is None else ("yes" if r["fw_cad"] else "no"),
+                        "-"
+                        if r["fw_cad"] is None
+                        else ("yes" if r["fw_cad"] else "no"),
                         f"{r['direct_origin_share_pct']:.1f}",
                         r["airtime_s"],
                     ]
@@ -2794,7 +3543,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("### Multiplicity histogram (how often the same msg_id was heard)")
     A("")
-    allk = sorted({k for n in receivers for k in res["06_redundancy"][n.label]["multiplicity_histogram"]}, key=int)
+    allk = sorted(
+        {
+            k
+            for n in receivers
+            for k in res["06_redundancy"][n.label]["multiplicity_histogram"]
+        },
+        key=int,
+    )
     rows = []
     for n in receivers:
         h = res["06_redundancy"][n.label]["multiplicity_histogram"]
@@ -2803,7 +3559,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("### Distinct relayers per msg_id")
     A("")
-    allk = sorted({k for n in receivers for k in res["06_redundancy"][n.label]["distinct_relayers_histogram"]}, key=int)
+    allk = sorted(
+        {
+            k
+            for n in receivers
+            for k in res["06_redundancy"][n.label]["distinct_relayers_histogram"]
+        },
+        key=int,
+    )
     rows = []
     for n in receivers:
         h = res["06_redundancy"][n.label]["distinct_relayers_histogram"]
@@ -2817,7 +3580,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
         A(
             md_table(
-                ["type", "uniq msgs", "rx", "copies/msg", "airtime s", "first-copy s", "redundant s", "% redundant"],
+                [
+                    "type",
+                    "uniq msgs",
+                    "rx",
+                    "copies/msg",
+                    "airtime s",
+                    "first-copy s",
+                    "redundant s",
+                    "% redundant",
+                ],
                 [
                     [
                         r["label"],
@@ -2843,7 +3615,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
             md_table(
                 ["msg_id", "copies", "t", "origin", "distinct relayers", "text"],
                 [
-                    [r["msg_id"], r["copies"], r["type"], r["origin"], r["distinct_relayers"], r["text"]]
+                    [
+                        r["msg_id"],
+                        r["copies"],
+                        r["type"],
+                        r["origin"],
+                        r["distinct_relayers"],
+                        r["text"],
+                    ]
                     for r in res["06_redundancy"][n.label]["top_repeated"]
                 ],
             )
@@ -2854,12 +3633,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     c = res["07_cross_node"]
     A("## 7. Cross-node reception")
     A("")
-    A(f"Union over {', '.join(c['receivers'])}: **{c['union_msg_ids']}** distinct msg_ids.")
+    A(
+        f"Union over {', '.join(c['receivers'])}: **{c['union_msg_ids']}** distinct msg_ids."
+    )
     A("")
     A(
         md_table(
             ["log", "uniq msg_id", "% of union", "exclusive to this node"],
-            [[l, d["unique_msg_ids"], f"{d['pct_of_union']:.2f}", d["exclusive"]] for l, d in c["per_node"].items()],
+            [
+                [l, d["unique_msg_ids"], f"{d['pct_of_union']:.2f}", d["exclusive"]]
+                for l, d in c["per_node"].items()
+            ],
         )
     )
     A("")
@@ -2871,7 +3655,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         row = [l]
         for t in types:
             e = d["by_type"].get(t)
-            row.append(f"{e['heard']}/{e['union']} ({e['delivery_pct']:.1f}%)" if e else "-")
+            row.append(
+                f"{e['heard']}/{e['union']} ({e['delivery_pct']:.1f}%)" if e else "-"
+            )
         rows.append(row)
     A(md_table(["log"] + [TYPE_LABEL.get(t, t) for t in types], rows))
     A("")
@@ -2882,7 +3668,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A(
         md_table(
             ["heard by N nodes", "msg_ids", "%"],
-            [[k, v["count"], f"{v['pct']:.2f}"] for k, v in c["heard_by_n_nodes"].items()],
+            [
+                [k, v["count"], f"{v['pct']:.2f}"]
+                for k, v in c["heard_by_n_nodes"].items()
+            ],
         )
     )
     A("")
@@ -2891,9 +3680,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     t = res["08_timing"]
     A("## 8. Timing")
     A("")
-    A("### Spread between the first reception at each node (msg_ids heard by >= 2 nodes)")
+    A(
+        "### Spread between the first reception at each node (msg_ids heard by >= 2 nodes)"
+    )
     A("")
-    A(md_table(list(t["first_reception_spread_s"].keys()), [list(t["first_reception_spread_s"].values())]))
+    A(
+        md_table(
+            list(t["first_reception_spread_s"].keys()),
+            [list(t["first_reception_spread_s"].values())],
+        )
+    )
     A("")
     A("### Pairwise first-reception offset, seconds (positive = second node later)")
     A("")
@@ -2901,19 +3697,37 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["pair", "n", "min", "median", "p90", "max", "mean"],
             [
-                [k, v["n"], v.get("min"), v.get("median"), v.get("p90"), v.get("max"), v.get("mean")]
+                [
+                    k,
+                    v["n"],
+                    v.get("min"),
+                    v.get("median"),
+                    v.get("p90"),
+                    v.get("max"),
+                    v.get("mean"),
+                ]
                 for k, v in t["pairwise_offset_s"].items()
             ],
         )
     )
     A("")
-    A("### Inter-arrival between consecutive copies of the same msg_id at one node, seconds")
+    A(
+        "### Inter-arrival between consecutive copies of the same msg_id at one node, seconds"
+    )
     A("")
     A(
         md_table(
             ["log", "n", "min", "median", "p90", "max", "mean"],
             [
-                [k, v["n"], v.get("min"), v.get("median"), v.get("p90"), v.get("max"), v.get("mean")]
+                [
+                    k,
+                    v["n"],
+                    v.get("min"),
+                    v.get("median"),
+                    v.get("p90"),
+                    v.get("max"),
+                    v.get("mean"),
+                ]
                 for k, v in t["inter_arrival_s"].items()
             ],
         )
@@ -2924,7 +3738,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     rows = []
     for node, d in t["inter_arrival_by_type_s"].items():
         for ty, v in d.items():
-            rows.append([node, TYPE_LABEL.get(ty, ty), v["n"], v.get("median"), v.get("p90"), v.get("max")])
+            rows.append(
+                [
+                    node,
+                    TYPE_LABEL.get(ty, ty),
+                    v["n"],
+                    v.get("median"),
+                    v.get("p90"),
+                    v.get("max"),
+                ]
+            )
     A(md_table(["log", "type", "n", "median", "p90", "max"], rows))
     A("")
 
@@ -2945,7 +3768,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A(
             md_table(
                 ["after", "before", "gap s", "beacons missed"],
-                [[m["after"], m["before"], m["gap_s"], m["missed_beacons"]] for m in ts["beacons_missed_by_all"]],
+                [
+                    [m["after"], m["before"], m["gap_s"], m["missed_beacons"]]
+                    for m in ts["beacons_missed_by_all"]
+                ],
             )
         )
     else:
@@ -2957,7 +3783,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "rx", "distinct beacons", "% of union", "missed", "delay median s", "delay p90 s", "delay max s"],
+            [
+                "log",
+                "rx",
+                "distinct beacons",
+                "% of union",
+                "missed",
+                "delay median s",
+                "delay p90 s",
+                "delay max s",
+            ],
             [
                 [
                     l,
@@ -2978,7 +3813,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         if d["missed_beacons"]:
             A(f"- **{l}** missed: {', '.join(d['missed_beacons'])}")
     A("")
-    A("### Slowest time-signal copies (reception delay against the beacon's own UTC stamp)")
+    A(
+        "### Slowest time-signal copies (reception delay against the beacon's own UTC stamp)"
+    )
     A("")
     rows = []
     for l, d in ts["per_node"].items():
@@ -2993,7 +3830,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(dd["note"])
     A("")
-    A(f"{dd['reappearance_count']} reappearances: {dd['reappearance_by_node']}; by type: {dd['reappearance_by_type']}")
+    A(
+        f"{dd['reappearance_count']} reappearances: {dd['reappearance_by_node']}; by type: {dd['reappearance_by_type']}"
+    )
     A("")
     A("Gap statistics, minutes:")
     A("")
@@ -3004,7 +3843,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A(
         md_table(
             ["last hop of late copy", "count", "% of reappearances"],
-            [[c, v, f"{pct(v, dd['reappearance_count']):.2f}"] for c, v in dd["late_copy_last_hop"]],
+            [
+                [c, v, f"{pct(v, dd['reappearance_count']):.2f}"]
+                for c, v in dd["late_copy_last_hop"]
+            ],
         )
     )
     A("")
@@ -3022,12 +3864,25 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A(md_table(["origin", "count"], [[c, v] for c, v in dd["reappearance_by_origin"]]))
     A("")
     top = dd["reappearances"][:60]
-    A(f"The {len(top)} largest gaps (full list in `berg.json` under `10_dedup.reappearances`):")
+    A(
+        f"The {len(top)} largest gaps (full list in `berg.json` under `10_dedup.reappearances`):"
+    )
     A("")
     if top:
         A(
             md_table(
-                ["node", "msg_id", "t", "origin", "first", "again", "gap min", "path first", "path again", "text"],
+                [
+                    "node",
+                    "msg_id",
+                    "t",
+                    "origin",
+                    "first",
+                    "again",
+                    "gap min",
+                    "path first",
+                    "path again",
+                    "text",
+                ],
                 [
                     [
                         r["node"],
@@ -3054,7 +3909,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     for l, w in dd["ring_turnover"].items():
         for minutes in ("10", "20", "40"):
             e = w[minutes]
-            rows.append([l, f"{minutes} min", e["rolling_max_new_msg_ids"], e["median_new_msg_ids"], e["p90_new_msg_ids"]])
+            rows.append(
+                [
+                    l,
+                    f"{minutes} min",
+                    e["rolling_max_new_msg_ids"],
+                    e["median_new_msg_ids"],
+                    e["p90_new_msg_ids"],
+                ]
+            )
     A(md_table(["log", "window", "rolling max", "median", "p90"], rows))
     A("")
 
@@ -3063,7 +3926,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "10-min bucket median", "p90", "max", "busiest rolling hour (rx)", "window start", "busiest clock hour"],
+            [
+                "log",
+                "10-min bucket median",
+                "p90",
+                "max",
+                "busiest rolling hour (rx)",
+                "window start",
+                "busiest clock hour",
+            ],
             [
                 [
                     l,
@@ -3094,8 +3965,13 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("### Receptions per 10-minute bucket, all types")
     A("")
-    bkeys = sorted({b["bucket"] for d in res["11_traffic"].values() for b in d["buckets_10min"]})
-    idx = {l: {b["bucket"]: b for b in d["buckets_10min"]} for l, d in res["11_traffic"].items()}
+    bkeys = sorted(
+        {b["bucket"] for d in res["11_traffic"].values() for b in d["buckets_10min"]}
+    )
+    idx = {
+        l: {b["bucket"]: b for b in d["buckets_10min"]}
+        for l, d in res["11_traffic"].items()
+    }
     rows = []
     for b in bkeys:
         row = [b]
@@ -3117,7 +3993,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["first heard", "by", "msg_id", "origin", "dest", "hw", "fw", "heard by (copies)", "text"],
+            [
+                "first heard",
+                "by",
+                "msg_id",
+                "origin",
+                "dest",
+                "hw",
+                "fw",
+                "heard by (copies)",
+                "text",
+            ],
             [
                 [
                     r["first_heard"],
@@ -3127,7 +4013,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                     r["dest"],
                     r["hw"],
                     r["fw"],
-                    " ".join(f"{k}:{v}" for k, v in sorted(r.get("heard_by", {}).items())),
+                    " ".join(
+                        f"{k}:{v}" for k, v in sorted(r.get("heard_by", {}).items())
+                    ),
                     r["text"][:180],
                 ]
                 for r in tx["rows"]
@@ -3142,7 +4030,12 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(h["grammar_note"])
     A("")
-    A(md_table(["payload grammar variant", "receptions"], [[k, v] for k, v in h["payload_grammar_seen"].items()]))
+    A(
+        md_table(
+            ["payload grammar variant", "receptions"],
+            [[k, v] for k, v in h["payload_grammar_seen"].items()],
+        )
+    )
     A("")
     A(
         md_table(
@@ -3153,7 +4046,20 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "HEY rx", "% of all rx", "uniq HEY", "copies/HEY", "direct", "relayed", "% relayed", "mean hops", "airtime s", "% of airtime", "HG share %"],
+            [
+                "log",
+                "HEY rx",
+                "% of all rx",
+                "uniq HEY",
+                "copies/HEY",
+                "direct",
+                "relayed",
+                "% relayed",
+                "mean hops",
+                "airtime s",
+                "% of airtime",
+                "HG share %",
+            ],
             [
                 [
                     l,
@@ -3177,12 +4083,22 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("### HEY hop histogram")
     A("")
-    allk = sorted({k for d in h["per_node"].values() for k in d["hop_histogram"]}, key=int)
+    allk = sorted(
+        {k for d in h["per_node"].values() for k in d["hop_histogram"]}, key=int
+    )
     rows = []
     for l, d in h["per_node"].items():
         if not d["hey_receptions"]:
             continue
-        rows.append([l] + [f"{d['hop_histogram'][k]['count']} ({d['hop_histogram'][k]['pct']:.1f}%)" if k in d["hop_histogram"] else "-" for k in allk])
+        rows.append(
+            [l]
+            + [
+                f"{d['hop_histogram'][k]['count']} ({d['hop_histogram'][k]['pct']:.1f}%)"
+                if k in d["hop_histogram"]
+                else "-"
+                for k in allk
+            ]
+        )
     A(md_table(["log"] + [f"{k} hops" for k in allk], rows))
     A("")
     A("### Top HEY originators")
@@ -3207,7 +4123,12 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["relay", "in short chains", "in complete chains", "short share %"],
             [
-                [s["relay"], s["in_short_chains"], s["in_complete_chains"], f"{s['short_share_pct']:.2f}"]
+                [
+                    s["relay"],
+                    s["in_short_chains"],
+                    s["in_complete_chains"],
+                    f"{s['short_share_pct']:.2f}",
+                ]
                 for s in h["non_appending_relay_suspects"]
             ],
         )
@@ -3220,7 +4141,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
             md_table(
                 ["node", "host", "msg_id", "path", "hops", "groups", "payload"],
                 [
-                    [m["node"], m["host"], m["msg_id"], m["path"], m["hops"], m["reports"], m["payload"]]
+                    [
+                        m["node"],
+                        m["host"],
+                        m["msg_id"],
+                        m["path"],
+                        m["hops"],
+                        m["reports"],
+                        m["payload"],
+                    ]
                     for m in h["group_count_vs_hops_mismatches"]
                 ],
             )
@@ -3245,7 +4174,21 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                     " ".join(f"M{k}={n}" for k, n in v["M"].items()),
                 ]
             )
-    A(md_table(["log", "type", "count", "S=1 %", "T=1 %", "M=01 %", "S detail", "M detail"], rows))
+    A(
+        md_table(
+            [
+                "log",
+                "type",
+                "count",
+                "S=1 %",
+                "T=1 %",
+                "M=01 %",
+                "S detail",
+                "M detail",
+            ],
+            rows,
+        )
+    )
     A("")
 
     # ---- 15 health ----
@@ -3267,7 +4210,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "stalls", "stall ms median", "stall ms max", "events", "tx_max_ms max", "rx_max_ms max"],
+            [
+                "log",
+                "stalls",
+                "stall ms median",
+                "stall ms max",
+                "events",
+                "tx_max_ms max",
+                "rx_max_ms max",
+            ],
             [
                 [
                     l,
@@ -3299,7 +4250,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["log", "gaps", "median ms", "p90 ms", "max ms", "sections"],
             [
-                [l, d["instr_gaps"], d["instr_gap_ms"].get("median", "-"), d["instr_gap_ms"].get("p90", "-"), d["instr_gap_ms"].get("max", "-"), d["instr_by_section"]]
+                [
+                    l,
+                    d["instr_gaps"],
+                    d["instr_gap_ms"].get("median", "-"),
+                    d["instr_gap_ms"].get("p90", "-"),
+                    d["instr_gap_ms"].get("max", "-"),
+                    d["instr_by_section"],
+                ]
                 for l, d in res["15_health"].items()
             ],
         )
@@ -3311,7 +4269,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A(
         md_table(
             ["log"] + hk,
-            [[l] + [d["instr_gap_histogram"].get(k, 0) for k in hk] for l, d in res["15_health"].items()],
+            [
+                [l] + [d["instr_gap_histogram"].get(k, 0) for k in hk]
+                for l, d in res["15_health"].items()
+            ],
         )
     )
     A("")
@@ -3320,14 +4281,34 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     rows = []
     for l, d in res["15_health"].items():
         for i in d["instr_worst"]:
-            rows.append([l, i["host"], i["gap_ms"], i["section"], i["section_ms"], i["sections_ms"]])
+            rows.append(
+                [
+                    l,
+                    i["host"],
+                    i["gap_ms"],
+                    i["section"],
+                    i["section_ms"],
+                    i["sections_ms"],
+                ]
+            )
     A(md_table(["log", "host", "gap ms", "section", "section ms", "sections ms"], rows))
     A("")
     A("### NTP, heap, gateway")
     A("")
     A(
         md_table(
-            ["log", "NTP ok", "NTP fail", "rtt median ms", "heap samples", "GW keepalives", "keep interval median s", "GW rx", "GATE injections", "wrong-FW discards"],
+            [
+                "log",
+                "NTP ok",
+                "NTP fail",
+                "rtt median ms",
+                "heap samples",
+                "GW keepalives",
+                "keep interval median s",
+                "GW rx",
+                "GATE injections",
+                "wrong-FW discards",
+            ],
             [
                 [
                     l,
@@ -3350,7 +4331,13 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         if d["ntp_fail_lines"]:
             A(f"- **{l}** NTP failures: {d['ntp_fail_lines']}")
         if d["heap"]:
-            A(f"- **{l}** heap: " + "; ".join(f"{e['host']} free={e['free']} largest={e['largest']}" for e in d["heap"]))
+            A(
+                f"- **{l}** heap: "
+                + "; ".join(
+                    f"{e['host']} free={e['free']} largest={e['largest']}"
+                    for e in d["heap"]
+                )
+            )
     A("")
     A("### Frames discarded for wrong FW version")
     A("")
@@ -3369,7 +4356,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         for n in mag:
             d = res["15_health"][n.label]
             ov = o[n.label]
-            A(f"`{n.path.name}` -- {ov['total_lines']} lines over {ov['duration_hms']}, no `[LOG]` receive lines at all.")
+            A(
+                f"`{n.path.name}` -- {ov['total_lines']} lines over {ov['duration_hms']}, no `[LOG]` receive lines at all."
+            )
             A("")
             A(
                 md_table(
@@ -3378,15 +4367,27 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                         ["ETH ip", d["eth_ip"]],
                         ["ETH dest", d["eth_dest"]],
                         ["ETH link lines", d["eth_link_lines"]],
-                        ["ETH counters", json.dumps(d["eth_counter_trend"], sort_keys=True)],
+                        [
+                            "ETH counters",
+                            json.dumps(d["eth_counter_trend"], sort_keys=True),
+                        ],
                         ["ETH stalls", json.dumps(d["eth_stalls"])],
                         ["ETH stall ms", json.dumps(d["eth_stall_ms"])],
                         ["ETH events", json.dumps(d["eth_events"])],
-                        ["INSTR-LOOP gaps", f"{d['instr_gaps']} ({json.dumps(d['instr_by_section'])})"],
+                        [
+                            "INSTR-LOOP gaps",
+                            f"{d['instr_gaps']} ({json.dumps(d['instr_by_section'])})",
+                        ],
                         ["INSTR gap ms", json.dumps(d["instr_gap_ms"])],
-                        ["NTP", f"{d['ntp_ok']} ok / {d['ntp_fail']} fail, rtt median {d['ntp_rtt_ms'].get('median')} ms"],
+                        [
+                            "NTP",
+                            f"{d['ntp_ok']} ok / {d['ntp_fail']} fail, rtt median {d['ntp_rtt_ms'].get('median')} ms",
+                        ],
                         ["Heap", json.dumps(d["heap"])],
-                        ["GW keepalives", f"{d['gw_keepalives']}, interval median {d['gw_keep_interval_s'].get('median')} s"],
+                        [
+                            "GW keepalives",
+                            f"{d['gw_keepalives']}, interval median {d['gw_keep_interval_s'].get('median')} s",
+                        ],
                         ["GW rx", json.dumps(d["gw_rx"])],
                         ["wrong-FW discards", d["wrong_fw_discards"]],
                     ],
@@ -3403,7 +4404,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "own call", "rx with own call in path", "% of rx", "own relay echoed", "own call deeper", "own call as last hop", "echo airtime s", "by type"],
+            [
+                "log",
+                "own call",
+                "rx with own call in path",
+                "% of rx",
+                "own relay echoed",
+                "own call deeper",
+                "own call as last hop",
+                "echo airtime s",
+                "by type",
+            ],
             [
                 [
                     l,
@@ -3429,7 +4440,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A(
             md_table(
                 ["neighbour", "echoes", "%"],
-                [[e["neighbour"], e["echoes"], f"{e['pct']:.2f}"] for e in d["echo_neighbours"]],
+                [
+                    [e["neighbour"], e["echoes"], f"{e['pct']:.2f}"]
+                    for e in d["echo_neighbours"]
+                ],
             )
         )
         A("")
@@ -3447,19 +4461,34 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     for n in nodes:
         for u in n.undecodable:
             rows.append([n.label, u["host"], u["type"], u["len"], u["raw"][-90:]])
-    A(md_table(["log", "host", "type", "len", "tail of line"], rows) if rows else "none")
+    A(
+        md_table(["log", "host", "type", "len", "tail of line"], rows)
+        if rows
+        else "none"
+    )
     A("")
 
     # ---- verification ----
     A("## 18. Verification against the raw logs")
     A("")
-    A("Each row re-derives a headline number with an independent one-line shell pipeline.")
+    A(
+        "Each row re-derives a headline number with an independent one-line shell pipeline."
+    )
     A("")
     v = res["_verification"]
     A(
         md_table(
             ["check", "shell pipeline", "shell result", "berglog result", "match"],
-            [[r["check"], f"`{r['cmd']}`", r["shell"], r["script"], "OK" if r["match"] else "MISMATCH"] for r in v],
+            [
+                [
+                    r["check"],
+                    f"`{r['cmd']}`",
+                    r["shell"],
+                    r["script"],
+                    "OK" if r["match"] else "MISMATCH",
+                ]
+                for r in v
+            ],
         )
     )
     A("")
@@ -3467,13 +4496,25 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     fr = res["19_first_relayer"]
     A("## 19. First relayer -- who wins the relay race")
     A("")
-    A("For every msg_id, the copy that arrived FIRST at that node. `first-copy rate` = first")
-    A("copies / all copies that relayer delivered, i.e. how often it is the winner when it is")
+    A(
+        "For every msg_id, the copy that arrived FIRST at that node. `first-copy rate` = first"
+    )
+    A(
+        "copies / all copies that relayer delivered, i.e. how often it is the winner when it is"
+    )
     A("heard at all.")
     A("")
     A(
         md_table(
-            ["log", "msg_ids", "first copy direct (path len 1)", "%", "first copy relayed", "lead over 2nd copy median s", "p90 s"],
+            [
+                "log",
+                "msg_ids",
+                "first copy direct (path len 1)",
+                "%",
+                "first copy relayed",
+                "lead over 2nd copy median s",
+                "p90 s",
+            ],
             [
                 [
                     l,
@@ -3491,7 +4532,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A("Hop count of the first copy:")
     A("")
-    allk = sorted({k for d in fr.values() for k in d["first_copy_hop_histogram"]}, key=int)
+    allk = sorted(
+        {k for d in fr.values() for k in d["first_copy_hop_histogram"]}, key=int
+    )
     A(
         md_table(
             ["log"] + [f"{k} hops" for k in allk],
@@ -3513,7 +4556,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     rows = []
     for l, d in fr.items():
         for t, v in d["lead_by_type_s"].items():
-            rows.append([l, TYPE_LABEL.get(t, t), v["n"], v.get("min"), v.get("median"), v.get("p90"), v.get("max")])
+            rows.append(
+                [
+                    l,
+                    TYPE_LABEL.get(t, t),
+                    v["n"],
+                    v.get("min"),
+                    v.get("median"),
+                    v.get("p90"),
+                    v.get("max"),
+                ]
+            )
     A(md_table(["log", "type", "n", "min", "median", "p90", "max"], rows))
     A("")
     for l, d in fr.items():
@@ -3521,7 +4574,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
         A(
             md_table(
-                ["relayer", "first copies", "% of msg_ids", "total copies", "first-copy rate %", "lead median s", "lead p90 s"],
+                [
+                    "relayer",
+                    "first copies",
+                    "% of msg_ids",
+                    "total copies",
+                    "first-copy rate %",
+                    "lead median s",
+                    "lead p90 s",
+                ],
                 [
                     [
                         r["relayer"],
@@ -3554,7 +4615,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
         A(
             md_table(
-                ["relayer", "total copies", "late copies", "late share %", "median s", "p90 s", "max s"],
+                [
+                    "relayer",
+                    "total copies",
+                    "late copies",
+                    "late share %",
+                    "median s",
+                    "p90 s",
+                    "max s",
+                ],
                 [
                     [
                         r["relayer"],
@@ -3572,7 +4641,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
     A("Hop count of the first copy when it already arrived multi-hop:")
     A("")
-    allk = sorted({k for d in rl.values() for k in d["first_copy_multihop_histogram"]}, key=int)
+    allk = sorted(
+        {k for d in rl.values() for k in d["first_copy_multihop_histogram"]}, key=int
+    )
     A(
         md_table(
             ["log", "multi-hop first copies"] + [f"{k} hops" for k in allk],
@@ -3593,7 +4664,19 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["callsign", "hw", "fw", "CAD", "NC min", "NC median", "NC max", "samples", "sources", "heard directly by n logs", "copies as relayer"],
+            [
+                "callsign",
+                "hw",
+                "fw",
+                "CAD",
+                "NC min",
+                "NC median",
+                "NC max",
+                "samples",
+                "sources",
+                "heard directly by n logs",
+                "copies as relayer",
+            ],
             [
                 [
                     r["callsign"],
@@ -3613,11 +4696,21 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         )
     )
     A("")
-    A("### NC in the node's own beacon vs direct neighbours actually observed in its log")
+    A(
+        "### NC in the node's own beacon vs direct neighbours actually observed in its log"
+    )
     A("")
     A(
         md_table(
-            ["log", "own call", "NC min", "NC median", "NC max", "distinct direct neighbours in log", "observed / reported"],
+            [
+                "log",
+                "own call",
+                "NC min",
+                "NC median",
+                "NC max",
+                "distinct direct neighbours in log",
+                "observed / reported",
+            ],
             [
                 [
                     r["log"],
@@ -3637,7 +4730,13 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["scope", "n relayers", "Spearman NC vs first-copy rate", "Spearman NC vs median delay behind first", "Spearman NC vs total copies"],
+            [
+                "scope",
+                "n relayers",
+                "Spearman NC vs first-copy rate",
+                "Spearman NC vs median delay behind first",
+                "Spearman NC vs total copies",
+            ],
             [
                 [
                     k,
@@ -3652,11 +4751,20 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     )
     A("")
     for l, entries in nc["scatter"].items():
-        A(f"**{l}** -- NC vs relay-race performance (relayers with >= {RELAY_MIN_COPIES} copies)")
+        A(
+            f"**{l}** -- NC vs relay-race performance (relayers with >= {RELAY_MIN_COPIES} copies)"
+        )
         A("")
         A(
             md_table(
-                ["relayer", "NC median", "total copies", "first copies", "first-copy rate %", "median delay behind first s"],
+                [
+                    "relayer",
+                    "NC median",
+                    "total copies",
+                    "first copies",
+                    "first-copy rate %",
+                    "median delay behind first s",
+                ],
                 [
                     [
                         e["relayer"],
@@ -3682,7 +4790,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["relayer that forwarded at H=0", "wrapping frames", "distinct msg_ids", "hw", "fw", "CAD firmware", "originates own traffic"],
+            [
+                "relayer that forwarded at H=0",
+                "wrapping frames",
+                "distinct msg_ids",
+                "hw",
+                "fw",
+                "CAD firmware",
+                "originates own traffic",
+            ],
             [
                 [
                     r["relayer"],
@@ -3704,7 +4820,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["host", "log", "msg_id", "H", "hops", "origin", "path", "text"],
             [
-                [r["host"], r["node"], r["msg_id"], r["max_hop"], r["hops"], r["origin"], r["path"], r["text"]]
+                [
+                    r["host"],
+                    r["node"],
+                    r["msg_id"],
+                    r["max_hop"],
+                    r["hops"],
+                    r["origin"],
+                    r["path"],
+                    r["text"],
+                ]
                 for r in wc["timeline"]
             ],
         )
@@ -3717,7 +4842,10 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(lb["note"])
     A("")
-    for key, title in (("slow_cluster", "Slow cluster"), ("fast_cluster", "Fast cluster")):
+    for key, title in (
+        ("slow_cluster", "Slow cluster"),
+        ("fast_cluster", "Fast cluster"),
+    ):
         c = lb[key]
         A(f"### {title} -- {c['count']} of {lb['total']} late copies")
         A("")
@@ -3729,12 +4857,21 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                 "`OE3KHA-20,OE3CZC-1`."
             )
             A("")
-        A("Delaying segments (a chain longer than 1 means the intermediate hops were never heard,")
+        A(
+            "Delaying segments (a chain longer than 1 means the intermediate hops were never heard,"
+        )
         A("so the delay could sit at any member):")
         A("")
         A(
             md_table(
-                ["culprit chain", "unambiguous", "count", "median delay min", "max delay min", "member hw / fw"],
+                [
+                    "culprit chain",
+                    "unambiguous",
+                    "count",
+                    "median delay min",
+                    "max delay min",
+                    "member hw / fw",
+                ],
                 [
                     [
                         r["culprit_chain"],
@@ -3742,7 +4879,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                         r["count"],
                         r["median_delay_min"],
                         r["max_delay_min"],
-                        "; ".join(f"{m['callsign']} {m['hw']} {m['fw']}" for m in r["members"]),
+                        "; ".join(
+                            f"{m['callsign']} {m['hw']} {m['fw']}" for m in r["members"]
+                        ),
                     ]
                     for r in c["culprits"]["chains"]
                 ],
@@ -3753,7 +4892,14 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
         A(
             md_table(
-                ["callsign", "in delaying segments", "median segment delay min", "hw", "fw", "CAD firmware"],
+                [
+                    "callsign",
+                    "in delaying segments",
+                    "median segment delay min",
+                    "hw",
+                    "fw",
+                    "CAD firmware",
+                ],
                 [
                     [
                         m["callsign"],
@@ -3761,7 +4907,9 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                         m["median_segment_delay_min"],
                         m["hw"],
                         m["fw"],
-                        "-" if m["fw_cad"] is None else ("yes" if m["fw_cad"] else "no"),
+                        "-"
+                        if m["fw_cad"] is None
+                        else ("yes" if m["fw_cad"] else "no"),
                     ]
                     for m in c["culprits"]["members"]
                 ],
@@ -3771,13 +4919,28 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         if key == "slow_cluster":
             A("Most frequent full paths of the slow copies:")
             A("")
-            A(md_table(["path of the late copy", "count"], [[p, v] for p, v in c["top_paths"]]))
+            A(
+                md_table(
+                    ["path of the late copy", "count"],
+                    [[p, v] for p, v in c["top_paths"]],
+                )
+            )
             A("")
     A("### The 40 latest copies with their attributed hop")
     A("")
     A(
         md_table(
-            ["node", "msg_id", "t", "origin", "gap min", "culprit chain", "culprit delay min", "prefixes observed", "path of late copy"],
+            [
+                "node",
+                "msg_id",
+                "t",
+                "origin",
+                "gap min",
+                "culprit chain",
+                "culprit delay min",
+                "prefixes observed",
+                "path of late copy",
+            ],
             [
                 [
                     r["node"],
@@ -3817,7 +4980,13 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["bucket", "copies", "% copies", "airtime s", "% airtime"],
             [
-                [b, v["copies"], f"{v['pct_copies']:.2f}", v["airtime_s"], f"{v['pct_airtime']:.2f}"]
+                [
+                    b,
+                    v["copies"],
+                    f"{v['pct_copies']:.2f}",
+                    v["airtime_s"],
+                    f"{v['pct_airtime']:.2f}",
+                ]
                 for b, v in pooled["summary"].items()
             ],
         )
@@ -3837,7 +5006,13 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         md_table(
             ["bucket", "first copies", "% first copies", "airtime s", "% airtime"],
             [
-                [b, v["copies"], f"{v['pct_copies']:.2f}", v["airtime_s"], f"{v['pct_airtime']:.2f}"]
+                [
+                    b,
+                    v["copies"],
+                    f"{v['pct_copies']:.2f}",
+                    v["airtime_s"],
+                    f"{v['pct_airtime']:.2f}",
+                ]
                 for b, v in fc["summary"].items()
             ],
         )
@@ -3853,7 +5028,15 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["log", "originator CAD %", "originator pre-CAD %", "relayer CAD %", "relayer pre-CAD %", "relayer unknown %", "relayer pre-CAD airtime %"],
+            [
+                "log",
+                "originator CAD %",
+                "originator pre-CAD %",
+                "relayer CAD %",
+                "relayer pre-CAD %",
+                "relayer unknown %",
+                "relayer pre-CAD airtime %",
+            ],
             [
                 [
                     r["log"],
@@ -3873,7 +5056,16 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
     A("")
     A(
         md_table(
-            ["relayer", "copies", "airtime s", "fw", "hw (from LH byte)", "heard by", "dominates", "share of that log's relayed copies %"],
+            [
+                "relayer",
+                "copies",
+                "airtime s",
+                "fw",
+                "hw (from LH byte)",
+                "heard by",
+                "dominates",
+                "share of that log's relayed copies %",
+            ],
             [
                 [
                     r["relayer"],
@@ -3903,7 +5095,17 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
         A("")
         A(
             md_table(
-                ["relayer", "copies", "% copies", "airtime s", "% airtime", "fw as originator", "CAD", "own frames heard", "hw (from LH byte)"],
+                [
+                    "relayer",
+                    "copies",
+                    "% copies",
+                    "airtime s",
+                    "% airtime",
+                    "fw as originator",
+                    "CAD",
+                    "own frames heard",
+                    "hw (from LH byte)",
+                ],
                 [
                     [
                         r["relayer"],
@@ -3921,11 +5123,21 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
             )
         )
         A("")
-        A(f"Column sum: {block['pct_sum']:.2f} % of copies, {block['pct_sum_airtime']:.2f} % of airtime")
+        A(
+            f"Column sum: {block['pct_sum']:.2f} % of copies, {block['pct_sum_airtime']:.2f} % of airtime"
+        )
         A("")
         A(
             md_table(
-                ["bucket", "copies", "% copies", "airtime s", "% airtime", "first copies", "% first copies"],
+                [
+                    "bucket",
+                    "copies",
+                    "% copies",
+                    "airtime s",
+                    "% airtime",
+                    "first copies",
+                    "% first copies",
+                ],
                 [
                     [
                         b,
@@ -3940,6 +5152,165 @@ def render_md(res: dict[str, Any], nodes: list[NodeLog], receivers: list[NodeLog
                 ],
             )
         )
+        A("")
+
+    # ---- 25 setlog instrumentation (SL-01..SL-06) ----
+    sl = res.get("25_setlog")
+    if sl is not None:
+        A("## 25. setlog instrumentation (SL-01..SL-06)")
+        A("")
+        A(sl["note"])
+        A("")
+        for label, block in sl["per_node"].items():
+            A(f"### {label}")
+            A("")
+
+            rs = block["rssi_snr"]
+            if isinstance(rs, str):
+                A(f"- RSSI/SNR distribution: {rs}")
+            else:
+                A(
+                    f"- RSSI/SNR over {rs['n']} receptions -- RSSI median {rs['rssi_dbm']['median']} dBm "
+                    f"(min {rs['rssi_dbm']['min']}, max {rs['rssi_dbm']['max']}), SNR median {rs['snr_db']['median']} dB. "
+                    f"Noise floor estimate {rs['noise_floor_estimate_dbm']} dBm ({rs['noise_floor_method']})."
+                )
+            cd = block["copies_vs_dup"]
+            if isinstance(cd, str):
+                A(f"- Copies vs `DUP:d` cross-check: {cd}")
+            else:
+                A(
+                    f"- Copies vs `DUP:d` cross-check: DUP field {cd['dup_field_count']}, old copy-count method "
+                    f"{cd['copy_count_old_method']}. {cd['note']}"
+                )
+            A("")
+
+            rr = block["relay_reasons"]
+            if isinstance(rr, str):
+                A(f"Relay reasons: {rr}")
+                A("")
+            else:
+                A(
+                    f"Relay decisions: {rr['total']} (SL-02 `RLY` lines, one per NEW frame)"
+                )
+                A("")
+                A(
+                    md_table(
+                        ["reason", "count"],
+                        [[k, v] for k, v in rr["by_reason"].items()],
+                    )
+                )
+                A("")
+                A(
+                    md_table(
+                        ["reason/type", "count"],
+                        [[k, v] for k, v in rr["by_reason_and_type"].items()],
+                    )
+                )
+                A("")
+
+            tw = block["tx_wait"]
+            if isinstance(tw, str):
+                A(f"TX wait time: {tw}")
+                A("")
+            else:
+                A(f"TX wait time (SL-03), {tw['total']} own transmissions, by prio:")
+                A("")
+                A(
+                    md_table(
+                        ["prio", "n", "median ms", "p90 ms", "max ms"],
+                        [
+                            [k, v["n"], v["median_ms"], v["p90_ms"], v["max_ms"]]
+                            for k, v in tw["by_prio"].items()
+                        ],
+                    )
+                )
+                A("")
+                A("by src (`o`=own, `r`=relay, `g`=server-injected):")
+                A("")
+                A(
+                    md_table(
+                        ["src", "n", "median ms", "p90 ms", "max ms"],
+                        [
+                            [k, v["n"], v["median_ms"], v["p90_ms"], v["max_ms"]]
+                            for k, v in tw["by_src"].items()
+                        ],
+                    )
+                )
+                A("")
+
+            co = block["collision"]
+            if isinstance(co, str):
+                A(f"Collision rate: {co}")
+            else:
+                A(
+                    f"Collision rate (SL-04): {co['err_count']} `ERR` lines, "
+                    f"{co['err_per_hour']}/h, {co['err_pct_of_rx_plus_err']} % of RX+ERR"
+                )
+            A("")
+
+            cu = block["channel_util_5min"]
+            if isinstance(cu, str):
+                A(f"Channel utilisation (5 min): {cu}")
+                A("")
+            else:
+                A("Channel utilisation per 5-minute `STAT` interval (SL-05):")
+                A("")
+                A(
+                    md_table(
+                        ["host", "util %", "rx ms", "tx ms"],
+                        [
+                            [r["host"], r["util_pct"], r["rx_ms"], r["tx_ms"]]
+                            for r in cu
+                        ],
+                    )
+                )
+                A("")
+                ht = block["heap_trend"]
+                A(
+                    f"Heap trend over {ht['n_stat_lines']} `STAT` lines: first {ht['first']}, "
+                    f"min {ht['min']}, last {ht['last']} bytes free."
+                )
+                A("")
+                dw = block["dedup_window"]
+                A(
+                    f"Dedup window estimate: {dw['window_s_median']} s median "
+                    f"(ring size assumed {dw['dedup_ring_assumed']}). {dw['note']}"
+                )
+                A("")
+                A(f"Firmware reported locally (SL-05 `fw=`): {block['fw']}")
+                A("")
+
+            gwu = block["gwu_count"]
+            A(f"Gateway uploads (SL-06 `GWU`): {gwu}")
+            A("")
+
+        A("### Gateway multiplier (SL-06 `GWI`, cross-node)")
+        A("")
+        gm = sl["gateway_multiplier"]
+        if isinstance(gm, str):
+            A(gm)
+        else:
+            A(gm["note"])
+            A("")
+            A(
+                md_table(
+                    ["msg_id", "GWI lines", "distinct nodes", "nodes"],
+                    [
+                        [
+                            r["msg_id"],
+                            r["gwi_count"],
+                            r["gwi_nodes"],
+                            ", ".join(r["nodes"]),
+                        ]
+                        for r in gm["rows"]
+                    ],
+                )
+            )
+            A("")
+            A(
+                f"Mean distinct nodes injecting the same msg_id: {gm['mean_gwi_nodes_per_msgid']}"
+            )
+            A("")
         A("")
 
     return "\n".join(p)
@@ -3959,7 +5330,11 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
     def run(cmd: str) -> str:
         try:
             return subprocess.run(
-                ["sh", "-c", cmd], capture_output=True, text=True, timeout=120, check=False
+                ["sh", "-c", cmd],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
             ).stdout.strip()
         except (OSError, subprocess.SubprocessError) as exc:  # pragma: no cover
             return f"ERROR {exc}"
@@ -3979,10 +5354,11 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
                 "match": shell == str(script),
             }
         )
-        # 2) unique msg_ids
-        cmd = (
-            f"grep ' \\[LOG\\] ' {f!r} | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l"
-        )
+        # 2) unique msg_ids. Restricted to the RX/ACK "[LOG] <3 digits> " marker
+        # (msg_len for RX, "007"/"012" for ACK) so the SL-02..SL-06 line kinds
+        # (RLY/TX/GWI/GWU), which also carry an "x<8 hex>" msg_id but use a
+        # keyword instead of 3 digits right after "[LOG] ", are not counted twice.
+        cmd = f"grep -E ' \\[LOG\\] [0-9]{{3}} ' {f!r} | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l"
         shell = run(cmd)
         script = len({r.msg_id for r in n.receptions})
         checks.append(
@@ -4053,7 +5429,7 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
         cmd = (
             f"echo $(( $(grep -c ' \\[LOG\\] [0-9][0-9][0-9] ' {f!r}) "
             f"- $(grep -c 'FCS:0000' {f!r}) "
-            f"- $(grep ' \\[LOG\\] ' {f!r} | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l) ))"
+            f"- $(grep -E ' \\[LOG\\] [0-9]{{3}} ' {f!r} | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l) ))"
         )
         shell = run(cmd)
         script = len(n.receptions) - len({r.msg_id for r in n.receptions})
@@ -4083,7 +5459,9 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
         # 9) position beacons carrying a /N neighbour-count field
         cmd = f"grep ' \\[LOG\\] [0-9][0-9][0-9] ! ' {f!r} | grep -cE '/N[0-9]' || true"
         shell = run(cmd)
-        script = sum(1 for r in n.receptions if r.ptype == "!" and RE_POS_NC.search(r.payload))
+        script = sum(
+            1 for r in n.receptions if r.ptype == "!" and RE_POS_NC.search(r.payload)
+        )
         checks.append(
             {
                 "check": f"{n.label}: position beacons with /N field",
@@ -4120,8 +5498,9 @@ def verify(nodes: list[NodeLog], res: dict[str, Any]) -> list[dict[str, Any]]:
     receivers = [n for n in nodes if n.receptions]
     files = " ".join(repr(str(n.path)) for n in receivers)
     all_files = " ".join(repr(str(n.path)) for n in nodes)
-    # corpus level: union of msg_ids over the receiving nodes
-    cmd = f"cat {files} | grep ' \\[LOG\\] ' | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l"
+    # corpus level: union of msg_ids over the receiving nodes (same "[LOG] <3
+    # digits> " restriction as check 2 -- excludes RLY/TX/GWI/GWU)
+    cmd = f"cat {files} | grep -E ' \\[LOG\\] [0-9]{{3}} ' | grep -v 'FCS:0000' | grep -oE 'x[0-9A-F]{{8}}' | sort -u | wc -l"
     shell = run(cmd)
     script = res["07_cross_node"]["union_msg_ids"]
     checks.append(
@@ -4185,7 +5564,9 @@ def collect_anomalies(nodes: list[NodeLog], res: dict[str, Any]) -> list[str]:
                 "frames, so it is a server-connected gateway."
             )
         elif not n.receptions:
-            out.append(f"**{n.label}** has no `[LOG]` receive lines at all (receive log flag off).")
+            out.append(
+                f"**{n.label}** has no `[LOG]` receive lines at all (receive log flag off)."
+            )
     for label, d in res["16_own_echo"].items():
         if d.get("own_call_as_last_hop", 0):
             out.append(
@@ -4233,7 +5614,11 @@ def collect_anomalies(nodes: list[NodeLog], res: dict[str, Any]) -> list[str]:
             + "; ".join(worst)
             + ". A station is flushing a stale transmit queue minutes after the fact."
         )
-    sus = [s for s in res["13_hey"]["non_appending_relay_suspects"] if s["short_share_pct"] > 50.0]
+    sus = [
+        s
+        for s in res["13_hey"]["non_appending_relay_suspects"]
+        if s["short_share_pct"] > 50.0
+    ]
     for s in sus:
         out.append(
             f"**{s['relay']} never appends its HEY signal report**: it appears in {s['in_short_chains']} short "
@@ -4259,7 +5644,13 @@ def collect_beacons(nodes: list[NodeLog]) -> dict[str, str]:
     # also add the calls named in the brief if present
     for n in nodes:
         for r in n.receptions:
-            if r.ptype == "!" and r.origin in {"OE3XIA-12", "OE3XOC-12", "OE3XWJ-12", "OE3XIR-12", "OE3MAG-12"}:
+            if r.ptype == "!" and r.origin in {
+                "OE3XIA-12",
+                "OE3XOC-12",
+                "OE3XWJ-12",
+                "OE3XIR-12",
+                "OE3MAG-12",
+            }:
                 out.setdefault(r.origin, f"{r.dest}!{r.payload[:90]}")
     return dict(sorted(out.items()))
 
@@ -4270,12 +5661,27 @@ def collect_beacons(nodes: list[NodeLog]) -> dict[str, str]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Analyse MeshCom mountain-gateway console logs.")
+    ap = argparse.ArgumentParser(
+        description="Analyse MeshCom mountain-gateway console logs."
+    )
     ap.add_argument("logs", nargs="+", type=Path, help="log files to analyse")
-    ap.add_argument("--out", required=True, type=Path, help="output directory for berg.json / berg.md")
+    ap.add_argument(
+        "--out",
+        required=True,
+        type=Path,
+        help="output directory for berg.json / berg.md",
+    )
     ap.add_argument("--json-name", default="berg.json")
     ap.add_argument("--md-name", default="berg.md")
-    ap.add_argument("--no-verify", action="store_true", help="skip the shell cross-checks")
+    ap.add_argument(
+        "--no-verify", action="store_true", help="skip the shell cross-checks"
+    )
+    ap.add_argument(
+        "--dedup-ring",
+        type=int,
+        default=100,
+        help="MAX_DEDUP_RING of the board under analysis, for the SL-05 dedup-window estimate (board-dependent, default 100)",
+    )
     args = ap.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -4318,6 +5724,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     res["21_neighbour_count"] = a21_neighbour_count(nodes, res)
     res["22_wrap_culprits"] = a22_wrap_culprits(nodes, res)
     res["23_late_by_path"] = a23_late_by_path(nodes, res)
+    res["25_setlog"] = a25_setlog(nodes, args.dedup_ring)
     res["00_beacons"] = collect_beacons(nodes)
     res["_anomalies"] = collect_anomalies(nodes, res)
     res["_verification"] = [] if args.no_verify else verify(nodes, res)
@@ -4333,7 +5740,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     json_path = args.out / args.json_name
     md_path = args.out / args.md_name
-    json_path.write_text(json.dumps(res, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(res, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
     md_path.write_text(render_md(res, nodes, receivers, cmds), encoding="utf-8")
 
     # sanity: every percentage table must sum to 100 +- 0.5
@@ -4353,7 +5762,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         for key in ("pct_sum", "pct_sum_airtime"):
             if d["rows"] and abs(d[key] - 100.0) > 0.5:
                 problems.append(f"24_relayer_firmware[{label}].{key} sums to {d[key]}")
-        if d["first_copy"]["first_copy_relayed"] and abs(d["first_copy"]["pct_sum"] - 100.0) > 0.5:
+        if (
+            d["first_copy"]["first_copy_relayed"]
+            and abs(d["first_copy"]["pct_sum"] - 100.0) > 0.5
+        ):
             problems.append(
                 f"24_relayer_firmware[{label}].first_copy sums to {d['first_copy']['pct_sum']}"
             )
@@ -4362,7 +5774,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             problems.append(f"19_first_relayer[{label}] sums to {d['pct_sum']}")
         got = sum(r["first_copies"] for r in d["rows"])
         if got != d["msg_ids"]:
-            problems.append(f"19_first_relayer[{label}] first copies {got} != msg_ids {d['msg_ids']}")
+            problems.append(
+                f"19_first_relayer[{label}] first copies {got} != msg_ids {d['msg_ids']}"
+            )
     for label, d in res["06_redundancy"].items():
         if label not in res["20_relay_latency"]:
             continue
@@ -4377,7 +5791,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     bad = [c for c in res["_verification"] if not c["match"]]
     for c in bad:
-        print(f"WARNING: verification mismatch: {c['check']} shell={c['shell']} script={c['script']}", file=sys.stderr)
+        print(
+            f"WARNING: verification mismatch: {c['check']} shell={c['shell']} script={c['script']}",
+            file=sys.stderr,
+        )
 
     print(f"wrote {json_path}")
     print(f"wrote {md_path}")

@@ -1,6 +1,7 @@
 # Implementierungsplan SL-01..SL-07 — Messpunkte unter `--setlog on`
 
-**Status: FREIGEGEBEN 2026-09-02 (Operator), noch nicht begonnen.** Umsetzung
+**Status: IN UMSETZUNG: Welle 0/1/2 fertig 2026-09-02, Welle 3 Bench offen (kein
+Knoten angesteckt).** Umsetzung
 mit `/orchestrate-waves` im eigenen Worktree `/Users/martinwerner/WebDev/mc-setlog`,
 Branch `feat-setlog-20260902`, Basis `v4.35p_prio` (Operator-Entscheid 2026-09-02:
 Fork-Basis, nicht `upstream/dev` — der Fork hat `env:native`, `test/support`,
@@ -54,8 +55,12 @@ im Nachtbericht offen bleiben mussten:
    ESP32 die 2323-Konsole nicht. Alle neuen Zeilen: `printfdeb`, Felder als
    `key=value`, Leerzeichen als Trenner, wie die bestehende `[LOG]`-Zeile.
 4. **Zeilen kurz halten.** `loc_buf` in `printfdeb_functions.cpp:86` hat 600
-   Byte; darüber wird `malloc` gerufen. Ziel: RX-Zeile bleibt unter 300 Byte
-   auch mit langem Pfad, alle anderen unter 160 Byte.
+   Byte; darüber wird `malloc` gerufen. Gemessene Grenzen: RX-Zeile unter
+   340 Byte mit Achter-Pfad — die bestehende Zeile liegt dort schon bei
+   264 Byte, der Anhang addiert maximal 46; STAT unter 300 Byte; alle
+   anderen (RLY, TX, ERR, GWI, GWU) unter 160 Byte. Zusätzlich jeder
+   Formatstring unter 300 Byte wegen `char nformat[300]`
+   (`printfdeb_functions.cpp:82`, siehe "Korrekturen 2026-09-02").
 5. **Ausführungskontext beachten.** `OnRxDone()` läuft auf nRF52 im
    FreeRTOS-Timer-Task (Prio 2, 1 KB Stack) oder im LORA-Task
    (`docs/architecture/09-concurrency-map.md:72-106`); die bestehende
