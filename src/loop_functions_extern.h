@@ -325,7 +325,7 @@ extern ch_util_ulong_t ch_util_tx_accum;
 
 // SL-05 -- Zaehler der 5-Minuten-STAT-Zeile unter `--setlog on`.
 // Definitionsstelle ist loop_functions.cpp neben ch_util_*_accum; alle sind
-// std::atomic, weil Timer-Task (SL-01/SL-04) und loop() (SL-03/SL-05) sie
+// std::atomic, weil LORA-Task (SL-01/SL-04) und loop() (SL-03/SL-05) sie
 // gleichzeitig anfassen. Zuruecksetzen im STAT-Druck per exchange(0).
 extern std::atomic<uint32_t> stat_newid;       // neue msg_id im Dedup-Ring
 extern std::atomic<uint32_t> stat_dup;         // erkannte Kopien
@@ -336,19 +336,14 @@ extern std::atomic<uint32_t> stat_util_rx_5m;  // RX-Luftzeit im Fenster (ms)
 extern std::atomic<uint32_t> stat_util_tx_5m;  // TX-Luftzeit im Fenster (ms)
 extern std::atomic<uint8_t>  stat_ring_max;    // Hochwasser von txRingDepth()
 
-// SL-01 -- RX-Varianten von printBuffer_aprs()/printBuffer_ack() mit dem
-// Pegel-/Dedup-Anhang (Definition in loop_functions.cpp neben den Originalen).
-// Hier deklariert und nicht in loop_functions.h, weil loop_functions.h in
-// Welle 1 kein Agent anfassen darf und diese Datei bereits Funktionen
-// deklariert (siehe addTxRingEntry oben).
-// `uint8_t *payload` statt `uint8_t payload[UDP_TX_BUF_SIZE+10]` wie in
-// loop_functions.h: als Parameter ist beides derselbe Typ, und diese Datei
-// zieht configuration.h nicht ein.
-struct aprsMessage;
-void printBuffer_aprs_rx(const char *msgSource, struct aprsMessage &aprsmsg,
-                         int16_t rssi, int8_t snr, bool dup, bool own_echo);
-void printBuffer_ack_rx(const char *msgSource, uint8_t *payload,
-                        int16_t size, int16_t rssi, int8_t snr, bool dup, bool own_echo);
+// SL: prints `HH:MM:SS [LOG] <body>` via printfdeb without a String allocation
+// (definition in loop_functions.cpp next to getTimeString()).
+void setlogPrint(const char *body);
+// SL-05: fills the STAT fields from the interval counters (drains them), the
+// mheard/trickle/version globals and uptime; heap is platform-specific and passed in.
+// stat_drop_count[] is read, not cleared -- the platform tick clears it.
+struct setlogStatFields;
+void setlogFillStat(struct setlogStatFields *f, uint32_t heap);
 
 
 // Trickle-HEY state

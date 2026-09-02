@@ -14,6 +14,10 @@
 #include <loop_functions_extern.h>
 #include <aprs_functions.h>
 
+// setlogRingSourceCode() -- Header-Inline, keine Link-Abhaengigkeit auf
+// setlog_lines.cpp (env:native_aprs baut diese TU, aber nicht setlog_lines.cpp).
+#include <setlog_lines.h>
+
 #if defined(NATIVE_BUILD)
 // Native Testbuild: loop_functions.cpp (die kanonische Definitionsstelle
 // dieser Globals, siehe loop_functions_extern.h) wird hier NICHT mitgebaut
@@ -597,11 +601,12 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     // SL-05: Hochwasser des Ringfuellstands im 5-Minuten-Fenster. Bewusst
     // ausserhalb des Locks und ueber txRingDepth() (selbst lock-frei, siehe
     // dessen Doku): iWrite ist hier bereits weitergeschaltet, die Tiefe
-    // enthaelt also den neuen Eintrag. Kein Ersatz fuer stat_queue_hwm -- das
-    // zaehlt seit dem Boot und wird nie zurueckgesetzt, stat_ring_max wird
-    // nach jedem STAT-Druck genullt. CAS-Schleife statt load/store, damit ein
-    // gleichzeitiger Schreiber aus dem anderen Task kein Maximum verliert.
-    if(resultSlot >= 0)
+    // enthaelt also den neuen Eintrag. Auch bei resultSlot < 0 gemessen -- ein
+    // verworfener Eintrag heisst voller Ring, und genau der Wert ist gesucht.
+    // Kein Ersatz fuer stat_queue_hwm -- das zaehlt seit dem Boot und wird nie
+    // zurueckgesetzt, stat_ring_max wird nach jedem STAT-Druck genullt.
+    // CAS-Schleife statt load/store, damit ein gleichzeitiger Schreiber aus
+    // dem anderen Task kein Maximum verliert.
     {
         uint8_t depth_now = (uint8_t)txRingDepth();
         uint8_t seen = stat_ring_max.load();

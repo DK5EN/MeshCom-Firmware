@@ -64,6 +64,7 @@ static void resetRing(void)
     memset(retryCount, 0, sizeof(retryCount));
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
+    memset(ringSource, 0, sizeof(ringSource));
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
     mc_test_set_millis(0);
@@ -395,6 +396,56 @@ static void test_n24_indirekte_eviction_verwaist_keinen_slot(void)
 
     // Kein unbilanzierter Verlust: CRITICAL wurde nie als Drop gebucht.
     TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
+}
+
+// -------------------------------------------- SL-03/SL-06: ringSource[]
+//
+// addTxRingEntry() leitet die Herkunftskennung aus dem `source`-Label ab
+// (setlogRingSourceCode() in setlog_lines.h) und nimmt sie beim Umzug der
+// Prio-Verdraengung mit -- ohne diese Kopie druckte die TX-Zeile aus SL-03
+// fuer den umgezogenen Eintrag die Herkunft des verdraengten Slots.
+static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
+{
+    // Slot 0: Relay-Weiterleitung eines Empfangs -> 'r', Prio CRITICAL
+    // (bleibt bei der Eviction-Auswahl unangetastet und zieht deshalb um).
+    BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "rx_ack_fwd"));
+    TEST_ASSERT_EQUAL_INT('r', (int)ringSource[0]);
+
+    // Slots 1..4: eigene Positionen -> 'o'
+    for (int i = 1; i <= 4; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x5000 + i));
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos"));
+        TEST_ASSERT_EQUAL_INT('o', (int)ringSource[i]);
+    }
+
+    // Slot 5: HEY -> schlechteste Prio im Fenster, wird verdraengt.
+    BuiltFrame hey = buildHeyFrame(0x6000UL);
+    TEST_ASSERT_EQUAL_INT(5, addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "beacon"));
+    TEST_ASSERT_EQUAL_INT('o', (int)ringSource[5]);
+
+    for (int i = 6; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x7000 + i));
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos");
+    }
+    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    // Vom Server eingespeist -> 'g'; verdraengt Slot 5 und zieht Slot 0 dorthin.
+    BuiltFrame trigger = buildPositionFrame(0x8000UL);
+    int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "udp_rx");
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+
+    // aus dem Label des neuen Eintrags
+    TEST_ASSERT_EQUAL_INT('g', (int)ringSource[slotNew]);
+    // beim Umzug mitgenommen: der ACK von Slot 0 steht jetzt in Slot 5 und
+    // ist weiterhin als Relay gekennzeichnet, nicht als das verdraengte 'o'.
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ack.len, ringBuffer[5][0]);
+    TEST_ASSERT_EQUAL_INT('r', (int)ringSource[5]);
+    // unbeteiligte Slots unveraendert
+    TEST_ASSERT_EQUAL_INT('o', (int)ringSource[1]);
 }
 
 // ----------------------------------------------------- Test 5: Overflow-Drop
@@ -870,6 +921,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);
     RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
+    RUN_TEST(test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert);
     RUN_TEST(test_len_null_wird_abgewiesen);
     RUN_TEST(test_len_ueber_max_wird_abgewiesen);
     RUN_TEST(test_len_exakt_max_wird_enqueued);

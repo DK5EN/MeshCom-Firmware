@@ -1388,41 +1388,21 @@ void nrf52loop()
             setlog_stat_timer = millis();
 
             struct setlogStatFields f;
-            unsigned long stat_rx_ms = stat_util_rx_5m.exchange(0);
-            unsigned long stat_tx_ms = stat_util_tx_5m.exchange(0);
-            uint32_t util = (uint32_t)((stat_rx_ms + stat_tx_ms) * 100UL /
-                                        (PRIO_STAT_INTERVAL_S * 1000UL));
-            if(util > 100) util = 100;
-            f.util_pct = (uint8_t)util;
-            f.rx_ms = (uint32_t)stat_rx_ms;
-            f.tx_ms = (uint32_t)stat_tx_ms;
-            f.newid = stat_newid.exchange(0);
-            f.dup = stat_dup.exchange(0);
-            f.err = stat_rx_err.exchange(0);
-            f.txn = stat_txn.exchange(0);
-            f.txfail = stat_txfail.exchange(0);
-            f.ringmax = stat_ring_max.exchange(0);
-            f.ring_size = MAX_RING;
+            setlogFillStat(&f, nrf52_getFreeHeap());
+
+            // stat_drop_count[] increments happen under this same lock in
+            // txring_functions.cpp -- clear under it too, right after the
+            // (uncleared) read inside setlogFillStat().
+            taskENTER_CRITICAL();
             for(int i = 0; i < 5; i++)
-            {
-                f.drop[i] = stat_drop_count[i + 1];
                 stat_drop_count[i + 1] = 0;
-            }
-            f.mh = (uint16_t)getMheardCount();
-            f.heap = nrf52_getFreeHeap();
-            f.trk_interval_s = (uint32_t)(trickle_interval_ms / 1000UL);
-            f.trk_consistent = trickle_consistent_count;
-            f.fw_major = shortVERSION();
-            f.fw_sub = shortSUBVERSION();
-            f.flash = FLASH_VERSION;
-            f.up_s = millis() / 1000UL;
-            f.t_ms = millis();
+            taskEXIT_CRITICAL();
 
             if(bDisplayLog)
             {
                 char buf[300];
                 setlogFormatStat(buf, sizeof(buf), &f);
-                printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                setlogPrint(buf);
             }
         }
     }

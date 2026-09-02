@@ -11,7 +11,6 @@
 //    <stdbool.h>/<string.h>. Damit sind die Zeilen ohne Hardware pruefbar.
 //  * Keine statischen Puffer. Jeder Formatierer schreibt in den vom Aufrufer
 //    gestellten `char buf[]` und schreibt nie mehr als `n` Byte (inkl. NUL).
-//    Der Kontext ist teilweise der nRF52-Timer-Task mit 1 KB Stack.
 //  * Kein Semikolon als Feldtrenner. printfdeb() schreibt `;` ausserhalb des
 //    CSV-Modus um (src/printfdeb_format.h). Trenner ist immer das Leerzeichen,
 //    Felder sind `key=value` bzw. `KEY:value` wie in der bestehenden
@@ -42,7 +41,7 @@
 //
 // Laenge im schlimmsten Fall (RSSI -32768, SNR -128, t = 2^32-1): 46 Zeichen;
 // mit realen Pegeln rund 38. Der Aufrufer braucht also 47 Byte Puffer --
-// printBuffer_aprs_rx()/printBuffer_ack_rx() stellen 56.
+// OnRxDone() in lora_functions.cpp stellt 56.
 int setlogFormatRxTail(char *buf, size_t n, int16_t rssi, int8_t snr,
                        bool dup, bool own_echo, uint32_t t_ms);
 

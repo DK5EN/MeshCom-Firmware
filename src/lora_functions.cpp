@@ -267,11 +267,8 @@ static int findAndStopRingSlot(uint32_t msgId)
     return -1;
 }
 
-// SL-01 -- Dedup-Verdikt zaehlen, genau einmal je empfangenem Frame und genau
-// dort, wo die Entscheidung faellt (ACK-Pfad und Normalpfad). Der Rueckgabewert
-// ist unveraendert der von is_new_packet(), damit sich der Aufrufer nicht
-// aendert. Die beiden Zaehler landen in der STAT-Zeile (SL-05) und muessen
-// deshalb zu RX_DEDUP_NEW/RX_DEDUP_DUP unter --loradebug passen.
+// SL-01 -- Dedup-Verdikt zaehlen, genau einmal je Frame und dort, wo die
+// Entscheidung faellt. Die Zaehler muessen zu RX_DEDUP_NEW/RX_DEDUP_DUP passen.
 static inline bool setlogCountDedup(bool is_new)
 {
     if(is_new)
@@ -282,11 +279,8 @@ static inline bool setlogCountDedup(bool is_new)
     return is_new;
 }
 
-// SL-01 -- steht das eigene Rufzeichen als vollstaendiges Pfadglied im
-// Source-Path? Dieselbe Aussage wie die Loop-Erkennung im Relay-Block
-// (String(",")+path+"," .indexOf(String(",")+call+",")), aber ohne die beiden
-// String-Allokationen: OnRxDone() laeuft auf nRF52 im Timer-Task mit 1 KB
-// Stack, und diese Auskunft wird bei jedem Empfang gebraucht.
+// SL-01 -- eigenes Rufzeichen als vollstaendiges Pfadglied im Source-Path?
+// Wie die Loop-Erkennung im Relay-Block, aber ohne String-Allokation.
 static bool setlogPathHasCall(const char *path, const char *call)
 {
     if(path == NULL || call == NULL || call[0] == 0x00)
@@ -337,16 +331,16 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
     memcpy(print_buff, payload, 12);
 
-    // SL-01: das Dedup-Verdikt faellt jetzt VOR dem Druck, damit die
-    // [LOG]-Zeile `DUP:` fuehren kann. is_new_packet() ist eine reine Suche
-    // ohne Seiteneffekt, checkOwnTx() weiter unten ebenfalls -- die
-    // Reihenfolge der beiden Aufrufe ist damit ohne Belang.
+    // SL-01: Dedup-Verdikt vor dem Druck, damit die [LOG]-Zeile `DUP:` fuehren
+    // kann. is_new_packet() ist eine reine Suche ohne Seiteneffekt.
     bool bIsNew = setlogCountDedup(is_new_packet(print_buff+1));
 
     if(bDisplayLog)
     {
         // ACK-Frames tragen keinen Pfad, deshalb OWN: immer '-'.
-        printBuffer_ack_rx("[LOG]", payload, (int16_t)size, (int16_t)rssi, (int8_t)snr, !bIsNew, false);
+        char tail[56];
+        setlogFormatRxTail(tail, sizeof(tail), (int16_t)rssi, (int8_t)snr, !bIsNew, false, (uint32_t)millis());
+        printBuffer_ack((char*)"[LOG]", payload, (int16_t)size, tail);
     }
 
     bool bServerFlag = false;
@@ -424,8 +418,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     //
     // Frueher hing das hinter `-D MC_TEST_HOOKS` und druckte hier direkt, was
     // in keinem Produktionsbuild lief: der Dump saesse im Radio-Callback
-    // (nRF52: Timer-Service-Task, 1 KB Stack) und printfdeb() braucht davon
-    // allein ~900 Byte, dazu ~48 ms Serial-Zeit mitten im RX-Pfad.
+    // (LORA-Task) und printfdeb() braucht allein ~900 Byte Stack, dazu
+    // ~48 ms Serial-Zeit mitten im RX-Pfad.
     // captureFrame() kopiert nur; ausgegeben wird aus dem Loop
     // (captureDrain() in main.cpp), siehe capture_functions.h.
     if(bLORADEBUG)
@@ -523,11 +517,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
     uint8_t print_buff[30];
 
-    // SL-02: einziger neuer Puffer in diesem Kontext. print_buff[30] ist zu
-    // klein und wird auf dem ACK-Pfad weiterbenutzt, die RX-Zeile formatiert
-    // in printBuffer_aprs_rx() -- bleibt die RLY-Zeile (unconf-Ausstieg oben
-    // und Relay-Entscheidung unten, nie beide im selben Durchlauf).
-    // Laengste RLY-Zeile: "RLY x12345678 : H03 q=gwfilter prio=5 slot=19".
+    // SL-02: Puffer fuer RLY/GWU (nie beide im selben Durchlauf). Laengste
+    // Zeile: "RLY x12345678 : H03 q=gwfilter prio=5 slot=19".
     char setlog_buf[96];
 
     //printfdeb("Start OnRxDone:<%c#%-20.20s> %i\n", payload[0], payload+6, size);
@@ -624,25 +615,26 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
         int icheck = checkOwnTx(aprsmsg.msg_id);
 
-        // SL-01: Dedup- und Echo-Verdikt fuer die [LOG]-Zeile. Nur wenn
-        // --setlog an ist, sonst kostet der zusaetzliche Ring-Durchlauf
-        // umsonst. Das gezaehlte Verdikt faellt weiterhin erst weiter unten,
-        // an der Stelle, die auch heute entscheidet.
-        bool rx_dup = false;
+        // SL-01: genau EIN is_new_packet() je Frame (die Suche druckt unter
+        // --loradebug); unten von setlogCountDedup() wiederverwendet.
+        bool rx_is_new = is_new_packet(RcvBuffer+1);
+        bool rx_dup = !rx_is_new;
         bool rx_own_echo = false;
 
         if(bDisplayLog)
         {
-            rx_dup = !is_new_packet(RcvBuffer+1);
             rx_own_echo = setlogPathHasCall(aprsmsg.msg_source_path.c_str(), meshcom_settings.node_call);
+
+            char tail[56];
+            setlogFormatRxTail(tail, sizeof(tail), (int16_t)rssi, (int8_t)snr, rx_dup, rx_own_echo, (uint32_t)millis());
 
             if(LogCallsign[0] != 0x00)
             {
                 if(is_equ((char*)LogCallsign, aprsmsg.msg_source_call.c_str()))
-                    printBuffer_aprs_rx("[LOG]", aprsmsg, (int16_t)rssi, (int8_t)snr, rx_dup, rx_own_echo);
+                    printBuffer_aprs((char*)"[LOG]", aprsmsg, tail);
             }
             else
-                printBuffer_aprs_rx("[LOG]", aprsmsg, (int16_t)rssi, (int8_t)snr, rx_dup, rx_own_echo);
+                printBuffer_aprs((char*)"[LOG]", aprsmsg, tail);
         }
 
         if(msg_type_b_lora == 0x00)
@@ -658,15 +650,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // the gateway upload and the relay decision below.
             logRxDropUnconfigured(aprsmsg.msg_source_call.c_str());
 
-            // SL-02: dieser Ausstieg liegt VOR dem Relay-Block, erzeugt aber
-            // dieselbe Aussage "nicht weitergesendet, Grund unconf". Wie im
-            // Block selbst nur fuer neue Frames -- ohne Dedup-Pruefung an
-            // dieser Stelle wuerde jede Kopie eine zweite RLY-Zeile ergeben.
+            // SL-02: Ausstieg vor dem Relay-Block, gleiche Aussage "nicht
+            // weitergesendet, Grund unconf". Nur fuer neue Frames.
             if(bDisplayLog && !rx_dup)
             {
                 setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
-                                aprsmsg.payload_type, aprsmsg.max_hop, "unconf", 0, -1);
-                printfdeb("%s [LOG] %s\n", getTimeString().c_str(), setlog_buf);
+                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, "unconf", 0, -1);
+                setlogPrint(setlog_buf);
             }
         }
         else
@@ -869,7 +859,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 }
             }
             else
-            if(setlogCountDedup(is_new_packet(RcvBuffer+1)))    // SL-01: Verdikt zaehlen, Logik unveraendert
+            if(setlogCountDedup(rx_is_new))    // SL-01: Verdikt von oben, Logik unveraendert
             {
                 // :|0x11223344|0x05|OE1KBC|>*:Hallo Mike, ich versuche eine APRS Meldung\0x00
                 if(bDisplayCont)
@@ -946,18 +936,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                         bool bMeshDestination = true;
 
-                        // SL-02: Relay-Entscheidung mit Grund. Genau eine
-                        // RLY-Zeile je neuem Frame, gedruckt am Ende dieses
-                        // Blocks -- an den Ausstiegen wird nur der Grund
-                        // gesetzt, damit der Block frei von verstreuten
-                        // Druckaufrufen bleibt. rly_hop ist der Hop-Zaehler
-                        // WIE EMPFANGEN (die Relay-Strecke dekrementiert
-                        // aprsmsg.max_hop weiter unten), damit die Zeile zur
-                        // H-Angabe der RX-Zeile passt.
+                        // SL-02: Grund an den Ausstiegen setzen, eine RLY-Zeile
+                        // am Blockende. rly_hop ist der Hop WIE EMPFANGEN
+                        // (Relay dekrementiert aprsmsg.max_hop weiter unten).
                         const char *rly_reason = NULL;
                         int rly_prio = 0;
                         int rly_slot = -1;
-                        uint8_t rly_hop = aprsmsg.max_hop;
+                        uint8_t rly_hop = aprsmsg.max_hop & 0x0F;
 
                         if(msg_type_b_lora == MSG_TYPE_TEXT)    // text message store&forward
                         {
@@ -1363,15 +1348,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     size = UDP_TX_BUF_SIZE - 2;
                             }
 
-                            // SL-06: Upload zum MeshCom-Server. Unmittelbar vor
-                            // addNodeData() und damit vor dem Hop-Dekrement des
-                            // Relay-Pfads -- die Reihenfolge ist im Mitschnitt
-                            // dadurch nachweisbar.
+                            // SL-06: Upload zum Server, unmittelbar vor
+                            // addNodeData() und vor dem Hop-Dekrement des Relays.
                             if(bDisplayLog)
                             {
                                 setlogFormatGwu(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
-                                                aprsmsg.payload_type, aprsmsg.max_hop, (uint32_t)millis());
-                                printfdeb("%s [LOG] %s\n", getTimeString().c_str(), setlog_buf);
+                                                aprsmsg.payload_type, aprsmsg.max_hop & 0x0F, (uint32_t)millis());
+                                setlogPrint(setlog_buf);
                             }
 
                             addNodeData(RcvBuffer, size, rssi, snr);
@@ -1380,16 +1363,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // resend only Packet to all and !owncall
                         // bSetLoRaAPRS = APRS via 433.775 usw.
 
-                        // SL-02: dieselbe Bedingung wie bisher, nur in ihre
-                        // Glieder zerlegt, damit genau ein Grund benannt werden
-                        // kann. Die Kurzschluss-Reihenfolge bleibt erhalten --
-                        // checkMesh() wird weiterhin nur gerufen, wenn Ziel und
-                        // APRS-Modus es zulassen (die Funktion druckt unter
-                        // bDisplayCont).
-                        // Ein bereits gesetzter Grund (gwfilter/gwcap/ping) hat
-                        // Vorrang: diese Pruefungen stehen im Code vor dieser
-                        // Bedingung. checkMesh() wird trotzdem genau dann
-                        // gerufen, wenn es das Original auch tut.
+                        // SL-02: dieselbe Bedingung wie bisher, nur zerlegt, damit
+                        // genau ein Grund benannt wird -- Kurzschlussreihenfolge
+                        // und damit jeder checkMesh()-Aufruf bleiben erhalten.
                         bool rly_go = false;
 
                         if(strcmp(destination_call, meshcom_settings.node_call) == 0)
@@ -1413,8 +1389,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         if(!bMeshDestination)
                         {
                             // Die uebrigen Ruecksetzer des Flags liegen im Zweig
-                            // "Ziel ist das eigene Rufzeichen" und werden hier
-                            // nie erreicht.
+                            // "Ziel ist das eigene Rufzeichen", hier nie erreicht.
                             if(rly_reason == NULL)
                                 rly_reason = "gwfilter";
                         }
@@ -1501,9 +1476,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // nullen (Alt-Verhalten: memset des ganzen Rings vor dem Schreiben)
                                 rly_slot = addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true);
 
-                                // SL-02: Rueckgabewert ist der belegte Slot bzw.
-                                // -1, wenn der Ring den Eintrag nicht annehmen
-                                // konnte (voll oder Prio zu niedrig).
+                                // SL-02: Rueckgabe ist der belegte Slot bzw. -1,
+                                // wenn der Ring den Eintrag verworfen hat.
                                 if(rly_slot >= 0)
                                 {
                                     rly_reason = "tx";
@@ -1532,13 +1506,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         }
 
                         // SL-02: genau eine RLY-Zeile je neuem Frame, hinter
-                        // allen Ausstiegen des Relay-Blocks (skip_relay wie auch
-                        // der else-Zweig muenden hier ein).
+                        // allen Ausstiegen des Relay-Blocks (auch skip_relay).
                         if(bDisplayLog && rly_reason != NULL)
                         {
                             setlogFormatRly(setlog_buf, sizeof(setlog_buf), aprsmsg.msg_id,
                                             aprsmsg.payload_type, rly_hop, rly_reason, rly_prio, rly_slot);
-                            printfdeb("%s [LOG] %s\n", getTimeString().c_str(), setlog_buf);
+                            setlogPrint(setlog_buf);
                         }
                     }
                 }
@@ -1683,7 +1656,7 @@ void OnRxError(void)
         // in esp32_main.cpp tut es).
         char err_buf[64];
         setlogFormatErr(err_buf, sizeof(err_buf), err_rssi, err_snr, 0, 0, (uint32_t)millis());
-        printfdeb("%s [LOG] %s\n", getTimeString().c_str(), err_buf);
+        setlogPrint(err_buf);
     }
 
     {
@@ -1705,17 +1678,14 @@ void OnRxError(void)
 // reine Verschiebung, Logik unveraendert. Siehe txring_functions.h/.cpp und
 // test/test_txring/test_txring.cpp.
 
-// SL-03 -- eine Zeile je tatsaechlich gestarteter Sendung, gerufen an den
-// Erfolgsausgaengen von doTX(). `line` wurde beim Slot-Lesen formatiert (leer,
-// wenn --setlog aus ist); stat_txn zaehlt unabhaengig davon, weil die
-// STAT-Zeile die Zahl der Sendungen auch dann melden soll, wenn --setlog erst
-// spaeter im Fenster eingeschaltet wurde.
+// SL-03 -- eine Zeile je gestarteter Sendung (Erfolgsausgaenge von doTX()).
+// stat_txn zaehlt auch bei --setlog off.
 static void setlogPrintTx(const char *line)
 {
     stat_txn.fetch_add(1);
 
     if(bDisplayLog && line[0] != 0x00)
-        printfdeb("%s [LOG] %s\n", getTimeString().c_str(), line);
+        setlogPrint(line);
 }
 
 /**@brief our Lora TX sequence — priority-based slot selection
@@ -1776,12 +1746,8 @@ bool doTX()
                           sendlng, tx_mid, retryCount[txSlot], queued, MAX_RING, (unsigned long)latency);
         }
 
-        // SL-03: die eigene Sendung. Hier wird nur formatiert -- gedruckt wird
-        // erst nach dem erfolgreichen Start der Sendung (siehe setlogPrintTx()
-        // weiter unten), damit ein Rollback (APRS-Chipwechsel, startTransmit
-        // schlaegt fehl) keine TX-Zeile hinterlaesst. Die Feldwerte werden wie
-        // in RING_TX_READ direkt aus dem Ring-Frame gelesen: [2] Typ,
-        // [3..6] msg_id, [7] Hop/Server-Byte.
+        // SL-03: hier nur formatieren, gedruckt wird erst nach erfolgreichem
+        // Sendestart (setlogPrintTx()), damit ein Rollback keine Zeile hinterlaesst.
         char setlog_tx_buf[128];
         setlog_tx_buf[0] = 0x00;
 
@@ -2134,10 +2100,8 @@ bool updateRetransmissionStatus()
                 int retxSlot = addTxRingEntry(&ringBuffer[ircheck][2], (uint16_t)size, retransmitStatus,
                                 "retransmit", retryCount[ircheck] + 1);
 
-                // SL-03: das Label "retransmit" bildet auf 'o' ab -- ein
-                // wiederholtes Relay verloere damit seine Herkunft. Die
-                // Kennung des Quellslots wird deshalb mitgenommen, so wie
-                // addTxRingEntry() sie bei der Prio-Verdraengung mitkopiert.
+                // SL-03: "retransmit" bildet auf 'o' ab -- die Kennung des
+                // Quellslots wird deshalb mitgenommen (wie bei der Prio-Verdraengung).
                 if(retxSlot >= 0)
                     ringSource[retxSlot] = ringSource[ircheck];
 

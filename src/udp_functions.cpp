@@ -333,6 +333,7 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
             // add rcvMsg to forward to LoRa TX
             addLoraRxBuffer(aprsmsg.msg_id, true);
+            stat_newid.fetch_add(1); // S2: server-injected ids occupy dedup-ring slots too
 
             if(bGATEWAY_NOPOS)
               bUDPtoLoraSend=false;
@@ -483,15 +484,18 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 {
                     char buf[96];
                     setlogFormatGwi(buf, sizeof(buf), aprsmsg.msg_id, aprsmsg.payload_type,
-                                     aprsmsg.max_hop, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
-                    printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                                     aprsmsg.max_hop & 0x0F, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
+                    setlogPrint(buf);
                 }
 
                 // TM-31: position frames were already entered into the dedup ring
                 // in the 0x21 branch above -- adding them again here would spend
                 // two ring slots per frame and halve the dedup window.
                 if(msg_type_b != 0x21)
+                {
                     addLoraRxBuffer(aprsmsg.msg_id, true);
+                    stat_newid.fetch_add(1); // S2: server-injected ids occupy dedup-ring slots too
+                }
 
                 // add rcvMsg to BLE out Buff
                 // size message is int -> uint16_t buffer size

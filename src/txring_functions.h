@@ -16,11 +16,6 @@
 #include <Arduino.h>
 #include <configuration.h>
 
-// setlogRingSourceCode() -- Header-Inline, damit hier keine
-// Link-Abhaengigkeit auf setlog_lines.cpp entsteht (env:native_aprs baut
-// txring_functions.cpp, aber nicht setlog_lines.cpp).
-#include <setlog_lines.h>
-
 // SL-03/SL-06: Herkunft je Ring-Slot, 'o' eigene Nachricht, 'r' Relay eines
 // Empfangs, 'g' vom Server eingespeist. Gesetzt in addTxRingEntry() aus dem
 // `source`-Label, das dort bisher nur in der `RING_WRITE ... src=`-Zeile

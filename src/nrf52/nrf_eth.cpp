@@ -660,11 +660,12 @@ int NrfETH::getUDP()
                   {
                       char buf[96];
                       setlogFormatGwi(buf, sizeof(buf), aprsmsg.msg_id, aprsmsg.payload_type,
-                                       aprsmsg.max_hop, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
-                      printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                                       aprsmsg.max_hop & 0x0F, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
+                      setlogPrint(buf);
                   }
 
                   addLoraRxBuffer(aprsmsg.msg_id, true);
+                  stat_newid.fetch_add(1); // S2: server-injected ids occupy dedup-ring slots too
 
                   // add rcvMsg to BLE out Buff
                   // size message is int -> uint16_t buffer size

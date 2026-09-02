@@ -16,9 +16,10 @@
 //     unter 340 Byte. Die 300/160-Schranken der Rahmenbedingung 4 des Plans
 //     halten fuer RX und STAT nicht -- siehe die Vermerke an den beiden
 //     Tests und die Eskalation im Wellenbericht.
-//  3. Grenzwerte: negative Pegel, uint32-Maximum bei t=, Pufferkuerzung.
-//  4. Dass die bestehende [LOG]-RX-Zeile byteidentisches PRAEFIX der neuen
-//     bleibt (Rahmenbedingung 7) -- alte Parser duerfen nicht brechen.
+//  3. Grenzwerte: negative Pegel, uint32-Maximum bei t=, Pufferkuerzung,
+//     n == 1 (nur NUL) und der exakt passende Puffer (len+1).
+//  4. Dass der Anhang das EINZIGE ist, was die RX-Zeile veraendert
+//     (Rahmenbedingung 7) -- alte Parser duerfen nicht brechen.
 //
 // Fails-before: der behavioural fails-before dieses Plans ist der Bench in
 // Welle 3 (ein Knoten mit `--setlog on`, dessen RX-Zeile heute kein `DUP:`
@@ -39,22 +40,20 @@ void setUp(void) {}
 void tearDown(void) {}
 
 // ---------------------------------------------------------------------------
-// Die beiden Formatstrings aus src/loop_functions.cpp, wortwoertlich.
+// Die Formatstrings aus src/loop_functions.cpp, wortwoertlich.
 //
-// Bewusst hier dupliziert und nicht aus einer Datei gelesen: der Test soll
-// genau dann fallen, wenn jemand printBuffer_aprs() aendert, ohne
-// printBuffer_aprs_rx() nachzuziehen (oder umgekehrt). Eine Fixture-Datei
-// wuerde stattdessen den Test mitwandern lassen.
-static const char RX_FMT_ALT[] =
-    "%s %s %03i %c x%08X H%02X S%i T%i M%02X %s>%s%c%s HW:%02i MOD:%01X/%01i FCS:%04X FW:%02i:%c LH:%02X\n";
-static const char RX_FMT_NEU[] =
+// Es gibt sie jeweils nur noch EINMAL im Quelltext: printBuffer_aprs() und
+// printBuffer_ack() nehmen den Anhang als `const char *tail = ""` entgegen und
+// haengen ihn per `%s` vor dem `\n` an. Die alte Zeile ist damit per
+// Konstruktion byteidentisch (leerer Anhang) -- ein Drift-Test zwischen zwei
+// Kopien des Formatstrings kann es nicht mehr geben. Geprueft wird hier
+// stattdessen, was der Anhang an der fertigen Zeile aendert, und dass der
+// Formatstring unter der nformat[300]-Klippe bleibt.
+static const char RX_FMT[] =
     "%s %s %03i %c x%08X H%02X S%i T%i M%02X %s>%s%c%s HW:%02i MOD:%01X/%01i FCS:%04X FW:%02i:%c LH:%02X%s\n";
 
-static const char ACK7_FMT_ALT[] = "%s %s 007 %c x%02X%02X%02X%02X H%02X %02X\n";
-static const char ACK7_FMT_NEU[] = "%s %s 007 %c x%02X%02X%02X%02X H%02X %02X%s\n";
-static const char ACK12_FMT_ALT[] =
-    "%s %s 012 %c x%02X%02X%02X%02X H%02X x%02X%02X%02X%02X %02X %02X\n";
-static const char ACK12_FMT_NEU[] =
+static const char ACK7_FMT[] = "%s %s 007 %c x%02X%02X%02X%02X H%02X %02X%s\n";
+static const char ACK12_FMT[] =
     "%s %s 012 %c x%02X%02X%02X%02X H%02X x%02X%02X%02X%02X %02X %02X%s\n";
 
 // Acht Rufzeichen mit Suffix, kommagetrennt -- der laengste Pfad, den ein
@@ -100,8 +99,8 @@ static void test_rx_tail_maximalwerte(void)
 
     TEST_ASSERT_EQUAL_STRING(" RSSI:-32768 SNR:-128 DUP:d OWN:e t=4294967295", buf);
     TEST_ASSERT_EQUAL_INT(46, len);
-    // Der Puffer in printBuffer_aprs_rx()/printBuffer_ack_rx() ist 56 Byte --
-    // faellt dieser Test, ist er zu klein geworden.
+    // Die Aufrufer in lora_functions.cpp stellen 56 Byte -- faellt dieser
+    // Test, ist ihr Puffer zu klein geworden.
     TEST_ASSERT_TRUE(len + 1 <= 56);
 }
 
@@ -329,68 +328,54 @@ static void test_gwi_und_gwu(void)
 }
 
 // ---------------------------------------------------------------------------
-// Rahmenbedingung 7 -- die alte RX-Zeile bleibt byteidentisches Praefix
+// Rahmenbedingung 7 -- der Anhang ist das Einzige, was sich an der Zeile aendert
 // ---------------------------------------------------------------------------
 
-// Baut die alte [LOG]-Zeile mit festen Werten. Die Werte entsprechen einem
-// realen Relay-Empfang: langer Pfad, 100 Byte Nutzlast.
-static int baueAlteRxZeile(char *out, size_t n, const char *pfad, const char *nutzlast)
+// Baut die [LOG]-Zeile mit festen Werten. Die Werte entsprechen einem realen
+// Relay-Empfang: langer Pfad, 100 Byte Nutzlast.
+static int baueRxZeile(char *out, size_t n, const char *pfad, const char *nutzlast,
+                       const char *tail)
 {
-    return snprintf(out, n, RX_FMT_ALT,
-                    "21:47:03", "[LOG]", 231, ':', 0x1A2B3C4Du, 0x03,
-                    1, 0, 0x01, pfad, "*", ':', nutzlast,
-                    9, 0x0, 3, 0xAB12, 35, 'p', 0x09);
-}
-
-static int baueNeueRxZeile(char *out, size_t n, const char *pfad, const char *nutzlast,
-                           const char *tail)
-{
-    return snprintf(out, n, RX_FMT_NEU,
+    return snprintf(out, n, RX_FMT,
                     "21:47:03", "[LOG]", 231, ':', 0x1A2B3C4Du, 0x03,
                     1, 0, 0x01, pfad, "*", ':', nutzlast,
                     9, 0x0, 3, 0xAB12, 35, 'p', 0x09, tail);
 }
 
-static void test_neue_rx_zeile_beginnt_mit_der_alten(void)
+// Frueher standen hier zwei Formatstring-Literale nebeneinander und der Test
+// verglich sie miteinander -- das prueft den Quelltext nicht, sondern nur die
+// Testdatei mit sich selbst. Seit S6 gibt es genau einen Formatstring mit
+// `const char *tail = ""`; das Praefix ist per Konstruktion identisch. Was
+// bleibt und geprueft gehoert, ist der Anhang: dass ein leerer Anhang die
+// Zeile exakt so laesst, wie alte Parser sie kennen, und dass ein gefuellter
+// Anhang ausschliesslich hinten anwaechst.
+static void test_anhang_ist_der_einzige_unterschied(void)
 {
-    char alt[600];
-    char neu[600];
+    char ohne[600];
+    char mit[600];
     char tail[64];
 
-    int alt_len = baueAlteRxZeile(alt, sizeof(alt), PFAD_ACHT, NUTZLAST_100);
+    int ohne_len = baueRxZeile(ohne, sizeof(ohne), PFAD_ACHT, NUTZLAST_100, "");
     setlogFormatRxTail(tail, sizeof(tail), -113, -9, false, false, 3600000u);
-    int neu_len = baueNeueRxZeile(neu, sizeof(neu), PFAD_ACHT, NUTZLAST_100, tail);
+    int mit_len = baueRxZeile(mit, sizeof(mit), PFAD_ACHT, NUTZLAST_100, tail);
 
-    TEST_ASSERT_TRUE(alt_len > 0 && neu_len > 0);
+    TEST_ASSERT_TRUE(ohne_len > 0 && mit_len > 0);
 
-    // alles bis auf das abschliessende '\n' der alten Zeile ist byteidentisch
-    TEST_ASSERT_EQUAL_INT('\n', alt[alt_len - 1]);
-    TEST_ASSERT_EQUAL_INT(0, memcmp(neu, alt, (size_t)(alt_len - 1)));
+    // Der Default-Aufruf (alle Nicht-RX-Aufrufer) endet unveraendert auf dem
+    // LH-Feld und dem Zeilenende -- kein Leerzeichen, kein Rest.
+    TEST_ASSERT_EQUAL_STRING("LH:09\n", ohne + ohne_len - 6);
 
-    // und direkt danach beginnt der Anhang, gefolgt vom Zeilenende
-    TEST_ASSERT_EQUAL_INT(0, memcmp(neu + (alt_len - 1), tail, strlen(tail)));
-    TEST_ASSERT_EQUAL_INT('\n', neu[neu_len - 1]);
-    TEST_ASSERT_EQUAL_INT(neu_len, alt_len + (int)strlen(tail));
-}
+    // Mit Anhang: Praefix byteidentisch, dann der Anhang, dann '\n'.
+    TEST_ASSERT_EQUAL_INT('\n', ohne[ohne_len - 1]);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(mit, ohne, (size_t)(ohne_len - 1)));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(mit + (ohne_len - 1), tail, strlen(tail)));
+    TEST_ASSERT_EQUAL_INT('\n', mit[mit_len - 1]);
+    TEST_ASSERT_EQUAL_INT(mit_len, ohne_len + (int)strlen(tail));
 
-static void test_neue_rx_zeile_ist_der_alte_formatstring_plus_ein_prozent_s(void)
-{
-    // Der eigentliche Schutz: die beiden Formatstrings duerfen sich um genau
-    // "%s" vor dem "\n" unterscheiden -- sonst hat jemand die bestehende
-    // Zeile veraendert (Rahmenbedingung 7 verletzt).
-    size_t alt_n = strlen(RX_FMT_ALT);
-    size_t neu_n = strlen(RX_FMT_NEU);
-
-    TEST_ASSERT_EQUAL_UINT32((uint32_t)(alt_n + 2), (uint32_t)neu_n);
-    TEST_ASSERT_EQUAL_INT(0, memcmp(RX_FMT_ALT, RX_FMT_NEU, alt_n - 1));
-    TEST_ASSERT_EQUAL_STRING("%s\n", RX_FMT_NEU + neu_n - 3);
-    TEST_ASSERT_EQUAL_STRING("\n", RX_FMT_ALT + alt_n - 1);
-
-    // dasselbe fuer beide ACK-Formate
-    TEST_ASSERT_EQUAL_INT(0, memcmp(ACK7_FMT_ALT, ACK7_FMT_NEU, strlen(ACK7_FMT_ALT) - 1));
-    TEST_ASSERT_EQUAL_STRING("%s\n", ACK7_FMT_NEU + strlen(ACK7_FMT_NEU) - 3);
-    TEST_ASSERT_EQUAL_INT(0, memcmp(ACK12_FMT_ALT, ACK12_FMT_NEU, strlen(ACK12_FMT_ALT) - 1));
-    TEST_ASSERT_EQUAL_STRING("%s\n", ACK12_FMT_NEU + strlen(ACK12_FMT_NEU) - 3);
+    // dasselbe fuer beide ACK-Formate: `%s` steht direkt vor dem `\n`
+    TEST_ASSERT_EQUAL_STRING("%s\n", ACK7_FMT + strlen(ACK7_FMT) - 3);
+    TEST_ASSERT_EQUAL_STRING("%s\n", ACK12_FMT + strlen(ACK12_FMT) - 3);
+    TEST_ASSERT_EQUAL_STRING("%s\n", RX_FMT + strlen(RX_FMT) - 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -403,12 +388,12 @@ static void test_rx_zeile_mit_langem_pfad(void)
     char neu[900];
     char tail[64];
 
-    int alt_len = baueAlteRxZeile(alt, sizeof(alt), PFAD_ACHT, NUTZLAST_100);
+    int alt_len = baueRxZeile(alt, sizeof(alt), PFAD_ACHT, NUTZLAST_100, "");
     setlogFormatRxTail(tail, sizeof(tail), -32768, -128, true, true, 4294967295u);
-    int neu_len = baueNeueRxZeile(neu, sizeof(neu), PFAD_ACHT, NUTZLAST_100, tail);
+    int neu_len = baueRxZeile(neu, sizeof(neu), PFAD_ACHT, NUTZLAST_100, tail);
 
-    printf("[setlog] RX-Zeile 8 Rufzeichen + 100 B Nutzlast: alt %d Byte, "
-           "neu %d Byte (Extremanhang %d Byte)\n",
+    printf("[setlog] RX-Zeile 8 Rufzeichen + 100 B Nutzlast: ohne Anhang %d Byte, "
+           "mit %d Byte (Extremanhang %d Byte)\n",
            alt_len, neu_len, (int)strlen(tail));
 
     // Befund (Eskalation im Wellenbericht): die 300-Byte-Schranke aus
@@ -424,7 +409,7 @@ static void test_rx_zeile_mit_langem_pfad(void)
 
     // Ohne den 100-Byte-Anhaenger -- also die Empfangszeile eines kurzen
     // Textes ueber acht Hops -- bleibt die Zeile unter 300.
-    int kurz_len = baueNeueRxZeile(neu, sizeof(neu), PFAD_ACHT, "QRV?", tail);
+    int kurz_len = baueRxZeile(neu, sizeof(neu), PFAD_ACHT, "QRV?", tail);
     TEST_ASSERT_TRUE(kurz_len < 300);
 }
 
@@ -433,10 +418,9 @@ static void test_alle_formatstrings_unter_300_zeichen(void)
     // printfdeb_functions.cpp kopiert den Formatstring in char nformat[300]
     // und kappt ihn dort -- ein zu langes Format zerstoert die Zeile, nicht
     // nur ihr Ende.
-    TEST_ASSERT_TRUE(strlen(RX_FMT_ALT) < 300);
-    TEST_ASSERT_TRUE(strlen(RX_FMT_NEU) < 300);
-    TEST_ASSERT_TRUE(strlen(ACK7_FMT_NEU) < 300);
-    TEST_ASSERT_TRUE(strlen(ACK12_FMT_NEU) < 300);
+    TEST_ASSERT_TRUE(strlen(RX_FMT) < 300);
+    TEST_ASSERT_TRUE(strlen(ACK7_FMT) < 300);
+    TEST_ASSERT_TRUE(strlen(ACK12_FMT) < 300);
 
     // Die Formatstrings der Formatierer selbst sind in setlog_lines.cpp
     // gekapselt; ihre Ausgabe ist oben festgenagelt, und die laengste davon
@@ -447,6 +431,76 @@ static void test_alle_formatstrings_unter_300_zeichen(void)
     char buf[400];
     fuelleStat(&f);
     TEST_ASSERT_TRUE(setlogFormatStat(buf, sizeof(buf), &f) < 300);
+}
+
+// ---------------------------------------------------------------------------
+// Puffergrenzen fuer JEDEN Formatierer: n == 1 und der exakt passende Puffer
+// ---------------------------------------------------------------------------
+//
+// n == 1 laesst nur Platz fuer die NUL: der Rueckgabewert muss 0 sein und der
+// Puffer eine leere Zeichenkette (nicht der Wunschwert von snprintf, nicht
+// uninitialisiert). n == len+1 ist der Uebergang direkt darueber -- dort muss
+// die Zeile vollstaendig und ungekuerzt stehen. Zusammen nageln die beiden
+// Faelle die Klemmung in setlogClamp() an beiden Enden fest.
+
+// Prueft einen bereits formatierten Sollwert gegen n == 1 und n == len+1.
+#define PRUEFE_GRENZEN(soll, aufruf)                                          \
+    do {                                                                      \
+        char eng[2] = { 0x7F, 0x7F };                                         \
+        char *buf = eng; size_t n = 1;                                        \
+        TEST_ASSERT_EQUAL_INT(0, (aufruf));                                   \
+        TEST_ASSERT_EQUAL_STRING("", eng);                                    \
+        char exakt[400];                                                      \
+        memset(exakt, 0x7F, sizeof(exakt));                                   \
+        buf = exakt; n = strlen(soll) + 1;                                    \
+        TEST_ASSERT_EQUAL_INT((int)strlen(soll), (aufruf));                   \
+        TEST_ASSERT_EQUAL_STRING(soll, exakt);                                \
+        TEST_ASSERT_EQUAL_INT(0x7F, (int)exakt[strlen(soll) + 1]);            \
+    } while(0)
+
+static void test_grenzen_rx_tail(void)
+{
+    PRUEFE_GRENZEN(" RSSI:-108 SNR:7 DUP:n OWN:- t=123456",
+                   setlogFormatRxTail(buf, n, -108, 7, false, false, 123456u));
+}
+
+static void test_grenzen_rly(void)
+{
+    PRUEFE_GRENZEN("RLY x1A2B3C4D : H03 q=tx prio=2 slot=7",
+                   setlogFormatRly(buf, n, 0x1A2B3C4Du, ':', 0x03, "tx", 2, 7));
+}
+
+static void test_grenzen_tx(void)
+{
+    PRUEFE_GRENZEN("TX xDEADBEEF : H02 prio=3 src=r wait=1450 q=2 cad=4 len=87 t=987654",
+                   setlogFormatTx(buf, n, 0xDEADBEEFu, ':', 0x02, 3, 'r',
+                                  1450u, 2, 4, 87u, 987654u));
+}
+
+static void test_grenzen_err(void)
+{
+    PRUEFE_GRENZEN("ERR rssi=-121 snr=-14 len=0 ferr=0 t=55000",
+                   setlogFormatErr(buf, n, -121, -14, 0u, 0, 55000u));
+}
+
+static void test_grenzen_stat(void)
+{
+    struct setlogStatFields f;
+    fuelleStat(&f);
+
+    PRUEFE_GRENZEN("STAT util=17 rx=51000 tx=2400 newid=812 dup=1943 err=27 txn=96 txfail=1 "
+                   "ringmax=7/20 drop=0/0/3/0/12 mh=34 heap=148320 trk=600/4 "
+                   "fw=35p/20260901 up=86400 t=86400000",
+                   setlogFormatStat(buf, n, &f));
+}
+
+static void test_grenzen_gwi_und_gwu(void)
+{
+    PRUEFE_GRENZEN("GWI x0A0B0C0D : H04 from=OE1KBC-12 t=7200",
+                   setlogFormatGwi(buf, n, 0x0A0B0C0Du, ':', 0x04, "OE1KBC-12", 7200u));
+
+    PRUEFE_GRENZEN("GWU x0A0B0C0D : H03 t=7205",
+                   setlogFormatGwu(buf, n, 0x0A0B0C0Du, ':', 0x03, 7205u));
 }
 
 // ---------------------------------------------------------------------------
@@ -510,8 +564,13 @@ int main(int, char **)
     RUN_TEST(test_stat_maximalfall);
     RUN_TEST(test_stat_ohne_struct_schreibt_nichts);
     RUN_TEST(test_gwi_und_gwu);
-    RUN_TEST(test_neue_rx_zeile_beginnt_mit_der_alten);
-    RUN_TEST(test_neue_rx_zeile_ist_der_alte_formatstring_plus_ein_prozent_s);
+    RUN_TEST(test_grenzen_rx_tail);
+    RUN_TEST(test_grenzen_rly);
+    RUN_TEST(test_grenzen_tx);
+    RUN_TEST(test_grenzen_err);
+    RUN_TEST(test_grenzen_stat);
+    RUN_TEST(test_grenzen_gwi_und_gwu);
+    RUN_TEST(test_anhang_ist_der_einzige_unterschied);
     RUN_TEST(test_rx_zeile_mit_langem_pfad);
     RUN_TEST(test_alle_formatstrings_unter_300_zeichen);
     RUN_TEST(test_ring_source_code_bildet_die_labels_ab);

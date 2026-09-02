@@ -2162,49 +2162,20 @@ void esp32loop()
             stat_prio_timer = millis();
 
             // SL-05: STAT line under --setlog on, independent of bLORADEBUG.
-            // Reads stat_drop_count[] before the existing (unconditional)
-            // memset further below resets it -- no second reset here. The
-            // interval counters are drained on every tick (so they never grow
-            // unbounded); only the print depends on bDisplayLog.
+            // setlogFillStat() reads stat_drop_count[] before the existing
+            // (unconditional) memset further below resets it -- no second
+            // reset here. The interval counters are drained on every tick
+            // (so they never grow unbounded); only the print depends on
+            // bDisplayLog.
             {
                 struct setlogStatFields f;
-                uint32_t rx5 = stat_util_rx_5m.exchange(0);
-                uint32_t tx5 = stat_util_tx_5m.exchange(0);
-                uint32_t util = 100UL * (rx5 + tx5) /
-                                (uint32_t)(PRIO_STAT_INTERVAL_S * 1000UL);
-                if(util > 100)
-                    util = 100;
-
-                f.util_pct       = (uint8_t)util;
-                f.rx_ms          = rx5;
-                f.tx_ms          = tx5;
-                f.newid          = stat_newid.exchange(0);
-                f.dup            = stat_dup.exchange(0);
-                f.err            = stat_rx_err.exchange(0);
-                f.txn            = stat_txn.exchange(0);
-                f.txfail         = stat_txfail.exchange(0);
-                f.ringmax        = stat_ring_max.exchange(0);
-                f.ring_size      = MAX_RING;
-                f.drop[0]        = stat_drop_count[1];
-                f.drop[1]        = stat_drop_count[2];
-                f.drop[2]        = stat_drop_count[3];
-                f.drop[3]        = stat_drop_count[4];
-                f.drop[4]        = stat_drop_count[5];
-                f.mh             = (uint16_t)getMheardCount();
-                f.heap           = (uint32_t)ESP.getFreeHeap();
-                f.trk_interval_s = trickle_interval_ms / 1000UL;
-                f.trk_consistent = trickle_consistent_count;
-                f.fw_major       = shortVERSION();
-                f.fw_sub         = shortSUBVERSION();
-                f.flash          = FLASH_VERSION;
-                f.up_s           = millis() / 1000UL;
-                f.t_ms           = millis();
+                setlogFillStat(&f, (uint32_t)ESP.getFreeHeap());
 
                 if(bDisplayLog)
                 {
                     char buf[300];
                     setlogFormatStat(buf, sizeof(buf), &f);
-                    printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+                    setlogPrint(buf);
                 }
             }
 
@@ -4219,7 +4190,7 @@ int checkRX(bool bRadio)
             char buf[300];
             setlogFormatErr(buf, sizeof(buf), saved_crc_rssi, saved_crc_snr,
                             (uint16_t)ibytes, (int32_t)saved_crc_ferr, millis());
-            printfdeb("%s [LOG] %s\n", getTimeString().c_str(), buf);
+            setlogPrint(buf);
         }
 
         // Diagnose-Output: RSSI/SNR + kompletter Payload-Hex-Dump
