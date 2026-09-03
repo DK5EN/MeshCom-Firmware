@@ -1,6 +1,17 @@
 # RESUME — pick up here
 
-## 2026-09-03: upstream 4.35s merged, fork branch renamed to `fork-main`
+## 2026-09-03: Release v4.35s.09.03-stability published, fork branch renamed to `fork-main`
+
+`v4.35s.09.03-stability` is live on GitHub (39 assets, `--latest`), tagged at
+`74810123` on `fork-main`, `FLASH_VERSION 20260903`. Gates: 32 envs clean,
+native 568/568 in 12 host envs, 250 tool tests. `v4.35p.09.02-stability` was
+kept -- this is a new release, not a replacement.
+
+**It is a maintenance cut.** The whole firmware delta is upstream's own 4.35s
+(`c908a4dd`, #1126): the `--postime` `else` branch removed, and the version
+letter. No hardware ran against this tree, and both release documents say so;
+the 09.02 bench and field results carry over because the source outside those
+two hunks is unchanged. Changelog items 177/178.
 
 The fork carries firmware **4.35s**. `upstream/dev` `4e649eae` merged cleanly
 (`c908a4dd`: `SOURCE_VERSION_SUB`/`_WEB_SUB` `p` -> `s`, and the `--postime`
