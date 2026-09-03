@@ -1,9 +1,71 @@
-# Release Notes -- MeshCom Firmware v4.35p
+# Release Notes -- MeshCom Firmware v4.35s
 
-Firmware `4.35p`, `FLASH_VERSION 20260902`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35s`, `FLASH_VERSION 20260903`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35s.09.03-stability (2026-09-03)
+
+Wartungs-Release. Der **gesamte Firmware-Unterschied zu
+`v4.35p.09.02-stability` ist upstreams eigener `4.35s`-Schnitt**
+(`c908a4dd`, ueber PR #1126 in `dev`): zwei Zeilen Versionskennung und eine
+Korrektur an `--postime`. Aus diesem Fork ist in diesem Schnitt keine einzige
+Code-Zeile dazugekommen -- die Aenderungen des Forks seit dem letzten Release
+sind Dokumentation und Werkzeug-Metadaten.
+
+### Was upstream geaendert hat
+
+- **`--postime` hat bisher jeden brauchbaren Wert verworfen.** Der Befehl hob
+  Werte unter 300 s auf 300 s an und setzte im `else`-Zweig jeden Wert **ab**
+  300 s auf `0`, was auf den einkompilierten Vorgabewert durchfiel. Damit war
+  ueber `--postime` gar kein Intervall einstellbar. Upstream hat den
+  `else`-Zweig entfernt; ein Wert ab 300 s wird jetzt uebernommen und wird zu
+  `posinfo_interval`. (Changelog-Punkt 177.)
+- **Versionskennung `p` -> `s`**: `SOURCE_VERSION_SUB` und
+  `SOURCE_VERSION_WEB_SUB` melden `4.35s` in Banner, `--info`, Weboberflaeche
+  und Positionsbake. (Changelog-Punkt 178.)
+
+### Was der Fork dazu geaendert hat
+
+Nichts an der Firmware. Organisatorisch: der Arbeitsbranch hiess
+`v4.35p_prio` und war damit nach dem Versionsbuchstaben von upstream benannt
+-- er veraltete bei jedem upstream-Schnitt. Er ist auf den versionsneutralen
+Namen `fork-main` umgestellt, der alte Remote-Branch ist geloescht, der letzte
+`4.35p`-Stand liegt unter dem Tag `archive/v4.35p_prio-20260903`. Das
+Tag-Schema der Release-Prozedur liest die Version jetzt aus
+`configuration_global.h`, statt `4.35p` fest verdrahtet zu haben.
+
+### Bekannte Einschraenkung, bewusst uebernommen
+
+`--postime 0` schaltet die periodische Positionsbake nicht mehr ab: `0` ist
+kleiner als 300 und wird jetzt auf 300 s angehoben. Vorher war der Befehl in
+die andere Richtung kaputt. Der Fork patcht das nicht selbst, damit die beiden
+Baeume nicht auseinanderlaufen -- das gehoert als eigener PR nach upstream.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Nichts. Es gab in diesem Schnitt keinen Hardware-Lauf. Das ist vertretbar,
+weil der Quelltext ausserhalb der beiden upstream-Hunks bytegleich zu
+`v4.35p.09.02-stability` ist -- dessen Bank- und Feldergebnisse (T-Deck Plus
+DK5EN-14, OE5HWN T-Deck Plus und T-Beam Supreme je eine Stunde GPS) gelten
+unveraendert weiter.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **Der `--postime`-Fix selbst.** Er ist gelesen und verstanden, aber auf
+  keinem Knoten gegen eine tatsaechlich veraenderte Bakenperiode gemessen.
+- Alle offenen Punkte aus `v4.35p.09.02-stability` bleiben offen: der
+  `--setlog`-Banklauf (RAK-90 + Heltec-93, 30 min), die GPS-Zwei-Stunden-Arme
+  A/B/C, der T-Deck-Pin-Fallback auf Hardware, TM-49 (Safeboot-OTA-Abschluss
+  nach Abriss), das BLE-`blelen + 2`-Ueberlaufrisiko.
+- **GPS-07** (neu im Backlog, Nachtaufzeichnung 2026-09-03): der
+  Kalman-Filter fuer die Hoehe setzt sich nachts zehnmal auf rohe Ausreisser
+  neu auf -- die Re-Seed-Schranke ist zu klein bemessen. In der Wiedergabe
+  behoben durch `RESEED_N 60` bzw. ein 30-m-Gate; beides ist in diesem
+  Release **nicht** enthalten.
 
 ---
 

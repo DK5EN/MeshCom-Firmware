@@ -1,8 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35p.09.02-stability` (2026-09-02), based on official MeshCom
-4.35p, upstream `dev` at `c6e18940` — the state **after** upstream merged this
-fork's changes, plus items 104-176 below. The full engineering rationale for
+Release: `v4.35s.09.03-stability` (2026-09-03), based on official MeshCom
+4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
+fork's changes, plus items 104-178 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -74,6 +74,40 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35s.09.03-stability
+
+A maintenance release. The **entire firmware delta against
+`v4.35p.09.02-stability` is upstream's own `4.35s` cut** (`c908a4dd`, merged
+via #1126) — two lines of version identity and one `--postime` fix, nothing
+from this fork. `FLASH_VERSION` moves to `20260903`; `FLASH_STRUCT_VERSION`
+stands at `20260724`, so configurations survive. Gates for this cut: 568
+native test cases across 12 host environments, 250 tool tests, all 32 release
+environments built. No hardware ran against this tree; the bench and field
+results of `v4.35p.09.02-stability` carry over unchanged, because the source
+outside those two upstream hunks is byte-identical.
+
+177. **`--postime` no longer discards every interval of five minutes or
+     more** (upstream `c908a4dd`). The command clamped values below 300 s up
+     to 300 s and then, in its `else` branch, set every value **at or above**
+     300 s to `0` — which fell through to the compiled-in default. The net
+     effect was that `--postime` could not set any interval at all: too small
+     was raised to five minutes, everything else was thrown away. Upstream
+     removed the `else` branch, so a value of 300 s or more is now kept and
+     becomes `posinfo_interval`.
+
+     Side effect, inherited as-is: `--postime 0` no longer switches position
+     beacons off, because `0 < 300` now clamps up to 300 s. Turning periodic
+     positions off is not reachable through this command any more. Filed for
+     an upstream PR rather than patched in the fork, so the two trees do not
+     diverge over it.
+
+178. **The firmware identifies as `4.35s`.** `SOURCE_VERSION_SUB` and
+     `SOURCE_VERSION_WEB_SUB` move from `"p"` to `"s"`, so the serial banner,
+     `--info`, the web interface and the beaconed version string all report
+     `4.35s`. No behavioural change beyond the string itself; it exists so a
+     node's reported version matches the upstream generation it is built
+     from.
 
 ## New in v4.35p.09.02-stability
 
