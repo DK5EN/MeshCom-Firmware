@@ -77,6 +77,11 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       // belonging to this fresh session.
       _updateGeneration++;
 
+      // TM-49: a new session starts unverified, with no inherited error text.
+      // Only a completed, MD5-checked image may set the flag back to true.
+      _ota_image_valid = false;
+      _update_error_str = "";
+
       // Pre-OTA update callback
       if (preUpdateCallback != NULL) preUpdateCallback();
 
@@ -124,6 +129,10 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       if (_authenticate && !_server->authenticate(_username.c_str(), _password.c_str())) {
         return _server->requestAuthentication();
       }
+
+      // TM-49: same fail-closed reset as the async /ota/start above.
+      _ota_image_valid = false;
+      _update_error_str = "";
 
       // Get header x-ota-mode value, if present
       OTA_Mode mode = OTA_MODE_FIRMWARE;
@@ -213,14 +222,25 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           return request->requestAuthentication();
         }
 
+        // TM-49: gate on the verified-image flag, not on `!Update.hasError()`.
+        // An upload that died before its `final` frame leaves hasError() false
+        // while nothing was ever verified -- that must not reboot into a
+        // half-written app image.
+        if (!_ota_image_valid) {
+          abortActiveUpdate("incomplete_upload");
+          if (_update_error_str.isEmpty()) {
+            _update_error_str = "Upload incomplete: image never verified\n";
+          }
+        }
+
         // Post-OTA update callback
         if (postUpdateCallback != NULL) {
           Serial.println("Calling postUpdateCallback");
-          postUpdateCallback(!Update.hasError());
+          postUpdateCallback(_ota_image_valid);
         }
 
         // Set reboot flag
-        if (!Update.hasError()) {
+        if (_ota_image_valid) {
           if (_auto_reboot) {
             _reboot_request_millis = millis();
             _reboot = true;
@@ -229,7 +249,7 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
 
         delay(100);
         Serial.println("Sending response");
-        request->send((Update.hasError()) ? 400 : 200, "text/plain", (Update.hasError()) ? _update_error_str.c_str() : "OK");
+        request->send((!_ota_image_valid) ? 400 : 200, "text/plain", (!_ota_image_valid) ? _update_error_str.c_str() : "OK");
 
     }, [&](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
         //Upload handler chunks in data
@@ -280,6 +300,13 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
                 _update_error_str = str.c_str();
                 _update_error_str.concat("\n");
                 Serial.println(_update_error_str.c_str());
+            } else {
+                // TM-49: end(true) succeeded -- length and the client-supplied
+                // MD5 (set in /ota/start) both check out. This is the only
+                // place that may clear the fail-closed gate.
+                _ota_image_valid = Update.isFinished();
+                Serial.printf("[SAFEBOOT];ota;verify;result;%s\n",
+                              _ota_image_valid ? "ok" : "unfinished");
             }
         }else{
             return;
@@ -290,12 +317,19 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
       if (_authenticate && !_server->authenticate(_username.c_str(), _password.c_str())) {
         return _server->requestAuthentication();
       }
+      // TM-49: same fail-closed gate as the async path above.
+      if (!_ota_image_valid) {
+        abortActiveUpdate("incomplete_upload");
+        if (_update_error_str.isEmpty()) {
+          _update_error_str = "Upload incomplete: image never verified\n";
+        }
+      }
       // Post-OTA update callback
-      if (postUpdateCallback != NULL) postUpdateCallback(!Update.hasError());
+      if (postUpdateCallback != NULL) postUpdateCallback(_ota_image_valid);
       _server->sendHeader("Connection", "close");
-      _server->send((Update.hasError()) ? 400 : 200, "text/plain", (Update.hasError()) ? _update_error_str.c_str() : "OK");
+      _server->send((!_ota_image_valid) ? 400 : 200, "text/plain", (!_ota_image_valid) ? _update_error_str.c_str() : "OK");
       // Set reboot flag
-      if (!Update.hasError()) {
+      if (_ota_image_valid) {
         if (_auto_reboot) {
           _reboot_request_millis = millis();
           _reboot = true;
@@ -324,6 +358,8 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           if (progressUpdateCallback != NULL) progressUpdateCallback(_current_progress_size, upload.totalSize);
       } else if (upload.status == UPLOAD_FILE_END) {
           if (Update.end(true)) {
+              // TM-49: see the async path -- only a verified image clears the gate.
+              _ota_image_valid = Update.isFinished();
               ELEGANTOTA_DEBUG_MSG(String("Update Success: "+String(upload.totalSize)+"\n").c_str());
           } else {
               ELEGANTOTA_DEBUG_MSG("[!] Update Failed\n");
@@ -393,6 +429,11 @@ void ElegantOTAClass::onAbort(std::function<void(const char* reason)> callable){
 // a stalled upload) so each one gets the same cleanup and the same log line.
 void ElegantOTAClass::abortActiveUpdate(const char* reason){
     if (Update.isRunning()) {
+        // TM-49: an aborted, still-running session can never be a verified
+        // image. Deliberately NOT cleared when the Update object has already
+        // finished: a disconnect event can land after a successful
+        // Update.end(true), and that one must not retract a valid verdict.
+        _ota_image_valid = false;
         Update.abort();
         Serial.printf("[SAFEBOOT];ota;abort;reason;%s\n", reason);
         if (abortUpdateCallback != NULL) abortUpdateCallback(reason);

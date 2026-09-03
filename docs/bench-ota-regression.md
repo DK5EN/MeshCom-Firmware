@@ -114,6 +114,43 @@ records `ota_md5` (the hash the upload was verified against) and the parsed
 genuinely different image (a real firmware update) shows the same fields
 changing meaningfully.
 
+## TM-49 arm — truncated upload must not switch partitions (owed)
+
+Not yet run. This is the bench proof for the fail-closed completion gate in
+`src/safeboot/ElegantOTA.cpp` (`_ota_image_valid`, false from `/ota/start`,
+set true only after `Update.end(true)` plus `Update.isFinished()`).
+
+Board: a **4 MB single-slot** ESP32 — the Heltec V3 (`DK5EN-93`) or the
+T-Beam (`DK5EN-92`). The 16 MB T-Deck is the wrong instrument here: its
+bootloader's slot validation masks the defect, which is why the original
+observation was only indirect.
+
+Procedure:
+
+1. Hold a USB serial session open on the node (`tools/meshlogger.py` or the
+   harness's own session) for the whole run.
+2. Trigger safeboot and start an upload exactly as `webflash.flash()` does —
+   `/callfunction/?otaupdate`, poll `/update`, `/ota/start?mode=fr&hash=<md5>`,
+   then `POST /ota/upload`.
+3. **Kill the upload mid-transfer** — close the TCP connection at roughly
+   50 % of the body, before the last chunk. `curl --limit-rate` plus a
+   `SIGKILL`, or a socket write that stops and closes, both do it.
+
+Assertions:
+
+- The POST completes with **HTTP 400**, body `Upload incomplete: image never
+verified` (or the `Update` error string if one was set).
+- Serial shows `[SAFEBOOT];ota;abort;reason;incomplete_upload` and **no**
+  `[SAFEBOOT];ota;verify;result;ok`.
+- Serial shows `[SAFEBOOT];ota;end;result;error` — **not** `success`, so
+  `setBootPartition_APP()` never runs.
+- The node stays in safeboot and recovers via the 180 s fallback, not by
+  booting a half-written app image.
+
+Control arm: the same run without the kill must still produce
+`[SAFEBOOT];ota;verify;result;ok`, `result;success` and a normal reboot — the
+gate must not have broken the good path.
+
 ## `--parse-only`
 
 Re-derives the verdict from an existing `serial.log` with no hardware or

@@ -142,6 +142,16 @@ class ElegantOTAClass{
     // began) can be told apart from a disconnect of the still-active one.
     uint32_t _updateGeneration = 0;
 
+    // TM-49: fail-closed completion gate. `Update.hasError()` only becomes true
+    // when something actively failed; an upload whose connection dies before
+    // the `final` frame arrives never runs `Update.end()`, so nothing sets an
+    // error and the completion handler would treat a PARTIAL image as good.
+    // This flag is the inverse: false from /ota/start, set true ONLY after
+    // `Update.end(true)` has verified the image (length + client MD5) and
+    // `Update.isFinished()` confirms it. Every reboot / partition switch is
+    // gated on it, so "we never got there" now reads as failure.
+    bool _ota_image_valid = false;
+
     std::function<void()> preUpdateCallback = NULL;
     std::function<void(size_t current, size_t final)> progressUpdateCallback = NULL;
     std::function<void(bool success)> postUpdateCallback = NULL;
