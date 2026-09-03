@@ -24,8 +24,12 @@ path.
 
 ## Versioning
 
-- Scheme: `v4.35p.MM.DD-stability` (fork stability line). A second cut on
-  the same day appends `.2`: `v4.35p.MM.DD.2-stability` (precedents:
+- Scheme: `v<VER>.MM.DD-stability` (fork stability line), where `<VER>` is
+  the firmware version the tree currently carries -- read it from
+  `SOURCE_VERSION` + `SOURCE_VERSION_SUB` in `src/configuration_global.h`,
+  never from an older tag. The letter follows upstream and changes without
+  notice (4.35p -> 4.35s on 2026-09-03). A second cut on the same day
+  appends `.2`: `v<VER>.MM.DD.2-stability` (precedents:
   v4.35p.08.27.2-stability, v4.35p.07.24.2). Ask the user for the tag name
   if there is any ambiguity (same-day re-release vs. replace-in-place).
 - `FLASH_VERSION` in `src/configuration_global.h`: bump to the release date

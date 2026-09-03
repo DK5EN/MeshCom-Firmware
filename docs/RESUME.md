@@ -1,5 +1,26 @@
 # RESUME — pick up here
 
+## 2026-09-03: upstream 4.35s merged, fork branch renamed to `fork-main`
+
+The fork carries firmware **4.35s**. `upstream/dev` `4e649eae` merged cleanly
+(`c908a4dd`: `SOURCE_VERSION_SUB`/`_WEB_SUB` `p` -> `s`, and the `--postime`
+`else node_postime = 0` branch removed, which had reset every value >= 300 s
+back to the default). 0 behind upstream. Gates on the merge: native 230/230,
+`wiscore_rak4631` builds (RAM 35.8 %, Flash 80.4 %).
+
+The branch `v4.35p_prio` was named after the upstream version letter and went
+stale on every upstream cut, so it is retired: renamed to the version-neutral
+`fork-main`, the fork's GitHub default branch moved with it, the old remote
+branch deleted behind tag `archive/v4.35p_prio-20260903` (last 4.35p state
+`1d0bd23a`). Updated to match: `.claude/commands/{rebase-upstream,submit-pr,
+code-audit,ram-snapshot}.md`, the release tag scheme in
+`release-firmware.md` (now `v<VER>.MM.DD-stability`, `<VER>` read from
+`configuration_global.h` instead of hard-coded `4.35p`), and BACKLOG §4.1 plus
+the new §4.2 table. Historic reports keep the old branch name on purpose.
+
+Inherited from upstream, not fixed here: `--postime 0` no longer disables
+position beacons (0 clamps to 300 s). Needs its own upstream PR if wanted.
+
 ## 2026-09-02 night: Release v4.35p.09.02-stability published — GPS/QNH path, --setlog lines, T-Deck key repeat
 
 `v4.35p.09.02-stability` is live on GitHub (39 assets, `--latest`), tagged at

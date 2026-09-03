@@ -81,7 +81,7 @@ Write to `docs/code-audit-YYYYMMDD.md` (today's date).
 # MeshCom Firmware Code Audit
 
 **Date:** YYYY-MM-DD  
-**Branch:** v4.35p_prio  
+**Branch:** fork-main  
 **HEAD:** <short hash>  
 **Scope:** changed files | full src/ | specific: <list>  
 **Rules:** docs/codequality-rules.md, docs/code-quality-2.0.md (Part D checklist)  

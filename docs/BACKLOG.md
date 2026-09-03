@@ -3379,22 +3379,22 @@ ueberlebt. Ueber ~90 s Laufzeit beobachtet:
 
 ## 4. State of the repository
 
-### 4.1 Branch model (decided 2026-08-29)
+### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
 
 ```
-upstream/dev --merge--> v4.35p_prio (fork main) --branch--> topic branch (tdeck-...)
+upstream/dev --merge--> fork-main --branch--> topic branch (tdeck-...)
       ^                        |                                  |
       |                        |<------------- merge back --------+
       +---- PR <-- pr/<topic> <+  (built from upstream/dev + firmware files only, 1 commit)
 ```
 
-- **`v4.35p_prio` is fork main and the permanent home of everything**: docs, `tools/`, `test/`,
+- **`fork-main` is fork main and the permanent home of everything**: docs, `tools/`, `test/`,
   `src/instrument.*`, `src/test_inject.*`, `src/t-deck/tdeck_debug.*`, the bench harness. It
   tracks upstream by **merge, never rebase** (icssw-org squash-merges; a rebase turns our merged
   fixes into deletion-only commits — memory `merge-not-rebase-after-upstream-squash`).
 - **Topic branches** off fork main for active work; merged back when done, then deleted.
 - **PR branches are built, not branched**: `git checkout -b pr/<topic> upstream/dev`, then
-  `git checkout v4.35p_prio -- <firmware files>`, cut the four couplings (memory
+  `git checkout fork-main -- <firmware files>`, cut the four couplings (memory
   `firmware-only-pr-coupling`), squash to one commit with the German per-file description. No
   docs, tools, tests or debug code in a PR. After upstream squash-merges, `git merge upstream/dev`
   into fork main sees identical content and the surrounding debug hooks survive.
@@ -3403,7 +3403,27 @@ upstream/dev --merge--> v4.35p_prio (fork main) --branch--> topic branch (tdeck-
   For v5 the durable path is to offer the instrumentation upstream as a default-off compile
   option in its own PR once the T-Deck PR has landed.
 
-### 4.2 Branches as of 2026-09-01
+### 4.2 Branches as of 2026-09-03
+
+| Branch               | State                                                          | Decision                                              |
+| -------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
+| `fork-main`          | fork main, 0 behind `upstream/dev` `4e649eae` (firmware 4.35s) | keep — carries docs, `test/`, `tools/`, bench harness |
+| `v4.35p_prio`        | previous name of `fork-main`, last 4.35p state `1d0bd23a`      | tag `archive/v4.35p_prio-20260903`, branch deleted    |
+| `pr-1114-kiss`       | KISS/TCP v1.3, 8 commits, worktree `mc-pr1114-kiss`            | keep — not upstream yet                               |
+| `master`, `gh-pages` | fork mirror / pages                                            | ignore                                                |
+
+Upstream cut `4.35s` on 2026-09-03 (`c908a4dd`: `SOURCE_VERSION_SUB` `p` -> `s`, plus the removal
+of the `else node_postime = 0` branch in `--postime` that had reset every value >= 300 s to the
+default). The fork branch was named after the upstream version letter and therefore went stale on
+every such cut, so it was renamed to the version-neutral `fork-main` in the same pass; the fork's
+default branch on GitHub moved with it. Historic reports keep the old name on purpose — they
+record the tree as it was.
+
+Consequence of the upstream `--postime` change: `--postime 0` no longer disables position beacons
+(0 < 300 clamps to 300). Inherited as-is; if "positions off" should stay reachable it needs its
+own upstream PR.
+
+### 4.2a Branches as of 2026-09-01 (historical)
 
 | Branch                        | State                                               | Decision                                                    |
 | ----------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
@@ -3420,7 +3440,7 @@ main — 154 commits ahead of `v4.35p_prio`, which held nothing it lacked. The s
 model of §4.1 by fast-forwarding `v4.35p_prio` onto it, so the branch named fork main is fork
 main again.
 
-### 4.2a Branches as of 2026-08-29 (historical)
+### 4.2b Branches as of 2026-08-29 (historical)
 
 | Branch                                             | State                                   | Decision                                                          |
 | -------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
