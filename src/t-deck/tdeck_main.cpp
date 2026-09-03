@@ -464,8 +464,8 @@ void setupLvgl()
 
     // G07: the 4th parameter is size_in_px_cnt, not a byte count
     // (lv_hal_disp.h:223). LVGL_BUFFER_SIZE is TFT_WIDTH*TFT_HEIGHT*sizeof(lv_color_t),
-    // i.e. twice the pixel count. Harmless while full_refresh=1 and buf2==NULL keep
-    // the partial-render paths unreachable; with partial refresh it is a ~150 KB overflow.
+    // i.e. twice the pixel count. This must stay a pixel count now that
+    // full_refresh=0 makes the partial-render paths reachable.
     lv_disp_draw_buf_init( &draw_buf, buf, NULL, TFT_WIDTH * TFT_HEIGHT );
 
     /*Initialize the display*/
@@ -477,7 +477,11 @@ void setupLvgl()
     disp_drv.ver_res = TFT_WIDTH;
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf;
-    disp_drv.full_refresh = 0;   // EXPERIMENT: partial refresh, no other changes
+    // TD-05: partial refresh. full_refresh=1 forced a ~45 ms blocking, non-DMA
+    // pushColors of the whole framebuffer on every invalidation -- including the
+    // 1 Hz clock tick -- while holding the SPI bus that also fronts SD and LoRa.
+    // Settled on hardware (DK5EN-14); see BACKLOG.md 3.8b/3.8e.
+    disp_drv.full_refresh = 0;
     disp_drv.monitor_cb = tdeck_dbg_monitor_cb;
     disp_drv.render_start_cb = tdeck_dbg_render_start_cb;
     lv_disp_drv_register( &disp_drv );
