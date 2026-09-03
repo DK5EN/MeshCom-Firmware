@@ -1,5 +1,61 @@
 # RESUME — pick up here
 
+## 2026-09-03 evening: Backlog grooming — twelve items closed, TM-49 fixed
+
+One pass over the open rows from an operator list. Detail and evidence per item:
+BACKLOG §3.8x.
+
+**Closed:** `TD-04` (Europe map installed and rendering), `TD-05` (partial
+refresh shipped and working), `GPS-01..04` + `GPS-06` (the 8 h overnight
+`DK5EN-14` capture — 9791 evaluations, 0 rejects, 0 corrupt samples — is the
+bench proof those rows were waiting for; the planned TRACK-mode A/B/C arms are
+superseded), `TM-35` (gate met since the async-NTP build, field-proven since),
+`TM-39` (both leftovers resolved by `b624bd33` and `CTY-01`/`a1191eaa`),
+`TM-44` (accepted, no fix), `CQ-01` (BLE PIN on the console is intended, risk
+accepted), `TOOL-06` (re-verified on disk, nothing to change), and decision
+`G12` (all at once).
+
+**Fixed:** `TM-49` — the OTA completion path is now fail-closed, which is what
+the operator proposed: `ElegantOTAClass::_ota_image_valid` is false from
+`/ota/start` and set true in exactly one place, after `Update.end(true)`
+(length + client MD5) _and_ `Update.isFinished()`. Both completion handlers
+gate the reboot, the partition switch and the HTTP 200 on it, and abort with
+`incomplete_upload` otherwise. `abortActiveUpdate()` clears it only while
+`Update.isRunning()`, so a late AsyncTCP disconnect cannot retract an earned
+verdict. Builds green (`esp32-safeboot`, `esp32-S3-safeboot`), native 568/568.
+
+**Still owed for TM-49:** the bench arm on a **4 MB** board (Heltec or T-Beam,
+not the 16 MB T-Deck whose bootloader masks the defect) — kill an upload
+mid-transfer, assert HTTP 400, `abort;reason;incomplete_upload`, no
+`verify;result;ok`, `end;result;error`, recovery via the 180 s fallback.
+Procedure written up in `docs/bench-ota-regression.md`.
+
+**Two stale statuses corrected on a read-through:** `TD-01` (WLAN association) had been sitting on
+`open` in §3.8b since 2026-08-30, when TM-34 Wave W closed it with 24/24 first joins — the row was
+stale, not the work. `TD-06` (automated test harness) sat on `in progress` while
+`tools/bench/tdeck_harness.py` (20 scenarios) and its sibling rigs were in daily use and HL-01
+(`--wifi on/off`) had closed the last gap; net-console observation is `meshlogger.py`, separate by
+design. The CI limit from §3.8e still stands and is tracked elsewhere: both fork workflows are
+disabled, so every green claim is a manual run.
+
+**Still open, corrected:** `MH-01` is **not** fixed — `lora_functions.cpp:705`
+still stamps `| 0xF0` over the country nibble. While checking it, a duplicate
+backlog ID surfaced: `MH-02` named two unrelated defects. The one that shipped
+in `a1191eaa` (dead MHeard eviction, §3.8p) keeps the ID; §3.8d's
+`decodeAPRS` defaulting defect is renamed **`MH-03`** and is also still open.
+
+**Upstream:** PR #1114 (KISS/TCP interface) was merged (`9d885b1a`) and
+reverted (`674413ce`, PR #1128) on 2026-09-03. `upstream/dev` does not carry
+it and neither do we. Our review had all 15 findings fixed and re-verified by
+the author; the last recorded blocker was the semantic conflict with BP-09's
+`sendMessage()` return type. **No repairs are carried for it.** That PR is also
+what answered `APRS-01`: it settled protocol choice (KISS-over-TCP + AX.25 UI),
+where the serialiser lives, per-env cost and which platforms cannot carry it.
+The one question it never touched is the one `APRS-01` said to ask first —
+node-side or a bridge in MCProxy — and after the revert that is the only live
+option. aprs.fi's app stays out of reach either way: it is an APRS-IS viewer,
+not a KISS client.
+
 ## 2026-09-03: Release v4.35s.09.03-stability published, fork branch renamed to `fork-main`
 
 `v4.35s.09.03-stability` is live on GitHub (39 assets, `--latest`), tagged at
