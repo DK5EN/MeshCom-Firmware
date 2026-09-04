@@ -1,5 +1,23 @@
 # RESUME — pick up here
 
+## 2026-09-04 morning: BP-11 echo guard — implemented, bench-proven, NOT published
+
+The node refuses to re-transmit its own back-pressure wording (`bpIsOwnWording()` in
+`src/backpressure.h`, wired into `sendMessage()` after the `{ZIEL}` parse; strict block, no
+receipt for an echo). Field case IZ5CND-1/-10, still looping during the bench. Plan, decision
+(Option A over strip-and-resend) and evidence: `docs/node-msg.md`; BACKLOG row `BP-11`;
+changelog item 179 in its own "Unreleased" section.
+
+**State:** commit `b3ecaa68` + this docs commit on `fork-main`, **ahead of origin, unpushed**.
+Operator decision the same morning: no upstream PR, no push, no release — the PR worktree was
+removed unpushed. A `/release-firmware` or `/submit-pr` run must stop before carrying it.
+Installed on `DK5EN-98` (OTA) and `DK5EN-14` (USB), both build Sep 4.
+
+**Still owed:** bench case 5 on `DK5EN-14` (flood the ring into the QRT band, feed the nack
+back over the same transport, expect one `[BP];echo;` and no second `[BP];nack;`); identify
+the re-injecting client on IZ5CND's side (node-to-node EXTUDP bridge is the first hypothesis);
+decide whether the commit moves to a private branch so `fork-main` stays pushable.
+
 ## 2026-09-03 evening: Backlog grooming — twelve items closed, TM-49 fixed
 
 One pass over the open rows from an operator list. Detail and evidence per item:
