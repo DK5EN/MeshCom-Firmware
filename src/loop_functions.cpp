@@ -3893,6 +3893,24 @@ int sendMessage(char *msg_text, int len)
         }
     }
 
+    // BP-11: the node's own back-pressure wording fed back in by a client
+    // (see bpIsOwnWording() in backpressure.h). Checked here, after the
+    // {ZIEL} parse, because the observed shape is "{*}QRT NOT SENT - ..."
+    // -- a client re-sending the nack frame with its dst -- and a check on
+    // the raw text would miss it. Before bp_origin_dst, before refusing()
+    // and before any msg-id is minted: a blocked echo leaves no trace in
+    // the BP state machine and gets NO nack and NO notice back -- a
+    // receipt for an echo is what opens the next loop. Unconditional on
+    // bp_origin: every sendMessage() caller is a local text input (BLE,
+    // serial, web, EXTUDP, T-Deck), relay traffic never comes through here.
+    // Marker carries no text, ever (BP-10 H3: a raw text in a [BP] line can
+    // forge a marker for tools/serial_monitor.py and loganalyse.sh).
+    if(bpIsOwnWording(strMsg.c_str()))
+    {
+        Serial.printf("[BP];echo;ms;%lu\n", (unsigned long)millis());
+        return BP_SEND_INVALID;
+    }
+
     // BP-06: strDestinationCall is authoritative here (fully parsed,
     // upper-cased, trimmed) -- set bp_origin_dst before the refuse check
     // below so a refused message's nack is addressed to the target the

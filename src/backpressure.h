@@ -47,6 +47,7 @@
 #ifdef __cplusplus
 
 #include <stdint.h>
+#include <string.h>
 
 /// Coarse state of the sender-facing back-pressure machine.
 enum BpState
@@ -156,6 +157,46 @@ inline const char *bpNoticeText(BpNotice n)
         case BP_NOTICE_QRV: return "QRV - ready again, TX buffer clear";
         default:            return "";
     }
+}
+
+/// BP-11: true if text is nothing but this node's own back-pressure wording --
+/// a notice or nack that a client (phone app, web GUI, EXTUDP peer) fed back
+/// into sendMessage() as if the operator had typed it. Such a text must never
+/// reach the TX ring: the observed field case (IZ5CND-1/-10, 2026-09-04) was
+/// "QRT NOT SENT - QRT NOT SENT - QRT NOT SENT - QRS - slow down, ..." on the
+/// air, one prefix added per re-injection while the ring sat in the QRT band.
+/// Rule (operator decision 2026-09-04, strict block): after leading spaces the
+/// text either starts with one of the two bpNackPrefix() literals or equals one
+/// of the four bpNoticeText() literals. Exact and case-sensitive on purpose --
+/// only the literals this firmware itself emits are caught, a text that merely
+/// quotes the wording mid-sentence is legitimate operator traffic. The literals
+/// are taken from the accessors, never duplicated here, so a reworded notice
+/// cannot silently unhook the guard (test_bp_echo_guard pins that).
+/// No allocation, no String: runs on the nRF52 4 KB loop stack (N-22).
+inline bool bpIsOwnWording(const char *text)
+{
+    if(text == nullptr)
+        return false;
+
+    while(*text == ' ')
+        text++;
+
+    static const BpNack kNackPrefixes[] = { BP_NACK_QRT, BP_NACK_QTA };
+    for(size_t i = 0; i < sizeof(kNackPrefixes) / sizeof(kNackPrefixes[0]); i++)
+    {
+        const char *prefix = bpNackPrefix(kNackPrefixes[i]);
+        size_t prefix_len = strlen(prefix);
+        if(prefix_len > 0 && strncmp(text, prefix, prefix_len) == 0)
+            return true;
+    }
+
+    for(int n = BP_NOTICE_QRS; n <= BP_NOTICE_QRV; n++)
+    {
+        if(strcmp(text, bpNoticeText((BpNotice)n)) == 0)
+            return true;
+    }
+
+    return false;
 }
 
 class BackPressure

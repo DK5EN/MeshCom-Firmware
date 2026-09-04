@@ -2,7 +2,7 @@
 
 Release: `v4.35s.09.03-stability` (2026-09-03), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-178 below. The full engineering rationale for
+fork's changes, plus items 104-179 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -108,6 +108,22 @@ outside those two upstream hunks is byte-identical.
      `4.35s`. No behavioural change beyond the string itself; it exists so a
      node's reported version matches the upstream generation it is built
      from.
+179. **A node no longer radiates `QRT NOT SENT - QRT NOT SENT - ...` when a
+     client feeds its own back-pressure wording back in** (BP-11). A client
+     attached to the node — an app, or two nodes bridged over EXTUDP — could
+     take the node's own "buffer full" notice or its `QRT NOT SENT - <text>`
+     receipt and hand it straight back as if it were a new message to send;
+     the node would refuse it again, prefix it again, and hand the growing
+     text back once more, until the ring drained and the accumulated wording
+     went out over the air. Field evidence: a stack five prefixes deep,
+     nine frames inside three seconds — faster than anyone could type. The
+     node now recognises its own wording exactly (`bpIsOwnWording()`,
+     `src/backpressure.h`) at the point a message is submitted and drops it
+     silently: no transmission, no further receipt, and no prefix ever
+     stacks. The operator's own original message is not resent by the node
+     either way — it already received the one notice that told it the
+     message was not sent; a client that keeps echoing the wrong text back
+     has its own bug to fix.
 
 ## New in v4.35p.09.02-stability
 

@@ -20,10 +20,11 @@
 // BP-06: the destination is now the same target the triggering message was
 // sent to (a group, a DM call, or "*"), not a hardcoded broadcast -- a
 // notice for a message the operator typed into group 20 should show up in
-// the 20 chat, not vanish into "*". msg_app_offline still keeps the frame
-// local: for a DM dst this makes the notice appear in the sender's own DM
-// thread, but the frame is never announced, never retransmitted and never
-// goes on the air, so the DM partner never sees it.
+// the 20 chat, not vanish into "*". What actually keeps the frame off the
+// air is that it is only ever written to BLEtoPhoneBuff / the EXTUDP
+// socket, never to the TX ring, plus BP-11 (bpIsOwnWording(),
+// backpressure.h), which refuses the frame if a client feeds it back into
+// sendMessage().
 static inline void bpNoticeFillFrame(struct aprsMessage &aprsmsg,
                                      const char *node_call,
                                      const char *text,
@@ -40,7 +41,12 @@ static inline void bpNoticeFillFrame(struct aprsMessage &aprsmsg,
     aprsmsg.msg_source_path = node_call;
     aprsmsg.msg_payload = text;
 
-    aprsmsg.msg_app_offline = true; // Rückmeldungen niemals announcen
+    // Bit 0x20 in byte 5: "app was offline, catch-up frame" marker read by
+    // the phone app (set on RX when no phone is connected, see
+    // lora_functions.cpp ~1141). It is NOT a send inhibit -- nothing in the
+    // TX path reads this flag; see the file header comment for what
+    // actually keeps this frame local.
+    aprsmsg.msg_app_offline = true;
 }
 
 // BP-07: bytes, not characters -- see the length budget table in

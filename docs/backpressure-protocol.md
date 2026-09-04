@@ -295,6 +295,28 @@ Es gibt **kein eigenes Feld** dafuer. Die belastbare Regel ist die Kombination:
 Das Textpraefix ist das einzige harte Merkmal. Das ist die groesste offene Schwaeche des
 heutigen Standes — Kapitel 5 sagt, was dagegen zu tun waere.
 
+### Was ein Client nicht tun darf
+
+Genau dieses Praefix-Merkmal ist auch die Falle: Ein Frame, der die Erkennungsregel oben
+erfuellt, ist eine Rueckmeldung, kein Posteingang. Er darf **niemals** erneut an den Node
+geschickt werden.
+
+Ein EXTUDP-Peer, der empfangene `type:msg`-Datagramme ungeprueft an einen Node zurueckspielt
+(eine Node-zu-Node-Bruecke), tut genau das mit jeder Quittung: `sendExternNotice()` liefert
+die Quittung als `{"type":"msg","dst":"*","msg":"QRT NOT SENT - ..."}`, und `getExtern()`
+nimmt exakt diese Form als Sendebefehl an — geprueft werden nur `type`, `dst` und `msg`. So
+kann eine Quittung ohne jede App dazwischen unbegrenzt zwischen zwei Nodes hin- und
+herlaufen, mit wachsendem Praefix-Stapel bei jedem Umlauf.
+
+Seit BP-11 blockiert der Node einen solchen Text lautlos (`[BP];echo;`), antwortet am
+Web-Pfad mit `sendmessage invalid` und schickt **keine** Quittung fuer dieses Echo. Die
+urspruengliche Nachricht des Operators wird vom Node dabei nicht erneut gesendet — sie hat
+ihre eine Quittung bereits bekommen; alles Weitere ist der zurueckspielende Client selbst.
+
+Feldbeweis (`IZ5CND`, 2026-09-04): `mcmap messages_query` zeigt bis zu fuenf gestapelte
+`QRT NOT SENT - `-Praefixe auf der Luft, neun Frames in drei Sekunden — schneller, als ein
+Mensch tippen kann.
+
 Ein Hinweis, kein Beweis: Meldungen tragen eine `msg_id` aus einem eigenen, streng steigenden
 Zaehler (im Benchlauf `00008C30`, `000099BA`, `00009A55` …), echte Nachrichten dagegen
 `(GW_ID & 0x3FFFFF) << 10 | Zaehler` (`EA25A323` …). Die Wertebereiche koennen sich
@@ -302,13 +324,14 @@ ueberschneiden; der Vergleich taugt nur zur Plausibilitaet.
 
 ### Konsolenmarker
 
-| Marker                                  | Bedeutung                                                          |
-| --------------------------------------- | ------------------------------------------------------------------ |
-| `[BP];notice;<code>;depth;N;max;M;ms;T` | Zustandswechsel, einmal pro Episode und Code                       |
-| `[BP];refuse;depth;N;max;M;ms;T`        | Eine Nachricht wurde abgewiesen                                    |
-| `[BP];nack;<code>;dst;D;ms;T`           | Quittung zu einer verlorenen Nachricht                             |
-| `[BP];nack;...;txt;<Text>`              | dieselbe Zeile mit Text — **nur bei eingeschaltetem `bLORADEBUG`** |
-| `[BP];invalid;depth;N;max;M;ms;T`       | Ablehnung, die **kein** Rueckstau ist                              |
+| Marker                                  | Bedeutung                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------- |
+| `[BP];notice;<code>;depth;N;max;M;ms;T` | Zustandswechsel, einmal pro Episode und Code                                          |
+| `[BP];refuse;depth;N;max;M;ms;T`        | Eine Nachricht wurde abgewiesen                                                       |
+| `[BP];nack;<code>;dst;D;ms;T`           | Quittung zu einer verlorenen Nachricht                                                |
+| `[BP];nack;...;txt;<Text>`              | dieselbe Zeile mit Text — **nur bei eingeschaltetem `bLORADEBUG`**                    |
+| `[BP];invalid;depth;N;max;M;ms;T`       | Ablehnung, die **kein** Rueckstau ist                                                 |
+| `[BP];echo;ms;T`                        | Eigener Meldungs-/Quittungstext wurde von einem Client zurueckgespielt und abgewiesen |
 
 Der Text haengt bewusst am Debug-Schalter: die Netzkonsole eines Knotens wird tagelang
 mitgeschnitten und ausgewertet, und diese Mitschnitte sollen keine Nachrichteninhalte fuehren.
@@ -317,7 +340,11 @@ mitgeschnitten und ausgewertet, und diese Mitschnitte sollen keine Nachrichtenin
 ### Was garantiert ist
 
 - Eine Meldung oder Quittung geht **nie ueber die Luft**. Sie wird nie in den Sendepuffer
-  eingereiht und traegt immer `msg_app_offline`.
+  eingereiht und traegt immer `msg_app_offline`. Seit BP-11 (2026-09-04) gilt das auch,
+  wenn ein Client den eigenen Wortlaut des Nodes wieder einspielt: der Node erkennt den
+  eigenen Text (`bpIsOwnWording()`) und weist ihn ab, bevor er in den Sendepfad kommt. Auf
+  ein solches Echo gibt es **keine** Quittung — sonst begaenne der naechste Kreislauf sofort
+  von vorn.
 - Sie geht **nur** an den Transport, ueber den die ausloesende Nachricht kam.
 - Sie geht an **dasselbe Ziel** wie die ausloesende Nachricht. Wer in Gruppe 20 getippt hat,
   sieht sie im Chat 20. Bei einer DM erscheint sie im eigenen DM-Verlauf; der Partner sieht
