@@ -11,8 +11,11 @@ operator list plus two stale statuses (`TD-01`, `TD-06`) caught on a read-throug
 `APRS-01`, `TOOL-06`, `TD-01`, `TD-06` and decision `G12` all closed; `TM-49` fixed in code (fail-closed OTA
 completion gate, bench arm on a 4 MB board still owed); `MH-01` re-checked and confirmed **still
 open**, with §3.8d's duplicate `MH-02` renamed to `MH-03`. Upstream note: PR #1114 (KISS/TCP) was
-merged and reverted the same day — we carry no repairs for it. Still open after this pass: `MH-01`,
-`MH-03`, `GPS-07`, `TD-09`, `TD-10`, `E22-01`, `TLM-01..03`, `MEM-02` (parked),
+merged and reverted the same day, on a **build break** (IRAM/DRAM overflow on four ESP32 envs), and
+our own PR review had missed it — `MEM-03` fixes the guard (`resource_watch.py` now checks
+`iram0_0_seg` as well as `dram0_0_seg`, and baselines both), `MEM-04` records that four envs sit
+within 4 kB of a link failure on a clean tree. We carry no repairs for the feature itself. Still open after this pass: `MH-01`,
+`MH-03`, `MEM-04`, `GPS-07`, `TD-09`, `TD-10`, `E22-01`, `TLM-01..03`, `MEM-02` (parked),
 `UDP-01`-Rückfragen, `WF-01` Sites 1+2, `TM-28`, `WEB-03` (c)-(e), `CQ-02..CQ-12`, `SL-01..07`,
 `TD-11`, and `G09`/`G10`/`G11` from §3.8c.
 
@@ -1786,10 +1789,85 @@ the easy half; the failure under investigation is the node dying while they do. 
 
 ### 3.8m Memory budget — static-DRAM guard and the heap-ring proposal (2026-08-30)
 
-| ID     | Board(s)        | Type | Sev.   | Location                                                                                                                   | Item                                                                                                                                                                                                                                      | Status                                                                                    |
-| ------ | --------------- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| MEM-01 | classic ESP32   | GAP  | High   | `tools/resource_watch.py`, `.github/workflows/ci-build.yml`, `configuration_global.h`                                      | Static-DRAM guard rail (`dram` subcommand, hard CI gate at 4 kB headroom) and classic-ESP32 rings right-sized (`MAX_RING` 30→20, `MAX_RING_UDP` 25→20).                                                                                   | **DONE 2026-08-30**, commit `861f2967` — headroom E22 1,712→11,896 B, T-Beam 528→10,712 B |
-| MEM-02 | all (see risks) | GAP  | Medium | `src/loop_functions.cpp:403-435`, `src/loop_functions_extern.h:189-237`, `src/txring_functions.cpp:27` (NATIVE_BUILD twin) | **Move the five big static rings to one-time boot allocation** — frees ~28 kB of `dram0_0_seg` on classic ESP32. **Parked: risk assessment before any code (operator, 2026-08-30), and it ships only with the regression bar below met.** | **parked — risk assessment first**                                                        |
+| ID     | Board(s)        | Type | Sev.   | Location                                                                                                                   | Item                                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                                                    |
+| ------ | --------------- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| MEM-01 | classic ESP32   | GAP  | High   | `tools/resource_watch.py`, `.github/workflows/ci-build.yml`, `configuration_global.h`                                      | Static-DRAM guard rail (`dram` subcommand, hard CI gate at 4 kB headroom) and classic-ESP32 rings right-sized (`MAX_RING` 30→20, `MAX_RING_UDP` 25→20).                                                                                                                                                                                                                                                      | **DONE 2026-08-30**, commit `861f2967` — headroom E22 1,712→11,896 B, T-Beam 528→10,712 B |
+| MEM-02 | all (see risks) | GAP  | Medium | `src/loop_functions.cpp:403-435`, `src/loop_functions_extern.h:189-237`, `src/txring_functions.cpp:27` (NATIVE_BUILD twin) | **Move the five big static rings to one-time boot allocation** — frees ~28 kB of `dram0_0_seg` on classic ESP32. **Parked: risk assessment before any code (operator, 2026-08-30), and it ships only with the regression bar below met.**                                                                                                                                                                    | **parked — risk assessment first**                                                        |
+| MEM-03 | classic ESP32   | BUG  | High   | `tools/resource_watch.py`                                                                                                  | **The memory guard could not see the region that actually overflows.** MEM-01 built a `dram0_0_seg` check and nothing for `iram0_0_seg`, and the baseline stored only PlatformIO's `RAM:`/`Flash:` summary — which on a PSRAM board measures against the PSRAM-inclusive total. A `ttgo_tbeam` build sitting at **99.98 % of iram0_0_seg** reports `RAM 8.7 %` and passes the DRAM gate with 10 kB to spare. | **FIXED 2026-09-03** — see below                                                          |
+| MEM-04 | classic ESP32   | RISK | High   | `variants/ttgo_tbeam*`, `variants/E22_XML*`                                                                                | **Four envs are within 4 kB of a link failure on a clean tree**: `ttgo_tbeam`, `ttgo_tbeam_SX1262`, `ttgo_tbeam_SX1268` at **20 bytes** of `iram0_0_seg`, and `E22_XML-DevKitC` at **920 bytes** of `dram0_0_seg` (plus 3 456 B IRAM). Any feature that touches IRAM breaks the T-Beam family; this is what broke upstream CI on `9d885b1a`.                                                                 | **open — no headroom campaign yet**                                                       |
+
+#### MEM-03 — the guard measured the wrong quantity
+
+**Found 2026-09-03, from an upstream CI failure rather than from our own gate**, which is the
+point. Job `100674766799` on `9d885b1a` (the merge commit of PR #1114) failed the `build` job on
+four envs — `ttgo_tbeam` / `_SX1262` / `_SX1268` with `IRAM0 overflowed by 104 bytes` and
+`E22_XML-DevKitC` with `DRAM0 overflowed by 304 bytes` — and the PR was reverted an hour later.
+None of the four is a design objection; it is a link failure.
+
+**Why our own PR review did not catch it — two independent reasons, both instrument defects.**
+
+1. **Env coverage.** The review built four envs: `heltec_wifi_lora_32_V3`, `ttgo-lora32-v21`,
+   `E22-DevKitC`, `wiscore_rak4631`. Three of the four failing envs were never built. Worse, the
+   two chosen as the "classic ESP32" representatives are precisely the two boards `MEM-01` had
+   just relieved by ~10 kB — measured on this tree 2026-09-03, `ttgo-lora32-v21` has 11 432 B of
+   DRAM and 4 972 B of IRAM free, `E22-DevKitC` 11 200 / 4 972. They are not the tight boards, and
+   picking them made the classic-ESP32 platform look like it had room.
+2. **The guard itself was blind.** `MEM-01` shipped a `dram0_0_seg` check and no `iram0_0_seg`
+   check, and `resource_watch.py`'s baseline stored only PlatformIO's `RAM:`/`Flash:` summary
+   lines. On a PSRAM board that summary measures against the PSRAM-inclusive total, so
+   `ttgo_tbeam` prints `RAM: 8.7% (used 114648 bytes from 1310720 bytes)` while `dram0_0_seg` is
+   at 92 % and `iram0_0_seg` at **99.98 %**. Even if the env had been built and the DRAM gate run,
+   it would have said `::notice ... headroom 10048 bytes` and exited 0.
+
+Counter-proof, run both ways on the same `ttgo_tbeam` map (`docs` are cheap, this took a minute):
+the pre-fix `dram` guard emits `::notice` and exits **0**; the fixed guard emits
+`::error ... iram0_0_seg 131052/131072 bytes, headroom 20 bytes` and exits **1** under `--strict`.
+
+**The fix (2026-09-03).** `resource_watch.py` now reads _every_ region the ESP32 linker can
+overflow, not one of them:
+
+- `parse_region()` generalises the old `_bss_end`-vs-origin arithmetic; `REGIONS` lists
+  `dram0_0_seg` (end marker `_bss_end`) and `iram0_0_seg` (end marker `_iram_end`).
+  `parse_dram()` stays as a thin wrapper keeping its `bss_end` key, so the MEM-01 wiring is
+  unaffected.
+- The `dram` subcommand now checks both regions and names the right consequence per region
+  ("the next static buffer" vs "the next IRAM-placed function fails the link"). `regions` is
+  added as the preferred alias; `dram` keeps working.
+- `snapshot` records `dram0_0_seg` and `iram0_0_seg` (used/length) into the baseline alongside the
+  aggregate, so the stored numbers include the quantity that actually fails.
+- Six new self-test assertions, built from the two real maps: the `ttgo_tbeam` shape (DRAM roomy,
+  IRAM at 20 B — asserted to _pass_ a DRAM-only gate and _fail_ on IRAM) and the
+  `E22_XML-DevKitC` shape, where the binding region is the other one (920 B DRAM vs 3 456 B IRAM).
+  Which region runs out first is a property of the board, so a one-region guard is wrong on some
+  board whichever region it picks.
+
+**Baseline refreshed** for the seven ESP32 envs measured here. The remaining envs still carry
+aggregate-only entries from 2026-08-21 — a full re-baseline is its own task and is not claimed
+here.
+
+#### MEM-04 — 20 bytes of IRAM on the T-Beam family
+
+Measured on `fork-main` 2026-09-03, clean tree, no KISS:
+
+| Env                      | `dram0_0_seg` free | `iram0_0_seg` free |
+| ------------------------ | -----------------: | -----------------: |
+| `ttgo_tbeam`             |           10 048 B |           **20 B** |
+| `ttgo_tbeam_SX1262`      |            9 920 B |           **20 B** |
+| `ttgo_tbeam_SX1268`      |            9 928 B |           **20 B** |
+| `E22_XML-DevKitC`        |          **920 B** |            3 456 B |
+| `E22-DevKitC`            |           11 200 B |            4 972 B |
+| `ttgo-lora32-v21`        |           11 432 B |            4 972 B |
+| `heltec_wifi_lora_32_V3` |          160 720 B |          277 124 B |
+
+This is pre-existing upstream state, not something this fork introduced — but it means **any**
+feature that places code in IRAM fails the T-Beam family, and any feature costing more than
+~900 B of static DRAM fails `E22_XML-DevKitC`. `MEM-01` freed DRAM and did nothing for IRAM,
+which is why the T-Beam row shows the split it does. Note this also confirms `APRS-01`'s own
+prediction: it named `E22-DevKitC`, `ttgo_tbeam` and its SX1262/SX1268 siblings as the
+"we cannot carry this" candidates before any of it was built.
+
+No headroom campaign is proposed here. What is proposed is that the gate now says so out loud
+before a PR is offered, rather than a maintainer's CI saying it after a merge.
 
 #### MEM-02 — what would move, and the risks that must be assessed first
 
@@ -2278,24 +2356,40 @@ branch at `:865`); dedup and relay run before the destination dispatch and key o
 reverted it.** Sequence, all on 2026-09-03: `9d885b1a` merged PR #1114 (`DH1FR:kiss-mode`,
 "optional KISS/TCP interface for standard packet-radio software (ESP32)"), and `674413ce` merged
 PR #1128 reverting it 60 minutes later. `upstream/dev` therefore does **not** carry the feature,
-and neither does this tree (`src/kiss_functions.*` does not exist here). Our review of the PR at
-head `627ff1e7`/`f0ecb890` is [`pr1114-kiss-review-20260901.md`](pr1114-kiss-review-20260901.md);
-all 15 findings were fixed by the author and re-verified, and the last blocker recorded there was
-a _semantic_ merge conflict with BP-09 (`sendMessage()` returning `BpSendResult` upstream vs.
-`msg_id` in the PR), not a defect.
+and neither does this tree (`src/kiss_functions.*` does not exist here).
+
+**Why it was reverted: the build broke, not the design.** CI job `100674766799` ran on the merge
+commit `9d885b1a` itself and failed on four ESP32 envs — `ttgo_tbeam`, `ttgo_tbeam_SX1262` and
+`ttgo_tbeam_SX1268` with `IRAM0 overflowed by 104 bytes`, `E22_XML-DevKitC` with
+`DRAM0 overflowed by 304 bytes`. Those boards sit at 20 B and 920 B of free region respectively on
+a clean tree (`MEM-04`), so roughly a kilobyte of new code is all it takes.
+
+**Our review did not catch it, for two reasons that are ours to fix** — filed as `MEM-03`. The
+review built four envs and three of the four failing ones were not among them; the two it did pick
+as classic-ESP32 representatives are the two boards `MEM-01` had just relieved by ~10 kB. On top of
+that the `resource_watch.py` guard checked only `dram0_0_seg` and baselined only PlatformIO's
+PSRAM-inclusive `RAM:` summary, so a build at 99.98 % of `iram0_0_seg` reported `RAM 8.7 %` and
+passed. Guard fixed 2026-09-03, with the `ttgo_tbeam` map as a self-test fixture.
+
+Our review of the PR at head `627ff1e7`/`f0ecb890` is
+[`pr1114-kiss-review-20260901.md`](pr1114-kiss-review-20260901.md); all 15 findings were fixed by
+the author and re-verified, and the blocker recorded there was a _semantic_ merge conflict with
+BP-09 (`sendMessage()` returning `BpSendResult` upstream vs. `msg_id` in the PR). **That review is
+now known to have had a blind spot of its own**: its build table covered four envs and reported
+"builds green" without ever touching the tightest three.
 
 **Per the standing rule, we do not carry repairs for a feature upstream has reverted.** Nothing
 here is to be re-implemented, rebased or offered back on our initiative.
 
 ##### Overlay: what APRS-01 asked for, and what the PR settled
 
-| APRS-01 asked                             | PR #1114's answer                                                                                                                                                                                                                                           | Still open?                                                                                                                                                                                                    |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which protocol, per client                | **KISS-over-TCP carrying AX.25 UI frames**, port 8001, single client, no auth by default (opt-in HMAC in the fix round). Reaches YAAC, APRSdroid, PinPoint, PocketPacket, Dire Wolf via `socat`, and the Linux `ax25` stack — one protocol for all of them. | **aprs.fi app is not covered and cannot be.** It is an APRS-IS viewer, not a KISS client; reaching it means the node's traffic entering APRS-IS, which is a gateway/policy question, not a firmware interface. |
-| Where the serialiser lives                | One layer **above** the PHY, in the interface path only: MeshCom frame ⇄ AX.25 UI, tapped after dedup at the existing RX fan-out (one line next to `queueExtern`). On-air stays 100 % MeshCom. The fix round extracted the codec to `lib/kiss_ax25/`.       | No. This is the design answer the paper was meant to produce, and the review confirmed it is the right one for this codebase (a PHY bypass would be a large, concurrency-hostile refactor).                    |
-| Per-env flash/DRAM cost                   | Measured, both before and after the fix round: `heltec_wifi_lora_32_V3` RAM 114 708 / Flash 1 397 209; `ttgo-lora32-v21` 123 128 / 1 500 117 (DRAM ~98.7 %, ~+1.1 kB); `E22-DevKitC` 123 384 / 1 511 913; `wiscore_rak4631` 87 020 / 579 552.               | No. The RAM-snapshot prerequisite below is moot — the numbers were taken directly on the PR head against its merge base with identical toolchains.                                                             |
-| Which platforms cannot carry it           | **nRF52 is out** (no transport implemented; `nm` finds zero KISS/AX25 symbols, RAM unchanged). Classic ESP32 carries it but with almost no DRAM headroom, hence the `-D DISABLE_KISS_TCP` opt-out.                                                          | No.                                                                                                                                                                                                            |
-| **The cheapest alternative, asked first** | **Not answered by the PR** — it only ever addressed the on-node option.                                                                                                                                                                                     | **Yes, and it is now the only live question.** MCProxy already speaks both node protocols and runs on a Pi next to the node; a bridge on that side costs the firmware nothing and is unaffected by the revert. |
+| APRS-01 asked                             | PR #1114's answer                                                                                                                                                                                                                                           | Still open?                                                                                                                                                                                                                    |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Which protocol, per client                | **KISS-over-TCP carrying AX.25 UI frames**, port 8001, single client, no auth by default (opt-in HMAC in the fix round). Reaches YAAC, APRSdroid, PinPoint, PocketPacket, Dire Wolf via `socat`, and the Linux `ax25` stack — one protocol for all of them. | **aprs.fi app is not covered and cannot be.** It is an APRS-IS viewer, not a KISS client; reaching it means the node's traffic entering APRS-IS, which is a gateway/policy question, not a firmware interface.                 |
+| Where the serialiser lives                | One layer **above** the PHY, in the interface path only: MeshCom frame ⇄ AX.25 UI, tapped after dedup at the existing RX fan-out (one line next to `queueExtern`). On-air stays 100 % MeshCom. The fix round extracted the codec to `lib/kiss_ax25/`.       | No. This is the design answer the paper was meant to produce, and the review confirmed it is the right one for this codebase (a PHY bypass would be a large, concurrency-hostile refactor).                                    |
+| Per-env flash/DRAM cost                   | Measured on four envs, before and after the fix round: `heltec_wifi_lora_32_V3` RAM 114 708 / Flash 1 397 209; `ttgo-lora32-v21` 123 128 / 1 500 117; `E22-DevKitC` 123 384 / 1 511 913; `wiscore_rak4631` 87 020 / 579 552.                                | **Yes — the measurement was incomplete, and it is what sank the PR.** The three tightest envs were never built and IRAM was never measured on any of them. `MEM-03` (guard) and `MEM-04` (the actual headroom) are the repair. |
+| Which platforms cannot carry it           | **nRF52 is out** (no transport implemented; `nm` finds zero KISS/AX25 symbols, RAM unchanged). Classic ESP32 was believed to carry it, with `-D DISABLE_KISS_TCP` as the per-variant escape hatch.                                                          | **Answered by CI rather than by the PR:** the T-Beam family and `E22_XML-DevKitC` cannot carry it at all, and an opt-out that must be set per variant is not the same as fitting. See `MEM-04`.                                |
+| **The cheapest alternative, asked first** | **Not answered by the PR** — it only ever addressed the on-node option.                                                                                                                                                                                     | **Yes, and it is now the only live question.** MCProxy already speaks both node protocols and runs on a Pi next to the node; a bridge on that side costs the firmware nothing and is unaffected by the revert.                 |
 
 **What that leaves.** One decision, not a research task: put the KISS/AX.25 bridge in MCProxy, or
 leave the requirement unserved on this tree. Both are cheap; neither needs new measurement. The
@@ -2983,11 +3077,26 @@ changed is the status of items whose evidence had already arrived without the ro
 
 Two things worth carrying forward from this pass:
 
+- **The memory guard was measuring the wrong quantity** (`MEM-03`, fixed). It watched
+  `dram0_0_seg` only and baselined PlatformIO's PSRAM-inclusive `RAM:` summary, so `ttgo_tbeam` at
+  **99.98 % of `iram0_0_seg`** reported `RAM 8.7 %` and passed a 4 kB DRAM gate with 10 kB to
+  spare. `resource_watch.py` now reads both regions, records them in the baseline, and carries the
+  two real maps as self-test fixtures. Counter-proof on the same map: old guard `::notice`, exit 0;
+  new guard `::error ... headroom 20 bytes`, exit 1 under `--strict`.
+
+- **Four envs are within 4 kB of a link failure on a clean tree** (`MEM-04`, open): the three
+  `ttgo_tbeam` variants at **20 bytes** of IRAM, `E22_XML-DevKitC` at **920 bytes** of DRAM. This
+  is pre-existing upstream state, but it is the reason PR #1114 could not land, and it constrains
+  every future feature that touches those boards.
+
 - **PR #1114 (KISS/TCP) was merged and reverted on 2026-09-03** (`9d885b1a`, then `674413ce`
-  reverting via PR #1128). `upstream/dev` does not carry it. Our review
-  ([`pr1114-kiss-review-20260901.md`](pr1114-kiss-review-20260901.md)) had all 15 findings fixed
-  and re-verified by the author; the last recorded blocker was the semantic conflict with BP-09's
-  `sendMessage()` return type, not a defect. **We carry no repairs for it.**
+  reverting via PR #1128). `upstream/dev` does not carry it. **The revert was a build break, not a
+  design objection** — CI job `100674766799` on the merge commit failed the four envs above. Our
+  review ([`pr1114-kiss-review-20260901.md`](pr1114-kiss-review-20260901.md)) had all 15 findings
+  fixed and re-verified by the author and recorded a semantic conflict with BP-09's
+  `sendMessage()` return type as the blocker — but its build table covered four envs and reported
+  "builds green" without touching the tightest three. **We carry no repairs for the feature**, and
+  the review's coverage gap is fixed as `MEM-03`.
 - **A duplicate backlog ID existed for five days.** `MH-02` named two unrelated defects filed
   three days apart in different sections; the fixed one is §3.8p's, the open one is now `MH-03`.
   Both rows now cross-reference the other. Worth a grep for the next ID before filing into a

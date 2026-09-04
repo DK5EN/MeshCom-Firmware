@@ -44,11 +44,33 @@ backlog ID surfaced: `MH-02` named two unrelated defects. The one that shipped
 in `a1191eaa` (dead MHeard eviction, §3.8p) keeps the ID; §3.8d's
 `decodeAPRS` defaulting defect is renamed **`MH-03`** and is also still open.
 
+**Memory guard was blind — fixed (`MEM-03`), and it is why we missed the PR #1114 break.**
+`resource_watch.py` watched `dram0_0_seg` only, and its baseline stored PlatformIO's `RAM:`/`Flash:`
+summary, which on a PSRAM board measures against the PSRAM-inclusive total. So `ttgo_tbeam` sitting
+at **99.98 % of `iram0_0_seg`** printed `RAM 8.7 %` and sailed through the 4 kB DRAM gate with
+10 kB to spare. Counter-proof on the same map: the old guard emits `::notice` and exits 0; the new
+one emits `::error ... iram0_0_seg 131052/131072, headroom 20 bytes` and exits 1 under `--strict`.
+The tool now parses every region the linker can overflow (`REGIONS`: `dram0_0_seg` via `_bss_end`,
+`iram0_0_seg` via `_iram_end`), names the right consequence per region, records both in the
+baseline, and carries the two real maps as self-test fixtures — the `ttgo_tbeam` shape asserts
+_passes a DRAM-only gate, fails on IRAM_. `regions` is the new preferred subcommand; `dram` still
+works. Baseline refreshed for seven ESP32 envs; a full 32-env re-baseline is not claimed.
+
+**`MEM-04` filed, open — four envs are one small feature from a link failure** (clean tree,
+2026-09-03): `ttgo_tbeam` / `_SX1262` / `_SX1268` at **20 bytes** of IRAM free, `E22_XML-DevKitC`
+at **920 bytes** of DRAM (and 3 456 B IRAM). For contrast the two envs our PR review _did_ build —
+`ttgo-lora32-v21` and `E22-DevKitC` — have ~11 kB DRAM and ~5 kB IRAM: they are the boards `MEM-01`
+relieved, not the tight ones. Pre-existing upstream state, no headroom campaign proposed; the point
+is that the gate now says so before a PR goes out.
+
 **Upstream:** PR #1114 (KISS/TCP interface) was merged (`9d885b1a`) and
-reverted (`674413ce`, PR #1128) on 2026-09-03. `upstream/dev` does not carry
+reverted (`674413ce`, PR #1128) on 2026-09-03 — **on a build break, not a design objection**: CI
+job `100674766799` on the merge commit failed `ttgo_tbeam`/`_SX1262`/`_SX1268` with
+`IRAM0 overflowed by 104 bytes` and `E22_XML-DevKitC` with `DRAM0 overflowed by 304 bytes`. `upstream/dev` does not carry
 it and neither do we. Our review had all 15 findings fixed and re-verified by
-the author; the last recorded blocker was the semantic conflict with BP-09's
-`sendMessage()` return type. **No repairs are carried for it.** That PR is also
+the author and recorded the semantic conflict with BP-09's `sendMessage()` return type as the
+blocker — but its build table covered four envs and reported "builds green" without ever touching
+three of the four that failed. **No repairs are carried for it.** That PR is also
 what answered `APRS-01`: it settled protocol choice (KISS-over-TCP + AX.25 UI),
 where the serialiser lives, per-env cost and which platforms cannot carry it.
 The one question it never touched is the one `APRS-01` said to ask first —
