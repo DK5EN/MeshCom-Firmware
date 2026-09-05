@@ -1213,12 +1213,17 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
             if (s_dbg_ball_pending[i] > 0)
             {
                 s_dbg_ball_pending[i]--;
-                dir = !last_dir[i];
+                // TD-13: button: always a press edge -- an injected click must land as a
+                // press regardless of the current pin level, otherwise `--ball click 2`
+                // would alternate press/release and only ever deliver one click.
+                dir = (i == 4) ? false : !last_dir[i];
             }
             if (dir != last_dir[i])
             {
+                // TD-13: the push button is a pulse on the press edge only; the release
+                // edge produced a second LVGL click that toggled the drawer shut.
+                steps = (i == 4 && dir) ? 0 : 1;
                 last_dir[i] = dir;
-                steps = 1;
             }
         }
         for (int k = 0; k < steps; k++)
