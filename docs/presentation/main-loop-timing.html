@@ -143,7 +143,7 @@ details.dev p{margin:.35rem 0 0;color:var(--fg2)}
 <h1>Wie der MeshCom-Main-Loop beschleunigt wurde</h1>
 <p class="lead">Fünfzehn Stellen, an denen die Hauptschleife der Firmware seit Version 4.35s schneller, stabiler
 und robuster läuft. Jede Zahl ist auf echter Hardware gemessen und trägt ihre Quelle am Kartenende.
-Nichts ist geschätzt, außer es steht ausdrücklich dabei. Der dritte Reiter zeigt die Runde davor: die Befunde vom März 2026 auf Firmware 4.35n, die seit 4.35p behoben sind.</p>
+Nichts ist geschätzt, außer es steht ausdrücklich dabei. Der dritte Reiter zeigt die Runde davor: Firmware 4.35n sendete nach Timer, ohne den Kanal zu prüfen. Mit 4.35p kam CAD in den Sendepfad, und die Blindzeiten des Funkmoduls fielen weg.</p>
 
 <div class="stats">
   <div class="stat"><div class="k">T-Deck Start bis „ready“</div><div class="v">14,9 s <span class="arrow">→</span><span class="after">10,9 s</span></div></div>
@@ -414,13 +414,55 @@ sondern eine Sammlung von Helferfunktionen.</p></details>
 </div>
 <div class="panel" id="panel-n">
 <div class="timeline">
-<div class="tgroup">A — Das Funkmodul hört nicht zu</div><div class="item baseline">
+<div class="tgroup">A — Senden nach Timer, ohne den Kanal zu prüfen</div><div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Kein CAD im Sendepfad</span><span class="plat">ESP32 + nRF52</span><span class="dur">0 Kanalprüfungen</span></div>
+  <div class="desc">Das Sendetor öffnete, sobald seit dem letzten Empfangsereignis 4,5 s vergangen waren (<code>RECEIVE_TIMEOUT</code>). Dann rief die Hauptschleife direkt <code>doTX()</code>. Eine Kanalprüfung gab es nicht: <code>scanChannel()</code> und <code>StartCad()</code> kommen im Sendepfad von 4.35n nicht vor.</div>
+  <div class="gain"><b>Auswirkung:</b> Ob gerade ein Nachbar sendete, wusste der Knoten nicht. Nur ein bereits erkannter Header (<code>OnHeaderDetect</code>) hielt das Senden zurück. Alles davor kollidierte.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Hardware-CAD vor jedem Senden, bei Belegung eine zweite Prüfung gegen Fehlalarme, dazu ein IRQ-Poll auf Präambel und Header direkt vor dem Sendestart.</div>
+  <div class="src"><b>Quelle</b> v4.35n <code>esp32_main.cpp</code> „Check transmit now“ · Fork-Commits 84584cc0, 52c2be75, 207c242e (04.–06.03.2026) · upstream „v4.35p insert CAD“ 13113d1c (15.03.2026)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Blind-Delay statt Kanalprüfung</span><span class="plat">ESP32 + nRF52</span><span class="dur">3 Schleifendurchläufe</span></div>
+  <div class="desc">Vor jedem Senden zählte <code>cmd_counter</code> drei Durchläufe der Hauptschleife herunter, vorher sieben. Der Kommentar im Code sagte es selbst: „blind delay, not real CAD“.</div>
+  <div class="gain"><b>Auswirkung:</b> Wartezeit ohne Information. Der Kanal war danach genauso unbekannt wie davor, nur die Nachricht lag länger im Ring.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Zähler entfernt. An seine Stelle tritt die CAD-Prüfung mit dem CSMA-Timer.</div>
+  <div class="src"><b>Quelle</b> v4.35n <code>lora_functions.cpp</code> <code>doTX()</code> · Fork-Commit 7bf48552 „Blind-Delay entfernen“ (06.03.2026)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Fester Timer ohne Zufall: alle im Gleichtakt</span><span class="plat">ESP32 + nRF52</span><span class="dur">4,5 s, kein Jitter</span></div>
+  <div class="desc">Die Wartezeit war für jeden Knoten und jede Nachrichtenart dieselbe Konstante. Im Sendepfad von 4.35n gibt es keinen einzigen <code>random()</code>-Aufruf.</div>
+  <div class="gain"><b>Auswirkung:</b> Alle Nachbarn, die dasselbe Paket gehört hatten, wurden 4,5 s später im selben Moment sendebereit und sendeten ineinander.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> CSMA mit Prioritätsbasis 3000 bis 5500 ms plus Zufallsslots 0 bis 10 × 35 ms; Wiederholversuche verkürzen die Basis.</div>
+  <div class="src"><b>Quelle</b> v4.35n <code>configuration_global.h</code> <code>RECEIVE_TIMEOUT 4500</code> · heute <code>csma_compute_timeout_prio()</code></div>
+</div>
+<div class="tgroup">B — Blindzeiten des Funkmoduls</div><div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Keine Funkaufsicht bei leerer Warteschlange</span><span class="plat">RAK4631</span><span class="dur">46 s Funkstille beobachtet</span></div>
+  <div class="desc">Ohne Sendeauftrag und ohne Empfang wurde der Timer nicht gesetzt. Blieben die Interrupts des SX1262 aus, merkte es niemand.</div>
+  <div class="gain"><b>Auswirkung:</b> Unbegrenzte Funkstille möglich, auf OE1KBC-12 46 s gemessen.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Periodischer Empfangs-Neustart über den normalen CSMA-Zyklus, wie auf ESP32.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „RAK4630: Silent Freeze“ P3 (17.03.2026)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">CAD-Zustandsautomat verklemmt sich</span><span class="plat">RAK4631</span><span class="dur">Stillstand nach ~14 h</span></div>
+  <div class="desc">Mit dem neuen CAD kam auf dem RAK ein Folgefehler: Feuerte <code>OnRxDone</code> während eines laufenden CAD, brach <code>Radio.Rx()</code> den CAD ab, die Flags blieben gesetzt, und die Automatik wartete auf ein <code>OnCadDone</code>, das nie kam.</div>
+  <div class="gain"><b>Auswirkung:</b> Der Knoten fror dauerhaft ein, mittlere Zeit bis zum Ausfall rund 14 Stunden.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p (Nachbesserung 17.03.):</b> CAD-Flags werden in <code>OnRxDone</code>, <code>OnRxTimeout</code> und <code>OnRxError</code> zurückgesetzt; Flag-Zugriffe laufen unter Critical Section.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „RAK4630: Silent Freeze“ P1, RACE-05 (17.03.2026)</div>
+</div>
+<div class="item baseline">
   <div class="dot"></div>
   <div class="head"><span class="title">CAD-Schleife ohne Empfang</span><span class="plat">ESP32 + nRF52</span><span class="dur">bis 51 s Funkstille</span></div>
-  <div class="desc">Fand <code>doTX()</code> im Ring kein sendefähiges Paket, folgte sofort der nächste CAD-Scan, alle 100 bis 200 ms. Der Ring wirkte nicht leer, weil Wiederholungs-Slots ihre Länge behalten.</div>
-  <div class="gain"><b>Auswirkung:</b> Während der Schleife stand das Funkmodul im CAD-Modus und empfing nichts. Hunderte CAD-Scans in Folge, RX-Fehler häuften sich, die Sendewarteschlange wuchs.</div>
-  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Nach <code>doTX()</code> ohne Paket geht das Modul zurück auf Empfang und der CSMA-Timer startet neu.</div>
-  <div class="src"><b>Quelle</b> release_lora_trx.md „CAD-Spinloop-Fix“ (2026-03-21) · PR #789</div>
+  <div class="desc">Zweiter Folgefehler des neuen CAD: Fand <code>doTX()</code> im Ring kein sendefähiges Paket, folgte sofort der nächste CAD-Scan, alle 100 bis 200 ms. Der Ring wirkte nicht leer, weil Wiederholungs-Slots ihre Länge behalten.</div>
+  <div class="gain"><b>Auswirkung:</b> Während der Schleife stand das Funkmodul im CAD-Modus und empfing nichts. Hunderte CAD-Scans in Folge, die Sendewarteschlange wuchs.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p (Nachbesserung 21.03.):</b> Nach <code>doTX()</code> ohne Paket geht das Modul zurück auf Empfang und der CSMA-Timer startet neu.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „CAD-Spinloop-Fix“ (21.03.2026) · PR #789</div>
+</div>
+</div>
 </div>
 <div class="item baseline">
   <div class="dot"></div>
@@ -523,21 +565,17 @@ sondern eine Sammlung von Helferfunktionen.</p></details>
 </tbody>
 </table>
 </div>
-<h3 style="margin-top:1.4rem">Die Runde davor: 4.35n → 4.35p (März 2026)</h3>
+<h3 style="margin-top:1.4rem">Die Runde davor: 4.35n → 4.35p, CAD kommt in den Sendepfad (März 2026)</h3>
 <div class="tocwrap">
 <table>
 <thead><tr><th>Was</th><th>Board</th><th>4.35n</th><th>4.35p</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>CAD-Schleife ohne Empfang</td><td>ESP32 + nRF52</td><td class="num">bis 51 s Funkstille</td><td class="num">Modul zurück auf Empfang</td><td><span class="tag fixed">in 4.35p · #789</span></td></tr>
-<tr><td>Funkaufsicht bei leerer Queue</td><td>RAK4631</td><td class="num">46 s Funkstille</td><td class="num">periodischer RX-Neustart</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
-<tr><td>CAD-Automat verklemmt</td><td>RAK4631</td><td class="num">Stillstand nach ~14 h</td><td class="num">Flags zurückgesetzt</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
-<tr><td>LoRa-IRQ auf belegtem SPI</td><td>RAK4631</td><td class="num">Stillstand</td><td class="num">SPI-Guard, Deferred Rx</td><td><span class="tag fixed">in 4.35p · #806</span></td></tr>
-<tr><td>Stack-Überlauf sendExtern</td><td>RAK4631</td><td class="num">Absturz</td><td class="num">statische Puffer</td><td><span class="tag fixed">in 4.35p · #809</span></td></tr>
-<tr><td>Flash-Schreiben im HTTP-Handler</td><td>RAK4631</td><td class="num">Standstill</td><td class="num">Deferred Save</td><td><span class="tag fixed">in 4.35p · #805</span></td></tr>
-<tr><td>ISR/Loop-Wettläufe</td><td>alle</td><td class="num">Speicherkorruption</td><td class="num">atomics, Spinlocks</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
-<tr><td>TX-Schleife im Ring</td><td>alle</td><td class="num">179× dieselbe Nachricht</td><td class="num">Status-Check</td><td><span class="tag fixed">in 4.35p · #792/#793</span></td></tr>
-<tr><td>UDP ohne Dedup</td><td>Gateways</td><td class="num">Kopien nach 30 Msgs</td><td class="num">is_new_packet()</td><td><span class="tag fixed">in 4.35p · 2026-03-19</span></td></tr>
-<tr><td>ACK löscht READY-Slot</td><td>Gateways</td><td class="num">Nachricht verloren</td><td class="num">READY-Guard</td><td><span class="tag fixed">in 4.35p · #802/#803</span></td></tr>
+<tr><td>Kanalprüfung vor dem Senden</td><td>ESP32 + nRF52</td><td class="num">keine, Timer 4,5 s</td><td class="num">Hardware-CAD + Doppelprüfung</td><td><span class="tag fixed">in 4.35p · 15.03.2026</span></td></tr>
+<tr><td>Blind-Delay vor dem Senden</td><td>ESP32 + nRF52</td><td class="num">3 Schleifendurchläufe</td><td class="num">entfernt</td><td><span class="tag fixed">in 4.35p · 06.03.2026</span></td></tr>
+<tr><td>Zufall im Sendetimer</td><td>ESP32 + nRF52</td><td class="num">keiner</td><td class="num">0–10 Slots × 35 ms, prioritätsabhängig</td><td><span class="tag fixed">in 4.35p · 06.03.2026</span></td></tr>
+<tr><td>Funkaufsicht bei leerer Queue</td><td>RAK4631</td><td class="num">46 s Funkstille</td><td class="num">periodischer RX-Neustart</td><td><span class="tag fixed">in 4.35p · 17.03.2026</span></td></tr>
+<tr><td>CAD-Automat verklemmt</td><td>RAK4631</td><td class="num">Stillstand nach ~14 h</td><td class="num">Flags zurückgesetzt</td><td><span class="tag fixed">in 4.35p · 17.03.2026</span></td></tr>
+<tr><td>CAD-Schleife ohne Empfang</td><td>ESP32 + nRF52</td><td class="num">bis 51 s Funkstille</td><td class="num">Modul zurück auf Empfang</td><td><span class="tag fixed">in 4.35p · 21.03.2026 · #789</span></td></tr>
 </tbody>
 </table>
 </div>
@@ -614,7 +652,7 @@ bekommt der Absender dazu eine Rückmeldung (Rückstau-Protokoll).</p>
 <h2 style="margin-top:0;border-top:none">Wo die Verbesserungen heute laufen</h2>
 <p><b>Alle fünfzehn Verbesserungen dieser Seite sind über Pull Request #1115 (01.09.2026) in den Entwicklungszweig von
 icssw-org/MeshCom-Firmware eingeflossen und damit in der offiziellen Firmware 4.35s enthalten.</b> Die Ausgangslage „4.35p“
-beschreibt die vorherige offizielle Version. Die Runde davor, 4.35n → 4.35p, ging im März 2026 über die Pull Requests #784 bis #816 nach upstream.</p>
+beschreibt die vorherige offizielle Version. Die Runde davor, 4.35n → 4.35p, brachte im März 2026 CAD und CSMA in den Sendepfad; upstream hat sie am 15.03.2026 übernommen („v4.35p insert CAD“).</p>
 <p>Alle Zahlen stammen aus diesen Dokumenten und wurden gegen den Baum vom 23.08.2026 verifiziert:</p>
 <pre>docs/BACKLOG.md              §3.8f (TM-01..TM-45), §3.8p (DOC-01)
 docs/wifi-report-20260830.md §4, §5, §6, §7
