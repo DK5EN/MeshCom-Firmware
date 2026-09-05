@@ -67,8 +67,10 @@ static inline uint32_t ackWireHash(const uint8_t *payload)
  * @brief Stammt die msg_id von diesem Node? Eigene msg_ids sind
  *        ((GW_ID & 0x3FFFFF) << 10) | counter, siehe loop_functions.cpp.
  *
- * own_msg_id[] enthaelt auch Frames, die der Node nur weitergeleitet hat
- * (Gateway-Uplink, Relay). Ohne diese Pruefung wuerde --ackinfo fuer jede
+ * own_msg_id[] enthaelt auf einem Gateway auch fremde msg_ids, die nur vom
+ * Server zum LoRa-Funk weitergeleitet wurden (insertOwnTx in udp_functions.cpp
+ * / nrf_eth.cpp); der reine LoRa-Relay-Pfad ruft insertOwnTx nie auf. Ohne
+ * diese Pruefung wuerde --ackinfo fuer jede
  * fremde, weitergeleitete Meldung bei jedem Repeat ein Heard zur App legen
  * (Bench 2026-09-05: DK8VW-99, DL9PN-1, DM3KS-12 auf DK5EN-98).
  */

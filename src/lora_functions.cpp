@@ -366,16 +366,23 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
         if(itxcheck >= 0)
         {
-            if((bAckInfo && ackMsgIdFromNode(msg_id, _GW_ID)) || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
+            // Status frame to the phone is origin-gated: own_msg_id[] also holds
+            // foreign msg_ids that a gateway only forwarded from the server to LoRa
+            // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
+            // unconditional so the web rxlog heard/ACK ticks keep working as today.
+            if(bAckInfo || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
             {
-                uint8_t phone_buff[ACK_PHONE_MAX_LEN];
-                uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
-                addBLEOutBuffer(phone_buff, plen);
-
-                if(bDisplayInfo)
+                if(ackMsgIdFromNode(msg_id, _GW_ID))
                 {
-                    printfdeb("\n%s", getTimeString().c_str());
-                    printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", phone_buff[0], phone_buff[4], phone_buff[3], phone_buff[2], phone_buff[1], phone_buff[5], phone_buff[6]);
+                    uint8_t phone_buff[ACK_PHONE_MAX_LEN];
+                    uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
+                    addBLEOutBuffer(phone_buff, plen);
+
+                    if(bDisplayInfo)
+                    {
+                        printfdeb("\n%s", getTimeString().c_str());
+                        printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", phone_buff[0], phone_buff[4], phone_buff[3], phone_buff[2], phone_buff[1], phone_buff[5], phone_buff[6]);
+                    }
                 }
 
                 own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
@@ -841,19 +848,26 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
             if(icheck >= 0) // own msg_id
             {
-                if(msg_type_b_lora == MSG_TYPE_TEXT && ((bAckInfo && ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID)) || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
+                // Status frame to the phone is origin-gated: own_msg_id[] also holds
+                // foreign msg_ids that a gateway only forwarded from the server to LoRa
+                // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
+                // unconditional so the web rxlog heard/ACK ticks keep working as today.
+                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
                 {
-                    uint16_t plen = buildAckPhoneFrame(print_buff, aprsmsg.msg_id, 0x00, aprsmsg.msg_source_last.c_str());
-
-                    addBLEOutBuffer(print_buff, plen);
-
-                    if(bDisplayInfo)
+                    if(ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID))
                     {
-                        printfdeb("%s", getTimeString().c_str());
-                        printfdeb(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
-                        bNewLine=true;
+                        uint16_t plen = buildAckPhoneFrame(print_buff, aprsmsg.msg_id, 0x00, aprsmsg.msg_source_last.c_str());
+
+                        addBLEOutBuffer(print_buff, plen);
+
+                        if(bDisplayInfo)
+                        {
+                            printfdeb("%s", getTimeString().c_str());
+                            printfdeb(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
+                            bNewLine=true;
+                        }
                     }
-            
+
                     if(own_msg_id[icheck][4] != 0x02)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
