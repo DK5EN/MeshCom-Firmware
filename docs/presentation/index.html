@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeshCom — Vorträge und Analysen (DK5EN)</title>
+<meta name="description" content="Präsentationen und Analyseseiten zur MeshCom-Firmware aus dem Fork von DK5EN.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark light;
+  --bg:#0f172a;--bg2:#151f36;--line:#2a3654;--fg:#e6ecff;--fg2:#9fb0cc;--fg3:#6f7f9c;
+  --acc:#6366f1;--acc2:#e879f9;--mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:light){:root{--bg:#fbfcfe;--bg2:#ffffff;--line:#dfe5f0;--fg:#111a2b;--fg2:#4a5a72;--fg3:#7a879c}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:var(--bg);color:var(--fg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;padding:clamp(1.5rem,5vw,4rem) 1.5rem}
+main{max-width:860px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fg3)}
+h1{font-size:clamp(1.7rem,4vw,2.5rem);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:.4rem 0 .8rem;
+  background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--fg2);max-width:62ch;margin-bottom:2.2rem}
+.cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+a.card{display:block;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
+a.card:hover{border-color:var(--acc);transform:translateY(-2px)}
+a.card h2{font-size:1.15rem;font-weight:600;margin:.15rem 0 .5rem;letter-spacing:-.01em}
+a.card p{color:var(--fg2);font-size:.95rem}
+a.card .meta{font-family:var(--mono);font-size:.74rem;color:var(--fg3);margin-top:.8rem}
+.foot{margin-top:2.6rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--fg2);font-size:.9rem}
+.foot a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--acc)}
+.foot .note{margin-top:.6rem;color:var(--fg3);font-size:.82rem;max-width:70ch}
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">MeshCom · Fork DK5EN</div>
+  <h1>Vorträge und Analysen zur MeshCom-Firmware</h1>
+  <p class="lead">Zwei Seiten, beide aus dem Quellcode belegt: ein Vortrag über das Protokoll und einen
+  Vorschlag für seine Weiterentwicklung, und eine Zeitleiste der Hauptschleife mit den gemessenen Stillständen.</p>
+
+  <div class="cards">
+    <a class="card" href="meshcom-protocol.html">
+      <div class="eyebrow">Vortrag · 27 Folien</div>
+      <h2>Kein Routing, und genau das ist richtig</h2>
+      <p>Warum MeshCom flutet statt zu routen, wo es heute hakt (Overhead, Stau, Zustellung) und was
+      wir vorschlagen: Vorrang für netzbildende Knoten, eine echte Transportsicherung für persönliche
+      Nachrichten und der Abgleich mit den Anforderungen aus EMCOMM.</p>
+      <div class="meta">Firmware 4.35s · Netzdaten 24.08.2026 · Tasten: → ← U</div>
+    </a>
+    <a class="card" href="main-loop-timing.html">
+      <div class="eyebrow">Analyse · interaktiv</div>
+      <h2>Zeitleiste der Hauptschleife, vorher und nachher</h2>
+      <p>Was die Firmware in einem Durchlauf der Hauptschleife tut, welche Stillstände upstream
+      gemessen wurden und wie der Fork sie behebt. Umschaltbar zwischen den beiden Ständen.</p>
+      <div class="meta">Stand 31.08.2026</div>
+    </a>
+  </div>
+
+  <div class="foot">
+    Quellcode und Release-Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.03-stability">v4.35s.09.03-stability</a>
+    <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
+    ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
+  </div>
+</main>
+</body>
+</html>

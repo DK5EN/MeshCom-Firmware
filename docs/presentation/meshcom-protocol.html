@@ -1076,7 +1076,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 </nav>
 <div id="toc"><h2>Übersicht — Taste U schließt</h2><ol id="toclist"></ol></div>
 <main class="deck">
-<section class="slide" id="s1"><span class="num"></span><div class="inner">
+<section class="slide" id="s1"><span class="num">01</span><div class="inner">
 <div class="eyebrow">MeshCom · Protokoll · Physik · Vorschlag</div>
 <h1>Kein Routing — und genau das ist richtig</h1>
 <p class="lead" style="margin-top:1rem">Ein LoRa-Mesh im ISM-Band kann keine stabilen Routen lernen. MeshCom flutet — und lässt die Statistik gewinnen. Dieser Vortrag zeigt, warum das die richtige Wahl ist, wo es noch hakt, und warum MeshCom genau das Werkzeug ist, das EMCOMM braucht.</p>
@@ -1085,10 +1085,10 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 <div class="card"><h3>2 · Für das Dev-Team</h3><p>Persönliche Nachrichten brauchen eine echte <b>Transportsicherung</b> — heute gibt es keine Zustellgarantie.</p></div>
 <div class="card good"><h3>3 · Für EMCOMM</h3><p>Robust, einfach, off-grid auf reinem LoRa. Der Backbone (Internet/HamNet) ist Brücke, nicht Träger: <b>LoRa is all you need.</b></p></div>
 </div>
-<div class="note" style="margin-top:.9rem"><b>Datenstand:</b> Firmware <code>v4.35p</code> (Branch <code>v4.35p_prio</code>), Live-Netzdaten <a href="https://meshmap.oevsv.at">meshmap.oevsv.at</a>, 24.08.2026. Jede Verhaltensaussage ist gegen den Quellcode geprüft; Details in den <span class="mono">▸ Für Entwickler</span>-Blöcken.</div>
+<div class="note" style="margin-top:.9rem"><b>Datenstand:</b> Firmware <code>v4.35s</code> (Release <code>v4.35s.09.03-stability</code>, Branch <code>fork-main</code>), Live-Netzdaten <a href="https://meshmap.oevsv.at">meshmap.oevsv.at</a> vom 24.08.2026. Jede Verhaltensaussage ist gegen den Quellcode geprüft. Die Zeilenangaben in den <span class="mono">▸ Für Entwickler</span>-Blöcken beziehen sich auf den Stand vom 23.08.2026, festgehalten im Tag <code>archive/v4.35p_prio-20260903</code>.</div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">02</span><div class="inner">
 <div class="eyebrow">Herkunft · 50 Jahre Funk-Nachrichten</div><h2>Digitale Nachrichten über Funk sind 50 Jahre alt — wir stehen auf ihren Schultern</h2>
 <div class="cmp-mount" data-cmp="timeline">
 <div class="cmp-timeline" id="cmp-timeline">
@@ -1301,7 +1301,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 <div class="note" style="margin-top:.9rem;font-size:.82rem">
   Zwei Ergänzungen zur Einordnung: <b>Meshtastic</b> (GitHub-Repository seit <b>01.02.2020</b>) und
   <b>MeshCore</b> (GitHub-Repository seit <b>19.01.2025</b>) sind die beiden bekanntesten
-  Geschwisterprojekte im LoRa-Mesh-Raum — beide Daten primärquellenbelegt (Repository-Historie),
+  Geschwisterprojekte im LoRa-Mesh-Raum. Beide Daten stammen aus der Repository-Historie,
   weil im Netz teils andere Gründungsdaten kursieren. Die fünf Digimode-Punkte (WSJT, WSPR, WSJT-X,
   FT8, JS8Call) zeigen, dass Amateurfunk-Digimodes parallel zur LoRa-Ära weiterentwickelt wurden —
   MeshCom entstand nicht im leeren Raum.
@@ -1309,7 +1309,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
 </div></section>
 
-<section class="slide" id="s2"><span class="num">02</span><div class="inner">
+<section class="slide" id="s2"><span class="num">03</span><div class="inner">
   <div class="eyebrow">Was überlebt hat</div>
   <h2>Von APRS blieb das Datenformat — die AX.25-Sicherungsschicht ließen wir zurück</h2>
 
@@ -1360,7 +1360,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">04</span><div class="inner">
 <div class="eyebrow">Der Held heute</div>
 <h2>MeshCom erbt Position und Telemetrie — und macht Chat zum Kern</h2>
 <div class="grid g3" style="margin-top:1rem">
@@ -1371,7 +1371,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 <div class="note" style="margin-top:.9rem"><b>Die Heldenreise:</b> Was in grauer Vorzeit als AX.25/APRS erdacht wurde, lebt als Datenformat weiter — und wird von MeshCom auf modernem LoRa zum Chat-Netz für Alltag und Notfall.</div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">05</span><div class="inner">
 <div class="eyebrow">Die Physik</div><h2>1200-Baud-FSK passt in 3,4 kHz — LoRa spreizt dasselbe Bit über 250 kHz</h2>
 <div class="cmp-mount" data-cmp="signal">
 <div class="cmp-signal" id="cmp-signal" role="region" aria-label="FSK vs LoRa Signalvergleich">
@@ -1515,7 +1515,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
 </div></section>
 
-<section class="slide" id="s3"><span class="num">03</span><div class="inner">
+<section class="slide" id="s3"><span class="num">06</span><div class="inner">
   <div class="eyebrow">Das Medium</div>
   <h2>Ein Kanal im ISM-Band — geteilt mit allem, was dort funkt</h2>
 
@@ -1549,17 +1549,17 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
       </div>
       <div class="card" style="margin-top:1rem">
         <h3>Hardware</h3>
-        <p>Die Firmware baut aktuell <b>30 Ziele</b>. Verbreitet sind Heltec V3 (ESP32-S3/SX1262), TTGO T-Beam (drei Revisionen mit SX1276 / SX1262 / SX1268),
+        <p>Die Firmware baut <b>über 30 Ziele</b>. Verbreitet sind Heltec V3 (ESP32-S3/SX1262), TTGO T-Beam (drei Revisionen mit SX1276 / SX1262 / SX1268),
         T-Deck und T-Deck Plus (ESP32-S3), T-Beam Supreme (ESP32-S3) und WisBlock RAK4631 (nRF52840).</p>
-        <p style="margin-top:.5rem">Die Board-Klasse ist kein Kosmetikum: <b>sie bestimmt, wie viele Nachbarn und wie viele Duplikate ein Knoten überhaupt merken kann.</b> Dazu später mehr.</p>
+        <p style="margin-top:.5rem">Die Board-Klasse entscheidet, <b>wie viele Nachbarn und wie viele Duplikate sich ein Knoten merken kann.</b> Dazu später mehr.</p>
       </div>
     </div>
   </div>
 
   <div class="note" style="margin-top:1rem;font-size:.82rem;line-height:1.6">
-    <b>Fußnote — Rechtsrahmen ISM/SRD vs. Amateurfunk:</b> Der lizenzfreie SRD/ISM-Teilbereich
+    <b>Fußnote, Rechtsrahmen ISM/SRD gegen Amateurfunk:</b> Der lizenzfreie SRD/ISM-Teilbereich
     <b>869,40–869,65 MHz</b> ist in Deutschland per BNetzA-Allgemeinzuteilung mit <b>500 mW ERP</b>
-    und <b>10 % Duty-Cycle</b> freigegeben — großzügiger als die meisten anderen 868-MHz-SRD-Kanäle.
+    und <b>10 % Duty-Cycle</b> freigegeben. Das ist großzügiger als bei den meisten anderen 868-MHz-SRD-Kanälen.
     Das ist ein anderer Rechtsrahmen als der Amateurfunk: Wer stattdessen mit Amateurfunk-Rufzeichen
     sendet, unterliegt der Amateurfunkverordnung (AFuV), u. a. dem Verschlüsselungsverbot aus
     <b>§ 16 Abs. 8</b>, das für ISM/SRD-Betrieb nicht gilt. Wortlaut:
@@ -1583,7 +1583,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   </div>
 </div></section>
 
-<section class="slide" id="s6"><span class="num">06</span><div class="inner">
+<section class="slide" id="s6"><span class="num">07</span><div class="inner">
   <div class="eyebrow">Die Grundentscheidung</div>
   <h2>MeshCom routet nicht — es flutet und lässt die Statistik gewinnen</h2>
 
@@ -1650,11 +1650,11 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     </div>
   </div>
 
-  <details class="deep"><summary>Für Entwickler — die neun Bedingungen, die ein Relay stoppen (Zeilennummern auf Stand v4.35p)</summary><div class="body">
+  <details class="deep"><summary>Für Entwickler — die neun Bedingungen, die ein Relay stoppen (Zeilennummern auf Stand v4.35p, Tag <code>archive/v4.35p_prio-20260903</code>)</summary><div class="body">
     <table><thead><tr><th>#</th><th>Bedingung</th><th class="m">Stelle</th></tr></thead><tbody>
       <tr><td>1</td><td>Hop-Budget aufgebraucht (Dekrement <em>vor</em> dem Einreihen)</td><td class="m">lora_functions.cpp:1209 / :1215</td></tr>
       <tr><td>2</td><td>Schleife — eigenes Rufzeichen steht schon im Quellpfad</td><td class="m">lora_functions.cpp:1220-1230</td></tr>
-      <tr><td>3</td><td>msg_id liegt schon im Dedup-Ring</td><td class="m">lora_functions.cpp:734, :1427-1456</td></tr>
+      <tr><td>3</td><td>msg_id liegt schon im Duplikatspeicher (Dedup-Ring)</td><td class="m">lora_functions.cpp:734, :1427-1456</td></tr>
       <tr><td>4</td><td>an mich selbst adressiert</td><td class="m">lora_functions.cpp:813, :1206</td></tr>
       <tr><td>5</td><td>Pfad zu lang (nur auf Gateways)</td><td class="m">lora_functions.cpp:1157, :1168-1170</td></tr>
       <tr><td>6</td><td>Typ nicht weiterleitbar (TEXT / POSITION / HEY; ACK läuft separat)</td><td class="m">lora_functions.cpp:758</td></tr>
@@ -1667,11 +1667,11 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     hält es nicht auf. Ausserdem ist die Ring-Logik nach <code>txring_functions.cpp</code> ausgezogen.</p>
     <p><b>Es gibt einen inaktiven Sonderfall:</b> <code>via_functions.cpp</code> enthält ein statisches VIA-Gate im Stil klassischer Digipeater.
     Es ist per Default aus (<code>bVIA = false</code>), muss von Hand konfiguriert werden und lernt nichts. Der einzige dynamische Ansatz
-    darin — den Nachbarn mit der größten Nachbarzahl als Zwischenhop zu wählen — ist auskommentiert („22.07.2026 – zum Test entfernt“).</p>
+    darin, den Nachbarn mit der größten Nachbarzahl als Zwischenhop zu wählen, ist auskommentiert („22.07.2026 – zum Test entfernt“).</p>
   </div></details>
 </div></section>
 
-<section class="slide" id="s7"><span class="num">07</span><div class="inner">
+<section class="slide" id="s7"><span class="num">08</span><div class="inner">
   <div class="eyebrow">Ein Missverständnis</div>
   <h2>Der Source-Path ist eine Spur, keine gelernte Route — so gewollt</h2>
 
@@ -1703,12 +1703,12 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
       </div>
 
       <p style="margin-top:1rem;font-size:.92rem;color:var(--fg2)">Und selbst wenn man sie läse: Ein Pfad, den ein Paket <em>gestern</em> genommen hat,
-      ist keine Zusage, dass er <em>morgen</em> noch existiert. Genau deshalb halten wir es für den falschen Ansatzpunkt — der bessere kommt auf Folie 13.</p>
+      ist keine Zusage, dass er <em>morgen</em> noch existiert. Genau deshalb halten wir es für den falschen Ansatzpunkt. Der bessere kommt auf Folie 15, „Der Vorschlag · Routing“.</p>
     </div>
   </div>
 </div></section>
 
-<section class="slide" id="s4"><span class="num">04</span><div class="inner">
+<section class="slide" id="s4"><span class="num">09</span><div class="inner">
   <div class="eyebrow">So sendet man heute</div>
   <h2>Drei Wege, eine Nachricht loszuschicken</h2>
 
@@ -1758,7 +1758,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide" id="s8"><span class="num">08</span><div class="inner">
+<section class="slide" id="s8"><span class="num">10</span><div class="inner">
   <div class="eyebrow">Zwei Schalter</div>
   <h2>Mesh an, Gateway optional — der Normalfall funkt ganz ohne Internet</h2>
 
@@ -1768,7 +1768,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <li>Schickt gehörte Pakete per UDP an den MeshCom-Server (Port <b>1990</b>)</li>
         <li>Legt Pakete vom Server zurück auf LoRa</li>
         <li>Setzt dabei das <b>Server-Bit</b>, damit kein zweites Gateway dasselbe Paket erneut einspeist</li>
-        <li>Sagt es seinen Nachbarn — dazu Folie 13</li>
+        <li>Sagt es seinen Nachbarn (dazu Folie 15)</li>
       </ul>
       <div class="kv" style="margin-top:.8rem"><span>Werkszustand</span><span style="color:var(--bad)">AUS</span></div>
       <div class="kv"><span>Kommando</span><span>--gateway on</span></div>
@@ -1805,7 +1805,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">11</span><div class="inner">
 <div class="eyebrow">Baustelle 1 · Overhead</div><h2>Heute erdrückt der Status-Verkehr die Nutzlast</h2>
 <div class="cmp-mount" data-cmp="overhead">
 <div class="cmp-overhead" id="cmp-overhead">
@@ -1826,7 +1826,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 
   <div class="cmp-overhead__sat-callout" id="cmp-overhead-sat-callout" role="status" aria-live="polite">
-    <strong>Kanalauslastung heute: ~66 %</strong> — bereits ohne Chat nahezu gesättigt.<br>
+    <strong>66 % der Sendeversuche fanden den Kanal belegt</strong> (BergLog, 5 Knoten, 16 h). Die Luft ist schon ohne Chat eng.<br>
     Wenn MSG-Traffic wächst: schon bei ×100 (1.000/h) wird Chat spürbar; bei ×500 (5.000/h) konkurriert Chat direkt mit dem Status-Overhead.
   </div>
 
@@ -1894,7 +1894,7 @@ Quittung: <b>{987</b> angehängt</pre>
       </div>
 
       <div class="note warn" style="margin-top:1rem">
-        <b>NCNT hat eine Decke.</b> Gezählt werden Nachbarn der letzten Stunde — höchstens aber so viele, wie die Board-Klasse Plätze hat:
+        <b>NCNT hat eine Decke.</b> Gezählt werden Nachbarn der letzten Stunde, höchstens aber so viele, wie die Board-Klasse Plätze hat:
         <b>80</b> auf ESP32-S3 und RAK4631, <b>30</b> auf klassischem ESP32, <b>50</b> auf T-Deck. In der Produktion melden Spitzenknoten
         wie DK7WK-12 und DB0KH-11 exakt den Maximalwert — ihr wahrer Wert liegt höher.
         <div class="cite"><b>mheard_functions.cpp:556-572</b> · <b>configuration_global.h:172-201</b></div>
@@ -1903,7 +1903,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">13</span><div class="inner">
 <div class="eyebrow">Baustelle 2 · Stau</div><h2>Kleben viele Knoten aufeinander, wird die Luft dicht</h2>
 <div class="cmp-mount" data-cmp="flood">
 <div class="cmp-flood" id="cmp-flood">
@@ -2035,7 +2035,7 @@ Quittung: <b>{987</b> angehängt</pre>
 <figure style="margin-top:1rem"><img src="assets/map-florenz.webp" alt="MeshCom-Karte Florenz/Prato, dicht vermascht" style="max-height:24vh"><figcaption><b>Realdaten Florenz/Prato, 23.08.2026</b> — 53 Knoten, 22 Gateways. Fast jeder hört fast jeden; genau hier wird die Luft dicht.</figcaption></figure>
 </div></section>
 
-<section class="slide" id="s9"><span class="num">09</span><div class="inner">
+<section class="slide" id="s9"><span class="num">14</span><div class="inner">
   <div class="eyebrow">Wer darf zuerst?</div>
   <h2>Heute würfeln alle gleich — der Zufall entscheidet, nicht die Wichtigkeit</h2>
 
@@ -2064,8 +2064,8 @@ Quittung: <b>{987</b> angehängt</pre>
     <div>
       <div class="card"><h3>Der Sendepuffer</h3>
         <p>Kein FIFO. <code>getNextTxSlot()</code> nimmt <b>zuerst die höchste Priorität</b>, und erst bei Gleichstand den ältesten Eintrag.
-        Läuft der Ring voll, wird nicht blind verworfen: der <b>älteste Eintrag der niedrigsten Priorität</b> weicht — es sei denn, das Neue ist selbst das Unwichtigste, dann fliegt es raus.</p>
-        <div class="kv" style="margin-top:.7rem"><span>ESP32 klassisch</span><span>30 Slots</span></div>
+        Läuft der Ring voll, wird nicht blind verworfen. Es weicht der <b>älteste Eintrag der niedrigsten Priorität</b>. Ist die neue Nachricht selbst die unwichtigste, fliegt sie raus.</p>
+        <div class="kv" style="margin-top:.7rem"><span>ESP32 klassisch</span><span>20 Slots (bis 08/2026: 30)</span></div>
         <div class="kv"><span>ESP32-S3 / RAK4631</span><span>20 Slots</span></div>
         <div class="kv"><span>T-Deck (XML/SBUFFER)</span><span>20 Slots</span></div>
         <div class="cite"><b>txring_functions.cpp:117-160, 284-354</b> · <b>configuration_global.h:169-201</b></div>
@@ -2088,7 +2088,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide" id="s13"><span class="num">13</span><div class="inner">
+<section class="slide" id="s13"><span class="num">15</span><div class="inner">
   <div class="eyebrow">Der Vorschlag · Routing</div>
   <h2>Nicht jeder Knoten ist gleich — netzbildende brauchen Vorrang</h2>
 
@@ -2101,8 +2101,7 @@ Quittung: <b>{987</b> angehängt</pre>
       <p style="margin-top:.6rem">Im Knoten existiert dafür <b>kein einziger Zähler</b>. Die MHeard-Tabelle ist ein Schnappschuss —
       jeder neue Empfang überschreibt den alten, nichts summiert sich. Die einzigen Zähler im System sind globale Sendestatistiken
       pro Prioritätsklasse, nicht pro Nachbar.</p>
-      <p style="margin-top:.6rem">Diese Last-Metrik gibt es heute <b>nur serverseitig</b> in der MeshMap. Sie müsste im Knoten neu gebaut werden —
-      es ist nichts da, das man nur freischalten müsste.</p>
+      <p style="margin-top:.6rem">Diese Last-Metrik gibt es heute <b>nur serverseitig</b> in der MeshMap. Im Knoten müsste sie neu gebaut werden.</p>
       <div class="cite">Geprüft: mheard_functions.cpp, txring_functions.cpp, via_functions.cpp — keine Per-Nachbar-Häufigkeit</div>
     </div>
 
@@ -2114,8 +2113,8 @@ Quittung: <b>{987</b> angehängt</pre>
         <li>Nachbar meldet <b>1</b> → er hängt zu 100 % an mir → Beitrag <b>1,0</b></li>
         <li>Nachbar meldet <b>20</b> → er hat reichlich Alternativen → Beitrag <b>0,05</b></li>
       </ul>
-      <p style="margin-top:.6rem">Der Sprung von 1 auf 2 halbiert den Beitrag — „einziger Weg“ gegen „eine Alternative“ ist der Unterschied,
-      der zählt. Von 10 auf 11 ändert sich fast nichts. Genau so soll es sein.</p>
+      <p style="margin-top:.6rem">Von 1 auf 2 Nachbarn halbiert sich der Beitrag: das ist der Unterschied zwischen „einziger Weg“ und „eine Alternative“.
+      Von 10 auf 11 ändert sich fast nichts. Genau so soll es sein.</p>
       <div class="cite"><b>docs/adr-nc-importance-backoff.md</b> — ADR 02, Rev. 3</div>
     </div>
   </div>
@@ -2131,8 +2130,8 @@ Quittung: <b>{987</b> angehängt</pre>
     <b>Ehrlich bleiben — zweimal.</b>
     Erstens: Das Ameisenbild ist <b>unsere Erzählebene</b>. Im ADR 02 kommen weder „Ameise“ noch „Pheromon“ vor; dort steht eine
     Abhängigkeitsformel, keine Verstärkung erfolgreicher Pfade.
-    Zweitens: Die Last-Zahlen der MeshMap sind <b>beobachtete HEY-Meldungen</b> — höchstens eine je gesendetem Frame netzweit, verzerrt
-    durch das Wettrennen der Gateways ans Internet und durch Trickle-Unterdrückung in dichten Gebieten.
+    Zweitens: Die Last-Zahlen der MeshMap sind <b>beobachtete HEY-Meldungen</b>, höchstens eine je gesendetem Frame netzweit.
+    Sie sind verzerrt durch das Wettrennen der Gateways ans Internet und durch die Trickle-Unterdrückung in dichten Gebieten.
     <b>Das ist keine Kanalauslastung und keine Airtime.</b> Ein niedriger Wert kann „ruhiges Segment“ heißen — oder nur, dass ein anderes Gateway schneller war.
   </div>
 </div></section>
@@ -2183,7 +2182,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide" id="s11"><span class="num">11</span><div class="inner">
+<section class="slide" id="s11"><span class="num">17</span><div class="inner">
   <div class="eyebrow">Baustelle 3 · Zustellung</div>
   <h2>Persönliche Nachrichten haben heute keine Zustellgarantie</h2>
 
@@ -2221,7 +2220,7 @@ Quittung: <b>{987</b> angehängt</pre>
 
       <p style="margin:1.1rem 0 .6rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)">Wo eine DM heute verschwinden kann</p>
       <ul class="plain">
-        <li class="no">TX-Ring voll — verdrängt nach Priorität, ohne jede Meldung</li>
+        <li class="no">TX-Ring voll: verdrängt nach Priorität. Seit 09/2026 meldet der Knoten das dem Absender („QTA NOT SENT“), wiederholt aber nicht.</li>
         <li class="no">Hop-Budget aufgebraucht, bevor das Ziel erreicht ist</li>
         <li class="no">Die Quittung geht auf dem Rückweg verloren (kein Retry)</li>
         <li class="no"><code>own_msg_id[]</code> überläuft — eine spät eintreffende Quittung findet ihren Eintrag nicht mehr</li>
@@ -2239,7 +2238,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">18</span><div class="inner">
 <div class="eyebrow">Baustelle 3 · Sicherheit</div>
 <h2>Und niemand prüft, wer da sendet</h2>
 <div class="grid g2" style="margin-top:1rem;align-items:start">
@@ -2249,7 +2248,7 @@ Quittung: <b>{987</b> angehängt</pre>
 <div class="note warn" style="margin-top:.9rem"><b>Ehrlich:</b> Verschlüsselung ist auf Amateurfunk-Frequenzen ohnehin nicht zulässig — aber <b>Integrität und Authentizität</b> (signieren, nicht verschlüsseln) sind es, und sie fehlen heute komplett.</div>
 </div></section>
 
-<section class="slide" id="s17"><span class="num">17</span><div class="inner">
+<section class="slide" id="s17"><span class="num">19</span><div class="inner">
   <div class="eyebrow">Der Vorschlag · Transport</div>
   <h2>Persönliche Nachrichten brauchen eine echte Transportsicherung</h2>
 
@@ -2304,7 +2303,7 @@ Quittung: <b>{987</b> angehängt</pre>
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">20</span><div class="inner">
   <div class="eyebrow">Der Vorschlag · Store-and-Forward</div>
   <h2>Der Absender hebt auf — eine Outbox, die 24 Stunden nicht lockerlässt</h2>
 
@@ -2326,7 +2325,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <li><b>L1</b> (existiert): 3 × 40 s, gleiche msg_id — schützt die Nachbarschaft</li>
         <li><b>L2</b> (neu): +10 / +30 / +60 min, dann stündlich — aus der gemessenen
           Hop-Latenz abgeleitet (30 s median, 286 s p99 <b>je Hop</b>)</li>
-        <li>Jeder Versuch mit <b>frischer msg_id</b> — Dedup-Ringe halten alte ~40 min fest</li>
+        <li>Jeder Versuch mit <b>frischer msg_id</b> — Duplikatspeicher halten alte ~40 min fest</li>
         <li>Vorher eine winzige <code>{prb}</code>-Probe statt 180 Byte auf einen toten Pfad</li>
         <li>Empfänger erkennt Wiederholungen am <b>Inhalts-Hash</b>: quittiert erneut, zeigt nicht doppelt</li>
       </ul>
@@ -2347,25 +2346,25 @@ Quittung: <b>{987</b> angehängt</pre>
     <div class="note ok">
       <b>Abwärtskompatibel, im Code verifiziert.</b> Der alte Quittungs-Parser (<code>toInt()</code>) ignoriert den Suffix,
       Apps sehen ohnehin nur das binäre 0x41 — und alte Knoten relayen <code>{prb}</code> als gewöhnlichen Text.
-      Hardware-Gate: nur ESP32-S3 und RAK4631 (~2 kB RAM); Classic-ESP32 hat 1,1 kB frei und bleibt außen vor.
+      Hardware-Gate: nur ESP32-S3 und RAK4631 (~2 kB RAM). Classic-ESP32 hat nach den RAM-Kürzungen vom August nur wenig Luft und bleibt vorerst außen vor.
     </div>
     <div class="note warn">
       <b>Advisor-geprüft, ehrlich benannt.</b> Ein unabhängiger adversarialer Review fand 1 Blocker
-      (das geplante Struktur-Versions-Bump hätte die Settings der ganzen Flotte gelöscht) und 7 Major — alle eingearbeitet.
-      Offen bleibt: v1 hält die Outbox nur im RAM (Reboot verliert sie — und sagt es), und Vertraulichkeit gibt es auf
+      (das geplante Struktur-Versions-Bump hätte die Settings der ganzen Flotte gelöscht) und 7 Major. Alle sind eingearbeitet.
+      Offen bleibt: v1 hält die Outbox nur im RAM (ein Reboot verliert sie und sagt es), und Vertraulichkeit gibt es auf
       Amateurfunk-Frequenzen nicht. Integrität und Zustellnachweis gibt es.
     </div>
   </div>
 
   <div class="note" style="margin-top:.85rem;font-size:.82rem">
     <b>Weiterlesen:</b>
-    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/tdeck-partial-refresh-trace/docs/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a> ·
-    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/tdeck-partial-refresh-trace/docs/review/advisor-dm-store-and-forward-20260830.md">Advisor-Review (Findings B1, M1–M7)</a>
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a> ·
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/review/advisor-dm-store-and-forward-20260830.md">Advisor-Review (Findings B1, M1–M7)</a>
     <span class="cite" style="margin-left:.6rem">Stand 30.08.2026, Entwurf v2.</span>
   </div>
 </div></section>
 
-<section class="slide" id="s18"><span class="num">18</span><div class="inner">
+<section class="slide" id="s18"><span class="num">21</span><div class="inner">
   <div class="eyebrow">Der Plan</div>
   <h2>Die Statistik gewinnen lassen — die Transportsicherung macht den Rest</h2>
 
@@ -2375,8 +2374,8 @@ Quittung: <b>{987</b> angehängt</pre>
         <thead><tr><th>Stufe</th><th>Inhalt</th><th>Ändert Verhalten?</th></tr></thead>
         <tbody>
           <tr><td class="m">0</td><td>Nur beobachten: Wichtigkeit rechnen und loggen</td><td><span class="tag t-ok">nein</span></td></tr>
-          <tr><td class="m">0.5</td><td>Duplikatspeicher vergrößern (Ziel 200–256)</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
-          <tr><td class="m">S</td><td>Sturmschutz: Rate-Limit je Quelle</td><td><span class="tag t-info">ja</span></td></tr>
+          <tr><td class="m">0.5</td><td>Duplikatspeicher <b>nicht</b> vergrößern, sondern nach Zeit altern lassen. Die Messung über 48 Knotenstunden zeigt: 100 Einträge reichen, ab 500 verwirft der Ring echte Nachrichten.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
+          <tr><td class="m">S</td><td>Sturmschutz: Rate-Limit je Quelle. Der Rückstau zum eigenen Absender (QRS/QRT/QTA, Quittung je verlorener Nachricht) ist seit v4.35p.09.02 ausgeliefert; das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
           <tr><td class="m">1a</td><td>Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
           <tr><td class="m">1b</td><td>Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
           <tr><td class="m">1c</td><td>Optional auch Positions-Relays</td><td><span class="tag t-warn">ja</span></td></tr>
@@ -2421,17 +2420,17 @@ Quittung: <b>{987</b> angehängt</pre>
     </div>
     <div class="note" style="font-size:.82rem">
       <b>Weiterlesen:</b>
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/adr-nc-importance-backoff.md">ADR 02 — Netzwichtigkeits-Backoff</a> ·
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/architecture/11-wire-format.md">Wire Format</a> ·
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/prio-talk-flood-networking.md">Flood-Networking-Analyse</a> ·
-      <a href="https://github.com/icssw-org/MeshCom-Firmware/blob/dev/docs/hey-supp.md">Trickle-HEY-Suppression</a> ·
+      <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/adr-nc-importance-backoff.md">ADR 02 — Netzwichtigkeits-Backoff</a> ·
+      <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/architecture/11-wire-format.md">Wire Format</a> ·
+      <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/prio-talk-flood-networking.md">Flood-Networking-Analyse</a> ·
+      <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/hey-supp.md">Trickle-HEY-Suppression</a> ·
       <a href="https://meshmap.oevsv.at">MeshCom Map</a>
-      <div class="cite" style="margin-top:.6rem">Alle Code-Belege gegen Branch <b>v4.35p_prio</b>, Stand 23.08.2026.</div>
+      <div class="cite" style="margin-top:.6rem">Alle Code-Belege gegen den Stand vom 23.08.2026 (Tag <b>archive/v4.35p_prio-20260903</b>). Firmware-Stand des Vortrags: <b>v4.35s</b>, Release v4.35s.09.03-stability.</div>
     </div>
   </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">22</span><div class="inner">
 <div class="eyebrow">EMCOMM · Warum</div><h2>Wir haben die EMCOMM-Leute vergessen — dabei bauen wir ihr Werkzeug</h2>
 <div class="cmp-mount">
 <div class="cmp-emcomm-section">
@@ -2465,7 +2464,7 @@ Quittung: <b>{987</b> angehängt</pre>
 </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">23</span><div class="inner">
 <div class="eyebrow">EMCOMM · Ebenen</div><h2>EMCOMM denkt in drei Ebenen: strategisch, taktisch, operativ</h2>
 <div class="cmp-mount" data-cmp="emcomm">
 <div class="cmp-emcomm-section">
@@ -2591,7 +2590,7 @@ Quittung: <b>{987</b> angehängt</pre>
 </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">24</span><div class="inner">
 <div class="eyebrow">EMCOMM · Abgleich</div><h2>MeshCom trifft den Kern: robust, einfach, off-grid auf reinem LoRa</h2>
 <div class="cmp-mount">
 <div class="cmp-emcomm-section">
@@ -2633,7 +2632,7 @@ Quittung: <b>{987</b> angehängt</pre>
       <tr>
         <td>Store-and-Forward</td>
         <td><span class="tag t-warn">&#126;&nbsp;teilweise</span></td>
-        <td>Dedup-Ring ohne Zeitablauf; kein persistentes Queuing</td>
+        <td>Duplikatspeicher bewusst bei 100 Einträgen (~38 min, gemessen); keine Ablage für abwesende Empfänger</td>
       </tr>
       <tr>
         <td>Wide-Area ohne Backbone</td>
@@ -2643,7 +2642,7 @@ Quittung: <b>{987</b> angehängt</pre>
       <tr>
         <td>Bestätigte Zustellung (Gruppe / Broadcast)</td>
         <td><span class="tag t-bad">&#10007;&nbsp;fehlt</span></td>
-        <td>Kein ACK für Broadcast; Unicast-ACK nicht implementiert</td>
+        <td>Kein ACK für Gruppe und Broadcast; das DM-ACK existiert, wird aber nie wiederholt</td>
       </tr>
       <tr>
         <td>Dringlichkeitsstufen / Precedence</td>
@@ -2661,7 +2660,7 @@ Quittung: <b>{987</b> angehängt</pre>
 </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">25</span><div class="inner">
 <div class="eyebrow">EMCOMM · Backbone</div><h2>Backbone ja, Abhängigkeit nein — LoRa is all you need</h2>
 <div class="cmp-mount">
 <div class="cmp-emcomm-section">
@@ -2693,7 +2692,7 @@ Quittung: <b>{987</b> angehängt</pre>
 </div>
 </div></section>
 
-<section class="slide"><span class="num"></span><div class="inner">
+<section class="slide"><span class="num">26</span><div class="inner">
 <div class="eyebrow">EMCOMM · Delta</div><h2>Das Delta zur EMCOMM-Reife ist genau unser Vorschlag</h2>
 <div class="cmp-mount">
 <div class="cmp-emcomm-section">
@@ -2715,7 +2714,7 @@ Quittung: <b>{987</b> angehängt</pre>
 </div>
 </div></section>
 
-<section class="slide" id="s5"><span class="num">05</span><div class="inner">
+<section class="slide" id="s5"><span class="num">27</span><div class="inner">
   <div class="eyebrow">Anhang · Referenz</div>
   <h2>Was wirklich über die Luft geht — das Frame-Format</h2>
 
@@ -2743,7 +2742,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <tr><td class="m">Bit 6</td><td>Tracking</td></tr>
         <tr><td class="m">Bit 5</td><td>App offline</td></tr>
         <tr><td class="m">Bit 4</td><td>Sender hat Mesh aktiv</td></tr>
-        <tr><td class="m">Bit 0–3</td><td><b>verbleibendes Hop-Budget</b> — Text 4, Position 2</td></tr>
+        <tr><td class="m">Bit 0–3</td><td><b>verbleibendes Hop-Budget</b>: Text 4 (seit v4.35p.09.02 per <code>--maxhop 1…6</code> einstellbar), Position 2</td></tr>
       </tbody></table>
       <div class="cite"><b>aprs_functions.cpp:1025-1037</b> / <b>:160-172</b> · Defaults <b>configuration_global.h:209-210</b></div>
     </div>
