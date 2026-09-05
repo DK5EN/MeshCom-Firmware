@@ -1,5 +1,20 @@
 # RESUME — pick up here
 
+## 2026-09-05 (evening): v4.35s.09.05 published, 39 assets, tag a60905d6
+
+Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.05>, marked
+latest, 39 assets diff-identical in name to 09.03. **Tag scheme changed: no `-stability` suffix
+from this tag on** (the release-firmware skill and the changelog say so). Shipped: changelog items
+179-191 -- BP-11 echo guard (publication hold lifted by the operator on 2026-09-05, still no
+upstream PR requested), RAK4631 TX power after flash reset (#1132, bench DK5EN-90), T-Deck TD-12/
+TD-13/TD-14 and CDC-01 (bench DK5EN-14), TM-49 fail-closed safeboot gate, TLM-04, ADC-01, WQ-01
+queue panel, web messages page (ring scan, browser history, group tabs), MEM-03 tool. Gates: 591
+native cases / 12 envs, 32 envs built, tracked safeboot bins unchanged by the build.
+`FLASH_VERSION 20260905`, struct version untouched. The 09.03 release stays published; nothing was
+deleted. Deliberately still open and stated in the notes: BP-11 ring-flood bench case, TM-49 bench
+arm on a 4 MB board, web GUI changes without a measured bench arm, TD-15, MEM-04 risk, GPS-07 and
+the carry-overs from 09.03. Bench fleet and gateway not yet flashed with the release build.
+
 ## 2026-09-05: TLM-04 fixed, ADC pin-99 guard
 
 Both on `fork-main`, pushed. TLM-04: the Extern-UDP `lora` `tele` datagram now puts the `/P=`
