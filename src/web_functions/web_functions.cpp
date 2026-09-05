@@ -1241,7 +1241,10 @@ void sub_page_rxlog()
         mcqAgeS = (millis() - stat_last_window_ms) / 1000UL;
     }
 
-    web_client.println("<div class=\"cardlayout mw-600\">");
+    // WQ-01: the card lives inside #content_inner so it shares the 4 % left
+    // margin of the log lines and spans their width (no mw-600 cap).
+    web_client.println("<div id=\"content_inner\" class=\"logoutput\">");
+    web_client.println("<div class=\"cardlayout\" style=\"max-width:none;\">");
     web_client.println("<label class=\"cardlabel\">LoRa Queue</label>");
     web_client.println("<button id=\"mcqtogglebtn\" class=\"mcq-toggle\" onclick=\"mcQueueToggle(this)\">hide</button>");
     web_client.printf("<div id=\"mcq\" data-ring=\"%u\" data-p0=\"%u\" data-p1=\"%u\" data-p2=\"%u\" data-p3=\"%u\"\n",
@@ -1255,7 +1258,6 @@ void sub_page_rxlog()
                        (unsigned long)stat_last_window.dup, (unsigned int)MAX_DEDUP_RING, (unsigned long)mcqDedupWin, (unsigned long)mcqAgeS);
     web_client.println("</div>");
 
-    web_client.println("<div id=\"content_inner\" class=\"logoutput\">");
     web_client.println("<div style=\"overflow:scroll;\">");
     do
     {
