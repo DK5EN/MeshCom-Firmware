@@ -1,6 +1,18 @@
 # ACK mit Absender: Wer hat quittiert?
 
 Stand 2026-09-05, Codebasis fork-main (`ffe31ca5`). Analyse, kein Code.
+Vokabular 2026-09-05 an McApp angeglichen (siehe Abschnitt 2). Entscheidungen vom
+2026-09-05, alle drei normativ fuer die Firmware-Umsetzung:
+
+- **Draht (4.1):** 22-Bit-Node-Hash, 3 Byte, kein Rufzeichen. Der Node loest den Hash selbst
+  auf (Abschnitt 4.1).
+- **BLE (4.2):** Laengenbyte statt Trenner, Rufzeichen zur App. McApp parst genau dieses
+  Format seit 2026-09-05 (`ble_protocol.parse_ack_appendix`); ein Trenner-Format ohne Laenge
+  wuerde dort als ungueltiger Anhang verworfen. Das ACK kaeme an, das Rufzeichen nicht.
+- **App-Gate (5.5):** fluechtiges Session-Flag `--ackinfo on`, Reset bei BLE-Disconnect.
+  McApp setzt es bei jedem Connect selbst (`ble_adapter.ACK_ATTRIBUTION_COMMAND`).
+
+McApp-Seite: `MCProxy/doc/2026-09-05_1545-ack-attribution-plan.md`.
 
 Stephans Wunsch: In der App soll bei der Wolke bzw. der Wolke mit Hakerl sichtbar sein, **wer**
 quittiert hat. Dafuer muss man wissen, was der Node heute ueber den Quittierenden weiss, was er
@@ -10,11 +22,11 @@ davon an die App weitergibt, und was auf dem Draht ueberhaupt mitkommt.
 
 - Der Frame zur App ist leicht erweiterbar. Der Node kennt den Absender aber nur in zwei von
   drei Faellen.
-- **Heard** (ein Nachbar hat meinen Frame wiederholt): Rufzeichen liegt vor, nur Firmware
-  noetig.
-- **DM-ACK** (Wolke mit Hakerl): Absender ist der DM-Partner, den die App sowieso kennt. Neu
-  waere nur: kam es ueber LoRa oder ueber den Server.
-- **Gateway-ACK** (Wolke): Der 12-Byte-Binaerframe auf dem Draht traegt **kein** Rufzeichen und
+- **Node ACK** (heard: ein Nachbar hat meinen Frame wiederholt): Rufzeichen liegt vor, nur
+  Firmware noetig.
+- **Peer ACK** (DM-ACK, Wolke mit Hakerl): Absender ist der DM-Partner, den die App sowieso
+  kennt. Neu waere nur: kam es ueber LoRa oder ueber den Server.
+- **Gateway ACK** (Wolke): Der 12-Byte-Binaerframe auf dem Draht traegt **kein** Rufzeichen und
   auch keinen Node-Hash. Das ist der interessante Fall, und er braucht eine Aenderung am
   Funkprotokoll, die auf allen Nodes ankommen muss.
 
@@ -27,22 +39,27 @@ Unix-Zeit an und schreibt die Gesamtlaenge in Byte 0 des Ringpuffers.
 ```
 0x41 | msg_id (4 Byte, LE) | Status | 0x00        + Unix-Zeit (4 Byte, BE)
 
-Status 0x00  heard          Nachbar hat meinen Frame wiederholt      (lora_functions.cpp:838)
-Status 0x01  server reached Gateway-ACK, oder Node ist selbst GW      (lora_functions.cpp:364, loop_functions.cpp:4131)
-Status 0x02  ACK            Empfaenger hat quittiert, nur DM          (lora_functions.cpp:992, udp_functions.cpp:406)
+Status 0x00  Node ACK     "heard": Nachbar hat meinen Frame wiederholt    (lora_functions.cpp:838)
+Status 0x01  Gateway ACK  "server reached", oder Node ist selbst GW       (lora_functions.cpp:364, loop_functions.cpp:4131)
+Status 0x02  Peer ACK     Empfaenger hat quittiert, nur DM                (lora_functions.cpp:992, udp_functions.cpp:406)
 ```
+
+Vokabular: Die drei Namen sind die von McApp (`ble_protocol.py`, `ack_kind` auf dem SSE-Event
+`msg:status`: `node` / `gateway` / `peer`) und mc-chat. "heard" und "server reached" bleiben
+als Erklaerung in Klammern, nicht als Bezeichner. Der Peer ACK ist das, was die App als Wolke
+mit Hakerl zeigt; Node und Gateway ACK sind Transportbestaetigungen, nie eine Zustellung.
 
 Byte 6 ist ein fixer Terminator. Ein Rufzeichen steht nirgends. Die App findet den Zeitstempel
 vermutlich ueber einen festen Offset, das ist die "Auswertung in der App", die Stephan meint.
 
 ## 3. Was der Node ueber den Quittierenden weiss
 
-| Status          | Absender bekannt? | Woher                                                                  | Bewertung                                  |
-| --------------- | ----------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
-| 0x00 heard      | ja                | Pfad des wiederholten Frames, Firmware loggt schon `HEARD from <call>` | Firmware-only, wenige Zeilen               |
-| 0x02 DM-ACK     | ja, aber trivial  | `msg_source_call` der Textmeldung `DEST:ack123`                        | Neu waere nur "via LoRa" vs. "via Server"  |
-| 0x01 Gateway    | **nein**          | Binaerframe ohne Rufzeichen, eigene msg_id ist `millis()`              | Braucht Protokollerweiterung auf dem Draht |
-| 0x01 eigener GW | entfaellt         | Node selbst ist GW mit IP, sendet sich den Status sofort               | Rufzeichen = eigenes                       |
+| Status            | Absender bekannt? | Woher                                                                  | Bewertung                                  |
+| ----------------- | ----------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
+| 0x00 Node ACK     | ja                | Pfad des wiederholten Frames, Firmware loggt schon `HEARD from <call>` | Firmware-only, wenige Zeilen               |
+| 0x02 Peer ACK     | ja, aber trivial  | `msg_source_call` der Textmeldung `DEST:ack123`                        | Neu waere nur "via LoRa" vs. "via Server"  |
+| 0x01 Gateway ACK  | **nein**          | Binaerframe ohne Rufzeichen, eigene msg_id ist `millis()`              | Braucht Protokollerweiterung auf dem Draht |
+| 0x01 GW = eigener | entfaellt         | Node selbst ist GW mit IP, sendet sich den Status sofort               | Rufzeichen = eigenes                       |
 
 Der Gateway-ACK-Frame auf dem Draht (`src/lora_functions.cpp:1210`):
 
@@ -60,43 +77,69 @@ Anders als beim Text-ACK ist die eigene msg_id hier **nicht** nach dem Schema
 
 Zwei Sperren begrenzen ausserdem, was die App sieht:
 
-- Nur das **erste** Gateway-ACK geht zur App (`own_msg_id[..][4] < 2`,
+- Nur das **erste** Gateway ACK geht zur App (`own_msg_id[..][4] < 2`,
   `src/lora_functions.cpp:364`). Weitere ACKs werden nur noch zum Retransmit-Stopp genutzt.
-- Nur der **erste** Heard geht zur App (`== 0x00`, `src/lora_functions.cpp:838`).
+- Nur der **erste** Node ACK (heard) geht zur App (`== 0x00`, `src/lora_functions.cpp:838`).
 
 Fuer eine Liste "wer hat quittiert" muessen beide Sperren fallen.
 
 ## 4. Vorschlag
 
-### 4.1 Auf dem Draht (Gateway-ACK)
+### 4.1 Auf dem Draht (Gateway ACK)
 
-Das Rufzeichen des Gateways als Anhang hinter Byte 11, Byte 11 wird von "immer 0x00" zur
-Laenge des Anhangs:
+**Entschieden 2026-09-05: 22-Bit-Node-Hash, nicht Rufzeichen.** Airtime ist die knappe
+Ressource (Abschnitt 5.4: rund 90 ACK-Frames pro Node und Stunde, ein Rufzeichen verdoppelt
+den Nutzteil). Der Hash ist derselbe, den der Node fuer seine eigene msg_id bildet
+(`(GW_ID << 10) | counter`), also kann jeder Node ihn ueber seine MHeard-Liste aufloesen:
+Hash aller bekannten Rufzeichen bilden, vergleichen. Bleibt er unaufgeloest, geht er als
+Hex-Token gross geschrieben zur App (`H3A5F21`), das passt in den Zeichensatz des Anhangs.
 
 ```
 Byte 0..10   wie bisher
-Byte 11      n = Laenge des Anhangs, 0 = altes Format
-Byte 12..    Rufzeichen, n Byte, ohne NUL, Zeichen [A-Z0-9-], n <= 10
+Byte 11      n = Laenge des Anhangs, 0 = altes Format, hier 3
+Byte 12..14  Node-Hash des Gateways, 22 Bit in 3 Byte (LE, Bit 22..23 = 0)
 ```
 
-Neue Laenge 12..22 Byte statt fix 12.
+Neue Laenge 15 Byte statt fix 12. Das Laengenbyte bleibt, damit ein spaeterer Anhang (z. B.
+Rufzeichen, falls die Messung Luft laesst) ohne neue Frame-Revision moeglich ist; der Parser
+akzeptiert n = 0 und n = 3, alles andere verwirft er als Anhang und behaelt das ACK (5.2).
 
 ### 4.2 Zur App (BLE)
 
-Gleiches Muster: Byte 6 bleibt 0x00 als Trenner, danach das Rufzeichen. Der Zeitstempel bleibt
-wie heute die letzten vier Byte des Frames. Damit die App das sauber lesen kann, muss sie den
-Zeitstempel ueber `len - 4` lokalisieren statt ueber Offset 7.
+Gleiches Muster wie 4.1, **mit Laengenbyte**: Byte 6 wird von "immer 0x00" zur Laenge des
+Anhangs, danach das Rufzeichen, danach wie heute die vier Byte Unix-Zeit.
 
-Fuer Heard und DM-ACK ist das Rufzeichen sofort da. Fuer den Gateway-ACK kommt es erst, wenn das
-sendende Gateway und alle Relays auf dem Weg die neue Firmware haben.
+```
+Byte 0      0x41
+Byte 1..4   msg_id (LE)
+Byte 5      Status 0x00 / 0x01 / 0x02
+Byte 6      n = Laenge des Anhangs, 0 = altes Format
+Byte 7..    Rufzeichen, n Byte, [A-Z0-9-], n <= 10
+danach      Unix-Zeit, 4 Byte
+```
+
+Warum ein Laengenbyte und nicht "0x00 als Trenner, Zeit ueber `len - 4`": Der Node haengt heute
+hinter die Zeit ein Pad-Byte (13 statt 12 Byte auf dem Draht, in McApp als reale Aufzeichnung
+gepinnt), und die Zeit-Bytes selbst koennen im Rufzeichen-Zeichensatz liegen. Ohne Laenge
+kann ein Parser `DK5EN-98` nicht von `DK5EN-98A` + verschobener Zeit unterscheiden. Mit Laenge
+ist die Regel auf BLE und Draht dieselbe, und alte Firmware (Byte 6 == 0x00) ist automatisch
+das alte Format. McApp liest die Zeit ohnehin nicht (stempelt Ankunft), parst den Anhang seit
+2026-09-05 nach genau dieser Regel und verwirft ihn bei jedem Verstoss, ohne das ACK zu
+verlieren (`ble_protocol.parse_ack_appendix`).
+
+Fuer Node ACK und Peer ACK ist das Rufzeichen sofort da. Fuer den Gateway ACK kommt es erst,
+wenn das sendende Gateway und alle Relays auf dem Weg die neue Firmware haben.
 
 ### 4.3 Reihenfolge
 
 1. Firmware: Parser fuer den Anhang auf allen Nodes, toleriert altes und neues Format. Relays
    leiten die volle Laenge weiter. Noch kein Node sendet den Anhang.
-2. App: Parser fuer den variablen Frame, Zeitstempel ueber `len - 4`.
-3. Firmware: Heard und DM-ACK mit Rufzeichen zur App. Sichtbares Ergebnis fuer Stephan.
-4. Firmware: Gateways senden den Anhang auf dem Draht. Sperren fuer Mehrfach-ACK lockern.
+2. App: Parser fuer den variablen Frame (Laengenbyte, 4.2). McApp: erledigt 2026-09-05,
+   vertraegt altes und neues Format.
+3. Firmware: Node ACK und Peer ACK mit Rufzeichen zur App. Sichtbares Ergebnis fuer Stephan.
+4. Firmware: Gateways senden den Hash-Anhang auf dem Draht (4.1), Nodes loesen ihn zum
+   Rufzeichen auf. `--ackinfo on` als fluechtiges Flag (5.5); mit Flag fallen die Sperren
+   fuer Mehrfach-ACK.
 
 Das passt zu dem, was `docs/backpressure-protocol.md` fuer die fehlenden Zustaende (refused,
 dropped, on air) sowieso vorschlaegt. Eine Frame-Revision, nicht zwei.
@@ -140,21 +183,31 @@ fehlendes Rufzeichen, nie ein verlorenes ACK.
 
 ### 5.4 Airtime
 
-Ein Gateway-ACK waechst von 12 auf bis zu 22 Byte Payload, also auf das Doppelte des Nutzteils.
-Im DG0OPK-Korpus liefen etwa 90 ACK-Frames pro Node und Stunde. Vor einem Rollout die
-zusaetzliche Airtime mit den echten Funkparametern rechnen und gegen die Kanalauslastung
-der `--setlog`-Messung halten. Falls zu teuer: statt Rufzeichen den 22-Bit-Node-Hash
-(3 Byte) senden und die Aufloesung Hash zu Rufzeichen der App oder dem Server ueberlassen.
-Die App sieht jede Textmeldung mit `msg_id` und Absender und kann die Tabelle selbst lernen.
+Mit dem Hash (4.1) waechst ein Gateway ACK von 12 auf 15 Byte Payload. Im DG0OPK-Korpus
+liefen etwa 90 ACK-Frames pro Node und Stunde. Die Rufzeichen-Variante (bis 22 Byte) wurde
+deshalb am 2026-09-05 verworfen. Vor dem Rollout die 3 Byte trotzdem mit den echten
+Funkparametern rechnen und gegen die Kanalauslastung der `--setlog`-Messung halten.
 
 ### 5.5 Mehrfach-ACK zur App
 
 Faellt die Sperre "nur das erste ACK", bekommt die App pro Nachricht mehrere Frames mit Status
 0x01. Eine alte App, die den Status als Zustandsmaschine fuehrt, verkraftet das vermutlich
-(gleicher Zustand nochmals gesetzt). Trotzdem: erst freischalten, wenn die App den Frame
-versteht. Am saubersten ueber ein Faehigkeitsflag der App beim Verbinden, sonst ueber die
-Firmware-Version der App, wenn die im Handshake mitkommt. Zu pruefen, was der Handshake heute
-hergibt.
+(gleicher Zustand nochmals gesetzt). McApp: idempotent, ein Wiederholungsframe derselben
+Station ist ein No-op in der Tabelle `message_acks` und ein doppeltes SSE-Event.
+
+**Entschieden 2026-09-05:** Der Handshake hat kein Faehigkeitsflag, also ein Kommando als
+Ersatz: `--ackinfo on`, ein **fluechtiges** Session-Flag im RAM, Reset bei jedem
+BLE-Disconnect, nie ins Flash. Solange es nicht gesetzt ist, gilt die heutige Sperre. Die
+offizielle App sendet es nicht und sieht keinen Unterschied, auch nicht am selben Node, nachdem
+McApp dort verbunden war. McApp sendet es in seinem Post-Connect-Burst als erstes Kommando,
+vor `--io` und `--tel` (`ble_service/src/ble_adapter.py`, `query_extended_registers`), damit
+schon die ACKs zu Nachrichten aus dem Burst-Fenster ungegated sind. Alte Firmware antwortet
+darauf mit `--wrong command --ackinfo on` auf dem Command-Back-Kanal; das ist harmlos und
+wird geloggt.
+
+Optional als Gurt und Hosentraeger: Status 0x00 (Node ACK) ohne Flag freigeben und nur 0x01
+und 0x02 gaten. Ein zweiter identischer Heard-Frame ist das Harmloseste, was eine alte App
+bekommen kann, und die Heard-Liste ist das sichtbare Ergebnis fuer Stephan.
 
 ### 5.6 Server bleibt unberuehrt
 
@@ -169,7 +222,8 @@ das ACK als Text `:ack123`, nicht binaer.
   ebenfalls, oder kopiert dort etwas die volle Laenge in einen kleinen Puffer? Nur dann waere
   ein 22-Byte-ACK auf alten Nodes gefaehrlich. In fork-main ist es sicher.
 - **App-Parser**: fester Offset fuer den Zeitstempel oder `len - 4`? Bei festem Offset zeigt
-  eine alte App das Rufzeichen als Zeit an.
+  eine alte App das Rufzeichen als Zeit an. McApp: weder noch, die Zeit wird nicht gelesen
+  (`transform_ack` stempelt die Ankunft); ein laengerer Frame dekodiert wie ein 12-Byte-Frame.
 - **Puffergroessen** in der Kette `print_buff[30]`, `BLEtoPhoneBuff`, Ring-Slot. 22 Byte plus
   Anhang plus Zeit passt ueberall, trotzdem mit dem Laengenbyte (uint8_t) gegenrechnen.
 - **Ringpuffer-Slot 12 vs. size**: Der Relay muss `size` statt der Konstante 12 weiterreichen,
@@ -210,15 +264,15 @@ Nachricht also der msg_id zuordnen. DMs bekommen dabei automatisch die ACK-Anfor
 
 - **Kein Zustellstatus.** Der 0x41-Frame erreicht extUDP nie: `handleACK()` kehrt bei Zeile 530
   zurueck, `queueExtern()` wird erst bei Zeile 890 gerufen, und `sendExtern()` wuerde ein
-  Binaerframe ohnehin verwerfen (`decodeAPRS()` liefert 0). Weder Heard noch Server-reached
-  noch DM-ACK kommen als Status beim Peer an.
+  Binaerframe ohnehin verwerfen (`decodeAPRS()` liefert 0). Weder Node ACK noch Gateway ACK
+  noch Peer ACK kommen als Status beim Peer an.
 - **DM-ACK nur als Text.** Das Text-ACK `DEST:ack123` ist ein normales 0x3A-Frame und geht als
   `msg` raus. Der Peer muss `:ack` selbst erkennen und die dreistellige Nummer ueber die
   msg_id-Regel `(GW_ID << 10) | ack_id` selbst auf seine Nachricht zurueckrechnen.
 - **Notice als getarnte Nachricht.** Bewusste Entscheidung vom 2026-08-31, weil McApp nur die
   bekannten Formen rendert. Ein Peer kann eine Notice nicht maschinell von einer Meldung
   unterscheiden.
-- **Kein Heard.** Der Peer erfaehrt nicht, ob und von wem seine Nachricht wiederholt wurde.
+- **Kein Node ACK.** Der Peer erfaehrt nicht, ob und von wem seine Nachricht wiederholt wurde.
 
 ### 6.3 Was zu ergaenzen waere
 
@@ -235,15 +289,18 @@ Ein Status-Datagramm, das den BLE-Frame spiegelt und dort abgesetzt wird, wo heu
 }
 ```
 
-- `status` 0 heard, 1 server reached, 2 ack, spaeter 3..6 wie im Backpressure-Vorschlag.
-- `from` das Rufzeichen, wo bekannt, sonst leer. Kommt fuer den Gateway-ACK erst mit dem
+- `status` 0 Node ACK, 1 Gateway ACK, 2 Peer ACK, spaeter 3..6 wie im Backpressure-Vorschlag.
+- `from` das Rufzeichen, wo bekannt, sonst weglassen. Kommt fuer den Gateway ACK erst mit dem
   Anhang aus Abschnitt 4.1.
-- `via` lora oder udp, weil der Node das beim DM-ACK unterscheiden kann.
+- `via` lora oder udp, weil der Node das beim Peer ACK unterscheiden kann.
+- McApp nimmt das Datagramm seit 2026-09-05 an (`udp_handler.normalize_extudp_ack`): `msg_id`
+  8 Hex-Zeichen, `status` 0..2, sonst verworfen; ungueltiges `from`/`via` verwirft nur das
+  Feld. Vorher fiel jedes Datagramm ohne `msg` in einen DEBUG-Log und war weg.
 - Testbar wie `extern_notice_json.h`: reine Funktion im Header, nativer Test daneben.
 
 Kein Absetzen aus `OnRxDone` heraus, sondern ueber `queueExtern()` in die Hauptschleife, aus
 demselben Grund wie heute bei den Textframes. Die Queue hat zwei Plaetze, mit Status-Frames
 wird sie enger. Vor der Umsetzung `MAX_EXTERN_QUEUE` gegen die erwartete Rate halten.
 
-Alle drei Stufen (Heard, DM-ACK mit Absender, Gateway-ACK) kommen beim Peer dann im selben
+Alle drei Stufen (Node ACK, Peer ACK mit Absender, Gateway ACK) kommen beim Peer dann im selben
 Datagramm an, ohne dass extUDP fuer die Gateway-Erweiterung ein zweites Mal angefasst wird.
