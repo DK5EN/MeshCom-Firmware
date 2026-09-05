@@ -79,6 +79,7 @@ a{color:var(--acc)}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem}
 .slide:nth-child(even) .card{background:var(--bg)}
 .slide:nth-child(odd) .card{background:var(--bg2)}
@@ -153,7 +154,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 .by.hi b,.by.hi u{color:var(--acc)}
 
 @media (max-width:900px){
-  .g2,.g3,.g4{grid-template-columns:1fr}
+  .g2,.g3,.g4,.g5{grid-template-columns:1fr}
   .slide{padding:4.5rem 1.1rem 4rem}
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
@@ -1122,8 +1123,8 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         10 FT8           x=935   above  lora     [PRES-02]
         11 JS8Call GA    x=1015  below  lora     [PRES-02]
         12 Meshtastic    x=1095  above  lora     [PRES-01]
-        13 MeshCore      x=1175  below  lora     [PRES-01]
-        14 MeshCom       x=1255  above  today
+        13 MeshCom 4.0   x=1175  below  today    (GitHub 25.02.2023)
+        14 MeshCore      x=1255  above  lora     [PRES-01]
     -->
     <svg class="cmp-tl-svg"
          viewBox="0 0 1360 290"
@@ -1253,20 +1254,20 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1095" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 13 : MeshCore  x=1175  below  [PRES-01] -->
+      <!-- Milestone 13 : MeshCom 4.0  x=1175  below -->
       <g class="cmp-tl-ms" data-ms="13">
         <line class="cmp-tl-connector" x1="1175" y1="159" x2="1175" y2="210"/>
-        <text class="cmp-tl-ms-year" x="1175" y="224">2025</text>
-        <text class="cmp-tl-ms-lbl"  x="1175" y="238">MeshCore</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1175" cy="150" r="5"/>
+        <text class="cmp-tl-ms-year" x="1175" y="224">2023</text>
+        <text class="cmp-tl-ms-lbl"  x="1175" y="238">MeshCom 4.0</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-today" cx="1175" cy="150" r="5"/>
       </g>
 
-      <!-- Milestone 14 : MeshCom  x=1255  above -->
+      <!-- Milestone 14 : MeshCore  x=1255  above  [PRES-01] -->
       <g class="cmp-tl-ms" data-ms="14">
         <line class="cmp-tl-connector" x1="1255" y1="141" x2="1255" y2="103"/>
-        <text class="cmp-tl-ms-year" x="1255" y="97">heute</text>
-        <text class="cmp-tl-ms-lbl"  x="1255" y="112">MeshCom</text>
-        <circle class="cmp-tl-ms-dot cmp-tl-dot-today" cx="1255" cy="150" r="5"/>
+        <text class="cmp-tl-ms-year" x="1255" y="97">2025</text>
+        <text class="cmp-tl-ms-lbl"  x="1255" y="112">MeshCore</text>
+        <circle class="cmp-tl-ms-dot cmp-tl-dot-lora" cx="1255" cy="150" r="5"/>
       </g>
 
       <!-- Running marker — positioned by initCmpTimeline() via setAttribute -->
@@ -1301,7 +1302,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 <div class="note" style="margin-top:.9rem;font-size:.82rem">
   Zwei Ergänzungen zur Einordnung: <b>Meshtastic</b> (GitHub-Repository seit <b>01.02.2020</b>) und
   <b>MeshCore</b> (GitHub-Repository seit <b>19.01.2025</b>) sind die beiden bekanntesten
-  Geschwisterprojekte im LoRa-Mesh-Raum. Beide Daten stammen aus der Repository-Historie,
+  Geschwisterprojekte im LoRa-Mesh-Raum. MeshCom selbst ist seit <b>25.02.2023</b> als „MeshCom Client 4.0“ auf GitHub. Beide Daten stammen aus der Repository-Historie,
   weil im Netz teils andere Gründungsdaten kursieren. Die fünf Digimode-Punkte (WSJT, WSPR, WSJT-X,
   FT8, JS8Call) zeigen, dass Amateurfunk-Digimodes parallel zur LoRa-Ära weiterentwickelt wurden —
   MeshCom entstand nicht im leeren Raum.
@@ -1313,7 +1314,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
   <div class="eyebrow">Was überlebt hat</div>
   <h2>Von APRS blieb das Datenformat — die AX.25-Sicherungsschicht ließen wir zurück</h2>
 
-  <div class="grid g4">
+  <div class="grid g5">
     <div class="card"><h3>1 · AX.25</h3>
       <p><b>Verbindungsorientiert.</b> I-Frames mit Sendefolgenummern N(S)/N(R), Quittung per RR, Wiederholung per REJ und T1-Timer.</p>
       <p style="margin-top:.6rem"><span class="tag t-ok">Transportsicherung</span></p>
@@ -1329,6 +1330,10 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
     <div class="card"><h3>4 · LoRa-APRS</h3>
       <p><b>Ein Hop zum iGate.</b> LoRa als Modulation, der iGate speist ins Internet. Meist gar kein Funk-Relay mehr.</p>
       <p style="margin-top:.6rem"><span class="tag t-info">Stern statt Netz</span></p>
+    </div>
+    <div class="card good"><h3>5 · MeshCom</h3>
+      <p><b>Wieder ein Netz.</b> Jeder Knoten wiederholt, ein Hop-Budget begrenzt die Flut. Chat wird zum Kern, das Gateway bleibt optional.</p>
+      <p style="margin-top:.6rem"><span class="tag t-ok">Flutnetz ohne Sicherung</span></p>
     </div>
   </div>
 
@@ -1361,14 +1366,14 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 </div></section>
 
 <section class="slide"><span class="num">04</span><div class="inner">
-<div class="eyebrow">Der Held heute</div>
+<div class="eyebrow">Evolution der Technik</div>
 <h2>MeshCom erbt Position und Telemetrie — und macht Chat zum Kern</h2>
 <div class="grid g3" style="margin-top:1rem">
 <div class="card"><h3>Geerbt von APRS</h3><ul class="plain"><li class="yes">Positionsmeldungen (APRS DDMM.MM)</li><li class="yes">Telemetrie (APRS <code>T#</code>, PARM/UNIT/EQNS)</li><li class="yes">aprs.fi-kompatibel über das Gateway</li></ul><div class="cite">README.md · aprs101.pdf (2000)</div></div>
 <div class="card good"><h3>Der neue Fokus</h3><ul class="plain"><li class="yes">Gruppenchat und persönliche Nachrichten</li><li class="yes">Über Handy und Laptop</li><li class="yes">Offline-fähig, über LoRa</li></ul></div>
 <div class="card cold"><h3>Der Umschlag ist neu</h3><p>Das APRS-<b>Datenformat</b> reist heute in einem eigenen binären LoRa-Frame — nicht mehr in AX.25-HDLC. <b>Das Format überlebt, die alte Sicherungsschicht nicht.</b></p></div>
 </div>
-<div class="note" style="margin-top:.9rem"><b>Die Heldenreise:</b> Was in grauer Vorzeit als AX.25/APRS erdacht wurde, lebt als Datenformat weiter — und wird von MeshCom auf modernem LoRa zum Chat-Netz für Alltag und Notfall.</div>
+<div class="note" style="margin-top:.9rem"><b>Die Evolution:</b> Was als AX.25/APRS erdacht wurde, lebt als Datenformat weiter. MeshCom macht daraus auf LoRa ein Chat-Netz für Alltag und Notfall.</div>
 </div></section>
 
 <section class="slide"><span class="num">05</span><div class="inner">
@@ -1531,8 +1536,7 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         <div class="cite">Beleg: <b>lora_setchip.cpp:337-354</b> · <b>variants/*/configuration.h</b> (in 10 Varianten identisch)</div>
       </div>
       <div class="note" style="margin-top:1rem;font-size:.85rem">
-        Insgesamt kennt die Firmware <b>17 Regionen-Presets</b> (EU, UK, ON, EA, LA, 868, 915, MAN, EU8, UK8, US, VR2, 435, 436, 442, PL, none).
-        Ein Preset namens „GB“ existiert nicht — Großbritannien läuft als <b>UK / UK8 auf 439,9125 MHz mit SF10 und 125 kHz</b>.
+        Insgesamt kennt die Firmware <b>17 Regionen-Presets</b> (EU, UK, ON, EA, LA, 868, 915, MAN, EU8, UK8, US, VR2, 435, 436, 442, PL, none). Großbritannien läuft als <b>UK / UK8 auf 439,9125 MHz mit SF10 und 125 kHz</b>.
       </div>
     </div>
 
@@ -1542,8 +1546,9 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
         <div class="kv"><span>Symboldauer bei SF11 / 250 kHz</span><span>8,19 ms</span></div>
         <div class="kv"><span>Kurze Textnachricht (~50 B)</span><span>≈ 0,66 s</span></div>
         <div class="kv"><span>Maximales Frame (255 B)</span><span>≈ 2,5 s</span></div>
+        <div class="kv"><span>Wartezeit vor dem Senden (CSMA, adaptiv nach Priorität und Versuch)</span><span>3,0 – 5,9 s, ab dem 4. Versuch 0,1 s</span></div>
         <div class="kv"><span>TX-Watchdog</span><span>15 s</span></div>
-        <p style="margin-top:.9rem">Eine einzige Nachricht mit <code>max_hop=4</code> belegt den Kanal nicht einmal, sondern <b>einmal je weiterleitendem Nachbarn und Hop</b>.
+        <p style="margin-top:.9rem">Eine einzige Nachricht mit <code>max_hop=4</code> (Vorgabe; seit 4.35p.09.02 per <code>--maxhop</code> zwischen 1 und 6 wählbar) belegt den Kanal nicht einmal, sondern <b>einmal je weiterleitendem Nachbarn und Hop</b>.
         Genau daraus entsteht der ganze Rest dieses Vortrags.</p>
         <div class="cite">Airtime nach Semtech-Formel gerechnet; die Firmware selbst berechnet keine Airtime und erzwingt keinen Duty-Cycle. Der ETSI-1-%-Hinweis steht nur als Kommentar im Code (<b>lora_setchip.cpp:781</b>).</div>
       </div>
@@ -2812,10 +2817,10 @@ function initCmpTimeline(root) {
       desc: 'FT8-Ableger mit Freitext-Chat und Store-and-Forward; General-Availability-Release am 01.04.2019.' },
     { x: 1095, year: '2020',    era: 'lora',   title: 'Meshtastic',
       desc: 'Offenes LoRa-Mesh-Chat-Projekt; GitHub-Repository angelegt am 01.02.2020.' },
-    { x: 1175, year: '2025',    era: 'lora',   title: 'MeshCore',
-      desc: 'Jüngeres offenes LoRa-Mesh-Projekt; GitHub-Repository angelegt am 19.01.2025.' },
-    { x: 1255, year: 'heute',   era: 'today',  title: 'MeshCom',
-      desc: 'APRS-Datenformat im LoRa-Umschlag, Fokus Chat.' }
+    { x: 1175, year: '2023',    era: 'today',  title: 'MeshCom 4.0',
+      desc: 'APRS-Datenformat im LoRa-Umschlag, Fokus Chat. Firmware-Repository auf GitHub seit 25.02.2023 (icssw-org, „MeshCom Client 4.0“); heute Version 4.35s.' },
+    { x: 1255, year: '2025',    era: 'lora',   title: 'MeshCore',
+      desc: 'Jüngeres offenes LoRa-Mesh-Projekt; GitHub-Repository angelegt am 19.01.2025.' }
   ];
   var AXIS_Y = 150;
   var TOTAL   = MS.length;
