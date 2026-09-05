@@ -931,6 +931,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var bp=parseInt(d.getAttribute('data-bp'))||0;");
     web_client.println("var bpname=d.getAttribute('data-bpname')||'';");
     web_client.println("var qrs=parseInt(d.getAttribute('data-qrs'))||0;");
+    web_client.println("var qrsf=parseInt(d.getAttribute('data-qrsf'))||qrs;");
     web_client.println("var qrt=parseInt(d.getAttribute('data-qrt'))||0;");
     web_client.println("var win=parseInt(d.getAttribute('data-win'))||0;");
     web_client.println("var rx=parseInt(d.getAttribute('data-rx'))||0;");
@@ -943,6 +944,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var empty=ring-used;");
     web_client.println("if(empty<0)empty=0;");
     web_client.println("var qrsPct=ring>0?(qrs/ring*100):0;");
+    web_client.println("var qrsfPct=ring>0?(qrsf/ring*100):0;");
     web_client.println("var qrtPct=ring>0?(qrt/ring*100):0;");
     web_client.println("var colors=['#A2182F','#E07B39','#3B7DD8','#6FA96F','#9E9E9E'];");
     web_client.println("var names=['crit','high','normal','low','bg'];");
@@ -952,11 +954,12 @@ void deliver_scaffold(bool bget_password)
     web_client.println("for(var pr=1;pr<=5;pr++){for(var c=0;c<p[pr];c++){html+='<div class=mcq-cell style=background:'+colors[pr-1]+'></div>';}}");
     web_client.println("for(var c2=0;c2<empty;c2++){html+='<div class=mcq-cell-empty></div>';}");
     web_client.println("html+='</div>';");
-    web_client.println("html+='<div class=mcq-tick style=left:'+qrsPct+'%></div>';");
+    web_client.println("html+='<div class=mcq-tick-faint style=left:'+qrsPct+'%></div>';");
+    web_client.println("html+='<div class=mcq-tick style=left:'+qrsfPct+'%></div>';");
     web_client.println("html+='<div class=mcq-tick style=left:'+qrtPct+'%></div>';");
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-ticklabels>';");
-    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrsPct+'%;transform:translateX(-50%)>QRS</span>';");
+    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrsfPct+'%;transform:translateX(-50%)>QRS</span>';");
     web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrtPct+'%;transform:translateX(-50%)>QRT</span>';");
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
@@ -964,7 +967,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("html+='</div>';");
     web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
     web_client.println("html+='<div class=font-bold>Back-pressure: <span style=color:'+bpcolor+'>'+bpname+'</span></div>';");
-    web_client.println("html+='<div class=font-small>(QRS at&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
+    web_client.println("html+='<div class=font-small>(QRS forecast at&nbsp;'+qrsf+' for your next msgs, line&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
     web_client.println("if(win==0){");
     web_client.println("html+='<div class=font-bold>Dedup window: n/a (no completed 5-min window yet)</div>';");
     web_client.println("}else if(dwin==0){");
@@ -1089,6 +1092,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".mcq-cell {flex:1;height:14px;}\n");
     web_client.println(".mcq-cell-empty {flex:1;height:14px;background:#ECECEC;border:1px solid #d0d0d0;box-sizing:border-box;}\n");
     web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.5;}\n");
+    web_client.println(".mcq-tick-faint {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.15;}\n");
     web_client.println(".mcq-ticklabels {position:relative;height:12px;font-size:x-small;margin:0 0 8px 0;}\n");
     web_client.println(".mcq-legend {font-size:x-small;margin:0 0 8px 0;}\n");
     web_client.println(".mcq-swatch {display:inline-block;width:8px;height:8px;margin:0 3px 0 6px;border-radius:2px;vertical-align:middle;}\n");
@@ -1282,8 +1286,8 @@ void sub_page_rxlog()
     web_client.println("<button id=\"mcqtogglebtn\" class=\"mcq-toggle\" onclick=\"mcQueueToggle(this)\">hide</button>");
     web_client.printf("<div id=\"mcq\" data-ring=\"%u\" data-p0=\"%u\" data-p1=\"%u\" data-p2=\"%u\" data-p3=\"%u\"\n",
                        (unsigned int)MAX_RING, (unsigned int)mcqPrio[0], (unsigned int)mcqPrio[1], (unsigned int)mcqPrio[2], (unsigned int)mcqPrio[3]);
-    web_client.printf(" data-p4=\"%u\" data-p5=\"%u\" data-bp=\"%d\" data-bpname=\"%s\" data-qrs=\"%d\" data-qrt=\"%d\"\n",
-                       (unsigned int)mcqPrio[4], (unsigned int)mcqPrio[5], bpCurrentState(), bpStateName(), bpQrsThreshold(), bpRefuseThreshold());
+    web_client.printf(" data-p4=\"%u\" data-p5=\"%u\" data-bp=\"%d\" data-bpname=\"%s\" data-qrs=\"%d\" data-qrsf=\"%d\" data-qrt=\"%d\"\n",
+                       (unsigned int)mcqPrio[4], (unsigned int)mcqPrio[5], bpCurrentState(), bpStateName(), bpQrsThreshold(), bpQrsForecast((int)mcqPrio[0]), bpRefuseThreshold());
     web_client.printf(" data-win=\"%d\" data-rx=\"%lu\" data-tx=\"%lu\" data-int=\"%d\" data-newid=\"%lu\"\n",
                        (stat_last_window_ms != 0) ? 1 : 0, (unsigned long)stat_last_window.rx_ms, (unsigned long)stat_last_window.tx_ms,
                        (int)PRIO_STAT_INTERVAL_S, (unsigned long)stat_last_window.newid);

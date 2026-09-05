@@ -40,6 +40,58 @@ void tearDown(void) {}
 
 // ---- thresholds -----------------------------------------------------------
 
+// ---- WQ-02: QRS forecast for the web GUI ----------------------------------
+
+// Empty or baseline ring: three own messages, each must land at/above 5,
+// so the third lands at 7 regardless of how far below the line the ring sits.
+static void test_qrs_forecast_on_a_quiet_ring_is_line_plus_two(void)
+{
+    BackPressure bp(20);
+    TEST_ASSERT_EQUAL_INT(7, bp.qrsForecastDepth(0));
+    TEST_ASSERT_EQUAL_INT(7, bp.qrsForecastDepth(4));
+}
+
+// Ring already above the line with foreign traffic: the marker slides right
+// with the fill, three own messages on top of what is there now.
+static void test_qrs_forecast_slides_with_foreign_fill(void)
+{
+    BackPressure bp(20);
+    TEST_ASSERT_EQUAL_INT(8,  bp.qrsForecastDepth(5));
+    TEST_ASSERT_EQUAL_INT(13, bp.qrsForecastDepth(10));
+}
+
+// Own messages already counted pull the marker back left; after the count is
+// complete the very next message fires, i.e. depth + 1.
+static void test_qrs_forecast_moves_left_as_own_msgs_accumulate(void)
+{
+    BackPressure bp(20);
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(9, false, 0));
+    TEST_ASSERT_EQUAL_INT(1, bp.userMsgsCounted());
+    TEST_ASSERT_EQUAL_INT(11, bp.qrsForecastDepth(9));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.onSend(10, false, 0));
+    TEST_ASSERT_EQUAL_INT(11, bp.qrsForecastDepth(10));
+    TEST_ASSERT_EQUAL_INT(BP_NOTICE_QRS, bp.onSend(11, false, 0));
+    TEST_ASSERT_EQUAL_INT(12, bp.qrsForecastDepth(11));
+}
+
+// A dip below the line restarts the count and the forecast with it.
+static void test_qrs_forecast_resets_below_the_line(void)
+{
+    BackPressure bp(20);
+    bp.onSend(9, false, 0);
+    bp.onSend(10, false, 0);
+    bp.poll(3, 0);
+    TEST_ASSERT_EQUAL_INT(0, bp.userMsgsCounted());
+    TEST_ASSERT_EQUAL_INT(7, bp.qrsForecastDepth(3));
+}
+
+// Never past QRT: from there the refusal band answers, not QRS.
+static void test_qrs_forecast_clamps_at_qrt(void)
+{
+    TEST_ASSERT_EQUAL_INT(16, BackPressure(20).qrsForecastDepth(15));
+    TEST_ASSERT_EQUAL_INT(8,  BackPressure(10).qrsForecastDepth(9));
+}
+
 // 80 % of MAX_RING, per board: T-Beam 10, Heltec/T-Deck/RAK 20, ESP32 classic 30.
 // A hardcoded 16 would make the T-Beam warn at 160 % and the classic ESP32 at 53 %.
 static void test_threshold_is_80_percent_of_max_ring(void)
@@ -707,6 +759,11 @@ int main(int, char **)
     RUN_TEST(test_qrv_water_band_hold_survives_millis_rollover);
 
     RUN_TEST(test_notice_wording);
+    RUN_TEST(test_qrs_forecast_on_a_quiet_ring_is_line_plus_two);
+    RUN_TEST(test_qrs_forecast_slides_with_foreign_fill);
+    RUN_TEST(test_qrs_forecast_moves_left_as_own_msgs_accumulate);
+    RUN_TEST(test_qrs_forecast_resets_below_the_line);
+    RUN_TEST(test_qrs_forecast_clamps_at_qrt);
 
     return UNITY_END();
 }

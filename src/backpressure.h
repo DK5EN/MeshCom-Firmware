@@ -287,6 +287,35 @@ public:
 
     BpState state() const { return state_; }
 
+    /// Own typed messages already counted towards QRS_MIN_USER_MSGS in the
+    /// running run (0 after any sighting below qrsThreshold()).
+    int userMsgsCounted() const { return qrs_user_msgs_; }
+
+    /// WQ-02 (2026-09-05): forecast for the web GUI -- the ring depth the
+    /// sender's *next* own messages would have to reach before QRS fires,
+    /// given the ring as it stands now. qrsThreshold() alone is a necessary
+    /// condition; the trigger is the QRS_MIN_USER_MSGS-th own message that
+    /// lands at/above it. Each further own message adds one to the depth
+    /// (no drain assumed), and messages landing below the line do not
+    /// count, so the firing message lands at
+    ///     max(qrsThreshold() + remaining - 1, depth + remaining).
+    /// Clamped to refuseThreshold(): from there on QRT takes over anyway.
+    /// A snapshot, not a promise -- the ring drains between renders and a
+    /// dip below the line restarts the count.
+    /// @param depth current ring depth (any frame type)
+    int qrsForecastDepth(int depth) const
+    {
+        if(depth < 0)
+            depth = 0;
+        int remaining = QRS_MIN_USER_MSGS - qrs_user_msgs_;
+        if(remaining < 1)
+            remaining = 1;
+        int by_line = qrsThreshold() + remaining - 1;
+        int by_fill = depth + remaining;
+        int t = (by_line > by_fill) ? by_line : by_fill;
+        return (t < refuseThreshold()) ? t : refuseThreshold();
+    }
+
     /// Highest notice already emitted in the running episode (BP_NOTICE_NONE
     /// while no episode is open).
     BpNotice latch() const { return latch_; }

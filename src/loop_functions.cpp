@@ -3456,6 +3456,11 @@ int bpQrsThreshold(void)
     return bp_state.qrsThreshold();
 }
 
+int bpQrsForecast(int depth)
+{
+    return bp_state.qrsForecastDepth(depth);
+}
+
 const char* bpStateName(void)
 {
     switch(bp_state.state())

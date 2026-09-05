@@ -226,6 +226,7 @@ MsgOrigin getMsgOrigin(void);
 int bpCurrentState(void);      // (int)BpState: 0 QUIET, 1 QRS, 2 QRT
 int bpRefuseThreshold(void);
 int bpQrsThreshold(void);
+int bpQrsForecast(int depth); // WQ-02: depth at which the next own msgs raise QRS
 const char* bpStateName(void); // "QUIET" / "QRS" / "QRT"
 
 // E5 (2026-09-01): msg_id must stay unique across every BP frame or the chat
