@@ -504,6 +504,49 @@ static void test_grenzen_gwi_und_gwu(void)
 }
 
 // ---------------------------------------------------------------------------
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- Dedup-Fenster
+// ---------------------------------------------------------------------------
+//
+// window_min = round(ring_size * interval_s / (newid * 60)), siehe
+// setlog_lines.h. Die Feldmessung in src/dedup_functions.h setzt den
+// sicheren Korridor bei 40-48 Minuten an; die Faelle unten pruefen die
+// Formel selbst, nicht diesen Korridor.
+
+static void test_dedup_fenster_newid_null_ist_na(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0, setlogDedupWindowMin(0, 300, 100));
+}
+
+static void test_dedup_fenster_interval_null_ist_na(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0, setlogDedupWindowMin(12, 0, 100));
+}
+
+static void test_dedup_fenster_rundet_auf(void)
+{
+    // 100*300/(12*60) = 30000/720 = 41.667 -> 42
+    TEST_ASSERT_EQUAL_UINT32(42, setlogDedupWindowMin(12, 300, 100));
+}
+
+static void test_dedup_fenster_ein_neuling_pro_intervall(void)
+{
+    // 100*300/(1*60) = 30000/60 = 500
+    TEST_ASSERT_EQUAL_UINT32(500, setlogDedupWindowMin(1, 300, 100));
+}
+
+static void test_dedup_fenster_kleiner_ring(void)
+{
+    // 10*300/(3*60) = 3000/180 = 16.667 -> 17
+    TEST_ASSERT_EQUAL_UINT32(17, setlogDedupWindowMin(3, 300, 10));
+}
+
+static void test_dedup_fenster_rundet_ab(void)
+{
+    // 100*300/(15*60) = 30000/900 = 33.33 -> 33
+    TEST_ASSERT_EQUAL_UINT32(33, setlogDedupWindowMin(15, 300, 100));
+}
+
+// ---------------------------------------------------------------------------
 // SL-06 -- Herkunftskennung fuer ringSource[]
 // ---------------------------------------------------------------------------
 
@@ -574,5 +617,11 @@ int main(int, char **)
     RUN_TEST(test_rx_zeile_mit_langem_pfad);
     RUN_TEST(test_alle_formatstrings_unter_300_zeichen);
     RUN_TEST(test_ring_source_code_bildet_die_labels_ab);
+    RUN_TEST(test_dedup_fenster_newid_null_ist_na);
+    RUN_TEST(test_dedup_fenster_interval_null_ist_na);
+    RUN_TEST(test_dedup_fenster_rundet_auf);
+    RUN_TEST(test_dedup_fenster_ein_neuling_pro_intervall);
+    RUN_TEST(test_dedup_fenster_kleiner_ring);
+    RUN_TEST(test_dedup_fenster_rundet_ab);
     return UNITY_END();
 }

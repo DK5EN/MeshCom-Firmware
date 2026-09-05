@@ -126,3 +126,20 @@ int setlogFormatGwu(char *buf, size_t n, uint32_t msg_id, char typ,
                                 (unsigned long)msg_id, typ, (unsigned)hop,
                                 (unsigned long)t_ms), n);
 }
+
+// WQ-01 (2026-09-05): queue panel on the rxlog web page.
+//
+// window_min = round(ring_size * interval_s / (newid * 60)); siehe
+// setlog_lines.h fuer die Herleitung. 64-bit Zwischenwerte vermeiden einen
+// Ueberlauf bei ring_size * interval_s; das Runden auf die naechste Minute
+// geschieht per Halbaddition vor der Ganzzahldivision.
+uint32_t setlogDedupWindowMin(uint32_t newid, uint32_t interval_s, uint32_t ring_size)
+{
+    if(newid == 0 || interval_s == 0)
+        return 0;
+
+    uint64_t numerator = (uint64_t)ring_size * (uint64_t)interval_s;
+    uint64_t denominator = (uint64_t)newid * 60ULL;
+
+    return (uint32_t)((numerator + denominator / 2) / denominator);
+}

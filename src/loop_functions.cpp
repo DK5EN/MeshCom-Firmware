@@ -3148,6 +3148,15 @@ void setlogPrint(const char *body)
     printfdeb("%s [LOG] %s\n", ts, body);
 }
 
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- Kopie des zuletzt
+// abgeschlossenen 5-Minuten-STAT-Fensters. setlogFillStat() fuellt und
+// leert die Intervallzaehler in jedem Fall auf jedem Tick (siehe unten);
+// diese Kopie macht das Ergebnis danach lesbar, ohne den naechsten
+// Druckaufruf abzuwarten. stat_last_window_ms == 0 heisst "seit dem Boot
+// noch kein Fenster abgeschlossen".
+struct setlogStatFields stat_last_window = {0};
+uint32_t stat_last_window_ms = 0;
+
 // SL-05 -- Felder der STAT-Zeile fuellen. Die Intervallzaehler werden hier
 // geleert (exchange(0)); stat_drop_count[] wird nur gelesen, das Nullen bleibt
 // plattformseitig (ESP32 memset, nRF52 unter taskENTER_CRITICAL()).
@@ -3186,6 +3195,11 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     f->flash          = FLASH_VERSION;
     f->up_s           = millis() / 1000UL;
     f->t_ms           = millis();
+
+    // WQ-01 (2026-09-05): queue panel on the rxlog web page -- Kopie des
+    // fertigen Fensters fuer Leser, die nicht selbst drucken (Web-GUI).
+    stat_last_window = *f;
+    stat_last_window_ms = f->t_ms;
 }
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
@@ -3421,6 +3435,35 @@ void SendPong(String msg_call, unsigned int msg_id)
 // Thresholds come from MAX_RING, which differs per board (10 / 20, MEM-01,
 // configuration_global.h) — a hardcoded 16 would warn at 160 % on a T-Beam.
 static BackPressure bp_state(MAX_RING);
+
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- read-only getters
+// onto bp_state for callers outside this TU (the web GUI). Plain int return
+// values keep the enum (BpState, backpressure.h) out of the shared header.
+int bpCurrentState(void)
+{
+    return (int)bp_state.state();
+}
+
+int bpRefuseThreshold(void)
+{
+    return bp_state.refuseThreshold();
+}
+
+int bpQrsThreshold(void)
+{
+    return bp_state.qrsThreshold();
+}
+
+const char* bpStateName(void)
+{
+    switch(bp_state.state())
+    {
+        case BP_QUIET: return "QUIET";
+        case BP_QRS:   return "QRS";
+        case BP_QRT:   return "QRT";
+        default:       return "QUIET";
+    }
+}
 
 // Set by each caller immediately before sendMessage(), cleared right after.
 static MsgOrigin bp_origin = ORIGIN_NONE;

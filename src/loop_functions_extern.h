@@ -11,6 +11,12 @@
 
 #include <atomic>
 
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- pulls in
+// struct setlogStatFields (below) for the last-window copy. Plain C-style
+// header (stdint/stdbool/stddef/string only, no Arduino dependency), so it
+// compiles cleanly for every TU that includes this extern header.
+#include "setlog_lines.h"
+
 extern bool gpsDetected;
 extern bool gpsInitDone;
 
@@ -213,6 +219,14 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
 void setMsgOrigin(MsgOrigin origin);
 MsgOrigin getMsgOrigin(void);
 
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- read-only view
+// onto bp_state (loop_functions.cpp). Plain int, not BpState, so callers
+// that only need this extern header don't need the enum.
+int bpCurrentState(void);      // (int)BpState: 0 QUIET, 1 QRS, 2 QRT
+int bpRefuseThreshold(void);
+int bpQrsThreshold(void);
+const char* bpStateName(void); // "QUIET" / "QRS" / "QRT"
+
 // E5 (2026-09-01): msg_id must stay unique across every BP frame or the chat
 // app's dedup filter swallows whichever of two notices lands in the same
 // millisecond -- see the comment at the definition in loop_functions.cpp.
@@ -343,8 +357,13 @@ void setlogPrint(const char *body);
 // SL-05: fills the STAT fields from the interval counters (drains them), the
 // mheard/trickle/version globals and uptime; heap is platform-specific and passed in.
 // stat_drop_count[] is read, not cleared -- the platform tick clears it.
-struct setlogStatFields;
 void setlogFillStat(struct setlogStatFields *f, uint32_t heap);
+
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- copy of the last
+// completed 5-minute STAT window, updated at the end of every setlogFillStat()
+// call. stat_last_window_ms == 0 means no window has completed since boot.
+extern struct setlogStatFields stat_last_window;
+extern uint32_t stat_last_window_ms;
 
 
 // Trickle-HEY state

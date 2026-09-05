@@ -906,6 +906,84 @@ static void test_bp03_rollover_sicher(void)
     TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_BACKGROUND]);
 }
 
+// --------------------------------------------------------------- WQ-01
+//
+// txRingPrioCounts(): per-priority Belegungszaehlung fuers Web-GUI-
+// Queue-Panel, gleicher lock-freier Scan wie txRingDepth() (siehe dessen
+// Testabdeckung oben fuer die Loecher-Semantik), nur zusaetzlich pro
+// Prioritaet aufgeschluesselt.
+
+static void test_wq01_leerer_ring_liefert_nur_nullen(void)
+{
+    uint8_t out[6];
+    memset(out, 0xFF, sizeof(out)); // Alt-Muell, damit ein fehlendes Zero-Init auffiele
+
+    txRingPrioCounts(out);
+
+    for (int i = 0; i < 6; i++)
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, out[i], "leerer Ring muss ueberall 0 liefern");
+}
+
+// Je ein Eintrag pro Prioritaetsstufe (CRITICAL..BACKGROUND) -- out[0] muss
+// mit txRingDepth() uebereinstimmen, out[1..5] je genau 1 zaehlen.
+static void test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein(void)
+{
+    BuiltFrame ack = buildAckFrame();                          // CRITICAL (1)
+    BuiltFrame dm  = buildTextFrame("DK5EN-91", "dringend");   // CRITICAL (1) -- Text-DM
+    BuiltFrame grp = buildTextFrame("9999", "Gruppen-Text");   // HIGH (2)
+    BuiltFrame rel = buildTextFrame("DK5EN-91", "Relay");      // NORMAL (3), ueber RING_STATUS_DONE
+    BuiltFrame pos = buildPositionFrame();                     // LOW (4)
+    BuiltFrame hey = buildHeyFrame();                          // BACKGROUND (5)
+
+    TEST_ASSERT_TRUE(addTxRingEntry(ack.bytes, ack.len, RING_STATUS_READY, "wq01") >= 0);
+    TEST_ASSERT_TRUE(addTxRingEntry(dm.bytes, dm.len, RING_STATUS_READY, "wq01") >= 0);
+    TEST_ASSERT_TRUE(addTxRingEntry(grp.bytes, grp.len, RING_STATUS_READY, "wq01") >= 0);
+    TEST_ASSERT_TRUE(addTxRingEntry(rel.bytes, rel.len, RING_STATUS_DONE, "wq01") >= 0);
+    TEST_ASSERT_TRUE(addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "wq01") >= 0);
+    TEST_ASSERT_TRUE(addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "wq01") >= 0);
+
+    uint8_t out[6];
+    txRingPrioCounts(out);
+
+    TEST_ASSERT_EQUAL_INT(txRingDepth(), out[0]);
+    TEST_ASSERT_EQUAL_UINT8(6, out[0]);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(2, out[MSG_PRIO_CRITICAL], "ACK + Text-DM");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, out[MSG_PRIO_HIGH], "Gruppen-Text");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, out[MSG_PRIO_NORMAL], "Relay");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, out[MSG_PRIO_LOW], "Position");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, out[MSG_PRIO_BACKGROUND], "HEY");
+}
+
+// Loecher-Szenario (wie test_bp02_tiefe_mit_loechern): ein in der Mitte
+// freigegebener Slot darf weder in out[0] noch in seiner Prio-Bucket
+// mitgezaehlt werden.
+static void test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt(void)
+{
+    for (int i = 0; i < 5; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0xC000 + i)); // LOW
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "wq01holes");
+        TEST_ASSERT_EQUAL_INT(i, slot);
+    }
+    TEST_ASSERT_EQUAL_UINT8(5, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    // Slots 1 und 3 freigeben -- Slots 0, 2, 4 bleiben belegt (alle LOW).
+    ringBuffer[1][0] = 0;
+    ringBuffer[3][0] = 0;
+
+    uint8_t out[6];
+    txRingPrioCounts(out);
+
+    TEST_ASSERT_EQUAL_INT(txRingDepth(), out[0]);
+    TEST_ASSERT_EQUAL_UINT8(3, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(3, out[MSG_PRIO_LOW]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[MSG_PRIO_CRITICAL]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[MSG_PRIO_HIGH]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[MSG_PRIO_NORMAL]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[MSG_PRIO_BACKGROUND]);
+}
+
 // EXT_PENDING-Guard (F7): nur relevant/baubar unter EXTERNAL_RADIO, das
 // env:native_aprs NICHT setzt (siehe platformio.ini [env:native_aprs] --
 // build_flags definiert dort kein -D EXTERNAL_RADIO=1, anders als
@@ -937,5 +1015,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_bp03_frischer_bg_bleibt);
     RUN_TEST(test_bp03_nicht_bg_altert_nie);
     RUN_TEST(test_bp03_rollover_sicher);
+    RUN_TEST(test_wq01_leerer_ring_liefert_nur_nullen);
+    RUN_TEST(test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein);
+    RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
     return UNITY_END();
 }
