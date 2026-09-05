@@ -532,7 +532,8 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 6. **TM-28** — E290 Wireless Paper Hardware kommt in der Woche ab 2026-09-01.
 7. Kleinvieh, alles gefiled: `ntpsync.py`-Live-Lauf; PM-01 boot-gecachtes Global (optional);
    CONF-Koordinaten anwenden (eigenes Ticket); WEB-03 (c)-(e); WF-01 Sites 1+2; TM-44
-   (deferred); TD-12/TD-13 (T-Deck Tab-Animation-Stall, Trackball-Doppelclick — Code
+   (deferred); TD-14 Karten-Doppelaufbau beim Tabwechsel ueber die Leiste (RCA
+   `tdeck-cursor-stall-rca-20260905.md`, Instrument `msg_roll`); TD-12/TD-13 (T-Deck Tab-Animation-Stall, Trackball-Doppelclick — Code
    gefixt 2026-09-05, `3f6a35d5`/`7368539e`, Bench-Nachweis auf DK5EN-14 offen, siehe
    BACKLOG §3.8p); TD-10 Backspace-Auto-Repeat (zurückgestellt, Konzept fertig:
    [`tdeck-backspace-autorepeat-20260831.md`](tdeck-backspace-autorepeat-20260831.md)),

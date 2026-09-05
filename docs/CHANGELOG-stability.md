@@ -1287,6 +1287,15 @@ The developer toolbox in `tools/` that grew alongside this work:
     animation killed it half-way (SCROLL_ON_FOCUS deletes the running
     animation, `LV_DIR_NONE` zeroes the replacement) and the screen froze on
     a split frame until the next menu tab change (TD-12, `3f6a35d5`).
+83. T-Deck bench: `msg_roll` scenario reproduces the operator's "cursor dead
+    time after messages and menu collapse" sequence and measures it on the
+    device clock (trackball read gaps, main-loop gaps by section, loop
+    average from `--instr` snapshots, SD map rebuilds). Verdict on the
+    message tab: no stall, no slowdown; the captured dead times are SD map
+    recompositions on the map tab (TD-14, TD-09). Two instrument artefacts
+    are documented so they are not re-chased: the one-byte-per-loop serial
+    reader overruns at a 60 ms command cadence, and a cursor clamped at the
+    screen edge reports no activity.
 
 ## Thank you
 

@@ -1099,6 +1099,230 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     }
 
 
+# --------------------------------------------------------------------------
+# msg_roll: cursor stall after messages arrived and the drawer was collapsed
+# --------------------------------------------------------------------------
+
+def _instr_snapshot(session: TDeckSession) -> Dict[str, Any]:
+    """One --instr readout: loop n/total/max and per-section n/total/max.
+    The counters accumulate since boot (or the last instrument_reset()), so
+    two snapshots give a per-phase average by difference."""
+    idx = session.send("--instr")
+    session.wait_for(r"\[INSTR-GAPS\]", 3.0, since=idx)
+    time.sleep(0.2)
+    snap: Dict[str, Any] = {"loop": None, "sect": {}}
+    for _, _, l in session.records_since(idx):
+        m = re.search(r"\[INSTR-LOOP\][; ]n[; ](\d+)[; ]total_us[; ](\d+)[; ]avg_us[; ]\d+[; ]max_us[; ](\d+)", l)
+        if m:
+            snap["loop"] = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            continue
+        m = re.search(r"\[INSTR-SECT\][; ](\w+)[; ]n[; ](\d+)[; ]total_us[; ](\d+)[; ]avg_us[; ]\d+[; ]max_us[; ](\d+)", l)
+        if m:
+            snap["sect"][m.group(1)] = (int(m.group(2)), int(m.group(3)), int(m.group(4)))
+    return snap
+
+
+def _instr_delta(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"loop_avg_us": None, "loop_n": None, "sect_avg_us": {}, "sect_share_pct": {}}
+    if a.get("loop") and b.get("loop"):
+        dn = b["loop"][0] - a["loop"][0]
+        dus = b["loop"][1] - a["loop"][1]
+        out["loop_n"] = dn
+        out["loop_avg_us"] = int(dus / dn) if dn > 0 else None
+        for name, (n1, us1, _) in b["sect"].items():
+            n0, us0, _ = a["sect"].get(name, (0, 0, 0))
+            sn, sus = n1 - n0, us1 - us0
+            if sn > 0:
+                out["sect_avg_us"][name] = int(sus / sn)
+                out["sect_share_pct"][name] = round(100.0 * sus / dus, 1) if dus > 0 else None
+    return out
+
+
+def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: int = 200) -> Dict[str, Any]:
+    """Roll the trackball for `seconds` (3-step chunks, like a hand rolls) and
+    measure: main-loop gaps attributed to the lvgl section, gaps between
+    consecutive [BALL] reads on the device clock, refresh times, and
+    content-sized flushes (> 50 kpx)."""
+    session.send("--redrawlog off")
+    time.sleep(0.1)
+    # Park the cursor at a known x first: mouse_read() clamps at the screen
+    # edges and a clamped step reports no activity, which looked like a stall
+    # in the first version of this scenario. Left edge, then 8 steps in, then
+    # +-4 commands x 3 steps x 10 px stays well inside the 320 px width.
+    session.send("--ball left 40")
+    time.sleep(0.4)
+    session.send("--ball right 8")
+    time.sleep(0.4)
+    snap0 = _instr_snapshot(session)
+    idx = session.length()
+    t0 = time.monotonic()
+    k = 0
+    while time.monotonic() - t0 < seconds:
+        direction = "right" if (k // 4) % 2 == 0 else "left"
+        session.send(f"--ball {direction} 3")
+        k += 1
+        # checkSerialCommand() drains ONE byte per main-loop iteration, so a
+        # 60 ms cadence (267 B/s) overruns the reader as soon as the loop
+        # slows to ~7 ms per iteration; 200 ms (80 B/s) keeps the serial path
+        # out of the measurement.
+        time.sleep(cadence_ms / 1000.0)
+    time.sleep(0.5)
+    recs = session.records_since(idx)
+    usage_err = sum(1 for _, _, l in recs if "[BALL];err;usage" in l)
+    snap1 = _instr_snapshot(session)
+    instr = _instr_delta(snap0, snap1)
+    ball_ms: List[int] = []
+    loop_gaps: List[Dict[str, Any]] = []
+    refr_ms: List[int] = []
+    big_flush = 0
+    sdmap_ms: List[int] = []
+    for _, _, l in recs:
+        m = re.search(r"\[ SDMAP \]\.\.\.Karte zusammengesetzt.*?, (\d+) ms \(", l)
+        if m:
+            sdmap_ms.append(int(m.group(1)))
+            continue
+        m = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+);btn;\d(?:;steps;\d+)?;ms;(\d+)", l)
+        if m:
+            ball_ms.append(int(m.group(3)))
+            continue
+        m = re.search(r"\[INSTR-LOOP\][; ]gap[; ]ms[; ](\d+)[; ]in[; ](\w+)", l)
+        if m:
+            loop_gaps.append({"ms": int(m.group(1)), "in": m.group(2)})
+            continue
+        m = re.search(r"\[REFR\];ms;\d+;px;(\d+);t_ms;(\d+)", l)
+        if m:
+            refr_ms.append(int(m.group(2)))
+            if int(m.group(1)) > 50000:
+                big_flush += 1
+    ball_gaps = [ball_ms[i] - ball_ms[i - 1] for i in range(1, len(ball_ms))]
+    stalls = [g for g in ball_gaps if g >= gap_ms]
+    return {
+        "sent_cmds": k,
+        "ball_reads": len(ball_ms),
+        "ball_gap_max_ms": max(ball_gaps) if ball_gaps else None,
+        "ball_stalls": stalls,
+        "loop_gaps_lvgl": [g["ms"] for g in loop_gaps if g["in"] == "lvgl"],
+        "loop_gaps_other": [g for g in loop_gaps if g["in"] != "lvgl"],
+        "refr_max_ms": max(refr_ms) if refr_ms else None,
+        "big_flushes": big_flush,
+        "sdmap_rebuilds_ms": sdmap_ms,
+        "serial_garbled_cmds": usage_err,
+        "loop_avg_us": instr["loop_avg_us"],
+        "loop_n": instr["loop_n"],
+        "sect_avg_us": instr["sect_avg_us"],
+        "sect_share_pct": instr["sect_share_pct"],
+    }
+
+
+def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Operator report 2026-09-05: after new messages have arrived and the tab
+    menu was collapsed once, rolling the trackball freezes the cursor for a
+    few hundred ms every couple of seconds. The main loop does not stall on
+    its own (no [INSTR-LOOP] gap in a plain roll); the stall only appears with
+    that preparation. Sequence: roll (control), inject messages, drawer on
+    and off, roll again. Verdict: the second roll must not show a main-loop
+    gap in the lvgl section or a [BALL] read gap of --msgroll-gap-ms or more.
+    A control phase that already stalls is reported as such (the instrument
+    is then not discriminating on this build)."""
+    gap_ms = args.msgroll_gap_ms
+    idx_all = session.length()
+    session.send("--tft on")
+    session.send(f"--tab {args.msgroll_tab}")
+    time.sleep(1.5)                      # tab 3 rebuilds the map tiles on entry
+    session.send("--drawer off")
+    time.sleep(0.3)
+    # move the cursor away from the corner so the roll has room both ways
+    session.send("--ball right 10")
+    time.sleep(0.3)
+    session.send("--ball down 10")
+    time.sleep(0.4)
+    uistat_before = get_uistat(session)
+
+    control = _roll_phase(session, args.msgroll_seconds, gap_ms, args.msgroll_cadence_ms)
+
+    injected = 0
+    for i in range(args.msgroll_msgs):
+        idx = session.send(f"--injectmsg {TEST_GROUP} msgroll {i}")
+        if session.wait_for(r"\[INJECT\];ok", 2.0, since=idx) is not None:
+            injected += 1
+        time.sleep(0.6)
+    time.sleep(1.0)
+    drawer_on = _acked_step(session, "--drawer on", r"\[DRAWER\];1\b")
+    time.sleep(0.5)
+    drawer_off = _acked_step(session, "--drawer off", r"\[DRAWER\];0\b")
+    time.sleep(0.5)
+
+    after = _roll_phase(session, args.msgroll_seconds, gap_ms, args.msgroll_cadence_ms)
+    uistat_after = get_uistat(session)
+
+    # Diagnostic pass only when the stall is present: a short roll with the
+    # redraw log on, and the invalidation backtraces that precede each loop
+    # gap, symbolized -- that is the root-cause pointer, not just the verdict.
+    diag: Optional[Dict[str, Any]] = None
+    stalled = bool(after["loop_gaps_lvgl"]) or bool(after["ball_stalls"])
+    if stalled:
+        session.send("--redrawlog on")
+        time.sleep(0.1)
+        idx = session.length()
+        t0 = time.monotonic()
+        k = 0
+        while time.monotonic() - t0 < min(6.0, args.msgroll_seconds):
+            session.send(f"--ball {'right' if (k // 8) % 2 == 0 else 'left'} 3")
+            k += 1
+            time.sleep(0.06)
+        time.sleep(0.5)
+        session.send("--redrawlog off")
+        time.sleep(0.2)
+        recs = [l for _, _, l in session.records_since(idx)]
+        gap_idx = [i for i, l in enumerate(recs) if re.search(r"\[INSTR-LOOP\][; ]gap", l)]
+        bt_counts: Dict[Tuple[str, ...], int] = {}
+        objs: Dict[str, int] = {}
+        for g in gap_idx:
+            for l in recs[max(0, g - 40):g]:
+                m = re.search(r"\[REDRAW\];ms;\d+;obj;(0x[0-9a-f]+);cls;(\w+);area;(-?\d+;-?\d+;-?\d+;-?\d+);ra;0x[0-9a-f]+;bt;([0-9a-fx,]+)", l)
+                if m:
+                    key = tuple(m.group(4).split(","))
+                    bt_counts[key] = bt_counts.get(key, 0) + 1
+                    ok_ = f"{m.group(2)} {m.group(1)} area {m.group(3)}"
+                    objs[ok_] = objs.get(ok_, 0) + 1
+        top_bt = sorted(bt_counts.items(), key=lambda kv: -kv[1])[:5]
+        sym_map = symbolize(sorted({a for key, _ in top_bt for a in key}), args.elf) if top_bt else {}
+        diag = {
+            "loop_gaps": len(gap_idx),
+            "objects_before_gaps": sorted(objs.items(), key=lambda kv: -kv[1])[:6],
+            "top_backtraces": [
+                {"count": cnt, "frames": [_short_sym(sym_map.get(a, a)) for a in key]}
+                for key, cnt in top_bt
+            ],
+        }
+
+    sdmap_all = [int(m.group(1)) for _, _, l in session.records_since(idx_all)
+                 for m in [re.search(r"\[ SDMAP \]\.\.\.Karte zusammengesetzt.*?, (\d+) ms \(", l)] if m]
+    control_clean = not control["loop_gaps_lvgl"] and not control["ball_stalls"]
+    slowdown = None
+    if control.get("loop_avg_us") and after.get("loop_avg_us"):
+        slowdown = round(after["loop_avg_us"] / control["loop_avg_us"], 2)
+    loop_slowed = slowdown is not None and slowdown >= 1.5
+    ok = control_clean and not stalled and not loop_slowed and injected == args.msgroll_msgs \
+        and drawer_on["acked"] and drawer_off["acked"]
+    return {
+        "ok": ok,
+        "control_clean": control_clean,
+        "stalled_after": stalled,
+        "loop_slowdown_x": slowdown,
+        "loop_slowed": loop_slowed,
+        "injected": injected,
+        "drawer_on": drawer_on["acked"],
+        "drawer_off": drawer_off["acked"],
+        "control": control,
+        "after": after,
+        "diag": diag,
+        "sdmap_rebuilds_total_ms": sdmap_all,
+        "msg_list_before": uistat_before.get("msg_list") if uistat_before else None,
+        "msg_list_after": uistat_after.get("msg_list") if uistat_after else None,
+    }
+
+
 def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     idx0 = session.send("--heap h0")
     m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
@@ -1894,6 +2118,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "map": scenario_map,
     "nav": scenario_nav,
     "input": scenario_input,
+    "msg_roll": scenario_msg_roll,
     "heap": scenario_heap,
     "trim": scenario_trim,
     "gps_experiment": scenario_gps_experiment,
@@ -1914,6 +2139,7 @@ SCENARIO_ORDER = [
     "map",
     "nav",
     "input",
+    "msg_roll",
     "heap",
     "trim",
     "displaycmd",
@@ -2116,6 +2342,7 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
 SCENARIO_HELP = {
     "boot": "inspect the boot log (version, audio outcome, errors)",
     "idle": "redraw/invalidation rate over an idle window",
+    "msg_roll": "cursor stall after injected messages + drawer collapse (operator report 2026-09-05)",
     "tabs": "switch through all tabs, repaint per tab",
     "drawer": "open/close the tab drawer three times",
     "inject": "inject messages via --injectmsg, bubble must be drawn",
@@ -2235,6 +2462,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10; 40 recycles marker slots)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
     p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")
+    p.add_argument("--msgroll-tab", type=int, default=0, help="tab the msg_roll scenario rolls on (default: 0; 3 = map)")
+    p.add_argument("--msgroll-cadence-ms", type=int, default=200, help="ms between --ball commands in msg_roll (default: 200; 60 overruns the 1-byte-per-loop serial reader)")
+    p.add_argument("--msgroll-seconds", type=float, default=12.0, help="trackball roll duration per phase in the msg_roll scenario (default: 12)")
+    p.add_argument("--msgroll-msgs", type=int, default=3, help="messages injected between the two rolls in msg_roll (default: 3)")
+    p.add_argument("--msgroll-gap-ms", type=int, default=400, help="[BALL] read gap that counts as a stall in msg_roll (default: 400; a SD map recomposition costs 470-750 ms, a clean roll stays under 250)")
     p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")
     p.add_argument(
         "--gps-window", type=float, default=120.0, help="gps_experiment: per-phase capture window seconds (default: 120)"
