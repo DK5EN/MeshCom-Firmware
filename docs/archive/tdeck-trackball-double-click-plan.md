@@ -1,7 +1,9 @@
-# T-Deck: trackball button fires two LVGL clicks per press (TD-11)
+# T-Deck: trackball button fires two LVGL clicks per press (TD-13)
 
-Status: plan, not implemented. Branch to work on: `fork-main` (worktree
-`mellow-marinating-lightning`).
+Status: FIXED 2026-09-05 (`7368539e`), bench-proven on DK5EN-14. This plan's original working
+number (`TD-11`, still visible below) collided with an unrelated, still-open enhancement filed
+the same week (send/delivery indicator) and was renumbered to `TD-13` in BACKLOG.md; see
+BACKLOG.md row TD-13.
 
 ## Symptom
 

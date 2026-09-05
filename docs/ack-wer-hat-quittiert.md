@@ -254,7 +254,7 @@ Ausgehend (`sendExtern()`, `src/extudp_functions.cpp:445`), jeweils als JSON-Dat
 | `pos`  | jedes Positionsframe (LoRa, UDP, eigenes) | `src_type` lora / udp / node, `msg_id`   |
 | `msg`  | jedes Textframe (LoRa, UDP, eigenes)      | `src`, `dst`, `msg`, `msg_id`            |
 | `tele` | zu jedem Positionsframe zusaetzlich       | qfe, qnh, pressure_alt                   |
-| Notice | QRS/QRT/QTA-Rueckmeldung (BP-01, BP-06)   | als `msg` vom eigenen Rufzeichen getarnt |
+| Notice | QRS/QRT/QTA-Rueckmeldung (BP-01, BP-07)   | als `msg` vom eigenen Rufzeichen getarnt |
 
 Eingehend (`getExtern()`, Zeile 239): `msg` (dst, msg) und `tele`. Sonst nichts.
 

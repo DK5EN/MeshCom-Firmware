@@ -55,7 +55,7 @@ Operator report: a dashboard fed by a gateway's Extern-UDP shows "190 hPa" for `
 (BME680). RCA by code reading, no fix: the relayed-node `tele` datagram copies the APRS `/F=`
 field, which carries `node_press_alt` in metres; the real `/P=` pressure is parsed but never
 emitted. Upstream-identical, MCProxy already works around it. Write-up
-`docs/bug-extudp-tele-qfe-20260904.md`, BACKLOG §3.8y. **Blocked on the operator's decision**
+`docs/archive/bug-extudp-tele-qfe-20260904.md` (now archived), BACKLOG §3.8y. **Blocked on the operator's decision**
 whether a one-line firmware fix (contract change for `src_type:"lora"`) goes upstream or the
 consumer side carries it. Nothing to do until then.
 
@@ -564,8 +564,8 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
 7. Kleinvieh, alles gefiled: `ntpsync.py`-Live-Lauf; PM-01 boot-gecachtes Global (optional);
    CONF-Koordinaten anwenden (eigenes Ticket); WEB-03 (c)-(e); WF-01 Sites 1+2; TM-44
    (deferred); CDC-01 GEFIXT (S3 HWCDC-Prints blockierten die Loop ohne USB-Host, RCA
-   `tdeck-cursor-stall-rca-20260905.md`, Unplug-Nachweis `tdeck_cdc_unplug.py`); TD-14 Karten-Doppelaufbau beim Tabwechsel ueber die Leiste (RCA
-   `tdeck-cursor-stall-rca-20260905.md`, Instrument `msg_roll`); TD-12/TD-13 (T-Deck Tab-Animation-Stall, Trackball-Doppelclick — Code
+   `archive/tdeck-cursor-stall-rca-20260905.md` (now archived), Unplug-Nachweis `tdeck_cdc_unplug.py`); TD-14 Karten-Doppelaufbau beim Tabwechsel ueber die Leiste (RCA
+   `archive/tdeck-cursor-stall-rca-20260905.md`, Instrument `msg_roll`); TD-12/TD-13 (T-Deck Tab-Animation-Stall, Trackball-Doppelclick — Code
    gefixt 2026-09-05, `3f6a35d5`/`7368539e`, Bench-Nachweis auf DK5EN-14 offen, siehe
    BACKLOG §3.8p); TD-10 Backspace-Auto-Repeat (zurückgestellt, Konzept fertig:
    [`tdeck-backspace-autorepeat-20260831.md`](tdeck-backspace-autorepeat-20260831.md)),
