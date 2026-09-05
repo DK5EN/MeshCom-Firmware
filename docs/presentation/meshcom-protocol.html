@@ -1594,45 +1594,98 @@ ul.plain li.yes::before{content:'✓';color:var(--ok)}
 
   <div class="grid g2" style="align-items:start">
     <div>
-      <svg viewBox="0 0 380 260" style="width:100%;height:auto" role="img" aria-label="Vergleich: geroutetes Netz gegen Flutnetz">
+      <svg id="rf-svg" viewBox="0 0 380 260" style="width:100%;height:auto" role="img" aria-label="Vergleich: geroutetes Netz gegen Flutnetz, animiert">
         <style>
           .rt{fill:none;stroke:var(--line2);stroke-width:1.4}
           .rt-on{stroke:var(--ok);stroke-width:2.6}
-          .fl{fill:none;stroke:var(--acc);stroke-width:1.8;opacity:.55}
-          .nd{fill:var(--bg3);stroke:var(--line2);stroke-width:1.6}
+          .fl{fill:none;stroke:var(--acc);stroke-width:1.8;opacity:.4}
+          .nd{fill:var(--bg3);stroke:var(--line2);stroke-width:1.6;transition:fill .25s,stroke .25s}
           .nd-s{fill:var(--mag);stroke:var(--mag)}
           .nd-d{fill:var(--ok);stroke:var(--ok)}
-          .nd-r{fill:var(--acc);stroke:var(--acc)}
+          .nd-r{fill:var(--bg3);stroke:var(--acc)}
+          .nd-r.on{fill:var(--acc)}
+          .nd-d.on{stroke:#fff}
           .lb{font-family:var(--mono);font-size:8px;fill:var(--fg2);text-anchor:middle}
           .hd{font-family:var(--mono);font-size:9px;fill:var(--fg3);text-anchor:middle;letter-spacing:.08em}
-          .pulse{fill:none;stroke:var(--acc);stroke-width:1.6;opacity:0}
-          @keyframes rip{0%{r:6;opacity:.85}100%{r:58;opacity:0}}
-          .pulse{animation:rip 2.8s ease-out infinite}
-          .p2{animation-delay:.45s}.p3{animation-delay:.9s}
+          .pk{fill:var(--acc);stroke:#fff;stroke-width:.8}
+          .pk.dup{fill:var(--fg3);stroke:none}
+          .pk.rt{fill:var(--ok);stroke:#fff}
+          .ring{fill:none;stroke:var(--acc);stroke-width:1.4}
+          .ring.rt{stroke:var(--ok)}
+          .st{font-family:var(--mono);font-size:8px;fill:var(--fg3);text-anchor:middle}
         </style>
-        <defs><clipPath id="rp"><rect x="194" y="0" width="186" height="200"/></clipPath></defs>
         <text class="hd" x="95" y="14">GEROUTET (z. B. IP)</text>
         <path class="rt" d="M28 60 L95 40 M28 60 L70 105 M95 40 L162 60 M70 105 L120 130 M120 130 L162 60 M95 40 L120 130 M28 60 L95 95"/>
         <path class="rt rt-on" d="M28 60 L95 40 L162 60"/>
-        <circle class="nd nd-s" cx="28" cy="60" r="7"/><text class="lb" x="28" y="80">A</text>
-        <circle class="nd nd-r" cx="95" cy="40" r="7"/>
-        <circle class="nd nd-d" cx="162" cy="60" r="7"/><text class="lb" x="162" y="80">B</text>
-        <circle class="nd" cx="70" cy="105" r="6"/><circle class="nd" cx="120" cy="130" r="6"/><circle class="nd" cx="95" cy="95" r="6"/>
+        <circle class="nd nd-s" data-n="LA" cx="28" cy="60" r="7"/><text class="lb" x="28" y="80">A</text>
+        <circle class="nd nd-r" data-n="L1" cx="95" cy="40" r="7"/>
+        <circle class="nd nd-d" data-n="LB" cx="162" cy="60" r="7"/><text class="lb" x="162" y="80">B</text>
+        <circle class="nd" data-n="L2" cx="70" cy="105" r="6"/><circle class="nd" data-n="L3" cx="120" cy="130" r="6"/><circle class="nd" data-n="L4" cx="95" cy="95" r="6"/>
         <text class="lb" x="95" y="160" style="fill:var(--ok)">ein Weg wird gewählt</text>
         <text class="lb" x="95" y="174">Tabelle · Next-Hop · Metrik</text>
+        <text class="st" id="rf-stl" x="95" y="192">1 Weg · 2 Sendungen</text>
 
         <line x1="190" y1="8" x2="190" y2="200" stroke="var(--line)" stroke-width="1"/>
 
         <text class="hd" x="285" y="14">MESHCOM (FLUTNETZ)</text>
         <path class="fl" d="M218 60 L285 40 M218 60 L260 105 M285 40 L352 60 M260 105 L310 130 M310 130 L352 60 M285 40 L310 130 M218 60 L285 95 M285 95 L310 130 M285 95 L352 60"/>
-        <g clip-path="url(#rp)"><circle class="pulse" cx="218" cy="60"/><circle class="pulse p2" cx="218" cy="60"/><circle class="pulse p3" cx="218" cy="60"/></g>
-        <circle class="nd nd-s" cx="218" cy="60" r="7"/><text class="lb" x="218" y="80">A</text>
-        <circle class="nd nd-r" cx="285" cy="40" r="7"/><circle class="nd nd-r" cx="260" cy="105" r="6"/>
-        <circle class="nd nd-r" cx="310" cy="130" r="6"/><circle class="nd nd-r" cx="285" cy="95" r="6"/>
-        <circle class="nd nd-d" cx="352" cy="60" r="7"/><text class="lb" x="352" y="80">B</text>
+        <g id="rf-anim"></g>
+        <circle class="nd nd-s" data-n="RA" cx="218" cy="60" r="7"/><text class="lb" x="218" y="80">A</text>
+        <circle class="nd nd-r" data-n="R1" cx="285" cy="40" r="7"/><circle class="nd nd-r" data-n="R2" cx="260" cy="105" r="6"/>
+        <circle class="nd nd-r" data-n="R3" cx="310" cy="130" r="6"/><circle class="nd nd-r" data-n="R4" cx="285" cy="95" r="6"/>
+        <circle class="nd nd-d" data-n="RB" cx="352" cy="60" r="7"/><text class="lb" x="352" y="80">B</text>
         <text class="lb" x="285" y="160" style="fill:var(--acc)">jeder wiederholt genau einmal</text>
         <text class="lb" x="285" y="174">kein Ziel-Wissen · nur Hop-Budget</text>
+        <text class="st" id="rf-str" x="285" y="192">Sendungen: 0 · Duplikate: 0</text>
+        <g id="rf-anim-l"></g>
       </svg>
+      <script>
+      (function(){
+        var svg=document.getElementById('rf-svg'); if(!svg) return;
+        var NS='http://www.w3.org/2000/svg';
+        var P={};
+        svg.querySelectorAll('circle[data-n]').forEach(function(c){P[c.dataset.n]={x:+c.getAttribute('cx'),y:+c.getAttribute('cy'),el:c};});
+        /* Flutnetz: ungerichtete Kanten; Nachbarn je Knoten */
+        var E=[['RA','R1'],['RA','R2'],['RA','R4'],['R1','RB'],['R1','R3'],['R2','R3'],['R3','RB'],['R4','R3'],['R4','RB']];
+        var NB={}; E.forEach(function(e){(NB[e[0]]=NB[e[0]]||[]).push(e[1]);(NB[e[1]]=NB[e[1]]||[]).push(e[0]);});
+        var gR=document.getElementById('rf-anim'), gL=document.getElementById('rf-anim-l');
+        var stR=document.getElementById('rf-str'), stL=document.getElementById('rf-stl');
+        var HOP=950, GAP=350, PAUSE=2600;
+        function mk(tag,cls,g){var el=document.createElementNS(NS,tag); if(cls) el.setAttribute('class',cls); g.appendChild(el); return el;}
+        function ring(n,cls,g){var r=mk('circle','ring '+cls,g); r.setAttribute('cx',P[n].x); r.setAttribute('cy',P[n].y);
+          var t0=performance.now(); (function f(t){var k=Math.min(1,(t-t0)/700); r.setAttribute('r',6+k*22); r.setAttribute('opacity',(1-k)*.8); if(k<1) requestAnimationFrame(f); else r.remove();})(t0);}
+        /* fliegt einen Punkt von a nach b, ruft done(dup) beim Ankommen */
+        function fly(a,b,cls,g,done){var d=mk('circle','pk '+cls,g); d.setAttribute('r',3.2); var t0=performance.now();
+          (function f(t){var k=Math.min(1,(t-t0)/HOP); k=k<.5?2*k*k:-1+(4-2*k)*k; d.setAttribute('cx',P[a].x+(P[b].x-P[a].x)*k); d.setAttribute('cy',P[a].y+(P[b].y-P[a].y)*k);
+            if(k<1) requestAnimationFrame(f); else {d.remove(); done&&done();}})(t0);}
+        function reset(){Object.keys(P).forEach(function(n){P[n].el.classList.remove('on');}); gR.innerHTML=''; gL.innerHTML='';}
+        var running=false;
+        function flood(){ if(running) return; running=true; reset();
+          var seen={RA:true}, tx=0, dup=0, front=['RA'], hop=0;
+          stR.textContent='Sendungen: 0 · Duplikate: 0';
+          /* Routing links: ein Weg, zwei Sendungen */
+          stL.textContent='1 Weg · 2 Sendungen'; ring('LA','rt',gL);
+          fly('LA','L1','rt',gL,function(){P.L1.el.classList.add('on'); ring('L1','rt',gL); fly('L1','LB','rt',gL,function(){P.LB.el.classList.add('on');});});
+          function wave(){
+            if(!front.length || hop>=4){ setTimeout(function(){running=false; if(visible()) flood();},PAUSE); return; }
+            var next=[], pending=0;
+            front.forEach(function(src){ ring(src,'',gR); NB[src].forEach(function(dst){ tx++; pending++;
+              fly(src,dst,'',gR,function(){ pending--;
+                if(seen[dst]){ dup++; }
+                else { seen[dst]=true; P[dst].el.classList.add('on'); if(dst!=='RB') next.push(dst); }
+                stR.textContent='Sendungen: '+tx+' · Duplikate: '+dup;
+                if(pending===0){ front=next; hop++; setTimeout(wave,GAP); }
+              }); }); });
+            stR.textContent='Sendungen: '+tx+' · Duplikate: '+dup;
+          }
+          setTimeout(wave,300);
+        }
+        /* nur laufen lassen, wenn die Folie sichtbar ist (Sichtbarkeit alle 500 ms geprueft) */
+        function visible(){var r=svg.getBoundingClientRect(); return r.bottom>0 && r.top<(window.innerHeight||document.documentElement.clientHeight);}
+        window.__rf={flood:flood,visible:visible,P:P};
+        setInterval(function(){ if(visible()) flood(); },500);
+      })();
+      </script>
     </div>
 
     <div>
