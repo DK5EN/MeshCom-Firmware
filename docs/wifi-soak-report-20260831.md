@@ -77,7 +77,7 @@ T-Deck, Heltec sat:7, T-Beam sat:8).
 Zweiter Soak in Folge, diesmal mit **realem Router-Neustart** statt erzwungener
 Treiber-Drops, und erstmals mit Gateway- und Ethernet-Knoten im Bild. Build
 `v4.35p.08.31.4-stability` (BP-02…06) auf allen dreien. Laufzeit 22:00–07:58 (~10 h).
-Rohdaten: `~/Downloads/dk5en-9?-soak-20260901/` und `meshcom_monitor/meshcom_2026-08-31_22*.log`.
+Rohdaten: `~/Downloads/dk5en-9?-soak-20260901/` und `tools/meshcom_monitor/meshcom_2026-08-31_22*.log`.
 
 ### Aufbau
 
