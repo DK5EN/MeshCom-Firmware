@@ -1052,29 +1052,17 @@ void commandAction(char *umsg_text, bool ble)
             digitalWrite(GPS_SWITCH, LOW);   // externes GPS im deepsleep ausschalten, Flashwerte aber für wakeup bestehen lassen
         #endif
 
-        #if defined(BOARD_HELTEC_T114)
-            
-            // GPIO21: LOW - power off GPS
-            // GPIO15: HIGH - power off LCD LED
-            // GPIO25: LOW - power off LORA
-
-            extern bool bDEEP_SLEEP;
-
-            if(bDEEP_SLEEP)
-            {
-                bDEEP_SLEEP = false;
-            }
-            else
-            {
-                stop_advertising();
-                
-                digitalWrite(PIN_VEXT_CTL, LOW);   // GPS
-                digitalWrite(PIN_TFT_LEDA_CTL, HIGH);   // TFT OFF
-                digitalWrite(PIN_TFT_VDD_CTL, HIGH);   // TFT VDD
-                digitalWrite(LORA_NRSET, LOW);   // LORA
-                
-                bDEEP_SLEEP = true;
-            }
+        #if defined(NRF52_SERIES)
+            // Issue 962 (docs/issue-962-deepsleep-verdict.md, section 6.4):
+            // real nRF52 System OFF for all three nRF52 boards (RAK4631,
+            // Heltec T114, T-Echo). Replaces the old T114-only bDEEP_SLEEP
+            // toggle (soft-off, needed a second --deepsleep call to "wake")
+            // and the RAK4631 no-op (this command did nothing at all for
+            // it). See src/nrf52/nrf52_sleep.cpp for the sequence; wake is a
+            // button press, USB plug-in, or RESET -- not a second
+            // --deepsleep call.
+            extern void nrf52EnterDeepSleep();
+            nrf52EnterDeepSleep();
         #else
             #if defined(WP_DISP)
             // GRAU-FIX (v.a. Akku-leer-Pfad): Bei fast leerem Akku konkurriert der energiehungrige
@@ -1105,15 +1093,13 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             Platform::prepareToSleep();
             #endif
-            #if not defined(BOARD_RAK4630)
-                #if defined(WP_DISP)
-                esp_deep_sleep_start();
-                #else
-                // Issue 962 / Option A: every other ESP32 board -- radio to
-                // sleep, display off, PMU LoRa/GPS rails off, button wake
-                // armed, then esp_deep_sleep_start(). See esp32_sleep.cpp.
-                esp32EnterDeepSleep();
-                #endif
+            #if defined(WP_DISP)
+            esp_deep_sleep_start();
+            #else
+            // Issue 962 / Option A: every other ESP32 board -- radio to
+            // sleep, display off, PMU LoRa/GPS rails off, button wake
+            // armed, then esp_deep_sleep_start(). See esp32_sleep.cpp.
+            esp32EnterDeepSleep();
             #endif
         #endif
 
