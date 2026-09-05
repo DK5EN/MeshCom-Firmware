@@ -18,6 +18,8 @@
 #include <maxhop.h>         // CS-02: drop-down values for the text hop limit
 #include <config_json.h>   // CS-03: config download/upload as one JSON object
 #include <ArduinoJson.h>    // JSN-01: call_function()/setparam()/getparam() JSON escaping
+#include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
+#include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -853,7 +855,7 @@ void deliver_scaffold(bool bget_password)
     // this function is used for login and logout
     web_client.println("function login(pwd){var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){window.location.reload(true);}};xhttp.open(\"GET\",\"?nodepassword=\"+pwd,true);xhttp.send();}\n");
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;mcRenderQueue();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     // this function is used to send a message from the browser via node to the mesh
     //
     // BP-09: the input fields used to be cleared unconditionally, right after
@@ -880,6 +882,88 @@ void deliver_scaffold(bool bget_password)
 
     // This function is used to toggle a css class so setup cars can collapse / expand
     web_client.println("function togglecard(element){element.parentElement.classList.toggle(\"cardopen\");}");
+
+    // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
+    // and injected with innerHTML, which never runs a <script> tag it carries,
+    // so the rendering logic has to live here in the scaffold instead and be
+    // invoked from loadPage() after each fragment swap (that covers both the
+    // initial page load and the 10s autorefresh). The fragment itself only
+    // emits an empty #mcq div carrying data-* attributes; all markup below is
+    // built from those. JS strings use single quotes and HTML attribute
+    // values are written unquoted (none of them ever contain a space) so
+    // nothing here needs quote-escaping in the C string literals.
+    web_client.println("var mcQueueOpen=true;");
+    web_client.println("function mcQueueToggle(btn){mcQueueOpen=!mcQueueOpen;var b=document.getElementById('mcq');if(b)b.hidden=!mcQueueOpen;if(btn)btn.textContent=mcQueueOpen?'hide':'show';}");
+    web_client.println("function mcRenderQueue(){");
+    web_client.println("var d=document.getElementById('mcq');");
+    web_client.println("if(!d)return;");
+    web_client.println("var p=[0,0,0,0,0,0];");
+    web_client.println("for(var i=1;i<=5;i++){p[i]=parseInt(d.getAttribute('data-p'+i))||0;}");
+    web_client.println("var ring=parseInt(d.getAttribute('data-ring'))||0;");
+    web_client.println("var used=parseInt(d.getAttribute('data-p0'))||0;");
+    web_client.println("var bp=parseInt(d.getAttribute('data-bp'))||0;");
+    web_client.println("var bpname=d.getAttribute('data-bpname')||'';");
+    web_client.println("var qrs=parseInt(d.getAttribute('data-qrs'))||0;");
+    web_client.println("var qrt=parseInt(d.getAttribute('data-qrt'))||0;");
+    web_client.println("var win=parseInt(d.getAttribute('data-win'))||0;");
+    web_client.println("var rx=parseInt(d.getAttribute('data-rx'))||0;");
+    web_client.println("var tx=parseInt(d.getAttribute('data-tx'))||0;");
+    web_client.println("var intv=parseInt(d.getAttribute('data-int'))||300;");
+    web_client.println("var newid=parseInt(d.getAttribute('data-newid'))||0;");
+    web_client.println("var dup=parseInt(d.getAttribute('data-dup'))||0;");
+    web_client.println("var dwin=parseInt(d.getAttribute('data-dwin'))||0;");
+    web_client.println("var age=parseInt(d.getAttribute('data-age'))||0;");
+    web_client.println("var empty=ring-used;");
+    web_client.println("if(empty<0)empty=0;");
+    web_client.println("var qrsPct=ring>0?(qrs/ring*100):0;");
+    web_client.println("var qrtPct=ring>0?(qrt/ring*100):0;");
+    web_client.println("var colors=['#A2182F','#E07B39','#3B7DD8','#6FA96F','#9E9E9E'];");
+    web_client.println("var names=['crit','high','normal','low','bg'];");
+    web_client.println("var html='';");
+    web_client.println("html+='<div class=font-bold>TX ring</div>';");
+    web_client.println("html+='<div class=mcq-barwrap><div class=mcq-bar>';");
+    web_client.println("for(var pr=1;pr<=5;pr++){for(var c=0;c<p[pr];c++){html+='<div class=mcq-cell style=background:'+colors[pr-1]+'></div>';}}");
+    web_client.println("for(var c2=0;c2<empty;c2++){html+='<div class=mcq-cell-empty></div>';}");
+    web_client.println("html+='</div>';");
+    web_client.println("html+='<div class=mcq-tick style=left:'+qrsPct+'%></div>';");
+    web_client.println("html+='<div class=mcq-tick style=left:'+qrtPct+'%></div>';");
+    web_client.println("html+='</div>';");
+    web_client.println("html+='<div class=mcq-ticklabels>';");
+    web_client.println("html+='<span style=position:absolute;left:'+qrsPct+'%;transform:translateX(-50%)>QRS</span>';");
+    web_client.println("html+='<span style=position:absolute;left:'+qrtPct+'%;transform:translateX(-50%)>QRT</span>';");
+    web_client.println("html+='</div>';");
+    web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
+    web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
+    web_client.println("html+='</div>';");
+    web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
+    web_client.println("html+='<div class=font-bold>Back-pressure: <span style=color:'+bpcolor+'>'+bpname+'</span></div>';");
+    web_client.println("html+='<div class=font-small>(QRS at&nbsp;&ge;'+qrs+', QRT at&nbsp;&ge;'+qrt+' of '+ring+')</div>';");
+    web_client.println("if(win==0){");
+    web_client.println("html+='<div class=font-bold>Dedup window: n/a (no completed 5-min window yet)</div>';");
+    web_client.println("}else if(dwin==0){");
+    web_client.println("html+='<div class=font-bold>Dedup window: n/a (no new ids in the last window)</div>';");
+    web_client.println("}else{");
+    web_client.println("var dwc=(dwin<40||dwin>48)?'#E07B39':'inherit';");
+    web_client.println("html+='<div class=font-bold>Dedup window:&nbsp;&asymp;<span style=color:'+dwc+'>'+dwin+'</span> min</div>';");
+    web_client.println("html+='<div class=font-small>('+newid+' new ids, '+dup+' dups in last '+Math.round(intv/60)+' min; safe corridor 40-48 min)</div>';");
+    web_client.println("}");
+    web_client.println("html+='<div class=font-bold>Channel utilisation (last 5 min)</div>';");
+    web_client.println("if(win==0){");
+    web_client.println("html+='<div class=font-small>n/a</div>';");
+    web_client.println("}else{");
+    web_client.println("var rxPct=rx/(intv*1000)*100;if(rxPct>100)rxPct=100;");
+    web_client.println("var txPct=tx/(intv*1000)*100;if(txPct>100)txPct=100;");
+    web_client.println("var totPct=(rx+tx)/(intv*1000)*100;if(totPct>100)totPct=100;");
+    web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>rx '+rxPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+rxPct+'%;background:#3B7DD8></div></div></div>';");
+    web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>tx '+txPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+txPct+'%;background:#A2182F></div></div></div>';");
+    web_client.println("html+='<div class=font-small>total '+totPct.toFixed(1)+'%</div>';");
+    web_client.println("}");
+    web_client.println("html+='<div class=font-small>('+age+' s ago)</div>';");
+    web_client.println("d.innerHTML=html;");
+    web_client.println("var btn=document.getElementById('mcqtogglebtn');");
+    web_client.println("d.hidden=!mcQueueOpen;");
+    web_client.println("if(btn)btn.textContent=mcQueueOpen?'hide':'show';");
+    web_client.println("}");
 
     web_client.println("</script>\n\n");
 
@@ -971,6 +1055,20 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".collapsablecard>div {max-height:0px;-webkit-transition:opacity .15s .0s,max-height .25s .10s;transition:opacity .15s .0s,max-height .25s .10s,margin .0s .50s;	opacity:0.0;overflow:hidden;margin:0px;}\n");
     web_client.println(".cardopen>div {-webkit-transition:opacity .15s .10s,max-height .25s .0s;transition:opacity .15s .10s,max-height .25s .0s;max-height:1000px;opacity:1;margin:7px;}\n");
     web_client.println(".cardopen>span:first-of-type {display:none;}\n");
+
+    // content definitions -> WQ-01 LoRa Queue panel (rxlog page)
+    web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:#fff;border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
+    web_client.println(".mcq-barwrap {position:relative;}\n");
+    web_client.println(".mcq-bar {display:flex;flex-direction:row;gap:1px;height:14px;margin:4px 0 2px 0;}\n");
+    web_client.println(".mcq-cell {flex:1;height:14px;}\n");
+    web_client.println(".mcq-cell-empty {flex:1;height:14px;background:#ECECEC;border:1px solid #d0d0d0;box-sizing:border-box;}\n");
+    web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.5;}\n");
+    web_client.println(".mcq-ticklabels {position:relative;height:12px;font-size:x-small;margin:0 0 8px 0;}\n");
+    web_client.println(".mcq-legend {font-size:x-small;margin:0 0 8px 0;}\n");
+    web_client.println(".mcq-swatch {display:inline-block;width:8px;height:8px;margin:0 3px 0 6px;border-radius:2px;vertical-align:middle;}\n");
+    web_client.println(".mcq-util-row {display:flex;align-items:center;gap:6px;margin:2px 0;}\n");
+    web_client.println(".mcq-util-label {display:inline-block;min-width:60px;}\n");
+    web_client.println(".mcq-util-track {flex:1;height:10px;background:#ECECEC;border-radius:4px;overflow:hidden;}\n");
 
     web_client.println("</style>\n\n");
 
@@ -1129,6 +1227,35 @@ void sub_page_rxlog()
 {
     int iRead = RAWLoRaRead;
     _create_meshcom_subheader("RX Log");
+
+    // WQ-01: LoRa Queue panel. This fragment only carries data-* attributes;
+    // mcRenderQueue() (scaffold JS, see deliver_scaffold()) turns them into
+    // the bars/text, because a <script> tag injected via innerHTML never
+    // runs. stat_last_window_ms == 0 means no 5-min window has completed
+    // since boot -- data-win covers that for the JS side.
+    uint8_t mcqPrio[6] = {0};
+    txRingPrioCounts(mcqPrio);
+    uint32_t mcqDedupWin = setlogDedupWindowMin(stat_last_window.newid, PRIO_STAT_INTERVAL_S, MAX_DEDUP_RING);
+    uint32_t mcqAgeS = 0;
+    if (stat_last_window_ms != 0)
+    {
+        mcqAgeS = (millis() - stat_last_window_ms) / 1000UL;
+    }
+
+    web_client.println("<div class=\"cardlayout mw-600\">");
+    web_client.println("<label class=\"cardlabel\">LoRa Queue</label>");
+    web_client.println("<button id=\"mcqtogglebtn\" class=\"mcq-toggle\" onclick=\"mcQueueToggle(this)\">hide</button>");
+    web_client.printf("<div id=\"mcq\" data-ring=\"%u\" data-p0=\"%u\" data-p1=\"%u\" data-p2=\"%u\" data-p3=\"%u\"\n",
+                       (unsigned int)MAX_RING, (unsigned int)mcqPrio[0], (unsigned int)mcqPrio[1], (unsigned int)mcqPrio[2], (unsigned int)mcqPrio[3]);
+    web_client.printf(" data-p4=\"%u\" data-p5=\"%u\" data-bp=\"%d\" data-bpname=\"%s\" data-qrs=\"%d\" data-qrt=\"%d\"\n",
+                       (unsigned int)mcqPrio[4], (unsigned int)mcqPrio[5], bpCurrentState(), bpStateName(), bpQrsThreshold(), bpRefuseThreshold());
+    web_client.printf(" data-win=\"%d\" data-rx=\"%lu\" data-tx=\"%lu\" data-int=\"%d\" data-newid=\"%lu\"\n",
+                       (stat_last_window_ms != 0) ? 1 : 0, (unsigned long)stat_last_window.rx_ms, (unsigned long)stat_last_window.tx_ms,
+                       (int)PRIO_STAT_INTERVAL_S, (unsigned long)stat_last_window.newid);
+    web_client.printf(" data-dup=\"%lu\" data-dedup=\"%u\" data-dwin=\"%lu\" data-age=\"%lu\"></div>\n",
+                       (unsigned long)stat_last_window.dup, (unsigned int)MAX_DEDUP_RING, (unsigned long)mcqDedupWin, (unsigned long)mcqAgeS);
+    web_client.println("</div>");
+
     web_client.println("<div id=\"content_inner\" class=\"logoutput\">");
     web_client.println("<div style=\"overflow:scroll;\">");
     do
