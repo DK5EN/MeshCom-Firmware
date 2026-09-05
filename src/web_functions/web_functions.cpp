@@ -1242,9 +1242,10 @@ void sub_page_rxlog()
     }
 
     // WQ-01: the card lives inside #content_inner so it shares the 4 % left
-    // margin of the log lines and spans their width (no mw-600 cap).
+    // margin of the log lines; fixed 600 px wide (max-width:100% keeps it on
+    // a phone screen), it does not scale with the page.
     web_client.println("<div id=\"content_inner\" class=\"logoutput\">");
-    web_client.println("<div class=\"cardlayout\" style=\"max-width:none;\">");
+    web_client.println("<div class=\"cardlayout\" style=\"width:600px;max-width:100%;box-sizing:border-box;\">");
     web_client.println("<label class=\"cardlabel\">LoRa Queue</label>");
     web_client.println("<button id=\"mcqtogglebtn\" class=\"mcq-toggle\" onclick=\"mcQueueToggle(this)\">hide</button>");
     web_client.printf("<div id=\"mcq\" data-ring=\"%u\" data-p0=\"%u\" data-p1=\"%u\" data-p2=\"%u\" data-p3=\"%u\"\n",
