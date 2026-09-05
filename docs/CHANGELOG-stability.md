@@ -1296,6 +1296,15 @@ The developer toolbox in `tools/` that grew alongside this work:
     are documented so they are not re-chased: the one-byte-per-loop serial
     reader overruns at a 60 ms command cadence, and a cursor clamped at the
     screen edge reports no activity.
+84. ESP32-S3: Serial prints no longer block the main loop when the USB host
+    is gone (CDC-01). The Arduino core's HWCDC raises its TX timeout to
+    100 ms on the first host read and never lowers it, so after the cable is
+    pulled every print that does not fit the 256 B ring stalls the loop --
+    on the T-Deck the cursor and the touch input froze in the rhythm of the
+    GPS log. The firmware now asks for a zero timeout (drop when full, never
+    block) and a 4 kB TX ring. Proven on DK5EN-14 with loop-gap counters
+    carried across the port-open reset in RTC memory: 7 gaps up to 1.8 s in
+    44 s without the fix, none attributable to prints with it.
 
 ## Thank you
 

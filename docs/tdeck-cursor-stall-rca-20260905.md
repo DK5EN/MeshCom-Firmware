@@ -4,9 +4,47 @@ Operator report (DK5EN-14, build 11:03 with TD-12/TD-13): after new messages
 have arrived and the menu bar was collapsed once, rolling the trackball freezes
 the cursor for a fraction of a second every couple of seconds.
 
-## Verdict
+## Verdict (revised 13:30, after the operator isolated the trigger)
 
-**No regression.** The dead times that were captured are SD map
+**Root cause CDC-01: Serial prints block the main loop once the USB host is
+gone.** On the ESP32-S3 boards `Serial` is the native USB-JTAG/CDC (HWCDC).
+arduino-esp32 2.0.14 (`cores/esp32/HWCDC.cpp`) starts with a TX timeout of
+0, raises it to 100 ms on the first successful host read
+(`hw_cdc_isr_handler`, `initial_empty`) and never lowers it again. With the
+cable pulled or the terminal closed nobody drains the 256 B TX ring, so every
+print that does not fit blocks `write()` for 100 ms per call: the `[BALL]`
+line per cursor step, the four GPS lines every 3 s, `[LOG]` lines. The
+trackball cursor and the touch input freeze in that rhythm because both are
+read from the same main loop. That is exactly the operator's observation:
+"it starts stalling after the USB serial connection is closed".
+
+Fix (`net_console.cpp`, `MeshSerialClass::begin()`, mirrored in
+`esp32_main.cpp` for builds without the net console): `setTxTimeoutMs(0)`
+right after `Serial.begin()` -- the core honours an explicit request
+(`tx_timeout_change_request`) -- plus `setTxBufferSize(4096)` so bench logs
+with a connected host do not lose lines now that a full ring drops instead
+of waiting.
+
+Proof on DK5EN-14 (`tools/bench/tdeck_cdc_unplug.py`, loop-gap counters
+carried across the port-open reset in RTC memory, `[INSTR-PREV]`):
+
+| Build           | Cable away | Loop gaps > 250 ms | Longest gap           |
+| --------------- | ---------- | ------------------ | --------------------- |
+| without the fix | 44 s       | 7                  | 1812 ms               |
+| with the fix    | 33 min     | 1                  | 586 ms, in lvgl (map) |
+
+The one remaining gap is a map recomposition (section lvgl, 470-750 ms
+class), see below -- not a print.
+
+Why the harness could not reproduce it: pausing the host reader
+(`cdc_backpressure` scenario) does not stop macOS from issuing USB IN
+transfers, the driver keeps buffering, and the node never sees a full ring.
+Only a physically absent host does. The scenario stays as a guard for the
+opposite regression (a future core that blocks even with a host present).
+
+## Secondary finding: map recompositions (TD-14)
+
+The dead times captured while the cable was still connected are SD map
 recompositions (`sdmap_refresh()`: tile read from SD plus PNG decode,
 470-750 ms each, main loop blocked, LVGL and cursor frozen). They are the
 known TD-09 cost, triggered on the map tab by:
