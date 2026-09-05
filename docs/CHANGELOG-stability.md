@@ -1,9 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35s.09.03-stability` (2026-09-03), based on official MeshCom
+Release: `v4.35s.09.05` (2026-09-05), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-178 below (item 179 is unreleased, see the
-first section). The full engineering rationale for
+fork's changes, plus items 104-191 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -76,15 +75,17 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased -- on `fork-main` since 2026-09-04, not tagged
+## New in v4.35s.09.05
 
-Item 179: not in any tag, not submitted upstream: operator decision 2026-09-04,
-the change stays private until that is lifted. Item 180 is a plain bug fix for
-an open upstream issue and is meant for the next upstream PR. Installed on the operator's own
-nodes only (`DK5EN-98` over WiFi OTA, `DK5EN-14` over USB, both 2026-09-04).
-Gates: 578 native cases / 12 envs, six board builds; bench on `DK5EN-98`, four
-of five cases (the ring-flood case is still owed on `DK5EN-14`). Rationale and
-evidence: [`docs/node-msg.md`](node-msg.md).
+Tag name without the `-stability` suffix from this release on; the line is
+the same. Items 179-191. Item 179 was held back from publication between
+2026-09-04 and 2026-09-05 by operator decision; the hold was lifted for this
+release. Item 180 is a plain bug fix for an open upstream issue and is meant
+for the next upstream PR. Gates: 591 native cases / 12 envs, all 32 release
+environments. Bench this cycle: `DK5EN-98` (Heltec V3, item 179, four of
+five cases -- the ring-flood case is still owed), `DK5EN-90` (RAK4631,
+item 180), `DK5EN-14` (T-Deck Plus, items 181-185). Rationale and evidence
+for item 179: [`docs/node-msg.md`](node-msg.md).
 
 179. **A node no longer radiates `QRT NOT SENT - QRT NOT SENT - ...` when a
      client feeds its own back-pressure wording back in** (BP-11). A client
@@ -126,6 +127,107 @@ evidence: [`docs/node-msg.md`](node-msg.md).
      are refused with the range message; a stored 2 dBm survives a reboot
      unchanged (the new normalisation touches only the two markers), and 22
      was restored afterwards.
+
+181. T-Deck: the trackball push button no longer fires two LVGL clicks per
+     press. `mouse_read()` reported a one-poll pulse on both the press and the
+     release edge, so the hamburger opened the drawer and closed it again on
+     release, and every one-way button ran twice. The pulse is now emitted on
+     the press edge only (TD-13, `7368539e`). Bench-proven on DK5EN-14: the old
+     logic closed the drawer again on release in 5 of 5 injected clicks, the
+     fix leaves it open in 5 of 5; the bench inject now models press, hold and
+     release so it reproduces what a finger does.
+182. T-Deck: the Send and Save Setting handlers switch back to the message
+     tab without animation. A second press during the 200-400 ms scroll
+     animation killed it half-way (SCROLL_ON_FOCUS deletes the running
+     animation, `LV_DIR_NONE` zeroes the replacement) and the screen froze on
+     a split frame until the next menu tab change (TD-12, `3f6a35d5`).
+183. T-Deck bench: `msg_roll` scenario reproduces the operator's "cursor dead
+     time after messages and menu collapse" sequence and measures it on the
+     device clock (trackball read gaps, main-loop gaps by section, loop
+     average from `--instr` snapshots, SD map rebuilds). Verdict on the
+     message tab: no stall, no slowdown; the captured dead times are SD map
+     recompositions on the map tab (TD-14, TD-09). Two instrument artefacts
+     are documented so they are not re-chased: the one-byte-per-loop serial
+     reader overruns at a 60 ms command cadence, and a cursor clamped at the
+     screen edge reports no activity.
+184. ESP32-S3: Serial prints no longer block the main loop when the USB host
+     is gone (CDC-01). The Arduino core's HWCDC raises its TX timeout to
+     100 ms on the first host read and never lowers it, so after the cable is
+     pulled every print that does not fit the 256 B ring stalls the loop --
+     on the T-Deck the cursor and the touch input froze in the rhythm of the
+     GPS log. The firmware now asks for a zero timeout (drop when full, never
+     block) and a 4 kB TX ring. Proven on DK5EN-14 with loop-gap counters
+     carried across the port-open reset in RTC memory: 7 gaps up to 1.8 s in
+     44 s without the fix, none attributable to prints with it.
+
+185. T-Deck: picking the map tab from the tab bar composed the SD map twice
+     (TD-14). LVGL bubbles the tab button matrix's VALUE_CHANGED up to the
+     tabview, so the tab callback ran once with the bar visible (294x140 px)
+     and once after it collapsed (294x182 px), ~1.3 s with the main loop
+     blocked. The callback now drops the bubbled duplicate, hides the bar
+     before composing, and `sdmap_refresh()` skips a compose whose set, zoom,
+     centre and viewport equal the last one. Every rebuild log line carries a
+     `from=` caller tag. Bench `map_tab_pick`: one 294x182 rebuild, 718 ms
+     loop gap instead of 1337 ms.
+
+186. **Safeboot OTA completion is fail-closed** (TM-49). `Update.hasError()`
+     only turns true when something actively failed; an upload whose
+     connection died before the final frame never ran `Update.end()`, so the
+     completion handler saw no error, treated a partial image as good, set
+     the reboot flag and switched the boot partition. On a 16 MB board the
+     bootloader's slot validation masked it; on a 4 MB single-slot board it
+     could boot a half-written app. `_ota_image_valid`
+     (`src/safeboot/ElegantOTA.{h,cpp}`) is false from `/ota/start` and set
+     true in exactly one place, after `Update.end(true)` with the client MD5
+     and `Update.isFinished()` both confirm; both completion handlers gate
+     the callback, the reboot and the HTTP 200 on that flag and answer 400
+     `incomplete_upload` otherwise, so the node falls back to safeboot's
+     180 s timer. Logged as `[SAFEBOOT];ota;verify;result;ok`. Bench arm on a
+     4 MB board still owed.
+187. **The Extern-UDP `tele` datagram for relayed nodes carries the station
+     pressure under `qfe`** (TLM-04). `sendExtern()` copied the `/F=`
+     pressure altitude in metres into the `qfe` key of the `src_type:"lora"`
+     datagram and never emitted the real `/P=` pressure, so a relayed BME680
+     node showed `"qfe":191` on a dashboard. `qfe` now carries the pressure;
+     the altitude moves to a new key `pressure_alt` (lora shape only, node
+     shape unchanged). The two builders live in `src/extern_tele_json.h`
+     with a native test; `docs/ext_udp_telemetry.md` §6 documents the
+     datagram and the trap on gateways with older firmware.
+188. **Analog input with an unset GPIO no longer floods the log, and the
+     operator is told** (ADC-01). With `--analog on` and `node_analog_pin`
+     left at the default 99, `analogReadRaw(99)` ran every 2 ms and the
+     ESP32 core printed `Pin 99 is not ADC pin!` hundreds of times per
+     second. Sampling is skipped while the pin is 99; `initAnalogPin()`
+     prints an unconditional line when it substitutes the board default,
+     and `--info` and the web status page show `GPIO not set, measurement
+paused`. The persisted setting is never changed behind the operator.
+189. **LoRa queue panel on the web RX-log page** (WQ-01). A collapsible card
+     above the RX log shows the TX ring occupancy per priority, the
+     back-pressure state and its thresholds, the effective dedup window and
+     the last completed 5-minute STAT window (channel utilisation, new-ID
+     and duplicate rate), refreshed with the page every 10 s. Read-only
+     getters in `txring_functions`, `backpressure` and `setlog_lines`; nine
+     native cases. Flash +6.8 kB (Heltec V3), +7.0 kB (RAK4631), RAM
+     unchanged.
+190. **The web messages page shows messages again while a phone is
+     connected, keeps them across refreshes and filters by group.** The
+     page read the BLE ring between the phone cursor and the write cursor;
+     a connected app drains that window within ~100 ms, so the page was
+     always empty (upstream `87c6c200`). It now scans the whole ring oldest
+     first. The browser merges each 10-second refresh into a history keyed
+     by message ID (cap 200), so messages that scrolled out of the 20-slot
+     ring stay visible, and a tab bar (All, `*`, one per configured group,
+     DM) filters by destination and presets the group for the send field.
+     Browser memory only; node RAM unchanged.
+191. **The memory guard in `tools/` now checks the segment that actually
+     overflows** (MEM-03). Upstream CI failed on the merge of PR #1114 with
+     IRAM0 overflowed by 104 bytes on the three `ttgo_tbeam` variants and
+     DRAM0 by 304 bytes on `E22_XML-DevKitC`; our own review had reported
+     "builds green". The guard checked `dram0_0_seg` only and stored
+     PlatformIO's PSRAM-inclusive RAM summary, so a build at 99.98 % of
+     `iram0_0_seg` passed with 10 kB of apparent headroom. It now checks
+     both segments from the map file and fails `--strict` at 20 bytes of
+     IRAM headroom on the same map.
 
 ## New in v4.35s.09.03-stability
 
@@ -1299,47 +1401,6 @@ The developer toolbox in `tools/` that grew alongside this work:
 80. Every finding above is written up in the engineering logs with evidence,
     status, and verification notes — including the claims we investigated and
     **refuted**, so nobody re-chases them (doc 08).
-81. T-Deck: the trackball push button no longer fires two LVGL clicks per
-    press. `mouse_read()` reported a one-poll pulse on both the press and the
-    release edge, so the hamburger opened the drawer and closed it again on
-    release, and every one-way button ran twice. The pulse is now emitted on
-    the press edge only (TD-13, `7368539e`). Bench-proven on DK5EN-14: the old
-    logic closed the drawer again on release in 5 of 5 injected clicks, the
-    fix leaves it open in 5 of 5; the bench inject now models press, hold and
-    release so it reproduces what a finger does.
-82. T-Deck: the Send and Save Setting handlers switch back to the message
-    tab without animation. A second press during the 200-400 ms scroll
-    animation killed it half-way (SCROLL_ON_FOCUS deletes the running
-    animation, `LV_DIR_NONE` zeroes the replacement) and the screen froze on
-    a split frame until the next menu tab change (TD-12, `3f6a35d5`).
-83. T-Deck bench: `msg_roll` scenario reproduces the operator's "cursor dead
-    time after messages and menu collapse" sequence and measures it on the
-    device clock (trackball read gaps, main-loop gaps by section, loop
-    average from `--instr` snapshots, SD map rebuilds). Verdict on the
-    message tab: no stall, no slowdown; the captured dead times are SD map
-    recompositions on the map tab (TD-14, TD-09). Two instrument artefacts
-    are documented so they are not re-chased: the one-byte-per-loop serial
-    reader overruns at a 60 ms command cadence, and a cursor clamped at the
-    screen edge reports no activity.
-84. ESP32-S3: Serial prints no longer block the main loop when the USB host
-    is gone (CDC-01). The Arduino core's HWCDC raises its TX timeout to
-    100 ms on the first host read and never lowers it, so after the cable is
-    pulled every print that does not fit the 256 B ring stalls the loop --
-    on the T-Deck the cursor and the touch input froze in the rhythm of the
-    GPS log. The firmware now asks for a zero timeout (drop when full, never
-    block) and a 4 kB TX ring. Proven on DK5EN-14 with loop-gap counters
-    carried across the port-open reset in RTC memory: 7 gaps up to 1.8 s in
-    44 s without the fix, none attributable to prints with it.
-
-85. T-Deck: picking the map tab from the tab bar composed the SD map twice
-    (TD-14). LVGL bubbles the tab button matrix's VALUE_CHANGED up to the
-    tabview, so the tab callback ran once with the bar visible (294x140 px)
-    and once after it collapsed (294x182 px), ~1.3 s with the main loop
-    blocked. The callback now drops the bubbled duplicate, hides the bar
-    before composing, and `sdmap_refresh()` skips a compose whose set, zoom,
-    centre and viewport equal the last one. Every rebuild log line carries a
-    `from=` caller tag. Bench `map_tab_pick`: one 294x182 rebuild, 718 ms
-    loop gap instead of 1337 ms.
 
 ## Thank you
 

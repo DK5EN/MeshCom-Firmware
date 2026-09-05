@@ -1,9 +1,110 @@
 # Release Notes -- MeshCom Firmware v4.35s
 
-Firmware `4.35s`, `FLASH_VERSION 20260903`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35s`, `FLASH_VERSION 20260905`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35s.09.05 (2026-09-05)
+
+Ab diesem Release traegt der Tag kein `-stability`-Suffix mehr; die Linie und
+ihre Regeln bleiben gleich. Dreizehn Aenderungen des Forks gegenueber
+`v4.35s.09.03-stability`, Changelog-Punkte 179 bis 191. `FLASH_VERSION`
+20260905, `FLASH_STRUCT_VERSION` unveraendert 20260724 -- die Einstellungen
+der Knoten bleiben erhalten. Gates: 591 native Testfaelle in 12
+Host-Umgebungen, alle 32 Release-Umgebungen gebaut.
+
+### Was dazugekommen ist
+
+- **Echo-Sperre fuer die eigene Back-Pressure-Formulierung (BP-11, Punkt
+  179).** Ein angeschlossener Client (App, oder ein zweiter Knoten ueber
+  EXTUDP) konnte die `QRT NOT SENT - <text>`-Quittung des Knotens als neue
+  Nachricht zurueckreichen; der Knoten lehnte erneut ab, stellte erneut das
+  Praefix voran, und nach dem Leerlaufen des Rings ging der Stapel in die
+  Luft. Feldbeleg: fuenf Praefixe tief, neun Frames in drei Sekunden. Der
+  Knoten erkennt seine eigene Formulierung beim Einreichen exakt
+  (`bpIsOwnWording()`, `src/backpressure.h`) und verwirft sie still. Die
+  Veroeffentlichung war vom 04.09. bis 05.09. auf Betreiberentscheidung
+  zurueckgehalten und wurde fuer dieses Release freigegeben. Beleg in
+  `docs/node-msg.md`.
+- **RAK4631 sendet nach Flash-Reset wieder mit 22 dBm (Punkt 180, upstream
+  #1132).** Seit 4.35p ist die Markierung "Leistung nicht gesetzt" -20 statt
+  0; der nRF52-Bootpfad hat sie nie normalisiert, `getPower()` klemmte -20
+  auf 2 dBm, die App zeigte -20. `resolve_tx_power()` in
+  `src/settings_sanitize` bildet beide Markierungen auf die Board-Vorgabe
+  ab; `nrf52setup()` wendet sie vor der Funkkonfiguration an,
+  `sendNodeSetting()` meldet den wirksamen Wert. Native Test mit sechs
+  Faellen.
+- **T-Deck, alle mit Bench-Beleg auf DK5EN-14 (Punkte 181 bis 185):**
+  Trackball-Taste liefert einen LVGL-Click pro Druck statt zwei (TD-13);
+  Send und Save Setting wechseln ohne Animation zurueck auf den
+  Nachrichten-Tab, die halb abgebrochene Animation liess den Bildschirm auf
+  einem geteilten Frame stehen (TD-12); der Karten-Tab komponiert die
+  SD-Karte einmal statt zweimal, 718 ms statt 1337 ms Loop-Luecke (TD-14);
+  das `msg_roll`-Szenario belegt, dass der Nachrichten-Tab keine Totzeit
+  hat, die gemessenen Totzeiten sind SD-Karten-Rekompositionen (TD-14,
+  TD-09).
+- **ESP32-S3 an nativem USB blockiert die Hauptschleife nicht mehr, wenn der
+  USB-Host weg ist (CDC-01, Punkt 184).** Der HWCDC des Arduino-Cores setzt
+  nach dem ersten Host-Read ein 100-ms-Timeout und senkt es nie wieder; nach
+  dem Ziehen des Kabels blockierte jeder Print, der nicht in den
+  256-Byte-Ring passte. Timeout 0 (verwerfen statt warten), 4-kB-Ring.
+  Beleg: 7 Luecken bis 1,8 s in 44 s ohne, keine mit der Aenderung.
+- **Safeboot-OTA schliesst fail-closed ab (TM-49, Punkt 186).** Ein Upload,
+  dessen Verbindung vor dem letzten Frame abbrach, erreichte den
+  Abschluss-Handler ohne Fehlerflag und schaltete die Boot-Partition auf ein
+  halb geschriebenes Image um. `_ota_image_valid` wird an genau einer Stelle
+  gesetzt, nach `Update.end(true)` mit MD5-Pruefung; beide Handler koppeln
+  Callback, Reboot und HTTP 200 daran, sonst 400 `incomplete_upload` und
+  Rueckfall auf den 180-s-Timer des Safeboot.
+- **Extern-UDP `tele`-Datagramm relayter Knoten (TLM-04, Punkt 187):** `qfe`
+  trug die `/F=`-Druckhoehe in Metern statt des `/P=`-Stationsdrucks.
+  `qfe` ist jetzt der Druck, die Hoehe steht unter dem neuen Schluessel
+  `pressure_alt` (nur lora-Form). Builder in `src/extern_tele_json.h`,
+  nativ getestet.
+- **Analogeingang mit ungesetztem GPIO (ADC-01, Punkt 188):** kein
+  `Pin 99 is not ADC pin!`-Sturm mehr, Abtastung pausiert, `--info` und
+  Web-Status sagen `GPIO not set, measurement paused`. Die gespeicherte
+  Einstellung wird nie hinter dem Betreiber geaendert.
+- **Web-GUI (Punkte 189, 190):** Queue-Panel auf der RX-Log-Seite (TX-Ring
+  je Prioritaet, Back-Pressure-Zustand, Dedup-Fenster, letztes
+  STAT-Fenster; Flash +7 kB, RAM unveraendert). Die Nachrichten-Seite liest
+  den ganzen BLE-Ring statt des Telefon-Fensters -- mit verbundener App war
+  sie bisher immer leer --, haelt die Historie im Browser (Limit 200) und
+  filtert ueber Tabs (Alle, `*`, je Gruppe, DM).
+- **Werkzeug (MEM-03, Punkt 191):** der Speicher-Waechter prueft jetzt
+  `iram0_0_seg` und `dram0_0_seg` aus der Map-Datei; bisher sah er nur DRAM
+  und die PSRAM-inklusive Summenzeile, deshalb blieb der IRAM-Ueberlauf von
+  PR #1114 unentdeckt.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **T-Deck Plus (DK5EN-14, Bench):** TD-13 5 von 5 Clicks korrekt mit, 5 von
+  5 falsch ohne die Aenderung; TD-14 `map_tab_pick` ein Rebuild 294x182,
+  718 ms; CDC-01 Loop-Luecken-Zaehler ueber den Port-Open-Reset getragen;
+  TD-12 Tab-Wechsel nach Send/Save friert nicht mehr.
+- **RAK4631 (DK5EN-90, Bench, Build `dfc02801`):** vor der Aenderung
+  `TXPWR 2 dBm`, nach `--cleanflash` und Reboot `RF_POWER: 22 dBm` im
+  Bootlog und `TXPWR 22 dBm` in `--info`; Sweep `--txpower 15/10/5/2` exakt
+  zurueckgelesen, `1`, `0`, `-20` abgelehnt, gespeicherte 2 dBm ueberleben
+  den Reboot.
+- **Heltec V3 (DK5EN-98, Bench und seit 04.09. als Gateway im Betrieb):**
+  Echo-Sperre vier von fuenf Bench-Faellen.
+- **Bauen:** alle 32 Release-Umgebungen, 591 native Testfaelle gruen.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Der Ring-Flut-Fall der Echo-Sperre (fuenfter Bench-Fall) auf DK5EN-14.
+- Der fail-closed-Pfad des Safeboot auf einem 4-MB-Board mit einem
+  abgebrochenen Upload.
+- Die Web-GUI-Aenderungen als gemessener Bench-Arm; sie wurden waehrend der
+  Entwicklung interaktiv benutzt, der Zehn-Minuten-Ringueberlauf aus dem
+  Plan ist nicht gelaufen.
+- T-Beam v1.2 und alle nicht genannten Boards: nur gebaut.
+- Alle aus 09.03 uebernommenen offenen Punkte (GPS-07, `--setlog` auf
+  Hardware, GPS-Vergleichsarme, `--postime 0`, TD-15, MEM-04-Risiko).
 
 ---
 

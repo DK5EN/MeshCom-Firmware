@@ -20,18 +20,25 @@ path.
   unless you add `--cleanup-tag`. Ask the user which of the two they want
   gone before deleting anything.
 - Releases go on the current working branch's HEAD. Do not merge or switch
-  branches for a release.
+  branches for a release. The working branch is `fork-main` (renamed from
+  `v4.35p_prio` on 2026-09-03; the old name survives only as
+  `archive/v4.35p_prio-20260903`). Older docs and RESUME entries that say
+  `v4.35p_prio` mean `fork-main`.
 
 ## Versioning
 
-- Scheme: `v<VER>.MM.DD-stability` (fork stability line), where `<VER>` is
-  the firmware version the tree currently carries -- read it from
-  `SOURCE_VERSION` + `SOURCE_VERSION_SUB` in `src/configuration_global.h`,
-  never from an older tag. The letter follows upstream and changes without
-  notice (4.35p -> 4.35s on 2026-09-03). A second cut on the same day
-  appends `.2`: `v<VER>.MM.DD.2-stability` (precedents:
-  v4.35p.08.27.2-stability, v4.35p.07.24.2). Ask the user for the tag name
-  if there is any ambiguity (same-day re-release vs. replace-in-place).
+- Scheme: `v<VER>.MM.DD` (no suffix -- the `-stability` suffix was dropped
+  on 2026-09-05; every tag up to and including `v4.35s.09.03-stability`
+  carries it, nothing newer does), where `<VER>` is the firmware version the
+  tree currently carries -- read it from `SOURCE_VERSION` +
+  `SOURCE_VERSION_SUB` in `src/configuration_global.h`, never from an older
+  tag. The letter follows upstream and changes without notice (4.35p ->
+  4.35s on 2026-09-03). A second cut on the same day appends `.2`:
+  `v<VER>.MM.DD.2` (precedents: v4.35p.08.27.2-stability, v4.35p.07.24.2).
+  Ask the user for the tag name if there is any ambiguity (same-day
+  re-release vs. replace-in-place).
+- The GitHub release title is the bare tag name. The release-notes headings
+  and the `## New in <tag>` changelog sections use the bare tag too.
 - `FLASH_VERSION` in `src/configuration_global.h`: bump to the release date
   (`YYYYMMDD`) for a new-day release; for a same-day `.2` cut it **stays**
   (08.27.2 precedent). It is purely informative since 3a31317b.
@@ -60,7 +67,7 @@ Then: `npx --yes prettier@3 --write release-notes.md release.md docs/CHANGELOG-s
 
 ## Step 2 — Gates (all must be green before tagging)
 
-Full native suite, 12 host envs (baseline 445 cases as of 08.31.2 — the
+Full native suite, 12 host envs (baseline 591 cases as of 09.05 — the
 count in release-notes.md must match reality):
 
 ```
