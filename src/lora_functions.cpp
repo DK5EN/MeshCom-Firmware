@@ -366,7 +366,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
         if(itxcheck >= 0)
         {
-            if(bAckInfo || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
+            if((bAckInfo && ackMsgIdFromNode(msg_id, _GW_ID)) || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
             {
                 uint8_t phone_buff[ACK_PHONE_MAX_LEN];
                 uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
@@ -841,7 +841,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
             if(icheck >= 0) // own msg_id
             {
-                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
+                if(msg_type_b_lora == MSG_TYPE_TEXT && ((bAckInfo && ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID)) || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
                 {
                     uint16_t plen = buildAckPhoneFrame(print_buff, aprsmsg.msg_id, 0x00, aprsmsg.msg_source_last.c_str());
 

@@ -63,6 +63,20 @@ static inline uint32_t ackWireHash(const uint8_t *payload)
     return ((uint32_t)payload[12] | ((uint32_t)payload[13] << 8) | ((uint32_t)payload[14] << 16)) & 0x3FFFFF;
 }
 
+/**
+ * @brief Stammt die msg_id von diesem Node? Eigene msg_ids sind
+ *        ((GW_ID & 0x3FFFFF) << 10) | counter, siehe loop_functions.cpp.
+ *
+ * own_msg_id[] enthaelt auch Frames, die der Node nur weitergeleitet hat
+ * (Gateway-Uplink, Relay). Ohne diese Pruefung wuerde --ackinfo fuer jede
+ * fremde, weitergeleitete Meldung bei jedem Repeat ein Heard zur App legen
+ * (Bench 2026-09-05: DK8VW-99, DL9PN-1, DM3KS-12 auf DK5EN-98).
+ */
+static inline bool ackMsgIdFromNode(uint32_t msgId, uint32_t gwId)
+{
+    return (msgId >> 10) == (gwId & 0x3FFFFF);
+}
+
 /** @brief Zeichensatz des Rufzeichen-Anhangs: [A-Z0-9-]. */
 static inline bool ackAttrCallChar(char c)
 {

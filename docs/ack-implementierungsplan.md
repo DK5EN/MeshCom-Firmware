@@ -200,3 +200,24 @@ nur gegen einen Same-Base-Build vergleichen.
 
 Ein Wave, ein Autor, keine Subagenten noetig: alle Aenderungen liegen in sechs Dateien und
 haengen sequentiell voneinander ab. Groessenordnung 150 Zeilen Firmware, 200 Zeilen Tests.
+
+## 7. Bench-Protokoll 2026-09-05
+
+Nodes: DK5EN-98 (Heltec V3, Gateway, McApp per BLE verbunden) und DK5EN-14 (T-Deck Plus, fuer
+den Test `--mesh on`, danach zurueck auf off). Beide per WiFi-OTA geflasht. Instrument: Konsole
+Port 2323 mit `--setinfo on`, McApp-Ledger `GET /api/messages/<id>/acks`.
+
+| Fall                             | Beleg                                                                                             | Ergebnis          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------- |
+| App-Gate ohne Zutun              | 98 meldet nach jedem Reboot `ackinfo on`, gesetzt von McApps Post-Connect-Burst; 14 ohne App: off | ok                |
+| Node ACK mit Rufzeichen          | `HEARD from <DK5EN-98,DK5EN-14> to Phone 41 1AE1E22C 00 08`, n = 8                                | ok                |
+| Peer ACK (DM 98 -> 14)           | Ledger 1AE1E224: `{"kind":"peer","from":"DK5EN-14"}`                                              | ok                |
+| Liste "wer hat gehoert"          | Ledger 1AE1E221: node von DK5EN-14, DB0ED-99, DL2JA-2                                             | ok                |
+| Gateway ACK ohne Rufzeichen      | Ledger 1AE1E229: `{"kind":"gateway","from":null}`, zwei `ACK to Phone .. 01 00` mit Flag          | ok, Stufe 4 offen |
+| Fremde weitergeleitete Meldungen | vor dem Nachtrag: Heard bei jedem Repeat (DK8VW-99, DL9PN-1); danach nur noch das erste (legacy)  | behoben           |
+
+Nachtrag aus dem Bench: `own_msg_id[]` enthaelt auch weitergeleitete fremde Frames. Die
+Flag-Freigabe ist deshalb auf eigene msg_ids beschraenkt (`ackMsgIdFromNode()`,
+`(msg_id >> 10) == GW_ID`), das Legacy-Verhalten (erstes Heard auch fuer fremde) bleibt.
+
+Vorfall: Ein Testtext ging als Broadcast `*` raus (x1AE1E227). Seitdem nur Gruppe 9/9999 oder DM.

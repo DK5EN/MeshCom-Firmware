@@ -173,6 +173,28 @@ void test_status_landet_in_byte5(void)
 void setUp(void) {}
 void tearDown(void) {}
 
+// ---------------------------------------------------------------------------
+// ackMsgIdFromNode(): eigene msg_id vs. weitergeleitete
+// ---------------------------------------------------------------------------
+
+void test_msgid_vom_eigenen_node_wird_erkannt(void)
+{
+    uint32_t gw = 0x12345678;
+    uint32_t own = ((gw & 0x3FFFFF) << 10) | 0x123;
+    TEST_ASSERT_TRUE(ackMsgIdFromNode(own, gw));
+    TEST_ASSERT_TRUE(ackMsgIdFromNode(((gw & 0x3FFFFF) << 10) | 0x3FF, gw));
+}
+
+void test_msgid_fremder_node_wird_abgelehnt(void)
+{
+    uint32_t gw = 0x12345678;
+    // Bench 2026-09-05: DK5EN-98 (1AE1E221) gegen fremde 134EF38A / A1BD804D
+    TEST_ASSERT_FALSE(ackMsgIdFromNode(0x134EF38A, gw));
+    TEST_ASSERT_TRUE(ackMsgIdFromNode(0x1AE1E221, 0x1AE1E221 >> 10));
+    TEST_ASSERT_FALSE(ackMsgIdFromNode(0xA1BD804D, 0x1AE1E221 >> 10));
+    TEST_ASSERT_FALSE(ackMsgIdFromNode(0, gw));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -192,6 +214,9 @@ int main(int, char **)
     RUN_TEST(test_hash_token_h3a5f21_wird_akzeptiert);
 
     RUN_TEST(test_status_landet_in_byte5);
+
+    RUN_TEST(test_msgid_vom_eigenen_node_wird_erkannt);
+    RUN_TEST(test_msgid_fremder_node_wird_abgelehnt);
 
     return UNITY_END();
 }
