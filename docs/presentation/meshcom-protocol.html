@@ -2448,7 +2448,7 @@ Quittung: <b>{987</b> angehängt</pre>
         <thead><tr><th>Stufe</th><th>Inhalt</th><th>Ändert Verhalten?</th></tr></thead>
         <tbody>
           <tr><td class="m">0</td><td>Nur beobachten: Wichtigkeit rechnen und loggen</td><td><span class="tag t-ok">nein</span></td></tr>
-          <tr><td class="m">0.5</td><td>Duplikatspeicher <b>nicht</b> vergrößern, sondern nach Zeit altern lassen. Die Messung über 48 Knotenstunden zeigt: 100 Einträge reichen, ab 500 verwirft der Ring echte Nachrichten.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
+          <tr><td class="m">0.5</td><td>Duplikatspeicher bleibt bei 100 Einträgen, das reicht (gemessen über 48 Knotenstunden). Stattdessen nach Zeit altern lassen statt nach Anzahl.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
           <tr><td class="m">S</td><td>Sturmschutz: Rate-Limit je Quelle. Der Rückstau zum eigenen Absender (QRS/QRT/QTA, Quittung je verlorener Nachricht) ist seit v4.35p.09.02 ausgeliefert; das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
           <tr><td class="m">1a</td><td>Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
           <tr><td class="m">1b</td><td>Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
