@@ -5,7 +5,8 @@ running McApp v2.0.3-dev.1. Follow-up to `docs/ack-wer-hat-quittiert.md` and com
 `fbadd2bb` ("--ackinfo lifts the first-only gates for own msg_ids only").
 
 Reviewed and corrected 2026-09-05 (relay claim, snippet/prose mismatch, peer-site inventory);
-fix implemented in the same commit as this revision.
+fix implemented in the same commit as this revision (`b2336e6f`), flashed to DK5EN-98 and
+DK5EN-14 over WiFi OTA 2026-09-05 20:02. Manual McApp verification by the operator pending.
 
 ## 1. Summary
 

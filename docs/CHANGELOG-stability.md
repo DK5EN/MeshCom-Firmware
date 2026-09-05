@@ -2,7 +2,8 @@
 
 Release: `v4.35s.09.05` (2026-09-05), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-191 below. The full engineering rationale for
+fork's changes, plus items 104-191 below; items 192-194 are on `fork-main`
+and not yet in a release. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -74,6 +75,55 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## Unreleased on `fork-main` since v4.35s.09.05
+
+Items 192-194, committed 2026-09-05 evening, flashed to `DK5EN-98` (Heltec V3
+gateway) and `DK5EN-14` (T-Deck Plus) over WiFi OTA the same evening. Not in a
+tagged release yet. Item 193 is a candidate for the next upstream PR on its
+own; items 192 and 194 wait for the McApp side to settle.
+
+192. **ACK frames to the phone carry the callsign of the station that
+     acknowledged** (stages 1 and 3 of
+     [`docs/ack-implementierungsplan.md`](ack-implementierungsplan.md)). The
+     BLE status frame gains a length byte at byte 6 and up to 10 characters
+     `[A-Z0-9-]` after it; when the callsign is unknown the frame is
+     byte-identical to before, so the official app is unaffected. Node ACK
+     (heard) carries the last hop, Peer ACK the partner, Gateway ACK stays
+     anonymous until the wire appendix (stage 4) ships. `handleACK()`
+     tolerates and relays a 15-byte ACK with a 22-bit node hash and builds
+     the phone frame explicitly instead of forwarding wire byte 11. New
+     volatile session flag `--ackinfo on|off` (reset on every BLE
+     disconnect, McApp sets it on connect) lifts the first-only gates so
+     every relaying neighbour produces its own heard frame; the lift applies
+     to msg_ids this node minted only (`ackMsgIdFromNode()`). Pure header
+     `src/ack_attribution.h`, 18 native cases (`test_ack_validate`,
+     `test_ack_phone_frame`). Bench protocol in the plan doc section 7.
+     Commits `09e6f274`, `fbadd2bb`.
+193. **A gateway no longer sends heard and gateway-ACK status frames to the
+     phone for messages it only forwarded from the server** (ACK-01). On a
+     gateway `own_msg_id[]` also holds the msg_ids of foreign messages pulled
+     from the server and put on LoRa; the legacy first-frame branch at both
+     emit sites in `lora_functions.cpp` then sent one status frame with a
+     foreign msg_id to the phone as soon as a neighbour relayed it. The
+     official app has no bubble for such an id and dropped it; McApp booked
+     roughly 150 `send_success` rows per day for messages nobody on that
+     phone had sent. Only the BLE emit is now origin-gated; the outer
+     condition and the heard/ACK state writes are unchanged, so the web
+     RX-log ticks survive and own messages behave identically in every
+     `--ackinfo` combination. Gateway-only: the pure LoRa relay path never
+     inserts into `own_msg_id[]`. Evidence, decision and bench plan:
+     [`docs/ack-heard-foreign-msgids-fix.md`](ack-heard-foreign-msgids-fix.md).
+     Commit `b2336e6f`.
+194. **The QRS marker in the LoRa queue panel forecasts where the operator's
+     next messages would actually raise QRS** (WQ-02). The card drew QRS at
+     the fixed line (depth 5), but the notice fires only on the third own
+     message that lands at or above that line, and the ring depth also
+     counts relay, ACK and beacon frames. `BackPressure::qrsForecastDepth()`
+     returns `max(line + remaining - 1, depth + remaining)`, clamped at the
+     QRT threshold; the solid tick and label follow it, the fixed line stays
+     as a faint tick, and the caption names both. A snapshot at page render,
+     stated as such. Five native cases. Commit `b1cc8cd5`.
 
 ## New in v4.35s.09.05
 

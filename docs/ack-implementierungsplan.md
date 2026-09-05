@@ -216,8 +216,18 @@ Port 2323 mit `--setinfo on`, McApp-Ledger `GET /api/messages/<id>/acks`.
 | Gateway ACK ohne Rufzeichen      | Ledger 1AE1E229: `{"kind":"gateway","from":null}`, zwei `ACK to Phone .. 01 00` mit Flag          | ok, Stufe 4 offen |
 | Fremde weitergeleitete Meldungen | vor dem Nachtrag: Heard bei jedem Repeat (DK8VW-99, DL9PN-1); danach nur noch das erste (legacy)  | behoben           |
 
-Nachtrag aus dem Bench: `own_msg_id[]` enthaelt auch weitergeleitete fremde Frames. Die
+Nachtrag aus dem Bench (`fbadd2bb`): `own_msg_id[]` enthaelt auf einem Gateway auch fremde
+msg_ids, die nur vom Server zum LoRa-Funk weitergeleitet wurden (`insertOwnTx` in
+`udp_functions.cpp` / `nrf_eth.cpp`; der reine LoRa-Relay-Pfad fuegt nie ein). Die
 Flag-Freigabe ist deshalb auf eigene msg_ids beschraenkt (`ackMsgIdFromNode()`,
-`(msg_id >> 10) == GW_ID`), das Legacy-Verhalten (erstes Heard auch fuer fremde) bleibt.
+`(msg_id >> 10) == GW_ID`).
+
+Zweiter Nachtrag (`b2336e6f`, ACK-01): das Legacy-Verhalten "erstes Heard und erstes Gateway-ACK
+auch fuer fremde msg_ids" war kein Feature, sondern derselbe Fehler eine Stufe frueher -- die
+offizielle App hat keine Blase fuer eine msg_id, die sie nie gesendet hat, McApp buchte daraus
+rund 150 falsche `send_success`-Zeilen pro Tag. Beide Emit-Stellen senden den BLE-Frame jetzt nur
+noch fuer eigene msg_ids; Zustandsmaschine und Web-rxlog-Haken unveraendert. Beleg, Entscheidung
+und Bench-Plan: `docs/ack-heard-foreign-msgids-fix.md`. Nachweis manuell ueber McApp
+(Operator-Entscheidung, keine neuen automatischen Tests).
 
 Vorfall: Ein Testtext ging als Broadcast `*` raus (x1AE1E227). Seitdem nur Gruppe 9/9999 oder DM.

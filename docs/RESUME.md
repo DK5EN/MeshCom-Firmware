@@ -1,5 +1,21 @@
 # RESUME — pick up here
 
+## 2026-09-05 (late evening): ACK attribution live, ACK-01 fixed, WQ-02, 98 + 14 flashed
+
+All on `fork-main`, pushed; HEAD `b2336e6f` plus this docs commit. Changelog items 192-194 under
+a new "Unreleased" heading, no tag. ACK attribution stages 1+3 (`09e6f274`, `fbadd2bb`) are on
+the air between DK5EN-98 and McApp; bench protocol in `ack-implementierungsplan.md` §7. The bench
+found `ACK-01`: a gateway sent one heard and one gateway-ACK frame per forwarded foreign message
+to the phone (legacy first-frame branch not origin-gated, gateway-only because only the
+server-to-LoRa forward inserts into `own_msg_id[]`). Fixed in `b2336e6f` by gating only the BLE
+emit; state writes and web rxlog ticks untouched. **Operator verifies manually in McApp** (query
+in `ack-heard-foreign-msgids-fix.md` §6: zero foreign ledger rows after 30 min of group traffic
+on 98; own messages still get gateway ACK + one heard per relay). `WQ-02` (`b1cc8cd5`): QRS tick
+in the queue panel forecasts the depth at which the next own messages raise QRS. Flashed via
+`tools/webflash.py`: 98 build 20:02:05, 14 build 20:02:51 (both OTA, no USB attached). Open: ACK
+stage 4 (wire hash appendix), R5 heard cap, UDP peer-ACK 0x01-without-match quirk (noted, not
+filed), WQ-02 not yet eyeballed in Chrome. 93/92/90 not flashed with these commits.
+
 ## 2026-09-05 (evening): v4.35s.09.05 published, 39 assets, tag a60905d6
 
 Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.05>, marked
