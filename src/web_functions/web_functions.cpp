@@ -929,8 +929,8 @@ void deliver_scaffold(bool bget_password)
     web_client.println("html+='<div class=mcq-tick style=left:'+qrtPct+'%></div>';");
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-ticklabels>';");
-    web_client.println("html+='<span style=position:absolute;left:'+qrsPct+'%;transform:translateX(-50%)>QRS</span>';");
-    web_client.println("html+='<span style=position:absolute;left:'+qrtPct+'%;transform:translateX(-50%)>QRT</span>';");
+    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrsPct+'%;transform:translateX(-50%)>QRS</span>';");
+    web_client.println("html+='<span class=font-small style=position:absolute;left:'+qrtPct+'%;transform:translateX(-50%)>QRT</span>';");
     web_client.println("html+='</div>';");
     web_client.println("html+='<div class=mcq-legend>'+used+'/'+ring+' queued&nbsp;|&nbsp;';");
     web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
@@ -1259,7 +1259,9 @@ void sub_page_rxlog()
     web_client.println("<div style=\"overflow:scroll;\">");
     do
     {
-        web_client.printf("<p class=\"font-small no-wrap\"><%i>%s</nobr></td></tr>\n", iRead, ringbufferRAWLoraRX[iRead]);
+        // WQ-01: normal text size (was font-small) -- the page uses three sizes only:
+        // title, normal (log lines, panel text), small (legend, notes, tick labels).
+        web_client.printf("<p class=\"no-wrap\"><%i>%s</p>\n", iRead, ringbufferRAWLoraRX[iRead]);
         iRead = increment_mod(iRead, MAX_LOG);
     } while (RAWLoRaRead != iRead);
     web_client.println("</div></div>");
