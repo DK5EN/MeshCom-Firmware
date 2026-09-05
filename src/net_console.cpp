@@ -222,7 +222,26 @@ static void authTask(void* arg)
 
 
 // ── MeshSerialClass ───────────────────────────────────────────────────────────
-void MeshSerialClass::begin(unsigned long baud) { s_hwSerial.begin(baud); }
+void MeshSerialClass::begin(unsigned long baud)
+{
+    s_hwSerial.begin(baud);
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // CDC-01 (2026-09-05, DK5EN-14): on the S3 boards s_hwSerial is the
+    // native USB-JTAG/CDC (HWCDC). arduino-esp32 2.0.14 raises its TX
+    // timeout from 0 to 100 ms on the first successful host read and never
+    // lowers it again, so once the cable is pulled or the terminal closed,
+    // every print that does not fit the 256 B ring buffer blocks the main
+    // loop for 100 ms -- [BALL] per cursor step, GPS lines every 3 s, [LOG]
+    // lines -- and the trackball cursor and the touch input freeze in that
+    // rhythm. Asking for 0 explicitly is honoured by the core
+    // (tx_timeout_change_request) and means "drop when full, never block".
+    // The larger TX ring keeps bench logs intact under a connected host:
+    // bursts (--redrawlog) that used to wait 100 ms for room now need the
+    // room to exist. Bench proof: tdeck_harness.py --scenario cdc_backpressure.
+    s_hwSerial.setTxBufferSize(4096);
+    s_hwSerial.setTxTimeoutMs(0);
+#endif
+}
 int  MeshSerialClass::available()               { return s_hwSerial.available(); }
 int  MeshSerialClass::read()                    { return s_hwSerial.read(); }
 int  MeshSerialClass::peek()                    { return s_hwSerial.peek(); }
