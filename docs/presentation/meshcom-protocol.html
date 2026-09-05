@@ -2428,17 +2428,12 @@ Quittung: <b>{987</b> angehängt</pre>
       Hardware-Gate: nur ESP32-S3 und RAK4631 (~2 kB RAM). Classic-ESP32 hat nach den RAM-Kürzungen vom August nur wenig Luft und bleibt vorerst außen vor.
     </div>
     <div class="note warn">
-      <b>Advisor-geprüft, ehrlich benannt.</b> Ein unabhängiger adversarialer Review fand 1 Blocker
-      (das geplante Struktur-Versions-Bump hätte die Settings der ganzen Flotte gelöscht) und 7 Major. Alle sind eingearbeitet.
-      Offen bleibt: v1 hält die Outbox nur im RAM (ein Reboot verliert sie und sagt es), und Vertraulichkeit gibt es auf
-      Amateurfunk-Frequenzen nicht. Integrität und Zustellnachweis gibt es.
-    </div>
+      <b>Was das Konzept bewusst offen lässt.</b> Die Outbox lebt in Version 1 nur im RAM: ein Neustart verliert sie und meldet das. Die Einstellungen der Flotte bleiben unangetastet, das Konzept kommt ohne Änderung am Speicherlayout aus. Vertraulichkeit gibt es auf Amateurfunk-Frequenzen nicht, Integrität und Zustellnachweis schon.</div>
   </div>
 
   <div class="note" style="margin-top:.85rem;font-size:.82rem">
     <b>Weiterlesen:</b>
-    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a> ·
-    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/review/advisor-dm-store-and-forward-20260830.md">Advisor-Review (Findings B1, M1–M7)</a>
+    <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.03-stability/docs/concept-dm-store-and-forward.md">Konzept — Store-and-Forward-Outbox</a>
     <span class="cite" style="margin-left:.6rem">Stand 30.08.2026, Entwurf v2.</span>
   </div>
 </div></section>
