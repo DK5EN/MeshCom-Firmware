@@ -956,9 +956,8 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var totPct=(rx+tx)/(intv*1000)*100;if(totPct>100)totPct=100;");
     web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>rx '+rxPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+rxPct+'%;background:#3B7DD8></div></div></div>';");
     web_client.println("html+='<div class=mcq-util-row><span class=mcq-util-label>tx '+txPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+txPct+'%;background:#A2182F></div></div></div>';");
-    web_client.println("html+='<div class=font-small>total '+totPct.toFixed(1)+'%</div>';");
+    web_client.println("html+='<div class=font-small>total '+totPct.toFixed(1)+'% ('+age+' s ago)</div>';");
     web_client.println("}");
-    web_client.println("html+='<div class=font-small>('+age+' s ago)</div>';");
     web_client.println("d.innerHTML=html;");
     web_client.println("var btn=document.getElementById('mcqtogglebtn');");
     web_client.println("d.hidden=!mcQueueOpen;");
