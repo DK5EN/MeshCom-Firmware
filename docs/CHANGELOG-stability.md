@@ -76,10 +76,11 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased -- local on `fork-main` since 2026-09-04
+## Unreleased -- on `fork-main` since 2026-09-04, not tagged
 
-Not in any tag, not pushed, not submitted upstream: operator decision 2026-09-04,
-the change stays private until that is lifted. Installed on the operator's own
+Item 179: not in any tag, not submitted upstream: operator decision 2026-09-04,
+the change stays private until that is lifted. Item 180 is a plain bug fix for
+an open upstream issue and is meant for the next upstream PR. Installed on the operator's own
 nodes only (`DK5EN-98` over WiFi OTA, `DK5EN-14` over USB, both 2026-09-04).
 Gates: 578 native cases / 12 envs, six board builds; bench on `DK5EN-98`, four
 of five cases (the ring-flood case is still owed on `DK5EN-14`). Rationale and
@@ -101,6 +102,30 @@ evidence: [`docs/node-msg.md`](node-msg.md).
      either way — it already received the one notice that told it the
      message was not sent; a client that keeps echoing the wrong text back
      has its own bug to fix.
+
+180. **A RAK4631 transmits at its 22 dBm default again after a flash reset,
+     and the app shows that value instead of -20 dBm** (upstream
+     [#1132](https://github.com/icssw-org/MeshCom-Firmware/issues/1132)).
+     Since v4.35p the "power not set" marker in the settings is -20 rather
+     than 0 (upstream `50c1ce59`), and the shared `getPower()` no longer maps
+     an unset value to the board default (upstream `546ad011`). The ESP32
+     boot path normalises the marker; the nRF52 path never did. So after a
+     flash reset a RAK kept -20 in flash, reported `TXP -20` to the app, and
+     `getPower()` clamped -20 to the board minimum of 2 dBm, which is what
+     the radio actually used until someone set `--txpower`. A node migrated
+     from the pre-4.35p settings layout carried a 0 and hit the same clamp
+     while the app showed 22. `resolve_tx_power()` (`src/settings_sanitize`)
+     maps both markers to the board default; `nrf52setup()` applies it
+     before the radio is configured, mirroring the ESP32, and
+     `sendNodeSetting()` uses it so the app sees the effective value. Native
+     regression test with six cases. Bench on `DK5EN-90` (RAK4631) with
+     build `dfc02801`, 2026-09-05: before the fix `--info` read
+     `TXPWR 2 dBm`; after `--cleanflash` and reboot the boot log reads
+     `[LoRa]...RF_POWER: 22 dBm` and `--info` `TXPWR 22 dBm`. Sweep
+     `--txpower 15 / 10 / 5 / 2` each read back exactly; `1`, `0` and `-20`
+     are refused with the range message; a stored 2 dBm survives a reboot
+     unchanged (the new normalisation touches only the two markers), and 22
+     was restored afterwards.
 
 ## New in v4.35s.09.03-stability
 
