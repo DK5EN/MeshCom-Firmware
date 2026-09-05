@@ -5884,7 +5884,10 @@ void commandAction(char *umsg_text, bool ble)
 
             if(bAnalogCheck)
             {
-                printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
+                if(meshcom_settings.node_analog_pin <= 0 || meshcom_settings.node_analog_pin >= 99)
+                    printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f (GPIO not set, measurement paused)\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
+                else
+                    printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
                 printfdeb("...Value %.2f V\n", fAnalogValue);
                 printfdeb("");
             }

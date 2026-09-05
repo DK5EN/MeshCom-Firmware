@@ -2733,6 +2733,8 @@ void initAnalogPin()
             ANAGPIO = ANALOG_PIN;
             meshcom_settings.node_analog_pin = ANALOG_PIN;
             save_settings();
+
+            printfdeb("%s [ANALOG] GPIO not set, using board default GPIO %i (--analog gpio N to change)\n", getTimeString().c_str(), ANAGPIO);
         }
 
         pinMode(ANAGPIO, INPUT);

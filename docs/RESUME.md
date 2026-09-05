@@ -6,9 +6,17 @@ Both on `fork-main`, pushed. TLM-04: the Extern-UDP `lora` `tele` datagram now p
 station pressure under `qfe` and the `/F=` pressure altitude under a new key `pressure_alt`;
 builder extracted to `src/extern_tele_json.h`, native test `test_extern_tele_json` registered in
 `[env:native]`, doc note `ext_udp_telemetry.md` §6, write-up §8. Ruled a bug fix, not a contract
-change. ADC: `--analog on` with the unset default pin 99 no longer calls `analogReadRaw(99)` every
-2 ms (`a7208537`); that error flood, fed back through a serial loopback, was what DG2NPE-5 was
-broadcasting as messages. Neither is upstream yet: two PR candidates against DEV.
+change. ADC (`a7208537` + feedback wave, see ADC-01 in BACKLOG): `loop_ADCFunctions()` skips
+sampling while `node_analog_pin` is the unset default 99, and `initAnalogPin()`, `--info` and the
+WebGUI status now say so instead of silently substituting the board default. **Attribution
+corrected the same day:** the DG2NPE-5 field case (a 4.35e E22 broadcasting
+`__analogReadRaw(): Pin 99 is not ADC pin!` lines as messages via a serial loopback) is NOT
+explained by this -- on 4.35e `initAnalogPin()` already replaced 99 by GPIO 32 at boot, the core
+emits that line from any `analogRead(99)`, and current E22 variants have no `ANALOG_PIN` at all
+(upstream dropped it in 4.35p). The message source on that node is unresolved; the loopback
+mechanism (parser needs `::`, own echo recirculates the flood) stands. Open questions to the
+operator: `--analogset` APN value, what hangs on the serial port, does `--analog check off` stop
+it. Neither fix is upstream yet: two PR candidates against DEV.
 
 ## 2026-09-04 morning: TLM-04 filed (superseded, fixed 2026-09-05) — Extern-UDP `tele` `qfe` is an altitude (BLOCKED, Low)
 

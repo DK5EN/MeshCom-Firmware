@@ -1850,7 +1850,12 @@ void sub_page_info()
         web_client.printf("<tr><td>Battery</td><td>%.3fV (%d%%) max %.3fV</td></tr>\n", global_batt / 1000.0, global_proz, meshcom_settings.node_maxv);
     web_client.printf("<tr><td>Settings</td><td>");
     web_client.printf("Gateway: %s<br>", (bGATEWAY ? "on" : "off"));
-    web_client.printf("Analog: %s<br>", (bAnalogCheck ? "on" : "off"));
+    if (!bAnalogCheck)
+        web_client.printf("Analog: off<br>");
+    else if (meshcom_settings.node_analog_pin <= 0 || meshcom_settings.node_analog_pin >= 99)
+        web_client.printf("Analog: on (GPIO not set, measurement paused)<br>");
+    else
+        web_client.printf("Analog: on (GPIO %i)<br>", meshcom_settings.node_analog_pin);
     web_client.printf("Mesh: %s<br>", (bMESH ? "on" : "off"));
     web_client.printf("Routing: %s<br>", (bVIA ? "on" : "off"));
     web_client.printf("Button: %s<br>", (bButtonCheck ? "on" : "off"));
@@ -1928,7 +1933,10 @@ void sub_page_info()
     if (bAnalogCheck)
     {
         web_client.println("<tr><td>Analog</td><td>");
-        web_client.printf("ANALOG GPIO: %i<br>>", meshcom_settings.node_analog_pin);
+        if (meshcom_settings.node_analog_pin <= 0 || meshcom_settings.node_analog_pin >= 99)
+            web_client.printf("ANALOG GPIO: not set (measurement paused)<br>");
+        else
+            web_client.printf("ANALOG GPIO: %i<br>", meshcom_settings.node_analog_pin);
         web_client.printf("Factor: %.4fV<br>", meshcom_settings.node_analog_faktor);
         web_client.printf("Value: %.2fV<br>", fAnalogValue);
         web_client.printf("</td></tr>\n");

@@ -22,8 +22,9 @@ within 4 kB of a link failure on a clean tree. We carry no repairs for the featu
 **2026-09-05:** `TLM-04` **FIXED** on `fork-main` (Extern-UDP `tele` `qfe` for `lora` now carries
 `/P=`, the `/F=` pressure altitude moved to `pressure_alt`; builder extracted to
 `src/extern_tele_json.h`, native test `test_extern_tele_json`). Ruled a bug fix, not a contract
-change. Same day: `--analog on` with the unset default pin 99 no longer hammers `analogReadRaw(99)`
-(`a7208537`, DG2NPE-5 field case).
+change. Same day `ADC-01` (§3.8y): sampling paused while `node_analog_pin` is the unset default 99
+(`a7208537`), plus serial/WebGUI feedback for that state. Attribution to the DG2NPE-5 field case
+withdrawn the same day, see RESUME 2026-09-05.
 
 Previously updated 2026-08-31 afternoon, at the push of `fb32f4ef`. The 3.8o/3.8p intake
 campaign is fully implemented (Waves A/B/C via `/orchestrate-waves`: WEB-01..04, NC-01/02,
@@ -3118,7 +3119,7 @@ Two things worth carrying forward from this pass:
 
 ---
 
-### 3.8y Extern-UDP `tele` reports the barometric altitude as `qfe` — operator report (2026-09-04)
+### 3.8y Extern-UDP `tele` reports the barometric altitude as `qfe` (2026-09-04) and ADC-01 analog GPIO feedback (2026-09-05)
 
 Operator report with the datagram attached: gateway `Primär` forwards `{"src_type":"lora",
 "type":"tele","src":"DM3KS-13",...,"qfe":191,"qnh":0,...}` and the dashboard shows "190,0 hPa".
@@ -3130,9 +3131,10 @@ pressure (`/P=`, parsed into `aprspos.press`) is never written to the datagram. 
 `tele` variant puts a genuine hPa value under the same key. Upstream-identical. MCProxy already
 drops `qfe` for `src_type:"lora"` by key.
 
-| ID     | Type | Sev. | Location                                                                                | Item                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------ | ---- | ---- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TLM-04 | BUG  | Low  | `src/extudp_functions.cpp:600`, `src/loop_functions.cpp:4326`, `src/bme680.cpp:159-161` | **`"qfe"` in the `lora` tele datagram was an altitude, not a pressure.** **FIXED 2026-09-05**: `qfe` ← `aprspos.press` (`/P=`), `/F=` altitude → new key `pressure_alt`, builder extracted to `src/extern_tele_json.h`, native test `test_extern_tele_json` (3 cases). Ruled a bug fix, not a contract change. Doc note for the installed base in `ext_udp_telemetry.md` §6. Write-up `bug-extudp-tele-qfe-20260904.md` §8. |
+| ID     | Type | Sev. | Location                                                                                                                                                              | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------ | ---- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TLM-04 | BUG  | Low  | `src/extudp_functions.cpp:600`, `src/loop_functions.cpp:4326`, `src/bme680.cpp:159-161`                                                                               | **`"qfe"` in the `lora` tele datagram was an altitude, not a pressure.** **FIXED 2026-09-05**: `qfe` ← `aprspos.press` (`/P=`), `/F=` altitude → new key `pressure_alt`, builder extracted to `src/extern_tele_json.h`, native test `test_extern_tele_json` (3 cases). Ruled a bug fix, not a contract change. Doc note for the installed base in `ext_udp_telemetry.md` §6. Write-up `bug-extudp-tele-qfe-20260904.md` §8.                                                                                                                                                                                                                                  |
+| ADC-01 | BUG  | Low  | `src/adc_functions.cpp:68`, `src/loop_functions.cpp` (`initAnalogPin()`), `src/command_functions.cpp` (`--info`), `src/web_functions/web_functions.cpp` (status rows) | **Analog check on with the unset default GPIO 99 was silent.** `initAnalogPin()` substituted the board `ANALOG_PIN` and saved it without telling the operator (message only under `bDEBUG && bDisplayInfo`); a pin that stays 99 (config import) reached `analogReadRaw(99)` every 2 ms and the ESP32 core logged `Pin 99 is not ADC pin!` per read. **FIXED 2026-09-05**: sampling paused while unset (`a7208537`), unconditional serial line on substitution, `--info` and WebGUI show "GPIO not set, measurement paused". No auto-off: the persisted setting is never changed behind the operator's back. Not the DG2NPE-5 cause (see RESUME 2026-09-05). |
 
 ## 3.9 Hardware-Handover nRF52 (RAK4631) — Stand 2026-08-19 00:58
 
