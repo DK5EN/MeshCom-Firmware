@@ -1,6 +1,6 @@
 # TD-14: map recomposed twice when the map tab is picked from the tab bar -- implementation plan
 
-Status: plan, not implemented. Branch: `fork-main`. Scope: `src/t-deck/` only.
+Status: IMPLEMENTED 2026-09-05 (steps 1-5). Outcome: step 1 named the second caller as a second `tabview_event_cb` invocation; the LVGL tab button matrix bubbles its VALUE_CHANGED to the tabview (`lv_tabview.c:233` `LV_OBJ_FLAG_EVENT_BUBBLE`). The callback now drops the bubbled duplicate, hides the bar first, and `sdmap_refresh()` carries the dedupe guard. Bench `map_tab_pick`: 2 rebuilds (140/182 px, 1337 ms gap) before, 1 rebuild (182 px, 718 ms) after. Branch: `fork-main`. Scope: `src/t-deck/` only.
 
 ## Symptom
 

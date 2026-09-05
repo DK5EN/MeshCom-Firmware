@@ -1306,6 +1306,16 @@ The developer toolbox in `tools/` that grew alongside this work:
     carried across the port-open reset in RTC memory: 7 gaps up to 1.8 s in
     44 s without the fix, none attributable to prints with it.
 
+85. T-Deck: picking the map tab from the tab bar composed the SD map twice
+    (TD-14). LVGL bubbles the tab button matrix's VALUE_CHANGED up to the
+    tabview, so the tab callback ran once with the bar visible (294x140 px)
+    and once after it collapsed (294x182 px), ~1.3 s with the main loop
+    blocked. The callback now drops the bubbled duplicate, hides the bar
+    before composing, and `sdmap_refresh()` skips a compose whose set, zoom,
+    centre and viewport equal the last one. Every rebuild log line carries a
+    `from=` caller tag. Bench `map_tab_pick`: one 294x182 rebuild, 718 ms
+    loop gap instead of 1337 ms.
+
 ## Thank you
 
 To the MeshCom maintainers and the ICSSW team: this project is a gift to the

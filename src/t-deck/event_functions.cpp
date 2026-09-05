@@ -897,6 +897,14 @@ void btn_event_handler_zoomout(lv_event_t * e)
 void tabview_event_cb(lv_event_t * e)
 {
     if(lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+        // TD-14: the tab button matrix carries LV_OBJ_FLAG_EVENT_BUBBLE
+        // (lv_tabview.c:233), so its own VALUE_CHANGED bubbles up to `tv`
+        // and this callback fires a second time for the same tab switch --
+        // once with target == tv (from cont_scroll_end_event_cb) and once
+        // with target == the btnmatrix. Keep only the first.
+        if (lv_event_get_target(e) != lv_event_get_current_target(e))
+            return;
+
         int tab_idx = lv_tabview_get_tab_act(tv);
 
         switch (tab_idx)
@@ -921,6 +929,13 @@ void tabview_event_cb(lv_event_t * e)
                     sdmap_lastKnownLon = meshcom_settings.node_lon;
                 }
 
+                // TD-14: hide the tab bar before composing so the single
+                // remaining rebuild already measures the bar-collapsed
+                // viewport (sdmap_refresh calls lv_obj_update_layout itself,
+                // which applies the pending hide). The generic call at the
+                // end of this callback still runs but is then a no-op.
+                tdeck_hide_tab_menu();
+
                 // TD-07: do not yank the view back to the own position on tab
                 // switch while the user has panned -- see tdeck_map_pan(). The
                 // own-position marker still gets repositioned either way (it
@@ -928,7 +943,7 @@ void tabview_event_cb(lv_event_t * e)
                 // refresh_map() only moves marker widgets against whatever
                 // origin the last sdmap_refresh() set, it does not redraw tiles.
                 if (!tdeck_map_user_panned())
-                    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+                    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "tab");
                 refresh_map(meshcom_settings.node_map);
 
                 break;

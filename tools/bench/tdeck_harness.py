@@ -1424,6 +1424,158 @@ def scenario_msg_roll(session: TDeckSession, args: argparse.Namespace) -> Dict[s
     }
 
 
+# --------------------------------------------------------------------------
+# map_tab_pick: TD-14 -- picking the map tab from the tab bar recomposes the
+# SD map twice (bar-visible height, then bar-hidden height)
+# --------------------------------------------------------------------------
+
+# Map tab button in the tab bar: idx 3, spans x 120..160, bar y 27..78
+# (measured on DK5EN-14 with --drawer on).
+MAPTAB_BUTTON_X = (120, 160)
+MAPTAB_BUTTON_Y = (27, 78)
+
+_SDMAP_BUILT_RE = re.compile(
+    r"Karte zusammengesetzt: zoom \d+, Kacheln \d+ \(fehlend \d+\), "
+    r"(\d+)x(\d+) px, (\d+) ms \([^)]*\)(?:\s+from=(\w+))?"
+)
+_SDMAP_SKIPPED_RE = re.compile(
+    r"Karte unveraendert, Aufbau uebersprungen(?:\s+from=(\w+))?"
+)
+
+
+def scenario_map_tab_pick(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-14 (docs/tdeck-map-double-rebuild-plan-20260905.md): picking the map
+    tab from the tab bar with the trackball (as opposed to `--tab 3`, which
+    switches directly) costs two full SD map recompositions back to back --
+    LVGL bubbles the tab button matrix's VALUE_CHANGED up to the tabview
+    (lv_tabview.c:233 LV_OBJ_FLAG_EVENT_BUBBLE), so tabview_event_cb() case 3
+    runs once with the bar visible (294x140 px) and once after the bar
+    collapsed (294x182 px). Both block the main loop (~1.3 s combined [INSTR-LOOP] gap
+    in the lvgl section); cursor and touch freeze for the duration.
+
+    Drives the trackball onto the map tab's bar button (idx 3, x 120..160,
+    y 27..78) and clicks it -- reproducing the operator's actual gesture,
+    not `--tab 3` which bypasses the bar entirely -- then asserts against a
+    reference height taken from a plain `--tab 2` / `--tab 3` switch (bar
+    already hidden, so only the bar-hidden rebuild is possible there).
+    PASS iff: `[TAB];active;3` after the click, exactly one
+    `Karte zusammengesetzt` line since the click, that line's `from` tag is
+    `tab`, and its height equals the reference height.
+
+    Baseline on the unfixed build (as of 2026-09-05): FAILs with exactly two
+    rebuilds, 294x140 then 294x182, and a ~1.3 s lvgl loop gap. Once the fix
+    lands the bubbled duplicate is dropped and the bar is hidden before
+    sdmap_refresh() is called, so only one 294x182 rebuild remains, matching
+    the reference height (measured 2026-09-05: 718 ms lvgl gap).
+    """
+    session.send("--tft on")
+    time.sleep(0.2)
+    session.send("--tab 0")
+    time.sleep(1.5)
+    session.send("--drawer on")
+    session.wait_for(r"\[DRAWER\];1\b", 2.0)
+    time.sleep(0.5)
+    session.send("--ball left 40")
+    time.sleep(0.5)
+    session.send("--ball up 40")  # parks at x=0, y=0 (BALL);x;0;y;0
+    time.sleep(0.5)
+    session.send("--ball right 8")  # BALL_MAX_STEPS_PER_READ=8, one read = 8*10 px
+    time.sleep(0.5)
+    idx_pos = session.length()
+    session.send("--ball right 6")  # -> x=140 (button spans 120..160)
+    time.sleep(0.5)
+    session.send("--ball down 5")  # -> y=50 (bar spans y 27..78)
+    time.sleep(0.5)
+
+    x = y = None
+    for _, _, l in session.records_since(idx_pos):
+        mm = re.search(r"\[BALL\];x;(-?\d+);y;(-?\d+)", l)
+        if mm:
+            x, y = int(mm.group(1)), int(mm.group(2))
+    cursor_ok = (
+        x is not None
+        and y is not None
+        and MAPTAB_BUTTON_X[0] <= x < MAPTAB_BUTTON_X[1]
+        and MAPTAB_BUTTON_Y[0] <= y < MAPTAB_BUTTON_Y[1]
+    )
+    if not cursor_ok:
+        return {
+            "ok": False,
+            "reason": f"cursor_missed: x={x} y={y}, expected "
+            f"{MAPTAB_BUTTON_X[0]}<=x<{MAPTAB_BUTTON_X[1]}, "
+            f"{MAPTAB_BUTTON_Y[0]}<=y<{MAPTAB_BUTTON_Y[1]}",
+            "cursor": {"x": x, "y": y},
+        }
+
+    click_idx = session.length()
+    session.send("--ball click 1")
+    post_click_lines = session.collect(args.maptab_settle_seconds, since=click_idx)
+
+    tlist_idx = session.send("--tab list")
+    m_active = session.wait_for(r"\[TAB\];active;(\d+)", 2.0, since=tlist_idx)
+    tab_active = int(m_active.group(1)) if m_active else None
+    time.sleep(0.3)
+
+    rebuilds: List[Dict[str, Any]] = []
+    sdmap_skipped = 0
+    for l in post_click_lines:
+        m = _SDMAP_BUILT_RE.search(l)
+        if m:
+            rebuilds.append(
+                {
+                    "w": int(m.group(1)),
+                    "h": int(m.group(2)),
+                    "ms": int(m.group(3)),
+                    "from": m.group(4),
+                }
+            )
+            continue
+        if _SDMAP_SKIPPED_RE.search(l):
+            sdmap_skipped += 1
+
+    loop_gaps_lvgl = [
+        int(m.group(1))
+        for l in post_click_lines
+        for m in [re.search(r"\[INSTR-LOOP\][; ]gap[; ]ms[; ](\d+)[; ]in[; ]lvgl", l)]
+        if m
+    ]
+
+    # Reference height: a plain tab switch with the bar already hidden, so
+    # only the bar-hidden rebuild is reachable on that path.
+    session.send("--tab 2")
+    session.collect(1.5)
+    ref_idx = session.length()
+    session.send("--tab 3")
+    ref_lines = session.collect(3.0, since=ref_idx)
+    ref_h = None
+    for l in ref_lines:
+        m = _SDMAP_BUILT_RE.search(l)
+        if m:
+            ref_h = int(m.group(2))
+
+    reason = None
+    if tab_active != 3:
+        reason = f"[TAB];active;{tab_active} after the click, expected 3"
+    elif len(rebuilds) != 1:
+        reason = f"expected exactly one 'Karte zusammengesetzt' line since the click, got {len(rebuilds)}"
+    elif rebuilds[0]["from"] != "tab":
+        reason = f"rebuild from tag is {rebuilds[0]['from']!r}, expected 'tab'"
+    elif ref_h is not None and rebuilds[0]["h"] != ref_h:
+        reason = f"rebuild height {rebuilds[0]['h']} != reference height {ref_h}"
+
+    ok = reason is None
+    return {
+        "ok": ok,
+        "reason": reason,
+        "cursor": {"x": x, "y": y},
+        "tab_active": tab_active,
+        "sdmap_rebuilds": rebuilds,
+        "sdmap_skipped": sdmap_skipped,
+        "ref_h": ref_h,
+        "loop_gaps_lvgl": loop_gaps_lvgl,
+    }
+
+
 def scenario_heap(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     idx0 = session.send("--heap h0")
     m0 = session.wait_for(r"\[INSTR-HEAP\];h0;", 2.0, since=idx0)
@@ -2217,6 +2369,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "displaycmd": scenario_displaycmd,
     "uptime": scenario_uptime,
     "map": scenario_map,
+    "map_tab_pick": scenario_map_tab_pick,
     "nav": scenario_nav,
     "input": scenario_input,
     "msg_roll": scenario_msg_roll,
@@ -2239,6 +2392,7 @@ SCENARIO_ORDER = [
     "screen",
     "disptest",
     "map",
+    "map_tab_pick",
     "nav",
     "input",
     "msg_roll",
@@ -2346,6 +2500,16 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
                 )
                 for x in st:
                     print(f"    {x['call']} {x['km']:6.1f} km @{x['bearing']:3d}: ok={x['ok']}")
+        elif name == "map_tab_pick":
+            if result.get("reason"):
+                print(f"  {result['reason']}")
+            print(
+                f"  cursor={result.get('cursor')}  tab_active={result.get('tab_active')}  "
+                f"ref_h={result.get('ref_h')}  sdmap_skipped={result.get('sdmap_skipped')}  "
+                f"loop_gaps_lvgl={result.get('loop_gaps_lvgl')}"
+            )
+            for rb in result.get("sdmap_rebuilds", []):
+                print(f"    rebuild {rb['w']}x{rb['h']} px, {rb['ms']} ms, from={rb['from']}")
         elif name == "input":
             print(
                 f"  keys={result.get('keys_consumed')}/{result.get('keys_sent')} repaints={result.get('key_repaints')} "
@@ -2456,6 +2620,7 @@ SCENARIO_HELP = {
     "screen": "panel readback probe (void on this hardware) + map content",
     "disptest": "TM-41: colour/geometry sequence, every pushed frame CRC-checked",
     "map": "10 stations at 0.3-400 km, full zoom sweeps, centring, crash watch",
+    "map_tab_pick": "TD-14: map tab picked from the tab bar recomposes the SD map twice (bar-visible then bar-hidden height)",
     "nav": "drawer -> tab -> drawer over all tabs, scroll the settings page",
     "input": "keyboard keys and trackball steps through the LVGL indev chain",
     "heap": "heap delta over N injected messages",
@@ -2574,6 +2739,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--msgroll-msgs", type=int, default=3, help="messages injected between the two rolls in msg_roll (default: 3)")
     p.add_argument("--msgroll-gap-ms", type=int, default=400, help="[BALL] read gap that counts as a stall in msg_roll (default: 400; a SD map recomposition costs 470-750 ms, a clean roll stays under 250)")
     p.add_argument("--input-ball-steps", type=int, default=10, help="trackball steps per direction in the input scenario (default: 10)")
+    p.add_argument("--maptab-settle-seconds", type=float, default=4.0, help="map_tab_pick: seconds collected after the click before checking rebuilds (default: 4.0)")
     p.add_argument(
         "--gps-window", type=float, default=120.0, help="gps_experiment: per-phase capture window seconds (default: 120)"
     )

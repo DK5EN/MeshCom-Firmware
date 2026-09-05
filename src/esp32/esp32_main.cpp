@@ -3265,7 +3265,7 @@ void esp32loop()
                             sdmap_lastKnownLon = meshcom_settings.node_lon;
                         }
 
-                        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+                        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "boundary");
                         refresh_map(meshcom_settings.node_map);
                     }
                 }

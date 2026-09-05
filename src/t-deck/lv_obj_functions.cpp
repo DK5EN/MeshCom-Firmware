@@ -1923,7 +1923,7 @@ void tdeck_map_zoom(int dir)
     }
     if (dir > 0) sdmap_zoom_in();
     else         sdmap_zoom_out();
-    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "zoom");
     refresh_map(meshcom_settings.node_map);
     add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
 }
@@ -1970,7 +1970,7 @@ void tdeck_map_pan(int dxPx, int dyPx)
     // dominating at ~170 ms/tile. Each pan keypress pays this cost; a held
     // key repeats it per repeat event, so it is discrete-step usable but not
     // smooth. Accepted for v1 per operator decision.
-    sdmap_refresh(map_ta, s_map_pan_lat, s_map_pan_lon);
+    sdmap_refresh(map_ta, s_map_pan_lat, s_map_pan_lon, "pan");
     refresh_map(meshcom_settings.node_map);
     // The GPS/own-position marker always tracks the real position, never the
     // pan point (TD-07 requirement: pan must not fight the marker draw).
@@ -2014,7 +2014,7 @@ void tdeck_map_recenter()
         sdmap_lastKnownLat = meshcom_settings.node_lat;
         sdmap_lastKnownLon = meshcom_settings.node_lon;
     }
-    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+    sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "recenter");
     refresh_map(meshcom_settings.node_map);
     add_map_point(meshcom_settings.node_call, sdmap_lastKnownLat, sdmap_lastKnownLon, true);
 }
@@ -2085,7 +2085,7 @@ void set_map(int iMap)
             {
                 double centerLat, centerLon;
                 tdeck_map_view_center(&centerLat, &centerLon);
-                sdmap_refresh(map_ta, centerLat, centerLon);
+                sdmap_refresh(map_ta, centerLat, centerLon, "setmap");
             }
             map_x[iMap] = sdmap_view_w();
             map_y[iMap] = sdmap_view_h();
@@ -3851,7 +3851,7 @@ void tdeck_add_pos_point(String callsign, double u_dlat, char lat_c, double u_dl
         // GPS position above and the marker draw at the call site below, but
         // must not snap the viewport back while the user has panned.
         if (!tdeck_map_user_panned())
-            sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+            sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "beacon");
     }
 
     #endif
