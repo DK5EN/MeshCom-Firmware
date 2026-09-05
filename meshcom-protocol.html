@@ -2114,7 +2114,7 @@ Quittung: <b>{987</b> angehängt</pre>
       <div class="note" style="margin-top:.85rem">
         <b>So wird der Backoff gerechnet:</b><br>
         <code>Basis + Zufall(0…10) × 35 ms</code><br>
-        Ab dem 2. Versuch <code>Basis × 5/6</code>, ab dem 3. <code>Basis × 2/3</code>, ab dem 4. nur noch <b>100 ms Rapid-Fire</b>, bis der Kanal frei ist.
+        Ab dem 2. Versuch <code>Basis × 5/6</code>, ab dem 3. <code>Basis × 2/3</code>, ab dem 4. nur noch <b>100 ms Rapid-Fire</b> ohne Jitter, bis der Kanal frei ist. Der Backoff wird also unter Last <b>aggressiver, nicht defensiver</b>. Ein Jitter auf den Rapid-Fire (<code>100 ms + Zufall(0…3) × 35 ms</code>) ist Teil von Stufe S.
         <div class="cite"><b>lora_functions.cpp:2153-2174</b></div>
       </div>
     </div>
@@ -2129,12 +2129,15 @@ Quittung: <b>{987</b> angehängt</pre>
         <div class="cite"><b>txring_functions.cpp:117-160, 284-354</b> · <b>configuration_global.h:169-201</b></div>
       </div>
 
-      <div class="card hot" style="margin-top:1rem"><h3>Der Kanal ist meistens belegt</h3>
-        <p>Vor jedem Senden prüft CAD den Kanal, bei Belegung ein zweites Mal gegen Fehlalarme. <b>Es gibt keine Obergrenze für CAD-Versuche</b> —
-        eine Nachricht bleibt im Ring, bis der Kanal frei ist. Verworfen wird sie nur durch den vollen Ring oder das Ende ihres Wiederholbudgets.</p>
+      <div class="card hot" style="margin-top:1rem"><h3>Der Kanal ist meistens belegt, und dann wird der Takt schneller</h3>
+        <p>Vor jedem Senden prüft CAD den Kanal, bei Belegung ein zweites Mal gegen Fehlalarme. Ist der Kanal belegt, wartet der Knoten
+        <b>nicht länger, sondern kürzer</b>: Basis, dann 5/6, dann 2/3, ab dem 4. Fehlversuch fix 100 ms ohne Zufallsanteil. Die Zahl der Versuche ist
+        nicht begrenzt (<code>MAX_CAD_WAIT</code> ist definiert, wird aber nirgends gelesen). <b>Das ist der CAD-Sturm:</b> Wird der Kanal frei,
+        feuern alle wartenden Knoten im selben 100-ms-Fenster ineinander, innerhalb der 28-ms-Blindzone des CAD. Eine Nachricht verlässt den Ring
+        nur durch Senden, durch Verdrängung bei vollem Ring, am Ende ihres Wiederholbudgets, oder als HEY-Relay nach 3 Minuten Alter (seit 4.35p.09.02).</p>
         <div class="big" style="margin-top:.8rem">66 %</div>
         <p style="margin-top:.3rem">aller Sendeversuche fanden den Kanal belegt — gemessen an 5 Knoten über 16 h, bis zu 27 CAD-Wiederholungen für ein Paket.</p>
-        <div class="cite">Felddaten „BergLog“ 2026-03-13/14, 856.000 Logzeilen · <b>docs/adr-nc-importance-backoff.md</b></div>
+        <div class="cite">Felddaten „BergLog“ 2026-03-13/14, 856.000 Logzeilen · <b>docs/adr-nc-importance-backoff.md</b> (Risiko-Kapitel, „Rapid-Fire ist ein Konvoi“) · Code: <b>esp32_main.cpp</b> TX-Gate (<code>cad_attempt++</code> nur bei bestätigtem Busy), <b>lora_functions.cpp</b> <code>csma_compute_timeout_prio()</code>, <b>configuration_global.h</b> <code>CSMA_MAX_ATTEMPTS 3</code>, <code>CSMA_RAPID_RX_MS 100</code></div>
       </div>
     </div>
   </div>
