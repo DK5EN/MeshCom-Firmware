@@ -1278,7 +1278,10 @@ The developer toolbox in `tools/` that grew alongside this work:
     press. `mouse_read()` reported a one-poll pulse on both the press and the
     release edge, so the hamburger opened the drawer and closed it again on
     release, and every one-way button ran twice. The pulse is now emitted on
-    the press edge only (TD-13, `7368539e`).
+    the press edge only (TD-13, `7368539e`). Bench-proven on DK5EN-14: the old
+    logic closed the drawer again on release in 5 of 5 injected clicks, the
+    fix leaves it open in 5 of 5; the bench inject now models press, hold and
+    release so it reproduces what a finger does.
 82. T-Deck: the Send and Save Setting handlers switch back to the message
     tab without animation. A second press during the 200-400 ms scroll
     animation killed it half-way (SCROLL_ON_FOCUS deletes the running
