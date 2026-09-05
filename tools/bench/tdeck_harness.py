@@ -95,6 +95,7 @@ class TDeckSession:
         self._lock = threading.Lock()
         self._log_lock = threading.Lock()
         self._stop = threading.Event()
+        self._paused = threading.Event()
         self._reader_thread: Optional[threading.Thread] = None
         self.ser: Optional["serial.Serial"] = None
         self._logf = open(self.log_path, "a", buffering=1, encoding="utf-8")
@@ -170,9 +171,22 @@ class TDeckSession:
 
     # -- reader thread -------------------------------------------------------
 
+    def pause_reader(self, paused: bool) -> None:
+        """Stop (or resume) draining the port. While paused the host side
+        stops issuing USB IN transfers once its driver buffer is full, which
+        is what an unplugged cable or a closed terminal looks like to the
+        node's HWCDC TX path (CDC-01)."""
+        if paused:
+            self._paused.set()
+        else:
+            self._paused.clear()
+
     def _reader_loop(self) -> None:
         assert self.ser is not None
         while not self._stop.is_set():
+            if self._paused.is_set():
+                time.sleep(0.05)
+                continue
             try:
                 raw = self.ser.readline()
             except Exception:
@@ -1136,6 +1150,93 @@ def _instr_delta(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
                 out["sect_avg_us"][name] = int(sus / sn)
                 out["sect_share_pct"][name] = round(100.0 * sus / dus, 1) if dus > 0 else None
     return out
+
+
+# --------------------------------------------------------------------------
+# cdc_backpressure: prints must not block the main loop when nobody reads
+# --------------------------------------------------------------------------
+
+def scenario_cdc_backpressure(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Operator report 2026-09-05 (CDC-01): once the USB serial connection is
+    gone (cable pulled, terminal closed) the trackball cursor and the touch
+    input freeze in regular intervals. arduino-esp32 2.0.14 HWCDC sets its TX
+    timeout to 100 ms on the first successful host read and never takes it
+    back, so every Serial print that does not fit the 256 B ring buffer
+    blocks the main loop for 100 ms per write once the host stops draining.
+    Instrument: keep the port open but stop reading it for --cdc-pause-seconds
+    while the node keeps printing ([BALL] per cursor step under --redrawlog,
+    GPS lines every 3 s). Verdict: no [INSTR-LOOP] gap and no rise of the
+    [INSTR-GAPS] counter during the pause, and the loop average must not
+    grow more than 1.5x against the control roll."""
+    session.send("--tft on")
+    session.send("--tab 0")
+    time.sleep(0.5)
+    session.send("--ball left 40")
+    time.sleep(0.3)
+    session.send("--ball right 8")
+    time.sleep(0.3)
+
+    def roll(seconds: float) -> int:
+        t0 = time.monotonic()
+        k = 0
+        while time.monotonic() - t0 < seconds:
+            session.send(f"--ball {'right' if (k // 4) % 2 == 0 else 'left'} 3")
+            k += 1
+            time.sleep(0.2)
+        return k
+
+    # control: host reads, redraw log on (same print load as the pause phase)
+    session.send("--redrawlog on")
+    time.sleep(0.2)
+    c0 = _instr_snapshot(session)
+    gaps0 = _instr_gap_count(session)
+    idx_c = session.length()
+    roll(args.cdc_control_seconds)
+    time.sleep(0.5)
+    c1 = _instr_snapshot(session)
+    gaps_c = _instr_gap_count(session) - gaps0
+    control = _instr_delta(c0, c1)
+    control_gap_lines = [l.strip()[:120] for _, _, l in session.records_since(idx_c) if re.search(r"\[INSTR-LOOP\][; ]gap", l)]
+
+    # pause: host stops reading, node keeps printing
+    p0 = _instr_snapshot(session)
+    gaps_before = _instr_gap_count(session)
+    idx_p = session.length()
+    session.pause_reader(True)
+    sent = roll(args.cdc_pause_seconds)
+    session.pause_reader(False)
+    time.sleep(3.0)                     # drain the backlog the host held back
+    session.send("--redrawlog off")
+    time.sleep(0.3)
+    p1 = _instr_snapshot(session)
+    gaps_after = _instr_gap_count(session)
+    paused = _instr_delta(p0, p1)
+    pause_gap_lines = [l.strip()[:120] for _, _, l in session.records_since(idx_p) if re.search(r"\[INSTR-LOOP\][; ]gap", l)]
+    gaps_p = gaps_after - gaps_before
+    slowdown = None
+    if control.get("loop_avg_us") and paused.get("loop_avg_us"):
+        slowdown = round(paused["loop_avg_us"] / control["loop_avg_us"], 2)
+    ok = gaps_p == 0 and not pause_gap_lines and (slowdown is None or slowdown < 1.5)
+    return {
+        "ok": ok,
+        "control_gap_count": gaps_c,
+        "control_gap_lines": control_gap_lines[:5],
+        "control_loop_avg_us": control.get("loop_avg_us"),
+        "pause_seconds": args.cdc_pause_seconds,
+        "pause_cmds_sent": sent,
+        "pause_gap_count": gaps_p,
+        "pause_gap_lines": pause_gap_lines[:10],
+        "pause_loop_avg_us": paused.get("loop_avg_us"),
+        "pause_loop_n": paused.get("loop_n"),
+        "loop_slowdown_x": slowdown,
+    }
+
+
+def _instr_gap_count(session: TDeckSession) -> int:
+    idx = session.send("--instr")
+    m = session.wait_for(r"\[INSTR-GAPS\][; ]n[; ](\d+)", 3.0, since=idx)
+    time.sleep(0.2)
+    return int(m.group(1)) if m else -1
 
 
 def _roll_phase(session: TDeckSession, seconds: float, gap_ms: int, cadence_ms: int = 200) -> Dict[str, Any]:
@@ -2119,6 +2220,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "nav": scenario_nav,
     "input": scenario_input,
     "msg_roll": scenario_msg_roll,
+    "cdc_backpressure": scenario_cdc_backpressure,
     "heap": scenario_heap,
     "trim": scenario_trim,
     "gps_experiment": scenario_gps_experiment,
@@ -2140,6 +2242,7 @@ SCENARIO_ORDER = [
     "nav",
     "input",
     "msg_roll",
+    "cdc_backpressure",
     "heap",
     "trim",
     "displaycmd",
@@ -2343,6 +2446,7 @@ SCENARIO_HELP = {
     "boot": "inspect the boot log (version, audio outcome, errors)",
     "idle": "redraw/invalidation rate over an idle window",
     "msg_roll": "cursor stall after injected messages + drawer collapse (operator report 2026-09-05)",
+    "cdc_backpressure": "prints must not block the loop when the host stops reading the USB CDC port (CDC-01)",
     "tabs": "switch through all tabs, repaint per tab",
     "drawer": "open/close the tab drawer three times",
     "inject": "inject messages via --injectmsg, bubble must be drawn",
@@ -2462,6 +2566,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("--map-stations", type=int, default=10, help="foreign stations injected in the map scenario (default: 10; 40 recycles marker slots)")
     p.add_argument("--input-text", default="bench73", help="text typed in the input scenario (default: bench73)")
     p.add_argument("--input-tab", type=int, default=0, help="tab for the trackball part of the input scenario (default: 0; 3 = map)")
+    p.add_argument("--cdc-control-seconds", type=float, default=10.0, help="cdc_backpressure: control roll with the host reading (default: 10)")
+    p.add_argument("--cdc-pause-seconds", type=float, default=25.0, help="cdc_backpressure: roll while the host does not read the port (default: 25)")
     p.add_argument("--msgroll-tab", type=int, default=0, help="tab the msg_roll scenario rolls on (default: 0; 3 = map)")
     p.add_argument("--msgroll-cadence-ms", type=int, default=200, help="ms between --ball commands in msg_roll (default: 200; 60 overruns the 1-byte-per-loop serial reader)")
     p.add_argument("--msgroll-seconds", type=float, default=12.0, help="trackball roll duration per phase in the msg_roll scenario (default: 12)")

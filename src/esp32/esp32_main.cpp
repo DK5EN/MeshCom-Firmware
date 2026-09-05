@@ -640,6 +640,13 @@ void esp32setup()
     ///< um Terminal verbinden zu können
     Serial.begin(MONITOR_SPEED);
     Serial.setTimeout(50);
+
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE && defined(DISABLE_NET_CONSOLE)
+    // CDC-01: without the net-console wrapper Serial is the HWCDC object
+    // itself; the rationale sits at MeshSerialClass::begin() (net_console.cpp).
+    Serial.setTxBufferSize(4096);
+    Serial.setTxTimeoutMs(0);
+#endif
     
 // 1.1.1??   pinMode(45,OUTPUT);
 // 1.1.1??    digitalWrite(45, LOW);
@@ -740,6 +747,9 @@ void esp32setup()
         esp_reset_reason_t rr = esp_reset_reason();
         Serial.printf("[BOOT] RESET_REASON=%d %s\n", (int)rr, resetReasonName(rr));
     }
+#if INSTRUMENT_ENABLED
+    instrument_report_prev_boot();   // CDC-01: loop gaps of the previous boot, from RTC memory
+#endif
 
     lFreeHeap =  ESP.getFreeHeap();
     lFreePsram = ESP.getFreePsram();

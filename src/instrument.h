@@ -58,6 +58,11 @@ void instrument_report_gui(void);
 /** Zero the accumulators. A measurement run starts here. */
 void instrument_reset(void);
 
+/** CDC-01: print the loop-gap evidence of the PREVIOUS boot ([INSTR-PREV],
+ *  kept in RTC memory across a chip reset) and arm the carry for this boot.
+ *  Call once at boot after Serial is up. ESP32 only; no-op elsewhere. */
+void instrument_report_prev_boot(void);
+
 /** TM-13: per-subsystem stall attribution. A section is a named scope in the
  *  main loop (lora_rx, gps, udp, lvgl, ...); its duration is accumulated per
  *  name and reported as [INSTR-SECT], and a loop gap over the threshold names

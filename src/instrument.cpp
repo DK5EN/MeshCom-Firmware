@@ -20,6 +20,7 @@ extern int dbgHeapTotal(void);   // nrf52_main.cpp: __HeapLimit - __HeapBase
 extern int dbgHeapUsed(void);    // mallinfo().uordblks
 #endif
 #include "printfdeb_functions.h"
+#include <string.h>
 
 /* Provided by src/t-deck/lv_obj_functions.cpp, which owns these objects.
  * Only linked for the T-Deck variants -- guarded identically there. */
@@ -48,6 +49,27 @@ static const char  *s_iter_worst_name = NULL;    /* longest section since the la
 static uint32_t     s_iter_worst_us   = 0;
 static uint32_t     s_iter_sect_us    = 0;       /* time inside any section since the last tick */
 static uint32_t     s_gap_reports     = 0;
+
+#if defined(ESP32)
+/* CDC-01 (2026-09-05): a measurement that only shows while the USB host is
+ * away (cable pulled) cannot be read live, and opening the port again resets
+ * the chip. RTC slow memory survives that reset (not a power cycle), so the
+ * loop-gap evidence is mirrored there and reported once at the next boot
+ * ([INSTR-PREV]). Written on every tick: three word stores, negligible. */
+#include <esp_attr.h>
+struct InstrRtcCarry
+{
+    uint32_t magic;
+    uint32_t gaps;
+    uint32_t loop_max_us;
+    uint32_t loop_n;
+    uint32_t up_ms;
+    uint32_t worst_gap_ms;     /* the longest gap above the threshold ... */
+    char     worst_gap_in[12]; /* ... and the section it was attributed to */
+};
+static const uint32_t INSTR_RTC_MAGIC = 0x43444331;   /* 'CDC1' */
+RTC_NOINIT_ATTR static struct InstrRtcCarry s_rtc;
+#endif
 
 void instrument_note_section(const char *name, uint32_t us)
 {
@@ -99,6 +121,26 @@ void instrument_note_loop_tick(void)
         s_loop_us += d;
         if (d > s_loop_max)
             s_loop_max = d;
+#if defined(ESP32)
+        if (s_rtc.magic == INSTR_RTC_MAGIC)
+        {
+            s_rtc.loop_n++;
+            s_rtc.up_ms = now / 1000;
+            if (d > s_rtc.loop_max_us)
+                s_rtc.loop_max_us = d;
+            if (d > INSTR_GAP_REPORT_US)
+            {
+                s_rtc.gaps++;
+                if (d / 1000 > s_rtc.worst_gap_ms)
+                {
+                    s_rtc.worst_gap_ms = d / 1000;
+                    const char *nm = s_iter_worst_name != NULL ? s_iter_worst_name : "unattributed";
+                    strncpy(s_rtc.worst_gap_in, nm, sizeof(s_rtc.worst_gap_in) - 1);
+                    s_rtc.worst_gap_in[sizeof(s_rtc.worst_gap_in) - 1] = '\0';
+                }
+            }
+        }
+#endif
         if (d > INSTR_GAP_REPORT_US)
         {
             /* Attribute the gap: the longest section of that iteration, or
@@ -121,6 +163,26 @@ void instrument_note_loop_tick(void)
     s_iter_sect_us = 0;
 }
 
+void instrument_report_prev_boot(void)
+{
+#if defined(ESP32)
+    /* Raw Serial.printf, not printfdeb: this is a bench marker that must
+     * survive --debug off (see the FL-01 note in tdeck_main.cpp). */
+    if (s_rtc.magic == INSTR_RTC_MAGIC)
+        Serial.printf("[INSTR-PREV];valid;1;gaps;%lu;loop_max_us;%lu;loop_n;%lu;up_ms;%lu;threshold_ms;%lu;worst_ms;%lu;in;%s\n",
+                      (unsigned long)s_rtc.gaps, (unsigned long)s_rtc.loop_max_us,
+                      (unsigned long)s_rtc.loop_n, (unsigned long)s_rtc.up_ms,
+                      (unsigned long)(INSTR_GAP_REPORT_US / 1000),
+                      (unsigned long)s_rtc.worst_gap_ms,
+                      s_rtc.worst_gap_in[0] ? s_rtc.worst_gap_in : "-");
+    else
+        Serial.printf("[INSTR-PREV];valid;0\n");
+    s_rtc.magic = INSTR_RTC_MAGIC;
+    s_rtc.gaps = 0; s_rtc.loop_max_us = 0; s_rtc.loop_n = 0; s_rtc.up_ms = 0;
+    s_rtc.worst_gap_ms = 0; s_rtc.worst_gap_in[0] = '\0';
+#endif
+}
+
 void instrument_reset(void)
 {
     s_flush_n = 0; s_flush_us = 0; s_flush_max = 0;
@@ -131,6 +193,13 @@ void instrument_reset(void)
         s_sect[i].n = 0; s_sect[i].us = 0; s_sect[i].max = 0;   /* keep the name: slot order is stable */
     }
     s_gap_reports = 0;
+#if defined(ESP32)
+    /* CDC-01: the RTC carry starts here too, so an armed measurement does
+     * not include the boot-time gap (WiFi/GPS start, ~3 s). */
+    s_rtc.magic = INSTR_RTC_MAGIC;
+    s_rtc.gaps = 0; s_rtc.loop_max_us = 0; s_rtc.loop_n = 0; s_rtc.up_ms = 0;
+    s_rtc.worst_gap_ms = 0; s_rtc.worst_gap_in[0] = '\0';
+#endif
     printfdeb("[INSTR];reset\n");
 }
 
