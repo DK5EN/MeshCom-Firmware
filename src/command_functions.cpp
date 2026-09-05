@@ -28,6 +28,7 @@
 
 #ifdef ESP32
 #include "esp32/esp32_functions.h"
+#include "esp32/esp32_sleep.h"
 #endif
 
 // Sensors
@@ -1041,20 +1042,14 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"deepsleep") == 0)
     {
-        #if defined(vEXT_CTRL)
-            digitalWrite(VEXT_CTRL, LOW);   // HWT needs this for GPS and TFT Screen
-            digitalWrite(ADC_CTRL, LOW);
-        #endif
-
+        // NB: vEXT_CTRL (dead, no variant defines the lowercase macro) and the
+        // BOARD_HELTEC/_V3/_V4 Vext-off block that used to live here have moved
+        // into esp32EnterDeepSleep() (src/esp32/esp32_sleep.cpp), which the
+        // generic ESP32 branch below now calls. GPS_SWITCH stays here: it also
+        // has to fire on the WP_DISP (Vision Master E213) branch just below,
+        // which is out of scope for this pass and must not change.
         #if defined(GPS_SWITCH)
             digitalWrite(GPS_SWITCH, LOW);   // externes GPS im deepsleep ausschalten, Flashwerte aber für wakeup bestehen lassen
-        #endif
-
-        #if defined(BOARD_HELTEC) || defined(BOARD_HELTEC_V3)
-            printlndeb(F("[INIT]...Disbling Vext for OLED power"));
-            pinMode(Vext, OUTPUT);
-            digitalWrite(Vext, HIGH);   // Vext OFF (active high)
-            delay(50);
         #endif
 
         #if defined(BOARD_HELTEC_T114)
@@ -1111,7 +1106,14 @@ void commandAction(char *umsg_text, bool ble)
             Platform::prepareToSleep();
             #endif
             #if not defined(BOARD_RAK4630)
-            esp_deep_sleep_start();
+                #if defined(WP_DISP)
+                esp_deep_sleep_start();
+                #else
+                // Issue 962 / Option A: every other ESP32 board -- radio to
+                // sleep, display off, PMU LoRa/GPS rails off, button wake
+                // armed, then esp_deep_sleep_start(). See esp32_sleep.cpp.
+                esp32EnterDeepSleep();
+                #endif
             #endif
         #endif
 

@@ -88,6 +88,26 @@
 #include <t-deck/lv_obj_functions.h>
 #endif
 
+// Issue 962 / --deepsleep: RadioLib radio.sleep() for every board where this
+// TU has the real `radio` object in scope (see the #ifdef ladder above).
+// Mirrors the working precedent at src/t5-epaper/peri_lora.cpp:276.
+// WP_DISP boards keep their own Platform::loraToSleep() call instead (see
+// lora_functions.h for why). T-Deck Pro is NOT excluded here: its variant
+// defines SX1262X, and the `SX1262 radio` that extern resolves to is the
+// real global object in esp32_main.cpp (guarded by the same SX1262X), not
+// the unrelated `static` (file-local) radio in src/t-deck-pro/peri_lora.cpp,
+// which is dead scaffolding -- every function body in that file besides the
+// static declarations is commented out, so its local `radio` is never used.
+#if (defined(SX127X) || defined(BOARD_E220) || defined(SX1262X) || defined(SX126X) || \
+     defined(SX1262_E22) || defined(USING_SX1262) || defined(SX1268_E22) || \
+     defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || \
+     defined(BOARD_T5_EPAPER)) && !defined(WP_DISP)
+void loraDeepSleep()
+{
+    radio.sleep();
+}
+#endif
+
                                         // flag to indicate if we are after receiving
 extern unsigned long iReceiveTimeOutTime;
 
