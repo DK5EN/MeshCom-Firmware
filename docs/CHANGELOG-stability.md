@@ -1274,6 +1274,16 @@ The developer toolbox in `tools/` that grew alongside this work:
 80. Every finding above is written up in the engineering logs with evidence,
     status, and verification notes — including the claims we investigated and
     **refuted**, so nobody re-chases them (doc 08).
+81. T-Deck: the trackball push button no longer fires two LVGL clicks per
+    press. `mouse_read()` reported a one-poll pulse on both the press and the
+    release edge, so the hamburger opened the drawer and closed it again on
+    release, and every one-way button ran twice. The pulse is now emitted on
+    the press edge only (TD-13, `7368539e`).
+82. T-Deck: the Send and Save Setting handlers switch back to the message
+    tab without animation. A second press during the 200-400 ms scroll
+    animation killed it half-way (SCROLL_ON_FOCUS deletes the running
+    animation, `LV_DIR_NONE` zeroes the replacement) and the screen froze on
+    a split frame until the next menu tab change (TD-12, `3f6a35d5`).
 
 ## Thank you
 
