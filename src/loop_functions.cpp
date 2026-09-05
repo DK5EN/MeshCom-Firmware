@@ -7,6 +7,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "ack_attribution.h"
 #include "txring_functions.h"
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
@@ -469,6 +470,7 @@ std::atomic<uint32_t> stat_util_tx_5m{0};  // TX-Luftzeit im 5-min-Fenster (ms)
 std::atomic<uint8_t> stat_ring_max{0};
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
+bool bAckInfo = false;     // --ackinfo on: volatile session flag, reset on BLE disconnect, never in flash
 
 // APP Time OK
 bool bPhoneTimeValid = false;
@@ -4126,17 +4128,10 @@ int sendMessage(char *msg_text, int len)
             // set Info message send and Server reached, not on DM
             if(!bDM && (aprsmsg.msg_destination_call == "*" || CheckGroup(strDestinationCall)))
             {
-                uint8_t print_buff[8];
+                uint8_t ack_buff[ACK_PHONE_MAX_LEN];
+                uint16_t plen = buildAckPhoneFrame(ack_buff, aprsmsg.msg_id, 0x01, meshcom_settings.node_call);
 
-                print_buff[0]=0x41;
-                print_buff[1]=aprsmsg.msg_id & 0xFF;
-                print_buff[2]=(aprsmsg.msg_id >> 8) & 0xFF;
-                print_buff[3]=(aprsmsg.msg_id >> 16) & 0xFF;
-                print_buff[4]=(aprsmsg.msg_id >> 24) & 0xFF;
-                print_buff[5]=0x01;     // 0x01 ... server reached
-                print_buff[6]=0x00;     // msg always 0x00 at the end
-
-                addBLEOutBuffer(print_buff, (uint16_t)7);
+                addBLEOutBuffer(ack_buff, plen);
             }
         }
 

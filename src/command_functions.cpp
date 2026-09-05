@@ -878,7 +878,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--relay on/off  mesh relay\n");
             delay(100);
             #endif
-            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n");
+            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n--ackinfo on/off  show who ACKed, not saved to flash\n");
             delay(100);
             printlndeb("--debug csv/man/en/de  debug output format/language\n");
             delay(100);
@@ -2339,6 +2339,32 @@ void commandAction(char *umsg_text, bool ble)
         bReturn = true;
 
         save_settings();
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ackinfo on") == 0)
+    {
+        // fluechtig: nie in meshcom_settings, nie ins Flash, siehe
+        // docs/ack-implementierungsplan.md 3.5
+        bAckInfo=true;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--ackinfo on");
+        }
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ackinfo off") == 0)
+    {
+        bAckInfo=false;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--ackinfo off");
+        }
+
+        return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"gateway pos") == 0)
@@ -5816,8 +5842,8 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...DEBUG %s ...LORADEBUG %s ...GPSDEBUG %s/%i ...SOFTSERDEBUG %s\n...WXDEBUG %s ...BLEDEBUG %s\n",
                 (bDEBUG?"on":"off"), (bLORADEBUG?"on":"off"), (iGPSDEBUG?"on":"off"), iGPSDEBUG, (bSOFTSERDEBUG?"on":"off"),(bWXDEBUG?"on":"off"), (bBLEDEBUG?"on":"off"));
             
-            printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i\n",
-                (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast);
+            printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
+                (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));
 
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             // TD-10: raw-mode verdict of the keyboard controller. "no" or a

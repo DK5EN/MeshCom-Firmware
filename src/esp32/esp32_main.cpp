@@ -3000,6 +3000,7 @@ void esp32loop()
 
         g_ble_uart_is_connected = false;
         isPhoneReady = 0;
+        bAckInfo = false;
         config_to_phone_prepare = false;
         conffin_sent = false;
 

@@ -164,6 +164,7 @@ extern unsigned int msg_counter;
 extern uint8_t RcvBuffer[UDP_TX_BUF_SIZE * 2];
 
 extern uint8_t own_msg_id[MAX_RING][5];
+extern bool bAckInfo;
 
 // TELEMTRY global variables
 extern int iNextTelemetry;

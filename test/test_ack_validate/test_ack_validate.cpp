@@ -22,6 +22,7 @@
 #include <Arduino.h>
 #include <configuration.h>
 #include <ack_functions.h>
+#include <ack_attribution.h>
 
 // ---------------------------------------------------------------------------
 // Hilfsmittel
@@ -186,6 +187,110 @@ void test_nullzeiger_wird_verworfen(void)
 }
 
 // ---------------------------------------------------------------------------
+// Draht-Anhang (ackWireAppendixLen() / ackWireHash(), siehe ack_attribution.h)
+//
+// Der Anhang darf ein ACK niemals kosten: jeder Fall wird zusaetzlich mit
+// isPlausibleAckFrame() geprueft, das Byte 11 gar nicht ansieht.
+// ---------------------------------------------------------------------------
+
+void test_anhang_n0_liefert_laenge_null(void)
+{
+    uint8_t buf[12];
+    buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+    buf[11] = 0x00;
+
+    TEST_ASSERT_EQUAL_UINT8(0, ackWireAppendixLen(buf, sizeof(buf)));
+    TEST_ASSERT_TRUE_MESSAGE(isPlausibleAckFrame(buf, sizeof(buf), MAX_HOP_LIMIT),
+                              "n=0 darf das ACK nicht kosten");
+}
+
+void test_anhang_n3_wird_erkannt_und_hash_stimmt(void)
+{
+    uint8_t buf[15];
+    buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+    buf[11] = 0x03;
+    buf[12] = 0x21;
+    buf[13] = 0x5F;
+    buf[14] = 0x3A;
+
+    TEST_ASSERT_EQUAL_UINT8(3, ackWireAppendixLen(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT32(0x3A5F21, ackWireHash(buf));
+    TEST_ASSERT_TRUE_MESSAGE(isPlausibleAckFrame(buf, sizeof(buf), MAX_HOP_LIMIT),
+                              "n=3 darf das ACK nicht kosten");
+}
+
+void test_anhang_puffer_zu_kurz_wird_verworfen(void)
+{
+    uint8_t buf[14];
+    buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+    buf[11] = 0x03;
+    buf[12] = 0x21;
+    buf[13] = 0x5F;
+
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ackWireAppendixLen(buf, sizeof(buf)),
+                                     "size 14 < 12+n=15 -- Anhang faellt");
+    TEST_ASSERT_TRUE_MESSAGE(isPlausibleAckFrame(buf, sizeof(buf), MAX_HOP_LIMIT),
+                              "verworfener Anhang darf das ACK nicht kosten");
+}
+
+// Nur n == 3 wird akzeptiert -- alle anderen Werte, auch mit ausreichend
+// Puffer, liefern 0.
+void test_anhang_andere_laengen_werden_verworfen(void)
+{
+    struct { uint8_t n; uint16_t size; } cases[] = {
+        { 6,  18 },
+        { 10, 22 },
+        { 11, 23 },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+    {
+        uint8_t buf[24];
+        memset(buf, 0xAA, sizeof(buf));
+        buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+        buf[11] = cases[i].n;
+
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ackWireAppendixLen(buf, cases[i].size),
+                                         "nur n=3 wird akzeptiert");
+        TEST_ASSERT_TRUE_MESSAGE(isPlausibleAckFrame(buf, cases[i].size, MAX_HOP_LIMIT),
+                                  "verworfener Anhang darf das ACK nicht kosten");
+    }
+}
+
+// Byte 11 != 0 ohne Anhang (altes Format, ~0,4 % der Feldmessung) ist kein
+// Fehler -- nur eben auch kein gueltiger Anhang.
+void test_anhang_byte11_ohne_anhang_ist_kein_fehler(void)
+{
+    uint8_t buf[12];
+    buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+    buf[11] = 0x01;
+
+    TEST_ASSERT_EQUAL_UINT8(0, ackWireAppendixLen(buf, sizeof(buf)));
+    TEST_ASSERT_TRUE_MESSAGE(isPlausibleAckFrame(buf, sizeof(buf), MAX_HOP_LIMIT),
+                              "altes Format ohne Anhang bleibt ein gueltiges ACK");
+}
+
+void test_anhang_nullzeiger_liefert_null(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(0, ackWireAppendixLen(NULL, 15));
+}
+
+// Obere Bits von Byte 14 sind reserviert -- ackWireHash() maskiert auf 22 Bit.
+void test_anhang_hash_wird_auf_22_bit_maskiert(void)
+{
+    uint8_t buf[15];
+    buildAck(buf, 0x687B40C8, 0x84, 0x9BF3C002);
+    buf[11] = 0x03;
+    buf[12] = 0xFF;
+    buf[13] = 0xFF;
+    buf[14] = 0xFF;
+
+    TEST_ASSERT_EQUAL_UINT8(3, ackWireAppendixLen(buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT32(0x3FFFFF, ackWireHash(buf));
+    TEST_ASSERT_TRUE(isPlausibleAckFrame(buf, sizeof(buf), MAX_HOP_LIMIT));
+}
+
+// ---------------------------------------------------------------------------
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -206,6 +311,14 @@ int main(int, char **)
     RUN_TEST(test_falscher_typ_wird_verworfen);
     RUN_TEST(test_zu_kurzer_frame_wird_verworfen);
     RUN_TEST(test_nullzeiger_wird_verworfen);
+
+    RUN_TEST(test_anhang_n0_liefert_laenge_null);
+    RUN_TEST(test_anhang_n3_wird_erkannt_und_hash_stimmt);
+    RUN_TEST(test_anhang_puffer_zu_kurz_wird_verworfen);
+    RUN_TEST(test_anhang_andere_laengen_werden_verworfen);
+    RUN_TEST(test_anhang_byte11_ohne_anhang_ist_kein_fehler);
+    RUN_TEST(test_anhang_nullzeiger_liefert_null);
+    RUN_TEST(test_anhang_hash_wird_auf_22_bit_maskiert);
 
     return UNITY_END();
 }

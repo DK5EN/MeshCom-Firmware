@@ -19,6 +19,7 @@
 #include <command_functions.h>
 
 extern int isPhoneReady;
+extern bool bAckInfo;
 extern bool ble_busy_flag;
 extern uint16_t swap2bytes(uint16_t value);
 extern void commandAction(char *msg_text, int len, bool ble);
@@ -211,6 +212,7 @@ void stop_advertising()
 	// disconnect
 	g_ble_uart_is_connected = false;
 	isPhoneReady = 0;
+	bAckInfo = false;
 	Bluefruit.setTxPower(0);
 	DEBUG_MSG("BLE", "Disconnected");
 }
@@ -229,6 +231,7 @@ void connect_callback(uint16_t conn_handle)
 	// isPhoneReady and config_to_phone_prepare are set only after
 	// successful app-layer PIN authentication via the hello message.
 	isPhoneReady = 0;
+	bAckInfo = false;
 	config_to_phone_prepare = false;
 	conffin_sent = false;
 	g_ble_uart_is_connected = true;
@@ -246,6 +249,7 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 	(void)reason;
 	g_ble_uart_is_connected = false;
 	isPhoneReady = 0;
+	bAckInfo = false;
 	config_to_phone_prepare = false;
 	conffin_sent = false;
 	Bluefruit.setTxPower(0);

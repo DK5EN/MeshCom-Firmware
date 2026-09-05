@@ -120,11 +120,13 @@ addBLEOutBuffer(print_buff + 5, 7)` legt Draht-Byte 11 als BLE-Byte 6 zur App. M
 - LoRa-Text-ACK, `src/lora_functions.cpp` Zeile 992 ff.: Status 0x02, Rufzeichen
   `aprsmsg.msg_source_call`. Kein Gate vorhanden, keines noetig.
 - UDP-Text-ACK, `src/udp_functions.cpp` Zeile 406 ff.: Rufzeichen `aprsmsg.msg_source_call`.
-  Status bleibt 0x01, wie es heute im Code steht (das Analysedokument nennt fuer diesen Pfad
-  0x02; der Code sendet 0x01, und genau daran unterscheidet die App heute "via Server" von
-  "via LoRa"). Nicht anfassen, im Analysedokument korrigieren.
+  Statuswert bleibt wie im Code: 0x01 als Vorgabe, 0x02 sobald `checkOwnTx()` die eigene
+  Nachricht findet, also fuer die App immer 0x02. Das Analysedokument stimmt, R4 ist erledigt.
 - Eigener GW, `src/loop_functions.cpp` Zeile 4131: Status 0x01, Rufzeichen
   `meshcom_settings.node_call`. `print_buff[8]` dort wird zu `uint8_t buf[24]`.
+- Zweiter eigener-GW-Punkt, `src/lora_functions.cpp` ~Zeile 1187: das Gateway hoert seine
+  eigene Meldung ueber einen Relay zurueck und meldet 0x01 mit eigenem Rufzeichen. Bei der
+  Umsetzung gefunden, gleich behandelt.
 
 ### 3.5 `--ackinfo on|off`, fluechtig
 
@@ -182,9 +184,8 @@ nur gegen einen Same-Base-Build vergleichen.
   Allokation pro ACK (Memory "printf malloc starves NimBLE").
 - **R3, Puffer.** BLE-Frame max. 7 + 10 + 4 = 21 Byte gegen `UDP_TX_BUF_SIZE - 4` und
   `MAX_MSG_LEN_PHONE` 300. Draht max. 15 Byte gegen `print_buff[30]`. Nichts knapp.
-- **R4, Statuswert des UDP-Peer-ACK.** Code sendet 0x01, Dokument sagt 0x02. Der Code
-  gewinnt, das Dokument wird korrigiert. Wer 0x02 will, aendert App-Semantik und braucht
-  Stephans Freigabe.
+- **R4, Statuswert des UDP-Peer-ACK.** Erledigt: der Code sendet 0x02 fuer eigene Nachrichten
+  (bedingt ueber `checkOwnTx()`), das Analysedokument war korrekt. Unveraendert uebernommen.
 - **R5, Mehrfach-Heard ohne Obergrenze.** Mit Flag und vielen Relays kommen viele
   Heard-Frames in den BLE-Ring (`MAX_RING` 10 bis 20). Bei Bedarf Obergrenze pro msg_id
   (z. B. 8) ueber ein Zaehlfeld; in dieser Runde nur messen, nicht bauen.
