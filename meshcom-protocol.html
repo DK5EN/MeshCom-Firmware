@@ -2154,16 +2154,19 @@ Quittung: <b>{987</b> angehängt</pre>
   <h2>Nicht jeder Knoten ist gleich — netzbildende brauchen Vorrang</h2>
 
   <p class="lead">Ameisen wählen keinen Weg, sie riechen ihn: Wo viele gelaufen sind, liegt Duftstoff, und der zieht weitere an.
-  Das Gegenteil von Routing: <b>lokale Regeln, globale Ordnung</b> — für ein Flutnetz die richtige Denkweise. Nur <em>riechen</em> kann unser Knoten heute nichts.</p>
+  Das Gegenteil von Routing: <b>lokale Regeln, globale Ordnung</b>, für ein Flutnetz die richtige Denkweise. <em>Riechen</em> kann unser Knoten seit 4.35p.09.02, nur <em>merken</em> noch nicht.</p>
 
   <div class="grid g2" style="margin-top:.85rem;align-items:start">
     <div class="card hot"><h3>Was wir gern hätten — und was fehlt</h3>
       <p>Die Duftspur wäre: <b>Wie viel Verkehr läuft tatsächlich über diesen Nachbarn?</b></p>
-      <p style="margin-top:.6rem">Im Knoten existiert dafür <b>kein einziger Zähler</b>. Die MHeard-Tabelle ist ein Schnappschuss —
-      jeder neue Empfang überschreibt den alten, nichts summiert sich. Die einzigen Zähler im System sind globale Sendestatistiken
-      pro Prioritätsklasse, nicht pro Nachbar.</p>
-      <p style="margin-top:.6rem">Diese Last-Metrik gibt es heute <b>nur serverseitig</b> in der MeshMap. Im Knoten müsste sie neu gebaut werden.</p>
-      <div class="cite">Geprüft: mheard_functions.cpp, txring_functions.cpp, via_functions.cpp — keine Per-Nachbar-Häufigkeit</div>
+      <p style="margin-top:.6rem"><b>Die Rohdaten dafür liefert der Knoten seit 4.35p.09.02 selbst.</b> Mit <code>--setlog on</code> schreibt er zu jedem
+      Empfang den vollständigen Pfad, RSSI, SNR und das Dedup-Verdikt, zu jedem Frame die Relay-Entscheidung mit Grund, zu jeder eigenen Sendung
+      Wartezeit, Warteschlangentiefe und CAD-Versuche, und alle fünf Minuten eine Statuszeile mit Kanalauslastung. Wie viel Verkehr über welchen
+      Nachbarn läuft, lässt sich daraus offline exakt ableiten, ohne Umweg über den Server.</p>
+      <p style="margin-top:.6rem">Was noch fehlt, ist die <b>Verdichtung im Knoten</b>: eine Häufigkeit je Nachbar, die sich summiert und auf die die
+      Sendelogik zugreift. Die MHeard-Tabelle bleibt ein Schnappschuss, jeder neue Empfang überschreibt den alten. Die Zähler im Knoten sind global
+      je Prioritätsklasse (<code>STAT</code>-Zeile), nicht je Nachbar. Das ist der Schritt von Stufe 0.</p>
+      <div class="cite">Zeilenarten: <b>src/setlog_lines.h</b> (RX-Anhang, RLY, TX, ERR, STAT, GWI/GWU), Changelog 173 · Geprüft: mheard_functions.cpp, txring_functions.cpp — keine Per-Nachbar-Häufigkeit im Knoten</div>
     </div>
 
     <div class="card good"><h3>Was der Knoten stattdessen heute schon messen kann</h3>
