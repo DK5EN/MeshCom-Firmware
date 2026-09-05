@@ -68,7 +68,9 @@ small,.small{font-size:.82rem;color:var(--fg3)}
 input.tabradio{display:none}
 label.tabbtn{font-family:var(--mono);font-size:.82rem;font-weight:600;padding:.45rem .9rem;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--fg2);cursor:pointer;user-select:none}
 body:has(#tab-before:checked) label[for=tab-before],
+body:has(#tab-n:checked) label[for=tab-n],
 body:has(#tab-after:checked) label[for=tab-after]{background:var(--acc);color:#04121c;border-color:var(--acc)}
+body:has(#tab-n:checked) #panel-n{display:block}
 .tabbar{flex-wrap:wrap}
 .panel{display:none}
 body:has(#tab-before:checked) #panel-before{display:block}
@@ -132,6 +134,7 @@ details.dev p{margin:.35rem 0 0;color:var(--fg2)}
 </style>
 </head>
 <body>
+<input type="radio" name="tab" id="tab-n" class="tabradio">
 <input type="radio" name="tab" id="tab-before" class="tabradio">
 <input type="radio" name="tab" id="tab-after" class="tabradio" checked>
 <div class="wrap">
@@ -140,7 +143,7 @@ details.dev p{margin:.35rem 0 0;color:var(--fg2)}
 <h1>Wie der MeshCom-Main-Loop beschleunigt wurde</h1>
 <p class="lead">Fünfzehn Stellen, an denen die Hauptschleife der Firmware seit Version 4.35s schneller, stabiler
 und robuster läuft. Jede Zahl ist auf echter Hardware gemessen und trägt ihre Quelle am Kartenende.
-Nichts ist geschätzt, außer es steht ausdrücklich dabei.</p>
+Nichts ist geschätzt, außer es steht ausdrücklich dabei. Der dritte Reiter zeigt die Runde davor: die Befunde vom März 2026 auf Firmware 4.35n, die seit 4.35p behoben sind.</p>
 
 <div class="stats">
   <div class="stat"><div class="k">T-Deck Start bis „ready“</div><div class="v">14,9 s <span class="arrow">→</span><span class="after">10,9 s</span></div></div>
@@ -171,11 +174,12 @@ sondern eine Sammlung von Helferfunktionen.</p></details>
 <div class="tabbar">
   <label class="tabbtn" for="tab-after">Firmware 4.35s — so läuft es jetzt</label>
   <label class="tabbtn" for="tab-before">Firmware 4.35p — Ausgangslage</label>
+  <label class="tabbtn" for="tab-n">Firmware 4.35n — März 2026</label>
 </div>
 
 <div class="legend">
   <span class="sw"><span class="dot n"></span> in 4.35s beschleunigt oder behoben</span>
-  <span class="sw"><span class="dot g"></span> Ausgangslage 4.35p</span>
+  <span class="sw"><span class="dot g"></span> Ausgangslage 4.35p bzw. 4.35n</span>
   <span class="sw"><span class="dot x"></span> nächster Schritt</span>
 </div>
 
@@ -408,6 +412,90 @@ sondern eine Sammlung von Helferfunktionen.</p></details>
 
 </div>
 </div>
+<div class="panel" id="panel-n">
+<div class="timeline">
+<div class="tgroup">A — Das Funkmodul hört nicht zu</div><div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">CAD-Schleife ohne Empfang</span><span class="plat">ESP32 + nRF52</span><span class="dur">bis 51 s Funkstille</span></div>
+  <div class="desc">Fand <code>doTX()</code> im Ring kein sendefähiges Paket, folgte sofort der nächste CAD-Scan, alle 100 bis 200 ms. Der Ring wirkte nicht leer, weil Wiederholungs-Slots ihre Länge behalten.</div>
+  <div class="gain"><b>Auswirkung:</b> Während der Schleife stand das Funkmodul im CAD-Modus und empfing nichts. Hunderte CAD-Scans in Folge, RX-Fehler häuften sich, die Sendewarteschlange wuchs.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Nach <code>doTX()</code> ohne Paket geht das Modul zurück auf Empfang und der CSMA-Timer startet neu.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „CAD-Spinloop-Fix“ (2026-03-21) · PR #789</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Keine Funkaufsicht bei leerer Warteschlange</span><span class="plat">RAK4631</span><span class="dur">46 s Funkstille beobachtet</span></div>
+  <div class="desc">Ohne Sendeauftrag und ohne Empfang wurde der CSMA-Timer nicht gesetzt. Blieben die Interrupts des SX1262 aus, merkte es niemand.</div>
+  <div class="gain"><b>Auswirkung:</b> Unbegrenzte Funkstille möglich, auf OE1KBC-12 46 s gemessen.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Periodischer Empfangs-Neustart über den normalen CSMA-Zyklus, wie auf ESP32.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „RAK4630: Silent Freeze“ P3 (2026-03-17)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">CAD-Zustandsautomat verklemmt sich</span><span class="plat">RAK4631</span><span class="dur">Stillstand nach ~14 h</span></div>
+  <div class="desc">Feuerte <code>OnRxDone</code> während eines laufenden CAD, brach <code>Radio.Rx()</code> den CAD ab, die Flags blieben aber gesetzt. Die Automatik wartete auf ein <code>OnCadDone</code>, das nie kam.</div>
+  <div class="gain"><b>Auswirkung:</b> Der Knoten fror dauerhaft ein, mittlere Zeit bis zum Ausfall rund 14 Stunden.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> CAD-Flags werden in <code>OnRxDone</code>, <code>OnRxTimeout</code> und <code>OnRxError</code> zurückgesetzt; Flag-Zugriffe laufen unter Critical Section.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „RAK4630: Silent Freeze“ P1, RACE-05 (2026-03-17)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">LoRa-Interrupt greift auf den belegten SPI-Bus</span><span class="plat">RAK4631</span><span class="dur">Stillstand</span></div>
+  <div class="desc">SX1262 und W5100S teilen sich einen SPI-Bus ohne Schutz. Kam ein Paket, während der Webserver oder EXTUDP gerade Ethernet bediente, rief der Empfangs-Interrupt <code>Radio.Rx()</code> bei aktivem Ethernet-Chip-Select.</div>
+  <div class="gain"><b>Auswirkung:</b> SPI-Korruption, Garbage-Bytes im Log, Gerät steht.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> <code>bSPI_ETH_Active</code> klammert jeden Ethernet-Block; der Interrupt verschiebt den Empfangs-Neustart auf <code>bPendingRadioRx</code>.</div>
+  <div class="src"><b>Quelle</b> PR #806 (2026-03-23)</div>
+</div>
+<div class="tgroup">B — Der Knoten stürzt ab oder steht</div><div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Stack-Überlauf beim Positions-Senden</span><span class="plat">RAK4631</span><span class="dur">Absturz</span></div>
+  <div class="desc"><code>sendExtern()</code> legte rund 2000 Byte JSON-Puffer auf einen Stack von 4096 Byte.</div>
+  <div class="gain"><b>Auswirkung:</b> Bei jeder Position mit Telemetrie über EXTUDP konnte der Loop-Task abstürzen.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Zwei Kopien entfernt, zwei Puffer statisch; rund 2000 Byte Stack gespart.</div>
+  <div class="src"><b>Quelle</b> PR #809 (2026-03-23)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Flash-Schreiben mitten im HTTP-Request</span><span class="plat">RAK4631</span><span class="dur">85–90 ms je Page, Browser hängt</span></div>
+  <div class="desc">Ein Klick im WebUI rief <code>save_settings()</code> synchron im HTTP-Handler. Flash-Erase sperrt Interrupts, während die TCP-Verbindung auf dem W5100S noch offen ist.</div>
+  <div class="gain"><b>Auswirkung:</b> Antwort ging verloren, Ethernet-Chip in inkonsistentem Zustand, Standstill.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Speichern und EXTUDP-Reset werden markiert und im nächsten Loop-Durchlauf außerhalb des Handlers ausgeführt.</div>
+  <div class="src"><b>Quelle</b> PR #805 (2026-03-23)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Zehn Wettläufe zwischen Interrupt und Hauptschleife</span><span class="plat">ESP32 + nRF52</span><span class="dur">Speicherkorruption</span></div>
+  <div class="desc">Empfangspuffer, Ring-Indizes, Dedup-Index und CAD-Flags wurden ohne Synchronisation zwischen Interrupt und Hauptschleife geteilt. Eine halb geschriebene Anzeige-Struktur konnte gelesen werden.</div>
+  <div class="gain"><b>Auswirkung:</b> Sporadische Abstürze und verlorene Aufwachsignale, schwer reproduzierbar.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Spinlocks um die Anzeige-Warteschlange, <code>std::atomic</code> für Flags und Indizes, Snapshot-Muster in der Hauptschleife.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „Race Condition Fixes“ RACE-01..08 (2026-03-17)</div>
+</div>
+<div class="tgroup">C — Die Luft füllt sich mit Kopien</div><div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Dieselbe Nachricht 179-mal gesendet</span><span class="plat">alle</span><span class="dur">TX/RX 8,5 : 1</span></div>
+  <div class="desc"><code>getNextTxSlot()</code> prüfte nur die Länge, nicht den Status. Ein bereits gesendeter Slot wurde erneut ausgewählt, etwa 20 Sendungen derselben Nachricht in 40 s.</div>
+  <div class="gain"><b>Auswirkung:</b> Gateway OE1KBC: 2573 Sendungen bei 302 Empfängen, Warteschlange bei 29 von 30.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> Nur READY- und DONE-Slots werden gewählt; die Wiederholungskopie ist READY, das Original wird nach DONE freigegeben.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „TX-Loop im Ring-Buffer“ (2026-03-19) · PR #792/#793</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Gateway nimmt Kopien vom Server erneut an</span><span class="plat">Gateways</span><span class="dur">nach 30 Nachrichten</span></div>
+  <div class="desc">Der UDP-Empfangspfad fragte nur die 30 eigenen Sende-IDs ab, nicht den Duplikatspeicher. Nach dem Umlauf akzeptierte das Gateway dieselbe Nachricht erneut vom Server.</div>
+  <div class="gain"><b>Auswirkung:</b> Jede Kopie ging noch einmal in die Luft.</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> <code>is_new_packet()</code> läuft auch im UDP-Pfad, wie beim LoRa-Empfang.</div>
+  <div class="src"><b>Quelle</b> release_lora_trx.md „UDP-Dedup“ (2026-03-19)</div>
+</div>
+<div class="item baseline">
+  <div class="dot"></div>
+  <div class="head"><span class="title">Server-Nachricht erreicht das lokale Netz nie</span><span class="plat">Gateways</span><span class="dur">Verlust</span></div>
+  <div class="desc">Sendete ein entferntes Gateway dieselbe Server-Nachricht schneller per LoRa, löschte die ACK-Logik den noch nicht gesendeten lokalen Slot.</div>
+  <div class="gain"><b>Auswirkung:</b> T-Deck, E290 und E22 am lokalen Gateway bekamen die Nachricht nie (msg_id AC573C4B, OE1KBC-12).</div>
+  <div class="gain" style="background:var(--ok-bg);border-color:var(--ok-line)"><b style="color:var(--ok)">Seit 4.35p:</b> READY-Slots werden von der ACK-Logik nicht mehr gelöscht, nur bereits gesendete.</div>
+  <div class="src"><b>Quelle</b> PR #802/#803 (2026-03-23)</div>
+</div>
+</div>
+</div>
 </div><!-- /panels -->
 
 <h2><span class="n">§</span>Auf einen Blick</h2>
@@ -432,6 +520,24 @@ sondern eine Sammlung von Helferfunktionen.</p></details>
 <tr><td>Anzeige-Flush (TD-05)</td><td>T-Deck</td><td class="num">Vollbild, verlorener Flush nach SD</td><td class="num">Teilbereiche, 30/30 verifiziert</td><td><span class="tag fixed">in 4.35s</span></td></tr>
 <tr class=open><td>G05 / G06</td><td>T-Deck</td><td class="num">~870 ms / 2 s (Schätzung)</td><td class="num">noch nicht vermessen</td><td><span class="tag next">nächster Schritt</span></td></tr>
 <tr class=open><td>Touch-Latenz (TM-30)</td><td>T-Deck</td><td class="num">Verdacht aus #1083</td><td class="num">nicht reproduziert</td><td><span class="tag next">Regressionstest</span></td></tr>
+</tbody>
+</table>
+</div>
+<h3 style="margin-top:1.4rem">Die Runde davor: 4.35n → 4.35p (März 2026)</h3>
+<div class="tocwrap">
+<table>
+<thead><tr><th>Was</th><th>Board</th><th>4.35n</th><th>4.35p</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>CAD-Schleife ohne Empfang</td><td>ESP32 + nRF52</td><td class="num">bis 51 s Funkstille</td><td class="num">Modul zurück auf Empfang</td><td><span class="tag fixed">in 4.35p · #789</span></td></tr>
+<tr><td>Funkaufsicht bei leerer Queue</td><td>RAK4631</td><td class="num">46 s Funkstille</td><td class="num">periodischer RX-Neustart</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
+<tr><td>CAD-Automat verklemmt</td><td>RAK4631</td><td class="num">Stillstand nach ~14 h</td><td class="num">Flags zurückgesetzt</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
+<tr><td>LoRa-IRQ auf belegtem SPI</td><td>RAK4631</td><td class="num">Stillstand</td><td class="num">SPI-Guard, Deferred Rx</td><td><span class="tag fixed">in 4.35p · #806</span></td></tr>
+<tr><td>Stack-Überlauf sendExtern</td><td>RAK4631</td><td class="num">Absturz</td><td class="num">statische Puffer</td><td><span class="tag fixed">in 4.35p · #809</span></td></tr>
+<tr><td>Flash-Schreiben im HTTP-Handler</td><td>RAK4631</td><td class="num">Standstill</td><td class="num">Deferred Save</td><td><span class="tag fixed">in 4.35p · #805</span></td></tr>
+<tr><td>ISR/Loop-Wettläufe</td><td>alle</td><td class="num">Speicherkorruption</td><td class="num">atomics, Spinlocks</td><td><span class="tag fixed">in 4.35p · 2026-03-17</span></td></tr>
+<tr><td>TX-Schleife im Ring</td><td>alle</td><td class="num">179× dieselbe Nachricht</td><td class="num">Status-Check</td><td><span class="tag fixed">in 4.35p · #792/#793</span></td></tr>
+<tr><td>UDP ohne Dedup</td><td>Gateways</td><td class="num">Kopien nach 30 Msgs</td><td class="num">is_new_packet()</td><td><span class="tag fixed">in 4.35p · 2026-03-19</span></td></tr>
+<tr><td>ACK löscht READY-Slot</td><td>Gateways</td><td class="num">Nachricht verloren</td><td class="num">READY-Guard</td><td><span class="tag fixed">in 4.35p · #802/#803</span></td></tr>
 </tbody>
 </table>
 </div>
@@ -508,7 +614,7 @@ bekommt der Absender dazu eine Rückmeldung (Rückstau-Protokoll).</p>
 <h2 style="margin-top:0;border-top:none">Wo die Verbesserungen heute laufen</h2>
 <p><b>Alle fünfzehn Verbesserungen dieser Seite sind über Pull Request #1115 (01.09.2026) in den Entwicklungszweig von
 icssw-org/MeshCom-Firmware eingeflossen und damit in der offiziellen Firmware 4.35s enthalten.</b> Die Ausgangslage „4.35p“
-beschreibt die vorherige offizielle Version.</p>
+beschreibt die vorherige offizielle Version. Die Runde davor, 4.35n → 4.35p, ging im März 2026 über die Pull Requests #784 bis #816 nach upstream.</p>
 <p>Alle Zahlen stammen aus diesen Dokumenten und wurden gegen den Baum vom 23.08.2026 verifiziert:</p>
 <pre>docs/BACKLOG.md              §3.8f (TM-01..TM-45), §3.8p (DOC-01)
 docs/wifi-report-20260830.md §4, §5, §6, §7
@@ -516,6 +622,7 @@ docs/wifi-soak-report-20260831.md
 docs/architecture/08-defect-catalogue.md   N-20, BATT-01
 docs/CHANGELOG-stability.md  147, 152
 docs/report-ble-tx-latency.md
+docs/release_lora_trx.md      Archiv 2026-03-11..22 (4.35n-Runde)
 src/instrument.{h,cpp}
 PR icssw-org/MeshCom-Firmware#1115, Abschnitte 3, 4, 8, 9, 10</pre>
 <p>Bewusst weggelassen: eine kombinierte ESP32/nRF52-Verlustrate, ein Wert „Pakete pro Sekunde Stillstand“ und jede Zahl ohne Quelle.</p>
