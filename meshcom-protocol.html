@@ -2447,13 +2447,13 @@ Quittung: <b>{987</b> angehängt</pre>
       <table>
         <thead><tr><th>Stufe</th><th>Inhalt</th><th>Ändert Verhalten?</th></tr></thead>
         <tbody>
-          <tr><td class="m">0</td><td>Nur beobachten: Wichtigkeit rechnen und loggen</td><td><span class="tag t-ok">nein</span></td></tr>
-          <tr><td class="m">0.5</td><td>Duplikatspeicher bleibt bei 100 Einträgen, das reicht (gemessen über 48 Knotenstunden). Stattdessen nach Zeit altern lassen statt nach Anzahl.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
-          <tr><td class="m">S</td><td>Sturmschutz: Rate-Limit je Quelle. Der Rückstau zum eigenen Absender (QRS/QRT/QTA, Quittung je verlorener Nachricht) ist seit v4.35p.09.02 ausgeliefert; das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
-          <tr><td class="m">1a</td><td>Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
-          <tr><td class="m">1b</td><td>Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
-          <tr><td class="m">1c</td><td>Optional auch Positions-Relays</td><td><span class="tag t-warn">ja</span></td></tr>
-          <tr><td class="m">2</td><td>Relay-Unterdrückung — erst nach vermessener Stufe 1</td><td><span class="tag t-bad">ja, heikel</span></td></tr>
+          <tr><td class="m">0</td><td><b>Beobachten:</b> Wichtigkeit rechnen und loggen, nichts ändern</td><td><span class="tag t-ok">nein</span></td></tr>
+          <tr><td class="m">0.5</td><td><b>Duplikatspeicher:</b> bleibt bei 100 Einträgen, das reicht (gemessen über 48 Knotenstunden). Stattdessen nach Zeit altern lassen statt nach Anzahl.</td><td><span class="tag t-info">ja, risikoarm</span></td></tr>
+          <tr><td class="m">S</td><td><b>Sturmschutz:</b> Rate-Limit je Quelle. Der Rückstau zum eigenen Absender (QRS/QRT/QTA, Quittung je verlorener Nachricht) ist seit v4.35p.09.02 ausgeliefert; das Limit für fremde Quellen fehlt noch.</td><td><span class="tag t-warn">teilweise</span></td></tr>
+          <tr><td class="m">1a</td><td><b>Vorrang:</b> Wichtigkeits-Slots in <b>einem</b> Cluster</td><td><span class="tag t-warn">ja, begrenzt</span></td></tr>
+          <tr><td class="m">1b</td><td><b>Vorrang:</b> Ausrollen auf die Flotte, Gate entscheidet</td><td><span class="tag t-warn">ja</span></td></tr>
+          <tr><td class="m">1c</td><td><b>Vorrang:</b> optional auch für Positions-Relays</td><td><span class="tag t-warn">ja</span></td></tr>
+          <tr><td class="m">2</td><td><b>Unterdrückung:</b> Relays weglassen, erst nach vermessenen Stufen 1a bis 1c</td><td><span class="tag t-bad">ja, heikel</span></td></tr>
         </tbody>
       </table>
       <div class="note ok" style="margin-top:1rem;font-size:.86rem">
@@ -2467,11 +2467,11 @@ Quittung: <b>{987</b> angehängt</pre>
       <p style="font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-bottom:.7rem">Was wir dazusagen müssen</p>
       <ul class="plain">
         <li class="no"><b>Der Hebel ist kleiner als er klingt.</b> Die Differenzierung wirkt zunächst nur auf Text-Relays — 3 bis 41 pro Stunde
-          gegenüber rund 3.800 Baken und 3.800 Positionen. Das sind unter 1 % des Relay-Volumens, bis Stufe 1c kommt.</li>
-        <li class="no"><b>Ein einzelner Knoten kann alles überfahren.</b> Am 22.08.2026 sendete IU4KCH-26 in einer Stunde <b>5.912</b> Baken
-          (Vorstunde: 9). Gegen so etwas hilft keine Backoff-Reihenfolge, sondern nur die eigene Stufe S.</li>
+          gegenüber rund 3.800 Baken und 3.800 Positionen. Das sind unter 1 % des Relay-Volumens, bis Stufe 1c (Vorrang auch für Positionen) kommt.</li>
+        <li class="no"><b>Ein einzelner Knoten kann alles überfahren.</b> Am 22.08.2026 sendete IU4KCH-26 in einer Stunde <b>5.912</b> Baken,
+          in der Stunde davor waren es 9. Gegen so etwas hilft keine Backoff-Reihenfolge, sondern nur Stufe S, der Sturmschutz in der Tabelle links.</li>
         <li class="no"><b>Unterdrückung ist schon einmal schiefgegangen.</b> <code>commit 60ea7d8</code> lief produktiv, hungerte Blattknoten aus
-          und wurde zurückgenommen. Deshalb steht sie hinten und bekommt eigene Schutzregeln.</li>
+          und wurde zurückgenommen. Deshalb steht sie als Stufe 2 ganz hinten und bekommt eigene Schutzregeln.</li>
         <li class="no"><b>„Wenige Segmente tragen das Netz“ stimmt nur halb.</b> Über 7 Tage entfallen auf die lastreichsten 10 % der
           Abschnitte rund <b>25 %</b> des beobachteten Verkehrs — deutlich, aber keine Handvoll Flaschenhälse.</li>
       </ul>
