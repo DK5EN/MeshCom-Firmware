@@ -1731,19 +1731,28 @@ void sub_page_setup()
  * ###########################################################################################################################
  * This will only deliver the preformatted messages to be loaded asyncronous into the WebUI scaffold
  */
+// The ring has no reader cursor of its own. toPhoneRead only advances when a
+// BLE client with an active "hello" session drains a slot, which happens
+// within ~100 ms of the write -- following toPhoneRead here reliably finds
+// an empty window while a phone is connected. toPhoneWrite always points at
+// the oldest surviving slot (the writer fills it, then wraps toPhoneWrite
+// forward), so scan the full ring from there instead. Upstream origin
+// 87c6c200.
 void sub_content_messages()
 {
-    int iRead = toPhoneRead;
+    int rendered = 0;
+    int iStart = toPhoneWrite; // snapshot: the writer may advance it while we scan
+
     if (bDEBUG)
-        Serial.printf("toPhoneWrite:%i toPhoneRead:%i\n", toPhoneWrite, toPhoneRead);
+        Serial.printf("toPhoneWrite:%i\n", iStart);
 
-    if (toPhoneWrite == 0)
+    for (int i = 0; i < MAX_RING; i++)
     {
-        web_client.printf("<p>No messages available.</p>");
-    }
+        int iRead = (iStart + i) % MAX_RING;
 
-    while (toPhoneWrite != iRead)
-    {
+        if (BLEtoPhoneBuff[iRead][0] == 0) // 0 = slot never written since reboot
+            continue;
+
         if (bDEBUG)
             Serial.printf("iRead:%i [1]:%02X\n", iRead, BLEtoPhoneBuff[iRead][1]);
 
@@ -1805,10 +1814,12 @@ void sub_content_messages()
                     String msg_source_path_esc = htmlEscape(aprsmsg.msg_source_path);
                     String msg_destination_path_esc = htmlEscape(aprsmsg.msg_destination_path);
 
-                    // messages by others
+                    // own messages (source == us): the browser's DM tab keys on the destination call
                     if (is_equ(meshcom_settings.node_call, aprsmsg.msg_source_call.c_str()))
                     {
-                        web_client.printf("<div class=\"message message-send\"><div>");
+                        String dst_esc = htmlEscape(aprsmsg.msg_destination_call);
+
+                        web_client.printf("<div class=\"message message-send\" data-id=\"%u\" data-dst=\"%s\"><div>", aprsmsg.msg_id, dst_esc.c_str());
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
                         web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
@@ -1818,10 +1829,26 @@ void sub_content_messages()
                         web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt_esc.c_str());
                         web_client.printf("</div></div>");
                     }
-                    // own messages
+                    // messages by others: "*" and group numbers key on the destination call as-is,
+                    // a DM to us keys on the source call so the DM tab shows both directions
                     else
                     {
-                        web_client.printf("<div class=\"message message-received\"><div>");
+                        bool isGroupDst = is_equ(aprsmsg.msg_destination_call.c_str(), "*");
+                        if (!isGroupDst && aprsmsg.msg_destination_call.length() > 0)
+                        {
+                            isGroupDst = true;
+                            for (unsigned int ci = 0; ci < aprsmsg.msg_destination_call.length(); ci++)
+                            {
+                                if (!isDigit(aprsmsg.msg_destination_call.charAt(ci)))
+                                {
+                                    isGroupDst = false;
+                                    break;
+                                }
+                            }
+                        }
+                        String dst_esc = htmlEscape(isGroupDst ? aprsmsg.msg_destination_call : aprsmsg.msg_source_call);
+
+                        web_client.printf("<div class=\"message message-received\" data-id=\"%u\" data-dst=\"%s\"><div>", aprsmsg.msg_id, dst_esc.c_str());
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
                         web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
@@ -1831,13 +1858,18 @@ void sub_content_messages()
                         web_client.printf("<p class=\"font-normal\">%s</p>", msgtxt_esc.c_str());
                         web_client.printf("</div></div>");
                     }
+
+                    rendered++;
                 }
             }
         }
-        iRead++;
-        if (iRead >= MAX_RING)
-            iRead = 0;
     }
+
+    if (rendered == 0)
+    {
+        web_client.printf("<p>No messages available.</p>");
+    }
+
     web_client.println(); // The HTTP response ends with another blank line
 }
 
