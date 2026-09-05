@@ -28,18 +28,27 @@ UDP packet to the node, port `1799`, JSON payload — all fields optional, only
 the fields present are applied:
 
 ```json
-{"type":"tele","temp":23.3,"hum":60,"press":1018.5,"temp2":0,"qnh":1018.5,"gasres":0,"co2":0}
+{
+  "type": "tele",
+  "temp": 23.3,
+  "hum": 60,
+  "press": 1018.5,
+  "temp2": 0,
+  "qnh": 1018.5,
+  "gasres": 0,
+  "co2": 0
+}
 ```
 
-| Field    | Target variable                  | APRS comment field in `PositionToAPRS()` |
-|----------|-----------------------------------|-------------------------------------------|
-| `temp`   | `meshcom_settings.node_temp`      | `/T=`                                      |
-| `hum`    | `meshcom_settings.node_hum`       | `/H=`                                      |
-| `press`  | `meshcom_settings.node_press`     | `/P=`                                      |
-| `temp2`  | `meshcom_settings.node_temp2`     | `/O=`                                      |
-| `qnh`    | `meshcom_settings.node_press_asl` | `/Q=`                                      |
-| `gasres` | `meshcom_settings.node_gas_res`   | `/G=`                                      |
-| `co2`    | `meshcom_settings.node_co2`       | `/C=`                                      |
+| Field    | Target variable                   | APRS comment field in `PositionToAPRS()` |
+| -------- | --------------------------------- | ---------------------------------------- |
+| `temp`   | `meshcom_settings.node_temp`      | `/T=`                                    |
+| `hum`    | `meshcom_settings.node_hum`       | `/H=`                                    |
+| `press`  | `meshcom_settings.node_press`     | `/P=`                                    |
+| `temp2`  | `meshcom_settings.node_temp2`     | `/O=`                                    |
+| `qnh`    | `meshcom_settings.node_press_asl` | `/Q=`                                    |
+| `gasres` | `meshcom_settings.node_gas_res`   | `/G=`                                    |
+| `co2`    | `meshcom_settings.node_co2`       | `/C=`                                    |
 
 There is no channel-name/unit field anymore — the meaning of each value is
 fixed by its APRS comment field (identical to real sensor hardware).
@@ -47,7 +56,7 @@ fixed by its APRS comment field (identical to real sensor hardware).
 ### Example
 
 ```json
-{"type":"tele","temp":23.3,"hum":60,"press":1018.5}
+{ "type": "tele", "temp": 23.3, "hum": 60, "press": 1018.5 }
 ```
 
 Sets `node_temp=23.3`, `node_hum=60`, `node_press=1018.5`. `temp2`/`qnh`/`gasres`/`co2`
@@ -98,8 +107,8 @@ remain unchanged (no value in the JSON = no change to that variable).
 
 ## 4. Error cases (log messages on the node)
 
-| Log message                                                                  | Cause                                                              |
-|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| Log message                                                                  | Cause                                                             |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `[EXT] tele ignored: real sensor hardware detected on this node`             | Node detected real sensor hardware — external values are rejected |
 | `[EXT] tele missing recognized fields (temp/hum/press/temp2/qnh/gasres/co2)` | None of the known fields were present in the JSON                 |
 
@@ -119,3 +128,24 @@ remain unchanged (no value in the JSON = no change to that variable).
   (unlike the earlier `"T:"` version) — the position-beacon code path
   (`sendPosition()`) always places packets in the local LoRa TX buffer
   regardless of those settings.
+
+---
+
+## 6. Outgoing `tele` datagram (node → client)
+
+For every position frame the node forwards to the Extern-UDP peer it also sends a
+`{"type":"tele",...}` datagram, built in `src/extern_tele_json.h`. Both shapes carry the
+same keys with the same physical meaning:
+
+| Key            | `src_type:"node"` (own sensor)    | `src_type:"lora"` (relayed node) | Unit / Q-group                    |
+| -------------- | --------------------------------- | -------------------------------- | --------------------------------- |
+| `qfe`          | `meshcom_settings.node_press`     | APRS `/P=`                       | hPa, station pressure (QFE)       |
+| `qnh`          | `meshcom_settings.node_press_asl` | APRS `/Q=`                       | hPa, reduced to MSL per ISA (QNH) |
+| `pressure_alt` | not present                       | APRS `/F=`                       | m, pressure altitude vs 1013.25   |
+
+**Fixed 2026-09-05 (TLM-04):** firmware up to and including 4.35p wrote the `/F=` value under
+`qfe` for `src_type:"lora"`, so a relayed BME680 node (which always sends `/F=` and suppresses
+`/Q=`) showed its pressure altitude in metres as "hPa" on a dashboard, e.g. `"qfe":191`. A client
+that talks to a gateway on older firmware can recognise the case by `src_type:"lora"`,
+`qnh` = 0 and a `qfe` below about 850. Since the fix `qfe` is the `/P=` pressure and the altitude
+moved to its own key.

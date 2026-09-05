@@ -1,5 +1,25 @@
 # RESUME — pick up here
 
+## 2026-09-05: TLM-04 fixed, ADC pin-99 guard
+
+Both on `fork-main`, pushed. TLM-04: the Extern-UDP `lora` `tele` datagram now puts the `/P=`
+station pressure under `qfe` and the `/F=` pressure altitude under a new key `pressure_alt`;
+builder extracted to `src/extern_tele_json.h`, native test `test_extern_tele_json` registered in
+`[env:native]`, doc note `ext_udp_telemetry.md` §6, write-up §8. Ruled a bug fix, not a contract
+change. ADC: `--analog on` with the unset default pin 99 no longer calls `analogReadRaw(99)` every
+2 ms (`a7208537`); that error flood, fed back through a serial loopback, was what DG2NPE-5 was
+broadcasting as messages. Neither is upstream yet: two PR candidates against DEV.
+
+## 2026-09-04 morning: TLM-04 filed (superseded, fixed 2026-09-05) — Extern-UDP `tele` `qfe` is an altitude (BLOCKED, Low)
+
+Operator report: a dashboard fed by a gateway's Extern-UDP shows "190 hPa" for `DM3KS-13`
+(BME680). RCA by code reading, no fix: the relayed-node `tele` datagram copies the APRS `/F=`
+field, which carries `node_press_alt` in metres; the real `/P=` pressure is parsed but never
+emitted. Upstream-identical, MCProxy already works around it. Write-up
+`docs/bug-extudp-tele-qfe-20260904.md`, BACKLOG §3.8y. **Blocked on the operator's decision**
+whether a one-line firmware fix (contract change for `src_type:"lora"`) goes upstream or the
+consumer side carries it. Nothing to do until then.
+
 ## 2026-09-04 morning: BP-11 echo guard — implemented, bench-proven, NOT published
 
 The node refuses to re-transmit its own back-pressure wording (`bpIsOwnWording()` in

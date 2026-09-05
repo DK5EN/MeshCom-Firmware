@@ -6,6 +6,7 @@
 #include <debugconf.h>
 #include "ArduinoJson.h"
 #include "extern_notice_json.h"
+#include "extern_tele_json.h"
 
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
 // Ethernet headers, the UdpExtern socket object, and every function that
@@ -565,47 +566,24 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     serializeJson(cJson, c_json, sizeof(c_json));
 
 
-    JsonDocument ctJson;
-
-    // Telemtrie
+    // Telemetrie -- TLM-04: built in extern_tele_json.h, native-testable.
     if(strcmp(src_type, "node") == 0)
     {
-      // build the json with Arduino JSON
-      ctJson["src_type"] = src_type;
-      ctJson["type"] = "tele";
-      ctJson["src"] = aprsmsg.msg_source_path.c_str();
-      ctJson["temp1"] = meshcom_settings.node_temp;
-      ctJson["temp2"] = meshcom_settings.node_temp2;
-      ctJson["hum"] = meshcom_settings.node_hum;
-      ctJson["qfe"] = meshcom_settings.node_press;
-      ctJson["qnh"] = meshcom_settings.node_press_asl;
-      ctJson["gas"] = meshcom_settings.node_gas_res;
-      ctJson["co2"] = meshcom_settings.node_co2;
-
-      // clear the buffer
-      // JSN-01: bound by the buffer, not by measureJson().
-      serializeJson(ctJson, c_tjson, sizeof(c_tjson));
-
+      externTeleJsonNode(c_tjson, sizeof(c_tjson),
+                         aprsmsg.msg_source_path.c_str(),
+                         meshcom_settings.node_temp, meshcom_settings.node_temp2,
+                         meshcom_settings.node_hum,
+                         meshcom_settings.node_press, meshcom_settings.node_press_asl,
+                         meshcom_settings.node_gas_res, meshcom_settings.node_co2);
     }
     if(strcmp(src_type, "lora") == 0)
     {
-      // build the json with Arduino JSON
-      ctJson["src_type"] = src_type;
-      ctJson["type"] = "tele";
-      ctJson["src"] = aprsmsg.msg_source_path.c_str();
-      ctJson["batt"] = aprspos.bat;
-      ctJson["temp1"] = aprspos.temp;
-      ctJson["temp2"] = aprspos.temp2;
-      ctJson["hum"] = aprspos.hum;
-      ctJson["qfe"] = aprspos.qfe;
-      ctJson["qnh"] = aprspos.qnh;
-      ctJson["gas"] = aprspos.gasres;
-      ctJson["co2"] = aprspos.co2;
-
-      // clear the buffer
-      // JSN-01: bound by the buffer, not by measureJson().
-      serializeJson(ctJson, c_tjson, sizeof(c_tjson));
-
+      // qfe = /P= (station pressure), not /F= (pressure altitude in metres).
+      externTeleJsonLora(c_tjson, sizeof(c_tjson),
+                         aprsmsg.msg_source_path.c_str(), aprspos.bat,
+                         aprspos.temp, aprspos.temp2, aprspos.hum,
+                         aprspos.press, aprspos.qnh, aprspos.qfe,
+                         aprspos.gasres, aprspos.co2);
     }
   }
   else
