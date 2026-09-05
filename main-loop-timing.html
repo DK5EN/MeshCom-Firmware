@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Main-Loop-Timeline — vorher/nachher</title>
+<style>
+:root{
+  --bg:#0f1420; --bg2:#171e2e; --bg3:#1f2840; --line:#2c3652; --line2:#3a4666;
+  --fg:#e7ecf7; --fg2:#a6b3cc; --fg3:#7f8caa;
+  --acc:#7dd3fc; --acc2:#38bdf8;
+  --ok:#4ade80; --ok-bg:#0e2a1a; --ok-line:#1f5c37;
+  --bad:#f87171; --bad-bg:#2a1414; --bad-line:#6b2626;
+  --warn:#fbbf24; --warn-bg:#2a2210; --warn-line:#6b5518;
+  --info:#60a5fa; --info-bg:#0f2036; --info-line:#234a78;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#fbfcfe; --bg2:#f2f5fa; --bg3:#e8edf5; --line:#d7dfea; --line2:#c3cfdf;
+    --fg:#101828; --fg2:#3f4c60; --fg3:#66748c;
+    --acc:#0369a1; --acc2:#0284c7;
+    --ok:#15803d; --ok-bg:#eafaf0; --ok-line:#bfe8cf;
+    --bad:#b91c1c; --bad-bg:#fdeeee; --bad-line:#f3caca;
+    --warn:#92400e; --warn-bg:#fdf4e3; --warn-line:#f0ddb0;
+    --info:#1d4ed8; --info-bg:#eef4fe; --info-line:#c7d9f6;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:15px}
+.wrap{max-width:980px;margin:0 auto;padding:2.4rem 1.4rem 5rem}
+h1{font-size:1.7rem;font-weight:800;letter-spacing:-.01em;margin:0 0 .4rem}
+h2{font-size:1.15rem;font-weight:700;margin:2.6rem 0 .8rem;padding-top:.6rem;border-top:1px solid var(--line)}
+h2 .n{color:var(--fg3);font-family:var(--mono);font-weight:600;margin-right:.5rem}
+h3{font-size:.95rem;font-weight:700;margin:0 0 .3rem}
+p{margin:.5rem 0}
+.lead{color:var(--fg2);max-width:70ch}
+.mono,code{font-family:var(--mono)}
+code{background:var(--bg3);border:1px solid var(--line);border-radius:4px;padding:.05em .35em;font-size:.87em}
+a{color:var(--acc)}
+small,.small{font-size:.82rem;color:var(--fg3)}
+.src{font-family:var(--mono);font-size:.74rem;color:var(--fg3);margin-top:.35rem}
+.src b{color:var(--fg2);font-weight:600}
+
+/* header stat strip */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin:1.4rem 0}
+.stat{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
+.stat .k{font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--fg3);margin-bottom:.3rem}
+.stat .v{font-family:var(--mono);font-weight:700;font-size:1.05rem}
+.stat .v .arrow{color:var(--fg3);font-weight:400;margin:0 .15rem}
+.stat .v .after{color:var(--ok)}
+
+/* callouts */
+.box{border-radius:10px;border:1px solid var(--line);padding:.85rem 1rem;margin:1rem 0}
+.box.warn{background:var(--warn-bg);border-color:var(--warn-line)}
+.box.warn h3{color:var(--warn)}
+.box.info{background:var(--info-bg);border-color:var(--info-line)}
+.box.info h3{color:var(--info)}
+.box.bad{background:var(--bad-bg);border-color:var(--bad-line)}
+.box.bad h3{color:var(--bad)}
+.box p{margin:.3rem 0;color:var(--fg2)}
+.box p:first-of-type{margin-top:.2rem}
+
+/* tabs */
+.tabbar{display:flex;gap:.4rem;margin:1.2rem 0 .2rem;position:sticky;top:0;background:var(--bg);padding:.6rem 0;z-index:5;border-bottom:1px solid var(--line)}
+input.tabradio{display:none}
+label.tabbtn{font-family:var(--mono);font-size:.82rem;font-weight:600;padding:.45rem .9rem;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--fg2);cursor:pointer;user-select:none}
+#tab-before:checked ~ .tabbar label[for=tab-before],
+#tab-after:checked ~ .tabbar label[for=tab-after]{background:var(--acc);color:#04121c;border-color:var(--acc)}
+.panel{display:none}
+#tab-before:checked ~ .panels #panel-before{display:block}
+#tab-after:checked ~ .panels #panel-after{display:block}
+
+/* timeline */
+.timeline{position:relative;margin-left:1rem;padding-left:1.6rem;border-left:2px solid var(--line2)}
+.tgroup{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);margin:1.6rem 0 .6rem -1.6rem;padding-left:1.6rem}
+.tgroup:first-child{margin-top:0}
+.item{position:relative;margin:0 0 1.05rem}
+.item .dot{position:absolute;left:-2.05rem;top:.28rem;width:.85rem;height:.85rem;border-radius:50%;border:2.5px solid var(--fg3);background:var(--bg)}
+.item.blocking .dot{background:var(--bad);border-color:var(--bad)}
+.item.nonblocking .dot{background:var(--bg);border-color:var(--ok)}
+.item .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem}
+.item .title{font-weight:700}
+.item .plat{font-family:var(--mono);font-size:.68rem;padding:.1rem .4rem;border-radius:5px;border:1px solid var(--line2);color:var(--fg3)}
+.item .dur{font-family:var(--mono);font-weight:700;font-size:.85rem}
+.item.blocking .dur{color:var(--bad)}
+.item.nonblocking .dur{color:var(--ok)}
+.item .desc{color:var(--fg2);margin:.25rem 0}
+.item .rx{font-size:.85rem;margin:.25rem 0;padding:.35rem .55rem;border-radius:6px;background:var(--bg2);border:1px solid var(--line)}
+.item .rx b{color:var(--fg)}
+.legend{display:flex;gap:1.4rem;align-items:center;font-size:.8rem;color:var(--fg3);margin:.6rem 0 .2rem}
+.legend .sw{display:inline-flex;align-items:center;gap:.4rem}
+.legend .dot{width:.75rem;height:.75rem;border-radius:50%;border:2.5px solid var(--fg3);display:inline-block}
+.legend .dot.b{background:var(--bad);border-color:var(--bad)}
+.legend .dot.n{background:var(--bg);border-color:var(--ok)}
+
+/* summary table */
+table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.86rem}
+th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--line)}
+th{color:var(--fg3);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+td.num{font-family:var(--mono);white-space:nowrap}
+tr.open td{color:var(--fg3)}
+.tag{font-family:var(--mono);font-size:.68rem;padding:.08rem .35rem;border-radius:4px;border:1px solid var(--line2)}
+.tag.fixed{color:var(--ok);border-color:var(--ok-line)}
+.tag.open{color:var(--warn);border-color:var(--warn-line)}
+.tag.est{color:var(--fg3)}
+
+footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--fg3);font-size:.78rem}
+footer pre{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;overflow-x:auto;font-size:.76rem}
+.tocwrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<input type="radio" name="tab" id="tab-before" class="tabradio">
+<input type="radio" name="tab" id="tab-after" class="tabradio" checked>
+<div class="wrap">
+
+<h1>Was den MeshCom-Main-Loop aufgehalten hat</h1>
+<p class="lead">Diese Seite zeigt, an welchen Stellen <code>esp32loop()</code> und <code>nrf52loop()</code>
+blockiert haben — vorher (Ausgangszustand, wie er heute noch ausgeliefert wird) und nachher (dieser
+Branch, <code>tdeck-partial-refresh-trace</code>). Jede Zahl ist gemessen, mit Quellenangabe am
+Kartenende. Nichts hier ist geschätzt, sofern nicht ausdrücklich als „Schätzung/unverifiziert"
+markiert.</p>
+
+<div class="stats">
+  <div class="stat"><div class="k">T-Deck Boot bis „ready"</div><div class="v">14,9 s <span class="arrow">→</span><span class="after">10,9 s</span></div></div>
+  <div class="stat"><div class="k">WLAN Erstanmeldung (WPA2/WPA3)</div><div class="v">0/24 <span class="arrow">→</span><span class="after">24/24</span></div></div>
+  <div class="stat"><div class="k">RAK-Loop-Maximum (600 s Fenster)</div><div class="v">314 ms <span class="arrow">→</span><span class="after">145 ms</span></div></div>
+  <div class="stat"><div class="k">Heltec OLED-Frame</div><div class="v">579 ms <span class="arrow">→</span><span class="after">34,5 ms</span></div></div>
+  <div class="stat"><div class="k">T-Deck Audio-Blockade</div><div class="v">1552 ms <span class="arrow">→</span><span class="after">23 ms</span></div></div>
+  <div class="stat"><div class="k">Batterie-Messung (Heltec)</div><div class="v">~100 ms / 500 ms <span class="arrow">→</span><span class="after">0</span></div></div>
+</div>
+
+<div class="box info">
+<h3>Was die beiden Loops überhaupt sind</h3>
+<p><code>src/loop_functions.cpp</code> ist <b>nicht</b> der Main Loop — das ist eine 5386-Zeilen-Sammlung
+von Helferfunktionen. Die tatsächlichen Loops sind <code>esp32loop()</code>
+(<code>src/esp32/esp32_main.cpp:1846–3943</code>, 47 Aufrufstellen, endet mit <code>delay(5)</code> bei
+<code>:3942</code>) und <code>nrf52loop()</code> (<code>src/nrf52/nrf52_main.cpp:1143–2514</code>,
+37 Aufrufstellen, endet mit <code>delay(100)</code> + <code>yield()</code> bei <code>:2520–2522</code>),
+aufgerufen aus <code>src/main.cpp:53–75</code>. Ein Stall auf dem RAK wird also gegen eine ~100-ms-Bodenrate
+gemessen, nicht gegen null.</p>
+<p>Alle Zahlen unten stammen aus <code>src/instrument.{h,cpp}</code>: <code>INSTR_LOOPTICK()</code> misst
+die Umlaufzeit, <code>INSTR_SECTION(name)</code> deckt bis zu 16 benannte Abschnitte ab (laut Kampagne
+9 auf ESP32, 33 auf nRF52 verdrahtet), und jede Lücke über 250 ms
+(<code>instrument.cpp:44</code>, <code>INSTR_GAP_REPORT_US</code>) meldet sofort den längsten Abschnitt
+dieses Umlaufs, ausgegeben über <code>--instr</code>. Per Default an auf ESP32/nRF52
+(<code>instrument.h:29–35</code>) und ausdrücklich als temporäres Bench-Gerüst markiert — nicht für
+Upstream gedacht.</p>
+</div>
+
+<div class="tabbar">
+  <label class="tabbtn" for="tab-before">Vorher — Ausgangszustand</label>
+  <label class="tabbtn" for="tab-after">Nachher — diese Branch</label>
+</div>
+
+<div class="legend">
+  <span class="sw"><span class="dot b"></span> blockierender Aufruf (Loop steht)</span>
+  <span class="sw"><span class="dot n"></span> nicht-blockierend / behoben</span>
+</div>
+
+<div class="panels">
+
+<!-- =========================== BEFORE =========================== -->
+<div class="panel" id="panel-before">
+<div class="timeline">
+
+<div class="tgroup">A — Boot-Phase (T-Deck)</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">Boot-Meldungen als Busy-Wait</span><span class="plat">T-Deck</span><span class="dur">2 s × 8 = 16 s</span></div>
+  <div class="desc">Jede der acht Boot-Statusmeldungen blockiert 2 s, bevor die nächste erscheint.</div>
+  <div class="rx"><b>Konsequenz:</b> Boot-Phase, nicht Dauerbetrieb — verlängert nur die Zeit bis der Knoten überhaupt empfangsbereit ist (kein laufender RX-Verlust, aber ein leerer Knoten für 16 s).</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-15</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>SetupUBLOX()</code> GPS-Initialisierung</span><span class="plat">alle</span><span class="dur">1933 ms</span></div>
+  <div class="desc"><code>WaitPause()</code> + <code>sendUBX_MON_VER()</code> + <code>readUBXbin()</code> — die Versionszeile dient nur einer <code>[GPS_VER]</code>-Debugausgabe, <code>readUBXbin()</code> läuft immer in seinen 500-ms-Timeout.</div>
+  <div class="rx"><b>Konsequenz:</b> Boot-Phase, verlängert Zeit bis „ready".</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-16</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">Synchroner <code>WiFi.scanNetworks()</code> vor jedem <code>begin()</code></span><span class="plat">ESP32</span><span class="dur">3–5 s</span></div>
+  <div class="desc">Eigener Kurz-Scan vor jedem Verbindungsversuch — beim Boot und bei jedem 5-Minuten-Retry.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32: der DIO1-ISR setzt nur ein Flag, das Rearm passiert in <code>checkRX()</code> aus dem Loop — ein Stall <em>während</em> laufendem Empfang kostet die während der Blockade eintreffenden Pakete.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-16</div>
+</div>
+
+<div class="tgroup">B — WLAN &amp; Netzwerk im Dauerbetrieb</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">BSSID-Pin entwertet den Treiber-Reconnect</span><span class="plat">ESP32</span><span class="dur">0/24 Erstanmeldungen</span></div>
+  <div class="desc">Firmware pinnt Kanal + BSSID aus eigenem Scan; an einem WPA2/WPA3-Mischbetriebs-AP scheitert das 9× mit <code>AUTH_EXPIRE</code>, bevor der 10. (Treiber-)Versuch bei ~55 s greift. 240 Disconnects über 24 Starts.</div>
+  <div class="rx"><b>Konsequenz:</b> kein Gateway-UDP, kein LoRa-Relay über WLAN, solange keine IP steht — 55,8 s Median, 56,5 s Maximum bis <code>got_ip</code>.</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §4 (Arm A0), §5.1</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>WiFi.hostByName()</code> synchron auf <code>loopTask</code></span><span class="plat">ESP32</span><span class="dur">bis 31 s</span></div>
+  <div class="desc">Server- und NTP-Namensauflösung in <code>startMeshComUDP()</code>: 16 s auf <code>WIFI_DNS_IDLE_BIT</code> plus 15 s auf <code>WIFI_DNS_DONE_BIT</code> im schlechten Fall (Captive Portal, Resolver tot, Router bootet noch).</div>
+  <div class="rx"><b>Konsequenz:</b> LoRa-Empfang, Serial und BLE stehen für die gesamte Dauer — größter beobachteter Einzel-Blocker der ganzen Kampagne.</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §5.4</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>WiFi.getMode()</code> im 60-s-Heartbeat</span><span class="plat">ESP32</span><span class="dur">2,9 s + 1,1 s</span></div>
+  <div class="desc"><code>esp_wifi_get_mode()</code> wartet auf den WiFi-Task — und der scannt gerade, während des Aufbau- bzw. Connect-Scans.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32-RX-Verlustfenster in jedem Boot-Start, „der Knoten hängt manchmal beim Start".</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §5.5</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>startNetwork()</code> Verzögerungen</span><span class="plat">ESP32</span><span class="dur">~7 s pro Versuch</span></div>
+  <div class="desc"><code>delay(1000+200+500)</code> plus synchroner <code>scanNetworks()</code>, dazu <code>delay(1500)</code> auf dem Boot-Retry-Pfad — bei jedem Versuch und bei jedem 5-Minuten-Retry ohne AP.</div>
+  <div class="rx"><b>Konsequenz:</b> LoRa-Empfang auf jedem ESP32-Gateway ohne AP unbedient, solange kein Access Point erreichbar ist.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-20</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>neth.getUDP()</code> W5100S-Socket</span><span class="plat">RAK4631</span><span class="dur">1,6 s alle ~20 s, Loop-Max 1,7–3,4 s</span></div>
+  <div class="desc">Mit Link up und Gateway registriert blockiert die Socket-Operation regelmäßig; <code>sendHey()</code> zusätzlich 0,7–1,4 s einmal nach Boot. Selbe Familie wie N-20 (SPI-Pfade).</div>
+  <div class="rx"><b>Konsequenz:</b> nRF52: <code>OnRxDone</code> läuft auf dem Radio-Task und rearmt selbständig — <em>außer</em> während der W5100S den geteilten SPI-Bus hält (<code>bSPI_ETH_Active</code>). Auf dem RAK ist das Verlustfenster also SPI-Kontention mit Ethernet, nicht ein genereller Loop-Stall.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-35</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">N-20: W5100S-Pfade ohne Link/Hardware</span><span class="plat">RAK4631 (Gateway ohne Ethernet)</span><span class="dur">Sekunden bis mehrere Minuten, nichtdeterministisch</span></div>
+  <div class="desc"><code>startETH()</code> → <code>Ethernet.begin(mac, 10000UL)</code> ohne vorherigen Link-Check; ein Boot hing minutenlang, der nächste identische lief in Sekunden durch. posinfo/heyinfo/telemetry-Abschnitt über 2 Minuten eingefroren beobachtet.</div>
+  <div class="rx"><b>Konsequenz:</b> serielle Kommandoverarbeitung tot, LoRa-TX-Ring unbedient — RX über den Radio-Task läuft weiter (BLE ebenso), aber der Knoten wirkt komplett tot.</div>
+  <div class="src"><b>Quelle</b> architecture/08-defect-catalogue.md N-20</div>
+</div>
+
+<div class="tgroup">C — Weitere Loop-Stellen</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">Heltec/Stick OLED über <code>_1_SW_I2C</code></span><span class="plat">Heltec V3/V4, Stick V3</span><span class="dur">579 ms Frame, Loop-Max 645 ms</span></div>
+  <div class="desc">Software-I2C statt Hardware-<code>Wire</code>-Instanz für den Displaytreiber.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32-RX-Verlustfenster bei jedem Displaywechsel.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-09</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>read_batt()</code> ADC-Einschwingzeit</span><span class="plat">Heltec V3/V4/Stick</span><span class="dur">~100 ms alle ~500 ms</span></div>
+  <div class="desc">Blockierendes <code>delay(100)</code> auf das Einschwingen des Spannungsteilers, aufgerufen über <code>BattTimeWait</code> alle ~500 ms — die Hauptschleife steht damit rund ein Fünftel der Zeit still.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32-RX-Verlustfenster, dauerhaft und periodisch — reproduzierbar im 500–600-ms-Takt.</div>
+  <div class="src"><b>Quelle</b> architecture/08-defect-catalogue.md BATT-01</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">Header-Indikatoren jeden Umlauf neu geschrieben</span><span class="plat">T-Deck</span><span class="dur">36,9 Invalidierungen/s</span></div>
+  <div class="desc"><code>update_header_batt_indicator</code> und Nachbarn schreiben Label/Farbe bedingungslos alle 500 ms, unabhängig davon, ob sich etwas geändert hat.</div>
+  <div class="rx"><b>Konsequenz:</b> kein Stall, aber unnötige LVGL-/Render-Last auf jedem Umlauf — Sockel-Overhead, kein Einzelereignis.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-08</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>play_cw()</code> Tongenerierung</span><span class="plat">T-Deck</span><span class="dur">1552 ms</span></div>
+  <div class="desc">Blockiert <code>loopTask</code> pro Nachricht mit Ton-Feedback direkt im Loop.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32-RX-Verlustfenster bei jeder quittierten Nachricht — sichtbarster Einzelfreeze am T-Deck.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-01</div>
+</div>
+
+<div class="tgroup">D — Offen, kein „Nachher" (dieser Branch)</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">T-Deck-Displayflush (TD-05/P1)</span><span class="plat">T-Deck</span><span class="dur">36,7 ms Mittelwert, 184 Flushes/60 s ≈ 11,5 % Duty, Loop-Max 72 ms im Leerlauf</span></div>
+  <div class="desc">Ursache noch nicht isoliert; gemessen, aber unbehoben.</div>
+  <div class="rx"><b>Konsequenz:</b> ESP32-RX-Verlustfenster bei jedem Flush, offen.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md §3.8f DOC-01-Absatz (TD-05/P1)</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">LVGL <code>read_cb</code> mit SD-I/O + PNG-Decode (G05)</span><span class="plat">T-Deck</span><span class="dur">~870 ms — <b>Schätzung, unverifiziert</b></span></div>
+  <div class="desc">SD-Zugriff und PNG-Decode plus ein <code>delay()</code> in der LVGL-Eingaberoutine.</div>
+  <div class="rx"><b>Konsequenz:</b> falls real, ESP32-RX-Verlustfenster — nicht gemessen, nicht bestätigt.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md §3.8f DOC-01-Absatz (G05), Zeile <code>tdeck_main.cpp:600</code></div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title"><code>addMessage()</code> (G06)</span><span class="plat">T-Deck</span><span class="dur">2 s, beim Boot 8 s — <b>Schätzung, unverifiziert</b></span></div>
+  <div class="desc">Blockiert angeblich den Loop beim Einfügen einer Nachricht in die Anzeige.</div>
+  <div class="rx"><b>Konsequenz:</b> falls real, ESP32-RX-Verlustfenster — nicht gemessen, nicht bestätigt.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md §3.8f DOC-01-Absatz (G06), Zeile <code>tdeck_main.cpp:262</code></div>
+</div>
+
+</div>
+</div>
+
+<!-- =========================== AFTER =========================== -->
+<div class="panel" id="panel-after">
+<div class="timeline">
+
+<div class="tgroup">A — Boot-Phase (T-Deck)</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Boot-Meldungen über LVGL-Pump</span><span class="plat">T-Deck</span><span class="dur">100 ms/Meldung</span></div>
+  <div class="desc">Non-blocking LVGL-Pump ersetzt die 2-s-Busy-Waits; <code>CLIENT STARTED</code> 17,8 s → 4,6 s.</div>
+  <div class="rx"><b>Ergebnis:</b> Boot-Phase deutlich kürzer, Knoten früher überhaupt empfangsbereit.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-15 — FIXED</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title"><code>SetupUBLOX()</code> auf Debug-Ausgabe gegated</span><span class="plat">alle</span><span class="dur">1933 → 899 ms</span></div>
+  <div class="desc">Versionszeile jetzt nur bei <code>iGPSDEBUG ≥ 2</code> gelesen; GPS-Init gesamt 3503 → 2001 ms, keine Änderung an der eigentlichen Modul-Konfiguration.</div>
+  <div class="rx"><b>Ergebnis:</b> T-Deck „ready" 3 Boote Median 10,76 s (10 587/10 758/10 805 ms), <code>got_ip</code> 10,36 s. TD-01-Bestätigungslauf (24 Boote): <code>got_ip</code> Median 10 394 ms, „ready" Median 10 949 ms — gegen den Wave-W-24-Boot-Referenzwert von 14,873 s „ready". Heltec 8,2 s, T-Beam 7,5 s.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-16, TM-11/TD-01 — DONE 2026-08-30</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Diagnose-Scan bleibt log-only</span><span class="plat">ESP32</span><span class="dur">übersprungen beim ersten Bring-up</span></div>
+  <div class="desc">Seit Wave W wählt der Treiber den AP selbst (<code>WiFi.begin(ssid, pwd, 0, NULL, false)</code>); der eigene Scan läuft nur noch für den Feldbericht mit und geht nicht mehr in <code>begin()</code>. Beim ersten Bring-up nach Reset entfällt er ganz (<code>[WIFI];scan;skipped;first_bringup</code>), bei jedem späteren (Funk-Neustart, Watchdog) bleibt er erhalten.</div>
+  <div class="rx"><b>Ergebnis:</b> kein RX-Verlustfenster mehr durch den eigenen Scan auf dem Boot-Pfad.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-16</div>
+</div>
+
+<div class="tgroup">B — WLAN &amp; Netzwerk im Dauerbetrieb</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Treiber-eigene AP-Wahl statt BSSID-Pin</span><span class="plat">ESP32</span><span class="dur">24/24 Erstanmeldungen</span></div>
+  <div class="desc"><code>WIFI_ALL_CHANNEL_SCAN</code> + <code>WIFI_CONNECT_AP_BY_SIGNAL</code>, <code>persistent(false)</code>, <code>setAutoReconnect(true)</code>; <code>SSID</code>-only <code>begin()</code> ohne Kanal/BSSID; dazu <code>esp_wifi_disable_pmf_config()</code>, damit die Station WPA2-PSK statt SAE aushandelt.</div>
+  <div class="rx"><b>Ergebnis:</b> T-Deck 24/24, <code>got_ip</code> Median 14,2 s / Max 14,7 s, 0 Disconnects; Heltec 12/12 (11,2 s), T-Beam 12/12 (10,6 s). Nach dem <code>getMode()</code>-Fix (unten): 24/24, 14,1 s / 14,6 s. 9,1-h-Soak (TM-36): 165/165 erzwungene Trennungen ohne Eingriff wiederverbunden, Reconnect-Median 4,0–4,5 s.</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §7, wifi-soak-report-20260831.md</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">DNS über lwIP <code>dns_gethostbyname()</code> async</span><span class="plat">ESP32</span><span class="dur">22–93 ms</span></div>
+  <div class="desc">Callback statt Warten; Literal-IP sofort, Wiederholung aus dem Heartbeat, KEEP/UDP-TX erst mit aufgelöster Adresse.</div>
+  <div class="rx"><b>Ergebnis:</b> aus bis zu 31 s Blockade werden 22–93 ms — kein spürbares RX-Verlustfenster mehr an dieser Stelle.</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §6 (F6), §7</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Loop-Hooks laufen über <code>STA_START</code>/<code>STA_STOP</code>-Events</span><span class="plat">ESP32</span><span class="dur">0 Lücken</span></div>
+  <div class="desc">Kein <code>esp_wifi_*</code>/<code>WiFi.getMode()</code> mehr aus der Hauptschleife, solange der Treiber scannen könnte — Regel seit diesem Fund.</div>
+  <div class="rx"><b>Ergebnis:</b> die 2,9-s/1,1-s-Lücke ist weg (Arm A4p1b: 24/24, 0 Stalls).</div>
+  <div class="src"><b>Quelle</b> wifi-report-20260830.md §5.5, §7</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title"><code>startNetwork()</code> ohne feste Delays</span><span class="plat">ESP32</span><span class="dur">Loop-Max 26 ms</span></div>
+  <div class="desc">Asynchroner Scan, keine Delays; ausgeklinkte Trackball-Flanken während eines Stalls werden verworfen statt nachträglich abgespielt.</div>
+  <div class="rx"><b>Ergebnis:</b> kein Gap über 0,7 s im Boot-Log mehr gemessen.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-20 — FIXED (bleibt vorerst außerhalb der T-Deck-PR, siehe TM-34)</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Async NTP über den geteilten Gateway-Socket</span><span class="plat">RAK4631</span><span class="dur">Loop-Max 314 → 145 ms, 0 Gaps &gt; 250 ms</span></div>
+  <div class="desc"><code>src/ntp_async.{h,cpp}</code>: Anfrage nicht-blockierend gesendet, Antwort über den normalen Empfangspfad geerntet (2,5 s Timeout, 5 s/60 s Backoff). Ersetzt <code>NTPClient::forceUpdate()</code>, das zusätzlich jedes wartende Datagramm vom Socket spülte.</div>
+  <div class="rx"><b>Ergebnis:</b> 600-s-Instrumentierungsfenster: Loop-Max 145 ms statt 314 ms, 0 Gaps über 250 ms; <code>eth_state</code>-Max 2,9 ms statt 213 ms NTP-Stall. Nativer Regressionstest <code>test_ntp_async</code> 10/10.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-35 — DONE 2026-08-30</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">NTP-Antwort auch ohne Gateway-Flag geerntet</span><span class="plat">ESP32 + nRF52</span><span class="dur">0 → erfolgreich</span></div>
+  <div class="desc"><code>ntpHarvestReply()</code> läuft im <code>else</code>-Zweig beider Gateway-Blöcke (<code>ntpHarvestUDP()</code> ESP32, <code>NrfETH::harvestNTP()</code> nRF52) — strukturell exklusiv zum Gateway-Lesepfad.</div>
+  <div class="rx"><b>Ergebnis:</b> Bench-Beweis DK5EN-93 (Gateway aus, GPS aus, Reboot): <code>[NTP];ok;rtt;89</code> ms, 0 Timeouts. Vorher: 0× <code>ok</code>, 545–548× <code>timeout</code> pro Board in 9,1 h. Nativer Regressionstest <code>test_ntp_harvest</code> (4 Fälle).</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-45 — FIXED 2026-08-31 (<code>81cfc064</code>)</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">N-20 Hauptauslöser: Link-Check vor <code>Ethernet.begin()</code></span><span class="plat">RAK4631</span><span class="dur">≤3 s statt Minuten</span></div>
+  <div class="desc"><code>startETH()</code> prüft den Link-Status, bevor das blockierende <code>Ethernet.begin(mac, 10000UL)</code> läuft (max. 3 s Warten auf LinkON); periodischer Reconnect nutzt <code>resetDHCP()</code> statt eines vollen HW-Resets.</div>
+  <div class="rx"><b>Ergebnis:</b> Fault-Injection-Soak (5 Kabel-Flaps, 4–16 s Haltezeit, mitten im Verkehr): Loop-Task blockierte keinen einzigen Takt, Serial-Echo-Stalls 0, kein Reboot. <b>Restrisiko bleibt offen:</b> die internen W5100S-Bibliotheks-Wartezeilen (Socket-Ops bei Link-Verlust mitten in der Operation) sind ungehärtet — theoretisches Risiko, unter Last nicht mehr beobachtet.</div>
+  <div class="src"><b>Quelle</b> architecture/08-defect-catalogue.md N-20 — Hauptauslöser gefixt (<code>780df254</code>), Fault-Injection-Soak bestanden</div>
+</div>
+
+<div class="tgroup">C — Weitere Loop-Stellen</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Heltec/Stick OLED auf Hardware-<code>Wire1</code></span><span class="plat">Heltec V3/V4, Stick V3</span><span class="dur">579 → 34,5 ms Frame, Loop-Max 645 → 39 ms</span></div>
+  <div class="desc"><code>U8G2_*_F_2ND_HW_I2C</code> auf <code>Wire1</code> (SDA 17/SCL 18), 400 kHz statt Software-I2C. T-Beam war bereits auf Hardware-I2C (37,8 ms).</div>
+  <div class="rx"><b>Ergebnis:</b> RX-Verlustfenster bei Displaywechseln um Faktor ~17 verkürzt.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-09 — FIXED</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title"><code>read_batt()</code> Einschwingzeit über zwei Aufrufe verteilt</span><span class="plat">Heltec V3/V4/Stick</span><span class="dur">0 ms Blockade</span></div>
+  <div class="desc">Erster Aufruf schaltet den Teiler frei und merkt den Zeitstempel, spätere Aufrufe messen erst nach ≥100 ms echt vergangener Zeit; bis dahin gilt der letzte Messwert. Kadenz geht von 500 ms auf 1000 ms.</div>
+  <div class="rx"><b>Ergebnis:</b> die periodischen Stall-Meldungen verschwinden vollständig.</div>
+  <div class="src"><b>Quelle</b> architecture/08-defect-catalogue.md BATT-01 — BEHOBEN (<code>b44fe712</code>)</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Header-Indikatoren nur bei Änderung geschrieben</span><span class="plat">T-Deck</span><span class="dur">36,9/s → 7,0/s Invalidierungen</span></div>
+  <div class="desc"><code>lv_label_set_text</code> nur, wenn sich Text/Farbe tatsächlich geändert hat (Harness „idle", 30 s).</div>
+  <div class="rx"><b>Ergebnis:</b> ~81 % weniger LVGL-Invalidierungen im Leerlauf.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-08 — FIXED</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">Tongenerierung auf eigenen Audio-Task ausgelagert</span><span class="plat">T-Deck</span><span class="dur">1552 → 23 ms</span></div>
+  <div class="desc">Queue + Audio-Task statt <code>playTone()</code> direkt im <code>loopTask</code>. Harness-Szenario <code>audio_stall</code>.</div>
+  <div class="rx"><b>Ergebnis:</b> RX-Verlustfenster bei Ton-Feedback praktisch verschwunden.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-01…TM-04 — FIXED (<code>49c482e1</code>)</div>
+</div>
+
+<div class="tgroup">D — Weiterhin offen (kein „Nachher" auf dieser Branch)</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">T-Deck-Displayflush (TD-05/P1)</span><span class="plat">T-Deck</span><span class="dur">unverändert — 36,7 ms Mittelwert, 11,5 % Duty</span></div>
+  <div class="desc">Kein Fix in dieser Kampagne. Verbleibt als offener Punkt mit gemessener Ausgangslage.</div>
+  <div class="rx"><b>Konsequenz:</b> unverändertes ESP32-RX-Verlustfenster bei jedem Flush.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md §3.8f DOC-01-Absatz (TD-05/P1) — offen</div>
+</div>
+
+<div class="item blocking">
+  <div class="head"><span class="title">G05/G06 (LVGL <code>read_cb</code>, <code>addMessage()</code>)</span><span class="plat">T-Deck</span><span class="dur">Schätzung, unverifiziert — kein Fix</span></div>
+  <div class="desc">Weder gemessen noch bestätigt in dieser Kampagne, deshalb ausdrücklich nicht als Zahl behandelt.</div>
+  <div class="rx"><b>Konsequenz:</b> unbekannt — nicht spekulieren.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md §3.8f DOC-01-Absatz (G05, G06) — unverifiziert</div>
+</div>
+
+<div class="item nonblocking">
+  <div class="head"><span class="title">TM-30 — Touch-Verzögerung mit wachsender Uptime</span><span class="plat">T-Deck</span><span class="dur">nicht reproduziert</span></div>
+  <div class="desc">35-min-Lauf, 7 Sonden alle 5 min: Input-Latenz flach (17–38 ms), Loop-Max pro Sonde konstant (0,59–0,69 s, kein Wachstum). Upstream-#1083-Fenster ist abgedeckt.</div>
+  <div class="rx"><b>Ergebnis:</b> kein auf dieser Branch reproduzierbarer Defekt — bleibt als Regressions-Szenario im Harness.</div>
+  <div class="src"><b>Quelle</b> BACKLOG.md TM-30 — nicht reproduziert 2026-08-30</div>
+</div>
+
+</div>
+</div>
+
+</div><!-- /panels -->
+
+<h2><span class="n">§</span>Das RX-Verlustmodell — ESP32 und nRF52 sind zwei verschiedene Mechanismen</h2>
+<div class="box warn">
+<h3>Nicht mischen</h3>
+<p>Die beiden Plattformen verlieren LoRa-Empfang auf unterschiedliche Weise während eines Loop-Stalls.
+Eine gemeinsame Zahl für „Pakete verloren pro Sekunde Stall" existiert nicht — <b>kein Experiment
+dieser Kampagne hat sie gemessen</b>, und diese Seite erfindet keine.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem" class="g2">
+<div class="box info">
+<h3>ESP32</h3>
+<p>Der DIO1-Interrupt setzt nur ein Flag (<code>receiveFlag</code>,
+<code>esp32_main.cpp:498–509</code>). Das Radio wird erst wieder scharfgeschaltet, wenn
+<code>checkRX()</code> (<code>:3946</code>) aus dem Loop läuft — <code>readData()</code>, dann
+<code>startReceive()</code> um <code>:4009</code>. Jedes Paket, das nach einem abgeschlossenen
+RX_DONE eintrifft, während der Loop steht, ist verloren. Ein Stall <em>vor</em> jedem Paket kostet
+dagegen nichts.</p>
+</div>
+<div class="box info">
+<h3>nRF52 (RAK4631)</h3>
+<p><code>OnRxDone</code> läuft auf dem eigenen Task der Radio-Bibliothek und rearmt sofort
+(<code>lora_functions.cpp:369</code>, <code>startRadioReceive()</code> <code>:435–439</code>) —
+<em>außer</em> während der W5100S den geteilten SPI-Bus besitzt (<code>bSPI_ETH_Active</code> →
+<code>bPendingRadioRx</code>, im Loop nachgeholt). Das Verlustfenster auf dem RAK ist damit
+SPI-Kontention mit Ethernet, kein genereller Loop-Stall.</p>
+</div>
+</div>
+<p class="small">Quelle beider Absätze: BACKLOG.md §3.8f (DOC-01-Vorbereitung), Zeilenverweise
+<code>esp32_main.cpp:498–509</code>, <code>:3946</code>, <code>:4009</code> und
+<code>lora_functions.cpp:369</code>, <code>:435–439</code>.</p>
+
+<h2><span class="n">§</span>Was nicht hierher gehört</h2>
+<div class="box">
+<h3>BLE-zu-LoRa End-to-End-Latenz — kein Stall, sondern CSMA-Backoff by design</h3>
+<p>Die BLE-TX-Latenzanalyse (117 Nachrichten, drei Nodes) misst 2–5 s typische Wartezeit zwischen
+<code>RING_WRITE</code> und <code>RING_TX_READ</code>, auch bei leerer Queue — das ist die
+4–6-s-CSMA-Backoff-Zeit bei SF11/BW250, kein Loop-Defekt und nicht Teil dieser Timeline.</p>
+<div class="src"><b>Quelle</b> report-ble-tx-latency.md</div>
+</div>
+<div class="box">
+<h3>TM-31 — TX-Ring-Sättigung unter Flutlast</h3>
+<p>Ein per UDP geflutetes Gateway relayt weiterhin auf LoRa, aber der 20-Slot-TX-Ring sättigt bei
+&lt; 1 s Inter-Arrival und verwirft dann ankommende Frames nach Prioritätsstufe (Text übersteht,
+Position wird geopfert). Das ist ein Sende-Warteschlangen-Effekt nach erfolgtem Empfang, nicht ein
+Loop-Stall, der Empfang verhindert — gehört deshalb nicht in die RX-Verlust-Diskussion oben.</p>
+<div class="src"><b>Quelle</b> BACKLOG.md TM-31</div>
+</div>
+
+<h2><span class="n">§</span>Kompakte Referenztabelle</h2>
+<div class="tocwrap">
+<table>
+<thead><tr><th>ID</th><th>Board</th><th>Vorher</th><th>Nachher</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>TM-15</td><td>T-Deck</td><td class="num">CLIENT STARTED 17,8 s</td><td class="num">4,6 s</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-16</td><td>alle</td><td class="num">SetupUBLOX 1933 ms / ready 14,9 s (24 Boote)</td><td class="num">899 ms / 10,9 s</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-11/TD-01</td><td>ESP32</td><td class="num">4/12 Erstanmeldung</td><td class="num">24/24, got_ip Median 10,4 s</td><td><span class="tag fixed">closed</span></td></tr>
+<tr><td>TM-34 (Wave&nbsp;W)</td><td>ESP32</td><td class="num">0/24 auf WPA2/WPA3, 55,8 s</td><td class="num">24/24, 14,2 s</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-20</td><td>ESP32</td><td class="num">Boot-Delays ~7 s, jeder 5-min-Retry</td><td class="num">Loop-Max 26 ms, kein Gap &gt; 0,7 s</td><td><span class="tag fixed">fixed (nicht in T-Deck-PR)</span></td></tr>
+<tr><td>hostByName()</td><td>ESP32</td><td class="num">bis 31 s</td><td class="num">22–93 ms async</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>getMode()-Heartbeat</td><td>ESP32</td><td class="num">2,9 s + 1,1 s pro Boot</td><td class="num">0 Gaps</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-09</td><td>Heltec V3/V4, Stick V3</td><td class="num">Frame 579 ms, Loop-Max 645 ms</td><td class="num">34,5 ms / 39 ms</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-08</td><td>T-Deck</td><td class="num">36,9 Invalidierungen/s</td><td class="num">7,0/s</td><td><span class="tag fixed">fixed</span></td></tr>
+<tr><td>TM-01…04</td><td>T-Deck</td><td class="num">1552 ms Audio-Blockade</td><td class="num">23 ms</td><td><span class="tag fixed">fixed (49c482e1)</span></td></tr>
+<tr><td>BATT-01</td><td>Heltec V3/V4/Stick</td><td class="num">~100 ms / 500 ms</td><td class="num">0 ms, Kadenz 500→1000 ms</td><td><span class="tag fixed">behoben (b44fe712)</span></td></tr>
+<tr><td>TM-35</td><td>RAK4631</td><td class="num">getUDP 1,6 s/20 s, Loop-Max 1,7–3,4 s</td><td class="num">Loop-Max 314→145 ms, 0 Gaps &gt; 250 ms</td><td><span class="tag fixed">done</span></td></tr>
+<tr><td>TM-45</td><td>ESP32 + nRF52</td><td class="num">0/548 NTP-Erfolge / 9,1 h</td><td class="num">ok, rtt 89 ms</td><td><span class="tag fixed">fixed 2026-08-31 (81cfc064)</span></td></tr>
+<tr><td>N-20</td><td>RAK4631</td><td class="num">Minuten, nichtdeterministisch</td><td class="num">Hauptauslöser gefixt, Soak bestanden</td><td><span class="tag open">Rest offen</span></td></tr>
+<tr class="open"><td>TD-05/P1</td><td>T-Deck</td><td class="num">Flush 36,7 ms, 11,5 % Duty</td><td class="num">—</td><td><span class="tag open">offen</span></td></tr>
+<tr class="open"><td>G05</td><td>T-Deck</td><td class="num">~870 ms (Schätzung)</td><td class="num">—</td><td><span class="tag est">unverifiziert</span></td></tr>
+<tr class="open"><td>G06</td><td>T-Deck</td><td class="num">2 s / 8 s beim Boot (Schätzung)</td><td class="num">—</td><td><span class="tag est">unverifiziert</span></td></tr>
+<tr class="open"><td>TM-30</td><td>T-Deck</td><td class="num">Verdacht: wachsende Touch-Verzögerung</td><td class="num">nicht reproduziert</td><td><span class="tag est">nicht bestätigt</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box">
+<h3>Regressionsgates (aus wifi-report-20260830.md §7)</h3>
+<p>Native Tests 60/60, T-Deck-Harness 15/15, OLED-Harness Heltec 8/8, RAK-Harness
+boot/info/instr/mheard, alle vier Boards gebaut.</p>
+</div>
+
+<footer>
+<h2 style="margin-top:0;border-top:none">Quellen &amp; Nachvollziehbarkeit</h2>
+<p>Alle Zahlen auf dieser Seite stammen aus den folgenden Dokumenten und wurden vor dem Schreiben
+dieser Seite gegen den aktuellen Baum verifiziert (Zeilenangaben siehe oben):</p>
+<pre>docs/BACKLOG.md              §3.8f (TM-01..TM-45), §3.8p (DOC-01-Zeile)
+docs/wifi-report-20260830.md §4, §5, §6, §7
+docs/wifi-soak-report-20260831.md
+docs/architecture/08-defect-catalogue.md   N-20, BATT-01
+docs/report-ble-tx-latency.md
+src/esp32/esp32_main.cpp:1846-3943  (esp32loop)
+src/nrf52/nrf52_main.cpp:1143-2514  (nrf52loop)
+src/instrument.{h,cpp}</pre>
+<p>Fixes leben, sofern nicht anders vermerkt, ausschließlich auf dieser Branch
+(<code>tdeck-partial-refresh-trace</code>) — noch keiner ist upstream gemerged (siehe
+„Standing risk" in <code>BACKLOG.md</code>). Der „Vorher"-Zustand entspricht damit dem, was heute
+noch ausgeliefert wird.</p>
+<p>Bewusst weggelassen: eine kombinierte ESP32/nRF52-Verlustrate, ein „Pakete pro Sekunde Stall"-Wert
+und jede Zahl ohne Quellenzeile — auf ausdrücklichen Auftrag der Intake vom 2026-08-31.</p>
+</footer>
+
+</div>
+</body>
+</html>
