@@ -882,6 +882,14 @@ void deliver_scaffold(bool bget_password)
     web_client.println("var mcSeen={};");
     web_client.println("var mcHistory=[];");
     web_client.println("var MC_HIST_MAX=200;");
+    // MC-msg-tabs: this and the rest of the mcTab* functions live in the
+    // scaffold rather than sub_page_messages() because sub-pages are
+    // injected via innerHTML and their own <script> tags never run.
+    web_client.println("var mcTabSel='all';");
+    web_client.println("try{var mcTabStored=localStorage.getItem('mcTab');if(mcTabStored!=null)mcTabSel=mcTabStored;}catch(e){}");
+    web_client.println("function mcTabMatch(dst){if(mcTabSel=='all')return true;if(mcTabSel=='*')return dst=='*';if(mcTabSel=='dm')return dst!='*' && !/^[0-9]+$/.test(dst);return dst==mcTabSel;}");
+    web_client.println("function mcApplyTab(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-dst]');for(var i=0;i<els.length;i++){els[i].hidden=!mcTabMatch(els[i].getAttribute('data-dst'));}var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){btns[j].classList.toggle('mctab-on',btns[j].getAttribute('data-tab')==mcTabSel);}}");
+    web_client.println("function mcTab(btn){mcTabSel=btn.getAttribute('data-tab');try{localStorage.setItem('mcTab',mcTabSel);}catch(e){}var sc=document.getElementById('sendcall');if(sc){if(/^[0-9]+$/.test(mcTabSel))sc.value=mcTabSel;else if(mcTabSel=='*')sc.value='';}if(typeof updateCharsLeft==='function' && sc)updateCharsLeft();mcApplyTab();}");
     web_client.println("function mcHistIndex(id){for(var i=0;i<mcHistory.length;i++){if(mcHistory[i].id==id)return i;}return -1;}");
     web_client.println("function mcMergeEntry(id,html){var idx=mcHistIndex(id);if(idx<0){mcHistory.push({id:id,html:html});mcSeen[id]=true;if(mcHistory.length>MC_HIST_MAX){var dropped=mcHistory.shift();delete mcSeen[dropped.id];}}else{mcHistory[idx].html=html;}}");
     web_client.println("function mcRemovePlaceholder(panel){var kids=panel.children;for(var i=kids.length-1;i>=0;i--){if(kids[i].tagName=='P')panel.removeChild(kids[i]);}}");
@@ -1087,6 +1095,11 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".mcq-util-row {display:flex;align-items:center;gap:6px;margin:2px 0;}\n");
     web_client.println(".mcq-util-label {display:inline-block;min-width:60px;}\n");
     web_client.println(".mcq-util-track {flex:1;height:10px;background:#ECECEC;border-radius:4px;overflow:hidden;}\n");
+
+    // content definitions -> message-page tab bar
+    web_client.println("#mctabs {margin:6px 0;}\n");
+    web_client.println("#content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;cursor:pointer;}\n");
+    web_client.println("#content_inner .mctab-on {background-color:var(--mclightblue);}\n");
 
     web_client.println("</style>\n\n");
 
@@ -1463,6 +1476,21 @@ void sub_page_messages()
 {
     _create_meshcom_subheader("Messages");
     web_client.println("<div id=\"content_inner\">");
+
+    // tab bar filtering the panel below by data-dst; mcTab()/mcApplyTab() in
+    // the scaffold do the actual filtering (sub-page <script> never runs)
+    web_client.println("<div id=\"mctabs\">");
+    web_client.println("<button class=\"mctab mctab-on\" data-tab=\"all\" onclick=\"mcTab(this)\">All</button>");
+    web_client.println("<button class=\"mctab\" data-tab=\"*\" onclick=\"mcTab(this)\">*</button>");
+    for (int i = 0; i < (int)sizeof(meshcom_settings.node_gcb) / (int)sizeof(meshcom_settings.node_gcb[0]); i++)
+    {
+        if (meshcom_settings.node_gcb[i] > 0 && meshcom_settings.node_gcb[i] < 100000)
+        {
+            web_client.printf("<button class=\"mctab\" data-tab=\"%i\" onclick=\"mcTab(this)\">%i</button>\n", meshcom_settings.node_gcb[i], meshcom_settings.node_gcb[i]);
+        }
+    }
+    web_client.println("<button class=\"mctab\" data-tab=\"dm\" onclick=\"mcTab(this)\">DM</button>");
+    web_client.println("</div>");
 
     // this is where the asynchronous received messages will be displayed
     web_client.println("<div id=\"messages_panel\" class=\"mw-600\">");
