@@ -671,7 +671,12 @@ void btn_event_handler_setup(lv_event_t * e)
 
         tdeck_refresh_SET_view();
 
-        lv_tabview_set_act(tv, 0, LV_ANIM_ON);
+        // TD-12: an animated switch here can be stalled mid-way by a second
+        // press landing on a focusable widget while the scroll animation is
+        // running -- SCROLL_ON_FOCUS deletes the running animation and the
+        // replacement scroll is zeroed by LV_DIR_NONE on the tabview content.
+        // An immediate jump leaves no window for that.
+        lv_tabview_set_act(tv, 0, LV_ANIM_OFF);
     }
     else
         if(code == LV_EVENT_VALUE_CHANGED)
@@ -731,7 +736,15 @@ void btn_event_handler_send(lv_event_t * e)
         {
             lv_textarea_set_text(text_input, "");
         }
-        lv_tabview_set_act(tv, 0, LV_ANIM_ON);
+
+        // TD-12: same rationale as the Save Setting handler above -- an
+        // animated switch can be stalled mid-way by a second press on a
+        // focusable widget (SCROLL_ON_FOCUS kills the running scroll
+        // animation, LV_DIR_NONE zeroes the replacement), so jump instead
+        // of animating. SCROLL_END still fires synchronously inside
+        // lv_obj_scroll_by, so tabview_event_cb and the msg_controls
+        // hide/show logic behave exactly as before.
+        lv_tabview_set_act(tv, 0, LV_ANIM_OFF);
     }
     else if(code == LV_EVENT_VALUE_CHANGED)
     {
