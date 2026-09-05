@@ -19,6 +19,7 @@
 #include "spectral_scan.h"
 #include "rtc_functions.h"
 #include "maxhop.h"
+#include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
 #ifdef ESP32
 #include "net_console.h"
 #endif
@@ -6189,10 +6190,7 @@ void sendNodeSetting()
     {
         meshcom_settings.node_bw = LORA_BANDWIDTH;
     }
-    if (meshcom_settings.node_power == 0)
-    {
-        meshcom_settings.node_power = TX_OUTPUT_POWER;
-    }
+    meshcom_settings.node_power = resolve_tx_power(meshcom_settings.node_power, TX_OUTPUT_POWER); // #1132: also normalize the -20 "unset" sentinel, not just 0
 
     // if we are on nrf52 we need to change frequency reading to MHz
     #ifdef BOARD_RAK4630

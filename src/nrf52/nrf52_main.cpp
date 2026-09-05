@@ -14,6 +14,7 @@
 #include <time.h>
 #include <nrf52_functions.h>
 #include <nrf52_radio.h>
+#include <settings_sanitize.h> // #1132: resolve_tx_power sentinel normalization
 #include <extudp_functions.h>
 
 #include <TinyGPSPlus.h>
@@ -1042,6 +1043,7 @@ void nrf52setup()
     );
 
     // Set Radio TX configuration
+    meshcom_settings.node_power = resolve_tx_power(meshcom_settings.node_power, TX_OUTPUT_POWER); // #1132: normalize -20/0 sentinel like ESP32 does
     Serial.printf("[LoRa]...RF_POWER: %i dBm\n", getPower());
 
     Radio.SetTxConfig(

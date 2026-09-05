@@ -164,6 +164,19 @@ static void test_max_hop_text_plausibilitaet(void)
     TEST_ASSERT_EQUAL_INT(0, g_log_calls);
 }
 
+static void test_1132_resolve_tx_power_sentinels(void)
+{
+    // #1132: both "not set" sentinels (0 pre-v4.35p, -20 since upstream
+    // 50c1ce59) resolve to the board default; anything else -- including a
+    // valid negative SX1262 setting -- passes through untouched.
+    TEST_ASSERT_EQUAL_INT(22, resolve_tx_power(-20, 22));
+    TEST_ASSERT_EQUAL_INT(22, resolve_tx_power(0, 22));
+    TEST_ASSERT_EQUAL_INT(-9, resolve_tx_power(-9, 22));
+    TEST_ASSERT_EQUAL_INT(10, resolve_tx_power(10, 22));
+    TEST_ASSERT_EQUAL_INT(22, resolve_tx_power(22, 22));
+    TEST_ASSERT_EQUAL_INT(10, resolve_tx_power(-20, 10));
+}
+
 static void test_cstring_terminator(void)
 {
     char ok[10] = "DK5EN-14";
@@ -192,6 +205,7 @@ int main(int, char **)
     RUN_TEST(test_alles_muell_zaehlt_jedes_feld);
     RUN_TEST(test_ohne_logger);
     RUN_TEST(test_max_hop_text_plausibilitaet);
+    RUN_TEST(test_1132_resolve_tx_power_sentinels);
     RUN_TEST(test_cstring_terminator);
     return UNITY_END();
 }
