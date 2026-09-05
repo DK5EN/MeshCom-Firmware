@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeshCom-Firmware: Beiträge von DK5EN nach upstream</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{color-scheme:dark light;--bg:#0f172a;--bg2:#151f36;--bg3:#1f2840;--line:#2a3654;--fg:#e6ecff;--fg2:#9fb0cc;--fg3:#6f7f9c;--acc:#6366f1;--acc2:#e879f9;--ok:#34d399;--bad:#f87171;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:light){:root{--bg:#fbfcfe;--bg2:#ffffff;--bg3:#eef2f8;--line:#dfe5f0;--fg:#111a2b;--fg2:#4a5a72;--fg3:#7a879c;--ok:#059669;--bad:#dc2626}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:15px}
+.wrap{max-width:980px;margin:0 auto;padding:2.4rem 1.4rem 5rem}
+h1{font-size:1.7rem;font-weight:800;letter-spacing:-.01em;margin:0 0 .4rem;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:1.2rem;font-weight:700;margin:.2rem 0 .6rem}
+section{margin-top:2.4rem;padding-top:1.2rem;border-top:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3)}
+.lead{color:var(--fg2);max-width:78ch;margin:.4rem 0 1rem}
+a{color:var(--acc)}
+.small{font-size:.82rem;color:var(--fg3)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem;margin:1rem 0}
+.stat{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
+.stat .k{font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--fg3);margin-bottom:.3rem}
+.stat .v{font-family:var(--mono);font-weight:700;font-size:1.05rem;white-space:nowrap}
+.plus{color:var(--ok)}.minus{color:var(--bad)}
+table{width:100%;border-collapse:collapse;margin:.6rem 0;font-size:.84rem;table-layout:fixed}
+th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+th{color:var(--fg3);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+th:nth-child(1){width:9%}th:nth-child(2){width:13%}th:nth-child(3){width:50%}th:nth-child(4){width:18%}th:nth-child(5){width:10%}
+td.num{font-family:var(--mono);font-size:.8rem;white-space:nowrap}
+tr.closed td{color:var(--fg3)}
+tr.closed .note{font-size:.78rem;margin-top:.15rem}
+.tocwrap{overflow-x:auto}
+.box{border-radius:10px;border:1px solid var(--line);background:var(--bg2);padding:.85rem 1rem;margin:1rem 0;color:var(--fg2)}
+@media (max-width:640px){table{table-layout:auto;font-size:.78rem}th,td{padding:.35rem .4rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="small" style="margin:0 0 .6rem"><a href="./">← Übersicht</a></p>
+<div class="eyebrow">icssw-org/MeshCom-Firmware · Pull Requests von DK5EN</div>
+<h1>Drei Runden nach upstream: von 4.35m bis 4.35s</h1>
+<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in drei Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt.</p>
+<div class="stats">
+<div class="stat"><div class="k">Gemergte PRs</div><div class="v">30</div></div>
+<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+22.269</span> <span class="minus">−5.541</span></div></div>
+<div class="stat"><div class="k">Dateiänderungen</div><div class="v">288</div></div>
+<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 03.09.2026</div></div>
+</div>
+<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
+<section>
+<div class="eyebrow">Februar 2026 · 4.35m → 4.35n</div>
+<h2>Empfangslöcher und Wiederholungen</h2>
+<p class="lead">Ausgangspunkt war rund 50 % Nachrichtenverlust in beide Richtungen auf einem belegten Kanal, gemessen auf Heltec V3. Zwölf Fehler in der Funk-Zustandsmaschine und im Ringpuffer: Empfangsfenster, in denen das Modul blind war, ein Wiederholmechanismus, der nie griff, Quittungen ohne msg_id, und ein Ringpuffer, der sich mit fertigen Slots füllte. Nach den drei PRs: Paketverlust auf der Teststrecke 13,2 % auf 0 %, drei Wiederholungen im Abstand von 40 s, nRF52 nachgezogen.</p>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">3</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+478</span> <span class="minus">−153</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">12</div></div></div>
+<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/709">#709</a></td><td>2026-02-22</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs<div class="note">Ersetzt durch #710: gegen master statt dev gestellt.</div></td><td class="num">nicht gemerged</td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/710">#710</a></td><td>2026-02-22</td><td>Fix LoRa message loss: RX blind windows, ring buffer overflow, retransmit bugs</td><td class="num"><span class="plus">+279</span> <span class="minus">−99</span></td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/714">#714</a></td><td>2026-02-23</td><td>Fix: Retransmit-Mechanismus und RING_OVERFLOW-Diagnose (BUG-01, BUG-02)</td><td class="num"><span class="plus">+54</span> <span class="minus">−41</span></td><td class="num">4</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/728">#728</a></td><td>2026-02-24</td><td>Port LoRa message loss fixes to nRF52/RAK4630</td><td class="num"><span class="plus">+145</span> <span class="minus">−13</span></td><td class="num">3</td></tr>
+</tbody></table></div>
+</section>
+<section>
+<div class="eyebrow">März 2026 · 4.35n → 4.35p</div>
+<h2>CAD kommt in den Sendepfad</h2>
+<p class="lead">Vor 4.35p sendete ein Knoten nach Timer, ohne den Kanal zu prüfen. Diese Runde bringt Hardware-CAD mit Doppelprüfung, CSMA mit Prioritäten und Zufallsslots, die Prioritätswarteschlange und Trickle für HEY-Baken. Dazu die Nachbesserungen am neuen CAD (Zustandsautomat, Schleife ohne Empfang), zehn Wettläufe zwischen Interrupt und Hauptschleife, und auf dem RAK4631 die Stillstände durch geteilten SPI-Bus, Stack-Überlauf und Flash-Schreiben im HTTP-Handler. Upstream hat CAD am 15.03. übernommen, die Fixes folgten bis 24.03.</p>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">21</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+5.768</span> <span class="minus">−2.168</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">83</div></div></div>
+<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/742">#742</a></td><td>2026-03-02</td><td>Fix: max_hop bei UDP-zu-LoRa Gateway-Relay dekrementieren<div class="note">Nicht gemerged. Hop-Dekrement am Gateway; das Thema kam später über den Server-Pfad.</div></td><td class="num">nicht gemerged</td><td class="num">1</td></tr>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/749">#749</a></td><td>2026-03-04</td><td>Dependency-Update: RadioLib 7.6.0, NimBLE-Arduino 2.3.8<div class="note">Nicht gemerged. RadioLib 7.6.0 / NimBLE 2.3.8, upstream blieb bei den gepinnten Versionen.</div></td><td class="num">nicht gemerged</td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/775">#775</a></td><td>2026-03-16</td><td>fix: strcpy/strcat Buffer-Overflow Hardening</td><td class="num"><span class="plus">+30</span> <span class="minus">−17</span></td><td class="num">4</td></tr>
+<tr class="closed"><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/776">#776</a></td><td>2026-03-17</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben<div class="note">Ersetzt durch #777: der Branch hatte eine falsche Basis, deshalb die absurde Bilanz von −30.991 Zeilen.</div></td><td class="num">nicht gemerged</td><td class="num">221</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/777">#777</a></td><td>2026-03-17</td><td>fix: RAK4630 CAD-Deadlock und SPI-Race behoben</td><td class="num"><span class="plus">+39</span> <span class="minus">−2</span></td><td class="num">3</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/778">#778</a></td><td>2026-03-17</td><td>fix: RAK4630 Radio-Watchdog bei leerer TX-Queue</td><td class="num"><span class="plus">+7</span> <span class="minus">−0</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/779">#779</a></td><td>2026-03-18</td><td>fix: RACE-01..05 — ISR/Main-Loop Race Conditions in Ring-Buffer, Display-Queue und CAD-State-Machine</td><td class="num"><span class="plus">+164</span> <span class="minus">−102</span></td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/781">#781</a></td><td>2026-03-18</td><td>fix: RACE-01..05 — volatile Ring-Buffer-Indizes, ISR-Display-Spinlock, CAD Critical Sections</td><td class="num"><span class="plus">+166</span> <span class="minus">−106</span></td><td class="num">8</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/782">#782</a></td><td>2026-03-18</td><td>feat: Priority-Queue, Trickle-HEY (RFC 6206), CSMA-Prioritaeten, Statistik</td><td class="num"><span class="plus">+545</span> <span class="minus">−114</span></td><td class="num">8</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/783">#783</a></td><td>2026-03-19</td><td>fix: TX-Loop und UDP-Dedup Bugfix</td><td class="num"><span class="plus">+3.984</span> <span class="minus">−1.516</span></td><td class="num">12</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/784">#784</a></td><td>2026-03-19</td><td>fix: BLE-Ringpuffer speichert Offline-Nachrichten</td><td class="num"><span class="plus">+20</span> <span class="minus">−4</span></td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/785">#785</a></td><td>2026-03-20</td><td>fix: updateHeyPath überschreibt RSSI/SNR/MOD mit Relay-Werten</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/787">#787</a></td><td>2026-03-21</td><td>fix: conffin nur einmal senden, nach Queue-Drain</td><td class="num"><span class="plus">+45</span> <span class="minus">−24</span></td><td class="num">4</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/789">#789</a></td><td>2026-03-21</td><td>fix(radio): CAD-Spinloop und RX-Error-Diagnose</td><td class="num"><span class="plus">+95</span> <span class="minus">−13</span></td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/790">#790</a></td><td>2026-03-21</td><td>fix(nrf52): BLE CR/BW Anzeige + RX_PROCESS State-Log</td><td class="num"><span class="plus">+76</span> <span class="minus">−2</span></td><td class="num">3</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/791">#791</a></td><td>2026-03-22</td><td>Serial Monitor Replay, nRF52 RX-Airtime Fix, loganalyse.sh CRC-Errors</td><td class="num"><span class="plus">+316</span> <span class="minus">−62</span></td><td class="num">4</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/792">#792</a></td><td>2026-03-22</td><td>fix(lora): Doppel-Send nach ACK verhindert</td><td class="num"><span class="plus">+2</span> <span class="minus">−2</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/793">#793</a></td><td>2026-03-22</td><td>fix(lora): findAndStopRingSlot len=0 (Doppel-Send v2)</td><td class="num"><span class="plus">+1</span> <span class="minus">−0</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/802">#802</a></td><td>2026-03-23</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+77</span> <span class="minus">−113</span></td><td class="num">6</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/803">#803</a></td><td>2026-03-23</td><td>fix: UDP-to-LoRa Relay Race Condition + nrf_eth Ring Buffer Alignment</td><td class="num"><span class="plus">+49</span> <span class="minus">−42</span></td><td class="num">3</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/805">#805</a></td><td>2026-03-23</td><td>fix: ext. UDP WebUI Standstill auf RAK4631 (deferred save/reset)</td><td class="num"><span class="plus">+31</span> <span class="minus">−8</span></td><td class="num">4</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/806">#806</a></td><td>2026-03-23</td><td>fix: SPI bus guard — LoRa ISR Crash bei Ethernet-Zugriff (RAK4631)</td><td class="num"><span class="plus">+40</span> <span class="minus">−12</span></td><td class="num">3</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/809">#809</a></td><td>2026-03-23</td><td>fix: Stack Overflow in sendExtern() crasht RAK4631</td><td class="num"><span class="plus">+7</span> <span class="minus">−14</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/816">#816</a></td><td>2026-03-24</td><td>feat: Heap/RAM Monitoring via Serial (ESP32 + nRF52)</td><td class="num"><span class="plus">+73</span> <span class="minus">−14</span></td><td class="num">3</td></tr>
+</tbody></table></div>
+</section>
+<section>
+<div class="eyebrow">August / September 2026 · 4.35p → 4.35s</div>
+<h2>Fünf Monate Feldbetrieb, dann Härtung und Ausbau</h2>
+<p class="lead">Zwei große Sammel-PRs und drei Nachzügler. #1102 bringt 82 Änderungen aus dem Dauerbetrieb an OE- und DL-Knoten: Speichersicherheit auf allen von außen erreichbaren Pfaden, Absturz- und Einfrierfixes, Nebenläufigkeit, Zeitarithmetik. #1115 macht die Hauptschleife frei (WLAN, DNS und NTP asynchron, OLED auf Hardware-I2C, Audio auf eigenem Task, Ethernet-Link-Check) und liefert das Rückstau-Protokoll, Zeichensatzfilter, den Konfigurations-Export und die Feld-Instrumentierung. #1125 schließt mit GPS-Kalmanfilter, T-Deck-Tastenwiederholung und den setlog-Zeilen ab. Alles davon ist in der offiziellen 4.35s.</p>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">6</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+16.023</span> <span class="minus">−3.220</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">193</div></div></div>
+<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a></td><td>2026-08-27</td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num"><span class="plus">+3.213</span> <span class="minus">−1.113</span></td><td class="num">64</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1103">#1103</a></td><td>2026-08-27</td><td>fix(ble): FWDATE-Puffer zu klein -- snprintf schneidet die Sekunden ab</td><td class="num"><span class="plus">+4</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1115">#1115</a></td><td>2026-09-01</td><td>feat/fix: Feld-Stabilitaet, Haertung und Funktionsausbau nach v4.35p.08.28</td><td class="num"><span class="plus">+11.020</span> <span class="minus">−1.989</span></td><td class="num">102</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1118">#1118</a></td><td>2026-09-01</td><td>fix: PlatformIO-Upload ohne upload_port reparieren, -Wall -Wextra nur fuer src/</td><td class="num"><span class="plus">+14</span> <span class="minus">−2</span></td><td class="num">2</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1122">#1122</a></td><td>2026-09-02</td><td>fix: QRS erst ab der dritten eigenen Nachricht bei Ringtiefe >= 5</td><td class="num"><span class="plus">+35</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a></td><td>2026-09-03</td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num"><span class="plus">+1.737</span> <span class="minus">−114</span></td><td class="num">23</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="eyebrow">Quelle</div>
+<p class="small">Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 05.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
+</section>
+</div>
+</body>
+</html>
