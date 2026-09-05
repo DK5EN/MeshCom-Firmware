@@ -1210,13 +1210,37 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
         {
             // Pegelvergleich (alter Weg, Taste immer so)
             // Bench-Harness: ein eingereihter Schritt wirkt wie eine Flanke
-            if (s_dbg_ball_pending[i] > 0)
+            // TD-13: an injected button click models a physical press -- press
+            // edge, DBG_CLICK_HOLD_POLLS polls held low, release edge -- so the
+            // harness exercises the same edge sequence as a finger. Two back-to-back
+            // press edges without a release between them (the previous inject
+            // shape) looked like one long press to LVGL and could not reproduce
+            // the double click; the hold is what separates the two pulses.
+            static uint8_t s_dbg_click_phase = 0;     // 0 idle, 1..HOLD held, then release
+            const uint8_t DBG_CLICK_HOLD_POLLS = 3;
+            if (i == 4 && (s_dbg_ball_pending[i] > 0 || s_dbg_click_phase != 0))
+            {
+                if (s_dbg_click_phase == 0)
+                {
+                    s_dbg_ball_pending[i]--;
+                    dir = false;                     // press edge (active low)
+                    s_dbg_click_phase = 1;
+                }
+                else if (s_dbg_click_phase < DBG_CLICK_HOLD_POLLS)
+                {
+                    dir = false;                     // held
+                    s_dbg_click_phase++;
+                }
+                else
+                {
+                    dir = true;                      // release edge
+                    s_dbg_click_phase = 0;
+                }
+            }
+            else if (s_dbg_ball_pending[i] > 0)
             {
                 s_dbg_ball_pending[i]--;
-                // TD-13: button: always a press edge -- an injected click must land as a
-                // press regardless of the current pin level, otherwise `--ball click 2`
-                // would alternate press/release and only ever deliver one click.
-                dir = (i == 4) ? false : !last_dir[i];
+                dir = !last_dir[i];
             }
             if (dir != last_dir[i])
             {
