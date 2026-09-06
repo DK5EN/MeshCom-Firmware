@@ -45,10 +45,30 @@ bench-proven on both platforms in this cycle, then reverted (`de18bcf0`) after t
 refuted. The revert is byte-exact; nothing of it is in the release.
 
 **Still open after this release:** the fusion tau (30 min ships, sd 6.6 m against a 4 m design
-gate; replay says 3.6 m at tau 2 h, 2.4 m at 4 h -- see [[baro-fusion-tau-open]]); no TRACK-mode
-altitude capture; the `/D=` transmit path is native-only (no MCP23017 on the bench); item 203
-unverified on Supreme hardware; the injection machinery still compiled in but unreachable at
-`INSTRUMENT_ENABLED=0`, costing flash for nothing.
+gate; replay says 3.6 m at tau 2 h, 2.4 m at 4 h -- see [[baro-fusion-tau-open]], BACKLOG
+`GPS-05b`); no TRACK-mode altitude capture; the `/D=` transmit path is native-only (no MCP23017
+on the bench, `TLM-05`); item 203 unverified on Supreme hardware (`TM-09`); `GPS-10` (nRF52 legacy
+integer altitude EMA) untouched; `INS-03` -- the injection machinery still compiled in but
+unreachable at `INSTRUMENT_ENABLED=0`, costing flash for nothing.
+
+**Backlog filed the same evening:** new §3.8aa (`INS-01`/`INS-02` fixed, `INS-03` open) and §3.8ab
+(`CTY-02` withdrawn, revert byte-exact). Stale rows corrected: the "still open after this pass"
+index no longer lists `GPS-07`/`GPS-08`/`GPS-09`, the two "GPS-07 stays open" sentences now name
+`531d66b4`, and the `TM-09` row records the T-Beam Supreme half (on `Wire`, not `Wire1` --
+the Supreme shares the OLED bus with PMU, RTC and sensors).
+
+**Post-publish check on the two Heltecs:** both report `MeshCom 4.35s (build: Sep 6 2026 /
+19:47:06)` and `Flash-Version 20260724`, and the file webflash sent (md5 `4225c551...`) is
+byte-identical to the published `heltec_wifi_lora_32_V3.bin` asset. Note for the next cut: the
+image carries **three** different `__TIME__` stamps (19:46:02 / 19:46:04 / 19:47:06) from separate
+translation units in one build run, so `webflash.py` and `--info` legitimately report different
+build times for the same image -- not a mismatch, do not chase it again.
+
+**Where to pick up.** Nothing is half-finished: the release is out, the tree is clean, branch
+`fork-main` pushed at `a0bd6222` plus this commit. Natural next moves, in the order they earn
+their keep: (1) decide the fusion tau and run a second 2 h bench, (2) the TRACK-mode capture with
+pressure, (3) the upstream PR for `/D=` (draft is `pr-draft-mcp17-din-20260906.md`; Kurt owns
+review/merge, see [[upstream-no-self-merge]]), (4) `INS-03` sizing.
 
 ## 2026-09-06 (morning): v4.35s.09.06 published, 39 assets, web GUI badges, deepsleep on every board
 
