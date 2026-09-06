@@ -247,6 +247,60 @@ class TestDataHeaderValidation(ServerTestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestInjectionCallsignGuard(ServerTestCase):
+    """send_gate() must never put a foreign callsign on the air: the gateway
+    radiates injected frames verbatim, so only our own DK5EN-* may appear in
+    the source path. Relayed DATA frames from a registered gateway are genuine
+    on-air traffic and stay exempt."""
+
+    @staticmethod
+    def frame_with_path(path: bytes) -> bytes:
+        body = path + b">*:{CET}bench\x00\x00\x88"
+        return bytes([0x3A, 1, 2, 3, 4, 0xB0]) + body + b"\x00\x00" + bytes.fromhex("00AB237E")
+
+    def test_source_path_of_splits_elements(self) -> None:
+        fr = self.frame_with_path(b"DK5EN-93,DK5EN-91")
+        self.assertEqual(srv.source_path_of(fr), ["DK5EN-93", "DK5EN-91"])
+
+    def test_own_callsign_frame_is_sent(self) -> None:
+        node_sock = free_udp_socket()
+        self.addCleanup(node_sock.close)
+        node_sock.settimeout(2.0)
+        fr = self.frame_with_path(b"DK5EN-93")
+        sent = self.server.send_gate(fr, node_sock.getsockname())
+        data, _ = node_sock.recvfrom(4096)
+        self.assertEqual(data, sent)
+        self.assertEqual(data, b"GATE" + fr)
+
+    def test_foreign_callsign_frame_is_refused_and_not_sent(self) -> None:
+        node_sock = free_udp_socket()
+        self.addCleanup(node_sock.close)
+        node_sock.settimeout(0.3)
+        # a real third-party station in the relay path, our own call in front
+        fr = self.frame_with_path(b"DK5EN-93,DL2JA-2")
+        with self.assertRaises(srv.ForeignCallsignError):
+            self.server.send_gate(fr, node_sock.getsockname())
+        with self.assertRaises(socket.timeout):
+            node_sock.recvfrom(4096)
+
+    def test_foreign_source_callsign_is_refused(self) -> None:
+        with self.assertRaises(srv.ForeignCallsignError):
+            srv.assert_own_source_path(self.frame_with_path(b"DL2JA-1,DL2JA-2"))
+
+    def test_frame_without_path_is_refused(self) -> None:
+        with self.assertRaises(srv.ForeignCallsignError):
+            srv.assert_own_source_path(bytes([0x3A, 1, 2, 3, 4, 0xB0]) + b"no path here")
+
+    def test_relayed_frame_skips_the_guard(self) -> None:
+        node_sock = free_udp_socket()
+        self.addCleanup(node_sock.close)
+        node_sock.settimeout(2.0)
+        fr = self.frame_with_path(b"DL2JA-1,DL2JA-2")
+        self.server.send_gate(fr, node_sock.getsockname(), relayed=True)
+        data, _ = node_sock.recvfrom(4096)
+        self.assertEqual(data, b"GATE" + fr)
+
+
 class TestMaxZeros(ServerTestCase):
     def test_zero_run_helper_direct(self) -> None:
         self.assertFalse(srv._has_excess_zero_run(b"A" * 10 + b"\x00" * 6 + b"B"))

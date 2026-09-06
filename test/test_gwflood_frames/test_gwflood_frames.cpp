@@ -185,6 +185,13 @@ static void test_decoder_nimmt_jeden_frame_an(void)
         snprintf(msg, sizeof(msg), "%s: Quellpfad leer", fx.name);
         TEST_ASSERT_TRUE_MESSAGE(m.msg_source_path.length() > 0, msg);
 
+        // Der Injektor legt jeden Frame unveraendert auf die Luft -- die Quelle
+        // muss unser eigenes Rufzeichen sein, nie ein mitgeschnittenes fremdes.
+        snprintf(msg, sizeof(msg), "%s: Quelle ist nicht DK5EN-93", fx.name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_call.c_str(), msg);
+        snprintf(msg, sizeof(msg), "%s: fremdes Rufzeichen im Pfad", fx.name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_path.c_str(), msg);
+
         snprintf(msg, sizeof(msg), "%s: FCS-Feld nicht uebernommen", fx.name);
         TEST_ASSERT_EQUAL_UINT16_MESSAGE(wireFcsStored(fx), (uint16_t)m.msg_fcs, msg);
     }

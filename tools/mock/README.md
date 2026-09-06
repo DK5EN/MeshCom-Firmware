@@ -11,7 +11,11 @@ Python 3 only — no external dependencies.
   frames as `GATE` to every _other_ registered client, and drops corrupt
   datagrams (`MAX_ZEROS` rule). Also exposes `send_gate()` / `send_conf()`
   and the `build_*_datagram()` byte-builders for direct use from tests or
-  scripts.
+  scripts. `send_gate()` refuses to inject a frame whose source path carries
+  any callsign outside `OWN_CALLSIGN_PREFIXES` (`DK5EN-`): a gateway radiates
+  injected frames verbatim, so a foreign callsign there would go on the air
+  under a licence we do not hold. Only frames relayed from a registered
+  gateway's own `DATA` are exempt (`relayed=True`).
 - `mock_client.py` — a minimal softnode-style client: sends `KEEP`, receives
   `BEAT`, can send a `DATA`-wrapped LoRa frame, and prints anything received
   (`BEAT`/`GATE`/`CONF`) as hex plus a short summary.

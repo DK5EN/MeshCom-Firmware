@@ -247,6 +247,43 @@ def build_gate_datagram(frame: bytes) -> bytes:
     return _GATE_PREFIX + frame
 
 
+# Callsign prefixes this bench is licensed to put on the air. Every frame the
+# mock server INJECTS (as opposed to relays between registered gateways) must
+# carry a source path made only of these -- a gateway fed a fabricated frame
+# radiates it verbatim, so a foreign callsign here is a transmission under a
+# licence we do not hold. Keep this list to our own station.
+OWN_CALLSIGN_PREFIXES: tuple[str, ...] = ("DK5EN-",)
+
+
+class ForeignCallsignError(ValueError):
+    """A frame to be injected carries a callsign that is not ours."""
+
+
+def source_path_of(frame: bytes) -> list[str]:
+    """Return the path elements of a raw LoRa frame: the ASCII body starts at
+    [6] (type, 4-byte msg_id, flags) and reads "SRC,VIA1,VIA2>DEST..."."""
+    body = frame[6:]
+    sep = body.find(b">")
+    if sep <= 0:
+        raise ForeignCallsignError("frame has no 'SRC...>DEST' path to check")
+    try:
+        path = body[:sep].decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise ForeignCallsignError("frame path is not ASCII") from exc
+    return path.split(",")
+
+
+def assert_own_source_path(frame: bytes) -> None:
+    """Refuse a frame whose source path names any callsign outside
+    OWN_CALLSIGN_PREFIXES. Raises ForeignCallsignError."""
+    for element in source_path_of(frame):
+        if not element.startswith(OWN_CALLSIGN_PREFIXES):
+            raise ForeignCallsignError(
+                f"refusing to inject frame with foreign callsign {element!r} in path; "
+                f"allowed prefixes: {OWN_CALLSIGN_PREFIXES}"
+            )
+
+
 def build_conf_datagram(
     callsign: str, shortname: str, lat: int, lon: int, alt: int
 ) -> bytes:
@@ -430,12 +467,23 @@ class MockMeshComServer:
         with self._lock:
             targets = [a for a in self.clients if a != addr]
         for target in targets:
-            self.send_gate(frame, target)
+            self.send_gate(frame, target, relayed=True)
 
     # -- test-driving helpers (importable by tests / manual scripts) --
 
-    def send_gate(self, frame_bytes: bytes, to_addr: tuple[str, int]) -> bytes:
-        """Build and send a byte-exact GATE datagram; returns the bytes sent."""
+    def send_gate(
+        self, frame_bytes: bytes, to_addr: tuple[str, int], *, relayed: bool = False
+    ) -> bytes:
+        """Build and send a byte-exact GATE datagram; returns the bytes sent.
+
+        Injected frames (the default) must pass assert_own_source_path(): the
+        gateway radiates whatever arrives here, so only our own callsigns may
+        appear in the path. `relayed=True` is reserved for frames a registered
+        gateway itself delivered via DATA -- genuine on-air traffic the real
+        server would forward the same way -- and skips the check.
+        """
+        if not relayed:
+            assert_own_source_path(frame_bytes)
         datagram = build_gate_datagram(frame_bytes)
         self.sock.sendto(datagram, to_addr)
         logger.debug(

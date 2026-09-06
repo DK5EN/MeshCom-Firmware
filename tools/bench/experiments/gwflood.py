@@ -12,14 +12,20 @@ Setup (all on the bench LAN, run from tools/bench/runs/):
     reception prints `RX-LoRa2 ... x<msg_id>`;
   * for every inter-arrival in --gaps the server sends --per-gap GATE frames to
     the gateway and records the send time. --frame picks what is injected:
-      pos    corpus frame f001, a foreign position beacon (MSG_PRIO_LOW)
-      text   a broadcast text frame built on corpus f002, --text-bytes long
-             (MSG_PRIO_HIGH) -- the class #568 is actually about
+      pos    a position beacon (MSG_PRIO_LOW), wire layout of corpus f001
+      text   a broadcast text frame, --text-bytes long (MSG_PRIO_HIGH) -- the
+             class #568 is actually about; wire layout of corpus f002
       mixed  alternating, which is what a real gateway sees
     Every frame gets a fresh msg_id and a recomputed FCS. The exact bytes are
     checked in as test/support/gwflood_frames.txt (--dump-frames) and decoded
     by the real decodeAPRS() in test_gwflood_frames, so a malformed injector
     cannot masquerade as a gateway that drops everything.
+
+  The gateway radiates every injected frame verbatim, so the source path is
+  always our own SOURCE_PATH (DK5EN-93) -- never a captured foreign callsign.
+  MockMeshComServer.send_gate() enforces that (assert_own_source_path) and the
+  fixture test pins it; the corpus frames with real third-party callsigns stay
+  in test/ for offline decoding only.
 
 The report attributes a loss to a stage: ingress -> [UDP];rx seen at the socket
 -> RING_WRITE src=udp_rx queued -> RING_DROP_* -> TX-LoRa -> observer RX, plus
@@ -46,27 +52,22 @@ sys.path.insert(0, str(HERE.parent.parent / "mock"))  # tools/mock
 from tdeck_harness import TDeckSession  # noqa: E402
 from meshcom_server import MockMeshComServer  # noqa: E402
 
-# On-air captured MeshCom frames, verbatim from test/test_aprs_corpus/corpus.txt.
-# Layout: [0] type, [1:5] msg_id little-endian, [5] flags/hop, then the ASCII
-# body "SRCPATH>DEST<type>payload", a 0x00 terminator and two trailing bytes,
-# then the 2-byte FCS and a 4-byte trailer. The FCS is the plain byte sum of
-# everything before it -- verified against all 12 FCS-carrying corpus frames.
-#
-# f001: position beacon (0x21) -- MSG_PRIO_LOW, the class that loses a ring
-#       contest against other positions (test_txring_flood).
-F001 = bytes.fromhex(
-    "21AB13F1E991444C324A412D312C444C324A412D323E2A21343832352E33354E5C30313134372E3139452D"
-    "4D61727A6C696E67235765726E65722F523D393B002B88132F23AB707E"
-)
-# f002: broadcast text (0x3A, dest "*") -- MSG_PRIO_HIGH, the class upstream
-#       #568 is actually about (a BBS listing sent to a gateway).
-F002 = bytes.fromhex(
-    "3AA425886AB04F45315841522D36322C444B3459552D37372C444C324A412D322C444B35454E2D39313E2A"
-    "3A7B4345547D323032362D30382D32312031303A35373A323800008811CC00AB237E"
-)
-
-FCS_TAIL_LEN = 6      # 2 bytes FCS + 4 bytes trailer
+# Frame layout, taken from the on-air captures in test/test_aprs_corpus/corpus.txt
+# (f001 position, f002 broadcast text): [0] type, [1:5] msg_id little-endian,
+# [5] flags/hop, then the ASCII body "SRCPATH>DEST<type>payload", a 0x00
+# terminator and two trailing bytes, then the 2-byte FCS and a 4-byte trailer.
+# The FCS is the plain byte sum of everything before it -- verified against all
+# 12 FCS-carrying corpus frames. Only the layout is reused: the source path is
+# our own callsign and the position is the bench, not the captured station.
+SOURCE_PATH = b"DK5EN-93"
+POS_FLAGS = 0x91
+TEXT_FLAGS = 0xB0
+POS_BODY = b"!4824.45N\\01144.27E-bench#gwflood/R=9;"   # the bench desk, as DK5EN-92 reports it
+POS_TAIL = b"\x00+\x88"           # payload terminator + the two f001 trailing bytes
+POS_TRAILER = bytes.fromhex("23AB707E")
+TEXT_TAIL = b"\x00\x00\x88"       # payload terminator + the two f002 trailing bytes
 TEXT_TRAILER = bytes.fromhex("00AB237E")
+FCS_TAIL_LEN = 6      # 2 bytes FCS + 4 bytes trailer
 
 
 def _with_fcs(b: bytearray) -> bytes:
@@ -77,29 +78,37 @@ def _with_fcs(b: bytearray) -> bytes:
     return bytes(b)
 
 
+def _head(frame_type: int, msg_id: int, flags: int) -> bytearray:
+    """type + msg_id + flags + "SRCPATH>*" -- everything the firmware parses as
+    source path and destination before the payload type byte."""
+    b = bytearray([frame_type])
+    b += msg_id.to_bytes(4, "little")
+    b.append(flags)
+    b += SOURCE_PATH + b">*"
+    return b
+
+
 def pos_frame_with_id(msg_id: int) -> bytes:
-    b = bytearray(F001)
-    b[1:5] = msg_id.to_bytes(4, "little")
+    """A position beacon (0x21) from SOURCE_PATH at the bench."""
+    b = _head(0x21, msg_id, POS_FLAGS)
+    b += POS_BODY
+    b += POS_TAIL
+    b += b"\x00\x00"               # FCS placeholder
+    b += POS_TRAILER
     return _with_fcs(b)
-
-
-# body of f002 up to and including the "…>*:" separator, i.e. everything the
-# firmware parses as source path + destination before the payload starts
-_TEXT_HEAD = F002[:F002.index(b">*:") + 3]
 
 
 def text_frame_with_id(msg_id: int, payload: bytes) -> bytes:
     """Build a broadcast text frame (0x3A) carrying `payload`.
 
-    Head, terminator bytes and trailer are f002's verbatim, so the source path
-    and destination are a real on-air combination; only the msg_id and the
-    payload change. #568's frames were ~128 bytes, which the default payload
-    length reproduces.
+    Terminator bytes and trailer follow f002's layout; source path is ours,
+    only the msg_id and the payload vary per frame. #568's frames were ~128
+    bytes, which the default payload length reproduces.
     """
-    b = bytearray(_TEXT_HEAD)
-    b[1:5] = msg_id.to_bytes(4, "little")
+    b = _head(0x3A, msg_id, TEXT_FLAGS)
+    b += b":"
     b += payload
-    b += b"\x00\x00\x88"          # payload terminator + the two f002 trailing bytes
+    b += TEXT_TAIL
     b += b"\x00\x00"               # FCS placeholder
     b += TEXT_TRAILER
     return _with_fcs(b)
@@ -107,7 +116,7 @@ def text_frame_with_id(msg_id: int, payload: bytes) -> bytes:
 
 # fixed cost of a text frame around its payload: head (type + msg_id + flags +
 # "SRCPATH>DEST:") + terminator + two trailing bytes + FCS + trailer
-TEXT_OVERHEAD = len(_TEXT_HEAD) + 3 + FCS_TAIL_LEN
+TEXT_OVERHEAD = len(_head(0x3A, 0, TEXT_FLAGS)) + 1 + len(TEXT_TAIL) + FCS_TAIL_LEN
 
 
 def text_payload(n: int, seq: int) -> bytes:
@@ -209,7 +218,7 @@ def main() -> int:
                     help="seconds to wait after the last frame -- the TX queue drains slowly, "
                          "a short settle counts still-queued frames as lost")
     ap.add_argument("--frame", default="pos", choices=("pos", "text", "mixed"),
-                    help="pos = corpus f001 position beacon (MSG_PRIO_LOW); "
+                    help="pos = position beacon from DK5EN-93 (MSG_PRIO_LOW); "
                          "text = broadcast text like upstream #568 (MSG_PRIO_HIGH); "
                          "mixed = alternating, which is what a real gateway sees")
     ap.add_argument("--text-bytes", type=int, default=128,
@@ -236,7 +245,8 @@ def main() -> int:
                      "# #568). Generated -- do not edit by hand:\n"
                      "#   python3 tools/bench/experiments/gwflood.py --frame mixed \\\n"
                      "#       --dump-frames test/support/gwflood_frames.txt\n"
-                     "# Format: <name> <hex>, same as test/test_aprs_corpus/corpus.txt.\n")
+                     "# Format: <name> <hex>, same as test/test_aprs_corpus/corpus.txt.\n"
+                     "# Source path is always our own DK5EN-93 -- no foreign callsign.\n")
             n = 0
             for i in range(6):
                 for kind in ("pos", "text"):
