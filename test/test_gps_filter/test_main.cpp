@@ -143,7 +143,7 @@ static void test_plausible_verwirft_nullinsel_und_kalender(void)
 }
 
 // F5: eine Muellhoehe darf node_alt nicht seeden (der Filter heilt sich zwar in
-// zehn Stichproben, aber der erste Wert geht sofort in die Konfiguration).
+// sechzig Stichproben, aber der erste Wert geht sofort in die Konfiguration).
 static void test_plausible_verwirft_hoehen_ausserhalb_des_bereichs(void)
 {
     TEST_ASSERT_FALSE(gpsSamplePlausible(48.2479, 14.2577, -501.0, 2026, 9, 1));
@@ -232,11 +232,13 @@ static void test_kaltstart_seedet_exakt(void)
 // ---------------------------------------------------------------------------
 //
 // F8: die alte Fassung dieses Falls hat nur eine +-3 m Schranke geprueft und
-// ist auch mit geloeschtem Gate durchgelaufen (max. Abweichung 0.78 m). Hier
+// ist auch mit geloeschtem Gate durchgelaufen (max. Abweichung 1.68 m). Hier
 // steht jetzt die Gate-Entscheidung jeder einzelnen Stichprobe: die vier
 // Werte, die mehr als ALT_KF_GATE_M unter dem Zustand liegen, muessen
 // verworfen werden, und der Zustand darf sich ueber die ganze Sequenz um
-// weniger als 0.5 m bewegen (gemessen 0.23 m; ohne Gate 0.78 m).
+// weniger als 0.5 m bewegen (gemessen 0.23 m; ohne Gate 1.68 m).
+// GPS-07: das Gate ist jetzt 30 m statt 15 m, die letzten vier Werte liegen
+// daher deutlich weiter unten (>30 m) als in der urspruenglichen Fassung.
 static void test_doc_sequenz_gate_verwirft_genau_vier_samples(void)
 {
     struct AltFilter f;
@@ -248,8 +250,8 @@ static void test_doc_sequenz_gate_verwirft_genau_vier_samples(void)
     f.init    = true;
 
     static const float seq[] = {278.6f, 273.6f, 268.5f, 267.2f,
-                                 263.4f, 261.8f, 261.2f, 257.7f};
-    // 263.4 und tiefer liegen mehr als 15 m unter dem (kaum bewegten) Zustand
+                                 245.0f, 235.0f, 225.0f, 215.0f};
+    // 245.0 und tiefer liegen mehr als 30 m unter dem (kaum bewegten) Zustand
     static const bool expectAccept[] = {true, true, true, true,
                                         false, false, false, false};
 
@@ -269,14 +271,14 @@ static void test_doc_sequenz_gate_verwirft_genau_vier_samples(void)
     }
 
     TEST_ASSERT_EQUAL_INT(4, accepted);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(4, rejected, "the four samples >15 m below 280 must be rejected");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(4, rejected, "the four samples >30 m below 280 must be rejected");
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(4, f.rejects, "consecutive-reject counter must hold the run");
     TEST_ASSERT_TRUE_MESSAGE(fabsf(f.x - 280.0f) < 0.5f,
                              "state moved further than the gated 0.23 m (gate ineffective?)");
 }
 
 // ---------------------------------------------------------------------------
-// 5. Gate: ein einzelner +25 m Ausreisser wird verworfen, Zustand unveraendert
+// 5. Gate: ein einzelner +40 m Ausreisser wird verworfen, Zustand unveraendert
 // ---------------------------------------------------------------------------
 
 static void test_einzelner_ausreisser_wird_verworfen(void)
@@ -290,7 +292,7 @@ static void test_einzelner_ausreisser_wird_verworfen(void)
     float xBefore = f.x;
     float pBefore = f.P;
 
-    bool ok = altFilterUpdate(&f, 305.0f, DT_3S); // 280 + 25
+    bool ok = altFilterUpdate(&f, 320.0f, DT_3S); // 280 + 40, > ALT_KF_GATE_M (30)
 
     TEST_ASSERT_FALSE(ok);
     TEST_ASSERT_EQUAL_FLOAT(xBefore, f.x);
@@ -299,10 +301,10 @@ static void test_einzelner_ausreisser_wird_verworfen(void)
 }
 
 // ---------------------------------------------------------------------------
-// 6. Re-Seed: 10 aufeinanderfolgende +50 m Samples seeden neu
+// 6. Re-Seed: 60 aufeinanderfolgende +50 m Samples seeden neu
 // ---------------------------------------------------------------------------
 
-static void test_zehn_ausreisser_seeden_neu(void)
+static void test_sechzig_ausreisser_seeden_neu(void)
 {
     struct AltFilter f;
     f.x       = 280.0f;
@@ -310,7 +312,7 @@ static void test_zehn_ausreisser_seeden_neu(void)
     f.rejects = 0;
     f.init    = true;
 
-    const float meas = 330.0f; // 280 + 50
+    const float meas = 330.0f; // 280 + 50, > ALT_KF_GATE_M (30)
 
     for (int i = 0; i < ALT_KF_RESEED_N - 1; i++)
     {
@@ -318,7 +320,7 @@ static void test_zehn_ausreisser_seeden_neu(void)
         TEST_ASSERT_FALSE_MESSAGE(ok, "reject count below the reseed threshold must stay rejected");
     }
 
-    // der zehnte Ausreisser in Folge loest das Reseed aus
+    // der sechzigste Ausreisser in Folge loest das Reseed aus
     bool ok = altFilterUpdate(&f, meas, DT_3S);
     TEST_ASSERT_TRUE(ok);
     TEST_ASSERT_EQUAL_FLOAT(meas, f.x);
@@ -433,7 +435,7 @@ static void test_dt_wird_geklemmt(void)
 // 9. Vollstaendige Feldserien aus dem Fixture
 // ---------------------------------------------------------------------------
 //
-// Gemessen mit exakt diesem Filter (Q=0.01, R=185, P0=400, Gate=15, Reseed=10,
+// Gemessen mit exakt diesem Filter (Q=0.01, R=185, P0=400, Gate=30, Reseed=60,
 // dt=3000 ms) gegen den Session-Median der Rohwerte. Der Rohwert der ersten
 // Serie deckt sich mit dem Doc-Wert (bug-GPS-uart-overflow-20260901.md S7.6:
 // "4.36 -> 1.52 m"); das dortige 1.52 m ist eine EMA mit tau=300s ueber die
@@ -441,6 +443,12 @@ static void test_dt_wird_geklemmt(void)
 // volle Serie inklusive Kaltstart. Schwellen unten sind daher die gemessenen
 // Werte dieses Filters (mit kleiner Toleranz fuer plattformabhaengige
 // Fliesskomma-Rundung), nicht der Doc-Zielwert.
+//
+// GPS-07: mit dem breiteren Gate (30 statt 15 m) werden fuer die erste Serie
+// sieben zuvor verworfene Stichproben jetzt eingerechnet, wodurch die
+// gefilterten Werte leicht besser werden (2.16 -> 2.14 m, 1.50 -> 1.45 m); die
+// zweite Serie ist unveraendert (in ihr loest kein Sample das alte 15 m Gate
+// aus). Keine der beiden Serien re-seedet unter alten oder neuen Konstanten.
 
 static const int kConvStart = 100;   // Kaltstart-Phase, gilt fuer beide Serien
 
@@ -451,10 +459,10 @@ static void test_feldserie_rms_verbessert_sich(void)
     double rawRms, filtRms, convRms;
     seriesRms(GPSDEBUG_ALT, n, kConvStart, &rawRms, &filtRms, &convRms);
 
-    // gemessen: raw 4.364, ganze Serie 2.162, konvergierte Phase 1.498
+    // gemessen: raw 4.364, ganze Serie 2.138, konvergierte Phase 1.450
     TEST_ASSERT_TRUE_MESSAGE(rawRms >= 3.5, "raw RMS dropped below the measured baseline (4.36 m)");
-    TEST_ASSERT_TRUE_MESSAGE(filtRms <= 2.2, "filtered RMS regressed past the measured baseline (2.16 m)");
-    TEST_ASSERT_TRUE_MESSAGE(convRms <= 1.6, "converged-phase RMS regressed past the measured baseline (1.50 m)");
+    TEST_ASSERT_TRUE_MESSAGE(filtRms <= 2.2, "filtered RMS regressed past the measured baseline (2.14 m)");
+    TEST_ASSERT_TRUE_MESSAGE(convRms <= 1.6, "converged-phase RMS regressed past the measured baseline (1.45 m)");
 }
 
 // F8: die zweite Aufzeichnung (gpsdebug1.txt, 305 Samples, derselbe Knoten
@@ -475,6 +483,71 @@ static void test_feldserie2_rms_verbessert_sich(void)
     TEST_ASSERT_TRUE_MESSAGE(convRms < rawRms, "the filter must beat the raw series it is fed");
 }
 
+// GPS-07: die dritte Feldserie (DK5EN-93, indoors/stationaer, siehe
+// traces/gpsdebug_alt_series.h fuer die volle Herkunft) ist genau die
+// Aufzeichnung, an der die alten Konstanten (Gate 15 m, Reseed 10) 20 mal
+// re-seeden und der Filter praktisch nichts gegenueber dem Rohsignal bringt
+// (docs/bug-baro-altitude-20260906.md S4). Mit den neuen Konstanten (Gate
+// 30 m, Reseed 60) re-seedet die Serie kein einziges Mal, und die
+// Streuung des gefilterten Ausgangs faellt deutlich unter die Streuung des
+// Rohsignals (gemessen: raw sd 16.12 m, gefiltert 7.69 m).
+//
+// Ein Re-Seed ist daran erkennbar, dass P direkt nach dem Update wieder
+// exakt ALT_KF_P0 ist, obwohl der Filter vor diesem Aufruf schon
+// initialisiert war (P0 taucht sonst nur beim allerersten Sample auf).
+static void test_feldserie93_keine_reseeds(void)
+{
+    const int n = (int)(sizeof(ALTB93_ALT) / sizeof(ALTB93_ALT[0]));
+
+    struct AltFilter f;
+    altFilterReset(&f);
+
+    int reseeds = 0;
+    double sumRaw = 0.0, sumFilt = 0.0;
+
+    for (int i = 0; i < n; i++)
+    {
+        bool wasInit = f.init;
+        altFilterUpdate(&f, ALTB93_ALT[i], DT_3S);
+
+        if (wasInit && f.P == ALT_KF_P0)
+            reseeds++;
+
+        sumRaw  += (double)ALTB93_ALT[i];
+        sumFilt += (double)f.x;
+    }
+
+    double meanRaw  = sumRaw  / n;
+    double meanFilt = sumFilt / n;
+
+    double sumSqRaw = 0.0, sumSqFilt = 0.0;
+
+    {
+        struct AltFilter g;
+        altFilterReset(&g);
+
+        for (int i = 0; i < n; i++)
+        {
+            altFilterUpdate(&g, ALTB93_ALT[i], DT_3S);
+
+            double dRaw = (double)ALTB93_ALT[i] - meanRaw;
+            sumSqRaw += dRaw * dRaw;
+
+            double dFilt = (double)g.x - meanFilt;
+            sumSqFilt += dFilt * dFilt;
+        }
+    }
+
+    double rawSd  = sqrt(sumSqRaw  / n);
+    double filtSd = sqrt(sumSqFilt / n);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, reseeds,
+                                  "ALT_KF_GATE_M/ALT_KF_RESEED_N must not re-seed on the DK5EN-93 capture");
+    TEST_ASSERT_TRUE_MESSAGE(rawSd > 14.0, "raw sd dropped below the measured baseline (~16.1 m)");
+    TEST_ASSERT_TRUE_MESSAGE(filtSd < rawSd,
+                             "the filter must reduce the spread of the DK5EN-93 capture below the raw sd");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -487,12 +560,13 @@ int main(int, char **)
     RUN_TEST(test_kaltstart_seedet_exakt);
     RUN_TEST(test_doc_sequenz_gate_verwirft_genau_vier_samples);
     RUN_TEST(test_einzelner_ausreisser_wird_verworfen);
-    RUN_TEST(test_zehn_ausreisser_seeden_neu);
+    RUN_TEST(test_sechzig_ausreisser_seeden_neu);
     RUN_TEST(test_konvergenz_flag_kippt_innerhalb_100_samples);
     RUN_TEST(test_drei_updates_bei_1s_wie_eines_bei_3s);
     RUN_TEST(test_dt_skaliert_das_prozessrauschen);
     RUN_TEST(test_dt_wird_geklemmt);
     RUN_TEST(test_feldserie_rms_verbessert_sich);
     RUN_TEST(test_feldserie2_rms_verbessert_sich);
+    RUN_TEST(test_feldserie93_keine_reseeds);
     return UNITY_END();
 }
