@@ -15,6 +15,11 @@
 #include "gps_functions.h"
 
 #include "gps_filter.h"
+#include "alt_fusion.h"
+
+#if defined(ENABLE_BMX280)
+#include "bmx280.h"
+#endif
 
 #include "printfdeb_functions.h"
 
@@ -110,6 +115,13 @@ static bool s_altConvergedOnce = false;
 // millis() der letzten in den Schaetzer eingespeisten Hoehe. 0 = unbekannt
 // (erste Auswertung nach dem Start/Reset), dann gilt die Nennkadenz.
 static uint32_t s_altLastMs = 0;
+
+// GPS-05b: Komplementaerfilter GPS/Barometer. Laeuft nur auf Boards mit
+// BMx280, deren Druckreferenz scharf ist (fBasePress != 0, siehe GPS-08);
+// alle anderen schreiben weiter den Kalman-Schaetzer nach node_alt. Die
+// Logik liegt Arduino-frei in alt_fusion.cpp.
+static struct AltFusion s_altFusion;
+static uint32_t s_altFusionLastMs = 0;
 
 unsigned long detectedBaud = 0;
 String ver = "";
@@ -890,6 +902,8 @@ void WZ_GPS_Init()
   altFilterReset(&s_alt);
   s_altConvergedOnce = false;
   s_altLastMs = 0;
+  altFusionReset(&s_altFusion);
+  s_altFusionLastMs = 0;
 
   Serial.printf("[GPS ]...Init GPIO RX=%d TX=%d\n", GPS_RX_PIN, GPS_TX_PIN);
   
@@ -1167,6 +1181,8 @@ int WZ_GPS_Loop() {
                 altFilterReset(&s_alt);
                 s_altConvergedOnce = false;
                 s_altLastMs = 0;
+                altFusionReset(&s_altFusion);
+                s_altFusionLastMs = 0;
 
                 meshcom_settings.node_alt = (int)gpsData.altitude;
             }
@@ -1183,7 +1199,37 @@ int WZ_GPS_Loop() {
                     s_altLastMs    = nowMs;
 
                     if(altFilterUpdate(&s_alt, (float)gpsData.altitude, dtMs))
-                        meshcom_settings.node_alt = (int)lroundf(s_alt.x);
+                    {
+                        float altOut = s_alt.x;
+
+                        #if defined(ENABLE_BMX280)
+                        // GPS-05b: Der Kalman-Schaetzer liefert den langsamen
+                        // Anteil, das Barometer die Form der letzten Minuten.
+                        // Der absolute Anker des Barometers (eine einzige
+                        // GPS-Stichprobe, GPS-08) kuerzt sich im Hochpass
+                        // heraus. Ohne scharfe Druckreferenz bleibt es beim
+                        // reinen Kalman-Wert, damit Boards ohne Sensor und die
+                        // erste Minute nach dem Boot unveraendert laufen.
+                        if((bBMPON || bBMEON) && fBasePress != 0.0f)
+                        {
+                            float baroAlt = getPressALTf();
+
+                            if(baroAlt != 0.0f)
+                            {
+                                uint32_t fdtMs = (s_altFusionLastMs == 0) ? 0 : (nowMs - s_altFusionLastMs);
+                                s_altFusionLastMs = nowMs;
+
+                                altOut = altFusionUpdate(&s_altFusion, s_alt.x, baroAlt, fdtMs);
+
+                                if(iGPSDEBUG > 1)
+                                    printfdeb("[GPS ]...alt fused: %.1f m (kf %.1f baro %.1f)\n",
+                                              (double)altOut, (double)s_alt.x, (double)baroAlt);
+                            }
+                        }
+                        #endif
+
+                        meshcom_settings.node_alt = (int)lroundf(altOut);
+                    }
                 }
 
                 // Flanke: erst ab hier ist die Hoehe gut genug, um die
@@ -1252,6 +1298,8 @@ void WZ_GPS_AltSeed(float alt)
     altFilterSeed(&s_alt, alt);
     s_altConvergedOnce = false;
     s_altLastMs        = 0;
+    altFusionReset(&s_altFusion);
+    s_altFusionLastMs  = 0;
 
     baroBaseRelatch(alt);
 }
