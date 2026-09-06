@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## 2026-09-06 (morning): v4.35s.09.06 published, 39 assets, web GUI badges, deepsleep on every board
+
+Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.06>, marked
+latest, 39 assets diff-identical in name to 09.05; tag on `83820d2f`, HEAD is this RESUME commit.
+Shipped: changelog items 192-201 -- ACK attribution stages 1+3 and ACK-01 (bench DK5EN-98 against
+McApp), WQ-02 QRS forecast, **WEB-05 unread badges on the message tabs** (`714fce85`, operator
+request; `tools/webgui_badge_test.js` = jsdom against the live node, 30 checks, Node needs
+`--insecure-http-parser` because the node's HTTP status line ends in a bare LF), **WEB-06 `{CET}`
+beacons hidden from the web list** (`9076824d`, operator screenshot), DS-01 `--deepsleep` real on
+every ESP32 board and System OFF on the three nRF52 boards, the wake-side gpio-hold releases
+(T-Deck/Plus/T-Beam-1W bench-found; Wireless Paper/E213 **blind**), CDC-02 HWCDC ring race
+(bench DK5EN-14 9/30 -> 0/80). Deepsleep bench per operator: T-Deck Plus, RAK4631 and a Heltec V3
+slept and woke; no sleep current measured anywhere. Gates: 616 native cases / 12 envs, 32 envs
+built, tracked safeboot bins byte-identical to the build. `FLASH_VERSION` 20260906 (was already
+bumped for the bench build), `FLASH_STRUCT_VERSION` 20260724. Chrome extension was not connected
+this session, hence the jsdom harness. **Deliberately not in:** low-voltage shutdown (issue 962
+Option B) and light sleep (Option C) -- no bench supply, packs or meter; release notes carry the
+community test list (WP/E213 two sleep/wake cycles, E290 e-ink frame, T-Beam Supreme AXP2101,
+T114/T-Echo System OFF, E22 button pull-up, sleep current). Open: nav-button badge from other
+pages (would need the poll on every page), WQ-02 still not eyeballed against a real burst, ACK
+stage 4, upstream PR for issue 962 waits for community feedback. dk5en-98 runs build 09:33:25 =
+the release code; 14/90/93/92 not flashed with the release build.
+
 ## 2026-09-05 (late evening): ACK attribution live, ACK-01 fixed, WQ-02, 98 + 14 flashed
 
 All on `fork-main`, pushed; HEAD `b2336e6f` plus this docs commit. Changelog items 192-194 under
