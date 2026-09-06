@@ -133,11 +133,24 @@ Zuwachs gegenueber dem Vorgaenger-Release.
   6,6 m, Allan-Deviation 0,22 m bei 30 s (Punkt 206). Korpus-Frame f003 mit
   eingesetztem `/D=01001100` und neu gerechneter FCS ueber `--injectraw` bis
   zum EXTUDP-Listener als `"din":"01001100"` (Punkt 207).
-- **Die vier wiederhergestellten Diagnoseschalter auf einem Serien-Build**
-  (Punkt 202): siehe den Abschnitt weiter unten -- auf DK5EN-98 (ESP32,
-  `--wifistat`, `--udpstat`, `--udplog`), DK5EN-14 (T-Deck Plus) und
-  DK5EN-90 (nRF52, `--ethstat`, `--udplog`) nach dem Flashen der
-  Release-Images geprueft.
+- **Die vier wiederhergestellten Diagnoseschalter auf einem Serien-Build
+  (Punkt 202), auf allen vier Bench-Boards nach dem Flashen des
+  Release-Images geprueft:**
+  - DK5EN-98 (Heltec V3, Gateway, WLAN-OTA): `--wifistat` liefert
+    `[WIFI];stat;up;rssi;-42;...`, `--udpstat` liefert `[UDPSTAT];bind;1990;...`,
+    `--udplog on` -> `[UDP];log;1` mit anschliessenden `[UDP];tx;...`-Zeilen
+    pro Datagramm, `--udplog off` -> `[UDP];log;0`. `--injectraw` und
+    `--heap` antworten `...wrong command`, wie beabsichtigt.
+  - DK5EN-90 (RAK4631, DFU): `--ethstat` liefert beide `[ETH];stat`-Zeilen,
+    `--udplog on/off` -> `[UDP];log;1` / `[UDP];log;0`. `--wifistat`,
+    `--injectraw` und `--heap` antworten `...wrong command` -- `--wifistat`
+    gibt es auf nRF52 korrekterweise nicht.
+  - DK5EN-14 (T-Deck Plus, USB): `--wifistat`, `--udpstat`, `--udplog on/off`
+    alle vier mit Marker; `--injectraw`, `--spitrace on` und `--heap`
+    `...wrong command`.
+  - DK5EN-92 (T-Beam v1.2, esptool mit 460800 Baud): `--wifistat`,
+    `--udpstat`, `--udplog on/off` mit Marker; `--injectraw` und `--heap`
+    `...wrong command`. Radio-Init `SX1276 Chip Initializing ... success`.
 - **String-Scan der gebauten Images:** `INSTR-LOOP`, `--injectraw` und
   `--injectmsg` fehlen im Serien-Build, `--udplog`/`--wifistat`/`--udpstat`
   sind vorhanden; auf dem nRF52-ELF `--ethstat` und `--udplog` vorhanden,

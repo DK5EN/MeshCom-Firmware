@@ -98,10 +98,10 @@ Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdi
 ### Verification for this release
 
 - **All 32 release environments build clean**; 643 native test cases green across 12 host environments.
-- **Heltec V3 (DK5EN-93 and the gateway DK5EN-98, bench)**: barometric reference self-latch, altitude filter and GPS/barometer fusion measured over two hours (items 204–206); MCP23017 `/D=` receive path through `--injectraw` to the EXTUDP listener (item 207, transmit path natively only — no MCP23017 here); the restored field-diagnostic switches (item 202) on a stock build; ACK attribution on the air against McApp (item 192); unread badges via a jsdom harness against the live node, 30 checks (item 195).
+- **Heltec V3 (DK5EN-93 and the gateway DK5EN-98, bench)**: barometric reference self-latch, altitude filter and GPS/barometer fusion measured over two hours (items 204–206); MCP23017 `/D=` receive path through `--injectraw` to the EXTUDP listener (item 207, transmit path natively only — no MCP23017 here); ACK attribution on the air against McApp (item 192); unread badges via a jsdom harness against the live node, 30 checks (item 195). Both nodes were flashed with this release's image over WiFi OTA, and on DK5EN-98 `--wifistat`, `--udpstat` and `--udplog on/off` were exercised on the stock build while `--injectraw` and `--heap` correctly report an unknown command (item 202).
 - **T-Deck Plus (DK5EN-14, bench)**: `--deepsleep` and button wake with the gpio-hold fix, rails and radio back after wake (items 197, 199); port-open crash loop 9 of 30 before, 0 of 80 after (item 201); the restored diagnostic switches on a stock build.
 - **WisBlock RAK4631 (DK5EN-90, bench)**: `--deepsleep` System OFF and wake (item 198); `--ethstat` and `--udplog` on a stock build (item 202); harness regression run on the release code — boot, Ethernet, LoRa RX/TX and MHeard nominal.
-- **T-Beam v1.2 (DK5EN-92, bench)**: boot and radio init on the release build.
+- **T-Beam v1.2 (DK5EN-92, bench)**: boot and SX1276 radio init on the release build; the restored diagnostic switches on a stock build (item 202).
 
 ### Built and shipped, not on our bench
 
