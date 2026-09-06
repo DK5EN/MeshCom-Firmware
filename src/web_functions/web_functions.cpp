@@ -887,18 +887,52 @@ void deliver_scaffold(bool bget_password)
     // injected via innerHTML and their own <script> tags never run.
     web_client.println("var mcTabSel='all';");
     web_client.println("try{var mcTabStored=localStorage.getItem('mcTab');if(mcTabStored!=null)mcTabSel=mcTabStored;}catch(e){}");
-    web_client.println("function mcTabMatch(dst){if(mcTabSel=='all')return true;if(mcTabSel=='*')return dst=='*';if(mcTabSel=='dm')return dst!='*' && !/^[0-9]+$/.test(dst);return dst==mcTabSel;}");
-    web_client.println("function mcApplyTab(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-dst]');for(var i=0;i<els.length;i++){els[i].hidden=!mcTabMatch(els[i].getAttribute('data-dst'));}var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){btns[j].classList.toggle('mctab-on',btns[j].getAttribute('data-tab')==mcTabSel);}}");
+    // MC-msg-badges: unread-state model. mcReadIds is a session-only set of
+    // message ids the operator has definitely seen -- it survives while
+    // mcHistory holds the entry, but not a browser restart. mcWm holds, per
+    // tab key, a unix-time watermark below which everything on that tab
+    // counts as read; it is the only read-state that is persisted
+    // (localStorage 'mcWm'), because persisting the exact id set across days
+    // of ring turnover would grow without bound. A message is unread for a
+    // tab key when it is inbound (an own message-send is never unread), it
+    // matches that key's dst filter, its id has not been marked read this
+    // session, and its ts is strictly greater than that key's watermark --
+    // equal timestamps fall back to the id set, since an unsynced node clock
+    // can hand two independent messages the same second. Viewing "All"
+    // raises every tab's watermark to the newest message seen, because
+    // looking at the merged stream is defined as having read everything in
+    // it, not only the "all" tab itself.
+    web_client.println("var mcReadIds={};");
+    web_client.println("var mcWm={};");
+    web_client.println("try{var mcWmStored=localStorage.getItem('mcWm');if(mcWmStored!=null)mcWm=JSON.parse(mcWmStored);}catch(e){}if(typeof mcWm!=='object' || mcWm===null)mcWm={};");
+    web_client.println("function mcSaveWm(){try{localStorage.setItem('mcWm',JSON.stringify(mcWm));}catch(e){}}");
+    web_client.println("function mcTabMatchKey(key,dst){if(key=='all')return true;if(key=='*')return dst=='*';if(key=='dm')return dst!='*' && !/^[0-9]+$/.test(dst);return dst==key;}");
+    web_client.println("function mcTabMatch(dst){return mcTabMatchKey(mcTabSel,dst);}");
+    web_client.println("function mcUnreadCount(key){var wm=mcWm[key]||0;var n=0;for(var i=0;i<mcHistory.length;i++){var m=mcHistory[i];if(m.rx && mcTabMatchKey(key,m.dst) && !mcReadIds[m.id] && m.ts>wm)n++;}return n;}");
+    // seeds the watermark of any tab key that has never had one (first visit
+    // to this browser, or a group number just added in setup) to the newest
+    // ts already known, so first load never shows a wall of unread badges
+    web_client.println("function mcSeedWm(){var btns=document.querySelectorAll('#mctabs .mctab');if(btns.length==0)return;var maxTs=0;for(var i=0;i<mcHistory.length;i++){if(mcHistory[i].ts>maxTs)maxTs=mcHistory[i].ts;}var changed=false;for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');if(!(key in mcWm)){mcWm[key]=maxTs;changed=true;}}if(changed)mcSaveWm();}");
+    // marks every history entry on the currently selected tab as read; viewing
+    // 'all' counts as having read every tab, so its watermark propagates to
+    // every configured tab key, not only 'all' itself
+    web_client.println("function mcMarkRead(){if(document.visibilityState==='hidden')return;var maxTs=0;var changed=false;for(var i=0;i<mcHistory.length;i++){var m=mcHistory[i];if(mcTabMatchKey(mcTabSel,m.dst)){if(!mcReadIds[m.id]){mcReadIds[m.id]=true;changed=true;}if(m.ts>maxTs)maxTs=m.ts;}}if(maxTs>(mcWm[mcTabSel]||0)){mcWm[mcTabSel]=maxTs;changed=true;}if(mcTabSel=='all'){var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');if(maxTs>(mcWm[key]||0)){mcWm[key]=maxTs;changed=true;}}}if(changed)mcSaveWm();}");
+    // the tab bar is re-rendered by the server on every loadPage('messages'),
+    // so badges are painted here on every call, never once at page load
+    web_client.println("function mcApplyTab(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-dst]');for(var i=0;i<els.length;i++){els[i].hidden=!mcTabMatch(els[i].getAttribute('data-dst'));}mcSeedWm();mcMarkRead();var btns=document.querySelectorAll('#mctabs .mctab');for(var j=0;j<btns.length;j++){var key=btns[j].getAttribute('data-tab');btns[j].classList.toggle('mctab-on',key==mcTabSel);var label=key=='all'?'All':(key=='dm'?'DM':key);var cnt=mcUnreadCount(key);btns[j].innerHTML=label+(cnt>0?' <span class=\"mcbadge\">'+cnt+'</span>':'');btns[j].classList.toggle('mctab-new',cnt>0);}}");
     web_client.println("function mcTab(btn){mcTabSel=btn.getAttribute('data-tab');try{localStorage.setItem('mcTab',mcTabSel);}catch(e){}var sc=document.getElementById('sendcall');if(sc){if(/^[0-9]+$/.test(mcTabSel))sc.value=mcTabSel;else if(mcTabSel=='*')sc.value='';}if(typeof updateCharsLeft==='function' && sc)updateCharsLeft();mcApplyTab();}");
+    // messages that arrive while the tab is hidden must not count as read
+    // until the operator actually comes back to look at them
+    web_client.println("document.addEventListener('visibilitychange',function(){if(cpage=='messages')mcApplyTab();});");
     web_client.println("function mcHistIndex(id){for(var i=0;i<mcHistory.length;i++){if(mcHistory[i].id==id)return i;}return -1;}");
-    web_client.println("function mcMergeEntry(id,html){var idx=mcHistIndex(id);if(idx<0){mcHistory.push({id:id,html:html});mcSeen[id]=true;if(mcHistory.length>MC_HIST_MAX){var dropped=mcHistory.shift();delete mcSeen[dropped.id];}}else{mcHistory[idx].html=html;}}");
+    web_client.println("function mcMergeEntry(el){var id=el.getAttribute('data-id');var html=el.outerHTML;var dst=el.getAttribute('data-dst')||'';var ts=parseInt(el.getAttribute('data-ts'))||0;var rx=el.classList.contains('message-received');var idx=mcHistIndex(id);if(idx<0){mcHistory.push({id:id,html:html,dst:dst,ts:ts,rx:rx});mcSeen[id]=true;if(mcHistory.length>MC_HIST_MAX){var dropped=mcHistory.shift();delete mcSeen[dropped.id];}}else{mcHistory[idx].html=html;mcHistory[idx].dst=dst;mcHistory[idx].ts=ts;mcHistory[idx].rx=rx;}}");
     web_client.println("function mcRemovePlaceholder(panel){var kids=panel.children;for(var i=kids.length-1;i>=0;i--){if(kids[i].tagName=='P')panel.removeChild(kids[i]);}}");
     // this function is an ayncronous loader that is used to update the received messages without re-loading the whole page, it will re-call itself after a timeout as long as the message-page is displayed
     // it merges the response into mcHistory/mcSeen instead of overwriting the panel outright, so a message already on screen keeps its DOM position when only its ack mark changed
-    web_client.println("function mcProcessMessages(text,panel){var tmpl=document.createElement('template');tmpl.innerHTML=text;var els=tmpl.content.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){var el=els[i];var id=el.getAttribute('data-id');var existed=mcSeen.hasOwnProperty(id);mcMergeEntry(id,el.outerHTML);if(existed){var old=panel.querySelector('.message[data-id=\"'+id+'\"]');if(old)old.replaceWith(el);}else{panel.appendChild(el);}}mcRemovePlaceholder(panel);if(mcHistory.length==0)panel.innerHTML='<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
+    web_client.println("function mcProcessMessages(text,panel){var tmpl=document.createElement('template');tmpl.innerHTML=text;var els=tmpl.content.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){var el=els[i];var id=el.getAttribute('data-id');var existed=mcSeen.hasOwnProperty(id);mcMergeEntry(el);if(existed){var old=panel.querySelector('.message[data-id=\"'+id+'\"]');if(old)old.replaceWith(el);}else{panel.appendChild(el);}}mcRemovePlaceholder(panel);if(mcHistory.length==0)panel.innerHTML='<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
     web_client.println("function updateMessages() {var xhttp=new XMLHttpRequest();xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){var panel=document.getElementById('messages_panel');if(panel!=null)mcProcessMessages(decodeURIComponent(this.responseText),panel);}};setTimeout(function(){xhttp.open('GET','/?getmessages',true);xhttp.send();},1000);}\n");
     // rebuilds #messages_panel from mcHistory when the messages page is (re-)injected by loadPage(); first merges the server-rendered entries already sitting in the panel into mcHistory (same dedupe as mcProcessMessages) so nothing the server just sent is lost, then renders the full remembered history in order
-    web_client.println("function mcRenderHistory(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){mcMergeEntry(els[i].getAttribute('data-id'),els[i].outerHTML);}var html='';for(var j=0;j<mcHistory.length;j++){html+=mcHistory[j].html;}panel.innerHTML=html.length>0?html:'<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
+    web_client.println("function mcRenderHistory(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){mcMergeEntry(els[i]);}var html='';for(var j=0;j<mcHistory.length;j++){html+=mcHistory[j].html;}panel.innerHTML=html.length>0?html:'<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
     //  this function sends a parameter:value request to the backend
     web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
     // this function invokes a function call to the backend passing the function name and an optional parameter (e.g. sendpos)
@@ -1103,7 +1137,9 @@ void deliver_scaffold(bool bget_password)
     // content definitions -> message-page tab bar
     web_client.println("#mctabs {margin:6px 0;}\n");
     web_client.println("#content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;cursor:pointer;}\n");
+    web_client.println("#content_inner .mctab-new {background-color:var(--mclightgreen);}\n");
     web_client.println("#content_inner .mctab-on {background-color:var(--mclightblue);}\n");
+    web_client.println(".mcbadge {font-size:x-small;font-weight:bold;margin-left:4px;}\n");
 
     web_client.println("</style>\n\n");
 
@@ -1870,7 +1906,7 @@ void sub_content_messages()
                     {
                         String dst_esc = htmlEscape(aprsmsg.msg_destination_call);
 
-                        web_client.printf("<div class=\"message message-send\" data-id=\"%u\" data-dst=\"%s\"><div>", aprsmsg.msg_id, dst_esc.c_str());
+                        web_client.printf("<div class=\"message message-send\" data-id=\"%u\" data-dst=\"%s\" data-ts=\"%lu\"><div>", aprsmsg.msg_id, dst_esc.c_str(), unix_time);
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
                         web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
@@ -1899,7 +1935,7 @@ void sub_content_messages()
                         }
                         String dst_esc = htmlEscape(isGroupDst ? aprsmsg.msg_destination_call : aprsmsg.msg_source_call);
 
-                        web_client.printf("<div class=\"message message-received\" data-id=\"%u\" data-dst=\"%s\"><div>", aprsmsg.msg_id, dst_esc.c_str());
+                        web_client.printf("<div class=\"message message-received\" data-id=\"%u\" data-dst=\"%s\" data-ts=\"%lu\"><div>", aprsmsg.msg_id, dst_esc.c_str(), unix_time);
 
                         web_client.printf("<p class=\"font-small font-bold\">%s", ccheck.c_str());
                         web_client.printf("<a target=\"_blank\" href=\"https://aprs.fi/?call=%s\">%s</a>", msg_source_path_esc.c_str(), msg_source_path_esc.c_str());
