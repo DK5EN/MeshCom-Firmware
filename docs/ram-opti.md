@@ -8,22 +8,23 @@ NimBLE-Tuning bereits eingebaut (Commit `9d99154b`, −792 B DRAM static,
 
 ## Top-DRAM-Verbraucher (statisch, aus `nm` der ELF)
 
-| Symbol | Größe | Quelle |
-|---|---|---|
-| `BLEtoPhoneBuff` | 9.150 B | `loop_functions.cpp:326` — `[MAX_RING][MAX_MSG_LEN_PHONE+5]` |
-| `BLEComToPhoneBuff` | 9.150 B | `loop_functions.cpp:331` — `[MAX_RING][MAX_MSG_LEN_PHONE+5]` |
-| `ringBufferUDPout` | 8.250 B | `loop_functions.cpp:321` — `[MAX_RING_UDP][UDP_TX_BUF_SIZE+20]` |
-| `ringBuffer` | 7.800 B | `loop_functions_extern.h:170` — `[MAX_RING][UDP_TX_BUF_SIZE+5]` |
-| `mheardPathBuffer1` | 7.500 B | `mheard_functions.cpp:30` — `[MAX_MHPATH][50]` |
-| `mheardBuffer` | 7.200 B | `mheard_functions.cpp:22` — `[MAX_MHEARD][60]` |
-| `ringbufferRAWLoraRX` | 5.200 B | `loop_functions.cpp:313` — `[MAX_LOG][UDP_TX_BUF_SIZE+5]` |
-| `u8g2_font_10x20_mf` | 4.194 B | U8g2-Lib in `.data` (sollte in Flash) |
-| `g_cnxMgr` | 3.800 B | esp-idf WiFi (prebuilt, nicht abschaltbar) |
-| `ftm_initiator` | 2.776 B | esp-idf WiFi FTM (prebuilt) |
-| `u8g2_font_6x10_mf` | 2.393 B | U8g2-Lib in `.data` |
-| `externQueue` | 2.056 B | `extudp_functions.cpp:56` — `[MAX_EXTERN_QUEUE]` |
+| Symbol                | Größe   | Quelle                                                          |
+| --------------------- | ------- | --------------------------------------------------------------- |
+| `BLEtoPhoneBuff`      | 9.150 B | `loop_functions.cpp:326` — `[MAX_RING][MAX_MSG_LEN_PHONE+5]`    |
+| `BLEComToPhoneBuff`   | 9.150 B | `loop_functions.cpp:331` — `[MAX_RING][MAX_MSG_LEN_PHONE+5]`    |
+| `ringBufferUDPout`    | 8.250 B | `loop_functions.cpp:321` — `[MAX_RING_UDP][UDP_TX_BUF_SIZE+20]` |
+| `ringBuffer`          | 7.800 B | `loop_functions_extern.h:170` — `[MAX_RING][UDP_TX_BUF_SIZE+5]` |
+| `mheardPathBuffer1`   | 7.500 B | `mheard_functions.cpp:30` — `[MAX_MHPATH][50]`                  |
+| `mheardBuffer`        | 7.200 B | `mheard_functions.cpp:22` — `[MAX_MHEARD][60]`                  |
+| `ringbufferRAWLoraRX` | 5.200 B | `loop_functions.cpp:313` — `[MAX_LOG][UDP_TX_BUF_SIZE+5]`       |
+| `u8g2_font_10x20_mf`  | 4.194 B | U8g2-Lib in `.data` (sollte in Flash)                           |
+| `g_cnxMgr`            | 3.800 B | esp-idf WiFi (prebuilt, nicht abschaltbar)                      |
+| `ftm_initiator`       | 2.776 B | esp-idf WiFi FTM (prebuilt)                                     |
+| `u8g2_font_6x10_mf`   | 2.393 B | U8g2-Lib in `.data`                                             |
+| `externQueue`         | 2.056 B | `extudp_functions.cpp:56` — `[MAX_EXTERN_QUEUE]`                |
 
 ESP32-S3 Konstanten aus `configuration_global.h:82-87`:
+
 ```c
 #define MAX_MHEARD 120  // "85-124 H00 nodes observed"
 #define MAX_MHPATH 150  // "multiple paths per node"
@@ -34,19 +35,19 @@ ESP32-S3 Konstanten aus `configuration_global.h:82-87`:
 
 ## Bewertungsmatrix der Vorschläge
 
-| # | Maßnahme | DRAM | Heap | Flash | Risiko | Aufwand |
-|---|---|---|---|---|---|---|
-| 1 | `MAX_LOG` 20→10 | −2.600 B | — | — | sehr niedrig | 1 Zeile |
-| 2 | `MAX_LOG` 20→5 | −3.900 B | — | — | niedrig | 1 Zeile |
-| 3 | `MAX_RING` 30→20 (3 Buffer!) | −8.700 B | — | — | mittel (Telemetrie nötig) | 1 Zeile |
-| 4 | `MAX_RING_UDP` 30→20 | −2.750 B | — | — | mittel (Telemetrie nötig) | 1 Zeile |
-| 5 | `web_header` String → `char[512]` | — | −viel (Frag.!) | minimal | mittel | ~30 Zeilen |
-| 6 | `MAX_MHEARD` 120→80 | −1.920 B | — | — | niedrig | 1 Zeile |
-| 7 | `MAX_MHPATH` 150→100 | −2.750 B | — | — | niedrig | 1 Zeile |
-| 8 | `MAX_EXTERN_QUEUE` 4→2 | −1.028 B | — | — | sehr niedrig | 1 Zeile |
-| 9 | APRS-Pfad-Konkatenation entstrings | — | −Fragm. | — | mittel | ~50 Zeilen |
-| 10 | U8g2-Fonts in Flash zwingen | −6.587 B | — | +6,5 kB | niedrig | Lib-Wrapper |
-| 11 | IDF Kconfig: FTM/coredump/err_msg | −5.620 B | — | — | hoch (Custom-IDF) | sehr hoch |
+| #   | Maßnahme                           | DRAM     | Heap           | Flash   | Risiko                    | Aufwand     |
+| --- | ---------------------------------- | -------- | -------------- | ------- | ------------------------- | ----------- |
+| 1   | `MAX_LOG` 20→10                    | −2.600 B | —              | —       | sehr niedrig              | 1 Zeile     |
+| 2   | `MAX_LOG` 20→5                     | −3.900 B | —              | —       | niedrig                   | 1 Zeile     |
+| 3   | `MAX_RING` 30→20 (3 Buffer!)       | −8.700 B | —              | —       | mittel (Telemetrie nötig) | 1 Zeile     |
+| 4   | `MAX_RING_UDP` 30→20               | −2.750 B | —              | —       | mittel (Telemetrie nötig) | 1 Zeile     |
+| 5   | `web_header` String → `char[512]`  | —        | −viel (Frag.!) | minimal | mittel                    | ~30 Zeilen  |
+| 6   | `MAX_MHEARD` 120→80                | −1.920 B | —              | —       | niedrig                   | 1 Zeile     |
+| 7   | `MAX_MHPATH` 150→100               | −2.750 B | —              | —       | niedrig                   | 1 Zeile     |
+| 8   | `MAX_EXTERN_QUEUE` 4→2             | −1.028 B | —              | —       | sehr niedrig              | 1 Zeile     |
+| 9   | APRS-Pfad-Konkatenation entstrings | —        | −Fragm.        | —       | mittel                    | ~50 Zeilen  |
+| 10  | U8g2-Fonts in Flash zwingen        | −6.587 B | —              | +6,5 kB | niedrig                   | Lib-Wrapper |
+| 11  | IDF Kconfig: FTM/coredump/err_msg  | −5.620 B | —              | —       | hoch (Custom-IDF)         | sehr hoch   |
 
 **Empfohlene Reihenfolge:** 1 → 5 → 6 → 8 → 3 → 4 (mit Telemetrie) → 2 → 7 → 9 → 10.
 
@@ -82,6 +83,7 @@ die den Heap zerschneiden.
 **Wo:** `web_functions/web_functions.cpp:31, 314, 340, 353, 355–365`
 
 **Diagnose:**
+
 ```cpp
 String web_header;                   // Zeile 31 (global, Heap)
 // ...
@@ -93,6 +95,7 @@ while (client.connected()) {
 ```
 
 **Lösung (Skizze):**
+
 ```cpp
 static char web_header[1024];        // BSS statt Heap
 static uint16_t web_header_len = 0;
@@ -109,6 +112,7 @@ while (client.connected()) {
     }
 }
 ```
+
 Plus Anpassung der Aufrufer (`indexOf`/`substring`/`trim` → `strstr`/
 `memmove`/inline Trim). 1024 B BSS statt unkalkulierbarem Heap.
 
@@ -129,7 +133,7 @@ plus stabilerer Heap.
 ## Vorschlag 6: `MAX_MHEARD` 120 → 80 (Empirisch begründbar)
 
 **Was:** Kommentar in `configuration_global.h:82` sagt
-*"85–124 H00 nodes observed"* — aber das ist der Worst-Case eines
+_"85–124 H00 nodes observed"_ — aber das ist der Worst-Case eines
 zentralen Gateway-Nodes. Typische Endgeräte sehen <50 Nachbarn.
 80 deckt 95 % der realen Knoten ab und gibt Spielraum.
 
@@ -139,13 +143,14 @@ zentralen Gateway-Nodes. Typische Endgeräte sehen <50 Nachbarn.
 **Nachher:** `#define MAX_MHEARD 80`
 
 **Effekt auf alle 7 mheard-Arrays gleichzeitig:**
-- `mheardBuffer`   60 B × 40 = 2.400 B
-- `mheardCalls`    10 B × 40 = 400 B
-- `mheardLat`       8 B × 40 = 320 B (genutzt für Position!)
-- `mheardLon`       8 B × 40 = 320 B (genutzt für Position!)
-- `mheardAlt`       4 B × 40 = 160 B
-- `mheardEpoch`     4 B × 40 = 160 B
-- `mheardNCount`    4 B × 40 = 160 B
+
+- `mheardBuffer` 60 B × 40 = 2.400 B
+- `mheardCalls` 10 B × 40 = 400 B
+- `mheardLat` 8 B × 40 = 320 B (genutzt für Position!)
+- `mheardLon` 8 B × 40 = 320 B (genutzt für Position!)
+- `mheardAlt` 4 B × 40 = 160 B
+- `mheardEpoch` 4 B × 40 = 160 B
+- `mheardNCount` 4 B × 40 = 160 B
 - **Summe:** **−3.920 B DRAM**
 
 **Funktionalität erhalten?** Ja — bei Überlauf rotiert der FIFO und
@@ -194,9 +199,10 @@ mit `MAX_RING` dimensioniert. Eine Reduzierung wirkt **dreifach**.
 **Nachher:** `#define MAX_RING 20`
 
 **Effekt:**
-- `ringBuffer` 30 × 260 B = 7.800 B  →  20 × 260 B = 5.200 B  (−2.600 B)
-- `BLEtoPhoneBuff` 30 × 305 B = 9.150 B  →  20 × 305 B = 6.100 B  (−3.050 B)
-- `BLEComToPhoneBuff` 30 × 305 B = 9.150 B  →  20 × 305 B = 6.100 B  (−3.050 B)
+
+- `ringBuffer` 30 × 260 B = 7.800 B → 20 × 260 B = 5.200 B (−2.600 B)
+- `BLEtoPhoneBuff` 30 × 305 B = 9.150 B → 20 × 305 B = 6.100 B (−3.050 B)
+- `BLEComToPhoneBuff` 30 × 305 B = 9.150 B → 20 × 305 B = 6.100 B (−3.050 B)
 - **Summe:** **−8.700 B DRAM** in einer Konstante.
 
 **Validierung vorab nötig:** Andere Varianten (TTGO T-Beam, vision-master-e290,
@@ -209,7 +215,7 @@ RX-Seite (höhere SF, mehr Backbone). Vor Reduzierung:
 2. Bei aktiver Nutzung 24–48 h mitlaufen lassen.
 3. Wenn Peak < 15 bei allen drei Buffern → reduzieren auf 20 sicher.
 
-**Funktionalität erhalten?** Ja, *falls* gemessener Peak unter neuer
+**Funktionalität erhalten?** Ja, _falls_ gemessener Peak unter neuer
 Cap. Bei Überlauf werden ältere Einträge verdrängt
 (`addRingPointer()`, `loop_functions.cpp:4132-4137`). In einem Burst
 würden Nachrichten/ACKs verloren gehen — daher Telemetrie zwingend.
@@ -247,10 +253,11 @@ reichen für Troubleshooting nach einem Crash.
 **Wo:** `configuration_global.h:83`
 
 **Effekt auf 4 Arrays:**
+
 - `mheardPathBuffer1` 50 B × 50 = 2.500 B
-- `mheardPathCalls`   10 B × 50 = 500 B
-- `mheardPathEpoch`    4 B × 50 = 200 B
-- `mheardPathLen`      1 B × 50 = 50 B
+- `mheardPathCalls` 10 B × 50 = 500 B
+- `mheardPathEpoch` 4 B × 50 = 200 B
+- `mheardPathLen` 1 B × 50 = 50 B
 - **Summe:** **−3.250 B DRAM**
 
 **Funktionalität erhalten?** Ja, FIFO-Rotation analog zu MAX_MHEARD.
@@ -286,6 +293,7 @@ deklariert sein sollten. Wahrscheinlich liefert die U8g2-Lib das Section-
 Attribut auf ESP32-S3 nicht korrekt aus, oder PlatformIO ignoriert es.
 
 **Mögliche Fixes:**
+
 1. Eigenes Wrapper-Header mit `const uint8_t my_font_6x10[] PROGMEM = {…};`
    (Font-Bytes extrahieren) → Linker pinnt in `.rodata`.
 2. U8g2 als source-build mit `-DU8X8_USE_PINS` und expliziter
@@ -304,6 +312,7 @@ genutzt).
 ## Vorschlag 11: IDF-Kconfig Bloat (nicht empfohlen ohne dringenden Bedarf)
 
 **Befund:**
+
 - `ftm_initiator` 2.776 B + `ftm_responder` ~ähnlich groß: WiFi Fine Time
   Measurement, von dieser Firmware ungenutzt.
 - `esp_err_msg_table` 1.720 B: Human-readable Error Strings.
@@ -320,26 +329,74 @@ geändertem `sdkconfig`. Aufwand sehr hoch, CI/CD-Bruch wahrscheinlich.
 
 ---
 
+## Vorschlag 12: Pfad-Ringpuffer — Hashes statt Rufzeichen? (Befund 2026-09-06)
+
+**Frage:** Lässt sich `mheardPathBuffer1` (50 B Pfadtext je Eintrag) verkleinern,
+indem statt der alphanumerischen Rufzeichen nur Node-Hashes gespeichert werden?
+
+**Stand heute** (`mheard_functions.cpp:66-76`), je Eintrag 69 B statisch:
+`mheardPathBuffer1` 50 B, `mheardPathCalls` 10 B, `mheardPathEpoch` 4 B,
+`mheardPathMillis` 4 B, `mheardPathLen` 1 B.
+
+| Board-Klasse                          | `MAX_MHPATH` | DRAM   |
+| ------------------------------------- | ------------ | ------ |
+| ESP32-S3 (Heltec V3, T-Deck), RAK4631 | 100          | 6,9 kB |
+| ESP32 classic (E22 etc.)              | 40           | 2,8 kB |
+| Boards mit XML/SBUFFER                | 50           | 3,5 kB |
+| T-Beam                                | 10           | 0,7 kB |
+
+**Warum Hashes allein nicht funktionieren:**
+
+- Der Pfad kommt als Klartext über die Luft, jeder Relay hängt sein volles
+  Rufzeichen an. Es gibt keinen Hop-Hash im Wire-Format. Der Knoten müsste selbst
+  hashen und ein Hash→Rufzeichen-Wörterbuch pflegen, um die Path-Seite im Web-GUI
+  weiterhin anzeigen zu können.
+- Hops wie `DD7MH-55` oder `DB0HOB-12` stehen oft nicht in der lokalen
+  MHeard-Tabelle; sie taugt daher nicht als Wörterbuch.
+- Ein 2-Byte-Hash kollidiert bei mehreren tausend Rufzeichen im Netz; eine
+  Kollision zeigt still den falschen Relay an.
+
+**Was es brächte** (6 Hops à 2 B = 12 B je Pfad, Wörterbuch ~120 Rufzeichen
+à 12 B):
+
+| Board-Klasse  | Pfadtext heute | Gehasht | Wörterbuch | Netto   |
+| ------------- | -------------- | ------- | ---------- | ------- |
+| S3, RAK4631   | 5,0 kB         | 1,2 kB  | ~1,4 kB    | ~2,4 kB |
+| ESP32 classic | 2,0 kB         | 0,5 kB  | ~1,4 kB    | ~0,1 kB |
+
+Die RAM-knappen classic-ESP32-Boards gewinnen praktisch nichts; S3/nRF52 haben
+Luft und brauchen die 2,4 kB nicht.
+
+**Günstigere Hebel im heutigen Code:**
+
+- **Das 50-B-Feld hält nur 37 B.** Der Writer (`mheard_functions.cpp:593`,
+  `if(ipc > 37)`) kappt den kopierten Pfad bei 37 Zeichen; die letzten 12 B jedes
+  Slots sind tot. Array auf 40 B schrumpfen: −1,0 kB (S3/RAK), −0,4 kB (classic).
+  Achtung: die Persistenz (`file.write` der Roh-Arrays, `mheard_functions.cpp:262`)
+  braucht dann eine Versionsprüfung beim Laden.
+- **String-Interning statt Hashing.** Falls die echte Ersparnis je gewollt ist:
+  Pfad als 1-Byte-Indizes in ein Rufzeichen-Wörterbuch. Keine Kollisionen, exakte
+  Anzeige, gleiche 12 B je Pfad, und das Wörterbuch dient dem Web-GUI als
+  Reverse-Lookup. Ist aber eine komplette Formatänderung von Pfadspeicher,
+  Flash-Datei und Path-Seite für wenige kB auf Boards, die sie nicht brauchen.
+
+**Empfehlung:** Nur den 37-Byte-Trim nehmen, Kodierung unverändert lassen.
+
+---
+
 ## Zusammenfassung — Phasen-Plan
 
 **Phase 1 (sofort umsetzbar, sehr niedriges Risiko, ~−7,6 kB DRAM):**
-1. `MAX_LOG` 20 → 10                              (−2.600 B)
-2. `MAX_MHEARD` 120 → 80                          (−3.920 B)
-3. `MAX_EXTERN_QUEUE` 4 → 2                       (−1.028 B)
 
-**Phase 2 (Heap-Fragmentierung, ~−2 kB Heap Runtime):**
-4. `web_header` String → `char[1024]`             Heap-Stabilität ↑↑
+1. `MAX_LOG` 20 → 10 (−2.600 B)
+2. `MAX_MHEARD` 120 → 80 (−3.920 B)
+3. `MAX_EXTERN_QUEUE` 4 → 2 (−1.028 B)
 
-**Phase 3 (mit Telemetrie validiert, ~−14,7 kB DRAM):**
-5. Telemetrie für `MAX_RING`-Peak + `MAX_RING_UDP`-Peak einbauen
-6. 24–48 h Messung im realen Betrieb
-7. Bei Peak <15: `MAX_RING` 30 → 20               (−8.700 B)
-8. Bei Peak <15: `MAX_RING_UDP` 30 → 20           (−2.750 B)
-9. `MAX_MHPATH` 150 → 100                         (−3.250 B)
+**Phase 2 (Heap-Fragmentierung, ~−2 kB Heap Runtime):** 4. `web_header` String → `char[1024]` Heap-Stabilität ↑↑
 
-**Phase 4 (mittlerer Aufwand, ~−6,6 kB DRAM + Heap):**
-10. APRS-Pfad-Konkatenation auf `char[]`
-11. U8g2-Fonts in Flash via Wrapper
+**Phase 3 (mit Telemetrie validiert, ~−14,7 kB DRAM):** 5. Telemetrie für `MAX_RING`-Peak + `MAX_RING_UDP`-Peak einbauen 6. 24–48 h Messung im realen Betrieb 7. Bei Peak <15: `MAX_RING` 30 → 20 (−8.700 B) 8. Bei Peak <15: `MAX_RING_UDP` 30 → 20 (−2.750 B) 9. `MAX_MHPATH` 150 → 100 (−3.250 B)
+
+**Phase 4 (mittlerer Aufwand, ~−6,6 kB DRAM + Heap):** 10. APRS-Pfad-Konkatenation auf `char[]` 11. U8g2-Fonts in Flash via Wrapper
 
 **Theoretisches Maximum (Phasen 1–4):** ~24,9 kB DRAM (von 132,3 kB →
 107,4 kB, also −18,8 %) + Heap-Stabilität.
@@ -367,6 +424,7 @@ Während der Agenten-Analyse aufgekommen, hier zur Korrektur:
 ## Stand T-Deck (Build vom 2026-05-14)
 
 T-Deck (`env:t_deck`, ESP32-S3 mit 8 MB PSRAM, 16 MB Flash):
+
 - **DRAM**: 151.284 B / 327.680 B (**66,24 %** — deutlich knapper als
   Heltec V3 mit 40,4 %)
 - **iram0_2_seg** (Code via Cache): 1.448.556 B / 8.388.576 B (17,3 %)
@@ -375,6 +433,7 @@ T-Deck (`env:t_deck`, ESP32-S3 mit 8 MB PSRAM, 16 MB Flash):
 - **Flash gesamt**: 2.929.589 B / 12.582.912 B (23,3 %)
 
 T-Deck zieht zusätzlich gegenüber Heltec V3 in den Build:
+
 - `src/t-deck/*.cpp` (insb. `lv_obj_functions.cpp` 4.310 Zeilen,
   `tdeck_main.cpp`, `event_functions.cpp`)
 - LVGL 8.x als UI-Framework (`lv_conf.h` mit `LV_MEM_CUSTOM_ALLOC=ps_malloc`)
@@ -384,30 +443,31 @@ T-Deck zieht zusätzlich gegenüber Heltec V3 in den Build:
 
 ## Top DRAM-Verbraucher T-Deck (nur `.dram0.*`, gefiltert)
 
-| Symbol | Größe | Anteil | Herkunft / Teilen mit Heltec V3 |
-|---|---|---|---|
-| **`audio`** | **10.096 B** | 4,4 % | T-Deck-only (ESP32-audioI2S `Audio` class state) |
-| `BLEtoPhoneBuff` | 9.150 B | 4,0 % | shared mit Heltec V3 |
-| `BLEComToPhoneBuff` | 9.150 B | 4,0 % | shared |
-| `ringBufferUDPout` | 8.250 B | 3,6 % | shared |
-| `ringBuffer` | 7.800 B | 3,4 % | shared |
-| `mheardPathBuffer1` | 7.500 B | 3,3 % | shared |
-| `mheardBuffer` | 7.200 B | 3,1 % | shared |
-| `ringbufferRAWLoraRX` | 5.200 B | 2,3 % | shared |
-| `g_cnxMgr` | 3.800 B | 1,7 % | esp-idf WiFi (prebuilt) |
-| `ftm_initiator` | 2.776 B | 1,2 % | esp-idf WiFi FTM (prebuilt) |
-| `externQueue` | 2.056 B | 0,9 % | shared |
-| `meshcom_settings` | 2.008 B | 0,9 % | shared (init data) |
+| Symbol                | Größe        | Anteil | Herkunft / Teilen mit Heltec V3                  |
+| --------------------- | ------------ | ------ | ------------------------------------------------ |
+| **`audio`**           | **10.096 B** | 4,4 %  | T-Deck-only (ESP32-audioI2S `Audio` class state) |
+| `BLEtoPhoneBuff`      | 9.150 B      | 4,0 %  | shared mit Heltec V3                             |
+| `BLEComToPhoneBuff`   | 9.150 B      | 4,0 %  | shared                                           |
+| `ringBufferUDPout`    | 8.250 B      | 3,6 %  | shared                                           |
+| `ringBuffer`          | 7.800 B      | 3,4 %  | shared                                           |
+| `mheardPathBuffer1`   | 7.500 B      | 3,3 %  | shared                                           |
+| `mheardBuffer`        | 7.200 B      | 3,1 %  | shared                                           |
+| `ringbufferRAWLoraRX` | 5.200 B      | 2,3 %  | shared                                           |
+| `g_cnxMgr`            | 3.800 B      | 1,7 %  | esp-idf WiFi (prebuilt)                          |
+| `ftm_initiator`       | 2.776 B      | 1,2 %  | esp-idf WiFi FTM (prebuilt)                      |
+| `externQueue`         | 2.056 B      | 0,9 %  | shared                                           |
+| `meshcom_settings`    | 2.008 B      | 0,9 %  | shared (init data)                               |
 
 **Wichtiger Befund — Karten- und Glyph-Daten liegen KORREKT in Flash:**
-| Symbol | Größe | Section (Adresse) |
-|---|---|---|
-| `data_europe` | 192.960 B | `.flash.rodata` (0x3c1a8f30) |
-| `data_deutschland` | 192.960 B | `.flash.rodata` |
-| `data_oesterreich` | 192.000 B | `.flash.rodata` |
-| `data_wien` | 157.440 B | `.flash.rodata` (0x3c206f08) |
-| `data_wien_umgebung` | 153.450 B | `.flash.rodata` |
-| `glyph_bitmap` (×5) | ~42.500 B | `.flash.rodata` |
+
+| Symbol               | Größe     | Section (Adresse)            |
+| -------------------- | --------- | ---------------------------- |
+| `data_europe`        | 192.960 B | `.flash.rodata` (0x3c1a8f30) |
+| `data_deutschland`   | 192.960 B | `.flash.rodata`              |
+| `data_oesterreich`   | 192.000 B | `.flash.rodata`              |
+| `data_wien`          | 157.440 B | `.flash.rodata` (0x3c206f08) |
+| `data_wien_umgebung` | 153.450 B | `.flash.rodata`              |
+| `glyph_bitmap` (×5)  | ~42.500 B | `.flash.rodata`              |
 
 → **Diese Symbole verbrauchen KEIN DRAM**, sie liegen über den Cache
 direkt im Flash. Insgesamt ~870 kB Kartendaten + Glyphen sauber als
@@ -419,7 +479,7 @@ T-Deck: 151.284 B – Heltec V3: 132.252 B = **+19.032 B**.
 Die +19 kB verteilen sich auf:
 
 - `audio` Singleton (10.096 B) — ESP32-audioI2S Library-State.
-  *Nur sinnvoll, wenn Audio-Output tatsächlich genutzt wird.*
+  _Nur sinnvoll, wenn Audio-Output tatsächlich genutzt wird._
 - LVGL Widget-State + Stylesheet-Cache (~3-4 kB, verteilt auf viele
   kleine Symbole, nicht in Top-Liste sichtbar).
 - TFT_eSPI Driver-State (~2-3 kB).
@@ -559,15 +619,15 @@ die Buffer-Konstanten (`MAX_RING`, `MAX_LOG`, `MAX_MHEARD`, etc.) im
 gemeinsamen Code-Pfad liegen. Da T-Deck-DRAM viel knapper ist (66 %
 statt 40 %), ist der Effekt dort **wichtiger**:
 
-| Maßnahme | Heltec V3 | T-Deck | Risiko |
-|---|---|---|---|
-| `MAX_LOG` 20→10 | −2.600 B | −2.600 B | sehr niedrig |
-| `MAX_MHEARD` 120→80 | −3.920 B | −3.920 B | niedrig |
-| `MAX_EXTERN_QUEUE` 4→2 | −1.028 B | −1.028 B | sehr niedrig |
-| `MAX_RING` 30→20 (mit Telemetrie) | −8.700 B | −8.700 B | mittel |
-| `MAX_RING_UDP` 30→20 (mit Telemetrie) | −2.750 B | −2.750 B | mittel |
-| `MAX_MHPATH` 150→100 | −3.250 B | −3.250 B | niedrig |
-| `web_header` String → char[] | Heap | Heap | mittel |
+| Maßnahme                              | Heltec V3 | T-Deck   | Risiko       |
+| ------------------------------------- | --------- | -------- | ------------ |
+| `MAX_LOG` 20→10                       | −2.600 B  | −2.600 B | sehr niedrig |
+| `MAX_MHEARD` 120→80                   | −3.920 B  | −3.920 B | niedrig      |
+| `MAX_EXTERN_QUEUE` 4→2                | −1.028 B  | −1.028 B | sehr niedrig |
+| `MAX_RING` 30→20 (mit Telemetrie)     | −8.700 B  | −8.700 B | mittel       |
+| `MAX_RING_UDP` 30→20 (mit Telemetrie) | −2.750 B  | −2.750 B | mittel       |
+| `MAX_MHPATH` 150→100                  | −3.250 B  | −3.250 B | niedrig      |
+| `web_header` String → char[]          | Heap      | Heap     | mittel       |
 
 Auf T-Deck wäre Phase 1 (−7,6 kB) das gleiche; relativ aber **doppelt
 so wertvoll** wegen 327 kB DRAM-Budget und 151 kB schon belegt.
@@ -575,19 +635,23 @@ so wertvoll** wegen 327 kB DRAM-Budget und 151 kB schon belegt.
 ## Phasen-Plan T-Deck
 
 **Phase 1 (gemeinsam mit Heltec V3, sofort):**
+
 - `MAX_LOG` 20 → 10, `MAX_MHEARD` 120 → 80, `MAX_EXTERN_QUEUE` 4 → 2,
   `strMaps` const → **−7,6 kB DRAM gemeinsam**.
 
 **Phase 2 (T-Deck-spezifisch, mittel):**
+
 - T1: `audio` bedingt linken oder lazy-init → **−10 kB DRAM** (falls
   Audio nicht zwingend genutzt).
 - T4: Event-Pool statt `new`/`delete` → Heap-Stabilität.
 
 **Phase 3 (PSRAM-Verlagerung, mittel-groß):**
+
 - T2: `persisted_msgs` mit PSRAM-Allocator → **bis zu −500 kB Heap-
   Druck im internen RAM**.
 
 **Phase 4 (Telemetrie-validiert, gemeinsam):**
+
 - `MAX_RING` 30 → 20, `MAX_RING_UDP` 30 → 20, `MAX_MHPATH` 150 → 100 →
   **−14,7 kB DRAM**.
 
