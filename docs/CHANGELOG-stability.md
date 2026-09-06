@@ -1,9 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35s.09.05` (2026-09-05), based on official MeshCom
+Release: `v4.35s.09.06` (2026-09-06), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-191 below; items 192-194 are on `fork-main`
-and not yet in a release. The full engineering rationale for
+fork's changes, plus items 104-201 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -76,13 +75,19 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased on `fork-main` since v4.35s.09.05
+## New in v4.35s.09.06
 
-Items 192-194, committed 2026-09-05 evening, flashed to `DK5EN-98` (Heltec V3
-gateway) and `DK5EN-14` (T-Deck Plus) over WiFi OTA the same evening. Items
-195 and 196 committed 2026-09-06 and flashed to `DK5EN-98` the same day. Not
-in a tagged release yet. Item 193 is a candidate for the next upstream PR on
-its own; items 192 and 194 wait for the McApp side to settle.
+Ten changes on top of `v4.35s.09.05`, items 192-201. Three groups: ACK
+attribution toward the phone (192-193) and two web GUI additions (194-196);
+`--deepsleep` made real on every board, with the wake-side gpio-hold fixes
+(197-200); and the HWCDC ring-buffer race on native-USB ESP32-S3 boards
+(201). `FLASH_VERSION` 20260906 (`08ce256d`), `FLASH_STRUCT_VERSION`
+unchanged at 20260724, so node settings survive the update. Bench this
+cycle: `DK5EN-14` (T-Deck Plus), `DK5EN-90` (RAK4631) and the Heltec V3
+gateway `DK5EN-98`. Item 193 is a candidate for the next upstream PR on its
+own; items 192 and 194 wait for the McApp side to settle. The automatic
+low-battery shutdown (issue 962 Option B) and light sleep are **not** in
+this release, see the release notes.
 
 192. **ACK frames to the phone carry the callsign of the station that
      acknowledged** (stages 1 and 3 of
@@ -152,6 +157,70 @@ its own; items 192 and 194 wait for the McApp side to settle.
      `*` and All tabs. `sub_content_messages()` now skips payloads starting
      with `{CET}` next to the existing `:ack` skip; the ring itself and the
      app are untouched. Commit `9076824d`.
+197. **`--deepsleep` puts every ESP32 board to sleep for real** (DS-01, upstream
+     issue #962, Option A). Only Wireless Paper and Vision Master E213 ever
+     armed a wake source; every other ESP32 board fell into
+     `esp_deep_sleep_start()` with the LoRa chip in RX, the display lit and
+     (T-Beam family) the PMU rails on, and woke only on RESET. Shared
+     `esp32EnterDeepSleep()` (`src/esp32/esp32_sleep.cpp`): radio to sleep,
+     display into power-save, AXP192/AXP2101 LoRa and GPS rails off, GPS and
+     ADC pins off, then a button ext1 wake on the runtime button pin
+     (`--button` remaps are honoured, the compile-time pin was used before)
+     with `RTC_PERIPH` kept on so the pull-up survives sleep. T-Deck and
+     T-Deck Plus cut the TFT and the shared LoRa/GPS/keyboard rail, T-Beam-1W
+     the radio LDO; the Wireless Tracker's rail-off guard tested a macro no
+     variant defines and never fired, the Wireless Stick was missing from the
+     Vext-off list. Vision Master E290 keeps drawing its last frame through
+     sleep, no hardware to verify a fix. Reviewed by an independent advisor
+     pass before commit. Commit `e242a4cf`.
+198. **`--deepsleep` on RAK4631, Heltec T114 and T-Echo is a real System OFF**
+     (issue #962, section 6). It was a no-op on the RAK4631
+     (`esp_deep_sleep_start()` is ESP-IDF only and nothing replaced it), a
+     soft-off toggle on the T114 that needed a second call to undo while
+     BLE, radio and USB stayed live, and unimplemented for the T-Echo's
+     command. Shared `nrf52EnterDeepSleep()` (`src/nrf52/nrf52_sleep.cpp`),
+     also behind the T-Echo long-press: `Radio.Sleep()`, advertising
+     stopped, display off, peripheral rail cut (RAK `WB_IO2`, T114
+     `PIN_VEXT_CTL`, T-Echo `Power_On_Pin`), Serial/Wire/SPI torn down, then
+     the Adafruit core's `systemOff()`; wake is a button press, USB plug-in
+     or RESET. Two review catches: `Serial1.end()` guarded on the port's
+     begun-state (the core's `Uart::end()` spins forever on a never-begun
+     port, and the GPS baud scan ends it on T114/T-Echo without a GPS), and
+     the `systemOff()` pin lookup bounds-checked against `PINS_COUNT`.
+     Commit `37537b11`.
+199. **T-Deck, T-Deck Plus and T-Beam-1W come back from `--deepsleep` with
+     their rails and radio working.** `gpio_hold_en()` survives the wake
+     reset and nothing released it, so `TDECK_POWERON` and `RADIO_LDO_EN`
+     stayed latched low after a button wake: SD card, keyboard and LoRa
+     failed to init until a full power cycle, and the backlight flickered
+     because GPIO42 lies outside the RTC range and needed
+     `gpio_deep_sleep_hold_en()` to hold through the power-down at all.
+     Every hold is now released on boot before the pins are reconfigured,
+     mirroring the T5 e-paper pattern already in the tree. Found on the
+     `DK5EN-14` bench. Commit `828a2567`.
+200. **Wireless Paper and Vision Master E213: the LoRa chip-select hold is
+     released on wake** (DS-02). `prepareToSleep()` holds `PIN_LORA_NSS`
+     HIGH with `gpio_hold_en()`; after the first sleep/wake cycle the SX1262
+     select could never go LOW again, radio dead until a power cycle, the
+     same mechanism as item 199. `gpio_hold_dis()` before the radio init,
+     no-op on a cold boot. **Fixed blind**: compile-verified on both envs,
+     no unit on the bench; the field-test ask is in BACKLOG row `DS-02`.
+     Commit `f7801a1c`.
+201. **ESP32-S3 boards on native USB no longer crash-loop when the host
+     opens the port during boot** (CDC-02). Item 184 raised the HWCDC TX
+     ring by calling `setTxBufferSize()` after `Serial.begin()`; on
+     arduino-esp32 2.0.14 `begin()` already creates the 256 B ring and
+     enables its ISR, and the resize leaves `tx_ring_buf` NULL for a few
+     lines while that ISR can fire: `assert failed:
+xRingbufferReceiveUpToFromISR ringbuf.c:1269`, then a two-to-three
+     reboot loop ending in a PANIC reset. The ring is sized before the first
+     `begin()` (no ISR exists yet, and `begin()` keeps a preset ring), with
+     a once-flag for the second `begin()` on T5-ePaper and T-Deck Pro.
+     Affects every env with `ARDUINO_USB_CDC_ON_BOOT=1` and
+     `ARDUINO_USB_MODE=1`. Bench on `DK5EN-14`
+     (`tools/bench/tdeck_cdc_portopen.py`): 9 of 30 port-opens crashed
+     before, 0 of 80 after, SD card and keyboard fine on every boot.
+     Commit `b57daf44`.
 
 ## New in v4.35s.09.05
 

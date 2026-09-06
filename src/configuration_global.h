@@ -70,8 +70,8 @@ inline bool isUnconfiguredCall(const char *call)
 // beim Sprung 20260724 -> 20260821 passiert: dieser Commit hat esp32_flash.h
 // nicht angefasst, die Einstellungen aller Knoten aber trotzdem verworfen.
 //
-// FLASH_VERSION 20260906 ist der Build-Stempel des Bench-Builds CDC-02/DS-02
-// nach v4.35s.09.05 (Release-Stempel war 20260905) --
+// FLASH_VERSION 20260906 ist der Release-Stempel von v4.35s.09.06
+// (Release-Stempel davor war 20260905) --
 // rein informativ, loest kein clear_flash() aus.
 //
 // FLASH_STRUCT_VERSION bleibt 20260724: letzte echte Layout-Aenderung war

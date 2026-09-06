@@ -1,11 +1,169 @@
 # Release Notes -- MeshCom Firmware v4.35s
 
-Firmware `4.35s`, `FLASH_VERSION 20260905`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35s`, `FLASH_VERSION 20260906`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
 
 ---
+
+## Stability-Release v4.35s.09.06 (2026-09-06)
+
+Zehn Aenderungen des Forks gegenueber `v4.35s.09.05`, Changelog-Punkte 192
+bis 201. `FLASH_VERSION` 20260906, `FLASH_STRUCT_VERSION` unveraendert
+20260724 -- die Einstellungen der Knoten bleiben erhalten. Gates: 616 native
+Testfaelle in 12 Host-Umgebungen, alle 32 Release-Umgebungen gebaut. Bench in
+diesem Zyklus: DK5EN-14 (T-Deck Plus), DK5EN-90 (RAK4631), Heltec V3 (Bench
+und DK5EN-98 als Gateway des Betreibers).
+
+### Was dazugekommen ist
+
+- **`--deepsleep` schlaeft auf jedem ESP32-Board wirklich (DS-01, Punkt 197,
+  upstream Issue #962 Option A).** Bisher haben nur Wireless Paper und Vision
+  Master E213 eine Aufwachquelle scharf gemacht; jedes andere ESP32-Board fiel
+  mit LoRa-Chip im RX, leuchtendem Display und (T-Beam-Familie) laufenden
+  PMU-Schienen in `esp_deep_sleep_start()` und kam nur per RESET zurueck.
+  Gemeinsamer Einstieg `esp32EnterDeepSleep()` (`src/esp32/esp32_sleep.cpp`):
+  Funk schlafen, Display aus, AXP192/AXP2101-Schienen fuer LoRa und GPS aus,
+  GPS- und ADC-Pins aus, dann ext1-Wakeup auf dem konfigurierten Taster-Pin
+  (`--button` wird beachtet), `RTC_PERIPH` bleibt an, damit der Pull-up den
+  Schlaf ueberlebt. T-Deck/T-Deck Plus trennen TFT und die gemeinsame
+  LoRa/GPS/Tastatur-Schiene, T-Beam-1W den Funk-LDO; der tote
+  Schienen-aus-Zweig des Wireless Tracker (prueft ein Makro, das keine
+  Variante definiert) ist repariert, der Wireless Stick in der
+  Vext-aus-Liste ergaenzt.
+- **`--deepsleep` auf RAK4631, Heltec T114 und T-Echo ist ein echtes System
+  OFF (Punkt 198, Issue #962 Abschnitt 6).** Auf dem RAK4631 war der Befehl
+  ein No-op, auf dem T114 ein Soft-off-Umschalter, den ein zweiter Aufruf
+  wieder zuruecknahm, waehrend BLE, Funk und USB weiterliefen, auf dem T-Echo
+  nicht umgesetzt. `nrf52EnterDeepSleep()` (`src/nrf52/nrf52_sleep.cpp`),
+  auch hinter dem T-Echo-Langdruck: `Radio.Sleep()`, Advertising aus, Display
+  aus, Peripherie-Schiene getrennt, Serial/Wire/SPI abgebaut, dann
+  `systemOff()` des Adafruit-Cores. Aufwachen per Taster, USB-Anstecken oder
+  RESET. Zwei Review-Funde vor dem Commit: `Serial1.end()` nur, wenn der Port
+  je gestartet war (der Core haengt sonst endlos, und der GPS-Baudscan beendet
+  den Port auf T114/T-Echo ohne GPS), `systemOff()`-Pin gegen `PINS_COUNT`
+  geprueft.
+- **T-Deck, T-Deck Plus und T-Beam-1W kommen mit funktionierenden Schienen
+  und Funk aus dem Schlaf zurueck (Punkt 199).** `gpio_hold_en()` ueberlebt
+  den Aufwach-Reset, nichts hat den Hold geloest: `TDECK_POWERON` und
+  `RADIO_LDO_EN` blieben nach dem Tasten-Wakeup auf LOW, SD-Karte, Tastatur
+  und LoRa starteten bis zum Stromwegnehmen nicht mehr, die
+  Hintergrundbeleuchtung flackerte (GPIO42 liegt ausserhalb des RTC-Bereichs
+  und brauchte `gpio_deep_sleep_hold_en()`). Alle Holds werden beim Boot vor
+  der Neukonfiguration geloest, nach dem Muster des T5-E-Paper. Auf der
+  DK5EN-14-Bench gefunden.
+- **Wireless Paper / Vision Master E213: der Chip-Select-Hold des SX1262 wird
+  beim Aufwachen geloest (DS-02, Punkt 200).** Gleicher Mechanismus wie
+  Punkt 199: `PIN_LORA_NSS` blieb nach dem ersten Schlaf/Wakeup auf HIGH,
+  Funk tot bis zum Stromwegnehmen. `gpio_hold_dis()` vor der Funk-Init, beim
+  Kaltstart wirkungslos. **Blind repariert** -- nur kompiliert, kein Geraet
+  auf der Bench.
+- **ESP32-S3 an nativem USB: Port-Oeffnen waehrend des Boots fuehrt nicht
+  mehr in eine Reboot-Schleife (CDC-02, Punkt 201).** Der 4-kB-Ring aus
+  Punkt 184 wurde nach `Serial.begin()` angelegt, ein paar Zeilen lang war
+  der Ring NULL, waehrend der CDC-Interrupt schon lief:
+  `assert failed: xRingbufferReceiveUpToFromISR ringbuf.c:1269`, dann zwei
+  bis drei Reboots bis zum PANIC. Der Ring wird vor dem ersten `begin()`
+  dimensioniert, Einmal-Flag fuer das zweite `begin()` auf T5-E-Paper und
+  T-Deck Pro. Bench DK5EN-14: 9 von 30 Port-Oeffnungen stuerzten vorher ab,
+  0 von 80 nachher.
+- **ACK-Statusframes an die App tragen das Rufzeichen der quittierenden
+  Station (Punkt 192)**, Node-ACK den letzten Hop, Peer-ACK den Partner;
+  ohne bekanntes Rufzeichen ist der Frame byteidentisch zu vorher. Session-
+  Flag `--ackinfo on` (McApp setzt es beim Verbinden) hebt die
+  Nur-der-Erste-Sperren fuer eigene msg_ids auf. **Ein Gateway meldet der App
+  keine Heard- und Gateway-ACK-Frames mehr fuer Nachrichten, die es nur vom
+  Server weitergereicht hat (ACK-01, Punkt 193)**; McApp buchte vorher rund
+  150 falsche `send_success`-Zeilen pro Tag.
+- **Web-GUI: die Nachrichten-Tabs werden gruen und zeigen eine Anzahl, wenn
+  ungelesene Nachrichten eingetroffen sind (WEB-05, Punkt 195).** Knotenseite
+  ein Attribut je Nachricht (`data-ts`, die Einfuegezeit im Ring), der Rest
+  im Browser: Id-Menge fuer die Sitzung plus je Tab eine gespeicherte
+  Wasserlinie (localStorage), beim ersten Besuch gesetzt, damit kein Wall
+  aus Badges erscheint. "All" gilt als alles gelesen, im versteckten Fenster
+  bleibt ungelesen, eigene Nachrichten und ACK-Aktualisierungen zaehlen nie.
+  Nur auf der Nachrichten-Seite, Poll-Takt unveraendert. **`{CET}`-Zeitbaken
+  erscheinen nicht mehr in der Liste (WEB-06, Punkt 196)** -- ein Gateway
+  legt sie fuer die Uhr der App in den Ring, und sie haetten bei jeder Bake
+  die Tabs `*` und All gruen gemacht.
+- **Web-GUI: die QRS-Marke im LoRa-Queue-Panel zeigt die Tiefe, ab der die
+  naechsten eigenen Nachrichten wirklich QRS ausloesen (WQ-02, Punkt 194).**
+
+### Deepsleep: was drin ist, was nicht, wo wir Hilfe brauchen
+
+Issue #962 fragt, warum der Akku-Deepsleep nichts tut. Befund
+(`docs/issue-962-deepsleep-verdict.md`): er tut nicht falsch, er ist seit
+`e0043a56` (4.35p.07.11, wegen Issue #1053) fuer jedes Board komplett
+abgeschaltet, und der manuelle `--deepsleep` hat auch nie richtig
+geschlafen. Dieses Release repariert den manuellen Befehl auf jedem Board
+(Punkte 197 bis 200).
+
+Ausdruecklich **nicht** enthalten:
+
+- **Keine automatische Abschaltung bei niedriger Spannung.** Option B aus
+  dem Befund (Timer-Wakeup-Schleife mit Hysterese, opt-in) ist entworfen,
+  nicht umgesetzt. Der alte Waechter bleibt auskommentiert, wie upstream ihn
+  hinterlassen hat.
+- **Kein Lightsleep.** Option C (Lightsleep mit LoRa-Wakeup) wird im Befund
+  abgeraten und wurde nicht angefasst.
+- **Keine Schlafstrom-Messungen.** Es gibt hier kein Labornetzteil, keine
+  entladenen Akkus und kein Strommessgeraet in der Akkuleitung. Schwelle,
+  Hysterese, Aufwachschleife und die 1053-Regression aus der Bench-Matrix
+  koennen hier nicht gefahren werden; die Zahlen "einige zehn Mikroampere"
+  und "etwa 2 Mikroampere" sind Datenblatt- und Core-Werte, keine Messungen.
+  Eine Abschaltung, die selbst entscheidet, wann ein Knoten dunkel wird,
+  ohne sie testen zu koennen, liefern wir nicht aus.
+
+**Wir sind auf die Community angewiesen.** Wer eines der folgenden Boards
+hat: bitte mit `--deepsleep` schlafen legen, aufwecken, und die
+Reset-Grund-Zeile des Bootlogs sowie den Zustand von LoRa, Display und GPS
+danach in den Thread zu Issue 962 oder als Issue in dieses Repository
+stellen:
+
+- Wireless Paper, Vision Master E213 (Punkt 200 ist blind): zwei
+  aufeinanderfolgende `--deepsleep`/Tasten-Wakeup-Zyklen, danach empfaengt
+  `--mheard` noch.
+- Vision Master E290: das E-Ink behaelt im Schlaf das letzte Bild, kein
+  Geraet zum Pruefen.
+- T-Beam Supreme (AXP2101-Schiene, nur kompiliert), T-Beam v1.2/SX1262/
+  SX1268 (AXP192-Schienen), T-Beam-1W (Funk-LDO).
+- Heltec T114 und T-Echo (System OFF nur kompiliert; der RAK4631 ist das
+  einzige nRF52-Board auf der Bench).
+- E22-DevKitC, E22_XML-DevKitC, ttgo-lora32-v21: der Taster-Pin hat dort
+  keinen externen Pull-up, die Firmware haelt den internen im Schlaf am
+  Leben -- auf diesen Boards nicht getestet.
+- Wer ein Messgeraet hat: Schlafstrom in der Akkuleitung, auf jedem Board.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Alle 32 Release-Umgebungen gebaut, 616 native Testfaelle in 12
+  Host-Umgebungen gruen.
+- T-Deck Plus (DK5EN-14): `--deepsleep` und Tasten-Wakeup mit dem
+  gpio-Hold-Fix, Schienen und Funk danach in Ordnung (Punkte 197, 199);
+  Port-Oeffnen-Schleife 9 von 30 vorher, 0 von 80 nachher (Punkt 201).
+- RAK4631 (DK5EN-90): System OFF und Wakeup (Punkt 198); Harness-Lauf auf
+  dem Release-Stand: Boot, Ethernet, LoRa RX/TX, MHeard unauffaellig.
+- Heltec V3 (Bench, und DK5EN-98 als Gateway): `--deepsleep` und
+  Tasten-Wakeup (Punkt 197); ACK-Attribution gegen McApp in der Luft (Punkt
+  192); Tab-Badges per jsdom-Harness gegen den laufenden Knoten, 30
+  Pruefungen (Punkt 195); `{CET}`-Filter im Browser gesehen (Punkt 196).
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Punkt 200 (Wireless Paper / E213) ist blind: nur kompiliert.
+- Deepsleep auf T-Beam Supreme, T-Beam v1.2-Familie, T-Beam-1W, Heltec
+  T114, T-Echo, Vision Master E290 und den E22-DevKitC-Boards: nur
+  kompiliert. Auf keinem Board wurde Schlafstrom gemessen.
+- Abschaltung bei niedriger Spannung und Lightsleep: nicht umgesetzt, nicht
+  geprueft.
+- Die QRS-Vorhersage (Punkt 194) wurde nicht gegen einen echten Burst im
+  Browser angesehen; die Getter sind durch fuenf native Faelle festgenagelt.
+- Alles unter "Known gaps" in `release-notes.md`, unveraendert aus den
+  Vorreleases: Safeboot-Gate ohne 4-MB-Bench-Arm, Ring-Flood-Fall der
+  Echo-Sperre, `--postime 0`, GPS-07, `--setlog` ohne Hardware-Lauf, GPS
+  A/B/C-Arme, T-Deck-Pin-Fallback, CONF-Koordinaten, 2S-Nullpunkt und
+  INA226-Zweig, QRS-Drei-Nachrichten-Regel.
 
 ## Stability-Release v4.35s.09.05 (2026-09-05)
 
