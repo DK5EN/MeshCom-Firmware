@@ -16,8 +16,7 @@ this document's word for it.
 
 - Issue 1 (CDC-02): **fixed** in `b57daf44`. Ring sized before the first `begin()`, once-flag
   for the second `begin()` on T5-ePaper/T-Deck Pro (a case this doc missed). Regression bench:
-  `tools/bench/tdeck_cdc_portopen.py`. The 50-iteration bench run is still open (no T-Deck Plus
-  on USB at fix time); BACKLOG row `CDC-02`.
+  `tools/bench/tdeck_cdc_portopen.py`. Bench-proven on DK5EN-14: pre-fix 9 of 30 port-opens hit the assert, fixed 0 of 80; the SD/keyboard wedge (secondary symptom) did not reappear. BACKLOG row `CDC-02`.
 - Issue 2 (DS-02): **fixed blind** in `f7801a1c` (`gpio_hold_dis(PIN_LORA_NSS)` before the radio
   init in `esp32setup()`, compile-verified on both envs). Still unverified on hardware; BACKLOG
   row `DS-02` carries the field-test ask.
