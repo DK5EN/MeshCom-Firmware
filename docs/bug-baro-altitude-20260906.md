@@ -1,7 +1,10 @@
 # GPS-05b/07/08/09 — the barometer is the only honest altitude on the node, and nothing uses it
 
-**Status:** Root cause ESTABLISHED for all four items by a 2 h bench capture on `DK5EN-93` plus code
-reading against the tree at `f3d07372`. **Measured, not fixed.** GPS-07 was already open on other
+**Status:** **FIXED 2026-09-06 on `fork-main`** — GPS-07 `531d66b4`, GPS-08/09 `49769eda`, GPS-05b
+`bc3ee68b`; bench verdict in §11 (GPS-07/08/09 proven, GPS-05b improves 2.6x but misses its sd gate on
+the verification run, tau choice open). Plan: [`baro-altitude-impl-plan-20260906.md`](baro-altitude-impl-plan-20260906.md).
+Original status: root cause ESTABLISHED for all four items by a 2 h bench capture on `DK5EN-93` plus code
+reading against the tree at `f3d07372`. GPS-07 was already open on other
 evidence; GPS-08 and GPS-09 are new; GPS-05b now has the measurement it was waiting for.
 **Severity:** Medium-high — no crash, no mesh impact, but a stationary indoor node reported an
 altitude spanning **72 m** over two hours, and the barometer that could have held it to **1.3 m**
@@ -415,3 +418,67 @@ python3 extra.py dk5en-93-altb.log
 
 `analyze_alt.py` takes `--truth <m>` to add a bias column, once a surveyed altitude for the site
 exists.
+
+---
+
+## 11. Verification run 2026-09-06 (after the fix)
+
+Same node, same place, instrumented build of `bc3ee68b` plus Appendix A, cold boot at 16:44, **no
+command sent for the whole run**; 2430 `[ALTB]` rows over 2.05 h, fix in 100 %, HDOP 0.8–2.1. Log:
+`logs/meshlog-20260906/dk5en-93-fused.log` (gitignored). The reboot-repeat check is a second cold
+boot on the clean build, §11.3.
+
+### 11.1 GPS-08 — proven
+
+Filter converged at t = 255 s; the pressure reference armed **on its own** at t = 312 s (first WX tick
+after convergence): `bp;969.74;ba;473.5`, barometric altitude 474 m. Before the fix this column stayed
+0 until `--setpress`. `--tel` on the second cold boot: §11.3.
+
+### 11.2 GPS-07 / GPS-09 / GPS-05b — measured
+
+Armed window, first eighth dropped as warm-up, 1.71 h:
+
+| channel                        |    sd |  p2p | ADEV 30 s | ADEV 5 m | ADEV 30 m |
+| ------------------------------ | ----: | ---: | --------: | -------: | --------: |
+| GPS raw                        | 12.17 | 69.1 |      3.25 |     5.47 |      8.78 |
+| Kalman alone (`kf`)            |  9.10 | 33.1 |      0.43 |     2.54 |      7.65 |
+| **reported `node_alt`, fused** |  6.64 | 18.0 |      0.22 |     0.97 |      5.64 |
+| barometric, float              |  1.02 |  4.0 |      0.10 |     0.21 |      0.79 |
+| before the fix (§3)            | 17.16 | 72.0 |      4.87 |    10.09 |      5.94 |
+
+- **GPS-07:** 0 re-seeds in 2 h (was 20 in 1.9 h). Kalman sd 9.10 m against raw 12.17 m — the filter
+  now does something, but see the next point.
+- **GPS-09:** the float barometric channel gives ADEV 30 s 0.10 m against 0.17 m for the whole-metre
+  value on this run; the fused output inherits the float figure (0.22 m). Proven.
+- **GPS-05b:** reported sd 6.64 m is 2.6x better than the 17.16 m shipped before, p2p 18 m instead of
+  72 m, 30 s stability 22x better. **The sd ≤ 4 m gate from §10 was not met.** Cause, visible in the
+  per-10-minute means: the raw GPS mean walked 471 → 502 → 477 m over one hour (a slow excursion, not
+  the multipath spikes of §4), the Kalman follows it with its ~7 min time constant, and a 30-minute
+  low-pass on top passes most of it (fused mean 471 → 491 → 486). The barometer stayed within
+  473–478 m throughout. The first hour alone had sd 3.77 m; the second hour carried the excursion.
+- **What tau would have done**, replaying this run offline with the firmware's own Kalman column as
+  input: tau 30 min sd 6.61 m, 60 min 5.08 m, **120 min 3.55 m**, 240 min 2.44 m. The §7 knee
+  argument for 30 min rested on the 30-min Allan deviation of a 2 h window, which has three blocks and
+  is void (the implementation plan §2.3 says so and the host test does not gate on it). The price of a
+  longer tau is weather leakage: the barometer's weather drift was 1.8 m/h here and is typically
+  2–3 m/h, so a 2 h tau lets roughly 5 m of it through while the GPS wander it removes was 30 m.
+  **Open decision:** move `ALT_FUSION_TAU_MS` to 2 h and re-run 2 h, or ship 30 min as the conservative
+  first step. Not changed without the operator; the shipped value is 30 min.
+
+### 11.3 Second cold boot on the clean build
+
+Clean build of `bc3ee68b` (instrumentation reverted), flashed 18:55, cold boot, no command sent.
+Filter converged at 18:59:45 (boot + 259 s); at 19:00:37, the first WX tick after that, the debug line
+`[GPS ]...alt fused: 478.1 m (kf 478.1 baro 477.4)` appeared — a non-zero barometric altitude, which
+requires `fBasePress` to be armed. Second boot, same result: GPS-08 reboot-repeat **proven** on ESP32.
+(`--tel` prints the telemetry definition, not the WX block; the `ALT asl` line of §5.1 lives elsewhere,
+the fused debug line is the stronger witness anyway.) Log:
+`logs/meshlog-20260906/dk5en-93-clean-reboot.log`.
+
+### 11.4 Not verified here
+
+- nRF52 half of GPS-08: `DK5EN-90` was not on the bench (no `/dev/cu.usbmodem2101`). On the RAK4631
+  the GPS path is not even compiled (`ENABLE_GPS` unset), so the relevant branch is the no-GPS one:
+  `getPressASL()` latches the altitude from `node_alt`, the next tick latches the pressure. Untested.
+- TRACK mode with pressure (§7 limits) — unchanged, still owed before a release claims it.
+- Absolute accuracy: still no surveyed altitude for the site; every number above is spread.

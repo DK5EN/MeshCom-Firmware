@@ -250,6 +250,47 @@ xRingbufferReceiveUpToFromISR ringbuf.c:1269`, then a two-to-three
      full buffer also re-enables the unchanged-frame skip (TM-10).
      Not yet confirmed on Supreme hardware — no such board on the bench.
 
+204. **The barometric altitude is no longer 0 until someone types
+     `--setpress`** (GPS-08, `531d66b4`/`49769eda`). `fBasePress` was
+     written by that handler alone and is not persisted, so every reboot
+     returned `ALT asl: 0 m` on every node with a BMx280. `getPressALTf()`
+     now latches the reference pressure from the current QFE as soon as the
+     reference altitude exists, which `baroBaseRelatch()` sets at GPS-filter
+     convergence (or `getPressASL()` on nodes without GPS) — the same
+     self-latch QNH already had two lines away. Deliberately not persisted:
+     a new settings field would bump `FLASH_STRUCT_VERSION` and wipe the
+     fleet, and a stale pressure after a long power-off is worse than none.
+     Bench: DK5EN-93 cold boot, no command, reference armed at boot + 312 s
+     and the barometric altitude read 474 m. The `--setpress` help text no
+     longer advertises an argument the handler never parsed.
+
+205. **The GPS altitude filter no longer re-seeds onto raw outliers every
+     few minutes** (GPS-07, `531d66b4`). Gate 15 m / 10 consecutive rejects
+     re-seeded 20 times in 1.9 h on a stationary Heltec V3 indoors; each
+     re-seed snapped the estimate onto the outlier that triggered it, so the
+     filter delivered nothing (sd 17.16 m against raw 16.93 m). Now gate 30 m
+     and 60 rejects (3 min at the ESP32 cadence): validated offline on both
+     corpora (either change alone still re-seeds 5x, the pair 0x), then on
+     the bench — 0 re-seeds in 2 h. Host test `test_feldserie93_keine_reseeds`
+     replays the capture and fails with 20 under the old constants.
+
+206. **Boards with a BMx280 now fuse the barometer into the reported
+     altitude** (GPS-05b, GPS-09, `bc3ee68b`). New Arduino-free module
+     `alt_fusion.cpp`: GPS low-pass plus barometer high-pass, single pole,
+     tau 30 min, the barometer in float (GPS-09: whole-metre rounding cost a
+     factor two in short-term stability, 0.22 vs 0.15 m at 30 s). Active only
+     while the pressure reference is armed; every other board and the first
+     minute after boot keep the plain Kalman value. Bench, 2 h stationary,
+     DK5EN-93: reported altitude sd **6.6 m** (raw 12.2 m, Kalman alone
+     9.1 m, previous firmware 17.2 m on the same bench), 30 s Allan deviation
+     **0.22 m** (was 4.87 m). The design gate of sd ≤ 4 m was **not** met on
+     this run: the GPS mean itself walked 30 m over one hour and a 30-minute
+     low-pass follows that; an offline replay of the same capture gives
+     sd 3.6 m at tau 2 h and 2.4 m at tau 4 h. Tau is one constant
+     (`ALT_FUSION_TAU_MS`); the choice is recorded as open in the bug doc.
+     TRACK mode bypasses both filters; a TRACK-mode capture with pressure is
+     still owed before a release claims moving-node altitude.
+
 ## New in v4.35s.09.05
 
 Tag name without the `-stability` suffix from this release on; the line is
