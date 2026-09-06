@@ -19,6 +19,7 @@
 #include <time_functions.h>
 
 #include <Arduino.h>
+#include <driver/gpio.h>
 #include <SPI.h>
 #include <RadioLib.h>
 #include <Wire.h>
@@ -136,6 +137,19 @@ void initTDeck()
     setCpuFrequencyMhz(160);
 
     Serial.println("[INIT]...initTDeck");
+
+    // Issue 962 deepsleep (esp32_sleep.cpp): --deepsleep holds TDECK_POWERON
+    // and TDECK_TFT_BACKLIGHT low with gpio_hold_en()/gpio_deep_sleep_hold_en()
+    // so they don't float during sleep. That hold survives the wake reset
+    // (esp_idf gpio.h) -- without releasing it here first, the digitalWrite()
+    // calls below (and setBrightness()'s later restore of the backlight) are
+    // silently ignored and the board stays without LoRa/GPS/SD/keyboard power
+    // until a full USB unplug/replug clears the latch. Release before
+    // reconfiguring, matching the working template in
+    // src/t5-epaper/t5epaper_main.cpp:579-581.
+    gpio_hold_dis((gpio_num_t) TDECK_POWERON);
+    gpio_hold_dis((gpio_num_t) TDECK_TFT_BACKLIGHT);
+    gpio_deep_sleep_hold_dis();
 
     //! The board peripheral power control pin needs to be set to HIGH when using the peripheral
     pinMode(TDECK_POWERON, OUTPUT);

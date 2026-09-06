@@ -1292,6 +1292,14 @@ void esp32setup()
 
         #if defined(BOARD_TBEAM_1W)
         #ifdef RADIO_LDO_EN
+            // Issue 962 deepsleep (esp32_sleep.cpp): --deepsleep holds this
+            // pin low with gpio_hold_en()/gpio_deep_sleep_hold_en() so it
+            // doesn't float during sleep. That hold survives the wake reset
+            // (esp_idf gpio.h), so the digitalWrite(HIGH) below would be
+            // silently ignored without releasing it first.
+            gpio_hold_dis((gpio_num_t) RADIO_LDO_EN);
+            gpio_deep_sleep_hold_dis();
+
             // T-BEAM-1W Control SX1262, LNA, must set RADIO_LDO_EN to HIGH to power the Radio
             pinMode(RADIO_LDO_EN, OUTPUT);
             digitalWrite(RADIO_LDO_EN, HIGH);

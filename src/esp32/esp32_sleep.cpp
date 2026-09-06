@@ -53,8 +53,11 @@ void esp32EnterDeepSleep()
     // T-Beam-1W: RADIO_LDO_EN (GPIO40) feeds the SX1262 + LNA and is driven
     // HIGH once at boot (esp32_main.cpp:1294-1297) and never lowered
     // elsewhere -- radio.sleep() above puts the chip in low-power mode but
-    // this LDO keeps supplying it. Wake is a full reset, so boot naturally
-    // re-drives it HIGH; hold it LOW only for the sleep interval.
+    // this LDO keeps supplying it. gpio_hold_en() survives the wake reset
+    // (esp_idf gpio.h: "retain the pin state through ... system reset
+    // triggered by ... Deep-sleep events"), so boot's own digitalWrite(HIGH)
+    // would silently be ignored without the matching gpio_hold_dis() added
+    // on the wake side in esp32_main.cpp's radio init.
     #ifdef RADIO_LDO_EN
     digitalWrite(RADIO_LDO_EN, LOW);
     gpio_hold_en((gpio_num_t) RADIO_LDO_EN);
@@ -81,15 +84,40 @@ void esp32EnterDeepSleep()
     #endif
 
     // T-Deck / T-Deck Plus: no u8g2 (LVGL/TFT), no AXP PMU. tft_off() blanks
-    // the panel; TDECK_POWERON (GPIO10) is the shared LoRa/GPS/keyboard
-    // rail, driven HIGH once at boot (tdeck_main.cpp:141-142) and otherwise
-    // never lowered. Held LOW like the WP e-ink path holds its NSS pin, for
-    // the same reason: an unheld digital output floats once the pin's
-    // domain powers down in deep sleep.
+    // the panel and already drives TDECK_TFT_BACKLIGHT (GPIO42) LOW as part
+    // of its own dimming sequence; TDECK_POWERON (GPIO10) is the shared
+    // LoRa/GPS/keyboard rail, driven HIGH once at boot
+    // (tdeck_main.cpp:141-142) and otherwise never lowered. Both held LOW
+    // like the WP e-ink path holds its NSS pin, for the same reason: an
+    // unheld digital output floats once the pin's domain powers down in
+    // deep sleep -- confirmed on the bench as a dim, flickering backlight
+    // with the panel blanked (floating GPIO42 picking up noise on the
+    // pulse-dimming driver's EN line). GPIO10 is RTC-capable (S3 RTC/LP
+    // range 0-21) so gpio_hold_en() alone survives actual sleep; GPIO42 is
+    // not, so it additionally needs the gpio_deep_sleep_hold_en() call
+    // below (esp_idf gpio.h: "the state of the digital gpio cannot be held
+    // during Deep-sleep ... unless gpio_deep_sleep_hold_en is also
+    // called"). Released on the wake side in tdeck_main.cpp's initTDeck().
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
     tft_off();
     digitalWrite(TDECK_POWERON, LOW);
     gpio_hold_en((gpio_num_t) TDECK_POWERON);
+    digitalWrite(TDECK_TFT_BACKLIGHT, LOW);
+    gpio_hold_en((gpio_num_t) TDECK_TFT_BACKLIGHT);
+    #endif
+
+    // esp_idf gpio.h: gpio_hold_en() on a non-RTC ("digital") pad retains
+    // its state through a reset, but NOT through the actual Deep-sleep
+    // power-down, unless gpio_deep_sleep_hold_en() is also armed -- without
+    // it RADIO_LDO_EN (T-Beam-1W, GPIO40) and TDECK_TFT_BACKLIGHT (GPIO42)
+    // would float for the whole sleep duration, not just survive the wake
+    // reset. Only takes effect during actual Deep-sleep ("When the chip is
+    // in active mode, the digital gpio state can be changed freely even you
+    // have called this function") so it is harmless to call unconditionally
+    // on the boards that need it; released on the wake side alongside each
+    // pin's own gpio_hold_dis().
+    #if defined(RADIO_LDO_EN) || defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    gpio_deep_sleep_hold_en();
     #endif
 
     // (c) PMU: LoRa + GPS rails off. No-op on boards without an AXP192/
