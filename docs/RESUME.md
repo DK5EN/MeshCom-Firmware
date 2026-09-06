@@ -1,5 +1,55 @@
 # RESUME — pick up here
 
+## 2026-09-06 (evening): v4.35s.09.06.2 published, replaces the morning release, notes now cover the whole gap to upstream 4.35s
+
+Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.06.2>, marked
+latest, 39 assets diff-identical in name to the previous release; tag on `a397bdb4`. The
+`v4.35s.09.06` **release object was deleted**, its **git tag kept** (`83820d2f`) as the record of
+what was published in the morning.
+
+Shipped on top of 09.06: changelog items 202-208 -- INS-01 (`INSTRUMENT_ENABLED` default 0, bench
+scaffolding out of a normal build), TM-09 for the T-Beam Supreme OLED on hardware I2C (unverified,
+no such board here), GPS-08 barometric reference self-latch, GPS-07 altitude filter gate 30 m /
+60 rejects, GPS-05b+GPS-09 GPS/barometer fusion (`alt_fusion.cpp`, tau 30 min), the MCP23017
+`/D=` field in the position beacon and the APRS `T#` digital slot (upstream issue 1076), and the
+gwflood injector fixed to our own callsign.
+
+`FLASH_VERSION` stayed 20260906 (same-day `.2` cut), `FLASH_STRUCT_VERSION` 20260724.
+Gates: 643 native cases / 12 host envs, all 32 release envs.
+
+**Two defects found while cutting this release, both fixed and folded into item 202:**
+
+- `--udplog`, `--udpstat`, `--wifistat` (ESP32) and `--ethstat` + `--udplog` (nRF52) had been swept
+  into the `INSTRUMENT_ENABLED` block by INS-01. They are field diagnostics, not bench scaffolding:
+  with them gone `bUDPLOG` could never be set, so the per-datagram `[UDP];rx/tx` lines and the
+  gateway's `[GW];rx;type;DATA` line were unreachable in a shipped build. Moved into their own
+  section ahead of the guard (`src/command_functions.cpp` ~4735) and announced in `--help` again.
+- `--help` still listed `--injectmsg`, `--injectraw`, `--loratx` and the T-Deck UI hooks although
+  the handlers are compiled out. Those help lines are now inside the same `#if INSTRUMENT_ENABLED`.
+
+**Hardware verification, all four bench boards on the release images** (a first for a release cut
+here -- previous cuts verified a subset): DK5EN-98 Heltec V3 gateway over WiFi OTA, DK5EN-93
+Heltec V3 over WiFi OTA, DK5EN-90 RAK4631 over DFU, DK5EN-14 T-Deck Plus over USB, DK5EN-92 T-Beam
+v1.2 via esptool at **460800** (the repo's `upload_command` hardcodes 921600, which fails on that
+CP2102 -- see [[tbeam-bench-pitfalls]]). On every board the restored switches answer with their
+marker and `--injectraw` / `--heap` answer `...wrong command`; `--wifistat` is correctly absent on
+the nRF52.
+
+**release-notes.md was rewritten for this cut.** It now describes the **entire delta against
+official upstream `4.35s`** -- changelog items 104-208, grouped by theme -- instead of only the
+increment over the previous fork release. Someone running official 4.35s reads one document and
+sees the whole gap. Keep that framing on the next cut unless the upstream base moves.
+
+**Also in the tree, deliberately not shipped:** CTY-02 (upstream issue #1133) was written and
+bench-proven on both platforms in this cycle, then reverted (`de18bcf0`) after the issue was
+refuted. The revert is byte-exact; nothing of it is in the release.
+
+**Still open after this release:** the fusion tau (30 min ships, sd 6.6 m against a 4 m design
+gate; replay says 3.6 m at tau 2 h, 2.4 m at 4 h -- see [[baro-fusion-tau-open]]); no TRACK-mode
+altitude capture; the `/D=` transmit path is native-only (no MCP23017 on the bench); item 203
+unverified on Supreme hardware; the injection machinery still compiled in but unreachable at
+`INSTRUMENT_ENABLED=0`, costing flash for nothing.
+
 ## 2026-09-06 (morning): v4.35s.09.06 published, 39 assets, web GUI badges, deepsleep on every board
 
 Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.06>, marked
