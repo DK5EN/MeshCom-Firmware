@@ -7,6 +7,161 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## Stability-Release v4.35s.09.06.2 (2026-09-06)
+
+Zweiter Schnitt am selben Tag. Sieben Aenderungen des Forks gegenueber
+`v4.35s.09.06`, Changelog-Punkte 202 bis 208. `FLASH_VERSION` bleibt
+20260906, `FLASH_STRUCT_VERSION` unveraendert 20260724 -- die Einstellungen
+der Knoten bleiben erhalten. Gates: 643 native Testfaelle in 12
+Host-Umgebungen, alle 32 Release-Umgebungen gebaut. Bench in diesem Zyklus:
+DK5EN-93 (Heltec V3), DK5EN-98 (Heltec V3, Gateway), DK5EN-14 (T-Deck Plus),
+DK5EN-90 (RAK4631), DK5EN-92 (T-Beam v1.2).
+
+Das GitHub-Release `v4.35s.09.06` vom Vormittag wird durch dieses ersetzt;
+der Git-Tag bleibt als Nachweis stehen. Die Release-Notes sind fuer diesen
+Schnitt umgeschrieben und beschreiben jetzt den **gesamten Abstand zum
+offiziellen upstream `4.35s`** (Punkte 104 bis 208), nicht mehr nur den
+Zuwachs gegenueber dem Vorgaenger-Release.
+
+### Was dazugekommen ist
+
+- **Die barometrische Hoehe ist nicht mehr 0, bis jemand `--setpress` tippt
+  (GPS-08, Punkt 204).** `fBasePress` wurde ausschliesslich von diesem
+  Handler geschrieben und nicht persistiert, also lieferte jeder Knoten mit
+  BMx280 nach jedem Neustart `ALT asl: 0 m`. `getPressALTf()` latcht den
+  Referenzdruck jetzt selbst aus dem aktuellen QFE, sobald die Referenzhoehe
+  existiert -- gesetzt von `baroBaseRelatch()` bei Konvergenz des
+  GPS-Filters, auf Knoten ohne GPS von `getPressASL()`. Bewusst nicht
+  persistiert: ein neues Settings-Feld wuerde `FLASH_STRUCT_VERSION` heben
+  und die Flotte loeschen, und ein alter Druckwert nach langer Standzeit ist
+  schlechter als gar keiner. Bench DK5EN-93: Kaltstart ohne Kommando,
+  Referenz nach 312 s scharf, barometrische Hoehe 474 m.
+
+- **Der GPS-Hoehenfilter setzt sich nicht mehr alle paar Minuten auf
+  Ausreisser neu (GPS-07, Punkt 205).** Mit Gate 15 m und 10 Rejects hat er
+  sich auf einem stehenden Heltec V3 in 1,9 h zwanzigmal neu gesetzt, jedes
+  Mal genau auf den Ausreisser, der das ausgeloest hat -- der Filter hat
+  damit nichts geliefert (sd 17,16 m gegen roh 16,93 m). Jetzt Gate 30 m und
+  60 Rejects, also 3 min bei der ESP32-Kadenz. Erst offline auf beiden Korpora
+  validiert (jede Aenderung allein setzt noch 5x neu, das Paar 0x), dann auf
+  der Bench: 0 Re-Seeds in 2 h. Host-Test `test_feldserie93_keine_reseeds`
+  spielt die Aufzeichnung ab und faellt mit den alten Konstanten durch.
+
+- **Boards mit BMx280 fusionieren Barometer und GPS zur gemeldeten Hoehe
+  (GPS-05b/GPS-09, Punkt 206).** Neues Arduino-freies Modul
+  `alt_fusion.cpp`: GPS-Tiefpass plus Barometer-Hochpass, einpolig, tau
+  30 min, Barometer in float (GPS-09: die Rundung auf ganze Meter hat die
+  Kurzzeitstabilitaet um den Faktor zwei gekostet). Nur aktiv, solange die
+  Druckreferenz scharf ist; jedes andere Board und die erste Minute nach dem
+  Boot behalten den reinen Kalman-Wert. Bench, 2 h stehend, DK5EN-93:
+  gemeldete Hoehe sd **6,6 m** (roh 12,2 m, Kalman allein 9,1 m, vorherige
+  Firmware 17,2 m auf derselben Bench), Allan-Deviation bei 30 s **0,22 m**
+  (vorher 4,87 m). Das Entwurfsziel sd <= 4 m wurde auf diesem Lauf **nicht**
+  erreicht: der GPS-Mittelwert selbst ist in einer Stunde um 30 m gewandert,
+  und ein 30-Minuten-Tiefpass folgt dem. Ein Offline-Replay derselben
+  Aufzeichnung ergibt sd 3,6 m bei tau 2 h und 2,4 m bei tau 4 h. Tau ist
+  eine Konstante (`ALT_FUSION_TAU_MS`); die Wahl bleibt ausdruecklich offen.
+
+- **Die Eingaenge von Port A des MCP23017 gehen auf die Luft: `/D=` im
+  Positions-Beacon und im Digital-Slot des APRS-`T#`-Frames (Punkt 207,
+  upstream Issue 1076).** Acht Zeichen, GPA0 zuerst, GPA7 zuletzt
+  (APRS-BITS-Reihenfolge), als OUTPUT konfigurierte Pins lesen `0`, Port B
+  wird nicht gesendet. Ein Arduino-freier Formatierer, `src/mcp17_bits.h`,
+  bedient beide Stellen. `/D` wurde gewaehlt, weil `/I=` schon den
+  INA226-Strom traegt. Knoten ohne den Baustein erzeugen bytegleiche Frames,
+  und die `BITS.`-Definitionszeile bleibt unangetastet. Die Empfangsseite
+  parst `/D=` nach `aprsPosition.din`, und das EXTUDP-`tele`-Datagramm
+  bekommt einen optionalen Schluessel `din` -- MCProxy, Web-App und mcmap
+  koennen ihn ohne Aenderung auf ihrer Seite auswerten. Gate: 19 neue native
+  Faelle in drei Suiten. Bench DK5EN-93 ueber `--injectraw`; der Sendepfad
+  ist nur nativ bewiesen, ein MCP23017 liegt hier nicht.
+
+- **Die Bench-Instrumentierung ist nicht mehr in einem normalen Board-Build
+  (INS-01, Punkt 202).** `INSTRUMENT_ENABLED` stand auf jeder ESP32- und
+  nRF52-Umgebung auf 1, und `printfdeb()` haengt nicht an `--debug`: Knoten
+  im Feld haben ungefragt `[INSTR-LOOP];gap;...` auf die serielle Konsole
+  geschrieben, und Nutzer haben das als Fehlermeldung gemeldet. Der Default
+  ist jetzt 0; eine Messfirmware baut man mit
+  `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e <env>`.
+
+- **Zwei Korrekturen an genau dieser Umstellung, gefunden beim Schneiden
+  dieses Releases (ebenfalls Punkt 202).** Erstens waren vier Schalter
+  Kollateralschaden und sind keine Bench-Geruest-Kommandos: `--udplog`,
+  `--udpstat` und `--wifistat` auf ESP32 sowie `--ethstat` und `--udplog`
+  auf nRF52 sind das, was ein Gateway-Betreiber braucht, um den
+  UDP-/WLAN-/Ethernet-Pfad im Feld mitzuschreiben. Ohne sie liess sich
+  `bUDPLOG` nie setzen, also waren die `[UDP];rx/tx`-Zeilen pro Datagramm und
+  die `[GW];rx;type;DATA`-Zeile in einem ausgelieferten Build unerreichbar.
+  Sie stehen jetzt in einem eigenen Abschnitt vor dem `#if`-Block und werden
+  in `--help` wieder angekuendigt. Zweitens hat `--help` weiterhin
+  `--injectmsg`, `--injectraw`, `--loratx` und die T-Deck-UI-Hooks
+  aufgezaehlt, obwohl die Handler wegkompiliert sind; diese Hilfezeilen
+  stehen jetzt im selben `#if INSTRUMENT_ENABLED`.
+
+- **T-Beam Supreme: das OLED blockiert die Hauptschleife nicht mehr rund
+  570 ms (TM-09 fuer `BOARD_TBEAM_V3`, Punkt 203).** Das Display lief noch
+  auf U8g2-Software-I2C mit Ein-Seiten-Puffer, also acht komplette
+  Neuzeichnungen und acht bitgebangte Uebertragungen pro Bild -- im Feld als
+  `[INSTR-LOOP];gap;ms;577;in;display_tick` gemessen, viermal pro Minute.
+  Jetzt Hardware-I2C mit Vollbildpuffer, auf `Wire` und nicht `Wire1`, weil
+  die Supreme das OLED am selben Bus wie PMU, RTC und Sensoren hat. Nicht auf
+  Supreme-Hardware bestaetigt -- kein solches Board hier.
+
+- **Der Gateway-Flood-Injektor der Bench sendet nur noch unser eigenes
+  Rufzeichen (Punkt 208).** `tools/bench/experiments/gwflood.py` hat
+  aufgezeichnete Korpus-Frames woertlich wiederholt, also trug jeder
+  injizierte Frame einen fremden Source-Path, und das Gateway unter Test hat
+  ihn unter einer Lizenz ausgestrahlt, die wir nicht haben -- 15 solche
+  Aussendungen am 2026-08-30. Der Injektor baut seine Frames jetzt aus dem
+  Wire-Layout mit fest auf `DK5EN-93` gesetztem Source-Path; der Mock-Server
+  erzwingt es zusaetzlich (`assert_own_source_path()` in `send_gate()`).
+  Reines Bench-Werkzeug, keine Firmware-Datei betroffen.
+
+### Was wieder herausgeflogen ist
+
+- **CTY-02 (upstream Issue #1133) ist zurueckgenommen.** Der Gateway-Fix war
+  geschrieben und auf beiden Plattformen auf Hardware bewiesen (DK5EN-93 und
+  DK5EN-90), dann wurde das Issue widerlegt. Der Revert `de18bcf0` setzt den
+  Quelltext exakt auf den Stand davor zurueck; in diesem Release steckt
+  nichts davon.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **DK5EN-93 (Heltec V3, Bench):** Kaltstart ohne Kommando, Druckreferenz
+  nach 312 s scharf, barometrische Hoehe 474 m (Punkt 204). Zwei Stunden
+  stehend: 0 Re-Seeds des Hoehenfilters (Punkt 205), gemeldete Hoehe sd
+  6,6 m, Allan-Deviation 0,22 m bei 30 s (Punkt 206). Korpus-Frame f003 mit
+  eingesetztem `/D=01001100` und neu gerechneter FCS ueber `--injectraw` bis
+  zum EXTUDP-Listener als `"din":"01001100"` (Punkt 207).
+- **Die vier wiederhergestellten Diagnoseschalter auf einem Serien-Build**
+  (Punkt 202): siehe den Abschnitt weiter unten -- auf DK5EN-98 (ESP32,
+  `--wifistat`, `--udpstat`, `--udplog`), DK5EN-14 (T-Deck Plus) und
+  DK5EN-90 (nRF52, `--ethstat`, `--udplog`) nach dem Flashen der
+  Release-Images geprueft.
+- **String-Scan der gebauten Images:** `INSTR-LOOP`, `--injectraw` und
+  `--injectmsg` fehlen im Serien-Build, `--udplog`/`--wifistat`/`--udpstat`
+  sind vorhanden; auf dem nRF52-ELF `--ethstat` und `--udplog` vorhanden,
+  `--wifistat` erwartungsgemaess nicht.
+- **Gates:** 643 native Testfaelle in 12 Host-Umgebungen gruen, alle 32
+  Release-Umgebungen gebaut.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **Der Sendepfad von `/D=` (Punkt 207).** Es liegt kein MCP23017 auf der
+  Bench; nur die Empfangsseite und der EXTUDP-Schluessel sind auf Hardware
+  bewiesen, der Rest nativ.
+- **Punkt 203 auf einer echten T-Beam Supreme.** Kein solches Board hier;
+  die Umstellung ist nur uebersetzt und gegen die bereits erledigte,
+  gleichartige Aenderung fuer Heltec V3/V4 gespiegelt.
+- **Bewegte Knoten in der Hoehenfusion.** TRACK umgeht beide Filter, und
+  eine TRACK-Aufzeichnung mit Druck wurde nicht gemacht.
+- **Tau der Fusion.** 30 min ist gesetzt, 2 h und 4 h sind nur im Replay
+  gerechnet, nicht auf der Bench gefahren.
+- **Alles, was schon fuer `v4.35s.09.06` nicht geprueft war**, bleibt
+  ungeprueft; die dortigen Abschnitte gelten unveraendert weiter.
+
+---
+
 ## Stability-Release v4.35s.09.06 (2026-09-06)
 
 Zehn Aenderungen des Forks gegenueber `v4.35s.09.05`, Changelog-Punkte 192

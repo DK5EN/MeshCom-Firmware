@@ -849,6 +849,10 @@ void commandAction(char *umsg_text, bool ble)
                 printlndeb("--setboostedgain    on/off  enable/disable boosted rx gain");
             #endif
             delay(100);
+            // INS-01: these live inside the INSTRUMENT_ENABLED block in
+            // commandAction() and do not exist in a normal board build, so
+            // --help must not advertise them there.
+            #if INSTRUMENT_ENABLED
             printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
             delay(100);
             printlndeb("--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)");
@@ -858,6 +862,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
             delay(100);
             printlndeb("--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up");
+            #endif
             #endif
 
             // DOC-02: everything above predates this pass and is kept as it
@@ -923,6 +928,14 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n");
             #endif
             delay(100);
+            #if defined(ESP32)
+            printlndeb("--wifistat  WiFi link/counters\n--udpstat  MeshCom UDP RX/TX counters\n--udplog on/off  one [UDP] line per datagram\n");
+            delay(100);
+            #endif
+            #if defined(NRF52_SERIES)
+            printlndeb("--ethstat  Ethernet link/counters\n--udplog on/off  one [UDP] line per datagram\n");
+            delay(100);
+            #endif
 
             // DOC-02: the ~50-command bench/instrument surface (--heap,
             // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
@@ -4719,6 +4732,53 @@ void commandAction(char *umsg_text, bool ble)
     }
     //
     ///////////////////////////////////////////////////////////////////////////
+    // Field diagnostics for gateway operators. Deliberately NOT part of the
+    // INSTRUMENT_ENABLED bench surface below: a node in the field has to be
+    // able to log its UDP / WiFi / Ethernet path without a special build.
+    //
+    #if defined(NRF52_SERIES)
+    else
+    if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
+    {
+        extern void ethStat();
+        ethStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
+        extern bool bUDPLOG;
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
+    #endif
+    #if defined(ESP32)
+    else
+    if(commandCheck(msg_text+2, (char*)"wifistat") == 0)
+    {
+        wifiStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udpstat") == 0)
+    {
+        // RX/TX counters of the MeshCom UDP socket
+        udpPrintStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // one [UDP];rx / [UDP];tx line per datagram
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
+    #endif
+    //
+    ///////////////////////////////////////////////////////////////////////////
 #if INSTRUMENT_ENABLED
     ///////////////////////////////////////////////////////////////////////////
     // TEMPORARY measurement commands -- see src/instrument.h. Removed together
@@ -4784,13 +4844,6 @@ void commandAction(char *umsg_text, bool ble)
     }
     #if defined(NRF52_SERIES)
     else
-    if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
-    {
-        extern void ethStat();
-        ethStat();
-        return;
-    }
-    else
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
     {
         // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
@@ -4798,38 +4851,8 @@ void commandAction(char *umsg_text, bool ble)
         ethDrop();
         return;
     }
-    else
-    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
-    {
-        // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
-        extern bool bUDPLOG;
-        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
-        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
-        return;
-    }
     #endif
     #if defined(ESP32)
-    else
-    if(commandCheck(msg_text+2, (char*)"wifistat") == 0)
-    {
-        wifiStat();
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"udpstat") == 0)
-    {
-        // TM-31 bench hook: RX/TX counters of the MeshCom UDP socket
-        udpPrintStat();
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
-    {
-        // TM-31 bench hook: one [UDP];rx / [UDP];tx line per datagram
-        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
-        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
-        return;
-    }
     else
     if(commandCheck(msg_text+2, (char*)"wifidrop") == 0)
     {

@@ -1,8 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35s.09.06` (2026-09-06), based on official MeshCom
+Release: `v4.35s.09.06.2` (2026-09-06), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-201 below. The full engineering rationale for
+fork's changes, plus items 104-208 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -74,6 +74,151 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35s.09.06.2
+
+Seven changes on top of `v4.35s.09.06`, items 202-208. One group and three
+singles: the altitude chain on boards with a BMx280 -- the barometric
+reference arms itself, the GPS altitude filter stops re-seeding onto raw
+outliers, and the two sources are fused (204-206); the MCP23017 port A
+inputs go on the air as `/D=` in the position beacon and in the digital
+slot of the APRS `T#` frame (207, upstream issue 1076); the bench
+instrumentation no longer ships in a normal board build (202); and the
+T-Beam Supreme OLED moves to hardware I2C (203). Item 208 is bench tooling
+only. `FLASH_VERSION` stays `20260906` and `FLASH_STRUCT_VERSION` stands at
+`20260724`, so node settings survive the update. Gates: 643 native cases
+across 12 host environments, all 32 release environments built. Bench this
+cycle: `DK5EN-93` (Heltec V3, items 204-207). Item 207 is the subject of an
+upstream PR. The CTY-02 gateway fix drafted in this cycle was **reverted**
+after upstream issue #1133 was refuted -- nothing of it ships here.
+
+202. **The bench instrumentation no longer ships in a normal board build**
+     (INS-01). `INSTRUMENT_ENABLED` (`src/instrument.h`) defaulted to 1 on
+     every ESP32 and nRF52 env, and `printfdeb()` is not gated by `--debug`,
+     so field nodes printed `[INSTR-LOOP];gap;...` lines to the serial
+     console unprompted and users reported them as error messages. The
+     default is now 0; a measurement firmware is built with
+     `-D INSTRUMENT_ENABLED=1` (for example
+     `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e <env>`).
+     This also compiles the ~50-command bench surface (`--heap`, `--instr`,
+     `--injectmsg`, `--injectraw`, `--loratx`, `--ntpsync`, `--flashpoke`,
+     `--disptest`, the T-Deck UI hooks, ...) out of a normal build; `--help`
+     announces the block only where it exists.
+
+     Two corrections found while cutting this release, both in the same
+     commit as the notes. First, four switches were collateral damage of the
+     guard and are **not** bench scaffolding: `--udplog`, `--udpstat` and
+     `--wifistat` on ESP32 and `--ethstat` plus `--udplog` on nRF52 are what
+     a gateway operator needs to log the UDP / WiFi / Ethernet path in the
+     field, and with them gone `bUDPLOG` could never be set, so the
+     per-datagram `[UDP];rx/tx` lines and the gateway's
+     `[GW];rx;type;DATA` line were unreachable in a shipped build. They now
+     sit in their own section ahead of the guarded block and are announced
+     in `--help` again. Second, `--help` still listed `--injectmsg`,
+     `--injectraw`, `--loratx` and the T-Deck UI hooks (`--redrawlog`,
+     `--uistat`, `--tab`, `--drawer`, `--playtone`, `--tft`, `--screencrc`,
+     `--spitrace`, `--touch`) although the handlers are compiled out; those
+     help lines are now inside the same `#if INSTRUMENT_ENABLED`. Verified
+     by string-scanning the built image and on hardware, see the release
+     notes. Verified by string-scanning
+     the built image: `INSTR-LOOP` absent by default, present with the flag.
+
+203. **T-Beam Supreme: the OLED no longer blocks the main loop for ~570 ms**
+     (TM-09 for `BOARD_TBEAM_V3`). The display still ran on U8g2 software
+     I2C with a one-page buffer, so every frame cost eight full re-renders
+     and eight bit-banged transfers — measured in the field as
+     `[INSTR-LOOP];gap;ms;577;in;display_tick`, four times a minute at the
+     15 s clock refresh, which also starves LoRa RX servicing. Switched to
+     hardware I2C with a full-frame buffer
+     (`U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE, 18, 17)`),
+     the same change already made for Heltec V3/V4 and Wireless Stick V3 —
+     but on `Wire`, not `Wire1`, because the Supreme has the OLED on the
+     same bus as PMU, RTC and sensors (`SDA_PIN 17` / `SCL_PIN 18`). The
+     full buffer also re-enables the unchanged-frame skip (TM-10).
+     Not yet confirmed on Supreme hardware — no such board on the bench.
+
+204. **The barometric altitude is no longer 0 until someone types
+     `--setpress`** (GPS-08, `531d66b4`/`49769eda`). `fBasePress` was
+     written by that handler alone and is not persisted, so every reboot
+     returned `ALT asl: 0 m` on every node with a BMx280. `getPressALTf()`
+     now latches the reference pressure from the current QFE as soon as the
+     reference altitude exists, which `baroBaseRelatch()` sets at GPS-filter
+     convergence (or `getPressASL()` on nodes without GPS) — the same
+     self-latch QNH already had two lines away. Deliberately not persisted:
+     a new settings field would bump `FLASH_STRUCT_VERSION` and wipe the
+     fleet, and a stale pressure after a long power-off is worse than none.
+     Bench: DK5EN-93 cold boot, no command, reference armed at boot + 312 s
+     and the barometric altitude read 474 m. The `--setpress` help text no
+     longer advertises an argument the handler never parsed.
+
+205. **The GPS altitude filter no longer re-seeds onto raw outliers every
+     few minutes** (GPS-07, `531d66b4`). Gate 15 m / 10 consecutive rejects
+     re-seeded 20 times in 1.9 h on a stationary Heltec V3 indoors; each
+     re-seed snapped the estimate onto the outlier that triggered it, so the
+     filter delivered nothing (sd 17.16 m against raw 16.93 m). Now gate 30 m
+     and 60 rejects (3 min at the ESP32 cadence): validated offline on both
+     corpora (either change alone still re-seeds 5x, the pair 0x), then on
+     the bench — 0 re-seeds in 2 h. Host test `test_feldserie93_keine_reseeds`
+     replays the capture and fails with 20 under the old constants.
+
+206. **Boards with a BMx280 now fuse the barometer into the reported
+     altitude** (GPS-05b, GPS-09, `bc3ee68b`). New Arduino-free module
+     `alt_fusion.cpp`: GPS low-pass plus barometer high-pass, single pole,
+     tau 30 min, the barometer in float (GPS-09: whole-metre rounding cost a
+     factor two in short-term stability, 0.22 vs 0.15 m at 30 s). Active only
+     while the pressure reference is armed; every other board and the first
+     minute after boot keep the plain Kalman value. Bench, 2 h stationary,
+     DK5EN-93: reported altitude sd **6.6 m** (raw 12.2 m, Kalman alone
+     9.1 m, previous firmware 17.2 m on the same bench), 30 s Allan deviation
+     **0.22 m** (was 4.87 m). The design gate of sd ≤ 4 m was **not** met on
+     this run: the GPS mean itself walked 30 m over one hour and a 30-minute
+     low-pass follows that; an offline replay of the same capture gives
+     sd 3.6 m at tau 2 h and 2.4 m at tau 4 h. Tau is one constant
+     (`ALT_FUSION_TAU_MS`); the choice is recorded as open in the bug doc.
+     TRACK mode bypasses both filters; a TRACK-mode capture with pressure is
+     still owed before a release claims moving-node altitude.
+
+207. **MCP23017 port A inputs go on the air: `/D=` in the position beacon
+     and the digital slot of the APRS `T#` frame** (upstream issue 1076 and
+     a companion request, `b179fdff`). A node whose MCP23017 answered at
+     boot appends `/D=01001100` to every position beacon and puts the same
+     string into the digital slot of the `T#` telemetry frame. Eight
+     characters, GPA0 first, GPA7 last (APRS BITS order), pins configured
+     as OUTPUT read `0`, port B is not sent. One Arduino-free formatter,
+     `src/mcp17_bits.h`, feeds both places; `/D` was chosen because `/I=`
+     already carries the INA226 current and D, E, J, K, L, M, S, W, X, Z
+     were the free letters. Nodes without the chip produce byte-identical
+     frames, and the `BITS.` definition line is untouched (it describes
+     bit sense, not values). The receive side parses `/D=` into
+     `aprsPosition.din` (exactly eight binary digits or nothing) and the
+     EXTUDP `tele` datagram gains an optional `din` key, omitted when the
+     sender has no MCP23017, so MCProxy, the web app and mcmap can pick it
+     up without any change on their side. The MeshCom server and the
+     official app do not know the field yet; that is the point of the
+     upstream PR. Gate: 19 new native cases across three suites, clean
+     builds on ESP32-S3, nRF52 and classic ESP32. Bench `DK5EN-93`: corpus
+     frame f003 with `/D=01001100` inserted and the FCS recomputed, fed
+     through `--injectraw`, reached the EXTUDP listener as
+     `"din":"01001100"`; a real frame without the field in the same minute
+     carried no key. The transmit path is proven natively only: there is no
+     MCP23017 on the bench.
+208. **The gateway-flood bench injector only ever puts our own callsign on
+     the air** (`c9a44117`). `tools/bench/experiments/gwflood.py` replayed
+     captured corpus frames verbatim, so every injected frame carried a
+     third-party source path and the gateway under test radiated it under a
+     licence we do not hold -- 15 such broadcasts on 2026-08-30, found
+     while reviewing that capture. The injector now builds its position and
+     text frames from the corpus wire layout with the source path fixed to
+     `DK5EN-93`, and the position frame beacons the bench desk instead of
+     the captured station; the captured hex blobs are gone from the tool.
+     The mock server enforces it rather than trusting the caller:
+     `assert_own_source_path()` parses the frame path and raises
+     `ForeignCallsignError` for any element outside `OWN_CALLSIGN_PREFIXES`,
+     and `send_gate()` runs it on every injected frame before the socket
+     write -- only the server's own relay of DATA frames from a registered
+     gateway passes. `test_gwflood_frames` pins source call and path and
+     fails on the old fixture. Bench tooling only: no firmware file is
+     touched by this item.
 
 ## New in v4.35s.09.06
 
@@ -221,100 +366,6 @@ xRingbufferReceiveUpToFromISR ringbuf.c:1269`, then a two-to-three
      (`tools/bench/tdeck_cdc_portopen.py`): 9 of 30 port-opens crashed
      before, 0 of 80 after, SD card and keyboard fine on every boot.
      Commit `b57daf44`.
-
-202. **The bench instrumentation no longer ships in a normal board build**
-     (INS-01). `INSTRUMENT_ENABLED` (`src/instrument.h`) defaulted to 1 on
-     every ESP32 and nRF52 env, and `printfdeb()` is not gated by `--debug`,
-     so field nodes printed `[INSTR-LOOP];gap;...` lines to the serial
-     console unprompted and users reported them as error messages. The
-     default is now 0; a measurement firmware is built with
-     `-D INSTRUMENT_ENABLED=1` (for example
-     `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e <env>`).
-     This also compiles the ~50-command bench surface (`--heap`, `--instr`,
-     `--injectmsg`, `--injectraw`, `--loratx`, `--ntpsync`, `--flashpoke`,
-     `--disptest`, the T-Deck UI hooks, ...) out of a normal build; `--help`
-     announces the block only where it exists. Verified by string-scanning
-     the built image: `INSTR-LOOP` absent by default, present with the flag.
-
-203. **T-Beam Supreme: the OLED no longer blocks the main loop for ~570 ms**
-     (TM-09 for `BOARD_TBEAM_V3`). The display still ran on U8g2 software
-     I2C with a one-page buffer, so every frame cost eight full re-renders
-     and eight bit-banged transfers — measured in the field as
-     `[INSTR-LOOP];gap;ms;577;in;display_tick`, four times a minute at the
-     15 s clock refresh, which also starves LoRa RX servicing. Switched to
-     hardware I2C with a full-frame buffer
-     (`U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE, 18, 17)`),
-     the same change already made for Heltec V3/V4 and Wireless Stick V3 —
-     but on `Wire`, not `Wire1`, because the Supreme has the OLED on the
-     same bus as PMU, RTC and sensors (`SDA_PIN 17` / `SCL_PIN 18`). The
-     full buffer also re-enables the unchanged-frame skip (TM-10).
-     Not yet confirmed on Supreme hardware — no such board on the bench.
-
-204. **The barometric altitude is no longer 0 until someone types
-     `--setpress`** (GPS-08, `531d66b4`/`49769eda`). `fBasePress` was
-     written by that handler alone and is not persisted, so every reboot
-     returned `ALT asl: 0 m` on every node with a BMx280. `getPressALTf()`
-     now latches the reference pressure from the current QFE as soon as the
-     reference altitude exists, which `baroBaseRelatch()` sets at GPS-filter
-     convergence (or `getPressASL()` on nodes without GPS) — the same
-     self-latch QNH already had two lines away. Deliberately not persisted:
-     a new settings field would bump `FLASH_STRUCT_VERSION` and wipe the
-     fleet, and a stale pressure after a long power-off is worse than none.
-     Bench: DK5EN-93 cold boot, no command, reference armed at boot + 312 s
-     and the barometric altitude read 474 m. The `--setpress` help text no
-     longer advertises an argument the handler never parsed.
-
-205. **The GPS altitude filter no longer re-seeds onto raw outliers every
-     few minutes** (GPS-07, `531d66b4`). Gate 15 m / 10 consecutive rejects
-     re-seeded 20 times in 1.9 h on a stationary Heltec V3 indoors; each
-     re-seed snapped the estimate onto the outlier that triggered it, so the
-     filter delivered nothing (sd 17.16 m against raw 16.93 m). Now gate 30 m
-     and 60 rejects (3 min at the ESP32 cadence): validated offline on both
-     corpora (either change alone still re-seeds 5x, the pair 0x), then on
-     the bench — 0 re-seeds in 2 h. Host test `test_feldserie93_keine_reseeds`
-     replays the capture and fails with 20 under the old constants.
-
-206. **Boards with a BMx280 now fuse the barometer into the reported
-     altitude** (GPS-05b, GPS-09, `bc3ee68b`). New Arduino-free module
-     `alt_fusion.cpp`: GPS low-pass plus barometer high-pass, single pole,
-     tau 30 min, the barometer in float (GPS-09: whole-metre rounding cost a
-     factor two in short-term stability, 0.22 vs 0.15 m at 30 s). Active only
-     while the pressure reference is armed; every other board and the first
-     minute after boot keep the plain Kalman value. Bench, 2 h stationary,
-     DK5EN-93: reported altitude sd **6.6 m** (raw 12.2 m, Kalman alone
-     9.1 m, previous firmware 17.2 m on the same bench), 30 s Allan deviation
-     **0.22 m** (was 4.87 m). The design gate of sd ≤ 4 m was **not** met on
-     this run: the GPS mean itself walked 30 m over one hour and a 30-minute
-     low-pass follows that; an offline replay of the same capture gives
-     sd 3.6 m at tau 2 h and 2.4 m at tau 4 h. Tau is one constant
-     (`ALT_FUSION_TAU_MS`); the choice is recorded as open in the bug doc.
-     TRACK mode bypasses both filters; a TRACK-mode capture with pressure is
-     still owed before a release claims moving-node altitude.
-
-207. **MCP23017 port A inputs go on the air: `/D=` in the position beacon
-     and the digital slot of the APRS `T#` frame** (upstream issue 1076 and
-     a companion request, `b179fdff`). A node whose MCP23017 answered at
-     boot appends `/D=01001100` to every position beacon and puts the same
-     string into the digital slot of the `T#` telemetry frame. Eight
-     characters, GPA0 first, GPA7 last (APRS BITS order), pins configured
-     as OUTPUT read `0`, port B is not sent. One Arduino-free formatter,
-     `src/mcp17_bits.h`, feeds both places; `/D` was chosen because `/I=`
-     already carries the INA226 current and D, E, J, K, L, M, S, W, X, Z
-     were the free letters. Nodes without the chip produce byte-identical
-     frames, and the `BITS.` definition line is untouched (it describes
-     bit sense, not values). The receive side parses `/D=` into
-     `aprsPosition.din` (exactly eight binary digits or nothing) and the
-     EXTUDP `tele` datagram gains an optional `din` key, omitted when the
-     sender has no MCP23017, so MCProxy, the web app and mcmap can pick it
-     up without any change on their side. The MeshCom server and the
-     official app do not know the field yet; that is the point of the
-     upstream PR. Gate: 19 new native cases across three suites, clean
-     builds on ESP32-S3, nRF52 and classic ESP32. Bench `DK5EN-93`: corpus
-     frame f003 with `/D=01001100` inserted and the FCS recomputed, fed
-     through `--injectraw`, reached the EXTUDP listener as
-     `"din":"01001100"`; a real frame without the field in the same minute
-     carried no key. The transmit path is proven natively only: there is no
-     MCP23017 on the bench.
 
 ## New in v4.35s.09.05
 
