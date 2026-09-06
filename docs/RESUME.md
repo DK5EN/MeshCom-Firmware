@@ -37,7 +37,16 @@ broken behaviour first and observed **red on the DL-Internet cell** before the f
 284/284. `wiscore_rak4631`, `heltec_wifi_lora_32_V3` and `heltec_wireless_tracker` all build. Every
 server address in `src/` now lives in exactly one file (swept).
 
-**Outstanding: no hardware proof.** No bench node was on USB this session. The end-to-end check is
+**Bench 2026-09-06: ESP32 proven, nRF52 not.** `DK5EN-93` (Heltec V3) flashed and confirmed —
+`--gateway srv dl` now yields `[GW];srv;DL;host;meshcom.hamnet.network;path;inet` where it yielded
+`OE;host;meshcom.oevsv.at` before, with `Gateway off` and `--srvip 192.0.2.1` armed as a sink so no
+packet reached the live DL server; node restored to OE afterwards. `DK5EN-90` (RAK4631) was flashed
+with the same commit but **its Ethernet cable is out** (`Ethernet link OFF - skip DHCP`), and both
+nRF52 entry points bail before the selection code when the link is down — so the nRF52 call sites
+have no hardware evidence. Plug the cable in, `--gateway srv dl`, expect
+`[GW];srv;DL;host;192.68.17.26;path;inet`.
+
+**Historic note on the check itself.** The end-to-end check is
 `--gateway srv dl` plus the fork-only `--srvip <sink>` (the `[GW];srv` marker prints before DNS
 starts, so it proves the selection while the override keeps traffic off the real DL server), or the
 existing `tools/bench/experiments/srvprobe.py`. Expect

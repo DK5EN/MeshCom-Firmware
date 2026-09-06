@@ -237,5 +237,29 @@ allow-list is checked first, so an arm alone stays unreachable. `node_gwsrv` is 
 comparison is `memcmp(.., 2)`, so a country code is exactly two uppercase characters; a longer one
 would be a flash-format change.
 
-**Not re-measured on hardware yet.** The August probe (`srvprobe.py`) is the right instrument for
+**Bench proof 2026-09-06 — ESP32 confirmed, nRF52 outstanding.** `DK5EN-93` (Heltec V3, ORBI63
+WLAN, non-HAMNET Internet path), flashed with the fix, `Gateway off` / `Webserver on` so no KEEP
+could leave the node, and the fork-only `--srvip 192.0.2.1` (TEST-NET-1) armed as a sink first —
+the `[GW];srv` marker is printed before DNS starts, so it reports the real selection while the
+override keeps traffic off the live DL server:
+
+```
+>>> --srvip 192.0.2.1
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;67736
+>>> --gateway srv dl
+>>> --srvip 192.0.2.1
+[WIFI]...inet UDP-DEST meshcom.hamnet.network
+[GW];srv;DL;host;meshcom.hamnet.network;path;inet;ms;71802
+[WIFI];dns;meshcom.hamnet.network;ip;192.0.2.1;ms;42      <- sink, not the real server
+```
+
+Node restored to `--gateway srv oe`, `--srvip 0.0.0.0` afterwards.
+
+`DK5EN-90` (RAK4631) was flashed with the same commit and boots it, but **its Ethernet cable is
+unplugged** (`Ethernet link OFF - skip DHCP`, `[ETH];event;link;down`). Both nRF52 entry points
+bail before the selection code when the link is down — `initethfixIP()` returns after five LinkOFF
+retries, `initethDHCP()` needs `startETH()` to succeed — so `startUDP()`/`startFIXUDP()` never ran
+and the nRF52 half of this change has **no hardware evidence yet**. It builds under `-Werror` and
+consumes the same unit-tested table as the ESP32 path, but the call-site wiring is unproven. Plug
+the cable in and expect `[GW];srv;DL;host;192.68.17.26;path;inet` after `--gateway srv dl`. The August probe (`srvprobe.py`) is the right instrument for
 the end-to-end proof and needs a bench node on USB; see the outstanding item in `docs/RESUME.md`.
