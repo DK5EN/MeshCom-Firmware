@@ -291,6 +291,31 @@ xRingbufferReceiveUpToFromISR ringbuf.c:1269`, then a two-to-three
      TRACK mode bypasses both filters; a TRACK-mode capture with pressure is
      still owed before a release claims moving-node altitude.
 
+207. **MCP23017 port A inputs go on the air: `/D=` in the position beacon
+     and the digital slot of the APRS `T#` frame** (upstream issue 1076 and
+     a companion request, `b179fdff`). A node whose MCP23017 answered at
+     boot appends `/D=01001100` to every position beacon and puts the same
+     string into the digital slot of the `T#` telemetry frame. Eight
+     characters, GPA0 first, GPA7 last (APRS BITS order), pins configured
+     as OUTPUT read `0`, port B is not sent. One Arduino-free formatter,
+     `src/mcp17_bits.h`, feeds both places; `/D` was chosen because `/I=`
+     already carries the INA226 current and D, E, J, K, L, M, S, W, X, Z
+     were the free letters. Nodes without the chip produce byte-identical
+     frames, and the `BITS.` definition line is untouched (it describes
+     bit sense, not values). The receive side parses `/D=` into
+     `aprsPosition.din` (exactly eight binary digits or nothing) and the
+     EXTUDP `tele` datagram gains an optional `din` key, omitted when the
+     sender has no MCP23017, so MCProxy, the web app and mcmap can pick it
+     up without any change on their side. The MeshCom server and the
+     official app do not know the field yet; that is the point of the
+     upstream PR. Gate: 19 new native cases across three suites, clean
+     builds on ESP32-S3, nRF52 and classic ESP32. Bench `DK5EN-93`: corpus
+     frame f003 with `/D=01001100` inserted and the FCS recomputed, fed
+     through `--injectraw`, reached the EXTUDP listener as
+     `"din":"01001100"`; a real frame without the field in the same minute
+     carried no key. The transmit path is proven natively only: there is no
+     MCP23017 on the bench.
+
 ## New in v4.35s.09.05
 
 Tag name without the `-stability` suffix from this release on; the line is
