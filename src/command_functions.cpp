@@ -2394,17 +2394,6 @@ void commandAction(char *umsg_text, bool ble)
         String strCtry = _owner_c;
         strCtry.toUpperCase();
 
-        // CTY-02: this allow-list is checked BEFORE the destination table in
-        // gwsrv_select.h ever sees the code, so uncommenting a reserved arm
-        // there is not enough on its own -- the code has to pass here too.
-        // Ready-made replacement for the two lines below when Switzerland and
-        // the United States go live (see the checklist in gwsrv_select.h):
-        //
-        // if(strCtry != "OE" && strCtry != "DL" && strCtry != "IT" && strCtry != "HB" && strCtry != "US")
-        // {
-        //     printfdeb("\nGateway-Server fault <%s> please only OE or DL or IT or HB or US\n", strCtry.c_str());
-        //     return;
-        // }
         if(strCtry != "OE" && strCtry != "DL" && strCtry != "IT")
         {
             printfdeb("\nGateway-Server fault <%s> please only OE or DL or IT\n", strCtry.c_str());

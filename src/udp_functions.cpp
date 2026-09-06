@@ -12,7 +12,6 @@
 #include <loop_functions_extern.h>
 #include <dedup_functions.h>
 #include "ack_attribution.h"
-#include "gwsrv_select.h"
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -1585,18 +1584,33 @@ void startMeshComUDP()
       // F6: Zielnamen bestimmen; aufgeloest wird asynchron (wifiDnsPoll),
       // Literal-IPs sofort, ein Name pro Boot nur einmal.
       const char *srv_host = NULL;
-      const char *srv_path = NULL;   // TM-39: "hamnet" or "inet", from gwsrvSelect()
+      const char *srv_path = NULL;   // TM-39: "hamnet" or "inet", matches the printlndeb text below
       const char *ntp_host = NULL;
       IPAddress ntp_literal(0,0,0,0);
 
-      const bool use_hamnet = (node_ip[0] == 44 || meshcom_settings.node_hamnet_only == 1);
-      const GwSrvTarget gw = gwsrvSelect(meshcom_settings.node_gwsrv, use_hamnet);
-      srv_host = gw.host;
-      srv_path = gw.path;
-      printfdeb("[WIFI]...%s UDP-DEST %s\n", gw.path, gw.host);
-
-      if (use_hamnet)
+      if (node_ip[0] == 44 || meshcom_settings.node_hamnet_only == 1)
       {
+        // Hamnet only not available for IT-Server, so we use Internet for IT-Server
+        if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
+        {
+          printlndeb("[WIFI]...Internet (no HAMNET) UDP-DEST meshcom.dig-italia.it");
+          srv_host = "meshcom.dig-italia.it";
+          srv_path = "inet";
+        }
+        else
+        if(memcmp(meshcom_settings.node_gwsrv, "DL", 2) == 0)
+        {
+          printlndeb("[WIFI]...Hamnet UDP-DEST meshcom.hamnet.cloud");
+          srv_host = "meshcom.hamnet.cloud";
+          srv_path = "hamnet";
+        }
+        else
+        {
+          printlndeb("[WIFI]...Hamnet UDP-DEST 44.143.8.143");
+          srv_host = "44.143.8.143";
+          srv_path = "hamnet";
+        }
+
         if(strlen(meshcom_settings.node_ntp) >= 7)
         {
           printfdeb("[WIFI]...Internet NTP-DEST %s\n", meshcom_settings.node_ntp);
@@ -1615,6 +1629,19 @@ void startMeshComUDP()
       }
       else
       {
+        if(memcmp(meshcom_settings.node_gwsrv, "IT", 2) == 0)
+        {
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.dig-italia.it");
+          srv_host = "meshcom.dig-italia.it";
+          srv_path = "inet";
+        }
+        else
+        {
+          printlndeb("[WIFI]...Internet UDP-DEST meshcom.oevsv.at");
+          srv_host = "meshcom.oevsv.at";
+          srv_path = "inet";
+        }
+
         if(strlen(meshcom_settings.node_ntp) >= 7)
         {
           printfdeb("[WIFI]...Internet NTP-DEST %s\n", meshcom_settings.node_ntp);

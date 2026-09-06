@@ -75,36 +75,6 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased
-
-One change on top of `v4.35s.09.06`, item 202: the DL gateway server is
-reachable again on the Internet path. Reported upstream as issue #1133 by a
-user whose Heltec V3 and Heltec Wireless Tracker both ignored
-`--gateway srv dl` after the update. No `FLASH_VERSION` or
-`FLASH_STRUCT_VERSION` change — node settings are untouched, and a node that
-already has `DL` stored simply starts reaching the right server again after
-the update. Bench-proven on both platforms: a Heltec V3 (`DK5EN-93`) now selects
-`meshcom.hamnet.network` and a RAK4631 (`DK5EN-90`) now selects
-`192.68.17.26`, where both previously reached the Austrian server.
-
-202. **`--gateway srv dl` reaches the DL server again.** On a plain Internet
-     uplink every country code except `IT` fell through to the Austrian
-     server, so a DL node registered with `meshcom.oevsv.at` no matter what
-     was configured. The setting was never lost — it was stored, persisted
-     and displayed correctly; only the destination lookup dropped it. Cause:
-     when the Italian server was added, the DL arm on that branch was
-     replaced rather than extended, deleting the DL address from the tree.
-     HAMNET was unaffected throughout, so the fault only showed on ordinary
-     Internet connections. The nRF52 Ethernet paths never had a DL arm at
-     all — CTY-01 had added only `IT`/`OE` — and gain one now. The
-     country/transport matrix, previously written out three times, is now a
-     single table (`src/gwsrv_select.h`) returning both the hostname the
-     ESP32 resolves and the literal the resolver-less nRF52 path needs, so
-     the two platforms cannot drift apart again; it carries commented-out
-     placeholder arms and an activation checklist for further national
-     servers. Pinned by a native regression suite over every cell (CTY-02,
-     upstream #1133).
-
 ## New in v4.35s.09.06
 
 Ten changes on top of `v4.35s.09.05`, items 192-201. Three groups: ACK

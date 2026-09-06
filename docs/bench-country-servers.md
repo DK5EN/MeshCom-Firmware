@@ -9,24 +9,29 @@ answer, same server-pushed traffic, same timing, same behaviour when the server 
 
 ## Server selection, read from the code
 
-| Platform                         | Path (own IP 44.x or `--hamnet on`)                                                                                                                                                           | Path (internet, the normal case)                                                            |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| ESP32 / RAK-WiFi                 | IT → `meshcom.dig-italia.it` (comment: "not available for IT-Server" on HAMNET, so IT is routed to the internet host even here) · DL → `meshcom.hamnet.cloud` · else → literal `44.143.8.143` | IT → `meshcom.dig-italia.it` · DL → `meshcom.hamnet.network` · else → `meshcom.oevsv.at`    |
-| nRF52 (RAK4631, Ethernet/W5100S) | IT → literal `145.239.75.155` · DL → literal `44.148.230.197` · else → literal `44.143.8.143`                                                                                                 | IT → literal `145.239.75.155` · DL → literal `192.68.17.26` · else → literal `89.185.97.38` |
+| Platform                         | Path (own IP 44.x or `--hamnet on`)                                                                                                                                                           | Path (internet, the normal case)                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| ESP32 / RAK-WiFi                 | IT → `meshcom.dig-italia.it` (comment: "not available for IT-Server" on HAMNET, so IT is routed to the internet host even here) · DL → `meshcom.hamnet.cloud` · else → literal `44.143.8.143` | IT → `meshcom.dig-italia.it` · **everything else (including DL) → `meshcom.oevsv.at`** |
+| nRF52 (RAK4631, Ethernet/W5100S) | IT → literal `145.239.75.155` · DL → literal `44.148.230.197` · else → literal `44.143.8.143`                                                                                                 | **no per-country case at all → always literal `89.185.97.38`**                         |
 
-Both tables above describe the state **after** CTY-02 (see the 2026-09-06 update at the end of
-this document). They no longer match what this probe measured in August 2026 — at that time the
-Internet path had no DL arm on either platform, which is exactly the defect CTY-02 fixed. The
-historical measurement below is kept as recorded, with its now-superseded reading marked.
+Two asymmetries fall out of just reading the code, before any bench measurement:
 
+- **ESP32 internet path:** `DL` is not special-cased. A DL-configured node without a HAMNET
+  address sends to the Austrian server (`meshcom.oevsv.at`), same as `OE`. Whether that is
+  intended is an operator question, not a firmware bug — this document only states what the code
+  does and what the bench observed, per the backlog item's own framing.
+- **nRF52 internet path is flatter still:** unlike the ESP32 side, the non-HAMNET branch has no
+  `IT`/`DL` distinction whatsoever — every country reaching the internet path lands on the same
+  literal IP, `89.185.97.38`. This is a second, RAK-specific instance of the same class of
+  asymmetry, found while instrumenting this backlog item; not bench-measured (the RAK4631 is not
+  on this session's bench port), reported here as a code-reading finding for the operator.
 - The nRF52 side never resolves a hostname — every destination is a literal IP baked into the
-  firmware (no DNS resolver on the W5100S/Ethernet path), where the ESP32 side resolves the name at
-  connect time (async DNS, `[WIFI];dns` marker). Since CTY-02 both platforms read the same table
-  (`src/gwsrv_select.h`), which returns a name and the matching literal for every cell, so the two
-  can no longer drift apart.
+  firmware (no DNS resolver on the W5100S/Ethernet path), where the ESP32 side resolves
+  `meshcom.dig-italia.it` / `meshcom.hamnet.cloud` / `meshcom.oevsv.at` at connect time (async DNS,
+  `[WIFI];dns` marker).
 
-At the time of this probe neither table was changed by the work — TM-39 asked what the servers do,
-not what the selection logic should do. CTY-02 later changed both, for the reason recorded below.
+Neither table is changed by this work — TM-39 asks what the servers do, not what the selection
+logic should do.
 
 ## Firmware markers added for this probe
 
@@ -132,8 +137,7 @@ confirmed the node was back to `Gateway off` after the run.
 
 ## Reading the result
 
-- **DL and OE are the same server today.** _(Superseded 2026-09-06 — this was the bug, see CTY-02
-  below. The reading as recorded in August 2026 follows.)_ Both resolve `meshcom.oevsv.at` → `89.185.97.38` on this
+- **DL and OE are the same server today.** Both resolve `meshcom.oevsv.at` → `89.185.97.38` on this
   WLAN — the internet-path asymmetry read from the code (DL has no `case` of its own on that path)
   is exactly what the bench shows: a DL-configured node without a HAMNET address talks to the same
   Austrian server an OE node does, with the same KEEP/BEAT behaviour. Nothing in the bench data
@@ -184,95 +188,3 @@ Fix-IP-Pfad (`startFIXUDP()`); der DHCP-Pfad (`startUDP()`) ging im Internet-Zwe
 immer auf `89.185.97.38`. Seit der Wave-A-Behebung hat `startUDP()` denselben Split
 wie `startFIXUDP()`: IT → `145.239.75.155`, sonst → `89.185.97.38`, inklusive der
 passenden NTP-Pool-Wahl. Die Tabellen oben beschreiben damit beide nRF52-Pfade.
-
-## Update 2026-09-06 — CTY-02: the DL Internet fall-through was a regression, not a topology question
-
-Upstream issue [#1133](https://github.com/icssw-org/MeshCom-Firmware/issues/1133) reported that a
-Heltec V3 and a Heltec Wireless Tracker both ignored `--gateway srv dl` after upgrading to 4.35s.
-They did. The RCA overturns the verdict this document and `docs/BACKLOG.md` recorded in August.
-
-**What this document got wrong.** The August reading treated "DL has no case of its own on the
-Internet path" as a deliberate server-topology decision for upstream to answer. It was not. The DL
-Internet arm _existed_ — a bare literal `192.68.17.26` — and was **overwritten rather than
-extended** when the Italian server was added on 2026-08-20. Every DL node on a normal Internet
-uplink has landed on the Austrian server ever since. The bench run above measured the regression
-faithfully and then mis-attributed it.
-
-**The endpoint.** `meshcom.hamnet.network` resolves to `192.68.17.26` — the same literal that was
-removed, and the same host the issue reporter used to check his node. There was never an open
-question about which server DL should use.
-
-**Why HAMNET was unaffected.** The HAMNET branch kept its DL arm (`meshcom.hamnet.cloud` →
-`44.148.230.197`) throughout. Only nodes on a plain Internet uplink were hit — the typical German
-home-WiFi node, which is why the report came from exactly that setup.
-
-**The nRF52 half was never right.** `startFIXUDP()` and `startUDP()` have never had a DL arm on
-their Internet branch — CTY-01 added only the `IT`/`OE` split. A DL RAK4631 gateway on
-Ethernet/Internet had the same symptom, and always had.
-
-**The fix.** The country/transport matrix was extracted from the three inline copies into one pure
-table, `src/gwsrv_select.h`, consumed by `startMeshComUDP()` (ESP32) and by both nRF52 functions.
-The table returns a DNS name _and_ the matching literal for every cell, so the resolver-based ESP32
-path and the resolver-less nRF52 path can no longer disagree about where a country points. Pinned
-by `test/test_gwsrv_select/` (9 cases, `pio test -e native -f test_gwsrv_select`), which was written
-against the broken behaviour first and observed to fail on the DL-Internet cell before the fix.
-
-| country | transport | host                     | literal        | path     |
-| ------- | --------- | ------------------------ | -------------- | -------- |
-| OE      | inet      | `meshcom.oevsv.at`       | 89.185.97.38   | `inet`   |
-| OE      | hamnet    | —                        | 44.143.8.143   | `hamnet` |
-| DL      | inet      | `meshcom.hamnet.network` | 192.68.17.26   | `inet`   |
-| DL      | hamnet    | `meshcom.hamnet.cloud`   | 44.148.230.197 | `hamnet` |
-| IT      | both      | `meshcom.dig-italia.it`  | 145.239.75.155 | `inet`   |
-
-IT deliberately answers `inet` on both transports — it runs no HAMNET server — and that is what
-drives the NTP choice on nRF52, so the collapse of the old per-branch NTP assignments to a single
-`path`-keyed ternary is behaviour-preserving on every cell.
-
-**Reserved arms for further countries.** `src/gwsrv_select.h` carries commented-out `HB`
-(Switzerland) and `US` (United States) arms for both the HAMNET and the Internet block, with an
-activation checklist at the foot of the file; `src/command_functions.cpp` carries the matching
-ready-made replacement for the `--gateway srv` allow-list. Both places have to be uncommented — the
-allow-list is checked first, so an arm alone stays unreachable. `node_gwsrv` is `char[3]` and the
-comparison is `memcmp(.., 2)`, so a country code is exactly two uppercase characters; a longer one
-would be a flash-format change.
-
-**Bench proof 2026-09-06 — both platforms confirmed.** `DK5EN-93` (Heltec V3, ORBI63
-WLAN, non-HAMNET Internet path), flashed with the fix, `Gateway off` / `Webserver on` so no KEEP
-could leave the node, and the fork-only `--srvip 192.0.2.1` (TEST-NET-1) armed as a sink first —
-the `[GW];srv` marker is printed before DNS starts, so it reports the real selection while the
-override keeps traffic off the live DL server:
-
-```
->>> --srvip 192.0.2.1
-[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;67736
->>> --gateway srv dl
->>> --srvip 192.0.2.1
-[WIFI]...inet UDP-DEST meshcom.hamnet.network
-[GW];srv;DL;host;meshcom.hamnet.network;path;inet;ms;71802
-[WIFI];dns;meshcom.hamnet.network;ip;192.0.2.1;ms;42      <- sink, not the real server
-```
-
-Node restored to `--gateway srv oe`, `--srvip 0.0.0.0` afterwards.
-
-`DK5EN-90` (RAK4631, W5100S Ethernet, DHCP path, `Gateway off` / `Webserver on`) confirmed the
-nRF52 half on the same commit. `--ethdrop` calls `resetDHCP()`, which re-runs `startUDP()`, so the
-selection can be re-driven live without a reboot — useful because the nRF52 USB CDC re-enumerates
-on `--reboot`, which makes the boot marker easy to miss:
-
-```
->>> --ethdrop
-[GW];srv;OE;host;89.185.97.38;path;inet;ms;66810
->>> --gateway srv dl
->>> --ethdrop
-[GW];srv;DL;host;192.68.17.26;path;inet;ms;82187
-```
-
-Gateway was off throughout on both nodes, and all KEEP traffic is `bGATEWAY`-gated on both
-platforms, so nothing reached the live DL server from either board. Node restored to
-`--gateway srv oe` afterwards.
-
-Note for future runs: with the Ethernet cable out, neither nRF52 entry point reaches the selection
-code at all — `initethfixIP()` returns after five LinkOFF retries, `initethDHCP()` needs
-`startETH()` to succeed first — so a cable-less RAK cannot verify this path. The August probe
-(`srvprobe.py`) remains the fuller instrument for server-behaviour comparisons.
