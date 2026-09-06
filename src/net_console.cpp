@@ -224,6 +224,26 @@ static void authTask(void* arg)
 // ── MeshSerialClass ───────────────────────────────────────────────────────────
 void MeshSerialClass::begin(unsigned long baud)
 {
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // CDC-02 (2026-09-06, DK5EN-14): HWCDC::begin() (arduino-esp32 2.0.14,
+    // HWCDC.cpp:171-197) creates the 256 B TX ring buffer and enables the
+    // SERIAL_IN_EMPTY ISR; setTxBufferSize() (HWCDC.cpp:228-241) frees that
+    // buffer and briefly leaves tx_ring_buf NULL while allocating the new
+    // one. The ISR (HWCDC.cpp:92) dereferences tx_ring_buf with no NULL
+    // check, so calling setTxBufferSize() after begin() races a host
+    // port-open against the ISR and hits "assert failed:
+    // xRingbufferReceiveUpToFromISR ringbuf.c:1269". Sizing the buffer
+    // before the first begin() is race-free, since no ISR exists yet. The
+    // once-flag guards against T5-ePaper/T-Deck Pro, where begin() runs
+    // twice per boot (esp32_main.cpp and again via idf_setup()/
+    // initTDeck_pro()) -- the second call must not resize a live buffer.
+    static bool s_txBufSized = false;
+    if (!s_txBufSized)
+    {
+        s_hwSerial.setTxBufferSize(4096);
+        s_txBufSized = true;
+    }
+#endif
     s_hwSerial.begin(baud);
 #if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
     // CDC-01 (2026-09-05, DK5EN-14): on the S3 boards s_hwSerial is the
@@ -238,7 +258,7 @@ void MeshSerialClass::begin(unsigned long baud)
     // The larger TX ring keeps bench logs intact under a connected host:
     // bursts (--redrawlog) that used to wait 100 ms for room now need the
     // room to exist. Bench proof: tdeck_harness.py --scenario cdc_backpressure.
-    s_hwSerial.setTxBufferSize(4096);
+    // (buffer sized above, before begin() -- see CDC-02.)
     s_hwSerial.setTxTimeoutMs(0);
 #endif
 }

@@ -638,13 +638,22 @@ void esp32setup()
     ///< Initialize T5-EPAPER GUI
     ///< delay for ESP32-S3 nativ USB [OE3WAS]
     ///< um Terminal verbinden zu können
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE && defined(DISABLE_NET_CONSOLE)
+    // CDC-02: must run BEFORE Serial.begin(). HWCDC::begin() (arduino-esp32
+    // cores/esp32/HWCDC.cpp) creates the 256 B tx ring buffer and enables the
+    // TX ISR; setTxBufferSize() on an already-begun HWCDC deletes and NULLs
+    // that buffer before recreating it, and the ISR dereferences it without a
+    // NULL check, so a live resize races the ISR and can assert/crash. Sizing
+    // before begin() avoids the race. Full rationale at
+    // MeshSerialClass::begin() (src/net_console.cpp).
+    Serial.setTxBufferSize(4096);
+#endif
     Serial.begin(MONITOR_SPEED);
     Serial.setTimeout(50);
 
 #if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE && defined(DISABLE_NET_CONSOLE)
     // CDC-01: without the net-console wrapper Serial is the HWCDC object
     // itself; the rationale sits at MeshSerialClass::begin() (net_console.cpp).
-    Serial.setTxBufferSize(4096);
     Serial.setTxTimeoutMs(0);
 #endif
     
