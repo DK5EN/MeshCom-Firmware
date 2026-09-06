@@ -79,9 +79,10 @@ discover them by surprise:
 ## Unreleased on `fork-main` since v4.35s.09.05
 
 Items 192-194, committed 2026-09-05 evening, flashed to `DK5EN-98` (Heltec V3
-gateway) and `DK5EN-14` (T-Deck Plus) over WiFi OTA the same evening. Not in a
-tagged release yet. Item 193 is a candidate for the next upstream PR on its
-own; items 192 and 194 wait for the McApp side to settle.
+gateway) and `DK5EN-14` (T-Deck Plus) over WiFi OTA the same evening. Items
+195 and 196 committed 2026-09-06 and flashed to `DK5EN-98` the same day. Not
+in a tagged release yet. Item 193 is a candidate for the next upstream PR on
+its own; items 192 and 194 wait for the McApp side to settle.
 
 192. **ACK frames to the phone carry the callsign of the station that
      acknowledged** (stages 1 and 3 of
@@ -124,6 +125,33 @@ own; items 192 and 194 wait for the McApp side to settle.
      QRT threshold; the solid tick and label follow it, the fixed line stays
      as a faint tick, and the caption names both. A snapshot at page render,
      stated as such. Five native cases. Commit `b1cc8cd5`.
+195. **The message tabs in the web GUI turn green and carry a count when
+     unread messages arrived on them.** Requested by a user after the tabs
+     shipped in v4.35s.09.05. The node adds one attribute per message div,
+     `data-ts`, the ring insert time addBLEOutBuffer() already stores;
+     everything else is browser side in the scaffold JS. Unread for a tab
+     means: an inbound message that matches the tab, whose id has not been
+     marked read this session, and whose timestamp is newer than the tab's
+     persisted watermark (localStorage `mcWm`). The watermark is seeded on
+     first sight so a fresh browser never opens with a wall of badges, and a
+     newly configured group starts clean. Viewing All counts as reading
+     everything, so it raises every tab's watermark. Messages that land while
+     the browser window is hidden stay unread until it is visible again. Own
+     messages and ack updates never count. The poll cadence is unchanged: the
+     badge lives on the Messages page only, the navigation button does not
+     light up from other pages. Known limits: the ring holds 20 slots, so the
+     count is a lower bound after a long absence; before the node has a valid
+     clock the timestamps sit near zero and such messages are only counted
+     within the session. Verified against `DK5EN-98` with
+     `tools/webgui_badge_test.js` (jsdom driving the real scaffold, 30
+     checks). Commit `714fce85`.
+196. **The web GUI message list no longer shows `{CET}` time beacons.** A
+     gateway that pulls the beacon from the server puts it into the phone
+     ring (the app uses it for clock sync), and the web list rendered it as
+     an ordinary broadcast, so with item 195 every beacon would have lit the
+     `*` and All tabs. `sub_content_messages()` now skips payloads starting
+     with `{CET}` next to the existing `:ack` skip; the ring itself and the
+     app are untouched. Commit `9076824d`.
 
 ## New in v4.35s.09.05
 
