@@ -1325,6 +1325,18 @@ void esp32setup()
         #endif
         #endif
 
+        #if defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E213)
+            // DS-02: prepareToSleep() in src/Platforms/<board>/power_controls.cpp
+            // holds PIN_LORA_NSS HIGH with gpio_hold_en() before deep sleep.
+            // ESP-IDF gpio.h: the hold survives the deep-sleep wake reset and is
+            // released only by gpio_hold_dis(). Without this the SPI chip-select
+            // can never go LOW after the first wake and the radio is dead until a
+            // power cycle. GPIO8 is RTC-capable but the sleep side never arms
+            // gpio_deep_sleep_hold_en(), so no gpio_deep_sleep_hold_dis() is needed.
+            // No-op on a cold boot. Not bench-verified: no WP/E213 hardware.
+            gpio_hold_dis((gpio_num_t) PIN_LORA_NSS);
+        #endif
+
         #if defined(EXTERNAL_RADIO)
         // External radio: the bridge owns the RF chip. Do NOT initialize/begin the
         // local RadioLib transceiver. bRadio is forced false below so no local
