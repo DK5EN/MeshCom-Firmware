@@ -1,5 +1,50 @@
 # RESUME — pick up here
 
+## 2026-09-06 (afternoon): CTY-02 — DL gateway server restored on the Internet path (upstream issue #1133)
+
+Upstream [#1133](https://github.com/icssw-org/MeshCom-Firmware/issues/1133): a Heltec V3 and a
+Heltec Wireless Tracker both ignored `--gateway srv dl` on 4.35s. Confirmed and fixed on
+`fork-main`; **not committed to upstream, no PR opened yet** — the German PR description is the
+next step.
+
+**Root cause.** When the IT server was added (2026-08-20, still under version `p`) the DL arm on
+the Internet branch was _replaced_ rather than extended, deleting literal `192.68.17.26` from the
+tree. Since then every non-IT code fell through to `meshcom.oevsv.at`, so a DL node on a plain
+Internet uplink registered with the Austrian server. HAMNET kept its DL arm and was never affected,
+which is why only ordinary home-WiFi nodes saw it. The setting itself was always stored and shown
+correctly by `--info` — only the destination lookup dropped it.
+
+**`meshcom.hamnet.network` resolves to `192.68.17.26`**, the same literal that was removed and the
+host the reporter used to verify his node. There was never an open question about which server DL
+should use — which **retracts the `TM-39` verdict** that called this a deliberate server-topology
+question for upstream (corrected in `docs/BACKLOG.md` and `docs/bench-country-servers.md`).
+
+**Fix.** The country/transport matrix was extracted from its three inline copies into one pure
+table, `src/gwsrv_select.h`, and all three call sites converted: `startMeshComUDP()`
+(`udp_functions.cpp`) plus `startUDP()` and `startFIXUDP()` (`nrf52/nrf_eth.cpp`). The table returns
+a hostname _and_ the matching literal for every cell, so the resolver-based ESP32 path and the
+resolver-less nRF52 path can no longer point at different servers. On nRF52 the per-branch NTP
+assignments collapse to one `path`-keyed ternary, verified cell-by-cell as behaviour-preserving.
+The nRF52 Internet paths gain a DL arm they never had (CTY-01 added only `IT`/`OE`).
+
+**Reserved country arms (operator request).** `gwsrv_select.h` carries commented-out `HB`
+(Switzerland) and `US` arms for both HAMNET and Internet, plus an activation checklist; the
+`--gateway srv` allow-list in `command_functions.cpp` carries the matching ready-made replacement
+lines. A maintainer uncomments both places and fills in host + literal.
+
+**Gates.** `test/test_gwsrv_select/` (9 cases, registered in `env:native`) was written against the
+broken behaviour first and observed **red on the DL-Internet cell** before the fix. Native suite
+284/284. `wiscore_rak4631`, `heltec_wifi_lora_32_V3` and `heltec_wireless_tracker` all build. Every
+server address in `src/` now lives in exactly one file (swept).
+
+**Outstanding: no hardware proof.** No bench node was on USB this session. The end-to-end check is
+`--gateway srv dl` plus the fork-only `--srvip <sink>` (the `[GW];srv` marker prints before DNS
+starts, so it proves the selection while the override keeps traffic off the real DL server), or the
+existing `tools/bench/experiments/srvprobe.py`. Expect
+`[GW];srv;DL;host;meshcom.hamnet.network;path;inet` on ESP32 and `[UDP-DEST] inet UDP-DEST
+192.68.17.26` on the RAK. A public reply drafted for the issue is in the session log, not yet
+posted.
+
 ## 2026-09-06 (morning): v4.35s.09.06 published, 39 assets, web GUI badges, deepsleep on every board
 
 Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.06>, marked
