@@ -29,6 +29,7 @@
 #include "via_functions.h"
 #include "charset_filter.h"
 #include "setlog_lines.h"
+#include "mcp17_bits.h"
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -4262,7 +4263,9 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
 
     char cinaU[15]={0};
     char cinaI[15]={0};
-    
+
+    char cdigital[15]={0};
+
     char ctele[15]={0};
 
     if(strcmp(meshcom_settings.node_atxt, "none") != 0 && meshcom_settings.node_atxt[0] != 0x00)
@@ -4416,6 +4419,15 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
         }
     }
 
+    // /D= MCP23017 port A inputs (issue 1076 companion): GPA0 first,
+    // output pins read '0'. Only when the chip answered at boot.
+    if(bMCP23017)
+    {
+        char cbits[MCP17_BITS_LEN + 1];
+        mcp17PortABits(meshcom_settings.node_mcp17in, meshcom_settings.node_mcp17io, cbits);
+        snprintf(cdigital, sizeof(cdigital), "/D=%s", cbits);
+    }
+
     /////////////////////////////////////////////////////////////////
     // send Group-Call settings zu MesCom-Server
     String strGRC="";
@@ -4462,6 +4474,7 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
     strncat(strconcat, cversion, sizeof(strconcat) - strlen(strconcat) - 1);    
     strncat(strconcat, cinaU, sizeof(strconcat) - strlen(strconcat) - 1);   
     strncat(strconcat, cinaI, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cdigital, sizeof(strconcat) - strlen(strconcat) - 1);
     strncat(strconcat, ctele, sizeof(strconcat) - strlen(strconcat) - 1);
 
     // wenn die concatenation zu lang ist, dann catxt und cname löschen
@@ -5121,6 +5134,13 @@ void sendTelemetry(int ID)
     // Values to APRS.FI
     if(iNextTelemetry >= 4)
     {
+        // digital slot (issue 1076): MCP23017 port A inputs, GPA0 first.
+        // Stays "00000000" -- byte-identical to today -- on boards without
+        // the chip (bMCP23017 false).
+        char cbits[MCP17_BITS_LEN + 1] = "00000000";
+        if(bMCP23017)
+            mcp17PortABits(meshcom_settings.node_mcp17in, meshcom_settings.node_mcp17io, cbits);
+
         char cv[20];
         snprintf(cv, sizeof(cv), "%-9.9s:T#%03i", stationCall.c_str(), meshcom_settings.node_msgid);
 
@@ -5150,7 +5170,9 @@ void sendTelemetry(int ID)
             for(int pad = realCount; pad < 5; pad++)
                 strTelemetry.concat(",0");
 
-            strTelemetry.concat(",00000000,");
+            strTelemetry.concat(",");
+            strTelemetry.concat(cbits);
+            strTelemetry.concat(",");
             strTelemetry.concat(meshcom_settings.node_parm_t);
             strTelemetry.concat(",");
             strTelemetry.concat(meshcom_settings.node_parm_id);
@@ -5252,9 +5274,24 @@ void sendTelemetry(int ID)
                     strValue.concat(cv);
                 }
             }
+
+            // digital slot (issue 1076): this path sent none before -- only
+            // append it when the chip actually answered at boot, so nodes
+            // without an MCP23017 keep a byte-identical frame. APRS puts the
+            // digital byte in slot 6, so pad the analog slots to five first
+            // (ivcount == values emitted, capped at 5 by the break above) or
+            // a three-value node would ship its bits as analog value 4.
+            if(bMCP23017)
+            {
+                for(int pad = ivcount; pad < 5; pad++)
+                    strTelemetry.concat(",0");
+
+                strTelemetry.concat(",");
+                strTelemetry.concat(cbits);
+            }
         }
 
-        
+
         snprintf(msg_text, sizeof(msg_text), "%s", strTelemetry.c_str());
 
         iNextTelemetry++;

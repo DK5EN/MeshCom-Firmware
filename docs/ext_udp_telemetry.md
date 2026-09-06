@@ -137,11 +137,14 @@ For every position frame the node forwards to the Extern-UDP peer it also sends 
 `{"type":"tele",...}` datagram, built in `src/extern_tele_json.h`. Both shapes carry the
 same keys with the same physical meaning:
 
-| Key            | `src_type:"node"` (own sensor)    | `src_type:"lora"` (relayed node) | Unit / Q-group                    |
-| -------------- | --------------------------------- | -------------------------------- | --------------------------------- |
-| `qfe`          | `meshcom_settings.node_press`     | APRS `/P=`                       | hPa, station pressure (QFE)       |
-| `qnh`          | `meshcom_settings.node_press_asl` | APRS `/Q=`                       | hPa, reduced to MSL per ISA (QNH) |
-| `pressure_alt` | not present                       | APRS `/F=`                       | m, pressure altitude vs 1013.25   |
+| Key            | `src_type:"node"` (own sensor)    | `src_type:"lora"` (relayed node) | Unit / Q-group                                    |
+| -------------- | --------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `qfe`          | `meshcom_settings.node_press`     | APRS `/P=`                       | hPa, station pressure (QFE)                       |
+| `qnh`          | `meshcom_settings.node_press_asl` | APRS `/Q=`                       | hPa, reduced to MSL per ISA (QNH)                 |
+| `pressure_alt` | not present                       | APRS `/F=`                       | m, pressure altitude vs 1013.25                   |
+| `din`          | own MCP23017 port A               | APRS `/D=`                       | 8-char bit string GPA0..GPA7, '0' for output pins |
+
+`din` is omitted entirely (no key, not an empty string) when the sender has no MCP23017.
 
 **Fixed 2026-09-05 (TLM-04):** firmware up to and including 4.35p wrote the `/F=` value under
 `qfe` for `src_type:"lora"`, so a relayed BME680 node (which always sends `/F=` and suppresses

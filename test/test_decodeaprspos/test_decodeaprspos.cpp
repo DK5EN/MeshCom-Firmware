@@ -60,6 +60,25 @@ static const char *VEC_F003 =
 // lon_d = 11 + 45.46/60 = 11.757666...
 static const char *VEC_F011 = "4825.00N/01145.46E#/B=057/N1";
 
+// ---- /D= (MCP23017 Port A, GPA0 zuerst) -- neue Vektoren fuer die
+// Digital-Erweiterung. VEC_F003 dient unveraendert als "kein /D="-Fall.
+
+// f003-Tail mit eingefuegtem /D= zwischen /A= und /N1 -- bat/alt muessen
+// trotz des neuen Tokens weiterhin korrekt geparst werden.
+static const char *VEC_DIN_ZWISCHEN_A_UND_N =
+    "4824.43N/01144.40E#github.com/dk5en/mcapp#Martin/B=099/A=001657/D=01001100/N1/R=20;232;262;9;26244;26244;";
+
+// /D= als letztes Token des Payloads (kein abschliessendes '/') -- die
+// Funktion haengt intern ein Leerzeichen an, das als Terminator wirkt.
+static const char *VEC_DIN_7_ZEICHEN = "4825.00N/01145.46E#/D=0100110";
+static const char *VEC_DIN_9_ZEICHEN = "4825.00N/01145.46E#/D=010011001";
+static const char *VEC_DIN_MIT_BUCHSTABE = "4825.00N/01145.46E#/D=0100110x";
+static const char *VEC_DIN_LETZTES_TOKEN = "4825.00N/01145.46E#/D=11111111";
+
+// /D= direkt nach dem Symbol bei leerem Kommentartext (wie VEC_F011),
+// gefolgt von /B=.
+static const char *VEC_DIN_LEERER_KOMMENTAR = "4825.00N/01145.46E#/D=00000000/B=057/N1";
+
 // ------------------------------------------------------------ Testfaelle
 
 static void test_f003_battery_und_altitude(void)
@@ -79,6 +98,7 @@ static void test_f003_battery_und_altitude(void)
     TEST_ASSERT_EQUAL_INT(1657, pos.alt);
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 48.407166, pos.lat_d);
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 11.740000, pos.lon_d);
+    TEST_ASSERT_EQUAL_STRING("", pos.din);   // kein /D= im Frame -- initAPRSPOS()-Default bleibt
 }
 
 static void test_f011_kein_battery_leerer_kommentar(void)
@@ -237,6 +257,77 @@ static void test_steuerzeichen_in_breitenangabe(void)
     TEST_ASSERT_EQUAL_FLOAT(48.0, pos.lat);  // ... aber sscanf() liest nur bis zum Steuerbyte
 }
 
+// /D=01001100 zwischen /A= und /N1 -- din wird gesetzt, bat/alt bleiben
+// unveraendert korrekt (die neue Schleife darf die Batt-/Alt-Schleifen davor
+// nicht stoeren).
+static void test_din_zwischen_a_und_n(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_ZWISCHEN_A_UND_N, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(99, pos.bat);
+    TEST_ASSERT_EQUAL_INT(1657, pos.alt);
+    TEST_ASSERT_EQUAL_STRING("01001100", pos.din);
+}
+
+// 7 Ziffern nach /D= -- zu kurz, din bleibt beim initAPRSPOS()-Default "".
+static void test_din_7_zeichen_ungueltig(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_7_ZEICHEN, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("", pos.din);
+}
+
+// 9 Ziffern nach /D= -- zu lang, din bleibt "". Deckt auch die
+// Ueberlaufbremse der neuen Schleife ab (das 9. Datenbyte darf decode_text
+// nicht ueberschreiben).
+static void test_din_9_zeichen_ungueltig(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_9_ZEICHEN, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("", pos.din);
+}
+
+// 8 Zeichen, aber ein Buchstabe statt '0'/'1' -- din bleibt "".
+static void test_din_mit_buchstabe_ungueltig(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_MIT_BUCHSTABE, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("", pos.din);
+}
+
+// /D= als letztes Token des gesamten Payloads (kein abschliessendes '/') --
+// muss trotzdem korrekt erkannt werden, weil decodeAPRSPOS() intern ein
+// Leerzeichen anhaengt.
+static void test_din_letztes_token(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_LETZTES_TOKEN, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("11111111", pos.din);
+}
+
+// /D= direkt nach dem Symbol bei leerem Kommentartext (wie VEC_F011),
+// gefolgt von /B= -- din wird gesetzt und bat parst weiterhin korrekt.
+static void test_din_leerer_kommentar(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_DIN_LEERER_KOMMENTAR, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_INT(57, pos.bat);
+    TEST_ASSERT_EQUAL_STRING("00000000", pos.din);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -251,5 +342,11 @@ int main(int argc, char **argv)
     RUN_TEST(test_ipt_notbremse_ohne_hemisphaere_wird_abgelehnt);
     RUN_TEST(test_ueberlanger_kommentartext_wird_gekappt);
     RUN_TEST(test_steuerzeichen_in_breitenangabe);
+    RUN_TEST(test_din_zwischen_a_und_n);
+    RUN_TEST(test_din_7_zeichen_ungueltig);
+    RUN_TEST(test_din_9_zeichen_ungueltig);
+    RUN_TEST(test_din_mit_buchstabe_ungueltig);
+    RUN_TEST(test_din_letztes_token);
+    RUN_TEST(test_din_leerer_kommentar);
     return UNITY_END();
 }

@@ -20,7 +20,7 @@ static void test_lora_qfe_is_station_pressure_not_altitude(void)
     size_t len = externTeleJsonLora(out, sizeof(out), "DM3KS-13", 100,
                                     21.5f, 0.0f, 55.0f,
                                     990.5f, 0.0f, 191,
-                                    0.0f, 0.0f);
+                                    0.0f, 0.0f, nullptr);
     TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
 
     JsonDocument doc;
@@ -40,7 +40,7 @@ static void test_node_qfe_qnh_are_pressures(void)
     size_t len = externTeleJsonNode(out, sizeof(out), "DK5EN-98",
                                     23.3f, 0.0f, 60.0f,
                                     1018.5f, 1044.2f,
-                                    0.0f, 0.0f);
+                                    0.0f, 0.0f, "");
     TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
 
     JsonDocument doc;
@@ -51,18 +51,88 @@ static void test_node_qfe_qnh_are_pressures(void)
     TEST_ASSERT_FALSE(doc.containsKey("pressure_alt"));
 }
 
+// TLM-05: optional /D= digital-input passthrough, MCP23017 port A bits.
+static void test_lora_din_present(void)
+{
+    char out[300];
+    size_t len = externTeleJsonLora(out, sizeof(out), "DM3KS-13", 100,
+                                    21.5f, 0.0f, 55.0f, 990.5f, 0.0f, 191,
+                                    0.0f, 0.0f, "01001100");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(doc, out).code());
+    TEST_ASSERT_EQUAL_STRING("01001100", doc["din"]);
+}
+
+// Empty string: no /D= field on the relayed frame -- key must be absent.
+static void test_lora_din_empty_is_absent(void)
+{
+    char out[300];
+    size_t len = externTeleJsonLora(out, sizeof(out), "DM3KS-13", 100,
+                                    21.5f, 0.0f, 55.0f, 990.5f, 0.0f, 191,
+                                    0.0f, 0.0f, "");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(doc, out).code());
+    TEST_ASSERT_FALSE(doc.containsKey("din"));
+}
+
+// nullptr: same as empty -- key must be absent.
+static void test_lora_din_null_is_absent(void)
+{
+    char out[300];
+    size_t len = externTeleJsonLora(out, sizeof(out), "DM3KS-13", 100,
+                                    21.5f, 0.0f, 55.0f, 990.5f, 0.0f, 191,
+                                    0.0f, 0.0f, nullptr);
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(doc, out).code());
+    TEST_ASSERT_FALSE(doc.containsKey("din"));
+}
+
+// Own node with an MCP23017: din present.
+static void test_node_din_present(void)
+{
+    char out[300];
+    size_t len = externTeleJsonNode(out, sizeof(out), "DK5EN-98",
+                                    23.3f, 0.0f, 60.0f, 1018.5f, 1044.2f,
+                                    0.0f, 0.0f, "10000000");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(doc, out).code());
+    TEST_ASSERT_EQUAL_STRING("10000000", doc["din"]);
+}
+
+// Own node without an MCP23017: din absent.
+static void test_node_din_empty_is_absent(void)
+{
+    char out[300];
+    size_t len = externTeleJsonNode(out, sizeof(out), "DK5EN-98",
+                                    23.3f, 0.0f, 60.0f, 1018.5f, 1044.2f,
+                                    0.0f, 0.0f, "");
+    TEST_ASSERT_GREATER_THAN_UINT(0, (unsigned)len);
+
+    JsonDocument doc;
+    TEST_ASSERT_EQUAL(DeserializationError::Ok, deserializeJson(doc, out).code());
+    TEST_ASSERT_FALSE(doc.containsKey("din"));
+}
+
 // JSN-01: bound by the buffer -- canary bytes behind it stay untouched.
 static void test_small_buffer_is_bounded(void)
 {
     char raw[32 + 8];
     memset(raw, 0xAA, sizeof(raw));
     size_t len = externTeleJsonLora(raw, 32, "DM3KS-13", 100,
-                                    21.5f, 0.0f, 55.0f, 990.5f, 0.0f, 191, 0.0f, 0.0f);
+                                    21.5f, 0.0f, 55.0f, 990.5f, 0.0f, 191, 0.0f, 0.0f, nullptr);
     TEST_ASSERT_LESS_OR_EQUAL_UINT(32, (unsigned)len);
     for(int i = 0; i < 8; i++)
         TEST_ASSERT_EQUAL_HEX8(0xAA, (uint8_t)raw[32 + i]);
     TEST_ASSERT_EQUAL_UINT(0, (unsigned)externTeleJsonLora(nullptr, 0, "X", 0,
-                                                           0, 0, 0, 0, 0, 0, 0, 0));
+                                                           0, 0, 0, 0, 0, 0, 0, 0, nullptr));
 }
 
 int main(int, char **)
@@ -71,5 +141,10 @@ int main(int, char **)
     RUN_TEST(test_lora_qfe_is_station_pressure_not_altitude);
     RUN_TEST(test_node_qfe_qnh_are_pressures);
     RUN_TEST(test_small_buffer_is_bounded);
+    RUN_TEST(test_lora_din_present);
+    RUN_TEST(test_lora_din_empty_is_absent);
+    RUN_TEST(test_lora_din_null_is_absent);
+    RUN_TEST(test_node_din_present);
+    RUN_TEST(test_node_din_empty_is_absent);
     return UNITY_END();
 }

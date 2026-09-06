@@ -16,6 +16,13 @@
 // the /F= altitude was written under "qfe", so a relayed BME680 node showed
 // e.g. 191 "hPa" on a dashboard.
 //
+// Both shapes can additionally carry "din": the MCP23017 port A inputs as an
+// eight-character bit string, GPA0 first (mcp17_bits.h convention). For
+// "lora" it comes from the relayed node's APRS /D= field; for "node" it comes
+// from the gateway's own MCP23017 via mcp17PortABits(). The key is omitted
+// entirely -- not even an empty string -- when the sender has no MCP23017,
+// so the JSON stays byte-identical to pre-din firmware for those senders.
+//
 // Rueckgabe: Anzahl geschriebener Bytes; die Schranke ist die Puffergroesse,
 // nicht measureJson() (JSN-01, siehe ble_json_frame.h).
 
@@ -24,7 +31,8 @@ static inline size_t externTeleJsonNode(char *out, size_t out_len,
                                         const char *src,
                                         float temp1, float temp2, float hum,
                                         float qfe, float qnh,
-                                        float gas, float co2)
+                                        float gas, float co2,
+                                        const char *din)
 {
     if(out == nullptr || out_len == 0)
         return 0;
@@ -41,6 +49,8 @@ static inline size_t externTeleJsonNode(char *out, size_t out_len,
     ctJson["qnh"] = qnh;
     ctJson["gas"] = gas;
     ctJson["co2"] = co2;
+    if(din != nullptr && din[0] != 0)
+        ctJson["din"] = din;
 
     return serializeJson(ctJson, out, out_len);
 }
@@ -51,7 +61,8 @@ static inline size_t externTeleJsonLora(char *out, size_t out_len,
                                         float temp1, float temp2, float hum,
                                         float qfe, float qnh,
                                         int pressure_alt,
-                                        float gas, float co2)
+                                        float gas, float co2,
+                                        const char *din)
 {
     if(out == nullptr || out_len == 0)
         return 0;
@@ -70,6 +81,8 @@ static inline size_t externTeleJsonLora(char *out, size_t out_len,
     ctJson["pressure_alt"] = pressure_alt;
     ctJson["gas"] = gas;
     ctJson["co2"] = co2;
+    if(din != nullptr && din[0] != 0)
+        ctJson["din"] = din;
 
     return serializeJson(ctJson, out, out_len);
 }
