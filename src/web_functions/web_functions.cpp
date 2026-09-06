@@ -1887,7 +1887,10 @@ void sub_content_messages()
             // Textmessage
             if (msg_type_b_lora == 0x3A)
             {
-                if (aprsmsg.msg_payload.indexOf(":ack") < 1)
+                // {CET} time beacons sit in the ring for the phone app's clock
+                // sync; they are not operator traffic and would light the tab
+                // badges on every beacon, so the web list skips them
+                if (aprsmsg.msg_payload.indexOf(":ack") < 1 && !aprsmsg.msg_payload.startsWith("{CET}"))
                 {
                     String msgtxt = aprsmsg.msg_payload;
                     if (bDEBUG)
