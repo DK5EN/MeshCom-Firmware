@@ -379,8 +379,16 @@ U8G2 *u8g2;
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0);  //RESET CLOCK DATA
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0);  //RESET CLOCK DATA
 #elif defined(BOARD_TBEAM_V3)
-    U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2_1(U8G2_R0, 18, 17, U8X8_PIN_NONE);
-    U8G2_SH1106_128X64_NONAME_1_SW_I2C u8g2_2(U8G2_R0, 18, 17, U8X8_PIN_NONE);
+    // Wie bei Heltec V3/V4 (TM-09): Software-Bitbanging mit 1-Seiten-Puffer
+    // kostete ein Bild ~570 ms auf dem Hauptschleifen-Task (Feldmeldung
+    // T-Beam Supreme, [INSTR-LOOP];gap;...;in;display_tick, 4x/min beim
+    // 15-s-Uhr-Refresh). Anders als dort liegt das OLED hier auf DEMSELBEN
+    // Bus wie PMU/RTC/Sensoren (SDA_PIN 17 / SCL_PIN 18), also Wire statt
+    // Wire1 -- u8g2 ruft Wire.begin(17, 18) mit genau diesen Pins auf.
+    // Vollbild-Puffer (_F_) statt _1_: ein Transfer je Bild, und ein
+    // unveraendertes Bild kann uebersprungen werden (TM-10).
+    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0, U8X8_PIN_NONE, 18, 17);
+    U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, U8X8_PIN_NONE, 18, 17);
 #elif defined(BOARD_TBEAM_1W)
     DISPLAY_MODEL u8g2_1(U8G2_R0, U8X8_PIN_NONE);  //RESET CLOCK DATA
     DISPLAY_MODEL u8g2_2(U8G2_R0, U8X8_PIN_NONE);

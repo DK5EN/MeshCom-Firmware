@@ -917,17 +917,22 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--t5 on/off  E-paper power\n");
             delay(100);
             #endif
+            #if INSTRUMENT_ENABLED
             printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n--ntpsync  request an immediate NTP refresh now\n");
+            #else
+            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n");
+            #endif
             delay(100);
 
-            // DOC-02: INSTRUMENT_ENABLED (src/instrument.h) defaults to 1 on
-            // ESP32 and nRF52 and is never overridden in any platformio.ini
-            // env, so the ~50-command bench/instrument surface (--heap,
+            // DOC-02: the ~50-command bench/instrument surface (--heap,
             // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
-            // ... see src/instrument.h) ships in every board build today --
-            // there is no clean/dev split to advertise honestly here, so
-            // --help does not enumerate that block command by command.
-            printlndeb("(bench/instrument commands -- INSTRUMENT_ENABLED, on by default in every board build, see src/instrument.h -- not listed individually here)\n");
+            // --ntpsync, ... see src/instrument.h) is compiled out of a normal
+            // board build and only present in a measurement firmware built
+            // with -D INSTRUMENT_ENABLED=1. Announce it only where it exists,
+            // and do not enumerate the block command by command.
+            #if INSTRUMENT_ENABLED
+            printlndeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            #endif
         }
 
         return;

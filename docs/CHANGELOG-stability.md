@@ -222,6 +222,34 @@ xRingbufferReceiveUpToFromISR ringbuf.c:1269`, then a two-to-three
      before, 0 of 80 after, SD card and keyboard fine on every boot.
      Commit `b57daf44`.
 
+202. **The bench instrumentation no longer ships in a normal board build**
+     (INS-01). `INSTRUMENT_ENABLED` (`src/instrument.h`) defaulted to 1 on
+     every ESP32 and nRF52 env, and `printfdeb()` is not gated by `--debug`,
+     so field nodes printed `[INSTR-LOOP];gap;...` lines to the serial
+     console unprompted and users reported them as error messages. The
+     default is now 0; a measurement firmware is built with
+     `-D INSTRUMENT_ENABLED=1` (for example
+     `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1" pio run -e <env>`).
+     This also compiles the ~50-command bench surface (`--heap`, `--instr`,
+     `--injectmsg`, `--injectraw`, `--loratx`, `--ntpsync`, `--flashpoke`,
+     `--disptest`, the T-Deck UI hooks, ...) out of a normal build; `--help`
+     announces the block only where it exists. Verified by string-scanning
+     the built image: `INSTR-LOOP` absent by default, present with the flag.
+
+203. **T-Beam Supreme: the OLED no longer blocks the main loop for ~570 ms**
+     (TM-09 for `BOARD_TBEAM_V3`). The display still ran on U8g2 software
+     I2C with a one-page buffer, so every frame cost eight full re-renders
+     and eight bit-banged transfers — measured in the field as
+     `[INSTR-LOOP];gap;ms;577;in;display_tick`, four times a minute at the
+     15 s clock refresh, which also starves LoRa RX servicing. Switched to
+     hardware I2C with a full-frame buffer
+     (`U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE, 18, 17)`),
+     the same change already made for Heltec V3/V4 and Wireless Stick V3 —
+     but on `Wire`, not `Wire1`, because the Supreme has the OLED on the
+     same bus as PMU, RTC and sensors (`SDA_PIN 17` / `SCL_PIN 18`). The
+     full buffer also re-enables the unchanged-frame skip (TM-10).
+     Not yet confirmed on Supreme hardware — no such board on the bench.
+
 ## New in v4.35s.09.05
 
 Tag name without the `-stability` suffix from this release on; the line is

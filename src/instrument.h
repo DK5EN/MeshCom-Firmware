@@ -20,18 +20,22 @@
  *
  * REMOVAL: this feature lives in exactly two new files (src/instrument.h,
  * src/instrument.cpp) plus four small guarded hook sites. `git revert` of the
- * commit that introduced it removes it completely. Alternatively define
- * INSTRUMENT_ENABLED=0 to compile it out while keeping the source.
+ * commit that introduced it removes it completely. It is compiled out by
+ * default; -D INSTRUMENT_ENABLED=1 builds a measurement firmware.
  */
 
 #pragma once
 
+/* Default OFF. This is bench scaffolding, not a field feature: with it on,
+ * [INSTR-LOOP] gap lines go to the serial console unconditionally (printfdeb()
+ * is not gated by --debug), and users read them as error messages. Build a
+ * measurement firmware with -D INSTRUMENT_ENABLED=1; the platform guard below
+ * still keeps it out of the native/host builds, which have no Arduino core. */
 #if !defined(INSTRUMENT_ENABLED)
-  #if defined(ESP32) || defined(NRF52_SERIES)
-    #define INSTRUMENT_ENABLED 1      /* nRF52 since TM-12: loop period + heap, no PSRAM fields */
-  #else
-    #define INSTRUMENT_ENABLED 0
-  #endif
+  #define INSTRUMENT_ENABLED 0
+#elif INSTRUMENT_ENABLED && !defined(ESP32) && !defined(NRF52_SERIES)
+  #undef  INSTRUMENT_ENABLED
+  #define INSTRUMENT_ENABLED 0        /* no Arduino core on the native/host builds */
 #endif
 
 #if INSTRUMENT_ENABLED
