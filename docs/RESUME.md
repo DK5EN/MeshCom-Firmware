@@ -37,14 +37,15 @@ broken behaviour first and observed **red on the DL-Internet cell** before the f
 284/284. `wiscore_rak4631`, `heltec_wifi_lora_32_V3` and `heltec_wireless_tracker` all build. Every
 server address in `src/` now lives in exactly one file (swept).
 
-**Bench 2026-09-06: ESP32 proven, nRF52 not.** `DK5EN-93` (Heltec V3) flashed and confirmed —
-`--gateway srv dl` now yields `[GW];srv;DL;host;meshcom.hamnet.network;path;inet` where it yielded
-`OE;host;meshcom.oevsv.at` before, with `Gateway off` and `--srvip 192.0.2.1` armed as a sink so no
-packet reached the live DL server; node restored to OE afterwards. `DK5EN-90` (RAK4631) was flashed
-with the same commit but **its Ethernet cable is out** (`Ethernet link OFF - skip DHCP`), and both
-nRF52 entry points bail before the selection code when the link is down — so the nRF52 call sites
-have no hardware evidence. Plug the cable in, `--gateway srv dl`, expect
-`[GW];srv;DL;host;192.68.17.26;path;inet`.
+**Bench 2026-09-06: both platforms proven.** `DK5EN-93` (Heltec V3): `--gateway srv dl` yields
+`[GW];srv;DL;host;meshcom.hamnet.network;path;inet` where it yielded `OE;host;meshcom.oevsv.at`
+before, with `--srvip 192.0.2.1` armed as a sink. `DK5EN-90` (RAK4631, DHCP/Ethernet):
+`[GW];srv;OE;host;89.185.97.38` -> `[GW];srv;DL;host;192.68.17.26;path;inet`. Gateway was off on
+both and all KEEP traffic is `bGATEWAY`-gated, so nothing reached the live DL server; both nodes
+restored to OE. Two bench notes worth keeping: `--ethdrop` (`resetDHCP()`) re-runs `startUDP()`, so
+the nRF52 selection can be re-driven without a reboot — which matters because the nRF52 USB CDC
+re-enumerates on `--reboot` and the boot marker is easily missed; and with the Ethernet cable out,
+neither nRF52 entry point reaches the selection code at all.
 
 **Historic note on the check itself.** The end-to-end check is
 `--gateway srv dl` plus the fork-only `--srvip <sink>` (the `[GW];srv` marker prints before DNS

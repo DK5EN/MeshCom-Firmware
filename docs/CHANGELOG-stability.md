@@ -83,10 +83,9 @@ user whose Heltec V3 and Heltec Wireless Tracker both ignored
 `--gateway srv dl` after the update. No `FLASH_VERSION` or
 `FLASH_STRUCT_VERSION` change — node settings are untouched, and a node that
 already has `DL` stored simply starts reaching the right server again after
-the update. Bench-proven on a Heltec V3 (`DK5EN-93`): the node now selects
-`meshcom.hamnet.network` where it selected `meshcom.oevsv.at` before. The
-nRF52 Ethernet half is **not** bench-proven yet — the bench RAK4631 had no
-cable plugged in.
+the update. Bench-proven on both platforms: a Heltec V3 (`DK5EN-93`) now selects
+`meshcom.hamnet.network` and a RAK4631 (`DK5EN-90`) now selects
+`192.68.17.26`, where both previously reached the Austrian server.
 
 202. **`--gateway srv dl` reaches the DL server again.** On a plain Internet
      uplink every country code except `IT` fell through to the Austrian

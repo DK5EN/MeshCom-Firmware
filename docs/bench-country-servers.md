@@ -237,7 +237,7 @@ allow-list is checked first, so an arm alone stays unreachable. `node_gwsrv` is 
 comparison is `memcmp(.., 2)`, so a country code is exactly two uppercase characters; a longer one
 would be a flash-format change.
 
-**Bench proof 2026-09-06 — ESP32 confirmed, nRF52 outstanding.** `DK5EN-93` (Heltec V3, ORBI63
+**Bench proof 2026-09-06 — both platforms confirmed.** `DK5EN-93` (Heltec V3, ORBI63
 WLAN, non-HAMNET Internet path), flashed with the fix, `Gateway off` / `Webserver on` so no KEEP
 could leave the node, and the fork-only `--srvip 192.0.2.1` (TEST-NET-1) armed as a sink first —
 the `[GW];srv` marker is printed before DNS starts, so it reports the real selection while the
@@ -255,11 +255,24 @@ override keeps traffic off the live DL server:
 
 Node restored to `--gateway srv oe`, `--srvip 0.0.0.0` afterwards.
 
-`DK5EN-90` (RAK4631) was flashed with the same commit and boots it, but **its Ethernet cable is
-unplugged** (`Ethernet link OFF - skip DHCP`, `[ETH];event;link;down`). Both nRF52 entry points
-bail before the selection code when the link is down — `initethfixIP()` returns after five LinkOFF
-retries, `initethDHCP()` needs `startETH()` to succeed — so `startUDP()`/`startFIXUDP()` never ran
-and the nRF52 half of this change has **no hardware evidence yet**. It builds under `-Werror` and
-consumes the same unit-tested table as the ESP32 path, but the call-site wiring is unproven. Plug
-the cable in and expect `[GW];srv;DL;host;192.68.17.26;path;inet` after `--gateway srv dl`. The August probe (`srvprobe.py`) is the right instrument for
-the end-to-end proof and needs a bench node on USB; see the outstanding item in `docs/RESUME.md`.
+`DK5EN-90` (RAK4631, W5100S Ethernet, DHCP path, `Gateway off` / `Webserver on`) confirmed the
+nRF52 half on the same commit. `--ethdrop` calls `resetDHCP()`, which re-runs `startUDP()`, so the
+selection can be re-driven live without a reboot — useful because the nRF52 USB CDC re-enumerates
+on `--reboot`, which makes the boot marker easy to miss:
+
+```
+>>> --ethdrop
+[GW];srv;OE;host;89.185.97.38;path;inet;ms;66810
+>>> --gateway srv dl
+>>> --ethdrop
+[GW];srv;DL;host;192.68.17.26;path;inet;ms;82187
+```
+
+Gateway was off throughout on both nodes, and all KEEP traffic is `bGATEWAY`-gated on both
+platforms, so nothing reached the live DL server from either board. Node restored to
+`--gateway srv oe` afterwards.
+
+Note for future runs: with the Ethernet cable out, neither nRF52 entry point reaches the selection
+code at all — `initethfixIP()` returns after five LinkOFF retries, `initethDHCP()` needs
+`startETH()` to succeed first — so a cable-less RAK cannot verify this path. The August probe
+(`srvprobe.py`) remains the fuller instrument for server-behaviour comparisons.
