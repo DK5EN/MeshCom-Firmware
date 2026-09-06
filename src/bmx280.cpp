@@ -305,16 +305,33 @@ float getHum()
 	return fHum;
 }
 
-int getPressALT()
+float getPressALTf()
 {
+	// GPS-08: Selbst-Latch statt Persistierung. Ein Struct-Feld wuerde
+	// FLASH_STRUCT_VERSION kippen und damit die Settings der ganzen Flotte
+	// zuruecksetzen -- und ein alter Druck nach langem Stromlos-Sein waere
+	// schlimmer als gar keiner. fBaseAltidude wird ohnehin binnen eines
+	// 60s-WX-Ticks von baroBaseRelatch() (GPS-Filter-Konvergenz) oder von
+	// getPressASL() (Nodes ohne GPS) gesetzt -- hier wird nur der dazu
+	// passende Druck nachgezogen. --setpress bleibt der manuelle Override.
+	if(fBasePress == 0.0f && fBaseAltidude != 0.0f && fPress != 0.0f)
+		fBasePress = fPress;
+
 	if(fPress == 0.0 || fBasePress == 0.0)
-		return 0;
-		
+		return 0.0f;
+
 	double x=(double)fPress/(double)fBasePress;
 	x=(double)-7990*log(x);
 	x = x + fBaseAltidude;
 
-	return (int)lround(x);
+	return (float)x;
+}
+
+int getPressALT()
+{
+	// GPS-09: float-Praezision ist fuer die GPS-05b-Fusion da;
+	// node_press_alt bleibt bewusst int (siehe bug doc §9).
+	return (int)lround(getPressALTf());
 }
 
 float getPressASL(int current_alt)

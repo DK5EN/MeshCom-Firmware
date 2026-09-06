@@ -895,7 +895,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
             delay(100);
             #endif
-            printlndeb("--setpress 999.9  set QNH reference\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
+            printlndeb("--setpress  latch QNH reference at current altitude\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
             delay(100);
             #ifdef BOARD_LED
             printlndeb("--board led on/off  board LED\n");
