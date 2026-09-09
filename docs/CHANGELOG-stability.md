@@ -2,7 +2,8 @@
 
 Release: `v4.35s.09.06.2` (2026-09-06), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-208 below. The full engineering rationale for
+fork's changes, plus items 104-208 below; item 209 is on `fork-main` and not
+yet in a release. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -74,6 +75,40 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## Unreleased on `fork-main` since v4.35s.09.06.2
+
+Item 209, committed 2026-09-09. Not in a tagged release yet. The charset
+widening CHR-03 (`16670de9`, `094636b2`) is also on `fork-main` since the same
+day and still needs an item of its own here.
+
+209. **Track mode now says what it costs the cell** (TRK-01, `7ace4b2f`).
+     Track (SmartBeaconing) hands one station a beacon cadence down to 10 s
+     against a channel that carries roughly one packet every 8 s, so a handful
+     of track users is enough to saturate a cell for everyone else -- the shape
+     the field keeps reporting as packet loss. No control path said so: the
+     WebGUI switch was described as "enable display of SmartBeaconing", the
+     serial `--track on` acknowledged silently, and a node that boots with the
+     flag already set never mentioned it again. The operator's wording, kept
+     verbatim and deliberately blunt, is now emitted in three places:
+     `degraded MeshCom RX performance, packetloss likely`. On serial it carries
+     a `Track on - ` prefix, because nothing else in the log line says which
+     setting fired it; in the WebGUI it sits next to the switch, where the
+     origin is obvious, so it stays bare. Both variants live once in the new
+     `src/track_warning.h`. The switch-on line is emitted from a single call
+     site, the `track on` handler in `command_functions.cpp` -- the WebGUI
+     switch, serial, BLE and the TripleClick in `onebutton_functions.cpp` all
+     route through `commandAction("--track on")` -- and it fires on every
+     operation, including a re-issue while track is already on. The boot line
+     carries the surrounding `[INIT]...` prefix and is emitted in both boot
+     paths (`esp32_main.cpp`, `nrf52_main.cpp`); on ESP32 it also reaches the
+     net console on port 2323. In the WebGUI the hint is a span next to the
+     switch that `setvalue()` toggles live on a successful set, so it appears
+     and disappears with the switch instead of waiting for a page reload;
+     `_create_setup_switch_element()` gained two defaulted parameters for it
+     and the other 23 callers are unchanged. Nothing about the beacon cadence
+     itself changed -- this is a warning, not a throttle. Still open: the fleet
+     has no telemetry for how many nodes actually run with track on.
 
 ## New in v4.35s.09.06.2
 

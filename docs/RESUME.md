@@ -23,11 +23,12 @@ linked images (on ESP32 the bare variant is tail-merged into the `[INIT]` string
 substring); 12 host envs / 656 native cases green; the extracted `setvalue()` driven against a DOM
 stub flips the hint on -> `""` / off -> `"none"` and is a no-op for switches without a warning span.
 
+Changelog item 209 is written, in a new `## Unreleased on \`fork-main\` since v4.35s.09.06.2`
+section. CHR-03 (`16670de9`, `094636b2`) is unreleased since the same day and still has no item
+there -- the section says so explicitly.
+
 **Open, and deliberately not done here:** the fleet has no telemetry for how many nodes actually
-run with track on -- the question the intake raised alongside the warning. The changelog item was
-not written either: this window follows the CHR-03 precedent (`16670de9`, `094636b2`), where
-`CHANGELOG-stability.md` is filled at the release cut, not per commit. TRK-01 needs an item there
-when the next release is cut.
+run with track on -- the question the intake raised alongside the warning.
 
 ## 2026-09-06 (evening): v4.35s.09.06.2 published, replaces the morning release, notes now cover the whole gap to upstream 4.35s
 
