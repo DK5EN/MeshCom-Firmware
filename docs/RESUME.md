@@ -1,5 +1,34 @@
 # RESUME — pick up here
 
+## 2026-09-09: TRK-01 shipped -- track mode now says what it costs
+
+`7ace4b2f` on `fork-main`. Track (SmartBeaconing) beacons as often as every 10 s against a channel
+that carries roughly one packet every 8 s, and until now no control path said so. The operator's
+wording, verbatim: **`degraded MeshCom RX performance, packetloss likely`**. On serial it carries a
+`Track on - ` prefix, because nothing else in the log line says which setting fired it; in the
+WebGUI it sits next to the switch, where the origin is obvious, so it stays bare. The leading `!`
+from the original intake was dropped on operator request.
+
+Both variants live once in the new `src/track_warning.h`. Three emission points: the `track on`
+handler (`command_functions.cpp:1633`), an `[INIT]...` line at boot in `esp32_main.cpp:842` and
+`nrf52_main.cpp:571`, and a `<span id="track_warn">` next to the WebGUI switch that `setvalue()`
+toggles live, without waiting for a reload -- `_create_setup_switch_element()` gained two defaulted
+parameters, the other 23 callers untouched.
+
+The intake sized (c) at three call sites; it is **one**. The WebGUI switch, serial, BLE and the
+TripleClick in `onebutton_functions.cpp:219` all route through `commandAction("--track on")`.
+
+Gate: `wiscore_rak4631` and `heltec_wifi_lora_32_V3` build clean, both strings present in the
+linked images (on ESP32 the bare variant is tail-merged into the `[INIT]` string, so it shows as a
+substring); 12 host envs / 656 native cases green; the extracted `setvalue()` driven against a DOM
+stub flips the hint on -> `""` / off -> `"none"` and is a no-op for switches without a warning span.
+
+**Open, and deliberately not done here:** the fleet has no telemetry for how many nodes actually
+run with track on -- the question the intake raised alongside the warning. The changelog item was
+not written either: this window follows the CHR-03 precedent (`16670de9`, `094636b2`), where
+`CHANGELOG-stability.md` is filled at the release cut, not per commit. TRK-01 needs an item there
+when the next release is cut.
+
 ## 2026-09-06 (evening): v4.35s.09.06.2 published, replaces the morning release, notes now cover the whole gap to upstream 4.35s
 
 Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.06.2>, marked
