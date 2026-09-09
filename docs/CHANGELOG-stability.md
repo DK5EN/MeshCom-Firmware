@@ -107,8 +107,12 @@ day and still needs an item of its own here.
      and disappears with the switch instead of waiting for a page reload;
      `_create_setup_switch_element()` gained two defaulted parameters for it
      and the other 23 callers are unchanged. Nothing about the beacon cadence
-     itself changed -- this is a warning, not a throttle. Still open: the fleet
-     has no telemetry for how many nodes actually run with track on.
+     itself changed -- this is a warning, not a throttle. Bench-proven on
+     `DK5EN-98` (Heltec V3 gateway, flashed over WiFi OTA 2026-09-09): the hint
+     appears and disappears with the switch without a reload, renders visible
+     on a fresh page load while track is on, and the serial line reaches the
+     net console on every switch-on -- one command, one line. Still open: the
+     fleet has no telemetry for how many nodes actually run with track on.
 
 ## New in v4.35s.09.06.2
 

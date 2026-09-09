@@ -27,6 +27,22 @@ Changelog item 209 is written, in a new `## Unreleased on \`fork-main\` since v4
 section. CHR-03 (`16670de9`, `094636b2`) is unreleased since the same day and still has no item
 there -- the section says so explicitly.
 
+Hardware-verified on `DK5EN-98` (Heltec V3 gateway) after a WiFi OTA of the 2026-09-09 07:46:30
+build. In Chrome: hint hidden with track off, appears in `--mcred` next to the switch on the
+switch-on click without a reload, still visible after a full page reload while track is on, gone
+again on switch-off; the node's own `/getparam/?track` agreed at every step and the node was left
+in the state it was found in (`track=off`). The serial half was read out of the meshlogger capture
+on `rpizero` (`~/meshlog/dk5en-98/2026-09-09.log`), because the node's console on 2323 is
+single-client and that very capture holds the slot -- the line lands there verbatim.
+
+**Lead, found by the warning itself:** the capture shows two `Track on - ...` lines at 07:55:41 and
+07:55:46 that belong to no switch operation of ours -- our own clicks are at 07:57:36 and the
+`setparam` probes at 08:00:09. Ruled out as the cause: the emitter (one `--track on` produces
+exactly one line, checked in isolation) and the WebGUI (three renders of `/?setup` produce none).
+So something else on the LAN sent `--track on` to a production gateway twice in five seconds --
+a phone app, MCProxy or mc-chat are the candidates. Before item 209 that command was silent, which
+is why nobody could have seen this. Worth chasing; not a defect in TRK-01.
+
 **Open, and deliberately not done here:** the fleet has no telemetry for how many nodes actually
 run with track on -- the question the intake raised alongside the warning.
 
