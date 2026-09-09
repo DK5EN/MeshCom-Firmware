@@ -18,13 +18,24 @@
  *   - CHR-03: bytes that form no UTF-8 sequence at all -- a stray
  *     continuation byte, a lead byte without its continuations, a sequence
  *     cut off by the end of the buffer, or the bytes 0xC0/0xC1/0xF5-0xFF
- *     that RFC 3629 never assigns as a lead -- are re-read as ISO-8859-1.
- *     0xA0-0xFF (NBSP and the Latin-1 graphic characters) pass through
- *     unchanged as the single byte they are; anything below 0xA0 is
- *     dropped, which keeps the C1 block (0x80-0x9F) out on this path just
- *     as is_c1 keeps it out on the UTF-8 path. Exactly one byte is
- *     consumed either way, so a run of legacy bytes never eats an adjacent
- *     valid character.
+ *     that RFC 3629 never assigns as a lead -- are legacy single-byte
+ *     characters and pass through unchanged. That is the whole range
+ *     0x80-0xFF: 0xA0-0xFF is the same in Latin-1 and CP1252, and
+ *     0x80-0x9F is passed as CP1252 (Euro sign, typographic quotes,
+ *     dashes) by operator decision 2026-09-09, because the senders here
+ *     that use single-byte umlauts use CP1252. Exactly one byte is
+ *     consumed, so a run of legacy bytes never eats an adjacent valid
+ *     character.
+ *
+ *     Two consequences of passing 0x80-0x9F, so nobody has to rediscover
+ *     them: a receiver that reads the stream as ISO-8859-1 instead of
+ *     CP1252 sees C1 control codes in message text, and the five bytes
+ *     undefined even in CP1252 (0x81, 0x8D, 0x8F, 0x90, 0x9D) are relayed
+ *     too and render as U+FFFD at the far end. This does NOT contradict
+ *     the C1 rule above, which still strips U+0080-U+009F arriving as a
+ *     proper C2 80..C2 9F sequence: a raw 0x80 in a legacy stream is a
+ *     Euro sign, a deliberately UTF-8-encoded U+0080 is the control
+ *     character PAD.
  *   - a small table of bidi/zero-width format characters is stripped:
  *     U+200B-U+200F, U+202A-U+202E, U+2060-U+2064, U+FEFF.
  *   - everything else -- umlauts, emoji, any other valid printable UTF-8 --
@@ -32,14 +43,14 @@
  *
  * Consequence of CHR-03, stated plainly: the output is NO LONGER guaranteed
  * to be valid UTF-8. A sender that puts umlauts on the wire as single
- * Latin-1 bytes (PinPoint does) now has them relayed byte-for-byte instead
+ * legacy bytes (PinPoint does) now has them relayed byte-for-byte instead
  * of silently deleted, and it is the receiving end that decides how to
  * read them -- mc-chat's decoder does exactly this, re-reading every byte
  * UTF-8 rejects as CP1252 (mc-chat commit 993b512). Nothing is transcoded
  * here: the filter only ever removes bytes, never rewrites or expands one,
  * so every caller's in-place buffer contract stays intact.
  *
- * The one case Latin-1 pass-through cannot reach: two adjacent Latin-1
+ * The one case the legacy pass-through cannot reach: two adjacent legacy
  * bytes that happen to form a syntactically valid UTF-8 sequence (e.g.
  * 0xDF 0xBC, Latin-1 "ss" + "1/4", which is well-formed UTF-8 for U+07FC).
  * Those are read as UTF-8 and pass as that codepoint. Distinguishing the

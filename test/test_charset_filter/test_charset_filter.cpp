@@ -82,10 +82,17 @@ static void test_c1_stripped(void)
 static void test_invalid_and_overlong_dropped_without_corrupting_neighbors(void)
 {
     // C0 80 ist die overlong 2-Byte-Kodierung von NUL (immer ungueltig,
-    // RFC 3629); ein einzelnes 0x80 ist ein Continuation-Byte ohne Lead;
-    // ED A0 80 kodiert einen Surrogate-Codepoint (U+D800, immer ungueltig);
-    // F4 90 80 80 liegt oberhalb U+10FFFF. Alle vier stehen zwischen
-    // gueltigen ASCII-Buchstaben, die unangetastet bleiben muessen.
+    // RFC 3629); ED A0 80 kodiert einen Surrogate-Codepoint (U+D800, immer
+    // ungueltig); F4 90 80 80 liegt oberhalb U+10FFFF. Alle drei stehen
+    // zwischen gueltigen ASCII-Buchstaben, die unangetastet bleiben muessen,
+    // und verschwinden vollstaendig.
+    //
+    // Das einzelne 0x80 hinter 'B' ist seit CHR-03 BEWUSST nicht mehr Teil
+    // dieser Liste: es ist ein Continuation-Byte ohne Lead, bildet also
+    // keine UTF-8-Sequenz, und faellt damit unter die Legacy-Regel -- in
+    // CP1252 ist es das Euro-Zeichen und passiert. Es steht hier weiter
+    // drin, damit genau diese Grenze gepinnt bleibt: ungueltige SEQUENZEN
+    // fallen, einzelne Legacy-BYTES nicht.
     char buf[] = {
         'A', (char)0xC0, (char)0x80,
         'B', (char)0x80,
@@ -94,12 +101,12 @@ static void test_invalid_and_overlong_dropped_without_corrupting_neighbors(void)
         'E', 0
     };
     size_t orig_len = strlen(buf);
+    char expect[] = { 'A', 'B', (char)0x80, 'C', 'D', 'E' };
 
     size_t out = charset_filter_apply(buf, orig_len, CHARSET_FILTER_PLAIN);
 
-    TEST_ASSERT_EQUAL_UINT(5, out);
-    buf[out] = 0;
-    TEST_ASSERT_EQUAL_STRING("ABCDE", buf);
+    TEST_ASSERT_EQUAL_UINT(sizeof(expect), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(expect));
 }
 
 static void test_overlong_3_and_4_byte_dropped(void)
@@ -232,30 +239,31 @@ static void test_truncate_exact_boundary_keeps_full_sequence(void)
     TEST_ASSERT_EQUAL_UINT(3, charset_utf8_safe_truncate(buf, sizeof(buf), 3));
 }
 
-// ---- CHR-03: Latin-1 als zweiter erlaubter Zeichensatz -----------------------
+// ---- CHR-03: Latin-1/CP1252 als zweiter erlaubter Zeichensatz ----------------
 //
-// Latin-1 kodiert 'ue' als einzelnes Byte 0xFC, UTF-8 als Sequenz C3 BC.
-// Sender wie PinPoint legen Umlaute als Latin-1-Einzelbytes auf die Leitung.
-// Der Filter laesst diese Bytes seit CHR-03 unveraendert durch, statt sie als
-// ungueltiges UTF-8 zu verwerfen -- nichts wird transkodiert, ein Byte bleibt
-// ein Byte, der In-Place-Kontrakt (nur entfernen, nie wachsen) gilt weiter.
-// Die Deutung uebernimmt die Gegenstelle; mc-chat tut das seit Commit 993b512.
+// Latin-1 und CP1252 kodieren 'ue' als einzelnes Byte 0xFC, UTF-8 als Sequenz
+// C3 BC. Sender wie PinPoint legen Umlaute als solche Einzelbytes auf die
+// Leitung. Der Filter laesst den gesamten Bereich 0x80-0xFF seit CHR-03
+// unveraendert durch, sofern die Bytes keine gueltige UTF-8-Sequenz bilden --
+// nichts wird transkodiert, ein Byte bleibt ein Byte, der In-Place-Kontrakt
+// (nur entfernen, nie wachsen) gilt weiter. Die Deutung uebernimmt die
+// Gegenstelle; mc-chat tut das seit Commit 993b512.
 
-static void test_latin1_graphic_bytes_pass_ascii_untouched(void)
+static void test_legacy_high_bytes_pass_ascii_untouched(void)
 {
-    // Jedes Byte 0xA0-0xFF zwischen zwei ASCII-Zeichen: das hohe Byte bleibt
-    // unveraendert stehen, beide Nachbarn ebenso. Deckt in einem Durchlauf
-    // alle vier Byteklassen ab, die aus UTF-8-Sicht ungueltig sind: reines
-    // Fortsetzungsbyte (A0-BF), Lead ohne Fortsetzung (C2-F4), nie
+    // JEDES Byte 0x80-0xFF zwischen zwei ASCII-Zeichen bleibt unveraendert
+    // stehen, beide Nachbarn ebenso. Deckt in einem Durchlauf alle vier
+    // Byteklassen ab, die aus UTF-8-Sicht ungueltig sind: reines
+    // Fortsetzungsbyte (80-BF), Lead ohne Fortsetzung (C2-F4), nie
     // vergebenes Lead (C0/C1, F5-FF).
-    for (int v = 0xA0; v <= 0xFF; v++)
+    for (int v = 0x80; v <= 0xFF; v++)
     {
         char buf[3] = { 'a', (char)v, 'b' };
 
         size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
 
         char msg[52];
-        snprintf(msg, sizeof(msg), "Latin-1-Byte 0x%02X nicht durchgelassen", v);
+        snprintf(msg, sizeof(msg), "Legacy-Byte 0x%02X nicht durchgelassen", v);
         TEST_ASSERT_EQUAL_UINT_MESSAGE(3, out, msg);
         TEST_ASSERT_EQUAL_INT_MESSAGE('a', buf[0], msg);
         TEST_ASSERT_EQUAL_INT_MESSAGE((char)v, buf[1], msg);
@@ -263,25 +271,74 @@ static void test_latin1_graphic_bytes_pass_ascii_untouched(void)
     }
 }
 
-static void test_c1_raw_bytes_still_dropped(void)
+static void test_cp1252_specials_pass(void)
 {
-    // 0x80-0x9F ist in Latin-1 der C1-Steuerzeichenblock und damit gerade
-    // KEIN druckbares Zeichen. Diese Bytes fallen weiter raus -- sonst kaeme
-    // ueber den Latin-1-Pfad genau das herein, was is_c1 auf dem UTF-8-Pfad
-    // heraushaelt. (In CP1252 waeren es Euro-Zeichen und typografische
-    // Anfuehrungszeichen; dieser Filter folgt Latin-1, nicht CP1252.)
-    for (int v = 0x80; v <= 0x9F; v++)
+    // 0x80-0x9F ist der Block, in dem sich CP1252 und ISO-8859-1
+    // unterscheiden: CP1252 legt hier Euro-Zeichen, typografische
+    // Anfuehrungszeichen und Gedankenstriche ab, ISO-8859-1 laesst ihn als
+    // C1-Steuerzeichen. Operator-Entscheid 2026-09-09: durchlassen.
+    // Stichproben mit Namen, damit der Zweck der Regel im Test steht.
+    const struct { unsigned char b; const char *name; } samples[] = {
+        { 0x80, "EURO SIGN" },
+        { 0x84, "DOUBLE LOW-9 QUOTATION MARK" },
+        { 0x91, "LEFT SINGLE QUOTATION MARK" },
+        { 0x93, "LEFT DOUBLE QUOTATION MARK" },
+        { 0x96, "EN DASH" },
+        { 0x97, "EM DASH" },
+        { 0x9F, "LATIN CAPITAL LETTER Y WITH DIAERESIS" },
+    };
+
+    for (size_t k = 0; k < sizeof(samples) / sizeof(samples[0]); k++)
     {
-        char buf[3] = { 'a', (char)v, 'b' };
+        char buf[3] = { 'a', (char)samples[k].b, 'b' };
 
         size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
 
-        char msg[48];
-        snprintf(msg, sizeof(msg), "C1-Byte 0x%02X nicht verworfen", v);
-        TEST_ASSERT_EQUAL_UINT_MESSAGE(2, out, msg);
-        TEST_ASSERT_EQUAL_INT_MESSAGE('a', buf[0], msg);
-        TEST_ASSERT_EQUAL_INT_MESSAGE('b', buf[1], msg);
+        char msg[80];
+        snprintf(msg, sizeof(msg), "CP1252 0x%02X (%s) verworfen",
+                 samples[k].b, samples[k].name);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(3, out, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((char)samples[k].b, buf[1], msg);
     }
+}
+
+static void test_cp1252_undefined_bytes_pass_too(void)
+{
+    // Diese fuenf Bytes sind auch in CP1252 nicht belegt. Sie passieren
+    // trotzdem -- der Filter transkodiert nicht und deutet nicht, er
+    // reicht durch; die Gegenstelle macht daraus U+FFFD (mc-chat tut das).
+    // Bewusst festgehalten, damit klar ist, dass das kein Versehen ist.
+    const unsigned char undefined_in_cp1252[] = { 0x81, 0x8D, 0x8F, 0x90, 0x9D };
+
+    for (size_t k = 0; k < sizeof(undefined_in_cp1252); k++)
+    {
+        char buf[3] = { 'a', (char)undefined_in_cp1252[k], 'b' };
+
+        size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Byte 0x%02X verworfen", undefined_in_cp1252[k]);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(3, out, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((char)undefined_in_cp1252[k], buf[1], msg);
+    }
+}
+
+static void test_c1_as_utf8_sequence_still_stripped(void)
+{
+    // Die Asymmetrie, die keine ist: ein ROHES 0x80 passiert (CP1252-Euro),
+    // dieselbe Codeposition als ordentliche UTF-8-Sequenz C2 80 faellt
+    // weiter (U+0080 PAD, ein echtes Steuerzeichen). Die beiden Faelle
+    // bedeuten Verschiedenes, also werden sie verschieden behandelt.
+    char raw[] = { 'a', (char)0x80, 'b' };
+    size_t out_raw = charset_filter_apply(raw, sizeof(raw), CHARSET_FILTER_PLAIN);
+    TEST_ASSERT_EQUAL_UINT(3, out_raw);
+    TEST_ASSERT_EQUAL_INT((char)0x80, raw[1]);
+
+    char encoded[] = { 'a', (char)0xC2, (char)0x80, 'b' };
+    size_t out_encoded = charset_filter_apply(encoded, sizeof(encoded), CHARSET_FILTER_PLAIN);
+    TEST_ASSERT_EQUAL_UINT(2, out_encoded);
+    TEST_ASSERT_EQUAL_INT('a', encoded[0]);
+    TEST_ASSERT_EQUAL_INT('b', encoded[1]);
 }
 
 static void test_latin1_and_utf8_umlauts_both_pass(void)
@@ -459,8 +516,10 @@ int main(int, char **)
     RUN_TEST(test_truncate_splits_3byte_sequence);
     RUN_TEST(test_truncate_splits_4byte_sequence);
     RUN_TEST(test_truncate_exact_boundary_keeps_full_sequence);
-    RUN_TEST(test_latin1_graphic_bytes_pass_ascii_untouched);
-    RUN_TEST(test_c1_raw_bytes_still_dropped);
+    RUN_TEST(test_legacy_high_bytes_pass_ascii_untouched);
+    RUN_TEST(test_cp1252_specials_pass);
+    RUN_TEST(test_cp1252_undefined_bytes_pass_too);
+    RUN_TEST(test_c1_as_utf8_sequence_still_stripped);
     RUN_TEST(test_latin1_and_utf8_umlauts_both_pass);
     RUN_TEST(test_latin1_adjacent_umlauts_all_pass);
     RUN_TEST(test_latin1_mixed_with_utf8_in_one_payload);

@@ -43,17 +43,34 @@ namespace
         }
     }
 
-    /* CHR-03: ISO-8859-1 graphic range -- 0xA0 (NBSP) through 0xFF. A byte
-     * in this range that is not part of a valid UTF-8 sequence is kept as
-     * the Latin-1 character it is, unchanged and one byte wide.
-     * 0x80-0x9F is deliberately NOT in this range: those are the C1
-     * controls, which Latin-1 leaves undefined and which the UTF-8 path
-     * strips as well (is_c1) -- accepting them here would let a control
-     * character in through the back door that the front door rejects. */
-    inline bool is_latin1_graphic(unsigned char b)
-    {
-        return b >= 0xA0;
-    }
+    /* CHR-03: the legacy single-byte range, 0x80 through 0xFF. A byte in
+     * this range that is not part of a valid UTF-8 sequence is kept as the
+     * single byte it is -- the sender meant it as Latin-1 or CP1252, and
+     * this filter relays it rather than deciding for the receiver.
+     *
+     * 0xA0-0xFF is identical in both encodings (NBSP and the Latin-1
+     * graphic characters). 0x80-0x9F is where they differ: CP1252 puts the
+     * Euro sign, the typographic quotes and the dashes there, while
+     * ISO-8859-1 leaves the block as C1 controls. Operator decision
+     * 2026-09-09: pass the whole block, because the senders in this network
+     * that use single-byte umlauts use CP1252 (PinPoint). Consequence,
+     * stated so nobody has to rediscover it: a receiver that reads the
+     * stream as ISO-8859-1 rather than CP1252 sees C1 control codes in
+     * message text. Five of these bytes (0x81, 0x8D, 0x8F, 0x90, 0x9D) are
+     * undefined even in CP1252; they are relayed too, and a receiver
+     * renders them as U+FFFD (mc-chat does exactly that).
+     *
+     * This does NOT contradict is_c1() on the UTF-8 path, which still
+     * strips U+0080-U+009F when they arrive properly encoded as C2 80..C2
+     * 9F. The two cases mean different things: a raw 0x80 in a legacy
+     * stream is a Euro sign, while a deliberately UTF-8-encoded U+0080 is
+     * the C1 control PAD and nothing else.
+     *
+     * There is deliberately no predicate function for this range: every
+     * byte that reaches the fallback below is 0x80-0xFF by construction,
+     * because an ASCII byte always forms a complete one-byte sequence and
+     * never gets there. A `b >= 0x80` test at that point would read like a
+     * live filter while always being true. */
 
     /* Determines the UTF-8 sequence length from a leading byte, or 0 if the
      * byte cannot start a sequence (a stray continuation byte, or one of
@@ -121,17 +138,16 @@ size_t charset_filter_apply(char *buf, size_t len, charset_filter_mode mode)
             // stray continuation byte, a lead byte whose continuations are
             // missing or wrong, a sequence cut off by the end of the
             // buffer, or one of the bytes RFC 3629 never assigns as a lead
-            // (0xC0, 0xC1, 0xF5-0xFF). Read the single byte as Latin-1 and
-            // keep it if it is a graphic character there; drop it
-            // otherwise. Either way exactly one byte is consumed, so the
-            // next iteration resyncs on whatever follows and a run of
-            // legacy bytes never eats an adjacent valid character.
-            if (is_latin1_graphic(b0))
-            {
-                buf[out] = (char)b0;
-                out += 1;
-            }
-
+            // (0xC0, 0xC1, 0xF5-0xFF). Every one of those is 0x80-0xFF --
+            // an ASCII byte always forms a complete one-byte sequence and
+            // never lands here -- so this is the legacy single-byte range
+            // and the byte is kept as-is, Latin-1 or CP1252 as the sender
+            // meant it (see the range note at the top of this file).
+            // Exactly one byte is consumed, so the next iteration resyncs
+            // on whatever follows and a run of legacy bytes never eats an
+            // adjacent valid character.
+            buf[out] = (char)b0;
+            out += 1;
             i += 1;
             continue;
         }

@@ -126,15 +126,18 @@ static void test_vektor2_text_oe1xar(void)
 // Rufzeichen bewusst DK5EN-90 (eigenes Bench-Call), nicht fremd.
 static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
 {
-    // "Gruesse" mit ue (0xFC) und scharfem S (0xDF) als Latin-1-Einzelbytes,
-    // wie PinPoint sie sendet -- plus ein UTF-8-ae (C3 A4) im selben Text,
-    // damit auch die Mischung geprueft ist.
+    // "Gruesse" mit ue (0xFC) und scharfem S (0xDF) als Legacy-Einzelbytes,
+    // wie PinPoint sie sendet -- plus ein UTF-8-ae (C3 A4) und das
+    // CP1252-Euro-Zeichen (0x80) im selben Text, damit die Mischung und der
+    // 0x80-0x9F-Block mitgeprueft sind.
     String payload = "Gr";
     payload += (char)0xFC;
     payload += (char)0xDF;
     payload += "e ";
     payload += (char)0xC3;
     payload += (char)0xA4;
+    payload += " 5";
+    payload += (char)0x80;
 
     struct aprsMessage tx;
     initAPRS(tx, ':');
@@ -151,13 +154,16 @@ static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
     // Byte bleibt ein Byte, es wird nichts nach UTF-8 transkodiert.
     bool found_fc = false;
     bool found_df = false;
+    bool found_80 = false;
     for(uint16_t i = 0; i < len; i++)
     {
         if(buf[i] == 0xFC) found_fc = true;
         if(buf[i] == 0xDF) found_df = true;
+        if(buf[i] == 0x80) found_80 = true;
     }
     TEST_ASSERT_TRUE_MESSAGE(found_fc, "Latin-1 'ue' (0xFC) fehlt auf der Leitung");
     TEST_ASSERT_TRUE_MESSAGE(found_df, "Latin-1 'sz' (0xDF) fehlt auf der Leitung");
+    TEST_ASSERT_TRUE_MESSAGE(found_80, "CP1252-Euro (0x80) fehlt auf der Leitung");
 
     struct aprsMessage rx;
     initAPRS(rx, 0x00);
