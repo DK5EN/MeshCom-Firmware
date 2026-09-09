@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include "instrument.h"
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <SPI.h>
 
@@ -566,6 +567,10 @@ void nrf52setup()
     bGATEWAY =  meshcom_settings.node_sset & 0x1000;
     bEXTUDP =  meshcom_settings.node_sset & 0x2000;
     bDisplayCont =  meshcom_settings.node_sset & 0x4000;
+
+    // TRK-01: Warnhinweis einmal beim Boot, wenn Track aus den Settings aktiv geladen wurde
+    if(bDisplayTrack)
+        Serial.printf("[INIT]..." TRACK_WARNING_SERIAL "\n");
 
     bONEWIRE =  meshcom_settings.node_sset2 & 0x0001;
     bLPS33 =  meshcom_settings.node_sset2 & 0x0002;

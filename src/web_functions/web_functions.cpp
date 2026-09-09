@@ -20,6 +20,7 @@
 #include <ArduinoJson.h>    // JSN-01: call_function()/setparam()/getparam() JSON escaping
 #include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
+#include "track_warning.h"    // TRK-01: Warnhinweis-Text neben dem Track-Switch
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -934,7 +935,9 @@ void deliver_scaffold(bool bget_password)
     // rebuilds #messages_panel from mcHistory when the messages page is (re-)injected by loadPage(); first merges the server-rendered entries already sitting in the panel into mcHistory (same dedupe as mcProcessMessages) so nothing the server just sent is lost, then renders the full remembered history in order
     web_client.println("function mcRenderHistory(){var panel=document.getElementById('messages_panel');if(!panel)return;var els=panel.querySelectorAll('.message[data-id]');for(var i=0;i<els.length;i++){mcMergeEntry(els[i]);}var html='';for(var j=0;j<mcHistory.length;j++){html+=mcHistory[j].html;}panel.innerHTML=html.length>0?html:'<p>No messages available.</p>';if(typeof mcApplyTab==='function')mcApplyTab();}");
     //  this function sends a parameter:value request to the backend
-    web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
+    // TRK-01: bei Erfolg (returncode==0, die Seite wird hier NICHT neu geladen) den Warnhinweis
+    // "<id>_warn" live ein-/ausblenden -- generisch ueber param, damit kuenftige Switches denselben Mechanismus erben
+    web_client.println("function setvalue(param,value,refresh) {fetch(\"/setparam/?\"+param+\"=\"+encodeURIComponent(value)).then(function(response){return response.json();}).then(function(jsonResponse){if(jsonResponse['returncode']==1)alert(\"Value could not be set.\");if(jsonResponse['returncode']==2)alert(\"Parameter unknown to node.\");if(jsonResponse['returncode']==0){var w=document.getElementById(param+\"_warn\");if(w)w.style.display=(value==\"on\")?\"\":\"none\";}if(jsonResponse['returncode']>0){loadPage(cpage,csender,false)}if(refresh)loadPage(cpage,csender,false);});}\n");
     // this function invokes a function call to the backend passing the function name and an optional parameter (e.g. sendpos)
     web_client.println("function callfunction(functionname,functionparameter){fetch(\"/callfunction/?\"+functionname+\"=\"+functionparameter).then(function(response){return response.json();}).then(function (jsonResponse) {/*Nothing todo yet.*/})}\n");
     // CS-03: config restore. Lives here and not in the setup page, because the
@@ -1681,7 +1684,7 @@ void sub_page_setup()
     web_client.println("</div><div class=\"grid grid2\">");
 
     _create_setup_switch_element("gps", "GPS", "enable GPS", bGPSON);                                  // create Switch-Element inclucing Label and Description
-    _create_setup_switch_element("track", "Track", "enable display of SmartBeaconing", bDisplayTrack); // create Switch-Element inclucing Label and Description
+    _create_setup_switch_element("track", "Track", "enable display of SmartBeaconing", bDisplayTrack, TRACK_WARNING_TEXT, bDisplayTrack); // create Switch-Element inclucing Label and Description; TRK-01: Warnhinweis neben dem Switch
 
     web_client.println("</div></div>");
 
@@ -2404,10 +2407,17 @@ void _create_setup_textinput_element(const char id[], const char labelText[], St
  * @param labelText the text in the label
  * @param descriptionText the smaller text in brackets
  * @param checked TRUE, if the switch should be displayed as activated
+ * @param warnText TRK-01: optionaler Warnhinweis-Text neben dem Switch; nullptr = kein Hinweis
+ * @param warnVisible TRK-01: TRUE, wenn der Warnhinweis beim Seitenaufbau sichtbar sein soll
  */
-void _create_setup_switch_element(const char id[], const char labelText[], const char descriptionText[], bool checked)
+void _create_setup_switch_element(const char id[], const char labelText[], const char descriptionText[], bool checked, const char warnText[], bool warnVisible)
 {
-    web_client.printf("<label for=\"%s\">%s <span class=\"font-small\">(%s)</span></label>\n", id, labelText, descriptionText);
+    web_client.printf("<label for=\"%s\">%s <span class=\"font-small\">(%s)</span>", id, labelText, descriptionText);
+    if (warnText != nullptr)
+    { // TRK-01: zweiter Span mit der id "<id>_warn", damit setvalue() ihn live umschalten kann
+        web_client.printf("<span id=\"%s_warn\" class=\"font-small\" style=\"color:var(--mcred)%s\"> %s</span>", id, warnVisible ? "" : ";display:none", warnText);
+    }
+    web_client.println("</label>");
     web_client.printf("<input type=\"checkbox\" role=\"switch\" id=\"%s\" %s onchange=\"setvalue(this.id,this.checked?'on':'off',false)\"/>\n", id, checked ? "checked" : "");
 }
 

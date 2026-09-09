@@ -16,6 +16,7 @@
 #include "dedup_functions.h"
 #include "ntp_async.h"      // NTP-01: isPending() haelt das GPS-Gate fuer --ntpsync offen
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <RadioLib.h>
 
@@ -837,6 +838,10 @@ void esp32setup()
     bGATEWAY =  meshcom_settings.node_sset & 0x1000;
     bEXTUDP =  meshcom_settings.node_sset & 0x2000;
     bDisplayCont = meshcom_settings.node_sset & 0x4000;
+
+    // TRK-01: Warnhinweis einmal beim Boot, wenn Track aus den Settings aktiv geladen wurde
+    if(bDisplayTrack)
+        printfdeb("[INIT]..." TRACK_WARNING_SERIAL "\n");
 
     bONEWIRE =  meshcom_settings.node_sset2 & 0x0001;
     bLPS33 =  meshcom_settings.node_sset2 & 0x0002;

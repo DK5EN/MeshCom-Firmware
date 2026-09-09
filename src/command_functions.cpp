@@ -20,6 +20,7 @@
 #include "rtc_functions.h"
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #ifdef ESP32
 #include "net_console.h"
 #endif
@@ -1627,6 +1628,9 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"track on") == 0)
     {
         bDisplayTrack=true;
+
+        // TRK-01: Warnhinweis bei jeder Bedienung ausgeben, auch wenn Track schon an war
+        printfdeb(TRACK_WARNING_SERIAL "\n");
 
         track_to_meshcom_timer=0;   // damit auch alle 5 minuten zu MeshCom gesendet wird wenn TRACK ON
 
