@@ -1,5 +1,49 @@
 # RESUME — pick up here
 
+## 2026-09-09 (evening): DM transport reliability designed, simulator built, nothing in code
+
+Two documents, no firmware change. `docs/proposal-dm-transport-reliability-20260909.md` (English,
+six options with a comparison and bench checks) and `docs/konzept-dm-transportsicherung-20260909.html`
+(German, konzeptpapier layout, single file; the same file sits on the Desktop as
+`MeshCom-DM-Transportsicherung.html`). Backlog §3.8ad carries the items `DM-01..DM-06`.
+
+**What the code says, re-read by hand after eight scouts:** the DM ACK is end-to-end and that is
+right; the retry is not. `updateRetransmissionStatus()` re-enqueues the **same msg_id** every 40 s
+(`src/lora_functions.cpp:2044-2081`), and the dedup gate at `:896` sits in front of the "for me"
+branch and the ACK emission at `:1072`, so every node that heard the original swallows the retry,
+the destination included. That leaves exactly one repairable case, first-hop loss, and no way to
+repair a lost ACK. The 40 s constant is below the round trip (1 min quiet, 4 min median loaded from
+the DG0OPK per-hop numbers). `SendAckMessage()` (`src/loop_functions.cpp:4858`) sends one
+fire-and-forget text frame and writes flash. Giving up after three retries produces one debug line
+and nothing for app or GUI. Own-echo detection already exists and is unused for the retry decision
+(`own_msg_id[][4]=0x01`, `:869-893`).
+
+**The design in one line each:** stage 0 gates the same-id retry on "no echo" and re-acks duplicates
+addressed to me (zero bytes, zero RAM, PR-sized); stage 1 keeps NNN stable across attempts and gives
+every re-flood a fresh msg_id, the destination dedups on (source, NNN) and always re-acks, the
+receipt carries a CRC; stage 2 sends a pending DM the moment any frame from the destination is
+heard, and a gateway 0x41 suspends blind re-floods; stage 3 adds precedence classes and an
+app-side outbox. Where this differs from `concept-dm-store-and-forward.md`: stable NNN instead of
+minted-NNN sets and hash matching, no `{prb}` probes, classic ESP32 included through parked ring
+slots.
+
+**What the simulator showed that the text had wrong:** the presence trigger fired on the
+destination's own ACK and caused one needless flood; the rule is now "earliest one round trip
+after the last own send". The 25-minute-outage row claimed three floods; the model gives four.
+Both corrected in the HTML before hand-over. The 352-cell matrix is consistent: stage 2 differs
+from stage 1 only for the returning destination (26 min versus 43 min) and where a gateway hears
+the DM.
+
+**Not verified:** no screenshot of the six SVG figures exists (Chrome extension not connected);
+they passed a computational width and bounds check after eight fixes, and the simulator UI passed
+a jsdom smoke test with zero script errors. mcmap `messages_stats` numbers (1,182 DMs per week,
+185 senders) are server-side counts; the hop histogram was left out because its semantics were
+ambiguous. One scout claimed the firmware has no automatic DM retry; the code says
+`MAX_RETRANSMIT 3`, so the documents follow the code.
+
+**Next:** DM-05 counters first (a week of baseline on DK5EN-98 and -90), then DM-01 as the
+upstream PR.
+
 ## 2026-09-09 (later): v4.35s.09.09 published, 39 assets, two items
 
 Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.09>, marked
