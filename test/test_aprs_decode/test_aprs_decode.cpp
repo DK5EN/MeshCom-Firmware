@@ -116,6 +116,59 @@ static void test_vektor2_text_oe1xar(void)
                              "Payload muss den Zeitstempel enthalten");
 }
 
+// CHR-03: Latin-1 durch BEIDE Chokepoints, nicht nur durch den Filter.
+// encodePayloadAPRS() ist die TX-Engstelle, decodeAPRS() die RX-Engstelle;
+// dieser Test faehrt eine Nachricht mit Latin-1-Umlauten einmal ganz herum.
+// Das Orakel ist nicht der Filter selbst, sondern die FCS-Pruefung im
+// Decoder (aprs_functions.cpp:427): haetten die Chokepoints Bytes entfernt
+// oder veraendert, passte die vom Encoder ueber die Wire-Bytes gerechnete
+// Pruefsumme nicht mehr und decodeAPRS() wuerde den Frame verwerfen.
+// Rufzeichen bewusst DK5EN-90 (eigenes Bench-Call), nicht fremd.
+static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
+{
+    // "Gruesse" mit ue (0xFC) und scharfem S (0xDF) als Latin-1-Einzelbytes,
+    // wie PinPoint sie sendet -- plus ein UTF-8-ae (C3 A4) im selben Text,
+    // damit auch die Mischung geprueft ist.
+    String payload = "Gr";
+    payload += (char)0xFC;
+    payload += (char)0xDF;
+    payload += "e ";
+    payload += (char)0xC3;
+    payload += (char)0xA4;
+
+    struct aprsMessage tx;
+    initAPRS(tx, ':');
+    tx.msg_id = 0x12345678u;
+    tx.msg_source_path = "DK5EN-90";
+    tx.msg_destination_path = "*";
+    tx.msg_payload = payload;
+
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = encodeAPRS(buf, tx);
+    TEST_ASSERT_TRUE_MESSAGE(len > 0, "encodeAPRS() muss einen Frame liefern");
+
+    // Die Latin-1-Bytes muessen unveraendert auf der Leitung stehen -- ein
+    // Byte bleibt ein Byte, es wird nichts nach UTF-8 transkodiert.
+    bool found_fc = false;
+    bool found_df = false;
+    for(uint16_t i = 0; i < len; i++)
+    {
+        if(buf[i] == 0xFC) found_fc = true;
+        if(buf[i] == 0xDF) found_df = true;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(found_fc, "Latin-1 'ue' (0xFC) fehlt auf der Leitung");
+    TEST_ASSERT_TRUE_MESSAGE(found_df, "Latin-1 'sz' (0xDF) fehlt auf der Leitung");
+
+    struct aprsMessage rx;
+    initAPRS(rx, 0x00);
+    uint16_t t = decodeAPRS(buf, len, rx);
+
+    TEST_ASSERT_EQUAL_UINT16(0x3A, t);                 // MSG_TYPE_TEXT
+    TEST_ASSERT_EQUAL_UINT32(0x12345678u, rx.msg_id);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", rx.msg_source_call.c_str());
+    TEST_ASSERT_EQUAL_STRING(payload.c_str(), rx.msg_payload.c_str());
+}
+
 static void test_leerer_frame_wird_abgelehnt(void)
 {
     uint8_t buf[UDP_TX_BUF_SIZE] = {0};
@@ -131,5 +184,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_leerer_frame_wird_abgelehnt);
     RUN_TEST(test_vektor1_position_dl2ja);
     RUN_TEST(test_vektor2_text_oe1xar);
+    RUN_TEST(test_latin1_umlaute_ueberleben_encode_und_decode);
     return UNITY_END();
 }

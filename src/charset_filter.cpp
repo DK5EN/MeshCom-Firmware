@@ -43,6 +43,18 @@ namespace
         }
     }
 
+    /* CHR-03: ISO-8859-1 graphic range -- 0xA0 (NBSP) through 0xFF. A byte
+     * in this range that is not part of a valid UTF-8 sequence is kept as
+     * the Latin-1 character it is, unchanged and one byte wide.
+     * 0x80-0x9F is deliberately NOT in this range: those are the C1
+     * controls, which Latin-1 leaves undefined and which the UTF-8 path
+     * strips as well (is_c1) -- accepting them here would let a control
+     * character in through the back door that the front door rejects. */
+    inline bool is_latin1_graphic(unsigned char b)
+    {
+        return b >= 0xA0;
+    }
+
     /* Determines the UTF-8 sequence length from a leading byte, or 0 if the
      * byte cannot start a sequence (a stray continuation byte, or one of
      * the bytes 0xF5-0xFF that RFC 3629 never assigns as a lead byte). */
@@ -73,55 +85,67 @@ size_t charset_filter_apply(char *buf, size_t len, charset_filter_mode mode)
         unsigned char b0 = (unsigned char)buf[i];
         int seqlen = lead_seqlen(b0);
 
-        if (seqlen == 0)
+        uint32_t cp = 0;
+        uint32_t min_cp = 0;
+        bool complete = false;
+
+        if (seqlen > 0 && i + (size_t)seqlen <= len)
         {
-            // Not a valid lead byte -- drop just this one byte and let the
-            // next iteration resync on whatever follows.
-            i += 1;
-            continue;
-        }
-
-        if (i + (size_t)seqlen > len)
-        {
-            // Sequence would run past the end of the buffer -- drop the
-            // lead byte only, the trailing bytes get their own chance to
-            // resync as the loop continues.
-            i += 1;
-            continue;
-        }
-
-        uint32_t cp;
-        uint32_t min_cp;
-
-        switch (seqlen)
-        {
-            case 1:  cp = b0;          min_cp = 0;      break;
-            case 2:  cp = b0 & 0x1F;   min_cp = 0x80;    break;
-            case 3:  cp = b0 & 0x0F;   min_cp = 0x800;   break;
-            default: cp = b0 & 0x07;   min_cp = 0x10000; break;
-        }
-
-        bool ok = true;
-
-        for (int k = 1; k < seqlen; k++)
-        {
-            unsigned char bc = (unsigned char)buf[i + (size_t)k];
-
-            if ((bc & 0xC0) != 0x80)
+            switch (seqlen)
             {
-                ok = false;
-                break;
+                case 1:  cp = b0;          min_cp = 0;       break;
+                case 2:  cp = b0 & 0x1F;   min_cp = 0x80;    break;
+                case 3:  cp = b0 & 0x0F;   min_cp = 0x800;   break;
+                default: cp = b0 & 0x07;   min_cp = 0x10000; break;
             }
 
-            cp = (cp << 6) | (uint32_t)(bc & 0x3F);
+            complete = true;
+
+            for (int k = 1; k < seqlen; k++)
+            {
+                unsigned char bc = (unsigned char)buf[i + (size_t)k];
+
+                if ((bc & 0xC0) != 0x80)
+                {
+                    complete = false;
+                    break;
+                }
+
+                cp = (cp << 6) | (uint32_t)(bc & 0x3F);
+            }
         }
 
-        if (!ok || cp < min_cp || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF)
+        if (!complete)
         {
-            // Invalid continuation, overlong encoding, an encoded
-            // surrogate, or a codepoint beyond U+10FFFF -- drop only the
-            // lead byte and resync from the next one.
+            // CHR-03: these bytes do not form a UTF-8 sequence at all -- a
+            // stray continuation byte, a lead byte whose continuations are
+            // missing or wrong, a sequence cut off by the end of the
+            // buffer, or one of the bytes RFC 3629 never assigns as a lead
+            // (0xC0, 0xC1, 0xF5-0xFF). Read the single byte as Latin-1 and
+            // keep it if it is a graphic character there; drop it
+            // otherwise. Either way exactly one byte is consumed, so the
+            // next iteration resyncs on whatever follows and a run of
+            // legacy bytes never eats an adjacent valid character.
+            if (is_latin1_graphic(b0))
+            {
+                buf[out] = (char)b0;
+                out += 1;
+            }
+
             i += 1;
+            continue;
+        }
+
+        if (cp < min_cp || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF)
+        {
+            // A structurally well-formed sequence that RFC 3629 still
+            // forbids: an overlong encoding, an encoded surrogate, or a
+            // codepoint beyond U+10FFFF. Drop the WHOLE sequence, not just
+            // the lead byte -- with the Latin-1 fallback above in place,
+            // resyncing into the middle of such a sequence would hand its
+            // continuation bytes (0xA0-0xBF) back as Latin-1 characters and
+            // leak a fragment of exactly the payload this branch rejects.
+            i += (size_t)seqlen;
             continue;
         }
 

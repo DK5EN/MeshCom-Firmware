@@ -232,6 +232,201 @@ static void test_truncate_exact_boundary_keeps_full_sequence(void)
     TEST_ASSERT_EQUAL_UINT(3, charset_utf8_safe_truncate(buf, sizeof(buf), 3));
 }
 
+// ---- CHR-03: Latin-1 als zweiter erlaubter Zeichensatz -----------------------
+//
+// Latin-1 kodiert 'ue' als einzelnes Byte 0xFC, UTF-8 als Sequenz C3 BC.
+// Sender wie PinPoint legen Umlaute als Latin-1-Einzelbytes auf die Leitung.
+// Der Filter laesst diese Bytes seit CHR-03 unveraendert durch, statt sie als
+// ungueltiges UTF-8 zu verwerfen -- nichts wird transkodiert, ein Byte bleibt
+// ein Byte, der In-Place-Kontrakt (nur entfernen, nie wachsen) gilt weiter.
+// Die Deutung uebernimmt die Gegenstelle; mc-chat tut das seit Commit 993b512.
+
+static void test_latin1_graphic_bytes_pass_ascii_untouched(void)
+{
+    // Jedes Byte 0xA0-0xFF zwischen zwei ASCII-Zeichen: das hohe Byte bleibt
+    // unveraendert stehen, beide Nachbarn ebenso. Deckt in einem Durchlauf
+    // alle vier Byteklassen ab, die aus UTF-8-Sicht ungueltig sind: reines
+    // Fortsetzungsbyte (A0-BF), Lead ohne Fortsetzung (C2-F4), nie
+    // vergebenes Lead (C0/C1, F5-FF).
+    for (int v = 0xA0; v <= 0xFF; v++)
+    {
+        char buf[3] = { 'a', (char)v, 'b' };
+
+        size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+        char msg[52];
+        snprintf(msg, sizeof(msg), "Latin-1-Byte 0x%02X nicht durchgelassen", v);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(3, out, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE('a', buf[0], msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((char)v, buf[1], msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE('b', buf[2], msg);
+    }
+}
+
+static void test_c1_raw_bytes_still_dropped(void)
+{
+    // 0x80-0x9F ist in Latin-1 der C1-Steuerzeichenblock und damit gerade
+    // KEIN druckbares Zeichen. Diese Bytes fallen weiter raus -- sonst kaeme
+    // ueber den Latin-1-Pfad genau das herein, was is_c1 auf dem UTF-8-Pfad
+    // heraushaelt. (In CP1252 waeren es Euro-Zeichen und typografische
+    // Anfuehrungszeichen; dieser Filter folgt Latin-1, nicht CP1252.)
+    for (int v = 0x80; v <= 0x9F; v++)
+    {
+        char buf[3] = { 'a', (char)v, 'b' };
+
+        size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+        char msg[48];
+        snprintf(msg, sizeof(msg), "C1-Byte 0x%02X nicht verworfen", v);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(2, out, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE('a', buf[0], msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE('b', buf[1], msg);
+    }
+}
+
+static void test_latin1_and_utf8_umlauts_both_pass(void)
+{
+    // "Gruesse" mit ue (0xFC) und scharfem S (0xDF) in Latin-1 und dieselbe
+    // Nachricht in UTF-8 (C3 BC / C3 9F): beide Kodierungen passieren jetzt
+    // vollstaendig und unveraendert.
+    char latin1[] = { 'G', 'r', (char)0xFC, (char)0xDF, 'e' };
+    char expect_latin1[sizeof(latin1)];
+    memcpy(expect_latin1, latin1, sizeof(latin1));
+
+    size_t out_latin1 = charset_filter_apply(latin1, sizeof(latin1), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(latin1), out_latin1);
+    TEST_ASSERT_EQUAL_MEMORY(expect_latin1, latin1, sizeof(latin1));
+
+    char utf8[] = { 'G', 'r', (char)0xC3, (char)0xBC, (char)0xC3, (char)0x9F, 'e' };
+    char expect_utf8[sizeof(utf8)];
+    memcpy(expect_utf8, utf8, sizeof(utf8));
+
+    size_t out_utf8 = charset_filter_apply(utf8, sizeof(utf8), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(utf8), out_utf8);
+    TEST_ASSERT_EQUAL_MEMORY(expect_utf8, utf8, sizeof(utf8));
+}
+
+static void test_latin1_adjacent_umlauts_all_pass(void)
+{
+    // ae oe ue (E4 F6 FC) direkt hintereinander -- der Fall, an dem die alte
+    // Policy die Nachricht komplett geloescht hat. Jedes Byte ist fuer sich
+    // ein Lead-Byte ohne gueltige Fortsetzung, alle drei bleiben stehen.
+    char buf[] = { (char)0xE4, (char)0xF6, (char)0xFC };
+    char expect[sizeof(buf)];
+    memcpy(expect, buf, sizeof(buf));
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(buf), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(buf));
+}
+
+static void test_latin1_mixed_with_utf8_in_one_payload(void)
+{
+    // Gemischte Nachricht: UTF-8-ae (C3 A4), ASCII, Latin-1-ue (FC),
+    // UTF-8-Emoji. Nichts davon darf sich gegenseitig stoeren.
+    char buf[] = {
+        'a', (char)0xC3, (char)0xA4, 'x', (char)0xFC,
+        (char)0xF0, (char)0x9F, (char)0x98, (char)0x80, 'z'
+    };
+    char expect[sizeof(buf)];
+    memcpy(expect, buf, sizeof(buf));
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(buf), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(buf));
+}
+
+static void test_truncated_utf8_lead_kept_as_latin1(void)
+{
+    // Abgeschnittene UTF-8-Sequenz am Pufferende: das Lead-Byte C3 hat keine
+    // Fortsetzung mehr und wird als Latin-1 'A tilde' gelesen statt die Zeile
+    // zu verlieren. Gleiches Verhalten wie mc-chats CP1252-Fallback.
+    char buf[] = { 'a', 'b', 'c', (char)0xC3 };
+    char expect[sizeof(buf)];
+    memcpy(expect, buf, sizeof(buf));
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(buf), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(buf));
+}
+
+static void test_illegal_sequences_drop_whole_no_latin1_leak(void)
+{
+    // Der Grund, warum ungueltige-aber-wohlgeformte Sequenzen als GANZES
+    // fallen: ihre Fortsetzungsbytes liegen in A0-BF und waeren nach der
+    // Latin-1-Regel druckbar. Wuerde nur das Lead-Byte fallen und der Filter
+    // mitten in der Sequenz resynchronisieren, kaeme ein Fragment genau der
+    // Nutzlast durch, die hier abgelehnt wird -- bei der Surrogat-Sequenz
+    // ED A0 80 etwa das A0 als NBSP.
+    char surrogate[] = { 'A', (char)0xED, (char)0xA0, (char)0x80, 'B' };
+    size_t out_surrogate = charset_filter_apply(surrogate, sizeof(surrogate), CHARSET_FILTER_PLAIN);
+    TEST_ASSERT_EQUAL_UINT(2, out_surrogate);
+    TEST_ASSERT_EQUAL_INT('A', surrogate[0]);
+    TEST_ASSERT_EQUAL_INT('B', surrogate[1]);
+
+    // Overlong-Kodierung von '/' (C0 AF): weder das '/' noch ein Latin-1-Rest
+    // ('macron' aus 0xAF) darf uebrig bleiben -- sonst waere die
+    // Trenner-Filterung von CHR-02 ueber den Umweg umgehbar.
+    char overlong[] = { 'A', (char)0xC0, (char)0xAF, 'B' };
+    size_t out_overlong = charset_filter_apply(overlong, sizeof(overlong), CHARSET_FILTER_STRIP_SEPARATORS);
+    TEST_ASSERT_EQUAL_UINT(2, out_overlong);
+    TEST_ASSERT_EQUAL_INT('A', overlong[0]);
+    TEST_ASSERT_EQUAL_INT('B', overlong[1]);
+}
+
+static void test_latin1_passes_in_separator_mode_too(void)
+{
+    // CHR-03 gilt in beiden Modi: Latin-1-Bytes sind keine Trenner und
+    // bleiben auch in STRIP_SEPARATORS stehen, waehrend '/' und '{' fallen.
+    char buf[] = { 'a', (char)0xFC, '/', 'b', '{', (char)0xE4, 'c' };
+    char expect[] = { 'a', (char)0xFC, 'b', (char)0xE4, 'c' };
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_STRIP_SEPARATORS);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(expect), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(expect));
+}
+
+static void test_latin1_pair_can_survive_as_wrong_character(void)
+{
+    // Grenzfall mit Biss, unveraendert durch CHR-03: 0xDF 0xBC ist in Latin-1
+    // "ss" + "1/4", zusammen aber eine syntaktisch gueltige 2-Byte-
+    // UTF-8-Sequenz (U+07FC, NKO-Block). Der Filter entscheidet byte-lokal
+    // und liest das Paar deshalb als UTF-8. Die beiden Lesarten
+    // auseinanderzuhalten braucht Statistik ueber den ganzen Text; die Bytes
+    // passieren so oder so unveraendert, nur die Deutung der Gegenstelle
+    // unterscheidet sich.
+    char buf[] = { 'x', (char)0xDF, (char)0xBC, 'y' };
+    char expect[sizeof(buf)];
+    memcpy(expect, buf, sizeof(buf));
+
+    size_t out = charset_filter_apply(buf, sizeof(buf), CHARSET_FILTER_PLAIN);
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(buf), out);
+    TEST_ASSERT_EQUAL_MEMORY(expect, buf, sizeof(buf));
+}
+
+static void test_truncate_steps_over_latin1_byte(void)
+{
+    // Die UTF-8-sichere Kuerzung behandelt ein Latin-1-Byte als Einzelbyte
+    // (lead_seqlen == 0 -> Schrittweite 1) und schneidet daher sauber
+    // dahinter.
+    const char latin1[] = { 'a', 'b', (char)0xFC, 'c' };
+    TEST_ASSERT_EQUAL_UINT(3, charset_utf8_safe_truncate(latin1, sizeof(latin1), 3));
+
+    // Konservativ und bewusst so: ein Latin-1-Byte, das zufaellig ein
+    // UTF-8-Lead ist (0xC3), wird an der Grenze als angeschnittene Sequenz
+    // gewertet und faellt weg. Lieber ein Zeichen zu wenig als ein
+    // halbes Zeichen beim byte-zaehlenden Empfaenger.
+    const char lead[] = { 'a', (char)0xC3, 'x' };
+    TEST_ASSERT_EQUAL_UINT(1, charset_utf8_safe_truncate(lead, sizeof(lead), 2));
+}
+
 // ---- empty / NULL input -----------------------------------------------------
 
 static void test_empty_and_null_input(void)
@@ -264,6 +459,16 @@ int main(int, char **)
     RUN_TEST(test_truncate_splits_3byte_sequence);
     RUN_TEST(test_truncate_splits_4byte_sequence);
     RUN_TEST(test_truncate_exact_boundary_keeps_full_sequence);
+    RUN_TEST(test_latin1_graphic_bytes_pass_ascii_untouched);
+    RUN_TEST(test_c1_raw_bytes_still_dropped);
+    RUN_TEST(test_latin1_and_utf8_umlauts_both_pass);
+    RUN_TEST(test_latin1_adjacent_umlauts_all_pass);
+    RUN_TEST(test_latin1_mixed_with_utf8_in_one_payload);
+    RUN_TEST(test_truncated_utf8_lead_kept_as_latin1);
+    RUN_TEST(test_illegal_sequences_drop_whole_no_latin1_leak);
+    RUN_TEST(test_latin1_passes_in_separator_mode_too);
+    RUN_TEST(test_latin1_pair_can_survive_as_wrong_character);
+    RUN_TEST(test_truncate_steps_over_latin1_byte);
     RUN_TEST(test_empty_and_null_input);
     return UNITY_END();
 }
