@@ -1,9 +1,95 @@
 # Release Notes -- MeshCom Firmware v4.35s
 
-Firmware `4.35s`, `FLASH_VERSION 20260906`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35s`, `FLASH_VERSION 20260909`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35s.09.09 (2026-09-09)
+
+Zwei Aenderungen des Forks gegenueber `v4.35s.09.06.2`, Changelog-Punkte 209
+und 210. `FLASH_VERSION` geht auf 20260909, `FLASH_STRUCT_VERSION` bleibt
+unveraendert 20260724 -- die Einstellungen der Knoten bleiben erhalten. Gates:
+656 native Testfaelle in 12 Host-Umgebungen, alle 32 Release-Umgebungen
+gebaut. Bench in diesem Zyklus: DK5EN-98 (Heltec V3, Gateway).
+
+### Was dazugekommen ist
+
+- **Track sagt jetzt, was es die Zelle kostet (TRK-01, Punkt 209).** Track
+  (SmartBeaconing) drueckt die Beacon-Kadenz einer einzelnen Station auf bis
+  zu 10 s herunter, gegen einen Kanal, der im Mittel etwa ein Paket alle 8 s
+  traegt. Eine Handvoll Track-Nutzer reicht damit aus, eine Zelle fuer alle
+  anderen zuzufahren -- genau das Bild, das aus dem Feld als Paketverlust
+  gemeldet wird. Bisher wies keine Bedienoberflaeche darauf hin: die WebGUI
+  beschrieb den Schalter als "enable display of SmartBeaconing", das serielle
+  `--track on` quittierte kommentarlos, und ein Knoten, der mit gesetztem Flag
+  bootet, schwieg dazu dauerhaft. Der vom Operator festgelegte Wortlaut lautet
+  jetzt an drei Stellen `degraded MeshCom RX performance, packetloss likely`:
+  im Moment des Einschaltens, einmal beim Boot solange das Flag steht, und in
+  der WebGUI neben dem Schalter. Auf der seriellen Konsole traegt die Zeile das
+  Praefix `Track on - `, weil dort sonst nichts verraet, welche Einstellung sie
+  ausgeloest hat; in der WebGUI steht sie neben dem Schalter und bleibt nackt.
+  An der Beacon-Kadenz selbst aendert sich nichts -- das ist eine Warnung, keine
+  Drossel.
+
+- **Einzelbyte-Umlaute ueberleben den Textfilter (CHR-03, Punkt 210).** Die
+  reine UTF-8-Allowlist aus CHR-01/CHR-02 hat Legacy-Umlaute bauartbedingt
+  geloescht: Latin-1 schreibt sie als Einzelbyte, UTF-8 als Zwei-Byte-Sequenz,
+  und ein alleinstehendes Legacy-Byte ist kein gueltiges UTF-8. Sender, die
+  genau das tun, gibt es im Netz -- PinPoint ist einer --, entsprechend kam
+  "Gruesse" als "Gre" an und eine Nachricht aus drei Umlauten als leere
+  Nachricht. Neue Regel: ein Byte, das nicht Teil einer gueltigen
+  UTF-8-Sequenz ist, wird als Legacy-Einzelbyte gelesen und unveraendert
+  durchgereicht. Der erste Schnitt liess `0xA0-0xFF` zu, der Nachzug den
+  gesamten Bereich `0x80-0xFF`, weil die Sender hier CP1252 verwenden -- dort
+  liegen Euro-Zeichen, typografische Anfuehrungszeichen und Gedankenstriche.
+  Transkodiert wird nichts: der Filter entfernt weiterhin nur Bytes, schreibt
+  keins um und verbreitert keins, womit der In-Place-Kontrakt jedes Aufrufers
+  und jedes Wire-Budget unberuehrt bleiben. Bewusst akzeptierte Folge: die
+  Ausgabe ist nicht mehr garantiert valides UTF-8, die Deutung liegt bei der
+  Gegenstelle.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **DK5EN-98 (Heltec V3, Gateway), ueber WLAN-OTA mit dem Code dieses Releases
+  geflasht.** Punkt 209 vollstaendig in der WebGUI durchgespielt: Hinweis
+  verborgen bei Track aus, erscheint beim Einschalt-Klick in Rot neben dem
+  Schalter ohne Reload, ist nach einem vollstaendigen Seiten-Neuladen bei
+  aktivem Track weiterhin sichtbar, und verschwindet beim Ausschalten wieder.
+  Der Knoten hat ueber `/getparam/?track` bei jedem Schritt denselben Zustand
+  gemeldet und wurde so hinterlassen, wie er vorgefunden wurde (`track=off`).
+  Die serielle Haelfte wurde aus dem laufenden meshlogger-Mitschnitt auf
+  `rpizero` gelesen -- die Netconsole auf 2323 ist Einzelplatz und genau dieser
+  Mitschnitt haelt den Platz --, die Zeile steht dort wortgleich. Ein
+  isoliertes `--track on` erzeugt genau eine Zeile, drei Renderings der
+  Setup-Seite erzeugen keine.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- **Punkt 210 hat keine Hardware-Verifikation.** Der Nachweis sind 27
+  Filter-Testfaelle und ein Ende-zu-Ende-Fall, der ein Latin-1-Byte, eine
+  UTF-8-Sequenz und das CP1252-Euro-Byte durch `encodeAPRS()` und
+  `decodeAPRS()` zurueckholt; Orakel ist die FCS-Pruefung des Decoders. **Eine
+  echte PinPoint-Nachricht wurde mit diesem Build nicht empfangen.**
+- **Die Boot-Zeile aus Punkt 209 wurde auf Hardware nicht ausgeloest.** Sie ist
+  im gelinkten Image beider Plattformen als String belegt, aber es wurde kein
+  Knoten mit gesetztem Track-Flag neu gestartet.
+- **Die nRF52-Haelfte von Punkt 209 wurde nicht auf Hardware geprueft.** Nur
+  der Build und der String im Image; DK5EN-90 hatte in diesem Zyklus keine
+  Bench-Zeit.
+- **Folgen von Punkt 210 fuer Verbraucher auf dem EXTUDP-Seitenband sind nicht
+  durchgemessen.** Ein Empfaenger mit striktem UTF-8-Decode verwirft jetzt
+  Frames, die er vorher angenommen hat, weil die Firmware die Bytes bislang
+  fuer ihn geloescht hat. mc-chat kann es, andere Verbraucher wurden nicht
+  geprueft.
+- **Offen und nicht Teil dieses Releases:** die Flotte hat keine Telemetrie
+  darueber, wie viele Knoten tatsaechlich mit Track laufen. Ausserdem zeigt der
+  Mitschnitt von DK5EN-98 zwei `Track on`-Zeilen, die keiner Bedienung von uns
+  zuzuordnen sind -- irgendetwas im LAN hat einem Produktions-Gateway zweimal
+  `--track on` geschickt. Emitter und WebGUI sind als Ursache ausgeschlossen,
+  der Rest ist offen.
 
 ---
 

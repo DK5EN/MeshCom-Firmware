@@ -1,9 +1,8 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35s.09.06.2` (2026-09-06), based on official MeshCom
+Release: `v4.35s.09.09` (2026-09-09), based on official MeshCom
 4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-208 below; item 209 is on `fork-main` and not
-yet in a release. The full engineering rationale for
+fork's changes, plus items 104-210 below. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -76,11 +75,11 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased on `fork-main` since v4.35s.09.06.2
+## New in v4.35s.09.09
 
-Item 209, committed 2026-09-09. Not in a tagged release yet. The charset
-widening CHR-03 (`16670de9`, `094636b2`) is also on `fork-main` since the same
-day and still needs an item of its own here.
+Two changes on top of `v4.35s.09.06.2`, items 209 and 210: a warning that
+track mode costs the whole cell, and a second accepted character set so
+single-byte umlauts stop being deleted in transit.
 
 209. **Track mode now says what it costs the cell** (TRK-01, `7ace4b2f`).
      Track (SmartBeaconing) hands one station a beacon cadence down to 10 s
@@ -113,6 +112,37 @@ day and still needs an item of its own here.
      on a fresh page load while track is on, and the serial line reaches the
      net console on every switch-on -- one command, one line. Still open: the
      fleet has no telemetry for how many nodes actually run with track on.
+
+210. **Single-byte umlauts survive the text filter** (CHR-03, `16670de9`,
+     `094636b2`). The UTF-8 allowlist from CHR-01/CHR-02 deleted a legacy
+     umlaut by construction: Latin-1 writes `ü` as the single byte `0xFC`,
+     UTF-8 as `C3 BC`, and a lone `0xFC` is not valid UTF-8. Senders that do
+     exactly this are on the air -- PinPoint is one -- so "Grüße" arrived as
+     "Gre", and a message that was three umlauts arrived empty. The rule now
+     is: a byte that is **not** part of a valid UTF-8 sequence is read as a
+     legacy single-byte character and passed through unchanged. The first cut
+     allowed the Latin-1 graphic range `0xA0-0xFF`; the follow-up widened it to
+     the whole `0x80-0xFF`, because the senders here use CP1252, which is where
+     the Euro sign, the typographic quotes and the dashes live. Nothing is
+     transcoded -- the filter still only removes bytes, never rewrites or
+     widens one, so the in-place contract of every caller and every wire budget
+     is untouched. Two supporting decisions: an invalid-but-well-formed
+     sequence now drops **entirely** instead of only its lead byte, which is
+     load-bearing because the continuation bytes of an overlong or surrogate
+     sequence sit in `0xA0-0xBF` and the new rule would otherwise hand a
+     fragment of exactly the payload the test rejects; and a properly
+     UTF-8-encoded `U+0080-U+009F` is still dropped as a C1 control, because a
+     raw `0x80` in a legacy stream is a Euro sign while an encoded `U+0080` is
+     the control character PAD -- different meaning, different treatment. Two
+     adjacent legacy bytes that happen to form valid UTF-8 (`DF BC` = `U+07FC`)
+     are still read as UTF-8; that is not decidable byte-locally. Deliberate
+     consequence: **the output is no longer guaranteed to be valid UTF-8** --
+     interpretation is the far end's job, and mc-chat's decoder has done that
+     since `993b512`. `test_charset_filter` went from 15 to 27 cases, and an
+     end-to-end case in `test_aprs_decode` carries a Latin-1 `ü`, a UTF-8 `ä`
+     and the CP1252 Euro byte through `encodeAPRS()` and back through
+     `decodeAPRS()`, with the decoder's FCS check as the oracle rather than the
+     filter itself.
 
 ## New in v4.35s.09.06.2
 

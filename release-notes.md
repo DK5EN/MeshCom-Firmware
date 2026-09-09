@@ -3,15 +3,15 @@
 
 ## What this release is
 
-**Everything this fork has on top of official MeshCom `4.35s`, in one build.** Upstream released `4.35s` on 3 September 2026; it already contains 103 changes of ours that the ICSSW maintainers merged on 27 August (PRs [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) and [#1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103)). What is **not** in official `4.35s` is changelog items 104–208 — the work of the four release cycles since, collected here so it can be flashed and field-tested as one firmware while the individual pull requests make their way upstream.
+**Everything this fork has on top of official MeshCom `4.35s`, in one build.** Upstream released `4.35s` on 3 September 2026; it already contains 103 changes of ours that the ICSSW maintainers merged on 27 August (PRs [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) and [#1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103)). What is **not** in official `4.35s` is changelog items 104–210 — the work of the five release cycles since, collected here so it can be flashed and field-tested as one firmware while the individual pull requests make their way upstream.
 
-If you run official `4.35s` today, this document describes your whole upgrade. If you run one of this fork's earlier builds, the newest items are 202–208 and the per-release breakdown is in the changelog.
+If you run official `4.35s` today, this document describes your whole upgrade. If you run one of this fork's earlier builds, the newest items are 209–210 and the per-release breakdown is in the changelog.
 
-Flash version `20260906`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
+Flash version `20260909`. `FLASH_STRUCT_VERSION` stands at `20260724` and only moves when the settings layout really changes — **your configuration survives this update.**
 
 ## What you get, by theme
 
-The numbered items are in the [MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/CHANGELOG-stability.md).
+The numbered items are in the [MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/CHANGELOG-stability.md).
 
 **Input hardening and web security** (107–118). Stored XSS in the web message page; three web JSON endpoints that escaped nothing; double-escaped EXTUDP JSON; all 13 BLE register builders on one fail-soft frame path; frames from unconfigured `XX0XXX` nodes dropped on RX and never sent; eight parser findings from the test campaign; a single 255-byte datagram that killed EXTUDP receive permanently; a one-byte over-read in `addUdpOutBuffer()`; settings sanity-checked after loading from flash; a UTF-8 allowlist at the two chokepoints that see every text.
 
@@ -35,13 +35,16 @@ The numbered items are in the [MeshCom Stability Changelog](https://github.com/D
 
 **Build, test and tooling** (150–152, 164, 166, 169, 170, 191, 202, 208). `-Wformat=2 -Werror` for our own sources on both platforms; every variant passing `--port` to esptool; PlatformIO upload on hosts without `upload_port`; integrated regression suites that pin the whole back-pressure incident class; and the bench instrumentation no longer shipping in a normal board build.
 
+**Text and operator warnings** (209, 210). A single-byte umlaut is no longer deleted on its way through the node: a byte that is not part of a valid UTF-8 sequence is now read as a legacy CP1252 character and passed through untouched, so a message from a sender like PinPoint arrives as it was typed instead of arriving as `Gre` — or, if it was three umlauts, arriving empty. And track mode finally says what it costs: switching on SmartBeaconing hands one station a beacon cadence down to 10 s against a channel that carries roughly one packet every 8 s, so the WebGUI switch and the serial log now both say `degraded MeshCom RX performance, packetloss likely`.
+
 ## What changes on the air
 
-Almost nothing. Three items change what a node transmits or reports, and each is a correction or an opt-in addition:
+Almost nothing. Four items change what a node transmits or reports, and each is a correction or an opt-in addition:
 
 1. **Frames from unconfigured nodes (`XX0XXX…`) are discarded on RX and never sent** (item 111).
 2. **Shot-path beacons have a 30-second floor** (item 132) — `--sendpos`, the user button and the boot beacon can no longer be fired back to back.
 3. **`/D=` in the position beacon and the `T#` digital slot** (item 207) — only on a node that actually has an MCP23017 answering at boot. Every other node's frames are byte-identical to before. The MeshCom server and the official app do not know the field yet; that is what the upstream PR is for.
+4. **Message text may now contain single bytes above `0x7F`** (item 210). Bytes that are not part of a valid UTF-8 sequence used to be deleted; they are now passed through as legacy CP1252 characters. Nothing is transcoded and nothing gets longer, so no wire budget changes — but the text a node forwards is no longer guaranteed to be valid UTF-8, and interpreting it is the far end's job.
 
 Toward the **phone app**, two things change: ACK status frames carry the acknowledging station's callsign (item 192), and a gateway stops sending heard and gateway-ACK frames for messages it only forwarded from the server (item 193).
 
@@ -61,7 +64,7 @@ If you capture a log of misbehavior in the field, open an issue with the log att
 
 ## Deep sleep: what is in, what is not, where we need your help
 
-Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdict is in [the linked document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/issue-962-deepsleep-verdict.md): it is not misbehaving, it was switched off entirely for issue #1053 (`e0043a56`, 4.35p.07.11), on every board, and the manual `--deepsleep` command never really slept either.
+Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdict is in [the linked document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/issue-962-deepsleep-verdict.md): it is not misbehaving, it was switched off entirely for issue #1053 (`e0043a56`, 4.35p.07.11), on every board, and the manual `--deepsleep` command never really slept either.
 
 **What this release does** (items 197–200):
 
@@ -86,18 +89,19 @@ Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdi
 
 ## Changelog and engineering rationale
 
-- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/CHANGELOG-stability.md)** — the numbered list; items 104–208 are the delta against official `4.35s`, items 202–208 are new since `v4.35s.09.06`.
-- **[Engineering write-up of the back-pressure campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/pr-draft-20260831.md)** — items 107–169, with per-change file references and measurements.
-- **[Issue 962 deep sleep verdict and plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/issue-962-deepsleep-verdict.md)** — what `--deepsleep` did before, the three options, the nRF52 System OFF plan, and the bench matrix we could and could not run (English).
-- **[gpio-hold and HWCDC follow-ups](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/gpio-hold-and-hwcdc-followups.md)** — the two defects found while bench-testing deep sleep on the T-Deck Plus.
-- **[ACK attribution plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/ack-implementierungsplan.md)** and **[the gateway heard-frame fix](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.06.2/docs/ack-heard-foreign-msgids-fix.md)** — items 192 and 193 (German).
+- **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/CHANGELOG-stability.md)** — the numbered list; items 104–210 are the delta against official `4.35s`, items 209–210 are new since `v4.35s.09.06.2`.
+- **[Engineering write-up of the back-pressure campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/pr-draft-20260831.md)** — items 107–169, with per-change file references and measurements.
+- **[Issue 962 deep sleep verdict and plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/issue-962-deepsleep-verdict.md)** — what `--deepsleep` did before, the three options, the nRF52 System OFF plan, and the bench matrix we could and could not run (English).
+- **[gpio-hold and HWCDC follow-ups](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/gpio-hold-and-hwcdc-followups.md)** — the two defects found while bench-testing deep sleep on the T-Deck Plus.
+- **[ACK attribution plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/ack-implementierungsplan.md)** and **[the gateway heard-frame fix](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35s.09.09/docs/ack-heard-foreign-msgids-fix.md)** — items 192 and 193 (German).
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Supported Hardware
 
 ### Verification for this release
 
-- **All 32 release environments build clean**; 643 native test cases green across 12 host environments.
+- **All 32 release environments build clean**; 656 native test cases green across 12 host environments.
+- **This cycle's bench work (items 209, 210)**: the track warning was verified on the gateway **DK5EN-98 (Heltec V3)** after a WiFi OTA of this release's code — the WebGUI hint appears and disappears with the switch without a page reload, renders correctly on a fresh page load while track is on, and the serial line reaches the network console once per switch-on. The character-set change (item 210) is proven by tests only: 27 filter cases plus an end-to-end case that carries a Latin-1 `ü`, a UTF-8 `ä` and the CP1252 Euro byte through `encodeAPRS()` and back, with the decoder's FCS check as the oracle. **No real PinPoint message has been received on hardware with this build.**
 - **Heltec V3 (DK5EN-93 and the gateway DK5EN-98, bench)**: barometric reference self-latch, altitude filter and GPS/barometer fusion measured over two hours (items 204–206); MCP23017 `/D=` receive path through `--injectraw` to the EXTUDP listener (item 207, transmit path natively only — no MCP23017 here); ACK attribution on the air against McApp (item 192); unread badges via a jsdom harness against the live node, 30 checks (item 195). Both nodes were flashed with this release's image over WiFi OTA, and on DK5EN-98 `--wifistat`, `--udpstat` and `--udplog on/off` were exercised on the stock build while `--injectraw` and `--heap` correctly report an unknown command (item 202).
 - **T-Deck Plus (DK5EN-14, bench)**: `--deepsleep` and button wake with the gpio-hold fix, rails and radio back after wake (items 197, 199); port-open crash loop 9 of 30 before, 0 of 80 after (item 201); the restored diagnostic switches on a stock build.
 - **WisBlock RAK4631 (DK5EN-90, bench)**: `--deepsleep` System OFF and wake (item 198); `--ethstat` and `--udplog` on a stock build (item 202); harness regression run on the release code — boot, Ethernet, LoRa RX/TX and MHeard nominal.
@@ -122,6 +126,9 @@ These boards build cleanly from the same source and inherit every improvement, b
 
 New with this release:
 
+- **A strict UTF-8 receiver may start rejecting frames it used to accept** (item 210). `extudp_functions.cpp` puts the message payload into the JSON `msg` field; until now the firmware had already deleted every byte that would have made that field invalid UTF-8. It no longer does. A consumer that decodes strictly will now drop those frames instead of showing a mangled word. mc-chat's decoder handles it; other consumers on the EXTUDP sideband have not been checked. Filed as CHR-03 in the backlog.
+- **Five bytes that are undefined even in CP1252** (`0x81`, `0x8D`, `0x8F`, `0x90`, `0x9D`) are passed through with the rest of the range and arrive at the far end as `U+FFFD` (item 210).
+- **The fleet has no telemetry for how many nodes run with track on** (item 209). The warning tells the operator of a single node; it does not answer the question that prompted it, which is how much of the reported packet loss is track traffic.
 - **The GPS/barometer fusion misses its own design gate.** The target was a reported-altitude standard deviation of 4 m or better; the two-hour bench run gave 6.6 m, because the GPS mean itself walked 30 m over one hour and a 30-minute low-pass follows it. An offline replay of the same capture reaches 3.6 m at tau 2 h and 2.4 m at tau 4 h. Tau is one constant (`ALT_FUSION_TAU_MS`) and the choice is deliberately left open.
 - **No moving-node altitude proof.** TRACK mode bypasses both filters, and a TRACK-mode capture with pressure has not been recorded.
 - **The MCP23017 transmit path is proven natively only** (item 207). There is no MCP23017 on the bench; the receive side and the EXTUDP `din` key were proven on hardware, the `/D=` a real chip would produce was not.
