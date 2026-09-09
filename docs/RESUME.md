@@ -1,5 +1,33 @@
 # RESUME — pick up here
 
+## 2026-09-09 (later): v4.35s.09.09 published, 39 assets, two items
+
+Release object at <https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35s.09.09>, marked
+latest, 39 assets diff-identical in name to the previous release; tag on `38d1b241`. The previous
+release `v4.35s.09.06.2` was **left in place** -- this is a new-day cut, not a replacement, so
+nothing was deleted. Say so if it should go.
+
+Shipped on top of 09.06.2: changelog items 209 and 210. Item 209 is TRK-01, the track warning.
+Item 210 is CHR-03, which had been sitting on `fork-main` since the morning **without a changelog
+item** -- it was written for this cut, from the two commits (`16670de9`, `094636b2`).
+
+`FLASH_VERSION` moved 20260906 -> 20260909, `FLASH_STRUCT_VERSION` stayed 20260724, so node
+settings survive. Gates: 656 native cases / 12 host envs, all 32 release envs built clean in one
+sequential run, `safeboot.bin` / `safeboot-s3.bin` byte-identical to the tracked copies, so tag
+content and shipped assets match.
+
+**What the release notes now say that they did not before:** item 210 changes what a node puts on
+the air -- message text may contain single bytes above `0x7F` and is no longer guaranteed to be
+valid UTF-8. That is in "What changes on the air" as point 4, and the consequence is in "Known
+gaps": a consumer on the EXTUDP sideband that decodes strictly will now reject frames it used to
+accept, because the firmware had been deleting those bytes for it. mc-chat handles it; nothing else
+was checked.
+
+**Bench this cycle was DK5EN-98 only** (Heltec V3 gateway, WiFi OTA). Item 210 has no hardware
+verification at all -- no real PinPoint message was received with this build -- and item 209's boot
+line and nRF52 half were never triggered on hardware, only proven as strings in the linked images.
+All three gaps are written into `release.md` under "Was ausdruecklich NICHT geprueft wurde".
+
 ## 2026-09-09: TRK-01 shipped -- track mode now says what it costs
 
 `7ace4b2f` on `fork-main`. Track (SmartBeaconing) beacons as often as every 10 s against a channel
