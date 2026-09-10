@@ -42,12 +42,12 @@ tr.closed .note{font-size:.78rem;margin-top:.15rem}
 <h1>Drei Runden nach upstream: von 4.35m bis 4.35s</h1>
 <p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in drei Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt.</p>
 <div class="stats">
-<div class="stat"><div class="k">Gemergte PRs</div><div class="v">30</div></div>
-<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+22.269</span> <span class="minus">−5.541</span></div></div>
-<div class="stat"><div class="k">Dateiänderungen</div><div class="v">288</div></div>
-<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 03.09.2026</div></div>
+<div class="stat"><div class="k">Gemergte PRs</div><div class="v">31</div></div>
+<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+24.504</span> <span class="minus">−5.848</span></div></div>
+<div class="stat"><div class="k">Dateiänderungen</div><div class="v">339</div></div>
+<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 10.09.2026</div></div>
 </div>
-<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
+<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09., fortgeführt bis 10.09.). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
 <section>
 <div class="eyebrow">Februar 2026 · 4.35m → 4.35n</div>
 <h2>Empfangslöcher und Wiederholungen</h2>
@@ -95,8 +95,8 @@ tr.closed .note{font-size:.78rem;margin-top:.15rem}
 <section>
 <div class="eyebrow">August / September 2026 · 4.35p → 4.35s</div>
 <h2>Fünf Monate Feldbetrieb, dann Härtung und Ausbau</h2>
-<p class="lead">Zwei große Sammel-PRs und drei Nachzügler. #1102 bringt 82 Änderungen aus dem Dauerbetrieb an OE- und DL-Knoten: Speichersicherheit auf allen von außen erreichbaren Pfaden, Absturz- und Einfrierfixes, Nebenläufigkeit, Zeitarithmetik. #1115 macht die Hauptschleife frei (WLAN, DNS und NTP asynchron, OLED auf Hardware-I2C, Audio auf eigenem Task, Ethernet-Link-Check) und liefert das Rückstau-Protokoll, Zeichensatzfilter, den Konfigurations-Export und die Feld-Instrumentierung. #1125 schließt mit GPS-Kalmanfilter, T-Deck-Tastenwiederholung und den setlog-Zeilen ab. Alles davon ist in der offiziellen 4.35s.</p>
-<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">6</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+16.023</span> <span class="minus">−3.220</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">193</div></div></div>
+<p class="lead">Drei große Sammel-PRs und drei Nachzügler. #1102 bringt 82 Änderungen aus dem Dauerbetrieb an OE- und DL-Knoten: Speichersicherheit auf allen von außen erreichbaren Pfaden, Absturz- und Einfrierfixes, Nebenläufigkeit, Zeitarithmetik. #1115 macht die Hauptschleife frei (WLAN, DNS und NTP asynchron, OLED auf Hardware-I2C, Audio auf eigenem Task, Ethernet-Link-Check) und liefert das Rückstau-Protokoll, Zeichensatzfilter, den Konfigurations-Export und die Feld-Instrumentierung. #1125 bringt GPS-Kalmanfilter, T-Deck-Tastenwiederholung und die setlog-Zeilen. #1135 schließt ab: Deepsleep, der auf jedem Board wirklich schläft, ACK-Frames mit dem Rufzeichen des Quittierenden, Echo-Schutz im Rückstau-Protokoll, das LoRa-Queue-Panel und die Nachrichten-Tabs in der Web-GUI, GPS/Barometer-Höhenfusion, MCP23017-Eingänge als <code>/D=</code> im Beacon, Latin-1-Umlaute im Zeichensatzfilter und die HWCDC-Fixes auf ESP32-S3. Alles davon ist in der offiziellen 4.35s.</p>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">7</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+18.258</span> <span class="minus">−3.527</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">244</div></div></div>
 <div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1102">#1102</a></td><td>2026-08-27</td><td>Stabilitaets- und Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)</td><td class="num"><span class="plus">+3.213</span> <span class="minus">−1.113</span></td><td class="num">64</td></tr>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1103">#1103</a></td><td>2026-08-27</td><td>fix(ble): FWDATE-Puffer zu klein -- snprintf schneidet die Sekunden ab</td><td class="num"><span class="plus">+4</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
@@ -104,12 +104,13 @@ tr.closed .note{font-size:.78rem;margin-top:.15rem}
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1118">#1118</a></td><td>2026-09-01</td><td>fix: PlatformIO-Upload ohne upload_port reparieren, -Wall -Wextra nur fuer src/</td><td class="num"><span class="plus">+14</span> <span class="minus">−2</span></td><td class="num">2</td></tr>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1122">#1122</a></td><td>2026-09-02</td><td>fix: QRS erst ab der dritten eigenen Nachricht bei Ringtiefe >= 5</td><td class="num"><span class="plus">+35</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
 <tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1125">#1125</a></td><td>2026-09-03</td><td>feat: GPS-Kalmanfilter, T-Deck-Tastaturwiederholung und Logging-Instrumentierung</td><td class="num"><span class="plus">+1.737</span> <span class="minus">−114</span></td><td class="num">23</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1135">#1135</a></td><td>2026-09-10</td><td>feat/fix: Deepsleep, ACK-Herkunft, Web-Queue, Hoehenfusion, Feldfixes</td><td class="num"><span class="plus">+2.235</span> <span class="minus">−307</span></td><td class="num">51</td></tr>
 </tbody></table></div>
 </section>
 
 <section>
 <div class="eyebrow">Quelle</div>
-<p class="small">Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 05.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
+<p class="small">Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 10.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
 </section>
 </div>
 </body>
