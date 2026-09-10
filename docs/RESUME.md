@@ -1,5 +1,19 @@
 # RESUME — pick up here
 
+## 2026-09-10: v4.35t.09.10 published -- upstream sync, version letter t
+
+Release `v4.35t.09.10` is on GitHub, 39 assets, tag on `17f3188d`. One item, 211: upstream `dev`
+at `674413ce` cherry-picked (`42b49df4`, Kurt's `2c291265` "v4.35s path + 2 chars", the only net
+change -- the KISS PR #1114 and its revert #1128 cancel out), `SOURCE_VERSION_SUB` and
+`SOURCE_VERSION_WEB_SUB` `s` -> `t`, `FLASH_VERSION` 20260910. `fork-main` is now content-identical
+to upstream `dev` except FLASH_VERSION, the letter and items 104-210. Gates: 656 native cases in
+12 host envs, all 32 release envs built, every image checked for the 20260910 integer.
+
+**No bench time this cycle** -- no board runs this image yet. Open: flash the bench fleet
+(98/93/14/90/92) and eyeball `--path` on serial and the T-Deck path tab with the 52-byte buffer;
+the T-Deck discards `/mhpath.dat` once. The letter `t` is the fork's own; if upstream ever
+publishes 4.35t the fork follows upstream to the next letter.
+
 ## 2026-09-09 (evening): DM transport reliability designed, simulator built, nothing in code
 
 Two documents, no firmware change. `docs/proposal-dm-transport-reliability-20260909.md` (English,
