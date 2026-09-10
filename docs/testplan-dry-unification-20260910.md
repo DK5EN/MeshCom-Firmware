@@ -286,10 +286,8 @@ Nachweis: Vorher/Nachher-Protokoll (docs/testplan/protocol-before.md, -after.md)
 
 ## 11. What is still missing or assumed (for the next planning round)
 
-- **BLE golden needs a host client that does not exist yet.** Without it, the BLE surface is
-  covered only by the web history and the frame-builder native tests. Decide whether to build the
-  client (1 day) or accept the gap for BLE and lean on `test_ble_json_frame` plus the phone app for
-  a manual check.
+- **BLE golden: resolved in section 12.** The host client is a planned tool (about 1 day); the
+  write corpus is derived from the app source, and the app itself is used once to calibrate it.
 - **Hardware covers 4 of 30 envs.** Classic E22 without OLED, the e-paper boards, T-Deck Pro and
   T5 are build-only. The audit's R4-02/03 board list decision needs hardware confirmation that the
   plan cannot give.
@@ -307,3 +305,92 @@ Nachweis: Vorher/Nachher-Protokoll (docs/testplan/protocol-before.md, -after.md)
   corpus lint in P0.5 is the guard, but it needs a list of which fixtures are injection-capable.
 - **Flakiness policy** for hardware steps: rerun the step alone, then 3 consecutive identical runs
   before a diff counts as real (project memory on flaky triage).
+
+## 12. BLE capture design (from the app source)
+
+Source of truth for the phone side: `/Users/martinwerner/WebDev/Meshcom-MobileApp` (Ionic/Capacitor,
+`@capacitor-community/bluetooth-le` 8.3.0), files `src/hooks/BleHandler.ts`, `src/pages/Connect.tsx`,
+`src/hooks/MessageHandler.ts`. Firmware side: `src/phone_commands.cpp`, `src/esp32/esp32_main.cpp`,
+`src/nrf52/nrf52_ble.cpp`.
+
+### 12.1 The link as both ends implement it
+
+| Item                | Value                                                                                                                      | Where                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Profile             | Nordic UART Service (NUS)                                                                                                  | `BleHandler.ts:8-10`                                                   |
+| Service             | `6e400001-b5a3-f393-e0a9-e50e24dcca9e`                                                                                     |                                                                        |
+| Phone writes to     | `6e400002-...` (TX char, write with response)                                                                              | `BleHandler.ts:66`                                                     |
+| Phone notifies from | `6e400003-...` (RX char, `startNotifications`)                                                                             | `Connect.tsx:607`                                                      |
+| Connections         | one central at a time (`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`; nRF52 `configPrphConn(250,...)`)                              | `platformio.ini`, `nrf52_ble.cpp:91-93`                                |
+| Pairing             | passkey: ESP32 `BLE_HS_IO_DISPLAY_ONLY` with `bt_code`; nRF52 `Bluefruit.Security.setPIN(PAIRING_PIN)`                     | `esp32_main.cpp:1728-1732`, `nrf52_ble.cpp:98`                         |
+| App-level PIN       | optional: hello carries SHA-256 of the 6-digit PIN, verified in firmware with mbedtls                                      | `Connect.tsx:681-703`, `phone_commands.cpp:232-236`                    |
+| MTU                 | 247 negotiated, 244 usable JSON payload (`BLE_JSON_PAYLOAD_MAX`)                                                           | `configuration_global.h:358-369`                                       |
+| Write frame         | `[len][opcode][payload]`, `len` = total length                                                                             | `BleHandler.ts:84-93,105-113`                                          |
+| Notify frame        | `[flag][type][payload]`, flag 0x40 text/pos (type `:` `!` `@` or 0x41 ack), 0x44 JSON (`D` + register letter), 0x91 mheard | `MessageHandler.ts:1-7,71-100,935,977-985`, `phone_commands.cpp:47-70` |
+
+Opcodes the current app actually writes (everything else in `phone_commands.cpp:307-668` is
+firmware-only legacy and stays out of the golden corpus unless a decision says otherwise):
+
+| Opcode | Frame                                              | Sent when                                 |
+| ------ | -------------------------------------------------- | ----------------------------------------- |
+| 0x10   | `04 10 20 30` or `23 10 20 30 <32 B SHA-256(pin)>` | once after `startNotifications` (hello)   |
+| 0x20   | `06 20 <int32 LE unix seconds>`                    | time sync after connect                   |
+| 0xA0   | `<n+2> A0 <utf-8 text>`                            | every text message and every `--` command |
+
+### 12.2 Capture options considered
+
+| Option | Mechanism                                                                                                                                                                              | Use in this plan                                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| A      | Mac host client (Python, `bleak`): scan by NUS UUID, connect, pair via the macOS passkey dialog once per node, subscribe, replay the write corpus, record every notification           | **golden driver for H4**, deterministic and scriptable                                                                    |
+| B      | Real iPhone app with Apple's Bluetooth logging profile installed; `sysdiagnose` yields a PacketLogger `.pklg`; ATT writes and notifications extracted with Wireshark's btatt dissector | **one-time calibration**: proves that A sends the same bytes the app sends and that the node answers the app the same way |
+| C      | macOS PacketLogger (Xcode Additional Tools) on the Mac while A runs                                                                                                                    | debugging aid when A and the node disagree on MTU or pairing                                                              |
+| D      | Instrumented app build with a frame logger, sideloaded with a development profile                                                                                                      | fallback if A cannot pair on macOS; changes the app, so last                                                              |
+
+Option A is the plan. The user can install profiles on the iPhone, so B is available for the
+calibration run without app changes.
+
+### 12.3 Host client specification (planned: `tools/bench/ble_golden.py`)
+
+- Arguments: node name or address, PIN (optional), corpus directory, output directory, listen
+  seconds after the last write.
+- Sequence: connect, subscribe to `6e400003`, send hello (with PIN hash if given), send timesync
+  with a **fixed** timestamp from the corpus (not `now`, for reproducibility), then each corpus
+  line as an `0xA0` frame with the same gap the app uses (`INIT_CONN_WAIT` 2 s after connect,
+  then one write per 500 ms), then listen.
+- Records: every notification as `<uint16 len><bytes>` in `ble-frames.bin` plus a hex text
+  rendering `ble-frames.txt` with one frame per line and the flag/type decoded, and every write
+  with its timestamp in `ble-writes.txt`.
+- Corpus (`test/golden/corpus/ble/writes.txt`): hello, timesync, the 13 register requests
+  (`--info`, `--seset`, `--wifiset`, `--nodeset`, `--analogset`, `--wx`, `--pos`, `--io`,
+  `--tel`, `--aprsset`, `--conffin`, `--mheard`, `--path`), one text message to group 9
+  (bench rule: never `*`), one direct message to a bench callsign, and the adversarial prefix
+  set from the command golden.
+- Normalization: the 0x44 JSON frames go through the section 7 rules; 0x40 frames mask the
+  4 timestamp bytes and the msg_id; 0x91 mheard frames mask time and RF fields.
+- Pass criteria at G1 and G2: identical frame sequence after normalization, identical frame count,
+  identical per-frame length. Length is asserted separately because the MTU budget
+  (`BLE_JSON_PAYLOAD_MAX 244`) is a wire contract.
+- Exclusions: firmware opcodes 0x50..0xF0 are not driven; they are not on the app's path and the
+  audit marks them as a separately validated legacy surface.
+
+### 12.4 Calibration run with the real app (option B, once at G0)
+
+1. Install Apple's Bluetooth logging profile on the iPhone, reproduce the connect and register
+   sequence in the app against RAK-90 and Heltec-93.
+2. Trigger `sysdiagnose`, transfer to the Mac, open the `.pklg` in PacketLogger or Wireshark.
+3. Extract the ATT write values and notification values for the NUS characteristics into the same
+   `ble-frames.txt` format.
+4. Diff against the option A capture of the same sequence. Differences in write bytes are a bug in
+   the client; differences in notification bytes are timing or state and must be explained.
+5. Commit both under `test/golden/hw/G0/<node>/ble-app-calibration/`.
+
+### 12.5 Practical constraints on the Mac
+
+- The node holds one connection: the phone must be disconnected before the client connects, and
+  the client must disconnect cleanly before any phone test.
+- macOS handles passkey pairing with a system dialog; the bond persists per node MAC. A firmware
+  erase invalidates it and the node must be removed from the Mac's Bluetooth list, the same
+  symptom the app reports as "removed pairing" (`Connect.tsx:748`).
+- Random address rotation is not used by the firmware; scanning by the NUS service UUID plus the
+  advertised name is enough to select the node.
+- `bleak` on macOS needs Bluetooth permission for the terminal application on first use.
