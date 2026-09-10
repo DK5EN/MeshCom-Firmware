@@ -1,9 +1,60 @@
-# Release Notes -- MeshCom Firmware v4.35s
+# Release Notes -- MeshCom Firmware v4.35t
 
-Firmware `4.35s`, `FLASH_VERSION 20260909`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35t`, `FLASH_VERSION 20260910`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+
+---
+
+## Stability-Release v4.35t.09.10 (2026-09-10)
+
+Eine Aenderung des Forks gegenueber `v4.35s.09.09`, Changelog-Punkt 211:
+Gleichstand mit upstream `dev` und ein eigener Versionsbuchstabe.
+`FLASH_VERSION` geht auf 20260910, `FLASH_STRUCT_VERSION` bleibt unveraendert
+20260724 -- die Einstellungen der Knoten bleiben erhalten. Gates: 656
+native Testfaelle in 12 Host-Umgebungen, alle 32 Release-Umgebungen gebaut.
+Bench in diesem Zyklus: keine.
+
+### Was dazugekommen ist
+
+- **Upstream-Sync auf `674413ce` (Punkt 211).** Upstream `dev` ist seit
+  unserer Merge-Base `4e649eae` um fuenfzehn Commits weiter; vierzehn davon
+  sind das KISS/TCP-Interface aus PR #1114 und dessen vollstaendiger Revert in
+  PR #1128, netto null. Uebrig bleibt Kurts "v4.35s path + 2 chars" vom 3. September: `mheardPathBuffer1` waechst von 50 auf 52 Byte je Slot, der
+  gespeicherte Pfadtext wird bei 51 statt 37 Zeichen gekappt, die
+  `--path`-Tabelle ist zwei Spalten breiter, der T-Deck-Pfad-Tab formatiert in
+  den groesseren Puffer. Per `git cherry-pick -x` unveraendert uebernommen,
+  Autorschaft bleibt bei upstream. Alle Konsumenten des Puffers geprueft:
+  WebGUI gibt per `%s` aus, Terminator an Index 51 steht immer, der
+  T-Deck-Zeilenpuffer hat 60 Byte. Nebenwirkung auf dem T-Deck: `/mhpath.dat`
+  auf der SD wird je Slot zwei Byte groesser, der Groessen-Check in
+  `loadPathPersistence()` loescht die alte Datei einmalig -- ein
+  Heard-Path-Cache, keine Einstellung, upstream verhaelt sich identisch.
+
+- **Versionsbuchstabe `t` (Punkt 211).** `SOURCE_VERSION_SUB` und
+  `SOURCE_VERSION_WEB_SUB` gehen von `s` auf `t`. Ein Knoten mit dieser
+  Firmware meldet sich in `--info`, auf der Luft und in der Fleet-Firmware-Sicht
+  als `4.35t` und ist damit ohne Blick auf den Flash-Stempel vom offiziellen
+  `4.35s` zu unterscheiden. Upstream hat kein 4.35t veroeffentlicht; sollte das
+  passieren, folgt der Buchstabe wieder upstream, wie am 3. September beim
+  Sprung p -> s.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+Nichts. Kein Board wurde vor der Veroeffentlichung mit diesem Image geflasht.
+Der Nachweis ist der Build aller 32 Umgebungen und die native Test-Suite; die
+Bench-Nachweise fuer die Punkte 104-210 stehen in den Abschnitten der
+vorherigen Releases und gelten unveraendert, weil sich an diesem Code nichts
+geaendert hat.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- `--path` auf der seriellen Konsole und der Pfad-Tab auf dem T-Deck mit dem
+  breiteren Puffer -- die Aenderung ist upstreams, nicht unsere, und rein
+  mechanisch.
+- Der einmalige Verwurf von `/mhpath.dat` auf dem T-Deck nach dem Update.
+- Alles, was in `v4.35s.09.09` unter "NICHT geprueft" steht, gilt weiter.
 
 ---
 

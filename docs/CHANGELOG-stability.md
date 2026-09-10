@@ -1,8 +1,10 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35s.09.09` (2026-09-09), based on official MeshCom
-4.35s, upstream `dev` at `4e649eae` — the state **after** upstream merged this
-fork's changes, plus items 104-210 below. The full engineering rationale for
+Release: `v4.35t.09.10` (2026-09-10), based on official MeshCom
+4.35s, upstream `dev` at `674413ce` — the state **after** upstream merged this
+fork's changes, plus items 104-211 below. The build reports itself as `4.35t`;
+that letter is this fork's own marker (item 211), upstream has not released a
+4.35t. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
 [`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
@@ -74,6 +76,37 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+
+## New in v4.35t.09.10
+
+One change on top of `v4.35s.09.09`, item 211: the fork is brought level with
+upstream `dev` again, and the build carries its own version letter from now on.
+
+211. **Upstream sync to `674413ce` and version letter `t`** (`42b49df4`,
+     cherry-pick of upstream `2c291265`). Upstream `dev` moved fifteen commits
+     since our merge-base `4e649eae`; fourteen of them are the KISS/TCP
+     interface of PR #1114 and its complete revert in PR #1128, which cancel
+     out to nothing. The one effective commit is Kurt's "v4.35s path + 2 chars"
+     of 3 September: `mheardPathBuffer1` grows from 50 to 52 bytes per slot,
+     the source-path text stored per MHeard entry is capped at 51 instead of 37
+     characters, the `--path` table on serial is two columns wider, and the
+     T-Deck path tab formats into the larger buffer. Applied verbatim with
+     `git cherry-pick -x`, so the commit keeps upstream's authorship. Every
+     consumer of the buffer was checked: the WebGUI prints it as a C string and
+     the terminator at index 51 is always set, the T-Deck line buffer is 60
+     bytes. One side effect on the T-Deck: the persisted `/mhpath.dat` on SD
+     grows by two bytes per slot, the size check in `loadPathPersistence()`
+     sees the mismatch once and deletes the old file -- a heard-path cache,
+     not a setting, and upstream behaves identically. With this, `fork-main`
+     is content-identical to upstream `dev` except for `FLASH_VERSION`, the
+     version letter and this fork's own items 104-210. The version letter:
+     `SOURCE_VERSION_SUB` and `SOURCE_VERSION_WEB_SUB` go from `s` to `t`, so
+     a node running this fork reports `4.35t` on the air, in `--info` and in
+     the fleet-firmware view, and can be told apart from official `4.35s`
+     without reading the flash stamp. Upstream has not published a 4.35t; if
+     it ever does, the letter will follow upstream again as it did on
+     3 September. `FLASH_VERSION` goes to 20260910, `FLASH_STRUCT_VERSION`
+     stays at 20260724 -- settings survive.
 
 ## New in v4.35s.09.09
 
