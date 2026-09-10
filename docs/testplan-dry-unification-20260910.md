@@ -134,36 +134,37 @@ Estimate for 4.4: 6 to 8 days, U1 dominates (stubbing the sinks for both platfor
 
 `docs/testplan/drift-matrix.csv`, one row per observed difference. Columns:
 
-| Column                     | Meaning                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `id`                       | `DR-01`..                                                                       |
-| `uut`                      | U1..U9                                                                          |
-| `pair`                     | function pair                                                                   |
-| `esp32_behaviour`          | one sentence, with `file:line`                                                  |
-| `nrf52_behaviour`          | one sentence, with `file:line`                                                  |
-| `evidence`                 | corpus item and line in the twin-diff fixture that shows it                     |
-| `class`                    | `bug-one-side`, `platform-api`, `feature-one-side`, `cosmetic`                  |
-| `default`                  | `ESP32`                                                                         |
-| `recommendation`           | analyst recommendation with reason when it deviates from the default            |
-| `decision`                 | `ESP32`, `nRF52`, `both-new`, `keep-split` (filled in the review)               |
-| `decided_by`, `decided_on` |                                                                                 |
-| `after_expect`             | `identical`, `nrf52-changes`, `esp32-changes`; drives the expected-diff fixture |
-| `asserting_test`           | test name that will fail if the decision is not implemented                     |
+| Column                     | Meaning                                                                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                       | `DR-01`..                                                                                                                                                  |
+| `uut`                      | U1..U9                                                                                                                                                     |
+| `pair`                     | function pair                                                                                                                                              |
+| `esp32_behaviour`          | one sentence, with `file:line`                                                                                                                             |
+| `nrf52_behaviour`          | one sentence, with `file:line`                                                                                                                             |
+| `evidence`                 | corpus item and line in the twin-diff fixture that shows it                                                                                                |
+| `class`                    | `bug-one-side`, `platform-api`, `feature-one-side`, `cosmetic`                                                                                             |
+| `tie_break`                | `ESP32`; applied only when the verdict is `both-valid` and one implementation must be chosen                                                               |
+| `recommendation`           | analyst recommendation with reason                                                                                                                         |
+| `verdict`                  | `esp32-correct`, `nrf52-correct`, `both-wrong` (correct behaviour stated in `spec`), `both-valid` (platform difference, stays split); filled in the review |
+| `spec`                     | for `both-wrong`: one sentence stating the correct behaviour                                                                                               |
+| `decided_by`, `decided_on` |                                                                                                                                                            |
+| `after_expect`             | `identical`, `nrf52-changes`, `esp32-changes`, `both-change`; derived from the verdict, drives the expected-diff fixture                                   |
+| `asserting_test`           | test name that will fail if the decision is not implemented                                                                                                |
 
 ### 5.2 Pre-filled rows (from the audit, to be confirmed by the twin-diff)
 
-| id      | pair                                             | difference                                                               | recommendation                                                                     |
+| id      | pair                                             | difference                                                               | recommended verdict                                                                |
 | ------- | ------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | DR-01   | U1 zero-scan                                     | nRF52 reads `buf[i+1]` past the datagram on odd sizes                    | ESP32                                                                              |
 | DR-02   | U1 RX-01 guard                                   | unconfigured-source guard ESP32 only                                     | ESP32                                                                              |
 | DR-03   | U1 `hb_warn_logged`                              | reset in all four ESP32 branches, absent on nRF52                        | ESP32                                                                              |
 | DR-04   | U1 `bGATEWAY_NOPOS`                              | honoured ESP32 only                                                      | ESP32                                                                              |
 | DR-05   | U1 server position frames                        | `sendDisplayPosition()` and TM-31 early-dedup ESP32 only                 | ESP32                                                                              |
-| DR-06   | U1 `decodeAPRS()` return                         | checked nRF52 only                                                       | **nRF52** (the check is the safer behaviour)                                       |
+| DR-06   | U1 `decodeAPRS()` return                         | checked nRF52 only                                                       | nrf52-correct                                                                      |
 | DR-07   | U1 `sendExtern()` gate                           | `hasExternIPaddress` gate ESP32 only                                     | ESP32                                                                              |
 | DR-08   | U1 CONF guard                                    | no zero-address check on nRF52                                           | ESP32                                                                              |
 | DR-09   | U1 ACK phone frame                               | nRF52 sends fixed 7 bytes, no attribution suffix                         | ESP32 via `buildAckPhoneFrame()`                                                   |
-| DR-10   | U3 `msg_buffer`                                  | static on nRF52 (N-22), stack on ESP32                                   | **nRF52**                                                                          |
+| DR-10   | U3 `msg_buffer`                                  | static on nRF52 (N-22), stack on ESP32                                   | nrf52-correct                                                                      |
 | DR-11   | U3 net-console input                             | ESP32 only                                                               | ESP32, guarded by `DISABLE_NET_CONSOLE`                                            |
 | DR-12   | U4 struct fields                                 | six fields missing on nRF52                                              | ESP32 (append on nRF52, migration)                                                 |
 | DR-13   | U4 compat struct                                 | frozen snapshot drifted from live struct                                 | both-new (schema-driven migration)                                                 |
@@ -178,30 +179,34 @@ Estimate for 4.4: 6 to 8 days, U1 dominates (stubbing the sinks for both platfor
 - Input: the CSV pre-filled from the twin-diff fixtures, plus the `.xlsx` generated by a small
   `openpyxl` script (`tools/testplan/matrix_xlsx.py`, planned) with one sheet per UUT, filters and
   the evidence column linked to the fixture line.
-- Rule: every row gets a decision before the first unification commit. Rows left open block the
+- The matrix is a correctness verdict per observed difference, not a platform contest: every
+  `esp32-correct` or `nrf52-correct` row is a confirmed bug on the other side, every `both-wrong`
+  row a bug on both. That list is the sign-off result and feeds the defect section of the German
+  PR description. The ESP32 tie-break applies only to `both-valid` rows.
+- Rule: every row gets a verdict before the first unification commit. Rows left open block the
   UUT they belong to, not the whole PR.
 - Output: CSV updated, committed; the `.xlsx` is a view, never the source.
-- A native test `test_drift_matrix_complete` (Python) fails if any row has an empty `decision`
-  or an `asserting_test` that does not exist.
+- A native test `test_drift_matrix_complete` (Python) fails if any row has an empty `verdict`,
+  a `both-wrong` row without `spec`, or an `asserting_test` that does not exist.
 
 ## 6. Hardware protocol (used for G0, G1, G2)
 
 Nodes: RAK-90 (nRF52, Ethernet gateway), Heltec-93 (S3, WiFi gateway), T-Beam-92 (classic, WiFi
 gateway, also the IRAM cliff board), T-Deck-14 (S3, UI, keyboard). Ports per project memory.
 
-| Step | Surface                | Driver                                                                                                                          | Capture                                              | Nodes                        |
-| ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------- |
-| H1   | Boot log               | power cycle, `serial_session.py --wait-boot`                                                                                    | `boot.txt` up to `[BOOT];ready`                      | all                          |
-| H2   | Settings dump          | `--info`, `--seset`, `--wifiset`, `--nodeset`, `--analogset`, `--wx`, `--pos`, `--io`, `--tel`, `--aprsset`, config JSON export | `settings.txt`, `settings.json`                      | all                          |
-| H3   | Command golden         | the corpus command script over USB, then the same over TCP 2323 (`tools/hmac_connect.py`)                                       | `cmd-usb.txt`, `cmd-2323.txt`                        | all except T-Deck (USB only) |
-| H4   | BLE golden             | host BLE client: connect, subscribe, send the 10 opcodes, request the 13 JSON registers, trigger an mheard and a text frame     | `ble-frames.bin` with per-frame length prefix        | RAK-90, Heltec-93            |
-| H5   | LoRa RX path           | `--injectraw` of the LoRa corpus after `[BOOT];ready` (mesh and gateway off first, per the injectraw recipe)                    | `rx-log.txt`, resulting BLE frames, EXTUDP datagrams | all                          |
-| H6   | UDP 1799 gateway path  | stub server replays the UDP corpus; node in gateway mode against the stub                                                       | `udp-rx-log.txt`, LoRa TX ring dump, BLE frames      | RAK-90, Heltec-93, T-Beam-92 |
-| H7   | UDP 1799 upstream path | inject LoRa corpus with gateway on; stub records the datagrams the node sends                                                   | stub log `udp-tx.bin`                                | same                         |
-| H8   | EXTUDP                 | `tools/bench/extudp_peer.py` sends the EXTUDP corpus, records replies                                                           | `extudp.txt`                                         | RAK-90, Heltec-93            |
-| H9   | Settings round trip    | import the exported JSON, reboot, export again                                                                                  | `settings-roundtrip.json`                            | all                          |
-| H10  | Region gate            | `tools/resource_watch.py regions` for all 32 envs from the same base build                                                      | `regions.csv`                                        | build only                   |
-| H11  | T-Deck UI checklist    | manual: MHeard screen (7 columns), TRACK no-fix text, keyboard types 1..4 full character map, APRS symbol dropdown round trip   | `tdeck-checklist.md` with pass/fail per line         | T-Deck-14                    |
+| Step | Surface                | Driver                                                                                                                                                                                          | Capture                                                               | Nodes                                                    |
+| ---- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| H1   | Boot log               | power cycle, `serial_session.py --wait-boot`                                                                                                                                                    | `boot.txt` up to `[BOOT];ready`                                       | all                                                      |
+| H2   | Settings dump          | `--info`, `--seset`, `--wifiset`, `--nodeset`, `--analogset`, `--wx`, `--pos`, `--io`, `--tel`, `--aprsset`, config JSON export                                                                 | `settings.txt`, `settings.json`                                       | all                                                      |
+| H3   | Command golden         | the corpus command script over USB, then the same over TCP 2323 (`tools/hmac_connect.py`); repeated once on an instrument image of one node; command-name string scan of all 32 shipping images | `cmd-usb.txt`, `cmd-2323.txt`, `cmd-instr.txt`, `cmd-names-<env>.txt` | all except T-Deck (USB only); instrument run on one node |
+| H4   | BLE golden             | host BLE client: connect, subscribe, send the 10 opcodes, request the 13 JSON registers, trigger an mheard and a text frame                                                                     | `ble-frames.bin` with per-frame length prefix                         | RAK-90, Heltec-93                                        |
+| H5   | LoRa RX path           | `--injectraw` of the LoRa corpus after `[BOOT];ready` (mesh and gateway off first, per the injectraw recipe)                                                                                    | `rx-log.txt`, resulting BLE frames, EXTUDP datagrams                  | all                                                      |
+| H6   | UDP 1799 gateway path  | stub server replays the UDP corpus; node in gateway mode against the stub                                                                                                                       | `udp-rx-log.txt`, LoRa TX ring dump, BLE frames                       | RAK-90, Heltec-93, T-Beam-92                             |
+| H7   | UDP 1799 upstream path | inject LoRa corpus with gateway on; stub records the datagrams the node sends                                                                                                                   | stub log `udp-tx.bin`                                                 | same                                                     |
+| H8   | EXTUDP                 | `tools/bench/extudp_peer.py` sends the EXTUDP corpus, records replies                                                                                                                           | `extudp.txt`                                                          | RAK-90, Heltec-93                                        |
+| H9   | Settings round trip    | import the exported JSON, reboot, export again                                                                                                                                                  | `settings-roundtrip.json`                                             | all                                                      |
+| H10  | Region gate            | `tools/resource_watch.py regions` for all 32 envs from the same base build                                                                                                                      | `regions.csv`                                                         | build only                                               |
+| H11  | T-Deck UI checklist    | manual: MHeard screen (7 columns), TRACK no-fix text, keyboard types 1..4 full character map, APRS symbol dropdown round trip                                                                   | `tdeck-checklist.md` with pass/fail per line                          | T-Deck-14                                                |
 
 Per node and step the capture is normalized (section 7) and committed under
 `test/golden/hw/<G>/<node>/<step>.*`. A run is complete when every cell of the protocol table in
@@ -295,8 +300,11 @@ Nachweis: Vorher/Nachher-Protokoll (docs/testplan/protocol-before.md, -after.md)
   guards it, but it means the "before" native tests run on code that is one commit past the tag.
 - **Command golden over BLE** (all 297 branches are BLE-reachable) is only as good as the BLE
   client; over USB and 2323 it is complete.
-- **INSTRUMENT_ENABLED builds** have 76 more commands. Decide whether the command golden runs on
-  the shipping build only or also on an instrument build of each node.
+- **INSTRUMENT_ENABLED builds** have 76 more command branches (`command_functions.cpp:4786-5361`).
+  Resolved: the command golden runs on the shipping image of all four nodes, once more on one
+  instrument image (RAK-90 or Heltec-93), and a string scan of all 32 shipping images checks the
+  full command-name list before and after (INS-01 lesson). The four `--spec*` commands that sit
+  outside the guard are a matrix row.
 - **Time budget.** Phase 0 about 5 days, phase 1 about 8 to 10 days including two bench days,
   phase 2 one review session, after-run 2 days. The unification itself is not in this plan.
 - **Who signs the matrix.** The plan assumes one reviewer; if Kurt or another upstream maintainer
