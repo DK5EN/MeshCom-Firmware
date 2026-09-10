@@ -4,6 +4,7 @@
 #include "printfdeb_functions.h"
 #include "txring_functions.h"
 #include "ack_functions.h"
+#include "ack_attribution.h"
 #include "capture_functions.h"
 #include "dedup_functions.h"
 #include "setlog_lines.h"
@@ -85,6 +86,26 @@
 
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
+#endif
+
+// Issue 962 / --deepsleep: RadioLib radio.sleep() for every board where this
+// TU has the real `radio` object in scope (see the #ifdef ladder above).
+// Mirrors the working precedent at src/t5-epaper/peri_lora.cpp:276.
+// WP_DISP boards keep their own Platform::loraToSleep() call instead (see
+// lora_functions.h for why). T-Deck Pro is NOT excluded here: its variant
+// defines SX1262X, and the `SX1262 radio` that extern resolves to is the
+// real global object in esp32_main.cpp (guarded by the same SX1262X), not
+// the unrelated `static` (file-local) radio in src/t-deck-pro/peri_lora.cpp,
+// which is dead scaffolding -- every function body in that file besides the
+// static declarations is commented out, so its local `radio` is never used.
+#if (defined(SX127X) || defined(BOARD_E220) || defined(SX1262X) || defined(SX126X) || \
+     defined(SX1262_E22) || defined(USING_SX1262) || defined(SX1268_E22) || \
+     defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || \
+     defined(BOARD_T5_EPAPER)) && !defined(WP_DISP)
+void loraDeepSleep()
+{
+    radio.sleep();
+}
 #endif
 
                                         // flag to indicate if we are after receiving
@@ -329,7 +350,11 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
     uint8_t print_buff[30];
 
-    memcpy(print_buff, payload, 12);
+    uint8_t n = ackWireAppendixLen(payload, size);
+    memcpy(print_buff, payload, 12 + n);
+
+    if(n == ACK_WIRE_APPENDIX_LEN && bLORADEBUG)
+        printfdeb("[MC-DBG] ACK_APPENDIX hash=%06X len=%u\n", ackWireHash(payload), (unsigned)size);
 
     // SL-01: Dedup-Verdikt vor dem Druck, damit die [LOG]-Zeile `DUP:` fuehren
     // kann. is_new_packet() ist eine reine Suche ohne Seiteneffekt.
@@ -361,15 +386,23 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
         if(itxcheck >= 0)
         {
-            if(own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
+            // Status frame to the phone is origin-gated: own_msg_id[] also holds
+            // foreign msg_ids that a gateway only forwarded from the server to LoRa
+            // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
+            // unconditional so the web rxlog heard/ACK ticks keep working as today.
+            if(bAckInfo || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
             {
-                print_buff[5] = MSG_TYPE_ACK;
-                addBLEOutBuffer(print_buff+5, 7);
-
-                if(bDisplayInfo)
+                if(ackMsgIdFromNode(msg_id, _GW_ID))
                 {
-                    printfdeb("\n%s", getTimeString().c_str());
-                    printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", print_buff[5], print_buff[9], print_buff[8], print_buff[7], print_buff[6], print_buff[10], print_buff[11]);
+                    uint8_t phone_buff[ACK_PHONE_MAX_LEN];
+                    uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
+                    addBLEOutBuffer(phone_buff, plen);
+
+                    if(bDisplayInfo)
+                    {
+                        printfdeb("\n%s", getTimeString().c_str());
+                        printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", phone_buff[0], phone_buff[4], phone_buff[3], phone_buff[2], phone_buff[1], phone_buff[5], phone_buff[6]);
+                    }
                 }
 
                 own_msg_id[itxcheck][4] = 0x02;   // 02...ACK
@@ -388,7 +421,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
             {
                 print_buff[5]--;
 
-                addTxRingEntry(print_buff, 12, RING_STATUS_DONE, "rx_ack_fwd", 0);
+                addTxRingEntry(print_buff, 12 + n, RING_STATUS_DONE, "rx_ack_fwd", 0);
 
                 if(bDisplayInfo)
                 {
@@ -835,25 +868,26 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
             if(icheck >= 0) // own msg_id
             {
-                if(msg_type_b_lora == MSG_TYPE_TEXT && own_msg_id[icheck][4] == 0x00)   // 00...not heard, 01...heard, 02...ACK
+                // Status frame to the phone is origin-gated: own_msg_id[] also holds
+                // foreign msg_ids that a gateway only forwarded from the server to LoRa
+                // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
+                // unconditional so the web rxlog heard/ACK ticks keep working as today.
+                if(msg_type_b_lora == MSG_TYPE_TEXT && (bAckInfo || own_msg_id[icheck][4] == 0x00))   // 00...not heard, 01...heard, 02...ACK
                 {
-                    print_buff[0]=MSG_TYPE_ACK;
-                    print_buff[1]=RcvBuffer[1];
-                    print_buff[2]=RcvBuffer[2];
-                    print_buff[3]=RcvBuffer[3];
-                    print_buff[4]=RcvBuffer[4];
-                    print_buff[5]=0x00;  // ONLY HEARD
-                    print_buff[6]=0x00;
-                    
-                    addBLEOutBuffer(print_buff, 7);
-
-                    if(bDisplayInfo)
+                    if(ackMsgIdFromNode(aprsmsg.msg_id, _GW_ID))
                     {
-                        printfdeb("%s", getTimeString().c_str());
-                        printfdeb(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
-                        bNewLine=true;
+                        uint16_t plen = buildAckPhoneFrame(print_buff, aprsmsg.msg_id, 0x00, aprsmsg.msg_source_last.c_str());
+
+                        addBLEOutBuffer(print_buff, plen);
+
+                        if(bDisplayInfo)
+                        {
+                            printfdeb("%s", getTimeString().c_str());
+                            printfdeb(" HEARD from <%s> to Phone  %02X %02X%02X%02X%02X %02X %02X\n", aprsmsg.msg_source_path.c_str(), print_buff[0], print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5], print_buff[6]);
+                            bNewLine=true;
+                        }
                     }
-            
+
                     if(own_msg_id[icheck][4] != 0x02)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
@@ -997,14 +1031,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         unsigned int iAckId = (aprsmsg.msg_payload.substring(iAckPos+4)).toInt();
                                         msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (iAckId & 0x3FF);
 
-                                        print_buff[0]=MSG_TYPE_ACK;
-                                        print_buff[1]=msg_counter & 0xFF;
-                                        print_buff[2]=(msg_counter >> 8) & 0xFF;
-                                        print_buff[3]=(msg_counter >> 16) & 0xFF;
-                                        print_buff[4]=(msg_counter >> 24) & 0xFF;
-                                        print_buff[5]=0x02;  // ACK
-                                        print_buff[6]=0x00;
-                                        
+                                        uint16_t plen = buildAckPhoneFrame(print_buff, msg_counter, 0x02, aprsmsg.msg_source_call.c_str());
+
                                         if(bDisplayInfo)
                                         {
                                             printfdeb("\n");
@@ -1025,7 +1053,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                             dmSlot, msg_counter);
                                         }
 
-                                        addBLEOutBuffer(print_buff, 7);
+                                        addBLEOutBuffer(print_buff, plen);
                                     }
                                     else
                                     if(iEnqPos > 0)
@@ -1190,10 +1218,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             // und an alle geht Wolke mit Hackerl an BLE senden
                                             if(aprsmsg.msg_destination_call == "*")
                                             {
-                                                print_buff[5]=MSG_TYPE_ACK;
-                                                print_buff[10]=0x01;     // switch ack GW / Node currently fixed to 0x00
-                                                print_buff[11]=0x00;     // msg always 0x00 at the end
-                                                addBLEOutBuffer(print_buff+5, 7);
+                                                // Gateway hoert seine eigene Meldung zurueck und ist selbst der
+                                                // Quittierende: Status 0x01 mit eigenem Rufzeichen.
+                                                uint8_t phone_buff[ACK_PHONE_MAX_LEN];
+                                                uint16_t plen = buildAckPhoneFrame(phone_buff, aprsmsg.msg_id, 0x01, meshcom_settings.node_call);
+                                                addBLEOutBuffer(phone_buff, plen);
                                             }
                                         }
                                         else

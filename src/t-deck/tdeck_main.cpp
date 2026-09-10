@@ -19,6 +19,7 @@
 #include <time_functions.h>
 
 #include <Arduino.h>
+#include <driver/gpio.h>
 #include <SPI.h>
 #include <RadioLib.h>
 #include <Wire.h>
@@ -136,6 +137,19 @@ void initTDeck()
     setCpuFrequencyMhz(160);
 
     Serial.println("[INIT]...initTDeck");
+
+    // Issue 962 deepsleep (esp32_sleep.cpp): --deepsleep holds TDECK_POWERON
+    // and TDECK_TFT_BACKLIGHT low with gpio_hold_en()/gpio_deep_sleep_hold_en()
+    // so they don't float during sleep. That hold survives the wake reset
+    // (esp_idf gpio.h) -- without releasing it here first, the digitalWrite()
+    // calls below (and setBrightness()'s later restore of the backlight) are
+    // silently ignored and the board stays without LoRa/GPS/SD/keyboard power
+    // until a full USB unplug/replug clears the latch. Release before
+    // reconfiguring, matching the working template in
+    // src/t5-epaper/t5epaper_main.cpp:579-581.
+    gpio_hold_dis((gpio_num_t) TDECK_POWERON);
+    gpio_hold_dis((gpio_num_t) TDECK_TFT_BACKLIGHT);
+    gpio_deep_sleep_hold_dis();
 
     //! The board peripheral power control pin needs to be set to HIGH when using the peripheral
     pinMode(TDECK_POWERON, OUTPUT);
@@ -464,8 +478,8 @@ void setupLvgl()
 
     // G07: the 4th parameter is size_in_px_cnt, not a byte count
     // (lv_hal_disp.h:223). LVGL_BUFFER_SIZE is TFT_WIDTH*TFT_HEIGHT*sizeof(lv_color_t),
-    // i.e. twice the pixel count. Harmless while full_refresh=1 and buf2==NULL keep
-    // the partial-render paths unreachable; with partial refresh it is a ~150 KB overflow.
+    // i.e. twice the pixel count. This must stay a pixel count now that
+    // full_refresh=0 makes the partial-render paths reachable.
     lv_disp_draw_buf_init( &draw_buf, buf, NULL, TFT_WIDTH * TFT_HEIGHT );
 
     /*Initialize the display*/
@@ -477,7 +491,11 @@ void setupLvgl()
     disp_drv.ver_res = TFT_WIDTH;
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf;
-    disp_drv.full_refresh = 0;   // EXPERIMENT: partial refresh, no other changes
+    // TD-05: partial refresh. full_refresh=1 forced a ~45 ms blocking, non-DMA
+    // pushColors of the whole framebuffer on every invalidation -- including the
+    // 1 Hz clock tick -- while holding the SPI bus that also fronts SD and LoRa.
+    // Settled on hardware (DK5EN-14); see BACKLOG.md 3.8b/3.8e.
+    disp_drv.full_refresh = 0;
     disp_drv.monitor_cb = tdeck_dbg_monitor_cb;
     disp_drv.render_start_cb = tdeck_dbg_render_start_cb;
     lv_disp_drv_register( &disp_drv );
@@ -1206,15 +1224,44 @@ static void mouse_read(lv_indev_drv_t *indev, lv_indev_data_t *data)
         {
             // Pegelvergleich (alter Weg, Taste immer so)
             // Bench-Harness: ein eingereihter Schritt wirkt wie eine Flanke
-            if (s_dbg_ball_pending[i] > 0)
+            // TD-13: an injected button click models a physical press -- press
+            // edge, DBG_CLICK_HOLD_POLLS polls held low, release edge -- so the
+            // harness exercises the same edge sequence as a finger. Two back-to-back
+            // press edges without a release between them (the previous inject
+            // shape) looked like one long press to LVGL and could not reproduce
+            // the double click; the hold is what separates the two pulses.
+            static uint8_t s_dbg_click_phase = 0;     // 0 idle, 1..HOLD held, then release
+            const uint8_t DBG_CLICK_HOLD_POLLS = 3;
+            if (i == 4 && (s_dbg_ball_pending[i] > 0 || s_dbg_click_phase != 0))
+            {
+                if (s_dbg_click_phase == 0)
+                {
+                    s_dbg_ball_pending[i]--;
+                    dir = false;                     // press edge (active low)
+                    s_dbg_click_phase = 1;
+                }
+                else if (s_dbg_click_phase < DBG_CLICK_HOLD_POLLS)
+                {
+                    dir = false;                     // held
+                    s_dbg_click_phase++;
+                }
+                else
+                {
+                    dir = true;                      // release edge
+                    s_dbg_click_phase = 0;
+                }
+            }
+            else if (s_dbg_ball_pending[i] > 0)
             {
                 s_dbg_ball_pending[i]--;
                 dir = !last_dir[i];
             }
             if (dir != last_dir[i])
             {
+                // TD-13: the push button is a pulse on the press edge only; the release
+                // edge produced a second LVGL click that toggled the drawer shut.
+                steps = (i == 4 && dir) ? 0 : 1;
                 last_dir[i] = dir;
-                steps = 1;
             }
         }
         for (int k = 0; k < steps; k++)

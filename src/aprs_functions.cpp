@@ -550,6 +550,7 @@ void initAPRSPOS(struct aprsPosition &aprspos)
 
     aprspos.version = 0;
     aprspos.telemetry = 0;
+    aprspos.din[0] = 0x00;
 }
 
 uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
@@ -1013,6 +1014,60 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
                 {
                     decode_text[ipt]=PayloadBuffer.charAt(id);
                     ipt++;
+                }
+            }
+
+            break;
+        }
+    }
+
+    memset(decode_text, 0x00, sizeof(decode_text));
+    ipt=0;
+
+    // check Digital /D=
+    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    {
+        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'D' && PayloadBuffer.charAt(itxt+2) == '=')
+        {
+            bool din_overflow = false;
+
+            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
+            {
+                // ENDE
+                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length())
+                {
+                    break;
+                }
+
+                if(ipt < 8)
+                {
+                    decode_text[ipt]=PayloadBuffer.charAt(id);
+                    ipt++;
+                }
+                else
+                {
+                    // 9th+ data byte -- token too long, reject below
+                    din_overflow = true;
+                }
+            }
+
+            if(!din_overflow && ipt == 8)
+            {
+                bool din_valid = true;
+
+                for(int idb=0; idb<8; idb++)
+                {
+                    if(decode_text[idb] != '0' && decode_text[idb] != '1')
+                    {
+                        din_valid = false;
+                        break;
+                    }
+                }
+
+                if(din_valid)
+                {
+                    memcpy(aprspos.din, decode_text, 8);
+                    aprspos.din[8] = 0x00;
                 }
             }
 

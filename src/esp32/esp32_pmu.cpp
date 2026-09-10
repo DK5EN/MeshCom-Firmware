@@ -323,7 +323,7 @@ void setupPMU()
         #ifndef BOARD_TBEAM_V3
             BOARD_HARDWARE = TBEAM_AXP2101;
         #endif
-        
+
         printlndeb("[INIT]...All AXP2101 started");
     }
     else
@@ -334,6 +334,47 @@ void setupPMU()
     }
 
     delay(100);
+
+    #endif
+}
+
+// Issue 962 / --deepsleep: cut the LoRa + GPS rails only. Channel names below
+// are the same ones setupPMU() assigns above -- LoRa/GPS per chip and board,
+// mirrored here so the disable list can never drift from the enable list.
+// The ESP32-feeding rail (DCDC3 on AXP192, DCDC1 on AXP2101, both left
+// unset/protected above) and the OLED rail (DCDC1 on AXP192) are
+// deliberately not touched here: cutting DCDC3 would brown out the ESP32
+// mid-shutdown, and OLED power-down is handled separately via
+// u8g2->setPowerSave(1) in esp32EnterDeepSleep().
+void pmuSleepRails()
+{
+    #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+
+    if (PMU != NULL)
+    {
+        if (PMU->getChipModel() == XPOWERS_AXP192)
+        {
+            // ttgo_tbeam / ttgo_tbeam_SX1262 / ttgo_tbeam_SX1268: LoRa on
+            // LDO2, GPS on LDO3 (see the AXP192 branch of setupPMU() above).
+            PMU->disablePowerOutput(XPOWERS_LDO2);
+            PMU->disablePowerOutput(XPOWERS_LDO3);
+        }
+        else if (PMU->getChipModel() == XPOWERS_AXP2101)
+        {
+            #if defined(BOARD_TBEAM_V3)
+            // ttgo_tbeam_supreme: LoRa on ALDO3, GPS on ALDO4 (see the
+            // BOARD_TBEAM_V3 branch of setupPMU() above). Sensor/SD/m.2
+            // channels (ALDO1/ALDO2/BLDO1/BLDO2/DCDC3/4/5) stay on.
+            PMU->disablePowerOutput(XPOWERS_ALDO3);
+            PMU->disablePowerOutput(XPOWERS_ALDO4);
+            #else
+            // Generic AXP2101 board: LoRa on ALDO2, GPS on ALDO3 (see the
+            // non-BOARD_TBEAM_V3 branch of setupPMU() above).
+            PMU->disablePowerOutput(XPOWERS_ALDO2);
+            PMU->disablePowerOutput(XPOWERS_ALDO3);
+            #endif
+        }
+    }
 
     #endif
 }

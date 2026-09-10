@@ -126,6 +126,29 @@ int setlogFormatGwu(char *buf, size_t n, uint32_t msg_id, char typ,
                     uint8_t hop, uint32_t t_ms);
 
 //////////////////////////////////////////////////////////////////////////////
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- reines
+// Rechenhilfsmittel fuer das Dedup-Fenster, keine Formatierer-Funktion.
+//
+// Effektives Dedup-Gedaechtnisfenster in ganzen Minuten:
+//
+//     window_min = round(ring_size * interval_s / (newid * 60))
+//
+// Herleitung: newid neue msg_id in interval_s Sekunden fuellen den Ring mit
+// ring_size Slots. Bei dieser Rate braucht der Ring ring_size / (newid /
+// interval_s) Sekunden, um sich einmal komplett umzudrehen -- das ist das
+// Zeitfenster, in dem eine bereits gesehene msg_id noch als Duplikat erkannt
+// wird, bevor ihr Slot ueberschrieben ist. Umgeformt auf Minuten:
+// ring_size * interval_s / (newid * 60).
+//
+// Die Feldmessung in src/dedup_functions.h beziffert den sicheren Korridor
+// mit ungefaehr 40 bis 48 Minuten; dieser Helfer liefert den aktuellen Wert
+// zum Vergleich gegen diesen Korridor.
+//
+// newid == 0 oder interval_s == 0 liefert 0 (Aufrufer zeigt "n/a" -- eine
+// Rate von null neuen IDs hat kein sinnvolles Fenster).
+uint32_t setlogDedupWindowMin(uint32_t newid, uint32_t interval_s, uint32_t ring_size);
+
+//////////////////////////////////////////////////////////////////////////////
 // SL-06/SL-03 -- Herkunftskennung fuer ringSource[].
 //
 // Bewusst `inline` im Header und nicht in setlog_lines.cpp: txring_functions.cpp

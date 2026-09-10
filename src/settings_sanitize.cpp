@@ -118,6 +118,13 @@ bool sanitize_max_hop_text(int &v, sanitize_log_fn log)
     return true;
 }
 
+int resolve_tx_power(int stored, int board_default)
+{
+    if (stored == 0 || stored == POWER_NOT_SET)
+        return board_default;
+    return stored;
+}
+
 bool sanitize_cstring(char *s, size_t n)
 {
     if (s == NULL || n == 0)

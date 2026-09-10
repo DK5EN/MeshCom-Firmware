@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include "instrument.h"
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <SPI.h>
 
@@ -14,6 +15,7 @@
 #include <time.h>
 #include <nrf52_functions.h>
 #include <nrf52_radio.h>
+#include <settings_sanitize.h> // #1132: resolve_tx_power sentinel normalization
 #include <extudp_functions.h>
 
 #include <TinyGPSPlus.h>
@@ -566,6 +568,10 @@ void nrf52setup()
     bEXTUDP =  meshcom_settings.node_sset & 0x2000;
     bDisplayCont =  meshcom_settings.node_sset & 0x4000;
 
+    // TRK-01: Warnhinweis einmal beim Boot, wenn Track aus den Settings aktiv geladen wurde
+    if(bDisplayTrack)
+        Serial.printf("[INIT]..." TRACK_WARNING_SERIAL "\n");
+
     bONEWIRE =  meshcom_settings.node_sset2 & 0x0001;
     bLPS33 =  meshcom_settings.node_sset2 & 0x0002;
     bBME680ON = meshcom_settings.node_sset2 & 0x0004;
@@ -1042,6 +1048,7 @@ void nrf52setup()
     );
 
     // Set Radio TX configuration
+    meshcom_settings.node_power = resolve_tx_power(meshcom_settings.node_power, TX_OUTPUT_POWER); // #1132: normalize -20/0 sentinel like ESP32 does
     Serial.printf("[LoRa]...RF_POWER: %i dBm\n", getPower());
 
     Radio.SetTxConfig(

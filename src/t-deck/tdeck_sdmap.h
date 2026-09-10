@@ -24,7 +24,8 @@ int  sdmap_get_set_count();
 const char * sdmap_get_set_name(int idx);
 
 // Laedt die passende Kachel fuer lat/lon beim aktuellen Zoom und zeigt sie in img an.
-bool sdmap_refresh(lv_obj_t * img, double lat, double lon);
+// `why` names the caller in the "Karte zusammengesetzt" log line (TD-14 attribution).
+bool sdmap_refresh(lv_obj_t * img, double lat, double lon, const char * why = "?");
 
 // Verschiebt lat/lon um (dxPx, dyPx) Bildschirmpixel beim aktuellen Zoom (TD-07 Pan).
 void sdmap_pan_latlon(double * lat, double * lon, int dxPx, int dyPx);

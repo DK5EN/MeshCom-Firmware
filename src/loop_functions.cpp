@@ -7,6 +7,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "ack_attribution.h"
 #include "txring_functions.h"
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
@@ -28,6 +29,7 @@
 #include "via_functions.h"
 #include "charset_filter.h"
 #include "setlog_lines.h"
+#include "mcp17_bits.h"
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -378,8 +380,16 @@ U8G2 *u8g2;
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0);  //RESET CLOCK DATA
     U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0);  //RESET CLOCK DATA
 #elif defined(BOARD_TBEAM_V3)
-    U8G2_SSD1306_128X64_NONAME_1_SW_I2C u8g2_1(U8G2_R0, 18, 17, U8X8_PIN_NONE);
-    U8G2_SH1106_128X64_NONAME_1_SW_I2C u8g2_2(U8G2_R0, 18, 17, U8X8_PIN_NONE);
+    // Wie bei Heltec V3/V4 (TM-09): Software-Bitbanging mit 1-Seiten-Puffer
+    // kostete ein Bild ~570 ms auf dem Hauptschleifen-Task (Feldmeldung
+    // T-Beam Supreme, [INSTR-LOOP];gap;...;in;display_tick, 4x/min beim
+    // 15-s-Uhr-Refresh). Anders als dort liegt das OLED hier auf DEMSELBEN
+    // Bus wie PMU/RTC/Sensoren (SDA_PIN 17 / SCL_PIN 18), also Wire statt
+    // Wire1 -- u8g2 ruft Wire.begin(17, 18) mit genau diesen Pins auf.
+    // Vollbild-Puffer (_F_) statt _1_: ein Transfer je Bild, und ein
+    // unveraendertes Bild kann uebersprungen werden (TM-10).
+    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0, U8X8_PIN_NONE, 18, 17);
+    U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, U8X8_PIN_NONE, 18, 17);
 #elif defined(BOARD_TBEAM_1W)
     DISPLAY_MODEL u8g2_1(U8G2_R0, U8X8_PIN_NONE);  //RESET CLOCK DATA
     DISPLAY_MODEL u8g2_2(U8G2_R0, U8X8_PIN_NONE);
@@ -469,6 +479,7 @@ std::atomic<uint32_t> stat_util_tx_5m{0};  // TX-Luftzeit im 5-min-Fenster (ms)
 std::atomic<uint8_t> stat_ring_max{0};
 
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
+bool bAckInfo = false;     // --ackinfo on: volatile session flag, reset on BLE disconnect, never in flash
 
 // APP Time OK
 bool bPhoneTimeValid = false;
@@ -2733,6 +2744,8 @@ void initAnalogPin()
             ANAGPIO = ANALOG_PIN;
             meshcom_settings.node_analog_pin = ANALOG_PIN;
             save_settings();
+
+            printfdeb("%s [ANALOG] GPIO not set, using board default GPIO %i (--analog gpio N to change)\n", getTimeString().c_str(), ANAGPIO);
         }
 
         pinMode(ANAGPIO, INPUT);
@@ -3146,6 +3159,15 @@ void setlogPrint(const char *body)
     printfdeb("%s [LOG] %s\n", ts, body);
 }
 
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- Kopie des zuletzt
+// abgeschlossenen 5-Minuten-STAT-Fensters. setlogFillStat() fuellt und
+// leert die Intervallzaehler in jedem Fall auf jedem Tick (siehe unten);
+// diese Kopie macht das Ergebnis danach lesbar, ohne den naechsten
+// Druckaufruf abzuwarten. stat_last_window_ms == 0 heisst "seit dem Boot
+// noch kein Fenster abgeschlossen".
+struct setlogStatFields stat_last_window = {0};
+uint32_t stat_last_window_ms = 0;
+
 // SL-05 -- Felder der STAT-Zeile fuellen. Die Intervallzaehler werden hier
 // geleert (exchange(0)); stat_drop_count[] wird nur gelesen, das Nullen bleibt
 // plattformseitig (ESP32 memset, nRF52 unter taskENTER_CRITICAL()).
@@ -3184,6 +3206,11 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     f->flash          = FLASH_VERSION;
     f->up_s           = millis() / 1000UL;
     f->t_ms           = millis();
+
+    // WQ-01 (2026-09-05): queue panel on the rxlog web page -- Kopie des
+    // fertigen Fensters fuer Leser, die nicht selbst drucken (Web-GUI).
+    stat_last_window = *f;
+    stat_last_window_ms = f->t_ms;
 }
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
@@ -3419,6 +3446,40 @@ void SendPong(String msg_call, unsigned int msg_id)
 // Thresholds come from MAX_RING, which differs per board (10 / 20, MEM-01,
 // configuration_global.h) — a hardcoded 16 would warn at 160 % on a T-Beam.
 static BackPressure bp_state(MAX_RING);
+
+// WQ-01 (2026-09-05): queue panel on the rxlog web page -- read-only getters
+// onto bp_state for callers outside this TU (the web GUI). Plain int return
+// values keep the enum (BpState, backpressure.h) out of the shared header.
+int bpCurrentState(void)
+{
+    return (int)bp_state.state();
+}
+
+int bpRefuseThreshold(void)
+{
+    return bp_state.refuseThreshold();
+}
+
+int bpQrsThreshold(void)
+{
+    return bp_state.qrsThreshold();
+}
+
+int bpQrsForecast(int depth)
+{
+    return bp_state.qrsForecastDepth(depth);
+}
+
+const char* bpStateName(void)
+{
+    switch(bp_state.state())
+    {
+        case BP_QUIET: return "QUIET";
+        case BP_QRS:   return "QRS";
+        case BP_QRT:   return "QRT";
+        default:       return "QUIET";
+    }
+}
 
 // Set by each caller immediately before sendMessage(), cleared right after.
 static MsgOrigin bp_origin = ORIGIN_NONE;
@@ -3893,6 +3954,24 @@ int sendMessage(char *msg_text, int len)
         }
     }
 
+    // BP-11: the node's own back-pressure wording fed back in by a client
+    // (see bpIsOwnWording() in backpressure.h). Checked here, after the
+    // {ZIEL} parse, because the observed shape is "{*}QRT NOT SENT - ..."
+    // -- a client re-sending the nack frame with its dst -- and a check on
+    // the raw text would miss it. Before bp_origin_dst, before refusing()
+    // and before any msg-id is minted: a blocked echo leaves no trace in
+    // the BP state machine and gets NO nack and NO notice back -- a
+    // receipt for an echo is what opens the next loop. Unconditional on
+    // bp_origin: every sendMessage() caller is a local text input (BLE,
+    // serial, web, EXTUDP, T-Deck), relay traffic never comes through here.
+    // Marker carries no text, ever (BP-10 H3: a raw text in a [BP] line can
+    // forge a marker for tools/serial_monitor.py and loganalyse.sh).
+    if(bpIsOwnWording(strMsg.c_str()))
+    {
+        Serial.printf("[BP];echo;ms;%lu\n", (unsigned long)millis());
+        return BP_SEND_INVALID;
+    }
+
     // BP-06: strDestinationCall is authoritative here (fully parsed,
     // upper-cased, trimmed) -- set bp_origin_dst before the refuse check
     // below so a refused message's nack is addressed to the target the
@@ -4063,17 +4142,10 @@ int sendMessage(char *msg_text, int len)
             // set Info message send and Server reached, not on DM
             if(!bDM && (aprsmsg.msg_destination_call == "*" || CheckGroup(strDestinationCall)))
             {
-                uint8_t print_buff[8];
+                uint8_t ack_buff[ACK_PHONE_MAX_LEN];
+                uint16_t plen = buildAckPhoneFrame(ack_buff, aprsmsg.msg_id, 0x01, meshcom_settings.node_call);
 
-                print_buff[0]=0x41;
-                print_buff[1]=aprsmsg.msg_id & 0xFF;
-                print_buff[2]=(aprsmsg.msg_id >> 8) & 0xFF;
-                print_buff[3]=(aprsmsg.msg_id >> 16) & 0xFF;
-                print_buff[4]=(aprsmsg.msg_id >> 24) & 0xFF;
-                print_buff[5]=0x01;     // 0x01 ... server reached
-                print_buff[6]=0x00;     // msg always 0x00 at the end
-
-                addBLEOutBuffer(print_buff, (uint16_t)7);
+                addBLEOutBuffer(ack_buff, plen);
             }
         }
 
@@ -4191,7 +4263,9 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
 
     char cinaU[15]={0};
     char cinaI[15]={0};
-    
+
+    char cdigital[15]={0};
+
     char ctele[15]={0};
 
     if(strcmp(meshcom_settings.node_atxt, "none") != 0 && meshcom_settings.node_atxt[0] != 0x00)
@@ -4345,6 +4419,15 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
         }
     }
 
+    // /D= MCP23017 port A inputs (issue 1076 companion): GPA0 first,
+    // output pins read '0'. Only when the chip answered at boot.
+    if(bMCP23017)
+    {
+        char cbits[MCP17_BITS_LEN + 1];
+        mcp17PortABits(meshcom_settings.node_mcp17in, meshcom_settings.node_mcp17io, cbits);
+        snprintf(cdigital, sizeof(cdigital), "/D=%s", cbits);
+    }
+
     /////////////////////////////////////////////////////////////////
     // send Group-Call settings zu MesCom-Server
     String strGRC="";
@@ -4391,6 +4474,7 @@ String PositionToAPRS(bool bConvPos, bool bSsendTele, bool bFuss, double plat, c
     strncat(strconcat, cversion, sizeof(strconcat) - strlen(strconcat) - 1);    
     strncat(strconcat, cinaU, sizeof(strconcat) - strlen(strconcat) - 1);   
     strncat(strconcat, cinaI, sizeof(strconcat) - strlen(strconcat) - 1);
+    strncat(strconcat, cdigital, sizeof(strconcat) - strlen(strconcat) - 1);
     strncat(strconcat, ctele, sizeof(strconcat) - strlen(strconcat) - 1);
 
     // wenn die concatenation zu lang ist, dann catxt und cname löschen
@@ -5050,6 +5134,13 @@ void sendTelemetry(int ID)
     // Values to APRS.FI
     if(iNextTelemetry >= 4)
     {
+        // digital slot (issue 1076): MCP23017 port A inputs, GPA0 first.
+        // Stays "00000000" -- byte-identical to today -- on boards without
+        // the chip (bMCP23017 false).
+        char cbits[MCP17_BITS_LEN + 1] = "00000000";
+        if(bMCP23017)
+            mcp17PortABits(meshcom_settings.node_mcp17in, meshcom_settings.node_mcp17io, cbits);
+
         char cv[20];
         snprintf(cv, sizeof(cv), "%-9.9s:T#%03i", stationCall.c_str(), meshcom_settings.node_msgid);
 
@@ -5079,7 +5170,9 @@ void sendTelemetry(int ID)
             for(int pad = realCount; pad < 5; pad++)
                 strTelemetry.concat(",0");
 
-            strTelemetry.concat(",00000000,");
+            strTelemetry.concat(",");
+            strTelemetry.concat(cbits);
+            strTelemetry.concat(",");
             strTelemetry.concat(meshcom_settings.node_parm_t);
             strTelemetry.concat(",");
             strTelemetry.concat(meshcom_settings.node_parm_id);
@@ -5181,9 +5274,24 @@ void sendTelemetry(int ID)
                     strValue.concat(cv);
                 }
             }
+
+            // digital slot (issue 1076): this path sent none before -- only
+            // append it when the chip actually answered at boot, so nodes
+            // without an MCP23017 keep a byte-identical frame. APRS puts the
+            // digital byte in slot 6, so pad the analog slots to five first
+            // (ivcount == values emitted, capped at 5 by the break above) or
+            // a three-value node would ship its bits as analog value 4.
+            if(bMCP23017)
+            {
+                for(int pad = ivcount; pad < 5; pad++)
+                    strTelemetry.concat(",0");
+
+                strTelemetry.concat(",");
+                strTelemetry.concat(cbits);
+            }
         }
 
-        
+
         snprintf(msg_text, sizeof(msg_text), "%s", strTelemetry.c_str());
 
         iNextTelemetry++;

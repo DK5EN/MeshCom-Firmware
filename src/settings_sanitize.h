@@ -50,3 +50,9 @@ bool sanitize_cstring(char *s, size_t n);
  * hands over a 0 and a corrupt one anything at all. Resets both to the
  * compile-time default (see maxhop.h). Returns true if the value was corrected. */
 bool sanitize_max_hop_text(int &v, sanitize_log_fn log);
+
+/* #1132: resolves the stored TX power to the value the radio and the app should
+ * use. Both "not set" sentinels count: 0 (structs written before v4.35p and the
+ * compat merge) and -20 (default since upstream 50c1ce59). Anything else is
+ * returned unchanged; range clamping stays in getPower(). */
+int resolve_tx_power(int stored, int board_default);
