@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRY-Vereinheitlichung Gantt</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f4;
+    --surface: #fcfcfb;
+    --line: #dcdbd5;
+    --grid: #ebeae5;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-3: #8a8983;
+    --accent: #2a78d6;
+    --p1: #2a78d6; --p2: #eb6834; --p3: #1baf7a; --p4: #eda100; --p5: #4a3aa7;
+    --ext: #c3c2b7;
+    --today: #d03b3b;
+    --tip-bg: #0b0b0b; --tip-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #141413; --surface: #1a1a19; --line: #34342f; --grid: #262622;
+      --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8a8983; --accent: #3987e5;
+      --p1: #3987e5; --p2: #d95926; --p3: #199e70; --p4: #c98500; --p5: #9085e9;
+      --ext: #52514e; --today: #e66767; --tip-bg: #f0efec; --tip-ink: #0b0b0b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #141413; --surface: #1a1a19; --line: #34342f; --grid: #262622;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8a8983; --accent: #3987e5;
+    --p1: #3987e5; --p2: #d95926; --p3: #199e70; --p4: #c98500; --p5: #9085e9;
+    --ext: #52514e; --today: #e66767; --tip-bg: #f0efec; --tip-ink: #0b0b0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.45;
+    padding-inline: 20px; padding-block: 24px 48px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 20px; }
+  header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+  h1 { font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 28px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .sub { color: var(--ink-2); margin: 4px 0 0; max-width: 64ch; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 13px; color: var(--ink-2); }
+  .controls label { display: inline-flex; gap: 8px; align-items: center; }
+  input[type="date"] { font: inherit; font-family: "IBM Plex Mono", monospace; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+  .kpi .l { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+  .kpi .v { font-family: "IBM Plex Mono", monospace; font-size: 20px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi .h { font-size: 12px; color: var(--ink-2); }
+  .chart { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 8px 12px; overflow-x: auto; position: relative; }
+  svg { display: block; font-family: "IBM Plex Sans", sans-serif; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--ink-2); padding: 0 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
+  .sw.gate { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 1px; background: var(--ink); }
+  .sw.ext { background: repeating-linear-gradient(135deg, var(--ext) 0 3px, transparent 3px 6px); border: 1px solid var(--ext); }
+  .tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-ink); padding: 8px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; max-width: 300px; display: none; z-index: 2; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .tip b { font-weight: 600; }
+  .tip .m { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; opacity: .85; }
+  h2 { font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600; font-size: 18px; margin: 8px 0 0; }
+  .tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  td.m { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.phase td { background: var(--grid); font-weight: 600; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: 1px; }
+  .notes { color: var(--ink-2); font-size: 13px; max-width: 78ch; }
+  .notes li { margin: 3px 0; }
+  @media (prefers-reduced-motion: no-preference) { .bar { transition: opacity .12s; } }
+  @media (max-width: 640px) { h1 { font-size: 22px; } body { padding-inline: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>DRY-Vereinheitlichung Gantt</h1>
+      <p class="sub">Wasserfall-Ablauf von Audit, Testplan, Vereinheitlichungswellen und Upstream-PR für MeshCom fork-main. Arbeitstage Montag bis Freitag. Jede Phase beginnt am Gate der vorherigen.</p>
+    </div>
+    <div class="controls">
+      <label for="start">Start (Montag)
+        <input type="date" id="start" value="2026-09-14">
+      </label>
+      <label><input type="checkbox" id="showreview" checked> Upstream-Review als Platzhalter anzeigen</label>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="legend" id="legend"></div>
+  <div class="chart" id="chart">
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <h2>Terminplan als Tabelle</h2>
+  <div class="tablewrap"><table id="table">
+    <thead><tr><th>ID</th><th>Aufgabe</th><th>Beginn</th><th>Ende</th><th>Tage</th><th>Gate / Ergebnis</th><th>Verantwortlich</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+
+  <h2>Annahmen</h2>
+  <ul class="notes">
+    <li>Die Dauern sind die Schätzungen aus <code>docs/testplan-dry-unification-20260910.md</code> und dem Wellenplan in <code>docs/optimization-audit-20260910.md</code> Abschnitt 7.1. Eine Person plus Agenten; keine parallelen Bench-Tage.</li>
+    <li>Ein Gate ist ein harter Stopp: die nächste Phase beginnt erst, wenn die Prüfungen des Gates grün und committet sind. Gates sind als Rauten am Phasenende gezeichnet.</li>
+    <li>Die Freigabe der Drift-Matrix (C2) ist der einzige menschliche Entscheidungspunkt und liegt auf dem kritischen Pfad.</li>
+    <li>Das Upstream-Review ist extern und von unbekannter Dauer; der schraffierte Balken ist ein Platzhalter und zählt nicht zur Summe.</li>
+    <li>Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur in diesem Browser gespeichert.</li>
+  </ul>
+</div>
+
+<script>
+(() => {
+  const PHASES = [
+    { id: "A", name: "Vorbereiten", color: "var(--p1)" },
+    { id: "B", name: "Basislinie und Charakterisierung", color: "var(--p2)" },
+    { id: "C", name: "Entscheiden", color: "var(--p3)" },
+    { id: "D", name: "Vereinheitlichen (Wellen 1-7)", color: "var(--p4)" },
+    { id: "E", name: "Nachweisen und ausliefern", color: "var(--p5)" },
+  ];
+  // days = Arbeitstage; after = Aufgabe, nach der diese beginnt (null = Phasenbeginn); parallele Aufgaben teilen sich "after"
+  const TASKS = [
+    { id: "A1", ph: "A", name: "Upstream-Sync, 32-Env-Build, Basis taggen", days: 1, after: null, gate: "Tag dry-base, Ressourcen-Baseline", owner: "Orchestrator" },
+    { id: "A2", ph: "A", name: "Korpus zusammenstellen, Rufzeichen-Lint", days: 2, after: "A1", gate: "test/golden/corpus committet", owner: "Agenten" },
+    { id: "A3", ph: "A", name: "Werkzeuge: UDP-1799-Stub, BLE-Golden-Client, Normalisierer", days: 3, after: "A1", gate: "Trockenlauf der Werkzeuge gegen RAK-90", owner: "Agenten" },
+    { id: "A4", ph: "A", name: "Knoten-Einstellungen sichern, Protokollvorlagen", days: 1, after: "A3", gate: "G0 bereit", owner: "Orchestrator", gateEnd: true },
+
+    { id: "B1", ph: "B", name: "G0 Hardware-Goldens, 4 Knoten, BLE-App-Kalibrierung", days: 2, after: null, gate: "test/golden/hw/G0", owner: "Bench" },
+    { id: "B2", ph: "B", name: "Carve-out-Commits C1-C5, Builds, Region-Gate", days: 2, after: "B1", gate: "kein IRAM-Wachstum", owner: "Agenten" },
+    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "B2", gate: "G1 == G0", owner: "Bench" },
+    { id: "B4", ph: "B", name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten", days: 6, after: "B3", gate: "Twin-Diff-Fixtures committet", owner: "Agenten", gateEnd: true },
+
+    { id: "C1", ph: "C", name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export", days: 1, after: null, gate: "drift-matrix.csv + xlsx", owner: "Orchestrator" },
+    { id: "C2", ph: "C", name: "Freigabesitzung: Urteil je Zeile", days: 1, after: "C1", gate: "Matrix freigegeben (Martin)", owner: "Martin", milestone: true },
+    { id: "C3", ph: "C", name: "Erwartete-Diff-Fixtures aus den Urteilen", days: 1, after: "C2", gate: "test_drift_matrix_complete grün", owner: "Agenten", gateEnd: true },
+
+    { id: "W1", ph: "D", name: "Welle 1: Defekte 1,2,7,10,11 und Hygiene-Löschungen", days: 2, after: null, gate: "32-Env-Build, bin-Vergleich", owner: "Agenten" },
+    { id: "W2", ph: "D", name: "Welle 2: RAM-Zeilen mit niedrigem Risiko, tinyxml, softser", days: 3, after: "W1", gate: "Frame-Dumps identisch, Regions-Delta", owner: "Agenten" },
+    { id: "W3", ph: "D", name: "Welle 3: Settings-Schema, ein Struct, Migration", days: 6, after: "W2", gate: "Roundtrip beide Plattformen, nRF52-Upgrade behält Einstellungen", owner: "Agenten" },
+    { id: "W4", ph: "D", name: "Welle 4: Kommandotabelle (D2-10, D2-06, D2-07)", days: 6, after: "W3", gate: "Golden-Capture-Diff leer, test_command_table", owner: "Agenten" },
+    { id: "W5", ph: "D", name: "Welle 5: RAM-Zeilen mit mittlerem Risiko, T-Deck Pro LVGL", days: 5, after: "W4", gate: "Prüfung je Zeile, 12 h nRF52-Soak", owner: "Agenten + Bench" },
+    { id: "W6", ph: "D", name: "Welle 6: gemeinsamer UDP-Handler, Helfer, ui_common", days: 6, after: "W5", gate: "EXTUDP-Bytevergleich beide Plattformen", owner: "Agenten + Bench" },
+    { id: "W7", ph: "D", name: "Welle 7: Varianten umstrukturieren", days: 3, after: "W6", gate: "Makro-Set-Diff je Env", owner: "Agenten", gateEnd: true },
+
+    { id: "E1", ph: "E", name: "G2 Nachher-Lauf, Instrument-Lauf, nRF52-Migrationstest", days: 2, after: null, gate: "G2 == G1 bis auf erwartete Diffs", owner: "Bench" },
+    { id: "E2", ph: "E", name: "Protokoll nachher, deutscher Nachweis, PR-Beschreibung", days: 2, after: "E1", gate: "protocol-after.md vollständig", owner: "Orchestrator" },
+    { id: "E3", ph: "E", name: "Upstream-Resync, gezielter Wiederholungslauf", days: 2, after: "E2", gate: "gezielte Goldens grün", owner: "Agenten + Bench" },
+    { id: "E4", ph: "E", name: "PR an icssw-org DEV einreichen", days: 0.5, after: "E3", gate: "PR offen", owner: "Martin", milestone: true, gateEnd: true },
+    { id: "E5", ph: "E", name: "Upstream-Review (Kurt), extern", days: 10, after: "E4", gate: "Merge durch Upstream", owner: "Upstream", external: true },
+  ];
+
+  const startEl = document.getElementById("start");
+  const reviewEl = document.getElementById("showreview");
+  try { const s = localStorage.getItem("gantt-start"); if (s) startEl.value = s; const r = localStorage.getItem("gantt-review"); if (r !== null) reviewEl.checked = r === "1"; } catch (e) {}
+
+  const DAY = 86400000;
+  function isWd(d) { const w = d.getUTCDay(); return w !== 0 && w !== 6; }
+  function addWd(d, n) {
+    let cur = new Date(d.getTime()); let left = n;
+    while (left > 0) {
+      const step = Math.min(1, left);
+      while (!isWd(cur)) cur = new Date(cur.getTime() + DAY);
+      if (step === 1) { cur = new Date(cur.getTime() + DAY); left -= 1; }
+      else { cur = new Date(cur.getTime() + DAY * step); left = 0; }
+    }
+    return cur;
+  }
+  function nextWd(d) { let c = new Date(d.getTime()); while (!isWd(c)) c = new Date(c.getTime() + DAY); return c; }
+  function fmt(d) { return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }); }
+  function fmtShort(d) { return d.toLocaleDateString("de-DE", { day: "2-digit", month: "short", timeZone: "UTC" }); }
+  function wdBetween(a, b) { let n = 0; let c = new Date(a.getTime()); while (c < b) { if (isWd(c)) n++; c = new Date(c.getTime() + DAY); } return n; }
+
+  function schedule() {
+    const start = nextWd(new Date(startEl.value + "T00:00:00Z"));
+    const showReview = reviewEl.checked;
+    const byId = {};
+    let phaseStart = start;
+    const out = [];
+    for (const ph of PHASES) {
+      const tasks = TASKS.filter(t => t.ph === ph.id && (showReview || !t.external));
+      let phaseEnd = phaseStart;
+      for (const t of tasks) {
+        const s = t.after ? byId[t.after].end : phaseStart;
+        const sAligned = nextWd(s);
+        const e = addWd(sAligned, t.days);
+        const row = { ...t, phase: ph, start: sAligned, end: e };
+        byId[t.id] = row; out.push(row);
+        if (!t.external && e > phaseEnd) phaseEnd = e;
+      }
+      phaseStart = nextWd(phaseEnd);
+    }
+    return { start, rows: out };
+  }
+
+  function render() {
+    try { localStorage.setItem("gantt-start", startEl.value); localStorage.setItem("gantt-review", reviewEl.checked ? "1" : "0"); } catch (e) {}
+    const { start, rows } = schedule();
+    const internal = rows.filter(r => !r.external);
+    const endAll = rows.reduce((m, r) => r.end > m ? r.end : m, start);
+    const endInternal = internal.reduce((m, r) => r.end > m ? r.end : m, start);
+    const totalWd = wdBetween(start, endInternal);
+    const sign = rows.find(r => r.id === "C2");
+    const submit = rows.find(r => r.id === "E4");
+
+    document.getElementById("kpis").innerHTML = [
+      ["Start", fmt(start), "erster Arbeitstag"],
+      ["Matrix-Freigabe", fmt(sign.end), "Entscheidungspunkt, Martin"],
+      ["PR eingereicht", fmt(submit.end), "nach Resync und Wiederholungslauf"],
+      ["Arbeitstage", String(totalWd), (Math.round(totalWd / 5 * 10) / 10).toLocaleString("de-DE") + " Wochen, ohne Review"],
+    ].map(([l, v, h]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`).join("");
+
+    document.getElementById("legend").innerHTML = PHASES.map(p => `<span><i class="sw" style="background:${p.color}"></i>${p.name}</span>`).join("")
+      + `<span><i class="sw gate"></i>Gate</span><span><i class="sw ext"></i>extern, nicht gezählt</span>`;
+
+    const labelW = 350, dayW = 14, rowH = 26, top = 44, left = 8, hdrH = 24;
+    const days = Math.ceil((endAll - start) / DAY) + 3;
+    const width = left + labelW + days * dayW + 16;
+    const height = top + rows.length * rowH + 20 + PHASES.length * (hdrH + 6);
+    const x = d => left + labelW + ((d - start) / DAY) * dayW;
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Gantt-Diagramm der DRY-Vereinheitlichung">`;
+    for (let i = 0; i <= days; i++) {
+      const d = new Date(start.getTime() + i * DAY);
+      const w = d.getUTCDay();
+      if (w === 0 || w === 6) svg += `<rect x="${x(d)}" y="${top - 6}" width="${dayW}" height="${height - top}" fill="var(--grid)" opacity=".6"/>`;
+      if (w === 1) {
+        svg += `<line x1="${x(d)}" x2="${x(d)}" y1="${top - 6}" y2="${height - 8}" stroke="var(--line)" stroke-width="1"/>`;
+        svg += `<text x="${x(d) + 3}" y="${top - 12}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${fmtShort(d)}</text>`;
+      }
+      if (d.getUTCDate() === 1 || i === 0) {
+        svg += `<text x="${x(d) + 3}" y="${top - 28}" font-size="11" font-weight="600" fill="var(--ink-2)">${d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" })}</text>`;
+      }
+    }
+    const today = new Date(); const t0 = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    if (t0 >= start && t0 <= endAll) svg += `<line x1="${x(t0)}" x2="${x(t0)}" y1="${top - 6}" y2="${height - 8}" stroke="var(--today)" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${x(t0) + 4}" y="${height - 12}" font-size="10" fill="var(--today)">heute</text>`;
+
+    svg += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="3" height="6" fill="var(--ext)"/></pattern></defs>`;
+
+    let y = top; let lastPh = null;
+    rows.forEach((r, i) => {
+      if (r.phase !== lastPh) {
+        if (lastPh) y += 6;
+        svg += `<rect x="${left}" y="${y + 4}" width="4" height="${hdrH - 8}" rx="1" fill="${r.phase.color}"/>`;
+        svg += `<text x="${left + 10}" y="${y + 16}" font-size="12" font-weight="600" fill="${r.phase.color}" font-family="IBM Plex Sans Condensed, sans-serif">${r.phase.id} ${r.phase.name}</text>`;
+        y += hdrH;
+        lastPh = r.phase;
+      }
+      const cy = y + rowH / 2;
+      svg += `<text x="${left + 18}" y="${cy + 4}" font-size="12" fill="var(--ink)">${r.id}</text>`;
+      svg += `<text x="${left + 52}" y="${cy + 4}" font-size="12" fill="var(--ink-2)">${trunc(r.name, 46)}</text>`;
+      const bx = x(r.start), bw = Math.max(dayW * 0.6, x(r.end) - bx - 2);
+      if (r.milestone) {
+        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${r.phase.color}"/><path d="M${bx + bw + 7} ${cy - 9} l9 9 l-9 9 l-9 -9z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/></g>`;
+      } else if (r.external) {
+        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="url(#hatch)" stroke="var(--ext)"/></g>`;
+      } else {
+        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${r.phase.color}"/>`;
+        if (r.gateEnd) svg += `<path d="M${bx + bw + 6} ${cy - 7} l7 7 l-7 7 l-7 -7z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>`;
+        svg += `</g>`;
+      }
+      svg += `<text x="${bx + bw + (r.gateEnd || r.milestone ? 18 : 6)}" y="${cy + 4}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${String(r.days).replace(".", ",")} T</text>`;
+      svg += `<rect class="hit" data-i="${i}" x="${left}" y="${y}" width="${width - left}" height="${rowH}" fill="transparent"/>`;
+      y += rowH;
+    });
+    svg += `</svg>`;
+    const chart = document.getElementById("chart");
+    const tip = document.getElementById("tip");
+    chart.querySelectorAll("svg").forEach(n => n.remove());
+    chart.insertAdjacentHTML("beforeend", svg);
+
+    chart.querySelectorAll(".hit").forEach(h => {
+      h.addEventListener("mousemove", ev => {
+        const r = rows[+h.dataset.i];
+        tip.innerHTML = `<b>${r.id} ${r.name}</b><br><span class="m">${fmt(r.start)} bis ${fmt(r.end)} (${String(r.days).replace(".", ",")} AT)</span><br>Gate: ${r.gate}<br>Verantwortlich: ${r.owner}`;
+        tip.style.display = "block";
+        const rect = chart.getBoundingClientRect();
+        let tx = ev.clientX - rect.left + chart.scrollLeft + 14, ty = ev.clientY - rect.top + 14;
+        if (tx + 310 > chart.scrollLeft + chart.clientWidth) tx = ev.clientX - rect.left + chart.scrollLeft - 320;
+        tip.style.left = tx + "px"; tip.style.top = ty + "px";
+      });
+      h.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    });
+
+    const tb = document.querySelector("#table tbody");
+    let html = ""; lastPh = null;
+    rows.forEach(r => {
+      if (r.phase !== lastPh) { html += `<tr class="phase"><td colspan="7"><i class="dot" style="background:${r.phase.color}"></i>${r.phase.id} ${r.phase.name}</td></tr>`; lastPh = r.phase; }
+      html += `<tr><td class="m">${r.id}</td><td>${r.name}${r.external ? " (Platzhalter, nicht gezählt)" : ""}</td><td class="m">${fmt(r.start)}</td><td class="m">${fmt(r.end)}</td><td class="m">${String(r.days).replace(".", ",")}</td><td>${r.gate}</td><td>${r.owner}</td></tr>`;
+    });
+    tb.innerHTML = html;
+  }
+  function trunc(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  startEl.addEventListener("change", render);
+  reviewEl.addEventListener("change", render);
+  render();
+})();
+</script>
+</body>
+</html>
