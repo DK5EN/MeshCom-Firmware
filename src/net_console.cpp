@@ -222,7 +222,46 @@ static void authTask(void* arg)
 
 
 // ── MeshSerialClass ───────────────────────────────────────────────────────────
-void MeshSerialClass::begin(unsigned long baud) { s_hwSerial.begin(baud); }
+void MeshSerialClass::begin(unsigned long baud)
+{
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // CDC-02 (2026-09-06, DK5EN-14): HWCDC::begin() (arduino-esp32 2.0.14,
+    // HWCDC.cpp:171-197) creates the 256 B TX ring buffer and enables the
+    // SERIAL_IN_EMPTY ISR; setTxBufferSize() (HWCDC.cpp:228-241) frees that
+    // buffer and briefly leaves tx_ring_buf NULL while allocating the new
+    // one. The ISR (HWCDC.cpp:92) dereferences tx_ring_buf with no NULL
+    // check, so calling setTxBufferSize() after begin() races a host
+    // port-open against the ISR and hits "assert failed:
+    // xRingbufferReceiveUpToFromISR ringbuf.c:1269". Sizing the buffer
+    // before the first begin() is race-free, since no ISR exists yet. The
+    // once-flag guards against T5-ePaper/T-Deck Pro, where begin() runs
+    // twice per boot (esp32_main.cpp and again via idf_setup()/
+    // initTDeck_pro()) -- the second call must not resize a live buffer.
+    static bool s_txBufSized = false;
+    if (!s_txBufSized)
+    {
+        s_hwSerial.setTxBufferSize(4096);
+        s_txBufSized = true;
+    }
+#endif
+    s_hwSerial.begin(baud);
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // CDC-01 (2026-09-05, DK5EN-14): on the S3 boards s_hwSerial is the
+    // native USB-JTAG/CDC (HWCDC). arduino-esp32 2.0.14 raises its TX
+    // timeout from 0 to 100 ms on the first successful host read and never
+    // lowers it again, so once the cable is pulled or the terminal closed,
+    // every print that does not fit the 256 B ring buffer blocks the main
+    // loop for 100 ms -- [BALL] per cursor step, GPS lines every 3 s, [LOG]
+    // lines -- and the trackball cursor and the touch input freeze in that
+    // rhythm. Asking for 0 explicitly is honoured by the core
+    // (tx_timeout_change_request) and means "drop when full, never block".
+    // The larger TX ring keeps bench logs intact under a connected host:
+    // bursts (--redrawlog) that used to wait 100 ms for room now need the
+    // room to exist. Bench proof: tdeck_harness.py --scenario cdc_backpressure.
+    // (buffer sized above, before begin() -- see CDC-02.)
+    s_hwSerial.setTxTimeoutMs(0);
+#endif
+}
 int  MeshSerialClass::available()               { return s_hwSerial.available(); }
 int  MeshSerialClass::read()                    { return s_hwSerial.read(); }
 int  MeshSerialClass::peek()                    { return s_hwSerial.peek(); }

@@ -31,6 +31,19 @@ static lv_img_dsc_t sdmap_dsc;
 static double sdmap_lastLat = 0.0;
 static double sdmap_lastLon = 0.0;
 
+// TD-14: dedupe guard. A repeat sdmap_refresh() call with an identical view
+// (bubbled VALUE_CHANGED duplicate from the tab bar, a beacon/boundary
+// refresh, switching back to an unchanged map) is composed for nothing --
+// every real change (set_map, zoom, pan) touches at least one of these keys,
+// so this only ever absorbs true repeats.
+static bool   sdmap_lastValid        = false;
+static int    sdmap_lastComposedSet  = -1;
+static int    sdmap_lastComposedZoom = -1;
+static double sdmap_lastComposedLat  = 0.0;
+static double sdmap_lastComposedLon  = 0.0;
+static int    sdmap_lastComposedVw   = -1;
+static int    sdmap_lastComposedVh   = -1;
+
 static double sdmap_lon2xf(double lon, int zoom)
 {
     return (lon + 180.0) / 360.0 * (double)(1 << zoom);
@@ -77,6 +90,7 @@ void sdmap_set_active_set(int idx)
     if (idx < 0) idx = 0;
     if (idx >= SDMAP_SET_COUNT) idx = SDMAP_SET_COUNT - 1;
     sdmap_activeSet = idx;
+    sdmap_lastValid = false;   // TD-14: a different set invalidates the dedupe key
 
     if (sdmap_zoom < sdmap_setMinZoom[idx])
         sdmap_zoom = sdmap_setMinZoom[idx];
@@ -248,7 +262,7 @@ static unsigned char * sdmap_load_tile_rgba(int zoom, int tx, int ty, unsigned *
 // Compose the visible map: a viewport-sized image built from every tile that
 // intersects the viewport, with (lat, lon) at the centre. The viewport is smaller
 // than one tile, so at most 2x2 tiles are read. Missing tiles stay grey.
-bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
+bool sdmap_refresh(lv_obj_t * img, double lat, double lon, const char * why)
 {
     uint32_t t0 = millis();
     sdmap_tReadMs = 0; sdmap_tDecodeMs = 0; sdmap_bytesRead = 0;
@@ -278,6 +292,7 @@ bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
                       sdmap_dirs[sdmap_activeSet], sdmap_zoom, SDMAP_MIN_ZOOM);
         if (map_no_data_label != NULL)
             lv_obj_clear_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
+        sdmap_lastValid = false;   // TD-14: nothing was composed, next call must not be skipped
         return false;
     }
     if (useZoom != sdmap_zoom)
@@ -299,6 +314,21 @@ bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
     }
     const int vw = sdmap_viewW, vh = sdmap_viewH;
 
+    // TD-14: skip the compose when the view is identical to the last one --
+    // this absorbs the bubbled VALUE_CHANGED duplicate from the tab bar
+    // (see tabview_event_cb()) and any other same-view repeat call. A real
+    // change always moves at least one key: set_map() bumps sdmap_activeSet,
+    // zoom in/out bumps sdmap_zoom, and a pan or a new fix changes lat/lon.
+    if (sdmap_buf != nullptr && sdmap_lastValid &&
+        sdmap_activeSet == sdmap_lastComposedSet &&
+        sdmap_zoom == sdmap_lastComposedZoom &&
+        lat == sdmap_lastComposedLat && lon == sdmap_lastComposedLon &&
+        vw == sdmap_lastComposedVw && vh == sdmap_lastComposedVh)
+    {
+        Serial.printf("[ SDMAP ]...Karte unveraendert, Aufbau uebersprungen from=%s\n", why);
+        return true;
+    }
+
     // Global pixel coordinates (tile index * 256 + pixel in tile) of the own position.
     double gx = sdmap_lon2xf(lon, sdmap_zoom) * SDMAP_TILE_PX;
     double gy = sdmap_lat2yf(lat, sdmap_zoom) * SDMAP_TILE_PX;
@@ -318,6 +348,7 @@ bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
             Serial.println("[ SDMAP ]...ps_malloc fuer Kartenbild fehlgeschlagen");
             if (map_no_data_label != NULL)
                 lv_obj_clear_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
+            sdmap_lastValid = false;   // TD-14: nothing was composed, next call must not be skipped
             return false;
         }
     }
@@ -379,9 +410,18 @@ bool sdmap_refresh(lv_obj_t * img, double lat, double lon)
         if (nMissing == nTiles) lv_obj_clear_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
         else                    lv_obj_add_flag(map_no_data_label, LV_OBJ_FLAG_HIDDEN);
     }
-    Serial.printf("[ SDMAP ]...Karte zusammengesetzt: zoom %d, Kacheln %d (fehlend %d), %dx%d px, %lu ms (read %lu ms / %lu KB, decode %lu ms)\n",
+    Serial.printf("[ SDMAP ]...Karte zusammengesetzt: zoom %d, Kacheln %d (fehlend %d), %dx%d px, %lu ms (read %lu ms / %lu KB, decode %lu ms) from=%s\n",
                   sdmap_zoom, nTiles, nMissing, vw, vh, (unsigned long)(millis() - t0),
-                  (unsigned long)sdmap_tReadMs, (unsigned long)(sdmap_bytesRead / 1024), (unsigned long)sdmap_tDecodeMs);
+                  (unsigned long)sdmap_tReadMs, (unsigned long)(sdmap_bytesRead / 1024), (unsigned long)sdmap_tDecodeMs, why);
+
+    // TD-14: remember the key of the view just composed for the guard above.
+    sdmap_lastComposedSet  = sdmap_activeSet;
+    sdmap_lastComposedZoom = sdmap_zoom;
+    sdmap_lastComposedLat  = lat;
+    sdmap_lastComposedLon  = lon;
+    sdmap_lastComposedVw   = vw;
+    sdmap_lastComposedVh   = vh;
+    sdmap_lastValid        = true;
     return true;
 }
 

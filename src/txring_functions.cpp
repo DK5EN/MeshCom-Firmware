@@ -272,6 +272,45 @@ int txRingDepth(void)
 }
 
 /**
+ * WQ-01 (2026-09-05): queue panel on the rxlog web page. Per-priority
+ * occupancy count for the TX ring, using the exact same lock-free scan as
+ * txRingDepth() above (both indices read once into locals, walk from iRead
+ * to iWrite wrapping at MAX_RING, occupied == ringBuffer[i][0] > 0) -- see
+ * that function's doc comment for the counting rationale (occupied slots,
+ * not index distance) and the lock-free tradeoff.
+ *
+ * out[0] receives the total occupied count (identical to txRingDepth());
+ * out[1..5] receive the occupied count broken down by ringPriority[i]
+ * (MSG_PRIO_CRITICAL..MSG_PRIO_BACKGROUND, i.e. 1..5). An occupied slot
+ * whose priority is outside 1..5 only bumps out[0] -- defensive, since
+ * getMessagePriority() never returns such a value today.
+ *
+ * No printf, no lock, no writes to the ring itself -- read-only, same as
+ * txRingDepth().
+ */
+void txRingPrioCounts(uint8_t out[6])
+{
+    memset(out, 0, 6 * sizeof(out[0]));
+
+    int w = (int)(uint8_t)iWrite;
+    int r = (int)(uint8_t)iRead;
+    int i = r;
+    while(i != w)
+    {
+        if(ringBuffer[i][0] > 0)
+        {
+            out[0]++;
+            uint8_t prio = ringPriority[i];
+            if(prio >= 1 && prio <= 5)
+                out[prio]++;
+        }
+        i++;
+        if(i >= MAX_RING)
+            i = 0;
+    }
+}
+
+/**
  * BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): sweep the whole ring and drop every
  * BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
  * (configuration_global.h). A priority-starved HEY parked at iRead behind a

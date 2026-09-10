@@ -65,7 +65,8 @@ uint16_t SampleCount = 0;
 void loop_ADCFunctions()
 {    
     #if defined (ANALOG_PIN)
-        if(bAnalogCheck)
+        // Pin 99 is the unset default: the ESP32 core logs "Pin 99 is not ADC pin!" on every read.
+        if(bAnalogCheck && meshcom_settings.node_analog_pin > 0 && meshcom_settings.node_analog_pin < 99)
         {
             // bAnalogFilter noch irgendwie sinnvoll?
             ADCslope = meshcom_settings.node_analog_slope;

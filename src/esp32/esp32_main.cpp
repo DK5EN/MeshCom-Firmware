@@ -16,6 +16,7 @@
 #include "dedup_functions.h"
 #include "ntp_async.h"      // NTP-01: isPending() haelt das GPS-Gate fuer --ntpsync offen
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
 #include <RadioLib.h>
 
@@ -638,8 +639,24 @@ void esp32setup()
     ///< Initialize T5-EPAPER GUI
     ///< delay for ESP32-S3 nativ USB [OE3WAS]
     ///< um Terminal verbinden zu können
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE && defined(DISABLE_NET_CONSOLE)
+    // CDC-02: must run BEFORE Serial.begin(). HWCDC::begin() (arduino-esp32
+    // cores/esp32/HWCDC.cpp) creates the 256 B tx ring buffer and enables the
+    // TX ISR; setTxBufferSize() on an already-begun HWCDC deletes and NULLs
+    // that buffer before recreating it, and the ISR dereferences it without a
+    // NULL check, so a live resize races the ISR and can assert/crash. Sizing
+    // before begin() avoids the race. Full rationale at
+    // MeshSerialClass::begin() (src/net_console.cpp).
+    Serial.setTxBufferSize(4096);
+#endif
     Serial.begin(MONITOR_SPEED);
     Serial.setTimeout(50);
+
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE && defined(DISABLE_NET_CONSOLE)
+    // CDC-01: without the net-console wrapper Serial is the HWCDC object
+    // itself; the rationale sits at MeshSerialClass::begin() (net_console.cpp).
+    Serial.setTxTimeoutMs(0);
+#endif
     
 // 1.1.1??   pinMode(45,OUTPUT);
 // 1.1.1??    digitalWrite(45, LOW);
@@ -740,6 +757,9 @@ void esp32setup()
         esp_reset_reason_t rr = esp_reset_reason();
         Serial.printf("[BOOT] RESET_REASON=%d %s\n", (int)rr, resetReasonName(rr));
     }
+#if INSTRUMENT_ENABLED
+    instrument_report_prev_boot();   // CDC-01: loop gaps of the previous boot, from RTC memory
+#endif
 
     lFreeHeap =  ESP.getFreeHeap();
     lFreePsram = ESP.getFreePsram();
@@ -818,6 +838,10 @@ void esp32setup()
     bGATEWAY =  meshcom_settings.node_sset & 0x1000;
     bEXTUDP =  meshcom_settings.node_sset & 0x2000;
     bDisplayCont = meshcom_settings.node_sset & 0x4000;
+
+    // TRK-01: Warnhinweis einmal beim Boot, wenn Track aus den Settings aktiv geladen wurde
+    if(bDisplayTrack)
+        printfdeb("[INIT]..." TRACK_WARNING_SERIAL "\n");
 
     bONEWIRE =  meshcom_settings.node_sset2 & 0x0001;
     bLPS33 =  meshcom_settings.node_sset2 & 0x0002;
@@ -1282,6 +1306,14 @@ void esp32setup()
 
         #if defined(BOARD_TBEAM_1W)
         #ifdef RADIO_LDO_EN
+            // Issue 962 deepsleep (esp32_sleep.cpp): --deepsleep holds this
+            // pin low with gpio_hold_en()/gpio_deep_sleep_hold_en() so it
+            // doesn't float during sleep. That hold survives the wake reset
+            // (esp_idf gpio.h), so the digitalWrite(HIGH) below would be
+            // silently ignored without releasing it first.
+            gpio_hold_dis((gpio_num_t) RADIO_LDO_EN);
+            gpio_deep_sleep_hold_dis();
+
             // T-BEAM-1W Control SX1262, LNA, must set RADIO_LDO_EN to HIGH to power the Radio
             pinMode(RADIO_LDO_EN, OUTPUT);
             digitalWrite(RADIO_LDO_EN, HIGH);
@@ -1296,6 +1328,18 @@ void esp32setup()
             digitalWrite(RADIO_CTRL, HIGH);  // RX Mode
             delay(200);
         #endif
+        #endif
+
+        #if defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E213)
+            // DS-02: prepareToSleep() in src/Platforms/<board>/power_controls.cpp
+            // holds PIN_LORA_NSS HIGH with gpio_hold_en() before deep sleep.
+            // ESP-IDF gpio.h: the hold survives the deep-sleep wake reset and is
+            // released only by gpio_hold_dis(). Without this the SPI chip-select
+            // can never go LOW after the first wake and the radio is dead until a
+            // power cycle. GPIO8 is RTC-capable but the sleep side never arms
+            // gpio_deep_sleep_hold_en(), so no gpio_deep_sleep_hold_dis() is needed.
+            // No-op on a cold boot. Not bench-verified: no WP/E213 hardware.
+            gpio_hold_dis((gpio_num_t) PIN_LORA_NSS);
         #endif
 
         #if defined(EXTERNAL_RADIO)
@@ -2990,6 +3034,7 @@ void esp32loop()
 
         g_ble_uart_is_connected = false;
         isPhoneReady = 0;
+        bAckInfo = false;
         config_to_phone_prepare = false;
         conffin_sent = false;
 
@@ -3255,7 +3300,7 @@ void esp32loop()
                             sdmap_lastKnownLon = meshcom_settings.node_lon;
                         }
 
-                        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon);
+                        sdmap_refresh(map_ta, sdmap_lastKnownLat, sdmap_lastKnownLon, "boundary");
                         refresh_map(meshcom_settings.node_map);
                     }
                 }

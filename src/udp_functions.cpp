@@ -11,6 +11,7 @@
 #include <command_functions.h>
 #include <loop_functions_extern.h>
 #include <dedup_functions.h>
+#include "ack_attribution.h"
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -403,25 +404,21 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                     uint8_t print_buff[30];
 
-                    print_buff[0]=0x41;
-                    print_buff[1]=msg_counter & 0xFF;
-                    print_buff[2]=(msg_counter >> 8) & 0xFF;
-                    print_buff[3]=(msg_counter >> 16) & 0xFF;
-                    print_buff[4]=(msg_counter >> 24) & 0xFF;
-                    print_buff[5]=0x01;  // ACK
-                    print_buff[6]=0x00;
-                    
+                    uint8_t ack_status = 0x01;  // ACK
+
                     int iackcheck = checkOwnTx(msg_counter);
                     if(iackcheck >= 0)
                     {
                         own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
-                        print_buff[5]=0x02;  // 02...ACK
+                        ack_status = 0x02;  // 02...ACK
                       }
+
+                    uint16_t plen = buildAckPhoneFrame(print_buff, msg_counter, ack_status, aprsmsg.msg_source_call.c_str());
 
                     if(bDisplayInfo)
                       printfdeb("[UDP-MSGID] ack_msg_id:%02X%02X%02X%02X ACK...%02X\n", print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5]);
 
-                    addBLEOutBuffer(print_buff, 7);
+                    addBLEOutBuffer(print_buff, plen);
 
                     if(strcmp(source_call, meshcom_settings.node_call) == 0)
                         bUDPtoLoraSend=false;

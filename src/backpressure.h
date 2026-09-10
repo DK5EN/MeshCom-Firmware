@@ -47,6 +47,7 @@
 #ifdef __cplusplus
 
 #include <stdint.h>
+#include <string.h>
 
 /// Coarse state of the sender-facing back-pressure machine.
 enum BpState
@@ -158,6 +159,46 @@ inline const char *bpNoticeText(BpNotice n)
     }
 }
 
+/// BP-11: true if text is nothing but this node's own back-pressure wording --
+/// a notice or nack that a client (phone app, web GUI, EXTUDP peer) fed back
+/// into sendMessage() as if the operator had typed it. Such a text must never
+/// reach the TX ring: the observed field case (IZ5CND-1/-10, 2026-09-04) was
+/// "QRT NOT SENT - QRT NOT SENT - QRT NOT SENT - QRS - slow down, ..." on the
+/// air, one prefix added per re-injection while the ring sat in the QRT band.
+/// Rule (operator decision 2026-09-04, strict block): after leading spaces the
+/// text either starts with one of the two bpNackPrefix() literals or equals one
+/// of the four bpNoticeText() literals. Exact and case-sensitive on purpose --
+/// only the literals this firmware itself emits are caught, a text that merely
+/// quotes the wording mid-sentence is legitimate operator traffic. The literals
+/// are taken from the accessors, never duplicated here, so a reworded notice
+/// cannot silently unhook the guard (test_bp_echo_guard pins that).
+/// No allocation, no String: runs on the nRF52 4 KB loop stack (N-22).
+inline bool bpIsOwnWording(const char *text)
+{
+    if(text == nullptr)
+        return false;
+
+    while(*text == ' ')
+        text++;
+
+    static const BpNack kNackPrefixes[] = { BP_NACK_QRT, BP_NACK_QTA };
+    for(size_t i = 0; i < sizeof(kNackPrefixes) / sizeof(kNackPrefixes[0]); i++)
+    {
+        const char *prefix = bpNackPrefix(kNackPrefixes[i]);
+        size_t prefix_len = strlen(prefix);
+        if(prefix_len > 0 && strncmp(text, prefix, prefix_len) == 0)
+            return true;
+    }
+
+    for(int n = BP_NOTICE_QRS; n <= BP_NOTICE_QRV; n++)
+    {
+        if(strcmp(text, bpNoticeText((BpNotice)n)) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 class BackPressure
 {
 public:
@@ -245,6 +286,35 @@ public:
     }
 
     BpState state() const { return state_; }
+
+    /// Own typed messages already counted towards QRS_MIN_USER_MSGS in the
+    /// running run (0 after any sighting below qrsThreshold()).
+    int userMsgsCounted() const { return qrs_user_msgs_; }
+
+    /// WQ-02 (2026-09-05): forecast for the web GUI -- the ring depth the
+    /// sender's *next* own messages would have to reach before QRS fires,
+    /// given the ring as it stands now. qrsThreshold() alone is a necessary
+    /// condition; the trigger is the QRS_MIN_USER_MSGS-th own message that
+    /// lands at/above it. Each further own message adds one to the depth
+    /// (no drain assumed), and messages landing below the line do not
+    /// count, so the firing message lands at
+    ///     max(qrsThreshold() + remaining - 1, depth + remaining).
+    /// Clamped to refuseThreshold(): from there on QRT takes over anyway.
+    /// A snapshot, not a promise -- the ring drains between renders and a
+    /// dip below the line restarts the count.
+    /// @param depth current ring depth (any frame type)
+    int qrsForecastDepth(int depth) const
+    {
+        if(depth < 0)
+            depth = 0;
+        int remaining = QRS_MIN_USER_MSGS - qrs_user_msgs_;
+        if(remaining < 1)
+            remaining = 1;
+        int by_line = qrsThreshold() + remaining - 1;
+        int by_fill = depth + remaining;
+        int t = (by_line > by_fill) ? by_line : by_fill;
+        return (t < refuseThreshold()) ? t : refuseThreshold();
+    }
 
     /// Highest notice already emitted in the running episode (BP_NOTICE_NONE
     /// while no episode is open).

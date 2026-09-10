@@ -6,6 +6,20 @@
 #include <debugconf.h>
 #include <aprs_functions.h>
 
+// Issue 962 / --deepsleep: put the RadioLib radio object to sleep so it stops
+// burning RX current before esp_deep_sleep_start(). Only declared/compiled
+// where lora_functions.cpp already has an extern `radio` of a matching
+// RadioLib type in scope (see the #ifdef ladder at the top of that file) --
+// a no-op declaration would either fail to link or bind to the wrong object.
+// WP_DISP boards (Wireless Paper, Vision Master E213) are excluded: they
+// keep their own Platform::loraToSleep() call at the --deepsleep call site.
+#if (defined(SX127X) || defined(BOARD_E220) || defined(SX1262X) || defined(SX126X) || \
+     defined(SX1262_E22) || defined(USING_SX1262) || defined(SX1268_E22) || \
+     defined(SX1262_V3) || defined(SX1262_E290) || defined(SX1262_V4) || \
+     defined(BOARD_T5_EPAPER)) && !defined(WP_DISP)
+void loraDeepSleep();
+#endif
+
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
 void OnRxTimeout(void);
 void OnRxError(void);

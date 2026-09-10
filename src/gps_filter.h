@@ -13,8 +13,15 @@
 #define ALT_KF_Q        0.01f   /* process noise per update, tau ~ 410 s at 3 s cadence */
 #define ALT_KF_R        185.0f  /* measurement noise (m^2), (4 m * 1.7 * 2.0)^2          */
 #define ALT_KF_P0       400.0f  /* initial covariance after a seed                        */
-#define ALT_KF_GATE_M   15.0f   /* innovation gate: larger jumps are rejected             */
-#define ALT_KF_RESEED_N 10      /* consecutive rejects that re-seed the filter            */
+/* GPS-07: gate and re-seed threshold raised together. Validated 2026-09-06
+ * against two corpora (docs/baro-altitude-impl-plan-20260906.md S2.3): with
+ * the old values (15.0f / 10) the DK5EN-93 capture re-seeds 20 times in
+ * under 2 h and the filter delivers essentially no improvement over the raw
+ * signal. Either change alone still re-seeds 5 times on that capture; only
+ * the combination gives 0 re-seeds on both DK5EN-93 and the DK5EN-14
+ * corpus. AltFilter::rejects is a uint8_t, so 60 fits comfortably. */
+#define ALT_KF_GATE_M   30.0f   /* innovation gate: larger jumps are rejected             */
+#define ALT_KF_RESEED_N 60      /* consecutive rejects that re-seed the filter            */
 #define ALT_KF_P_CONV   2.5f    /* P below this value = converged                          */
 #define ALT_KF_DT_REF_MS  3000u /* cadence ALT_KF_Q is expressed for (one ESP32 cycle)     */
 #define ALT_KF_DT_MAX_MS 60000u /* dt clamp: a longer gap injects no more process noise    */

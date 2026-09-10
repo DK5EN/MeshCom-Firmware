@@ -34,6 +34,18 @@ void advanceIReadPastEmpty(void);
 // both after an enqueue and on the per-loop drain check.
 int txRingDepth(void);
 
+// WQ-01 (2026-09-05): queue panel on the rxlog web page. Same occupied-slot
+// scan as txRingDepth() (see its doc comment for the counting rationale),
+// split out per priority so the panel can show "N queued, of which K
+// critical/high/normal/low/background" without five separate ring walks.
+// out[0] = total occupied slots (identical to txRingDepth()); out[1..5] =
+// occupied slots whose ringPriority[] is MSG_PRIO_CRITICAL..MSG_PRIO_BACKGROUND
+// (1..5, configuration_global.h). An occupied slot whose priority somehow
+// falls outside 1..5 is counted in out[0] only, not in any out[1..5] bucket
+// -- defensive, not reachable via getMessagePriority() today. Read-only,
+// lock-free, same as txRingDepth(): caller must pass a 6-element array.
+void txRingPrioCounts(uint8_t out[6]);
+
 // BP-03 (DJ8MEH-RCA 2026-08-31, Teil 2): sweep the whole ring and drop any
 // BACKGROUND (HEY, prio 5) entry older than RING_BG_MAX_AGE_MS
 // (configuration_global.h). Deliberately its own function, NOT folded into

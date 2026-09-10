@@ -62,6 +62,7 @@ struct aprsPosition
     // more
     int version;
     int telemetry;
+    char din[9]; // /D= MCP23017 port A bits, GPA0 first; "" when absent or malformed
 };
 
 struct mheardLine

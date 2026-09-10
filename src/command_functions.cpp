@@ -19,6 +19,8 @@
 #include "spectral_scan.h"
 #include "rtc_functions.h"
 #include "maxhop.h"
+#include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
+#include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #ifdef ESP32
 #include "net_console.h"
 #endif
@@ -27,6 +29,7 @@
 
 #ifdef ESP32
 #include "esp32/esp32_functions.h"
+#include "esp32/esp32_sleep.h"
 #endif
 
 // Sensors
@@ -847,6 +850,10 @@ void commandAction(char *umsg_text, bool ble)
                 printlndeb("--setboostedgain    on/off  enable/disable boosted rx gain");
             #endif
             delay(100);
+            // INS-01: these live inside the INSTRUMENT_ENABLED block in
+            // commandAction() and do not exist in a normal board build, so
+            // --help must not advertise them there.
+            #if INSTRUMENT_ENABLED
             printlndeb("--injectmsg <grp|call> <text>  queue a text as if received via LoRa");
             delay(100);
             printlndeb("--injectraw <hex>  feed a raw frame through the real RX path (decodeAPRS/dedup/relay)");
@@ -856,6 +863,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--redrawlog on/off, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc");
             delay(100);
             printlndeb("--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up");
+            #endif
             #endif
 
             // DOC-02: everything above predates this pass and is kept as it
@@ -877,7 +885,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--relay on/off  mesh relay\n");
             delay(100);
             #endif
-            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n");
+            printlndeb("--gps autosymbol/fixsymbol  APRS symbol source\n--via on/off/<call>  set via callsign\n--viadebug on/off\n--ackinfo on/off  show who ACKed, not saved to flash\n");
             delay(100);
             printlndeb("--debug csv/man/en/de  debug output format/language\n");
             delay(100);
@@ -893,7 +901,7 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--setrtc yyyy.mm.dd hh:mm:ss  set RTC chip\n");
             delay(100);
             #endif
-            printlndeb("--setpress 999.9  set QNH reference\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
+            printlndeb("--setpress  latch QNH reference at current altitude\n--setublox <cmd>  u-blox GPS passthrough\n--setl76k <cmd>  L76K GPS passthrough\n");
             delay(100);
             #ifdef BOARD_LED
             printlndeb("--board led on/off  board LED\n");
@@ -915,17 +923,30 @@ void commandAction(char *umsg_text, bool ble)
             printlndeb("--t5 on/off  E-paper power\n");
             delay(100);
             #endif
+            #if INSTRUMENT_ENABLED
             printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n--ntpsync  request an immediate NTP refresh now\n");
+            #else
+            printlndeb("--nopmother on/off  suppress foreign DMs to the EXTUDP peer\n");
+            #endif
             delay(100);
+            #if defined(ESP32)
+            printlndeb("--wifistat  WiFi link/counters\n--udpstat  MeshCom UDP RX/TX counters\n--udplog on/off  one [UDP] line per datagram\n");
+            delay(100);
+            #endif
+            #if defined(NRF52_SERIES)
+            printlndeb("--ethstat  Ethernet link/counters\n--udplog on/off  one [UDP] line per datagram\n");
+            delay(100);
+            #endif
 
-            // DOC-02: INSTRUMENT_ENABLED (src/instrument.h) defaults to 1 on
-            // ESP32 and nRF52 and is never overridden in any platformio.ini
-            // env, so the ~50-command bench/instrument surface (--heap,
+            // DOC-02: the ~50-command bench/instrument surface (--heap,
             // --instr, --injectmsg, --tft, --srvip, --flashpoke, --disptest,
-            // ... see src/instrument.h) ships in every board build today --
-            // there is no clean/dev split to advertise honestly here, so
-            // --help does not enumerate that block command by command.
-            printlndeb("(bench/instrument commands -- INSTRUMENT_ENABLED, on by default in every board build, see src/instrument.h -- not listed individually here)\n");
+            // --ntpsync, ... see src/instrument.h) is compiled out of a normal
+            // board build and only present in a measurement firmware built
+            // with -D INSTRUMENT_ENABLED=1. Announce it only where it exists,
+            // and do not enumerate the block command by command.
+            #if INSTRUMENT_ENABLED
+            printlndeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
+            #endif
         }
 
         return;
@@ -1040,45 +1061,27 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"deepsleep") == 0)
     {
-        #if defined(vEXT_CTRL)
-            digitalWrite(VEXT_CTRL, LOW);   // HWT needs this for GPS and TFT Screen
-            digitalWrite(ADC_CTRL, LOW);
-        #endif
-
+        // NB: vEXT_CTRL (dead, no variant defines the lowercase macro) and the
+        // BOARD_HELTEC/_V3/_V4 Vext-off block that used to live here have moved
+        // into esp32EnterDeepSleep() (src/esp32/esp32_sleep.cpp), which the
+        // generic ESP32 branch below now calls. GPS_SWITCH stays here: it also
+        // has to fire on the WP_DISP (Vision Master E213) branch just below,
+        // which is out of scope for this pass and must not change.
         #if defined(GPS_SWITCH)
             digitalWrite(GPS_SWITCH, LOW);   // externes GPS im deepsleep ausschalten, Flashwerte aber für wakeup bestehen lassen
         #endif
 
-        #if defined(BOARD_HELTEC) || defined(BOARD_HELTEC_V3)
-            printlndeb(F("[INIT]...Disbling Vext for OLED power"));
-            pinMode(Vext, OUTPUT);
-            digitalWrite(Vext, HIGH);   // Vext OFF (active high)
-            delay(50);
-        #endif
-
-        #if defined(BOARD_HELTEC_T114)
-            
-            // GPIO21: LOW - power off GPS
-            // GPIO15: HIGH - power off LCD LED
-            // GPIO25: LOW - power off LORA
-
-            extern bool bDEEP_SLEEP;
-
-            if(bDEEP_SLEEP)
-            {
-                bDEEP_SLEEP = false;
-            }
-            else
-            {
-                stop_advertising();
-                
-                digitalWrite(PIN_VEXT_CTL, LOW);   // GPS
-                digitalWrite(PIN_TFT_LEDA_CTL, HIGH);   // TFT OFF
-                digitalWrite(PIN_TFT_VDD_CTL, HIGH);   // TFT VDD
-                digitalWrite(LORA_NRSET, LOW);   // LORA
-                
-                bDEEP_SLEEP = true;
-            }
+        #if defined(NRF52_SERIES)
+            // Issue 962 (docs/issue-962-deepsleep-verdict.md, section 6.4):
+            // real nRF52 System OFF for all three nRF52 boards (RAK4631,
+            // Heltec T114, T-Echo). Replaces the old T114-only bDEEP_SLEEP
+            // toggle (soft-off, needed a second --deepsleep call to "wake")
+            // and the RAK4631 no-op (this command did nothing at all for
+            // it). See src/nrf52/nrf52_sleep.cpp for the sequence; wake is a
+            // button press, USB plug-in, or RESET -- not a second
+            // --deepsleep call.
+            extern void nrf52EnterDeepSleep();
+            nrf52EnterDeepSleep();
         #else
             #if defined(WP_DISP)
             // GRAU-FIX (v.a. Akku-leer-Pfad): Bei fast leerem Akku konkurriert der energiehungrige
@@ -1109,8 +1112,13 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             Platform::prepareToSleep();
             #endif
-            #if not defined(BOARD_RAK4630)
+            #if defined(WP_DISP)
             esp_deep_sleep_start();
+            #else
+            // Issue 962 / Option A: every other ESP32 board -- radio to
+            // sleep, display off, PMU LoRa/GPS rails off, button wake
+            // armed, then esp_deep_sleep_start(). See esp32_sleep.cpp.
+            esp32EnterDeepSleep();
             #endif
         #endif
 
@@ -1620,6 +1628,9 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"track on") == 0)
     {
         bDisplayTrack=true;
+
+        // TRK-01: Warnhinweis bei jeder Bedienung ausgeben, auch wenn Track schon an war
+        printfdeb(TRACK_WARNING_SERIAL "\n");
 
         track_to_meshcom_timer=0;   // damit auch alle 5 minuten zu MeshCom gesendet wird wenn TRACK ON
 
@@ -2338,6 +2349,32 @@ void commandAction(char *umsg_text, bool ble)
         bReturn = true;
 
         save_settings();
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ackinfo on") == 0)
+    {
+        // fluechtig: nie in meshcom_settings, nie ins Flash, siehe
+        // docs/ack-implementierungsplan.md 3.5
+        bAckInfo=true;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--ackinfo on");
+        }
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ackinfo off") == 0)
+    {
+        bAckInfo=false;
+
+        if(ble)
+        {
+            addBLECommandBack((char*)"--ackinfo off");
+        }
+
+        return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"gateway pos") == 0)
@@ -4699,6 +4736,53 @@ void commandAction(char *umsg_text, bool ble)
     }
     //
     ///////////////////////////////////////////////////////////////////////////
+    // Field diagnostics for gateway operators. Deliberately NOT part of the
+    // INSTRUMENT_ENABLED bench surface below: a node in the field has to be
+    // able to log its UDP / WiFi / Ethernet path without a special build.
+    //
+    #if defined(NRF52_SERIES)
+    else
+    if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
+    {
+        extern void ethStat();
+        ethStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
+        extern bool bUDPLOG;
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
+    #endif
+    #if defined(ESP32)
+    else
+    if(commandCheck(msg_text+2, (char*)"wifistat") == 0)
+    {
+        wifiStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udpstat") == 0)
+    {
+        // RX/TX counters of the MeshCom UDP socket
+        udpPrintStat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
+    {
+        // one [UDP];rx / [UDP];tx line per datagram
+        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
+        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        return;
+    }
+    #endif
+    //
+    ///////////////////////////////////////////////////////////////////////////
 #if INSTRUMENT_ENABLED
     ///////////////////////////////////////////////////////////////////////////
     // TEMPORARY measurement commands -- see src/instrument.h. Removed together
@@ -4764,13 +4848,6 @@ void commandAction(char *umsg_text, bool ble)
     }
     #if defined(NRF52_SERIES)
     else
-    if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
-    {
-        extern void ethStat();
-        ethStat();
-        return;
-    }
-    else
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
     {
         // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
@@ -4778,38 +4855,8 @@ void commandAction(char *umsg_text, bool ble)
         ethDrop();
         return;
     }
-    else
-    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
-    {
-        // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
-        extern bool bUDPLOG;
-        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
-        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
-        return;
-    }
     #endif
     #if defined(ESP32)
-    else
-    if(commandCheck(msg_text+2, (char*)"wifistat") == 0)
-    {
-        wifiStat();
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"udpstat") == 0)
-    {
-        // TM-31 bench hook: RX/TX counters of the MeshCom UDP socket
-        udpPrintStat();
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
-    {
-        // TM-31 bench hook: one [UDP];rx / [UDP];tx line per datagram
-        bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
-        Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
-        return;
-    }
     else
     if(commandCheck(msg_text+2, (char*)"wifidrop") == 0)
     {
@@ -5815,8 +5862,8 @@ void commandAction(char *umsg_text, bool ble)
             printfdeb("...DEBUG %s ...LORADEBUG %s ...GPSDEBUG %s/%i ...SOFTSERDEBUG %s\n...WXDEBUG %s ...BLEDEBUG %s\n",
                 (bDEBUG?"on":"off"), (bLORADEBUG?"on":"off"), (iGPSDEBUG?"on":"off"), iGPSDEBUG, (bSOFTSERDEBUG?"on":"off"),(bWXDEBUG?"on":"off"), (bBLEDEBUG?"on":"off"));
             
-            printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i\n",
-                (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast);
+            printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
+                (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));
 
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             // TD-10: raw-mode verdict of the keyboard controller. "no" or a
@@ -5884,7 +5931,10 @@ void commandAction(char *umsg_text, bool ble)
 
             if(bAnalogCheck)
             {
-                printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
+                if(meshcom_settings.node_analog_pin <= 0 || meshcom_settings.node_analog_pin >= 99)
+                    printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f (GPIO not set, measurement paused)\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
+                else
+                    printfdeb("\n...ANALOG PIN %i factor %.4f slope %.4f offset %.0f\n", meshcom_settings.node_analog_pin, meshcom_settings.node_analog_faktor, meshcom_settings.node_analog_slope, meshcom_settings.node_analog_offset);
                 printfdeb("...Value %.2f V\n", fAnalogValue);
                 printfdeb("");
             }
@@ -6186,10 +6236,7 @@ void sendNodeSetting()
     {
         meshcom_settings.node_bw = LORA_BANDWIDTH;
     }
-    if (meshcom_settings.node_power == 0)
-    {
-        meshcom_settings.node_power = TX_OUTPUT_POWER;
-    }
+    meshcom_settings.node_power = resolve_tx_power(meshcom_settings.node_power, TX_OUTPUT_POWER); // #1132: also normalize the -20 "unset" sentinel, not just 0
 
     // if we are on nrf52 we need to change frequency reading to MHz
     #ifdef BOARD_RAK4630
