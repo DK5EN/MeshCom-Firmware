@@ -129,9 +129,6 @@
 --gateway srv 1
 --gateway srv 999999
 --gateway srv abc
---netconsole on
---netconsole off
---netconsole
 --webtimer 0
 --setname 1
 --setname 999999

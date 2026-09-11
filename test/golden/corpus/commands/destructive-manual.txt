@@ -7,6 +7,7 @@
 #   ethdrop        drops the Ethernet link the capture runs over
 #   extudpip       redirects the EXTUDP feed away from the listener
 #   flashpoke      writes out-of-range radio values to flash (TM-32 hook)
+#   netconsole     turns the 2323 console off; the 2323 capture runs over it
 #   ota-update     reflashes the node
 #   passwd         changes the BLE PIN; a wrong value locks the bench out
 #   reboot         reboots the node mid-capture
@@ -30,6 +31,9 @@
 --ota-update
 --deepsleep
 --spiffs reset
+--netconsole on
+--netconsole off
+--netconsole
 --webserver on
 --webserver off
 --webpwd 1

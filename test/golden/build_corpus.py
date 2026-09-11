@@ -229,6 +229,12 @@ _MANUAL_ONLY: Dict[str, str] = {
     #     over. The HTTP restore needs the web server, an IP, and the right
     #     WiFi credentials; the 2323 half of the golden needs the same link.
     "webserver": "turns the web server off; the HTTP restore needs it",
+    # Found 2026-09-11: `--netconsole off` killed the 2323 console DURING the
+    # 2323 capture. Every later reconnect was refused, the driver burned its
+    # retry budget per command, and the run was killed by its timeout with
+    # nothing written. A command that disables the transport it arrived on is
+    # the worst case of this class.
+    "netconsole": "turns the 2323 console off; the 2323 capture runs over it",
     "wifi": "`--wifi off` drops the link the restore runs over",
     "wifitxpower": "a low value cripples the radio and the node stops associating",
     "wifiap": "switches the node into AP mode",
@@ -499,7 +505,8 @@ def _self_test() -> int:
         # Every command that stranded a node during the 2026-09-11 captures
         # must stay out, by name, so the list cannot quietly regress.
         for stranded in ("--deepsleep", "--setpwd", "--webpwd", "--webserver",
-                         "--wifi on", "--wifi off", "--wifitxpower"):
+                         "--wifi on", "--wifi off", "--wifitxpower",
+                         "--netconsole"):
             if stranded in script_lines or stranded.split(" ")[0] in first_words:
                 failures += 1
                 print(f"FAIL: {stranded} is in the auto script; it stranded a node")
