@@ -3,26 +3,38 @@
 # cuts the link the capture runs over. Run by hand, one at a time,
 # with the settings backup at hand.
 #   cleanflash     wipes settings on next boot
+#   deepsleep      halts the node; everything after it in a script is lost
 #   ethdrop        drops the Ethernet link the capture runs over
 #   extudpip       redirects the EXTUDP feed away from the listener
 #   flashpoke      writes out-of-range radio values to flash (TM-32 hook)
 #   ota-update     reflashes the node
 #   passwd         changes the BLE PIN; a wrong value locks the bench out
 #   reboot         reboots the node mid-capture
-#   setcall        changes the node callsign, which every capture is keyed on
+#   setcall        changes the node callsign
 #   setowndns      changes DNS; also the duplicate-branch defect (OPT-D2)
 #   setowngw       changes the default gateway
 #   setownip       changes the static IP the 2323 capture connects to
 #   setownms       changes the netmask
 #   setownntp      changes the NTP server
+#   setpwd         sets the WiFi password; a wrong value strands the node
 #   setssid        changes the WiFi network the node joins
 #   spiffs         erases the filesystem (`spiffs reset`)
+#   webpwd         sets the web password; locks the HTTP restore out
+#   webserver      turns the web server off; the HTTP restore needs it
+#   wifi           `--wifi off` drops the link the restore runs over
 #   wifiap         switches the node into AP mode
 #   wifidrop       drops the WiFi link the capture runs over
+#   wifitxpower    a low value cripples the radio and the node stops associating
 --cleanflash
 --reboot
 --ota-update
+--deepsleep
 --spiffs reset
+--webserver on
+--webserver off
+--webpwd 1
+--webpwd 999999
+--webpwd abc
 --extudpip
 --passwd 1
 --passwd 999999
@@ -34,6 +46,9 @@
 --setssid 1
 --setssid 999999
 --setssid abc
+--setpwd 1
+--setpwd 999999
+--setpwd abc
 --wifiap on
 --wifiap off
 --setownip 1
@@ -54,8 +69,13 @@
 --setownntp 1
 --setownntp 999999
 --setownntp abc
+--wifitxpower 1
+--wifitxpower 999999
+--wifitxpower abc
 --ethdrop
 --wifidrop
+--wifi on
+--wifi off
 --flashpoke 1
 --flashpoke 999999
 --flashpoke abc

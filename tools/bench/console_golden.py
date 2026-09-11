@@ -122,9 +122,21 @@ class SerialTransport(Transport):
 
 
 class TcpTransport(Transport):
-    """The HMAC console of `net_console.cpp`, protocol per tools/hmac_connect.py."""
+    """The HMAC console of `net_console.cpp`, protocol per tools/hmac_connect.py.
+
+    Reconnects on a reset. The node drops the console connection during a long
+    run -- seen mid-capture on Heltec-93, `ConnectionResetError` -- and without
+    reconnecting the rest of the script goes nowhere. The console is
+    single-client, so a reconnect is only safe because nothing else is using it.
+    """
 
     def __init__(self, host: str, port: int, password: str) -> None:
+        self.host, self.port, self.password = host, port, password
+        self.resets = 0
+        self._connect()
+
+    def _connect(self) -> None:
+        host, port, password = self.host, self.port, self.password
         self.sock = socket.create_connection((host, port), timeout=10)
         self.sock.settimeout(0.2)
         first = b""
@@ -142,13 +154,36 @@ class TcpTransport(Transport):
             digest = hmac.new(password.encode(), nonce, hashlib.sha256).hexdigest()
             self.sock.sendall((digest + "\n").encode())
 
+    def _reconnect(self) -> None:
+        self.resets += 1
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+        for _ in range(20):
+            try:
+                self._connect()
+                return
+            except Exception:
+                time.sleep(1.0)
+
     def send(self, text: str) -> None:
-        self.sock.sendall((text + "\n").encode())
+        try:
+            self.sock.sendall((text + "\n").encode())
+        except Exception:
+            self._reconnect()
+            try:
+                self.sock.sendall((text + "\n").encode())
+            except Exception:
+                pass
 
     def read(self, timeout: float) -> bytes:
         try:
             return self.sock.recv(4096)
         except socket.timeout:
+            return b""
+        except Exception:
+            self._reconnect()
             return b""
 
     def close(self) -> None:
@@ -374,8 +409,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     (args.out / f"cmd-{name}.txt").write_text(render(answers, name))
     (args.out / f"cmd-{name}-async.txt").write_text("\n".join(async_lines) + "\n")
     answered = sum(1 for _c, lines in answers if lines)
+    resets = getattr(transport, "resets", 0)
     print(f"{len(answers)} commands, {answered} answered, "
-          f"{len(async_lines)} async lines filtered", file=sys.stderr)
+          f"{len(async_lines)} async lines filtered"
+          + (f", {resets} transport reset(s) recovered" if resets else ""),
+          file=sys.stderr)
     return 0
 
 

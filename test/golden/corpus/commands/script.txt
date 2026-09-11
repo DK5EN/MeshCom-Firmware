@@ -37,7 +37,6 @@
 --t5 off
 --display on
 --display off
---deepsleep
 --contrast 1
 --contrast 999999
 --contrast abc
@@ -133,11 +132,6 @@
 --netconsole on
 --netconsole off
 --netconsole
---webserver on
---webserver off
---webpwd 1
---webpwd 999999
---webpwd abc
 --webtimer 0
 --setname 1
 --setname 999999
@@ -255,9 +249,6 @@
 --pingmax 1
 --pingmax 999999
 --pingmax abc
---setpwd 1
---setpwd 999999
---setpwd abc
 --sethamnet on
 --setinet off
 --setinet
@@ -285,9 +276,6 @@
 --setctry 1
 --setctry 999999
 --setctry abc
---wifitxpower 1
---wifitxpower 999999
---wifitxpower abc
 --maxhop 1
 --maxhop 999999
 --maxhop abc
@@ -337,8 +325,6 @@
 --btn 999999
 --btn abc
 --oledstat
---wifi on
---wifi off
 --oledlog on
 --oledlog off
 --injectmsg 1

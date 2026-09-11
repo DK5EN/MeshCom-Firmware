@@ -1,0 +1,523 @@
+[readBatteryVoltage] Float : 3975.180
+[readBatteryVoltage] milliVolts : 3975
+[readBatteryVoltage] ADC : 925
+[readBatteryVoltage] Float : 3866.500
+[readBatteryVoltage] milliVolts : 3866
+[readBatteryVoltage] Float : 4159.100
+[readBatteryVoltage] milliVolts : 4159
+[GPS ]...fix:no sat:5 hdop:2.8
+[GPS ]...Time <UTC>: 12:38:47 / Date: 2026.09.11
+[readBatteryVoltage] Float : 4359.740
+[readBatteryVoltage] milliVolts : 4359
+[readBatteryVoltage] Float : 4572.920
+[readBatteryVoltage] milliVolts : 4572
+[readBatteryVoltage] Float : 4259.420
+[readBatteryVoltage] milliVolts : 4259
+[GPS ]...fix:yes sat:6 hdop:2.7
+[GPS ]...Time <UTC>: 12:38:50 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407584 lon:11.738383 alt:477.8
+[readBatteryVoltage] Float : 4464.240
+[readBatteryVoltage] milliVolts : 4464
+[readBatteryVoltage] Float : 3770.360
+[readBatteryVoltage] milliVolts : 3770
+[readBatteryVoltage] 14:38:51 ... 3.77 V 35 % max_batt 4.200 V
+[readBatteryVoltage] Float : 3828.880
+[readBatteryVoltage] milliVolts : 3828
+[GPS ]...fix:no sat:5 hdop:2.8
+[GPS ]...Time <UTC>: 12:38:53 / Date: 2026.09.11
+[readBatteryVoltage] Float : 3787.080
+[readBatteryVoltage] milliVolts : 3787
+[readBatteryVoltage] Float : 4359.740
+[readBatteryVoltage] milliVolts : 4359
+[readBatteryVoltage] Float : 4159.100
+[readBatteryVoltage] milliVolts : 4159
+[GPS ]...fix:yes sat:6 hdop:2.7
+[GPS ]...Time <UTC>: 12:38:56 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407608 lon:11.738404 alt:475.1
+[readBatteryVoltage] Float : 4372.280
+[readBatteryVoltage] milliVolts : 4372
+[readBatteryVoltage] Float : 4781.920
+[readBatteryVoltage] milliVolts : 4781
+[GPS ]...fix:yes sat:6 hdop:2.7
+[GPS ]...Time <UTC>: 12:38:59 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407611 lon:11.738429 alt:473.9
+[readBatteryVoltage] ADC : 1142
+[readBatteryVoltage] Float : 4773.560
+[readBatteryVoltage] milliVolts : 4773
+[readBatteryVoltage] Float : 4740.120
+[readBatteryVoltage] milliVolts : 4740
+[readBatteryVoltage] Float : 4096.400
+[readBatteryVoltage] milliVolts : 4096
+[GPS ]...fix:yes sat:6 hdop:2.7
+[GPS ]...Time <UTC>: 12:39:02 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407600 lon:11.738430 alt:474.1
+[readBatteryVoltage] 14:39:02 ... 4.10 V 84 % max_batt 4.200 V
+[readBatteryVoltage] ADC : 927
+[readBatteryVoltage] Float : 3874.860
+[readBatteryVoltage] milliVolts : 3874
+[readBatteryVoltage] Float : 4230.160
+[readBatteryVoltage] milliVolts : 4230
+[readBatteryVoltage] ADC : 1052
+[readBatteryVoltage] Float : 4397.360
+[readBatteryVoltage] milliVolts : 4397
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:05 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407624 lon:11.738504 alt:469.0
+[readBatteryVoltage] ADC : 957
+[readBatteryVoltage] Float : 4000.260
+[readBatteryVoltage] milliVolts : 4000
+[INSTR-LOOP] gap ms 3726 in udp section_ms 0 sections_ms 0
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:10 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407635 lon:11.738516 alt:467.5
+[WIFI];link;up;rssi;-48;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;62;got_ip_n;1;ip;1;ms;69577
+[INSTR-LOOP] gap ms 4688 in udp section_ms 0 sections_ms 0
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:12 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407627 lon:11.738508 alt:467.8
+[readBatteryVoltage] ADC : 1128
+[readBatteryVoltage] Float : 4715.040
+[readBatteryVoltage] milliVolts : 4715
+[readBatteryVoltage] ADC : 1136
+[readBatteryVoltage] Float : 4748.480
+[readBatteryVoltage] milliVolts : 4748
+[readBatteryVoltage] ADC : 1019
+[readBatteryVoltage] Float : 4259.420
+[readBatteryVoltage] milliVolts : 4259
+[GPS ]...fix:yes sat:6 hdop:1.4
+[GPS ]...Time <UTC>: 12:39:18 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407621 lon:11.738498 alt:470.0
+[readBatteryVoltage] ADC : 1142
+[readBatteryVoltage] Float : 4773.560
+[readBatteryVoltage] milliVolts : 4773
+[readBatteryVoltage] ADC : 1102
+[readBatteryVoltage] Float : 4606.360
+[readBatteryVoltage] milliVolts : 4606
+[readBatteryVoltage] ADC : 1102
+[readBatteryVoltage] Float : 4606.360
+[readBatteryVoltage] milliVolts : 4606
+[GPS ]...fix:yes sat:6 hdop:1.4
+[GPS ]...Time <UTC>: 12:39:21 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407620 lon:11.738496 alt:470.7
+[readBatteryVoltage] ADC : 893
+[readBatteryVoltage] Float : 3732.740
+[readBatteryVoltage] milliVolts : 3732
+[readBatteryVoltage] 14:39:21 ... 3.73 V 30 % max_batt 4.200 V
+[readBatteryVoltage] ADC : 943
+[readBatteryVoltage] Float : 3941.740
+[readBatteryVoltage] milliVolts : 3941
+[readBatteryVoltage] ADC : 1069
+[readBatteryVoltage] Float : 4468.420
+[readBatteryVoltage] milliVolts : 4468
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:24 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407616 lon:11.738492 alt:471.3
+[readBatteryVoltage] ADC : 1042
+[readBatteryVoltage] Float : 4355.560
+[readBatteryVoltage] milliVolts : 4355
+[readBatteryVoltage] Float : 3795.440
+[readBatteryVoltage] milliVolts : 3795
+[readBatteryVoltage] ADC : 958
+[readBatteryVoltage] Float : 4004.440
+[readBatteryVoltage] milliVolts : 4004
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:27 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407614 lon:11.738488 alt:471.7
+[readBatteryVoltage] ADC : 995
+[readBatteryVoltage] Float : 4159.100
+[readBatteryVoltage] milliVolts : 4159
+[readBatteryVoltage] ADC : 1064
+[readBatteryVoltage] Float : 4447.520
+[readBatteryVoltage] milliVolts : 4447
+[readBatteryVoltage] ADC : 1140
+[readBatteryVoltage] Float : 4765.200
+[readBatteryVoltage] milliVolts : 4765
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:30 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407599 lon:11.738504 alt:472.2
+[readBatteryVoltage] ADC : 954
+[readBatteryVoltage] Float : 3987.720
+[readBatteryVoltage] milliVolts : 3987
+[readBatteryVoltage] ADC : 1004
+[readBatteryVoltage] Float : 4196.720
+[readBatteryVoltage] milliVolts : 4196
+[readBatteryVoltage] ADC : 971
+[readBatteryVoltage] Float : 4058.780
+[readBatteryVoltage] milliVolts : 4058
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:33 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407586 lon:11.738517 alt:472.8
+[readBatteryVoltage] ADC : 978
+[readBatteryVoltage] Float : 4088.040
+[readBatteryVoltage] milliVolts : 4088
+[readBatteryVoltage] ADC : 1014
+[readBatteryVoltage] Float : 4238.520
+[readBatteryVoltage] milliVolts : 4238
+[readBatteryVoltage] ADC : 1118
+[readBatteryVoltage] Float : 4673.240
+[readBatteryVoltage] milliVolts : 4673
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:36 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407574 lon:11.738515 alt:474.1
+[readBatteryVoltage] ADC : 1151
+[readBatteryVoltage] Float : 4811.180
+[readBatteryVoltage] milliVolts : 4811
+[readBatteryVoltage] ADC : 1139
+[readBatteryVoltage] Float : 4761.020
+[readBatteryVoltage] milliVolts : 4761
+[readBatteryVoltage] 14:39:38 ... 4.76 V 100 % max_batt 4.200 V
+[readBatteryVoltage] Float : 4694.140
+[readBatteryVoltage] milliVolts : 4694
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:39 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407561 lon:11.738509 alt:475.4
+[readBatteryVoltage] Float : 3987.720
+[readBatteryVoltage] milliVolts : 3987
+[readBatteryVoltage] ADC : 994
+[readBatteryVoltage] Float : 4154.920
+[readBatteryVoltage] milliVolts : 4154
+[readBatteryVoltage] ADC : 1020
+[readBatteryVoltage] Float : 4263.600
+[readBatteryVoltage] milliVolts : 4263
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:42 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407549 lon:11.738507 alt:476.7
+[readBatteryVoltage] Float : 4522.760
+[readBatteryVoltage] milliVolts : 4522
+[readBatteryVoltage] ADC : 925
+[readBatteryVoltage] Float : 3866.500
+[readBatteryVoltage] milliVolts : 3866
+[readBatteryVoltage] ADC : 1071
+[readBatteryVoltage] Float : 4476.780
+[readBatteryVoltage] milliVolts : 4476
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:45 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407544 lon:11.738508 alt:477.3
+[readBatteryVoltage] Float : 4798.640
+[readBatteryVoltage] milliVolts : 4798
+[readBatteryVoltage] ADC : 1011
+[readBatteryVoltage] Float : 4225.980
+[readBatteryVoltage] milliVolts : 4225
+[readBatteryVoltage] ADC : 983
+[readBatteryVoltage] Float : 4108.940
+[readBatteryVoltage] milliVolts : 4108
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:48 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407532 lon:11.738513 alt:478.0
+[readBatteryVoltage] Float : 4075.500
+[readBatteryVoltage] milliVolts : 4075
+[readBatteryVoltage] 14:39:48 ... 4.08 V 81 % max_batt 4.200 V
+[readBatteryVoltage] ADC : 893
+[readBatteryVoltage] Float : 3732.740
+[readBatteryVoltage] milliVolts : 3732
+[readBatteryVoltage] Float : 3941.740
+[readBatteryVoltage] milliVolts : 3941
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:51 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407530 lon:11.738522 alt:478.1
+[readBatteryVoltage] ADC : 940
+[readBatteryVoltage] Float : 3929.200
+[readBatteryVoltage] milliVolts : 3929
+[readBatteryVoltage] Float : 4861.340
+[readBatteryVoltage] milliVolts : 4861
+[readBatteryVoltage] Float : 3828.880
+[readBatteryVoltage] milliVolts : 3828
+[GPS ]...fix:yes sat:7 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:54 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407527 lon:11.738530 alt:478.2
+[readBatteryVoltage] Float : 4100.580
+[readBatteryVoltage] milliVolts : 4100
+[readBatteryVoltage] Float : 4343.020
+[readBatteryVoltage] milliVolts : 4343
+[readBatteryVoltage] ADC : 949
+[readBatteryVoltage] Float : 3966.820
+[readBatteryVoltage] milliVolts : 3966
+[GPS ]...fix:yes sat:6 hdop:1.3
+[GPS ]...Time <UTC>: 12:39:57 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407523 lon:11.738530 alt:478.3
+[readBatteryVoltage] ADC : 979
+[readBatteryVoltage] Float : 4092.220
+[readBatteryVoltage] milliVolts : 4092
+[readBatteryVoltage] ADC : 1005
+[readBatteryVoltage] Float : 4200.900
+[readBatteryVoltage] milliVolts : 4200
+[readBatteryVoltage] 14:39:59 ... 4.20 V 100 % max_batt 4.200 V
+[readBatteryVoltage] Float : 4439.160
+[readBatteryVoltage] milliVolts : 4439
+[GPS ]...fix:yes sat:6 hdop:1.3
+[GPS ]...Time <UTC>: 12:40:00 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407529 lon:11.738523 alt:478.1
+[readBatteryVoltage] ADC : 975
+[readBatteryVoltage] Float : 4075.500
+[readBatteryVoltage] milliVolts : 4075
+[readBatteryVoltage] Float : 4134.020
+[readBatteryVoltage] milliVolts : 4134
+[GPS ]...fix:yes sat:6 hdop:1.3
+[GPS ]...Time <UTC>: 12:40:02 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407530 lon:11.738525 alt:477.8
+[readBatteryVoltage] ADC : 1081
+[readBatteryVoltage] Float : 4518.580
+[readBatteryVoltage] milliVolts : 4518
+[GPS ]...Init GPIO RX=47 TX=48
+[GPS ]...38400 baud --> 62 chars (NMEA ok)
+[GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 423 ms)
+[GPS ]...erkannte Baudrate: 38400
+[GPS ]...Try to init L76K/UBLOX
+[GPS ]...clear NMEA-Buffer
+[GPS ]>>> $PCAS06,0*1B
+[GPS ]...wait
+[GPS ]<<< $GPTXT,01,01,01,PCAS inv format*3D
+[GPS ]...UBLOX connected
+[GPS ]...UBX_CFG_PRT 38400
+[GPS ]...Sende UBX_CFG_RATE
+[GPS ]...Sende UBX_CFG_CFG
+[GPS ]...UBLOX Flash save
+[GPS ]...UBLOX config finished
+[GPS ]...wait[GPS ]...Sende UBX_MON_VER
+[GPS ]...UBLOX erkannt
+[GPS ]...fix:yes sat:6 hdop:1.3
+[GPS ]...Time <UTC>: 12:40:03 / Date: 2026.09.11
+[GPS ]...position  : lat:48.407531 lon:11.738530 alt:477.6
+[readBatteryVoltage] Float : 4355.560
+[readBatteryVoltage] milliVolts : 4355
+[INSTR-LOOP] gap ms 3001 in gps section_ms 11 sections_ms 11
+[readBatteryVoltage] Float : 4305.400
+[readBatteryVoltage] milliVolts : 4305
+[readBatteryVoltage] Float : 4042.060
+[readBatteryVoltage] milliVolts : 4042
+[readBatteryVoltage] ADC : 1126
+[readBatteryVoltage] Float : 4706.680
+[readBatteryVoltage] milliVolts : 4706
+[readBatteryVoltage] ADC : 1109
+[readBatteryVoltage] Float : 4635.620
+[readBatteryVoltage] milliVolts : 4635
+[readBatteryVoltage] Float : 4577.100
+[readBatteryVoltage] milliVolts : 4577
+[readBatteryVoltage] ADC : 1134
+[readBatteryVoltage] Float : 4740.120
+[readBatteryVoltage] milliVolts : 4740
+[readBatteryVoltage] 14:40:11 ... 4.74 V 100 % max_batt 4.200 V
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-49;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;127760
+[BOOT] RESET_REASON=3 SW
+[INSTR-PREV];valid;1;gaps;4;loop_max_us;4688005;loop_n;19615;up_ms;127757;threshold_ms;250;worst_ms;4688;in;udp
+[HEAP] 00:00:00 244648 239368 204788 (init)
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 2 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[WIFI]...bWIFIAP=false
+[WIFI]...WiFi full radio reset
+[WIFI];scan;skipped;first_bringup;ms;2930
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[readBatteryVoltage] Float : 4376.460
+[readBatteryVoltage] milliVolts : 4376
+[readBatteryVoltage] Float : 4639.800
+[readBatteryVoltage] milliVolts : 4639
+[readBatteryVoltage] Float : 4434.980
+[readBatteryVoltage] milliVolts : 4434
+[readBatteryVoltage] Float : 4522.760
+[readBatteryVoltage] milliVolts : 4522
+[WIFI];event;connected;ms;6722
+[WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-51;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6723
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-50;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;7308
+[readBatteryVoltage] ADC : 939
+[readBatteryVoltage] Float : 3925.020
+[readBatteryVoltage] milliVolts : 3925
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.69, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7971
+[BOOT];ready;ms;7991;ip;1
+[WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;65
+[WIFI];dns;pool.ntp.org;ip;79.133.44.142;ms;65
+[NTP];ok;epoch;1789130421;rtt;67
+[readBatteryVoltage] ADC : 968
+[readBatteryVoltage] Float : 4046.240
+[readBatteryVoltage] milliVolts : 4046
+[readBatteryVoltage] ADC : 1035
+[readBatteryVoltage] Float : 4326.300
+[readBatteryVoltage] milliVolts : 4326
+[readBatteryVoltage] Float : 3929.200
+[readBatteryVoltage] milliVolts : 3929
+[readBatteryVoltage] Float : 3954.280
+[readBatteryVoltage] milliVolts : 3954
+[readBatteryVoltage] Float : 3904.120
+[readBatteryVoltage] milliVolts : 3904
+[readBatteryVoltage] ADC : 969
+[readBatteryVoltage] Float : 4050.420
+[readBatteryVoltage] milliVolts : 4050
+[readBatteryVoltage] ADC : 910
+[readBatteryVoltage] Float : 3803.800
+[readBatteryVoltage] milliVolts : 3803
+[readBatteryVoltage] Float : 4200.900
+[readBatteryVoltage] milliVolts : 4200
+[readBatteryVoltage] ADC : 939
+[readBatteryVoltage] Float : 3925.020
+[readBatteryVoltage] milliVolts : 3925
+[readBatteryVoltage] ADC : 1077
+[readBatteryVoltage] Float : 4501.860
+[readBatteryVoltage] milliVolts : 4501
+[readBatteryVoltage] Float : 4267.780
+[readBatteryVoltage] milliVolts : 4267
+[readBatteryVoltage] Float : 3941.740
+[readBatteryVoltage] milliVolts : 3941
+[readBatteryVoltage] Float : 4142.380
+[readBatteryVoltage] milliVolts : 4142
+[readBatteryVoltage] Float : 4430.800
+[readBatteryVoltage] milliVolts : 4430
+[readBatteryVoltage] ADC : 999
+[readBatteryVoltage] Float : 4175.820
+[readBatteryVoltage] milliVolts : 4175
+[readBatteryVoltage] ADC : 931
+[readBatteryVoltage] Float : 3891.580
+[readBatteryVoltage] milliVolts : 3891
+[readBatteryVoltage] 14:40:36 ... 3.89 V 53 % max_batt 4.200 V
+[readBatteryVoltage] ADC : 989
+[readBatteryVoltage] Float : 4134.020
+[readBatteryVoltage] milliVolts : 4134
+[readBatteryVoltage] ADC : 1060
+[readBatteryVoltage] Float : 4430.800
+[readBatteryVoltage] milliVolts : 4430
+[readBatteryVoltage] ADC : 1118
+[readBatteryVoltage] Float : 4673.240
+[readBatteryVoltage] milliVolts : 4673
+[readBatteryVoltage] ADC : 1039
+[readBatteryVoltage] Float : 4343.020
+[readBatteryVoltage] milliVolts : 4343
+[readBatteryVoltage] Float : 4121.480
+[readBatteryVoltage] milliVolts : 4121
+[readBatteryVoltage] Float : 3874.860
+[readBatteryVoltage] milliVolts : 3874
+[readBatteryVoltage] Float : 4205.080
+[readBatteryVoltage] milliVolts : 4205
+[readBatteryVoltage] Float : 3904.120
+[readBatteryVoltage] milliVolts : 3904
+[readBatteryVoltage] Float : 3958.460
+[readBatteryVoltage] milliVolts : 3958
+[readBatteryVoltage] Float : 4067.140
+[readBatteryVoltage] milliVolts : 4067
+[readBatteryVoltage] Float : 4873.880
+[readBatteryVoltage] milliVolts : 4873
+[readBatteryVoltage] Float : 4443.340
+[readBatteryVoltage] milliVolts : 4443
+[EXT] URL:192.168.68.58 to IP:192.168.68.58
+[EXT]...now listening at IP 192.168.68.69, UDP port 1799
+[EXT]...now sending   to IP , UDP port 1799
+[readBatteryVoltage] ADC : 1008
+[readBatteryVoltage] Float : 4213.440
+[readBatteryVoltage] milliVolts : 4213
+[readBatteryVoltage] Float : 3899.940
+[readBatteryVoltage] milliVolts : 3899
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-50;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;52682
+[BOOT] RESET_REASON=3 SW
+[INSTR-PREV];valid;1;gaps;0;loop_max_us;242999;loop_n;7974;up_ms;52679;threshold_ms;250;worst_ms;0;in;-
+[HEAP] 00:00:00 244792 239520 204788 (init)
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 2 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[WIFI];scan;skipped;first_bringup;ms;2899
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-49;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6692
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-50;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;7206
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.69, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7940
+[BOOT];ready;ms;7948;ip;1
+[WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;66
+[WIFI];dns;pool.ntp.org;ip;116.203.244.102;ms;76
+[NTP];ok;epoch;1789130474;rtt;13
+[readBatteryVoltage] 14:41:29 ... 3.98 V 66 % max_batt 4.200 V
+[WIFI];event;disconnected;reason;8;ms;56561
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-50;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;56562
+[BOOT] RESET_REASON=3 SW
+[INSTR-PREV];valid;1;gaps;0;loop_max_us;148005;loop_n;8662;up_ms;56559;threshold_ms;250;worst_ms;0;in;-
+[HEAP] 00:00:00 244648 239376 204788 (init)
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 433.175 MHz
+[LoRa]...RF_BANDWIDTH: 250 kHz
+[LoRa]...RF_SF: 11
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 2 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[WIFI];scan;skipped;first_bringup;ms;2896
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[WIFI];event;connected;ms;6657
+[WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-52;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6657
+[WIFI];event;got_ip;ms;6690
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-52;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6691
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.69, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;6939
+[BOOT];ready;ms;6947;ip;1
+[WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;54
+[WIFI];dns;pool.ntp.org;ip;116.203.244.102;ms;58
+[NTP];ok;epoch;1789130529;rtt;67
+[readBatteryVoltage] 14:42:14 ... 0.00 V 0 % max_batt 4.200 V
+[readBatteryVoltage] 14:42:25 ... 0.00 V 0 % max_batt 4.200 V
+[WIFI];event;disconnected;reason;8;ms;24808
+[WIFI];assoc;disconnected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-52;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;24809
+[BOOT] RESET_REASON=3 SW
+[INSTR-PREV];valid;1;gaps;0;loop_max_us;86004;loop_n;3696;up_ms;24806;threshold_ms;250;worst_ms;0;in;-
+[HEAP] 00:00:00 244648 239380 204788 (init)
+[LoRa]...SX1262 V3 chip Initializing ... success
+[LoRa]...RX_BOOSTED_GAIN: 0
+[LoRa]...RF_FREQUENCY: 439.913 MHz
+[LoRa]...RF_BANDWIDTH: 125 kHz
+[LoRa]...RF_SF: 10
+[LoRa]...RF_CR: 4/6
+[LoRa]...RF_POWER: 1 dBm
+[LoRa]...PREAMBLE: 8 symbols
+[LoRa]...Starting to listen ... success
+[LoRa]...All settings successfully changed
+[WIFI];scan;skipped;first_bringup;ms;2890
+[WIFI]...try connecting to SSID: ORBI63 
+[WIFI];policy;pmf_off;rc;0
+[WIFI];event;connected;ms;6662
+[WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-55;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6662
+[WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-56;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;7186
+[WIFI]...connect OK
+[WIFI]...now listening at IP 192.168.68.69, UDP port 1990
+[WIFI]...Internet UDP-DEST meshcom.oevsv.at
+[WIFI]...Internet NTP-DEST pool.ntp.org
+[GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7936
+[BOOT];ready;ms;7944;ip;1
+[WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;76
+[WIFI];dns;pool.ntp.org;ip;116.203.244.102;ms;76
+[NTP];ok;epoch;1789130555;rtt;65
+[WIFI];stat;ssid;ORBI63;localip;192.168.68.69;hostip;89.185.97.38;iWlanWait;0;wd_stage;0;policy;1;scan_pending;0;bringups;1;bringup_ms;2872;last_got_ip_ms;7186;last_disc_ms;0
+[readBatteryVoltage] 14:42:39 ... 3.95 V 61 % max_batt 4.200 V
+[readBatteryVoltage] 14:43:01 ... 0.00 V 0 % max_batt 4.200 V
+[readBatteryVoltage] 14:43:11 ... 0.00 V 0 % max_batt 4.200 V
+[readBatteryVoltage] 14:43:22 ... 0.00 V 0 % max_batt 4.200 V
+[NTP];ok;epoch;1789130604;rtt;80
+[INSTR-FLUSH] n 0 total_us 0 avg_us 0 max_us 0
+[INSTR-LOOP] n 480 total_us 2885994 avg_us 6012 max_us 8003
+[INSTR-SECT] display_rx n 481 total_us 810 avg_us 1 max_us 4
+[INSTR-SECT] display_tick n 481 total_us 7542 avg_us 15 max_us 35
+[INSTR-SECT] udp n 481 total_us 47553 avg_us 98 max_us 421
+[INSTR-GAPS] n 0 threshold_ms 250
+[INSTR-GUI] not_available_on_this_board

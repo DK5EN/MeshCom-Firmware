@@ -205,28 +205,42 @@ def malformed_datagrams(good_frame: bytes) -> List[Tuple[str, bytes, str | None]
 # "sf" matches `txsf`, while the genuinely destructive `cleanflash` contains
 # none of the obvious words.
 _MANUAL_ONLY: Dict[str, str] = {
-    # Wipes the settings on the next boot, then reboots.
+    # (a) destroys or halts. A halting command is as destructive to a capture
+    #     as an erasing one: --deepsleep at command 38 of 449 put Heltec-93 to
+    #     sleep and the remaining 411 went into a node that was not listening.
+    #     The capture looked complete and only 38 blocks meant anything.
     "cleanflash": "wipes settings on next boot",
     "reboot": "reboots the node mid-capture",
+    "deepsleep": "halts the node; everything after it in a script is lost",
     "spiffs": "erases the filesystem (`spiffs reset`)",
     "ota-update": "reflashes the node",
     "flashpoke": "writes out-of-range radio values to flash (TM-32 hook)",
+    # (b) writes a credential. Driving `--setpwd abc` set the WiFi password to
+    #     "abc" and the node could not associate afterwards (reason 15,
+    #     4-way handshake timeout); `--webpwd abc` then locked the HTTP restore
+    #     out with a 401. Recovery took the vault copy of the password over
+    #     serial, which is exactly the situation to avoid.
+    "setpwd": "sets the WiFi password; a wrong value strands the node",
+    "webpwd": "sets the web password; locks the HTTP restore out",
     "passwd": "changes the BLE PIN; a wrong value locks the bench out",
-    # Network settings: driving these from the script would cut the node off
-    # the bench LAN, and the TCP 2323 half of the command golden runs over
-    # exactly that link. The node would stop answering mid-run and the capture
-    # would be truncated rather than failed, which is worse.
+    # (c) changes node identity, which every capture is keyed on.
+    "setcall": "changes the node callsign",
+    # (d) cuts or reconfigures the transport the capture and the restore run
+    #     over. The HTTP restore needs the web server, an IP, and the right
+    #     WiFi credentials; the 2323 half of the golden needs the same link.
+    "webserver": "turns the web server off; the HTTP restore needs it",
+    "wifi": "`--wifi off` drops the link the restore runs over",
+    "wifitxpower": "a low value cripples the radio and the node stops associating",
+    "wifiap": "switches the node into AP mode",
+    "wifidrop": "drops the WiFi link the capture runs over",
+    "ethdrop": "drops the Ethernet link the capture runs over",
     "setssid": "changes the WiFi network the node joins",
     "setowndns": "changes DNS; also the duplicate-branch defect (OPT-D2)",
     "setowngw": "changes the default gateway",
     "setownip": "changes the static IP the 2323 capture connects to",
     "setownms": "changes the netmask",
     "setownntp": "changes the NTP server",
-    "setcall": "changes the node callsign, which every capture is keyed on",
     "extudpip": "redirects the EXTUDP feed away from the listener",
-    "wifiap": "switches the node into AP mode",
-    "wifidrop": "drops the WiFi link the capture runs over",
-    "ethdrop": "drops the Ethernet link the capture runs over",
 }
 
 
@@ -440,11 +454,24 @@ def _self_test() -> int:
 
         # The manual list must hold every held-back command and nothing else.
         script = (out / "commands" / "script.txt").read_text()
+        # Whole lines, not substrings: "--wifi" is a prefix of "--wifistat"
+        # and "--wifiset", which are perfectly safe and must stay in the
+        # script. The same loose-substring mistake that once classified
+        # `rotate` as destructive.
+        script_lines = {ln.strip() for ln in script.splitlines()}
+        first_words = {ln.split(" ")[0] for ln in script_lines}
         for token in _MANUAL_ONLY:
-            if f"--{token}" in script:
+            if f"--{token}" in first_words:
                 failures += 1
                 print(f"FAIL: manual-only command {token!r} is in the auto script")
-        for harmless in ("rotate", "txsf", "format", "instreset", "wifi on", "wifi off"):
+        # Every command that stranded a node during the 2026-09-11 captures
+        # must stay out, by name, so the list cannot quietly regress.
+        for stranded in ("--deepsleep", "--setpwd", "--webpwd", "--webserver",
+                         "--wifi on", "--wifi off", "--wifitxpower"):
+            if stranded in script_lines or stranded.split(" ")[0] in first_words:
+                failures += 1
+                print(f"FAIL: {stranded} is in the auto script; it stranded a node")
+        for harmless in ("rotate", "txsf", "format", "instreset"):
             if f"--{harmless}" not in script:
                 failures += 1
                 print(f"FAIL: harmless command {harmless!r} was held back")
