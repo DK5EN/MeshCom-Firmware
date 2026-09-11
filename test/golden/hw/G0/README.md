@@ -5,10 +5,24 @@ criterion for G1 (after the carve-out) is that these compare clean; for G2
 (after the unification) that they compare clean except where the drift matrix
 says a value was deliberately changed.
 
-| Node        | Board           | BLE stack | Capture                                                   |
-| ----------- | --------------- | --------- | --------------------------------------------------------- |
-| `heltec-93` | Heltec V3 (S3)  | NimBLE    | `ble-frames.{bin,txt}`, `ble-burst.txt`, `ble-writes.txt` |
-| `rak-90`    | RAK4631 (nRF52) | Bluefruit | same, captured with `--pin 100000`                        |
+| Node        | Board            | Image      | BLE stack | Reproducible |
+| ----------- | ---------------- | ---------- | --------- | ------------ |
+| `heltec-93` | Heltec V3 (S3)   | instrument | NimBLE    | 19 frames    |
+| `rak-90`    | RAK4631 (nRF52)  | instrument | Bluefruit | 19 frames    |
+| `t-beam-92` | T-Beam v1.2      | instrument | NimBLE    | 19 frames    |
+| `t-deck-14` | T-Deck Plus (S3) | instrument | NimBLE    | 17 frames    |
+
+All four run `INSTRUMENT_ENABLED` images (operator decision 2 of 2026-09-11),
+built into `.pio/build-instr` so the shipping tree in `.pio/build` survives
+alongside them. Each "reproducible" figure is two independent runs of that
+node, each preceded by a configuration restore, compared and found identical —
+not a count of what was recorded. `rak-90` is captured with `--pin 100000`;
+the PIN never reaches a capture, the recorded hello is redacted.
+
+Consequence of decision 2 that must not be dropped: because the goldens are
+taken on instrument images, the string scan of the command-name list across
+all 32 **shipping** images is now the only evidence about the shipping command
+set. It is owed.
 
 Compare a later run against these with:
 
@@ -60,6 +74,7 @@ With restore in front of each run, all four nodes reproduce exactly.
 
 ## Not yet captured
 
-The BLE surface only. The console, UDP-1990, EXTUDP and T-Deck UI steps of the
-test plan's section 6 are still owed, as are the `t-beam-92` and `t-deck-14`
-nodes.
+The BLE surface only, on all four nodes. Still owed from the test plan's
+section 6: the console command golden over USB and TCP 2323, UDP-1990 through
+the stub server (now driveable on every node — the nRF52 `--srvip` hook landed
+2026-09-11), EXTUDP, and the T-Deck UI checklist, which is manual.
