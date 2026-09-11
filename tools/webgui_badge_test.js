@@ -130,6 +130,25 @@ async function load(seedStorage) {
   check('All now 2', b.all.n === 2, b.all.n);
   check('sendcall follows group tab', win.document.getElementById('sendcall').value === g1);
 
+  // sendMessage() with a stubbed XHR: a group destination must survive the
+  // "sendmessage ok" clear, a DM call sign must not (nothing reaches the node)
+  {
+    const RealXHR = win.XMLHttpRequest;
+    win.XMLHttpRequest = function () {
+      this.readyState = 0; this.status = 0; this.responseText = '';
+      this.open = function () {};
+      this.send = function () { this.readyState = 4; this.status = 200; this.responseText = 'sendmessage ok'; this.onreadystatechange(); };
+    };
+    const sc = win.document.getElementById('sendcall');
+    const mt = win.document.getElementById('messagetext');
+    mt.value = 'x'; win.sendMessage();
+    check('send to group keeps sendcall', sc.value === g1 && mt.value === '', JSON.stringify({ sc: sc.value, mt: mt.value }));
+    sc.value = 'OE1XYZ-9'; mt.value = 'x'; win.sendMessage();
+    check('send to DM call clears sendcall', sc.value === '' && mt.value === '');
+    win.XMLHttpRequest = RealXHR;
+    sc.value = g1;
+  }
+
   // hidden window: message on the ACTIVE tab must stay unread
   Object.defineProperty(win.document, 'visibilityState', { configurable: true, get: () => 'hidden' });
   win.mcProcessMessages(frag(900005, g1, now + 5, 'message-received'), panel);

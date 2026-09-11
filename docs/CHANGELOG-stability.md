@@ -119,6 +119,16 @@ position keys, and its own decoder only understood 14.
      implemented in MCProxy and the mobile app, and recorded in
      `docs/architecture/11-wire-format.md` §1.8.1.
 
+217. **Web GUI keeps the group in the destination field after a send**
+     (uncommitted). Selecting a group tab writes the group number into
+     `#sendcall` (item 195), but the `sendmessage ok` handler cleared the
+     field after every send, so the next message typed in a hurry went out
+     as a broadcast to `*`. Reported by DJ8MEH on 2026-09-11. The handler
+     now leaves a purely numeric destination alone and clears only a DM
+     call sign, as before. `tools/webgui_badge_test.js` gains a stubbed-XHR
+     check for both cases; it fails on the old firmware and passes on
+     `dk5en-98` after OTA.
+
 ## New in v4.35t.09.10
 
 One change on top of `v4.35s.09.09`, item 211: the fork is brought level with
