@@ -32,6 +32,11 @@ web GUI, run MCProxy `9501bb0` on the Pi, phone test of the merged app, then the
 (items 212-217) and the upstream PR for the firmware half (N-32..N-35 are all upstream
 defects). App PR for `aprs-position-name` only on request.
 
+**Correction 2026-09-11:** the BACKLOG "Standing risk" box (dated 2026-08-18) still listed
+`N-03..N-06` + `SEC-02`/`N-18` as not upstream and as the highest-value open item. Checked
+against the PR text and the tree: all of them went upstream in PR #1102 (merged 2026-08-27),
+the affected files are identical to `upstream/dev`. Box marked resolved; not owed.
+
 **Decision 2026-09-11:** the BP-11 echo guard (item 179, shipped since v4.35s.09.05) stays
 fork-only. No upstream PR will be requested; the "still no upstream PR" note below is closed,
 not owed.

@@ -124,12 +124,12 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 > 1.15, 4.3 of its description); `src/nrf52/nrf_eth.cpp`, `web_setup.cpp` and
 > `printfdeb_functions.cpp` are identical between `fork-main` and `upstream/dev` as of
 > 2026-09-11. Nothing below is owed any more. Verified against the tree and the PR text on
-> 2026-09-11; the "highest-value open item" line at the end is obsolete.
+> 2026-09-11.
 >
 > **Status 2026-08-18.** Of the eight RF- or network-reachable defects, **four are now fixed on
 > this branch** — `N-03` (CONF zero-fill), `N-04` (BLE length underflow), `N-05` (mheard heap
-> over-read), `N-06` (web `t_io` index) — plus `SEC-02` (format string). None are upstream yet,
-> so **the shipped fleet still runs all of them**.
+> over-read), `N-06` (web `t_io` index) — plus `SEC-02` (format string). ~~None are upstream yet,
+> so the shipped fleet still runs all of them~~ — upstream since PR #1102, 2026-08-27.
 >
 > **Achtung bei `SEC-02`:** der Fix allein ist nicht vollstaendig. `d36fb66f` hat als
 > Nebenwirkung jeden BLE-Verbindungsaufbau verhindert (`N-18`, auf Hardware per Bisect
@@ -143,7 +143,8 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 > re-pairs — an upstream decision, not a branch decision. Rationale in
 > [`docs/architecture/08-defect-catalogue.md` §2](architecture/08-defect-catalogue.md).
 >
-> Getting the four fixes upstream is now the highest-value open item in this campaign.
+> ~~Getting the four fixes upstream is now the highest-value open item in this campaign.~~
+> Done with PR #1102 on 2026-08-27.
 
 ---
 
