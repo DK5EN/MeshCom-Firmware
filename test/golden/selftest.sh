@@ -16,6 +16,7 @@ python3 test/golden/backup_nodes.py --self-test
 python3 test/golden/backup_nodes.py --verify-masked
 python3 tools/bench/ble_golden.py --self-test
 python3 test/golden/command_name_scan.py --self-test
+python3 test/golden/compare_udp.py --self-test
 python3 test/golden/radio_units_lint.py --self-test
 python3 test/golden/radio_units_lint.py
 python3 test/golden/verify_captures.py
