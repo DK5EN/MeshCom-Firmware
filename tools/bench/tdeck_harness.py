@@ -2355,6 +2355,37 @@ def scenario_touch_inject(session: TDeckSession, args: argparse.Namespace) -> Di
     return {"ok": ok, "results": results}
 
 
+def scenario_keylock(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """TD-16: the keyboard lock (SYM+K, persisted) silently gates touch and
+    keyboard delivery to LVGL and stops both from waking the panel -- a dark,
+    unresponsive T-Deck that only the trackball revives. --keylock on/off is
+    the serial recovery path; this asserts the command exists on the image,
+    that a locked keyboard reads keys without waking the panel, and that
+    --keylock off wakes it and is reported by --info. Ends unlocked."""
+    steps: List[Dict[str, Any]] = []
+
+    def step(cmd: str, *checks: Tuple[str, bool], timeout: float = 3.0) -> None:
+        # One send, several markers judged against the same window.
+        idx = session.send(cmd)
+        time.sleep(timeout)
+        text = "\n".join(l for _, _, l in session.records_since(idx))
+        for marker, want in checks:
+            seen = re.search(marker, text) is not None
+            steps.append({"cmd": cmd, "marker": marker, "seen": seen, "want": want, "ok": seen == want})
+
+    session.send("--tft on")
+    time.sleep(0.5)
+    # "wrong command" on a pre-fix image; the lock must blank the panel
+    step("--keylock on", (r"KEYLOCK on", True), (r"\[TFT\];off", True))
+    # key is read (logged) but must not wake the panel while locked
+    step("--key x", (r"\[KEY\];78;ms;\d+;src;inject", True), (r"\[TFT\];on", False))
+    # unlock wakes it and --info reports it
+    step("--keylock off", (r"KEYLOCK off", True), (r"\[TFT\];on", True))
+    step("--info", (r"KEYLOCK off", True))
+    ok = all(st["ok"] for st in steps)
+    return {"ok": ok, "steps": steps}
+
+
 SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]]] = {
     "boot": scenario_boot,
     "idle": scenario_idle,
@@ -2379,6 +2410,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "gps_experiment": scenario_gps_experiment,
     "flush_lora_correlation": scenario_flush_lora_correlation,
     "touch_inject": scenario_touch_inject,
+    "keylock": scenario_keylock,
 }
 SCENARIO_ORDER = [
     "boot",
@@ -2401,6 +2433,7 @@ SCENARIO_ORDER = [
     "trim",
     "displaycmd",
     "touch_inject",
+    "keylock",
 ]
 # gps_experiment, flush_lora_correlation and uptime are long-running
 # measurement experiments (multi-minute A/B windows) -- opt in explicitly
@@ -2630,6 +2663,7 @@ SCENARIO_HELP = {
     "gps_experiment": "TM-14: A/B loop-time tails with GPS on vs off, fixed load (not in all)",
     "flush_lora_correlation": "TM-06 (c): TFT flush vs LoRa SPI activity correlation (not in all)",
     "touch_inject": "TM-19: injected touch tap/down/up ack + flush-follows sanity",
+    "keylock": "TD-16: --keylock on/off exists, lock reads keys without waking the panel, off wakes it",
 }
 
 EPILOG = """\

@@ -4193,34 +4193,28 @@ than by reading:
 
 #### TD-16 T-Deck-14 touch and keyboard dead, repeated crashes (2026-09-11)
 
-| ID    | Type | Sev.   | Location                | Item                                                                                                                                                                                                                                                                                                                                              | Status                  |
-| ----- | ---- | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| TD-16 | BUG  | High   | DK5EN-14, `src/t-deck/` | Touch does not respond, keyboard does not reach the screen, repeated crashes. Trackball works. Touch and keyboard hardware init OK every boot and **keypresses do reach the firmware** (`[KEY];…;src;kbd`), so the failure is downstream of the driver. Panel awake at full brightness, `disptest` passes, configuration identical to its backup. | **OPEN, cause unknown** |
-| TD-17 | GAP  | Medium | bench method            | Every reset observed was `USB_UART_CHIP_RESET` — caused by opening the port to look. No panic or backtrace has been captured because the act of diagnosing destroys the evidence. A continuous logger must be attached **before** the crash.                                                                                                      | **OPEN**, blocks TD-16  |
+| ID    | Type | Sev.   | Location                | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Status                                 |
+| ----- | ---- | ------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TD-16 | BUG  | High   | DK5EN-14, `src/t-deck/` | Touch dead, keyboard read but never typed, "repeated crashes", trackball fine. **Cause: the persisted keyboard lock (`node_keyboardlock`, SYM+K) was on.** It gates touch and keyboard delivery to LVGL and stops both from waking the panel; the 30 s panel timeout then looks like a crash and only the trackball brings it back. Not hardware, not the instrument image, no panic ever occurred. Fix: `--keylock on/off` serial command (T-Deck/T-Deck Plus, outside the instrument guard). Bench: lock cleared over USB on the shipping image, `--info` KEYLOCK off, survives `--reboot`; harness scenario `keylock` PASS on the instrument image; operator confirmed touch works again. | **FIXED 2026-09-11**, confirmed by eye |
+| TD-17 | GAP  | Medium | bench method            | Every reset observed was `USB_UART_CHIP_RESET` from opening the port to look. **Cause: DTR low on open resets a native-USB S3; DTR high + RTS low attaches without a reset.** `tools/bench/usb_logger.py` opens that way, timestamps every line, re-attaches after USB drops, takes commands from a file. Proven: uptime continuous across attach; survived a WiFi OTA (safeboot + app reboot) and `--reboot`. Port numbers follow the USB socket: the first attach landed on the RAK.                                                                                                                                                                                                       | **FIXED 2026-09-11**                   |
 
 Full write-up: [`bug-tdeck-touch-keyboard-20260911.md`](bug-tdeck-touch-keyboard-20260911.md).
 
-**Ruled out: the `INSTRUMENT_ENABLED` image.** That was the leading hypothesis
-and it was wrong. The node was reflashed to a verified shipping `t_deck_plus`
-image — zero `INSTR` output, `srvip`/`instreset` absent from the ELF — and it
-crashed again with touch still dead.
-
-**The one hard anomaly** is multi-second stalls inside LVGL: 2.69 s, 3.39 s
-(six gaps in 86 s) and 2.85 s across three boots. Cause or symptom is not
-established.
+**What it was.** `--info` had printed `KEYLOCK on` all along (the field TD-10
+added); nobody read it while chasing the LVGL stall and the reset reasons. The
+"configuration byte-identical to its vault backup" check compares the web
+`POST /config` export, which does not carry `node_kblock` -- the flag lives
+only in NVS. The LVGL stalls (2.69 s, 3.39 s, 2.85 s) are unrelated to this bug
+and remain an open lead of their own.
 
 **Consequence for this campaign.** T-Deck-14's G0 captures (BLE, UDP-1990,
-EXTUDP) were taken on the instrument image, on a node now known to be
-unhealthy, and the node has since been reflashed to shipping. All three must be
-re-taken once it is repaired and must not be used as a G1 baseline until then.
-The T-Deck UI checklist (H11) cannot be filled in at all in this state. The
-other three nodes are unaffected.
+EXTUDP) were taken with the lock on. The lock touches only the LVGL input path,
+none of those three surfaces, so the captures are **valid** and stay the G1
+baseline. The T-Deck UI checklist (H11) can be filled in now.
 
-**Decision 2 needs a carve-out.** "`INSTRUMENT_ENABLED` images throughout" was
-applied to the T-Deck without anyone then looking at its screen — the harness
-scenarios pass without noticing a three-second stall. Whatever TD-16 turns out
-to be, a UI board needs a by-eye check after any reflash, not just a green
-harness run.
+**Decision 2 keeps its carve-out.** A board with a display still needs a
+by-eye check after any reflash; the harness scenarios cannot see a locked
+keyboard any more than they could see a stall.
 
 **Bench lessons that cost a capture each**Bench lessons that cost a capture each, all now enforced in code.** Every one
 was found by driving real hardware, none by reading:

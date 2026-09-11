@@ -889,6 +889,10 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             printlndeb("--debug csv/man/en/de  debug output format/language\n");
             delay(100);
+            #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+            printlndeb("--keylock on/off  keyboard lock (SYM+K); on = touch and keyboard ignored\n");
+            delay(100);
+            #endif
             printlndeb("--setcont on/off\n--setlog on/off/<val>\n--setretx on/off\n--shortpath on/off\n");
             delay(100);
             printlndeb("--softser app0/baud/rxpin/txpin  softser wiring\n");
@@ -2377,6 +2381,33 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    // TD-16: the keyboard lock (SYM+K on the T-Deck keyboard) gates touch and
+    // keyboard delivery to LVGL and stops both from waking the panel, while
+    // the trackball keeps working -- from the outside that looks like dead
+    // touch plus a "crashed" dark screen. The flag persists in flash and was
+    // only clearable on the keyboard itself; this gives a serial/BLE/2323
+    // recovery path. tft_on()/tft_off() mirror the keyboard toggle
+    // (tdeck_main.cpp keypad_read, SYM+K).
+    if(commandCheck(msg_text+2, (char*)"keylock on") == 0)
+    {
+        meshcom_settings.node_keyboardlock = true;
+        tft_off();
+        save_settings();
+        printlndeb("...KEYLOCK on");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"keylock off") == 0)
+    {
+        meshcom_settings.node_keyboardlock = false;
+        tft_on();
+        save_settings();
+        printlndeb("...KEYLOCK off");
+        return;
+    }
+    else
+    #endif
     if(commandCheck(msg_text+2, (char*)"gateway pos") == 0)
     {
         bGATEWAY_NOPOS=false;
