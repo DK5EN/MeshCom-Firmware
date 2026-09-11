@@ -67,37 +67,44 @@ one to update when an item moves.
 - `G09`/`G10`/`G11` `tdeck_sdmap.cpp` findings from the stage-1 GUI review, never verified.
 - Standing accepted risk, not work: `N-01`, `N-02`, `N-07` (maintainer decision 2026-08-18).
 
-**F. DRY unification and RAM: the one-shot PR — IN EXECUTION on branch `dry-unification`**
+**F. DRY unification and RAM: the one-shot PR — IN EXECUTION on `dry-unification`**
 
-Phase 0 of `testplan-dry-unification-20260910.md` is closed except four items. Base tagged
-`dry-base-20260911`; BACKLOG §3.8af carries the execution log and the new rows.
+Phase A of the plan is done except the protocol templates; phase B (G0 captures)
+is under way. Base tagged `dry-base-20260911`. BACKLOG §3.8af carries the full
+status tables, the bench lessons and the decisions; the Gantt
+(`docs/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
+same stand as a vertical bar.
 
-- **Next action, needs nothing from anyone:** `P0.2` — re-check the audit's `file:line`
-  references against the tag. Source moved between `c51c5881` (the audit's HEAD) and the base, so
-  some of the ~200 cited lines have shifted.
-- **Next action, needs a Terminal restart:** `P0.8` validation — run `tools/bench/ble_golden.py`
-  against RAK-90 (Bluefruit, `--pin 100000`) and Heltec-93 (NimBLE, no PIN). The macOS Bluetooth
-  permission for Terminal.app was granted 2026-09-11 but only takes effect after the process
-  restarts.
-- **Needs boards on USB:** `P0.3` backups for T-Beam-92 and T-Deck-14; `P0.9` protocol templates.
-  RAK-90 (`/dev/cu.usbmodem2101`, 192.168.68.68) and Heltec-93 (`/dev/cu.usbserial-0001`,
-  192.168.68.69) are done. RAK-90 is silent unless `dtr=True`; `serial_session.py` hardcodes
-  `dtr=False` and therefore does not work on it.
-- **Operator decision, blocks steps H6/H7 on the nRF52:** `OPT-06` — the nRF52 has no server
-  override at all, so RAK-90 cannot be pointed at the stub server. Three options in §3.8af.
-- **Four decisions taken 2026-09-11** (table in §3.8af): add an nRF52 `--srvip` hook;
-  `INSTRUMENT_ENABLED` images on all bench nodes; G0 on two nodes now with the other two added
-  **before** the carve-out (hard gate — after C1-C5 the before-capture window is gone); normalize
-  the `OPT-D14` settings units, which makes the `D1-06` migration mandatory and extends it to the
-  `configImportJson()` path.
-- **Then phase 1:** G0 hardware goldens on the two connected nodes, the C1-C5 carve-out commits, G1, and
-  the N1 characterization tests. Nothing in product code has been touched yet.
-- `OPT-02` golden command capture is no longer "does not exist": the corpus and the drivers are
-  in `test/golden/corpus/commands/` and `tools/mock/meshcom_server.py`. What is owed is the run.
-- `OPT-D1..D14` unchanged in the tree. `OPT-D8` confirmed live with a _different_ field list than
-  the audit's; `OPT-D14` is new — four settings keys hold different units per platform, which
-  constrains the `D1-05` schema table.
-- Timing of the upstream PR is still the operator's: one large PR, then back to minimal changes.
+**Next, in order:**
+
+1. **Re-capture the four BLE goldens.** The committed ones were taken before
+   the broadcast fix and contain `*` frames. `verify_no_broadcast()` is active
+   now and exits 2 if it happens again. ~10 min per node, restore in front of
+   each. Needs all four nodes; two are on the desk at a time.
+2. **Decide the console-golden method** (see below), then re-capture it.
+3. **`P0.2`** — re-check the audit's ~200 `file:line` anchors against the tag.
+   Desk work, no hardware, and the command-table wave transcribes those lines.
+4. **Finish B1**: UDP-1990 on T-Deck-14, EXTUDP via `tools/bench/extudp_peer.py`,
+   the T-Deck UI checklist, the shipping-image string scan across all 32 envs.
+5. **Then B2** — the carve-out commits C1-C5. **Hard gate: every node that is
+   to be compared G0→G1 must have its G0 capture before this point.**
+
+**Decision owed — the console golden.** A bench node receiving live mesh
+traffic cannot produce a byte-comparable console capture: async output splices
+_inside_ lines (`--postime abc` comes back as `ostime abc`) and no prefix list
+can be complete. Filtering was tried three times and the difference count did
+not fall. The fix is bench conditions — mesh and gateway off, no antenna — but
+a radio-quiet capture does not exercise the RX-to-console path. Either accept
+that, or compare replies only and tolerate the chatter.
+
+**Two false findings were caught before they were filed**, both by measuring
+rather than asserting: 50 commands that looked silent on the net console
+answered fine with a wider window, and an extra `START CHECK:` line is gated on
+runtime debug flags, not on the transport. Had either shipped, the command
+table would have been measured against a wrong baseline.
+
+`OPT-D1..D14` unchanged in the tree. Timing of the upstream PR is still the
+operator's.
 
 **E. Leads without a proof yet**
 

@@ -116,7 +116,8 @@
     <li>Ein Gate ist ein harter Stopp: die nächste Phase beginnt erst, wenn die Prüfungen des Gates grün und committet sind. Gates sind als Rauten am Phasenende gezeichnet.</li>
     <li>Die Freigabe der Drift-Matrix (C2) ist der einzige menschliche Entscheidungspunkt und liegt auf dem kritischen Pfad.</li>
     <li>Das Upstream-Review ist extern und von unbekannter Dauer; der schraffierte Balken ist ein Platzhalter und zählt nicht zur Summe.</li>
-    <li>Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur in diesem Browser gespeichert.</li>
+    <li>Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur in diesem Browser gespeichert. Voreingestellt ist der tatsächliche Beginn, 11.09.2026.</li>
+    <li><b>Stand 11.09.2026:</b> Phase A ist bis auf die Protokollvorlagen abgearbeitet, Phase B läuft. B1 ist teilweise erfasst: BLE auf allen vier Knoten reproduzierbar, UDP-1990 auf drei Knoten, die Konsole auf beiden Transporten aufgezeichnet — letztere noch ohne Vergleichsbasis, weil der Knoten währenddessen Funkverkehr empfing. Der senkrechte Balken im Diagramm markiert diesen Stand; ausgefüllte Balken sind erledigt, umrissene offen.</li>
   </ul>
 </div>
 
@@ -131,38 +132,38 @@
   ];
   // days = Arbeitstage; after = Aufgabe, nach der diese beginnt (null = Phasenbeginn); parallele Aufgaben teilen sich "after"
   const TASKS = [
-    { id: "A1", ph: "A", name: "Upstream-Sync, 32-Env-Build, Basis taggen", days: 1, after: null, gate: "Tag dry-base, Ressourcen-Baseline", owner: "Orchestrator" },
-    { id: "A2", ph: "A", name: "Korpus zusammenstellen, Rufzeichen-Lint", days: 2, after: "A1", gate: "test/golden/corpus committet", owner: "Agenten" },
-    { id: "A3", ph: "A", name: "Werkzeuge: UDP-1799-Stub, BLE-Golden-Client, Normalisierer", days: 3, after: "A1", gate: "Trockenlauf der Werkzeuge gegen RAK-90", owner: "Agenten" },
-    { id: "A4", ph: "A", name: "Knoten-Einstellungen sichern, Protokollvorlagen", days: 1, after: "A3", gate: "G0 bereit", owner: "Orchestrator", gateEnd: true },
+    { id: "A1", ph: "A", name: "Upstream-Sync, 32-Env-Build, Basis taggen", days: 1, after: null, gate: "Tag dry-base, Ressourcen-Baseline", owner: "Orchestrator" , st: "done", note: 'Tag dry-base-20260911, 32 Envs gebaut, Baseline erneuert, 12 native Suiten grün (673 Fälle)'},
+    { id: "A2", ph: "A", name: "Korpus zusammenstellen, Rufzeichen-Lint", days: 2, after: "A1", gate: "test/golden/corpus committet", owner: "Agenten" , st: "done", note: '28 LoRa-Frames, 37 UDP-1990-Datagramme, 23 EXTUDP, 21 BLE-Writes, 305 Kommandos; Rufzeichen-Lint grün'},
+    { id: "A3", ph: "A", name: "Werkzeuge: UDP-1799-Stub, BLE-Golden-Client, Normalisierer", days: 3, after: "A1", gate: "Trockenlauf der Werkzeuge gegen RAK-90", owner: "Agenten" , st: "done", note: 'Stub-Server existierte bereits und wurde erweitert; normalize.py, mc_frame.py, corpus_lint.py, extract_commands.py, ble_golden.py, console_golden.py'},
+    { id: "A4", ph: "A", name: "Knoten-Einstellungen sichern, Protokollvorlagen", days: 1, after: "A3", gate: "G0 bereit", owner: "Orchestrator", gateEnd: true , st: "wip", note: 'Einstellungen aller 4 Knoten gesichert (maskiert im Repo, unmaskiert im Vault). Protokollvorlagen offen.'},
 
-    { id: "B1", ph: "B", name: "G0 Hardware-Goldens, 4 Knoten, BLE-App-Kalibrierung", days: 2, after: null, gate: "test/golden/hw/G0", owner: "Bench" },
-    { id: "B2", ph: "B", name: "Carve-out-Commits C1-C5, Builds, Region-Gate", days: 2, after: "B1", gate: "kein IRAM-Wachstum", owner: "Agenten" },
-    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "B2", gate: "G1 == G0", owner: "Bench" },
-    { id: "B4", ph: "B", name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten", days: 6, after: "B3", gate: "Twin-Diff-Fixtures committet", owner: "Agenten", gateEnd: true },
+    { id: "B1", ph: "B", name: "G0 Hardware-Goldens, 4 Knoten, BLE-App-Kalibrierung", days: 2, after: null, gate: "test/golden/hw/G0", owner: "Bench" , st: "wip", note: 'BLE auf 4 Knoten reproduzierbar; UDP-1990 auf 3 Knoten; Konsole auf beiden Transporten erfasst, aber wegen Funkverkehr noch keine Vergleichsbasis. Offen: EXTUDP, T-Deck-UI, BLE-App-Kalibrierung, BLE-Neuaufnahme nach dem Broadcast-Fix.'},
+    { id: "B2", ph: "B", name: "Carve-out-Commits C1-C5, Builds, Region-Gate", days: 2, after: "B1", gate: "kein IRAM-Wachstum", owner: "Agenten" , st: "open"},
+    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "B2", gate: "G1 == G0", owner: "Bench" , st: "open"},
+    { id: "B4", ph: "B", name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten", days: 6, after: "B3", gate: "Twin-Diff-Fixtures committet", owner: "Agenten", gateEnd: true , st: "open"},
 
-    { id: "C1", ph: "C", name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export", days: 1, after: null, gate: "drift-matrix.csv + xlsx", owner: "Orchestrator" },
-    { id: "C2", ph: "C", name: "Freigabesitzung: Urteil je Zeile", days: 1, after: "C1", gate: "Matrix freigegeben (Martin)", owner: "Martin", milestone: true },
-    { id: "C3", ph: "C", name: "Erwartete-Diff-Fixtures aus den Urteilen", days: 1, after: "C2", gate: "test_drift_matrix_complete grün", owner: "Agenten", gateEnd: true },
+    { id: "C1", ph: "C", name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export", days: 1, after: null, gate: "drift-matrix.csv + xlsx", owner: "Orchestrator" , st: "open"},
+    { id: "C2", ph: "C", name: "Freigabesitzung: Urteil je Zeile", days: 1, after: "C1", gate: "Matrix freigegeben (Martin)", owner: "Martin", milestone: true , st: "open"},
+    { id: "C3", ph: "C", name: "Erwartete-Diff-Fixtures aus den Urteilen", days: 1, after: "C2", gate: "test_drift_matrix_complete grün", owner: "Agenten", gateEnd: true , st: "open"},
 
-    { id: "W1", ph: "D", name: "Welle 1: Defekte 1,2,7,10,11 und Hygiene-Löschungen", days: 2, after: null, gate: "32-Env-Build, bin-Vergleich", owner: "Agenten" },
-    { id: "W2", ph: "D", name: "Welle 2: RAM-Zeilen mit niedrigem Risiko, tinyxml, softser", days: 3, after: "W1", gate: "Frame-Dumps identisch, Regions-Delta", owner: "Agenten" },
-    { id: "W3", ph: "D", name: "Welle 3: Settings-Schema, ein Struct, Migration", days: 6, after: "W2", gate: "Roundtrip beide Plattformen, nRF52-Upgrade behält Einstellungen", owner: "Agenten" },
-    { id: "W4", ph: "D", name: "Welle 4: Kommandotabelle (D2-10, D2-06, D2-07)", days: 6, after: "W3", gate: "Golden-Capture-Diff leer, test_command_table", owner: "Agenten" },
-    { id: "W5", ph: "D", name: "Welle 5: RAM-Zeilen mit mittlerem Risiko, T-Deck Pro LVGL", days: 5, after: "W4", gate: "Prüfung je Zeile, 12 h nRF52-Soak", owner: "Agenten + Bench" },
-    { id: "W6", ph: "D", name: "Welle 6: gemeinsamer UDP-Handler, Helfer, ui_common", days: 6, after: "W5", gate: "EXTUDP-Bytevergleich beide Plattformen", owner: "Agenten + Bench" },
-    { id: "W7", ph: "D", name: "Welle 7: Varianten umstrukturieren", days: 3, after: "W6", gate: "Makro-Set-Diff je Env", owner: "Agenten", gateEnd: true },
+    { id: "W1", ph: "D", name: "Welle 1: Defekte 1,2,7,10,11 und Hygiene-Löschungen", days: 2, after: null, gate: "32-Env-Build, bin-Vergleich", owner: "Agenten" , st: "open"},
+    { id: "W2", ph: "D", name: "Welle 2: RAM-Zeilen mit niedrigem Risiko, tinyxml, softser", days: 3, after: "W1", gate: "Frame-Dumps identisch, Regions-Delta", owner: "Agenten" , st: "open"},
+    { id: "W3", ph: "D", name: "Welle 3: Settings-Schema, ein Struct, Migration", days: 6, after: "W2", gate: "Roundtrip beide Plattformen, nRF52-Upgrade behält Einstellungen", owner: "Agenten" , st: "open"},
+    { id: "W4", ph: "D", name: "Welle 4: Kommandotabelle (D2-10, D2-06, D2-07)", days: 6, after: "W3", gate: "Golden-Capture-Diff leer, test_command_table", owner: "Agenten" , st: "open"},
+    { id: "W5", ph: "D", name: "Welle 5: RAM-Zeilen mit mittlerem Risiko, T-Deck Pro LVGL", days: 5, after: "W4", gate: "Prüfung je Zeile, 12 h nRF52-Soak", owner: "Agenten + Bench" , st: "open"},
+    { id: "W6", ph: "D", name: "Welle 6: gemeinsamer UDP-Handler, Helfer, ui_common", days: 6, after: "W5", gate: "EXTUDP-Bytevergleich beide Plattformen", owner: "Agenten + Bench" , st: "open"},
+    { id: "W7", ph: "D", name: "Welle 7: Varianten umstrukturieren", days: 3, after: "W6", gate: "Makro-Set-Diff je Env", owner: "Agenten", gateEnd: true , st: "open"},
 
-    { id: "E1", ph: "E", name: "G2 Nachher-Lauf, Instrument-Lauf, nRF52-Migrationstest", days: 2, after: null, gate: "G2 == G1 bis auf erwartete Diffs", owner: "Bench" },
-    { id: "E2", ph: "E", name: "Protokoll nachher, deutscher Nachweis, PR-Beschreibung", days: 2, after: "E1", gate: "protocol-after.md vollständig", owner: "Orchestrator" },
-    { id: "E3", ph: "E", name: "Upstream-Resync, gezielter Wiederholungslauf", days: 2, after: "E2", gate: "gezielte Goldens grün", owner: "Agenten + Bench" },
-    { id: "E4", ph: "E", name: "PR an icssw-org DEV einreichen", days: 0.5, after: "E3", gate: "PR offen", owner: "Martin", milestone: true, gateEnd: true },
-    { id: "E5", ph: "E", name: "Upstream-Review (Kurt), extern", days: 10, after: "E4", gate: "Merge durch Upstream", owner: "Upstream", external: true },
+    { id: "E1", ph: "E", name: "G2 Nachher-Lauf, Instrument-Lauf, nRF52-Migrationstest", days: 2, after: null, gate: "G2 == G1 bis auf erwartete Diffs", owner: "Bench" , st: "open"},
+    { id: "E2", ph: "E", name: "Protokoll nachher, deutscher Nachweis, PR-Beschreibung", days: 2, after: "E1", gate: "protocol-after.md vollständig", owner: "Orchestrator" , st: "open"},
+    { id: "E3", ph: "E", name: "Upstream-Resync, gezielter Wiederholungslauf", days: 2, after: "E2", gate: "gezielte Goldens grün", owner: "Agenten + Bench" , st: "open"},
+    { id: "E4", ph: "E", name: "PR an icssw-org DEV einreichen", days: 0.5, after: "E3", gate: "PR offen", owner: "Martin", milestone: true, gateEnd: true , st: "open"},
+    { id: "E5", ph: "E", name: "Upstream-Review (Kurt), extern", days: 10, after: "E4", gate: "Merge durch Upstream", owner: "Upstream", external: true , st: "open"},
   ];
 
   const startEl = document.getElementById("start");
   const reviewEl = document.getElementById("showreview");
-  try { const s = localStorage.getItem("gantt-start"); if (s) startEl.value = s; const r = localStorage.getItem("gantt-review"); if (r !== null) reviewEl.checked = r === "1"; } catch (e) {}
+  try { const s = localStorage.getItem("gantt-start"); if (s) startEl.value = s; else startEl.value = "2026-09-11"; const r = localStorage.getItem("gantt-review"); if (r !== null) reviewEl.checked = r === "1"; } catch (e) {}
 
   const DAY = 86400000;
   function isWd(d) { const w = d.getUTCDay(); return w !== 0 && w !== 6; }
@@ -218,10 +219,15 @@
       ["Matrix-Freigabe", fmt(sign.end), "Entscheidungspunkt, Martin"],
       ["PR eingereicht", fmt(submit.end), "nach Resync und Wiederholungslauf"],
       ["Arbeitstage", String(totalWd), (Math.round(totalWd / 5 * 10) / 10).toLocaleString("de-DE") + " Wochen, ohne Review"],
+      ["Fortschritt", internal.filter(r => r.st === "done").length + " / " + internal.length + " Aufgaben",
+       "erledigt; " + internal.filter(r => r.st === "wip").length + " laufend"],
     ].map(([l, v, h]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`).join("");
 
     document.getElementById("legend").innerHTML = PHASES.map(p => `<span><i class="sw" style="background:${p.color}"></i>${p.name}</span>`).join("")
-      + `<span><i class="sw gate"></i>Gate</span><span><i class="sw ext"></i>extern, nicht gezählt</span>`;
+      + `<span><i class="sw gate"></i>Gate</span><span><i class="sw ext"></i>extern, nicht gezählt</span>`
+      + `<span><i class="sw" style="background:var(--ink-2)"></i>erledigt</span>`
+      + `<span><i class="sw" style="background:var(--ink-2);opacity:.9"></i>läuft</span>`
+      + `<span><i class="sw" style="background:none;border:1.5px dashed var(--ink-3)"></i>offen</span>`;
 
     const labelW = 350, dayW = 14, rowH = 26, top = 44, left = 8, hdrH = 24;
     const days = Math.ceil((endAll - start) / DAY) + 3;
@@ -243,7 +249,8 @@
       }
     }
     const today = new Date(); const t0 = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-    if (t0 >= start && t0 <= endAll) svg += `<line x1="${x(t0)}" x2="${x(t0)}" y1="${top - 6}" y2="${height - 8}" stroke="var(--today)" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${x(t0) + 4}" y="${height - 12}" font-size="10" fill="var(--today)">heute</text>`;
+    // Die Standlinie wird zuletzt gezeichnet (siehe unten), damit sie ueber
+    // den Balken liegt; hier nur der Wochenend-Raster-Teil.
 
     svg += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="3" height="6" fill="var(--ext)"/></pattern></defs>`;
 
@@ -265,7 +272,15 @@
       } else if (r.external) {
         svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="url(#hatch)" stroke="var(--ext)"/></g>`;
       } else {
-        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${r.phase.color}"/>`;
+        // Status: erledigt = voll, laufend = voll mit Rahmen und Punkt,
+        // offen = nur Umriss. Der Plan bleibt derselbe, sichtbar wird nur,
+        // wie weit er abgearbeitet ist.
+        const done = r.st === "done", wip = r.st === "wip";
+        const fill = done || wip ? r.phase.color : "none";
+        const op = done ? 1 : (wip ? 0.9 : 1);
+        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${fill}" fill-opacity="${op}" stroke="${r.phase.color}" stroke-width="${done || wip ? 0 : 1.5}" stroke-dasharray="${r.st === "open" ? "4 3" : ""}"/>`;
+        if (done) svg += `<path d="M${bx + 5} ${cy} l3.5 4 l7 -8" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        if (wip) svg += `<circle cx="${bx + 9}" cy="${cy}" r="3.5" fill="var(--surface)"/>`;
         if (r.gateEnd) svg += `<path d="M${bx + bw + 6} ${cy - 7} l7 7 l-7 7 l-7 -7z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>`;
         svg += `</g>`;
       }
@@ -273,6 +288,14 @@
       svg += `<rect class="hit" data-i="${i}" x="${left}" y="${y}" width="${width - left}" height="${rowH}" fill="transparent"/>`;
       y += rowH;
     });
+    // Standlinie zum Schluss: ein kraeftiger senkrechter Balken ueber der
+    // ganzen Hoehe, damit auf einen Blick zu sehen ist, wo der Plan steht.
+    if (t0 >= start && t0 <= endAll) {
+      const tx = x(t0);
+      svg += `<rect x="${tx - 1.5}" y="${top - 30}" width="3" height="${height - top + 22}" fill="var(--today)" opacity="0.9"/>`;
+      svg += `<rect x="${tx + 5}" y="${top - 42}" width="118" height="18" rx="3" fill="var(--today)"/>`;
+      svg += `<text x="${tx + 11}" y="${top - 29}" font-size="11" font-weight="700" fill="var(--surface)" font-family="IBM Plex Sans Condensed, sans-serif">Stand ${fmt(t0)}</text>`;
+    }
     svg += `</svg>`;
     const chart = document.getElementById("chart");
     const tip = document.getElementById("tip");
@@ -282,7 +305,8 @@
     chart.querySelectorAll(".hit").forEach(h => {
       h.addEventListener("mousemove", ev => {
         const r = rows[+h.dataset.i];
-        tip.innerHTML = `<b>${r.id} ${r.name}</b><br><span class="m">${fmt(r.start)} bis ${fmt(r.end)} (${String(r.days).replace(".", ",")} AT)</span><br>Gate: ${r.gate}<br>Verantwortlich: ${r.owner}`;
+        const stLabel = { done: "erledigt", wip: "läuft", open: "offen" }[r.st] || "offen";
+        tip.innerHTML = `<b>${r.id} ${r.name}</b><br><span class="m">${fmt(r.start)} bis ${fmt(r.end)} (${String(r.days).replace(".", ",")} AT)</span><br>Status: <b>${stLabel}</b>${r.note ? "<br>" + r.note : ""}<br>Gate: ${r.gate}<br>Verantwortlich: ${r.owner}`;
         tip.style.display = "block";
         const rect = chart.getBoundingClientRect();
         let tx = ev.clientX - rect.left + chart.scrollLeft + 14, ty = ev.clientY - rect.top + 14;

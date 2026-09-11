@@ -4152,10 +4152,49 @@ incapable of catching this class.
 The four G0 BLE captures taken before the fix contain those frames and are
 replaced.
 
-**Owed in phase 0:** `P0.2` re-check the audit's `file:line` references against the tag (desk work);
-`P0.3` for T-Beam-92 and T-Deck-14 (needs them on USB); `P0.8` validation of the BLE client against
-both stacks (needs the macOS Bluetooth permission for Terminal.app, granted 2026-09-11, pending a
-Terminal restart); `P0.9` protocol templates.
+**Phase 0 and the G0 captures, stand 2026-09-11 evening.**
+
+| Step                      | State                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `P0.1` base               | **done** — tag `dry-base-20260911`, 32 envs, baseline refreshed, 12 native suites green (673 cases)                                        |
+| `P0.2` line references    | **open** — the audit's ~200 `file:line` anchors are not re-checked against the tag                                                         |
+| `P0.3` node backups       | **done** — all four nodes, masked in the repo, unmasked in `~/MeshCom-bench-backups/`                                                      |
+| `P0.4` corpora            | **done** — 28 LoRa, 37 UDP-1990, 23 EXTUDP, 21 BLE, 305 ladder commands                                                                    |
+| `P0.5` callsign lint      | **done** — 65 files, 0 violations                                                                                                          |
+| `P0.6` stub server        | **done** — the existing `tools/mock/meshcom_server.py` gained capture, replay and a deterministic mode                                     |
+| `P0.7` normalizer         | **done** — `test/golden/normalize.py`                                                                                                      |
+| `P0.8` BLE client         | **done** — `tools/bench/ble_golden.py`, reproducible on both stacks                                                                        |
+| `P0.9` protocol templates | **open**                                                                                                                                   |
+| `B1` G0 BLE               | **done, needs re-capture** — reproducible on all four nodes, but taken before the broadcast fix, so the committed files contain `*` frames |
+| `B1` G0 UDP-1990          | **done on 3 nodes** — Heltec-93, RAK-90, T-Beam-92; T-Deck-14 owed                                                                         |
+| `B1` G0 console           | **captured, not a baseline** — see `test/golden/hw/G0/heltec-93/console/README.md`; needs a radio-quiet re-capture                         |
+| `B1` G0 EXTUDP            | **open** — only an incidental sample inside the RAK UDP capture                                                                            |
+| `B1` T-Deck UI checklist  | **open** — manual                                                                                                                          |
+| `B1` BLE app calibration  | **open** — the one-time iPhone PacketLogger run of test plan §12.4                                                                         |
+| shipping string scan      | **open** — mandatory under decision 2, and now the only evidence about the shipping command set                                            |
+
+**Bench lessons that cost a capture each, all now enforced in code.** Every one
+was found by driving real hardware, none by reading:
+
+| What happened                                                                                              | Enforcement now                                                                |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `--deepsleep` halted the node at command 38 of 449; 411 went nowhere and the capture still looked complete | held back by name, asserted in `build_corpus`'s self-test                      |
+| `--setpwd abc` / `--webpwd abc` stranded the node off WiFi and behind a 401                                | held back; recovery needs the vault password over serial                       |
+| `--webserver off`, `--wifitxpower 1` cut the transport the restore runs over                               | held back                                                                      |
+| `--netconsole off` killed the 2323 console **during** the 2323 capture                                     | held back; the TCP transport now gives up after 3 refused reconnects           |
+| the BLE corpus broadcast to the live network                                                               | no message sends in the BLE corpus; `verify_no_broadcast()` on captured frames |
+| the corpus `CONF` renamed every node it was replayed at                                                    | the stub warns and names the restore command                                   |
+| USB timing over TCP invented 50 false "silent" commands                                                    | timing defaults per transport, recorded in every capture header                |
+| a 28-minute capture was killed with nothing written                                                        | partial captures are always written and stamped `COMPLETE: NO`                 |
+
+**The open methodological question** is `B1` console: a bench node receiving live
+mesh traffic cannot produce a byte-comparable console golden, because async
+output splices _inside_ lines and no prefix list can be complete. The fix is
+bench conditions — mesh and gateway off, no antenna — not more filtering.
+Decision owed, because a radio-quiet capture does not exercise the RX-to-console
+path.
+
+**Owed in phase 0:**
 
 ## 4. State of the repository
 
