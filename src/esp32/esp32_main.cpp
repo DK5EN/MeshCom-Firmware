@@ -551,6 +551,8 @@ unsigned long wifi_active_timer = 0;
 bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet received we never saw before RcvBuffer[12] changes, rest is same
 // checkSerialCommand() now lives in its own TU (C3 carve-out)
 #include "serial_command.h"
+// gatewayService_*() likewise (C4 carve-out)
+#include "gateway_service.h"
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -3838,75 +3840,8 @@ void esp32loop()
     }
     #endif
     
-    ////////////////////////////////////////////////
-    // WIFI Gateway functions
-    if(bGATEWAY && meshcom_settings.node_hasIPaddress)
-    {
-        { INSTR_SECTION("udp"); getMeshComUDP(); sendMeshComUDP(); }
-
-        // heartbeat
-        if ((uint32_t)(millis() - hb_timer) >= (HEARTBEAT_INTERVAL * 1000))
-        {
-            sendMeshComHeartbeat();
-            hb_timer = millis();
-
-            if (last_upd_timer > 0)
-            {
-                unsigned long hb_age = millis() - last_upd_timer;
-
-
-                // Stage 1: diagnostic warning at 35s
-                if (hb_age > (HB_WARN_TIME * 1000) && !hb_warn_logged)
-                {
-                    bool wifi_ok = (WiFi.status() == WL_CONNECTED);
-                    printfdeb("[UDP] Server not responding for %lus — WiFi %s\n",
-                                  hb_age / 1000, wifi_ok ? "CONNECTED" : "NOT_CONNECTED");
-                    hb_warn_logged = true;
-
-                    // WiFi actually down → reset immediately, don't wait
-                    if (!wifi_ok)
-                    {
-                        printfdeb("[UDP] WiFi down — resetting");
-                        resetMeshComUDP();
-                        last_upd_timer = millis();
-                        hb_warn_logged = false;
-                    }
-                }
-
-                // Stage 2: timeout at 65s
-                if (hb_age > (MAX_HB_RX_TIME * 1000))
-                {
-                    bool wifi_ok = (WiFi.status() == WL_CONNECTED);
-
-                    if (!wifi_ok)
-                    {
-                        printfdeb("[UDP] Heartbeat timeout %lus — WiFi NOT_CONNECTED, resetting\n",
-                                      hb_age / 1000);
-                        resetMeshComUDP();
-                    }
-                    else
-                    {
-                        printfdeb("[UDP] Heartbeat timeout %lus — WiFi CONNECTED, server unresponsive, waiting\n",
-                                      hb_age / 1000);
-                    }
-
-                    last_upd_timer = millis();
-                    hb_warn_logged = false;
-                }
-            }
-        }
-
-        meshcom_settings.node_last_upd_timer = hb_timer;
-
-    }
-    else if(meshcom_settings.node_hasIPaddress)
-    {
-        // TM-45: bGATEWAY is off, so the block above never runs and never
-        // reads the socket -- do only the NTP-reply harvest instead, not
-        // the full gateway receive path (no double read: exactly one of
-        // the two branches runs per loop pass).
-        INSTR_SECTION("udp"); ntpHarvestUDP();
-    }
+    // C4 carve-out: the gateway service block lives in gateway_service_esp32.cpp
+    gatewayService_esp32();
 
     if(bEXTUDP)
     {
