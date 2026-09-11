@@ -183,6 +183,107 @@ static void test_leerer_frame_wird_abgelehnt(void)
     TEST_ASSERT_EQUAL_UINT16(0, decodeAPRS(buf, 0, m));
 }
 
+// ---------------------------------------------------------------------
+// /R=, /U=, /I= decoding + /Y= reset regression (docs/aprs-parser-drift-
+// 20260911.md SS2, docs/architecture/11-wire-format.md SS1.8). These call
+// decodeAPRSPOS() directly on a position-payload String, the same way
+// test/test_decodeaprspos/test_decodeaprspos.cpp does -- decodeAPRS() only
+// splits the frame envelope, it never parses the extension tags itself.
+// ---------------------------------------------------------------------
+
+// /R=9;20; -- two Group-Call entries.
+static void test_grc_zwei_gruppen(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/R=9;20;", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(2, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+    TEST_ASSERT_EQUAL_INT(20, pos.grc[1]);
+}
+
+// /R=9; -- a single Group-Call entry.
+static void test_grc_eine_gruppe(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/R=9;", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(1, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+}
+
+// /U= (bus voltage) und /I= (current), beide float.
+static void test_bus_voltage_und_strom(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/U=12.34/I=0.5", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 12.34, pos.vbus);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 0.5, pos.vcurrent);
+}
+
+// Regression fuer Finding 3: die /Y=-Schleife setzte decode_text/ipt bislang
+// NICHT zurueck und erbte damit den Rest des /V=-Puffers. Bei "/V=3/Y=1"
+// haengt der ungefixte Code "1" hinter das stehengebliebene "3" und liest
+// telemetry=31 statt 1.
+static void test_telemetry_kein_puffer_leck_von_version(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=3/Y=1", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(3, pos.version);
+    TEST_ASSERT_EQUAL_INT(1, pos.telemetry);
+}
+
+// /V= ohne begleitendes /Y= -- telemetry bleibt auf dem initAPRSPOS()-Default.
+static void test_telemetry_ohne_y_bleibt_null(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=3", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(3, pos.version);
+    TEST_ASSERT_EQUAL_INT(0, pos.telemetry);
+}
+
+// Voller Tag-Satz in Encoder-Reihenfolge (B A N P H T O F Q G C R V U I D Y,
+// src/loop_functions.cpp:4300-4447) -- jedes Feld muss unabhaengig von den
+// anderen korrekt decodiert werden.
+static void test_alle_tags_in_encoder_reihenfolge(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(
+        "4825.35N/01147.19E-"
+        "/B=099/A=001657/N5/P=1013.2/H=55.0/T=21.5/O=18.0/F=1000/Q=1015.0"
+        "/G=120.5/C=450/R=9;20;/V=5/U=12.34/I=0.5/D=00000101/Y=1",
+        pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(99, pos.bat);
+    TEST_ASSERT_EQUAL_INT(1657, pos.alt);
+    TEST_ASSERT_EQUAL_INT(5, pos.ncnt);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 1013.2, pos.press);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 55.0, pos.hum);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 21.5, pos.temp);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 18.0, pos.temp2);
+    TEST_ASSERT_EQUAL_INT(1000, pos.qfe);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 1015.0, pos.qnh);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 120.5, pos.gasres);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 450.0, pos.co2);
+    TEST_ASSERT_EQUAL_INT(2, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+    TEST_ASSERT_EQUAL_INT(20, pos.grc[1]);
+    TEST_ASSERT_EQUAL_INT(5, pos.version);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 12.34, pos.vbus);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 0.5, pos.vcurrent);
+    TEST_ASSERT_EQUAL_STRING("00000101", pos.din);
+    TEST_ASSERT_EQUAL_INT(1, pos.telemetry);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -191,5 +292,11 @@ int main(int argc, char **argv)
     RUN_TEST(test_vektor1_position_dl2ja);
     RUN_TEST(test_vektor2_text_oe1xar);
     RUN_TEST(test_latin1_umlaute_ueberleben_encode_und_decode);
+    RUN_TEST(test_grc_zwei_gruppen);
+    RUN_TEST(test_grc_eine_gruppe);
+    RUN_TEST(test_bus_voltage_und_strom);
+    RUN_TEST(test_telemetry_kein_puffer_leck_von_version);
+    RUN_TEST(test_telemetry_ohne_y_bleibt_null);
+    RUN_TEST(test_alle_tags_in_encoder_reihenfolge);
     return UNITY_END();
 }
