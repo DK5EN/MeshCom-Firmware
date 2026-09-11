@@ -56,7 +56,7 @@ MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für AP
 ### Terms:
 - Identifier — APRS data type identifier
 - Message ID – 32-bit LSB->MSB unique value
-- MAX-HOP – max. 7 (mask 0x07); default is 4 for text messages and 2 for position reports (see `MAX_HOP_TEXT_DEFAULT` / `MAX_HOP_POS_DEFAULT` in `src/configuration_global.h`).
+- MAX-HOP – 4-bit field (mask 0x0F), configurable up to `MAX_HOP_LIMIT` 7; default is 4 for text messages and 2 for position reports (see `MAX_HOP_TEXT_DEFAULT` / `MAX_HOP_POS_DEFAULT` in `src/configuration_global.h`).
   - 0x80 – ID as to whether this message has already been sent via the MQTT server
   - 0x40 – Identification that this message should be supplemented for each MeshClient with the call sign of the transmitting station. For measurement and control purposes.
 - Source Address — This field contains the callsign and SSID of the transmitting station
@@ -81,9 +81,9 @@ MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für AP
 #### Message elements
 - Message type ID: ! @ ... text, position, weather message
 - MMMMMMMM Message ID 32-bit LSB->MSB
-- HH MAX-HOP 8-bit bit mask 0x07
+- HH MAX-HOP 8-bit bit mask 0x0F
 - Message via MQTT server bit mask 0x80
-- Insert path into mesh (with comma as separation) bit mask 0x40
+- msg_track (track beacon flag) bit mask 0x40
 - 4800.00 latitude degrees/decimal x 100
 - 01600.00 Longitude degrees/decimal x 100
 - N north / south char
@@ -91,7 +91,7 @@ MeshCom 4.0 verwendet für die Payload-Daten das AX.25 Protokoll, wie es für AP
 - E East / West char
 - \# APRS SYMBOL char
 - BBB battery status in % int 0 - 100
-- /A=HHHH GPS sea level (m) int 0 - 9999
+- /A=HHHHHH GPS altitude (ft), 6 zero-padded digits. Full position-extension key table: [docs/architecture/11-wire-format.md](docs/architecture/11-wire-format.md) §1.8.
 - Message completion closes the APRS message range from 0x00
 - HW ... Hardware Type ID
 - MOD ... LoRa modulation ID

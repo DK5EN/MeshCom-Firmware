@@ -8,6 +8,10 @@ from frames captured on the air (433.175 MHz, raw-frame capture hook in
 where the wire format is ambiguous, the decoder in `src/aprs_functions.cpp`
 is the authority this document follows.
 
+Addendum: §1.8 (the `/X=` position-comment key space) was added 2026-09-11
+against firmware `fork-main` `c6ac16bd` (v4.35t base); the rest of this
+document is unchanged from the 4.35p baseline above.
+
 Purpose: precise enough to implement **mock services and test doubles** for
 `mc-chat`, `MCProxy` and `mcmap` — a fake node, a fake gateway, a fake server,
 and a fake BLE peripheral. Machine-readable companion vectors live in
@@ -185,6 +189,151 @@ consumes them in `loop_functions.cpp` and marks them no-retransmission
 | `{MCP}…` / `{mcp}…`        | Remote IO switching (`:2141`): payload carries a 3-digit sequence check derived from the frame's own `msg_id & 0x3FF`, a password checked against `node_passwd`, and `A | B<n> ON/OFF`mapped to`--setout`. |
 | `{ping}` / `{pong}`        | Connectivity test with RSSI/SNR display echo (`:2115`).                                                                                                                 |
 | `:ackNNN` / `:rejNNN`      | Text-level acknowledgement (§1.5).                                                                                                                                      |
+
+### 1.8 Position comment tail: the `/X=` key space
+
+Encoder: `PositionToAPRS()` (`src/loop_functions.cpp:4200-4495`); decoder:
+`decodeAPRSPOS()` (`src/aprs_functions.cpp:556-1087`). This section covers
+only the comment/tag portion of a position payload — the lat/lon head is
+already covered by §1.1/§1.6.
+
+#### 1.8.1 Grammar
+
+The on-air position payload (frame type byte `0x21` from §1.1, followed by
+the string `PositionToAPRS()` returns) is:
+
+```
+! ddmm.mm <N|S> <symbol-table-char> dddmm.mm <E|W> <symbol-char> [atxt] [#name] [tail]
+```
+
+- `ddmm.mm`/`dddmm.mm`: `%07.2lf`/`%08.2lf` degrees-minutes
+  (`loop_functions.cpp:4492`).
+- `atxt`: free-text comment, optional, ≤ 25 bytes, UTF-8-safe truncated
+  (`charset_utf8_safe_truncate`, `:4280`) and CHR-02-filtered — the bytes
+  `{ } : ; , /` are stripped before truncation because each is structure
+  elsewhere in the wire format (`src/charset_filter.h:71-89`; path
+  `PositionToAPRS():4271-4284`).
+- `#name`: optional, `#` + `node_name` (`:4288`), only when a name is
+  configured.
+- `tail`: the `/X=` key sequence, §1.8.2.
+
+**App-relevant fact**: `tail` (if present) starts immediately after the
+symbol char only when both `atxt` and `#name` are absent — with either one
+present, a `split('/')`-style consumer must skip past it first, not assume a
+fixed offset. See §1.8.5 for the consequence.
+
+#### 1.8.2 The 17 keys
+
+One `snprintf` per key into its own small buffer, then concatenated in a
+fixed order (§1.8.3) into a single tail string. "Branch" is which half of
+`PositionToAPRS()` computes the value: the `bINA226ON` branch (`:4309-4333`),
+the plain-sensor `else` branch (`:4336-4419`), or code outside both (`/R=`,
+`/Y=`, `/D=` — computed unconditionally on their own gates).
+
+| Key   | printf format                                                             | Unit / meaning                                                                | Emit condition                               | Branch       | Origin                                     |
+| ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------ |
+| `/A=` | `%06i` feet (`%05i` metres only if `bFuss=false`, no call site uses that) | altitude, `conv_fuss(alt)` when `bFuss` (always true today)                   | `alt > 0`                                    | both         | upstream (`mcp23017-digital-field.md` §3)  |
+| `/B=` | `%03d`                                                                    | battery percent, sent at 0 % too (empty ≠ "flat", it means "no battery")      | `battHardwarePresent()`                      | both         | upstream                                   |
+| `/P=` | `%.1f`                                                                    | station pressure (QFE), hPa                                                   | `press > 0`                                  | sensor only  | upstream                                   |
+| `/H=` | `%.1f`                                                                    | humidity, %                                                                   | `hum > 0`                                    | sensor only  | upstream                                   |
+| `/T=` | `%.1f`                                                                    | temperature, °C                                                               | `temp != 0`                                  | sensor only  | upstream                                   |
+| `/O=` | `%.1f`                                                                    | second/OneWire temperature, °C                                                | `temp2 != 0`                                 | sensor only  | upstream                                   |
+| `/F=` | `%i`                                                                      | **pressure altitude in metres — not a pressure** (`extern_tele_json.h:12-17`) | `qfe > 0`                                    | sensor only  | upstream                                   |
+| `/Q=` | `%.1f`                                                                    | QNH, hPa                                                                      | `qnh > 0 && !bMCU811ON && !bBME680ON`        | sensor only  | upstream                                   |
+| `/G=` | `%.1f`                                                                    | BME680 gas resistance                                                         | `gasres > 0 && bBME680ON`; also sets `/V=3`  | sensor only  | upstream                                   |
+| `/C=` | `%.0f`                                                                    | CO2, ppm                                                                      | `co2 > 0 && bMCU811ON`; also sets `/V=2`     | sensor only  | upstream                                   |
+| `/V=` | literal `2`, `3` or `5`                                                   | sensor-block version: `2`=MCU811/CO2, `3`=BME680/gas, `5`=INA226              | set by whichever of `/G=`/`/C=`/INA226 fired | both         | upstream (meaning undocumented elsewhere)  |
+| `/N`  | `"/N%i"` — **no `=`**                                                     | MHeard count, capped at 99                                                    | `getMheardCount() > 0`                       | sensor only  | upstream                                   |
+| `/R=` | `%i;` repeated, up to 6                                                   | configured group-call list                                                    | at least one non-zero `node_gcb[]` entry     | outside both | upstream                                   |
+| `/Y=` | literal `1`                                                               | telemetry-beacon flag                                                         | `bSsendTele`                                 | outside both | upstream                                   |
+| `/D=` | `%s`, 8 chars of `0`/`1`                                                  | MCP23017 port A input bits, GPA0 first                                        | `bMCP23017` (chip answered at boot)          | outside both | **fork-only**, commit `b179fdff`, item 207 |
+| `/U=` | `%.2f`                                                                    | INA226 bus voltage, V                                                         | inside the INA226 branch                     | INA226 only  | upstream                                   |
+| `/I=` | `%.1f`                                                                    | INA226 current, A                                                             | inside the INA226 branch                     | INA226 only  | upstream                                   |
+
+Origin follows the letter table in `docs/mcp23017-digital-field.md` §3
+("letters in use in the beacon sensor tail at the time of the decision"),
+against which `D` was the only free, newly-assigned letter.
+
+#### 1.8.3 Concatenation order, separator rule, and the 100-byte budget
+
+There is no explicit separator between keys — **the leading `/` of each key
+is the separator** — so a decoder must scan for `/X=` (or `/N` + digit)
+tokens, never split on `/` as a delimiter (that would also split inside
+`/R=232;2321;`, which itself has no trailing `/`).
+
+Fixed emission order, the `strncat` chain at `loop_functions.cpp:4458-4478`:
+
+```
+B  A  N  P  H  T  O  F  Q  G  C  R  (4 dead buffers, never written)  V  U  I  D  Y
+```
+
+Four buffers (`csfpegel`, `csfpegel2`, `csftemp`, `csfbatt`,
+`loop_functions.cpp:4259-4262,4470-4473`) are concatenated but never
+populated by any code path — reserved slots, currently always empty.
+
+The tail plus `atxt` plus `#name` share a 100-byte budget
+(`strconcat[100]`, `:4455`). If the combined length exceeds 100 bytes, the
+encoder drops fields in this order: **`atxt` first** (`:4481-4484`), then
+**`#name`** (`:4486-4489`) — the `/X=` tail itself is never truncated or
+reordered, only the free-text comment and the node name are sacrificed.
+
+#### 1.8.4 Decoder tolerance
+
+`decodeAPRSPOS()` reads **14 of the 17** keys — `/R=`, `/U=`, `/I=` have no
+scan loop and are silently ignored on receive, even though the same
+firmware emits them. Scan order (independent of the encoder's emission
+order, since each key has its own forward scan over the whole payload):
+
+```
+B  A  P  H  T  O  F  Q  G  N  C  V  Y  D
+```
+
+Per-key notes:
+
+- Each numeric key's value is read into a 25-byte buffer with a 6-or-7
+  character cap (`ipt > 6` cuts the scan; `decode_text[25]` is never
+  overrun) — `/A=`, `/B=`, `/P=`, `/H=`, `/T=`, `/O=`, `/F=`, `/Q=`, `/G=`,
+  `/C=`, `/V=` all share this shape.
+- `/N` is matched only as `/N` immediately followed by a digit `1`-`9`
+  (`:921`) — a leading `0` (never emitted by the encoder, since it only
+  writes `/N` when `incnt > 0`) would not match at all. The value itself is
+  capped at 3 characters.
+- `/D=` requires **exactly 8 characters**, each `0` or `1`
+  (`:1028-1076`); 7, 9+, or any non-binary character leaves `aprspos.din`
+  empty rather than accepting a partial value. 9+ data bytes set an
+  overflow flag instead of being copied, so a long garbage token cannot
+  overrun the 25-byte scratch buffer.
+- `/Y=`'s scan loop (`:999-1022`) is not preceded by a `memset` of
+  `decode_text` the way every other loop is — it can read a stale digit
+  left over from the `/V=` scan directly above it if `/Y=` itself is absent
+  or short. Not a §1.8 fix, just a decode caveat worth knowing before
+  trusting `aprspos.telemetry`.
+- All 14 decoded keys are found independent of their position in the
+  string and independent of each other's presence — the 14 loops each
+  scan the full payload from `istarttext` on.
+
+#### 1.8.5 Consumer notes
+
+- **Never `split('/')` the comment.** A free-text `atxt` may legitimately
+  contain digits after a `/` that is not a key marker once CHR-02's filter
+  is bypassed by an older firmware or a foreign encoder; anchor on the
+  known key letters (§1.8.2), not on the separator byte.
+- **`/A=` is 6-digit feet.** The 5-digit metre form (`%05i`, `bFuss=false`)
+  exists in the encoder but no call site passes `bFuss=false` today — a
+  consumer that branches on digit count to pick feet vs. metres is
+  defending against a form that cannot currently occur on this firmware.
+- **`/Q=` can be legitimately absent** even on a node with a barometric
+  sensor: it is suppressed whenever `bMCU811ON` or `bBME680ON` is set
+  (`:4387`), so "no `/Q=`" does not mean "no pressure sensor".
+- **`/F=` is metres, not hPa** — despite sitting next to `/P=` (hPa) and
+  `/Q=` (hPa) in the tail, treating it as a pressure produces a value off
+  by roughly three orders of magnitude.
+
+For the state of MCProxy's, the phone app's, and the firmware's own
+decoder's handling of each key relative to this grammar — including which
+keys each consumer drops, mis-types, or reads at the wrong offset — see
+`docs/aprs-parser-drift-20260911.md` §2 (per-key drift matrix) and §3
+(frame/trailer drift).
 
 ---
 

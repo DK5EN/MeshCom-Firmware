@@ -2316,7 +2316,7 @@ the configured comment `node_atxt` (`char[40]`, copied verbatim by `--atxt`/`--a
   read as an ACK signal (`lora_functions.cpp:905-908`).
 - `,` and `;` inside a HEY payload separate `count,rssi,snr` per hop
   (`appendHeySignalReport()`, `aprs_functions.cpp:1152-1157`, consumed `mheard_functions.cpp:455`).
-- `/B= /A= /P= /H= /T= /O= /F= /Q= /G= /N= /C= /V= /Y=` are the position extension markers, scanned
+- `/B= /A= /P= /H= /T= /O= /F= /Q= /G= /N<n> /C= /V= /Y= /R= /U= /I= /D=` are the position extension markers, scanned
   byte-by-byte at `aprs_functions.cpp:656-1011`; `N`/`S` and `W`/`E` terminate the lat/lon numeric
   fields (`:560`, `:596`).
 - Callsign and path fields are **already** ASCII-gated (`:204`, `:302`) plus `checkRegexCall()`
