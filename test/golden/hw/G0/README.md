@@ -27,9 +27,11 @@ set. Done 2026-09-11, 0 unexplained absences on the four shipping envs.
 ## The branch has moved one command past this tag
 
 `--keylock` was added after `dry-base-20260911` (the `TD-16` fix, commit
-`76302aab`). The command corpus in `test/golden/corpus/commands/` holds **305**
-ladder entries and does not contain it, which is correct for the tag and stale
-for the branch head. That is a deliberate divergence, not corpus rot:
+`76302aab`). It is **two** ladder entries, `keylock on ` and `keylock off `, so
+the corpus in `test/golden/corpus/commands/` holds **305** entries where the
+branch head has 307. Verified by diffing the extractor against the committed
+`ladder-order.txt`: those two entries are the only difference, nothing else in
+the ladder moved. That is a deliberate divergence, not corpus rot:
 
 - a G1 console capture on the branch head will show one command the G0 capture
   does not. It belongs on the expected-diff list; it does not invalidate G0.
