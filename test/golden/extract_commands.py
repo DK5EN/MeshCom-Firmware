@@ -149,12 +149,70 @@ def _guard_stack(lines: List[str]) -> List[str]:
     return out
 
 
+def blank_comments(text: str) -> str:
+    """Replace C comments with spaces, keeping every line and column.
+
+    Without this the scan counts commented-out branches as live commands. The
+    very first entry it used to report, `"compress "` at :288, sits inside a
+    `/* TEST ... */` block: the node answers `...wrong command --compress`,
+    which is how it was found -- by driving the generated script at real
+    hardware, not by reading. The audit's D2-01/04 names ~55 lines of
+    commented-out branches, so it was never going to be the only one.
+
+    String literals are respected, or a command containing `//` would truncate
+    the rest of the file.
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    state = "code"
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if c == '"':
+                state = "string"
+            elif c == "'":
+                state = "char"
+            elif c == "/" and nxt == "*":
+                state = "block"
+                out[i] = out[i + 1] = " "
+                i += 2
+                continue
+            elif c == "/" and nxt == "/":
+                while i < n and text[i] != "\n":
+                    out[i] = " "
+                    i += 1
+                continue
+        elif state == "string":
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                state = "code"
+        elif state == "char":
+            if c == "\\":
+                i += 2
+                continue
+            if c == "'":
+                state = "code"
+        elif state == "block":
+            if c == "*" and nxt == "/":
+                out[i] = out[i + 1] = " "
+                i += 2
+                state = "code"
+                continue
+            if c != "\n":
+                out[i] = " "
+        i += 1
+    return "".join(out)
+
+
 def extract(src: Path = LADDER_SRC, *, inner: bool = False) -> List[Command]:
     """Ladder-level commandCheck sites in source order.
 
     With `inner=True` the disambiguation calls are returned instead.
     """
-    lines = src.read_text(errors="replace").splitlines()
+    lines = blank_comments(src.read_text(errors="replace")).splitlines()
     ladder_lines = {n for span in _condition_spans(lines) for n in span}
     guards = _guard_stack(lines)
 
@@ -247,6 +305,18 @@ def _self_test() -> int:
     failures = 0
     commands = extract()
 
+    # The commented-out `"compress "` at :288 must not be in the list.
+    if any(c.name.strip() == "compress" for c in commands):
+        failures += 1
+        print("FAIL: a commented-out command is counted as a ladder entry")
+    blanked = blank_comments('a = "/* not a comment */"; /* real */ b;')
+    if '"/* not a comment */"' not in blanked or "real" in blanked:
+        failures += 1
+        print(f"FAIL: comment stripping: {blanked!r}")
+    if len(blank_comments("x /* a\nb */ y")) != len("x /* a\nb */ y"):
+        failures += 1
+        print("FAIL: comment stripping changed the length")
+
     if len(commands) < 280:
         failures += 1
         print(f"FAIL: only {len(commands)} ladder sites found")
@@ -254,10 +324,15 @@ def _self_test() -> int:
     # The split must be exhaustive: every call is either a ladder test or an
     # inner disambiguation, never both and never neither.
     inner = extract(inner=True)
-    total = len(_CALL_RE.findall(LADDER_SRC.read_text(errors="replace")))
-    if len(commands) + len(inner) != total:
+    raw = LADDER_SRC.read_text(errors="replace")
+    live = len(_CALL_RE.findall(blank_comments(raw)))
+    total = len(_CALL_RE.findall(raw))
+    if len(commands) + len(inner) != live:
         failures += 1
-        print(f"FAIL: {len(commands)} ladder + {len(inner)} inner != {total} calls")
+        print(f"FAIL: {len(commands)} ladder + {len(inner)} inner != {live} live calls")
+    if live >= total:
+        failures += 1
+        print(f"FAIL: comment stripping removed nothing ({live} of {total})")
 
     # An inner disambiguation must not be reported as a ladder duplicate:
     # `operatorname ` (:2555 ladder, :2557 inner) is the canonical shape.
