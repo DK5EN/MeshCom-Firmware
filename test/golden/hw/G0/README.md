@@ -38,9 +38,26 @@ the ladder moved. That is a deliberate divergence, not corpus rot:
 - the shipping-image command-name scan predates `--keylock` too and has to be
   re-run before it can be cited again as evidence about the shipping command
   set.
-- regenerate with `python3 test/golden/build_corpus.py` when G1 is taken, not
-  before -- regenerating now would leave G0's own baseline describing a tree
-  that no capture was taken on.
+- **regenerated 2026-09-11 anyway**, earlier than this note first said, because
+  `--setctry` had to be held back from the driveable script (see below). The
+  corpus now describes the branch head, 307 entries, not the tag. Under
+  operator decision 5 that costs nothing: `H3` has no baseline to compare
+  against in the first place, so there is no capture whose corpus this would
+  no longer match.
+
+## `--setctry` is manual-only from 2026-09-11
+
+`--setctry 1` is a _valid_ country (UK), so the node accepts it: it
+reconfigures the radio to 439.9125 MHz and prints `Auto. Reboot after 15 sec.`
+In the Heltec-93 USB capture that lands about 600 lines from the end of 2 124,
+so the whole tail is post-reboot state at a different frequency, with reboot
+timing that varies from run to run -- and the node is left on UK settings
+afterwards.
+
+Same class as `--deepsleep`: the command succeeds and the capture is the
+casualty. It is now in `destructive-manual.txt`. Whether it explains part of
+the console golden's 153 unexplained differences is **not established** -- it
+is a plausible contributor, nothing more.
 
 Compare a later run against these with:
 

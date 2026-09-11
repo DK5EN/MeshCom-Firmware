@@ -124,6 +124,8 @@
 --gateway off
 --ackinfo on
 --ackinfo off
+--keylock on
+--keylock off
 --gateway pos
 --gateway nopos
 --gateway srv 1
@@ -270,9 +272,6 @@
 --setio 1
 --setio 999999
 --setio abc
---setctry 1
---setctry 999999
---setctry abc
 --maxhop 1
 --maxhop 999999
 --maxhop abc

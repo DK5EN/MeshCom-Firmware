@@ -212,6 +212,14 @@ _MANUAL_ONLY: Dict[str, str] = {
     "cleanflash": "wipes settings on next boot",
     "reboot": "reboots the node mid-capture",
     "deepsleep": "halts the node; everything after it in a script is lost",
+    # Found 2026-09-11 by reading the Heltec-93 console capture: `--setctry 1`
+    # is a *valid* country (UK), so it is accepted -- it reconfigures the radio
+    # to 439.9125 MHz and prints "Auto. Reboot after 15 sec.". In the capture
+    # that lands about 600 lines from the end of 2124, so the tail is
+    # post-reboot state at a different frequency, with reboot timing that
+    # varies from run to run, and the node is left on UK afterwards. Same class
+    # as --deepsleep: the command succeeds and the capture is the casualty.
+    "setctry": "valid values reconfigure the radio and reboot after 15 s",
     "spiffs": "erases the filesystem (`spiffs reset`)",
     "ota-update": "reflashes the node",
     "flashpoke": "writes out-of-range radio values to flash (TM-32 hook)",

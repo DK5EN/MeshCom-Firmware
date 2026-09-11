@@ -12,6 +12,7 @@
 #   passwd         changes the BLE PIN; a wrong value locks the bench out
 #   reboot         reboots the node mid-capture
 #   setcall        changes the node callsign
+#   setctry        valid values reconfigure the radio and reboot after 15 s
 #   setowndns      changes DNS; also the duplicate-branch defect (OPT-D2)
 #   setowngw       changes the default gateway
 #   setownip       changes the static IP the 2323 capture connects to
@@ -73,6 +74,9 @@
 --setownntp 1
 --setownntp 999999
 --setownntp abc
+--setctry 1
+--setctry 999999
+--setctry abc
 --wifitxpower 1
 --wifitxpower 999999
 --wifitxpower abc
