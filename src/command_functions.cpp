@@ -5252,26 +5252,42 @@ void commandAction(char *umsg_text, bool ble)
         instrument_reset();
         return;
     }
-    #if defined(ESP32) && !defined(DISABLE_NET_CONSOLE)
+    #if (defined(ESP32) && !defined(DISABLE_NET_CONSOLE)) || defined(NRF52_SERIES)
     // DISABLE_NET_CONSOLE (E22_XML): kein WiFi-Include-Pfad und kein RAM-Budget
     // fuer den Bench-Hook -- der Block entfaellt dort komplett.
+    //
+    // nRF52 was added 2026-09-11: `bench_srvip` already linked there
+    // (udp_functions.cpp is in the nRF52 build filter) but nothing read it, so
+    // the board could only ever talk to a real MeshCom server -- it has no DNS
+    // resolver on the Ethernet path and every branch of NrfETH::startUDP()
+    // assigns a hardcoded literal. Without this the UDP-1990 golden captures
+    // of the test plan's steps H6/H7 cannot be driven on RAK4631 at all.
+    // The override is RAM-only on both platforms and must therefore be applied
+    // in place, never across a reboot.
     else
     if(commandCheck(msg_text+2, (char*)"srvip ") == 0)
     {
         // TM-31 bench hook: MeshCom server override (0.0.0.0 clears), RAM only,
         // takes effect at the next startMeshComUDP() (--reboot or WiFi restart).
         extern IPAddress bench_srvip;
+        #if defined(NRF52_SERIES)
+        extern void nrfEthRestartUDP();
+        #endif
         IPAddress ip;
         if(ip.fromString(msg_text+8))
         {
             bench_srvip = ip;
-            Serial.printf("[SRVIP];%s;set\n", ip.toString().c_str());
+            // Octets, not ip.toString(): the nRF52 IPAddress (RAK13800_W5100S)
+            // has no toString(). The rendered text is identical on both
+            // platforms, so the console line stays byte-for-byte what it was.
+            Serial.printf("[SRVIP];%i.%i.%i.%i;set\n", ip[0], ip[1], ip[2], ip[3]);
             // Re-run the UDP bring-up now so the override takes effect without a
             // reboot (the override lives in RAM only). Keyed on the driver state,
             // not on hasIPaddress: after the boot retry gave up, a driver-side
             // reconnect is never harvested (TM-34 F3 blind window, seen live
             // 2026-08-29: got_ip at 53 s, no startMeshComUDP() until the 5-min
             // restart) -- this hook doubles as the manual harvest for the bench.
+            #if defined(ESP32)
             if(WiFi.status() == WL_CONNECTED)
             {
                 extern WiFiUDP Udp;
@@ -5280,6 +5296,16 @@ void commandAction(char *umsg_text, bool ble)
             }
             else
                 Serial.println("[SRVIP];note;WiFi not connected, applies at the next bring-up");
+            #else
+            // nRF52: apply now, exactly as the ESP32 branch does. The override
+            // lives in RAM only, so "use --reboot" -- the first shape of this
+            // hook -- destroyed the value before startUDP() could read it, and
+            // the node went on talking to the hardcoded server. Re-entering
+            // startUDP() from here is safe: it is public, and its normal
+            // caller initethDHCP() runs in the same loop task that dispatches
+            // this command.
+            nrfEthRestartUDP();
+            #endif
         }
         else
             Serial.println("[SRVIP];err;usage --srvip a.b.c.d");

@@ -3,6 +3,7 @@
 **/
 
 #include <SPI.h>
+#include "instrument.h"   // INSTRUMENT_ENABLED for the --srvip bench hook below
 #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
 #include <Arduino.h>
 #include <nrf_eth.h>
@@ -48,6 +49,20 @@ unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE+5]; // Buffer to hold incoming pack
 
 String s_node_ip;
 String s_node_hostip;
+
+#if INSTRUMENT_ENABLED
+// One free function so command_functions.cpp can re-apply the override without
+// pulling nrf_eth.h (and the whole RAK13800 driver) into a file that every
+// platform compiles.
+void nrfEthRestartUDP();
+
+// TM-31 bench hook, nRF52 definition. The ESP32 copy in udp_functions.cpp sits
+// inside that file's `#ifdef ESP32` block -- the file compiles for nRF52 but
+// the symbol does not, so it has to be defined here or the link fails with
+// "undefined reference to bench_srvip" from both command_functions.cpp and
+// startUDP(). Exactly one definition per build either way.
+IPAddress bench_srvip = IPAddress(0, 0, 0, 0);
+#endif
 String strSource_call;
 
 // ---- TM-35 / N-20 instrumentation ------------------------------------------
@@ -1173,6 +1188,26 @@ void NrfETH::startUDP()
       }
     }
 
+#if INSTRUMENT_ENABLED
+    // Bench hook, nRF52 half of the ESP32 `--srvip` override
+    // (command_functions.cpp, applied there in wifiDnsPoll()). Unlike the
+    // ESP32 path there is no DNS resolver here at all: every branch above
+    // assigns a hardcoded literal, so without this the node can only ever
+    // talk to a real MeshCom server and the UDP-1990 golden captures cannot
+    // be driven against a local stub. RAM only, cleared by 0.0.0.0, applied
+    // at the next startUDP().
+    {
+        if((uint32_t)bench_srvip != 0)
+        {
+            udp_dest_addr = bench_srvip;
+            srv_path = "bench";
+            Serial.printf("[SRVIP];%i.%i.%i.%i;applied\n",
+                          udp_dest_addr[0], udp_dest_addr[1],
+                          udp_dest_addr[2], udp_dest_addr[3]);
+        }
+    }
+#endif
+
     snprintf(sn, sizeof(sn), "%i.%i.%i.%i", udp_dest_addr[0], udp_dest_addr[1], udp_dest_addr[2], udp_dest_addr[3]);
     s_node_hostip = sn;
 
@@ -1320,3 +1355,12 @@ void NrfETH::startFIXUDP()
   btimeClient = true;
 
 }
+
+#if INSTRUMENT_ENABLED
+// Defined out of line, after NrfETH and the `neth` instance are both complete.
+void nrfEthRestartUDP()
+{
+    extern NrfETH neth;
+    neth.startUDP();
+}
+#endif
