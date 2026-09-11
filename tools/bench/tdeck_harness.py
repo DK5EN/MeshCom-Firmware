@@ -996,6 +996,20 @@ def _pct(values: Sequence[float], q: float) -> Optional[float]:
     return round(v[k], 1)
 
 
+def _keylock_state(session: TDeckSession) -> Optional[bool]:
+    """True/False from the `...KEYLOCK on|off` field of --info, None if the
+    node did not answer with that line. TD-16: a persisted SYM+K lock makes
+    touch and keyboard dead while every other symptom reads as a crash."""
+    idx = session.send("--info")
+    session.wait_for(r"KEYLOCK\s+(on|off)", 4.0, since=idx)
+    time.sleep(0.2)
+    for _, _, l in session.records_since(idx):
+        m = re.search(r"KEYLOCK\s+(on|off)", l)
+        if m:
+            return m.group(1) == "on"
+    return None
+
+
 def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     """Keyboard and trackball tests. Keys are injected into keypad_get_key()
     (the I2C keyboard path) on the chat tab, trackball steps into mouse_read()
@@ -1004,7 +1018,31 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     every trackball step is consumed and followed by a repaint; the
     event-to-repaint latency is reported (p50/p95), and the trackball's
     cursor must move by exactly one step per event -- the "not smooth"
-    symptom is an event that is swallowed or a repaint that lags."""
+    symptom is an event that is swallowed or a repaint that lags.
+
+    Blind spot this scenario cannot close, and the reason for the keylock
+    precondition below (TD-18): the `[KEY]` line is printed near the top of
+    keypad_read() (`tdeck_main.cpp:785/803`), while a locked keyboard is
+    dropped at the *bottom* of the same function, which forces
+    LV_INDEV_STATE_REL (`tdeck_main.cpp:1161`). So every injected key is
+    logged and counted even though LVGL receives nothing, and the clock and
+    the status bar supply the repaint the latency probe waits for. Measured
+    on DK5EN-14 on 2026-09-11: PASS with keys=7/7 on a node whose keyboard
+    was entirely dead to the operator. Nothing in the serial stream
+    distinguishes the two cases, so the scenario refuses to run with the lock
+    on rather than pretend to measure through it. The trackball is
+    unaffected: mouse_read() is not gated by the lock, which is why the
+    trackball kept working while the keyboard did not."""
+    lock = _keylock_state(session)
+    if lock is not False:
+        return {
+            "ok": False,
+            "error": "keyboard lock is %s -- a SYM+K lock gates key delivery to LVGL "
+                     "while the [KEY] lines keep printing, so this scenario cannot "
+                     "measure the keyboard. Clear it with --keylock off and re-run "
+                     "(TD-16/TD-18)." % ("on" if lock else "unreadable"),
+            "keylock": lock,
+        }
     session.send("--tft on")
     session.send("--tab 1")               # chat input tab
     time.sleep(1.0)
@@ -2544,6 +2582,9 @@ def print_summary(summary: Dict[str, Dict[str, Any]]) -> None:
             for rb in result.get("sdmap_rebuilds", []):
                 print(f"    rebuild {rb['w']}x{rb['h']} px, {rb['ms']} ms, from={rb['from']}")
         elif name == "input":
+            if result.get("error"):
+                print(f"  not run: {result['error']}")
+                continue
             print(
                 f"  keys={result.get('keys_consumed')}/{result.get('keys_sent')} repaints={result.get('key_repaints')} "
                 f"latency p50={result.get('key_latency_p50_ms')} p95={result.get('key_latency_p95_ms')} ms"

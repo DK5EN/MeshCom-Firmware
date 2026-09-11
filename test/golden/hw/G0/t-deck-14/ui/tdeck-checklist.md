@@ -8,15 +8,24 @@ Filled by: **\_\_\_\_\_\_\_\_** · Repeat verbatim at G1 and G2.
 `tools/bench/tdeck_harness.py --scenario tabs,nav,input` ran green on this
 node; the log is `harness-tabs-nav-input.txt` next to this file.
 
-| Scenario | Covers                                               | Result |
-| -------- | ---------------------------------------------------- | ------ |
-| `tabs`   | switching through every tab, repaint per tab         | PASS   |
-| `nav`    | drawer → tab → drawer over all tabs, settings scroll | PASS   |
-| `input`  | keyboard keys and trackball through the LVGL indev   | PASS   |
+| Scenario | Covers                                               | Result   |
+| -------- | ---------------------------------------------------- | -------- |
+| `tabs`   | switching through every tab, repaint per tab         | PASS     |
+| `nav`    | drawer → tab → drawer over all tabs, settings scroll | PASS     |
+| `input`  | keyboard keys and trackball through the LVGL indev   | **VOID** |
 
 Those prove the UI **responds**. They cannot prove what it **shows**: the panel
 readback probe is void on this hardware, so nothing can read the framebuffer
 back. That is why the four items below need eyes.
+
+**The `input` result above is void, and that is the point (TD-18).** This run
+was taken while the `TD-16` keyboard lock was still on, so the keyboard was
+dead to the operator while the scenario reported `keys=7/7`: it counts the
+`[KEY]` line, printed at the top of `keypad_read()`, and the lock drops the key
+at the bottom of the same function. The scenario now reads `--info` first and
+refuses to run unless `KEYLOCK off`; the keyboard half must be re-run on the
+unlocked node before this checklist counts as the G0 record. The trackball half
+was never affected -- `mouse_read()` is not gated by the lock.
 
 ## Manual — four checks, about five minutes
 
