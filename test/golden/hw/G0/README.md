@@ -72,21 +72,23 @@ the GPS rewrites them and no import can restore them.
 
 With restore in front of each run, all four nodes reproduce exactly.
 
-## UDP-1990, captured on three platforms
+## UDP-1990, captured on all four nodes
 
-All three read the same corpus the same way — the classification agrees on
-every entry, and the counts differ only where the KEEP cadence fell:
+All four read the same corpus the same way — the classification agrees on every
+entry, and the counts differ only where the KEEP cadence fell:
 
 | Node        | Platform      | DATA | BEAT | CET | OTHER | CONF | own uploads     |
 | ----------- | ------------- | ---: | ---: | --: | ----: | ---: | --------------- |
 | `heltec-93` | ESP32-S3      |   24 |    7 |   3 |     2 |    1 | 3 KEEP          |
 | `rak-90`    | nRF52         |   26 |    4 |   3 |     2 |    1 | 2 KEEP + 2 DATA |
 | `t-beam-92` | ESP32 classic |   24 |    8 |   3 |     2 |    1 | 3 KEEP + 2 DATA |
+| `t-deck-14` | ESP32-S3      |   24 |    5 |   3 |     2 |    1 | 4 KEEP          |
 
-The `DATA` uploads are acks the node generated for the corpus DM addressed to
-it — genuine node → server traffic, so part of step H7 is captured without any
-LoRa injection. Their lengths differ per node because the `DATA` header
-carries the node's own callsign and version.
+The `DATA` uploads are acks for the corpus DM, which is addressed to
+`DK5EN-90` — so only a node that considers itself the addressee generates one,
+and `t-deck-14` rightly stays quiet. That asymmetry is only visible because the
+surface was captured per node rather than once, and a shared `D1-01` handler
+has to preserve it.
 
 `rak-90` is the case the nRF52 `--srvip` hook was written for: before
 `ee545088` that board could not be pointed at a stub at all.
