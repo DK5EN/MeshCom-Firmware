@@ -7,6 +7,38 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 
 ---
 
+## APRS-Parser-Contract und Decoder/Encoder-Fixes (unreleased) (2026-09-11)
+
+`FLASH_VERSION` bleibt bei 20260910 -- kein neuer Stand getaggt, diese
+Aenderungen laufen im Changelog als "Unreleased" (Punkte 212-215).
+
+Ausloeser war eine Parser-Drift-Analyse (`docs/aprs-parser-drift-20260911.md`):
+die Firmware emittiert 17 `/X=`-Positionsschluessel, ihr eigener Decoder kannte
+nur 14. Drei kleine, upstream-faehige Fixes plus eine Doku-Korrektur:
+
+- **Decoder liest `/R=`, `/U=`, `/I=`** (Punkt 212, `decodeAPRSPOS()` in
+  `src/aprs_functions.cpp`) -- Gruppenliste, INA226-Busspannung und -Strom
+  wurden bisher beim Empfang stillschweigend verworfen.
+- **`/Y=`-Puffer-Reset** (Punkt 213, dieselbe Funktion) -- der Telemetriewert
+  konnte Ziffern aus dem vorangehenden `/V=`-Scan erben.
+- **Encoder-NaN-Guards pruefen jetzt den eigenen Puffer** (Punkt 214,
+  `PositionToAPRS()` in `src/loop_functions.cpp`, neuer Header
+  `src/pos_tag_nan.h`) -- sieben von acht Guards verglichen bisher `cpress`
+  statt ihres eigenen Puffers, ein NaN in `/H= /T= /O= /F= /Q= /G= /C=` waere
+  ungefiltert auf die Luft gegangen.
+- **Contract-Dokumentation** (Punkt 215) -- `docs/architecture/11-wire-format.md`
+  bekommt einen §1.8 mit dem vollstaendigen `/X=`-Schluesselraum, dazu
+  Korrekturen in README und BACKLOG.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+Nichts davon ist auf echter Hardware gelaufen. Verifiziert ist ausschliesslich
+die native Testsuite (`native_parsers`, inklusive `test/test_pos_tag_nan/`);
+kein Board wurde geflasht, kein Feldrahmen mit den drei zusaetzlichen
+Schluesseln empfangen.
+
+---
+
 ## Stability-Release v4.35t.09.10 (2026-09-10)
 
 Eine Aenderung des Forks gegenueber `v4.35s.09.09`, Changelog-Punkt 211:

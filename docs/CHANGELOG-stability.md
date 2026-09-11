@@ -77,6 +77,37 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
+## Unreleased (after v4.35t.09.10)
+
+Four items, found by a parser-drift analysis against the firmware's own wire
+format (`docs/aprs-parser-drift-20260911.md`): the encoder emits 17 `/X=`
+position keys, and its own decoder only understood 14.
+
+212. **Decoder now reads `/R=`, `/U=` and `/I=`** (`6fd9c3a5`, N-32).
+     `decodeAPRSPOS()` (`src/aprs_functions.cpp`) scanned 14 of the 17 keys
+     `PositionToAPRS()` (`src/loop_functions.cpp`) emits; the group list
+     (`/R=`), INA226 bus voltage (`/U=`) and INA226 current (`/I=`) were
+     silently dropped on receive. Three new scan loops, mirroring the
+     existing ones, decode them into new `aprsPosition` fields.
+213. **`/Y=` scan no longer inherits the `/V=` buffer** (`6fd9c3a5`, N-33). The
+     scan loop for `/Y=` (`aprs_functions.cpp:999-1022`) was the only key
+     that did not reset `decode_text`/`ipt` before scanning, so a frame
+     carrying both `/V=` and `/Y=` could read a concatenation of both values
+     into `aprspos.telemetry`. Now reset like every other key.
+214. **Encoder NaN guards now test their own buffer** (`6fd9c3a5`, N-34). All
+     eight NaN guards in `PositionToAPRS()` (`src/loop_functions.cpp:~4355-4408`)
+     compared `cpress` instead of their own buffer; seven of the eight
+     (`/H= /T= /O= /F= /Q= /G= /C=`) could let a NaN value on the air as
+     `/H=nan` etc. Fixed with a shared header-only helper,
+     `posTagIsNan()` (`src/pos_tag_nan.h`), applied per buffer and covered
+     by a new native suite, `test/test_pos_tag_nan/`.
+215. **Docs: `/X=` contract and README/BACKLOG corrections** (`af498676`).
+     `docs/architecture/11-wire-format.md` gains a §1.8 with the full
+     17-key `/X=` grammar (format, unit, condition, order, the 100-byte
+     budget and drop order); `README.md` and `BACKLOG.md` are corrected
+     where they contradicted it (see
+     `docs/aprs-parser-drift-20260911.md` §4).
+
 ## New in v4.35t.09.10
 
 One change on top of `v4.35s.09.09`, item 211: the fork is brought level with

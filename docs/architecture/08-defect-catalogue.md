@@ -1374,6 +1374,60 @@ kann. Nativ geprueft in `test/test_mask_secret` (6 Faelle).
 Unabhaengig davon bleibt richtig, was `net_console.h` empfiehlt: `--passwd`
 setzen. Die Maskierung nimmt dem offenen Port nur den lohnendsten Fund.
 
+### N-32 — Decoder liest `/R=`, `/U=`, `/I=` nicht — 3 von 17 `/X=`-Schluesseln gehen beim Empfang verloren — **FIXED (2026-09-11)** — Low, Datenverlust
+
+`decodeAPRSPOS()` (`src/aprs_functions.cpp`) scannt der Reihe nach `/B= /A= /P= /H=
+/T= /O= /F= /Q= /G= /N /C= /V= /Y= /D=` — 14 Schluessel. Der eigene Encoder
+(`PositionToAPRS()`, `src/loop_functions.cpp`) emittiert aber 17
+(`docs/aprs-parser-drift-20260911.md` §2, formalisiert in
+`docs/architecture/11-wire-format.md` §1.8): `/R=` (bis zu sechs Gruppen,
+semikolongetrennt), `/U=` (INA226-Busspannung, `%.2f`) und `/I=` (INA226-Strom,
+`%.1f`) fehlten dem Decoder komplett — kein Scan-Loop, kein Feld. Jeder Konsument,
+der sich auf den firmwareeigenen Decode verlaesst, sieht diese drei Werte nie,
+obwohl sie auf der Luft stehen.
+
+Fix: drei neue Scan-Loops nach dem Muster der bestehenden Schluessel, decodiert in
+neue `aprsPosition`-Felder (Gruppenliste, Busspannung, Strom).
+
+> **STATUS 2026-09-11 — FIXED (commit `6fd9c3a5`)** `decodeAPRSPOS()` liest jetzt alle
+> 17 emittierten Schluessel. Kein Hardware-Test — Regressionsabdeckung im
+> `native_parsers`-Korpus.
+
+### N-33 — `/Y=`-Scan erbt den `/V=`-Puffer — Telemetriewert kann verfaelscht sein — **FIXED (2026-09-11)** — Low, Datenintegritaet
+
+`decodeAPRSPOS()` setzt vor jedem Schluessel-Scan `memset(decode_text, 0x00,
+sizeof(decode_text)); ipt=0;` — ausser vor `/Y=` (`aprs_functions.cpp:999-1022`).
+Der Scan fuer `/V=` laeuft unmittelbar davor und laesst `decode_text`/`ipt` mit
+seinem eigenen Zwischenstand stehen; der `/Y=`-Scan schreibt seine Ziffern hinter
+die bereits vorhandenen von `/V=`, statt bei Index 0 neu zu beginnen. Bei einem
+Frame mit beiden Schluesseln liest `sscanf(decode_text, "%i", &aprspos.telemetry)`
+deshalb eine Verkettung wie `"31"` statt `"1"`.
+
+Fix: derselbe `memset`/`ipt=0`-Reset wie vor jedem anderen Schluessel, jetzt auch
+vor dem `/Y=`-Scan.
+
+> **STATUS 2026-09-11 — FIXED (commit `6fd9c3a5`)** Reset ergaenzt, deckungsgleich mit
+> den uebrigen 13 Schluesseln. Kein Hardware-Test — Regressionsabdeckung im
+> `native_parsers`-Korpus.
+
+### N-34 — Encoder-NaN-Guards pruefen den falschen Puffer — `/H=nan` und sechs weitere Schluessel koennen auf die Luft gehen — **FIXED (2026-09-11)** — Medium, RF
+
+`PositionToAPRS()` (`src/loop_functions.cpp:~4355-4408`) baut acht `/X=`-Werte
+(`/P= /H= /T= /O= /F= /Q= /G= /C=`) und prueft danach per `memcmp` auf `"nan"`, ob
+`snprintf` einen NaN-Wert geliefert hat. Sieben der acht Guards vergleichen aber
+nicht ihren eigenen Puffer, sondern `cpress` — Copy-Paste vom ersten Guard (`/P=`,
+dort ist `cpress` zufaellig korrekt, weil es der eigene Puffer ist). Ein NaN in
+`hum`, `temp`, `temp2`, `qfe`, `qnh`, `gasres` oder `co2` wird also nie erkannt,
+solange `cpress` selbst keinen NaN-String traegt — die betroffene Angabe (z. B.
+`/H=nan`) geht unveraendert auf die Luft.
+
+Fix: `posTagIsNan()` (`src/pos_tag_nan.h`, header-only) je Puffer aufgerufen, statt
+des siebenfachen `cpress`-Vergleichs.
+
+> **STATUS 2026-09-11 — FIXED (commit `6fd9c3a5`)** Alle acht Guards pruefen jetzt
+> ihren eigenen Puffer ueber `posTagIsNan()`. Kein Hardware-Test — native
+> Unit-Tests (`native_parsers`, `test/test_pos_tag_nan/`).
+
 ## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
 
 Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
@@ -1669,19 +1723,23 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 
 ### Wave 1 — RF-reachable criticals (each a standalone PR)
 
-| #       | Item                                   | ID              | Size        | Status                                                   |
-| ------- | -------------------------------------- | --------------- | ----------- | -------------------------------------------------------- |
-| 1.1     | `printfdeb` non-literal format string  | `SEC-02`        | 1 line      | **DONE** 2026-08-18                                      |
-| 1.2     | CONF zero-fill overflow                | `N-03`          | delete loop | **DONE** 2026-08-18                                      |
-| ~~1.3~~ | `{MCP}` password bypass                | `N-01`/`SEC-01` | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
-| ~~1.4~~ | `{SET}` unauthenticated routing change | `N-02`          | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
-| 1.5     | `memcpy` length underflow chain        | `N-04`/`BUG-08` | small       | **DONE** 2026-08-18                                      |
-| 1.6     | mheard heap over-read                  | `N-05`          | 1 line      | **DONE** 2026-08-18                                      |
-| 1.7     | web `t_io` bound check                 | `N-06`          | 2 lines     | **DONE** 2026-08-18                                      |
-| ~~1.8~~ | BLE command gate                       | `N-07`          | small       | ACCEPTED / WONTFIX 2026-08-18 — bonding breaks app fleet |
+| #       | Item                                    | ID              | Size        | Status                                                   |
+| ------- | --------------------------------------- | --------------- | ----------- | -------------------------------------------------------- |
+| 1.1     | `printfdeb` non-literal format string   | `SEC-02`        | 1 line      | **DONE** 2026-08-18                                      |
+| 1.2     | CONF zero-fill overflow                 | `N-03`          | delete loop | **DONE** 2026-08-18                                      |
+| ~~1.3~~ | `{MCP}` password bypass                 | `N-01`/`SEC-01` | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
+| ~~1.4~~ | `{SET}` unauthenticated routing change  | `N-02`          | small       | ACCEPTED / WONTFIX 2026-08-18 — maintainer decision      |
+| 1.5     | `memcpy` length underflow chain         | `N-04`/`BUG-08` | small       | **DONE** 2026-08-18                                      |
+| 1.6     | mheard heap over-read                   | `N-05`          | 1 line      | **DONE** 2026-08-18                                      |
+| 1.7     | web `t_io` bound check                  | `N-06`          | 2 lines     | **DONE** 2026-08-18                                      |
+| ~~1.8~~ | BLE command gate                        | `N-07`          | small       | ACCEPTED / WONTFIX 2026-08-18 — bonding breaks app fleet |
+| 1.9     | APRS decoder: `/R= /U= /I=` fehlen      | `N-32`          | small       | FIXED 2026-09-11                                         |
+| 1.10    | APRS `/Y=` Puffer-Reset                 | `N-33`          | small       | FIXED 2026-09-11                                         |
+| 1.11    | APRS Encoder-NaN-Guards falscher Puffer | `N-34`          | small       | FIXED 2026-09-11                                         |
 
-**Wave 1 is closed** — all 8 items done or deliberately accepted as risk. See the Standing risk
-box in `docs/BACKLOG.md` for what "done" means here (fixed locally, not yet upstream).
+**Wave 1's original 8 items are closed** — all done or deliberately accepted as risk; items 1.9-1.11
+were added 2026-09-11 (APRS parser contract fixes, `docs/aprs-parser-drift-20260911.md`). See the
+Standing risk box in `docs/BACKLOG.md` for what "done" means here (fixed locally, not yet upstream).
 
 ### Wave 2 — remaining prior-verdict Track A
 
