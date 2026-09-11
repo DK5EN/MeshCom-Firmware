@@ -17,8 +17,7 @@ decision 2026-09-11, no upstream PR owed. Still open: `MH-01`, `MH-03`, `MEM-04`
 `INS-03`, `TD-09`, `TD-10`, `TD-11`, `TD-15`, `E22-01`, `TLM-01..03`, `MEM-02` (parked),
 `UDP-01`-Rückfragen, `WF-01` Sites 1+2, `TM-28`, `TM-49` bench arm, `WEB-03` (c)-(e),
 `CQ-02..CQ-12`, `SL-01..07`, `DM-01..DM-06`, `APRS-02..APRS-04` (§3.8ae), ACK stage 4 / R5,
-German PR texts for `TD-12`/`TD-13`/`CDC-01`, the N-03..N-06 + SEC-02/N-18 upstream submission,
-and `G09`/`G10`/`G11` from §3.8c. Hand-over: [`RESUME.md`](RESUME.md).
+German PR texts for `TD-12`/`TD-13`/`CDC-01`, and `G09`/`G10`/`G11` from §3.8c. Hand-over: [`RESUME.md`](RESUME.md).
 
 **Last updated 2026-09-05 late evening — see the 2026-09-05 paragraphs below; previous grooming 2026-09-03 evening, §3.8x.** Fourteen items from an
 operator list plus two stale statuses (`TD-01`, `TD-06`) caught on a read-through: `TD-04`, `TD-05`, `GPS-01..04`/`GPS-06`, `TM-35`, `TM-39`, `TM-44`, `CQ-01`,
@@ -119,6 +118,13 @@ Earlier the same day (WLAN-Bericht [`wifi-report-20260830.md`](wifi-report-20260
 **Intake 2026-08-30 (fourth list), filed in §3.8l — TM-43 DONE the same night, UDP-01 stack question answered (424 B / 276 B free), and the run found + fixed `UDP-02` (ESP32 EXTUDP receive killed by one 255-byte datagram). PT-01: all eight parser findings fixed. §3.8m: `MEM-01` done (commit `861f2967`), `MEM-02` parked.** Original intake text: `UDP-01` — second-hand report that `--extudp on` kills a RAK4631; unreproduced, and the two defects with exactly this symptom (`N-22` stack overflow, `N-23` brick trap) are fixed both here **and** in `upstream/dev`, so the section lists what to ask the reporter before touching code. `TM-43` — the regression test the operator asked for: the RAK's UDP interface driven in both directions, send and receive, with node liveness as the assertion.
 
 > ### Standing risk — read first
+>
+> **Resolved 2026-08-27, box kept for history.** `N-03`, `N-04`, `N-05`, `N-06` and `SEC-02`
+> together with `N-18` went upstream in PR #1102 (merged 2026-08-27, sections 1.1, 1.5, 1.14,
+> 1.15, 4.3 of its description); `src/nrf52/nrf_eth.cpp`, `web_setup.cpp` and
+> `printfdeb_functions.cpp` are identical between `fork-main` and `upstream/dev` as of
+> 2026-09-11. Nothing below is owed any more. Verified against the tree and the PR text on
+> 2026-09-11; the "highest-value open item" line at the end is obsolete.
 >
 > **Status 2026-08-18.** Of the eight RF- or network-reachable defects, **four are now fixed on
 > this branch** — `N-03` (CONF zero-fill), `N-04` (BLE length underflow), `N-05` (mheard heap
