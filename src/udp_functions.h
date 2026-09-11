@@ -41,6 +41,13 @@ void getMeshComUDP();
 // the nRF52 build gets it from the Ethernet library in nrf_eth.h.
 void handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);
 #endif
+// C2 carve-out (DRY unification U2): the socket primitives of the UDP-out
+// ring drain, paired with udpWriteRaw_nrf52()/udpEndRaw_nrf52() in
+// nrf52/nrf_eth.h. Replaceable by a recording sink in a native test.
+bool udpBeginRaw_esp32();
+bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len);
+bool udpEndRaw_esp32();
+
 void sendMeshComUDP();
 void startMeshComUDP();
 void sendMeshComHeartbeat();

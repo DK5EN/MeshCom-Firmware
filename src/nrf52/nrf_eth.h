@@ -18,6 +18,12 @@ void ethDrop();              // --ethdrop: Udp.stop + DHCP renew + UDP restart, 
 // sides can be linked into one native binary and fed the same corpus.
 int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip);
 
+// C2 carve-out (DRY unification U2): the socket primitives of the datagram
+// write, paired with udpWriteRaw_esp32()/udpEndRaw_esp32() in udp_functions.h.
+bool udpBeginRaw_nrf52();
+bool udpWriteRaw_nrf52(const uint8_t *buf, uint16_t len);
+bool udpEndRaw_nrf52();
+
 class NrfETH {
 
     public:

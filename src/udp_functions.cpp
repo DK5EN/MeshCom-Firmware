@@ -636,6 +636,36 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
     udp_is_busy = false;   //setting the busy flag
 }
 
+// C2 carve-out (DRY unification U2): the three socket primitives the datagram
+// write goes through, paired one for one with the _nrf52 set in
+// nrf52/nrf_eth.h, so a native test can replace them with a recording sink.
+//
+// Three and not one, because the caller's error policy runs *between* them: a
+// failed write() that trips MAX_ERR_UDP_TX resets the socket and returns
+// without ever calling endPacket(), while a failed write() that does not trip
+// it still falls through to endPacket(). A single send primitive cannot
+// express that ordering, and begin stays separate because on nRF52 a debug
+// print sits between begin and write.
+//
+// The write result is checked here and nowhere on nRF52: NrfETH::sendUDP()
+// writes byte by byte, ignores every Udp.write() result and reports only
+// endPacket(), so a failed write cannot reset the socket there. That
+// asymmetry is D1 drift-matrix material; preserved here, not fixed.
+bool udpBeginRaw_esp32()
+{
+    return Udp.beginPacket(node_hostip , UDP_PORT) != 0;
+}
+
+bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len)
+{
+    return Udp.write(buf, len) != 0;
+}
+
+bool udpEndRaw_esp32()
+{
+    return Udp.endPacket() != 0;
+}
+
 /**@brief UDP tx Routine
  */
 void sendMeshComUDP()
@@ -679,9 +709,9 @@ void sendMeshComUDP()
 
             // send it over UDP
 
-            Udp.beginPacket(node_hostip , UDP_PORT);
+            udpBeginRaw_esp32();
 
-            if (!Udp.write(udpSnapshot + 1, msg_len))
+            if (!udpWriteRaw_esp32(udpSnapshot + 1, msg_len))
             {
                 if(bDisplayCont)
                   printlndeb("[ERROR]...Sending UDP Packet failed");
@@ -705,7 +735,7 @@ void sendMeshComUDP()
             }
 
             {
-              bool tx_ok = Udp.endPacket() != 0;
+              bool tx_ok = udpEndRaw_esp32();
               udpCountTx(tx_ok);            // TM-31 instrument
               if(bUDPLOG)
                 Serial.printf("[UDP];tx;ip;%s;port;%u;len;%u;ok;%d\n",

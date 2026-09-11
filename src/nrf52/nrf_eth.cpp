@@ -296,6 +296,42 @@ void NrfETH::initethDHCP()
 }
 
 
+// C2 carve-out (DRY unification U2): the three socket primitives of the
+// datagram write, paired one for one with the _esp32 set in udp_functions.h,
+// so a native test can replace them with a recording sink.
+//
+// Three and not one, for two independent reasons. The caller's error policy
+// runs *between* them on ESP32: a failed write that trips MAX_ERR_UDP_TX
+// resets the socket and returns without ever calling endPacket(). And the
+// debug print here sits between beginPacket() and the write loop -- keeping
+// begin and write apart preserves that order exactly, which matters because
+// beginPacket() is an SPI transaction to the W5100S, not a local setup call.
+//
+// The write half returns true unconditionally, which is not an oversight in
+// the carve but the behaviour as it stands: this path writes byte by byte and
+// never looks at Udp.write()'s result, so the only failure nRF52 can report is
+// endPacket()'s. ESP32 checks the write and can reset the socket on it. That
+// asymmetry is D1 drift-matrix material; preserved here, not fixed.
+bool udpBeginRaw_nrf52()
+{
+  return Udp.beginPacket(neth.udp_dest_addr, UDP_PORT) != 0;
+}
+
+bool udpWriteRaw_nrf52(const uint8_t *buf, uint16_t len)
+{
+  for (int i=0; i<len; i++)
+  {
+    Udp.write(buf[i]);
+  }
+
+  return true;
+}
+
+bool udpEndRaw_nrf52()
+{
+  return Udp.endPacket();
+}
+
 /**@brief Method to send UDP packets
  * returns true if packet was sent successful
  */
@@ -303,7 +339,7 @@ bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
 {
   EthStall st("udp_tx");
   uint32_t t0 = millis();
-  Udp.beginPacket(udp_dest_addr, UDP_PORT);
+  udpBeginRaw_nrf52();
   
   if(bDEBUG)
   {
@@ -311,12 +347,9 @@ bool NrfETH::sendUDP(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
     printBuffer(buffer, rx_buf_size);
   }
 
-  for (int i=0; i<rx_buf_size; i++)
-  {
-    Udp.write(buffer[i]);
-  }
+  udpWriteRaw_nrf52(buffer, rx_buf_size);
 
-  bool ok = Udp.endPacket();
+  bool ok = udpEndRaw_nrf52();
   uint32_t d = (uint32_t)(millis() - t0);
   if(d > s_ethUdpTxMaxMs) s_ethUdpTxMaxMs = d;
   if(!ok) s_ethUdpTxFail++;
