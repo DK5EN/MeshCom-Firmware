@@ -88,6 +88,13 @@ _RULES: List[Tuple[re.Pattern[str], str]] = [
     (re.compile(r"(\[INSTR-[A-Z]+\][^\n]*?\bn)(\s+)\d+"), r"\1\2<NUM>"),
     (re.compile(r"\b(int_free|int_min|int_largest|psram_free|psram_largest)"
                 r"(\s+)-?\d+"), r"\1\2<NUM>"),
+    # Console-form live readings. The JSON rule above only covers `"LAT":48.4`;
+    # the console prints `...LAT: 48.4076 N`, and two captures of the same node
+    # minutes apart differ in the last digit because the GPS moved. Same
+    # trade-off as the BLE capture: a GPS regression has to be caught by a
+    # dedicated test, not by this golden.
+    (re.compile(r"(\.\.\.(?:LAT|LON|ALT|SAT|HDOP|DIST):\s*)-?\d+(?:\.\d+)?"),
+     r"\1<GPS>"),
 ]
 
 # msg_ids. Every spelling the firmware uses for the same 32-bit value.
@@ -177,6 +184,8 @@ _SELF_TEST: List[Tuple[str, str]] = [
      "Ethernet.localIP(): <ADDR>"),
     ("[INIT]...FLASH layout 20260724 ok, build 20260905",
      "[INIT]...FLASH layout 20260724 ok, build 20260905"),
+    ("...LAT: 48.4076 N", "...LAT: <GPS> N"),
+    ("...ALT: 493", "...ALT: <GPS>"),
     ("[EXT];tx;len;266;stack_hwm;153;ms;137674",
      "[EXT];tx;len;266;stack_hwm;<NUM>;ms;<NUM>"),
     ("[INSTR-LOOP] gap ms 3329 in unattributed section_ms 0 sections_ms 0",
