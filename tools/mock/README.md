@@ -33,6 +33,47 @@ callsign sent in `BEAT`, default `MOCK-SRV`), `--beat-status` (adds the
 optional status TLV to every `BEAT`), `--registry-ttl` (seconds before an
 idle client is expired, default 120), `--verbose`.
 
+## Golden-capture mode (test plan P0.6, steps H6/H7)
+
+For the DRY-unification goldens the same server doubles as the capture
+instrument: it records every datagram in both directions and replays a fixed
+corpus at the node under test.
+
+```sh
+python3 tools/mock/meshcom_server.py --port 1990 \
+    --replay test/golden/corpus/udp1990/ --gap 1.0 --repeat 1 \
+    --capture-dir test/golden/hw/G0/rak-90/ --no-redistribute --verbose
+```
+
+- `--replay DIR` reads `.bin` (verbatim) and `.hex` (whitespace- and
+  `#`-comment-tolerant) files in **sorted file order**, so corpus entries carry
+  a numeric prefix. Each file is one complete datagram including its
+  4-byte indicator. The server waits for the node's first `KEEP`
+  (`--replay-timeout`, default 90 s) before it starts, because that `KEEP` is
+  where it learns the node's source port.
+- `--repeat N` sends the whole corpus N times — the dedup tests need the same
+  frame twice.
+- `--capture-dir` writes three files on exit, named from the **node's** point
+  of view: `udp-log.txt` (one line per datagram: monotonic time, direction,
+  peer, indicator, length, hex), `udp-tx.bin` (what the node sent) and
+  `udp-rx.bin` (what the node received), both length-prefixed
+  (`<uint16 LE len><bytes>` per record). They are written once, at the end, so
+  a crashed run cannot leave a truncated file that looks complete.
+- `--no-redistribute` turns off the `DATA` → `GATE` broadcast. That routing is
+  a mock assumption (see the note at the end of this file), and a golden
+  capture must contain only what the replay deliberately sent.
+- `--linger` keeps recording for N seconds after the last replayed datagram,
+  so the node's reaction lands in the same capture.
+
+Corpus entries are **not** checked against `OWN_CALLSIGN_PREFIXES` on replay —
+they are sent verbatim by design. The corpus lint (test plan P0.5) is what
+guarantees no foreign callsign can reach the air, and it runs when the corpus
+is built. `send_gate()` keeps its check for frames built on the fly.
+
+Captured text is compared after `test/golden/normalize.py`; the binary files
+are compared byte for byte after masking the volatile offsets
+(`normalize.mask_binary()`).
+
 ## Running the client
 
 ```sh
@@ -107,9 +148,9 @@ claim for the rest of the `BEAT` datagram, and that's what this mock and
 `test_mock_server.py`'s byte-exact `BEAT` assertions actually verify.
 
 **Mock-only assumption beyond doc 11: `DATA` → `GATE` broadcast routing.**
-Doc 11 §2 specifies the *wire shape* of `DATA` and `GATE` but says nothing
+Doc 11 §2 specifies the _wire shape_ of `DATA` and `GATE` but says nothing
 about server-side routing policy. This mock's choice — forward every valid
-`DATA` frame as `GATE` to all *other* registered clients, never back to the
+`DATA` frame as `GATE` to all _other_ registered clients, never back to the
 sender — is a mock assumption, not a documented or verified real-server
 behavior. Real-server routing semantics (dedup, group filtering, etc.)
 remain unmocked; acceptable for a wire-shape test double, but do not read

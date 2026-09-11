@@ -464,3 +464,128 @@ class TestKeepParsingEdgeCases(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# 8. Capture recording, corpus replay and the deterministic capture mode
+#    (test plan P0.6, steps H6/H7)
+# ---------------------------------------------------------------------------
+
+
+class TestRecorder(unittest.TestCase):
+    def test_records_both_directions_in_order(self) -> None:
+        recorder = srv.DatagramRecorder()
+        server = srv.MockMeshComServer(
+            "127.0.0.1", 0, recorder=recorder, registry_ttl=120.0
+        )
+        server.start()
+        self.addCleanup(server.stop)
+
+        node_sock = free_udp_socket()
+        self.addCleanup(node_sock.close)
+        keep = cli.build_keep(0x48A4690D, "DK5EN-90")
+        node_sock.sendto(keep, ("127.0.0.1", server.port))
+        beat, _ = node_sock.recvfrom(4096)
+
+        wait_until(lambda: len(recorder.records) == 2)
+        self.assertEqual([r.direction for r in recorder.records], ["rx", "tx"])
+        self.assertEqual(recorder.records[0].data, keep)
+        self.assertEqual(recorder.records[1].data, beat)
+        self.assertEqual(recorder.records[0].indicator, "KEEP")
+        self.assertEqual(recorder.records[1].indicator, "BEAT")
+        # Monotonic and non-decreasing, so the text log reads as a sequence.
+        self.assertLessEqual(recorder.records[0].t, recorder.records[1].t)
+
+    def test_binary_is_length_prefixed_in_node_direction(self) -> None:
+        recorder = srv.DatagramRecorder()
+        recorder.record("rx", ("127.0.0.1", 1), b"KEEPxx")
+        recorder.record("tx", ("127.0.0.1", 1), b"BEAT")
+        recorder.record("rx", ("127.0.0.1", 1), b"DATAyyy")
+
+        # "rx" here is what the node transmitted.
+        self.assertEqual(
+            recorder.binary("rx"),
+            struct.pack("<H", 6) + b"KEEPxx" + struct.pack("<H", 7) + b"DATAyyy",
+        )
+        self.assertEqual(recorder.binary("tx"), struct.pack("<H", 4) + b"BEAT")
+
+    def test_write_produces_the_three_capture_files(self) -> None:
+        import tempfile
+
+        recorder = srv.DatagramRecorder()
+        recorder.record("rx", ("10.0.0.9", 1990), b"KEEP1234")
+        recorder.record("tx", ("10.0.0.9", 1990), b"BEAT")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "G0" / "rak-90"
+            written = recorder.write(out)
+            self.assertEqual(
+                sorted(p.name for p in written),
+                ["udp-log.txt", "udp-rx.bin", "udp-tx.bin"],
+            )
+            log = (out / "udp-log.txt").read_text()
+            self.assertIn("rx 10.0.0.9:1990 ind=KEEP len=8 4b45455031323334", log)
+            self.assertIn("tx 10.0.0.9:1990 ind=BEAT len=4", log)
+            # udp-tx.bin is the node's transmissions, i.e. our rx.
+            self.assertEqual(
+                (out / "udp-tx.bin").read_bytes(),
+                struct.pack("<H", 8) + b"KEEP1234",
+            )
+
+
+class TestCorpusLoader(unittest.TestCase):
+    def test_reads_bin_and_hex_in_sorted_order(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            (d / "02-beat.bin").write_bytes(b"BEAT")
+            (d / "01-gate.hex").write_text("# a GATE frame\n4741 5445 21\n")
+            (d / "notes.md").write_text("ignored")
+            self.assertEqual(srv.load_corpus(d), [b"GATE!", b"BEAT"])
+
+
+class TestReplay(ServerTestCase):
+    def test_replay_sends_verbatim_in_order_and_repeats(self) -> None:
+        node_sock = free_udp_socket()
+        self.addCleanup(node_sock.close)
+        self.register(node_sock, 0x48A4690D, "DK5EN-90")
+        wait_until(lambda: len(self.server.clients) == 1)
+
+        addr = self.server.wait_for_client(timeout=1.0)
+        self.assertIsNotNone(addr)
+
+        corpus = [b"GATE\x01", b"GATE\x02"]
+        sent = self.server.replay(corpus, addr, gap=0.0, repeat=2)
+        self.assertEqual(sent, 4)
+
+        got = [node_sock.recvfrom(4096)[0] for _ in range(4)]
+        self.assertEqual(got, corpus + corpus)
+
+    def test_wait_for_client_times_out_without_keep(self) -> None:
+        self.assertIsNone(self.server.wait_for_client(timeout=0.2))
+
+
+class TestNoRedistribute(unittest.TestCase):
+    def test_data_is_not_forwarded_when_disabled(self) -> None:
+        server = srv.MockMeshComServer(
+            "127.0.0.1", 0, redistribute=False, registry_ttl=120.0
+        )
+        server.start()
+        self.addCleanup(server.stop)
+        addr = ("127.0.0.1", server.port)
+
+        sock_a = free_udp_socket()
+        sock_b = free_udp_socket()
+        self.addCleanup(sock_a.close)
+        self.addCleanup(sock_b.close)
+        for sock, gw, call in ((sock_a, 0x11111111, "NODE-A"), (sock_b, 0x22222222, "NODE-B")):
+            sock.sendto(cli.build_keep(gw, call), addr)
+            sock.recvfrom(4096)
+        wait_until(lambda: len(server.clients) == 2)
+
+        sock_a.sendto(cli.build_data(0x11111111, "NODE-A", load_corpus_frame("f001")), addr)
+
+        sock_b.settimeout(0.3)
+        with self.assertRaises(socket.timeout):
+            sock_b.recvfrom(4096)

@@ -352,7 +352,7 @@ keys each consumer drops, mis-types, or reads at the wrong offset — see
 
 Gateway nodes exchange UDP datagrams with the MeshCom server
 (`meshcom.oevsv.at` / OE and DL hamnet servers). Port: `UDP_PORT 1990`
-(`src/configuration_global.h:86`). Implementations: `src/udp_functions.cpp`
+(`src/configuration_global.h:165`). Implementations: `src/udp_functions.cpp`
 (ESP32/WiFi) and `src/nrf52/nrf_eth.cpp` (nRF52/W5100S Ethernet). The
 DRY-21 clone covers only the **server → node receive path** (`getUDP()`);
 the encode side (`sendKEEP()`/`addNodeData()`) is compiled once for both
