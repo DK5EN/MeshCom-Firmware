@@ -58,7 +58,7 @@ Nothing below may change bytes on any of these surfaces. Storage behind them may
   item in this report is source hygiene unless it says otherwise.
 - The U8g2 fonts `u8g2_font_10x20_mf` (4,194 B) and `u8g2_font_6x10_mf` (2,393 B) sit at flash
   addresses (`0x3f41e824`, `0x3f41f886` on E22_XML) inside `.flash.rodata`. `nm` prints them as
-  `D` because the section is writable-flagged. The `docs/ram-opti.md` item 10 claim of 6.6 kB DRAM
+  `D` because the section is writable-flagged. The `docs/archive/ram-opti.md` item 10 claim of 6.6 kB DRAM
   is wrong on every measured ESP32 target. Close the item.
 - Root `src/*.cpp` files compile for every hardware env (`+<*>` filters). `batt_function_old.cpp`,
   `spectral_scan.cpp`, `test_inject.cpp`, `tinyxml_functions.cpp`, `Regexp.cpp` and
@@ -126,7 +126,7 @@ inventory (appendix S3, analysis R2) shows:
   two `[10]` arrays it replaces: net −426 B classic, −492 B on S3/nRF52. It pays only as the
   enabler for the hop list, where 52 B of text become 8 B of indices.
 - Interning stores the callsign verbatim exactly once and never emits the index; it is not the
-  hashing idea rejected in `docs/ram-opti.md` item 12, which derived a lossy tag from the callsign.
+  hashing idea rejected in `docs/archive/ram-opti.md` item 12, which derived a lossy tag from the callsign.
 
 So the callsign work splits into R2-01 (binary mheard row, independent of any callsign change,
 low risk, the largest gain on the cliff boards) and the R2-02/R2-03 bundle (hop indices plus intern
@@ -317,7 +317,7 @@ T-Beam), the OLED-less board list for R4-02/03, and the nRF52 migration versus w
 
 ## 8. Closed and rejected
 
-- `docs/ram-opti.md` item 10 (U8g2 fonts into flash): void, fonts are already in flash on every
+- `docs/archive/ram-opti.md` item 10 (U8g2 fonts into flash): void, fonts are already in flash on every
   measured target. Item 11 (custom IDF): stays rejected. Item 12 hashing: stays rejected; the
   52-to-40 trim survives as R3-13, interning as R2-03 with the distinction stated in section 3.
 - Plain `MAX_*` count cuts: done in MEM-01; `MAX_DEDUP_RING` is settled by field measurement and is

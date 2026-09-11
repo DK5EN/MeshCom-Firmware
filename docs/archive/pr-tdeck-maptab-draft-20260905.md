@@ -1,5 +1,7 @@
 # PR-Entwurf: T-Deck – Karte wird beim Tab-Wechsel über die Tab-Leiste doppelt aufgebaut (TD-14)
 
+> **ARCHIVED 2026-09-11.** TD-14 went upstream inside the collective PR **#1135** (section 12, `sdmap_refresh()` dedupe guard), merged 2026-09-10. No separate PR was cut.
+
 Ziel: `icssw-org/MeshCom-Firmware`, Branch `dev`. Betrifft nur `src/t-deck/`.
 
 ## Symptom

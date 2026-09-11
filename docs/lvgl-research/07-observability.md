@@ -164,7 +164,7 @@ lv_log_register_print_cb(tdeck_lvgl_log_cb);
 ```
 
 **Symptom if the `[LVLOG];` prefix is skipped**: the existing bench harness
-(`tools/bench/tdeck_harness.py`, see `docs/tdeck-handover.md` §1.2) "skips to the first `[`" to
+(`tools/bench/tdeck_harness.py`, see `docs/archive/tdeck-handover.md` §1.2) "skips to the first `[`" to
 strip the echoed command; an unprefixed `[Trace]\t...` line also starts with `[` and will be
 mis-parsed as a tag by any code that assumes `[TAGNAME];` is the shape.
 **Source**: `lib/lvgl/src/misc/lv_log.c:64-118` (read directly);
@@ -376,7 +376,7 @@ definition and call site), already overridden with a strong (non-weak) symbol in
 (`esp_backtrace_get_next_frame`) and emits the `[REDRAW]` line described above. `ret_addr` is
 `__builtin_return_address(0)` taken **inside `lv_obj_invalidate_area`**, so it always points into
 `lv_obj_invalidate()` (the near-universal caller), not into user code — the backtrace walk exists
-specifically to get past that one useless frame (`docs/tdeck-handover.md`'s bench-facts §5 already
+specifically to get past that one useless frame (`docs/archive/tdeck-handover.md`'s bench-facts §5 already
 documents this exact gotcha).
 **Symptom if violated (i.e. if an agent adds a second, competing hook)**: a linker error (duplicate
 strong symbol) if done the same way, or silently-lost coverage if done via a different mechanism
@@ -863,7 +863,7 @@ tied to the refresh timer specifically).
 read directly); [Arduino-ESP32 USB CDC docs](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/usb_cdc.html)
 (default TX buffer size, `setTxBufferSize`); ESP32 forum thread on USB-CDC large-transfer data loss
 (cross-check for the "blocks/loses data under load" behavior, not authoritative but consistent
-with the buffer-size finding); `docs/tdeck-handover.md` §1.2 and repo memory
+with the buffer-size finding); `docs/archive/tdeck-handover.md` §1.2 and repo memory
 (`tdeck-plus-bench-pitfalls.md`) for the port-open-resets-device hazard.
 
 ### 8. Assertions and crash forensics
@@ -915,14 +915,14 @@ comma-separated — swap commas for spaces).
    for this env, `platformio.ini:381,420`) — auto-decodes inline, **but** opening the monitor port
    reboots the T-Deck Plus (repo memory: `tdeck-plus-bench-pitfalls.md`), so this only works if the
    crash is expected to happen _after_ the monitor is already attached and the harness's own
-   held-open serial session (per `docs/tdeck-handover.md` §1.2) is not otherwise in use.
+   held-open serial session (per `docs/archive/tdeck-handover.md` §1.2) is not otherwise in use.
 2. **Offline from a captured log** (the harness's own recorded `.log` file, or a `[REDRAW];bt;...`
    line) — copy the hex addresses out, run the `addr2line` command above manually. This is the
    only option compatible with the harness's "hold one session open for the whole run" constraint,
    since it doesn't require a second serial attachment.
    **Source**: local filesystem check (`~/.platformio/packages/toolchain-xtensa-esp32s3/bin/`,
    confirmed present), `platformio.ini:381,420` (monitor_filters, read directly),
-   `variants/t_deck_plus/platformio.ini:1` (env name), `docs/tdeck-handover.md` §1.2 and repo memory
+   `variants/t_deck_plus/platformio.ini:1` (env name), `docs/archive/tdeck-handover.md` §1.2 and repo memory
    (port-open-resets-device hazard); [Espressif — Inspecting backtrace after ESP32 panic using
    xtensa toolchain (Medium)](https://stephencowchau.medium.com/inspebacktrace-stack-trace-after-esp32-using-espressif-xtensa-toolchain-7b0bf35905c1)
    and [platformio/platform-espressif32#1083](https://github.com/platformio/platform-espressif32/issues/1083)
@@ -995,7 +995,7 @@ domains exist, but premature with only two domains (REFR, FLUSH) currently wired
     `~/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-addr2line -pfiaC -e
 .pio/build/t_deck_plus/firmware.elf <addrs>` — do not open a live `pio device monitor` session
     to catch a crash unless the harness's single held-open serial session (per
-    `docs/tdeck-handover.md` §1.2) is not otherwise required, since opening a second port resets
+    `docs/archive/tdeck-handover.md` §1.2) is not otherwise required, since opening a second port resets
     the device.
 
 ## Open questions / UNVERIFIED
@@ -1037,7 +1037,7 @@ domains exist, but premature with only two domains (REFR, FLUSH) currently wired
 - `src/esp32/esp32_main.cpp`, `src/udp_functions.cpp` — existing `esp_task_wdt_*` usage pattern.
 - `variants/t_deck_plus/platformio.ini`, `platformio.ini` — build flags (`CORE_DEBUG_LEVEL=1`,
   `ARDUINO_USB_CDC_ON_BOOT=1`), `monitor_speed`/`monitor_filters`.
-- `docs/tdeck-findings-20260828.md`, `docs/tdeck-handover.md` — existing measured baselines and
+- `docs/tdeck-findings-20260828.md`, `docs/archive/tdeck-handover.md` — existing measured baselines and
   bench-harness gotchas, cited but not repeated wholesale.
 - `lib/lvgl/src/core/lv_refr.c` — refresh timer, perf/mem monitor, `_lv_inv_area`, `call_flush_cb`;
   read in full for the relevant functions.

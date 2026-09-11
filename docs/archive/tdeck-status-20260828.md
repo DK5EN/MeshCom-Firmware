@@ -1,5 +1,7 @@
 # T-Deck Plus campaign — interim status (2026-08-28)
 
+> **ARCHIVED 2026-09-11.** Session record of the T-Deck bring-up. Superseded first by [`tdeck-handover.md`](tdeck-handover.md), then by the fixes themselves (`TD-01`..`TD-14` closed, `TD-09`/`TD-11`/`TD-15` still open in `BACKLOG.md`).
+
 > **Superseded for handover purposes by [`tdeck-handover.md`](tdeck-handover.md).** That document is
 > the entry point for the fix team: goal, the three blocking problems, the full item list, and the
 > state of the deliberately dirty working tree. This file remains as the session record.
@@ -41,10 +43,10 @@ documentation and measurement.
 
 ### 1.3 Review findings on record
 
-- Stage 1 (`/code-review medium`): 16 findings — [`review-tdeck-gui-20260828.md`](review-tdeck-gui-20260828.md)
-- Stage 2 (`/fable-review`, 7 blind finders + verification): [`tdeck-gui-verdict.md`](tdeck-gui-verdict.md)
-- Measurements: [`tdeck-baseline-20260828.md`](tdeck-baseline-20260828.md)
-- Backlog entry points: [`BACKLOG.md`](BACKLOG.md) §3.8a (HL-01..04), §3.8b (TD-01..06),
+- Stage 1 (`/code-review medium`): 16 findings — [`review-tdeck-gui-20260828.md`](../review-tdeck-gui-20260828.md)
+- Stage 2 (`/fable-review`, 7 blind finders + verification): [`tdeck-gui-verdict.md`](../tdeck-gui-verdict.md)
+- Measurements: [`tdeck-baseline-20260828.md`](../tdeck-baseline-20260828.md)
+- Backlog entry points: [`BACKLOG.md`](../BACKLOG.md) §3.8a (HL-01..04), §3.8b (TD-01..06),
   §3.8c (stage 1), §3.8e (stage 2 verdict)
 
 ### 1.4 Claims that measurement killed

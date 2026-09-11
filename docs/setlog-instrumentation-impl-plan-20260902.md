@@ -1,5 +1,11 @@
 # Implementierungsplan SL-01..SL-07 — Messpunkte unter `--setlog on`
 
+> **Status 2026-09-11:** waves 0/1/2 are implemented and **upstream in PR #1125** (section 4,
+> `--setlog`), merged 2026-09-03. The worktree `mc-setlog` and the branch `feat-setlog-20260902`
+> no longer exist. What is still owed is **bench wave 3** (`SL-01`..`SL-07` in `BACKLOG.md`), which
+> needs a node on the desk; this document remains its runbook. Review findings:
+> [`archive/review-verdict-setlog-20260902.md`](archive/review-verdict-setlog-20260902.md).
+
 **Status: IN UMSETZUNG: Welle 0/1/2 fertig 2026-09-02, Welle 3 Bench offen (kein
 Knoten angesteckt).** Umsetzung
 mit `/orchestrate-waves` im eigenen Worktree `/Users/martinwerner/WebDev/mc-setlog`,

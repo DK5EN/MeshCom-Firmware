@@ -1,9 +1,14 @@
 # Two follow-up bugs found while bench-testing issue #962 (deepsleep)
 
+> **Status 2026-09-11: both follow-ups still open.** The parent deepsleep fix is upstream in PR
+> **#1135** (section 1) and its verdict document is archived
+> ([`archive/issue-962-deepsleep-verdict.md`](archive/issue-962-deepsleep-verdict.md)); the two bugs
+> described here were never part of it and are unchanged in the tree.
+
 Repo: `/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main` (MeshCom Firmware fork, branch
 `fork-main`). Found 2026-09-06 while bench-verifying the `--deepsleep` fix for issue #962 on real
 hardware (T-Beam, RAK4631, Heltec V3, T-Deck Plus). Background/design doc for the parent work:
-`docs/issue-962-deepsleep-verdict.md`. The deepsleep fix itself is committed and bench-verified
+`docs/archive/issue-962-deepsleep-verdict.md`. The deepsleep fix itself is committed and bench-verified
 clean on all four boards above (commits `e242a4cf`, `37537b11`, `828a2567`); these two issues are
 separate, **not required** for that fix to be correct, and were never fixed as part of it.
 
@@ -245,7 +250,7 @@ misattribute to something else (bad antenna, out of range, etc.) in the field.
 
 ### Why this wasn't caught before
 
-The doc this work descends from (`docs/issue-962-deepsleep-verdict.md`, §2.2) describes the
+The doc this work descends from (`docs/archive/issue-962-deepsleep-verdict.md`, §2.2) describes the
 Wireless Paper / Vision Master E213 sleep path as "already fixed by PR 1050" and treats it as a
 correct reference template for the rest of the deepsleep fix (which is accurate for _entering_
 sleep — the radio-off/display-clear/wake-arm sequence on the way down is fine). The bench

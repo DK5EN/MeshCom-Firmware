@@ -1,9 +1,11 @@
 # Release Notes Archiv -- MeshCom Firmware v4.35n bis v4.35p (2026-03-11 bis 2026-03-22)
 
+> **ARCHIVED 2026-09-11.** Release-notes archive v4.35n..v4.35p; the file itself has said "wird nicht mehr fortgeschrieben" since 2026-03-22. Moved here so `docs/` holds only live documents.
+
 > **Archiv, wird nicht mehr fortgeschrieben.** Dieses Dokument haelt den ersten
 > Abschnitt der Release Notes fest: Basis `v4.35n` (2026-03-11) bis
 > `v4.35p` (2026-03-22). Alles ab dem 2026-03-23 steht in
-> [`release.md`](../release.md) im Repository-Wurzelverzeichnis -- das ist die
+> [`release.md`](../../release.md) im Repository-Wurzelverzeichnis -- das ist die
 > Datei, die der Release-Workflow (`.github/workflows/meshcom-ci.yml`) als
 > Release-Body auf GitHub veroeffentlicht.
 >
@@ -721,7 +723,7 @@ sind unter dem Tag `v4.35n_20260311` dokumentiert.
 ## Supported Hardware (Stand 2026-03-22)
 
 Historischer Stand. Die aktuelle Liste der veroeffentlichten Images steht in
-[`release.md`](../release.md); massgeblich sind `default_envs` in
+[`release.md`](../../release.md); massgeblich sind `default_envs` in
 `platformio.ini` und die Artefaktliste in `.github/workflows/meshcom-ci.yml`.
 
 E22-DevKitC.bin (433 MHz)

@@ -1,12 +1,14 @@
 # Implementation plan BP-11 — the node refuses to re-transmit its own back-pressure wording
 
+> **ARCHIVED 2026-09-11.** **The "NOT PUBLISHED" status in the header below is obsolete.** BP-11 shipped in the fork (item 179) and went upstream in PR **#1135** (section 3), merged 2026-09-10. No upstream PR is owed.
+
 **DECIDED 2026-09-04: Option A (strict block). IMPLEMENTED (BP-11), gate green, bench
 cases 1-4 passed on DK5EN-98, case 5 deferred. NOT PUBLISHED: operator decision 2026-09-04, no upstream PR, no push -- the change
 stays local on `fork-main` until that is lifted.** Evidence and root
 cause: §1. The decision and its reasoning: §2. Code: `src/backpressure.h`
 (`bpIsOwnWording()`), `src/loop_functions.cpp` (`sendMessage()`), `src/bp_notice_frame.h`
 (corrected comment), new `test/test_bp_echo_guard/`. Protocol reference:
-[`backpressure-protocol.md`](backpressure-protocol.md).
+[`backpressure-protocol.md`](../backpressure-protocol.md).
 
 ---
 

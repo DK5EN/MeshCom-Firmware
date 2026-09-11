@@ -83,7 +83,7 @@ Sauberer Build von `fork-main` (Commit `1ce83e0f`), env `ttgo_tbeam`, 2026-09-06
 | dram0_0 statisch (.data + .bss) | 114.600 B | 124.580 B | 9.980 B (8 %)     |
 | Flash                           | 1,63 MB   | 3,40 MB   | 52 %              |
 
-Zum Vergleich der Stand aus `docs/ram-comparison-20260517.md`: damals lag dram0_0 bei
+Zum Vergleich der Stand aus `docs/archive/ram-comparison-20260517.md`: damals lag dram0_0 bei
 98,95 % (1.304 B frei) und iram0_0 bei 99,98 % (28 B frei). Die Ringpuffer-Verkleinerung
 hat die statische DRAM-Lage von "gar nichts" auf "unter 20 %" gebracht; das ist die
 Mindestreserve, kein Spielraum. Der IRAM ist unverändert am Anschlag.

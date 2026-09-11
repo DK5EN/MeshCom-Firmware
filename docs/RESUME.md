@@ -36,12 +36,15 @@ one to update when an item moves.
   E22_XML 920 B DRAM); ~10.5 kB of levers measured, nothing committed.
 - `TM-49` fail-closed OTA completion gate is in code, bench arm on a 4 MB single-slot board
   (Heltec) still owed.
-- `SL-01..07` `--setlog` lines implemented 2026-09-02, bench wave 3 never ran.
+- `SL-01..07` `--setlog` lines implemented 2026-09-02 and upstream in PR #1125, bench wave 3
+  never ran. Runbook: `setlog-instrumentation-impl-plan-20260902.md`.
 - `GPS-05b` fusion tau: 30 min ships, sd 6.6 m against the 4 m gate; tau 2 h meets it in replay.
   `GPS-10` nRF52 legacy `getGPS()` integer EMA, deferred until the tau run closes.
 - `TD-15` map empty after reboot (markers RAM-only, HEY never feeds the map), `TD-11` no
-  send/delivery marker in the T-Deck message view, `TD-10` backspace auto-repeat (concept
-  ready, ~50 lines), `TD-09` map tile cache in PSRAM.
+  send/delivery marker in the T-Deck message view, `TD-09` map tile cache in PSRAM.
+- `TD-10` key auto-repeat is **implemented and upstream in PR #1125** — the open part is only the
+  bench proof, and it cannot be produced on this bench: `DK5EN-14` has old keyboard-controller
+  firmware and never answers the raw-mode probe. Needs a T-Deck with newer keyboard firmware.
 - `TM-28` E290 Wireless Paper instrument and scenarios, hardware still not on the bench.
 - `E22-01` frame integrity under supply spikes / RF ingress, concept for operator review.
 - `MH-01` `| 0xF0` marker overwrites the country nibble (`0xF` == PL), `MH-03` absent trailing
@@ -93,12 +96,44 @@ one to update when an item moves.
 - ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
   operator open.
 
+## 2026-09-11 (evening): documentation sweep — 23 documents archived, index rebuilt, four stale statuses corrected
+
+`docs/` had grown to 98 top-level files with no index and several headers that the merged upstream
+PRs had overtaken. Docs only, no code touched.
+
+- **Archived (23), each stamped with a status box saying why and where the work landed:** the five
+  PR drafts whose PRs are merged (#1102/#1103, #1115, #1125 twice, #1135), the GPS/keyrepeat/setlog
+  review verdicts, the GPS-NMEA / baro-altitude / keyrepeat implementation plans, `node-msg.md`
+  (BP-11), `ack-heard-foreign-msgids-fix.md` (ACK-01), `issue-962-deepsleep-verdict.md`,
+  `bug-loganalyse-toolchain-20260824.md` (TOOL-01..06), the two T-Deck handover documents, and the
+  superseded RAM/release-notes files. `docs/archive/README.md` states the rules of that directory:
+  never delete, always stamp, the body is never edited into agreement with today, open work never
+  moves there.
+- **Corrected statuses.** `BP-11` is upstream in PR #1135 §3 — the "stays fork-only, no upstream PR"
+  note in BACKLOG and in the `bp11-echo-guard-not-public` memory is **wrong**. `TD-10` and
+  `SL-01..07` are upstream in PR #1125; what is owed on them is bench work, and for `TD-10` it
+  cannot be produced here at all (old keyboard-controller firmware on `DK5EN-14`). `TLM-05` is
+  upstream in PR #1135 §6. The last upstream sync is `0ba9f063` = `upstream/dev` `6edc7499`, not
+  `674413ce`.
+- **Status boxes added to documents that stay** where their header no longer matched the tree:
+  `bug-GPS-uart-overflow-20260901.md` (closed), `bug-N25-...` (catalogue says FIXED, no backlog
+  row), `setlog-instrumentation-impl-plan-...` (upstream, bench owed), `gpio-hold-and-hwcdc-...`
+  (still open), `pr1114-kiss-review-...` (merged and reverted upstream), `aprs-parser-drift-...`
+  (drift closed), `concept-dm-store-and-forward.md` (superseded by the 09-09 proposal),
+  `mcp23017-digital-field.md`, `bug-baro-altitude-...`, `mem-headroom-...`.
+- **`BACKLOG.md` §5 is now a complete index of `docs/`** in six groups (architecture set, protocol
+  references, open-defect analyses, bench runbooks, provenance, undecided proposals), §4.2 carries
+  the current branch state, and the §6 gap "German design docs are not linked" is closed.
+- **Verified:** every relative link in `docs/`, `release.md` and `release-notes.md` resolves. One
+  pre-existing dangling link remains and is not ours to fix here:
+  `automation-runner-runbook.md` → `bench-country-servers.md`, a document that was never written.
+
 ## 2026-09-11: APRS parser contract wave shipped in three repos, items 212-217, nothing flashed
 
 Trigger was a parser-drift analysis (`docs/aprs-parser-drift-20260911.md`): the firmware emits
 17 `/X=` position keys and its own decoder understood 14; MCProxy and the mobile app each lost a
 different subset, and no document listed the keys. Four waves plus a `#name` follow-up, all on
-`fork-main` after the upstream sync to `674413ce` (`0ba9f063`, v4.35t base):
+`fork-main` after the upstream sync `0ba9f063` (`upstream/dev` at `6edc7499`, v4.35t; `674413ce` is the base of PR #1135, not the sync point):
 
 - **Firmware:** `6fd9c3a5` decoder reads `/R= /U= /I=` (N-32), `/Y=` scan buffer reset (N-33),
   encoder NaN guards test their own buffer via `src/pos_tag_nan.h` (N-34); `b6d9f3cf` decoder
@@ -343,7 +378,7 @@ build times for the same image -- not a mismatch, do not chase it again.
 **Where to pick up.** Nothing is half-finished: the release is out, the tree is clean, branch
 `fork-main` pushed at `a0bd6222` plus this commit. Natural next moves, in the order they earn
 their keep: (1) decide the fusion tau and run a second 2 h bench, (2) the TRACK-mode capture with
-pressure, (3) the upstream PR for `/D=` (draft is `pr-draft-mcp17-din-20260906.md`; Kurt owns
+pressure, (3) the upstream PR for `/D=` (draft is `archive/pr-draft-mcp17-din-20260906.md`; Kurt owns
 review/merge, see [[upstream-no-self-merge]]), (4) `INS-03` sizing.
 
 ## 2026-09-06 (morning): v4.35s.09.06 published, 39 assets, web GUI badges, deepsleep on every board
@@ -378,7 +413,7 @@ found `ACK-01`: a gateway sent one heard and one gateway-ACK frame per forwarded
 to the phone (legacy first-frame branch not origin-gated, gateway-only because only the
 server-to-LoRa forward inserts into `own_msg_id[]`). Fixed in `b2336e6f` by gating only the BLE
 emit; state writes and web rxlog ticks untouched. **Operator verifies manually in McApp** (query
-in `ack-heard-foreign-msgids-fix.md` §6: zero foreign ledger rows after 30 min of group traffic
+in `archive/ack-heard-foreign-msgids-fix.md` §6: zero foreign ledger rows after 30 min of group traffic
 on 98; own messages still get gateway ACK + one heard per relay). `WQ-02` (`b1cc8cd5`): QRS tick
 in the queue panel forecasts the depth at which the next own messages raise QRS. Flashed via
 `tools/webflash.py`: 98 build 20:02:05, 14 build 20:02:51 (both OTA, no USB attached). Open: ACK
@@ -433,7 +468,7 @@ consumer side carries it. Nothing to do until then.
 The node refuses to re-transmit its own back-pressure wording (`bpIsOwnWording()` in
 `src/backpressure.h`, wired into `sendMessage()` after the `{ZIEL}` parse; strict block, no
 receipt for an echo). Field case IZ5CND-1/-10, still looping during the bench. Plan, decision
-(Option A over strip-and-resend) and evidence: `docs/node-msg.md`; BACKLOG row `BP-11`;
+(Option A over strip-and-resend) and evidence: `docs/archive/node-msg.md`; BACKLOG row `BP-11`;
 changelog item 179 in its own "Unreleased" section.
 
 **State:** commit `b3ecaa68` + this docs commit on `fork-main`, **ahead of origin, unpushed**.
@@ -572,11 +607,11 @@ Deliberately still open (all in release-notes.md "Known gaps"):
 1. **`--setlog` bench** (plan Welle 3: RAK-90 + Heltec-93, 30 min) — no
    hardware run yet.
 2. **GPS two-hour arms A/B/C** on DK5EN-14 — only 6.5 min bench + two
-   one-hour OE5HWN field logs exist (`gps-nmea-impl-plan-20260902.md` §6).
+   one-hour OE5HWN field logs exist (`archive/gps-nmea-impl-plan-20260902.md` §6).
 3. **GPS-06 T-Deck pin fallback** unverified on hardware; OE5HWN has the
    build (`firmware_t_deck_gps-kbd-test_20260902c.bin`, pre-merge tree).
-4. **PR cuts to upstream**: `docs/pr-gps-draft-20260902.md`,
-   `docs/pr-tdeck-keyrepeat-draft-20260902.md`; setlog has no draft yet.
+4. **PR cuts to upstream**: `docs/archive/pr-gps-draft-20260902.md`,
+   `docs/archive/pr-tdeck-keyrepeat-draft-20260902.md`; setlog has no draft yet.
    Include the T-Deck pin note for Kurt ("Modul-TX an GPIO44").
 5. `tools/resource_baseline.json` is stale (deltas of +4 kB on unchanged
    trees); refresh it from this release's build logs.
@@ -863,7 +898,7 @@ next full-layout USB flash, not via OTA.
 
 **Release published**: [v4.35p.08.31-stability](https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.35p.08.31-stability)
 — 39 assets (list identical to 08.28), release-notes.md as body, CHANGELOG items 107-152
-(condensed from and linked to `pr-draft-20260831.md`), FLASH_VERSION 20260831
+(condensed from and linked to `archive/pr-draft-20260831.md`), FLASH_VERSION 20260831
 (STRUCT unchanged). Full field instrumentation ships enabled; exception E22_XML
 (`MC_CAPTURE=0`, `MC_INJECT_HOOKS=0` — the campaign had pushed that link 648 B over
 `dram0_0_seg`). Five envs had been broken since 08.28 (never in a gate) and were fixed for
@@ -902,7 +937,7 @@ PRES-01/02, DOC-01/03/04), gated (438 native cases / 12 envs, 7 standard targets
 proven where reachable ([NTP];ok rtt 37-89, NCNT 0->1 on DK5EN-90, "USB (no battery)" on
 DK5EN-93/-14, web NTP/BSSID rows live), and pushed. The bench regression caught and fixed one
 real gap (`--ntpsync` was a silent no-op with a GPS fix). **PR draft for the upstream
-follow-up lives in `docs/pr-draft-20260831.md`** (firmware-only, full per-change granularity,
+follow-up lives in `docs/archive/pr-draft-20260831.md`** (firmware-only, full per-change granularity,
 open cut questions in its Teil E). Last code commit `a3ae913f` (FLASH_VERSION comment),
 everything pushed to `origin/tdeck-partial-refresh-trace`, working tree clean. All four bench
 nodes run the final build.
@@ -911,7 +946,7 @@ nodes run the final build.
 
 Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority order:
 
-1. **Upstream-PR vorbereiten** — `docs/pr-draft-20260831.md` Teil E abarbeiten (Entwurf
+1. **Upstream-PR vorbereiten** — `docs/archive/pr-draft-20260831.md` Teil E abarbeiten (Entwurf
    am 2026-08-31 abends um GW-01/4.9, C.3-Kommandos und das benannte TM-07-Register
    aktualisiert): (E1) das
    `full_refresh=0`-EXPERIMENT auf dem T-Deck zurückdrehen oder deklarieren — dank TM-07
@@ -919,7 +954,7 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
    werden (Entscheidung offen), (E2) die 11
    nativen Test-Envs aus dem PR-Schnitt halten, (E3) die "nicht für Upstream"-Kopfkommentare
    in `instrument.*`/`test_inject.*`/`tdeck_debug.*` anpassen, (E5) Bedienungs-Anhang im Stil
-   von `command-changes-pr1102-1103.md` für die neuen Kommandos. DK5EN merged nie selbst
+   von `archive/command-changes-pr1102-1103.md` für die neuen Kommandos. DK5EN merged nie selbst
    ([[upstream-no-self-merge]]).
 2. **TD-09 Tile-Cache** (§3.8p follow-ups) — flüssiges Karten-Pan; ohne Cache 0,33-0,79 s
    pro Schritt. TD-07-Handtest auf DK5EN-14 steht ebenfalls aus (Skript im Wave-Report).
@@ -937,7 +972,7 @@ Read BACKLOG §0 (re-entry procedure) first; then, in the operator's priority or
    `archive/tdeck-cursor-stall-rca-20260905.md`, Instrument `msg_roll`); TD-12/TD-13 (T-Deck Tab-Animation-Stall, Trackball-Doppelclick — Code
    gefixt 2026-09-05, `3f6a35d5`/`7368539e`, Bench-Nachweis auf DK5EN-14 offen, siehe
    BACKLOG §3.8p); TD-10 Backspace-Auto-Repeat (zurückgestellt, Konzept fertig:
-   [`tdeck-backspace-autorepeat-20260831.md`](tdeck-backspace-autorepeat-20260831.md)),
+   [`archive/tdeck-backspace-autorepeat-20260831.md`](archive/tdeck-backspace-autorepeat-20260831.md)),
    TM-29, TM-23 (von TD-09 abgelöst) — TM-06/07/14/19 sind seit 2026-08-31
    erledigt (siehe oben); BAT-02-Grenze dokumentiert
    (stabil in-band floatender Teiler ist von einer vollen Zelle nicht unterscheidbar —

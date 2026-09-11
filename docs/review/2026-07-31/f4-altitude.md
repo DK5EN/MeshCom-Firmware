@@ -434,7 +434,7 @@ instead of branching at compile time"_; `01` highest-leverage item #2; `04` reme
 migration. 05 then proposes converting compile-time board selection to runtime field reads without
 once mentioning that this **removes the dead-code elimination the tight boards depend on**.
 
-**Evidence — the headroom.** `docs/ram-comparison-20260517.md`:
+**Evidence — the headroom.** `docs/archive/ram-comparison-20260517.md`:
 
 - line 102–103: `ttgo_tbeam` `iram0_0_seg` at **99.98 %** — _"nur **28 Byte frei**"_.
 - line 104: `E22-DevKitC` `dram0_0_seg` at **99.09 %** — _"nur **1.128 Byte frei**"_.
@@ -666,7 +666,7 @@ for every source change below. It is currently ranked #9 in 07 — that ranking 
 
 **Step 3 — RAM/flash gate in CI.** `tools/ram_snapshot.py` as a CI artifact, with a hard threshold on
 `iram0_0_seg` and `dram0_0_seg`. `ttgo_tbeam` has **28 bytes** of IRAM free and `E22-DevKitC` has
-1,128 bytes of DRAM free (`docs/ram-comparison-20260517.md:102–104`); Heltec V3 has ~213 kB. Without
+1,128 bytes of DRAM free (`docs/archive/ram-comparison-20260517.md:102–104`); Heltec V3 has ~213 kB. Without
 this gate, every refactor validated on your hardware is unvalidated on theirs. (Subsumes 03 step 0b.)
 
 **Step 4 — Free wins, minutes each.** Pin `nordicnrf52 = 10.12.0` (02 B-04); `monitor_filters =

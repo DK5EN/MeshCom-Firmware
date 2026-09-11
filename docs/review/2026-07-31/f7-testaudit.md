@@ -641,7 +641,7 @@ test_build_src|test_ignore|test_filter` across `platformio.ini` and all
 **Flash headroom is not a blocker — the doc's only unexamined worry is the one that is fine.**
 `partitions-4MB-safeboot.csv` gives `app` (ota_0) at offset `768K = 0xC0000`, size
 `3324K = 3 403 776 bytes`; `safeboot` (factory) at `64K = 0x10000`, size `704K = 720 896`.
-Latest recorded build (`docs/ram-comparison-20260517.md:156`, commit `e9edf0df`) is
+Latest recorded build (`docs/archive/ram-comparison-20260517.md:156`, commit `e9edf0df`) is
 **1 492 589 B = 43.9 %**, leaving **1.91 MB free**. A Unity test firmware fits comfortably.
 
 **Corrected plan.** Replace 07 §5's snippet with something that can actually run:
@@ -786,7 +786,7 @@ Everything above is measured against the working tree at `1ba101f4`. Specificall
   parallel investigation and then spot-checked directly: I re-read
   `partitions-4MB-safeboot.csv`, `variants/heltec_wifi_lora_32_V3/platformio.ini:1-8`,
   `src/main.cpp:22,52`, `test/`, `src/esp32/esp32_main.cpp:3168-3182` and `:579-594`,
-  `src/gps_functions.cpp:61,368-371`, `docs/ram-comparison-20260517.md:156`, and the full
+  `src/gps_functions.cpp:61,368-371`, `docs/archive/ram-comparison-20260517.md:156`, and the full
   `monitor_filters` grep. All confirmed; the one correction I made was the V-01 variant count
   (11, not 12).
 

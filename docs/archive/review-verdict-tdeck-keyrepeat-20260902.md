@@ -1,5 +1,7 @@
 # TD-10 key auto-repeat — Fable Verdict (2026-09-02)
 
+> **ARCHIVED 2026-09-11.** All findings fixed (K1-K7) before the merge of upstream PR **#1125**. Kept as provenance for the fix wave.
+
 Review of `feat-tdeck-keyrepeat-20260902` @ `1068edef` (five finders, one adversarial
 verifier against the LilyGo keyboard source and the ESP32 Arduino core 2.0.14 I2C HAL).
 

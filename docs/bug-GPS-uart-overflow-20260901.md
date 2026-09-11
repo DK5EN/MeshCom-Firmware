@@ -1,5 +1,13 @@
 # GPS-01..04 — the NMEA link is structurally lossy, and nothing downstream checks the result
 
+> **Status 2026-09-11: CLOSED.** The "not yet fixed" line below is the original 2026-09-01 state and
+> is kept for the record. `GPS-01`..`GPS-04` and `GPS-06` were implemented 2026-09-02
+> ([`archive/gps-nmea-impl-plan-20260902.md`](archive/gps-nmea-impl-plan-20260902.md)), went upstream in PR **#1125**, and were closed
+> 2026-09-03 on the 8 h `DK5EN-14` capture: 9791 GPS evaluations, 0 rejects, 0 corrupt samples at the
+> ordinary 3 s cadence. The altitude work that grew out of this doc continued as `GPS-05b`/`GPS-07`/
+> `GPS-08`/`GPS-09` ([`bug-baro-altitude-20260906.md`](bug-baro-altitude-20260906.md)); `GPS-10`
+> (nRF52 legacy `getGPS()`) is the only GPS row still open.
+
 **Status:** Root cause ESTABLISHED by code reading plus two field logs from the same node; the
 arithmetic is verified against the module configuration the node itself prints. **Not yet
 reproduced on the bench, not yet fixed.**
@@ -381,9 +389,9 @@ Two consequences the dashboard hint does not account for:
 ## 7. Fix
 
 > **Implemented 2026-09-02.** The fix below was carried out as
-> [`gps-nmea-impl-plan-20260902.md`](gps-nmea-impl-plan-20260902.md) on
+> [`archive/gps-nmea-impl-plan-20260902.md`](archive/gps-nmea-impl-plan-20260902.md) on
 > `feat-gps-nmea-20260902` (worktree `mc-gps`), reviewed with ten findings fixed —
-> [`review-verdict-gps-20260902.md`](review-verdict-gps-20260902.md). §8 below records
+> [`archive/review-verdict-gps-20260902.md`](archive/review-verdict-gps-20260902.md). §8 below records
 > which of the items owed there now exist.
 
 ### 7.1 Rejected: raising the RX buffer
@@ -666,7 +674,7 @@ Per the working rules, no fix ships without a test that fails before and passes 
    4.08 m, converged-phase RMS ≤ 1.6 m / 0.9 m, measured 1.50 m / 0.71 m). TRACK bypass is
    `bDisplayTrack` resetting the filter in `gps_functions.cpp`, asserted only via bench
    (item 4) — no native seam for `bDisplayTrack` either. Full list:
-   `gps-nmea-impl-plan-20260902.md` §5.
+   `archive/gps-nmea-impl-plan-20260902.md` §5.
 4. **Bench, GPS-01: pending.** `DK5EN-14` was not attached during the 2026-09-02
    implementation session; arms A/B/C of the plan's §6 protocol have not run.
 5. **Bench, falsification: pending**, blocked on the same node.

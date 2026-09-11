@@ -1,5 +1,7 @@
 # PR-Entwurf: MCP23017 Port-A-Eingaenge als `/D=` in der Positionsbake und im `T#`-Digitalfeld (Issue 1076)
 
+> **ARCHIVED 2026-09-11.** TLM-05 / `/D=` went upstream inside the collective PR **#1135** (section 6), merged 2026-09-10. Reference document for the field: [`../mcp23017-digital-field.md`](../mcp23017-digital-field.md).
+
 **Nicht via `/submit-pr` erzeugt** (kein `gh`-Aufruf, kein PR-Branch geschnitten). Dieser
 Text ist die Vorlage fuer den PR-Cut gegen `upstream/dev`; Format nach `submit-pr`.
 Fork-Commit: `b179fdff`, Changelog-Eintrag 207.

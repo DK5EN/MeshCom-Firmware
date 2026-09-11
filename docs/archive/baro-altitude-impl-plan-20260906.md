@@ -1,6 +1,8 @@
 # Implementation plan — GPS-08 / GPS-09 / GPS-07 / GPS-05b (barometer vs GPS altitude)
 
-**Source:** [`bug-baro-altitude-20260906.md`](bug-baro-altitude-20260906.md) · **Branch:** `fork-main` at
+> **ARCHIVED 2026-09-11.** Waves 1-2 committed (`531d66b4`, `49769eda`, `bc3ee68b`) and upstream in PR **#1135** (section 5). The one open question -- the fusion time constant tau -- lives on in [`../bug-baro-altitude-20260906.md`](../bug-baro-altitude-20260906.md) SS7/SS11 and the `GPS-05b` backlog row.
+
+**Source:** [`bug-baro-altitude-20260906.md`](../bug-baro-altitude-20260906.md) · **Branch:** `fork-main` at
 `4ed8bfd2` (tree clean) · **Written:** 2026-09-06 · **Status:** APPROVED 2026-09-06 (operator). Waves 1-2 committed on `fork-main`: `531d66b4` (GPS-07),
 `49769eda` (GPS-08/09), `bc3ee68b` (GPS-05b). Wave 3 (docs) follows the bench verdict; see the bug doc
 for the numbers.

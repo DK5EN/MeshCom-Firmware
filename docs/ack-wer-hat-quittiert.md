@@ -140,7 +140,7 @@ wenn das sendende Gateway und alle Relays auf dem Weg die neue Firmware haben.
    Erledigt 2026-09-05 zusammen mit Stufe 1 (`09e6f274`, `fbadd2bb`; Plan und Bench in
    `ack-implementierungsplan.md`). `--ackinfo on` ist mit dabei, nur fuer eigene msg_ids.
    Dabei gefunden und behoben (`b2336e6f`): Gateways schickten Statusframes fuer fremde,
-   vom Server weitergeleitete msg_ids zur App (`ack-heard-foreign-msgids-fix.md`).
+   vom Server weitergeleitete msg_ids zur App (`archive/ack-heard-foreign-msgids-fix.md`).
 4. Firmware: Gateways senden den Hash-Anhang auf dem Draht (4.1), Nodes loesen ihn zum
    Rufzeichen auf. Offen.
 

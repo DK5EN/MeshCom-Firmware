@@ -1,17 +1,19 @@
 # T-Deck Plus — handover to the fix team
 
+> **ARCHIVED 2026-09-11.** The handover was taken up and the campaign ran to completion; the "deliberately dirty working tree" it describes no longer exists. Measured findings stay in [`../tdeck-findings-20260828.md`](../tdeck-findings-20260828.md), the open T-Deck rows in `BACKLOG.md`.
+
 Written 2026-08-28 at the end of a bring-up and analysis session. **The working tree is left dirty
 on purpose** (see §6). Read §1 and §6 before touching anything.
 
 Companion documents, all committed:
 
-| Document                                                       | Contents                                    |
-| -------------------------------------------------------------- | ------------------------------------------- |
-| [`tdeck-status-20260828.md`](tdeck-status-20260828.md)         | session status, commit list, refuted claims |
-| [`tdeck-baseline-20260828.md`](tdeck-baseline-20260828.md)     | all measurements, before/after              |
-| [`review-tdeck-gui-20260828.md`](review-tdeck-gui-20260828.md) | stage 1 review, 16 findings                 |
-| [`tdeck-gui-verdict.md`](tdeck-gui-verdict.md)                 | stage 2 review, verdict + refuted claims    |
-| [`BACKLOG.md`](BACKLOG.md) §3.8a-e                             | backlog entries HL-, TD-, G-                |
+| Document                                                          | Contents                                    |
+| ----------------------------------------------------------------- | ------------------------------------------- |
+| [`tdeck-status-20260828.md`](tdeck-status-20260828.md)            | session status, commit list, refuted claims |
+| [`tdeck-baseline-20260828.md`](../tdeck-baseline-20260828.md)     | all measurements, before/after              |
+| [`review-tdeck-gui-20260828.md`](../review-tdeck-gui-20260828.md) | stage 1 review, 16 findings                 |
+| [`tdeck-gui-verdict.md`](../tdeck-gui-verdict.md)                 | stage 2 review, verdict + refuted claims    |
+| [`BACKLOG.md`](../BACKLOG.md) §3.8a-e                             | backlog entries HL-, TD-, G-                |
 
 ---
 

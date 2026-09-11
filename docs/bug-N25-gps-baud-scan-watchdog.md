@@ -4,6 +4,10 @@
 re-verified by an eight-angle adversarial review — and since **2026-08-22 reproduced and fixed on the
 bench**. Waves 0 to 3 are landed (`dae2d863` S1, `f20b922d` S4, `7bd313bd` S5+B-15, `f190aad3` reorder, wave 3 cleanup); GPS detection
 on a Heltec V3 drops from 12 000 ms to 2120 ms. **Waves 4–6 remain open**; §8.3 and §8.4 passed on hardware, §8.5 needs a board this bench does not have. Bench record and open-item run book: `docs/gps-sensor-bench-20260822.md`.
+**Re-checked 2026-09-11:** `architecture/08-defect-catalogue.md` carries N-25 as **FIXED (waves 0 to 3,
+reproduced and verified on real hardware)** and `BACKLOG.md` carries no N-25 row at all. The defect
+itself is closed; waves 4–6 are hardening that was never filed as backlog work, and §8.5 still needs
+a T-Beam Supreme that this bench does not have. Nothing here is a live regression.
 **Severity:** Critical — permanent boot loop, node unusable, no recovery window, recoverable only by reflashing.
 **Class:** regression introduced on this branch (`v4.35p_prio`), not an upstream defect.
 **Reported:** 2026-08-21, T-Beam Supreme (`ttgo_tbeam_supreme`, ESP32-S3), field unit.

@@ -1,5 +1,7 @@
 # PR-Entwurf: GPS-01..04 — Hoehe und QNH-Referenz
 
+> **ARCHIVED 2026-09-11.** Submitted as part of upstream PR **#1125** (GPS-Kalmanfilter, T-Deck-Tastaturwiederholung, Logging-Instrumentierung), merged 2026-09-03.
+
 **Nicht via `/submit-pr` erzeugt** (kein `gh`-Aufruf, kein PR-Branch geschnitten). Dieser
 Text ist die Vorlage fuer den PR-Cut aus
 [`gps-nmea-impl-plan-20260902.md`](gps-nmea-impl-plan-20260902.md) §8; Format nach
@@ -233,7 +235,7 @@ clean-gebaut (`heltec_wifi_lora_32_V3`, `E22-DevKitC`, `ttgo_tbeam`,
 - Review-Verdikt mit allen zehn Findings und ihren Fixes:
   [`review-verdict-gps-20260902.md`](review-verdict-gps-20260902.md).
 - Vollstaendige Root-Cause-Analyse mit Log-Belegen:
-  [`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md).
+  [`bug-GPS-uart-overflow-20260901.md`](../bug-GPS-uart-overflow-20260901.md).
 - Zwei verwandte Befunde aus denselben Logs sind **nicht** Teil dieses PRs: TM-51 (Boot
   protokolliert den Reset-Grund) ist bereits separat gefixt; TM-52
   (Display-Sektion ~570 ms auf dem T-Beam Supreme) wurde fuer diese Kampagne fallen

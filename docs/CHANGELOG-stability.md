@@ -7,7 +7,7 @@ that letter is this fork's own marker (item 211), upstream has not released a
 4.35t. The full engineering rationale for
 items 107-152, with per-change file references and measurements, is in the
 upstream PR draft
-[`docs/pr-draft-20260831.md`](pr-draft-20260831.md).
+[`docs/archive/pr-draft-20260831.md`](archive/pr-draft-20260831.md).
 
 **Items 1-103 below are now in official MeshCom.** The ICSSW maintainers merged
 [PR #1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) (82 changes)
@@ -418,7 +418,7 @@ this release, see the release notes.
      RX-log ticks survive and own messages behave identically in every
      `--ackinfo` combination. Gateway-only: the pure LoRa relay path never
      inserts into `own_msg_id[]`. Evidence, decision and bench plan:
-     [`docs/ack-heard-foreign-msgids-fix.md`](ack-heard-foreign-msgids-fix.md).
+     [`docs/archive/ack-heard-foreign-msgids-fix.md`](archive/ack-heard-foreign-msgids-fix.md).
      Commit `b2336e6f`.
 194. **The QRS marker in the LoRa queue panel forecasts where the operator's
      next messages would actually raise QRS** (WQ-02). The card drew QRS at
@@ -531,7 +531,7 @@ for the next upstream PR. Gates: 591 native cases / 12 envs, all 32 release
 environments. Bench this cycle: `DK5EN-98` (Heltec V3, item 179, four of
 five cases -- the ring-flood case is still owed), `DK5EN-90` (RAK4631,
 item 180), `DK5EN-14` (T-Deck Plus, items 181-185). Rationale and evidence
-for item 179: [`docs/node-msg.md`](node-msg.md).
+for item 179: [`docs/archive/node-msg.md`](archive/node-msg.md).
 
 179. **A node no longer radiates `QRT NOT SENT - QRT NOT SENT - ...` when a
      client feeds its own back-pressure wording back in** (BP-11). A client
@@ -793,7 +793,7 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      clamped to 0 m. Reviewed (`/fable-review`, ten findings, all fixed) before
      landing. Cost: ~16 B additional static RAM on boards with `ENABLE_GPS`, 0 B
      elsewhere. Bench verification (DK5EN-14) is still open — no bench node was
-     attached at the time of this entry; see `gps-nmea-impl-plan-20260902.md` and
+     attached at the time of this entry; see `archive/gps-nmea-impl-plan-20260902.md` and
      `bug-GPS-uart-overflow-20260901.md`. Field logs from OE5HWN (T-Deck Plus and
      T-Beam Supreme, one hour each) then showed 2375 evaluations without a single
      corrupt sample, convergence after 88 samples as modelled, and the QNH
@@ -821,7 +821,7 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      one-character-per-press behaviour automatically, at a cost of about 1 ms
      of extra I2C per key press and no other functional change. 39 native test
      cases (`test/test_kbd_repeat`); reviewed and fixed against six findings
-     (`docs/review-verdict-tdeck-keyrepeat-20260902.md`). Bench proof on
+     (`docs/archive/review-verdict-tdeck-keyrepeat-20260902.md`). Bench proof on
      DK5EN-14 (T-Deck Plus): the keyboard answered `support;1`, hold windows of
      0.8–1.2 s for Backspace, Space and `d`, repeated deletion seen on screen.
      Field counter-example the same evening (OE5HWN, T-Deck Plus): every probe
@@ -829,7 +829,7 @@ RESET_REASON=<n> <name>` right after `CLIENT SETUP`, raw `Serial.printf`
      press — the pre-2025-06 controller firmware, degrading exactly as designed.
      Because the probe line is capped at five presses per boot, `--info` now
      prints `...KBD raw-mode yes|no|unknown ...KEYLOCK on|off` on T-Deck builds
-     (`docs/tdeck-keyrepeat-impl-plan-20260902.md` §3.6).
+     (`docs/archive/tdeck-keyrepeat-impl-plan-20260902.md` §3.6).
 176. **Upstream `dev` sync (#1124, OE3LCR): the battery divider probe
      recognises a permanently connected divider.** On the Heltec Wireless
      Stick V3 the ADC control pin does nothing; both probe readings are
@@ -1073,7 +1073,7 @@ The complete field campaign since the 08.28 hotfix: two `/orchestrate-waves`
 passes over a 4-board bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631 with
 W5100S Ethernet), 438 native test cases in 12 host environments, and soak runs
 up to 9.1 h. Every item below is written up with file references and
-measurements in [`docs/pr-draft-20260831.md`](pr-draft-20260831.md); the item
+measurements in [`docs/archive/pr-draft-20260831.md`](archive/pr-draft-20260831.md); the item
 IDs (WEB-03, TM-35, GW-01 ...) match the fork's engineering backlog. This
 release deliberately ships the full serial instrumentation (`[TAG];key;value`
 markers, `--debug`, `--udplog`, `--wifistat`, injection commands), so a field

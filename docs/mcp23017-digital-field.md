@@ -1,8 +1,11 @@
 # MCP23017 digital inputs on the air: the `/D=` field and the `T#` digital slot
 
-Status 2026-09-06: implemented in fork commit `b179fdff`, changelog item 207,
-BACKLOG `TLM-05`. Upstream PR not yet cut; the German PR text is
-[`pr-draft-mcp17-din-20260906.md`](pr-draft-mcp17-din-20260906.md).
+Status 2026-09-11: implemented in fork commit `b179fdff`, changelog item 207,
+BACKLOG `TLM-05`, and **upstream in PR #1135 (section 6), merged 2026-09-10** — the standalone
+German PR text that was prepared for it is archived unused
+([`archive/pr-draft-mcp17-din-20260906.md`](archive/pr-draft-mcp17-din-20260906.md)). Still open on
+`TLM-05`: the transmit path has never run on hardware (no MCP23017 on this bench); server and app
+support are not ours.
 
 This document is the reference for what a node sends, in which order, why the
 letter `D` was chosen, and what a receiver may assume. Read it before

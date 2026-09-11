@@ -1,5 +1,12 @@
 # APRS-Parser-Drift: Firmware, MCProxy, MobileApp, Contract
 
+> **Status 2026-09-11 (evening): the contract this analysis asked for exists, and the drift is closed
+> in all three repos.** Firmware `6fd9c3a5` (`N-32`/`N-33`/`N-34`) and `b6d9f3cf` (`N-35`, `#name`),
+> web GUI `86be10c8`; the key table is now normative in
+> [`architecture/11-wire-format.md`](architecture/11-wire-format.md) SS1.8/SS1.8.1. MCProxy
+> `development` `9501bb0`, mobile app PR #8 merged (`534ba45`), `#name` follow-up on branch
+> `aprs-position-name` (`3f61059`, no PR). **Native gates only -- nothing flashed** (`APRS-02`).
+
 Stand 2026-09-11. Firmware `fork-main` @ `c6ac16bd` (Basis upstream v4.35t), MCProxy @ `7dacfa5`,
 Meshcom-MobileApp @ `6e7f2e5` (7 Commits hinter `origin/main`, alle sieben sind
 Dependency-Bumps ohne Parser-Code). Reine Analyse, keine Codeänderung. Jede Aussage ist gegen

@@ -1,5 +1,7 @@
 # RAM-Vergleich Heltec V3 — Upstream-Sync + NimBLE-Tuning 2026-05-14
 
+> **ARCHIVED 2026-09-11.** Superseded by [`../optimization-audit-20260910.md`](../optimization-audit-20260910.md) (32 release images measured) and the per-release snapshots from `/ram-snapshot`.
+
 ## Fragestellung
 
 1. Haben die Upstream-Maintainer im jüngsten Sync tatsächlich RAM gespart
@@ -20,14 +22,14 @@
 
 ## Frage 1 — Upstream-Sync allein
 
-| Region          | Region Size | Baseline    | Rebased     | Diff      |
-|-----------------|-------------|-------------|-------------|-----------|
-| iram0_0_seg     | 362.240 B   | 85.076 B    | 85.076 B    | 0         |
-| iram0_2_seg     | 8.388.576 B | 997.992 B   | 999.092 B   | +1.100    |
-| dram0_0_seg     | 345.856 B   | 201.736 B   | 201.752 B   | +16       |
-| drom0_0_seg     | 33.554.400 B| 1.329.949 B | 1.330.085 B | +136      |
-| **RAM**         | 327.680 B   | 133.028 B   | 133.044 B   | **+16**   |
-| **Flash**       | 3.403.776 B | 1.373.385 B | 1.374.637 B | **+1.252**|
+| Region      | Region Size  | Baseline    | Rebased     | Diff       |
+| ----------- | ------------ | ----------- | ----------- | ---------- |
+| iram0_0_seg | 362.240 B    | 85.076 B    | 85.076 B    | 0          |
+| iram0_2_seg | 8.388.576 B  | 997.992 B   | 999.092 B   | +1.100     |
+| dram0_0_seg | 345.856 B    | 201.736 B   | 201.752 B   | +16        |
+| drom0_0_seg | 33.554.400 B | 1.329.949 B | 1.330.085 B | +136       |
+| **RAM**     | 327.680 B    | 133.028 B   | 133.044 B   | **+16**    |
+| **Flash**   | 3.403.776 B  | 1.373.385 B | 1.374.637 B | **+1.252** |
 
 **Ergebnis:** Die Behauptung trifft nicht zu. Upstream hat NimBLE nicht
 angefasst (keine `BT_NIMBLE_*` Konfigänderung, nur `sprintf`→`snprintf`
@@ -39,12 +41,14 @@ gestiegen, durch das neue `checkmesh`-Feature in `2083fdbd`.
 ### Eingriff (platformio.ini, `[esp32]` build_flags)
 
 Geändert:
+
 ```
 -DCONFIG_BT_NIMBLE_MAX_BONDS=4    →  =1
 -DCONFIG_BT_NIMBLE_MAX_CCCDS=12   →  =2
 ```
 
 Neu hinzu:
+
 ```
 -DCONFIG_BT_NIMBLE_ROLE_CENTRAL_DISABLED
 -DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED
@@ -54,14 +58,14 @@ Neu hinzu:
 
 ### Begründung pro Flag
 
-| Flag | Code-Belegt | Warum sicher |
-|---|---|---|
-| `ROLE_CENTRAL_DISABLED` | Keine `NimBLEClient`/`connect()`-Calls im Source | Wir sind kein BLE-Client |
-| `ROLE_OBSERVER_DISABLED` | Keine `NimBLEScan`-Calls im Source | Wir scannen nichts |
-| `MAX_BONDS=1` | `setSecurityAuth(false,false,false)` – kein Pairing aktiv | Kein Bonding genutzt |
-| `MAX_CCCDS=2` | 2 NOTIFY-Chars × 1 Connection = 2 CCCD-Einträge | Exakter Bedarf |
-| `HOST_TASK_STACK_SIZE=3072` | Callbacks rufen nur `xQueueSend` + `Serial.printf` | Reichlich Spielraum |
-| `MSYS1_BLOCK_COUNT=4` | NUS-Pakete typ. <100 B, MTU ≤255, 1 Conn | 4 × ~92 B = 368 B Pufferplatz |
+| Flag                        | Code-Belegt                                               | Warum sicher                  |
+| --------------------------- | --------------------------------------------------------- | ----------------------------- |
+| `ROLE_CENTRAL_DISABLED`     | Keine `NimBLEClient`/`connect()`-Calls im Source          | Wir sind kein BLE-Client      |
+| `ROLE_OBSERVER_DISABLED`    | Keine `NimBLEScan`-Calls im Source                        | Wir scannen nichts            |
+| `MAX_BONDS=1`               | `setSecurityAuth(false,false,false)` – kein Pairing aktiv | Kein Bonding genutzt          |
+| `MAX_CCCDS=2`               | 2 NOTIFY-Chars × 1 Connection = 2 CCCD-Einträge           | Exakter Bedarf                |
+| `HOST_TASK_STACK_SIZE=3072` | Callbacks rufen nur `xQueueSend` + `Serial.printf`        | Reichlich Spielraum           |
+| `MSYS1_BLOCK_COUNT=4`       | NUS-Pakete typ. <100 B, MTU ≤255, 1 Conn                  | 4 × ~92 B = 368 B Pufferplatz |
 
 `CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS=1` wurde getestet, ist aber für
 arduino-esp32 nicht nutzbar — der Linker meldet:
@@ -76,27 +80,27 @@ einen mbedtls-Rebuild erfordern (~8 kB potenzieller Flash-Gewinn).
 
 ### Messwerte (Rebased vs. Optimized)
 
-| Region          | Rebased     | Optimized   | Diff      | %      |
-|-----------------|-------------|-------------|-----------|--------|
-| iram0_0_seg     | 85.076 B    | 85.076 B    | 0         | 0,00 % |
-| iram0_2_seg     | 999.092 B   | 994.456 B   | **−4.636**| −0,46 %|
-| dram0_0_seg     | 201.752 B   | 200.960 B   | **−792**  | −0,39 %|
-| drom0_0_seg     | 1.330.085 B | 1.326.829 B | **−3.256**| −0,24 %|
-| **RAM**         | 133.044 B   | 132.252 B   | **−792**  | −0,60 %|
-| **Flash**       | 1.374.637 B | 1.366.745 B | **−7.892**| −0,57 %|
+| Region      | Rebased     | Optimized   | Diff       | %       |
+| ----------- | ----------- | ----------- | ---------- | ------- |
+| iram0_0_seg | 85.076 B    | 85.076 B    | 0          | 0,00 %  |
+| iram0_2_seg | 999.092 B   | 994.456 B   | **−4.636** | −0,46 % |
+| dram0_0_seg | 201.752 B   | 200.960 B   | **−792**   | −0,39 % |
+| drom0_0_seg | 1.330.085 B | 1.326.829 B | **−3.256** | −0,24 % |
+| **RAM**     | 133.044 B   | 132.252 B   | **−792**   | −0,60 % |
+| **Flash**   | 1.374.637 B | 1.366.745 B | **−7.892** | −0,57 % |
 
 ### Realer Runtime-Effekt > Linker-Diff
 
 Der Linker zeigt nur statisch allozierten Speicher. Drei weitere
 Einsparungen wirken erst zur Laufzeit (nach `NimBLEDevice::init()`):
 
-| Quelle | Geschätzt | Wo gemessen |
-|---|---|---|
-| Static DRAM (s.o.) | −792 B | `dram0_0_seg` |
-| NimBLE Host Task Stack 4096→3072 | −1.024 B | Heap (xTaskCreate) |
-| MSYS-Pool 12→4 Blöcke | −~736 B | Heap (`os_mempool`) |
-| MAX_BONDS 4→1 Persistenz | −~300 B | Heap (NVS-Cache) |
-| MAX_CCCDS 12→2 | −~80 B  | Heap |
+| Quelle                            | Geschätzt   | Wo gemessen                              |
+| --------------------------------- | ----------- | ---------------------------------------- |
+| Static DRAM (s.o.)                | −792 B      | `dram0_0_seg`                            |
+| NimBLE Host Task Stack 4096→3072  | −1.024 B    | Heap (xTaskCreate)                       |
+| MSYS-Pool 12→4 Blöcke             | −~736 B     | Heap (`os_mempool`)                      |
+| MAX_BONDS 4→1 Persistenz          | −~300 B     | Heap (NVS-Cache)                         |
+| MAX_CCCDS 12→2                    | −~80 B      | Heap                                     |
 | **Erwartete Heap-Free-Differenz** | **~2,9 kB** | `esp_get_free_heap_size()` nach BLE-Init |
 
 Pro-Tipp aus `docs/NimBLE.md` umsetzen: vor und nach
@@ -105,10 +109,10 @@ verifizieren.
 
 ## Vergleich Baseline → Optimized (Gesamtgewinn)
 
-| Metrik          | Baseline    | Optimized   | Diff       |
-|-----------------|-------------|-------------|------------|
-| **RAM**         | 133.028 B   | 132.252 B   | **−776 B** |
-| **Flash**       | 1.373.385 B | 1.366.745 B | **−6.640 B**|
+| Metrik    | Baseline    | Optimized   | Diff         |
+| --------- | ----------- | ----------- | ------------ |
+| **RAM**   | 133.028 B   | 132.252 B   | **−776 B**   |
+| **Flash** | 1.373.385 B | 1.366.745 B | **−6.640 B** |
 
 ## Fazit
 

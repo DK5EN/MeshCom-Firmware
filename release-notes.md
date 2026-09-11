@@ -68,7 +68,7 @@ If you capture a log of misbehavior in the field, open an issue with the log att
 
 ## Deep sleep: what is in, what is not, where we need your help
 
-Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdict is in [the linked document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/issue-962-deepsleep-verdict.md): it is not misbehaving, it was switched off entirely for issue #1053 (`e0043a56`, 4.35p.07.11), on every board, and the manual `--deepsleep` command never really slept either.
+Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdict is in [the linked document](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/archive/issue-962-deepsleep-verdict.md): it is not misbehaving, it was switched off entirely for issue #1053 (`e0043a56`, 4.35p.07.11), on every board, and the manual `--deepsleep` command never really slept either.
 
 **What this release does** (items 197–200):
 
@@ -94,10 +94,10 @@ Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdi
 ## Changelog and engineering rationale
 
 - **[MeshCom Stability Changelog](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/CHANGELOG-stability.md)** — the numbered list; items 104–211 are the delta against official `4.35s`, item 211 is new since `v4.35s.09.09`.
-- **[Engineering write-up of the back-pressure campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/pr-draft-20260831.md)** — items 107–169, with per-change file references and measurements.
-- **[Issue 962 deep sleep verdict and plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/issue-962-deepsleep-verdict.md)** — what `--deepsleep` did before, the three options, the nRF52 System OFF plan, and the bench matrix we could and could not run (English).
+- **[Engineering write-up of the back-pressure campaign](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/archive/pr-draft-20260831.md)** — items 107–169, with per-change file references and measurements.
+- **[Issue 962 deep sleep verdict and plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/archive/issue-962-deepsleep-verdict.md)** — what `--deepsleep` did before, the three options, the nRF52 System OFF plan, and the bench matrix we could and could not run (English).
 - **[gpio-hold and HWCDC follow-ups](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/gpio-hold-and-hwcdc-followups.md)** — the two defects found while bench-testing deep sleep on the T-Deck Plus.
-- **[ACK attribution plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/ack-implementierungsplan.md)** and **[the gateway heard-frame fix](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/ack-heard-foreign-msgids-fix.md)** — items 192 and 193 (German).
+- **[ACK attribution plan](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/ack-implementierungsplan.md)** and **[the gateway heard-frame fix](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.35t.09.10/docs/archive/ack-heard-foreign-msgids-fix.md)** — items 192 and 193 (German).
 - [MeshCom@ICSSW project page](https://icssw.org/en/meshcom/)
 
 ## Supported Hardware

@@ -1,6 +1,6 @@
 # T-Deck Plus — measured findings (session 2026-08-28/29)
 
-Successor to [`tdeck-handover.md`](tdeck-handover.md). Everything here was measured on DK5EN-14
+Successor to [`archive/tdeck-handover.md`](archive/tdeck-handover.md). Everything here was measured on DK5EN-14
 over USB serial with `tools/bench/tdeck_harness.py` plus the operator's eyes where the panel had to
 be read; nothing is from reading code alone. Raw logs: `tools/bench/runs/tdeck_run_*.log`
 (untracked). Research companion: [`tdeck-lvgl-agent-guide.md`](tdeck-lvgl-agent-guide.md).

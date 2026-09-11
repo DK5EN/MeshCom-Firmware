@@ -1,5 +1,7 @@
 # Befehlsaenderungen aus PR #1102 und #1103
 
+> **ARCHIVED 2026-09-11.** Historical record of the command surface as PRs **#1102**/**#1103** changed it (merged 2026-08-27). Current command behaviour is the source and `--help`, not this file.
+
 **Stand:** 2026-08-28 -- **Upstream:** `icssw-org/MeshCom-Firmware`, Branch `dev`
 **PRs:** [#1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) "Stabilitaets- und
 Speichersicherheits-Fixes aus dem Feldbetrieb (82 Aenderungen)" und

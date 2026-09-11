@@ -1,5 +1,9 @@
 # Classic ESP32: IRAM/DRAM headroom analysis (MEM-04 follow-up)
 
+> **Status 2026-09-11: still nothing committed.** The T-Beam PSRAM lever measured here is now also
+> carried as `OPT-04` in the DRY/RAM audit ([`optimization-audit-20260910.md`](optimization-audit-20260910.md)),
+> which is the plan that would land it. `MEM-04` stays open until something is committed.
+
 Date: 2026-09-05. Branch `fork-main`, measured in a clean worktree. Nothing committed.
 Tool: `python3 tools/resource_watch.py regions --env <env> --map .pio/build/<env>/firmware.map`.
 

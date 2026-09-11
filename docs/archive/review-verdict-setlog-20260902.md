@@ -1,5 +1,7 @@
 # SL-01..SL-07 — Fable Verdict (2026-09-02)
 
+> **ARCHIVED 2026-09-11.** All findings fixed before the merge of upstream PR **#1125** (section 4, `--setlog`). The open `SL-01..07` item is the _bench_ wave 3, not these findings; its runbook is [`../setlog-instrumentation-impl-plan-20260902.md`](../setlog-instrumentation-impl-plan-20260902.md).
+
 Review of `feat-setlog-20260902` @ `11ff99b8` (four finders incl. object-code stack
 measurements on the RAK4631 build; orchestrator re-derived the load-bearing claims in
 `dedup_functions.cpp`, `udp_functions.cpp`, `nrf_eth.cpp`, `lora_functions.cpp:1156`).
@@ -73,7 +75,7 @@ measurements on the RAK4631 build; orchestrator re-derived the load-bearing clai
 ## Finding 9: Comments and includes
 
 - **Fix (S9):** `txring_functions.h` includes only what it needs (`extern uint8_t
-  ringSource[MAX_RING]`); `setlog_lines.h` is included in `txring_functions.cpp`. Trim the
+ringSource[MAX_RING]`); `setlog_lines.h` is included in `txring_functions.cpp`. Trim the
   multi-line German comments in `lora_functions.cpp` added by this branch to ≤ 2 lines
   each (upstream style is terse); every "1 KB timer task" remark is wrong — `OnRxDone`
   runs in the 16 KB LORA task (`RX_TIMEOUT_VALUE 0` on all variants, DIO1 → semaphore →

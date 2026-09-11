@@ -1,5 +1,7 @@
 # GPS-01..04 — Fable Verdict (2026-09-02)
 
+> **ARCHIVED 2026-09-11.** All findings fixed (F1-F10) before the merge of upstream PR **#1125**. Kept as provenance for the fix wave.
+
 Review of `feat-gps-nmea-20260902` @ `2f8245b3` (six finders, one adversarial verifier
 with TinyGPS++ 1.1.0 host builds and filter simulations). Fix wave: F1–F10 below.
 
@@ -34,7 +36,7 @@ with TinyGPS++ 1.1.0 host builds and filter simulations). Fix wave: F1–F10 bel
   forever and reports QFE as QNH. Before the patch it latched the persisted `node_alt`.
 - **Fix (F4):** withhold the latch only while a fix exists and the filter is not yet
   converged: `if (bGPSON && gpsDetected && !bDisplayTrack && WZ_GPS_HasFix()) return
-  WZ_GPS_AltConverged(); return true;`. Pre-fix the persisted value latches as before; the
+WZ_GPS_AltConverged(); return true;`. Pre-fix the persisted value latches as before; the
   convergence edge re-latches.
 
 ## Finding 4: Stale altitude re-fed into the filter

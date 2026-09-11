@@ -1,5 +1,7 @@
 # Issue 962: deepsleep überarbeiten — Verdict and Implementation Plan
 
+> **ARCHIVED 2026-09-11.** Implemented, bench-verified on four boards (`e242a4cf`, `37537b11`, `828a2567`) and upstream in PR **#1135** (section 1), merged 2026-09-10. The two side findings from that bench are still open: [`../gpio-hold-and-hwcdc-followups.md`](../gpio-hold-and-hwcdc-followups.md).
+
 Date: 2026-09-05
 Tree inspected: fork-main worktree at ffe31ca5, compared against upstream `icssw-org/MeshCom-Firmware` branch `dev`
 Author: DK5EN

@@ -1,5 +1,7 @@
 # PR-Entwurf: T-Deck-Tastatur — Auto-Repeat für Backspace, Leertaste und Alphatasten (TD-10)
 
+> **ARCHIVED 2026-09-11.** Submitted as part of upstream PR **#1125** (section 3, T-Deck-Tastatur Auto-Repeat), merged 2026-09-03.
+
 > **Status: ENTWURF** (Stand 2026-09-02, Basis `v4.35p_prio` @ `16c0733f`,
 > `src/t-deck/` zu diesem Zeitpunkt byte-identisch zu `upstream/dev` @ `6a613547`).
 > Zielbranch: icssw-org DEV. Umsetzung, Protokoll-Herleitung und Review-Fixes:

@@ -1,11 +1,13 @@
 # Implementation plan TD-10 — T-Deck key auto-repeat (Backspace, Space, alpha keys)
 
+> **ARCHIVED 2026-09-11.** Implemented and upstream in PR **#1125** (merged 2026-09-03). Only the bench proof is owed, and it cannot be produced here: the bench T-Deck Plus (`DK5EN-14`) runs old keyboard-controller firmware that never answers the raw-mode probe, so it always takes the one-character-per-press path.
+
 **Status: IMPLEMENTED 2026-09-02 (wave 1 + review fixes K1–K7), operator bench
 §7 pending.** Supersedes the "parked" state of
 [`tdeck-backspace-autorepeat-20260831.md`](tdeck-backspace-autorepeat-20260831.md)
 (concept, §1–§6 still valid). Operator extended the scope on 2026-09-02 from Backspace
 to Backspace + Space + the alpha keys. Execution with `/orchestrate-waves` in its own
-worktree. Backlog row: [`BACKLOG.md`](BACKLOG.md) TD-10. Code sites verified against
+worktree. Backlog row: [`BACKLOG.md`](../BACKLOG.md) TD-10. Code sites verified against
 `v4.35p_prio` @ `16c0733f`; `src/t-deck/` is byte-identical to `upstream/dev` @
 `6a613547`.
 
@@ -276,9 +278,9 @@ four files.
 
 ### Wave 3 — docs (one implementer) and PR text
 
-Exclusive: `docs/tdeck-backspace-autorepeat-20260831.md` (status line → implemented,
+Exclusive: `docs/archive/tdeck-backspace-autorepeat-20260831.md` (status line → implemented,
 pointer here), `docs/BACKLOG.md` TD-10 row, `docs/CHANGELOG-stability.md`, this plan's
-status line. PR text German, `docs/pr-tdeck-keyrepeat-draft-20260902.md` via
+status line. PR text German, `docs/archive/pr-tdeck-keyrepeat-draft-20260902.md` via
 `/submit-pr --dry-run`, marked "Bench-Nachweis durch Operator ausstehend" until §7 is
 done.
 

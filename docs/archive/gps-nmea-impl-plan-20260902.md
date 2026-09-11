@@ -1,11 +1,13 @@
 # Implementation plan GPS-01..GPS-04 — lossless NMEA drain, plausibility gate, altitude estimate, QNH re-latch
 
+> **ARCHIVED 2026-09-11.** Implemented, upstream in PR **#1125**, and GPS-01..04/GPS-06 closed 2026-09-03 on the 8 h `DK5EN-14` capture (9791 evaluations, 0 rejects). The remaining GPS row is `GPS-10`.
+
 **Status: IMPLEMENTED 2026-09-02 (waves 1–2 incl. review fixes F1–F10), bench wave 3
 open (no node attached).** Operator decisions of 2026-09-02 are
 recorded in §1. Execution with `/orchestrate-waves` in its own worktree. Analysis and
-measurements: [`bug-GPS-uart-overflow-20260901.md`](bug-GPS-uart-overflow-20260901.md)
+measurements: [`bug-GPS-uart-overflow-20260901.md`](../bug-GPS-uart-overflow-20260901.md)
 (§4 root cause, §7 fix, §7.6 filter measurements, §8 verification owed). Backlog rows:
-[`BACKLOG.md`](BACKLOG.md) §3.8r. Code sites verified against `v4.35p_prio` @ `16c0733f`
+[`BACKLOG.md`](../BACKLOG.md) §3.8r. Code sites verified against `v4.35p_prio` @ `16c0733f`
 (= `upstream/dev` @ `6a613547` plus fork commits; every GPS/QNH file named below is
 byte-identical to upstream, only `esp32_main.cpp` carries the TM-51 banner, +27 lines
 above the GPS call site).
@@ -352,7 +354,7 @@ Commit.
 - Docs implementer (exclusive: `docs/BACKLOG.md` §3.8r rows, `docs/CHANGELOG-stability.md`,
   `docs/bug-GPS-uart-overflow-20260901.md` §8 status lines, this plan's status line):
   results in, wave statuses, bench numbers.
-- PR text in German: `docs/pr-gps-draft-20260902.md` via `/submit-pr --dry-run`,
+- PR text in German: `docs/archive/pr-gps-draft-20260902.md` via `/submit-pr --dry-run`,
   with this plan's §3 as the "Was/Warum" body and the §6 numbers as evidence.
 
 ## 5. Tests (native, `test/test_gps_filter/test_main.cpp`)

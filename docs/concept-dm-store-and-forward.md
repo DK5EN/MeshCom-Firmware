@@ -1,5 +1,11 @@
 # Concept: Assured Delivery for Personal Messages (Store-and-Forward Outbox)
 
+> **Status 2026-09-11: superseded as the active design.** The line of work that is being pursued is
+> [`proposal-dm-transport-reliability-20260909.md`](proposal-dm-transport-reliability-20260909.md)
+> (`DM-01`..`DM-06` in `BACKLOG.md` SS3.8ad) -- repair the existing `{NNN` / `:ackNNN` end-to-end ACK
+> rather than add an outbox. This concept is kept for the store-and-forward option and for the
+> advisor findings in SS11; it is **not** what the backlog rows implement.
+
 Status: DRAFT v2 — advisor findings incorporated (see §11 and
 `docs/review/advisor-dm-store-and-forward-20260830.md`)
 Date: 2026-08-30

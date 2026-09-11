@@ -82,9 +82,9 @@ From `src/esp32/esp32_audio.cpp`:
 ## Existing in-repo analysis you may cite but must not repeat wholesale
 
 - `docs/tdeck-findings-20260828.md` — measured flush timings, partial-refresh experiment
-- `docs/tdeck-handover.md` — problem list as handed to the fix team
+- `docs/archive/tdeck-handover.md` — problem list as handed to the fix team
 - `docs/tdeck-gui-verdict.md` — adversarial review verdict (findings H1, C1, C2, C3, P1, P2, F1)
-- `docs/tdeck-status-20260828.md` — campaign status
+- `docs/archive/tdeck-status-20260828.md` — campaign status
 
 ## Hard rules for every agent in this wave
 

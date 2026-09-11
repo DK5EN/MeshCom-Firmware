@@ -1,5 +1,7 @@
 # Fix: Node ACK (heard) frames to the phone for foreign msg_ids
 
+> **ARCHIVED 2026-09-11.** `ACK-01` FIXED (`b2336e6f`, item 193) and upstream in PR **#1135** (section 2), merged 2026-09-10. The ACK work that is still open is stage 4 / R5 in [`../ack-implementierungsplan.md`](../ack-implementierungsplan.md).
+
 Status 2026-09-05 19:30, firmware fork-main `fbadd2bb`, measured on DK5EN-98 / mcapp.local
 running McApp v2.0.3-dev.1. Follow-up to `docs/ack-wer-hat-quittiert.md` and commit
 `fbadd2bb` ("--ackinfo lifts the first-only gates for own msg_ids only").

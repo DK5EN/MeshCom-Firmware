@@ -1,5 +1,7 @@
 # RAM-Optimierung Heltec V3 — Vorschläge (2026-05-14)
 
+> **ARCHIVED 2026-09-11.** Superseded by [`../optimization-audit-20260910.md`](../optimization-audit-20260910.md), which measures the same NimBLE/DRAM levers against the current tree and against all 32 envs.
+
 ## Stand nach NimBLE-Tuning
 
 Heltec V3 (ESP32-S3): **132.252 B RAM / 327.680 B** (40,4 %), Flash 1.366.745 B.

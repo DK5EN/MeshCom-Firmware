@@ -3,7 +3,7 @@
 Firmware `4.35t`, `FLASH_VERSION 20260910`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
-[`docs/release_lora_trx.md`](docs/release_lora_trx.md).
+[`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
 
 ---
 
@@ -441,7 +441,7 @@ und DK5EN-98 als Gateway des Betreibers).
 ### Deepsleep: was drin ist, was nicht, wo wir Hilfe brauchen
 
 Issue #962 fragt, warum der Akku-Deepsleep nichts tut. Befund
-(`docs/issue-962-deepsleep-verdict.md`): er tut nicht falsch, er ist seit
+(`docs/archive/issue-962-deepsleep-verdict.md`): er tut nicht falsch, er ist seit
 `e0043a56` (4.35p.07.11, wegen Issue #1053) fuer jedes Board komplett
 abgeschaltet, und der manuelle `--deepsleep` hat auch nie richtig
 geschlafen. Dieses Release repariert den manuellen Befehl auf jedem Board
@@ -534,7 +534,7 @@ Host-Umgebungen, alle 32 Release-Umgebungen gebaut.
   (`bpIsOwnWording()`, `src/backpressure.h`) und verwirft sie still. Die
   Veroeffentlichung war vom 04.09. bis 05.09. auf Betreiberentscheidung
   zurueckgehalten und wurde fuer dieses Release freigegeben. Beleg in
-  `docs/node-msg.md`.
+  `docs/archive/node-msg.md`.
 - **RAK4631 sendet nach Flash-Reset wieder mit 22 dBm (Punkt 180, upstream
   #1132).** Seit 4.35p ist die Markierung "Leistung nicht gesetzt" -20 statt
   0; der nRF52-Bootpfad hat sie nie normalisiert, `getPower()` klemmte -20
@@ -1093,7 +1093,7 @@ auf der Vier-Board-Bench (Heltec V3, T-Beam v1.2, T-Deck Plus, RAK4631 mit
 W5100S-Ethernet), abgesichert mit 438 nativen Testfaellen in 12 Host-Envs und
 Soak-Laeufen bis 9,1 h. Die vollstaendige Begruendung jeder Aenderung mit
 Dateiverweisen und Messwerten steht im PR-Entwurf fuer upstream
-(`docs/pr-draft-20260831.md`); das englische Changelog
+(`docs/archive/pr-draft-20260831.md`); das englische Changelog
 (`docs/CHANGELOG-stability.md`) traegt die nummerierte Liste.
 
 ### Die Schwerpunkte

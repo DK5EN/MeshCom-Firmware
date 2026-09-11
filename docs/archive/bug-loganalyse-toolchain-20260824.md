@@ -1,5 +1,7 @@
 # TOOL-01…06 — `tools/loganalyse.sh` / `logauswertung` skill: 4 bugs + 1 enhancement + 1 doc fix
 
+> **ARCHIVED 2026-09-11.** `TOOL-01`..`TOOL-06` all DONE 2026-08-24, each with a regression test that was red before and green after.
+
 **Status:** FIXED on `v4.35p_prio` (2026-08-24). TOOL-01…05 landed as six commits (see Resolution);
 each carries a regression test that was red before and green after. TOOL-06 (skill doc) is applied to
 the local, git-ignored `SKILL.md`. Original report verified against `6157e3fe` and the source lines

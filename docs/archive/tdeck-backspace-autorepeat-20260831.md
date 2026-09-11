@@ -1,5 +1,7 @@
 # TD-10 — T-Deck: Auto-Repeat für Backspace (Taste halten = mehrfach löschen)
 
+> **ARCHIVED 2026-09-11.** Superseded by [`tdeck-keyrepeat-impl-plan-20260902.md`](tdeck-keyrepeat-impl-plan-20260902.md) (scope widened to Backspace + Space + alpha keys) and shipped upstream in PR **#1125**.
+
 **Status: IMPLEMENTIERT 2026-09-02** (erweitert von Backspace auf Backspace + Space +
 Alphatasten). Umsetzung, Protokoll-Verifikation gegen den LilyGo-Quelltext und
 Review-Fixes siehe

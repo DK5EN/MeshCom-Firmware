@@ -2,7 +2,9 @@
 
 **Status:** **FIXED 2026-09-06 on `fork-main`** — GPS-07 `531d66b4`, GPS-08/09 `49769eda`, GPS-05b
 `bc3ee68b`; bench verdict in §11 (GPS-07/08/09 proven, GPS-05b improves 2.6x but misses its sd gate on
-the verification run, tau choice open). Plan: [`baro-altitude-impl-plan-20260906.md`](baro-altitude-impl-plan-20260906.md).
+the verification run, tau choice open). **Upstream in PR #1135 (section 5), merged 2026-09-10** —
+the reviewer note there says the same thing about tau. The only thing still owed on this document is
+the tau decision (30 min shipped vs 2 h in replay) plus a TRACK-mode capture with pressure. Plan: [`archive/baro-altitude-impl-plan-20260906.md`](archive/baro-altitude-impl-plan-20260906.md).
 Original status: root cause ESTABLISHED for all four items by a 2 h bench capture on `DK5EN-93` plus code
 reading against the tree at `f3d07372`. GPS-07 was already open on other
 evidence; GPS-08 and GPS-09 are new; GPS-05b now has the measurement it was waiting for.

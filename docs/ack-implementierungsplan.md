@@ -227,7 +227,7 @@ auch fuer fremde msg_ids" war kein Feature, sondern derselbe Fehler eine Stufe f
 offizielle App hat keine Blase fuer eine msg_id, die sie nie gesendet hat, McApp buchte daraus
 rund 150 falsche `send_success`-Zeilen pro Tag. Beide Emit-Stellen senden den BLE-Frame jetzt nur
 noch fuer eigene msg_ids; Zustandsmaschine und Web-rxlog-Haken unveraendert. Beleg, Entscheidung
-und Bench-Plan: `docs/ack-heard-foreign-msgids-fix.md`. Nachweis manuell ueber McApp
+und Bench-Plan: `docs/archive/ack-heard-foreign-msgids-fix.md`. Nachweis manuell ueber McApp
 (Operator-Entscheidung, keine neuen automatischen Tests).
 
 Vorfall: Ein Testtext ging als Broadcast `*` raus (x1AE1E227). Seitdem nur Gruppe 9/9999 oder DM.
