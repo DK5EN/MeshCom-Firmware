@@ -64,6 +64,26 @@ one to update when an item moves.
 - `G09`/`G10`/`G11` `tdeck_sdmap.cpp` findings from the stage-1 GUI review, never verified.
 - Standing accepted risk, not work: `N-01`, `N-02`, `N-07` (maintainer decision 2026-08-18).
 
+**F. DRY unification and RAM: the one-shot PR (audit 2026-09-10, BACKLOG §3.8af, filed today)**
+
+- `optimization-audit-20260910.md` is the plan the Track-B epics (`DRY-20/21/23/24`, `SIMP-26/27`,
+  `STATE-28`, `ALT-31/32`) were waiting for: settings schema table + single struct (`D1-04/05/06`),
+  shared UDP frame handler (`D1-01`), one `checkSerialCommand()` (`D1-03`), table-driven command
+  dispatcher (`D2-06/07/10`), `ui_common`, variants restructure, plus a measured RAM bundle
+  (~22 kB classic E22, ~17-18 kB S3/nRF52, 48 kB T-Deck Pro). Seven waves with gates, §7.1.
+- `OPT-02` golden command capture over USB and TCP 2323 is the prerequisite for the command-table
+  wave and does not exist. First concrete step.
+- `OPT-D1..D13` thirteen defects found on the way, all still in the tree: four one-liners
+  (`adc_chars[sizeof]`, nRF52 UDP zero-scan over-read, `msg_buffer[600]` on the ESP32 stack,
+  `--pingcall` sizeof), two stored-value/behaviour decisions (`--specstep`/`--specsamples`
+  swapped, `--softser app0` shadowed), two nRF52 gateway behaviours needing a soak (`sendUDP()`
+  only after "no packet", heartbeat recovery never on a live link), six nRF52 settings fields
+  missing, telemetry gate asymmetry, nRF52 ACK phone frame without attribution, five one-sided
+  guards in the UDP handler. `OPT-D2` is `NET-04`.
+- Operator decisions before waves 5/6 (`OPT-03`) and the gated leftovers (`OPT-04`, among them
+  the T-Beam PSRAM unflag that is the only `MEM-04` lever).
+- Timing is the operator's: one large upstream PR, then back to minimal changes.
+
 **E. Leads without a proof yet**
 
 - RX buffer never cleared between receives, `MAX_APRS_FRAME_SIZE` 340 > `UDP_TX_BUF_SIZE` 255.
@@ -100,7 +120,8 @@ extra keys was received, no phone ran the merged app against a node. That is wri
 `release.md` under "Was ausdruecklich NICHT geprueft wurde".
 
 **Open overall, 2026-09-11 evening:** APRS-02/03/04 below, then DM-05 counters and DM-01, ACK
-stage 4 / R5; everything else is parked or bench-bound (BACKLOG header list).
+stage 4 / R5, and the DRY one-shot PR (group F) when the operator opens the window; everything
+else is parked or bench-bound (BACKLOG header list).
 
 **Open from this cycle, in order:** flash the bench fleet (98/93/14/90/92 still run pre-09.10
 images), receive a real position with `/R= /U= /I=` and a `#name` comment on serial and in the
