@@ -32,6 +32,10 @@ web GUI, run MCProxy `9501bb0` on the Pi, phone test of the merged app, then the
 (items 212-217) and the upstream PR for the firmware half (N-32..N-35 are all upstream
 defects). App PR for `aprs-position-name` only on request.
 
+**Also closed 2026-09-11:** the German PR texts for `TD-12`/`TD-13`/`CDC-01` are moot, all three
+fixes are in upstream PR #1135 (merged 2026-09-10, `src/t-deck/` identical to `upstream/dev`).
+The `--track on` lead from 2026-09-09 (two unexplained lines on gateway 98) is closed unchased.
+
 **Correction 2026-09-11:** the BACKLOG "Standing risk" box (dated 2026-08-18) still listed
 `N-03..N-06` + `SEC-02`/`N-18` as not upstream and as the highest-value open item. Checked
 against the PR text and the tree: all of them went upstream in PR #1102 (merged 2026-08-27),
@@ -169,6 +173,8 @@ exactly one line, checked in isolation) and the WebGUI (three renders of `/?setu
 So something else on the LAN sent `--track on` to a production gateway twice in five seconds --
 a phone app, MCProxy or mc-chat are the candidates. Before item 209 that command was silent, which
 is why nobody could have seen this. Worth chasing; not a defect in TRK-01.
+
+**Closed 2026-09-11 by operator decision: not chased.**
 
 **Open, and deliberately not done here:** the fleet has no telemetry for how many nodes actually
 run with track on -- the question the intake raised alongside the warning.

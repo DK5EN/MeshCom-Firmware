@@ -17,7 +17,7 @@ decision 2026-09-11, no upstream PR owed. Still open: `MH-01`, `MH-03`, `MEM-04`
 `INS-03`, `TD-09`, `TD-10`, `TD-11`, `TD-15`, `E22-01`, `TLM-01..03`, `MEM-02` (parked),
 `UDP-01`-Rückfragen, `WF-01` Sites 1+2, `TM-28`, `TM-49` bench arm, `WEB-03` (c)-(e),
 `CQ-02..CQ-12`, `SL-01..07`, `DM-01..DM-06`, `APRS-02..APRS-04` (§3.8ae), ACK stage 4 / R5,
-German PR texts for `TD-12`/`TD-13`/`CDC-01`, and `G09`/`G10`/`G11` from §3.8c. Hand-over: [`RESUME.md`](RESUME.md).
+and `G09`/`G10`/`G11` from §3.8c. Hand-over: [`RESUME.md`](RESUME.md).
 
 **Last updated 2026-09-05 late evening — see the 2026-09-05 paragraphs below; previous grooming 2026-09-03 evening, §3.8x.** Fourteen items from an
 operator list plus two stale statuses (`TD-01`, `TD-06`) caught on a read-through: `TD-04`, `TD-05`, `GPS-01..04`/`GPS-06`, `TM-35`, `TM-39`, `TM-44`, `CQ-01`,
@@ -54,7 +54,7 @@ bar, plus zoom/beacon rebuilds — TD-09 cost, filed) and the real cause `CDC-01
 loop-gap counters carried across the port-open reset in RTC memory, 7 gaps / 1.8 s max in 44 s
 without the fix, none from prints with it). New bench instruments: `msg_roll`,
 `cdc_backpressure`, `tdeck_cdc_unplug.py`. `TD-14` **FIXED** (bubbled tab-bar event dropped, bar hidden before the build, dedupe guard; `map_tab_pick` bench 2 -> 1 rebuilds). Still open from today: `TD-15` (map empty after reboot, filed),
-the German PR texts for `TD-12`/`TD-13`/`CDC-01` (TD-14 text: `pr-tdeck-maptab-draft-20260905.md`).
+~~the German PR texts for `TD-12`/`TD-13`/`CDC-01`~~ (all three went upstream in PR #1135, 2026-09-10; TD-14 text: `pr-tdeck-maptab-draft-20260905.md`).
 
 **2026-09-05 late evening (all on `fork-main`, pushed, 98 + 14 flashed via OTA):** ACK attribution
 stages 1+3 shipped (`09e6f274`, `fbadd2bb`; changelog item 192; plan and bench protocol in
