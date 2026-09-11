@@ -421,9 +421,23 @@ and `src/udp_functions.cpp:144`):
   in such frames (`:ackNNN`) are forwarded to the BLE app with ack level
   `0x02` when they confirm the node's own message. Server control payloads
   (§1.7: `{CET}`, `{SET}`, …) arrive as `GATE`-wrapped text frames.
-- **`CONF`** + config TLV sequence — **nRF52 only** (`nrf_eth.cpp:497–587`;
-  the ESP32 `getUDP()` mentions CONF in a comment but has no code branch for
-  it — only GATE and BEAT are handled, `udp_functions.cpp:148–151,382`):
+- **`CONF`** + config TLV sequence — **both platforms** (`nrf_eth.cpp:497–587`,
+  `udp_functions.cpp:515–600`).
+
+  > **Correction 2026-09-11.** This section previously said CONF was nRF52
+  > only and that the ESP32 `getUDP()` "mentions CONF in a comment but has no
+  > code branch for it". That was true of the 4.35p baseline this document was
+  > written against; TM-39 added the ESP32 branch, which parses the frame,
+  > checks the source against the configured gateway server, bounds the size,
+  > validates the callsign against `checkRegexCall()` and then **applies**
+  > callsign and shortname. Found by replaying the corpus CONF at Heltec-93
+  > during the G0 capture: the node logged
+  > `[CONF] Call:DK5EN-1 Short:BNCH set from server` and was renamed until it
+  > was restored. lat/lon/alt are parsed and deliberately not applied on the
+  > ESP32 side.
+  >
+  > **A CONF frame provisions the node.** Anything replaying one at live
+  > hardware must restore the configuration afterwards.
 
   ```
   0x00 <len> <callsign bytes>        assigned callsign ("longname")

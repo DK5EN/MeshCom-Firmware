@@ -645,6 +645,19 @@ class MockMeshComServer:
         sent = 0
         for _ in range(repeat):
             for datagram in datagrams:
+                if datagram[:UDP_MSG_INDICATOR_LEN] == _CONF_PREFIX:
+                    # CONF is not a read-only probe: the node applies it. On
+                    # 2026-09-11 a corpus CONF renamed DK5EN-93 to DK5EN-1 /
+                    # BNCH and it stayed renamed until the next restore.
+                    # Replaying one is legitimate -- provisioning is a
+                    # behaviour under test -- but the caller has to put the
+                    # node back afterwards.
+                    logger.warning(
+                        "event=conf_replay addr=%s:%s -- this PROVISIONS the node "
+                        "(callsign and shortname). Restore it afterwards: "
+                        "python3 test/golden/backup_nodes.py --restore <node>=<ip>",
+                        addr[0], addr[1],
+                    )
                 self._sendto(datagram, addr)
                 logger.info(
                     "event=replay addr=%s:%s ind=%s bytes=%d",
