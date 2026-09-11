@@ -4057,6 +4057,59 @@ all still present on 2026-09-11 (re-checked on the cited lines).
 any fix touching one half of a named ESP32/nRF52 pair must be applied to, or explicitly justified
 against, the other half. `tools/pair_diff.sh` does not exist yet.
 
+#### Execution log — phase 0, branch `dry-unification` (opened 2026-09-11)
+
+Topic branch off `fork-main` `32837022`; `fork-main` stays free for the bugfix PRs. It tracks
+`fork-main` by **merge, never rebase**, same rule as §4.1. Base tagged **`dry-base-20260911`**
+(commit `291f375a`): clean 32-env build from an empty `.pio/build`, `resource_baseline.json`
+refreshed with per-env `dram0_0_seg`/`iram0_0_seg`, all 12 native suites green (673 test cases) —
+that is the N0 row of the test plan's evidence chain. The baseline reproduces the audit's cliff
+numbers: `E22_XML-DevKitC` 1,160 B DRAM free (audit 1,164), `ttgo_tbeam` family 20 B IRAM free
+(audit 21 — one byte of source moved since `c51c5881`, which is why it had to be re-measured).
+
+Gate for the whole tool set: `sh test/golden/selftest.sh` (six self-tests against real repository
+fixtures plus the 115 mock-server tests).
+
+| ID      | Type | Sev.   | Item                                                                                                                                                                                                                                                                                                                                                                | Status                                                                                                                                                                                                                                                                                          |
+| ------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPT-05  | TEST | High   | **Golden-capture tooling.** `test/golden/{mc_frame,normalize,corpus_lint,extract_commands,build_corpus,backup_nodes}.py`, `tools/bench/ble_golden.py`, and the capture/replay role added to the existing `tools/mock/meshcom_server.py`. Corpora generated: 28 LoRa frames, 37 UDP-1990 datagrams, 23 EXTUDP objects, 23 BLE writes, 309 ladder commands.           | **DONE** (`291f375a`, `724692ec`, `57aaec0c`, `76199a61`)                                                                                                                                                                                                                                       |
+| OPT-06  | DEC  | High   | **The nRF52 has no server override.** `--srvip` is ESP32-only _and_ `INSTRUMENT_ENABLED`-only (`command_functions.cpp:5259`). On nRF52 the server is a hardcoded literal IP chosen by `--gwsrv`, with no DNS resolver on that path (`nrf_eth.cpp:1168` and its own comment). Test plan steps H6/H7 name RAK-90 as a target.                                         | **OPEN, operator decision.** (a) redirect `89.185.97.38` to the Mac on the bench network, (b) add an nRF52 `--srvip` hook (product code, outside phase 0), (c) run H6/H7 on the ESP32 gateways only and declare the nRF52 UDP path build-only                                                   |
+| OPT-D14 | GAP  | Medium | **Four settings keys hold different units on the two platforms.** `node_freq`/`node_track` MHz vs Hz, `node_bw` kHz vs radio-API index, `node_cr` 4/N denominator vs index — identical key names, identical struct types, written that way by `lora_setcountry()` (`lora_setchip.cpp:193-503`, the `D3-05` item). Confirmed in source and on both live bench nodes. | **OPEN.** Constrains `D1-05`: either the schema gains a per-platform column, or the values are normalized — and normalizing changes flash contents, so it needs the `D1-06` migration. Sharpens drift row `DR-17` from "to be measured" to a measured `keep-split` in exactly these four fields |
+
+**Corrections made to the planning documents while executing them.** Both were wrong in a way that
+would have cost bench time, so they are recorded rather than silently fixed:
+
+- **Port.** The audit and the test plan named UDP **1799** for the mesh/server `GATE`/`BEAT`/`CONF`
+  surface. 1799 is the EXTUDP sideband; the server protocol is **1990** (`UDP_PORT`/`LOCAL_PORT`,
+  `configuration_global.h:165-166`, used at `udp_functions.cpp:681`), as
+  `architecture/11-wire-format.md` §2 had it all along. Seven occurrences corrected; the corpus
+  directory is `test/golden/corpus/udp1990/`.
+- **Settings export.** The plan's P0.3 called for an `--export` serial command. There is none: the
+  export is HTTP only (`GET /config.json`, `web_functions.cpp:656`). It carries the WiFi, AP and
+  web passwords and the BLE pairing code **in plaintext**, so the restorable backups live outside
+  the repository (`~/MeshCom-bench-backups/`, mode 600) and only a masked copy is committed under
+  `test/golden/nodes/`. `backup_nodes.py --verify-masked` is fail-closed and part of the gate.
+
+**`OPT-D8` is confirmed live, and it is a different list than the audit's.** The audit names six
+missing _struct members_ (`node_ntp`, `node_immediate_save`, `node_modus`, `node_mute`,
+`node_persist_to_flash`, `node_disp_rot`). What the JSON export shows is the subset
+`config_json.cpp` enumerates: ESP32 has `node_disrot`, `node_spstart`, `node_spend`, `node_spstep`,
+`node_spsamp`, `node_bfakt` that nRF52 lacks, and nRF52 has `send_repeat_time` and `auto_join` that
+ESP32 lacks. Both true, not the same set — `D1-05` has to reconcile them.
+
+**`OPT-D2` and `OPT-D3` are the only ladder defects of their kind.** `extract_commands.py` walks all
+322 `commandCheck()` sites mechanically: 309 ladder tests, 13 inner disambiguation calls. It finds
+exactly one same-guard duplicate (`setowndns ` at `:3966` and `:4034` = `OPT-D2`) and exactly one
+shadowed pair (`softser app` swallowing `softser app0` = `OPT-D3`). The ESP32/nRF52 `udplog on`
+pair is a platform split, not a defect. `softser fixpegel ` does **not** shadow
+`softser fixpegel2 ` — byte 16 is a space in the command and a `2` in the input, so the compare
+fails; an earlier, token-stripping version of the tool reported it and was wrong.
+
+**Owed in phase 0:** `P0.2` re-check the audit's `file:line` references against the tag (desk work);
+`P0.3` for T-Beam-92 and T-Deck-14 (needs them on USB); `P0.8` validation of the BLE client against
+both stacks (needs the macOS Bluetooth permission for Terminal.app, granted 2026-09-11, pending a
+Terminal restart); `P0.9` protocol templates.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)

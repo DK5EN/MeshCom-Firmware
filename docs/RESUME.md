@@ -67,25 +67,32 @@ one to update when an item moves.
 - `G09`/`G10`/`G11` `tdeck_sdmap.cpp` findings from the stage-1 GUI review, never verified.
 - Standing accepted risk, not work: `N-01`, `N-02`, `N-07` (maintainer decision 2026-08-18).
 
-**F. DRY unification and RAM: the one-shot PR (audit 2026-09-10, BACKLOG §3.8af, filed today)**
+**F. DRY unification and RAM: the one-shot PR — IN EXECUTION on branch `dry-unification`**
 
-- `optimization-audit-20260910.md` is the plan the Track-B epics (`DRY-20/21/23/24`, `SIMP-26/27`,
-  `STATE-28`, `ALT-31/32`) were waiting for: settings schema table + single struct (`D1-04/05/06`),
-  shared UDP frame handler (`D1-01`), one `checkSerialCommand()` (`D1-03`), table-driven command
-  dispatcher (`D2-06/07/10`), `ui_common`, variants restructure, plus a measured RAM bundle
-  (~22 kB classic E22, ~17-18 kB S3/nRF52, 48 kB T-Deck Pro). Seven waves with gates, §7.1.
-- `OPT-02` golden command capture over USB and TCP 2323 is the prerequisite for the command-table
-  wave and does not exist. First concrete step.
-- `OPT-D1..D13` thirteen defects found on the way, all still in the tree: four one-liners
-  (`adc_chars[sizeof]`, nRF52 UDP zero-scan over-read, `msg_buffer[600]` on the ESP32 stack,
-  `--pingcall` sizeof), two stored-value/behaviour decisions (`--specstep`/`--specsamples`
-  swapped, `--softser app0` shadowed), two nRF52 gateway behaviours needing a soak (`sendUDP()`
-  only after "no packet", heartbeat recovery never on a live link), six nRF52 settings fields
-  missing, telemetry gate asymmetry, nRF52 ACK phone frame without attribution, five one-sided
-  guards in the UDP handler. `OPT-D2` is `NET-04`.
-- Operator decisions before waves 5/6 (`OPT-03`) and the gated leftovers (`OPT-04`, among them
-  the T-Beam PSRAM unflag that is the only `MEM-04` lever).
-- Timing is the operator's: one large upstream PR, then back to minimal changes.
+Phase 0 of `testplan-dry-unification-20260910.md` is closed except four items. Base tagged
+`dry-base-20260911`; BACKLOG §3.8af carries the execution log and the new rows.
+
+- **Next action, needs nothing from anyone:** `P0.2` — re-check the audit's `file:line`
+  references against the tag. Source moved between `c51c5881` (the audit's HEAD) and the base, so
+  some of the ~200 cited lines have shifted.
+- **Next action, needs a Terminal restart:** `P0.8` validation — run `tools/bench/ble_golden.py`
+  against RAK-90 (Bluefruit, `--pin 100000`) and Heltec-93 (NimBLE, no PIN). The macOS Bluetooth
+  permission for Terminal.app was granted 2026-09-11 but only takes effect after the process
+  restarts.
+- **Needs boards on USB:** `P0.3` backups for T-Beam-92 and T-Deck-14; `P0.9` protocol templates.
+  RAK-90 (`/dev/cu.usbmodem2101`, 192.168.68.68) and Heltec-93 (`/dev/cu.usbserial-0001`,
+  192.168.68.69) are done. RAK-90 is silent unless `dtr=True`; `serial_session.py` hardcodes
+  `dtr=False` and therefore does not work on it.
+- **Operator decision, blocks steps H6/H7 on the nRF52:** `OPT-06` — the nRF52 has no server
+  override at all, so RAK-90 cannot be pointed at the stub server. Three options in §3.8af.
+- **Then phase 1:** G0 hardware goldens on all four nodes, the C1-C5 carve-out commits, G1, and
+  the N1 characterization tests. Nothing in product code has been touched yet.
+- `OPT-02` golden command capture is no longer "does not exist": the corpus and the drivers are
+  in `test/golden/corpus/commands/` and `tools/mock/meshcom_server.py`. What is owed is the run.
+- `OPT-D1..D14` unchanged in the tree. `OPT-D8` confirmed live with a _different_ field list than
+  the audit's; `OPT-D14` is new — four settings keys hold different units per platform, which
+  constrains the `D1-05` schema table.
+- Timing of the upstream PR is still the operator's: one large PR, then back to minimal changes.
 
 **E. Leads without a proof yet**
 
@@ -95,6 +102,33 @@ one to update when an item moves.
 - No fleet telemetry for how many nodes run with track on (raised with TRK-01).
 - ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
   operator open.
+
+## 2026-09-11: DRY unification phase 0 — branch, base tag, capture tooling, corpora
+
+Branch `dry-unification` off `fork-main` `32837022`. No product code touched; everything below is
+instrumentation, corpora and documentation. Gate: `sh test/golden/selftest.sh`.
+
+- **Base `dry-base-20260911`** (`291f375a`): clean 32-env build from an empty `.pio/build`,
+  `resource_baseline.json` refreshed with the per-env linker regions, all 12 native suites green
+  (673 cases). Reproduces the audit's cliffs: E22_XML 1,160 B DRAM free, T-Beam family 20 B IRAM.
+- **Two planning-document errors corrected.** The mesh/server UDP port is **1990**, not the 1799
+  both documents named (1799 is EXTUDP) — the stub server would have bound the wrong port. And
+  there is no `--export` settings command; the export is `GET /config.json` and carries the WiFi,
+  AP and web passwords plus the BLE pairing code in plaintext, so restorable backups go to
+  `~/MeshCom-bench-backups/` and only masked copies are committed.
+- **The stub server did not have to be written.** `tools/mock/meshcom_server.py` already spoke
+  doc-11 §2; it gained a datagram recorder, corpus replay and a deterministic capture mode.
+- **New tooling:** `normalize.py` (§7 rules, validated on a real RAK-90 log), `mc_frame.py` (one
+  frame implementation, FCS verified against all 12 path-bearing on-air frames), `corpus_lint.py`
+  (the foreign-callsign gate), `extract_commands.py`, `build_corpus.py`, `backup_nodes.py`,
+  `tools/bench/ble_golden.py`.
+- **Corpora generated** from the repository's own fixtures: 28 LoRa frames, 37 UDP-1990 datagrams,
+  23 EXTUDP objects, 23 BLE writes, 309 ladder commands. Every foreign callsign rewritten to
+  `DK5EN-<ssid>` with the FCS recomputed; `*` rewritten to group 9999 wherever the frame can be
+  transmitted.
+- **Findings:** `OPT-D14` (four settings keys, different units per platform), `OPT-06` (the nRF52
+  has no server override), `OPT-D8` confirmed live with a different field list than the audit's,
+  and mechanical confirmation that `OPT-D2`/`OPT-D3` are the only ladder defects of their kind.
 
 ## 2026-09-11 (evening): documentation sweep — 23 documents archived, index rebuilt, four stale statuses corrected
 
