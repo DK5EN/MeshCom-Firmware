@@ -22,7 +22,23 @@ the PIN never reaches a capture, the recorded hello is redacted.
 Consequence of decision 2 that must not be dropped: because the goldens are
 taken on instrument images, the string scan of the command-name list across
 all 32 **shipping** images is now the only evidence about the shipping command
-set. It is owed.
+set. Done 2026-09-11, 0 unexplained absences on the four shipping envs.
+
+## The branch has moved one command past this tag
+
+`--keylock` was added after `dry-base-20260911` (the `TD-16` fix, commit
+`76302aab`). The command corpus in `test/golden/corpus/commands/` holds **305**
+ladder entries and does not contain it, which is correct for the tag and stale
+for the branch head. That is a deliberate divergence, not corpus rot:
+
+- a G1 console capture on the branch head will show one command the G0 capture
+  does not. It belongs on the expected-diff list; it does not invalidate G0.
+- the shipping-image command-name scan predates `--keylock` too and has to be
+  re-run before it can be cited again as evidence about the shipping command
+  set.
+- regenerate with `python3 test/golden/build_corpus.py` when G1 is taken, not
+  before -- regenerating now would leave G0's own baseline describing a tree
+  that no capture was taken on.
 
 Compare a later run against these with:
 
