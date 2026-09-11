@@ -8,6 +8,7 @@
 #include "batt_functions.h"
 #include "mheard_functions.h"
 #include "udp_functions.h"
+#include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "extudp_functions.h"
 #include "ntp_async.h"
 #include "ble_json_frame.h"
@@ -4573,11 +4574,11 @@ void commandAction(char *umsg_text, bool ble)
         {
             printfdeb("set txfrequency to %.4f MHz\n", fVar);
 
-            meshcom_settings.node_freq=fVar;
-
-            #ifdef BOARD_RAK4630
-                 meshcom_settings.node_freq= meshcom_settings.node_freq*1000000;
-            #endif
+            // RF-05: the MHz -> Hz conversion was #ifdef BOARD_RAK4630, but
+            // node_freq holds Hz on BOARD_RAK4630 || USE_HELTEC_T114 ||
+            // BOARD_T_ECHO -- so T114 and T-Echo stored MHz where the rest of
+            // the firmware reads Hz. Same mistake as RF-02, different field.
+            meshcom_settings.node_freq = radioFreqMhzToStored(fVar, radioUnitsIndexed());
 
             if(ble)
             {
@@ -4603,9 +4604,15 @@ void commandAction(char *umsg_text, bool ble)
         }
         else
         {
-            meshcom_settings.node_bw=fVar;
+            // RF-01: node_bw holds kHz on the SX127x path and a bandwidth
+            // index on the SX126x path (RAK4630/T114/T-Echo), where
+            // lora_setchip_meshcom() hands it to Radio.SetRxConfig() raw.
+            // Storing 125/250 there configured the radio with enum value
+            // 125/250. lora_setcountry() always wrote the index, so the unit
+            // of this field depended on which command last wrote it.
+            meshcom_settings.node_bw = radioBwKhzToStored(fVar, radioUnitsIndexed());
 
-            printfdeb("set txbw to %f kHz\n", meshcom_settings.node_bw);
+            printfdeb("set txbw to %.0f kHz\n", radioBwStoredToKhz(meshcom_settings.node_bw, radioUnitsIndexed()));
 
             if(ble)
             {
@@ -4667,11 +4674,11 @@ void commandAction(char *umsg_text, bool ble)
                 addBLECommandBack((char*)msg_text);
             }
 
-            meshcom_settings.node_cr = iVar;
-
-            #ifdef BOARD_RAK4630
-                meshcom_settings.node_cr = iVar - 4;
-            #endif
+            // RF-02: this conversion was #ifdef BOARD_RAK4630, but the
+            // index-unit radio path is BOARD_RAK4630 || USE_HELTEC_T114 ||
+            // BOARD_T_ECHO -- so T114 and T-Echo stored 5..8 where the driver
+            // reads a 1..4 coding-rate index.
+            meshcom_settings.node_cr = radioCrDenomToStored(iVar, radioUnitsIndexed());
 
             save_settings();
 
@@ -6303,9 +6310,10 @@ void sendNodeSetting()
     meshcom_settings.node_power = resolve_tx_power(meshcom_settings.node_power, TX_OUTPUT_POWER); // #1132: also normalize the -20 "unset" sentinel, not just 0
 
     // if we are on nrf52 we need to change frequency reading to MHz
-    #ifdef BOARD_RAK4630
-        node_qrg = node_qrg / 1000000.0;
-    #endif
+    // RF-06: this was #ifdef BOARD_RAK4630 while node_freq holds Hz on all
+    // three SX126x boards, so T114 and T-Echo printed the raw Hz value here.
+    // Display only -- it never reached the radio.
+    node_qrg = radioFreqStoredToMhz(node_qrg, radioUnitsIndexed());
 
     JsonDocument nsetdoc;
 

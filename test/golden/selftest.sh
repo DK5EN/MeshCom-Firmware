@@ -16,6 +16,8 @@ python3 test/golden/backup_nodes.py --self-test
 python3 test/golden/backup_nodes.py --verify-masked
 python3 tools/bench/ble_golden.py --self-test
 python3 test/golden/command_name_scan.py --self-test
+python3 test/golden/radio_units_lint.py --self-test
+python3 test/golden/radio_units_lint.py
 python3 test/golden/verify_captures.py
 python3 test/golden/corpus_lint.py test/golden/corpus/
 python3 -m unittest discover tools/mock 2>&1 | tail -3

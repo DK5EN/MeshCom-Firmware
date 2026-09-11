@@ -4,6 +4,7 @@
 #include "loop_functions_extern.h"
 
 #include "lora_setchip.h"
+#include "radio_units.h"   // RF-01..RF-03 unit conversions
 
 #if defined(EXTERNAL_RADIO)
 #include "esp32/external_radio_glue.h"   // externalRadioConfigChanged() re-sync hook
@@ -297,42 +298,67 @@ void lora_setcountry(int iCtry)
             break;
 
         case 7:  // MAN ... manual
+        {
+            // RF-03: this block validates what the user set by hand, and it
+            // used to compare the stored values against literals written in
+            // ESP32 units -- kHz for bw, a 4/N denominator for cr, MHz for
+            // the frequency window. On the SX126x path those fields hold an
+            // index, an index and Hz, so none of the comparisons could ever
+            // match: every --setcountry 7 there forced freq, bw and cr back
+            // to the defaults and kept only sf. The one case whose whole
+            // purpose is to preserve manual settings preserved nothing.
+            //
+            // Normalize first, decide in one unit, write back in the
+            // platform's unit. getBW()/getCR()/getFreq() already return kHz,
+            // 4/N and MHz on both platforms.
+            const bool indexed = radioUnitsIndexed();
 
-            // bandwith        
-            if(meshcom_settings.node_bw <= 0)
-                meshcom_settings.node_bw = LORA_BANDWIDTH;
+            // bandwith
+            float bw_khz = getBW();
 
-            if(meshcom_settings.node_bw != 125 && meshcom_settings.node_bw != 250)
-                meshcom_settings.node_bw = LORA_BANDWIDTH;
+            if(bw_khz != 125 && bw_khz != 250)
+                bw_khz = radioBwStoredToKhz(LORA_BANDWIDTH, indexed);
+
+            meshcom_settings.node_bw = radioBwKhzToStored(bw_khz, indexed);
 
             // frequency
-            if(meshcom_settings.node_freq <= 0)
-                meshcom_settings.node_freq = RF_FREQUENCY;
+            float freq_mhz = getFreq();
 
-            dec_bandwith = (meshcom_settings.node_bw/2.0)/100.0;
+            // Kept at /100.0, which is what this line has always computed:
+            // for 250 kHz it yields a 1.25 MHz guard band, where half the
+            // bandwidth is 0.125 MHz -- a factor of ten too wide, so the
+            // window is 431.25..437.75 instead of 430.125..438.875. That is
+            // RF-04 and it is a behaviour change on ESP32 too, so it is not
+            // made here inside an nRF52 unit fix.
+            dec_bandwith = (bw_khz/2.0)/100.0;
 
-            if(!((meshcom_settings.node_freq >= (430.0 + dec_bandwith) && meshcom_settings.node_freq <= (439.000 - dec_bandwith)) || (meshcom_settings.node_freq >= (869.4 + dec_bandwith) && meshcom_settings.node_freq <= (869.65 - dec_bandwith))))
-                meshcom_settings.node_freq = RF_FREQUENCY;
+            if(!((freq_mhz >= (430.0 + dec_bandwith) && freq_mhz <= (439.000 - dec_bandwith)) || (freq_mhz >= (869.4 + dec_bandwith) && freq_mhz <= (869.65 - dec_bandwith))))
+                freq_mhz = radioFreqStoredToMhz(RF_FREQUENCY, indexed);
 
-            // set spreading factor 
-            if(meshcom_settings.node_sf <= 0)
-                meshcom_settings.node_sf = LORA_SF;
+            meshcom_settings.node_freq = radioFreqMhzToStored(freq_mhz, indexed);
 
-            if(meshcom_settings.node_sf < 6 ||  meshcom_settings.node_sf > 12)
-                meshcom_settings.node_sf = LORA_SF;
+            // set spreading factor
+            int sf = getSF();
 
-            // set coding rate 
-            if(meshcom_settings.node_cr <= 0)
-                meshcom_settings.node_cr = LORA_CR;
+            if(sf < 6 || sf > 12)
+                sf = LORA_SF;
 
-            if(meshcom_settings.node_cr < 5 ||  meshcom_settings.node_cr > 8)
-                meshcom_settings.node_cr = LORA_CR;
+            meshcom_settings.node_sf = sf;
+
+            // set coding rate
+            int cr_denom = getCR();
+
+            if(cr_denom < 5 || cr_denom > 8)
+                cr_denom = radioCrStoredToDenom(LORA_CR, indexed);
+
+            meshcom_settings.node_cr = radioCrDenomToStored(cr_denom, indexed);
 
             meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
 
             meshcom_settings.node_preamplebits = LORA_PREAMBLE_LENGTH;
 
             break;
+        }
 
         case 8:  // EU Preabble 8 ... 
             meshcom_settings.node_freq = RF_FREQUENCY;
