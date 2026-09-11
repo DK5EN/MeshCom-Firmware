@@ -72,6 +72,25 @@ the GPS rewrites them and no import can restore them.
 
 With restore in front of each run, all four nodes reproduce exactly.
 
+## UDP-1990, captured on three platforms
+
+All three read the same corpus the same way — the classification agrees on
+every entry, and the counts differ only where the KEEP cadence fell:
+
+| Node        | Platform      | DATA | BEAT | CET | OTHER | CONF | own uploads     |
+| ----------- | ------------- | ---: | ---: | --: | ----: | ---: | --------------- |
+| `heltec-93` | ESP32-S3      |   24 |    7 |   3 |     2 |    1 | 3 KEEP          |
+| `rak-90`    | nRF52         |   26 |    4 |   3 |     2 |    1 | 2 KEEP + 2 DATA |
+| `t-beam-92` | ESP32 classic |   24 |    8 |   3 |     2 |    1 | 3 KEEP + 2 DATA |
+
+The `DATA` uploads are acks the node generated for the corpus DM addressed to
+it — genuine node → server traffic, so part of step H7 is captured without any
+LoRa injection. Their lengths differ per node because the `DATA` header
+carries the node's own callsign and version.
+
+`rak-90` is the case the nRF52 `--srvip` hook was written for: before
+`ee545088` that board could not be pointed at a stub at all.
+
 ## Not yet captured
 
 The BLE surface only, on all four nodes. Still owed from the test plan's
