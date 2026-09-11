@@ -1,5 +1,41 @@
 # RESUME — pick up here
 
+## 2026-09-11: APRS parser contract wave shipped in three repos, items 212-217, nothing flashed
+
+Trigger was a parser-drift analysis (`docs/aprs-parser-drift-20260911.md`): the firmware emits
+17 `/X=` position keys and its own decoder understood 14; MCProxy and the mobile app each lost a
+different subset, and no document listed the keys. Four waves plus a `#name` follow-up, all on
+`fork-main` after the upstream sync to `674413ce` (`0ba9f063`, v4.35t base):
+
+- **Firmware:** `6fd9c3a5` decoder reads `/R= /U= /I=` (N-32), `/Y=` scan buffer reset (N-33),
+  encoder NaN guards test their own buffer via `src/pos_tag_nan.h` (N-34); `b6d9f3cf` decoder
+  splits `#name` off the comment into `aprsPosition::pos_name`, `--setname` strips `#` (N-35);
+  `86be10c8` web GUI keeps the group in the destination field after a send (item 217).
+  Contract in `docs/architecture/11-wire-format.md` §1.8/§1.8.1, HTML rendering committed
+  (`73600269`). Changelog items 212-217 under "Unreleased (after v4.35t.09.10)", defect
+  catalogue N-32..N-35 FIXED, `release.md` journal entry written. `FLASH_VERSION` still 20260910.
+- **MCProxy** `development` `9501bb0`: `parse_aprs_position()` returns comment and name;
+  `/N<n>`, `/D=`, `/U=`, `/I=` typed, `T#` from text frames (McApp v2.0.6 released 2026-09-11,
+  development on 2.0.7). **Not deployed to the Pi.**
+- **App** `rainerfritz/Meshcom-MobileApp`: PR #8 (`src/utils/AprsParser.ts` + 23 tests, msg_id
+  little-endian fix, five new Positions columns) **merged** as `534ba45`. The `#name` follow-up
+  sits on branch `aprs-position-name` (`3f61059`) on the DK5EN fork, pushed, **no PR opened**.
+
+**Verified:** native gates only (`native_parsers`, `test/test_pos_tag_nan/`, 12 host envs) and
+the app's vitest suite. **Not verified:** no board runs any of it, no field frame with the three
+extra keys was received, no phone ran the merged app against a node. That is written into
+`release.md` under "Was ausdruecklich NICHT geprueft wurde".
+
+**Open from this cycle, in order:** flash the bench fleet (98/93/14/90/92 still run pre-09.10
+images), receive a real position with `/R= /U= /I=` and a `#name` comment on serial and in the
+web GUI, run MCProxy `9501bb0` on the Pi, phone test of the merged app, then the release cut
+(items 212-217) and the upstream PR for the firmware half (N-32..N-35 are all upstream
+defects). App PR for `aprs-position-name` only on request.
+
+**Decision 2026-09-11:** the BP-11 echo guard (item 179, shipped since v4.35s.09.05) stays
+fork-only. No upstream PR will be requested; the "still no upstream PR" note below is closed,
+not owed.
+
 ## 2026-09-10: v4.35t.09.10 published -- upstream sync, version letter t
 
 Release `v4.35t.09.10` is on GitHub, 39 assets, tag on `17f3188d`. One item, 211: upstream `dev`
