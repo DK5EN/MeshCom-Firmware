@@ -32,7 +32,15 @@ void udpCountTx(bool ok);
 
 // MeshCom UDP functions
 void getMeshComUDP();
-void getMeshComUDPpacket(unsigned char inc_udp_buffer[500], int packetSize);
+#if defined(ESP32)
+// C1 carve-out (DRY unification U1): the frame handler is the body that runs
+// once a datagram is in the buffer -- no socket, no platform. Same signature
+// as handleUdpFrame_nrf52() in nrf52/nrf_eth.h so both sides can be linked
+// into one native binary and fed the same corpus (twin-differential). Guarded
+// because IPAddress reaches this header only through the ESP32 include chain;
+// the nRF52 build gets it from the Ethernet library in nrf_eth.h.
+void handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);
+#endif
 void sendMeshComUDP();
 void startMeshComUDP();
 void sendMeshComHeartbeat();

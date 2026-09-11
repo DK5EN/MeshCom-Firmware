@@ -176,7 +176,7 @@ void getMeshComUDP()
       if(timeClient.tryConsume(remote_ip, remote_port, incomingPacket, len))
         return;
 
-      getMeshComUDPpacket(incomingPacket, len);
+      handleUdpFrame_esp32(incomingPacket, len, remote_ip);
     }
   }
 }
@@ -202,7 +202,7 @@ void ntpHarvestUDP()
 }
 
 // UDP functions
-void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int packetSize)
+void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int packetSize, IPAddress src_ip)
 {
     char source_call[20] = {0};
     char destination_call[20] = {0};
@@ -531,19 +531,20 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
         // Guard: apply only when this datagram actually came from the
         // gateway server this node resolved and sends GATE traffic to
-        // (node_hostip, see sendMeshComUDP()). s_udpRxLastIp is set for
-        // this exact packet just above in getMeshComUDP() -- the two never
-        // interleave (udp_is_busy, single-threaded loop, one socket read
-        // per pass). A spoofed LAN datagram must not be able to rename the
-        // node. This call path also only ever runs while bGATEWAY is on
-        // (esp32_main.cpp only calls getMeshComUDP() from the bGATEWAY-on
-        // branch; the bGATEWAY-off branch calls ntpHarvestUDP() instead,
-        // which never reaches getMeshComUDPpacket()), so the guard below is
-        // a second, independent check on top of that.
-        if((uint32_t)node_hostip == 0 || s_udpRxLastIp != node_hostip)
+        // (node_hostip, see sendMeshComUDP()). src_ip is this datagram's own
+        // source, passed in by getMeshComUDP() -- before the C1 carve-out
+        // this read the file-static s_udpRxLastIp, which getMeshComUDP()
+        // had set from the same packet one line before the call. A spoofed
+        // LAN datagram must not be able to rename the node. This call path
+        // also only ever runs while bGATEWAY is on (esp32_main.cpp only
+        // calls getMeshComUDP() from the bGATEWAY-on branch; the
+        // bGATEWAY-off branch calls ntpHarvestUDP() instead, which never
+        // reaches the frame handler), so the guard below is a second,
+        // independent check on top of that.
+        if((uint32_t)node_hostip == 0 || src_ip != node_hostip)
         {
           printfdeb("[CONF] ignored: source %s does not match gateway server %s\n",
-                     s_udpRxLastIp.toString().c_str(), node_hostip.toString().c_str());
+                     src_ip.toString().c_str(), node_hostip.toString().c_str());
         }
         else if(packetSize < UDP_MSG_INDICATOR_LEN || packetSize > UDP_CONF_BUFF_SIZE)
         {
