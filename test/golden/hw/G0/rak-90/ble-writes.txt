@@ -1,25 +1,23 @@
-    4.289 hello pin=yes            231020303c70696e2d686173682d33323e
-    6.328 timesync 1767225600      062000b95569
-   15.838 text '--info'            08a02d2d696e666f
-   17.879 text '--seset'           09a02d2d7365736574
-   19.918 text '--wifiset'         0ba02d2d77696669736574
-   21.958 text '--nodeset'         0ba02d2d6e6f6465736574
-   23.998 text '--analogset'       0da02d2d616e616c6f67736574
-   26.038 text '--wx'              06a02d2d7778
-   28.078 text '--pos'             07a02d2d706f73
-   30.118 text '--io'              06a02d2d696f
-   32.158 text '--tel'             07a02d2d74656c
-   34.198 text '--aprsset'         0ba02d2d61707273736574
-   36.238 text '--conffin'         0ba02d2d636f6e6666696e
-   38.278 text '--mheard'          0aa02d2d6d6865617264
-   40.319 text '--path'            08a02d2d70617468
-   42.358 text '::{9}bench golden ' 1ba03a3a7b397d62656e636820676f6c64656e2063617074757265
-   44.398 text '::{DK5EN-1}bench g' 1ca03a3a7b444b35454e2d317d62656e636820676f6c64656e20646d
-   46.468 text '--info'            08a02d2d696e666f
-   48.508 text '--infoX'           09a02d2d696e666f58
-   50.548 text '--heap'            08a02d2d68656170
-   52.588 text '--heap tag'        0ca02d2d6865617020746167
-   54.629 text '--softser app'     0fa02d2d736f667473657220617070
-   56.671 text '--softser app0'    10a02d2d736f66747365722061707030
-   58.708 text '--maxhop'          0aa02d2d6d6178686f70
-   60.749 text '--maxhop 5'        0ca02d2d6d6178686f702035
+    4.009 hello pin=yes            231020303c70696e2d686173682d33323e
+    6.049 timesync 1767225600      062000b95569
+   15.050 text '--info'            08a02d2d696e666f
+   17.089 text '--seset'           09a02d2d7365736574
+   19.130 text '--wifiset'         0ba02d2d77696669736574
+   21.169 text '--nodeset'         0ba02d2d6e6f6465736574
+   23.209 text '--analogset'       0da02d2d616e616c6f67736574
+   25.249 text '--wx'              06a02d2d7778
+   27.289 text '--pos'             07a02d2d706f73
+   29.329 text '--io'              06a02d2d696f
+   31.369 text '--tel'             07a02d2d74656c
+   33.409 text '--aprsset'         0ba02d2d61707273736574
+   35.449 text '--conffin'         0ba02d2d636f6e6666696e
+   37.489 text '--mheard'          0aa02d2d6d6865617264
+   39.529 text '--path'            08a02d2d70617468
+   41.570 text '--info'            08a02d2d696e666f
+   43.609 text '--infoX'           09a02d2d696e666f58
+   45.649 text '--heap'            08a02d2d68656170
+   47.690 text '--heap tag'        0ca02d2d6865617020746167
+   49.730 text '--softser app'     0fa02d2d736f667473657220617070
+   51.769 text '--softser app0'    10a02d2d736f66747365722061707030
+   53.810 text '--maxhop'          0aa02d2d6d6178686f70
+   55.850 text '--maxhop 5'        0ca02d2d6d6178686f702035

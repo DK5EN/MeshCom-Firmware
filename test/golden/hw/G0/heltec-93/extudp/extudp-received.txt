@@ -1,0 +1,18 @@
+   4.294   <ADDR>  156 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"Test 1 2 3{046","msg_id":"<ID1>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+   7.696   <ADDR>  146 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"9999","msg":"an alle","msg_id":"<ID2>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+   9.124   <ADDR>  154 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"Test 1 2 3{046","msg_id":"<ID1>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  12.916   <ADDR>  144 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"9999","msg":"an alle","msg_id":"<ID2>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  28.790   <ADDR>  154 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"trotzdem{049","msg_id":"<ID3>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  32.385   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"kein type feld{050","msg_id":"<ID4>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  40.809   <ADDR>  158 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"kein type feld{050","msg_id":"<ID4>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  49.708   <ADDR>  177 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"123456789","msg":"QRS - slow down, TX buffer is filling","msg_id":"<ID5>","firmware":35,"fw_sub":"t",
+  56.849   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"truncated case{052","msg_id":"<ID6>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  65.179   <ADDR>  257 B  {"src_type":"node","type":"pos","src":"DK5EN-93","msg":"","lat":48.4075,"lat_dir":"N","long":11.7384,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","h
+  65.255   <ADDR>  131 B  {"src_type":"node","type":"tele","src":"DK5EN-93","temp1":25.97,"temp2":0,"hum":42.79297,"qfe":966.18,"qnh":966.18,"gas":0,"co2":0}
+  67.293   <ADDR>  158 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"nur das hier{054","msg_id":"<ID7>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  70.444   <ADDR>  158 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"truncated case{052","msg_id":"<ID6>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  74.267   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"none{055","msg_id":"<ID8>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  75.059   <ADDR>  156 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"nur das hier{054","msg_id":"<ID7>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  75.737   <ADDR>  161 B  {"src_type":"lora","type":"msg","src":"DK5EN-93,DK5EN-92","dst":"DK5EN-1","msg":"trotzdem{049","msg_id":"<ID3>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>
+  79.814   <ADDR>  148 B  {"src_type":"lora","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"none{055","msg_id":"<ID8>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  81.435   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-93","dst":"DK5EN-1","msg":"text{056","msg_id":"<ID9>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}

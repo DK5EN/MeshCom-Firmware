@@ -145,7 +145,17 @@ def _guard_stack(lines: List[str]) -> List[str]:
             elif kind == "endif":
                 if stack:
                     stack.pop()
-        out.append(" && ".join(stack))
+        # Each level is parenthesised before joining. Without that, a nested
+        # `#if` whose own condition has a top-level `||` loses its grouping:
+        # `#if INSTRUMENT_ENABLED` around
+        # `#if (defined(ESP32) && !defined(X)) || defined(NRF52_SERIES)`
+        # joined flat reads, under C precedence, as
+        # `(INSTRUMENT_ENABLED && ESP32 && !X) || NRF52_SERIES` -- which says
+        # the command is present on any nRF52 build. It is not; it needs
+        # INSTRUMENT_ENABLED too. Found by command_name_scan.py bucketing
+        # `srvip ` (command_functions.cpp:5268) as unexplained-absent on the
+        # shipping nRF52 image, 2026-09-11.
+        out.append(" && ".join(f"({c})" for c in stack))
     return out
 
 
@@ -370,6 +380,16 @@ def _self_test() -> int:
     if not any(a.name == "udplog on" for a, _ in guarded_duplicates(commands)):
         failures += 1
         print("FAIL: the ESP32/nRF52 udplog pair was not reported as guarded")
+
+    # Nested guards must keep their grouping, or a consumer that evaluates the
+    # text gets the wrong answer for every command built this way.
+    srvip = [c for c in commands if c.name.strip() == "srvip"]
+    if not srvip:
+        failures += 1
+        print("FAIL: srvip not found")
+    elif "(INSTRUMENT_ENABLED)" not in srvip[0].guard or not srvip[0].guard.startswith("("):
+        failures += 1
+        print(f"FAIL: nested guard lost its parenthesisation: {srvip[0].guard}")
 
     # Order must be the file order, which is what makes the prefix match
     # deterministic.
