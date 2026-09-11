@@ -4114,6 +4114,44 @@ fails; an earlier, token-stripping version of the tool reported it and was wrong
 | 3   | Node coverage for G0                                    | **Two now, two later** — G0 on RAK-90 and Heltec-93, T-Beam-92 and T-Deck-14 added before the carve-out.    | Any node added after G0 has no before-capture and can only be compared G1 to G2. Acceptable only if the two are connected _before_ the C1-C5 commits; after that the window is gone. Track it as a hard gate on wave B2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 4   | `OPT-D14` — the four settings keys with different units | **Normalize the stored values**, one canonical unit in flash on both platforms, converted at the radio API. | Changes flash contents, so `D1-06` migration is now **mandatory, not optional**, and a wrong migration wipes every nRF52 node's settings. Second exposure, not on the audit's list: the web config JSON carries these values, so a `config.json` exported from a pre-normalization nRF52 node (`node_freq` in Hz) and imported afterwards would set a nonsense frequency. The migration therefore has to cover the `configImportJson()` path, not only the flash layout. The nRF52 BLE settings characteristic is raw struct bytes — the layout is unchanged, but the _values_ the phone sees change; the app does not appear to read `FREQ` at all, which should be confirmed before the PR rather than assumed. |
 
+#### Incident 2026-09-11: the BLE golden corpus broadcast to the live network
+
+Four bench nodes transmitted broadcast frames into the live MeshCom network
+during the G0 BLE captures and appeared publicly as `DK5EN-93>all`,
+`DK5EN-90>all`, `DK5EN-92>all` and `DK5EN-14>all` — 15 frames in total,
+between 12:32 and 13:52. This violates the hard rule of 2026-08-31 (bench
+traffic only to group 9/9999 or a direct contact, never `*`).
+
+**Cause.** The corpus used the serial console's message form over BLE. The
+BLE path is different: `phone_commands.cpp:583-588` prepends **one** `:` to any
+0xA0 text that does not start with `--`, because the app sends a bare message
+body. So `::{9}text` arrived at the dispatcher as `:::{9}text`;
+`sendMessage()` (`loop_functions.cpp:3786`) consumed two colons, found `:`
+where `{group}` should start, parsed no destination and fell through to `*`.
+The correct BLE form is a single colon, `:{9}text`.
+
+**Why the guard missed it.** `corpus_lint.py` checks the corpus text, and the
+corpus text contained no `*` anywhere. The `*` was created by the firmware,
+downstream of everything the lint can see. A text-level check was structurally
+incapable of catching this class.
+
+**Fixes, both in place.**
+
+1. The BLE corpus sends **no messages at all** any more. It carries the 13
+   registers and the adversarial prefix pairs, which is what it is for;
+   messaging is covered on the serial path where the two-colon form is proven.
+   `build_corpus.ble_corpus()` refuses any line starting with `:`, and its
+   self-test asserts it. An automated corpus is the wrong place for something
+   that transmits on every run.
+2. `ble_golden.verify_no_broadcast()` inspects the **captured frames** after
+   every capture and exits 2 on any own-originated frame addressed to `*`.
+   Checked against the four captures that caused the incident: it reports all
+   15 frames. Relayed traffic from other stations is not flagged, and a direct
+   message is not flagged.
+
+The four G0 BLE captures taken before the fix contain those frames and are
+replaced.
+
 **Owed in phase 0:** `P0.2` re-check the audit's `file:line` references against the tag (desk work);
 `P0.3` for T-Beam-92 and T-Deck-14 (needs them on USB); `P0.8` validation of the BLE client against
 both stacks (needs the macOS Bluetooth permission for Terminal.app, granted 2026-09-11, pending a

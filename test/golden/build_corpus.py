@@ -321,9 +321,37 @@ BLE_ADVERSARIAL = (
 def ble_corpus() -> str:
     """One write per line, sent as a 0xA0 text frame.
 
-    Messages go to group 9 or to a bench callsign, never to `*` -- the same
-    bench rule the UDP corpus follows, and here it matters more: a BLE text
-    write is transmitted immediately, with no gateway in between.
+    **INCIDENT 2026-09-11 -- this corpus broadcast to the live network.**
+
+    It carried two message lines in the serial console's form,
+    `::{9}bench golden capture` and `::{DK5EN-1}bench golden dm`. Over BLE that
+    form is wrong, and the failure mode is a broadcast:
+
+      1. `phone_commands.cpp:583-588` prepends **one** `:` to any 0xA0 text
+         that does not start with `--`, because the app sends a bare message
+         body. So `::{9}x` became `:::{9}x` on the wire into the dispatcher.
+      2. `sendMessage()` (`loop_functions.cpp:3786`) consumes the first two
+         colons and looks for `{group}` at the start of what remains. What
+         remained was `:{9}x` -- a colon, not a brace -- so no destination was
+         parsed and it fell through to `*`.
+
+    Four bench nodes therefore transmitted broadcast frames into the live
+    MeshCom network, where they appeared publicly as `DK5EN-93>all`,
+    `DK5EN-90>all`, `DK5EN-92>all` and `DK5EN-14>all`. The corpus lint did not
+    catch it: the corpus text contained no `*` anywhere, and the `*` was
+    created by the firmware afterwards.
+
+    The correct BLE form is a **single** colon -- `:{9}text` -- so that the
+    firmware's prepend yields `::{9}text`. That is written down here rather
+    than used: this corpus now sends no messages at all. The registers and the
+    adversarial prefix pairs are what it is for, messaging is covered on the
+    serial path where the two-colon form is proven, and an automated corpus is
+    the wrong place to put something that transmits on every run.
+
+    The durable guard is not this comment but
+    `ble_golden.verify_no_broadcast()`, which inspects the **captured frames**
+    and fails on any own-originated frame addressed to `*`. A text-level check
+    could never have caught this.
 
     `hello` and `timesync` are not in this file. The client builds them itself
     (they are opcodes 0x10 and 0x20, not text), and the hello carries the PIN
@@ -334,12 +362,11 @@ def ble_corpus() -> str:
         "# Driven by tools/bench/ble_golden.py as 0xA0 text frames, in order.",
         "# hello (0x10) and timesync (0x20) are built by the client, not listed here.",
         "#",
+        "# NO MESSAGE SENDS. Read the incident note in this function before",
+        "# adding one back.",
+        "#",
         "# the 13 JSON registers",
         *BLE_REGISTERS,
-        "#",
-        "# one group message and one direct message (never '*')",
-        "::{9}bench golden capture",
-        f"::{{{BENCH_DM}}}bench golden dm",
         "#",
         "# adversarial prefix pairs",
         *BLE_ADVERSARIAL,
@@ -443,8 +470,13 @@ def _self_test() -> int:
             failures += 1
             print(f"FAIL: {bad} rewritten frames carry a stale FCS")
 
-        # No BLE write may address the broadcast destination.
+        # The BLE corpus must not send messages at all -- see ble_corpus().
         ble = (out / "ble" / "writes.txt").read_text()
+        for line in ble.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and line.startswith(":"):
+                failures += 1
+                print(f"FAIL: the BLE corpus sends a message: {line!r}")
         if "{*}" in ble or "::*" in ble:
             failures += 1
             print("FAIL: the BLE corpus addresses '*'")

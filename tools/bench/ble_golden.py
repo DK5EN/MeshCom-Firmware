@@ -438,8 +438,18 @@ async def run(args: argparse.Namespace) -> int:
         await asyncio.sleep(args.listen)
         await client.stop_notify(NUS_RX_CHAR)
 
+    broadcasts = verify_no_broadcast(cap.notifications, own_calls)
     for path in cap.write_files(args.out, args.reply_window):
         print(f"wrote {path}", file=sys.stderr)
+    if broadcasts:
+        print("\n*** BROADCAST TRANSMITTED -- the bench rule was violated ***",
+              file=sys.stderr)
+        for line in broadcasts:
+            print(f"    {line}", file=sys.stderr)
+        print("    The node put these on the air addressed to '*'. Find out why\n"
+              "    before running this capture again; see build_corpus.ble_corpus().",
+              file=sys.stderr)
+        return 2
     burst, compared, excluded = cap.counts
     print(f"{len(cap.writes)} writes; notifications: {burst} pre-corpus burst, "
           f"{compared} replies (compared), {excluded} mesh/spontaneous (excluded)",
@@ -539,6 +549,20 @@ def _self_test() -> int:
             != b'{"TYP":"G","DATE":<v>}':
         failures += 1
         print("FAIL: a string-valued volatile key was not masked")
+    # The broadcast guard must fire on our own frame and stay quiet on a
+    # relayed one. f011's path is DK5EN-91 and its destination is '*'.
+    ours = [(0.0, b"\x40" + frames["f011"])]
+    if len(verify_no_broadcast(ours, ("DK5EN-91",))) != 1:
+        failures += 1
+        print("FAIL: a broadcast we transmitted was not reported")
+    if verify_no_broadcast(ours, ("DK5EN-93",)):
+        failures += 1
+        print("FAIL: another station's broadcast was reported as ours")
+    # f007 is a direct message from us: not a broadcast.
+    if verify_no_broadcast([(0.0, b"\x40" + frames["f007"])], ("DK5EN-98",)):
+        failures += 1
+        print("FAIL: a direct message was reported as a broadcast")
+
     folded, dropped = collapse(["x", "x", "y", "x"])
     if folded != ["x", "y", "x"] or dropped != 1:
         failures += 1
@@ -561,6 +585,46 @@ def _self_test() -> int:
 
     print("ble_golden.py self-test: " + ("ok" if failures == 0 else f"{failures} failure(s)"))
     return 1 if failures else 0
+
+
+# --------------------------------------------------------------- safety
+
+
+def verify_no_broadcast(frames: List[Tuple[float, bytes]],
+                        own_calls: Tuple[str, ...]) -> List[str]:
+    """Every own-originated frame addressed to `*`, as printable findings.
+
+    This is the guard that had to exist after 2026-09-11, when a BLE corpus
+    made four bench nodes transmit broadcast frames into the live MeshCom
+    network. The corpus itself contained no `*`: the firmware created the
+    broadcast, because the corpus used the serial console's two-colon message
+    form over BLE and `sendMessage()` fell through to `*` when it could not
+    parse a destination (see `build_corpus.ble_corpus()` for the full chain).
+
+    A text-level check of the corpus could not have caught that, and did not.
+    Only looking at what the node actually put on the air can. So this runs on
+    the captured frames, on every capture, and it reports rather than being
+    something a caller has to remember to ask for.
+    """
+    findings: List[str] = []
+    for t, data in frames:
+        if not data or data[0] != 0x40:
+            continue
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "golden"))
+        import mc_frame
+        parsed = mc_frame.parse(data[1:])
+        if parsed is None or parsed.dest != b"*":
+            continue
+        originator = parsed.path[0] if parsed.path else ""
+        if originator == "response":
+            continue
+        if not any(originator.upper().startswith(c.upper()) for c in own_calls):
+            continue      # inbound mesh traffic, not something we transmitted
+        findings.append(
+            f"{t:9.3f} {originator} transmitted to '*': "
+            f"{parsed.payload[:60]!r}"
+        )
+    return findings
 
 
 # --------------------------------------------------------------- compare
