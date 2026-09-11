@@ -115,25 +115,51 @@ def check_lone_rak_guard(rel: str) -> list:
 
 
 def check_case7_normalizes() -> list:
-    """RF-03: lora_setcountry() case 7 must decide on normalized values
-    (getBW()/getCR()/getFreq()), not on the raw stored fields."""
+    """RF-03: the manual-country branch must decide on normalized values
+    (getBW()/getCR()/getFreq()), not on the raw stored fields.
+
+    It moved with the C5 carve-out: the table cases went into
+    countryProfile() (src/country_profile.cpp) and country 7 stayed behind as
+    the `else` branch of lora_setcountry(), because it validates what is
+    already stored instead of assigning literals. This checker follows it
+    there rather than pinning a `case 7:` label that no longer exists -- and
+    it also asserts country_profile.cpp still returns false for 7, since
+    without that the `default` would hand back the EU profile and silently
+    turn manual mode into EU."""
     text = (REPO / "src/lora_setchip.cpp").read_text()
-    m = re.search(r"case 7:.*?(?=\n\s*case \d+:)", text, re.S)
+    m = re.search(r"^void lora_setcountry\(int iCtry\)\n\{\n.*?\n\}\n",
+                  text, re.S | re.M)
     if not m:
-        return ["src/lora_setchip.cpp: case 7 of lora_setcountry() not found"]
-    body = m.group(0)
-    out = []
+        return ["src/lora_setchip.cpp: lora_setcountry() not found"]
+    e = re.search(r"\n    else\n    \{\n(.*?)\n    \}\n", m.group(0), re.S)
+    if not e:
+        return ["src/lora_setchip.cpp: the manual-country branch of "
+                "lora_setcountry() not found"]
+    body = e.group(1)
+
+    out_pre = []
+    prof = (REPO / "src/country_profile.cpp")
+    if prof.exists():
+        ptext = prof.read_text()
+        if not re.search(r"case 7:.*?return false;", ptext, re.S):
+            out_pre.append("src/country_profile.cpp: country 7 must return "
+                           "false explicitly, or `default` returns the EU "
+                           "profile for it and manual mode silently becomes EU")
+    else:
+        out_pre.append("src/country_profile.cpp missing; the C5 carve-out is "
+                       "part of what this checker pins")
+    out = out_pre
     # a comparison of a raw stored field against a numeric literal is the bug
     for cmp in re.finditer(
             r"meshcom_settings\.(node_bw|node_cr|node_freq)\s*(==|!=|<|>|<=|>=)\s*[\d.]+",
             body):
-        line = text.count("\n", 0, m.start() + cmp.start()) + 1
-        out.append(f"src/lora_setchip.cpp:{line}: case 7 compares raw "
+        line = text.count("\n", 0, m.start() + e.start() + cmp.start()) + 1
+        out.append(f"src/lora_setchip.cpp:{line}: the manual-country branch compares raw "
                    f"{cmp.group(1)} against a literal; the stored unit differs "
                    f"per platform -- compare getBW()/getCR()/getFreq() instead")
     for acc in ("getBW()", "getFreq()", "getCR()"):
         if acc not in body:
-            out.append(f"src/lora_setchip.cpp: case 7 does not use {acc}; "
+            out.append(f"src/lora_setchip.cpp: the manual-country branch does not use {acc}; "
                        f"it must decide on normalized values")
     return out
 
@@ -208,6 +234,27 @@ def self_test() -> int:
             ok = False
         else:
             print("  ok  a comment naming the guard is not the guard")
+
+        # The C5 trap: with country 7 lifted out of the switch, `default`
+        # catches it unless an explicit case returns false -- manual mode
+        # would silently become EU. Caught once during the carve itself.
+        (Path(d) / "src/lora_setchip.cpp").write_text(
+            "void lora_setcountry(int iCtry)\n{\n"
+            "    if(countryProfile(iCtry, p))\n    {\n    }\n"
+            "    else\n    {\n"
+            "        float bw_khz = getBW();\n"
+            "        float freq_mhz = getFreq();\n"
+            "        int cr_denom = getCR();\n"
+            "    }\n}\n")
+        (Path(d) / "src/country_profile.cpp").write_text(
+            "bool countryProfile(int iCtry, CountryProfile &out)\n{\n"
+            "    switch (iCtry)\n    {\n"
+            "        default:\n            return true;\n    }\n}\n")
+        if check_case7_normalizes():
+            print("  ok  country 7 falling through to `default` is caught")
+        else:
+            print("SELF-TEST FAIL: country 7 fallthrough not caught")
+            ok = False
         REPO = real_repo
 
     lone = check_lone_rak_guard.__doc__ is not None

@@ -5,6 +5,7 @@
 
 #include "lora_setchip.h"
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
+#include "country_profile.h"   // C5: the country table
 
 #if defined(EXTERNAL_RADIO)
 #include "esp32/external_radio_glue.h"   // externalRadioConfigChanged() re-sync hook
@@ -195,334 +196,79 @@ void lora_setcountry(int iCtry)
 {
     float dec_bandwith = 0;
 
-    switch (iCtry)
+    CountryProfile p;
+
+    if(countryProfile(iCtry, p))
     {
-        case 1:  // UK ... 
-            
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 439912500;
-                meshcom_settings.node_bw = 0;
-                meshcom_settings.node_cr = 1;
-            #else
-                meshcom_settings.node_freq = 439.9125;
-                meshcom_settings.node_bw = 125.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 10;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 2:  // ON
-            meshcom_settings.node_freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_bw = 0;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_bw = 125.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 10;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 4:  // LA
-            meshcom_settings.node_freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 433925000;
-                meshcom_settings.node_bw = 0;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 433.9250;
-                meshcom_settings.node_bw = 125.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 10;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-            case 5:  // 868 ... 
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 869525000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 869.525;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = LORA_SF;
-
-            meshcom_settings.node_track_freq = 999;
-
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 6:  // 915 ... 
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 906875000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 906.875;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = LORA_SF;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 7:  // MAN ... manual
-        {
-            // RF-03: this block validates what the user set by hand, and it
-            // used to compare the stored values against literals written in
-            // ESP32 units -- kHz for bw, a 4/N denominator for cr, MHz for
-            // the frequency window. On the SX126x path those fields hold an
-            // index, an index and Hz, so none of the comparisons could ever
-            // match: every --setcountry 7 there forced freq, bw and cr back
-            // to the defaults and kept only sf. The one case whose whole
-            // purpose is to preserve manual settings preserved nothing.
-            //
-            // Normalize first, decide in one unit, write back in the
-            // platform's unit. getBW()/getCR()/getFreq() already return kHz,
-            // 4/N and MHz on both platforms.
-            const bool indexed = radioUnitsIndexed();
-
-            // bandwith
-            float bw_khz = getBW();
-
-            if(bw_khz != 125 && bw_khz != 250)
-                bw_khz = radioBwStoredToKhz(LORA_BANDWIDTH, indexed);
-
-            meshcom_settings.node_bw = radioBwKhzToStored(bw_khz, indexed);
-
-            // frequency
-            float freq_mhz = getFreq();
-
-            // Kept at /100.0, which is what this line has always computed:
-            // for 250 kHz it yields a 1.25 MHz guard band, where half the
-            // bandwidth is 0.125 MHz -- a factor of ten too wide, so the
-            // window is 431.25..437.75 instead of 430.125..438.875. That is
-            // RF-04 and it is a behaviour change on ESP32 too, so it is not
-            // made here inside an nRF52 unit fix.
-            dec_bandwith = (bw_khz/2.0)/100.0;
-
-            if(!((freq_mhz >= (430.0 + dec_bandwith) && freq_mhz <= (439.000 - dec_bandwith)) || (freq_mhz >= (869.4 + dec_bandwith) && freq_mhz <= (869.65 - dec_bandwith))))
-                freq_mhz = radioFreqStoredToMhz(RF_FREQUENCY, indexed);
-
-            meshcom_settings.node_freq = radioFreqMhzToStored(freq_mhz, indexed);
-
-            // set spreading factor
-            int sf = getSF();
-
-            if(sf < 6 || sf > 12)
-                sf = LORA_SF;
-
-            meshcom_settings.node_sf = sf;
-
-            // set coding rate
-            int cr_denom = getCR();
-
-            if(cr_denom < 5 || cr_denom > 8)
-                cr_denom = radioCrStoredToDenom(LORA_CR, indexed);
-
-            meshcom_settings.node_cr = radioCrDenomToStored(cr_denom, indexed);
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-
-            meshcom_settings.node_preamplebits = LORA_PREAMBLE_LENGTH;
-
-            break;
-        }
-
-        case 8:  // EU Preabble 8 ... 
-            meshcom_settings.node_freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = LORA_SF;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 9:  // UK8 ... 
-            
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 439912500;
-                meshcom_settings.node_bw = 0;
-                meshcom_settings.node_cr = 1;
-            #else
-                meshcom_settings.node_freq = 439.9125;
-                meshcom_settings.node_bw = 125.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 10;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 10:  // US ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 433175000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 433.175;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 11;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 11:  // VR2 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 435775000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 435.775;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = 11;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        case 12:  // 435 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 435750000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 435.750;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-            meshcom_settings.node_sf = 11;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-            break;
-        case 13:  // 436 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 436250000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 436.250;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-            meshcom_settings.node_sf = 11;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-            break;
-        case 14:  // 442 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_freq = 442000000;
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_freq = 442.000;
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-            meshcom_settings.node_sf = 11;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = 8;
-            break;
-
-        case 15:  // PL
-            meshcom_settings.node_freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = LORA_SF;
-
-            meshcom_settings.node_track_freq = 434.855; // LORA_APRS_FREQUENCY for Poland
-
-            meshcom_settings.node_preamplebits = 8;
-
-            break;
-
-        default:    // EU
-            meshcom_settings.node_freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                meshcom_settings.node_bw = 1;
-                meshcom_settings.node_cr = 2;
-            #else
-                meshcom_settings.node_bw = 250.0;
-                meshcom_settings.node_cr = 6;
-            #endif
-
-            meshcom_settings.node_sf = LORA_SF;
-
-            meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
-            
-            meshcom_settings.node_preamplebits = LORA_PREAMBLE_LENGTH;
-
-            break;
+        meshcom_settings.node_freq = p.freq;
+        meshcom_settings.node_bw = p.bw;
+        meshcom_settings.node_sf = p.sf;
+        meshcom_settings.node_cr = p.cr;
+        meshcom_settings.node_track_freq = p.track_freq;
+        meshcom_settings.node_preamplebits = p.preamble;
+    }
+    else
+    {
+        // Country 7 (MAN, manual) is the one code that is not a table entry:
+        // it validates what the user already set rather than assigning
+        // literals, so it cannot move into the pure countryProfile().
+        // RF-03: this block validates what the user set by hand, and it
+        // used to compare the stored values against literals written in
+        // ESP32 units -- kHz for bw, a 4/N denominator for cr, MHz for
+        // the frequency window. On the SX126x path those fields hold an
+        // index, an index and Hz, so none of the comparisons could ever
+        // match: every --setcountry 7 there forced freq, bw and cr back
+        // to the defaults and kept only sf. The one case whose whole
+        // purpose is to preserve manual settings preserved nothing.
+        //
+        // Normalize first, decide in one unit, write back in the
+        // platform's unit. getBW()/getCR()/getFreq() already return kHz,
+        // 4/N and MHz on both platforms.
+        const bool indexed = radioUnitsIndexed();
+
+        // bandwith
+        float bw_khz = getBW();
+
+        if(bw_khz != 125 && bw_khz != 250)
+            bw_khz = radioBwStoredToKhz(LORA_BANDWIDTH, indexed);
+
+        meshcom_settings.node_bw = radioBwKhzToStored(bw_khz, indexed);
+
+        // frequency
+        float freq_mhz = getFreq();
+
+        // Kept at /100.0, which is what this line has always computed:
+        // for 250 kHz it yields a 1.25 MHz guard band, where half the
+        // bandwidth is 0.125 MHz -- a factor of ten too wide, so the
+        // window is 431.25..437.75 instead of 430.125..438.875. That is
+        // RF-04 and it is a behaviour change on ESP32 too, so it is not
+        // made here inside an nRF52 unit fix.
+        dec_bandwith = (bw_khz/2.0)/100.0;
+
+        if(!((freq_mhz >= (430.0 + dec_bandwith) && freq_mhz <= (439.000 - dec_bandwith)) || (freq_mhz >= (869.4 + dec_bandwith) && freq_mhz <= (869.65 - dec_bandwith))))
+            freq_mhz = radioFreqStoredToMhz(RF_FREQUENCY, indexed);
+
+        meshcom_settings.node_freq = radioFreqMhzToStored(freq_mhz, indexed);
+
+        // set spreading factor
+        int sf = getSF();
+
+        if(sf < 6 || sf > 12)
+            sf = LORA_SF;
+
+        meshcom_settings.node_sf = sf;
+
+        // set coding rate
+        int cr_denom = getCR();
+
+        if(cr_denom < 5 || cr_denom > 8)
+            cr_denom = radioCrStoredToDenom(LORA_CR, indexed);
+
+        meshcom_settings.node_cr = radioCrDenomToStored(cr_denom, indexed);
+
+        meshcom_settings.node_track_freq = LORA_APRS_FREQUENCY;
+
+        meshcom_settings.node_preamplebits = LORA_PREAMBLE_LENGTH;
     }
 
     save_settings();
