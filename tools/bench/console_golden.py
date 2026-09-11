@@ -310,12 +310,137 @@ def render(answers: List[Tuple[str, List[str]]], transport_name: str,
     return "\n".join(out) + "\n"
 
 
-def compare(a: Path, b: Path) -> int:
-    """Block-by-block diff of two captures, keyed on the command."""
+
+# --- chatter-tolerant comparison -------------------------------------------
+#
+# compare() reads files written by render(), which already ran every line
+# through normalize.Normalizer -- so by the time these helpers see a line, a
+# real wall-clock stamp is long gone and, where the node's own timestamp
+# prefix survived (e.g. inside an embedded splice, see below), it reads as
+# the literal token "<TS>". That is why this half uses "<TS>" and not the
+# digit regex is_async() uses on the raw capture.
+#
+# ASYNC_PREFIXES is the same deny-list drive() uses; is_async() only ever
+# matches at the start of a whole raw line, which catches an async line that
+# lands *beside* a command's answer. Measured 2026-09-11 (README.md next to
+# the G0/heltec-93 capture): a full third of the 233 raw differences are async
+# text that lands *inside* an answer line instead, because the node's print
+# raced the echo rather than waiting for a line boundary -- e.g.
+# '--setlog 1' came back as two physical lines, '--set[readBatteryVoltage]...'
+# and 'log 1START CHECK:ONE:<--setlog 1>' (cmd-usb.txt), with the echo cut in
+# half and glued to a real line on either side. is_async() cannot see any of
+# that because none of those physical lines *starts* with a deny-listed
+# prefix.
+_TS_TOKEN = r"<TS>\s*"
+_ASYNC_EMBEDDED = re.compile(
+    r"(?:" + _TS_TOKEN + r")?(?:" + "|".join(re.escape(p) for p in ASYNC_PREFIXES) + r")"
+)
+
+
+def _strip_embedded_async(line: str) -> Tuple[str, bool]:
+    """Cut `line` at the first recognised async chunk, wherever it starts.
+
+    Returns (real_prefix, True) when a chatter run was found and dropped --
+    real_prefix is everything before it, empty when the whole line was async.
+    Returns (line, False) when nothing matched, i.e. an ordinary real line.
+
+    Everything from the match to the end of the physical line is discarded
+    without a "did real content follow it" check, because in every measured
+    case (README.md) the node's own print ends with its own newline: the
+    chatter never has a real fragment trailing it on the same physical line,
+    only ever preceding it.
+    """
+    m = _ASYNC_EMBEDDED.search(line)
+    if not m:
+        return line, False
+    return line[: m.start()], True
+
+
+def _try_repair_echo(lines: List[str], expected: str) -> List[str]:
+    """Reassemble `expected` -- the command itself, i.e. the block's own key
+    -- from fragments chatter split it across one or more lines.
+
+    The node echoes the command verbatim as the first thing it prints, so
+    `expected` is known exactly; a fragment only ever needs to be a prefix or
+    suffix of it, never guessed at. Matched character-by-character rather
+    than whole-line, because a splice can leave the echo's tail sharing a
+    physical line with the *next* real line with no separator between them
+    (the '--setlog 1' -> 'log 1START CHECK:ONE:<--setlog 1>' case above) --
+    a whole-line match would wrongly refuse to repair that one.
+
+    The moment a line cannot extend the accumulation as a prefix of
+    `expected`, the original lines are returned untouched: a real mismatch
+    must still show up as a difference rather than be forced into place.
+    """
+    acc = ""
+    for idx, ln in enumerate(lines):
+        remaining = len(expected) - len(acc)
+        if len(ln) <= remaining:
+            candidate = acc + ln
+            if not expected.startswith(candidate):
+                return lines
+            acc = candidate
+            if acc == expected:
+                return [expected] + lines[idx + 1:]
+            continue
+        # This line runs past where the echo ends: only its head can belong
+        # to the echo, and the rest is a real line glued on without its
+        # separating newline (the splice ate that newline, not the content).
+        head, tail = ln[:remaining], ln[remaining:]
+        if acc + head != expected:
+            return lines
+        return [expected, tail] + lines[idx + 1:]
+    return lines  # ran out of lines before the echo was ever completed
+
+
+def _clean_block(lines: List[str], command: str) -> List[str]:
+    """One command's answer, with chatter tolerated: async runs dropped
+    (whole lines and mid-line splices alike) and a split echo reassembled."""
+    cleaned: List[str] = []
+    for ln in lines:
+        prefix, matched = _strip_embedded_async(ln)
+        if matched and not prefix:
+            continue  # the whole line was async chatter -- drop it
+        cleaned.append(prefix)
+    return _try_repair_echo(cleaned, command)
+
+
+def compare(a: Path, b: Path, *, strict: bool = False) -> int:
+    """Block-by-block diff of two captures, keyed on the command.
+
+    A bench node on a live mesh answers unsolicited -- see
+    test/golden/hw/G0/heltec-93/console/README.md, 233 of 432 commands
+    differed 2026-09-11 between two captures of one otherwise-idle node, and
+    essentially none of it was firmware behaviour. `--strict` keeps the old
+    byte-exact block diff, for a future capture taken with the radio quiet.
+    The default instead classifies each command into one of three buckets --
+    identical, equal once chatter is tolerated (_clean_block), or genuinely
+    different -- because only the third is a finding; report all three
+    rather than folding chatter tolerance into a single yes/no verdict.
+    """
     def blocks(p: Path):
         current, out = None, {}
         order = []
-        for line in p.read_text().splitlines():
+        # A captured answer line can carry a bare \r mid-content, not just at
+        # its end -- measured in cmd-usb.txt's '--setlog 1' block, "log
+        # 1\rSTART CHECK:ONE:<--setlog 1>" (drive() only ever strips a
+        # trailing \r off a line it already split on \n; an embedded one
+        # survives). Two things must both hold to see that \r rather than
+        # lose the text after it: read with newline="" so Python's own
+        # universal-newline handling does not silently rewrite it to \n
+        # before this code ever runs (Path.read_text() would), and then
+        # split on "\n" ourselves rather than call splitlines(), which also
+        # treats a bare \r as a line break -- normalize.py's text() documents
+        # the identical hazard for the same reason. Getting only one of the
+        # two half-fixes it and reproduces the same silent drop: the second
+        # physical piece would come back without its leading four spaces and
+        # fail the "    " check below. The \r itself carries no content (a
+        # cursor-return artifact of the same splice, not data), so once
+        # correctly seen it is discarded rather than compared.
+        with p.open(encoding="utf-8", errors="replace", newline="") as f:
+            raw_text = f.read()
+        for raw_line in raw_text.split("\n"):
+            line = raw_line.replace("\r", "")
             if line.startswith(">>> "):
                 current = line[4:]
                 out[current] = []
@@ -328,22 +453,56 @@ def compare(a: Path, b: Path) -> int:
     order_b, bb = blocks(b)
     only_a = [c for c in order_a if c not in bb]
     only_b = [c for c in order_b if c not in ba]
-    changed = [c for c in order_a if c in bb and ba[c] != bb[c]]
+    common = [c for c in order_a if c in bb]
+
+    if strict:
+        changed = [c for c in common if ba[c] != bb[c]]
+        print(f"{a}: {len(order_a)} commands\n{b}: {len(order_b)} commands")
+        for c in only_a:
+            print(f"  only in a: {c}")
+        for c in only_b:
+            print(f"  only in b: {c}")
+        for c in changed:
+            print(f"  differs: {c}")
+            for line in ba[c][:4]:
+                print(f"      a: {line}")
+            for line in bb[c][:4]:
+                print(f"      b: {line}")
+        bad = len(only_a) + len(only_b) + len(changed)
+        print("identical" if not bad else f"{bad} difference(s)")
+        return 1 if bad else 0
+
+    identical = [c for c in common if ba[c] == bb[c]]
+    repaired: List[str] = []
+    different: List[str] = []
+    for c in common:
+        if ba[c] == bb[c]:
+            continue
+        if _clean_block(ba[c], c) == _clean_block(bb[c], c):
+            repaired.append(c)
+        else:
+            different.append(c)
 
     print(f"{a}: {len(order_a)} commands\n{b}: {len(order_b)} commands")
     for c in only_a:
         print(f"  only in a: {c}")
     for c in only_b:
         print(f"  only in b: {c}")
-    for c in changed:
+    for c in different:
         print(f"  differs: {c}")
         for line in ba[c][:4]:
             print(f"      a: {line}")
         for line in bb[c][:4]:
             print(f"      b: {line}")
-    bad = len(only_a) + len(only_b) + len(changed)
-    print("identical" if not bad else f"{bad} difference(s)")
-    return 1 if bad else 0
+
+    # A command missing from one capture entirely is not chatter -- it is
+    # real evidence (a run that ended early, a reboot mid-capture) -- so it
+    # counts as a finding, not as tolerated noise.
+    finding = len(different) + len(only_a) + len(only_b)
+    print(f"identical: {len(identical)}")
+    print(f"equal after chatter repair: {len(repaired)}")
+    print(f"genuinely different: {finding}")
+    return 1 if finding else 0
 
 
 def _self_test() -> int:
@@ -382,6 +541,89 @@ def _self_test() -> int:
             failures += 1
             print("FAIL: a changed answer must be reported")
 
+    # --- chatter-tolerant compare(): cases modelled on the measured evidence
+    # in test/golden/hw/G0/heltec-93/console/{README.md,cmd-usb.txt}.
+    if _strip_embedded_async("--set[readBatteryVoltage] <TS> ... 0.00 V") != ("--set", True):
+        failures += 1
+        print("FAIL: _strip_embedded_async should cut at the embedded prefix")
+    if _strip_embedded_async("--utcoff") != ("--utcoff", False):
+        failures += 1
+        print("FAIL: _strip_embedded_async must not touch an ordinary line")
+    if _strip_embedded_async("[HEAP] 111 222 333 (mon)") != ("", True):
+        failures += 1
+        print("FAIL: _strip_embedded_async should drop a wholly-async line")
+    if _try_repair_echo(["--set", "log 1START CHECK:ONE:<--setlog 1>"], "--setlog 1") != \
+            ["--setlog 1", "START CHECK:ONE:<--setlog 1>"]:
+        failures += 1
+        print("FAIL: _try_repair_echo should reassemble a splice that also "
+              "glued on the next real line")
+    if _try_repair_echo(["[MAXHOP];text;4;pos;2"], "--maxhop") != ["[MAXHOP];text;4;pos;2"]:
+        failures += 1
+        print("FAIL: _try_repair_echo must leave a non-echo answer untouched")
+
+    def _block(command: str, lines: List[str]) -> str:
+        return f">>> {command}\n" + "".join(f"    {ln}\n" for ln in lines) + "\n"
+
+    # usb-like: chatter split *inside* lines (--setlog 1, --maxv); clean on
+    # its own terms otherwise. 2323-like: chatter as a whole extra line
+    # (--maxv) or none at all. --maxhop carries a real difference on both,
+    # unrelated to chatter -- it must survive every tolerance pass.
+    usb_like = (
+        _block("--utcoff", ["--utcoff"])
+        + _block("--setlog 1", ["--set[readBatteryVoltage] <TS> ... 0.00 V",
+                                 "log 1START CHECK:ONE:<--setlog 1>",
+                                 "[ERR]..Callsign <1> not valid"])
+        + _block("--maxv", ["--maxv"])
+        + _block("--maxhop", ["[MAXHOP];text;4;pos;2"])
+    )
+    net_like = (
+        _block("--utcoff", ["--utcoff"])
+        + _block("--setlog 1", ["--setlog 1", "START CHECK:ONE:<--setlog 1>",
+                                 "[ERR]..Callsign <1> not valid"])
+        + _block("--maxv", ["--maxv", "[HEAP] 111 222 333 (mon)"])
+        + _block("--maxhop", ["[MAXHOP];text;5;pos;2"])
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        u = Path(tmp) / "usb.txt"
+        n = Path(tmp) / "net.txt"
+        u.write_text(usb_like)
+        n.write_text(net_like)
+
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = compare(u, n)
+        report = out.getvalue()
+        if rc != 1:
+            failures += 1
+            print("FAIL: a genuine difference must fail compare() even with "
+                  "chatter tolerance on")
+        if "identical: 1" not in report:
+            failures += 1
+            print(f"FAIL: expected 1 identical command\n{report}")
+        if "equal after chatter repair: 2" not in report:
+            failures += 1
+            print(f"FAIL: expected 2 commands equal after repair "
+                  f"(spliced echo + ignored async line)\n{report}")
+        if "genuinely different: 1" not in report:
+            failures += 1
+            print(f"FAIL: expected the real --maxhop difference to survive "
+                  f"chatter tolerance\n{report}")
+        if "differs: --maxhop" not in report or "differs: --setlog 1" in report:
+            failures += 1
+            print(f"FAIL: only --maxhop should be reported as differing\n{report}")
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc_strict = compare(u, n, strict=True)
+        # Byte-exact mode must not know about chatter tolerance at all: all
+        # three commands whose raw text differs are findings.
+        if rc_strict != 1 or "3 difference(s)" not in out.getvalue():
+            failures += 1
+            print(f"FAIL: --strict must count all 3 raw differences\n{out.getvalue()}")
+
     print("console_golden.py self-test: "
           + ("ok" if failures == 0 else f"{failures} failure(s)"))
     return 1 if failures else 0
@@ -417,13 +659,16 @@ def main(argv: Iterable[str] | None = None) -> int:
                     help="silence that ends the boot flood")
     ap.add_argument("--limit", type=int, default=0, help="only the first N commands")
     ap.add_argument("--compare", nargs=2, type=Path, metavar="TXT")
+    ap.add_argument("--strict", action="store_true",
+                    help="byte-exact --compare (no chatter tolerance); "
+                         "for a capture taken with the radio quiet")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     if args.self_test:
         return _self_test()
     if args.compare:
-        return compare(*args.compare)
+        return compare(*args.compare, strict=args.strict)
     if not args.out:
         ap.error("--out is required for a capture")
 
