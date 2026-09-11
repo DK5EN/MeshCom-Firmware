@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -55,6 +56,12 @@ SECRET_KEYS = (
 # Per-node facts that are not secret but differ by node; kept, because the
 # whole point of the committed copy is to show what each node was set to.
 MASK_TOKEN = "<masked>"
+
+# Fields the node rewrites from its own hardware, so a restore can never bring
+# them back and a mismatch here is not a failure. Found by verifying a restore:
+# node_alt came back as 503 against a backup of 488 -- the GPS had moved the
+# altitude, not the import.
+LIVE_FIELDS = ("node_lat", "node_lon", "node_alt", "node_lat_c", "node_lon_c")
 
 
 def fetch(ip: str, timeout: float = 20.0) -> Dict[str, Any]:
@@ -133,6 +140,64 @@ def verify_masked(root: Path = MASKED_DIR) -> List[str]:
     return problems
 
 
+def restore(name: str, ip: str, vault: Path, timeout: float = 30.0) -> str:
+    """POST the unmasked backup back to the node; it reboots on success.
+
+    **Every capture run has to start here.** The golden corpora are full of
+    setters -- the command script alone drives `--<cmd> 1 / 999999 / abc` for
+    every setter in the ladder, and even the small BLE corpus contains
+    `--maxhop 5`. Measured on T-Beam-92 2026-09-11: one BLE capture moved
+    `max_hop_text` from 4 to 5 permanently, and the next run's frames carried
+    the new hop budget, so two runs of the same firmware differed. A capture
+    that does not restore first is measuring the previous run's leftovers.
+
+    The masked copies in the repository are deliberately not restorable; this
+    reads the vault.
+    """
+    src = vault / f"{name}-settings-base.json"
+    body = src.read_bytes()
+    req = urllib.request.Request(
+        f"http://{ip}/config", data=body, method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as fh:
+            return fh.read().decode("utf-8", errors="replace").strip()
+    except (TimeoutError, urllib.error.URLError, ConnectionError) as exc:
+        # The node reboots as part of the import, so it often never finishes
+        # the HTTP response. That is success, not failure -- but say so only
+        # after the node is back and the values actually match.
+        return f"(no response, node rebooted: {type(exc).__name__})"
+
+
+def verify_restore(name: str, ip: str, vault: Path, wait: float = 25.0) -> List[str]:
+    """Re-read the node and report every field that did not come back.
+
+    Without this, "restored" rests on an HTTP call that usually times out by
+    design. Volatile fields are not compared -- only what the backup set.
+    """
+    import time
+
+    expected = json.loads((vault / f"{name}-settings-base.json").read_text())
+    deadline = time.monotonic() + wait
+    live = None
+    while time.monotonic() < deadline:
+        try:
+            live = fetch(ip, timeout=5.0)
+            break
+        except Exception:
+            time.sleep(2.0)
+    if live is None:
+        return [f"{name}: node did not answer within {wait:.0f} s after the restore"]
+
+    exp, got = settings_of(expected), settings_of(live)
+    return [
+        f"{name}: {k} is {got.get(k)!r}, backup had {exp[k]!r}"
+        for k in sorted(exp)
+        if k in got and got[k] != exp[k] and k not in LIVE_FIELDS
+    ]
+
+
 def _self_test() -> int:
     failures = 0
     sample = {
@@ -190,6 +255,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                     help=f"where the unmasked backups go (default: {DEFAULT_VAULT})")
     ap.add_argument("--compare", nargs=2, metavar="NAME",
                     help="diff two already-committed masked backups")
+    ap.add_argument("--restore", action="append", default=[], metavar="NAME=IP",
+                    help="POST the unmasked vault backup back to the node and let it "
+                         "reboot; run this before every capture")
     ap.add_argument("--verify-masked", action="store_true",
                     help="check every committed backup for live credentials")
     ap.add_argument("--self-test", action="store_true")
@@ -197,6 +265,22 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     if args.self_test:
         return _self_test()
+
+    if args.restore:
+        for spec in args.restore:
+            name, _, ip = spec.partition("=")
+            answer = restore(name, ip, args.vault)
+            print(f"{name:12} POST /config -> {answer[:100]}", file=sys.stderr)
+            problems = verify_restore(name, ip, args.vault)
+            for p in problems:
+                print(f"  {p}", file=sys.stderr)
+            print(f"{'':12} verified: "
+                  + ("all fields match the backup" if not problems
+                     else f"{len(problems)} field(s) did NOT come back"),
+                  file=sys.stderr)
+            if problems:
+                return 1
+        return 0
 
     if args.verify_masked:
         problems = verify_masked()

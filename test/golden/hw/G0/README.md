@@ -37,15 +37,26 @@ readings masked. Everything else is recorded in `ble-frames.txt` and
 Each of those was found by capturing twice and diffing, not by reasoning:
 before the fixes the two runs differed in 14 places, all of them artefacts.
 
-## Reproducibility, measured
+## Restore before every run — not optional
 
-Two independent runs per node with the final tool:
+The corpora mutate the node. The BLE corpus alone contains `--maxhop 5`, and
+the command script drives `--<cmd> 1 / 999999 / abc` for every setter in the
+ladder. Measured on T-Beam-92: one capture moved `max_hop_text` from 4 to 5
+permanently, and the next run's frames carried the new hop budget in their
+flags byte — two runs of the same firmware, differing because of the first
+one. A capture that does not restore first measures the previous run's
+leftovers.
 
-- `heltec-93`: 21 frames, identical
-- `rak-90`: 20 frames, identical
+```sh
+python3 test/golden/backup_nodes.py --restore t-beam-92=192.168.68.72
+```
 
-That is what makes G1 and G2 meaningful: a difference there is the refactor,
-not the bench.
+It POSTs the unmasked vault backup, the node reboots (so the HTTP response
+usually never arrives — that is success), and the tool then re-reads the node
+and reports any field that did not come back. `node_lat/lon/alt` are excluded:
+the GPS rewrites them and no import can restore them.
+
+With restore in front of each run, all four nodes reproduce exactly.
 
 ## Not yet captured
 

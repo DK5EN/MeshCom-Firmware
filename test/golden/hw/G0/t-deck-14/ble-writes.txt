@@ -1,0 +1,25 @@
+    5.821 hello pin=no             04102030
+    7.921 timesync 1767225600      062000b95569
+   15.722 text '--info'            08a02d2d696e666f
+   17.881 text '--seset'           09a02d2d7365736574
+   20.041 text '--wifiset'         0ba02d2d77696669736574
+   22.201 text '--nodeset'         0ba02d2d6e6f6465736574
+   24.300 text '--analogset'       0da02d2d616e616c6f67736574
+   26.403 text '--wx'              06a02d2d7778
+   28.501 text '--pos'             07a02d2d706f73
+   30.661 text '--io'              06a02d2d696f
+   32.761 text '--tel'             07a02d2d74656c
+   34.861 text '--aprsset'         0ba02d2d61707273736574
+   36.961 text '--conffin'         0ba02d2d636f6e6666696e
+   39.061 text '--mheard'          0aa02d2d6d6865617264
+   41.162 text '--path'            08a02d2d70617468
+   43.269 text '::{9}bench golden ' 1ba03a3a7b397d62656e636820676f6c64656e2063617074757265
+   45.361 text '::{DK5EN-1}bench g' 1ca03a3a7b444b35454e2d317d62656e636820676f6c64656e20646d
+   47.461 text '--info'            08a02d2d696e666f
+   49.560 text '--infoX'           09a02d2d696e666f58
+   51.661 text '--heap'            08a02d2d68656170
+   53.761 text '--heap tag'        0ca02d2d6865617020746167
+   55.861 text '--softser app'     0fa02d2d736f667473657220617070
+   58.021 text '--softser app0'    10a02d2d736f66747365722061707030
+   60.181 text '--maxhop'          0aa02d2d6d6178686f70
+   62.281 text '--maxhop 5'        0ca02d2d6d6178686f702035
