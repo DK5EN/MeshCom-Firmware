@@ -13,7 +13,9 @@ CHR-03, INS-01..03 (§3.8aa), CTY-02 withdrawn (§3.8ab), the DM transport conce
 `DM-01..DM-06`, nothing in code), and on 2026-09-11 the APRS parser wave: `N-32..N-35` fixed on
 `fork-main` (items 212-216), item 217 web GUI, MCProxy `9501bb0`, app PR #8 merged — native
 gates only, **no board flashed since v4.35s.09.09**. BP-11 (item 179) stays fork-only by operator
-decision 2026-09-11, no upstream PR owed. Still open: `MH-01`, `MH-03`, `MEM-04`, `GPS-10`,
+decision 2026-09-11, no upstream PR owed. Also closed 2026-09-11: the "Standing risk" box (`N-03..N-06` +
+`SEC-02`/`N-18` upstream since PR #1102), the German PR texts for `TD-12`/`TD-13`/`CDC-01`
+(upstream in PR #1135), and the `--track on` lead from §3.8ac (not chased). Still open: `MH-01`, `MH-03`, `MEM-04`, `GPS-10`,
 `INS-03`, `TD-09`, `TD-10`, `TD-11`, `TD-15`, `E22-01`, `TLM-01..03`, `MEM-02` (parked),
 `UDP-01`-Rückfragen, `WF-01` Sites 1+2, `TM-28`, `TM-49` bench arm, `WEB-03` (c)-(e),
 `CQ-02..CQ-12`, `SL-01..07`, `DM-01..DM-06`, `APRS-02..APRS-04` (§3.8ae), ACK stage 4 / R5,

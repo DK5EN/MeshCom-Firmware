@@ -26,6 +26,9 @@ the app's vitest suite. **Not verified:** no board runs any of it, no field fram
 extra keys was received, no phone ran the merged app against a node. That is written into
 `release.md` under "Was ausdruecklich NICHT geprueft wurde".
 
+**Open overall, 2026-09-11 evening:** APRS-02/03/04 below, then DM-05 counters and DM-01, ACK
+stage 4 / R5; everything else is parked or bench-bound (BACKLOG header list).
+
 **Open from this cycle, in order:** flash the bench fleet (98/93/14/90/92 still run pre-09.10
 images), receive a real position with `/R= /U= /I=` and a `#name` comment on serial and in the
 web GUI, run MCProxy `9501bb0` on the Pi, phone test of the merged app, then the release cut
