@@ -85,7 +85,12 @@ Phase 0 of `testplan-dry-unification-20260910.md` is closed except four items. B
   `dtr=False` and therefore does not work on it.
 - **Operator decision, blocks steps H6/H7 on the nRF52:** `OPT-06` — the nRF52 has no server
   override at all, so RAK-90 cannot be pointed at the stub server. Three options in §3.8af.
-- **Then phase 1:** G0 hardware goldens on all four nodes, the C1-C5 carve-out commits, G1, and
+- **Four decisions taken 2026-09-11** (table in §3.8af): add an nRF52 `--srvip` hook;
+  `INSTRUMENT_ENABLED` images on all bench nodes; G0 on two nodes now with the other two added
+  **before** the carve-out (hard gate — after C1-C5 the before-capture window is gone); normalize
+  the `OPT-D14` settings units, which makes the `D1-06` migration mandatory and extends it to the
+  `configImportJson()` path.
+- **Then phase 1:** G0 hardware goldens on the two connected nodes, the C1-C5 carve-out commits, G1, and
   the N1 characterization tests. Nothing in product code has been touched yet.
 - `OPT-02` golden command capture is no longer "does not exist": the corpus and the drivers are
   in `test/golden/corpus/commands/` and `tools/mock/meshcom_server.py`. What is owed is the run.
