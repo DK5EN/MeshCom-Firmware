@@ -1,7 +1,7 @@
 # PR draft: Meshcom-MobileApp, branch `aprs-parser-contract`
 
 Target: `rainerfritz/Meshcom-MobileApp` `main`. Local branch `aprs-parser-contract` @ `578964b`,
-based on `origin/main` `760f1f7`. Not pushed yet. English, because the app repo is English.
+based on `origin/main` `760f1f7`. Pushed to fork `DK5EN/Meshcom-MobileApp`, PR opened: https://github.com/rainerfritz/Meshcom-MobileApp/pull/8. English, because the app repo is English.
 
 ---
 
