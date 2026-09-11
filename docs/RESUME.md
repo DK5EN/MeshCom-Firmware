@@ -75,16 +75,33 @@ status tables, the bench lessons and the decisions; the Gantt
 (`docs/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
 same stand as a vertical bar.
 
+**Blocking, new 2026-09-11: `TD-16`.** T-Deck-14's touch and keyboard are dead
+and it crashes repeatedly. Write-up in `bug-tdeck-touch-keyboard-20260911.md`.
+The `INSTRUMENT_ENABLED` image was the leading hypothesis and is **ruled out** —
+it fails the same way on a verified shipping image. No panic has been captured
+because every reset seen came from opening the port to look (`TD-17`): a
+continuous logger has to be attached _before_ the next crash.
+
+Its three G0 captures were taken on the instrument image, on a node now known
+to be unhealthy, and must be re-taken once it is repaired. The T-Deck UI
+checklist (H11) cannot be filled in at all until then. The other three nodes
+are unaffected and restored.
+
 **Next, in order:**
 
-1. **B2 — the carve-out commits C1-C5.** B1 is complete on every automatable
-   surface and all four nodes have their G0, so the gate is satisfied: nothing
-   more is lost by moving code. This is the first step that touches product
-   code beyond the `--srvip` hook.
-2. **Owed but not blocking B2**: EXTUDP and the console golden on the three
-   nodes that lack them, and the T-Deck UI checklist (H11), which is manual and
-   cannot be automated.
-3. `P0.9` protocol templates — the last open phase-0 item.
+1. **B2 — the carve-out commits C1-C5.** Not blocked by `TD-16`: three of four
+   nodes have clean, reproducible G0 captures on BLE, UDP-1990 and EXTUDP, and
+   the T-Deck contributes no unique platform (it is a second ESP32-S3 alongside
+   Heltec-93).
+2. `TD-16` diagnosis when there is appetite for it — start with a continuous
+   logger and an official upstream image, per the write-up's step list.
+3. Console golden on rak-90 and t-beam-92 (~15 min each). Owed, not blocking.
+4. `P0.9` protocol templates — last open phase-0 item.
+
+**Decision 2 needs a carve-out for UI boards.** "`INSTRUMENT_ENABLED` images
+throughout" was applied to the T-Deck and nobody then looked at its screen; the
+harness scenarios pass without noticing a three-second stall. Whatever `TD-16`
+turns out to be, a board with a display needs a by-eye check after any reflash.
 
 **Console golden method — decided 2026-09-11:** the radio stays on and the
 antenna stays connected. The comparison tolerates chatter instead: three

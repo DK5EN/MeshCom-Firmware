@@ -4191,6 +4191,37 @@ than by reading:
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
 
+#### TD-16 T-Deck-14 touch and keyboard dead, repeated crashes (2026-09-11)
+
+| ID    | Type | Sev.   | Location                | Item                                                                                                                                                                                                                                                                                                                                              | Status                  |
+| ----- | ---- | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| TD-16 | BUG  | High   | DK5EN-14, `src/t-deck/` | Touch does not respond, keyboard does not reach the screen, repeated crashes. Trackball works. Touch and keyboard hardware init OK every boot and **keypresses do reach the firmware** (`[KEY];…;src;kbd`), so the failure is downstream of the driver. Panel awake at full brightness, `disptest` passes, configuration identical to its backup. | **OPEN, cause unknown** |
+| TD-17 | GAP  | Medium | bench method            | Every reset observed was `USB_UART_CHIP_RESET` — caused by opening the port to look. No panic or backtrace has been captured because the act of diagnosing destroys the evidence. A continuous logger must be attached **before** the crash.                                                                                                      | **OPEN**, blocks TD-16  |
+
+Full write-up: [`bug-tdeck-touch-keyboard-20260911.md`](bug-tdeck-touch-keyboard-20260911.md).
+
+**Ruled out: the `INSTRUMENT_ENABLED` image.** That was the leading hypothesis
+and it was wrong. The node was reflashed to a verified shipping `t_deck_plus`
+image — zero `INSTR` output, `srvip`/`instreset` absent from the ELF — and it
+crashed again with touch still dead.
+
+**The one hard anomaly** is multi-second stalls inside LVGL: 2.69 s, 3.39 s
+(six gaps in 86 s) and 2.85 s across three boots. Cause or symptom is not
+established.
+
+**Consequence for this campaign.** T-Deck-14's G0 captures (BLE, UDP-1990,
+EXTUDP) were taken on the instrument image, on a node now known to be
+unhealthy, and the node has since been reflashed to shipping. All three must be
+re-taken once it is repaired and must not be used as a G1 baseline until then.
+The T-Deck UI checklist (H11) cannot be filled in at all in this state. The
+other three nodes are unaffected.
+
+**Decision 2 needs a carve-out.** "`INSTRUMENT_ENABLED` images throughout" was
+applied to the T-Deck without anyone then looking at its screen — the harness
+scenarios pass without noticing a three-second stall. Whatever TD-16 turns out
+to be, a UI board needs a by-eye check after any reflash, not just a green
+harness run.
+
 **Bench lessons that cost a capture each**Bench lessons that cost a capture each, all now enforced in code.** Every one
 was found by driving real hardware, none by reading:
 
