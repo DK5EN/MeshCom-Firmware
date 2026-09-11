@@ -301,11 +301,6 @@ extern bool ble_busy_flag;    // flag to signal bluetooth uart is active
 //variables and helper functions
 uint8_t err_cnt_udp_tx = 0;    // counter on errors sending message via UDP
 
-// CheckSerialConsole
-String strTextWork;
-char strText[600] = {0};
-int iTxtPos = 0;
-int iTxtLen = 0;
 
 // TinyGPS
 TinyGPSPlus tinyGPSPlus;
@@ -384,7 +379,8 @@ void blinkLED();                                     // blink GREEN
 void blinkLED2();                                    // blink BLUE
 void blinkLED2();                                    // blink RED
 
-void checkSerialCommand(void);
+// checkSerialCommand() now lives in its own TU (C3 carve-out)
+#include "serial_command.h"
 
 
 unsigned long gps_refresh_timer = 0;
@@ -2892,117 +2888,6 @@ unsigned int getGPS(void)
 }
 #endif
 
-void checkSerialCommand(void)
-{
-    // Serial available
-    if(Serial)
-    {
-        // Check USB Serial input (Serial == MSerial after telnet_functions.h include)
-        if(Serial.available() > 0)
-        {
-            char rd = (char)Serial.read();
-            // Drop NUL bytes: UART RX noise (e.g. unpowered USB-UART bridge on battery
-            // supply) delivers 0x00 which strlen() cannot see and wedges the parser
-            // (DRY-22 — ported from the ESP32 copy of this function).
-            if(rd != 0x00)
-            {
-                printdeb(rd);   // echo to USB + net console via MSerial
-                strText[iTxtPos] = rd;
-                if(iTxtPos < (int)sizeof(strText) - 1)
-                {
-                    iTxtPos++;
-                }
-            }
-        }
-    }
-
-    iTxtLen = strlen(strText);
-
-    // Self-healing: normally every stored byte is non-NUL, so strlen == iTxtPos.
-    // A stray NUL in the buffer breaks that invariant and would block command
-    // processing forever (early return below never reaches the memset). Discard.
-    // (DRY-22 — ported from the ESP32 copy of this function.)
-    if(iTxtLen != iTxtPos)
-    {
-        memset(strText, 0x00, sizeof(strText));
-        iTxtPos = 0;
-        return;
-    }
-
-    if(iTxtLen == 0)
-        return;
-
-    if(strText[0] == ':' || strText[0] == '-' || strText[0] == '{')
-    {
-        if(strText[iTxtLen-1] == '\n' || strText[iTxtLen-1] == '\r')
-        {
-            strTextWork = strText;
-            strTextWork.trim();
-            snprintf(strText, sizeof(strText), "%s", strTextWork.c_str());
-
-            strncpy(msg_text, strText, sizeof(msg_text) - 1);
-            msg_text[sizeof(msg_text) - 1] = '\0';
-
-            int inext=0;
-            // N-22: 600 B vom knappen 4-KB-Loop-Task-Stack in BSS verlagert —
-            // checkSerialCommand() laeuft nur im Loop-Task, und der Pfad
-            // ueber sendMessage() -> sendExtern() lief mit Watermark 0
-            // (Details: STATUS-Box N-22 im Defektkatalog).
-            static char msg_buffer[600];
-            iTxtLen = strlen(strText);
-            for(int itx=0; itx<iTxtLen; itx++)
-            {
-                if(msg_text[itx] == 0x08 || msg_text[itx] == 0x7F)
-                {
-                    inext--;
-                    if(inext < 0)
-                        inext=0;
-                        
-                    msg_buffer[inext+1]=0x00;
-                }
-                else
-                {
-                    msg_buffer[inext]=msg_text[itx];
-                    msg_buffer[inext+1]=0x00;
-                    inext++;
-
-                    // buffer size reached
-                    if(inext > (int)sizeof(msg_buffer)-2)
-                        break;
-                }
-            }
-
-            if(strText[0] == ':' && strText[1] == ':')
-            {
-                // BP-01: origin serial -- the notice comes back on the console.
-                setMsgOrigin(ORIGIN_SERIAL);
-                (void)sendMessage(msg_buffer, inext);
-                setMsgOrigin(ORIGIN_NONE);
-            }
-            else
-                if(strText[0] == '-' && strText[1] == '-')
-                    commandAction(msg_buffer, isPhoneReady, false);
-                else
-                    printfdeb("\n...wrong command %s\n", strText);
-
-            memset(strText, 0x00, sizeof(strText));
-            iTxtPos = 0;
-        }
-    }
-    else
-    {
-        if(bDEBUG)
-        {
-            if(strText[0] != '\n' && strText[0] != '\r')
-            {
-                printfdeb("MSG:%02X..not sent\n", (unsigned char)strText[0]);
-            }
-        }
-
-        memset(strText, 0x00, sizeof(strText));
-        iTxtPos = 0;
-    }
-}
 
 /**@brief UDP tx Routine
  */

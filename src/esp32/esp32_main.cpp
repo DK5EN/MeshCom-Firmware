@@ -251,11 +251,6 @@ String strTime;
 String strDate;
 String str;
 
-// CheckSerialConsole
-String strTextWork;
-char strText[600] = {0};
-int iTxtPos = 0;
-int iTxtLen = 0;
 /*
     Video: https://www.youtube.com/watch?v=oCMOYS71NIU
     Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleNotify.cpp
@@ -554,7 +549,8 @@ unsigned long ble_wait = 0;
 unsigned long wifi_active_timer = 0;
 
 bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet received we never saw before RcvBuffer[12] changes, rest is same
-void checkSerialCommand(void);
+// checkSerialCommand() now lives in its own TU (C3 carve-out)
+#include "serial_command.h"
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -4304,131 +4300,3 @@ int checkRX(bool bRadio)
 }
 
 
-void checkSerialCommand(void)
-{
-    // Serial available
-    if(Serial)
-    {
-        // Check USB Serial input (Serial == MSerial after telnet_functions.h include)
-        if(Serial.available() > 0)
-        {
-            char rd = (char)Serial.read();
-            // Drop NUL bytes: UART RX noise (e.g. unpowered USB-UART bridge on battery
-            // supply) delivers 0x00 which strlen() cannot see and wedges the parser.
-            if(rd != 0x00)
-            {
-                printdeb(rd);   // echo to USB + net console via MSerial
-                strText[iTxtPos] = rd;
-                if(iTxtPos < (int)sizeof(strText) - 1)
-                {
-                    iTxtPos++;
-                }
-            }
-        }
-    }
-    // Check net console input
-    #ifndef DISABLE_NET_CONSOLE
-    if(netConsoleAvailable())
-    {
-        char rd = (char)netConsoleRead();
-        // Skip Telnet IAC negotiation bytes (0xFF and following 2 bytes)
-        if((uint8_t)rd == 0xFF)
-        {
-            // Consume the 2 option bytes that follow IAC
-            if(netConsoleAvailable()) netConsoleRead();
-            if(netConsoleAvailable()) netConsoleRead();
-        }
-        else if(rd != '\r' && rd != 0x00)   // strip CR, keep LF; drop NUL (see above)
-        {
-            printdeb(rd);       // echo back via MSerial (server-side echo)
-            strText[iTxtPos] = rd;
-            if(iTxtPos < sizeof(strText) - 1)
-            {
-                iTxtPos++;
-            }
-        }
-    }
-    #endif
-
-    iTxtLen = strlen(strText);
-
-    // Self-healing: normally every stored byte is non-NUL, so strlen == iTxtPos.
-    // A stray NUL in the buffer breaks that invariant and would block command
-    // processing forever (early return below never reaches the memset). Discard.
-    if(iTxtLen != iTxtPos)
-    {
-        memset(strText, 0x00, sizeof(strText));
-        iTxtPos = 0;
-        return;
-    }
-
-    if(iTxtLen == 0)
-        return;
-
-    if(strText[0] == ':' || strText[0] == '-' || strText[0] == '{')
-    {
-        if(strText[iTxtLen-1] == '\n' || strText[iTxtLen-1] == '\r')
-        {
-            strTextWork = strText;
-            strTextWork.trim();
-            snprintf(strText, sizeof(strText), "%s", strTextWork.c_str());
-
-            strncpy(msg_text, strText, sizeof(msg_text) - 1);
-            msg_text[sizeof(msg_text) - 1] = '\0';
-
-            int inext=0;
-            char msg_buffer[600];
-            iTxtLen = strlen(strText);
-            for(int itx=0; itx<iTxtLen; itx++)
-            {
-                if(msg_text[itx] == 0x08 || msg_text[itx] == 0x7F)
-                {
-                    inext--;
-                    if(inext < 0)
-                        inext=0;
-                        
-                    msg_buffer[inext+1]=0x00;
-                }
-                else
-                {
-                    msg_buffer[inext]=msg_text[itx];
-                    msg_buffer[inext+1]=0x00;
-                    inext++;
-
-                    // buffer size reached
-                    if(inext > sizeof(msg_buffer)-2)
-                        break;
-                }
-            }
-
-            if(strText[0] == ':' && strText[1] == ':')
-            {
-                // BP-01: origin serial -- the notice comes back on the console.
-                setMsgOrigin(ORIGIN_SERIAL);
-                (void)sendMessage(msg_buffer, inext);
-                setMsgOrigin(ORIGIN_NONE);
-            }
-            else
-                if(strText[0] == '-' && strText[1] == '-')
-                    commandAction(msg_buffer, isPhoneReady, false);
-                else
-                    printfdeb("\n...wrong command %s\n", strText);
-
-            memset(strText, 0x00, sizeof(strText));
-            iTxtPos = 0;
-        }
-    }
-    else
-    {
-        if(bDEBUG)
-        {
-            if(strText[0] != '\n' && strText[0] != '\r')
-            {
-                printfdeb("MSG:%02X..not sent\n", (unsigned char)strText[0]);
-            }
-        }
-
-        memset(strText, 0x00, sizeof(strText));
-        iTxtPos = 0;
-    }
-}
