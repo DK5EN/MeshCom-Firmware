@@ -10,7 +10,7 @@ Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 ## APRS-Parser-Contract und Decoder/Encoder-Fixes (unreleased) (2026-09-11)
 
 `FLASH_VERSION` bleibt bei 20260910 -- kein neuer Stand getaggt, diese
-Aenderungen laufen im Changelog als "Unreleased" (Punkte 212-215).
+Aenderungen laufen im Changelog als "Unreleased" (Punkte 212-216).
 
 Ausloeser war eine Parser-Drift-Analyse (`docs/aprs-parser-drift-20260911.md`):
 die Firmware emittiert 17 `/X=`-Positionsschluessel, ihr eigener Decoder kannte
@@ -29,6 +29,17 @@ nur 14. Drei kleine, upstream-faehige Fixes plus eine Doku-Korrektur:
 - **Contract-Dokumentation** (Punkt 215) -- `docs/architecture/11-wire-format.md`
   bekommt einen §1.8 mit dem vollstaendigen `/X=`-Schluesselraum, dazu
   Korrekturen in README und BACKLOG.
+- **Decoder trennt `#name` vom Kommentar, `--setname` verbietet `#`** (Punkt 216,
+  `b6d9f3cf`, N-35) -- `decodeAPRSPOS()` las den Kommentar bisher nur bis zum
+  ersten `/` oder Leerzeichen und maximal 25 Byte; der vom Encoder angehaengte
+  Node-Name (`#` + `node_name`) blieb im Kommentar kleben, ein Kommentar mit
+  Leerzeichen wurde abgeschnitten. Jetzt endet der Bereich am ersten
+  `/X=`-Token, der Text nach dem letzten `#` landet im neuen Feld `pos_name`.
+  Damit der Split eindeutig ist, strippt `--setname` das Zeichen `#`.
+  Dieselbe Regel ist parallel in MCProxy (`parse_aprs_position()`, `9501bb0`)
+  und in der App (`parsePositionPayload()`, Branch `aprs-position-name`)
+  umgesetzt; Ausloeser war ein Hinweis des App-Maintainers, dass der
+  Name-Suffix nirgends gelesen wurde.
 
 ### Was ausdruecklich NICHT geprueft wurde
 

@@ -1428,6 +1428,27 @@ des siebenfachen `cpress`-Vergleichs.
 > ihren eigenen Puffer ueber `posTagIsNan()`. Kein Hardware-Test — native
 > Unit-Tests (`native_parsers`, `test/test_pos_tag_nan/`).
 
+### N-35 — Decoder trennt `#name` nicht vom Kommentar, `--setname` erlaubt `#` — **FIXED (2026-09-11)** — Low, Datenverlust
+
+`PositionToAPRS()` (`src/loop_functions.cpp:~4287`) haengt hinter den Freitext-
+Kommentar `#` + `node_name` an (`11-wire-format.md` §1.8.1). `decodeAPRSPOS()`
+(`src/aprs_functions.cpp`) las den Kommentar aber nur bis zum ersten `/` oder
+Leerzeichen und hoechstens 25 Byte: der Name blieb im Kommentar kleben, ein
+Kommentar wie `MeshCom Zeltweg` wurde nach dem ersten Wort abgeschnitten, und
+bei atxt (25) + `#` + Name (19) ging der Rest verloren. Kein Konsument — weder
+Firmware, MCProxy noch App — kannte das Namensfeld; `node_name` durfte selbst
+`#` enthalten, was jeden Split mehrdeutig macht.
+
+Fix: Kommentarbereich endet am ersten `/X=`-Token (`/` + Grossbuchstabe + `=`
+oder `/N` + Ziffer), Cap 47 Byte; Text nach dem letzten `#` wird `pos_name`,
+davor `pos_atxt`. `--setname` (`src/command_functions.cpp`) strippt `#`.
+Leerzeichen im Namen bleiben erlaubt.
+
+> **STATUS 2026-09-11 — FIXED (commit `b6d9f3cf`)** Dieselbe Regel in MCProxy
+> (`parse_aprs_position()`, `9501bb0`) und der App (`parsePositionPayload()`,
+> Branch `aprs-position-name`). Kein Hardware-Test — Regressionsabdeckung in
+> `test/test_decodeaprspos/` (`native_parsers`).
+
 ## 2b. Upstream-introduced findings (UP-nn) — reviewed at merge time
 
 Every `git merge upstream/dev` into fork main is preceded by a review of the net diff since the
@@ -1736,8 +1757,9 @@ Each row is one commit and one upstream PR. Upstream has merged 24 PRs from this
 | 1.9     | APRS decoder: `/R= /U= /I=` fehlen      | `N-32`          | small       | FIXED 2026-09-11                                         |
 | 1.10    | APRS `/Y=` Puffer-Reset                 | `N-33`          | small       | FIXED 2026-09-11                                         |
 | 1.11    | APRS Encoder-NaN-Guards falscher Puffer | `N-34`          | small       | FIXED 2026-09-11                                         |
+| 1.12    | APRS Decoder: `#name` nicht getrennt    | `N-35`          | small       | FIXED 2026-09-11                                         |
 
-**Wave 1's original 8 items are closed** — all done or deliberately accepted as risk; items 1.9-1.11
+**Wave 1's original 8 items are closed** — all done or deliberately accepted as risk; items 1.9-1.12
 were added 2026-09-11 (APRS parser contract fixes, `docs/aprs-parser-drift-20260911.md`). See the
 Standing risk box in `docs/BACKLOG.md` for what "done" means here (fixed locally, not yet upstream).
 

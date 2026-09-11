@@ -79,7 +79,7 @@ discover them by surprise:
 
 ## Unreleased (after v4.35t.09.10)
 
-Four items, found by a parser-drift analysis against the firmware's own wire
+Five items, found by a parser-drift analysis against the firmware's own wire
 format (`docs/aprs-parser-drift-20260911.md`): the encoder emits 17 `/X=`
 position keys, and its own decoder only understood 14.
 
@@ -107,6 +107,17 @@ position keys, and its own decoder only understood 14.
      budget and drop order); `README.md` and `BACKLOG.md` are corrected
      where they contradicted it (see
      `docs/aprs-parser-drift-20260911.md` §4).
+216. **Decoder splits `#name` off the position comment; `--setname` rejects
+     `#`** (`b6d9f3cf`, N-35). `PositionToAPRS()` appends `#` + `node_name`
+     after the free-text comment, but `decodeAPRSPOS()` read the comment
+     only up to the first `/` or space and 25 bytes at most, so the name
+     stayed glued to the comment and a comment with a space was cut short.
+     The comment region now ends at the first `/X=` token (47-byte cap,
+     covering atxt + `#` + name), and the text after the last `#` goes into
+     the new `aprsPosition::pos_name`. `--setname` strips `#` so the split
+     is unambiguous; spaces in the name stay allowed. The same rule is
+     implemented in MCProxy and the mobile app, and recorded in
+     `docs/architecture/11-wire-format.md` §1.8.1.
 
 ## New in v4.35t.09.10
 
