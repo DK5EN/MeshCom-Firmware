@@ -50,8 +50,11 @@ static const char *VEC_F001 = "4825.35N\\01147.19E-Marzling#Werner/R=9;";
 // f003 (golden.txt): Positionsbake DK5EN-90 -- der einzige Korpus-Frame mit
 // sowohl /B= als auch /A=. Gruppe '/', Symbol '#'.
 // lat_d = 48 + 24.43/60 = 48.4071666..., lon_d = 11 + 44.40/60 = 11.740000
-// pos_atxt endet am ERSTEN '/' nach dem Symbol: "github.com" (danach
-// "/dk5en/mcapp#Martin/B=099/A=001657/...").
+// Die Kommentar/Name-Region endet erst am ERSTEN /X=-Token nach dem Symbol
+// ("/B=099"), nicht an einem beliebigen '/' -- "/dk5en" und "/mcapp" sind
+// keine Token (Kleinbuchstabe nach '/'), bleiben also Teil der Region.
+// Letztes '#' in der Region trennt Kommentar "github.com/dk5en/mcapp" von
+// Name "Martin" (docs/architecture/11-wire-format.md §1.8.1).
 static const char *VEC_F003 =
     "4824.43N/01144.40E#github.com/dk5en/mcapp#Martin/B=099/A=001657/N1/R=20;232;262;9;26244;26244;";
 
@@ -79,6 +82,29 @@ static const char *VEC_DIN_LETZTES_TOKEN = "4825.00N/01145.46E#/D=11111111";
 // gefolgt von /B=.
 static const char *VEC_DIN_LEERER_KOMMENTAR = "4825.00N/01145.46E#/D=00000000/B=057/N1";
 
+// ---- #name-Split-Vektoren (docs/architecture/11-wire-format.md §1.8.1) --
+// Kontrakt: die Region laeuft bis zum ERSTEN /X=-Token (nicht bis zum
+// ersten '/' oder Leerzeichen); der Name ist der Text nach dem LETZTEN '#'
+// in der Region, alles davor ist der Kommentar.
+
+// (a) Leerzeichen unmittelbar vor dem Token -- weder das Leerzeichen selbst
+// noch dessen Naehe zum '/' darf die Region vorzeitig beenden oder das
+// Leerzeichen abschneiden. Kein '#', also kein Name.
+static const char *VEC_LEERZEICHEN_VOR_TOKEN = "4825.00N/01145.46E#MeshCom Zeltweg /B=050";
+
+// (b) Kommentar enthaelt selbst ein '#' ("Net#1 Info"); erst das LETZTE '#'
+// vor dem /B=-Token trennt den Namen ("Werner") ab.
+static const char *VEC_HASH_IM_KOMMENTAR = "4825.00N/01145.46E#Net#1 Info#Werner/B=060";
+
+// (c) Symbol ist '#'; die Region selbst beginnt sofort mit einem weiteren
+// '#' -- Kommentar leer, kompletter Regionsinhalt ist der Name.
+static const char *VEC_NUR_NAME = "4825.00N/01145.46E##Name/B=070";
+
+// (d) Kein '#' irgendwo in der Region -- pos_name bleibt leer, der ganze
+// Regionsinhalt ist der Kommentar (Gegenstueck zu VEC_F001, das denselben
+// Payload MIT "#Werner" verwendet).
+static const char *VEC_OHNE_HASH = "4825.35N\\01147.19E-Marzling/R=9;";
+
 // ------------------------------------------------------------ Testfaelle
 
 static void test_f003_battery_und_altitude(void)
@@ -93,7 +119,8 @@ static void test_f003_battery_und_altitude(void)
     TEST_ASSERT_EQUAL_CHAR('E', pos.lon_c);
     TEST_ASSERT_EQUAL_CHAR('/', pos.aprs_group);
     TEST_ASSERT_EQUAL_CHAR('#', pos.aprs_symbol);
-    TEST_ASSERT_EQUAL_STRING("github.com", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("github.com/dk5en/mcapp", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("Martin", pos.pos_name.c_str());
     TEST_ASSERT_EQUAL_INT(99, pos.bat);
     TEST_ASSERT_EQUAL_INT(1657, pos.alt);
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 48.407166, pos.lat_d);
@@ -110,6 +137,7 @@ static void test_f011_kein_battery_leerer_kommentar(void)
     TEST_ASSERT_EQUAL_CHAR('/', pos.aprs_group);
     TEST_ASSERT_EQUAL_CHAR('#', pos.aprs_symbol);
     TEST_ASSERT_EQUAL_STRING("", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_name.c_str());
     TEST_ASSERT_EQUAL_INT(57, pos.bat);
     TEST_ASSERT_EQUAL_INT(0, pos.alt);   // kein /A= im Frame -- initAPRSPOS-Default bleibt
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 48.416666, pos.lat_d);
@@ -124,7 +152,8 @@ static void test_f001_gruppe_backslash_kein_ba(void)
     TEST_ASSERT_EQUAL_UINT16(0x01, r);
     TEST_ASSERT_EQUAL_CHAR('\\', pos.aprs_group);
     TEST_ASSERT_EQUAL_CHAR('-', pos.aprs_symbol);
-    TEST_ASSERT_EQUAL_STRING("Marzling#Werner", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("Marzling", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("Werner", pos.pos_name.c_str());
     TEST_ASSERT_EQUAL_INT(0, pos.bat);
     TEST_ASSERT_EQUAL_INT(0, pos.alt);
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 48.4225, pos.lat_d);
@@ -221,11 +250,12 @@ static void test_ipt_notbremse_ohne_hemisphaere_wird_abgelehnt(void)
     TEST_ASSERT_EQUAL_CHAR('/', pos.aprs_group);   // initAPRSPOS()-Default
 }
 
-// Ueberlanger Kommentartext: pos_atxt ist auf 25 Zeichen (ipt<25) gedeckelt,
-// unabhaengig davon, wie lang der Text im Payload tatsaechlich ist -- der
-// Puffer dahinter (cConcat1[UDP_TX_BUF_SIZE]) wird also nie annaehernd
-// ausgeschoepft. 300 'A' vor dem impliziten Leerzeichen-Terminator
-// (PayloadBuffer.concat(" ") am Funktionsanfang).
+// Ueberlanger Kommentartext: die Kommentar/Name-Region ist auf 47 Zeichen
+// gedeckelt (char cregion[48], Puffergrenze minus Terminator) -- kein /X=-
+// Token stoppt die Region vorher, und keins der 300 'A' bildet zufaellig
+// eins, also greift ausschliesslich die Puffergrenze. 300 'A' vor dem
+// impliziten Leerzeichen-Terminator (PayloadBuffer.concat(" ") am
+// Funktionsanfang) werden nie erreicht.
 static void test_ueberlanger_kommentartext_wird_gekappt(void)
 {
     std::string atxt(300, 'A');
@@ -236,8 +266,9 @@ static void test_ueberlanger_kommentartext_wird_gekappt(void)
     uint16_t r = decodeAPRSPOS(payload, pos);
 
     TEST_ASSERT_EQUAL_UINT16(0x01, r);
-    TEST_ASSERT_EQUAL_size_t(25u, pos.pos_atxt.length());
-    TEST_ASSERT_EQUAL_STRING(std::string(25, 'A').c_str(), pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_size_t(47u, pos.pos_atxt.length());
+    TEST_ASSERT_EQUAL_STRING(std::string(47, 'A').c_str(), pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_name.c_str());
 }
 
 // Steuerzeichen mitten in der Breitenangabe: kein Crash, sscanf("%lf", ...)
@@ -328,6 +359,58 @@ static void test_din_leerer_kommentar(void)
     TEST_ASSERT_EQUAL_STRING("00000000", pos.din);
 }
 
+// (a) Ein Leerzeichen unmittelbar vor dem /B=-Token darf die Region weder
+// vorzeitig beenden noch das Leerzeichen selbst abschneiden.
+static void test_leerzeichen_im_kommentar_bleibt_erhalten(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_LEERZEICHEN_VOR_TOKEN, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("MeshCom Zeltweg ", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_name.c_str());
+    TEST_ASSERT_EQUAL_INT(50, pos.bat);
+}
+
+// (b) Kommentar enthaelt selbst ein '#' -- nur das LETZTE '#' vor dem Token
+// trennt den Namen ab, das erste bleibt Teil des Kommentartexts.
+static void test_hash_im_kommentar_letztes_trennt_namen(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_HASH_IM_KOMMENTAR, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("Net#1 Info", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("Werner", pos.pos_name.c_str());
+    TEST_ASSERT_EQUAL_INT(60, pos.bat);
+}
+
+// (c) Nur ein Name, kein Kommentartext -- Symbol ist '#', die Region
+// beginnt sofort mit einem weiteren '#'.
+static void test_nur_name_leerer_kommentar(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_NUR_NAME, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_CHAR('#', pos.aprs_symbol);
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("Name", pos.pos_name.c_str());
+    TEST_ASSERT_EQUAL_INT(70, pos.bat);
+}
+
+// (d) Kein '#' in der Region -- pos_name bleibt leer, der komplette
+// Regionsinhalt bleibt Kommentartext.
+static void test_kein_hash_pos_name_leer(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_OHNE_HASH, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_STRING("Marzling", pos.pos_atxt.c_str());
+    TEST_ASSERT_EQUAL_STRING("", pos.pos_name.c_str());
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -348,5 +431,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_din_mit_buchstabe_ungueltig);
     RUN_TEST(test_din_letztes_token);
     RUN_TEST(test_din_leerer_kommentar);
+    RUN_TEST(test_leerzeichen_im_kommentar_bleibt_erhalten);
+    RUN_TEST(test_hash_im_kommentar_letztes_trennt_namen);
+    RUN_TEST(test_nur_name_leerer_kommentar);
+    RUN_TEST(test_kein_hash_pos_name_leer);
     return UNITY_END();
 }

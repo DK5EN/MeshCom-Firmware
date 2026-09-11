@@ -222,6 +222,17 @@ symbol char only when both `atxt` and `#name` are absent — with either one
 present, a `split('/')`-style consumer must skip past it first, not assume a
 fixed offset. See §1.8.5 for the consequence.
 
+**Decode rule** (`decodeAPRSPOS()`, `aprs_functions.cpp:642-699`, field
+`pos_name` next to `pos_atxt` in `aprsPosition`): the comment/name region is
+everything from right after the symbol char up to the first `/X=`-style
+token — `/` + an uppercase letter + `=`, or `/N` + a digit `1`-`9` — never a
+bare space or `/`. Within that region, the text after the **last** `#`
+becomes `pos_name` and everything before it becomes `pos_atxt`; no `#` at
+all leaves `pos_name` empty and the whole region is the comment. `node_name`
+can never contain `#` (`--setname`, `command_functions.cpp` strips it before
+truncation), so the last-`#` split is unambiguous for names this firmware
+writes — spaces in the name are fine.
+
 #### 1.8.2 The 17 keys
 
 One `snprintf` per key into its own small buffer, then concatenated in a

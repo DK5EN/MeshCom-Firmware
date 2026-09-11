@@ -36,7 +36,8 @@ struct aprsMessage
 struct aprsPosition
 {
     String pos_atxt;
-    
+    String pos_name;
+
     double lat;
     char lat_c;
     double lon;

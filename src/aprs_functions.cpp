@@ -525,6 +525,7 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 void initAPRSPOS(struct aprsPosition &aprspos)
 {
     aprspos.pos_atxt = "";
+    aprspos.pos_name = "";
 
     aprspos.lat = 0.0;
     aprspos.lat_c = 0x00;
@@ -638,30 +639,64 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
 
     ipt=0;
 
-    char cConcat1[UDP_TX_BUF_SIZE];
-    memset(cConcat1, 0x00, UDP_TX_BUF_SIZE);
-    int iConcat1 = 0;
+    // check ATXT + #name (docs/architecture/11-wire-format.md §1.8.1/§1.8.5):
+    // the comment/name region runs from istarttext up to the first /X=-style
+    // token -- '/' followed by an uppercase letter and '=', or '/N' followed
+    // by a digit '1'-'9' (the neighbour-count key, matched the same way the
+    // NCNT loop below matches it). Nothing else ends the region: not a
+    // space, not a bare '/'. Region cap mirrors the encoder's own budget
+    // (atxt 25 + '#' 1 + node_name 19 = 45 bytes); the local buffer is 48
+    // for headroom, capped at 47 to leave room for the terminator.
+    char cregion[48];
+    memset(cregion, 0x00, sizeof(cregion));
+    int iregion = 0;
 
-    // check ATXT
-    for(unsigned int id=istarttext;id<PayloadBuffer.length();id++)
+    for(unsigned int id=istarttext; id<PayloadBuffer.length() && iregion < 47; id++)
     {
-        // ENDE
-        if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 25)
+        char c = PayloadBuffer.charAt(id);
+
+        if(c == '/')
         {
-            break;
+            char c1 = PayloadBuffer.charAt(id+1);
+            char c2 = PayloadBuffer.charAt(id+2);
+
+            if((c1 >= 'A' && c1 <= 'Z' && c2 == '=') || (c1 == 'N' && c2 >= '1' && c2 <= '9'))
+                break;
         }
 
-        if(ipt < 25)
-        {
-            //aprspos.pos_atxt.concat(PayloadBuffer.charAt(id));
-            cConcat1[iConcat1] = PayloadBuffer.charAt(id);
-            iConcat1++;
+        cregion[iregion] = c;
+        iregion++;
+    }
 
-            ipt++;
+    // Split on the LAST '#' in the region: text before it is the free-text
+    // comment (pos_atxt), text after it is the node name (pos_name). No '#'
+    // -> the whole region is the comment and pos_name stays empty. A '#'
+    // can never appear in a name written via --setname (command_functions.cpp),
+    // so the last-'#' split is unambiguous for names this firmware writes;
+    // it degrades gracefully (name = everything after the last '#') for a
+    // comment that legitimately contains '#' from an older/foreign encoder.
+    int ihash = -1;
+
+    for(int ic=iregion-1; ic>=0; ic--)
+    {
+        if(cregion[ic] == '#')
+        {
+            ihash = ic;
+            break;
         }
     }
 
-    aprspos.pos_atxt = cConcat1;
+    if(ihash < 0)
+    {
+        aprspos.pos_atxt = cregion;
+        aprspos.pos_name = "";
+    }
+    else
+    {
+        cregion[ihash] = 0x00;
+        aprspos.pos_atxt = cregion;
+        aprspos.pos_name = cregion + ihash + 1;
+    }
 
     aprspos.bat = 0;
     aprspos.alt = 0;
