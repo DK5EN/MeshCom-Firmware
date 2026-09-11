@@ -4082,7 +4082,7 @@ fixtures plus the 115 mock-server tests).
 | ID      | Type | Sev.   | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------- | ---- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | OPT-05  | TEST | High   | **Golden-capture tooling.** `test/golden/{mc_frame,normalize,corpus_lint,extract_commands,build_corpus,backup_nodes}.py`, `tools/bench/ble_golden.py`, and the capture/replay role added to the existing `tools/mock/meshcom_server.py`. Corpora generated: 28 LoRa frames, 37 UDP-1990 datagrams, 23 EXTUDP objects, 23 BLE writes, 309 ladder commands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **DONE** (`291f375a`, `724692ec`, `57aaec0c`, `76199a61`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| OPT-06  | DEC  | High   | **The nRF52 has no server override.** `--srvip` is ESP32-only _and_ `INSTRUMENT_ENABLED`-only (`command_functions.cpp:5259`). On nRF52 the server is a hardcoded literal IP chosen by `--gwsrv`, with no DNS resolver on that path (`nrf_eth.cpp:1168` and its own comment). Test plan steps H6/H7 name RAK-90 as a target.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | **OPEN, operator decision.** (a) redirect `89.185.97.38` to the Mac on the bench network, (b) add an nRF52 `--srvip` hook (product code, outside phase 0), (c) run H6/H7 on the ESP32 gateways only and declare the nRF52 UDP path build-only                                                                                                                                                                                                                                                                            |
+| OPT-06  | DEC  | High   | **The nRF52 has no server override.** `--srvip` is ESP32-only _and_ `INSTRUMENT_ENABLED`-only (`command_functions.cpp:5259`). On nRF52 the server is a hardcoded literal IP chosen by `--gwsrv`, with no DNS resolver on that path (`nrf_eth.cpp:1168` and its own comment). Test plan steps H6/H7 name RAK-90 as a target.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | **DECIDED and DONE.** Option (b): the nRF52 `--srvip` hook landed in `ee545088`, behind `INSTRUMENT_ENABLED`, and RAK-90's `H6` was captured through it at both G0 and G1                                                                                                                                                                                                                                                                                                                                                |
 | OPT-D14 | GAP  | Medium | **Four settings keys hold different units on the two platforms.** `node_freq`/`node_track` MHz vs Hz, `node_bw` kHz vs radio-API index, `node_cr` 4/N denominator vs index — identical key names, identical struct types, written that way by `lora_setcountry()` (`lora_setchip.cpp:193-503`, the `D3-05` item). Confirmed in source and on both live bench nodes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | **OPEN.** Constrains `D1-05`: either the schema gains a per-platform column, or the values are normalized — and normalizing changes flash contents, so it needs the `D1-06` migration. Sharpens drift row `DR-17` from "to be measured" to a measured `keep-split` in exactly these four fields                                                                                                                                                                                                                          |
 | RF-01   | BUG  | High   | **`--txbw` corrupts the radio bandwidth on every nRF52 board.** The handler (`command_functions.cpp:4595-4620`) accepts only 125 or 250 and stores that number in `node_bw` with **no platform conversion**. On the `BOARD_RAK4630 \|\| USE_HELTEC_T114 \|\| BOARD_T_ECHO` path `lora_setchip_meshcom()` passes `(uint32_t)meshcom_settings.node_bw` **raw** into `Radio.SetRxConfig`/`SetTxConfig` (`lora_setchip.cpp:532/553`), where the argument is the SX126x bandwidth **enum** (0 = 125 kHz, 1 = 250, 2 = 500) -- so the radio is configured with enum value 125 or 250. `lora_setcountry()` writes the index correctly on the same field, so whether `node_bw` holds an index or kHz depends on which command last wrote it. A `getBW()` converter exists (`lora_setchip.cpp:99`) and is used for display, not on this path.   | **FIXED 2026-09-11.** `--txbw` now stores through `radioBwKhzToStored()`. Regression: `test/golden/radio_units_lint.py` (18 violations on the pre-fix tree, 0 after) plus `test_radio_units` for the conversion table. Not bench-confirmed -- the fix was verified by build and by the call-site gate, not on air                                                                                                                                                                                                        |
 | RF-02   | BUG  | Medium | **`--txcr` converts for the RAK only, not for the other two boards on the same radio path.** The handler converts `node_cr = iVar - 4` under `#ifdef BOARD_RAK4630` (`command_functions.cpp:4674-4676`), but the index-unit radio path is guarded `BOARD_RAK4630 \|\| USE_HELTEC_T114 \|\| BOARD_T_ECHO`. On Heltec T114 and T-Echo `--txcr 5..8` therefore stores 5..8 where the driver expects the 1..4 coding-rate index. Same family as RF-01: the author knew about the index unit for `cr` and applied the conversion to one of the three boards that need it.                                                                                                                                                                                                                                                                   | **FIXED 2026-09-11.** `--txcr` now stores through `radioCrDenomToStored()`, which takes the platform from `radioUnitsIndexed()` rather than a lone `#ifdef`. Still no T114 or T-Echo on the bench, so the nRF52 half is covered by the native test, not by hardware                                                                                                                                                                                                                                                      |
@@ -4132,6 +4132,86 @@ fails; an earlier, token-stripping version of the tool reported it and was wrong
 | 3   | Node coverage for G0                                    | **Two now, two later** — G0 on RAK-90 and Heltec-93, T-Beam-92 and T-Deck-14 added before the carve-out.                                                                                                                                                                                                   | Any node added after G0 has no before-capture and can only be compared G1 to G2. Acceptable only if the two are connected _before_ the C1-C5 commits; after that the window is gone. Track it as a hard gate on wave B2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 4   | `OPT-D14` — the four settings keys with different units | **Normalize the stored values**, one canonical unit in flash on both platforms, converted at the radio API.                                                                                                                                                                                                | Changes flash contents, so `D1-06` migration is now **mandatory, not optional**, and a wrong migration wipes every nRF52 node's settings. Second exposure, not on the audit's list: the web config JSON carries these values, so a `config.json` exported from a pre-normalization nRF52 node (`node_freq` in Hz) and imported afterwards would set a nonsense frequency. The migration therefore has to cover the `configImportJson()` path, not only the flash layout. The nRF52 BLE settings characteristic is raw struct bytes — the layout is unchanged, but the _values_ the phone sees change; the app does not appear to read `FREQ` at all, which should be confirmed before the PR rather than assumed. |
 | 5   | Widen G0 before C3, or accept a narrow G1               | **Accept a narrow G1, no one-day bench wait.** G0 stays at the four steps it has (`H4` BLE, `H6` UDP-1990 inbound, `H8` EXTUDP, `H11` UI); `H1`, `H2`, `H5`, `H7` and `H9` are not captured and will not be. Taken 2026-09-11 against the recommendation to spend half a day on `H2`/`H5`/`H7`/`H9` first. |
+
+#### Phase B status, 2026-09-11 night: B2 and B3 done
+
+**B2 — all five carve-outs are in**, each gated on a 32-env build, the resource
+baseline and the region gate, each with its moved code diffed against `HEAD`:
+
+| Carve | What                                                       | Commit     |
+| ----- | ---------------------------------------------------------- | ---------- |
+| `C1`  | UDP frame handler per platform (`U1`)                      | `03c4ba65` |
+| `C2`  | three socket primitives for the datagram write (`U2`)      | `35b8823f` |
+| `C3`  | `checkSerialCommand()` into its own TU per platform (`U3`) | `7f5a0469` |
+| `C4`  | gateway service block (`D1-09`)                            | `8c48243c` |
+| `C5`  | `countryProfile()` out of `lora_setcountry()` (`U6`)       | `f666e158` |
+
+Two plan rows were wrong and are corrected in place rather than quietly
+followed: `C3` said "no carve needed, build only" -- the obstacle was never
+`Serial` but that the function lived in the two largest translation units in
+the tree, which never compile on a host. And `C4` names `D1-09` **and**
+`D1-10`; only `D1-09` is carved. `D1-10`, the loop scheduler, is ~18 timer
+predicates spread through a 2 162-line and a 1 437-line function and is still
+owed.
+
+**B3 — G1 is complete and clean: 12 of 12 cells identical to G0.**
+
+| Node        | BLE `H4`  | UDP-1990 `H6`            | EXTUDP `H8`            |
+| ----------- | --------- | ------------------------ | ---------------------- |
+| `heltec-93` | identical | identical, 30 classified | identical, 8 responses |
+| `rak-90`    | identical | identical, 32 classified | identical, 8 responses |
+| `t-beam-92` | identical | identical, 30 classified | identical, 8 responses |
+| `t-deck-14` | identical | identical, 30 classified | identical, 8 responses |
+
+Captured on instrument images built from the post-carve tree and flashed onto
+all four nodes, each restored from its vault backup first. What G1 proves is
+bounded by decision 5: it covers `U1`-inbound and the BLE path, not the seven
+units with no hardware before-picture.
+
+The one prediction in `EXPECTED-DIFF.md` that could have failed -- `RF-06`
+changing the `--info` frequency readout from a float/double division to a
+float/float one, on RAK-90, the only bench board where that is not a no-op --
+held. Serial `--info` reads `FREQ 433.1750 MHz` before and after the flash and
+the BLE capture is byte-identical.
+
+**Three comparison tools had to be written, because three surfaces had none.**
+Each was written after a raw diff said "differs" on firmware that had not
+changed, and each names its volatile classes with the measurement that
+established them:
+
+- `compare_udp.py` -- `KEEP` is a wall-clock timer and `BEAT` answers it, so a
+  shifted pair makes 751 bytes of a length-prefixed capture differ. It also
+  compares the **node-side** log, which is the half that says what the node
+  made of the corpus, and fails when that file is absent instead of reporting
+  "identical" about the stub talking to itself.
+- `compare_extudp.py` -- relayed `lora` frames and the node's `pos`/`tele`
+  beacons are volatile; the corpus responses are not. Heltec-93's apparent
+  10 -> 8 shortfall was entirely two beacons that fired inside the G0 window
+  and not the G1 one.
+- `radio_units_lint.py` -- the call-site gate for `RF-01..RF-06`.
+
+**Bench lessons from the run**, each of which cost time:
+
+- The T-Deck's native-USB CDC re-enumerated **63 times in 80 s** while logging
+  an instrument image during a UDP replay, losing more than half the
+  `[GW];rx` lines and leaving a _shifted_ sequence that looked like the node
+  classifying datagrams differently. `tools/bench/netconsole_log.py` records
+  the same stream over TCP 2323 with no drops: 33 lines against USB's 14.
+- The EXTUDP peer binds one port and **every** node with `--extudp on`
+  pointing at the host delivers into it. The first T-Beam capture silently
+  contained 8 of RAK-90's datagrams out of 20.
+- The UDP corpus contains a `CONF` frame that renames the node, and the G0
+  README says in bold to restore **after** the capture as well as before. One
+  run skipped it and T-Beam-92 spent the next capture calling itself
+  `DK5EN-1 / BNCH`. Nothing caught it; it was noticed by reading the `src`
+  field of the EXTUDP payloads.
+- `ttgo_tbeam`'s `upload_command` hardcodes `-b 921600`, which that board does
+  not tolerate. `esptool.py` at 460800 works first try.
+
+**Next:** `B4`, the `N1` characterization tests. `U2` and `U6` twins are hours
+of work; `U1` is the plan's 6-8 day estimate and dominates -- its ESP32 handler
+alone calls about 30 project symbols that need recording sinks on both
+platforms in one native binary.
 
 **What decision 5 costs, stated plainly so no later reader mistakes G1 for
 more than it is.** Seven of the nine units under unification have no hardware

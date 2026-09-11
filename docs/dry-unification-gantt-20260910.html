@@ -121,8 +121,8 @@
     <li>Das Upstream-Review ist extern und von unbekannter Dauer; der schraffierte Balken ist ein Platzhalter und zählt nicht zur Summe.</li>
     <li>Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur in diesem Browser gespeichert. Voreingestellt ist der tatsächliche Beginn, 11.09.2026.</li>
     <li><b>Die Carve-outs heißen jetzt C1 bis C5 und stehen einzeln im Diagramm.</b> Vorher steckten alle fünf in einer Sammelzeile „B2“, während die Aufgaben der Phase <i>Entscheiden</i> ebenfalls C1, C2, C3 hießen — „C4“ und „C5“ kamen im Diagramm also gar nicht vor, und „C2“ meinte zwei verschiedene Dinge. Die Entscheidungsaufgaben heißen daher jetzt M1 bis M3 (Matrix), die Carve-outs behalten die Bezeichnungen aus <code>testplan-dry-unification-20260910.md</code> Abschnitt 4.2.</li>
-    <li><b>Warum ausgefüllte Balken rechts vom Standbalken stehen.</b> Die Balken sind der <i>geplante</i> Ablauf aus den Schätzungen, der Füllzustand ist der <i>tatsächliche</i>. Beides fällt hier auseinander: A1 bis A3, B1 und B2a sind am ersten Tag fertig geworden, obwohl der Plan sie über zwei Wochen verteilt. Das ist kein Vorsprung im Sinne von Mehrleistung — B1 ist erledigt, weil Entscheidung 5 seinen Umfang verkleinert hat, und B2a stand nie im Plan. Die Balken werden bewusst nicht auf die Ist-Daten geschoben: der Plan bleibt als Maßstab stehen, an dem die Abweichung ablesbar ist.</li>
-    <li><b>Stand 11.09.2026, abends:</b> Phase A ist bis auf die Protokollvorlagen (P0.9) abgearbeitet. <b>B1 ist abgeschlossen, aber schmal:</b> auf allen vier Knoten liegen BLE, UDP-1990 und EXTUDP vor, dazu die T-Deck-UI-Checkliste. Von den fünf Carve-outs sind C1 und C2 erledigt und gegatet, C3 liegt im Gate, C4 und C5 stehen aus. Der senkrechte Balken markiert diesen Stand; ausgefüllte Balken sind erledigt, umrissene offen.</li>
+    <li><b>Warum der Standbalken jetzt am Fortschritt hängt, nicht am Datum.</b> Er steht am Ende der am weitesten fortgeschrittenen nicht-offenen Aufgabe — markiert also, wie viele Aufgaben erledigt sind, nicht welcher Tag heute ist. Die Termine auf der Zeitachse bleiben Schätzungen aus dem Plan; dass der tatsächliche Arbeitsfortschritt ihnen bislang nicht gefolgt ist, zeigt sich am Abstand zwischen den ausgefüllten Balken und dem Standbalken.</li>
+    <li><b>Stand 11.09.2026, nachts:</b> Phase A ist bis auf die Protokollvorlagen (P0.9) abgearbeitet. <b>Phase B ist fertig:</b> alle fünf Carve-outs C1 bis C5 sind gegatet (32 Envs, Ressourcen-Baseline, Region-Gate, verschobener Code gegen HEAD gediffed), und G1 ist vollständig — 12 von 12 Zellen identisch zu G0. Als Nächstes B4, die Charakterisierungstests N1: U2 und U6 sind Stunden, U1 ist die 6-8-Tage-Schätzung des Plans und dominiert. Ausgefüllte Balken sind erledigt, umrissene offen.</li>
     <li><b>Betreiberentscheidung 5 vom 11.09.: schmales G1 wird akzeptiert</b>, kein zusätzlicher Bench-Tag. H1, H2, H5, H7 und H9 werden nicht erfasst. Das ist bewusst und es hat einen Preis, der hier stehen bleiben soll: <b>sieben der neun Einheiten haben kein Vorher-Bild auf Hardware.</b> G1 kann die Neutralität der Carve-outs nur für den UDP-Eingang (U1) und die T-Deck-Oberfläche (U9) belegen; für alles andere stützt sich die Aussage auf das 32-Env-Build, das Region-Gate und das Lesen des Diffs. Das ist ein Beleg, aber keine Messung, und die Abnahmekriterien in Abschnitt 9 müssen das so benennen. N1 trägt dadurch mehr — und für die Datagramme aus U2 und die Frames aus U7/U8 trägt es gar nicht, weil deren Fixtures aus demselben Code entstünden, der geändert wird. Das Zeitfenster für eine Vorher-Aufnahme schließt mit C3; danach ginge es nur noch über ein Zurück auf den Tag.</li>
     <li><b>Zwei Funde, die nicht im Plan standen.</b> <b>TD-16/TD-18:</b> die tote Tastatur des T-Deck war die gespeicherte Tastensperre (SYM+K), und das automatisierte Szenario <code>input</code> meldete dabei PASS auf einer Tastatur, mit der der Betreiber kein Zeichen tippen konnte — es zählt die <code>[KEY]</code>-Zeile, die vor der Sperre gedruckt wird. Nebenbei widerlegt: TD-10 galt als auf dieser Bench nicht nachweisbar, weil der Controller angeblich nicht auf die Raw-Mode-Probe antwortet; die Probe war nur nie gelaufen, weil sie an <code>!node_keyboardlock</code> hängt. <b>RF-01..RF-06:</b> fünf fehlende Einheiten-Umrechnungen auf dem SX126x-Pfad, gefunden beim Lesen für C5 (Aufgabe B2a).</li>
   </ul>
@@ -147,12 +147,12 @@
     { id: "B1", ph: "B", name: "G0 Hardware-Goldens, 4 Knoten (schmal, Entscheidung 5)", days: 2, after: null, gate: "test/golden/hw/G0", owner: "Bench" , st: "done", note: 'Erfasst auf allen vier Knoten: BLE (H4, byteweise reproduzierbar), UDP-1990 (H6), EXTUDP (H8), dazu die T-Deck-UI-Checkliste (H11) nach Behebung von TD-16. NICHT erfasst und laut Betreiberentscheidung 5 vom 11.09. auch nicht mehr geplant: H1 Bootlog, H2 Settings-Dump, H5 LoRa-RX, H7 UDP-Upstream, H9 Settings-Roundtrip. Die Konsole (H3) liegt nur fuer Heltec-93 vor und ist keine Vergleichsbasis. Folge: sieben der neun Einheiten haben kein Vorher-Bild auf Hardware, G1 kann die Neutralitaet der Carve-outs nur fuer U1-Eingang und U9 belegen.'},
     { id: "C1", ph: "B", name: "Carve C1: UDP-Frame-Handler je Plattform (U1)", days: 0.4, after: "B1", gate: "32 Envs, RAM +0 B, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'getMeshComUDPpacket() -> handleUdpFrame_esp32(buf,len,src_ip); die 411 Zeilen aus NrfETH::getUDP() als freie handleUdpFrame_nrf52() mit gleicher Signatur. Verschobener Bereich gegen HEAD gediffed (Einrueckung und neth.-Qualifizierung herausgerechnet): nur der beabsichtigte Epilog-Tausch. 32/32 Envs, RAM +0 B, Flash +4..+320 B, Regionen byteweise unveraendert.'},
     { id: "C2", ph: "B", name: "Carve C2: Socket-Primitive fuer den Datagramm-Versand (U2)", days: 0.4, after: "C1", gate: "32 Envs, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'Drei Primitive je Plattform statt des einen udpSendRaw() aus dem Plan: die Fehlerpolitik des Aufrufers laeuft auf ESP32 ZWISCHEN write und endPacket, und auf nRF52 steht ein Debug-Print zwischen beginPacket und der Schreibschleife -- beginPacket ist dort eine SPI-Transaktion zum W5100S. 32/32 Envs, RAM +0 B.'},
-    { id: "C3", ph: "B", name: "Carve C3: checkSerialCommand() in eigene TUs (U3)", days: 0.4, after: "C2", gate: "32 Envs, Rumpf byteidentisch", owner: "Agenten" , st: "wip", note: 'Die Planzeile "kein Carve noetig, nur Build" war falsch: blockiert war U3 nicht durch Serial, sondern dadurch, dass die Funktion in den beiden groessten Uebersetzungseinheiten des Baums lag, die nie auf einem Host uebersetzen. Je Plattform eine eigene TU, bewusst NICHT zusammengefuehrt -- Zusammenfuehren waere Vereinheitlichung und ist eine Matrix-Entscheidung. Beide Rumpfe diffen byteidentisch gegen HEAD. 32-Env-Gate laeuft.'},
-    { id: "C4", ph: "B", name: "Carve C4: Gateway-Block und Scheduler (D1-09, D1-10)", days: 0.4, after: "C3", gate: "32 Envs, Regionen unveraendert", owner: "Agenten" , st: "open"},
-    { id: "C5", ph: "B", name: "Carve C5: countryProfile() aus lora_setcountry() (U6)", days: 0.4, after: "C4", gate: "32 Envs, Laenderdump identisch", owner: "Agenten" , st: "open", note: 'Voraussetzung war RF-03: case 7 (MAN) verglich in ESP32-Einheiten und verwarf auf nRF52 jede Handeinstellung. Behoben in B2a -- sonst haette der Carve den Defekt in eine Funktion eingefroren, die danach rein aussieht.'},
+    { id: "C3", ph: "B", name: "Carve C3: checkSerialCommand() in eigene TUs (U3)", days: 0.4, after: "C2", gate: "32 Envs, Rumpf byteidentisch", owner: "Agenten" , st: "done", note: 'Die Planzeile "kein Carve noetig, nur Build" war falsch: blockiert war U3 nicht durch Serial, sondern dadurch, dass die Funktion in den beiden groessten Uebersetzungseinheiten des Baums lag, die nie auf einem Host uebersetzen. Je Plattform eine eigene TU, bewusst NICHT zusammengefuehrt -- Zusammenfuehren waere Vereinheitlichung und ist eine Matrix-Entscheidung. Beide Rumpfe diffen byteidentisch gegen HEAD. 32-Env-Gate laeuft.'},
+    { id: "C4", ph: "B", name: "Carve C4: Gateway-Block und Scheduler (D1-09, D1-10)", days: 0.4, after: "C3", gate: "32 Envs, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'gatewayService_esp32()/_nrf52(), beide Bloecke byteidentisch gegen HEAD. Nur D1-09 ist gecarvt; D1-10, der Loop-Scheduler, sind ~18 Timer-Praedikate in einer 2162- und einer 1437-zeiligen Funktion und stehen weiter aus.'},
+    { id: "C5", ph: "B", name: "Carve C5: countryProfile() aus lora_setcountry() (U6)", days: 0.4, after: "C4", gate: "32 Envs, Laenderdump identisch", owner: "Agenten" , st: "done", note: 'countryProfile() in eigener TU, haengt nur an den Konfigurationsmakros. Die 14 Tabellenfaelle diffen byteidentisch gegen HEAD, Land 7 (MAN) ist wortgleich in den else-Zweig gewandert. Beim Carve selbst eingebaut und gefangen: ohne explizites case 7 haette default den Code 7 verschluckt.'},
     { id: "B2a", ph: "B", name: "Ungeplant: RF-01..RF-06, fehlende Einheiten-Umrechnungen", days: 0.5, after: "B1", gate: "radio_units_lint + test_radio_units", owner: "Agenten" , st: "done", note: 'Beim Lesen von lora_setcountry() fuer C5 gefunden, nicht durch einen Test. node_freq/node_bw/node_cr tragen je Plattform andere Einheiten (OPT-D14), und an fuenf Schreibstellen fehlte die Umrechnung: --txbw, --txcr, case 7 (MAN), --txfreq und die --info-Anzeige. Behoben ueber src/radio_units.cpp. Regression zweiteilig: test_radio_units fuer die Tabelle, radio_units_lint.py fuer die Aufrufstellen (18 Verstoesse vorher, 0 nachher). RF-04 bewusst nicht behoben (Schutzband 10x zu breit, waere auch auf ESP32 eine Verhaltensaenderung), RF-07 als unbelegte Spur abgelegt. Keine Bestaetigung auf Hardware: T114 und T-Echo stehen auf dieser Bench nicht.'},
 
-    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "C5", gate: "G1 == G0", owner: "Bench" , st: "open"},
+    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "C5", gate: "G1 == G0", owner: "Bench" , st: "done", note: 'G1 vollstaendig und sauber: 12 von 12 Zellen identisch zu G0 -- BLE, UDP-1990 und EXTUDP auf allen vier Knoten, aufgenommen auf Instrument-Images des Baums nach den Carve-outs, jeder Knoten vorher aus dem Vault zurueckgespielt. Keine Abweichung ausserhalb von EXPECTED-DIFF.md, das vor dem Lauf geschrieben wurde. Drei Vergleichswerkzeuge mussten dafuer erst entstehen.'},
     { id: "B4", ph: "B", name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten", days: 6, after: "B3", gate: "Twin-Diff-Fixtures committet", owner: "Agenten", gateEnd: true , st: "open"},
 
     { id: "M1", ph: "C", name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export", days: 1, after: null, gate: "drift-matrix.csv + xlsx", owner: "Orchestrator" , st: "open"},
@@ -263,7 +263,6 @@
         svg += `<text x="${x(d) + 3}" y="${top - 28}" font-size="11" font-weight="600" fill="var(--ink-2)">${d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" })}</text>`;
       }
     }
-    const today = new Date(); const t0 = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
     // Die Standlinie wird zuletzt gezeichnet (siehe unten), damit sie ueber
     // den Balken liegt; hier nur der Wochenend-Raster-Teil.
 
@@ -309,21 +308,22 @@
     // Standlinie zum Schluss: ein kraeftiger senkrechter Balken ueber der
     // ganzen Hoehe, damit auf einen Blick zu sehen ist, wo der Plan steht.
     //
-    // Wird IMMER gezeichnet. Vorher hing sie an `t0 >= start && t0 <= endAll`
-    // und verschwand damit ersatzlos, sobald das Startdatum hinter dem
-    // heutigen Tag lag -- und das Startdatum wird pro Browser in localStorage
-    // gemerkt, also sah nicht jeder dieselbe Seite. Liegt heute ausserhalb des
-    // Plans, wird die Linie an den Rand geklemmt und beschriftet das auch.
+    // Markiert den Baustand, nicht das Kalenderdatum: die Linie steht am
+    // `end` der am weitesten fortgeschrittenen nicht-offenen internen
+    // Aufgabe (max. ueber alle "done"/"wip", robust gegen die Reihenfolge
+    // in `internal`), beschriftet mit erledigt/gesamt statt einem Datum.
     {
-      const before = t0 < start, after = t0 > endAll;
-      const tx = before ? x(start) : after ? x(endAll) : x(t0);
-      const suffix = before ? " (vor Planbeginn)" : after ? " (nach Planende)" : "";
-      const boxW = 118 + suffix.length * 5.4;
+      const advanced = internal.filter(r => r.st === "done" || r.st === "wip");
+      const markEnd = advanced.reduce((m, r) => r.end > m ? r.end : m, start);
+      const doneCount = internal.filter(r => r.st === "done").length;
+      const label = `Plan-Stand: ${doneCount} von ${internal.length} Aufgaben`;
+      const tx = x(markEnd);
+      const boxW = 12 + label.length * 6.6;
       // Beschriftung nach links kippen, wenn sie sonst rechts hinauslaeuft
       const boxX = (tx + 5 + boxW > width - 8) ? tx - boxW - 5 : tx + 5;
       svg += `<rect x="${tx - 1.5}" y="${top - 30}" width="3" height="${height - top + 22}" fill="var(--today)" opacity="0.9"/>`;
       svg += `<rect x="${boxX}" y="${top - 42}" width="${boxW}" height="18" rx="3" fill="var(--today)"/>`;
-      svg += `<text x="${boxX + 6}" y="${top - 29}" font-size="11" font-weight="700" fill="var(--surface)" font-family="IBM Plex Sans Condensed, sans-serif">Stand ${fmt(t0)}${suffix}</text>`;
+      svg += `<text x="${boxX + 6}" y="${top - 29}" font-size="11" font-weight="700" fill="var(--surface)" font-family="IBM Plex Sans Condensed, sans-serif">${label}</text>`;
     }
     svg += `</svg>`;
     const chart = document.getElementById("chart");

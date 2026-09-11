@@ -69,50 +69,62 @@ one to update when an item moves.
 
 **F. DRY unification and RAM: the one-shot PR — IN EXECUTION on `dry-unification`**
 
-Phase A of the plan is done except the protocol templates; phase B (G0 captures)
-is under way. Base tagged `dry-base-20260911`. BACKLOG §3.8af carries the full
-status tables, the bench lessons and the decisions; the Gantt
+Phase A done except `P0.9`. **Phase B done: all five carve-outs are in and G1 is
+complete and clean.** Base tagged `dry-base-20260911`. BACKLOG §3.8af carries
+the status tables, the decisions and the bench lessons; the Gantt
 (`docs/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
-same stand as a vertical bar.
+same stand as a vertical bar positioned by plan progress.
 
-**`TD-16` / `TD-17` closed 2026-09-11 evening.** T-Deck-14's "dead touch,
-keyboard, repeated crashes" was the persisted keyboard lock (SYM+K) being on:
-touch and keys are gated, the panel times out, only the trackball wakes it.
-Fixed with `--keylock on/off`; cleared on the node, survives a reboot. Write-up
-in `bug-tdeck-touch-keyboard-20260911.md`. `TD-17` fell out of it: DTR high on
-open attaches to a native-USB S3 without a reset, `tools/bench/usb_logger.py`
-is the continuous logger. The T-Deck's three G0 captures are valid (the lock
-touches only LVGL input); H11 can be filled in now. Operator confirmed by eye
-that touch works again. Owed: the H11 checklist.
+**B2 — the five carves**, each gated on a 32-env build, the resource baseline
+and the region gate, each with its moved code diffed against `HEAD`:
+`C1` `03c4ba65`, `C2` `35b8823f`, `C3` `7f5a0469`, `C4` `8c48243c`,
+`C5` `f666e158`.
+
+**B3 — G1 is 12 of 12 identical to G0**: BLE, UDP-1990 and EXTUDP on all four
+nodes, captured on instrument images from the post-carve tree, each node
+restored from its vault backup first. No diff outside `EXPECTED-DIFF.md`, which
+was written before the run.
+
+What that does and does not prove is set by operator decision 5 (narrow G1,
+taken 2026-09-11): **seven of the nine units have no hardware before-picture.**
+G1 covers `U1`-inbound and the BLE path. For the rest, carve neutrality rests
+on the build gate, the region gate and reading the diff — evidence, not
+measurement, and §9's pass criteria must say so.
 
 **Next, in order:**
 
-1. **B2 — the carve-out commits C1-C5.** Not blocked by `TD-16`: three of four
-   nodes have clean, reproducible G0 captures on BLE, UDP-1990 and EXTUDP, and
-   the T-Deck contributes no unique platform (it is a second ESP32-S3 alongside
-   Heltec-93).
-2. H11 T-Deck UI checklist by eye, now unblocked.
-3. Console golden on rak-90 and t-beam-92 (~15 min each). Owed, not blocking.
+1. **B4 — the `N1` characterization tests.** `U2` (the three socket primitives
+   from `C2`) and `U6` (`countryProfile()`, all 15 codes on both `#if` sides)
+   are hours of work each. `U1` is the plan's 6-8 day estimate and dominates:
+   its ESP32 handler alone calls ~30 project symbols that need recording sinks
+   for both platforms in one native binary.
+2. `GLD-01` — the G0 EXTUDP baseline is truncated at 160 characters, the
+   normalizer does not mask EXTUDP's live readings, and `compare_extudp.py`
+   therefore compares destinations and bodies rather than whole payloads.
+   Until that is settled, EXTUDP is a partially compared surface.
+3. `D1-10` — the loop scheduler, the half of the `C4` plan row that is not
+   carved.
 4. `P0.9` protocol templates — last open phase-0 item.
+5. `RF-04` (guard band ten times too wide, a behaviour change on ESP32 too) and
+   `RF-07` (lone `BOARD_RAK4630` guard on the display-queue critical sections,
+   unverified) — filed, not fixed, and independent of this campaign.
 
-**Decision 2 needs a carve-out for UI boards.** "`INSTRUMENT_ENABLED` images
+**Bench state:** four nodes flashed with instrument images from the post-carve
+tree and restored — `DK5EN-90`, `-93`, `-14`, `-92`. The bench has **three
+usable USB slots**: the T-Deck and the T-Beam displace each other, so any
+four-node run happens in two passes. `tools/bench/netconsole_log.py` is the way
+to get a node-side log off the T-Deck, whose USB CDC re-enumerated 63 times in
+80 s under the instrument image.
+
+**Decision 2 keeps its carve-out for UI boards.** "`INSTRUMENT_ENABLED` images
 throughout" was applied to the T-Deck and nobody then looked at its screen; the
-harness scenarios pass without noticing a stall or a locked keyboard. A board
-with a display needs a by-eye check after any reflash.
+harness scenarios pass without noticing a stall or a locked keyboard, which is
+`TD-18`. A board with a display needs a by-eye check after any reflash.
 
 **Console golden method — decided 2026-09-11:** the radio stays on and the
-antenna stays connected. The comparison tolerates chatter instead: three
-buckets (identical / equal after chatter repair / genuinely different) with
-`--strict` kept for a byte-exact comparison should conditions ever allow one.
-
-**Two false findings were caught before they were filed**, both by measuring
-rather than asserting: 50 commands that looked silent on the net console
-answered fine with a wider window, and an extra `START CHECK:` line is gated on
-runtime debug flags, not on the transport. Had either shipped, the command
-table would have been measured against a wrong baseline.
-
-`OPT-D1..D14` unchanged in the tree. Timing of the upstream PR is still the
-operator's.
+antenna stays connected; the comparison tolerates chatter instead. `--setctry`
+is now manual-only: it is a valid country, so the node accepts it, retunes and
+reboots 15 s later, which cost the G0 console capture its tail.
 
 **E. Leads without a proof yet**
 
