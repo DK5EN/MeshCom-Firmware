@@ -1,5 +1,78 @@
 # RESUME — pick up here
 
+## Consolidated open list, 2026-09-11 evening
+
+Everything still owed, grouped by what unblocks it. IDs point at BACKLOG rows; this list is the
+one to update when an item moves.
+
+**A. Blocking the next release cut and upstream PR (APRS wave, §3.8ae)**
+
+- `APRS-02` hardware proof: no board runs any post-09.10 image. Flash 98/93/14/90/92, receive a
+  real position with `/R= /U= /I=` and a `#name` comment on serial and in the web GUI, check
+  `--path` and the T-Deck path tab (52-byte buffer, `/mhpath.dat` discarded once).
+- `APRS-03` ops: MCProxy `9501bb0` onto the Pi; phone test of the merged app PR #8.
+- `APRS-04` PRs: firmware PR for N-32..N-35 after APRS-02; app PR for `aprs-position-name` only
+  on request. Then the release cut for items 212-217.
+
+**B. Next engineering work, in order**
+
+- `DM-05` counters (DMs sent, echo heard, gateway ACK, peer ACK, gave up, median time to peer
+  ACK) into the STAT line; one week of baseline on DK5EN-98 and -90.
+- `DM-01` stage 0 of the DM ARQ repair (echo-gated same-id retry, re-ack duplicates addressed to
+  me, failure reported to app and GUI). Upstream-PR candidate. `DM-02..DM-04` stages 1-3 and
+  `DM-06` open questions follow.
+- ACK attribution stage 4 (gateway hash appendix on the wire, `--ackinfo` coupling) and R5 (no
+  cap on heard frames per msg_id when the flag is on), `ack-implementierungsplan.md`.
+- `CQ-02` response frames mint `msg_id` from `millis()` (duplicate ids in one ms, 0 at
+  rollover); route through the monotonic allocator.
+- `CQ-05` `save_settings()` on every originated frame (170 000 NVS writes in the 08-27 storm;
+  LittleFS from the nRF52 timer task on the ACK path).
+- `CQ-06` `loop_functions.cpp` and `esp32_main.cpp` in no native build filter, so their fixes
+  ship untested.
+
+**C. Bench-bound (needs a board on the desk)**
+
+- `MEM-04` four classic-ESP32 envs within 4 kB of a link failure (T-Beam family 20 B IRAM,
+  E22_XML 920 B DRAM); ~10.5 kB of levers measured, nothing committed.
+- `TM-49` fail-closed OTA completion gate is in code, bench arm on a 4 MB single-slot board
+  (Heltec) still owed.
+- `SL-01..07` `--setlog` lines implemented 2026-09-02, bench wave 3 never ran.
+- `GPS-05b` fusion tau: 30 min ships, sd 6.6 m against the 4 m gate; tau 2 h meets it in replay.
+  `GPS-10` nRF52 legacy `getGPS()` integer EMA, deferred until the tau run closes.
+- `TD-15` map empty after reboot (markers RAM-only, HEY never feeds the map), `TD-11` no
+  send/delivery marker in the T-Deck message view, `TD-10` backspace auto-repeat (concept
+  ready, ~50 lines), `TD-09` map tile cache in PSRAM.
+- `TM-28` E290 Wireless Paper instrument and scenarios, hardware still not on the bench.
+- `E22-01` frame integrity under supply spikes / RF ingress, concept for operator review.
+- `MH-01` `| 0xF0` marker overwrites the country nibble (`0xF` == PL), `MH-03` absent trailing
+  fields keep the receiver's hw/fw.
+
+**D. Parked by decision, with the trigger that unparks them**
+
+- `TLM-01`/`TLM-02` telemetry definitions over LoRa/UDP: blocked by `TLM-03` (soft-serial
+  telemetry path review; the sender is dead code without a measuring station).
+- `MEM-02` move the five static rings to boot allocation (~28 kB DRAM): risk assessment first.
+- `UDP-01` RAK EXTUDP crash report: unreproduced, questions to the reporter listed in §3.8l.
+- `WF-01` sites 1+2 (BLE `blelen + 2`, UDP KEEP terminator): wire-format change, parked.
+- `WEB-03` (c) password in GET query, (d) no XHR timeout / in-flight guard, (e) cosmetics:
+  judgement calls, (a)/(b) are fixed.
+- `INS-03` `MC_INJECT_HOOKS` still defaults to 1 (~430 lines of dead injection code in every
+  image); decide whether it follows `INSTRUMENT_ENABLED`.
+- `CQ-03/04/07..11` code-quality harvest (dead SD persistence, duplicate `lv_conf.h`, warning
+  flags, settings `static_assert`, ruff gate, scanner checks, `.gitignore` for `.claude/`) and
+  `CQ-12` the four-wave full audit.
+- `G09`/`G10`/`G11` `tdeck_sdmap.cpp` findings from the stage-1 GUI review, never verified.
+- Standing accepted risk, not work: `N-01`, `N-02`, `N-07` (maintainer decision 2026-08-18).
+
+**E. Leads without a proof yet**
+
+- RX buffer never cleared between receives, `MAX_APRS_FRAME_SIZE` 340 > `UDP_TX_BUF_SIZE` 255.
+- Static-IP/DNS chain `NET-01..06` established by code reading only; two operator commands
+  would confirm the field case (`bug-static-ip-dns-20260901.md` §7).
+- No fleet telemetry for how many nodes run with track on (raised with TRK-01).
+- ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
+  operator open.
+
 ## 2026-09-11: APRS parser contract wave shipped in three repos, items 212-217, nothing flashed
 
 Trigger was a parser-drift analysis (`docs/aprs-parser-drift-20260911.md`): the firmware emits
