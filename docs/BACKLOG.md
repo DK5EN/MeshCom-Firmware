@@ -4152,28 +4152,46 @@ incapable of catching this class.
 The four G0 BLE captures taken before the fix contain those frames and are
 replaced.
 
-**Phase 0 and the G0 captures, stand 2026-09-11 evening.**
+**Phase 0 and the G0 captures, stand 2026-09-11 night.**
 
-| Step                      | State                                                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `P0.1` base               | **done** — tag `dry-base-20260911`, 32 envs, baseline refreshed, 12 native suites green (673 cases)                                        |
-| `P0.2` line references    | **open** — the audit's ~200 `file:line` anchors are not re-checked against the tag                                                         |
-| `P0.3` node backups       | **done** — all four nodes, masked in the repo, unmasked in `~/MeshCom-bench-backups/`                                                      |
-| `P0.4` corpora            | **done** — 28 LoRa, 37 UDP-1990, 23 EXTUDP, 21 BLE, 305 ladder commands                                                                    |
-| `P0.5` callsign lint      | **done** — 65 files, 0 violations                                                                                                          |
-| `P0.6` stub server        | **done** — the existing `tools/mock/meshcom_server.py` gained capture, replay and a deterministic mode                                     |
-| `P0.7` normalizer         | **done** — `test/golden/normalize.py`                                                                                                      |
-| `P0.8` BLE client         | **done** — `tools/bench/ble_golden.py`, reproducible on both stacks                                                                        |
-| `P0.9` protocol templates | **open**                                                                                                                                   |
-| `B1` G0 BLE               | **done, needs re-capture** — reproducible on all four nodes, but taken before the broadcast fix, so the committed files contain `*` frames |
-| `B1` G0 UDP-1990          | **done on 3 nodes** — Heltec-93, RAK-90, T-Beam-92; T-Deck-14 owed                                                                         |
-| `B1` G0 console           | **captured, not a baseline** — see `test/golden/hw/G0/heltec-93/console/README.md`; needs a radio-quiet re-capture                         |
-| `B1` G0 EXTUDP            | **open** — only an incidental sample inside the RAK UDP capture                                                                            |
-| `B1` T-Deck UI checklist  | **open** — manual                                                                                                                          |
-| `B1` BLE app calibration  | **open** — the one-time iPhone PacketLogger run of test plan §12.4                                                                         |
-| shipping string scan      | **open** — mandatory under decision 2, and now the only evidence about the shipping command set                                            |
+Phase 0 is closed except `P0.9` (protocol templates). B1 is complete on every
+surface that can be automated; what remains is one manual checklist.
 
-**Bench lessons that cost a capture each, all now enforced in code.** Every one
+| Surface                   | heltec-93 | rak-90 | t-beam-92 | t-deck-14        |
+| ------------------------- | --------- | ------ | --------- | ---------------- |
+| BLE golden                | done      | done   | done      | done             |
+| UDP-1990 (H6/H7)          | done      | done   | done      | done             |
+| EXTUDP (H8)               | done      | owed   | owed      | owed             |
+| console (H3)              | done      | owed   | owed      | owed             |
+| T-Deck UI checklist (H11) | n/a       | n/a    | n/a       | **owed, manual** |
+
+All four BLE captures are reproducible across two independent runs and carry
+zero broadcast frames; `test/golden/verify_captures.py` enforces that on every
+committed capture and is wired into `selftest.sh`. All four UDP captures agree
+on the classification of every corpus entry.
+
+Closed since the last stand: `P0.2` (both audit documents re-anchored against
+the tag — ~550 references checked, ~150 corrected, 0 gone, 3 ranges tagged as
+commented out), the shipping-image command-name scan
+(`test/golden/command_name_scan.py`, **0 unexplained absences on all four
+shipping envs**, which is the evidence operator decision 2 made mandatory), and
+the chatter-tolerant console comparison.
+
+Two defects were found in the golden tooling itself, both by machine rather
+than by reading:
+
+- `extract_commands.py` joined nested `#if` levels with a flat `&&`, losing
+  operator precedence: `#if INSTRUMENT_ENABLED` around
+  `#if (ESP32 && !X) || NRF52_SERIES` read as
+  `(INSTRUMENT_ENABLED && ESP32 && !X) || NRF52_SERIES`, claiming `--srvip`
+  exists on any nRF52 build. Each level is parenthesised now.
+- `console_golden.compare()` read captures with `read_text()` and split with
+  `splitlines()`, both of which break on a bare `\r`. The USB capture holds 205
+  of them and every byte after one was silently dropped — content hidden, not
+  merely mangled. Its strict count was therefore 263, not the 233 previously
+  recorded.
+
+**Bench lessons that cost a capture each**Bench lessons that cost a capture each, all now enforced in code.** Every one
 was found by driving real hardware, none by reading:
 
 | What happened                                                                                              | Enforcement now                                                                |

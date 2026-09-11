@@ -77,25 +77,19 @@ same stand as a vertical bar.
 
 **Next, in order:**
 
-1. **Re-capture the four BLE goldens.** The committed ones were taken before
-   the broadcast fix and contain `*` frames. `verify_no_broadcast()` is active
-   now and exits 2 if it happens again. ~10 min per node, restore in front of
-   each. Needs all four nodes; two are on the desk at a time.
-2. **Decide the console-golden method** (see below), then re-capture it.
-3. **`P0.2`** — re-check the audit's ~200 `file:line` anchors against the tag.
-   Desk work, no hardware, and the command-table wave transcribes those lines.
-4. **Finish B1**: UDP-1990 on T-Deck-14, EXTUDP via `tools/bench/extudp_peer.py`,
-   the T-Deck UI checklist, the shipping-image string scan across all 32 envs.
-5. **Then B2** — the carve-out commits C1-C5. **Hard gate: every node that is
-   to be compared G0→G1 must have its G0 capture before this point.**
+1. **B2 — the carve-out commits C1-C5.** B1 is complete on every automatable
+   surface and all four nodes have their G0, so the gate is satisfied: nothing
+   more is lost by moving code. This is the first step that touches product
+   code beyond the `--srvip` hook.
+2. **Owed but not blocking B2**: EXTUDP and the console golden on the three
+   nodes that lack them, and the T-Deck UI checklist (H11), which is manual and
+   cannot be automated.
+3. `P0.9` protocol templates — the last open phase-0 item.
 
-**Decision owed — the console golden.** A bench node receiving live mesh
-traffic cannot produce a byte-comparable console capture: async output splices
-_inside_ lines (`--postime abc` comes back as `ostime abc`) and no prefix list
-can be complete. Filtering was tried three times and the difference count did
-not fall. The fix is bench conditions — mesh and gateway off, no antenna — but
-a radio-quiet capture does not exercise the RX-to-console path. Either accept
-that, or compare replies only and tolerate the chatter.
+**Console golden method — decided 2026-09-11:** the radio stays on and the
+antenna stays connected. The comparison tolerates chatter instead: three
+buckets (identical / equal after chatter repair / genuinely different) with
+`--strict` kept for a byte-exact comparison should conditions ever allow one.
 
 **Two false findings were caught before they were filed**, both by measuring
 rather than asserting: 50 commands that looked silent on the net console
