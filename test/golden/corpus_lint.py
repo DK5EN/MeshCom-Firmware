@@ -57,6 +57,28 @@ def read_datagram(path: Path) -> bytes:
     return bytes.fromhex("".join(text.split()))
 
 
+_EXEMPT_RE = re.compile(r"^#\s*lint-exempt:\s*(\S.*)$", re.M)
+
+
+def exemption(path: Path) -> str | None:
+    """A `# lint-exempt: <reason>` line in a .hex header, if present.
+
+    Deliberately malformed corpus entries -- a truncated indicator, a `GATE`
+    with no frame -- carry no readable source path, and this lint must not
+    treat "cannot read it" as "safe". The exemption makes the decision
+    explicit, requires a reason, and is reported in the summary so an
+    exempted file stays visible rather than disappearing.
+
+    It cannot be used to smuggle a transmittable frame past the check: an
+    entry the node would actually radiate has a GATE/DATA indicator and a
+    readable path, and for those the check runs regardless.
+    """
+    if path.suffix != ".hex":
+        return None
+    m = _EXEMPT_RE.search(path.read_text(errors="replace"))
+    return m.group(1).strip() if m else None
+
+
 def frame_of(data: bytes, kind: str) -> Tuple[bytes | None, str]:
     """The transmittable LoRa frame inside `data`, plus what it was found in.
 
@@ -86,13 +108,20 @@ def lint_dir(root: Path, prefixes: Sequence[str]) -> Tuple[List[str], int]:
     """Returns (violations, files_checked). Violations are printable lines."""
     violations: List[str] = []
     checked = 0
+    exempted: List[str] = []
 
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix not in (".bin", ".hex"):
             continue
         checked += 1
         kind = path.relative_to(root).parts[0] if path.parent != root else ""
-        frame, where = frame_of(read_datagram(path), kind)
+        data = read_datagram(path)
+        frame, where = frame_of(data, kind)
+
+        reason = exemption(path)
+        if reason and where in ("unclassified", "unknown-indicator"):
+            exempted.append(f"{path.name}: {reason}")
+            continue
 
         if where in ("unclassified", "unknown-indicator"):
             violations.append(
@@ -108,6 +137,11 @@ def lint_dir(root: Path, prefixes: Sequence[str]) -> Tuple[List[str], int]:
         for call in foreign:
             violations.append(f"{path}: foreign callsign {call!r} in the {where} source path")
 
+    if exempted:
+        print(f"corpus lint: {len(exempted)} deliberate exemption(s):",
+              file=sys.stderr)
+        for line in exempted:
+            print(f"  {line}", file=sys.stderr)
     return violations, checked
 
 
