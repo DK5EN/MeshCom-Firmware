@@ -9,11 +9,15 @@ enough to pin everything the harness relies on (timestamped receive thread,
 byte-exact send, JSON parsing, heartbeat sequence gaps, the rejection vectors).
 """
 
+import json
 import os
 import socket
 import sys
+import tempfile
+import threading
 import time
 import unittest
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -147,6 +151,43 @@ class TestRejectionVectors(unittest.TestCase):
             self.assertIsNone(ep.parse_json(vecs[name]), name)
 
 
+class TestRecord(unittest.TestCase):
+    """GLD-01 gap 1/2: the `--record` full-fidelity JSON-lines file."""
+
+    def test_record_entry_keeps_the_whole_text_and_the_literal_address(self) -> None:
+        # A position frame is ~258 B -- well past the console's [:160] cut.
+        long_text = '{"src_type":"node","type":"pos","msg":""' + ",\"pad\":\"" + "x" * 220 + "\"}"
+        dg = ep.Datagram(t=5.5, addr=("192.168.68.72", 1799), raw=long_text.encode(), obj=None)
+        entry = ep.record_entry(dg, t0=2.0)
+        self.assertEqual(entry["text"], long_text)
+        self.assertGreater(len(entry["text"]), 160)
+        self.assertEqual(entry["addr"], "192.168.68.72")
+        self.assertEqual(entry["port"], 1799)
+        self.assertEqual(entry["len"], len(long_text.encode()))
+        self.assertAlmostEqual(entry["t"], 3.5)
+
+    def test_write_record_is_one_json_object_per_line_in_arrival_order(self) -> None:
+        dgs = [
+            ep.Datagram(t=1.0, addr=("10.0.0.5", 1799), raw=b'{"n":1}', obj=None),
+            ep.Datagram(t=2.0, addr=("10.0.0.9", 1799), raw=b'{"n":2}', obj=None),
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "nested" / "extudp-received.jsonl"
+            ep.write_record(out, dgs, t0=0.0)
+            lines = out.read_text().splitlines()
+            self.assertEqual(len(lines), 2)
+            rows = [json.loads(ln) for ln in lines]
+            self.assertEqual([r["text"] for r in rows], ['{"n":1}', '{"n":2}'])
+            self.assertEqual([r["addr"] for r in rows], ["10.0.0.5", "10.0.0.9"])
+
+    def test_write_record_creates_missing_parent_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "a" / "b" / "c.jsonl"
+            ep.write_record(out, [], t0=0.0)
+            self.assertTrue(out.exists())
+            self.assertEqual(out.read_text(), "")
+
+
 # --------------------------------------------------------- loopback socket
 
 
@@ -251,6 +292,48 @@ class TestPeerLifecycle(unittest.TestCase):
         peer = _loopback_peer()
         peer.stop()
         peer.stop()
+
+
+class TestRecordCli(unittest.TestCase):
+    """`--record` end-to-end through `main()`, not just the pure helpers."""
+
+    def test_main_writes_full_fidelity_record_alongside_console_output(self) -> None:
+        node = FakeNode()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                out = Path(d) / "extudp-received.jsonl"
+                long_msg = "x" * 220   # forces the datagram past the [:160] console cut
+
+                # main() binds its own ephemeral port only after it starts, and
+                # there is no callback to learn it from -- an ephemeral port
+                # probed just before and released is good enough on loopback in
+                # a single-process test run.
+                probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+                probe.close()
+
+                def fire_after_bind() -> None:
+                    time.sleep(0.2)   # main() binds well within this
+                    node.sock.sendto(
+                        ('{"src_type":"node","type":"msg","dst":"DK5EN-1","msg":"%s"}'
+                         % long_msg).encode(),
+                        ("127.0.0.1", port))
+
+                t = threading.Thread(target=fire_after_bind)
+                t.start()
+                rc = ep.main(["--bind", "127.0.0.1", "--port", str(port),
+                              "--listen", "1.0", "--record", str(out)])
+                t.join()
+                self.assertEqual(rc, 0)
+                lines = out.read_text().splitlines()
+                self.assertEqual(len(lines), 1)
+                row = json.loads(lines[0])
+                self.assertIn(long_msg, row["text"])
+                self.assertGreater(len(row["text"]), 160)
+                self.assertEqual(row["addr"], "127.0.0.1")
+        finally:
+            node.close()
 
 
 class TestHostIp(unittest.TestCase):

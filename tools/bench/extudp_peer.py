@@ -23,6 +23,24 @@ that sequence dates a stall to the millisecond and separates "network gone,
 loop alive" from "loop task hung" -- see `seq_gaps()`. Stock builds do not
 define MC_TEST_HOOKS, so an empty heartbeat list is not a failure.
 
+**`--record` (GLD-01 gap 1).** The console loop below prints `dg.text[:160]`
+on purpose: a human skimming `--listen` output does not want a 259-byte JSON
+wall of text scrolling past, and a position frame *is* ~258 B, well past that
+cut. But that means nothing past character 160 ever existed anywhere -- the
+console redirect *is* the only record most bench sessions ever kept (see
+test/golden/hw/G0/*/extudp/extudp-received.txt, captured exactly this way).
+`--record <path>` fixes that without touching the console line: it writes a
+second, full-fidelity JSON-lines file with the complete `text` of every
+datagram, alongside whatever the console shows. It also keeps the literal
+source address per datagram (GLD-01 gap 2) -- deliberately un-anonymized
+here, because turning "the bench address of the day" into something that
+belongs in a baseline is `test/golden/compare_extudp.py`'s job (it does it by
+majority vote, the same division of labour `normalize.py` already draws
+between a raw capture and a golden one).
+
+    python3 tools/bench/extudp_peer.py --node-ip 192.168.68.72 --listen 60 \
+        --record extudp-received.jsonl > extudp-received.txt
+
 No third-party dependencies: stdlib + type hints only.
 """
 
@@ -36,6 +54,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 EXTERN_PORT = 1799        # configuration_global.h:160
@@ -282,6 +301,41 @@ class ExtUdpPeer:
         return seq_gaps(self.heartbeats(since))
 
 
+# --------------------------------------------------------------- full record
+
+
+def record_entry(dg: Datagram, t0: float) -> Dict[str, Any]:
+    """One datagram as a full-fidelity JSON object (GLD-01 gap 1).
+
+    `text` is the WHOLE payload, never `[:160]` -- that cut only ever applied
+    to the console line. `addr` is the literal source IP, kept on purpose
+    (GLD-01 gap 2): anonymizing it into a per-capture label is the comparison
+    tool's job, not the capture tool's, so a bench operator can still see
+    exactly which host said what while a run is live.
+    """
+    return {
+        "t": round(dg.t - t0, 3),
+        "addr": dg.addr[0],
+        "port": dg.addr[1],
+        "len": len(dg.raw),
+        "text": dg.text,
+    }
+
+
+def write_record(path: Path, dgs: Sequence[Datagram], t0: float) -> None:
+    """Write one JSON object per line, in arrival order -- the `--record` file.
+
+    Plain JSON-lines, not a JSON array: a run that is killed mid-write still
+    leaves every completed line readable, which a truncated `]`-less array
+    would not.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for dg in dgs:
+            f.write(json.dumps(record_entry(dg, t0), ensure_ascii=False))
+            f.write("\n")
+
+
 # -------------------------------------------------------------------- CLI
 
 
@@ -297,6 +351,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--listen", type=float, default=10.0, help="seconds to listen (default 10)")
     p.add_argument("--host-ip", action="store_true",
                    help="print the host address to feed --extudpip and exit")
+    p.add_argument("--record", type=Path, default=None,
+                   help="write every received datagram, untruncated, with its "
+                        "source address, as JSON-lines to this path (GLD-01)")
     args = p.parse_args(argv)
 
     if args.host_ip:
@@ -331,6 +388,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if hb:
             print(f"heartbeats: {len(hb)} seq {hb[0]}..{hb[-1]} gaps={seq_gaps(hb)}",
                   file=sys.stderr)
+        if args.record:
+            write_record(args.record, peer.since(0), t0)
+            print(f"recorded {len(peer.since(0))} datagram(s), untruncated, to "
+                  f"{args.record}", file=sys.stderr)
     return 0
 
 
