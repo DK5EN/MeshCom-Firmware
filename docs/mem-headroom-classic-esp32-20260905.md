@@ -57,11 +57,28 @@ build_unflags =
 - Fleet share (mcmap, 2026-09-05, 1 476 nodes): TBEAM V1.2 234, V1.1 129, V1.1-1268 8,
   V1.2-1262 3 (all on the affected envs), Supreme 18 (S3, unaffected). About a quarter of the
   fleet.
-- Decide with the bench T-Beam-92 `[PSRM]` line right after `[HEAP] ... (init)` (board was not
-  on USB on 2026-09-05; only the RAK was). If it reads 0, the unflag removes code that never
-  succeeds and is free. If it reads ~4 MB, the unflag trades 4 MB PSRAM heap for 4.9 kB IRAM;
-  with `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096` every allocation >= 4 kB would move back to
-  internal heap. That is an operator decision.
+- **RESOLVED 2026-09-12 on T-Beam-92 (V1.2, AXP2101).** The reading is **`[PSRM] 00:00:00 4191863`**
+  -- PSRAM is present and working, so the 40 MHz-flash-vs-80 MHz-SPIRAM theory above is **wrong**
+  and is struck. The unflag was taken anyway, as the operator decision this bullet asked for, on
+  three measured grounds:
+  - the firmware uses **596 bytes** of the 4 MB (4 191 863 at init -> 4 191 267 once WiFi is up),
+    and there is no `ps_malloc` call site in any file these envs build -- every one in the tree is
+    under `src/t-deck/` or `src/t5-epaper/`, which are S3 boards;
+  - **PSRAM cannot substitute for IRAM.** IRAM holds code that executes with the flash cache
+    disabled; PSRAM is data memory behind that same cache. No use of PSRAM frees a byte of IRAM,
+    and IRAM at 20 B was the binding constraint (it is what broke upstream CI on `9d885b1a`);
+  - the one big DRAM win people expect from PSRAM -- moving the static rings (`MEM-02`, ~28 kB)
+    out of `.bss` -- is not available: `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY` is **not set**
+    in the prebuilt SDK, so `EXT_RAM_ATTR` does nothing without rebuilding ESP-IDF.
+
+  Measured after flashing the unflagged image: `iram0_0_seg` free **20 -> 4 972 B**, `dram0_0_seg`
+  free 10 312 -> 10 384 B, and init free internal heap **146 488 -> 151 348 B (+4 860)** -- the
+  PSRAM machinery was costing internal DRAM at runtime as well. SX1276 init, AXP2101, GPS fix and
+  WiFi join all verified, no backtraces.
+
+  Fleet note that survives this: PSRAM presence is **not uniform**. `dj8meh-41`, also a V1.2 with
+  AXP2101, reports `[PSRM] 0`. Any future feature wanting PSRAM must guard with `psramFound()`
+  regardless of this flag.
 
 ## 3. Lever 2: tinyxml2 example program linked into E22_XML (DRAM +5 768 B)
 
