@@ -4440,9 +4440,43 @@ compares numerically where both sides parse as numbers, and allow-lists
 it necessarily moves). Mutation-checked: it catches `node_power 22 -> 2`,
 catches a deleted field, and does not flag a float that only re-renders.
 
-**Still unproven on a device.** None of the four load/save paths has
-executed. That gap is being closed by a native path suite, and the real
-proof remains RAK-90 upgrading from its 20260724 image.
+**The four load/save paths are now executed** (`W3` wave D,
+`native_nrf52_settings_paths`, 11 cases). The real `nrf52_flash.cpp` and
+`settings_store_nrf52.cpp` compile on the host against an in-memory
+filesystem, so each path runs rather than merely linking: the keyed fast path
+(store and legacy seeded to DISAGREE on `node_call`, so the assertion says
+which source won and cannot pass vacuously, with the legacy file byte-identical
+afterwards); the sanity gate, once per rejection reason -- empty file, all
+unknown keys, decoded-but-blank `node_call` -- each falling through to legacy
+rather than to `flash_reset()`; the migration (store created, decodes back to
+the same values, legacy present and unmodified); and the retired `0x57` file,
+asserted to end at defaults AND specifically NOT at the values those bytes
+would produce reinterpreted as the current layout. Also covered:
+skip-if-unchanged through a write counter, atomicity by capturing what the
+live path held at the moment of the rename, `node_power = -20` round-tripping
+through the REAL schema table, and both allocation-failure branches through a
+targeted `malloc` interposer.
+
+**The suite buys that coverage by copying `s_meshcom_settings` into a stub**, so
+that `nrf52_flash.cpp` can be compiled at all -- and `settings_schema.cpp` takes
+`offsetof()` against whichever definition it sees. Member-order or type drift in
+that copy would leave all 11 cases green while testing a layout no device has.
+The pair is therefore in `twin_stub_lint.py`'s table, whose docstring states the
+risk exactly: _"it passes, and it passes about something that is not the shipped
+declaration"_. Mutation-verified -- changing one member from `int` to `int32_t`
+fails the gate.
+
+**One branch is unreachable and is documented rather than faked:** the encode
+overflow in `settingsStoreSave()`. Filling every persisted `CFG_STR` field to
+capacity with backslashes (worst-case 2x escape expansion) encodes to 3 396 B
+against `kSettingsBufferCap` of 4 096 B, and no other member can add to it.
+Reaching it would need a mock `encode()` (which stops testing the real save
+path) or shrinking the real constant.
+
+**Still unproven on a device.** Native execution is not the acceptance
+criterion; the criterion is a real node keeping its settings across the
+upgrade. That remains RAK-90 jumping from its 20260724 image, measured with
+`tools/bench/w3_upgrade_check.py` against `docs/bench/w3-baseline/`.
 
 **Deliberately out of scope for this wave:** ESP32 keeps its NVS path (it is
 already keyed by name, so it already has the property W3 buys), and the

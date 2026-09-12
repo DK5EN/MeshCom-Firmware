@@ -48,6 +48,16 @@ PAIRS: List[Tuple[str, str]] = [
     # in-tree original to compare against.
     ("test/test_gateway_service_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_gateway_service_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
+    # W3 path suite (test_nrf52_settings_paths). This one is the sharpest case
+    # in the list and the reason to read the docstring above twice: the stub
+    # does not shadow a few declarations, it carries a FULL COPY of
+    # s_meshcom_settings so that nrf52_flash.cpp can be compiled on a host.
+    # settings_schema.cpp computes every descriptor's offset with offsetof()
+    # against whichever definition it sees -- so if the stub copy drifts from
+    # the real struct in member ORDER or TYPE, the suite keeps passing while
+    # testing a layout no device has. That is precisely "it passes, and it
+    # passes about something that is not the shipped declaration".
+    ("test/test_nrf52_settings_paths/stubs/nrf52/WisBlock-API.h", "src/nrf52/WisBlock-API.h"),
 ]
 
 # A declaration is a line that ends in ';' and is not a preprocessor line,
