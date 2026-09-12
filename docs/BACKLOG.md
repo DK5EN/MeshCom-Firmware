@@ -4218,7 +4218,7 @@ wrong for `U2` and is corrected there.
 | Unit | Test                 | Env                             | Commit     |
 | ---- | -------------------- | ------------------------------- | ---------- |
 | `U6` | `test_country_twin`  | `native_country_esp32`/`_nrf52` | `e662a6d1` |
-| `U2` | `test_udp_send_twin` | `native_udp_send_twin`          | pending    |
+| `U2` | `test_udp_send_twin` | `native_udp_send_twin`          | `bbf6665c` |
 
 **A `C2`-shaped correction, and the same mistake the `C3` row made.** The plan
 put `U2` at "hours": `C2` had already made the socket write replaceable, so
