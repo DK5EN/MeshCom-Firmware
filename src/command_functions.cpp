@@ -3727,7 +3727,7 @@ void commandAction(char *umsg_text, bool ble)
             }
         }
 
-        snprintf(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_call), "%s", sVar.c_str());
+        snprintf(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_pingcall), "%s", sVar.c_str());
 
          if(meshcom_settings.node_pingcall[0] == 0x00)
             meshcom_settings.node_pingtime = 0;
@@ -4012,6 +4012,24 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
+        // Audit-Defekt 2 (Welle 1, Betreiberentscheidung 2026-09-12): --setowndns war das
+        // EINZIGE der fuenf setown*-Kommandos ohne diesen Auto-Reboot -- setownip (:3975),
+        // setowngw, setownms und setownntp haben ihn alle. Die Pruefung stand nur in einem
+        // zweiten, unerreichbaren setowndns-Block weiter unten (commandCheck() ist ein
+        // Praefix-Vergleich und kehrt beim ersten Treffer zurueck, der zweite Block lief
+        // also nie). Dieser tote Block ist geloescht und die Pruefung hierher geholt, statt
+        // die Asymmetrie mit ihm zu entsorgen. Der tote Block trug ausserdem msg_text+11
+        // statt +12 -- das haette dem Wert ein Leerzeichen vorangestellt, "setowndns " belegt
+        // die Indizes 2..11.
+        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
+           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
+        {
+            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+            printfdeb("Auto. Reboot after 15 sec.");
+            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
+            #endif
+        }
+
         return;
     }
     else
@@ -4046,32 +4064,6 @@ void commandAction(char *umsg_text, bool ble)
         msg_text[50]=0x00;
 
         snprintf(meshcom_settings.node_ownms, sizeof(meshcom_settings.node_ownms), "%s", msg_text+11);
-
-        if(ble)
-        {
-            bWifiSetting = true;
-        }
-
-        save_settings();
-
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
-
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"setowndns ") == 0)
-    {
-        // max. 40 char
-        msg_text[50]=0x00;
-
-        snprintf(meshcom_settings.node_owndns, sizeof(meshcom_settings.node_owndns), "%s", msg_text+11);
 
         if(ble)
         {

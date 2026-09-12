@@ -350,12 +350,21 @@ def _self_test() -> int:
         failures += 1
         print("FAIL: inner disambiguation counted as a ladder duplicate")
 
-    # The two documented defects must both be visible to this tool, or it is
-    # not detecting what it claims to detect.
+    # Audit defect 2 was FIXED 2026-09-12 (wave 1): the unreachable second
+    # `setowndns ` rung is gone, and the auto-reboot check it alone carried was
+    # moved into the live block -- `--setowndns` was the only one of the five
+    # `setown*` commands without it. This assertion used to require the
+    # duplicate to be PRESENT, exactly as the `softser app0` one below did:
+    # right while the defect stands, wrong once it is fixed. Inverted rather
+    # than deleted, so the fix cannot silently regress. The standing gate
+    # against the whole class is test/golden/command_ladder_lint.py, which
+    # gained exact-duplicate detection in the same wave -- it could not see
+    # this defect before, because it collapsed repeated rung names to their
+    # first occurrence.
     dups = duplicate_names(commands)
-    if not any(a.name == "setowndns " for a, _ in dups):
+    if any(a.name == "setowndns " for a, _ in dups):
         failures += 1
-        print("FAIL: --setowndns duplicate (audit defect 2) not detected")
+        print("FAIL: --setowndns duplicate is back -- audit defect 2 regressed")
 
     shadows = shadowed_pairs(commands)
     # Audit defect 3 was FIXED 2026-09-12: the `softser app0` rung now sits
