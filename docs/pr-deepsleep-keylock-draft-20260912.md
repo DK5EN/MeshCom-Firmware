@@ -1,0 +1,74 @@
+# PR-Entwurf: Long-Press-Deepsleep weckt sofort wieder auf, T-Deck Tastaturlicht bei Keylock
+
+Ziel: `icssw-org/MeshCom-Firmware`, Branch `dev`. Zwei Feldmeldungen gegen 4.35t, zwei Commits,
+nur `src/`. Bugreports: `docs/bugreport-heltec-v3-longpress-deepsleep.md`,
+`docs/bugreport-tdeck-keylock-kbl.md`.
+
+## 1. Heltec V3 (und alle Long-Press-Deepsleep-Boards) lassen sich per Taste nicht mehr ausschalten
+
+### Symptom
+
+Auf 4.35s schaltet ein langer Druck auf die PRG-Taste (GPIO0) den Node aus, das OLED bleibt
+dunkel bis zum Reset. Auf 4.35t geht das OLED kurz aus und der Node bootet sofort wieder
+(`[BOOT] RESET_REASON=5 DEEPSLEEP`). Gemeldet fuer Heltec V3; derselbe Pfad gilt fuer Heltec
+V2/V4, Wireless Stick V3, Wireless Tracker, TLORA V2.1.6 sowie Heltec T114 und T-Echo (nRF52).
+
+### Ursache
+
+PR #1135 hat den `--deepsleep`-Rumpf in `esp32EnterDeepSleep()` / `nrf52EnterDeepSleep()`
+zusammengezogen und dabei erstmals die Bedientaste als Wake-Quelle armiert (ext1 `ANY_LOW` bzw.
+`systemOff(pin, LOW)`). `PressLong()` in `src/onebutton_functions.cpp` haengt an
+`attachLongPressStart()` und feuert 800 ms nach Druckbeginn, nicht beim Loslassen. Bis zu
+`esp_deep_sleep_start()` vergehen dann rund 50 ms, der Finger liegt noch auf der Taste, der Pin
+ist LOW, die Wake-Bedingung ist beim Einschlafen bereits erfuellt: der Chip wacht sofort auf und
+bootet. Auf 4.35s war schlicht keine Wake-Quelle armiert, deshalb blieb der Node dunkel.
+
+Wireless Paper und E213 armieren die Taste in ihrem eigenen `--deepsleep`-Zweig genauso; dort
+ueberbrueckt bisher nur der E-Ink-Refresh (~300 ms) die Zeit bis zum Loslassen.
+
+### Aenderungen
+
+- `src/esp32/esp32_sleep.{h,cpp}`: neu `esp32WaitButtonRelease()`. Liest `iButtonPin`; ist der
+  Pin LOW, wird bis zum Loslassen gewartet (begrenzt auf 10 s, dann 100 ms Entprellung). Kein
+  Button (99) oder Pin bereits HIGH (`--deepsleep` per Serial/BLE): kehrt sofort zurueck.
+  `esp32EnterDeepSleep()` ruft die Funktion direkt vor dem ext1-Armieren, also nach Funk-Sleep und
+  Display-aus -- der Node wird weiterhin nach etwa einer Sekunde dunkel, schlaeft aber erst nach
+  dem Loslassen.
+- `src/command_functions.cpp`: der WP_DISP-Zweig (Wireless Paper, Vision Master E213) ruft
+  `esp32WaitButtonRelease()` vor `esp_sleep_enable_ext1_wakeup()`. Ersetzt das bisherige
+  Timing-Glueck durch eine explizite Wartebedingung.
+- `src/nrf52/nrf52_sleep.cpp`: gleicher Warteblock inline vor `systemOff(iButtonPin, LOW)`,
+  unter derselben `PINS_COUNT`-Pruefung wie das Armieren selbst.
+
+Die Alternative, `PressLong()` an `attachLongPressStop()` zu haengen, wuerde das Verhalten des
+Long-Press auf jedem Board aendern (nichts passiert, bis der Finger hebt) und den Fall
+`--deepsleep` per Serial/BLE bei zufaellig gedrueckter Taste nicht abdecken.
+
+## 2. T-Deck: Tastaturbeleuchtung geht bei aktivem Keylock mit jeder Nachricht an
+
+### Symptom
+
+Keylock aktiv (SYM+K), Tastaturlicht aus: bei jeder eingehenden Nachricht leuchtet die Tastatur
+mit Stufe 150 auf, geht nach dem Display-Timeout wieder aus und wiederholt das bei der naechsten
+Nachricht.
+
+### Ursache
+
+`tft_on()` in `src/t-deck/lv_obj_functions.cpp` enthaelt seit `583782a9b` (v4.35p
+Tastaturlicht-Schalter) eine invertierte Bedingung: `if (node_keyboardlock)
+setKeyboardBacklight(150)`. Vorher stand dort `if (!node_keyboardlock) { if (kbd_light_on) ... }`.
+Tastatur, Trackball und Touch rufen `tft_on()` nur ohne Keylock (`tdeck_main.cpp`), die
+Nachricht (`msg_focus_and_alert()`) ist die einzige Weckquelle, die auch bei Keylock durchkommt --
+deshalb zeigt sich der Fehler nur dort.
+
+### Aenderung
+
+- `src/t-deck/lv_obj_functions.cpp`, `tft_on()`: der Block ist entfernt. `resetBrightness()` ->
+  `setBrightness()` (`tdeck_helpers.cpp`) synchronisiert das Tastaturlicht bereits aus der echten
+  Einstellung `node_kbllightlock`; ein zweiter, an das falsche Flag gebundener Schreibzugriff ist
+  ueberfluessig. Ohne Keylock aendert sich nichts: Tastaturlicht an folgt weiter dem Display,
+  Tastaturlicht aus bleibt aus.
+
+## Nachweis
+
+(wird nach dem Bench-Lauf ergaenzt)

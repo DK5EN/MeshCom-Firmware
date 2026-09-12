@@ -137,6 +137,10 @@ void setBrightness(uint8_t value)
  */
 void setKeyboardBacklight(uint8_t value)
 {
+    // Bench marker (tools/bench/tdeck_harness.py, scenario keylock_kbl): the
+    // keyboard light has no readback, so the value written to the controller
+    // is the only observable. Raw Serial.printf like [TFT];on in tft_on().
+    Serial.printf("[KBL];set;%u\n", (unsigned)value);
     Wire.beginTransmission(0x55);
     Wire.write(0x01);
     Wire.write(value);
