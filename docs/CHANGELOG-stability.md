@@ -1,19 +1,27 @@
 # MeshCom Stability Changelog
 
-Release: `v4.35t.09.10` (2026-09-10), based on official MeshCom
-4.35s, upstream `dev` at `674413ce` — the state **after** upstream merged this
-fork's changes, plus items 104-211 below. The build reports itself as `4.35t`;
-that letter is this fork's own marker (item 211), upstream has not released a
-4.35t. The full engineering rationale for
-items 107-152, with per-change file references and measurements, is in the
-upstream PR draft
+Release: `v4.35t.09.12.2` (2026-09-12), based on official MeshCom 4.35t
+(`6edc7499`, released 10 September 2026), upstream `dev` at `1cb2d9e6` — the
+state **after** upstream merged this fork's PR #1140 — plus items 212-221
+below and the fork-only pieces named in `release-notes.md` (safeboot OTA
+recovery and fail-closed gate, `--port` in the upload commands, the host-side
+test environments). Official 4.35t already contains items 104-210 through
+PR #1135, so the build's letter `t` is upstream's own since item 221; the flash
+stamp (`20260912`) is what tells this build apart in `--info`. The full
+engineering rationale for items 107-152, with per-change file references and
+measurements, is in the upstream PR draft
 [`docs/archive/pr-draft-20260831.md`](archive/pr-draft-20260831.md).
 
-**Items 1-103 below are now in official MeshCom.** The ICSSW maintainers merged
+**Items 1-210 below are now in official MeshCom.** The ICSSW maintainers merged
 [PR #1102](https://github.com/icssw-org/MeshCom-Firmware/pull/1102) (82 changes)
 and [PR #1103](https://github.com/icssw-org/MeshCom-Firmware/pull/1103) into
-upstream `dev` on 27 August 2026. This document is kept as the record of what
-was done and why; it is no longer a list of differences from the official
+upstream `dev` on 27 August 2026 (items 1-103) and
+[PR #1135](https://github.com/icssw-org/MeshCom-Firmware/pull/1135) on
+10 September 2026 (items 104-210, released as official `4.35t` the same day);
+items 218-220 followed through
+[PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) on
+12 September and are in upstream `dev`. This document is kept as the record of
+what was done and why; it is no longer a list of differences from the official
 firmware.
 
 > **`v4.35p.08.21-stability` has been withdrawn and deleted.** It put any node
@@ -77,9 +85,16 @@ discover them by surprise:
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
 
-## Unreleased (after v4.35t.09.10)
+## New in v4.35t.09.12.2
 
-Five items, found by a parser-drift analysis against the firmware's own wire
+Ten items on top of `v4.35t.09.10`: the APRS position parser wave (212-216),
+one web GUI fix (217), three field fixes against 4.35t (218-220) and the
+upstream sync (221). Item 200 gained its field confirmation from OE3LCR on
+both boards. `FLASH_VERSION` goes to 20260912, `FLASH_STRUCT_VERSION` stays at
+20260724 -- settings survive. The tag carries `.2` because upstream tagged its
+own `dev` `v4.35t.09.12` a few hours earlier (item 221).
+
+Items 212-216 were found by a parser-drift analysis against the firmware's own wire
 format (`docs/aprs-parser-drift-20260911.md`): the encoder emits 17 `/X=`
 position keys, and its own decoder only understood 14.
 
@@ -169,6 +184,26 @@ upstream `dev` as [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/
      100 kHz like the sensor path on the same bus. Compile-verified only
      on the bench (no Supreme here); field confirmation with the fix
      build is open.
+221. **Upstream sync to `1cb2d9e6`; the version letter is upstream's now**
+     (`0ba9f063`, `cfc30fbe`, `ce7d7f1e`). Three upstream merges since
+     `674413ce`, all plain merges, no cherry-picks: (a) Kurt's own move to
+     `4.35t` (`0b240bf5`, `cdbfa292`, PRs #1136/#1137), released as official
+     `v4.35t` on 10 September with this fork's PR #1135 inside -- so the
+     letter introduced in item 211 no longer sets this fork apart from the
+     official firmware; the flash stamp in `--info` does (`20260912` here,
+     `20260909` in official 4.35t). (b) OE1KFR's "RAK LEDs off in
+     Deepsleep" (`33a56047`, PR #1139): `nrf52EnterDeepSleep()` drives the
+     green and blue LEDs LOW before System OFF, so a sleeping RAK4631 no
+     longer shows a lit LED. (c) Upstream's merge of this fork's PR #1140
+     (`1cb2d9e6`), items 218-220 verbatim. With that, `fork-main` is
+     content-identical to upstream `dev` except for items 212-217, the
+     fork-only safeboot work (153, 154, 186), `--port` in the esptool upload
+     commands (151), the eleven host-side test environments in
+     `platformio.ini`, a T-Deck bench marker and `FLASH_VERSION`. Upstream
+     tagged `1cb2d9e6` as `v4.35t.09.12` on the evening of 12 September (a
+     release without assets at the time of writing); this fork's tag carries
+     `.2` so the two names cannot be confused or clobber each other on a
+     fetch. `FLASH_VERSION` 20260912, `FLASH_STRUCT_VERSION` unchanged.
 
 ## New in v4.35t.09.10
 

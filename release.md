@@ -1,20 +1,40 @@
 # Release Notes -- MeshCom Firmware v4.35t
 
-Firmware `4.35t`, `FLASH_VERSION 20260910`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.35t`, `FLASH_VERSION 20260912`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](docs/archive/release_lora_trx.md).
 
 ---
 
-## APRS-Parser-Contract und Decoder/Encoder-Fixes (unreleased) (2026-09-11)
+## Stability-Release v4.35t.09.12.2 (2026-09-12)
 
-`FLASH_VERSION` bleibt bei 20260910 -- kein neuer Stand getaggt, diese
-Aenderungen laufen im Changelog als "Unreleased" (Punkte 212-216).
+Zehn Punkte des Forks gegenueber `v4.35t.09.10`, Changelog-Punkte 212-221:
+die APRS-Parser-Welle (212-216), ein WebGUI-Fix (217), drei Feldfixes gegen
+4.35t (218-220) und der Upstream-Sync (221). `FLASH_VERSION` geht auf 20260912,
+`FLASH_STRUCT_VERSION` bleibt unveraendert 20260724 -- die Einstellungen der
+Knoten bleiben erhalten. Gates: 673 native Testfaelle in 12 Host-Umgebungen,
+alle 32 Release-Umgebungen gebaut. Bench in diesem Zyklus: DK5EN-93 (Heltec
+V3), DK5EN-98 (Heltec V3, Gateway), DK5EN-14 (T-Deck Plus); dazu die
+Feldbestaetigung von OE3LCR fuer Punkt 200.
 
-Ausloeser war eine Parser-Drift-Analyse (`docs/aprs-parser-drift-20260911.md`):
-die Firmware emittiert 17 `/X=`-Positionsschluessel, ihr eigener Decoder kannte
-nur 14. Drei kleine, upstream-faehige Fixes plus eine Doku-Korrektur:
+Der Tag traegt `.2`, weil upstream am Abend des 12. September seinen eigenen
+`dev`-Stand als `v4.35t.09.12` getaggt hat (Release ohne Assets zum Zeitpunkt
+des Schreibens); ein gleichnamiger Fork-Tag wuerde beim naechsten
+`git fetch upstream` kollidieren. Dieses Release ersetzt `v4.35t.09.10`, das
+Release-Objekt wurde geloescht, der Tag bleibt.
+
+Wichtig fuer die Einordnung: upstream hat am 10. September offiziell `v4.35t`
+veroeffentlicht, mit unserem PR #1135 (Punkte 104-210) darin. Der Buchstabe
+`t` unterscheidet den Fork damit nicht mehr von der offiziellen Firmware; das
+tut nur noch der Flash-Stempel in `--info` (`20260912` hier, `20260909` im
+offiziellen 4.35t).
+
+### Was dazugekommen ist
+
+Ausloeser der Punkte 212-216 war eine Parser-Drift-Analyse
+(`docs/aprs-parser-drift-20260911.md`): die Firmware emittiert 17
+`/X=`-Positionsschluessel, ihr eigener Decoder kannte nur 14.
 
 - **Decoder liest `/R=`, `/U=`, `/I=`** (Punkt 212, `decodeAPRSPOS()` in
   `src/aprs_functions.cpp`) -- Gruppenliste, INA226-Busspannung und -Strom
@@ -41,12 +61,85 @@ nur 14. Drei kleine, upstream-faehige Fixes plus eine Doku-Korrektur:
   umgesetzt; Ausloeser war ein Hinweis des App-Maintainers, dass der
   Name-Suffix nirgends gelesen wurde.
 
+- **WebGUI behaelt die Gruppe im Zielfeld nach dem Senden** (Punkt 217,
+  `86be10c8`). Der `sendmessage ok`-Handler leerte das Zielfeld nach jedem
+  Senden; die naechste schnell getippte Nachricht ging als Broadcast an `*`.
+  Gemeldet von DJ8MEH am 2026-09-11. Eine rein numerische Gruppe bleibt jetzt
+  stehen, nur ein DM-Rufzeichen wird wie bisher geleert.
+
+- **Langer Tastendruck schaltet den Knoten wieder aus** (DS-03, Punkt 218,
+  `40c29e7f`). Seit Punkt 197 armieren die Deepsleep-Helfer die Taste als
+  Wake-Quelle, `PressLong()` feuert aber waehrend die Taste noch gehalten wird
+  -- die Wake-Bedingung war beim Einschlafen schon wahr, der Knoten bootete
+  sofort neu (`RESET_REASON=5`). Neues `esp32WaitButtonRelease()` wartet auf
+  das Loslassen (maximal 10 s, dann 100 ms Entprellung), in beiden Helfern und
+  im Wireless-Paper/E213-Zweig, nur bei `--button on` (bei `--button off` ist
+  der Pin nie konfiguriert und kann LOW floaten, RAK4631 WB_IO6 tut das).
+
+- **T-Deck: Tastaturlicht bleibt bei aktivem Keylock dunkel** (TD-16, Punkt
+  219, `9c3bdf6b`). `tft_on()` prueften `node_keyboardlock` statt der
+  Tastaturlicht-Einstellung und setzte die Tastatur bei jedem Nachrichten-Wake
+  des gesperrten Panels auf 150. Der Block ist weg, `setBrightness()` folgt
+  bereits der echten Einstellung.
+
+- **T-Beam Supreme bootet wieder auf 4.35t** (TM-09-Nachtrag, Punkt 220,
+  `1427ac6f`). Punkt 203 gab dem u8g2-Konstruktor die I2C-Pins mit; damit
+  macht u8g2 `pinMode(OUTPUT)` auf beiden Pins und trennt sie auf dem S3 vom
+  I2C-Controller, den `Wire.begin(17, 18)` schon besitzt -- `u8g2->begin()`
+  haengt. Zwei Knoten standen nach `Auto detecting display:`. Konstruktoren
+  ohne Pins (Muster T-Beam v1.2 / RAK), Bustakt 100 kHz wie der Sensorpfad.
+
+- **Upstream-Sync auf `1cb2d9e6`** (Punkt 221). Drei reine Merges: Kurts
+  eigener Wechsel auf `4.35t` (PRs #1136/#1137, offizielles Release am 10.
+  September), OE1KFRs "RAK LEDs off in Deepsleep" (PR #1139: gruene und blaue
+  LED werden vor System OFF auf LOW gezogen), und upstreams Merge unseres PR
+  #1140 mit den Punkten 218-220. `fork-main` ist damit inhaltsgleich mit
+  upstream `dev` bis auf die Punkte 212-217, das Fork-eigene Safeboot (153,
+  154, 186), `--port` in den Upload-Kommandos (151), die Host-Testumgebungen
+  und `FLASH_VERSION`.
+
+- **Punkt 200 (Wireless Paper / E213, Chip-Select-Hold) ist im Feld
+  bestaetigt.** OE3LCR hat am 2026-09-11 auf E213 (OE3LCR-11) und Wireless
+  Paper V1.2 (OE3LCR-10) den EXT1-Wake nachgestellt: `RESET_REASON=8`,
+  `wake: 3`, SX1262-Init und SPI-Verkehr danach in Ordnung. Vor dem Fix liefen
+  dort schon Timer-Wakes mit RX, der Aufruf ist also vermutlich praktisch
+  wirkungslos und bleibt als Absicherung.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- **Heltec V3 (DK5EN-93)**: `--deepsleep` ueber seriell schlaeft sofort, kein
+  Reboot in 15 s; langer Tastendruck mit `--button on` zwei Zyklen -- dunkel,
+  bleibt nach dem Loslassen dunkel, Wake beim naechsten Druck mit
+  `RESET_REASON=8 DEEPSLEEP` (Punkt 218). Geflasht am 2026-09-12 mit dem
+  Quellstand dieses Zyklus.
+- **Heltec V3 Gateway (DK5EN-98)**: Punkt 217 nach WiFi-OTA am 2026-09-11 mit
+  dem jsdom-Harness gegen den laufenden Knoten geprueft (Gruppe bleibt,
+  DM-Rufzeichen wird geleert); der Test schlaegt auf der alten Firmware fehl.
+- **T-Deck Plus (DK5EN-14)**: Bench-Szenario `keylock_kbl` auf einem
+  Instrument-Build -- `[KBL];set;150` auf dem alten Code, kein Schreibzugriff
+  auf dem neuen; Handtest 2026-09-12: KBL aus, SYM+K, LoRa-Nachricht weckt das
+  Display, die Tastatur bleibt dunkel (Punkt 219). Das Geraet laeuft auf dem
+  Instrument-Image, nicht auf dem Release-Image.
+- **Wireless Paper V1.2 und Vision Master E213 (OE3LCR-10/-11, Feld)**: Punkt
+  200, siehe oben -- upstream `dev` nach #1137, derselbe Codepfad, nicht
+  dieses Image.
+
 ### Was ausdruecklich NICHT geprueft wurde
 
-Nichts davon ist auf echter Hardware gelaufen. Verifiziert ist ausschliesslich
-die native Testsuite (`native_parsers`, inklusive `test/test_pos_tag_nan/`);
-kein Board wurde geflasht, kein Feldrahmen mit den drei zusaetzlichen
-Schluesseln empfangen.
+- Kein Board hat das veroeffentlichte Image selbst gesehen; die drei Boards
+  oben liefen denselben Quellcode auf frueheren Commits dieses Zyklus.
+- **APRS-Decoder (Punkte 212-216)**: nur die native Suite. Kein Board hat eine
+  echte Position mit `/R= /U= /I=` oder einem `#name`-Kommentar empfangen,
+  weder auf der seriellen Konsole noch in der WebGUI.
+- **T-Beam Supreme (Punkt 220)**: nur kompiliert, kein Board hier. Die
+  Feldbestaetigung mit dem Fix-Build durch die beiden Melder ist offen.
+- **RAK4631 (DK5EN-90)**: der nRF52-Deepsleep-Pfad hat sich geaendert (Punkt
+  218 Warte-auf-Loslassen mit `--button`-Gate, Punkt 221 LEDs aus) und wurde
+  nicht erneut gefahren; der Knoten steht in System OFF und braucht erst die
+  Reset-Taste. Heltec T114 und T-Echo nur kompiliert.
+- **T-Beam v1.2 (DK5EN-92)**: keine Bench-Zeit in diesem Zyklus.
+- Alles, was in `v4.35t.09.10` und `v4.35s.09.09` unter "NICHT geprueft"
+  steht, gilt weiter.
 
 ---
 
