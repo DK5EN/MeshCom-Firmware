@@ -28,6 +28,14 @@ python3 test/golden/command_ladder_lint.py --self-test
 python3 test/golden/command_ladder_lint.py
 python3 test/golden/settings_layout_lint.py --self-test
 python3 test/golden/settings_layout_lint.py
+# W3 step 1: both settings gates stand BEFORE the migration rewrites this
+# code, not after. settings_persist_lint is currently clean -- DR-13's
+# failure mode (a field in the X() table with no preferences.put* call, so
+# the node silently forgets it) is not present today; the gate exists to
+# keep it that way while W3 replaces 266 hand-written NVS calls with a
+# schema walk. Mutation-verified: deleting one putInt() makes it fail.
+python3 test/golden/settings_persist_lint.py --self-test
+python3 test/golden/settings_persist_lint.py
 python3 test/golden/variant_macros_lint.py --self-test
 python3 test/golden/variant_macros_lint.py
 python3 test/golden/twin_diff.py --self-test

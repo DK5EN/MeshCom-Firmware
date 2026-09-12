@@ -68,6 +68,53 @@ own definitions()): a trailing `// comment (with parens)` can hide a
 declaration from a naive scanner, or worse, get swallowed into what looks
 like a value. Comments are stripped from every line BEFORE any structural
 test, same as there.
+
+FIELD-SET PARITY (the check this script gained on top of the table/baseline
+comparison above): D1-04 is about to replace both structs with one keyed
+store, and DR-12 (`both-wrong`) settled that single-platform fields keep
+platform scope in that store rather than the struct growing shared members.
+The risk during that move is silent: a field quietly dropped off one side, or
+quietly picked up by the other, and the table/baseline check above alone does
+not force anyone to notice -- its own docstring says so ("regenerate the file
+by copy-pasting the table printed above"), and a copy-paste is exactly the
+kind of edit a reviewer skims past.
+
+So the expected esp32-only and nrf52-only NAME sets are pinned a second time,
+as literal Python sets in THIS file (`EXPECTED_ESP32_ONLY_FIELDS` /
+`EXPECTED_NRF52_ONLY_FIELDS`), not in `settings-layout.txt` and not in a
+separate data file either -- a second file is just one more thing that can be
+regenerated without being read. Changing either set requires touching the
+script's source, which is a real code-review diff, not a table replacement.
+`run()` fails (independent of whether the baseline table still matches) the
+moment the *computed* esp32-only/nrf52-only name sets stop matching these
+pinned sets, and the message names the field and which side changed.
+
+As of 2026-09-12 the pinned sets are 15 esp32-only members (14 persisted
+UI/behaviour flags plus `node_ntp`, which is a live RUNTIME field -- re-copied
+from `node_ownntp` on every connect in `src/udp_functions.cpp`, never
+persisted -- but it is still a member of the esp32 `s_meshcom_settings`
+struct, and struct membership, not persistence, is what this script parses)
+and 2 nrf52-only members (`send_repeat_time`, `auto_join` -- both LoRaWAN OTAA
+fields with no ESP32 path). These were re-derived independently from the
+headers for this check, not copied from docs/d1-04-settings-field-triage-
+20260912.md; they match that document's 14+1 / 2 split exactly (verified
+2026-09-12 against the real tree, see this file's history).
+
+DISTINGUISHING `s_meshcom_settings` FROM `s_meshcomcompat_settings`: only the
+former is parsed, and the split is by construction, not by extra filtering
+code that could get it wrong. `extract_struct()` does a plain `re.search` for
+the literal text `struct s_meshcom_settings` (word-bounded) and returns the
+body of the FIRST brace-matched block after that match. `s_meshcomcompat_
+settings` (WisBlock-API.h:413, the frozen on-disk migration format) does not
+contain that literal substring anywhere in its own name -- "meshcom" is
+immediately followed by "compat", not by "_settings" -- so the regex cannot
+match it, deliberately or by accident, and the earlier `s_meshcom_settings`
+definition (WisBlock-API.h:178) is what gets extracted. Nothing in this
+script ever calls `extract_struct` or `load_fields` with `s_meshcomcompat_
+settings` as the name, and nothing should: that struct's frozen `node_gpsbaud`
+-as-`unsigned int` spelling (intentionally divergent from the live struct's
+`uint32_t`, for the migration path) must stay exactly as committed. This
+script only reads it, never diffs or "corrects" it.
 """
 import argparse
 import re
@@ -170,6 +217,84 @@ def load_fields(path: Path) -> "Dict[str, Tuple[str, str]]":
     return parse_fields(body)
 
 
+# Pinned field-SET parity (names only, not type/bound -- that is `compare()`'s
+# job). See the module docstring's "FIELD-SET PARITY" section for why these
+# live here, as literal sets, rather than in settings-layout.txt or a
+# separate data file. Re-derived from the headers 2026-09-12; matches
+# docs/d1-04-settings-field-triage-20260912.md §4d's 14+1 / 2 split.
+EXPECTED_ESP32_ONLY_FIELDS = frozenset({
+    "node_disp_rot", "node_map", "node_audio_start", "node_audio_msg",
+    "node_keyboardlock", "node_backlightlock", "node_kbllightlock",
+    "node_modus", "node_mute", "node_persist_to_flash", "node_persist_to_sd",
+    "node_immediate_save", "node_kbl_sync", "node_wifion",
+    "node_ntp",  # RUNTIME-only, never persisted -- see module docstring
+})
+EXPECTED_NRF52_ONLY_FIELDS = frozenset({
+    "send_repeat_time", "auto_join",  # LoRaWAN OTAA, no ESP32 path
+})
+
+
+def check_field_parity(esp32: "Dict[str, Tuple[str, str]]",
+                        nrf52: "Dict[str, Tuple[str, str]]") -> List[str]:
+    """Compare the CURRENT esp32-only/nrf52-only NAME sets against the pinned
+    `EXPECTED_*_ONLY_FIELDS` sets above. Returns one message per name that
+    changed side, naming the field and which side it changed on. Empty means
+    the field set is exactly as pinned.
+
+    Three ways a name can violate this, per side:
+      - an expected only-field is gone from that platform's struct entirely
+        (removed, or renamed to something this pinned set doesn't know)
+      - an expected only-field now also exists on the OTHER platform (it
+        quietly became shared -- exactly the "quietly added to the other
+        platform" risk this check exists to catch)
+      - a NEW only-field exists that isn't in the pinned set at all (quietly
+        dropped from the other platform, or a genuinely new field)
+    """
+    esp32_only = set(esp32) - set(nrf52)
+    nrf52_only = set(nrf52) - set(esp32)
+    violations: List[str] = []
+
+    for name in sorted(EXPECTED_ESP32_ONLY_FIELDS - esp32_only):
+        if name not in esp32:
+            violations.append(
+                f"{name}: expected esp32-only field (EXPECTED_ESP32_ONLY_FIELDS) "
+                f"is gone from the esp32 struct entirely -- removed, or renamed")
+        elif name in nrf52:
+            violations.append(
+                f"{name}: expected esp32-only field (EXPECTED_ESP32_ONLY_FIELDS) "
+                f"now also exists on nrf52 -- no longer esp32-only")
+        else:
+            violations.append(
+                f"{name}: expected esp32-only field (EXPECTED_ESP32_ONLY_FIELDS) "
+                f"is missing from the esp32-only set for an unexplained reason")
+    for name in sorted(esp32_only - EXPECTED_ESP32_ONLY_FIELDS):
+        violations.append(
+            f"{name}: NEW esp32-only field, not in the pinned "
+            f"EXPECTED_ESP32_ONLY_FIELDS set -- if intentional, add it there; "
+            f"otherwise it may be a field silently dropped from nrf52")
+
+    for name in sorted(EXPECTED_NRF52_ONLY_FIELDS - nrf52_only):
+        if name not in nrf52:
+            violations.append(
+                f"{name}: expected nrf52-only field (EXPECTED_NRF52_ONLY_FIELDS) "
+                f"is gone from the nrf52 struct entirely -- removed, or renamed")
+        elif name in esp32:
+            violations.append(
+                f"{name}: expected nrf52-only field (EXPECTED_NRF52_ONLY_FIELDS) "
+                f"now also exists on esp32 -- no longer nrf52-only")
+        else:
+            violations.append(
+                f"{name}: expected nrf52-only field (EXPECTED_NRF52_ONLY_FIELDS) "
+                f"is missing from the nrf52-only set for an unexplained reason")
+    for name in sorted(nrf52_only - EXPECTED_NRF52_ONLY_FIELDS):
+        violations.append(
+            f"{name}: NEW nrf52-only field, not in the pinned "
+            f"EXPECTED_NRF52_ONLY_FIELDS set -- if intentional, add it there; "
+            f"otherwise it may be a field silently dropped from esp32")
+
+    return violations
+
+
 Row = Tuple[str, str, str, str]  # name, esp32 col, nrf52 col, verdict
 
 
@@ -243,23 +368,35 @@ def run(esp32: "Dict[str, Tuple[str, str]]", nrf52: "Dict[str, Tuple[str, str]]"
               f"for why that is a wire-format bug (OPT-D14 / D1-04), not a "
               f"source-level inconsistency")
 
-    if baseline is None:
-        return 0
+    parity_violations = check_field_parity(esp32, nrf52)
+    if parity_violations:
+        print()
+        for v in parity_violations:
+            print(f"FATAL FIELD-SET DRIFT {v}")
+        print(f"{len(parity_violations)} field(s) moved relative to the "
+              f"pinned EXPECTED_ESP32_ONLY_FIELDS / EXPECTED_NRF52_ONLY_FIELDS "
+              f"sets in this script -- see the module docstring's FIELD-SET "
+              f"PARITY section. This fails independently of the baseline-"
+              f"table check below.")
 
-    if not baseline.exists():
-        print(f"\nno committed baseline at {baseline} -- copy the table "
-              f"printed above into it")
-        return 1
+    baseline_rc = 0
+    if baseline is not None:
+        if not baseline.exists():
+            print(f"\nno committed baseline at {baseline} -- copy the table "
+                  f"printed above into it")
+            baseline_rc = 1
+        else:
+            committed = baseline.read_text()
+            if committed.rstrip("\n") != table.rstrip("\n"):
+                print(f"\nDRIFT: table does not match committed baseline "
+                      f"({baseline}) -- if this is a deliberate change, "
+                      f"regenerate the file by copy-pasting the table "
+                      f"printed above")
+                baseline_rc = 1
+            else:
+                print(f"\ntable matches committed baseline ({baseline})")
 
-    committed = baseline.read_text()
-    if committed.rstrip("\n") != table.rstrip("\n"):
-        print(f"\nDRIFT: table does not match committed baseline "
-              f"({baseline}) -- if this is a deliberate change, regenerate "
-              f"the file by copy-pasting the table printed above")
-        return 1
-
-    print(f"\ntable matches committed baseline ({baseline})")
-    return 0
+    return 1 if parity_violations else baseline_rc
 
 
 def self_test() -> int:
@@ -304,6 +441,67 @@ def self_test() -> int:
         "char node_update[21] = {0};\n",
         "char node_update[20] = {0};\n",
         want_fatal=True)
+
+    # --- check_field_parity(): the pinned EXPECTED_*_ONLY_FIELDS sets ---
+    # Synthetic esp32/nrf52 dicts built directly FROM the pinned sets, so
+    # these cases test the mechanism, not today's field list -- if the
+    # pinned sets are edited later, these cases still pass unchanged.
+    def synthetic_pair() -> "Tuple[Dict[str, Tuple[str, str]], Dict[str, Tuple[str, str]]]":
+        shared = {"node_alt": ("int", "")}
+        e = dict(shared)
+        n = dict(shared)
+        for nm in EXPECTED_ESP32_ONLY_FIELDS:
+            e[nm] = ("int", "")
+        for nm in EXPECTED_NRF52_ONLY_FIELDS:
+            n[nm] = ("int", "")
+        return e, n
+
+    def parity_case(name: str, mutate, want_violation: bool,
+                     want_name: Optional[str] = None) -> bool:
+        e, n = synthetic_pair()
+        mutate(e, n)
+        violations = check_field_parity(e, n)
+        got = bool(violations)
+        good = got == want_violation
+        if good and want_violation and want_name is not None:
+            good = any(want_name in v for v in violations)
+        print(f"  {'ok  ' if good else 'FAIL'} {name}: "
+              f"{len(violations)} violation(s) (expected "
+              f"{'>=1' if want_violation else '0'}"
+              f"{', naming ' + want_name if want_name else ''})")
+        return good
+
+    ok &= parity_case(
+        "field-parity-clean-matches-pinned-sets",
+        lambda e, n: None, want_violation=False)
+
+    _esp_name = sorted(EXPECTED_ESP32_ONLY_FIELDS)[0]
+    ok &= parity_case(
+        "field-parity-esp32-only-field-removed-entirely",
+        lambda e, n, nm=_esp_name: e.pop(nm), want_violation=True,
+        want_name=_esp_name)
+    ok &= parity_case(
+        "field-parity-esp32-only-field-now-also-on-nrf52",
+        lambda e, n, nm=_esp_name: n.__setitem__(nm, ("int", "")),
+        want_violation=True, want_name=_esp_name)
+    ok &= parity_case(
+        "field-parity-new-unexpected-esp32-only-field",
+        lambda e, n: e.__setitem__("node_totally_new_flag", ("int", "")),
+        want_violation=True, want_name="node_totally_new_flag")
+
+    _nrf_name = sorted(EXPECTED_NRF52_ONLY_FIELDS)[0]
+    ok &= parity_case(
+        "field-parity-nrf52-only-field-removed-entirely",
+        lambda e, n, nm=_nrf_name: n.pop(nm), want_violation=True,
+        want_name=_nrf_name)
+    ok &= parity_case(
+        "field-parity-nrf52-only-field-now-also-on-esp32",
+        lambda e, n, nm=_nrf_name: e.__setitem__(nm, ("uint32_t", "")),
+        want_violation=True, want_name=_nrf_name)
+    ok &= parity_case(
+        "field-parity-new-unexpected-nrf52-only-field",
+        lambda e, n: n.__setitem__("node_totally_new_lorawan_flag", ("int", "")),
+        want_violation=True, want_name="node_totally_new_lorawan_flag")
 
     # Parser-matches-nothing: neither side has anything the FIELD pattern
     # recognises (only comments / preprocessor noise survive strip_comments).
