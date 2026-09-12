@@ -39,6 +39,14 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <climits>
+#include <dirent.h>   // corpus directory listing (POSIX; native env is host-only, no Windows target)
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>   // _NSGetExecutablePath(), see repo_root_from_file()
+#endif
 
 #include <Arduino.h>
 #include <IPAddress.h>
@@ -158,9 +166,68 @@ static std::vector<ExternCall> g_extern;
 static std::vector<uint32_t> g_own_tx_known;
 static std::vector<uint32_t> g_insert_calls;
 
+// ---------------------------------------------------------------------------
+// U1 ordered sink log (test plan 4.4, section 9.1). The vectors above record
+// each sink's OWN call history for the named Unity cases to assert on; this
+// log additionally records EVERY sink call, from every stub below, into one
+// timeline in call order -- the interleaving the separate vectors lose. Read
+// by the corpus dump further down; not used by the named cases above.
+//
+// Deliberately NOT recorded here (see the corpus-dump section's comment for
+// why): raw Serial output (setlogPrint()/Serial.printf() lines in the real
+// handlers carry millis() and this test has no interception point for
+// Serial's mock without touching test/support, which is out of this file
+// set) and checkOwnTx() (a pure read, not a sink).
+// ---------------------------------------------------------------------------
+
+struct SinkCall
+{
+    std::string sink;
+    std::string detail;
+};
+static std::vector<SinkCall> g_sink_log;
+
+// TSV is the wire format below (NNN\tSINK\tdetail); a raw '\t'/'\n' from an
+// input string (call sign, tail, src_type -- none is expected to carry one
+// today) would otherwise split a line silently. Cheap defensive escaping,
+// not exercised by any corpus file today.
+static std::string sink_sanitize(const std::string &s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s)
+    {
+        if (c == '\t') out += "\\t";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else out.push_back(c);
+    }
+    return out;
+}
+
+static std::string sink_hex(const uint8_t *data, size_t len)
+{
+    static const char digits[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(len * 3);
+    for (size_t i = 0; i < len; i++)
+    {
+        if (i) out.push_back(' ');
+        out.push_back(digits[(data[i] >> 4) & 0xF]);
+        out.push_back(digits[data[i] & 0xF]);
+    }
+    return out;
+}
+
+static void record_sink(const char *sink, const std::string &detail)
+{
+    g_sink_log.push_back(SinkCall{sink, sink_sanitize(detail)});
+}
+
 void logRxDropUnconfigured(const char *call)
 {
     g_dropped.push_back(call ? call : "(null)");
+    record_sink("DROP", call ? call : "(null)");
 }
 
 void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage, const char *tail)
@@ -170,14 +237,18 @@ void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage, const c
     p.tail = tail ? tail : "";
     (void)msg_source;
     g_printed.push_back(p);
+    record_sink("PRINT", "source=" + p.source + " tail=" + p.tail);
 }
 
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
 {
     g_ble.emplace_back(buffer, buffer + len);
+    std::string detail = "len=" + std::to_string(len);
+    if (len) detail += " " + sink_hex(buffer, len);
+    record_sink("BLE", detail);
 }
 
-void resetMeshComUDP() { g_reset_udp++; }
+void resetMeshComUDP() { g_reset_udp++; record_sink("RESET", "-"); }
 
 int checkOwnTx(unsigned int msg_id)
 {
@@ -191,6 +262,9 @@ void insertOwnTx(unsigned int id)
 {
     g_insert_calls.push_back(id);
     g_own_tx_known.push_back(id);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "id=%x", id);
+    record_sink("TXRING", buf);
 }
 
 String convertCallToShort(char callsign[10])
@@ -204,24 +278,29 @@ String convertCallToShort(char callsign[10])
 // bool, not void: see the drift note in test/support/nrf52/WisBlock-API.h --
 // ESP32 declares this void, nRF52 bool, and the mangled name cannot tell them
 // apart. Neither call site reads the result.
-bool save_settings(void) { g_save_settings_calls++; return true; }
+bool save_settings(void) { g_save_settings_calls++; record_sink("SAVESETTINGS", "-"); return true; }
 
 void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
     (void)aprsmsg; (void)rssi; (void)snr;
     g_sendDisplayText_calls++;
+    record_sink("DISPLAYTEXT", "-");
 }
 
 void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
     (void)aprsmsg; (void)rssi; (void)snr;
     g_sendDisplayPosition_calls++;
+    record_sink("DISPLAYPOS", "-");
 }
 
 void SendAckMessage(String dest_call, unsigned int iAckId)
 {
     g_ack_dest.push_back(dest_call.c_str());
     g_ack_ids.push_back(iAckId);
+    char buf[96];
+    snprintf(buf, sizeof(buf), "dest=%s id=%x", dest_call.c_str(), iAckId);
+    record_sink("ACK", buf);
 }
 
 void sendExtern(bool bUDP, char *src_type, uint8_t *buffer, uint16_t buflen, int16_t rssi, int8_t snr)
@@ -233,6 +312,10 @@ void sendExtern(bool bUDP, char *src_type, uint8_t *buffer, uint16_t buflen, int
     c.bytes.assign(buffer, buffer + buflen);
     c.buflen_arg = buflen;
     g_extern.push_back(c);
+    std::string detail = std::string("bUDP=") + (bUDP ? "1" : "0") +
+                          " src_type=" + c.src_type + " len=" + std::to_string(buflen);
+    if (buflen) detail += " " + sink_hex(buffer, buflen);
+    record_sink("EXTERN", detail);
 }
 
 void setlogPrint(const char *body)
@@ -344,6 +427,7 @@ static void recorder_reset()
     g_sendDisplayText_calls = 0;
     g_sendDisplayPosition_calls = 0;
     g_extern.clear();
+    g_sink_log.clear();
     g_own_tx_known.clear();
     g_insert_calls.clear();
 
@@ -963,8 +1047,260 @@ static void test_drift_max_zeros_return_value_and_reset_call_differ(void)
                                   "drift row changed, update the matrix");
 }
 
-int main(int, char **)
+// ===========================================================================
+// U1 CORPUS DUMP: the ordered sink-call sequence per corpus datagram (test
+// plan section 4.4, "Fixture written": native/u1-esp32.txt, native/u1-nrf52.
+// txt), consumed by section 9.1's after-run diff. Additive alongside the
+// named AGREEMENT/DRIFT cases above -- bulk coverage, not a replacement:
+// those pin specific drift with failure messages naming DR rows and reasons,
+// which a corpus dump cannot do on its own.
+//
+// Deliberately excluded from the dump (see the g_sink_log comment above for
+// why): raw Serial output and checkOwnTx() reads.
+// ===========================================================================
+
+// This source lives at <repo_root>/test/test_udp_frame_twin/test_udp_frame_
+// twin.cpp. A PlatformIO native test binary's CWD is not guaranteed (it can
+// be the project root, the build dir, or wherever the runner happened to
+// start), so a path relative to CWD can silently resolve to nothing.
+//
+// __FILE__, measured on this build (`strings` on the .o -- see the wave
+// report), comes back RELATIVE ("test/test_udp_frame_twin/test_udp_frame_
+// twin.cpp"): SCons runs with the project root as its own CWD, so the
+// relative form is correct at COMPILE time -- but useless standing alone at
+// RUN time, since this binary's run-time CWD is exactly the thing not
+// guaranteed to still be the project root (the trap this function exists
+// to dodge). An absolute __FILE__ (a different toolchain/build system)
+// is handled directly, by stripping the known suffix. For the relative
+// case, the fallback is this executable's own resolved path: PlatformIO
+// always builds a native test to <repo_root>/.pio/build/<env>/program, a
+// fixed 4-component depth, and resolving argv[0]/the running image through
+// the OS (not through textual path arithmetic on the current CWD) is safe
+// regardless of where the binary is invoked from.
+static std::string g_argv0;   // captured in main() before anything else runs
+
+static std::string resolve_absolute_path(const std::string &path)
 {
+    char buf[PATH_MAX];
+    if (path.empty())
+        return std::string();
+    if (realpath(path.c_str(), buf) != nullptr)
+        return std::string(buf);
+    return std::string();
+}
+
+static std::string running_executable_path()
+{
+#if defined(__APPLE__)
+    char raw[PATH_MAX];
+    uint32_t size = sizeof(raw);
+    if (_NSGetExecutablePath(raw, &size) == 0)
+    {
+        std::string resolved = resolve_absolute_path(raw);
+        if (!resolved.empty())
+            return resolved;
+    }
+#endif
+    // Linux: /proc/self/exe is a symlink the OS resolves to the running
+    // image regardless of how the process was invoked.
+    std::string resolved = resolve_absolute_path("/proc/self/exe");
+    if (!resolved.empty())
+        return resolved;
+    // Last resort: argv[0] realpath()'d against the CURRENT cwd. Valid even
+    // then, because if argv[0] was relative, the OS resolved it against
+    // this same cwd at exec() time and the process has not chdir'd since.
+    return resolve_absolute_path(g_argv0);
+}
+
+static std::string strip_trailing_path_components(std::string p, int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        size_t pos = p.find_last_of("/\\");
+        if (pos == std::string::npos)
+            return std::string();
+        p.erase(pos);
+    }
+    return p;
+}
+
+static std::string repo_root_from_file()
+{
+    std::string f = __FILE__;
+    for (char &c : f)
+        if (c == '\\') c = '/';
+
+    static const char *anchor = "test/test_udp_frame_twin/test_udp_frame_twin.cpp";
+    size_t pos = f.rfind(anchor);
+    if (pos != std::string::npos && pos > 0 &&
+        pos + strlen(anchor) == f.size() && f[pos - 1] == '/')
+    {
+        // Absolute __FILE__: strip the anchor and its leading separator.
+        return f.substr(0, pos - 1);
+    }
+
+    // Relative __FILE__ (the measured case): fall back to the executable's
+    // own OS-resolved location, four components below the repo root
+    // (.pio/build/<env>/program).
+    std::string exe = running_executable_path();
+    if (exe.empty())
+        return std::string();
+    return strip_trailing_path_components(exe, 4);
+}
+
+// Corpus format (test/golden/corpus_lint.py, test/golden/mc_frame.py): lines
+// starting with '#' are comments, the remaining hex digits (whitespace
+// tolerated) are one datagram.
+static bool read_hex_corpus_file(const std::string &path, std::vector<uint8_t> &out)
+{
+    FILE *f = fopen(path.c_str(), "rb");
+    if (!f)
+        return false;
+
+    std::string hex;
+    char line[2048];
+    while (fgets(line, sizeof(line), f))
+    {
+        std::string l(line);
+        size_t hashpos = l.find('#');
+        if (hashpos != std::string::npos)
+            l.erase(hashpos);
+        for (char c : l)
+            if (isxdigit((unsigned char)c))
+                hex.push_back(c);
+    }
+    fclose(f);
+
+    if (hex.size() % 2 != 0)
+        return false;
+
+    auto hexval = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    };
+
+    out.clear();
+    out.reserve(hex.size() / 2);
+    for (size_t i = 0; i < hex.size(); i += 2)
+    {
+        int hi = hexval(hex[i]);
+        int lo = hexval(hex[i + 1]);
+        if (hi < 0 || lo < 0)
+            return false;
+        out.push_back((uint8_t)((hi << 4) | lo));
+    }
+    return true;
+}
+
+// Drives every corpus datagram (sorted filename order) through one platform
+// handler, recorder_reset() between EACH datagram -- the dump is one
+// sequence PER datagram, not a chained simulation across the corpus, so a
+// file's meaning never depends on what ran before it (same discipline the
+// named cases above use). Appends "=== <filename>" plus the ordered sink
+// lines (or "(no sink calls)") to out_path. Returns the number of corpus
+// files processed; fails the test loudly (TEST_ASSERT, not a return code) if
+// the corpus directory is missing, unreadable, empty, or any file in it
+// fails to parse -- a silently-empty dump is exactly the false-comfort
+// artefact this exists to avoid.
+static int dump_corpus_for_platform(const std::string &corpus_dir,
+                                     const std::string &out_path,
+                                     bool nrf52_side)
+{
+    DIR *d = opendir(corpus_dir.c_str());
+    {
+        std::string msg = "U1: corpus directory missing or unreadable: " + corpus_dir;
+        TEST_ASSERT_NOT_NULL_MESSAGE(d, msg.c_str());
+    }
+
+    std::vector<std::string> names;
+    struct dirent *entry;
+    while ((entry = readdir(d)) != nullptr)
+    {
+        std::string name = entry->d_name;
+        if (name == "." || name == "..")
+            continue;
+        names.push_back(name);
+    }
+    closedir(d);
+    std::sort(names.begin(), names.end());
+
+    {
+        std::string msg = "U1: corpus directory yielded zero datagrams: " + corpus_dir;
+        TEST_ASSERT_TRUE_MESSAGE(!names.empty(), msg.c_str());
+    }
+
+    FILE *out = fopen(out_path.c_str(), "wb");
+    {
+        std::string msg = "U1: cannot open output file for writing: " + out_path;
+        TEST_ASSERT_NOT_NULL_MESSAGE(out, msg.c_str());
+    }
+
+    int processed = 0;
+    for (const auto &name : names)
+    {
+        std::vector<uint8_t> datagram;
+        bool ok = read_hex_corpus_file(corpus_dir + "/" + name, datagram);
+        {
+            std::string msg = "U1: failed to parse corpus file " + name;
+            TEST_ASSERT_TRUE_MESSAGE(ok, msg.c_str());
+        }
+        {
+            std::string msg = "U1: corpus file " + name + " exceeds the working buffer capacity";
+            TEST_ASSERT_TRUE_MESSAGE(datagram.size() <= BUF_CAP, msg.c_str());
+        }
+
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        memset(buf, 0, BUF_CAP);
+        if (!datagram.empty())
+            memcpy(buf, datagram.data(), datagram.size());
+
+        if (nrf52_side)
+            handleUdpFrame_nrf52(buf, (int)datagram.size(), IPAddress(1, 2, 3, 4));
+        else
+            handleUdpFrame_esp32(buf, (int)datagram.size(), IPAddress(1, 2, 3, 4));
+
+        fprintf(out, "=== %s\n", name.c_str());
+        if (g_sink_log.empty())
+        {
+            fprintf(out, "(no sink calls)\n");
+        }
+        else
+        {
+            for (size_t i = 0; i < g_sink_log.size(); i++)
+                fprintf(out, "%03zu\t%s\t%s\n", i + 1,
+                        g_sink_log[i].sink.c_str(), g_sink_log[i].detail.c_str());
+        }
+        processed++;
+    }
+    fclose(out);
+    return processed;
+}
+
+static void test_u1_corpus_ordered_sink_dump_both_platforms(void)
+{
+    std::string root = repo_root_from_file();
+    TEST_ASSERT_TRUE_MESSAGE(!root.empty(),
+        "U1: could not derive the repo root from __FILE__ -- this source moved, "
+        "update repo_root_from_file()'s component count");
+
+    std::string corpus_dir = root + "/test/golden/corpus/udp1990";
+    std::string out_esp32 = root + "/test/golden/native/u1-esp32.txt";
+    std::string out_nrf52 = root + "/test/golden/native/u1-nrf52.txt";
+
+    int n_esp32 = dump_corpus_for_platform(corpus_dir, out_esp32, false);
+    int n_nrf52 = dump_corpus_for_platform(corpus_dir, out_nrf52, true);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(n_esp32, n_nrf52,
+        "U1: esp32 and nrf52 dumps processed a different number of corpus files");
+}
+
+int main(int, char **argv)
+{
+    g_argv0 = argv[0] ? argv[0] : "";
+
     UNITY_BEGIN();
 
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
@@ -982,6 +1318,8 @@ int main(int, char **)
     RUN_TEST(test_drift_senddisplayposition_esp32_only);
     RUN_TEST(test_drift_rx01_unconfigured_guard_esp32_only);
     RUN_TEST(test_drift_max_zeros_return_value_and_reset_call_differ);
+
+    RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 
     return UNITY_END();
 }

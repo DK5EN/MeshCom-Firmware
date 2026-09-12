@@ -41,6 +41,11 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <dirent.h>
+#include <fstream>
+#include <sstream>
+#include <unistd.h>
 
 #include <Arduino.h>
 #include <IPAddress.h>
@@ -103,6 +108,45 @@ struct Datagram
 
 static std::vector<Datagram> g_sent;
 static std::vector<std::string> g_printed;   // "<prefix>|<source call>"
+
+// ---------------------------------------------------------------------------
+// Ordered sink-call log (test plan 4.4/9.1): every stub below appends one
+// line here, IN CALL ORDER, alongside (not instead of) the vectors above --
+// the existing named tests assert on those and stay unchanged. This is what
+// the corpus dump at the bottom of the file writes out, one file per
+// platform. Format: "NNN\tSINK\tdetail", NNN a 3-digit index restarting at
+// 001 per corpus item (see log_reset()).
+// ---------------------------------------------------------------------------
+static std::vector<std::string> g_log;
+static int g_log_seq = 0;
+
+static void log_reset()
+{
+    g_log.clear();
+    g_log_seq = 0;
+}
+
+static void log_sink(const char *token, const std::string &detail)
+{
+    g_log_seq++;
+    char prefix[8];
+    snprintf(prefix, sizeof(prefix), "%03d\t", g_log_seq);
+    g_log.push_back(std::string(prefix) + token + "\t" + detail);
+}
+
+static std::string hex_render(const uint8_t *buf, size_t len)
+{
+    std::string s;
+    s.reserve(len * 3);
+    char b[4];
+    for (size_t i = 0; i < len; i++)
+    {
+        if (i) s += ' ';
+        snprintf(b, sizeof(b), "%02x", buf[i]);
+        s += b;
+    }
+    return s;
+}
 // What decodeAPRS() actually made of the frame: payload and decoded length.
 // Kept apart from g_printed because the payload sits at the END of the frame
 // and is therefore the only field that notices a wrong aprs_len -- the source
@@ -127,6 +171,7 @@ static void recorder_reset()
     g_payload.clear();
     g_decoded_len.clear();
     g_dropped.clear();
+    log_reset();
     g_reset_udp = g_reset_dhcp = 0;
     g_count_tx_ok = g_count_tx_fail = 0;
     g_write_fails = false;
@@ -147,6 +192,7 @@ static void sink_write(const uint8_t *buf, uint16_t len)
     d.bytes.assign(buf, buf + len);
     d.ended = false;
     g_sent.push_back(d);
+    log_sink("UDPWRITE", hex_render(buf, len));
     if (g_evict_during_send)
     {
         udpRead++;
@@ -156,7 +202,7 @@ static void sink_write(const uint8_t *buf, uint16_t len)
 }
 
 // --- ESP32 side: the C2 primitives ---------------------------------------
-bool udpBeginRaw_esp32() { return true; }
+bool udpBeginRaw_esp32() { log_sink("UDPBEGIN", ""); return true; }
 
 bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len)
 {
@@ -168,15 +214,23 @@ bool udpEndRaw_esp32()
 {
     if (!g_sent.empty())
         g_sent.back().ended = true;
+    log_sink("UDPEND", g_write_fails ? "fail" : "ok");
     return !g_write_fails;
 }
 
-void udpCountTx(bool ok) { ok ? g_count_tx_ok++ : g_count_tx_fail++; }
-void resetMeshComUDP() { g_reset_udp++; }
+void udpCountTx(bool ok)
+{
+    ok ? g_count_tx_ok++ : g_count_tx_fail++;
+    log_sink("TXCOUNT", ok ? "ok" : "fail");
+}
+
+void resetMeshComUDP() { g_reset_udp++; log_sink("RESET", "udp"); }
 
 void logRxDropUnconfigured(const char *call)
 {
-    g_dropped.push_back(call ? call : "(null)");
+    std::string c = call ? call : "(null)";
+    g_dropped.push_back(c);
+    log_sink("DROP", c);
 }
 
 // --- nRF52 side: NrfETH ---------------------------------------------------
@@ -185,12 +239,17 @@ bool NrfETH::sendUDP(uint8_t buffer[UDP_TX_BUF_SIZE], uint16_t rx_buf_size)
     sink_write(buffer, rx_buf_size);
     if (!g_write_fails)
         g_sent.back().ended = true;
+    // NrfETH::sendUDP() wraps write+endPacket in one hardware call; logged
+    // as its own UDPEND so both platforms' logs carry the same tokens, even
+    // though ESP32 reaches the ring via two stub calls and nRF52 via one.
+    log_sink("UDPEND", g_write_fails ? "fail" : "ok");
     return !g_write_fails;
 }
 
 int NrfETH::resetDHCP()
 {
     g_reset_dhcp++;
+    log_sink("RESET", "dhcp");
     return 0;
 }
 
@@ -205,6 +264,7 @@ void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage,
     g_printed.push_back(s);
     g_payload.push_back(aprsMessage.msg_payload.c_str());
     g_decoded_len.push_back((int)aprsMessage.msg_len);
+    log_sink("PRINT", s + "|" + aprsMessage.msg_payload.c_str());
 }
 
 // ---------------------------------------------------------------------------
@@ -690,6 +750,308 @@ static void test_short_slot_is_not_decoded_on_either_side(void)
     bDisplayInfo = false;
 }
 
+// ---------------------------------------------------------------------------
+// CORPUS DUMP (test plan 4.4/9.1): one ordered sink-call-sequence per corpus
+// datagram, one file per platform -- u2-esp32.txt / u2-nrf52.txt. Additive to
+// the named Unity cases above; those stay exactly as they are.
+//
+// This suite is the OUTBOUND drain, not the inbound parser U1 feeds directly:
+// test/golden/corpus/udp1990/*.hex holds wire datagrams for the INCOMING UDP
+// side (GATE/BEAT/CONF-indicator-wrapped, consumed by handleUdpFrame_*() in
+// src/esp32|nrf52/udp_frame_*.cpp, which relays a decoded GATE frame to LoRa
+// TX -- never back onto ringBufferUDPout). There is no src/ code path that
+// turns a corpus item into outbound-ring content, so nothing here invents
+// one. Instead every corpus item's raw bytes are staged into the ring
+// verbatim, the same way the hand-built cases above stage a frame via
+// put_slot(): a recognisable dummy 36-byte header (0xC0+i, never inspected by
+// the drain) followed by the datagram bytes unchanged. The drain is then run
+// exactly as production code runs it and the real sink calls are recorded.
+//
+// Consequence, and the reason this is spelled out rather than left for the
+// reader to notice: since every corpus item's own first byte is an indicator
+// letter ('G'/'B'/'C'/'X', 0x47/0x42/0x43/0x58), never the APRS type marker
+// (0x21/0x3A/0x40) the drain's own gate checks for, decodeAPRS() is never
+// reached from this loop and PRINT/DROP never appear in the two files it
+// writes. That is not a bug in the dump -- it is the honest, if unglamorous,
+// answer to "what does the outbound drain do with the inbound corpus", and
+// it is exactly why the sink log records what actually ran rather than what
+// was expected to.
+// ---------------------------------------------------------------------------
+
+// Repo root, derived from __FILE__ rather than the working directory: a
+// PlatformIO native test binary's CWD is not guaranteed, so a relative path
+// to test/golden/corpus/udp1990/ could silently resolve to nothing (or to
+// something else entirely) instead of failing loudly.
+static bool path_exists(const std::string &p)
+{
+    std::ifstream f(p.c_str());
+    return f.good();
+}
+
+static std::string repo_root()
+{
+    std::string file(__FILE__);
+    const std::string suffix = "test/test_udp_send_twin/test_udp_send_twin.cpp";
+
+    if (!file.empty() && file[0] == '/')
+    {
+        // __FILE__ came out absolute: strip the known relative suffix.
+        TEST_ASSERT_TRUE_MESSAGE(
+            file.size() > suffix.size() &&
+                file.compare(file.size() - suffix.size(), suffix.size(), suffix) == 0,
+            ("unexpected absolute __FILE__ shape: " + file).c_str());
+        std::string root = file.substr(0, file.size() - suffix.size());
+        while (!root.empty() && root.back() == '/')
+            root.pop_back();
+        TEST_ASSERT_TRUE_MESSAGE(path_exists(root + "/platformio.ini"),
+                                 ("derived repo root does not look like one "
+                                  "(no platformio.ini): " + root).c_str());
+        return root;
+    }
+
+    // __FILE__ came out relative (PlatformIO's normal case, compiled with
+    // CWD == project root) -- but the test BINARY's own CWD when it runs is
+    // NOT guaranteed, so a relative path formed from it could silently
+    // resolve to nothing (or to an unrelated file). Re-derive the root
+    // instead: walk upward from the actual runtime CWD until
+    // "<candidate>/<file>" exists next to a platformio.ini, which is true at
+    // exactly one place regardless of where the binary happens to be run
+    // from, as long as that place is an ancestor of the CWD.
+    char cwd_buf[4096];
+    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
+    std::string dir(cwd_buf);
+
+    for (int hops = 0; hops < 16; hops++)
+    {
+        if (path_exists(dir + "/" + file) && path_exists(dir + "/platformio.ini"))
+            return dir;
+        if (dir.empty() || dir == "/")
+            break;
+        size_t pos = dir.find_last_of('/');
+        dir = (pos == std::string::npos || pos == 0) ? "/" : dir.substr(0, pos);
+    }
+
+    TEST_FAIL_MESSAGE(("could not derive repo root: walked up from the runtime "
+                       "cwd looking for '" + file + "' next to platformio.ini "
+                       "and found neither").c_str());
+    return "";
+}
+
+struct CorpusItem
+{
+    std::string filename;
+    std::vector<uint8_t> bytes;
+};
+
+static bool hex_nibble(char c, uint8_t &out)
+{
+    if (c >= '0' && c <= '9') { out = (uint8_t)(c - '0'); return true; }
+    if (c >= 'a' && c <= 'f') { out = (uint8_t)(c - 'a' + 10); return true; }
+    if (c >= 'A' && c <= 'F') { out = (uint8_t)(c - 'A' + 10); return true; }
+    return false;
+}
+
+// Loads every *.hex file in `dir`, sorted by filename, skipping '#' comment
+// lines. Fails the test loudly (never returns an empty/partial result
+// silently) if the directory is missing or yields zero items -- a dump that
+// quietly writes nothing is the false-comfort artefact this work exists to
+// avoid.
+static std::vector<CorpusItem> load_corpus(const std::string &dir)
+{
+    std::vector<CorpusItem> items;
+
+    DIR *d = opendir(dir.c_str());
+    TEST_ASSERT_NOT_NULL_MESSAGE(d, ("corpus directory missing: " + dir).c_str());
+
+    std::vector<std::string> names;
+    struct dirent *ent;
+    while ((ent = readdir(d)) != nullptr)
+    {
+        std::string name(ent->d_name);
+        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".hex") == 0)
+            names.push_back(name);
+    }
+    closedir(d);
+    std::sort(names.begin(), names.end());
+
+    for (const auto &name : names)
+    {
+        std::ifstream f((dir + "/" + name).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(f.good(), ("could not open " + name).c_str());
+
+        std::string hexstr;
+        std::string line;
+        while (std::getline(f, line))
+        {
+            while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
+                line.pop_back();
+            size_t start = line.find_first_not_of(" \t");
+            if (start == std::string::npos)
+                continue;
+            if (line[start] == '#')
+                continue;
+            hexstr += line.substr(start);
+        }
+        TEST_ASSERT_TRUE_MESSAGE(hexstr.size() % 2 == 0,
+                                 ("odd hex digit count in " + name).c_str());
+
+        CorpusItem item;
+        item.filename = name;
+        item.bytes.reserve(hexstr.size() / 2);
+        for (size_t i = 0; i + 1 < hexstr.size(); i += 2)
+        {
+            uint8_t hi = 0, lo = 0;
+            TEST_ASSERT_TRUE_MESSAGE(hex_nibble(hexstr[i], hi) && hex_nibble(hexstr[i + 1], lo),
+                                     ("bad hex digit in " + name).c_str());
+            item.bytes.push_back((uint8_t)((hi << 4) | lo));
+        }
+        items.push_back(std::move(item));
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(!items.empty(),
+                             ("corpus directory yielded zero items: " + dir).c_str());
+    return items;
+}
+
+// Stages one corpus item into ring slot `slot`, same shape as put_slot():
+// byte 0 = msg_len, then the fixed dummy 36-byte header, then the datagram
+// bytes verbatim. `msg_len` is a uint8_t in the real ring (ringBufferUDPout's
+// byte 0), so a datagram that would overflow it cannot be staged this way --
+// returns false with a reason rather than truncating or wrapping it.
+static bool stage_corpus_item(int slot, const std::vector<uint8_t> &bytes,
+                              std::string &why_not)
+{
+    size_t total = (size_t)UDP_HDR + bytes.size();
+    if (total > 255)
+    {
+        char msg[160];
+        snprintf(msg, sizeof(msg),
+                 "exceeds UDP_TX_BUF_SIZE: %d-byte header + %d-byte payload = "
+                 "%d > 255 (ringBufferUDPout[..][0] / msg_len is a uint8_t)",
+                 UDP_HDR, (int)bytes.size(), (int)total);
+        why_not = msg;
+        return false;
+    }
+    if (1 + total > sizeof(ringBufferUDPout[0]))
+    {
+        why_not = "exceeds the ring slot buffer (UDP_TX_BUF_SIZE+20)";
+        return false;
+    }
+
+    memset(ringBufferUDPout[slot], 0, sizeof(ringBufferUDPout[0]));
+    ringBufferUDPout[slot][0] = (uint8_t)total;
+    for (int i = 0; i < UDP_HDR; i++)
+        ringBufferUDPout[slot][1 + i] = (uint8_t)(0xC0 + i);
+    if (!bytes.empty())
+        memcpy(ringBufferUDPout[slot] + 1 + UDP_HDR, bytes.data(), bytes.size());
+    return true;
+}
+
+// REPRESENTATIVE SUBSET -- and why this is not the whole corpus.
+//
+// Driving all 37 items produced 37 blocks with exactly TWO distinct sink
+// SHAPES: 36x `UDPBEGIN,UDPWRITE,UDPEND,TXCOUNT` (ESP32) against
+// `UDPWRITE,UDPEND` (nRF52), plus the one oversize item that cannot be
+// staged. Only the payload bytes varied, and those are just the corpus
+// echoed back through a dummy header. The resulting before-diff was 20 kB
+// -- three times U1's -- to express ONE fact 36 times, and it would churn
+// wholesale on any change to the header or the hex rendering.
+//
+// The cause is above: this corpus is INBOUND wire format and no real code
+// path turns an item into outbound-ring content, so the drain never reaches
+// decodeAPRS() and the shape cannot vary with the payload. Per operator
+// decision 2026-09-12 the dump therefore drives a representative subset:
+// the first few items (the recurring shape) plus every item that is NOT
+// applicable, so the not-applicable reasons stay on the record. The guard
+// that matters -- the socket call SEQUENCE, which DR-23 warns a refactor of
+// either layer could silently change, and which W6 is about to rewrite --
+// is fully preserved by one block per shape.
+//
+// If a genuine outbound corpus is ever built (frames shaped as the drain
+// would really receive them), drop the subset and drive all of it: the
+// shapes would then actually vary and the bulk would be worth its size.
+static std::vector<CorpusItem> representative_subset(const std::vector<CorpusItem> &all)
+{
+    const size_t KEEP_LEADING = 3;
+    std::vector<CorpusItem> out;
+    for (size_t i = 0; i < all.size(); i++)
+    {
+        // Same two bounds stage_corpus_item() enforces, asked without
+        // staging: byte 0 of a ring slot is the uint8_t msg_len, and the
+        // slot itself is finite. Kept in step with that function by
+        // construction -- if its bounds change, this must change with it.
+        size_t total = (size_t)UDP_HDR + all[i].bytes.size();
+        bool stageable = (total <= 255) && (1 + total <= sizeof(ringBufferUDPout[0]));
+        if (i < KEEP_LEADING || !stageable)
+            out.push_back(all[i]);
+    }
+    TEST_ASSERT_TRUE_MESSAGE(out.size() >= KEEP_LEADING,
+                             "representative subset collapsed to nothing");
+    return out;
+}
+
+
+// Drives every corpus item through one platform's drain and writes the
+// ordered sink log to `out_path`. One item per ring slot, one drain pass per
+// item, recorder_reset() (and with it log_reset()) between items so the
+// NNN numbering in the output restarts at 001 per "=== <filename>" section.
+static void dump_platform(const std::string &out_path, Drain fn)
+{
+    std::string root = repo_root();
+    std::vector<CorpusItem> items = load_corpus(root + "/test/golden/corpus/udp1990");
+    items = representative_subset(items);
+
+    std::ofstream out(out_path.c_str(), std::ios::binary | std::ios::trunc);
+    TEST_ASSERT_TRUE_MESSAGE(out.good(),
+                             ("could not open output file: " + out_path).c_str());
+
+    for (const auto &item : items)
+    {
+        out << "=== " << item.filename << "\n";
+
+        recorder_reset();
+        memset(ringBufferUDPout, 0, sizeof(ringBufferUDPout));
+        // decodeAPRS() runs its gate unconditionally; PRINT itself is gated
+        // by bDisplayInfo (ESP32) / bDisplayInfo or bDisplayVia (nRF52) --
+        // on, so a corpus item that DID carry a decodable frame at offset 0
+        // would show it, matching how the named agreement/drift tests above
+        // observe decode.
+        bDisplayInfo = true;
+
+        std::string why_not;
+        if (!stage_corpus_item(0, item.bytes, why_not))
+        {
+            out << "(not applicable: " << why_not << ")\n";
+            bDisplayInfo = false;
+            continue;
+        }
+        udpRead = 0;
+        udpWrite = 1;
+
+        fn();
+
+        if (g_log.empty())
+            out << "(no sink calls)\n";
+        else
+            for (const auto &line : g_log)
+                out << line << "\n";
+
+        bDisplayInfo = false;
+    }
+}
+
+static void test_dump_u2_esp32(void)
+{
+    std::string path = repo_root() + "/test/golden/native/u2-esp32.txt";
+    dump_platform(path, sendMeshComUDP);
+}
+
+static void test_dump_u2_nrf52(void)
+{
+    std::string path = repo_root() + "/test/golden/native/u2-nrf52.txt";
+    dump_platform(path, sendUDP);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -711,6 +1073,9 @@ int main(int, char **)
 
     RUN_TEST(test_frame_survives_the_drain_intact_on_both_sides);
     RUN_TEST(test_short_slot_is_not_decoded_on_either_side);
+
+    RUN_TEST(test_dump_u2_esp32);
+    RUN_TEST(test_dump_u2_nrf52);
 
     return UNITY_END();
 }
