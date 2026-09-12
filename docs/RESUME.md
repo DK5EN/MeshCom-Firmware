@@ -32,8 +32,12 @@ one to update when an item moves.
 
 **C. Bench-bound (needs a board on the desk)**
 
-- `MEM-04` four classic-ESP32 envs within 4 kB of a link failure (T-Beam family 20 B IRAM,
-  E22_XML 920 B DRAM); ~10.5 kB of levers measured, nothing committed.
+- ~~`MEM-04`~~ **CLOSED 2026-09-12.** Both halves shipped: the three `ttgo_tbeam` envs went
+  20 B -> 4 972 B IRAM by unflagging `BOARD_HAS_PSRAM`/`-mfix-esp32-psram-cache-issue` (no
+  `ps_malloc` call site exists, 596 B was all the firmware ever used of it), and
+  `E22_XML-DevKitC` went 1 160 B -> 6 928 B DRAM by vendoring tinyxml2 with a `srcFilter` that
+  excludes the example `main()`. Verified on independent clean rebuilds; T-Beam-92 flashed and
+  run (SX1276, AXP2101, GPS fix, WiFi, zero backtraces), init free heap also +4 860 B.
 - `TM-49` fail-closed OTA completion gate is in code, bench arm on a 4 MB single-slot board
   (Heltec) still owed.
 - `SL-01..07` `--setlog` lines implemented 2026-09-02 and upstream in PR #1125, bench wave 3
@@ -154,6 +158,42 @@ reboots 15 s later, which cost the G0 console capture its tail.
 - No fleet telemetry for how many nodes run with track on (raised with TRK-01).
 - ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
   operator open.
+
+## 2026-09-12: DRY unification phases B2-B4 — five carves, six twins, MEM-04 closed
+
+Branch `dry-unification`, base tag `dry-base-20260911`. 20 commits, tree clean. Nothing flashed
+except the T-Beam-92 PSRAM proof.
+
+**Carves (B2), all five in, each gated on 32 envs + the region gate + a byte-identical diff of
+the moved code:** `C1` UDP frame handler, `C2` the three socket primitives, `C3`
+`checkSerialCommand()`, `C4` gateway service block, `C5` `countryProfile()`. Two plan rows were
+wrong about _why_ a carve was needed and are corrected in the backlog rather than quietly
+followed: in both cases the obstacle was the translation unit, not the call.
+
+**Twins (B4), six of the nine `N1` suites exist:** `U1` (14 cases), `U2` (15), `U3` (6 x 2),
+`U6` (4 x 2), `U7` (8), `U8` (15). `U4`/`U5` are covered by static Python gates instead
+(`settings_layout_lint.py`, `command_ladder_lint.py`) because neither unit links natively at any
+sane price — a weaker instrument, recorded as such. `U9` needs hardware.
+
+**Defects fixed:** nRF52 UDP zero-scan read one byte past the packet and could flip its own
+verdict on out-of-bounds memory; `RF-04` (the 868 window was unsatisfiable, so those frequencies
+were silently replaced by the board default; `LORA_BANDWIDTH` also meant kHz on ESP32 and an
+index on nRF52); `strText` terminator loss; `--softser app0` was unreachable because
+`commandCheck()` is a prefix match and `--softser app` was tested first; `node_update` leaked
+uninitialised stack; `node_gpsbaud` had two spellings. `BattTimeWait`/`INA226TimeWait` unified on
+the slower progression (30 s / 60 s), with the `BattWaitCounter` gate that hid battery debug
+prints removed rather than re-tuned.
+
+**Leads closed as NOT defects, with the reason recorded:** `RF-08` (RadioLib range-checks the
+`999` sentinel on all three shipped chips) and `RF-07` (the backlog row's premise was wrong —
+`BOARD_RAK4630` is inherited by all three nRF52 boards on purpose).
+
+**Two findings pinned, not fixed** — both are decisions, not cleanups: `OPT-D15` the APRS
+epilogue loses a `0x7E` sub-version on every hop, `OPT-D16` the mHeard list is a raw ring walk
+and does not sort.
+
+Still owed: `P0.9` protocol templates, `D1-10` the loop-scheduler carve (measured at **50** timer
+predicates, not the "~18" the plan claimed), phase 2's drift matrix, and the `displayMux` vestige.
 
 ## 2026-09-11: DRY unification phase 0 — branch, base tag, capture tooling, corpora
 
