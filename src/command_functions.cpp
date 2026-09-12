@@ -1104,6 +1104,10 @@ void commandAction(char *umsg_text, bool ble)
             // GPIO (ESP32-S3 ext1); 99 = kein Button -> nur GPIO0.
             uint64_t wake_mask = (1ULL << 0);
             if (iButtonPin < 22) wake_mask |= (1ULL << iButtonPin);
+            // Per Long-Press ausgeloest ist die Taste hier noch gedrueckt (attachLongPressStart);
+            // ein ANY_LOW-Wake auf einem bereits LOW liegenden Pin feuert sofort. Bisher hat nur
+            // der E-Ink-Refresh oben die Zeit bis zum Loslassen ueberbrueckt -- jetzt explizit.
+            esp32WaitButtonRelease();
             esp_sleep_enable_ext1_wakeup(wake_mask, ESP_EXT1_WAKEUP_ANY_LOW);
             // Schlafstrom senken. Kurzes Settle, damit der E-Ink-Voll-Refresh aus wpShowDeepSleep()
             // sicher fertig ist, dann prepareToSleep(): SX1262 -> SLEEP (sonst Dauer-RX ~5 mA),

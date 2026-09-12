@@ -13,4 +13,13 @@
 // deliberately out-of-scope piece of work).
 void esp32EnterDeepSleep();
 
+// Blocks (bounded, 10 s) until the runtime wake button (iButtonPin) reads
+// HIGH, then a short debounce. Called right before a button wake source is
+// armed, in esp32EnterDeepSleep() and in the WP_DISP --deepsleep branch:
+// a long press reaches --deepsleep via OneButton's attachLongPressStart()
+// with the button still held, and an ext1 low-level wake on a pin that is
+// already LOW fires the instant deep sleep starts. No-op when no button is
+// configured (99) or the pin is not pressed (serial/BLE --deepsleep).
+void esp32WaitButtonRelease();
+
 #endif

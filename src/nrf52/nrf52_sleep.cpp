@@ -36,6 +36,12 @@ extern void Batterie_Vide_logo(void);
 // (esp32_main.cpp:890-896, esp32_sleep.cpp) for the identical purpose.
 extern uint8_t iButtonPin;
 
+// `--button on|off` (node_sset bit 0x0010). Only then has init_onebutton()
+// configured iButtonPin INPUT_PULLUP and attached the long press; with it
+// off the pin is unconfigured and floats (RAK4631 WB_IO6 reads LOW), so the
+// release wait below would only burn its 10 s bound on every --deepsleep.
+extern bool bButtonCheck;
+
 void nrf52EnterDeepSleep()
 {
     // (a) Radio to sleep first, so it stops burning RX current while the rest
@@ -112,6 +118,25 @@ void nrf52EnterDeepSleep()
     // map. A node with no button configured, or misconfigured with
     // `--button` above 47, wakes only on RESET or USB plug-in (VBUS
     // DETECT), which sd_power_system_off() still honours.
+    //
+    // The long-press path (PressLong(), onebutton_functions.cpp, attached
+    // with attachLongPressStart()) reaches this point with the button still
+    // held. systemOff(pin, LOW) arms a LOW-level sense on that very pin, so
+    // System OFF would end the moment it starts and the node reboots
+    // instead of sleeping -- the same flaw the ESP32 helper had (field
+    // report, Heltec V3 on v4.35t; Heltec T114 and T-Echo share this path).
+    // Wait for the release first, bounded so a stuck-LOW pin or a serial/BLE
+    // --deepsleep still sleeps. Only with `--button on` has OneButton
+    // configured the pin INPUT_PULLUP, so digitalRead() is meaningful there
+    // and only there.
+    if (bButtonCheck && iButtonPin < PINS_COUNT && digitalRead(iButtonPin) == LOW)
+    {
+        uint32_t t0 = millis();
+        while (digitalRead(iButtonPin) == LOW && millis() - t0 < 10000)
+            delay(10);
+        delay(100);   // contact bounce after release
+    }
+
     if (iButtonPin < PINS_COUNT)
     {
         systemOff(iButtonPin, LOW);   // active-low button, internal pull-up configured by systemOff() itself
