@@ -19,6 +19,13 @@
 // instead of this variable would ignore a user's remapped pin.
 extern uint8_t iButtonPin;
 
+// `--button on|off` (node_sset bit 0x0010, loop_functions.cpp). Only when it
+// is on does init_onebutton() configure iButtonPin (INPUT_PULLUP) and attach
+// PressLong(); with it off the pin is unconfigured and may float LOW
+// (RAK4631 WB_IO6 does), so a release wait there would only burn its 10 s
+// bound on every --deepsleep -- and no long press can have brought us here.
+extern bool bButtonCheck;
+
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/lv_obj_functions.h>
 #endif
@@ -34,6 +41,33 @@ extern uint8_t iButtonPin;
 #include <U8g2lib.h>
 extern U8G2 *u8g2;
 #endif
+
+void esp32WaitButtonRelease()
+{
+    // PressLong() (onebutton_functions.cpp) is attached with
+    // attachLongPressStart(), so it fires 800 ms into the press and the
+    // operator's finger is still on the button when --deepsleep gets here.
+    // The ext1 wake armed below (ANY_LOW / ALL_LOW on that very pin) is
+    // then already true at esp_deep_sleep_start(): the chip wakes at once
+    // and reboots (RESET_REASON=5 DEEPSLEEP), and from the outside the node
+    // "cannot be switched off" -- field report, Heltec V3 on v4.35t. On
+    // v4.35s no wake source was armed at all, which is why the same press
+    // used to leave the node dark until reset. Wait for the release first.
+    // Bounded so that a pin stuck LOW, or a `--button` remapped to a LOW
+    // GPIO, still lets a serial/BLE --deepsleep go through; a pin that is
+    // HIGH on entry costs nothing. Only with `--button on` has OneButton
+    // configured the pin INPUT_PULLUP (init_onebutton()), so digitalRead()
+    // is meaningful there and only there.
+    if (!bButtonCheck || iButtonPin == 99)
+        return;
+    if (digitalRead(iButtonPin) != LOW)
+        return;
+
+    uint32_t t0 = millis();
+    while (digitalRead(iButtonPin) == LOW && millis() - t0 < 10000)
+        delay(10);
+    delay(100);   // contact bounce after release
+}
 
 void esp32EnterDeepSleep()
 {
@@ -178,6 +212,8 @@ void esp32EnterDeepSleep()
     // (A second bit for GPIO0 was deliberately not added: on classic ESP32
     // ALL_LOW requires every masked pin low simultaneously, so a two-pin
     // mask would make a single button press unable to wake the node.)
+    esp32WaitButtonRelease();
+
     if (iButtonPin != 99)
     {
         esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
