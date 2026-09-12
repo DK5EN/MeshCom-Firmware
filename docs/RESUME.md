@@ -22,8 +22,13 @@ OTA, DK5EN-14 keylock_kbl harness + hand test on an instrument image (219), OE3L
 confirmation of item 200. **Not run**: no board on the published image itself; APRS 212-216 never
 seen on hardware (APRS-02 still open); Supreme 220 compile-only, field confirmation owed; RAK4631
 deep-sleep path changed (218, 221) without a re-run, node sits in System OFF; T114/T-Echo
-compile-only. Next: flash 98/93/14/90/92 with the release image, APRS-02 proof, then the PR for
-212-217 (APRS-04).
+compile-only. **Fleet flashed with the release image 2026-09-12 late**: DK5EN-93 and -92 over
+USB (esptool, T-Beam at 460800), DK5EN-90 over serial DFU after its reset button, DK5EN-14
+(192.168.68.73, `dk5en-14.local`) and dk5en-98 over `tools/webflash.py`; all five report build
+Sep 12 2026 and `build 20260912`, radios listening. Tool note: on the T-Deck the webflash
+"node up" poll accepted the old app's page before the reboot and the final query then failed
+("Meshcom ? build ?") -- the flash itself succeeded; the poll should compare the build string
+against the pre-OTA one. Next: APRS-02 proof on the fleet, then the PR for 212-217 (APRS-04).
 
 ## Consolidated open list, 2026-09-11 evening
 
