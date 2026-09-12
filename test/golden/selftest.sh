@@ -20,6 +20,8 @@ python3 test/golden/compare_udp.py --self-test
 python3 test/golden/compare_extudp.py --self-test
 python3 test/golden/radio_units_lint.py --self-test
 python3 test/golden/radio_units_lint.py
+python3 test/golden/twin_stub_lint.py --self-test
+python3 test/golden/twin_stub_lint.py
 python3 test/golden/verify_captures.py
 python3 test/golden/corpus_lint.py test/golden/corpus/
 python3 -m unittest discover tools/mock 2>&1 | tail -3

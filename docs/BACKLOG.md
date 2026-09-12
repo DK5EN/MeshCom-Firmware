@@ -4209,10 +4209,96 @@ established them:
 - `ttgo_tbeam`'s `upload_command` hardcodes `-b 921600`, which that board does
   not tolerate. `esptool.py` at 460800 works first try.
 
-**Next:** `B4`, the `N1` characterization tests. `U2` and `U6` twins are hours
-of work; `U1` is the plan's 6-8 day estimate and dominates -- its ESP32 handler
-alone calls about 30 project symbols that need recording sinks on both
-platforms in one native binary.
+**Next:** `B4`, the `N1` characterization tests -- see the B4 status below.
+The estimate that stood here ("`U2` and `U6` twins are hours of work") was
+wrong for `U2` and is corrected there.
+
+#### Phase B4 status, 2026-09-12: the first two `N1` twins
+
+| Unit | Test                 | Env                             | Commit     |
+| ---- | -------------------- | ------------------------------- | ---------- |
+| `U6` | `test_country_twin`  | `native_country_esp32`/`_nrf52` | `e662a6d1` |
+| `U2` | `test_udp_send_twin` | `native_udp_send_twin`          | pending    |
+
+**A `C2`-shaped correction, and the same mistake the `C3` row made.** The plan
+put `U2` at "hours": `C2` had already made the socket write replaceable, so
+the drain looked ready to test. It was not. `sendMeshComUDP()` still lived in
+`udp_functions.cpp` (`esp_task_wdt.h`, `web_functions.h`, ArduinoJson) and
+`sendUDP()` in `nrf52_main.cpp` (SPI, the WisBlock API); **neither TU compiles
+on a host**, so neither drain could be linked into a native binary however
+replaceable its sink was. `C2` did what its row asked -- the row was not
+sufficient for the test `N1` asks for. That is the identical error the `C3`
+row made about `Serial`: both rows named the wrong obstacle, and in both cases
+the real one was the translation unit, not the call. **Carve commit
+`329b1bac`** moved both bodies out unchanged (138 and 99 lines, diffed
+byte-identical against `HEAD`); 32/32 envs, regions byte-identical on
+`ttgo_tbeam` and `E22_XML-DevKitC`.
+
+Corrected estimate, since the plan's is now known to be wrong: **`U2`'s twin
+is roughly `U1`-sized, not a fraction of it.** `U6` was the cheap twin and it
+is done.
+
+**The twin is one binary, not two.** Unlike `U6` (built twice with different
+macros), the two drains have different names -- `sendMeshComUDP()` against
+`sendUDP()` -- so both TUs link together and share one `ringBufferUDPout`.
+The same ring is drained by both implementations in one process, which makes
+the comparison a real differential rather than two runs compared through
+files. 15 cases: 7 pin agreement, 6 pin drift, 2 pin the decode contract.
+
+**Six drifts are now pinned and will fail on change**, rather than living in a
+comment:
+
+| Drift                                   | ESP32                                                         | nRF52                                                     |
+| --------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
+| preconditions before draining           | `bWIFIAP`, `hasIPaddress`, `node_hostip`                      | none                                                      |
+| decode + print after a **failed** write | yes                                                           | no (inside the `else`)                                    |
+| `endPacket()` after a failed write      | yes                                                           | inside `NrfETH::sendUDP`                                  |
+| on the pass that trips `MAX_ERR_UDP_TX` | resets socket, **returns before the advance** -- slot retried | resets DHCP, **falls through** -- slot zeroed and dropped |
+| `RX-01` unconfigured-source guard       | yes                                                           | none                                                      |
+| print prefix under `bDisplayVia`        | `"TX-UDP "` always                                            | `"[MESHu]...TX-UDP  "`                                    |
+
+The error-limit row is the sharpest: one side loses a frame on every socket
+reset, the other can wedge on a permanently-failing slot. Which is correct is
+a `D1-06` drift-matrix decision; that they differ is now a failing test.
+
+**The twin was mutation-tested, not just run green.** Nine mutations were
+applied to the two drains one at a time; eight were caught:
+
+| Mutation                                             | Caught       |
+| ---------------------------------------------------- | ------------ |
+| ESP32 loses the early return after `resetMeshComUDP` | yes          |
+| ESP32 sends from offset 0 instead of 1               | yes          |
+| ESP32 drops the `bWIFIAP` precondition               | yes          |
+| ESP32 / nRF52 lose the `CONC-16` advance guard       | yes, both    |
+| nRF52 grows the ESP32 `RX-01` guard                  | yes          |
+| nRF52 stops zeroing the sent slot                    | yes          |
+| ESP32 / nRF52 `aprs_len` regresses to `msg_len`      | **no, both** |
+
+**`GLD-02` (new): the `CONC-16` `aprs_len` fix is not observable at this
+boundary.** Mutating `aprs_len = msg_len - 36` back to `msg_len` on either
+side leaves the twin green, and so does asserting on the decoded payload and
+on the decoded length. That is not a weak assertion: `decodeAPRS()` walks the
+frame's own structure and barely uses its `size` argument, and the snapshot
+the copy reads from is oversized and zero-filled precisely so a 36-byte
+overrun lands in padding. The fix is a correctness fix for the **read**, not
+a behaviour change, and cannot be regression-tested from a behavioural twin.
+Catching it needs a bounds check over the drain (ASan in the native env), not
+a stronger assertion. Filed rather than hidden, because the first version of
+this test claimed to cover it and did not.
+
+**Three shared native support headers grew**, each additively and each because
+the drain needed something the hardware headers already provide:
+`test/support/Arduino.h` now includes `IPAddress.h` (both cores pull it in
+through `Arduino.h`); `IPAddress.h` gained `toString()` (ESP32 only on
+hardware -- the Adafruit core has none, which is why `nrf_eth.cpp` formats by
+octet); `test/support/nrf52/WisBlock-API.h` gained `node_hasIPaddress`.
+
+**`twin_stub_lint.py` (new).** The twin shadows `udp_functions.h` and
+`nrf52/nrf_eth.h`, which is the risk it exists for: a stub whose types have
+drifted from the header under test passes, and passes about something that is
+not the shipped declaration. Every declaration a stub copies must appear
+byte-identical in its real counterpart; a subset is fine by design, a `bool`
+that became an `int` is not. Six self-test cases, wired into `selftest.sh`.
 
 **What decision 5 costs, stated plainly so no later reader mistakes G1 for
 more than it is.** Seven of the nine units under unification have no hardware

@@ -278,3 +278,10 @@ private:
 };
 
 inline SerialStub Serial;
+
+// The ESP32 and nRF52 cores both pull IPAddress in through Arduino.h, so a TU
+// that only includes <Arduino.h> still has the type on hardware. Native did
+// not, which is why esp32/udp_drain_esp32.cpp (U2 twin) could not compile
+// until this line existed. Kept at the end of the file: IPAddress.h needs
+// String, which is defined above.
+#include <IPAddress.h>

@@ -28,6 +28,10 @@ typedef struct
     int  node_country = 0;
     int  max_hop_text = 0;
     int  max_hop_pos = 0;
+    // U2 twin: the ESP32 drain mirrors its hasIPaddress into the settings
+    // blob when the TX error limit trips. Verbatim from both platform
+    // headers (esp32_flash.h:206, nrf52/WisBlock-API.h:372).
+    bool node_hasIPaddress = false;
 } s_meshcom_settings;
 
 extern s_meshcom_settings meshcom_settings;

@@ -69,8 +69,9 @@ one to update when an item moves.
 
 **F. DRY unification and RAM: the one-shot PR — IN EXECUTION on `dry-unification`**
 
-Phase A done except `P0.9`. **Phase B done: all five carve-outs are in and G1 is
-complete and clean.** Base tagged `dry-base-20260911`. BACKLOG §3.8af carries
+Phase A done except `P0.9`. **Phase B: all five carve-outs are in, G1 is
+complete and clean, and `B4` has its first two twins.** Base tagged
+`dry-base-20260911`. BACKLOG §3.8af carries
 the status tables, the decisions and the bench lessons; the Gantt
 (`docs/dry-unification-gantt-20260910.html`, copy on the Desktop) shows the
 same stand as a vertical bar positioned by plan progress.
@@ -93,19 +94,38 @@ measurement, and §9's pass criteria must say so.
 
 **Next, in order:**
 
-1. **B4 — the `N1` characterization tests.** `U2` (the three socket primitives
-   from `C2`) and `U6` (`countryProfile()`, all 15 codes on both `#if` sides)
-   are hours of work each. `U1` is the plan's 6-8 day estimate and dominates:
-   its ESP32 handler alone calls ~30 project symbols that need recording sinks
-   for both platforms in one native binary.
-2. `GLD-01` — the G0 EXTUDP baseline is truncated at 160 characters, the
+1. **B4 — the `N1` characterization tests.** Two are in: `U6`
+   (`test_country_twin`, `e662a6d1`) and `U2` (`test_udp_send_twin`, 15 cases
+   — 7 agreement, 6 drift, 2 decode contract).
+
+   The plan's "`U2` is hours of work" was wrong and is corrected in the
+   BACKLOG. `C2` made the socket write replaceable, but both drains still
+   lived in TUs that never compile on a host, so neither could be linked into
+   a native binary at all — the same mistake the `C3` row made about `Serial`.
+   Carve `329b1bac` fixed that; **`U2`'s twin came in roughly `U1`-sized.**
+   `U6` was the cheap one.
+
+   Remaining, and `U1` still dominates at the plan's 6-8 days: its ESP32
+   handler alone calls ~30 project symbols that need recording sinks for both
+   platforms in one native binary. Then `U3` (`test_serial_command_twin`),
+   `U4` (settings layout/NVS keys/schema), `U5` (`test_command_ladder_order`),
+   `test_aprs_epilogue`, `test_mheard_render`, `test_variant_macros`.
+
+2. `GLD-02` — the `CONC-16` `aprs_len` fix is **not observable** at the
+   drain's boundary: mutating it back leaves the `U2` twin green, because
+   `decodeAPRS()` barely uses its `size` argument and the snapshot is
+   oversized and zero-filled so the overrun lands in padding. It is a
+   correctness fix for the read, not a behaviour change. Needs ASan over the
+   native drain env, not a stronger assertion. Filed because the first draft
+   of that test claimed to cover it and did not.
+3. `GLD-01` — the G0 EXTUDP baseline is truncated at 160 characters, the
    normalizer does not mask EXTUDP's live readings, and `compare_extudp.py`
    therefore compares destinations and bodies rather than whole payloads.
    Until that is settled, EXTUDP is a partially compared surface.
-3. `D1-10` — the loop scheduler, the half of the `C4` plan row that is not
+4. `D1-10` — the loop scheduler, the half of the `C4` plan row that is not
    carved.
-4. `P0.9` protocol templates — last open phase-0 item.
-5. `RF-04` (guard band ten times too wide, a behaviour change on ESP32 too) and
+5. `P0.9` protocol templates — last open phase-0 item.
+6. `RF-04` (guard band ten times too wide, a behaviour change on ESP32 too) and
    `RF-07` (lone `BOARD_RAK4630` guard on the display-queue critical sections,
    unverified) — filed, not fixed, and independent of this campaign.
 
