@@ -41,6 +41,29 @@ PSRAM/tinyxml2 bloat that has nothing to do with settings persistence; it is not
 nRF52 flash headroom for a ~2.9 KB text table, which this measurement checks directly rather
 than inferring by analogy.
 
+### 1a. Re-verified after waves 1 and 2 (same day, later)
+
+The headroom figures below were taken before `W1`/`W2` landed, and those waves
+moved both flash and RAM. Re-measured on the post-`W2` tree rather than assumed
+to still hold:
+
+| env               | flash free, at measurement | flash free, now | RAM free, now |
+| ----------------- | -------------------------: | --------------: | ------------: |
+| `wiscore_rak4631` |                    148 656 |     **149 304** |       163 516 |
+| `heltec_t114`     |                    218 184 |     **218 896** |       151 812 |
+| `t_echo`          |                    192 156 |     **192 908** |       159 692 |
+
+Every env gained a little -- `W2`'s `String`-table conversions returned flash as
+well as RAM (-648 B RAM and -688 B flash on `wiscore_rak4631` alone). **The
+verdict is unchanged and now sits on slightly more margin**: the persist set's
+worst case is 2 937 B string-keyed against 149 kB free on the tightest env, a
+50x margin. Nothing about `W3` should be decided on flash bytes.
+
+The one number worth restating, because it is the one that could still bite:
+the 15 592 B `config_json.cpp` already costs is **already paid** -- it is in the
+image today. The keyed store reuses that table and its formatting rather than
+adding a second one, so it is not a second 15 kB.
+
 ## 2. Baseline: current struct and file size
 
 **Method: read the real linked symbol, not a synthetic probe.** `s_meshcom_settings` is a real
