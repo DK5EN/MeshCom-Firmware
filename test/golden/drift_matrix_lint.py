@@ -15,6 +15,21 @@ loudly on exactly those three holes, plus the structural ones (missing
 header column, duplicate id, an enum value that isn't one of the ones the
 testplan defines).
 
+THE THREE PHASES, and why they exist in this order:
+
+  --phase pre-review     verdicts may be empty (the M2 review has not happened)
+  --phase implementation verdicts REQUIRED; asserting_test may be empty
+                         (decided, but the waves have not written the tests yet)
+  (default)              everything required -- the end state
+
+Each is strictly stricter than the last, and each is TEMPORARY except the
+default. `pre-review` became obsolete on 2026-09-12 when the M2 review filled
+all 29 verdicts; `implementation` should be dropped the moment every row names
+a test that exists. A phase flag left in place after its window has passed is
+how a requirement quietly expires, so both print a warning saying so on every
+run. Nothing downgrades an asserting_test NAME that does not resolve: that is
+a typo or a rename in every phase, never a gap.
+
 `asserting_test` resolution rule -- and why it is exact, not fuzzy:
     A CSV cell resolves to a real test only if it matches, character for
     character, either
@@ -244,7 +259,7 @@ def analyze(csv_text: str, test_dirs: Set[str], envs: Set[str], phase: str,
             # it becomes a violation. A row that instead spells the gap out in
             # prose ("none yet") is worse than empty: it reads like a name.
             result.missing_test_count += 1
-            if phase != "pre-review":
+            if phase not in ("pre-review", "implementation"):
                 result.violations.append(
                     f"{row_label}: asserting_test is empty -- name the test "
                     f"that will fail if this decision is not implemented")
@@ -445,6 +460,31 @@ def self_test() -> int:
           f"violation even pre-review: {r.violations}")
     ok = ok and good
 
+    # --- the implementation phase: verdicts hard, missing tests counted ---
+    # Guards the one way this phase could be wrong: it must NOT also let an
+    # empty verdict through, or it would silently become pre-review.
+    impl_no_test = csv_of(merged(asserting_test="", verdict="esp32-correct"))
+    r = analyze(impl_no_test, fake_dirs, fake_envs, "implementation")
+    good = (not r.fatal and r.missing_test_count == 1 and not r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} implementation phase downgrades an empty "
+          f"asserting_test: missing_test_count={r.missing_test_count}, "
+          f"violations={len(r.violations)}")
+    ok = ok and good
+
+    impl_no_verdict = csv_of(merged(verdict="", asserting_test="zero_scan"))
+    r = analyze(impl_no_verdict, fake_dirs, fake_envs, "implementation")
+    good = (not r.fatal and any("empty verdict" in v for v in r.violations))
+    print(f"  {'ok ' if good else 'FAIL'} implementation phase still FAILS an empty "
+          f"verdict (must not become pre-review): {r.violations}")
+    ok = ok and good
+
+    r = analyze(csv_of(merged(asserting_test="no_such_suite")),
+                fake_dirs, fake_envs, "implementation")
+    good = (not r.fatal and any("does not resolve" in v for v in r.violations))
+    print(f"  {'ok ' if good else 'FAIL'} implementation phase still FAILS an "
+          f"unresolvable asserting_test name: {r.violations}")
+    ok = ok and good
+
     # --- asserting_test resolution rule itself, in isolation ---
     resolution_cases = [
         ("bare name matching a test dir", "zero_scan", True),
@@ -478,7 +518,8 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument(
-        "--phase", choices=["default", "pre-review"], default="default",
+        "--phase", choices=["default", "pre-review", "implementation"],
+        default="default",
         help="'pre-review' downgrades the empty-verdict check to a reported "
              "count (still exits 0) while keeping every other check hard. "
              "TEMPORARY -- stop passing this once the §5.3 review session "
@@ -494,6 +535,13 @@ def main() -> int:
         return 1
 
     print(f"{result.row_count} row(s) checked (phase={args.phase})")
+    if args.phase == "implementation":
+        print(
+            f"phase=implementation: {result.missing_test_count} row(s) with no "
+            f"asserting_test yet -- decided but not yet implemented, so the test "
+            f"that would fail does not exist. TEMPORARY: drop this flag once the "
+            f"unification waves have written them; verdicts are already enforced "
+            f"hard in this phase")
     if args.phase == "pre-review":
         print(
             f"phase=pre-review: {result.empty_verdict_count} row(s) with "
