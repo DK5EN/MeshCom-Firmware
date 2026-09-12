@@ -3281,15 +3281,9 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-    if(commandCheck(msg_text+2, (char*)"softser app") == 0)
-    {
-        strSOFTSER_BUF="";
-
-        bSOFTSER_APP = true;
-        
-        return;
-    }
-    else
+    // "softser app0" must be tested before "softser app": commandCheck() is a
+    // prefix match, so the shorter name would otherwise shadow the longer one
+    // and iNextTelemetry=0 below would never run.
     if(commandCheck(msg_text+2, (char*)"softser app0") == 0)
     {
         iNextTelemetry = 0;
@@ -3297,7 +3291,16 @@ void commandAction(char *umsg_text, bool ble)
         strSOFTSER_BUF="";
 
         bSOFTSER_APP = true;
-        
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"softser app") == 0)
+    {
+        strSOFTSER_BUF="";
+
+        bSOFTSER_APP = true;
+
         return;
     }
     else
