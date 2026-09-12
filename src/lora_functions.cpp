@@ -153,6 +153,22 @@ int8_t  pendingDisplaySnr = 0;
 portMUX_TYPE displayMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
+// RF-07 (BACKLOG): this guard reads as RAK-only but is not. `BOARD_RAK4630`
+// is defined for ALL THREE nRF52 boards -- platformio.ini's shared
+// [nrf52_base] build_flags carries `-D BOARD_RAK4630="RAK4630"` and both
+// heltec_t114 and t_echo build on `${nrf52_base.build_flags}`, deliberately
+// (platformio.ini's own comment: "ABSICHTLICH mitgeerbt ... schaltet ueber
+// 60 nRF52-Codestellen frei"). Verified by compiling this TU for both envs
+// (`pio run -e heltec_t114/t_echo -t compiledb`) and grepping the resulting
+// command line: BOARD_RAK4630 is present on both. So the critical section
+// below already compiles in on T114/T-Echo, matching the consumer side
+// (nrf52_main.cpp's unconditional taskENTER_CRITICAL() around the drain,
+// which every nRF52 board builds). Same producer/consumer split as RAK4631
+// (OnRxDone runs in the FreeRTOS timer-service task, prio 2, see C-01 /
+// architecture/09-concurrency-map.md; the drain runs in loop() at prio 1),
+// so the race this guards against is real on T114/T-Echo too -- and already
+// covered. Closed as NOT a defect; do not widen this to `|| USE_HELTEC_T114
+// || BOARD_T_ECHO`, that would be a no-op at best and misleading at worst.
 // Queue display text update for main loop execution
 static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
@@ -169,6 +185,8 @@ static void queueDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t s
 }
 
 // Queue display position update for main loop execution
+// RF-07: same BOARD_RAK4630 note as queueDisplayText() above -- already
+// covers T114/T-Echo, see there.
 static void queueDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 {
 #if defined(BOARD_RAK4630)
