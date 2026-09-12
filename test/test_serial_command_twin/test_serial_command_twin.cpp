@@ -144,6 +144,14 @@ int printfdeb(const char *format, ...)
 void setMsgOrigin(MsgOrigin origin) { g_origin_calls.push_back((int)origin); }
 MsgOrigin getMsgOrigin(void) { return g_origin_calls.empty() ? ORIGIN_NONE : (MsgOrigin)g_origin_calls.back(); }
 
+// Declared under #ifdef UNIT_TEST in serial_command_{esp32,nrf52}.cpp (both
+// native test environments define UNIT_TEST; no firmware build does). Gives
+// this test direct read access to the otherwise file-static parser buffer,
+// for the overflow case below where inferring state from behavior alone
+// would leave the "still NUL-terminated" claim unproven.
+extern const char *test_get_strText(void);
+extern int test_get_iTxtPos(void);
+
 // net console (stubs/net_console.h): declared unconditionally there so the
 // ESP32 copy's `#ifndef DISABLE_NET_CONSOLE` block compiles; on the nRF52
 // side these are defined but never called (that absence of a call is the
@@ -417,6 +425,66 @@ static void test_stale_buffer_content_does_not_leak_between_calls(void)
 }
 
 // ---------------------------------------------------------------------------
+// REGRESSION: the 600-byte overflow (write-before-check-order bug).
+//
+// strText[iTxtPos] used to be written BEFORE checking iTxtPos against
+// capacity, not after. iTxtPos saturates at 599 (sizeof(strText)-1), but
+// under the old order the write at index 599 kept happening on every byte
+// past the 599-byte boundary -- so a line of 600+ bytes with no NUL and no
+// CR/LF destroyed the array's only implicit terminator (strText[599], never
+// otherwise written). The very next statement, unconditional on every call,
+// is `iTxtLen = strlen(strText)`, which then ran past the 600-byte array
+// into adjacent BSS. That bogus length almost always disagreed with iTxtPos,
+// so the "self-healing" check a few lines down would silently memset the
+// buffer back to empty mid-overflow -- observable here as a command sent
+// right after the overflow executing as if the parser had never seen the
+// overflow at all. (capacity_boundary, above, exercises the SAFE 599-byte
+// boundary and was never able to reach this: it stops one byte short of the
+// bug on purpose.)
+static void test_overflow_line_stays_terminated_no_silent_reset(void)
+{
+    resetRecorders();
+
+    // Trigger-prefixed line, 702 bytes total, no NUL/CR/LF anywhere -- past
+    // both the 599-byte safe boundary and the 600-byte array itself, and
+    // with nothing in it that could ever complete the line.
+    std::string overflow = "--" + std::string(700, 'A');
+    feed_serial_and_pump(overflow);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE((int)overflow.size(), g_echo_count,
+                                  "every overflow byte should still be echoed even once storage is full");
+    TEST_ASSERT_TRUE_MESSAGE(g_sendMessage_calls.empty() && g_commandAction_calls.empty(),
+                             "an unterminated line must never fire a command");
+
+    // The direct check the brief calls for: NUL-terminated, strlen bounded.
+    const char *raw = test_get_strText();
+    size_t len = strlen(raw);   // the same read checkSerialCommand() itself performs;
+                                 // it stays in-bounds here only because the fix holds
+    TEST_ASSERT_TRUE_MESSAGE(len <= 599, "strlen(strText) ran past the 600-byte array");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(599, (int)len,
+                                  "buffer should be saturated at 599 bytes, terminator intact "
+                                  "at strText[599]");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(599, test_get_iTxtPos(),
+                                  "iTxtPos should stay saturated at 599, not corrupted or reset");
+
+    // Durability check: a fresh, complete command sent right after the
+    // overflow must be swallowed (the saturated buffer drops every further
+    // byte), not executed as if the overflow had silently reset the parser
+    // to empty -- which is exactly what the old bug did whenever the OOB
+    // strlen() happened to disagree with iTxtPos.
+    feed_serial_and_pump("--info\r");
+    TEST_ASSERT_TRUE_MESSAGE(g_commandAction_calls.empty(),
+                             "a command executed right after the overflow as if the buffer had "
+                             "been silently reset -- the terminator did not survive");
+
+    // strText/iTxtPos (file-static in the src .cpp, no accessor to reset them)
+    // are left saturated on purpose -- that saturation IS what this test
+    // proves durable. Nothing else in this binary can un-stick it (no stray
+    // NUL ever reaches strText; input NULs are filtered before storage), so
+    // this test must stay last in RUN_TEST order below.
+}
+
+// ---------------------------------------------------------------------------
 // DRIFT: the net console. ESP32 also reads it; nRF52 has none at all --
 // not "reads it and ignores it", literally no call to either function.
 // ---------------------------------------------------------------------------
@@ -472,5 +540,6 @@ int main(int, char **)
     RUN_TEST(test_origin_bracket_set_and_cleared_around_sendmessage);
     RUN_TEST(test_stale_buffer_content_does_not_leak_between_calls);
     RUN_TEST(test_drift_net_console_esp32_only_nrf52_ignores_it);
+    RUN_TEST(test_overflow_line_stays_terminated_no_silent_reset);   // must stay last, see its comment
     return UNITY_END();
 }

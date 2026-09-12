@@ -16,6 +16,17 @@ static char strText[600] = {0};
 static int iTxtPos = 0;
 static int iTxtLen = 0;
 
+#ifdef UNIT_TEST
+// Test-only accessors: strText/iTxtPos are otherwise file-static, with no
+// header declaring them extern (see the comment above). UNIT_TEST is defined
+// only by the native test environments, never by a firmware build, so these
+// never ship. Added for test_serial_command_twin.cpp's 600-byte overflow
+// case, which needs to see whether the terminator actually survived rather
+// than infer it from behavior alone.
+const char *test_get_strText(void) { return strText; }
+int test_get_iTxtPos(void) { return iTxtPos; }
+#endif
+
 void checkSerialCommand(void)
 {
     // Serial available
@@ -30,9 +41,13 @@ void checkSerialCommand(void)
             if(rd != 0x00)
             {
                 printdeb(rd);   // echo to USB + net console via MSerial
-                strText[iTxtPos] = rd;
+                // Check capacity before writing, not after: strText[599] must
+                // stay the terminator once iTxtPos saturates there, or a
+                // 600-byte line with no NUL/CR/LF overwrites it and strlen()
+                // runs into adjacent BSS.
                 if(iTxtPos < (int)sizeof(strText) - 1)
                 {
+                    strText[iTxtPos] = rd;
                     iTxtPos++;
                 }
             }
@@ -53,9 +68,13 @@ void checkSerialCommand(void)
         else if(rd != '\r' && rd != 0x00)   // strip CR, keep LF; drop NUL (see above)
         {
             printdeb(rd);       // echo back via MSerial (server-side echo)
-            strText[iTxtPos] = rd;
-            if(iTxtPos < sizeof(strText) - 1)
+            // Check capacity before writing, not after: strText[599] must
+            // stay the terminator once iTxtPos saturates there, or a
+            // 600-byte line with no NUL/CR/LF overwrites it and strlen()
+            // runs into adjacent BSS.
+            if(iTxtPos < (int)sizeof(strText) - 1)
             {
+                strText[iTxtPos] = rd;
                 iTxtPos++;
             }
         }
