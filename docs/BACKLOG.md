@@ -4226,6 +4226,115 @@ established them:
 The estimate that stood here ("`U2` and `U6` twins are hours of work") was
 wrong for `U2` and is corrected there.
 
+#### `D1-04` target architecture: schema-driven settings, decided 2026-09-12
+
+`W3`'s destination, so the wave has something to build towards rather than
+"unify the struct". Written after the 2026-09-12 settings work, which is what
+exposed the shape of the problem.
+
+##### What is actually wrong today
+
+Not that there are two structs. That the **on-disk format IS a C struct**, on
+one of the two platforms:
+
+| platform | how settings persist                                                               | consequence of a layout change                 |
+| -------- | ---------------------------------------------------------------------------------- | ---------------------------------------------- |
+| ESP32    | ~266 individual NVS key/value pairs                                                | none -- fields are addressed by name           |
+| nRF52    | `lora_file.read((uint8_t*)&meshcom_settings, sizeof(...))` (`nrf52_flash.cpp:321`) | the file is a memory image; every offset moves |
+
+That single asymmetry produces every symptom:
+
+- **A frozen twin per generation.** `s_meshcomcompat_settings`
+  (`WisBlock-API.h:413`) exists only to describe the _previous_ byte layout.
+  It must never be tidied -- `:567` still spells `node_gpsbaud`
+  `unsigned int` while the live struct is `uint32_t` -- so the codebase
+  permanently carries a struct that looks like dead style-drift and is
+  actually a wire format. Every future generation adds another.
+- **A size check standing in for a layout check, and a weak one.**
+  `nrf52_flash.cpp:333` compares the stored file size against
+  `sizeof(s_meshcom_settings)` and resets to defaults on mismatch (`N-12`).
+  Its own comment concedes the hole: _padding-neutral field reordering leaves
+  `sizeof` unchanged and passes undetected_. Correctness then rests on a human
+  remembering to bump a version.
+- **Any size change silently wipes.** Not migrates -- `flash_reset()`.
+- **`D1-04` is a one-way door.** Merging the two structs today means picking a
+  byte layout and freezing it, which is why the two mismatches fixed in
+  `64f3cdd1` had to be checked field by field for layout-neutrality before
+  they could ship.
+
+##### The target
+
+**Persistence becomes schema-driven and self-describing on both platforms.**
+The struct stops being a format and goes back to being an implementation
+detail.
+
+The schema already exists and already works: `config_json.cpp`'s `X()` table
+maps JSON key to type to struct member to range to escaping, and drives config
+export/import today.
+
+    X("node_call",     CFG_STR,  node_call,     CFG_NORANGE,      CFG_NOESC)
+    X("node_gpsbaud",  CFG_U32,  node_gpsbaud,  1200.0, 921600.0, CFG_NOESC)
+
+It covers **89 of the 147 struct fields**. One table drives JSON _and_
+persistence; the reader walks records by key.
+
+What that buys, against the list above:
+
+| failure mode today                  | under the target                                   |
+| ----------------------------------- | -------------------------------------------------- |
+| frozen compat struct per generation | **none, ever again** -- no struct is a format      |
+| size check as a layout proxy        | not needed -- records are keyed, not positional    |
+| reordering silently misreads        | impossible                                         |
+| size change wipes                   | unknown key ignored, missing key takes its default |
+| `D1-04` is a one-way door           | the struct may be refactored freely, forever       |
+
+The migration that `OPT-03` approved then becomes **the last one**: read the
+old blob through the existing compat struct once, write the new keyed store,
+retire the compat struct permanently.
+
+##### Work, in dependency order
+
+1. **Triage all 147 fields into persist / runtime-only.** ~58 are outside the
+   `X()` table today and many should stay out (`node_date_*`, `node_age`,
+   `node_ackid` are runtime state). This triage _is_ the `D1-04` audit and is
+   the prerequisite for everything else.
+2. **Extend the `X()` table to the persist set**, with the existing type
+   vocabulary (`CFG_STR/INT/FLT/CHR/U32`).
+3. **Write a keyed store for nRF52** over `InternalFS`. ESP32 already has NVS
+   and needs only to be driven from the same table.
+4. **One-time migration**, using `s_meshcomcompat_settings` for the last time.
+5. **Retire** the compat struct, the `sizeof` check, and the
+   `FLASH_STRUCT_VERSION`-bump discipline.
+6. Only then **merge the two structs** (`D1-04` proper) -- safe now, because
+   layout no longer means anything.
+
+##### The open question, which is NOT settled
+
+**Nobody has measured the nRF52 cost.** `OPT-03` chose migration on the
+premise that "flash is cheap", and that premise is untested for a keyed store:
+a serializer plus per-key overhead costs flash _and_ RAM during load, on the
+platform with 248 KB of RAM -- and `MEM-04` is the standing reminder that
+"there is room" is exactly the assumption that breaks here.
+
+**Size it before committing to step 3**: flash delta on `wiscore_rak4631`,
+`heltec_t114` and `t_echo`, peak RAM during load, and worst-case store size
+for the full persist set. If the keyed store is too expensive, the fallback is
+a tagged record format (2-byte key id + length + value), which keeps
+self-description at much lower cost and still kills the compat struct.
+
+##### Acceptance criteria for `W3`
+
+- One settings struct, both platforms; `settings_layout_lint.py` reports zero
+  esp32-only, zero nrf52-only and zero MISMATCH rows.
+- `s_meshcomcompat_settings` deleted; no struct in the tree is a persistence
+  format.
+- A node configured on the previous firmware keeps every setting across the
+  upgrade, verified on real hardware on both platforms -- not a wipe.
+- Reordering the struct's members changes nothing observable: a test reorders
+  them and the round-trip still passes.
+- The measurement from the open question above is recorded, whichever way it
+  came out.
+
 #### Operator decisions of 2026-09-12
 
 **`OPT-03`, nRF52 settings: MIGRATE, do not wipe.** Flash is not the scarce
