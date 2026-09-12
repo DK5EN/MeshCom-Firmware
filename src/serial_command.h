@@ -10,8 +10,14 @@
 // (esp32/serial_command_esp32.cpp, nrf52/serial_command_nrf52.cpp) rather than
 // being merged here: merging is unification, and which of the two copies is
 // right is a drift-matrix decision that has not been taken. What the carve
-// buys is that both can be linked into one native binary and fed the same byte
-// scripts (test_serial_command_twin, N1).
+// buys is that each can be built into a native binary at all and fed the same
+// byte scripts (test_serial_command_twin, N1).
+//
+// NOT one binary, unlike the U1/U2 twins: both copies define the same symbol,
+// `void checkSerialCommand(void)`, so they collide at link. The twin is built
+// twice (env native_serial_esp32 / native_serial_nrf52) and compared through
+// committed per-side baselines -- the U6 country-twin arrangement. An earlier
+// version of this comment claimed a single binary was possible; it is not.
 //
 // The two differ in exactly two ways today, both preserved:
 //   - ESP32 also reads the net console (nRF52 has none)

@@ -32,6 +32,25 @@ typedef struct
     // blob when the TX error limit trips. Verbatim from both platform
     // headers (esp32_flash.h:206, nrf52/WisBlock-API.h:372).
     bool node_hasIPaddress = false;
+    // U1 twin: both frame handlers read/write node_short in the CONF branch,
+    // and via_functions.cpp (checkVia) reads node_via. Verbatim size and
+    // default from both platform headers (esp32_flash.h:18/:180,
+    // nrf52/WisBlock-API.h:188/:341) -- the two agree on both fields.
+    char node_short[6] = {0x58, 0x58, 0x58, 0x34, 0x30, 0x00};
+    char node_via[40] = {0};
 } s_meshcom_settings;
 
 extern s_meshcom_settings meshcom_settings;
+
+// U1 twin. A REAL DRIFT, not a stub convenience: this function has a
+// different return type per platform --
+//   esp32/esp32_flash.h:245     void save_settings(void);
+//   nrf52/WisBlock-API.h:614    bool save_settings(void);
+// The C++ mangled name ignores the return type, so both spell _Z13save_settingsv
+// and nothing diagnoses the mismatch. This shim is the nRF52 one, so it carries
+// the nRF52 signature. The U1 twin compiles BOTH frame handlers into one binary
+// against this single declaration; that is sound only because neither call site
+// uses the return value (esp32/udp_frame_esp32.cpp:428,
+// nrf52/udp_frame_nrf52.cpp:416). If either ever does, this shim stops being
+// able to serve both sides and the drift has to be resolved for real.
+bool save_settings(void);

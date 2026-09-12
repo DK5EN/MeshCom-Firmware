@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parents[2]
 PAIRS: List[Tuple[str, str]] = [
     ("test/test_udp_send_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_udp_send_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
+    # U1 twin shadows the same two headers for the same reasons.
+    ("test/test_udp_frame_twin/stubs/udp_functions.h", "src/udp_functions.h"),
+    ("test/test_udp_frame_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
 ]
 
 # A declaration is a line that ends in ';' and is not a preprocessor line,
