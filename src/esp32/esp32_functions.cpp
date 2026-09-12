@@ -214,6 +214,16 @@ void initDisplay()
         u8g2->setBusClock(400000);
     #endif
 
+    #if defined(BOARD_TBEAM_V3)
+        // OLED auf demselben Wire-Bus wie PMU, RTC und BME280; der Sensorpfad
+        // faehrt 100 kHz. u8g2 wuerde fuer den SH1106 sonst vor jedem Transfer
+        // 400 kHz setzen (i2c_bus_clock_100kHz = 4). 100 kHz passend zum Rest
+        // des Busses; ein Bild kostet damit ~100 ms statt 570 ms mit
+        // Software-I2C (Feldmeldung T-Beam Supreme 4.35t, siehe den
+        // Konstruktor in loop_functions.cpp).
+        u8g2->setBusClock(100000);
+    #endif
+
     u8g2->begin();
 
     #if defined(BOARD_HELTEC_V3) || defined(BOARD_HELTEC_V4) || defined(BOARD_STICK_V3)
