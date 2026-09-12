@@ -48,7 +48,8 @@ bool udpBeginRaw_esp32();
 bool udpWriteRaw_esp32(const uint8_t *buf, uint16_t len);
 bool udpEndRaw_esp32();
 
-void sendMeshComUDP();
+// sendMeshComUDP() moved to esp32/udp_drain_esp32.cpp (U2 carve)
+#include "udp_drain.h"
 void startMeshComUDP();
 void sendMeshComHeartbeat();
 void resetMeshComUDP();
