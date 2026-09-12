@@ -6,6 +6,41 @@
 // assignment target (meshcom_settings.node_* -> out.*) and `break;` becoming
 // `return true;`.
 
+// RF-08 (BACKLOG), resolved as "not a defect": country 5 ("868") has no real
+// APRS/track sub-channel to assign, unlike every other code (Poland, case 15,
+// is the other literal, but a real one: 434.855). 999 stands in for "none",
+// and is safe *only* because it is out of every actually-shipped radio's
+// tunable range, not because anything here gates it.
+//
+// track mode is reachable on a country-5 node: --track has no country guard
+// (bDisplayTrack in loop_functions.cpp toggles unconditionally), so
+// out.track_freq does reach meshcom_settings.node_track_freq
+// (lora_setchip.cpp:207) and then lora_setchip_aprs()'s ESP32 branch, which
+// reads it straight into `rf_freq` (lora_setchip.cpp:~456) and hands it to
+// lora_setchip_new() -> radio.setFrequency(rf_freq). It stops there: every
+// RadioLib driver this firmware actually instantiates rejects 999 MHz before
+// any register write --
+//   SX1278::setFrequency (SX127X)                 137 ..  525 MHz
+//   SX1262::setFrequency (SX1262X/E22/V3/V4/...)   150 ..  960 MHz
+//   SX1268::setFrequency (SX126X/E22)              410 ..  810 MHz
+// (RadioLib RADIOLIB_CHECK_RANGE in each modules/SX12{6,7}x/*.cpp) -- 999 is
+// above all three ceilings, so setFrequency() returns
+// RADIOLIB_ERR_INVALID_FREQUENCY, lora_setchip_new() returns false
+// (lora_setchip.cpp:~506-509), lora_setchip_aprs() propagates that, and the
+// caller in lora_functions.cpp (~:1888) rolls the TX back -- nothing is ever
+// written to an antenna. An EXTERNAL_RADIO board never even gets that far:
+// lora_setchip_new()'s EXTERNAL_RADIO branch returns before touching rf_freq
+// at all. The nRF52 path is unaffected regardless (lora_setchip.cpp:387
+// hardcodes LORA_APRS_FREQUENCY and never reads node_track_freq).
+//
+// Confirmed 2026-09-12 against the RadioLib version vendored for every board
+// this firmware ships (heltec_wifi_lora_32_V3 checked; SX1278/SX1262/SX1268
+// share the same range macro across envs). If a future RadioLib version, a
+// new chip family, or a change to the EXTERNAL_RADIO bridge removes that
+// range check, this sentinel stops being safe -- re-derive the guard before
+// touching this value, do not just trust the comment.
+#define TRACK_FREQ_NONE_SENTINEL 999 // no APRS/track frequency defined for this region
+
 bool countryProfile(int iCtry, CountryProfile &out)
 {
     switch (iCtry)
@@ -84,13 +119,13 @@ bool countryProfile(int iCtry, CountryProfile &out)
 
             out.sf = LORA_SF;
 
-            out.track_freq = 999;
+            out.track_freq = TRACK_FREQ_NONE_SENTINEL;
 
             out.preamble = 8;
 
             return true;
 
-        case 6:  // 915 ... 
+        case 6:  // 915 ...
 
             #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
                 out.freq = 906875000;
