@@ -2869,7 +2869,22 @@ void esp32loop()
             snprintf(ctemp, sizeof(ctemp), "%04i-%02i-%02i %02i:%02i:%02i",
              meshcom_settings.node_date_year, meshcom_settings.node_date_month, meshcom_settings.node_date_day, meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second);
 
-            memcpy(meshcom_settings.node_update, ctemp, 21);
+            // This was `memcpy(..., ctemp, 21)` against a char[21] field, but
+            // the snprintf above fills exactly 20 bytes (19-char timestamp +
+            // NUL) -- so the 21st byte copied was UNINITIALISED STACK, and it
+            // landed in a settings field. The field is char[20] now and the
+            // copy is bounded by its own size with the terminator written
+            // explicitly, so neither the length nor the NUL depends on what
+            // snprintf happened to leave behind.
+            //
+            // Not formatted straight into node_update the way nrf52_main.cpp
+            // does it: the date fields are plain `int`, so xtensa-gcc cannot
+            // bound "%02i" to two characters and -Werror=format-truncation
+            // rejects a 20-byte target. Formatting into the wide scratch and
+            // copying a provable number of bytes keeps both the bound and the
+            // warning honest.
+            memcpy(meshcom_settings.node_update, ctemp, sizeof(meshcom_settings.node_update) - 1);
+            meshcom_settings.node_update[sizeof(meshcom_settings.node_update) - 1] = 0x00;
 
             #if defined(ENABLE_RTC)
             if(bRTCON && bNTPDateTimeValid) // NTP hat Vorang zur RTC und setzt RTC

@@ -167,7 +167,7 @@ struct s_meshcom_settings
 	int node_mversion = 0;
 	char node_fwversion[8] = {0};
 
-	unsigned long node_gpsbaud = 38400;
+	uint32_t node_gpsbaud = 38400;   // D1-04: one spelling on both platforms; CFG_U32 range 1200..921600 needs 32 bit
 
 	int node_cleanflash = 0;
 
@@ -209,7 +209,7 @@ struct s_meshcom_settings
 	int max_hop_text = 0;
 	int max_hop_pos = 0;
 
-	char node_update[21] = {0};
+	char node_update[20] = {0};   // D1-04: 19-char timestamp + NUL. Was [21]; the 21st byte was filled by a hardcoded memcpy(...,21) from a stack buffer that only had 20 bytes written
 
 	char node_parm_1[100] = {0};
 	char node_parm_t[150] = {0};

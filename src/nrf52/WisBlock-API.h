@@ -328,7 +328,7 @@ struct s_meshcom_settings
 	int node_mversion = 0;
 	char node_fwversion[8] = {0};
 
-	unsigned int node_gpsbaud = 38400;
+	uint32_t node_gpsbaud = 38400;   // D1-04: one spelling on both platforms; CFG_U32 range 1200..921600 needs 32 bit
 
 	int node_cleanflash = 0;
 
