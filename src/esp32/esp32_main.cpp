@@ -240,7 +240,6 @@ bool bTeleFirst = true;
 
 bool bAllStarted = true;
 
-int BattWaitCounter = 0;
 
 #if defined(BOARD_T_ETH_ELITE) || defined(BOARD_T_CONNECT_PRO)
 EspETH neth;
@@ -3528,12 +3527,12 @@ void esp32loop()
         test_inject_service();
 
     if(BattTimeWait == 0)
-        BattTimeWait = millis() - 500;
+        BattTimeWait = millis() - 30000;
 
-    if ((uint32_t)(millis() - BattTimeWait) >= 500)  // 0.5 sec OE3WAS
+    if ((uint32_t)(millis() - BattTimeWait) >= 30000)  // 30 sec -- unified with nRF52 cadence (DRY unification, operator decision
+                                                        // 2026-09-11); the NTC/fan control below used to share this timer but now
+                                                        // runs on its own fast FanTimeWait so 1W-TBeam thermal response stays at 0.5 s
     {
-        BattWaitCounter++;
-
         if (tx_is_active == false && is_receiving == false)
         {
             #if defined(MODUL_FW_TBEAM)
@@ -3546,7 +3545,7 @@ void esp32loop()
                     // no BATT
                     if(global_proz < 0)
                     {
-                        if(bDisplayCont && BattWaitCounter > 20)
+                        if(bDisplayCont)
                             printfdeb("[readBatteryVoltage]...no battery is connected");
                             
                         global_batt = (float)PMU->getVbusVoltage();
@@ -3570,7 +3569,7 @@ void esp32loop()
                     battProbeState = BATT_PROBE_NONE;
                 }
 
-                if(bDisplayCont && BattWaitCounter > 20)
+                if(bDisplayCont)
                     printfdeb("[readBatteryVoltage]...PMU.volt %.1f PMU.proz %i %i\n", global_batt, global_proz, pmu_proz);
             #else
             
@@ -3578,7 +3577,7 @@ void esp32loop()
                 global_proz = mv_to_percent(global_batt);
                 
                 #ifndef USE_BATT
-                if(bDisplayCont && BattWaitCounter > 20)  // neue Ausgabe erfolgt in batt_functions
+                if(bDisplayCont)  // neue Ausgabe erfolgt in batt_functions
                 {
                     #if not defined(BOARD_T_DECK_PRO) and not defined(BOARD_TBEAM_1W)
                     printfdeb("[readBatteryVoltage] %s ... %.2f V %i %% max_batt %.3f V\n", getTimeString().c_str(), global_batt/1000., global_proz, meshcom_settings.node_maxv);
@@ -3592,12 +3591,37 @@ void esp32loop()
             
             #endif
 
-            // [OE3WAS] Lüftersteuerung
-            #if defined(NTC_PIN) && defined(FAN_CTRL) // BOARD_TBEAM_1W
+            // BattWaitCounter is gone: it existed only to throttle the debug
+            // prints above when this block ran every 500 ms (it let them
+            // through on every 21st pass, about every 10 s). The block's own
+            // 30 s cadence is the throttle now, so the counter would have
+            // stretched those prints to roughly every 10 minutes.
+            BattTimeWait = millis();
+        }
+    }
+
+    // [OE3WAS] Lüftersteuerung -- split off from the battery-read block above into its own
+    // 0.5 sec timer (DRY unification, operator decision 2026-09-11): BattTimeWait was slowed
+    // to 30 sec to unify with the nRF52 cadence, but this 1W T-Beam fan/NTC control must not
+    // wait up to 30 sec to react to overtemp -- that would be a thermal regression. Only
+    // LilyGo_T-Beam-1W defines NTC_PIN/FAN_CTRL, so this whole block compiles away elsewhere.
+    #if defined(NTC_PIN) && defined(FAN_CTRL) // BOARD_TBEAM_1W
+    static unsigned long FanTimeWait = 0;
+    static int FanWaitCounter = 0;
+
+    if(FanTimeWait == 0)
+        FanTimeWait = millis() - 500;
+
+    if ((uint32_t)(millis() - FanTimeWait) >= 500)  // 0.5 sec OE3WAS -- kept fast on purpose, see comment above
+    {
+        if (tx_is_active == false && is_receiving == false)
+        {
+            FanWaitCounter++;
+
             float NTCtemp = getTempForNTC();
             if (NTCtemp > 40.0)
             {
-                 digitalWrite(FAN_CTRL, HIGH); 
+                 digitalWrite(FAN_CTRL, HIGH);
             }
             else
             {
@@ -3605,9 +3629,9 @@ void esp32loop()
                     digitalWrite(FAN_CTRL, LOW);
             }
 
-            if(bWXDEBUG && BattWaitCounter > 20)
+            if(bWXDEBUG && FanWaitCounter > 20)
                 printfdeb("%s;[TEMP];%.2f;%s\n", getTimeString().c_str(), NTCtemp, digitalRead(FAN_CTRL) ? "on" : "off");
-                
+
             meshcom_settings.node_ntctemp = NTCtemp;
 
             if(digitalRead(FAN_CTRL) == HIGH)
@@ -3615,16 +3639,15 @@ void esp32loop()
             else
                 meshcom_settings.node_fanon = false;
 
-            #endif
+            FanTimeWait = millis();
 
-            BattTimeWait = millis();
-
-            if(BattWaitCounter > 20)
+            if(FanWaitCounter > 20)
             {
-                BattWaitCounter = 0;
+                FanWaitCounter = 0;
             }
         }
     }
+    #endif
 
     // Heap Monitor — always active, 60s interval
     {
@@ -3810,7 +3833,7 @@ void esp32loop()
         if(INA226TimeWait == 0)
             INA226TimeWait = millis() - 10000;
 
-        if ((uint32_t)(millis() - INA226TimeWait) >= 15000)   // 15 sec
+        if ((uint32_t)(millis() - INA226TimeWait) >= 60000)   // 60 sec -- unified with nRF52 cadence (DRY unification, operator decision 2026-09-11)
         {
             // read INA226 Sensor
             if(loopINA226())
