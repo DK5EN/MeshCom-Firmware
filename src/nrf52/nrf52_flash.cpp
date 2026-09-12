@@ -132,6 +132,12 @@ void init_flash(void)
 		DEBUG_MSG("FLASH", "Loaded settings from keyed store (%u fields set, %u unknown keys, %u malformed lines)",
 				  (unsigned)keyed.stats.fields_set, (unsigned)keyed.stats.unknown_keys,
 				  (unsigned)keyed.stats.malformed_lines);
+		// Permanent diagnostic (not gated by DO_DEBUG, see debugconf.h): which load path this boot
+		// took, plus the DecodeStats a keyed load produced -- see docs/w3-settings-verdict.md's
+		// "sharpest open lead", which this line exists to make reproducible on the console.
+		Serial.printf("[SETST];path;keyed;fields_set=%u;unknown_keys=%u;malformed_lines=%u;lines_total=%u\n",
+					  (unsigned)keyed.stats.fields_set, (unsigned)keyed.stats.unknown_keys,
+					  (unsigned)keyed.stats.malformed_lines, (unsigned)keyed.stats.lines_total);
 		sanitize_loaded_settings();
 		log_settings();
 		init_flash_done = true;
@@ -144,6 +150,14 @@ void init_flash(void)
 				  "*** Keyed settings store present but failed the sanity gate (read_ok=%d fields_set=%u "
 				  "node_call=\"%s\") -- falling back to legacy load ***",
 				  keyed.read_ok ? 1 : 0, (unsigned)keyed.stats.fields_set, meshcom_settings.node_call);
+		Serial.printf("[SETST];path;sanity_gate_rejected;read_ok=%d;fields_set=%u;unknown_keys=%u;"
+					  "malformed_lines=%u;node_call_empty=%d\n",
+					  keyed.read_ok ? 1 : 0, (unsigned)keyed.stats.fields_set, (unsigned)keyed.stats.unknown_keys,
+					  (unsigned)keyed.stats.malformed_lines, meshcom_settings.node_call[0] == '\0' ? 1 : 0);
+	}
+	else
+	{
+		Serial.printf("[SETST];path;keyed_absent\n");
 	}
 
 	// -------------------------------------------------------------------------------------------
@@ -158,6 +172,7 @@ void init_flash(void)
 	if (!lora_file)
 	{
 		DEBUG_MSG("FLASH", "File doesn't exist, force format");
+		Serial.printf("[SETST];flash_reset_reason;legacy_file_missing\n");
 		delay(1000);
 		flash_reset();
 		lora_file.open(settings_name, FILE_O_READ);
@@ -182,6 +197,7 @@ void init_flash(void)
 		DEBUG_MSG("FLASH",
 				  "*** File has pre-compat structure (marker 0x57); no firmware can read this layout any "
 				  "more, resetting to defaults ***");
+		Serial.printf("[SETST];flash_reset_reason;precompat_marker\n");
 		lora_file.close();
 		flash_reset();
 		lora_file.open(settings_name, FILE_O_READ);
@@ -217,6 +233,8 @@ void init_flash(void)
 		// nicht noetig und wuerde auch keine Rekursion ausloesen -- wir lesen direkt die frisch
 		// geschriebene Default-Datei zurueck (einmaliger Reset, kein Retry-Loop).
 		DEBUG_MSG("FLASH", "Invalid data set or size mismatch, resetting to defaults");
+		Serial.printf("[SETST];flash_reset_reason;invalid_marker_or_size;stored_size=%lu;expected=%u\n",
+					  (unsigned long)stored_size, (unsigned)sizeof(s_meshcom_settings));
 		flash_reset();
 		lora_file.open(settings_name, FILE_O_READ);
 		lora_file.read((uint8_t *)&meshcom_settings, sizeof(s_meshcom_settings));
@@ -234,12 +252,14 @@ void init_flash(void)
 	if (settingsStoreSave())
 	{
 		DEBUG_MSG("FLASH", "*** Migrated legacy settings into the keyed store ***");
+		Serial.printf("[SETST];path;legacy_migrated\n");
 	}
 	else
 	{
 		DEBUG_MSG("FLASH",
 				  "*** Migration of legacy settings into the keyed store FAILED -- still running on the "
 				  "legacy struct blob this boot ***");
+		Serial.printf("[SETST];path;legacy_migration_failed\n");
 	}
 
 	init_flash_done = true;
@@ -264,13 +284,25 @@ boolean save_settings(void)
 	// is presumably why the blit version read its own file back and memcmp'd it before writing.
 	//
 	// Deliberately NOT touching the legacy blob (settings_name / lora_file) here any more, and
-	// deliberately NOT deleting it either: it is left on the filesystem exactly as it was at the
-	// moment of migration. That is what lets a downgrade to an older firmware -- one that still
-	// reads the legacy blob and knows nothing about the keyed store -- find its file and come back
-	// to the node's PRE-migration settings: stale, but not wiped. Silently keeping both formats in
-	// sync from here on would require writing the legacy blob on every save forever, which is
-	// exactly the raw-struct fragility (N-12: any layout change wipes the file) this cutover exists
-	// to get away from.
+	// deliberately NOT deleting it either. Silently keeping both formats in sync from here on would
+	// require writing the legacy blob on every save forever, which is exactly the raw-struct
+	// fragility (N-12: any layout change wipes the file) this cutover exists to get away from --
+	// that part of the original reasoning stands.
+	//
+	// WITHDRAWN CLAIM (Fable verdict, docs/w3-settings-verdict.md, Finding 2): an earlier version of
+	// this comment claimed that leaving the legacy blob in place lets a downgrade to an older
+	// firmware recover the node's PRE-migration settings. That is false and must not be
+	// reintroduced: flash_reset() below overwrites the legacy blob with a FRESH DEFAULTS record every
+	// time it runs, including on ordinary reset paths that run AFTER this file's migration has
+	// already happened (e.g. nrf52_main.cpp's layout-mismatch check, reachable on a boot that
+	// loaded the keyed store fine). Nothing after that point ever writes real settings back into the
+	// legacy blob, so a downgrade reads defaults, not the node's prior configuration -- the blob
+	// surviving is an artifact of not bothering to delete it, not a safety net.
+	//
+	// The real recovery story for a bad migration or a bad save is an operator-triggered
+	// configExportJson() backup (src/config_json.cpp) taken BEFORE an upgrade that changes this
+	// store's format -- see docs/bench/w3-baseline/ for what that looks like in practice. There is
+	// currently no on-device fallback that recovers pre-migration settings automatically.
 	bool result = settingsStoreSave();
 
 	log_settings();
@@ -282,18 +314,75 @@ boolean save_settings(void)
  * @brief Reset content of the filesystem
  *
  */
+// Callers (in and outside this file): nrf52_main.cpp on a FLASH_STRUCT_VERSION layout mismatch
+// (reachable AFTER init_flash() already returned successfully via the keyed path -- W3 verdict
+// Finding 2), init_flash() itself on a missing/pre-compat/invalid legacy file, and command
+// handlers. flash_reset()'s own signature (WisBlock-API.h, out of this wave's file set) carries no
+// reason argument, so the reason is logged by each call site immediately before calling this, in
+// the same [SETST] marker style; this function logs only that it was entered and what it did.
 void flash_reset(void)
 {
-	InternalFS.format();
+	Serial.printf("[SETST];flash_reset;enter\n");
+
+	// Targeted removal instead of InternalFS.format() (Fable verdict, docs/w3-settings-verdict.md,
+	// Finding 2): format() erases EVERY file on the internal flash filesystem, not just this
+	// function's own two.
+	//
+	// The worst of that is NOT the settings, and it is worth naming because nothing else in the
+	// tree records it: BLE bonds live on this same filesystem, under BOND_DIR_PRPH
+	// ("/adafruit/bond_prph/", the Adafruit nRF52 core's bonding.cpp), so every format() silently
+	// unpaired every phone that had ever bonded with the node. That damage is invisible from the
+	// settings console, survives no backup, and can only be undone by re-pairing each device by
+	// hand. A settings reset has no business doing it.
+	//
+	// It also erased the keyed store (settings_store_nrf52.cpp) that init_flash()'s
+	// step (a) may already have trusted and returned through on THIS boot before something later
+	// (e.g. the layout-mismatch check in nrf52_main.cpp) calls flash_reset(). Wiping that store just
+	// to rewrite one legacy defaults blob destroyed data this function has no business touching, and
+	// left `save_settings()`'s downgrade-safety-net comment describing a guarantee the code did not
+	// keep (withdrawn above). Remove exactly the two files this function is responsible for instead.
+	// Existence check via open()-then-close, not InternalFS.exists(): both the real Adafruit_LittleFS
+	// and the native test double (test/test_nrf52_settings_paths/stubs/Adafruit_LittleFS.h) already
+	// implement File::open()'s falsy-on-missing-file behaviour -- the same thing `if (!lora_file)`
+	// above already relies on -- so this needs no test-fixture change.
+	bool legacy_existed = lora_file.open(settings_name, FILE_O_READ);
+	lora_file.close();
+	bool legacy_removed = !legacy_existed || InternalFS.remove(settings_name);
+	bool keyed_removed = settingsStoreRemove(); // also removes the keyed store's temp file, if any
+
+	bool wrote_defaults = false;
 	if (lora_file.open(settings_name, FILE_O_WRITE))
 	{
 		// default_settings ist default-konstruiert -> die Member-Initializer in s_meshcom_settings
 		// setzen gueltige Marker (0xAA/MESHCOM_DATA_MARKER) sowie alle Default-Werte.
 		s_meshcom_settings default_settings;
-		lora_file.write((uint8_t *)&default_settings, sizeof(s_meshcom_settings));
+		size_t put = lora_file.write((uint8_t *)&default_settings, sizeof(s_meshcom_settings));
 		lora_file.flush();
 		lora_file.close();
+		wrote_defaults = (put == sizeof(s_meshcom_settings));
 	}
+
+	// InternalFS.format() stays as a genuine fallback, not the normal path: it is the one operation
+	// guaranteed to leave the filesystem in a known, mountable state, and is worth reaching for only
+	// when the targeted removal above or the rewrite that must follow it could not proceed -- a
+	// filesystem that cannot delete its own files or take a fresh write of a few hundred bytes is
+	// suspect enough that starting over is safer than continuing to poke at it file-by-file.
+	if (!legacy_removed || !keyed_removed || !wrote_defaults)
+	{
+		Serial.printf("[SETST];flash_reset;fallback_format;legacy_removed=%d;keyed_removed=%d;wrote_defaults=%d\n",
+					  legacy_removed ? 1 : 0, keyed_removed ? 1 : 0, wrote_defaults ? 1 : 0);
+		InternalFS.format();
+		if (lora_file.open(settings_name, FILE_O_WRITE))
+		{
+			s_meshcom_settings default_settings;
+			size_t put = lora_file.write((uint8_t *)&default_settings, sizeof(s_meshcom_settings));
+			lora_file.flush();
+			lora_file.close();
+			wrote_defaults = (put == sizeof(s_meshcom_settings));
+		}
+	}
+
+	Serial.printf("[SETST];flash_reset;done;wrote_defaults=%d\n", wrote_defaults ? 1 : 0);
 
 	// Cache invalidieren: ohne dies ist der naechste init_flash()-Aufruf ein No-Op (Guard oben),
 	// und save_settings() wuerde die alte RAM-Kopie zurueckschreiben, obwohl das Log einen

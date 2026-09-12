@@ -33,6 +33,10 @@
 #include "esp32/esp32_sleep.h"
 #endif
 
+#if defined(NRF52_SERIES)
+#include "nrf52/settings_store_nrf52.h" // settingsStoreDump() -- --dumpsettings
+#endif
+
 // Sensors
 #include "bmx280.h"
 #include "bmp390.h"
@@ -681,6 +685,27 @@ void commandAction(char *umsg_text, bool ble)
     }
     else
     #endif
+    #if defined(NRF52_SERIES)
+    // --dumpsettings: print the raw contents of the nRF52 keyed settings
+    // store file to the console. Bench diagnostic for the boot-2 settings
+    // loss investigated in docs/w3-settings-verdict.md -- DO_DEBUG 0
+    // compiles out every DEBUG_MSG on the migration/save/load path, so this
+    // is currently the only way to see what actually reached flash, as
+    // opposed to --info, which only ever shows the in-RAM struct.
+    if(commandCheck(msg_text+2, (char*)"dumpsettings") == 0)
+    {
+        bool ok = settingsStoreDump();
+
+        if(ble)
+        {
+            snprintf(print_buff, sizeof(print_buff), "--dumpsettings %s\n", ok ? "ok" : "failed");
+            addBLECommandBack(print_buff);
+        }
+
+        return;
+    }
+    else
+    #endif
     if(commandCheck(msg_text+2, (char*)"reboot") == 0)
     {
         if(ble)
@@ -940,6 +965,8 @@ void commandAction(char *umsg_text, bool ble)
             #endif
             #if defined(NRF52_SERIES)
             printlndeb("--ethstat  Ethernet link/counters\n--udplog on/off  one [UDP] line per datagram\n");
+            delay(100);
+            printlndeb("--dumpsettings  dump the raw keyed settings store file to console\n");
             delay(100);
             #endif
 

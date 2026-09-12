@@ -249,7 +249,7 @@ struct CfgField
     X("node_sset",     CFG_INT,  node_sset,             0.0, 65535.0,       CFG_NOESC)        \
     X("node_maxv",     CFG_FLT,  node_maxv,             0.0, 20.0,          CFG_NOESC)        \
     X("node_extern",   CFG_STR,  node_extern,           CFG_NORANGE,        CFG_NOESC)        \
-    X("max_hop_text",  CFG_INT,  max_hop_text,          (double)MAXHOP_TEXT_MIN, (double)MAXHOP_TEXT_MAX, CFG_NOESC) \
+    X("max_hop_text",  CFG_INT,  max_hop_text,          (double)MAXHOP_TEXT_MIN, (double)MAXHOP_TEXT_MAX, CFG_ESC(0)) \
     X("node_power",    CFG_INT,  node_power,            (double)TX_POWER_MIN, (double)TX_POWER_MAX, CFG_ESC(CFG_POWER_NOT_SET)) \
     X("node_freq",     CFG_FLT,  node_freq,             0.0, 1.0e9,         CFG_NOESC)        \
     X("node_bw",       CFG_FLT,  node_bw,               0.0, 500.0,         CFG_NOESC)        \

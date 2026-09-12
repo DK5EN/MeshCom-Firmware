@@ -70,4 +70,17 @@ bool settingsStoreSave();
 // exactly as today's sanitize/default path does.
 SettingsLoadResult settingsStoreLoad();
 
+// Removes the keyed store's live file and its temp file (if either exists),
+// for flash_reset()'s targeted reset (nrf52_flash.cpp) -- an alternative to
+// InternalFS.format(), which would also erase every OTHER file on the
+// filesystem. "The file did not exist" is not a failure (expected on a
+// first-ever reset); this returns false only when a file that DID exist
+// could not be removed, which is flash_reset()'s signal to fall back to
+// format().
+bool settingsStoreRemove();
+
+// Prints the raw contents of the keyed store to Serial, for bench diagnosis.
+// Returns false if the file does not exist or cannot be read.
+bool settingsStoreDump(void);
+
 #endif // NRF52_SERIES

@@ -24,6 +24,7 @@ namespace
 {
 bool g_armed = false;
 size_t g_target_size = 0;
+bool g_fired = false;
 
 typedef void *(*malloc_fn)(size_t);
 
@@ -36,23 +37,44 @@ malloc_fn real_malloc()
 
 // Test-facing control surface (declared extern "C" so the test .cpp can call
 // it without needing this header).
-extern "C" void mc_arm_malloc_failure(size_t target_size)
+// Arms the next allocation of AT LEAST `min_size` bytes to fail.
+//
+// This used to match on an EXACT size, and that was a defect in the harness,
+// not a detail. The tests armed it with the literal 4096 because that was
+// kSettingsBufferCap at the time. When the cap was raised to 8192,
+// malloc(8192) stopped matching malloc(4096), the injected failure silently
+// never fired, and both "allocation failure" cases went green while testing
+// nothing. A fault injector that quietly stops injecting is worse than none,
+// so the match is a lower bound now, and mc_malloc_failure_fired() lets a
+// test assert the fault actually happened.
+extern "C" void mc_arm_malloc_failure(size_t min_size)
 {
 	g_armed = true;
-	g_target_size = target_size;
+	g_fired = false;
+	g_target_size = min_size;
+}
+
+// True if the armed failure actually fired since arming. A fault-injection
+// test that does not assert this cannot distinguish "the code handled the
+// failure" from "the failure never happened".
+extern "C" bool mc_malloc_failure_fired()
+{
+	return g_fired;
 }
 
 extern "C" void mc_disarm_malloc_failure()
 {
 	g_armed = false;
+	g_fired = false;
 	g_target_size = 0;
 }
 
 extern "C" void *malloc(size_t n)
 {
-	if (g_armed && n == g_target_size)
+	if (g_armed && n >= g_target_size)
 	{
-		g_armed = false; // one-shot: only the next matching-size call fails
+		g_armed = false; // one-shot: only the next matching call fails
+		g_fired = true;
 		return nullptr;
 	}
 	return real_malloc()(n);

@@ -174,11 +174,19 @@ public:
 		if (mode == FILE_O_WRITE)
 		{
 			g_fake_fs.open_write_calls++;
-			// Real LittleFS truncates on write-open; every byte the caller
-			// writes lands only under `path_` (the temp path, for the
-			// settings-store save sequence) -- the destination of a later
-			// rename() is untouched until that call.
-			g_fake_fs.files[path_] = FakeFsState::Entry{};
+			// Real Adafruit_LittleFS's FILE_O_WRITE is LFS_O_RDWR |
+			// LFS_O_CREAT, seeked to END on open (lfs.h) -- it APPENDS, it
+			// does NOT truncate. This used to model truncation instead,
+			// which is wrong and hides a real bug class: every current
+			// product call site (nrf52_flash.cpp's flash_reset(),
+			// settings_store_nrf52.cpp's settingsStoreSave()) removes the
+			// path before opening it for write, so a regression that drops
+			// that remove() would silently double the file's length on real
+			// hardware -- and a fixture that truncates on open would never
+			// catch it (see test_nrf52_settings_paths.cpp's flash_reset()
+			// test, which depends on this being modeled correctly).
+			auto &entry = g_fake_fs.files[path_]; // creates empty if absent, else keeps existing bytes
+			pos_ = entry.data.size();             // append point
 			is_open_ = true;
 			return true;
 		}

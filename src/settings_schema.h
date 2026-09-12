@@ -33,24 +33,35 @@
  * The full reasoning is on the SETTINGS_SCHEMA_ROW macro in the .cpp; do not
  * simplify that expression without reading it.
  *
- * Source of the 15 rows in SETTINGS_PERSIST_ONLY_LIST: doc
+ * Source of the 17 rows in SETTINGS_PERSIST_ONLY_LIST: doc
  * docs/d1-04-settings-field-triage-20260912.md, S4(b) (25 fields persisted in
  * ESP32 NVS, absent from CFG_FIELD_LIST), filtered to
  *   - classified PERSIST in S3 there (all 25 are), MINUS
- *   - the 8 S4(c) fields (classified RUNTIME despite an NVS slot: running
- *     message-id/ack-id counters and last-sensor-reading caches) -- these
- *     must NOT gain a schema row, see the comment block below, MINUS
+ *   - the 6 remaining S4(c) fields (classified RUNTIME despite an NVS slot:
+ *     the last-sensor-reading caches) -- these must NOT gain a schema row,
+ *     see the comment block below, MINUS
  *   - the 2 Arduino String fields (node_audio_start, node_audio_msg) --
  *     settings_store has no String type and writing a heap pointer into a
  *     settings record is exactly the landmine docs/BACKLOG.md's "step 6"
  *     note warns about, see the comment block below.
- * 25 - 8 - 2 = 15 rows, matching settings_schema.cpp's row count.
+ * 25 - 6 - 2 = 17 rows, matching settings_schema.cpp's row count.
+ *
+ * node_msgid and node_ackid were originally counted among the S4(c)
+ * exclusions (8 of them) but are RESTORED here (Fable verdict 2026-09-12,
+ * Finding 3): the triage conflated "deliberately not exported" (correct --
+ * config_json.h explains why a JSON restore must never rewind these
+ * counters) with "deliberately not persisted" (wrong -- the raw-struct blob
+ * on nRF52 persisted every field, so dropping them from the schema was a
+ * behavioural regression, not a carried-over exclusion). See the comment
+ * block below for the corrected reasoning and src/loop_functions.cpp:3331
+ * for the effect (msg_id built from a counter that now restarts at 0 every
+ * reboot, replaying ids into every neighbour's dedup ring).
  *
  * Key spelling: each row uses the field's ESP32 NVS key from
  * src/esp32/esp32_flash.cpp's save_settings()/init_flash(), so a future
  * NVS-driven path and this schema-driven file store address the same field
  * by the same name (same rule CFG_FIELD_LIST already follows for the export
- * table). A member with no NVS key spelling of its own (none of the 15 rows
+ * table). A member with no NVS key spelling of its own (none of the 17 rows
  * below has this case -- every one of them already has an ESP32 NVS key)
  * would use its member name verbatim, per the same rule.
  *
@@ -97,6 +108,12 @@ size_t fieldCount();
     /* one-shot "wipe at next boot" trigger (config_json.h:131-132); NVS key  \
      * is "node_cflash", member is node_cleanflash. */                       \
     X("node_cflash",    CFG_INT, node_cleanflash, CFG_NORANGE, CFG_NOESC)                        \
+    /* Running message-id / ack-id counters (both platforms). Persisted so   \
+     * a reboot does not replay msg_ids the mesh has already seen; NOT in    \
+     * CFG_FIELD_LIST on purpose (config_json.h:362-367) -- restoring a      \
+     * backup must never rewind them. See the comment block below. */       \
+    X("node_msgid",     CFG_INT, node_msgid,      CFG_NORANGE, CFG_NOESC)                        \
+    X("node_ackid",     CFG_INT, node_ackid,      CFG_NORANGE, CFG_NOESC)                        \
     SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)
 
 /* Platform-only persisted-but-not-exported fields: the 11 T-Deck device
@@ -137,20 +154,24 @@ size_t fieldCount();
 #endif
 
 /* Deliberately NOT given a schema row, although each has an ESP32 NVS slot
- * today (triage doc S4(c)): node_msgid, node_ackid, node_temp, node_hum,
- * node_press, node_temp2, node_gas_res, node_co2.
+ * today (triage doc S4(c)): node_temp, node_hum, node_press, node_temp2,
+ * node_gas_res, node_co2 -- the last live sensor readings, not configuration.
+ * config_json.cpp already calls them "not configuration" for the export
+ * table, and the same is true here: two schema-encoded dumps of an
+ * unchanged node would differ solely because a sensor ticked between them.
  *
- * node_msgid / node_ackid are the running message-id / ack-id counters --
- * config_json.cpp already explains why they can never be *imported*
- * (rewinding them would collide with the dedup ring of every neighbour);
- * that reasoning applies just as much to a schema-driven persist path, so
- * they get no descriptor at all rather than a descriptor nothing may safely
- * decode into. node_temp / node_hum / node_press / node_temp2 /
- * node_gas_res / node_co2 are the last live sensor readings, not
- * configuration -- config_json.cpp already calls them "not configuration"
- * for the export table, and the same is true here: two schema-encoded
- * dumps of an unchanged node would differ solely because a sensor ticked
- * between them. */
+ * node_msgid / node_ackid are NOT in this exclusion list -- they DO get a
+ * descriptor, in SETTINGS_PERSIST_ONLY_LIST above, so a schema-driven store
+ * persists them the same way the raw-struct blob always did. What they are
+ * still excluded from is CFG_FIELD_LIST, the JSON export/import table
+ * (config_json.h:362-367): config_json.cpp's reasoning there -- that
+ * *importing* a foreign value would rewind the counter and collide with the
+ * dedup ring of every neighbour -- is a reason to keep them out of a
+ * restorable backup file, not a reason to stop writing them to flash on
+ * every boot. Those are two different questions; treating them as one and
+ * dropping the descriptor entirely was the regression Fable Finding 3
+ * (2026-09-12) caught, since the nRF52's previous raw-struct persistence
+ * covered every field including these two. */
 
 } // namespace settings_schema
 

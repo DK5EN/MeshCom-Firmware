@@ -24,15 +24,38 @@ using namespace Adafruit_LittleFS_Namespace;
 namespace
 {
 
-// Worst-case encoded size for the full persist set, string-keyed, measured
-// in docs/opt07-nrf52-settings-store-sizing-20260912.md: 2 937 B against
-// 149 304 B free flash on wiscore_rak4631 (the tightest nRF52 env). This
-// constant is the BUFFER CAP, not the measured worst case itself, so it
-// needs headroom above 2 937 B: 4096 B gives ~1.4x margin over the measured
-// figure while still being a small fraction of the 149 304 B free-flash
-// budget the same document reports -- a round power of two costs nothing
-// extra there, so there was no reason to cut it closer.
-constexpr size_t kSettingsBufferCap = 4096;
+// Worst-case encoded size for the full persist set, string-keyed. The
+// docs/opt07-nrf52-settings-store-sizing-20260912.md figure of 2 937 B (cited
+// against a 4096 B cap as "50x margin" in docs/BACKLOG.md OPT-07) is
+// SUPERSEDED: it maximised only the STRING fields and left numerics at their
+// struct defaults. The Fable verdict (docs/w3-settings-verdict.md, Finding 1)
+// re-measured with BOTH axes at their worst case together -- every STRING
+// field filled to capacity with backslashes (each escapes to two bytes on
+// the wire, settings_store.h's ENCODE CONTRACT) AND every numeric field at
+// its maximum-width representation (a `double` at "%.17g" is ~24 characters,
+// e.g. "-1.2345678901234567e+308") -- and measured 4 036 B, 60 B under the
+// OLD 4096 B cap.
+//
+// That 4 036 B figure is itself already stale, and the reason matters: the
+// same wave then restored node_msgid and node_ackid to the schema, taking the
+// table from 107 to 109 rows and the worst case to **4 082 B** -- 14 B under
+// the old cap. Re-derived independently twice (orchestrator and advisor) and
+// in agreement. Two routine rows consumed three quarters of what looked like
+// headroom, which is the whole argument for not sizing this to just clear the
+// measurement. Re-measure on any schema change; the sweep lives in the Fable
+// verdict. That is not a margin, it is a live overflow risk
+// for any node whose strings and numerics are both long: encode() would
+// return -1, settingsStoreSave() would return false, and 234 save_settings()
+// call sites across the tree ignore that return value (DO_DEBUG 0 compiles
+// out the DEBUG_MSG that would have said why) -- the setting takes in RAM
+// and silently reverts on the next reboot. Raised to 8192 B: a round power
+// of two giving ~2x margin over the 4 082 B measured worst case, i.e. real
+// headroom rather than a number chosen to just clear it. This buffer is
+// heap-allocated per call (settingsStoreSave()/settingsStoreLoad()), never
+// held for the file's lifetime, and free RAM on wiscore_rak4631 is ~165 kB
+// (docs/bench/w3-baseline/), so the extra 4096 B here costs nothing that
+// matters.
+constexpr size_t kSettingsBufferCap = 8192;
 
 const char kSettingsPath[] = "/MeshCom-Settings-Store";
 const char kSettingsTmpPath[] = "/MeshCom-Settings-Store.tmp";
@@ -51,6 +74,7 @@ bool settingsStoreSave()
 	if (buf == nullptr)
 	{
 		DEBUG_MSG("SETST", "save: malloc(%u) failed", (unsigned)kSettingsBufferCap);
+		Serial.printf("[SETST];save;malloc_failed;cap=%u\n", (unsigned)kSettingsBufferCap);
 		return false;
 	}
 
@@ -63,9 +87,15 @@ bool settingsStoreSave()
 		// is the fix if this ever fires for real; it means the schema grew past the OPT-07 sizing
 		// headroom, not that this call site is doing anything wrong.
 		DEBUG_MSG("SETST", "save: encode() overflowed the %u B buffer", (unsigned)kSettingsBufferCap);
+		// Permanent diagnostic, not gated by DO_DEBUG (see debugconf.h): this is exactly the silent
+		// failure mode of Fable verdict Finding 1 -- settingsStoreSave() is about to return false and
+		// none of save_settings()'s 234 call sites check it, so this line is the only trace this
+		// overflow leaves anywhere.
+		Serial.printf("[SETST];save;overflow;cap=%u\n", (unsigned)kSettingsBufferCap);
 		free(buf);
 		return false;
 	}
+	Serial.printf("[SETST];save;encoded;bytes=%ld\n", written);
 
 	// ---------------------------------------------------------------------
 	// Skip the write entirely when the encoded content is byte-identical to
@@ -111,6 +141,7 @@ bool settingsStoreSave()
 
 		if (identical)
 		{
+			Serial.printf("[SETST];save;skipped_unchanged;bytes=%ld\n", written);
 			free(buf);
 			return true;
 		}
@@ -159,6 +190,7 @@ bool settingsStoreSave()
 
 	if (!write_ok)
 	{
+		Serial.printf("[SETST];save;write_failed;bytes=%ld\n", written);
 		InternalFS.remove(kSettingsTmpPath);
 		return false;
 	}
@@ -166,10 +198,12 @@ bool settingsStoreSave()
 	if (!InternalFS.rename(kSettingsTmpPath, kSettingsPath))
 	{
 		DEBUG_MSG("SETST", "save: rename of temp file onto live path failed");
+		Serial.printf("[SETST];save;rename_failed;bytes=%ld\n", written);
 		InternalFS.remove(kSettingsTmpPath);
 		return false;
 	}
 
+	Serial.printf("[SETST];save;ok;bytes=%ld\n", written);
 	return true;
 }
 
@@ -199,6 +233,7 @@ SettingsLoadResult settingsStoreLoad()
 	if (buf == nullptr)
 	{
 		DEBUG_MSG("SETST", "load: malloc(%u) failed", (unsigned)kSettingsBufferCap);
+		Serial.printf("[SETST];load;malloc_failed;cap=%u\n", (unsigned)kSettingsBufferCap);
 		settings_store_file.close();
 		return result; // file_found=true, read_ok=false, stats default
 	}
@@ -215,6 +250,7 @@ SettingsLoadResult settingsStoreLoad()
 	if (got < 0)
 	{
 		DEBUG_MSG("SETST", "load: read() failed");
+		Serial.printf("[SETST];load;read_failed\n");
 		free(buf);
 		return result; // file_found=true, read_ok=false, stats default
 	}
@@ -236,6 +272,86 @@ SettingsLoadResult settingsStoreLoad()
 
 	free(buf);
 	return result;
+}
+
+namespace
+{
+// Existence check via open()-then-close rather than InternalFS.exists(): both the real
+// Adafruit_LittleFS and the native test double (test/test_nrf52_settings_paths/stubs/
+// Adafruit_LittleFS.h) implement File::open()'s falsy-on-missing-file behaviour (it is exactly what
+// `if (!lora_file)` / `if (!settings_store_file)` already rely on elsewhere in this cutover), so
+// this needs no test-fixture change to work in both the real firmware and the native suite.
+bool fileExists(Adafruit_LittleFS_Namespace::File &file, const char *path)
+{
+	bool found = file.open(path, FILE_O_READ);
+	file.close();
+	return found;
+}
+} // namespace
+
+bool settingsStoreRemove()
+{
+	// "Did not exist" is success, not failure -- checked explicitly (rather than trusting remove()'s
+	// bool return alone) so flash_reset() gets a real signal to fall back to InternalFS.format() only
+	// when a file that DID exist could not be removed, not on the ordinary first-ever-reset case where
+	// neither file has ever been written.
+	bool ok = true;
+
+	if (fileExists(settings_store_file, kSettingsPath))
+	{
+		if (!InternalFS.remove(kSettingsPath))
+		{
+			Serial.printf("[SETST];reset;remove_failed;file=store\n");
+			ok = false;
+		}
+	}
+
+	if (fileExists(settings_store_file, kSettingsTmpPath))
+	{
+		if (!InternalFS.remove(kSettingsTmpPath))
+		{
+			Serial.printf("[SETST];reset;remove_failed;file=store_tmp\n");
+			ok = false;
+		}
+	}
+
+	return ok;
+}
+
+bool settingsStoreDump(void)
+{
+	if (!settings_store_file.open(kSettingsPath, FILE_O_READ))
+	{
+		Serial.printf("[SETST];dump;no_file\n");
+		return false;
+	}
+
+	uint32_t stored_size = settings_store_file.size();
+	Serial.printf("[SETST];dump;begin;bytes=%lu\n", (unsigned long)stored_size);
+
+	// Printed via printf("%.*s", ...) rather than Serial.write(buf, len): the keyed store's content
+	// is text ("key=value\n" lines, settings_store.h), and printf is the one Serial primitive every
+	// build of this codebase already relies on (including the native test double, which stubs only
+	// printf -- see test/test_nrf52_settings_paths/stubs).
+	char chunk[64];
+	uint32_t remaining = stored_size;
+	bool read_error = false;
+	while (remaining > 0)
+	{
+		int want = (int)(remaining < sizeof(chunk) ? remaining : sizeof(chunk));
+		int got = settings_store_file.read(chunk, want);
+		if (got <= 0)
+		{
+			read_error = true;
+			break;
+		}
+		Serial.printf("%.*s", got, chunk);
+		remaining -= (uint32_t)got;
+	}
+	settings_store_file.close();
+
+	Serial.printf("\n[SETST];dump;end;read_error=%d\n", read_error ? 1 : 0);
+	return !read_error;
 }
 
 #endif // NRF52_SERIES

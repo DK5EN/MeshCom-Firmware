@@ -36,7 +36,8 @@
 // injection for the two allocation-failure paths (settingsStoreSave() /
 // settingsStoreLoad(), both `malloc(kSettingsBufferCap)`, 4096 bytes,
 // documented in settings_store_nrf52.cpp).
-extern "C" void mc_arm_malloc_failure(size_t target_size);
+extern "C" void mc_arm_malloc_failure(size_t min_size);
+extern "C" bool mc_malloc_failure_fired();
 extern "C" void mc_disarm_malloc_failure(void);
 
 // ---------------------------------------------------------------------------
@@ -299,9 +300,20 @@ static void test_save_allocation_failure_leaves_everything_untouched(void)
 {
     strncpy(meshcom_settings.node_call, "ALLOC-001", sizeof(meshcom_settings.node_call) - 1);
 
-    mc_arm_malloc_failure(4096);
+    // Lower bound, deliberately NOT kSettingsBufferCap: that constant is
+    // private to settings_store_nrf52.cpp and has already been raised once
+    // (4096 -> 8192). Arming on the exact value made this test silently stop
+    // injecting when the cap moved, and it passed anyway. 1024 is far below
+    // any plausible cap and far above every other allocation on this path.
+    mc_arm_malloc_failure(1024);
     bool ok = settingsStoreSave();
 
+    // Assert the fault ACTUALLY fired before asserting how the code reacted --
+    // without this, "the failure never happened" is indistinguishable from
+    // "the failure was handled", which is exactly how this test went green
+    // while testing nothing.
+    TEST_ASSERT_TRUE_MESSAGE(mc_malloc_failure_fired(),
+                             "injected malloc failure never fired -- the test is not testing anything");
     TEST_ASSERT_FALSE(ok);
     TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedPath));
     TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedTmpPath));
@@ -313,11 +325,110 @@ static void test_load_allocation_failure_reports_read_not_ok(void)
     auto keyed = make_keyed_store("SHOULDNT1");
     g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
 
-    mc_arm_malloc_failure(4096);
+    mc_arm_malloc_failure(1024);   // see the note in the save case above
     SettingsLoadResult r = settingsStoreLoad();
 
+    TEST_ASSERT_TRUE_MESSAGE(mc_malloc_failure_fired(),
+                             "injected malloc failure never fired -- the test is not testing anything");
     TEST_ASSERT_TRUE(r.file_found);
     TEST_ASSERT_FALSE(r.read_ok);
+}
+
+// ---------------------------------------------------------------------------
+// flash_reset() (Fable verdict, docs/w3-settings-verdict.md, Finding 2):
+// targeted removal of its own two files, NOT InternalFS.format(). format()
+// would erase every file on the filesystem, including BLE bond pairings the
+// Adafruit nRF52 core keeps on the same filesystem under BOND_DIR_PRPH
+// (bonding.cpp, "/adafruit/bond_prph/") -- flash_reset() has no business
+// touching those. Also: real FILE_O_WRITE seeks to END rather than
+// truncating (see stubs/Adafruit_LittleFS.h), so the remove() ahead of the
+// defaults rewrite is load-bearing -- drop it and the legacy blob comes back
+// double length instead of an obvious failure.
+// ---------------------------------------------------------------------------
+
+static void test_flash_reset_preserves_bonds_and_writes_exact_length(void)
+{
+    const char *const kBondFile = "/adafruit/bond_prph/1";
+    static const uint8_t bond_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    g_fake_fs.seed(kBondFile, bond_bytes, sizeof(bond_bytes));
+
+    auto legacy = make_legacy_blob("RESET-001");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+
+    auto keyed = make_keyed_store("RESET-001");
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+
+    flash_reset();
+
+    // Unrelated file, entirely outside flash_reset()'s own two -- untouched.
+    TEST_ASSERT_TRUE(g_fake_fs.exists(kBondFile));
+    TEST_ASSERT_EQUAL_INT(0, g_fake_fs.format_calls);
+
+    // The keyed store IS one of flash_reset()'s own two files -- gone.
+    TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedPath));
+
+    // Exactly sizeof(s_meshcom_settings), not double: a missing remove()
+    // before the defaults rewrite would append onto the OLD legacy content
+    // instead of replacing it.
+    const auto *after = g_fake_fs.peek(kLegacyPath);
+    TEST_ASSERT_NOT_NULL(after);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)sizeof(s_meshcom_settings), (uint32_t)after->size());
+}
+
+// ---------------------------------------------------------------------------
+// max_hop_text's 0 sentinel ("nothing stored yet", maxhop.h) must survive a
+// real save/load round trip, mirroring test_node_power_sentinel_survives_
+// round_trip above. CFG_ESC(0) on its config_json.h row (settings_schema.cpp)
+// is what makes this pass: without it, decode()'s has_range clamp would
+// raise a stored 0 up to MAXHOP_TEXT_MIN (1) before sanitize_max_hop_text()
+// ever saw it, and 1 is a legal value there, so it would stick -- pinning
+// the node to one text hop instead of falling back to MAXHOP_TEXT_FALLBACK
+// (4). The poison value below (3) is a real in-range value distinct from
+// both the sentinel (0) and the wrongful clamp target (1), so a pass here
+// cannot be a coincidence of "value happened to already be right".
+// ---------------------------------------------------------------------------
+
+static void test_max_hop_text_sentinel_survives_round_trip(void)
+{
+    meshcom_settings.max_hop_text = 0; // "nothing stored yet"
+    strncpy(meshcom_settings.node_call, "HOP-TEST1", sizeof(meshcom_settings.node_call) - 1);
+
+    TEST_ASSERT_TRUE(settingsStoreSave());
+
+    meshcom_settings = s_meshcom_settings();
+    meshcom_settings.max_hop_text = 3; // poison, see comment above
+
+    SettingsLoadResult r = settingsStoreLoad();
+    TEST_ASSERT_TRUE(r.file_found);
+    TEST_ASSERT_TRUE(r.read_ok);
+    TEST_ASSERT_EQUAL_INT32(0, meshcom_settings.max_hop_text);
+}
+
+// ---------------------------------------------------------------------------
+// node_msgid / node_ackid persistence (Fable verdict, Finding 3): restored to
+// SETTINGS_PERSIST_ONLY_LIST (settings_schema.h) after being dropped from the
+// schema. Losing either row silently restarts that counter at 0 every
+// reboot, replaying msg_ids into every neighbour's dedup ring
+// (src/loop_functions.cpp:3331).
+// ---------------------------------------------------------------------------
+
+static void test_node_msgid_and_ackid_persist_round_trip(void)
+{
+    meshcom_settings.node_msgid = 321;
+    meshcom_settings.node_ackid = 654;
+    strncpy(meshcom_settings.node_call, "MSGID-001", sizeof(meshcom_settings.node_call) - 1);
+
+    TEST_ASSERT_TRUE(settingsStoreSave());
+
+    meshcom_settings = s_meshcom_settings();
+    meshcom_settings.node_msgid = 0; // zeroed explicitly, even though this is also the struct default
+    meshcom_settings.node_ackid = 0;
+
+    SettingsLoadResult r = settingsStoreLoad();
+    TEST_ASSERT_TRUE(r.file_found);
+    TEST_ASSERT_TRUE(r.read_ok);
+    TEST_ASSERT_EQUAL_INT32(321, meshcom_settings.node_msgid);
+    TEST_ASSERT_EQUAL_INT32(654, meshcom_settings.node_ackid);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +477,10 @@ int main(void)
 
     RUN_TEST(test_save_allocation_failure_leaves_everything_untouched);
     RUN_TEST(test_load_allocation_failure_reports_read_not_ok);
+
+    RUN_TEST(test_flash_reset_preserves_bonds_and_writes_exact_length);
+    RUN_TEST(test_max_hop_text_sentinel_survives_round_trip);
+    RUN_TEST(test_node_msgid_and_ackid_persist_round_trip);
 
     return UNITY_END();
 }

@@ -121,7 +121,7 @@ SETTINGS_PERSIST_ONLY_LIST(X)
 // CFG_ESC rows are NOT range-checked, which is why has_range folds in
 // !has_esc rather than reading (lo <= hi) alone.
 //
-// Exactly one row carries CFG_ESC today: node_power, whose escape value is
+// Two rows carry CFG_ESC today. node_power, whose escape value is
 // CFG_POWER_NOT_SET (-20) meaning "no TX power stored yet". That sentinel is
 // deliberately OUTSIDE TX_POWER_MIN..MAX on several boards (RAK4631: 2..22).
 // settings_store::decode() CLAMPS an out-of-envelope numeric into the range
@@ -131,10 +131,23 @@ SETTINGS_PERSIST_ONLY_LIST(X)
 // legitimate in-range value and leave it alone (:48), so the node would pin
 // itself to minimum TX power instead of taking its board default (:123).
 //
+// And max_hop_text, added 2026-09-12 after the same failure mode was found a
+// second time: range 1..6, struct default 0 meaning "nothing stored yet"
+// (maxhop.h:30-37), whose intended resolution is MAXHOP_TEXT_FALLBACK (4).
+// Without the escape, decode() clamped the 0 to 1 before maxHopTextSanitize()
+// could see it, and 1 is a valid value, so it was kept -- pinning the node to
+// one text hop instead of four.
+//
 // The other sentinel-bearing radio rows do not need the escape: node_freq,
 // node_bw, node_sf and node_cr all use 0 as their "not set" value
 // (settings_sanitize.cpp:8, FLOAT_NOT_SET) and 0 already lies inside each of
 // their declared ranges.
+//
+// The rule that finds this class, which is the one to apply to any new row:
+// a row needs CFG_ESC when its STRUCT DEFAULT lies outside its own declared
+// [lo, hi]. Sweeping every row on that rule finds exactly these two. Checking
+// only the fields that settings_sanitize.cpp names is NOT the same sweep and
+// misses max_hop_text -- that is how it was missed the first time.
 #define SETTINGS_SCHEMA_ROW(key, cfgtype, member, lo, hi, esc, has_esc)                          \
     {key, CfgTypeToFieldType(cfgtype), offsetof(s_meshcom_settings, member),                     \
      sizeof(((s_meshcom_settings *)0)->member),                                                   \
