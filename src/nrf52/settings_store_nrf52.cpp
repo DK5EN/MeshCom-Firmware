@@ -10,6 +10,7 @@
 #include "settings_store_nrf52.h"
 
 #include <cstdlib>
+#include <cstring>   // memcmp, for the skip-if-unchanged compare below
 
 #include <debugconf.h>
 
@@ -64,6 +65,55 @@ bool settingsStoreSave()
 		DEBUG_MSG("SETST", "save: encode() overflowed the %u B buffer", (unsigned)kSettingsBufferCap);
 		free(buf);
 		return false;
+	}
+
+	// ---------------------------------------------------------------------
+	// Skip the write entirely when the encoded content is byte-identical to
+	// what is already on the filesystem.
+	//
+	// This is NOT an optimisation bolted on: the raw-blit save_settings()
+	// this store replaces read the stored struct back and did a memcmp
+	// before writing ("Flash content changed, writing new data"), and that
+	// guard has to survive the cutover. Its existence is the evidence for
+	// why: save_settings() has 150+ call sites across command_functions.cpp,
+	// phone_commands.cpp, loop_functions.cpp and event_functions.cpp, and
+	// nothing makes them call only on an actual change. Dropping the guard
+	// would turn every one of those calls into a temp-file write plus a
+	// rename on the nRF52's internal flash -- a wear increase that would
+	// show up in the field, months later, as a filesystem that stopped
+	// taking writes.
+	//
+	// Compared in chunks against a small stack buffer rather than by slurping
+	// the file into a second heap allocation: the encoded record is already
+	// kSettingsBufferCap bytes of heap, and this runs on the main-loop task
+	// whose stack is 4 KB.
+	// ---------------------------------------------------------------------
+	if (settings_store_file.open(kSettingsPath, FILE_O_READ))
+	{
+		bool identical = (settings_store_file.size() == (uint32_t)written);
+		if (identical)
+		{
+			uint8_t chunk[64];
+			long off = 0;
+			while (off < written)
+			{
+				int want = (int)((written - off) < (long)sizeof(chunk) ? (written - off) : (long)sizeof(chunk));
+				int got = settings_store_file.read(chunk, want);
+				if (got != want || memcmp(chunk, buf + off, (size_t)got) != 0)
+				{
+					identical = false;
+					break;
+				}
+				off += got;
+			}
+		}
+		settings_store_file.close();
+
+		if (identical)
+		{
+			free(buf);
+			return true;
+		}
 	}
 
 	// ---------------------------------------------------------------------

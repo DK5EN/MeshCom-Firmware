@@ -4389,6 +4389,66 @@ ahead of step 5, not a RAM saving.
 
 **Gate:** 32/32 envs, `selftest.sh` exit 0, 115 self-test cases.
 
+##### Steps 4 and 5 are done: the nRF52 cutover, 2026-09-12
+
+`W3` wave C. **The struct has stopped being a persistence format on nRF52.**
+
+- `init_flash()` tries the keyed store first; on a pass it loads and returns
+  without touching the legacy blob. Otherwise it runs the legacy path
+  unchanged and migrates once into the keyed store.
+- **The sanity gate is the part that protects the fleet.**
+  `settings_store::decode()` never fails as a whole, so a truncated store
+  would leave almost every field at its default and still report a normal
+  read -- a false accept would look like a clean boot and then be written
+  back over everything. Acceptance requires `fields_set > 0` AND a non-empty
+  `node_call`; either failing falls through to the legacy blob, not to
+  `flash_reset()`.
+- `save_settings()` writes the keyed store only. **The legacy blob is
+  neither updated nor deleted** -- it stays exactly as it was at migration,
+  so a downgrade finds its file and returns the node to its pre-migration
+  settings: stale, but not wiped.
+- `s_meshcomcompat_settings` and `MESHCOM_COMPAT_MARKER` are **deleted**
+  (`WisBlock-API.h`, a 200-line pure deletion), along with the unused
+  `g_flash_content`. Zero references remain in `src/`. A file still carrying
+  the pre-compat `0x57` marker now resets to defaults: nothing can decode
+  that layout any more, and reinterpreting its bytes as the current struct
+  is the one outcome that had to be ruled out.
+
+**One regression caught at the gate.** The rewrite dropped
+`save_settings()`'s skip-if-unchanged guard, on the reasoning that call
+sites only call it on a real change. The old code's read-back `memcmp` is
+evidence against that, and `save_settings()` has 150+ call sites across
+`command_functions.cpp`, `phone_commands.cpp`, `loop_functions.cpp` and
+`event_functions.cpp` with nothing constraining them. Unconditional writing
+would turn each into a temp-file write plus a rename on internal flash --
+wear that surfaces months later as a filesystem that stops accepting
+writes. Restored inside `settingsStoreSave()`, comparing in 64-byte chunks
+against a stack buffer rather than a second heap slurp (4 KB main-loop
+task).
+
+**What is asserted, and what is not.** `native_settings_roundtrip` (9 cases)
+asserts W3's headline criterion at the mechanism level: two structs, same
+members, different declaration order, byte-identical encoding and lossless
+round trip. Every one of its eight fields sits at a different offset while
+`sizeof` is identical at 48 bytes in both -- which is precisely the
+padding-neutral reordering `nrf52_flash.cpp`'s own size-check comment
+concedes it cannot detect. `tools/bench/w3_upgrade_check.py` is the hardware
+instrument: it diffs a fresh config export against the baselines in
+`docs/bench/w3-baseline/`, classifies PRESERVED / CHANGED / LOST / ADDED,
+compares numerically where both sides parse as numbers, and allow-lists
+`layout`, `fw` and `crc32` (the CRC is computed over `layout` and `fw`, so
+it necessarily moves). Mutation-checked: it catches `node_power 22 -> 2`,
+catches a deleted field, and does not flag a float that only re-renders.
+
+**Still unproven on a device.** None of the four load/save paths has
+executed. That gap is being closed by a native path suite, and the real
+proof remains RAK-90 upgrading from its 20260724 image.
+
+**Deliberately out of scope for this wave:** ESP32 keeps its NVS path (it is
+already keyed by name, so it already has the property W3 buys), and the
+`FLASH_STRUCT_VERSION` gate stays -- `node_fversion` round-trips through the
+store, so a migrating node still compares equal.
+
 Four decisions it surfaced, owed in `W3`:
 
 - **8 fields classified RUNTIME are persisted anyway** -- `node_msgid`,

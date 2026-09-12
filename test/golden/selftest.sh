@@ -68,6 +68,12 @@ python3 test/golden/drift_matrix_lint.py --self-test
 # flag left in place after its window has passed is how a requirement quietly
 # expires, which is why the script prints the count on every run.
 python3 test/golden/drift_matrix_lint.py --phase implementation
+# The W3 upgrade proof's instrument. Not a golden gate -- it is pointed at real
+# hardware by a human after the nRF52 cutover, comparing a fresh config export
+# against the baselines in docs/bench/w3-baseline/ that were captured while the
+# nodes still ran a 20260724 image. Its self-test runs here so it cannot rot
+# between now and the bench run that depends on it.
+python3 tools/bench/w3_upgrade_check.py --self-test
 python3 test/golden/verify_captures.py
 python3 test/golden/corpus_lint.py test/golden/corpus/
 python3 -m unittest discover tools/mock 2>&1 | tail -3
