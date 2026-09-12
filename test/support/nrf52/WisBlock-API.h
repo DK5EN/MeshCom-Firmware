@@ -32,6 +32,16 @@ typedef struct
     // blob when the TX error limit trips. Verbatim from both platform
     // headers (esp32_flash.h:206, nrf52/WisBlock-API.h:372).
     bool node_hasIPaddress = false;
+    // U10 twin (DR-14/DR-15): both gatewayService_* functions write this
+    // back every pass (ESP32: hb_timer: nRF52: neth.last_upd_timer), and the
+    // nRF52 side reads node_ownip/node_ownms/node_owngw's length to choose
+    // its DHCP-vs-fixed-IP recovery branch. Verbatim size/type from both
+    // platform headers (esp32_flash.h:113-115/207,
+    // nrf52/WisBlock-API.h:282-284/373) -- the two agree on all four.
+    unsigned long node_last_upd_timer = 0;
+    char node_ownip[20] = {0};
+    char node_owngw[20] = {0};
+    char node_ownms[20] = {0};
     // U1 twin: both frame handlers read/write node_short in the CONF branch,
     // and via_functions.cpp (checkVia) reads node_via. Verbatim size and
     // default from both platform headers (esp32_flash.h:18/:180,

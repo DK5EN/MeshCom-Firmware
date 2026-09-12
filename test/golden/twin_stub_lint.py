@@ -39,6 +39,15 @@ PAIRS: List[Tuple[str, str]] = [
     # U1 twin shadows the same two headers for the same reasons.
     ("test/test_udp_frame_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_udp_frame_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
+    # U10 (C4 gateway-service twin) shadows the same two again. Added
+    # 2026-09-12, flagged by the agent that wrote the suite rather than found
+    # later: a stub outside this list is a stub nothing checks against the
+    # real header, and the drift it would hide is exactly the drift the twin
+    # exists to measure. WiFi.h is deliberately NOT paired -- it shadows an
+    # arduino-esp32 framework header, not a header of ours, so there is no
+    # in-tree original to compare against.
+    ("test/test_gateway_service_twin/stubs/udp_functions.h", "src/udp_functions.h"),
+    ("test/test_gateway_service_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
 ]
 
 # A declaration is a line that ends in ';' and is not a preprocessor line,
