@@ -111,9 +111,7 @@ Markern hat den Haenger in `u8g2->begin()` und den intakten Bus davor gezeigt (s
 die Feldbestaetigung des Fix-Builds steht aus.
 
 Heltec V3 (DK5EN-93), `--deepsleep` ueber Serial bei unberuehrter Taste: Node schlaeft sofort
-(letzte Ausgabe `Disbling Vext`), kein Reboot in 15 s, Wecken per Reset. Der Long-Press mit
-gehaltener Taste ist ein Handtest (Node wird nach ~1 s dunkel, bleibt nach dem Loslassen dunkel,
-naechster Druck weckt mit `RESET_REASON=5`).
+(letzte Ausgabe `Disbling Vext`), kein Reboot in 15 s, Wecken per Reset. Long-Press mit gehaltener Taste (`--button on`), zwei Zyklen am Stueck: `GO to deepsleep` um 21:36:20, Node dunkel und dunkel nach dem Loslassen, Wecken per Tastendruck um 21:36:25 mit `RESET_REASON=8 DEEPSLEEP`, zweiter Long-Press um 21:36:35, Node bleibt dunkel. Auf 4.35t bootete derselbe Knoten sofort wieder.
 
 RAK4631 (DK5EN-90), `--deepsleep` ueber Serial: System OFF (USB-Port verschwindet). Ohne die
 `bButtonCheck`-Bedingung dauerte das 12,6 s -- WB_IO6 ist bei `--button off` nie konfiguriert

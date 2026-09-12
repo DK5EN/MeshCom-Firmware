@@ -143,7 +143,9 @@ upstream `dev` as one PR (`docs/pr-deepsleep-keylock-draft-20260912.md`):
      Wireless Paper / E213 branch and `nrf52EnterDeepSleep()`; only when
      `--button` is on, because with it off the pin is never configured and
      can float LOW (RAK4631 WB_IO6 does). Serial `--deepsleep` with the
-     button untouched is unaffected.
+     button untouched is unaffected. Bench 2026-09-12, DK5EN-93 with
+     `--button on`: two long-press cycles, dark and staying dark after the
+     release, wake on the next press with `RESET_REASON=8 DEEPSLEEP`.
 219. **T-Deck keyboard light stays dark while the keylock is engaged**
      (`9c3bdf6b`, TD-16). `tft_on()` tested `node_keyboardlock` instead of
      the keyboard-light setting (inverted since the v4.35p light switch) and

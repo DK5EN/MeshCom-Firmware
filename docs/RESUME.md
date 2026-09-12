@@ -17,9 +17,8 @@ one to update when an item moves.
 - `DS-03`/`TD-16`/`TM-09` upstream PR (long-press deep sleep, T-Deck keylock light, T-Beam
   Supreme display hang): branch `pr-deepsleep-keylock-20260912`, three commits on upstream `dev`
   `c17c07c0`, draft `pr-deepsleep-keylock-draft-20260912.md`. The Supreme fix is compile-only
-  here (no board); field confirmation with the fix build is open. Still owed on the bench: the operator's
-  hold-the-button test on Heltec V3 (dark at ~1 s, stays dark after release, wakes on the next
-  press) and the RAK4631 re-test of serial `--deepsleep` with the `bButtonCheck` gate (node is in
+  here (no board); field confirmation with the fix build is open. Heltec V3 hold-the-button test passed
+  2026-09-12 (two cycles, DK5EN-93). Still owed on the bench: the RAK4631 re-test of serial `--deepsleep` with the `bButtonCheck` gate (node is in
   System OFF, needs its reset button first). T114/T-Echo compile-only.
 
 **B. Next engineering work, in order**
