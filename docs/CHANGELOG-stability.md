@@ -129,6 +129,44 @@ position keys, and its own decoder only understood 14.
      check for both cases; it fails on the old firmware and passes on
      `dk5en-98` after OTA.
 
+Three field reports against 4.35t, all fixed 2026-09-12 and offered to
+upstream `dev` as one PR (`docs/pr-deepsleep-keylock-draft-20260912.md`):
+
+218. **Long press switches the node off again** (`40c29e7f`, DS-03). Since
+     item 197 the shared deep-sleep helpers arm the user button as wake
+     source, but `PressLong()` is attached with `attachLongPressStart()` and
+     fires while the button is still held, so the wake condition was already
+     true at sleep entry and the node rebooted at once (`RESET_REASON=5`).
+     Reported on Heltec V3; every long-press-to-sleep board shares the path.
+     New `esp32WaitButtonRelease()` waits for the release (bounded 10 s, then
+     100 ms debounce) before arming, in `esp32EnterDeepSleep()`, the
+     Wireless Paper / E213 branch and `nrf52EnterDeepSleep()`; only when
+     `--button` is on, because with it off the pin is never configured and
+     can float LOW (RAK4631 WB_IO6 does). Serial `--deepsleep` with the
+     button untouched is unaffected.
+219. **T-Deck keyboard light stays dark while the keylock is engaged**
+     (`9c3bdf6b`, TD-16). `tft_on()` tested `node_keyboardlock` instead of
+     the keyboard-light setting (inverted since the v4.35p light switch) and
+     forced the keyboard to 150 whenever a message woke the locked panel.
+     The block is gone; `setBrightness()` already follows the real setting.
+     Fork-only bench scenario `keylock_kbl` (`5d9877e2`) fails on the old
+     code and passes on the new.
+220. **T-Beam Supreme boots again on 4.35t** (TM-09 follow-up,
+     `docs/bug-tbeam-supreme-435t-display-hang.md`). Item 203 moved the
+     Supreme OLED to hardware I2C with the pins given to the u8g2
+     constructor (`..._F_HW_I2C(U8G2_R0, U8X8_PIN_NONE, 18, 17)`). With
+     explicit pins u8g2 runs `pinMode(OUTPUT)` on both in its GPIO init,
+     which on the S3 detaches them from the I2C controller that already
+     owns them since `Wire.begin(17, 18)` in setup; u8g2's own
+     `Wire.begin(17, 18)` is then a no-op on the running bus and
+     `u8g2->begin()` hangs. Two nodes stuck after
+     `[INIT]...Auto detecting display:`; a diagnostic build showed the
+     panel ACKing on 0x3C right before the hang. Constructors now take no
+     pins (the T-Beam v1.2 / RAK pattern) and the bus clock is pinned to
+     100 kHz like the sensor path on the same bus. Compile-verified only
+     on the bench (no Supreme here); field confirmation with the fix
+     build is open.
+
 ## New in v4.35t.09.10
 
 One change on top of `v4.35s.09.09`, item 211: the fork is brought level with
@@ -290,6 +328,9 @@ after upstream issue #1133 was refuted -- nothing of it ships here.
      same bus as PMU, RTC and sensors (`SDA_PIN 17` / `SCL_PIN 18`). The
      full buffer also re-enables the unchanged-frame skip (TM-10).
      Not yet confirmed on Supreme hardware — no such board on the bench.
+     **Field result 2026-09-12: this change hung the Supreme in
+     `u8g2->begin()`; see item 220 for the cause (explicit constructor pins)
+     and the fix.**
 
 204. **The barometric altitude is no longer 0 until someone types
      `--setpress`** (GPS-08, `531d66b4`/`49769eda`). `fBasePress` was

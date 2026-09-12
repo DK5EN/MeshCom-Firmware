@@ -14,6 +14,14 @@ one to update when an item moves.
 - `APRS-04` PRs: firmware PR for N-32..N-35 after APRS-02; app PR for `aprs-position-name` only
   on request. Then the release cut for items 212-217.
 
+- `DS-03`/`TD-16`/`TM-09` upstream PR (long-press deep sleep, T-Deck keylock light, T-Beam
+  Supreme display hang): branch `pr-deepsleep-keylock-20260912`, three commits on upstream `dev`
+  `c17c07c0`, draft `pr-deepsleep-keylock-draft-20260912.md`. The Supreme fix is compile-only
+  here (no board); field confirmation with the fix build is open. Still owed on the bench: the operator's
+  hold-the-button test on Heltec V3 (dark at ~1 s, stays dark after release, wakes on the next
+  press) and the RAK4631 re-test of serial `--deepsleep` with the `bButtonCheck` gate (node is in
+  System OFF, needs its reset button first). T114/T-Echo compile-only.
+
 **B. Next engineering work, in order**
 
 - `DM-05` counters (DMs sent, echo heard, gateway ACK, peer ACK, gave up, median time to peer
