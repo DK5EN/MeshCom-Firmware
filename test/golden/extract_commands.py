@@ -358,9 +358,17 @@ def _self_test() -> int:
         print("FAIL: --setowndns duplicate (audit defect 2) not detected")
 
     shadows = shadowed_pairs(commands)
-    if not any(b.name == "softser app0" for _, b in shadows):
+    # Audit defect 3 was FIXED 2026-09-12: the `softser app0` rung now sits
+    # ahead of `softser app` in the ladder, so the longer name is reached and
+    # its `iNextTelemetry = 0` runs. This assertion used to require the
+    # shadowing to be PRESENT -- it was pinning a known defect, which is the
+    # right thing to do while the defect stands and the wrong thing after it is
+    # fixed. Inverted rather than deleted, so the fix cannot silently regress.
+    # The standing gate against the whole class is
+    # test/golden/command_ladder_lint.py.
+    if any(b.name == "softser app0" for _, b in shadows):
         failures += 1
-        print("FAIL: softser app0 shadowing (audit defect 3) not detected")
+        print("FAIL: softser app0 is shadowed again -- audit defect 3 regressed")
 
     # The near-miss that must NOT be reported: byte 16 differs.
     if any(b.name == "softser fixpegel2 " for _, b in shadows):

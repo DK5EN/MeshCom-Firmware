@@ -24,6 +24,12 @@ python3 test/golden/twin_stub_lint.py --self-test
 python3 test/golden/twin_stub_lint.py
 python3 test/golden/carve_extern_lint.py --self-test
 python3 test/golden/carve_extern_lint.py
+python3 test/golden/command_ladder_lint.py --self-test
+python3 test/golden/command_ladder_lint.py
+python3 test/golden/settings_layout_lint.py --self-test
+python3 test/golden/settings_layout_lint.py
+python3 test/golden/variant_macros_lint.py --self-test
+python3 test/golden/variant_macros_lint.py
 python3 test/golden/verify_captures.py
 python3 test/golden/corpus_lint.py test/golden/corpus/
 python3 -m unittest discover tools/mock 2>&1 | tail -3
