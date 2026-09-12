@@ -4328,6 +4328,67 @@ every ambiguous case, so nothing rests on a guess. Persist set: **106 fields,
 1 325 bytes fixed-width** plus two unbounded `String`s, which is the number
 `OPT-07` needed.
 
+##### Steps 2 and 3 are done: the schema and the nRF52 backend, 2026-09-12
+
+`W3` wave B. **Wired into nothing on either platform** -- no call from
+`init_flash()`, no loop, no command handler. The cutover is wave C and is
+gated on hardware.
+
+- **`src/settings_schema.{h,cpp}`** builds the
+  `settings_store::FieldDescriptor` table by expanding `CFG_FIELD_LIST(X)`
+  plus a new `SETTINGS_PERSIST_ONLY_LIST(X)`. To make that possible without a
+  second copy of 101 rows, `CFG_FIELD_LIST` and its platform block **moved
+  from `config_json.cpp` into `config_json.h`, unchanged** -- the list is
+  still the single source of truth, it is now merely expanded by two
+  translation units. `CFG_POWER_NOT_SET` moved with it, so the sentinel is
+  not redefined per-TU.
+- **Row counts**, verified independently of the agent that wrote them: 101
+  common + 6 ESP32 / 2 nRF52 platform rows in `CFG_FIELD_LIST`; 4 common + 11
+  T-Deck-only in `SETTINGS_PERSIST_ONLY_LIST`. Table totals **122** on T-Deck,
+  111 on other ESP32 boards, **107** on nRF52.
+- **Three exclusions, deliberate.** The 8 fields of triage S4(c) (running
+  message-id/ack-id counters and last-sensor-reading caches) get no schema row
+  -- this settles the decision that row owed. Neither do `node_audio_start` /
+  `node_audio_msg`: Arduino `String` members, and persisting one writes a heap
+  pointer, which is the "landmine for step 6" above.
+- **`CFG_CHR` maps to `U8`, not `STRING`.** Those members are a bare `char`,
+  `sizeof` 1, and a STRING descriptor's size includes the NUL slot -- size 1
+  has no room for it. `settings_store.h`'s own type-coverage note already
+  resolves this case; no new `FieldType` was invented.
+- **`src/nrf52/settings_store_nrf52.{h,cpp}`** encodes through the schema and
+  writes `/MeshCom-Settings-Store` over `InternalFS`: temp file, length
+  verify, `lfs_rename()` swap. The 4 096 B buffer is **heap, not stack** --
+  the nRF52 main-loop task has 4 KB and is where essentially every
+  `save_settings()` caller runs. The `CFG_IMP_ELAYOUT` check is deliberately
+  absent, commented, for the reason `OPT-07` gives.
+- **`test/golden/settings_schema_lint.py`**, wired into `selftest.sh`: six
+  checks -- PERSIST coverage, no RUNTIME field in the schema, no duplicate key
+  or member, triage disagreement (a) pinned at 0, and the `CFG_ESC` pair
+  below. Ten exemptions pinned in-script.
+
+**One defect found at the wave gate, of the class that reaches flashed nodes.**
+The row macro first dropped `CFG_FIELD_LIST`'s `esc`/`has_esc` pair as
+"unused". It is not. Exactly one row carries `CFG_ESC`: `node_power`, escape
+value `CFG_POWER_NOT_SET` (-20) meaning "no TX power stored yet", which sits
+**outside** `TX_POWER_MIN..MAX` on several boards on purpose (RAK4631: 2..22).
+`settings_store::decode()` CLAMPS an out-of-envelope numeric when `has_range`
+is set, so a factory-fresh node's -20 would have become the board minimum on
+first load; `settings_sanitize.cpp:48` would then see a legitimate in-range
+value and leave it, and `:123` would never apply the board default. The node
+would pin itself to minimum TX power. Fixed as
+`has_range = (lo <= hi) && !has_esc`, and **bounded**: `node_freq`, `node_bw`,
+`node_sf` and `node_cr` all use 0 as their sentinel and 0 is already inside
+their declared ranges, so `node_power` is the only row affected. Check 6 of
+the schema gate now fails if that term is simplified away -- mutation-verified
+(removing it: exit 1 with the clamp named; restored: exit 0).
+
+**Also at the gate:** `g_flash_content_compat` (`nrf52_flash.cpp:22`) was
+defined and never referenced anywhere in `src/`; deleted. It recovered **zero
+bytes** -- the linker was already discarding it -- so it is dead-code hygiene
+ahead of step 5, not a RAM saving.
+
+**Gate:** 32/32 envs, `selftest.sh` exit 0, 115 self-test cases.
+
 Four decisions it surfaced, owed in `W3`:
 
 - **8 fields classified RUNTIME are persisted anyway** -- `node_msgid`,

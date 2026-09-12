@@ -4,7 +4,7 @@
 Two platforms maintain the same "which settings fields exist" mapping twice
 by hand:
 
-  src/config_json.cpp   the `X()` table (CFG_FIELD_LIST) -- one row per field
+  src/config_json.h     the `X()` table (CFG_FIELD_LIST) -- one row per field
                          that the JSON export/import and (per D1-04) the BLE
                          config path know about.
   src/esp32/esp32_flash.cpp
@@ -24,7 +24,7 @@ someone power-cycles a node and finds their change gone.
 D1-04). This gate has to stand BEFORE that migration starts, not after --
 otherwise the rewrite is building on a mapping nobody has actually checked
 end to end. It is a static gate over the CURRENT tree: three checks, run by
-parsing `src/config_json.cpp` and `src/esp32/esp32_flash.cpp` as text (this
+parsing `src/config_json.h` and `src/esp32/esp32_flash.cpp` as text (this
 file never compiles firmware and must work with a native `python3`).
 
 THE THREE CHECKS
@@ -70,7 +70,7 @@ EXPLAINED EXCLUSIONS -- how a documented exception is told apart from a gap
 ----------------------------------------------------------------------------
 
 `esp32_flash.cpp` persists more than the `X()` table exports, on purpose,
-and `config_json.h:127-137` / `config_json.cpp:214-219` say so in as many
+and `config_json.h:127-137` / `config_json.h:362-367` say so in as many
 words: flash/firmware bookkeeping (`node_fversion`, `node_mversion`,
 `node_fwversion`, `node_cleanflash`/`node_cflash`), the T-Deck-only UI block
 (`node_map` .. `node_wifion`, 13 fields), the running `node_msgid`/
@@ -99,7 +99,7 @@ CROSS-CHECK AGAINST THE D1-04 TRIAGE
 
 `docs/d1-04-settings-field-triage-20260912.md` hand-classified all 147
 settings fields and states, in its own "Method" section, the exact naive
-regex it ran over the whole of `config_json.cpp` (both platform branches,
+regex it ran over the whole of `config_json.h` (both platform branches,
 undistinguished) to get "89 unique members" in the `X()` table, and in its
 outcome table "disagreement (a): 0" -- no `X()` field with an ESP32 member
 lacks an ESP32 NVS key. This script re-runs that literal regex (see
@@ -129,13 +129,18 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 REPO = Path(__file__).resolve().parents[2]
-CONFIG_JSON_CPP = "src/config_json.cpp"
+# The X() table moved from config_json.cpp into config_json.h on 2026-09-12
+# (W3 step 2) so that settings_schema.cpp can expand the same single list
+# instead of copying it. The list itself is byte-for-byte unchanged; only
+# the file it lives in moved, so this parser follows the path and nothing
+# else about it changes.
+CONFIG_JSON_CPP = "src/config_json.h"
 ESP32_FLASH_H = "src/esp32/esp32_flash.h"
 ESP32_FLASH_CPP = "src/esp32/esp32_flash.cpp"
 STRUCT_NAME = "s_meshcom_settings"
 
 # ---------------------------------------------------------------------------
-# Explained exclusions -- config_json.h:127-137, config_json.cpp:214-219
+# Explained exclusions -- config_json.h:127-137, config_json.h:362-367
 # ---------------------------------------------------------------------------
 # Keyed by every spelling (NVS key AND struct member, where they differ) a
 # finding could name, so a lookup by either always succeeds. See the module
@@ -152,9 +157,9 @@ _TDECK = "T-Deck-only device UI/behaviour preference (config_json.h:133-134), " 
     "not portable configuration, deliberately kept out of the X() table"
 _CLOCK_MARKER = "clock or flash-integrity marker (config_json.h:135-136), " \
     "no NVS key on the ESP32 by design"
-_COUNTER = "running id counter (config_json.cpp:214-217); persisted so ids " \
+_COUNTER = "running id counter (config_json.h:362-365); persisted so ids " \
     "stay monotone across reboot, never exported (would rewind and collide)"
-_SENSOR = "last sensor reading (config_json.cpp:218-219), explicitly 'not " \
+_SENSOR = "last sensor reading (config_json.h:366-367), explicitly 'not " \
     "configuration' -- persisted for display continuity only"
 
 EXPLAINED_EXCLUSIONS: Dict[str, str] = {}
@@ -432,7 +437,7 @@ def analyze(x_rows: List[XRow], struct_members: Set[str],
     if not x_rows:
         r.fatal.append(
             "zero X() table rows extracted from the ESP32 branch of "
-            "config_json.cpp -- the row/macro-body pattern has stopped "
+            "config_json.h -- the row/macro-body pattern has stopped "
             "matching; this is NOT a clean tree, it is a broken instrument")
     if not struct_members:
         r.fatal.append(
@@ -540,7 +545,7 @@ def check(repo: Path = REPO) -> AnalysisResult:
 
 def _fake_x_table_cpp(rows: str, esp32_platform_rows: str = "",
                        nrf52_platform_rows: str = 'X("send_repeat_time", CFG_U32, send_repeat_time, CFG_NORANGE, CFG_NOESC)') -> str:
-    """A minimal config_json.cpp-shaped fixture: a backslash-continued
+    """A minimal config_json.h-shaped fixture: a backslash-continued
     CFG_FIELD_LIST(X) that calls CFG_FIELD_LIST_PLATFORM(X), plus an
     #ifdef ESP32 / #else pair defining that macro per platform -- the exact
     shape parse_x_table_esp32() depends on."""
@@ -787,7 +792,7 @@ def main() -> int:
     if result.excluded:
         print(f"\n{len(result.excluded)} finding(s) downgraded by "
               f"EXPLAINED_EXCLUSIONS (documented in config_json.h:127-137 / "
-              f"config_json.cpp:214-219):")
+              f"config_json.h:362-367):")
         for e in result.excluded:
             print(f"  EXCLUDED {e}")
 

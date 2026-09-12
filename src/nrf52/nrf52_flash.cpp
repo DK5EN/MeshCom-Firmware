@@ -19,7 +19,6 @@
 s_meshcom_settings meshcom_settings;
 
 s_meshcom_settings g_flash_content;
-s_meshcomcompat_settings g_flash_content_compat;
 
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>

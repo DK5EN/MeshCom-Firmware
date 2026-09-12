@@ -36,6 +36,16 @@ python3 test/golden/settings_layout_lint.py
 # schema walk. Mutation-verified: deleting one putInt() makes it fail.
 python3 test/golden/settings_persist_lint.py --self-test
 python3 test/golden/settings_persist_lint.py
+# W3 step 2: the schema gate. settings_schema.{h,cpp} builds the persistence
+# descriptor table by expanding config_json.h's CFG_FIELD_LIST plus the
+# persist-only list, so the two must not drift from each other or from the
+# D1-04 field triage. This gate holds four properties the table cannot assert
+# about itself: every PERSIST field is covered or explicitly exempted, no
+# RUNTIME field slipped in, no key or member is duplicated, and triage
+# disagreement (a) stays at zero. The 10 exemptions are pinned in-script --
+# the 8 counter/sensor fields and the 2 Arduino String members.
+python3 test/golden/settings_schema_lint.py --self-test
+python3 test/golden/settings_schema_lint.py
 python3 test/golden/variant_macros_lint.py --self-test
 python3 test/golden/variant_macros_lint.py
 python3 test/golden/twin_diff.py --self-test
