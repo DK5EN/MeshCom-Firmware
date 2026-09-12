@@ -27,8 +27,9 @@ USB (esptool, T-Beam at 460800), DK5EN-90 over serial DFU after its reset button
 (192.168.68.73, `dk5en-14.local`) and dk5en-98 over `tools/webflash.py`; all five report build
 Sep 12 2026 and `build 20260912`, radios listening. Tool note: on the T-Deck the webflash
 "node up" poll accepted the old app's page before the reboot and the final query then failed
-("Meshcom ? build ?") -- the flash itself succeeded; the poll should compare the build string
-against the pre-OTA one. Next: APRS-02 proof on the fleet, then the PR for 212-217 (APRS-04).
+("Meshcom ? build ?") -- the flash itself succeeded. **Fixed the same night** (`8b4c67c4`): the
+poll accepts only the app page with a build string, an unchanged build is flagged, the
+pre-OTA line is labelled as such; self-test carries a scripted whole-flow regression. Next: APRS-02 proof on the fleet, then the PR for 212-217 (APRS-04).
 
 ## Consolidated open list, 2026-09-11 evening
 
