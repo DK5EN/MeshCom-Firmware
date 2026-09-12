@@ -1,5 +1,30 @@
 # RESUME — pick up here
 
+## 2026-09-12 (late): v4.35t.09.12.2 published -- items 212-221, replaces v4.35t.09.10
+
+Release `v4.35t.09.12.2` is on GitHub, 39 assets (names diff-identical to 09.10), tag on
+`cb263f3f`, `--latest`. The `v4.35t.09.10` release object is deleted, its tag stays. Ten items:
+APRS parser wave 212-216, web GUI destination 217, the three 4.35t field fixes 218-220, upstream
+sync 221 (`ce7d7f1e` on upstream `dev` `1cb2d9e6` = upstream's merge of our PR #1140; pure
+ancestry merge, no source change). `FLASH_VERSION` 20260912, every ESP32 image checked for the
+integer. Gates: 673 native cases in 12 host envs, 32 envs built, safeboot bins unchanged.
+
+**Two framing changes for every future release text.** (1) Upstream released official `v4.35t`
+on 2026-09-10 with our PR #1135 inside, so items 104-210 are official now and the letter `t` no
+longer marks the fork -- only the flash stamp does (`20260912` vs `20260909`). Fork-only code
+against upstream `dev` is down to items 212-217, safeboot (153/154/186), `--port` (151), the
+eleven native envs, the `[KBL]` bench marker and `FLASH_VERSION`. (2) Upstream tagged `dev` as
+`v4.35t.09.12` a few hours before our cut (empty release, no assets), so our tag carries `.2`;
+check `git ls-remote --tags upstream` before naming a tag from now on.
+
+**Bench this cycle**: DK5EN-93 long-press two cycles (218), DK5EN-98 item 217 via jsdom after
+OTA, DK5EN-14 keylock_kbl harness + hand test on an instrument image (219), OE3LCR's field
+confirmation of item 200. **Not run**: no board on the published image itself; APRS 212-216 never
+seen on hardware (APRS-02 still open); Supreme 220 compile-only, field confirmation owed; RAK4631
+deep-sleep path changed (218, 221) without a re-run, node sits in System OFF; T114/T-Echo
+compile-only. Next: flash 98/93/14/90/92 with the release image, APRS-02 proof, then the PR for
+212-217 (APRS-04).
+
 ## Consolidated open list, 2026-09-11 evening
 
 Everything still owed, grouped by what unblocks it. IDs point at BACKLOG rows; this list is the
@@ -12,9 +37,9 @@ one to update when an item moves.
   `--path` and the T-Deck path tab (52-byte buffer, `/mhpath.dat` discarded once).
 - `APRS-03` ops: MCProxy `9501bb0` onto the Pi; phone test of the merged app PR #8.
 - `APRS-04` PRs: firmware PR for N-32..N-35 after APRS-02; app PR for `aprs-position-name` only
-  on request. Then the release cut for items 212-217.
+  on request. Release cut done 2026-09-12 (`v4.35t.09.12.2`, items 212-221).
 
-- `DS-03`/`TD-16`/`TM-09` upstream [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) **submitted 2026-09-12** (long-press deep sleep,
+- `DS-03`/`TD-16`/`TM-09` upstream [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) **submitted and merged upstream 2026-09-12** (`1cb2d9e6`; long-press deep sleep,
   T-Deck keylock light, T-Beam Supreme display hang): branch `pr-deepsleep-keylock-20260912`
   (worktree `MeshCom-Firmware-DEV-Main-pr`), three commits on upstream `dev` `c17c07c0`, draft `pr-deepsleep-keylock-draft-20260912.md`. The Supreme fix is compile-only
   here (no board); field confirmation with the fix build is open. Heltec V3 hold-the-button test passed
