@@ -434,17 +434,33 @@ int RAWLoRaRead=0;
 bool ble_disconnect_requested = false;
 
 // RINGBUFFER for outgoing UDP lora packets for lora TX
-uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+20];
+// R1-03 (DRY audit, docs/optimization-audit-20260910-appendix.md): +20 -> +1.
+// addUdpOutBuffer() (udp_functions.cpp) clamps len to UDP_TX_BUF_SIZE and
+// writes exactly len bytes at offset 1 (WF-01 removed the old len+1 read/
+// write past the payload) -- 1 length byte + up to UDP_TX_BUF_SIZE payload
+// bytes is the true maximum a slot ever holds. The +20 padding predates
+// WF-01 and has been dead reserve since.
+uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+1];
 int udpWrite=0;
 int udpRead=0;
 
 // RINGBUFFER BLE to phone
-unsigned char BLEtoPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5] = {0};
+// R1-01 (DRY audit): MAX_MSG_LEN_PHONE (300) is a phone-message limit, never
+// this ring's real bound. addBLEOutBuffer() (below) clamps len to
+// UDP_TX_BUF_SIZE-4 (non-'D' frames, +4 appended timestamp bytes) or
+// UDP_TX_BUF_SIZE (255, 'D'/JSON frames, no timestamp) before writing at
+// offset 1 -- 1 length byte + 255 payload is the hard maximum either branch
+// ever needs (256 B); UDP_TX_BUF_SIZE+5 (260) keeps that with headroom.
+unsigned char BLEtoPhoneBuff[MAX_RING][UDP_TX_BUF_SIZE+5] = {0};
 int toPhoneWrite=0;
 int toPhoneRead=0;
 
 // RINGBUFFER BLE Commandos to phone
-unsigned char BLEComToPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5] = {0};
+// R1-01 (DRY audit): addBLEComToOutBuffer() (below) clamps len to 245
+// (configuration_global.h:361-368 documents why) before writing at offset 1
+// -- 1 length byte + 245 payload = 246 is the exact maximum this ring ever
+// holds.
+unsigned char BLEComToPhoneBuff[MAX_RING][246] = {0};
 int ComToPhoneWrite=0;
 int ComToPhoneRead=0;
 

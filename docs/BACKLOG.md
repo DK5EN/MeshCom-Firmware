@@ -4694,6 +4694,49 @@ decisions rested on a wrong premise and were re-decided by the operator the same
   documented flip of the 12 drift-pinning `asserting_test` cases into agreement cases at
   implementation time, and `compare_extudp.py` learning the `"type":"ack"` line before G2.
 
+#### Wave 2 measured, and two audit rows that cannot be done as written (2026-09-12)
+
+**What landed: ~28 kB of RAM.** Every figure below is measured before/after
+per env, not carried from the audit -- and this time the audit's estimates
+were good.
+
+| Row              | Measured                                                        | Audit est.       |
+| ---------------- | --------------------------------------------------------------- | ---------------- |
+| `D5-01`          | **-24 320 B** RAM on both safeboot envs, flash unchanged        | ~24 318, matches |
+| `R1-01/03/06`    | **-2 928 B** `ttgo_tbeam`, -2 936 `heltec_V3`, -2 928 `rak4631` | 2 932, matches   |
+| `R2-07`, `R3-06` | **-848 B** ESP32, **-648 B** nRF52                              | 848 / 636        |
+| `R3-04`          | already done (tinyxml2 vendored during the `MEM-04` work)       | --               |
+
+`D5-01` is the single largest RAM row of the campaign: `ota_html[]` lacked
+`const`, so the whole array was copied into RAM at boot. Adding `const` moves
+it from `.data` to `.rodata` -- flash unchanged, 24 kB of RAM back. The tracked
+`safeboot.bin`/`safeboot-s3.bin` were regenerated; verified DETERMINISTIC
+(identical sha256 across two builds), so their diff is the fix and not build
+noise -- unlike `ttgo_tbeam`/`heltec_V3`, whose images are not reproducible at
+all (see the wave 1 note).
+
+| ID    | Type | Sev.   | Location                                                               | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                                                  |
+| ----- | ---- | ------ | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| W2-01 | BUG  | Medium | `src/aprs_functions.cpp:185-193`, copy loops at `:195-237`, `:293-323` | **`R3-07` is UNSAFE AS WRITTEN and was refused.** The audit says two of the three `decodeAPRS()` scratch buffers "hold a callsign" and should drop from 255 B to 24 B, for -462 B of stack. They do not hold only a callsign: the copy loops have **no per-token length cap** -- the only bound is the outer loop's `(ib - x) < 120` iteration limit -- and `checkRegexCall()`, which does enforce callsign format, runs _after_ the copy has completed. `decodeAPRS()` is fed straight from `OnRxDone()` with the raw over-the-air RX buffer (`src/lora_functions.cpp:667`), i.e. untrusted RF input. A crafted frame carrying a comma-free run before the delimiter therefore writes up to ~120 bytes into a buffer the audit wants at 24 -- a stack overflow on the nRF52's 4 KB LoRa task. The saving is only available AFTER a write-time bound exists in the copy loops, which is a larger and riskier change than a declaration edit. | **OPEN.** Do the bound first, then the shrink. Do not re-file `R3-07` as a one-line row |
+| W2-02 | GAP  | Low    | `src/softser_functions.cpp:334-339`                                    | **`R3-10`'s 2 720 B is not available as described.** The audit lists `strSID`, `strSNAME`, `strPARM`, `strPARM_ID`, `strUNIT` as constant `String` tables to convert to `const char* const[]`. They are **runtime-mutable**: `getSOFTSER_ID()` writes `strSID[next_id]`, and `setSOFTSER_PARM()`/`setSOFTSER_UNIT()`/`setSOFTSER_SNAME()` assign parsed telemetry names and units into the others. They are not constants and were left alone, with a comment saying why. A saving may still exist by giving them fixed `char` arrays instead of `String`, but that is a different change with a different risk profile and needs its own row.                                                                                                                                                                                                                                                                                               | **OPEN, re-scope needed.** The row's premise (constant tables) is wrong                 |
+
+Three loose ends the agents could not reach, closed by the orchestrator: the
+`String`-table change broke `src/t-deck/lv_obj_functions.cpp:1728`
+(`.compareTo()` on what is now a `const char*`) and no T-Deck env was in the
+agent's build sample -- fixed with `strcmp` and confirmed by building `t_deck`;
+the `U2` twin hardcoded `UDP_TX_BUF_SIZE + 20` for its own
+`ringBufferUDPout` definition and stopped compiling when `R1-03` shrank the
+header's to `+1`; and `queueExtern()`'s declaration still advertised
+`buffer[500]`.
+
+**A prediction of mine that was wrong, recorded so the reasoning is not
+repeated.** I expected `R1-03` to move the committed `u2-*` twin-diff artefact,
+because the `U2` staging predicate reads `sizeof(ringBufferUDPout[0])`. It did
+not: the predicate is `total <= 255 && 1 + total <= sizeof(slot)`, and the first
+bound was always the binding one -- the slot size would only matter below 256,
+and `+1` lands exactly there. The real coupling surfaced as a compile-time
+redefinition instead, which is the louder and better failure.
+
 #### `M3` completion plan, filed 2026-09-12: what phase C still owes before `W1`
 
 Three things were named at the M2 review and by the Fable verdict but never

@@ -1725,7 +1725,9 @@ String getCountryDropbox()
 
     for(int ic = 0; ic < max_country; ic++)
     {
-        int icc = strCountry[ic].compareTo("none");
+        // R3-06: strCountry ist jetzt const char* const[] statt String[]
+        // (RAM-Zeile der Welle 2), deshalb strcmp statt String::compareTo.
+        int icc = strcmp(strCountry[ic], "none");
 
         if(icc != 0)
         {

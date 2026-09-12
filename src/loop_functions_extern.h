@@ -257,19 +257,23 @@ extern int RAWLoRaWrite;
 extern int RAWLoRaRead;
 
 // RINGBUFFER for outgoing UDP lora packets for lora TX
-extern uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+20];
+// R1-03: kept in lockstep with the definition in loop_functions.cpp -- see
+// the comment there for why +1 (not +20) is the true bound.
+extern uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+1];
 extern int udpWrite;
 extern int udpRead;
 
 extern bool hasMsgFromPhone;
 
 // BLE Ringbuffer to phone
-extern unsigned char BLEtoPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5];
+// R1-01: kept in lockstep with the definition in loop_functions.cpp -- see
+// the comment there for the producer-clamp derivation of these sizes.
+extern unsigned char BLEtoPhoneBuff[MAX_RING][UDP_TX_BUF_SIZE+5];
 extern int toPhoneWrite;
 extern int toPhoneRead;
 
 // BLE Commands Ringbuffer to phone
-extern unsigned char BLEComToPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5];
+extern unsigned char BLEComToPhoneBuff[MAX_RING][246];
 extern int ComToPhoneWrite;
 extern int ComToPhoneRead;
 

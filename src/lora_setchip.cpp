@@ -61,7 +61,12 @@ bool rf_crc = true;
 uint16_t rf_preamble_length = LORA_PREAMBLE_LENGTH;
 
 //0...EU  1...UK, 2...ON, 3...EA, 4...OM, 8...EU8, 10...US, ..... 5...868, 6...915, 7...MAN
-String strCountry[max_country] = {"EU", "UK", "ON", "EA", "LA", "868", "915", "MAN", "EU8", "UK8", "US", "VR2", "435", "436", "442", "PL", "none"};
+// R3-06 (DRY audit): pure constant lookup table, converted from String[] to
+// const char*[] -- was 17 heap-backed String objects, now 17 pointers into
+// .rodata plus zero allocations. getCountry() still returns String
+// (unchanged call contract); the const char* -> String conversion happens
+// once, at that single return, not once per table entry at startup.
+const char* const strCountry[max_country] = {"EU", "UK", "ON", "EA", "LA", "868", "915", "MAN", "EU8", "UK8", "US", "VR2", "435", "436", "442", "PL", "none"};
 
 String getCountry(int iCtry)
 {
@@ -77,7 +82,12 @@ int getCountryID(String strCtry)
 {
     for(int ic=0;ic<max_country;ic++)
     {
-        if(strCountry[ic] == strCtry)
+        // Comparison kept String-member-side (strCtry == const char*) rather
+        // than the other way around: String::operator==(const char*) is a
+        // guaranteed member overload, whereas const char* == String relies
+        // on an implicit String temporary being constructed for the left
+        // operand, which is not guaranteed to resolve the same way.
+        if(strCtry == strCountry[ic])
             return ic;
     }
 

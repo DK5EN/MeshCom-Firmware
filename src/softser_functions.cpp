@@ -331,6 +331,12 @@ bool sendSOFTSER(char cText[100])
 
 #define MAX_ID 10
 
+// R3-10 (DRY audit): NOT converted to const char*[] like R2-07/R3-06.
+// These are runtime state, not constant tables -- getSOFTSER_ID() writes
+// strSID[next_id] = ID (below), and setSOFTSER_PARM()/setSOFTSER_UNIT()/
+// setSOFTSER_SNAME() assign parsed telemetry field names/units into
+// strPARM[]/strPARM_ID[]/strUNIT[]/strSNAME[] at runtime. A const char*
+// table cannot hold that; leaving these as String is correct.
 String strSID[MAX_ID];
 
 String strSNAME[MAX_ID];

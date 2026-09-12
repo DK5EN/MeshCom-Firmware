@@ -62,8 +62,16 @@ int packetExtSize=0;
 
 // Deferred sendExtern ringbuffer — queued from OnRxDone, flushed in main loop
 #define MAX_EXTERN_QUEUE 2
+// R1-06 (DRY audit, docs/optimization-audit-20260910-appendix.md): 500 -> 264.
+// queueExtern()'s sole caller (lora_functions.cpp:950) passes RcvBuffer/size
+// straight out of OnRxDone(); size traces back to aprsmsg.msg_len <= the
+// decodeAPRS() rsize argument, which is the OnRxDone() payload length --
+// hardware/double-buffer bounded to UDP_TX_BUF_SIZE (255, see
+// lora_functions.cpp's rxPayloadCopy[2][UDP_TX_BUF_SIZE] and the raw-inject
+// path's buf[UDP_TX_BUF_SIZE] in test_inject.cpp). 264 keeps 9 B headroom
+// over that 255-B maximum; the queueExtern() clamp below still guards it.
 struct externQueueEntry {
-    uint8_t  buffer[500];
+    uint8_t  buffer[264];
     uint16_t buflen;
     int16_t  rssi;
     int8_t   snr;

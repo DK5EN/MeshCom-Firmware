@@ -67,7 +67,11 @@ bool bDisplayInfo = false;
 bool bDisplayVia = false;
 bool bDisplayCont = false;
 bool bWIFIAP = false;
-uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE + 20];
+// R1-03 (wave 2): the slot padding shrank from +20 to +1 in
+// src/loop_functions_extern.h. This definition MUST track that header --
+// it is the same object, and a mismatch is a redefinition error, which is
+// how the change announced itself. Do not re-hardcode a number here.
+uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE + 1];
 int udpWrite = 0;
 int udpRead = 0;
 
