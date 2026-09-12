@@ -1894,7 +1894,9 @@ void esp32_write_ble(uint8_t confBuff[300], uint8_t conf_len)
 
 
 // Deferred display update from OnRxDone (avoid I2C inside the radio callback).
-// RACE-01 fix: snapshot under spinlock, display call outside. Factored so both
+// RACE-01: snapshot first, display call outside. There is no lock here and none
+// is needed -- OnRxDone runs inside esp32loop() on ESP32, so producer and
+// consumer are one task. Factored so both
 // the local-radio loop and the external-radio path flush pending RX displays.
 static void flushDeferredDisplayUpdates()
 {

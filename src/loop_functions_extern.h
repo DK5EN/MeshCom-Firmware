@@ -301,11 +301,6 @@ extern std::atomic<bool> cad_done_flag;
 extern std::atomic<bool> cad_double_check;
 
 
-// RACE-01 fix: spinlock for deferred display update (ISR → main loop)
-#if defined(ESP32)
-extern portMUX_TYPE displayMux;
-#endif
-
 // Channel utilization tracking (10s window)
 #if defined(ESP32)
 // ESP32 never registers OnHeaderDetect as a radio callback (see esp32_main.cpp),

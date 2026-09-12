@@ -30,6 +30,13 @@ python3 test/golden/settings_layout_lint.py --self-test
 python3 test/golden/settings_layout_lint.py
 python3 test/golden/variant_macros_lint.py --self-test
 python3 test/golden/variant_macros_lint.py
+python3 test/golden/drift_matrix_lint.py --self-test
+# --phase pre-review is TEMPORARY: it downgrades the empty-verdict check while
+# the phase-2 HITL review session is still owed. Drop the flag the day the
+# verdicts are filled in -- testplan section 5.3 requires a verdict on every row
+# before the first unification commit, and leaving this flag here would let
+# that requirement quietly expire.
+python3 test/golden/drift_matrix_lint.py --phase pre-review
 python3 test/golden/verify_captures.py
 python3 test/golden/corpus_lint.py test/golden/corpus/
 python3 -m unittest discover tools/mock 2>&1 | tail -3

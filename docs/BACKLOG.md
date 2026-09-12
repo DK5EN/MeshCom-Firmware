@@ -4153,16 +4153,43 @@ followed: `C3` said "no carve needed, build only" -- the obstacle was never
 `Serial` but that the function lived in the two largest translation units in
 the tree, which never compile on a host. And `C4` names `D1-09` **and**
 `D1-10`; only `D1-09` is carved. `D1-10`, the loop scheduler, is still owed --
-and the "~18 timer predicates" this row used to claim is wrong. Measured
-2026-09-12: **50 distinct timer predicates**, 27 shared, 15 ESP32-only, 8
-nRF52-only, across `esp32loop()` (`esp32_main.cpp:1919-4013`, 2 095 lines) and
-`nrf52loop()` (`nrf52_main.cpp:1150-2497`, 1 348 lines). Two of the shared
-ones disagree on their interval, which is drift nobody chose:
+and the "~18 timer predicates" this row used to claim is wrong. It has now
+been measured three times and reported three different ways, so the row states
+the **definition** as well as the number -- a count whose definition is
+implicit is how "~18" survived in the first place:
 
-| timer            | ESP32                      | nRF52                         | ratio   |
-| ---------------- | -------------------------- | ----------------------------- | ------- |
-| `BattTimeWait`   | 500 ms (`esp32_main:3518`) | 30 000 ms (`nrf52_main:2174`) | **60x** |
-| `INA226TimeWait` | 15 s (`:3798`)             | 60 s (`:2352`)                | 4x      |
+| Measure                   | Definition                                                           | ESP32  | nRF52  | Union                                   |
+| ------------------------- | -------------------------------------------------------------------- | ------ | ------ | --------------------------------------- |
+| timer **predicate sites** | `if`/`while` conditions containing `millis()` inside the loop body   | **43** | **35** | **78** (they are per-platform sites)    |
+| timer **variables**       | distinct identifiers compared against `millis()` in those conditions | 37     | 31     | **43** -- 25 shared, 12 / 6 single-side |
+
+Measured 2026-09-12 over `esp32loop()` (`esp32_main.cpp:1920-4053`, 2 134
+lines) and `nrf52loop()` (`nrf52_main.cpp:1150-2497`, 1 348 lines), brace-
+matched rather than eyeballed. Two identifiers are excluded by hand because
+they appear in a `millis()` expression without being timers: `_tx_s` (a
+duration) and `lreduction` (a divisor).
+
+**The 25 shared variables are the only thing a common scheduler could own**,
+and that is the number the carve should be planned against -- not 78, and not
+the "50 (27 shared)" this row carried until now. That earlier figure counted
+neither sites nor variables consistently, and one of its "shared" rows was a
+name collision rather than a shared timer: `stat_prio_timer` is ESP32-only,
+while `nrf52_main.cpp:1391` -- the line it was attributed to -- is
+`setlog_stat_timer`, which is nRF52-only. Two different timers, one wrong
+"shared" row.
+
+The two shared timers that disagreed on their interval have since been
+unified, so this table records what was rather than what is:
+
+| timer            | ESP32 was | nRF52 was | ratio   | now                                    |
+| ---------------- | --------- | --------- | ------- | -------------------------------------- |
+| `BattTimeWait`   | 500 ms    | 30 000 ms | **60x** | 30 000 ms both (`esp32_main.cpp:3534`) |
+| `INA226TimeWait` | 15 s      | 60 s      | 4x      | 60 s both (`esp32_main.cpp:3838`)      |
+
+Settled by operator decision 2026-09-11 on the slower progression in both
+cases. The `BattWaitCounter` gate that came with the fast ESP32 cadence was
+removed rather than re-tuned: it had gated battery debug prints behind
+`> 20` ticks, which at the new interval would have meant ten minutes.
 
 Both loops also sit in translation units that never compile on a host (WiFi,
 `esp_task_wdt`, NeoPixel, Arduino_GFX on one side; W5100S, WisBlock API,
@@ -4611,6 +4638,82 @@ fail the day someone changes it, which is the point.
 | ------- | ---- | ---- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | OPT-D15 | BUG  | Low  | `src/aprs_functions.cpp:1356` (encode) vs `:470` (decode)   | **The APRS epilogue loses a sub-version of `0x7E` on every round trip.** Epilogue layout is `[payload] 0x00 HW MOD FCS_HI FCS_LO FW LASTHW SUB 0x7E`, with `FCS` a 16-bit big-endian sum over bytes `0..MOD`. The encoder already knows one byte value is unusable and substitutes `0x23` when `SUB == 0x00` -- but it writes `SUB == 0x7E` verbatim, and `0x7E` is the frame terminator. The decoder reads it as `'#'` (`:470`). A node whose sub-version is `~` therefore advertises a different one after one hop, silently. Pinned by `test/test_aprs_epilogue` (8 cases, 4/4 mutations caught).                                                                                    | **OPEN, pinned not fixed.** The fix is a wire-format decision (extend the encoder's substitution to `0x7E`, or escape it), and changing an encoder both ends already agree on is a fleet-compatibility question, not a cleanup. Owed a decision. |
 | OPT-D16 | GAP  | Low  | `src/mheard_functions.cpp`, `showMHeard()` / `sendMheard()` | **The mHeard list is not sorted -- it is a raw ring walk.** `showMHeard()` is a plain `for(int iset=0; iset<MAX_MHEARD; iset++)` over the slot array, so the displayed order is slot order, which on a fresh node is roughly reverse discovery order and looks meaningful without being it. Proved with an ordering that separates slot order from hearing order from most-recent-first (heard `C,A,B` -> displayed `B,A,C`; re-hearing `C` did not move it). Second, smaller drift: `sendMheard()` puts raw ASCII in `PLT` (`'!'` -> 33) where `showMHeard()` prints decoded text. Pinned by `test/test_mheard_render` (15 cases, 80-slot case added after a slot-0 mutation escaped). | **OPEN, pinned not fixed.** Sorting by last-heard is the obvious behaviour and costs a sort over <=80 slots; it changes what every user sees, so it is a product decision rather than a correctness fix.                                         |
+
+#### Phase C stand, 2026-09-12: the drift matrix exists and has a gate
+
+`M1` is done. `docs/testplan/drift-matrix.csv` carries **29 rows**, DR-01..DR-29,
+in the column set testplan §5.1 specifies:
+
+- **DR-01..DR-17** are the audit's pre-filled rows, each re-sourced against the
+  tree rather than copied from the prose -- 88 `file:line` references, all of
+  which resolve to a real line in a real file (checked mechanically, not by
+  eye). `DR-01` is recorded as already fixed.
+- **DR-18..DR-29** are new, harvested from the drift the twins pinned:
+  3 from `U1`, 6 from `U2` (its six documented drifts), 1 from `U7`
+  (`OPT-D15`), 2 from `U8` (`OPT-D16`, split into its two distinct findings).
+  `U3` and `U6` contributed none beyond what `DR-10`/`DR-11`/`DR-17` already
+  carried.
+
+`verdict`, `spec`, `decided_by` and `decided_on` are **empty on every row by
+construction**. §5.3 makes the matrix a correctness verdict per difference,
+which is `M2`, the operator review session -- an analyst filling those columns
+would be deciding the thing the session exists to decide. `class` and
+`recommendation` are filled, because those are analyst columns.
+
+`test/golden/drift_matrix_lint.py` is the `test_drift_matrix_complete` the plan
+calls for, wired into `selftest.sh`. It enforces: a verdict on every row, a
+`spec` on every `both-wrong`, an `asserting_test` that resolves against the real
+tree, and the enum values of `after_expect` and `class`. Two details are worth
+recording because they are what makes it more than decorative:
+
+1. **`asserting_test` is spelled `suite::case` and BOTH halves are checked.**
+   Resolving only the suite would let a row keep pointing at a case that has
+   since been renamed -- suite still exists, gate still green, and the row's
+   claim that something asserts this is no longer true. Mutation-tested:
+   renaming a real case in the CSV makes the gate fail.
+2. **An empty cell and an unresolvable name are treated differently.** Ten rows
+   have no test yet (`U4`/`U5` invariants and the `C4` gateway rows have no
+   suite); those cells are empty and counted as a reported gap. A NAME that does
+   not resolve is a violation in every phase, because that is a typo or a
+   rename, not a gap. The agent's first draft wrote `"none yet -- ..."` into the
+   cell, which reads like a test name; prose in that column is worse than an
+   empty one.
+
+`--phase pre-review` downgrades the empty-`verdict` check to a counted report so
+the gate can run before `M2`. **It is temporary and `selftest.sh` says so at the
+call site:** §5.3 requires a verdict on every row before the first unification
+commit, and a flag left in place is how that requirement would quietly expire.
+
+**One escalation out of the matrix, for the `W3`/`D1-04` decision.** `DR-12` was
+filed by the audit as "six fields missing on nRF52". Measured field-by-field on
+2026-09-12, the real diff is **14 ESP32-only and 2 nRF52-only** -- more than
+twice the audit's figure. Several of the 14 are genuinely T-Deck-only hardware
+state (`node_keyboardlock`, `node_backlightlock`, the audio fields) with no
+nRF52 counterpart, but `node_disp_rot` and `node_ntp` look portable. The row
+carries the escalation and waits for a verdict rather than the number living on
+in prose.
+
+#### `displayMux` removed, and the three comments that were the actual defect
+
+`portMUX_TYPE displayMux` was defined in `src/lora_functions.cpp` and externed
+in `src/loop_functions_extern.h`, with **no site anywhere taking or giving it**.
+Commit `4a250602` (N-13, ESP32 over-synchronisation) removed all three
+`portENTER_CRITICAL(&displayMux)` / `portEXIT_CRITICAL()` pairs and left the
+variable behind.
+
+The variable cost a few bytes. What it actually cost was the truth: three
+comments -- `lora_functions.cpp`, `loop_functions_extern.h`, and
+`esp32_main.cpp`'s `flushDeferredDisplayUpdates()` ("snapshot under spinlock")
+-- all told a reader that `pendingDisplayMsg` was protected on ESP32. Anyone
+chasing a display race would have believed it and looked elsewhere.
+
+It does not need protecting on ESP32: `OnRxDone` runs synchronously inside
+`esp32loop()`, so the producers (`queueDisplayText()`/`queueDisplayPosition()`)
+and the consumer are the same task and cannot preempt each other. On nRF52 they
+genuinely can -- `OnRxDone` runs in the LoRa task, the drain in `loop()` -- and
+that side is guarded by `taskENTER_CRITICAL()`, on all three nRF52 boards (see
+`RF-07`). Variable and extern deleted, the three comments replaced with what is
+actually true. Gated on 32/32 envs.
 
 #### Incident 2026-09-11: the BLE golden corpus broadcast to the live network
 

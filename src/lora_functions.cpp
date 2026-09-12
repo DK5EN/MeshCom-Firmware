@@ -148,10 +148,18 @@ struct aprsMessage pendingDisplayMsg;
 int16_t pendingDisplayRssi = 0;
 int8_t  pendingDisplaySnr = 0;
 
-// RACE-01 fix: spinlock protects pendingDisplayMsg struct copy between ISR and main loop
-#if defined(ESP32)
-portMUX_TYPE displayMux = portMUX_INITIALIZER_UNLOCKED;
-#endif
+// RACE-01: the ESP32 spinlock that used to guard pendingDisplayMsg was removed
+// in 4a250602 along with every portENTER_CRITICAL(&displayMux) that took it;
+// the variable itself outlived them until 2026-09-12. It is gone now, and so is
+// the comment that claimed a lock existed here -- which was the actual cost of
+// leaving it: three files told a reader this struct was protected on ESP32.
+// It does not need to be. On ESP32 OnRxDone runs synchronously inside
+// esp32loop() (architecture/09-concurrency-map.md), so the producer
+// queueDisplayText()/queueDisplayPosition() and the consumer
+// flushDeferredDisplayUpdates() are the same task and cannot preempt each
+// other. On nRF52 they genuinely can -- OnRxDone runs in the LoRa task, the
+// drain in loop() -- and that side is guarded by taskENTER_CRITICAL() below,
+// on all three nRF52 boards (see the RF-07 note).
 
 // RF-07 (BACKLOG): this guard reads as RAK-only but is not. `BOARD_RAK4630`
 // is defined for ALL THREE nRF52 boards -- platformio.ini's shared
