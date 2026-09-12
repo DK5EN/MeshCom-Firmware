@@ -487,8 +487,10 @@ static void test_agreement_dedup_blocks_repeat_relay_on_both(void)
 static void test_agreement_max_zeros_rejected_by_both(void)
 {
     // Fully-zeroed, EVEN-length datagram: both loops read exactly the same
-    // set of byte pairs (no odd-length over-read ambiguity, see D1), so
-    // zerocount is identical (16) on both and both exceed MAX_ZEROS (6).
+    // set of byte pairs (no odd-length bound to disagree over --
+    // see test_agreement_zero_scan_bound_matches_on_odd_length() below for
+    // the odd-length case), so zerocount is identical (16) on both and both
+    // exceed MAX_ZEROS (6).
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
     const int len = 16;
@@ -608,47 +610,102 @@ static void test_agreement_conf_updates_node_call_and_short_identically(void)
     TEST_ASSERT_EQUAL_INT(0, g_save_settings_calls);
 }
 
-// ===========================================================================
-// DRIFT: differences that exist today and must not change silently
-// ===========================================================================
-
-static void test_drift_zero_scan_bound_nrf52_overreads_by_one_byte(void)
+static void test_agreement_zero_scan_bound_matches_on_odd_length(void)
 {
-    // ESP32: `for (i = 0; i + 1 < packetSize; i += 2)` -- with packetSize=7
-    // reads pairs (0,1)(2,3)(4,5), never touching index 6 or beyond.
-    // nRF52:  `for (i = 0; i < packetSize; i += 2)`     -- reads a FOURTH
-    // pair (6,7), where byte 7 is one past the 7-byte logical datagram.
-    // Fixed on ESP32 by commit cd88ae12 (SEC-05/SEC-06/BUG-12); never
-    // applied to nRF52 (src/udp_frame.h, src/nrf52/udp_frame_nrf52.cpp:53).
+    // BUG-13 fix: nRF52's zero-scan loop used `for (i = 0; i < packetSize;
+    // i += 2)`, one byte too permissive for an odd packetSize -- its last
+    // iteration read a FOURTH pair (6,7) for a 7-byte datagram, where byte 7
+    // is one past the logical datagram. ESP32's `for (i = 0; i + 1 <
+    // packetSize; i += 2)` never had this: it stops after (4,5), the third
+    // and last IN-BOUNDS pair. Fixed on ESP32 by commit cd88ae12
+    // (SEC-05/SEC-06/BUG-12); the same fix now applied to nRF52
+    // (src/nrf52/udp_frame_nrf52.cpp:53) -- this test used to live in the
+    // DRIFT block, pinning the disagreement the bug caused. See
+    // test_regression_zero_scan_oob_byte_flips_verdict_before_fix() below
+    // for a case where the extra byte does not just change zerocount's
+    // final value but flips accept/reject outright.
     //
-    // A fully-zeroed buffer with headroom makes this observable WITHOUT an
-    // actual out-of-bounds access: the extra byte nRF52 reads is real,
-    // allocated memory (the fixed-size UDP receive buffer on hardware is
-    // exactly this shape -- fixed capacity, a shorter logical packetSize),
-    // it is simply outside the 7 bytes this datagram claims to be. Seven
-    // zero pairs would be needed to trip MAX_ZEROS (6) on the pair count
-    // alone; ESP32 reads 3 (zerocount 6, accepts), nRF52 reads 4 (zerocount
-    // 8, rejects) -- the SAME bytes, a different verdict, purely from the
-    // loop bound.
+    // A fully-zeroed buffer with headroom makes the bound itself observable
+    // without touching unmapped memory: the fixed-size UDP receive buffer
+    // on hardware is exactly this shape -- fixed capacity, a shorter
+    // logical packetSize. Both loops now read exactly the same 3 in-bounds
+    // pairs -- (0,1)(2,3)(4,5) -- never touching index 6 or 7: zerocount 6
+    // on both, at the MAX_ZEROS (6) boundary, both accept.
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));   // whole buffer zero, including the tail
     const int len = 7;
 
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+
+        char msg[96];
+        if (side)
+        {
+            int rc = handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            snprintf(msg, sizeof(msg), "%s: 3 in-bounds pairs (zerocount 6) must accept", name);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, rc, msg);
+        }
+        else
+        {
+            handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+            snprintf(msg, sizeof(msg), "%s: 3 pairs (zerocount 6) must accept", name);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_reset_udp, msg);
+        }
+    }
+}
+
+static void test_regression_zero_scan_oob_byte_flips_verdict_before_fix(void)
+{
+    // Regression for the bound fixed just above: constructs a case where
+    // the one-byte over-read does not merely nudge zerocount's final value
+    // but flips the accept/reject VERDICT outright, so this test is a
+    // meaningful fail-before/pass-after check on its own (not just a
+    // restatement of the agreement test).
+    //
+    // packetSize 15 (odd): the correct bound (`i + 1 < packetSize`) reads 7
+    // in-bounds pairs, indices (0,1)..(12,13) -- 14 bytes, all zero here --
+    // so zerocount accumulates to 14, over MAX_ZEROS (6): the correct
+    // verdict is REJECT (rc == 1). Index 14, the datagram's real but
+    // unpaired trailing byte (odd length always leaves one), is never read
+    // by either correct scan.
+    //
+    // The buggy bound (`i < packetSize`) adds one more iteration at i=14,
+    // pairing that trailing byte with inc_udp_buffer[15] -- one byte past
+    // the 15-byte datagram, poisoned non-zero below. A non-zero pair resets
+    // zerocount to 0 on the spot, and since it is the LOOP'S LAST
+    // iteration, that reset is never overwritten: the accumulated
+    // over-threshold count is silently erased and the all-zero frame is
+    // wrongly ACCEPTED (rc == 0) -- a real garbage/malformed frame let
+    // through solely because of what happened to sit one byte past the
+    // buffer.
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    const int len = 15;
+
     recorder_reset();
     uint8_t buf[BUF_CAP];
     copy_into(buf, tmpl, len);
-    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_reset_udp,
-                                  "esp32 (3 pairs, zerocount 6) must still accept the frame");
+    buf[len] = 0xFF;   // poison one byte past the datagram; copy_into() only
+                       // clears/copies the first `len` logical bytes, so this
+                       // stands in for whatever real hardware's fixed-size
+                       // UDP receive buffer happens to hold there
 
-    recorder_reset();
-    copy_into(buf, tmpl, len);
     int rc = handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, rc,
-                                  "nrf52 (4 pairs via the one-byte over-read, zerocount 8) "
-                                  "must reject -- if this became 0, the over-read was fixed "
-                                  "and src/udp_frame.h's drift list is stale");
+                                  "nrf52 must reject an all-zero 15-byte datagram (zerocount 14 "
+                                  "from the 7 in-bounds pairs) regardless of the byte one past "
+                                  "packetSize -- if this reads 0, the zero-scan bound is reading "
+                                  "inc_udp_buffer[packetSize] again");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, txRingDepth(), "a rejected frame must not relay");
 }
+
+// ===========================================================================
+// DRIFT: differences that exist today and must not change silently
+// ===========================================================================
 
 static void test_drift_extudp_requires_hasExternIPaddress_on_esp32_only(void)
 {
@@ -885,7 +942,9 @@ static void test_drift_max_zeros_return_value_and_reset_call_differ(void)
     // src/nrf52/nrf_eth.h's own doc comment on handleUdpFrame_nrf52()).
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
-    const int len = 16;   // even length: both loops read identical pairs (see D1)
+    const int len = 16;   // even length: both loops read identical pairs
+                          // (test_agreement_zero_scan_bound_matches_on_odd_length
+                          // below covers the odd-length case)
 
     recorder_reset();
     uint8_t buf[BUF_CAP];
@@ -913,8 +972,9 @@ int main(int, char **)
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
+    RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);
+    RUN_TEST(test_regression_zero_scan_oob_byte_flips_verdict_before_fix);
 
-    RUN_TEST(test_drift_zero_scan_bound_nrf52_overreads_by_one_byte);
     RUN_TEST(test_drift_extudp_requires_hasExternIPaddress_on_esp32_only);
     RUN_TEST(test_drift_extudp_gate_before_vs_after_msgtype_check);
     RUN_TEST(test_drift_extudp_length_arg_type_differs_but_is_unobservable_at_the_clamp);

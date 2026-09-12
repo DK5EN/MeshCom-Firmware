@@ -50,7 +50,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
   // if more than n values are 00 we might have received a faulty message
   uint8_t zerocount = 0;
 
-  for (int i = 0; i < packetSize; i+=2)
+  for (int i = 0; i + 1 < packetSize; i+=2)
   {
     if (inc_udp_buffer[i] == 0x00 && inc_udp_buffer[i + 1] == 0x00)
     {
