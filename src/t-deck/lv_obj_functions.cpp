@@ -2126,17 +2126,13 @@ void tft_on()
     // Ensure we have a valid brightness to restore
     if(pre_sleep_brightness_level == 0) pre_sleep_brightness_level = BRIGHTNESS_STEPS;
 
+    // Keyboard backlight: resetBrightness() -> setBrightness() already syncs
+    // it from node_kbllightlock (tdeck_helpers.cpp). The "force sync" block
+    // that used to follow here tested node_keyboardlock instead (inverted
+    // since the v4.35p keyboard-light switch) and lit the keyboard at 150
+    // whenever the panel woke with the keylock engaged -- i.e. on every
+    // incoming message, the only wake source not gated by the keylock.
     resetBrightness();
-
-    // Force sync keyboard backlight
-    if (meshcom_settings.node_keyboardlock)
-    {
-        if (bDEBUG)
-            Serial.println("[TDECK]...tft_on: turn on keyboard backlight");
-
-        // turn on keyboard backlight
-        setKeyboardBacklight(150);
-    }
 
     tdeck_tft_timer = millis();
     if (bDEBUG)
