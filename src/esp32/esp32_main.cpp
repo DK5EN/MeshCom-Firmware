@@ -1338,7 +1338,10 @@ void esp32setup()
             // can never go LOW after the first wake and the radio is dead until a
             // power cycle. GPIO8 is RTC-capable but the sleep side never arms
             // gpio_deep_sleep_hold_en(), so no gpio_deep_sleep_hold_dis() is needed.
-            // No-op on a cold boot. Not bench-verified: no WP/E213 hardware.
+            // No-op on a cold boot. Field-verified 2026-09-11 by OE3LCR on
+            // E213 and Wireless Paper V1.2 (PR #1135 comment): EXT1 wake, radio
+            // init and SPI traffic fine. Pre-fix 4.35p also woke with working
+            // RX there, so in practice this is a guard rather than a repair.
             gpio_hold_dis((gpio_num_t) PIN_LORA_NSS);
         #endif
 

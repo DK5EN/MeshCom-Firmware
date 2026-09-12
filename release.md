@@ -405,8 +405,11 @@ und DK5EN-98 als Gateway des Betreibers).
   beim Aufwachen geloest (DS-02, Punkt 200).** Gleicher Mechanismus wie
   Punkt 199: `PIN_LORA_NSS` blieb nach dem ersten Schlaf/Wakeup auf HIGH,
   Funk tot bis zum Stromwegnehmen. `gpio_hold_dis()` vor der Funk-Init, beim
-  Kaltstart wirkungslos. **Blind repariert** -- nur kompiliert, kein Geraet
-  auf der Bench.
+  Kaltstart wirkungslos. Zunaechst blind repariert (nur kompiliert), am
+  2026-09-11 von OE3LCR auf E213 und Wireless Paper V1.2 im Feld bestaetigt
+  (EXT1-Wake, `wake: 3`, Funk-Init und SPI danach in Ordnung). Vor dem Fix
+  liefen dort laut OE3LCR schon Timer-Wakes mit RX, der Aufruf ist also
+  vermutlich praktisch wirkungslos und bleibt als Absicherung.
 - **ESP32-S3 an nativem USB: Port-Oeffnen waehrend des Boots fuehrt nicht
   mehr in eine Reboot-Schleife (CDC-02, Punkt 201).** Der 4-kB-Ring aus
   Punkt 184 wurde nach `Serial.begin()` angelegt, ein paar Zeilen lang war

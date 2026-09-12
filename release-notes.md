@@ -74,7 +74,7 @@ Upstream issue #962 asked why the low-battery deep sleep does nothing. The verdi
 
 - `--deepsleep` is a real sleep on **every ESP32 board**: radio to sleep, display off, PMU rails off on the T-Beam family, the shared rail cut on the T-Deck and T-Deck Plus, a button wake armed on the configured button pin. Wake is the user button or RESET.
 - `--deepsleep` on **RAK4631, Heltec T114 and T-Echo** is a real nRF52 System OFF (the T-Echo long-press too). Wake is the button, plugging in USB, or RESET.
-- Boards wake up **with their rails and radio working**: the T-Deck, T-Deck Plus and T-Beam-1W left a gpio hold latched across the wake reset, which killed SD card, keyboard and LoRa until a power cycle (item 199). The same mechanism on Wireless Paper and Vision Master E213 is fixed blind (item 200).
+- Boards wake up **with their rails and radio working**: the T-Deck, T-Deck Plus and T-Beam-1W left a gpio hold latched across the wake reset, which killed SD card, keyboard and LoRa until a power cycle (item 199). The same mechanism on Wireless Paper and Vision Master E213 is fixed too (item 200, field-confirmed by OE3LCR on both boards 2026-09-11).
 
 **What this release deliberately does not do:**
 

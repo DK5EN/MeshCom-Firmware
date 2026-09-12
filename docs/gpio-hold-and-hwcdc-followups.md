@@ -22,9 +22,12 @@ this document's word for it.
 - Issue 1 (CDC-02): **fixed** in `b57daf44`. Ring sized before the first `begin()`, once-flag
   for the second `begin()` on T5-ePaper/T-Deck Pro (a case this doc missed). Regression bench:
   `tools/bench/tdeck_cdc_portopen.py`. Bench-proven on DK5EN-14: pre-fix 9 of 30 port-opens hit the assert, fixed 0 of 80; the SD/keyboard wedge (secondary symptom) did not reappear. BACKLOG row `CDC-02`.
-- Issue 2 (DS-02): **fixed blind** in `f7801a1c` (`gpio_hold_dis(PIN_LORA_NSS)` before the radio
-  init in `esp32setup()`, compile-verified on both envs). Still unverified on hardware; BACKLOG
-  row `DS-02` carries the field-test ask.
+- Issue 2 (DS-02): **fixed** in `f7801a1c` (`gpio_hold_dis(PIN_LORA_NSS)` before the radio
+  init in `esp32setup()`, compile-verified on both envs). **Field-verified 2026-09-11 by OE3LCR**
+  on E213 and Wireless Paper V1.2 (EXT1 wake, `wake: 3`, radio init and SPI traffic fine).
+  OE3LCR also reports pre-fix 4.35p timer wakes with working RX, so the hold most likely never
+  survived the wake (no `gpio_deep_sleep_hold_en()` on the sleep side) and the call is a
+  practical no-op kept as a guard. BACKLOG row `DS-02` has the log lines and test hints.
 
 ---
 

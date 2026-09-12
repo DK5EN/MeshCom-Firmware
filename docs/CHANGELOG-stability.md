@@ -546,9 +546,14 @@ this release, see the release notes.
      HIGH with `gpio_hold_en()`; after the first sleep/wake cycle the SX1262
      select could never go LOW again, radio dead until a power cycle, the
      same mechanism as item 199. `gpio_hold_dis()` before the radio init,
-     no-op on a cold boot. **Fixed blind**: compile-verified on both envs,
-     no unit on the bench; the field-test ask is in BACKLOG row `DS-02`.
-     Commit `f7801a1c`.
+     no-op on a cold boot. Fixed blind on 2026-09-06 (compile-verified,
+     no unit on the bench); **field-verified 2026-09-11 by OE3LCR** on a
+     Vision Master E213 and a Wireless Paper V1.2 (v4.35t): EXT1 wake with
+     `RESET_REASON=8`, `wake: 3`, SX1262 init and listen succeed, SPI
+     live afterwards (posshot sent, foreign frame relayed). OE3LCR notes
+     pre-fix 4.35p already woke with working RX, so the call is probably a
+     no-op in practice and stays as a guard. Details in BACKLOG row
+     `DS-02`. Commit `f7801a1c`.
 201. **ESP32-S3 boards on native USB no longer crash-loop when the host
      opens the port during boot** (CDC-02). Item 184 raised the HWCDC TX
      ring by calling `setTxBufferSize()` after `Serial.begin()`; on

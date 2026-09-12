@@ -20,6 +20,10 @@ one to update when an item moves.
   here (no board); field confirmation with the fix build is open. Heltec V3 hold-the-button test passed
   2026-09-12 (two cycles, DK5EN-93). Still owed on the bench: the RAK4631 re-test of serial `--deepsleep` with the `bButtonCheck` gate (node is in
   System OFF, needs its reset button first). T114/T-Echo compile-only.
+- `DS-02` **closed 2026-09-11**: OE3LCR field-verified the `gpio_hold_dis(PIN_LORA_NSS)` wake path
+  on E213 (OE3LCR-11) and Wireless Paper V1.2 (OE3LCR-10) in the PR #1135 thread; EXT1 wake
+  (`wake: 3`), radio init and SPI traffic fine. Probably a practical no-op, kept as a guard.
+  The WP/E213 sleep/wake item drops off the community test list.
 
 **B. Next engineering work, in order**
 
