@@ -1,4 +1,4 @@
-// Native test suite for radio_units.cpp (RF-01, RF-02, RF-03).
+// Native test suite for radio_units.cpp (RF-01, RF-02, RF-03, RF-04).
 //
 // The three defects this pins are all the same mistake: a radio settings key
 // holds a different unit on the two platforms, and a write site forgot to
@@ -120,11 +120,11 @@ static void test_freq_nrf52_is_hz(void)
 // the default. Normalising first is what makes one window correct on both.
 static void test_freq_window_matches_on_both_sides_after_normalising(void)
 {
-    // /100.0 as the shipping code computes it, not the physically correct
-    // /1000.0 -- see RF-04. The point of this test is the unit of the value
-    // being compared, not the width of the guard band.
+    // /1000.0, the corrected divisor (RF-04) -- see the guard-band tests
+    // below for why /100.0 was wrong. The point of *this* test is the unit
+    // of the value being compared, not the width of the guard band.
     const float bw_khz = 250.0f;
-    const float dec = (bw_khz / 2.0f) / 100.0f;
+    const float dec = (bw_khz / 2.0f) / 1000.0f;
 
     const float esp_stored = 434.0f;
     const float nrf_stored = 434000000.0f;
@@ -143,13 +143,75 @@ static void test_freq_window_matches_on_both_sides_after_normalising(void)
 // accepted everything would pass the test above and still be wrong.
 static void test_freq_window_rejects_out_of_band_on_both_sides(void)
 {
-    const float dec = (250.0f / 2.0f) / 100.0f;
+    const float dec = (250.0f / 2.0f) / 1000.0f;
 
     const float esp_mhz = radioFreqStoredToMhz(450.0f, false);
     const float nrf_mhz = radioFreqStoredToMhz(450000000.0f, true);
 
     TEST_ASSERT_FALSE(esp_mhz >= (430.0f + dec) && esp_mhz <= (439.0f - dec));
     TEST_ASSERT_FALSE(nrf_mhz >= (430.0f + dec) && nrf_mhz <= (439.0f - dec));
+}
+
+// ---- RF-04: guard-band width and its per-platform quantity ---------------
+//
+// Two problems, both in the `dec_bandwith = (X/2.0)/100.0` guard-band
+// arithmetic at src/lora_setchip.cpp:246 and src/command_functions.cpp:4568:
+//
+//   1. /100.0 converts kHz to MHz ten times too wide. Half of 250 kHz is
+//      0.125 MHz, not 1.25 MHz -- the divisor must be /1000.0.
+//   2. command_functions.cpp fed the raw LORA_BANDWIDTH macro into that
+//      arithmetic. Per OPT-D14, LORA_BANDWIDTH is kHz on ESP32 variants
+//      (e.g. variants/heltec_wifi_lora_32_V3/configuration.h: `#define
+//      LORA_BANDWIDTH 250`) but a bandwidth INDEX on nRF52 variants (e.g.
+//      variants/wiscore_rak4631/configuration.h: `#define LORA_BANDWIDTH 1
+//      // [0: 125 kHz, 1: 250 kHz, 2: 500 kHz, ...]`) -- so the same
+//      expression computed a different quantity per platform. Both sites
+//      must route the macro through radioBwStoredToKhz() first, exactly as
+//      lora_setchip.cpp:233 already does for the LORA_BANDWIDTH default.
+static void test_guard_band_divisor_is_one_tenth_of_bandwidth_in_mhz(void)
+{
+    const float bw_khz = 250.0f;
+    const float dec = (bw_khz / 2.0f) / 1000.0f;
+
+    TEST_ASSERT_EQUAL_FLOAT(0.125f, dec);
+
+    // 70cm window: 431.25..437.75 (old, ten times too wide a guard) widens
+    // to 430.125..438.875 (correct).
+    TEST_ASSERT_EQUAL_FLOAT(430.125f, 430.0f + dec);
+    TEST_ASSERT_EQUAL_FLOAT(438.875f, 439.0f - dec);
+
+    // SRD860 window: 869.4..869.65 is itself exactly one 250 kHz channel, so
+    // a correctly-sized guard eats it down to its single physically valid
+    // centre frequency, 869.525 -- not the 869.275..869.775 the old /100.0
+    // divisor would have (wrongly) computed as symmetric bounds.
+    TEST_ASSERT_EQUAL_FLOAT(869.525f, 869.4f + dec);
+    TEST_ASSERT_EQUAL_FLOAT(869.65f - dec, 869.4f + dec);
+}
+
+static void test_guard_band_same_quantity_on_both_platforms_via_converter(void)
+{
+    // ESP32 stores LORA_BANDWIDTH as kHz directly; nRF52 stores it as a
+    // bandwidth index (0/1/2). Route both through radioBwStoredToKhz()
+    // before halving, exactly as the fixed call sites must, and check they
+    // agree on the resulting guard band.
+    const float esp32_bw_khz = radioBwStoredToKhz(250.0f, false); // ESP32 LORA_BANDWIDTH
+    const float nrf52_bw_khz = radioBwStoredToKhz(1.0f, true);    // nRF52 LORA_BANDWIDTH (index)
+
+    TEST_ASSERT_EQUAL_FLOAT(250.0f, esp32_bw_khz);
+    TEST_ASSERT_EQUAL_FLOAT(250.0f, nrf52_bw_khz);
+
+    const float esp32_dec = (esp32_bw_khz / 2.0f) / 1000.0f;
+    const float nrf52_dec = (nrf52_bw_khz / 2.0f) / 1000.0f;
+
+    TEST_ASSERT_EQUAL_FLOAT(esp32_dec, nrf52_dec);
+    TEST_ASSERT_EQUAL_FLOAT(0.125f, nrf52_dec);
+
+    // Problem 2, pinned directly: feeding the raw nRF52 index (1) into the
+    // same arithmetic without the converter -- what command_functions.cpp
+    // did before this fix -- computes a different, wrong guard band instead
+    // of agreeing with the ESP32 side.
+    const float unconverted_nrf52_dec = (1.0f / 2.0f) / 1000.0f;
+    TEST_ASSERT_FALSE(unconverted_nrf52_dec == nrf52_dec);
 }
 
 int main(int, char **)
@@ -170,6 +232,9 @@ int main(int, char **)
     RUN_TEST(test_freq_nrf52_is_hz);
     RUN_TEST(test_freq_window_matches_on_both_sides_after_normalising);
     RUN_TEST(test_freq_window_rejects_out_of_band_on_both_sides);
+
+    RUN_TEST(test_guard_band_divisor_is_one_tenth_of_bandwidth_in_mhz);
+    RUN_TEST(test_guard_band_same_quantity_on_both_platforms_via_converter);
 
     return UNITY_END();
 }

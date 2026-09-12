@@ -4565,7 +4565,14 @@ void commandAction(char *umsg_text, bool ble)
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
         sscanf(_owner_c, "%f", &fVar);
 
-        float dec_bandwith = (LORA_BANDWIDTH/2.0)/100.0;
+        // RF-04: LORA_BANDWIDTH is kHz on ESP32 but a bandwidth INDEX (0/1/2)
+        // on nRF52 (OPT-D14) -- feeding it straight into this arithmetic
+        // computed a different quantity per platform, on top of the /100.0
+        // vs /1000.0 (kHz->MHz) factor-of-ten error shared with
+        // lora_setchip.cpp's guard band. radioBwStoredToKhz() normalizes
+        // first, same as that site.
+        float bw_khz = radioBwStoredToKhz(LORA_BANDWIDTH, radioUnitsIndexed());
+        float dec_bandwith = (bw_khz/2.0)/1000.0;
         if(!((fVar >= (430.0 + dec_bandwith) && fVar <= (439.000 - dec_bandwith)) || (fVar >= (869.4 + dec_bandwith) && fVar <= (869.65 - dec_bandwith))))
         {
             printfdeb("txfrequency %.3f MHz not within Band\n", fVar);

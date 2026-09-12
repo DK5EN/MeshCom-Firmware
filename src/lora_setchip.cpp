@@ -237,13 +237,16 @@ void lora_setcountry(int iCtry)
         // frequency
         float freq_mhz = getFreq();
 
-        // Kept at /100.0, which is what this line has always computed:
-        // for 250 kHz it yields a 1.25 MHz guard band, where half the
-        // bandwidth is 0.125 MHz -- a factor of ten too wide, so the
-        // window is 431.25..437.75 instead of 430.125..438.875. That is
-        // RF-04 and it is a behaviour change on ESP32 too, so it is not
-        // made here inside an nRF52 unit fix.
-        dec_bandwith = (bw_khz/2.0)/100.0;
+        // RF-04: this used to be /100.0, which for 250 kHz yields a 1.25 MHz
+        // guard band -- half the bandwidth is 0.125 MHz, so /100.0 was a
+        // factor of ten too wide. /1000.0 converts kHz to MHz correctly:
+        // the 70cm window widens from 431.25..437.75 to 430.125..438.875,
+        // and the SRD860 window (869.4..869.65, itself only one 250 kHz
+        // channel wide) narrows to its physically correct single centre
+        // frequency, 869.525. This widens what --setcountry 7 accepts on
+        // both platforms; see command_functions.cpp's --txfreq site for the
+        // matching fix.
+        dec_bandwith = (bw_khz/2.0)/1000.0;
 
         if(!((freq_mhz >= (430.0 + dec_bandwith) && freq_mhz <= (439.000 - dec_bandwith)) || (freq_mhz >= (869.4 + dec_bandwith) && freq_mhz <= (869.65 - dec_bandwith))))
             freq_mhz = radioFreqStoredToMhz(RF_FREQUENCY, indexed);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Call-site gate for the radio unit conversions (RF-01..RF-03, RF-05, RF-06).
+"""Call-site gate for the radio unit conversions (RF-01..RF-06).
 
 The converters in src/radio_units.cpp have their own native test
 (test/test_radio_units). That test pins the conversion table; it cannot pin
@@ -12,6 +12,11 @@ that the call sites actually use it, and every defect in this family was a
          BOARD_T_ECHO
   RF-03  lora_setcountry() case 7 compared stored values against literals
          written in ESP32 units, so nothing matched on nRF52
+  RF-04  the frequency guard band halved a bandwidth in kHz and divided by
+         100.0 to reach MHz -- ten times too wide -- and command_functions.cpp
+         fed the raw LORA_BANDWIDTH macro into that arithmetic, which is kHz
+         on ESP32 but a bandwidth INDEX on nRF52 (OPT-D14): a different
+         quantity per platform, not just a wrong constant
   RF-05  --txfreq converted MHz -> Hz under the same lone RAK guard
   RF-06  the --info frequency readout, same lone guard
 
@@ -114,6 +119,53 @@ def check_lone_rak_guard(rel: str) -> list:
     return out
 
 
+## Guard-band arithmetic must halve a kHz bandwidth and divide by 1000.0 to
+## reach MHz (RF-04 problem 1), and any bandwidth macro it uses must already
+## be in kHz -- i.e. routed through radioBwStoredToKhz(), not the raw
+## LORA_BANDWIDTH macro, which is an index on nRF52 (RF-04 problem 2).
+GUARD_DIV_100 = re.compile(r"/\s*2\.0\s*\)\s*/\s*100\.0")
+RAW_LORA_BW_ARITH = re.compile(r"LORA_BANDWIDTH\s*/|/\s*LORA_BANDWIDTH\b")
+
+
+def check_guard_band_divisor(rel: str) -> list:
+    """RF-04 problem 1: the frequency guard band is half the bandwidth (kHz)
+    converted to MHz. /100.0 divides by the wrong power of ten -- half of
+    250 kHz is 0.125 MHz, which needs /1000.0. /100.0 yields 1.25 MHz, ten
+    times too wide a guard."""
+    path = REPO / rel
+    lines = path.read_text().split("\n")
+    out = []
+    for i, line in enumerate(lines):
+        if line.strip().startswith(("//", "*", "/*")):
+            continue
+        if GUARD_DIV_100.search(line):
+            out.append(f"{rel}:{i + 1}: guard-band halving divides by 100.0 "
+                       f"instead of 1000.0 (kHz -> MHz) -- ten times too wide")
+    return out
+
+
+def check_guard_band_raw_macro(rel: str) -> list:
+    """RF-04 problem 2: LORA_BANDWIDTH is kHz on ESP32 but a bandwidth INDEX
+    (0/1/2) on nRF52 (OPT-D14). Feeding it straight into guard-band
+    arithmetic computes a different quantity per platform; it must go
+    through radioBwStoredToKhz() first, as lora_setchip.cpp:233 already does
+    for the same macro."""
+    path = REPO / rel
+    lines = path.read_text().split("\n")
+    out = []
+    for i, line in enumerate(lines):
+        if line.strip().startswith(("//", "*", "/*")):
+            continue
+        if not RAW_LORA_BW_ARITH.search(line):
+            continue
+        if "radioBwStoredToKhz" in line:
+            continue
+        out.append(f"{rel}:{i + 1}: LORA_BANDWIDTH used directly in "
+                   f"arithmetic without radioBwStoredToKhz() -- it is kHz on "
+                   f"ESP32 but a bandwidth index on nRF52")
+    return out
+
+
 def check_case7_normalizes() -> list:
     """RF-03: the manual-country branch must decide on normalized values
     (getBW()/getCR()/getFreq()), not on the raw stored fields.
@@ -169,6 +221,10 @@ def run() -> list:
     v += check_conversions("src/command_functions.cpp")
     v += check_lone_rak_guard("src/command_functions.cpp")
     v += check_case7_normalizes()
+    v += check_guard_band_divisor("src/command_functions.cpp")
+    v += check_guard_band_divisor("src/lora_setchip.cpp")
+    v += check_guard_band_raw_macro("src/command_functions.cpp")
+    v += check_guard_band_raw_macro("src/lora_setchip.cpp")
     return v
 
 
@@ -189,6 +245,12 @@ def self_test() -> int:
                            '        meshcom_settings.node_freq = '
                            'meshcom_settings.node_freq*1000000;\n'
                            '        #endif\n', check_conversions),
+        "RF-04 guard divisor": (
+            '        float dec_bandwith = (bw_khz/2.0)/100.0;\n',
+            check_guard_band_divisor),
+        "RF-04 raw macro": (
+            '        float dec_bandwith = (LORA_BANDWIDTH/2.0)/100.0;\n',
+            check_guard_band_raw_macro),
     }
     with tempfile.TemporaryDirectory() as d:
         rel = "src/command_functions.cpp"
@@ -213,6 +275,16 @@ def self_test() -> int:
             ok = False
         else:
             print("  ok  fixed shape is clean")
+
+        fake.write_text(
+            "        float bw_khz = radioBwStoredToKhz(LORA_BANDWIDTH, "
+            "radioUnitsIndexed());\n"
+            "        float dec_bandwith = (bw_khz/2.0)/1000.0;\n")
+        if check_guard_band_divisor(rel) or check_guard_band_raw_macro(rel):
+            print("SELF-TEST FAIL: fixed RF-04 guard-band shape still reported")
+            ok = False
+        else:
+            print("  ok  fixed RF-04 guard-band shape is clean")
 
         # both false positives this checker had on its first run
         fake.write_text("    if (meshcom_settings.node_cr == 0)\n"
