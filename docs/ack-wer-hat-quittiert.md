@@ -266,9 +266,13 @@ Nachricht also der msg_id zuordnen. DMs bekommen dabei automatisch die ACK-Anfor
 ### 6.2 Was fehlt
 
 - **Kein Zustellstatus.** Der 0x41-Frame erreicht extUDP nie: `handleACK()` kehrt bei Zeile 530
-  zurueck, `queueExtern()` wird erst bei Zeile 890 gerufen, und `sendExtern()` wuerde ein
-  Binaerframe ohnehin verwerfen (`decodeAPRS()` liefert 0). Weder Node ACK noch Gateway ACK
-  noch Peer ACK kommen als Status beim Peer an.
+  zurueck, `queueExtern()` wird erst bei Zeile 890 gerufen. Der eigentliche Grund liegt aber
+  nicht bei `decodeAPRS()` -- die dekodiert einen ACK-Frame korrekt und liefert `0x41`
+  (`src/aprs_functions.cpp:130-131`), kein Verwerfen. `sendExtern()` (`src/extudp_functions.cpp:446`)
+  hat schlicht keinen `0x41`-Zweig: nur `0x21` (`:501`) und `0x3A` (`:600`) sind bedient, jeder
+  andere dekodierte Typ faellt durch bis zum `else return;` (`:664-669`) -- der Frame wird also
+  sauber dekodiert und danach still verworfen, weil niemand ihn serialisiert. Weder Node ACK
+  noch Gateway ACK noch Peer ACK kommen als Status beim Peer an.
 - **DM-ACK nur als Text.** Das Text-ACK `DEST:ack123` ist ein normales 0x3A-Frame und geht als
   `msg` raus. Der Peer muss `:ack` selbst erkennen und die dreistellige Nummer ueber die
   msg_id-Regel `(GW_ID << 10) | ack_id` selbst auf seine Nachricht zurueckrechnen.
@@ -276,8 +280,37 @@ Nachricht also der msg_id zuordnen. DMs bekommen dabei automatisch die ACK-Anfor
   bekannten Formen rendert. Ein Peer kann eine Notice nicht maschinell von einer Meldung
   unterscheiden.
 - **Kein Node ACK.** Der Peer erfaehrt nicht, ob und von wem seine Nachricht wiederholt wurde.
+- **EXT-01 (Fehler, nicht Luecke): ein Telemetrie-Textframe kann den Socket selbst
+  zerstoeren.** Im selben Sendeblock, den §6.3 mitbenutzt, hat der Zweig fuer
+  Textframes (`src/extudp_functions.cpp:629`) `if(msg_destination_path != "100001")` ohne
+  `else` -- das `else return;` bei `:664` gehoert zur aeusseren Typ-Weiche (Position/Text),
+  nicht zu dieser Bedingung. Fuer ein Frame mit Zielpfad `100001` (Telemetrie) bleibt der
+  ganze JSON-Aufbau also aus, `c_json` bleibt leer (bei jedem Aufruf neu genullt), und die
+  Ausfuehrung laeuft trotzdem bis zum Sendeblock durch. Dort wird
+  `[EXT] Out:  Len: 0` geloggt (`:673`, die zwei Leerzeichen sind der leere String vor
+  "Len:") und `UdpExtern.write((uint8_t*)c_json, 0)` liefert 0, was `resetExternUDP()`
+  ausloest (`:687`) und `hasExternIPaddress` auf false setzt. Ein `--extudp on`-Node reisst
+  sich damit bei jedem gehoerten Telemetrie-Textframe (`queueExtern("lora")`) selbst den
+  Socket ab. Gelesen und am Quellcode nachvollzogen, **noch nicht am Bench bestaetigt**
+  (Kandidat Heltec-93, Marker ist exakt die Logzeile oben). In `docs/BACKLOG.md` als EXT-01
+  gefuehrt. Relevant fuer §6.3: das Ack-Datagramm haengt sich in denselben Sendeblock, der
+  sich unter dieser Bedingung selbst zerlegt -- EXT-01 gehoert vor oder zusammen mit der
+  Ack-Umsetzung behoben, nicht danach.
 
-### 6.3 Was zu ergaenzen waere
+### 6.3 Status-Datagramm fuer Zustellstatus (DR-18)
+
+**Entschieden 2026-09-12** (Drift-Matrix-Review, `docs/testplan/drift-matrix.csv` Zeile
+DR-18, Finding 4 in `docs/testplan/drift-matrix-review-verdict-20260912.md`); **noch nicht
+umgesetzt**, vorgesehen fuer Welle W6. Was hier vorher als Vorschlag stand, ist damit eine
+Entscheidung -- die Form bleibt wie unten beschrieben.
+
+Ausdruecklich NICHT entschieden, weil erwogen und verworfen: den 0x41-Frame durch
+`sendExtern()` selbst zu schleusen. `sendExtern()` (`src/extudp_functions.cpp:446`) hat nur
+zwei Typ-Zweige, Position `0x21` (`:501`) und Text `0x3A` (`:600`); ein `0x41`-Zweig existiert
+nicht und ist auch nicht geplant. Das Status-Datagramm unten ist deshalb ein **eigener
+Absender**, der aus den bestehenden BLE-Ack-Stellen heraus ueber `queueExtern()` geht -- keine
+Erweiterung der Typ-Weiche in `sendExtern()`. Diese Trennung ist der Kern von DR-18, nicht ein
+Nebendetail.
 
 Ein Status-Datagramm, das den BLE-Frame spiegelt und dort abgesetzt wird, wo heute
 `addBLEOutBuffer(print_buff, 7)` fuer 0x41 gerufen wird:
@@ -302,8 +335,13 @@ Ein Status-Datagramm, das den BLE-Frame spiegelt und dort abgesetzt wird, wo heu
 - Testbar wie `extern_notice_json.h`: reine Funktion im Header, nativer Test daneben.
 
 Kein Absetzen aus `OnRxDone` heraus, sondern ueber `queueExtern()` in die Hauptschleife, aus
-demselben Grund wie heute bei den Textframes. Die Queue hat zwei Plaetze, mit Status-Frames
-wird sie enger. Vor der Umsetzung `MAX_EXTERN_QUEUE` gegen die erwartete Rate halten.
+demselben Grund wie heute bei den Textframes. Bestaetigt im Code:
+`MAX_EXTERN_QUEUE` ist **2** (`src/extudp_functions.cpp:64`), ein Ringpuffer mit zwei
+Eintraegen, geleert einmal pro Hauptschleifendurchlauf (`flushExternQueue()`). Mit
+Status-Frames zusaetzlich zu den bestehenden Text-/Positions-Frames wird derselbe Puffer
+enger geteilt. Das ist keine Bench-Beobachtung, sondern der aktuelle Quelltextstand -- als
+Voraussetzung fuer W6: die erwartete Rate (Ack-Frames plus Text/Position) gegen diese zwei
+Plaetze halten, BEVOR die Ack-Umsetzung landet, nicht danach nachmessen.
 
 Alle drei Stufen (Node ACK, Peer ACK mit Absender, Gateway ACK) kommen beim Peer dann im selben
 Datagramm an, ohne dass extUDP fuer die Gateway-Erweiterung ein zweites Mal angefasst wird.

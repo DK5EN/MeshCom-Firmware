@@ -66,6 +66,46 @@ corpus messages each, identical destinations, bodies and order.
    `snr`/`rssi` after `normalize.py`'s masking, and any field added later) --
    still excluding the volatile classes named above, by the same reasoning.
 
+**DR-18, the one predicted diff (drift-matrix.csv row DR-18; verdict
+`docs/testplan/drift-matrix-review-verdict-20260912.md` Finding 4).** Once the
+section 6.3 ack JSON (`docs/ack-wer-hat-quittiert.md`) ships via
+`queueExtern()`, an EXTUDP capture gains a `{"type":"ack",...}` line the
+pre-change baseline does not have. That is the ONE difference this surface is
+allowed to show for that change; this tool does not start ignoring ack lines
+in general, only recognising the single predicted shape of ONE new line on
+the *second* (`b`, "after") capture argument that the first (`a`, "before")
+lacks:
+
+- The ack line must parse and match every field section 6.3 actually pins:
+  `type` == `"ack"`, `msg_id` an 8-hex-digit string, `status` in `0..2`
+  (McApp's currently-accepted range; section 6.3 also mentions a future
+  `3..6`, not yet accepted anywhere, so not treated as valid here), `via` in
+  `("lora", "udp")`. `from` is explicitly optional in the spec ("wo bekannt,
+  sonst weglassen") and unconstrained beyond being a string when present.
+  Section 6.3 does NOT say this is a closed key set (it is presented as a
+  proposal, "was zu ergaenzen waere", not a schema with "no other keys"), so
+  extra fields on the object are not grounds to reject it.
+- A line matching `"type":"ack"` that fails that shape check is a hard
+  failure on whichever side it is on -- it is not the predicted line, so it
+  gets no tolerance.
+- Counts, not position: exactly one more well-formed ack line in the capture
+  than in the baseline is the predicted diff (reported, not a failure). Zero
+  extra is fine (nothing to predict yet). More than one extra, or fewer in
+  the capture than the baseline (the baseline had one the capture lost), is
+  a failure. This mirrors how this tool already treats the other genuinely
+  async classes (lora relays, beacons): counted in bulk, not matched by
+  position, because an async gateway ACK's place in the capture relative to
+  corpus replay is no more deterministic than theirs.
+- **The reverse direction is a different situation, not a mirror-image
+  tolerance.** A baseline (`a`) that already carries a well-formed ack line
+  is not "the predicted diff" running backwards -- DR-18 predicts an ADDED
+  line on the after side, not a pre-existing one. If both sides carry the
+  same count of well-formed ack lines (including both having exactly one),
+  that is ordinary equality and produces no special note beyond saying so;
+  if the baseline has MORE well-formed ack lines than the capture, that is
+  treated as an ordinary missing-response regression, same as any other
+  disappeared line, and fails.
+
   python3 test/golden/compare_extudp.py G0/<node>/extudp G1/<node>/extudp
   python3 test/golden/compare_extudp.py --self-test
 
@@ -80,6 +120,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 COUNTER = re.compile(r"\{\d+$")
+
+# DR-18 / section 6.3: a raw-text match, not a parsed one, so it also catches
+# a line that fails the shape check below (that line still needs to be found
+# and failed on, not silently missed because it never became a Rec).
+_ACK_LINE = re.compile(r'"type":"ack"')
+
+# section 6.3 pins these four; `status` 0..2 is McApp's currently-accepted
+# range (`normalize_extudp_ack`), not the "3..6 later" the doc floats.
+_ACK_MSG_ID = re.compile(r"^[0-9A-Fa-f]{8}$")
+_ACK_STATUS_OK = (0, 1, 2)
+_ACK_VIA_OK = ("lora", "udp")
 
 # normalize.py substitutes some JSON values with bare `<TOKEN>` text -- e.g.
 # `"rssi":<RF>` -- which reads fine to a human but is not valid JSON (a bare
@@ -117,6 +168,94 @@ def _extract_object(line: str) -> Optional[Dict[str, Any]]:
     except ValueError:
         return None
     return obj if isinstance(obj, dict) else None
+
+
+def _is_predicted_ack(obj: Dict[str, Any]) -> bool:
+    """Whether `obj` matches every field section 6.3 actually pins.
+
+    Deliberately narrow: only `type`/`msg_id`/`status`/`via` are checked
+    (`from` is documented optional and otherwise unconstrained), and extra
+    keys are not grounds to reject -- section 6.3 is a proposal ("was zu
+    ergaenzen waere"), not a closed schema. See the module docstring's DR-18
+    section for the reasoning.
+    """
+    if obj.get("type") != "ack":
+        return False
+    msg_id = obj.get("msg_id")
+    if not (isinstance(msg_id, str) and _ACK_MSG_ID.match(msg_id)):
+        return False
+    if obj.get("status") not in _ACK_STATUS_OK:
+        return False
+    if obj.get("via") not in _ACK_VIA_OK:
+        return False
+    frm = obj.get("from")
+    if frm is not None and not isinstance(frm, str):
+        return False
+    return True
+
+
+def _check_ack_lines(a_text: str, b_text: str) -> Tuple[List[str], List[str]]:
+    """DR-18 (section 6.3): classify every `"type":"ack"` line on both sides.
+
+    Returns (problems, notes). `a_text`/`b_text` are the raw capture files,
+    not the filtered `msg`-record lists -- an ack line carries no
+    `"src_type"` field at all, so `_record_from_line`'s filter never sees it;
+    it has to be found here or not at all.
+
+    Bulk count comparison, not position: see the module docstring for why
+    (same reasoning this tool already applies to lora-relay and beacon
+    counts). Any line that matches the raw `"type":"ack"` text but fails
+    `_is_predicted_ack` is a failure on its own side regardless of counts --
+    it is not the predicted line, so nothing here tolerates it.
+    """
+    problems: List[str] = []
+    notes: List[str] = []
+
+    def classify(text: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+        valid: List[Dict[str, Any]] = []
+        invalid: List[str] = []
+        for line in text.splitlines():
+            if not _ACK_LINE.search(line):
+                continue
+            obj = _extract_object(line)
+            if obj is not None and _is_predicted_ack(obj):
+                valid.append(obj)
+            else:
+                invalid.append(line.strip())
+        return valid, invalid
+
+    a_valid, a_invalid = classify(a_text)
+    b_valid, b_invalid = classify(b_text)
+
+    for name, invalid in (("A", a_invalid), ("B", b_invalid)):
+        for line in invalid:
+            problems.append(
+                f"{name} has an ack-type line that does not match the "
+                f"section 6.3 contract (type/msg_id/status/via): {line!r}")
+
+    delta = len(b_valid) - len(a_valid)
+    if delta == 0:
+        if a_valid:
+            notes.append(
+                f"{len(a_valid)} matching ack line(s) present on both sides "
+                f"-- not a new diff, not the DR-18 prediction (that predicts "
+                f"an ADDED after-side line), just equal")
+    elif delta == 1:
+        notes.append(
+            "capture (B) has exactly one more well-formed ack line than the "
+            "baseline (A) -- the DR-18 (section 6.3) predicted diff, "
+            "reported, not a failure")
+    elif delta > 1:
+        problems.append(
+            f"capture (B) has {delta} extra well-formed ack line(s) over "
+            f"the baseline (A); only ONE is predicted by DR-18 (section 6.3)")
+    else:
+        problems.append(
+            f"capture (B) is missing {-delta} well-formed ack line(s) that "
+            f"the baseline (A) has -- DR-18 predicts an ADDED after-side "
+            f"line, not a removed one")
+
+    return problems, notes
 
 
 def _prepare(obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -264,6 +403,19 @@ def compare(a_dir: Path, b_dir: Path) -> List[str]:
     if (al, ab) != (bl, bb):
         print("note: relayed/beacon counts differ -- not a failure, both are "
               "live traffic and timers")
+
+    # DR-18 / section 6.3: on the raw capture text, not the msg-filtered
+    # records above -- an ack line carries no "src_type" field, so it would
+    # never reach `a`/`b` otherwise. Scope note: unlike the msg records,
+    # this does not go through the --record jsonl's per-address foreign
+    # filter (GLD-01 gap 2) -- there is no ack traffic in any capture on
+    # disk today to have exercised that path, so it is simply unhandled,
+    # not silently trusted.
+    ack_problems, ack_notes = _check_ack_lines(a_f.read_text(), b_f.read_text())
+    problems.extend(ack_problems)
+    for note in ack_notes:
+        print(f"note: {note}")
+
     if skipped:
         print(f"note: {skipped} response(s) matched on dst/msg but could not "
               f"be checked further -- captured pre-GLD-01, cut off before "
@@ -391,6 +543,81 @@ def self_test() -> int:
         print(f"  {'ok ' if good else 'FAIL'} gap2-cross-contamination: "
               f"{len(problems)} problem(s), expected none (foreign traffic "
               f"filtered before comparison)")
+        ok = ok and good
+
+        # DR-18 / section 6.3: the ack line drift-matrix.csv predicts once
+        # the ack JSON ships. `ack_line()` builds a raw capture line the
+        # same shape a real one would have (some prefix, then the object);
+        # the prefix content itself is never inspected, only `"type":"ack"`.
+        def ack_line(msg_id="1A2B3C4D", status=1, via="lora", frm=None):
+            obj = {"type": "ack", "msg_id": msg_id, "status": status}
+            if frm is not None:
+                obj["from"] = frm
+            obj["via"] = via
+            # separators=(",", ":"): every real capture line on disk is
+            # compact JSON with no space after ":" -- `_ACK_LINE` and
+            # `_record_from_line`'s substring checks both key on that.
+            return f"<ADDR>   90 {json.dumps(obj, separators=(',', ':'))}"
+
+        ack1 = ack_line()
+        base_plus_ack = base + ack1 + "\n"
+
+        # baseline == capture, clean: the required first case, spelled out
+        # for the ack path even though the plain `a`-vs-`a` shape is already
+        # implied by every "must pass" case above.
+        problems = compare(mk("ack-clean-a", base), mk("ack-clean-b", base))
+        good = not problems
+        print(f"  {'ok ' if good else 'FAIL'} ack-baseline-equals-capture: "
+              f"{len(problems)} problem(s), expected none")
+        ok = ok and good
+
+        # capture has the ONE predicted ack line: clean, reported as
+        # predicted (checked via captured stdout, like gap 1 above).
+        problems = compare(mk("ack-pred-a", base), mk("ack-pred-b", base_plus_ack))
+        good = not problems
+        print(f"  {'ok ' if good else 'FAIL'} ack-predicted-diff: "
+              f"{len(problems)} problem(s), expected none")
+        ok = ok and good
+
+        # capture has an unexpected EXTRA ack line (two, not the one
+        # predicted): must fail.
+        base_plus_two_acks = (base + ack1 + "\n" +
+                               ack_line(msg_id="2B3C4D5E") + "\n")
+        problems = compare(mk("ack-extra-a", base),
+                            mk("ack-extra-b", base_plus_two_acks))
+        good = bool(problems)
+        print(f"  {'ok ' if good else 'FAIL'} ack-unexpected-extra-line: "
+              f"{len(problems)} problem(s), expected some")
+        ok = ok and good
+
+        # an ack line in the wrong position -- the baseline has it and the
+        # capture does not (a regression, not the after-side addition DR-18
+        # predicts): must fail, same bucket as "capture is missing a line
+        # the baseline has".
+        problems = compare(mk("ack-lost-a", base_plus_ack), mk("ack-lost-b", base))
+        good = bool(problems)
+        print(f"  {'ok ' if good else 'FAIL'} ack-missing-from-capture: "
+              f"{len(problems)} problem(s), expected some")
+        ok = ok and good
+
+        # both sides already carry the same ack line: the "different
+        # situation" the module docstring calls out -- ordinary equality,
+        # not the predicted-diff path, and not a failure either.
+        problems = compare(mk("ack-both-a", base_plus_ack), mk("ack-both-b", base_plus_ack))
+        good = not problems
+        print(f"  {'ok ' if good else 'FAIL'} ack-already-on-both-sides: "
+              f"{len(problems)} problem(s), expected none")
+        ok = ok and good
+
+        # a malformed ack (status outside 0..2): must fail even though it is
+        # the only ack line and even though it is on the after side -- shape
+        # is checked before count/direction.
+        base_plus_bad_ack = base + ack_line(status=9) + "\n"
+        problems = compare(mk("ack-malformed-a", base),
+                            mk("ack-malformed-b", base_plus_bad_ack))
+        good = bool(problems)
+        print(f"  {'ok ' if good else 'FAIL'} ack-malformed-shape: "
+              f"{len(problems)} problem(s), expected some")
         ok = ok and good
 
     return 0 if ok else 1

@@ -27,18 +27,50 @@
 // here rather than in a commit message because the same trap is still open
 // for every uncarved row of the plan.
 //
-// WHAT THE TWO COPIES DO DIFFERENTLY. Deliberately not merged: which of them
-// is right is a drift-matrix decision, and the differences are the point.
+// WHAT THE TWO COPIES DO DIFFERENTLY. All four were open drift-matrix
+// questions as of the M2 review; all four are now DECIDED (2026-09-12,
+// docs/testplan/drift-matrix.csv, drift-matrix-review-verdict-20260912.md).
+// None of the decisions is implemented yet -- this block records the target,
+// not the current state, so update it in the same edit that lands each fix
+// or it goes back to advertising a settled question as open.
 //
-//   - ESP32 returns void and swallows the over-MAX_ZEROS case; nRF52 returns
-//     1 for it and its caller resets DHCP.
-//   - ESP32 runs the RX-01 unconfigured-source guard on a GATE frame before
-//     radiating it; nRF52 has no such guard.
-//   - ESP32 reads the dedup gate BEFORE the position branch inserts the
-//     msg_id (TM-31); the nRF52 path never had the early insert to begin with.
-//   - ESP32 forwards to EXTUDP and drives both display paths
-//     (sendDisplayText and sendDisplayPosition); nRF52 drives only the text
-//     one.
+//   - DR-20 (return value / reset call): ESP32 returns void and swallows the
+//     over-MAX_ZEROS case, calling resetMeshComUDP() itself; nRF52 returns 1
+//     for it and its caller (NrfETH::getUDP()) resets DHCP. DECIDED
+//     nrf52-correct on WHO decides: both handlers return a status: the
+//     handler is a parser, not connectivity policy. The reset ITSELF stays
+//     platform-specific (ESP32 resets the UDP socket, nRF52 resets DHCP --
+//     there is no shared answer to want); only the caller-decides shape is
+//     unified. ESP32's caller becomes getMeshComUDP() (udp_functions.cpp),
+//     mirroring NrfETH::getUDP() -- not gatewayService_esp32().
+//   - DR-02 (RX-01 unconfigured-source guard): ESP32 runs the guard on a
+//     GATE frame before radiating it onto LoRa; nRF52 has no such guard.
+//     DECIDED esp32-correct: port the guard to handleUdpFrame_nrf52() so an
+//     unconfigured-source frame from an nRF52 gateway cannot defeat the
+//     primary OnRxDone guard's purpose either.
+//   - DR-05 (display paths / TM-31 shape): ESP32 reads the dedup gate BEFORE
+//     the position branch inserts the msg_id (the documented TM-31 fix) and
+//     also calls sendDisplayPosition() there; nRF52 never had the early
+//     insert to begin with (the historical TM-31 bug does not reproduce on
+//     either side today) and never calls sendDisplayPosition() at all
+//     (only sendDisplayText()). DECIDED esp32-correct: port
+//     sendDisplayPosition() to nRF52's position branch for display parity;
+//     the TM-31 early-dedup difference is now a no-op and can be unified for
+//     hygiene without behaviour risk, landing after DR-06's return-value
+//     gate so a rejected frame doesn't reach it.
+//   - DR-18 (EXTUDP forward): ESP32 forwards to EXTUDP only for recognised
+//     msg_type_b (0x3A/0x21/0x40) INSIDE the relay branch; nRF52 forwards
+//     unconditionally, BEFORE that type check. DECIDED: shape parity, not a
+//     wider type set -- lift the EXTUDP forward out of the relay branch on
+//     BOTH platforms into its own explicit type test (same 0x3A/0x21/0x40
+//     set ESP32 already uses), kept ahead of is_new_packet() so duplicates
+//     still reach EXTUDP as today. One edit together with DR-07 (its outer
+//     hasExternIPaddress check becomes the guard on the lifted call) and
+//     DR-19 (drops the (uint8_t) cast on the same line). A widened set
+//     including ACK 0x41 was considered and WITHDRAWN -- see
+//     docs/architecture/11-wire-format.md §3 and
+//     docs/ack-wer-hat-quittiert.md §6.3 for the separate JSON-ack answer,
+//     which is not this mechanism.
 //
 // The twin turns each of those into a failing-on-change test rather than a
 // comment; see test/test_udp_frame_twin.

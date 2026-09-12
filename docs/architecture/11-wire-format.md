@@ -68,6 +68,33 @@ The trailer fields after the FCS (FW, LASTHW, FW-sub, 0x7E) are parsed
 must tolerate their absence, encoders must always write all of them
 (`encodeAPRS()` does).
 
+**FW sub-version: two reserved values, one of them by decision, not by
+accident (DR-27).** `0x00` and `0x7E` both read back as `'#'`, but they get
+there by different routes. `0x00` is substituted by the encoder itself —
+`encodeAPRS()` writes `0x23` ('#') whenever `msg_source_fw_sub_version` is
+0x00 (`aprs_functions.cpp:1356`) — so the wire never carries a literal
+`0x00` in this slot. `0x7E` is written **verbatim** by the same encoder: no
+substitution branch catches it, so a node whose sub-version byte is
+literally `0x7E` ('~') puts two consecutive `0x7E` bytes on the wire. The
+decoder then reads the first of that pair back as `'#'`
+(`aprs_functions.cpp:469–473`) and separately consumes the second as the
+frame's own end marker — the value survives one hop, then silently becomes
+`'#'` on every receiver, regardless of platform.
+
+This is decided as **`0x7E` is an illegal, reserved sub-version value, and
+the encoder is deliberately not being changed to escape it.** Why it is
+safe to leave as-is: `SOURCE_VERSION_SUB` is a single, human-picked version
+letter (currently `"t"`, `src/configuration_global.h:2`), incremented by a
+person choosing an ASCII letter for a release — no shipped firmware has
+ever used `'~'` and nothing about the value's role would lead anyone to
+pick it. Why the encoder is not being changed instead: doing so would mean
+every node on the network re-agreeing on how this byte is written — a
+fleet-coordination window — purely to protect a value nobody picks. A
+mock/test implementation should treat `0x7E` here as a value it must never
+emit, and should not "fix" the encoder to escape it if it notices the
+collision; `test/test_aprs_epilogue` pins the current (lossy) behaviour on
+purpose, as evidence the value is reserved rather than as a bug report.
+
 **msg_id composition.** The 32-bit msg_id is not opaque: firmware nodes build
 it as `((gw_id & 0x3FFFFF) << 10) | (counter & 0x3FF)` — 22 bits of the
 node's gateway id (MAC-derived), low 10 bits a per-node message counter
@@ -528,6 +555,40 @@ terminator. Message example (captured):
 - HEY/weather frames (`0x40`) are never forwarded — the type dispatch ends
   in `else return` (`:530`).
 
+**Outbound type contract (DR-18).** `sendExtern()` (`src/extudp_functions.cpp:446`)
+decodes the frame itself and then has exactly two payload branches:
+position `0x21` (`:501`) and text `0x3A` (`:600`). Every other decoded type
+— including ACK `0x41` and hey/weather `0x40` — falls through to
+`else return;` (`:664–669`, before the actual `beginPacket()` send) and
+produces no datagram. There is no `0x40` branch and no `0x41` branch today;
+this is not "unrecognised frames get dropped", it is that only these two
+types were ever given a serializer.
+
+The drift-matrix review considered widening this to a four-type set
+(`0x21`/`0x3A`/`0x40`/`0x41`) and withdrew it (`DR-18`, re-decided
+2026-09-12): routing a binary ACK through `sendExtern()`'s existing branches
+would decode fine (`decodeAPRS()` returns `0x41` for an ACK before parsing
+anything, `src/aprs_functions.cpp:130–131`) but then fall through the same
+`else return;` and emit nothing, so gating it in ships no new behaviour by
+itself. What is actually decided for implementation (not yet done):
+
+1. **Shape parity**, not a new type set: the nRF52 handler adopts ESP32's
+   gate-then-forward ordering — the EXTUDP forward decided by frame type
+   before whatever the relay branch does — for the same two types the
+   platforms already agree on. This is a structural/ordering fix on the
+   inbound frame-handler side (`src/udp_frame.h`, see that file's carve
+   comment), not a change to which types `sendExtern()` itself emits.
+2. **A separate JSON ack**, specified in §6.3 of
+   `docs/ack-wer-hat-quittiert.md`: a `{"type":"ack",...}` status datagram
+   emitted via `queueExtern()` from the BLE-ack call sites (where
+   `addBLEOutBuffer(print_buff, ...)` is called for a `0x41` frame today).
+   This is **not** the same mechanism as forwarding a raw `0x41` frame
+   through `sendExtern()` — it is a purpose-built status object, queued
+   from the main loop like the existing text/position datagrams, and it is
+   the only planned way an ACK's existence reaches an EXTUDP peer. Do not
+   conflate "sendExtern() gains a 0x41 branch" (rejected) with "an ack
+   datagram gets added via queueExtern()" (decided, pending W6).
+
 **Peer → node** (`getExtern()`, `:218`): JSON commands —
 
 ```json
@@ -613,6 +674,21 @@ carry `"TYP"` as discriminator):
 
 `MH` records are also pushed live as each frame updates the MHeard table
 (`updateMheard()`, `src/mheard_functions.cpp:331`).
+
+**The `PLT` contract (DR-29).** `PLT` is the raw wire payload-type byte,
+`(uint8_t)` cast, not a decoded string — `sendMheard()` emits
+`mhdoc["PLT"] = (uint8_t)mheardLine.mh_payload_type` (`src/mheard_functions.cpp:742`),
+so a position frame (`'!'`, 0x21) serializes as `PLT:33`, never `"POS"`.
+This is deliberate, not an oversight: JSON/BLE — the machine-readable feed —
+carries the raw byte, while the human-facing serial display carries decoded
+text via `getPayloadType()` (`"TXT"`/`"POS"`/`"HEY"`), used by `showMHeard()`
+at `src/mheard_functions.cpp:787` calling into the decoder at `:836`. The
+two renderers are intentionally inconsistent with each other and **must
+stay that way**: do not "fix" `sendMheard()` to emit `"POS"` instead of a
+number — MCProxy and the app both read `PLT` as numeric
+(`ble_protocol.py` `_coerce_mh_payload_type()` fails closed on a non-numeric
+value; the app's `AppInterfaces.ts` declares `PLT: number`), so changing the
+JSON shape would break every existing client silently.
 
 ### 4.3 Node → phone notifications
 

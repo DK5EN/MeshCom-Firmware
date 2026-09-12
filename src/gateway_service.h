@@ -26,8 +26,23 @@
 //
 // Those become drift-matrix rows DR-14..DR-16. Nothing here changes behaviour.
 //
-// D1-10, the loop scheduler, is NOT carved: it is ~18 timer predicates spread
-// through a 2162-line and a 1437-line loop, and extracting them is a much
-// larger and riskier change than this one. Still owed.
+// D1-10, the loop scheduler, is NOT carved, and extracting it is a much larger
+// and riskier change than this one. Still owed.
+//
+// The "~18 timer predicates" this comment used to claim was wrong, and it kept
+// being repeated because no definition came with it -- most recently by a 2026-09-12
+// audit that read it from here. Measured 2026-09-12, with the definitions, over
+// esp32loop() (esp32_main.cpp, ~2134 lines) and nrf52loop() (nrf52_main.cpp,
+// 1348 lines):
+//
+//   78 timer PREDICATE SITES  -- if/while conditions containing millis()
+//                                (43 ESP32 + 35 nRF52)
+//   43 timer VARIABLES        -- distinct identifiers compared against millis()
+//                                25 shared, 12 ESP32-only, 6 nRF52-only
+//
+// The 25 shared variables are the number a common scheduler could own, and the
+// only one worth planning against. Excluded by hand from the variable count:
+// _tx_s (a duration) and lreduction (a divisor), which appear in a millis()
+// expression without being timers. Full derivation in BACKLOG.md.
 void gatewayService_esp32(void);
 void gatewayService_nrf52(void);
