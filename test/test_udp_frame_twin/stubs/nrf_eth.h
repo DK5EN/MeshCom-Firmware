@@ -6,10 +6,9 @@
 // its own declaration. Each declaration line below is copied verbatim from
 // the real class body / the real free-function declaration -- same
 // discipline as test/test_udp_send_twin/stubs/nrf_eth.h and checked the same
-// way by eye against src/nrf52/nrf_eth.h (this test's own env is not wired
-// into test/golden/twin_stub_lint.py, which only knows the U2 pair; see the
-// report for that gap). A handler reaching for a fifth member fails to
-// compile rather than binding to a stub.
+// way against src/nrf52/nrf_eth.h by test/golden/twin_stub_lint.py, whose
+// PAIRS list carries this file too. A handler reaching for a fifth member
+// fails to compile rather than binding to a stub.
 #pragma once
 
 #ifndef NATIVE_BUILD

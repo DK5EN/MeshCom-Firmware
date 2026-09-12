@@ -515,12 +515,18 @@ static void test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it(void)
     // The sharpest difference in the pair. On the pass where err_cnt_udp_tx
     // reaches MAX_ERR_UDP_TX:
     //   ESP32  resets the socket and RETURNS BEFORE THE ADVANCE -- the slot
-    //          stays in the ring and is retried on the next pass.
+    //          stays in the ring for one more pass.
     //   nRF52  resets DHCP and FALLS THROUGH to the advance -- the slot is
     //          zeroed and dropped.
-    // One of these loses a frame on every socket reset and the other can
-    // wedge on a permanently-failing slot. Which is correct is a drift-matrix
-    // decision (D1-06); that it differs is pinned here.
+    // Neither side wedges: err_cnt_udp_tx is zeroed before ESP32's early
+    // return, so the retained slot is dropped on the very next failing pass
+    // (the assertion below shows nine of ten frames gone). And this whole
+    // branch keys on udpWriteRaw_esp32(), which on real hardware cannot fail
+    // for a non-empty frame (WiFiUDP::write() only buffers); the real result
+    // is endPacket(), which the ESP32 drain logs and discards. Decided as
+    // DR-24 (nrf52-correct, 2026-09-12): ESP32 keys on endPacket() and drops
+    // like nRF52; this case then flips to an agreement pin. See
+    // docs/testplan/drift-matrix-review-verdict-20260912.md, Finding 1.
     // The ring must hold more than MAX_ERR_UDP_TX slots: a failed write is
     // not by itself an early return on either side, so each of the first
     // nine passes still consumes a slot.

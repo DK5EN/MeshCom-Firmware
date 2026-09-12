@@ -272,13 +272,31 @@ After the unification (audit section 7.1 waves), on the same hardware, same corp
    for rows with `after_expect != identical`, against the expected-diff fixture generated from the
    matrix (`test/golden/native/<uut>-twin-diff-after-expected.txt`).
 2. Hardware G2: every step identical to G1 except the lines the expected-diff files enumerate.
-   Any extra diff is a failure, including a "better" one.
-3. Invariants: NVS key set identical; ESP32 struct layout identical; nRF52 struct layout identical
-   in the existing prefix, appended fields only; command name order equal to the ladder order for
-   the 13 prefix pairs; per-env macro sets identical; per-env resolved config identical.
+   Any extra diff is a failure, including a "better" one. G2 compares the steps G1 captured
+   (`H4`, `H6`, `H8`, `H11`, operator decision 5); the other rows of `protocol-after.md` are
+   filled `n/a` with the reason "no G1 baseline". The predictions live in
+   `test/golden/hw/G2/EXPECTED-DIFF.md`, written before the run, and
+   `test/golden/drift_matrix_lint.py` fails if a matrix row with `after_expect != identical` is
+   not named there.
+3. Invariants (rewritten 2026-09-12 after the Fable review of the M2 decisions, verdict Finding 14;
+   the earlier "ESP32 struct layout identical; nRF52 appended fields only; NVS key set identical"
+   contradicted the `D1-04` target that `DR-12`/`DR-13` adopt, under which the struct is no longer a
+   format): settings round trip equal on both platforms (`settings.json` equal after normalization,
+   every field, both directions); the config JSON export surface unchanged except for fields the
+   `D1-04` schema deliberately adds, each named in `EXPECTED-DIFF.md`; the nRF52 BLE settings
+   characteristic (`src/nrf52/nrf52_ble.cpp`, `sizeof(s_meshcom_settings)` raw bytes, write rejected
+   on any other length) byte-identical to G1 -- it is a frozen wire contract with the app and is
+   served from a versioned snapshot of today's layout until the app is updated; command name order
+   equal to the ladder order for the 13 prefix pairs; per-env macro sets identical; per-env resolved
+   config identical. The struct layouts themselves are no longer invariants; `settings_layout_lint.py`
+   keeps reporting them so a change is seen, not so it is forbidden.
 4. Migration: RAK-90 flashed with the base image and the backed-up settings, then upgraded to the
    post image: settings survive (`settings.json` equal after normalization). A wipe is a failing
-   result, recorded, and the backup is re-imported.
+   result, recorded, and the backup is re-imported. The base image (20260724) is read through the
+   live struct behind a `sizeof` check that wipes (`src/nrf52/nrf52_flash.cpp:313-341`), so the post
+   image must carry a frozen copy of today's live layout to read that blob, and that one-shot
+   migration code stays in the image indefinitely; the keyed store and the struct merge cannot land
+   in the same release.
 5. Region gate: no env grows in IRAM; DRAM deltas match the audit's predictions within 5 %.
 6. T-Deck checklist all pass.
 

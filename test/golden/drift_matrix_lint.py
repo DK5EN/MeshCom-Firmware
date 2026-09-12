@@ -92,6 +92,36 @@ REQUIRED_COLUMNS = [
 VALID_AFTER_EXPECT = {"identical", "nrf52-changes", "esp32-changes", "both-change"}
 VALID_CLASS = {"bug-one-side", "platform-api", "feature-one-side", "cosmetic"}
 
+# Fable review of the M2 decisions, 2026-09-12 (docs/testplan/
+# drift-matrix-review-verdict-20260912.md, Findings 15 and 17): `after_expect`
+# was read by nothing but the enum check above, so a row could say `identical`
+# beside `esp32-correct` and the gate would pass, and the G2 expected-diff file
+# the rows keep promising ("before G2") had no path and no check. Both are now
+# enforced here, in every phase:
+#
+#   - verdict -> after_expect must be coherent. `both-valid` means nothing
+#     moves (`identical`); `both-wrong` means both move (`both-change`); a
+#     one-sided verdict cannot say the CORRECT side changes alone. `identical`
+#     under a one-sided verdict is allowed (DR-01: fixed before the review) and
+#     so is `both-change` (DR-18: the correct shape plus a shared addition).
+#   - `tie_break` is only meaningful on a `both-valid` row (testplan 5.1); on
+#     any other row it contradicts the verdict (three rows said ESP32 beside
+#     nrf52-correct) and must be empty.
+#   - every row with `after_expect != identical` must be named in
+#     test/golden/hw/G2/EXPECTED-DIFF.md, the file written BEFORE the G2 run
+#     so a prediction can be shown wrong by the capture. A missing file is
+#     fatal, not clean: the whole G2 pass criterion rests on it.
+G2_EXPECTED_DIFF = "test/golden/hw/G2/EXPECTED-DIFF.md"
+ROW_ID = re.compile(r"\bDR-\d{2}\b")
+
+# verdict -> the after_expect values it may carry
+AFTER_EXPECT_ALLOWED = {
+    "both-valid": {"identical"},
+    "both-wrong": {"both-change"},
+    "esp32-correct": {"identical", "nrf52-changes", "both-change"},
+    "nrf52-correct": {"identical", "esp32-changes", "both-change"},
+}
+
 CASE_DEF = re.compile(r"^\s*(?:static\s+)?void\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.M)
 RUN_TEST = re.compile(r"RUN_TEST\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)")
 ENV_HEADER = re.compile(r'^\[env:([^\]]+)\]\s*$', re.M)
@@ -194,8 +224,20 @@ def asserting_test_exists(name: str, test_dirs: Set[str], envs: Set[str],
     return env_name in envs
 
 
+def read_g2_expected_ids(repo: Path) -> Optional[Set[str]]:
+    """Row ids named anywhere in the G2 EXPECTED-DIFF file, or None if the
+    file does not exist (the caller decides that None is fatal)."""
+    p = repo / G2_EXPECTED_DIFF
+    if not p.exists():
+        return None
+    return set(ROW_ID.findall(p.read_text(errors="replace")))
+
+
 def analyze(csv_text: str, test_dirs: Set[str], envs: Set[str], phase: str,
-            case_index: Optional[Dict[str, Set[str]]] = None) -> AnalysisResult:
+            case_index: Optional[Dict[str, Set[str]]] = None,
+            g2_ids: Optional[Set[str]] = None) -> AnalysisResult:
+    """`g2_ids` is the set of row ids the G2 EXPECTED-DIFF file names; None
+    skips that check (isolated self-test cases without a tree)."""
     result = AnalysisResult()
 
     reader = csv.DictReader(io.StringIO(csv_text))
@@ -279,6 +321,30 @@ def analyze(csv_text: str, test_dirs: Set[str], envs: Set[str], phase: str,
             result.violations.append(
                 f"{row_label}: after_expect {after_expect!r} is not one of "
                 f"{sorted(VALID_AFTER_EXPECT)}")
+        elif verdict in AFTER_EXPECT_ALLOWED:
+            allowed = AFTER_EXPECT_ALLOWED[verdict]
+            if not after_expect:
+                result.violations.append(
+                    f"{row_label}: verdict {verdict!r} but after_expect is "
+                    f"empty -- a decided row must say what moves")
+            elif after_expect not in allowed:
+                result.violations.append(
+                    f"{row_label}: verdict {verdict!r} does not admit "
+                    f"after_expect {after_expect!r} (allowed: {sorted(allowed)})")
+
+        tie_break = (row.get("tie_break") or "").strip()
+        if tie_break and verdict and verdict != "both-valid":
+            result.violations.append(
+                f"{row_label}: tie_break {tie_break!r} on a {verdict!r} row -- "
+                f"the tie-break applies only to both-valid rows (testplan 5.1); "
+                f"blank it")
+
+        if (g2_ids is not None and raw_id and after_expect
+                and after_expect != "identical" and raw_id not in g2_ids):
+            result.violations.append(
+                f"{row_label}: after_expect {after_expect!r} but the row is not "
+                f"named in {G2_EXPECTED_DIFF} -- write the prediction before "
+                f"the G2 run, not after")
 
         klass = (row.get("class") or "").strip()
         if klass and klass not in VALID_CLASS:
@@ -302,7 +368,15 @@ def check(path: Optional[Path] = None, phase: str = "default") -> AnalysisResult
     text = p.read_text()
     test_dirs, envs = resolve_test_names(REPO)
     case_index = build_case_index(REPO, test_dirs)
-    return analyze(text, test_dirs, envs, phase, case_index)
+    g2_ids = read_g2_expected_ids(REPO)
+    if g2_ids is None:
+        r = AnalysisResult()
+        r.fatal.append(
+            f"{REPO / G2_EXPECTED_DIFF} does not exist -- the G2 expected-diff "
+            f"predictions must be written before the G2 run; without the file "
+            f"no after_expect row can be checked, so this is not a clean pass")
+        return r
+    return analyze(text, test_dirs, envs, phase, case_index, g2_ids)
 
 
 def _row(values: Dict[str, str]) -> str:
@@ -448,6 +522,69 @@ def self_test() -> int:
     print(f"  {'ok ' if good else 'FAIL'} empty asserting_test (pre-review, "
           f"downgraded to a counted gap): missing_test_count="
           f"{r.missing_test_count}, violations={len(r.violations)}")
+    ok = ok and good
+
+    # --- verdict -> after_expect coherence (review 2026-09-12, Finding 17) ---
+    r = analyze(csv_of(merged(verdict="both-valid", after_expect="nrf52-changes")),
+                fake_dirs, fake_envs, "default")
+    good = not r.fatal and any("does not admit" in v for v in r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} both-valid with a moving after_expect: "
+          f"{r.violations}")
+    ok = ok and good
+
+    r = analyze(csv_of(merged(verdict="nrf52-correct", after_expect="nrf52-changes")),
+                fake_dirs, fake_envs, "default")
+    good = not r.fatal and any("does not admit" in v for v in r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} nrf52-correct saying nRF52 changes: "
+          f"{r.violations}")
+    ok = ok and good
+
+    r = analyze(csv_of(merged(verdict="esp32-correct", after_expect="")),
+                fake_dirs, fake_envs, "default")
+    good = not r.fatal and any("after_expect is empty" in v for v in r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} decided row with empty after_expect: "
+          f"{r.violations}")
+    ok = ok and good
+
+    # both-change under a one-sided verdict is allowed (DR-18 shape) and so is
+    # identical (DR-01, fixed before the review)
+    r = analyze(csv_of(merged(verdict="esp32-correct", after_expect="both-change"),
+                       merged(id="DR-02", verdict="esp32-correct",
+                              after_expect="identical")),
+                fake_dirs, fake_envs, "default")
+    good = not r.fatal and not r.violations
+    print(f"  {'ok ' if good else 'FAIL'} esp32-correct admits both-change and "
+          f"identical: {r.violations}")
+    ok = ok and good
+
+    # --- tie_break only on both-valid rows ---
+    r = analyze(csv_of(merged(verdict="nrf52-correct", after_expect="esp32-changes",
+                              tie_break="ESP32")),
+                fake_dirs, fake_envs, "default")
+    good = not r.fatal and any("tie_break" in v for v in r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} tie_break on a non-both-valid row: "
+          f"{r.violations}")
+    ok = ok and good
+
+    # --- G2 EXPECTED-DIFF coverage: a moving row must be named there ---
+    moving = csv_of(merged(verdict="esp32-correct", after_expect="nrf52-changes"))
+    r = analyze(moving, fake_dirs, fake_envs, "default", g2_ids=set())
+    good = not r.fatal and any("EXPECTED-DIFF" in v for v in r.violations)
+    print(f"  {'ok ' if good else 'FAIL'} moving row absent from G2 "
+          f"EXPECTED-DIFF: {r.violations}")
+    ok = ok and good
+
+    r = analyze(moving, fake_dirs, fake_envs, "default", g2_ids={"DR-01"})
+    good = not r.fatal and not r.violations
+    print(f"  {'ok ' if good else 'FAIL'} moving row named in G2 EXPECTED-DIFF: "
+          f"{r.violations}")
+    ok = ok and good
+
+    r = analyze(csv_of(merged(verdict="both-valid", after_expect="identical")),
+                fake_dirs, fake_envs, "default", g2_ids=set())
+    good = not r.fatal and not r.violations
+    print(f"  {'ok ' if good else 'FAIL'} identical row needs no G2 entry: "
+          f"{r.violations}")
     ok = ok and good
 
     # A name that does not resolve stays a violation in EVERY phase -- that is
