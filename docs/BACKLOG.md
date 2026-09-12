@@ -4226,6 +4226,98 @@ established them:
 The estimate that stood here ("`U2` and `U6` twins are hours of work") was
 wrong for `U2` and is corrected there.
 
+#### Operator decisions of 2026-09-12
+
+**`OPT-03`, nRF52 settings: MIGRATE, do not wipe.** Flash is not the scarce
+resource -- DRAM and IRAM are -- so a migration path is cheap and spares every
+node its configuration. The machinery already exists and is the model to
+follow: `nrf52_flash.cpp` keeps `s_meshcomcompat_settings` as the previous
+on-disk generation and maps it field by field into the live struct
+(`nrf52_flash.cpp:121`, `:287`). A future layout generation adds one more
+compat struct and one more mapping step; `FLASH_STRUCT_VERSION` selects it.
+
+Two consequences worth stating now.
+
+- **The compat struct is on-disk format, not source style.** It must NOT be
+  tidied along with the live struct. `WisBlock-API.h:567` still spells
+  `node_gpsbaud` as `unsigned int` on purpose, while the live struct at `:331`
+  is now `uint32_t`; changing the compat copy would silently reinterpret the
+  bytes of every node that has not migrated yet.
+- **The two `D1-04` fixes below did NOT need this.** They are layout-neutral
+  (`uint32_t` is identical in size and alignment to both previous spellings on
+  both toolchains, asserted by compiling a `static_assert` with each; the
+  `node_update` shrink is ESP32-only and ESP32 persists settings as ~266 NVS
+  key/value pairs, never as a struct blob). The migration decision governs the
+  `W3` single-struct work, not those.
+
+**`BattTimeWait`: unify on the SLOWER cadence (30 s, the nRF52 value).** The
+60x divergence (`esp32_main.cpp:3533` 500 ms against `nrf52_main.cpp:2174`
+30 000 ms) is settled in favour of 30 s: polling a battery twice a second buys
+nothing and costs power.
+
+**But the ESP32 timer is overloaded and cannot simply be slowed.** The 88-line
+block it gates (`esp32_main.cpp:3533-3620`) also drives, on
+`LilyGo_T-Beam-1W` only, the **fan control**: `getTempForNTC()` with fan on
+above 40 C and off below 35 C, inside
+`#if defined(NTC_PIN) && defined(FAN_CTRL)`. Slowing that to 30 s would delay
+fan spin-up by up to half a minute on a 1 W PA -- a thermal regression, not a
+cosmetic one. `LilyGo_T-Beam-1W` is the only variant defining those macros, so
+every other ESP32 board is unaffected either way.
+
+Implementation therefore: battery read moves to 30 s on both platforms, and
+the fan/NTC section gets its own 500 ms timer compiled only where those macros
+are defined. Recorded here because "settle on the slower value" is correct for
+the battery and wrong for the fan, and the next reader needs to know why the
+two were separated.
+
+`INA226TimeWait` (15 s ESP32 against 60 s nRF52) is the same class and is NOT
+covered by this decision -- it is still open.
+
+#### `D1-04` settings drift: the two resolved rows, queued for wave W3
+
+`settings_layout_lint.py` (2026-09-12) tabulates both `s_meshcom_settings`
+definitions and pins the result. **145 fields on ESP32, 132 on nRF52, 128
+shared, 15 ESP32-only, 2 nRF52-only, and 2 same-name-different-type.** The two
+mismatches are the ones that matter, because the nRF52 BLE settings
+characteristic ships this struct as **raw bytes** -- a differing width is a
+wire-format difference, not a source inconsistency. Both are now decided:
+
+| field          | ESP32           | nRF52          | resolution                                    |
+| -------------- | --------------- | -------------- | --------------------------------------------- |
+| `node_gpsbaud` | `unsigned long` | `unsigned int` | **spell both `uint32_t`** -- no size change   |
+| `node_update`  | `char[21]`      | `char[20]`     | **shrink ESP32 to `[20]`** and fix its writer |
+
+**`node_gpsbaud` is a naming fix, not a memory fix.** "Take the more compact
+type" does not apply: `unsigned long` and `unsigned int` are both 4 bytes on
+both toolchains (checked against `xtensa-esp32-elf-gcc` and
+`arm-none-eabi-gcc`). Nor can it shrink -- `config_json.cpp:180` declares it
+`CFG_U32` over 1 200..921 600, which needs 32 bits, and
+`config_json.cpp:243` already carries
+`static_assert(sizeof(...) == 4, "CFG_U32 assumes a 32-bit member")`. The only
+defect is that one field has two spellings; `uint32_t` on both sides ends it
+at zero cost.
+
+**`node_update`'s 21st byte is not merely unused, it leaks.** The payload is
+`"%04i-%02i-%02i %02i:%02i:%02i"` -- 19 characters plus NUL, exactly 20 bytes,
+so nRF52 is right-sized. ESP32 writes it with
+
+    char ctemp[80];
+    snprintf(ctemp, sizeof(ctemp), "%04i-...", ...);   // fills 20 bytes
+    memcpy(meshcom_settings.node_update, ctemp, 21);   // copies 21
+
+(`esp32_main.cpp:2872`), so byte 20 is **one byte of uninitialised stack**
+copied into the settings struct -- which is then persisted to flash and shipped
+over BLE as raw bytes. Never read back (the string terminates at 19), but it
+should not be there. Fix: `char[20]` plus `snprintf`/`sizeof` at the writer,
+which is what the nRF52 side (`nrf52_main.cpp:1284`) already does correctly.
+
+**Neither ships standalone.** Both change the struct layout, so
+`FLASH_STRUCT_VERSION` (currently `20260724`) has to move, and that triggers
+`clear_flash()` -- every node in the fleet loses its settings. They therefore
+ride with the settings unification (`D1-04` single struct, `D1-06` migration,
+Gantt wave `W3`) so the fleet pays **one** wipe-or-migrate rather than three.
+That is the `OPT-03` decision already owed: nRF52 settings migration vs wipe.
+
 #### Phase B4 status, 2026-09-12: the first two `N1` twins
 
 | Unit | Test                 | Env                             | Commit     |
