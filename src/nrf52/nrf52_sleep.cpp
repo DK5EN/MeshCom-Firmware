@@ -78,6 +78,9 @@ void nrf52EnterDeepSleep()
     #elif defined(BOARD_T_ECHO)
     digitalWrite(Power_On_Pin, LOW);   // peripheral rail off
     #elif defined(BOARD_RAK4630)
+    // Power down the green and blue LEDs on the RAK4630 board
+    digitalWrite(LED_GREEN, LOW);   // green LED off
+    digitalWrite(LED_BLUE, LOW);    // blue LED off
     digitalWrite(WB_IO2, 0);   // 3V3_S off: W5100S, RAK12500 GPS, every WisBlock slot
     #endif
 
