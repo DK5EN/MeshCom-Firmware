@@ -4,6 +4,7 @@
 **Board:** LilyGO T-Deck / T-Deck Plus
 **Date:** 2026-09-11
 **Reporter:** field report via DK5EN
+**Status:** fixed in `fork-main` `9c3bdf6b`, harness scenario `keylock_kbl` plus hand test on DK5EN-14 2026-09-12, upstream [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140)
 
 ## Symptom
 

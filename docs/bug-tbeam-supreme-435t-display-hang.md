@@ -3,7 +3,7 @@
 Stand: 2026-09-12, Diagnose abgeschlossen, Fix gebaut, Feldbestaetigung offen.
 
 Fix in `fork-main` als `1427ac6f` (nur Konstruktor und `setBusClock`, ohne Diag-Marker), Changelog
-220, BACKLOG TM-09; im Upstream-PR zusammen mit DS-03/TD-16 (`pr-deepsleep-keylock-draft-20260912.md`).
+220, BACKLOG TM-09; im Upstream-[PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) zusammen mit DS-03/TD-16 (`pr-deepsleep-keylock-draft-20260912.md`).
 
 ## Symptom
 

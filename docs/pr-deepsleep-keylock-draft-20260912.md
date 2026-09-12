@@ -1,6 +1,8 @@
 # PR-Entwurf: Long-Press-Deepsleep weckt sofort wieder auf, T-Deck Tastaturlicht bei Keylock
 
-Ziel: `icssw-org/MeshCom-Firmware`, Branch `dev`. Zwei Feldmeldungen gegen 4.35t, zwei Commits,
+Eingereicht 2026-09-12 als [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) (Branch `pr-deepsleep-keylock-20260912`, drei Commits auf `dev` `c17c07c0`).
+
+Ziel: `icssw-org/MeshCom-Firmware`, Branch `dev`. Drei Feldmeldungen gegen 4.35t, drei Commits,
 nur `src/`. Bugreports: `docs/bugreport-heltec-v3-longpress-deepsleep.md`,
 `docs/bugreport-tdeck-keylock-kbl.md`.
 
@@ -124,3 +126,6 @@ per `--injectmsg`, Beobachtung der Schreibzugriffe auf den Tastatur-Controller):
 | ------- | ----------- | ----------------------------------------------- |
 | vorher  | ja          | `150` (der Fehler)                              |
 | nachher | ja          | keiner                                          |
+
+Handtest auf demselben Geraet 2026-09-12: KBL aus, SYM+K, Nachricht per LoRa -> Display weckt,
+Tastatur bleibt dunkel, SYM+K entsperrt wieder.

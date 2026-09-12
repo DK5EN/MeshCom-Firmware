@@ -130,7 +130,8 @@ position keys, and its own decoder only understood 14.
      `dk5en-98` after OTA.
 
 Three field reports against 4.35t, all fixed 2026-09-12 and offered to
-upstream `dev` as one PR (`docs/pr-deepsleep-keylock-draft-20260912.md`):
+upstream `dev` as [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140)
+(`docs/pr-deepsleep-keylock-draft-20260912.md`):
 
 218. **Long press switches the node off again** (`40c29e7f`, DS-03). Since
      item 197 the shared deep-sleep helpers arm the user button as wake

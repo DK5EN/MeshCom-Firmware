@@ -5,6 +5,7 @@
 **Works on:** MeshCom 4.35s
 **Date:** 2026-09-12
 **Reporter:** field report via DK5EN
+**Status:** fixed in `fork-main` `40c29e7f` (release wait gated on `--button on`), bench-confirmed on DK5EN-93 2026-09-12, upstream [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140)
 
 ## Symptom
 
