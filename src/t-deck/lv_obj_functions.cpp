@@ -4065,8 +4065,8 @@ void tdeck_refresh_SET_view()
     snprintf(vChar, sizeof(vChar), "%i", meshcom_settings.node_power);
     lv_textarea_set_text(setup_txpower, vChar);
 
-    lv_textarea_set_text(setup_stone, meshcom_settings.node_audio_start.c_str());
-    lv_textarea_set_text(setup_mtone, meshcom_settings.node_audio_msg.c_str());
+    lv_textarea_set_text(setup_stone, meshcom_settings.node_audio_start);
+    lv_textarea_set_text(setup_mtone, meshcom_settings.node_audio_msg);
     lv_textarea_set_text(setup_name, meshcom_settings.node_name);
     lv_textarea_set_text(setup_comment, meshcom_settings.node_atxt);
     lv_textarea_set_text(setup_wifissid, meshcom_settings.node_ssid);
@@ -4209,7 +4209,7 @@ static void msg_focus_and_alert(bool bWithAudio)
 
         // Einreihen, nicht abspielen: die SD-Suche und der Ton laufen im
         // Audio-Task, loopTask (LVGL) steht dafuer nicht mehr 1.1 s still.
-        audio_play_file_or_cw(meshcom_settings.node_audio_msg.c_str(), 12, 'r');
+        audio_play_file_or_cw(meshcom_settings.node_audio_msg, 12, 'r');
     }
 }
 

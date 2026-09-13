@@ -72,19 +72,37 @@ THE FIVE CHECKS
      re-derives the same fact from a fresh parse on every run and keeps it
      at 0 going forward.
 
-EXCLUDED_FROM_SCHEMA -- one table, two directions
---------------------------------------------------
+     SCHEMA-DRIVEN MODE (D1-04 W3 Task 1, landed 2026-09-13): once
+     esp32_flash.cpp's load/save walk `settings_schema::fields()` generically
+     (dispatching on FieldDescriptor::type against a variable `d.key`) rather
+     than issuing one hand-written `preferences.put*("literal key", ...)`
+     call per field, `parse_put_keys()`'s literal-string regex has nothing
+     left to find -- not because a field stopped being persisted, but because
+     the persistence mechanism moved from source-code call sites to a data
+     table this same script already parses in full elsewhere (checks 1-4).
+     `check()` detects this (a `settings_schema::fields()` marker appearing
+     at least twice in esp32_flash.cpp -- once for load, once for save) and
+     substitutes the ESP32 schema union's own key set for `put_keys` in that
+     case: check 5 is then a tautology BY CONSTRUCTION (every X()-union key
+     with a real member is, trivially, a member of that same union) EXCEPT
+     for keys the walk explicitly skips on the load side (see
+     esp32_flash.cpp's `isLoadSpecialCased()`) -- those still only reach
+     flash via the save-side generic walk, which has no exclusions, so they
+     remain covered too. This is intentionally a weaker check than the
+     legacy literal-call parse it replaces for THIS one axis (it can no
+     longer catch "someone renamed a key string in only the put call",
+     because there is only one call site, this table, driving both
+     directions) -- checks 1-4 (which never depended on literal call
+     parsing) are unaffected and remain the real coverage gate.
+
+EXCLUDED_FROM_SCHEMA -- one table, one direction now
+-----------------------------------------------------
 
 Same "explained exception, not a fig leaf" idiom as
 settings_persist_lint.py's EXPLAINED_EXCLUSIONS: named in code, cited, and
-consulted by more than one check rather than duplicated per check. It is
-pinned to exactly 10 entries, in two groups that exempt opposite checks:
+consulted by more than one check rather than duplicated per check. Pinned to
+exactly 8 entries, all exempting check 4 (no RUNTIME in the schema):
 
-  - `node_audio_start`, `node_audio_msg` -- PERSIST per TRIAGE_DOC §3, but
-    exempted from check 3 (coverage): both are Arduino `String` members
-    (T-Deck-only), and `settings_schema`'s persistence descriptors have no
-    String type -- persisting one would write a heap pointer into NVS, not
-    the string's bytes. They stay out of the schema on purpose.
   - the 8 fields of TRIAGE_DOC §4(c) (`node_msgid`, `node_ackid`,
     `node_temp`, `node_hum`, `node_press`, `node_temp2`, `node_gas_res`,
     `node_co2`) -- classified RUNTIME per TRIAGE_DOC §3 (they are computed/
@@ -94,6 +112,14 @@ pinned to exactly 10 entries, in two groups that exempt opposite checks:
     reboot on purpose) and leaves "keep persisting" an open, reasonable W3
     call -- if SETTINGS_PERSIST_ONLY_LIST legitimately carries them, that is
     not the drift this check exists to catch.
+
+  `node_audio_start`/`node_audio_msg` used to sit here too (PERSIST per
+  TRIAGE_DOC §3, exempted from check 3/coverage): both were Arduino `String`
+  members and `settings_schema`'s descriptors have no String type. D1-04 W3
+  Task 2 converted both to a fixed `char[128]` and Task 1 gave both a real
+  SETTINGS_PERSIST_ONLY_LIST row (settings_schema.h) -- they are now
+  ordinary covered members, not an exception, so they were removed from this
+  table rather than left in it pointing at a reason that no longer applies.
 
 Self-tests: `--self-test` (`--selftest` also accepted) drives every function
 above against synthetic fixtures in a temp directory or plain in-memory
@@ -294,11 +320,6 @@ assert len(FIELD_CLASSIFICATION) == 147, (
 # EXCLUDED_FROM_SCHEMA -- see the module docstring's "EXCLUDED_FROM_SCHEMA"
 # section for what these 10 are and which check (3 or 4) each one exempts.
 # ---------------------------------------------------------------------------
-_STRING_HEAP_POINTER = (
-    "Arduino String member, T-Deck-only (config_json.h:133-134); "
-    "settings_schema's persistence descriptors have no String type, and "
-    "persisting one would write a heap pointer into NVS, not the string's "
-    "bytes -- deliberately kept out of the schema (check 3 exemption)")
 _PERSISTED_COUNTER_OR_SENSOR = (
     f"{TRIAGE_DOC} section 4(c): RUNTIME-shaped value (running id counter "
     "or last-sensor-reading cache) that IS persisted in ESP32 NVS today on "
@@ -306,8 +327,6 @@ _PERSISTED_COUNTER_OR_SENSOR = (
     "the drift check 4 exists to catch (check 4 exemption)")
 
 EXCLUDED_FROM_SCHEMA: Dict[str, str] = {
-    "node_audio_start": _STRING_HEAP_POINTER,
-    "node_audio_msg": _STRING_HEAP_POINTER,
     "node_msgid": _PERSISTED_COUNTER_OR_SENSOR,
     "node_ackid": _PERSISTED_COUNTER_OR_SENSOR,
     "node_temp": _PERSISTED_COUNTER_OR_SENSOR,
@@ -317,7 +336,7 @@ EXCLUDED_FROM_SCHEMA: Dict[str, str] = {
     "node_gas_res": _PERSISTED_COUNTER_OR_SENSOR,
     "node_co2": _PERSISTED_COUNTER_OR_SENSOR,
 }
-assert len(EXCLUDED_FROM_SCHEMA) == 10
+assert len(EXCLUDED_FROM_SCHEMA) == 8
 
 
 # ---------------------------------------------------------------------------
@@ -1053,10 +1072,29 @@ def check(repo: Path = REPO) -> Tuple[AnalysisResult, bool]:
     persist_esp32_rows, persist_nrf52_rows = load_persist_only_schema(schema_text)
 
     esp32_struct_members = parse_esp32_struct_members(h_p.read_text())
-    put_keys = parse_put_keys(cpp_p.read_text())
+    cpp_text = cpp_p.read_text()
+
+    # See check 5's docstring ("SCHEMA-DRIVEN MODE"): once esp32_flash.cpp
+    # calls settings_schema::fields() generically instead of issuing one
+    # preferences.put*("literal key", ...) per field, there is no literal
+    # call left for parse_put_keys() to find. Two occurrences of the marker
+    # (load and save each walk the table once) distinguishes "the mechanism
+    # moved" from "the mechanism vanished" -- one stray mention in a comment
+    # would not clear this bar.
+    schema_driven = cpp_text.count("settings_schema::fields()") >= 2
+    if schema_driven:
+        put_keys = {row.key for row in x_esp32_rows + persist_esp32_rows}
+    else:
+        put_keys = parse_put_keys(cpp_text)
 
     r = analyze(x_esp32_rows, x_nrf52_rows, persist_esp32_rows,
                 persist_nrf52_rows, esp32_struct_members, put_keys)
+    if schema_driven:
+        r.notes.append(
+            "esp32_flash.cpp is schema-driven (settings_schema::fields() "
+            "walk, D1-04 W3 Task 1): check 5 used the ESP32 schema union's "
+            "own key set in place of a literal preferences.put* parse -- "
+            "see check 5's docstring")
 
     # --- check 6 -----------------------------------------------------------
     schema_cpp_p = repo / SETTINGS_SCHEMA_CPP
@@ -1493,6 +1531,77 @@ def self_test() -> int:
         result, _ = check(repo=Path(d) / "does-not-exist")
         report("check(): required source files missing entirely -> FATAL",
                bool(result.fatal) and all("does not exist" in f for f in result.fatal))
+
+    # check(): schema-driven esp32_flash.cpp (D1-04 W3 Task 1 shape) -- a
+    # settings_schema::fields() walk with NO literal preferences.put*(...)
+    # call sites must not FATAL on "zero put calls found" and must not raise
+    # a wave of false check-5 violations (one per real field) just because
+    # parse_put_keys() has nothing left to match.
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "src" / "esp32").mkdir(parents=True)
+        (root / "src" / "config_json.h").write_text(
+            "#define CFG_FIELD_LIST(X)                       \\\n"
+            '    X("node_call", CFG_STR, node_call, CFG_NORANGE, CFG_NOESC) \\\n'
+            "    CFG_FIELD_LIST_PLATFORM(X)\n"
+            + _fake_platform_macro("CFG_FIELD_LIST_PLATFORM", "", ""))
+        (root / "src" / "esp32" / "esp32_flash.h").write_text(
+            _fake_struct_h("    char node_call[10] = {0};\n"))
+        (root / "src" / "esp32" / "esp32_flash.cpp").write_text(
+            "void load() {\n"
+            "    for (size_t i = 0; i < settings_schema::fieldCount(); i++)\n"
+            "        loadFieldFromPreferences(settings_schema::fields()[i], &meshcom_settings);\n"
+            "}\n"
+            "void save() {\n"
+            "    for (size_t i = 0; i < settings_schema::fieldCount(); i++)\n"
+            "        saveFieldToPreferences(settings_schema::fields()[i], &meshcom_settings);\n"
+            "}\n")
+        result, _ = check(repo=root)
+        # NOTE: this fixture's config_json.h has only ONE X() row, so
+        # checks 3/4 (coverage vs. the REAL 147-field FIELD_CLASSIFICATION
+        # table, which check() always uses -- it takes no override) fire a
+        # wall of unrelated noise regardless of schema-driven detection; that
+        # is not what this case is testing. What matters here is specific to
+        # check 5: no FATAL from an empty put_keys void-check, no check-5
+        # "no preferences.put* call" finding for node_call (which IS in this
+        # fixture's tiny schema), and the substitution note is present.
+        report("check(): schema-driven esp32_flash.cpp -> not fatal, no "
+               "check-5 violation for the one field this fixture covers, "
+               "and a note explains the substitution",
+               not result.fatal
+               and not any("no preferences.put* call" in v for v in result.violations)
+               and any("schema-driven" in n for n in result.notes),
+               f"fatal={result.fatal} violations={result.violations} notes={result.notes}")
+
+    # Mutation: only ONE settings_schema::fields() occurrence (e.g. someone
+    # ported the load side but left save hand-written, or vice versa) must
+    # NOT be treated as schema-driven -- the real legacy parse_put_keys()
+    # runs instead, finds zero literal preferences.put*(...) calls in this
+    # fixture (there are none), and correctly FATALs as a broken instrument
+    # rather than silently passing check 5 the way the >=2 branch would.
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "src" / "esp32").mkdir(parents=True)
+        (root / "src" / "config_json.h").write_text(
+            "#define CFG_FIELD_LIST(X)                       \\\n"
+            '    X("node_call", CFG_STR, node_call, CFG_NORANGE, CFG_NOESC) \\\n'
+            "    CFG_FIELD_LIST_PLATFORM(X)\n"
+            + _fake_platform_macro("CFG_FIELD_LIST_PLATFORM", "", ""))
+        (root / "src" / "esp32" / "esp32_flash.h").write_text(
+            _fake_struct_h("    char node_call[10] = {0};\n"))
+        (root / "src" / "esp32" / "esp32_flash.cpp").write_text(
+            "void load() {\n"
+            "    for (size_t i = 0; i < settings_schema::fieldCount(); i++)\n"
+            "        loadFieldFromPreferences(settings_schema::fields()[i], &meshcom_settings);\n"
+            "}\n")
+        result, _ = check(repo=root)
+        report("check(): only ONE settings_schema::fields() occurrence -> "
+               "NOT treated as schema-driven, legacy parse runs and FATALs "
+               "on the real zero-put-calls void-check instead of silently "
+               "passing check 5",
+               bool(result.fatal)
+               and any("preferences.put*" in f for f in result.fatal),
+               f"fatal={result.fatal} violations={result.violations}")
 
     return 0 if ok else 1
 

@@ -15,8 +15,8 @@ node_analog_pin          int            int            both
 node_analog_slope        float          float          both
 node_aprsmc              char[10]       char[10]       both
 node_atxt                char[40]       char[40]       both
-node_audio_msg           String         -              esp32-only
-node_audio_start         String         -              esp32-only
+node_audio_msg           char[128]      -              esp32-only
+node_audio_start         char[128]      -              esp32-only
 node_backlightlock       bool           -              esp32-only
 node_button_pin          int            int            both
 node_bw                  float          float          both

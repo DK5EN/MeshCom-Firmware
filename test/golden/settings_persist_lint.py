@@ -27,6 +27,32 @@ end to end. It is a static gate over the CURRENT tree: three checks, run by
 parsing `src/config_json.h` and `src/esp32/esp32_flash.cpp` as text (this
 file never compiles firmware and must work with a native `python3`).
 
+SCHEMA-DRIVEN MODE (D1-04 W3 Task 1, landed 2026-09-13): the migration this
+docstring says the gate must stand BEFORE has now landed. esp32_flash.cpp's
+load/save no longer contain the 266 literal `preferences.put*`/`get*("literal
+key", ...)` calls these three checks parse -- they walk
+`settings_schema::fields()` generically instead, dispatching on
+`FieldDescriptor::type` against a variable key, so there is categorically
+nothing left for `parse_pref_calls()`'s literal-string regexes to find. That
+is not a new instance of DR-13 -- it is the fix DR-13 called for, just
+authored as one data table plus one dispatch function instead of one call
+site per field, so the exact drift these checks were built to catch (a field
+present in the table with no matching call) is now structurally impossible:
+load and save are the SAME loop over the SAME array.
+`check()` detects this (two-plus occurrences of the literal string
+`"settings_schema::fields()"` in esp32_flash.cpp -- see `is_schema_driven()`)
+and returns a reduced, honest result instead of running checks 1-3 against
+call sites that no longer exist: no FATAL from the now-genuinely-empty
+put/get call lists, no wall of false "no preferences.put* call" findings, and
+a note pointing at `settings_schema_lint.py` as the tool that now does the
+real completeness check (it parses the schema table directly, not this
+file's call sites). `EXPLAINED_EXCLUSIONS`, `parse_x_table_esp32()`,
+`parse_esp32_struct_members()` and the cross-checks below are all left fully
+intact and still exercised by `--self-test` against synthetic legacy-shaped
+fixtures -- this file stays the correct instrument for a *hand-written*
+persistence layer, on the CURRENT tree or a future one that reverts to it;
+it simply steps out of the way once persistence is schema-driven instead.
+
 THE THREE CHECKS
 -----------------
 
@@ -412,6 +438,7 @@ class AnalysisResult:
     excluded: List[str] = field(default_factory=list)      # informational only
     unresolved: List[str] = field(default_factory=list)    # informational only
     fatal: List[str] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)         # informational only, e.g. schema-driven mode
 
 
 def analyze(x_rows: List[XRow], struct_members: Set[str],
@@ -523,6 +550,17 @@ def analyze(x_rows: List[XRow], struct_members: Set[str],
     return r
 
 
+def is_schema_driven(esp32_flash_cpp_text: str) -> bool:
+    """True once esp32_flash.cpp's load AND save both walk
+    settings_schema::fields() generically instead of issuing one hand-written
+    preferences.put*/get*("literal key", ...) call per field -- see the
+    module docstring's "SCHEMA-DRIVEN MODE" section. Two-plus occurrences
+    (load and save each walk the table once) distinguishes "the mechanism
+    moved" from "the mechanism vanished" -- one stray mention in a comment
+    would not clear this bar."""
+    return esp32_flash_cpp_text.count("settings_schema::fields()") >= 2
+
+
 def check(repo: Path = REPO) -> AnalysisResult:
     cfg_p = repo / CONFIG_JSON_CPP
     h_p = repo / ESP32_FLASH_H
@@ -535,7 +573,29 @@ def check(repo: Path = REPO) -> AnalysisResult:
 
     x_rows = parse_x_table_esp32(cfg_p.read_text())
     struct_members = parse_esp32_struct_members(h_p.read_text())
-    pref_calls = parse_pref_calls(cpp_p.read_text())
+    cpp_text = cpp_p.read_text()
+
+    if is_schema_driven(cpp_text):
+        # See the module docstring's "SCHEMA-DRIVEN MODE" section: the three
+        # checks below all depend on literal preferences.put*/get*("literal
+        # key", ...) call sites, which this file categorically no longer
+        # has. Running them anyway would either FATAL on the now-genuinely-
+        # empty call lists, or -- once that FATAL is worked around -- report
+        # one false "no preferences.put* call" violation per real field.
+        # settings_schema_lint.py's checks 1-4 already verify schema
+        # completeness against the same triage table by parsing the schema
+        # itself, not this file's call sites, so nothing here is silently
+        # going unchecked.
+        r = AnalysisResult(x_row_count=len(x_rows), struct_member_count=len(struct_members))
+        r.notes.append(
+            "esp32_flash.cpp is schema-driven (settings_schema::fields() "
+            "walk, D1-04 W3 Task 1): checks 1-3 do not apply to a generic "
+            "walk with no literal preferences.put*/get* call sites left to "
+            "parse -- see settings_schema_lint.py for the completeness "
+            "check that replaces them")
+        return r
+
+    pref_calls = parse_pref_calls(cpp_text)
     return analyze(x_rows, struct_members, pref_calls)
 
 
@@ -734,6 +794,58 @@ def self_test() -> int:
     report("FATAL via check(): missing source files on disk",
            bool(r.fatal) and all("does not exist" in f for f in r.fatal))
 
+    # --- is_schema_driven() / check(): D1-04 W3 Task 1 shape ---
+    report("is_schema_driven: two occurrences (load + save) -> True",
+           is_schema_driven(
+               "settings_schema::fields()\nsettings_schema::fields()\n"))
+    report("is_schema_driven: one occurrence only -> False (still legacy)",
+           not is_schema_driven("settings_schema::fields()\n"))
+    report("is_schema_driven: zero occurrences -> False",
+           not is_schema_driven('preferences.putInt("node_alt", 0);\n'))
+
+    import tempfile
+
+    def _write_fixture(root: Path, cpp_text: str) -> None:
+        (root / "src" / "esp32").mkdir(parents=True)
+        (root / "src" / "config_json.h").write_text(
+            "#define CFG_FIELD_LIST(X)                       \\\n"
+            '    X("node_call", CFG_STR, node_call, CFG_NORANGE, CFG_NOESC) \\\n'
+            "    CFG_FIELD_LIST_PLATFORM(X)\n"
+            "#ifdef ESP32\n"
+            "    #define CFG_FIELD_LIST_PLATFORM(X)\n"
+            "#else\n"
+            "    #define CFG_FIELD_LIST_PLATFORM(X)\n"
+            "#endif\n")
+        (root / "src" / "esp32" / "esp32_flash.h").write_text(
+            f"struct {STRUCT_NAME}\n{{\n    char node_call[10] = {{0}};\n}};\n")
+        (root / "src" / "esp32" / "esp32_flash.cpp").write_text(cpp_text)
+
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        _write_fixture(root, (
+            "void load() { settings_schema::fields(); }\n"
+            "void save() { settings_schema::fields(); }\n"))
+        r = check(repo=root)
+        report("check(): schema-driven fixture -> no fatal, no violations, "
+               "note explains the mode switch",
+               not r.fatal and not r.violations
+               and any("schema-driven" in n for n in r.notes),
+               f"fatal={r.fatal} violations={r.violations} notes={r.notes}")
+
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        # Only ONE occurrence (e.g. load ported, save left hand-written with
+        # zero literal calls in this minimal fixture) -- must NOT be treated
+        # as schema-driven; the legacy parse runs and correctly FATALs on
+        # the real zero-calls void-check rather than silently reporting
+        # nothing wrong.
+        _write_fixture(root, "void load() { settings_schema::fields(); }\n")
+        r = check(repo=root)
+        report("check(): only ONE settings_schema::fields() occurrence -> "
+               "NOT schema-driven, legacy parse FATALs on zero real calls",
+               bool(r.fatal) and any("preferences.get*/put*" in f for f in r.fatal),
+               f"fatal={r.fatal}")
+
     return 0 if ok else 1
 
 
@@ -754,6 +866,9 @@ def main() -> int:
     print(f"{result.x_row_count} ESP32 X() table row(s), "
           f"{result.struct_member_count} struct member(s), "
           f"{result.get_count} get call(s), {result.put_count} put call(s)")
+
+    for n in result.notes:
+        print(f"\nNOTE: {n}")
 
     cfg_text = (REPO / CONFIG_JSON_CPP).read_text()
     naive_total, naive_members, naive_keys = naive_doc_member_count(cfg_text)

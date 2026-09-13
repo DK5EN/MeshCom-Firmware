@@ -33,18 +33,24 @@
  * The full reasoning is on the SETTINGS_SCHEMA_ROW macro in the .cpp; do not
  * simplify that expression without reading it.
  *
- * Source of the 17 rows in SETTINGS_PERSIST_ONLY_LIST: doc
+ * Source of the 19 rows in SETTINGS_PERSIST_ONLY_LIST: doc
  * docs/d1-04-settings-field-triage-20260912.md, S4(b) (25 fields persisted in
  * ESP32 NVS, absent from CFG_FIELD_LIST), filtered to
  *   - classified PERSIST in S3 there (all 25 are), MINUS
  *   - the 6 remaining S4(c) fields (classified RUNTIME despite an NVS slot:
  *     the last-sensor-reading caches) -- these must NOT gain a schema row,
- *     see the comment block below, MINUS
- *   - the 2 Arduino String fields (node_audio_start, node_audio_msg) --
- *     settings_store has no String type and writing a heap pointer into a
- *     settings record is exactly the landmine docs/BACKLOG.md's "step 6"
- *     note warns about, see the comment block below.
- * 25 - 6 - 2 = 17 rows, matching settings_schema.cpp's row count.
+ *     see the comment block below.
+ * 25 - 6 = 19 rows, matching settings_schema.cpp's row count.
+ *
+ * node_audio_start and node_audio_msg (T-Deck-only) were ALSO originally
+ * excluded here: both were Arduino `String` members (esp32_flash.h), and
+ * settings_store has no String type -- a schema row computing offsetof()/
+ * sizeof() against a String would persist its small on-stack control block
+ * (SSO buffer plus a heap pointer for anything longer), not the path text,
+ * exactly the landmine docs/BACKLOG.md's "step 6" note warns about. D1-04 W3
+ * Task 2 converted both to a fixed `char[128]` (esp32_flash.h), which is
+ * what unblocks the two rows below -- do not add a schema row for either one
+ * without that conversion having landed first.
  *
  * node_msgid and node_ackid were originally counted among the S4(c)
  * exclusions (8 of them) but are RESTORED here (Fable verdict 2026-09-12,
@@ -116,26 +122,24 @@ size_t fieldCount();
     X("node_ackid",     CFG_INT, node_ackid,      CFG_NORANGE, CFG_NOESC)                        \
     SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)
 
-/* Platform-only persisted-but-not-exported fields: the 11 T-Deck device
+/* Platform-only persisted-but-not-exported fields: the 13 T-Deck device
  * UI/behaviour rows from the triage's S4(b) list that are NOT already
- * covered by the 4 "both platforms" rows above. These 11 struct members
+ * covered by the 4 "both platforms" rows above. These 13 struct members
  * exist ONLY when BOARD_T_DECK / BOARD_T_DECK_PLUS / BOARD_T_DECK_PRO is
- * defined (src/esp32/esp32_flash.h:224-240's own `#if` guard) -- narrower
- * than plain `#ifdef ESP32`, unlike CFG_FIELD_LIST_PLATFORM's ESP32 block
- * (node_disp_rot and the spectrum-scan fields, which have no such further
- * guard and exist on every ESP32 board). Two of the 13 T-Deck fields named
- * in the triage, node_audio_start and node_audio_msg, are Arduino `String`
- * members (esp32_flash.h:226-227) and are excluded here on purpose:
- * settings_store::FieldType has no String type, and writing a heap pointer
- * (a String's internal buffer pointer) into a settings record via
- * offsetof/sizeof would silently serialise raw pointer bytes instead of
- * string content -- exactly "A landmine for step 6" that docs/BACKLOG.md
- * already records. Giving them a schema row needs settings_store to grow a
- * bounded-String encoding first; that is not this wave's file set. */
+ * defined (src/esp32/esp32_flash.h's own `#if` guard) -- narrower than plain
+ * `#ifdef ESP32`, unlike CFG_FIELD_LIST_PLATFORM's ESP32 block (node_disp_rot
+ * and the spectrum-scan fields, which have no such further guard and exist
+ * on every ESP32 board). node_audio_start/node_audio_msg are CFG_STR rows
+ * here (not CFG_FIELD_LIST) for the same reason the other 11 T-Deck fields
+ * are: T-Deck-only device UI state, not portable configuration -- see the
+ * file header comment above for why they could not be schema rows before
+ * D1-04 W3 Task 2's char[] conversion. */
 #ifdef ESP32
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
         #define SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)                                           \
             X("node_map",      CFG_INT,  node_map,             CFG_NORANGE, CFG_NOESC)          \
+            X("node_audstart", CFG_STR,  node_audio_start,     CFG_NORANGE, CFG_NOESC)          \
+            X("node_audmsg",   CFG_STR,  node_audio_msg,       CFG_NORANGE, CFG_NOESC)          \
             X("node_kblock",   CFG_BOOL, node_keyboardlock,     CFG_NORANGE, CFG_NOESC)          \
             X("node_bllock",   CFG_BOOL, node_backlightlock,    CFG_NORANGE, CFG_NOESC)          \
             X("node_kllock",   CFG_BOOL, node_kbllightlock,     CFG_NORANGE, CFG_NOESC)          \

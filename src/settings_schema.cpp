@@ -44,7 +44,20 @@
     #include <nrf52/WisBlock-API.h>
 #endif
 
-#include <configuration.h>
+// The variant's configuration.h supplies TX_POWER_MIN/TX_POWER_MAX for the
+// node_power row's range. Guarded because this translation unit is now also
+// compiled into the two safeboot images (platformio.ini), which build no
+// variant and therefore have no configuration.h on the include path -- there
+// the fallbacks immediately below apply. Safeboot only ever LOADS settings to
+// reach the OTA path; the range bounds clamp on decode, never on save, so a
+// wider fallback range cannot write an out-of-range value to NVS.
+#if defined(__has_include)
+    #if __has_include(<configuration.h>)
+        #include <configuration.h>
+    #endif
+#else
+    #include <configuration.h>
+#endif
 
 #include <stddef.h>
 
@@ -79,7 +92,7 @@ constexpr settings_store::FieldType CfgTypeToFieldType(CfgType t) {
 } // namespace
 
 // ---------------------------------------------------------------------------
-// Correctness machinery: one static_assert pair per included row.
+// Correctness machinery: one static_assert set per included row.
 //
 //   1. the member fits inside s_meshcom_settings (catches a typo'd member
 //      name resolving to the wrong offset/size combination, or a struct
@@ -87,11 +100,31 @@ constexpr settings_store::FieldType CfgTypeToFieldType(CfgType t) {
 //   2. a STRING row's buffer is at least 2 bytes (room for one content byte
 //      plus the NUL terminator) -- see the CFG_CHR -> U8 note above for why
 //      this is the rule that forced that mapping choice.
+//   3. ESP32 ONLY (D1-04 W3 Task 1(e)): the NVS key is <= 15 characters.
+//      ESP32's Preferences/NVS silently rejects (or truncates, depending on
+//      library version) any key longer than that -- a fail-CLOSED compile-
+//      time gate here means a too-long key can never ship, instead of
+//      surfacing as a field that mysteriously never persists on real
+//      hardware. Guarded to ESP32 on purpose: "send_repeat_time" (16
+//      characters) is nRF52-only (CFG_FIELD_LIST_PLATFORM's nRF52 branch,
+//      config_json.h) and has no NVS key at all -- it is excluded from this
+//      gate simply by never being one of the rows CFG_FIELD_LIST(X) expands
+//      to when ESP32 is the platform being compiled, not by an exception
+//      list that could rot. `sizeof(key) - 1` is the string length (sizeof
+//      a string literal includes its NUL terminator; `key` is always a
+//      literal here, one per X() row).
 //
 // (esc, has_esc) are accepted per CFG_FIELD_LIST's row shape. FieldDescriptor
 // has no escape-sentinel concept, so has_esc is folded into has_range instead
 // -- see the CFG_ESC note on the row macro below.
 // ---------------------------------------------------------------------------
+#ifdef ESP32
+#define SETTINGS_SCHEMA_ASSERT_KEY_LENGTH(key) \
+    static_assert(sizeof(key) - 1 <= 15, key);
+#else
+#define SETTINGS_SCHEMA_ASSERT_KEY_LENGTH(key)
+#endif
+
 #define SETTINGS_SCHEMA_ASSERT_ROW(key, cfgtype, member, lo, hi, esc, has_esc)                   \
     static_assert(offsetof(s_meshcom_settings, member) +                                         \
                       sizeof(((s_meshcom_settings *)0)->member) <=                                \
@@ -99,7 +132,8 @@ constexpr settings_store::FieldType CfgTypeToFieldType(CfgType t) {
                   key);                                                                           \
     static_assert(CfgTypeToFieldType(cfgtype) != settings_store::FieldType::STRING ||             \
                       sizeof(((s_meshcom_settings *)0)->member) >= 2,                             \
-                  key);
+                  key);                                                                           \
+    SETTINGS_SCHEMA_ASSERT_KEY_LENGTH(key)
 
 #define X(...) SETTINGS_SCHEMA_ASSERT_ROW(__VA_ARGS__)
 CFG_FIELD_LIST(X)
@@ -107,6 +141,7 @@ SETTINGS_PERSIST_ONLY_LIST(X)
 #undef X
 
 #undef SETTINGS_SCHEMA_ASSERT_ROW
+#undef SETTINGS_SCHEMA_ASSERT_KEY_LENGTH
 
 // Cross-check performed by hand against
 // docs/d1-04-settings-field-triage-20260912.md S3 (recorded here, not

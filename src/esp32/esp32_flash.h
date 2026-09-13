@@ -223,8 +223,18 @@ struct s_meshcom_settings
 
 	#if defined(BOARD_T_DECK) || defined (BOARD_T_DECK_PLUS) || defined (BOARD_T_DECK_PRO)
 	int node_map = 0;
-	String node_audio_start = "/";
-	String node_audio_msg = "/";
+	// D1-04 W3 Task 2: fixed char[], not Arduino String. A schema-driven
+	// descriptor (settings_schema.cpp) persists a field by offsetof()/
+	// sizeof() against this struct; a String's sizeof() is its small
+	// on-stack control block (SSO buffer + a heap pointer for anything
+	// longer), not the path text -- persisting that would write raw
+	// heap-pointer bytes into NVS instead of the string. 128: the T-Deck
+	// setup screen's own start/message-tone textareas already cap input at
+	// lv_textarea_set_max_length(..., 100) (src/t-deck/lv_obj_functions.cpp),
+	// so 128 covers that UI's own hard limit (a full SD-card path to an
+	// audio file) with 27 bytes of margin, not sized to just clear it.
+	char node_audio_start[128] = "/";
+	char node_audio_msg[128] = "/";
 	bool node_keyboardlock = false;
 	bool node_backlightlock = false;
 	bool node_kbllightlock = false;
