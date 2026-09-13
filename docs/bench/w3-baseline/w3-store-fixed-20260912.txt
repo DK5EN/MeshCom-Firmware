@@ -1,0 +1,153 @@
+RAK4631 DK5EN-90, image with the hand-rolled integer encoder, 2026-09-12.
+
+Third reboot after restoring the configuration from the vault backup. The load
+marker reports 109 of 109 fields decoded with no unknown key and no malformed
+line, the store dump carries real decimal integers, and GET /config.json
+matches docs/bench/w3-baseline/rak90-config-20260912.json field for field
+(103 of 103, zero diffs) -- the pre-cutover baseline captured while the node
+still ran a 20260724 image.
+
+Credentials and the BLE pairing code are masked; nothing else is edited.
+
+oo[INIT]...init_batt
+[SETST];path;keyed;fields_set=109;unknown_keys=0;malformed_lines=0;lines_total=109
+[INIT]...FLASH layout 20260724 ok, build 20260910
+[SETST];save;encoded;bytes=1545
+[SETST];save;skipped_unchanged;bytes=1545
+[OBUT]...One Button GPIO(10) not activated
+[INIT]...Initialize clock: ok
+=====================================
+GPS: trying 9600 baud
+GPS: trying 38400 baud
+[GPS ]...wait[GPS ]...Sende UBX_SET_GNSS
+=====================================
+[ETH];stall;dhcp_begin;ms;4165;task;loop
+Ethernet.localIP(): 192.168.68.68
+
+My IP address: 192.168.68.68
+Default GW address: 192.168.68.1
+DNS address: 217.237.150.188
+SNM: 255.255.252.0
+[ETH];event;got_ip;192.168.68.68;ms;18215
+[GW];srv;OE;host;89.185.97.38;path;inet;ms;18215
+[EXT] to IP:192.168.68.58
+[EXT]...now listening at IP 192.168.68.68, UDP port 1799
+[EXT]...now sending   to IP 192.168.68.58, UDP port 1799
+[BOOT];ready;ms;18218;ip;1;eth;1
+[SETST];save;encoded;bytes=1545
+[SETST];save;ok;bytes=1545
+[ETH];event;link;up;ip;1;ms;19801
+[ETH];link;up;link;1;link_age_s;0;ip;192.168.68.68;dest;89.185.97.38;hb_age_s;1;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;19801
+[NTP];ok;epoch;1789247142;rtt;103
+--dumpsettings[SETST];dump;begin;bytes=1545
+node_call=DK5EN-90
+node_short=5EN40
+node_symid=47
+node_symcd=35
+node_lat=0
+node_lon=0
+node_alt=0
+node_lat_c=32
+node_lon_c=32
+node_ssid=<masked>
+node_pwd=<masked>
+node_honly=0
+node_sset=8192
+node_maxv=4.19999981
+node_extern=192.168.68.58
+max_hop_text=2
+node_power=22
+node_freq=433175008
+node_bw=1
+node_sf=11
+node_cr=2
+node_atxt=github.com/dk5en/mcapp
+node_sset2=64
+node_owgpio=0
+node_utcof=2
+node_mcp17=0
+node_mcp17o=0
+node_mcp17i=0
+node_mcp170=
+node_mcp171=
+node_mcp172=
+node_mcp173=
+node_mcp174=
+node_mcp175=
+node_mcp176=
+node_mcp177=
+node_mcp178=
+node_mcp179=
+node_mcp1710=
+node_mcp1711=
+node_mcp1712=
+node_mcp1713=
+node_mcp1714=
+node_mcp1715=
+node_gcb0=20
+node_gcb1=232
+node_gcb2=262
+node_gcb3=9
+node_gcb4=26244
+node_gcb5=0
+node_ctry=8
+node_track=433775008
+node_pream=8
+node_ss_rx=0
+node_ss_tx=0
+node_ss_bd=0
+node_postime=0
+node_passwd=<masked>
+node_sset3=0
+bt_code=<masked>
+node_bpin=0
+node_ownip=
+node_owngw=
+node_ownms=
+node_name=Martin
+node_webpwd=<masked>
+node_lssid=<masked>
+node_lpwd=<masked>
+node_apin=99
+node_afakt=1
+node_parm=
+node_unit=
+node_format=
+node_eqns=
+node_values=
+node_ptime=15
+node_wifip=60
+node_ucall=
+node_aak=0
+node_aslo=0
+node_aoff=0
+node_atten=0
+node_gwsrv=OE
+node_tmpiof=0
+node_tmpoof=0
+node_shunt=0.00200000009
+node_imax=20
+node_isamp=7
+node_owndns=
+node_contrast=255
+node_ownntp=
+node_gpsbaud=38400
+node_netmode=0
+node_gpsdebug=2
+node_relay=0
+node_via=
+node_sset4=2
+node_aprsmc=APRSMC
+node_pingtime=0
+node_pingcall=
+node_pingmax=0
+send_repeat_time=0
+auto_join=0
+node_fversion=20260724
+node_mversion=9
+node_fwversion=4.35t
+node_cflash=0
+node_msgid=9
+node_ackid=0
+
+[SETST];dump;end;read_error=0

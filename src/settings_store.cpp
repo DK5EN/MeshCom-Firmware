@@ -62,16 +62,41 @@ const FieldDescriptor *find_field(const FieldDescriptor *fields,
 // counting pass and the writing pass (see Sink above).
 // ---------------------------------------------------------------------------
 
-void encode_i64(Sink &sink, long long v) {
-    char tmp[32];
-    int n = snprintf(tmp, sizeof(tmp), "%lld", v);
-    sink.put(tmp, (size_t)n);
+// The integer encoders convert by hand instead of calling snprintf, and that
+// is not a style choice: the nRF52 links newlib-NANO, whose printf is built
+// without _WANT_IO_LONG_LONG. It parses the first 'l', does not recognise the
+// second as a modifier, and emits the rest of the conversion LITERALLY -- so
+// "%lld" wrote the two characters `ld` into the settings file for every
+// integer field, and "%llu" wrote `lu`. The write succeeded, the file was
+// well formed, and the loss only surfaced one reboot later when decode()
+// rejected `ld` and left those fields at their defaults. Floats are fine
+// (%.9g/%.17g are supported and were observed correct on hardware); only the
+// long-long conversions are missing. Hand conversion removes the dependency
+// on a libc build option that no test on the host can see.
+// test/golden/nano_printf_lint.py keeps every other nRF52-compiled file off
+// the same rake.
+void encode_u64(Sink &sink, unsigned long long v) {
+    char tmp[24];                       // 20 digits of UINT64_MAX + slack
+    size_t n = 0;
+    do {
+        tmp[n++] = (char)('0' + (int)(v % 10ULL));
+        v /= 10ULL;
+    } while (v != 0ULL);
+    while (n > 0) {
+        sink.put(tmp[--n]);
+    }
 }
 
-void encode_u64(Sink &sink, unsigned long long v) {
-    char tmp[32];
-    int n = snprintf(tmp, sizeof(tmp), "%llu", v);
-    sink.put(tmp, (size_t)n);
+void encode_i64(Sink &sink, long long v) {
+    // Negated in unsigned space so LLONG_MIN does not overflow on the way.
+    unsigned long long mag;
+    if (v < 0) {
+        sink.put('-');
+        mag = (unsigned long long)(-(v + 1)) + 1ULL;
+    } else {
+        mag = (unsigned long long)v;
+    }
+    encode_u64(sink, mag);
 }
 
 // FLT_DECIMAL_DIG / DBL_DECIMAL_DIG significant digits -- see

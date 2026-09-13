@@ -20,6 +20,8 @@ python3 test/golden/compare_udp.py --self-test
 python3 test/golden/compare_extudp.py --self-test
 python3 test/golden/radio_units_lint.py --self-test
 python3 test/golden/radio_units_lint.py
+python3 test/golden/nano_printf_lint.py --self-test
+python3 test/golden/nano_printf_lint.py
 python3 test/golden/twin_stub_lint.py --self-test
 python3 test/golden/twin_stub_lint.py
 python3 test/golden/carve_extern_lint.py --self-test

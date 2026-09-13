@@ -71,3 +71,68 @@ Serial capture: `ext01-heltec93-serial-20260912.txt`.
 - `DK5EN-90` and `DK5EN-92` were read only -- not reflashed, not reconfigured.
   **Leave `DK5EN-90` on its current image**: it is the article for the `W3`
   upgrade proof and has to make that jump from a real 20260724 node.
+
+## 3. The boot-2 loss, diagnosed and closed -- 2026-09-12 evening
+
+`W3`'s open item 1. One bench session on `DK5EN-90`, one cause, fixed and
+re-proven on the same node.
+
+**The cause is newlib-nano's printf.** `settings_store.cpp` encoded every
+integer with `"%lld"` / `"%llu"`. The three nRF52 environments link
+**newlib-nano**, which is built without `_WANT_IO_LONG_LONG`: it parses the
+first `l`, does not recognise the second as a length modifier, and emits the
+rest of the conversion **literally**. So the migration boot wrote a
+well-formed settings file in which every numeric field read `ld` or `lu`:
+
+    node_power=ld    max_hop_text=ld    bt_code=ld    send_repeat_time=lu
+
+`encode()` reported the right byte count, the write and the rename succeeded,
+and `--info` still looked correct because RAM held what the legacy blob had
+just supplied. The loss appeared one reboot later, when `decode()` rejected
+those values and left the fields at their struct defaults.
+
+**That also explains the split** the verdict called its sharpest open lead.
+The survivors were not surviving: `sanitize_loaded_settings()` repairs the six
+radio parameters and the `SANITIZE_STR` list from defaults on every boot, so
+those came back looking untouched, while the plain integers it does not name
+stayed at their defaults. Six for six, and no exotic code path needed.
+
+**Why no test could see it.** The host's libc formats `%lld` correctly, so the
+same code round-trips perfectly under `pio test` while losing the whole
+configuration on hardware. `-Wformat` is no help either: `%lld` with a
+`long long` is exactly right. It is a property of the libc that gets linked.
+
+**Fix:** `encode_u64` / `encode_i64` convert by hand, with no printf in the
+path at all. `test/golden/nano_printf_lint.py` rejects `%ll` / `%j` / `%q`
+integer conversions anywhere in the nRF52 source set (derived from
+`[nrf52_base]`'s `build_src_filter`, not hard-coded), and
+`test_encoded_integers_are_plain_decimal_text` pins the emitted bytes rather
+than only the round trip.
+
+**Re-proven on `DK5EN-90`**, and this time across reboots, which is what the
+`W3` acceptance criterion actually needs:
+
+| step                       | result                                                                      |
+| -------------------------- | --------------------------------------------------------------------------- |
+| store dump before the fix  | every integer `ld` / `lu` (`w3-store-broken-20260912.txt`)                  |
+| configuration restored     | `POST /config`, 103 fields applied from the vault backup                    |
+| reboots 1-3 after the fix  | `[SETST];path;keyed;fields_set=109;unknown_keys=0;malformed_lines=0`        |
+| store dump after the fix   | real decimal integers, 0 fields reading `ld`/`lu` (`w3-store-fixed-...txt`) |
+| `GET /config.json` vs base | **103 of 103 fields identical to `rak90-config-20260912.json`, zero diffs** |
+
+**One open lead from the same session, not fixed:** the boot immediately after
+the reflash printed `[SETST];save;rename_failed;bytes=1527` twice, and
+`settingsStoreSave()` returned false both times -- a silent failure, because
+234 `save_settings()` call sites ignore the return. It has not recurred in any
+later boot (every save since reports `save;ok`). The untested hypothesis is
+space: the filesystem then held the legacy blob (2 000 B), the old store
+(1 554 B) and the new temp file (1 527 B) at once on a 28 672 B LittleFS, and
+`lfs_rename` has to allocate metadata. The instrument that would settle it is
+a free-space figure in the marker.
+
+**Bench state after this session:** `DK5EN-90` now runs the post-fix image
+(`wiscore_rak4631`, hand-rolled integer encoder), its keyed store is populated
+and correct, and its configuration is the baseline one. The "leave `DK5EN-90`
+on its current image" note in the section above is spent -- it existed to keep
+a real 20260724 node available for the upgrade jump, and the jump has now been
+made and measured.

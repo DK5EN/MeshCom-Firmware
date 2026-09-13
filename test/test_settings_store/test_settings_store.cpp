@@ -155,6 +155,44 @@ static void test_roundtrip_integer_edges(void) {
     TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, out.u32_val);
 }
 
+// Integers are asserted as TEXT, not only through a round trip, because the
+// round trip is blind to the failure this test exists for: on the nRF52 the
+// encoder's "%lld"/"%llu" wrote the literal characters `ld` and `lu` into the
+// settings file (newlib-nano's printf has no long-long conversion), which
+// decode() then rejected one reboot later. The host's libc formats those
+// conversions correctly, so encode->decode agreed here while hardware lost
+// every integer setting. Asserting the bytes pins the emitted form itself;
+// test/golden/nano_printf_lint.py stops a printf-based encoder coming back.
+static void test_encoded_integers_are_plain_decimal_text(void) {
+    TestState in;
+    default_state(in);
+    in.i8_val = -128;
+    in.u8_val = 255;
+    in.i32_val = INT32_MIN;
+    in.u32_val = UINT32_MAX;
+
+    char buf[512];
+    long n = settings_store::encode(kFields, kFieldCount, &in, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    buf[n] = '\0';
+
+    TEST_ASSERT_NOT_NULL(strstr(buf, "i8=-128\n"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "u8=255\n"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "i32=-2147483648\n"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "u32=4294967295\n"));
+    // The exact bytes the nRF52 wrote instead, in either spelling.
+    TEST_ASSERT_NULL(strstr(buf, "=ld"));
+    TEST_ASSERT_NULL(strstr(buf, "=lu"));
+
+    in.i32_val = 0;
+    in.u32_val = 0;
+    n = settings_store::encode(kFields, kFieldCount, &in, buf, sizeof(buf));
+    TEST_ASSERT_GREATER_THAN(0, n);
+    buf[n] = '\0';
+    TEST_ASSERT_NOT_NULL(strstr(buf, "i32=0\n"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "u32=0\n"));
+}
+
 // The dedicated float/double honesty test: 1.0f/3.0f is the textbook value
 // that a naive "%f"/"%.6g" formatter does NOT round-trip (6 significant
 // digits is short of FLT_DECIMAL_DIG=9), plus DBL/FLT MIN/MAX, -0.0 (sign
@@ -536,6 +574,7 @@ int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_roundtrip_typical_values);
     RUN_TEST(test_roundtrip_integer_edges);
+    RUN_TEST(test_encoded_integers_are_plain_decimal_text);
     RUN_TEST(test_roundtrip_float_double_honesty);
     RUN_TEST(test_roundtrip_nan_and_infinity);
     RUN_TEST(test_roundtrip_string_edges);

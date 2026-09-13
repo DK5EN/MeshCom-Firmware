@@ -1,7 +1,7 @@
 {
   "meshcom_config": {
     "layout": 20260724,
-    "fw": "4.35s",
+    "fw": "4.35t",
     "hw": 9,
     "settings": {
       "node_call": "DK5EN-90",
@@ -108,7 +108,7 @@
       "send_repeat_time": "0",
       "auto_join": "0"
     },
-    "crc32": "7d45466e"
+    "crc32": "46de9d31"
   },
   "_masked": {
     "note": "credentials replaced; NOT restorable, do not POST to a node",

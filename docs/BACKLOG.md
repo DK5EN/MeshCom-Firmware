@@ -4483,12 +4483,15 @@ already keyed by name, so it already has the property W3 buys), and the
 `FLASH_STRUCT_VERSION` gate stays -- `node_fversion` round-trips through the
 store, so a migrating node still compares equal.
 
-##### `W3` state at the end of 2026-09-12: built, tested, and NOT proven
+##### `W3` state at the end of 2026-09-12: the upgrade is proven on hardware
 
 Steps 1-5 are in the code and `s_meshcomcompat_settings` is deleted -- no
-struct in the tree is a persistence format any more. Natively there are 589
-cases, including the four load/save paths and the reorder round trip. **The
-hardware proof failed, and that is the result of the day.**
+struct in the tree is a persistence format any more. Natively there are 590
+cases, including the four load/save paths and the reorder round trip.
+
+**The hardware proof failed first, then the cause was found and the jump was
+re-made and measured on the same node.** Read the two paragraphs below in that
+order: the first is what the failed run showed, the second is what it was.
 
 **The bench run on `DK5EN-90`** (`docs/bench/w3-baseline/`): boot 1 after
 flashing preserved 104 of 104 fields and the upgrade check passed. Boot 2,
@@ -4535,16 +4538,46 @@ have hidden a dropped `remove()`. Both fixed at the mechanism level -- the
 injector matches a lower bound and the tests now assert the fault actually
 fired.
 
+**The boot-2 loss is diagnosed, fixed and re-proven** (bench session
+2026-09-12 evening, `docs/bench/w3-baseline/README.md` section 3). The cause
+was **newlib-nano's printf**: the three nRF52 envs link a libc built without
+`_WANT_IO_LONG_LONG`, so `settings_store.cpp`'s `"%lld"` / `"%llu"` emitted the
+tail of the conversion LITERALLY and every integer field went into the store as
+the two characters `ld` or `lu`. `encode()` returned the right byte count, the
+write and the rename succeeded, `--info` still read correctly out of RAM, and
+the loss surfaced one reboot later when `decode()` rejected those values.
+
+That also closes the "sharpest open lead": the survivors were not surviving.
+`sanitize_loaded_settings()` repairs the six radio parameters and the
+`SANITIZE_STR` list from defaults on every boot, so they came back looking
+untouched while the plain integers it does not name stayed at their defaults.
+Six for six, no exotic code path.
+
+**No test could have caught it and neither could the compiler.** The host's
+libc formats `%lld` correctly, so the identical code round-trips green under
+`pio test` while losing the whole configuration on hardware; `-Wformat` is
+happy because `%lld` with a `long long` is exactly right. It is a property of
+the libc that gets LINKED, which is why the new gate is a lint over the nRF52
+source set (`test/golden/nano_printf_lint.py`, wired into `selftest.sh`) and
+not another native case. `test_encoded_integers_are_plain_decimal_text` pins
+the emitted bytes as well, so a printf-based encoder cannot come back quietly.
+
+Measured on `DK5EN-90` after the fix: store dump carries real decimal integers
+(0 fields reading `ld`/`lu`), three reboots each report
+`[SETST];path;keyed;fields_set=109;unknown_keys=0;malformed_lines=0`, and
+`GET /config.json` is **identical to the pre-cutover baseline in all 103
+fields**. Captures: `w3-store-broken-20260912.txt`,
+`w3-store-fixed-20260912.txt`.
+
 **Still open, and `W3` is not done until it is closed:**
 
-1. **The boot-2 loss is not diagnosed.** The sharpest lead is that the
-   survivors are exactly the fields `sanitize_loaded_settings()` touches, six
-   for six, with no code path found that produces that split. It cannot be
-   settled by reading: `DO_DEBUG 0` compiled out every diagnostic on this path,
-   so a boot that formatted the filesystem, failed the sanity gate or failed to
-   write looked identical to a clean one. Hence 24 raw `Serial.printf` markers
-   and `--dumpsettings`. **Next step is a bench session with two reboots, not
-   more code.**
+1. **`save;rename_failed` on the post-reflash boot.** Twice, with
+   `settingsStoreSave()` returning false both times and 234 `save_settings()`
+   call sites ignoring that return. Not reproduced since -- every later save
+   reports `save;ok`. Untested hypothesis: space. That boot held the legacy
+   blob (2 000 B), the old store (1 554 B) and the temp file (1 527 B) at once
+   on a 28 672 B LittleFS, and `lfs_rename` has to allocate metadata. The
+   instrument that settles it is a free-space figure in the marker.
 2. **Flash wear.** With `node_msgid` persisted again, every increment is
    followed by `save_settings()`, so skip-if-unchanged never skips: a full file
    write plus rename per transmitted frame on a 28 KB filesystem. This matches
@@ -4558,9 +4591,10 @@ fired.
 
 **Note for whoever reads the acceptance criterion next:** boot 1's "104 fields
 preserved" read `meshcom_settings` in RAM. It proves the legacy read worked and
-says nothing about what reached flash. The `W3` acceptance test as run cannot
-catch a bad migration write, and needs at least two reboots plus
-`--dumpsettings`.
+says nothing about what reached flash -- which is exactly how a store full of
+`ld` passed it. The criterion needs at least two reboots plus `--dumpsettings`
+and an export diffed against the pre-cutover baseline; that is how the evening
+run was done, and it is the form to repeat on the ESP32 side.
 
 Four decisions it surfaced, owed in `W3`:
 

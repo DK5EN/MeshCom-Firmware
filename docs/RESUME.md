@@ -159,6 +159,45 @@ reboots 15 s later, which cost the G0 console capture its tail.
 - ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
   operator open.
 
+## 2026-09-12 (evening): the W3 boot-2 settings loss, diagnosed on the bench and closed
+
+Branch `dry-unification`. One bench session on `DK5EN-90`, one cause, fix and proof on the same
+node. Record: `docs/bench/w3-baseline/README.md` section 3.
+
+**Cause: newlib-nano's printf.** The three nRF52 environments link a libc built without
+`_WANT_IO_LONG_LONG`. `settings_store.cpp` encoded every integer with `"%lld"` / `"%llu"`, nano
+parsed the first `l`, did not recognise the second as a length modifier, and emitted the rest of
+the conversion **literally** -- so the migration boot wrote a well-formed settings file in which
+every numeric field read `ld` or `lu` (`node_power=ld`, `bt_code=ld`, `send_repeat_time=lu`).
+`encode()` returned the right byte count, write and rename succeeded, `--info` still read
+correctly out of RAM, and the loss appeared one reboot later when `decode()` rejected those
+values. **The "survivors" were not surviving**: `sanitize_loaded_settings()` repairs the six radio
+parameters and the `SANITIZE_STR` list from defaults on every boot -- six for six, the verdict's
+sharpest open lead explained without an exotic code path.
+
+**Neither a native test nor the compiler could see it.** The host's libc formats `%lld`
+correctly, so the identical code round-trips green under `pio test`; `-Wformat` is happy because
+`%lld` with a `long long` is right. It is a property of the libc that gets LINKED.
+
+**Fix and gates:** `encode_u64` / `encode_i64` convert by hand, no printf in the path.
+`test/golden/nano_printf_lint.py` (in `selftest.sh`) rejects `%ll` / `%j` / `%q` integer
+conversions across the nRF52 source set, which it derives from `[nrf52_base]`'s
+`build_src_filter`; it flags the pre-fix file and passes the tree.
+`test_encoded_integers_are_plain_decimal_text` pins the emitted bytes, not just the round trip.
+
+**Proven on hardware:** store dump with real decimal integers (0 fields reading `ld`/`lu`), three
+reboots each reporting `[SETST];path;keyed;fields_set=109;unknown_keys=0;malformed_lines=0`, and
+`GET /config.json` **identical to the pre-cutover baseline in all 103 fields**. Captures
+`w3-store-broken-20260912.txt` / `w3-store-fixed-20260912.txt`, both masked.
+
+**Still open on `W3`:** (1) `save;rename_failed` twice on the boot right after the reflash, never
+since -- untested hypothesis is space (legacy blob + old store + temp file on a 28 672 B
+LittleFS); (2) flash wear from `node_msgid` persistence; (3) the member-level fail-closed gate.
+
+**Bench state:** `DK5EN-90` runs the post-fix `wiscore_rak4631` image with its baseline
+configuration restored and verified. It is no longer a 20260724 node, so the upgrade jump cannot
+be repeated on it without a downgrade first.
+
 ## 2026-09-12: DRY unification phases B2-B4 — five carves, six twins, MEM-04 closed
 
 Branch `dry-unification`, base tag `dry-base-20260911`. 20 commits, tree clean. Nothing flashed
