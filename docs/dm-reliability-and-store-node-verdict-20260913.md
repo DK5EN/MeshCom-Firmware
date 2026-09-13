@@ -188,6 +188,41 @@ bits are no longer NNN, so the ACK stops **nothing** and the ladder runs to its 
 The binary `0x41` path uses the identical rule. _Fix:_ index the outbox by NNN, not by a
 reconstructed msg_id, and stop every attempt sharing the NNN.
 
+**T2b. A ring slot is not durable enough to hold a 9-minute ladder.** Not for the reason one would
+expect. After transmit, `doTX()` zeroes the slot length (`src/lora_functions.cpp:1826`) and calls
+`advanceIReadPastEmpty()` before restoring the length at `:2043-2044`, so the retransmit-holding
+slot sits **behind** `iRead`. `txRingDepth()` counts only occupied slots between `iRead` and
+`iWrite` (`src/txring_functions.cpp:257-272`), so the held slot is invisible to back-pressure: the
+ladder does **not** inflate ring depth and does **not** push the node into QRT. An earlier draft of
+this document claimed it did; that was wrong.
+
+The real hazard is destruction, not congestion. `addTxRingEntry()` writes unconditionally at
+`w = iWrite` (`src/txring_functions.cpp:490`, `:500-503`) — it never searches for a free slot — so
+a parked message is **overwritten after `MAX_RING` (20) further enqueues**, regardless of its
+timer. Relays, beacons and ACKs all enqueue. On a quiet node that takes an hour; on a busy relay,
+minutes. A 9-minute ladder kept in the ring would therefore fire its later attempts only on quiet
+nodes — passing every bench test and silently failing on a hilltop. This is also why today's third
+retry is unreliable in the field.
+
+The TX ring's priority system does not prevent this, though it is easy to assume it does. It
+protects messages **queued and waiting to be sent** from being evicted by lower-priority arrivals,
+and a DM does rank high. But it cannot protect a message that has **already been transmitted** and
+is parked for its retry timer, for two reasons: the frame is written into `ringBuffer[w]` at
+`:500-503` before the priority block at `:540` runs at all, so the slot `iWrite` lands on is
+already destroyed by the memcpy; and the eviction scan walks `scan = r; while(scan != w)`
+(`:549-566`), which cannot see a slot sitting behind `iRead`. Queued and parked are different
+states on different code paths.
+
+One caveat that keeps this from being clean either way: whether the parked slot ends up behind
+`iRead` depends on whether it was at `iRead` when transmitted. On an out-of-order read it stays
+inside the window, where it **is** counted and **is** priority-protected. So the behaviour differs
+between two cases, which is its own reason not to depend on it.
+
+_Fix:_ the outbox holds the payload; each attempt enqueues a fresh ring entry that is free to be
+consumed and clobbered as usual. Whether the ring would in fact hold for 9 minutes under real
+traffic is **M0-1** in `docs/dm-transport-impl-plan-20260913.md` — measured in stage 0, not
+assumed here.
+
 **T2. The own-TX table is too small to hold a long ladder.** `own_msg_id` is 20 slots. Beacons
 consume one per transmission — `sendPosition()` writes the ring **inline** at
 `src/loop_functions.cpp:4829-4831`, not through `insertOwnTx()`, so a call-site grep of the helper
