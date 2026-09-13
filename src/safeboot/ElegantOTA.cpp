@@ -2,6 +2,7 @@
 #include "ElegantOTA.h"
 #include "ota.h"
 #include "ota_state.h"
+#include "safeboot_log.h" // keep last: renames Serial on the S3
 
 // Owned by main.cpp; driven from the handlers below (docs/safeboot-ota-contract.md).
 extern safeboot::OtaSession g_ota;

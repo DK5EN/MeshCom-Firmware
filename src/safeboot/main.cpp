@@ -22,6 +22,11 @@
 #include <Preferences.h>
 #include "../configuration_global.h"
 #include "../esp32/esp32_flash.h"
+#include "safeboot_log.h" // keep last: renames Serial on the S3
+
+#if SAFEBOOT_LOG_TEE
+SafebootTee SafebootSerial;
+#endif
 
 #define TAG "SafeBoot"
 
