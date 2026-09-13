@@ -123,10 +123,10 @@ Nachbarknoten -- nie ein Broadcast-Ziel.
 
 **Ping-Pong ist damit als Runde belegt**, nicht nur als Sendevorgang.
 
-### RAK4631 (`XX0XXX-00`, unkonfiguriert) -- 3/4, ein Test blockiert
+### DK5EN-90, RAK4631 -- 4/4
 
-Der Knoten traegt das Werks-Rufzeichen `XX0XXX-00`, nicht die in den Bench-Notizen
-erwartete Identitaet DK5EN-90.
+Der Knoten trug zunaechst das Werks-Rufzeichen `XX0XXX-00`. Der Positivpfad wurde nach
+Betreiber-Entscheidung mit `--setcall DK5EN-90` nachgeholt (siehe unten).
 
 | Test                          | Ergebnis  | Beleg                                                                                                     |
 | ----------------------------- | --------- | --------------------------------------------------------------------------------------------------------- |
@@ -135,7 +135,7 @@ erwartete Identitaet DK5EN-90.
 | TRACK on erneut (Re-arm)      | PASS      | nach einem vollen TRACK-off-Intervall erneut genau 1x                                                     |
 | Info-Gate-Asymmetrie (TEST 4) | PASS      | mit `bDisplayInfo` aus: `send Ping` bleibt weg, `[PING]...FAILED` kommt trotzdem                          |
 
-**Warum TEST 2 blockiert ist -- und was er stattdessen bewiesen hat.** Mit Werks-Rufzeichen
+**Was der zunaechst blockierte TEST 2 nebenbei bewiesen hat.** Mit Werks-Rufzeichen
 weist `addTxRingEntry()` jeden Frame unbedingt ab (`isUnconfiguredCall()`,
 `src/txring_functions.cpp:449`), noch bevor er den Ring erreicht. `TX_GATE_ENTER` kann auf
 diesem Knoten also unabhaengig von TRACK nie feuern. Die beobachtete Kette war:
@@ -160,11 +160,19 @@ und laesst `bDisplayInfo` unberuehrt -- es ist nicht das Gate, das der Test brau
 `send Ping`-Zeile weg, waehrend `[PING]...FAILED` weiter kam. Genau die Asymmetrie, die
 die nRF52-Aenderung garantieren soll.
 
-**Offen:** der Positivpfad braucht ein konfiguriertes Rufzeichen (`--setcall`, erzwingt
-einen Reboot und bringt den Knoten unter dieser Identitaet auf die Luft -- Betreiber-
-Entscheidung, nicht vom Bench-Agenten getroffen). Die Marker-Paritaet aus `ec070235` ist
-auf Hardware ebenfalls noch nicht bestaetigt: Image gebaut, Marker per String-Scan im
-Image nachgewiesen, aber auf dem Knoten laeuft noch der Stand `c570e62e`.
+**Nachgeholt nach Betreiber-Entscheidung.** `--setcall DK5EN-90` gesetzt, mit `ec070235`
+neu geflasht, Positivpfad und Ping-Pong-Runde bestaetigt (Zeilen oben). Damit ist auch die
+**Marker-Paritaet auf Hardware belegt**: `TX_START qlen=` existiert nur im neuen Stand und
+erscheint auf dem Knoten, und die Reihenfolge ist jetzt identisch zum ESP32 --
+`TX_GATE_ENTER` -> `CAD_FREE` -> `TX_PREPARE -> TX_ACTIVE` -> `TX_START` -> `TX_DONE`.
+Vorher kam `CAD_FREE` erst nach `doTX()` und `TX_START` gar nicht.
+
+Die `build:`-Zeile taugt hier uebrigens nicht als Frischetest: es wurden nur zwei
+Uebersetzungseinheiten neu kompiliert, das `__TIME__` der Datei mit der Versionszeile blieb
+stehen. Der tragfaehige Nachweis ist das Auftreten von `TX_START` selbst.
+
+Knoten danach aufgeraeumt: `--pingcall NONE`, `--loradebug off`, TRACK off, Rufzeichen
+DK5EN-90 bleibt.
 
 ### Ein Nachweis, der nur auf nativem USB gelingt
 
