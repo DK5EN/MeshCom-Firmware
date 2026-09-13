@@ -1019,6 +1019,166 @@ static void test_drift_rx01_unconfigured_guard_esp32_only(void)
                                   "drift row changed, update the matrix");
 }
 
+static void test_drift_decodeaprs_reject_suppresses_processing_nrf52_only(void)
+{
+    // DR-06: decodeAPRS() returns 0x00 (aprs_functions.cpp) for a GATE frame
+    // whose logical body is shorter than 16 bytes. nRF52 captures the return
+    // value into msg_type_b_lora and gates ALL further processing on it
+    // (udp_frame_nrf52.cpp:119-121) -- DECIDED 2026-09-12 nrf52-correct.
+    // ESP32 discards decodeAPRS()'s return value (udp_frame_esp32.cpp:117)
+    // and keeps dispatching on the RAW msg_type_b byte read straight off the
+    // wire, so a rejected 0x21 ('!' position) frame still runs
+    // sendDisplayPosition() and unconditionally inserts msg_id 0 into the
+    // dedup ring (REVIEW 2026-09-12, fable Finding 7) -- neither is gated by
+    // the RX-01 bSrcUnconfigured check either. The relay itself stays
+    // suppressed on ESP32 today only by accident: isUnconfiguredCall("")
+    // (the source_call a failed decode leaves behind) reads true, so
+    // bUDPtoLoraSend is false regardless of this bug -- pinned below too, so
+    // a future change that fixes DR-06 by tightening isUnconfiguredCall()
+    // instead of porting the return-value gate would be caught.
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    // Body: type 0x21 + 4 non-zero fill bytes -> rsize 5, under decodeAPRS's
+    // 16-byte floor (aprs_functions.cpp).
+    uint16_t len = build_gate_raw(tmpl, 0x21, 0xAB, 4);
+
+    // nRF52 (decided-correct): decode rejects, so the whole block --
+    // including the print and the position-branch side effects -- never
+    // runs.
+    recorder_reset();
+    bDisplayInfo = true;
+    uint8_t buf[BUF_CAP];
+    int depth0 = txRingDepth();
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
+                                  "nrf52 printed a frame decodeAPRS() rejected");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayPosition_calls,
+                                  "nrf52 called sendDisplayPosition() on a frame decodeAPRS() rejected");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, loraWrite.load(),
+                                  "nrf52 inserted a decode-rejected frame's msg_id into the dedup ring");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(),
+                                  "nrf52 relayed a frame decodeAPRS() rejected");
+
+    // ESP32 (today's bug): decode's return value is discarded, so the raw
+    // msg_type_b byte alone still drives the position branch on a zeroed
+    // aprsmsg. If any of these flips, DR-06 has been fixed -- update the
+    // matrix and tighten this half of the test.
+    recorder_reset();
+    bDisplayInfo = true;
+    depth0 = txRingDepth();
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_printed.size(),
+                                  "esp32 stopped printing a decode-rejected frame -- drift row "
+                                  "changed, update the matrix (DR-06 may now be fixed)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayPosition_calls,
+                                  "esp32 stopped calling sendDisplayPosition() on a decode-rejected "
+                                  "frame -- drift row changed, update the matrix");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, loraWrite.load(),
+                                  "esp32 stopped inserting a decode-rejected frame's msg_id into "
+                                  "the dedup ring -- drift row changed, update the matrix");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(),
+                                  "esp32 relayed a decode-rejected frame to LoRa TX -- the accidental "
+                                  "RX-01 protection from isUnconfiguredCall(\"\") is load-bearing here, "
+                                  "per the DR-06 matrix note; re-examine before removing it");
+}
+
+static void test_drift_conf_zero_address_guard_esp32_only(void)
+{
+    // DR-08: ESP32 rejects a CONF frame when the source doesn't match the
+    // resolved gateway OR the resolved gateway address is still unresolved
+    // (0.0.0.0) -- an explicit, independent check
+    // (udp_frame_esp32.cpp:381). nRF52 checks only equality
+    // (udp_frame_nrf52.cpp:372) -- a CONF datagram whose OWN source happens
+    // to read 0.0.0.0 slips through while the destination address is also
+    // still unresolved (0.0.0.0 before DHCP/pre-resolve). DECIDED
+    // 2026-09-12 esp32-correct.
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_conf_datagram(tmpl, "DK5EN-8");
+
+    // ESP32: gateway address unresolved (node_hostip == 0) -- the frame's
+    // OWN source also reads 0.0.0.0, so the plain equality check alone
+    // would pass; the explicit zero-guard is what rejects it.
+    recorder_reset();
+    node_hostip = IPAddress(0, 0, 0, 0);
+    uint8_t buf[BUF_CAP];
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(0, 0, 0, 0));
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-1", meshcom_settings.node_call,
+                                     "esp32 applied a CONF while the gateway address was unresolved (0.0.0.0)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_save_settings_calls,
+                                  "esp32 saved settings from a CONF received before the gateway address resolved");
+
+    // nRF52: same scenario -- udp_dest_addr defaults to 0.0.0.0 (unresolved,
+    // see recorder_reset()'s `neth = NrfETH();`) and the source also reads
+    // 0.0.0.0, so the plain equality check (no independent zero-guard)
+    // passes and the CONF is applied. This is today's bug the row exists to
+    // fix.
+    recorder_reset();
+    TEST_ASSERT_TRUE_MESSAGE((uint32_t)neth.udp_dest_addr == 0,
+                             "fixture assumption broken: neth.udp_dest_addr is not 0.0.0.0 by default");
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_nrf52(buf, len, IPAddress(0, 0, 0, 0));
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-8", meshcom_settings.node_call,
+                                     "nrf52 stopped applying a CONF from a 0.0.0.0 source while "
+                                     "unresolved -- drift row changed, update the matrix (DR-08 may "
+                                     "now be fixed)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_save_settings_calls,
+                                  "nrf52 stopped saving settings in this scenario -- drift row "
+                                  "changed, update the matrix");
+}
+
+static void test_drift_ack_phone_frame_attribution_esp32_only(void)
+{
+    // DR-09: the BLE ack/rej phone frame built when a UDP-received text
+    // message carries a ":ack"/":rej" payload. ESP32 builds it via the
+    // shared buildAckPhoneFrame() (src/ack_attribution.h), which appends
+    // the acknowledging callsign as a variable-length suffix and forwards
+    // the real length (udp_frame_esp32.cpp:253,258). nRF52 hand-rolls the
+    // same 7-byte base frame inline and always calls
+    // addBLEOutBuffer(print_buff, 7) -- no attribution suffix is ever
+    // attached (udp_frame_nrf52.cpp:217-223,242). DECIDED 2026-09-12
+    // esp32-correct, via the shared helper (the status byte itself was
+    // already brought in line by DRY-21; only length/attribution remains
+    // open).
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    // Destination == own node_call, NOT "*" (which would force iAckPos back
+    // to 0 before the ack branch is even reached); payload carries ":ack"
+    // at a position > 0.
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack3", 0x7007);
+
+    const char *attribution = "DK5EN-9";
+    uint16_t expected_len_esp32 = (uint16_t)(7 + strlen(attribution));
+
+    recorder_reset();
+    uint8_t buf[BUF_CAP];
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, "esp32 did not build an ack phone frame");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x41, g_ble[0][0], "esp32 ack frame indicator byte");
+    TEST_ASSERT_EQUAL_INT_MESSAGE((int)expected_len_esp32, (int)g_ble[0].size(),
+                                  "esp32 stopped attributing the ack -- the frame length no "
+                                  "longer matches base(7)+attribution");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)strlen(attribution), g_ble[0][6],
+                                  "esp32 ack frame attribution length byte");
+    for (size_t i = 0; i < strlen(attribution); i++)
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)attribution[i], g_ble[0][7 + i],
+                                        "esp32 ack frame attribution byte mismatch");
+
+    recorder_reset();
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_TRUE_MESSAGE(g_ble.size() >= 1, "nrf52 did not build an ack phone frame");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x41, g_ble[0][0], "nrf52 ack frame indicator byte");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(7, (int)g_ble[0].size(),
+                                  "nrf52 started attributing the ack -- drift row changed, update "
+                                  "the matrix (DR-09 may now be fixed; the length should match "
+                                  "base(7)+attribution once it is)");
+}
+
 static void test_drift_max_zeros_return_value_and_reset_call_differ(void)
 {
     // ESP32 returns void and calls resetMeshComUDP() itself; nRF52 returns 1
@@ -1317,6 +1477,9 @@ int main(int, char **argv)
     RUN_TEST(test_drift_dedup_gate_position_esp32_honors_gateway_nopos_nrf52_does_not);
     RUN_TEST(test_drift_senddisplayposition_esp32_only);
     RUN_TEST(test_drift_rx01_unconfigured_guard_esp32_only);
+    RUN_TEST(test_drift_decodeaprs_reject_suppresses_processing_nrf52_only);
+    RUN_TEST(test_drift_conf_zero_address_guard_esp32_only);
+    RUN_TEST(test_drift_ack_phone_frame_attribution_esp32_only);
     RUN_TEST(test_drift_max_zeros_return_value_and_reset_call_differ);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);

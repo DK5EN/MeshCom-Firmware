@@ -187,6 +187,11 @@ static void recorder_reset()
     neth.hasIPaddress = true;
     bWIFIAP = false;
     node_hostip = IPAddress(44, 143, 8, 143);
+    // DR-21: resolved by default, mirroring node_hostip above, so every
+    // OTHER test in this file (none of which touches this field) is
+    // unaffected; test_drift_esp32_refuses_unresolved_destination_nrf52_
+    // does_not() below overrides it.
+    neth.udp_dest_addr = IPAddress(44, 143, 8, 143);
     meshcom_settings.node_hasIPaddress = true;
 }
 
@@ -531,6 +536,44 @@ static void test_drift_esp32_has_three_preconditions_nrf52_has_none(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sent.size(),
                                   "nrf52 grew a precondition -- drift row D1-05 "
                                   "changed, update the matrix");
+}
+
+static void test_drift_esp32_refuses_unresolved_destination_nrf52_does_not(void)
+{
+    // DR-21, RE-DECIDED 2026-09-12 (fable Findings 1/2/12; operator: narrow
+    // to parity). ESP32 refuses to drain when the resolved gateway server
+    // address is still 0.0.0.0 (udp_drain_esp32.cpp:34, node_hostip == 0) --
+    // one of its three preconditions (the other two are covered by
+    // test_drift_esp32_has_three_preconditions_nrf52_has_none() above).
+    // nRF52's sendUDP() has no equivalent for its OWN destination-address
+    // concept (neth.udp_dest_addr -- already read by udp_frame_nrf52.cpp's
+    // CONF guard, DR-08) and enters the drain regardless. DECIDED
+    // esp32-correct, but narrowed: nRF52 gets ONLY this one early return,
+    // not ESP32's other two (hasIPaddress is already the sole caller's
+    // gate, gateway_service_nrf52.cpp:28-34, and nRF52 has no AP mode) --
+    // porting all three would be vacuous or wrong, not just extra.
+    recorder_reset();
+    fill_ring(2);
+    node_hostip = IPAddress(0, 0, 0, 0);
+    sendMeshComUDP();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(),
+                                  "esp32 drained despite an unresolved gateway server address");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead,
+                                  "esp32 advanced the ring despite an unresolved gateway server address");
+
+    // nRF52: today's bug -- neth.udp_dest_addr is 0.0.0.0 (unresolved) but
+    // sendUDP() never looks at it, so the drain runs and NrfETH::sendUDP()
+    // is called regardless.
+    recorder_reset();
+    fill_ring(2);
+    neth.udp_dest_addr = IPAddress(0, 0, 0, 0);
+    sendUDP();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sent.size(),
+                                  "nrf52 grew the unresolved-destination precondition -- drift row "
+                                  "changed, update the matrix (DR-21 may now be fixed)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, udpRead,
+                                  "nrf52 stopped advancing the ring on an unresolved destination -- "
+                                  "drift row changed, update the matrix");
 }
 
 static void test_drift_failed_write_decodes_on_esp32_only(void)
@@ -1069,6 +1112,7 @@ int main(int, char **)
     RUN_TEST(test_mid_send_eviction_does_not_double_advance);
 
     RUN_TEST(test_drift_esp32_has_three_preconditions_nrf52_has_none);
+    RUN_TEST(test_drift_esp32_refuses_unresolved_destination_nrf52_does_not);
     RUN_TEST(test_drift_failed_write_decodes_on_esp32_only);
     RUN_TEST(test_drift_esp32_calls_endpacket_after_a_failed_write);
     RUN_TEST(test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it);

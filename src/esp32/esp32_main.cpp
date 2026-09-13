@@ -41,10 +41,6 @@ SPIClass ethSPI(FSPI);
 Timeout timerSerial;
 #endif
 
-#ifdef HAS_SDCARD
-#include <SD.h>
-#endif
-
 #if defined(ARDUINO_ARCH_ESP32)
 #include <FS.h>
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
