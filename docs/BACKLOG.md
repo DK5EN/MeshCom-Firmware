@@ -5209,24 +5209,37 @@ five phases; the Gantt (`docs/dry-unification-gantt-20260910.html`) carries the
 same rows with per-row notes. This table is the single place that says where the
 campaign actually stands, and it is the one to correct when a row moves.
 
-| Phase                        | Rows                               | State                                                                                      |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
-| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work          |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done, **`M3` open**: 8 of 29 decided rows still name no asserting test (`M3-01`) |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` all but one item, `W2` done, **`W3` half**, `W4`-`W7` and `C4d` **not started**       |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                              |
+| Phase                        | Rows                               | State                                                                                                                             |
+| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                       |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                 |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run      |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` ESP32 half shipped and hardware-proven; struct merge open**, `W4`-`W7` and `C4d` **not started** |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                     |
 
 ##### What each open row still needs
 
 - **`P0.9` protocol templates** -- the last phase-0 item, a documentation
   deliverable, not code.
-- **`M3`** -- `DR-06`, `DR-08`, `DR-09` into `test_udp_frame_twin`; `DR-21` into
-  `test_udp_send_twin`; `DR-12`/`DR-13` ride with `W3`'s `U4` work; `DR-03` and
-  `DR-16` stay bench-only by decision. Only then may
-  `drift_matrix_lint.py --phase implementation` be dropped.
-- **`W1`** -- one hygiene item left: the unused `<SD.h>` include, which is not in
-  the files wave 1 touched.
+- **`M3`** -- `DR-06`, `DR-08`, `DR-09`, `DR-21` **DONE 2026-09-13** (each names
+  a mutation-verified twin case; the lint reports 4 rows without a test, not 8).
+  `DR-12`/`DR-13` ride with `W3`'s `U4` work. `DR-03` and `DR-16` stay
+  bench-only by decision.
+  **Corrected 2026-09-13:** the old text said the
+  `drift_matrix_lint.py --phase implementation` flag could be dropped once
+  `M3` closed. It cannot. The lint resolves an `asserting_test` cell only to a
+  `test/test_<name>/` directory or a `[env:<name>]`, so a bench-only row can
+  never fill one in by writing code -- and the evidence those two rows would
+  name does not exist yet either: `test/golden/hw/G2/` holds only
+  `EXPECTED-DIFF.md`, the predictions, because the G2 run is `E1` and has not
+  happened. So the flag drops after `E1`, not after `M3`. Growing the lint a
+  `bench:<path>` spelling was considered and rejected: it would resolve to a
+  file that does not exist until the same G2 run, which buys nothing.
+- **`W1`** -- **DONE 2026-09-13** (`D6-10`, the unused `<SD.h>` in
+  `src/esp32/esp32_main.cpp`; only `LilyGo_T-Beam-1W` defines `HAS_SDCARD`, so
+  that variant proves it). Filed separately while checking: `t5epaper_main.h`
+  includes `SD.h` twice (lines 16 and 25) -- a duplicate, not a dead include,
+  since that header is load-bearing for `t5epaper_main.cpp` and `ui_port.cpp`.
 - **`W3`** -- steps 1-5 shipped and proven on nRF52 hardware; **steps 6 and the
   ESP32 half are not started.** In dependency order:
   1. drive the ESP32 NVS load/save from `settings_schema` instead of its
