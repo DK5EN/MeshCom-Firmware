@@ -108,7 +108,7 @@ These are mandatory. Without the per-node ceiling the role is a runaway-node amp
 | The ack is addressed to `msg_source_call`, the original sender, not the last relay                | `src/loop_functions.cpp:4858-4885`                   |
 | The sender matches an ack by rebuilding msg_id from its own node id and the NNN in the payload    | `src/lora_functions.cpp:1023-1060`                   |
 | The 0x02 status frame goes to the phone even when the original id has rotated out of `own_msg_id` | same, `addBLEOutBuffer` after the `checkOwnTx` block |
-| A relayed DM with a fresh msg_id passes the dedup gate at every node                               | `src/lora_functions.cpp:896`                         |
+| A relayed DM with a fresh msg_id passes the dedup gate at every node                              | `src/lora_functions.cpp:896`                         |
 | An old destination acks every DM addressed to it that carries `{NNN`                              | `src/lora_functions.cpp:1072`                        |
 
 Consequences:
@@ -200,10 +200,11 @@ dropped by cap, cancelled by peer.
 
 ## 9. Open questions
 
-- What the EMCOMM group means by "store and forward": eventual delivery of a DM to an absent
-  recipient (this concept), or a node that was off pulling the traffic it missed, BBS-style.
-  The second is a different feature with a request frame, time sync, and real storage needs.
-  Confirm before building.
+- ~~What the EMCOMM group means by "store and forward".~~ Answered 2026-09-13 by upstream issue
+  `icssw-org/MeshCom-Firmware#224`: the requester asks for the BBS-style pull model, for groups as
+  well as nodes, and across the mesh. This concept implements the push model for direct-neighbour
+  DMs. See section 12 of `docs/dm-reliability-and-store-node-verdict-20260913.md` for what that
+  does and does not deliver against the issue.
 - Whether the MeshCom server holds DMs for offline destinations. Decides how often server and
   mailbox double-deliver in gateway-dense areas.
 - Whether upstream accepts a node role at all, or only the sender-side stages.
@@ -216,4 +217,6 @@ dropped by cap, cancelled by peer.
 numbers), `docs/concept-dm-store-and-forward.md` and
 `docs/review/advisor-dm-store-and-forward-20260830.md` (outbox, flash and timer-task findings),
 `docs/presentation/meshcom-protocol.html` (EMCOMM requirements), the firmware lines cited in
-section 4, mcmap `fleet_firmware` and `nodes_query` on 2026-09-11.
+section 4, mcmap `fleet_firmware` and `nodes_query` on 2026-09-11, upstream issue
+`icssw-org/MeshCom-Firmware#224`, and the review in
+`docs/review/fable-dm-store-node-verdict-20260913.md`.
