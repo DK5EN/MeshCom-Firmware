@@ -14,6 +14,15 @@ against this document in parallel. Change it here first, then everywhere.
 - AP stays open (no password). Fallback-to-app window stays 180 s.
 - Scan results: RSSI, channel, auth mode. There is no SNR in the ESP32 scan API.
 - Page language: English.
+- **Single app slot (bench finding 2026-09-13, Heltec V3 kill50):** both partition tables
+  (`partitions-4MB-safeboot.csv`, `partitions-16MB-safeboot.csv`) have exactly one app partition
+  (`ota_0`). An upload writes into that slot from the first chunk on, so once an upload has
+  started there is **no way back into the previous firmware**; `esp_ota_set_boot_partition(ota_0)`
+  refuses the half-written image (`ESP_ERR_OTA_VALIDATE_FAILED`) and the bootloader boots
+  safeboot again. Therefore: the safeboot checks the app image at boot and after every abort
+  (`app_valid`), the fallback-to-app timer runs only while `app_valid` is true, and with
+  `app_valid` false the node stays in safeboot (no reboot loop) until a complete upload succeeds.
+  The page says so; `/ota/cancel` answers `409 app_invalid`.
 
 ## `GET /ota/info` -> `application/json`
 
@@ -77,7 +86,8 @@ against this document in parallel. Change it here first, then everywhere.
   "received": 1048576,
   "total": 2182465,
   "image_valid": false,
-  "fallback_in_ms": 151000,
+  "app_valid": false,
+  "fallback_in_ms": -1,
   "uptime_ms": 98000
 }
 ```
@@ -87,8 +97,12 @@ against this document in parallel. Change it here first, then everywhere.
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
   `begin_failed`; `verifying` is the window between the last chunk and the `Update.end()` verdict.
 - `received`/`total`: bytes of the current or last session; `total` 0 when unknown.
+- `app_valid`: true when the app partition holds a complete, verified image (checked at boot and
+  re-checked after every abort). False after an aborted upload has written into the single app
+  slot: the node then stays in safeboot until a full upload succeeds.
 - `fallback_in_ms`: remaining time of the 180 s fallback-to-app window; `-1` while an upload is
-  in progress (the window is suspended, the stall watchdog applies instead). `done` means the
+  in progress (the window is suspended, the stall watchdog applies instead) and `-1` while
+  `app_valid` is false (no fallback possible). `done` means the
   reboot into the app is scheduled.
 - The last `aborted`/`done` record stays visible until the next `/ota/start`.
 
@@ -101,7 +115,7 @@ scan is already running, `409 no_sta` when the STA is not configured. Results ap
 ## Existing endpoints, unchanged
 
 `GET /update` (page), `GET /ota/start?mode=fr|fs&hash=<md5>`, `POST /ota/upload` (multipart),
-`GET /ota/cancel`. `/ota/upload` answers `200 OK` only when the image was verified, otherwise
+`GET /ota/cancel` (`409 app_invalid` when `app_valid` is false). `/ota/upload` answers `200 OK` only when the image was verified, otherwise
 `400` with the abort reason text; `/ota/cancel` answers `400` while an upload is in progress.
 
 ## Serial markers (unchanged names, complete list)
@@ -111,12 +125,14 @@ scan is already running, `409 no_sta` when the STA is not configured. Results ap
 `[SAFEBOOT];wifi;event;<connected|disconnected|got_ip>;reason;<n>`,
 `[SAFEBOOT];ota;start`, `[SAFEBOOT];ota;abort;reason;<r>`, `[SAFEBOOT];ota;rearm;reason;<r>`,
 `[SAFEBOOT];ota;verify;result;ok`, `[SAFEBOOT];ota;end;result;<success|error>`,
-`[SAFEBOOT];fallback;reason;<timeout|cancel>`.
+`[SAFEBOOT];fallback;reason;<timeout|cancel>`, `[SAFEBOOT];app;image;<valid|invalid>;rc;<n>` (at boot
+and after every abort).
 
 ## State machine (host-testable, `src/safeboot/ota_state.h`)
 
 Pure C++ (no Arduino), driven by events with an injected clock in ms:
 `onStart(gen, total)`, `onChunk(len, now)`, `onFinal(verified_ok, now)`, `onDisconnect(gen, now)`,
-`onCancel(now)`, `tick(now)`. Outputs: current `/ota/state` record, and actions the caller
+`onCancel(now)`, `tick(now)`, `setAppValid(bool)` (false: tick never emits the timeout reboot,
+`fallback_in_ms` is -1, cancel is refused). Outputs: current `/ota/state` record, and actions the caller
 must perform (`abort(reason)`, `switch_partition`, `reboot_to_app`). Constants: stall 30 000 ms,
 fallback 180 000 ms. Signed deltas everywhere (the TM-46 cross-task race).
