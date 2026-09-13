@@ -105,19 +105,20 @@ static void test_unbekannte_nnn_wird_ignoriert(void)
     TEST_ASSERT_NOT_NULL(strstr(buf, "rtt=0/0/0/0/0/0"));
 }
 
-static void test_wiederholtes_note_sent_behaelt_die_erste_zeit(void)
+static void test_wiederholtes_note_sent_ersetzt_den_alten_eintrag(void)
 {
     uint32_t base = g_next_base;
     g_next_base += 8;
     uint16_t nnn = (uint16_t)base;
 
+    // Ein nie bestaetigter Eintrag, dann laeuft der 0..999-Zaehler auf
+    // dieselbe NNN: das ist eine neue Nachricht, die alte Zeit ist Muell.
     dmStatNoteSent(nnn, 1000u);
-    dmStatNoteSent(nnn, 500000u); // dieselbe NNN erneut -- muss ignoriert werden
+    dmStatNoteSent(nnn, 500000u);
 
-    // Waere die ZWEITE Zeit uebernommen worden, laege "jetzt" (11000) VOR ihr
-    // (500000) -- der vorzeichenlose Ueberlauf ergaebe eine riesige Differenz
-    // und Bucket 5, statt der erwarteten Bucket 0 ab der ersten Zeit.
-    dmStatNoteAck(nnn, 1000u + 10000u);
+    // 10 s nach der ZWEITEN Zeit -> Bucket 0. Waere die erste geblieben,
+    // laege der Ack 509 s danach in Bucket 3.
+    dmStatNoteAck(nnn, 500000u + 10000u);
 
     char buf[256];
     dmStatFormat(buf, sizeof(buf));
@@ -232,7 +233,7 @@ int main(int, char **)
     RUN_TEST(test_bucket_grenzwerte);
     RUN_TEST(test_note_sent_und_ack_buckets_und_loescht_den_eintrag);
     RUN_TEST(test_unbekannte_nnn_wird_ignoriert);
-    RUN_TEST(test_wiederholtes_note_sent_behaelt_die_erste_zeit);
+    RUN_TEST(test_wiederholtes_note_sent_ersetzt_den_alten_eintrag);
     RUN_TEST(test_tabelle_ueberschreibt_nach_acht_eintraegen);
     RUN_TEST(test_format_exakter_string_und_reset);
     RUN_TEST(test_klemmung_bei_zu_kleinem_puffer);

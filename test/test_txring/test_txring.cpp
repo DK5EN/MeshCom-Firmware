@@ -1032,6 +1032,28 @@ static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
     TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
 }
 
+// Die drei Ausschluesse des Kriteriums einzeln: ein Slot mit Laenge != 0,
+// dessen Status DONE, READY oder EXT_PENDING ist, wird NICHT als
+// ueberschriebener Pending-Eintrag gezaehlt. Ohne diese Faelle bestuende der
+// Test auch mit `len != 0` allein (Advisor-Befund F4, 2026-09-13).
+static void test_ringstat_parked_overwrite_ignoriert_done_ready_ext(void)
+{
+    const uint8_t statusse[3] = { RING_STATUS_DONE, RING_STATUS_READY, RING_STATUS_EXT_PENDING };
+    for(int i = 0; i < 3; i++)
+    {
+        resetRing();
+        ringBuffer[0][0] = 10;
+        ringBuffer[0][1] = statusse[i];
+
+        BuiltFrame f = buildPositionFrame(0xF010UL + (uint32_t)i);
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_excl");
+
+        TEST_ASSERT_EQUAL_INT(0, slot);
+        TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+        TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+    }
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -1062,5 +1084,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
     RUN_TEST(test_ringstat_parked_overwrite_bei_pending_slot);
     RUN_TEST(test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null);
+    RUN_TEST(test_ringstat_parked_overwrite_ignoriert_done_ready_ext);
     return UNITY_END();
 }

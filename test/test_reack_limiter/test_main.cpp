@@ -74,6 +74,16 @@ static void test_neunter_eintrag_verdraengt_den_aeltesten(void)
         TEST_ASSERT_FALSE(reackAllowed("DK5EN-1", (uint16_t)i, 1001));
 }
 
+// Rufzeichen mit gemeinsamem Praefix sind verschiedene Paare (strncmp ueber
+// die volle Laenge, nicht nur den Praefix).
+static void test_praefix_rufzeichen_sind_verschieden(void)
+{
+    TEST_ASSERT_TRUE(reackAllowed("DK5EN-1", 42, 1000));
+    TEST_ASSERT_TRUE(reackAllowed("DK5EN-10", 42, 1000));
+    TEST_ASSERT_FALSE(reackAllowed("DK5EN-1", 42, 1001));
+    TEST_ASSERT_FALSE(reackAllowed("DK5EN-10", 42, 1001));
+}
+
 static void test_millis_rollover(void)
 {
     uint32_t near_wrap = 0xFFFFFFF0UL;
@@ -98,6 +108,7 @@ int main(int, char **)
     RUN_TEST(test_andere_nnn_gleiches_rufzeichen_erlaubt);
     RUN_TEST(test_anderes_rufzeichen_gleiche_nnn_erlaubt);
     RUN_TEST(test_neunter_eintrag_verdraengt_den_aeltesten);
+    RUN_TEST(test_praefix_rufzeichen_sind_verschieden);
     RUN_TEST(test_millis_rollover);
     return UNITY_END();
 }

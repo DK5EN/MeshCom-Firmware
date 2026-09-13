@@ -448,32 +448,6 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-#if INSTRUMENT_ENABLED
-    // 0.5 --airgap: drop the frame entirely at the radio boundary, before
-    // captureFrame() and before anything that touches ch_util, mheard or
-    // dedup -- the node behaves exactly as if the frame never arrived.
-    //
-    // Re-arm finding: on ESP32, radio.startReceive() already ran in the
-    // CALLER (checkRX(), src/esp32/esp32_main.cpp) before OnRxDone() is
-    // even invoked -- nothing to do here. On nRF52 (BOARD_RAK4630),
-    // startRadioReceive() normally runs from INSIDE OnRxDone (the BUG #2
-    // early-RX-restart fix, a few dozen lines below this one) to minimize
-    // the RX blind window; returning before that point would never re-arm
-    // the receiver and the node would deafen permanently after
-    // `--airgap on`. So the nRF52 branch replicates just that minimal
-    // re-arm before returning.
-    if(bAirgap)
-    {
-#if defined BOARD_RAK4630
-        if(bSPI_ETH_Active)
-            bPendingRadioRx = true;
-        else
-            startRadioReceive();
-#endif
-        return;
-    }
-#endif
-
     // Testfang-Hook (Katalog doc 08 §4, Mechanismus 2): akzeptierte Frames als
     // Rohbytes — das Gegenstueck zum CRC_PAYLOAD-Dump der VERWORFENEN Frames
     // in checkRX (esp32_main.cpp). OnRxDone ist auf beiden Plattformen der
@@ -589,6 +563,28 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     bNewLine=false;
 
     bLED_GREEN = true;
+
+#if INSTRUMENT_ENABLED
+    // 0.5 --airgap: drop the frame here, after the platform RX plumbing has
+    // run (nRF52: buffer copy, radio re-arm, CAD abort above; ESP32: the
+    // caller checkRX() re-armed before calling us) and the ch_util window
+    // was closed, but before handleACK()/is_new_packet()/mheard -- the
+    // node's dedup ring and heard tables see nothing. Tear the receive
+    // state down exactly like the handleACK() return path below, otherwise
+    // is_receiving stays set and the node is TX-mute after `--airgap off`.
+    if(bAirgap)
+    {
+#if defined BOARD_RAK4630
+        taskENTER_CRITICAL();
+        rxBufInUse[rxBufIndex] = false;
+        taskEXIT_CRITICAL();
+#endif
+        is_receiving = false;
+        iReceiveTimeOutTime = millis();
+        csma_timeout = csma_compute_timeout(cad_attempt);
+        return;
+    }
+#endif
 
     if(handleACK(payload, size, rssi, snr))
     {
@@ -922,10 +918,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     // broadcast/group text heard back counts here too, same
                     // as a DM -- see the report for why that split is not
                     // cheaply knowable at this site.
-                    if(own_msg_id[icheck][4] == 0x00)
+                    if(own_msg_id[icheck][4] == 0x00 &&
+                       msg_type_b_lora == MSG_TYPE_TEXT &&
+                       aprsmsg.msg_payload.indexOf("{", 1) > 0 &&
+                       aprsmsg.msg_payload.indexOf(":ack") <= 0)
                         dmstat_echo.fetch_add(1);
 
-                    if(own_msg_id[icheck][4] != 0x02)
+                    // 0x02 (acked) and 0x03 (failed, 0.3) are final: a late
+                    // relay echo must not turn them back into "heard".
+                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
             }
@@ -1617,7 +1618,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // (decodeAPRS() above, unconditional), so no extra decode.
                 if(msg_type_b_lora == MSG_TYPE_TEXT &&
                    aprsmsg.msg_destination_call == meshcom_settings.node_call &&
-                   !aprsmsg.msg_server)
+                   !aprsmsg.msg_payload.startsWith("{ping}") &&
+                   !aprsmsg.msg_payload.startsWith("{pong}"))
                 {
                     int iReackAckPos = aprsmsg.msg_payload.indexOf(":ack");
                     int iReackRejPos = aprsmsg.msg_payload.indexOf(":rej");

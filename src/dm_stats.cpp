@@ -39,11 +39,17 @@ int dmStatRttBucket(uint32_t rtt_ms)
 
 void dmStatNoteSent(uint16_t nnn, uint32_t now_ms)
 {
-    // Same NNN sent again (ladder attempt, or the 0..999 counter wrapped):
-    // keep the first send time so the RTT measures the whole exchange.
+    // Same NNN noted again: the 0..999 counter wrapped onto a never-acked
+    // entry, which is a different message -- replace it. (A retry ladder
+    // must note only its first attempt, see dm_stats.h.)
     for(int i = 0; i < DMSTAT_SENT_SLOTS; i++)
+    {
         if(dmstat_sent_tab[i].used && dmstat_sent_tab[i].nnn == nnn)
+        {
+            dmstat_sent_tab[i].sent_ms = now_ms;
             return;
+        }
+    }
 
     struct dmstat_sent_entry *e = &dmstat_sent_tab[dmstat_sent_next];
     e->nnn = nnn;

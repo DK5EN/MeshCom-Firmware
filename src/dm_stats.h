@@ -23,7 +23,7 @@ extern std::atomic<uint32_t> dmstat_peer_ack;         // :ackNNN from the destin
 extern std::atomic<uint32_t> dmstat_giveup;           // RETRANSMIT_GIVEUP on a user-originated DM (0.3)
 extern std::atomic<uint32_t> dmstat_attempts;         // transmissions of DM ring slots including retries
 extern std::atomic<uint32_t> dmstat_reack;            // duplicate-for-me re-acked (0.2)
-extern std::atomic<uint32_t> dmstat_reack_limited;    // re-ack suppressed by the 60 s limiter (0.2)
+extern std::atomic<uint32_t> dmstat_reack_limited;    // re-ack suppressed by the 30 s limiter (0.2)
 extern std::atomic<uint32_t> ringstat_enqueue;        // addTxRingEntry() calls (M0-1: enqueues per window)
 extern std::atomic<uint32_t> ringstat_parked_overwrite; // enqueue landed on a slot with len != 0 and a
                                                         // retransmit-pending status (M0-1)
@@ -36,10 +36,12 @@ extern std::atomic<uint32_t> dmstat_rtt[DMSTAT_RTT_BUCKETS];
 int dmStatRttBucket(uint32_t rtt_ms);
 
 // Send-time table keyed on NNN (the {NNN transport sequence number, 0..999).
-// dmStatNoteSent() records the first send of a DM; dmStatNoteAck() buckets
-// the RTT of the first :ackNNN and clears the entry. A NNN that was never
-// noted (ack for a message sent before boot, or a foreign NNN) is ignored.
-// Table size is small (8) and overwrites the oldest entry.
+// dmStatNoteSent() records the send of a DM (call it once per message, on
+// the first attempt only -- a later note for the same NNN is taken as the
+// counter having wrapped and replaces the stale entry); dmStatNoteAck()
+// buckets the RTT of the first :ackNNN and clears the entry. A NNN that
+// was never noted (ack for a message sent before boot, or a foreign NNN)
+// is ignored. Table size is small (8) and overwrites the oldest entry.
 void dmStatNoteSent(uint16_t nnn, uint32_t now_ms);
 void dmStatNoteAck(uint16_t nnn, uint32_t now_ms);
 
