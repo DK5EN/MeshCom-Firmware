@@ -35,6 +35,20 @@ fork-main synced with merge `7b55deaf` (tree unchanged, the fix was already in).
 `docs/pr-tdeck-mute-draft-20260913.md`. The `-pr` worktree and the three temporary worktrees
 were removed 2026-09-13, the merged PR branches deleted locally (they stay on origin).
 
+**Three follow-up PRs opened 2026-09-13 afternoon**, each one commit on upstream `dev` `893cffd0`
+in a fresh `-pr` worktree (kept while they are open), file-disjoint, no ordering:
+[PR #1142](https://github.com/icssw-org/MeshCom-Firmware/pull/1142) APRS decoder `#name`,
+`/R=` `/U=` `/I=`, NaN guard per tag + `--setname` strips `#` (branch `pr-aprs-codec-20260913`,
+gate Heltec V3 / T-Deck Plus / RAK4631 + native 308/98/47/5);
+[PR #1143](https://github.com/icssw-org/MeshCom-Firmware/pull/1143) `[BOOT] WAKE_CAUSE` line
+(branch `pr-wake-cause-20260913`, gate Heltec V3 / T-Deck Plus, evidence = the two DK5EN-93
+runs above); [PR #1144](https://github.com/icssw-org/MeshCom-Firmware/pull/1144) web GUI keeps
+the group in `sendcall` after a send (branch `pr-webgui-group-target-20260913`, gate Heltec V3 /
+RAK4631, jsdom harness 30/30 against DK5EN-98). Drafts `docs/pr-{aprs-codec,wake-cause,webgui-group-target}-draft-20260913.md`.
+Fork-only by decision, never PR candidates: the nine-variant `--port "$UPLOAD_PORT"` upload
+lines (broke the maintainer's setup, backed out), the `[KBL];set` marker, the `native_*` envs
+and the Tasmota pre-script. Still unsubmitted fork code: safeboot OTA TM-46/48/49.
+
 **Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
 `usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
 esptool attempt went against the RAK on `usbmodem101` and failed to connect; the RAK then
