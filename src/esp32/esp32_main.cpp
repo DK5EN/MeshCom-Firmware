@@ -34,6 +34,7 @@ SPIClass ethSPI(FSPI);
 #include <esp_adc_cal.h>
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include <esp_sleep.h>
 
 #if not defined(BOARD_T_DECK_PRO)
 //====== Timer for periodical events u.a.
@@ -634,6 +635,25 @@ static const char* resetReasonName(esp_reset_reason_t r)
     }
 }
 
+// DS-03: name of the wakeup cause after a deep-sleep reset. tools/bench/deepsleep_button.py
+// reads this line to prove the ext1 button wake in place of a scope on the wake pin.
+static const char* wakeCauseName(esp_sleep_source_t c)
+{
+    switch (c)
+    {
+        case ESP_SLEEP_WAKEUP_UNDEFINED: return "UNDEFINED";
+        case ESP_SLEEP_WAKEUP_ALL:       return "ALL";
+        case ESP_SLEEP_WAKEUP_EXT0:      return "EXT0";
+        case ESP_SLEEP_WAKEUP_EXT1:      return "EXT1";
+        case ESP_SLEEP_WAKEUP_TIMER:     return "TIMER";
+        case ESP_SLEEP_WAKEUP_TOUCHPAD:  return "TOUCHPAD";
+        case ESP_SLEEP_WAKEUP_ULP:       return "ULP";
+        case ESP_SLEEP_WAKEUP_GPIO:      return "GPIO";
+        case ESP_SLEEP_WAKEUP_UART:      return "UART";
+        default:                         return "OTHER";
+    }
+}
+
 void esp32setup()
 {
     ///< Initialize T5-EPAPER GUI
@@ -756,6 +776,11 @@ void esp32setup()
     {
         esp_reset_reason_t rr = esp_reset_reason();
         Serial.printf("[BOOT] RESET_REASON=%d %s\n", (int)rr, resetReasonName(rr));
+        if (rr == ESP_RST_DEEPSLEEP)
+        {
+            esp_sleep_source_t wc = esp_sleep_get_wakeup_cause();
+            Serial.printf("[BOOT] WAKE_CAUSE=%d %s\n", (int)wc, wakeCauseName(wc));
+        }
     }
 #if INSTRUMENT_ENABLED
     instrument_report_prev_boot();   // CDC-01: loop gaps of the previous boot, from RTC memory
