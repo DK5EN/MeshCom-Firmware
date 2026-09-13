@@ -1,0 +1,33 @@
+{
+  "scenario": "control",
+  "started": "2026-09-13 17:58:43",
+  "verdict": "PASS",
+  "assertions": [
+    {
+      "name": "full OTA flow ok (HTTP 200 on upload)",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "serial ota;verify;result;ok",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "serial ota;end;result;success",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "node back in the app ([BOOT];ready or CLIENT STARTED) within 120s",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "GET / answers",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "extra": {}
+}
