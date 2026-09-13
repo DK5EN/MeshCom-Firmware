@@ -21,7 +21,7 @@ worktree, two cherry-picked commits: [PR #1141](https://github.com/icssw-org/Mes
 **Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
 `usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
 esptool attempt went against the RAK on `usbmodem101` and failed to connect; the RAK then
-echoed esptool's sync frames (`UUUU...$`) for minutes and did not answer `--info`. Twelve minutes later it still echoed only `U`s and gave no `--info` answer, while its `[EXT] Out` lines showed the loop alive; if it stays that way, press its reset button and check `--info` (uptime was 22156 s at 09:38, so a reboot shows as a small uptime).
+echoed esptool's sync frames (`UUUU...$`) for minutes and did not answer `--info`. It drained the garbage on its own: at 09:45 (about 14 min later) it printed `...wrong command` for the esptool frames and answered `--info` again as DK5EN-90 with uptime 22540 s, so no reboot and nothing to repair.
 
 ## 2026-09-12 (late): v4.35t.09.12.2 published -- items 212-221, replaces v4.35t.09.10
 
