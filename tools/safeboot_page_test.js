@@ -209,6 +209,11 @@ const STATE_ABORTED_APP_VALID = {
       rows[0].children[0].textContent === 'ORBI63' && rows[1].children[0].textContent === 'OTHERAP',
       rows[0].children[0].textContent + ',' + rows[1].children[0].textContent);
     check('connected row is highlighted', rows[0].className === 'connected', rows[0].className);
+    check('scan columns are SSID, RSSI, CH, AUTH, BSSID',
+      rows[0].children[1].textContent === '-43' && rows[0].children[2].textContent === '6'
+      && rows[0].children[3].textContent === 'WPA2_WPA3_PSK' && rows[0].children[4].textContent === '5A:AF:97:2E:2B:8B',
+      Array.from(rows[0].children).map((c) => c.textContent).join('|'));
+    check('header row has no hostname field', win.document.getElementById('netHostname') === null);
     check('non-connected row is not highlighted', rows[1].className === '');
     check('rescan enabled when configured and not scanning', q(win, 'rescanButton').disabled === false);
 
@@ -244,6 +249,22 @@ const STATE_ABORTED_APP_VALID = {
 
     win.__safeboot.renderState(STATE_DONE);
     check('done: state text mentions rebooting', q(win, 'stateText').textContent.includes('Rebooting'), q(win, 'stateText').textContent);
+    check('done: app-return armed (state poll stopped, watcher running)',
+      win.__safeboot.pollIntervals.state === null && win.__safeboot.pollIntervals.appReturn !== null);
+    check('done: status says the page follows automatically',
+      q(win, 'status').textContent.includes('follows automatically'), q(win, 'status').textContent);
+    // Drive the watcher by hand: first GET / still serves this OTA page (no
+    // navigation), then the app's page (navigate).
+    let navigated = 0;
+    win.__safeboot.navigate = () => { navigated++; };
+    let serveApp = false;
+    win.fetch = async () => ({ status: 200, text: async () => serveApp ? '<title>DK5EN-93 - Meshcom</title>' : '<title>MeshCom OTA</title>' });
+    await win.__safeboot._test.appReturnTick();
+    check('app-return: OTA page still served -> no navigation yet', navigated === 0);
+    serveApp = true;
+    await win.__safeboot._test.appReturnTick();
+    check('app-return: app page served -> navigated once', navigated === 1, navigated);
+    check('app-return: watcher stopped after navigation', win.__safeboot.pollIntervals.appReturn === null);
 
     dom.window.close();
   }

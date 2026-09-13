@@ -338,7 +338,6 @@
         <h2>Network</h2>
         <div class="info-grid">
             <div><label>Node call</label><span id="netCall">-</span></div>
-            <div><label>Hostname</label><span id="netHostname">-</span></div>
             <div><label>mDNS name</label><span id="netMdns">-</span></div>
             <div><label>Mode</label><span id="netMode">-</span></div>
         </div>
@@ -371,7 +370,7 @@
         <div class="table-scroll">
             <table class="scan-table">
                 <thead>
-                    <tr><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Ch</th><th>Auth</th></tr>
+                    <tr><th>SSID</th><th>RSSI</th><th>Ch</th><th>Auth</th><th>BSSID</th></tr>
                 </thead>
                 <tbody id="scanBody"></tbody>
             </table>
@@ -399,7 +398,6 @@
 
         const rescanButton = document.getElementById('rescanButton');
         const netCall = document.getElementById('netCall');
-        const netHostname = document.getElementById('netHostname');
         const netMdns = document.getElementById('netMdns');
         const netMode = document.getElementById('netMode');
         const staSsid = document.getElementById('staSsid');
@@ -478,7 +476,6 @@
             const scan = info.scan || {};
 
             netCall.textContent = info.call || '';
-            netHostname.textContent = info.hostname || '';
             netMdns.textContent = info.mdns || '';
             netMode.textContent = MODE_LABEL[info.mode] || info.mode || '';
 
@@ -518,7 +515,7 @@
             ordered.forEach((a) => {
                 const tr = document.createElement('tr');
                 if (a.connected) tr.className = 'connected';
-                [a.ssid, a.bssid, (a.rssi != null ? a.rssi : ''), (a.channel != null ? a.channel : ''), a.auth].forEach((val) => {
+                [a.ssid, (a.rssi != null ? a.rssi : ''), (a.channel != null ? a.channel : ''), a.auth, a.bssid].forEach((val) => {
                     const td = document.createElement('td');
                     td.textContent = (val === undefined || val === null) ? '' : val;
                     tr.appendChild(td);
@@ -578,18 +575,60 @@
             }
 
             if (st.state === 'done') {
-                if (!doneTimer) {
-                    doneTimer = setTimeout(() => {
-                        stopStatePolling();
-                        doneTimer = null;
-                    }, 10000);
-                    pollIntervals.doneTimeout = doneTimer;
-                }
-            } else if (doneTimer) {
-                clearTimeout(doneTimer);
-                doneTimer = null;
-                pollIntervals.doneTimeout = null;
+                armAppReturn('update');
+            } else if (appValid && typeof st.fallback_in_ms === 'number' && st.fallback_in_ms >= 0 && st.fallback_in_ms < 1500
+                       && (st.state === 'idle' || st.state === 'aborted')) {
+                armAppReturn('fallback');
             }
+        }
+
+        // ---- follow the node back into the app ---------------------------
+        // After a successful update, a cancel, or the fallback timeout the
+        // node reboots into the app on the same address. Stop the OTA polls,
+        // watch GET / until it no longer serves this OTA page, then navigate
+        // there. Give up after 180 s and tell the user to reload by hand.
+        let appReturnTimer = null;
+        let appReturnStarted = 0;
+        function navigateToApp() {
+            window.location.replace(`http://${hostIP}/`);
+        }
+        function armAppReturn(why) {
+            if (appReturnTimer) return;
+            stopStatePolling();
+            stopInfoPolling();
+            appReturnStarted = Date.now();
+            const label = why === 'update' ? 'Update installed, the node is rebooting into the app'
+                        : why === 'cancel' ? 'Cancelled, the node is rebooting into the app'
+                        : 'Fallback: the node is rebooting into the app';
+            status.textContent = label + ' - this page follows automatically...';
+            fallbackLine.hidden = true;
+            const tick = async () => {
+                if (Date.now() - appReturnStarted > 180000) {
+                    clearInterval(appReturnTimer);
+                    appReturnTimer = null;
+                    pollIntervals.appReturn = null;
+                    status.textContent = 'The node did not come back on this address within 3 minutes. Reload the page by hand.';
+                    return;
+                }
+                try {
+                    const res = await fetchWithTimeout(`http://${hostIP}/`);
+                    if (res && res.status === 200) {
+                        const body = await res.text();
+                        if (body.indexOf('<title>MeshCom OTA</title>') < 0) {
+                            clearInterval(appReturnTimer);
+                            appReturnTimer = null;
+                            pollIntervals.appReturn = null;
+                            window.__safeboot.navigate();
+                        }
+                    }
+                } catch (e) {
+                    // node still rebooting
+                }
+            };
+            appReturnTimer = setInterval(tick, 3000);
+            pollIntervals.appReturn = appReturnTimer;
+            setTimeout(tick, 5000);
+            if (window.__safeboot && window.__safeboot._test) window.__safeboot._test.appReturnTick = tick;
         }
 
         const supportsAbort = typeof AbortController === 'function';
@@ -603,7 +642,6 @@
 
         let infoTimer = null;
         let stateTimer = null;
-        let doneTimer = null;
         const pollIntervals = { info: null, state: null, doneTimeout: null };
 
         async function pollInfoOnce() {
@@ -807,7 +845,7 @@
                         status.textContent = `Error Cancel: ${cancelBody}`;
                     }
                 } else {
-                    status.textContent = "Cancel successful! Rebooting...";
+                    armAppReturn('cancel');
                 }
             } else {
                 status.textContent = "Cancel not possible, upload error!";
@@ -841,6 +879,8 @@
             stopInfoPolling,
             startStatePolling,
             stopStatePolling,
+            armAppReturn,
+            navigate: navigateToApp,
             _test: {
                 setSelectedFile(file) { selectedFile = file; },
                 get finishedWithErr() { return finishedWithErr; },
