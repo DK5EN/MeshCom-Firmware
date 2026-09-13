@@ -225,6 +225,10 @@ ota_abort.py`, 6/6 scenarios on Heltec V3, T-Beam v1.2, T-Deck Plus) found that 
      recovers the node in about 80 s from the abort. Also fixed: a superseded upload's
      completion handler answering for the new session, and the S3 safeboot console being
      invisible on native-USB boards (UART0 + CDC tee).
+     Page follow-up (`c0882d0b`): scan columns SSID/RSSI/CH/AUTH/BSSID, node call, mDNS
+     name and mode on one line, and after an update, a cancel or the fallback timeout the
+     page follows the node back into the app on its own (watches `GET /`, gives up after
+     3 min with a hint). Verified live on DK5EN-93.
 
 223. **Upstream sync to `674413ce` and version letter `t`** (`42b49df4`,
      cherry-pick of upstream `2c291265`). Upstream `dev` moved fifteen commits
