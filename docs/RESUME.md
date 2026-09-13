@@ -24,6 +24,25 @@ pin the tasmota 3.x core, every firmware env including Heltec V3 uses the 2.x co
 entered and the hostname was never observed there — code and build, not a measurement.
 Tracked as BACKLOG DH-04.
 
+**`serial_session.py` fixed (same day).** It now waits for `[BOOT];ready` — the marker
+both platforms emit with a raw `Serial.printf` — instead of `CLIENT STARTED`, which on the
+ESP32 goes through `printlndeb()` and is suppressed unless debug output is on. Commands are
+LF-terminated (the parser strips `0x0a`, not CR), output streams live instead of buffering
+until the window closes, a missing marker or a zero-byte session is a loud warning on stderr,
+`--strict` turns those into exit 2, and `--help` is no longer parsed as a port name. A
+missing marker stays non-fatal on purpose: a native-USB board (RAK4631, S3) does not reset
+when the port is opened, so on an already-running RAK there is no boot to wait for, and the
+ESP32 marker itself only fires once the network is up. Verified on DK5EN-93 and against a
+pty for the marker/no-marker/strict paths, and on DK5EN-90 (RAK4631) once it was plugged in.
+
+The RAK exposed a second fault the concept had not anticipated: a native-USB board implements
+CDC in firmware and sends **nothing at all** until the host asserts DTR — the first RAK run
+returned 0 bytes with no error, which the new zero-byte warning caught. A CP2102/CH340 bridge
+is the opposite: DTR/RTS drive EN/BOOT there and asserting them resets the ESP32. The tool now
+defaults to `--dtr auto` and picks by port name (`usbmodem` = native USB = assert DTR). Both
+boards now work on default flags. Streaming into `head` also surfaced an unhandled
+`BrokenPipeError`, fixed. BACKLOG DH-03.
+
 **Tooling note for next time:** `tools/bench/serial_session.py --wait-boot` waits for
 `CLIENT STARTED`, which this firmware never prints, and sends commands CR-terminated only;
 against this node that meant two early `--info` calls came back silently empty and looked
