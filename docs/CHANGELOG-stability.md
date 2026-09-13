@@ -280,8 +280,9 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      caveat expected. Rename tested: `--setcall DK5EN-94` -> the Deco showed
      `DK5EN-94` within minutes, same MAC, same IP; reverted to `DK5EN-93`
      and confirmed via `--info` and the BLE name, node left as found. The
-     safeboot half is code and build only — OTA mode was not entered and the
-     name was not observed there (BACKLOG DH-04).
+     safeboot half was verified the same way: `--ota-update`, safeboot up on
+     `/ota/info`, and the Deco still showing `DK5EN-93` rather than
+     `esp32-3A8968` (BACKLOG DH-04).
 
 ## New in v4.35s.09.09
 

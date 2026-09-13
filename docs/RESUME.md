@@ -19,10 +19,15 @@ stays unbuilt); its core-version table also had a bug fixed (only the two safebo
 pin the tasmota 3.x core, every firmware env including Heltec V3 uses the 2.x core from
 `[esp32]` in `platformio.ini`).
 
-**Not verified:** the safeboot half. `esp32-S3-safeboot` builds and the fresh
-`safeboot-s3.bin` went onto the node at `0x10000` with the V3 flash, but OTA mode was never
-entered and the hostname was never observed there — code and build, not a measurement.
-Tracked as BACKLOG DH-04.
+**safeboot verified too** (same evening, after the first write-up said it was not).
+`--ota-update` on DK5EN-93: safeboot came up (`[SAFEBOOT];app;image;valid;rc;0`,
+`[SAFEBOOT];wifi;event;got_ip`, `/ota/info` reporting `mode:sta` on 192.168.68.69) and the
+Deco kept showing `DK5EN-93` rather than `esp32-3A8968`. That reading is only meaningful
+because the rename test had already proved the Deco follows a changed name. Back to the app
+with `GET /ota/cancel`. Two safeboot handling notes: it prints only `[SAFEBOOT];...` markers,
+never `[BOOT];ready`/`CLIENT STARTED`, so `serial_session.py --wait-boot` times out there by
+design; and while the boot partition points at safeboot, every port-open reboots back into
+safeboot. BACKLOG DH-04 closed.
 
 **`serial_session.py` fixed (same day).** It now waits for `[BOOT];ready` — the marker
 both platforms emit with a raw `Serial.printf` — instead of `CLIENT STARTED`, which on the

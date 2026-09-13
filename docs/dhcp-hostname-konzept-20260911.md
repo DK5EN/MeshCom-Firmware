@@ -1,7 +1,7 @@
 # DHCP-Hostname aus dem Node-Namen (statt `esp32-XXXXXX`)
 
-**Stand:** 2026-09-13 — implementiert (`3af07485`); Firmware-Pfad auf der Bench
-verifiziert, safeboot-Pfad nur gebaut (offen, BACKLOG DH-04)
+**Stand:** 2026-09-13 — implementiert (`3af07485`), Firmware- und safeboot-Pfad auf der
+Bench verifiziert
 **Repo:** MeshCom-Firmware-DEV-Main, Branch `fork-main`
 
 ## BLUF
@@ -247,16 +247,19 @@ Umgesetzt in `3af07485` (2026-09-13). Ergebnisse:
    bestätigt über `--info` (`Call: <DK5EN-93>`) und den BLE-Namen (`MC-8968-DK5EN-93`).
    Knoten unverändert hinterlassen. Dieses Messergebnis entscheidet die Ausbaustufe oben:
    für diesen Router nicht gebraucht.
-8. **safeboot: NICHT auf der Bench verifiziert.** Der Aufruf sitzt in `wifiConnect()` vor
-   `WiFi.mode(WIFI_STA)`, `esp32-S3-safeboot` baut sauber, und das frische
-   `safeboot-s3.bin` wurde beim Flashen des V3 mit auf `0x10000` geschrieben — der
-   OTA-Modus wurde aber nie betreten und der Hostname dort nie beobachtet. Es steht damit
-   der Code und der Build, nicht eine Messung. Offen, siehe unten.
+8. **safeboot gegengeprobt.** `--ota-update` auf DK5EN-93: safeboot kam hoch
+   (`[SAFEBOOT];app;image;valid;rc;0`, `[SAFEBOOT];wifi;event;got_ip`, `/ota/info` meldet
+   `mode:sta` auf `192.168.68.69`), und die Deco-Geräteliste zeigte weiterhin `DK5EN-93`
+   statt `esp32-3A8968`. Aussagekräftig, weil Schritt 7 belegt hat, dass die Deco einem
+   geänderten Namen folgt — hätte safeboot den Core-Default gesendet, wäre der Eintrag
+   umgesprungen. Rückkehr in die App über `GET /ota/cancel`.
+
+   Nebenbefund: safeboot druckt weder `[BOOT];ready` noch `CLIENT STARTED`, nur
+   `[SAFEBOOT];...`-Marken. `serial_session.py --wait-boot` läuft dort in den Timeout und
+   warnt — korrekt, aber beim Bedienen von safeboot besser weglassen. Und solange die
+   Boot-Partition auf safeboot zeigt, bootet jeder Port-Open wieder in safeboot.
 
 ## Offen
 
-- **safeboot-Gegenprobe.** Knoten in den Safeboot-/OTA-Modus bringen und prüfen, dass die
-  Geräteliste ihn auch dort unter `DK5EN-93` führt statt unter `esp32-3A8968`. Rezept und
-  Fallstricke stehen in der Safeboot-OTA-Kampagne (BACKLOG 3.8ah).
 - ESP32-Ethernet-Pfad (`HAS_ETHERNET`) — bleibt liegen, solange kein Board auf der Bench
   steht.
