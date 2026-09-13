@@ -73,6 +73,14 @@ one to update when an item moves.
 
 **F. DRY unification and RAM: the one-shot PR — IN EXECUTION on `dry-unification`**
 
+> **Stand 2026-09-13.** The row-by-row state and what finishing the plan takes now live in one
+> place: **"Campaign stand 2026-09-13"** in `BACKLOG.md` §3.8af, mirrored in the Gantt's
+> assumptions box. Phases A and B done; phase C owes `M3`; `W1` is one hygiene item from done,
+> `W2` done, **`W3` half** (nRF52 shipped and hardware-proven, ESP32 half and struct merge not
+> started), `W4`-`W7` and `C4d` untouched, phase E not started. Plan estimate for the remainder:
+> **~33 working days to the PR**, upstream review on top. The paragraphs below are the detail
+> from before that stand and are still accurate where they do not contradict it.
+
 Phase A done except `P0.9`. **Phase B: all five carve-outs are in, G1 is
 complete and clean, and `B4` has its first two twins.** Base tagged
 `dry-base-20260911`. BACKLOG §3.8af carries

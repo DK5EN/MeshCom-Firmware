@@ -6,7 +6,17 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-**Last updated 2026-09-11 (evening) — documentation sweep.** `docs/` was groomed: 23 closed
+**Last updated 2026-09-13 — DRY campaign stand.** The one-shot PR campaign (§3.8af) now has a
+single place that says where it stands and what finishing it takes: **"Campaign stand 2026-09-13"**
+in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic (~33 working
+days to the PR, upstream review on top). Short version: phases A and B are done, phase C owes
+`M3`, phase D has `W1` all but one item, `W2` done, **`W3` half** (steps 1-5 shipped and proven on
+nRF52 hardware 2026-09-12/13; the ESP32 half and the struct merge are not started), `W4`-`W7` and
+`C4d` untouched, phase E not started. `W3`'s two open leads from the settings loss are closed:
+the loss itself was newlib-nano's printf, and the flash wear is gone
+(`src/msgid_counter.h`, one write per 100 frames instead of one per frame).
+
+**Previous update 2026-09-11 (evening) — documentation sweep.** `docs/` was groomed: 23 closed
 documents moved to [`archive/`](archive/README.md), each stamped with why and where the work
 landed; §5 below is now a **complete** index of what is left; §4.2 carries the current branch
 state (`fork-main` 0 behind `upstream/dev` `6edc7499`). Four item rows had statuses that the
@@ -5191,6 +5201,86 @@ than by reading:
   of them and every byte after one was silently dropped — content hidden, not
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
+
+#### Campaign stand 2026-09-13: what is done, what completing the plan takes
+
+The audit's plan (`optimization-audit-20260910.md` §7.1) is eight waves inside
+five phases; the Gantt (`docs/dry-unification-gantt-20260910.html`) carries the
+same rows with per-row notes. This table is the single place that says where the
+campaign actually stands, and it is the one to correct when a row moves.
+
+| Phase                        | Rows                               | State                                                                                      |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work          |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done, **`M3` open**: 8 of 29 decided rows still name no asserting test (`M3-01`) |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` all but one item, `W2` done, **`W3` half**, `W4`-`W7` and `C4d` **not started**       |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                              |
+
+##### What each open row still needs
+
+- **`P0.9` protocol templates** -- the last phase-0 item, a documentation
+  deliverable, not code.
+- **`M3`** -- `DR-06`, `DR-08`, `DR-09` into `test_udp_frame_twin`; `DR-21` into
+  `test_udp_send_twin`; `DR-12`/`DR-13` ride with `W3`'s `U4` work; `DR-03` and
+  `DR-16` stay bench-only by decision. Only then may
+  `drift_matrix_lint.py --phase implementation` be dropped.
+- **`W1`** -- one hygiene item left: the unused `<SD.h>` include, which is not in
+  the files wave 1 touched.
+- **`W3`** -- steps 1-5 shipped and proven on nRF52 hardware; **steps 6 and the
+  ESP32 half are not started.** In dependency order:
+  1. drive the ESP32 NVS load/save from `settings_schema` instead of its
+     hand-written `preferences.get*`/`put*` list (`D1-05`'s ESP32 half);
+  2. merge the two `s_meshcom_settings` definitions (`D1-04` proper) -- and
+     first convert `node_audio_start`/`node_audio_msg` from `String` to fixed
+     `char[]`, or an nRF52 that still blits writes a heap pointer to flash;
+  3. the member-level fail-closed gate that replaces `settings_schema_lint.py`'s
+     struct-blind table;
+  4. the four classification decisions this wave surfaced (8 RUNTIME fields
+     persisted anyway, 25 persisted but absent from `X()`, 16 platform-only
+     fields, the stale `// nicht im Flash` divider);
+  5. the same upgrade proof on an **ESP32** node that `DK5EN-90` has now passed;
+  6. `DR-12`/`DR-13` from `M3`.
+     Carried as a live lead, not blocking: `save;rename_failed`, which now has an
+     inventory and a retry to identify itself with the next time it happens.
+- **`W4`** command table (`D2-10`, then `D2-06`, `D2-07`, `D2-01`) -- the
+  largest single flash win in the audit (~-6.0 kB ESP32, ~-3.5 kB nRF52) and
+  ~2 600 lines. Needs the golden capture diff and `test_command_table`.
+- **`W5`** RAM rows of medium risk (`R1-04`, `R1-02`, `R2-01`, `R2-04`,
+  `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- blocked on operator decisions
+  `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03` and the OLED-less board list,
+  plus a 12 h nRF52 soak for `R1-04`.
+- **`W6`** shared UDP frame handler (`D1-01`, carrying defects 12/13), `D3-01`,
+  `D3-02`, `D3-05`, `D4-01/02` `ui_common` -- and `EXT-01`'s early return, which
+  must land with or before this wave, not after.
+- **`C4d`** the nRF52 diagnosis port out of `C4`, and **`D1-10`** the loop
+  scheduler, measured at **50** timer predicates rather than the plan's "~18".
+- **`W7`** variants restructure -- highest upstream-conflict surface; sync
+  immediately before submitting, and it is the one wave that may want its own PR.
+- **`E1`-`E4`** G2 after-run on the bench, the German proof document and PR
+  text, an upstream resync with a targeted repeat run, then submit. `E5` is
+  Kurt's review.
+
+##### Plan estimate for the remainder
+
+Days are the audit's own estimates, carried in the Gantt, not measurements --
+except where a row has already been measured and corrected:
+
+| Row                        | Plan days             | Note                                             |
+| -------------------------- | --------------------- | ------------------------------------------------ |
+| `P0.9`, `M3`, rest of `W1` | ~2                    | documentation and four test cases                |
+| `W3` remainder             | ~3 of the corrected 9 | 6 of 9 spent; the struct merge is the risky half |
+| `W4`                       | 6                     |                                                  |
+| `W5`                       | 5                     | gated on five operator decisions                 |
+| `W6` + `C4d` + `D1-10`     | 7+                    | `D1-10` re-measured at 50 predicates, so "+"     |
+| `W7`                       | 3                     |                                                  |
+| `E1`-`E4`                  | 6.5                   | two of those days are bench time on four nodes   |
+| **Total to PR**            | **~33 working days**  | `E5` (upstream review, 10 d) sits outside that   |
+
+Two things that do not appear as rows and will still cost time: every wave ends
+in a 32-env build plus the native suites (~20 min wall clock each, sequential --
+never parallel, `.pio/build` corrupts), and every bench row needs the four-node
+fleet, which has **three usable USB slots**, so a four-node run is two passes.
 
 #### TD-16 T-Deck-14 touch and keyboard dead, repeated crashes (2026-09-11)
 
