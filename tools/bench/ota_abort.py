@@ -77,6 +77,14 @@ RE_FALLBACK_TIMEOUT = re.compile(r"\[SAFEBOOT\];fallback;reason;timeout")
 RE_FALLBACK_TIMEOUT_LEGACY = re.compile(r"OTA Start Timeout")
 RE_FALLBACK_CANCEL = re.compile(r"\[SAFEBOOT\];fallback;reason;cancel")
 RE_FALLBACK_CANCEL_LEGACY = re.compile(r"Rebooting to app partition")
+# Single app slot (docs/safeboot-ota-contract.md, bench finding 2026-09-13):
+# printed at boot and after every abort. `RE_OTA_UPDATE_BANNER` is the plain
+# boot banner a node re-entering safeboot prints (real capture,
+# tools/bench/runs/ota_abort_kill50_20260913-154513.log) -- its presence
+# after an abort with app_valid false means the firmware is (wrongly)
+# looping through the old fallback/reboot cycle instead of holding still.
+RE_APP_IMAGE = re.compile(r"\[SAFEBOOT\];app;image;(?P<result>valid|invalid);rc;(?P<rc>-?\d+)")
+RE_OTA_UPDATE_BANNER = re.compile(r"OTA UDATE started")
 
 # reasons /ota/state and the abort marker may report for a client-side kill
 # vs stall (docs/safeboot-ota-contract.md's `reason` enum)
@@ -230,25 +238,59 @@ def _run_controlled_upload_bg(url: str, fw: Path, *, controlled_poster: Controll
     return result, th
 
 
-def assert_abort_and_fallback(sess: "otr.SerialSession", target: str, get: webflash.GetFn,
-                                t_trigger: float, args: argparse.Namespace, assertions: list[Assertion],
-                                *, expected_reasons: frozenset, abort_wait_s: float
-                                ) -> tuple[Optional[float], Optional[float]]:
+def assert_abort_and_recover(sess: "otr.SerialSession", target: str, get: webflash.GetFn,
+                               poster: webflash.PostFn, md5: str, fw: Path, t_trigger: float,
+                               args: argparse.Namespace, assertions: list[Assertion],
+                               *, expected_reasons: frozenset, abort_wait_s: float) -> dict[str, Any]:
     """Shared tail for kill50/stall: the node must abort with one of
     `expected_reasons` (both on /ota/state and on serial), never print the
-    success markers, stay in safeboot for a beat, and then recover through
-    the fallback-to-app window. Returns (abort_ts, boot_ts) for the
-    abort-to-boot timing, either possibly None if not observed."""
+    success markers, and then recover -- either through a full upload on the
+    same safeboot session (`app_valid` false: the expected outcome on every
+    one of our boards, docs/safeboot-ota-contract.md "Single app slot" --
+    the aborted upload already wrote into the single app slot, so there is
+    nothing left to fall back to) or through the 180s fallback-to-app window
+    (`app_valid` true: an abort before any chunk was written, or a future
+    dual-slot board). An older safeboot image that predates `app_valid`
+    takes the fallback path too, but fails one assertion so it stands out in
+    the report. Returns the scenario's `extra` fields (`app_valid`,
+    `bytes_before_kill`, `abort_to_boot_s` where observed)."""
     abort = wait_for_ts(sess, RE_OTA_ABORT, abort_wait_s, since_ts=t_trigger)
     assertions.append(Assertion(
         f"serial ota;abort;reason;<r> within {abort_wait_s:.0f}s, reason in {sorted(expected_reasons)}",
         abort is not None and abort[0].group("reason") in expected_reasons,
         (abort[0].group("reason") if abort else "not seen")))
+    abort_ts = abort[1] if abort else None
 
     state = poll_state(target, get, 40.0, want_state="aborted")
     ok_state = state is not None and state.get("reason") in expected_reasons
     assertions.append(Assertion("/ota/state aborted with expected reason", ok_state, f"state={state}"))
 
+    has_app_valid = state is not None and "app_valid" in state
+    app_valid = state.get("app_valid") if state is not None else None
+    assertions.append(Assertion(
+        "app_valid reported", has_app_valid,
+        "" if has_app_valid else f"missing from /ota/state -- older safeboot image (state={state})"))
+
+    extra: dict[str, Any] = {"app_valid": app_valid if has_app_valid else "missing"}
+    if state is not None and state.get("received") is not None:
+        extra["bytes_before_kill"] = state.get("received")
+
+    if app_valid is False:
+        boot_ts = _assert_app_invalid_and_recover(
+            sess, target, get, poster, md5, fw, t_trigger, state, args, assertions)
+    else:
+        boot_ts = _assert_fallback_recovery(sess, target, get, t_trigger, args, assertions)
+
+    if abort_ts is not None and boot_ts is not None:
+        extra["abort_to_boot_s"] = round(boot_ts - abort_ts, 1)
+    return extra
+
+
+def _assert_fallback_recovery(sess: "otr.SerialSession", target: str, get: webflash.GetFn,
+                                t_trigger: float, args: argparse.Namespace,
+                                assertions: list[Assertion]) -> Optional[float]:
+    """`app_valid` true (or missing -- an older safeboot image): today's
+    fallback-to-app expectations, unchanged."""
     time.sleep(args.post_abort_settle_s)
     status_upd, _ = safe_get(get, f"http://{target}/update", 5.0)
     assertions.append(Assertion(
@@ -268,7 +310,69 @@ def assert_abort_and_fallback(sess: "otr.SerialSession", target: str, get: webfl
     assertions.append(Assertion("no serial ota;verify;result;ok", not_seen(sess, RE_OTA_VERIFY_OK, t_trigger)))
     assertions.append(Assertion("no serial ota;end;result;success", not_seen(sess, RE_OTA_END_SUCCESS, t_trigger)))
 
-    return (abort[1] if abort else None), (boot[1] if boot else None)
+    return boot[1] if boot else None
+
+
+def _assert_app_invalid_and_recover(sess: "otr.SerialSession", target: str, get: webflash.GetFn,
+                                      poster: webflash.PostFn, md5: str, fw: Path, t_trigger: float,
+                                      state: Optional[dict[str, Any]], args: argparse.Namespace,
+                                      assertions: list[Assertion]) -> Optional[float]:
+    """`app_valid` false: the single app slot holds an incomplete image
+    (docs/safeboot-ota-contract.md "Single app slot"). The node must hold
+    still in safeboot -- no fallback timer, no reboot loop -- until a
+    complete upload recovers it; that recovery upload is part of this
+    scenario's PASS, not a separate scenario."""
+    invalid_marker = wait_for_ts(sess, RE_APP_IMAGE, args.serial_timeout_s, since_ts=t_trigger)
+    assertions.append(Assertion(
+        "serial app;image;invalid after the abort",
+        invalid_marker is not None and invalid_marker[0].group("result") == "invalid",
+        (invalid_marker[0].group(0) if invalid_marker else "not seen")))
+
+    assertions.append(Assertion(
+        "fallback_in_ms == -1 (app invalid, no fallback possible)",
+        state is not None and state.get("fallback_in_ms") == -1,
+        f"fallback_in_ms={state.get('fallback_in_ms') if state else None}"))
+
+    time.sleep(args.app_invalid_settle_s)
+    status_upd, _ = safe_get(get, f"http://{target}/update", 5.0)
+    assertions.append(Assertion(
+        f"node stays in safeboot {args.app_invalid_settle_s:.0f}s with app invalid (/update still 200)",
+        status_upd == 200, f"HTTP {status_upd}"))
+    assertions.append(Assertion(
+        "no OTA UDATE started boot banner in that window (no reboot loop)",
+        not_seen(sess, RE_OTA_UPDATE_BANNER, t_trigger)))
+    assertions.append(Assertion(
+        "no serial fallback;reason;timeout while app invalid (no reboot loop)",
+        not_seen(sess, RE_FALLBACK_TIMEOUT, t_trigger)))
+
+    status_cancel, body_cancel = safe_get(get, f"http://{target}/ota/cancel", 10.0)
+    assertions.append(Assertion(
+        "/ota/cancel 409 app_invalid",
+        status_cancel == 409 and "app_invalid" in body_cancel,
+        f"HTTP {status_cancel} {body_cancel}"))
+
+    assertions.append(Assertion("no serial ota;verify;result;ok", not_seen(sess, RE_OTA_VERIFY_OK, t_trigger)))
+    assertions.append(Assertion("no serial ota;end;result;success", not_seen(sess, RE_OTA_END_SUCCESS, t_trigger)))
+
+    # -- recovery: a full upload (control flow) on the same safeboot session
+    # must succeed and bring the app back; this is part of the scenario's PASS.
+    status_start, body_start = safe_get(get, f"http://{target}/ota/start?mode=fr&hash={md5}", 10.0)
+    assertions.append(Assertion("recovery /ota/start 200", status_start == 200,
+                                 f"HTTP {status_start} {body_start}"))
+    t_recover = time.time()
+    up_status, up_body = poster(f"http://{target}/ota/upload", fw)
+    assertions.append(Assertion("recovery upload HTTP 200", up_status == 200,
+                                 f"HTTP {up_status} {up_body}"))
+    verify_ok = wait_for_ts(sess, RE_OTA_VERIFY_OK, args.serial_timeout_s, since_ts=t_recover)
+    assertions.append(Assertion("recovery serial ota;verify;result;ok", verify_ok is not None))
+    end_ok = wait_for_ts(sess, RE_OTA_END_SUCCESS, args.serial_timeout_s, since_ts=t_recover)
+    assertions.append(Assertion("recovery serial ota;end;result;success", end_ok is not None))
+    boot = wait_for_any_ts(sess, [otr.RE_BOOT_READY, otr.RE_CLIENT_STARTED], args.reboot_poll_s,
+                            since_ts=t_recover)
+    assertions.append(Assertion("app back after recovery upload ([BOOT];ready)", boot is not None))
+    assertions.append(Assertion("GET / answers after recovery", check_root(target, get)))
+
+    return boot[1] if boot else None
 
 
 # --- scenarios ---------------------------------------------------------------
@@ -313,8 +417,9 @@ def scenario_kill50(target: str, sess: "otr.SerialSession", fw: Path, args: argp
     """Kill the upload's TCP connection at ~50% of the body. The POST must
     end without a 200 (status 0 -- we closed it -- or a 4xx), the node must
     abort (client_disconnected/incomplete_upload/stalled) rather than switch
-    partitions, and must still recover through the fallback window."""
-    del poster  # unused: kill50 always drives the raw-socket path
+    partitions, and must then recover -- via a full upload on the same
+    session on our single-app-slot boards (`app_valid` false), or via the
+    fallback window otherwise (see `assert_abort_and_recover`)."""
     assertions: list[Assertion] = []
     t0 = time.time()
     md5 = hashlib.md5(fw.read_bytes()).hexdigest()
@@ -336,13 +441,10 @@ def scenario_kill50(target: str, sess: "otr.SerialSession", fw: Path, args: argp
                                  up_status == 0 or 400 <= up_status < 500,
                                  f"status={up_status} body={up_body!r}"))
 
-    abort_ts, boot_ts = assert_abort_and_fallback(
-        sess, target, get, t_upload, args, assertions,
+    extra = assert_abort_and_recover(
+        sess, target, get, poster, md5, fw, t_upload, args, assertions,
         expected_reasons=KILL_REASONS, abort_wait_s=40.0)
 
-    extra: dict[str, Any] = {}
-    if abort_ts is not None and boot_ts is not None:
-        extra["abort_to_boot_s"] = round(boot_ts - abort_ts, 1)
     return ScenarioResult("kill50", assertions, otr.wall_now(t0), extra=extra)
 
 
@@ -351,9 +453,8 @@ def scenario_stall(target: str, sess: "otr.SerialSession", fw: Path, args: argpa
                      controlled_poster: ControlledPostFn) -> ScenarioResult:
     """Pause the upload at ~50% for longer than the firmware's 30s stall
     watchdog (docs/safeboot-ota-contract.md's state machine constant). The
-    node must abort with reason `stalled` on its own, then recover through
-    the fallback window exactly like kill50."""
-    del poster  # unused: stall always drives the raw-socket path
+    node must abort with reason `stalled` on its own, then recover exactly
+    like kill50 (see `assert_abort_and_recover`)."""
     assertions: list[Assertion] = []
     t0 = time.time()
     md5 = hashlib.md5(fw.read_bytes()).hexdigest()
@@ -372,15 +473,12 @@ def scenario_stall(target: str, sess: "otr.SerialSession", fw: Path, args: argpa
         f"http://{target}/ota/upload", fw, controlled_poster=controlled_poster,
         stop_after_fraction=None, stall_after_fraction=0.5, stall_seconds=args.stall_seconds)
 
-    abort_ts, boot_ts = assert_abort_and_fallback(
-        sess, target, get, t_upload, args, assertions,
+    extra = assert_abort_and_recover(
+        sess, target, get, poster, md5, fw, t_upload, args, assertions,
         expected_reasons=STALL_REASONS, abort_wait_s=args.stall_seconds)
 
     upload_thread.join(timeout=max(5.0, args.stall_seconds))
 
-    extra: dict[str, Any] = {}
-    if abort_ts is not None and boot_ts is not None:
-        extra["abort_to_boot_s"] = round(boot_ts - abort_ts, 1)
     return ScenarioResult("stall", assertions, otr.wall_now(t0), extra=extra)
 
 
@@ -424,6 +522,18 @@ def scenario_doublestart(target: str, sess: "otr.SerialSession", fw: Path, args:
         stale is not None and stale[0].group("reason") in STALE_SESSION_REASONS,
         (stale[0].group("reason") if stale else "not seen")))
 
+    # Single app slot (docs/safeboot-ota-contract.md): the abandoned first
+    # session already wrote into it, so app_valid should have gone false --
+    # not re-asserted here (the second session below overwrites and
+    # revalidates it), but an older safeboot image that predates the field
+    # entirely should still be visible in the report.
+    state_after_stale = poll_state(target, get, args.serial_timeout_s)
+    has_app_valid = state_after_stale is not None and "app_valid" in state_after_stale
+    assertions.append(Assertion(
+        "app_valid reported (first session)", has_app_valid,
+        "" if has_app_valid else f"missing from /ota/state -- older safeboot image "
+                                  f"(state={state_after_stale})"))
+
     # Control-style assertions for the full upload on the (now sole) second session.
     t_second = time.time()
     up_status, up_body = poster(f"http://{target}/ota/upload", fw)
@@ -439,7 +549,8 @@ def scenario_doublestart(target: str, sess: "otr.SerialSession", fw: Path, args:
     assertions.append(Assertion(f"node back in the app within {args.reboot_poll_s:.0f}s", boot is not None))
     assertions.append(Assertion("GET / answers", check_root(target, get)))
 
-    return ScenarioResult("doublestart", assertions, otr.wall_now(t0))
+    extra = {"app_valid_first_session": state_after_stale.get("app_valid") if has_app_valid else "missing"}
+    return ScenarioResult("doublestart", assertions, otr.wall_now(t0), extra=extra)
 
 
 def scenario_cancel(target: str, sess: "otr.SerialSession", fw: Path, args: argparse.Namespace,
@@ -450,8 +561,10 @@ def scenario_cancel(target: str, sess: "otr.SerialSession", fw: Path, args: argp
     "Rebooting to app partition" line). Part B: GET /ota/cancel while an
     upload is in progress (stalled at ~50%) must be refused (400); recovery
     from that abandoned session is left to the next scenario's
-    between-scenario wait rather than re-checked here."""
-    del poster  # unused: cancel part B always drives the raw-socket path
+    between-scenario wait rather than re-checked here. Part C: after a kill
+    has left the single app slot invalid (docs/safeboot-ota-contract.md),
+    /ota/cancel must be refused with 409 app_invalid -- then a full recovery
+    upload on the same session must succeed."""
     assertions: list[Assertion] = []
     t0 = time.time()
     md5 = hashlib.md5(fw.read_bytes()).hexdigest()
@@ -502,6 +615,58 @@ def scenario_cancel(target: str, sess: "otr.SerialSession", fw: Path, args: argp
         assertions.append(Assertion("/ota/start 200 (part B)", False, "skipped: safeboot never came up"))
         assertions.append(Assertion("/ota/cancel 400 while an upload is in progress", False,
                                      "skipped: safeboot never came up"))
+
+    # -- Part C: cancel after a kill (app_valid false) must be refused, then
+    # a full recovery upload on the same session must succeed ---------------
+    safe_get(get, f"http://{target}/callfunction/?otaupdate", 10.0)
+    up3 = wait_safeboot_up(target, get, args.safeboot_poll_s)
+    assertions.append(Assertion("safeboot web server up (part C)", up3))
+    if up3:
+        status_start3, body_start3 = safe_get(get, f"http://{target}/ota/start?mode=fr&hash={md5}", 10.0)
+        assertions.append(Assertion("/ota/start 200 (part C)", status_start3 == 200,
+                                     f"HTTP {status_start3} {body_start3}"))
+
+        t_kill = time.time()
+        up_status3, up_body3 = controlled_poster(
+            f"http://{target}/ota/upload", fw, stop_after_fraction=0.5, stall_after_fraction=None,
+            stall_seconds=0.0)
+        assertions.append(Assertion(
+            "part C upload ends without a 200 (client killed at ~50%)",
+            up_status3 == 0 or 400 <= up_status3 < 500, f"status={up_status3} body={up_body3!r}"))
+
+        abort3 = wait_for_ts(sess, RE_OTA_ABORT, args.serial_timeout_s, since_ts=t_kill)
+        assertions.append(Assertion(
+            "part C serial ota;abort;reason;<r>", abort3 is not None,
+            (abort3[0].group("reason") if abort3 else "not seen")))
+
+        status_cancel3, body_cancel3 = safe_get(get, f"http://{target}/ota/cancel", 10.0)
+        assertions.append(Assertion(
+            "/ota/cancel 409 app_invalid (part C, after a kill)",
+            status_cancel3 == 409 and "app_invalid" in body_cancel3,
+            f"HTTP {status_cancel3} {body_cancel3}"))
+
+        status_start4, body_start4 = safe_get(get, f"http://{target}/ota/start?mode=fr&hash={md5}", 10.0)
+        assertions.append(Assertion("part C recovery /ota/start 200", status_start4 == 200,
+                                     f"HTTP {status_start4} {body_start4}"))
+        t_recover = time.time()
+        up_status4, up_body4 = poster(f"http://{target}/ota/upload", fw)
+        assertions.append(Assertion("part C recovery upload HTTP 200", up_status4 == 200,
+                                     f"HTTP {up_status4} {up_body4}"))
+        verify_ok4 = wait_for_ts(sess, RE_OTA_VERIFY_OK, args.serial_timeout_s, since_ts=t_recover)
+        assertions.append(Assertion("part C recovery serial ota;verify;result;ok", verify_ok4 is not None))
+        end_ok4 = wait_for_ts(sess, RE_OTA_END_SUCCESS, args.serial_timeout_s, since_ts=t_recover)
+        assertions.append(Assertion("part C recovery serial ota;end;result;success", end_ok4 is not None))
+        boot4 = wait_for_any_ts(sess, [otr.RE_BOOT_READY, otr.RE_CLIENT_STARTED], args.reboot_poll_s,
+                                 since_ts=t_recover)
+        assertions.append(Assertion("part C app back after recovery ([BOOT];ready)", boot4 is not None))
+        assertions.append(Assertion("GET / answers after part C recovery", check_root(target, get)))
+    else:
+        for name in ("/ota/start 200 (part C)", "part C upload ends without a 200 (client killed at ~50%)",
+                     "part C serial ota;abort;reason;<r>", "/ota/cancel 409 app_invalid (part C, after a kill)",
+                     "part C recovery /ota/start 200", "part C recovery upload HTTP 200",
+                     "part C recovery serial ota;verify;result;ok", "part C recovery serial ota;end;result;success",
+                     "part C app back after recovery ([BOOT];ready)", "GET / answers after part C recovery"):
+            assertions.append(Assertion(name, False, "skipped: safeboot never came up"))
 
     return ScenarioResult("cancel", assertions, otr.wall_now(t0))
 
@@ -663,7 +828,11 @@ def build_parser() -> argparse.ArgumentParser:
                           "rebooting via the 180s fallback window")
     ap.add_argument("--post-abort-settle-s", type=float, default=10.0,
                      help="kill50/stall: how long to wait after the abort before confirming the "
-                          "node is still holding in safeboot (/update still 200)")
+                          "node is still holding in safeboot (/update still 200) -- app_valid true path")
+    ap.add_argument("--app-invalid-settle-s", type=float, default=60.0,
+                     help="kill50/stall: how long to hold after the abort confirming no reboot "
+                          "loop (/update still 200, no OTA UDATE started banner, no "
+                          "fallback;reason;timeout) before the recovery upload -- app_valid false path")
     ap.add_argument("--cancel-wait-s", type=float, default=60.0,
                      help="cancel part A: time budget for the fallback + app boot")
     ap.add_argument("--doublestart-settle-s", type=float, default=1.0,

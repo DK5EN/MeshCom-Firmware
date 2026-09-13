@@ -47,6 +47,9 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
+APP_INVALID_NOTE = ("node reports: firmware image incomplete -- the node stays in the bootloader, "
+                     "upload a complete firmware to recover")
+
 DEFAULT_HOST = "dk5en-98.local"
 DEFAULT_ENV = "heltec_wifi_lora_32_V3"
 SAFEBOOT_POLL_S = 120
@@ -144,12 +147,16 @@ def fetch_ota_state(host: str, timeout: float = 5.0, get: GetFn = http_get) -> O
 def _state_fields(state: Optional[dict[str, Any]]) -> dict[str, Any]:
     """`/ota/state` JSON -> the subset of OtaResult kwargs it fills in, empty
     when there was no state to fetch (old node, or connection never got that
-    far)."""
+    far). `app_valid` is absent from `state` on a safeboot image that
+    predates the field (docs/safeboot-ota-contract.md "Single app slot") --
+    that comes through as `None`, same as a node that reported it explicitly
+    unknown; only an explicit `false` means the single app slot holds an
+    incomplete image."""
     if not state:
         return {}
     return dict(state=state.get("state"), reason=state.get("reason") or None,
                 received=state.get("received"), total=state.get("total"),
-                fallback_in_ms=state.get("fallback_in_ms"))
+                fallback_in_ms=state.get("fallback_in_ms"), app_valid=state.get("app_valid"))
 
 
 def app_back(info: Optional[dict[str, str]]) -> bool:
@@ -306,6 +313,10 @@ class OtaResult:
     received: Optional[int] = None
     total: Optional[int] = None
     fallback_in_ms: Optional[int] = None
+    # True/False from /ota/state's app_valid (docs/safeboot-ota-contract.md
+    # "Single app slot"); None when the node predates the field or no state
+    # was fetched at all.
+    app_valid: Optional[bool] = None
 
     def node_state_line(self) -> Optional[str]:
         """Human line for the node's own /ota/state at the time of failure, e.g.
@@ -699,6 +710,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         state_line = result.node_state_line()
         if state_line:
             print(f"  {state_line}")
+        if result.app_valid is False:
+            print(f"  {APP_INVALID_NOTE}")
         return 1
     a = result.after or {}
     print(f"Done: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "

@@ -317,6 +317,58 @@ static void test_fallback_in_ms_suspended_while_receiving_and_verifying(void) {
     TEST_ASSERT_EQUAL_INT32(-1, s.state().fallback_in_ms);
 }
 
+// ---------------------------------------------------------------------
+// 12. Single app slot: app_valid gates the fallback and cancel (bench
+// finding, docs/safeboot-ota-contract.md "Single app slot").
+// ---------------------------------------------------------------------
+static void test_app_invalid_suspends_fallback_and_refuses_cancel(void) {
+    OtaSession s;
+    s.begin(0);
+    s.setAppValid(false);
+
+    s.tick(400000);
+    TEST_ASSERT_EQUAL(0, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Timeout));
+    TEST_ASSERT_EQUAL_INT32(-1, s.state().fallback_in_ms);
+    TEST_ASSERT_FALSE(s.state().app_valid);
+
+    bool accepted = s.onCancelRequest(400100);
+    TEST_ASSERT_FALSE(accepted);
+    TEST_ASSERT_EQUAL(0, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Cancel));
+}
+
+static void test_app_invalid_then_good_upload_still_switches_partition(void) {
+    OtaSession s;
+    s.begin(0);
+    s.setAppValid(false);
+
+    uint32_t gen = s.onStart(1000, 100);
+    TEST_ASSERT_EQUAL_UINT32(1, gen);
+    s.onChunk(1010, 100);
+    s.onFinalReceived(1020);
+    s.onVerified(1030, true);
+
+    const OtaSession::Status& st = s.state();
+    TEST_ASSERT_EQUAL(OtaSession::State::Done, st.state);
+    TEST_ASSERT_TRUE(st.image_valid);
+    TEST_ASSERT_EQUAL(1, countActions(s, OtaSession::ActionType::SwitchPartition, OtaSession::Reason::None));
+}
+
+static void test_setappvalid_true_rearms_fallback_from_that_moment(void) {
+    OtaSession s;
+    s.begin(0);
+    s.setAppValid(false);
+    s.tick(50000); // app invalid for a while, now_ tracks this tick
+
+    s.setAppValid(true); // re-arms the fallback window starting at now_ (50000)
+    TEST_ASSERT_TRUE(s.state().app_valid);
+
+    s.tick(50000 + 179000);
+    TEST_ASSERT_EQUAL(0, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Timeout));
+
+    s.tick(50000 + 181000);
+    TEST_ASSERT_EQUAL(1, countActions(s, OtaSession::ActionType::RebootToApp, OtaSession::Reason::Timeout));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_good_path_reaches_done_with_one_switch_partition);
@@ -333,5 +385,8 @@ int main(int, char**) {
     RUN_TEST(test_fallback_timeout_reboots_to_app_after_180s);
     RUN_TEST(test_fallback_window_rearms_on_abort);
     RUN_TEST(test_fallback_in_ms_suspended_while_receiving_and_verifying);
+    RUN_TEST(test_app_invalid_suspends_fallback_and_refuses_cancel);
+    RUN_TEST(test_app_invalid_then_good_upload_still_switches_partition);
+    RUN_TEST(test_setappvalid_true_rearms_fallback_from_that_moment);
     return UNITY_END();
 }

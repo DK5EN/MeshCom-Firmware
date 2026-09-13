@@ -244,6 +244,15 @@
             color: #ffcf7a;
         }
 
+        .state-view #appInvalidNotice {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border: 1px solid #7a2020;
+            border-radius: 8px;
+            background: rgba(255, 80, 80, 0.12);
+            color: #ffb3b3;
+        }
+
         path { fill: rgb(175,40,51);}
     </style>
 </head>
@@ -322,6 +331,7 @@
             <div id="stateReason" hidden></div>
             <div><span id="stateBytes"></span> <span id="statePercent"></span></div>
             <div id="fallbackLine" hidden></div>
+            <div id="appInvalidNotice" hidden>The firmware image on this node is incomplete (an upload was aborted after it had started writing). There is no previous firmware to fall back to: the node stays in the bootloader until a complete firmware upload succeeds. Select the firmware file and upload again.</div>
         </div>
     </div>
     <div class="panel" id="networkPanel">
@@ -413,6 +423,7 @@
         const stateBytes = document.getElementById('stateBytes');
         const statePercent = document.getElementById('statePercent');
         const fallbackLine = document.getElementById('fallbackLine');
+        const appInvalidNotice = document.getElementById('appInvalidNotice');
 
         const MODE_LABEL = { sta: 'Wifi-Client', ap_sta: 'Auto-AP + Wifi-Client', ap: 'Auto-AP' };
 
@@ -444,9 +455,20 @@
         let uploadInProgress = false;
         let scanInProgress = false;
         let staConfigured = false;
+        // Assumed valid until /ota/state says otherwise; also stays true for
+        // older nodes whose /ota/state JSON has no app_valid field at all
+        // (today's behaviour, per the contract's "when missing" case).
+        let appValid = true;
 
         function updateRescanButton() {
             rescanButton.disabled = uploadInProgress || scanInProgress || !staConfigured;
+        }
+
+        function updateCancelButton() {
+            const invalid = (appValid === false);
+            cancelBtn.disabled = uploadInProgress || invalid;
+            cancelBtn.style.backgroundColor = cancelBtn.disabled ? '#444' : '#007BFF';
+            cancelBtn.title = invalid ? 'No valid firmware to boot into' : '';
         }
 
         function renderInfo(info) {
@@ -533,7 +555,13 @@
                 statePercent.textContent = '';
             }
 
-            if (typeof st.fallback_in_ms === 'number' && st.fallback_in_ms >= 0) {
+            // Missing app_valid (older node) keeps today's behaviour: treated
+            // as valid, no notice, fallback line follows fallback_in_ms alone.
+            appValid = (st.app_valid === false) ? false : true;
+            appInvalidNotice.hidden = appValid;
+            updateCancelButton();
+
+            if (appValid && typeof st.fallback_in_ms === 'number' && st.fallback_in_ms >= 0) {
                 fallbackLine.textContent = 'Fallback to app in ' + Math.round(st.fallback_in_ms / 1000) + ' s';
                 fallbackLine.hidden = false;
             } else {
@@ -738,18 +766,18 @@
                     } else {
                         status.textContent = `Error: ${xhr.status} - ${xhr.responseText}`;
                         finishedWithErr = true;
-                        cancelBtn.style.backgroundColor = '#007BFF';
-                        cancelBtn.disabled = false;
+                        endUpload();
+                        updateCancelButton();
+                        return;
                     }
                     endUpload();
                 };
 
                 xhr.onerror = () => {
                     status.textContent = 'An error occurred during the upload.';
-                    cancelBtn.style.backgroundColor = '#007BFF';
-                    cancelBtn.disabled = false;
                     finishedWithErr = true;
                     endUpload();
+                    updateCancelButton();
                 };
 
                 xhr.send(formData);
@@ -772,7 +800,12 @@
                     }
                 });
                 if (cancelResponse.status !== 200) {
-                    status.textContent = `Error Cancel: ${await cancelResponse.text()}`;
+                    const cancelBody = await cancelResponse.text();
+                    if (cancelResponse.status === 409 && cancelBody.trim() === 'app_invalid') {
+                        status.textContent = 'Cancel not possible: no valid firmware to boot into. Upload a complete firmware.';
+                    } else {
+                        status.textContent = `Error Cancel: ${cancelBody}`;
+                    }
                 } else {
                     status.textContent = "Cancel successful! Rebooting...";
                 }

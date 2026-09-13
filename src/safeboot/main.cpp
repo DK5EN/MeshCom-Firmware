@@ -13,6 +13,7 @@
 
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
+#include <esp_image_format.h>
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -23,6 +24,15 @@
 #include "../esp32/esp32_flash.h"
 
 #define TAG "SafeBoot"
+
+// 0: validate ota_0 via esp_image_verify() (bootloader_support, linked in by
+//    esp_ota_ops.c) without touching the boot pointer -- the normal path.
+// 1: fallback for a toolchain where esp_image_verify() does not link --
+//    validate by attempting esp_ota_set_boot_partition() itself and reading
+//    its verdict (see checkAppImageValid()).
+#ifndef SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION
+#define SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION 0
+#endif
 
 const unsigned int port = 80;
 AsyncWebServer webServer(port);
@@ -45,7 +55,18 @@ safeboot::OtaSession g_ota;
 portMUX_TYPE g_ota_mux = portMUX_INITIALIZER_UNLOCKED;
 
 void startMDNS();
-void setBootPartition_APP();
+bool setBootPartition_APP();
+bool checkAppImageValid();
+
+// Re-checks the ota_0 image (boot, and after every drained Abort action --
+// docs/safeboot-ota-contract.md "Single app slot") and feeds the verdict
+// into g_ota under the spinlock.
+static void refreshAppValid() {
+  bool valid = checkAppImageValid();
+  portENTER_CRITICAL(&g_ota_mux);
+  g_ota.setAppValid(valid);
+  portEXIT_CRITICAL(&g_ota_mux);
+}
 
 // ---------------------------------------------------------------------------
 // WiFi bookkeeping for the non-blocking join / AP-fallback / scan (contract
@@ -325,18 +346,65 @@ void wifiConnect() {
  }
 
 
- // set partition to ota_0 and reboot
- void setBootPartition_APP()
+ // Set partition to ota_0. Returns whether the switch actually succeeded --
+ // on the single app slot (docs/safeboot-ota-contract.md "Single app slot")
+ // this fails (ESP_ERR_OTA_VALIDATE_FAILED) when ota_0 holds a half-written
+ // image, e.g. right after a kill-mid-upload abort; the caller must not
+ // reboot in that case, or it loops straight back into safeboot.
+ bool setBootPartition_APP()
  {
    const esp_partition_t *partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
-   if (partition)
-   {
-     esp_ota_set_boot_partition(partition);
-   }
-   else
+   if (!partition)
    {
      Serial.println("Error setting boot partition!");
+     Serial.println("[SAFEBOOT];fallback;result;app_invalid;rc;-1");
+     return false;
    }
+   esp_err_t rc = esp_ota_set_boot_partition(partition);
+   bool ok = (rc == ESP_OK);
+   Serial.printf("[SAFEBOOT];fallback;result;%s;rc;%d\n", ok ? "ok" : "app_invalid", (int)rc);
+   return ok;
+ }
+
+ // Validates the ota_0 image without switching the boot pointer (bench
+ // finding, docs/safeboot-ota-contract.md "Single app slot"): called once at
+ // boot and again after every Abort action this session drains, since an
+ // abort that landed after chunks were written is exactly the case that
+ // invalidates the single app slot. esp_image_verify() comes from
+ // bootloader_support, which esp_ota_ops.c already links into every
+ // arduino-esp32 app -- if that ever stops being true in this toolchain,
+ // the fallback below (attempting the real esp_ota_set_boot_partition() and
+ // reading its verdict, undoing it immediately) is exactly the check the
+ // fallback-to-app path would perform anyway, just run early instead of at
+ // reboot time.
+ bool checkAppImageValid()
+ {
+   const esp_partition_t *partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
+   if (!partition)
+   {
+     Serial.println("[SAFEBOOT];app;image;invalid;rc;-1");
+     return false;
+   }
+
+#if SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION
+   // Fallback path: esp_image_verify() did not link. The boot-partition
+   // switch validates the image as its own side effect (ESP_ERR_OTA_
+   // VALIDATE_FAILED on a half-written image), so use that verdict directly
+   // -- this is exactly what the fallback-to-app reboot would do anyway,
+   // just performed here instead of at reboot time so the state machine can
+   // stay quiet in the meantime.
+   esp_err_t rc = esp_ota_set_boot_partition(partition);
+   bool valid = (rc == ESP_OK);
+#else
+   esp_partition_pos_t pos;
+   pos.offset = partition->address;
+   pos.size = partition->size;
+   esp_image_metadata_t data;
+   esp_err_t rc = esp_image_verify(ESP_IMAGE_VERIFY_SILENT, &pos, &data);
+   bool valid = (rc == ESP_OK);
+#endif
+   Serial.printf("[SAFEBOOT];app;image;%s;rc;%d\n", valid ? "valid" : "invalid", (int)rc);
+   return valid;
  }
 
 
@@ -416,6 +484,19 @@ void wifiConnect() {
 
    //endpoint for canceling the update. Only works if the update has not started yet
    webServer.on("/ota/cancel", HTTP_GET, [](AsyncWebServerRequest *request) {
+     bool app_valid;
+     portENTER_CRITICAL(&g_ota_mux);
+     app_valid = g_ota.state().app_valid;
+     portEXIT_CRITICAL(&g_ota_mux);
+     if (!app_valid)
+     {
+       // Single app slot (docs/safeboot-ota-contract.md): a cancel would
+       // just reboot into the same half-written image. Checked before the
+       // in-progress check below.
+       request->send(409, "text/plain", "app_invalid");
+       return;
+     }
+
      bool accepted;
      portENTER_CRITICAL(&g_ota_mux);
      accepted = g_ota.onCancelRequest(millis());
@@ -510,10 +591,11 @@ void wifiConnect() {
      int off = 0;
      off = appendf(g_json_buf, sizeof(g_json_buf), off,
        "{\"state\":\"%s\",\"reason\":\"%s\",\"generation\":%lu,\"received\":%lu,\"total\":%lu,"
-       "\"image_valid\":%s,\"fallback_in_ms\":%ld,\"uptime_ms\":%lu}",
+       "\"image_valid\":%s,\"app_valid\":%s,\"fallback_in_ms\":%ld,\"uptime_ms\":%lu}",
        safeboot::OtaSession::stateName(st.state), safeboot::OtaSession::reasonName(st.reason),
        (unsigned long)st.generation, (unsigned long)st.received, (unsigned long)st.total,
-       st.image_valid ? "true" : "false", (long)st.fallback_in_ms, (unsigned long)millis());
+       st.image_valid ? "true" : "false", st.app_valid ? "true" : "false",
+       (long)st.fallback_in_ms, (unsigned long)millis());
 
      AsyncWebServerResponse *response = request->beginResponse(200, "application/json", g_json_buf);
      response->addHeader("Cache-Control", "no-store");
@@ -546,6 +628,11 @@ void wifiConnect() {
    g_ota.begin(millis());
    portEXIT_CRITICAL(&g_ota_mux);
 
+   // Boot-time check of the ota_0 image (docs/safeboot-ota-contract.md
+   // "Single app slot"): a prior kill-mid-upload can leave the single app
+   // slot half-written, in which case the fallback-to-app timer must stay
+   // suspended (g_ota.setAppValid(false)) instead of looping every 180 s.
+   refreshAppValid();
  }
 
  void loop() {
@@ -679,6 +766,12 @@ void wifiConnect() {
      switch (action.type) {
        case safeboot::OtaSession::ActionType::Abort:
          ElegantOTA.abortActiveUpdate(safeboot::OtaSession::reasonName(action.reason));
+         // An abort that landed after chunks were written into the single
+         // app slot is exactly the case that can invalidate ota_0 (bench
+         // finding, docs/safeboot-ota-contract.md "Single app slot") --
+         // re-check now so the fallback timer stays suspended instead of
+         // looping.
+         refreshAppValid();
          break;
 
        case safeboot::OtaSession::ActionType::SwitchPartition:
@@ -701,7 +794,15 @@ void wifiConnect() {
          // safeboot/factory partition explicitly on safeboot entry (see
          // command_functions.cpp), so it must be pointed back at the app
          // here, or ESP.restart() would boot straight back into safeboot.
-         setBootPartition_APP();
+         // Single app slot (bench finding): on a half-written ota_0 this
+         // switch fails (ESP_ERR_OTA_VALIDATE_FAILED) -- only restart when
+         // it actually succeeded, or this becomes the 180 s reboot loop
+         // the fix is for. g_ota should already be quiet in that case
+         // (app_valid is refreshed after every Abort, above) but this is
+         // kept as its own guard rather than trusting that alone.
+         if (!setBootPartition_APP()) {
+           break;
+         }
          delay(1000);
          ESP.restart();
          break;

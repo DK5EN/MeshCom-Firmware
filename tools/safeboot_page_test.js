@@ -161,6 +161,32 @@ const STATE_DONE = {
   uptime_ms: 99000,
 };
 
+// Single-app-slot case: an abort left the app partition half-written, so
+// there is no firmware to fall back to (docs/safeboot-ota-contract.md).
+const STATE_ABORTED_APP_INVALID = {
+  state: 'aborted',
+  reason: 'incomplete_upload',
+  generation: 3,
+  received: 1048576,
+  total: 2182465,
+  image_valid: false,
+  app_valid: false,
+  fallback_in_ms: -1,
+  uptime_ms: 98000,
+};
+
+const STATE_ABORTED_APP_VALID = {
+  state: 'aborted',
+  reason: 'stalled',
+  generation: 4,
+  received: 500,
+  total: 2000,
+  image_valid: false,
+  app_valid: true,
+  fallback_in_ms: 179000,
+  uptime_ms: 1000,
+};
+
 (async () => {
   // ---------- info render ----------
   {
@@ -218,6 +244,83 @@ const STATE_DONE = {
 
     win.__safeboot.renderState(STATE_DONE);
     check('done: state text mentions rebooting', q(win, 'stateText').textContent.includes('Rebooting'), q(win, 'stateText').textContent);
+
+    dom.window.close();
+  }
+
+  // ---------- state render: app_valid false (single-app-slot lockout) ----------
+  {
+    const dom = await loadPage();
+    const win = dom.window;
+
+    // Baseline: app_valid true keeps the notice hidden and the cancel button enabled.
+    win.__safeboot.renderState(STATE_ABORTED_APP_VALID);
+    check('app_valid true: notice hidden', q(win, 'appInvalidNotice').hidden === true);
+    check('app_valid true: cancel button enabled', q(win, 'cancelButton').disabled === false);
+    check('app_valid true: fallback line shown', q(win, 'fallbackLine').hidden === false);
+
+    win.__safeboot.renderState(STATE_ABORTED_APP_INVALID);
+    check('app_valid false: notice shown', q(win, 'appInvalidNotice').hidden === false);
+    check('app_valid false: notice text matches the contract wording',
+      q(win, 'appInvalidNotice').textContent.includes('stays in the bootloader until a complete firmware upload succeeds'),
+      q(win, 'appInvalidNotice').textContent);
+    check('app_valid false: fallback line hidden (fallback_in_ms is -1)', q(win, 'fallbackLine').hidden === true);
+    check('app_valid false: abort reason line stays visible', q(win, 'stateReason').hidden === false);
+    check('app_valid false: cancel button disabled', q(win, 'cancelButton').disabled === true);
+    check('app_valid false: cancel button has the tooltip', q(win, 'cancelButton').title === 'No valid firmware to boot into', q(win, 'cancelButton').title);
+
+    // app_valid turning true again (a fresh upload succeeded): notice hides,
+    // button re-enables, tooltip clears.
+    win.__safeboot.renderState(STATE_ABORTED_APP_VALID);
+    check('app_valid true again: notice hidden', q(win, 'appInvalidNotice').hidden === true);
+    check('app_valid true again: cancel button re-enabled', q(win, 'cancelButton').disabled === false);
+    check('app_valid true again: tooltip cleared', q(win, 'cancelButton').title === '');
+
+    // Older node: /ota/state has no app_valid field at all -> today's behaviour.
+    win.__safeboot.renderState(STATE_ABORTED);
+    check('app_valid missing: notice stays hidden', q(win, 'appInvalidNotice').hidden === true);
+    check('app_valid missing: cancel button stays enabled', q(win, 'cancelButton').disabled === false);
+    check('app_valid missing: fallback line still shown', q(win, 'fallbackLine').hidden === false);
+
+    dom.window.close();
+  }
+
+  // ---------- cancelUpdate: 409 app_invalid ----------
+  {
+    const fetchImpl = async (url) => {
+      const u = String(url);
+      if (u.includes('/ota/cancel')) {
+        return { status: 409, text: async () => 'app_invalid' };
+      }
+      return hangingFetch();
+    };
+    const dom = await loadPage(fetchImpl);
+    const win = dom.window;
+
+    await win.cancelUpdate();
+    const statusText = q(win, 'status').textContent;
+    check('cancel 409 app_invalid: mapped text shown',
+      statusText === 'Cancel not possible: no valid firmware to boot into. Upload a complete firmware.',
+      statusText);
+
+    dom.window.close();
+  }
+
+  // ---------- cancelUpdate: other 409/400 keeps the existing generic text ----------
+  {
+    const fetchImpl = async (url) => {
+      const u = String(url);
+      if (u.includes('/ota/cancel')) {
+        return { status: 400, text: async () => 'busy' };
+      }
+      return hangingFetch();
+    };
+    const dom = await loadPage(fetchImpl);
+    const win = dom.window;
+
+    await win.cancelUpdate();
+    const statusText = q(win, 'status').textContent;
+    check('cancel other 400: existing "Error Cancel:" text kept', statusText === 'Error Cancel: busy', statusText);
 
     dom.window.close();
   }

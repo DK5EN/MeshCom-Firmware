@@ -84,7 +84,11 @@ public:
         uint32_t received;
         uint32_t total;
         bool image_valid;
-        int32_t fallback_in_ms; // -1 while receiving/verifying
+        bool app_valid; // false: the ota_0 slot holds an unverified/half-written
+                         // image (a boot-time check failed, or an abort landed
+                         // after chunks were written); see setAppValid().
+        int32_t fallback_in_ms; // -1 while receiving/verifying, and -1 while
+                                 // app_valid is false (no fallback possible).
     };
 
     static constexpr uint32_t STALL_MS = 30000;
@@ -196,17 +200,39 @@ public:
         refreshStatus();
     }
 
-    // GET /ota/cancel. Refused (false, HTTP 400 upstream) while an upload
-    // is actively in flight; otherwise queues an immediate reboot to the
-    // app and returns true.
+    // GET /ota/cancel. Refused (false, HTTP 400/409 upstream) while an
+    // upload is actively in flight, or while the app partition does not
+    // hold a valid image (single app slot -- a cancel would just reboot
+    // into the same half-written image, see setAppValid()); otherwise
+    // queues an immediate reboot to the app and returns true.
     bool onCancelRequest(uint32_t now) {
         now_ = now;
-        bool accepted = !(state_ == State::Receiving || state_ == State::Verifying);
+        bool accepted = app_valid_ && !(state_ == State::Receiving || state_ == State::Verifying);
         if (accepted) {
             pushAction(ActionType::RebootToApp, Reason::Cancel);
         }
         refreshStatus();
         return accepted;
+    }
+
+    // Set by the caller after checking the app_0 partition at boot and
+    // after every drained Abort action (docs/safeboot-ota-contract.md,
+    // "Single app slot"). While false: tick() never emits
+    // RebootToApp(timeout) and does not re-arm anything; fallback_in_ms
+    // reports -1; onCancelRequest() is refused. Flipping back to true
+    // re-arms the fallback window starting now (the most recent time seen
+    // by this session, i.e. from whichever call -- tick/onStart/onChunk/
+    // onVerified/etc -- most recently ran), regardless of when it last
+    // elapsed while suspended. onVerified(ok=true) is unaffected by this
+    // flag either way: a complete upload always proceeds to Done +
+    // SwitchPartition, and the caller re-checks the image and calls
+    // setAppValid(true) afterwards.
+    void setAppValid(bool v) {
+        app_valid_ = v;
+        if (v) {
+            fallback_armed_ms_ = now_;
+        }
+        refreshStatus();
     }
 
     // Called periodically (main loop). May queue ABORT(stalled) when
@@ -221,9 +247,11 @@ public:
                 doAbort(now, Reason::Stalled);
             }
         } else if (state_ == State::Idle || state_ == State::Aborted) {
-            int32_t delta = static_cast<int32_t>(now - fallback_armed_ms_);
-            if (delta > static_cast<int32_t>(fallback_ms_)) {
-                pushAction(ActionType::RebootToApp, Reason::Timeout);
+            if (app_valid_) {
+                int32_t delta = static_cast<int32_t>(now - fallback_armed_ms_);
+                if (delta > static_cast<int32_t>(fallback_ms_)) {
+                    pushAction(ActionType::RebootToApp, Reason::Timeout);
+                }
             }
         }
         refreshStatus();
@@ -296,7 +324,8 @@ private:
         status_.received = received_;
         status_.total = total_;
         status_.image_valid = image_valid_;
-        if (state_ == State::Receiving || state_ == State::Verifying) {
+        status_.app_valid = app_valid_;
+        if (state_ == State::Receiving || state_ == State::Verifying || !app_valid_) {
             status_.fallback_in_ms = -1;
         } else {
             int32_t elapsed = static_cast<int32_t>(now_ - fallback_armed_ms_);
@@ -317,6 +346,7 @@ private:
     uint32_t received_ = 0;
     uint32_t total_ = 0;
     bool image_valid_ = false;
+    bool app_valid_ = true;
 
     uint32_t now_ = 0;
     uint32_t last_data_ms_ = 0;
