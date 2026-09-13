@@ -1,5 +1,73 @@
 # RESUME — pick up here
 
+## 2026-09-13 (late morning): DS-03 long-press deep sleep has an automated bench test
+
+`tools/bench/deepsleep_button.py` (`866e328f`, design `docs/deepsleep-button-autotest.md`,
+`276c513b`): on the Heltec V3 the CP2102 DTR line is GPIO0, so `ser.dtr=True` for 2 s is the
+long press and a 200 ms pulse is the wake press; RTS is never touched. Per cycle it expects
+`GO to deepsleep`, 15 s without a boot signature, then `RESET_REASON=8 DEEPSLEEP` plus the new
+`[BOOT] WAKE_CAUSE=3 EXT1` line (`a3bd7f19`, raw print on every ESP32 board) and a `--info`
+answer. Exit 0/1/2 = pass/regression/harness error, JSON under `tools/bench/runs/`. **Runs on
+DK5EN-93**: PASS on the fork image (2 cycles, GO at ~880 ms, boot ready ~7.7 s), REGRESSION on
+official v4.35t (reboot 815 ms after GO while still held -- the field defect), PASS again after the reflash (868/877 ms). JSON summaries `tools/bench/runs/deepsleep_button_20260913-10{0632,0816,0945}.json`.
+Two things the plan doc got wrong and the run corrected: no wake-cause print existed, and
+`--oledstat` is bench-only (probe is `--info`). Gate: Heltec V3, T-Deck Plus, T-Beam classic
+built, 673/673 native. DK5EN-93 is back on the fork image with `--button on` (its prior state).
+
+## 2026-09-13: T-Deck mute fix (INS-04) on fork-main, PR to upstream dev
+
+Field report: on a T-Deck Plus running 4.35t the message tone cannot be switched off. Cause:
+`--mute on/off` and the four persistence commands sat inside `#if INSTRUMENT_ENABLED` in
+`commandAction()` since the firmware-only cut; INS-01 missed them. The GUI "Sound on" switch
+calls exactly that command since HL-03, so it was a no-op in every shipped image (upstream
+v4.35t, v4.35t.09.12, fork 09.12.2). Bugreport `docs/bugreport-tdeck-mute-4.35t.md`, BACKLOG
+§3.8ag. **Fixed** `e8f16117` (five handlers moved into their own T-Deck field block ahead of the
+guard) + `62d16acf` (SYM+M toggles through `--mute` so it saves). Gates: t_deck, t_deck_plus,
+Heltec V3, RAK4631 built; 673/673 native; string scan of both T-Deck images `[AUDIO];mute;` 2,
+`[PERSIST];stat;` 1, `injectraw` 0. **Bench** DK5EN-14 flashed with the fixed `t_deck_plus`
+(build Sep 13 09:32): `--mute off` -> `[AUDIO];mute;0` and `[PERSIST];stat;...mute;0`, survives
+`--reboot` (boot CW tone audible in the log at 0: `[AUDIO];play;cw;start`); `--mute on` -> 1,
+survives reboot, no boot tone; node left at its original state mute 1. SYM+M not hand-tested
+(node has KEYLOCK on). PR branch `pr-tdeck-mute-20260913` on upstream `1cb2d9e6` in the `-pr`
+worktree, two cherry-picked commits: [PR #1141](https://github.com/icssw-org/MeshCom-Firmware/pull/1141) opened 2026-09-13 (state OPEN, two commits `708eaf22`/`a577f4fb`, t_deck_plus + Heltec V3 built in the worktree, scan mute=2 stat=1 injectraw=0). Draft
+`docs/pr-tdeck-mute-draft-20260913.md`.
+
+**Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
+`usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
+esptool attempt went against the RAK on `usbmodem101` and failed to connect; the RAK then
+echoed esptool's sync frames (`UUUU...$`) for minutes and did not answer `--info`. It drained the garbage on its own: at 09:45 (about 14 min later) it printed `...wrong command` for the esptool frames and answered `--info` again as DK5EN-90 with uptime 22540 s, so no reboot and nothing to repair.
+
+## 2026-09-12 (late): v4.35t.09.12.2 published -- items 212-221, replaces v4.35t.09.10
+
+Release `v4.35t.09.12.2` is on GitHub, 39 assets (names diff-identical to 09.10), tag on
+`cb263f3f`, `--latest`. The `v4.35t.09.10` release object is deleted, its tag stays. Ten items:
+APRS parser wave 212-216, web GUI destination 217, the three 4.35t field fixes 218-220, upstream
+sync 221 (`ce7d7f1e` on upstream `dev` `1cb2d9e6` = upstream's merge of our PR #1140; pure
+ancestry merge, no source change). `FLASH_VERSION` 20260912, every ESP32 image checked for the
+integer. Gates: 673 native cases in 12 host envs, 32 envs built, safeboot bins unchanged.
+
+**Two framing changes for every future release text.** (1) Upstream released official `v4.35t`
+on 2026-09-10 with our PR #1135 inside, so items 104-210 are official now and the letter `t` no
+longer marks the fork -- only the flash stamp does (`20260912` vs `20260909`). Fork-only code
+against upstream `dev` is down to items 212-217, safeboot (153/154/186), `--port` (151), the
+eleven native envs, the `[KBL]` bench marker and `FLASH_VERSION`. (2) Upstream tagged `dev` as
+`v4.35t.09.12` a few hours before our cut (empty release, no assets), so our tag carries `.2`;
+check `git ls-remote --tags upstream` before naming a tag from now on.
+
+**Bench this cycle**: DK5EN-93 long-press two cycles (218), DK5EN-98 item 217 via jsdom after
+OTA, DK5EN-14 keylock_kbl harness + hand test on an instrument image (219), OE3LCR's field
+confirmation of item 200. **Not run**: no board on the published image itself; APRS 212-216 never
+seen on hardware (APRS-02 still open); Supreme 220 compile-only, field confirmation owed; RAK4631
+deep-sleep path changed (218, 221) without a re-run, node sits in System OFF; T114/T-Echo
+compile-only. **Fleet flashed with the release image 2026-09-12 late**: DK5EN-93 and -92 over
+USB (esptool, T-Beam at 460800), DK5EN-90 over serial DFU after its reset button, DK5EN-14
+(192.168.68.73, `dk5en-14.local`) and dk5en-98 over `tools/webflash.py`; all five report build
+Sep 12 2026 and `build 20260912`, radios listening. Tool note: on the T-Deck the webflash
+"node up" poll accepted the old app's page before the reboot and the final query then failed
+("Meshcom ? build ?") -- the flash itself succeeded. **Fixed the same night** (`8b4c67c4`): the
+poll accepts only the app page with a build string, an unchanged build is flagged, the
+pre-OTA line is labelled as such; self-test carries a scripted whole-flow regression. Next: APRS-02 proof on the fleet, then the PR for 212-217 (APRS-04).
+
 ## Consolidated open list, 2026-09-11 evening
 
 Everything still owed, grouped by what unblocks it. IDs point at BACKLOG rows; this list is the
@@ -12,7 +80,18 @@ one to update when an item moves.
   `--path` and the T-Deck path tab (52-byte buffer, `/mhpath.dat` discarded once).
 - `APRS-03` ops: MCProxy `9501bb0` onto the Pi; phone test of the merged app PR #8.
 - `APRS-04` PRs: firmware PR for N-32..N-35 after APRS-02; app PR for `aprs-position-name` only
-  on request. Then the release cut for items 212-217.
+  on request. Release cut done 2026-09-12 (`v4.35t.09.12.2`, items 212-221).
+
+- `DS-03`/`TD-16`/`TM-09` upstream [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/1140) **submitted and merged upstream 2026-09-12** (`1cb2d9e6`; long-press deep sleep,
+  T-Deck keylock light, T-Beam Supreme display hang): branch `pr-deepsleep-keylock-20260912`
+  (worktree `MeshCom-Firmware-DEV-Main-pr`), three commits on upstream `dev` `c17c07c0`, draft `pr-deepsleep-keylock-draft-20260912.md`. The Supreme fix is compile-only
+  here (no board); field confirmation with the fix build is open. Heltec V3 hold-the-button test passed
+  2026-09-12 (two cycles, DK5EN-93). Still owed on the bench: the RAK4631 re-test of serial `--deepsleep` with the `bButtonCheck` gate (node is in
+  System OFF, needs its reset button first). T114/T-Echo compile-only.
+- `DS-02` **closed 2026-09-11**: OE3LCR field-verified the `gpio_hold_dis(PIN_LORA_NSS)` wake path
+  on E213 (OE3LCR-11) and Wireless Paper V1.2 (OE3LCR-10) in the PR #1135 thread; EXT1 wake
+  (`wake: 3`), radio init and SPI traffic fine. Probably a practical no-op, kept as a guard.
+  The WP/E213 sleep/wake item drops off the community test list.
 
 **B. Next engineering work, in order**
 

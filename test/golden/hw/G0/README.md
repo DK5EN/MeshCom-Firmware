@@ -26,7 +26,7 @@ set. Done 2026-09-11, 0 unexplained absences on the four shipping envs.
 
 ## The branch has moved one command past this tag
 
-`--keylock` was added after `dry-base-20260911` (the `TD-16` fix, commit
+`--keylock` was added after `dry-base-20260911` (the `TD-19` fix, commit
 `76302aab`). It is **two** ladder entries, `keylock on ` and `keylock off `, so
 the corpus in `test/golden/corpus/commands/` holds **305** entries where the
 branch head has 307. Verified by diffing the extractor against the committed

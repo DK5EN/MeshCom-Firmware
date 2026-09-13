@@ -998,7 +998,7 @@ def _pct(values: Sequence[float], q: float) -> Optional[float]:
 
 def _keylock_state(session: TDeckSession) -> Optional[bool]:
     """True/False from the `...KEYLOCK on|off` field of --info, None if the
-    node did not answer with that line. TD-16: a persisted SYM+K lock makes
+    node did not answer with that line. TD-19: a persisted SYM+K lock makes
     touch and keyboard dead while every other symptom reads as a crash."""
     idx = session.send("--info")
     session.wait_for(r"KEYLOCK\s+(on|off)", 4.0, since=idx)
@@ -1040,7 +1040,7 @@ def scenario_input(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
             "error": "keyboard lock is %s -- a SYM+K lock gates key delivery to LVGL "
                      "while the [KEY] lines keep printing, so this scenario cannot "
                      "measure the keyboard. Clear it with --keylock off and re-run "
-                     "(TD-16/TD-18)." % ("on" if lock else "unreadable"),
+                     "(TD-19/TD-18)." % ("on" if lock else "unreadable"),
             "keylock": lock,
         }
     session.send("--tft on")
@@ -1966,6 +1966,61 @@ def scenario_sleep(session: TDeckSession, args: argparse.Namespace) -> Dict[str,
     }
 
 
+def scenario_keylock_kbl(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """Keyboard backlight must stay dark when a message wakes the panel while
+    the keylock is engaged (field report 2026-09-11, docs/bugreport-tdeck-
+    keylock-kbl.md).
+
+    The keylock is engaged the way the keyboard does it: SYM+K arrives from
+    the controller as key code 0x27, so `--key '` (apostrophe = 0x27) walks the
+    identical keypad_read() branch. tft_off() then writes [KBL];set;0. The
+    injected message is the only wake source not gated by the keylock and
+    reaches tft_on() via msg_focus_and_alert().
+
+    Bug signature: the removed block forced setKeyboardBacklight(150). 150 is
+    neither 0, 255 nor a multiple of 16 -- the only values setBrightness()'s
+    own sync ever writes -- so a [KBL];set;150 after the message is the defect
+    itself, whatever the operator's KBL setting on this unit.
+    """
+    session.send("--tab 0")
+    time.sleep(0.3)
+
+    # a. engage the keylock via SYM+K and confirm through --info.
+    lock_idx = session.send("--key '")
+    key_acked = session.wait_for(r"\[KEY\];27;", 2.0, since=lock_idx) is not None
+    kbl_off_on_lock = session.wait_for(r"\[KBL\];set;0\b", 2.0, since=lock_idx) is not None
+    info_idx = session.send("--info")
+    locked = session.wait_for(r"KEYLOCK on", 4.0, since=info_idx) is not None
+    time.sleep(0.5)
+
+    # b. a message arrives while locked: panel may wake, keyboard must not.
+    inj_idx = session.send(f"--injectmsg {TEST_GROUP} keylock kbl probe")
+    inject_ok = session.wait_for(r"\[INJECT\];ok", 2.0, since=inj_idx) is not None
+    tft_on_seen = session.wait_for(r"\[TFT\];on;", 3.0, since=inj_idx) is not None
+    window = session.collect(1.5, since=inj_idx)
+    kbl_writes = [int(m.group(1)) for m in (re.search(r"\[KBL\];set;(\d+)", l) for l in window) if m]
+    forced_150 = 150 in kbl_writes
+
+    # c. release the keylock again (SYM+K toggles) and confirm.
+    unlock_idx = session.send("--key '")
+    session.wait_for(r"\[KEY\];27;", 2.0, since=unlock_idx)
+    info2_idx = session.send("--info")
+    unlocked = session.wait_for(r"KEYLOCK off", 4.0, since=info2_idx) is not None
+
+    ok = key_acked and locked and inject_ok and tft_on_seen and not forced_150 and unlocked
+    return {
+        "ok": ok,
+        "key_acked": key_acked,
+        "kbl_off_on_lock": kbl_off_on_lock,
+        "locked": locked,
+        "inject_ok": inject_ok,
+        "tft_on_seen": tft_on_seen,
+        "kbl_writes_after_msg": kbl_writes,
+        "forced_150": forced_150,
+        "unlocked": unlocked,
+    }
+
+
 def scenario_disptest(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
     """TM-41: colour/geometry sequence, asserted on the push path.
 
@@ -2394,7 +2449,7 @@ def scenario_touch_inject(session: TDeckSession, args: argparse.Namespace) -> Di
 
 
 def scenario_keylock(session: TDeckSession, args: argparse.Namespace) -> Dict[str, Any]:
-    """TD-16: the keyboard lock (SYM+K, persisted) silently gates touch and
+    """TD-19: the keyboard lock (SYM+K, persisted) silently gates touch and
     keyboard delivery to LVGL and stops both from waking the panel -- a dark,
     unresponsive T-Deck that only the trackball revives. --keylock on/off is
     the serial recovery path; this asserts the command exists on the image,
@@ -2449,6 +2504,7 @@ SCENARIOS: Dict[str, Callable[[TDeckSession, argparse.Namespace], Dict[str, Any]
     "flush_lora_correlation": scenario_flush_lora_correlation,
     "touch_inject": scenario_touch_inject,
     "keylock": scenario_keylock,
+    "keylock_kbl": scenario_keylock_kbl,
 }
 SCENARIO_ORDER = [
     "boot",
@@ -2472,6 +2528,7 @@ SCENARIO_ORDER = [
     "displaycmd",
     "touch_inject",
     "keylock",
+    "keylock_kbl",
 ]
 # gps_experiment, flush_lora_correlation and uptime are long-running
 # measurement experiments (multi-minute A/B windows) -- opt in explicitly
@@ -2704,7 +2761,8 @@ SCENARIO_HELP = {
     "gps_experiment": "TM-14: A/B loop-time tails with GPS on vs off, fixed load (not in all)",
     "flush_lora_correlation": "TM-06 (c): TFT flush vs LoRa SPI activity correlation (not in all)",
     "touch_inject": "TM-19: injected touch tap/down/up ack + flush-follows sanity",
-    "keylock": "TD-16: --keylock on/off exists, lock reads keys without waking the panel, off wakes it",
+    "keylock": "TD-19: --keylock on/off exists, lock reads keys without waking the panel, off wakes it",
+    "keylock_kbl": "keylock on + message: panel wakes, keyboard light must not ([KBL];set;150 = bug)",
 }
 
 EPILOG = """\

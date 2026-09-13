@@ -118,6 +118,18 @@ def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optiona
     return info
 
 
+def app_back(info: Optional[dict[str, str]]) -> bool:
+    """True only for the app's own index page after the OTA reboot.
+
+    The reboot poll used to accept any HTTP 200 -- including the safeboot's
+    OTA page, which node_info() returns as {"safeboot": "1"} without a build
+    string. On a T-Deck Plus (2026-09-12) that ended the wait 25 s after the
+    upload with "Done: Meshcom ? build ?" while the node was still in
+    safeboot. Require the app page (no safeboot flag) with a build string.
+    """
+    return info is not None and not info.get("safeboot") and bool(info.get("build"))
+
+
 def poll(check: Callable[[], Any], deadline_s: float, interval: float = 3.0,
          label: str = "", on_wait: Optional[Callable[[str], None]] = None) -> Any:
     """Poll check() until it returns a truthy value or the deadline passes."""
@@ -167,6 +179,7 @@ class OtaResult:
     before: Optional[dict[str, str]] = None
     after: Optional[dict[str, str]] = None
     error: Optional[str] = None
+    note: Optional[str] = None  # non-fatal observation, e.g. same build as before
     timings: dict[str, float] = field(default_factory=dict)
 
     def line(self) -> str:
@@ -179,7 +192,7 @@ class OtaResult:
 
 def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool = False,
           safeboot_poll_s: float = SAFEBOOT_POLL_S, reboot_poll_s: float = REBOOT_POLL_S,
-          precheck_timeout: float = 10.0,
+          precheck_timeout: float = 10.0, poll_interval: float = 3.0,
           get: GetFn = http_get, poster: PostFn = upload_multipart,
           on_phase: Optional[Callable[[str, str], None]] = None,
           on_wait: Optional[Callable[[str], None]] = None) -> OtaResult:
@@ -254,7 +267,8 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
         except (urllib.error.URLError, OSError):
             return False
 
-    if not poll(safeboot_up, safeboot_poll_s, label="safeboot web server", on_wait=on_wait):
+    if not poll(safeboot_up, safeboot_poll_s, interval=poll_interval,
+                label="safeboot web server", on_wait=on_wait):
         timings["safeboot_wait_s"] = time.monotonic() - t
         timings["total_s"] = time.monotonic() - t_all
         return OtaResult(
@@ -307,18 +321,26 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
 
     phase("reboot_wait", "")
     t = time.monotonic()
-    new_info = poll(lambda: node_info(host, get=get), reboot_poll_s, label="app reboot",
+    def app_page() -> Optional[dict[str, str]]:
+        i = node_info(host, get=get)
+        return i if app_back(i) else None
+
+    new_info = poll(app_page, reboot_poll_s, interval=poll_interval, label="app reboot",
                      on_wait=on_wait)
     timings["reboot_wait_s"] = time.monotonic() - t
     timings["total_s"] = time.monotonic() - t_all
     if not new_info:
         return OtaResult(ok=False, stage="reboot_timeout", fw_path=str(fw), fw_size=fw_size,
                           md5=md5, before=info, timings=timings,
-                          error=f"node did not come back within {reboot_poll_s:.0f}s "
+                          error=f"node did not come back into the app within {reboot_poll_s:.0f}s "
                                 "-- check it manually")
 
+    note = None
+    if info.get("build") and new_info.get("build") == info.get("build"):
+        note = (f"build string unchanged ({new_info['build']}) -- same firmware as before, "
+                "or the upload did not take")
     return OtaResult(ok=True, stage="done", fw_path=str(fw), fw_size=fw_size, md5=md5,
-                      before=info, after=new_info, timings=timings)
+                      before=info, after=new_info, note=note, timings=timings)
 
 
 # --- self-test --------------------------------------------------------
@@ -406,6 +428,61 @@ def run_self_test() -> int:
     check("TBEAM vs HELTEC_V3 normalize differ",
           _normalize_hw("TBEAM") != _normalize_hw("HELTEC_V3"))
 
+    # reboot-wait acceptance (2026-09-12 T-Deck Plus race): the safeboot page
+    # and a page without a build string must not end the wait; the app page must.
+    check("app_back rejects None", not app_back(None))
+    check("app_back rejects safeboot page", not app_back({"safeboot": "1"}))
+    check("app_back rejects page without build", not app_back({"hardware": "TDECK+"}))
+    check("app_back accepts app page", app_back({"hardware": "TDECK+", "build": "x", "version": "4.35t"}))
+
+    # whole flow against a scripted node: app (old build) -> trigger -> safeboot
+    # /update up -> ota/start ok -> upload ok -> reboot poll sees the safeboot
+    # page twice, then the app with the new build. Before the fix the first
+    # safeboot page ended the poll with after={"safeboot": "1"}.
+    import tempfile
+    old_page = _FIXTURE_TDECK_PLUS
+    new_page = old_page.replace("Aug 31 2026 12:00:00", "Sep 12 2026 22:07:05")
+    root_pages = [old_page, _FIXTURE_SAFEBOOT, _FIXTURE_SAFEBOOT, new_page]
+    seen_safeboot_in_reboot_poll = [0]
+
+    def scripted_get(url: str, timeout: float = 5.0) -> tuple[int, str]:
+        if url.endswith("/"):
+            page = root_pages.pop(0) if len(root_pages) > 1 else root_pages[0]
+            if page is _FIXTURE_SAFEBOOT:
+                seen_safeboot_in_reboot_poll[0] += 1
+            return 200, page
+        return 200, "ok"
+
+    def scripted_post(url: str, path: Path) -> tuple[int, str]:
+        return 200, "ok"
+
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
+        tmp.write(b"\xe9firmware")
+        fw_path = Path(tmp.name)
+    try:
+        res = flash("fixture", fw_path, expect_hw="TDECK+", poll_interval=0.0,
+                    get=scripted_get, poster=scripted_post)
+    finally:
+        fw_path.unlink(missing_ok=True)
+    check("flow ok", res.ok)
+    check("flow saw safeboot page during reboot wait", seen_safeboot_in_reboot_poll[0] == 2)
+    check("flow after is the app page", (res.after or {}).get("build") == "Sep 12 2026 22:07:05")
+    check("flow before is the old build", (res.before or {}).get("build") == "Aug 31 2026 12:00:00")
+    check("flow no same-build note", res.note is None)
+
+    # same build re-flashed: still ok, but flagged
+    root_pages[:] = [old_page, _FIXTURE_SAFEBOOT, old_page]
+    with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
+        tmp.write(b"\xe9firmware")
+        fw_path = Path(tmp.name)
+    try:
+        res2 = flash("fixture", fw_path, expect_hw="TDECK+", poll_interval=0.0,
+                     get=scripted_get, poster=scripted_post)
+    finally:
+        fw_path.unlink(missing_ok=True)
+    check("same-build flow ok", res2.ok)
+    check("same-build flow flagged", bool(res2.note) and "unchanged" in (res2.note or ""))
+
     if failures:
         print(f"SELF-TEST FAILED ({len(failures)}): {', '.join(failures)}", file=sys.stderr)
         return 1
@@ -468,7 +545,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
     if result.before:
         b = result.before
-        print(f"  node up: Meshcom {b.get('version', '?')} build {b.get('build', '?')}, "
+        print(f"  node before OTA: Meshcom {b.get('version', '?')} build {b.get('build', '?')}, "
               f"hardware {b.get('hardware', '?')}")
     if not result.ok:
         print(f"error: {result.error}")
@@ -476,6 +553,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     a = result.after or {}
     print(f"Done: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
           f"hardware {a.get('hardware', '?')} (total {result.timings.get('total_s', 0):.0f}s)")
+    if result.note:
+        print(f"  note: {result.note}")
     return 0
 
 

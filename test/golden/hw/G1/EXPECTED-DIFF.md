@@ -24,7 +24,7 @@ diff. `H3` (console) has no G0 baseline on three of four nodes and is out.
 | 2   | `RF-01`, `RF-02`, `RF-05` radio-unit write paths | **No.** Only `--txbw`/`--txcr`/`--txfreq` reach them, and none is in a G1 corpus      |
 | 3   | `RF-03` manual country validation                | **No.** Only `--setctry 7` reaches it; `--setctry` is manual-only and not in a corpus |
 | 4   | `RF-06` `--info` frequency readout               | **Possible on RAK-90 only** — see below, this is the one to watch                     |
-| 5   | `--keylock on/off` (TD-16)                       | **No.** Two new ladder entries, driven by no G1 corpus                                |
+| 5   | `--keylock on/off` (TD-19)                       | **No.** Two new ladder entries, driven by no G1 corpus                                |
 | 6   | `MEM-05` extra `INADDR_NONE` copy                | **No.** RAM layout only, nothing observable on a wire                                 |
 | 7   | `--setctry` held back from the console script    | **No.** `H3` only, and `H3` is not in G1                                              |
 

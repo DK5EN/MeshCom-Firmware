@@ -256,5 +256,5 @@ firing is what "the load path no longer writes" looks like from outside).
 T-Deck UI block and the flash bookkeeping fields -- are invisible to
 `GET /config.json` and so are outside this comparison entirely. `DK5EN-93` is
 a Heltec and carries none of the T-Deck block, so proving those needs a T-Deck
-run. Same trap as `TD-16`, where a "byte-identical to its vault backup" check
+run. Same trap as `TD-19`, where a "byte-identical to its vault backup" check
 missed `node_kblock` because the export does not carry it.

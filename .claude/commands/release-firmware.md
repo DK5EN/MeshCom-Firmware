@@ -37,6 +37,17 @@ path.
   `v<VER>.MM.DD.2` (precedents: v4.35p.08.27.2-stability, v4.35p.07.24.2).
   Ask the user for the tag name if there is any ambiguity (same-day
   re-release vs. replace-in-place).
+- **Check upstream's tags before naming ours**: `git ls-remote --tags upstream`.
+  Upstream uses the same `v<VER>.MM.DD` shape since 2026-09-12 (`v4.35t.09.12`
+  on their `dev` merge of our PR #1140). A fork tag with an upstream tag's name
+  clobbers on every fetch, so append `.2` and say why in release-notes.md
+  (precedent: `v4.35t.09.12.2`). Also `git fetch upstream --tags` first so the
+  upstream name exists locally and nothing is pushed under it later.
+- The letter no longer marks the fork: upstream released official `v4.35t` on
+  2026-09-10 with our PR #1135 (items 104-210) inside. Release text must frame
+  the delta against the official release that actually exists (check
+  `gh release list -R icssw-org/MeshCom-Firmware`), and point at the flash
+  stamp in `--info` as the distinguishing mark.
 - The GitHub release title is the bare tag name. The release-notes headings
   and the `## New in <tag>` changelog sections use the bare tag too.
 - `FLASH_VERSION` in `src/configuration_global.h`: bump to the release date
@@ -87,8 +98,13 @@ git push origin <tag>
 
 ## Step 4 — Build all 32 release environments
 
-Sequential, one `pio run` invocation, run in background (~16 min). Never run
-parallel pio builds of the same env — the build cache corrupts.
+Sequential, one `pio run` invocation (~16 min). Never run parallel pio
+builds of the same env — the build cache corrupts. The Bash tool's background
+mode still enforces its 10-minute timeout, so launch the build detached
+(`nohup bash -c 'pio run ...; echo "exit=$?"' > build.log 2>&1 & disown`) and
+wait with a backgrounded `until grep -q '^exit=' build.log` loop; re-arm the
+waiter if it times out. pio processes envs in `platformio.ini` order, not
+command-line order.
 
 ```
 pio run -e E22-DevKitC -e E22_1262-DevKitC -e E22_1262_S3-DevKitC-1-N16R8 \
@@ -118,6 +134,19 @@ root, where they are **tracked in git**. The build is deterministic — if
 `git status` shows them modified (or `md5 -q` differs from the tracked
 files), the tracked bins were stale: commit them and move the tag BEFORE
 publishing, so tag content and shipped assets match.
+
+**Field-command string scan after the build (INS-01/INS-04):** a compile-guard
+change can drop shipped commands without a compiler or test complaint. Both
+T-Deck images must carry the field commands and none of the bench block:
+
+```
+for e in t_deck t_deck_plus; do B=.pio/build/$e/firmware.bin; \
+  echo "$e mute=$(strings $B | grep -c 'AUDIO\];mute;') stat=$(strings $B | grep -c 'PERSIST\];stat;') \
+  udplog=$(strings $B | grep -c 'UDP\];log') injectraw=$(strings $B | grep -c injectraw)"; done
+```
+
+Expected: `mute=2 stat=1 udplog=1 injectraw=0`. On nRF52 scan the `.elf`, not
+the ASCII `.hex`.
 
 ## Step 5 — Assemble the 39 assets
 

@@ -20,7 +20,7 @@ readback probe is void on this hardware, so nothing can read the framebuffer
 back. That is why the four items below need eyes.
 
 **The `input` result above is void, and that is the point (TD-18).** This run
-was taken while the `TD-16` keyboard lock was still on, so the keyboard was
+was taken while the `TD-19` keyboard lock was still on, so the keyboard was
 dead to the operator while the scenario reported `keys=7/7`: it counts the
 `[KEY]` line, printed at the top of `keypad_read()`, and the lock drops the key
 at the bottom of the same function. The scenario now reads `--info` first and
@@ -79,7 +79,7 @@ Open a message input field and type through each keyboard layer.
 below.** This said that the unit has old keyboard-controller firmware, never
 answers the raw-mode probe, and that `TD-10` (key auto-repeat) therefore cannot
 be proven on this bench at all. The probe had simply never been allowed to run:
-it is gated on `!node_keyboardlock`, and the TD-16 lock was on. With the lock
+it is gated on `!node_keyboardlock`, and the TD-19 lock was on. With the lock
 cleared the controller answers `support;1` on the first try.
 
 Result: `pass, layers 1-4` · Any key that produced the wrong character: `none`
@@ -90,7 +90,7 @@ auto-repeat working, and the node backs that up: the firmware printed
 `KBD_RAW_YES`) and `--info` now reports `KBD raw-mode yes` where it reported
 `unknown` all evening. The probe had never run before, not because the
 controller is old, but because `eligible` in `keypad_read()`
-(`src/t-deck/tdeck_main.cpp:1125`) requires `!node_keyboardlock` -- the TD-16
+(`src/t-deck/tdeck_main.cpp:1125`) requires `!node_keyboardlock` -- the TD-19
 lock suppressed the very probe whose silence was read as "this unit cannot do
 raw mode". TD-10 is provable on this bench after all.
 
@@ -122,4 +122,4 @@ Failures observed: `none`
 
 Open, and deliberately left as text rather than as a backlog row: the TRACK
 no-fix wording (item 2) and the keyboard half of the automated `input` scenario
-(TD-18), which is void because it ran under the TD-16 lock.
+(TD-18), which is void because it ran under the TD-19 lock.
