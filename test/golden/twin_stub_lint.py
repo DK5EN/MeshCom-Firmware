@@ -58,6 +58,14 @@ PAIRS: List[Tuple[str, str]] = [
     # testing a layout no device has. That is precisely "it passes, and it
     # passes about something that is not the shipped declaration".
     ("test/test_nrf52_settings_paths/stubs/nrf52/WisBlock-API.h", "src/nrf52/WisBlock-API.h"),
+    # W3 BLE wire-layout freeze (test_ble_settings_v1). Same sharp case as the
+    # line above and registered for the same reason: the suite compares a
+    # frozen s_ble_settings_v1 snapshot against the LIVE s_meshcom_settings,
+    # so a stub copy that drifts in member order or type would let the suite
+    # pass while proving the freeze against a struct no device carries. The
+    # agent that wrote the suite flagged this gap rather than editing this
+    # file; registering it here is the fix.
+    ("test/test_ble_settings_v1/stubs/nrf52/WisBlock-API.h", "src/nrf52/WisBlock-API.h"),
 ]
 
 # A declaration is a line that ends in ';' and is not a preprocessor line,
