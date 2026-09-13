@@ -6,15 +6,24 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-**Last updated 2026-09-13 — DRY campaign stand.** The one-shot PR campaign (§3.8af) now has a
-single place that says where it stands and what finishing it takes: **"Campaign stand 2026-09-13"**
-in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic (~33 working
-days to the PR, upstream review on top). Short version: phases A and B are done, phase C owes
-`M3`, phase D has `W1` all but one item, `W2` done, **`W3` half** (steps 1-5 shipped and proven on
-nRF52 hardware 2026-09-12/13; the ESP32 half and the struct merge are not started), `W4`-`W7` and
-`C4d` untouched, phase E not started. `W3`'s two open leads from the settings loss are closed:
-the loss itself was newlib-nano's printf, and the flash wear is gone
-(`src/msgid_counter.h`, one write per 100 frames instead of one per frame).
+**Last updated 2026-09-13 (evening) — DRY campaign stand.** The one-shot PR campaign (§3.8af)
+has a single place that says where it stands and what finishing it takes: **"Campaign stand
+2026-09-13"** in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic
+(**~30 working days** to the PR, upstream review on top). Short version: phases A and B are done,
+phase C owes only `M3`'s two bench-only rows (4 of 8 closed; `DR-03`/`DR-16` wait for the `E1` G2
+run, so the `--phase implementation` flag drops after `E1`, not after `M3`), phase D has `W1` and
+`W2` **done** and **`W3`'s ESP32 half shipped and hardware-proven** (`DK5EN-93`, 104 of 107
+settings byte-identical across two boots) with the struct merge still open, `W4`-`W7` and `C4d`
+untouched, phase E not started.
+
+Three things this day added that the audit's plan did not contain. **`W3-BLE`:** the nRF52 BLE
+settings characteristic pins the struct's byte layout (the phone app writes a raw image the node
+`memcpy`s onto its settings), so the layout had to be frozen behind `s_ble_settings_v1` before the
+struct could be merged at all — roughly a day the plan never had. **A settings-eating defect in our
+own `bce95db5`**, which called `save_settings()` from inside `init_flash()`'s open `Preferences`
+handle and reset roughly half of all ESP32 settings on every boot; found, fixed, guarded and
+regression-tested, and it never reached hardware. **`fork-main` merged in** (33 commits), which
+surfaced a real `TD-16` ID collision — ours is now `TD-19`.
 
 **Previous update 2026-09-11 (evening) — documentation sweep.** `docs/` was groomed: 23 closed
 documents moved to [`archive/`](archive/README.md), each stamped with why and where the work
@@ -5211,6 +5220,15 @@ five phases; the Gantt (`docs/dry-unification-gantt-20260910.html`) carries the
 same rows with per-row notes. This table is the single place that says where the
 campaign actually stands, and it is the one to correct when a row moves.
 
+**Branch state, end of 2026-09-13:** `fork-main` was merged in (33 commits --
+the 4.35t field fixes, `INS-04`, `DS-03`, and the v4.35t.09.12.2 release), so
+the campaign branch is no longer behind. Merge, not rebase: icssw-org
+squash-merges our PRs. Two files conflicted, both resolved by keeping both
+sides. One collision was real rather than textual -- both branches had
+allocated **`TD-16`** to a different T-Deck bug, and ours was renumbered to
+**`TD-19`** because theirs is already public in the merged PR #1140. Five of
+our own commit messages still say `TD-16` and are stale as a result.
+
 | Phase                        | Rows                               | State                                                                                                                             |
 | ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                       |
@@ -5242,22 +5260,63 @@ campaign actually stands, and it is the one to correct when a row moves.
   that variant proves it). Filed separately while checking: `t5epaper_main.h`
   includes `SD.h` twice (lines 16 and 25) -- a duplicate, not a dead include,
   since that header is load-bearing for `t5epaper_main.cpp` and `ui_port.cpp`.
-- **`W3`** -- steps 1-5 shipped and proven on nRF52 hardware; **steps 6 and the
-  ESP32 half are not started.** In dependency order:
-  1. drive the ESP32 NVS load/save from `settings_schema` instead of its
-     hand-written `preferences.get*`/`put*` list (`D1-05`'s ESP32 half);
-  2. merge the two `s_meshcom_settings` definitions (`D1-04` proper) -- and
-     first convert `node_audio_start`/`node_audio_msg` from `String` to fixed
-     `char[]`, or an nRF52 that still blits writes a heap pointer to flash;
-  3. the member-level fail-closed gate that replaces `settings_schema_lint.py`'s
-     struct-blind table;
-  4. the four classification decisions this wave surfaced (8 RUNTIME fields
-     persisted anyway, 25 persisted but absent from `X()`, 16 platform-only
-     fields, the stale `// nicht im Flash` divider);
-  5. the same upgrade proof on an **ESP32** node that `DK5EN-90` has now passed;
-  6. `DR-12`/`DR-13` from `M3`.
-     Carried as a live lead, not blocking: `save;rename_failed`, which now has an
-     inventory and a retry to identify itself with the next time it happens.
+- **`W3`** -- the ESP32 half is **shipped and hardware-proven**; the struct
+  merge is what remains. State per step:
+  1. **DONE 2026-09-13** -- ESP32 NVS load/save driven by `settings_schema`
+     (`D1-05`'s ESP32 half). 134 `get*`/132 `put*` call sites replaced by one
+     walk. Upgrade-in-place verified rather than asserted: all 132 historical
+     NVS keys diffed against the new set -- **zero renamed, zero added**, six
+     removed (the sensor cache, operator decision below). `CFG_CHR` keeps
+     `getChar`/`putChar` so the on-flash TYPE tag, not just the key spelling,
+     is unchanged for provisioned nodes. 15-character NVS key limit is now a
+     compile-time `static_assert`.
+  2. **OPEN, and the risky half** -- merge the two `s_meshcom_settings`
+     definitions (`D1-04` proper), remove the dead LoRaWAN cluster, drop
+     `node_ackid`, move `node_msgid` to a counters namespace. The
+     `String` -> `char[128]` conversion of `node_audio_start`/`node_audio_msg`
+     that this used to depend on is **done** (step 1).
+  3. **OPEN** -- the member-level fail-closed gate replacing
+     `settings_schema_lint.py`'s struct-blind text parse. Today a member in the
+     struct but absent from the schema is silently not persisted.
+  4. **DECIDED 2026-09-13** (operator) -- the six last-sensor-reading fields
+     stop being persisted; `node_msgid` moves to a counters namespace and
+     `node_ackid` is dropped as dead state; the 14 ESP32-only fields stay
+     platform-scoped via `CFG_FIELD_LIST_PLATFORM` rather than becoming inert
+     nRF52 members; `auto_join`/`send_repeat_time` are dead code and go, with
+     the timer scaffolding behind them.
+  5. **DONE 2026-09-13** -- the ESP32 upgrade proof on `DK5EN-93` (Heltec V3):
+     104 of 107 exported settings byte-identical across the migration boot AND
+     a plain reboot, the three movers being live GPS. Does NOT cover the 25
+     NVS-only keys, which `GET /config.json` cannot see -- that needs a T-Deck
+     run (the `TD-19` trap).
+  6. **OPEN** -- `DR-12`/`DR-13` from `M3`.
+
+  **`W3-BLE` -- not in the audit's plan at all, and a hard prerequisite for
+  step 2. DONE 2026-09-13.** The nRF52 settings characteristic ships
+  `s_meshcom_settings` as raw bytes and the phone app writes an image the node
+  `memcpy`s straight onto it (`nrf52_ble.cpp:354,380`), with no version field --
+  length is the entire negotiation. So every member offset, order and type is a
+  wire contract, and the struct merge could not have been done safely first: a
+  size change is rejected by the app, and a coincidentally-matching size is
+  accepted and scatters a user's configuration across misaligned fields.
+  `s_ble_settings_v1` freezes today's layout with `static_assert`s on `sizeof`
+  and all 131 offsets; the BLE path translates instead of blitting. Verified by
+  a temporary ARM-build probe (with a false negative control first) that
+  snapshot and live struct still agree byte-for-byte.
+
+  **Found and fixed while doing step 1, in our own `bce95db5` from the same
+  day:** `sanitize_loaded_settings()` called `save_settings()` from inside
+  `init_flash()`'s open `Preferences` handle. `Preferences::end()` is
+  unconditional, and every `getX()` returns its default once `_started` is
+  false, so roughly the second half of all ESP32 settings was being clobbered
+  in NVS and reset in RAM, on every boot. Never reached hardware (the only node
+  flashed for that commit was an nRF52). A `g_flash_load_in_progress` guard now
+  makes any of the 250 `save_settings()` call sites refuse loudly instead of
+  corrupting NVS, covered by `test_esp32_flash_lifecycle`.
+
+  Carried as a live lead, not blocking: `save;rename_failed`, which now has an
+  inventory and a retry to identify itself with the next time it happens.
+
 - **`W4`** command table (`D2-10`, then `D2-06`, `D2-07`, `D2-01`) -- the
   largest single flash win in the audit (~-6.0 kB ESP32, ~-3.5 kB nRF52) and
   ~2 600 lines. Needs the golden capture diff and `test_command_table`.
@@ -5281,16 +5340,22 @@ campaign actually stands, and it is the one to correct when a row moves.
 Days are the audit's own estimates, carried in the Gantt, not measurements --
 except where a row has already been measured and corrected:
 
-| Row                        | Plan days             | Note                                             |
-| -------------------------- | --------------------- | ------------------------------------------------ |
-| `P0.9`, `M3`, rest of `W1` | ~2                    | documentation and four test cases                |
-| `W3` remainder             | ~3 of the corrected 9 | 6 of 9 spent; the struct merge is the risky half |
-| `W4`                       | 6                     |                                                  |
-| `W5`                       | 5                     | gated on five operator decisions                 |
-| `W6` + `C4d` + `D1-10`     | 7+                    | `D1-10` re-measured at 50 predicates, so "+"     |
-| `W7`                       | 3                     |                                                  |
-| `E1`-`E4`                  | 6.5                   | two of those days are bench time on four nodes   |
-| **Total to PR**            | **~33 working days**  | `E5` (upstream review, 10 d) sits outside that   |
+| Row                    | Plan days            | Note                                                           |
+| ---------------------- | -------------------- | -------------------------------------------------------------- |
+| `P0.9`                 | ~0.5                 | documentation only; `W1` and 4 of `M3`'s 8 rows are now done   |
+| `W3` remainder         | ~2 of 10             | steps 2/3/6; the audit budgeted 9 and did not contain `W3-BLE` |
+| `W4`                   | 6                    |                                                                |
+| `W5`                   | 5                    | gated on five operator decisions                               |
+| `W6` + `C4d` + `D1-10` | 7+                   | `D1-10` re-measured at 50 predicates, so "+"                   |
+| `W7`                   | 3                    |                                                                |
+| `E1`-`E4`              | 6.5                  | two of those days are bench time on four nodes                 |
+| **Total to PR**        | **~30 working days** | was ~33 at the 2026-09-13 stand; `E5` (10 d) sits outside that |
+
+`W3` is the one row where the plan was simply missing work: the audit costed
+the struct merge without noticing the BLE characteristic pins the struct's byte
+layout, so `W3-BLE` is roughly a day the plan never had. `M3`'s remaining two
+bench-only rows (`DR-03`, `DR-16`) are not in this table because they cost
+nothing to write -- they wait for the `E1` G2 run.
 
 Two things that do not appear as rows and will still cost time: every wave ends
 in a 32-env build plus the native suites (~20 min wall clock each, sequential --
