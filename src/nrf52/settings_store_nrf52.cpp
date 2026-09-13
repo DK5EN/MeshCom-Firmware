@@ -10,6 +10,7 @@
 #include "settings_store_nrf52.h"
 
 #include <cstdlib>
+#include <cstdio>    // snprintf, for the filesystem inventory's path names
 #include <cstring>   // memcmp, for the skip-if-unchanged compare below
 
 #include <debugconf.h>
@@ -199,6 +200,29 @@ bool settingsStoreSave()
 	{
 		DEBUG_MSG("SETST", "save: rename of temp file onto live path failed");
 		Serial.printf("[SETST];save;rename_failed;bytes=%ld\n", written);
+
+		// Inventory BEFORE the temp file is removed: on the space hypothesis
+		// the temp file is exactly what pushed the filesystem over, so a
+		// report taken after the cleanup would describe a state that never
+		// existed. (Measured on DK5EN-90 2026-09-13 with a healthy store:
+		// 29 of 224 blocks in content, so space is not the explanation there.)
+		settingsStoreReportFilesystem("rename_failed");
+
+		// One retry, which is a diagnostic as much as a repair. The failure
+		// this exists for (DK5EN-90, 2026-09-12, twice on one boot, never
+		// since) has two live explanations left now that space is measured
+		// out: a transient flash error while the SoftDevice owns the radio,
+		// or something persistent about the destination. The retry separates
+		// them on the console the next time it happens, and it cannot make
+		// anything worse: the temp file is intact and the live path still
+		// holds its old content either way.
+		if (InternalFS.rename(kSettingsTmpPath, kSettingsPath))
+		{
+			Serial.printf("[SETST];save;rename_retry_ok;bytes=%ld\n", written);
+			return true;
+		}
+
+		Serial.printf("[SETST];save;rename_failed_twice;bytes=%ld\n", written);
 		InternalFS.remove(kSettingsTmpPath);
 		return false;
 	}
@@ -351,7 +375,105 @@ bool settingsStoreDump(void)
 	settings_store_file.close();
 
 	Serial.printf("\n[SETST];dump;end;read_error=%d\n", read_error ? 1 : 0);
+	settingsStoreReportFilesystem("dump");
 	return !read_error;
+}
+
+namespace
+{
+
+// Running totals for settingsStoreReportFilesystem()'s walk. Kept in one
+// struct so the recursion carries a single reference rather than four
+// out-parameters.
+struct FsInventory
+{
+	const char *reason = "";
+	uint32_t block_bytes = 128;
+	uint32_t total_bytes = 0;
+	uint32_t total_blocks = 0;
+	uint32_t file_count = 0;
+	uint32_t dir_count = 0;
+	uint32_t depth_truncated = 0; // directories not entered because of the depth bound
+};
+
+// Prints one line per file below `dir` and accumulates into `inv`.
+// `prefix` is the path already walked (no trailing slash), used only for the
+// printed name; `depth_left` bounds the recursion.
+void walk_directory(File &dir, const char *prefix, int depth_left, FsInventory &inv)
+{
+	for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile())
+	{
+		// 64 covers /adafruit/bond_prph/<16-hex-digit peer id> with room to
+		// spare; a longer path is printed truncated rather than skipped, since
+		// this line is a diagnostic and the SIZE is what carries the answer.
+		char path[64];
+		snprintf(path, sizeof(path), "%s/%s", prefix, entry.name());
+
+		if (entry.isDirectory())
+		{
+			inv.dir_count++;
+			if (depth_left > 1)
+			{
+				walk_directory(entry, path, depth_left - 1, inv);
+			}
+			else
+			{
+				inv.depth_truncated++;
+			}
+		}
+		else
+		{
+			const uint32_t size = entry.size();
+			Serial.printf("[SETST];fs;%s;file;%s;%lu\n", inv.reason, path, (unsigned long)size);
+			inv.total_bytes += size;
+			inv.total_blocks += (size + inv.block_bytes - 1) / inv.block_bytes;
+			inv.file_count++;
+		}
+		entry.close();
+	}
+}
+
+} // namespace
+
+void settingsStoreReportFilesystem(const char *reason)
+{
+	// Geometry is compile-time constant on this platform and printed with the
+	// inventory so a log line is self-contained: InternalFileSystem.cpp sizes
+	// the filesystem at 7 flash pages (7 x 4096 = 28 672 B) in 128 B blocks.
+	// It is repeated here rather than included because those macros are
+	// private to that .cpp.
+	constexpr uint32_t kFsTotalBytes = 7u * 4096u;
+	constexpr uint32_t kFsBlockBytes = 128u;
+
+	FsInventory inv;
+	inv.reason = reason;
+	inv.block_bytes = kFsBlockBytes;
+
+	// Depth 3, not an unbounded walk: the deepest path this filesystem holds
+	// is /adafruit/bond_prph/<peer> (bonding.cpp), and a diagnostic that runs
+	// on a failure path has no business recursing without a bound on a 4 KB
+	// task. Anything deeper is counted as a directory that was not entered,
+	// which the total line reports rather than hides.
+	File dir = InternalFS.open("/");
+	if (!dir || !dir.isDirectory())
+	{
+		Serial.printf("[SETST];fs;%s;root_unreadable\n", reason);
+		return;
+	}
+	walk_directory(dir, "", 3, inv);
+	dir.close();
+
+	const uint32_t total_bytes = inv.total_bytes;
+	const uint32_t total_blocks = inv.total_blocks;
+	const uint32_t file_count = inv.file_count;
+
+	// content_blocks is file data only: littlefs also spends blocks on
+	// directory metadata pairs and keeps free blocks for its copy-on-write
+	// updates, so this is a floor on usage, never the free-space figure.
+	Serial.printf("[SETST];fs;%s;total;files;%lu;dirs;%lu;bytes;%lu;content_blocks;%lu;of;%lu;not_entered;%lu\n",
+				  reason, (unsigned long)file_count, (unsigned long)inv.dir_count, (unsigned long)total_bytes,
+				  (unsigned long)total_blocks, (unsigned long)(kFsTotalBytes / kFsBlockBytes),
+				  (unsigned long)inv.depth_truncated);
 }
 
 #endif // NRF52_SERIES

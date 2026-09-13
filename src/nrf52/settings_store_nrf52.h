@@ -83,4 +83,23 @@ bool settingsStoreRemove();
 // Returns false if the file does not exist or cannot be read.
 bool settingsStoreDump(void);
 
+// Prints an inventory of the internal filesystem to Serial -- one line per
+// file with its size, then a total -- tagged with `reason`.
+//
+// This exists for one specific open question: a save can fail at the rename
+// step (`[SETST];save;rename_failed`), it failed twice on one boot on
+// DK5EN-90 on 2026-09-12, and it has not been reproduced since. The leading
+// hypothesis is space (the legacy blob, the live store and the temp file all
+// present at once on a 28 672 B filesystem in 128 B blocks), and the
+// competing one is a transient flash error while the SoftDevice is busy.
+// A byte total plus the actual file list separates those two: out of space
+// shows up as a total near the ceiling, a transient IO error does not.
+// Adafruit_LittleFS exposes no free-space call, so this walks the tree
+// (root plus one level, which reaches /adafruit/bond_prph/) using only the
+// public File API and its own mutex.
+//
+// Called on a save failure and from `--dumpsettings`. Not cheap enough to
+// call on a healthy save path, and it is not called there.
+void settingsStoreReportFilesystem(const char *reason);
+
 #endif // NRF52_SERIES

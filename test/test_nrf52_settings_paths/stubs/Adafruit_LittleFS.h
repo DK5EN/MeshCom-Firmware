@@ -69,6 +69,12 @@ struct FakeFsState
 	long force_short_read = -1;  // next read() returns at most this many bytes
 	long force_short_write = -1; // next write() returns at most this many bytes
 
+	// The next N rename() calls fail without touching either path, the way a
+	// real lfs_rename() failure does; each failure decrements the count.
+	// settingsStoreSave() retries a failed rename once, so 1 exercises the
+	// retry-succeeds path and 2 the give-up path.
+	int force_rename_fail = 0;
+
 	// The whole point of the temp-file-then-rename atomicity claim
 	// (settings_store_nrf52.cpp) is that the LIVE path holds its OLD content
 	// right up until the moment rename() swaps the temp file onto it.
@@ -85,6 +91,7 @@ struct FakeFsState
 		format_calls = rename_calls = remove_calls = 0;
 		open_write_calls = open_read_calls = 0;
 		force_short_read = force_short_write = -1;
+		force_rename_fail = 0;
 		last_rename_had_dest = false;
 		last_rename_dest_previous_content.clear();
 	}
@@ -107,6 +114,11 @@ struct FakeFsState
 	}
 };
 
+namespace Adafruit_LittleFS_Namespace
+{
+class File;
+}
+
 // C++17 inline variable: one definition shared across every translation
 // unit that includes this header (same idiom test/support/Arduino.h already
 // uses for its Serial/millis globals), so no separate stub .cpp is needed
@@ -122,6 +134,10 @@ class Adafruit_LittleFS
 public:
 	bool begin() { return true; }
 
+	// Declared here, defined after File: settingsStoreReportFilesystem()
+	// walks the tree with InternalFS.open("/") + File::openNextFile().
+	Adafruit_LittleFS_Namespace::File open(char const *filepath, uint8_t mode = 0);
+
 	bool format()
 	{
 		g_fake_fs.files.clear();
@@ -131,6 +147,12 @@ public:
 
 	bool rename(char const *from, char const *to)
 	{
+		if (g_fake_fs.force_rename_fail > 0)
+		{
+			g_fake_fs.force_rename_fail--;
+			return false; // neither path is touched
+		}
+
 		auto it = g_fake_fs.files.find(from);
 		if (it == g_fake_fs.files.end())
 			return false;
@@ -168,6 +190,8 @@ public:
 	bool open(char const *filepath, uint8_t mode)
 	{
 		path_ = filepath;
+		name_ = leaf_name(path_);
+		is_dir_ = false;
 		pos_ = 0;
 		mode_ = mode;
 
@@ -205,6 +229,39 @@ public:
 	// `if (!lora_file)` / `if (!settings_store_file)` -- both real call
 	// sites test truthiness rather than open()'s return value.
 	operator bool() const { return is_open_; }
+
+	// ---- directory iteration ---------------------------------------------
+	// Modelled to the same shape settingsStoreReportFilesystem() uses: a
+	// path that ends in '/' (or is exactly "/") is a directory, and
+	// openNextFile() hands back its entries one at a time. The fake stores a
+	// flat path -> bytes map, so "a directory" is just the set of paths
+	// sharing a prefix; a nested path like "/adafruit/bond_prph/1a2b" makes
+	// "/adafruit/" a directory containing the directory "/adafruit/bond_prph/".
+	bool isDirectory() const { return is_dir_; }
+
+	char const *name() const { return name_.c_str(); }
+
+	File openNextFile(uint8_t mode = FILE_O_READ)
+	{
+		File ret(*fs_);
+		if (!is_dir_ || !is_open_)
+			return ret;
+
+		while (dir_index_ < dir_entries_.size())
+		{
+			const std::string child = dir_entries_[dir_index_++];
+			if (child.back() == '/')
+			{
+				ret.open_directory(child);
+			}
+			else if (!ret.open(child.c_str(), mode))
+			{
+				continue;
+			}
+			return ret;
+		}
+		return ret;
+	}
 
 	uint32_t size() const
 	{
@@ -263,15 +320,70 @@ public:
 
 	void close() { is_open_ = false; }
 
+	// Opens `path` (which must end in '/') as a directory and snapshots its
+	// immediate children. Public only because Adafruit_LittleFS::open() below
+	// needs it; product code never calls it.
+	bool open_directory(const std::string &path)
+	{
+		path_ = path;
+		is_dir_ = true;
+		is_open_ = true;
+		dir_index_ = 0;
+		dir_entries_.clear();
+		name_ = leaf_name(path);
+
+		// Immediate children only: everything under `path` truncated at its
+		// next '/', de-duplicated, with a trailing '/' kept on directories.
+		std::string previous;
+		for (const auto &kv : g_fake_fs.files)
+		{
+			if (kv.first.size() <= path.size() || kv.first.compare(0, path.size(), path) != 0)
+				continue;
+			const size_t slash = kv.first.find('/', path.size());
+			const std::string child =
+				(slash == std::string::npos) ? kv.first : kv.first.substr(0, slash + 1);
+			if (child != previous)
+			{
+				dir_entries_.push_back(child);
+				previous = child;
+			}
+		}
+		return true;
+	}
+
 private:
+	static std::string leaf_name(const std::string &path)
+	{
+		std::string trimmed = path;
+		if (trimmed.size() > 1 && trimmed.back() == '/')
+			trimmed.pop_back();
+		const size_t slash = trimmed.find_last_of('/');
+		return slash == std::string::npos ? trimmed : trimmed.substr(slash + 1);
+	}
+
 	// Kept only for constructor-signature parity with the real File(fs&) --
 	// there is one process-wide g_fake_fs regardless of which instance
 	// constructed a given File, exactly like the real singleton InternalFS.
 	[[maybe_unused]] Adafruit_LittleFS *fs_;
 	std::string path_;
+	std::string name_;
 	size_t pos_ = 0;
 	uint8_t mode_ = FILE_O_READ;
 	bool is_open_ = false;
+	bool is_dir_ = false;
+	size_t dir_index_ = 0;
+	std::vector<std::string> dir_entries_;
 };
 
 } // namespace Adafruit_LittleFS_Namespace
+
+inline Adafruit_LittleFS_Namespace::File Adafruit_LittleFS::open(char const *filepath, uint8_t mode)
+{
+	Adafruit_LittleFS_Namespace::File f(*this);
+	const std::string path(filepath);
+	if (!path.empty() && path.back() == '/')
+		f.open_directory(path);
+	else
+		f.open(filepath, mode);
+	return f;
+}
