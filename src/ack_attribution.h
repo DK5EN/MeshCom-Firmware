@@ -17,12 +17,19 @@
 // BLE (0x41, erzeugt, Uebergabe an addBLEOutBuffer(), die 4 Byte Zeit anhaengt):
 //   [0]      0x41
 //   [1..4]   msg_id, little endian
-//   [5]      Status 0x00 Node ACK (heard) / 0x01 Gateway bzw. Server / 0x02 Peer ACK
+//   [5]      Status 0x00 Node ACK (heard) / 0x01 Gateway bzw. Server / 0x02 Peer ACK /
+//            0x03 Failed (Stage 0.3, D8: der Retransmit-Ladder hat aufgegeben,
+//            nutzerinitiierte DM, siehe updateRetransmissionStatus() in
+//            lora_functions.cpp)
 //   [6]      n = Laenge des Anhangs, 0 = altes Format (byteidentisch mit frueher)
 //   [7..]    Rufzeichen, n Byte, [A-Z0-9-], n <= ACK_ATTR_CALL_MAX, kein NUL
 
 #include <stdint.h>
 #include <string.h>
+
+// Stage 0.3 (D8): give-up status, user-originated DMs only. See the BLE
+// layout comment above; buildAckPhoneFrame() itself is unchanged.
+#define ACK_STATUS_FAILED      0x03
 
 #define ACK_WIRE_BASE_LEN      12
 #define ACK_WIRE_APPENDIX_LEN  3

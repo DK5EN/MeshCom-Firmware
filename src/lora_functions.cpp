@@ -8,6 +8,9 @@
 #include "capture_functions.h"
 #include "dedup_functions.h"
 #include "setlog_lines.h"
+#include "reack_limiter.h"
+#include "dm_stats.h"
+#include "instrument.h"
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -397,6 +400,7 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
                     uint8_t phone_buff[ACK_PHONE_MAX_LEN];
                     uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
                     addBLEOutBuffer(phone_buff, plen);
+                    dmstat_gw_ack.fetch_add(1);   // 0.3: itxcheck >= 0 already gates this block
 
                     if(bDisplayInfo)
                     {
@@ -444,6 +448,32 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
+#if INSTRUMENT_ENABLED
+    // 0.5 --airgap: drop the frame entirely at the radio boundary, before
+    // captureFrame() and before anything that touches ch_util, mheard or
+    // dedup -- the node behaves exactly as if the frame never arrived.
+    //
+    // Re-arm finding: on ESP32, radio.startReceive() already ran in the
+    // CALLER (checkRX(), src/esp32/esp32_main.cpp) before OnRxDone() is
+    // even invoked -- nothing to do here. On nRF52 (BOARD_RAK4630),
+    // startRadioReceive() normally runs from INSIDE OnRxDone (the BUG #2
+    // early-RX-restart fix, a few dozen lines below this one) to minimize
+    // the RX blind window; returning before that point would never re-arm
+    // the receiver and the node would deafen permanently after
+    // `--airgap on`. So the nRF52 branch replicates just that minimal
+    // re-arm before returning.
+    if(bAirgap)
+    {
+#if defined BOARD_RAK4630
+        if(bSPI_ETH_Active)
+            bPendingRadioRx = true;
+        else
+            startRadioReceive();
+#endif
+        return;
+    }
+#endif
+
     // Testfang-Hook (Katalog doc 08 §4, Mechanismus 2): akzeptierte Frames als
     // Rohbytes — das Gegenstueck zum CRC_PAYLOAD-Dump der VERWORFENEN Frames
     // in checkRX (esp32_main.cpp). OnRxDone ist auf beiden Plattformen der
@@ -888,6 +918,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         }
                     }
 
+                    // dmstat_echo: own_msg_id[] carries no destination, so a
+                    // broadcast/group text heard back counts here too, same
+                    // as a DM -- see the report for why that split is not
+                    // cheaply knowable at this site.
+                    if(own_msg_id[icheck][4] == 0x00)
+                        dmstat_echo.fetch_add(1);
+
                     if(own_msg_id[icheck][4] != 0x02)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
@@ -1046,6 +1083,11 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         {
                                             own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
+                                            // 0.3/0.4: peer ACK for an own DM, plus the RTT sample
+                                            // for the send-to-ack histogram (M0-1).
+                                            dmstat_peer_ack.fetch_add(1);
+                                            dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis());
+
                                             // BUG #8 fix: clear ringBuffer entry to stop retransmission
                                             int dmSlot = findAndStopRingSlot(msg_counter);
                                             if(dmSlot >= 0 && bDisplayRetx)
@@ -1069,6 +1111,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             bNewLine=true;
                                         }
 
+                                        // 0.2: seed the re-ACK limiter with the original ack, so the
+                                        // relayed copy of this DM (a duplicate seconds from now) is
+                                        // not acked twice; the sender's 40 s retry still is.
+                                        reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis());
                                         SendAckMessage(aprsmsg.msg_source_call, iAckId);
 
                                         aprsmsg.msg_payload = aprsmsg.msg_payload.substring(0, iEnqPos);
@@ -1223,6 +1269,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                 uint8_t phone_buff[ACK_PHONE_MAX_LEN];
                                                 uint16_t plen = buildAckPhoneFrame(phone_buff, aprsmsg.msg_id, 0x01, meshcom_settings.node_call);
                                                 addBLEOutBuffer(phone_buff, plen);
+                                                dmstat_gw_ack.fetch_add(1);   // 0.3: checkOwnTx >= 0 already gates this block
                                             }
                                         }
                                         else
@@ -1556,6 +1603,48 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                 //blinkLED();
             }
+            else
+            {
+                // 0.2: split the dedup gate. This is the pure duplicate
+                // branch (rx_is_new was false above -- SL-01's dedup verdict
+                // above is unchanged, we only read what it already decided).
+                // A duplicate DM addressed to us
+                // may be a lost :ackNNN's only sign of life; re-ACK it,
+                // rate-limited (the original ack seeded the limiter, so a
+                // relay's copy of the DM does not trigger this, only the
+                // sender's retry does), and stop here: no display, no
+                // phone/server forward, no relay. aprsmsg is already fully decoded
+                // (decodeAPRS() above, unconditional), so no extra decode.
+                if(msg_type_b_lora == MSG_TYPE_TEXT &&
+                   aprsmsg.msg_destination_call == meshcom_settings.node_call &&
+                   !aprsmsg.msg_server)
+                {
+                    int iReackAckPos = aprsmsg.msg_payload.indexOf(":ack");
+                    int iReackRejPos = aprsmsg.msg_payload.indexOf(":rej");
+                    int iReackEnqPos = aprsmsg.msg_payload.indexOf("{", 1);
+
+                    if(iReackAckPos <= 0 && iReackRejPos <= 0 && iReackEnqPos > 0)
+                    {
+                        uint16_t reackNnn = (uint16_t)(aprsmsg.msg_payload.substring(iReackEnqPos + 1)).toInt();
+
+                        if(reackAllowed(aprsmsg.msg_source_call.c_str(), reackNnn, millis()))
+                        {
+                            SendAckMessage(aprsmsg.msg_source_call, reackNnn);
+                            dmstat_reack.fetch_add(1);
+
+                            if(bDisplayInfo)
+                                printfdeb("\n[REACK] dup from %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), reackNnn);
+                        }
+                        else
+                        {
+                            dmstat_reack_limited.fetch_add(1);
+
+                            if(bDisplayInfo)
+                                printfdeb("\n[REACK-LIMIT] dup from %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), reackNnn);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1846,7 +1935,13 @@ bool doTX()
             captureFrame('T', lora_tx_buffer, (uint16_t)sendlng, 0, 0);
 
         // we can now tx the message
+#if INSTRUMENT_ENABLED
+        // 0.5 --airgap: treat like TX disabled, same drop semantics (slot
+        // already marked consumed above -- non-rollback).
+        if (TX_ENABLE == 1 && !bAirgap)
+#else
         if (TX_ENABLE == 1)
+#endif
         {
             // TX-01 (BACKLOG 3.8k): hard backstop -- an unconfigured node
             // (factory callsign) must not transmit, no matter what made it
@@ -2026,6 +2121,12 @@ bool doTX()
 
                     setlogPrintTx(setlog_tx_buf);   // SL-03
 
+                    // 0.4: one transmission of a DM ring slot, first send or
+                    // retry alike (dmstat_attempts counts both, per its
+                    // dm_stats.h doc comment).
+                    if(ringBuffer[save_read][2] == MSG_TYPE_TEXT)
+                        dmstat_attempts.fetch_add(1);
+
                     if(bDisplayInfo)
                     {
                         if(lora_tx_buffer[0] == MSG_TYPE_ACK)
@@ -2049,7 +2150,19 @@ bool doTX()
         }
         else
         {
+#if INSTRUMENT_ENABLED
+            if(bAirgap)
+            {
+                if(bLORADEBUG)
+                    printfdeb("[AIRGAP];tx-dropped\n");
+            }
+            else
+            {
+                DEBUG_MSG("RADIO", "TX DISABLED");
+            }
+#else
             DEBUG_MSG("RADIO", "TX DISABLED");
+#endif
         }
 
         // Non-rollback drop paths (TX disabled, unconfigured node, or decode failure) — slot stays cleared
@@ -2104,6 +2217,50 @@ bool updateRetransmissionStatus()
                     // Give up — max retries exhausted
                     ringBuffer[ircheck][1] = RING_STATUS_DONE;
                     ringBuffer[ircheck][0] = 0;  // free slot so getNextTxSlot skips it
+
+                    // 0.3 (D8): report failure to app + GUI, scoped to
+                    // user-originated DMs only. ACK frames and broadcast
+                    // texts are also retransmit-eligible and legitimately
+                    // give up (advisor m6) -- reporting those unscoped would
+                    // give every node in a sparse net bogus failure notices
+                    // about its own ACKs/broadcasts. `size` was captured
+                    // above before ringBuffer[ircheck][0] was cleared; the
+                    // payload bytes at [2..] are untouched by that clear, so
+                    // decoding here is the same decodeAPRS() doTX() already
+                    // runs on this slot's content just before transmit.
+                    {
+                        unsigned int ring_msg_id = (ringBuffer[ircheck][6]<<24) | (ringBuffer[ircheck][5]<<16) | (ringBuffer[ircheck][4]<<8) | ringBuffer[ircheck][3];
+
+                        struct aprsMessage giveupMsg;
+                        uint16_t giveupType = decodeAPRS(&ringBuffer[ircheck][2], (uint16_t)size, giveupMsg);
+
+                        if(giveupType == MSG_TYPE_TEXT &&
+                           giveupMsg.msg_source_call == meshcom_settings.node_call &&
+                           giveupMsg.msg_destination_call != "*" &&
+                           CheckGroup(giveupMsg.msg_destination_call) == 0)
+                        {
+                            int iGiveupAckPos = giveupMsg.msg_payload.indexOf(":ack");
+                            int iGiveupRejPos = giveupMsg.msg_payload.indexOf(":rej");
+                            int iGiveupEnqPos = giveupMsg.msg_payload.indexOf("{", 1);
+
+                            if(iGiveupAckPos <= 0 && iGiveupRejPos <= 0 && iGiveupEnqPos > 0)
+                            {
+                                dmstat_giveup.fetch_add(1);
+
+                                int idx = checkOwnTx(ring_msg_id);
+                                if(idx >= 0 && own_msg_id[idx][4] != 0x02)
+                                    own_msg_id[idx][4] = 0x03;
+
+                                uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
+                                uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call.c_str());
+                                addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+
+                                if(bLORADEBUG)
+                                    printfdeb("[MC-DBG] RETRANSMIT_GIVEUP_DM msg_id=%08X dest=%s\n",
+                                              ring_msg_id, giveupMsg.msg_destination_call.c_str());
+                            }
+                        }
+                    }
 
                     if(bLORADEBUG)
                     {

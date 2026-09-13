@@ -29,6 +29,7 @@
 #include "via_functions.h"
 #include "charset_filter.h"
 #include "setlog_lines.h"
+#include "dm_stats.h"
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
 
@@ -3222,6 +3223,20 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
     // fertigen Fensters fuer Leser, die nicht selbst drucken (Web-GUI).
     stat_last_window = *f;
     stat_last_window_ms = f->t_ms;
+
+    // 0.4 (docs/dm-transport-impl-plan-20260913.md): DM counters/RTT histogram
+    // as a second setlog line, same channel (setlogPrint -> printfdeb) and the
+    // same bDisplayLog gate as the STAT line. setlogFormatStat()/setlogPrint()
+    // for STAT itself live in each platform's main loop (esp32_main.cpp,
+    // nrf52_main.cpp), both outside this file's ownership for this change, so
+    // this prints just before the caller's STAT line rather than right after
+    // it -- same tick, reverse order of the two lines.
+    if(bDisplayLog)
+    {
+        char dmbuf[200];
+        dmStatFormat(dmbuf, sizeof(dmbuf));
+        setlogPrint(dmbuf);
+    }
 }
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
@@ -4095,9 +4110,20 @@ int sendMessage(char *msg_text, int len)
     // ACK add request only DM Calls
     if(bDM)
     {
+        // A '{' inside the user text breaks the receiver's NNN parse
+        // (indexOf("{", 1) finds the first brace, not the ack tag); escape it
+        // at the sender (plan risk list, advisor m4).
+        strMsg.replace('{', '(');
+
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
         aprsmsg.msg_payload = strMsg + "{" + String(cAckId);
+
+        // 0.4: DM outcome counters (docs/dm-transport-impl-plan-20260913.md).
+        // nnn is the same node_msgid value just written into cAckId, before
+        // the increment below.
+        dmstat_sent.fetch_add(1);
+        dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
     }
 
     meshcom_settings.node_msgid++;
@@ -4915,9 +4941,14 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
 
     aprsmsg.msg_len = 0;
 
-    // MSG ID zusammen setzen    
-    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
-    
+    // MSG ID: mint from millis(), same as the gateway ACK path
+    // (lora_functions.cpp msg_counter=millis() at the rx_dm_ack_gw/rx_dm_ack_new
+    // sites). An ACK does not need to survive in node_msgid's 0-999 transport
+    // sequence space, and minting it there forced a node_msgid++ plus a flash
+    // rewrite per ACK: on nRF52 that rewrites the whole LittleFS settings file,
+    // on ESP32 it is ~20 NVS put*() calls, both for a value nothing reads back.
+    aprsmsg.msg_id = millis();
+
     aprsmsg.msg_source_path = meshcom_settings.node_call;   // own Call
     aprsmsg.msg_destination_path = dest_call;
     aprsmsg.msg_destination_call = dest_call;
@@ -4928,13 +4959,6 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
     else
         snprintf(cackmsg, sizeof(cackmsg), "%-9.9s:ack%03i", dest_call.c_str(), iAckId);
     aprsmsg.msg_payload = cackmsg;
-
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
-
-    // Flash rewrite
-    save_settings();
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
     

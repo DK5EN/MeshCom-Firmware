@@ -13,6 +13,7 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <aprs_functions.h>
+#include <dm_stats.h>
 
 // setlogRingSourceCode() -- Header-Inline, keine Link-Abhaengigkeit auf
 // setlog_lines.cpp (env:native_aprs baut diese TU, aber nicht setlog_lines.cpp).
@@ -482,12 +483,29 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     int dropSlot = -1;
     uint8_t dropPrio = 0, dropType = 0;
     uint32_t dropId = 0, newLostId = 0;
+    bool parkedOverwrite = false;
 
 #if defined(NRF52_SERIES)
     taskENTER_CRITICAL();
 #endif
 
     w = iWrite;
+
+    // M0-1 instrumentation (0.4, docs/dm-transport-impl-plan-20260913.md):
+    // snapshot slot w's occupancy before the write below overwrites it.
+    // "Retransmit-pending" mirrors updateRetransmissionStatus()'s own
+    // definition (lora_functions.cpp): non-zero length, and a status that is
+    // none of READY (not yet sent), DONE (finished) or EXT_PENDING (owned by
+    // an in-flight external-radio bridge TX, see configuration_global.h).
+    // Only the read has to happen here, before overwrite; the atomic
+    // increments themselves are deferred to the lock-free section below
+    // (same style as stat_ring_max's CAS loop there) since fetch_add() does
+    // not need the lock for correctness and the critical section stays
+    // print/malloc-free either way.
+    parkedOverwrite = ringBuffer[w][0] != 0 &&
+                       ringBuffer[w][1] != RING_STATUS_READY &&
+                       ringBuffer[w][1] != RING_STATUS_DONE &&
+                       ringBuffer[w][1] != RING_STATUS_EXT_PENDING;
     r = iRead;
 
     if(clearSlotFirst)
@@ -636,6 +654,13 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
 #endif
 
     // ---- Ab hier ausserhalb des Locks ----
+
+    // M0-1 (0.4): ring enqueues per window and parked-slot overwrites. The
+    // condition was read under the lock above (parkedOverwrite); the counts
+    // themselves are plain fetch_add() and do not need the lock.
+    ringstat_enqueue.fetch_add(1);
+    if(parkedOverwrite)
+        ringstat_parked_overwrite.fetch_add(1);
 
     // SL-05: Hochwasser des Ringfuellstands im 5-Minuten-Fenster. Bewusst
     // ausserhalb des Locks und ueber txRingDepth() (selbst lock-frei, siehe

@@ -6,13 +6,13 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 
 ## Stage status log
 
-| Stage | Content                                 | Status                              |
-| ----- | --------------------------------------- | ----------------------------------- |
-| 0     | ARQ repair, instrumentation, `--airgap` | **not started** — ready to dispatch |
-| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)    |
-| 2     | Destination dedup + bounded ACK repeats | not started                         |
-| 3     | Store node + mailbox GUI                | not started                         |
-| 4     | Sender-visible custody notice           | deferred, not planned               |
+| Stage | Content                                 | Status                                                                                               |
+| ----- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open |
+| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                     |
+| 2     | Destination dedup + bounded ACK repeats | not started                                                                                          |
+| 3     | Store node + mailbox GUI                | not started                                                                                          |
+| 4     | Sender-visible custody notice           | deferred, not planned                                                                                |
 
 Resume rule: this table is the authority. A compacted or interrupted session reads it, not the
 git log.
@@ -156,6 +156,26 @@ variables per run.
 
 **Acceptance:** with `--airgap on` the node emits nothing and its mheard/dedup state is unchanged
 after a minute of nearby traffic; `--airgap off` restores normal behaviour without a reboot.
+
+### Stage 0 implementation notes (2026-09-13)
+
+Deviations from the text above, decided at the wave gate:
+
+- **Re-ACK limiter is 30 s, not 60 s, and the original ACK seeds it.** A relay's copy of a DM
+  arrives at the destination as a same-`msg_id` duplicate seconds after the original; unseeded,
+  every relayed DM would have been acked twice. Seeding at the original ACK suppresses that, and a
+  60 s window would then swallow the sender's first retry (40 s cadence), so the window is 30 s.
+  `src/reack_limiter.h`, test `test/test_reack_limiter`.
+- **The `DM` setlog line prints before the STAT line**, same tick and same `bDisplayLog` gate.
+  `setlogFillStat()` owns the counters; the STAT print itself sits in each platform's main loop.
+- **`dmstat_echo` counts every own text echo**, DM or not: `own_msg_id[]` carries no destination.
+- **`dmstat_attempts` counts every text-slot transmission**, first send and retry alike.
+- **`{` in DM text is rewritten to `(` at the sender** (`sendMessage()`, `bDM` only) so the
+  receiver's `{NNN` parse stays unambiguous.
+- Counter module is `src/dm_stats.{h,cpp}` (native-tested), the airgap flag lives in
+  `src/instrument.cpp` behind `INSTRUMENT_ENABLED`, and the give-up status is `ACK_STATUS_FAILED`
+  (`0x03`) in `src/ack_attribution.h`; the web GUI renders it as a ballot X.
+- Release-image string scan: `AIRGAP` count 0 on the non-instrument Heltec V3 image.
 
 ### Stage 0 gate
 

@@ -23,6 +23,7 @@
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
 #include <aprs_functions.h>
+#include <dm_stats.h>             // M0-1: ringstat_enqueue/ringstat_parked_overwrite
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
 
 // ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp ------------
@@ -68,6 +69,9 @@ static void resetRing(void)
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
     mc_test_set_millis(0);
+    // M0-1 (0.4): reset between tests, same as every other stat_* counter above.
+    ringstat_enqueue.store(0);
+    ringstat_parked_overwrite.store(0);
 }
 
 void setUp(void) { resetRing(); }
@@ -990,6 +994,44 @@ static void test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt(void)
 // [env:*_external_radio]). Ein #if-gated Test wuerde in diesem Env nie
 // laufen (toter Test) -- deshalb hier bewusst ausgelassen, siehe Wave-Report.
 
+// --------------------------------------------------------------- M0-1 (0.4)
+//
+// ringstat_parked_overwrite (docs/dm-transport-impl-plan-20260913.md): landet
+// ein Enqueue auf einem Slot, der noch retransmit-pending ist (Laenge != 0,
+// Status weder READY(0x00) noch DONE(0xFF) noch EXT_PENDING(0x80) -- 0x05 hier
+// als typischer Wert innerhalb der 0x01..0x14-Alterungsfolge aus
+// updateRetransmissionStatus()), muss der Zaehler steigen; auf einem leeren
+// Slot nicht. ringstat_enqueue zaehlt beide Faelle (jeder erreichte Write).
+
+static void test_ringstat_parked_overwrite_bei_pending_slot(void)
+{
+    // Slot 0 traegt noch einen unbestaetigten Sendeversuch: Laenge gesetzt,
+    // Status 0x05 (pending, wie ihn updateRetransmissionStatus() nach ein
+    // paar Alterungs-Ticks hinterlaesst) -- weder READY noch DONE noch
+    // EXT_PENDING.
+    ringBuffer[0][0] = 10;
+    ringBuffer[0][1] = 0x05;
+
+    BuiltFrame f = buildPositionFrame(0xF001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_ovw");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
+static void test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null(void)
+{
+    // resetRing() (per setUp bereits gelaufen) liefert einen frischen, leeren
+    // Slot 0 -- kein Ueberschreiben eines Pending-Eintrags.
+    BuiltFrame f = buildPositionFrame(0xF002UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "parked_empty");
+
+    TEST_ASSERT_EQUAL_INT(0, slot);
+    TEST_ASSERT_EQUAL_UINT32(0, ringstat_parked_overwrite.load());
+    TEST_ASSERT_EQUAL_UINT32(1, ringstat_enqueue.load());
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -1018,5 +1060,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_wq01_leerer_ring_liefert_nur_nullen);
     RUN_TEST(test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein);
     RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_pending_slot);
+    RUN_TEST(test_ringstat_parked_overwrite_bei_leerem_slot_bleibt_null);
     return UNITY_END();
 }

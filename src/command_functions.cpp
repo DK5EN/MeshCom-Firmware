@@ -4906,6 +4906,31 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // --airgap on|off: RAM-only bench instrument (plan 0.5). While set,
+    // OnRxDone() drops every frame at the radio boundary and doTX() refuses
+    // to transmit -- see src/instrument.h. Never persisted, so a reboot
+    // always clears it. Order matters: "airgap on"/"airgap off" must be
+    // tested before the bare "airgap" (commandCheck() is a prefix match).
+    if(commandCheck(msg_text+2, (char*)"airgap on") == 0)
+    {
+        bAirgap = true;
+        Serial.printf("[AIRGAP];on\n");   // Serial is MSerial here: UART + net console 2323
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"airgap off") == 0)
+    {
+        bAirgap = false;
+        Serial.printf("[AIRGAP];off\n");
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"airgap") == 0)
+    {
+        Serial.printf("[AIRGAP];%s\n", bAirgap ? "on" : "off");
+        return;
+    }
+    else
     // --- UI test hooks (T-Deck) and message injection -----------------------
     // --injectmsg <dst> <text>: enqueue a text message as if received via LoRa
     // --injectpos <call> <lat> <lon>   (decimal degrees, negative = S / W)
