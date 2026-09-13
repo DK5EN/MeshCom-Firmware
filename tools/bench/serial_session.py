@@ -7,6 +7,11 @@ Usage:
 Options:
   --wait-boot           wait for a boot marker before sending commands
   --boot-timeout SECS   how long to wait for that marker (default 30)
+  --boot-marker {any,ready}
+                        which marker --wait-boot accepts (default any).
+                        "ready" waits for "[BOOT];ready" only -- use it on an
+                        ESP32, where "CLIENT STARTED" fires before the command
+                        parser is usable and swallows the first command.
   --listen SECS         drain window after the last command (default 6)
   --eol {lf,cr,crlf}    command terminator (default lf)
   --baud N              default 115200
@@ -74,6 +79,11 @@ except ImportError:
     raise SystemExit(1)
 
 BOOT_MARKERS = (b"[BOOT];ready", b"CLIENT STARTED")
+# "CLIENT STARTED" fires long before the command parser is usable on an ESP32
+# that still has to bring up WiFi: a command sent on that marker is swallowed
+# and the run looks like it worked. --boot-marker ready waits for the real
+# end-of-boot line instead.
+BOOT_MARKERS_READY = (b"[BOOT];ready",)
 EOL = {"lf": b"\n", "cr": b"\r", "crlf": b"\r\n"}
 
 
@@ -98,6 +108,7 @@ def main(argv):
     baud = 115200
     dtr = None  # None => auto
     eol = EOL["lf"]
+    boot_markers = BOOT_MARKERS
     cmds = []
 
     def need(flag, rest):
@@ -122,6 +133,11 @@ def main(argv):
             if v not in ("auto", "on", "off"):
                 die("--dtr must be auto, on or off")
             dtr = None if v == "auto" else (v == "on")
+        elif a == "--boot-marker":
+            v = need(a, argv)
+            if v not in ("any", "ready"):
+                die("--boot-marker must be any or ready")
+            boot_markers = BOOT_MARKERS if v == "any" else BOOT_MARKERS_READY
         elif a == "--eol":
             v = need(a, argv)
             if v not in EOL:
@@ -174,7 +190,7 @@ def main(argv):
             if until_marker:
                 # keep a small overlap so a marker split across reads is found
                 tail = (tail + chunk)[-256:]
-                for m in BOOT_MARKERS:
+                for m in boot_markers:
                     if m in tail:
                         marker_seen = m.decode()
                         return True
@@ -188,7 +204,7 @@ def main(argv):
                     "continuing anyway. A native-USB board (RAK4631, S3) does not "
                     "reset when the port is opened, so there may be no boot to "
                     "wait for; an ESP32 that never gets an IP also never prints "
-                    "it.\n" % (" or ".join(m.decode() for m in BOOT_MARKERS), boot_timeout)
+                    "it.\n" % (" or ".join(m.decode() for m in boot_markers), boot_timeout)
                 )
             else:
                 time.sleep(1.5)  # let the post-marker burst settle
