@@ -75,23 +75,6 @@
             letter-spacing: 0.03em;
         }
 
-        .kv-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        .kv-table td {
-            padding: 3px 6px 3px 0;
-            border-bottom: 1px solid #2a2a2a;
-        }
-
-        .kv-table td:first-child {
-            color: #888;
-            width: 40%;
-            white-space: nowrap;
-        }
-
         .scan-header {
             display: flex;
             align-items: center;
@@ -266,51 +249,6 @@
 </head>
 <body>
     <div class="page">
-    <div class="panel" id="networkPanel">
-        <h2>Network</h2>
-        <div class="info-grid">
-            <div><label>Node call</label><span id="netCall">-</span></div>
-            <div><label>Hostname</label><span id="netHostname">-</span></div>
-            <div><label>mDNS name</label><span id="netMdns">-</span></div>
-            <div><label>Mode</label><span id="netMode">-</span></div>
-        </div>
-
-        <h3>Wifi-Client</h3>
-        <table class="kv-table">
-            <tr><td>SSID</td><td id="staSsid">-</td></tr>
-            <tr><td>Connected</td><td id="staConnected">-</td></tr>
-            <tr><td>BSSID</td><td id="staBssid">-</td></tr>
-            <tr><td>IP</td><td id="staIp">-</td></tr>
-            <tr><td>RSSI</td><td id="staRssi">-</td></tr>
-            <tr><td>Channel</td><td id="staChannel">-</td></tr>
-            <tr><td>Auth</td><td id="staAuth">-</td></tr>
-            <tr id="staDisconnectRow" hidden>
-                <td>Last disconnect</td>
-                <td>reason <span id="staDisconnectReason">0</span>, <span id="staJoinAttempts">0</span> join attempts</td>
-            </tr>
-        </table>
-
-        <table class="kv-table" id="apRow" hidden>
-            <tr><td colspan="2"><h3 style="margin:0">Auto-AP</h3></td></tr>
-            <tr><td>SSID</td><td id="apSsid">-</td></tr>
-            <tr><td>IP</td><td id="apIp">-</td></tr>
-        </table>
-
-        <h3>Scanned access points</h3>
-        <div class="scan-header">
-            <span id="scanAge">scan age 0s</span>
-            <button id="rescanButton" type="button" disabled>Rescan</button>
-        </div>
-        <div class="table-scroll">
-            <table class="scan-table">
-                <thead>
-                    <tr><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Ch</th><th>Auth</th></tr>
-                </thead>
-                <tbody id="scanBody"></tbody>
-            </table>
-        </div>
-    </div>
-
     <div class="container">
         <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
         width="90.000000pt" height="90.000000pt" viewBox="0 0 128.000000 128.000000"
@@ -386,6 +324,50 @@
             <div id="fallbackLine" hidden></div>
         </div>
     </div>
+    <div class="panel" id="networkPanel">
+        <h2>Network</h2>
+        <div class="info-grid">
+            <div><label>Node call</label><span id="netCall">-</span></div>
+            <div><label>Hostname</label><span id="netHostname">-</span></div>
+            <div><label>mDNS name</label><span id="netMdns">-</span></div>
+            <div><label>Mode</label><span id="netMode">-</span></div>
+        </div>
+
+        <h3>Wifi-Client</h3>
+        <div class="info-grid">
+            <div><label>SSID</label><span id="staSsid">-</span></div>
+            <div><label>Connected</label><span id="staConnected">-</span></div>
+            <div><label>BSSID</label><span id="staBssid">-</span></div>
+            <div><label>IP</label><span id="staIp">-</span></div>
+            <div><label>RSSI</label><span id="staRssi">-</span></div>
+            <div><label>Channel</label><span id="staChannel">-</span></div>
+            <div><label>Auth</label><span id="staAuth">-</span></div>
+            <div id="staDisconnectRow" hidden><label>Last disconnect</label><span>reason <span id="staDisconnectReason">0</span>, <span id="staJoinAttempts">0</span> join attempts</span></div>
+        </div>
+
+        <div id="apRow" hidden>
+            <h3>Auto-AP</h3>
+            <div class="info-grid">
+                <div><label>SSID</label><span id="apSsid">-</span></div>
+                <div><label>IP</label><span id="apIp">-</span></div>
+            </div>
+        </div>
+
+        <h3>Scanned access points</h3>
+        <div class="scan-header">
+            <span id="scanAge">scan age 0s</span>
+            <button id="rescanButton" type="button" disabled>Rescan</button>
+        </div>
+        <div class="table-scroll">
+            <table class="scan-table">
+                <thead>
+                    <tr><th>SSID</th><th>BSSID</th><th>RSSI</th><th>Ch</th><th>Auth</th></tr>
+                </thead>
+                <tbody id="scanBody"></tbody>
+            </table>
+        </div>
+    </div>
+
     </div>
 
     <script>
