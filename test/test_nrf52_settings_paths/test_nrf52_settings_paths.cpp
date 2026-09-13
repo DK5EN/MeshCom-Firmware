@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include <msgid_counter.h>
 #include <nrf52/WisBlock-API.h> // s_meshcom_settings, meshcom_settings, init_flash_done, MESHCOM_DATA_MARKER
 #include <nrf52/settings_store_nrf52.h> // SettingsLoadResult, settingsStoreLoad()/Save()
 #include <settings_schema.h>
@@ -269,6 +270,89 @@ static void test_save_atomicity_live_path_held_old_content_until_rename(void)
 }
 
 // ---------------------------------------------------------------------------
+// A rename that fails is the one save failure mode observed on hardware and
+// not yet explained: DK5EN-90 printed [SETST];save;rename_failed twice on the
+// boot right after a reflash, on 2026-09-12, and has not repeated it since.
+// Two things have to hold when it happens, and neither was asserted before:
+// the previously persisted file must survive untouched (the whole point of
+// writing to a temp path first), and the failure must be VISIBLE -- 234
+// save_settings() call sites ignore the bool return, so the console line is
+// the only signal a bench session gets. The filesystem inventory is part of
+// that line's job: it is what distinguishes "out of space" from a transient
+// flash error, which is exactly the open question.
+// ---------------------------------------------------------------------------
+
+static void test_rename_failure_keeps_old_file_and_reports_the_filesystem(void)
+{
+    auto old_bytes = make_keyed_store("OLD-CALL1");
+    g_fake_fs.seed(kKeyedPath, old_bytes.data(), old_bytes.size());
+    const char *const kBondFile = "/adafruit/bond_prph/1";
+    g_fake_fs.seed(kBondFile, "bond", 4);
+
+    strncpy(meshcom_settings.node_call, "NEW-CALL2", sizeof(meshcom_settings.node_call) - 1);
+    Serial.clear();
+    g_fake_fs.force_rename_fail = 2; // the first attempt AND the retry fail
+
+    TEST_ASSERT_FALSE(settingsStoreSave());
+
+    // The live file still holds what it held before the attempt.
+    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(live);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)old_bytes.size(), (uint32_t)live->size());
+    TEST_ASSERT_EQUAL_MEMORY(old_bytes.data(), live->data(), old_bytes.size());
+
+    // No half-written temp file is left behind.
+    TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedTmpPath));
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];save;rename_failed"));
+    // The inventory reached the root file AND the one three levels down
+    // under /adafruit/bond_prph/, which is the depth the real filesystem
+    // uses for BLE bonds -- a two-level walk would have missed it.
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), ";file;/MeshCom-Settings-Store;"));
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), ";file;/adafruit/bond_prph/1;4"));
+    // Three files, because the inventory is taken BEFORE the temp file is
+    // cleaned up: on the space hypothesis the temp file is precisely what
+    // pushed the filesystem over, so a report that had already removed it
+    // would describe a state that never existed.
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), ";file;/MeshCom-Settings-Store.tmp;"));
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];fs;rename_failed;total;files;3;dirs;2;"));
+    // 224 is the real geometry: 7 x 4096 B in 128 B blocks (InternalFileSystem.cpp).
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), ";of;224;"));
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];save;rename_failed_twice"));
+}
+
+// The other half of the same branch: a rename that fails once and works on
+// the retry must SAVE, not report a failure. That is the outcome the retry
+// exists to produce -- and the console line is what tells a bench session
+// afterwards that the failure was transient rather than persistent, which is
+// the open question on this row.
+
+static void test_rename_failure_recovers_on_the_retry(void)
+{
+    auto old_bytes = make_keyed_store("OLD-CALL1");
+    g_fake_fs.seed(kKeyedPath, old_bytes.data(), old_bytes.size());
+
+    strncpy(meshcom_settings.node_call, "NEW-CALL2", sizeof(meshcom_settings.node_call) - 1);
+    Serial.clear();
+    g_fake_fs.force_rename_fail = 1; // only the first attempt fails
+
+    TEST_ASSERT_TRUE(settingsStoreSave());
+
+    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(live);
+    // The live path now holds the NEW content -- the retry really wrote, it
+    // did not merely stop complaining.
+    const std::string live_text(live->begin(), live->end());
+    TEST_ASSERT_NOT_NULL(strstr(live_text.c_str(), "node_call=NEW-CALL2"));
+    TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedTmpPath));
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];save;rename_retry_ok"));
+    TEST_ASSERT_NULL(strstr(log.c_str(), "rename_failed_twice"));
+}
+
+// ---------------------------------------------------------------------------
 // node_power's -20 sentinel (CFG_ESC(CFG_POWER_NOT_SET), outside
 // TX_POWER_MIN..MAX on RAK4631) must survive a real save/load round trip
 // through the real schema, not a synthetic one.
@@ -456,6 +540,49 @@ static void test_node_msgid_and_ackid_persist_round_trip(void)
 // so it is reported here rather than weakened into a synthetic pass.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The message-id high-water mark on the REAL load path (msgid_counter.h).
+// The unit test for the policy lives in test_msgid_counter; what is asserted
+// here is the half that policy cannot do for itself -- that init_flash()
+// actually advances the counter past the block the previous run may have
+// used, and that the advanced value REACHES FLASH before the first frame can
+// go out. Without the write-back the scheme silently reuses ids after a crash
+// in the first frames of a boot.
+// ---------------------------------------------------------------------------
+
+static void test_load_advances_the_msgid_block_and_writes_it_back(void)
+{
+    s_meshcom_settings stored;
+    strncpy(stored.node_call, "MSGID-HWM", sizeof(stored.node_call) - 1);
+    stored.node_msgid = 200;
+    // Everything else deliberately VALID, so sanitize_loaded_settings() finds
+    // nothing to correct: its pre-existing "something was fixed" write would
+    // otherwise carry the counter to flash by accident and this test would
+    // pass with the write-back removed (it did, until these lines existed).
+    stored.node_power = 22;
+    stored.node_freq = 433175000.0f;
+    stored.node_bw = 1;
+    stored.node_sf = 11;
+    stored.node_cr = 2;
+    stored.node_country = 1;
+    stored.max_hop_text = 4;
+    auto keyed = make_keyed_store(stored);
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT32(200 + kMsgIdPersistStep, meshcom_settings.node_msgid);
+
+    // ... and the file says so too, so a crash before the next persist point
+    // cannot hand out that block a second time.
+    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(live);
+    s_meshcom_settings reloaded;
+    settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &reloaded,
+                           (const char *)live->data(), live->size());
+    TEST_ASSERT_EQUAL_INT32(200 + kMsgIdPersistStep, reloaded.node_msgid);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -472,6 +599,8 @@ int main(void)
 
     RUN_TEST(test_save_skip_if_unchanged_performs_no_second_write);
     RUN_TEST(test_save_atomicity_live_path_held_old_content_until_rename);
+    RUN_TEST(test_rename_failure_keeps_old_file_and_reports_the_filesystem);
+    RUN_TEST(test_rename_failure_recovers_on_the_retry);
 
     RUN_TEST(test_node_power_sentinel_survives_round_trip);
 
@@ -481,6 +610,7 @@ int main(void)
     RUN_TEST(test_flash_reset_preserves_bonds_and_writes_exact_length);
     RUN_TEST(test_max_hop_text_sentinel_survives_round_trip);
     RUN_TEST(test_node_msgid_and_ackid_persist_round_trip);
+    RUN_TEST(test_load_advances_the_msgid_block_and_writes_it_back);
 
     return UNITY_END();
 }

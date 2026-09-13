@@ -28,6 +28,7 @@
 
 #include "via_functions.h"
 #include "charset_filter.h"
+#include "msgid_counter.h"
 #include "setlog_lines.h"
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
@@ -3340,12 +3341,11 @@ void sendPing(char msg_call[10])
 
     aprsmsg.msg_payload = msg_text;
     
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-    // Flash rewrite
-    save_settings();
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     checkVia(aprsmsg);
 
@@ -3417,12 +3417,11 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     aprsmsg.msg_payload = msg_text;
     
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-    // Flash rewrite
-    save_settings();
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     checkVia(aprsmsg);
 
@@ -4065,12 +4064,11 @@ int sendMessage(char *msg_text, int len)
         aprsmsg.msg_payload = strMsg + "{" + String(cAckId);
     }
 
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-    // Flash rewrite
-    save_settings();
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     checkVia(aprsmsg);
 
@@ -4754,12 +4752,11 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         if(aprsmsg.msg_payload == "")
             return;
 
-        meshcom_settings.node_msgid++;
-        if(meshcom_settings.node_msgid > 999)
-            meshcom_settings.node_msgid=0;
-            
-        // Flash rewrite
-        save_settings();
+        meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
+
+        // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+        if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+            save_settings();
 
         checkVia(aprsmsg);
 
@@ -4831,12 +4828,11 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     if(aprsmsg.msg_payload == "")
         return;
 
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
-        
-    // Flash rewrite
-    save_settings();
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
+
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     checkVia(aprsmsg);
 
@@ -4894,12 +4890,11 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
         snprintf(cackmsg, sizeof(cackmsg), "%-9.9s:ack%03i", dest_call.c_str(), iAckId);
     aprsmsg.msg_payload = cackmsg;
 
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-    // Flash rewrite
-    save_settings();
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
     
@@ -4983,12 +4978,11 @@ void sendHey()
 
     aprsmsg.msg_payload = "R" + String(getMheardCount()) + ";";
    
-    meshcom_settings.node_msgid++;
-    if(meshcom_settings.node_msgid > 999)
-        meshcom_settings.node_msgid=0;
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-    // Flash rewrite
-    save_settings();
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        save_settings();
 
     checkVia(aprsmsg);
 
@@ -5321,12 +5315,11 @@ void sendTelemetry(int ID)
     {
         aprsmsg.msg_payload = msg_text;
         
-        meshcom_settings.node_msgid++;
-        if(meshcom_settings.node_msgid > 999)
-            meshcom_settings.node_msgid=0;
+        meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
-        // Flash rewrite
-        save_settings();
+        // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+        if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+            save_settings();
 
         checkVia(aprsmsg);
 

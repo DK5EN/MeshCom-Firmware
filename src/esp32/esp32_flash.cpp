@@ -6,6 +6,7 @@
 // lora_setchip.h), die der minimale Safeboot-Build nicht hat -- und kein Radio,
 // dessen Parameter zu plausibilisieren waeren.
 #include <settings_sanitize.h>
+#include <msgid_counter.h>
 #include <lora_setchip.h>
 #else
 #include <maxhop.h>   // MAXHOP_TEXT_FALLBACK, dependency-frei (siehe unten)
@@ -50,11 +51,23 @@ void sanitize_loaded_settings(void)
     if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
         fixed++;
 
+
+    // Message-id high-water mark (msgid_counter.h). The counter is no longer
+    // persisted on every originated frame -- it reaches flash once per
+    // kMsgIdPersistStep frames -- so the stored value can be up to one step
+    // behind what the node actually used before it went down. Stepping past
+    // that whole block here, and writing the result back below, is what keeps
+    // an id from being handed out twice after an unclean shutdown.
+    meshcom_settings.node_msgid = msgIdAfterLoad(meshcom_settings.node_msgid);
+
     if(fixed > 0)
-    {
         Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
-        save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
-    }
+
+    // One write per boot, unconditionally: it carries the corrections above
+    // when there were any (otherwise every boot reports the same one again),
+    // and it always carries the advanced message-id block, which is only safe
+    // once it is on flash.
+    save_settings();
 }
 #endif // !MC_SAFEBOOT
 

@@ -12,6 +12,7 @@
 
 #include <debugconf.h>
 #include <settings_sanitize.h>
+#include <msgid_counter.h>
 #include <lora_setchip.h>
 
 #include "WisBlock-API.h"
@@ -79,11 +80,23 @@ void sanitize_loaded_settings(void)
 	SANITIZE_STR(node_update); SANITIZE_STR(node_parm_1); SANITIZE_STR(node_parm_t); SANITIZE_STR(node_parm_id);
 	#undef SANITIZE_STR
 
+
+	// Message-id high-water mark (msgid_counter.h). The counter is no longer
+	// persisted on every originated frame -- it reaches flash once per
+	// kMsgIdPersistStep frames -- so the stored value can be up to one step
+	// behind what the node actually used before it went down. Stepping past
+	// that whole block here, and writing the result back below, is what keeps
+	// an id from being handed out twice after an unclean shutdown.
+	meshcom_settings.node_msgid = msgIdAfterLoad(meshcom_settings.node_msgid);
+
 	if(fixed > 0 || strings > 0)
-	{
 		Serial.printf("[FLASH]...%d setting(s), %d string(s) corrected\n", fixed, strings);
-		save_settings();    // einmal zurueckschreiben, sonst meldet jeder Boot dieselbe Korrektur
-	}
+
+	// One write per boot, unconditionally: it carries the corrections above
+	// when there were any (otherwise every boot reports the same one again),
+	// and it always carries the advanced message-id block, which is only safe
+	// once it is on flash.
+	save_settings();
 }
 
 void init_flash(void)

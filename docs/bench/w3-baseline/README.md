@@ -136,3 +136,82 @@ and correct, and its configuration is the baseline one. The "leave `DK5EN-90`
 on its current image" note in the section above is spent -- it existed to keep
 a real 20260724 node available for the upgrade jump, and the jump has now been
 made and measured.
+
+## 4. `save;rename_failed` chased -- space refuted, instrument in place
+
+2026-09-13, same node. The lead from section 3 was two `rename_failed` markers
+on the boot right after a reflash, with `settingsStoreSave()` returning false
+both times and nothing on the console to say why.
+
+**The space hypothesis is refuted by measurement.** `--dumpsettings` now prints
+a filesystem inventory, and on `DK5EN-90` it reads:
+
+    [SETST];fs;dump;file;/MeshCom-RAK;2000
+    [SETST];fs;dump;file;/MeshCom-Settings-Store;1546
+    [SETST];fs;dump;total;files;2;dirs;3;bytes;3546;content_blocks;29;of;224
+
+29 of 224 blocks in file content, with a temp file adding ~13 more during a
+save. The filesystem was nowhere near full, so `lfs_rename` did not fail for
+want of space. (The inventory also confirms the struct is **2 000 B on the
+device**, as the Fable verdict said against the 2 008 B host-ABI figure.)
+
+**It did not reproduce.** Two further DFU reflashes, each with the port caught
+from the first byte of boot: every save reports `save;ok` or
+`save;skipped_unchanged`. "The boot after a reflash" is not a trigger on its
+own.
+
+**What is in place for the next occurrence**, since it cannot be forced today:
+
+- the inventory above, printed on any rename failure BEFORE the temp file is
+  cleaned up -- the state as it actually was, not after tidying;
+- **one retry** of the rename, reported as `save;rename_retry_ok` or
+  `save;rename_failed_twice`. That single line separates the two explanations
+  left standing -- a transient flash error while the SoftDevice owns the radio
+  versus something persistent about the destination -- and it cannot lose
+  anything: the temp file is intact and the live path still holds its old
+  content either way.
+
+Both paths are regression-tested natively and mutation-verified
+(`test_rename_failure_keeps_old_file_and_reports_the_filesystem`,
+`test_rename_failure_recovers_on_the_retry`): remove the retry and the second
+test fails, walk the tree two levels instead of three and the first one fails
+because it stops seeing `/adafruit/bond_prph/`.
+
+## 5. Flash wear: the message-id high-water mark
+
+2026-09-13. `node_msgid` had to be persisted (a node that restarts its counter
+at 0 replays ids into every neighbour's dedup ring) and was being persisted on
+every originated frame -- on the nRF52 a ~1.5 kB file write plus a rename on a
+28 KB filesystem, once per frame, from eight call sites in
+`loop_functions.cpp`.
+
+`src/msgid_counter.h` replaces that with a high-water mark: the counter reaches
+flash only at multiples of `kMsgIdPersistStep` (100), and on load the stored
+value is advanced by a whole step **and written back once**. Ids that an
+unclean shutdown may have used without recording them are treated as spent, so
+none is ever handed out twice; the cost drops from one write per frame to one
+per hundred frames plus one per boot.
+
+The write-back at load is the half that is easy to leave out and fatal to leave
+out -- without it flash still names the previous block while the node hands out
+ids from the new one. Two tests hold it down, both mutation-verified:
+`test_msgid_counter`'s property case walks every crash point across two blocks,
+and `test_load_advances_the_msgid_block_and_writes_it_back` drives the real
+`init_flash()` with an otherwise-valid configuration (so the pre-existing
+"something was corrected" write cannot mask it).
+
+**Measured on `DK5EN-90`:**
+
+| boot                 | `node_msgid` in the store | writes during boot                          |
+| -------------------- | ------------------------: | ------------------------------------------- |
+| after the reflash    |                       124 | one `save;ok`, the rest `skipped_unchanged` |
+| after a plain reboot |                       224 | one `save;ok`, the rest `skipped_unchanged` |
+
+124 was 24 + one step: the value the previous firmware had persisted per frame,
+advanced by the new scheme and written back. +100 per boot with no frames sent
+is exactly the design.
+
+Not verified on hardware: that an originated frame no longer writes. It follows
+from the eight edited call sites and is covered natively, but proving it on the
+bench means transmitting from a node on the live 433 MHz mesh, which is not
+worth the risk of a mis-addressed test frame.

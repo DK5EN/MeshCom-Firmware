@@ -159,6 +159,38 @@ reboots 15 s later, which cost the G0 console capture its tail.
 - ADC-01 field case DG2NPE-5: message source on that node unresolved, questions to the
   operator open.
 
+## 2026-09-13: the `rename_failed` lead chased, and the msgid flash-wear scheme
+
+Branch `dry-unification`, continuing `W3`'s open list. Both items measured on `DK5EN-90`;
+record in `docs/bench/w3-baseline/README.md` sections 4 and 5.
+
+**`save;rename_failed`: the space hypothesis is refuted, and it does not reproduce.**
+`--dumpsettings` now prints a filesystem inventory, and the node reads 29 of 224 blocks in file
+content (`/MeshCom-RAK` 2 000 B + `/MeshCom-Settings-Store` 1 546 B) -- nowhere near full, with a
+temp file adding ~13 blocks during a save. Two further DFU reflashes with the boot caught from the
+first byte: every save reports `ok` or `skipped_unchanged`. What is in place for the next
+occurrence, since it cannot be forced: the inventory, printed **before** the temp file is cleaned
+up, and **one retry** of the rename reported as `rename_retry_ok` or `rename_failed_twice` -- the
+line that separates a transient flash error from something persistent about the destination. Both
+paths regression-tested and mutation-verified. The inventory also confirms the nRF52 struct is
+**2 000 B on the device**, against the 2 008 B host-ABI figure.
+
+**Flash wear closed: `src/msgid_counter.h`.** `node_msgid` reaches flash once per 100 originated
+frames plus once per boot, instead of once per frame from eight call sites. On load the stored
+value is advanced by a whole step and written back; that write-back is the load-bearing half and
+the first draft lacked it (without it a crash in the first 100 frames after a boot makes the next
+boot start where this one did -- the reuse the persistence exists to prevent). Measured on the
+bench: `node_msgid` 24 -> 124 -> 224 across two boots, one `save;ok` per boot, everything else
+`skipped_unchanged`. Not verified on hardware: that an originated frame no longer writes -- it
+would mean transmitting on the live mesh. **`node_ackid` is dead state**: loaded, saved, never
+incremented anywhere in `src/`.
+
+**Gate:** 32/32 envs, `selftest.sh` exit 0, 22 native envs (`native` 328, `nrf52_settings_paths`
+17, `settings_store` 24).
+
+**Still open on `W3`:** the member-level fail-closed gate, and `rename_failed` itself until it
+happens once more with the new markers.
+
 ## 2026-09-12 (evening): the W3 boot-2 settings loss, diagnosed on the bench and closed
 
 Branch `dry-unification`. One bench session on `DK5EN-90`, one cause, fix and proof on the same

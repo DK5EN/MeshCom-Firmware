@@ -4578,12 +4578,26 @@ fields**. Captures: `w3-store-broken-20260912.txt`,
    blob (2 000 B), the old store (1 554 B) and the temp file (1 527 B) at once
    on a 28 672 B LittleFS, and `lfs_rename` has to allocate metadata. The
    instrument that settles it is a free-space figure in the marker.
-2. **Flash wear.** With `node_msgid` persisted again, every increment is
-   followed by `save_settings()`, so skip-if-unchanged never skips: a full file
-   write plus rename per transmitted frame on a 28 KB filesystem. This matches
-   pre-cutover behaviour -- `2c8e7336` had accidentally stopped doing it -- but
-   it was restored knowingly and needs a high-water-mark scheme (persist
-   `msgid + 100`, seed from it on boot).
+2. ~~**Flash wear.**~~ **CLOSED 2026-09-13 -- the high-water-mark scheme is in
+   (`src/msgid_counter.h`).** `node_msgid` reaches flash once per
+   `kMsgIdPersistStep` (100) originated frames instead of once per frame, plus
+   one write per boot. The eight `node_msgid++; ... save_settings();` blocks in
+   `loop_functions.cpp` became `msgIdAdvance()` + `if(msgIdNeedsPersist(...))`,
+   and both platforms' `sanitize_loaded_settings()` now advances the loaded
+   value by a whole step and writes it back.
+
+   **That write-back is the load-bearing half**, and the first draft did not
+   have it: persisting only at multiples of the step leaves flash naming the
+   PREVIOUS block while the node hands out ids from the new one, so a crash in
+   the first 100 frames after a boot makes the next boot start where this one
+   did -- the reuse the persistence exists to prevent, in a subtler form. The
+   native property test walks every crash point across two blocks and fails on
+   exactly that mutation (`test_msgid_counter`, in `env:native`).
+
+   Related and NOT a wear source: `node_ackid` is loaded, saved and never
+   incremented anywhere in `src/` -- it is dead state, and the schema row it
+   regained in `af00c402` persists a counter nothing counts.
+
 3. **The member-level fail-closed gate**, replacing both the byte-coverage idea
    and `settings_schema_lint.py`'s current check, which iterates a
    hand-transcribed table and never parses the struct, so a new member in
