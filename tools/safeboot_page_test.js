@@ -169,7 +169,7 @@ const STATE_DONE = {
     check('page exposes window.__safeboot', typeof win.__safeboot === 'object' && win.__safeboot !== null);
 
     win.__safeboot.renderInfo(INFO_STA_CONNECTED);
-    check('STA connected: mode label is STA', q(win, 'netMode').textContent === 'STA', q(win, 'netMode').textContent);
+    check('STA connected: mode label is Wifi-Client', q(win, 'netMode').textContent === 'Wifi-Client', q(win, 'netMode').textContent);
     check('STA connected: SSID shown', q(win, 'staSsid').textContent === 'ORBI63');
     check('STA connected: BSSID shown', q(win, 'staBssid').textContent === '5A:AF:97:2E:2B:8B');
     check('STA connected: IP shown', q(win, 'staIp').textContent === '192.168.1.98');
@@ -187,7 +187,7 @@ const STATE_DONE = {
     check('rescan enabled when configured and not scanning', q(win, 'rescanButton').disabled === false);
 
     win.__safeboot.renderInfo(INFO_AP_STA_DISCONNECTED);
-    check('ap_sta: mode label is AP+STA', q(win, 'netMode').textContent === 'AP+STA');
+    check('ap_sta: mode label is Auto-AP + Wifi-Client', q(win, 'netMode').textContent === 'Auto-AP + Wifi-Client');
     check('ap_sta disconnected: AP row visible', q(win, 'apRow').hidden === false);
     check('ap_sta disconnected: AP IP is 192.168.4.1', q(win, 'apIp').textContent === '192.168.4.1');
     check('ap_sta disconnected: disconnect reason row visible', q(win, 'staDisconnectRow').hidden === false);
@@ -195,7 +195,7 @@ const STATE_DONE = {
     check('ap_sta disconnected: join attempts shown', q(win, 'staJoinAttempts').textContent === '3');
 
     win.__safeboot.renderInfo(INFO_NOT_CONFIGURED);
-    check('unconfigured: mode label is AP', q(win, 'netMode').textContent === 'AP');
+    check('unconfigured: mode label is Auto-AP', q(win, 'netMode').textContent === 'Auto-AP');
     check('unconfigured: rescan disabled', q(win, 'rescanButton').disabled === true);
 
     dom.window.close();

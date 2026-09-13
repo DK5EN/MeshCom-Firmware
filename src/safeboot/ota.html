@@ -275,7 +275,7 @@
             <div><label>Mode</label><span id="netMode">-</span></div>
         </div>
 
-        <h3>STA</h3>
+        <h3>Wifi-Client</h3>
         <table class="kv-table">
             <tr><td>SSID</td><td id="staSsid">-</td></tr>
             <tr><td>Connected</td><td id="staConnected">-</td></tr>
@@ -291,7 +291,7 @@
         </table>
 
         <table class="kv-table" id="apRow" hidden>
-            <tr><td colspan="2"><h3 style="margin:0">AP</h3></td></tr>
+            <tr><td colspan="2"><h3 style="margin:0">Auto-AP</h3></td></tr>
             <tr><td>SSID</td><td id="apSsid">-</td></tr>
             <tr><td>IP</td><td id="apIp">-</td></tr>
         </table>
@@ -432,7 +432,7 @@
         const statePercent = document.getElementById('statePercent');
         const fallbackLine = document.getElementById('fallbackLine');
 
-        const MODE_LABEL = { sta: 'STA', ap_sta: 'AP+STA', ap: 'AP' };
+        const MODE_LABEL = { sta: 'Wifi-Client', ap_sta: 'Auto-AP + Wifi-Client', ap: 'Auto-AP' };
 
         const STATE_LABEL = {
             idle: 'Idle',
