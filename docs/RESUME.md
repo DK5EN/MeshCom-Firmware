@@ -28,9 +28,12 @@ Heltec V3, RAK4631 built; 673/673 native; string scan of both T-Deck images `[AU
 (build Sep 13 09:32): `--mute off` -> `[AUDIO];mute;0` and `[PERSIST];stat;...mute;0`, survives
 `--reboot` (boot CW tone audible in the log at 0: `[AUDIO];play;cw;start`); `--mute on` -> 1,
 survives reboot, no boot tone; node left at its original state mute 1. SYM+M not hand-tested
-(node has KEYLOCK on). PR branch `pr-tdeck-mute-20260913` on upstream `1cb2d9e6` in the `-pr`
-worktree, two cherry-picked commits: [PR #1141](https://github.com/icssw-org/MeshCom-Firmware/pull/1141) opened 2026-09-13 (state OPEN, two commits `708eaf22`/`a577f4fb`, t_deck_plus + Heltec V3 built in the worktree, scan mute=2 stat=1 injectraw=0). Draft
-`docs/pr-tdeck-mute-draft-20260913.md`.
+(node has KEYLOCK on). [PR #1141](https://github.com/icssw-org/MeshCom-Firmware/pull/1141) from branch
+`pr-tdeck-mute-20260913` (two cherry-picked commits `708eaf22`/`a577f4fb` on upstream `1cb2d9e6`)
+opened and **merged upstream 2026-09-13** (`893cffd0`, released as upstream v4.35t.09.13);
+fork-main synced with merge `7b55deaf` (tree unchanged, the fix was already in). Draft
+`docs/pr-tdeck-mute-draft-20260913.md`. The `-pr` worktree and the three temporary worktrees
+were removed 2026-09-13, the merged PR branches deleted locally (they stay on origin).
 
 **Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
 `usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
