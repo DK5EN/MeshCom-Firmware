@@ -33,7 +33,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
+import json
 import re
+import socket
 import sys
 import time
 import urllib.error
@@ -42,6 +45,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
+from urllib.parse import urlsplit
 
 DEFAULT_HOST = "dk5en-98.local"
 DEFAULT_ENV = "heltec_wifi_lora_32_V3"
@@ -118,6 +122,36 @@ def node_info(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optiona
     return info
 
 
+def fetch_ota_state(host: str, timeout: float = 5.0, get: GetFn = http_get) -> Optional[dict[str, Any]]:
+    """GET /ota/state (docs/safeboot-ota-contract.md) and return the parsed JSON,
+    or None when the node is unreachable, answers non-200 (including a 404 --
+    tolerated here for nodes that predate this endpoint), or the body does
+    not parse as a JSON object. Used to enrich a failed upload's OtaResult
+    with the node's own abort reason (TM-49/abort bench)."""
+    try:
+        status, body = get(f"http://{host}/ota/state", timeout)
+    except (urllib.error.URLError, OSError):
+        return None
+    if status != 200:
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _state_fields(state: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """`/ota/state` JSON -> the subset of OtaResult kwargs it fills in, empty
+    when there was no state to fetch (old node, or connection never got that
+    far)."""
+    if not state:
+        return {}
+    return dict(state=state.get("state"), reason=state.get("reason") or None,
+                received=state.get("received"), total=state.get("total"),
+                fallback_in_ms=state.get("fallback_in_ms"))
+
+
 def app_back(info: Optional[dict[str, str]]) -> bool:
     """True only for the app's own index page after the OTA reboot.
 
@@ -163,6 +197,89 @@ def upload_multipart(url: str, path: Path, timeout: float = 180.0) -> tuple[int,
         return resp.status, resp.read().decode(errors="replace")
 
 
+def upload_multipart_controlled(url: str, path: Path, *, stop_after_fraction: Optional[float] = None,
+                                 stall_after_fraction: Optional[float] = None, stall_seconds: float = 0.0,
+                                 chunk: int = 4096, timeout: float = 180.0) -> tuple[int, str]:
+    """Like `upload_multipart`, but streams the body over a raw socket with
+    injectable mid-transfer misbehaviour for the abort bench
+    (docs/bench-ota-regression.md TM-49, docs/safeboot-ota-contract.md abort
+    reasons `client_disconnected`/`incomplete_upload`/`stalled`):
+
+    - `stop_after_fraction`: stop sending and hard-close the socket once this
+      fraction of the multipart body has gone out (kill scenario -- a client
+      that vanishes mid-upload). There is no HTTP response to read once we
+      killed the connection ourselves, so this returns `(0, "")`.
+    - `stall_after_fraction`/`stall_seconds`: pause for `stall_seconds` after
+      this fraction of the body has gone out, without closing the socket,
+      then resume sending the rest and read the real response (stall
+      scenario). A caller that wants to abandon the connection mid-stall
+      (the doublestart scenario: leave the socket open, half-fed, and start a
+      second session on a separate connection) runs this in a background
+      thread with a `stall_seconds` longer than it needs and never joins it.
+
+      Passing neither `stop_after_fraction` nor `stall_after_fraction` is a
+      plain (if slower, one-socket-write-per-chunk) upload.
+    """
+    boundary = uuid.uuid4().hex
+    head = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode()
+    tail = f"\r\n--{boundary}--\r\n".encode()
+    body = head + path.read_bytes() + tail
+    total = len(body)
+
+    parts = urlsplit(url)
+    if parts.hostname is None:
+        raise ValueError(f"upload_multipart_controlled: url has no host: {url!r}")
+    path_qs = parts.path or "/"
+    if parts.query:
+        path_qs += "?" + parts.query
+    request_head = (
+        f"POST {path_qs} HTTP/1.1\r\n"
+        f"Host: {parts.hostname}\r\n"
+        f"Content-Type: multipart/form-data; boundary={boundary}\r\n"
+        f"Content-Length: {total}\r\n"
+        f"Connection: close\r\n\r\n"
+    ).encode()
+
+    stop_at = int(total * stop_after_fraction) if stop_after_fraction is not None else None
+    stall_at = int(total * stall_after_fraction) if stall_after_fraction is not None else None
+
+    sock = socket.create_connection((parts.hostname, parts.port or 80), timeout=timeout)
+    try:
+        sock.sendall(request_head)
+        sent = 0
+        stalled = False
+        while sent < total:
+            if stop_at is not None and sent >= stop_at:
+                sock.close()
+                return 0, ""
+            end = min(sent + chunk, total)
+            if stop_at is not None and end > stop_at:
+                end = stop_at
+            if stall_at is not None and not stalled and end > stall_at:
+                end = stall_at
+            sock.sendall(body[sent:end])
+            sent = end
+            if stall_at is not None and not stalled and sent >= stall_at:
+                stalled = True
+                time.sleep(stall_seconds)
+        # Full body sent (possibly after a stall) -- read the real response
+        # the same way http.client would, reusing its status/header/chunked
+        # body handling rather than reimplementing it.
+        resp = http.client.HTTPResponse(sock, method="POST")
+        resp.begin()
+        resp_body = resp.read()
+        return resp.status, resp_body.decode(errors="replace")
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
 def resolve_firmware(env: str, file: Optional[Path]) -> Path:
     return file if file is not None else Path(".pio/build") / env / "firmware.bin"
 
@@ -181,13 +298,41 @@ class OtaResult:
     error: Optional[str] = None
     note: Optional[str] = None  # non-fatal observation, e.g. same build as before
     timings: dict[str, float] = field(default_factory=dict)
+    # Populated from GET /ota/state (docs/safeboot-ota-contract.md) after a
+    # failed upload -- None on older nodes that predate the endpoint, or when
+    # the upload never got that far (e.g. hardware_mismatch, safeboot_timeout).
+    state: Optional[str] = None
+    reason: Optional[str] = None
+    received: Optional[int] = None
+    total: Optional[int] = None
+    fallback_in_ms: Optional[int] = None
+
+    def node_state_line(self) -> Optional[str]:
+        """Human line for the node's own /ota/state at the time of failure, e.g.
+        'node reports: aborted (incomplete_upload), 1048576/2182465 bytes,
+        fallback in 151 s'. None when no state was fetched (old node, or the
+        failure happened before an OTA session existed)."""
+        if not self.state:
+            return None
+        line = f"node reports: {self.state}"
+        if self.reason:
+            line += f" ({self.reason})"
+        if self.received is not None and self.total is not None:
+            line += f", {self.received}/{self.total} bytes"
+        if self.fallback_in_ms is not None and self.fallback_in_ms >= 0:
+            line += f", fallback in {self.fallback_in_ms / 1000:.0f} s"
+        return line
 
     def line(self) -> str:
         if self.ok:
             a = self.after or {}
             return (f"OTA ok: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
                     f"hardware {a.get('hardware', '?')} (total {self.timings.get('total_s', 0):.0f}s)")
-        return f"OTA FAILED at {self.stage}: {self.error}"
+        out = f"OTA FAILED at {self.stage}: {self.error}"
+        extra = self.node_state_line()
+        if extra:
+            out += f" -- {extra}"
+        return out
 
 
 def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool = False,
@@ -309,15 +454,17 @@ def flash(host: str, fw: Path, *, expect_hw: Optional[str] = None, force: bool =
                 detail = " -- " + e.read().decode(errors="replace").strip()
             except OSError:
                 pass
+        state = fetch_ota_state(host, get=get)
         return OtaResult(ok=False, stage="upload_failed", fw_path=str(fw), fw_size=fw_size,
                           md5=md5, before=info, timings=timings,
-                          error=f"upload failed: {e}{detail}")
+                          error=f"upload failed: {e}{detail}", **_state_fields(state))
     timings["upload_s"] = time.monotonic() - t
     if status != 200:
         timings["total_s"] = time.monotonic() - t_all
+        state = fetch_ota_state(host, get=get)
         return OtaResult(ok=False, stage="upload_failed", fw_path=str(fw), fw_size=fw_size,
                           md5=md5, before=info, timings=timings,
-                          error=f"upload failed: HTTP {status} {body.strip()}")
+                          error=f"upload failed: HTTP {status} {body.strip()}", **_state_fields(state))
 
     phase("reboot_wait", "")
     t = time.monotonic()
@@ -549,6 +696,9 @@ def main(argv: Optional[list[str]] = None) -> int:
               f"hardware {b.get('hardware', '?')}")
     if not result.ok:
         print(f"error: {result.error}")
+        state_line = result.node_state_line()
+        if state_line:
+            print(f"  {state_line}")
         return 1
     a = result.after or {}
     print(f"Done: Meshcom {a.get('version', '?')} build {a.get('build', '?')}, "
