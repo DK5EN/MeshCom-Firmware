@@ -83,11 +83,13 @@ Reine Instrumentierung, kein geaendertes Sendeverhalten.
 
 Der Fehlerbericht ist in der Diagnose richtig, in zwei Details aber nicht:
 
-1. **`[MC-DBG] RADIO_TX len=...` ist als Nachweis-Marker nicht tragfaehig.** Er existiert
-   (`src/lora_functions.cpp:1985`), wird aber nur an **einer** der drei Sendestellen in
-   `doTX()` gedruckt, und dort nur im Nicht-RAK-Zweig. Auf dem ESP32 feuert er fuer
-   normale MeshCom-Frames -- Ping inklusive, im Bench auch gesehen --, nicht fuer
-   TRACK/LoRa-APRS; auf dem RAK nie. Seine Abwesenheit beweist also nichts.
+1. **`[MC-DBG] RADIO_TX len=...` war als Nachweis-Marker nicht tragfaehig** -- inzwischen
+   behoben (`47eb2011`). Er stand an **einer** der drei Sendestellen in `doTX()`, und dort
+   nur im Nicht-RAK-Zweig: auf dem ESP32 feuerte er fuer normale MeshCom-Frames -- Ping
+   inklusive --, nicht fuer TRACK/LoRa-APRS, auf dem RAK nie. Seine Abwesenheit bewies
+   also nichts, und genau daran ist der Nachweisteil des Fehlerberichts gescheitert.
+   Jetzt an allen sechs Varianten (drei Stellen x RAK/Nicht-RAK) mit einem `kind=`-Feld
+   (`track` / `aprs` / `msg`); der Prefix bleibt fuer bestehende Greps unveraendert.
 2. **Die nRF52-Kette ist kuerzer.** Kein `TX_START`, kein `TX_DONE state=` (vor
    `ec070235`). Der Positivnachweis lautet dort `TX_GATE_ENTER` + `CAD_FREE` +
    `CHANNEL_UTIL tx!=0`.
@@ -173,6 +175,35 @@ stehen. Der tragfaehige Nachweis ist das Auftreten von `TX_START` selbst.
 
 Knoten danach aufgeraeumt: `--pingcall NONE`, `--loradebug off`, TRACK off, Rufzeichen
 DK5EN-90 bleibt.
+
+## Nachtrag: RADIO_TX repariert und nachgemessen (`47eb2011`)
+
+Alle drei Boards neu geflasht und nachgeprueft:
+
+| Variante                                  | Beleg                                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `kind=msg`, RAK (`Radio.Send`-Zweig)      | `RADIO_TX len=39 kind=msg` auf DK5EN-90 -- dort hatte es **nie** einen RADIO_TX gegeben            |
+| `kind=msg`, ESP32 (`startTransmit`-Zweig) | `RADIO_TX len=39 kind=msg` auf DK5EN-93                                                            |
+| `kind=aprs`, ESP32                        | `RADIO_TX len=33 kind=aprs` auf DK5EN-93 -- Pfad ohne vorherigen Marker auf **beiden** Plattformen |
+| `kind=track`                              | **nicht beobachtet** -- siehe unten                                                                |
+
+`kind=track` sitzt hinter zwei Bedingungen: ein Positions-Frame im Trackbetrieb **und**
+der 5-Minuten-Timer zu MeshCom. Der Knoten steht still, und die Bake laeuft dann mit
+`[POSINFO]...STATIONARY --> RATE:1800`, also alle 30 Minuten -- in keinem Testfenster kam
+ein Positions-Frame faellig, und `--sendpos` hat keinen erzwungen. Es ist derselbe
+Einzeiler in derselben Form wie die vier belegten Varianten; als "beobachtet" auszuweisen
+waere zu viel behauptet.
+
+**Nebenbefund, live bestaetigt:** beim Umschalten druckte DK5EN-93
+`[PONG]...suppressed: TRACK mode active` -- der `SendPong()`-Marker aus `c570e62e`, den
+kein geplanter Test abgedeckt hatte.
+
+**Werkzeug-Lehre (Betreiber-Hinweis):** die Netz-Konsole auf Port 2323
+(`tools/hmac_connect.py <ip>`) setzt den Knoten **nicht** zurueck und nimmt Kommandos
+entgegen. Damit ist eine Laufzeit > 5 Minuten ueberhaupt erst erreichbar -- ueber die
+serielle CP2102-Leitung bootet der Knoten bei jedem Port-Open neu und kommt nie dorthin.
+Bei einer zweiten Verbindung blieb `--info` allerdings unbeantwortet, waehrend der
+Log-Strom weiterlief; fuer den Abschluss wurde deshalb wieder seriell aufgeraeumt.
 
 ### Ein Nachweis, der nur auf nativem USB gelingt
 
