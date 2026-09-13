@@ -1,6 +1,7 @@
 # DHCP-Hostname aus dem Node-Namen (statt `esp32-XXXXXX`)
 
-**Stand:** 2026-09-13 — Konzept, gegen den Baum verifiziert, noch nicht implementiert
+**Stand:** 2026-09-13 — implementiert (`3af07485`); Firmware-Pfad auf der Bench
+verifiziert, safeboot-Pfad nur gebaut (offen, BACKLOG DH-04)
 **Repo:** MeshCom-Firmware-DEV-Main, Branch `fork-main`
 
 ## BLUF
@@ -17,10 +18,17 @@ Die Firmware setzt nirgends einen WiFi-Hostnamen — `grep -rn "setHostname\|get
 src/` ist leer. Der arduino-esp32-Core bildet ihn dann selbst. Das Repo pinnt **zwei**
 Cores; beide verhalten sich identisch:
 
-| Core                                | Fallback-Name           | Puffer                      | Anwendung aufs netif   |
-| ----------------------------------- | ----------------------- | --------------------------- | ---------------------- |
-| 2.x (`espressif32@^6.13.0`)         | `CONFIG_IDF_TARGET-MAC` | `WiFiGeneric.cpp:283`, 32 B | `WiFiGeneric.cpp:1265` |
-| 3.x (tasmota `2026.02.30`, S3-Envs) | dito                    | `NetworkManager.cpp`, 32 B  | `WiFiGeneric.cpp:636`  |
+| Core                                                                   | Fallback-Name           | Puffer                      | Anwendung aufs netif   |
+| ---------------------------------------------------------------------- | ----------------------- | --------------------------- | ---------------------- |
+| 2.x (`espressif32@^6.13.0`, alle Firmware-Envs)                        | `CONFIG_IDF_TARGET-MAC` | `WiFiGeneric.cpp:283`, 32 B | `WiFiGeneric.cpp:1265` |
+| 3.x (tasmota `2026.02.30`, nur `esp32-safeboot` / `esp32-S3-safeboot`) | dito                    | `NetworkManager.cpp`, 32 B  | `WiFiGeneric.cpp:636`  |
+
+Alle Firmware-Board-Envs erweitern `[esp32]` in `platformio.ini` und hängen damit am 2.x-Core
+— auch `heltec_wifi_lora_32_V3`, selbst ein S3-Board (`extends = esp32` in
+`variants/heltec_wifi_lora_32_V3/platformio.ini`). Nur die beiden Safeboot-Envs pinnen den
+Tasmota-3.x-Core. Beide Pfade wurden vom Gate abgedeckt (Heltec V3 fürs 2.x-, die Safeboot-Envs
+fürs 3.x-Verhalten), die Schlussfolgerung oben bleibt unverändert — nur die Tabellenbeschriftung
+war falsch.
 
 In beiden Fällen schreibt der Core den statischen Puffer auf das STA-netif, sobald der
 Modus **nach** `WIFI_MODE_STA` wechselt. Vom netif geht der Name als DHCP-Option 12
@@ -67,7 +75,7 @@ damit im Netz so eindeutig wie das Rufzeichen selbst; erst ein blankes `DK5EN` o
 SSID würde kollidieren. Nebeneffekt: `node_call` bleibt unbedingt unter der
 31-Zeichen-Grenze, die Trunkierungsfrage entfällt.
 
-## Patch (Entwurf)
+## Patch (wie umgesetzt)
 
 Gemeinsamer Helfer in `src/configuration_global.h` — der Header wird von der Firmware
 **und** von safeboot eingebunden (`safeboot/main.cpp:23`) und beherbergt bereits
@@ -76,12 +84,12 @@ Gemeinsamer Helfer in `src/configuration_global.h` — der Header wird von der F
 ```c
 // DHCP-Option 12 / RFC-1123-Label aus dem Rufzeichen. false => nicht setzen,
 // dann bleibt der Core-Default (esp32-XXXXXX) stehen.
-inline bool makeDhcpHostname(char *out, size_t n, const char *call)
+inline bool makeDhcpHostname(char *out, unsigned long n, const char *call)
 {
-    if (out == nullptr || n < 2 || isNodeUnconfigured(call))
+    if (out == nullptr || n < 2 || isUnconfiguredCall(call))
         return false;
-    size_t o = 0;
-    for (size_t i = 0; call[i] != 0 && o < n - 1; i++)
+    unsigned long o = 0;
+    for (unsigned long i = 0; call[i] != 0 && o < n - 1; i++)
     {
         char c = call[i];
         bool ok = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
@@ -104,6 +112,12 @@ Aufruf in `startNetwork()`, `src/udp_functions.cpp`, direkt vor Zeile 1187:
 ```
 
 Ergebnis im DHCP-Server: `DK5EN-93`.
+
+Zwei Details gegenüber dem ersten Entwurf: `unsigned long` statt `size_t`, weil
+`configuration_global.h` keinerlei Header einbindet und `size_t` dort nicht garantiert
+ist; und `isUnconfiguredCall()` statt `isNodeUnconfigured()`, weil dessen `memcmp()`
+feste 6 bzw. 4 Byte liest und nur für `meshcom_settings.node_call` sicher ist, nicht für
+eine beliebige Zeichenkette.
 
 ## Was bei einer Rufzeichenänderung passiert
 
@@ -132,10 +146,11 @@ Lease, teils darüber hinaus. Nach einer Umbenennung steht `DK5EN-93` also unter
 Umständen noch tagelang neben dem neuen `OE1ABC-12` in der Liste. Abhilfe am Server:
 Lease löschen.
 
-## Ausbaustufe: Lease vor dem Reboot freigeben
+## Ausbaustufe: Lease vor dem Reboot freigeben — gemessen, nicht gebraucht
 
 Naheliegende Frage aus der Praxis — ja, das geht, und die APIs sind auf **beiden**
-gepinnten Cores vorhanden:
+gepinnten Cores vorhanden. Die Tabelle bleibt hier stehen, falls ein anderer Router sich
+anders verhält als der Bench-Router; für den Bench-Router ist die Frage unten beantwortet.
 
 | Funktion                              | 2.x                        | 3.x                        |
 | ------------------------------------- | -------------------------- | -------------------------- |
@@ -156,14 +171,19 @@ Zwei Varianten:
    `esp_netif_tcpip_exec()` (lwIP-Kernfunktionen dürfen nicht aus dem Arduino-Task
    heraus gerufen werden). Sagt dem Server ausdrücklich, dass die Bindung frei ist.
 
-**Dennoch zurückgestellt.** Der Nutzen ist serverabhängig und nicht messbar
-vorhersagbar: ein dnsmasq oder ISC-dhcpd übernimmt den neuen Namen bei frischer
-Bindung, eine FRITZ!Box mit persistenter Geräteliste unter Umständen nicht. Dem steht
-ein konkreter Nachteil gegenüber — nach einem RELEASE kann der Knoten eine **andere
+**Gemessen 2026-09-13, nicht gebraucht.** Der Nutzen ist serverabhängig und war vorab
+nicht messbar vorhersagbar: ein dnsmasq oder ISC-dhcpd übernimmt den neuen Namen bei
+frischer Bindung, eine FRITZ!Box mit persistenter Geräteliste unter Umständen nicht. Dem
+stünde ein konkreter Nachteil gegenüber — nach einem RELEASE kann der Knoten eine **andere
 IP** bekommen, und gerade der RAK4631 ist mangels mDNS-Responder ausschließlich per IP
-erreichbar. Für einen Vorgang, der pro Knoten vielleicht einmal im Leben stattfindet,
-ist "Lease am Router löschen" der ehrlichere Weg. Wird als BACKLOG-Punkt geführt und
-erst nach einer Bench-Messung gegen den tatsächlich eingesetzten Router entschieden.
+erreichbar. Bench-Schritt 7 hat die Frage für den eingesetzten Router beantwortet: Der
+Knoten lief an einem **D-Link Deco**-Meshsystem. Sowohl der erste Join nach dem Flashen
+(`DK5EN-93`, 19:19) als auch die Umbenennung (`--setcall DK5EN-94` -> `DK5EN-94`, 19:23,
+gleiche MAC, gleiche IP) erschienen in der Geräteliste des Deco **ohne jede
+Lease-Freigabe**. Damit bleibt diese Ausbaustufe unimplementiert — nicht weil sie
+zurückgestellt ist, sondern weil sie für den gemessenen Router nichts beitragen würde. Die
+Tabelle oben bleibt als Referenz stehen, falls ein anderer Router (dnsmasq, FRITZ!Box,
+ISC-dhcpd) sich anders verhält und die Frage neu aufwirft.
 
 ## Zu beachten
 
@@ -202,19 +222,41 @@ erst nach einer Bench-Messung gegen den tatsächlich eingesetzten Router entschi
 
 ## Verifikation
 
-1. Sauberer, sequentieller Build: `heltec_v3` (2.x-Core), ein S3-Env (3.x-Core),
-   `esp32-safeboot`, `wiscore_rak4631` (belegt, dass der nRF52-Build unberührt bleibt).
-2. Host-Tests und Format-Gate.
-3. Flash auf DK5EN-93 (Heltec V3, Bench).
-4. Bestehendes Lease im DHCP-Server löschen, Knoten neu verbinden lassen.
-5. Prüfen: Hostname in der Lease-Liste lautet `DK5EN-93`.
-6. Reconnect-Pfad gegentesten (`WIFI_OFF → STA`): Name muss erhalten bleiben.
-7. Umbenennung gegentesten: `--setcall DK5EN-94`, Reconnect abwarten, prüfen dass die
-   neue Option 12 hinausgeht — und festhalten, was der Router vor und nach einem
-   Lease-Flush anzeigt. Dieses Messergebnis entscheidet über die Ausbaustufe oben.
-8. safeboot-Gegenprobe auf demselben Board.
+Umgesetzt in `3af07485` (2026-09-13). Ergebnisse:
+
+1. **Build.** `heltec_wifi_lora_32_V3` (2.x-Core), `esp32-safeboot` und `esp32-S3-safeboot`
+   (3.x-Core), `wiscore_rak4631` (belegt, dass der nRF52-Build unberührt bleibt) — 4/4
+   SUCCESS.
+2. **Host-Tests.** `pio test -e native_aprs -f test_unconfigured` — 14/14 grün (6
+   bestehende + 8 neue Fälle für `makeDhcpHostname()`).
+3. **Flash auf DK5EN-93** (Heltec V3, `/dev/cu.usbserial-0001`), WiFi-MAC
+   `48:CA:43:3A:89:68`, Node-ID `433A8968`, SSID `ORBI63`, IP `192.168.68.69`, DHCP-Server
+   ein **D-Link Deco**-Meshsystem. Vor der Änderung wäre der Knoten als `esp32-3A8968`
+   erschienen (Core-Default aus den letzten drei MAC-Bytes).
+4. **Kein Lease-Flush nötig.** Ohne jede Lease-Freigabe zeigte die Deco-Geräteliste nach dem
+   Flashen um 19:19 sofort `DK5EN-93` — besser als der Konzeptvorbehalt, der ein mögliches
+   Fortbestehen des alten Namens bis zum Lease-Ablauf einkalkuliert hatte.
+5. Hostname in der Lease-Liste bestätigt: `DK5EN-93`.
+6. Reconnect-Pfad (`WIFI_OFF → STA`): nicht gesondert gemessen. Der Aufruf sitzt genau auf
+   diesem Übergang in `startNetwork()`, der Name wird also bei jedem Bringup neu gesetzt —
+   das ist Konstruktion, keine Messung. Jeder Port-Open der Bench-Sitzung hat den Knoten
+   allerdings neu gebootet und damit diesen Pfad mehrfach durchlaufen, ohne dass der Name
+   in der Deco-Liste verlorenging.
+7. **Umbenennung gegengetestet:** `--setcall DK5EN-94` → Deco zeigt `DK5EN-94` um 19:23,
+   gleiche MAC, gleiche IP `192.168.68.69`. Zurückgesetzt mit `--setcall DK5EN-93`,
+   bestätigt über `--info` (`Call: <DK5EN-93>`) und den BLE-Namen (`MC-8968-DK5EN-93`).
+   Knoten unverändert hinterlassen. Dieses Messergebnis entscheidet die Ausbaustufe oben:
+   für diesen Router nicht gebraucht.
+8. **safeboot: NICHT auf der Bench verifiziert.** Der Aufruf sitzt in `wifiConnect()` vor
+   `WiFi.mode(WIFI_STA)`, `esp32-S3-safeboot` baut sauber, und das frische
+   `safeboot-s3.bin` wurde beim Flashen des V3 mit auf `0x10000` geschrieben — der
+   OTA-Modus wurde aber nie betreten und der Hostname dort nie beobachtet. Es steht damit
+   der Code und der Build, nicht eine Messung. Offen, siehe unten.
 
 ## Offen
 
-- Ausbaustufe "Lease freigeben / DHCP-Renew" — Entscheidung nach Schritt 7.
-- ESP32-Ethernet-Pfad — bleibt liegen, solange kein Board auf der Bench steht.
+- **safeboot-Gegenprobe.** Knoten in den Safeboot-/OTA-Modus bringen und prüfen, dass die
+  Geräteliste ihn auch dort unter `DK5EN-93` führt statt unter `esp32-3A8968`. Rezept und
+  Fallstricke stehen in der Safeboot-OTA-Kampagne (BACKLOG 3.8ah).
+- ESP32-Ethernet-Pfad (`HAS_ETHERNET`) — bleibt liegen, solange kein Board auf der Bench
+  steht.

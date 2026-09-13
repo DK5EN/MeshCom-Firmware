@@ -1,5 +1,36 @@
 # RESUME — pick up here
 
+## 2026-09-13 (evening): DHCP hostname from the callsign, shipped and bench-verified
+
+Concept `docs/dhcp-hostname-konzept-20260911.md` implemented as `3af07485`, CHANGELOG item
+224, BACKLOG §3.8ai. `makeDhcpHostname()` in `src/configuration_global.h` sets
+`WiFi.setHostname()` from `meshcom_settings.node_call` right before STA bringup, called
+from `startNetwork()` (`src/udp_functions.cpp`) and the STA path of `wifiConnect()`
+(`src/safeboot/main.cpp`); 8 new cases in `test/test_unconfigured/test_unconfigured.cpp`.
+Gate: `esp32-S3-safeboot`, `esp32-safeboot`, `heltec_wifi_lora_32_V3`, `wiscore_rak4631` 4/4
+SUCCESS; `pio test -e native_aprs -f test_unconfigured` 14/14. Bench on DK5EN-93 (Heltec
+V3) against a D-Link Deco: flashed, and the Deco's device list showed `DK5EN-93` at 19:19
+with **no lease flush** -- better than the concept's caveat, which expected the old name to
+possibly linger until the lease expired. Rename tested: `--setcall DK5EN-94` -> Deco showed
+`DK5EN-94` at 19:23, same MAC, same IP `192.168.68.69`; reverted to `DK5EN-93`, confirmed
+via `--info` and the BLE name, node left as found. The concept doc's "release the lease
+before reboot" question is answered by this result and closed (not needed on this router,
+stays unbuilt); its core-version table also had a bug fixed (only the two safeboot envs
+pin the tasmota 3.x core, every firmware env including Heltec V3 uses the 2.x core from
+`[esp32]` in `platformio.ini`).
+
+**Not verified:** the safeboot half. `esp32-S3-safeboot` builds and the fresh
+`safeboot-s3.bin` went onto the node at `0x10000` with the V3 flash, but OTA mode was never
+entered and the hostname was never observed there — code and build, not a measurement.
+Tracked as BACKLOG DH-04.
+
+**Tooling note for next time:** `tools/bench/serial_session.py --wait-boot` waits for
+`CLIENT STARTED`, which this firmware never prints, and sends commands CR-terminated only;
+against this node that meant two early `--info` calls came back silently empty and looked
+rejected. What worked: wait for `[BOOT];ready` in the log, then send LF-terminated
+commands. Opening the CP2102 port resets the node every time, so budget for a reboot per
+session. Tool itself not modified.
+
 ## 2026-09-13 (afternoon/evening): safeboot OTA campaign done on three boards
 
 Operator brief -> contract (`docs/safeboot-ota-contract.md`) -> three `/orchestrate-waves`

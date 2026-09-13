@@ -256,6 +256,33 @@ ota_abort.py`, 6/6 scenarios on Heltec V3, T-Beam v1.2, T-Deck Plus) found that 
      3 September. `FLASH_VERSION` goes to 20260910, `FLASH_STRUCT_VERSION`
      stays at 20260724 -- settings survive.
 
+224. **DHCP hostname is now the callsign, not `esp32-XXXXXX`** (fork-only,
+     `3af07485`, 2026-09-13). The firmware never set a WiFi hostname, so the
+     arduino-esp32 core invented one from `CONFIG_IDF_TARGET` plus the last
+     three MAC bytes and sent that as DHCP option 12 -- useless for telling
+     nodes apart in a router's lease list. New `inline bool
+makeDhcpHostname(char*, unsigned long, const char*)` in
+     `src/configuration_global.h` builds an RFC 1123 label from
+     `meshcom_settings.node_call`; called from `startNetwork()`
+     (`src/udp_functions.cpp`) immediately before the `WIFI_OFF -> WIFI_STA`
+     transition, and from the STA path of `wifiConnect()`
+     (`src/safeboot/main.cpp`) immediately before `WiFi.mode(WIFI_STA)`, so
+     OTA mode carries the same name too. nRF52/W5100S and the ESP32
+     `HAS_ETHERNET` boards are untouched and documented as out of scope
+     (`docs/dhcp-hostname-konzept-20260911.md`). 8 new cases in
+     `test/test_unconfigured/test_unconfigured.cpp`.
+     Gate: `esp32-S3-safeboot`, `esp32-safeboot`, `heltec_wifi_lora_32_V3`,
+     `wiscore_rak4631` 4/4 SUCCESS (the RAK build proves the nRF52 path
+     stays untouched); `pio test -e native_aprs -f test_unconfigured` 14/14
+     (6 pre-existing + 8 new). Bench on DK5EN-93 (Heltec V3) against a
+     D-Link Deco mesh router: after flashing, the Deco's device list showed
+     `DK5EN-93` at once -- no lease flush needed, better than the concept's
+     caveat expected. Rename tested: `--setcall DK5EN-94` -> the Deco showed
+     `DK5EN-94` within minutes, same MAC, same IP; reverted to `DK5EN-93`
+     and confirmed via `--info` and the BLE name, node left as found. The
+     safeboot half is code and build only — OTA mode was not entered and the
+     name was not observed there (BACKLOG DH-04).
+
 ## New in v4.35s.09.09
 
 Two changes on top of `v4.35s.09.06.2`, items 209 and 210: a warning that

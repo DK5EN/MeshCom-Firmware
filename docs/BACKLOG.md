@@ -4323,3 +4323,25 @@ AsyncTCP's RX timeout closes a stalled upload in ~4 s, the 30 s watchdog is the 
 | SB-05 | DOC  | Low    | `docs/`, `platformio.ini`     | Requirement "node boots back into the running firmware after an abort" cannot be met with one app slot; a second slot needs a new partition table (4 MB boards cannot afford it)     | open, operator decision                        |
 | SB-06 | TEST | Low    | `tools/bench/ota_abort.py`    | Bench runs against the same image it uploads, so a 30 % overwrite can still verify as valid (doublestart `app_valid_first_session` true); use a different image for a stricter check | open                                           |
 | SB-07 | PR   | Medium | `src/safeboot/`               | Upstream PR with the verified safeboot delta (`src/safeboot/` only)                                                                                                                  | open, after operator review                    |
+
+### 3.8ai DHCP hostname from the callsign — shipped 2026-09-13
+
+**What shipped** (`3af07485`): `makeDhcpHostname()` in `src/configuration_global.h` sets
+`WiFi.setHostname()` from `meshcom_settings.node_call` right before every STA bringup —
+`startNetwork()` (`src/udp_functions.cpp`) and the STA path of `wifiConnect()`
+(`src/safeboot/main.cpp`), so OTA mode gets the same name. Concept:
+`docs/dhcp-hostname-konzept-20260911.md`. Gate: 4/4 board builds (Heltec V3, both safeboot
+envs, RAK4631 to prove the nRF52 path untouched), 14/14 native (`native_aprs`,
+`test_unconfigured`). Bench on DK5EN-93 against a D-Link Deco: initial join and a
+`--setcall` rename both showed up under the new name immediately, no lease flush needed —
+the concept's "release the lease before reboot" question is answered and closed, that
+build-out stays unbuilt.
+
+**Deliberately not done, still open:**
+
+| ID    | Type | Prio | Location                                                  | Item                                                                                                                                                                                                                                                                                                  | Status                                              |
+| ----- | ---- | ---- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| DH-01 | FEAT | Low  | `.pio/libdeps/wiscore_rak4631/RAK13800-W5100S/src/Dhcp.h` | nRF52/RAK13800 W5100S path sends a hardcoded `HOST_NAME "WIZnet"`; fixing it means patching a vendored library, not a firmware one-liner                                                                                                                                                              | open, out of scope                                  |
+| DH-02 | FEAT | Low  | `src/esp32/esp32_eth.cpp`                                 | ESP32 `HAS_ETHERNET` boards (`T-ETH-ELITE_1262`, `LilyGo_T_Connect_Pro`) set no netif hostname before `ETH.begin()`'s DHCP start                                                                                                                                                                      | open, neither board is on the bench, not verifiable |
+| DH-03 | TEST | Low  | `tools/bench/serial_session.py`                           | `--wait-boot` looks for `CLIENT STARTED`, which this firmware never prints, and terminates with CR only; commands sent before boot finished were silently swallowed. What works: wait for `[BOOT];ready`, send LF-terminated. Opening the CP2102 port also resets the node every time.                | open, tool not modified (see RESUME 2026-09-13)     |
+| DH-04 | TEST | Low  | `src/safeboot/main.cpp`                                   | The safeboot half of the change is code + build only: `esp32-S3-safeboot` builds and the fresh `safeboot-s3.bin` was flashed to `0x10000`, but OTA mode was never entered and the hostname was never observed there. Enter safeboot and confirm the device list shows `DK5EN-93`, not `esp32-3A8968`. | open, not bench-verified                            |
