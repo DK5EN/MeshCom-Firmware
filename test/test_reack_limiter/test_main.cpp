@@ -63,7 +63,7 @@ static void test_neunter_eintrag_verdraengt_den_aeltesten(void)
     TEST_ASSERT_TRUE(reackAllowed("DK5EN-1", 8, 1000));
 
     // nnn=0 ist aus der Tabelle gefallen -- sofort wieder erlaubt, obwohl
-    // das 60s-Fenster nicht abgelaufen ist. (Dieser Aufruf traegt nnn=0
+    // das Fenster (REACK_LIMITER_WINDOW_MS) nicht abgelaufen ist. (Dieser Aufruf traegt nnn=0
     // seinerseits wieder ein -- Slot 1 (nnn=1) waere der naechste, den ein
     // 11. distinctes Paar verdraengen wuerde; das ist hier nicht Teil der
     // Behauptung.)
