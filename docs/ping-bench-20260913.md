@@ -5,7 +5,8 @@ BACKLOG 3.8aj. Deutsch, weil der Fehlerbericht es ist.
 
 ## Kurzfassung
 
-Der gemeldete Defekt ist behoben und auf zwei Boards nachgewiesen. `sendPing()` gibt
+Der gemeldete Defekt ist behoben und auf drei Boards nachgewiesen -- inklusive des
+zweiten, im Bericht nur vermuteten Fehlerwegs (voller/ablehnender Ring). `sendPing()` gibt
 jetzt ein Ergebnis zurueck, beide Fehlerwege nennen ihren Grund, und die
 TRACK-Unterdrueckung verbraucht kein Ping-Budget mehr. Nebenbei fielen drei Marker
 auf, die auf nRF52 und ESP32 dasselbe heissen, aber nicht dasselbe bedeuten; auch das
@@ -122,14 +123,48 @@ Nachbarknoten -- nie ein Broadcast-Ziel.
 
 **Ping-Pong ist damit als Runde belegt**, nicht nur als Sendevorgang.
 
-### DK5EN-90, RAK4631 -- laeuft noch
+### RAK4631 (`XX0XXX-00`, unkonfiguriert) -- 3/4, ein Test blockiert
 
-Nachtrag folgt. Getestet wird dieselbe Matrix plus TEST 4: die neue
-`[PING]...FAILED`-Zeile steht auf dem nRF52 bewusst **ausserhalb** von `bDisplayInfo`,
-waehrend die bestehende `send Ping`-Zeile dahinter bleibt -- mit Info aus muss die
-Fehlermeldung trotzdem kommen. Die Marker-Paritaet aus `ec070235` ist auf Hardware
-ebenfalls noch nicht bestaetigt (Image gebaut, Marker per String-Scan im Image
-nachgewiesen, aber nicht auf dem Knoten gesehen).
+Der Knoten traegt das Werks-Rufzeichen `XX0XXX-00`, nicht die in den Bench-Notizen
+erwartete Identitaet DK5EN-90.
+
+| Test                          | Ergebnis  | Beleg                                                                                                     |
+| ----------------------------- | --------- | --------------------------------------------------------------------------------------------------------- |
+| TRACK on (Negativpfad)        | PASS      | Suppressed-Zeile genau 1x, `[PING]...FAILED Ping to DK5EN-93` 3x ueber ~75 s, `grep -c TX_GATE_ENTER` = 0 |
+| TRACK off (Positivpfad)       | BLOCKIERT | siehe unten -- kein Defekt des Fixes                                                                      |
+| TRACK on erneut (Re-arm)      | PASS      | nach einem vollen TRACK-off-Intervall erneut genau 1x                                                     |
+| Info-Gate-Asymmetrie (TEST 4) | PASS      | mit `bDisplayInfo` aus: `send Ping` bleibt weg, `[PING]...FAILED` kommt trotzdem                          |
+
+**Warum TEST 2 blockiert ist -- und was er stattdessen bewiesen hat.** Mit Werks-Rufzeichen
+weist `addTxRingEntry()` jeden Frame unbedingt ab (`isUnconfiguredCall()`,
+`src/txring_functions.cpp:449`), noch bevor er den Ring erreicht. `TX_GATE_ENTER` kann auf
+diesem Knoten also unabhaengig von TRACK nie feuern. Die beobachtete Kette war:
+
+```
+[PING]...send Ping to DK5EN-93
+[TX];refuse;unconfigured;ms;...
+[PING]...not queued: TX ring refused the frame
+[PING]...FAILED Ping to DK5EN-93
+```
+
+Das ist der **zweite** neue Rueckgabepfad, `PING_RING_REFUSED` -- auf beiden ESP32-Boards
+nie ausgeloest, weil dort der Ring nie abgelehnt hat. Der Fehlerbericht nennt genau diesen
+Fall als zweiten Befund ("Bei vollem Ring verschwindet der Ping genauso lautlos"): vorher
+haette der Knoten hier `PING nnn / SENT` aufs Display gemalt, `bPingSend` scharf gestellt
+und ein Intervall spaeter ein irrefuehrendes `[PONG]...fail` gedruckt. Er sagt jetzt, dass
+nichts eingereiht wurde. Der blockierte Test hat damit mehr belegt als der geplante.
+
+**TEST 4 im Detail.** `--debug off` (`command_functions.cpp:2720`) schaltet nur `bDEBUG`
+und laesst `bDisplayInfo` unberuehrt -- es ist nicht das Gate, das der Test braucht. Erst
+`--loradebug off` setzt `bDisplayInfo` wirklich auf false. Damit blieb die info-gated
+`send Ping`-Zeile weg, waehrend `[PING]...FAILED` weiter kam. Genau die Asymmetrie, die
+die nRF52-Aenderung garantieren soll.
+
+**Offen:** der Positivpfad braucht ein konfiguriertes Rufzeichen (`--setcall`, erzwingt
+einen Reboot und bringt den Knoten unter dieser Identitaet auf die Luft -- Betreiber-
+Entscheidung, nicht vom Bench-Agenten getroffen). Die Marker-Paritaet aus `ec070235` ist
+auf Hardware ebenfalls noch nicht bestaetigt: Image gebaut, Marker per String-Scan im
+Image nachgewiesen, aber auf dem Knoten laeuft noch der Stand `c570e62e`.
 
 ### Ein Nachweis, der nur auf nativem USB gelingt
 
