@@ -50,11 +50,15 @@ receive time, and a delivery counter. About 260 B per slot, 50 slots by default.
 | ------- | ------------------------------------------------------------ | ---------------------------------------------------- |
 | `own`   | All SSIDs of the node's own base callsign                    | Home node holding for the owner's handheld (default) |
 | `list`  | Explicit callsigns, with or without SSID                     | Club and EMCOMM group nodes                          |
-| `heard` | Callsigns heard directly (no relay hop) within the last 24 h | Area mailbox on a hilltop node (v2)                  |
+| `heard` | Callsigns heard directly (no relay hop) within the last 12 h | Area mailbox on a hilltop node (v1)                  |
 | `off`   | Nothing                                                      | Default for every node without the switch            |
 
-`own` and `list` ship first. `heard` is the unscoped idea with a bounded number of holders and
-waits until the coordination rules in 3.5 are proven on the bench.
+**Decided 2026-09-13: `heard` ships in v1**, against the existing 12 h mheard window rather than a
+new 24 h one. No mheard change is needed — the table already keys on the last hop
+(`src/lora_functions.cpp:729`), so it is a directly-heard set by construction. `own` and `list`
+remain as the explicit alternatives. See T7 and T8 in
+`docs/dm-reliability-and-store-node-verdict-20260913.md` for the eviction caveat and the
+gateway-injection guard.
 
 ### 3.3 Lifecycle of a mailbox entry
 
@@ -95,9 +99,11 @@ These are mandatory. Without the per-node ceiling the role is a runaway-node amp
 
 ### 3.6 What the store node does not do
 
-- No custody acknowledgement to the sender. A 0x41 per store node per DM reintroduces the
-  k-acks-per-hop problem the proposal rejects. The sender's own ladder (S2) runs unchanged and
-  simply receives the destination's ack sooner or later.
+- No custody acknowledgement to the sender. This is a **hard constraint, not a preference**: the
+  binary 0x41 is matched on msg_id alone and calls `findAndStopRingSlot()`, and byte 10 is never
+  read (`src/lora_functions.cpp:394-415`, `src/ack_functions.h:60`), so any 0x41 from a store node
+  would stop the sender's ladder and display the message as delivered. The sender's own ladder runs
+  unchanged and receives the destination's ack sooner or later. See T9 in the verdict document.
 - No storage in ordinary relays. Only nodes with the switch, only for their store set.
 - No persistence in v1 (see section 6).
 
@@ -200,11 +206,12 @@ dropped by cap, cancelled by peer.
 
 ## 9. Open questions
 
-- ~~What the EMCOMM group means by "store and forward".~~ Answered 2026-09-13 by upstream issue
-  `icssw-org/MeshCom-Firmware#224`: the requester asks for the BBS-style pull model, for groups as
-  well as nodes, and across the mesh. This concept implements the push model for direct-neighbour
-  DMs. See section 12 of `docs/dm-reliability-and-store-node-verdict-20260913.md` for what that
-  does and does not deliver against the issue.
+- ~~What the EMCOMM group means by "store and forward".~~ Raised by upstream issue
+  `icssw-org/MeshCom-Firmware#224`, which asks for the BBS-style pull model, for groups as well as
+  nodes, and across the mesh. **Decided 2026-09-13:** the pull model is rejected — a returning node
+  is never asked to request its mail, the holder hears it and delivers unprompted — and group
+  messages are never stored. This concept's push model for direct-neighbour DMs is the answer.
+  See section 12 of `docs/dm-reliability-and-store-node-verdict-20260913.md`.
 - Whether the MeshCom server holds DMs for offline destinations. Decides how often server and
   mailbox double-deliver in gateway-dense areas.
 - Whether upstream accepts a node role at all, or only the sender-side stages.

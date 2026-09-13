@@ -35,17 +35,21 @@ the air today:
    `millis()` is a **prerequisite**; the gateway ACK path at `:1241` already does exactly that and
    is the precedent to copy.
 
-**Two decisions are still missing before anything can be built**: the total cap on the sender's
-ladder, and the gap between groups. Section 10.
+The ladder is settled: **(3x40 s + 1 min) x 3 — 9 transmissions over 9 minutes, then report
+failure.** Group messages are never stored but get the same repair capped at 3 transmissions, and
+that one needs a dedup key groups do not have today (section 3.5). Section 10 lists what is left.
 
 ## 2. Decisions taken
 
-| #   | Question                  | Decision                                                                                                                                                                                                                                                                       |
-| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| D1  | DM retry ladder           | Keep 3x40 s groups as specified. Round-trip and airtime objections noted and overruled. **The `via` argument that supported this does not hold (section 7); the decision now rests on measurement alone.** Section 7's evidence gate is a proposal, not part of this decision. |
-| D2  | Store-node delivery reach | Direct neighbour only. **`max_hop` 0 on the raw wire field** — `--maxhop` clamps to 1..6 (`src/maxhop.h:17-18`), so "minimal" via the normal setter would still allow one relay hop.                                                                                           |
-| D3  | Custody ACK               | Display only — the sender's ladder keeps running. **In v1 this means no on-air notice at all** (T9 option A): the store node logs it and shows it on its own mailbox page, and the sender sees nothing. A sender-visible state is stage 4.                                     |
-| D4  | Store set                 | `heard` mode against the existing 12 h mheard window. No mheard change needed — see T7, now resolved in this design's favour.                                                                                                                                                  |
+| #   | Question                   | Decision                                                                                                                                                                                                                                                                                                                   |
+| --- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | DM retry ladder            | **(3x40 s + 1 min) x 3 = 9 transmissions over 9 minutes, then stop and report failure.** That is the whole ladder; there is no 24 h sender-side ladder. The `via` argument that supported the fast rate does not hold (section 7), but the 9-send cap makes the airtime objection small — section 7 redoes the arithmetic. |
+| D2  | Store-node delivery reach  | Direct neighbour only. **`max_hop` 0 on the raw wire field** — `--maxhop` clamps to 1..6 (`src/maxhop.h:17-18`), so "minimal" via the normal setter would still allow one relay hop.                                                                                                                                       |
+| D3  | Custody ACK                | Display only — the sender's ladder keeps running. **In v1 this means no on-air notice at all** (T9 option A): the store node logs it and shows it on its own mailbox page, and the sender sees nothing. A sender-visible state is stage 4.                                                                                 |
+| D4  | Store set                  | `heard` mode against the existing 12 h mheard window. No mheard change needed — see T7, now resolved in this design's favour.                                                                                                                                                                                              |
+| D5  | Store-node delivery ladder | The same 9-send ladder per presence trigger, then **a one-hour cooldown** before the next cycle, until `storetime` expires or the `:ackNNN` arrives.                                                                                                                                                                       |
+| D6  | Group messages             | **Never stored** — the mailbox is for personal messages only. But group sends get the same fresh-msg_id repair, capped at **one group of 3x40 s, 3 transmissions, no ladder**. Section 3.5.                                                                                                                                |
+| D7  | Pull model                 | Rejected. A returning node is never asked to request its mail; the holder hears it and delivers unprompted. Operator decision 2026-09-13, against the mechanism in upstream #224. Section 12.                                                                                                                              |
 
 ## 3. The four DM changes, judged
 
@@ -70,11 +74,11 @@ added is the useful kind, and it is larger. Section 7.
 Your ladder: three attempts 40 s apart, pause, three more, repeat. Decision D1 keeps it. Three
 things must ride along or it is a runaway-node design:
 
-- **A total cap.** Not yet named. At the assumed 3-minute gap the ladder fires roughly **1,170
-  sender frames for one DM over 24 h**. Without a cap and a `storetime` ceiling, a DM to a node
-  that is simply switched off transmits for as long as the sender is up. Today `MAX_RETRANSMIT 3`
-  bounds it at ~120 s; removing that bound without replacing it is the single largest risk in this
-  design.
+- **The cap (D1).** Three groups of three, 40 s inside a group, 1 min between groups: **9
+  transmissions over 9 minutes**, then the sender stops and reports failure. This replaces
+  `MAX_RETRANSMIT 3`'s 120 s bound. A DM to a node that is switched off costs 9 frames and ends; it
+  does not transmit for as long as the sender is up. Everything past those 9 minutes is the store
+  node's job, not the sender's.
 - **The existing back-pressure gates.** No attempt while QRS/QRT is latched or while the 5-minute
   channel utilisation is above threshold; at most one outbox action per 30 s per node. These
   already exist in the fork (`bp_state.refusing()` at `src/loop_functions.cpp:4070`) and cost
@@ -123,6 +127,34 @@ duplicate frame is dropped wholesale at `src/lora_functions.cpp:896`, which take
 at `:1072` with it. Needed: duplicate + addressed to me + carries `{NNN` -> re-ACK, do not display,
 do not relay. This is S1's "re-ACK on duplicate" and it repairs one-hop ACK loss on its own, before
 anything else ships.
+
+### 3.5 Group messages — the same repair, a third of the ladder (D6)
+
+Current state, verified: a group send gets **no** `{NNN` (the marker is added only under `bDM`,
+`src/loop_functions.cpp:4096-4101`), but it **is** retransmit-eligible — status `0x00` at
+`:4128-4133` — so it already re-sends 3 times, 40 s apart, with the same msg_id. It is therefore
+broken in exactly the way DMs are: every node that heard the original swallows the repeat. The only
+thing that can stop that ladder early is a neighbouring **gateway's** `0x41`, which is emitted for
+groups (`src/lora_functions.cpp:1237`, `CheckGroup() > 0`) though never for DMs. Off-grid, with no
+gateway in range, all three transmissions always fire and nothing is learned from them.
+
+So the repair is the same — fresh msg_id per attempt — capped at **one group: 3 transmissions,
+40 s apart, no further groups** (D6). One thing does not carry over, and it is the catch:
+
+**A group message has no NNN, so there is nothing to dedup on.** The (source, NNN) cache in 3.3
+cannot be used. Without a substitute, a fresh-msg_id repeat makes every node in the network
+**display the same group message three times**. That is worse than the bug being fixed.
+
+The fix is receive-side dedup on **(source callsign, CRC-16 of the payload)**, time-aged like the
+DM cache. No wire change, and it also suppresses today's duplicate displays from multipath
+re-floods. Adding `{NNN` to group frames instead is wrong twice over: nobody would ack it — the ack
+branch is gated on the destination matching the node's own callsign exactly
+(`src/lora_functions.cpp:983`), so a group destination never reaches it — and old nodes would
+render the trailing `{123` as visible text, because the strip happens in that same branch.
+
+Consequence to accept: for groups there is no delivery proof at all, with or without this change.
+The 3 transmissions are blind redundancy, which is the right trade at 3 frames and the wrong one at
+9 — which is why D6 caps it where it does.
 
 ## 4. Code facts this design rests on
 
@@ -263,14 +295,20 @@ Changes against `docs/MeshCom-Store-Node-Concept-20260911.md`:
 - **3.4 delivery frame:** original sender as `msg_source_call`, store node appended to the path,
   fresh msg_id from `millis()`, **`max_hop` 0 on the raw field** (D2), payload including `{NNN`
   untouched.
-- **3.5 coordination rules: unchanged and still mandatory.** One delivery per (source, NNN) per
-  10 min, at most 3 deliveries per entry, at most one mailbox action per 30 s and 20 per hour, no
-  action while QRS/QRT is latched or 5-minute utilisation exceeds 25 %, jitter 5-60 s with
-  cancellation on hearing a peer's delivery. An earlier draft of this document proposed replacing
-  these with the sender's 3x40 s ladder; that is withdrawn. The sender's ladder and the store
-  node's schedule are separate rate regimes, and §3.5 is what bounds the role. Note T14: jitter
-  cancellation fails in a hidden-terminal geometry, so the per-entry cap of 3 is the real ceiling,
-  not the cancellation.
+- **3.5 delivery schedule (D5).** On a presence trigger the store node runs the same 9-send
+  ladder — (3x40 s + 1 min) x 3 — then waits **one hour** before it may start another cycle for
+  that entry, until the `:ackNNN` arrives or `storetime` expires. A delivery is one frame at
+  `max_hop` 0, ~1.4 s, not a flood, which is what makes a ladder affordable here at all.
+  The concept's other §3.5 caps stay and are what bound the role: at most one mailbox action per
+  30 s and **20 per hour per node**, no action while QRS/QRT is latched or 5-minute utilisation
+  exceeds 25 %, jitter 5-60 s with cancellation on hearing a peer's delivery for the same
+  (source, NNN).
+  Two numbers to keep in view: a destination that is heard but never acks costs 9 frames per hour
+  per entry, up to ~216 frames over a 24 h hold — ~5 min of airtime for one message, tolerable
+  alone. But with a full 50-slot mailbox the same situation is ~10,800 frames, which is why the
+  20-per-hour node ceiling is the real cap, not the per-entry one. Note T14: jitter cancellation
+  fails in a hidden-terminal geometry, so between two store nodes that cannot hear each other the
+  node ceiling is again the only thing that holds.
 - **3.6:** "no custody acknowledgement" is a **T9 constraint**, not a preference. v1 emits nothing
   on air (option A).
 - **New: the switch.** `--store heard|own|list|off`, default `off`, stored per T13. Turning it on
@@ -314,37 +352,57 @@ concede on it.** `checkMesh()` does return false for a node not named in `msg_de
 - If the named via node is down, nobody relays at all — no fallback to flood. The ladder then fails
   silently and permanently, which is worse than the flood it was meant to avoid.
 
-So the ladder decision rests on measurement alone. Two things settle it without anyone arguing from
-memory:
+### The cost, recomputed under the 9-send cap
 
-1. **Measure the round trip.** Add to the setlog STAT line: DMs sent, echo heard, peer ACK,
-   attempts per DM, and send-to-`:ackNNN` time as a histogram. There is no end-to-end DM outcome
-   measurement in the network today at all. One week decides the ladder empirically — and your
-   "the 4 minutes is a misconfigured site" is a testable claim, currently supported by one data
-   point on each side.
-2. **Measure the dedup-ring side effect (T11)**, which no round-trip argument covers: distinct
-   msg_ids per minute at a busy relay, before and after. If the rotation window drops below the
-   39.6-48.5 min corridor, the ladder is damaging traffic that has nothing to do with DMs.
+With D1's cap the worry I raised is much smaller than I made it sound, and the arithmetic should be
+on the record rather than the scary aggregate:
 
-**Proposal, not a decision:** gate the fast rate on evidence — full 3x40 s when the measured RTT to
-that destination was below the rate, or when 5-minute utilisation is low; otherwise the same ladder
-with the group gap stretched. This keeps your ladder wherever the network can actually answer
-inside it and makes the congested case self-limiting. It needs your decision; D1 as recorded does
-not include it.
+- Worst case per DM: **9 transmissions over 9 minutes**, versus 4 today (1 + 3 retries) of which 3
+  are swallowed and useless. So the honest comparison is 1 useful flood today against 9 useful ones,
+  not "1,170 frames".
+- Cost at any one node: each node hears a frame 2.1 to 2.6 times (measured DUP/NEW), each ~1.4 s,
+  so one flood costs a given node ~3.4 s of receive time and 9 cost ~31 s. Spread over 9 minutes
+  that is **roughly 6 % of the channel at one node, for one DM taken to full failure**.
+- Network-wide volume makes this a non-issue on the average: 1,182 DMs in 7 days across 185 senders
+  (mcmap, 09-09). Even if every one of them failed all 9 times, it disappears against 3,600 to
+  4,600 HEY beacons per hour.
+- Where it still bites is a **local burst** — several senders in one area retrying at once — which
+  is what the QRT/utilisation gate and the one-action-per-30 s ceiling are for. Those are not
+  optional.
+
+So: the ladder is affordable, and the reason is the cap, not `via`. What remains genuinely unknown
+is whether 40 s is long enough to be _useful_ — if the round trip is longer than 9 minutes on a
+given path, all 9 transmissions fire before an ACK could arrive and the ladder is merely expensive
+noise. That is the measurement below, and it is a question about effectiveness, not about damage.
+
+### Measure two things
+
+1. **The round trip.** Add to the setlog STAT line: DMs sent, echo heard, peer ACK, attempts per
+   DM, and send-to-`:ackNNN` time as a histogram. There is no end-to-end DM outcome measurement in
+   the network today at all. One week decides whether 9 minutes is the right window — and your "the
+   4 minutes is a misconfigured site" becomes a testable claim rather than one data point against
+   another.
+2. **The dedup-ring side effect (T11)**, which no round-trip argument covers: distinct msg_ids per
+   minute at a busy relay, before and after. Nine fresh ids per DM instead of one raises the
+   distinct-id arrival rate everywhere on the path. If a busy node's rotation window drops below
+   the measured 39.6-48.5 min corridor, the ladder is damaging traffic that has nothing to do with
+   DMs. This is now the main open risk of D1, and the only one the cap does not settle.
 
 ## 8. Build order
 
-| Stage | Content                                                                                                                                                                                                                                                                                   | Depends on                                         |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 0     | Mint ACK/attempt msg_ids from `millis()`, drop `save_settings()` from the ACK path (T4). Split the dedup gate, re-ACK on duplicate-for-me (T5). Report give-up to the app, scoped to user DMs only (advisor m6). STAT counters, the RTT histogram and the dedup-rate counter (section 7). | —                                                  |
-| 1     | Outbox keyed on NNN (T1, T2). Fresh msg_id per attempt, NNN stable. The ladder with its cap and the QRT/utilisation gates. Echo-gated first attempt.                                                                                                                                      | 0, **and the cap and gap decisions in section 10** |
-| 2     | Destination dedup on (source, NNN) with time ageing and payload compare, on both RX paths (3.3). Bounded ACK repeats with echo stop (3.4).                                                                                                                                                | 1                                                  |
-| 3     | Store node: store set with the T8 gateway guard, `max_hop` 0 delivery, §3.5 caps, mailbox page, switch with the RAM warning, settings via T13, counters.                                                                                                                                  | 2                                                  |
-| 4     | Sender-visible custody notice with a real app status, once a capability signal exists (T9 option B or C).                                                                                                                                                                                 | 3                                                  |
+| Stage | Content                                                                                                                                                                                                                                                                                   | Depends on |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 0     | Mint ACK/attempt msg_ids from `millis()`, drop `save_settings()` from the ACK path (T4). Split the dedup gate, re-ACK on duplicate-for-me (T5). Report give-up to the app, scoped to user DMs only (advisor m6). STAT counters, the RTT histogram and the dedup-rate counter (section 7). | —          |
+| 1     | Outbox keyed on NNN (T1, T2). Fresh msg_id per attempt, NNN stable. The 9-send ladder (D1) and the QRT/utilisation gates. Echo-gated first attempt.                                                                                                                                       | 0          |
+| 2     | Destination dedup on (source, NNN) with time ageing and payload compare, on both RX paths (3.3). Bounded ACK repeats with echo stop (3.4).                                                                                                                                                | 1          |
+| 3     | Store node: store set with the T8 gateway guard, `max_hop` 0 delivery, §3.5 caps, mailbox page, switch with the RAM warning, settings via T13, counters.                                                                                                                                  | 2          |
+| 4     | Sender-visible custody notice with a real app status, once a capability signal exists (T9 option B or C).                                                                                                                                                                                 | 3          |
 
 Stage 0 verifies as genuinely self-contained and is upstream-PR-sized; it repairs real defects on
-its own. Stage 1 can only be stubbed until stage 0's measurement has run, because two of its
-defining parameters are open. Stage 3 is fork-first; a new node role needs the concept accepted
+its own. Stage 1's parameters are now fixed (D1), so it no longer waits on the measurement — but
+stage 0 should still land first, because without the counters there is no way to show stages 1 to 3
+worked. Group repair (D6) rides with stage 2, since it needs the same receive-side dedup machinery
+keyed on a CRC instead of NNN. Stage 3 is fork-first; a new node role needs the concept accepted
 before code.
 
 ## 9. Bench plan
@@ -372,27 +430,29 @@ a direct contact only, never `*` (the broadcast incident of 2026-09-11).
 
 ## 10. Open questions
 
-**Blocking stage 1:**
+**Settled 2026-09-13** (these were blocking stage 1): the gap between groups is **1 minute**; the
+total cap is **9 transmissions over 9 minutes**, then failure is reported; the store node repeats
+that ladder after a **one-hour cooldown** (D5); group messages are **never stored** and get **3
+transmissions only** (D6); the pull model is **rejected** (D7).
 
-- **The gap between groups: 1 minute or 3 minutes?** Your message says both. Assumed 3 min
-  throughout; the 1,170-frame figure in 3.2 uses it.
-- **The total cap.** How many groups before the sender gives up and reports failure? Does the
-  sender-side ladder run for 24 h, or only the store node's? Today `MAX_RETRANSMIT 3` bounds
-  everything at ~120 s; nothing replaces it yet.
-- **Does the section 7 evidence gate go in, or is the 40 s rate unconditional?**
+**Still open:**
 
-**Not blocking:**
-
-- ~~What the EMCOMM group means by store-and-forward.~~ **Answered by upstream issue #224**: the
-  requester wants the pull model. See section 12 — this design implements the other one, and the
-  difference has to be stated in any PR that references the issue.
-- mcmap and the server must fold on (source, NNN) or DM counts inflate once attempts carry fresh
-  ids.
+- **Does the evidence gate go in?** A much smaller question than it was — with the 9-send cap the
+  worst case is ~6 % of one node's channel for one DM, so the gate is no longer a safety measure,
+  only an optimisation. Recommendation: **leave it out**. A fixed, predictable ladder is easier to
+  reason about in the field than one that changes rate from a utilisation average, and the
+  QRT/utilisation gate already refuses transmission when the channel is genuinely in trouble.
+  Revisit only if the stage 0 measurement shows the fast rate firing into round trips it cannot
+  beat.
+- **Group dedup needs a decision on the CRC** (3.5): which bytes it covers, cache size and ageing,
+  and whether it shares the DM cache or gets its own.
+- mcmap and the server must fold on (source, NNN) — and for groups on (source, payload CRC) — or
+  message counts inflate once attempts carry fresh ids.
 - `{` in user text still breaks NNN parsing (advisor m4). Pre-existing, and it gets worse once NNN
   is load-bearing for dedup. Strip or escape at the sender in stage 0.
 - Advisor M3, m1 and m2 — the app never learns a per-attempt outcome, `sendMessage()` has no return
   channel, and a single-variable receipt mailbox loses acks — are dropped here with no successor.
-  All three concern reconciling several fresh-msg_id attempts into one app-visible state. They will
+  All three concern reconciling several fresh-msg_id attempts into one app-visible state. They
   return in stage 2.
 
 ## 11. Corrections to the existing documents
@@ -441,21 +501,39 @@ Four differences, stated so a PR does not overclaim:
 | Works **across the mesh**, multi-hop    | Direct RF neighbours only (D2, `max_hop` 0)                    | **Not delivered.** And it is structural, not a setting: mheard keys on `msg_source_last` (T7), so a store node can only ever learn, and hold for, its own neighbours.                                                       |
 | Retrieval reaches a store node far away | The holder must be in RF range of B when B returns             | **Not delivered.** This is the pull model's one genuine advantage over presence: B can be served by a node it is not a neighbour of.                                                                                        |
 
-**Verdict on the framing.** A PR headed "#224 delivered" would overclaim on two of four rows. What
-is defensible: _"#224 delivered for direct-neighbour direct messages, without a wire-format change;
-group storage and multi-hop retrieval remain open."_ That is worth saying plainly, because the
-honest version is still a strong claim — the issue has been open since March 2025 and parked behind
+**Two of the four gaps are now closed by decision, not by code (2026-09-13):**
+
+- **The pull model is rejected outright (D7).** Not deferred: a returning node should never have to
+  ask. The holder heard it, the holder knows it has something, the holder sends it. That is a
+  defensible stance — it needs no new frame type, no time sync, and no support whatsoever at the
+  returning end, which is exactly why it works with the entire existing fleet as receivers. The
+  issue's mechanism is declined; its use case is met.
+- **Group storage is rejected outright (D6).** The mailbox is for personal messages. Technically
+  this is also the right call: a group message has no single destination to trigger delivery on and
+  no acknowledgement to purge on, so every mechanism in §3.3 would have to be reinvented, with
+  unbounded fan-out. Groups instead get the cheap half of the fix — the fresh-msg_id repair, capped
+  at 3 transmissions (section 3.5).
+
+What remains genuinely undelivered is the third row alone: **multi-hop retrieval**. A store node
+holds for its RF neighbours and no one else, structurally (T7).
+
+**Verdict on the framing.** A PR headed "#224 delivered" would still overclaim. What is defensible:
+_"#224 delivered for direct-neighbour direct messages, without a wire-format change. Group storage
+and multi-hop retrieval are deliberately out of scope, and the retrieval-request mechanism the issue
+proposes is replaced by presence-triggered delivery, which needs no support at the returning node."_
+That is worth saying plainly, because the honest version is still a strong claim — the issue has been open since March 2025 and parked behind
 a protocol step, and this design needs no protocol step at all. Landing the 80 % case now, with old
 firmware on both ends, is a better outcome than waiting for MeshCom 5.0; it just has to be labelled
 as the 80 % case.
 
-**If the full issue is the goal**, it is a stage 5 on top of stage 3: a request frame (`{req}`-style
-marker or a new type), a response path, dedup on the request, and a rate limit against the obvious
-failure mode — every node that returns from a long outage asking every neighbour at once, which is
-a request storm exactly when the channel is recovering. Multi-hop retrieval also reintroduces the
-flood the store node was designed to avoid: the request floods, and every holder answers. The
-per-holder caps in §3.5 become load-bearing at that point rather than precautionary. Worth
-designing only after stage 3 has field data.
+**The case for D7, to have ready when the issue author asks.** A request frame has one real
+advantage — B can be served by a holder it is not a neighbour of — against four costs: a new frame
+type, so old firmware cannot participate at either end; a request storm exactly when the channel is
+recovering, because every node returning from an outage asks every neighbour at once; a flood per
+request in the multi-hop case, with every holder answering, which is the amplifier the store node
+was designed to avoid; and time sync. Presence-triggered delivery buys the same outcome for one
+frame at `max_hop` 0 and needs nothing at the returning end. The honest trade is coverage
+(neighbours only) against cost and compatibility, and D7 takes compatibility.
 
 **Upstream consequence.** The `MeshCom 5.0` label means the maintainers parked this for a protocol
 step. A fork-first store node that needs no wire change is a different proposition from what that
