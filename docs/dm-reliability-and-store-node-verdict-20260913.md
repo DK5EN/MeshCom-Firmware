@@ -48,7 +48,7 @@ that one needs a dedup key groups do not have today (section 3.5). Section 10 li
 | D3  | Custody ACK                | Display only — the sender's ladder keeps running. **In v1 this means no on-air notice at all** (T9 option A): the store node logs it and shows it on its own mailbox page, and the sender sees nothing. A sender-visible state is stage 4.                                                                                 |
 | D4  | Store set                  | `heard` mode against the existing 12 h mheard window. No mheard change needed — see T7, now resolved in this design's favour.                                                                                                                                                                                              |
 | D5  | Store-node delivery ladder | The same 9-send ladder per presence trigger, then **a one-hour cooldown** before the next cycle, until `storetime` expires or the `:ackNNN` arrives.                                                                                                                                                                       |
-| D6  | Group messages             | **Never stored** — the mailbox is for personal messages only. But group sends get the same fresh-msg_id repair, capped at **one group of 3x40 s, 3 transmissions, no ladder**. Section 3.5.                                                                                                                                |
+| D6  | Group messages             | **Out of scope entirely.** Never stored, and the fresh-msg_id repair is _not_ extended to group sends either. This programme is about personal messages. Section 3.5 records what was found, as a parked item.                                                                                                             |
 | D7  | Pull model                 | Rejected. A returning node is never asked to request its mail; the holder hears it and delivers unprompted. Operator decision 2026-09-13, against the mechanism in upstream #224. Section 12.                                                                                                                              |
 
 ## 3. The four DM changes, judged
@@ -128,33 +128,25 @@ at `:1072` with it. Needed: duplicate + addressed to me + carries `{NNN` -> re-A
 do not relay. This is S1's "re-ACK on duplicate" and it repairs one-hop ACK loss on its own, before
 anything else ships.
 
-### 3.5 Group messages — the same repair, a third of the ladder (D6)
+### 3.5 Group messages — out of scope, but record the finding (D6)
 
-Current state, verified: a group send gets **no** `{NNN` (the marker is added only under `bDM`,
-`src/loop_functions.cpp:4096-4101`), but it **is** retransmit-eligible — status `0x00` at
-`:4128-4133` — so it already re-sends 3 times, 40 s apart, with the same msg_id. It is therefore
-broken in exactly the way DMs are: every node that heard the original swallows the repeat. The only
-thing that can stop that ladder early is a neighbouring **gateway's** `0x41`, which is emitted for
-groups (`src/lora_functions.cpp:1237`, `CheckGroup() > 0`) though never for DMs. Off-grid, with no
-gateway in range, all three transmissions always fire and nothing is learned from them.
+Group messages are out of scope for this programme (D6): not stored, and not given the
+fresh-msg_id repair either. What was found while checking, parked for whoever picks it up later:
 
-So the repair is the same — fresh msg_id per attempt — capped at **one group: 3 transmissions,
-40 s apart, no further groups** (D6). One thing does not carry over, and it is the catch:
+- A group send already re-sends 3 times, 40 s apart — it is retransmit-eligible, status `0x00` at
+  `src/loop_functions.cpp:4128-4133` — but with the same msg_id, so it is broken exactly the way
+  DMs are. It carries no `{NNN` (the marker is added only under `bDM`, `:4096-4101`).
+- The only thing that can end that ladder early is a neighbouring **gateway's** `0x41`, which is
+  emitted for groups (`src/lora_functions.cpp:1237`, `CheckGroup() > 0`) though never for DMs.
+  Off-grid with no gateway in range, all three transmissions always fire and nothing is learned.
+- **The blocker for anyone extending the repair to groups:** a group message has no NNN, so the
+  (source, NNN) cache cannot be used. Fresh msg_ids without a substitute key would make every node
+  display the message three times. The answer would be receive-side dedup on (source callsign,
+  CRC-16 of the payload); adding `{NNN` to group frames is not, because nobody would ack it — the
+  ack branch requires the destination to equal the node's own callsign exactly — and old nodes
+  would render the trailing `{123` as visible text.
 
-**A group message has no NNN, so there is nothing to dedup on.** The (source, NNN) cache in 3.3
-cannot be used. Without a substitute, a fresh-msg_id repeat makes every node in the network
-**display the same group message three times**. That is worse than the bug being fixed.
-
-The fix is receive-side dedup on **(source callsign, CRC-16 of the payload)**, time-aged like the
-DM cache. No wire change, and it also suppresses today's duplicate displays from multipath
-re-floods. Adding `{NNN` to group frames instead is wrong twice over: nobody would ack it — the ack
-branch is gated on the destination matching the node's own callsign exactly
-(`src/lora_functions.cpp:983`), so a group destination never reaches it — and old nodes would
-render the trailing `{123` as visible text, because the strip happens in that same branch.
-
-Consequence to accept: for groups there is no delivery proof at all, with or without this change.
-The 3 transmissions are blind redundancy, which is the right trade at 3 frames and the wrong one at
-9 — which is why D6 caps it where it does.
+Nothing here is built. It is written down so the next reader does not rediscover it.
 
 ## 4. Code facts this design rests on
 
@@ -305,8 +297,11 @@ Changes against `docs/MeshCom-Store-Node-Concept-20260911.md`:
   (source, NNN).
   Two numbers to keep in view: a destination that is heard but never acks costs 9 frames per hour
   per entry, up to ~216 frames over a 24 h hold — ~5 min of airtime for one message, tolerable
-  alone. But with a full 50-slot mailbox the same situation is ~10,800 frames, which is why the
-  20-per-hour node ceiling is the real cap, not the per-entry one. Note T14: jitter cancellation
+  alone. But with a full 50-slot mailbox the same situation is ~10,800 frames. **Accepted risk,
+  operator decision 2026-09-13**, on the basis that the 20-actions-per-hour node ceiling bounds it
+  in practice and that a mailbox full of destinations which are heard but never ack is not a real
+  field state. That ceiling is therefore load-bearing, not precautionary, and the `dropped by cap`
+  counter is how we find out if the assumption was wrong. Note T14: jitter cancellation
   fails in a hidden-terminal geometry, so between two store nodes that cannot hear each other the
   node ceiling is again the only thing that holds.
 - **3.6:** "no custody acknowledgement" is a **T9 constraint**, not a preference. v1 emits nothing
@@ -401,8 +396,7 @@ noise. That is the measurement below, and it is a question about effectiveness, 
 Stage 0 verifies as genuinely self-contained and is upstream-PR-sized; it repairs real defects on
 its own. Stage 1's parameters are now fixed (D1), so it no longer waits on the measurement — but
 stage 0 should still land first, because without the counters there is no way to show stages 1 to 3
-worked. Group repair (D6) rides with stage 2, since it needs the same receive-side dedup machinery
-keyed on a CRC instead of NNN. Stage 3 is fork-first; a new node role needs the concept accepted
+worked. Stage 3 is fork-first; a new node role needs the concept accepted
 before code.
 
 ## 9. Bench plan
@@ -432,22 +426,13 @@ a direct contact only, never `*` (the broadcast incident of 2026-09-11).
 
 **Settled 2026-09-13** (these were blocking stage 1): the gap between groups is **1 minute**; the
 total cap is **9 transmissions over 9 minutes**, then failure is reported; the store node repeats
-that ladder after a **one-hour cooldown** (D5); group messages are **never stored** and get **3
-transmissions only** (D6); the pull model is **rejected** (D7).
+that ladder after a **one-hour cooldown** (D5); group messages are **out of scope** (D6); the pull
+model is **rejected** (D7); the evidence gate is **left out** — the ladder rate is unconditional.
 
 **Still open:**
 
-- **Does the evidence gate go in?** A much smaller question than it was — with the 9-send cap the
-  worst case is ~6 % of one node's channel for one DM, so the gate is no longer a safety measure,
-  only an optimisation. Recommendation: **leave it out**. A fixed, predictable ladder is easier to
-  reason about in the field than one that changes rate from a utilisation average, and the
-  QRT/utilisation gate already refuses transmission when the channel is genuinely in trouble.
-  Revisit only if the stage 0 measurement shows the fast rate firing into round trips it cannot
-  beat.
-- **Group dedup needs a decision on the CRC** (3.5): which bytes it covers, cache size and ageing,
-  and whether it shares the DM cache or gets its own.
-- mcmap and the server must fold on (source, NNN) — and for groups on (source, payload CRC) — or
-  message counts inflate once attempts carry fresh ids.
+- mcmap and the server must fold on (source, NNN) or message counts inflate once attempts carry
+  fresh ids.
 - `{` in user text still breaks NNN parsing (advisor m4). Pre-existing, and it gets worse once NNN
   is load-bearing for dedup. Strip or escape at the sender in stage 0.
 - Advisor M3, m1 and m2 — the app never learns a per-attempt outcome, `sendMessage()` has no return

@@ -157,6 +157,18 @@ which are the natural mailbox hosts.
   writes flash per message, LittleFS is loop-task-only on nRF52, and wear multiplies with
   retries. Persistence on the T-Deck SD card is a later stage. Say this plainly to the EMCOMM
   group.
+- **No multi-hop retrieval, by decision (2026-09-13).** A store node holds only for callsigns it
+  hears directly, and delivers only at `max_hop` 0. Extending it across the mesh would put the
+  flood back in — a retrieval request would flood and every holder would answer — which is the
+  amplifier this role exists to avoid. The two shapes the role is designed for are both
+  single-hop by nature: a tower or hilltop node with many direct neighbours, and a home node on
+  permanent power parking messages for the handhelds around one apartment until they come back.
+- **Airtime for an entry that is heard but never acked is accepted (2026-09-13).** Nine frames per
+  hour per entry, up to ~216 over a 24 h hold; a full 50-slot mailbox in that state would be
+  ~10,800 frames. Accepted on the basis that the 20-mailbox-actions-per-hour node ceiling bounds it
+  and that the worst case is not a real field state. That ceiling is therefore load-bearing rather
+  than precautionary, and the `dropped by cap` counter is the instrument that tells us if the
+  assumption was wrong.
 - **The mesh becomes stateful at designated nodes.** Operators must know which node holds for
   whom. The `own` and `list` modes make that explicit; `heard` does not, which is why it is v2.
 - **Depends on S1 and S2 of the transport proposal.** Re-ack on duplicate, no flash write in the
