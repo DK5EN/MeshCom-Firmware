@@ -215,3 +215,46 @@ Not verified on hardware: that an originated frame no longer writes. It follows
 from the eight edited call sites and is covered natively, but proving it on the
 bench means transmitting from a node on the live 433 MHz mesh, which is not
 worth the risk of a mis-addressed test frame.
+
+## 6. The ESP32 half of the upgrade proof -- `DK5EN-93`, 2026-09-13
+
+`W3`'s acceptance criterion is one keyed store on **both** platforms, so the
+proof `DK5EN-90` gave the nRF52 half was owed on an ESP32 node too. This is it.
+
+**Node:** `DK5EN-93`, Heltec V3, `192.168.68.69`, CP2102 on
+`/dev/cu.usbserial-0001`. Pre-flash `Flash-Version 20260724`.
+
+**Method.** Back up to the vault first (`backup_nodes.py --node
+dk5en-93=192.168.68.69`), capture `GET /config.json` as the baseline, flash
+`heltec_wifi_lora_32_V3` with the schema-driven store, then compare the same
+export after the migration boot and again after a plain reboot. The vault copy
+is the recovery path if the cutover had lost anything; the masked copy is
+`test/golden/nodes/dk5en-93/settings-base.json`.
+
+**Result -- 104 of 107 settings byte-identical, across two boots:**
+
+| comparison                   | identical | differing | non-GPS drift |
+| ---------------------------- | --------: | --------: | ------------- |
+| migration boot vs. pre-flash |       104 |         3 | none          |
+| plain reboot vs. pre-flash   |       104 |         3 | none          |
+
+The three that move are `node_lat`, `node_lon` and `node_alt`, and they are
+live GPS rather than persistence: the boot log's own NMEA sentence reads
+`4824.45454,N,01144.29887,E` with altitude `471.4 m`, and the altitude jitters
+`504 -> 474 -> 501` across the two captures. A persistence fault does not
+wander; a GPS altitude does. Credentials (`node_lpwd`, `node_pwd`,
+`node_passwd`, `node_webpwd`, `bt_code`) are unchanged in both comparisons.
+
+Boot 2 is reported separately because that is where the nRF52 half failed
+before the newlib-nano fix -- boot 1 looked clean there too. On `DK5EN-93`
+boot 2 printed `[INIT]...FLASH layout 20260724 ok, build 20260910`, no
+`[FLASH]...%d setting(s) out of range`, and no
+`save_settings() REFUSED` (the new guard against saving during a load; it not
+firing is what "the load path no longer writes" looks like from outside).
+
+**What this does NOT prove.** The 25 NVS keys with no JSON export -- the
+T-Deck UI block and the flash bookkeeping fields -- are invisible to
+`GET /config.json` and so are outside this comparison entirely. `DK5EN-93` is
+a Heltec and carries none of the T-Deck block, so proving those needs a T-Deck
+run. Same trap as `TD-16`, where a "byte-identical to its vault backup" check
+missed `node_kblock` because the export does not carry it.
