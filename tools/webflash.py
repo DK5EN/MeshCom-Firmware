@@ -200,8 +200,18 @@ def upload_multipart(url: str, path: Path, timeout: float = 180.0) -> tuple[int,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read().decode(errors="replace")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        # A 4xx from /ota/upload is the safeboot's verdict (e.g. 400
+        # incomplete_upload, docs/safeboot-ota-contract.md), not a transport
+        # failure -- return it like any other status.
+        try:
+            body = e.read().decode(errors="replace")
+        except Exception:  # noqa: BLE001
+            body = str(e)
+        return e.code, body
 
 
 def upload_multipart_controlled(url: str, path: Path, *, stop_after_fraction: Optional[float] = None,

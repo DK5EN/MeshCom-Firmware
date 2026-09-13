@@ -258,10 +258,25 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
         // the upload-data callback below.
         bool ok;
         safeboot::OtaSession::Reason reason;
+        uint32_t cur_gen;
         portENTER_CRITICAL(&g_ota_mux);
         ok = g_ota.state().image_valid;
         reason = g_ota.state().reason;
+        cur_gen = g_ota.state().generation;
         portEXIT_CRITICAL(&g_ota_mux);
+
+        // Generation guard (bench 2026-09-13, doublestart): the completion
+        // handler of a request that a later /ota/start has superseded runs
+        // when AsyncTCP finally closes its client -- it must not read the
+        // verdict of, nor reboot on behalf of, the session that replaced it.
+        // The request's own generation lives in _tempObject (set by the body
+        // handler at index 0, freed by the request destructor).
+        uint32_t req_gen = request->_tempObject ? *(uint32_t *)request->_tempObject : 0;
+        if (request->_tempObject == NULL || req_gen != cur_gen) {
+          Serial.printf("[SAFEBOOT];ota;stale_request;gen;%lu;current;%lu\n",
+                        (unsigned long)req_gen, (unsigned long)cur_gen);
+          return request->send(400, "text/plain", "stale_session");
+        }
 
         // Post-OTA update callback
         if (postUpdateCallback != NULL) {
@@ -305,11 +320,34 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
           portENTER_CRITICAL(&g_ota_mux);
           gen = g_ota.state().generation;
           portEXIT_CRITICAL(&g_ota_mux);
+          // Per-request copy for the body chunks and the completion handler
+          // (the request destructor free()s _tempObject).
+          if (request->_tempObject == NULL) {
+            request->_tempObject = malloc(sizeof(uint32_t));
+          }
+          if (request->_tempObject != NULL) {
+            *(uint32_t *)request->_tempObject = gen;
+          }
           request->onDisconnect([gen]() {
             portENTER_CRITICAL(&g_ota_mux);
             g_ota.onDisconnect(millis(), gen);
             portEXIT_CRITICAL(&g_ota_mux);
           });
+        }
+
+        // Generation guard: data still trickling in from a request that a
+        // later /ota/start superseded belongs to a session Update no longer
+        // runs for -- drop it instead of feeding it into the new session
+        // (bench 2026-09-13, doublestart).
+        {
+          uint32_t cur_gen;
+          portENTER_CRITICAL(&g_ota_mux);
+          cur_gen = g_ota.state().generation;
+          portEXIT_CRITICAL(&g_ota_mux);
+          uint32_t req_gen = request->_tempObject ? *(uint32_t *)request->_tempObject : 0;
+          if (request->_tempObject == NULL || req_gen != cur_gen) {
+            return;
+          }
         }
 
         // Write chunked data to the free sketch space

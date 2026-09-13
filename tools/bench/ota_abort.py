@@ -64,6 +64,7 @@ from typing import Any, Callable, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ota_regression as otr  # noqa: E402
+import urllib.error
 import webflash  # noqa: E402  (path already added by ota_regression's own sys.path.insert)
 
 RUN_PREFIX = "ota_abort"
@@ -89,7 +90,12 @@ RE_OTA_UPDATE_BANNER = re.compile(r"OTA UDATE started")
 # reasons /ota/state and the abort marker may report for a client-side kill
 # vs stall (docs/safeboot-ota-contract.md's `reason` enum)
 KILL_REASONS = frozenset({"client_disconnected", "incomplete_upload", "stalled"})
-STALL_REASONS = frozenset({"stalled"})
+# A stalled client is closed by the async server's own RX timeout (~3 s,
+# AsyncTCP) long before the safeboot's 30 s stall watchdog can fire, so the
+# node reports client_disconnected; "stalled" stays accepted for a client that
+# keeps the socket alive without data (measured Heltec V3 2026-09-13: abort
+# 4 s after the last chunk).
+STALL_REASONS = frozenset({"stalled", "client_disconnected"})
 STALE_SESSION_REASONS = frozenset({"stale_session"})
 
 
@@ -122,6 +128,14 @@ def safe_get(get: webflash.GetFn, url: str, timeout: float = 5.0) -> tuple[Optio
     same either way."""
     try:
         return get(url, timeout)
+    except urllib.error.HTTPError as e:
+        # 4xx/5xx is an answer from the node (e.g. /ota/cancel -> 409
+        # app_invalid), not a transport failure: hand the status back.
+        try:
+            body = e.read().decode(errors="replace")
+        except Exception:  # noqa: BLE001
+            body = str(e)
+        return e.code, body
     except Exception as e:  # noqa: BLE001 - urllib.error.URLError, OSError, ...
         return None, str(e)
 
@@ -139,9 +153,13 @@ def wait_app_back(target: str, get: webflash.GetFn, timeout: float) -> bool:
     return bool(webflash.poll(check, timeout, interval=3.0))
 
 
-def check_root(target: str, get: webflash.GetFn) -> bool:
-    status, _ = safe_get(get, f"http://{target}/", 5.0)
-    return status == 200
+def check_root(target: str, get: webflash.GetFn, timeout: float = 60.0) -> bool:
+    """The app answers GET / only after its own WiFi join, which follows
+    [BOOT];ready by several seconds -- poll instead of a single shot."""
+    def check() -> bool:
+        status, _ = safe_get(get, f"http://{target}/", 5.0)
+        return status == 200
+    return bool(webflash.poll(check, timeout, interval=2.0))
 
 
 def poll_state(target: str, get: webflash.GetFn, timeout: float,
