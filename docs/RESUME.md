@@ -1,5 +1,19 @@
 # RESUME — pick up here
 
+## 2026-09-13 (late morning): DS-03 long-press deep sleep has an automated bench test
+
+`tools/bench/deepsleep_button.py` (`866e328f`, design `docs/deepsleep-button-autotest.md`,
+`276c513b`): on the Heltec V3 the CP2102 DTR line is GPIO0, so `ser.dtr=True` for 2 s is the
+long press and a 200 ms pulse is the wake press; RTS is never touched. Per cycle it expects
+`GO to deepsleep`, 15 s without a boot signature, then `RESET_REASON=8 DEEPSLEEP` plus the new
+`[BOOT] WAKE_CAUSE=3 EXT1` line (`a3bd7f19`, raw print on every ESP32 board) and a `--info`
+answer. Exit 0/1/2 = pass/regression/harness error, JSON under `tools/bench/runs/`. **Runs on
+DK5EN-93**: PASS on the fork image (2 cycles, GO at ~880 ms, boot ready ~7.7 s), REGRESSION on
+official v4.35t (reboot 815 ms after GO while still held -- the field defect), PASS again after the reflash (868/877 ms). JSON summaries `tools/bench/runs/deepsleep_button_20260913-10{0632,0816,0945}.json`.
+Two things the plan doc got wrong and the run corrected: no wake-cause print existed, and
+`--oledstat` is bench-only (probe is `--info`). Gate: Heltec V3, T-Deck Plus, T-Beam classic
+built, 673/673 native. DK5EN-93 is back on the fork image with `--button on` (its prior state).
+
 ## 2026-09-13: T-Deck mute fix (INS-04) on fork-main, PR to upstream dev
 
 Field report: on a T-Deck Plus running 4.35t the message tone cannot be switched off. Cause:

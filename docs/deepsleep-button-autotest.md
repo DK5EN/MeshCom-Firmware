@@ -1,6 +1,7 @@
 # Automated test for the Heltec V3 long-press deep sleep (DS-03)
 
-Date: 2026-09-13. Status: plan, not implemented.
+Date: 2026-09-13. Status: implemented (`tools/bench/deepsleep_button.py`, commit `866e328f`) and run
+on DK5EN-93 the same day, see "Results" at the end.
 
 ## Outcome
 
@@ -76,3 +77,24 @@ finger on a 4 mm tactile switch on a bare dev board.
 
 Neither DTR nor an actuator on the pads exercises the physical switch and its debounce. That is
 acceptable here: what broke was the firmware sequencing, not the button.
+
+## Results 2026-09-13 (DK5EN-93, `/dev/cu.usbserial-0001`)
+
+Two deviations from the plan above. The firmware had no wake-cause print; `a3bd7f19` adds
+`[BOOT] WAKE_CAUSE=<n> <NAME>` after `RESET_REASON` on a deep-sleep reset (raw print, all ESP32
+boards). And `--oledstat`, the alive probe of the OLED harness, is an `INSTRUMENT_ENABLED` bench
+command and absent from the shipping image; the scenario probes with `--info` instead.
+
+| Run | Image                                    | Cycle 1                                              | Cycle 2           | Verdict    | Exit |
+| --- | ---------------------------------------- | ---------------------------------------------------- | ----------------- | ---------- | ---- |
+| 1   | fork `fork-main` `a3bd7f19` (fix inside) | GO at 877 ms, quiet 15 s, wake DEEPSLEEP/EXT1, alive | 893 ms, same      | PASS       | 0    |
+| 2   | official v4.35t (`Sep 10 2026`, no fix)  | GO at 874 ms, reboot 815 ms later while still held   | not run (stopped) | REGRESSION | 1    |
+| 3   | fork image again                         | GO at 868 ms, quiet 15 s, wake DEEPSLEEP/EXT1, alive | 877 ms, same      | PASS       | 0    |
+
+Run 2 is the DS-03 defect exactly as the field saw it: `RESET_REASON=8 DEEPSLEEP` 329 ms before
+the DTR release, i.e. the ext1 wake fired at sleep entry. The test therefore fails before the fix
+and passes after it. Raw logs are gitignored (`*.log`); the JSON summaries are committed under
+`tools/bench/runs/`.
+
+Wake pulse of 200 ms on GPIO0 did not enter download mode on either wake (boot log shows the
+app, not the ROM). DTR reaches GPIO0 on this board as assumed; RTS was never touched.

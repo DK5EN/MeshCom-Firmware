@@ -64,8 +64,10 @@ class DeepsleepSession(OledSession):
             ready_timeout=ready_timeout,
             log_path=log_path,
         )
-        self.probe_cmd = "--oledstat"
-        self.probe_pattern = r"\[OLEDSTAT\]"
+        # --oledstat is an INSTRUMENT_ENABLED bench command and absent from the
+        # shipping image; --info exists everywhere and answers with the call.
+        self.probe_cmd = "--info"
+        self.probe_pattern = r"\.\.\.Call:"
         self.wake_cmd = None
 
 
