@@ -3,6 +3,8 @@
 Datum: 2026-09-13
 Melder: Feldbericht (T-Deck Plus, 4.35t), analysiert von DK5EN
 Betroffen: upstream v4.35t, upstream v4.35t.09.12, Fork v4.35t.09.12.2 (t_deck und t_deck_plus)
+Status: behoben 2026-09-13 auf `fork-main` (`e8f16117` Guard-Fix, `62d16acf` SYM+M speichert), am Geraet
+bestaetigt (DK5EN-14), Upstream-PR aus Branch `pr-tdeck-mute-20260913`. BACKLOG INS-04 (3.8ag).
 
 ## Kurzfassung
 

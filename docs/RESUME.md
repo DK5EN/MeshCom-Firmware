@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## 2026-09-13: T-Deck mute fix (INS-04) on fork-main, PR to upstream dev
+
+Field report: on a T-Deck Plus running 4.35t the message tone cannot be switched off. Cause:
+`--mute on/off` and the four persistence commands sat inside `#if INSTRUMENT_ENABLED` in
+`commandAction()` since the firmware-only cut; INS-01 missed them. The GUI "Sound on" switch
+calls exactly that command since HL-03, so it was a no-op in every shipped image (upstream
+v4.35t, v4.35t.09.12, fork 09.12.2). Bugreport `docs/bugreport-tdeck-mute-4.35t.md`, BACKLOG
+§3.8ag. **Fixed** `e8f16117` (five handlers moved into their own T-Deck field block ahead of the
+guard) + `62d16acf` (SYM+M toggles through `--mute` so it saves). Gates: t_deck, t_deck_plus,
+Heltec V3, RAK4631 built; 673/673 native; string scan of both T-Deck images `[AUDIO];mute;` 2,
+`[PERSIST];stat;` 1, `injectraw` 0. **Bench** DK5EN-14 flashed with the fixed `t_deck_plus`
+(build Sep 13 09:32): `--mute off` -> `[AUDIO];mute;0` and `[PERSIST];stat;...mute;0`, survives
+`--reboot` (boot CW tone audible in the log at 0: `[AUDIO];play;cw;start`); `--mute on` -> 1,
+survives reboot, no boot tone; node left at its original state mute 1. SYM+M not hand-tested
+(node has KEYLOCK on). PR branch `pr-tdeck-mute-20260913` on upstream `1cb2d9e6` in the `-pr`
+worktree, two cherry-picked commits: [PR #1141](https://github.com/icssw-org/MeshCom-Firmware/pull/1141) opened 2026-09-13 (state OPEN, two commits `708eaf22`/`a577f4fb`, t_deck_plus + Heltec V3 built in the worktree, scan mute=2 stat=1 injectraw=0). Draft
+`docs/pr-tdeck-mute-draft-20260913.md`.
+
+**Bench note**: the USB ports swapped again -- DK5EN-14 is `usbmodem2101`, the RAK4631
+`usbmodem101` (CLAUDE.md still says the reverse; identify via `ioreg` every time). The first
+esptool attempt went against the RAK on `usbmodem101` and failed to connect; the RAK then
+echoed esptool's sync frames (`UUUU...$`) for minutes and did not answer `--info`. Twelve minutes later it still echoed only `U`s and gave no `--info` answer, while its `[EXT] Out` lines showed the loop alive; if it stays that way, press its reset button and check `--info` (uptime was 22156 s at 09:38, so a reboot shows as a small uptime).
+
 ## 2026-09-12 (late): v4.35t.09.12.2 published -- items 212-221, replaces v4.35t.09.10
 
 Release `v4.35t.09.12.2` is on GitHub, 39 assets (names diff-identical to 09.10), tag on

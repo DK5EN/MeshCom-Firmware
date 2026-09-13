@@ -4059,6 +4059,24 @@ all still present on 2026-09-11 (re-checked on the cited lines).
 any fix touching one half of a named ESP32/nRF52 pair must be applied to, or explicitly justified
 against, the other half. `tools/pair_diff.sh` does not exist yet.
 
+### 3.8ag T-Deck "Sound on" and `--mute` compiled out of every 4.35t image — field report 2026-09-13 (INS-04)
+
+**Intake.** A T-Deck Plus user on 4.35t: the message tone cannot be turned off. Bugreport
+[`bugreport-tdeck-mute-4.35t.md`](bugreport-tdeck-mute-4.35t.md). Same blast radius as INS-01
+(§3.8aa), one wave later: the firmware-only cut (`2e874921`, 2026-09-01) wrapped the whole T-Deck
+command block in `#if INSTRUMENT_ENABLED`, INS-01 pulled the four UDP/WiFi diagnostics out and
+left the five T-Deck field commands in. Since HL-03 the GUI switch `btn_soundon` calls
+`commandAction("--mute on/off")`, so the switch found no handler in any shipped image; `--help`
+still advertised the command. Only SYM+M muted, and it did not save.
+
+| ID     | Kind | Sev  | Files                                                    | Finding                                                                                                                                                                                                                                                                                                                                                                                                                | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | ---- | ---- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INS-04 | BUG  | High | `src/command_functions.cpp`, `src/t-deck/tdeck_main.cpp` | `--mute on/off`, `--persistflash`, `--persistsd`, `--immediatesave`, `--persiststat` inside `#if INSTRUMENT_ENABLED` (v4.35t: guard 4786-5362, T-Deck block 4945-5242). `strings t_deck_plus.bin \| grep -c 'AUDIO\];mute;'` = 0 on upstream v4.35t, v4.35t.09.12 (both T-Deck envs) and fork v4.35t.09.12.2; control marker `[AUDIO]..muted` = 1 everywhere. SYM+M calls `audio_set_mute()` directly and never saves. | **FIXED 2026-09-13** (`e8f16117` handlers moved into their own T-Deck-guarded field block ahead of the guard, INS-01 pattern; `62d16acf` SYM+M goes through `commandAction("--mute on/off")`). Gate: t_deck, t_deck_plus, Heltec V3, RAK4631 built; scan of both T-Deck images `[AUDIO];mute;` 2, `[PERSIST];stat;` 1, `injectraw` 0, Heltec/RAK 0. Bench DK5EN-14 on the fixed image: `--mute off` -> `[AUDIO];mute;0`, survives `--reboot`; `--mute on` -> 1, survives reboot; boot CW tone plays at 0 and is silent at 1. SYM+M compile-only (keylock was on). Upstream PR from branch `pr-tdeck-mute-20260913`. |
+
+**Rule reinforced** (from §3.8aa): after any change to a compile guard, scan the built image for
+the commands expected present **and** absent. `.claude/commands/release-firmware.md` now carries
+the T-Deck scan line next to the safeboot check.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)

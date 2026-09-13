@@ -135,6 +135,19 @@ root, where they are **tracked in git**. The build is deterministic — if
 files), the tracked bins were stale: commit them and move the tag BEFORE
 publishing, so tag content and shipped assets match.
 
+**Field-command string scan after the build (INS-01/INS-04):** a compile-guard
+change can drop shipped commands without a compiler or test complaint. Both
+T-Deck images must carry the field commands and none of the bench block:
+
+```
+for e in t_deck t_deck_plus; do B=.pio/build/$e/firmware.bin; \
+  echo "$e mute=$(strings $B | grep -c 'AUDIO\];mute;') stat=$(strings $B | grep -c 'PERSIST\];stat;') \
+  udplog=$(strings $B | grep -c 'UDP\];log') injectraw=$(strings $B | grep -c injectraw)"; done
+```
+
+Expected: `mute=2 stat=1 udplog=1 injectraw=0`. On nRF52 scan the `.elf`, not
+the ASCII `.hex`.
+
 ## Step 5 — Assemble the 39 assets
 
 Stage in a scratch directory. Exact recipe (verified byte-for-byte-in-name
