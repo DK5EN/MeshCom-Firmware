@@ -1,5 +1,18 @@
 # RESUME — pick up here
 
+## 2026-09-13 (afternoon/evening): safeboot OTA campaign done on three boards
+
+Operator brief -> contract (`docs/safeboot-ota-contract.md`) -> three `/orchestrate-waves`
+writer waves -> hardware. Everything is in fork-main (`80e763f0`..`6a040d3e`), BACKLOG §3.8ah,
+CHANGELOG item 222, bench doc `docs/bench-ota-regression.md`. Bench: `tools/bench/ota_abort.py
+--all` PASS 6/6 on Heltec V3 (run 5, tee image), T-Beam v1.2 (run 2, rebuilt classic image), T-Deck Plus (run 2, tee image). The three
+findings that changed the design are in the bench doc: single app slot (no fallback after the
+first byte, `app_valid`), per-request generation, S3 console tee. **Not done:** a browser
+screenshot of the live page on a real node (Chrome extension was disconnected; the jsdom harness
+and a stub-server render check cover the page), the upstream PR (SB-07), and the operator
+decision on SB-05 (a second app slot is not possible on 4 MB boards). All three bench nodes are
+back in their apps on the images built from this tree.
+
 ## 2026-09-13 (late morning): DS-03 long-press deep sleep has an automated bench test
 
 `tools/bench/deepsleep_button.py` (`866e328f`, design `docs/deepsleep-button-autotest.md`,

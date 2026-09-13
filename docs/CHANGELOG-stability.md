@@ -210,7 +210,23 @@ upstream `dev` as [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/
 One change on top of `v4.35s.09.09`, item 211: the fork is brought level with
 upstream `dev` again, and the build carries its own version letter from now on.
 
-211. **Upstream sync to `674413ce` and version letter `t`** (`42b49df4`,
+222. **Safeboot OTA: status page, Auto-AP, and the single-app-slot truth** (fork-only,
+     `80e763f0`..`6a040d3e`, 2026-09-13). The OTA page now shows the node's network state
+     (call, mDNS name, mode, Wifi-Client SSID/BSSID/IP/RSSI/channel/auth, the scanned APs with
+     the connected one marked, the Auto-AP when it is up) and a live upload state with the
+     abort reason and the fallback countdown (`GET /ota/info`, `/ota/state`, `/ota/scan`;
+     contract `docs/safeboot-ota-contract.md`). The WLAN join is non-blocking; the open Auto-AP
+     starts only after 25 s without a join and the STA keeps retrying. The session bookkeeping
+     is one host-tested state machine (`src/safeboot/ota_state.h`). Bench (`tools/bench/
+ota_abort.py`, 6/6 scenarios on Heltec V3, T-Beam v1.2, T-Deck Plus) found that every
+     board has a single app slot: after an aborted upload there is no firmware to fall back to,
+     and the old safeboot rebooted into itself every 180 s. It now validates the app image
+     (`app_valid`), stays in safeboot with a clear notice, refuses cancel, and a complete upload
+     recovers the node in about 80 s from the abort. Also fixed: a superseded upload's
+     completion handler answering for the new session, and the S3 safeboot console being
+     invisible on native-USB boards (UART0 + CDC tee).
+
+223. **Upstream sync to `674413ce` and version letter `t`** (`42b49df4`,
      cherry-pick of upstream `2c291265`). Upstream `dev` moved fifteen commits
      since our merge-base `4e649eae`; fourteen of them are the KISS/TCP
      interface of PR #1114 and its complete revert in PR #1128, which cancel

@@ -114,42 +114,67 @@ records `ota_md5` (the hash the upload was verified against) and the parsed
 genuinely different image (a real firmware update) shows the same fields
 changing meaningfully.
 
-## TM-49 arm — truncated upload must not switch partitions (owed)
+## Abort bench (`tools/bench/ota_abort.py`) — measured 2026-09-13
 
-Not yet run. This is the bench proof for the fail-closed completion gate in
-`src/safeboot/ElegantOTA.cpp` (`_ota_image_valid`, false from `/ota/start`,
-set true only after `Update.end(true)` plus `Update.isFinished()`).
+The TM-49 arm that was owed here is now automated, together with the TM-46 abort paths, as
+`tools/bench/ota_abort.py` (unit tests with a fake serial and a fake node in
+`tools/bench/test_ota_abort.py`; contract in `docs/safeboot-ota-contract.md`). One held-open
+serial session for the whole run, scenarios `control`, `kill50` (socket killed at ~50 % of the
+body), `stall` (writer pauses 45 s at ~50 %), `doublestart` (first session abandoned at 30 %
+with its socket open, second `/ota/start` must win), `cancel` (idle cancel, cancel during an
+upload, cancel with an invalid app image), then `control` again. `--all` runs that sequence.
 
-Board: a **4 MB single-slot** ESP32 — the Heltec V3 (`DK5EN-93`) or the
-T-Beam (`DK5EN-92`). The 16 MB T-Deck is the wrong instrument here: its
-bootloader's slot validation masks the defect, which is why the original
-observation was only indirect.
+```
+python3 tools/bench/ota_abort.py --host <ip> --port <tty> --env <env> \
+    --fw .pio/build/<env>/firmware.bin --all --out tools/bench/runs/
+```
 
-Procedure:
+**The finding that changed the design (run 1, Heltec V3):** every partition table of this fork
+(`partitions-4MB-safeboot.csv`, `partitions-16MB-safeboot.csv`) has exactly one app slot,
+`ota_0`. An upload writes into that slot from the first chunk on. After the 50 % kill the abort
+was detected cleanly, but the 180 s "fallback to app" called `esp_ota_set_boot_partition(ota_0)`
+on a half-written image, the call refused it (`ESP_ERR_OTA_VALIDATE_FAILED`, return code ignored),
+`ESP.restart()` booted safeboot again, and that repeated every 180 s with a WiFi rejoin each time.
+The old safeboot had the identical loop; nobody had measured it. There is no way back into the
+previous firmware once an upload has started, on any of our boards (the 16 MB T-Deck table is
+single-slot too). The safeboot therefore validates `ota_0` with `esp_image_verify()` at boot and
+after every abort (`app_valid`), suspends the fallback while the image is invalid, refuses
+`/ota/cancel` with `409 app_invalid`, and the page says so; only a complete upload brings the app
+back.
 
-1. Hold a USB serial session open on the node (`tools/meshlogger.py` or the
-   harness's own session) for the whole run.
-2. Trigger safeboot and start an upload exactly as `webflash.flash()` does —
-   `/callfunction/?otaupdate`, poll `/update`, `/ota/start?mode=fr&hash=<md5>`,
-   then `POST /ota/upload`.
-3. **Kill the upload mid-transfer** — close the TCP connection at roughly
-   50 % of the body, before the last chunk. `curl --limit-rate` plus a
-   `SIGKILL`, or a socket write that stops and closes, both do it.
+**Second finding (run 2, doublestart):** the completion handler of a superseded upload request
+ran when AsyncTCP closed its idle client ~4 s later and answered for the new session. The
+request's generation now travels in `_tempObject`; stale chunks are dropped and a stale
+completion answers `400 stale_session`.
 
-Assertions:
+**Third finding (T-Deck run 1):** the S3 safeboot printed only to UART0, so on a native-USB board
+the whole safeboot log was invisible (every HTTP assertion green, zero `[SAFEBOOT]` lines).
+`src/safeboot/safeboot_log.h` now tees UART0 and the HWCDC (writes to the CDC only while a host
+is attached).
 
-- The POST completes with **HTTP 400**, body `Upload incomplete: image never
-verified` (or the `Update` error string if one was set).
-- Serial shows `[SAFEBOOT];ota;abort;reason;incomplete_upload` and **no**
-  `[SAFEBOOT];ota;verify;result;ok`.
-- Serial shows `[SAFEBOOT];ota;end;result;error` — **not** `success`, so
-  `setBootPartition_APP()` never runs.
-- The node stays in safeboot and recovers via the 180 s fallback, not by
-  booting a half-written app image.
+**Stall behaviour:** the async server's own RX timeout (AsyncTCP, ~3 s) closes an idle upload long
+before the safeboot's 30 s stall watchdog, so a stalled client shows up as
+`client_disconnected` 4 s after its last chunk. The 30 s watchdog remains for a client that keeps
+the TCP window alive without payload.
 
-Control arm: the same run without the kill must still produce
-`[SAFEBOOT];ota;verify;result;ok`, `result;success` and a normal reboot — the
-gate must not have broken the good path.
+| Board (call)           | Safeboot image          | Run              | Scenarios |     Assertions | Bytes before the kill | Abort → app back via recovery upload |
+| ---------------------- | ----------------------- | ---------------- | --------- | -------------: | --------------------: | -----------------------------------: |
+| Heltec V3 (DK5EN-93)   | `safeboot-s3.bin`, tee  | 2026-09-13 run 5 | 6/6 PASS  | 77 OK / 0 FAIL |               728 226 |                                 78 s |
+| T-Beam v1.2 (DK5EN-92) | `safeboot.bin`, rebuilt | 2026-09-13 run 2 | 6/6 PASS  | 77 OK / 0 FAIL |               815 258 |                                 82 s |
+| T-Deck Plus (DK5EN-14) | `safeboot-s3.bin`, tee  | 2026-09-13 run 2 | 6/6 PASS  | 77 OK / 0 FAIL |             1 091 378 |                                 80 s |
+
+**Fallback timeout with a valid app** (Heltec V3, tee image, serial watched by hand
+2026-09-13): safeboot entered via `/callfunction/?otaupdate`, no upload; `[SAFEBOOT];app;image;valid`
+at 2.3 s, `[SAFEBOOT];fallback;reason;timeout` at 181.8 s, `fallback;result;ok;rc;0`,
+`RESET_REASON=3 SW`, `[BOOT];ready` at 191.6 s.
+
+JSON summaries: `tools/bench/runs/ota_abort_<scenario>_20260913-*.json` (the run-1 kill50 that
+found the loop is kept as `ota_abort_kill50_20260913-154513.json`). Serial logs stay untracked.
+
+Recipe pitfalls: `GET /` answers 200 in safeboot too (it rewrites to `/update`), so "is the app
+back" must look for the OTA page title, as `webflash.node_info()` does; the S3 safeboot build
+(Tasmota platform) wipes the other envs' `.pio/build/<env>/firmware.bin`, rebuild the app image
+before a run; the T-Beam needs `--webserver on` over serial before it joins WLAN at all.
 
 ## `--parse-only`
 
