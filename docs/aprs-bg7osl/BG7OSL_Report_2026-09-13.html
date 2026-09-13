@@ -1,0 +1,87 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BG7OSL Einladungsflut 2026-09-13</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1f1f1f;--mut:#5c5c5c;--acc:#8a3b12;--line:#ddd8cf;--box:#f1eee6;--mono:ui-monospace,Menlo,Consolas,monospace}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;padding:24px 20px 60px}
+main{max-width:880px;margin:0 auto}
+h1{font-size:26px;margin:0 0 4px} h2{font-size:18px;margin:34px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.sub{color:var(--mut);margin-bottom:22px}
+.bluf{background:var(--box);border-left:4px solid var(--acc);padding:12px 16px;margin:18px 0}
+table{border-collapse:collapse;width:100%;font-size:14px} th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top} th{background:var(--box)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+pre,.raw{font:12.5px/1.45 var(--mono);background:#26241f;color:#e8e4da;padding:12px;border-radius:6px;overflow-x:auto;white-space:pre}
+.raw div{white-space:pre}
+.zh{font-size:16px}
+.wrap{overflow-x:auto}
+small{color:var(--mut)}
+</style></head><body><main>
+<h1>BG7OSL: Einladungsflut vom 13.09.2026</h1>
+<div class="sub">Auswertung der aprs.fi-Rohdaten. Anlass: Auf einem MeshCom-Node in DL erschien eine Nachricht von BG7OSL an DB0ED-99.</div>
+
+<div class="bluf"><strong>Kurzfassung.</strong> Der chinesische OM BG7OSL hat um 09:12:48 bis 09:12:50 CEST aus der Android-App <em>APRSLocus CONNECT</em> mit einem Klick eine Gruppeneinladung an 3.257 Stationen gleichzeitig ins APRS-IS geschickt. Er sagt es selbst in einer Nachricht an einen Freund: "Ich habe mit einem Klick alle online befindlichen APRS-Stationen eingeladen." Der chinesische Text im Paket ist der Gruppenname <span class="zh">测试群组</span>, "Testgruppe". Eine der 3.257 Adressen war DB0ED-99, ein MeshCom-Node. Der MeshCom-Server holt Nachrichten an -99-Rufzeichen aus dem APRS-IS ins Mesh, darum lag die Einladung auf deinem Node. Kein Funkweg aus China, keine Fehlfunktion, keine Absicht gegen DB0ED. Nebenwirkung: Etwa 90 Einladungen wurden von europäischen iGates auf 144,800 MHz ausgesendet.</div>
+
+<h2>1. Was die Nachricht bedeutet</h2>
+<p>Auf dem MeshCom-Node stand: <code>APRS-FI:INVITE BG7OSL-G3 测试群组</code>. Im APRS-IS lautet das Paket:</p>
+<pre>2026-09-13 09:12:49 CEST: BG7OSL>APRS,TCPIP*,qAC,T2SYDNEY::DB0ED-99 :INVITE BG7OSL-G3 测试群组{7637}</pre>
+<ul>
+<li><strong>INVITE BG7OSL-G3</strong> ist ein Steuerbefehl der Gruppenchat-Funktion von APRSLocus CONNECT. Die App legt Gruppen als Rufzeichen mit Suffix -G1, -G2, -G3 an und lädt andere Stationen per APRS-Nachricht ein. Wer zusagt, antwortet mit <code>JOIN_CONFIRM</code>. Das ist kein Standard-APRS, nur diese App versteht es.</li>
+<li><span class="zh">测试群组</span> = "Testgruppe" (<span class="zh">测试</span> Test, <span class="zh">群组</span> Gruppe). Das ist der Anzeigename der Gruppe.</li>
+<li><strong>APRS-FI:</strong> stammt nicht aus dem Paket. Das Präfix setzt der MeshCom-Server vor Nachrichten, die er aus dem APRS-IS importiert. Mit aprs.fi selbst hat der Vorgang nichts zu tun, aprs.fi hat ihn nur mitgeschrieben.</li>
+<li><strong>TCPIP*,qAC,T2SYDNEY</strong>: Das Paket kam per Internet vom Handy in den APRS-IS-Server T2SYDNEY. Kein HF-Weg. Der Standort in Zhanjiang (Guangdong) passt daher problemlos.</li>
+</ul>
+
+<h2>2. Was der OM getan hat, in seinen eigenen Worten</h2>
+<p>Unmittelbar nach dem Massenversand chattet BG7OSL mit BG2EFX-5 und BG5VIG-14. Die Nachrichten erklären den Vorgang vollständig:</p>
+<div class="wrap"><table><tr><th>Zeit CEST</th><th>An</th><th>Text</th><th>Übersetzung</th></tr><tr><td>09:13:45</td><td>OK0BAD-2</td><td>Help</td><td></td></tr><tr><td>09:14:04</td><td>BG2EFX-5</td><td>嗯</td><td>Mm / ja</td></tr><tr><td>09:14:15</td><td>VK3XEM-5</td><td>Hello</td><td></td></tr><tr><td>09:15:02</td><td>BG2EFX-5</td><td>测试个aprslocus群组啊</td><td>Ich teste mal eine APRSLocus-Gruppe</td></tr><tr><td>09:15:24</td><td>BG2EFX-5</td><td>测试个aprslocus群组啊</td><td>Ich teste mal eine APRSLocus-Gruppe</td></tr><tr><td>09:15:31</td><td>SP6RJ-9</td><td>Hello</td><td></td></tr><tr><td>09:15:38</td><td>BG2EFX-5</td><td>我晕</td><td>Oh nein (wörtlich: mir wird schwindlig)</td></tr><tr><td>09:15:53</td><td>BG2EFX-5</td><td>我一键邀请了全部在线的aprs站台</td><td>Ich habe mit einem Klick alle online befindlichen APRS-Stationen eingeladen</td></tr><tr><td>09:16:14</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（：</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (:</td></tr><tr><td>09:16:32</td><td>BG2EFX-5</td><td>你发&#x27;嗯&#x27;之前</td><td>bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:17:09</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（： 你发&#x27;嗯&#x27;之前</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (: bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:17:16</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:17:19</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:17:57</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:18:11</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:19:10</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:19:16</td><td>BG7OSL-G3</td><td>Aprslocus测试群组</td><td>Aprslocus-Testgruppe (Nachricht in die Gruppe)</td></tr><tr><td>09:19:26</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr><tr><td>09:19:27</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（： 你发&#x27;嗯&#x27;之前</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (: bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:19:45</td><td>BG7OSL-G3</td><td>Hello BD3QID-6</td><td></td></tr><tr><td>09:20:02</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（： 你发&#x27;嗯&#x27;之前</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (: bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:20:24</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（： 你发&#x27;嗯&#x27;之前</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (: bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:20:24</td><td>BG2EFX-5</td><td>你发过来给我看看 我发了啥给你（： 你发&#x27;嗯&#x27;之前</td><td>Schick es mir rüber, damit ich sehe, was ich dir geschickt habe (: bevor du &#x27;mm&#x27; geschickt hast</td></tr><tr><td>09:20:51</td><td>BG5VIG-14</td><td>Hello</td><td></td></tr><tr><td>09:21:40</td><td>BG2EFX-5</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:40</td><td>BG7OSL-G1</td><td>1</td><td></td></tr><tr><td>09:21:42</td><td>BG7LZQ-G1</td><td>123</td><td></td></tr><tr><td>09:21:47</td><td>BG5VIG-14</td><td>wtf</td><td></td></tr><tr><td>09:21:48</td><td>BG5VIG-14</td><td>wtf</td><td></td></tr><tr><td>09:21:52</td><td>BG2EFX-5</td><td>666</td><td></td></tr><tr><td>09:21:56</td><td>BG7OSL-G2</td><td>6</td><td></td></tr><tr><td>09:22:21</td><td>BG5VIG-14</td><td>刚刚在测试aprslocus群组功能</td><td>Habe gerade die APRSLocus-Gruppenfunktion getestet</td></tr><tr><td>09:22:26</td><td>BG2EFX-5</td><td>刚刚在测试aprslocus群组功能</td><td>Habe gerade die APRSLocus-Gruppenfunktion getestet</td></tr><tr><td>09:22:44</td><td>IZ8FPF-2</td><td>刚刚在测试aprslocus群组功能</td><td>Habe gerade die APRSLocus-Gruppenfunktion getestet</td></tr><tr><td>09:22:49</td><td>OK0BAD-2</td><td>刚刚在测试aprslocus群组功能</td><td>Habe gerade die APRSLocus-Gruppenfunktion getestet</td></tr><tr><td>09:22:54</td><td>LD3GO</td><td>刚刚在测试aprslocus群组功能</td><td>Habe gerade die APRSLocus-Gruppenfunktion getestet</td></tr><tr><td>09:22:57</td><td>BG2EFX-5</td><td>JOIN_CONFIRM BG7OSL-G3</td><td>Protokoll: Beitrittsbestätigung zur Gruppe BG7OSL-G3</td></tr></table></div>
+<p>Ablauf: Er testet die Gruppenfunktion, drückt die Schaltfläche "alle einladen", die App schickt 3.257 Einladungen in zwei Sekunden. Kurz danach merkt er es ("Oh nein"), fragt einen Freund, was bei ihm angekommen ist, und erklärt Fremden, die zurückfragen (OK0BAD-2, IZ8FPF-2, LD3GO), dass es nur ein Test war. Ein Bedienfehler in Kombination mit einer App-Funktion, die keine Obergrenze kennt.</p>
+
+<h2>3. Umfang der Flut</h2>
+<div class="wrap"><table>
+<tr><th>Kennzahl</th><th class="num">Wert</th></tr>
+<tr><td>Gesicherte Pakete von BG7OSL (06:49 bis 11:18 CEST)</td><td class="num">4.088</td></tr>
+<tr><td>Einladungen INVITE BG7OSL-G3, direkt per Internet</td><td class="num">3.257</td></tr>
+<tr><td>Zeitfenster des Versands</td><td class="num">09:12:48 bis 09:12:50, 3 s</td></tr>
+<tr><td>Empfänger mit B-Präfix (China)</td><td class="num">1.911</td></tr>
+<tr><td>Empfänger DL (DA bis DR)</td><td class="num">123</td></tr>
+<tr><td>Empfänger OE</td><td class="num">32</td></tr>
+<tr><td>Empfänger mit SSID -99 (MeshCom-Nodes)</td><td class="num">8</td></tr>
+<tr><td>Einladungen, die von iGates auf HF gingen und zurück ins IS kamen (Echos)</td><td class="num">90</td></tr>
+<tr><td>Erhaltene Antworten (ack-Pakete von BG7OSL an Antwortende)</td><td class="num">60</td></tr>
+</table></div>
+<p>Die Empfängerliste ist alphabetisch, beginnend mit B. Das deutet auf "alle Stationen, die die App gerade kennt", vermutlich die zuletzt im APRS-IS gesehenen. Die Nachrichten-IDs laufen von 7604 bis 7665, die App vergibt eine ID pro Block von etwa 50 Empfängern.</p>
+
+<h2>4. Warum es auf dem MeshCom-Node lag</h2>
+<p>Acht der Empfänger tragen den SSID -99, den MeshCom-Gateways im APRS-IS verwenden:</p>
+<div class="raw"><div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::BG3OTT-99:INVITE BG7OSL-G3 测试群组{7612</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::BG7RXQ-99:INVITE BG7OSL-G3 测试群组{7619</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::BR4SN-99 :INVITE BG7OSL-G3 测试群组{7635</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::DB0ED-99 :INVITE BG7OSL-G3 测试群组{7637</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::DH4NBB-99:INVITE BG7OSL-G3 测试群组{7638</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::DL1HTY-99:INVITE BG7OSL-G3 测试群组{7639</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::DL1MSI-99:INVITE BG7OSL-G3 测试群组{7639</div>
+<div>2026-09-13 09:12:49 CEST: BG7OSL&gt;APRS,TCPIP*,qAC,T2SYDNEY::DL8CJ-99 :INVITE BG7OSL-G3 测试群组{7639</div></div>
+<p>Der MeshCom-Server ist selbst mit dem APRS-IS verbunden. Nachrichten, die dort an ein MeshCom-Rufzeichen adressiert sind, reicht er als Direktnachricht ins Mesh weiter und markiert sie mit dem Präfix APRS-FI. So kam die Einladung an DB0ED-99 auf die 433-MHz-Mesh-Seite und wurde von deinem Node mitgehört. DB0ED wurde nicht gezielt ausgewählt, es stand nur in der Liste. Die anderen sieben MeshCom-Nodes (BG3OTT-99, BG7RXQ-99, BR4SN-99, DH4NBB-99, DL1HTY-99, DL1MSI-99, DL8CJ-99) haben denselben Text bekommen.</p>
+
+<h2>5. Nebenwirkung: Die Einladung ging in Europa auf HF</h2>
+<p>Ein iGate sendet eine APRS-IS-Nachricht auf 144,800 MHz aus, wenn der Empfänger kürzlich lokal gehört wurde. Genau das ist passiert. 90 Einladungen kamen mit HF-Pfad zurück ins APRS-IS, also mindestens so viele wurden ausgesendet, vermutlich deutlich mehr (nur ein Teil wird von einem zweiten iGate wieder gehört). Beispiele:</p>
+<pre>09:12:51 BG7OSL>APRS,OE2XZR-10,qAR,OE2PDR-2::DB0BKN   :INVITE BG7OSL-G3 测试群组{7637}
+09:12:56 BG7OSL>APRS,DK7SB-10*,qAO,DL9MEA-10::DB0OAL   :INVITE BG7OSL-G3 测试群组{7637}
+09:13:10 BG7OSL>APRS,DB0KOE-1*,qAR,DL3DP-1::ON4MAX-2 :INVITE BG7OSL-G3 测试群组{7652}
+09:12:52 BG7OSL>APRS,IQ3AZ-11*,qAR,S53UAN-10::IR3ZXT   :INVITE BG7OSL-G3 测试群组{7643}</pre>
+<p>Beteiligte iGates: OE2XZR-10, OE2XGR-10, OE5XGR-10, OE5XUL-10 (Salzburg/Oberösterreich), DK7SB-10 und DB0KOE-1 (Bayern), IQ3AZ-11 (Norditalien), DB0HFT-10. Die Echos wiederholen sich bis 10:38 Uhr, weil die App unbeantwortete Nachrichten erneut sendet und die iGates sie jedes Mal wieder auf HF geben. Empfänger wie OE2XZR (22 Wiederholungen) und DB0BKN (20) sind Digipeater, die nie antworten.</p>
+
+<h2>6. Bewertung</h2>
+<ul>
+<li><strong>Harmlos in der Absicht.</strong> Ein OM hat eine Gruppenfunktion ausprobiert und den Umfang nicht überblickt. Er hat es sofort gemerkt und sich Rückfragern gegenüber erklärt.</li>
+<li><strong>Problematisch in der Wirkung.</strong> 3.257 Nachrichten in drei Sekunden sind Massenversand im APRS-IS, mit HF-Aussendungen auf mehreren Kontinenten als Folge. Die App-Funktion "alle einladen" ohne Obergrenze und ohne Rückfrage ist der eigentliche Fehler. Ein Hinweis an den APRSLocus-Entwickler wäre sinnvoll.</li>
+<li><strong>Für MeshCom nichts zu tun.</strong> Das Verhalten des Servers (APRS-IS-Nachrichten an -99 ins Mesh holen) ist gewollt. Ein Filter auf INVITE/JOIN_CONFIRM wäre möglich, aber ein Einzelfall rechtfertigt ihn nicht. Die Einladung einfach ignorieren.</li>
+</ul>
+
+<h2>7. Gesicherte Dateien</h2>
+<ul>
+<li><code>BG7OSL_aprsfi_raw_2026-09-13.txt</code>: 4.088 Pakete, wie aprs.fi sie anzeigt (UTF-8 als &lt;0xNN&gt;), vier Seiten zu 1.000 Paketen zusammengeführt und dedupliziert, Zeitraum 06:49:38 bis 11:18:24 CEST.</li>
+<li><code>BG7OSL_aprsfi_decoded_2026-09-13.txt</code>: dieselben Pakete mit dekodierten chinesischen Zeichen.</li>
+<li>Quelle: <code>https://aprs.fi/?c=raw&amp;call=BG7OSL</code>, abgerufen 13.09.2026 gegen 11:30 CEST im angemeldeten Konto DK5EN-7. aprs.fi hält Rohpakete nur zwei Tage vor.</li>
+</ul>
+<p><small>Erstellt 13.09.2026. Übersetzungen aus dem Chinesischen sinngemäß.</small></p>
+</main></body></html>

@@ -1,0 +1,15 @@
+aprs.fi station info for BG7OSL, captured 2026-09-13 11:45 CEST (https://aprs.fi/info/a/BG7OSL)
+
+Comment: Bat:43%
+Last status: APRSlocus CONNECT v1.6.97 Android
+Location: 21°13.17' N 110°24.49' E - Locator OL51EF82XQ
+  6.1 km SW of Potou, Guangdong Sheng, China
+  9.7 km SE of Zhanjiang, Guangdong Sheng, China
+Last position: 2026-09-13 11:45:07 CEST
+Heading 0°, speed 0 km/h
+Last path: BG7OSL>APALOC via TCPIP*,qAC,T2CSNGRAD
+Stored positions: 236
+Packet rate: average 20 seconds between packets over 959 seconds
+aprs.fi warning: "This station transmits packets at a high rate, which can overload the APRS network."
+Other SSIDs: BG7OSL-5 (no raw packets in the 2-day raw window)
+Retention on aprs.fi: raw packets 2 days, messages 14 days. Earliest stored message involving BG7OSL: 2026-09-12 07:05:31 CEST.
