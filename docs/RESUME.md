@@ -103,8 +103,8 @@ fork-main synced with merge `7b55deaf` (tree unchanged, the fix was already in).
 `docs/pr-tdeck-mute-draft-20260913.md`. The `-pr` worktree and the three temporary worktrees
 were removed 2026-09-13, the merged PR branches deleted locally (they stay on origin).
 
-**Three follow-up PRs opened 2026-09-13 afternoon**, each one commit on upstream `dev` `893cffd0`
-in a fresh `-pr` worktree (kept while they are open), file-disjoint, no ordering:
+**Three follow-up PRs opened 2026-09-13 afternoon, all merged upstream 2026-09-14**, each one
+commit on upstream `dev` `893cffd0` in a fresh `-pr` worktree, file-disjoint, no ordering:
 [PR #1142](https://github.com/icssw-org/MeshCom-Firmware/pull/1142) APRS decoder `#name`,
 `/R=` `/U=` `/I=`, NaN guard per tag + `--setname` strips `#` (branch `pr-aprs-codec-20260913`,
 gate Heltec V3 / T-Deck Plus / RAK4631 + native 308/98/47/5);
@@ -113,6 +113,13 @@ gate Heltec V3 / T-Deck Plus / RAK4631 + native 308/98/47/5);
 runs above); [PR #1144](https://github.com/icssw-org/MeshCom-Firmware/pull/1144) web GUI keeps
 the group in `sendcall` after a send (branch `pr-webgui-group-target-20260913`, gate Heltec V3 /
 RAK4631, jsdom harness 30/30 against DK5EN-98). Drafts `docs/pr-{aprs-codec,wake-cause,webgui-group-target}-draft-20260913.md`.
+All three landed as **real merge commits** (`5ea93cf5` / `ab2c8fa6` / `edb0ecc1`, upstream `dev`
+head `edb0ecc1`), not squashes. Fork-main synced 2026-09-14 with merge `df833669`, **tree
+unchanged** (`git diff` against the pre-merge tree empty -- the fork already carried the code).
+Three conflicts, all resolved `--ours`, all of them text the PR branches deliberately stripped:
+the `docs/architecture` reference in the `#name` comment (`aprs_functions.cpp`), the
+`test/test_pos_tag_nan` reference (`pos_tag_nan.h`), and the DS-03 bench comment plus the
+fork-only `PING_SUPPRESSED_TRACK` ping-budget branch (`esp32_main.cpp`).
 Fork-only by decision, never PR candidates: the nine-variant `--port "$UPLOAD_PORT"` upload
 lines (broke the maintainer's setup, backed out), the `[KBL];set` marker, the `native_*` envs
 and the Tasmota pre-script. Still unsubmitted fork code: safeboot OTA TM-46/48/49.
