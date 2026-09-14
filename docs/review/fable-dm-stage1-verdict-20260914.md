@@ -5,7 +5,7 @@ sections 1-5, 8 and the S1-1 notes; traps T1/T2/T2b/T11 in
 `docs/dm-reliability-and-store-node-verdict-20260913.md`. Native: `pio test -e native -f test_dm_outbox
 -f test_dm_stats` = 29/29 green (22 + 7). Line numbers are the tree at `731e0ebc`.
 
-## Verdict: REWORK
+## Verdict: APPROVED (after rework `1595542c`; the original `731e0ebc` verdict below was REWORK)
 
 One High (T2 is not solved at the ack site — the outbox stop sits behind `checkOwnTx()`), two Medium
 (server-path acks never reach the outbox; every fresh-id attempt is re-uploaded to the server), five
@@ -226,3 +226,67 @@ len, 0xFF, "dm_retry")` (`:653`), `insertOwnTx()` (`:661`), `addLoraRxBuffer()` 
   once as today" (the plan table still says the pre-decision-3 behaviour; update it).
 - Finding 3 check: with a gateway sender in mode 9, count copies at the server (mcmap
   `messages_query`) before and after the fix.
+
+## Re-check (1595542c)
+
+Diff `731e0ebc..1595542c`. Native: `pio test -e native -f test_dm_outbox -f test_dm_stats` 32/32
+(outbox 25, stats 7), `pio test -e native_aprs -f test_bp_notice_frame` 19/19 (the suite lives in
+`native_aprs`, `platformio.ini:257-270`). Line numbers are the tree at `1595542c`.
+
+- **F1 — CONFIRMED fixed.** `dmOutboxLastIdForNnn()` and `dmOutboxOnAck()` run at
+  `src/lora_functions.cpp:1130-1131`, before and independent of `checkOwnTx()` at `:1141`; the
+  bookkeeping block is `if(iackcheck >= 0 || dmAckStopped)` (`:1142`) with the `own_msg_id[]` write
+  guarded on `iackcheck >= 0` (`:1144-1145`), `stoHolderClear`/`dmstat_peer_ack`/`dmStatNoteAck`/
+  `findAndStopRingSlot(msg_counter)` inside it. The 0x02 frame: `print_buff` is built at `:1110`
+  for `msg_counter` (`== first_id` by construction) and `addBLEOutBuffer(print_buff, plen)` at
+  `:1178` sits after the block, unconditional — the writer's claim is correct, the phone gets 0x02
+  even when `own_msg_id[]` evicted `first_id`. `dmOutboxOnHeld(stoNnn)` unconditional at `:1197`.
+  F5: `dmLadderLastId` read before the free, second `findAndStopRingSlot()` at `:1133-1139` only
+  when `dmAckStopped && last_id != 0 && last_id != msg_counter`. New native
+  `test_f1_ack_on_nnn_dst_stops_ladder_after_several_fresh_ids` pins the core side; the call-site
+  side stays bench (T-1.3).
+- **F2 — CONFIRMED fixed.** `src/udp_functions.cpp:434-437` and `src/nrf52/nrf_eth.cpp:600-603`:
+  `dmOutboxOnAck()` unconditional, `if(iackcheck >= 0 || dmAckStopped)`, `own_msg_id[]` write
+  guarded, `ack_status`/`print_buff[5]` upgraded to 0x02 inside the block. No ring stop for
+  `last_id` on the server twins — consistent with the pre-existing twins, which never stopped the
+  ring for `msg_counter` either; one extra frame at most.
+- **F3 — CONFIRMED fixed.** No `addNodeData()`/`sendExtern()` left in `src/dm_outbox_glue.cpp`
+  (includes removed `:20-21`, comment only at `:104-115`).
+- **F4 — CONFIRMED fixed.** `dm_outbox.cpp:365-366` calls `report()` for every give-up;
+  `glueReport()` counts `dmstat_giveup` (+ `dmstat_giveup_held` when `e->held`) at
+  `dm_outbox_glue.cpp:138-143`, then returns before the frame for held (`:147-148`), so no 0x03 on
+  the wire and no `own_msg_id[]` 0x03 write for a held message. Test updated to assert the held
+  report call (`test_main.cpp:553-556`).
+- **F6 — CONFIRMED.** Plan S1-1 note corrected and an S1-2 rework section added
+  (`docs/dm-stage1-plan-20260914.md`); code unchanged, as it should be.
+- **F7 — CONFIRMED sharp.** `test_echo_on_last_id_also_gates` (`:275-305`) runs mode 9 to attempt 3
+  (always fresh), asserts `last_id != first_id` and `echo_seen == false`, then echoes `last_id` —
+  deleting the `last_id` disjunct at `dm_outbox.cpp:307` fails it. `test_held_on_unknown_nnn`
+  asserts the add slot and reads the entry by slot (`:391-400`). New two-entry test (`:406-431`):
+  A due 40000, B due 40100, one tick at 40200 must enqueue A only, then B, then nothing — a
+  last-wins or all-due-at-once bug fails it.
+- **F8 — CONFIRMED fixed.** `BP_NACK_OUTBOX_FULL` (`backpressure.h:85`), code `"OUTBOX"` (`:96`),
+  prefix `"OUTBOX FULL NOT SENT - "` (`:118`, 23 bytes), added to the BP-11 echo-guard list
+  (`:200`). `outboxEmitRefuse()` (`loop_functions.cpp:3820-3835`): `bpNackCompose()` into a
+  `24 + BP_NACK_TEXT_MAX + 4` buffer (prefix 23 + NUL + 120 + "..." fits; static on nRF52 as
+  `bpEmitNack()`), then `bpDeliver()` only — no `Serial.printf("[BP];nack…")`, no
+  `bp_episode_origin/dst` write. Call site `:4149`, `[OUTBOX];refuse;full` stays the only marker.
+  Wire length 23 + 120 + 3 = 146 < 160. `bpNackCode()`/`bpNackPrefix()` are the only `BpNack`
+  switches in the tree, both with `default`. Native `test_nack_compose_outbox_full` green. Client
+  guide paragraph present (`docs/client-integration-store-forward.md`).
+- **Opened by the rework — foreign-DM ack at a gateway: CONFIRMED protected.** The LoRa ack arm
+  sits inside the for-me branch (`strcmp(destination_call, node_call) == 0`, stage 2.1 verdict
+  `:1022`); the server twins sit inside `(* && !bNoMSGtoALL) || for-me || group`
+  (`udp_functions.cpp:386`, `nrf_eth.cpp:545`) with `*` zeroing `iAckPos`, and an `:ack` frame is
+  always addressed to a callsign, so a foreign ack never reaches `dmOutboxOnAck()`. Even if it did,
+  the core requires `dst == acker` and `nnn` (`dm_outbox.cpp:322-327`), i.e. this node's own live
+  DM to that very acker with that NNN.
+- **Pre-existing, not opened:** the arm also takes `:rej` (`iAckPos == -1` → `substring(3).toInt()`,
+  usually 0), so a `:rej` from the destination could stop an entry with NNN 0 — the same parse feeds
+  `stoHolderClear()` and `findAndStopRingSlot()` today; a reject from the destination stopping the
+  ladder is the right outcome anyway.
+
+Still open (bench, unchanged from the first pass): T-1.3 including the gateway variant as the
+call-site proof of F1/F2; the "SRC,GW" hop-0 peer-cancel question (Confirmation 1); T-1.7 byte
+identity capture; T-1.9 wording now `OUTBOX FULL NOT SENT - ` (the plan's T-1.9 row still says
+"sent once as today").

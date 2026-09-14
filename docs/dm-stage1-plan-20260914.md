@@ -150,17 +150,17 @@ and boot-time load in both platform mains at the gate, native env entries.
 Native suite, sequential builds (Heltec V3, RAK4631, T-Beam as the 3-slot board, T-Deck Plus),
 advisor pass, then on the bench with `--dmretry 9` on the sender and `off` on a control node:
 
-| ID    | Test                                                                | Expect                                                                   |
-| ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| T-1.1 | Two-hop DM, destination's ACK suppressed (`--airgap` after receipt) | 9 attempts reach the destination (fresh ids), each re-acked, one display |
-| T-1.2 | Same, ACK allowed on attempt 2                                      | every remaining attempt stops (T1)                                       |
-| T-1.3 | Sender beaconing hard so `first_id` rotates out of `own_msg_id`     | ACK still attributed via the outbox, ladder stops (T2)                   |
-| T-1.4 | Echo gate: once with a relay in range, once without                 | with relay: no same-id retry; without: exactly one                       |
-| T-1.5 | QRT latched during a ladder                                         | no attempt while latched; resumes or expires cleanly                     |
-| T-1.6 | Fresh-id attempt heard by a store node holding the DM               | entry refreshed, no second slot, no peer cancel                          |
-| T-1.7 | `--dmretry off`                                                     | frames byte-identical to today, three same-id retries                    |
-| T-1.8 | Destination on upstream 4.35t, `--dmretry 3`                        | three copies displayed there (documented cost), acks matched here        |
-| T-1.9 | Outbox full (6 DMs in flight)                                       | 6th sent once as today, `outbox_full` counter, no drop                   |
+| ID    | Test                                                                | Expect                                                                                          |
+| ----- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| T-1.1 | Two-hop DM, destination's ACK suppressed (`--airgap` after receipt) | 9 attempts reach the destination (fresh ids), each re-acked, one display                        |
+| T-1.2 | Same, ACK allowed on attempt 2                                      | every remaining attempt stops (T1)                                                              |
+| T-1.3 | Sender beaconing hard so `first_id` rotates out of `own_msg_id`     | ACK still attributed via the outbox, ladder stops (T2)                                          |
+| T-1.4 | Echo gate: once with a relay in range, once without                 | with relay: no same-id retry; without: exactly one                                              |
+| T-1.5 | QRT latched during a ladder                                         | no attempt while latched; resumes or expires cleanly                                            |
+| T-1.6 | Fresh-id attempt heard by a store node holding the DM               | entry refreshed, no second slot, no peer cancel                                                 |
+| T-1.7 | `--dmretry off`                                                     | frames byte-identical to today, three same-id retries                                           |
+| T-1.8 | Destination on upstream 4.35t, `--dmretry 3`                        | three copies displayed there (documented cost), acks matched here                               |
+| T-1.9 | Outbox full (6 DMs in flight)                                       | 6th refused with the OUTBOX FULL notice, `[OUTBOX];refuse;full`, nothing sent, `obfull=` counts |
 
 ## 8. Decisions (operator, 2026-09-14)
 
