@@ -2157,6 +2157,9 @@ void esp32loop()
         if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
         {
             updateRetransmissionStatus();
+#if defined(ENABLE_MSGSTORE)
+            msgstoreLoop();   // S3: the main radio tick (advisor F1: the EXTERNAL_RADIO tick below is not it)
+#endif
             // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring
             // entries here, in the main-loop tick -- NOT in getNextTxSlot(),
             // which also runs on the nRF52 timer task (Advisor F1).

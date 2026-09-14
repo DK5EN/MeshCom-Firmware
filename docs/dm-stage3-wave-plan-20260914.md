@@ -141,6 +141,46 @@ the gate.
 - The core never emits on air by itself: `deliver()` enqueues one frame with status DONE, so the TX
   ring never retransmits a mailbox frame; the ladder is the mailbox's own (D3: no `0x41`, ever).
 
+## S3-2 rework notes (2026-09-14)
+
+Rework of `59f21e5b` per `docs/review/fable-dm-stage3-verdict-20260914.md` (F2-F8; F1, the
+ESP32-S3 `msgstoreLoop()` call site, was already fixed by the orchestrator in `esp32_main.cpp`
+and untouched here).
+
+- **T8 corrected:** the plan's hook 1 text ("Never for `msg_server` frames") and the recon bullet
+  under "mheard" no longer hold for the store/purge/peer-cancel/presence hooks in
+  `src/lora_functions.cpp` — every frame in `OnRxDone()` arrived over RF, so the 0x80 bit only
+  says a server-connected gateway touched the copy, not that the frame is server-injected;
+  excluding it excluded gateway-relayed and app-originated DMs, the primary mailbox case. **T8
+  applies to the server RX paths, which never reach these hooks.** The guard is gone from all
+  four hooks (F2).
+- **Hook order corrected (F6):** the store hook now runs the peer-delivery signature test
+  (`rly_hop == 0 && path has a comma`) first and skips storing when it matches, instead of
+  storing-then-cancelling a frame that is itself another store node's delivery.
+- **Wrap safety (F3):** every `next_ms`/`stored_ms` comparison in `msgstore.cpp` and the mailbox
+  page's remaining-time arithmetic now uses the signed-difference idiom already used elsewhere in
+  the file; native coverage added at `now` around `0xFFFFFFF0`.
+- **Re-entrancy (F4, nRF52 only):** `MsgStoreEntry` gained an additive `gen` counter, bumped on
+  every hook-driven mutation of a slot; `msgstoreLoop()` snapshots it before `env->deliver()` and
+  skips the post-delivery ladder step (but still counts the delivery) if a hook touched the slot
+  meanwhile.
+- **READY-then-DONE (F5):** kept as shipped, comment added explaining why — see
+  `src/msgstore_glue.cpp`. CRITICAL priority for a mailbox delivery is correct (it is a personal
+  DM); enqueuing straight into DONE would trade that for always-NORMAL, and staying at READY
+  would hand the delivery back to the TX ring's own retransmit logic, which D3 forbids.
+  `addTxRingEntry()` has no separate priority argument to close the window without one of those
+  two trade-offs.
+- **`blocked_bp` (F7):** counts once per blocked episode now, not once per refused tick; page
+  label renamed to "blocked by caps", setlog key renamed `bp` -> `blk` (struct field name
+  unchanged).
+- **Slot shrink (F8):** `msgstoreConfigure()` frees every live slot `>= new count` and counts them
+  in `dropped_slots` instead of stranding them.
+- Test count: 28 -> 41 (native `test_msgstore`); new coverage: captured deliver() arguments,
+  millis-wrap (due check, candidate pick, cooldown release, storetime, next-action), presence
+  ignored outside HELD (ARMED/LADDER/COOLDOWN), re-entrant ack during `deliver()`, blocked-episode
+  counting, slot shrink, jitter upper bound. F6 is not unit-testable at the core level (the core
+  has no `rly_hop`/path) — noted in the test file, covered by reading the hook order instead.
+
 ## Gate
 
 Native suite, sequential builds (Heltec V3, RAK4631, T-Beam as the ineligible board, T-Deck

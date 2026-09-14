@@ -52,6 +52,13 @@ struct MsgStoreEntry
     uint8_t  attempt;                  // 0..9 within the current ladder cycle
     uint8_t  cycles;                   // completed ladder cycles
     uint8_t  state;                    // MsgStoreState
+    uint8_t  gen;                      // bumped on every hook-driven mutation of this
+                                        // slot (purge, refresh/replace, peer cancel,
+                                        // presence, any transition to FREE); msgstoreLoop()
+                                        // reads it back after env->deliver() to tell a slot
+                                        // the nRF52 LORA task rewrote mid-delivery from one
+                                        // it can still safely stamp a ladder step onto
+                                        // (verdict F4, docs/review/fable-dm-stage3-verdict-20260914.md).
 };
 
 struct MsgStoreCounters

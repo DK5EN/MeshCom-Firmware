@@ -1689,7 +1689,10 @@ void sub_page_mailbox()
         uint32_t held_ms = (age_ms >= hold_total_ms) ? hold_total_ms : age_ms;
         mbxFormatDuration(buf_hold, sizeof(buf_hold), hold_total_ms - held_ms);
 
-        uint32_t remain_ms = (e->next_ms > now_ms) ? (e->next_ms - now_ms) : 0;
+        // F3 (docs/review/fable-dm-stage3-verdict-20260914.md): millis-wrap
+        // safe "time left" -- plain > misreports across the 49.7-day wrap.
+        int32_t remain_signed = (int32_t)(e->next_ms - now_ms);
+        uint32_t remain_ms = (remain_signed > 0) ? (uint32_t)remain_signed : 0;
         if (e->state == MSGSTORE_ARMED)
         {
             char buf_remain[16];
@@ -1769,7 +1772,7 @@ void sub_page_mailbox()
     web_client.printf("<div><span>dropped by cap</span><b>%u</b></div>", (unsigned)cnt->dropped_cap);
     web_client.printf("<div><span>dropped no slot</span><b>%u</b></div>", (unsigned)cnt->dropped_slots);
     web_client.printf("<div><span>cancelled by peer</span><b>%u</b></div>", (unsigned)cnt->cancelled_peer);
-    web_client.printf("<div><span>blocked QRS/QRT</span><b>%u</b></div>", (unsigned)cnt->blocked_bp);
+    web_client.printf("<div><span>blocked by caps</span><b>%u</b></div>", (unsigned)cnt->blocked_bp);
     web_client.println("</div>");
     web_client.println("<p class=\"font-small\" style=\"margin:7px;\">Same numbers as the <code>MBOX</code> setlog line. Dropped by cap and dropped no slot are two counters on purpose: the first means the 20-per-hour ceiling ate a hold time, the second means the mailbox was full.</p>");
     web_client.println("</div>");

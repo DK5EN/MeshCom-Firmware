@@ -47,6 +47,12 @@ static uint8_t  s_action_ring_head  = 0;
 static uint32_t s_last_action_ms   = 0;
 static bool     s_have_last_action = false;
 
+// F7: blocked_bp counts once per blocked *episode* (a run of due-but-refused
+// ticks), not once per tick. Set true the first time a due candidate is
+// refused, cleared as soon as the gate lets an action through or nothing is
+// due any more.
+static bool s_blocked_episode_active = false;
+
 // ---------------------------------------------------------------- helpers
 
 static uint32_t nowMs(void)
@@ -163,6 +169,17 @@ static void recordAction(uint32_t now)
     s_have_last_action = true;
 }
 
+// F4: mark slot i as hook-touched. Called from every receive-path event and
+// operator action that mutates a live slot (refresh/replace in msgstoreStore,
+// msgstoreOnAck, msgstorePresence, msgstoreOnPeerDelivery, msgstorePurge(All),
+// storetime expiry) so msgstoreLoop() can tell, after env->deliver() returns,
+// whether the candidate slot it is about to stamp a ladder step onto is still
+// the same logical entry it handed to deliver() a moment ago.
+static void entryTouch(int i)
+{
+    s_entries[i].gen++;
+}
+
 // ---------------------------------------------------- lifecycle / config
 
 void msgstoreInit(const struct MsgStoreEnv *env)
@@ -172,8 +189,29 @@ void msgstoreInit(const struct MsgStoreEnv *env)
 
 void msgstoreConfigure(enum MsgStoreMode mode, uint8_t slots, uint16_t hold_hours)
 {
-    s_mode   = mode;
-    s_slots  = (slots < 1) ? 1 : (slots > MSGSTORE_SLOTS_MAX ? MSGSTORE_SLOTS_MAX : slots);
+    s_mode = mode;
+
+    uint8_t new_slots = (slots < 1) ? 1 : (slots > MSGSTORE_SLOTS_MAX ? MSGSTORE_SLOTS_MAX : slots);
+
+    // F8: shrinking below the used range must not strand live entries --
+    // every loop below iterates only `< s_slots`, so a slot >= new_slots
+    // would otherwise sit forever with no expiry, no delivery, no ack purge
+    // and no counter ever telling the operator it is gone.
+    if(new_slots < s_slots)
+    {
+        for(int i = new_slots; i < s_slots; i++)
+        {
+            if(s_entries[i].state != MSGSTORE_FREE)
+            {
+                s_entries[i].state = MSGSTORE_FREE;
+                s_capblocked[i]     = false;
+                entryTouch(i);
+                s_cnt.dropped_slots++;
+            }
+        }
+    }
+
+    s_slots  = new_slots;
     s_hold_h = (hold_hours < 1) ? 1 : (hold_hours > MSGSTORE_HOLD_MAX_H ? MSGSTORE_HOLD_MAX_H : hold_hours);
 }
 
@@ -224,6 +262,8 @@ void msgstoreReset(void)
     s_action_ring_head  = 0;
     s_last_action_ms    = 0;
     s_have_last_action  = false;
+
+    s_blocked_episode_active = false;
 
     s_mode   = MSGSTORE_OFF;
     s_slots  = MSGSTORE_SLOTS_DEFAULT;
@@ -294,6 +334,7 @@ int msgstoreStore(const char *src, const char *dst, uint16_t nnn,
             s_entries[i].stored_ms  = now;
             s_entries[i].state      = MSGSTORE_HELD;
             s_capblocked[i]         = false;
+            entryTouch(i);
             s_cnt.refreshed++;
             return i;
         }
@@ -310,6 +351,7 @@ int msgstoreStore(const char *src, const char *dst, uint16_t nnn,
         s_entries[i].cycles    = 0;
         s_entries[i].state     = MSGSTORE_HELD;
         s_capblocked[i]        = false;
+        entryTouch(i);
         s_cnt.stored++;
         return i;
     }
@@ -360,6 +402,7 @@ void msgstoreOnAck(const char *acker, const char *sender, uint16_t nnn)
 
         s_entries[i].state = MSGSTORE_FREE;
         s_capblocked[i]     = false;
+        entryTouch(i);
         s_cnt.purged_ack++;
         return;   // (src, dst, nnn) is unique among live entries
     }
@@ -385,6 +428,7 @@ void msgstorePresence(const char *call)
 
         s_entries[i].state = MSGSTORE_ARMED;
         s_capblocked[i]     = false;
+        entryTouch(i);
 
         uint32_t jitter = (s_env != NULL && s_env->random_between != NULL)
                                ? s_env->random_between(MSGSTORE_JITTER_MIN_MS, MSGSTORE_JITTER_MAX_MS)
@@ -409,6 +453,7 @@ void msgstoreOnPeerDelivery(const char *src, uint16_t nnn)
 
         s_entries[i].state = MSGSTORE_HELD;
         s_capblocked[i]     = false;
+        entryTouch(i);
         s_cnt.cancelled_peer++;
     }
 }
@@ -439,10 +484,13 @@ void msgstoreLoop(void)
 
             s_entries[i].state = MSGSTORE_FREE;
             s_capblocked[i]     = false;
+            entryTouch(i);
             continue;
         }
 
-        if(s_entries[i].state == MSGSTORE_COOLDOWN && now >= s_entries[i].next_ms)
+        // F3: millis-wrap safe "cooldown is over" -- (int32_t)(now - next_ms)
+        // >= 0 reads correctly across the 49.7-day wrap, plain >= does not.
+        if(s_entries[i].state == MSGSTORE_COOLDOWN && (int32_t)(now - s_entries[i].next_ms) >= 0)
             s_entries[i].state = MSGSTORE_HELD;
     }
 
@@ -455,10 +503,12 @@ void msgstoreLoop(void)
     {
         if(s_entries[i].state != MSGSTORE_ARMED && s_entries[i].state != MSGSTORE_LADDER)
             continue;
-        if(s_entries[i].next_ms > now)
+        // F3: due test, wrap-safe.
+        if((int32_t)(now - s_entries[i].next_ms) < 0)
             continue;
 
-        if(candidate < 0 || s_entries[i].next_ms < candidate_next)
+        // F3: "earlier than the current candidate", wrap-safe.
+        if(candidate < 0 || (int32_t)(s_entries[i].next_ms - candidate_next) < 0)
         {
             candidate      = i;
             candidate_next = s_entries[i].next_ms;
@@ -466,7 +516,10 @@ void msgstoreLoop(void)
     }
 
     if(candidate < 0)
+    {
+        s_blocked_episode_active = false;   // F7: nothing due, no episode in progress
         return;   // nothing due -- no gate check, nothing was blocked
+    }
 
     bool gate_ok = true;
 
@@ -481,19 +534,49 @@ void msgstoreLoop(void)
 
     if(!gate_ok)
     {
-        s_cnt.blocked_bp++;
+        // F7: count once per blocked episode (the run of due-but-refused
+        // ticks), not once per 2 s tick -- a util-only block held for
+        // minutes must not read as "the 20/h ceiling ate a hold time".
+        if(!s_blocked_episode_active)
+        {
+            s_cnt.blocked_bp++;
+            s_blocked_episode_active = true;
+        }
         s_capblocked[candidate] = true;
         return;
     }
 
+    s_blocked_episode_active = false;   // F7: the gate let this tick through
+
     if(s_env->deliver == NULL)
         return;
 
-    if(!s_env->deliver(&s_entries[candidate]))
+    // F4: snapshot the generation before handing the slot to deliver() --
+    // on nRF52 deliver() (String building + encodeAPRS + ring enqueue,
+    // hundreds of microseconds) runs from the loop task while the LORA task
+    // can concurrently purge/refresh/peer-cancel/re-arm this very slot
+    // through the receive-path hooks (no lock: the alternative would put
+    // the LORA task behind the loop task's TX enqueue). If the slot the hook
+    // left behind does not match what we started with, the frame is still on
+    // the ring (it counts as delivered) but the ladder bookkeeping below
+    // must not stamp attempt/next_ms/COOLDOWN onto storage the hook has
+    // since repurposed -- that would resurrect a purged entry or silently
+    // promote a peer-cancelled one.
+    uint8_t gen_before = s_entries[candidate].gen;
+
+    // Same race, other half: deliver() reads src/dst/payload while a hook
+    // may replace them (same NNN, wrapped counter). Hand it a stack copy so
+    // the frame it builds is one consistent message, never a torn one.
+    struct MsgStoreEntry snapshot = s_entries[candidate];
+
+    if(!s_env->deliver(&snapshot))
         return;   // ring refused -- retry next tick, do not advance
 
     recordAction(now);
     s_cnt.delivered++;
+
+    if(s_entries[candidate].state == MSGSTORE_FREE || s_entries[candidate].gen != gen_before)
+        return;   // F4: a hook touched this slot during deliver() -- leave it as the hook left it
 
     if(s_entries[candidate].state == MSGSTORE_ARMED)
         s_entries[candidate].state = MSGSTORE_LADDER;   // jitter over, ladder starts
@@ -526,6 +609,7 @@ bool msgstorePurge(int slot)
 
     s_entries[slot].state = MSGSTORE_FREE;
     s_capblocked[slot]     = false;
+    entryTouch(slot);
     return true;
 }
 
@@ -535,6 +619,7 @@ void msgstorePurgeAll(void)
     {
         s_entries[i].state = MSGSTORE_FREE;
         s_capblocked[i]     = false;
+        entryTouch(i);
     }
 }
 
@@ -591,16 +676,19 @@ uint32_t msgstoreNextActionInMs(void)
     {
         if(s_entries[i].state != MSGSTORE_ARMED && s_entries[i].state != MSGSTORE_LADDER)
             continue;
-        if(!found || s_entries[i].next_ms < earliest)
+        // F3: "earlier than the current earliest", wrap-safe.
+        if(!found || (int32_t)(s_entries[i].next_ms - earliest) < 0)
         {
             earliest = s_entries[i].next_ms;
             found    = true;
         }
     }
 
-    if(!found || earliest <= now)
+    // F3: "already due", wrap-safe -- and the remaining distance is then
+    // just the unsigned difference, which is correctly wrap-safe on its own.
+    if(!found || (int32_t)(earliest - now) <= 0)
         return 0;
-    return earliest - now;
+    return (uint32_t)(earliest - now);
 }
 
 int msgstoreFormatLine(char *buf, size_t n)
@@ -608,8 +696,11 @@ int msgstoreFormatLine(char *buf, size_t n)
     if(buf == NULL || n == 0)
         return 0;
 
+    // F7: "blk" (blocked by caps), not "bp" -- the counter covers all four
+    // node-wide gates (30 s gap, 20/h ceiling, back-pressure, utilisation),
+    // not only back-pressure.
     int len = snprintf(buf, n,
-        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u bp=%u",
+        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u blk=%u",
         msgstoreModeName(s_mode),
         (unsigned)msgstoreUsed(), (unsigned)s_slots,
         (unsigned)msgstoreActionsLastHour(),
