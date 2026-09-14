@@ -3804,6 +3804,37 @@ static void bpEmitNack(BpNack n, MsgOrigin origin, const char *dst, const char *
     bpDeliver(body, origin, dst);
 }
 
+// F8 (fable-dm-stage1-verdict-20260914.md): the stage 1 outbox-full refusal
+// (below, dmOutboxHasRoom()) reused bpEmitNack(BP_NACK_QRT, ...) for its app
+// wording, which carries two side effects the plan never asked for --
+// [BP];nack;QRT; makes bench tooling (tools/loganalyse.sh, serial_monitor.py)
+// count an outbox refusal as channel back-pressure, and bpEmitNack() always
+// latches bp_episode_origin/bp_episode_dst (~:3798-3802 above), which can
+// route a QRT episode's closing QRV to a sender this refusal never opened
+// one for. outboxEmitRefuse() delivers the same per-message nack framing
+// (now BP_NACK_OUTBOX_FULL, its own wire prefix) without either side
+// effect: no [BP];nack; marker -- [OUTBOX];refuse;full (already printed at
+// the call site) stays the only marker for this refusal -- and no touch to
+// the episode state, which belongs to the TX-ring-depth episode machinery
+// this refusal never went through.
+static void outboxEmitRefuse(MsgOrigin origin, const char *dst, const char *msg_text)
+{
+    // 24, not bpEmitNack()'s 16: bpNackPrefix(BP_NACK_OUTBOX_FULL) is
+    // "OUTBOX FULL NOT SENT - ", 23 bytes plus NUL -- longer than either of
+    // the two prefixes 16 was sized for. bpNackCompose() is out_len-safe
+    // either way (never overflows), but a too-small headroom constant would
+    // needlessly clip a few bytes of the operator's own text off the
+    // BP_NACK_TEXT_MAX budget for no reason.
+#if defined(NRF52_SERIES)
+    static char body[24 + BP_NACK_TEXT_MAX + 4];
+#else
+    char body[24 + BP_NACK_TEXT_MAX + 4];
+#endif
+    bpNackCompose(body, sizeof(body), bpNackPrefix(BP_NACK_OUTBOX_FULL), msg_text);
+
+    bpDeliver(body, origin, dst);
+}
+
 /// Route a notice: to the sender that just spoke, else to the one the episode
 /// was opened for. Also remembers the transport and destination for the
 /// closing QRV (BP-06: bp_episode_dst mirrors bp_episode_origin exactly).
@@ -4112,7 +4143,10 @@ int sendMessage(char *msg_text, int len)
     {
         Serial.printf("[OUTBOX];refuse;full\n");
         dmstat_outbox_full.fetch_add(1);
-        bpEmitNack(BP_NACK_QRT, bp_origin, bp_origin_dst, strMsg.c_str());
+        // F8 (fable-dm-stage1-verdict-20260914.md): outboxEmitRefuse(), not
+        // bpEmitNack(BP_NACK_QRT, ...) -- see its comment for why reusing
+        // the QRT nack was wrong here.
+        outboxEmitRefuse(bp_origin, bp_origin_dst, strMsg.c_str());
         return BP_SEND_REFUSED;
     }
 

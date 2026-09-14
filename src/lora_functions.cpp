@@ -1115,36 +1115,66 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             bNewLine=true;
                                         }
                                 
-                                        int iackcheck = checkOwnTx(msg_counter);
-                                        if(iackcheck >= 0)
+                                        // F1 (fable-dm-stage1-verdict-20260914.md, T2): the
+                                        // outbox is keyed on (dst, NNN), never on own_msg_id[]
+                                        // (only 20 slots, beacons/gateway traffic rotate it
+                                        // fast) -- dmOutboxOnAck() must therefore run for every
+                                        // :ackNNN addressed to this node, independent of
+                                        // checkOwnTx(). F6: this hook is a no-op with an empty
+                                        // table when dmRetryMode() == off, so no mode gate is
+                                        // needed here either. F5: read the current attempt's id
+                                        // BEFORE the ack frees the entry, so a still-queued
+                                        // fresh-id ring slot (attempts 3+ always carry a fresh
+                                        // id; the first_id-based stop below only ever covers
+                                        // attempts 1-2) can be stopped too.
+                                        uint32_t dmLadderLastId = dmOutboxLastIdForNnn((uint16_t)(iAckId & 0x3FF));
+                                        bool     dmAckStopped   = dmOutboxOnAck(aprsmsg.msg_source_call.c_str(), (uint16_t)(iAckId & 0x3FF));
+
+                                        if(dmAckStopped && dmLadderLastId != 0 && dmLadderLastId != (uint32_t)msg_counter)
                                         {
-                                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                                            int dmLadderSlot = findAndStopRingSlot(dmLadderLastId);
+                                            if(dmLadderSlot >= 0 && bDisplayRetx)
+                                                printfdeb("\n[RETX] DM-ACK ladder stop retid:%i msg-id:%08X\n",
+                                                            dmLadderSlot, dmLadderLastId);
+                                        }
+
+                                        int iackcheck = checkOwnTx(msg_counter);
+                                        if(iackcheck >= 0 || dmAckStopped)
+                                        {
+                                            if(iackcheck >= 0)
+                                                own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
                                             // S4: the destination's own ack is the final word --
                                             // forget any store node(s) that were holding this DM.
+                                            // Matches on msg_counter alone, independent of
+                                            // own_msg_id[] -- correct even when iackcheck < 0.
                                             stoHolderClear(msg_counter);
 
                                             // 0.3/0.4: peer ACK for an own DM, plus the RTT sample
-                                            // for the send-to-ack histogram (M0-1).
+                                            // for the send-to-ack histogram (M0-1). Also correct
+                                            // when only the outbox (not own_msg_id[]) still knew
+                                            // this NNN (F1).
                                             dmstat_peer_ack.fetch_add(1);
                                             dmStatNoteAck((uint16_t)(iAckId & 0x3FF), millis());
 
                                             // BUG #8 fix: clear ringBuffer entry to stop retransmission
+                                            // (the attempt-1/same-id slot; a fresh-id ladder slot
+                                            // still queued is stopped above, F5).
                                             int dmSlot = findAndStopRingSlot(msg_counter);
                                             if(dmSlot >= 0 && bDisplayRetx)
                                                 printfdeb("\n[RETX] DM-ACK for retid:%i stop retransmit msg-id:%08X\n",
                                                             dmSlot, msg_counter);
-
-                                            // S1: the destination's ack (own DM, matched on NNN,
-                                            // never on a reconstructed msg_id -- T1) stops the
-                                            // outbox's ladder. The phone's 0x02 status frame was
-                                            // already sent above (plen for msg_counter ==
-                                            // first_id whenever this is the ack for attempt 1);
-                                            // dmOutboxOnAck() deliberately does not send a second
-                                            // one, see its comment in dm_outbox.cpp.
-                                            dmOutboxOnAck(aprsmsg.msg_source_call.c_str(), (uint16_t)(iAckId & 0x3FF));
                                         }
 
+                                        // The phone's 0x02 status frame is built above for
+                                        // msg_counter, which equals first_id by construction --
+                                        // sent unconditionally here regardless of iackcheck/
+                                        // dmAckStopped, so the app's row for this message always
+                                        // sees "acked" (F1's "the phone still needs the 0x02 for
+                                        // first_id" is already met by this existing, unconditional
+                                        // send; dmOutboxOnAck() does not additionally call
+                                        // report(), see its comment in dm_outbox.cpp, to avoid a
+                                        // duplicate frame).
                                         addBLEOutBuffer(print_buff, plen);
                                     }
                                     else
@@ -1162,8 +1192,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                         // S1 (D3): informational only, never stops the ladder --
                                         // independent of the rate-limited phone-frame branch below.
-                                        if(iStoCheck >= 0)
-                                            dmOutboxOnHeld(stoNnn);
+                                        // F1: unconditional, same T2 reasoning as the :ack branch
+                                        // above -- the outbox is keyed on NNN, not on own_msg_id[].
+                                        dmOutboxOnHeld(stoNnn);
 
                                         if(iStoCheck >= 0 &&
                                            (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&

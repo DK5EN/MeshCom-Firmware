@@ -153,6 +153,22 @@ static void test_nack_compose_kurzer_text(void)
     TEST_ASSERT_EQUAL_UINT(strlen(out), len);
 }
 
+// F8 (fable-dm-stage1-verdict-20260914.md): the stage 1 outbox's own nack
+// reason, distinct from BP_NACK_QRT/QTA -- a different Q-code-style marker
+// name (bpNackCode()) and a different wire prefix (mc-chat/MCProxy can
+// render "outbox full" distinctly, see
+// docs/client-integration-store-forward.md).
+static void test_nack_compose_outbox_full(void)
+{
+    char out[64];
+    size_t len = bpNackCompose(out, sizeof(out), bpNackPrefix(BP_NACK_OUTBOX_FULL),
+                               "Hello World 17");
+
+    TEST_ASSERT_EQUAL_STRING("OUTBOX FULL NOT SENT - Hello World 17", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), len);
+    TEST_ASSERT_EQUAL_STRING("OUTBOX", bpNackCode(BP_NACK_OUTBOX_FULL));
+}
+
 // Genau BP_NACK_TEXT_MAX (120) Byte Text: passt vollstaendig, kein "..." --
 // die Kante zwischen "passt" und "wird gekuerzt".
 static void test_nack_compose_exakt_max_laenge(void)
@@ -342,6 +358,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_frame_roundtrip_dm_ziel);
     RUN_TEST(test_kein_response_absender);
     RUN_TEST(test_nack_compose_kurzer_text);
+    RUN_TEST(test_nack_compose_outbox_full);
     RUN_TEST(test_nack_compose_exakt_max_laenge);
     RUN_TEST(test_nack_compose_zu_langer_text_bekommt_ellipse);
     RUN_TEST(test_nack_compose_kuerzt_auf_utf8_codepoint_grenze);

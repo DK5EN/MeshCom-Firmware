@@ -16,6 +16,7 @@
 #include "reack_limiter.h"
 #include "dm_stats.h"
 #include "dm_dedup.h"
+#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -425,15 +426,27 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                     uint8_t ack_status = 0x01;  // ACK
 
-                    int iackcheck = checkOwnTx(msg_counter);
-                    if(iackcheck >= 0)
+                    // F2 (fable-dm-stage1-verdict-20260914.md): the LoRa ack
+                    // site's T2 gap (Finding 1) applies here too -- a
+                    // destination that answers over the server (out of RF
+                    // range, or the RF copy of the ack lost) must still stop
+                    // the outbox's ladder, independent of checkOwnTx().
+                    int  iackcheck   = checkOwnTx(msg_counter);
+                    bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call.c_str(), (uint16_t)(iAckId & 0x3FF));
+
+                    if(iackcheck >= 0 || dmAckStopped)
                     {
-                        own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                        if(iackcheck >= 0)
+                            own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
                         // S4: the destination's own ack is the final word --
                         // forget any store node(s) that were holding this DM.
                         stoHolderClear(msg_counter);
 
+                        // Same first_id report rule as the LoRa site: the
+                        // app needs the "own message acked" level (0x02),
+                        // not the default 0x01, even when own_msg_id[] no
+                        // longer has this NNN and only the outbox still did.
                         ack_status = 0x02;  // 02...ACK
                       }
 

@@ -85,5 +85,11 @@ int                            dmOutboxUsed(void);
 const struct DmOutboxEntry    *dmOutboxEntry(int slot);
 const struct DmOutboxCounters *dmOutboxCounters(void);
 uint32_t                       dmOutboxFirstIdForNnn(uint16_t nnn);  // 0 when unknown
+// F5 (fable-dm-stage1-verdict-20260914.md): the current attempt's id, read
+// BEFORE dmOutboxOnAck() frees the entry, so a call site can also stop a
+// still-queued fresh-id ring slot (findAndStopRingSlot(), lora_functions.cpp
+// -- the outbox's own first_id-based stop only ever covers attempts 1-2,
+// which keep first_id; attempt 3+ always carries a fresh id). 0 when unknown.
+uint32_t                       dmOutboxLastIdForNnn(uint16_t nnn);
 int                            dmOutboxFormatLine(char *buf, size_t n); // "OUTBOX ..." setlog line
 void                           dmOutboxReset(void);                  // tests

@@ -354,7 +354,17 @@ void dmOutboxLoop(void)
         entryTouch(candidate);
         s_cnt.gaveup++;
 
-        if(!s_entries[candidate].held && s_env->report != NULL)
+        // F4 (fable-dm-stage1-verdict-20260914.md): report() now runs for
+        // EVERY give-up, held or not -- dm_outbox_api.h's report() contract
+        // already says "caller decides the held case", but this function
+        // used to decide it here instead, by skipping the call outright.
+        // That left the glue's stage 0 counters (dmstat_giveup/
+        // dmstat_giveup_held) uncounted for every held give-up, even though
+        // OUTBOX give= (s_cnt.gaveup above) always counted it. The glue is
+        // still the one that must never put a 0x03 on the wire for a held
+        // message (stage 4 decision 3) -- it does that by checking e->held
+        // itself before building the phone frame.
+        if(s_env->report != NULL)
             s_env->report(&s_entries[candidate], 0x03);
     }
     else
@@ -399,6 +409,18 @@ uint32_t dmOutboxFirstIdForNnn(uint16_t nnn)
             continue;
         if(s_entries[i].nnn == nnn)
             return s_entries[i].first_id;
+    }
+    return 0;
+}
+
+uint32_t dmOutboxLastIdForNnn(uint16_t nnn)
+{
+    for(int i = 0; i < s_slots; i++)
+    {
+        if(s_entries[i].state == DMOB_FREE)
+            continue;
+        if(s_entries[i].nnn == nnn)
+            return s_entries[i].last_id;
     }
     return 0;
 }

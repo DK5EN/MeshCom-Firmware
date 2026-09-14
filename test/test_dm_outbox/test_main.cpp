@@ -6,7 +6,7 @@
 // Fake DmOutboxEnv: eine stellbare Uhr (g_now), ein bp-Knopf (g_bp), ein
 // skriptbares mint_id() (fortlaufend ab einer hohen Basis, damit es nie mit
 // einer Test-first_id kollidiert), ein Transmit-Log (id/nnn/dst je Aufruf)
-// und ein Report-Log (first_id/status je Aufruf). dmOutboxReset() leert die
+// und ein Report-Log (first_id/status/held je Aufruf). dmOutboxReset() leert die
 // Tabelle und Zaehler vor jedem Test; dmOutboxInit() (env + Slotzahl) bleibt
 // ueber alle Tests hinweg gleich, wie im echten Boot-Ablauf.
 
@@ -43,6 +43,7 @@ struct ReportLogEntry
 {
     uint32_t first_id;
     uint8_t  status;
+    bool     held;   // F4: the glue's own suppress-on-wire decision key
 };
 static std::vector<ReportLogEntry> g_report_log;
 
@@ -72,6 +73,7 @@ static void fakeReport(const struct DmOutboxEntry *e, uint8_t status)
     ReportLogEntry r;
     r.first_id = e->first_id;
     r.status   = status;
+    r.held     = e->held;
     g_report_log.push_back(r);
 }
 
@@ -272,17 +274,27 @@ static void test_echo_gate_relay_heard_goes_fresh(void)
 
 static void test_echo_on_last_id_also_gates(void)
 {
-    // Echo of the attempt CURRENTLY in flight (last_id), not just first_id,
-    // still counts -- relevant once attempt 2 has already gone fresh and a
-    // relay echoes attempt 2's id before some other logic re-checks it.
+    // F7 (fable-dm-stage1-verdict-20260914.md): the original version of
+    // this test echoed id 500, which is ALSO first_id (no attempt had gone
+    // fresh yet), so it passed even with the `last_id` disjunct deleted
+    // from dmOutboxOnEcho() -- it never actually exercised that branch.
+    // Attempt 3 always mints fresh (only attempt 2's id choice depends on
+    // echo_seen -- dm_outbox.cpp), so two ticks with no echo in between
+    // leave last_id diverged from first_id while echo_seen is still false;
+    // an echo of THAT fresh id must still set echo_seen. fails-before: with
+    // `&& last_id != msg_id` removed from the match guard, this echo call
+    // would not match (first_id != msg_id here) and the assertion below
+    // would fail.
     g_now = 0;
-    int slot = dmOutboxAdd(5, "OE1EEE", "p", 1, 3, 500, DM_RETRY_3);
-    advanceToDueAndTick(slot);   // attempt 2, same id (no echo yet) -> last_id == 500 still
-    const struct DmOutboxEntry *e = dmOutboxEntry(slot);
-    TEST_ASSERT_EQUAL_UINT32(500, e->last_id);
+    int slot = dmOutboxAdd(5, "OE1EEE", "p", 1, 3, 500, DM_RETRY_9);
+    advanceToDueAndTick(slot);   // attempt 2, same id (no echo) -> last_id == 500
+    advanceToDueAndTick(slot);   // attempt 3, always fresh -> last_id != first_id
 
-    // A later echo of last_id must not crash / must be recognised.
-    dmOutboxOnEcho(500);
+    const struct DmOutboxEntry *e = dmOutboxEntry(slot);
+    TEST_ASSERT_TRUE(e->last_id != 500);   // fresh id, diverged from first_id
+    TEST_ASSERT_FALSE(e->echo_seen);
+
+    dmOutboxOnEcho(e->last_id);
     e = dmOutboxEntry(slot);
     TEST_ASSERT_TRUE(e->echo_seen);
 }
@@ -380,22 +392,103 @@ static void test_held_suppresses_giveup_report_but_still_counts(void)
     TEST_ASSERT_EQUAL_INT(DMOB_DONE_GIVEUP, e->state);
     TEST_ASSERT_TRUE(e->held);
     TEST_ASSERT_EQUAL_UINT32(1, dmOutboxCounters()->gaveup);
-    TEST_ASSERT_TRUE(g_report_log.empty());   // held: no 0x03 frame
+
+    // F4 (fable-dm-stage1-verdict-20260914.md): report() now runs for EVERY
+    // give-up, held or not -- dm_outbox_api.h's report() contract says
+    // "caller decides the held case"; the core no longer decides it by
+    // skipping the call. The glue (dm_outbox_glue.cpp) is the one that must
+    // not put a 0x03 on the wire for a held message and the one that counts
+    // dmstat_giveup_held -- this fake env does neither, it only logs every
+    // call, so what this test pins is that report() ran WITH e->held ==
+    // true, which is exactly what the glue's suppress decision is keyed on.
+    TEST_ASSERT_EQUAL_INT(1, (int)g_report_log.size());
+    TEST_ASSERT_EQUAL_UINT32(1400, g_report_log[0].first_id);
+    TEST_ASSERT_EQUAL_UINT8(0x03, g_report_log[0].status);
+    TEST_ASSERT_TRUE(g_report_log[0].held);
 }
 
 static void test_held_on_unknown_nnn_is_a_no_op(void)
 {
-    dmOutboxAdd(14, "OE1KKK", "p", 1, 3, 1500, DM_RETRY_3);
+    // F7 (fable-dm-stage1-verdict-20260914.md): the original version never
+    // asserted the add succeeded -- a broken dmOutboxAdd() would have made
+    // the loop below vacuous (no entry with nnn 14 to find) and the test
+    // would still pass.
+    int slot = dmOutboxAdd(14, "OE1KKK", "p", 1, 3, 1500, DM_RETRY_3);
+    TEST_ASSERT_TRUE(slot >= 0);
+
     dmOutboxOnHeld(999);   // no matching entry
-    const struct DmOutboxEntry *e = dmOutboxEntry(0);
-    // Whichever slot holds nnn 14 must be untouched by the foreign nnn.
-    for(int i = 0; i < 5; i++)
-    {
-        const struct DmOutboxEntry *ei = dmOutboxEntry(i);
-        if(ei != NULL && ei->nnn == 14)
-            TEST_ASSERT_FALSE(ei->held);
-    }
-    (void)e;
+    const struct DmOutboxEntry *e = dmOutboxEntry(slot);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT16(14, e->nnn);
+    TEST_ASSERT_FALSE(e->held);
+}
+
+// F7 (fable-dm-stage1-verdict-20260914.md): not covered before -- "one
+// enqueue per loop call" with two due entries, and the earliest-next_ms
+// selection (decision 4 / dm_outbox.cpp's candidate loop).
+static void test_two_due_entries_one_enqueue_per_tick_earliest_first(void)
+{
+    g_now = 0;
+    int slotA = dmOutboxAdd(50, "OE1AAA", "p", 1, 3, 5000, DM_RETRY_3);   // due at 40000
+    g_now = 100;
+    int slotB = dmOutboxAdd(51, "OE1BBB", "p", 1, 3, 5100, DM_RETRY_3);   // due at 40100
+
+    TEST_ASSERT_EQUAL_UINT32(40000, dmOutboxEntry(slotA)->next_ms);
+    TEST_ASSERT_EQUAL_UINT32(40100, dmOutboxEntry(slotB)->next_ms);
+
+    // Both due now -- exactly one attempt enqueued per dmOutboxLoop() call,
+    // and it is A's (the earlier next_ms), not B's.
+    g_now = 40200;
+    dmOutboxLoop();
+    TEST_ASSERT_EQUAL_INT(1, (int)g_tx_log.size());
+    TEST_ASSERT_EQUAL_UINT16(50, g_tx_log.back().nnn);
+
+    // B's turn on the next tick, still without touching A a second time.
+    dmOutboxLoop();
+    TEST_ASSERT_EQUAL_INT(2, (int)g_tx_log.size());
+    TEST_ASSERT_EQUAL_UINT16(51, g_tx_log.back().nnn);
+
+    // A third tick: nothing else due, no further enqueue.
+    dmOutboxLoop();
+    TEST_ASSERT_EQUAL_INT(2, (int)g_tx_log.size());
+}
+
+// F1 (fable-dm-stage1-verdict-20260914.md, T2): the fix moved
+// dmOutboxOnAck() out from behind the CALL SITE's checkOwnTx() gate
+// (lora_functions.cpp/udp_functions.cpp/nrf_eth.cpp) -- the core itself
+// (dm_outbox.cpp) never knew about own_msg_id[] and was already keyed on
+// (dst, nnn) alone (Confirmation 2 in the verdict: "Core -- CONFIRMED").
+// This test pins that core-side guarantee natively, the way the verdict's
+// "test via the return value + report path" asks: run a ladder far enough
+// that last_id has moved through several fresh ids (standing in for
+// first_id having rotated out of a 20-slot msg_id table a real firmware
+// would keep), then ack on (dst, nnn) alone -- the outbox must still stop,
+// and dmOutboxLoop() must never call report() (0x03 give-up) for this
+// entry afterwards, no matter how much later it is asked to run again.
+static void test_f1_ack_on_nnn_dst_stops_ladder_after_several_fresh_ids(void)
+{
+    g_now = 0;
+    int slot = dmOutboxAdd(60, "OE1XXX", "p", 1, 3, 6000, DM_RETRY_9);
+    for(int i = 0; i < 4; i++)
+        advanceToDueAndTick(slot);   // attempts 2..5: several fresh ids minted
+
+    const struct DmOutboxEntry *e = dmOutboxEntry(slot);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_TRUE(e->last_id != e->first_id);
+    TEST_ASSERT_TRUE(e->last_id >= 900000UL);   // a fresh (minted) id, not first_id
+
+    bool stopped = dmOutboxOnAck("OE1XXX", 60);
+    TEST_ASSERT_TRUE(stopped);
+    TEST_ASSERT_NULL(dmOutboxEntry(slot));
+    TEST_ASSERT_EQUAL_UINT32(1, dmOutboxCounters()->acked);
+
+    // Give-up must never fire for this entry now: it is FREE, dmOutboxLoop()
+    // finds nothing due for it even well past every remaining attempt's
+    // schedule.
+    g_now += 500000;
+    dmOutboxLoop();
+    TEST_ASSERT_TRUE(g_report_log.empty());
+    TEST_ASSERT_EQUAL_UINT32(0, dmOutboxCounters()->gaveup);
 }
 
 // -------------------------------------------------------------------- bp
@@ -576,9 +669,12 @@ int main(int, char **)
     RUN_TEST(test_ack_wrong_dst_is_ignored);
     RUN_TEST(test_ack_unknown_nnn_is_ignored);
     RUN_TEST(test_ack_after_attempt_1_2_and_8);
+    RUN_TEST(test_f1_ack_on_nnn_dst_stops_ladder_after_several_fresh_ids);
 
     RUN_TEST(test_held_suppresses_giveup_report_but_still_counts);
     RUN_TEST(test_held_on_unknown_nnn_is_a_no_op);
+
+    RUN_TEST(test_two_due_entries_one_enqueue_per_tick_earliest_first);
 
     RUN_TEST(test_bp_blocks_without_advancing_next_ms);
     RUN_TEST(test_transmit_false_retries_next_tick);

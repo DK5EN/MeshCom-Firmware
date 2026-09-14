@@ -84,6 +84,15 @@ old nodes it is the only signal the operator gets.
 The same padded-callsign layout exists for `:ackNNN` and `:rejNNN` texts; new firmware consumes
 those as well.
 
+**Also new (stage 1, 2026-09-14): an "outbox full" nack.** When `--dmretry 3`/`9` is on and the
+sender's own retry-ladder queue has no free slot, a DM is refused before it is even sent; the
+client gets an ordinary text reply on the same transport the operator sent from (BLE/serial/web/
+EXTUDP) -- `"OUTBOX FULL NOT SENT - <the message>"` -- the same shape as the existing
+`"QRT NOT SENT - "` / `"QTA NOT SENT - "` channel-congestion nacks, but with its own prefix, so a
+client that wants to render "outbox full" distinctly from generic channel congestion can match on
+it (`src/backpressure.h`, `BP_NACK_OUTBOX_FULL`); a client that does not care still shows it like
+any other refused message.
+
 ## 4. Per-client checklist
 
 ### MCProxy (`src/mcapp/ble_protocol.py`, `push_delivery.py`)

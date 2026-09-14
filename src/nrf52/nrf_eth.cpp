@@ -15,6 +15,7 @@
 #include "reack_limiter.h"
 #include "dm_stats.h"
 #include "dm_dedup.h"
+#include "dm_outbox_api.h"   // F2: dmOutboxOnAck() for a server-side :ackNNN
 #include <command_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -591,10 +592,18 @@ int NrfETH::getUDP()
                       print_buff[5]=0x01;  // ACK
                       print_buff[6]=0x00;
 
-                      int iackcheck = checkOwnTx(msg_counter);
-                      if(iackcheck >= 0)
+                      // F2 (fable-dm-stage1-verdict-20260914.md): same T2 gap
+                      // as the ESP32 twin (udp_functions.cpp) and the LoRa
+                      // ack site (Finding 1) -- a destination that answers
+                      // over the server must still stop the outbox's ladder,
+                      // independent of checkOwnTx().
+                      int  iackcheck    = checkOwnTx(msg_counter);
+                      bool dmAckStopped = dmOutboxOnAck(aprsmsg.msg_source_call.c_str(), (uint16_t)(iAckId & 0x3FF));
+
+                      if(iackcheck >= 0 || dmAckStopped)
                       {
-                          own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+                          if(iackcheck >= 0)
+                              own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
                           // S4: the destination's own ack is the final word --
                           // forget any store node(s) that were holding this DM.
@@ -604,6 +613,8 @@ int NrfETH::getUDP()
                           // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                           // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,
                           // die App zeigte auf nRF52-Gateways nie den vollen ACK-Status.
+                          // F2: same first_id report rule as the LoRa site -- also 0x02
+                          // when only the outbox (not own_msg_id[]) still knew this NNN.
                           print_buff[5]=0x02;  // 02...ACK
                       }
 

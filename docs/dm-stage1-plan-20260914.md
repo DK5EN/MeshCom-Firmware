@@ -182,10 +182,68 @@ advisor pass, then on the bench with `--dmretry 9` on the sender and `off` on a 
 - `sendMessage()`: in mode 3/9 a DM is refused with the QRT-style notice and `[OUTBOX];refuse;full`
   when no slot is free, else attempt 1 is enqueued with ring retransmission disabled and the entry
   registered. Mode off touches nothing.
-- Receive side: echo, ack and held hooks only when the mode is not off; the ack site's own 0x02
-  frame stands, the outbox only stops the ladder. The stage 3 peer-delivery tell is now the path
-  shape (two calls, last differs from the source).
+- Receive side: echo, ack and held hooks are mode-independent no-ops (F6, corrected 2026-09-14 --
+  see "S1-2 rework notes" below: an in-flight ladder must finish after `--dmretry off`, and the
+  outbox holds no entry to act on in off mode either way, so no mode gate is needed or wanted at
+  the hook call sites). The ack site's own 0x02 frame stands, the outbox only stops the ladder. The
+  stage 3 peer-delivery tell is now the path shape (two calls, last differs from the source).
 - The echo gate decides at attempt 2 (due at 40 s), so the 15 s constant in the contract header is
   documentary only.
 - Loop: `dmOutboxLoop()` next to `updateRetransmissionStatus()` in both platform mains (ESP32: the
   `bRadio` tick and the external-radio tick), `OUTBOX` setlog line after `MBOX` when the mode is on.
+
+## S1-2 rework notes (2026-09-14)
+
+Rework of commit `731e0ebc` against `docs/review/fable-dm-stage1-verdict-20260914.md` (Findings
+1-8). Per finding:
+
+- **F1 (High, T2).** `dmOutboxOnAck()`/`dmOutboxOnHeld()` moved out from behind
+  `checkOwnTx() >= 0` at the LoRa ack/`:sto` sites (`lora_functions.cpp`) -- they now run for every
+  `:ackNNN`/`:sto` addressed to this node, independent of `own_msg_id[]`. `stoHolderClear()`,
+  `dmstat_peer_ack`, `dmStatNoteAck()` and the ring stop for `msg_counter` now run whenever either
+  `checkOwnTx()` or the outbox itself matched. The phone's 0x02 frame at this site was already
+  built unconditionally for `msg_counter == first_id` before this fix (verdict Confirmation 1); the
+  fix did not need to add a second explicit report there, and does not -- `dmOutboxOnAck()` still
+  never calls `report()` (see its comment in `dm_outbox.cpp`), so the app never gets a duplicate
+  0x02.
+- **F2 (Medium).** Both server ack twins (`udp_functions.cpp`, `nrf_eth.cpp`) gained the same
+  unconditional `dmOutboxOnAck()` call. Unlike the LoRa site, these build `ack_status`/`print_buff[5]`
+  conditionally (0x01 default, 0x02 only when `checkOwnTx() >= 0`) -- the fix upgrades that same
+  variable to 0x02 whenever the outbox stopped the ladder too, so the app gets the "own message
+  acked" level even when only the outbox (not `own_msg_id[]`) still knew the NNN.
+- **F3 (Medium).** `glueTransmit()`'s `addNodeData()`/`sendExtern()` mirror removed
+  (`dm_outbox_glue.cpp`); attempt 1's upload in `sendMessage()` is the only server-side copy of a
+  DM, same as the ring's own pre-stage-1 same-id retries never re-uploaded either.
+- **F4 (Low).** `dm_outbox.cpp`'s give-up branch now calls `report()` unconditionally (the header's
+  own "caller decides the held case" contract, previously not honoured); `glueReport()`
+  (`dm_outbox_glue.cpp`) counts `dmstat_giveup`/`dmstat_giveup_held` first and only then decides
+  whether a 0x03 reaches the phone (never for `e->held`).
+- **F5 (Low, optional).** New reader `dmOutboxLastIdForNnn()` (`dm_outbox_api.h`/`.cpp`), read at
+  the LoRa ack site before `dmOutboxOnAck()` frees the entry; a second `findAndStopRingSlot()` call
+  stops a still-queued fresh-id ladder slot (attempts 3+) the existing first_id-based stop never
+  covered. Not added to the server ack twins (F2): `findAndStopRingSlot()` is LoRa-ring-local
+  (`lora_functions.cpp`).
+- **F6 (Low, doc).** The S1-1 notes above corrected: the receive hooks are mode-independent
+  no-ops, not gated on `dmRetryMode()`, by design -- an in-flight ladder must finish after
+  `--dmretry off`, and the code was already unconditional; only the notes were wrong.
+- **F7 (Low, tests).** `test_echo_on_last_id_also_gates` now echoes a genuinely fresh `last_id`
+  (mode 9, two ticks with no echo) instead of `first_id`-that-happens-to-equal-`last_id`;
+  `test_held_on_unknown_nnn_is_a_no_op` asserts the add succeeded; new
+  `test_two_due_entries_one_enqueue_per_tick_earliest_first` (one enqueue per call, earliest
+  `next_ms` wins); new `test_f1_ack_on_nnn_dst_stops_ladder_after_several_fresh_ids` pins the core's
+  side of the F1 contract (ack on `(dst, nnn)` alone stops the ladder no matter how far `last_id`
+  has drifted from `first_id`, and give-up never fires afterwards). `ReportLogEntry` gained a
+  `held` field for the F4 test change.
+- **F8 (Low).** New `BP_NACK_OUTBOX_FULL` (`backpressure.h`, own Q-code-style name `OUTBOX` and
+  wire prefix `"OUTBOX FULL NOT SENT - "`, added to the BP-11 echo guard's prefix list) used by
+  `sendMessage()`'s outbox-full refusal via a new `outboxEmitRefuse()` (`loop_functions.cpp`, next
+  to `bpEmitNack()`) that delivers the nack without the `[BP];nack;` marker and without touching
+  `bp_episode_origin`/`bp_episode_dst` -- `[OUTBOX];refuse;full` stays the only marker, and the
+  refusal no longer misroutes a QRT episode's closing QRV. New native test
+  `test_nack_compose_outbox_full` (`test/test_bp_notice_frame/`). One paragraph added to
+  `docs/client-integration-store-forward.md` for the client side.
+
+Files touched: `src/dm_outbox.cpp`, `src/dm_outbox_api.h`, `src/dm_outbox_glue.cpp`,
+`src/lora_functions.cpp`, `src/loop_functions.cpp`, `src/udp_functions.cpp`,
+`src/nrf52/nrf_eth.cpp`, `src/backpressure.h`, `test/test_dm_outbox/test_main.cpp`,
+`test/test_bp_notice_frame/test_bp_notice_frame.cpp`, `docs/client-integration-store-forward.md`.
