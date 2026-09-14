@@ -21,6 +21,7 @@
 #include "maxhop.h"
 #include "settings_sanitize.h" // #1132: resolve_tx_power sentinel normalization
 #include "msgstore_settings.h" // store node settings persistence (stage 3, owner C)
+#include "dm_settings.h"       // sender-side --dmretry, every board (stage 1, owner C)
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"      // store node core -- link stub off ENABLE_MSGSTORE boards (owner A)
 #endif
@@ -254,6 +255,34 @@ static void storeApplyMode(enum MsgStoreMode newMode)
     storePrintState();
 }
 #endif // ENABLE_MSGSTORE
+
+// Prints the current dm retry state, bench-parseable (raw Serial.printf,
+// like --maxhop's [MAXHOP] line -- printfdeb() strips ';' outside CSV mode).
+// Every board -- this is sender-side, not ENABLE_MSGSTORE.
+static void dmRetryPrintState(void)
+{
+    Serial.printf("[DMRETRY];%s\n", dmRetryModeName(dmRetryMode()));
+}
+
+// Applies a new dm retry mode, persists it, and -- when arming retries for
+// the first time (off -> 3 or 9) -- prints the interop warning: a receiving
+// node on older firmware shows every fresh-id retry as a new message
+// (docs/dm-stage1-plan-20260914.md sec. 1, "What the GUI must say").
+static void dmRetryApplyMode(enum DmRetryMode newMode)
+{
+    enum DmRetryMode prevMode = dmRetryMode();
+
+    dmRetrySet(newMode);
+    dmSettingsSave();
+
+    dmRetryPrintState();
+
+    if(prevMode == DM_RETRY_OFF && newMode != DM_RETRY_OFF)
+    {
+        Serial.printf("[DMRETRY];warning;receiving nodes must run this firmware or newer; "
+                       "older nodes show every retry as a new message\n");
+    }
+}
 
 void commandAction(char *msg_text, int iphone, bool rxFromPhone)
 {
@@ -4606,6 +4635,36 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // Sender-side DM retry ladder, "Enhanced message transport protection"
+    // (docs/dm-stage1-plan-20260914.md sec. 1-2). Every board -- T13:
+    // persisted through dm_settings.cpp's own key/file, never through struct
+    // s_meshcom_settings. commandCheck is a prefix match, so "dmretry " must
+    // be tested before the bare "dmretry" below; there is no other dm*
+    // command to shadow.
+    if(commandCheck(msg_text+2, (char*)"dmretry ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
+
+        enum DmRetryMode mode;
+        if(!dmRetryModeParse(_owner_c, &mode))
+        {
+            Serial.printf("[ERR];dmretry;%s not one of off|3|9\n", _owner_c);
+
+            return;
+        }
+
+        dmRetryApplyMode(mode);
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"dmretry") == 0)
+    {
+        dmRetryPrintState();
+
+        return;
+    }
+    else
     // Store node (mailbox) settings, stage 3 (docs/dm-stage3-wave-plan-20260914.md).
     // T13: persisted through msgstore_settings.cpp's own keys/file, never
     // through struct s_meshcom_settings. commandCheck is a prefix match, so
@@ -6274,6 +6333,10 @@ void commandAction(char *umsg_text, bool ble)
                 msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
                 (msgstoreNotice()?"on":"off"));
 #endif
+
+            // Sender-side DM retry ladder, "Enhanced message transport
+            // protection" -- every board (docs/dm-stage1-plan-20260914.md).
+            printfdeb("...DMRETRY mode=%s\n", dmRetryModeName(dmRetryMode()));
 
             for(int ig=0;ig<6;ig++)
             {

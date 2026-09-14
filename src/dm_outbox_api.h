@@ -59,6 +59,14 @@ struct DmOutboxEnv
 
 void dmOutboxInit(const struct DmOutboxEnv *env, uint8_t slots);
 
+// Firmware-side wiring (src/dm_outbox_glue.cpp): installs the real
+// DmOutboxEnv and calls dmOutboxInit() with the board's slot count (5 on
+// ESP32-S3/nRF52840, 3 on classic ESP32). Every board -- unlike msgstore's
+// store-node role, the outbox is the sender side and compiles everywhere.
+// Not called from anywhere in this wave's files; the boot-time call site is
+// the orchestrator's (see docs/dm-stage1-plan-20260914.md section 6).
+void dmOutboxGlueInit(void);
+
 // sendMessage() after attempt 1 is enqueued: returns the slot, or -1 when full (the caller refuses the DM).
 int  dmOutboxAdd(uint16_t nnn, const char *dst, const char *payload, size_t len,
                  uint8_t max_hop, uint32_t first_id, enum DmRetryMode mode);

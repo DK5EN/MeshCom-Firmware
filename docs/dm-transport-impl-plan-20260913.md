@@ -6,13 +6,13 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 
 ## Stage status log
 
-| Stage | Content                                 | Status                                                                                                                                                |
-| ----- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                                  |
-| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                                                                      |
-| 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below)                                           |
-| 3     | Store node + mailbox GUI                | **code in tree 2026-09-14** (59f21e5b + rework 96050d72), advisor re-check pending; bench T-3.1..T-3.9 open                                           |
-| 4     | Sender-visible custody notice           | **in tree 2026-09-14** (66dea241 + rework 150b0a4a), advisor APPROVED; bench T-4.1..T-4.7 open; client guide docs/client-integration-store-forward.md |
+| Stage | Content                                 | Status                                                                                                                                                                                     |
+| ----- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                                                                       |
+| 1     | Outbox + the 9-send ladder              | **in tree 2026-09-14** behind `--dmretry off\|3\|9` (default off, "Enhanced message transport protection"); docs/dm-stage1-plan-20260914.md; gate/advisor pending, bench T-1.1..T-1.9 open |
+| 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below)                                                                                |
+| 3     | Store node + mailbox GUI                | **code in tree 2026-09-14** (59f21e5b + rework 96050d72), advisor re-check pending; bench T-3.1..T-3.9 open                                                                                |
+| 4     | Sender-visible custody notice           | **in tree 2026-09-14** (66dea241 + rework 150b0a4a), advisor APPROVED; bench T-4.1..T-4.7 open; client guide docs/client-integration-store-forward.md                                      |
 
 Resume rule: this table is the authority. A compacted or interrupted session reads it, not the
 git log.

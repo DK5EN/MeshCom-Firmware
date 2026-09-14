@@ -1,6 +1,6 @@
 // dm_settings.h -- sender-side DM transport settings, every board.
 //
-// docs/dm-stage1-plan-20260914.md: `--dmretry off|3|9` ("Enhanced message
+// docs/dm-stage1-plan-20260914.md: `--dmretry off|3|9` ("Enhanced message transport
 // protection"). Persisted per T13 outside struct s_meshcom_settings: ESP32
 // NVS key "dm_retry", nRF52 own file "/dm.cfg". Default off, which leaves the
 // sender byte-identical to today (no outbox at all).

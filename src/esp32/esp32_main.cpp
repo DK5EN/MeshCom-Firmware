@@ -130,6 +130,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include "msgstore_api.h"
 #include "msgstore_settings.h"
 #endif
+#include "dm_settings.h"
+#include "dm_outbox_api.h"
 #include <loop_functions_extern.h>
 #include <test_inject.h>
 #include <command_functions.h>
@@ -816,6 +818,9 @@ void esp32setup()
     msgstoreGlueInit();
     msgstoreSettingsLoad();
 #endif
+    // S1: sender-side DM transport -- persisted --dmretry, then the outbox glue (every board)
+    dmSettingsLoad();
+    dmOutboxGlueInit();
 
     bool bClear = false;
     if(meshcom_settings.node_cleanflash == 1)
@@ -2160,6 +2165,7 @@ void esp32loop()
 #if defined(ENABLE_MSGSTORE)
             msgstoreLoop();   // S3: the main radio tick (advisor F1: the EXTERNAL_RADIO tick below is not it)
 #endif
+            dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
             // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring
             // entries here, in the main-loop tick -- NOT in getNextTxSlot(),
             // which also runs on the nRF52 timer task (Advisor F1).
@@ -4105,6 +4111,7 @@ void esp32loop()
 #if defined(ENABLE_MSGSTORE)
         msgstoreLoop();   // S3: all mailbox work runs here, in the loop task
 #endif
+        dmOutboxLoop();   // S1: retry ladder, folds due attempts into the TX ring
         retransmit_timer = millis();
     }
 

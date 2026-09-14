@@ -11,6 +11,8 @@
 #include "reack_limiter.h"
 #include "dm_stats.h"
 #include "dm_dedup.h"
+#include "dm_outbox_api.h"   // S1: stage 1 outbox/retry ladder
+#include "dm_settings.h"     // S1: dmRetryMode()
 #include "instrument.h"
 #include "sto_notice.h"     // stage 4 custody notice, sender side -- platform-neutral, every board
 #if defined(ENABLE_MSGSTORE)
@@ -914,6 +916,16 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
             if(icheck >= 0) // own msg_id
             {
+                // S1: own frame heard relayed -- mode-independent, cheap
+                // (dmOutboxOnEcho() only matches entries the outbox itself
+                // is tracking, a no-op for every non-DM own_msg_id hit).
+                // Unconditional on msg_type_b_lora/own_msg_id[][4] below:
+                // the outbox needs to know the moment attempt 1 (or the
+                // current attempt) is heard relayed, not gated on whether
+                // the phone status frame below has already fired once.
+                if(msg_type_b_lora == MSG_TYPE_TEXT)
+                    dmOutboxOnEcho(aprsmsg.msg_id);
+
                 // Status frame to the phone is origin-gated: own_msg_id[] also holds
                 // foreign msg_ids that a gateway only forwarded from the server to LoRa
                 // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
@@ -1122,6 +1134,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             if(dmSlot >= 0 && bDisplayRetx)
                                                 printfdeb("\n[RETX] DM-ACK for retid:%i stop retransmit msg-id:%08X\n",
                                                             dmSlot, msg_counter);
+
+                                            // S1: the destination's ack (own DM, matched on NNN,
+                                            // never on a reconstructed msg_id -- T1) stops the
+                                            // outbox's ladder. The phone's 0x02 status frame was
+                                            // already sent above (plen for msg_counter ==
+                                            // first_id whenever this is the ack for attempt 1);
+                                            // dmOutboxOnAck() deliberately does not send a second
+                                            // one, see its comment in dm_outbox.cpp.
+                                            dmOutboxOnAck(aprsmsg.msg_source_call.c_str(), (uint16_t)(iAckId & 0x3FF));
                                         }
 
                                         addBLEOutBuffer(print_buff, plen);
@@ -1138,6 +1159,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
 
                                         int iStoCheck = checkOwnTx(msg_counter);
+
+                                        // S1 (D3): informational only, never stops the ladder --
+                                        // independent of the rate-limited phone-frame branch below.
+                                        if(iStoCheck >= 0)
+                                            dmOutboxOnHeld(stoNnn);
+
                                         if(iStoCheck >= 0 &&
                                            (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
                                            stoHolderNote(msg_counter, aprsmsg.msg_source_call.c_str(), stoNnn, millis()))
@@ -1268,10 +1295,30 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // fresh-id attempts will need a different tell.)
                                 int iMboxTagPos = aprsmsg.msg_payload.indexOf("{", 1);
                                 uint16_t mboxTagNnn = (iMboxTagPos > 0) ? (uint16_t)(aprsmsg.msg_payload.substring(iMboxTagPos + 1)).toInt() : 0;
+
+                                // S1 (docs/dm-stage1-plan-20260914.md section 5): the old tell,
+                                // "hop 0 + comma in path + (msg_id & 0x3FF) != NNN", also matches
+                                // a stage 1 fresh-id ladder attempt -- its msg_id is millis()-based
+                                // too, so the low bits never equal NNN either. Replaced with the
+                                // path shape a store node's own delivery actually has: exactly two
+                                // calls in msg_source_path (glueDeliver() appends itself to the
+                                // sender's own single-call path), and the last one is not the
+                                // frame's source -- a sender's own frame (ladder or attempt 1)
+                                // keeps a single-call path unless relayed, and a relayed frame is
+                                // hop > 0 in the common case (the exhausted-hop-count case stays a
+                                // false positive, accepted: it only cancels one ladder cycle).
+                                int iMboxPathComma1 = aprsmsg.msg_source_path.indexOf(',');
+                                int iMboxPathComma2 = (iMboxPathComma1 >= 0)
+                                                           ? aprsmsg.msg_source_path.indexOf(',', iMboxPathComma1 + 1)
+                                                           : -1;
+                                bool bMboxPathTwoCalls = (iMboxPathComma1 > 0 && iMboxPathComma2 < 0);
+                                String strMboxPathLastCall = bMboxPathTwoCalls
+                                                                  ? aprsmsg.msg_source_path.substring(iMboxPathComma1 + 1)
+                                                                  : String("");
                                 bool bMboxPeerDelivery = (rly_hop == 0 &&
-                                                          aprsmsg.msg_source_path.indexOf(',') >= 0 &&
-                                                          iMboxTagPos > 0 &&
-                                                          (aprsmsg.msg_id & 0x3FF) != mboxTagNnn);
+                                                          bMboxPathTwoCalls &&
+                                                          strMboxPathLastCall != aprsmsg.msg_source_call &&
+                                                          iMboxTagPos > 0);
 
                                 int iMboxAckPos = aprsmsg.msg_payload.indexOf(":ack");
 

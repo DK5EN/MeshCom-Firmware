@@ -17,11 +17,11 @@ Draft for review, 2026-09-14. Not approved, nothing in code. Derived from stage 
 
 One setting, three values, on every board:
 
-| `--dmretry` | GUI label "Enhanced message protection" | Behaviour                                                                 |
-| ----------- | --------------------------------------- | ------------------------------------------------------------------------- |
-| `off`       | off (default)                           | exactly today: three same-id retries 40 s apart, byte-identical frames    |
-| `3`         | 3 attempts                              | attempt 1 as today; attempts 2 and 3 with a fresh msg_id; stop all on ACK |
-| `9`         | 9 attempts                              | the D5 ladder: (3 x 40 s + 1 min) x 3, nine transmissions in nine minutes |
+| `--dmretry` | GUI label "Enhanced message transport protection" | Behaviour                                                                 |
+| ----------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| `off`       | off (default)                                     | exactly today: three same-id retries 40 s apart, byte-identical frames    |
+| `3`         | 3 attempts                                        | attempt 1 as today; attempts 2 and 3 with a fresh msg_id; stop all on ACK |
+| `9`         | 9 attempts                                        | the D5 ladder: (3 x 40 s + 1 min) x 3, nine transmissions in nine minutes |
 
 Applies to user-originated DMs only (destination is a callsign, payload carries `{NNN`). Groups,
 broadcasts, positions and ACKs are untouched (D6). Default off means the release changes nothing
@@ -173,3 +173,19 @@ advisor pass, then on the bench with `--dmretry 9` on the sender and `off` on a 
 4. **No separate outbox rate limit.** The TX ring is the transmit queue; attempts are folded into
    it one by one as ordinary slots, the ring decides when they go on air.
 5. **Mode `off` means no outbox at all**, legacy path untouched.
+
+## S1-1 implementation notes (2026-09-14)
+
+- Modules: `src/dm_outbox.{cpp}` behind `src/dm_outbox_api.h` (22 native cases), glue
+  `src/dm_outbox_glue.cpp` (5 slots on S3/nRF52840, 3 on classic ESP32), settings
+  `src/dm_settings.{h,cpp}` (NVS key `dm_retry`, nRF52 file `/dm.cfg`, native no-op).
+- `sendMessage()`: in mode 3/9 a DM is refused with the QRT-style notice and `[OUTBOX];refuse;full`
+  when no slot is free, else attempt 1 is enqueued with ring retransmission disabled and the entry
+  registered. Mode off touches nothing.
+- Receive side: echo, ack and held hooks only when the mode is not off; the ack site's own 0x02
+  frame stands, the outbox only stops the ladder. The stage 3 peer-delivery tell is now the path
+  shape (two calls, last differs from the source).
+- The echo gate decides at attempt 2 (due at 40 s), so the 15 s constant in the contract header is
+  documentary only.
+- Loop: `dmOutboxLoop()` next to `updateRetransmissionStatus()` in both platform mains (ESP32: the
+  `bRadio` tick and the external-radio tick), `OUTBOX` setlog line after `MBOX` when the mode is on.

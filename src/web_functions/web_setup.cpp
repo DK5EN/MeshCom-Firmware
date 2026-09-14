@@ -6,6 +6,7 @@ This file contains all web-based setup functions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <string>
+#include <dm_settings.h> // stage 1: dmretry setparam mapping, every board
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots setparam mapping
 #endif
@@ -504,6 +505,17 @@ void webSetup_setParam(setupStruct *setupData){
         return;
     } else
 
+    // Stage 1 (docs/dm-stage1-plan-20260914.md): "Enhanced message transport protection", every board --
+    // through commandAction() like every other setting here, so the web GUI and the serial
+    // console can never drift apart (same discipline as maxhop/HL-01, store above).
+    if(setupData->paramName.equals("dmretry")) {
+        snprintf(message_text, sizeof(message_text), "--dmretry %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (strcmp(dmRetryModeName(dmRetryMode()), setupData->paramValue.c_str())==0)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = dmRetryModeName(dmRetryMode());
+        return;
+    } else
+
     #if defined(ENABLE_MSGSTORE)
     // Stage 3 store node (docs/dm-stage3-wave-plan-20260914.md): four commands owned by sibling
     // C (command_functions.cpp), reached from the mailbox setup card the same way every other
@@ -963,6 +975,11 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("netconsole")) {
         setupData->returnValue = bNETCONSOLE?"on":"off";
+        return;
+    }
+
+    if(setupData->paramName.equals("dmretry")) {
+        setupData->returnValue = dmRetryModeName(dmRetryMode());
         return;
     }
 

@@ -30,6 +30,8 @@
 #include "charset_filter.h"
 #include "setlog_lines.h"
 #include "dm_stats.h"
+#include "dm_outbox_api.h"   // S1: stage 1 outbox/retry ladder
+#include "dm_settings.h"     // S1: dmRetryMode()
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"
 #endif
@@ -3246,6 +3248,11 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
             setlogPrint(dmbuf);
         }
 #endif
+        if(dmRetryMode() != DM_RETRY_OFF)
+        {
+            dmOutboxFormatLine(dmbuf, sizeof(dmbuf));   // S1: OUTBOX line, same gate
+            setlogPrint(dmbuf);
+        }
     }
 }
 
@@ -4094,6 +4101,21 @@ int sendMessage(char *msg_text, int len)
         return BP_SEND_REFUSED;
     }
 
+    // S1 (docs/dm-stage1-plan-20260914.md section 3, decision 3): the stage 1
+    // outbox refuses a DM outright when it has no free slot, the same way
+    // the BP-01/BP-07 check above refuses one -- before any side effect
+    // (node_msgid++, save_settings(), insertOwnTx(), addLoraRxBuffer()) has
+    // happened, so a refused message does not consume a message id either.
+    // Mode off: dmOutboxHasRoom() is never consulted (short-circuit on
+    // dmRetryMode()), sendMessage() stays byte-identical to today (T-1.7).
+    if(bDM && dmRetryMode() != DM_RETRY_OFF && !dmOutboxHasRoom())
+    {
+        Serial.printf("[OUTBOX];refuse;full\n");
+        dmstat_outbox_full.fetch_add(1);
+        bpEmitNack(BP_NACK_QRT, bp_origin, bp_origin_dst, strMsg.c_str());
+        return BP_SEND_REFUSED;
+    }
+
     // N-22: siehe Kommentar bei msg_text_check oben — auf nRF52 in BSS,
     // encodeAPRS() beschreibt den Puffer bei jedem Aufruf vollstaendig.
 #if defined(NRF52_SERIES)
@@ -4165,6 +4187,8 @@ int sendMessage(char *msg_text, int len)
     {
         if(aprsmsg.msg_payload.startsWith("{CET}") || aprsmsg.msg_payload.startsWith("{MCP}") || aprsmsg.msg_payload.startsWith("{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
+        else if(bDM && dmRetryMode() != DM_RETRY_OFF)
+            user_msg_status = 0xFF; // S1: the outbox's own ladder replaces the ring's 3x40s retry
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
     }
@@ -4255,6 +4279,20 @@ int sendMessage(char *msg_text, int len)
         addLoraRxBuffer(aprsmsg.msg_id, true);
     else
         addLoraRxBuffer(aprsmsg.msg_id, false);
+
+    // S1: register this DM with the stage 1 outbox -- attempt 1 was just
+    // enqueued above (user_msg_status 0xFF), dmOutboxAdd() only records it
+    // as sent and schedules attempt 2. nnn is recovered from the low 10
+    // bits of aprsmsg.msg_id (meshcom_settings.node_msgid already advanced
+    // above), the same reconstruction lora_functions.cpp uses for an
+    // incoming :ackNNN/:stoNNN. Mode off: never called, sendMessage() stays
+    // byte-identical to today (T-1.7); full was already refused earlier.
+    if(bDM && dmRetryMode() != DM_RETRY_OFF)
+    {
+        dmOutboxAdd((uint16_t)(aprsmsg.msg_id & 0x3FF), strDestinationCall.c_str(),
+                    strMsg.c_str(), strMsg.length(), aprsmsg.max_hop, aprsmsg.msg_id,
+                    dmRetryMode());
+    }
 
     // BP-01/BP-08: the ring accepted the frame above (w < 0 already returned
     // early), so this call always signals success -- the new depth after
