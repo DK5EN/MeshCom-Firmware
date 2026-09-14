@@ -10,6 +10,7 @@
 #include "setlog_lines.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
+#include "dm_dedup.h"
 #include "instrument.h"
 
 #ifdef SX127X
@@ -1112,25 +1113,56 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                             bNewLine=true;
                                         }
 
-                                        // 0.2: seed the re-ACK limiter with the original ack, so the
-                                        // relayed copy of this DM (a duplicate seconds from now) is
-                                        // not acked twice; the sender's 40 s retry still is.
-                                        reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis());
-                                        SendAckMessage(aprsmsg.msg_source_call, iAckId);
+                                        // 2.1: second dedup layer, keyed on (source call, NNN).
+                                        // Stage 1's retry ladder (not yet built) mints a FRESH
+                                        // msg_id for attempts 2..9 of the same DM, so the msg_id
+                                        // ring above (addLoraRxBuffer(), line ~991) sees each as
+                                        // new -- this catches the repeat before it is displayed
+                                        // or forwarded to the app a second time. Stripped payload
+                                        // computed here, before the mutating substring() below.
+                                        String strippedPayload = aprsmsg.msg_payload.substring(0, iEnqPos);
 
-                                        aprsmsg.msg_payload = aprsmsg.msg_payload.substring(0, iEnqPos);
-                                        
-                                        uint8_t tempRcvBuffer[255];
+                                        if(dmDedupCheck(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId,
+                                                        strippedPayload.c_str(), strippedPayload.length(),
+                                                        millis()) == DM_DEDUP_DUP)
+                                        {
+                                            // Duplicate by (call, NNN, payload): re-ack, rate
+                                            // limited the same way as the msg_id-dup path below
+                                            // (~:1632), but do not display or forward again --
+                                            // mheard and the msg_id ring already saw this frame.
+                                            if(reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis()))
+                                            {
+                                                SendAckMessage(aprsmsg.msg_source_call, iAckId);
+                                                dmstat_reack.fetch_add(1);
+                                            }
+                                            else
+                                                dmstat_reack_limited.fetch_add(1);
 
-                                        uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
+                                            if(bDisplayInfo)
+                                                printfdeb("[DMDUP] from %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), (unsigned)iAckId);
+                                        }
+                                        else
+                                        {
+                                            // 0.2: seed the re-ACK limiter with the original ack, so the
+                                            // relayed copy of this DM (a duplicate seconds from now) is
+                                            // not acked twice; the sender's 40 s retry still is.
+                                            reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis());
+                                            SendAckMessage(aprsmsg.msg_source_call, iAckId);
 
-                                        queueDisplayText(aprsmsg, rssi, snr);
+                                            aprsmsg.msg_payload = strippedPayload;
 
-                                        if(bDisplayVia)
-                                            printfdeb("[MESHx]...SRC-PATH:%s ... DST-PATH:%s TEXT:%s\n", aprsmsg.msg_source_path.c_str(), aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
+                                            uint8_t tempRcvBuffer[255];
+
+                                            uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
+
+                                            queueDisplayText(aprsmsg, rssi, snr);
+
+                                            if(bDisplayVia)
+                                                printfdeb("[MESHx]...SRC-PATH:%s ... DST-PATH:%s TEXT:%s\n", aprsmsg.msg_source_path.c_str(), aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
 
 
-                                        addBLEOutBuffer(tempRcvBuffer, tempsize);
+                                            addBLEOutBuffer(tempRcvBuffer, tempsize);
+                                        }
                                     }
                                     else
                                     {

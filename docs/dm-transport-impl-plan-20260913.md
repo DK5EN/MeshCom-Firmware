@@ -6,13 +6,13 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 
 ## Stage status log
 
-| Stage | Content                                 | Status                                                                                               |
-| ----- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open |
-| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                     |
-| 2     | Destination dedup + bounded ACK repeats | not started                                                                                          |
-| 3     | Store node + mailbox GUI                | not started                                                                                          |
-| 4     | Sender-visible custody notice           | deferred, not planned                                                                                |
+| Stage | Content                                 | Status                                                                                                                                                          |
+| ----- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                                            |
+| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                                                                                |
+| 2     | Destination dedup + bounded ACK repeats | **2.1 dispatched 2026-09-14** (pulled ahead of stage 1: receivers must understand fresh-id attempts before any sender emits them); **2.2 deferred** (see below) |
+| 3     | Store node + mailbox GUI                | not started                                                                                                                                                     |
+| 4     | Sender-visible custody notice           | deferred, not planned                                                                                                                                           |
 
 Resume rule: this table is the authority. A compacted or interrupted session reads it, not the
 git log.
@@ -251,7 +251,23 @@ CRC of the stripped payload before suppressing a display.
 Hook **both** receive paths — LoRa and server/GATE — or a DM arriving by two routes still displays
 twice (advisor M6). A duplicate is never displayed, never forwarded twice, and **always re-acked**.
 
-### 2.2 Bounded ACK repeats
+**Implementation notes (2026-09-14):** module `src/dm_dedup.{h,cpp}` (16 slots, keyed on source
+call + NNN, aged 1 h, payload length + 16 bits of CRC32; a same-NNN different-payload sighting
+counts as the counter having wrapped and replaces the entry). Hooked in three places, one table:
+LoRa RX in `OnRxDone()`, the ESP32 server path in `getMeshComUDPpacket()`, and the RAK4631
+Ethernet gateway path in `src/nrf52/nrf_eth.cpp`, which is a hand-duplicated twin of the ESP32
+server path and would otherwise have displayed every attempt. A duplicate is re-acked through the
+stage 0 limiter, not displayed, not forwarded to the app; mheard and the msg_id ring still see the
+frame. The limiter table moved from the header into `src/reack_limiter.cpp` so all three paths
+share one 30 s window per (call, NNN). Test `test/test_dm_dedup` (11 cases).
+
+### 2.2 Bounded ACK repeats — deferred (2026-09-14)
+
+Not built. With stage 0 in place a lost ACK is repaired by the sender's own 40 s retry plus the
+receiver's re-ACK, driven by an actual signal that the ACK did not arrive. Blind repeats would add
+up to two ACKs to every DM on a two-node link, where the echo stop never triggers, for a loss case
+that is already covered. Revisit only if the stage 1 measurements show ACK loss the retry path
+does not close.
 
 ACKs are enqueued `RING_STATUS_DONE` and never retransmitted (`src/loop_functions.cpp:4972-4975`),
 so this needs its own small scheduler, not the ring's retransmit path.

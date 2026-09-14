@@ -12,6 +12,9 @@
 #include <loop_functions_extern.h>
 #include <dedup_functions.h>
 #include "ack_attribution.h"
+#include "reack_limiter.h"
+#include "dm_stats.h"
+#include "dm_dedup.h"
 #include <lora_functions.h>
 #include <time_functions.h>
 #include <lora_setchip.h>
@@ -386,6 +389,12 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 unsigned int iAckId = 0;
 
+                // 2.1: default for every path through this block except the
+                // dedup-covered one set below (a DM addressed to this node,
+                // iEnqPos > 0) -- groups and `*` are out of scope (D6) and
+                // keep today's unconditional behaviour.
+                bool bDmDedupNew = true;
+
                 int iAckPos=aprsmsg.msg_payload.indexOf(":ack");
                 int iRefPos=aprsmsg.msg_payload.indexOf(":rej");
                 int iEnqPos=aprsmsg.msg_payload.indexOf("{", 1);
@@ -429,9 +438,22 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
                 {
                   iAckId = (aprsmsg.msg_payload.substring(iEnqPos+1)).toInt();
                   aprsmsg.msg_payload = aprsmsg.msg_payload.substring(0, iEnqPos);
+
+                  // 2.1: second dedup layer, source-call + NNN, same table
+                  // the LoRa RX path (lora_functions.cpp) writes to -- so a
+                  // DM heard by LoRa and by the server displays and forwards
+                  // only once (advisor M6). msg_payload above is already the
+                  // stripped payload (no trailing "{NNN" tag).
+                  if(strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(dmDedupCheck(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId,
+                                      aprsmsg.msg_payload.c_str(), aprsmsg.msg_payload.length(),
+                                      millis()) == DM_DEDUP_DUP)
+                          bDmDedupNew = false;
+                  }
                 }
 
-                if(iAckPos <= 0)
+                if(iAckPos <= 0 && bDmDedupNew)
                 {
                   sendDisplayText(aprsmsg, 99, 0);
                 }
@@ -447,15 +469,41 @@ void getMeshComUDPpacket(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
 
                 uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                addBLEOutBuffer(tempRcvBuffer, tempsize);
+                if(bDmDedupNew)
+                    addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                 bBLELoopOut=false;
 
-                // DM message for lokal Node 
+                // DM message for lokal Node
                 if(iAckId > 0)
                 {
                   strSource_call = source_call;
-                  SendAckMessage(strSource_call, iAckId);
+
+                  if(iEnqPos > 0 && strcmp(destination_call, meshcom_settings.node_call) == 0)
+                  {
+                      if(bDmDedupNew)
+                      {
+                          // mirror the LoRa path: seed the re-ACK limiter with
+                          // the original ack, then ack unconditionally.
+                          reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis());
+                          SendAckMessage(strSource_call, iAckId);
+                      }
+                      else
+                      {
+                          if(reackAllowed(aprsmsg.msg_source_call.c_str(), (uint16_t)iAckId, millis()))
+                          {
+                              SendAckMessage(strSource_call, iAckId);
+                              dmstat_reack.fetch_add(1);
+                          }
+                          else
+                              dmstat_reack_limited.fetch_add(1);
+
+                          if(bDisplayInfo)
+                              printfdeb("[DMDUP] from %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), (unsigned)iAckId);
+                      }
+                  }
+                  else
+                      SendAckMessage(strSource_call, iAckId);
                 }
             }
           }
