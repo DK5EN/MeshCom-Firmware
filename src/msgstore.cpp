@@ -712,3 +712,8 @@ int msgstoreFormatLine(char *buf, size_t n)
         return 0;
     return ((size_t)len >= n) ? (int)(n - 1) : len;
 }
+
+// ---- stage 4 (orchestrator stub, owner A replaces) ----
+static bool s_notice_on = true;
+void msgstoreSetNotice(bool on) { s_notice_on = on; }
+bool msgstoreNotice(void) { return s_notice_on; }

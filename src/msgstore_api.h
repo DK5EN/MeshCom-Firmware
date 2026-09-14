@@ -52,6 +52,7 @@ struct MsgStoreEntry
     uint8_t  attempt;                  // 0..9 within the current ladder cycle
     uint8_t  cycles;                   // completed ladder cycles
     uint8_t  state;                    // MsgStoreState
+    uint8_t  notice;                   // stage 4: 0 none, 1 pending (send :sto to the sender), 2 sent
     uint8_t  gen;                      // bumped on every hook-driven mutation of this
                                         // slot (purge, refresh/replace, peer cancel,
                                         // presence, any transition to FREE); msgstoreLoop()
@@ -65,7 +66,8 @@ struct MsgStoreCounters
 {
     uint32_t stored, refreshed, delivered, purged_ack,
              dropped_storetime, dropped_cap, dropped_slots,
-             cancelled_peer, blocked_bp;
+             cancelled_peer, blocked_bp,
+             notified, notice_blocked;   // stage 4: :sto notices sent / refused by the caps
 };
 
 // Environment the core runs against. All pointers required except log.
@@ -79,12 +81,17 @@ struct MsgStoreEnv
     uint32_t    (*random_between)(uint32_t lo, uint32_t hi);
     bool        (*deliver)(const struct MsgStoreEntry *e);  // build + enqueue one frame at hop 0; true if enqueued
     void        (*log)(const char *line);                   // may be NULL
+    // Stage 4, LAST on purpose so positional initialisers of older glue/tests
+    // leave it NULL: build + enqueue the :sto text to e->src at max_hop_text.
+    bool        (*notify)(const struct MsgStoreEntry *e);   // stage 4: build + enqueue the :sto text to e->src at max_hop_text; may be NULL
 };
 
 // ---- lifecycle / configuration (C writes, A reads) ----
 void          msgstoreInit(const struct MsgStoreEnv *env);
 void          msgstoreConfigure(enum MsgStoreMode mode, uint8_t slots, uint16_t hold_hours);
 void          msgstoreSetList(const char *csv);          // list mode, "CALL1,CALL2,..."
+void          msgstoreSetNotice(bool on);                // stage 4: --storenotice on|off (default on)
+bool          msgstoreNotice(void);
 enum MsgStoreMode msgstoreMode(void);
 uint8_t       msgstoreSlots(void);
 uint16_t      msgstoreHoldHours(void);

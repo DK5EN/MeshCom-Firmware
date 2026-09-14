@@ -19,6 +19,7 @@
 //   [1..4]   msg_id, little endian
 //   [5]      Status 0x00 Node ACK (heard) / 0x01 Gateway bzw. Server / 0x02 Peer ACK /
 //            0x03 Failed (Stage 0.3, D8: der Retransmit-Ladder hat aufgegeben,
+//            0x04 Held (Stage 4: ein Store-Node haelt die DM, Rufzeichen im Anhang) /
 //            nutzerinitiierte DM, siehe updateRetransmissionStatus() in
 //            lora_functions.cpp)
 //   [6]      n = Laenge des Anhangs, 0 = altes Format (byteidentisch mit frueher)
@@ -30,6 +31,11 @@
 // Stage 0.3 (D8): give-up status, user-originated DMs only. See the BLE
 // layout comment above; buildAckPhoneFrame() itself is unchanged.
 #define ACK_STATUS_FAILED      0x03
+// Stage 4 (docs/dm-stage4-plan-20260914.md): a store node holds the DM for an
+// absent destination and said so with a `:stoNNN` text; the attribution field
+// carries the holder's callsign. Not final: the destination's ack still flips
+// the message to 0x02.
+#define ACK_STATUS_HELD        0x04
 
 #define ACK_WIRE_BASE_LEN      12
 #define ACK_WIRE_APPENDIX_LEN  3
