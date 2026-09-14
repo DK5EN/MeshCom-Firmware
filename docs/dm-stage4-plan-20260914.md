@@ -147,3 +147,19 @@ string scan, advisor pass, then:
 4. **Status `0x04`, attribution = holder.** No objection from the app side; a useful extension of
    the protocol. mc-chat and MCProxy follow.
 5. **Ordering:** now, before the bench and stage 1.
+
+## S4-1 implementation notes (2026-09-14)
+
+- Frame from `glueNotify()`: source and path = store node, destination = the DM's sender,
+  `max_hop` from `max_hop_text`, msg_id = millis, enqueued READY then DONE like a delivery, never
+  `insertOwnTx()`, never uploaded. A pending notice pre-empts the ladder pick for that one tick
+  and counts as one mailbox action.
+- Sender side compiles on every board (`src/sto_notice.cpp` is platform-neutral): `:sto` is
+  parsed between the `:ack`/`:rej` branch and the `{NNN` branch of the DM-for-me path, the frame
+  is consumed there (no display, no phone text, no ack), `own_msg_id[][4] = 0x04` only from 0x00,
+  0x01 or 0x04, one phone frame per (holder, NNN) per hour, holder table 16 entries for the GUI
+  mark, cleared on the destination's ack. Give-up on a held message counts `giveuph=` in the DM
+  line instead of sending 0x03.
+- Settings: NVS key `store_notice` on ESP32, `/msgstore.cfg` v2 (`MBX2`) on nRF52 with v1 still
+  readable. `--storenotice on|off`, default on.
+- Tests: `test_sto_notice` 24 cases, `test_msgstore` 51, `test_dm_stats` updated.

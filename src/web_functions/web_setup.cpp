@@ -540,6 +540,14 @@ void webSetup_setParam(setupStruct *setupData){
         setupData->returnValue = String(msgstoreSlots());
         return;
     } else
+
+    if(setupData->paramName.equals("storenotice")) {
+        snprintf(message_text, sizeof(message_text), "--storenotice %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (msgstoreNotice() == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = msgstoreNotice()?"on":"off";
+        return;
+    } else
     #endif
 
     /// ###################################### MCPIO ######################################
@@ -976,6 +984,11 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("storeslots")) {
         setupData->returnValue = String(msgstoreSlots());
+        return;
+    }
+
+    if(setupData->paramName.equals("storenotice")) {
+        setupData->returnValue = msgstoreNotice()?"on":"off";
         return;
     }
     #endif

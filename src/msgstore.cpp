@@ -33,8 +33,9 @@ static enum MsgStoreMode s_mode   = MSGSTORE_OFF;
 static uint8_t           s_slots  = MSGSTORE_SLOTS_DEFAULT;
 static uint16_t          s_hold_h = MSGSTORE_HOLD_DEFAULT_H;
 static char              s_list[MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX] = {0};
+static bool              s_notice_on = true;   // stage 4: --storenotice, default on
 
-static struct MsgStoreCounters s_cnt = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static struct MsgStoreCounters s_cnt = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Ring of the last MSGSTORE_ACTION_RING_SIZE (== 20) mailbox action
 // timestamps, so "actions in the trailing hour" never needs an unbounded
@@ -203,7 +204,8 @@ void msgstoreConfigure(enum MsgStoreMode mode, uint8_t slots, uint16_t hold_hour
         {
             if(s_entries[i].state != MSGSTORE_FREE)
             {
-                s_entries[i].state = MSGSTORE_FREE;
+                s_entries[i].state  = MSGSTORE_FREE;
+                s_entries[i].notice = 0;   // stage 4: purge/free clears notice
                 s_capblocked[i]     = false;
                 entryTouch(i);
                 s_cnt.dropped_slots++;
@@ -265,10 +267,11 @@ void msgstoreReset(void)
 
     s_blocked_episode_active = false;
 
-    s_mode   = MSGSTORE_OFF;
-    s_slots  = MSGSTORE_SLOTS_DEFAULT;
-    s_hold_h = MSGSTORE_HOLD_DEFAULT_H;
-    s_list[0] = 0;
+    s_mode      = MSGSTORE_OFF;
+    s_slots     = MSGSTORE_SLOTS_DEFAULT;
+    s_hold_h    = MSGSTORE_HOLD_DEFAULT_H;
+    s_list[0]   = 0;
+    s_notice_on = true;   // stage 4: default on
 }
 
 // ---------------------------------------------------- receive-path events
@@ -374,6 +377,7 @@ int msgstoreStore(const char *src, const char *dst, uint16_t nnn,
         s_entries[i].attempt   = 0;
         s_entries[i].cycles    = 0;
         s_entries[i].state     = MSGSTORE_HELD;
+        s_entries[i].notice    = msgstoreNotice() ? 1 : 0;   // stage 4: new slot only
         s_capblocked[i]        = false;
         s_cnt.stored++;
         return i;
@@ -400,7 +404,8 @@ void msgstoreOnAck(const char *acker, const char *sender, uint16_t nnn)
         if(strcmp(s_entries[i].src, sender) != 0)
             continue;
 
-        s_entries[i].state = MSGSTORE_FREE;
+        s_entries[i].state  = MSGSTORE_FREE;
+        s_entries[i].notice = 0;   // stage 4: purge/free clears notice
         s_capblocked[i]     = false;
         entryTouch(i);
         s_cnt.purged_ack++;
@@ -482,7 +487,8 @@ void msgstoreLoop(void)
             else
                 s_cnt.dropped_storetime++;
 
-            s_entries[i].state = MSGSTORE_FREE;
+            s_entries[i].state  = MSGSTORE_FREE;
+            s_entries[i].notice = 0;   // stage 4: purge/free clears notice
             s_capblocked[i]     = false;
             entryTouch(i);
             continue;
@@ -494,28 +500,51 @@ void msgstoreLoop(void)
             s_entries[i].state = MSGSTORE_HELD;
     }
 
-    // (2) at most one mailbox action this call: pick the ARMED/LADDER entry
-    // with the smallest due next_ms.
-    int      candidate      = -1;
-    uint32_t candidate_next = 0;
+    // (2) stage 4: a pending notice pre-empts a ladder step this tick -- it
+    // competes with deliveries under the very same node gates below (§5:
+    // "one action; it competes with deliveries on purpose so the node
+    // ceiling stays the single bound"). Picked ahead of the ARMED/LADDER
+    // scan so a due delivery never starves a pending notice on a busy node.
+    int notice_slot = -1;
 
-    for(int i = 0; i < s_slots; i++)
+    if(s_env->notify != NULL)
     {
-        if(s_entries[i].state != MSGSTORE_ARMED && s_entries[i].state != MSGSTORE_LADDER)
-            continue;
-        // F3: due test, wrap-safe.
-        if((int32_t)(now - s_entries[i].next_ms) < 0)
-            continue;
-
-        // F3: "earlier than the current candidate", wrap-safe.
-        if(candidate < 0 || (int32_t)(s_entries[i].next_ms - candidate_next) < 0)
+        for(int i = 0; i < s_slots; i++)
         {
-            candidate      = i;
-            candidate_next = s_entries[i].next_ms;
+            if(s_entries[i].state != MSGSTORE_FREE && s_entries[i].notice == 1)
+            {
+                notice_slot = i;
+                break;
+            }
         }
     }
 
-    if(candidate < 0)
+    // (3) at most one mailbox action this call: pick the ARMED/LADDER entry
+    // with the smallest due next_ms -- skipped when a notice already claimed
+    // this tick's action.
+    int      candidate      = -1;
+    uint32_t candidate_next = 0;
+
+    if(notice_slot < 0)
+    {
+        for(int i = 0; i < s_slots; i++)
+        {
+            if(s_entries[i].state != MSGSTORE_ARMED && s_entries[i].state != MSGSTORE_LADDER)
+                continue;
+            // F3: due test, wrap-safe.
+            if((int32_t)(now - s_entries[i].next_ms) < 0)
+                continue;
+
+            // F3: "earlier than the current candidate", wrap-safe.
+            if(candidate < 0 || (int32_t)(s_entries[i].next_ms - candidate_next) < 0)
+            {
+                candidate      = i;
+                candidate_next = s_entries[i].next_ms;
+            }
+        }
+    }
+
+    if(notice_slot < 0 && candidate < 0)
     {
         s_blocked_episode_active = false;   // F7: nothing due, no episode in progress
         return;   // nothing due -- no gate check, nothing was blocked
@@ -537,16 +566,42 @@ void msgstoreLoop(void)
         // F7: count once per blocked episode (the run of due-but-refused
         // ticks), not once per 2 s tick -- a util-only block held for
         // minutes must not read as "the 20/h ceiling ate a hold time".
+        // Stage 4: a blocked pending notice counts into notice_blocked
+        // instead, same one-per-episode rule (reusing the same flag).
         if(!s_blocked_episode_active)
         {
-            s_cnt.blocked_bp++;
+            if(notice_slot >= 0)
+                s_cnt.notice_blocked++;
+            else
+                s_cnt.blocked_bp++;
             s_blocked_episode_active = true;
         }
-        s_capblocked[candidate] = true;
+        if(notice_slot < 0)
+            s_capblocked[candidate] = true;
         return;
     }
 
     s_blocked_episode_active = false;   // F7: the gate let this tick through
+
+    if(notice_slot >= 0)
+    {
+        // F4-style snapshot/gen guard, same reasoning as the delivery path
+        // below: notify() (String building + ring enqueue) can race a hook
+        // that purges/refreshes this very slot from the LORA task.
+        uint8_t gen_before = s_entries[notice_slot].gen;
+        struct MsgStoreEntry snapshot = s_entries[notice_slot];
+
+        if(!s_env->notify(&snapshot))
+            return;   // ring refused -- retry next tick, do not advance
+
+        recordAction(now);
+        s_cnt.notified++;
+
+        if(s_entries[notice_slot].state != MSGSTORE_FREE && s_entries[notice_slot].gen == gen_before)
+            s_entries[notice_slot].notice = 2;   // sent -- do not re-notify
+
+        return;
+    }
 
     if(s_env->deliver == NULL)
         return;
@@ -607,7 +662,8 @@ bool msgstorePurge(int slot)
     if(s_entries[slot].state == MSGSTORE_FREE)
         return false;
 
-    s_entries[slot].state = MSGSTORE_FREE;
+    s_entries[slot].state  = MSGSTORE_FREE;
+    s_entries[slot].notice = 0;   // stage 4: purge/free clears notice
     s_capblocked[slot]     = false;
     entryTouch(slot);
     return true;
@@ -617,7 +673,8 @@ void msgstorePurgeAll(void)
 {
     for(int i = 0; i < MSGSTORE_SLOTS_MAX; i++)
     {
-        s_entries[i].state = MSGSTORE_FREE;
+        s_entries[i].state  = MSGSTORE_FREE;
+        s_entries[i].notice = 0;   // stage 4: purge/free clears notice
         s_capblocked[i]     = false;
         entryTouch(i);
     }
@@ -700,20 +757,20 @@ int msgstoreFormatLine(char *buf, size_t n)
     // node-wide gates (30 s gap, 20/h ceiling, back-pressure, utilisation),
     // not only back-pressure.
     int len = snprintf(buf, n,
-        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u blk=%u",
+        "MBOX mode=%s used=%u/%u act=%u/20 stored=%u refr=%u deliv=%u ack=%u dropt=%u dropc=%u drops=%u peer=%u blk=%u sto=%u/%u",
         msgstoreModeName(s_mode),
         (unsigned)msgstoreUsed(), (unsigned)s_slots,
         (unsigned)msgstoreActionsLastHour(),
         (unsigned)s_cnt.stored, (unsigned)s_cnt.refreshed, (unsigned)s_cnt.delivered,
         (unsigned)s_cnt.purged_ack, (unsigned)s_cnt.dropped_storetime, (unsigned)s_cnt.dropped_cap,
-        (unsigned)s_cnt.dropped_slots, (unsigned)s_cnt.cancelled_peer, (unsigned)s_cnt.blocked_bp);
+        (unsigned)s_cnt.dropped_slots, (unsigned)s_cnt.cancelled_peer, (unsigned)s_cnt.blocked_bp,
+        (unsigned)s_cnt.notified, (unsigned)s_cnt.notice_blocked);
 
     if(len < 0)
         return 0;
     return ((size_t)len >= n) ? (int)(n - 1) : len;
 }
 
-// ---- stage 4 (orchestrator stub, owner A replaces) ----
-static bool s_notice_on = true;
+// ---- stage 4: --storenotice on|off, default on ----
 void msgstoreSetNotice(bool on) { s_notice_on = on; }
-bool msgstoreNotice(void) { return s_notice_on; }
+bool msgstoreNotice(void)       { return s_notice_on; }

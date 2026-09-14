@@ -8,6 +8,7 @@ std::atomic<uint32_t> dmstat_echo{0};
 std::atomic<uint32_t> dmstat_gw_ack{0};
 std::atomic<uint32_t> dmstat_peer_ack{0};
 std::atomic<uint32_t> dmstat_giveup{0};
+std::atomic<uint32_t> dmstat_giveup_held{0};
 std::atomic<uint32_t> dmstat_attempts{0};
 std::atomic<uint32_t> dmstat_reack{0};
 std::atomic<uint32_t> dmstat_reack_limited{0};
@@ -82,13 +83,14 @@ int dmStatFormat(char *buf, size_t n)
         rtt[i] = (unsigned)dmstat_rtt[i].exchange(0);
 
     int len = snprintf(buf, n,
-                       "DM sent=%u echo=%u gwack=%u ack=%u giveup=%u att=%u reack=%u/%u "
+                       "DM sent=%u echo=%u gwack=%u ack=%u giveup=%u giveuph=%u att=%u reack=%u/%u "
                        "rtt=%u/%u/%u/%u/%u/%u ring=enq:%u ovw:%u",
                        (unsigned)dmstat_sent.exchange(0),
                        (unsigned)dmstat_echo.exchange(0),
                        (unsigned)dmstat_gw_ack.exchange(0),
                        (unsigned)dmstat_peer_ack.exchange(0),
                        (unsigned)dmstat_giveup.exchange(0),
+                       (unsigned)dmstat_giveup_held.exchange(0),
                        (unsigned)dmstat_attempts.exchange(0),
                        (unsigned)dmstat_reack.exchange(0),
                        (unsigned)dmstat_reack_limited.exchange(0),

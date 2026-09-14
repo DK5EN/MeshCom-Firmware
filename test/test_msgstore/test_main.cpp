@@ -43,6 +43,14 @@ static char     g_deliver_last_payload[MSGSTORE_PAYLOAD_MAX + 1];
 // 20260914.md, Finding 4).
 static bool g_deliver_reentrant_ack = false;
 
+// Stage 4 fixture: a notify() fake with the same shape as fakeDeliver()
+// above, minus the F4 re-entrancy hook (no test below needs it).
+static int      g_notify_calls  = 0;
+static bool     g_notify_result = true;
+static char     g_notify_last_src[MSGSTORE_CALL_MAX];
+static char     g_notify_last_dst[MSGSTORE_CALL_MAX];
+static uint16_t g_notify_last_nnn = 0;
+
 // Jitter-range fixture (verdict "Tests" remarks): normally the fake returns
 // lo (exact timing in every other test); set true to check the hi bound too,
 // so a swapped (lo, hi) or an off-by-one in the real glueRandomBetween()
@@ -113,9 +121,26 @@ static bool fakeDeliver(const struct MsgStoreEntry *e)
 
 static void fakeLog(const char *line) { (void)line; }
 
+// Stage 4: records the entry it was handed (same shape as fakeDeliver()) and
+// answers g_notify_result -- so "notify() false retries" (verdict-precedent
+// on deliver()) and the exact entry fields can both be asserted.
+static bool fakeNotify(const struct MsgStoreEntry *e)
+{
+    g_notify_calls++;
+    if(e != NULL)
+    {
+        strncpy(g_notify_last_src, e->src, sizeof(g_notify_last_src) - 1);
+        g_notify_last_src[sizeof(g_notify_last_src) - 1] = 0;
+        strncpy(g_notify_last_dst, e->dst, sizeof(g_notify_last_dst) - 1);
+        g_notify_last_dst[sizeof(g_notify_last_dst) - 1] = 0;
+        g_notify_last_nnn = e->nnn;
+    }
+    return g_notify_result;
+}
+
 static const struct MsgStoreEnv g_env = {
     fakeNowMs, fakeOwnCall, fakeHeardAgeMs, fakeBpState, fakeUtilPct,
-    fakeRandomBetween, fakeDeliver, fakeLog
+    fakeRandomBetween, fakeDeliver, fakeLog, fakeNotify
 };
 
 void setUp(void)
@@ -136,6 +161,18 @@ void setUp(void)
     g_deliver_last_payload[0] = 0;
     g_deliver_reentrant_ack = false;
     g_random_return_hi     = false;
+
+    // Stage 4: default the flag off so every pre-existing (pre-stage-4) test
+    // above keeps its exact ladder/delivery timing -- msgstoreStore() would
+    // otherwise arm a pending notice on every single entry those tests
+    // create and let it pre-empt their first ladder step. Tests that
+    // exercise the notice path turn it on explicitly.
+    msgstoreSetNotice(false);
+    g_notify_calls  = 0;
+    g_notify_result = true;
+    g_notify_last_src[0] = 0;
+    g_notify_last_dst[0] = 0;
+    g_notify_last_nnn    = 0;
 }
 
 void tearDown(void) {}
@@ -946,7 +983,7 @@ static void test_format_line_content(void)
     int  len = msgstoreFormatLine(buf, sizeof(buf));
     TEST_ASSERT_TRUE(len > 0);
     TEST_ASSERT_EQUAL_STRING(
-        "MBOX mode=own used=0/50 act=0/20 stored=0 refr=0 deliv=0 ack=0 dropt=0 dropc=0 drops=0 peer=0 blk=0",
+        "MBOX mode=own used=0/50 act=0/20 stored=0 refr=0 deliv=0 ack=0 dropt=0 dropc=0 drops=0 peer=0 blk=0 sto=0/0",
         buf);
 
     // no semicolons -- printfdeb strips them in csv mode
@@ -956,6 +993,190 @@ static void test_format_line_content(void)
     msgstoreFormatLine(buf, sizeof(buf));
     TEST_ASSERT_NOT_NULL(strstr(buf, "used=1/50"));
     TEST_ASSERT_NOT_NULL(strstr(buf, "stored=1"));
+}
+
+// ------------------------------------------------------------ stage 4: notice
+
+static void test_new_slot_sets_notice_pending_when_enabled(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT8(1, e->notice);
+}
+
+static void test_new_slot_no_notice_when_disabled(void)
+{
+    // msgstoreSetNotice(false) is setUp()'s default.
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT8(0, e->notice);
+}
+
+static void test_refresh_does_not_rearm_notice(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->notice);
+
+    msgstoreLoop();   // sends the pending notice
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(slot)->notice);
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);
+
+    // A re-flood (same src/dst/nnn/payload) refreshes the entry, but must
+    // not re-arm a notice that already went out -- notice stays at 2, and
+    // msgstoreLoop() must not call notify() a second time for it.
+    g_now += 1000;
+    int slot2 = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_EQUAL(slot, slot2);
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(slot)->notice);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->refreshed);
+
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);   // unchanged
+}
+
+// §5: a pending notice is this tick's action, ahead of a due ladder step --
+// the two compete for the same one-action-per-tick node gate on purpose.
+static void test_loop_sends_notice_before_ladder_step(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));   // HELD -> ARMED, next_ms = now (due now)
+
+    msgstoreLoop();
+
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);
+    TEST_ASSERT_EQUAL_INT(0, g_deliver_calls);
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(slot)->notice);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_ARMED, msgstoreEntry(slot)->state);   // untouched
+    TEST_ASSERT_EQUAL_UINT8(0, msgstoreEntry(slot)->attempt);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreCounters()->delivered);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->notified);
+
+    // Next tick, clear of the 30 s node gap: the ladder step now goes
+    // through -- the notice pre-empted exactly one tick, not the ladder.
+    g_now += MSGSTORE_ACTION_GAP_MS;
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_INT(1, g_deliver_calls);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->attempt);
+}
+
+static void test_notify_receives_entry_fields(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 42, "hallo", 5);
+    (void)slot;
+
+    msgstoreLoop();
+
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);
+    TEST_ASSERT_EQUAL_STRING("OE1ABC", g_notify_last_src);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", g_notify_last_dst);
+    TEST_ASSERT_EQUAL_UINT16(42, g_notify_last_nnn);
+}
+
+static void test_notify_false_retries_without_advancing(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+
+    g_notify_result = false;
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_INT(1, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->notice);   // still pending
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreCounters()->notified);
+
+    g_notify_result = true;
+    msgstoreLoop();   // same g_now, retried
+    TEST_ASSERT_EQUAL_INT(2, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(slot)->notice);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->notified);
+}
+
+// F7-style episode counting (reused for stage 4, docs/dm-stage4-plan-
+// 20260914.md): a pending notice refused by the node gate for a run of
+// ticks counts into notice_blocked once, not once per tick.
+static void test_notice_blocked_episode_counted_once(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+
+    g_bp = 1;   // QRT: every tick refused
+    for(int i = 0; i < 5; i++)
+    {
+        msgstoreLoop();
+        g_now += 2000;
+    }
+
+    TEST_ASSERT_EQUAL_INT(0, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreCounters()->notified);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->notice_blocked);   // one episode, not five
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->notice);           // still pending
+
+    g_bp = 0;
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->notified);
+    TEST_ASSERT_EQUAL_UINT8(2, msgstoreEntry(slot)->notice);
+}
+
+static void test_ack_purge_clears_pending_notice(void)
+{
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->notice);
+
+    // The destination acks before the store node got a chance to notify.
+    msgstoreOnAck("DK5EN-9", "OE1ABC", 5);
+    TEST_ASSERT_NULL(msgstoreEntry(slot));
+
+    msgstoreLoop();   // nothing pending any more -- notify() must not fire
+    TEST_ASSERT_EQUAL_INT(0, g_notify_calls);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreCounters()->notified);
+}
+
+static void test_notice_ignored_when_env_has_no_notify(void)
+{
+    // A glue/older test env with notify == NULL (aggregate-initialised with
+    // only the first 8 fields, msgstore_api.h's documented fallback) must
+    // fall through to the ladder untouched -- never dereference a NULL
+    // notify -- even with a pending notice and msgstoreNotice() on.
+    static const struct MsgStoreEnv no_notify_env = {
+        fakeNowMs, fakeOwnCall, fakeHeardAgeMs, fakeBpState, fakeUtilPct,
+        fakeRandomBetween, fakeDeliver, fakeLog
+    };
+    msgstoreInit(&no_notify_env);
+
+    msgstoreSetNotice(true);
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->notice);   // still armed, just never sent
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));
+
+    msgstoreLoop();   // no crash; the ladder runs as if notify() did not exist
+
+    TEST_ASSERT_EQUAL_INT(1, g_deliver_calls);
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->attempt);
+    TEST_ASSERT_EQUAL_UINT32(0, msgstoreCounters()->notified);
+
+    msgstoreInit(&g_env);   // restore for the tests that follow
+}
+
+static void test_format_line_shows_sto(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, MSGSTORE_HOLD_DEFAULT_H);
+    msgstoreSetNotice(true);
+
+    char buf[200];
+    msgstoreFormatLine(buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "sto=0/0"));
+
+    msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    msgstoreLoop();   // sends the pending notice
+
+    msgstoreFormatLine(buf, sizeof(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "sto=1/0"));
 }
 
 // ------------------------------------------------------------------ NULL-safe
@@ -1049,6 +1270,17 @@ int main(int, char **)
     RUN_TEST(test_shrink_slots_frees_stranded_entries);
 
     RUN_TEST(test_format_line_content);
+
+    RUN_TEST(test_new_slot_sets_notice_pending_when_enabled);
+    RUN_TEST(test_new_slot_no_notice_when_disabled);
+    RUN_TEST(test_refresh_does_not_rearm_notice);
+    RUN_TEST(test_loop_sends_notice_before_ladder_step);
+    RUN_TEST(test_notify_receives_entry_fields);
+    RUN_TEST(test_notify_false_retries_without_advancing);
+    RUN_TEST(test_notice_blocked_episode_counted_once);
+    RUN_TEST(test_ack_purge_clears_pending_notice);
+    RUN_TEST(test_notice_ignored_when_env_has_no_notify);
+    RUN_TEST(test_format_line_shows_sto);
 
     RUN_TEST(test_null_arguments_are_safe);
 

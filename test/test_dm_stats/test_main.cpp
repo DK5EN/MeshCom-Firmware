@@ -169,6 +169,7 @@ static void test_format_exakter_string_und_reset(void)
     dmstat_gw_ack.store(2);
     dmstat_peer_ack.store(4);
     dmstat_giveup.store(1);
+    dmstat_giveup_held.store(6);
     dmstat_attempts.store(9);
     dmstat_reack.store(2);
     dmstat_reack_limited.store(1);
@@ -184,7 +185,7 @@ static void test_format_exakter_string_und_reset(void)
     int len = dmStatFormat(buf, sizeof(buf));
 
     TEST_ASSERT_EQUAL_STRING(
-        "DM sent=3 echo=1 gwack=2 ack=4 giveup=1 att=9 reack=2/1 "
+        "DM sent=3 echo=1 gwack=2 ack=4 giveup=1 giveuph=6 att=9 reack=2/1 "
         "rtt=0/1/0/0/0/0 ring=enq:50 ovw:5",
         buf);
     TEST_ASSERT_EQUAL_INT((int)strlen(buf), len);
@@ -193,7 +194,7 @@ static void test_format_exakter_string_und_reset(void)
     // dmStatFormat() hat sie per exchange(0) geleert.
     len = dmStatFormat(buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING(
-        "DM sent=0 echo=0 gwack=0 ack=0 giveup=0 att=0 reack=0/0 "
+        "DM sent=0 echo=0 gwack=0 ack=0 giveup=0 giveuph=0 att=0 reack=0/0 "
         "rtt=0/0/0/0/0/0 ring=enq:0 ovw:0",
         buf);
     TEST_ASSERT_EQUAL_INT((int)strlen(buf), len);

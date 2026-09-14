@@ -21,6 +21,7 @@
 #include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
 #include "track_warning.h"    // TRK-01: Warnhinweis-Text neben dem Track-Switch
+#include "sto_notice.h"       // stage 4: stoHolder() for the messages-page held mark, all boards
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -1646,6 +1647,7 @@ void sub_page_mailbox()
     web_client.println("<div class=\"mbx-toolbar\">");
     web_client.printf("<span class=\"mctab mctab-on\">store node: %s<span class=\"mcbadge\">%s</span></span>\n",
                        msgstoreModeName(mode), mode == MSGSTORE_OFF ? "OFF" : "ON");
+    web_client.printf("<span class=\"mctab\">notice %s</span>\n", msgstoreNotice() ? "on" : "off");
     web_client.printf("<span class=\"mctab\">slots %d / %u</span>\n", used, (unsigned)msgstoreSlots());
     web_client.printf("<span class=\"mctab\">actions this hour %u / %u</span>\n", (unsigned)msgstoreActionsLastHour(), (unsigned)MSGSTORE_ACTIONS_PER_HOUR);
     web_client.printf("<span class=\"mctab\">next action in %s</span>\n", buf_next);
@@ -1656,7 +1658,7 @@ void sub_page_mailbox()
 
     web_client.println("<div class=\"tablewrap\">");
     web_client.println("<table><thead><tr>");
-    web_client.println("<th>Destination</th><th>Last heard</th><th>Source</th><th>NNN</th><th>Size</th><th>Age</th><th>Hold left</th><th>State</th><th>Attempts</th><th>Actions</th>");
+    web_client.println("<th>Destination</th><th>Last heard</th><th>Source</th><th>NNN</th><th>Size</th><th>Age</th><th>Hold left</th><th>State</th><th>Attempts</th><th>Notified</th><th>Actions</th>");
     web_client.println("</tr></thead><tbody>");
 
     uint32_t now_ms = millis();
@@ -1732,6 +1734,7 @@ void sub_page_mailbox()
         web_client.printf("<td class=\"no-wrap\">%s</td>", buf_hold);
         web_client.printf("<td><span class=\"mbx-state %s\">%s</span></td>", state_class, msgstoreStateName(e->state));
         web_client.printf("<td>%s</td>", buf_attempt);
+        web_client.printf("<td>%s</td>", (e->notice == 2) ? "sent" : (e->notice == 1) ? "pending" : "-");
 
         web_client.println("<td class=\"mbx-actions\">");
         if (e->state == MSGSTORE_ARMED || e->state == MSGSTORE_LADDER)
@@ -1773,6 +1776,8 @@ void sub_page_mailbox()
     web_client.printf("<div><span>dropped no slot</span><b>%u</b></div>", (unsigned)cnt->dropped_slots);
     web_client.printf("<div><span>cancelled by peer</span><b>%u</b></div>", (unsigned)cnt->cancelled_peer);
     web_client.printf("<div><span>blocked by caps</span><b>%u</b></div>", (unsigned)cnt->blocked_bp);
+    web_client.printf("<div><span>notices sent</span><b>%u</b></div>", (unsigned)cnt->notified);
+    web_client.printf("<div><span>notices blocked</span><b>%u</b></div>", (unsigned)cnt->notice_blocked);
     web_client.println("</div>");
     web_client.println("<p class=\"font-small\" style=\"margin:7px;\">Same numbers as the <code>MBOX</code> setlog line. Dropped by cap and dropped no slot are two counters on purpose: the first means the 20-per-hour ceiling ate a hold time, the second means the mailbox was full.</p>");
     web_client.println("</div>");
@@ -2046,6 +2051,7 @@ void sub_page_setup()
     _create_setup_textinput_element("storecall", "Callsign list (list mode, up to 16)", msgstoreListCsv(), "OE1KBC-4,DK5EN-14", "storecall", MSGSTORE_LIST_MAX * MSGSTORE_CALL_MAX, false, false);
     _create_setup_textinput_element("storetime", "Hold time in hours (1 to 168)", String(msgstoreHoldHours()), "24", "storetime", 3, false, false);
     _create_setup_textinput_element("storeslots", "Slots (1 to 50)", String(msgstoreSlots()), "50", "storeslots", 3, false, false);
+    _create_setup_switch_element("storenotice", "Notify sender", "tell the sender when a message is held", msgstoreNotice()); // stage 4: --storenotice on|off
     web_client.println("</div>");
     web_client.printf("<div class=\"mbx-warn\"><b>Before you switch this on.</b> This node must run 24/7 on continuous power. Stored messages live in RAM only; a reboot discards all of them without notice, and nobody is told. About %.1f kB of RAM is reserved for %u slots.</div>\n",
                        (float)(msgstoreSlots() * sizeof(struct MsgStoreEntry)) / 1024.0f, (unsigned)msgstoreSlots());
@@ -2134,18 +2140,25 @@ void sub_content_messages()
             if (icheck >= 0)
             {
                 if (own_msg_id[icheck][4] == 1)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                     ccheck = "&#x2713&nbsp;";
                 }
 
                 if (own_msg_id[icheck][4] == 2)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held
                     ccheck = "&#x2611;&nbsp;";
                 }
 
                 if (own_msg_id[icheck][4] == 3)
-                { // 00...not heard, 01...heard, 02...ACK, 03...failed (retransmit gave up on a user-originated DM)
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held (retransmit gave up on a user-originated DM)
                     ccheck = "<span title=\"delivery failed\">&#x2717;</span>&nbsp;";
+                }
+
+                if (own_msg_id[icheck][4] == 4)
+                { // 00...not heard, 01...heard, 02...ACK, 03...failed, 04...held (a store node holds this DM for an absent destination)
+                    String holder = stoHolder(aprsmsg.msg_id);
+                    String holdtitle = holder.length() > 0 ? ("held by " + htmlEscape(holder)) : "held by a store node";
+                    ccheck = "<span title=\"" + holdtitle + "\">&#x2709;</span>&nbsp;";
                 }
             }
 

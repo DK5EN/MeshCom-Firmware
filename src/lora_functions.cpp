@@ -12,6 +12,7 @@
 #include "dm_stats.h"
 #include "dm_dedup.h"
 #include "instrument.h"
+#include "sto_notice.h"     // stage 4 custody notice, sender side -- platform-neutral, every board
 #if defined(ENABLE_MSGSTORE)
 #include "msgstore_api.h"   // store node (last-hop mailbox), docs/dm-stage3-wave-plan-20260914.md
 #endif
@@ -945,7 +946,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                     // 0x02 (acked) and 0x03 (failed, 0.3) are final: a late
                     // relay echo must not turn them back into "heard".
-                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03)
+                    // S4: same for 0x04 (held, docs/dm-stage4-plan-20260914.md) --
+                    // a heard echo of the original DM must not downgrade a
+                    // held message back to plain "heard".
+                    if(own_msg_id[icheck][4] != 0x02 && own_msg_id[icheck][4] != 0x03 && own_msg_id[icheck][4] != 0x04)
                         own_msg_id[icheck][4]=0x01; // 0x01 HEARD
                 }
             }
@@ -1079,6 +1083,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                     int iAckPos=aprsmsg.msg_payload.indexOf(":ack");
                                     int iEnqPos=aprsmsg.msg_payload.indexOf("{", 1);
+                                    uint16_t stoNnn=0;   // S4: filled by stoNoticeParse() below
                                     
                                     if(iAckPos > 0 || aprsmsg.msg_payload.indexOf(":rej") > 0)
                                     {
@@ -1103,6 +1108,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         {
                                             own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
 
+                                            // S4: the destination's own ack is the final word --
+                                            // forget any store node(s) that were holding this DM.
+                                            stoHolderClear(msg_counter);
+
                                             // 0.3/0.4: peer ACK for an own DM, plus the RTT sample
                                             // for the send-to-ack histogram (M0-1).
                                             dmstat_peer_ack.fetch_add(1);
@@ -1116,6 +1125,39 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         }
 
                                         addBLEOutBuffer(print_buff, plen);
+                                    }
+                                    else
+                                    if(stoNoticeParse(aprsmsg.msg_payload.c_str(), &stoNnn, NULL))
+                                    {
+                                        // S4: docs/dm-stage4-plan-20260914.md -- a store node holding
+                                        // one of our own DMs told us so. Reconstruct msg_id from NNN
+                                        // exactly like the :ack branch above; own_msg_id[][4] gains
+                                        // 0x04 = held. The frame was for us and is fully consumed
+                                        // here -- never displayed, never forwarded to the phone as
+                                        // text, never acked.
+                                        msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
+
+                                        int iStoCheck = checkOwnTx(msg_counter);
+                                        if(iStoCheck >= 0 &&
+                                           (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
+                                           stoHolderNote(msg_counter, aprsmsg.msg_source_call.c_str(), stoNnn, millis()))
+                                        {
+                                            own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                                            uint16_t stoPlen = buildAckPhoneFrame(print_buff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call.c_str());
+                                            addBLEOutBuffer(print_buff, stoPlen);
+
+                                            if(bDisplayInfo)
+                                            {
+                                                printfdeb("\n");
+                                                printfdeb("%s", getTimeString().c_str());
+                                                printfdeb("[HELD] by %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), (unsigned)stoNnn);
+                                                bNewLine=true;
+                                            }
+                                        }
+                                        // 0x02 (acked) and 0x03 (failed, 0.3) are final states and are
+                                        // never downgraded back to held; stoHolderNote()'s per-hour rate
+                                        // limit keeps a replayed notice from repeating the phone frame.
                                     }
                                     else
                                     if(iEnqPos > 0)
@@ -2372,12 +2414,25 @@ bool updateRetransmissionStatus()
                                 dmstat_giveup.fetch_add(1);
 
                                 int idx = checkOwnTx(ring_msg_id);
-                                if(idx >= 0 && own_msg_id[idx][4] != 0x02)
-                                    own_msg_id[idx][4] = 0x03;
 
-                                uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
-                                uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call.c_str());
-                                addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                // S4: a store node is holding this DM (docs/dm-stage4-plan-
+                                // 20260914.md, decision 3) -- the ladder giving up on its own
+                                // ring slot is not a failure, the message stays "held" until
+                                // the destination's real :ack flips it. Skip the 0x03 frame
+                                // and the failed mark; count it separately instead.
+                                if(idx >= 0 && own_msg_id[idx][4] == 0x04)
+                                {
+                                    dmstat_giveup_held.fetch_add(1);
+                                }
+                                else
+                                {
+                                    if(idx >= 0 && own_msg_id[idx][4] != 0x02)
+                                        own_msg_id[idx][4] = 0x03;
+
+                                    uint8_t giveupPhoneBuff[ACK_PHONE_MAX_LEN];
+                                    uint16_t giveupPlen = buildAckPhoneFrame(giveupPhoneBuff, ring_msg_id, ACK_STATUS_FAILED, giveupMsg.msg_destination_call.c_str());
+                                    addBLEOutBuffer(giveupPhoneBuff, giveupPlen);
+                                }
 
                                 if(bLORADEBUG)
                                     printfdeb("[MC-DBG] RETRANSMIT_GIVEUP_DM msg_id=%08X dest=%s\n",

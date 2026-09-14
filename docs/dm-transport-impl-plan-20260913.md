@@ -6,29 +6,29 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 
 ## Stage status log
 
-| Stage | Content                                 | Status                                                                                                      |
-| ----- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open        |
-| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                            |
-| 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below) |
-| 3     | Store node + mailbox GUI                | **code in tree 2026-09-14** (59f21e5b + rework 96050d72), advisor re-check pending; bench T-3.1..T-3.9 open |
-| 4     | Sender-visible custody notice           | deferred, not planned                                                                                       |
+| Stage | Content                                 | Status                                                                                                                                         |
+| ----- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                           |
+| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                                                               |
+| 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below)                                    |
+| 3     | Store node + mailbox GUI                | **code in tree 2026-09-14** (59f21e5b + rework 96050d72), advisor re-check pending; bench T-3.1..T-3.9 open                                    |
+| 4     | Sender-visible custody notice           | **approved and in tree 2026-09-14** (`:stoNNN` text, status 0x04); see docs/dm-stage4-plan-20260914.md; gate/advisor pending, bench T-4.x open |
 
 Resume rule: this table is the authority. A compacted or interrupted session reads it, not the
 git log.
 
 ## Decisions in force
 
-| ID  | Decision                                                                                                                                     |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Ladder is (3x40 s + 1 min) x 3 = **9 transmissions over 9 minutes**, then report failure. Rate is unconditional; no evidence gate.           |
-| D2  | Store-node delivery: direct neighbour only, **`max_hop` 0 on the raw wire field**.                                                           |
-| D3  | Custody ACK is display-only, which in v1 means **no on-air notice at all** — the store node logs it locally. A `0x41` would stop the ladder. |
-| D4  | Store set is `heard`, against the existing **12 h** mheard window. No mheard change.                                                         |
-| D5  | Store node runs the same 9-send ladder per presence trigger, then a **one-hour cooldown**, until ack or `storetime`.                         |
-| D6  | Group messages **out of scope** — not stored, and not given the fresh-msg_id repair.                                                         |
-| D7  | **No pull model**, no retrieval request, no multi-hop retrieval.                                                                             |
-| D8  | Failure is reported as BLE status **`0x03`** plus the web GUI, scoped to user-originated DMs only.                                           |
+| ID  | Decision                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | Ladder is (3x40 s + 1 min) x 3 = **9 transmissions over 9 minutes**, then report failure. Rate is unconditional; no evidence gate.                                                   |
+| D2  | Store-node delivery: direct neighbour only, **`max_hop` 0 on the raw wire field**.                                                                                                   |
+| D3  | No `0x41` from a store node, ever (it would stop the ladder). Stage 4 (2026-09-14) adds the display-only notice as a `:stoNNN` text and phone status 0x04; the ladder keeps running. |
+| D4  | Store set is `heard`, against the existing **12 h** mheard window. No mheard change.                                                                                                 |
+| D5  | Store node runs the same 9-send ladder per presence trigger, then a **one-hour cooldown**, until ack or `storetime`.                                                                 |
+| D6  | Group messages **out of scope** — not stored, and not given the fresh-msg_id repair.                                                                                                 |
+| D7  | **No pull model**, no retrieval request, no multi-hop retrieval.                                                                                                                     |
+| D8  | Failure is reported as BLE status **`0x03`** plus the web GUI, scoped to user-originated DMs only.                                                                                   |
 
 ## Open measurement that gates stage 1
 

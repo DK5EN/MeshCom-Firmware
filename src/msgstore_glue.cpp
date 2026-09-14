@@ -12,6 +12,7 @@
 #if defined(ENABLE_MSGSTORE)
 
 #include "msgstore_api.h"
+#include "sto_notice.h"
 
 #include "aprs_functions.h"
 #include "via_functions.h"
@@ -124,6 +125,57 @@ static void glueLog(const char *line)
         printfdeb("%s\n", line);
 }
 
+// Stage 4 (docs/dm-stage4-plan-20260914.md §5): builds and enqueues the
+// :sto custody notice back to the DM's original sender. Same shape as
+// glueDeliver() above with three differences: the notice's own destination
+// is the sender (e->src), not the mailbox's held destination; source/path
+// are this node's own call, since the notice originates here, not relayed
+// on someone else's behalf; and max_hop is left at the normal text hop
+// count (initAPRS() already sets it from meshcom_settings.max_hop_text for
+// a ':' message -- D1: the sender is normally several hops away, so a
+// hop-0 notice would only ever reach a direct neighbour). Never acked,
+// never insertOwnTx()'d, never uploaded to the server -- same as deliver().
+static bool glueNotify(const struct MsgStoreEntry *e)
+{
+    if(e == NULL)
+        return false;
+
+    char payload[32];   // "%-9.9s:sto%03u %s" -> at most 9+4+3+1+9+1 = 27 bytes
+    int  plen = stoNoticeBuild(payload, sizeof(payload), e->src, e->nnn, e->dst);
+    if(plen <= 0)
+        return false;
+
+    struct aprsMessage m;
+    initAPRS(m, ':');
+
+    m.msg_id                = millis();
+    m.msg_source_call       = meshcom_settings.node_call;
+    m.msg_source_path       = meshcom_settings.node_call;
+    m.msg_destination_call  = e->src;
+    m.msg_destination_path  = e->src;
+    m.msg_payload           = String(payload);
+
+    checkVia(m);
+
+    uint8_t buf[MAX_MSG_LEN_PHONE];
+    uint16_t len = encodeAPRS(buf, m);
+
+    if(len == 0)
+        return false;
+
+    // Same READY-then-DONE enqueue as glueDeliver(): the mailbox's own
+    // ladder (for a delivery) or "pending until acked by notified==2" (for
+    // a notice) is the only retry schedule either ever gets, never the TX
+    // ring's own retransmit logic.
+    int slot = addTxRingEntry(buf, len, 0x00, "sto");
+    if(slot < 0)
+        return false;
+
+    ringBuffer[slot][1] = 0xFF;
+
+    return true;
+}
+
 static const struct MsgStoreEnv msgstore_env = {
     glueNowMs,
     glueOwnCall,
@@ -132,7 +184,8 @@ static const struct MsgStoreEnv msgstore_env = {
     glueUtilPct,
     glueRandomBetween,
     glueDeliver,
-    glueLog
+    glueLog,
+    glueNotify
 };
 
 void msgstoreGlueInit(void)

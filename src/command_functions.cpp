@@ -221,8 +221,9 @@ static bool storeCallEntryValid(char *call)
 // like --maxhop's [MAXHOP] line -- printfdeb() strips ';' outside CSV mode).
 static void storePrintState(void)
 {
-    Serial.printf("[STORE];mode;%s;slots;%u;time;%u\n",
-        msgstoreModeName(msgstoreMode()), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours());
+    Serial.printf("[STORE];mode;%s;slots;%u;time;%u;notice;%s\n",
+        msgstoreModeName(msgstoreMode()), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+        msgstoreNotice() ? "on" : "off");
 }
 
 // Applies a new store mode, persists it, and -- when arming the store for
@@ -4758,6 +4759,41 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    // Stage 4 (docs/dm-stage4-plan-20260914.md sec. 5/9): sender-visible
+    // custody notice. Tested before the bare "store" catch-all below --
+    // that 5-char prefix would otherwise match "storenotice" too.
+    if(commandCheck(msg_text+2, (char*)"storenotice ") == 0)
+    {
+        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
+
+        if(casecmp(_owner_c, (char*)"on") == 0)
+        {
+            msgstoreSetNotice(true);
+        }
+        else if(casecmp(_owner_c, (char*)"off") == 0)
+        {
+            msgstoreSetNotice(false);
+        }
+        else
+        {
+            Serial.printf("[ERR];storenotice;must be on or off\n");
+
+            return;
+        }
+
+        msgstoreSettingsSave();
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"storenotice") == 0)
+    {
+        Serial.printf("[STORE];notice;%s\n", msgstoreNotice() ? "on" : "off");
+
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"store") == 0)
     {
         storePrintState();
@@ -6230,8 +6266,9 @@ void commandAction(char *umsg_text, bool ble)
 
 #if defined(ENABLE_MSGSTORE)
             // Store node (mailbox), stage 3 -- docs/dm-stage3-wave-plan-20260914.md.
-            printfdeb("...STORE mode=%s used=%d/%u time=%uh\n",
-                msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours());
+            printfdeb("...STORE mode=%s used=%d/%u time=%uh notice=%s\n",
+                msgstoreModeName(msgstoreMode()), msgstoreUsed(), (unsigned)msgstoreSlots(), (unsigned)msgstoreHoldHours(),
+                (msgstoreNotice()?"on":"off"));
 #endif
 
             for(int ig=0;ig<6;ig++)

@@ -21,6 +21,7 @@ extern std::atomic<uint32_t> dmstat_echo;             // own DM heard relayed (o
 extern std::atomic<uint32_t> dmstat_gw_ack;           // gateway/server ack for an own DM (phone status 0x01)
 extern std::atomic<uint32_t> dmstat_peer_ack;         // :ackNNN from the destination for an own DM (0x02)
 extern std::atomic<uint32_t> dmstat_giveup;           // RETRANSMIT_GIVEUP on a user-originated DM (0.3)
+extern std::atomic<uint32_t> dmstat_giveup_held;      // RETRANSMIT_GIVEUP suppressed: message is held (stage 4)
 extern std::atomic<uint32_t> dmstat_attempts;         // transmissions of DM ring slots including retries
 extern std::atomic<uint32_t> dmstat_reack;            // duplicate-for-me re-acked (0.2)
 extern std::atomic<uint32_t> dmstat_reack_limited;    // re-ack suppressed by the 30 s limiter (0.2)
@@ -46,7 +47,7 @@ void dmStatNoteSent(uint16_t nnn, uint32_t now_ms);
 void dmStatNoteAck(uint16_t nnn, uint32_t now_ms);
 
 // Formats the DM line and resets every counter (exchange(0)):
-//   DM sent=%u echo=%u gwack=%u ack=%u giveup=%u att=%u reack=%u/%u
+//   DM sent=%u echo=%u gwack=%u ack=%u giveup=%u giveuph=%u att=%u reack=%u/%u
 //      rtt=%u/%u/%u/%u/%u/%u ring=enq:%u ovw:%u
 // Returns the snprintf length clamped to n-1, 0 on bad arguments.
 int dmStatFormat(char *buf, size_t n);
