@@ -30,6 +30,9 @@
 #include "charset_filter.h"
 #include "setlog_lines.h"
 #include "dm_stats.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#endif
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
 
@@ -3236,6 +3239,13 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
         char dmbuf[200];
         dmStatFormat(dmbuf, sizeof(dmbuf));
         setlogPrint(dmbuf);
+#if defined(ENABLE_MSGSTORE)
+        if(msgstoreMode() != MSGSTORE_OFF)
+        {
+            msgstoreFormatLine(dmbuf, sizeof(dmbuf));   // S3: MBOX line, same gate
+            setlogPrint(dmbuf);
+        }
+#endif
     }
 }
 

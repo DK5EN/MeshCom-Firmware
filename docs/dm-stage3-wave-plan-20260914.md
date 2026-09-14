@@ -121,6 +121,26 @@ variants, `+<msgstore.cpp>` and the test in the native env, an interface header
 Loop-task call site (`msgstoreLoop()` in the two platform mains) is applied by the orchestrator at
 the gate.
 
+## S3-1 gate notes (2026-09-14)
+
+- **Ladder arithmetic:** attempts at 0, 40, 80, 180, 220, 260, 360, 400, 440 s — "3x40 s + 1 min"
+  per block means the gap after attempts 3 and 6 is 40 s + 60 s. Nine transmissions, the cycle
+  closes at 540 s. This is D5 as written; the shorthand "+60" above reads the same way.
+- **`MSGSTORE_SLOTS_MAX` is 50, not 100.** The table is static at the build-time maximum on every
+  eligible node whatever `--storeslots` says; 100 slots cost 20 kB on the RAK4631 for a mailbox
+  nobody fills. 50 slots, ~9.5 kB.
+- **Store hook excludes every payload starting with `{`**, not only `{ping}`/`{pong}`: `{MCP}`,
+  `{SET}`, `{CET}` are control frames whose JSON body can contain a second brace; a DM text never
+  starts with `{` since stage 0 rewrites it at the sender.
+- **Orchestrator-owned edits at the gate:** `msgstoreGlueInit()` + `msgstoreSettingsLoad()` after
+  `init_flash()` and `msgstoreLoop()` next to `updateRetransmissionStatus()` in both platform
+  mains; the `MBOX` setlog line after the `DM` line in `setlogFillStat()` (only when the mode is
+  not off); the mailbox auto-refresh JS guarded so the string is absent from ineligible images.
+- Settings: ESP32 own NVS keys (`store_mode/slots/time/list`), nRF52 own file `/msgstore.cfg`
+  (magic `MBX1`), struct untouched (T13). Commands per `docs/commands-store-node.md`.
+- The core never emits on air by itself: `deliver()` enqueues one frame with status DONE, so the TX
+  ring never retransmits a mailbox frame; the ladder is the mailbox's own (D3: no `0x41`, ever).
+
 ## Gate
 
 Native suite, sequential builds (Heltec V3, RAK4631, T-Beam as the ineligible board, T-Deck

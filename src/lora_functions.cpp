@@ -12,6 +12,9 @@
 #include "dm_stats.h"
 #include "dm_dedup.h"
 #include "instrument.h"
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"   // store node (last-hop mailbox), docs/dm-stage3-wave-plan-20260914.md
+#endif
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -873,7 +876,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 }
 
                 updateMheard(mheardLine, isPhoneReady);
-                
+
+#if defined(ENABLE_MSGSTORE)
+                // S3: presence hook -- a frame heard directly from its
+                // originator (no relay hop in the path) arms any HELD
+                // mailbox entry addressed to that call.
+                if(!aprsmsg.msg_server && aprsmsg.msg_source_path.indexOf(',') < 0)
+                    msgstorePresence(aprsmsg.msg_source_call.c_str());
+#endif
+
                 // last heard LoRa MeshCom-Packet
                 lastHeardTime = millis();
 
@@ -1180,6 +1191,57 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                             }
                             else
                             {
+#if defined(ENABLE_MSGSTORE)
+                                // Destination is not us: a store node may need to purge an
+                                // entry heard acked, hold a fresh DM for its store set, or
+                                // cancel a pending delivery it heard a peer store node do
+                                // first. All three run before the relay decision below, so
+                                // a stored/purged DM is still relayed normally.
+                                if(!aprsmsg.msg_server)
+                                {
+                                    int iMboxAckPos = aprsmsg.msg_payload.indexOf(":ack");
+
+                                    if(iMboxAckPos > 0)
+                                    {
+                                        // S3: purge hook -- :ackNNN heard for someone else's DM.
+                                        uint16_t mboxAckNnn = (uint16_t)(aprsmsg.msg_payload.substring(iMboxAckPos + 4)).toInt();
+                                        msgstoreOnAck(aprsmsg.msg_source_call.c_str(), destination_call, mboxAckNnn);
+                                    }
+                                    else
+                                    if(strcmp(destination_call, "*") != 0 &&
+                                       CheckGroup(destination_call) == 0 &&
+                                       aprsmsg.msg_payload.indexOf(":rej") <= 0 &&
+                                       !aprsmsg.msg_payload.startsWith("{") &&   // {ping}/{pong}/{MCP}/{SET}/{CET}: control frames, never a DM
+                                       msgstoreEligible(destination_call))
+                                    {
+                                        // S3: store hook -- a DM for our store set.
+                                        int iMboxEnqPos = aprsmsg.msg_payload.indexOf("{", 1);
+
+                                        if(iMboxEnqPos > 0)
+                                        {
+                                            uint16_t mboxNnn = (uint16_t)(aprsmsg.msg_payload.substring(iMboxEnqPos + 1)).toInt();
+                                            String mboxPayload = aprsmsg.msg_payload.substring(0, iMboxEnqPos);
+
+                                            msgstoreStore(aprsmsg.msg_source_call.c_str(), destination_call,
+                                                          mboxNnn, mboxPayload.c_str(), mboxPayload.length());
+                                        }
+                                    }
+
+                                    // S3: peer-cancel hook -- a hop-0 delivery frame (rly_hop
+                                    // computed above) whose path already holds one hop is
+                                    // another store node's mailbox delivery, heard directly.
+                                    if(rly_hop == 0 && aprsmsg.msg_source_path.indexOf(',') >= 0)
+                                    {
+                                        int iMboxPeerPos = aprsmsg.msg_payload.indexOf("{", 1);
+
+                                        if(iMboxPeerPos > 0)
+                                        {
+                                            uint16_t mboxPeerNnn = (uint16_t)(aprsmsg.msg_payload.substring(iMboxPeerPos + 1)).toInt();
+                                            msgstoreOnPeerDelivery(aprsmsg.msg_source_call.c_str(), mboxPeerNnn);
+                                        }
+                                    }
+                                }
+#endif
                                 //
                                 // next sequence to decode special broadcast messages
                                 //

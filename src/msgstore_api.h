@@ -16,7 +16,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define MSGSTORE_SLOTS_MAX     100   // build-time maximum, --storeslots 1..MSGSTORE_SLOTS_MAX
+#define MSGSTORE_SLOTS_MAX     50    // build-time maximum, --storeslots 1..MSGSTORE_SLOTS_MAX (static table, ~190 B/slot)
 #define MSGSTORE_SLOTS_DEFAULT 50
 #define MSGSTORE_PAYLOAD_MAX   160   // stripped DM text, the on-air text limit
 #define MSGSTORE_CALL_MAX      10
@@ -108,3 +108,10 @@ const struct MsgStoreCounters *msgstoreCounters(void);
 uint8_t                        msgstoreActionsLastHour(void);
 uint32_t                       msgstoreNextActionInMs(void); // 0 when nothing is due
 int                            msgstoreFormatLine(char *buf, size_t n); // "MBOX mode=.. used=../.. ..." setlog line
+
+// ---- test-only ----
+void msgstoreReset(void);
+
+// Firmware glue (src/msgstore_glue.cpp): installs the Arduino-side MsgStoreEnv.
+// Called once at boot from the platform main before msgstoreSettingsLoad().
+void msgstoreGlueInit(void);    // zero table, counters, action ring and config back to boot defaults

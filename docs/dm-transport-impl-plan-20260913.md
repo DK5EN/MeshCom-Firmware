@@ -6,13 +6,13 @@ traps), `docs/MeshCom-Store-Node-Concept-20260911.md` (the role) and
 
 ## Stage status log
 
-| Stage | Content                                 | Status                                                                                                                                                          |
-| ----- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open                                                            |
-| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                                                                                |
-| 2     | Destination dedup + bounded ACK repeats | **2.1 dispatched 2026-09-14** (pulled ahead of stage 1: receivers must understand fresh-id attempts before any sender emits them); **2.2 deferred** (see below) |
-| 3     | Store node + mailbox GUI                | not started                                                                                                                                                     |
-| 4     | Sender-visible custody notice           | deferred, not planned                                                                                                                                           |
+| Stage | Content                                 | Status                                                                                                      |
+| ----- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 0     | ARQ repair, instrumentation, `--airgap` | **code in tree 2026-09-13**, native + build gate green; bench T-0.1..T-0.5 and the advisor pass open        |
+| 1     | Outbox + the 9-send ladder              | not started — needs M0-1 (below)                                                                            |
+| 2     | Destination dedup + bounded ACK repeats | **2.1 done 2026-09-14** (44506d0b, advisor APPROVED), pulled ahead of stage 1; **2.2 deferred** (see below) |
+| 3     | Store node + mailbox GUI                | **wave S3-1 code in tree 2026-09-14**, gate running; see docs/dm-stage3-wave-plan-20260914.md               |
+| 4     | Sender-visible custody notice           | deferred, not planned                                                                                       |
 
 Resume rule: this table is the authority. A compacted or interrupted session reads it, not the
 git log.

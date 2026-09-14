@@ -126,6 +126,10 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 
 // MeshCom Common (ers32/nrf52) Funktions
 #include <loop_functions.h>
+#if defined(ENABLE_MSGSTORE)
+#include "msgstore_api.h"
+#include "msgstore_settings.h"
+#endif
 #include <loop_functions_extern.h>
 #include <test_inject.h>
 #include <command_functions.h>
@@ -806,6 +810,12 @@ void esp32setup()
 
 	// Get LoRa parameter
 	init_flash();
+
+#if defined(ENABLE_MSGSTORE)
+    // S3: store node -- glue first (clock/mheard/bp/deliver), then the persisted switch
+    msgstoreGlueInit();
+    msgstoreSettingsLoad();
+#endif
 
     bool bClear = false;
     if(meshcom_settings.node_cleanflash == 1)
@@ -4089,6 +4099,9 @@ void esp32loop()
     if((int32_t)(millis() - (retransmit_timer + (1000 * 2))) > 0)
     {
         updateRetransmissionStatus();
+#if defined(ENABLE_MSGSTORE)
+        msgstoreLoop();   // S3: all mailbox work runs here, in the loop task
+#endif
         retransmit_timer = millis();
     }
 
