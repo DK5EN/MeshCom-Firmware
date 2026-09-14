@@ -208,6 +208,42 @@ Deliberately **not** implemented, so the firmware side does not wait on it:
 - **No store-node configuration surfaces** (section 5's commands, `--mbox`, `/?page=mailbox`).
   Separate feature; the `SN` field above is the only part of section 5 MCProxy asks for.
 
+### 5.3 Feedback from implementing this (2026-09-14)
+
+Both backends now implement the guide. Two things in it did not survive contact.
+
+**Section 4's mc-chat checklist cannot be followed as written.** It asks mc-chat to implement the
+section 2 frame in `_decode_aprs_struct()`, "or rely on MCProxy's `msg_status` SSE event".
+Neither is possible. mc-chat replaces the node _and_ the proxy: it speaks UDP to the MeshCom
+server, has no phone link, and therefore never receives a `0x41` phone frame at all — and it is an
+independent backend that does not talk to MCProxy. The `0x41` that section 4 points at in its
+decoder is the on-air APRS ACK **packet type**, an unrelated `0x41`. mc-chat's only possible
+source for these states is the `:sto` / `:ack` texts of section 3, which is what it implements:
+`:sto` becomes `held`, correlated back to the sent DM through the `{NNN` ack-request suffix. A
+future revision of this guide should say that, rather than pointing a UDP-only client at a
+node-to-phone frame.
+
+Worth stating explicitly there too: **section 3 is the normal path for that client, not the
+legacy one.** The guide frames `:sto` as something seen "only on old firmware", which is true for
+a phone behind a node and false for a client that _is_ the node.
+
+**Please make the held destination in `:stoNNN` mandatory.** Section 3 gives the grammar as
+`^\S{1,9}\s*:sto\d{3}( \S+)?$` — the held destination optional. Without it the notice cannot be
+attributed: the sender knows a store node holds _something_ with counter NNN, but the counter is
+per-sender and reused, so matching on it alone attributes the hold to whichever conversation
+happened to reuse that number. mc-chat therefore records no status when the token is absent and
+shows the text only. Making it mandatory costs a few bytes on a frame that is already rate-limited
+to one per holder per message per hour, and it is the difference between an attributable state and
+an informational line.
+
+Two smaller confirmations, no action needed:
+
+- The status-byte rules in section 2 hold up. The precedence table collapses cleanly to a monotone
+  rank (`sent/heard/gateway < held < failed < acked`) enforced in a single conditional write,
+  which is the only form that survives frames arriving out of order. Both backends do it that way.
+- "Unknown status values are not errors" was worth stating. MCProxy already reported them as
+  `unknown(...)` and now has a test pinning that a byte outside the table still decodes.
+
 ## 6. Test vectors
 
 Frames as the node hands them to the transport (before the length byte and the 4 time bytes).
