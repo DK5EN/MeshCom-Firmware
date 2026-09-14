@@ -6,10 +6,10 @@ Subject: commit `66dea241` (wave S4-1), diff `bf9e689d..66dea241`, against
 Review only; `pio test -e native -f test_sto_notice -f test_msgstore -f test_dm_stats` run here:
 3/3 suites PASSED (24 + 51 + all dm_stats cases).
 
-## Verdict: REWORK
+## Verdict: APPROVED (after rework 150b0a4a, see the Re-check section at the end)
 
-One Medium finding (F1) refutes the headline sender-side claim for every gateway sender; the fix
-is small and local. Everything else is Low/Info and can ride the same wave.
+First pass (66dea241) was REWORK: one Medium finding (F1) refuted the headline sender-side claim
+for every gateway sender. The rework closed F1-F5; F6/F7 are recorded as accepted limitations.
 
 ## Finding 1: the notice is displayed as text on NEW firmware when it arrives via the server
 
@@ -220,3 +220,40 @@ is small and local. Everything else is Low/Info and can ride the same wave.
 | T-4.6 | plan T-4.6                      | Notice relayed at `max_hop_text` (read hop byte on a sniffer), sender two hops away marks held                                                                      |
 | T-4.7 | **new, F1**                     | Gateway sender (Heltec V3 with `--gateway on`, RAK Ethernet) receiving the notice only via the server: after the fix, held mark and no text; before, text displayed |
 | T-4.8 | commit claim, unverifiable here | "native 410/410 (13 envs)" and the four board builds — no board build was run for this verdict; string scan of the existing T-Beam image only                       |
+
+## Re-check (150b0a4a)
+
+Diff `66dea241..150b0a4a`; native `test_sto_notice` (26), `test_msgstore`, `test_dm_stats` re-run
+here: 3/3 PASSED.
+
+- **F1 — CLOSED.** Both server twins carry the `:sto` arm as an `else if` directly behind the
+  `:ack/:rej` block and ahead of the `{NNN` / display handling, gated on
+  `destination_call == node_call` (`src/udp_functions.cpp:452-484`,
+  `src/nrf52/nrf_eth.cpp:623-656`). State rule identical to the LoRa branch (0x00/0x01/0x04,
+  `stoHolderNote`, `own_msg_id = 0x04`, `buildAckPhoneFrame(ACK_STATUS_HELD, source)`).
+  `bStoConsumed` gates `sendDisplayText` (`udp:504`, `eth:672`) and the DM `addBLEOutBuffer`
+  (`udp:520`, `eth:689`). No ack: a notice has no `{`, so `iAckId` stays 0 and every
+  `SendAckMessage` sits under `if(iAckId > 0)` (`udp:526`, `eth:695`). No LoRa resend:
+  `bUDPtoLoraSend = false` is forced for `node_call` before the block (`udp:389`, `eth:548`).
+  `stoHolderClear()` added on both `:ack` writes (`udp:435`, `eth:601`). Foreign msg_ids: the
+  reconstruction uses this node's `_GW_ID`, so a `checkOwnTx()` hit requires our own hash — a
+  server-forwarded foreign DM that `insertOwnTx()` parked in `own_msg_id[]` carries the other
+  node's hash in the top 22 bits and cannot match (same property the `:ack` arm has relied on;
+  `ackMsgIdFromNode`). A `:sto` for a DM this gateway only forwarded has
+  `destination_call != node_call` and never enters the arm. Nothing new opened.
+- **F2 — CLOSED by documentation.** `dm_stats.h:24` now reads "subset of giveup"; the code
+  comment at `lora_functions.cpp:2422-2425` states it. Counter semantics unchanged (subset);
+  plan wording aligned.
+- **F3 — CLOSED.** `char line[200]` at `src/command_functions.cpp:4810`, matching the STAT
+  buffer.
+- **F4 — CLOSED.** `docs/commands-store-node.md` names the suffix `<destination-call>` and
+  defines `<holder-call>` as the frame's source.
+- **F5 — CLOSED.** `stoNoticeParse()` requires `strlen >= 13` and `strncmp(payload + 9, ":sto",
+4) == 0` (`src/sto_notice.cpp:57-73`); a 13-byte payload fails the digit test on the NUL
+  safely. New tests `test_parse_akzeptiert_tag_nur_bei_byte_9` (tag at byte 3 and 12 rejected)
+  and `test_parse_lehnt_zu_kurzes_payload_ab` (12-byte payload) fail under the previous
+  `strstr` implementation; `test_parse_roundtrip` still pins the accepted layout.
+- **F6/F7 — accepted limitations**, recorded in the plan per the coordinator.
+
+Still bench-only: T-4.7 (gateway sender receiving the notice via the server: held mark, no text)
+is the direct proof of the F1 fix; no board build was run for this re-check.

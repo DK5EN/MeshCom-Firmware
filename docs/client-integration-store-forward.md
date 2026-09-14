@@ -2,7 +2,7 @@
 
 For mc-chat, MCProxy and Meshcom-MobileApp. Describes what the node now sends and what each
 client must implement to show DM delivery honestly and to understand a store-and-forward node.
-Firmware state: fork-main 66dea241 (2026-09-14), stages 0, 2.1, 3 and 4 of
+Firmware state: fork-main 150b0a4a (2026-09-14), stages 0, 2.1, 3 and 4 of
 `docs/dm-transport-impl-plan-20260913.md`.
 
 ## 1. What changed on the node
@@ -74,8 +74,8 @@ destination  DK5EN-93            the DM's sender
 payload      "DK5EN-93 :sto017 DK5EN-14"   sender padded to 9, the NNN, the held destination
 ```
 
-New firmware consumes it (no display, no forward to the phone, no ack) and emits the `0x04`
-frame instead. A node on **upstream firmware** forwards it to the phone as a normal DM from the
+New firmware consumes it on every ingress path, LoRa and server (no display, no forward to the
+phone, no ack), and emits the `0x04` frame instead. A node on **upstream firmware** forwards it to the phone as a normal DM from the
 store node. Clients therefore see it only behind old nodes. Recommended: treat a DM text matching
 `^\S{1,9}\s*:sto\d{3}( \S+)?$` from a node that never sends `0x04` as informational ("DK5EN-90
 holds your message 017 for DK5EN-14"), do not answer it, and never filter it silently, because on
