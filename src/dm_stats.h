@@ -21,7 +21,7 @@ extern std::atomic<uint32_t> dmstat_echo;             // own DM heard relayed (o
 extern std::atomic<uint32_t> dmstat_gw_ack;           // gateway/server ack for an own DM (phone status 0x01)
 extern std::atomic<uint32_t> dmstat_peer_ack;         // :ackNNN from the destination for an own DM (0x02)
 extern std::atomic<uint32_t> dmstat_giveup;           // RETRANSMIT_GIVEUP on a user-originated DM (0.3)
-extern std::atomic<uint32_t> dmstat_giveup_held;      // RETRANSMIT_GIVEUP suppressed: message is held (stage 4)
+extern std::atomic<uint32_t> dmstat_giveup_held;      // subset of giveup: message was held (stage 4), 0x03/failed suppressed
 extern std::atomic<uint32_t> dmstat_attempts;         // transmissions of DM ring slots including retries
 extern std::atomic<uint32_t> dmstat_reack;            // duplicate-for-me re-acked (0.2)
 extern std::atomic<uint32_t> dmstat_reack_limited;    // re-ack suppressed by the 30 s limiter (0.2)

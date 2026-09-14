@@ -69,10 +69,12 @@ what the "off -> on" warning is telling the operator.
 ## The `:sto` notice on old firmware
 
 The custody notice (stage 4) is an ordinary text frame from the store node
-to the DM's original sender, payload `"<sender-call> :sto<nnn> <holder-call>"`
-— the same `%-9.9s:sto%03u` layout as an `:ack` line, with a readable
-destination-call suffix. A **new** firmware sender parses the `:sto` tag,
-does not display it, and shows "held by `<holder-call>`" instead. **Old**
-firmware does not recognise `:sto`: it falls through the existing parsers
-(no `:ack`, no `:rej`, no `{`) and the notice is simply displayed as a short
-plain-text DM from the store node.
+to the DM's original sender, payload `"<sender-call> :sto<nnn> <destination-call>"`
+— the same `%-9.9s:sto%03u` layout as an `:ack` line, with the held DM's
+destination call as a readable suffix for old firmware. A **new** firmware
+sender parses the `:sto` tag, does not display it, and shows "held by
+`<holder-call>`" instead, where `<holder-call>` is the frame's own source
+callsign (the store node), not the trailing payload word. **Old** firmware
+does not recognise `:sto`: it falls through the existing parsers (no `:ack`,
+no `:rej`, no `{`) and the notice is simply displayed as a short plain-text
+DM from the store node.

@@ -10,6 +10,8 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include "dedup_functions.h"
+#include "ack_attribution.h"
+#include "sto_notice.h"
 #include "reack_limiter.h"
 #include "dm_stats.h"
 #include "dm_dedup.h"
@@ -553,6 +555,16 @@ int NrfETH::getUDP()
                   // groups and `*` keep today's behaviour).
                   bool bDmDedupNew = true;
 
+                  // S4-2: set when the :sto branch below consumes the frame
+                  // -- fable-dm-stage4-verdict-20260914.md F1, the same
+                  // carve-out as the ESP32 twin (udp_functions.cpp). Gates
+                  // the display and BLE-text steps further down; iAckId
+                  // stays 0 for a notice, so the SendAckMessage arm (guarded
+                  // by `iAckId > 0`) is already skipped, and bUDPtoLoraSend
+                  // is already forced false for node_call above.
+                  bool bStoConsumed = false;
+                  uint16_t stoNnn = 0;
+
                   int iAckPos=aprsmsg.msg_payload.indexOf(":ack");
                   int iRefPos=aprsmsg.msg_payload.indexOf(":rej");
                   int iEnqPos=aprsmsg.msg_payload.indexOf("{", 1);
@@ -583,6 +595,11 @@ int NrfETH::getUDP()
                       if(iackcheck >= 0)
                       {
                           own_msg_id[iackcheck][4] = 0x02;   // 02...ACK
+
+                          // S4: the destination's own ack is the final word --
+                          // forget any store node(s) that were holding this DM.
+                          stoHolderClear(msg_counter);
+
                           // DRY-21: von der ESP32-Kopie (udp_functions.cpp) abgedriftet —
                           // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                           // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,
@@ -603,6 +620,40 @@ int NrfETH::getUDP()
 
                       bBLELoopOut=false;
                   }
+                  else if(strcmp(destination_call, meshcom_settings.node_call) == 0 &&
+                          stoNoticeParse(aprsmsg.msg_payload.c_str(), &stoNnn, NULL))
+                  {
+                      // S4-2: mirror the LoRa branch (lora_functions.cpp,
+                      // the :sto arm) for a notice that reached us via the
+                      // server instead of RF -- fable-dm-stage4-verdict-
+                      // 20260914.md F1. The frame is for us and is fully
+                      // consumed here: no display, no DM text/frame to the
+                      // phone, no ack, no LoRa re-send (bUDPtoLoraSend is
+                      // already forced false for destination_call==node_call
+                      // above).
+                      msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (stoNnn & 0x3FF);
+
+                      int iStoCheck = checkOwnTx(msg_counter);
+                      if(iStoCheck >= 0 &&
+                         (own_msg_id[iStoCheck][4] == 0x00 || own_msg_id[iStoCheck][4] == 0x01 || own_msg_id[iStoCheck][4] == 0x04) &&
+                         stoHolderNote(msg_counter, aprsmsg.msg_source_call.c_str(), stoNnn, millis()))
+                      {
+                          own_msg_id[iStoCheck][4] = 0x04;   // 04...HELD
+
+                          uint8_t stoPrintBuff[30];
+                          uint16_t stoPlen = buildAckPhoneFrame(stoPrintBuff, msg_counter, ACK_STATUS_HELD, aprsmsg.msg_source_call.c_str());
+                          addBLEOutBuffer(stoPrintBuff, stoPlen);
+
+                          if(bDisplayInfo)
+                              printfdeb("[HELD] by %s nnn:%03u\n", aprsmsg.msg_source_call.c_str(), (unsigned)stoNnn);
+                      }
+                      // 0x02/0x03 are final states and are never downgraded
+                      // back to held; stoHolderNote()'s per-hour rate limit
+                      // keeps a replayed notice from repeating the phone
+                      // frame.
+
+                      bStoConsumed = true;
+                  }
 
                   if(iEnqPos > 0)
                   {
@@ -618,7 +669,7 @@ int NrfETH::getUDP()
                     }
                   }
 
-                  if(iAckPos <= 0 && bDmDedupNew)
+                  if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed)
                   {
                     if(!bGATEWAY)
                       sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
@@ -635,7 +686,7 @@ int NrfETH::getUDP()
 
                   uint16_t tempsize = encodeAPRS(tempRcvBuffer, aprsmsg);
 
-                  if(bDmDedupNew)
+                  if(bDmDedupNew && !bStoConsumed)
                       addBLEOutBuffer(tempRcvBuffer, tempsize);
 
                   bBLELoopOut=false;

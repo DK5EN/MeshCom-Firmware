@@ -2419,7 +2419,10 @@ bool updateRetransmissionStatus()
                                 // 20260914.md, decision 3) -- the ladder giving up on its own
                                 // ring slot is not a failure, the message stays "held" until
                                 // the destination's real :ack flips it. Skip the 0x03 frame
-                                // and the failed mark; count it separately instead.
+                                // and the failed mark. dmstat_giveup already counted this
+                                // give-up above (F2, fable-dm-stage4-verdict-20260914.md):
+                                // dmstat_giveup_held additionally marks the held subset, it
+                                // does not replace the giveup count.
                                 if(idx >= 0 && own_msg_id[idx][4] == 0x04)
                                 {
                                     dmstat_giveup_held.fetch_add(1);

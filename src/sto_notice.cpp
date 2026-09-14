@@ -47,18 +47,29 @@ bool stoNoticeParse(const char *payload, uint16_t *nnn, char *dst)
     if(payload == NULL)
         return false;
 
+    // F5 (fable-dm-stage4-verdict-20260914.md): the builder's "%-9.9s:sto%03u
+    // %s" layout always puts the tag at byte 9 -- pad or truncate the sender
+    // call to exactly 9 bytes, same fixed position the :ack payloads are
+    // matched at. Anchor here instead of a free strstr() so a `{`-less DM
+    // whose text happens to contain ":sto" plus three digits somewhere else
+    // is never mistaken for a notice. A too-short payload cannot carry the
+    // tag at that offset at all.
+    size_t stoPayloadLen = strlen(payload);
+    if(stoPayloadLen < 9 + strlen(STO_NOTICE_TAG))
+        return false;
+
     // Rejected outright: a control/store tag ('{') or an :ack/:rej payload --
-    // the tag search below would never match those anyway (no ":sto" text in
-    // an :ack/:rej line by construction), but the explicit check documents
-    // the contract and stays correct even if a future payload happened to
-    // embed the literal substring ":sto" elsewhere.
+    // every firmware-originated DM carries one of these, so the tag anchor
+    // below would never be reached for those anyway; the explicit check
+    // documents the contract and stays correct even if a future payload
+    // happened to place ":sto" at byte 9 by coincidence.
     if(strchr(payload, '{') != NULL)
         return false;
     if(strstr(payload, ":ack") != NULL || strstr(payload, ":rej") != NULL)
         return false;
 
-    const char *tag = strstr(payload, STO_NOTICE_TAG);
-    if(tag == NULL)
+    const char *tag = payload + 9;
+    if(strncmp(tag, STO_NOTICE_TAG, strlen(STO_NOTICE_TAG)) != 0)
         return false;
 
     const char *digits = tag + strlen(STO_NOTICE_TAG);

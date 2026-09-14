@@ -4803,7 +4803,11 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"mbox") == 0)
     {
-        char line[128];
+        // F3 (fable-dm-stage4-verdict-20260914.md): matches the STAT path's
+        // dmbuf[200] (loop_functions.cpp) -- msgstoreFormatLine() now carries
+        // 15 numbers behind 94 bytes of literals, and 128 clamps the trailing
+        // sto= field first on a store node that has been up for weeks.
+        char line[200];
         msgstoreFormatLine(line, sizeof(line));
         Serial.printf("%s\n", line);
 

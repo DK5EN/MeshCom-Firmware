@@ -151,6 +151,34 @@ static void test_parse_null_payload_ist_sicher(void)
     TEST_ASSERT_EQUAL_STRING("", dst);
 }
 
+static void test_parse_akzeptiert_tag_nur_bei_byte_9(void)
+{
+    // F5 (fable-dm-stage4-verdict-20260914.md): the tag must sit exactly at
+    // byte 9 -- the fixed offset the builder's "%-9.9s:sto%03u %s" layout
+    // always places it at (test_parse_roundtrip above covers the accepted
+    // case). A tag anywhere else is rejected, even though a free strstr()
+    // would have matched it.
+    uint16_t nnn = 99;
+
+    // Tag at byte 3.
+    TEST_ASSERT_FALSE(stoNoticeParse("ABC:sto017 DK5EN-14", &nnn, NULL));
+    TEST_ASSERT_EQUAL_UINT16(0, nnn);
+
+    // Tag at byte 12.
+    nnn = 99;
+    TEST_ASSERT_FALSE(stoNoticeParse("123456789012:sto017 DK5EN-14", &nnn, NULL));
+    TEST_ASSERT_EQUAL_UINT16(0, nnn);
+}
+
+static void test_parse_lehnt_zu_kurzes_payload_ab(void)
+{
+    // F5: shorter than 9 + strlen(":sto") == 13 bytes cannot carry the tag
+    // at byte 9 at all.
+    uint16_t nnn = 99;
+    TEST_ASSERT_FALSE(stoNoticeParse("123456789:st", &nnn, NULL));   // 12 bytes
+    TEST_ASSERT_EQUAL_UINT16(0, nnn);
+}
+
 static void test_parse_destination_laenger_als_puffer_wird_gekappt(void)
 {
     char dst[STO_NOTICE_CALL_MAX];
@@ -282,6 +310,8 @@ int main(int, char **)
     RUN_TEST(test_parse_lehnt_ack_und_rej_ab);
     RUN_TEST(test_parse_lehnt_fehlenden_tag_ab);
     RUN_TEST(test_parse_lehnt_nicht_numerische_stellen_ab);
+    RUN_TEST(test_parse_akzeptiert_tag_nur_bei_byte_9);
+    RUN_TEST(test_parse_lehnt_zu_kurzes_payload_ab);
     RUN_TEST(test_parse_null_payload_ist_sicher);
     RUN_TEST(test_parse_destination_laenger_als_puffer_wird_gekappt);
 

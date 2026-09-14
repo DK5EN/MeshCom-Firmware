@@ -23,8 +23,11 @@
 // Build the payload. Returns the length, 0 on bad arguments or a too-small buffer.
 int  stoNoticeBuild(char *buf, size_t n, const char *sender, uint16_t nnn, const char *dst);
 
-// Parse a payload; true when it carries a :stoNNN tag. nnn and dst (may be NULL,
-// dst buffer STO_NOTICE_CALL_MAX) are filled.
+// Parse a payload; true when it carries a :stoNNN tag at byte 9 (the fixed
+// offset the builder's "%-9.9s:sto%03u %s" layout always places it at --
+// a tag anywhere else, or a payload too short to hold one there, is
+// rejected). nnn and dst (may be NULL, dst buffer STO_NOTICE_CALL_MAX) are
+// filled.
 bool stoNoticeParse(const char *payload, uint16_t *nnn, char *dst);
 
 // Sender side: remember that `holder` holds msg_id; rate-limited per (holder, nnn).

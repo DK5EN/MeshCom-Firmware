@@ -127,14 +127,15 @@ Native suite, sequential builds (V3, RAK, T-Deck Plus, T-Beam as the ineligible 
 sender-side parse and mark compile everywhere, the store-node side only under `ENABLE_MSGSTORE`),
 string scan, advisor pass, then:
 
-| ID    | Test                                                 | Expect                                                                          |
-| ----- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
-| T-4.1 | Sender next to the store node, destination airgapped | Held mark within the jitter, ladder keeps running, ack later flips to delivered |
-| T-4.2 | Same, sender on upstream 4.35t                       | One short text displayed, no ack emitted, no crash                              |
-| T-4.3 | Sender re-floods the DM (fresh id) while held        | No second notice; refresh only                                                  |
-| T-4.4 | Ladder gives up on a held message                    | No `0x03`, mark stays held; delivery later flips it                             |
-| T-4.5 | Two store nodes hold the same DM                     | Two held frames with different callsigns, caps hold                             |
-| T-4.6 | `--storenotice all`, sender two hops away            | Notice relayed once, sender marks held; `direct` sends nothing                  |
+| ID    | Test                                                       | Expect                                                                          |
+| ----- | ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| T-4.1 | Sender next to the store node, destination airgapped       | Held mark within the jitter, ladder keeps running, ack later flips to delivered |
+| T-4.2 | Same, sender on upstream 4.35t                             | One short text displayed, no ack emitted, no crash                              |
+| T-4.3 | Sender re-floods the DM (fresh id) while held              | No second notice; refresh only                                                  |
+| T-4.4 | Ladder gives up on a held message                          | No `0x03`, mark stays held; delivery later flips it                             |
+| T-4.5 | Two store nodes hold the same DM                           | Two held frames with different callsigns, caps hold                             |
+| T-4.6 | `--storenotice all`, sender two hops away                  | Notice relayed once, sender marks held; `direct` sends nothing                  |
+| T-4.7 | Sender is a gateway; notice arrives via the server, not RF | Held mark, nothing displayed on the sender (see S4-2 rework notes)              |
 
 ## 9. Decisions (operator, 2026-09-14)
 
@@ -163,3 +164,48 @@ string scan, advisor pass, then:
 - Settings: NVS key `store_notice` on ESP32, `/msgstore.cfg` v2 (`MBX2`) on nRF52 with v1 still
   readable. `--storenotice on|off`, default on.
 - Tests: `test_sto_notice` 24 cases, `test_msgstore` 51, `test_dm_stats` updated.
+
+## S4-2 rework notes (2026-09-14)
+
+Rework of the S4-1 wave against `docs/review/fable-dm-stage4-verdict-20260914.md`.
+
+- **F1 (Medium, fixed on both server ingress paths).** `:sto` was only parsed on the LoRa RX
+  path. A frame that reached a sender through the server instead — any gateway sender (ESP32
+  UDP path) or Ethernet RAK (nRF52 path), which covers the common home setup — fell through to
+  plain display and BLE text as an ordinary DM, exactly the old-firmware behaviour stage 4 exists
+  to replace. Mirrored the LoRa `:sto` arm into both twins, `src/udp_functions.cpp` and
+  `src/nrf52/nrf_eth.cpp`, in an `else if` alongside the existing `:ack`/`:rej` branch, guarded to
+  `destination_call == node_call` (a notice is always unicast to the sender, never broadcast or
+  group): reconstruct `msg_id` from NNN the same way, `checkOwnTx`, the same 0x00/0x01/0x04 ->
+  0x04 state rule, `stoHolderNote()` rate limit, `buildAckPhoneFrame(..., ACK_STATUS_HELD, ...)`,
+  `[HELD]` debug line. A new `bStoConsumed` flag (parallel to the existing `bDmDedupNew`) gates
+  `sendDisplayText()` and the raw-frame `addBLEOutBuffer()` so the frame is fully consumed: no
+  display, no DM text/frame to the phone, no ack. `bUDPtoLoraSend` was already forced false for
+  `destination_call == node_call` on both paths, so no separate re-send guard was needed. Also
+  added the missing `stoHolderClear(msg_counter)` on both twins' `:ack` write
+  (`own_msg_id[..][4] = 0x02`), matching the LoRa path. New bench item **T-4.7**: "sender is a
+  gateway; notice arrives via the server, not RF — held mark, nothing displayed" (added to the
+  §8 test table above).
+- **F5 (Low, hardening).** `stoNoticeParse()` matched the `:sto` tag anywhere in the payload via
+  `strstr()`. The builder's `"%-9.9s:sto%03u %s"` layout always places the tag at byte 9, so the
+  parser now anchors there (`payload + 9`, `strncmp`) and rejects a payload shorter than
+  `9 + strlen(":sto") == 13` bytes outright. Closes the residual window where a `{`-less DM whose
+  text happened to contain `:sto` plus three digits elsewhere would have been swallowed instead
+  of displayed. New tests: tag at byte 9 accepted (existing roundtrip test), tag at byte 3 or 12
+  rejected, a payload shorter than 13 bytes rejected.
+- **F2 (Low, wording only).** The code already does the right thing — `dmstat_giveup` counts
+  every give-up including held ones, `dmstat_giveup_held` counts only the held subset — but the
+  give-up comment in `src/lora_functions.cpp` and the `dm_stats.h` header comment both said the
+  held count replaced or was counted "instead" of the giveup count, which reads as disjoint
+  counters. Reworded both to say `giveuph` is a subset of `giveup`, no counter logic changed.
+- **F6 (Info, accepted limitation).** The sender-side holder table (`src/sto_notice.h`) is
+  cleared on the destination's real `:ack` on all three ingress paths as of this wave (LoRa, UDP,
+  nRF52 Ethernet), but never on the own-message table's own eviction (`insertOwnTx` has no
+  corresponding call). Harmless: state 0x02 is never downgraded, the table is 16 entries with
+  oldest-first eviction, and a stale holder entry only ever affects the GUI mark for a msg_id that
+  has since aged out. Not fixed this wave.
+- **F7 (Info, spec-conformant, accepted limitation).** The msgstore replace-in-place path
+  (`src/msgstore.cpp`) never re-arms `notice`: if the old entry's notice already went out, an
+  unrelated new message stored under the same wrapped slot is never announced. §5 above already
+  carves replace out of the notice trigger ("a new slot, not a refresh, not a replace"), so this
+  is recorded as the documented behaviour, not a defect.
