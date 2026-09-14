@@ -1,6 +1,13 @@
 # Decentralised store node for DM delivery (last-hop mailbox)
 
-Concept, 2026-09-11. Status: draft, not advisor-reviewed, nothing in code.
+Concept, 2026-09-11. **Status 2026-09-14: implemented as stage 3 + stage 4 of
+`docs/dm-transport-impl-plan-20260913.md`** (fork-main `59f21e5b`..`c2db86bb`), advisor-approved,
+not yet bench-tested — see `docs/dm-bench-session-plan-20260914.md`. Deviations from this text
+that were decided during implementation: delivery schedule is D5 (9-send ladder per presence
+trigger, 1 h cooldown, 20 actions per hour per node) instead of §3.5's "max 3 per entry";
+`heard` ships in v1; slots max 50; the custody notice exists (stage 4, `:stoNNN` text, status
+0x04) and does not stop the sender's ladder; T8's server-flag guard applies to the server ingress
+paths only.
 
 Extends `docs/proposal-dm-transport-reliability-20260909.md` in the MeshCom firmware fork as
 stage 2b. Scope: 1:1 direct messages (DM) on the pure-LoRa path, delivered to a destination that

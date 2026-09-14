@@ -1,5 +1,22 @@
 # RESUME — pick up here
 
+## 2026-09-14: DM transport campaign — five stages in the tree, bench session next
+
+Stages 0, 1, 2.1, 3 and 4 of `docs/dm-transport-impl-plan-20260913.md` are on fork-main
+(`7aeb2ac5`..`c2db86bb`), each advisor-approved after at most one rework, native 436/436 across
+13 envs, four boards build. **Nothing has been flashed.** Pick up with
+`docs/dm-bench-session-plan-20260914.md`: four nodes, 93 (Heltec, sender) / 92 (T-Beam, relay)
+/ 90 (RAK, store node) flashed over USB serial, 14 (T-Deck Plus, destination) over OTA with
+`tools/webflash.py`; all driven over the net console on 2323 except the RAK (serial, `--dtr
+auto`); instrument builds (`-D INSTRUMENT_ENABLED=1`) on all four for `--airgap`/`--injectraw`.
+Test blocks A (stage 0) to E (stage 4) in order; T-3.1 on the Heltec, T-4.7 on a gateway sender
+and T-1.3 in its gateway variant are the direct proofs of the advisor-caught bugs.
+
+Defaults on the new firmware: `--dmretry off` ("Enhanced message transport protection", tri-state
+off/3/9, default off so the release is safe), `--store off`, `--storenotice on`. BACKLOG §3.8z
+(DM-01..DM-13) holds the open list incl. client work in MCProxy / mobile app / mc-chat
+(`docs/client-integration-store-forward.md`). Stage 2.2 deferred by operator decision.
+
 ## 2026-09-13 (evening): DHCP hostname from the callsign, shipped and bench-verified
 
 Concept `docs/dhcp-hostname-konzept-20260911.md` implemented as `3af07485`, CHANGELOG item
