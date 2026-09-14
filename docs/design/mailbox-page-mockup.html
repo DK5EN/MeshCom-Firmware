@@ -31,7 +31,7 @@ select,input {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing
 #head_layer>p {margin:0px 0px;}
 #content_title {padding:0px 30px 0px 0px;margin:0px 0px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#FCEDF0;}
 #content_title>p {margin:0;padding:6px 0;}
-#content_layer {margin-left:calc(60px*var(--widthfactor));top:0px;overflow:hidden;}
+#content_layer {margin-left:calc(60px*var(--widthfactor));top:0px;overflow:visible;}
 #content_inner {margin:20px 10px 30px 4%;}
 #content_inner > table {border-collapse:separate;overflow:hidden;border-spacing:0;border:solid 1px #7c7c7c;border-radius:10px;width:100%;background:#f9f9f9;font-variant-numeric:tabular-nums;}
 #content_inner > table thead {background-color:var(--mcgray);color:#ffffff;}
@@ -39,7 +39,9 @@ select,input {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing
 #content_inner > table tr:nth-child(even) {background-color:#f0f0f0;}
 #content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px #e0e0e0;}
 #content_inner > table tr:last-child td {border-bottom:none;}
-.tablewrap {overflow-x:auto;max-width:100%;}
+.tablewrap {overflow-x:auto;max-width:100%;margin-right:10px;}
+#content_inner > table td.num {white-space:nowrap;font-variant-numeric:tabular-nums;}
+.mbx-actions button {padding:3px 7px;}
 #content_inner a {color:var(--mcred);}
 #content_inner button {background-color:var(--mclightred);border:solid 1px var(--mcgray);padding:3px 10px;text-align:center;cursor:pointer;display:inline-flex;align-items:center;border-radius:5px;font:inherit;color:inherit;}
 #content_inner button:hover {background-color:var(--mcmidred);}
@@ -122,14 +124,14 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.3em;}
           <td class="font-bold no-wrap">DK5EN-14</td>
           <td class="no-wrap">3 min</td>
           <td class="no-wrap">DK5EN-93</td>
-          <td>017</td>
-          <td>42 B</td>
+          <td class="num">017</td>
+          <td class="num">42&nbsp;B</td>
           <td class="no-wrap">1 h 12 min</td>
           <td class="no-wrap">22 h 48 min</td>
           <td><span class="mbx-state mbx-ladder">LADDER</span></td>
           <td class="no-wrap">1.4 of 9</td>
           <td class="mbx-actions">
-            <button type="button" disabled title="A ladder is already running">Deliver now</button>
+            <button type="button" disabled title="A ladder is already running">Deliver</button>
             <button type="button" onclick="if(confirm('Purge the message for DK5EN-14 from DK5EN-93 (NNN 017)?')){callfunction('mboxpurge','3');}">Purge</button>
           </td>
         </tr>
@@ -137,14 +139,14 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.3em;}
           <td class="font-bold no-wrap">DK5EN-14</td>
           <td class="no-wrap">3 min</td>
           <td class="no-wrap">OE3XIR-12</td>
-          <td>884</td>
-          <td>118 B</td>
+          <td class="num">884</td>
+          <td class="num">118&nbsp;B</td>
           <td class="no-wrap">2 h 05 min</td>
           <td class="no-wrap">21 h 55 min</td>
           <td><span class="mbx-state mbx-cooldown">COOLDOWN</span></td>
-          <td class="no-wrap">1.9 of 9 &middot; next 38 min</td>
+          <td>1.9 of 9 &middot; next 38 min</td>
           <td class="mbx-actions">
-            <button type="button" onclick="if(confirm('Start a delivery ladder now for OE3XIR-12 to DK5EN-14 (NNN 884)? Ignores the cooldown, still subject to the node caps.')){callfunction('mboxdeliver','7');}">Deliver now</button>
+            <button type="button" onclick="if(confirm('Start a delivery ladder now for OE3XIR-12 to DK5EN-14 (NNN 884)? Ignores the cooldown, still subject to the node caps.')){callfunction('mboxdeliver','7');}">Deliver</button>
             <button type="button" onclick="if(confirm('Purge the message for DK5EN-14 from OE3XIR-12 (NNN 884)?')){callfunction('mboxpurge','7');}">Purge</button>
           </td>
         </tr>
@@ -152,14 +154,14 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.3em;}
           <td class="font-bold no-wrap">DK5EN-92</td>
           <td class="no-wrap mbx-stale" title="Older than the store set window">11 h 40 min</td>
           <td class="no-wrap">DK5EN-93</td>
-          <td>018</td>
-          <td>27 B</td>
+          <td class="num">018</td>
+          <td class="num">27&nbsp;B</td>
           <td class="no-wrap">4 h 31 min</td>
           <td class="no-wrap">19 h 29 min</td>
           <td><span class="mbx-state mbx-held">HELD</span></td>
           <td class="no-wrap">0 of 9</td>
           <td class="mbx-actions">
-            <button type="button" onclick="if(confirm('Start a delivery ladder now for DK5EN-93 to DK5EN-92 (NNN 018)? DK5EN-92 was last heard 11 h 40 min ago.')){callfunction('mboxdeliver','12');}">Deliver now</button>
+            <button type="button" onclick="if(confirm('Start a delivery ladder now for DK5EN-93 to DK5EN-92 (NNN 018)? DK5EN-92 was last heard 11 h 40 min ago.')){callfunction('mboxdeliver','12');}">Deliver</button>
             <button type="button" onclick="if(confirm('Purge the message for DK5EN-92 from DK5EN-93 (NNN 018)?')){callfunction('mboxpurge','12');}">Purge</button>
           </td>
         </tr>
@@ -167,14 +169,14 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.3em;}
           <td class="font-bold no-wrap">OE1KBC-4</td>
           <td class="no-wrap">just now</td>
           <td class="no-wrap">DK5EN-93</td>
-          <td>019</td>
-          <td>61 B</td>
+          <td class="num">019</td>
+          <td class="num">61&nbsp;B</td>
           <td class="no-wrap">14 min</td>
           <td class="no-wrap">23 h 46 min</td>
           <td><span class="mbx-state mbx-armed">ARMED</span></td>
-          <td class="no-wrap">0 of 9 &middot; jitter 41 s</td>
+          <td>0 of 9 &middot; jitter 41 s</td>
           <td class="mbx-actions">
-            <button type="button" disabled title="Delivery is already scheduled">Deliver now</button>
+            <button type="button" disabled title="Delivery is already scheduled">Deliver</button>
             <button type="button" onclick="if(confirm('Purge the message for OE1KBC-4 from DK5EN-93 (NNN 019)?')){callfunction('mboxpurge','15');}">Purge</button>
           </td>
         </tr>
