@@ -162,6 +162,52 @@ Web GUI: `/?page=mailbox` (owner password), setup card "Store node", and the `/s
 `"STORE":"heard","STON":1`. Say if you want it; it is a small firmware change once the app side
 agrees on the names.
 
+### 5.1 Answer from MCProxy (2026-09-14): yes to `SN`, with these names
+
+MCProxy wants the `SN` field. Without it the only way to show a store node's role is a console
+round trip, which MCProxy does not do on a timer and cannot do at all while the BLE link is busy;
+the role would then be stale exactly when the mailbox matters. Proposed names, matching the
+existing `SN` style:
+
+```
+"STORE": "off" | "own" | "list" | "heard"     role, absent on ineligible hardware
+"STON":  0 | 1                                 --storenotice state
+```
+
+Two requests on the semantics, both cheap on the firmware side and both load-bearing for a client:
+
+- **Omit `STORE` entirely on ineligible hardware** rather than sending `"off"`. "This node cannot
+  store" and "this node could but is switched off" are different claims, and a client that cannot
+  tell them apart will offer a setting that silently does nothing. This mirrors `[STORE];unavailable`
+  on the console.
+- **Keep `used`/`slots` out of `SN`.** They change constantly while the role does not, and `SN` is a
+  settings frame. A client that wants occupancy can ask for `--mbox`.
+
+Until the field exists, MCProxy shows no store role at all — it will not infer one from `[STORE];…`
+console lines, because those only appear in response to a command MCProxy has no reason to send.
+
+### 5.2 What MCProxy implements, and what it deliberately does not
+
+Plan of record: MCProxy `doc/2026-09-14_1153-store-forward-dm-status-plan.md`.
+
+Implemented: section 2 in full — `0x03`/`0x04` status decoding, the callsign appendix as `holder`,
+the precedence rules applied on ingest (as a monotone rank `sent/heard/gateway < held < failed <
+acked`, which reproduces every rule and every sequence in section 6), and a durable per-message
+status plus holder persisted so a client reload does not lose the state.
+
+Deliberately **not** implemented, so the firmware side does not wait on it:
+
+- **No push notification on `failed` or on `acked`-after-`held`** (section 4's suggestion).
+  MCProxy's push dispatcher subscribes to inbound mesh messages, not to status events; adding a
+  second source is its own change. Delivery status is shown in every view, just not pushed.
+- **No `held` synthesis from the `:sto` text** (section 3). The rule is conditioned on "a node that
+  never sends `0x04`", which a client cannot cheaply establish, and guessing wrong double-counts on
+  fork firmware. MCProxy therefore leaves the text a visible DM — its history filter matches
+  `:ack` only, so the text was never at risk of being silently filtered — and suppresses only the
+  push for it, alongside `:ack` and `:rej`.
+- **No store-node configuration surfaces** (section 5's commands, `--mbox`, `/?page=mailbox`).
+  Separate feature; the `SN` field above is the only part of section 5 MCProxy asks for.
+
 ## 6. Test vectors
 
 Frames as the node hands them to the transport (before the length byte and the 4 time bytes).
