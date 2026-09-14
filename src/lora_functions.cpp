@@ -1218,7 +1218,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // re-stored here (that is what feeds msgstoreOnPeerDelivery()
                                 // below) -- compute the signature once and gate the store
                                 // hook on it.
-                                bool bMboxPeerDelivery = (rly_hop == 0 && aprsmsg.msg_source_path.indexOf(',') >= 0);
+                                // Advisor re-check: hop 0 + comma alone also matches a
+                                // sender's DM whose hops ran out in the mesh. Sender ids
+                                // are (_GW_ID<<10)|NNN (loop_functions.cpp sendMessage),
+                                // mailbox ids are millis(), so the low 10 bits of msg_id
+                                // equalling the payload NNN says "sender copy". (Stage 1's
+                                // fresh-id attempts will need a different tell.)
+                                int iMboxTagPos = aprsmsg.msg_payload.indexOf("{", 1);
+                                uint16_t mboxTagNnn = (iMboxTagPos > 0) ? (uint16_t)(aprsmsg.msg_payload.substring(iMboxTagPos + 1)).toInt() : 0;
+                                bool bMboxPeerDelivery = (rly_hop == 0 &&
+                                                          aprsmsg.msg_source_path.indexOf(',') >= 0 &&
+                                                          iMboxTagPos > 0 &&
+                                                          (aprsmsg.msg_id & 0x3FF) != mboxTagNnn);
 
                                 int iMboxAckPos = aprsmsg.msg_payload.indexOf(":ack");
 
@@ -1254,12 +1265,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // another store node's mailbox delivery, heard directly.
                                 if(bMboxPeerDelivery)
                                 {
-                                    int iMboxPeerPos = aprsmsg.msg_payload.indexOf("{", 1);
-
-                                    if(iMboxPeerPos > 0)
                                     {
-                                        uint16_t mboxPeerNnn = (uint16_t)(aprsmsg.msg_payload.substring(iMboxPeerPos + 1)).toInt();
-                                        msgstoreOnPeerDelivery(aprsmsg.msg_source_call.c_str(), mboxPeerNnn);
+                                        msgstoreOnPeerDelivery(aprsmsg.msg_source_call.c_str(), mboxTagNnn);
                                     }
                                 }
 #endif

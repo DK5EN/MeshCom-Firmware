@@ -242,3 +242,12 @@ entries `test_msgstore` + `+<msgstore.cpp>`.
 - **Bench:** `--injectraw` replays through `OnRxDone()`; `--airgap` (stage 0) simulates the absent
   destination; RAK-90 store node, Heltec-93 sender, T-Beam-92 relay/ineligible, T-Deck-14
   destination.
+
+## Advisor re-check close-out (2026-09-14)
+
+APPROVED on 96050d72. Two low items closed afterwards: the peer-delivery signature also requires
+the frame's msg_id low 10 bits to differ from the payload NNN (sender copies carry the NNN there,
+mailbox deliveries carry millis), so an exhausted-hop relay copy is stored and does not cancel a
+running ladder — stage 1's fresh-id attempts will need another tell; and the re-entrancy test now
+runs to the ninth attempt, where the old code would have stamped COOLDOWN onto a purged slot.
+Bench T-3.1..T-3.9 open; T-3.1 on the Heltec V3 is the proof of the F1 fix.

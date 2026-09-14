@@ -484,12 +484,25 @@ static void test_reentrant_ack_during_deliver_keeps_slot_free(void)
     int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
     TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));   // ARMED
 
+    // Advisor re-check: run the ladder to attempt 8 first, so the ninth
+    // attempt's post-deliver step would stamp COOLDOWN onto the slot --
+    // that is the resurrection the gen counter must prevent. At attempt 1
+    // the old code passed this test too.
+    for(int i = 0; i < 8; i++)
+    {
+        g_now += 200000UL;   // past any step or block gap and the 30 s node gap
+        msgstoreLoop();
+    }
+    TEST_ASSERT_NOT_NULL(msgstoreEntry(slot));
+    TEST_ASSERT_EQUAL_UINT8(8, msgstoreEntry(slot)->attempt);
+
+    g_now += 200000UL;
     g_deliver_reentrant_ack = true;
-    msgstoreLoop();   // deliver() acks this exact entry from inside itself
+    msgstoreLoop();   // ninth attempt: deliver() acks this exact entry from inside itself
 
     TEST_ASSERT_NULL(msgstoreEntry(slot));                        // stays FREE, not resurrected into COOLDOWN
     TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->purged_ack);
-    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->delivered);   // the frame is still on the ring
+    TEST_ASSERT_EQUAL_UINT32(9, msgstoreCounters()->delivered);   // every frame was still put on the ring
 }
 
 // ------------------------------------------------------------- millis wrap

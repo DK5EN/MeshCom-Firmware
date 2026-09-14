@@ -8,7 +8,7 @@ T7/T8/T9/T12/T13/T14. Refuted claims from the three earlier verdicts were not re
 Native run by the advisor: `pio test -e native -f test_msgstore` 28/28. No board build run here
 (orchestrator owns `.pio/build`).
 
-## Verdict: REWORK
+## Verdict: APPROVED (re-check of 96050d72; the original verdict on 59f21e5b was REWORK)
 
 One critical, one high, two medium. The core is sound against D5/§3.5 in every arithmetic the
 brief asked for, but on every normal ESP32-S3 image the loop task never calls it, and the hook gate
@@ -291,3 +291,83 @@ sender` (`msgstore.cpp:356-358`): argument order CONFIRMED correct, test
   deliveries should appear at NORMAL priority in the setlog `RLY`/`TX` lines.
 - Finding 4's window is not bench-observable at useful rates; the native re-entrancy case is
   the evidence.
+
+## Re-check (96050d72)
+
+Diff `59f21e5b..96050d72`. Native `pio test -e native -f test_msgstore` 41/41 (0.53 s). No board
+build run here.
+
+- **F1 — FIXED.** `msgstoreLoop()` now sits in the `if(bRadio)` tick at
+  `src/esp32/esp32_main.cpp:2160-2162`, guarded; the EXTERNAL_RADIO copy at `:4104` stays. Both
+  ticks key on the same `retransmit_timer`, so at most one fires per iteration.
+- **F2 — FIXED.** The `!msg_server` gate is gone from presence (`src/lora_functions.cpp:891`)
+  and from the store/purge/peer block (`:1207-1265`). New false triggers checked: a gateway's
+  server→LoRa emission keeps the server frame's hop count (`udp_functions.cpp` never assigns
+  `max_hop` except the 0x20 flag at `:461`; `nrf_eth.cpp:627` same) and carries a comma
+  (`SENDER,GW`), so it neither passes the presence test nor matches the hop-0 peer signature;
+  a gateway's own originated frames never set 0x80 (only `:1598`, `udp_functions.cpp:358`,
+  `nrf_eth.cpp:487` set it, all on forwarded copies). No new trigger found.
+- **F3 — FIXED.** Every `next_ms` compare is signed-difference now: `msgstore.cpp:493`, `:507`,
+  `:511`, `:680`, `:688-690`; page `web_functions.cpp:1694`. The `stored_ms` compares were
+  already unsigned-difference (`:426`, `:478`, `command_functions.cpp:4781`,
+  `web_functions.cpp:1686`). Grep over `src/` finds no raw `<`/`>` on either field.
+- **F4 — FIXED, one residual.** `gen` (`msgstore_api.h:55`) is bumped on every hook mutation
+  (refresh `:337`, new `:354`, ack `:405`, presence `:431`, peer `:456`, expiry `:487`, purge
+  `:612`, purge-all `:622`, shrink `:206`); the loop snapshots `gen` and the entry
+  (`:563-571`), hands `deliver()` the stack copy, and skips the ladder stamp when
+  `state == FREE || gen != gen_before` (`:579-580`) while still recording the action. Walked
+  every hook: `msgstoreDeliverNow()` does not touch `gen`, but it only acts on HELD/COOLDOWN and
+  the candidate is ARMED/LADDER, so it cannot hit the in-flight slot. Residual: the few
+  instructions between the `gen` check at `:579` and the stamps at `:582-597` remain
+  unguarded — irreducible without a lock, orders of magnitude narrower than the `deliver()`
+  window, accepted.
+- **F5 — NOT CHANGED, accepted as operator decision.** `msgstore_glue.cpp:91-115` documents
+  the choice: CRITICAL classification wanted, READY-then-DONE inherits the SendAckMessage N-14
+  window (`loop_functions.cpp:4990-5009`). The trade-off is stated correctly; the residual race
+  is the same one the ACK path has carried since N-14. Bench T-3.9 should confirm mailbox
+  frames do not starve relays at a busy hour.
+- **F6 — FIXED, with an over-reach I proposed and now flag.** `bMboxPeerDelivery` is computed
+  once at `:1219`, the store hook is gated on `!bMboxPeerDelivery` (`:1235`), the peer-cancel
+  runs after (`:1252`). The signature (`rly_hop == 0` and a comma) is also what a sender's DM
+  looks like after its hop count is exhausted in the mesh: `MAX_HOP_TEXT_DEFAULT` is 4
+  (`configuration_global.h:288`), so a DM heard from the fourth relay, or any DM whose sender
+  set `--maxhop` low, is now never stored and cancels a running ladder for that (src, NNN)
+  instead of refreshing it. Cheap discriminator available: every sender-originated text id is
+  `(_GW_ID << 10) | NNN` (`loop_functions.cpp:4112`, kept by relays), a mailbox id is `millis()`
+  (`msgstore_glue.cpp:71`) — `(aprsmsg.msg_id & 0x3FF) == nnn` identifies the sender's frame
+  with a 1/1024 miss. Stage 1's fresh ids must keep the low-10-bit NNN for this to hold; note
+  it in the stage-1 brief either way. Low; decide before S3-2 closes, not a blocker.
+- **F7 — FIXED.** `s_blocked_episode_active` (`:54`) counts once per due-but-refused run
+  (`:536-544`), cleared on pass (`:549`) or nothing-due (`:521`); label "blocked by caps",
+  setlog key `blk` (`:703`). Test `test_blocked_episode_counted_once_across_five_ticks` fails
+  on the old code (5 vs 1).
+- **F8 — FIXED.** `msgstoreConfigure()` frees live slots `>= new_slots` and counts them as
+  `dropped_slots` (`:200-211`). Test fails on the old code (used 10, entries visible).
+
+### New tests (13): sharpness
+
+Fail-before verified by reading the old code for: `test_wrap_due_check_across_wrap` (old
+`next_ms > now` skips), `test_wrap_candidate_pick_across_wrap` (old picks b),
+`test_wrap_cooldown_release_across_wrap` (old never releases),
+`test_wrap_next_action_in_ms_across_wrap` (old returns ~2^32), blocked-episode, shrink,
+`test_deliver_call_receives_entry_fields`, `test_presence_jitter_uses_hi_bound` (a swapped
+`(lo, hi)` in the core returns MIN). Coverage-only (pass on old code too, acknowledged in the
+file): `test_wrap_storetime_drop_across_wrap`, the three presence-outside-HELD cases.
+
+**Not sharp: `test_reentrant_ack_during_deliver_keeps_slot_free`.** On the old `59f21e5b`
+loop the re-entrant ack frees the slot, then `attempt++` makes it 1, which is `< 9`, so the
+old code writes `next_ms` on a FREE slot and leaves `state` FREE — `msgstoreEntry()` returns
+NULL and all three assertions pass on the unfixed code. The resurrection F4 described needs
+the ninth attempt (`attempt >= 9` → COOLDOWN). Fix: drive the entry to `attempt == 8` first
+(eight `msgstoreLoop()` calls with the step gaps), then set `g_deliver_reentrant_ack` for the
+ninth; or add a peer-cancel variant asserting `state == HELD && attempt == 0` afterwards (old
+code leaves HELD with `attempt == 1`). One of the two is owed before S3-2 closes — the code
+fix itself is correct by reading.
+
+### Still open
+
+1. Sharpen the F4 regression test as above (test-only change).
+2. Decide the F6 over-reach: keep (miss hop-exhausted DMs, simpler) or add the
+   `(msg_id & 0x3FF) == nnn` discriminator (one condition in the hook, one native case if the
+   core is given the id — or bench-only).
+3. Bench T-3.1..T-3.9 as listed, T-3.1 on the Heltec specifically for F1.
