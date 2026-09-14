@@ -1,0 +1,239 @@
+<title>MeshCom Mailbox Page</title>
+<meta name="description" content="Design mockup for the store-node mailbox page (/?page=mailbox) in the MeshCom web GUI, stage 3">
+<!--
+  Mockup for /?page=mailbox (docs/dm-stage3-wave-plan-20260914.md, owner B).
+  Deliberately single-theme: the firmware GUI (src/web_functions/web_functions.cpp:1042-1152)
+  has one fixed light palette and no dark mode, and this page must be liftable into
+  sub_page_mailbox() as-is. Tokens, class names and the scaffold (nav rail, red head bar,
+  content_title, content_inner, cardlayout, grid, mctab, mcbadge) are the firmware's own.
+  Added for this page only: .mbx-* classes, kept in the same idiom.
+  Example rows are bench-fleet callsigns; payload text is never shown (only its length).
+-->
+<style>
+:root {--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--mcamber:#F6E7B8;--widthfactor:1.0;}
+@media screen and (max-width:600px) {* {font-size:12px;} :root{--widthfactor:0.7;}}
+@media screen and (min-width:601px) {* {font-size:14px;} :root{--widthfactor:0.7;}}
+@media screen and (min-width:801px) {* {font-size:14px;} :root{--widthfactor:1.0;}}
+html {background:var(--mcbg);}
+body {background:var(--mcbg);padding:0px;margin:0px 0px;min-height:100vh;width:100%;-webkit-font-smoothing:antialiased;color:var(--mcgray);font-family:sans-serif;}
+.font-small {font-size:x-small;}
+.font-bold {font-weight:bold;}
+.no-wrap {white-space:nowrap;}
+#nav_layer {height:100%;width:calc(60px*var(--widthfactor));background-color:var(--mcgray);position:fixed;overflow:auto;top:0px;}
+#mc_logo {width:100%;aspect-ratio:1/1;margin:0px auto 75px auto;padding:5px 0px;display:block;background-color:#000;color:#fff;text-align:center;font-weight:bold;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:x-small;letter-spacing:0.05em;}
+.nav_button {background-color:var(--mcgray);border:solid 6px var(--mcgray);box-shadow:none;border-radius:10px 0px 0px 10px;cursor:pointer;width:100%;aspect-ratio:1/1;margin:calc(20px*var(--widthfactor)) 0;padding:0;display:block;}
+.nav_button>svg {display:block;width:90%;height:90%;margin:auto auto;stroke:#fff;fill:none;stroke-width:1.6;}
+.nav_button.nbactive {background-color:var(--mcbg);border-right-color:var(--mcbg);}
+.nav_button.nbactive>svg {stroke:var(--mcgray);}
+.nav_button:focus-visible {outline:2px solid var(--mcmidred);outline-offset:-2px;}
+select,input {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing:border-box;border:solid 1px #7c7c7c;}
+#head_layer {margin:0px 0px 0px calc(60px*var(--widthfactor));padding:10px 30px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#a2182f;color:#ffffff;width:auto;height:39px;box-sizing:content-box;}
+#head_layer>p {margin:0px 0px;}
+#content_title {padding:0px 30px 0px 0px;margin:0px 0px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#FCEDF0;}
+#content_title>p {margin:0;padding:6px 0;}
+#content_layer {margin-left:calc(60px*var(--widthfactor));top:0px;overflow:hidden;}
+#content_inner {margin:20px 10px 30px 4%;}
+#content_inner > table {border-collapse:separate;overflow:hidden;border-spacing:0;border:solid 1px #7c7c7c;border-radius:10px;width:100%;background:#f9f9f9;font-variant-numeric:tabular-nums;}
+#content_inner > table thead {background-color:var(--mcgray);color:#ffffff;}
+#content_inner > table th {text-align:left;padding:0.5em;font-weight:bold;white-space:nowrap;}
+#content_inner > table tr:nth-child(even) {background-color:#f0f0f0;}
+#content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px #e0e0e0;}
+#content_inner > table tr:last-child td {border-bottom:none;}
+.tablewrap {overflow-x:auto;max-width:100%;}
+#content_inner a {color:var(--mcred);}
+#content_inner button {background-color:var(--mclightred);border:solid 1px var(--mcgray);padding:3px 10px;text-align:center;cursor:pointer;display:inline-flex;align-items:center;border-radius:5px;font:inherit;color:inherit;}
+#content_inner button:hover {background-color:var(--mcmidred);}
+#content_inner button:focus-visible {outline:2px solid var(--mcred);outline-offset:1px;}
+#content_inner button:disabled {opacity:0.45;cursor:not-allowed;}
+.cardlayout {min-height:20px;border:solid 1px var(--mcgray);border-radius:7px;padding:7px;padding-top:16px;margin:30px 0px;position:relative;max-width:600px;}
+.cardlabel {position:absolute;font-weight:bold;margin:0 5px;left:6px;top:-1px;transform:translateY(-50%);z-index:10;background-color:#fff;padding:0 2px;}
+.grid {display:grid;align-items:center;grid-column-gap:8px;grid-row-gap:7px;margin:7px;}
+.grid2 {grid-template-columns:minmax(min-content,550px) minmax(min-content,50px);}
+.flex-auto-wrap {display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;}
+.flex-auto-wrap>* {flex:1;}
+input:where([type="checkbox"][role="switch"]) {-webkit-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border:1px solid #7c7c7c;border-radius:1em;vertical-align:text-bottom;margin:auto;background:#ddd;cursor:pointer;}
+input:where([type="checkbox"][role="switch"]):checked {background-color:rgb(102, 214, 102);}
+input:where([type="checkbox"][role="switch"])::before {content:"";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:#fff;border:1px solid #7c7c7c;}
+input:where([type="checkbox"][role="switch"]):checked::before {left:1.3em;}
+#content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;}
+#content_inner .mctab-on {background-color:var(--mclightblue);}
+.mcbadge {font-size:x-small;font-weight:bold;margin-left:4px;}
+/* mailbox page additions, same idiom */
+.mbx-counters {display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px 10px;margin:7px;font-variant-numeric:tabular-nums;}
+.mbx-counters>div {display:flex;justify-content:space-between;gap:6px;border-bottom:1px dotted #c8c8c8;padding:2px 0;}
+.mbx-counters b {font-weight:bold;}
+.mbx-state {display:inline-block;border:solid 1px var(--mcgray);border-radius:5px;padding:0 6px;font-size:x-small;font-weight:bold;white-space:nowrap;}
+.mbx-held {background:var(--mclightblue);}
+.mbx-armed {background:var(--mclightgreen);}
+.mbx-ladder {background:var(--mclightgreen);}
+.mbx-cooldown {background:var(--mcamber);}
+.mbx-stale {color:var(--mcred);}
+.mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}
+.mbx-actions {display:flex;gap:6px;white-space:nowrap;}
+.mbx-toolbar {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 10px 0;}
+.mbx-toolbar .spacer {flex:1;}
+.mbx-legend {font-size:x-small;margin:8px 0 0 0;color:#555;}
+.mbx-legend .mbx-state {margin-right:8px;}
+@media (prefers-reduced-motion:reduce) {* {transition:none !important;}}
+</style>
+
+<div id="nav_layer">
+  <div id="mc_logo">MESH<br>COM</div>
+  <button class="nav_button" title="Messages" aria-label="Messages"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg></button>
+  <button class="nav_button nbactive" title="Mailbox" aria-label="Mailbox"><svg viewBox="0 0 24 24"><path d="M3 8l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg></button>
+  <button class="nav_button" title="MHeard" aria-label="MHeard"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0"/></svg></button>
+  <button class="nav_button" title="Setup" aria-label="Setup"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+</div>
+
+<div id="head_layer"><p>DK5EN-90 &middot; RAK4631 &middot; 14.09.2026 21:42:07 UTC</p></div>
+
+<div id="content_layer">
+  <div id="content_title"><p><b>Mailbox</b> &nbsp; 14.09.2026 &nbsp; 21:42:07</p></div>
+  <div id="content_inner">
+
+    <div class="mbx-toolbar">
+      <span class="mctab mctab-on">store node: heard<span class="mcbadge">ON</span></span>
+      <span class="mctab">slots 4 / 50</span>
+      <span class="mctab">actions this hour 7 / 20</span>
+      <span class="mctab">next action in 12 s</span>
+      <span class="spacer"></span>
+      <button type="button" title="Reload the list">Refresh</button>
+      <button type="button" title="Drop every stored message" onclick="if(confirm('Purge all 4 stored messages? The senders are not told.')){callfunction('mboxpurge','all');}">Purge all</button>
+    </div>
+
+    <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Destination</th>
+          <th>Last heard</th>
+          <th>Source</th>
+          <th>NNN</th>
+          <th>Size</th>
+          <th>Age</th>
+          <th>Hold left</th>
+          <th>State</th>
+          <th>Attempts</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="font-bold no-wrap">DK5EN-14</td>
+          <td class="no-wrap">3 min</td>
+          <td class="no-wrap">DK5EN-93</td>
+          <td>017</td>
+          <td>42 B</td>
+          <td class="no-wrap">1 h 12 min</td>
+          <td class="no-wrap">22 h 48 min</td>
+          <td><span class="mbx-state mbx-ladder">LADDER</span></td>
+          <td class="no-wrap">1.4 of 9</td>
+          <td class="mbx-actions">
+            <button type="button" disabled title="A ladder is already running">Deliver now</button>
+            <button type="button" onclick="if(confirm('Purge the message for DK5EN-14 from DK5EN-93 (NNN 017)?')){callfunction('mboxpurge','3');}">Purge</button>
+          </td>
+        </tr>
+        <tr>
+          <td class="font-bold no-wrap">DK5EN-14</td>
+          <td class="no-wrap">3 min</td>
+          <td class="no-wrap">OE3XIR-12</td>
+          <td>884</td>
+          <td>118 B</td>
+          <td class="no-wrap">2 h 05 min</td>
+          <td class="no-wrap">21 h 55 min</td>
+          <td><span class="mbx-state mbx-cooldown">COOLDOWN</span></td>
+          <td class="no-wrap">1.9 of 9 &middot; next 38 min</td>
+          <td class="mbx-actions">
+            <button type="button" onclick="if(confirm('Start a delivery ladder now for OE3XIR-12 to DK5EN-14 (NNN 884)? Ignores the cooldown, still subject to the node caps.')){callfunction('mboxdeliver','7');}">Deliver now</button>
+            <button type="button" onclick="if(confirm('Purge the message for DK5EN-14 from OE3XIR-12 (NNN 884)?')){callfunction('mboxpurge','7');}">Purge</button>
+          </td>
+        </tr>
+        <tr>
+          <td class="font-bold no-wrap">DK5EN-92</td>
+          <td class="no-wrap mbx-stale" title="Older than the store set window">11 h 40 min</td>
+          <td class="no-wrap">DK5EN-93</td>
+          <td>018</td>
+          <td>27 B</td>
+          <td class="no-wrap">4 h 31 min</td>
+          <td class="no-wrap">19 h 29 min</td>
+          <td><span class="mbx-state mbx-held">HELD</span></td>
+          <td class="no-wrap">0 of 9</td>
+          <td class="mbx-actions">
+            <button type="button" onclick="if(confirm('Start a delivery ladder now for DK5EN-93 to DK5EN-92 (NNN 018)? DK5EN-92 was last heard 11 h 40 min ago.')){callfunction('mboxdeliver','12');}">Deliver now</button>
+            <button type="button" onclick="if(confirm('Purge the message for DK5EN-92 from DK5EN-93 (NNN 018)?')){callfunction('mboxpurge','12');}">Purge</button>
+          </td>
+        </tr>
+        <tr>
+          <td class="font-bold no-wrap">OE1KBC-4</td>
+          <td class="no-wrap">just now</td>
+          <td class="no-wrap">DK5EN-93</td>
+          <td>019</td>
+          <td>61 B</td>
+          <td class="no-wrap">14 min</td>
+          <td class="no-wrap">23 h 46 min</td>
+          <td><span class="mbx-state mbx-armed">ARMED</span></td>
+          <td class="no-wrap">0 of 9 &middot; jitter 41 s</td>
+          <td class="mbx-actions">
+            <button type="button" disabled title="Delivery is already scheduled">Deliver now</button>
+            <button type="button" onclick="if(confirm('Purge the message for OE1KBC-4 from DK5EN-93 (NNN 019)?')){callfunction('mboxpurge','15');}">Purge</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="mbx-legend">
+      <span class="mbx-state mbx-held">HELD</span>waiting for the destination to be heard directly
+      <span class="mbx-state mbx-armed">ARMED</span>heard, random 5-60 s wait, cancelled if another store node delivers first
+      <span class="mbx-state mbx-ladder">LADDER</span>9 sends over 9 min at hop 0
+      <span class="mbx-state mbx-cooldown">COOLDOWN</span>ladder done without ack, 1 h before the next
+      <br>Attempts read cycle.attempt. Last heard in red is older than the 12 h store-set window: the entry is kept until hold runs out, but delivery needs a fresh direct sighting. Message text is never shown here.
+    </p>
+
+    <div class="cardlayout">
+      <span class="cardlabel">Counters since boot</span>
+      <div class="mbx-counters">
+        <div><span>stored</span><b>23</b></div>
+        <div><span>refreshed</span><b>5</b></div>
+        <div><span>delivered</span><b>16</b></div>
+        <div><span>purged by ack</span><b>14</b></div>
+        <div><span>dropped storetime</span><b>2</b></div>
+        <div><span>dropped by cap</span><b>0</b></div>
+        <div><span>dropped no slot</span><b>0</b></div>
+        <div><span>cancelled by peer</span><b>1</b></div>
+        <div><span>blocked QRS/QRT</span><b>3</b></div>
+      </div>
+      <p class="font-small" style="margin:7px;">Same numbers as the <code>MBOX</code> setlog line. Dropped by cap and dropped no slot are two counters on purpose: the first means the 20-per-hour ceiling ate a hold time, the second means the mailbox was full.</p>
+    </div>
+
+    <div class="cardlayout">
+      <span class="cardlabel">Store node</span>
+      <div class="grid grid2">
+        <label for="storemode">Store messages for</label>
+        <select id="storemode" name="storemode">
+          <option value="off">off</option>
+          <option value="own">own callsign, all SSIDs</option>
+          <option value="list">callsign list</option>
+          <option value="heard" selected>every station heard directly (12 h)</option>
+        </select>
+        <label for="storecall">Callsign list (list mode, up to 16)</label>
+        <input id="storecall" name="storecall" type="text" value="" placeholder="OE1KBC-4,DK5EN-14" size="28">
+        <label for="storetime">Hold time in hours (1 to 168)</label>
+        <input id="storetime" name="storetime" type="number" min="1" max="168" value="24" size="6">
+        <label for="storeslots">Slots (1 to 50)</label>
+        <input id="storeslots" name="storeslots" type="number" min="1" max="50" value="50" size="6">
+      </div>
+      <div class="mbx-warn" id="storewarn">
+        <b>Before you switch this on.</b> This node must run 24/7 on continuous power. Stored messages live in RAM only; a reboot discards all of them without notice, and nobody is told. About 9.5 kB of RAM is reserved for 50 slots.
+      </div>
+      <div class="grid grid2">
+        <span>Enable the store node role</span>
+        <input id="storeenable" type="checkbox" role="switch" checked onchange="if(this.checked && !confirm('Run this node as a store node? It must stay on 24/7; stored messages are lost on every reboot.')){this.checked=false;return;}setvalue('store',this.checked?document.getElementById('storemode').value:'off',false);">
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>
+function callfunction(name,param){console.log('callfunction',name,param);}
+function setvalue(name,value,refresh){console.log('setvalue',name,value,refresh);}
+</script>

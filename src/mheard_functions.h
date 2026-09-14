@@ -39,4 +39,10 @@ int getMheardCount();
 bool mheardFreshMs(int iset, uint32_t window_ms);
 bool mheardPathFreshMs(int iset, uint32_t window_ms);
 
+// Store node (stage 3): monotonic age of the last direct sighting of `call`
+// in ms, or -1 when the call is not in the table. The mailbox page shows
+// this as the real last-heard age (T7) instead of implying a clean 12 h
+// window; the delivery gate uses it for the store-set test in `heard` mode.
+int32_t mheardAgeMs(const char *call);
+
 #endif

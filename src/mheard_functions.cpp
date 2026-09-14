@@ -1193,3 +1193,23 @@ unsigned long getLatestMHeardTimestamp()
     }
     return max_ts;
 }
+
+int32_t mheardAgeMs(const char *call)
+{
+    if(call == NULL || call[0] == 0x00)
+        return -1;
+
+    for(int i = 0; i < MAX_MHEARD; i++)
+    {
+        if(mheardCalls[i][0] == 0x00)
+            continue;
+        if(strcmp(mheardCalls[i], call) == 0)
+        {
+            uint32_t age = (uint32_t)(millis() - mheardMillis[i]);
+            if(age > (uint32_t)INT32_MAX)
+                age = (uint32_t)INT32_MAX;
+            return (int32_t)age;
+        }
+    }
+    return -1;
+}
