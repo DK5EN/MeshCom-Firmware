@@ -259,7 +259,12 @@ Ethernet gateway path in `src/nrf52/nrf_eth.cpp`, which is a hand-duplicated twi
 server path and would otherwise have displayed every attempt. A duplicate is re-acked through the
 stage 0 limiter, not displayed, not forwarded to the app; mheard and the msg_id ring still see the
 frame. The limiter table moved from the header into `src/reack_limiter.cpp` so all three paths
-share one 30 s window per (call, NNN). Test `test/test_dm_dedup` (11 cases).
+share one 30 s window per (call, NNN). Test `test/test_dm_dedup` (12 cases). A duplicate that
+arrives by LoRa on a gateway is still uploaded to the server (the GWU path runs after the hook):
+"never forwarded twice" holds for the app and the display, while the server-side fold on (source,
+NNN) is the accepted risk in the list at the end. On nRF52 the dedup and limiter tables are written
+from the LORA task and the loop task without a lock; the worst case is one torn verdict, no memory
+unsafety, accepted (advisor F3).
 
 ### 2.2 Bounded ACK repeats — deferred (2026-09-14)
 
@@ -314,9 +319,13 @@ Constraints that must be in every brief:
   evicts the oldest under pressure, so show the **real last-heard age** per mailbox entry rather
   than implying a clean 12 h window.
 - **Mailbox dedup needs the payload check too** (T12), over a 24 h window rather than 1 h.
-- **§3.5 caps are mandatory**: one delivery per (source, NNN) per 10 min, max 3 per entry, one
-  mailbox action per 30 s, **20 per hour per node**, nothing while QRS/QRT is latched, jitter
-  5-60 s with peer cancellation.
+- **Delivery schedule is D5, caps are §3.5 as amended by the verdict** (corrected 2026-09-14; the
+  earlier "one per 10 min, max 3 per entry" wording here was the concept's pre-D5 text). Per
+  presence trigger: the 9-send ladder, then a one-hour cooldown before the next cycle for that
+  entry, until `:ackNNN` or `storetime`. Node-wide: one mailbox action per 30 s, **20 per hour**,
+  nothing while QRS/QRT is latched or the 5-minute utilisation exceeds 25 %, jitter 5-60 s with
+  cancellation on hearing a peer's delivery for the same (source, NNN). The 20-per-hour ceiling is
+  load-bearing, not precautionary.
 - **Owner-only auth on the mailbox page**, and never show payload text — `heard` mode exposes
   third-party DM metadata to an operator who is not a party to it.
 - Counters, with `dropped by delivery cap` and `dropped by slot pressure` as **two** counters.
@@ -373,17 +382,17 @@ the real presence trigger, not a synthetic event.
 
 ### Stage 3 tests
 
-| ID    | Test                                                                              | Expect                                                                                            |
-| ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| T-3.1 | Destination `--airgap on`, send DM, wait, `--airgap off`                          | One delivery at `max_hop` 0 within a beacon interval; ACK reaches sender                          |
-| T-3.2 | Watch the relay during T-3.1                                                      | Relay logs `hop0` skip; the delivery is never forwarded                                           |
-| T-3.3 | Destination never acks                                                            | 9 sends, one-hour cooldown, then 9 more; `dropped by cap` after `storetime`                       |
-| T-3.4 | Two store nodes that hear each other; then repeat with them mutually airgapped    | First: one delivery. Second: two deliveries, per-entry cap of 3 still holds (T14 hidden terminal) |
-| T-3.5 | Store node is also a gateway, fed a server-injected frame for an unknown callsign | No phantom neighbour learned (T8); no stale replay to the server                                  |
-| T-3.6 | Store node reboot with pending entries                                            | Mailbox empty, drop logged, the RAM warning was shown when enabling                               |
-| T-3.7 | Destination on upstream 4.35t                                                     | DM displayed, plain `:ackNNN` matched by the sender                                               |
-| T-3.8 | String-scan the release image                                                     | No `0x41` emission path for a stored DM; `--airgap` compiled out                                  |
-| T-3.9 | 25 DMs to an absent destination                                                   | §3.5 caps hold, no QRT, ring occupancy flat                                                       |
+| ID    | Test                                                                              | Expect                                                                                                                                          |
+| ----- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-3.1 | Destination `--airgap on`, send DM, wait, `--airgap off`                          | One delivery at `max_hop` 0 within a beacon interval; ACK reaches sender                                                                        |
+| T-3.2 | Watch the relay during T-3.1                                                      | Relay logs `hop0` skip; the delivery is never forwarded                                                                                         |
+| T-3.3 | Destination never acks                                                            | 9 sends, one-hour cooldown, then 9 more; `dropped by cap` after `storetime`                                                                     |
+| T-3.4 | Two store nodes that hear each other; then repeat with them mutually airgapped    | First: one delivery, the peer cancels in jitter. Second: two deliveries; the 20-per-hour node ceiling still holds on each (T14 hidden terminal) |
+| T-3.5 | Store node is also a gateway, fed a server-injected frame for an unknown callsign | No phantom neighbour learned (T8); no stale replay to the server                                                                                |
+| T-3.6 | Store node reboot with pending entries                                            | Mailbox empty, drop logged, the RAM warning was shown when enabling                                                                             |
+| T-3.7 | Destination on upstream 4.35t                                                     | DM displayed, plain `:ackNNN` matched by the sender                                                                                             |
+| T-3.8 | String-scan the release image                                                     | No `0x41` emission path for a stored DM; `--airgap` compiled out                                                                                |
+| T-3.9 | 25 DMs to an absent destination                                                   | §3.5 caps hold, no QRT, ring occupancy flat                                                                                                     |
 
 ### Gate after every stage
 

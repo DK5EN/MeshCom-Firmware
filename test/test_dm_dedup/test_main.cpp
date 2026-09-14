@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include <dm_dedup.h>
+#include <crc32_util.h>
 
 void setUp(void)
 {
@@ -103,6 +104,10 @@ static void test_gealterter_eintrag_ist_wieder_new(void)
 // NEW, die uebrigen 15 bleiben DUP.
 static void test_siebzehnter_eintrag_verdraengt_den_aeltesten(void)
 {
+    // Einfuegereihenfolge != Altersreihenfolge (Advisor F1): nnn=0 wird nach
+    // dem Fuellen mit anderem Payload ersetzt und bekommt damit die JUENGSTE
+    // first_ms. Der aelteste Eintrag ist dann nnn=1. Ein Rundlauf-Verdraenger
+    // wuerde nnn=0 opfern, ein Alters-Verdraenger nnn=1.
     for(int i = 0; i < DM_DEDUP_SLOTS; i++)
     {
         char payload[8];
@@ -110,25 +115,37 @@ static void test_siebzehnter_eintrag_verdraengt_den_aeltesten(void)
         TEST_ASSERT_EQUAL(DM_DEDUP_NEW,
                            dmDedupCheck("DK5EN-1", (uint16_t)i, payload, strlen(payload), 1000 + (uint32_t)i));
     }
+    TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 0, "q0", 2, 1500));   // ersetzt, jung
 
-    // 17. distinctes Paar, weit innerhalb des Alterungsfensters -- verdraengt
-    // per Alter, nicht per Rundlauf.
+    // 17. distinctes Paar, weit innerhalb des Alterungsfensters.
     TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 16, "p16", 3, 2000));
 
-    // nnn=0 ist verdraengt -- sofort wieder NEW. (Dieser Aufruf traegt nnn=0
-    // seinerseits wieder ein -- nnn=1 waere jetzt der aelteste Eintrag und
-    // wuerde von einem naechsten distinkten Paar verdraengt; das ist hier
-    // nicht Teil der Behauptung, siehe die Schleife unten ab i=2.)
-    TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 0, "p0", 2, 2001));
+    // nnn=1 (aeltester) ist verdraengt, nnn=0 (juengster) nicht.
+    TEST_ASSERT_EQUAL(DM_DEDUP_DUP, dmDedupCheck("DK5EN-1", 0, "q0", 2, 2001));
+    TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 1, "p1", 2, 2001));
+}
 
-    // nnn=2..15 sind unberuehrt und bleiben DUP.
-    for(int i = 2; i < DM_DEDUP_SLOTS; i++)
-    {
-        char payload[8];
-        snprintf(payload, sizeof(payload), "p%d", i);
-        TEST_ASSERT_EQUAL(DM_DEDUP_DUP,
-                           dmDedupCheck("DK5EN-1", (uint16_t)i, payload, strlen(payload), 2001));
-    }
+// Laenge unabhaengig von der CRC (Advisor F2): ein laengerer Payload mit
+// identischen unteren 16 CRC-Bits muss trotzdem NEW sein. Die Kollision wird
+// zur Laufzeit gesucht (3-Byte-Suffix, ~857k Kandidaten, Sekundenbruchteil).
+static void test_andere_laenge_bei_gleicher_crc16_ist_new(void)
+{
+    const char *base = "hallo";
+    uint16_t want = (uint16_t)(crc32_buf(base, strlen(base)) & 0xFFFF);
+    char cand[16];
+    bool found = false;
+    for(int a = 0x20; a < 0x7F && !found; a++)
+        for(int b = 0x20; b < 0x7F && !found; b++)
+            for(int c = 0x20; c < 0x7F && !found; c++)
+            {
+                snprintf(cand, sizeof(cand), "%s%c%c%c", base, a, b, c);
+                if((uint16_t)(crc32_buf(cand, strlen(cand)) & 0xFFFF) == want)
+                    found = true;
+            }
+    TEST_ASSERT_TRUE_MESSAGE(found, "no 3-byte crc16 collision found");
+
+    TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 5, base, strlen(base), 1000));
+    TEST_ASSERT_EQUAL(DM_DEDUP_NEW, dmDedupCheck("DK5EN-1", 5, cand, strlen(cand), 1001));
 }
 
 static void test_millis_rollover(void)
@@ -164,6 +181,7 @@ int main(int, char **)
     RUN_TEST(test_praefix_rufzeichen_sind_verschieden);
     RUN_TEST(test_gealterter_eintrag_ist_wieder_new);
     RUN_TEST(test_siebzehnter_eintrag_verdraengt_den_aeltesten);
+    RUN_TEST(test_andere_laenge_bei_gleicher_crc16_ist_new);
     RUN_TEST(test_millis_rollover);
     RUN_TEST(test_null_argumente_sind_new_ohne_absturz);
     return UNITY_END();
