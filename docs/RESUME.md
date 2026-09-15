@@ -1,5 +1,28 @@
 # RESUME — pick up here
 
+## Where we are, end of 2026-09-15 (start here)
+
+Branch `dry-unification`, HEAD `b0adf723`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row
+W3C): phases A-C done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done, **W3
+code-complete -- only its bench proof is open**, W4-W7, C4d and phase E not started. ~29 working
+days to the PR.
+
+**First thing next session -- bench, three nodes on the table (three USB slots):**
+
+1. RAK4631 DK5EN-90, still on release v4.35t.09.12.2: flash the W3c `wiscore_rak4631` image, watch
+   the boot log for `[SETST];path;legacy_rewritten` then `legacy_migrated` (it carries a stale
+   keyed-store file from 09-12 next to the newer blob), then
+   `python3 tools/bench/w3_upgrade_check.py docs/bench/w3-baseline/rak90-config-20260912.json <ip>`
+   (web GUI by IP only, no mDNS). Expect 0 CHANGED / 0 LOST. Also check `/counters.txt` exists via a
+   second reboot: `[SETST];path;keyed` and no `legacy_rewritten`.
+2. Heltec V3 DK5EN-93: same check against `heltec93-config-20260912.json`; the boot log must not
+   show `[SETST];counters;...;failed`; `--info` msg ids continue from the old Credentials counter.
+3. T-Deck Plus DK5EN-14: the 25 NVS-only keys (W3 step 5 remainder) -- keyboard lock, backlight,
+   mute, audio paths survive the upgrade boot (`--info`, SYM+K state).
+
+When all three pass: close W3 in BACKLOG/Gantt (W3 row `st: "done"`), then W4 (command table,
+`D2-10`) is next. Do not flash anything before the nodes are on the table and confirmed.
+
 ## 2026-09-15: W3c -- one settings struct, counters namespace, member gate (dry-unification)
 
 W3 steps 2, 3 and 6 are in code on `dry-unification`; only the bench proof is left of W3.
