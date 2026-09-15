@@ -25,8 +25,11 @@
 #include <string>
 #include <vector>
 
+#include <counters_store.h>	// countersLoad()/countersSave()
+#include <crc32_util.h>		// crc32_buf() -- must match nrf52_flash.cpp's own legacy-blob CRC
 #include <msgid_counter.h>
 #include <nrf52/WisBlock-API.h> // s_meshcom_settings, meshcom_settings, init_flash_done, MESHCOM_DATA_MARKER
+#include <nrf52/ble_settings_v1.h> // s_ble_settings_v1, bleSettingsToV1() -- legacy blobs are v1 images now (D1-04 W3 step 4)
 #include <nrf52/settings_store_nrf52.h> // SettingsLoadResult, settingsStoreLoad()/Save()
 #include <settings_schema.h>
 #include <settings_store.h>
@@ -50,23 +53,47 @@ extern "C" void mc_disarm_malloc_failure(void);
 static const char *const kLegacyPath = "MeshCom-RAK";
 static const char *const kKeyedPath = "/MeshCom-Settings-Store";
 static const char *const kKeyedTmpPath = "/MeshCom-Settings-Store.tmp";
+static const char *const kCountersPath = "/counters.txt";
+static const char *const kLegacyCrcPath = "/legacy_blob.crc";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-// A legacy-format blob: a raw struct blit, exactly what nrf52_flash.cpp's
-// pre-cutover load/save path read and wrote directly. Built from an actual
-// native s_meshcom_settings instance (never hand-assembled byte offsets) so
-// this suite's notion of "the struct's bytes" always matches whatever this
-// host's ABI actually produces, the same object the product code reads back.
+// A legacy-format blob: a v1 image (s_ble_settings_v1, src/nrf52/ble_settings_v1.h), exactly what
+// nrf52_flash.cpp's init_flash() now reads through (D1-04 W3 step 4, Task 1) and what official
+// firmware v4.35t still writes as its raw settings blob -- NOT a raw blit of s_meshcom_settings any
+// more (that struct's layout is free to change since the D1-04 merge). Built from an actual native
+// s_meshcom_settings instance converted through the REAL bleSettingsToV1() (never hand-assembled byte
+// offsets), so this suite's notion of "the blob's bytes" always matches whatever this host's ABI and
+// the real conversion function actually produce, the same bytes the product code reads back.
+static std::vector<uint8_t> make_legacy_blob_from(const s_meshcom_settings &state)
+{
+    s_ble_settings_v1 img{};
+    bleSettingsToV1(state, img);
+    const uint8_t *p = reinterpret_cast<const uint8_t *>(&img);
+    return std::vector<uint8_t>(p, p + sizeof(img));
+}
+
 static std::vector<uint8_t> make_legacy_blob(const char *node_call)
 {
     s_meshcom_settings s; // struct defaults
     strncpy(s.node_call, node_call, sizeof(s.node_call) - 1);
     s.node_call[sizeof(s.node_call) - 1] = '\0';
-    const uint8_t *p = reinterpret_cast<const uint8_t *>(&s);
-    return std::vector<uint8_t>(p, p + sizeof(s));
+    return make_legacy_blob_from(s);
+}
+
+// Matches nrf52_flash.cpp's own recordLegacyBlobCrc() encoding exactly ("%08lX\n" hex, uppercase) --
+// Task 7 (addendum): seeds the CRC record a real boot would have written the last time it left the
+// legacy blob in a known state, so a test that wants the KEYED store to win can simulate "this blob
+// is unchanged since the last migration" instead of always looking freshly-downgraded.
+static void seed_legacy_blob_crc(const std::vector<uint8_t> &legacy_bytes)
+{
+    uint32_t crc = crc32_buf(legacy_bytes.data(), legacy_bytes.size());
+    char buf[16];
+    int n = snprintf(buf, sizeof(buf), "%08lX\n", (unsigned long)crc);
+    TEST_ASSERT_GREATER_THAN(0, n);
+    g_fake_fs.seed(kLegacyCrcPath, buf, (size_t)n);
 }
 
 // A valid keyed-store record, built through the REAL schema/codec
@@ -107,6 +134,10 @@ static void test_keyed_fast_path_wins_and_leaves_legacy_untouched(void)
 {
     auto legacy = make_legacy_blob("LEGACY-A1");
     g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    // Task 7 (addendum): the keyed fast path is refused unless the legacy blob's CRC matches a
+    // recorded one -- simulate "this blob was already migrated at some prior boot and has not
+    // changed since" so this test still exercises the fast path rather than the legacy one.
+    seed_legacy_blob_crc(legacy);
 
     auto keyed = make_keyed_store("KEYED-A2");
     g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
@@ -451,12 +482,15 @@ static void test_flash_reset_preserves_bonds_and_writes_exact_length(void)
     // The keyed store IS one of flash_reset()'s own two files -- gone.
     TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedPath));
 
-    // Exactly sizeof(s_meshcom_settings), not double: a missing remove()
-    // before the defaults rewrite would append onto the OLD legacy content
-    // instead of replacing it.
+    // Exactly sizeof(s_ble_settings_v1) (the v1 image flash_reset() now writes, Task 2), not double:
+    // a missing remove() before the defaults rewrite would append onto the OLD legacy content instead
+    // of replacing it. NOT sizeof(s_meshcom_settings) -- on this host's ABI the two coincidentally
+    // differ (2000 vs. 2008 bytes; see test_wrong_sized_legacy_blob_resets_to_defaults below for why
+    // that coincidence is exactly the regression this cutover has to guard against), so asserting
+    // against the live struct's size here would not even catch a real bug.
     const auto *after = g_fake_fs.peek(kLegacyPath);
     TEST_ASSERT_NOT_NULL(after);
-    TEST_ASSERT_EQUAL_UINT32((uint32_t)sizeof(s_meshcom_settings), (uint32_t)after->size());
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)sizeof(s_ble_settings_v1), (uint32_t)after->size());
 }
 
 // ---------------------------------------------------------------------------
@@ -489,30 +523,323 @@ static void test_max_hop_text_sentinel_survives_round_trip(void)
 }
 
 // ---------------------------------------------------------------------------
-// node_msgid / node_ackid persistence (Fable verdict, Finding 3): restored to
-// SETTINGS_PERSIST_ONLY_LIST (settings_schema.h) after being dropped from the
-// schema. Losing either row silently restarts that counter at 0 every
-// reboot, replaying msg_ids into every neighbour's dedup ring
-// (src/loop_functions.cpp:3331).
+// node_msgid persistence (D1-04 W3 step 4, operator decision 2026-09-13):
+// node_msgid was dropped from settings_schema.h entirely and given its own
+// file instead (src/counters_store.h), so a settings restore/rewrite/BLE
+// write can never rewind it. Replaces the two settings-store-based msgid/
+// ackid tests this suite had before that decision (node_ackid itself was
+// dropped from s_meshcom_settings in the same wave -- loaded, saved, never
+// read -- so there is nothing left to test a round trip of).
 // ---------------------------------------------------------------------------
 
-static void test_node_msgid_and_ackid_persist_round_trip(void)
+static void test_node_msgid_persists_via_counters_file(void)
 {
     meshcom_settings.node_msgid = 321;
-    meshcom_settings.node_ackid = 654;
-    strncpy(meshcom_settings.node_call, "MSGID-001", sizeof(meshcom_settings.node_call) - 1);
 
-    TEST_ASSERT_TRUE(settingsStoreSave());
+    TEST_ASSERT_TRUE(countersSave());
 
-    meshcom_settings = s_meshcom_settings();
-    meshcom_settings.node_msgid = 0; // zeroed explicitly, even though this is also the struct default
-    meshcom_settings.node_ackid = 0;
+    const std::vector<uint8_t> *bytes = g_fake_fs.peek(kCountersPath);
+    TEST_ASSERT_NOT_NULL(bytes);
 
-    SettingsLoadResult r = settingsStoreLoad();
-    TEST_ASSERT_TRUE(r.file_found);
-    TEST_ASSERT_TRUE(r.read_ok);
-    TEST_ASSERT_EQUAL_INT32(321, meshcom_settings.node_msgid);
-    TEST_ASSERT_EQUAL_INT32(654, meshcom_settings.node_ackid);
+    // Decoded through a local one-row descriptor rather than countersLoad(): that function's own
+    // contract is to ALWAYS advance the value it reads (msgIdAfterLoad()), so it cannot itself prove
+    // "what was written is what comes back" -- only what the file's bytes actually say, which is what
+    // this checks. Same shape as nrf52_flash.cpp's own (unexported) descriptor for this file.
+    const settings_store::FieldDescriptor counters_fields[] = {
+        {"node_msgid", settings_store::FieldType::I32, offsetof(s_meshcom_settings, node_msgid), 0, false, 0.0,
+         0.0},
+    };
+    s_meshcom_settings decoded{};
+    decoded.node_msgid = -1; // poison: distinct from both the struct default (0) and the value under test (321)
+    settings_store::DecodeStats st =
+        settings_store::decode(counters_fields, 1, &decoded, (const char *)bytes->data(), bytes->size());
+    TEST_ASSERT_EQUAL_UINT32(1, (unsigned)st.fields_set);
+    TEST_ASSERT_EQUAL_INT32(321, decoded.node_msgid);
+}
+
+// ---------------------------------------------------------------------------
+// The message-id high-water mark on the REAL load path (msgid_counter.h),
+// now through countersLoad()'s own file rather than the settings store. The
+// unit test for the policy itself lives in test_msgid_counter; what is
+// asserted here is the half that policy cannot do for itself -- that
+// init_flash() actually advances the counter past the block the previous run
+// may have used, that the advanced value REACHES FLASH before the first
+// frame can go out, and that it reaches the COUNTERS file specifically, not
+// the settings store (which no longer has a row for node_msgid at all).
+// ---------------------------------------------------------------------------
+
+static void test_load_advances_the_msgid_block_via_counters_file(void)
+{
+    s_meshcom_settings stored;
+    strncpy(stored.node_call, "MSGID-HWM", sizeof(stored.node_call) - 1);
+    stored.node_msgid = 200;
+    // Everything else deliberately VALID, so sanitize_loaded_settings() finds nothing to correct --
+    // keeps this test's signal isolated to the counters file, not a settings-store side effect.
+    stored.node_power = 22;
+    stored.node_freq = 433175000.0f;
+    stored.node_bw = 1;
+    stored.node_sf = 11;
+    stored.node_cr = 2;
+    stored.node_country = 1;
+    stored.max_hop_text = 4;
+    auto legacy = make_legacy_blob_from(stored);
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    // No keyed store, no counters file -- the legacy path is the only one reachable regardless of the
+    // Task 7 CRC gate, so this test does not need to seed a CRC record.
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT32(200 + kMsgIdPersistStep, meshcom_settings.node_msgid);
+
+    // The counters file says so too, so a crash before the next persist point cannot hand out that
+    // block a second time.
+    const std::vector<uint8_t> *counters_bytes = g_fake_fs.peek(kCountersPath);
+    TEST_ASSERT_NOT_NULL(counters_bytes);
+    std::string counters_text(counters_bytes->begin(), counters_bytes->end());
+    char expect_line[32];
+    snprintf(expect_line, sizeof(expect_line), "node_msgid=%d", 200 + kMsgIdPersistStep);
+    TEST_ASSERT_NOT_NULL(strstr(counters_text.c_str(), expect_line));
+
+    // ... and the SETTINGS file was not rewritten for it: node_msgid has no schema row any more
+    // (settings_schema.h), so a settings-store record that somehow still carried it would mean the
+    // counters write-back leaked into the wrong file.
+    const std::vector<uint8_t> *keyed_bytes = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(keyed_bytes);
+    std::string keyed_text(keyed_bytes->begin(), keyed_bytes->end());
+    TEST_ASSERT_NULL(strstr(keyed_text.c_str(), "node_msgid="));
+}
+
+// ---------------------------------------------------------------------------
+// countersLoad() contract (src/counters_store.h): if the counters file is
+// absent (a node upgrading onto this firmware for the first time), the
+// counter must fall back to whatever init_flash()'s settings load already
+// left in meshcom_settings.node_msgid -- for the legacy v1 blob path, that is
+// a REAL value (the frozen layout still carries node_msgid at its own
+// offset), not the struct default.
+// ---------------------------------------------------------------------------
+
+static void test_counters_file_absent_keeps_legacy_msgid(void)
+{
+    s_meshcom_settings stored;
+    strncpy(stored.node_call, "MSGID-ABS", sizeof(stored.node_call) - 1);
+    stored.node_msgid = 417;
+    stored.node_power = 22;
+    stored.node_freq = 433175000.0f;
+    stored.node_bw = 1;
+    stored.node_sf = 11;
+    stored.node_cr = 2;
+    stored.node_country = 1;
+    stored.max_hop_text = 4;
+    auto legacy = make_legacy_blob_from(stored);
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    // No keyed store, no counters file.
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT32(msgIdAfterLoad(417), meshcom_settings.node_msgid);
+
+    const std::vector<uint8_t> *counters_bytes = g_fake_fs.peek(kCountersPath);
+    TEST_ASSERT_NOT_NULL(counters_bytes);
+    std::string counters_text(counters_bytes->begin(), counters_bytes->end());
+    char expect_line[32];
+    snprintf(expect_line, sizeof(expect_line), "node_msgid=%d", msgIdAfterLoad(417));
+    TEST_ASSERT_NOT_NULL(strstr(counters_text.c_str(), expect_line));
+}
+
+// ---------------------------------------------------------------------------
+// Task 1: the legacy blob is read through the FROZEN v1 layout
+// (s_ble_settings_v1), not the live s_meshcom_settings struct -- member
+// order differs between the two (meshcom_settings.h's own file banner: "the
+// member order below is free to change" vs. ble_settings_v1.h's frozen
+// order). Picks members whose relative order/offset actually differs
+// between the two layouts, so a regression that went back to reading the
+// blob directly into meshcom_settings would scramble them, not merely widen
+// or narrow a field.
+// ---------------------------------------------------------------------------
+
+static void test_legacy_blob_reads_through_frozen_v1_layout(void)
+{
+    s_meshcom_settings stored;
+    strncpy(stored.node_call, "V1LAYOUT1", sizeof(stored.node_call) - 1);
+    stored.node_owgpio = 77;
+    stored.node_mcp17out = 111;
+    stored.node_mcp17in = 222;
+    stored.node_msgid = 555;
+    stored.node_wifi_power = 88;
+    stored.node_specstart = 440.5f;
+    auto legacy = make_legacy_blob_from(stored);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)sizeof(s_ble_settings_v1), (uint32_t)legacy.size());
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    // No keyed store -- the legacy path is the only one reachable.
+
+    Serial.clear();
+    init_flash();
+
+    TEST_ASSERT_EQUAL_STRING("V1LAYOUT1", meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_INT32(77, meshcom_settings.node_owgpio);
+    TEST_ASSERT_EQUAL_INT32(111, meshcom_settings.node_mcp17out);
+    TEST_ASSERT_EQUAL_INT32(222, meshcom_settings.node_mcp17in);
+    TEST_ASSERT_EQUAL_INT32(555, meshcom_settings.node_msgid - kMsgIdPersistStep); // countersLoad() advances it
+    TEST_ASSERT_EQUAL_INT32(88, meshcom_settings.node_wifi_power);
+    TEST_ASSERT_EQUAL_FLOAT(440.5f, meshcom_settings.node_specstart);
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];path;legacy_migrated"));
+
+    // Mutation check (recorded in the wave report, not executed here): reading the very same bytes
+    // directly into meshcom_settings instead of through s_ble_settings_v1 -- i.e. reverting Task 1 --
+    // makes every assertion above fail or read a scrambled value, because node_owgpio/node_mcp17out/
+    // node_mcp17in/node_wifi_power/node_specstart sit at different offsets (and in a different
+    // relative order) in the two layouts. Confirmed by hand against the pre-Task-1 code path and
+    // restored; see the wave report for the exact failure output.
+}
+
+// ---------------------------------------------------------------------------
+// Task 2: flash_reset() writes a v1-sized defaults blob, not a
+// sizeof(s_meshcom_settings)-sized one -- the two happen to differ on this
+// host's ABI (2000 vs. 2008 bytes), which is exactly the silent-drift
+// failure mode Task 1's read-through-v1 cutover exists to close off from the
+// WRITE side too: a defaults blob official firmware could not read back.
+// ---------------------------------------------------------------------------
+
+static void test_flash_reset_writes_v1_sized_defaults(void)
+{
+    auto legacy = make_legacy_blob("PRE-RESET");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+
+    flash_reset();
+
+    const auto *after = g_fake_fs.peek(kLegacyPath);
+    TEST_ASSERT_NOT_NULL(after);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)sizeof(s_ble_settings_v1), (uint32_t)after->size());
+
+    // Markers must validate through the same frozen-layout accessor init_flash() itself uses --
+    // proves the bytes are a real v1 image, not merely the right length by coincidence.
+    s_ble_settings_v1 img{};
+    memcpy(&img, after->data(), sizeof(img));
+    TEST_ASSERT_TRUE(bleSettingsV1MarkersOk(img));
+}
+
+// ---------------------------------------------------------------------------
+// A blob whose size equals sizeof(s_meshcom_settings) but not
+// sizeof(s_ble_settings_v1) must still reset to defaults -- on this host's
+// ABI sizeof(s_meshcom_settings) is coincidentally 2000, the SAME number the
+// pre-D1-04 code compared against as a LITERAL; that literal would have
+// silently accepted a live-struct-sized blob under the OLD check, exactly
+// the regression this cutover (Task 1: compare against sizeof(s_ble_settings_v1),
+// never a literal) has to guard against.
+// ---------------------------------------------------------------------------
+
+static void test_wrong_sized_legacy_blob_resets_to_defaults(void)
+{
+    TEST_ASSERT_NOT_EQUAL(sizeof(s_meshcom_settings), sizeof(s_ble_settings_v1));
+
+    std::vector<uint8_t> blob(sizeof(s_meshcom_settings), 0xAB);
+    // Valid v1 markers at the front, so only the SIZE check can catch this -- not a marker mismatch.
+    blob[0] = 0xAA;
+    blob[1] = MESHCOM_DATA_MARKER; // == BLE_SETTINGS_V1_MARK_2, same offset in both layouts
+    g_fake_fs.seed(kLegacyPath, blob.data(), blob.size());
+
+    init_flash();
+
+    s_meshcom_settings defaults;
+    TEST_ASSERT_EQUAL_STRING(defaults.node_call, meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_UINT8(MESHCOM_DATA_MARKER, meshcom_settings.valid_mark_2);
+}
+
+// ---------------------------------------------------------------------------
+// Task 7 (addendum): the keyed store's fast path must not win over a legacy
+// blob that changed since the last time this firmware recorded its CRC --
+// the scenario is a node downgraded to official firmware (which only ever
+// writes the raw v1 blob), reconfigured there, then upgraded back: without
+// this gate the keyed store's now-stale configuration would silently win.
+// ---------------------------------------------------------------------------
+
+static void test_rewritten_legacy_blob_beats_stale_keyed_store(void)
+{
+    auto keyed = make_keyed_store("OLD");
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+
+    auto legacy = make_legacy_blob("NEW");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    // No CRC file -- "never recorded" must be treated exactly like "recorded but different".
+
+    Serial.clear();
+    init_flash();
+
+    TEST_ASSERT_EQUAL_STRING("NEW", meshcom_settings.node_call);
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];path;legacy_rewritten"));
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];path;legacy_migrated"));
+
+    // The keyed store was rewritten with the blob's content, and a fresh CRC record now exists.
+    const auto *keyed_after = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(keyed_after);
+    std::string keyed_text(keyed_after->begin(), keyed_after->end());
+    TEST_ASSERT_NOT_NULL(strstr(keyed_text.c_str(), "node_call=NEW"));
+    TEST_ASSERT_TRUE(g_fake_fs.exists(kLegacyCrcPath));
+}
+
+// The other half: an UNCHANGED legacy blob (its CRC matches what was
+// recorded) must let the keyed store win and must leave the blob untouched
+// -- the ordinary boot, proven the same way
+// test_keyed_fast_path_wins_and_leaves_legacy_untouched already does, but
+// named and grouped with its Task 7 counterpart above for the wave report.
+
+// A blob rewritten by official firmware carries the counter that firmware advanced; a counters file
+// left behind by an earlier run of THIS firmware is older than that and must not win (W3c advisor
+// finding 2). blob 700, counters file 300, no CRC record -> the counter continues from 700.
+static void test_rewritten_legacy_blob_counter_beats_stale_counters_file(void)
+{
+    s_meshcom_settings stored;
+    strncpy(stored.node_call, "CNT-BLOB", sizeof(stored.node_call) - 1);
+    stored.node_msgid = 700;
+    stored.node_power = 22;
+    stored.node_freq = 433175000.0f;
+    stored.node_bw = 1;
+    stored.node_sf = 11;
+    stored.node_cr = 2;
+    stored.node_country = 1;
+    stored.max_hop_text = 4;
+    auto legacy = make_legacy_blob_from(stored);
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    const char stale_counters[] = "node_msgid=300\n";
+    g_fake_fs.seed(kCountersPath, (const uint8_t *)stale_counters, sizeof(stale_counters) - 1);
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT32(msgIdAfterLoad(700), meshcom_settings.node_msgid);
+    const std::vector<uint8_t> *counters_bytes = g_fake_fs.peek(kCountersPath);
+    TEST_ASSERT_NOT_NULL(counters_bytes);
+    std::string counters_text(counters_bytes->begin(), counters_bytes->end());
+    char expect_line[32];
+    snprintf(expect_line, sizeof(expect_line), "node_msgid=%d", msgIdAfterLoad(700));
+    TEST_ASSERT_NOT_NULL(strstr(counters_text.c_str(), expect_line));
+}
+
+static void test_unchanged_legacy_blob_does_not_override_keyed_store(void)
+{
+    auto legacy = make_legacy_blob("LEGACY-C1");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    seed_legacy_blob_crc(legacy);
+
+    auto keyed = make_keyed_store("KEYED-C2");
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+
+    Serial.clear();
+    init_flash();
+
+    TEST_ASSERT_EQUAL_STRING("KEYED-C2", meshcom_settings.node_call);
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NULL(strstr(log.c_str(), "[SETST];path;legacy_rewritten"));
+
+    // The blob itself is byte-for-byte untouched.
+    const auto *legacy_after = g_fake_fs.peek(kLegacyPath);
+    TEST_ASSERT_NOT_NULL(legacy_after);
+    TEST_ASSERT_EQUAL_UINT32((uint32_t)legacy.size(), (uint32_t)legacy_after->size());
+    TEST_ASSERT_EQUAL_MEMORY(legacy.data(), legacy_after->data(), legacy.size());
 }
 
 // ---------------------------------------------------------------------------
@@ -540,49 +867,6 @@ static void test_node_msgid_and_ackid_persist_round_trip(void)
 // so it is reported here rather than weakened into a synthetic pass.
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// The message-id high-water mark on the REAL load path (msgid_counter.h).
-// The unit test for the policy lives in test_msgid_counter; what is asserted
-// here is the half that policy cannot do for itself -- that init_flash()
-// actually advances the counter past the block the previous run may have
-// used, and that the advanced value REACHES FLASH before the first frame can
-// go out. Without the write-back the scheme silently reuses ids after a crash
-// in the first frames of a boot.
-// ---------------------------------------------------------------------------
-
-static void test_load_advances_the_msgid_block_and_writes_it_back(void)
-{
-    s_meshcom_settings stored;
-    strncpy(stored.node_call, "MSGID-HWM", sizeof(stored.node_call) - 1);
-    stored.node_msgid = 200;
-    // Everything else deliberately VALID, so sanitize_loaded_settings() finds
-    // nothing to correct: its pre-existing "something was fixed" write would
-    // otherwise carry the counter to flash by accident and this test would
-    // pass with the write-back removed (it did, until these lines existed).
-    stored.node_power = 22;
-    stored.node_freq = 433175000.0f;
-    stored.node_bw = 1;
-    stored.node_sf = 11;
-    stored.node_cr = 2;
-    stored.node_country = 1;
-    stored.max_hop_text = 4;
-    auto keyed = make_keyed_store(stored);
-    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
-
-    init_flash();
-
-    TEST_ASSERT_EQUAL_INT32(200 + kMsgIdPersistStep, meshcom_settings.node_msgid);
-
-    // ... and the file says so too, so a crash before the next persist point
-    // cannot hand out that block a second time.
-    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
-    TEST_ASSERT_NOT_NULL(live);
-    s_meshcom_settings reloaded;
-    settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &reloaded,
-                           (const char *)live->data(), live->size());
-    TEST_ASSERT_EQUAL_INT32(200 + kMsgIdPersistStep, reloaded.node_msgid);
-}
-
 int main(void)
 {
     UNITY_BEGIN();
@@ -608,9 +892,18 @@ int main(void)
     RUN_TEST(test_load_allocation_failure_reports_read_not_ok);
 
     RUN_TEST(test_flash_reset_preserves_bonds_and_writes_exact_length);
+    RUN_TEST(test_flash_reset_writes_v1_sized_defaults);
     RUN_TEST(test_max_hop_text_sentinel_survives_round_trip);
-    RUN_TEST(test_node_msgid_and_ackid_persist_round_trip);
-    RUN_TEST(test_load_advances_the_msgid_block_and_writes_it_back);
+    RUN_TEST(test_node_msgid_persists_via_counters_file);
+    RUN_TEST(test_load_advances_the_msgid_block_via_counters_file);
+    RUN_TEST(test_counters_file_absent_keeps_legacy_msgid);
+
+    RUN_TEST(test_legacy_blob_reads_through_frozen_v1_layout);
+    RUN_TEST(test_wrong_sized_legacy_blob_resets_to_defaults);
+
+    RUN_TEST(test_rewritten_legacy_blob_beats_stale_keyed_store);
+    RUN_TEST(test_rewritten_legacy_blob_counter_beats_stale_counters_file);
+    RUN_TEST(test_unchanged_legacy_blob_does_not_override_keyed_store);
 
     return UNITY_END();
 }

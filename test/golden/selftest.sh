@@ -28,8 +28,12 @@ python3 test/golden/carve_extern_lint.py --self-test
 python3 test/golden/carve_extern_lint.py
 python3 test/golden/command_ladder_lint.py --self-test
 python3 test/golden/command_ladder_lint.py
-python3 test/golden/settings_layout_lint.py --self-test
-python3 test/golden/settings_layout_lint.py
+# settings_layout_lint.py (the struct-twin diff between src/esp32/esp32_flash.h
+# and src/nrf52/WisBlock-API.h) was retired in the D1-04 W3 struct merge: with
+# ONE struct (src/meshcom_settings.h) there is no twin left to diff. Its
+# replacement is the member-level fail-closed gate,
+# test/test_settings_members (native_settings_members_esp32/_nrf52 envs) --
+# see docs/BACKLOG.md D1-04 W3 step 3.
 # W3 step 1: both settings gates stand BEFORE the migration rewrites this
 # code, not after. settings_persist_lint is currently clean -- DR-13's
 # failure mode (a field in the X() table with no preferences.put* call, so
@@ -44,8 +48,12 @@ python3 test/golden/settings_persist_lint.py
 # D1-04 field triage. This gate holds four properties the table cannot assert
 # about itself: every PERSIST field is covered or explicitly exempted, no
 # RUNTIME field slipped in, no key or member is duplicated, and triage
-# disagreement (a) stays at zero. The 10 exemptions are pinned in-script --
-# the 8 counter/sensor fields and the 2 Arduino String members.
+# disagreement (a) stays at zero. The 7 exemptions (EXCLUDED_FROM_SCHEMA) are
+# pinned in-script -- the running node_msgid counter plus the 6 last-sensor-
+# reading caches; the D1-04 W3 struct merge closed the 2 Arduino String
+# exemptions (node_audio_start/node_audio_msg are now ordinary covered
+# members, char[128] with a real schema row) and dropped node_ackid outright
+# (removed from the struct).
 python3 test/golden/settings_schema_lint.py --self-test
 python3 test/golden/settings_schema_lint.py
 python3 test/golden/variant_macros_lint.py --self-test

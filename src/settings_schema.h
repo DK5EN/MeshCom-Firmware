@@ -52,16 +52,11 @@
  * what unblocks the two rows below -- do not add a schema row for either one
  * without that conversion having landed first.
  *
- * node_msgid and node_ackid were originally counted among the S4(c)
- * exclusions (8 of them) but are RESTORED here (Fable verdict 2026-09-12,
- * Finding 3): the triage conflated "deliberately not exported" (correct --
- * config_json.h explains why a JSON restore must never rewind these
- * counters) with "deliberately not persisted" (wrong -- the raw-struct blob
- * on nRF52 persisted every field, so dropping them from the schema was a
- * behavioural regression, not a carried-over exclusion). See the comment
- * block below for the corrected reasoning and src/loop_functions.cpp:3331
- * for the effect (msg_id built from a counter that now restarts at 0 every
- * reboot, replaying ids into every neighbour's dedup ring).
+ * node_msgid is deliberately NOT a schema row (operator decision 2026-09-13,
+ * D1-04 W3 step 4): it is a counter, persisted through src/counters_store.h
+ * in its own namespace/file, so neither a settings rewrite nor a config
+ * import nor a BLE settings write can rewind it. node_ackid was dropped from
+ * the struct entirely in the D1-04 merge (loaded, saved, never read).
  *
  * Key spelling: each row uses the field's ESP32 NVS key from
  * src/esp32/esp32_flash.cpp's save_settings()/init_flash(), so a future
@@ -114,12 +109,6 @@ size_t fieldCount();
     /* one-shot "wipe at next boot" trigger (config_json.h:131-132); NVS key  \
      * is "node_cflash", member is node_cleanflash. */                       \
     X("node_cflash",    CFG_INT, node_cleanflash, CFG_NORANGE, CFG_NOESC)                        \
-    /* Running message-id / ack-id counters (both platforms). Persisted so   \
-     * a reboot does not replay msg_ids the mesh has already seen; NOT in    \
-     * CFG_FIELD_LIST on purpose (config_json.h:362-367) -- restoring a      \
-     * backup must never rewind them. See the comment block below. */       \
-    X("node_msgid",     CFG_INT, node_msgid,      CFG_NORANGE, CFG_NOESC)                        \
-    X("node_ackid",     CFG_INT, node_ackid,      CFG_NORANGE, CFG_NOESC)                        \
     SETTINGS_PERSIST_ONLY_LIST_PLATFORM(X)
 
 /* Platform-only persisted-but-not-exported fields: the 13 T-Deck device
@@ -164,18 +153,9 @@ size_t fieldCount();
  * table, and the same is true here: two schema-encoded dumps of an
  * unchanged node would differ solely because a sensor ticked between them.
  *
- * node_msgid / node_ackid are NOT in this exclusion list -- they DO get a
- * descriptor, in SETTINGS_PERSIST_ONLY_LIST above, so a schema-driven store
- * persists them the same way the raw-struct blob always did. What they are
- * still excluded from is CFG_FIELD_LIST, the JSON export/import table
- * (config_json.h:362-367): config_json.cpp's reasoning there -- that
- * *importing* a foreign value would rewind the counter and collide with the
- * dedup ring of every neighbour -- is a reason to keep them out of a
- * restorable backup file, not a reason to stop writing them to flash on
- * every boot. Those are two different questions; treating them as one and
- * dropping the descriptor entirely was the regression Fable Finding 3
- * (2026-09-12) caught, since the nRF52's previous raw-struct persistence
- * covered every field including these two. */
+ * The complete list of members that are NOT persisted lives in
+ * src/meshcom_settings_runtime.h; test/test_settings_members proves that
+ * every struct member is in exactly one of the two sets. */
 
 } // namespace settings_schema
 

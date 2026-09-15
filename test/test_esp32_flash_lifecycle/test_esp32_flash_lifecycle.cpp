@@ -66,6 +66,7 @@
 
 #include <esp32/esp32_flash.h> // s_meshcom_settings, meshcom_settings, init_flash()/save_settings()
 #include <msgid_counter.h>     // msgIdAfterLoad() -- the real function, for computing expected values
+#include <counters_store.h>    // countersLoad()/countersSave() -- the ESP32 backend under test here
 #include <settings_schema.h>
 #include <settings_store.h>
 
@@ -271,27 +272,40 @@ void test_no_write_happens_while_load_handle_is_open(void)
 }
 
 // ---------------------------------------------------------------------------
-// 3. The handle opens and closes exactly twice across one init_flash() call:
-//    once for the load (begin() near the top, end() after
-//    sanitize_loaded_settings()), once for save_settings()'s own cycle.
-//    Never once (a leaked-open load handle, or a save that never ran),
-//    never more (a stray extra open/close).
+// 3. The handle opens and closes a known, exact number of times across one
+//    init_flash() call on a completely empty store -- never leaked open,
+//    never a stray extra open/close.
 //
-// MUTATION VERIFIED: with save_settings() moved back inside
-// sanitize_loaded_settings() (Task 2 guard active): the guard refuses the
-// nested call before it makes any Preferences call at all, so only the
-// ORIGINAL load's own preferences.end() ever executes -- this case FAILED
-// with:
-//   "Expected 2 Was 1"
-// Reverted; passes again (2).
+// COUNT CHANGED under D1-04 W3 step 4 (was 2/2 before this step): on an
+// empty NVS, sanitize_loaded_settings() finds nothing to correct (every
+// radio-param/max_hop_text default is already a valid sentinel -- see
+// test_no_write_happens_while_load_handle_is_open's identical empty-store
+// premise), so the conditional save_settings() call is skipped entirely and
+// contributes 0. countersLoad() (also called unconditionally, now that
+// node_msgid is no longer part of the "one write per boot" save_settings()
+// call) contributes the other 3 real opens/closes on its OWN Preferences
+// objects, never the global `preferences` this test inspects:
+//   1. the load span itself (global `preferences`, "Credentials")
+//   2. countersLoad() probing "Counters" -- empty, falls through
+//   3. countersLoad()'s legacy-fallback read of "Credentials"/"node_msgid"
+//   4. countersLoad() reopening "Counters" to write the advanced value back
+// 1 + 3 = 4. See test_counter_namespace_migrates_from_credentials for the
+// same sequence exercised for its DATA content rather than its open count.
+//
+// MUTATION VERIFIED (pre-existing, still holds): with save_settings() moved
+// back inside sanitize_loaded_settings() (Task 2 guard active), the guard
+// refuses the nested call before it makes any Preferences call at all, so
+// only the load's own preferences.end() would execute on the global handle
+// -- this case's own assertion on `preferences.isStarted()` and the total
+// count both catch that regression the same way they did before this step.
 // ---------------------------------------------------------------------------
 void test_handle_opens_and_closes_exactly_twice(void)
 {
     init_flash();
 
     TEST_ASSERT_FALSE(preferences.isStarted()); // not leaked open
-    TEST_ASSERT_EQUAL_INT(2, FakeNvs::instance().openCount());
-    TEST_ASSERT_EQUAL_INT(2, FakeNvs::instance().closeCount());
+    TEST_ASSERT_EQUAL_INT(4, FakeNvs::instance().openCount());
+    TEST_ASSERT_EQUAL_INT(4, FakeNvs::instance().closeCount());
 }
 
 // ---------------------------------------------------------------------------
@@ -303,25 +317,144 @@ void test_handle_opens_and_closes_exactly_twice(void)
 //    reaching flash, a crash in the following boot's first
 //    kMsgIdPersistStep frames replays ids the mesh has already seen.
 //
-// MUTATION VERIFIED: with save_settings() moved back inside
-// sanitize_loaded_settings() (Task 2 guard active), this case FAILED with:
-//   "Expected 124 Was 24"
-// (the fake NVS's "node_msgid" entry stayed at the raw seeded 24 -- the
-// advance happened in RAM but the guard refused the only write that would
-// have persisted it, and the outer save_settings() call this mutation
-// removes was the other one that used to). Reverted; passes again.
+// TARGET NAMESPACE CHANGED under D1-04 W3 step 4: the counter's storage
+// moved from "Credentials" (the settings namespace, save_settings()'s own)
+// to its own "Counters" namespace (counters_store.h) -- see
+// esp32_flash.cpp's countersLoad(). Seeded here in the LEGACY location, the
+// same as a node upgrading from a pre-cutover firmware image: "Counters"
+// starts empty, "Credentials" still holds the value from before this change.
+// The assertions below moved from the default ("Credentials") namespace to
+// "Counters" to match; test_counter_namespace_migrates_from_credentials
+// covers the migration's STRUCTURAL properties (legacy key preserved,
+// Counters wins once populated) separately -- this case stays focused on the
+// numeric write-back guarantee itself, unchanged in substance since
+// bce95db5.
+//
+// MUTATION VERIFIED (pre-existing, still holds): with save_settings() moved
+// back inside sanitize_loaded_settings() (Task 2 guard active) AND
+// countersLoad()'s own write-back temporarily removed, this case fails with
+// "Expected 124 Was 0" (RAM assertion: countersLoad() never ran at all, so
+// meshcom_settings.node_msgid never advanced past its struct default).
+// Reverted; passes again.
 // ---------------------------------------------------------------------------
 void test_msgid_writeback_survives_the_boot(void)
 {
-    FakeNvs::instance().seedInt("node_msgid", 24);
+    FakeNvs::instance().seedInt("node_msgid", 24); // legacy location ("Credentials", the default ns)
     int expected = msgIdAfterLoad(24);
     TEST_ASSERT_EQUAL_INT(124, expected); // sanity on the fixture itself (kMsgIdPersistStep == 100)
 
     init_flash();
 
     TEST_ASSERT_EQUAL_INT(expected, meshcom_settings.node_msgid); // RAM
-    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_msgid"));
-    TEST_ASSERT_EQUAL_INT(expected, (int)FakeNvs::instance().entries().at("node_msgid").i); // flash
+    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_msgid", "Counters"));
+    TEST_ASSERT_EQUAL_INT(expected, (int)FakeNvs::instance().entries("Counters").at("node_msgid").i); // new location on flash
+}
+
+// ---------------------------------------------------------------------------
+// 4a. D1-04 W3 step 4, upgrade path: a node that has never booted this
+//     firmware has "node_msgid" only in the LEGACY "Credentials" location
+//     and nothing yet in "Counters". After init_flash(), "Counters" must
+//     hold the ADVANCED (msgIdAfterLoad) value, and the legacy key must be
+//     left exactly as it was -- migrated, never deleted, so a downgrade back
+//     to a pre-cutover firmware still finds its counter.
+//
+// MUTATION VERIFIED: temporarily made countersLoad()'s fallback branch skip
+// the legacy read entirely (`if (false)` guarding the `else` body instead of
+// the real `!counters_preferences.isKey(...)` check, i.e. countersLoad()
+// always takes the "Counters already has it" branch). This case then FAILED
+// with:
+//   "Expected 100 Was 0"
+// (meshcom_settings.node_msgid stayed at its struct default 0 -- with
+// "Counters" empty and the fallback disabled, getInt()'s own caller-supplied
+// default of the CURRENT struct value, still 0, was all countersLoad() ever
+// saw before advancing it -- msgIdAfterLoad(0) is 100, and 100 is what a
+// correctly-migrated node would have stored instead). Reverted; passes
+// again.
+// ---------------------------------------------------------------------------
+void test_counter_namespace_migrates_from_credentials(void)
+{
+    FakeNvs::instance().seedInt("node_msgid", 55, "Credentials"); // legacy location, explicit
+    int expected = msgIdAfterLoad(55);
+
+    init_flash();
+
+    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_msgid", "Counters"));
+    TEST_ASSERT_EQUAL_INT(expected, (int)FakeNvs::instance().entries("Counters").at("node_msgid").i);
+    // Legacy key untouched -- migrated, not deleted (a downgrade must still find it).
+    TEST_ASSERT_TRUE(FakeNvs::instance().hasKey("node_msgid", "Credentials"));
+    TEST_ASSERT_EQUAL_INT(55, (int)FakeNvs::instance().entries("Credentials").at("node_msgid").i);
+}
+
+// ---------------------------------------------------------------------------
+// 4b. D1-04 W3 step 4: once "Counters" itself holds a value, it wins outright
+//     over whatever the legacy "Credentials" key still says -- the legacy
+//     key is only ever consulted on the FIRST boot after the cutover, never
+//     again once "Counters" has been populated (the common case for every
+//     boot from the second one on).
+// ---------------------------------------------------------------------------
+void test_counter_namespace_wins_over_legacy_key(void)
+{
+    FakeNvs::instance().seedInt("node_msgid", 900, "Credentials"); // stale legacy value
+    FakeNvs::instance().seedInt("node_msgid", 300, "Counters");    // authoritative, current value
+    int expected = msgIdAfterLoad(300);
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_INT(expected, meshcom_settings.node_msgid);
+    TEST_ASSERT_EQUAL_INT(expected, (int)FakeNvs::instance().entries("Counters").at("node_msgid").i);
+    // Stale legacy value never touched, and never used to compute the result.
+    TEST_ASSERT_EQUAL_INT(900, (int)FakeNvs::instance().entries("Credentials").at("node_msgid").i);
+}
+
+// ---------------------------------------------------------------------------
+// 4c. countersSave() (the loop_functions.cpp high-water-mark write path, not
+//     countersLoad()'s own boot-time write-back) touches ONLY the "Counters"
+//     namespace -- it must never reach into "Credentials", the settings
+//     store's own namespace, the way the pre-cutover save_settings() call it
+//     replaced implicitly did (that call rewrote the ENTIRE settings record
+//     on every high-water mark, "Credentials" included).
+// ---------------------------------------------------------------------------
+void test_counters_save_touches_only_the_counters_namespace(void)
+{
+    init_flash(); // establishes a baseline Counters/node_msgid entry, like a real boot would
+    FakeNvs::instance().seedString("node_call", "DK5EN-1", "Credentials");
+    size_t credentialsSizeBefore = FakeNvs::instance().entries("Credentials").size();
+    size_t writesBefore = FakeNvs::instance().writes().size(); // isolate THIS call's writes from init_flash()'s own
+
+    meshcom_settings.node_msgid = 42;
+    bool ok = countersSave();
+
+    TEST_ASSERT_TRUE(ok);
+    TEST_ASSERT_EQUAL_INT(42, (int)FakeNvs::instance().entries("Counters").at("node_msgid").i);
+    TEST_ASSERT_EQUAL_size_t(credentialsSizeBefore, FakeNvs::instance().entries("Credentials").size());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-1", FakeNvs::instance().entries("Credentials").at("node_call").s.c_str());
+
+    const auto &writes = FakeNvs::instance().writes();
+    TEST_ASSERT_TRUE_MESSAGE(writes.size() > writesBefore, "expected countersSave() to have written something");
+    for (size_t i = writesBefore; i < writes.size(); i++)
+    {
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("Counters", writes[i].ns.c_str(), "countersSave() wrote outside its own namespace");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4d. init_flash() no longer writes "node_msgid" into "Credentials" at all
+//     (it moved to "Counters" entirely, D1-04 W3 step 4) -- on an empty
+//     store, after init_flash(), "Credentials" must have no "node_msgid" key
+//     whether or not sanitize_loaded_settings() found something else to
+//     correct (this case uses the empty-store, nothing-to-correct path, same
+//     premise as test_no_write_happens_while_load_handle_is_open).
+// ---------------------------------------------------------------------------
+void test_init_flash_writes_no_msgid_into_credentials(void)
+{
+    init_flash();
+
+    TEST_ASSERT_FALSE(FakeNvs::instance().hasKey("node_msgid", "Credentials"));
+    for (const auto &w : FakeNvs::instance().writes())
+    {
+        if (w.key == "node_msgid")
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("Counters", w.ns.c_str(), "node_msgid written into the wrong namespace");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +503,10 @@ int main(int, char **)
     RUN_TEST(test_no_write_happens_while_load_handle_is_open);
     RUN_TEST(test_handle_opens_and_closes_exactly_twice);
     RUN_TEST(test_msgid_writeback_survives_the_boot);
+    RUN_TEST(test_counter_namespace_migrates_from_credentials);
+    RUN_TEST(test_counter_namespace_wins_over_legacy_key);
+    RUN_TEST(test_counters_save_touches_only_the_counters_namespace);
+    RUN_TEST(test_init_flash_writes_no_msgid_into_credentials);
     RUN_TEST(test_guard_refuses_save_during_load_and_logs);
     return UNITY_END();
 }

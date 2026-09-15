@@ -40,7 +40,11 @@ namespace
 // That 4 036 B figure is itself already stale, and the reason matters: the
 // same wave then restored node_msgid and node_ackid to the schema, taking the
 // table from 107 to 109 rows and the worst case to **4 082 B** -- 14 B under
-// the old cap. Re-derived independently twice (orchestrator and advisor) and
+// the old cap. (W3c later took both rows out again -- node_ackid is gone from
+// the struct, node_msgid lives in its own counters file -- so the live worst
+// case is back near 4 036 B; the 8192 B cap below was sized against 4 082 B
+// and is not re-measured on every row change, which is the point of the
+// margin.) Re-derived independently twice (orchestrator and advisor) and
 // in agreement. Two routine rows consumed three quarters of what looked like
 // headroom, which is the whole argument for not sizing this to just clear the
 // measurement. Re-measure on any schema change; the sweep lives in the Fable
@@ -148,38 +152,50 @@ bool settingsStoreSave()
 		}
 	}
 
+	// Atomicity from here on is writeFileAtomic()'s job (factored out so
+	// src/counters_store.h's nRF52 implementation and the Task 7 legacy-blob
+	// CRC file can share it instead of duplicating the sequence) -- see that
+	// function for exactly what guarantee it does and does not provide.
+	bool ok = writeFileAtomic(kSettingsPath, kSettingsTmpPath, buf, (size_t)written);
+	free(buf);
+	return ok;
+}
+
+bool writeFileAtomic(const char *path, const char *tmp_path, const void *data, size_t len)
+{
 	// ---------------------------------------------------------------------
-	// Atomicity: write the FULL new content to a temp path, verify every
-	// byte of it landed, and only then replace the live path -- the live
-	// path itself is never opened for writing. Adafruit_LittleFS exposes a
-	// real rename() (Adafruit_LittleFS.h), and littlefs's own lfs_rename()
-	// (littlefs/lfs.h) both replaces an existing destination of matching
-	// type and is a single atomic metadata update -- littlefs is a
-	// power-loss-safe filesystem by design, so that swap step has no
-	// partial-write window: after any reset, kSettingsPath is either the
-	// old content or the new content, never a mix.
+	// Write the FULL new content to a temp path, verify every byte of it
+	// landed, and only then replace the live path -- the live path itself is
+	// never opened for writing. Adafruit_LittleFS exposes a real rename()
+	// (Adafruit_LittleFS.h), and littlefs's own lfs_rename() (littlefs/lfs.h)
+	// both replaces an existing destination of matching type and is a single
+	// atomic metadata update -- littlefs is a power-loss-safe filesystem by
+	// design, so that swap step has no partial-write window: after any
+	// reset, `path` is either the old content or the new content, never a
+	// mix.
 	//
 	// The temp-file WRITE ahead of the rename is NOT covered by that
-	// guarantee -- a power loss while writing kSettingsTmpPath can leave a
+	// guarantee -- a power loss while writing `tmp_path` can leave a
 	// partial/corrupt temp file. That is the window this sequence leaves
-	// open, and it is the safe one to leave open: kSettingsPath (the file
-	// settingsStoreLoad() actually reads) is untouched throughout, so the
+	// open, and it is the safe one to leave open: `path` (the file a caller's
+	// own load function actually reads) is untouched throughout, so the
 	// worst case is one lost save attempt, never a corrupted live file. The
-	// stale temp file left behind is silently overwritten by the next
-	// settingsStoreSave() call (removed below, then reopened for write).
+	// stale temp file left behind is silently overwritten by the next call
+	// to this function for the same paths (removed below, then reopened for
+	// write).
 	// ---------------------------------------------------------------------
-	InternalFS.remove(kSettingsTmpPath);
+	InternalFS.remove(tmp_path);
 
 	bool write_ok = false;
-	if (settings_store_file.open(kSettingsTmpPath, FILE_O_WRITE))
+	if (settings_store_file.open(tmp_path, FILE_O_WRITE))
 	{
-		size_t put = settings_store_file.write((const uint8_t *)buf, (size_t)written);
+		size_t put = settings_store_file.write((const uint8_t *)data, len);
 		settings_store_file.flush();
 		settings_store_file.close();
-		write_ok = (put == (size_t)written);
+		write_ok = (put == len);
 		if (!write_ok)
 		{
-			DEBUG_MSG("SETST", "save: short write to temp file (%u of %ld bytes)", (unsigned)put, written);
+			DEBUG_MSG("SETST", "save: short write to temp file (%u of %u bytes)", (unsigned)put, (unsigned)len);
 		}
 	}
 	else
@@ -187,19 +203,17 @@ bool settingsStoreSave()
 		DEBUG_MSG("SETST", "save: could not open temp file for write");
 	}
 
-	free(buf);
-
 	if (!write_ok)
 	{
-		Serial.printf("[SETST];save;write_failed;bytes=%ld\n", written);
-		InternalFS.remove(kSettingsTmpPath);
+		Serial.printf("[SETST];save;write_failed;bytes=%u\n", (unsigned)len);
+		InternalFS.remove(tmp_path);
 		return false;
 	}
 
-	if (!InternalFS.rename(kSettingsTmpPath, kSettingsPath))
+	if (!InternalFS.rename(tmp_path, path))
 	{
 		DEBUG_MSG("SETST", "save: rename of temp file onto live path failed");
-		Serial.printf("[SETST];save;rename_failed;bytes=%ld\n", written);
+		Serial.printf("[SETST];save;rename_failed;bytes=%u\n", (unsigned)len);
 
 		// Inventory BEFORE the temp file is removed: on the space hypothesis
 		// the temp file is exactly what pushed the filesystem over, so a
@@ -216,18 +230,18 @@ bool settingsStoreSave()
 		// them on the console the next time it happens, and it cannot make
 		// anything worse: the temp file is intact and the live path still
 		// holds its old content either way.
-		if (InternalFS.rename(kSettingsTmpPath, kSettingsPath))
+		if (InternalFS.rename(tmp_path, path))
 		{
-			Serial.printf("[SETST];save;rename_retry_ok;bytes=%ld\n", written);
+			Serial.printf("[SETST];save;rename_retry_ok;bytes=%u\n", (unsigned)len);
 			return true;
 		}
 
-		Serial.printf("[SETST];save;rename_failed_twice;bytes=%ld\n", written);
-		InternalFS.remove(kSettingsTmpPath);
+		Serial.printf("[SETST];save;rename_failed_twice;bytes=%u\n", (unsigned)len);
+		InternalFS.remove(tmp_path);
 		return false;
 	}
 
-	Serial.printf("[SETST];save;ok;bytes=%ld\n", written);
+	Serial.printf("[SETST];save;ok;bytes=%u\n", (unsigned)len);
 	return true;
 }
 

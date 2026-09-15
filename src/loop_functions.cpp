@@ -29,6 +29,7 @@
 #include "via_functions.h"
 #include "charset_filter.h"
 #include "msgid_counter.h"
+#include <counters_store.h>
 #include "setlog_lines.h"
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
@@ -3355,7 +3356,7 @@ void sendPing(char msg_call[10])
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     checkVia(aprsmsg);
 
@@ -3431,7 +3432,7 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     checkVia(aprsmsg);
 
@@ -4078,7 +4079,7 @@ int sendMessage(char *msg_text, int len)
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     checkVia(aprsmsg);
 
@@ -4766,7 +4767,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
 
         // Flash rewrite, but only at a high-water mark -- msgid_counter.h
         if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-            save_settings();
+            countersSave();
 
         checkVia(aprsmsg);
 
@@ -4842,7 +4843,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     checkVia(aprsmsg);
 
@@ -4904,7 +4905,7 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
     
@@ -4992,7 +4993,7 @@ void sendHey()
 
     // Flash rewrite, but only at a high-water mark -- msgid_counter.h
     if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        save_settings();
+        countersSave();
 
     checkVia(aprsmsg);
 
@@ -5329,7 +5330,7 @@ void sendTelemetry(int ID)
 
         // Flash rewrite, but only at a high-water mark -- msgid_counter.h
         if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-            save_settings();
+            countersSave();
 
         checkVia(aprsmsg);
 

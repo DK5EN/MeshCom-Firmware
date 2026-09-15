@@ -2,10 +2,11 @@
 // architecture ("D1-04 target architecture: schema-driven settings",
 // docs/BACKLOG.md, decided 2026-09-12).
 //
-// WHY THIS EXISTS: today the nRF52 on-disk settings format IS the C struct
-// (nrf52_flash.cpp reads/writes sizeof(s_meshcom_settings) raw bytes), so any
-// field reorder silently misreads and any size change wipes the file
-// (nrf52_flash.cpp:333). The target replaces that with a schema-driven,
+// WHY THIS EXISTS: before W3 the nRF52 on-disk settings format WAS the C
+// struct (nrf52_flash.cpp read/wrote sizeof(s_meshcom_settings) raw bytes), so
+// any field reorder silently misread and any size change wiped the file. Since
+// W3c that legacy blob is only READ, through the frozen s_ble_settings_v1
+// layout, and migrated once. The target replaces it with a schema-driven,
 // self-describing record format on both platforms, driven by the same field
 // table config_json.cpp's X() macro already builds for JSON export/import.
 //

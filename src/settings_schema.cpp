@@ -38,11 +38,7 @@
 #include <maxhop.h>
 #include <settings_store.h>
 
-#ifdef ESP32
-    #include <esp32/esp32_flash.h>
-#else
-    #include <nrf52/WisBlock-API.h>
-#endif
+#include <meshcom_settings.h> // the one settings struct, both platforms (D1-04)
 
 // The variant's configuration.h supplies TX_POWER_MIN/TX_POWER_MAX for the
 // node_power row's range. Guarded because this translation unit is now also
@@ -105,12 +101,10 @@ constexpr settings_store::FieldType CfgTypeToFieldType(CfgType t) {
 //      library version) any key longer than that -- a fail-CLOSED compile-
 //      time gate here means a too-long key can never ship, instead of
 //      surfacing as a field that mysteriously never persists on real
-//      hardware. Guarded to ESP32 on purpose: "send_repeat_time" (16
-//      characters) is nRF52-only (CFG_FIELD_LIST_PLATFORM's nRF52 branch,
-//      config_json.h) and has no NVS key at all -- it is excluded from this
-//      gate simply by never being one of the rows CFG_FIELD_LIST(X) expands
-//      to when ESP32 is the platform being compiled, not by an exception
-//      list that could rot. `sizeof(key) - 1` is the string length (sizeof
+//      hardware. Guarded to ESP32 on purpose: NVS is an ESP32 concept and
+//      the nRF52 keyed store has no such limit (the 16-character
+//      "send_repeat_time" row that once forced this guard is gone with the
+//      D1-04 struct merge). `sizeof(key) - 1` is the string length (sizeof
 //      a string literal includes its NUL terminator; `key` is always a
 //      literal here, one per X() row).
 //

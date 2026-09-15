@@ -180,12 +180,6 @@ void init_ble(void)
 	Bluefruit.Advertising.setInterval(32, 244); // in unit of 0.625 ms
 	Bluefruit.Advertising.setFastTimeout(15);	// number of seconds in fast mode
 	// Bluefruit.Advertising.start(60);			// 0 = Don't stop advertising
-	// we do not need
-	// if (meshcom_settings.auto_join)
-	//{
-	//	restart_advertising(60);
-	//}
-	//else
 	{
 		restart_advertising(0);
 	}

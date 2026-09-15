@@ -32,7 +32,9 @@ Live confirmation of `OPT-D8` / audit defect 8, now with the exact names:
 
 - **ESP32 only:** `node_disrot`, `node_spstart`, `node_spend`, `node_spstep`,
   `node_spsamp`, `node_bfakt`
-- **nRF52 only:** `send_repeat_time`, `auto_join`
+- **nRF52 only:** `send_repeat_time`, `auto_join` -- both removed from the
+  struct in W3c (2026-09-15); the rak-90 fixture still carries the two keys,
+  which the importer ignores as unknown
 
 The audit named six missing fields from a different angle (`node_ntp`,
 `node_immediate_save`, `node_modus`, `node_mute`, `node_persist_to_flash`,

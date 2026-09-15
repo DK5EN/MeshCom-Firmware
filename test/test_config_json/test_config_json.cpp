@@ -69,15 +69,11 @@ static void fill_settings(void)
     snprintf(meshcom_settings.node_ossid, sizeof(meshcom_settings.node_ossid), "meshcom-srv");
     snprintf(meshcom_settings.node_opwd, sizeof(meshcom_settings.node_opwd), "srv-secret");
 
-    meshcom_settings.send_repeat_time = 12345;
-    meshcom_settings.auto_join = true;
-
     meshcom_settings.node_hamnet_only = 1;
     meshcom_settings.node_sset = 0x0404;
     meshcom_settings.node_maxv = 4.24f;
     snprintf(meshcom_settings.node_extern, sizeof(meshcom_settings.node_extern), "192.168.100.100");
     meshcom_settings.node_msgid = 4711;
-    meshcom_settings.node_ackid = 815;
 
     meshcom_settings.max_hop_text = 3;
 
@@ -221,8 +217,6 @@ static void test_roundtrip_restores_every_field(void)
     TEST_ASSERT_EQUAL_STRING("port07", meshcom_settings.node_mcp17t[7]);
     TEST_ASSERT_EQUAL_INT(3, meshcom_settings.max_hop_text);
     TEST_ASSERT_EQUAL_INT(123456, meshcom_settings.bt_code);
-    TEST_ASSERT_EQUAL_UINT32(12345u, meshcom_settings.send_repeat_time);
-    TEST_ASSERT_TRUE(meshcom_settings.auto_join);
     TEST_ASSERT_EQUAL_UINT32(9600u, (uint32_t)meshcom_settings.node_gpsbaud);
     /* TEST_ASSERT_EQUAL_DOUBLE ist in diesem Environment abgeschaltet
      * (Unity ohne UNITY_INCLUDE_DOUBLE) -- exakter Vergleich, der Wert ist
@@ -240,7 +234,6 @@ static void test_roundtrip_restores_every_field(void)
     TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_msgid);
     TEST_ASSERT_EQUAL_FLOAT(0.0f, meshcom_settings.node_temp);
     golden.node_msgid = meshcom_settings.node_msgid;
-    golden.node_ackid = meshcom_settings.node_ackid;
     golden.node_temp = meshcom_settings.node_temp;
     golden.node_hum = meshcom_settings.node_hum;
     golden.node_press = meshcom_settings.node_press;

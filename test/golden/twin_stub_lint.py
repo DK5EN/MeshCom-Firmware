@@ -48,24 +48,14 @@ PAIRS: List[Tuple[str, str]] = [
     # in-tree original to compare against.
     ("test/test_gateway_service_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_gateway_service_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
-    # W3 path suite (test_nrf52_settings_paths). This one is the sharpest case
-    # in the list and the reason to read the docstring above twice: the stub
-    # does not shadow a few declarations, it carries a FULL COPY of
-    # s_meshcom_settings so that nrf52_flash.cpp can be compiled on a host.
-    # settings_schema.cpp computes every descriptor's offset with offsetof()
-    # against whichever definition it sees -- so if the stub copy drifts from
-    # the real struct in member ORDER or TYPE, the suite keeps passing while
-    # testing a layout no device has. That is precisely "it passes, and it
-    # passes about something that is not the shipped declaration".
-    ("test/test_nrf52_settings_paths/stubs/nrf52/WisBlock-API.h", "src/nrf52/WisBlock-API.h"),
-    # W3 BLE wire-layout freeze (test_ble_settings_v1). Same sharp case as the
-    # line above and registered for the same reason: the suite compares a
-    # frozen s_ble_settings_v1 snapshot against the LIVE s_meshcom_settings,
-    # so a stub copy that drifts in member order or type would let the suite
-    # pass while proving the freeze against a struct no device carries. The
-    # agent that wrote the suite flagged this gap rather than editing this
-    # file; registering it here is the fix.
-    ("test/test_ble_settings_v1/stubs/nrf52/WisBlock-API.h", "src/nrf52/WisBlock-API.h"),
+    # D1-04 (W3c, 2026-09-15): the two settings-suite stubs
+    # (test/test_nrf52_settings_paths and test/test_ble_settings_v1) used to
+    # carry a hand-copied struct s_meshcom_settings and were registered here
+    # so the copy could not drift from the real one. The struct now lives in
+    # src/meshcom_settings.h, defined once, and both stubs #include it -- so
+    # drift is impossible by construction and there is nothing left for this
+    # line-match check to compare (the real WisBlock-API.h holds no struct
+    # declaration any more). Deliberately NOT registered.
 ]
 
 # A declaration is a line that ends in ';' and is not a preprocessor line,

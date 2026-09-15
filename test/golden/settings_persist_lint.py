@@ -57,8 +57,9 @@ THE THREE CHECKS
 -----------------
 
   1. MISSING PERSIST -- every field in the `X()` table that has a matching
-     ESP32 struct member (`src/esp32/esp32_flash.h`) must have a
-     `preferences.put*()` call for its NVS key in `esp32_flash.cpp`. A
+     ESP32 struct member (`src/meshcom_settings.h`'s COMMON + ESP32 + TDECK
+     X-macro lists) must have a `preferences.put*()` call for its NVS key in
+     `esp32_flash.cpp`. A
      field found in the table but never put()'d is exactly DR-13's silent
      bug: the user can set it, the node forgets it.
 
@@ -81,8 +82,8 @@ THE THREE CHECKS
      `get*()` call in the file (both functions, irrespective of the
      `#if defined(BOARD_T_DECK...)` guards some of them sit inside -- a
      guarded call is still a real call on the boards where the macro is
-     set, same convention `settings_layout_lint.py` uses for the struct
-     itself). A key on only one side is two DIFFERENT defects, reported
+     set, same convention `parse_esp32_struct_members()` below uses for the
+     struct itself). A key on only one side is two DIFFERENT defects, reported
      with different wording because they fail differently in the field:
        - WRITE-ONLY (put, no get): the value is saved but `init_flash()`
          never loads it back -- every boot re-reads whatever earlier
@@ -161,9 +162,20 @@ REPO = Path(__file__).resolve().parents[2]
 # the file it lives in moved, so this parser follows the path and nothing
 # else about it changes.
 CONFIG_JSON_CPP = "src/config_json.h"
-ESP32_FLASH_H = "src/esp32/esp32_flash.h"
+# D1-04 W3 struct merge (2026-09-14): struct s_meshcom_settings moved out of
+# src/esp32/esp32_flash.h (and src/nrf52/WisBlock-API.h) into ONE header,
+# generated from three X-macro lists (MESHCOM_SETTINGS_MEMBERS_COMMON/_ESP32/
+# _TDECK, each `M(type, name, default)` / `A(type, name, bounds, init...)`
+# row). parse_esp32_struct_members() below parses those rows instead of a
+# `struct { ... }` body -- see its own docstring.
+MESHCOM_SETTINGS_H = "src/meshcom_settings.h"
 ESP32_FLASH_CPP = "src/esp32/esp32_flash.cpp"
 STRUCT_NAME = "s_meshcom_settings"
+MESHCOM_SETTINGS_MEMBER_MACROS = (
+    "MESHCOM_SETTINGS_MEMBERS_COMMON",
+    "MESHCOM_SETTINGS_MEMBERS_ESP32",
+    "MESHCOM_SETTINGS_MEMBERS_TDECK",
+)
 
 # ---------------------------------------------------------------------------
 # Explained exclusions -- config_json.h:127-137, config_json.h:362-367
@@ -319,59 +331,162 @@ def naive_doc_member_count(config_json_cpp_text: str) -> Tuple[int, int, int]:
 
 
 # ---------------------------------------------------------------------------
-# Extraction: the ESP32 struct's member names
+# Extraction: the ESP32 struct's member names (src/meshcom_settings.h,
+# D1-04 W3 struct merge)
 # ---------------------------------------------------------------------------
-
-FIELD_RE = re.compile(
-    r"^\s*([A-Za-z_][\w:<>]*(?:\s+[A-Za-z_][\w:<>]*)*)"
-    r"\s+(\w+)"
-    r"((?:\s*\[[^\]]*\])*)"
-    r"\s*(?:=[^;]*)?;\s*$")
+#
+# Before the merge this parsed a real `struct { ... }` body out of
+# src/esp32/esp32_flash.h. Since then the struct is generated once, from
+# three X-macro lists (MESHCOM_SETTINGS_MEMBERS_COMMON/_ESP32/_TDECK, each a
+# `M(type, name, default)` / `A(type, name, bounds, init...)` row -- see
+# meshcom_settings.h's own "Row shapes" comment) -- there is no struct body
+# left to parse as C++ field declarations.
 
 
 def _strip_line_comments(text: str) -> str:
     return "\n".join(l.split("//", 1)[0] for l in text.splitlines())
 
 
-def parse_esp32_struct_members(esp32_flash_h_text: str) -> Set[str]:
-    """Member names of `struct s_meshcom_settings` in esp32_flash.h. A field
-    inside a `#if defined(BOARD_T_DECK...)` guard is still a real ESP32
-    member on the boards where that macro is set (same convention
-    settings_layout_lint.py uses for this same struct) -- only bare `#...`
-    preprocessor lines themselves are skipped, not the code they guard."""
-    text = _strip_line_comments(esp32_flash_h_text)
-    m = re.search(r"struct\s+" + re.escape(STRUCT_NAME) + r"\b", text)
-    if not m:
-        return set()
-    rest = text[m.end():]
-    start = rest.find("{")
-    if start == -1:
-        return set()
-    depth, end = 0, None
-    for i, ch in enumerate(rest[start:], start):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                end = i
-                break
-    if end is None:
-        return set()
-    body = rest[start + 1:end]
+def _strip_c_comments(text: str) -> str:
+    """`_strip_line_comments` plus `/* ... */` block comments -- meshcom_settings.h's
+    X-macro rows carry plenty of those (e.g. `/* flash marker, legacy blob
+    only */`), and a `(`/`)` inside one would otherwise corrupt
+    `extract_calls()`'s paren-depth scan. Safe here: no string literal in
+    this file's row shape contains `//` or `/*`."""
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+    return _strip_line_comments(text)
 
+
+def _split_top_level_args(s: str) -> List[str]:
+    """Split `s` on top-level commas, respecting (), [] and "..." nesting --
+    so a nested/bracketed argument (a bounds `[16][16]`, a braced
+    initialiser `{0x00, 0x0D, ...}` -- note braces do NOT need their own
+    case: the C preprocessor's own argument splitting only tracks `()`
+    nesting, so a top-level comma inside `{...}` really is a separate
+    preprocessor argument, exactly why meshcom_settings.h's own A(...)
+    macro is variadic -- `__VA_ARGS__` is what reassembles them, not this
+    splitter) never gets cut into two arguments here just because it stays
+    inside `[` `]`."""
+    args: List[str] = []
+    depth = 0
+    in_str = False
+    cur: List[str] = []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if in_str:
+            cur.append(c)
+            if c == "\\" and i + 1 < len(s):
+                cur.append(s[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+            cur.append(c)
+        elif c in "([":
+            depth += 1
+            cur.append(c)
+        elif c in ")]":
+            depth -= 1
+            cur.append(c)
+        elif c == "," and depth == 0:
+            args.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(c)
+        i += 1
+    if cur:
+        args.append("".join(cur).strip())
+    return args
+
+
+def extract_calls(text: str, call_name: str) -> List[List[str]]:
+    """Every `<call_name>(...)` invocation in `text`, as its raw, comma-split
+    argument strings. Matched only at a word boundary
+    (`(?<![A-Za-z0-9_])<call_name>\\(`) so this can never trigger inside a
+    longer identifier (e.g. `call_name="M"` must not match inside
+    `MC_SETTINGS_M(`). An unbalanced call (should never happen in real
+    source) is skipped, not guessed at."""
+    calls: List[List[str]] = []
+    pat = re.compile(r'(?<![A-Za-z0-9_])' + re.escape(call_name) + r'\(')
+    for m in pat.finditer(text):
+        start = m.end()
+        depth = 1
+        i = start
+        in_str = False
+        while i < len(text) and depth > 0:
+            c = text[i]
+            if in_str:
+                if c == "\\":
+                    i += 2
+                    continue
+                if c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+            i += 1
+        if depth != 0:
+            continue
+        inner = text[start:i - 1]
+        calls.append(_split_top_level_args(inner))
+    return calls
+
+
+def _all_backslash_macro_bodies(text: str, macro_name: str) -> List[str]:
+    """Body text of every `#define <macro_name>(...)` backslash-continued
+    block in `text`, in file order. The parameter list is matched loosely
+    (`\\([^)]*\\)`, no fixed arity) so this covers meshcom_settings.h's
+    two-parameter `MESHCOM_SETTINGS_MEMBERS_COMMON(M, A)` shape (an empty
+    `#else`-branch redefinition with no parameters used, e.g.
+    `MESHCOM_SETTINGS_MEMBERS_TDECK(M, A)` with no body at all, is still
+    found -- it just contributes zero M(...)/A(...) rows)."""
+    lines = text.splitlines()
+    pat = re.compile(r'^\s*#define\s+' + re.escape(macro_name) + r'\([^)]*\)')
+    results: List[str] = []
+    i = 0
+    while i < len(lines):
+        if pat.search(lines[i]):
+            block = [lines[i]]
+            while block[-1].rstrip().endswith("\\"):
+                i += 1
+                if i >= len(lines):
+                    break
+                block.append(lines[i])
+            results.append("\n".join(block))
+        i += 1
+    return results
+
+
+def parse_esp32_struct_members(meshcom_settings_h_text: str) -> Set[str]:
+    """Member names from every `M(...)`/`A(...)` row across ALL occurrences
+    (populated or empty) of MESHCOM_SETTINGS_MEMBERS_COMMON/_ESP32/_TDECK in
+    `meshcom_settings_h_text` -- meshcom_settings.h's COMMON + ESP32 + TDECK
+    X-macro lists, i.e. every member the widest (ESP32 + T-Deck) build of
+    struct s_meshcom_settings has, matching what a pre-merge
+    `struct { ... }` body parse against esp32_flash.h used to return. Name
+    is always the second argument for both row shapes (`M(type, name,
+    default)` / `A(type, name, bounds, ...)`), so one pass over both call
+    names is enough -- no need to track which `#ifdef`/`#if defined(...)`
+    branch a body came from: whichever branch is non-empty is the one that
+    matters, the other contributes no rows either way."""
     members: Set[str] = set()
-    for raw in body.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        fm = FIELD_RE.match(line)
-        if not fm:
-            continue
-        ty = " ".join(fm.group(1).split())
-        if ty.split(" ")[0] in ("return", "else", "case", "static", "const"):
-            continue
-        members.add(fm.group(2))
+    for macro_name in MESHCOM_SETTINGS_MEMBER_MACROS:
+        for body in _all_backslash_macro_bodies(meshcom_settings_h_text, macro_name):
+            body = _strip_c_comments(body)
+            for call in extract_calls(body, "M"):
+                if len(call) >= 2:
+                    members.add(call[1].strip())
+            for call in extract_calls(body, "A"):
+                if len(call) >= 2:
+                    members.add(call[1].strip())
     return members
 
 
@@ -468,8 +583,8 @@ def analyze(x_rows: List[XRow], struct_members: Set[str],
             "matching; this is NOT a clean tree, it is a broken instrument")
     if not struct_members:
         r.fatal.append(
-            f"zero members extracted from struct {STRUCT_NAME} in "
-            f"{ESP32_FLASH_H} -- the struct pattern has stopped matching")
+            f"zero members extracted from the M(...)/A(...) X-macro rows of "
+            f"{MESHCOM_SETTINGS_H} -- the row pattern has stopped matching")
     if not pref_calls.put_calls and not pref_calls.get_keys:
         r.fatal.append(
             f"zero preferences.get*/put* calls extracted from "
@@ -563,7 +678,7 @@ def is_schema_driven(esp32_flash_cpp_text: str) -> bool:
 
 def check(repo: Path = REPO) -> AnalysisResult:
     cfg_p = repo / CONFIG_JSON_CPP
-    h_p = repo / ESP32_FLASH_H
+    h_p = repo / MESHCOM_SETTINGS_H
     cpp_p = repo / ESP32_FLASH_CPP
     missing = [p for p in (cfg_p, h_p, cpp_p) if not p.exists()]
     if missing:
@@ -623,8 +738,35 @@ def _fake_x_table_cpp(rows: str, esp32_platform_rows: str = "",
         "#endif\n")
 
 
-def _fake_struct_h(members: str) -> str:
-    return f"struct {STRUCT_NAME}\n{{\n{members}\n}};\n"
+def _fake_meshcom_settings_h(common_rows: str, esp32_rows: str = "",
+                              tdeck_rows: str = "") -> str:
+    """A minimal meshcom_settings.h-shaped fixture: MESHCOM_SETTINGS_MEMBERS_COMMON
+    always defined, plus MESHCOM_SETTINGS_MEMBERS_ESP32/_TDECK each defined
+    TWICE (a populated body under their real guard, an empty body under the
+    opposite branch) -- the exact shape parse_esp32_struct_members() depends
+    on: it unions M(...)/A(...) rows from every occurrence of each macro
+    NAME it finds, by construction ignoring which branch produced them, so
+    the always-empty opposite branch simply contributes nothing.
+    `common_rows`/`esp32_rows`/`tdeck_rows` must each be pre-formatted
+    exactly like a real X-macro body: every row line ends in ` \\\\\\n'
+    except the body's own last line, matching meshcom_settings.h's own
+    convention."""
+    return (
+        "#define MESHCOM_SETTINGS_MEMBERS_COMMON(M, A)                       \\\n"
+        f"{common_rows}\n"
+        "#ifdef ESP32\n"
+        "    #define MESHCOM_SETTINGS_MEMBERS_ESP32(M, A)                       \\\n"
+        f"{esp32_rows}\n"
+        "#else\n"
+        "    #define MESHCOM_SETTINGS_MEMBERS_ESP32(M, A)\n"
+        "#endif\n"
+        "\n"
+        "#if defined(ESP32) && defined(BOARD_T_DECK)\n"
+        "    #define MESHCOM_SETTINGS_MEMBERS_TDECK(M, A)                       \\\n"
+        f"{tdeck_rows}\n"
+        "#else\n"
+        "    #define MESHCOM_SETTINGS_MEMBERS_TDECK(M, A)\n"
+        "#endif\n")
 
 
 def self_test() -> int:
@@ -654,23 +796,25 @@ def self_test() -> int:
            "(the whole-file, preprocessor-blind count the triage doc uses)",
            naive_total == 4 and naive_keys == 4, f"total={naive_total} keys={naive_keys}")
 
-    # --- struct member parsing, including a T-Deck-guarded field ---
-    struct_h = _fake_struct_h(
-        "    char node_call[10] = {0};\n"
-        "    int node_alt = 0;\n"
-        "    int node_disp_rot = 0;\n"
-        "    #if defined(BOARD_T_DECK)\n"
-        "    int node_map = 0;\n"
-        "    #endif\n")
-    members = parse_esp32_struct_members(struct_h)
-    report("struct member parse includes a guarded (#if) field",
+    # --- meshcom_settings.h member-row parsing, including a T-Deck-only
+    # (MESHCOM_SETTINGS_MEMBERS_TDECK) member ---
+    settings_h = _fake_meshcom_settings_h(
+        common_rows=(
+            '    M(char, node_call, 10)                                    \\\n'
+            '    M(int, node_alt, 0)'),
+        esp32_rows='        M(int, node_disp_rot, 0)',
+        tdeck_rows='            M(int, node_map, 0)')
+    members = parse_esp32_struct_members(settings_h)
+    report("meshcom_settings.h member-row parse includes the T-Deck-only "
+           "(MESHCOM_SETTINGS_MEMBERS_TDECK) member",
            members == {"node_call", "node_alt", "node_disp_rot", "node_map"},
            repr(sorted(members)))
 
-    empty_struct = _fake_struct_h("// nothing parseable here\n")
-    report("struct member parse returns empty set when nothing matches "
-           "(feeds the FATAL void-check, not asserted here directly)",
-           parse_esp32_struct_members(empty_struct) == set())
+    empty_settings_h = _fake_meshcom_settings_h("    // nothing parseable here")
+    report("meshcom_settings.h member-row parse returns empty set when "
+           "nothing matches (feeds the FATAL void-check, not asserted here "
+           "directly)",
+           parse_esp32_struct_members(empty_settings_h) == set())
 
     # --- pref call parsing: direct member, strVar idiom, unresolved ---
     flash_cpp = (
@@ -816,8 +960,8 @@ def self_test() -> int:
             "#else\n"
             "    #define CFG_FIELD_LIST_PLATFORM(X)\n"
             "#endif\n")
-        (root / "src" / "esp32" / "esp32_flash.h").write_text(
-            f"struct {STRUCT_NAME}\n{{\n    char node_call[10] = {{0}};\n}};\n")
+        (root / "src" / "meshcom_settings.h").write_text(
+            _fake_meshcom_settings_h('    M(char, node_call, 10)'))
         (root / "src" / "esp32" / "esp32_flash.cpp").write_text(cpp_text)
 
     with tempfile.TemporaryDirectory() as d:

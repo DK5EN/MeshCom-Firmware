@@ -340,11 +340,12 @@ struct CfgField
 /* Platform-only persisted fields.
  *
  * ESP32: node_disp_rot, the spectrum-scan window and node_analog_batt_faktor
- * have NVS keys; on the nRF52 the same members exist but sit below the
- * "nicht im Flash" line of the struct and are not part of the stored config.
+ * have NVS keys; on the nRF52 the spectrum/battery members exist in the
+ * shared struct (src/meshcom_settings.h) but are runtime-only there
+ * (src/meshcom_settings_runtime.h), and node_disp_rot does not exist at all.
  *
- * nRF52: send_repeat_time and auto_join exist only there and have no NVS key,
- * so they get their member name as key. */
+ * nRF52: nothing. send_repeat_time and auto_join (LoRaWAN OTAA leftovers)
+ * were removed from the struct in the D1-04 merge. */
 #ifdef ESP32
     #define CFG_FIELD_LIST_PLATFORM(X)                                                        \
         X("node_disrot",  CFG_INT, node_disp_rot,          0.0, 270.0,      CFG_NOESC)        \
@@ -354,17 +355,16 @@ struct CfgField
         X("node_spsamp",  CFG_INT, node_specsamples,       0.0, 65535.0,    CFG_NOESC)        \
         X("node_bfakt",   CFG_FLT, node_analog_batt_faktor, CFG_NORANGE,    CFG_NOESC)
 #else
-    #define CFG_FIELD_LIST_PLATFORM(X)                                                        \
-        X("send_repeat_time", CFG_U32,  send_repeat_time,  CFG_NORANGE,     CFG_NOESC)        \
-        X("auto_join",        CFG_BOOL, auto_join,         CFG_NORANGE,     CFG_NOESC)
+    #define CFG_FIELD_LIST_PLATFORM(X)
 #endif
 
-/* Deliberately NOT exported although they have NVS keys (gate decision,
- * 2026-08-30, from the first live round trip on DK5EN-93): node_msgid /
- * node_ackid are the running message-id counters -- restoring a backup would
- * rewind them and make fresh messages collide with the dedup ring of every
- * neighbour; node_temp/hum/press/temp2/gas/co2 are the last sensor readings,
- * not configuration, and made two exports of an unchanged node differ. */
+/* Deliberately NOT exported (gate decision, 2026-08-30, from the first live
+ * round trip on DK5EN-93): node_msgid is the running message-id counter --
+ * restoring a backup would rewind it and make fresh messages collide with
+ * the dedup ring of every neighbour (it is persisted on its own, see
+ * counters_store.h); node_temp/hum/press/temp2/gas/co2 are the last sensor
+ * readings, not configuration, and made two exports of an unchanged node
+ * differ (since 2026-09-13 they are not persisted at all). */
 
 
 #endif

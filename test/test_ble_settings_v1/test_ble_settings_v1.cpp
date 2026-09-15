@@ -129,14 +129,23 @@ static void fillPattern(void *p, size_t n, int idx, bool isBool)
     X(node_press, false)                     \
     X(node_ossid, false)                     \
     X(node_opwd, false)                      \
-    X(send_repeat_time, false)               \
-    X(auto_join, true)                       \
+    /* send_repeat_time and auto_join were removed from s_meshcom_settings in the D1-04 struct merge \
+     * (they stay in s_ble_settings_v1 -- frozen -- but bleSettingsToV1() now hard-codes their wire  \
+     * slots to 0/false and bleSettingsFromV1() ignores them on the way in, since there is no live   \
+     * member left to read from or write into). Not filled here for exactly that reason: this macro  \
+     * drives zeroAndFillAllMembers(s_meshcom_settings&), which no longer has anywhere to put a       \
+     * pattern for either one. test_v1_only_members_ignored_inbound_and_zeroed_outbound below covers  \
+     * both directions explicitly instead. */                                                        \
     X(node_hamnet_only, false)               \
     X(node_sset, false)                      \
     X(node_maxv, false)                      \
     X(node_extern, false)                    \
+    /* node_msgid IS still a live s_meshcom_settings member (just no longer a settings_schema row --  \
+     * see meshcom_settings.h), so it stays filled/checked exactly like any other field.               \
+     * node_ackid, unlike the two above, was DROPPED FROM THE STRUCT ENTIRELY (loaded, saved, never   \
+     * read) -- same "no longer a live member" reasoning applies, also covered by the dedicated test   \
+     * below instead of here. */                                                                       \
     X(node_msgid, false)                     \
-    X(node_ackid, false)                     \
     X(node_power, false)                     \
     X(node_freq, false)                      \
     X(node_bw, false)                        \
@@ -237,8 +246,10 @@ static void fillPattern(void *p, size_t n, int idx, bool isBool)
     X(node_pingcount, false)                 \
     X(node_pingduration, false)
 
-// 132 members total -- matches the count parsed from src/nrf52/WisBlock-API.h
-// at commit 64ba5774 while writing this suite.
+// 129 members total (132 at the freeze commit, minus send_repeat_time,
+// auto_join and node_ackid -- removed from s_meshcom_settings in the D1-04
+// struct merge; s_ble_settings_v1 itself still has all 132, see the comment
+// on the macro rows above).
 
 // `T x{}` value-initialization is only REQUIRED by the standard to zero
 // padding -- in practice, on the exact toolchain this suite's own env
@@ -328,9 +339,16 @@ static void test_round_trip_restores_every_field(void)
     memset(&dst, 0, sizeof(dst));
     bleSettingsFromV1(wire, dst);
 
+    // The ONE deliberate exception: node_msgid goes out (the app sees the live counter) but never
+    // comes back in (a BLE write must not rewind it -- W3c advisor finding 1, counters_store.h).
+    // Assert the exception explicitly, then patch it so the whole-struct memcmp stays exact.
+    TEST_ASSERT_EQUAL_INT32_MESSAGE(src.node_msgid, wire.node_msgid, "node_msgid must be exported outbound");
+    TEST_ASSERT_EQUAL_INT32_MESSAGE(0, dst.node_msgid, "node_msgid must NOT be applied inbound");
+    dst.node_msgid = src.node_msgid;
+
     TEST_ASSERT_EQUAL_MEMORY_MESSAGE(&src, &dst, sizeof(src),
                                       "round trip (bleSettingsToV1 + bleSettingsFromV1) did not "
-                                      "restore the original settings struct byte-for-byte");
+                                      "restore every other member byte-for-byte");
 }
 
 // =============================================================================
@@ -374,7 +392,59 @@ static void test_bad_markers_rejected(void)
 }
 
 // =============================================================================
-// 5. Every field the app can set (config_json.h's CFG_FIELD_LIST -- the
+// 5. v1-only members (send_repeat_time, auto_join, node_ackid): removed from
+//    s_meshcom_settings in the D1-04 struct merge, still frozen in
+//    s_ble_settings_v1. An inbound image with real, non-zero/non-false
+//    values in those three slots must convert WITHOUT affecting any live
+//    member (bleSettingsFromV1() ignores them -- there is no live member
+//    left to write into), and a freshly produced outbound image must always
+//    carry 0/false/0 there regardless of what the live struct holds (it
+//    cannot hold anything for these three any more, so bleSettingsToV1()
+//    hard-codes the frozen defaults).
+// =============================================================================
+
+static void test_v1_only_members_ignored_inbound_and_zeroed_outbound(void)
+{
+    // Inbound: an image with poison values in the three v1-only slots must convert IDENTICALLY to one
+    // with the two structs' respective defaults there. Everything else is filled from the same
+    // generic pattern in both, so any difference in the result is only explainable by the poison
+    // leaking into a live member -- which bleSettingsFromV1() must not do.
+    s_ble_settings_v1 wire_poison = validImage();
+    wire_poison.send_repeat_time = 0xAABBCCDDu;
+    wire_poison.auto_join = true;
+    wire_poison.node_ackid = 424242;
+    // node_msgid is a live member but state, not configuration: an inbound image must not rewind the
+    // counter (W3c advisor finding 1). Poisoned here for the same identical-conversion check.
+    wire_poison.node_msgid = 999;
+
+    s_ble_settings_v1 wire_clean = validImage();
+
+    s_meshcom_settings dst_poison;
+    memset(&dst_poison, 0, sizeof(dst_poison));
+    bleSettingsFromV1(wire_poison, dst_poison);
+
+    s_meshcom_settings dst_clean;
+    memset(&dst_clean, 0, sizeof(dst_clean));
+    bleSettingsFromV1(wire_clean, dst_clean);
+
+    TEST_ASSERT_EQUAL_MEMORY_MESSAGE(&dst_clean, &dst_poison, sizeof(dst_clean),
+                                      "an inbound image's send_repeat_time/auto_join/node_ackid must not "
+                                      "affect any live s_meshcom_settings member");
+
+    // Outbound: whatever the live struct holds -- and it holds nothing for these three any more -- a
+    // freshly produced wire image always carries the frozen 0/false/0 defaults in those slots.
+    s_meshcom_settings src;
+    zeroAndFillAllMembers(src);
+    s_ble_settings_v1 out;
+    memset(&out, 0, sizeof(out));
+    bleSettingsToV1(src, out);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(0u, out.send_repeat_time, "send_repeat_time must always be zeroed outbound");
+    TEST_ASSERT_FALSE_MESSAGE(out.auto_join, "auto_join must always be false outbound");
+    TEST_ASSERT_EQUAL_INT32_MESSAGE(0, out.node_ackid, "node_ackid must always be zeroed outbound");
+}
+
+// =============================================================================
+// 6. Every field the app can set (config_json.h's CFG_FIELD_LIST -- the
 //    SAME field list config export/import and the settings schema already
 //    use, not a hand-picked subset invented for this suite) survives
 //    bleSettingsToV1()+bleSettingsFromV1(). A field added to
@@ -418,6 +488,7 @@ int main(void)
     RUN_TEST(test_round_trip_restores_every_field);
     RUN_TEST(test_wrong_length_rejected);
     RUN_TEST(test_bad_markers_rejected);
+    RUN_TEST(test_v1_only_members_ignored_inbound_and_zeroed_outbound);
     RUN_TEST(test_every_cfg_field_survives_conversion);
 
     return UNITY_END();

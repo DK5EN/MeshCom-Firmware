@@ -83,6 +83,24 @@ bool settingsStoreRemove();
 // Returns false if the file does not exist or cannot be read.
 bool settingsStoreDump(void);
 
+// Generic atomic write: replaces `path`'s content with exactly `len` bytes
+// from `data`, via the same temp-file-then-rename sequence settingsStoreSave()
+// itself uses -- write the FULL new content to `tmp_path`, verify every byte
+// landed, then InternalFS.rename() it onto `path` (one retry on a failed
+// rename, with a filesystem inventory logged in between; see
+// settingsStoreSave()'s own top comment in the .cpp for exactly what
+// guarantee this sequence does and does not provide). Returns false, leaving
+// `path` completely untouched, on any failure -- open/write/rename error.
+// Used by settingsStoreSave() itself and by src/counters_store.h's nRF52
+// implementation (nrf52_flash.cpp) and its legacy-blob-CRC bookkeeping, so
+// neither has to duplicate this sequence. NOT reentrant with itself or with
+// settingsStoreSave()/settingsStoreLoad(): all three share the one
+// `settings_store_file` object this translation unit keeps open only for the
+// duration of a single call, matching Adafruit_LittleFS::open()'s own
+// documented "only one file open at a time" constraint -- callers on the
+// same task (the only place any of this runs) already serialise through it.
+bool writeFileAtomic(const char *path, const char *tmp_path, const void *data, size_t len);
+
 // Prints an inventory of the internal filesystem to Serial -- one line per
 // file with its size, then a total -- tagged with `reason`.
 //

@@ -11,8 +11,13 @@
 // suite -- that path pulls in settings_sanitize.h/msgid_counter.h/
 // lora_setchip.h's full board-configuration chain, none of which this
 // suite's target (the generic FieldDescriptor <-> Preferences walk) needs.
-// node_msgid and max_hop_text are still exercised: both are loaded via their
-// own explicit (non-generic) lines in init_flash() regardless of MC_SAFEBOOT.
+// max_hop_text is still exercised: it is loaded via its own explicit
+// (non-generic) line in init_flash() regardless of MC_SAFEBOOT. node_msgid is
+// NOT a settings_schema row at all any more (D1-04 W3 step 4) and its
+// counters_store.h load/save path (countersLoad()/countersSave(), see
+// test_esp32_flash_lifecycle) is itself gated `#if !defined(MC_SAFEBOOT)` in
+// esp32_flash.cpp -- under MC_SAFEBOOT, init_flash() never touches it, so it
+// simply stays at whatever setUp() reset the struct to.
 //
 //   pio test -e native_esp32_settings_nvs
 
@@ -123,8 +128,9 @@ void test_dropped_sensor_fields_produce_no_nvs_key(void)
 //    node_contrast), and the fields whose load default had to be seeded
 //    separately because it differs from the struct's own compiled default
 //    (node_lat_c, node_maxv, node_power, node_owgpio, node_gwsrv,
-//    node_fversion, node_kbl_sync), plus the two explicitly-loaded keys
-//    (node_msgid, max_hop_text).
+//    node_fversion, node_kbl_sync), plus the one explicitly-loaded key
+//    (max_hop_text). node_msgid is asserted too, but only as "MC_SAFEBOOT
+//    never touches it" -- see that assertion's own comment.
 //
 // MUTATION VERIFIED: temporarily commented out the
 //    meshcom_settings.node_power = -20;
@@ -146,7 +152,7 @@ void test_missing_key_takes_default_on_first_boot(void)
     TEST_ASSERT_FALSE(meshcom_settings.node_kbl_sync);
     TEST_ASSERT_EQUAL_INT(60, meshcom_settings.node_wifi_power);   // unseeded: struct default already correct
     TEST_ASSERT_EQUAL_INT(255, meshcom_settings.node_contrast);    // unseeded: struct default already correct
-    TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_msgid);         // explicit load, no key present
+    TEST_ASSERT_EQUAL_INT(0, meshcom_settings.node_msgid);         // MC_SAFEBOOT: countersLoad() never runs, struct default stands
     TEST_ASSERT_EQUAL_INT(MAXHOP_TEXT_FALLBACK, meshcom_settings.max_hop_text); // explicit load, MC_SAFEBOOT branch
 }
 

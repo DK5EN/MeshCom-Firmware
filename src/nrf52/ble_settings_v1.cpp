@@ -56,11 +56,12 @@ void bleSettingsToV1(const s_meshcom_settings &src, s_ble_settings_v1 &out)
 	memcpy(out.node_ossid, src.node_ossid, sizeof(out.node_ossid));
 	memcpy(out.node_opwd, src.node_opwd, sizeof(out.node_opwd));
 
-	// v1-only carryover: s_meshcom_settings still has these two today. The
-	// next wave drops both from that struct -- when it does, delete these
-	// two lines (only), never touch s_ble_settings_v1 itself.
-	out.send_repeat_time = src.send_repeat_time;
-	out.auto_join = src.auto_join;
+	// v1-only members: send_repeat_time / auto_join (dead LoRaWAN OTAA state)
+	// and node_ackid (never read) were removed from s_meshcom_settings in the
+	// D1-04 struct merge. The wire image keeps their slots at their frozen
+	// defaults; s_ble_settings_v1 itself is never touched.
+	out.send_repeat_time = 0;
+	out.auto_join = false;
 
 	out.node_hamnet_only = src.node_hamnet_only;
 
@@ -71,7 +72,7 @@ void bleSettingsToV1(const s_meshcom_settings &src, s_ble_settings_v1 &out)
 	memcpy(out.node_extern, src.node_extern, sizeof(out.node_extern));
 
 	out.node_msgid = src.node_msgid;
-	out.node_ackid = src.node_ackid;
+	out.node_ackid = 0;
 
 	out.node_power = src.node_power;
 	out.node_freq = src.node_freq;
@@ -259,9 +260,8 @@ void bleSettingsFromV1(const s_ble_settings_v1 &in, s_meshcom_settings &out)
 	memcpy(out.node_ossid, in.node_ossid, sizeof(out.node_ossid));
 	memcpy(out.node_opwd, in.node_opwd, sizeof(out.node_opwd));
 
-	// v1-only carryover: see the matching comment in bleSettingsToV1() above.
-	out.send_repeat_time = in.send_repeat_time;
-	out.auto_join = in.auto_join;
+	// v1-only members (send_repeat_time, auto_join, node_ackid): no longer in
+	// s_meshcom_settings, so an inbound image's values for them are ignored.
 
 	out.node_hamnet_only = in.node_hamnet_only;
 
@@ -271,8 +271,13 @@ void bleSettingsFromV1(const s_ble_settings_v1 &in, s_meshcom_settings &out)
 
 	memcpy(out.node_extern, in.node_extern, sizeof(out.node_extern));
 
-	out.node_msgid = in.node_msgid;
-	out.node_ackid = in.node_ackid;
+	// node_msgid is deliberately NOT copied inbound (advisor finding 1, W3c):
+	// the app writes back the image it read earlier, and applying its stale
+	// counter would hand out message ids a second time. The counter is state
+	// behind counters_store.h, never configuration. Outbound (bleSettingsToV1)
+	// still exports it, so the app sees the live value. The legacy-blob path in
+	// nrf52_flash.cpp copies it explicitly, because there the blob IS the only
+	// source of the counter.
 
 	out.node_power = in.node_power;
 	out.node_freq = in.node_freq;

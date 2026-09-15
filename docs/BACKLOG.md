@@ -6,10 +6,10 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-**Last updated 2026-09-13 (evening) — DRY campaign stand.** The one-shot PR campaign (§3.8af)
+**Last updated 2026-09-15 — DRY campaign stand.** The one-shot PR campaign (§3.8af)
 has a single place that says where it stands and what finishing it takes: **"Campaign stand
-2026-09-13"** in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic
-(**~30 working days** to the PR, upstream review on top). Short version: phases A and B are done,
+2026-09-15"** in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic
+(**~29 working days** to the PR, upstream review on top). Short version: phases A and B are done,
 phase C owes only `M3`'s two bench-only rows (4 of 8 closed; `DR-03`/`DR-16` wait for the `E1` G2
 run, so the `--phase implementation` flag drops after `E1`, not after `M3`), phase D has `W1` and
 `W2` **done** and **`W3`'s ESP32 half shipped and hardware-proven** (`DK5EN-93`, 104 of 107
@@ -5213,7 +5213,7 @@ than by reading:
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
 
-#### Campaign stand 2026-09-13: what is done, what completing the plan takes
+#### Campaign stand 2026-09-15: what is done, what completing the plan takes
 
 The audit's plan (`optimization-audit-20260910.md` §7.1) is eight waves inside
 five phases; the Gantt (`docs/dry-unification-gantt-20260910.html`) carries the
@@ -5229,13 +5229,13 @@ allocated **`TD-16`** to a different T-Deck bug, and ours was renumbered to
 **`TD-19`** because theirs is already public in the merged PR #1140. Five of
 our own commit messages still say `TD-16` and are stale as a result.
 
-| Phase                        | Rows                               | State                                                                                                                             |
-| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                       |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                 |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run      |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` ESP32 half shipped and hardware-proven; struct merge open**, `W4`-`W7` and `C4d` **not started** |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                     |
+| Phase                        | Rows                               | State                                                                                                                                   |
+| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                             |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                       |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run            |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` code complete (W3c 2026-09-15), nRF52 + T-Deck bench proof open**, `W4`-`W7` and `C4d` **not started** |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                           |
 
 ##### What each open row still needs
 
@@ -5270,14 +5270,45 @@ our own commit messages still say `TD-16` and are stale as a result.
      `getChar`/`putChar` so the on-flash TYPE tag, not just the key spelling,
      is unchanged for provisioned nodes. 15-character NVS key limit is now a
      compile-time `static_assert`.
-  2. **OPEN, and the risky half** -- merge the two `s_meshcom_settings`
-     definitions (`D1-04` proper), remove the dead LoRaWAN cluster, drop
-     `node_ackid`, move `node_msgid` to a counters namespace. The
-     `String` -> `char[128]` conversion of `node_audio_start`/`node_audio_msg`
-     that this used to depend on is **done** (step 1).
-  3. **OPEN** -- the member-level fail-closed gate replacing
-     `settings_schema_lint.py`'s struct-blind text parse. Today a member in the
-     struct but absent from the schema is silently not persisted.
+  2. **DONE 2026-09-15 (W3c)** -- one `struct s_meshcom_settings` in
+     `src/meshcom_settings.h`, generated from X-macro member lists
+     (`MESHCOM_SETTINGS_MEMBERS_COMMON/_ESP32/_TDECK`) with the two old
+     structs' per-platform defaults kept verbatim (`MC_PLATFORM_DEFAULT`).
+     Removed for good: `send_repeat_time`, `auto_join` and the whole
+     `api_timer_*`/`periodic_wakeup`/`g_task_wakeup_timer` scaffolding,
+     `node_ackid`. `node_msgid` stays a member but is no schema row: it is a
+     counter behind `src/counters_store.h` -- ESP32 namespace `"Counters"`
+     with a one-time fallback read of the legacy `Credentials/node_msgid`
+     key, nRF52 its own `/counters.txt`; the eight high-water-mark sites in
+     `loop_functions.cpp` call `countersSave()`, so the 4 kB settings record
+     no longer hits flash every 100 frames and no import/BLE write/settings
+     rewrite can rewind the counter. nRF52 legacy blob: read through the
+     frozen `s_ble_settings_v1` (verified byte-identical to upstream v4.35t's
+     struct), `flash_reset()` writes a v1 image so a downgrade still finds a
+     size-correct file. **Found while reading the bench notes and fixed in
+     the same wave:** RAK-90 still carries a keyed-store file from the 09-12
+     dev image next to the newer blob its release image writes -- the keyed
+     store would have won. That is the general "downgrade to official,
+     reconfigure, upgrade again" case, so the blob's CRC32 is recorded
+     (`/legacy_blob.crc`) and a changed blob forces the migration
+     (`[SETST];path;legacy_rewritten`, regression-tested). Cost: +2.1 kB BSS
+     on nRF52 for the static v1 scratch image (the 4 kB loop-task stack
+     cannot hold a second 2 kB struct in `flash_reset()`). **Advisor pass
+     (`docs/w3c-advisor-verdict-20260915.md`) found one real gap and fixed it
+     in the same commit:** a BLE settings write still copied `node_msgid`
+     inbound and rewound the counter -- now ignored inbound, exported
+     outbound; and the legacy path discards a stale counters file so a blob
+     rewritten by official firmware wins. Two decisions recorded: a settings
+     reset keeps the counter, and "no CRC recorded" means the blob wins.
+  3. **DONE 2026-09-15 (W3c)** -- the member-level fail-closed gate:
+     `test/test_settings_members` (envs `native_settings_members_esp32`,
+     `_nrf52`) enumerates every member via the X-macros and asserts each is
+     EXACTLY one of schema-covered or named in
+     `src/meshcom_settings_runtime.h`; mutation-verified both ways.
+     `settings_layout_lint.py` and its baseline are retired (no twin left to
+     diff); `settings_schema_lint.py`/`settings_persist_lint.py` parse the new
+     header; `twin_stub_lint.py` no longer registers the two settings stubs,
+     which now include the real header instead of copying the struct.
   4. **DECIDED 2026-09-13** (operator) -- the six last-sensor-reading fields
      stop being persisted; `node_msgid` moves to a counters namespace and
      `node_ackid` is dropped as dead state; the 14 ESP32-only fields stay
@@ -5289,7 +5320,16 @@ our own commit messages still say `TD-16` and are stale as a result.
      a plain reboot, the three movers being live GPS. Does NOT cover the 25
      NVS-only keys, which `GET /config.json` cannot see -- that needs a T-Deck
      run (the `TD-19` trap).
-  6. **OPEN** -- `DR-12`/`DR-13` from `M3`.
+  6. **DONE 2026-09-15** -- `DR-12` asserts through
+     `test_settings_members::test_every_member_is_schema_or_runtime`, `DR-13`
+     through `test_nrf52_settings_paths::test_legacy_blob_reads_through_frozen_v1_layout`
+     and `test_esp32_flash_lifecycle::test_counter_namespace_migrates_from_credentials`;
+     the drift lint reports 2 rows without a test (`DR-03`, `DR-16`, bench-only).
+  7. **OPEN, bench** -- the nRF52 upgrade proof on RAK-90 (expect
+     `legacy_rewritten` then `legacy_migrated`, settings diffed with
+     `tools/bench/w3_upgrade_check.py` against `docs/bench/w3-baseline/rak90-config-20260912.json`),
+     the ESP32 re-proof on Heltec-93 (counter migration into `Counters`), the
+     T-Deck run for the 25 NVS-only keys. Three USB slots, three nodes.
 
   **`W3-BLE` -- not in the audit's plan at all, and a hard prerequisite for
   step 2. DONE 2026-09-13.** The nRF52 settings characteristic ships
@@ -5340,16 +5380,16 @@ our own commit messages still say `TD-16` and are stale as a result.
 Days are the audit's own estimates, carried in the Gantt, not measurements --
 except where a row has already been measured and corrected:
 
-| Row                    | Plan days            | Note                                                           |
-| ---------------------- | -------------------- | -------------------------------------------------------------- |
-| `P0.9`                 | ~0.5                 | documentation only; `W1` and 4 of `M3`'s 8 rows are now done   |
-| `W3` remainder         | ~2 of 10             | steps 2/3/6; the audit budgeted 9 and did not contain `W3-BLE` |
-| `W4`                   | 6                    |                                                                |
-| `W5`                   | 5                    | gated on five operator decisions                               |
-| `W6` + `C4d` + `D1-10` | 7+                   | `D1-10` re-measured at 50 predicates, so "+"                   |
-| `W7`                   | 3                    |                                                                |
-| `E1`-`E4`              | 6.5                  | two of those days are bench time on four nodes                 |
-| **Total to PR**        | **~30 working days** | was ~33 at the 2026-09-13 stand; `E5` (10 d) sits outside that |
+| Row                    | Plan days            | Note                                                                   |
+| ---------------------- | -------------------- | ---------------------------------------------------------------------- |
+| `P0.9`                 | ~0.5                 | documentation only; `W1` and 4 of `M3`'s 8 rows are now done           |
+| `W3` remainder         | ~1 of 11.5           | bench only (step 7); W3c took 1.5 d on top of the audit's 9 + `W3-BLE` |
+| `W4`                   | 6                    |                                                                        |
+| `W5`                   | 5                    | gated on five operator decisions                                       |
+| `W6` + `C4d` + `D1-10` | 7+                   | `D1-10` re-measured at 50 predicates, so "+"                           |
+| `W7`                   | 3                    |                                                                        |
+| `E1`-`E4`              | 6.5                  | two of those days are bench time on four nodes                         |
+| **Total to PR**        | **~29 working days** | was ~30 at the 2026-09-13 stand; `E5` (10 d) sits outside that         |
 
 `W3` is the one row where the plan was simply missing work: the audit costed
 the struct merge without noticing the BLE characteristic pins the struct's byte

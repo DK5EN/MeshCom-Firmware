@@ -14,11 +14,7 @@
 #include <crc32_util.h>
 #include <maxhop.h>
 
-#ifdef ESP32
-    #include <esp32/esp32_flash.h>
-#else
-    #include <nrf52/WisBlock-API.h>
-#endif
+#include <meshcom_settings.h> // the one settings struct, both platforms (D1-04)
 
 #include <ArduinoJson.h>
 

@@ -14,6 +14,7 @@
 
 #include <settings_schema.h>
 #include <settings_store.h>
+#include <counters_store.h>
 
 #include <cstring>
 
@@ -175,11 +176,6 @@ void saveFieldToPreferences(const settings_store::FieldDescriptor &d, void *base
 // SAVE (see save_settings() below) has no exclusions at all and writes every
 // row in settings_schema::fields() generically.
 //
-//   - "node_msgid": sanitize_loaded_settings() (called right after the walk)
-//     advances this counter via msgIdAfterLoad() before anything else touches
-//     it again. It is loaded explicitly, once, ahead of the walk instead, so
-//     the walk running over it a SECOND time can never re-read the
-//     pre-advance value straight back out of NVS and undo the advance.
 //   - "max_hop_text": its load-time default is a build-variant literal
 //     (MC_SAFEBOOT vs not, see the two-line block below) -- both variants are
 //     asserted numerically equal (command_functions.cpp's
@@ -188,9 +184,17 @@ void saveFieldToPreferences(const settings_store::FieldDescriptor &d, void *base
 //     generic "missing key -> keep the field's current value" default, to
 //     avoid this file depending on maxhop.h being reachable from both
 //     branches of the #if at the top of this file.
+//
+// "node_msgid" USED to be a second entry here (it advanced via
+// msgIdAfterLoad() right after the walk, so the walk itself had to skip it
+// or re-reading it a second time from NVS would undo the advance). It is no
+// longer a settings_schema row at all (D1-04 W3 step 4, operator decision
+// 2026-09-13): the walk never sees it, and its own load/advance/write-back
+// lives in counters_store.h's countersLoad(), called from init_flash()
+// separately -- see that call site's comment.
 bool isLoadSpecialCased(const char *key)
 {
-    return strcmp(key, "node_msgid") == 0 || strcmp(key, "max_hop_text") == 0;
+    return strcmp(key, "max_hop_text") == 0;
 }
 
 } // namespace
@@ -204,7 +208,16 @@ static void sanitize_log(const char *field, const char *oldv, const char *newv)
     Serial.printf("[FLASH]...sanitized %s: %s -> %s\n", field, oldv, newv);
 }
 
-void sanitize_loaded_settings(void)
+// Returns true when this call actually changed something in
+// `meshcom_settings` (a radio param or max_hop_text out of range and reset).
+// init_flash() (below) uses this to decide whether it needs to call
+// save_settings() at all -- see that call site's comment. D1-04 W3 step 4:
+// this function used to also advance and report on the message-id
+// high-water mark (msgid_counter.h); that responsibility, write-back
+// included, now lives entirely in counters_store.h's countersLoad(), called
+// separately by init_flash() -- a correction here and the counter's own
+// advance are unrelated events and no longer need to share one return path.
+bool sanitize_loaded_settings(void)
 {
     RadioLimits lim = { TX_POWER_MIN, TX_POWER_MAX, 400.0f, 960.0f, 0, 0, max_country };
     RadioParams p = { meshcom_settings.node_power, meshcom_settings.node_freq, meshcom_settings.node_bw,
@@ -224,20 +237,71 @@ void sanitize_loaded_settings(void)
     if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
         fixed++;
 
+    if(fixed > 0)
+        Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
+
+    return fixed > 0;
+}
+
+// ---------------------------------------------------------------------------
+// D1-04 W3 step 4: counters_store.h's ESP32 backend. Contract is that
+// header's own top comment -- read it first. Storage is a SEPARATE
+// Preferences namespace ("Counters") through a SEPARATE static Preferences
+// instance, deliberately never the global `preferences` object init_flash()/
+// save_settings() use for "Credentials": sharing one handle across two
+// unrelated call paths is exactly what bce95db5 got bitten by (a nested
+// begin()/end() pair silently closing the handle a caller further up the
+// stack was still using -- see g_flash_load_in_progress's comment above).
+// Keeping the counter on its own handle makes that class of bug structurally
+// unreachable here, not just guarded against.
+static Preferences counters_preferences;
+
+void countersLoad(void)
+{
+    if (!counters_preferences.begin("Counters", false))
+        Serial.printf("[SETST];counters;namespace_open;failed\n");
+    if (counters_preferences.isKey("node_msgid"))
+    {
+        meshcom_settings.node_msgid = counters_preferences.getInt("node_msgid", meshcom_settings.node_msgid);
+    }
+    else
+    {
+        // Upgrade path: nothing in "Counters" yet -- fall back to the legacy
+        // location this value lived in before this cutover. Opened
+        // read-only, on its own short-lived Preferences instance, and NOT
+        // deleted afterwards: a downgrade back to a pre-cutover firmware
+        // must still find it in "Credentials".
+        counters_preferences.end();
+        Preferences legacy;
+        legacy.begin("Credentials", true);
+        meshcom_settings.node_msgid = legacy.getInt("node_msgid", meshcom_settings.node_msgid);
+        legacy.end();
+        counters_preferences.begin("Counters", false);
+    }
 
     // Message-id high-water mark (msgid_counter.h). The counter is no longer
     // persisted on every originated frame -- it reaches flash once per
     // kMsgIdPersistStep frames -- so the stored value can be up to one step
     // behind what the node actually used before it went down. Stepping past
-    // that whole block here is what keeps an id from being handed out twice
-    // after an unclean shutdown; init_flash() (below) is what actually
-    // writes the result back, once the rest of the struct has finished
-    // loading -- see its own comment for why that write does not belong
-    // here any more.
+    // that whole block here, and writing the result back BEFORE returning,
+    // is what keeps an id from being handed out twice after an unclean
+    // shutdown -- see msgid_counter.h's own top comment for why the
+    // write-back is not optional.
     meshcom_settings.node_msgid = msgIdAfterLoad(meshcom_settings.node_msgid);
+    // msgid_counter.h: the advanced block MUST reach flash before the first frame goes out. NVS can
+    // be full or the namespace can fail to open; neither is silent any more (advisor finding 6).
+    if (counters_preferences.putInt("node_msgid", meshcom_settings.node_msgid) == 0)
+        Serial.printf("[SETST];counters;load_writeback;failed\n");
+    counters_preferences.end();
+}
 
-    if(fixed > 0)
-        Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
+bool countersSave(void)
+{
+    if (!counters_preferences.begin("Counters", false))
+        return false;
+    bool ok = counters_preferences.putInt("node_msgid", meshcom_settings.node_msgid) > 0;
+    counters_preferences.end();
+    return ok;
 }
 #endif // !MC_SAFEBOOT
 
@@ -302,9 +366,8 @@ void init_flash(void)
     meshcom_settings.node_kbl_sync = false;
     #endif
 
-    // Explicit, non-generic loads -- see isLoadSpecialCased()'s comment for
-    // why these two keys are not part of the walk below.
-    meshcom_settings.node_msgid = preferences.getInt("node_msgid", meshcom_settings.node_msgid);
+    // Explicit, non-generic load -- see isLoadSpecialCased()'s comment for
+    // why this key is not part of the walk below.
     #if defined(MC_SAFEBOOT)
     meshcom_settings.max_hop_text = preferences.getInt("max_hop_text", MAXHOP_TEXT_FALLBACK);
     #else
@@ -325,56 +388,69 @@ void init_flash(void)
 
     // TM-32 (upstream #661/#57): Radio-Parameter auf Plausibilitaet pruefen,
     // bevor sie in radio.setOutputPower() & Co. landen. Sentinels bleiben.
-    // Called at exactly this point (radio params, max_hop_text and
-    // node_msgid already loaded; nothing else has been reached yet by
-    // anything OUTSIDE this function) -- same relative position this call
-    // has held since TM-32 landed it.
+    // Called at exactly this point (radio params and max_hop_text already
+    // loaded; nothing else has been reached yet by anything OUTSIDE this
+    // function) -- same relative position this call has held since TM-32
+    // landed it. `settings_corrected` records whether it actually changed
+    // anything, for the conditional save_settings() call below.
     #if !defined(MC_SAFEBOOT)
-    sanitize_loaded_settings();
+    bool settings_corrected = sanitize_loaded_settings();
     #endif
 
     g_flash_load_in_progress = false;
     preferences.end();
 
-    // One write per boot, unconditionally: it carries sanitize_loaded_settings()'s
-    // corrections when there were any (otherwise every boot reports the same
-    // one again), and it always carries the advanced message-id block, which
-    // is only safe once it is on flash.
-    //
-    // Deliberately called HERE -- after the walk above has finished and
-    // after this function's own preferences.end() -- and not from inside
+    // save_settings() runs here -- after the walk above has finished and
+    // after this function's own preferences.end(), never from inside
     // sanitize_loaded_settings() itself, where an earlier commit this same
-    // day (bce95db5, "W3: node_msgid reaches flash once per 100 frames")
-    // had put it. Found while wiring this walk, not by that commit's own
-    // testing: calling save_settings() before every field had been loaded
-    // persists a HALF-loaded struct, so every field not yet reached at that
-    // point gets clobbered in NVS with whatever s_meshcom_settings' compiled
-    // default (or this function's own pre-load seed above) happened to
-    // still hold. Worse, save_settings() opens its OWN preferences.begin()/
-    // end() pair (Preferences::begin() is a documented no-op re-entering an
-    // already-open handle, harmless) -- but its preferences.end() is
-    // UNCONDITIONAL once the handle is open (Preferences.cpp), so it closes
-    // the handle THIS function is still using. Every following
-    // preferences.getX() call in this function (there would have been ~70 of
-    // them, everything from node_track_freq onward in the old hand-written
-    // order) would then see Preferences::_started == false and silently
-    // return its own literal default argument, NEVER reading NVS again for
-    // the rest of this boot -- indistinguishable, from the node's point of
-    // view, from every one of those settings resetting to factory default on
-    // every single reboot. Neither half of this (the clobber, or the
-    // closed-handle short-circuit) is specific to the schema walk above; both
-    // apply identically to the original hand-written call list. This is a
-    // separate, independent defect from the one docs/... already describes
-    // as "the boot-2 settings loss was newlib-nano's printf, not a schema
-    // gap" -- flagged for its own follow-up, not fixed further than moving
-    // this one call site back out of the load path.
+    // day (bce95db5, "W3: node_msgid reaches flash once per 100 frames") had
+    // put an equivalent call. Found while wiring this walk, not by that
+    // commit's own testing: calling save_settings() before every field had
+    // been loaded persists a HALF-loaded struct, so every field not yet
+    // reached at that point gets clobbered in NVS with whatever
+    // s_meshcom_settings' compiled default (or this function's own pre-load
+    // seed above) happened to still hold. Worse, save_settings() opens its
+    // OWN preferences.begin()/end() pair (Preferences::begin() is a
+    // documented no-op re-entering an already-open handle, harmless) -- but
+    // its preferences.end() is UNCONDITIONAL once the handle is open
+    // (Preferences.cpp), so it closes the handle THIS function is still
+    // using. Every following preferences.getX() call in this function (there
+    // would have been ~70 of them, everything from node_track_freq onward in
+    // the old hand-written order) would then see Preferences::_started ==
+    // false and silently return its own literal default argument, NEVER
+    // reading NVS again for the rest of this boot -- indistinguishable, from
+    // the node's point of view, from every one of those settings resetting
+    // to factory default on every single reboot. Neither half of this (the
+    // clobber, or the closed-handle short-circuit) is specific to the schema
+    // walk above; both apply identically to the original hand-written call
+    // list. This is a separate, independent defect from the one docs/...
+    // already describes as "the boot-2 settings loss was newlib-nano's
+    // printf, not a schema gap" -- flagged for its own follow-up, not fixed
+    // further than moving this one call site back out of the load path.
+    //
+    // Unlike the original one-write-per-boot shape, this call is now
+    // CONDITIONAL on sanitize_loaded_settings() having actually corrected
+    // something: with node_msgid no longer a settings_schema row (D1-04 W3
+    // step 4), nothing else in this struct changes on an ordinary boot, so
+    // an unconditional write here would just re-persist byte-identical data
+    // every single time. The message-id write-back guarantee that used to
+    // ride along with this call (bce95db5) is now countersLoad()'s own job,
+    // called separately below, through its own Preferences handle -- see
+    // that function's comment for why it is safe to call only after this
+    // preferences.end() and does not need save_settings() at all.
     #if !defined(MC_SAFEBOOT)
-    save_settings();
+    if (settings_corrected)
+        save_settings();
+
+    countersLoad();
     #endif
 }
 
 void clear_flash(void)
 {
+    // DECISION (W3c, advisor finding 4): only "Credentials" is cleared. The "Counters" namespace
+    // (node_msgid, counters_store.h) survives a settings reset on purpose -- a reset is not a reason
+    // to replay message ids into every neighbour's dedup ring.
     preferences.begin("Credentials", false);
 
     printfdeb("[INIT]...FLASH #entries %i bevor clear\n", (int)preferences.freeEntries());

@@ -1,5 +1,26 @@
 # RESUME — pick up here
 
+## 2026-09-15: W3c -- one settings struct, counters namespace, member gate (dry-unification)
+
+W3 steps 2, 3 and 6 are in code on `dry-unification`; only the bench proof is left of W3.
+`struct s_meshcom_settings` lives once in `src/meshcom_settings.h` (X-macro lists, per-platform
+defaults unchanged); `node_ackid`, `send_repeat_time`, `auto_join` and the LoRaWAN timer
+scaffolding are gone; `node_msgid` persists through `src/counters_store.h` (ESP32 `"Counters"`
+namespace with legacy fallback, nRF52 `/counters.txt`). nRF52 reads its legacy blob through the
+frozen `s_ble_settings_v1` and records the blob's CRC so a blob rewritten by official firmware
+(downgrade-then-upgrade; RAK-90 is in exactly that state) forces the migration --
+`[SETST];path;legacy_rewritten`. Member gate `test/test_settings_members` (two envs).
+Gates: 868/868 native cases in 27 envs, `selftest.sh` green, drift lint 2 rows without test (DR-03/DR-16),
+32-env build, advisor pass. Details: BACKLOG §3.8af "Campaign stand 2026-09-15", Gantt row W3C.
+
+**Bench next (needs RAK-90, Heltec-93, T-Deck-14 on the table):** flash RAK-90 from its release
+image, expect `legacy_rewritten` -> `legacy_migrated`, diff `GET /config.json` with
+`tools/bench/w3_upgrade_check.py docs/bench/w3-baseline/rak90-config-20260912.json <ip>`; Heltec-93
+re-proof plus `Counters` namespace; T-Deck NVS-only keys. RAM: nRF52 +2.1 kB BSS (v1 scratch).
+
+**Environment:** macOS 27 had dropped Rosetta 2 -- every nRF52 build died with "Bad CPU type in
+executable". Reinstalled (`softwareupdate --install-rosetta --agree-to-license`); memory note.
+
 ## 2026-09-13 (late morning): DS-03 long-press deep sleep has an automated bench test
 
 `tools/bench/deepsleep_button.py` (`866e328f`, design `docs/deepsleep-button-autotest.md`,
