@@ -255,6 +255,57 @@ _MANUAL_ONLY: Dict[str, str] = {
     "setownms": "changes the netmask",
     "setownntp": "changes the NTP server",
     "extudpip": "redirects the EXTUDP feed away from the listener",
+    # (e) KEYS THE TRANSMITTER on a shared amateur-radio network. Added
+    #     2026-09-16, before the first D2-V run: every category above is about
+    #     protecting the node or the capture, and none of them looks outside
+    #     the bench at all. These commands do -- the frames land in other
+    #     operators' nodes and their dedup rings, and a run of this script
+    #     would have put a burst of them on 433.175 MHz.
+    #
+    #     This is not theoretical: `--pingcall <call>` was driven by hand on
+    #     DK5EN-90 on 2026-09-16 and immediately produced a PONG back from
+    #     DK5EN-93 over the air. The name suggests it only stores a callsign;
+    #     it pings.
+    #
+    #     Held back rather than made safe, because there is no value that
+    #     makes them safe: the emission IS the command. They belong on an
+    #     RF-isolated node or a dummy load, driven deliberately -- see the
+    #     standing bench rule that test traffic goes to group 9/9999 or a
+    #     direct contact and never to `*`.
+    "sendhey": "originates a hey frame onto the shared mesh",
+    "hey": "originates a hey frame onto the shared mesh",
+    "sendpos": "originates a position frame onto the shared mesh",
+    "posshot": "forces an immediate position beacon",
+    "sendtele": "originates a telemetry frame onto the shared mesh",
+    "sendtrack": "originates a track frame onto the shared mesh",
+    "ping": "`--ping start` originates repeated pings over the air",
+    "pingcall": "arms the recurring ping timer (sets node_pingtime when it was 0), so the node keeps transmitting afterwards -- the PONG seen from DK5EN-93 on 2026-09-16 was that timer, not a one-shot",
+    "loratx": "raw LoRa transmit test",
+    "injectraw": "injected frames can be relayed back out onto the air",
+    "injectmsg": "injected frames can be relayed back out onto the air",
+    "injectpos": "injected frames can be relayed back out onto the air",
+    # Added 2026-09-16 after an advisor pass caught them still in the driven
+    # script -- and the first G0 run had already driven all three. None of
+    # them originates a single frame, which is why they were missed: they
+    # change how much the node transmits, and they PERSIST, so a run aborted
+    # between the `on` and the `off` leaves the node that way across reboots.
+    "track": "SmartBeaconing: pushes one station's beacon cadence to ~10 s on a channel that carries about one packet per 8 s (src/track_warning.h), and persists",
+    "mesh": "`--mesh on` makes the node relay every frame it hears, and persists",
+    "gateway": "`--gateway on` radiates what the server pushes down, and persists",
+    # Not emitters, but they poison the payload of everything the node does
+    # transmit: none of the three range-checks its argument, and the script's
+    # `abc` case parks the node at 0.0 N / 0.0 E -- persisted, then beaconed
+    # onto the live mesh and into mcmap at the next position interval.
+    "setlat": "no range check; the script's non-numeric case persists 0.0 as the node's latitude",
+    "setlon": "no range check; the script's non-numeric case persists 0.0 as the node's longitude",
+    "setalt": "no range check; the script's non-numeric case persists 0 as the node's altitude",
+    # The ping timer's two dials. Harmless only while node_pingcall is empty,
+    # which is not a property of this script -- DK5EN-90 carries a configured
+    # ping target right now, and `--pingtime 1` on such a node is a ping per
+    # second until something stops it. Held back with `pingcall` and `ping`
+    # rather than relying on the node's current state.
+    "pingtime": "sets the ping interval; on a node with a ping target configured this is a transmit every N seconds",
+    "pingmax": "sets how many pings the armed timer sends",
 }
 
 

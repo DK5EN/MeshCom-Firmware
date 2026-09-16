@@ -29,6 +29,28 @@ if(bGATEWAY)
     {
         bSPI_ETH_Active = true;   // SPI guard: Ethernet owns bus
         INSTR_SECTION("eth_udp");
+        // DR-14, DECIDED 2026-09-12, both-valid -- do not "fix" this to
+        // match ESP32. ESP32 drains the TX ring unconditionally, every
+        // bGATEWAY pass (gateway_service_esp32.cpp: getMeshComUDP() then
+        // sendMeshComUDP(), no condition between them). nRF52 instead calls
+        // sendUDP() ONLY on a pass where getUDP() just reported "no packet
+        // received", because on RAK4631 the W5100S (Ethernet) and the SX1262
+        // (LoRa radio) share one SPI bus: bSPI_ETH_Active is held across the
+        // whole Ethernet access above and a radio re-arm is deferred
+        // (bPendingRadioRx) until it releases below. Draining TX on every
+        // pass, including RX-received passes, would lengthen that shared-bus
+        // window and risk the radio missing LoRa frames. Both platforms are
+        // therefore correct for their own hardware; the asymmetry is
+        // intentional and the residual risk (TX ring only drains on
+        // RX-free passes here) was accepted knowingly at that review.
+        // Two independent readers have already misread this as a bug and
+        // proposed unifying it -- the original DRY audit (OPT-D5) and the
+        // M2 drift-matrix row -- which is why this is pinned by a test, not
+        // just this comment: test/test_gateway_service_twin (env
+        // native_gateway_twin) case
+        // test_dr14_nrf52_sends_only_when_no_packet_received asserts
+        // sendUDP() fires only on the no-packet pass, and will fail if this
+        // selectivity is ever "unified" away. See docs/BACKLOG.md DR-14.
         if(neth.getUDP() == 1)  // 1...no udp-paket received
         {
             { INSTR_SECTION("eth_udp_tx"); sendUDP(); }

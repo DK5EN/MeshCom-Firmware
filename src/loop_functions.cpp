@@ -3325,6 +3325,30 @@ void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
     #endif
 }
 
+// D3-02: shared epilogue for locally originated APRS frames -- advance the
+// message-id counter, persist it only at the high-water mark (see
+// msgid_counter.h; DO NOT reorder these three calls, the persist-on-step
+// scheme depends on this exact order), pick the via-path, then encode into
+// msg_buffer. `msg_buffer` must be at least MAX_MSG_LEN_PHONE bytes, and
+// `aprsmsg.msg_id` must already be set by the caller before this runs.
+//
+// Not every call site fits this shape: SendAckMessage() interleaves
+// insertOwnTx()/addLoraRxBuffer() between the persist step and checkVia(),
+// so it keeps its own inline epilogue rather than being forced through here
+// (docs/optimization-audit-20260910.md D3-02).
+static void finalizeAndSendAPRS(struct aprsMessage &aprsmsg, uint8_t *msg_buffer)
+{
+    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
+
+    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
+    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
+        countersSave();
+
+    checkVia(aprsmsg);
+
+    encodeAPRS(msg_buffer, aprsmsg);
+}
+
 void sendPing(char msg_call[10])
 {
     // no ping within track mode
@@ -3352,15 +3376,7 @@ void sendPing(char msg_call[10])
 
     aprsmsg.msg_payload = msg_text;
     
-    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        countersSave();
-
-    checkVia(aprsmsg);
-
-    encodeAPRS(msg_buffer, aprsmsg);
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
     if(bDisplayInfo)
     {
@@ -3428,15 +3444,7 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     aprsmsg.msg_payload = msg_text;
     
-    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        countersSave();
-
-    checkVia(aprsmsg);
-
-    encodeAPRS(msg_buffer, aprsmsg);
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
     if(bDisplayInfo)
     {
@@ -4075,15 +4083,7 @@ int sendMessage(char *msg_text, int len)
         aprsmsg.msg_payload = strMsg + "{" + String(cAckId);
     }
 
-    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        countersSave();
-
-    checkVia(aprsmsg);
-
-    encodeAPRS(msg_buffer, aprsmsg);
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
     if(bDisplayInfo)
     {
@@ -4763,15 +4763,7 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         if(aprsmsg.msg_payload == "")
             return;
 
-        meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-        // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-        if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-            countersSave();
-
-        checkVia(aprsmsg);
-
-        encodeAPRS(msg_buffer, aprsmsg);
+        finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
         if(bDisplayInfo)
         {
@@ -4839,15 +4831,7 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     if(aprsmsg.msg_payload == "")
         return;
 
-    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        countersSave();
-
-    checkVia(aprsmsg);
-
-    encodeAPRS(msg_buffer, aprsmsg);
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
     if(bDisplayInfo)
     {
@@ -4989,15 +4973,7 @@ void sendHey()
 
     aprsmsg.msg_payload = "R" + String(getMheardCount()) + ";";
    
-    meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-    // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-    if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-        countersSave();
-
-    checkVia(aprsmsg);
-
-    encodeAPRS(msg_buffer, aprsmsg);
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
     if(bDisplayInfo)
     {
@@ -5326,15 +5302,7 @@ void sendTelemetry(int ID)
     {
         aprsmsg.msg_payload = msg_text;
         
-        meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
-
-        // Flash rewrite, but only at a high-water mark -- msgid_counter.h
-        if(msgIdNeedsPersist(meshcom_settings.node_msgid))
-            countersSave();
-
-        checkVia(aprsmsg);
-
-        encodeAPRS(msg_buffer, aprsmsg);
+        finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
         if(bDisplayInfo)
         {

@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "configuration.h"
 #include "country_profile.h"
 
@@ -7,8 +9,7 @@
 // `return true;`.
 
 // RF-08 (BACKLOG), resolved as "not a defect": country 5 ("868") has no real
-// APRS/track sub-channel to assign, unlike every other code (Poland, case 15,
-// is the other literal, but a real one: 434.855). 999 stands in for "none",
+// APRS/track sub-channel to assign, unlike every other code. 999 stands in for "none",
 // and is safe *only* because it is out of every actually-shipped radio's
 // tunable range, not because anything here gates it.
 //
@@ -41,282 +42,114 @@
 // touching this value, do not just trust the comment.
 #define TRACK_FREQ_NONE_SENTINEL 999 // no APRS/track frequency defined for this region
 
+// PRE-EXISTING DEFECT, carried over unchanged from the switch this table
+// replaced -- recorded here 2026-09-16 rather than fixed, because changing an
+// emitted RF value is a behaviour change that needs its own row and a bench
+// proof, not a drive-by edit inside a DRY refactor.
+//
+// `track_freq` is ONE column shared by both platforms, while `freq` has
+// separate esp32/nrf52 columns -- and the two platforms do not use the same
+// unit. ESP32 stores MHz (test/golden/native/country-profile-esp32.txt:
+// `track=433.774994`), the nRF52 stores Hz (country-profile-nrf52.txt:
+// `track=433775008`). Every row gets that right because it uses the
+// LORA_APRS_FREQUENCY macro, which is per-platform.
+//
+// Poland (code 15) does not: it is the one row with a bare literal,
+// `434.855f`. On ESP32 that is correct. On the nRF52 it lands in a Hz column
+// as 434.855 Hz -- below every RadioLib floor, so a Polish nRF52 node with
+// --track on gets RADIOLIB_ERR_INVALID_FREQUENCY, exactly like the 999
+// sentinel above. Fixing it means 434855000.0f on the nRF52 side, which needs
+// track_freq split into two columns like freq already is.
+
+// D3-05: the 14-case switch collapsed into a const lookup table. Every case
+// assigned the same six fields (freq, bw, sf, cr, track_freq, preamble) and
+// differed only in the numbers -- and, for freq/bw/cr, by platform, because
+// those three are stored in different units on the two sides (OPT-D14, see
+// country_profile.h). sf/track_freq/preamble are the same value on both
+// platforms for every row here, so those get one column each; freq/bw/cr get
+// an _esp32 and an _nrf52 column instead of a per-row `#if`.
+//
+// Case 7 (MAN) never reaches this table: countryProfile() returns false for
+// it before the lookup, exactly as the switch's `case 7: return false;` did.
+// The table itself must stay `static const` -- see the D3-05 report for the
+// `nm`/`objdump` check that it lands in .rodata (flash), not .data (RAM).
+struct CountryRfProfile
+{
+    int8_t code;
+    float  freq_esp32;
+    float  freq_nrf52;
+    float  bw_esp32;
+    float  bw_nrf52;
+    int8_t cr_esp32;
+    int8_t cr_nrf52;
+    int8_t sf;
+    float  track_freq;
+    int8_t preamble;
+};
+
+static const CountryRfProfile kCountryRfProfiles[] = {
+    // code  freq_esp32     freq_nrf52     bw_esp32  bw_nrf52  cr_esp32  cr_nrf52  sf        track_freq                 preamble
+    {   1,   439.9125f,     439912500.f,   125.0f,   0.0f,     6,        1,        10,       (float)LORA_APRS_FREQUENCY,      8 }, // UK
+    {   2,   (float)RF_FREQUENCY,  (float)RF_FREQUENCY,  125.0f,   0.0f,     6,        2,        10,       (float)LORA_APRS_FREQUENCY,      8 }, // ON
+    {   4,   433.9250f,     433925000.f,   125.0f,   0.0f,     6,        2,        10,       (float)LORA_APRS_FREQUENCY,      8 }, // LA
+    {   5,   869.525f,      869525000.f,   250.0f,   1.0f,     6,        2,        LORA_SF,  TRACK_FREQ_NONE_SENTINEL, 8 }, // 868
+    {   6,   906.875f,      906875000.f,   250.0f,   1.0f,     6,        2,        LORA_SF,  (float)LORA_APRS_FREQUENCY,      8 }, // 915
+    {   8,   (float)RF_FREQUENCY,  (float)RF_FREQUENCY,  250.0f,   1.0f,     6,        2,        LORA_SF,  (float)LORA_APRS_FREQUENCY,      8 }, // EU8 (preamble 8)
+    {   9,   439.9125f,     439912500.f,   125.0f,   0.0f,     6,        1,        10,       (float)LORA_APRS_FREQUENCY,      8 }, // UK8
+    {  10,   433.175f,      433175000.f,   250.0f,   1.0f,     6,        2,        11,       (float)LORA_APRS_FREQUENCY,      8 }, // US
+    {  11,   435.775f,      435775000.f,   250.0f,   1.0f,     6,        2,        11,       (float)LORA_APRS_FREQUENCY,      8 }, // VR2
+    {  12,   435.750f,      435750000.f,   250.0f,   1.0f,     6,        2,        11,       (float)LORA_APRS_FREQUENCY,      8 }, // 435
+    {  13,   436.250f,      436250000.f,   250.0f,   1.0f,     6,        2,        11,       (float)LORA_APRS_FREQUENCY,      8 }, // 436
+    {  14,   442.000f,      442000000.f,   250.0f,   1.0f,     6,        2,        11,       (float)LORA_APRS_FREQUENCY,      8 }, // 442
+    {  15,   (float)RF_FREQUENCY,  (float)RF_FREQUENCY,  250.0f,   1.0f,     6,        2,        LORA_SF,  434.855f,                 8 }, // PL
+};
+
+// The switch's `default` (EU): whatever code has no row above -- 0, 3, 16,
+// and anything else out of range. Unlike every row, its preamble is
+// LORA_PREAMBLE_LENGTH, not the literal 8; that split is in the switch this
+// replaces and test_table_matches_the_committed_baseline pins it (codes 0/3/16
+// print preamble=32 in the stub configs, every table row prints 8).
+static const CountryRfProfile kCountryRfProfileDefault = {
+    0, (float)RF_FREQUENCY, (float)RF_FREQUENCY, 250.0f, 1.0f, 6, 2,
+    LORA_SF, (float)LORA_APRS_FREQUENCY, LORA_PREAMBLE_LENGTH
+};
+
 bool countryProfile(int iCtry, CountryProfile &out)
 {
-    switch (iCtry)
+    if (iCtry == 7)  // MAN ... manual
     {
-        case 1:  // UK ... 
-            
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 439912500;
-                out.bw = 0;
-                out.cr = 1;
-            #else
-                out.freq = 439.9125;
-                out.bw = 125.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 10;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-
-            return true;
-
-        case 2:  // ON
-            out.freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.bw = 0;
-                out.cr = 2;
-            #else
-                out.bw = 125.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 10;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-
-            out.preamble = 8;
-
-            return true;
-
-        case 4:  // LA
-            out.freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 433925000;
-                out.bw = 0;
-                out.cr = 2;
-            #else
-                out.freq = 433.9250;
-                out.bw = 125.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 10;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-
-            out.preamble = 8;
-
-            return true;
-
-            case 5:  // 868 ... 
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 869525000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 869.525;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = LORA_SF;
-
-            out.track_freq = TRACK_FREQ_NONE_SENTINEL;
-
-            out.preamble = 8;
-
-            return true;
-
-        case 6:  // 915 ...
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 906875000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 906.875;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = LORA_SF;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-
-            return true;
-
-
-        case 8:  // EU Preabble 8 ... 
-            out.freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = LORA_SF;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-
-            out.preamble = 8;
-
-            return true;
-
-        case 9:  // UK8 ... 
-            
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 439912500;
-                out.bw = 0;
-                out.cr = 1;
-            #else
-                out.freq = 439.9125;
-                out.bw = 125.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 10;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-
-            return true;
-
-        case 10:  // US ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 433175000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 433.175;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 11;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-
-            return true;
-
-        case 11:  // VR2 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 435775000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 435.775;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = 11;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-
-            return true;
-
-        case 12:  // 435 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 435750000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 435.750;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-            out.sf = 11;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-            return true;
-        case 13:  // 436 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 436250000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 436.250;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-            out.sf = 11;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-            return true;
-        case 14:  // 442 ... 
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.freq = 442000000;
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.freq = 442.000;
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-            out.sf = 11;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = 8;
-            return true;
-
-        case 15:  // PL
-            out.freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = LORA_SF;
-
-            out.track_freq = 434.855; // LORA_APRS_FREQUENCY for Poland
-
-            out.preamble = 8;
-
-            return true;
-
-        case 7:  // MAN ... manual
-            // Not a table entry: it validates what is already stored instead
-            // of assigning literals, so the caller keeps it. Without this
-            // case the `default` below would swallow code 7 and hand back the
-            // EU profile, silently turning manual mode into EU.
-            return false;
-
-        default:    // EU
-            out.freq = RF_FREQUENCY;
-
-            #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
-                out.bw = 1;
-                out.cr = 2;
-            #else
-                out.bw = 250.0;
-                out.cr = 6;
-            #endif
-
-            out.sf = LORA_SF;
-
-            out.track_freq = LORA_APRS_FREQUENCY;
-            
-            out.preamble = LORA_PREAMBLE_LENGTH;
-
-            return true;
+        // Not a table entry: it validates what is already stored instead of
+        // assigning literals, so the caller keeps it. Without this early
+        // return, falling through to the default-row lookup below would
+        // silently hand back the EU profile for country 7, turning manual
+        // mode into EU.
+        return false;
     }
+
+    const CountryRfProfile *row = &kCountryRfProfileDefault;
+
+    for (unsigned i = 0; i < sizeof(kCountryRfProfiles) / sizeof(kCountryRfProfiles[0]); i++)
+    {
+        if (kCountryRfProfiles[i].code == iCtry)
+        {
+            row = &kCountryRfProfiles[i];
+            break;
+        }
+    }
+
+    #if defined(BOARD_RAK4630) || defined(USE_HELTEC_T114) || defined(BOARD_T_ECHO)
+        out.freq = row->freq_nrf52;
+        out.bw = row->bw_nrf52;
+        out.cr = row->cr_nrf52;
+    #else
+        out.freq = row->freq_esp32;
+        out.bw = row->bw_esp32;
+        out.cr = row->cr_esp32;
+    #endif
+
+    out.sf = row->sf;
+    out.track_freq = row->track_freq;
+    out.preamble = row->preamble;
 
     return true;
 }

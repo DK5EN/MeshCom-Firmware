@@ -634,7 +634,28 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     }
 
     // no telemetry
-    if(aprsmsg.msg_destination_path != "100001")
+    if(aprsmsg.msg_destination_path == "100001")
+    {
+      // EXT-01 (BACKLOG.md): this leg built no JSON, so c_json stayed at its
+      // memset-cleared "" and control fell through into the shared send
+      // block below with an empty buffer. UdpExtern.write(c_json, 0) then
+      // returns 0 (nothing written) and the false-y result was read as a
+      // failed write, calling resetExternUDP() -- a full UDP socket
+      // teardown/rebuild for every telemetry text frame heard, confirmed on
+      // hardware in docs/bench/w3-baseline/README.md section 2 (resetExternUDP()
+      // re-establishes immediately, so this is churn, not an outage). Return
+      // before the send block instead of falling into it with nothing to send.
+      //
+      // Deliberate log difference: the old fall-through still printed the
+      // trailing [EXT];tx;len;... line (with len 0) on the non-EXTUDP path.
+      // That line is dropped here. It reported a send that never happened,
+      // so losing it removes a misleading entry rather than a useful one --
+      // on the EXTUDP path the old code returned early too, so nothing there
+      // changes. Noted because a log line vanishing is otherwise the kind of
+      // thing that reads as an accident later.
+      return;
+    }
+
     {
       JsonDocument cJson;
 

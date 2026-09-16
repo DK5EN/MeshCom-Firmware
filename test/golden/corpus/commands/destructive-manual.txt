@@ -7,12 +7,31 @@
 #   ethdrop        drops the Ethernet link the capture runs over
 #   extudpip       redirects the EXTUDP feed away from the listener
 #   flashpoke      writes out-of-range radio values to flash (TM-32 hook)
+#   gateway        `--gateway on` radiates what the server pushes down, and persists
+#   hey            originates a hey frame onto the shared mesh
+#   injectmsg      injected frames can be relayed back out onto the air
+#   injectpos      injected frames can be relayed back out onto the air
+#   injectraw      injected frames can be relayed back out onto the air
+#   loratx         raw LoRa transmit test
+#   mesh           `--mesh on` makes the node relay every frame it hears, and persists
 #   netconsole     turns the 2323 console off; the 2323 capture runs over it
 #   ota-update     reflashes the node
 #   passwd         changes the BLE PIN; a wrong value locks the bench out
+#   ping           `--ping start` originates repeated pings over the air
+#   pingcall       arms the recurring ping timer (sets node_pingtime when it was 0), so the node keeps transmitting afterwards -- the PONG seen from DK5EN-93 on 2026-09-16 was that timer, not a one-shot
+#   pingmax        sets how many pings the armed timer sends
+#   pingtime       sets the ping interval; on a node with a ping target configured this is a transmit every N seconds
+#   posshot        forces an immediate position beacon
 #   reboot         reboots the node mid-capture
+#   sendhey        originates a hey frame onto the shared mesh
+#   sendpos        originates a position frame onto the shared mesh
+#   sendtele       originates a telemetry frame onto the shared mesh
+#   sendtrack      originates a track frame onto the shared mesh
+#   setalt         no range check; the script's non-numeric case persists 0 as the node's altitude
 #   setcall        changes the node callsign
 #   setctry        valid values reconfigure the radio and reboot after 15 s
+#   setlat         no range check; the script's non-numeric case persists 0.0 as the node's latitude
+#   setlon         no range check; the script's non-numeric case persists 0.0 as the node's longitude
 #   setowndns      changes DNS; also the duplicate-branch defect (OPT-D2)
 #   setowngw       changes the default gateway
 #   setownip       changes the static IP the 2323 capture connects to
@@ -21,17 +40,28 @@
 #   setpwd         sets the WiFi password; a wrong value strands the node
 #   setssid        changes the WiFi network the node joins
 #   spiffs         erases the filesystem (`spiffs reset`)
+#   track          SmartBeaconing: pushes one station's beacon cadence to ~10 s on a channel that carries about one packet per 8 s (src/track_warning.h), and persists
 #   webpwd         sets the web password; locks the HTTP restore out
 #   webserver      turns the web server off; the HTTP restore needs it
 #   wifi           `--wifi off` drops the link the restore runs over
 #   wifiap         switches the node into AP mode
 #   wifidrop       drops the WiFi link the capture runs over
 #   wifitxpower    a low value cripples the radio and the node stops associating
+--posshot
 --cleanflash
 --reboot
 --ota-update
 --deepsleep
 --spiffs reset
+--track on
+--track off
+--gateway on
+--gateway off
+--gateway pos
+--gateway nopos
+--gateway srv 1
+--gateway srv 999999
+--gateway srv abc
 --netconsole on
 --netconsole off
 --netconsole
@@ -40,14 +70,32 @@
 --webpwd 1
 --webpwd 999999
 --webpwd abc
+--mesh on
+--mesh off
 --extudpip
 --passwd 1
 --passwd 999999
 --passwd abc
 --passwd
+--sendhey
+--sendpos
+--sendtele
+--sendtrack
 --setcall 1
 --setcall 999999
 --setcall abc
+--pingcall 1
+--pingcall 999999
+--pingcall abc
+--pingtime 1
+--pingtime 999999
+--pingtime abc
+--ping start
+--ping stop
+--pingmax max
+--pingmax 1
+--pingmax 999999
+--pingmax abc
 --setssid 1
 --setssid 999999
 --setssid abc
@@ -68,22 +116,41 @@
 --setownms 1
 --setownms 999999
 --setownms abc
---setowndns 1
---setowndns 999999
---setowndns abc
 --setownntp 1
 --setownntp 999999
 --setownntp abc
+--setlat 1
+--setlat 999999
+--setlat abc
+--setlon 1
+--setlon 999999
+--setlon abc
+--setalt 1
+--setalt 999999
+--setalt abc
 --setctry 1
 --setctry 999999
 --setctry abc
 --wifitxpower 1
 --wifitxpower 999999
 --wifitxpower abc
+--injectpos 1
+--injectpos 999999
+--injectpos abc
 --ethdrop
 --wifidrop
 --wifi on
 --wifi off
+--injectmsg 1
+--injectmsg 999999
+--injectmsg abc
+--injectraw 1
+--injectraw 999999
+--injectraw abc
+--loratx 1
+--loratx 999999
+--loratx abc
 --flashpoke 1
 --flashpoke 999999
 --flashpoke abc
+--hey

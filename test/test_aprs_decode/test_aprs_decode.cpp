@@ -250,6 +250,37 @@ static void test_telemetry_ohne_y_bleibt_null(void)
     TEST_ASSERT_EQUAL_INT(0, pos.telemetry);
 }
 
+// D3-01: /V= und /Y= sind die EINZIGEN beiden Tags, die "%i" statt "%d"
+// benutzen -- "%i" leitet die Basis ab, also ist "010" oktal 8 und nicht
+// dezimal 10. Nach der Umstellung auf aprsExtractTag() waehlt ein
+// AprsTagType-Enum die Konversion; vertauscht man dort APRS_TAG_INT_AUTOBASE
+// gegen APRS_TAG_INT, dekodieren genau diese beiden Felder still anders und
+// KEIN anderer Test merkt es (alle vorhandenen /V=- und /Y=-Vektoren sind
+// einstellig, wo "%i" und "%d" uebereinstimmen). Diese beiden Faelle pinnen
+// die Basis-Ableitung fest.
+static void test_v_und_y_lesen_oktal_wie_scanf_i(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=010/Y=010", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(8, pos.version);   // "%d" wuerde hier 10 liefern
+    TEST_ASSERT_EQUAL_INT(8, pos.telemetry); // "%d" wuerde hier 10 liefern
+}
+
+// Gegenprobe: ein Tag mit "%d" darf die Basis NICHT ableiten. /A= (Altitude)
+// ist einer der drei reinen "%d"-Tags; "010" muss dort dezimal 10 bleiben.
+// Ohne diesen Fall wuerde ein pauschales Umstellen aller Int-Tags auf
+// APRS_TAG_INT_AUTOBASE unbemerkt durchgehen.
+static void test_d_tags_leiten_keine_basis_ab(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/A=010", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(10, pos.alt); // "%i" wuerde hier oktal 8 liefern
+}
+
 // Voller Tag-Satz in Encoder-Reihenfolge (B A N P H T O F Q G C R V U I D Y,
 // src/loop_functions.cpp:4300-4447) -- jedes Feld muss unabhaengig von den
 // anderen korrekt decodiert werden.
@@ -297,6 +328,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_bus_voltage_und_strom);
     RUN_TEST(test_telemetry_kein_puffer_leck_von_version);
     RUN_TEST(test_telemetry_ohne_y_bleibt_null);
+    RUN_TEST(test_v_und_y_lesen_oktal_wie_scanf_i);
+    RUN_TEST(test_d_tags_leiten_keine_basis_ab);
     RUN_TEST(test_alle_tags_in_encoder_reihenfolge);
     return UNITY_END();
 }

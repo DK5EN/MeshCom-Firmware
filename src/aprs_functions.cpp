@@ -560,6 +560,90 @@ void initAPRSPOS(struct aprsPosition &aprspos)
     aprspos.grccnt = 0;
 }
 
+// DRY campaign D3-01 (docs/optimization-audit-20260910.md:200): 14 of the
+// decodeAPRSPOS() '/X=value' tag blocks (Batt/Alt/Press/Hum/Temp/Temp2/
+// QFE/QNH/GASRES/CO2/version/Bus-Voltage/Current/telemetry) shared this
+// exact loop, byte for byte, differing only in the tag letter, the sscanf
+// format and the destination field. This is that loop, extracted verbatim.
+//
+// Deliberately NOT routed through here (their clamping/offset differs, see
+// the audit and the call sites themselves): /N (NCNT, 2-char tag matched by
+// a digit range, offset +2, 3-byte cap instead of 7), /R (GRC, its own
+// buffer + ';'-split group-list parsing) and /D (Digital, 8-byte fixed-width
+// bitfield with its own validity check). Unifying those into "one true
+// helper" would have meant either adding parameters nothing else uses or
+// quietly changing their behavior -- reported instead of forced.
+//
+// Quirks preserved on purpose, not fixed:
+//  - only the first occurrence of the tag is honored (outer loop breaks on
+//    match), so a duplicate tag later in the string is ignored;
+//  - a present-but-empty value ("/X=/" or "/X= ") calls sscanf() on an
+//    empty string, which performs zero conversions and leaves *target
+//    exactly as it was (decodeAPRSPOS()'s initAPRSPOS() default, normally);
+//  - a value longer than the 7-byte capture window is silently truncated
+//    to its first 7 characters, not rejected (e.g. an 8-digit /A= parses
+//    only the leading 7 digits);
+//  - the `id == PayloadBuffer.length()` end check can never actually fire
+//    (the enclosing `for(id...; id<PayloadBuffer.length(); ...)` already
+//    exits before the body runs again at that point) -- moot in practice
+//    because decodeAPRSPOS() always concat(" ")s a trailing space onto
+//    PayloadBuffer before any of these run, so a value can never truly
+//    reach the raw end of the buffer without a delimiter first.
+// The value's type, instead of a printf format string.
+//
+// sscanf() must be reached with a LITERAL format: several envs build with
+// -Werror=format-nonliteral (it fired on E22_1262_S3-DevKitC-1-N16R8), and a
+// non-literal format also silently disables the compiler's argument-type
+// check on the void* target -- which is exactly the check worth keeping when
+// the caller hands over an address and a type separately.
+//
+// APRS_TAG_INT_AUTOBASE is "%i", NOT "%d", and the two are kept apart on
+// purpose: "%i" infers the base, so "010" reads as octal 8 and "0x10" as 16.
+// Only the version ('V') and telemetry ('Y') tags used it; collapsing them
+// into "%d" would silently change what those two fields decode to.
+enum AprsTagType
+{
+    APRS_TAG_INT,          // "%d" -> int *
+    APRS_TAG_INT_AUTOBASE, // "%i" -> int *
+    APRS_TAG_FLOAT,        // "%f" -> float *
+};
+
+static void aprsExtractTag(const String &PayloadBuffer, unsigned int istarttext, char tagchar, AprsTagType type, void *target)
+{
+    char decode_text[8];
+    memset(decode_text, 0x00, sizeof(decode_text));
+    unsigned int ipt = 0;
+
+    for(unsigned int itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
+    {
+        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == tagchar && PayloadBuffer.charAt(itxt+2) == '=')
+        {
+            for(unsigned int id=itxt+3; id<PayloadBuffer.length(); id++)
+            {
+                // ENDE
+                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
+                {
+                    switch(type)
+                    {
+                        case APRS_TAG_INT:          sscanf(decode_text, "%d", (int *)target);   break;
+                        case APRS_TAG_INT_AUTOBASE: sscanf(decode_text, "%i", (int *)target);   break;
+                        case APRS_TAG_FLOAT:        sscanf(decode_text, "%f", (float *)target); break;
+                    }
+                    break;
+                }
+
+                if(ipt < 7)
+                {
+                    decode_text[ipt]=PayloadBuffer.charAt(id);
+                    ipt++;
+                }
+            }
+
+            break;
+        }
+    }
+}
+
 uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
 {
     initAPRSPOS(aprspos);
@@ -701,257 +785,32 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
     aprspos.bat = 0;
     aprspos.alt = 0;
 
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
-
     // check Batt
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'B' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%d", &aprspos.bat);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'B', APRS_TAG_INT, &aprspos.bat);
 
     // check Altitute
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'A' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%d", &aprspos.alt);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'A', APRS_TAG_INT, &aprspos.alt);
 
     // check Press
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'P' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.press);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'P', APRS_TAG_FLOAT, &aprspos.press);
 
     // check Hum
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'H' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.hum);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'H', APRS_TAG_FLOAT, &aprspos.hum);
 
     // check Temp
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'T' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.temp);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'T', APRS_TAG_FLOAT, &aprspos.temp);
 
     // check Temp2
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'O' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.temp2);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'O', APRS_TAG_FLOAT, &aprspos.temp2);
 
     // check QFE
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'F' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%d", &aprspos.qfe);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'F', APRS_TAG_INT, &aprspos.qfe);
 
     // check QNH
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'Q' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.qnh);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'Q', APRS_TAG_FLOAT, &aprspos.qnh);
 
     // check GASRES
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'G' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.gasres);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
+    aprsExtractTag(PayloadBuffer, istarttext, 'G', APRS_TAG_FLOAT, &aprspos.gasres);
 
     // check NCNT
     memset(decode_text, 0x00, sizeof(decode_text));
@@ -981,33 +840,8 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
         }
     }
 
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
-
     // check CO2
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'C' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.co2);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
+    aprsExtractTag(PayloadBuffer, istarttext, 'C', APRS_TAG_FLOAT, &aprspos.co2);
 
     // check GRC (Group-Call list) /R=; up to 6 groups separated by ';'.
     // Own buffer sized for the worst case (6 x "99999;" = 36 chars) instead
@@ -1069,117 +903,17 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
         }
     }
 
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
-
     // check version
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'V' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%i", &aprspos.version);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'V', APRS_TAG_INT_AUTOBASE, &aprspos.version);
 
     // check Bus-Voltage /U=
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'U' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.vbus);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'U', APRS_TAG_FLOAT, &aprspos.vbus);
 
     // check Current /I=
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'I' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%f", &aprspos.vcurrent);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
-
-    memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
+    aprsExtractTag(PayloadBuffer, istarttext, 'I', APRS_TAG_FLOAT, &aprspos.vcurrent);
 
     // check telemetry
-    for(itxt=istarttext; itxt<PayloadBuffer.length(); itxt++)
-    {
-        if(PayloadBuffer.charAt(itxt) == '/' && PayloadBuffer.charAt(itxt+1) == 'Y' && PayloadBuffer.charAt(itxt+2) == '=')
-        {
-            for(unsigned int id=itxt+3;id<PayloadBuffer.length();id++)
-            {
-                // ENDE
-                if(PayloadBuffer.charAt(id) == '/' || PayloadBuffer.charAt(id) == ' ' || id == PayloadBuffer.length() || ipt > 6)
-                {
-                    sscanf(decode_text, "%i", &aprspos.telemetry);
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer.charAt(id);
-                    ipt++;
-                }
-            }
-
-            break;
-        }
-    }
+    aprsExtractTag(PayloadBuffer, istarttext, 'Y', APRS_TAG_INT_AUTOBASE, &aprspos.telemetry);
 
     memset(decode_text, 0x00, sizeof(decode_text));
     ipt=0;

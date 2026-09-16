@@ -105,6 +105,21 @@ static const char *VEC_NUR_NAME = "4825.00N/01145.46E##Name/B=070";
 // Payload MIT "#Werner" verwendet).
 static const char *VEC_OHNE_HASH = "4825.35N\\01147.19E-Marzling/R=9;";
 
+// D3-01 (docs/optimization-audit-20260910.md:200, aprsExtractTag()): the
+// shared tag-extractor caps a value's capture window at 7 bytes and does
+// NOT reject an oversized value -- it silently truncates to the first 7
+// characters instead. An 8-digit /A= must therefore parse as 1234567, not
+// 12345678 and not get rejected outright. This is the sharpest of the 14
+// unified blocks' edge cases: get the cap off by one in the helper (<7 vs
+// <8, or the ENDE check's ipt>6 vs ipt>7) and this is the vector that
+// catches it, not the "normal" fixture frames above.
+static const char *VEC_A_UEBERLANG_WIRD_GEKAPPT = "4825.00N/01145.46E#/A=12345678/N1";
+
+// Companion vector: a present-but-EMPTY /B= (sscanf on an empty capture
+// buffer performs zero conversions) must leave pos.bat at its
+// initAPRSPOS() default (0), not stomp it with garbage or crash.
+static const char *VEC_B_LEERER_WERT = "4825.00N/01145.46E#/B=/A=001657/N1";
+
 // ------------------------------------------------------------ Testfaelle
 
 static void test_f003_battery_und_altitude(void)
@@ -142,6 +157,25 @@ static void test_f011_kein_battery_leerer_kommentar(void)
     TEST_ASSERT_EQUAL_INT(0, pos.alt);   // kein /A= im Frame -- initAPRSPOS-Default bleibt
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 48.416666, pos.lat_d);
     TEST_ASSERT_FLOAT_WITHIN(0.0001, 11.757666, pos.lon_d);
+}
+
+static void test_a_wert_laenger_als_puffer_wird_gekappt(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_A_UEBERLANG_WIRD_GEKAPPT, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(1234567, pos.alt);   // 8. Ziffer wird gekappt, nicht abgelehnt
+}
+
+static void test_b_leerer_wert_laesst_default_stehen(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(VEC_B_LEERER_WERT, pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(0, pos.bat);         // sscanf() auf leeren Puffer: 0 Konversionen, Default bleibt
+    TEST_ASSERT_EQUAL_INT(1657, pos.alt);      // /A= danach wird trotzdem normal geparst
 }
 
 static void test_f001_gruppe_backslash_kein_ba(void)
@@ -417,6 +451,8 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_f003_battery_und_altitude);
     RUN_TEST(test_f011_kein_battery_leerer_kommentar);
+    RUN_TEST(test_a_wert_laenger_als_puffer_wird_gekappt);
+    RUN_TEST(test_b_leerer_wert_laesst_default_stehen);
     RUN_TEST(test_f001_gruppe_backslash_kein_ba);
     RUN_TEST(test_hemisphaere_sued_west);
     RUN_TEST(test_leerer_payload);

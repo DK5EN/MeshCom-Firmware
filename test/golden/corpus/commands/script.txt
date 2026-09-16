@@ -6,7 +6,6 @@
 --rotate abc
 --settime
 --maxv
---posshot
 --postime 1
 --postime 999999
 --postime abc
@@ -28,10 +27,12 @@
 --shortpath off
 --shortpath on
 --dfu
+--dumpsettings
 --spectrum
 --help
 --info
 --all
+--msgid
 --msg
 --t5 on
 --t5 off
@@ -83,8 +84,6 @@
 --batt factor abc
 --board led on
 --board led off
---track on
---track off
 --gps on
 --gps off
 --gps autosymbol
@@ -120,17 +119,10 @@
 --onewire gpio 999999
 --onewire gpio abc
 --setpress
---gateway on
---gateway off
 --ackinfo on
 --ackinfo off
 --keylock on
 --keylock off
---gateway pos
---gateway nopos
---gateway srv 1
---gateway srv 999999
---gateway srv abc
 --webtimer 0
 --setname 1
 --setname 999999
@@ -138,8 +130,6 @@
 --operatorname 1
 --operatorname 999999
 --operatorname abc
---mesh on
---mesh off
 --extudp on
 --extudp off
 --debug on
@@ -185,8 +175,8 @@
 --softser on
 --softser off
 --softser send
---softser app
 --softser app0
+--softser app
 --softser baud 1
 --softser baud 999999
 --softser baud abc
@@ -217,10 +207,6 @@
 --tempoff out abc
 --weather
 --wx
---sendhey
---sendpos
---sendtele
---sendtrack
 --symid 1
 --symid 999999
 --symid abc
@@ -236,31 +222,10 @@
 --setudpcall 1
 --setudpcall 999999
 --setudpcall abc
---pingcall 1
---pingcall 999999
---pingcall abc
---pingtime 1
---pingtime 999999
---pingtime abc
---ping start
---ping stop
---pingmax max
---pingmax 1
---pingmax 999999
---pingmax abc
 --sethamnet on
 --setinet off
 --setinet
 --sethamnet off
---setlat 1
---setlat 999999
---setlat abc
---setlon 1
---setlon 999999
---setlon abc
---setalt 1
---setalt 999999
---setalt abc
 --setrtc 1
 --setrtc 999999
 --setrtc abc
@@ -310,28 +275,25 @@
 --udpstat
 --udplog on
 --udplog off
+--persiststat
+--mute on
+--mute off
+--persistflash on
+--persistflash off
+--persistsd on
+--persistsd off
+--immediatesave on
+--immediatesave off
 --heap 1
 --heap 999999
 --heap abc
 --heap
---injectpos 1
---injectpos 999999
---injectpos abc
 --btn 1
 --btn 999999
 --btn abc
 --oledstat
 --oledlog on
 --oledlog off
---injectmsg 1
---injectmsg 999999
---injectmsg abc
---injectraw 1
---injectraw 999999
---injectraw abc
---loratx 1
---loratx 999999
---loratx abc
 --spitrace on
 --spitrace off
 --touch 1
@@ -373,15 +335,6 @@
 --audiodbg 1
 --audiodbg 999999
 --audiodbg abc
---mute on
---mute off
---persistflash on
---persistflash off
---persistsd on
---persistsd off
---immediatesave on
---immediatesave off
---persiststat
 --tft on
 --tft off
 --tft state
@@ -399,7 +352,6 @@
 --mheard
 --mh
 --path
---hey
 --showi2c
 --setgrc
 --seset

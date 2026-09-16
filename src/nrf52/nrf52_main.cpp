@@ -265,6 +265,18 @@ extern QueueHandle_t bleQueue;
 
 bool bPosFirst = true;
 bool bHeyFirst = true;
+// DR-16: own first-flag for the telemetry gate below, scoped to that gate
+// only. Previously shared bHeyFirst with the trickle-HEY gate a few lines
+// above; the hey gate always runs first each pass and clears bHeyFirst, so
+// by the time the telemetry gate below checked it, it was already false --
+// the first telemetry frame missed its own "first pass" condition and had
+// to wait out the full akt_timer instead (~15s at boot, since iNextTelemetry
+// < 5 shortens akt_timer to 15s). ESP32 never had this bug: it already uses
+// a separate bTeleFirst (esp32_main.cpp:236, 3500). bAllStarted and
+// extra_hey_time are ESP32-only concepts (network-readiness state machine /
+// softser grace) and are deliberately NOT ported here -- see docs/BACKLOG.md
+// DR-16.
+bool bTeleFirst = true;
 
 // Queue for sending config jsons to phone
 uint8_t iPhoneState = 0;
@@ -2013,10 +2025,10 @@ void nrf52loop()
     if(iNextTelemetry < 5)
         akt_timer= 15 * 1000; // 15 Seconds PARM, UNIT, EQNS and 1st T-Message
 
-    if (((uint32_t)(millis() - telemetry_timer) >= (uint32_t)akt_timer) || bHeyFirst)
+    if (((uint32_t)(millis() - telemetry_timer) >= (uint32_t)akt_timer) || bTeleFirst)
     {
-        bHeyFirst = false;
-        
+        bTeleFirst = false;
+
         { INSTR_SECTION("telemetry"); sendTelemetry(SOFTSER_APP_ID); }
 
         telemetry_timer = millis();

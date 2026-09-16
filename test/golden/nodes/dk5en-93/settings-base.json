@@ -8,9 +8,9 @@
       "node_short": "5EN40",
       "node_symid": "/",
       "node_symcd": "#",
-      "node_lat": "48.4075",
-      "node_lon": "11.7382",
-      "node_alt": "504",
+      "node_lat": "48.4073",
+      "node_lon": "11.7378",
+      "node_alt": "503",
       "node_lat_c": "N",
       "node_lon_c": "E",
       "node_ssid": "",
@@ -104,7 +104,7 @@
       "node_aprsmc": "APRSMC",
       "node_pingtime": "0",
       "node_pingcall": "",
-      "node_pingmax": "0",
+      "node_pingmax": "5",
       "node_disrot": "0",
       "node_spstart": "432",
       "node_spend": "434",
@@ -112,7 +112,7 @@
       "node_spsamp": "2048",
       "node_bfakt": "0"
     },
-    "crc32": "c6c2596e"
+    "crc32": "a488f6a2"
   },
   "_masked": {
     "note": "credentials replaced; NOT restorable, do not POST to a node",
