@@ -210,6 +210,36 @@ def register_of(frame: bytes) -> Optional[str]:
     return m.group(1).decode("ascii") if m else None
 
 
+def _parse_local(frame: bytes):
+    """mc_frame.parse() on the payload behind a 0x40 text tag, or None."""
+    if len(frame) < 2 or frame[0] != 0x40:
+        return None
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "golden"))
+    import mc_frame
+    return mc_frame.parse(frame[1:])
+
+
+def _is_own_position_beacon(frame: bytes, own_calls: Tuple[str, ...]) -> bool:
+    """True for a position frame this node originated, addressed to `*`.
+
+    Position beacons to `*` are how MeshCom beaconing works; they are not the
+    2026-09-11 incident, which was TEXT messages (type ':') falling through to
+    `*`. Keeping the two apart matters twice: such a beacon must not be
+    compared as if it were a reply, and it must not be reported as a broadcast
+    finding -- a guard that cries wolf on normal beaconing is a guard people
+    stop reading.
+    """
+    parsed = _parse_local(frame)
+    if parsed is None or parsed.dest != b"*":
+        return False
+    if parsed.type != 0x21:            # '!' position; ':' (0x3A) is a message
+        return False
+    originator = parsed.path[0] if parsed.path else ""
+    if originator == "response":
+        return False
+    return any(originator.upper().startswith(c.upper()) for c in own_calls)
+
+
 def classify(frame: bytes, own_calls: Tuple[str, ...]) -> str:
     """`mesh` for traffic the node received off the air, `local` otherwise.
 
@@ -267,7 +297,7 @@ class Capture:
         return (f"{t:9.3f} {kind:11} len={len(data):3d} "
                 f"{decode_notify(data):12}{tag}{via} {data.hex()}")
 
-    def attribute(self, t: float, window: float) -> Tuple[str, str]:
+    def attribute(self, t: float, window: float, frame: Optional[bytes] = None) -> Tuple[str, str]:
         """(class, the write this answers) for a notification at time `t`.
 
         A reply follows its write closely -- measured 0.2 to 0.4 s on both
@@ -277,6 +307,22 @@ class Capture:
         periodic status frame), and it will not repeat in the next run. Such
         frames are recorded but kept out of the compared artifact.
         """
+        # Timing alone is not enough. Our own POSITION beacon is spontaneous by
+        # construction -- the node beacons on posinfo_interval, not because
+        # anything was written to it, and no corpus entry makes it transmit a
+        # position (`--pos` calls sendGpsJson(), a JSON register to the phone,
+        # not an RF send). On 2026-09-16 one landed 0.4 s after `--io` in one
+        # run and not at all in the next: it was counted as that write's reply,
+        # every later frame shifted by one, and two runs of an UNCHANGED image
+        # differed in 10 places. Content decides this one, not the clock.
+        #
+        # Note this is deliberately NOT done in classify(): such a frame is
+        # `local`, not `mesh` -- it really did come from us, and dropping it
+        # from the record would hide a regression in the frame-to-phone path.
+        # It is recorded and excluded from the comparison, like every other
+        # spontaneous frame.
+        if frame is not None and _is_own_position_beacon(frame, self.own_calls):
+            return "spontaneous", ""
         preceding = [w for w in self.writes if w[0] <= t]
         if not preceding:
             return "spontaneous", ""
@@ -306,7 +352,7 @@ class Capture:
             if t < start:
                 burst.append(self._row(t, data, kind))
                 continue
-            when, label = self.attribute(t, window)
+            when, label = self.attribute(t, window, data)
             if kind in ("mesh", "volatile"):
                 excluded.append(self._row(t, data, kind))
             elif when == "spontaneous":
@@ -514,6 +560,29 @@ def _self_test() -> int:
         if line and not line.startswith("#"):
             name, hexstr = line.split()
             frames[name] = bytes.fromhex(hexstr)
+    # 2026-09-16: an own POSITION beacon landing inside a reply window made two
+    # runs of an UNCHANGED image differ in 10 places, because it was counted as
+    # the reply to `--io` and shifted every later frame. It must be spontaneous
+    # on content, whatever the clock says -- but still `local`, so it stays in
+    # the record. f003 is exactly that shape: '!' to '*' from DK5EN-90.
+    _beacon = b"\x40" + frames["f003"]
+    _cap = Capture(("DK5EN",))
+    _cap.on_write(b"\xa0--io", "--io")
+    _cap.writes[-1] = (0.0, _cap.writes[-1][1], "--io")
+    if _cap.attribute(0.4, 0.55, _beacon)[0] != "spontaneous":
+        failures += 1
+        print("FAIL: own position beacon inside the reply window counted as a reply")
+    if _cap.attribute(0.4, 0.55, b"\x40" + frames["f001"])[0] != "reply":
+        failures += 1
+        print("FAIL: a foreign frame in the window stopped being a reply")
+    if classify(_beacon, ("DK5EN",)) != "local":
+        failures += 1
+        print("FAIL: own position beacon dropped out of the record entirely")
+    _found = verify_no_broadcast([(0.4, _beacon)], ("DK5EN",))
+    if len(_found) != 1 or "position beacon" not in _found[0]:
+        failures += 1
+        print("FAIL: the broadcast guard must still report a beacon, and name its type")
+
     # f001 path is DL2JA-1,DL2JA-2 -- foreign. f003 is DK5EN-90,DK5EN-91.
     if classify(b"\x40" + frames["f001"], ("DK5EN",)) != "mesh":
         failures += 1
@@ -620,8 +689,16 @@ def verify_no_broadcast(frames: List[Tuple[float, bytes]],
             continue
         if not any(originator.upper().startswith(c.upper()) for c in own_calls):
             continue      # inbound mesh traffic, not something we transmitted
+        # Name the type. '!' is a position beacon -- that is how MeshCom
+        # beaconing works, and on a bench node it is still live-network
+        # traffic worth seeing, so it is NOT suppressed. ':' is the shape of
+        # the 2026-09-11 incident, where a text message fell through to '*'.
+        # Telling them apart used to mean decoding the hex by hand.
+        kind = {0x21: "position beacon (routine, but live RF)",
+                0x3A: "TEXT MESSAGE -- the 2026-09-11 shape, investigate"}.get(
+                    parsed.type, f"type 0x{parsed.type:02X}")
         findings.append(
-            f"{t:9.3f} {originator} transmitted to '*': "
+            f"{t:9.3f} {originator} transmitted to '*' [{kind}]: "
             f"{parsed.payload[:60]!r}"
         )
     return findings
