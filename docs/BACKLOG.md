@@ -6053,6 +6053,75 @@ Same class as the `t5_epaper` findings: code no compiler has ever seen.
 the same self-healing size check as `R3-12`: the load path compares
 `file.size()` against the sum of the `sizeof()`s and deletes a mismatched file.
 
+### 3.8al `R4-01` -- the fifth `lv_conf.h` was the one nobody updated (2026-09-16)
+
+The audit framed this as a tuning change: point the T-Deck Pro's LVGL heap at
+PSRAM. What it actually is: **five copies of `lv_conf.h` exist in this tree,
+four of them already run `LV_MEM_CUSTOM 1` with `ps_malloc`, and `config/`
+is the one copy that never got the change.**
+
+| file                        | `LV_MEM_CUSTOM` | allocator   | used by          |
+| --------------------------- | --------------- | ----------- | ---------------- |
+| `variants/t_deck/lv_conf.h` | 1               | `ps_malloc` | `t_deck`         |
+| `variants/t_deck_plus/`     | 1               | `ps_malloc` | `t_deck_plus`    |
+| `variants/t5_epaper/`       | 1               | `ps_malloc` | `t5_epaper`      |
+| `src/t-deck/lv_conf.h`      | 1               | `ps_malloc` | `t_deck`         |
+| `config/lv_conf.h`          | **0**           | --          | **`t_deck_pro`** |
+
+With `LV_MEM_CUSTOM 0`, LVGL declares its arena as a **static array** --
+`work_mem_int[LV_MEM_SIZE]` at `lib/lvgl/src/misc/lv_mem.c:95`. A static array
+cannot live in PSRAM, so the 48 kB was pinned in internal DRAM by construction,
+reserved at boot regardless of what the UI ever allocated.
+
+**Measured, `t_deck_pro`, clean builds either side:**
+
+|       | before    | after     | delta       |
+| ----- | --------- | --------- | ----------- |
+| RAM   | 181 008 B | 131 840 B | **-49 168** |
+| Flash | 1 986 385 | 1 984 945 | -1 440      |
+
+The flash comes off too: with a custom allocator LVGL's TLSF implementation is
+no longer reachable. Static RAM on this board drops from 55.2 % to 40.2 %.
+
+**Proven in the artifact, not just by a green build.** `nm` on the ELF: the
+symbol `work_mem_int$3696` (0xc000 = 49 152 B, `.bss` at 0x3FC8xxxx, internal
+SRAM) is **gone**, and `lv_mem.c.o` now carries `U ps_malloc` / `U ps_realloc` /
+`U free` as its only allocator references.
+
+**Why PSRAM is safe to depend on here, on a board that is not on the bench.**
+The board already proves it: `src/t-deck-pro/tdeck_pro.cpp:195-218` allocates
+**three buffers of 76 800 B each with `ps_calloc`** at LVGL init. Its fallback
+to `malloc` cannot serve that size from internal DRAM -- with ~146 kB free
+before this change, 230 kB of draw buffers do not fit. If PSRAM were not
+coming up, this board would never have drawn a screen. So the row does not
+introduce a PSRAM dependency; it joins one that has always been load-bearing.
+
+**Not done: the sixth copy.** The audit's plan was "new/adjusted lv_conf
+variant, ~5-10 lines" -- i.e. give `t_deck_pro` its own file. That would have
+made **six** near-identical 700-770 line configs. `config/lv_conf.h` has
+exactly one consumer (`-include config/lv_conf.h`, only in
+`variants/t_deck_pro/platformio.ini:36`; nothing else puts `config/` on an
+include path), so it was changed in place instead. No new file.
+
+**Left open: the five copies themselves.** Four of the five differ from each
+other in `LV_COLOR_DEPTH` and a handful of widget toggles and are otherwise the
+same 700+ lines. That is a real duplication row and a bigger one than `R4-01`,
+but collapsing it means reconciling per-board colour depth and widget sets
+across four boards, only one of which (`t_deck_plus`, DK5EN-14) is on the
+bench. Recorded, not attempted.
+
+**Unverified by construction.** No T-Deck Pro exists on this bench, so this is
+a build-and-`nm` verdict only: the pool is provably gone from internal DRAM and
+the allocator is provably `ps_malloc`, but nobody has watched the UI render
+afterwards. Carry that caveat into the PR.
+
+**Also seen, not a blocker.** `boards/T-Deck-Pro.json` is a renamed copy of the
+T-Watch S3 board file -- it still carries `-DARDUINO_TWATCH_S3_M10Q` and the
+name "LilyGo T-Watch S3 M10Q". Its `memory_type` is `qio_qspi`
+(`CONFIG_SPIRAM_MODE_QUAD`) while its own `psram_type` field says `opi`. The
+two disagree. The `ps_calloc` evidence above says the quad path does find the
+PSRAM, so nothing is broken today, but the file is not describing this board.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
