@@ -13,20 +13,31 @@ deleted (-14 240 lines). Plus the `D2-V` golden capture, which `W4` could not st
 
 **What is left in phase D:**
 
-| row               | state                                                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `W4` `D2-10`      | **next.** Exact-match `commandCheck()` + the 13 order-dependent prefix pairs                                                      |
-| `W4` `D2-06`/`07` | 120 toggles + 71 setters -> table. Both depend on `D2-10` landing first                                                           |
-| `W6` `D1-01`      | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                   |
-| `W6` `D4-01/02`   | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                   |
-| `W5` all rows     | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list              |
-| `W7` second half  | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now |
-| `C4d` `DR-03`     | bench-only, waits for the `E1` G2 run                                                                                             |
+| row               | state                                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `W4` `D2-10`      | **DONE** (`184f84ff`) -- exact-token matching in `src/command_match.h`, `native_command_match` (11 cases), golden before/after on DK5EN-93 showed zero dispatch changes          |
+| `W4` `D2-06`/`07` | **next.** 120 toggles + 71 setters -> table. `D2-10` unblocked them: the ladder no longer depends on rung order, except for the 28 exact-vs-argument pairs the lint still guards |
+| `W6` `D1-01`      | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                                                                  |
+| `W6` `D4-01/02`   | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                                                                  |
+| `W5` all rows     | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list                                                             |
+| `W7` second half  | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now                                                |
+| `C4d` `DR-03`     | bench-only, waits for the `E1` G2 run                                                                                                                                            |
 
 **`W4` is one file and cannot be parallelised**: `src/command_functions.cpp`, ~6 470 lines, 309
 `commandCheck()` cases in one ladder under 42 distinct `#if` guards. Serial sub-steps, one owner.
 The safety net now exists: `docs/bench/g0-commands-20260916/heltec-93/` (409 commands over USB,
 408 answered, scrubbed of SSID/BSSID/IP). Re-capture after the change and diff.
+
+**DR-16 is as closed as this bench can make it.** `--loradebug on` does show the hey frames
+(`NEW-HEY ... DK5EN-90>H@R0;` fires on the first loop pass, then TXes) -- but telemetry cannot
+appear on `DK5EN-90` at all, with or without the fix: `sendTelemetry()` returns at its first guard
+unless `node_parm`, `node_unit` and `node_values` are set, and that node's `GET /config.json`
+reports all three (and `node_eqns`) as `''`. To observe the timing: either configure those three on
+an nRF52 node and read the first `T#` frame under `--loradebug`, or build with
+`-D INSTRUMENT_ENABLED=1` and read `[INSTR-SECT];telemetry;n;<count>` a few seconds after boot --
+1 means the gate fired on pass 1 (fixed), 0 means it waited out `akt_timer` (unfixed). The second
+needs no transmission at all. The code was confirmed by the advisor pass: the `|| bHeyFirst` really
+was dead, because the hey gate runs first every pass and always clears it.
 
 **Open gap worth its own row -- three fixes shipped without an executable test.**
 `src/loop_functions.cpp`, `sendExtern()` (`#ifndef NATIVE_BUILD`) and `src/nrf52/nrf52_main.cpp`
