@@ -15,6 +15,7 @@ fields is exactly how a silent single-field regression ships.
 
     python3 tools/bench/w3_upgrade_check.py <baseline.json> <new.json>
     python3 tools/bench/w3_upgrade_check.py <baseline.json> <node-ip>
+    python3 tools/bench/w3_upgrade_check.py --gps-node <baseline.json> <node-ip>
     python3 tools/bench/w3_upgrade_check.py --self-test
 
 The second argument is either a path to a previously saved export, or a bare
@@ -56,6 +57,13 @@ BUCKETS
   ALLOWLISTED fields that legitimately differ across a reboot/upgrade (see
               ALLOWLIST below). Shown so the difference stays visible, but
               never counted toward CHANGED/LOST and never fails the gate.
+              With --gps-node this bucket also absorbs the three live-GPS
+              fields (GPS_DRIFT) -- opt-in, because on a node with a fixed
+              configured position they are settings like any other.
+  REMOVED BY  in the baseline, gone from the new export because the member no
+  DESIGN      longer exists in the firmware (REMOVED_BY_DESIGN). Reported
+              separately from LOST so the two expected nRF52 rows cannot hide
+              a real one.
 
 COMPARISON METHOD
 -----------------
@@ -113,6 +121,53 @@ ALLOWLIST: dict[str, str] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Fields a GPS-equipped node rewrites on its own, independently of any
+# firmware change. NOT in ALLOWLIST above, and deliberately opt-in per run
+# (--gps-node): on a node with a fixed configured position these three ARE
+# settings, and silently excusing them would stop the gate checking the very
+# thing an operator is most likely to notice going missing.
+#
+# Measured on DK5EN-93 2026-09-16: two GET /config.json 20 s apart with NO
+# flash between them already disagreed on node_alt (482 -> 484). Across the
+# W3 migration boot the same node moved node_lat/node_lon/node_alt and
+# nothing else, which is what a false FAIL looks like.
+# ---------------------------------------------------------------------------
+GPS_DRIFT: dict[str, str] = {
+    key: (
+        "live GPS output on a node with a fix -- the node rewrites this "
+        "between any two exports, with or without a firmware change "
+        "(measured on DK5EN-93, 20 s apart, no flash). Excused only because "
+        "--gps-node was given."
+    )
+    for key in ("node_lat", "node_lon", "node_alt")
+}
+
+# ---------------------------------------------------------------------------
+# Keys that exist in a pre-cutover baseline and are GONE from the firmware on
+# the far side, by decision rather than by accident. Their absence is the
+# correct outcome, so it is reported in its own bucket instead of as LOST.
+#
+# Unconditional: these members no longer exist in s_meshcom_settings at all
+# (removed in the D1-04 merge), so there is no build in which they could come
+# back and no regression the LOST bucket could still catch for them.
+# ---------------------------------------------------------------------------
+REMOVED_BY_DESIGN: dict[str, str] = {
+    "send_repeat_time": (
+        "LoRaWAN OTAA leftover, removed from s_meshcom_settings in the D1-04 "
+        "merge together with the timer scaffolding behind it "
+        "(src/config_json.h, 'nRF52: nothing.' note). nRF52-only export key, "
+        "so this bucket is normally empty on an ESP32 node."
+    ),
+    "auto_join": (
+        "LoRaWAN OTAA leftover, removed from s_meshcom_settings in the D1-04 "
+        "merge together with the timer scaffolding behind it "
+        "(src/config_json.h, 'nRF52: nothing.' note). nRF52-only export key, "
+        "so this bucket is normally empty on an ESP32 node."
+    ),
+}
+
+
 def try_float(value: str) -> Optional[float]:
     """Parse value as a float, or return None. Used to decide the comparison
     method per field -- see the module docstring's COMPARISON METHOD."""
@@ -150,6 +205,11 @@ class DiffResult:
     lost: list[tuple[str, str]] = field(default_factory=list)
     added: list[tuple[str, str]] = field(default_factory=list)
     allowlisted: list[tuple[str, Optional[str], Optional[str]]] = field(default_factory=list)
+    removed_by_design: list[tuple[str, str]] = field(default_factory=list)
+    # The allow-list this particular run applied: ALLOWLIST, plus GPS_DRIFT when
+    # --gps-node was given. Carried on the result so the report can print the
+    # right reason per row without the caller having to reconstruct it.
+    allowlist_used: dict[str, str] = field(default_factory=lambda: dict(ALLOWLIST))
 
     @property
     def failed(self) -> bool:
@@ -166,10 +226,21 @@ def compare_value(old: str, new: str) -> tuple[bool, str]:
     return old == new, "exact"
 
 
-def diff_configs(baseline: dict[str, str], new: dict[str, str]) -> DiffResult:
-    result = DiffResult()
+def diff_configs(baseline: dict[str, str], new: dict[str, str],
+                 gps_node: bool = False) -> DiffResult:
+    """Bucket every field of the two exports.
+
+    gps_node=True additionally excuses the three live-GPS fields (GPS_DRIFT).
+    It defaults to False so the gate stays strict unless the operator states
+    that this node has a fix -- see GPS_DRIFT's own comment.
+    """
+    allowlist = dict(ALLOWLIST)
+    if gps_node:
+        allowlist.update(GPS_DRIFT)
+
+    result = DiffResult(allowlist_used=allowlist)
     for key in sorted(set(baseline) | set(new)):
-        if key in ALLOWLIST:
+        if key in allowlist:
             result.allowlisted.append((key, baseline.get(key), new.get(key)))
             continue
         if key in baseline and key in new:
@@ -179,7 +250,13 @@ def diff_configs(baseline: dict[str, str], new: dict[str, str]) -> DiffResult:
             else:
                 result.changed.append((key, baseline[key], new[key], method))
         elif key in baseline:
-            result.lost.append((key, baseline[key]))
+            # Gone on the far side. Intentional removals get their own bucket
+            # so a real regression stays visible in LOST instead of being
+            # crowded out by two rows that are expected on every nRF52 run.
+            if key in REMOVED_BY_DESIGN:
+                result.removed_by_design.append((key, baseline[key]))
+            else:
+                result.lost.append((key, baseline[key]))
         else:
             result.added.append((key, new[key]))
     return result
@@ -211,7 +288,7 @@ def format_report(baseline_name: str, new_name: str, result: DiffResult) -> str:
         f"the upgrade, not counted as failures")
     if result.allowlisted:
         for k, old, new in result.allowlisted:
-            reason = ALLOWLIST[k]
+            reason = result.allowlist_used[k]
             old_s = "(missing)" if old is None else old
             new_s = "(missing)" if new is None else new
             same = "unchanged" if old == new else "changed"
@@ -226,6 +303,13 @@ def format_report(baseline_name: str, new_name: str, result: DiffResult) -> str:
     lines.append(f"LOST ({len(result.lost)}): in the baseline, absent from the new export")
     for k, old in result.lost:
         lines.append(f"  {k}: {old!r}")
+    lines.append("")
+
+    lines.append(
+        f"REMOVED BY DESIGN ({len(result.removed_by_design)}): in the baseline, "
+        f"deliberately gone from the firmware -- not counted as failures")
+    for k, old in result.removed_by_design:
+        lines.append(f"  {k}: {old!r} -- {REMOVED_BY_DESIGN[k]}")
     lines.append("")
 
     lines.append(f"ADDED ({len(result.added)}): new key, not in the baseline")
@@ -326,6 +410,45 @@ def self_test() -> int:
     check("allow-listed field changed: still visible in its own bucket",
           layout_row == ("layout", "20260724", "20260901"))
 
+    # 8. Live-GPS drift. Regression for the false FAIL every GPS node produced
+    #    before --gps-node existed: DK5EN-93's migration run reported exactly
+    #    these three fields as CHANGED and nothing else.
+    base = _wrap({"node_sf": "11", "node_lat": "48.4077", "node_lon": "11.7385",
+                  "node_alt": "484"})
+    new = _wrap({"node_sf": "11", "node_lat": "48.4076", "node_lon": "11.7386",
+                 "node_alt": "492"})
+    r = diff_configs(flatten_config(base), flatten_config(new))
+    check("GPS drift without --gps-node: still CHANGED, still fails "
+          "(a fixed-position node must not be excused)",
+          len(r.changed) == 3 and r.failed)
+
+    r = diff_configs(flatten_config(base), flatten_config(new), gps_node=True)
+    check("GPS drift with --gps-node: not CHANGED, passes",
+          not r.changed and not r.failed)
+    check("GPS drift with --gps-node: still visible in the allow-list bucket",
+          sorted(row[0] for row in r.allowlisted)
+          == ["crc32", "fw", "layout", "node_alt", "node_lat", "node_lon"])
+    check("GPS drift with --gps-node: a real setting still fails alongside it",
+          diff_configs(flatten_config(_wrap({"node_sf": "11", "node_alt": "484"})),
+                       flatten_config(_wrap({"node_sf": "10", "node_alt": "492"})),
+                       gps_node=True).failed)
+
+    # 9. Keys removed from the struct by decision (D1-04). Expected on every
+    #    nRF52 upgrade run; must not be able to mask a genuine loss.
+    base = _wrap({"node_sf": "11", "send_repeat_time": "0", "auto_join": "0"})
+    new = _wrap({"node_sf": "11"})
+    r = diff_configs(flatten_config(base), flatten_config(new))
+    check("removed-by-design keys: own bucket, not LOST",
+          not r.lost and sorted(k for k, _ in r.removed_by_design)
+          == ["auto_join", "send_repeat_time"])
+    check("removed-by-design keys: do not fail the gate", not r.failed)
+
+    base = _wrap({"node_sf": "11", "send_repeat_time": "0", "node_via": "X"})
+    new = _wrap({"node_sf": "11"})
+    r = diff_configs(flatten_config(base), flatten_config(new))
+    check("a genuine loss alongside a by-design removal still fails",
+          r.lost == [("node_via", "X")] and r.failed)
+
     return 0 if ok else 1
 
 
@@ -335,6 +458,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("baseline", nargs="?", help="committed baseline JSON (docs/bench/w3-baseline/*.json)")
     ap.add_argument("new", nargs="?", help="new export: a JSON file, or a bare IP/hostname to fetch from")
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument(
+        "--gps-node", action="store_true",
+        help="this node has a live GPS fix: treat node_lat/node_lon/node_alt as "
+             "drifting output rather than as settings. Off by default -- on a "
+             "node with a fixed configured position those three are real "
+             "settings and a change in them is a real defect.")
     args = ap.parse_args(argv)
 
     if args.self_test:
@@ -346,7 +475,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     baseline_doc = load_config(args.baseline)
     new_doc = load_config(args.new)
 
-    result = diff_configs(flatten_config(baseline_doc), flatten_config(new_doc))
+    result = diff_configs(flatten_config(baseline_doc), flatten_config(new_doc),
+                          gps_node=args.gps_node)
     print(format_report(args.baseline, args.new, result))
     return 1 if result.failed else 0
 

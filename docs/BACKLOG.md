@@ -6,14 +6,16 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-**Last updated 2026-09-15 — DRY campaign stand.** The one-shot PR campaign (§3.8af)
+**Last updated 2026-09-16 — DRY campaign stand.** The one-shot PR campaign (§3.8af)
 has a single place that says where it stands and what finishing it takes: **"Campaign stand
 2026-09-15"** in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic
 (**~29 working days** to the PR, upstream review on top). Short version: phases A and B are done,
 phase C owes only `M3`'s two bench-only rows (4 of 8 closed; `DR-03`/`DR-16` wait for the `E1` G2
 run, so the `--phase implementation` flag drops after `E1`, not after `M3`), phase D has `W1` and
-`W2` **done** and **`W3`'s ESP32 half shipped and hardware-proven** (`DK5EN-93`, 104 of 107
-settings byte-identical across two boots) with the struct merge still open, `W4`-`W7` and `C4d`
+`W2` **done** and `W3` code-complete and bench-run on all three nodes on 2026-09-16 — the
+ESP32 half **passes** (`DK5EN-93` 105 of 107, `DK5EN-14` **107 of 107**, both across two boots)
+and the nRF52 half preserves every setting but **fails on its migration marker**
+(`legacy_migration_failed`, see the 2026-09-16 entry in §3.8af), `W4`-`W7` and `C4d`
 untouched, phase E not started.
 
 Three things this day added that the audit's plan did not contain. **`W3-BLE`:** the nRF52 BLE
@@ -5229,13 +5231,13 @@ allocated **`TD-16`** to a different T-Deck bug, and ours was renumbered to
 **`TD-19`** because theirs is already public in the merged PR #1140. Five of
 our own commit messages still say `TD-16` and are stale as a result.
 
-| Phase                        | Rows                               | State                                                                                                                                   |
-| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                             |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                       |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run            |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` code complete (W3c 2026-09-15), nRF52 + T-Deck bench proof open**, `W4`-`W7` and `C4d` **not started** |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                           |
+| Phase                        | Rows                               | State                                                                                                                                                                                                         |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                                                                                                   |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                                                                                             |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run                                                                                  |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` code complete (W3c 2026-09-15), bench-run 2026-09-16: ESP32 half passes on two nodes, nRF52 migration marker fails -- `W3` stays open**, `W4`-`W7` and `C4d` **not started** |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                                                                                                 |
 
 ##### What each open row still needs
 
@@ -5325,11 +5327,59 @@ our own commit messages still say `TD-16` and are stale as a result.
      through `test_nrf52_settings_paths::test_legacy_blob_reads_through_frozen_v1_layout`
      and `test_esp32_flash_lifecycle::test_counter_namespace_migrates_from_credentials`;
      the drift lint reports 2 rows without a test (`DR-03`, `DR-16`, bench-only).
-  7. **OPEN, bench** -- the nRF52 upgrade proof on RAK-90 (expect
-     `legacy_rewritten` then `legacy_migrated`, settings diffed with
-     `tools/bench/w3_upgrade_check.py` against `docs/bench/w3-baseline/rak90-config-20260912.json`),
-     the ESP32 re-proof on Heltec-93 (counter migration into `Counters`), the
-     T-Deck run for the 25 NVS-only keys. Three USB slots, three nodes.
+  7. **RUN 2026-09-16, one item failed** -- all three nodes on the table,
+     each flashed from a real 20260724 image. Full write-up and the captures:
+     `docs/bench/w3-baseline/README.md` §7, exports
+     `docs/bench/w3-baseline/*-config-20260916-{pre,post}.json`.
+
+     | node                   | settings across the upgrade                   | verdict                         |
+     | ---------------------- | --------------------------------------------- | ------------------------------- |
+     | `DK5EN-93` Heltec V3   | 105 preserved, 0 lost, 3 live-GPS movers only | **pass**                        |
+     | `DK5EN-14` T-Deck Plus | **107 of 107**, 0 lost / changed / added      | **pass**                        |
+     | `DK5EN-90` RAK4631     | 102 preserved, 0 changed, 2 removed by design | settings pass, **marker fails** |
+
+     **What blocks `W3`:** the nRF52 migration boot logged
+     `[SETST];path;legacy_migration_failed`, not the expected `legacy_migrated`.
+     `InternalFS.rename()` failed for every file and failed again on the retry
+     that §4 of that README installed precisely to tell a transient flash error
+     from a persistent one -- so the answer is "not transient", and the space
+     hypothesis is refuted again by the inventory it prints (29 of 224 content
+     blocks). The node's settings survived only because the keyed store already
+     held current values written by the _old_ firmware, so the failed rename had
+     nothing to overwrite; a node with a stale or absent store would have kept
+     the stale copy silently. Boots 2/3 and a later reflash all load
+     `path;keyed` with 105 fields, and a plain reflash does **not** reproduce it
+     -- the trigger is the migration boot itself.
+
+     **Closed by the same run:** the `Counters` migration is verified on both
+     platforms with the new `--msgid` probe (`DK5EN-93` 182 -> 282 -> 382,
+     exactly `kMsgIdPersistStep` per boot; `DK5EN-90` 412 -> 511 with the extra
+     id coming from live traffic). Neither node restarted near 0.
+
+     **Still not covered:** 12 of the NVS-only keys have no read-back command
+     (`--persiststat` covers four, `--info` one). The count is **17** by the
+     schema-versus-export diff, not the 25 this row used to quote.
+
+     **Instruments this run had to fix before it could report anything:**
+
+     - `--msgid` (`src/command_functions.cpp`) prints the counter as
+       `[SETST];counters;msgid;<n>`. Read-only, both platforms, deliberately
+       outside `INSTRUMENT_ENABLED` because the upgrade it verifies happens on
+       shipped images. It **must** stay ahead of the `msg` case in the chain:
+       `commandCheck()` truncates to the command word, so `--msgid` would
+       otherwise be executed as `--msg on`.
+     - `tools/bench/w3_upgrade_check.py` returned exit 1 on a healthy node.
+       `--gps-node` (opt-in) moves `node_lat`/`node_lon`/`node_alt` into the
+       allow-list; a `REMOVED BY DESIGN` bucket takes `send_repeat_time` and
+       `auto_join` out of `LOST`. Opt-in rather than automatic because on a
+       fixed-position node those three are settings and must stay checked.
+       Seven new self-test cases, and the old tool is shown failing both real
+       captures that the new one passes.
+     - The 09-12 baselines had drifted (Heltec 4 fields, RAK 13 — it had been
+       reset to defaults since) and cannot be used again; `*-20260916-pre.json`
+       replaces them as the article of proof.
+     - `.prettierignore` now exempts `docs/bench/**/*.json` and `**/*.txt`: the
+       captures are raw single-line output exactly as the node emitted it.
 
   **`W3-BLE` -- not in the audit's plan at all, and a hard prerequisite for
   step 2. DONE 2026-09-13.** The nRF52 settings characteristic ships

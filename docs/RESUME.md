@@ -1,27 +1,39 @@
 # RESUME — pick up here
 
-## Where we are, end of 2026-09-15 (start here)
+## Where we are, end of 2026-09-16 (start here)
 
-Branch `dry-unification`, HEAD `b0adf723`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row
-W3C): phases A-C done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done, **W3
-code-complete -- only its bench proof is open**, W4-W7, C4d and phase E not started. ~29 working
-days to the PR.
+Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row W3C): phases A-C
+done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done. **The W3 bench proof ran
+on 2026-09-16 across all three nodes: the ESP32 half passes, the nRF52 half does not, so W3 stays
+open.** W4-W7, C4d and phase E not started. ~29 working days to the PR.
 
-**First thing next session -- bench, three nodes on the table (three USB slots):**
+| node                   | result                                                         |
+| ---------------------- | -------------------------------------------------------------- |
+| `DK5EN-93` Heltec V3   | **pass** -- 105 preserved, 0 lost, 3 live-GPS movers only      |
+| `DK5EN-14` T-Deck Plus | **pass** -- 107 of 107, across the migration boot and a reboot |
+| `DK5EN-90` RAK4631     | settings pass (102 + 2 removed by design), **marker fails**    |
 
-1. RAK4631 DK5EN-90, still on release v4.35t.09.12.2: flash the W3c `wiscore_rak4631` image, watch
-   the boot log for `[SETST];path;legacy_rewritten` then `legacy_migrated` (it carries a stale
-   keyed-store file from 09-12 next to the newer blob), then
-   `python3 tools/bench/w3_upgrade_check.py docs/bench/w3-baseline/rak90-config-20260912.json <ip>`
-   (web GUI by IP only, no mDNS). Expect 0 CHANGED / 0 LOST. Also check `/counters.txt` exists via a
-   second reboot: `[SETST];path;keyed` and no `legacy_rewritten`.
-2. Heltec V3 DK5EN-93: same check against `heltec93-config-20260912.json`; the boot log must not
-   show `[SETST];counters;...;failed`; `--info` msg ids continue from the old Credentials counter.
-3. T-Deck Plus DK5EN-14: the 25 NVS-only keys (W3 step 5 remainder) -- keyboard lock, backlight,
-   mute, audio paths survive the upgrade boot (`--info`, SYM+K state).
+Full write-up and the captures: `docs/bench/w3-baseline/README.md` §7.
 
-When all three pass: close W3 in BACKLOG/Gantt (W3 row `st: "done"`), then W4 (command table,
-`D2-10`) is next. Do not flash anything before the nodes are on the table and confirmed.
+**First thing next session -- the one thing blocking W3:**
+
+1. **`legacy_migration_failed` on the nRF52 migration boot.** `InternalFS.rename()` failed for
+   every file and failed again on the retry, so the answer that retry was built to give is "not
+   transient"; space is refuted again (29 of 224 content blocks). `DK5EN-90` came out correct only
+   because its keyed store already held current values written by the old firmware -- a node with a
+   stale or absent store would silently have kept the stale copy. A plain reflash does **not**
+   reproduce it; the trigger is the migration boot, which holds the legacy blob, `/counters.txt`
+   and a fresh 1 458 B temp file at once. Reproduce by forcing another migration boot (the blob CRC
+   path), and decide whether `settingsStoreSave()` needs a non-rename fallback -- 234 call sites
+   still ignore its return value.
+2. **The 12 NVS-only keys with no read-back.** `--persiststat` covers four, `--info` one. Either
+   extend `--persiststat` to the rest of the block (`node_audmsg`, `node_audstart`, `node_bllock`,
+   `node_cflash`, `node_kblock`, `node_kblsync`, `node_map`, `node_modus`, `node_wifion`) or accept
+   them as unmeasured and say so in the row. Note the real count is **17**, not the 25 W3 quotes.
+
+Then W4 (command table, `D2-10`). **Bench flashing:** the RAK goes through `--dfu` +
+`/Volumes/RAK4631` + `.uf2` -- `pio run --target upload` prints `[SUCCESS]` over a failed nrfutil
+DFU and leaves the old image running. Always check the build string afterwards.
 
 ## 2026-09-15: W3c -- one settings struct, counters namespace, member gate (dry-unification)
 
@@ -36,10 +48,7 @@ frozen `s_ble_settings_v1` and records the blob's CRC so a blob rewritten by off
 Gates: 868/868 native cases in 27 envs, `selftest.sh` green, drift lint 2 rows without test (DR-03/DR-16),
 32-env build, advisor pass. Details: BACKLOG §3.8af "Campaign stand 2026-09-15", Gantt row W3C.
 
-**Bench next (needs RAK-90, Heltec-93, T-Deck-14 on the table):** flash RAK-90 from its release
-image, expect `legacy_rewritten` -> `legacy_migrated`, diff `GET /config.json` with
-`tools/bench/w3_upgrade_check.py docs/bench/w3-baseline/rak90-config-20260912.json <ip>`; Heltec-93
-re-proof plus `Counters` namespace; T-Deck NVS-only keys. RAM: nRF52 +2.1 kB BSS (v1 scratch).
+**Bench: ran 2026-09-16, see the start-here block above.** RAM: nRF52 +2.1 kB BSS (v1 scratch).
 
 **Environment:** macOS 27 had dropped Rosetta 2 -- every nRF52 build died with "Bad CPU type in
 executable". Reinstalled (`softwareupdate --install-rosetta --agree-to-license`); memory note.

@@ -838,7 +838,7 @@ void commandAction(char *umsg_text, bool ble)
                 delay(100);
             #endif
 
-            printfdeb("--info      show info\n--mheard    show MHeard\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
+            printfdeb("--info      show info\n--msgid     show message-id counter\n--mheard    show MHeard\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
             delay(100);
             #ifdef ESP32
                 printlndeb("--netconsole on/off  (net console port 2323)\n");
@@ -1003,6 +1003,33 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         save_settings();
+
+        return;
+    }
+    else
+    // Read-only probe for the W3 counter migration (counters_store.h). node_msgid
+    // is deliberately neither a settings_schema row nor a config_json export
+    // (src/settings_schema.h, src/config_json.h both say why), so until this
+    // command existed the only way to observe the counter was to originate a
+    // frame and read the id back off the air -- which means transmitting just to
+    // run a bench check. Field diagnostic, NOT part of the INSTRUMENT_ENABLED
+    // surface below: the upgrade it exists to verify happens on shipped images.
+    //
+    // MUST stay ahead of the "msg" case directly below: commandCheck() truncates
+    // the input to the length of the command word (it is a prefix match), so
+    // "--msgid" reaches "msg" first and would silently be executed as "--msg on".
+    //
+    // Raw Serial.printf, not DEBUG_MSG: DO_DEBUG 0 compiles every DEBUG_MSG away,
+    // and this has to answer on a normal build.
+    if(commandCheck(msg_text+2, (char*)"msgid") == 0)
+    {
+        Serial.printf("[SETST];counters;msgid;%d\n", meshcom_settings.node_msgid);
+
+        if(ble)
+        {
+            snprintf(print_buff, sizeof(print_buff), "--msgid %d\n", meshcom_settings.node_msgid);
+            addBLECommandBack(print_buff);
+        }
 
         return;
     }

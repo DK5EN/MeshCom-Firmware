@@ -16,5 +16,11 @@ tools/meshcom_monitor/
 tools/__pycache__/
 data/
 
+# Bench captures: raw single-line configExportJson exactly as the node emitted
+# it, plus raw serial logs. Reformatting would rewrite the evidence. The .md
+# write-ups next to them are NOT exempt and are still formatted.
+docs/bench/**/*.json
+docs/bench/**/*.txt
+
 # Board definitions are consumed verbatim by PlatformIO
 boards/

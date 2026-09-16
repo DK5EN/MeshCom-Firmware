@@ -258,3 +258,140 @@ T-Deck UI block and the flash bookkeeping fields -- are invisible to
 a Heltec and carries none of the T-Deck block, so proving those needs a T-Deck
 run. Same trap as `TD-19`, where a "byte-identical to its vault backup" check
 missed `node_kblock` because the export does not carry it.
+
+## 7. The three-node W3 upgrade run -- 2026-09-16
+
+The run section 1 was recorded for: `DK5EN-90` (RAK4631), `DK5EN-93` (Heltec
+V3) and `DK5EN-14` (T-Deck Plus) on the table at once, each flashed from a
+`FLASH_STRUCT_VERSION 20260724` image to the `W3c` build on `dry-unification`.
+
+**Two of the three pass outright. `W3` does not close**, because the nRF52
+migration boot logged `legacy_migration_failed` rather than the
+`legacy_migrated` the plan expected -- see "The one real failure" below.
+
+### The baselines in section 1 had drifted and could not be used
+
+Diffed against the live nodes before anything was flashed:
+
+| node       | vs `*-config-20260912.json`                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DK5EN-93` | 4 fields differ (`node_alt`, `node_lon`, `node_pingmax`, `node_sset`)                                                                                   |
+| `DK5EN-90` | 13 fields differ -- the node had been reset to defaults since (callsign, `node_sset`, `node_name`, `node_atxt`, `node_utcof`, the five `node_gcb*` ...) |
+
+A stale "before" produces exactly the failure mode this check exists to catch,
+so fresh pre-flash exports were taken minutes before each flash and are the
+article of proof here: `*-config-20260916-pre.json`, with the post-migration
+exports alongside as `*-config-20260916-post.json`. The 09-12 files stay for
+the history sections above; **use the 09-16 pair for any re-run.**
+
+### The RAK baseline was too empty to fail, so it was seeded first
+
+70 of `DK5EN-90`'s 103 exported fields read `0` or `""`. A migration bug whose
+symptom is "fields revert to defaults" cannot be detected by a field that is
+already at its default, so four distinctive values were set before the
+baseline was captured: `node_name=Martin-W3`, `node_atxt=W3-BENCH-RAK90`,
+`node_utcof=2`, `bt_code=424242`.
+
+**Set them one command per session.** Eleven `--set*` commands sent ~1 s apart
+in one session reset the node to factory defaults mid-sequence (callsign back
+to `XX0XXX-00`): every one of those handlers ends in `save_settings()`, so that
+is eleven back-to-back flash writes, with a LoRa `PONG` being serviced in the
+middle. Restored and verified field-by-field (104 preserved, 0 changed) before
+any measurement was taken. Note also that `--pingcall <call>` **transmits** --
+it pinged `DK5EN-93` -- which is not obvious from the name.
+
+### Results
+
+| node                   | settings across the upgrade                               | boot 2                                                       | verdict                         |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------- |
+| `DK5EN-90` RAK4631     | 102 preserved, 0 changed, 2 removed by design             | `path;keyed;fields_set=105;unknown_keys=0;malformed_lines=0` | settings pass, **marker fails** |
+| `DK5EN-93` Heltec V3   | 105 preserved, 0 lost, 3 live-GPS movers and nothing else | clean, no `[SETST];counters;...;failed`, no "out of range"   | pass                            |
+| `DK5EN-14` T-Deck Plus | **107 of 107**, 0 lost / 0 changed / 0 added              | 107 of 107, `--persiststat` identical                        | pass                            |
+
+The two removed on the RAK are `send_repeat_time` and `auto_join`, gone from
+the struct in the D1-04 merge (`src/config_json.h`, "nRF52: nothing." note).
+They are nRF52-only export keys, which is why no ESP32 node shows them.
+
+### The one real failure: the nRF52 migration boot
+
+`DK5EN-90`, first boot on the new image
+(`rak90-migration-boot-20260916.txt`):
+
+    [SETST];path;legacy_rewritten          <- expected
+    [SETST];path;keyed_absent
+    [SETST];save;ok;bytes=15               <- /counters.txt
+    [SETST];save;encoded;bytes=1458
+    [SETST];save;rename_failed;bytes=1458
+    [SETST];fs;rename_failed;file;/MeshCom-RAK;2000
+    [SETST];fs;rename_failed;file;/counters.txt;15
+    [SETST];fs;rename_failed;file;/MeshCom-Settings-Store;1458
+    [SETST];fs;rename_failed;total;files;3;dirs;3;bytes;3473;content_blocks;29;of;224
+    [SETST];save;rename_failed_twice;bytes=1458
+    [SETST];path;legacy_migration_failed   <- expected legacy_migrated
+
+**This is the recurrence section 4 built its instrument for, and the answer it
+gives is "not transient".** The retry that exists to separate a transient flash
+error from something persistent about the destination fired and failed too.
+Space is refuted again by the inventory it prints: 29 of 224 content blocks,
+the same figure as 2026-09-13.
+
+**The node still ended up correct, but not because the migration worked.**
+Boot 1 went on to log `save;skipped_unchanged;bytes=1458` -- the keyed store
+already held the current values, written by the _old_ firmware before the
+flash, so the failed rename had nothing to overwrite. Boots 2, 3 and a later
+reflash all load `path;keyed` cleanly with 105 fields. **A node whose keyed
+store was stale or absent when the rename failed would have kept the stale
+copy**, and nothing in the log would have said so beyond this one marker.
+
+A plain reflash does **not** reproduce it: the fourth boot went straight to
+`path;keyed` with no `legacy_rewritten` and every save reporting `ok`. The
+trigger is the migration boot specifically -- the one that holds the legacy
+blob, the counters file and a fresh 1 458 B temp file at once.
+
+### Live GPS made the check fail on a healthy node
+
+`DK5EN-93`'s only movers were `node_lat`, `node_lon` and `node_alt` -- the same
+three as section 6. Demonstrated to be drift rather than persistence by
+exporting **twice with no flash between the exports**, 20 s apart:
+`node_alt` went `482 -> 484` on its own.
+
+`w3_upgrade_check.py` therefore returned exit 1 on a node that had lost
+nothing. It now takes **`--gps-node`**, which moves those three into the
+allow-list for that run, and reports intentional removals in their own
+`REMOVED BY DESIGN` bucket instead of `LOST`. Both are opt-in or narrowly
+scoped on purpose: on a node with a fixed configured position `node_lat` is a
+setting like any other, and the gate must keep checking it.
+
+### The message-id counter, and the instrument that was missing
+
+`node_msgid` is neither a schema row nor an export field, so the only way to
+observe it was to originate a frame and read the id off the air -- transmitting
+purely to run a bench check. **`--msgid` now prints it**
+(`[SETST];counters;msgid;<n>`), on both platforms, outside
+`INSTRUMENT_ENABLED` because the upgrade it verifies happens on shipped images.
+
+Continuity across the `Credentials` -> `Counters` cutover holds:
+
+| node       | reads                                        | note                                                                                                                                       |
+| ---------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DK5EN-93` | 182 -> 282 -> 382                            | exactly `kMsgIdPersistStep` per boot, idle                                                                                                 |
+| `DK5EN-90` | 412 -> 511, then 511 -> 512 without a reboot | live mesh: the second read shows the counter also advancing from originated traffic, which is what makes the boot delta 99 rather than 100 |
+
+Neither node restarted near 0, which is what a lost counter looks like.
+
+### What this run does NOT cover
+
+- **12 of the 17 NVS-only keys.** `--persiststat` covers `node_perflash`,
+  `node_persd`, `node_immsave` and `node_mute` (`flash;0;sd;0;immediate;0;mute;1`,
+  identical before and after), and `--info` covers `node_kllock` (`KEYLOCK on`).
+  The rest -- `node_audmsg`, `node_audstart`, `node_bllock`, `node_cflash`,
+  `node_kblock`, `node_kblsync`, `node_map`, `node_modus`, `node_wifion` and the
+  version fields -- have no read-back command, so "survived" is inferred from
+  the boot behaving normally, not measured. Note the count: the schema-versus-
+  export diff yields **17**, not the 25 quoted in section 6 and in `W3`.
+- **`--dfu` is the only working RAK flash path here.** `pio run -e
+wiscore_rak4631 --target upload` printed `[SUCCESS]` over an nrfutil run that
+  had failed ("Timed out waiting for acknowledgement", "Touch disabled") and
+  left the old image in place; it was caught only by checking the running build
+  afterwards. Use `--dfu` (sets `GPREGRET=0x57`), wait ~4 s for
+  `/Volumes/RAK4631`, copy the `.uf2`, and verify the build string after.
