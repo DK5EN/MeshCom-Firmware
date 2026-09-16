@@ -13,16 +13,17 @@ deleted (-14 240 lines). Plus the `D2-V` golden capture, which `W4` could not st
 
 **What is left in phase D:**
 
-| row              | state                                                                                                                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `W4` `D2-10`     | **DONE** (`184f84ff`) -- exact-token matching in `src/command_match.h`, `native_command_match` (11 cases), golden before/after on DK5EN-93 showed zero dispatch changes                                                                          |
-| `W4` `D2-06`     | **in the tree, not yet committed** -- 70 of 107 on/off rungs are `COMMAND_TOGGLES[]` rows, -768 lines, flash -2 696 B ESP32 / -1 808 B nRF52. Three self-inflicted defects found and fixed; see BACKLOG `W4`                                     |
-| `W4` `D2-07`     | **next.** 96 rungs take an argument out of `msg_text+N`. The offsets are NOT the risk: 95 of 98 name/offset pairs follow one rule, and the 3 that do not are all correct (see below). The risk is the clamp bounds and the per-rung echo wording |
-| `W6` `D1-01`     | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                                                                                                                                  |
-| `W6` `D4-01/02`  | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                                                                                                                                  |
-| `W5` all rows    | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list                                                                                                                             |
-| `W7` second half | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now                                                                                                                |
-| `C4d` `DR-03`    | bench-only, waits for the `E1` G2 run                                                                                                                                                                                                            |
+| row              | state                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `W4` `D2-10`     | **DONE** (`184f84ff`) -- exact-token matching in `src/command_match.h`, `native_command_match` (11 cases), golden before/after on DK5EN-93 showed zero dispatch changes                                                         |
+| `W4` `D2-06`     | **DONE** (`e46326c3`) -- 70 of 107 on/off rungs are `COMMAND_TOGGLES[]` rows, -768 lines. Three self-inflicted defects found and fixed; see BACKLOG `W4`                                                                        |
+| `W4` `D2-07`     | **DONE** (`27be0d12` + `f8d937fe`) -- 24 numeric setters share one tested parse (`src/command_setters.h`). Closes two real defects: uninitialised `iVar` read, and five setters with no range check that stored zeros from junk |
+| `W4` `D2-01`     | **DONE** -- the last three commented-out rung blocks deleted (51 lines), including the `/* TEST */ compress` block that made `D2-06` insert its dispatch inside a comment                                                       |
+| `W6` `D1-01`     | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                                                                                                                 |
+| `W6` `D4-01/02`  | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                                                                                                                 |
+| `W5` all rows    | **unblocked 2026-09-16** -- all six operator decisions are made. `R4-02/03` needs no board list: the OLED is already detected at runtime, so the buffer moves behind that detection. Still needs a 12 h nRF52 soak for `R1-04`  |
+| `W7` second half | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now                                                                                               |
+| `C4d` `DR-03`    | bench-only, waits for the `E1` G2 run                                                                                                                                                                                           |
 
 **`W4` is one file and cannot be parallelised**: `src/command_functions.cpp`, now ~5 690 lines
 (was 6 484), 241 `commandCheck()` names in the ladder plus 70 in the toggle table. Serial
@@ -64,6 +65,54 @@ So D2-07 is not an offset-transcription job. What varies per rung, and what a ta
 is the clamp range and the echo wording. An earlier scout report claiming 8 offset mismatches
 (including `button off`, a toggle with no argument at all) was wrong -- it measured the
 `commandCheck(msg_text+2, ...)` in each rung's own header. Do not build on it.
+
+**`D2-07` outcome: the trap was coercion, not offsets.** The first, mechanical version paired
+`sscanf` with `iVar = 0` and so made junk _storable_ -- `--txpower abc` answered **"set txpower to
+0 dBm"**, because 0 is inside `[-9, 22]`. Seven sites were exposed. The shipped helpers therefore
+**reject rather than coerce**: `CMD_SET_NAN` outranks the range test, and the not-a-number guard is
+SEPARATE from the range check. Folding them produced _"txpower 0 dBm not between -9 and max 22"_,
+and 0 is between -9 and 22 -- a message that is worse than the bug.
+
+The pass condition was classification, not an empty diff: the change deliberately alters what junk
+answers. 332 identical, 12 intended, **0 unexplained among the 24 touched commands**. An empty diff
+here would have meant the guards were not running.
+
+**`R4-02/03` needs no board list, and the audit's premise was wrong again.** The firmware
+**already detects the OLED at runtime** on both platforms -- `esp32_isSSD1306(0x3C)` returns `-1`
+and `src/esp32/esp32_functions.cpp:187-197` / `src/nrf52/nrf52_functions.cpp:27-35` set
+`u8g2 = NULL; bDisplayOff = true`. A board with no display already works; it just does not get the
+memory back, because the two `U8G2` objects are namespace-scope globals. The row is therefore
+"allocate the buffer after the probe succeeds" (`U8G2_USE_DYNAMIC_ALLOC` / `setBufferPtr()`) --
+one code path, no variant list, no board that can be blanked by being listed wrong. Also note the
+audit's 4 304 B is optimistic: the 1 024-byte buffer is a function-local `static` in
+`u8g2_m_16_8_f()` that **both** U8g2 objects share.
+
+**`DISP-01` -- documented, not fixed** (operator decision). The probe contract is `2` = SSD1306,
+`1` = SH1106; nRF52 honours it and **ESP32 inverts it**, against its own comment. The hardcoded
+early returns look tuned to the inversion, so bench boards work and a blind fix would trade one
+unverified state for another. Bench list owed: Heltec V3, and a T-Beam once the RAK is unplugged.
+T-Deck Plus is NOT in scope -- it never compiles the U8g2 path. Full write-up: BACKLOG §3.8ah.
+
+**`env:t5_epaper` now builds, and what that cost is the interesting part.** It had never compiled
+once. The missing `variants/t5_epaper/configuration.h` was the first of **eight** blockers, and
+three of them are this campaign's own subject:
+
+- its `lib_deps` was a stale 16-line **copy** of `[libs]`, missing the SparkFun u-blox library that
+  `src/esp32/esp32_pmu.cpp:13` includes unconditionally for every ESP32 board -- so the env could
+  not have compiled. Inherited now, with `RadioLib 7.1.2` kept deliberately.
+- **`GRD-01`:** "does this board drive a U8g2 OLED" is hand-written in **six** places in three
+  spellings, and the one that drifted (`loop_functions.cpp`'s `#if/#elif` cascade) never listed
+  `BOARD_T5_EPAPER`. Patched minimally; **unify it inside `R4-02/03`**, which needs the same
+  predicate in one place. The repo's own `WP_DISP` (`configuration_global.h:158`) is the pattern.
+- `src/t5-epaper/peri_gps.cpp` is a **stale fork** of `src/t-deck-pro/peri_gps.cpp`, 96 lines apart:
+  it still used `bGPSDEBUG_DETAIL` (14 sites, a symbol deleted from the tree) and defined a second
+  `TinyGPSPlus gps` that collided at link. That pair is `D4-01/02` in `W6`.
+
+The rest were plain code rot no compiler had ever seen: a Windows backslash `#include`, an
+`extern int` against a `volatile int` definition, and a fallback branch casting to the wrong
+pointer type. **An env excluded from the sweep as "known broken" is not frozen** -- it keeps being
+edited by whole-tree passes, and nothing checks it. Flash 66.8%, RAM 33.8%, compile-only: the board
+is on no bench and nothing about its runtime is claimed.
 
 **`D2-06` did not reach the audit's numbers, and the audit's premise was partly wrong.** It
 promised "120 `on/off` branches" and **-6.0 kB** ESP32. There are 107 such rungs, not 120, and only

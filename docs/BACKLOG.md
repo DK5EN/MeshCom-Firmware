@@ -5515,8 +5515,30 @@ decision at all.
   variant's OneWire has never worked. Fix the pin or mark the variant
   unsupported; the three T-Beams on GPIO 4 are untouched.
 
-**Still owed from `OPT-03`:** the OLED-less board list for `R4-02/03`. That is the
-last operator input `W5` needs.
+- **`R4-02/03` -- RUNTIME, NO BOARD LIST (decided 2026-09-16).** The audit asked
+  for a list of boards without an OLED and a `#if` per variant. That premise was
+  wrong: the firmware **already detects the display at runtime**, on both
+  platforms. `esp32_isSSD1306(0x3C)` returns `-1` when nothing answers, and both
+  `src/esp32/esp32_functions.cpp:187-197` and `src/nrf52/nrf52_functions.cpp:27-35`
+  then set `u8g2 = NULL; bDisplayOff = true`. A board with no OLED therefore
+  already WORKS -- what it does not do is give the memory back, because the two
+  `U8G2` objects are namespace-scope globals.
+
+  So the row becomes: allocate the frame buffer only once the probe has found a
+  display, using U8g2's own `U8G2_USE_DYNAMIC_ALLOC` / `setBufferPtr()`. **One
+  code path, no variant list, nothing to maintain and no board that can be
+  blanked by being listed wrong** -- a RAK with no RAK1921 fitted and an E22
+  DevKitC both benefit without either being enumerated.
+
+  **The audit's 4 304 B is optimistic and must not be quoted.** The 1 024-byte
+  buffer is a function-local `static` inside `u8g2_m_16_8_f()`
+  (`U8g2/src/clib/u8g2_d_memory.c:61-70`), and `u8g2_1` (SSD1306) and `u8g2_2`
+  (SH1106) both call that same function -- they **share one buffer**. The real
+  static cost is ~1 kB of buffer plus two `u8g2_t` structs, not two buffers.
+
+**No operator input is outstanding.** `OPT-03` is fully closed: every decision it
+owed -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, the `D1-04` migration and
+now `R4-02/03` -- has been made.
 
 - **`W4`** command table. `D2-10` **done** (`184f84ff`), `D2-06` **in the tree**
   -- 70 of the 107 `on/off` rungs are `COMMAND_TOGGLES[]` rows in
@@ -5553,12 +5575,48 @@ last operator input `W5` needs.
      AFTER `save_settings()`, the first table version before. Fixed with a
      `post_after` hook the caller runs after the save; pinned by a native case.
 
-  Left: `D2-07` (71 setters) and `D2-01`.
+  **`D2-07` done** (`27be0d12` step 1, `f8d937fe` step 2). 24 numeric-setter
+  parse sites share one tested parse (`src/command_setters.h`, 14 cases in
+  `native_command_setters`) behind a uniform guard. It removes duplication
+  rather than bytes -- it adds roughly as many lines as it deletes -- and it
+  closes two real defects: `--txpower abc` used to read an uninitialised `iVar`
+  and answer `16711680`, and five setters had no range check at all, so junk
+  stored a **zero scaling factor or zero temperature offset** silently.
+
+  The design point worth keeping: **reject junk, do not coerce it.** The first,
+  mechanical version paired `sscanf` with `iVar = 0` and made junk _storable_ --
+  `--txpower abc` answered "set txpower to 0 dBm", because 0 is inside
+  `[-9, 22]`. Seven sites were exposed. `CMD_SET_NAN` therefore outranks the
+  range test, and a native case
+  (`test_junk_is_rejected_even_when_zero_would_be_in_range`) pins it. The guard
+  is also SEPARATE from the range check, not folded into it: folding produced
+  "txpower 0 dBm not between -9 and max 22", and 0 _is_ between -9 and 22.
+
+  Pass condition was classification, not an empty diff -- the change
+  deliberately alters what junk answers. 332 identical, 12 intended (exactly the
+  `--<setter> abc` inputs), **0 unexplained among the 24 touched commands**.
+  Four setters keep the old `_owner_c` form because they genuinely reuse the
+  buffer later in the rung; left for a later pass rather than reshaped to fit.
+
+  **`D2-01` done.** The three remaining commented-out rung blocks are deleted
+  (51 lines): the `/* TEST */ compress` block, the `/* only for testing */`
+  `softser test0`/`softser test` pair with the `#if defined(ENABLE_XML)` that
+  wrapped nothing else, and the `/* for testing only */ softser xml` block. The
+  `--setowndns` half of `D2-01/04` was already done in `W1`. **This is the same
+  dead code that made the `D2-06` dispatch land inside a comment**, so deleting
+  it removes the trap as well as the lines.
+
+  That forced a second fix. `test/golden/extract_commands.py --self-test`
+  asserted "comment stripping removed something" **against the live source**,
+  which only held while dead code existed to strip; with it gone the gate failed.
+  The assertion now runs against a fixture (`_FIXTURE`, one live rung and one
+  commented-out rung). **A gate must not need the defect it guards against to
+  keep existing.** Mutation-verified: making `blank_comments()` a no-op fails it.
 
 - **`W5`** RAM rows of medium risk (`R1-04`, `R1-02`, `R2-01`, `R2-04`,
-  `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- blocked on operator decisions
-  `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03` and the OLED-less board list,
-  plus a 12 h nRF52 soak for `R1-04`.
+  `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- **no longer blocked on any operator
+  decision**; all six are made. What it still needs is a 12 h nRF52 soak for
+  `R1-04`.
 - **`W6`** shared UDP frame handler (`D1-01`, carrying defects 12/13), `D3-01`,
   `D3-02`, `D3-05`, `D4-01/02` `ui_common` -- and `EXT-01`'s early return, which
   must land with or before this wave, not after.
@@ -5663,6 +5721,88 @@ still advertised the command. Only SYM+M muted, and it did not save.
 **Rule reinforced** (from §3.8aa): after any change to a compile guard, scan the built image for
 the commands expected present **and** absent. `.claude/commands/release-firmware.md` now carries
 the T-Deck scan line next to the safeboot check.
+
+### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
+
+Four findings that are not DRY rows. They surfaced because the `W4` gate builds
+every env and because `R4-02/03` forced a read of the display-init path.
+
+| ID      | Kind | Sev    | Files                                                                          | Finding                                                                                                                                                                                                                                                                                                                                                                                                | Status                                                                                                                                                                 |
+| ------- | ---- | ------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BLD-01  | BUG  | Medium | `src/configuration_global.h`                                                   | The header has **no include guard at all** -- no `#pragma once`, no `#ifndef`. Any translation unit that pulls it in twice fails with `redefinition of 'isNodeUnconfigured'`, `'isUnconfiguredCall'`, `'FLASH_STRUCT_LEGACY'`, `'flashLayoutCompatible'`. Only `env:esp32-external-radio` reaches it today; every other env happens to include it exactly once.                                        | **FIXED 2026-09-16.** `#pragma once` added. Verified: the four redefinition errors are gone from the `esp32-external-radio` build; what remains there is BLD-02.       |
+| BLD-02  | DOC  | Low    | `platformio.ini:1167`, `src/esp32/external_radio_glue.cpp:48`                  | `env:esp32-external-radio` is **not buildable standalone by design** -- it stops at a deliberate `#error "EXTERNAL_RADIO requires EXTERNAL_RADIO_HOST and EXTERNAL_RADIO_PORT from the build overlay"`, and no such overlay is in the repo. It has been counted as a build failure in every gate report; it is a missing input, not a defect.                                                          | **DOCUMENTED.** Excluded from the env sweep with the reason stated, rather than reported as red each time.                                                             |
+| BLD-03  | BUG  | Medium | `variants/t5_epaper/`, `src/t5-epaper/`                                        | `env:t5_epaper` **had never compiled once**. The missing `variants/t5_epaper/configuration.h` -- the only variant directory in the repo without one -- was merely the FIRST of eight blockers; behind it sat a board port nobody had ever run through a POSIX compiler. Full list below the table.                                                                                                     | **FIXED 2026-09-16.** Builds: Flash 66.8% (4 380 717 B), RAM 33.8% (110 904 B). Compile-only -- no T5 on the bench, so nothing about its runtime behaviour is claimed. |
+| DISP-01 | BUG  | Medium | `src/esp32/esp32_functions.cpp:199-207`, `src/nrf52/nrf52_functions.cpp:37-44` | The probe contract is **`2` = SSD1306, `1` = SH1106** (`src/loop_functions.cpp:951-958`). nRF52 honours it (`idtype == 1` -> `u8g2_2`, the SH1106 object). **ESP32 inverts it**: `if(idtype == 1) u8g2 = &u8g2_1;` and `u8g2_1` IS the SSD1306 object -- while the comment two lines above states the correct mapping. So the two platforms disagree, and one of them is driving the wrong controller. | **DOCUMENTED, CODE UNCHANGED** by operator decision 2026-09-16. See below.                                                                                             |
+
+**What `BLD-03` actually was.** The operator authorised "write the missing
+`configuration.h`" on my description of the fault, and that description was
+incomplete: the header was the first blocker, not the only one. Eight in total,
+and only two were configuration:
+
+| #   | Blocker                                                                                | Kind        |
+| --- | -------------------------------------------------------------------------------------- | ----------- |
+| 1   | `variants/t5_epaper/configuration.h` missing entirely                                  | config      |
+| 2   | `bq27220.h` unreachable -- shared driver in `src/t-deck-pro/`, excluded by the filter  | config      |
+| 3   | `lib_deps` was a **stale copy** of `[libs]` and lacked the SparkFun u-blox library     | duplication |
+| 4   | `#include "esp32\esp32_main.h"` -- a **Windows backslash path**                        | code        |
+| 5   | `extern int transmissionState` vs the one definition's `volatile int`                  | code        |
+| 6   | the `#if/#elif` display cascade at `loop_functions.cpp` never listed `BOARD_T5_EPAPER` | duplication |
+| 7   | `src/t5-epaper/peri_gps.cpp` is a **stale fork** of `src/t-deck-pro/peri_gps.cpp`      | duplication |
+| 8   | `decodebuffer` fallback branch cast to `lv_color_t *`; the variable is `uint8_t *`     | code        |
+
+**Three of the eight are this campaign's own subject matter**, which is the
+finding that matters:
+
+- **`#3`** the env carried its own 16-line copy of `[libs].lib_deps`. `[libs]`
+  gained the SparkFun u-blox library; the copy did not; and
+  `src/esp32/esp32_pmu.cpp:13` includes that header **unconditionally for every
+  ESP32 board**. The env could not have compiled. Now inherited, not copied --
+  with the board's own pins (`RadioLib 7.1.2`, against `[esp32libs]`'s 7.6.0)
+  deliberately kept, because changing a radio library version on a board that is
+  on no bench is a behaviour change, not a cleanup.
+- **`#6` -- `GRD-01`, open.** "Does this board drive a U8g2 OLED" is written out
+  by hand in **six** places in three spellings: `loop_functions.cpp:364`, `:821`,
+  `:1346` (same 11 terms, reordered), `esp32_functions.cpp:183` and
+  `nrf52_functions.cpp:15` (shorter, platform-specific), and a differently shaped
+  `#if/#elif` cascade in `loop_functions.cpp` whose `#else` arm means the same
+  thing. That cascade is the one that drifted: it never listed
+  `BOARD_T5_EPAPER`, so the first compile died on
+  `'u8g2' was not declared in this scope`. **Patched minimally here, not
+  unified** -- six guard sites across three files is its own change with its own
+  gate. The repo already shows how: `WP_DISP` (`configuration_global.h:158`) is
+  exactly this pattern done once. **Do `GRD-01` as part of `R4-02/03`**, which
+  needs the same predicate in one place anyway.
+- **`#7`** `src/t5-epaper/peri_gps.cpp` and `src/t-deck-pro/peri_gps.cpp` are 96
+  lines apart. When `bGPSDEBUG` was replaced by `iGPSDEBUG`, the T-Deck Pro copy
+  followed and the T5 copy did not -- it still referenced `bGPSDEBUG_DETAIL`, a
+  symbol that exists nowhere in the tree (14 sites). It also **defined its own
+  `TinyGPSPlus gps`** instead of declaring the one in `gps_functions.cpp:51`
+  extern, which collided at link. Both are now aligned with the maintained twin.
+  These two files are `D4-01/02` (`ui_common`) in `W6`; this is what an
+  unmerged twin costs once the maintained side moves.
+
+**Why an unbuildable env is worth more than it looks.** Nothing in the gate could
+see any of this. The env was excluded from every sweep as "known broken", so its
+files were carried along, edited by whole-tree passes, and never once checked by
+a compiler. `#4` and `#7` in particular could not have survived a single build.
+
+**Why `DISP-01` is documented rather than fixed.** The hardcoded early returns in
+`esp32_isSSD1306()` -- `BOARD_HELTEC_V3` -> `1`, `BOARD_TRACKER` -> `1`,
+`BOARD_TBEAM_V3` -> `2`, `BOARD_TBEAM_1W` -> `1 //SH1106 aber stimmt 1 wirklich?`
+-- appear to have been tuned **against** the ESP32 inversion, which is why those
+boards work today. Correcting the mapping without also re-deriving every one of
+those constants would swap one unverified state for another. The boards actually
+at risk are the ones that take the **probe** path rather than an early return:
+the E22 family, `ttgo_tbeam`, `ttgo-lora32-v21` and the RAK. The in-file comment
+`// 0x00 == T-BEAM 1.3" 1106 !! sonst kommen artefakte` reads like somebody
+already hit this from the symptom end.
+
+**Bench list owed** (operator, 2026-09-16): confirm on **Heltec V3** and on a
+**T-Beam** -- the latter needs the RAK unplugged first, the two share the bench.
+Note that **T-Deck Plus is NOT in scope for `DISP-01`**: `BOARD_T_DECK_PLUS` is
+in the exclusion list at `src/loop_functions.cpp:363`, so it never compiles the
+U8g2 path and the probe never runs there. Its display is checked under
+`R4-02/03` instead, where what matters is that the exclusion still holds.
 
 ## 4. State of the repository
 
