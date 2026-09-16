@@ -4,6 +4,7 @@
 #include "loop_functions.h"
 #include "loop_functions_extern.h"
 #include "printfdeb_functions.h"
+#include "command_match.h" // D2-10: commandMatches(), the ladder's matching rule
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
 #include "mheard_functions.h"
@@ -136,40 +137,13 @@ static void sendBleJsonRegister(JsonDocument &doc)
         addBLEComToOutBuffer(msg_buffer, len);
 }
 
-int casecmp(const char *s1, const char *s2)
-{
-	while (*s1 != 0 && tolower(*s1) == tolower(*s2))
-    {
-		++s1;
-		++s2;
-	}
-
-	return
-	(*s2 == 0)
-	? (*s1 != 0)
-	: (*s1 == 0)
-		? -1
-		: (tolower(*s1) - tolower(*s2));
-}
-
-// CS-01: maxhop.h is Arduino-free (native test), configuration_global.h is not --
-// so the default is written down twice. It must not drift.
-static_assert(MAXHOP_TEXT_FALLBACK == MAX_HOP_TEXT_DEFAULT,
-              "maxhop.h MAXHOP_TEXT_FALLBACK and configuration_global.h MAX_HOP_TEXT_DEFAULT differ");
-static_assert(MAXHOP_TEXT_MAX < MAX_HOP_LIMIT,
-              "the serial --maxhop range must stay inside the on-air hop limit");
-
+// Both the case-insensitive compare and the matching rule now live in
+// src/command_match.h so that native_command_match can test them; this file
+// is not compiled by any native env. See that header for the rule and why it
+// changed.
 int commandCheck(char *msg, char *command)
 {
-    char vmsg[100];
-    strncpy(vmsg, msg, sizeof(vmsg) - 1);
-    vmsg[sizeof(vmsg) - 1] = '\0';
-    vmsg[strlen(command)] = 0x00;
-
-    if(casecmp(vmsg, command) == 0)
-        return 0;
-
-    return -1;
+    return commandMatches(msg, command) ? 0 : -1;
 }
 
 void commandAction(char *msg_text, int iphone, bool rxFromPhone)

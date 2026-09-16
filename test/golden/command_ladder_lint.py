@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
 """Ladder-order gate for commandAction()'s commandCheck() dispatch chain.
 
-commandCheck() in src/command_functions.cpp does not compare for equality:
+UPDATED 2026-09-16 (D2-10): commandCheck() no longer prefix-matches
+everything. src/command_match.h's commandMatches() is an EXACT TOKEN match,
+except when the candidate name ends in a space, which is the argument form and
+stays a prefix match ("setname " matches "setname Martin").
+
+That kills most of what this lint was written for -- "msg" can no longer
+swallow "msgid", "pos" can no longer swallow "posshot" -- but NOT all of it,
+which is why the gate stays:
+
+    an exact-token name still shadows its own argument form.
+
+"heap" matches the input "heap 5", because a space terminates an exact token.
+So if the rung for "heap" is tested before the rung for "heap ", the tagged
+form is still unreachable, exactly as before. Same for setlog/setlog ,
+gpsdebug/gpsdebug , passwd/passwd , maxhop/maxhop , pingmax/pingmax ,
+tab/tab  and postime/postime . Those pairs are what this script now protects.
+
+The original problem, kept for the record:
 
     vmsg[strlen(command)] = 0x00;      // truncates the INPUT to command's length
     if(casecmp(vmsg, command) == 0) return 0;
 
-It truncates the incoming command to the length of the candidate name and
-compares THAT. This is a PREFIX match. commandAction() chains ~324 of these
+It truncated the incoming command to the length of the candidate name and
+compared THAT. This was a PREFIX match. commandAction() chains ~324 of these
 in one long if/else-if ladder, so when name A is a prefix of name B, whichever
 rung is tested first wins -- if A comes before B, B's rung can never be
 reached: A already matched and returned.
