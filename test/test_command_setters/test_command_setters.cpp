@@ -53,6 +53,30 @@ static void test_percent_i_keeps_its_auto_base()
     TEST_ASSERT_EQUAL_INT(10, (int)cmdArgLong("010"));          // as "%d" reads it
 }
 
+// The form the rungs use: parse into their own temporary, fold the false
+// return into their own reject path. `*out` is still set so the existing error
+// wording ("txpower %i dBm not between ...") prints a deterministic number.
+static void test_cmd_arg_wrappers_report_failure_and_still_set_out()
+{
+    int i = 99;
+    TEST_ASSERT_TRUE(cmdArgInt("14", &i));
+    TEST_ASSERT_EQUAL_INT(14, i);
+
+    TEST_ASSERT_FALSE(cmdArgInt("abc", &i));
+    TEST_ASSERT_EQUAL_INT(0, i);          // deterministic, and the caller rejects
+
+    float f = 9.0f;
+    TEST_ASSERT_FALSE(cmdArgFloat("abc", &f));
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, f);
+    TEST_ASSERT_TRUE(cmdArgFloat("1.25", &f));
+    TEST_ASSERT_EQUAL_FLOAT(1.25f, f);
+
+    double d = 9.0;
+    TEST_ASSERT_FALSE(cmdArgDbl("", &d));
+    TEST_ASSERT_TRUE(cmdArgDbl("-3.5", &d));
+    TEST_ASSERT_EQUAL_DOUBLE(-3.5, d);
+}
+
 static void test_range_is_inclusive()
 {
     TEST_ASSERT_TRUE(cmdInRange(1, 1, 6));
@@ -139,6 +163,7 @@ int main(int, char **)
     RUN_TEST(test_leading_space_is_skipped);
     RUN_TEST(test_trailing_junk_still_yields_the_leading_number);
     RUN_TEST(test_percent_i_keeps_its_auto_base);
+    RUN_TEST(test_cmd_arg_wrappers_report_failure_and_still_set_out);
     RUN_TEST(test_range_is_inclusive);
     RUN_TEST(test_lo_above_hi_means_no_range_check);
     RUN_TEST(test_an_out_of_range_value_does_not_reach_the_destination);

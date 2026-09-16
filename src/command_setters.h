@@ -48,6 +48,21 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+/**
+ * Parse into an existing temporary, reporting whether the argument was a number
+ * at all. `*out` receives the value, or 0 when it was not -- the rungs' error
+ * messages print the offending number, so they need something deterministic.
+ *
+ * These are the form the ladder uses: a rung already owns its bounds check and
+ * its wording, and only wants the parse. The caller MUST fold the false return
+ * into its reject path -- see the header comment above for why a bare 0 is not
+ * safe to store.
+ */
+inline bool cmdArgInt(const char *arg, int *out);
+inline bool cmdArgIntBase(const char *arg, int base, int *out);
+inline bool cmdArgFloat(const char *arg, float *out);
+inline bool cmdArgDbl(const char *arg, double *out);
+
 /** What cmdStore*() did with the argument. */
 enum CmdSetResult
 {
@@ -119,6 +134,51 @@ inline double cmdArgDouble(const char *arg, bool *ok = nullptr)
         *ok = true;
 
     return v;
+}
+
+inline bool cmdArgInt(const char *arg, int *out)
+{
+    bool ok = false;
+    const long v = cmdArgLong(arg, &ok);
+
+    if (out)
+        *out = (int)v;
+
+    return ok;
+}
+
+/** The "%i" form: auto-base, so "010" is 8. Two setters need this. */
+inline bool cmdArgIntBase(const char *arg, int base, int *out)
+{
+    bool ok = false;
+    const long v = cmdArgLongBase(arg, base, &ok);
+
+    if (out)
+        *out = (int)v;
+
+    return ok;
+}
+
+inline bool cmdArgFloat(const char *arg, float *out)
+{
+    bool ok = false;
+    const double v = cmdArgDouble(arg, &ok);
+
+    if (out)
+        *out = (float)v;
+
+    return ok;
+}
+
+inline bool cmdArgDbl(const char *arg, double *out)
+{
+    bool ok = false;
+    const double v = cmdArgDouble(arg, &ok);
+
+    if (out)
+        *out = v;
+
+    return ok;
 }
 
 /**

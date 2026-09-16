@@ -6,6 +6,7 @@
 #include "printfdeb_functions.h"
 #include "command_match.h" // D2-10: commandMatches(), the ladder's matching rule
 #include "command_toggles.h" // D2-06: the table-driven on/off toggles
+#include "command_setters.h" // D2-07: numeric argument parse/range/store
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
 #include "mheard_functions.h"
@@ -367,6 +368,19 @@ void commandAction(char *msg_text, int iphone, bool rxFromPhone)
     bRxFromPhone = false;
 }
 
+/**
+ * D2-07: one wording for "that argument was not a number", used by every setter.
+ *
+ * It has to be separate from each rung's range message. Folding the parse
+ * failure into the range test looked tidier and lies: a rejected "--txpower abc"
+ * then answers "txpower 0 dBm not between -9 and max 22", and 0 IS between -9
+ * and 22. The user is told the wrong thing about their input.
+ */
+static void cmdArgNotNumber(const char *label, const char *arg)
+{
+    printfdeb("%s: <%s> is not a number\n", label, arg);
+}
+
 void commandAction(char *umsg_text, bool ble)
 {
     // -info
@@ -375,7 +389,11 @@ void commandAction(char *umsg_text, bool ble)
     char msg_text[300];
     char _owner_c[300];
     double dVar=0.0;
-    int iVar;
+    int iVar = 0;
+    bool bArgOk = false;   // D2-07: did the numeric argument parse at all? Folded
+                           // into each setter's reject path, because a bad argument
+                           // must never reach a persisted setting -- see
+                           // src/command_setters.h.
     float fVar=0.0;
 
     String sVar = umsg_text;
@@ -1357,8 +1375,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"analog factor ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+16);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+16, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("analog factor", msg_text+16); return; }
+
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -1376,8 +1396,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"analog alpha ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+15);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+15, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("analog alpha", msg_text+15); return; }
+
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -1395,8 +1417,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"analog slope ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+15);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+15, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("analog slope", msg_text+15); return; }
 
         if(dVar < 0 || dVar >= 10.)
         {
@@ -1418,8 +1441,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"analog offset ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+16);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+16, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("analog offset", msg_text+16); return; }
 
         if(dVar < 0 || dVar >= 1000.0)
         {
@@ -1441,8 +1465,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"analog atten ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+15);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+15, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("analog atten", msg_text+15); return; }
 
         if(dVar < 0 || dVar > 3)
         {
@@ -1468,8 +1493,9 @@ void commandAction(char *umsg_text, bool ble)
     #if defined (ENABLE_INA226)
     if(commandCheck(msg_text+2, (char*)"shunt ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+8);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+8, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("shunt", msg_text+8); return; }
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -1493,8 +1519,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"imax ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+7, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("imax", msg_text+7); return; }
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -1518,8 +1545,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"isamp ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+8);
-        sscanf(_owner_c, "%i", &iVar);
+        bArgOk = cmdArgIntBase(msg_text+8, 0, &iVar);   // "%i" is auto-base
+
+        if(!bArgOk) { cmdArgNotNumber("isamp", msg_text+8); return; }
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -1544,8 +1572,10 @@ void commandAction(char *umsg_text, bool ble)
     #endif
     if(commandCheck(msg_text+2, (char*)"batt factor ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+14, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("batt factor", msg_text+14); return; }
+
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -2819,8 +2849,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"tempoff in ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+13, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("tempoff in", msg_text+13); return; }
+
 
         meshcom_settings.node_tempi_off=fVar;
 
@@ -2836,8 +2868,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"tempoff out ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+14, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("tempoff out", msg_text+14); return; }
+
 
         meshcom_settings.node_tempo_off=fVar;
 
@@ -3497,8 +3531,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setlat ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+9, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("setlat", msg_text+9); return; }
 
         //printf("_owner_c:%s fVar:%f\n", _owner_c, dVar);
 
@@ -3518,8 +3553,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setlon ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        sscanf(_owner_c, "%lf", &dVar);
+        bArgOk = cmdArgDbl(msg_text+9, &dVar);
+
+        if(!bArgOk) { cmdArgNotNumber("setlon", msg_text+9); return; }
 
         meshcom_settings.node_lon=dVar;
 
@@ -3539,8 +3575,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setalt ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        sscanf(_owner_c, "%d", &iVar);
+        bArgOk = cmdArgInt(msg_text+9, &iVar);
+
+        if(!bArgOk) { cmdArgNotNumber("setalt", msg_text+9); return; }
 
         // GPS-03/F7: Ein Tippfehler darf die Hoehe nicht auf 0 klemmen -- das
         // hat frueher den Schaetzer auf 0 m geseedet UND die barometrische
@@ -3803,8 +3840,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"wifitxpower ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
-        sscanf(_owner_c, "%d", &iVar);
+        bArgOk = cmdArgInt(msg_text+14, &iVar);
+
+        if(!bArgOk) { cmdArgNotNumber("wifitxpower", msg_text+14); return; }
 
         if(iVar < 2 || iVar > 20)
         {
@@ -3872,8 +3910,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"txpower ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
-        sscanf(_owner_c, "%d", &iVar);
+        bArgOk = cmdArgInt(msg_text+10, &iVar);
+
+        if(!bArgOk) { cmdArgNotNumber("txpower", msg_text+10); return; }
 
         printdeb(iVar);
 
@@ -3902,8 +3941,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"txfreq ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+9, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("txfreq", msg_text+9); return; }
 
         // RF-04: LORA_BANDWIDTH is kHz on ESP32 but a bandwidth INDEX (0/1/2)
         // on nRF52 (OPT-D14) -- feeding it straight into this arithmetic
@@ -3942,10 +3982,11 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"txbw ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+7, &fVar);
 
-        if(fVar != 125 && fVar != 250)
+        if(!bArgOk) { cmdArgNotNumber("txbw", msg_text+7); return; }
+
+        if((fVar != 125 && fVar != 250))
         {
             printfdeb("txbw %.0f MHz not 125 or 250 kHz\n", fVar);
         }
@@ -3976,8 +4017,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"txsf ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
-        sscanf(_owner_c, "%d", &iVar);
+        bArgOk = cmdArgInt(msg_text+7, &iVar);
+
+        if(!bArgOk) { cmdArgNotNumber("txsf", msg_text+7); return; }
 
         if(iVar < 6 || iVar > 12)
         {
@@ -4005,8 +4047,9 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"txcr ") == 0)
     {
         // 4/txcr --> 4/5 ... 4/8
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
-        sscanf(_owner_c, "%d", &iVar);
+        bArgOk = cmdArgInt(msg_text+7, &iVar);
+
+        if(!bArgOk) { cmdArgNotNumber("txcr", msg_text+7); return; }
 
         if(iVar < 5 || iVar > 8)
         {
@@ -4045,8 +4088,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"specstart ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+12);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+12, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("specstart", msg_text+12); return; }
 
         if(!((fVar >= 430.0 && fVar <= (439.000)) || (fVar >= 869.4 && fVar <= 869.65)))
         {
@@ -4066,8 +4110,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"specend ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+10, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("specend", msg_text+10); return; }
 
         if(!((fVar >= 430.0 && fVar <= 439.000) || (fVar >= 869.4 && fVar <= 869.65)))
         {
@@ -4087,8 +4132,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"specstep ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+11);
-        sscanf(_owner_c, "%f", &fVar);
+        bArgOk = cmdArgFloat(msg_text+11, &fVar);
+
+        if(!bArgOk) { cmdArgNotNumber("specstep", msg_text+11); return; }
 
         if(!(fVar >= 0.1 && fVar <= 2.0))
         {
@@ -4114,8 +4160,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"specsamples ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
-        sscanf(_owner_c, "%i", &iVar);
+        bArgOk = cmdArgIntBase(msg_text+14, 0, &iVar);   // "%i" is auto-base
+
+        if(!bArgOk) { cmdArgNotNumber("specsamples", msg_text+14); return; }
 
         if(!(iVar >= 500 && iVar <= 2048))
         {
