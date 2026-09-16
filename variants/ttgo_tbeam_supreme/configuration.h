@@ -101,4 +101,15 @@ definitions for T-Beam-Supreme
 #define GPS_TX_PIN 8
 #define GPS_WAKEUP 7
 
-#define OneWire_GPIO  99 // please test
+// R3-03 (2026-09-16): stand hier als 99. 99 ist auf diesem Board kein
+// gueltiger GPIO -- OneWire hat hier also nie funktioniert. -1 ist die
+// Schreibweise fuer "dieses Board hat keinen OneWire-Pin", wie sie
+// T-ETH-ELITE_1262 schon benutzt: sie faellt durch den `> 0`-Test in
+// onewire_functions.cpp, der Treiber startet nicht.
+//
+// Das Makro bleibt DEFINIERT und wird nicht geloescht: die gesamte
+// OneWire-Implementierung steht in `#ifdef OneWire_GPIO`
+// (onewire_functions.cpp:13-379). Ohne das Makro koennte man den Sensor
+// auch mit `--owgpio <pin>` nicht mehr einschalten -- das waere eine
+// Funktionsentfernung, keine Bereinigung.
+#define OneWire_GPIO -1

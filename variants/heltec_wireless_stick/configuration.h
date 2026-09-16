@@ -100,7 +100,18 @@ definitions for HELTEC_V3
 #define SDA_PIN 17
 #define SCL_PIN 18
 
-#define OneWire_GPIO 99 // getestet ???
+// R3-03 (2026-09-16): stand hier als 99. 99 ist auf diesem Board kein
+// gueltiger GPIO -- OneWire hat hier also nie funktioniert. -1 ist die
+// Schreibweise fuer "dieses Board hat keinen OneWire-Pin", wie sie
+// T-ETH-ELITE_1262 schon benutzt: sie faellt durch den `> 0`-Test in
+// onewire_functions.cpp, der Treiber startet nicht.
+//
+// Das Makro bleibt DEFINIERT und wird nicht geloescht: die gesamte
+// OneWire-Implementierung steht in `#ifdef OneWire_GPIO`
+// (onewire_functions.cpp:13-379). Ohne das Makro koennte man den Sensor
+// auch mit `--owgpio <pin>` nicht mehr einschalten -- das waere eine
+// Funktionsentfernung, keine Bereinigung.
+#define OneWire_GPIO -1
 
 #define GPS_RX_PIN 47
 #define GPS_TX_PIN 48
