@@ -1443,7 +1443,7 @@ void sub_page_mheard()
         {
             if (mheardFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
                 isShowing = true;
-            decodeMHeard(mheardBuffer[iset], mheardLine);
+            mheardLineFromRecord(mheardRecords[iset], mheardLine);
             web_client.printf("<div class=\"cardlayout\">\n");
             web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date.c_str(), mheardLine.mh_time.c_str());
             web_client.printf("<div class=\"flex-auto-wrap\">");

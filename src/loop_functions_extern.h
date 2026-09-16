@@ -9,6 +9,7 @@
  *  @date        2025-12-03
  */
 
+#include "mheard_record.h"   // MheardRecord, siehe mheardRecords[] unten
 #include <atomic>
 
 // WQ-01 (2026-09-05): queue panel on the rxlog web page -- pulls in
@@ -435,7 +436,9 @@ extern unsigned long web_timer;          // Refreshtime WEbServer
 extern float global_batt;
 extern int global_proz;
 
-extern unsigned char mheardBuffer[MAX_MHEARD][60]; //Ringbuffer for MHeard Lines
+// R2-01: war `unsigned char mheardBuffer[MAX_MHEARD][60]` -- Text je
+// Eintrag. Jetzt der Datensatz, 20 statt 60 Byte (src/mheard_record.h).
+extern MheardRecord mheardRecords[MAX_MHEARD];
 extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
 extern unsigned long mheardEpoch[MAX_MHEARD];  //Ringbuffer for MHeard EPoch Update Time
 extern int mheardNCount[MAX_MHEARD];

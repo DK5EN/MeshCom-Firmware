@@ -9,7 +9,11 @@ void initMheard();
 void initMheardLine(struct mheardLine &mheardLine);
 void updateMheard(struct mheardLine &mheardLine, uint8_t isPhoneReady);
 void updateHeyPath(struct mheardLine &mheardLine);
-void decodeMHeard(unsigned char mh_buffer[], struct mheardLine &mheardLine);
+// R2-01: war decodeMHeard(), das eine pipe-getrennte Zeichenkette
+// zeichenweise zerlegte. Jetzt Feldkopien aus dem Datensatz.
+struct MheardRecord;
+void mheardLineFromRecord(const MheardRecord &rec, struct mheardLine &mheardLine);
+void mheardRecordFromLine(const struct mheardLine &mheardLine, MheardRecord &rec);
 void showMHeard();
 void showPath();
 void sendMheard();
