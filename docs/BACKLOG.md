@@ -5470,9 +5470,91 @@ Three things this wave surfaced that are now open rows in their own right:
   Carried as a live lead, not blocking: `save;rename_failed`, which now has an
   inventory and a retry to identify itself with the next time it happens.
 
-- **`W4`** command table (`D2-10`, then `D2-06`, `D2-07`, `D2-01`) -- the
-  largest single flash win in the audit (~-6.0 kB ESP32, ~-3.5 kB nRF52) and
-  ~2 600 lines. Needs the golden capture diff and `test_command_table`.
+### Operator decisions 2026-09-16 -- `W5`/`W6` unblocked
+
+All four open `OPT-03` decisions are answered. One of them turned out not to be a
+decision at all.
+
+- **`OPT-D3` -- CLOSED, no decision needed.** The row was "`--softser app0`
+  shadowed by the prefix match on `--softser app`". `D2-10` replaced prefix
+  matching with exact-token matching, so `softser app` no longer matches the
+  input `softser app0`: the tail character after the name must be end-of-string,
+  space, CR or LF, and `0` is none of those. Verified against the shipped rule in
+  `src/command_match.h`. The hand-ordering that kept the two rungs apart is no
+  longer load-bearing, and the comment at `command_functions.cpp:2627` still
+  claiming "commandCheck() is a prefix match" is stale -- corrected in this wave.
+
+- **`OPT-D4` -- FIX THE SWAP.** `--specstep` writes `node_specsamples` and
+  `--specsamples` writes `node_specstep` (`command_functions.cpp:4086-4125`).
+  **Checked first whether the bug is self-cancelling: it is not.** The consumers
+  use both fields correctly -- `node_specstep` as an MHz divisor
+  (`web_functions.cpp:2002, 2009, 2010`), `node_specsamples` as the sample count
+  (`:2048`) -- so the setters genuinely write to the wrong homes. `--specstep 0.5`
+  stores `0` into an int; `--specsamples 1024` stores `1024.0` as an MHz step.
+  Live impact is small only because `web_functions.cpp:1986-1994` overwrites both
+  with defaults before scanning, but the wrong values persist and are exported as
+  `node_spstep` / `node_spsamp`. Decision: point each setter at its own field.
+  Already-stored garbage is left alone rather than force-reset -- discarding a
+  value a user may have set deliberately needs its own justification.
+
+- **`R3-11` + `D2-09` -- ONE SWITCH: follow `INSTRUMENT_ENABLED`.** Diagnostics
+  are governed by two independent knobs today: `MC_CAPTURE` (`capture_functions.h:49`,
+  default on everywhere except `E22_XML`) and `INSTRUMENT_ENABLED`. That is
+  duplicated _policy_, not duplicated code, and it is the kind this campaign is
+  for. `MC_CAPTURE` and the four `--spec*` commands both move behind
+  `INSTRUMENT_ENABLED`. **Mandatory check afterwards:** string-scan every built
+  image for the affected command names. `INS-01` was exactly this guard silently
+  compiling out `--udplog`, `--udpstat`, `--wifistat` and `--ethstat`, and a green
+  build said nothing about it.
+
+- **`R3-03` -- KEEP OneWire on all T-Beams.** The audit proposed dropping the
+  feature for the family to recover IRAM. Rejected: it is a feature removal for
+  real users, not a refactor. What does change is the dead configuration --
+  `variants/ttgo_tbeam_supreme/configuration.h:104` declares
+  `#define OneWire_GPIO 99 // please test`, and 99 is not a valid pin, so that
+  variant's OneWire has never worked. Fix the pin or mark the variant
+  unsupported; the three T-Beams on GPIO 4 are untouched.
+
+**Still owed from `OPT-03`:** the OLED-less board list for `R4-02/03`. That is the
+last operator input `W5` needs.
+
+- **`W4`** command table. `D2-10` **done** (`184f84ff`), `D2-06` **in the tree**
+  -- 70 of the 107 `on/off` rungs are `COMMAND_TOGGLES[]` rows in
+  `src/command_toggles.h`, -768 lines, flash **-2 696 B** ESP32 / **-1 808 B**
+  nRF52. Guarded by `native_command_toggles` (13 cases) and
+  `test/golden/toggle_table_lint.py` (70 rows, in `selftest.sh`).
+  The audit's `-6.0 kB` was too optimistic: it assumed 120 convertible rungs;
+  there are 107, only 70 are regular, and the table costs ~2 kB back. The other
+  37 genuinely branch -- conditional error paths (`webserver on` with no SSID),
+  reboot scheduling (`wifiap`, `setboostedgain`), hardware re-init (`display`,
+  `gps off`, `onewire on`) and bench markers the capture tooling greps verbatim.
+
+  **Three defects in this work, all caught before any commit, all worth
+  remembering because each was invisible to the obvious check:**
+
+  1. **The dispatch landed inside a `/* TEST */` block** and did nothing. HEAD
+     keeps a disabled `compress ` rung in that comment; the rung parser did not
+     strip comments, so it took that dead rung for the ladder's first and
+     anchored the insertion there. It compiled clean -- the table is
+     `static const` at namespace scope and the thunks stay referenced by its
+     initializer, so nothing warns. **A green build cannot tell you the code is
+     reachable.** The gate now blanks comments and asserts exactly one live
+     `toggleApply(` call site.
+  2. **The ladder's `else` scaffolding broke only under some `#if` sets.** The
+     idiom is that the `else` introducing a rung sits at the END of the previous
+     rung's guard group, so exactly one survives whichever guards are on.
+     Removing rungs breaks that in ways no single board build shows:
+     `heltec_t114`, `t_deck_plus`, `wireless-paper`, `t_deck_pro` and
+     `vision-master-e213` failed while the Heltec V3 and RAK builds passed.
+     **Every wave that edits guarded code needs the full env sweep, not a
+     representative board.**
+  3. **`ina226 on` wrote zeros to flash.** `setupINA226()` zeroes four persisted
+     `meshcom_settings` floats when `INA0.begin()` fails; the ladder called it
+     AFTER `save_settings()`, the first table version before. Fixed with a
+     `post_after` hook the caller runs after the save; pinned by a native case.
+
+  Left: `D2-07` (71 setters) and `D2-01`.
+
 - **`W5`** RAM rows of medium risk (`R1-04`, `R1-02`, `R2-01`, `R2-04`,
   `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- blocked on operator decisions
   `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03` and the OLED-less board list,

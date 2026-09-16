@@ -13,20 +13,65 @@ deleted (-14 240 lines). Plus the `D2-V` golden capture, which `W4` could not st
 
 **What is left in phase D:**
 
-| row               | state                                                                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `W4` `D2-10`      | **DONE** (`184f84ff`) -- exact-token matching in `src/command_match.h`, `native_command_match` (11 cases), golden before/after on DK5EN-93 showed zero dispatch changes          |
-| `W4` `D2-06`/`07` | **next.** 120 toggles + 71 setters -> table. `D2-10` unblocked them: the ladder no longer depends on rung order, except for the 28 exact-vs-argument pairs the lint still guards |
-| `W6` `D1-01`      | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                                                                  |
-| `W6` `D4-01/02`   | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                                                                  |
-| `W5` all rows     | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list                                                             |
-| `W7` second half  | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now                                                |
-| `C4d` `DR-03`     | bench-only, waits for the `E1` G2 run                                                                                                                                            |
+| row              | state                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `W4` `D2-10`     | **DONE** (`184f84ff`) -- exact-token matching in `src/command_match.h`, `native_command_match` (11 cases), golden before/after on DK5EN-93 showed zero dispatch changes                                                                          |
+| `W4` `D2-06`     | **in the tree, not yet committed** -- 70 of 107 on/off rungs are `COMMAND_TOGGLES[]` rows, -768 lines, flash -2 696 B ESP32 / -1 808 B nRF52. Three self-inflicted defects found and fixed; see BACKLOG `W4`                                     |
+| `W4` `D2-07`     | **next.** 96 rungs take an argument out of `msg_text+N`. The offsets are NOT the risk: 95 of 98 name/offset pairs follow one rule, and the 3 that do not are all correct (see below). The risk is the clamp bounds and the per-rung echo wording |
+| `W6` `D1-01`     | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                                                                                                                                  |
+| `W6` `D4-01/02`  | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                                                                                                                                  |
+| `W5` all rows    | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list                                                                                                                             |
+| `W7` second half | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now                                                                                                                |
+| `C4d` `DR-03`    | bench-only, waits for the `E1` G2 run                                                                                                                                                                                                            |
 
-**`W4` is one file and cannot be parallelised**: `src/command_functions.cpp`, ~6 470 lines, 309
-`commandCheck()` cases in one ladder under 42 distinct `#if` guards. Serial sub-steps, one owner.
-The safety net now exists: `docs/bench/g0-commands-20260916/heltec-93/` (409 commands over USB,
-408 answered, scrubbed of SSID/BSSID/IP). Re-capture after the change and diff.
+**`W4` is one file and cannot be parallelised**: `src/command_functions.cpp`, now ~5 690 lines
+(was 6 484), 241 `commandCheck()` names in the ladder plus 70 in the toggle table. Serial
+sub-steps, one owner. The safety net works and is now proven twice: drive
+`test/golden/corpus/commands/script.txt` with `tools/bench/console_golden.py` before and after,
+then diff per command with the LoRa/mesh chatter filtered -- on a live node the raw diff is
+dominated by RX frames, echo dots and ESP32 millisecond stamps, so compare answers, not bytes.
+
+**How D2-06 nearly shipped as a no-op, and what the gate now does about it.** The dispatch was
+inserted inside HEAD's `/* TEST */` block -- the one holding the disabled `compress ` rung -- because
+the rung parser did not strip comments and took that dead rung for the ladder's first. It compiled
+without a warning and every toggle silently answered `wrong command`. Worse, a golden capture was
+taken against that build and reported "zero dispatch changes", which is exactly what a capture looks
+like when you compare two runs of the same broken thing against a stale baseline.
+
+Three rules came out of it, and they apply to every remaining wave:
+
+1. **Prove the code is in the artifact.** Blank comments, then assert the expected number of live
+   call sites. `pio run` exiting 0 says nothing about reachability.
+2. **A capture is only evidence if the thing it measures is known to be running.** Check the
+   artifact first, then capture -- never the other way round.
+3. **`else` placement in the ladder is guard-conditional.** The `else` introducing a rung sits at
+   the END of the previous rung's guard group. Two `else` tokens collide only for some `#if` sets,
+   so the full 35-env sweep is the gate; a Heltec-V3-and-RAK spot check passes while five other
+   boards do not.
+
+**`D2-07` recon, done 2026-09-16 (read-only).** 96 rungs index into `msg_text+N`. The offset rule
+is mechanical: an argument-form name (`"setout "`, trailing space) starts its value at
+`2 + len(name)`, an exact-token name (`"utcoff"`) at `2 + len(name) + 1`, because the separating
+space is not part of the name. 95 of 98 name/offset pairs obey it. The 3 that do not are all
+sound, and none is a bug:
+
+- `setout ` / `setio ` read a bank letter with `msg_text[9]` / `msg_text[8]` (bracket indexing, so
+  an `msg_text+N` regex misses it) and the digit at `+10` / `+9`.
+- `disptest` points `sscanf` at the separating space itself (`msg_text+10`, not `+11`), which works
+  only because `%15s` skips leading whitespace. Sloppy, harmless, leave it or fix it deliberately.
+
+So D2-07 is not an offset-transcription job. What varies per rung, and what a table has to carry,
+is the clamp range and the echo wording. An earlier scout report claiming 8 offset mismatches
+(including `button off`, a toggle with no argument at all) was wrong -- it measured the
+`commandCheck(msg_text+2, ...)` in each rung's own header. Do not build on it.
+
+**`D2-06` did not reach the audit's numbers, and the audit's premise was partly wrong.** It
+promised "120 `on/off` branches" and **-6.0 kB** ESP32. There are 107 such rungs, not 120, and only
+70 of them are regular enough to be rows; the other 37 genuinely branch (conditional error paths
+like `webserver on` without an SSID, reboot scheduling for `wifiap`/`setboostedgain`, hardware
+re-init for `display`/`gps off`/`onewire on`, and bench markers whose wording the capture tooling
+greps). The table itself costs ~2 kB of flash back, so the measured win is **-2 696 B** ESP32 and
+**-1 808 B** nRF52. The line count is the real prize: -950.
 
 **DR-16 is as closed as this bench can make it.** `--loradebug on` does show the hey frames
 (`NEW-HEY ... DK5EN-90>H@R0;` fires on the first loop pass, then TXes) -- but telemetry cannot
