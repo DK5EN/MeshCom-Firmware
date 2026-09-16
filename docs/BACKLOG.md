@@ -5933,6 +5933,63 @@ on the static argument that the Com ring's text and `0x91` arms are unreachable
 -- **not** on a bench capture. The capture was attempted and is blocked on
 quiet-bench conditions, which is an operator task.
 
+### 3.8aj `W5` mheard cluster -- `R3-12` done, `R3-13` skipped (2026-09-16)
+
+**`R3-12` DONE.** `mheardLat`/`mheardLon` `double` -> `float`. Measured per env,
+matching the audit: **-648 B** on twelve envs, -640 on ten, -400 on one, -240 on
+nine, 0 on the two safeboot envs (no mheard). Flash +608 B across all 34 (~19 B
+each) for the float/double conversions at the assignment sites.
+
+**Precision measured, not argued.** 600 000 random coordinate pairs through a
+`float` round trip: worst absolute error **0.00000763 deg (~0.85 m)**. At the
+web GUI's `%06.3lf` / `%07.3lf` format, **0.15 %** of coordinates render a
+different last digit (~1 in 670) -- only where the true value sits on a rounding
+boundary. Worth knowing before it is mistaken for a regression: a later capture
+diff showing a last-digit lat/lon change on an mheard row is THIS.
+
+**Two things this row was not, until they were looked at.** It is not a
+single-file change: the arrays are re-declared by hand as `extern` in
+`src/lora_functions.cpp` and `src/web_functions/web_functions.cpp`, and a
+missed one links SILENTLY and reads at the wrong width. And it is not
+RAM-only: both arrays are written raw into `/mheard.dat` on the T-Deck
+(`file.write((uint8_t*)mheardLat, sizeof(mheardLat))`), so the file layout
+changes. That is already handled -- the load path compares `file.size()`
+against the sum of the `sizeof()`s and deletes the file on mismatch -- so an
+existing file is lost once and rebuilt. Self-healing, but it happens.
+
+**`carve_extern_lint.py` widened, and it paid immediately.** Its docstring
+describes a tree-wide hazard ("an `extern` with a drifted type COMPILES AND
+LINKS SILENTLY and then reads the object at the wrong width") but its scope was
+four carved TUs. The reasoning is not a property of being carved; it is a
+property of hand-writing an `extern`. Now 10 files, 52 externs. Mutation-
+verified: flipping one `extern double mheardLat[]` to `float` fails it.
+
+Widening it found **`extern bool bInitDisplay;` in `src/nrf52/nrf52_ble.cpp`
+binding to NOTHING** -- no definition anywhere in the tree, no second use. It
+compiled and linked only because nobody reads it. Removed. Two exemptions are
+recorded in the script (`extern U8G2 u8g2_1/u8g2_2` against definitions of
+derived u8g2 device classes, which add no data members); each is argued in
+place, because an exemption is a hole.
+
+**`R3-13` SKIPPED (operator decision 2026-09-16).** Row 52 -> 40 B would free
+1 200 B by capping the stored relay path at 39 characters. The audit's own
+caveat asked for a corpus check; it passes (max stored path **25** chars,
+median 8, **0 over 39** across 14 multi-hop frames) -- but the corpus is not the
+bound. A callsign is up to 9 characters (`mheardPathCalls[10]`) and the stored
+string is everything after the first comma, so:
+
+| hops | stored chars | row 52 today | row 40 proposed |
+| ---- | ------------ | ------------ | --------------- |
+| 4    | 29           | fits         | fits            |
+| 5    | 39           | fits         | fits exactly    |
+| 6    | 49           | fits         | **truncated**   |
+| 7    | 59           | already cut  | cut harder      |
+
+`--maxhop` accepts 1..6 and `MAX_HOP_LIMIT` is 7, so 6-hop paths are legal and
+do occur. The row therefore buys 1 200 B by degrading the one feature that
+exists to analyse multi-hop routing. Keeping 6 hops means row 50, worth 200 B.
+Skipped; the bytes stay on the table.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
