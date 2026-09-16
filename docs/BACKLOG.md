@@ -5876,10 +5876,62 @@ is only observable over BLE, which is exactly why the discrepancy survived.
    permanently on any unframeable slot. Fixed to match the existing
    `blelen == 0` idiom directly above it.
 
-**Step 2** merges the rings and frees the 4 920 B. It changes the BLE wire
-path, and `tools/bench/ble_golden.py` is the instrument for it -- it connects as
-the phone app does over the Nordic UART Service and records every notification.
-It needs a **before-capture on DK5EN-93 taken before any change lands**.
+**Step 2 -- NOT DONE, row closed at step 1 by operator decision 2026-09-16.**
+The bench run that was meant to gate it found the audit's premise false a
+SECOND time. The two rings are not one queue split in two; they are **two
+queues with different priority and different rates**:
+
+| ring                              | drained                    | pacing (ESP32) |
+| --------------------------------- | -------------------------- | -------------- |
+| `BLEComToPhoneBuff` (config/JSON) | **first**, unconditionally | 300 ms         |
+| `BLEtoPhoneBuff` (text/position)  | only when Com is empty     | 400 ms         |
+| both empty                        | `--conffin` once           | --             |
+
+(`esp32_main.cpp:3152-3175`; `nrf52_main.cpp:1855-1862` keeps the priority and
+gates on `iPhoneState > 3` instead of a timer.) Merging into one ring means
+re-implementing that policy as code, inside the drain `CONC-15`/`CONC-18`
+hardened and that is written from `OnRxDone` in the nRF52 timer-service task.
+The 13 JSON registers all arrive at connect time, and BLE connection
+establishment is exactly where this platform is fragile.
+
+So the 4 920 B would be bought with a scheduling policy that is currently
+STRUCTURAL -- expressed by having two queues -- turned into logic somebody has
+to keep correct. The real duplication in this row was the drain switch, and
+step 1 removed it. **Closed at step 1**; the bytes stay on the table
+deliberately, recorded here so the audit row is not re-derived from its
+original framing.
+
+**The instrument needed fixing before it could gate anything** (`a9b78578`).
+Two captures of an UNCHANGED image differed in **10** places: the node's own
+position beacon landed inside a reply window and was counted as a reply,
+shifting every later frame. `attribute()` decides on timing alone, and this
+file had already been bitten by the same shape twice (volatile registers, the
+binary ack). Content decides it now. The remaining 2 differences were a genuine
+`--wrong command` reply arriving later than the 1.9 s default `--reply-window`
+-- the corpus's adversarial prefix pairs take that slow path. At
+`--gap 3.2 --reply-window 2.9` two runs are **identical over 20 frames**.
+
+**Rule this establishes:** a BLE before/after diff is evidence only after two
+captures of the SAME unchanged image have been shown to agree. Without that
+noise floor the diff proves nothing.
+
+**And the timing knobs are not the real fix.** `--gap 3.2 --reply-window 2.9`
+gave two identical 20-frame runs on one image, then the SAME settings gave 10
+differences on another image twenty minutes later. The variable is not the
+window but how much inbound mesh traffic the node is handling: in the failing
+run the `--io` reply arrived more than 3 s after its write and was excluded as
+spontaneous, dropping one compared frame and shifting the rest. Both runs were
+full of `MH` registers from `DL2JA-2`, `DK5EN-90` and `DK5EN-98`.
+
+That is the **same limit already recorded above for the `B1` console golden**:
+a bench node receiving live mesh traffic cannot produce a byte-comparable
+golden, and the fix is bench conditions -- mesh and gateway off, **no antenna**
+-- not more filtering. Removing the antenna needs a human, so a definitive BLE
+before/after cannot be taken unattended. Consequence for `R1-02` step 1: its
+wire-neutrality rests on the host tests (`native_ble_phone_frame`, 8 cases) and
+on the static argument that the Com ring's text and `0x91` arms are unreachable
+-- **not** on a bench capture. The capture was attempted and is blocked on
+quiet-bench conditions, which is an operator task.
 
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
