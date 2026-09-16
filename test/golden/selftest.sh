@@ -35,6 +35,15 @@ python3 test/golden/command_ladder_lint.py
 # Mutation-verified: drop one printed field and it fails.
 python3 test/golden/persist_readback_lint.py --self-test
 python3 test/golden/persist_readback_lint.py
+
+# D2-06 turned 70 of the ladder's on/off rungs into COMMAND_TOGGLES[] rows. A
+# table has no rung order to lean on, so the properties the ladder used to get
+# from its layout have to be asserted: no row shadows another under the D2-10
+# exact-token rule, no command is a table row AND a hand-written rung (the row
+# would always win and the rung would be dead code), and every mask has a
+# register. Mutation-verified: re-add a `debug on` rung and it fails.
+python3 test/golden/toggle_table_lint.py --self-test
+python3 test/golden/toggle_table_lint.py
 # settings_layout_lint.py (the struct-twin diff between src/esp32/esp32_flash.h
 # and src/nrf52/WisBlock-API.h) was retired in the D1-04 W3 struct merge: with
 # ONE struct (src/meshcom_settings.h) there is no twin left to diff. Its

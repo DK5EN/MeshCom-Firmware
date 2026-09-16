@@ -327,7 +327,12 @@ def _self_test() -> int:
         failures += 1
         print("FAIL: comment stripping changed the length")
 
-    if len(commands) < 280:
+    # Sanity floor: the extractor must still be finding essentially the whole
+    # ladder. The floor dropped from 280 to 230 in D2-06, when 70 on/off rungs
+    # left the ladder for COMMAND_TOGGLES[] -- they are not gone, they are
+    # counted by test/golden/toggle_table_lint.py instead. Check both numbers
+    # when this fires: a real regression shows up as the SUM falling.
+    if len(commands) < 230:
         failures += 1
         print(f"FAIL: only {len(commands)} ladder sites found")
 
