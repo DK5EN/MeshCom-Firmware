@@ -2,50 +2,51 @@
 
 ## Where we are, end of 2026-09-16 (start here)
 
-Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row W3C). **`W3` is
-DONE** -- bench-proven on all three nodes, closed 2026-09-16. Phases A-C done except two bench-only
-matrix rows (`DR-03`/`DR-16`, waiting on the `E1` G2 run). Waves `W1`, `W2`, `W3-BLE`, `W3c`, `W3`
-done. **`W4`-`W7` and `C4d` not started**; phase E not started.
+Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af). **`W3` DONE**; one parallel
+wave landed on top of it (`6b03bd37`). Phases A-C done except `DR-03`/`DR-16`'s G2 bench rows.
 
-| node                   | result                                                                 |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `DK5EN-93` Heltec V3   | pass -- 105 preserved, 0 lost, 3 live-GPS movers only                  |
-| `DK5EN-14` T-Deck Plus | pass -- 107 of 107, plus all 17 persist-only keys stable over a reboot |
-| `DK5EN-90` RAK4631     | pass -- `legacy_migrated` on a forced downgrade-then-upgrade, 102/0/0  |
+**Done today:** `W3` closed (bench-proven on three nodes). Then one wave of five disjoint writers:
+`D3-01` (14 aprs tag blocks -> `aprsExtractTag()`), `D3-02` (7 msgid epilogues ->
+`finalizeAndSendAPRS()`), `D3-05` (country switch -> `const` table), `EXT-01` (telemetry-path socket
+churn), `DR-16`/`DR-14` (nRF52 `bTeleFirst` + the DR-14 comment), and 20 dead `lv_conf.h` copies
+deleted (-14 240 lines). Plus the `D2-V` golden capture, which `W4` could not start without.
 
-Write-up and captures: `docs/bench/w3-baseline/README.md` §7.
+**What is left in phase D:**
 
-**Next: `W4` (command table, `D2-10` -> `D2-06`/`D2-07`).** Ownership scouted 2026-09-16:
+| row               | state                                                                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `W4` `D2-10`      | **next.** Exact-match `commandCheck()` + the 13 order-dependent prefix pairs                                                      |
+| `W4` `D2-06`/`07` | 120 toggles + 71 setters -> table. Both depend on `D2-10` landing first                                                           |
+| `W6` `D1-01`      | shared GATE/CONF/BEAT UDP handler (the big one; `OPT-D12`/`OPT-D13` drift rows)                                                   |
+| `W6` `D4-01/02`   | `src/ui_common/`: the two `peri_gps.cpp` and the `scr_mrg` pair                                                                   |
+| `W5` all rows     | **blocked on five operator decisions** -- `OPT-D3`, `OPT-D4`, `R3-11`/`D2-09`, `R3-03`, and the OLED-less board list              |
+| `W7` second half  | `configuration_default.h` + `extends=` inheritance. Highest upstream-conflict surface -- do it immediately before the PR, not now |
+| `C4d` `DR-03`     | bench-only, waits for the `E1` G2 run                                                                                             |
 
-- `D2-10` must land FIRST -- an exact-match variant of `commandCheck()` plus the 13 order-dependent
-  prefix pairs. `D2-06` (120 on/off toggles) and `D2-07` (71 setters) both depend on it.
-- It is all one file: `src/command_functions.cpp`, 6 469 lines, 309 `commandCheck()` cases in one
-  ladder (293-5747) under 42 distinct `#if` guards. **W4 cannot be parallelised across writers** --
-  one file, one owner, serial sub-steps.
-- **Blocker: the golden capture (`D2-V`) does not exist**, and it is the only safety net -- there is
-  no `test_command_table` today. Capture it on hardware BEFORE touching the ladder:
-  `tools/bench/console_golden.py` (USB + TCP 2323) and `tools/bench/ble_golden.py`, normalised by
-  `test/golden/normalize.py`, compared with `test/golden/verify_captures.py`. Exclude the
-  destructive commands (`--reboot`, `--dfu`, `--deepsleep`, `--cleanflash`, `--ota-update`,
-  `--spiffs reset`).
-- Wire contract: six distinct echo styles must be preserved per row; `--msgid`/`--persiststat`
-  (added 2026-09-16) are part of the ladder now and must survive the conversion.
+**`W4` is one file and cannot be parallelised**: `src/command_functions.cpp`, ~6 470 lines, 309
+`commandCheck()` cases in one ladder under 42 distinct `#if` guards. Serial sub-steps, one owner.
+The safety net now exists: `docs/bench/g0-commands-20260916/heltec-93/` (409 commands over USB,
+408 answered, scrubbed of SSID/BSSID/IP). Re-capture after the change and diff.
 
-**Sequencing for the rest of phase D**, from the same scouting:
+**Open gap worth its own row -- three fixes shipped without an executable test.**
+`src/loop_functions.cpp`, `sendExtern()` (`#ifndef NATIVE_BUILD`) and `src/nrf52/nrf52_main.cpp`
+are compiled by **no** `env:native*`, so `D3-02`, `EXT-01` and `DR-16` have source-level proof only.
+Three separate agents each proved this independently and refused to write a test that would pass
+either way. Closing it means a native harness for those three translation units (stub headers +
+`platformio.ini` envs) -- that is `D1-10`-shaped work, not a drive-by.
 
-- `W5` (RAM rows) and `W6` (shared UDP handler) **both edit `src/loop_functions.cpp`** -- they
-  cannot run in parallel. `W5` also has five open operator decisions (`OPT-D3`, `OPT-D4`,
-  `R3-11`/`D2-09`, `R3-03`, the OLED-less board list) and its `R4-01` target (T-Deck Pro LVGL to
-  PSRAM) has no bench unit.
-- `W6` must land `EXT-01` (telemetry-frame socket churn, `src/extudp_functions.cpp:629-665`) before
-  or with the wave, not after.
-- `C4d` (`DR-03`, `DR-14`, `DR-16`) is a 1-day mini-wave after `W6`; `DR-14` owes a source comment.
-- `W7` (variants) has the highest upstream-conflict surface -- sync immediately before the PR. Gate
-  tooling already exists: `test/golden/variant_macros_lint.py`.
+**HARDWARE: DK5EN-90 (RAK4631) is down and needs a physical double-tap.** After the DR-16 flash the
+node went silent: the port enumerates (`/dev/cu.usbmodem2101`) and the USB descriptor reads
+`WisBlock RAK4631` (the bootloader string, not the app's `WisCore RAK4631 Board`), but it exposes
+CDC only -- no `/Volumes/RAK4631` to copy a `.uf2` onto, and `adafruit-nrfutil` answers "No data
+received on serial port". A 1200-baud touch reaches serial-DFU but nrfutil still gets nothing.
+Recovery is a physical double-tap of the reset button to force UF2 mode, then copy
+`.pio/build/wiscore_rak4631/firmware.uf2`. Everything else on the bench is healthy: DK5EN-93
+restored from its vault backup and verified field by field, DK5EN-14 on the current image.
 
-**Bench flashing:** the RAK goes through `--dfu` + `/Volumes/RAK4631` + `.uf2`; `pio run --target
-upload` prints `[SUCCESS]` over a failed nrfutil DFU. The first `cp` onto the freshly mounted
-volume often fails -- check `/Volumes/RAK4631` is gone afterwards, and retry if it is not.
+**Bench flashing note:** the first `cp` onto a freshly mounted `/Volumes/RAK4631` frequently fails
+with an I/O error and does nothing. Check the volume is GONE afterwards; if it is still mounted,
+copy again. Copying twice in one go is what appears to have bricked DK5EN-90.
 
 ## 2026-09-15: W3c -- one settings struct, counters namespace, member gate (dry-unification)
 

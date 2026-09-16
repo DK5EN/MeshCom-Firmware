@@ -5231,13 +5231,42 @@ allocated **`TD-16`** to a different T-Deck bug, and ours was renumbered to
 **`TD-19`** because theirs is already public in the merged PR #1140. Five of
 our own commit messages still say `TD-16` and are stale as a result.
 
-| Phase                        | Rows                               | State                                                                                                                                                                                                              |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                                                                                                        |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                                                                                                  |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run                                                                                       |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` DONE 2026-09-16** (bench-proven on all three nodes, `legacy_migrated` on a forced downgrade-then-upgrade, all 17 persist-only keys readable), `W4`-`W7` and `C4d` **not started** |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                                                                                                      |
+| Phase                        | Rows                               | State                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                                                                                                                                                                                                                                                                            |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                                                                                                                                                                                                                                                                      |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run                                                                                                                                                                                                                                                           |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1`/`W2`/**`W3` DONE 2026-09-16**. One wave landed on top (`6b03bd37`): `D3-01`, `D3-02`, `D3-05`, `EXT-01`, `DR-16`/`DR-14` and 20 dead `lv_conf.h`. **`W4` next** (`D2-10` first; the `D2-V` golden baseline now exists). `W6` owes `D1-01` + `D4-01/02`; `W5` **blocked on five operator decisions**; `W7` second half deferred to just before the PR; `C4d` owes `DR-03` (bench). |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                                                                                                                                                                                                                                                                          |
+
+##### Wave landed 2026-09-16 (`6b03bd37`) -- what it closed and what it exposed
+
+`D3-01`, `D3-02`, `D3-05`, `EXT-01`, `DR-16`, `DR-14` and the `lv_conf.h` half of `D6-01/02/03`.
+Five parallel writers on disjoint file sets plus an advisor pass; details in the commit message.
+
+Three things this wave surfaced that are now open rows in their own right:
+
+1. **`OPT-D14` (new) -- three translation units have no native build target.**
+   `src/loop_functions.cpp`, `sendExtern()` in `src/extudp_functions.cpp` (behind
+   `#ifndef NATIVE_BUILD`) and `src/nrf52/nrf52_main.cpp` are compiled by no `env:native*`.
+   `D3-02`, `EXT-01` and `DR-16` therefore ship with source-level equivalence proof only. Three
+   independent agents each hit this, proved it, and correctly refused to write a test that passes
+   either way. Closing it needs stub headers plus new envs -- `D1-10`-shaped, not a drive-by.
+
+2. **`RF-09` (new) -- Poland's track frequency is broken on the nRF52.**
+   `src/country_profile.cpp`: `track_freq` is ONE column shared by both platforms while `freq` has
+   separate ones, and the units differ (ESP32 MHz, nRF52 Hz). Every row is saved by the
+   per-platform `LORA_APRS_FREQUENCY` macro except code 15, the one bare literal `434.855f` --
+   434.855 Hz on the nRF52, rejected like the 999 "none" sentinel. Pre-existing and faithfully
+   reproduced by the table; the comment claiming it was fine is corrected. The fix is splitting
+   `track_freq` into two columns, which is a behaviour change needing a bench proof.
+
+3. **The golden corpus had no notion of RF emission.** `_MANUAL_ONLY` in
+   `test/golden/build_corpus.py` protected the node and the capture but never looked outside the
+   bench, so the driven script keyed the transmitter on a shared network. Category (e) added:
+   the emitters, plus `track`/`mesh`/`gateway` (persist, and change how much the node transmits)
+   and `setlat`/`setlon`/`setalt` (no range check; the script's non-numeric case persists
+   0.0 N / 0.0 E, which the node then beacons). 383 driven, 107 held back.
 
 ##### What each open row still needs
 
