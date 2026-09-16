@@ -1,3 +1,4 @@
+#include "ble_phone_frame.h"
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
@@ -65,7 +66,6 @@ void sendToPhone()
 		uint8_t toPhoneBuff [MAX_MSG_LEN_PHONE] = {0};
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
 		uint8_t blelen;
-		uint8_t statusByte;
 		// CONC-18: snapshot the slot's length/status/payload bytes under a
 		// single lock, instead of reading blelen here and memcpy-ing from the
 		// live ring further down. addBLEOutBuffer() (CONC-15) can wrap the
@@ -77,7 +77,11 @@ void sendToPhone()
 		taskENTER_CRITICAL();
 #endif
 		blelen = BLEtoPhoneBuff[toPhoneRead][0];
-		statusByte = BLEtoPhoneBuff[toPhoneRead][1];
+		// (Das Typbyte wurde hier zusaetzlich als statusByte gelesen. Es ist
+		//  dasselbe Byte wie ringSnapshot[0], das der memcpy unten ohnehin
+		//  mitnimmt, und seit blePhoneFrame() die Verzweigung macht,
+		//  brauchte es niemand mehr -- eine Lesestelle weniger im
+		//  kritischen Abschnitt.)
 		if(blelen > 0)
 			memcpy(ringSnapshot, BLEtoPhoneBuff[toPhoneRead]+1, blelen);
 		// Advance the read pointer here, still under the lock: the slot's
@@ -100,22 +104,15 @@ void sendToPhone()
 			return;
 		}
 
-		//Mheard
-		if(statusByte == 0x91)
+		// R1-02 Schritt 1: die dreiarmige Umformung stand hier und in
+		// sendComToPhone() zweimal. Jetzt einmal, in src/ble_phone_frame.h,
+		// host-getestet (env native_ble_phone_frame). Die Sendelaenge bleibt
+		// blelen+2 wie gehabt -- siehe die Warnung im Header, warum die
+		// Funktion bewusst keine Laenge liefert.
+		if(!blePhoneFrame(ringSnapshot, blelen, toPhoneBuff, sizeof(toPhoneBuff)))
 		{
-			memcpy(toPhoneBuff, ringSnapshot, blelen-1);
-		}
-		else
-		// Data Message (JSON)
-		if(statusByte == 0x44)
-		{
-			memcpy(toPhoneBuff, ringSnapshot, blelen);
-		}
-		else
-		// Text Message and Position
-		{
-			toPhoneBuff[0] = 0x40;
-			memcpy(toPhoneBuff+1, ringSnapshot, blelen);
+			ble_busy_flag = false;
+			return;
 		}
 
 		// send to phone
@@ -174,22 +171,23 @@ void sendComToPhone()
 			return;
 		}
 
-		//Mheard
-		if(BLEComToPhoneBuff[ComToPhoneRead][1] == 0x91)
+		// R1-02 Schritt 1: dieselbe Umformung wie in sendToPhone(), jetzt
+		// derselbe Code. Der Text-Arm hier kopierte blelen-1 statt blelen --
+		// ein Byte zu wenig. Unerreichbar, weil beide Erzeuger dieses Rings
+		// 0x44 setzen (Begruendung im Header), aber falsch; massgeblich ist
+		// die Fassung aus sendToPhone().
+		if(!blePhoneFrame(BLEComToPhoneBuff[ComToPhoneRead]+1, blelen,
+		                  ComToPhoneBuff, sizeof(ComToPhoneBuff)))
 		{
-			memcpy(ComToPhoneBuff, BLEComToPhoneBuff[ComToPhoneRead]+1, blelen-1);
-		} else
-		// Data Message (JSON)
-		if(BLEComToPhoneBuff[ComToPhoneRead][1] == 0x44)
-		{
-			memcpy(ComToPhoneBuff, BLEComToPhoneBuff[ComToPhoneRead]+1, blelen);
-		} 
-		else
-		// Text Message
-		{
-			ComToPhoneBuff[0] = 0x40;
-			memcpy(ComToPhoneBuff+1, BLEComToPhoneBuff[ComToPhoneRead]+1, blelen-1);
-
+			// Lesezeiger MUSS weiter, wie im blelen==0-Fall darueber:
+			// ComToPhoneRead wandert sonst erst nach dem Senden weiter, und
+			// ein Schlitz, der sich nicht rahmen laesst, haette den Ring
+			// dauerhaft an genau dieser Stelle stehenlassen.
+			ComToPhoneRead++;
+			if (ComToPhoneRead >= MAX_RING)
+				ComToPhoneRead = 0;
+			ble_busy_flag = false;
+			return;
 		}
 
 		// send to phone
