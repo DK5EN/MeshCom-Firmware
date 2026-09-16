@@ -361,7 +361,7 @@ int dzeile[maxdisplines] = {42, 52, 62, 0, 0, 0, 0};
 int dzeile[maxdisplines] = {8, 21, 31, 41, 51, 61, 0};
 #endif
 
-#if !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+#if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
 
 #include <U8g2lib.h>
 #include "instrument.h"
@@ -818,7 +818,7 @@ uint32_t oled_skipped = 0;          // TM-10: Bilder, die unveraendert waren und
 uint32_t oled_last_crc = 0;         // TM-27: CRC32 des zuletzt gezeichneten Bildpuffers
 static bool oled_last_crc_valid = false;
 
-#if !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+#if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
 // CRC32 (IEEE, bitweise) ueber den U8g2-Bildpuffer: 1 KB fuer 128x64, ~50 us.
 static uint32_t oledBufferCrc(void)
 {
@@ -971,7 +971,7 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 {
     #if !defined (BOARD_T_DECK)  && !defined (BOARD_T_DECK_PLUS)
 
-    #if !defined (BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined (BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+    #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
         if(u8g2 == NULL)
             return;
     #endif
@@ -1343,7 +1343,7 @@ void oledStat()
                   iDisplayType, (unsigned long)oled_frames, (unsigned long)oled_last_frame_us,
                   bPosDisplay ? 1 : 0,
                   DisplayOffWait > 0 ? (long)((int32_t)(DisplayOffWait - millis())) : 0L,
-    #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined(BOARD_TRACKER) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO)
+    #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
                   u8g2 != NULL ? 1 : 0
     #else
                   -1
@@ -1630,7 +1630,7 @@ void sendDisplayTime()
             pagePointer=PAGE_MAX-1;
     }
 
-    #if !defined (BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && !defined (BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK)  && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+    #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
         if(u8g2 == NULL)
             return;
     #endif
@@ -4657,25 +4657,28 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         // uebersetzt hat; der erste Build ueberhaupt starb hier mit
         // "'u8g2' was not declared in this scope". Zusammenfuehrung der
         // Kopien: BACKLOG GRD-01, faellig mit R4-02/03.
+        // GRD-01: hier stand eine neunarmige Kaskade, die jedes Board ohne
+        // U8g2 einzeln aufzaehlte, damit der letzte #else-Zweig u8g2 benutzen
+        // durfte. Eine Aufzaehlung garantiert das nicht, sie behauptet es nur
+        // -- und diese hier lief auseinander: BOARD_T5_EPAPER fehlte, der
+        // erste Build jener Umgebung starb an "'u8g2' was not declared".
+        //
+        // Jetzt entscheidet MC_HAS_U8G2 (configuration_global.h), und der
+        // u8g2-Zweig ist STRUKTURELL unerreichbar, wo es kein u8g2 gibt. Die
+        // sieben Boards, die hier einzeln standen (HAS_TFT -> tracker,
+        // HAS_EPAPER -> t_echo/e213/e290/wireless-paper, T_ECHO, TRACKER,
+        // HELTEC_T114, T_CONNECT_PRO, T5_EPAPER), schliesst MC_HAS_U8G2 alle
+        // schon aus; ihre Zweige waren reine Wiederholung.
+        //
+        // BOARD_STICK_V3 bleibt als eigener Zweig stehen: das Board HAT ein
+        // U8g2-Display, bekommt auf seinem 0,49"-Panel aber keine Track-Seite.
+        // Das ist eine andere Aussage als "kein OLED" und darf nicht mit ihr
+        // zusammenfallen.
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
-        #elif defined(HAS_TFT)
-        // none
-        #elif defined(BOARD_T_ECHO)
-        // none
-        #elif defined(HAS_EPAPER)
-        // none
-        #elif defined(BOARD_T5_EPAPER)
-        // none
-        #elif defined(BOARD_TRACKER)
-        // none
-        #elif defined(BOARD_HELTEC_T114)
-        // none
-        #elif defined(BOARD_T_CONNECT_PRO)
-        // none
         #elif defined(BOARD_STICK_V3)
-        // none
-        #else
+        // none -- hat u8g2, aber keine Track-Seite
+        #elif MC_HAS_U8G2
             if(u8g2 != NULL)
             {
                 char cvers[20];

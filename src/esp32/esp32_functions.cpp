@@ -180,7 +180,7 @@ void initDisplay()
     printfdeb("[INIT]...2.13\" E-Ink Panel -> %s\n", g_wp_panel_name);
 #endif
 
-#if ! (defined(BOARD_E290) || defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E213)) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_TRACKER) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+#if MC_HAS_U8G2   // GRD-01: war dieselbe Aussage ohne die nRF52-Boards
 
     printlndeb("[INIT]...Auto detecting display:");
         

@@ -159,6 +159,32 @@ static inline bool flashLayoutCompatible(int stored)
 #define WP_DISP
 #endif
 
+// GRD-01 -- EINE Stelle beantwortet "treibt dieses Board ein U8g2-OLED?".
+//
+// Dieselbe Aussage stand bis 2026-09-16 in SECHS handgeschriebenen Fassungen in
+// drei Dateien: dreimal wortgleich in loop_functions.cpp (:364, :821, :1346),
+// je einmal kuerzer in esp32_functions.cpp und nrf52_functions.cpp (dort fehlen
+// die Boards, die es auf der jeweiligen Plattform ohnehin nicht geben kann --
+// gleichbedeutend, aber anders geschrieben), und einmal als andersfoermige
+// #if/#elif-Kaskade in sendPosition(), deren #else-Zweig u8g2 benutzt.
+//
+// Diese Kaskade war die, die auseinandergelaufen ist: BOARD_T5_EPAPER stand
+// nicht darin, und der allererste Build dieser Umgebung starb mit
+// "'u8g2' was not declared in this scope". Gemerkt hat es niemand, weil
+// env:t5_epaper mangels configuration.h noch nie uebersetzt hatte.
+//
+// Wer ein Board ohne OLED hinzufuegt, aendert ab jetzt DIESE Zeile und sonst
+// keine. Muster wie WP_DISP daneben.
+#if !defined(BOARD_E290) && !defined(WP_DISP) && !defined(BOARD_E213) && \
+    !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && \
+    !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && \
+    !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && \
+    !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+#define MC_HAS_U8G2 1
+#else
+#define MC_HAS_U8G2 0
+#endif
+
 #define DEFAULT_PREAMPLE_LENGTH 32
 
 // R3-11/D2-09 -- EIN Schalter fuer die Feld-Diagnose.
