@@ -5497,7 +5497,51 @@ decision at all.
   Already-stored garbage is left alone rather than force-reset -- discarding a
   value a user may have set deliberately needs its own justification.
 
-- **`R3-11` + `D2-09` -- ONE SWITCH: follow `INSTRUMENT_ENABLED`.** Diagnostics
+- **`R3-11` + `D2-09` -- DONE 2026-09-16, but NOT by following `INSTRUMENT_ENABLED`.**
+  The recorded decision below rested on a premise that turned out to be false.
+  **`INSTRUMENT_ENABLED` is 0 in every single env** -- no `platformio.ini` in
+  this repo ever sets it to 1 -- while `MC_CAPTURE` is 1 everywhere except
+  `E22_XML`. Moving `MC_CAPTURE` and the four `--spec*` commands behind it
+  would therefore have **deleted all five commands from all 34 shipped
+  images**: INS-01 and INS-04 a third time, this time deliberately.
+
+  Operator decision 2026-09-16: **one switch, default ON.** `MC_CAPTURE` is
+  retired into **`MC_DIAG`**, defined once in `src/configuration_global.h`
+  next to `WP_DISP`, default 1, and `E22_XML-DevKitC` sets `-D MC_DIAG=0`. It
+  governs both things that used to need two names: the TX/RX capture ring and
+  the four `--spec*` rungs. `INSTRUMENT_ENABLED` is untouched and stays what it
+  actually is -- the opt-in bench MEASUREMENT build, not a field-diagnostics
+  switch. Two knobs became one and nothing left a shipped image.
+
+  **The mandatory string-scan paid for itself on its first run.** With
+  `MC_DIAG=0`, `E22_XML` still carried `specstart`/`specend`/`specstep`/
+  `specsamples` exactly once each: the `--help` line at
+  `command_functions.cpp:917` sat outside the guard, so the board **advertised
+  four commands it no longer had**. That is the T-Deck `--mute` report (INS-04)
+  verbatim. The build was green and said nothing. Guarded; re-scanned; 0.
+
+  Two tooling notes worth keeping. `strings` on an nRF52 `.hex` returns 0 for
+  every needle, because Intel HEX is ASCII-encoded -- it looks exactly like a
+  clean pass. Convert with `arm-none-eabi-objcopy -I ihex -O binary` first.
+  And `test/golden/command_name_scan.py` now knows `MC_DIAG`, but **reads it
+  out of the ini** rather than hardcoding which board turns it off -- a second
+  copy of that policy is the thing this row existed to remove. Its self-test
+  pins that; mutation-verified by hardcoding the board name, which fails it.
+
+  Result across all 34 images: **0 UNEXPLAINED absences.** `E22_XML` reports 43
+  absent-as-designed against 39 on every other ESP32 board -- a difference of
+  exactly the four `--spec*` commands, correctly classified.
+
+  **Left open, pre-existing:** `txcapture` still appears in the `E22_XML` image
+  and the command still answers there, setting a flag nothing reads, because
+  `bTXCAPTURE` is deliberately kept as a real global so settings-load and the
+  `COMMAND_TOGGLES[]` rows compile unchanged (`capture_functions.h`). Same
+  class as the help-line defect just fixed, but it predates this row and
+  removing it would strand the persisted `node_sset4` bit 0x0008.
+
+  <details><summary>The original decision text, kept for the record</summary>
+
+  **`R3-11` + `D2-09` -- ONE SWITCH: follow `INSTRUMENT_ENABLED`.** Diagnostics
   are governed by two independent knobs today: `MC_CAPTURE` (`capture_functions.h:49`,
   default on everywhere except `E22_XML`) and `INSTRUMENT_ENABLED`. That is
   duplicated _policy_, not duplicated code, and it is the kind this campaign is
@@ -5507,13 +5551,41 @@ decision at all.
   compiling out `--udplog`, `--udpstat`, `--wifistat` and `--ethstat`, and a green
   build said nothing about it.
 
-- **`R3-03` -- KEEP OneWire on all T-Beams.** The audit proposed dropping the
+  </details>
+
+- **`R3-03` -- DONE 2026-09-16. KEEP OneWire on all T-Beams.** The audit proposed dropping the
   feature for the family to recover IRAM. Rejected: it is a feature removal for
   real users, not a refactor. What does change is the dead configuration --
   `variants/ttgo_tbeam_supreme/configuration.h:104` declares
   `#define OneWire_GPIO 99 // please test`, and 99 is not a valid pin, so that
   variant's OneWire has never worked. Fix the pin or mark the variant
   unsupported; the three T-Beams on GPIO 4 are untouched.
+
+  **Two corrections to that scope, both found while doing it.**
+
+  **It was never one variant -- it was eight.** `heltec_wifi_lora_32_V3`
+  (`// nicht getestet !!`), `_V4`, `heltec_wireless_stick` and
+  `heltec_wireless_tracker` (both `// getestet ???`), `vision-master-e213` and
+  `wireless-paper` (both `// ungenutzt`), `vision-master-e290` and
+  `ttgo_tbeam_supreme` (both `// please test`) all declared the same invalid 99. Operator decision 2026-09-16: same fix for all eight.
+
+  **And the fix is `-1`, not deletion.** Deleting the macro looks like the
+  tidier option and saves 6 624 B of flash, but it is a FEATURE REMOVAL: the
+  entire OneWire implementation lives inside `#ifdef OneWire_GPIO`
+  (`src/onewire_functions.cpp:13-379`), so without the macro
+  `init_onewire_dht()`, `init_onewire_ds18()` and both loops cease to exist and
+  `--owgpio <pin>` can never turn a sensor on again. `-1` is the spelling
+  `T-ETH-ELITE_1262` already used: it fails the `> 0` test, the driver stays
+  compiled, the default stays inactive. All eight now carry it; the value 99 is
+  gone from the tree.
+
+  **The defect underneath was better than the symptom.** The macro fallback
+  reached the driver **without the validity test the runtime path applies**.
+  `--owgpio` rejects `<= 2` (`command_functions.cpp:1984`), but
+  `onewire_functions.cpp:56-58` and `:204-206` took the macro unchecked -- and
+  the DS18 branch additionally set `one_found = true`, so the node reported a
+  sensor on a pin that does not exist. Both fallbacks now apply the same test,
+  which fixes the class rather than the eight instances.
 
 - **`R4-02/03` -- RUNTIME, NO BOARD LIST (decided 2026-09-16).** The audit asked
   for a list of boards without an OLED and a `#if` per variant. That premise was
