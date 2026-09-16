@@ -265,9 +265,16 @@ The run section 1 was recorded for: `DK5EN-90` (RAK4631), `DK5EN-93` (Heltec
 V3) and `DK5EN-14` (T-Deck Plus) on the table at once, each flashed from a
 `FLASH_STRUCT_VERSION 20260724` image to the `W3c` build on `dry-unification`.
 
-**Two of the three pass outright. `W3` does not close**, because the nRF52
-migration boot logged `legacy_migration_failed` rather than the
-`legacy_migrated` the plan expected -- see "The one real failure" below.
+**All three preserve every setting.** The nRF52 migration boot nonetheless
+logged `legacy_migration_failed` instead of `legacy_migrated` -- **a false
+alarm**, traced to `lfs_rename()` reporting failure on a move it had actually
+performed, and fixed by verifying the destination instead of the return value.
+See "The one real failure" below for the proof and the fix.
+
+**`W3` still does not close**, for two reasons that are now the whole
+remainder: the fixed migration path has not been through a real migration boot
+on hardware (a plain reflash does not trigger one), and 12 of the NVS-only keys
+have no read-back command.
 
 ### The baselines in section 1 had drifted and could not be used
 
@@ -329,24 +336,56 @@ They are nRF52-only export keys, which is why no ESP32 node shows them.
     [SETST];save;rename_failed_twice;bytes=1458
     [SETST];path;legacy_migration_failed   <- expected legacy_migrated
 
-**This is the recurrence section 4 built its instrument for, and the answer it
-gives is "not transient".** The retry that exists to separate a transient flash
-error from something persistent about the destination fired and failed too.
-Space is refuted again by the inventory it prints: 29 of 224 content blocks,
-the same figure as 2026-09-13.
+**This is the recurrence section 4 built its instrument for. The answer it
+gives is not the one that instrument was designed to distinguish:
+`lfs_rename()` reported failure having ACTUALLY PERFORMED THE MOVE.**
 
-**The node still ended up correct, but not because the migration worked.**
-Boot 1 went on to log `save;skipped_unchanged;bytes=1458` -- the keyed store
-already held the current values, written by the _old_ firmware before the
-flash, so the failed rename had nothing to overwrite. Boots 2, 3 and a later
-reflash all load `path;keyed` cleanly with 105 fields. **A node whose keyed
-store was stale or absent when the rename failed would have kept the stale
-copy**, and nothing in the log would have said so beyond this one marker.
+The capture proves it three times over, and the three are independent:
 
-A plain reflash does **not** reproduce it: the fourth boot went straight to
-`path;keyed` with no `legacy_rewritten` and every save reporting `ok`. The
-trigger is the migration boot specifically -- the one that holds the legacy
-blob, the counters file and a fresh 1 458 B temp file at once.
+1. **The store did not exist when the boot started.** `path;keyed_absent`
+   (line 7) is printed by `init_flash()` after it failed to open
+   `/MeshCom-Settings-Store`. Nothing else in this boot creates that file.
+2. **The inventory shows the move already done.** It is taken _before_ any
+   cleanup, and lists exactly three files: `/MeshCom-RAK` 2 000,
+   `/counters.txt` 15, `/MeshCom-Settings-Store` **1 458** -- the destination,
+   at exactly the size being written. There is no
+   `/MeshCom-Settings-Store.tmp` anywhere, and the total (3 473 B) leaves no
+   room for a fourth file. The temp file was consumed by the rename.
+3. **The bytes are right.** Later in the same boot another save encodes the
+   same 1 458 B and reports `save;skipped_unchanged` -- its chunked compare
+   found the destination byte-identical to what `encode()` produces.
+
+So the retry was not merely useless, it was actively harmful: the source it
+wanted was **already gone**, so it failed for a second and unrelated reason,
+and that pair of failures reported `legacy_migration_failed` on a migration
+that had written every byte correctly. Space is refuted again either way (29
+of 224 content blocks, the same figure as 2026-09-13), and "not transient" was
+the wrong question -- the first call did not fail at all.
+
+**Fixed: believe the filesystem, not the return value.** `writeFileAtomic()`
+now asks the destination directly when `rename()` reports failure -- if it
+holds exactly the bytes this call was asked to write, the write is done
+(`[SETST];save;rename_false_negative`), the stale temp path is cleaned up and
+the retry is skipped. A no-op failure and a false negative are
+indistinguishable from the return value alone and demand opposite responses,
+so the post-condition the caller actually cares about is verified instead. The
+chunked compare that the unchanged-guard in `settingsStoreSave()` already used
+is now one shared `fileHasExactContent()` serving both.
+
+Two tests hold it, both mutation-verified against the fake filesystem's new
+`force_rename_false_negative` knob (which performs the move and returns false):
+`test_rename_false_negative_is_accepted_when_the_file_landed` fails without the
+fix, and `test_rename_failure_that_lost_the_content_still_fails` keeps a
+genuine no-op failure failing, so the fix cannot degrade into "any reported
+rename failure is fine".
+
+**Not reproducible on demand, so not re-proven on hardware.** A plain reflash
+does not trigger it: the fourth and fifth boots went straight to `path;keyed`
+with no `legacy_rewritten` and every save reporting `ok`. The trigger is the
+migration boot specifically -- the one that holds the legacy blob, the counters
+file and a fresh 1 458 B temp file at once -- and reaching it again means
+forcing a downgrade-then-upgrade. `DK5EN-90` now runs the fixed image and
+re-exports clean (102 preserved, 0 changed, 0 lost).
 
 ### Live GPS made the check fail on a healthy node
 

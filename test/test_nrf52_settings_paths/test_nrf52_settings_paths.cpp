@@ -383,6 +383,74 @@ static void test_rename_failure_recovers_on_the_retry(void)
     TEST_ASSERT_NULL(strstr(log.c_str(), "rename_failed_twice"));
 }
 
+// The third case, and the one hardware actually produced: rename() performs
+// the move and reports failure anyway.
+//
+// DK5EN-90, W3 migration boot 2026-09-16 (capture
+// docs/bench/w3-baseline/rak90-migration-boot-20260916.txt). Retrying there is
+// not merely useless, it is actively misleading: the source is already gone,
+// so the retry fails for a second and unrelated reason, and the pair is
+// reported as rename_failed_twice -> legacy_migration_failed on a migration
+// that had written every byte correctly.
+//
+// So the save must be judged by the destination's content, not by the return
+// value: no retry, no failure, and the temp file must not be left behind.
+
+static void test_rename_false_negative_is_accepted_when_the_file_landed(void)
+{
+    auto old_bytes = make_keyed_store("OLD-CALL1");
+    g_fake_fs.seed(kKeyedPath, old_bytes.data(), old_bytes.size());
+
+    strncpy(meshcom_settings.node_call, "NEW-CALL2", sizeof(meshcom_settings.node_call) - 1);
+    Serial.clear();
+    g_fake_fs.force_rename_false_negative = 1; // moves the file, returns false
+
+    TEST_ASSERT_TRUE(settingsStoreSave());
+
+    // The destination holds the new content and the temp file is gone --
+    // exactly the post-condition a successful save promises.
+    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(live);
+    const std::string live_text(live->begin(), live->end());
+    TEST_ASSERT_NOT_NULL(strstr(live_text.c_str(), "node_call=NEW-CALL2"));
+    TEST_ASSERT_FALSE(g_fake_fs.exists(kKeyedTmpPath));
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];save;rename_false_negative"));
+    // The retry must NOT have run: it would fail on a source that no longer
+    // exists and turn a correct save into a reported failure.
+    TEST_ASSERT_NULL(strstr(log.c_str(), "rename_retry_ok"));
+    TEST_ASSERT_NULL(strstr(log.c_str(), "rename_failed_twice"));
+}
+
+// A false negative on a destination that did NOT receive the bytes is still a
+// real failure -- the check must be about the content, not about the marker.
+// Without this the fix could degrade into "any reported rename failure is
+// fine", which would hide the very loss the retry was built to survive.
+
+static void test_rename_failure_that_lost_the_content_still_fails(void)
+{
+    auto old_bytes = make_keyed_store("OLD-CALL1");
+    g_fake_fs.seed(kKeyedPath, old_bytes.data(), old_bytes.size());
+
+    strncpy(meshcom_settings.node_call, "NEW-CALL2", sizeof(meshcom_settings.node_call) - 1);
+    Serial.clear();
+    g_fake_fs.force_rename_fail = 2; // genuine no-op failure, both attempts
+
+    TEST_ASSERT_FALSE(settingsStoreSave());
+
+    // The live path still holds the OLD content, so the false-negative branch
+    // must not have claimed success for it.
+    const std::vector<uint8_t> *live = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(live);
+    const std::string live_text(live->begin(), live->end());
+    TEST_ASSERT_NOT_NULL(strstr(live_text.c_str(), "node_call=OLD-CALL1"));
+
+    const std::string &log = Serial.captured();
+    TEST_ASSERT_NULL(strstr(log.c_str(), "rename_false_negative"));
+    TEST_ASSERT_NOT_NULL(strstr(log.c_str(), "[SETST];save;rename_failed_twice"));
+}
+
 // ---------------------------------------------------------------------------
 // node_power's -20 sentinel (CFG_ESC(CFG_POWER_NOT_SET), outside
 // TX_POWER_MIN..MAX on RAK4631) must survive a real save/load round trip
@@ -885,6 +953,8 @@ int main(void)
     RUN_TEST(test_save_atomicity_live_path_held_old_content_until_rename);
     RUN_TEST(test_rename_failure_keeps_old_file_and_reports_the_filesystem);
     RUN_TEST(test_rename_failure_recovers_on_the_retry);
+    RUN_TEST(test_rename_false_negative_is_accepted_when_the_file_landed);
+    RUN_TEST(test_rename_failure_that_lost_the_content_still_fails);
 
     RUN_TEST(test_node_power_sentinel_survives_round_trip);
 

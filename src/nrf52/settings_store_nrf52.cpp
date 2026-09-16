@@ -71,6 +71,45 @@ const char kSettingsTmpPath[] = "/MeshCom-Settings-Store.tmp";
 // already uses for the very same reason.
 File settings_store_file(InternalFS);
 
+// True when `path` exists and holds exactly `len` bytes equal to `data`.
+//
+// Compared in 64 B chunks against a stack buffer rather than by slurping the
+// file into a second heap allocation: the encoded record is already
+// kSettingsBufferCap bytes of heap, and both callers run on tasks with a 4 KB
+// stack.
+//
+// Two callers, deliberately sharing one implementation: the unchanged-guard in
+// settingsStoreSave() (is a write needed at all?) and the false-negative check
+// in writeFileAtomic() (did the write land despite the error?). Both are asking
+// the same question of the filesystem -- "does this path already hold exactly
+// these bytes" -- and only the conclusion drawn differs.
+bool fileHasExactContent(const char *path, const void *data, size_t len)
+{
+	if (!settings_store_file.open(path, FILE_O_READ))
+		return false;
+
+	bool identical = (settings_store_file.size() == (uint32_t)len);
+	if (identical)
+	{
+		const uint8_t *want_bytes = (const uint8_t *)data;
+		uint8_t chunk[64];
+		size_t off = 0;
+		while (off < len)
+		{
+			size_t want = (len - off) < sizeof(chunk) ? (len - off) : sizeof(chunk);
+			int got = settings_store_file.read(chunk, (int)want);
+			if (got != (int)want || memcmp(chunk, want_bytes + off, want) != 0)
+			{
+				identical = false;
+				break;
+			}
+			off += (size_t)got;
+		}
+	}
+	settings_store_file.close();
+	return identical;
+}
+
 } // namespace
 
 bool settingsStoreSave()
@@ -123,33 +162,11 @@ bool settingsStoreSave()
 	// kSettingsBufferCap bytes of heap, and this runs on the main-loop task
 	// whose stack is 4 KB.
 	// ---------------------------------------------------------------------
-	if (settings_store_file.open(kSettingsPath, FILE_O_READ))
+	if (fileHasExactContent(kSettingsPath, buf, (size_t)written))
 	{
-		bool identical = (settings_store_file.size() == (uint32_t)written);
-		if (identical)
-		{
-			uint8_t chunk[64];
-			long off = 0;
-			while (off < written)
-			{
-				int want = (int)((written - off) < (long)sizeof(chunk) ? (written - off) : (long)sizeof(chunk));
-				int got = settings_store_file.read(chunk, want);
-				if (got != want || memcmp(chunk, buf + off, (size_t)got) != 0)
-				{
-					identical = false;
-					break;
-				}
-				off += got;
-			}
-		}
-		settings_store_file.close();
-
-		if (identical)
-		{
-			Serial.printf("[SETST];save;skipped_unchanged;bytes=%ld\n", written);
-			free(buf);
-			return true;
-		}
+		Serial.printf("[SETST];save;skipped_unchanged;bytes=%ld\n", written);
+		free(buf);
+		return true;
 	}
 
 	// Atomicity from here on is writeFileAtomic()'s job (factored out so
@@ -221,6 +238,41 @@ bool writeFileAtomic(const char *path, const char *tmp_path, const void *data, s
 		// existed. (Measured on DK5EN-90 2026-09-13 with a healthy store:
 		// 29 of 224 blocks in content, so space is not the explanation there.)
 		settingsStoreReportFilesystem("rename_failed");
+
+		// ---------------------------------------------------------------
+		// Believe the filesystem, not the return value.
+		//
+		// DK5EN-90, 2026-09-16 (docs/bench/w3-baseline/README.md §7, capture
+		// rak90-migration-boot-20260916.txt): on the W3 migration boot
+		// lfs_rename() reported failure having ACTUALLY PERFORMED THE MOVE.
+		// The inventory printed immediately above -- taken before any
+		// cleanup -- listed the destination at its new size with no temp
+		// file left anywhere on the volume, and a later save in the same
+		// boot found the destination byte-identical to what encode()
+		// produces ("save;skipped_unchanged"). The store had not existed at
+		// all at the start of that boot ("path;keyed_absent"), so the only
+		// thing that can have created it is this rename.
+		//
+		// The retry below then failed for a SECOND, different reason -- the
+		// source it wanted was already gone -- and that pair of failures is
+		// what reported `legacy_migration_failed` on a migration that had in
+		// fact written every byte correctly.
+		//
+		// A no-op failure and a false negative are indistinguishable from
+		// the return value alone and call for opposite actions (retry vs.
+		// stop), so the destination is asked directly. This is strictly
+		// stronger than trusting the return code: it verifies the actual
+		// post-condition the caller cares about.
+		// ---------------------------------------------------------------
+		if (fileHasExactContent(path, data, len))
+		{
+			Serial.printf("[SETST];save;rename_false_negative;bytes=%u\n", (unsigned)len);
+			// No-op when the rename consumed the temp file, which is the
+			// case this branch exists for; harmless if some other path left
+			// one behind.
+			InternalFS.remove(tmp_path);
+			return true;
+		}
 
 		// One retry, which is a diagnostic as much as a repair. The failure
 		// this exists for (DK5EN-90, 2026-09-12, twice on one boot, never

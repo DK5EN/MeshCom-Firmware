@@ -75,6 +75,14 @@ struct FakeFsState
 	// retry-succeeds path and 2 the give-up path.
 	int force_rename_fail = 0;
 
+	// The next N rename() calls PERFORM the move and still return false --
+	// the failure mode DK5EN-90 showed on the W3 migration boot 2026-09-16
+	// (docs/bench/w3-baseline/README.md §7). Kept separate from
+	// force_rename_fail because the two are indistinguishable from the
+	// return value alone and demand opposite responses: retry the no-op
+	// failure, stop on the false negative.
+	int force_rename_false_negative = 0;
+
 	// The whole point of the temp-file-then-rename atomicity claim
 	// (settings_store_nrf52.cpp) is that the LIVE path holds its OLD content
 	// right up until the moment rename() swaps the temp file onto it.
@@ -92,6 +100,7 @@ struct FakeFsState
 		open_write_calls = open_read_calls = 0;
 		force_short_read = force_short_write = -1;
 		force_rename_fail = 0;
+		force_rename_false_negative = 0;
 		last_rename_had_dest = false;
 		last_rename_dest_previous_content.clear();
 	}
@@ -165,6 +174,13 @@ public:
 		g_fake_fs.files[to] = it->second; // replaces an existing destination
 		g_fake_fs.files.erase(it);
 		g_fake_fs.rename_calls++;
+
+		// The move above has already happened; only the verdict is a lie.
+		if (g_fake_fs.force_rename_false_negative > 0)
+		{
+			g_fake_fs.force_rename_false_negative--;
+			return false;
+		}
 		return true;
 	}
 

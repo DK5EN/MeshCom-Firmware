@@ -5338,18 +5338,33 @@ our own commit messages still say `TD-16` and are stale as a result.
      | `DK5EN-14` T-Deck Plus | **107 of 107**, 0 lost / changed / added      | **pass**                        |
      | `DK5EN-90` RAK4631     | 102 preserved, 0 changed, 2 removed by design | settings pass, **marker fails** |
 
-     **What blocks `W3`:** the nRF52 migration boot logged
-     `[SETST];path;legacy_migration_failed`, not the expected `legacy_migrated`.
-     `InternalFS.rename()` failed for every file and failed again on the retry
-     that §4 of that README installed precisely to tell a transient flash error
-     from a persistent one -- so the answer is "not transient", and the space
-     hypothesis is refuted again by the inventory it prints (29 of 224 content
-     blocks). The node's settings survived only because the keyed store already
-     held current values written by the _old_ firmware, so the failed rename had
-     nothing to overwrite; a node with a stale or absent store would have kept
-     the stale copy silently. Boots 2/3 and a later reflash all load
-     `path;keyed` with 105 fields, and a plain reflash does **not** reproduce it
-     -- the trigger is the migration boot itself.
+     **`legacy_migration_failed` was a false alarm, diagnosed and fixed
+     2026-09-16.** The nRF52 migration boot logged it instead of
+     `legacy_migrated` because `lfs_rename()` reported failure on a move it had
+     **actually performed**. Three independent lines of the capture prove the
+     move happened: the store did not exist at boot start (`path;keyed_absent`),
+     the pre-cleanup inventory lists the destination at its new size with no
+     `.tmp` anywhere and a total that leaves no room for a fourth file, and a
+     later save in the same boot finds the destination byte-identical
+     (`save;skipped_unchanged`). The retry then failed for a second, unrelated
+     reason -- its source was already gone -- and that pair is what reported a
+     failed migration on a migration that had written every byte correctly. So
+     "transient vs. persistent", the question §4's retry was built to answer,
+     was the wrong question: the first call did not fail at all.
+
+     **Fix:** `writeFileAtomic()` verifies the destination when `rename()`
+     reports failure and accepts the write if the bytes are there
+     (`[SETST];save;rename_false_negative`), skipping the harmful retry; the
+     chunked compare is now one shared `fileHasExactContent()` used by both the
+     unchanged-guard and this check. Two mutation-verified tests, including one
+     that keeps a genuine no-op failure failing so the fix cannot degrade into
+     "any reported rename failure is fine".
+
+     **What still blocks `W3`:** the fixed path has **not** been through a real
+     migration boot on hardware -- a plain reflash does not trigger one (boots
+     4 and 5 went straight to `path;keyed`), so reaching it again means forcing
+     a downgrade-then-upgrade. `DK5EN-90` runs the fixed image and re-exports
+     clean (102 preserved, 0 changed, 0 lost).
 
      **Closed by the same run:** the `Counters` migration is verified on both
      platforms with the new `--msgid` probe (`DK5EN-93` 182 -> 282 -> 382,

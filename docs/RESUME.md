@@ -3,29 +3,29 @@
 ## Where we are, end of 2026-09-16 (start here)
 
 Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row W3C): phases A-C
-done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done. **The W3 bench proof ran
-on 2026-09-16 across all three nodes: the ESP32 half passes, the nRF52 half does not, so W3 stays
-open.** W4-W7, C4d and phase E not started. ~29 working days to the PR.
+done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done. **The W3 bench proof ran on 2026-09-16 across all three
+nodes: every node preserved every setting. The one failing marker was traced to a false negative
+from `lfs_rename()` and fixed, so what is left of W3 is a hardware re-run of the migration boot
+and the NVS-only keys.** W4-W7, C4d and phase E not started. ~29 working days to the PR.
 
-| node                   | result                                                         |
-| ---------------------- | -------------------------------------------------------------- |
-| `DK5EN-93` Heltec V3   | **pass** -- 105 preserved, 0 lost, 3 live-GPS movers only      |
-| `DK5EN-14` T-Deck Plus | **pass** -- 107 of 107, across the migration boot and a reboot |
-| `DK5EN-90` RAK4631     | settings pass (102 + 2 removed by design), **marker fails**    |
+| node                   | result                                                                     |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `DK5EN-93` Heltec V3   | **pass** -- 105 preserved, 0 lost, 3 live-GPS movers only                  |
+| `DK5EN-14` T-Deck Plus | **pass** -- 107 of 107, across the migration boot and a reboot             |
+| `DK5EN-90` RAK4631     | settings pass (102 + 2 removed by design); marker was a false alarm, fixed |
 
 Full write-up and the captures: `docs/bench/w3-baseline/README.md` §7.
 
-**First thing next session -- the one thing blocking W3:**
+**First thing next session -- what is left of W3:**
 
-1. **`legacy_migration_failed` on the nRF52 migration boot.** `InternalFS.rename()` failed for
-   every file and failed again on the retry, so the answer that retry was built to give is "not
-   transient"; space is refuted again (29 of 224 content blocks). `DK5EN-90` came out correct only
-   because its keyed store already held current values written by the old firmware -- a node with a
-   stale or absent store would silently have kept the stale copy. A plain reflash does **not**
-   reproduce it; the trigger is the migration boot, which holds the legacy blob, `/counters.txt`
-   and a fresh 1 458 B temp file at once. Reproduce by forcing another migration boot (the blob CRC
-   path), and decide whether `settingsStoreSave()` needs a non-rename fallback -- 234 call sites
-   still ignore its return value.
+1. **A real migration boot on the fixed nRF52 path.** `legacy_migration_failed` turned out to be a
+   false alarm -- `lfs_rename()` reported failure on a move it had actually performed (the store
+   did not exist at boot start, the pre-cleanup inventory shows the destination at its new size
+   with no `.tmp`, and a later save in the same boot finds it byte-identical), and the retry then
+   failed for a second reason because its source was already gone. **Fixed**: `writeFileAtomic()`
+   verifies the destination and accepts the write (`[SETST];save;rename_false_negative`) instead of
+   retrying. Two mutation-verified tests. What is left is the hardware arm: a plain reflash does
+   not trigger a migration boot, so forcing one means a downgrade-then-upgrade on `DK5EN-90`.
 2. **The 12 NVS-only keys with no read-back.** `--persiststat` covers four, `--info` one. Either
    extend `--persiststat` to the rest of the block (`node_audmsg`, `node_audstart`, `node_bllock`,
    `node_cflash`, `node_kblock`, `node_kblsync`, `node_map`, `node_modus`, `node_wifion`) or accept
