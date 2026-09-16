@@ -41,11 +41,45 @@ from typing import Dict, List, Optional, Tuple
 ROOT = Path(__file__).resolve().parents[2]
 
 CARVED = [
+    # The four carved TUs this check was originally written for.
     "src/esp32/udp_drain_esp32.cpp",
     "src/nrf52/udp_drain_nrf52.cpp",
     "src/esp32/udp_frame_esp32.cpp",
     "src/nrf52/udp_frame_nrf52.cpp",
+    # 2026-09-16: the hazard in the docstring above is not a property of being
+    # "carved" -- it is a property of hand-writing an `extern` for something
+    # defined in another TU, and this tree does that in six more files. The
+    # scope was narrower than the reasoning. Widening it immediately paid:
+    # `extern bool bInitDisplay;` in nrf52_ble.cpp bound to NOTHING (no
+    # definition anywhere, no second use) and had been sitting there unnoticed
+    # because nobody reads it, so the linker never had to resolve it.
+    #
+    # This matters right now for W5: R3-12 and R2-01 change the TYPE of
+    # mheardLat/mheardLon/mheardBuffer, and lora_functions.cpp and
+    # web_functions.cpp each re-declare them by hand. Getting one of those
+    # wrong is precisely the silent wrong-width read described above.
+    "src/lora_functions.cpp",
+    "src/web_functions/web_functions.cpp",
+    "src/phone_commands.cpp",
+    "src/esp32/esp32_main.cpp",
+    "src/nrf52/nrf52_main.cpp",
+    "src/nrf52/nrf52_ble.cpp",
 ]
+
+# (file, type, name) triples this check cannot decide and must not fail on.
+# Keep this list SHORT and each entry argued -- an exemption is a hole.
+EXEMPT = {
+    # `extern U8G2 u8g2_1;` against a definition of a DERIVED type, e.g.
+    # `U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_1(U8G2_R0);`. The u8g2 device
+    # classes derive from U8G2 and add no data members of their own (see
+    # U8g2lib.h: each is a constructor and nothing else), so the base-typed
+    # extern has the same size and layout. It is legal to declare it this way
+    # and the tree has done so in three files for years. The check compares
+    # spellings and cannot know the inheritance, so it would report a mismatch
+    # that is not one.
+    ("U8G2", "u8g2_1"),
+    ("U8G2", "u8g2_2"),
+}
 
 # `extern <type> <name>;` or `extern <type> <name>[...];` at column 0.
 EXTERN = re.compile(r"^extern\s+(.+?)\s+(\w+)\s*(\[[^\]]*\])?\s*;")
@@ -109,6 +143,8 @@ def check(root: Path = ROOT, carved: Optional[List[str]] = None) -> List[str]:
                 continue
             ty, name, bound = norm(m.group(1)), m.group(2), norm_bound(m.group(3) or "")
             checked += 1
+            if (ty, name) in EXEMPT:
+                continue
             cands = defs.get(name)
             if not cands:
                 problems.append(

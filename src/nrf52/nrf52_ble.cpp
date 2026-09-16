@@ -28,7 +28,12 @@ extern int sendMessage(char *buffer, int len);
 extern bool hasMsgFromPhone;
 extern char textbuff_phone [MAX_MSG_LEN_PHONE];
 extern uint8_t txt_msg_len_phone;
-extern bool bInitDisplay;
+// `extern bool bInitDisplay;` stand hier und band an NICHTS: den Namen gibt
+// es nirgendwo sonst im Baum, weder als Definition noch als zweite
+// Verwendung. Uebersetzt und linkt nur, weil ihn niemand liest -- ein
+// Symbol, das aussieht, als gaebe es irgendwo einen Display-Init-Zustand.
+// Gefunden 2026-09-16, als carve_extern_lint.py auf diese Datei erweitert
+// wurde.
 extern uint8_t dmac[6];
 extern bool config_to_phone_prepare;
 extern bool conffin_sent;
