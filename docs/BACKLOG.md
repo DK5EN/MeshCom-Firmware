@@ -5990,6 +5990,69 @@ do occur. The row therefore buys 1 200 B by degrading the one feature that
 exists to analyse multi-hop routing. Keeping 6 hops means row 50, worth 200 B.
 Skipped; the bytes stay on the table.
 
+### 3.8ak `R2-01` -- the mheard text codec is gone (2026-09-16)
+
+The row the mheard cluster was actually about, and the only one this wave that
+gave back more than it cost.
+
+**What was there.** Every mheard entry was `snprintf`'d into a pipe-delimited
+string in `mheardBuffer[MAX_MHEARD][60]` and parsed back **three separate
+ways**: `decodeMHeard()` scanned it character by character with an
+Arduino-`String` append per character (~55 iterations per read); `sendMheard()`
+carried a SECOND copy built from **eleven `getValue()` calls**, each allocating
+a `String` and rescanning the whole record; and two encode sites wrote the
+60-byte record with `snprintf`. A serialise/deserialise round trip for data
+that never leaves the device -- on exactly the paths that serve `--mheard`, the
+JSON register and the web GUI, on a platform where per-line heap churn is the
+documented cause of BLE connection failures ([[printf-malloc-starves-nimble]]).
+
+**Measured, all 34 envs:**
+
+|       | per env                                                     | total         |
+| ----- | ----------------------------------------------------------- | ------------- |
+| RAM   | -3 200 (22 envs) / -2 000 (1) / -1 200 (9) / 0 (2 safeboot) | **-83 200 B** |
+| Flash | -876 .. **-4 928**                                          | **-54 676 B** |
+
+The flash was not in the audit, which claimed RAM only. Three copies of a text
+codec plus the `String`/`getValue` machinery they drag in cost far more code
+than a 20-byte struct. `mheard_functions.cpp` is 117 lines shorter.
+
+**The rounding had to be exact, and two obvious implementations were wrong.**
+`mhdoc["DIST"]` emits `mh_dist` **raw**, not formatted, so the stored precision
+IS the wire format: the old text kept one decimal (`%.1lf`) and the decode read
+that rounded value back. Reproducing it:
+
+- `(long)(x*10 + 0.5)` -- rounds halves up. `printf("%.1lf", 1.25)` is
+  **"1.2"**, because IEEE rounds to the EVEN digit and 1.25 is exactly
+  representable.
+- `nearbyint(x*10) / 10` -- rounds to even, but the MULTIPLY destroys the
+  deciding information first: 0.05 as a double is slightly ABOVE 0.05, yet
+  `0.05 * 10` rounds to exactly 0.5, which then goes to the even zero.
+  `printf` sees the original and yields **"0.1"**.
+
+**Binary scaling cannot reproduce a decimal rounding.** The only faithful way
+to keep the old value is the old mechanism -- format and parse -- so
+`mheardRoundDist()` does exactly that, but ONCE per store and for one field,
+instead of the whole record on every read. Both wrong versions were caught by
+`test/test_mheard_record` (env `native_mheard_record`, 10 cases), which is the
+first executable test this transformation has ever had.
+
+**Preserved deliberately.** The REP encode site mixed two structs -- date,
+type, path length, mesh and ncount from `mheardLine`, but `hw`/`mod`/`rssi`/
+`snr`/`dist` from `mheardLine_save`, i.e. the RF values of the EXISTING entry.
+Collapsing that into one call would have been a silent behaviour change; it is
+reproduced field by field with a note saying why.
+
+**Found en route.** `json += "\"dist\":" + String(mheardLine.mh_dist + ",", 1);`
+is `double + const char*` -- **ill-formed C++** that cannot compile. It survives
+only because it sits inside `#ifdef HEAP_TEST`, and `HEAP_TEST` is defined
+nowhere in the tree. The closing parenthesis was one position too far left.
+Same class as the `t5_epaper` findings: code no compiler has ever seen.
+
+**Persistence.** `/mheard.dat` (T-Deck only) changes layout again. Handled by
+the same self-healing size check as `R3-12`: the load path compares
+`file.size()` against the sum of the `sizeof()`s and deletes a mismatched file.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
