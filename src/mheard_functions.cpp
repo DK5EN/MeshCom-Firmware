@@ -34,8 +34,25 @@ extern bool bDEBUG;
 
 unsigned char mheardBuffer[MAX_MHEARD][60]; //Ringbuffer for MHeard Lines
 char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
-double mheardLat[MAX_MHEARD];
-double mheardLon[MAX_MHEARD];
+// R3-12: float statt double. Ein float haelt ~7 signifikante Dezimalstellen;
+// gebraucht werden 4 Nachkommastellen bei zweistelligem Grad (48.1234 ->
+// 6 Stellen), also bleibt eine Stelle Reserve. Das entspricht rund 1 m,
+// und die MHeard-Liste ist eine Nachbarschaftsanzeige, keine Navigation.
+//
+// ACHTUNG: diese beiden Felder werden auf dem T-Deck ROH in /mheard.dat
+// geschrieben (saveMHeardPersistence, file.write((uint8_t*)..., sizeof)).
+// Die Typaenderung aendert die Dateigroesse. Das ist abgefangen: der
+// Ladeweg vergleicht file.size() gegen die Summe der sizeof() und
+// loescht die Datei bei Abweichung (siehe readMHeardPersistence). Eine
+// vorhandene Datei geht also einmalig verloren und wird neu aufgebaut --
+// kein Fehlverhalten, aber es passiert und gehoert hierher geschrieben.
+//
+// Drei Dateien deklarieren diese Felder von Hand als extern
+// (lora_functions.cpp, web_functions.cpp). Ein vergessenes davon linkt
+// STILL und liest in der falschen Breite; seit 2026-09-16 deckt
+// test/golden/carve_extern_lint.py auch diese Dateien ab.
+float mheardLat[MAX_MHEARD];
+float mheardLon[MAX_MHEARD];
 int mheardAlt[MAX_MHEARD];
 unsigned long mheardEpoch[MAX_MHEARD];
 

@@ -112,8 +112,8 @@ void loraDeepSleep()
 extern unsigned long iReceiveTimeOutTime;
 
 extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
-extern double mheardLat[MAX_MHEARD];
-extern double mheardLon[MAX_MHEARD];
+extern float mheardLat[MAX_MHEARD];   // R3-12: war double
+extern float mheardLon[MAX_MHEARD];   // R3-12: war double
 extern int mheardAlt[MAX_MHEARD];
 
 #include "TinyGPSPlus.h"

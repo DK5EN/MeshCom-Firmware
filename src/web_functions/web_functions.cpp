@@ -45,8 +45,8 @@ bool bweb_server_running = false;
 char web_ip[10][20] = {0};
 long web_ip_passwd_time[10] = {0};
 
-extern double mheardLat[MAX_MHEARD];
-extern double mheardLon[MAX_MHEARD];
+extern float mheardLat[MAX_MHEARD];   // R3-12: war double
+extern float mheardLon[MAX_MHEARD];   // R3-12: war double
 extern int mheardAlt[MAX_MHEARD];
 
 double dlat;
