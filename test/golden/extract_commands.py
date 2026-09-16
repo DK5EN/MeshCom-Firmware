@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import tempfile
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -311,14 +312,51 @@ def render_shadowed(pairs: List[Tuple[Command, Command]]) -> str:
     )
 
 
+# Two rungs, one live and one commented out, in the ladder's own shape. Small
+# on purpose: it pins the property, not the tree.
+_FIXTURE = """
+void commandAction(char *msg_text, bool ble)
+{
+    /* TEST
+    if(commandCheck(msg_text+2, (char*)"ghost ") == 0)
+    {
+        return;
+    }
+    else
+    */
+    if(commandCheck(msg_text+2, (char*)"live ") == 0)
+    {
+        return;
+    }
+}
+"""
+
+
 def _self_test() -> int:
     failures = 0
     commands = extract()
 
-    # The commented-out `"compress "` at :288 must not be in the list.
-    if any(c.name.strip() == "compress" for c in commands):
+    # A commented-out rung must never be counted. This is proven against a
+    # FIXTURE, not against the live source. It used to lean on the real
+    # `/* TEST ... "compress " ... */` block at :437 -- and that coupling was
+    # the bug: D2-01 deleted the last three dead blocks, at which point an
+    # assertion that dead code is ignored had no dead code left to ignore and
+    # the gate went green for the wrong reason. Worse, the same three blocks
+    # are what made D2-06 insert its dispatch INSIDE a comment. A gate must not
+    # need the defect it guards against to keep existing.
+    with tempfile.NamedTemporaryFile("w", suffix=".cpp", delete=False) as fh:
+        fh.write(_FIXTURE)
+        fixture = Path(fh.name)
+    try:
+        names = {c.token for c in extract(fixture)}
+    finally:
+        fixture.unlink()
+    if "ghost" in names:
         failures += 1
         print("FAIL: a commented-out command is counted as a ladder entry")
+    if "live" not in names:
+        failures += 1
+        print(f"FAIL: fixture ladder rung not found, got {sorted(names)}")
     blanked = blank_comments('a = "/* not a comment */"; /* real */ b;')
     if '"/* not a comment */"' not in blanked or "real" in blanked:
         failures += 1
@@ -345,9 +383,9 @@ def _self_test() -> int:
     if len(commands) + len(inner) != live:
         failures += 1
         print(f"FAIL: {len(commands)} ladder + {len(inner)} inner != {live} live calls")
-    if live >= total:
+    if live > total:
         failures += 1
-        print(f"FAIL: comment stripping removed nothing ({live} of {total})")
+        print(f"FAIL: blanking invented calls ({live} of {total})")
 
     # An inner disambiguation must not be reported as a ladder duplicate:
     # `operatorname ` (:2555 ladder, :2557 inner) is the canonical shape.

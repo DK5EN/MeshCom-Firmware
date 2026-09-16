@@ -434,20 +434,6 @@ void commandAction(char *umsg_text, bool ble)
         snprintf(msg_text, sizeof(msg_text), "%s", sVar.c_str());
     }
 
-    /* TEST
-    if(commandCheck(msg_text+2, (char*)"compress ") == 0)
-    {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+11);
-        _owner_c[49] = 0x00;
-
-        String text=_owner_c;
-
-        text_compress(text);
-        
-        return;
-    }
-    else
-    */
     // D2-06: the table-driven on/off toggles are consulted before the rest of
     // the ladder. Hoisting them is only safe because D2-10 made matching
     // exact-token; it was then checked mechanically in both directions (no row
@@ -2679,32 +2665,6 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
-#if defined(ENABLE_XML)
-    /* only for testing
-    if(commandCheck(msg_text+2, (char*)"softser test0") == 0)
-    {
-        iNextTelemetry = 0;
-        
-        // TEST
-        testTinyXML();
-        
-        sendTelemetry(SOFTSER_APP_ID);
-
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"softser test") == 0)
-    {
-        // TEST
-        testTinyXML();
-        
-        sendTelemetry(SOFTSER_APP_ID);
-
-        return;
-    }
-    else
-    */
-#endif
     if(commandCheck(msg_text+2, (char*)"softser baud ") == 0)
     {
         sscanf(msg_text+15, "%d", &meshcom_settings.node_ss_baud);
@@ -2762,17 +2722,6 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
 #endif
-
-/* for testing only
-#if defined(ENABLE_XML)
-    if(commandCheck(msg_text+2, (char*)"softser xml") == 0)
-    {
-        testTinyXML();
-        
-        return;
-    }
-#endif
-*/
 
     else
     if(commandCheck(msg_text+2, (char*)"passwd ") == 0)
