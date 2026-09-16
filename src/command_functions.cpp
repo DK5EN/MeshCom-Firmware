@@ -4098,7 +4098,13 @@ void commandAction(char *umsg_text, bool ble)
         {
             printfdeb("set Step-Frequency to %.3f MHz\n", fVar);
 
-            meshcom_settings.node_specsamples=fVar;
+            // OPT-D4: this wrote node_specsamples. The two spectrum setters had
+            // their destinations swapped. Checked that the bug is not
+            // self-cancelling before touching it: the consumers read both fields
+            // correctly -- web_functions.cpp:2002 uses node_specstep as an MHz
+            // divisor, :2048 passes node_specsamples as the sample count -- so
+            // the defect was in the setters alone.
+            meshcom_settings.node_specstep=fVar;
 
             save_settings();
         }
@@ -4119,7 +4125,7 @@ void commandAction(char *umsg_text, bool ble)
         {
             printfdeb("set Samples to %i MHz\n", iVar);
 
-            meshcom_settings.node_specstep=iVar;
+            meshcom_settings.node_specsamples=iVar;   // OPT-D4, was node_specstep
 
             save_settings();
         }
