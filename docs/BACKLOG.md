@@ -5794,6 +5794,93 @@ still advertised the command. Only SYM+M muted, and it did not save.
 the commands expected present **and** absent. `.claude/commands/release-firmware.md` now carries
 the T-Deck scan line next to the safeboot check.
 
+### 3.8ai `W5` in progress -- measured RAM ranking, and two audit premises corrected (2026-09-16)
+
+**Measure first.** `nm -S` on `E22-DevKitC` (an OLED-less board that still
+compiles U8g2) gives the real static-RAM ranking, and it does not match the
+order the audit implies:
+
+| symbol                | bytes | row                                   |
+| --------------------- | ----- | ------------------------------------- |
+| `ringbufferRAWLoraRX` | 5 200 | `R1-04`                               |
+| `ringBuffer`          | 5 200 | --                                    |
+| `BLEtoPhoneBuff`      | 5 200 | `R1-02`                               |
+| `ringBufferUDPout`    | 5 120 | --                                    |
+| `BLEComToPhoneBuff`   | 4 920 | `R1-02` -- the merge removes it whole |
+| `mheardPathBuffer1`   | 2 080 | `R3-13`                               |
+| `buf$11727` (u8g2)    | 1 024 | `R4-02/03`                            |
+| `u8g2_1` + `u8g2_2`   | 376   | `R4-02/03`                            |
+
+**`R4-02/03` is worth ~1 400 B, not the audited 4 304 B**, and `R1-02` alone is
+3.5x its entire prize.
+
+**`GRD-01` -- DONE (`46ed0f3c`).** "Does this board drive a U8g2 OLED" existed as
+**seven** hand-written copies in three files in three spellings, plus an eighth
+of a different shape: a nine-arm `#if/#elif` cascade whose `#else` used `u8g2`,
+guarded by enumerating every board that lacks one. That cascade is the one that
+drifted. All are now `#if MC_HAS_U8G2`, defined once in
+`configuration_global.h`. The cascade is three arms; seven of its branches were
+pure repetition of what the predicate already says, and its U8g2 arm is now
+structurally unreachable where U8g2 does not exist. `BOARD_STICK_V3` keeps its
+own branch: it HAS a display but gets no track page, which is a different
+statement. Proven neutral against the pre-change sweep -- 62 of 68 RAM/Flash
+figures byte-identical, the rest +/-16 B flash with mixed signs and no RAM
+movement, on boards emitting the same branch.
+
+**`R4-02/03` -- CLOSED 2026-09-16, second half dropped by operator decision.** The decision was "runtime,
+no board list", justified as one code path with no variant list. `GRD-01` has
+now delivered exactly that on its own. What remains is the dynamic frame
+buffer, and it is a worse trade than it looked: `U8G2_USE_DYNAMIC_ALLOC` is a
+**library-wide** flag, so all 20+ U8g2 boards would have to call
+`setBufferPtr()` and each gains an allocation-failure branch -- one static
+allocation that cannot fail traded for a runtime one that can, to recover
+~1 400 B on a subset. By the campaign's own rule (prefer the option that leaves
+one code path) this now ADDS one.
+
+Operator decision 2026-09-16: **drop it, close the row.** The row's stated
+purpose -- one code path, no variant list -- is delivered by `GRD-01`. What was
+left was a byte figure, and the campaign does not buy byte figures with extra
+code paths. The ~1 400 B stays on the table deliberately, and it is recorded
+here so nobody re-derives the idea from the audit's 4 304 B without finding
+this note first.
+
+**`R1-02` -- STEP 1 DONE, step 2 open.** The audit said "byte 1 already tags the
+type", which is true but insufficient: `0x91` and `0x44` appear in BOTH rings
+and are dispatched by two separate copies of the same three-way switch in
+`phone_commands.cpp`. The copies differ in exactly one arm:
+
+| arm             | `sendToPhone()` | `sendComToPhone()`   |
+| --------------- | --------------- | -------------------- |
+| `0x91` mheard   | `blelen - 1`    | `blelen - 1`         |
+| `0x44` JSON     | `blelen`        | `blelen`             |
+| text / position | `blelen`        | **`blelen - 1`** <-- |
+
+The Com text arm is unreachable -- `BLEComToPhoneBuff` has exactly two
+producers (`sendBleJsonRegister()`, the mheard send) and both set `0x44`, and
+nothing else writes that ring, so its `0x91` arm is dead too. Dead, but wrong.
+
+Step 1: one `blePhoneFrame()` in `src/ble_phone_frame.h`, both drains call it,
+8 host cases in `native_ble_phone_frame`. **-976 B flash across 32 envs, RAM
+unchanged.** That is the first executable test this framing has ever had -- it
+is only observable over BLE, which is exactly why the discrepancy survived.
+
+**Two traps in step 1, both caught before the build:**
+
+1. Both drains copy a DIFFERENT byte count per arm but always send
+   `blelen + 2` -- the source's own `// why do we need to add 2 bytes??`. Had
+   the helper returned a length and the caller used it, **every BLE frame would
+   have shrunk by 1-3 bytes**. It returns `bool` precisely so that cannot
+   happen, and the send length is untouched.
+2. The first refusal path returned early without advancing `ComToPhoneRead`,
+   which advances only AFTER the send -- that would have stalled the ring
+   permanently on any unframeable slot. Fixed to match the existing
+   `blelen == 0` idiom directly above it.
+
+**Step 2** merges the rings and frees the 4 920 B. It changes the BLE wire
+path, and `tools/bench/ble_golden.py` is the instrument for it -- it connects as
+the phone app does over the Nordic UART Service and records every notification.
+It needs a **before-capture on DK5EN-93 taken before any change lands**.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
