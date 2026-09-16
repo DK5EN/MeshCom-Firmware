@@ -3,11 +3,19 @@
 #include "peripheral.h"
 #include <TinyGPS++.h>
 
+// loop_functions.h MUSS vor loop_functions_extern.h stehen -- der extern-Header
+// benutzt MAX_RING, UDP_TX_BUF_SIZE, MAX_MSG_LEN_PHONE usw. aus
+// configuration_global.h und zieht sie nicht selbst herein. Der gepflegte
+// Zwilling src/t-deck-pro/peri_gps.cpp:6-7 macht es genau so.
+#include "loop_functions.h"
 #include "loop_functions_extern.h"
 
 /* clang-format off */
 
-TinyGPSPlus gps;
+// Das eine TinyGPSPlus-Objekt gehoert gps_functions.cpp:51. Diese Kopie legte
+// ein ZWEITES an und kollidierte beim Linken; der gepflegte Zwilling
+// src/t-deck-pro/peri_gps.cpp:11 deklariert es richtig als extern.
+extern TinyGPSPlus gps;
 static bool GPS_Recovery();
 bool setupGPS();
 void displayInfo();
@@ -126,14 +134,14 @@ void gps_get_speed(double *speed)
 /* clang-format on */
 void displayInfo()
 {
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.print(F("Location: "));
 
     if (gps.location.isValid())
     {
         gps_lat = gps.location.lat();
         gps_lng = gps.location.lng();
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
         {
             Serial.print(gps_lat, 6);
             Serial.print(F(","));
@@ -142,11 +150,11 @@ void displayInfo()
     }
     else
     {
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
             Serial.print(F("INVALID"));
     }
 
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.print(F("  Date/Time: "));
 
     if (gps.date.isValid())
@@ -154,7 +162,7 @@ void displayInfo()
         gps_year = gps.date.year();
         gps_month = gps.date.month();
         gps_day = gps.date.day();
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
         {
             Serial.print(gps_month);
             Serial.print(F("/"));
@@ -165,11 +173,11 @@ void displayInfo()
     }
     else
     {
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
             Serial.print(F("INVALID"));
     }
 
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.print(F(" "));
 
     if (gps.time.isValid())
@@ -178,7 +186,7 @@ void displayInfo()
         gps_minute = gps.time.minute();
         gps_second = gps.time.second();
 
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
         {
             if (gps_hour < 10)
                 Serial.print(F("0"));
@@ -196,37 +204,37 @@ void displayInfo()
     }
     else
     {
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
             Serial.print(F("INVALID"));
     }
 
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.print(F("  Satellites: "));
 
     if(gps.satellites.isValid())
     {
         gps_vsat = gps.satellites.value();
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
         {
             Serial.print(gps_vsat);
             Serial.print(F(" "));
         }
     }
 
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.print(F("  Speed: "));
 
     if(gps.speed.isValid())
     {
         gps_speed = gps.speed.kmph();
-        if(bGPSDEBUG_DETAIL)
+        if(iGPSDEBUG > 0)
         {
             Serial.print(gps_speed);
             Serial.print(F(" "));
         }
     }
 
-    if(bGPSDEBUG_DETAIL)
+    if(iGPSDEBUG > 0)
         Serial.println();
 }
 /* clang-format off */

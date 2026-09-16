@@ -1,3 +1,9 @@
+// Kein Include-Guard bis 2026-09-16: jede Uebersetzungseinheit, die diesen
+// Header zweimal sah, brach mit "redefinition of 'isNodeUnconfigured'" ab.
+// Sichtbar wurde das nur in env:esp32-external-radio, weil dort zwei Pfade
+// ihn einziehen; die uebrigen Envs kamen mit genau einem Include davon.
+#pragma once
+
 #define SOURCE_VERSION "4.35"
 #define SOURCE_VERSION_SUB "t"
 #define SOURCE_VERSION_WEB_SUB "t"

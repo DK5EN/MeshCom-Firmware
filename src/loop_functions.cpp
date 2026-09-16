@@ -4648,6 +4648,15 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         // local LoRa-APRS position-messages send to LoRa TX
         addTxRingEntry(msg_buffer, (uint16_t)ilng, 0xFF, "user_pos"); // 0xFF no retransmission
 
+        // BOARD_T5_EPAPER gehoert in diese Kaskade, weil ihr #else-Zweig u8g2
+        // benutzt und u8g2 auf diesem Board gar nicht existiert (:364 schliesst
+        // es aus). Es fehlte hier -- das ist die VIERTE, abweichend
+        // geschriebene Kopie derselben Aussage "dieses Board treibt ein
+        // U8g2-OLED", und die einzige, die nicht mitgepflegt wurde. Gemerkt hat
+        // das niemand, weil env:t5_epaper mangels configuration.h noch nie
+        // uebersetzt hat; der erste Build ueberhaupt starb hier mit
+        // "'u8g2' was not declared in this scope". Zusammenfuehrung der
+        // Kopien: BACKLOG GRD-01, faellig mit R4-02/03.
         #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
             tdeck_send_track_view();
         #elif defined(HAS_TFT)
@@ -4655,6 +4664,8 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         #elif defined(BOARD_T_ECHO)
         // none
         #elif defined(HAS_EPAPER)
+        // none
+        #elif defined(BOARD_T5_EPAPER)
         // none
         #elif defined(BOARD_TRACKER)
         // none
