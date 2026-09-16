@@ -59,6 +59,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from extract_commands import Command, extract  # noqa: E402  (see sys.path above)
 
@@ -245,11 +247,38 @@ def eval_guard(guard: str, facts: Dict[str, Optional[bool]]) -> Optional[bool]:
     return _GuardParser(_tokenize(guard), facts).parse()
 
 
-def facts_for(platform: Platform, instrument: bool) -> Dict[str, Optional[bool]]:
+# R3-11/D2-09: MC_DIAG is the single field-diagnostics switch (see
+# src/configuration_global.h). It defaults to 1 and one env turns it off. That
+# policy is NOT repeated here -- repeating it is what R3-11 existed to stop.
+# It is read back out of the build files, so an env that starts or stops
+# setting it needs no change in this tool.
+_MC_DIAG_RE = re.compile(r"^\s*-D\s+MC_DIAG\s*=\s*(\d+)\s*$", re.M)
+
+
+def mc_diag_for(env: str, repo_root: Path = REPO_ROOT) -> bool:
+    """True unless this env's platformio.ini sets -D MC_DIAG=0."""
+    for ini in [repo_root / "platformio.ini", repo_root / "variants" / env / "platformio.ini"]:
+        if not ini.is_file():
+            continue
+        text = ini.read_text(errors="replace")
+        # only the section for this env, so a sibling's flag cannot leak in
+        start = text.find(f"[env:{env}]")
+        if start < 0:
+            continue
+        nxt = text.find("\n[", start + 1)
+        section = text[start:] if nxt < 0 else text[start:nxt]
+        m = _MC_DIAG_RE.search(section)
+        if m:
+            return m.group(1) != "0"
+    return True
+
+
+def facts_for(platform: Platform, instrument: bool, mc_diag: Optional[bool] = True) -> Dict[str, Optional[bool]]:
     return {
         "INSTRUMENT_ENABLED": instrument,
         "ESP32": platform.esp32,
         "NRF52_SERIES": platform.nrf52,
+        "MC_DIAG": mc_diag,
     }
 
 
@@ -378,7 +407,7 @@ def analyze_env(
     instrument: bool,
 ) -> EnvReport:
     platform = read_platform(elf_path)
-    facts = facts_for(platform, instrument)
+    facts = facts_for(platform, instrument, mc_diag_for(env))
     data = elf_path.read_bytes()
     report = EnvReport(env=env, elf_path=elf_path, platform=platform, instrument=instrument)
     report.total = len(by_name)
@@ -629,6 +658,35 @@ def _self_test() -> int:
         check(p_xt.esp32 is True and p_xt.nrf52 is False, "EM_XTENSA classified as ESP32")
         p_short = read_platform(short_path)
         check(p_short.esp32 is None and p_short.nrf52 is None, "truncated header -> unknown, not a crash")
+
+    # --- mc_diag_for reads the policy out of the ini, never hardcodes it ---
+    # R3-11 exists to stop "which board turns diagnostics off" being written
+    # down twice. This tool must therefore READ it, and must not be the second
+    # copy. Mutation-verified: hardcode a board name here instead and the
+    # "unknown env" case below fails.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "variants" / "tight_board").mkdir(parents=True)
+        (root / "variants" / "tight_board" / "platformio.ini").write_text(
+            "[env:tight_board]\nbuild_flags =\n\t-D SOMETHING=1\n\t-D MC_DIAG=0\n"
+        )
+        (root / "variants" / "normal_board").mkdir(parents=True)
+        (root / "variants" / "normal_board" / "platformio.ini").write_text(
+            "[env:normal_board]\nbuild_flags =\n\t-D SOMETHING=1\n"
+        )
+        # two envs in ONE file: a sibling's flag must not leak across sections
+        (root / "platformio.ini").write_text(
+            "[env:off_here]\nbuild_flags =\n\t-D MC_DIAG=0\n\n[env:on_here]\nbuild_flags =\n\t-D X=1\n"
+        )
+        check(mc_diag_for("tight_board", root) is False, "-D MC_DIAG=0 in a variant ini -> off")
+        check(mc_diag_for("normal_board", root) is True, "no flag -> on (the default)")
+        check(mc_diag_for("off_here", root) is False, "-D MC_DIAG=0 in the root ini -> off")
+        check(mc_diag_for("on_here", root) is True, "a sibling section's flag does not leak in")
+        check(mc_diag_for("no_such_env", root) is True, "unknown env -> the default, not a crash")
+
+    # --- an unknown MC_DIAG must degrade to UNKNOWN, never to a silent pass -
+    check(eval_guard("MC_DIAG", {"MC_DIAG": False}) is False, "MC_DIAG known false -> absence is by design")
+    check(eval_guard("MC_DIAG", {}) is None, "MC_DIAG unknown -> needs a human, not a pass")
 
     # --- find_envs on a partial / absent tree must not raise --------------
     with tempfile.TemporaryDirectory() as td:

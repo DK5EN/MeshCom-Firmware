@@ -161,6 +161,35 @@ static inline bool flashLayoutCompatible(int stored)
 
 #define DEFAULT_PREAMPLE_LENGTH 32
 
+// R3-11/D2-09 -- EIN Schalter fuer die Feld-Diagnose.
+//
+// Vorher gab es zwei voneinander unabhaengige Knoepfe, und das war doppelte
+// POLITIK, nicht doppelter Code:
+//
+//   MC_CAPTURE          default 1, per -D MC_CAPTURE=0 nur auf E22_XML aus
+//   INSTRUMENT_ENABLED  default 0, von KEINER einzigen Umgebung auf 1 gesetzt
+//
+// Die beiden sehen austauschbar aus, sind es aber nicht. INSTRUMENT_ENABLED
+// baut eine MESS-Firmware fuer die Bench (src/instrument.h) und ist ueberall
+// aus; MC_CAPTURE schaltet Diagnose, die im Feld gebraucht wird, und ist
+// ueberall an. Sie zusammenzulegen, indem man MC_CAPTURE hinter
+// INSTRUMENT_ENABLED haengt, haette --txcapture und die vier --spec*-Kommandos
+// aus JEDEM ausgelieferten Image entfernt -- genau INS-01 und INS-04 noch
+// einmal, diesmal mit Absicht. Betreiberentscheidung 2026-09-16: ein Schalter,
+// Vorgabe AN.
+//
+// MC_DIAG deckt jetzt beides ab, was vorher an zwei Namen hing: den
+// TX/RX-Mitschnittring (vormals MC_CAPTURE) und die vier
+// Spektrum-Parameterkommandos. INSTRUMENT_ENABLED bleibt, was es ist -- die
+// getrennte Opt-in-Messfirmware, kein Feld-Diagnoseschalter.
+//
+// Wer das abschaltet, verliert: --txcapture on/off, --specstart, --specend,
+// --specstep, --specsamples. Nach jeder Aenderung an diesem Makro gehoert ein
+// String-Scan der gebauten Images dazu (siehe BACKLOG INS-01).
+#ifndef MC_DIAG
+#define MC_DIAG 1
+#endif
+
 // Meshcom Params
 #define LONGNAME_MAXLEN 20 // maximum length of the longname
 #define TX_ENABLE 1        // switch to en/disable LoRa TX

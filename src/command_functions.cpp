@@ -914,8 +914,16 @@ void commandAction(char *umsg_text, bool ble)
             delay(100);
             printlndeb("--softserread   on/off (show rx msg)");
             delay(100);
+            // INS-04-Muster: die Hilfe darf ein Kommando nicht bewerben, das
+            // in DIESEM Image gar nicht existiert. Genau das war der T-Deck-
+            // Mute-Fehlbericht -- "Sound on" stand im Menue, --mute war
+            // wegkompiliert. Der String-Scan nach R3-11 fand hier dasselbe:
+            // E22_XML (MC_DIAG=0) trug "specstart" noch genau einmal im Image,
+            // und das war diese Zeile.
+            #if MC_DIAG
             printlndeb("--spectrum  run spectral scan  --specstart MHz --specend MHz  --specstep MHz  --specsamples 500-2048");
             delay(100);
+            #endif
             //own-call-ssid:PARM.VOLT,AMPERE,BATT,,,track,-,-,-,-,-,-,-
             printlndeb("--parm tm1,tm2,tm3,tm4,tm5 (measured value name ... not used leave blank)");
             delay(100);
@@ -4034,6 +4042,17 @@ void commandAction(char *umsg_text, bool ble)
 	//  float node_specstep = 0.025;
 	//  int node_specsamples = 2048;
     //
+    // R3-11/D2-09: die vier Spektrum-Parameterkommandos haengen am selben
+    // Schalter wie der Mitschnittring -- EIN Schalter fuer die Feld-Diagnose
+    // statt zweier. MC_DIAG ist Vorgabe 1; nur E22_XML (die RAM-knappste
+    // Variante) baut mit -D MC_DIAG=0 und verliert sie zusammen mit
+    // --txcapture. Begruendung in configuration_global.h.
+    //
+    // Das einleitende `else` steht MIT im Block: faellt er weg, liefert die
+    // naechste Gruppe ihr eigenes `else` (#if NRF52_SERIES bzw. #if ESP32,
+    // beide direkt darunter, danach ein unbedingtes `else`). Genau die
+    // Kollision, die in D2-06 fuenf Boards zerlegt hat.
+    #if MC_DIAG
     else
     if(commandCheck(msg_text+2, (char*)"specstart ") == 0)
     {
@@ -4128,6 +4147,7 @@ void commandAction(char *umsg_text, bool ble)
 
         return;
     }
+    #endif // MC_DIAG
     //
     ///////////////////////////////////////////////////////////////////////////
     // Field diagnostics for gateway operators. Deliberately NOT part of the
