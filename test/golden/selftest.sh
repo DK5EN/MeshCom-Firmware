@@ -28,6 +28,13 @@ python3 test/golden/carve_extern_lint.py --self-test
 python3 test/golden/carve_extern_lint.py
 python3 test/golden/command_ladder_lint.py --self-test
 python3 test/golden/command_ladder_lint.py
+# W3 bench 2026-09-16: the persist-only schema rows are never exported, so the
+# upgrade check that diffs GET /config.json cannot see them -- 12 of the 17 had
+# no read-back at all. --persiststat is that read-back; this gate keeps it from
+# falling behind the schema, which would reopen the gap invisibly.
+# Mutation-verified: drop one printed field and it fails.
+python3 test/golden/persist_readback_lint.py --self-test
+python3 test/golden/persist_readback_lint.py
 # settings_layout_lint.py (the struct-twin diff between src/esp32/esp32_flash.h
 # and src/nrf52/WisBlock-API.h) was retired in the D1-04 W3 struct merge: with
 # ONE struct (src/meshcom_settings.h) there is no twin left to diff. Its

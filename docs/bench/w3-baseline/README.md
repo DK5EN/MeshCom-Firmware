@@ -271,10 +271,10 @@ alarm**, traced to `lfs_rename()` reporting failure on a move it had actually
 performed, and fixed by verifying the destination instead of the return value.
 See "The one real failure" below for the proof and the fix.
 
-**`W3` still does not close**, for two reasons that are now the whole
-remainder: the fixed migration path has not been through a real migration boot
-on hardware (a plain reflash does not trigger one), and 12 of the NVS-only keys
-have no read-back command.
+**`W3` CLOSES with this run.** Both remainders were cleared the same day: the
+fixed migration path went through a real downgrade-then-upgrade on `DK5EN-90`
+and printed `legacy_migrated`, and `--persiststat` now reads back all 17
+persist-only keys. Both are written up at the end of this section.
 
 ### The baselines in section 1 had drifted and could not be used
 
@@ -434,3 +434,58 @@ wiscore_rak4631 --target upload` printed `[SUCCESS]` over an nrfutil run that
   left the old image in place; it was caught only by checking the running build
   afterwards. Use `--dfu` (sets `GPREGRET=0x57`), wait ~4 s for
   `/Volumes/RAK4631`, copy the `.uf2`, and verify the build string after.
+
+### Closing the two remainders -- same day
+
+**1. A real migration boot, from genuine official firmware.** A plain reflash
+does not trigger one, so the downgrade-then-upgrade was forced: official
+`v4.35t` (`wiscore_rak4631.uf2`, published 2026-09-10, the pre-cutover
+raw-blit `save_settings()`) flashed onto `DK5EN-90`, then the `W3c`+fix build
+on top. The downgrade preserved every seeded value on its own -- callsign,
+`node_utcof` 2, `bt_code` 424242, `node_atxt`, `node_name`, webserver on -- so
+the "before" for this run is a genuine official-firmware export
+(`rak90-config-20260916-official-pre.json`, layout 20260724, 103 keys).
+
+The upgrade boot (`rak90-migration-proof-20260916.txt`):
+
+    [SETST];path;legacy_rewritten
+    [SETST];path;sanity_gate_rejected;read_ok=1;fields_set=105;unknown_keys=0;malformed_lines=0;node_call_empty=0
+    [SETST];save;ok;bytes=15
+    [SETST];save;encoded;bytes=1458
+    [SETST];save;skipped_unchanged;bytes=1458
+    [SETST];path;legacy_migrated          <- the marker W3 was waiting for
+
+`sanity_gate_rejected` rather than `keyed_absent` this time, and that is
+correct: the keyed store from the earlier run was still present and healthy
+(105 fields), but `legacy_rewritten` refuses the fast path anyway -- the Task 7
+addendum in `init_flash()`, doing exactly what it says. Result against the
+official-firmware baseline: **102 preserved, 0 changed, 0 lost**, plus the two
+by-design removals; boot 2 loads `path;keyed` with 105 fields and no
+`legacy_rewritten`. Post-upgrade export
+`rak90-config-20260916-migrated-post.json`.
+
+Note what this run does **not** re-exercise: the store's content was unchanged,
+so the save short-circuited on `skipped_unchanged` and no rename was attempted.
+The false-negative fix above is proven natively and mutation-verified, not by
+this boot.
+
+**2. All 17 persist-only keys are readable.** `--persiststat` was a T-Deck-only
+probe printing four switches. It now prints every
+`SETTINGS_PERSIST_ONLY_LIST(_PLATFORM)` row: four common ones on every board,
+and the 13 T-Deck rows under the same guard as their struct members -- which
+now includes `BOARD_T_DECK_PRO`, left out by the old copy although the members
+exist there. The `stat` line keeps its exact HL-03/HL-04 wording and field
+order, because bench captures grep for it verbatim.
+
+On `DK5EN-14`, byte-identical across a reboot:
+
+    [PERSIST];meta;fversion;20260724;mversion;46;cflash;0;fwversion;4.35t
+    [PERSIST];stat;flash;0;sd;0;immediate;0;mute;1
+    [PERSIST];ui;kblock;1;bllock;0;kllock;1;kblsync;0;map;0;modus;1;wifion;1
+    [PERSIST];audio;start;/
+    [PERSIST];audio;msg;/
+
+`test/golden/persist_readback_lint.py` (in `selftest.sh`) pins the printed set
+to the schema rows, mutation-verified by dropping one printed field. Without it
+a new schema row would reopen the gap invisibly -- which is the whole nature of
+this class of bug: it is unobservable in the export diff by construction.

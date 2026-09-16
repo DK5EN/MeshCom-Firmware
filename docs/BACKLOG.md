@@ -6,7 +6,7 @@ Working document for picking the campaign back up. Records **what we set out to 
 
 _(Previously `resume.md` in the repository root.)_
 
-**Last updated 2026-09-16 — DRY campaign stand.** The one-shot PR campaign (§3.8af)
+**Last updated 2026-09-16 (W3 closed) — DRY campaign stand.** The one-shot PR campaign (§3.8af)
 has a single place that says where it stands and what finishing it takes: **"Campaign stand
 2026-09-15"** in §3.8af, with the phase table, the per-row remainder and the plan-day arithmetic
 (**~29 working days** to the PR, upstream review on top). Short version: phases A and B are done,
@@ -5231,13 +5231,13 @@ allocated **`TD-16`** to a different T-Deck bug, and ours was renumbered to
 **`TD-19`** because theirs is already public in the merged PR #1140. Five of
 our own commit messages still say `TD-16` and are stale as a result.
 
-| Phase                        | Rows                               | State                                                                                                                                                                                                         |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                                                                                                   |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                                                                                             |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run                                                                                  |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` code complete (W3c 2026-09-15), bench-run 2026-09-16: ESP32 half passes on two nodes, nRF52 migration marker fails -- `W3` stays open**, `W4`-`W7` and `C4d` **not started** |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                                                                                                 |
+| Phase                        | Rows                               | State                                                                                                                                                                                                              |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A -- prepare                 | `A1`-`A4`                          | **done** except `P0.9` (protocol templates)                                                                                                                                                                        |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**; `GLD-01`/`GLD-02` are recorded limits of the G0 baseline, not open work                                                                                                                                  |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 4 of 29 rows open** (was 8): `DR-12`/`DR-13` ride with `W3`, `DR-03`/`DR-16` wait for the `E1` G2 run                                                                                       |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1` **done**, `W2` done, **`W3` DONE 2026-09-16** (bench-proven on all three nodes, `legacy_migrated` on a forced downgrade-then-upgrade, all 17 persist-only keys readable), `W4`-`W7` and `C4d` **not started** |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**; `E5` is upstream review, outside our control                                                                                                                                                      |
 
 ##### What each open row still needs
 
@@ -5360,11 +5360,30 @@ our own commit messages still say `TD-16` and are stale as a result.
      that keeps a genuine no-op failure failing so the fix cannot degrade into
      "any reported rename failure is fine".
 
-     **What still blocks `W3`:** the fixed path has **not** been through a real
-     migration boot on hardware -- a plain reflash does not trigger one (boots
-     4 and 5 went straight to `path;keyed`), so reaching it again means forcing
-     a downgrade-then-upgrade. `DK5EN-90` runs the fixed image and re-exports
-     clean (102 preserved, 0 changed, 0 lost).
+     **Both remainders closed the same day, `W3` is DONE.**
+
+     _A real migration boot._ Forced with a genuine downgrade-then-upgrade:
+     official `v4.35t` (`wiscore_rak4631.uf2`, 2026-09-10) onto `DK5EN-90`,
+     then the `W3c`+fix build. The downgrade preserved every seeded value by
+     itself, so the "before" is a real official-firmware export. The upgrade
+     boot printed `legacy_rewritten` -> `sanity_gate_rejected` (correct: the
+     Task 7 addendum refuses the fast path once the blob CRC moved, even with a
+     healthy keyed store) -> **`legacy_migrated`**. 102 preserved, 0 changed,
+     0 lost, 2 removed by design; boot 2 loads `path;keyed` with 105 fields.
+     Proof `docs/bench/w3-baseline/rak90-migration-proof-20260916.txt`, exports
+     `rak90-config-20260916-{official-pre,migrated-post}.json`. It does not
+     re-exercise the rename false negative -- the store was unchanged, so the
+     save short-circuited on `skipped_unchanged`.
+
+     _All 17 persist-only keys readable._ `--persiststat` was a T-Deck-only
+     probe printing four switches; it now prints every
+     `SETTINGS_PERSIST_ONLY_LIST(_PLATFORM)` row -- four common on every board,
+     13 T-Deck rows under the same guard as their struct members, now including
+     `BOARD_T_DECK_PRO` which the old copy omitted although the members exist
+     there. The `stat` line keeps its exact HL-03/HL-04 wording (bench captures
+     grep it verbatim). Byte-identical across a reboot on `DK5EN-14`.
+     `test/golden/persist_readback_lint.py` pins the printed set to the schema
+     rows so a new row cannot reopen the gap invisibly -- mutation-verified.
 
      **Closed by the same run:** the `Counters` migration is verified on both
      platforms with the new `--msgid` probe (`DK5EN-93` 182 -> 282 -> 382,

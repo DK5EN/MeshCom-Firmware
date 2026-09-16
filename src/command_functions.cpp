@@ -829,7 +829,7 @@ void commandAction(char *umsg_text, bool ble)
             // so they exist in every T-Deck image) -- this line used to
             // advertise them on every board unconditionally.
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-            printlndeb("--mute on/off  Ton stumm\n--persistflash on/off  Positionen ins Flash\n--persistsd on/off  Positionen auf SD\n--immediatesave on/off  sofort speichern\n--persiststat  Zustand der vier Schalter\n");
+            printlndeb("--mute on/off  Ton stumm\n--persistflash on/off  Positionen ins Flash\n--persistsd on/off  Positionen auf SD\n--immediatesave on/off  sofort speichern\n--persiststat  alle nur-NVS-Werte lesen\n");
             delay(100);
             #endif
             
@@ -4886,6 +4886,60 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     #endif
+    else
+    // --persiststat: every setting that is persisted but NEVER exported.
+    //
+    // settings_schema.h's SETTINGS_PERSIST_ONLY_LIST(_PLATFORM) rows are
+    // deliberately absent from GET /config.json (config_json.h says why), so
+    // the W3 upgrade check -- which diffs exactly that export -- is blind to
+    // all 17 of them. That is the TD-19 trap in general form: a node can come
+    // through a migration "byte-identical" on every exported field and still
+    // have lost its keyboard lock. This command is the read-back that closes
+    // it, so the set printed here must track those schema rows exactly.
+    //
+    // Field diagnostic, NOT part of the INSTRUMENT_ENABLED surface below: the
+    // migration it exists to check happens on shipped images.
+    //
+    // The four common rows print on every board. The 13 T-Deck rows are
+    // guarded with the SAME condition as their struct members
+    // (meshcom_settings.h MESHCOM_SETTINGS_MEMBERS_TDECK) and their schema
+    // rows -- including BOARD_T_DECK_PRO, which the old T-Deck-only copy of
+    // this command left out even though the members exist there.
+    //
+    // The `stat` line keeps its exact HL-03/HL-04 wording and field order:
+    // tools/bench and docs/bench captures grep for it verbatim.
+    if(commandCheck(msg_text+2, (char*)"persiststat") == 0)
+    {
+        Serial.printf("[PERSIST];meta;fversion;%d;mversion;%d;cflash;%d;fwversion;%s\n",
+                      meshcom_settings.node_fversion,
+                      meshcom_settings.node_mversion,
+                      meshcom_settings.node_cleanflash,
+                      meshcom_settings.node_fwversion);
+
+        #if defined(ESP32) && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO))
+        Serial.printf("[PERSIST];stat;flash;%d;sd;%d;immediate;%d;mute;%d\n",
+                      meshcom_settings.node_persist_to_flash ? 1 : 0,
+                      meshcom_settings.node_persist_to_sd ? 1 : 0,
+                      meshcom_settings.node_immediate_save ? 1 : 0,
+                      meshcom_settings.node_mute ? 1 : 0);
+
+        Serial.printf("[PERSIST];ui;kblock;%d;bllock;%d;kllock;%d;kblsync;%d;map;%d;modus;%d;wifion;%d\n",
+                      meshcom_settings.node_keyboardlock ? 1 : 0,
+                      meshcom_settings.node_backlightlock ? 1 : 0,
+                      meshcom_settings.node_kbllightlock ? 1 : 0,
+                      meshcom_settings.node_kbl_sync ? 1 : 0,
+                      meshcom_settings.node_map,
+                      meshcom_settings.node_modus,
+                      meshcom_settings.node_wifion ? 1 : 0);
+
+        // One path per line: these are free-text char[128] and a ';' inside a
+        // path would otherwise split a field of the line above.
+        Serial.printf("[PERSIST];audio;start;%s\n", meshcom_settings.node_audio_start);
+        Serial.printf("[PERSIST];audio;msg;%s\n", meshcom_settings.node_audio_msg);
+        #endif
+
+        return;
+    }
     #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
     // T-Deck field switches: mute and the three position-persistence flags.
     // Until 2026-09-13 they sat in the INSTRUMENT_ENABLED block below and were
@@ -4946,19 +5000,6 @@ void commandAction(char *umsg_text, bool ble)
         meshcom_settings.node_immediate_save = (commandCheck(msg_text+2, (char*)"immediatesave on") == 0);
         save_settings();
         Serial.printf("[PERSIST];immediate;%d\n", meshcom_settings.node_immediate_save ? 1 : 0);
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"persiststat") == 0)
-    {
-        // HL-03/HL-04: den Zustand aller vier Schalter in einer Zeile lesbar
-        // machen -- ohne das war ueber die serielle Schnittstelle nicht einmal
-        // pruefbar, was der GUI-Schalter gerade gesetzt hat.
-        Serial.printf("[PERSIST];stat;flash;%d;sd;%d;immediate;%d;mute;%d\n",
-                      meshcom_settings.node_persist_to_flash ? 1 : 0,
-                      meshcom_settings.node_persist_to_sd ? 1 : 0,
-                      meshcom_settings.node_immediate_save ? 1 : 0,
-                      meshcom_settings.node_mute ? 1 : 0);
         return;
     }
     #endif

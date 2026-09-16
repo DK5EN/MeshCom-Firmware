@@ -2,38 +2,50 @@
 
 ## Where we are, end of 2026-09-16 (start here)
 
-Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row W3C): phases A-C
-done except two bench-only matrix rows, waves W1, W2, W3-BLE, W3c done. **The W3 bench proof ran on 2026-09-16 across all three
-nodes: every node preserved every setting. The one failing marker was traced to a false negative
-from `lfs_rename()` and fixed, so what is left of W3 is a hardware re-run of the migration boot
-and the NVS-only keys.** W4-W7, C4d and phase E not started. ~29 working days to the PR.
+Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af, Gantt row W3C). **`W3` is
+DONE** -- bench-proven on all three nodes, closed 2026-09-16. Phases A-C done except two bench-only
+matrix rows (`DR-03`/`DR-16`, waiting on the `E1` G2 run). Waves `W1`, `W2`, `W3-BLE`, `W3c`, `W3`
+done. **`W4`-`W7` and `C4d` not started**; phase E not started.
 
-| node                   | result                                                                     |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `DK5EN-93` Heltec V3   | **pass** -- 105 preserved, 0 lost, 3 live-GPS movers only                  |
-| `DK5EN-14` T-Deck Plus | **pass** -- 107 of 107, across the migration boot and a reboot             |
-| `DK5EN-90` RAK4631     | settings pass (102 + 2 removed by design); marker was a false alarm, fixed |
+| node                   | result                                                                 |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `DK5EN-93` Heltec V3   | pass -- 105 preserved, 0 lost, 3 live-GPS movers only                  |
+| `DK5EN-14` T-Deck Plus | pass -- 107 of 107, plus all 17 persist-only keys stable over a reboot |
+| `DK5EN-90` RAK4631     | pass -- `legacy_migrated` on a forced downgrade-then-upgrade, 102/0/0  |
 
-Full write-up and the captures: `docs/bench/w3-baseline/README.md` §7.
+Write-up and captures: `docs/bench/w3-baseline/README.md` §7.
 
-**First thing next session -- what is left of W3:**
+**Next: `W4` (command table, `D2-10` -> `D2-06`/`D2-07`).** Ownership scouted 2026-09-16:
 
-1. **A real migration boot on the fixed nRF52 path.** `legacy_migration_failed` turned out to be a
-   false alarm -- `lfs_rename()` reported failure on a move it had actually performed (the store
-   did not exist at boot start, the pre-cleanup inventory shows the destination at its new size
-   with no `.tmp`, and a later save in the same boot finds it byte-identical), and the retry then
-   failed for a second reason because its source was already gone. **Fixed**: `writeFileAtomic()`
-   verifies the destination and accepts the write (`[SETST];save;rename_false_negative`) instead of
-   retrying. Two mutation-verified tests. What is left is the hardware arm: a plain reflash does
-   not trigger a migration boot, so forcing one means a downgrade-then-upgrade on `DK5EN-90`.
-2. **The 12 NVS-only keys with no read-back.** `--persiststat` covers four, `--info` one. Either
-   extend `--persiststat` to the rest of the block (`node_audmsg`, `node_audstart`, `node_bllock`,
-   `node_cflash`, `node_kblock`, `node_kblsync`, `node_map`, `node_modus`, `node_wifion`) or accept
-   them as unmeasured and say so in the row. Note the real count is **17**, not the 25 W3 quotes.
+- `D2-10` must land FIRST -- an exact-match variant of `commandCheck()` plus the 13 order-dependent
+  prefix pairs. `D2-06` (120 on/off toggles) and `D2-07` (71 setters) both depend on it.
+- It is all one file: `src/command_functions.cpp`, 6 469 lines, 309 `commandCheck()` cases in one
+  ladder (293-5747) under 42 distinct `#if` guards. **W4 cannot be parallelised across writers** --
+  one file, one owner, serial sub-steps.
+- **Blocker: the golden capture (`D2-V`) does not exist**, and it is the only safety net -- there is
+  no `test_command_table` today. Capture it on hardware BEFORE touching the ladder:
+  `tools/bench/console_golden.py` (USB + TCP 2323) and `tools/bench/ble_golden.py`, normalised by
+  `test/golden/normalize.py`, compared with `test/golden/verify_captures.py`. Exclude the
+  destructive commands (`--reboot`, `--dfu`, `--deepsleep`, `--cleanflash`, `--ota-update`,
+  `--spiffs reset`).
+- Wire contract: six distinct echo styles must be preserved per row; `--msgid`/`--persiststat`
+  (added 2026-09-16) are part of the ladder now and must survive the conversion.
 
-Then W4 (command table, `D2-10`). **Bench flashing:** the RAK goes through `--dfu` +
-`/Volumes/RAK4631` + `.uf2` -- `pio run --target upload` prints `[SUCCESS]` over a failed nrfutil
-DFU and leaves the old image running. Always check the build string afterwards.
+**Sequencing for the rest of phase D**, from the same scouting:
+
+- `W5` (RAM rows) and `W6` (shared UDP handler) **both edit `src/loop_functions.cpp`** -- they
+  cannot run in parallel. `W5` also has five open operator decisions (`OPT-D3`, `OPT-D4`,
+  `R3-11`/`D2-09`, `R3-03`, the OLED-less board list) and its `R4-01` target (T-Deck Pro LVGL to
+  PSRAM) has no bench unit.
+- `W6` must land `EXT-01` (telemetry-frame socket churn, `src/extudp_functions.cpp:629-665`) before
+  or with the wave, not after.
+- `C4d` (`DR-03`, `DR-14`, `DR-16`) is a 1-day mini-wave after `W6`; `DR-14` owes a source comment.
+- `W7` (variants) has the highest upstream-conflict surface -- sync immediately before the PR. Gate
+  tooling already exists: `test/golden/variant_macros_lint.py`.
+
+**Bench flashing:** the RAK goes through `--dfu` + `/Volumes/RAK4631` + `.uf2`; `pio run --target
+upload` prints `[SUCCESS]` over a failed nrfutil DFU. The first `cp` onto the freshly mounted
+volume often fails -- check `/Volumes/RAK4631` is gone afterwards, and retry if it is not.
 
 ## 2026-09-15: W3c -- one settings struct, counters namespace, member gate (dry-unification)
 
