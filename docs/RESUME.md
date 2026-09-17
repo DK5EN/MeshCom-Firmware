@@ -1,6 +1,48 @@
 # RESUME — pick up here
 
-## Where we are, end of 2026-09-17 (start here)
+## Where we are, 2026-09-17 late evening (start here)
+
+Branch `dry-unification`, closing run of the DRY campaign. Operator decisions
+taken 2026-09-17 evening: **no merge, no push, no upstream PR -- this branch is
+the PoC**; `E3` (upstream resync) is therefore dropped, `W7-II(b)` goes on the
+current base; `W7-II(a)`, `W7-II(b)` and `D1-10` are all in scope; `H6` runs on
+the instrument image and closes as "done as scoped"; the end state is commits
+on this branch, nothing else.
+
+| wave | what                                                              | state                                                                                                                   |
+| ---- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1    | `ETH-03` fix + `DR-28`                                            | **committed `173a2970`**. Bench PASS for ETH-03 still owed (RAK stuck in serial-DFU, see below)                         |
+| 2    | `H4` instrument (`ble_golden.py` timestamp, `--maxhop` restore)   | **committed `289cf64b`**                                                                                                |
+| 3    | `W7-II(a)` presence flags, `W7-II(b)` `extends=` in variant inis  | in flight, two writers, disjoint files; gates: `variant_macros_effective.py` byte-identical, `variant_ini_effective.py` |
+| 4    | `D1-10` loop scheduler                                            | scouting; carve + `native_loop_scheduler` twin                                                                          |
+| 5    | `E1` G2 after-run on the FINAL image: `H4`, `H6`, `H11`, `ETH-02` | last, because `DR-28` moves the T-Deck MHeard screen and `H4`/`H6` must capture the end state                           |
+| --   | `E3` upstream resync                                              | **dropped by decision** (no merging on this branch)                                                                     |
+
+**`ETH-03` was a stack overflow, not a ring overflow.** One inbound EXTUDP
+datagram resets DK5EN-90 (`RESETREAS=0x4`, the N-22 signature). The Adafruit
+core's loop task has a fixed 4 kB stack; the August watermark on this path was
+956 B, and `R2-04` (this morning) put ~1.2 kB more `aprsMessage` text on it.
+Fix: `nrf52loop()` runs in an 8 kB task via `Scheduler.startLoop()`
+(`src/main.cpp`). The `[RING] overflow` line that led the investigation astray
+fired on an EMPTY ring (`iWrite == iRead`); it now tests `txRingDepth()`.
+Regression instrument: `tools/bench/eth03_probe.py` (FAIL on `d05a0dc3`).
+
+**HARDWARE: DK5EN-90 needs a physical double-tap again.** Flashing the fix over
+DFU serial failed the same way RESUME already documents (bootloader answers
+"No data received"), and `--dfu` landed in serial-only DFU without a UF2
+volume. The node now sits in the bootloader (USB name `WisBlock RAK4631`).
+Recovery: double-tap reset, then `cp ~/Desktop/rak4631-eth03-fix.uf2
+/Volumes/RAK4631/` (a fresh copy of `.pio/build/wiscore_rak4631/firmware.uf2`
+from HEAD works too), then
+`python3 tools/bench/eth03_probe.py --port /dev/cu.usbmodem2101 --ip 192.168.68.66 --n 4`
+must print `=== overall PASS` with a `stack_hwm` per datagram. The node still
+has `--extudp on` / `--extudpip 192.168.68.58` from the bench; set both back
+afterwards.
+
+**`DR-28` is now implemented** (`mheardSortedIndex()`, four renderers,
+tests rewritten; the correction below stays as history).
+
+## Where we are, end of 2026-09-17 (before the closing run)
 
 Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af). **Phases A, B and C are
 closed. Phase D is one row short of closed.** The Gantt now stands at **24 of 28 active
