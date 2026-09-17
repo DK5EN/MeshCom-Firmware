@@ -150,3 +150,23 @@ class TestMaxhopRestore(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RestoreOverrideTest(unittest.TestCase):
+    """--restore "<cmd> <value>" replaces the value of the matching RESTORE: line."""
+
+    def test_override_replaces_corpus_default(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "writes.txt"
+            p.write_text("--info\nRESTORE:--maxhop 4\n")
+            got = bg.read_corpus(p, bg.parse_restore_args(["--maxhop 2"]))
+            self.assertEqual(got, [("--info", False), ("--maxhop 2", True)])
+            # a different command is untouched
+            got = bg.read_corpus(p, bg.parse_restore_args(["--txpower 1"]))
+            self.assertEqual(got[1], ("--maxhop 4", True))
+
+    def test_bare_word_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            bg.parse_restore_args(["--maxhop"])

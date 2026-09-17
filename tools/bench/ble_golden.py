@@ -65,7 +65,7 @@ import struct
 import sys
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 NUS_TX_CHAR = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"   # phone -> node (write)
@@ -141,17 +141,40 @@ def decode_notify(frame: bytes) -> str:
 RESTORE_PREFIX = "RESTORE:"
 
 
-def read_corpus(path: Path) -> List[Tuple[str, bool]]:
-    """One (text, is_restore) pair per line; '#' comments and blanks ignored."""
+def read_corpus(path: Path, restore_override: Optional[Dict[str, str]] = None) -> List[Tuple[str, bool]]:
+    """One (text, is_restore) pair per line; '#' comments and blanks ignored.
+
+    `restore_override` maps a command word (e.g. "--maxhop") to the value the
+    RESTORE: line for that command should carry instead of the corpus's fleet
+    default. The corpus cannot know a node's own setting (the node does not
+    answer `--maxhop` over BLE), and DK5EN-93 runs with max_hop 2 while the
+    compile-time default is 4 -- restoring "the default" would overwrite an
+    operator setting. Pass `--restore "--maxhop 2"` per node.
+    """
     out: List[Tuple[str, bool]] = []
     for raw in path.read_text().splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         if line.startswith(RESTORE_PREFIX):
-            out.append((line[len(RESTORE_PREFIX):].strip(), True))
+            cmd = line[len(RESTORE_PREFIX):].strip()
+            word = cmd.split()[0] if cmd else ""
+            if restore_override and word in restore_override:
+                cmd = f"{word} {restore_override[word]}"
+            out.append((cmd, True))
         else:
             out.append((line, False))
+    return out
+
+
+def parse_restore_args(values: Optional[List[str]]) -> Dict[str, str]:
+    """`--restore "--maxhop 2"` -> {"--maxhop": "2"}; rejects a bare word."""
+    out: Dict[str, str] = {}
+    for v in values or []:
+        parts = v.split(None, 1)
+        if len(parts) != 2:
+            raise SystemExit(f"--restore needs '<command> <value>', got {v!r}")
+        out[parts[0]] = parts[1].strip()
     return out
 
 
@@ -483,7 +506,7 @@ async def run(args: argparse.Namespace) -> int:
     own = args.own_call or args.name or ""
     own_calls = tuple(c.strip() for c in own.split(",") if c.strip())
     cap = Capture(own_calls)
-    corpus = read_corpus(args.corpus) if args.corpus else []
+    corpus = read_corpus(args.corpus, parse_restore_args(args.restore)) if args.corpus else []
 
     async with BleakClient(target) as client:
         await client.start_notify(NUS_RX_CHAR, cap.on_notify)
@@ -859,6 +882,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--pin-file", type=Path, default=None,
                     help="read the PIN from a file instead of the command line")
     ap.add_argument("--corpus", type=Path, default=None, help="write corpus, one line per write")
+    ap.add_argument("--restore", action="append", default=None, metavar="'--cmd value'",
+                    help="value a RESTORE: corpus line puts back for this node, e.g. "
+                         "\"--maxhop 2\" (repeatable); default is the corpus's fleet default")
     ap.add_argument("--out", type=Path, default=Path("."), help="capture directory")
     ap.add_argument("--timestamp", type=int, default=CORPUS_TIMESTAMP,
                     help="fixed unix time for the timesync frame")
