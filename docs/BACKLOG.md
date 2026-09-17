@@ -6697,6 +6697,58 @@ toolchain needed.
 tool's behaviour is correct -- the glob simply finds it now -- only the comment
 is stale.
 
+### 3.8ar `E1` part 1 -- `H8` passes on ESP32, and the RAK answers nothing (2026-09-17)
+
+`E1`'s scope is fixed by what G1 captured under operator decision 5: `H4` BLE,
+`H6` UDP-1990 inbound, `H8` EXTUDP, `H11` T-Deck checklist. Nothing else has a
+baseline, so nothing else is comparable.
+
+**`H8` on `DK5EN-93` (Heltec V3): PASS.** All 23 corpus objects, stock `HEAD`
+build, compared with `test/golden/compare_extudp.py`:
+
+```
+A 8 corpus responses, 3 relayed, 0 beacons     <- G1
+B 8 corpus responses, 1 relayed, 4 beacons     <- G2
+corpus responses identical (8)
+```
+
+Relayed and beacon counts differ by design -- live traffic and free-running
+timers -- and the tool declares that a non-failure. The comparable surface is
+identical. Artefacts in `test/golden/hw/G2/heltec-93/extudp/`.
+
+**`H8` on `DK5EN-90` (RAK4631): 0 of 23.** G1 recorded 8 responses from this
+node on the same corpus. Configuration verified correct, link up, two reboots,
+and the `--webserver off` theory (the W5100S has four hardware sockets) refuted
+rather than merely untested. The same host sender drove the Heltec to a clean
+pass minutes earlier. Full write-up and what is still unmeasured:
+`test/golden/hw/G2/rak-90/extudp/FINDING.md`.
+
+This is the second independent sighting of the nRF52 EXTUDP path misbehaving --
+§3.8l already carries "EXTUDP on the RAK4631, reported crash" as an open row --
+and the first with a controlled same-hour comparison against a working ESP32
+node. It also explains a gap that would otherwise look like an oversight:
+**`EXT-01` is confirmed on ESP32 only** (§3.8ao), and this is why it could not
+be confirmed on nRF52.
+
+**Not run, and why**, so the Gantt row is not read as more than it is:
+
+| Step  | State                                                                                                                |
+| ----- | -------------------------------------------------------------------------------------------------------------------- |
+| `H4`  | BLE golden. Needs two agreeing captures of the UNCHANGED image before any before/after diff is evidence; not started |
+| `H6`  | UDP-1990 inbound. Needs the stub server; not started                                                                 |
+| `H8`  | **done** on Heltec-93 (pass) and RAK-90 (finding above)                                                              |
+| `H11` | T-Deck checklist -- **impossible today**, `DK5EN-14` is not connected                                                |
+
+**A capture was thrown away before the passing one, and the reason generalises.**
+The first RAK run recorded two datagrams that came from **192.168.68.71**, the
+Heltec: its `--extudp off` had been sent over a freshly opened CP2102 port,
+which resets the board, and the reset swallowed the command. One node was still
+streaming into another node's capture. Recording the source address per datagram
+is what caught it -- `compare_extudp.py` names this as GLD-01 gap 2 and cannot
+check it itself, because `normalize.py` has masked the address to `<ADDR>` by
+the time the comparison runs. Rule for the next run: shut a node down with
+`--wait-boot`, verify with `--info`, and only then arm the next one.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
