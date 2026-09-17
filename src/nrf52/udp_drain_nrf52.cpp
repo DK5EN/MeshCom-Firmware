@@ -17,11 +17,25 @@ extern uint8_t err_cnt_udp_tx;
 // File-static in nrf52_main.cpp before the carve, and used by nothing but
 // this function, so it moves here rather than becoming a global.
 static uint8_t convBuffer[UDP_TX_BUF_SIZE+50];
+// DR-25: the outbound leak logger, defined alongside logRxDropUnconfigured()
+// in lora_functions.cpp.
+void logTxLeakUnconfigured(const char *call);
 
 /**@brief UDP tx Routine
  */
 void sendUDP()
 {
+    // DR-21, RE-DECIDED 2026-09-12 (fable Findings 1/2/12; operator: narrow
+    // to parity). ESP32 refuses to drain while the resolved gateway server
+    // address is unset (udp_drain_esp32.cpp, node_hostip == 0); this is
+    // nRF52's own equivalent concept, neth.udp_dest_addr (already read by
+    // udp_frame_nrf52.cpp's CONF guard, DR-08). ESP32's other two
+    // preconditions do NOT port: hasIPaddress is already the sole caller's
+    // gate (gateway_service_nrf52.cpp:28-34) and nRF52 has no AP mode, so
+    // porting them would be vacuous or wrong, not just extra.
+    if((uint32_t)neth.udp_dest_addr == 0)
+        return;
+
     if(udpWrite != udpRead)
     {
         if(bDisplayCont)
@@ -45,7 +59,23 @@ void sendUDP()
             uint16_t msg_len = udpSnapshot[0];
 
             // send it over UDP
-            if (!neth.sendUDP(udpSnapshot + 1, msg_len))
+            // DR-24: nRF52's shape -- key on the one result NrfETH::sendUDP()
+            // gives (it wraps write+endPacket, nrf_eth.cpp), never retry,
+            // always fall through to decode/print and the advance/zero
+            // block below. ESP32 now matches this (udp_drain_esp32.cpp).
+            // ADVISOR-BEFUND W6b (F6): err_cnt_udp_tx wurde nur im Limit-Zweig
+            // selbst zurueckgesetzt, nie bei Erfolg -- der Zaehler zaehlte also
+            // Fehler ueber die ganze Laufzeit statt hintereinander. Zehn ueber
+            // Wochen verstreute Sendefehler loesen sonst denselben vollen Reset
+            // aus wie zehn in Folge. MAX_ERR_UDP_TX legt AUFEINANDERFOLGENDE
+            // nahe; auf beiden Plattformen jetzt gleich, damit die eine Form
+            // auch eine Bedeutung hat.
+            bool udp_tx_ok = neth.sendUDP(udpSnapshot + 1, msg_len);
+
+            if (udp_tx_ok)
+                err_cnt_udp_tx = 0;
+
+            if (!udp_tx_ok)
             {
                 Serial.printf("Sending UDP Packet failed <%i>!\n", msg_len);
 
@@ -65,38 +95,52 @@ void sendUDP()
                     neth.resetDHCP();
                 }
             }
-            else
+
+            // DR-22, DECIDED 2026-09-12 esp32-correct: decode/print moved out
+            // of the success-only branch -- a frame whose write failed must
+            // still be logged (which frame, not just how many), and once
+            // DR-24 makes both platforms drop-and-log on failure that log
+            // line is the only record of what was lost.
+            //
+            // UDP DATA Header 36 byte. Der Slot enthaelt msg_len Bytes ab
+            // Offset 1 (Header + APRS-Frame); msg_len Bytes ab Offset 1+36 zu
+            // kopieren las 36 Bytes ueber das Geschriebene hinaus — bei
+            // msg_len > 239 sogar ueber das Slot-Ende (Slot ist
+            // UDP_TX_BUF_SIZE+20). Wahre APRS-Laenge ist msg_len-36.
+            // (Nebenbefund aus dem CONC-16-Commit; auf nRF52-Gateways aktiv —
+            // Schreiber ist addUdpOutBuffer() via addNodeData(), auf
+            // Hardware am TX-UDP-Log verifiziert.)
+            uint16_t aprs_len = (msg_len > 36) ? (uint16_t)(msg_len - 36) : 0;
+            memcpy(convBuffer, udpSnapshot + 1 + 36, aprs_len);
+
+            if(aprs_len > 0 && (convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40))
             {
-                // UDP DATA Header 36 byte. Der Slot enthaelt msg_len Bytes ab
-                // Offset 1 (Header + APRS-Frame); msg_len Bytes ab Offset 1+36
-                // zu kopieren las 36 Bytes ueber das Geschriebene hinaus — bei
-                // msg_len > 239 sogar ueber das Slot-Ende (Slot ist
-                // UDP_TX_BUF_SIZE+20). Wahre APRS-Laenge ist msg_len-36.
-                // (Nebenbefund aus dem CONC-16-Commit; auf nRF52-Gateways
-                // aktiv — Schreiber ist addUdpOutBuffer() via addNodeData(),
-                // auf Hardware am TX-UDP-Log verifiziert.)
-                uint16_t aprs_len = (msg_len > 36) ? (uint16_t)(msg_len - 36) : 0;
-                memcpy(convBuffer, udpSnapshot + 1 + 36, aprs_len);
+                struct aprsMessage aprsmsg;
 
-                if(aprs_len > 0 && (convBuffer[0] == 0x3A || convBuffer[0] == 0x21 || convBuffer[0] == 0x40))
+                // print which message type we got
+                decodeAPRS(convBuffer, aprs_len, aprsmsg);
+
+                // RX-01 (BACKLOG 3.8k), second door, DR-25: the frame's UDP
+                // bytes were already handed to neth.sendUDP() above -- this
+                // check cannot prevent the send, it only detects that the
+                // primary guard (OnRxDone, lora_functions.cpp) failed to keep
+                // an unconfigured source out of ringBufferUDPout. Own
+                // counter/marker (stat_tx_leak_unconfigured /
+                // logTxLeakUnconfigured(), lora_functions.cpp), never the RX
+                // drop counter used at the two doors where a frame really IS
+                // stopped -- the two counts mean opposite things.
+                if(isUnconfiguredCall(aprsmsg.msg_source_call))
                 {
-                    struct aprsMessage aprsmsg;
-
-                    // print which message type we got
-                    decodeAPRS(convBuffer, aprs_len, aprsmsg);
-
-                    // print aprs message
-                    if(bDisplayVia)
-                    {
-                        printBuffer_aprs((char*)"[MESHu]...TX-UDP  ", aprsmsg);
-                    }
-                    else
-                    {
-                        if(bDisplayInfo)
-                        {
-                            printBuffer_aprs((char*)"TX-UDP  ", aprsmsg);
-                        }
-                    }
+                    logTxLeakUnconfigured(aprsmsg.msg_source_call);
+                }
+                // DR-26: bDisplayInfo gates the print; bDisplayVia only
+                // decorates the prefix when info is already on -- it must
+                // never add a line that --info off would have suppressed
+                // (shared-code precedent: lora_functions.cpp:1108-1160 treats
+                // via as additive, not a second gate).
+                else if(bDisplayInfo)
+                {
+                    printBuffer_aprs((char*)(bDisplayVia ? "[MESHu]...TX-UDP  " : "TX-UDP  "), aprsmsg);
                 }
             }
 

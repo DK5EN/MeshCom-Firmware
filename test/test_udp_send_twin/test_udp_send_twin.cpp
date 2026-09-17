@@ -159,12 +159,25 @@ static std::string hex_render(const uint8_t *buf, size_t len)
 static std::vector<std::string> g_payload;
 static std::vector<int> g_decoded_len;
 static std::vector<std::string> g_dropped;   // RX-01 logRxDropUnconfigured()
+// DR-25: the outbound drain's OWN leak counter/marker, kept in a SEPARATE
+// vector from g_dropped above so a test can assert the two never mix.
+static std::vector<std::string> g_leaked;    // logTxLeakUnconfigured()
 static int g_reset_udp = 0;                  // ESP32 resetMeshComUDP()
 static int g_reset_dhcp = 0;                 // nRF52 resetDHCP()
 static int g_count_tx_ok = 0, g_count_tx_fail = 0;
 
-// When set, the next write fails. Models a refused/short socket write.
+// When set, the next write fails. Models a refused/short socket write; on
+// ESP32 this ALSO fails the following udpEndRaw_esp32() (kept coupled: it is
+// what the other, still-valid drift/agreement cases in this file mean by "a
+// failed write"). On nRF52, NrfETH::sendUDP() is one call, so this alone
+// models its whole send failing.
 static bool g_write_fails = false;
+// DR-24: fails ONLY udpEndRaw_esp32() (ESP32's real send result,
+// endPacket()) while udpWriteRaw_esp32() still succeeds -- the realistic
+// hardware case (WiFiUDP::write() only buffers and cannot fail for a
+// non-empty frame). Has no nRF52 counterpart: NrfETH::sendUDP() wraps both
+// and is driven by g_write_fails alone.
+static bool g_end_fails = false;
 // When set, the sink force-advances udpRead mid-send, modelling the ring-full
 // eviction path in addRingPointer() overtaking the reader (CONC-16).
 static bool g_evict_during_send = false;
@@ -176,10 +189,12 @@ static void recorder_reset()
     g_payload.clear();
     g_decoded_len.clear();
     g_dropped.clear();
+    g_leaked.clear();
     log_reset();
     g_reset_udp = g_reset_dhcp = 0;
     g_count_tx_ok = g_count_tx_fail = 0;
     g_write_fails = false;
+    g_end_fails = false;
     g_evict_during_send = false;
     err_cnt_udp_tx = 0;
     udp_is_busy = false;
@@ -190,8 +205,8 @@ static void recorder_reset()
     node_hostip = IPAddress(44, 143, 8, 143);
     // DR-21: resolved by default, mirroring node_hostip above, so every
     // OTHER test in this file (none of which touches this field) is
-    // unaffected; test_drift_esp32_refuses_unresolved_destination_nrf52_
-    // does_not() below overrides it.
+    // unaffected; test_agreement_both_refuse_an_unresolved_destination()
+    // below overrides it.
     neth.udp_dest_addr = IPAddress(44, 143, 8, 143);
     meshcom_settings.node_hasIPaddress = true;
 }
@@ -224,8 +239,11 @@ bool udpEndRaw_esp32()
 {
     if (!g_sent.empty())
         g_sent.back().ended = true;
-    log_sink("UDPEND", g_write_fails ? "fail" : "ok");
-    return !g_write_fails;
+    // DR-24: this is the real send result on ESP32 -- fails if EITHER the
+    // joint write/end flag or the end-only flag is set.
+    bool ok = !(g_write_fails || g_end_fails);
+    log_sink("UDPEND", ok ? "ok" : "fail");
+    return ok;
 }
 
 void udpCountTx(bool ok)
@@ -241,6 +259,16 @@ void logRxDropUnconfigured(const char *call)
     std::string c = call ? call : "(null)";
     g_dropped.push_back(c);
     log_sink("DROP", c);
+}
+
+// DR-25: the outbound leak logger, shared by both platforms' drains -- kept
+// in its own vector (g_leaked) so a test can assert it never overlaps with
+// g_dropped (the RX drop counter's stub above).
+void logTxLeakUnconfigured(const char *call)
+{
+    std::string c = call ? call : "(null)";
+    g_leaked.push_back(c);
+    log_sink("LEAK", c);
 }
 
 // --- nRF52 side: NrfETH ---------------------------------------------------
@@ -539,20 +567,19 @@ static void test_drift_esp32_has_three_preconditions_nrf52_has_none(void)
                                   "changed, update the matrix");
 }
 
-static void test_drift_esp32_refuses_unresolved_destination_nrf52_does_not(void)
+static void test_agreement_both_refuse_an_unresolved_destination(void)
 {
     // DR-21, RE-DECIDED 2026-09-12 (fable Findings 1/2/12; operator: narrow
-    // to parity). ESP32 refuses to drain when the resolved gateway server
-    // address is still 0.0.0.0 (udp_drain_esp32.cpp:34, node_hostip == 0) --
-    // one of its three preconditions (the other two are covered by
-    // test_drift_esp32_has_three_preconditions_nrf52_has_none() above).
-    // nRF52's sendUDP() has no equivalent for its OWN destination-address
-    // concept (neth.udp_dest_addr -- already read by udp_frame_nrf52.cpp's
-    // CONF guard, DR-08) and enters the drain regardless. DECIDED
-    // esp32-correct, but narrowed: nRF52 gets ONLY this one early return,
-    // not ESP32's other two (hasIPaddress is already the sole caller's
-    // gate, gateway_service_nrf52.cpp:28-34, and nRF52 has no AP mode) --
-    // porting all three would be vacuous or wrong, not just extra.
+    // to parity), IMPLEMENTED: ESP32 refuses to drain when the resolved
+    // gateway server address is still 0.0.0.0 (udp_drain_esp32.cpp,
+    // node_hostip == 0) -- one of its three preconditions (the other two
+    // are covered by test_drift_esp32_has_three_preconditions_nrf52_has_
+    // none() above and stay drift, per the narrowed decision). nRF52 now has
+    // its OWN equivalent early return on ITS destination-address concept
+    // (neth.udp_dest_addr -- already read by udp_frame_nrf52.cpp's CONF
+    // guard, DR-08), and ONLY that one: hasIPaddress is already the sole
+    // caller's gate (gateway_service_nrf52.cpp:28-34) and nRF52 has no AP
+    // mode, so porting the other two would be vacuous or wrong.
     recorder_reset();
     fill_ring(2);
     node_hostip = IPAddress(0, 0, 0, 0);
@@ -562,27 +589,24 @@ static void test_drift_esp32_refuses_unresolved_destination_nrf52_does_not(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead,
                                   "esp32 advanced the ring despite an unresolved gateway server address");
 
-    // nRF52: today's bug -- neth.udp_dest_addr is 0.0.0.0 (unresolved) but
-    // sendUDP() never looks at it, so the drain runs and NrfETH::sendUDP()
-    // is called regardless.
     recorder_reset();
     fill_ring(2);
     neth.udp_dest_addr = IPAddress(0, 0, 0, 0);
     sendUDP();
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sent.size(),
-                                  "nrf52 grew the unresolved-destination precondition -- drift row "
-                                  "changed, update the matrix (DR-21 may now be fixed)");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, udpRead,
-                                  "nrf52 stopped advancing the ring on an unresolved destination -- "
-                                  "drift row changed, update the matrix");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(),
+                                  "nrf52 drained despite an unresolved destination address -- "
+                                  "DR-21's early return regressed");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead,
+                                  "nrf52 advanced the ring despite an unresolved destination address");
 }
 
-static void test_drift_failed_write_decodes_on_esp32_only(void)
+static void test_agreement_decode_and_print_survive_a_failed_send(void)
 {
-    // ESP32 decodes and prints the frame after the write regardless of the
-    // result; nRF52 does both inside the `else` of the same check, so a
-    // failed write means no decode at all. Same frame, same failure, two
-    // behaviours.
+    // DR-22, DECIDED 2026-09-12 esp32-correct, IMPLEMENTED: both drains now
+    // decode and print regardless of the send result -- ESP32 always did;
+    // nRF52's decode/print moved out of the success-only branch. A failed
+    // send is still worth knowing WHICH frame it was, not just how many (see
+    // DR-24 below: the frame is dropped either way, no retry).
     bDisplayInfo = true;
 
     recorder_reset();
@@ -598,17 +622,22 @@ static void test_drift_failed_write_decodes_on_esp32_only(void)
     fill_ring(1);
     g_write_fails = true;
     sendUDP();
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
-                                  "nrf52 started printing on a failed write");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_printed.size(),
+                                  "nrf52 stopped printing on a failed write -- DR-22 regressed");
 
     bDisplayInfo = false;
 }
 
 static void test_drift_esp32_calls_endpacket_after_a_failed_write(void)
 {
-    // ESP32 runs udpEndRaw_esp32() even when the write failed (unless the
-    // error limit tripped). nRF52's failure path is inside
-    // NrfETH::sendUDP(), which has already ended the packet itself.
+    // DR-23: both-valid, no action -- stays a drift pin, not an agreement
+    // case. ESP32 runs udpEndRaw_esp32() unconditionally now (DR-24 removed
+    // the one early return that used to skip it at the error limit).
+    // nRF52's failure path is inside NrfETH::sendUDP(), which has already
+    // ended the packet itself (nrf_eth.cpp:350-352, verified at the review)
+    // -- a layering difference, not a functional gap. Kept as a warning: a
+    // future refactor of either layer could drop the call on one side and
+    // nothing would fail loudly.
     recorder_reset();
     fill_ring(1);
     g_write_fails = true;
@@ -618,42 +647,39 @@ static void test_drift_esp32_calls_endpacket_after_a_failed_write(void)
                              "esp32 skipped endPacket after a failed write");
 }
 
-static void test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it(void)
+static void test_agreement_error_limit_drops_the_slot_on_both_sides(void)
 {
-    // The sharpest difference in the pair. On the pass where err_cnt_udp_tx
-    // reaches MAX_ERR_UDP_TX:
-    //   ESP32  resets the socket and RETURNS BEFORE THE ADVANCE -- the slot
-    //          stays in the ring for one more pass.
-    //   nRF52  resets DHCP and FALLS THROUGH to the advance -- the slot is
-    //          zeroed and dropped.
-    // Neither side wedges: err_cnt_udp_tx is zeroed before ESP32's early
-    // return, so the retained slot is dropped on the very next failing pass
-    // (the assertion below shows nine of ten frames gone). And this whole
-    // branch keys on udpWriteRaw_esp32(), which on real hardware cannot fail
-    // for a non-empty frame (WiFiUDP::write() only buffers); the real result
-    // is endPacket(), which the ESP32 drain logs and discards. Decided as
-    // DR-24 (nrf52-correct, 2026-09-12): ESP32 keys on endPacket() and drops
-    // like nRF52; this case then flips to an agreement pin. See
-    // docs/testplan/drift-matrix-review-verdict-20260912.md, Finding 1.
-    // The ring must hold more than MAX_ERR_UDP_TX slots: a failed write is
-    // not by itself an early return on either side, so each of the first
-    // nine passes still consumes a slot.
+    // DR-24, RE-DECIDED 2026-09-12 (fable Finding 1; nrf52-correct,
+    // esp32-changes), IMPLEMENTED. The row's original ESP32 failure mode did
+    // not exist: WiFiUDP::write() only buffers and cannot fail for a
+    // non-empty frame, so keying the error-limit branch on
+    // udpWriteRaw_esp32()'s result meant a real failure was never seen at
+    // all. ESP32 now keys on udpEndRaw_esp32()'s result (the real send
+    // result, endPacket()) and no longer returns early before the
+    // advance/zero block -- same shape as nRF52: reset the link on the Nth
+    // consecutive failure, log/count it, and ALWAYS drop the failing slot.
+    // No retry on either side, so neither platform can wedge on one
+    // permanently-failing frame.
+    //
+    // The two platforms fail through different knobs: ESP32's write always
+    // succeeds here and only endPacket (g_end_fails) fails, matching what
+    // can actually happen on hardware; nRF52's NrfETH::sendUDP() is one call
+    // (g_write_fails fails the whole send), matching what actually can
+    // happen there.
     const int N = MAX_RING_UDP - 1;
     TEST_ASSERT_TRUE_MESSAGE(N > MAX_ERR_UDP_TX,
                              "ring too small to reach the error limit");
 
     recorder_reset();
     fill_ring(N);
-    g_write_fails = true;
+    g_end_fails = true;
     for (int i = 0; i < MAX_ERR_UDP_TX; i++)
         sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_reset_udp, "esp32 resetMeshComUDP count");
-    // nine passes advanced; the tenth tripped the limit and returned BEFORE
-    // the advance, so the slot it failed on is still in the ring.
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_ERR_UDP_TX - 1, udpRead,
-                                  "esp32 advanced past the slot it just failed");
-    TEST_ASSERT_NOT_EQUAL_MESSAGE(0, ringBufferUDPout[MAX_ERR_UDP_TX - 1][0],
-                                  "esp32 zeroed the slot it kept for a retry");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_ERR_UDP_TX, udpRead,
+                                  "esp32 kept a failing slot instead of dropping it -- DR-24 regressed");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBufferUDPout[MAX_ERR_UDP_TX - 1][0],
+                                    "esp32 kept the slot it failed on");
     TEST_ASSERT_FALSE_MESSAGE(hasIPaddress, "esp32 kept hasIPaddress after reset");
     TEST_ASSERT_FALSE_MESSAGE(meshcom_settings.node_hasIPaddress,
                               "esp32 did not mirror hasIPaddress into settings");
@@ -664,7 +690,6 @@ static void test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it(void)
     for (int i = 0; i < MAX_ERR_UDP_TX; i++)
         sendUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_reset_dhcp, "nrf52 resetDHCP count");
-    // no early return: the tenth slot is zeroed and dropped like the others.
     TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_ERR_UDP_TX, udpRead,
                                   "nrf52 stopped advancing on a failed write");
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBufferUDPout[MAX_ERR_UDP_TX - 1][0],
@@ -673,58 +698,110 @@ static void test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it(void)
                               "nrf52 kept hasIPaddress after reset");
 }
 
-static void test_drift_rx01_unconfigured_guard_is_esp32_only(void)
+static void test_agreement_outbound_leak_counted_separately_on_both_sides(void)
 {
-    // RX-01 (BACKLOG 3.8k): a frame whose source is still the factory
-    // callsign is counted and its debug print suppressed -- on ESP32. The
-    // nRF52 drain has no such check and prints it like any other frame.
-    // Note what neither side does: the datagram has already been sent by
-    // this point on both. This is the second door, not the first.
+    // DR-25, RE-DECIDED 2026-09-12 (review corrected verdict to both-wrong),
+    // IMPLEMENTED: an unconfigured-source frame reaching this SECOND door
+    // (the frame has already been sent by this point on both platforms) is
+    // now counted on BOTH sides, under its OWN counter/marker
+    // (stat_tx_leak_unconfigured / logTxLeakUnconfigured(),
+    // lora_functions.cpp) -- NEVER the RX drop counter/marker used at the
+    // two real doors (OnRxDone's primary guard and the inbound GATE) where a
+    // frame really IS stopped. The separation is the whole point of the row:
+    // a rising RX-drop count means the primary guard is working; a rising
+    // TX-leak count means it is NOT. g_dropped and g_leaked are fed by two
+    // separate stub functions (logRxDropUnconfigured / logTxLeakUnconfigured)
+    // so this test can assert the counters never cross-contaminate.
     bDisplayInfo = true;
 
     recorder_reset();
     fill_ring(1, "XX0XXX-00");
     sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sent.size(),
-                                  "the frame is sent either way -- if this "
-                                  "became 0, RX-01's second door grew teeth "
-                                  "and the comment in the drain is stale");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_dropped.size(),
-                                  "esp32 lost the RX-01 count");
+                                  "the frame is sent either way -- this is the "
+                                  "second door, not the first");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_leaked.size(),
+                                  "esp32 lost the DR-25 leak count");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_dropped.size(),
+                                  "esp32 counted the outbound leak under the RX drop counter -- "
+                                  "the two events mean opposite things");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
                                   "esp32 printed an unconfigured source");
 
     recorder_reset();
     fill_ring(1, "XX0XXX-00");
     sendUDP();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_sent.size(),
+                                  "the frame is sent either way -- this is the "
+                                  "second door, not the first");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_leaked.size(),
+                                  "nrf52 did not grow the DR-25 leak count");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_dropped.size(),
-                                  "nrf52 grew an RX-01 guard -- drift row "
-                                  "changed, update the matrix");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_printed.size(),
-                                  "nrf52 stopped printing the frame");
+                                  "nrf52 counted the outbound leak under the RX drop counter -- "
+                                  "the two events mean opposite things");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
+                                  "nrf52 printed an unconfigured source");
 
     bDisplayInfo = false;
 }
 
-static void test_drift_nrf52_prefixes_the_print_with_mesh_when_via_is_on(void)
+static void test_agreement_via_prefixes_the_print_on_both_sides(void)
 {
-    // bDisplayVia selects a different prefix on nRF52 ("[MESHu]...TX-UDP  ");
-    // ESP32 has one prefix ("TX-UDP ") and ignores bDisplayVia entirely.
-    // Note the trailing spaces differ too -- "TX-UDP " against "TX-UDP  ".
+    // DR-26, RE-DECIDED 2026-09-12 (fable Finding 8; operator: info gates,
+    // via decorates), IMPLEMENTED: both drains now print only when
+    // bDisplayInfo is set, and bDisplayVia only decorates the prefix when it
+    // does -- "[MESHu]...TX-UDP  " with via on, "TX-UDP  " without (ESP32
+    // adopted nRF52's two-trailing-space form). --via never adds a line that
+    // --info off would have suppressed.
+    recorder_reset();
     bDisplayInfo = true;
     bDisplayVia = true;
-
-    recorder_reset();
     fill_ring(1);
     sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT(1, (int)g_printed.size());
-    TEST_ASSERT_EQUAL_STRING("TX-UDP |DK5EN-1", g_printed[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("[MESHu]...TX-UDP  |DK5EN-1", g_printed[0].c_str());
 
     recorder_reset();
+    bDisplayInfo = true;
+    bDisplayVia = true;
     fill_ring(1);
     sendUDP();
     TEST_ASSERT_EQUAL_INT(1, (int)g_printed.size());
     TEST_ASSERT_EQUAL_STRING("[MESHu]...TX-UDP  |DK5EN-1", g_printed[0].c_str());
+
+    recorder_reset();
+    bDisplayInfo = true;
+    bDisplayVia = false;
+    fill_ring(1);
+    sendMeshComUDP();
+    TEST_ASSERT_EQUAL_INT(1, (int)g_printed.size());
+    TEST_ASSERT_EQUAL_STRING("TX-UDP  |DK5EN-1", g_printed[0].c_str());
+
+    recorder_reset();
+    bDisplayInfo = true;
+    bDisplayVia = false;
+    fill_ring(1);
+    sendUDP();
+    TEST_ASSERT_EQUAL_INT(1, (int)g_printed.size());
+    TEST_ASSERT_EQUAL_STRING("TX-UDP  |DK5EN-1", g_printed[0].c_str());
+
+    // DR-26's other half: --via must never add a line that --info off would
+    // have suppressed.
+    recorder_reset();
+    bDisplayInfo = false;
+    bDisplayVia = true;
+    fill_ring(1);
+    sendMeshComUDP();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
+                                  "esp32: --via printed with --info off");
+
+    recorder_reset();
+    bDisplayInfo = false;
+    bDisplayVia = true;
+    fill_ring(1);
+    sendUDP();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_printed.size(),
+                                  "nrf52: --via printed with --info off");
 
     bDisplayVia = false;
     bDisplayInfo = false;
@@ -1113,12 +1190,12 @@ int main(int, char **)
     RUN_TEST(test_mid_send_eviction_does_not_double_advance);
 
     RUN_TEST(test_drift_esp32_has_three_preconditions_nrf52_has_none);
-    RUN_TEST(test_drift_esp32_refuses_unresolved_destination_nrf52_does_not);
-    RUN_TEST(test_drift_failed_write_decodes_on_esp32_only);
+    RUN_TEST(test_agreement_both_refuse_an_unresolved_destination);
+    RUN_TEST(test_agreement_decode_and_print_survive_a_failed_send);
     RUN_TEST(test_drift_esp32_calls_endpacket_after_a_failed_write);
-    RUN_TEST(test_drift_error_limit_esp32_retries_the_slot_nrf52_drops_it);
-    RUN_TEST(test_drift_rx01_unconfigured_guard_is_esp32_only);
-    RUN_TEST(test_drift_nrf52_prefixes_the_print_with_mesh_when_via_is_on);
+    RUN_TEST(test_agreement_error_limit_drops_the_slot_on_both_sides);
+    RUN_TEST(test_agreement_outbound_leak_counted_separately_on_both_sides);
+    RUN_TEST(test_agreement_via_prefixes_the_print_on_both_sides);
 
     RUN_TEST(test_frame_survives_the_drain_intact_on_both_sides);
     RUN_TEST(test_short_slot_is_not_decoded_on_either_side);

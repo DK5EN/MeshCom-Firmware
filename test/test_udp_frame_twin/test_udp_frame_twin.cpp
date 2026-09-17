@@ -33,6 +33,7 @@
 // handler's call site.
 
 #include "../../src/mc_text.h"
+#include "../../src/udp_frame.h"   // F4: buildExternAckJson() direkt pruefen
 #include <unity.h>
 
 #include <stdio.h>
@@ -160,6 +161,18 @@ struct ExternCall
     uint16_t buflen_arg;
 };
 static std::vector<ExternCall> g_extern;
+
+// DR-18 part 2: queueExternAck() calls -- the EXTUDP ack status datagram,
+// separate from g_extern above (that one is sendExtern()'s raw-APRS-bytes
+// path; this is the JSON-ack path, see extudp_functions.cpp).
+struct ExternAckCall
+{
+    uint32_t msg_id;
+    uint8_t status;
+    std::string from;
+    std::string via;
+};
+static std::vector<ExternAckCall> g_extern_ack;
 
 // checkOwnTx()/insertOwnTx(): model of the "own tx" cache both handlers
 // share (own_msg_id[] on hardware). Empty by default, so a fresh id always
@@ -319,6 +332,23 @@ void sendExtern(bool bUDP, char *src_type, uint8_t *buffer, uint16_t buflen, int
     record_sink("EXTERN", detail);
 }
 
+// DR-18 part 2: real definition lives in extudp_functions.cpp, which this
+// native env does not build (build_src_filter has neither the TU nor an
+// ArduinoJson lib_dep) -- stubbed here exactly like sendExtern() above.
+void queueExternAck(uint32_t msg_id, uint8_t status, const char *from, const char *via)
+{
+    ExternAckCall c;
+    c.msg_id = msg_id;
+    c.status = status;
+    c.from = from ? from : "";
+    c.via = via ? via : "";
+    g_extern_ack.push_back(c);
+    char buf[96];
+    snprintf(buf, sizeof(buf), "msg_id=%08X status=%u from=%s via=%s",
+             msg_id, (unsigned)status, c.from.c_str(), c.via.c_str());
+    record_sink("EXTERNACK", buf);
+}
+
 void setlogPrint(const char *body)
 {
     (void)body; // real setlogFormatGwi() output is compared directly below
@@ -428,6 +458,7 @@ static void recorder_reset()
     g_sendDisplayText_calls = 0;
     g_sendDisplayPosition_calls = 0;
     g_extern.clear();
+    g_extern_ack.clear();
     g_sink_log.clear();
     g_own_tx_known.clear();
     g_insert_calls.clear();
@@ -566,6 +597,47 @@ static void test_agreement_dedup_blocks_repeat_relay_on_both(void)
 
         snprintf(msg, sizeof(msg), "%s: repeat of the same msg_id must not relay again", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(depth1, depth2, msg);
+    }
+}
+
+static void test_agreement_extudp_forward_ahead_of_dedup_gate_on_both(void)
+{
+    // DR-18 (drift-matrix.csv row, ordering clause): the EXTUDP forward
+    // must stay AHEAD of is_new_packet() on both platforms, so a DUPLICATE
+    // datagram still reaches EXTUDP even though its second relay to LoRa TX
+    // is suppressed by the dedup ring -- nothing pinned this before. Same
+    // repeat pattern as test_agreement_dedup_blocks_repeat_relay_on_both
+    // just above, plus the EXTUDP assertion that test lacks: the TX ring
+    // gains only ONE entry (the dedup gate did its job), but EXTUDP sees
+    // the frame BOTH times (the forward never consults the dedup ring).
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", ':', "extudp-dup", 0x2102);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        bEXTUDP = true;
+        hasExternIPaddress = true;
+        int depth0 = txRingDepth();
+
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        copy_into(buf, tmpl, len);   // identical frame, same msg_id -- a genuine repeat
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%s: duplicate must not relay to LoRa TX a second time", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+
+        snprintf(msg, sizeof(msg), "%s: EXTUDP forward must still see the duplicate -- it must "
+                                    "stay ahead of is_new_packet()", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)g_extern.size(), msg);
     }
 }
 
@@ -789,12 +861,12 @@ static void test_regression_zero_scan_oob_byte_flips_verdict_before_fix(void)
 }
 
 // ===========================================================================
-// AGREEMENT (formerly DRIFT, unified 2026-09-12 wave): DR-02/DR-04/DR-05/
-// DR-06/DR-07/DR-08/DR-09/DR-18/DR-19 all had a decided verdict in the
-// drift matrix and are implemented here -- what were separate ESP32-only/
-// nRF52-only cases are now single cases run on both sides. DR-01 needed no
-// implementation (already fixed) and lives in the AGREEMENT block above.
-// DR-20 is the one row still DRIFT; see its own test further down for why.
+// AGREEMENT (formerly DRIFT, unified 2026-09-12 wave, DR-20 added 2026-09-17
+// wave W6): DR-02/DR-04/DR-05/DR-06/DR-07/DR-08/DR-09/DR-18/DR-19/DR-20 all
+// had a decided verdict in the drift matrix and are implemented here --
+// what were separate ESP32-only/nRF52-only cases are now single cases run
+// on both sides. DR-01 needed no implementation (already fixed) and lives
+// in the AGREEMENT block above. No U1 row is left in DRIFT as of this wave.
 // ===========================================================================
 
 static void test_agreement_extudp_requires_hasExternIPaddress_on_both(void)
@@ -825,16 +897,65 @@ static void test_agreement_extudp_requires_hasExternIPaddress_on_both(void)
     }
 }
 
-static void test_agreement_extudp_gate_matches_msgtype_check_on_both(void)
+static void test_agreement_extudp_forwards_one_decodable_frame_per_type_and_rejects_unrecognised(void)
 {
     // DR-18 (2026-09-12 decided, RE-DECIDED withdrawing the wider 4-type
-    // set): ESP32's shape wins -- EXTUDP is forwarded only for the
-    // recognised msg_type_b set (0x3A/0x21/0x40), now as its own explicit
-    // type test on BOTH platforms (udp_frame_esp32.cpp:114,
-    // udp_frame_nrf52.cpp:128), lifted out of (nRF52) / alongside (ESP32)
-    // the relay branch. Previously nRF52 forwarded unconditionally, before
-    // the type switch -- an unrecognised type reached EXTUDP there and was
-    // dropped on ESP32; both drop it now.
+    // set; TEST clause added 2026-09-17 wave W6): ESP32's shape wins --
+    // EXTUDP is forwarded only for the recognised msg_type_b set
+    // (0x3A/0x21/0x40), now as its own explicit type test on BOTH platforms
+    // (udp_frame_esp32.cpp, udp_frame_nrf52.cpp), lifted out of (nRF52) /
+    // alongside (ESP32) the relay branch.
+    //
+    // Replaces a single 0xFF-garbage/undecodable case that used to be this
+    // test's only coverage. An advisor PROVED by mutation that narrowing
+    // BOTH handlers' type test to `msg_type_b == 0x3A` alone left the whole
+    // suite green: 0xFF was already excluded before AND after that mutation
+    // (it was never in the recognised set), so it never exercised the
+    // difference, and nothing else in this file positively checked that
+    // 0x21 (position) or 0x40 (hey) reach EXTUDP at all -- only
+    // test_agreement_extudp_length_arg_matches_after_cast_removed did, and
+    // only for 0x3A. This test drives one DECODABLE frame per recognised
+    // type through both handlers and asserts each one DOES reach EXTUDP
+    // (g_extern), so narrowing the check to 0x3A fails here on 0x21 and
+    // 0x40 for both platforms. The negative case (an unrecognised,
+    // undecodable type must NOT reach EXTUDP) is kept alongside the
+    // positive ones rather than dropped, so this test still covers both
+    // directions of the gate.
+    struct TypeCase { char msgType; const char *payload; uint32_t msg_id; };
+    static const TypeCase cases[] = {
+        { ':', "extudp-text",                      0x8101 },   // 0x3A text
+        { '!', "4700.00N/01300.00E-extudp",         0x8102 },   // 0x21 position
+        { '@', "extudp-hey",                        0x8103 },   // 0x40 hey
+    };
+
+    for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++)
+    {
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", cases[c].msgType,
+                                           cases[c].payload, cases[c].msg_id);
+
+        for (int side = 0; side < 2; side++)
+        {
+            const char *name = side ? "nrf52" : "esp32";
+            recorder_reset();
+            bEXTUDP = true;
+            hasExternIPaddress = true;
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpl, len);
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s did not forward a decodable 0x%02X frame to EXTUDP "
+                                        "(0x3A-narrowing mutation would leave this undetected "
+                                        "for 0x21/0x40)", name, (unsigned)cases[c].msgType);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_extern.size(), msg);
+        }
+    }
+
+    // Negative half, unchanged in spirit from the case this replaces: an
+    // unrecognised, undecodable msg_type must still not reach EXTUDP on
+    // either platform.
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
     const uint16_t bodylen = 8;
@@ -1157,51 +1278,113 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
     }
 }
 
-// ===========================================================================
-// DRIFT: differences that exist today and must not change silently
-// ===========================================================================
-
-static void test_drift_max_zeros_return_value_and_reset_call_differ(void)
+static void test_agreement_extudp_ack_json_mirrors_ble_ack_on_both(void)
 {
-    // ESP32 returns void and calls resetMeshComUDP() itself; nRF52 returns 1
-    // and calls nothing -- its caller resets DHCP instead (src/udp_frame.h,
-    // src/nrf52/nrf_eth.h's own doc comment on handleUdpFrame_nrf52()).
-    //
-    // DR-20 (2026-09-12 decided nrf52-correct on WHO decides) STILL DRIFT:
-    // unlike the other U1 rows, this one cannot be implemented from
-    // src/esp32/udp_frame_esp32.cpp alone. Its own signature
-    // (`void handleUdpFrame_esp32(...)`) is declared in src/udp_functions.h
-    // and called from src/udp_functions.cpp (getMeshComUDP(), not
-    // gatewayService_esp32() -- see the drift-matrix row's 2026-09-12
-    // correction), neither of which is in the U1/DRY-unification carve's
-    // exclusive file set. Changing the return type here without moving the
-    // resetMeshComUDP() call to that caller would either not compile (the
-    // header's declaration would disagree with this definition) or, if the
-    // header were changed without also updating the caller, silently drop
-    // the reset on the real ESP32 reject path -- a regression, not a fix.
-    // Left as drift and escalated to the orchestrator; the caller-side
-    // migration is a separate wave's work.
+    // DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3, implemented
+    // 2026-09-17 wave W6): the same ":ack" frame as the DR-09 test just
+    // above also queues an EXTUDP status datagram (queueExternAck(),
+    // extudp_functions.cpp) at the same call site as the BLE ack frame --
+    // same msg_id, same status byte (ack_attribution.h's 0x00/0x01/0x02
+    // values ARE the doc's status values, mirrored verbatim, not
+    // reinterpreted), same acknowledging callsign, via "udp" (this ack
+    // arrived as a UDP GATE-relayed text frame). Deliberately NOT routed
+    // through sendExtern() -- see that function's and queueExternAck()'s
+    // own comments for why (the widened-type-set alternative was
+    // considered and withdrawn).
+    uint8_t tmpl[BUF_CAP];
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-9", "DK5EN-1", ':', "x:ack3", 0x7107);
+
+    const char *attribution = "DK5EN-9";
+    // msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (iAckId & 0x3FF); iAckId=3
+    // (the digit after ":ack" in the payload above), _GW_ID is the file-scope
+    // default set at the top of this file.
+    uint32_t expected_msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (3 & 0x3FF);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[112];
+
+        // W6b-Nachtrag (Advisor F1): die Ack-Ausleitung haengt jetzt an
+        // bEXTUDP, genau wie queueExtern() in lora_functions.cpp:983. Erst der
+        // AUS-Fall, damit die Wache selbst gepinnt ist und nicht nur der
+        // Normalfall.
+        recorder_reset();
+        bEXTUDP = false;
+        uint8_t off_buf[BUF_CAP];
+        copy_into(off_buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(off_buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(off_buf, len, IPAddress(1, 2, 3, 4));
+        snprintf(msg, sizeof(msg), "%s emitted an EXTUDP ack with --extudp off", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_extern_ack.size(), msg);
+
+        recorder_reset();
+        bEXTUDP = true;
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s did not queue an EXTUDP ack datagram for a BLE ack frame", name);
+        TEST_ASSERT_TRUE_MESSAGE(g_extern_ack.size() >= 1, msg);
+
+        snprintf(msg, sizeof(msg), "%s EXTUDP ack msg_id does not match the BLE ack frame's", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected_msg_id, g_extern_ack[0].msg_id, msg);
+
+        snprintf(msg, sizeof(msg), "%s EXTUDP ack status does not match the BLE ack frame's status byte (g_ble[0][5])", name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(g_ble[0][5], g_extern_ack[0].status, msg);
+
+        snprintf(msg, sizeof(msg), "%s EXTUDP ack 'from' does not match the attributed callsign", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(attribution, g_extern_ack[0].from.c_str(), msg);
+
+        snprintf(msg, sizeof(msg), "%s EXTUDP ack 'via' must be \"udp\"", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("udp", g_extern_ack[0].via.c_str(), msg);
+    }
+}
+
+static void test_agreement_max_zeros_returns_1_without_resetting_on_both(void)
+{
+    // DR-20 (2026-09-12 decided nrf52-correct on WHO decides, IMPLEMENTED
+    // 2026-09-17 wave W6): both handlers now return a status -- 0 handled, 1
+    // too many zeros -- instead of ESP32 returning void. ESP32's handler
+    // used to call resetMeshComUDP() itself on this path; that call moved to
+    // its caller, getMeshComUDP() (src/udp_functions.cpp, outside this
+    // handler-only harness and therefore not observable here -- see that
+    // function for the reset itself). The handler-level agreement pinned
+    // here is exactly that NEITHER handler resets anything on its own any
+    // more; WHICH reset the respective caller performs stays
+    // platform-specific (ESP32 resets the UDP socket, nRF52 resets DHCP --
+    // neither call site links into this native binary, only the handlers
+    // do). g_reset_udp (the resetMeshComUDP() sink) is asserted at 0 on both
+    // sides as a regression pin: if a handler ever calls it again directly,
+    // this fails.
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
     const int len = 16;   // even length: both loops read identical pairs
                           // (test_agreement_zero_scan_bound_matches_on_odd_length
                           // below covers the odd-length case)
 
-    recorder_reset();
-    uint8_t buf[BUF_CAP];
-    copy_into(buf, tmpl, len);
-    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_reset_udp,
-                                  "esp32 stopped calling resetMeshComUDP() on the reject path");
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        copy_into(buf, tmpl, len);
+        int rc;
+        if (side)
+            rc = handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else
+            rc = handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
 
-    recorder_reset();
-    copy_into(buf, tmpl, len);
-    int rc = handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, rc,
-                                  "nrf52 stopped returning 1 on the too-many-zeros reject path");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_reset_udp,
-                                  "nrf52 called the ESP32-only resetMeshComUDP() sink -- "
-                                  "drift row changed, update the matrix");
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s must return 1 (too many zeros)", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, rc, msg);
+
+        snprintf(msg, sizeof(msg), "%s must not reset anything itself any more -- DR-20 moved "
+                                    "the reset to the caller", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_reset_udp, msg);
+    }
 }
 
 // ===========================================================================
@@ -1454,6 +1637,52 @@ static void test_u1_corpus_ordered_sink_dump_both_platforms(void)
         "U1: esp32 and nrf52 dumps processed a different number of corpus files");
 }
 
+// ADVISOR-BEFUND W6b (F4): buildExternAckJson() hatte NULL Abdeckung. Der
+// einzige Aufrufer ist extudp_functions.cpp, das keine native Umgebung
+// uebersetzt, und der Zwilling stubbt queueExternAck() -- jede Mutation am
+// Serialisierer liess die Suite gruen. Der Bauer ist eine reine Funktion in
+// einem Header, den diese Umgebung ohnehin einbindet, also wird er hier direkt
+// geprueft: an seinen Raendern, nicht ueber seine Aufrufargumente.
+static void test_extern_ack_json_is_valid_at_its_edges(void)
+{
+    char o[160];
+
+    size_t n = buildExternAckJson(o, sizeof(o), 0x11223344u, 1, "DK5EN-90", "udp");
+    TEST_ASSERT_TRUE_MESSAGE(n > 0, "Normalfall wurde verworfen");
+    TEST_ASSERT_NOT_NULL(strstr(o, "\"type\":\"ack\""));
+    TEST_ASSERT_NOT_NULL(strstr(o, "\"msg_id\":\"11223344\""));
+    TEST_ASSERT_NOT_NULL(strstr(o, "\"from\":\"DK5EN-90\""));
+    TEST_ASSERT_NOT_NULL(strstr(o, "\"via\":\"udp\""));
+
+    // Ein Anfuehrungszeichen aus dem Mesh darf das Dokument NICHT sprengen --
+    // weder ueber from noch ueber via. Beide Felder fallen dann weg.
+    n = buildExternAckJson(o, sizeof(o), 1, 1, "DK\"5EN", "udp");
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NULL_MESSAGE(strstr(o, "DK\"5EN"), "Rufzeichen mit Quote eingebettet");
+    n = buildExternAckJson(o, sizeof(o), 1, 1, "DK5EN-90", "u\"dp");
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NULL_MESSAGE(strstr(o, "u\"dp"), "via mit Quote eingebettet");
+
+    // Jede Ausgabe muss ausgewogene Anfuehrungszeichen haben: ein kaputtes
+    // Dokument ist schlimmer als ein fehlendes Feld.
+    static const char *bad_from[] = {"", "dk5en-90", "DK5EN-90-TOO-LONG", "\\"};
+    for(size_t i = 0; i < sizeof(bad_from)/sizeof(bad_from[0]); i++)
+    {
+        n = buildExternAckJson(o, sizeof(o), 7, 2, bad_from[i], "udp");
+        if(n == 0) continue;
+        int q = 0;
+        for(size_t k = 0; k < n; k++) if(o[k] == '"') q++;
+        TEST_ASSERT_TRUE_MESSAGE((q % 2) == 0, "ungerade Zahl von Anfuehrungszeichen");
+        TEST_ASSERT_EQUAL_CHAR('{', o[0]);
+        TEST_ASSERT_EQUAL_CHAR('}', o[n-1]);
+    }
+
+    // Zu kleiner Zielpuffer: lieber gar nichts als ein halbes Dokument.
+    char tiny[24];
+    TEST_ASSERT_EQUAL_size_t(0, buildExternAckJson(tiny, sizeof(tiny), 1, 1, "DK5EN-90", "udp"));
+}
+
+
 int main(int, char **argv)
 {
     g_argv0 = argv[0] ? argv[0] : "";
@@ -1462,6 +1691,7 @@ int main(int, char **argv)
 
     RUN_TEST(test_agreement_gate_text_message_decodes_and_relays_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
+    RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
@@ -1472,7 +1702,7 @@ int main(int, char **argv)
     // 2026-09-12 decided, implemented this wave): former DRIFT cases,
     // converted to AGREEMENT now that both platforms behave the same.
     RUN_TEST(test_agreement_extudp_requires_hasExternIPaddress_on_both);
-    RUN_TEST(test_agreement_extudp_gate_matches_msgtype_check_on_both);
+    RUN_TEST(test_agreement_extudp_forwards_one_decodable_frame_per_type_and_rejects_unrecognised);
     RUN_TEST(test_agreement_extudp_length_arg_matches_after_cast_removed);
     RUN_TEST(test_agreement_dedup_gate_position_and_gateway_nopos_on_both);
     RUN_TEST(test_agreement_senddisplayposition_on_both);
@@ -1480,10 +1710,9 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_decodeaprs_reject_suppresses_processing_on_both);
     RUN_TEST(test_agreement_conf_zero_address_guard_on_both);
     RUN_TEST(test_agreement_ack_phone_frame_attribution_on_both);
-
-    // DR-20: still drift -- see the test's own comment for why this row
-    // cannot be implemented from the U1 exclusive file set.
-    RUN_TEST(test_drift_max_zeros_return_value_and_reset_call_differ);
+    RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
+    RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);
+    RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

@@ -152,3 +152,39 @@ same keys with the same physical meaning:
 that talks to a gateway on older firmware can recognise the case by `src_type:"lora"`,
 `qnh` = 0 and a `qfe` below about 850. Since the fix `qfe` is the `/P=` pressure and the altitude
 moved to its own key.
+
+---
+
+## 7. Outbound datagram type contract (node → client)
+
+Sections 1–6 above document only the **inbound** direction (`"msg"`, `"tele"`). Everything the
+node sends back out on port `1799` also carries a `"type"` key, but until now that outbound
+contract had no single written answer — this section is it (DR-18,
+`docs/testplan/drift-matrix.csv`).
+
+| `type`   | Built in                                                                 | Sent from                                                                                                                                                              | Trigger                                                                                         |
+| -------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `"pos"`  | `sendExtern()` (`src/extudp_functions.cpp`, 0x21 branch)                 | `sendExtern()` directly, or deferred via `queueExtern()`                                                                                                               | A GATE frame carrying a position (`msg_type_b`/`msg_type_b_lora` 0x21) reaches EXTUDP           |
+| `"msg"`  | `sendExtern()` (0x3A branch)                                             | same                                                                                                                                                                   | A GATE frame carrying text (0x3A) reaches EXTUDP                                                |
+| `"tele"` | `externTeleJsonNode()`/`externTeleJsonLora()` (`src/extern_tele_json.h`) | `sendExtern()`, alongside a `"pos"` datagram, for `src_type "node"`/`"lora"`                                                                                           | See §6 above                                                                                    |
+| `"ack"`  | `buildExternAckJson()` (`src/udp_frame.h`)                               | `queueExternAck()`/`sendExternJson()` (`src/extudp_functions.cpp`), deferred through the same ring buffer as `queueExtern()`, NOT through `sendExtern()`'s type switch | A UDP GATE-relayed text frame carrying `:ack`/`:rej` triggers the BLE ack echo (both platforms) |
+
+`"ack"` is the DR-18 part 2 addition (implemented 2026-09-17, wave W6):
+
+```json
+{
+  "type": "ack",
+  "msg_id": "1A2B3C4D",
+  "status": 1,
+  "from": "OE1XYZ-12",
+  "via": "udp"
+}
+```
+
+`status` matches `ack_attribution.h`'s BLE ack status byte verbatim (0 Node ACK, 1
+Gateway/Server, 2 Peer ACK). Full contract, including why it is a separate sender rather than a
+widened `sendExtern()` type switch, and what is and is not covered yet:
+`docs/ack-wer-hat-quittiert.md` §6.3.
+
+Every outbound type above is sent unauthenticated to whatever IP `meshcom_settings.node_extern`
+resolves to — same "no sender/receiver validation" caveat as §3 for the inbound side.

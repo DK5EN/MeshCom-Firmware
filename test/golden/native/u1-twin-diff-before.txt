@@ -3,7 +3,7 @@
 # empty diff -- it is this file staying byte-identical to a fresh
 # --generate run. The drift recorded below is expected; --check
 # catches drift that CHANGES (a block flipping agree<->differ).
-# 37 block(s): 36 agree, 1 differ
+# 37 block(s): 37 agree, 0 differ
 
 === 01-gate-f001.hex: identical (3 sink call(s))
 === 02-gate-f002.hex: identical (3 sink call(s))
@@ -37,9 +37,7 @@
 === 30-conf.hex: identical (no sink calls)
 === 31-m01-short-indicator.hex: identical (no sink calls)
 === 32-m02-unknown-indicator.hex: identical (no sink calls)
-=== 33-m03-trailing-zeros.hex: DIFFERS  (esp32 1 line(s), nrf52 1 line(s); '-' esp32-only, '+' nrf52-only, '?' char-level hint)
-    - RESET	-
-    + (no sink calls)
+=== 33-m03-trailing-zeros.hex: identical (no sink calls)
 === 34-m04-zeros-then-nonzero.hex: identical (3 sink call(s))
 === 35-m05-odd-length.hex: identical (3 sink call(s))
 === 36-m06-gate-empty.hex: identical (no sink calls)

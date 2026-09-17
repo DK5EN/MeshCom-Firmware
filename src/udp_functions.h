@@ -39,7 +39,12 @@ void getMeshComUDP();
 // into one native binary and fed the same corpus (twin-differential). Guarded
 // because IPAddress reaches this header only through the ESP32 include chain;
 // the nRF52 build gets it from the Ethernet library in nrf_eth.h.
-void handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);
+// DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): returns 0 when
+// the frame was handled and 1 when it carried more than MAX_ZEROS zero bytes
+// -- same contract as handleUdpFrame_nrf52(), whose caller (NrfETH::getUDP())
+// resets DHCP on 1. This handler no longer resets anything itself; its
+// caller, getMeshComUDP() below, resets the UDP socket on 1.
+int handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);
 #endif
 // C2 carve-out (DRY unification U2): the socket primitives of the UDP-out
 // ring drain, paired with udpWriteRaw_nrf52()/udpEndRaw_nrf52() in

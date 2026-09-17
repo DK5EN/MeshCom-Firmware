@@ -112,7 +112,7 @@
 === 32-m02-unknown-indicator.hex
 (no sink calls)
 === 33-m03-trailing-zeros.hex
-001	RESET	-
+(no sink calls)
 === 34-m04-zeros-then-nonzero.hex
 001	DISPLAYPOS	-
 002	TXRING	id=e9f113ab

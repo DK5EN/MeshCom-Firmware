@@ -33,4 +33,6 @@ void resetMeshComUDP();
 
 // C1 carve-out (DRY unification U1): verbatim signature, minus the ESP32
 // guard around it in the real header (see the file comment above).
-void handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);
+// DR-20 (implemented 2026-09-17 wave W6): int, not void -- see
+// src/udp_functions.h's own copy of this declaration for the contract.
+int handleUdpFrame_esp32(unsigned char inc_udp_buffer[500], int packetSize, IPAddress src_ip);

@@ -5794,7 +5794,13 @@ void addRingPointer(volatile int &pWrite, volatile int &pRead, int iMAX, const c
             if (pRead >= iMAX) // if the buffer is full we start at index 0 -> take care of overwriting!
                 pRead = 0;
 
-            if(bLORADEBUG && strcmp(bufName, "raw_rx") != 0 && strcmp(bufName, "phone") != 0 && strcmp(bufName, "udp") != 0)
+            // DR-21 (Sichtbarkeitsklausel, 2026-09-12 entschieden): "udp" faellt
+            // aus der Ausnahmeliste. Der Ausgangsring war der EINZIGE, dessen
+            // Ueberlauf stumm blieb -- und genau er laeuft jetzt voll, wenn die
+            // neue Fruehruecknahme bei udp_dest_addr == 0 den Drain gar nicht
+            // mehr laufen laesst. Ohne diese Zeile waere die Verdraengung
+            // unbeobachtbar.
+            if(bLORADEBUG && strcmp(bufName, "raw_rx") != 0 && strcmp(bufName, "phone") != 0)
             {
                 printfdeb("[MC-DBG] RING_OVERFLOW buf=%s\n", bufName);
             }

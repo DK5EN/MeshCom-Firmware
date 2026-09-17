@@ -256,6 +256,39 @@ void logRxDropUnconfigured(const char *call)
     }
 }
 
+// DR-25 (docs/testplan/drift-matrix.csv, U2): the outbound UDP-out drain's
+// own copy of the RX-01 idea (esp32/udp_drain_esp32.cpp, nrf52/udp_drain_
+// nrf52.cpp) detects an unconfigured-source frame AFTER the send has already
+// happened -- a LEAK, not a drop. It must not share stat_rx_drop_
+// unconfigured/logRxDropUnconfigured() above: a rising count at the inbound
+// doors (this file's OnRxDone guard, and udp_frame_{esp32,nrf52}.cpp's GATE)
+// means the primary guard is WORKING; a rising count here means it is NOT --
+// a frame the primary guard should have stopped reached the ring and went
+// out. Same shape (10 s marker floor, raw Serial.printf -- not printfdeb,
+// which strips ';' outside --debug csv and this line's format depends on
+// them), distinct counter and line so the two events are never conflated.
+uint32_t stat_tx_leak_unconfigured = 0;
+
+void logTxLeakUnconfigured(const char *call)
+{
+    static bool s_have_marker = false;
+    static uint32_t s_last_marker_ms = 0;
+    static uint32_t s_leaked_since_marker = 0;
+
+    stat_tx_leak_unconfigured++;
+    s_leaked_since_marker++;
+
+    uint32_t now = (uint32_t)millis();
+    if(!s_have_marker || (uint32_t)(now - s_last_marker_ms) >= 10000UL)
+    {
+        Serial.printf("[TX];leak;unconfigured;src;%s;ms;%lu;leaked;%lu\n",
+                      call, (unsigned long)now, (unsigned long)s_leaked_since_marker);
+        s_have_marker = true;
+        s_last_marker_ms = now;
+        s_leaked_since_marker = 0;
+    }
+}
+
 #if defined(EXTERNAL_RADIO)
 // The single in-flight external-radio TX ownership record. At most one ring
 // slot may be RING_STATUS_EXT_PENDING at a time (enforced by ExtTxq::begin).

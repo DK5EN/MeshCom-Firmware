@@ -176,7 +176,16 @@ void getMeshComUDP()
       if(timeClient.tryConsume(remote_ip, remote_port, incomingPacket, len))
         return;
 
-      handleUdpFrame_esp32(incomingPacket, len, remote_ip);
+      // DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): the
+      // handler is a parser, not connectivity policy -- it now only reports
+      // the too-many-zeros verdict (1) instead of resetting the socket
+      // itself. This caller performs the reset, mirroring NrfETH::getUDP()
+      // (nrf52/nrf_eth.cpp:442-453), which resets DHCP on the same verdict
+      // from handleUdpFrame_nrf52(). Losing this call would silently stop
+      // resetting the UDP socket on every too-many-zeros datagram -- a real
+      // gateway regression, not just a caller-decides refactor.
+      if(handleUdpFrame_esp32(incomingPacket, len, remote_ip) != 0)
+        resetMeshComUDP();
     }
   }
 }

@@ -9,6 +9,10 @@
 #include "extern_notice_json.h"
 #include "extern_tele_json.h"
 #include "mcp17_bits.h"
+// DR-18 part 2: queueExternAck()'s declaration and its pure JSON builder
+// buildExternAckJson() live in udp_frame.h (see that header for why -- not
+// extudp_functions.h, which is outside the U1 carve's file set).
+#include "udp_frame.h"
 
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
 // Ethernet headers, the UdpExtern socket object, and every function that
@@ -78,6 +82,10 @@ struct externQueueEntry {
     int8_t   snr;
     char     src_type[8];
     std::atomic<bool> used{false};
+    // DR-18 part 2: true when `buffer` already holds a finished JSON
+    // datagram (queueExternAck()) instead of raw APRS bytes for sendExtern()
+    // to decode -- same ring, same two slots, distinguished on flush so a
+    // status frame never gets fed through decodeAPRS().
 };
 static struct externQueueEntry externQueue[MAX_EXTERN_QUEUE];
 static int externQueueWrite = 0;
@@ -782,12 +790,99 @@ void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t r
     externQueueWrite = (externQueueWrite + 1) % MAX_EXTERN_QUEUE;
 }
 
+// DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3): the outbound ack status
+// datagram. Builds the JSON via the header-side pure function (native
+// testable, see udp_frame.h) and queues it through the SAME ring
+// queueExtern() uses -- MAX_EXTERN_QUEUE is 2, now shared between text/
+// position frames and ack frames (doc §6.3's own caveat: hold the expected
+// combined rate against these two slots, not measure it after the fact).
+// Deliberately NOT routed through sendExtern(): that function's type switch
+// has only 0x21/0x3A branches and an `else return;` before the send block
+// (extudp_functions.cpp) -- widening it for 0x41 was considered and
+// WITHDRAWN (src/udp_frame.h). This is a separate sender that flushes to
+// the same socket.
+static void sendExternJson(const uint8_t *json, uint16_t jlen);   // Definition weiter unten
+
+void queueExternAck(uint32_t msg_id, uint8_t status, const char *from, const char *via)
+{
+    // ADVISOR-BEFUND W6b (blockierend, behoben): diese Funktion legte den Ack
+    // zuerst in externQueue[] ab. Das war FALSCH, und zwar aus zwei Gruenden
+    // gleichzeitig.
+    //
+    // ERSTENS ein Wettlauf ueber Tasks. Der Ringpuffer hat genau einen
+    // Erzeuger: queueExtern() aus OnRxDone(), also auf nRF52 dem LORA-Task --
+    // er existiert ueberhaupt nur, um Arbeit AUS dem Funk-Callback
+    // herauszuhalten ("Deferred -- avoid blocking UDP in radio callback",
+    // lora_functions.cpp:982). queueExternAck() laeuft dagegen aus
+    // gatewayService_nrf52() (nrf52_main.cpp:2070), also dem Hauptloop.
+    // externQueueWrite ist ein gewoehnlicher int ohne Sperre: zwei Tasks
+    // haetten denselben Slot gewaehlt und ihre memcpy()s verschraenkt, und der
+    // Vorruecker haette einen noch nicht geleerten Eintrag verdraengt.
+    //
+    // ZWEITENS war der Puffer hier gar nicht noetig. flushExternQueue() laeuft
+    // im SELBEN Task wie diese Funktion (nrf52_main.cpp:2427,
+    // esp32_main.cpp:3913), der Umweg ueber den Ring verschiebt also nichts --
+    // und der Handler direkt darueber ruft sendExtern() ohnehin synchron auf.
+    //
+    // Also: direkt senden, wie der Nachbaraufruf. Kein Slot, kein zweiter
+    // Erzeuger, kein Wettlauf, und die beiden Ringplaetze bleiben dem
+    // Funkpfad, fuer den sie bemessen wurden.
+    char c_json[160];
+    size_t jlen = buildExternAckJson(c_json, sizeof(c_json), msg_id, status, from, via);
+
+    if(jlen == 0)
+        return;
+
+    sendExternJson((const uint8_t *)c_json, (uint16_t)jlen);
+}
+
+// DR-18 part 2: the send half; called directly by queueExternAck() above, separate from
+// sendExtern() on purpose (see that function's comment) -- writes a
+// finished JSON buffer straight to UdpExtern instead of decoding APRS
+// bytes first. Same guard order and same write-fails-so-reset pattern as
+// sendExtern()'s send block, so a socket failure on an ack datagram is
+// handled identically to one on a text/position datagram.
+static void sendExternJson(const uint8_t *json, uint16_t jlen)
+{
+  #ifdef ESP32
+    if(bWIFIAP)
+      return;
+  #endif
+
+  if(!bEXTUDP)
+    return;
+
+  if(!hasExternIPaddress)
+    return;
+
+  if(!(bEXTUDP && hasExternIPaddress && (int)strlen(meshcom_settings.node_extern) > 7))
+  {
+    Serial.printf("%.*s\n", (int)jlen, (const char*)json);
+    return;
+  }
+
+  UdpExtern.beginPacket(apip, EXTERN_PORT);
+
+  Serial.printf("[EXT] Ack-Out: %.*s Len: %u\n", (int)jlen, (const char*)json, (unsigned)jlen);
+
+  if (!UdpExtern.write(json, jlen))
+  {
+    resetExternUDP();
+    return;
+  }
+
+  UdpExtern.endPacket();
+}
+
 void flushExternQueue()
 {
     for(int i = 0; i < MAX_EXTERN_QUEUE; i++)
     {
         if(externQueue[i].used.load(std::memory_order_acquire))
         {
+            // Ein Erzeuger, ein Verbraucher, eine Nutzlastart -- so war der
+            // Ring bemessen und so bleibt er. Der JSON-Ack aus W6b geht NICHT
+            // hier durch, siehe queueExternAck().
             sendExtern(true, externQueue[i].src_type, externQueue[i].buffer,
                        externQueue[i].buflen, externQueue[i].rssi, externQueue[i].snr);
             externQueue[i].used.store(false, std::memory_order_relaxed);

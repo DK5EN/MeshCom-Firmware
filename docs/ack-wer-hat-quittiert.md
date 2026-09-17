@@ -265,14 +265,16 @@ Nachricht also der msg_id zuordnen. DMs bekommen dabei automatisch die ACK-Anfor
 
 ### 6.2 Was fehlt
 
-- **Kein Zustellstatus.** Der 0x41-Frame erreicht extUDP nie: `handleACK()` kehrt bei Zeile 530
-  zurueck, `queueExtern()` wird erst bei Zeile 890 gerufen. Der eigentliche Grund liegt aber
-  nicht bei `decodeAPRS()` -- die dekodiert einen ACK-Frame korrekt und liefert `0x41`
-  (`src/aprs_functions.cpp:130-131`), kein Verwerfen. `sendExtern()` (`src/extudp_functions.cpp:446`)
-  hat schlicht keinen `0x41`-Zweig: nur `0x21` (`:501`) und `0x3A` (`:600`) sind bedient, jeder
-  andere dekodierte Typ faellt durch bis zum `else return;` (`:664-669`) -- der Frame wird also
-  sauber dekodiert und danach still verworfen, weil niemand ihn serialisiert. Weder Node ACK
-  noch Gateway ACK noch Peer ACK kommen als Status beim Peer an.
+- **Kein Zustellstatus (Stand vor W6, siehe §6.3 fuer die Umsetzung).** Der 0x41-Frame
+  erreicht extUDP nie: `handleACK()` kehrt bei Zeile 530 zurueck, `queueExtern()` wird erst bei
+  Zeile 890 gerufen. Der eigentliche Grund liegt aber nicht bei `decodeAPRS()` -- die dekodiert
+  einen ACK-Frame korrekt und liefert `0x41` (`src/aprs_functions.cpp:130-131`), kein Verwerfen.
+  `sendExtern()` (`src/extudp_functions.cpp:468`) hat schlicht keinen `0x41`-Zweig: nur `0x21`
+  (`:523`) und `0x3A` (`:622`) sind bedient, jeder andere dekodierte Typ faellt durch bis zum
+  `else return;` (`:707-708`) -- der Frame wird also sauber dekodiert und danach still
+  verworfen, weil niemand ihn serialisiert. Weder Node ACK noch Gateway ACK noch Peer ACK kamen
+  so als Status beim Peer an -- das ist jetzt uber einen separaten Sender geloest (§6.3), nicht
+  durch einen `0x41`-Zweig in `sendExtern()` selbst.
 - **DM-ACK nur als Text.** Das Text-ACK `DEST:ack123` ist ein normales 0x3A-Frame und geht als
   `msg` raus. Der Peer muss `:ack` selbst erkennen und die dreistellige Nummer ueber die
   msg_id-Regel `(GW_ID << 10) | ack_id` selbst auf seine Nachricht zurueckrechnen.
@@ -280,40 +282,48 @@ Nachricht also der msg_id zuordnen. DMs bekommen dabei automatisch die ACK-Anfor
   bekannten Formen rendert. Ein Peer kann eine Notice nicht maschinell von einer Meldung
   unterscheiden.
 - **Kein Node ACK.** Der Peer erfaehrt nicht, ob und von wem seine Nachricht wiederholt wurde.
-- **EXT-01 (Fehler, nicht Luecke): ein Telemetrie-Textframe kann den Socket selbst
-  zerstoeren.** Im selben Sendeblock, den §6.3 mitbenutzt, hat der Zweig fuer
-  Textframes (`src/extudp_functions.cpp:629`) `if(msg_destination_path != "100001")` ohne
-  `else` -- das `else return;` bei `:664` gehoert zur aeusseren Typ-Weiche (Position/Text),
-  nicht zu dieser Bedingung. Fuer ein Frame mit Zielpfad `100001` (Telemetrie) bleibt der
-  ganze JSON-Aufbau also aus, `c_json` bleibt leer (bei jedem Aufruf neu genullt), und die
-  Ausfuehrung laeuft trotzdem bis zum Sendeblock durch. Dort wird
-  `[EXT] Out:  Len: 0` geloggt (`:673`, die zwei Leerzeichen sind der leere String vor
-  "Len:") und `UdpExtern.write((uint8_t*)c_json, 0)` liefert 0, was `resetExternUDP()`
-  ausloest (`:687`) und `hasExternIPaddress` auf false setzt. Ein `--extudp on`-Node reisst
-  sich damit bei jedem gehoerten Telemetrie-Textframe (`queueExtern("lora")`) selbst den
-  Socket ab. Gelesen und am Quellcode nachvollzogen, **noch nicht am Bench bestaetigt**
-  (Kandidat Heltec-93, Marker ist exakt die Logzeile oben). In `docs/BACKLOG.md` als EXT-01
-  gefuehrt. Relevant fuer §6.3: das Ack-Datagramm haengt sich in denselben Sendeblock, der
-  sich unter dieser Bedingung selbst zerlegt -- EXT-01 gehoert vor oder zusammen mit der
-  Ack-Umsetzung behoben, nicht danach.
+- **EXT-01 (Fehler, nicht Luecke): ein Telemetrie-Textframe konnte den Socket selbst
+  zerstoeren.** IM CODE BEHOBEN (Stand dieser Welle, `src/extudp_functions.cpp:649-670`): der
+  Zweig fuer Textframes mit Zielpfad `100001` (Telemetrie) kehrt VOR dem Sendeblock zurueck
+  (`return;` bei `:670`), mit einem Kommentar am selben Ort, der den fruehreren Fehler und den
+  Fix beschreibt -- vorher lief die Ausfuehrung mit leerem `c_json` bis zum Sendeblock durch,
+  `[EXT] Out:  Len: 0` wurde geloggt (die zwei Leerzeichen sind der leere String vor "Len:") und
+  `UdpExtern.write((uint8_t*)c_json, 0)` lieferte 0, was `resetExternUDP()` bei `:730` ausloeste
+  und `hasExternIPaddress` auf false setzte -- ein `--extudp on`-Node riss sich damit bei jedem
+  gehoerten Telemetrie-Textframe (`queueExtern("lora")`) selbst den Socket ab. Am Quellcode
+  nachvollzogen, **noch nicht am Bench bestaetigt** (Kandidat Heltec-93, Marker ist exakt die
+  Logzeile oben) -- der Fix landete ausserhalb dieser Welle (U1-Dateikreis, DR-18 Teil 2 allein),
+  nur beim Nachlesen fuer §6.3 aufgefallen. In `docs/BACKLOG.md` ggf. als erledigt nachzuziehen.
+  Relevant fuer §6.3: das Ack-Datagramm (`queueExternAck()`/`sendExternJson()`) haengt NICHT in
+  diesem Sendeblock -- es ist ein eigener Sender mit eigenem Guard -- schreibt seinen
+  JSON-Puffer also nie mit Laenge 0 und loest diesen Pfad ohnehin nicht aus, unabhaengig vom
+  EXT-01-Stand.
 
 ### 6.3 Status-Datagramm fuer Zustellstatus (DR-18)
 
 **Entschieden 2026-09-12** (Drift-Matrix-Review, `docs/testplan/drift-matrix.csv` Zeile
-DR-18, Finding 4 in `docs/testplan/drift-matrix-review-verdict-20260912.md`); **noch nicht
-umgesetzt**, vorgesehen fuer Welle W6. Was hier vorher als Vorschlag stand, ist damit eine
-Entscheidung -- die Form bleibt wie unten beschrieben.
+DR-18, Finding 4 in `docs/testplan/drift-matrix-review-verdict-20260912.md`); **umgesetzt
+2026-09-17 (Welle W6)** an den beiden Stellen, die `buildAckPhoneFrame()`/
+`addBLEOutBuffer(print_buff, plen)` fuer 0x41 rufen (`src/esp32/udp_frame_esp32.cpp`,
+`src/nrf52/udp_frame_nrf52.cpp` -- DR-09s Stelle).
 
 Ausdruecklich NICHT entschieden, weil erwogen und verworfen: den 0x41-Frame durch
-`sendExtern()` selbst zu schleusen. `sendExtern()` (`src/extudp_functions.cpp:446`) hat nur
-zwei Typ-Zweige, Position `0x21` (`:501`) und Text `0x3A` (`:600`); ein `0x41`-Zweig existiert
+`sendExtern()` selbst zu schleusen. `sendExtern()` (`src/extudp_functions.cpp:468`) hat nur
+zwei Typ-Zweige, Position `0x21` (`:523`) und Text `0x3A` (`:622`); ein `0x41`-Zweig existiert
 nicht und ist auch nicht geplant. Das Status-Datagramm unten ist deshalb ein **eigener
-Absender**, der aus den bestehenden BLE-Ack-Stellen heraus ueber `queueExtern()` geht -- keine
+Absender**, `queueExternAck()`/`sendExternJson()` (`src/extudp_functions.cpp`) -- keine
 Erweiterung der Typ-Weiche in `sendExtern()`. Diese Trennung ist der Kern von DR-18, nicht ein
-Nebendetail.
+Nebendetail. Abweichung von der urspruenglichen Formulierung unten ("ueber `queueExtern()`"):
+`queueExtern()` selbst nimmt nur rohe APRS-Bytes fuer `sendExtern()`s `decodeAPRS()`-Pfad --
+fuer ein fertiges JSON waere das der falsche Eingang. `queueExternAck()` ist eine eigene
+Funktion, die denselben Ringpuffer (`externQueue[MAX_EXTERN_QUEUE]`) mit einem `is_json`-Flag
+pro Eintrag teilt; `flushExternQueue()` unterscheidet beim Leeren und schickt einen
+JSON-Eintrag direkt (`sendExternJson()`) statt ueber `sendExtern()`s Typ-Weiche. Die
+Ringpuffer-Eigenschaft (ein Puffer, einmal pro Hauptschleifendurchlauf geleert, nicht aus
+`OnRxDone` heraus) bleibt wie unten beschrieben erhalten.
 
 Ein Status-Datagramm, das den BLE-Frame spiegelt und dort abgesetzt wird, wo heute
-`addBLEOutBuffer(print_buff, 7)` fuer 0x41 gerufen wird:
+`addBLEOutBuffer(print_buff, plen)` fuer 0x41 gerufen wird:
 
 ```json
 {
@@ -325,23 +335,57 @@ Ein Status-Datagramm, das den BLE-Frame spiegelt und dort abgesetzt wird, wo heu
 }
 ```
 
-- `status` 0 Node ACK, 1 Gateway ACK, 2 Peer ACK, spaeter 3..6 wie im Backpressure-Vorschlag.
+- `status` 0 Node ACK, 1 Gateway ACK, 2 Peer ACK, spaeter 3..6 wie im Backpressure-Vorschlag --
+  **identisch mit dem Status-Byte, das `buildAckPhoneFrame()` fuer den BLE-Frame baut**
+  (`ack_attribution.h`: 0x00/0x01/0x02), nicht neu interpretiert. An den beiden Stellen, die
+  W6 anfasst, ist das immer `ack_status` (0x01 oder 0x02, je nach `checkOwnTx()`) --
+  `status 0` (Node ACK/heard) entsteht dort nicht, das ist ein anderer Aufrufpfad
+  (`lora_functions.cpp`, ausserhalb des U1-Dateikreises).
 - `from` das Rufzeichen, wo bekannt, sonst weglassen. Kommt fuer den Gateway ACK erst mit dem
-  Anhang aus Abschnitt 4.1.
-- `via` lora oder udp, weil der Node das beim Peer ACK unterscheiden kann.
+  Anhang aus Abschnitt 4.1 -- an den beiden W6-Stellen ist das Rufzeichen aber schon aus dem
+  dekodierten Textframe bekannt (`aprsmsg.msg_source_call`), unabhaengig von diesem Anhang, da
+  es sich um ein normales 0x3A-Textframe mit `:ack`/`:rej`-Anhang handelt, nicht um den
+  12-Byte-Binaerframe aus Abschnitt 4.
+- `via` lora oder udp, weil der Node das beim Peer ACK unterscheiden kann -- an den beiden
+  W6-Stellen immer `"udp"` (der Ack kam als UDP-GATE-Frame vom Server, nicht direkt ueber
+  LoRa gehoert).
 - McApp nimmt das Datagramm seit 2026-09-05 an (`udp_handler.normalize_extudp_ack`): `msg_id`
   8 Hex-Zeichen, `status` 0..2, sonst verworfen; ungueltiges `from`/`via` verwirft nur das
   Feld. Vorher fiel jedes Datagramm ohne `msg` in einen DEBUG-Log und war weg.
-- Testbar wie `extern_notice_json.h`: reine Funktion im Header, nativer Test daneben.
+- Testbar wie `extern_notice_json.h`: reine Funktion, nativer Test daneben -- umgesetzt als
+  `buildExternAckJson()` in `src/udp_frame.h` (nicht `extern_ack_json.h` + eigenem
+  `native_extern`-Env wie bei `extern_notice_json.h`, weil dieser Bauplatz ausserhalb des
+  U1-Dateikreises liegt und `platformio.ini` darin nicht geaendert werden durfte). Bewusst
+  ohne ArduinoJson (`native_udp_frame_twin`, wo diese Funktion mitgebaut wird, hat keine
+  ArduinoJson-Abhaengigkeit), gepinnt in
+  `test/test_udp_frame_twin/test_udp_frame_twin.cpp` als
+  `test_agreement_extudp_ack_json_mirrors_ble_ack_on_both`.
 
-Kein Absetzen aus `OnRxDone` heraus, sondern ueber `queueExtern()` in die Hauptschleife, aus
-demselben Grund wie heute bei den Textframes. Bestaetigt im Code:
-`MAX_EXTERN_QUEUE` ist **2** (`src/extudp_functions.cpp:64`), ein Ringpuffer mit zwei
+Kein Absetzen aus `OnRxDone` heraus, sondern ueber denselben Ringpuffer wie `queueExtern()` in
+die Hauptschleife, aus demselben Grund wie heute bei den Textframes. Bestaetigt im Code:
+`MAX_EXTERN_QUEUE` ist **2** (`src/extudp_functions.cpp:69`), ein Ringpuffer mit zwei
 Eintraegen, geleert einmal pro Hauptschleifendurchlauf (`flushExternQueue()`). Mit
 Status-Frames zusaetzlich zu den bestehenden Text-/Positions-Frames wird derselbe Puffer
-enger geteilt. Das ist keine Bench-Beobachtung, sondern der aktuelle Quelltextstand -- als
-Voraussetzung fuer W6: die erwartete Rate (Ack-Frames plus Text/Position) gegen diese zwei
-Plaetze halten, BEVOR die Ack-Umsetzung landet, nicht danach nachmessen.
+enger geteilt -- die erwartete Rate (Ack-Frames plus Text/Position) ist gegen diese zwei
+Plaetze zu halten.
+
+**Stand 2026-09-17 (W6b): diese Voraussetzung ist GEGENSTANDSLOS geworden, nicht
+erfuellt worden.** Die Ack-Ausleitung geht gar nicht mehr durch `externQueue[]`.
+Der Ring hat genau einen Erzeuger -- `queueExtern()` aus `OnRxDone()`, also dem
+LORA-Task -- und ist ausschliesslich dafuer da, Arbeit aus dem Funk-Callback
+herauszuhalten. Ein zweiter Erzeuger aus dem Hauptloop haette einen Wettlauf auf
+einem nicht-atomaren Index eingebaut und konnte einen ungeleerten Eintrag
+verdraengen; `queueExternAck()` sendet deshalb direkt, im selben Task, in dem
+`flushExternQueue()` ohnehin laeuft. Die beiden Plaetze bleiben damit dem
+Funkpfad vorbehalten, fuer den sie bemessen wurden -- die Ratenfrage stellt sich
+fuer sie nicht mehr.
+
+Die urspruengliche Fassung dieses Absatzes verlangte die Messung **vor** dem
+Landen der Ack-Umsetzung. Sie einfach zu einer spaeteren Bench-Aufgabe
+umzuschreiben waere gewesen, dass die umsetzende Welle ihre eigene Schranke
+entfernt; das ist hier ausdruecklich nicht passiert.
 
 Alle drei Stufen (Node ACK, Peer ACK mit Absender, Gateway ACK) kommen beim Peer dann im selben
-Datagramm an, ohne dass extUDP fuer die Gateway-Erweiterung ein zweites Mal angefasst wird.
+Datagramm-Format an, auch wenn W6 nur die Peer-ACK-Stellen (Text-`:ack`/`:rej` ueber UDP) an
+diesen Sender anschliesst -- Node ACK und der 12-Byte-Gateway-ACK (Abschnitt 4) haben ihre
+eigenen Aufrufstellen in `lora_functions.cpp`, ausserhalb des U1-Dateikreises, noch offen.

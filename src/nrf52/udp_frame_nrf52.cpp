@@ -307,6 +307,20 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                     addBLEOutBuffer(print_buff, plen);
 
+                    // DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3):
+                    // mirror the BLE ack frame just built above to the
+                    // EXTUDP peer -- same msg_id/status/callsign, ack_status
+                    // already carries the doc's status values verbatim
+                    // (0x01 Gateway/Server, 0x02 Peer ACK, ack_attribution.h).
+                    // via "udp": this ack arrived as a UDP GATE-relayed text
+                    // frame, not heard directly over LoRa. Mirrors the ESP32
+                    // call site (udp_frame_esp32.cpp), same as DR-09 above.
+                    // F1: wie queueExtern() in lora_functions.cpp:983 auf bEXTUDP
+                    // gewacht -- ohne das baut eine Flotte mit --extudp off jeden
+                    // Ack umsonst zusammen, nur damit der Sender ihn verwirft.
+                    if(bEXTUDP)
+                        queueExternAck(msg_counter, ack_status, aprsmsg.msg_source_call, "udp");
+
                     if(strcmp(source_call, meshcom_settings.node_call) == 0)
                         bUDPtoLoraSend=false;
 

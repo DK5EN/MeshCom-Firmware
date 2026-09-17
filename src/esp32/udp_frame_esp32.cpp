@@ -40,7 +40,17 @@ extern IPAddress node_hostip;
 void logRxDropUnconfigured(const char *call);
 
 // UDP functions
-void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int packetSize, IPAddress src_ip)
+// DR-20 (2026-09-12 decided, implemented 2026-09-17 wave W6): returns a
+// status instead of void -- 0 handled, 1 too many zeros -- matching
+// handleUdpFrame_nrf52()'s contract (nrf52/udp_frame_nrf52.cpp:50). The
+// handler is a parser, not connectivity policy: it used to call
+// resetMeshComUDP() itself on the too-many-zeros path; that call moved to
+// the caller, getMeshComUDP() (udp_functions.cpp), which now resets on a
+// returned 1 -- mirroring NrfETH::getUDP() resetting DHCP on the mirrored
+// verdict (nrf52/nrf_eth.cpp:450-453). WHICH reset stays platform-specific
+// (ESP32 resets the UDP socket, nRF52 resets DHCP); only the caller-decides
+// SHAPE is unified.
+int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int packetSize, IPAddress src_ip)
 {
     // R2-04: 20 -> MC_CALL_LEN_Z. Ein Rufzeichenfeld ist jetzt 21 Byte
     // breit, und GCC sieht das: "%s" aus einem 21-Byte-Feld in 20 Byte ist
@@ -300,6 +310,19 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
 
                     addBLEOutBuffer(print_buff, plen);
 
+                    // DR-18 part 2 (docs/ack-wer-hat-quittiert.md §6.3):
+                    // mirror the BLE ack frame just built above to the
+                    // EXTUDP peer -- same msg_id/status/callsign, ack_status
+                    // already carries the doc's status values verbatim
+                    // (0x01 Gateway/Server, 0x02 Peer ACK, ack_attribution.h).
+                    // via "udp": this ack arrived as a UDP GATE-relayed text
+                    // frame, not heard directly over LoRa.
+                    // F1: wie queueExtern() in lora_functions.cpp:983 auf bEXTUDP
+                    // gewacht -- ohne das baut eine Flotte mit --extudp off jeden
+                    // Ack umsonst zusammen, nur damit der Sender ihn verwirft.
+                    if(bEXTUDP)
+                        queueExternAck(msg_counter, ack_status, aprsmsg.msg_source_call, "udp");
+
                     if(strcmp(source_call, meshcom_settings.node_call) == 0)
                         bUDPtoLoraSend=false;
 
@@ -391,7 +414,7 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
 
         udp_is_busy = false;   //setting the busy flag
 
-        return;
+        return 0;   // handled
       }
       // TM-39: server-pushed CONF (callsign/longname/shortname, and
       // lat/lon/alt which we parse but do not yet apply). Mirrors the
@@ -511,8 +534,15 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
     else
     {
       DEBUG_MSG("ERROR", "UDP Message has too much Zeros");
-      resetMeshComUDP();
+
+      // DR-20: reset lifted to the caller (getMeshComUDP()), which resets
+      // the UDP socket on a returned 1 -- see the function-header comment.
+      // Do NOT drop this return value's meaning: a caller that ignores it
+      // is a gateway that stops resetting its UDP socket on this path.
+      udp_is_busy = false;   //setting the busy flag
+      return 1;   // too many zeros
     }
 
     udp_is_busy = false;   //setting the busy flag
+    return 0;   // handled
 }
