@@ -157,6 +157,18 @@ static void tg_post_setlog_off() { memset(LogCallsign, 0x00, sizeof(LogCallsign)
 static void tg_post_button_on() { init_onebutton(); }
 static void tg_post_680_off() { bme680_found = false; }
 static void tg_post_811_off() { mcu811_found = false; }
+// EXT-02 (second half): --extudp off used to leave hasExternIPaddress (and
+// the UdpExtern socket itself) untouched, so the flag that gates both
+// startExternUDP()'s early return and getExternUDP()'s receive path stayed
+// stale. resetExternUDP() is exactly the right routine -- it stops the
+// socket and only reopens if bEXTUDP is (still) true. toggleApply() writes
+// *row.flag (bEXTUDP here) unconditionally before running post(), whether or
+// not TG_POST_FIRST is set (see command_toggles.h), so by the time this runs
+// bEXTUDP is already false and resetExternUDP() will not reopen the socket.
+// TG_POST_FIRST is therefore not needed on this row: it only reorders post()
+// against the *sset mask write / save_settings(), neither of which
+// resetExternUDP() depends on.
+static void tg_post_extudp_off() { resetExternUDP(); }
 #if defined BOARD_T5_EPAPER
 static void tg_post_t5_on() { disp_next_power(true); }
 static void tg_post_t5_off() { disp_next_power(false); }
@@ -230,7 +242,7 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--webserver off",      &bWEBSERVER,           &meshcom_settings.node_sset2,    0xFFFFFFBF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
     { "--mesh on",            &bMESH,                &meshcom_settings.node_sset2,    0xFFFFFFDF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
     { "--mesh off",           &bMESH,                &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x0020,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
-    { "--extudp off",         &bEXTUDP,              &meshcom_settings.node_sset,     0xFFFFDFFF,   0x00000000,   nullptr,                       TG_DIRTY_WIFI,   TG_SAVE | TG_BRETURN },
+    { "--extudp off",         &bEXTUDP,              &meshcom_settings.node_sset,     0xFFFFDFFF,   0x00000000,   tg_post_extudp_off,            TG_DIRTY_WIFI,   TG_SAVE | TG_BRETURN },
     { "--debug on",           &bDEBUG,               &meshcom_settings.node_sset,     0xFFFFFFFF,   0x0008,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--debug off",          &bDEBUG,               &meshcom_settings.node_sset,     0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--txcapture on",       &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0008,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },

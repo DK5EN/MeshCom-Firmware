@@ -6820,7 +6820,7 @@ finding should be read as "one of two candidate causes", not as a diagnosis.
 
 Gate: 34/34 board envs, 962/962 native cases, `selftest.sh` exit 0.
 
-### 3.8at `ETH-03` -- inbound EXTUDP takes the nRF52 off the network, and it is NOT a stall (2026-09-17)
+### 3.8at `ETH-03` -- inbound EXTUDP REBOOTS the nRF52 (2026-09-17)
 
 **Reproduced twice, cleanly.** The node is healthy, four small JSON datagrams
 arrive on UDP 1799, and its entire network goes away for about 25 seconds:
@@ -6855,6 +6855,69 @@ an unnecessary request to replug the cable.
 not what was happening here. The "no heartbeat left the node" observation from
 that write-up was worthless in both directions: `sendExternHeartbeat()`
 (`extudp_functions.cpp:928`) has an **empty body**. There is no heartbeat.
+
+#### RESOLVED, third measurement: the node is crashing
+
+**`ETH-03` is a reboot.** Not a stall, not a lost flag, not a socket that never
+opened. A burst of inbound EXTUDP datagrams resets the node, and everything
+else observed over this whole investigation is a consequence of that.
+
+Two independent observations, each decisive on its own:
+
+| Evidence           | Measurement                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Uptime arithmetic  | datagrams 21:11:26; `--info` at 21:12:49 reports `TIME 61914 ms` -> boot at **21:11:47**, 21 s after the traffic              |
+| USB de-enumeration | datagrams 21:13:01; `/dev/cu.usbmodem2101` **disappeared and returned at 21:13:28**. A USB device only de-enumerates on reset |
+
+And the serial capture caught the moment before it died:
+
+```
+[EXT] Inc: {"type":"msg","dst":"DK5EN-1","msg":"clear"}
+[RING] overflow, slot 1 dropped
+<serial dies: OSError Errno 6, Device not configured>
+```
+
+**Threshold: a burst, not a single packet.** One datagram alone does not reset
+the node (tested: web 200 before, 200 after, no de-enumeration). Four at 0.5 s
+spacing does, repeatably. So this is a rate or queue condition, and
+`[RING] overflow, slot 1 dropped` arriving immediately after the receive is the
+lead worth pulling next.
+
+#### Why this took four attempts, and what each wrong answer was made of
+
+Worth keeping, because every one of the wrong answers was supported by real
+evidence that turned out to mean something else:
+
+| #   | Claim                                    | What actually made it look true                                                                                 |
+| --- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | The extern socket never opens (`EXT-02`) | A genuine latent defect in the same function. Refuted: a fresh boot prints `now listening`, `begin()` returns 1 |
+| 2   | The Ethernet link is unstable            | `link;1` throughout. What it really surfaced was `ETH-02`, a separate real defect                               |
+| 3   | The EXTUDP path stalls the loop          | Refuted by instrumentation: 397 passes, `extudp_parse` max 977 us, `webserver_loop` 0                           |
+| 4   | Something clears `hasIPaddress`          | The four clear-site probes **never fired**. Nothing clears it -- the node restarts with it false                |
+
+The `hasIpAddress: no` that drove theory 4 was a **post-reboot sample**: the
+node was in its boot window before DHCP completed. Likewise round three's
+"`extudp_read` never executed over 397 loop passes" measured a healthy node
+that simply was not being sent anything at that moment -- and `[EXT] Inc:`
+above now proves the datagram _is_ received when one arrives. Both numbers were
+correct; both were readings of the aftermath rather than the event.
+
+The general lesson, at some cost: **a symptom sampled after a reset describes
+the reset, not the fault.** Every capture that mattered here had to bracket the
+event, and the two that finally settled it were the crudest instruments in the
+box -- a subtraction of uptimes, and watching a device file disappear.
+
+#### Severity
+
+Any host that can reach UDP 1799 on a node with `--extudp on` can reboot it
+with four small datagrams, repeatably, with no authentication. On a LAN that is
+a denial of service against a gateway; the corresponding EXTUDP peer is
+normally a trusted host, which is presumably why this was never seen. It is
+recorded here as a defect to fix, not a vulnerability to publish.
+
+**The four `[ETH];clear;site;...` probes stay in the tree.** They fired zero
+times, which is exactly what made theory 4 falsifiable, and they remain the
+instrument that would catch a genuine flag-clear if one ever happens.
 
 #### MEASURED 2026-09-17 evening: the stall hypothesis is refuted
 

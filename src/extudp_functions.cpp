@@ -152,8 +152,11 @@ void startExternUDP()
   // checked -- and set hasExternIPaddress, which is the very flag that makes
   // startExternUDP() return early next time (:127) and getExternUDP() proceed
   // into a dead socket (:379). Nothing retried, because the retry is gated on
-  // exactly that flag, and --extudp off does not clear it (its toggle row has
-  // no post-action). Measured on DK5EN-90 2026-09-17: socket bound "ok",
+  // exactly that flag -- and --extudp off used to leave it set (its toggle
+  // row had no post-action), so cycling off/on never re-opened the socket
+  // either. Fixed: the "--extudp off" row now runs resetExternUDP() as its
+  // post-action (command_functions.cpp), which clears this flag and stops
+  // UdpExtern without reopening it. Measured on DK5EN-90 2026-09-17: socket bound "ok",
   // three [EXT] lines printed, and then 0 of 23 corpus objects answered and
   // not even the heartbeat below left the node -- through two reboots.
   //

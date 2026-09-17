@@ -154,6 +154,57 @@ void ethStat()
     (unsigned long)s_ethLastGotIpMs, (int)ETH_STALL_MS);
 }
 
+// ETH-03 measurement (2026-09-17, docs/BACKLOG.md sec 3.8at): the fault is a
+// false hasIPaddress=false clear while the W5100S is demonstrably still up
+// (answers ARP/ICMP) -- --info and [ETH] both say "no IP" at the same
+// instant the chip disagrees. Four sites clear the flag (:169 below,
+// :281/:294 in initethDHCP(), :567 in resetDHCP()); this is the raw,
+// unconditional marker fired at each one, carrying both sides of that
+// disagreement in a single line: the decision value that drove the clear
+// (a DHCP/startETH() return code, or -1 for the one unconditional site) and
+// the chip's own linkStatus()/localIP() read at that exact instant.
+//
+// Raw Serial.printf, not printfdeb/DEBUG_MSG: the node under test runs with
+// --setlog and bDEBUG both off, so a gated line would never have appeared
+// here -- which is exactly why this bug needed a measurement pass instead of
+// a grep through the existing log. Left unconditional in shipping images
+// too, matching every other [ETH];event;.../[ETH];drop;... line already in
+// this file (ethDrop() below, ethLinkPoll(), resetDHCP(), checkDHCP()), all
+// of which are already always-on -- one more raw line at these four sites
+// does not change that policy, it is consistent with it.
+//
+// site: a fixed id (169/281/294/567), not a live line number -- these match
+// the site names docs/BACKLOG.md sec 3.8at already published for this bug
+// before this instrumentation existed, and adding these markers moves every
+// later line in the file, so a live line number would drift out of sync
+// with the doc on the next edit. rc: startETH()'s return code at 281/294/567
+// (2 = no ETH hardware, 1 = DHCP no answer), or -1 at 169 where there is no
+// decision value to report. linkst: Ethernet.linkStatus() at this instant,
+// raw EthernetLinkStatus enum value (0 Unknown, 1 LinkON, 2 LinkOFF) --
+// the library's own numbering, not remapped, so it can be checked against
+// RAK13800_W5100S.h directly. ip: Ethernet.localIP() at this instant.
+//
+// Measurement only, per the brief: no control-flow change, no guard, no
+// retry added here -- a fix applied before this measurement would destroy
+// the evidence the next capture needs.
+//
+// Counters: NOT extended for this pass. The existing s_ethResets/
+// s_ethLinkDowns/s_ethGotIpCount/s_ethDhcpFails feed the 60-s
+// [ETH];link;... heartbeat, but none of them increments at 169/281/294/567
+// today, and folding a new counter into that heartbeat's fixed field list
+// risks breaking whatever already parses it. Each [ETH];clear;site;... line
+// below is already its own countable, greppable event carrying the site
+// number, so a shared counter would be redundant with what these four lines
+// already give the next capture.
+static void ethClearLog(int site, int rc)
+{
+  Serial.printf("[ETH];clear;site;%d;rc;%d;linkst;%d;ip;%d.%d.%d.%d;ms;%lu\n",
+                site, rc, (int)Ethernet.linkStatus(),
+                Ethernet.localIP()[0], Ethernet.localIP()[1],
+                Ethernet.localIP()[2], Ethernet.localIP()[3],
+                (unsigned long)millis());
+}
+
 // Bench-/Feldhaken: der Wiederherstellungspfad der Firmware (resetDHCP: UDP
 // stoppen, DHCP erneuern, UDP neu starten), mit Zeit. Kein Kabel-Ereignis --
 // das kann nur der Operator ausloesen (N-20-Soak).
@@ -166,6 +217,8 @@ void ethDrop()
   }
   uint32_t t0 = millis();
   Serial.printf("[ETH];drop;ms;%lu\n", (unsigned long)t0);
+  ethClearLog(169, -1);   // -1: no decision value here, this clear is the unconditional
+                          // operator trigger (--ethdrop), not a DHCP/init outcome
   neth.hasIPaddress = false;
   int rc = neth.resetDHCP();
   Serial.printf("[ETH];drop;done;rc;%d;took_ms;%lu;ip;%d;ms;%lu\n", rc, (unsigned long)(millis() - t0), neth.hasIPaddress ? 1 : 0, (unsigned long)millis());
@@ -278,6 +331,7 @@ void NrfETH::initethDHCP()
   if(retStart == 2)
   {
     // not ETH-hardware found
+    ethClearLog(281, retStart);
     hasIPaddress = false;
     return;
   }
@@ -287,10 +341,11 @@ void NrfETH::initethDHCP()
     // start the UDP service
     startUDP();
   }
-  else 
+  else
   {
     printlndeb("ERROR: DHCP No Answer");
     printlndeb("ERROR: Set to fixed IP!");
+    ethClearLog(294, retStart);
     hasIPaddress = false;
   }
 }
@@ -564,6 +619,7 @@ int NrfETH::resetDHCP()
   if(retStart == 2)
   {
     // not ETH-hardware found
+    ethClearLog(567, retStart);
     hasIPaddress = false;
     return 1;
   }
