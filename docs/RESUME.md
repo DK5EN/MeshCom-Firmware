@@ -1,6 +1,61 @@
 # RESUME — pick up here
 
-## Where we are, end of 2026-09-16 (start here)
+## Where we are, end of 2026-09-17 (start here)
+
+Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af). **Phases A, B and C are
+closed. Phase D is one row short of closed.** The Gantt now stands at **24 of 28 active
+tasks**; three tasks are struck through rather than deleted, because they were planned and then
+dropped for a reason worth keeping.
+
+**Done 2026-09-17:** `W6a` (`55a7b4c4`) and `W6b` (`3be9a9da`) — together every drift-matrix row a
+source change can close. `DISP-01` (`5b57d555`) — resolved on the bench, and the audit's diagnosis
+was backwards. `R1-04` (`d5a071d8`) — the RX log ring is lazy, −109 kB RAM. `C4d`/`DR-03` — nRF52's
+missing heartbeat warning stage. `EXT-01` confirmed on hardware. Both bench nodes restored to
+stock `HEAD` images and their pre-bench configuration.
+
+**What is left, in order:**
+
+| row     | state                                                                                                                                                 |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `E1`    | G2 after-run. Scope is fixed by what G1 captured: `H4` BLE, `H6` UDP-1990 inbound, `H8` EXTUDP, `H11` T-Deck checklist -- nothing else has a baseline |
+| `E3`    | upstream resync. A trial merge conflicts on **four files** only; the nine `variants/*/platformio.ini` merge cleanly **today**                         |
+| `W7` II | the 325 presence-tested flags, and the `extends=` half. Both deliberately deferred, reasons in BACKLOG §3.8aq and the `W7` Gantt note                 |
+| `D1-10` | **not on the Gantt** -- the loop scheduler, measured at 50 timer predicates against the audit's "~18". An open row, not a silent omission             |
+
+**`E3` before the `extends=` half of `W7`, not after.** Upstream commit `b30e31a4` (2026-09-14)
+rewrote the `upload_command` of exactly the nine `variants/*/platformio.ini` that half would
+restructure. Git merges them cleanly as they stand; it would not once they are folded into
+`extends=` bases. The `configuration_default.h` half had no such conflict -- upstream touched **zero**
+`variants/*/configuration.h` -- which is why it went first and is already committed.
+
+### Bench state as of 2026-09-17
+
+Both nodes were flashed back to a **stock** (no `INSTRUMENT_ENABLED`) build of `HEAD` and their
+pre-bench configuration restored. Verify before assuming — a bench image left on a node is how a
+later measurement gets quietly invalidated:
+
+| Node       | Port                     | Image              | Config                                                        |
+| ---------- | ------------------------ | ------------------ | ------------------------------------------------------------- |
+| `DK5EN-93` | `/dev/cu.usbserial-0001` | stock `HEAD` 15:28 | `--extudp off`, mesh off, gateway off, TXPWR 1 dBm, IP .68.71 |
+| `DK5EN-90` | `/dev/cu.usbmodem2101`   | stock `HEAD` 15:28 | mesh off, gateway off, EXTUDP off, IP .68.66                  |
+
+`DK5EN-90` still carries the bench `ATXT` `W3-BENCH-RAK90`; it was blank before the `W3` session.
+Cosmetic.
+
+**The RAK is not deaf, and the reason it looks deaf is worth knowing.** It prints no RX line at all,
+which reads as "hears nothing" and was written up that way here earlier today -- wrongly. Two pieces
+of evidence: `DK5EN-93` hears `DK5EN-90`'s own HEY beacons at **RSSI -42**, so the antenna is
+connected and the radio transmits; and with `--setlog on` the RAK's own `[LOG] STAT` line reports
+**`rx=1629`, `mh=3`** -- it has been receiving, from three distinct stations. The `[LOG]` RX line is
+gated on `bDisplayLog` (`--setlog`, shown as `DisplyLog` in `--info`, `lora_functions.cpp:423`),
+which is **off** on this node and **on** on `DK5EN-93`. That one setting is the whole difference.
+
+Two consequences. A silent node is a logging question before it is a hardware question -- check
+`DisplyLog` in `--info` first. And the raw-log writer `charBuffer_aprs()` is **not** behind that
+gate (`lora_functions.cpp:755-759`), so `R1-04`'s changed path runs on every received frame whether
+or not anything is printed; the RAK's soak arm was being exercised the whole time it appeared idle.
+
+## Where we were, end of 2026-09-16 (history)
 
 Branch `dry-unification`, tree clean. DRY campaign (BACKLOG §3.8af). **`W3` DONE**; one parallel
 wave landed on top of it (`6b03bd37`). Phases A-C done except `DR-03`/`DR-16`'s G2 bench rows.
@@ -100,11 +155,14 @@ one code path, no variant list, no board that can be blanked by being listed wro
 audit's 4 304 B is optimistic: the 1 024-byte buffer is a function-local `static` in
 `u8g2_m_16_8_f()` that **both** U8g2 objects share.
 
-**`DISP-01` -- documented, not fixed** (operator decision). The probe contract is `2` = SSD1306,
-`1` = SH1106; nRF52 honours it and **ESP32 inverts it**, against its own comment. The hardcoded
-early returns look tuned to the inversion, so bench boards work and a blind fix would trade one
-unverified state for another. Bench list owed: Heltec V3, and a T-Beam once the RAK is unplugged.
-T-Deck Plus is NOT in scope -- it never compiles the U8g2 path. Full write-up: BACKLOG §3.8ah.
+**`DISP-01` -- RESOLVED 2026-09-17, and the paragraph that stood here was wrong.** It said the
+ESP32 branch inverted the probe contract. **It does not.** Two boards on the bench (Heltec V3,
+T-Beam) prove the ESP32 mapping correct; what was inverted was **nRF52**, plus two swapped log
+labels in the probe that led two independent readers to the same wrong conclusion. Acting on the
+old paragraph would have broken every working ESP32 board. The `idtype -> u8g2` mapping is now one
+function (`mcSelectU8g2()`, `loop_functions.cpp`), so it cannot drift again; the nRF52 half is
+code-proven only, because the bench RAK has no panel. Still open: `BOARD_TBEAM_1W`'s hardwired `1`,
+which needs one fact nobody here has — that board's panel size. Full write-up: BACKLOG §3.8ah.
 
 **`env:t5_epaper` now builds, and what that cost is the interesting part.** It had never compiled
 once. The missing `variants/t5_epaper/configuration.h` was the first of **eight** blockers, and

@@ -5373,13 +5373,13 @@ weaker without a near-term PR -- a later PR would face the same surface.
 Supersedes the 2026-09-15 stand below, which is kept because its findings
 (`OPT-D14`, `RF-09`, the corpus emission category) are still open rows.
 
-| Phase                        | Rows                               | State                                                                                                                                                                                                                        |
-| ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A -- prepare                 | `A1`-`A4`                          | **done**                                                                                                                                                                                                                     |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**                                                                                                                                                                                                                     |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 2 of 29 rows open** -- `DR-03`/`DR-16` wait for the `E1` G2 run, so the row cannot close before `E1`                                                                                                  |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1`-`W4` **done**. `W5` **7 of 9 rows done**, owes `R1-04` (12 h nRF52 soak) and the `mheardLine` half of `R2-04`. `W6` owes `D1-01` + `D4-01/02`. `C4d` owes `DR-03`. `W7` deferred to immediately before the PR by design |
-| E -- prove and ship          | `E1`-`E5`                          | **not started**. `E1` is a bench run; `E4` is an outward-facing submission; `E5` is Kurt's review, outside our control                                                                                                       |
+| Phase                        | Rows                               | State                                                                                                                                                                                                                                                                                |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A -- prepare                 | `A1`-`A4`                          | **done**                                                                                                                                                                                                                                                                             |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**                                                                                                                                                                                                                                                                             |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done. **`M3` closed 2026-09-17**: `DR-16` shipped in the 2026-09-16 wave and `DR-03` in `C4d`, so no matrix row still waits on `E1`. All 29 rows carry a verdict and every row a source change can close is closed                                                         |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1`-`W6` **done** (`W6a` `55a7b4c4`, `W6b` `3be9a9da`). `W5` closed: `R1-04` committed `d5a071d8` and soaked on the bench 2026-09-17; the `mheardLine` half of `R2-04` is the wave's last row. **`C4d` done** (`DR-03`). `W7` is the only wave left, kept last by operator decision |
+| E -- prove and ship          | `E1`-`E3`                          | **not started**. `E1` is a bench run, `E3` the upstream resync. `E2`/`E4`/`E5` left the plan with operator decision 6 -- no PR for now                                                                                                                                               |
 
 **W5, row by row (2026-09-17).** Delivered: `GRD-01`, `R2-01`, `R3-12`,
 `R4-01`, `R2-04` (`aprsMessage` half), `R1-02` step 1 -- together about
@@ -5391,13 +5391,14 @@ standing rule: prefer the option that leaves ONE code path.
 
 **What is NOT agent-completable, and therefore caps "finish the Gantt":**
 
-| Post                 | Needs                                          |
-| -------------------- | ---------------------------------------------- |
-| `R1-04` (`W5`)       | 12 h nRF52 soak                                |
-| `E1` (G2 after-run)  | bench session, 3-4 nodes                       |
-| `M3` last 2 rows     | rides on `E1`                                  |
-| `DISP-01`            | Heltec V3 + a T-Beam (needs the RAK unplugged) |
-| BLE golden as a gate | a quiet bench -- antenna off DK5EN-93          |
+| Post                 | Needs                                          | State 2026-09-17                                                  |
+| -------------------- | ---------------------------------------------- | ----------------------------------------------------------------- |
+| `R1-04` (`W5`)       | nRF52 soak                                     | **done** -- 2 h, both arms, §3.8an; the 12 h figure was a guess   |
+| `DISP-01`            | Heltec V3 + a T-Beam (needs the RAK unplugged) | **done** -- §3.8ah; only `BOARD_TBEAM_1W`'s panel size still open |
+| `EXT-01`             | `--injectraw` against a live EXTUDP peer       | **done** -- §3.8ao                                                |
+| `M3` last 2 rows     | rode on `E1`                                   | **moot** -- both closed by source changes instead                 |
+| `E1` (G2 after-run)  | bench session, 3-4 nodes                       | open                                                              |
+| BLE golden as a gate | a quiet bench -- antenna off DK5EN-93          | open (`R1-02` step 2 was dropped, so this gates nothing shipped)  |
 | `E4` submit PR       | operator authorisation; never done unprompted  |
 | `E5` upstream review | Kurt; external                                 |
 
@@ -5882,19 +5883,24 @@ now `R4-02/03` -- has been made.
   keep existing.** Mutation-verified: making `blank_comments()` a no-op fails it.
 
 - **`W5`** RAM rows of medium risk (`R1-04`, `R1-02`, `R2-01`, `R2-04`,
-  `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- **no longer blocked on any operator
-  decision**; all six are made. What it still needs is a 12 h nRF52 soak for
-  `R1-04`.
+  `R4-02/03`, `R3-13`, `R3-12`, `R4-01`) -- **done 2026-09-17** except the
+  `mheardLine` half of `R2-04`. The soak `R1-04` owed is run (§3.8an); it took
+  2 h on two nodes, not the 12 h the plan guessed, because the two arms
+  (allocated / never allocated) are both observable within minutes and the rest
+  is stability.
 - **`W6`** shared UDP frame handler (`D1-01`, carrying defects 12/13), `D3-01`,
   `D3-02`, `D3-05`, `D4-01/02` `ui_common` -- and `EXT-01`'s early return, which
-  must land with or before this wave, not after.
-- **`C4d`** the nRF52 diagnosis port out of `C4`, and **`D1-10`** the loop
-  scheduler, measured at **50** timer predicates rather than the plan's "~18".
-- **`W7`** variants restructure -- highest upstream-conflict surface; sync
-  immediately before submitting, and it is the one wave that may want its own PR.
-- **`E1`-`E4`** G2 after-run on the bench, the German proof document and PR
-  text, an upstream resync with a targeted repeat run, then submit. `E5` is
-  Kurt's review.
+  had to land with or before this wave. **Done**: `W6a` `55a7b4c4`, `W6b`
+  `3be9a9da`, `EXT-01` confirmed on hardware (§3.8ao).
+- **`C4d`** the nRF52 diagnosis port out of `C4` -- **done 2026-09-17**
+  (§3.8ap). **`D1-10`** the loop scheduler is NOT done and was measured at
+  **50** timer predicates rather than the plan's "~18"; it is not on the Gantt
+  and stays an open row rather than a silent omission.
+- **`W7`** variants restructure -- highest upstream-conflict surface. The
+  "sync immediately before submitting" argument is weaker now that there is no
+  near-term PR (operator decision 6), but it stays last by operator decision.
+- **`E1`, `E3`** G2 after-run on the bench, then an upstream resync with a
+  targeted repeat run. `E2`/`E4`/`E5` left the plan with operator decision 6.
 
 ##### Plan estimate for the remainder
 
@@ -6409,6 +6415,287 @@ rewrite.
 **Still owed.** The heap claim is the row's whole premise and is NOT proven by
 any of this: it needs the 1 h `--heap` watermark on the bench, plus a BLE
 connect soak. Everything above is a build-and-test verdict.
+
+### 3.8an `R1-04` -- the RX log ring is allocated when someone asks for it (2026-09-17)
+
+`ringbufferRAWLoraRX` was a static `unsigned char[MAX_LOG][UDP_TX_BUF_SIZE+5]`
+in `loop_functions.cpp`. It exists to back exactly one thing: the web GUI's
+**RX Log** page. Every node paid for it at every boot, on every board, whether
+or not anyone ever opened that page -- and on a headless gateway nobody ever
+does.
+
+It is now a `NULL` pointer plus `rawLogEnsure()`, which `calloc()`s the array
+the first time `sub_page_rxlog()` runs (`web_functions.cpp:1349`).
+
+**Measured, all 34 envs, clean sequential rebuild:**
+
+| Group                     | Envs | RAM per env | Subtotal       |
+| ------------------------- | ---- | ----------- | -------------- |
+| `MAX_LOG` 20              | 10   | **-5 192**  | -51 920        |
+| `MAX_LOG` 10 (S3 / nRF52) | 12   | **-2 600**  | -31 200        |
+| `MAX_LOG` 10 (classic)    | 10   | **-2 592**  | -25 920        |
+| safeboot                  | 2    | 0           | 0              |
+| **Total**                 | 34   |             | **-109 040 B** |
+
+Flash goes the other way by **+7 076 B** across the fleet -- the allocator call,
+the NULL checks and the failure page. That trade is the row: 109 kB of RAM that
+every node holds forever, against 7 kB of flash that no node is short of.
+
+**The two rules the writer had to obey, because the reader is not the writer.**
+The page runs in the web/main task; the writer runs in `OnRxDone`, which on
+nRF52 is the **16 KB LORA task** (see `docs/` N-22 and the memory note on
+`OnRxDone`). So:
+
+- `rawLogEnsure()` publishes the pointer **after** `calloc()` has zeroed the
+  block, never before -- a reader that sees a non-`NULL` pointer sees a fully
+  initialised array.
+- the writer reads the pointer **once** into a local and returns on `NULL`
+  (`loop_functions.cpp:3384`). Reading `ringbufferRAWLoraRX` twice would allow
+  the allocation to land between the test and the use.
+
+The ring index `RAWLoRaWrite` advances either way, so a page opened later shows
+the same ordering it would have shown before -- just with the pre-allocation
+frames missing rather than blank.
+
+**Out of memory is a page, not a crash.** If the `calloc()` fails the page says
+`RX log buffer not available (out of memory)` and everything else keeps
+running. That string is also the artifact check: it must be present in a built
+image, because a guard placed wrongly can compile this whole feature away.
+
+**Gate:** 34/34 board envs, 33/33 native envs (951 cases), `selftest.sh` exit 0.
+Commit `d5a071d8`, which records the hardware soak as **owed, not done**.
+
+#### Bench, 2026-09-17: both arms of `R1-04` on real nodes -- PASSED
+
+Static RAM is arithmetic; the allocation is not. Two boards, two arms, both on
+a stock (non-instrument) build of `HEAD`, each restored to its normal image and
+configuration first. **2 h, not the 12 h the plan guessed** -- both arms are
+observable within minutes and everything after that is stability.
+
+| Node                       | Arm                                     | Result over 2 h                                                    |
+| -------------------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| `DK5EN-93` Heltec V3 (S3)  | ring **allocated** at t=0, live LoRa RX | **309 frames** written, 0 reboots, free heap never changed         |
+| `DK5EN-90` RAK4631 (nRF52) | ring **never allocated**, live LoRa RX  | 37 frames through the `NULL` path, 0 reboots, heap flat at 114 368 |
+
+The `[HEAP]` monitor prints on change and once a minute otherwise, so **zero
+heap lines over two hours is the assertion**, not an absence of data: the free
+heap never moved on either board. The RAK's own `STAT` line reports the same
+figure at `up=60` and at `up=7800`.
+
+**The decisive check is the page, not the counters.** At t=0 the rxlog page
+rendered ten empty slots -- the ring had just been allocated and nothing had
+been written yet. After the soak the same page renders real frames from four
+distinct senders:
+
+```
+17:20:01 :1AE1E1E6 2 000 8/8 LH:AB DK5EN-98>* !4824.47N\01144.28E-...
+17:21:47 :91A43603 4 000 8/8 LH:89 DK5EN-90>H @R2;
+17:24:15 :4106E373 2 000 8/8 LH:8C DK5EN-92>* !4824.46N/01144.30E#/B=100/...
+```
+
+That is the whole claim of the row, end to end: the buffer is allocated when
+someone looks at the page, the writer in the LORA task fills it from then on,
+and a node whose page nobody opens runs for hours with the pointer at `NULL`
+and never notices.
+
+The allocation itself was measured separately on the instrument build via
+`--heap`, which the stock image does not carry:
+
+| Probe                 | `int_free` | Step       |
+| --------------------- | ---------- | ---------- |
+| before any rxlog view | 143 948    |            |
+| after view 1          | 140 816    | **-3 132** |
+| after view 2          | 140 580    | -236       |
+| after view 3          | 140 356    | -224       |
+
+The first view costs an order of magnitude more than the next two, and the
+second and third cost the same as each other -- that residual ~230 B is the
+ordinary per-request churn of the web handler. Subtracting it leaves
+**~2 900 B** for the one-off, against the 2 600 B the array occupies on this
+board (`MAX_LOG` 10 on ESP32-S3); the rest is the heap block header and the
+±200 B the two "before" probes already differ by. **Allocated once, on the
+first view, and never again.**
+
+#### A silent node is a logging question before it is a hardware question
+
+Recorded because it cost two wrong conclusions in one afternoon. `DK5EN-90`
+printed no RX line at all for 90 s and was written up here as "hears nothing,
+assume the antenna is off". Both halves were wrong:
+
+- `DK5EN-93` hears `DK5EN-90`'s own HEY beacons at **RSSI -42**. The antenna is
+  connected and the radio transmits.
+- With `--setlog on` the RAK's own `[LOG] STAT` line reports `rx=1629`, `mh=3`.
+  It had been receiving the whole time, from three stations.
+
+The `[LOG]` RX line is gated on `bDisplayLog` (`--setlog`, shown as `DisplyLog`
+in `--info`, `lora_functions.cpp:423`), which is **off** on that node and **on**
+on `DK5EN-93`. One setting, and it looks exactly like dead hardware.
+
+It also matters for this row specifically: the raw-log writer
+`charBuffer_aprs()` is **not** behind that gate (`lora_functions.cpp:755-759`),
+so `R1-04`'s changed path runs on every received frame whether or not anything
+is printed. The RAK's arm was being exercised throughout the period it appeared
+idle -- had the gate covered the writer too, the arm would have proved nothing.
+
+### 3.8ao `EXT-01` confirmed on hardware -- the telemetry frame no longer kills EXTUDP (2026-09-17)
+
+`EXT-01`'s early return landed in code during the `W6b` wave; the `W6b` writer
+found it already fixed and the row needed observing, not changing. Observed now
+on `DK5EN-93`, following the same protocol that produced the 2026-09-12 failure
+record.
+
+Setup: Heltec V3 on an `INSTRUMENT_ENABLED=1` build (needed for `--injectraw`),
+`--mesh off`, `--gateway off`, `--extudpip 192.168.68.58`, `--extudp on`. Three
+frames built from corpus `f006` by `test/golden/mc_frame.py` with fresh
+`msg_id`s and source `DK5EN-98`; destinations `9999` / `100001` / `9999`, never
+`*`. The builder's self-check (rebuilding `f006` reproduces its committed bytes)
+passed first.
+
+| #   | frame             | 2026-09-12 (broken)          | 2026-09-17           |
+| --- | ----------------- | ---------------------------- | -------------------- |
+| A3  | `DK5EN-98>9999`   | datagram, `Len: 153`         | datagram, len 161    |
+| B3  | `DK5EN-98>100001` | `[EXT] Out:  Len: 0` + reset | **no output at all** |
+| C3  | `DK5EN-98>9999`   | datagram, `Len: 151`         | datagram, len 161    |
+
+Both control datagrams arrived on port 1799 as valid JSON. The telemetry frame
+produces no marker and no `resetExternUDP()`: the early return in
+`extudp_functions.cpp:650-670` fires before the send block, so there is no empty
+`write(c_json, 0)` whose false-y result was being read as a failed write. C3
+going out normally afterwards is the part that matters -- it proves the socket
+survived the frame that used to tear it down.
+
+Also captured: `stack_hwm;2592` on the EXTUDP TX path, which is the figure
+`N-22` moved 600 B off.
+
+**Incidental finding, not `EXT-01`.** The first frame after `--extudp` is
+switched on is silently dropped. `startExternUDP()` is called lazily from the
+main loop when `!hasExternIPaddress` (`esp32_main.cpp:4002`), so a frame
+arriving in that window finds no socket. It cost two confounded passes here
+before the socket was warmed deliberately. Pre-existing, affects only the moment
+the feature is enabled, and not worth a fix on its own -- recorded so the next
+reader does not file it as a regression of this row.
+
+### 3.8ap `DR-03` -- nRF52 was silent for the first 65 seconds (2026-09-17)
+
+The last drift-matrix row a source change can close, and the whole of `C4d`
+(`DR-14` was decided `both-valid` and is pinned by three tests; `DR-16` shipped
+in the 2026-09-16 wave).
+
+ESP32 runs a **two-stage** heartbeat watchdog: warn at `HB_WARN_TIME` (35 s) of
+server silence, act at `MAX_HB_RX_TIME` (65 s). nRF52 had only the acting stage.
+For the first 65 s it printed nothing at all, and then went straight to
+re-initialising the link -- so the log could never distinguish _the server went
+quiet_ from _the link went down_, which is exactly what those 30 s are for.
+
+nRF52 now carries the diagnostic, naming the Ethernet state where ESP32 names
+WiFi, plus the `hb_warn_logged` one-shot latch cleared in the same four
+live-traffic branches of `handleUdpFrame_nrf52()` (GATE, CONF, BEAT, OTHER --
+each alongside the `neth.last_upd_timer` reset that already lived there, because
+a latch that outlives its own age counter warns once per node lifetime).
+
+**Only the diagnosis was ported, not ESP32's stage-1 action.** ESP32 resets the
+UDP session immediately in stage 1 when WiFi is also down. The nRF52 counterpart
+of that reset is `resetDHCP()`/`initethfixIP()` -- and that path is `N-20`: every
+retry hardware-resets the W5100S, after which PHY negotiation takes seconds and
+`startETH()` sees a permanent `LinkOFF`, so a once-unplugged cable never
+reconnects. A second, earlier trigger for it would be a regression dressed as
+parity. Stage 2 stays the only acting stage.
+
+Guarded on `neth.last_upd_timer > 0`, as ESP32 guards on `last_upd_timer > 0`:
+without it the age just after boot is `millis() - 0` and the warning fires once
+into the void before any server has had a chance to answer.
+
+**Five cases in `native_gateway_twin`**, asserting the latch rather than the
+printed text -- a test on the wording would pin the wording:
+
+| Case                                            | Asserts                                              |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| `..._warns_once_in_the_window_and_does_not_act` | latch set at 40 s; **no** `resetDHCP`/`initethfixIP` |
+| `..._silent_before_the_warn_time`               | nothing at 20 s                                      |
+| `..._no_warn_before_the_server_ever_answered`   | the `> 0` boot guard                                 |
+| `..._latch_clears_when_the_acting_stage_runs`   | stage 2 clears it, so later episodes warn again      |
+| `..._both_platforms_warn_at_the_same_age`       | the parity claim, as one differential in one process |
+
+### 3.8aq `W7` planned -- what the variants actually share, and the gate that had to be built first (2026-09-17)
+
+`W7` is the last code wave. Recon produced a headline that would have killed
+the row, and it was wrong, so both the number and the way it was wrong are
+recorded here.
+
+**The wrong question.** "Which `#define`s appear in every one of the 31
+`variants/*/configuration.h` with an identical value?" Answer: **two**
+(`LORA_SF`, `LORA_PREAMBLE_LENGTH`), from which it follows that 3 558 of 3 560
+lines are per-variant and a shared default is pointless.
+
+**The right question**, because that is what a default header does: for each
+macro, what is the most common value, and how many variants repeat it?
+
+| Macro                 | Value        | Variants repeating it    |
+| --------------------- | ------------ | ------------------------ |
+| `RF_FREQUENCY`        | `433.175000` | 28 of 31                 |
+| `LORA_APRS_FREQUENCY` | `433.775000` | 28                       |
+| `LORA_CR`             | `6`          | 28                       |
+| `TX_POWER_MAX`        | `22`         | 28                       |
+| `CURRENT_LIMIT`       | `140`        | 27 of the 27 that set it |
+| `LORA_BANDWIDTH`      | `250`        | 26                       |
+| `TX_POWER_MIN`        | `-9`         | 25                       |
+
+**967 of the 1 616 macro definitions in the tree are a variant repeating the
+fleet's own default.** That is the duplication the row exists to remove, and
+"two common macros" measured something else.
+
+**The 967 is not one number, it is two, and the split decides the wave:**
+
+|                                                | lines   | why it is separate                                                                   |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| plain value macros (`RF_FREQUENCY`, `LORA_CR`) | **642** | hoisting changes no behaviour; a variant that differs keeps its own line             |
+| presence-tested flags (`ENABLE_GPS`, ...)      | **325** | the source tests `#ifdef`, so ABSENCE is the signal -- hoisting inverts the contract |
+
+The 73 macros the source presence-tests are the whole risk. `ENABLE_GPS` is
+defined -- empty -- in 28 variants and simply absent in 3, and
+`src/lora_functions.cpp:124` tests `#ifdef`. Moving it into a default means the
+3 must now `#undef` it, and **`#undef` of a macro that was never defined is
+legal and silent**, so a typo in one opt-out list disables a sensor on a board
+with no warning from any compiler. `W4` already lost a day to a guard that
+compiled a whole file to nothing while exiting 0.
+
+**Therefore `W7` is two steps, not one**: the 642 first, with the flags left
+exactly where they are; the 325 only afterwards and only with a positive
+assertion per variant, never a bare `#undef` list. Doing both at once makes the
+gate unable to say which half broke a board.
+
+#### The existing macro gate cannot see this wave, which is why a second one exists
+
+`test/golden/variant_macros_lint.py` (wired into `test/golden/selftest.sh:75`)
+reads each `configuration.h` **as text** and records what that file literally
+writes down. That is right for the job it has -- catching drift between two
+board headers -- and blind to `W7`, which MOVES those lines: hoisting
+`RF_FREQUENCY` changes 28 of its baseline entries by construction, after which
+it cannot distinguish a correct hoist from one that dropped the value for a
+single board. Regenerating its baseline to make it pass would discard the only
+signal.
+
+So `test/golden/variant_macros_effective.py` records the other half: not what
+the file says, but **what the compiler ends up seeing per env**. It takes the
+argv from PlatformIO's own compilation database (`pio run -t compiledb`),
+re-runs it as `-dM -E`, and subtracts the bare compiler's predefines so a
+toolchain upgrade cancels out. A correct hoist produces a **byte-identical**
+dump even though every file involved changed; a wrong one shows up as a single
+line naming the env, the macro and both values.
+
+It deliberately does not read `default_envs`: `t5_epaper` sits there commented
+out and `vision-master-e213-preview` was never in it, yet the campaign's sweep
+builds both. Keying on `default_envs` would drop exactly the two envs most
+likely to rot unnoticed -- a mistake the recon pass made, filing
+`vision-master-e213-preview` as dead when the 34-env gate builds it every time.
+The tool reads `variants/*/platformio.ini` instead and finds **32** board envs,
+which is the campaign's 34 minus the two safeboot envs. Six self-tests, no
+toolchain needed.
+
+**Also noted, not fixed:** `variant_macros_lint.py`'s own docstring still says
+`t5_epaper` has no `configuration.h`. It has had one since `W4` created it. The
+tool's behaviour is correct -- the glob simply finds it now -- only the comment
+is stale.
 
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
