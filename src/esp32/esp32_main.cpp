@@ -123,6 +123,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 // MeshCom Common (ers32/nrf52) Funktions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
 #include <test_inject.h>
 #include <command_functions.h>
 #include <phone_commands.h>
@@ -2105,6 +2106,23 @@ void esp32loop()
         }
     #endif
 
+    // D1-10: the shared scheduler runs at function scope, BEFORE the
+    // BOARD_T5_EPAPER / if(bRadio) block below. Six of its seven jobs (battery,
+    // heap monitor, MCP23017, BMP390, MCU811, INA226) never depended on the
+    // radio; only retransmit did, and loopEnabled_retransmit() keeps that gate
+    // (bRadio) per entry. Inside the block they would stop on a node whose
+    // radio failed to init, on env:esp32-external-radio (bRadio is false by
+    // design there) and on the T5 e-paper build, which compiles the #else arm
+    // away. BattTimeWait's zero-init is unconditional in the original (unlike
+    // heapMonTimer's/INA226TimeWait's, which are nested inside their own
+    // runtime guard and so live inside loopEnabled_heapMon()/
+    // loopEnabled_ina226() instead -- see loop_actions_esp32.cpp), so it stays
+    // a top-level statement here, right before the scheduler call.
+    if (BattTimeWait == 0)
+        BattTimeWait = millis() - 30000;
+
+    loopSchedulerRun(millis());
+
     // LoRa-Chip found
     #if defined(BOARD_T5_EPAPER)
         idf_loop();
@@ -2136,19 +2154,6 @@ void esp32loop()
             }
         }
 
-        // Retransmission status must tick on ALL nodes (including gateways).
-        // Without this, gateway text messages stay stuck at RING_STATUS_SENT
-        // forever if no echo is received via LoRa (RING_ZOMBIE).
-        if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
-        {
-            updateRetransmissionStatus();
-            // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring
-            // entries here, in the main-loop tick -- NOT in getNextTxSlot(),
-            // which also runs on the nRF52 timer task (Advisor F1).
-            txRingAgeBackground(millis());
-
-            retransmit_timer = millis();
-        }
 
         // FIX: Periodic ring buffer utilization report (every 30s)
         {
@@ -3192,18 +3197,7 @@ void esp32loop()
     }
 
 
-    #if defined(ENABLE_MCP23017)
-    // 5 sec
-    if ((uint32_t)(millis() - mcp_refresh_timer) >= 5000)
-    {
-        // get i/o state
-        if(loopMCP23017())
-        {
-        }
-
-        mcp_refresh_timer = millis();
-    }
-    #endif
+    // D1-10 loop scheduler: mcp_refresh_timer moved to the scheduler call above.
 
     // gps display refresh every 5 sec
     gps_refresh_intervall = GPS_REFRESH_INTERVAL;
@@ -3552,79 +3546,9 @@ void esp32loop()
     if(tx_is_active == false && is_receiving == false)
         test_inject_service();
 
-    if(BattTimeWait == 0)
-        BattTimeWait = millis() - 30000;
-
-    if ((uint32_t)(millis() - BattTimeWait) >= 30000)  // 30 sec -- unified with nRF52 cadence (DRY unification, operator decision
-                                                        // 2026-09-11); the NTC/fan control below used to share this timer but now
-                                                        // runs on its own fast FanTimeWait so 1W-TBeam thermal response stays at 0.5 s
-    {
-        if (tx_is_active == false && is_receiving == false)
-        {
-            #if defined(MODUL_FW_TBEAM)
-                int pmu_proz=0;
-                if(PMU != NULL)
-                {
-                    global_batt = (float)PMU->getBattVoltage();
-                    global_proz = (int)PMU->getBatteryPercent();
-
-                    // no BATT
-                    if(global_proz < 0)
-                    {
-                        if(bDisplayCont)
-                            printfdeb("[readBatteryVoltage]...no battery is connected");
-                            
-                        global_batt = (float)PMU->getVbusVoltage();
-                        global_proz=100.0;
-                    }
-                    else
-                    {
-                        if(global_proz < 1.0 && global_batt < 3200.0)
-                            global_proz = 2;
-                    }
-                }
-                else
-                {
-                    global_batt = 0;
-                    global_proz = 0;
-
-                    // Ohne PMU gibt es keine Messung. Ohne diese Zeile wuerde
-                    // PositionToAPRS() jetzt dauerhaft "/B=000" senden und damit
-                    // "Akku leer" behaupten, wo in Wahrheit "nicht messbar" gilt --
-                    // genau die Falschmeldung, die der /B=000-Fix beseitigen soll.
-                    battProbeState = BATT_PROBE_NONE;
-                }
-
-                if(bDisplayCont)
-                    printfdeb("[readBatteryVoltage]...PMU.volt %.1f PMU.proz %i %i\n", global_batt, global_proz, pmu_proz);
-            #else
-            
-                global_batt = read_batt();
-                global_proz = mv_to_percent(global_batt);
-                
-                #ifndef USE_BATT
-                if(bDisplayCont)  // neue Ausgabe erfolgt in batt_functions
-                {
-                    #if not defined(BOARD_T_DECK_PRO) and not defined(BOARD_TBEAM_1W)
-                    printfdeb("[readBatteryVoltage] %s ... %.2f V %i %% max_batt %.3f V\n", getTimeString().c_str(), global_batt/1000., global_proz, meshcom_settings.node_maxv);
-                    #endif
-                }
-                #endif
-
-                #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-                tdeck_update_batt_label(global_batt/1000., global_proz);
-                #endif 
-            
-            #endif
-
-            // BattWaitCounter is gone: it existed only to throttle the debug
-            // prints above when this block ran every 500 ms (it let them
-            // through on every 21st pass, about every 10 s). The block's own
-            // 30 s cadence is the throttle now, so the counter would have
-            // stretched those prints to roughly every 10 minutes.
-            BattTimeWait = millis();
-        }
-    }
+    // D1-10 loop scheduler: BattTimeWait (30 s battery/PMU read) moved to
+    // the scheduler call above; its zero-init stays here (see the comment
+    // there).
 
     // [OE3WAS] Lüftersteuerung -- split off from the battery-read block above into its own
     // 0.5 sec timer (DRY unification, operator decision 2026-09-11): BattTimeWait was slowed
@@ -3675,37 +3599,9 @@ void esp32loop()
     }
     #endif
 
-    // Heap Monitor — always active, 60s interval
-    {
-        static unsigned long heapMonTimer = 0;
-        if (heapMonTimer == 0)
-            heapMonTimer = millis();
-
-        if ((uint32_t)(millis() - heapMonTimer) >= 60000)
-        {
-            if(ESP.getFreeHeap() != lFreeHeap || ESP.getFreePsram() != lFreePsram)
-            {
-                lFreeHeap = ESP.getFreeHeap();
-                lFreePsram = ESP.getFreePsram();
-
-                if(!bDisplayLog)
-                {
-                    printfdeb("[HEAP];%s;%lu;%d;%d;(mon)\n",
-                        getTimeString().c_str(),
-                        lFreeHeap,
-                        ESP.getMinFreeHeap(),
-                        ESP.getMaxAllocHeap());
-                    #if defined(BOARD_HAS_PSRAM)
-                    printfdeb("[PSRM];%s;%lu;(mon)\n",
-                        getTimeString().c_str(),
-                        lFreePsram);
-                    #endif
-                }
-            }
-
-            heapMonTimer = millis();
-        }
-    }
+    // D1-10 loop scheduler: heapMonTimer (always-active 60 s heap monitor)
+    // moved to the scheduler call above; its zero-init now lives inside
+    // loopEnabled_heapMon() (loop_actions_esp32.cpp).
 
     #ifdef OneWire_GPIO
     if(bONEWIRE)
@@ -3809,71 +3705,9 @@ void esp32loop()
     }
     #endif
 
-    // read BMP390 Sensor
-    #if defined(ENABLE_BMP390)
-    if((bBMP3ON && bmp3_found))
-    {
-        if ((uint32_t)(millis() - BMP3TimeWait) >= 60000)   // 60 sec
-        {
-            if(loopBMP390())
-            {
-                meshcom_settings.node_press = getPress3();
-                if(!aht20_found)
-                {
-                    meshcom_settings.node_temp = getTemp3();
-                }
-                meshcom_settings.node_press_asl = getPressASL3();
-                meshcom_settings.node_press_alt = getAltitude3();
-            }
-
-            BMP3TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
-
-    #if defined(ENABLE_MC811)
-    if(bMCU811ON && mcu811_found)
-    {
-        if ((uint32_t)(millis() - MCU811TimeWait) >= 60000)   // 60 sec
-        {
-            // read MCU-811 Sensor
-            if(loopMCU811())
-            {
-                meshcom_settings.node_co2 = geteCO2();
-                
-                if(wx_shot)
-                {
-                    commandAction((char*)"--wx", isPhoneReady, false);
-                    wx_shot = false;
-                }
-            }
-
-            MCU811TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
-
-    #if defined(ENABLE_INA226)
-    if(bINA226ON && ina226_found)
-    {
-        if(INA226TimeWait == 0)
-            INA226TimeWait = millis() - 10000;
-
-        if ((uint32_t)(millis() - INA226TimeWait) >= 60000)   // 60 sec -- unified with nRF52 cadence (DRY unification, operator decision 2026-09-11)
-        {
-            // read INA226 Sensor
-            if(loopINA226())
-            {
-                meshcom_settings.node_vbus = getvBUS();
-                meshcom_settings.node_vshunt = getvSHUNT();
-                meshcom_settings.node_vcurrent = getvCURRENT();
-                meshcom_settings.node_vpower = getvPOWER();
-            }
-
-            INA226TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
+    // D1-10 loop scheduler: BMP3TimeWait, MCU811TimeWait and INA226TimeWait
+    // moved to the scheduler call above (bodies/guards in
+    // loop_actions_esp32.cpp).
 
     // read every n seconds the bme680 sensor calculated from millis()
     #if defined(ENABLE_BMX680)

@@ -70,6 +70,11 @@ extern char LogCallsign[10];
 extern bool bDisplayRetx;
 extern unsigned long DisplayOffWait;
 extern int DisplayTimeWait;
+// retransmit_timer/mcp_refresh_timer: each platform main defines its OWN
+// `unsigned long`, same name, no prior shared extern (D1-10 loop scheduler
+// needs one to build the shared table in loop_scheduler.cpp).
+extern unsigned long retransmit_timer;
+extern unsigned long mcp_refresh_timer;
 extern unsigned long BattTimeWait;
 extern unsigned long BattTimeAPP;
 extern unsigned long BMXTimeWait;

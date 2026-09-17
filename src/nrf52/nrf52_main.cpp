@@ -75,13 +75,17 @@ OneButton btn;
 extern int dbgHeapTotal(void);
 extern int dbgHeapUsed(void);
 
-static uint32_t nrf52_getFreeHeap(void)
+// D1-10 loop scheduler: no longer `static` -- loop_actions_nrf52.cpp's
+// loopAction_heapMon() (the old heapMonTimer body, moved verbatim) needs to
+// reach these from another translation unit now. Internal-linkage-only
+// helpers otherwise; this does not change what they compute.
+uint32_t nrf52_getFreeHeap(void)
 {
     return (uint32_t)(dbgHeapTotal() - dbgHeapUsed());
 }
 
 // Largest contiguous free block — binary search probe (fragmentation indicator)
-static uint32_t nrf52_getMaxFreeBlock(void)
+uint32_t nrf52_getMaxFreeBlock(void)
 {
     uint32_t lo = 0, hi = nrf52_getFreeHeap();
     while (lo + 64 < hi) {
@@ -94,8 +98,8 @@ static uint32_t nrf52_getMaxFreeBlock(void)
 }
 
 // Min-free watermark since boot
-static uint32_t nrf52_heapMinFree = UINT32_MAX;
-static uint32_t nrf52_heapFree = UINT32_MAX;
+uint32_t nrf52_heapMinFree = UINT32_MAX;
+uint32_t nrf52_heapFree = UINT32_MAX;
 
 // Ethernet Object
 NrfETH neth;
@@ -123,6 +127,7 @@ void sendHeartbeat();
 #include <lora_setchip.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include "loop_scheduler.h" // D1-10: shared loop scheduler (see there)
 #include "setlog_lines.h"
 #include "dedup_functions.h"
 #include <command_functions.h>
@@ -1298,20 +1303,22 @@ void nrf52loop()
         }
     }
 
-    // Retransmission status must tick on ALL nodes (including gateways).
-    // Without this, gateway text messages stay stuck at RING_STATUS_SENT
-    // forever if no echo is received via LoRa (RING_ZOMBIE).
-    if ((uint32_t)(millis() - retransmit_timer) >= (1000 * 2))
-    {
-        updateRetransmissionStatus();
-        // BP-03 (DJ8MEH-RCA): age out stale BACKGROUND (HEY) ring entries
-        // here, in the main-loop tick -- NOT in getNextTxSlot(), which also
-        // runs on the nRF52 timer task itself (Advisor F1, the critical
-        // finding this fix is named after).
-        txRingAgeBackground(millis());
+    // D1-10 loop scheduler: retransmit_timer, mcp_refresh_timer,
+    // BattTimeWait, heapMonTimer, BMP3TimeWait, MCU811TimeWait and
+    // INA226TimeWait now fire from here (table in loop_scheduler.cpp,
+    // bodies in loop_actions_nrf52.cpp) instead of their old, much later
+    // positions further down nrf52loop() -- see src/loop_scheduler.h for
+    // the full audit trail of what moved and the in-pass reordering check.
+    // BattTimeWait's zero-init is unconditional in the original (unlike
+    // heapMonTimer's/MCU811TimeWait's/INA226TimeWait's, which are nested
+    // inside their own runtime guard and so live inside
+    // loopEnabled_heapMon()/loopEnabled_mcu811()/loopEnabled_ina226()
+    // instead -- see loop_actions_nrf52.cpp), so it stays a top-level
+    // statement here, right before the scheduler call.
+    if (BattTimeWait == 0)
+        BattTimeWait = millis() - 31000;
 
-        retransmit_timer = millis();
-    }
+    loopSchedulerRun(millis());
 
     // Periodischer Ringpuffer-Auslastungsbericht (alle 30s)
     {
@@ -1679,18 +1686,7 @@ void nrf52loop()
         hasMsgFromPhone = false;
     }
 
-    #if defined(ENABLE_MCP23017)
-    // 5 sec
-    if ((uint32_t)(millis() - mcp_refresh_timer) >= 5000)
-    {
-        // get i/o state
-        if(loopMCP23017())
-        {
-        }
-
-        mcp_refresh_timer = millis();
-    }
-    #endif
+    // D1-10 loop scheduler: mcp_refresh_timer moved to the scheduler call above.
 
     #if defined(ENABLE_GPS)
         gKeyNum = 2;
@@ -2227,47 +2223,10 @@ void nrf52loop()
 
     { INSTR_SECTION("serial_cmd"); checkSerialCommand(); }
 
-    if(BattTimeWait == 0)
-        BattTimeWait = millis() - 31000;
-
-    if ((uint32_t)(millis() - BattTimeWait) >= 30000)
-    {
-        if (tx_is_active == false && is_receiving == false)
-        {
-            global_batt = read_batt();
-            global_proz = mv_to_percent(global_batt);
-
-            BattTimeWait = millis();
-        }
-    }
-
-    // Heap Monitor — always active, 60s interval
-    if(!bDisplayLog)
-    {
-        static unsigned long heapMonTimer = 0;
-        if (heapMonTimer == 0)
-            heapMonTimer = millis();
-
-        if ((uint32_t)(millis() - heapMonTimer) >= 60000)
-        {
-            uint32_t freeHeap = nrf52_getFreeHeap();
-
-            if(nrf52_heapFree != freeHeap)
-            {
-                nrf52_heapFree = freeHeap;
-                
-                if (freeHeap < nrf52_heapMinFree) nrf52_heapMinFree = freeHeap;
-
-                Serial.printf("%s;[HEAP];%lu;%lu;%lu;(mon)\n",
-                    getTimeString().c_str(),
-                    (unsigned long)freeHeap,
-                    (unsigned long)nrf52_heapMinFree,
-                    (unsigned long)nrf52_getMaxFreeBlock());
-            }
-
-            heapMonTimer = millis();
-        }
-    }
+    // D1-10 loop scheduler: BattTimeWait and heapMonTimer moved to the
+    // scheduler call (BattTimeWait's zero-init stays at the top of the
+    // loop -- see the comment there; heapMonTimer's zero-init lives inside
+    // loopEnabled_heapMon(), loop_actions_nrf52.cpp).
 
     #ifdef OneWire_GPIO
     if(bONEWIRE)
@@ -2355,74 +2314,9 @@ void nrf52loop()
     }
     #endif
 
-    // read BMP390 Sensor
-    #if defined(ENABLE_BMP390)
-    if((bBMP3ON && bmp3_found))
-    {
-        if ((uint32_t)(millis() - BMP3TimeWait) >= 60000)   // 60 sec
-        {
-            if(loopBMP390())
-            {
-                meshcom_settings.node_press = getPress3();
-                if(!aht20_found)
-                {
-                    meshcom_settings.node_temp = getTemp3();
-                }
-                meshcom_settings.node_press_asl = getPressASL3();
-                meshcom_settings.node_press_alt = getAltitude3();
-            }
-
-            BMP3TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
-
-    #if defined(ENABLE_MC811)
-    if(bMCU811ON && mcu811_found)
-    {
-        if(MCU811TimeWait == 0)
-            MCU811TimeWait = millis() - 10000;
-
-        if ((uint32_t)(millis() - MCU811TimeWait) >= 60000)   // 60 sec
-        {
-            // read MCU-811 Sensor
-            if(loopMCU811())
-            {
-                meshcom_settings.node_co2 = geteCO2();
-                
-                if(wx_shot)
-                {
-                    commandAction((char*)"--wx", isPhoneReady, true);
-                    wx_shot = false;
-                }
-            }
-
-            MCU811TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
-
-    #if defined(ENABLE_INA226)
-    if(bINA226ON)
-    {
-        if(INA226TimeWait == 0)
-            INA226TimeWait = millis() - 10000;
-
-        if ((uint32_t)(millis() - INA226TimeWait) >= 60000)   // 60 sec
-        {
-            // read INA Sensor
-            if(loopINA226())
-            {
-                meshcom_settings.node_vbus = getvBUS();
-                meshcom_settings.node_vshunt = getvSHUNT();
-                meshcom_settings.node_vcurrent = getvCURRENT();
-                meshcom_settings.node_vpower = getvPOWER();
-            }
-
-            INA226TimeWait = millis(); // wait for next messurement
-        }
-    }
-    #endif
+    // D1-10 loop scheduler: BMP3TimeWait, MCU811TimeWait and INA226TimeWait
+    // moved to the scheduler call (bodies/guards/seeds in
+    // loop_actions_nrf52.cpp).
 
     // read every n seconds the bme680 sensor calculated from millis()
     #if defined(ENABLE_BMX680)
