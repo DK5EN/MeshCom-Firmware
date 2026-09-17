@@ -1,5 +1,13 @@
 # BLE golden, Heltec-93 (test plan step H4) -- G2
 
+> **RESOLVED 2026-09-17 late.** The phase-1 disagreement below was the
+> instrument, not the node: `ble_golden.py` stamped each write AFTER the
+> `await`, so a fast reply raced its own write timestamp (fixed in
+> `289cf64b`, H4 wave). With the fix, two captures of the unchanged image
+> agree over all 20 frames, and the canonical G2 capture on the final image
+> `e64ce346` lives in `ble/` with its own README. The two `phase1-run*/`
+> directories stay as evidence of the defect.
+
 Attempted 2026-09-17 on `dry-unification` `HEAD` (the same stock,
 non-instrument image the `extudp/` G2 capture in this directory was taken
 against). Two-phase protocol per operator decision: two captures of the

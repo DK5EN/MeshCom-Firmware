@@ -1,0 +1,24 @@
+    5.210 hello pin=no                        04102030
+    7.310 timesync 1767225600                 062000b95569
+   13.442 text '--info'                       08a02d2d696e666f
+   15.530 text '--seset'                      09a02d2d7365736574
+   17.691 text '--wifiset'                    0ba02d2d77696669736574
+   19.791 text '--nodeset'                    0ba02d2d6e6f6465736574
+   21.952 text '--analogset'                  0da02d2d616e616c6f67736574
+   24.050 text '--wx'                         06a02d2d7778
+   26.152 text '--pos'                        07a02d2d706f73
+   28.309 text '--io'                         06a02d2d696f
+   30.411 text '--tel'                        07a02d2d74656c
+   32.510 text '--aprsset'                    0ba02d2d61707273736574
+   34.610 text '--conffin'                    0ba02d2d636f6e6666696e
+   36.709 text '--mheard'                     0aa02d2d6d6865617264
+   38.811 text '--path'                       08a02d2d70617468
+   40.917 text '--info'                       08a02d2d696e666f
+   43.010 text '--infoX'                      09a02d2d696e666f58
+   45.110 text '--heap'                       08a02d2d68656170
+   47.210 text '--heap tag'                   0ca02d2d6865617020746167
+   49.311 text '--softser app'                0fa02d2d736f667473657220617070
+   51.413 text '--softser app0'               10a02d2d736f66747365722061707030
+   53.512 text '--maxhop'                     0aa02d2d6d6178686f70
+   55.610 text '--maxhop 5'                   0ca02d2d6d6178686f702035
+   57.711 restore '--maxhop 2'     [excluded] 0ca02d2d6d6178686f702032

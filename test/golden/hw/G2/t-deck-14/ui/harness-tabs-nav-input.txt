@@ -1,0 +1,25 @@
+=== running scenario: tabs ===
+=== running scenario: nav ===
+=== running scenario: input ===
+
+========================================================================
+T-Deck Plus bench summary
+========================================================================
+
+[tabs] PASS
+  tab 0: inv=  39 refr=  2 px= 10582 repainted=True
+  tab 1: inv=  28 refr=  7 px= 75899 repainted=True
+  tab 2: inv=   8 refr=  3 px= 73638 repainted=True
+  tab 3: inv=  21 refr=  4 px= 75599 repainted=True
+  tab 4: inv= 209 refr=  4 px=186293 repainted=True
+  tab 5: inv=   7 refr=  3 px= 73564 repainted=True
+  tab 6: inv=  12 refr=  3 px= 73453 repainted=True
+  tab 7: inv= 233 refr=  5 px=134623 repainted=True
+
+[nav] PASS
+  steps=34/34  not_acked=[]  not_repainted=[]  settings_scroll_max=415  settings_scroll_final=0  crashed=None
+
+[input] FAIL
+  not run: keyboard lock is on -- a SYM+K lock gates key delivery to LVGL while the [KEY] lines keep printing, so this scenario cannot measure the keyboard. Clear it with --keylock off and re-run (TD-19/TD-18).
+
+summary written to summary.json
