@@ -6749,6 +6749,77 @@ check it itself, because `normalize.py` has masked the address to `<ADDR>` by
 the time the comparison runs. Rule for the next run: shut a node down with
 `--wait-boot`, verify with `--info`, and only then arm the next one.
 
+### 3.8as `EXT-02` -- a failed socket open that reports success and never retries (2026-09-17)
+
+Found while chasing why `DK5EN-90` answered none of the `H8` corpus (§3.8ar).
+**The defect is certain from the source; that it caused that particular bench
+result is NOT.** Both halves are written down here, because collapsing them
+would be the more satisfying story and the less true one.
+
+#### The defect, proven by reading
+
+`EthernetUDP::begin()` returns **0** when no socket could be allocated -- it
+asks `Ethernet.socketBegin()` and returns 0 as soon as the index comes back
+`>= MAX_SOCK_NUM` (`RAK13800-W5100S/src/EthernetUdp.cpp:35-43`). The W5100S has
+**four** hardware sockets, shared with the port-1990 socket
+(`nrf_eth.cpp:30`), DHCP and the web server. `WiFiUDP::begin()` has the same
+0-on-failure contract.
+
+`startExternUDP()` discarded that return (`extudp_functions.cpp:142`) and then,
+unconditionally:
+
+1. printed `[EXT]...now listening at IP ... UDP port 1799` -- a claim it had
+   never checked;
+2. set `hasExternIPaddress = true` (`:171`).
+
+Both consequences are worse than the missing check. That flag is the early
+return of `startExternUDP()` itself (`:127`), so nothing retries; it is also
+what `getExternUDP()` tests (`:379`), so the receive path proceeds happily into
+a dead socket. And `--extudp off` does **not** clear it -- its toggle row
+carries `nullptr` as the post-action (`command_functions.cpp:233`), so the one
+operator gesture that looks like a reset is not one. A bind that fails once is
+therefore silent, permanent, survives reboots, and is contradicted by the
+node's own log saying it is listening.
+
+**Fixed** by checking the return, logging at most once per 30 s, and returning
+**without** latching -- leaving the flag clear IS the retry, because the caller
+tests `!hasExternIPaddress` on every loop pass (`nrf52_main.cpp:2467`,
+`esp32_main.cpp:4002`).
+
+#### What the bench did and did not show
+
+Observed on `DK5EN-90`: three `[EXT]` lines on a fresh boot with correct
+addresses, then **0 of 23** corpus objects answered, and not even the
+`sendExternHeartbeat()` at the end of `startExternUDP()` left the node. Two
+reboots, and `--webserver off` verified by `--info` before re-testing, changed
+nothing.
+
+**Then the confirmation attempt failed, and not in the fix's favour.** After
+flashing the fix the node returned nothing again -- and `--info` showed
+`hasIpAddress: no`. The Ethernet link was down, so that run measured nothing.
+The node answers serial normally (876 B, `--info` responds); it is the W5100S
+link that is gone, which is `N-20` territory and consistent with the repeated
+reboots this session put it through.
+
+That weakens the earlier reading of §3.8ar. `hasIpAddress: yes` was verified
+**before** the `H8` run but not after, so "the link dropped mid-run" is now as
+live an explanation for 0-of-23 as "the extern socket was never open". Both
+would produce exactly the symptom seen.
+
+| Claim                                                       | Status                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| `begin()`'s failure return is discarded and success latched | **certain**, by source                                 |
+| `--extudp off` does not clear the latch                     | **certain**, by source                                 |
+| The fix is behaviour-neutral when `begin()` succeeds        | **certain** -- the only new branch is the failure path |
+| This defect caused `DK5EN-90`'s 0-of-23 on 2026-09-17       | **unproven**; the link is now down                     |
+
+**Owed:** a power cycle of `DK5EN-90` (USB and the Ethernet cable), then a
+re-run of `H8` with the link verified before **and after**. Until then `EXT-02`
+is a code-proven fix with hardware confirmation outstanding, and §3.8ar's
+finding should be read as "one of two candidate causes", not as a diagnosis.
+
+Gate: 34/34 board envs, 962/962 native cases, `selftest.sh` exit 0.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds

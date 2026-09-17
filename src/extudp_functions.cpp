@@ -139,7 +139,42 @@ void startExternUDP()
   snprintf(s_extern, sizeof(s_extern), "%i.%i.%i.%i", extern_node_ip[0], extern_node_ip[1], extern_node_ip[2], extern_node_ip[3]);
   s_extern_node_ip = s_extern;
 
-  UdpExtern.begin(EXTERN_PORT);
+  // EXT-02: begin() CAN fail, and the result used to be discarded. Both
+  // implementations return 0 when no socket could be allocated -- on nRF52
+  // EthernetUDP::begin() returns 0 as soon as Ethernet.socketBegin() hands
+  // back an index >= MAX_SOCK_NUM (RAK13800_W5100S/src/EthernetUdp.cpp:35-43),
+  // and the W5100S has only four hardware sockets, shared with the port-1990
+  // socket, DHCP and the web server.
+  //
+  // Ignoring it was not a missing nicety, it was a permanent silent outage:
+  // the code went on to print "[EXT]...now listening" -- a claim it had never
+  // checked -- and set hasExternIPaddress, which is the very flag that makes
+  // startExternUDP() return early next time (:127) and getExternUDP() proceed
+  // into a dead socket (:379). Nothing retried, because the retry is gated on
+  // exactly that flag, and --extudp off does not clear it (its toggle row has
+  // no post-action). Measured on DK5EN-90 2026-09-17: socket bound "ok",
+  // three [EXT] lines printed, and then 0 of 23 corpus objects answered and
+  // not even the heartbeat below left the node -- through two reboots.
+  //
+  // Not latching on failure is what makes it recoverable: the caller
+  // (nrf52_main.cpp:2467 / esp32_main.cpp:4002) tests !hasExternIPaddress on
+  // every pass, so leaving the flag clear IS the retry. The log is rate-limited
+  // so a node that genuinely has no socket left does not flood the console.
+  if(UdpExtern.begin(EXTERN_PORT) == 0)
+  {
+      static uint32_t last_fail_log = 0;
+      static bool first_fail = true;
+      uint32_t now = millis();
+      if(first_fail || (uint32_t)(now - last_fail_log) > 30000)
+      {
+          Serial.printf("[EXT] socket busy -- UDP port %d not opened, will retry\n",
+                        EXTERN_PORT);
+          last_fail_log = now;
+          first_fail = false;
+      }
+      return;   // hasExternIPaddress stays false, so the next pass retries
+  }
+
 
   #if defined(ESP32)
   if(!WiFi.isConnected())
