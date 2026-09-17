@@ -5215,6 +5215,87 @@ than by reading:
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
 
+#### 3.8an `W6a` -- nine drift rows unified, and `ui_common` (2026-09-17)
+
+`55a7b4c4`. Two disjoint halves under one gate.
+
+**`D1-01`.** Nine U1 rows of `docs/testplan/drift-matrix.csv` implemented as
+decided on 2026-09-12 (`DR-02`, `04`, `05`, `06`, `07`, `08`, `09`, `18` part 1,
+`19`). Every row's `test_drift_*` case became a `test_agreement_*` case driving
+BOTH handlers with the same input.
+
+**The proof is the twin diff, not a green suite:**
+
+|        | blocks | agree  | differ |
+| ------ | ------ | ------ | ------ |
+| before | 37     | 24     | 13     |
+| after  | 37     | **36** | **1**  |
+
+Twelve flipped `DIFFER->AGREE`, none the other way -- `twin_diff.py` labels the
+directions differently and reported only `FIXED`. The survivor is
+`33-m03-trailing-zeros.hex` (`RESET` vs `(no sink calls)`), which is `DR-20`
+exactly, the one row deliberately not done.
+
+**Two rows left open on purpose, both correctly refused by the writer.**
+`DR-20`'s decision moves connectivity policy to the CALLER, so
+`udp_functions.{h,cpp}` must change with it -- turning the return type in the
+handler alone either fails to compile or silently drops the ESP32 socket reset.
+`DR-18` part 2 (the JSON ack) IS `W6` work and is still owed, with the per-type
+test that row ordered, the `G2` `EXPECTED-DIFF` entry, the
+`ext_udp_telemetry.md` outbound contract and the `ack-wer-hat-quittiert.md:266`
+fix.
+
+**`D4-01/02`.** `src/ui_common/` now holds the shared GPS protocol
+(parameterised on `HardwareSerial&`, so it needs no board header) and the LVGL
+screen manager as ONE `.c` compiled by both envs. `peri_gps.cpp` goes 417->271
+and 387->312 lines; the two emptied translation units are deleted rather than
+left as stubs. Both envs are mutually exclusive, so this saves no flash -- the
+point is one code path.
+
+**Found while merging:** t-deck-pro's `PCAS03` sentence carried checksum `*26`
+where the XOR is `*02` (t5-epaper had it right). Inert -- that board's
+`setupGPS()` call is commented out -- but it does not go into shared code.
+
+**What the advisor pass caught, fixed before commit:**
+
+1. **`memcpy(convBuffer, ...)` had been left INSIDE the EXTUDP type-test
+   block**, with the relay path below depending on it -- coupled only by two
+   textually duplicated conditions staying identical. Mutating one produced a
+   stale decode buffer. Hoisted above both.
+2. **Two unrequested behaviour changes to t5-epaper's `displayInfo()`**
+   (`gps_vsat = 0`, `gps_speed = 0` on an invalid sentence, where it previously
+   kept the last valid value). That function is NOT shared code and was not
+   extracted; copying one board's semantics onto another that has never run is
+   not unification. Reverted; the additive parts kept.
+3. **The RX-01 comment overstated the guard.** It covers the relay path, not
+   every transmit path -- `SendAckMessage()` reaches `addTxRingEntry()` ungated
+   by `bUDPtoLoraSend`. Pre-existing on both platforms, so not a regression, but
+   the comment now says what the guard actually does.
+4. **The matrix still described the pre-fix state.** Only `asserting_test` had
+   been updated; the behaviour columns read "nRF52 has no such check". Rows are
+   now marked implemented.
+
+It also PROVED, by mutation, that **`DR-18`'s type set is unasserted**:
+narrowing the EXTUDP test to `0x3A` on both platforms leaves the suite green,
+so `0x21` and `0x40` could stop reaching EXTUDP on every gateway unnoticed.
+That test is part of `W6b`.
+
+**Ownership was wider than the writer mapped.** Four envs define their own
+`build_src_filter` instead of inheriting `${esp32.src_filter}`, so
+`vision-master-e213`/`e290` and `wireless-paper` each needed `-<ui_common/*>`
+too. Only the full 34-env sweep showed it -- one env is not the gate.
+
+**CAVEAT.** The `ui_common` half is **build-verified only**. `t_deck_pro` is not
+on the bench and `t5_epaper` is commented out of `default_envs`, so no board has
+executed any of it, before or after. Three questions for the operator are parked
+in the wave report: whether `gps_get_coord()` should carry altitude on t5-epaper
+(`variants/t_deck_pro/configuration.h:16` defines `GPS_L76K` while that board
+takes the u-blox path, and `variants/t5_epaper/configuration.h` names no GPS
+chip at all), whether `setupGPS()` should stay live on t5 and commented on
+t-deck-pro, and which board's invalid-sentence display semantics are right.
+
+Gate: 34/34 board envs, 33/33 native envs (948 cases), `selftest.sh` exit 0.
+
 #### Operator decision 6, 2026-09-17: no PR for now
 
 Verbatim: _"no PR at the moment. Everything here is very experimental"_.
