@@ -7219,6 +7219,49 @@ pre-existing, untouched, worth a row.
 **Note for the golden selftest:** `selftest.sh` now shells out to `pio` in its
 last step and must not run beside a build.
 
+### 3.8ax `D1-10` done -- seven timers in a shared scheduler, nineteen left where they are (2026-09-17, late)
+
+The audit's "~18 timer predicates" had already been corrected to 25 shared
+variables (§3.8 above). What a shared scheduler can actually own without
+changing behaviour is smaller again: **seven**. `src/loop_scheduler.cpp`
+holds one table (timer address, interval, `enabled()`, `action()`, reset
+mode) and one runner; both loops call `loopSchedulerRun(millis())` once,
+where `retransmit_timer` used to sit. The bodies moved verbatim into
+`src/esp32/loop_actions_esp32.cpp` and `src/nrf52/loop_actions_nrf52.cpp`;
+extra predicate terms and the nested zero-seeds became `enabled()` functions
+nested exactly as before (a flat seed would have shifted the first read after
+a runtime `--ina226 on`). Migrated: `retransmit_timer` 2 s,
+`mcp_refresh_timer` 5 s, `BattTimeWait` 30 s, `heapMonTimer`, `BMP3TimeWait`,
+`MCU811TimeWait`, `INA226TimeWait` 60 s. Table order is the old order on both
+platforms. `esp32_main.cpp` -220/+95 lines, `nrf52_main.cpp` -170/+72.
+
+**Not migrated, each for a stated reason** (all in `src/loop_scheduler.h`):
+`posinfo_timer_min` (its reset belongs to `posinfo_timer`'s branch),
+`softser_refresh_timer` (head of an if/else-if chain), `onewireTimeWait` and
+`BMXTimeWait` (reset with `millis() - lreduction`, a retry-sooner rule),
+`ring_status_timer`/`ch_util_timer` (`>`, and the elapsed value is used in
+the body), and `config_to_phone_datetime_timer` -- **new finding**: it races
+`updateTimeClient` for the last write to `bNTPDateTimeValid`; on ESP32 the
+scheduler position would flip that order on a coincident pass, on nRF52 it
+would not, and an entry must be identical on both. The first-fire (`||`),
+absolute-deadline and settings-driven timers were never candidates.
+
+**Advisor blocker, fixed before commit:** the ESP32 call had landed inside
+`if(bRadio)` (and inside the `#else` of the T5 e-paper arm). Six of the seven
+jobs never depended on the radio; inside that block they would have stopped
+on a node whose radio failed to initialise, on `esp32-external-radio`
+(`bRadio` false by design) and on `t5_epaper`. Now at function scope ahead of
+the block; `loopEnabled_retransmit()` carries the `bRadio` gate. Two console-
+only effects of running the seven earlier in the pass are named in the header
+(nRF52 `--wx` echo flag on a coincident pass; `--wx` snapshot up to one sensor
+cycle staler).
+
+**Test:** `native_loop_scheduler`, 16 cases against the real table; the
+advisor mutation-checked it (`>=`->`>` 19 failures, reset mode 9, enabled
+gate 6) and asked for every interval as a literal, done. `DR-16` still has no
+host test: `telemetry_timer` is a `||` first-fire timer and stays in the
+loops, so that row remains bench-only as recorded in `M3-01`.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
