@@ -1468,44 +1468,50 @@ void sub_page_mheard()
     _create_meshcom_subheader("MHeard Information");
     web_client.println("<div id=\"content_inner\">");
 
-    for (int iset = 0; iset < MAX_MHEARD; iset++)
+    // DR-28 (BACKLOG OPT-D16): most-recent-first, via mheardSortedIndex() --
+    // the storage arrays themselves stay in physical slot order, see that
+    // function's comment in mheard_functions.cpp/.h.
+    uint8_t idx[MAX_MHEARD];
+    uint32_t now = (uint32_t)millis();
+    uint8_t n = mheardSortedIndex(idx, now);
+
+    for (uint8_t k = 0; k < n; k++)
     {
-        if (mheardCalls[iset][0] != 0x00)
+        uint8_t iset = idx[k];
+
+        if (mheardFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
+            isShowing = true;
+        mheardLineFromRecord(mheardRecords[iset], mheardLine);
+        web_client.printf("<div class=\"cardlayout\">\n");
+        web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date, mheardLine.mh_time);
+        web_client.printf("<div class=\"flex-auto-wrap\">");
+        web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", getPayloadType(mheardLine.mh_payload_type));
+        web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", getHardwareLong(mheardLine.mh_hw).c_str());
+        web_client.printf("<div><span class=\"font-bold\">Mod:</span><br><span>%01X/%01X</span></div>", (mheardLine.mh_mod >> 4), (mheardLine.mh_mod & 0x0f));
+        web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%4idBm</span></div>", mheardLine.mh_rssi);
+        web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span>%4idB</span></div>", mheardLine.mh_snr);
+        web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", mheardLine.mh_dist);
+        web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2i</span></div>", mheardLine.mh_ncount);
+
+        dlat = mheardLat[iset];
+        clat = 'N';
+        if(dlat < 0)
         {
-            if (mheardFreshMs(iset, 3UL * 60UL * 60UL * 1000UL)) // 3h (NC-02: monoton, nicht Wanduhr)
-                isShowing = true;
-            mheardLineFromRecord(mheardRecords[iset], mheardLine);
-            web_client.printf("<div class=\"cardlayout\">\n");
-            web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date, mheardLine.mh_time);
-            web_client.printf("<div class=\"flex-auto-wrap\">");
-            web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", getPayloadType(mheardLine.mh_payload_type));
-            web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", getHardwareLong(mheardLine.mh_hw).c_str());
-            web_client.printf("<div><span class=\"font-bold\">Mod:</span><br><span>%01X/%01X</span></div>", (mheardLine.mh_mod >> 4), (mheardLine.mh_mod & 0x0f));
-            web_client.printf("<div><span class=\"font-bold\">RSSI:</span><br><span>%4idBm</span></div>", mheardLine.mh_rssi);
-            web_client.printf("<div><span class=\"font-bold\">SNR:</span><br><span>%4idB</span></div>", mheardLine.mh_snr);
-            web_client.printf("<div><span class=\"font-bold\">Dist:</span><br><span>%5.1lf</span></div>", mheardLine.mh_dist);
-            web_client.printf("<div><span class=\"font-bold\">NCNT:</span><br><span>%2i</span></div>", mheardLine.mh_ncount);            
-
-            dlat = mheardLat[iset];
-            clat = 'N';
-            if(dlat < 0)
-            {
-                dlat = dlat * (-1);
-                clat = 'S';
-            }
-            dlon = mheardLon[iset];
-            clon = 'E';
-            if(dlon < 0)
-            {
-                dlon = dlon * (-1);
-                clon = 'W';
-            }
-
-            web_client.printf("<div><span class=\"font-bold\">Lat:</span><br><span>%c%06.3lf</span></div>", clat, dlat);
-            web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span>%c%07.3lf</span></div>", clon, dlon);
-            web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span>%4i</span></div>", mheardAlt[iset]);
-            web_client.printf("</div></div>");
+            dlat = dlat * (-1);
+            clat = 'S';
         }
+        dlon = mheardLon[iset];
+        clon = 'E';
+        if(dlon < 0)
+        {
+            dlon = dlon * (-1);
+            clon = 'W';
+        }
+
+        web_client.printf("<div><span class=\"font-bold\">Lat:</span><br><span>%c%06.3lf</span></div>", clat, dlat);
+        web_client.printf("<div><span class=\"font-bold\">Lon:</span><br><span>%c%07.3lf</span></div>", clon, dlon);
+        web_client.printf("<div><span class=\"font-bold\">Alt:</span><br><span>%4i</span></div>", mheardAlt[iset]);
+        web_client.printf("</div></div>");
     }
     if (!isShowing)
         web_client.println("<p>No Nodes heard so far.</p>"); // no nodes available? Tell the user

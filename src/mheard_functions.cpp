@@ -709,6 +709,48 @@ int getMheardCount()
     return imhcount;
 }
 
+// DR-28 (BACKLOG OPT-D16, decided 2026-09-12): the mHeard renderers must
+// list entries most-recent-first. The slot-parallel storage arrays
+// (mheardRecords, mheardCalls, mheardLat/Lon/Alt, mheardEpoch, mheardMillis,
+// mheardNCount) are written by updateMheard() from the LORA task and are
+// NEVER permuted -- this fills a caller-owned idx[] with the occupied slots
+// in most-recently-heard-first order instead, so every renderer iterates
+// idx[0..n) rather than the physical slot range 0..MAX_MHEARD.
+//
+// Age = (uint32_t)(now - mheardMillis[i]), same rollover-safe subtraction
+// as the existing aging filters throughout this file (NC-01). Stable
+// insertion sort ascending by age: MAX_MHEARD is <=80, so O(n^2) is cheap,
+// and a stable sort keeps ties (equal age, e.g. two entries heard in the
+// same millis() tick) in ascending slot order -- the scan below already
+// visits slots ascending, and an element is only shifted past entries with
+// a STRICTLY greater age, so equal-age entries never swap past each other.
+uint8_t mheardSortedIndex(uint8_t *idx, uint32_t now)
+{
+    uint8_t n = 0;
+
+    for(uint8_t i = 0; i < MAX_MHEARD; i++)
+    {
+        if(mheardCalls[i][0] == 0x00)
+            continue;
+
+        uint32_t age = (uint32_t)(now - mheardMillis[i]);
+
+        uint8_t pos = n;
+        while(pos > 0)
+        {
+            uint32_t prevAge = (uint32_t)(now - mheardMillis[idx[pos - 1]]);
+            if(prevAge <= age)
+                break;
+            idx[pos] = idx[pos - 1];
+            pos--;
+        }
+        idx[pos] = i;
+        n++;
+    }
+
+    return n;
+}
+
 String getValue(String data, char separator, int index)
 {
     int found = 0;
@@ -747,49 +789,55 @@ void sendMheard()
     struct mheardLine mheardLine;
 #endif
 
-    for(int iset=0; iset<MAX_MHEARD; iset++)
+    // DR-28: most-recent-first, via mheardSortedIndex() -- the storage
+    // arrays themselves stay in physical slot order, see that function's
+    // comment and mheard_functions.h.
+    uint8_t idx[MAX_MHEARD];
+    uint32_t now = (uint32_t)millis();
+    uint8_t n = mheardSortedIndex(idx, now);
+
+    for(uint8_t k=0; k<n; k++)
     {
-        if(mheardCalls[iset][0] != 0x00)
+        uint8_t iset = idx[k];
+
+        if((uint32_t)(now - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
         {
-            if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
-            {
-                // R2-01: hier stand die DRITTE Kopie derselben Zerlegung --
-                // elf getValue()-Aufrufe, jeder mit einer eigenen String-
-                // Anforderung, und jeder scannte die Zeichenkette erneut. Der
-                // Datensatz braucht keine davon.
-                //
-                // Reihenfolge: mheardLineFromRecord() ruft initMheardLine()
-                // auf und wuerde ein vorher gesetztes Rufzeichen wieder
-                // loeschen. Deshalb erst der Datensatz, dann das Rufzeichen.
-                mheardLineFromRecord(mheardRecords[iset], mheardLine);
-                mcSet(mheardLine.mh_callsign, sizeof(mheardLine.mh_callsign), mheardCalls[iset]);
+            // R2-01: hier stand die DRITTE Kopie derselben Zerlegung --
+            // elf getValue()-Aufrufe, jeder mit einer eigenen String-
+            // Anforderung, und jeder scannte die Zeichenkette erneut. Der
+            // Datensatz braucht keine davon.
+            //
+            // Reihenfolge: mheardLineFromRecord() ruft initMheardLine()
+            // auf und wuerde ein vorher gesetztes Rufzeichen wieder
+            // loeschen. Deshalb erst der Datensatz, dann das Rufzeichen.
+            mheardLineFromRecord(mheardRecords[iset], mheardLine);
+            mcSet(mheardLine.mh_callsign, sizeof(mheardLine.mh_callsign), mheardCalls[iset]);
 
-                // generate JSON
-                JsonDocument mhdoc;
+            // generate JSON
+            JsonDocument mhdoc;
 
-                mhdoc["TYP"] = "MH";
-                mhdoc["CALL"] = mheardLine.mh_callsign;
-                mhdoc["DATE"] = mheardLine.mh_date;
-                mhdoc["TIME"] = mheardLine.mh_time;
-                mhdoc["PLT"] = (uint8_t)mheardLine.mh_payload_type;
-                mhdoc["HW"] = mheardLine.mh_hw;
-                mhdoc["MOD"] = mheardLine.mh_mod;
-                mhdoc["RSSI"] = mheardLine.mh_rssi;
-                mhdoc["SNR"] = mheardLine.mh_snr;
-                mhdoc["DIST"] = mheardLine.mh_dist;
-                mhdoc["PL"] = mheardLine.mh_path_len;
-                mhdoc["MESH"] = mheardLine.mh_mesh;
-                mheardLine.mh_ncount = mheardNCount[iset];
-                mhdoc["NCNT"] = mheardNCount[iset]; // 8immer aus array nehmen
+            mhdoc["TYP"] = "MH";
+            mhdoc["CALL"] = mheardLine.mh_callsign;
+            mhdoc["DATE"] = mheardLine.mh_date;
+            mhdoc["TIME"] = mheardLine.mh_time;
+            mhdoc["PLT"] = (uint8_t)mheardLine.mh_payload_type;
+            mhdoc["HW"] = mheardLine.mh_hw;
+            mhdoc["MOD"] = mheardLine.mh_mod;
+            mhdoc["RSSI"] = mheardLine.mh_rssi;
+            mhdoc["SNR"] = mheardLine.mh_snr;
+            mhdoc["DIST"] = mheardLine.mh_dist;
+            mhdoc["PL"] = mheardLine.mh_path_len;
+            mhdoc["MESH"] = mheardLine.mh_mesh;
+            mheardLine.mh_ncount = mheardNCount[iset];
+            mhdoc["NCNT"] = mheardNCount[iset]; // 8immer aus array nehmen
 
-                // send to Phone
-                uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
-                bleBuffer[0] = 0x44;
-                // Schranke ist der Puffer, nicht die JSON-Laenge (UP-01, BND-03)
-                uint16_t frame_len = bleJsonFrame(mhdoc, bleBuffer, sizeof(bleBuffer));
+            // send to Phone
+            uint8_t bleBuffer[MAX_MSG_LEN_PHONE] = {0};
+            bleBuffer[0] = 0x44;
+            // Schranke ist der Puffer, nicht die JSON-Laenge (UP-01, BND-03)
+            uint16_t frame_len = bleJsonFrame(mhdoc, bleBuffer, sizeof(bleBuffer));
 
-                addBLEComToOutBuffer(bleBuffer, frame_len);
-            }
+            addBLEComToOutBuffer(bleBuffer, frame_len);
         }
     }
 }
@@ -819,33 +867,39 @@ void showMHeard()
     mheardLine mheardLine;
 #endif
 
-    for(int iset=0; iset<MAX_MHEARD; iset++)
+    // DR-28: most-recent-first, via mheardSortedIndex() -- the storage
+    // arrays themselves stay in physical slot order, see that function's
+    // comment and mheard_functions.h.
+    uint8_t idx[MAX_MHEARD];
+    uint32_t now = (uint32_t)millis();
+    uint8_t n = mheardSortedIndex(idx, now);
+
+    for(uint8_t k=0; k<n; k++)
     {
-        if(mheardCalls[iset][0] != 0x00)
+        uint8_t iset = idx[k];
+
+        if((uint32_t)(now - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
         {
-            if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
-            {
-                printlndeb("|------------|------------|----------|-----|-----------------|-----|------|------|------|----|---|----|");
+            printlndeb("|------------|------------|----------|-----|-----------------|-----|------|------|------|----|---|----|");
 
-                printfdeb("| %-10.10s | ", mheardCalls[iset]);
-                
-                mheardLineFromRecord(mheardRecords[iset], mheardLine);
+            printfdeb("| %-10.10s | ", mheardCalls[iset]);
 
-                printfdeb("%-10.10s | ", mheardLine.mh_date);
-                printfdeb("%-8.8s | ", mheardLine.mh_time);
+            mheardLineFromRecord(mheardRecords[iset], mheardLine);
 
-                printfdeb("%-3.3s | ", getPayloadType(mheardLine.mh_payload_type));
+            printfdeb("%-10.10s | ", mheardLine.mh_date);
+            printfdeb("%-8.8s | ", mheardLine.mh_time);
 
-                printfdeb("%-11.11s/%03i | ", getHardwareLong(mheardLine.mh_hw).c_str(), mheardLine.mh_hw);
+            printfdeb("%-3.3s | ", getPayloadType(mheardLine.mh_payload_type));
 
-                printfdeb("%01X/%01i | ", (mheardLine.mh_mod>>4), (mheardLine.mh_mod & 0xf));
-                printfdeb("%4i | ", mheardLine.mh_rssi);
-                printfdeb("%4i |", mheardLine.mh_snr);
-                printfdeb("%5.1lf |", mheardLine.mh_dist);
-                printfdeb("%3i |", mheardLine.mh_path_len);
-                printfdeb("%2i |", mheardLine.mh_mesh);
-                printfdeb("%3i |\n", mheardNCount[iset]); // 8immer aus array nehmen
-            }
+            printfdeb("%-11.11s/%03i | ", getHardwareLong(mheardLine.mh_hw).c_str(), mheardLine.mh_hw);
+
+            printfdeb("%01X/%01i | ", (mheardLine.mh_mod>>4), (mheardLine.mh_mod & 0xf));
+            printfdeb("%4i | ", mheardLine.mh_rssi);
+            printfdeb("%4i |", mheardLine.mh_snr);
+            printfdeb("%5.1lf |", mheardLine.mh_dist);
+            printfdeb("%3i |", mheardLine.mh_path_len);
+            printfdeb("%2i |", mheardLine.mh_mesh);
+            printfdeb("%3i |\n", mheardNCount[iset]); // 8immer aus array nehmen
         }
     }
 
@@ -976,68 +1030,71 @@ void showMHeardTDECK()
 
     row++;
 
-    int anzrow=1;
+    // DR-28: most-recent-first, via mheardSortedIndex() -- the storage
+    // arrays themselves stay in physical slot order, see that function's
+    // comment and mheard_functions.h.
+    uint8_t idx[MAX_MHEARD];
+    uint32_t now = (uint32_t)millis();
+    uint8_t n = mheardSortedIndex(idx, now);
 
-    for(int iset=0; iset<MAX_MHEARD; iset++)
-    {
-        if(mheardCalls[iset][0] != 0x00)
-            anzrow++;
-    }
+    // n (from mheardSortedIndex() above) is already the occupied-slot count
+    // that the old "for(iset=0..MAX_MHEARD) if(occupied) anzrow++" loop
+    // computed by hand -- no separate counting pass needed.
+    int anzrow = 1 + n;
 
     lv_table_set_row_cnt(mheard_ta, anzrow);
 
-    for(int iset=0; iset<MAX_MHEARD; iset++)
+    for(uint8_t k=0; k<n; k++)
     {
-        if(mheardCalls[iset][0] != 0x00)
+        uint8_t iset = idx[k];
+
+        snprintf(buf, 10, "%s", mheardCalls[iset]);
+        lv_table_set_cell_value(mheard_ta, row, 0, buf);
+
+        mheardLineFromRecord(mheardRecords[iset], mheardLine);
+
+        snprintf(buf, 6, "%.5s", mheardLine.mh_time);
+        lv_table_set_cell_value(mheard_ta, row, 1, buf);
+
+        if(mheardLine.mh_payload_type == ':')
         {
-            snprintf(buf, 10, "%s", mheardCalls[iset]);
-            lv_table_set_cell_value(mheard_ta, row, 0, buf);
-            
-            mheardLineFromRecord(mheardRecords[iset], mheardLine);
-
-            snprintf(buf, 6, "%.5s", mheardLine.mh_time);
-            lv_table_set_cell_value(mheard_ta, row, 1, buf);
-
-            if(mheardLine.mh_payload_type == ':')
-            {
-                snprintf(buf, 4, "TXT");
-                lv_table_set_cell_value(mheard_ta, row, 2, buf);
-            }
-            else
-            if(mheardLine.mh_payload_type == '!')
-            {
-                snprintf(buf, 4, "POS");
-                lv_table_set_cell_value(mheard_ta, row, 2, buf);
-            }
-            else
-            if(mheardLine.mh_payload_type == '@')
-            {
-                snprintf(buf, 4, "HY");
-                lv_table_set_cell_value(mheard_ta, row, 2, buf);
-            }
-            else
-            {
-                snprintf(buf, 4, "???");
-                lv_table_set_cell_value(mheard_ta, row, 2, buf);
-            }
-
-            snprintf(buf, 8, "%s", getHardwareLong(mheardLine.mh_hw).c_str());
-            lv_table_set_cell_value(mheard_ta, row, 3, buf);
-
-            //snprintf(buf, 200, "%3i | ", mheardLine.mh_mod);
-            //strRet.concat(buf);
-
-            snprintf(buf, 7, "%4i", mheardLine.mh_rssi);
-            lv_table_set_cell_value(mheard_ta, row, 4, buf);
-
-            snprintf(buf, 7, "%4i", mheardLine.mh_snr);
-            lv_table_set_cell_value(mheard_ta, row, 5, buf);
-
-            snprintf(buf, 7, "%4i", mheardNCount[iset]); // 8immer aus array nehmen
-            lv_table_set_cell_value(mheard_ta, row, 6, buf);
-
-            row++;
+            snprintf(buf, 4, "TXT");
+            lv_table_set_cell_value(mheard_ta, row, 2, buf);
         }
+        else
+        if(mheardLine.mh_payload_type == '!')
+        {
+            snprintf(buf, 4, "POS");
+            lv_table_set_cell_value(mheard_ta, row, 2, buf);
+        }
+        else
+        if(mheardLine.mh_payload_type == '@')
+        {
+            snprintf(buf, 4, "HY");
+            lv_table_set_cell_value(mheard_ta, row, 2, buf);
+        }
+        else
+        {
+            snprintf(buf, 4, "???");
+            lv_table_set_cell_value(mheard_ta, row, 2, buf);
+        }
+
+        snprintf(buf, 8, "%s", getHardwareLong(mheardLine.mh_hw).c_str());
+        lv_table_set_cell_value(mheard_ta, row, 3, buf);
+
+        //snprintf(buf, 200, "%3i | ", mheardLine.mh_mod);
+        //strRet.concat(buf);
+
+        snprintf(buf, 7, "%4i", mheardLine.mh_rssi);
+        lv_table_set_cell_value(mheard_ta, row, 4, buf);
+
+        snprintf(buf, 7, "%4i", mheardLine.mh_snr);
+        lv_table_set_cell_value(mheard_ta, row, 5, buf);
+
+        snprintf(buf, 7, "%4i", mheardNCount[iset]); // 8immer aus array nehmen
+        lv_table_set_cell_value(mheard_ta, row, 6, buf);
+
+        row++;
     }
 }
 

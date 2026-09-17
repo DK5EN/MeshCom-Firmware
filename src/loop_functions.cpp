@@ -4217,8 +4217,16 @@ int sendMessage(char *msg_text, int len)
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    if (iWrite == iRead) {   // ring full: about to overwrite an unread slot
-        Serial.printf("[RING] overflow, slot %d dropped\n", (int)iWrite);
+    // ETH-03 (docs/BACKLOG.md 3.8at): this used to test `iWrite == iRead`,
+    // which is ALSO the empty ring -- so a node with nothing queued printed
+    // "[RING] overflow" on every user message and sent a whole investigation
+    // after a full ring that was not there. Occupancy is txRingDepth(), and
+    // the ring holds at most MAX_RING-1 entries (addTxRingEntry() keeps iRead
+    // one ahead of iWrite on overflow), so MAX_RING-1 is "full". The eviction
+    // itself (which slot, why) is decided and logged inside addTxRingEntry()
+    // below; this line is only a heads-up.
+    if (txRingDepth() >= MAX_RING - 1) {   // ring full: addTxRingEntry() will evict or refuse
+        Serial.printf("[RING] full, depth %d of %d\n", txRingDepth(), (int)MAX_RING - 1);
     }
     // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
     // Slot wird erst in addTxRingEntry() unter Lock gewaehlt/beschrieben.

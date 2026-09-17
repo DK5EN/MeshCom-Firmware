@@ -156,6 +156,10 @@ bool bVIA = false;
 // test in the same conceptual unit may).
 extern char mheardCalls[MAX_MHEARD][10];
 extern int mheardNCount[MAX_MHEARD];
+// DR-28: needed to set up mheardSortedIndex()'s direct unit tests below with
+// exact, hand-picked ages instead of driving them through updateMheard()'s
+// own millis()-stamping.
+extern uint32_t mheardMillis[MAX_MHEARD];
 
 void setUp(void)
 {
@@ -266,30 +270,26 @@ static void test_showMHeard_ein_eintrag_alle_spalten(void)
     TEST_ASSERT_EQUAL_STRING(expected, g_out.c_str());
 }
 
-// SORT ORDER: showMHeard() sortiert NICHT -- es laeuft die physische
-// Ringpuffer-Slot-Reihenfolge ab (iset aufsteigend), nicht die Hoer-
-// Reihenfolge, nicht Aktualitaet, nicht alphabetisch nach Rufzeichen.
+// SORT ORDER (DR-28, BACKLOG OPT-D16): showMHeard() muss most-recent-first
+// anzeigen -- NICHT die physische Ringpuffer-Slot-Reihenfolge (die Storage-
+// Arrays selbst werden dafuer nicht umsortiert, siehe mheardSortedIndex()
+// in mheard_functions.cpp).
 //
 // Beweisaufbau: updateMheard()s eigene Slot-Suche (siehe dortiger Kommentar
 // und test_mheard_aging.cpp) fuellt eine leere Tabelle von HINTEN nach VORNE
 // -- der erste neue Eintrag landet in Slot MAX_MHEARD-1, der zweite in
 // MAX_MHEARD-2, usw. Drei Eintraege in der Hoer-Reihenfolge C, A, B landen
-// also physisch bei Slot 79 (C), 78 (A), 77 (B); showMHeard()s aufsteigender
-// iset-Lauf zeigt sie deshalb in der Reihenfolge B, A, C -- weder die
-// Hoer-Reihenfolge (C, A, B) noch alphabetisch (A, B, C) noch invers-
-// alphabetisch (C, B, A).
+// also physisch bei Slot 79 (C), 78 (A), 77 (B). Ein rein physischer,
+// aufsteigender iset-Lauf zeigte sie in der Reihenfolge B, A, C; DR-28
+// verlangt stattdessen die Anzeigereihenfolge nach Aktualitaet.
 //
-// Um "physische Slot-Reihenfolge" zusaetzlich von "zuletzt gehoert zuerst"
-// zu unterscheiden (beides wuerde hier zufaellig densel Reihenfolge liefern,
-// weil neue Eintraege wie oben rueckwaerts einsortieren): der Eintrag, der
-// zuerst gehoert wurde (physisch bei Slot 79, wird also ALS LETZTES
-// angezeigt), wird danach per gleichem Rufzeichen erneut gehoert (bOld-Pfad
-// in updateMheard() -- der Slot bleibt derselbe, nur mheardMillis[] wird
-// aktualisiert). Ein "zuletzt gehoert zuerst"-Renderer wuerde ihn danach
-// ZUERST zeigen; showMHeard() zeigt ihn weiterhin ZULETZT, weil die
-// Anzeigereihenfolge an den physischen Slot gebunden ist, nicht an die
-// Aktualitaet.
-static void test_showMHeard_zeigt_physische_slot_reihenfolge_nicht_zeit_oder_alphabet(void)
+// C wird danach per gleichem Rufzeichen erneut gehoert (bOld-Pfad in
+// updateMheard() -- der Slot bleibt derselbe, nur mheardMillis[] wird
+// aktualisiert) und ist damit der zeitlich JUENGSTE Eintrag, obwohl es
+// physisch zuerst (Slot 79) gehoert wurde. Erwartete Anzeigereihenfolge
+// most-recent-first: C (gerade erneut gehoert), B (zuletzt vor C gehoert),
+// A (am laengsten her).
+static void test_showMHeard_zeigt_zuletzt_gehoert_zuerst(void)
 {
     struct mheardLine mh;
 
@@ -306,6 +306,9 @@ static void test_showMHeard_zeigt_physische_slot_reihenfolge_nicht_zeit_oder_alp
 
     // Slot-Positionen wie im Kommentar oben hergeleitet -- direkte
     // Introspektion belegt den Aufbau, bevor der Renderer geprueft wird.
+    // Diese physische Lage ist ein Implementierungsdetail der Speicherung
+    // (siehe mheard_functions.h/mheardSortedIndex()-Kommentar), nicht die
+    // Anzeigereihenfolge.
     TEST_ASSERT_EQUAL_STRING("DK5EN-C", mheardCalls[79]);
     TEST_ASSERT_EQUAL_STRING("DK5EN-A", mheardCalls[78]);
     TEST_ASSERT_EQUAL_STRING("DK5EN-B", mheardCalls[77]);
@@ -320,18 +323,18 @@ static void test_showMHeard_zeigt_physische_slot_reihenfolge_nicht_zeit_oder_alp
     g_out.clear();
     showMHeard();
 
-    // Aufsteigender iset-Lauf -> Reihenfolge B (77), A (78), C (79): NICHT
-    // die Hoer-Reihenfolge (C,A,B), NICHT alphabetisch (A,B,C), UND -- der
-    // eigentliche Beweis -- C (das zuletzt gehoerte, jetzt frischeste)
-    // erscheint weiterhin ZULETZT, nicht zuerst.
-    size_t posB = g_out.find("DK5EN-B");
+    // Most-recent-first: C (gerade erneut gehoert) zuerst, dann B (vor C
+    // zuletzt gehoert), dann A (am laengsten her) -- NICHT die Hoer-
+    // Reihenfolge (C,A,B), NICHT alphabetisch (A,B,C), NICHT die physische
+    // Slot-Reihenfolge (B,A,C).
     size_t posA = g_out.find("DK5EN-A");
+    size_t posB = g_out.find("DK5EN-B");
     size_t posC = g_out.find("DK5EN-C");
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, posB);
     TEST_ASSERT_NOT_EQUAL(std::string::npos, posA);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, posB);
     TEST_ASSERT_NOT_EQUAL(std::string::npos, posC);
+    TEST_ASSERT_TRUE(posC < posB);
     TEST_ASSERT_TRUE(posB < posA);
-    TEST_ASSERT_TRUE(posA < posC);
 }
 
 // Feldformatierung: negativer RSSI/SNR, dist==0.0, hop/mesh/ncount==0 --
@@ -445,29 +448,38 @@ static void test_sendMheard_ein_frischer_eintrag_json_feldreihenfolge(void)
     TEST_ASSERT_EQUAL_STRING(expected_json, g_bleFrames[0].json.c_str());
 }
 
-// SORT ORDER, JSON-Serialisierer: dieselbe physische Slot-Reihenfolge wie
-// showMHeard() (siehe dortiger Beweis) -- sendMheard() laeuft denselben
-// "for(iset=0..MAX_MHEARD)"-Scan, keine eigene Sortierung.
-static void test_sendMheard_physische_slot_reihenfolge(void)
+// SORT ORDER, JSON-Serialisierer (DR-28): sendMheard() muss dieselbe
+// most-recent-first-Reihenfolge liefern wie showMHeard() (siehe dortiger
+// Beweis) -- ueber mheardSortedIndex(), nicht ueber einen physischen
+// "for(iset=0..MAX_MHEARD)"-Scan.
+static void test_sendMheard_zuletzt_gehoert_zuerst(void)
 {
     struct mheardLine mh;
     buildLine(mh, "DK5EN-C", '!', 9, 0, -60, 1, 1.0, 0, 0, 0);
     updateMheard(mh, 0);
+    mc_test_advance_millis(1000UL);
     buildLine(mh, "DK5EN-A", '!', 9, 0, -61, 2, 2.0, 0, 0, 0);
     updateMheard(mh, 0);
+    mc_test_advance_millis(1000UL);
     buildLine(mh, "DK5EN-B", '!', 9, 0, -62, 3, 3.0, 0, 0, 0);
     updateMheard(mh, 0);
-    g_bleFrames.clear();
 
+    // DK5EN-C erneut hoeren (bOld-Pfad, gleicher Slot) -- jetzt der
+    // zeitlich juengste Eintrag, siehe test_showMHeard_zeigt_zuletzt_...
+    mc_test_advance_millis(1000UL);
+    buildLine(mh, "DK5EN-C", '!', 9, 0, -63, 4, 4.0, 0, 0, 0);
+    updateMheard(mh, 0);
+
+    g_bleFrames.clear();
     sendMheard();
 
     TEST_ASSERT_EQUAL_INT(3, (int)g_bleFrames.size());
-    // Slot 77=B, 78=A, 79=C (siehe test_showMHeard_zeigt_physische_...
-    // fuer die Herleitung) -- aufsteigender iset-Scan liefert die Frames
-    // exakt in dieser Reihenfolge, nicht der Hoer-Reihenfolge (C,A,B).
-    TEST_ASSERT_TRUE(g_bleFrames[0].json.find("\"CALL\":\"DK5EN-B\"") != std::string::npos);
-    TEST_ASSERT_TRUE(g_bleFrames[1].json.find("\"CALL\":\"DK5EN-A\"") != std::string::npos);
-    TEST_ASSERT_TRUE(g_bleFrames[2].json.find("\"CALL\":\"DK5EN-C\"") != std::string::npos);
+    // Most-recent-first: C (gerade erneut gehoert), B (vor C zuletzt
+    // gehoert), A (am laengsten her) -- NICHT die Hoer-Reihenfolge
+    // (C,A,B) und NICHT die physische Slot-Reihenfolge (B,A,C).
+    TEST_ASSERT_TRUE(g_bleFrames[0].json.find("\"CALL\":\"DK5EN-C\"") != std::string::npos);
+    TEST_ASSERT_TRUE(g_bleFrames[1].json.find("\"CALL\":\"DK5EN-B\"") != std::string::npos);
+    TEST_ASSERT_TRUE(g_bleFrames[2].json.find("\"CALL\":\"DK5EN-A\"") != std::string::npos);
 }
 
 // Randabdeckung Slot 0: alle Faelle oben belegen ausschliesslich Slot 77-79
@@ -531,6 +543,99 @@ static void test_sendMheard_eintrag_ueber_zwoelf_stunden_wird_nicht_gesendet(voi
     TEST_ASSERT_EQUAL_INT(0, (int)g_bleFrames.size());
 }
 
+// ============================================================ mheardSortedIndex()
+//
+// Direct unit tests for the DR-28 helper itself, bypassing updateMheard()'s
+// own millis()-stamping so each case can pick exact, hand-crafted ages.
+// setUp() has already run initMheard(), so every slot starts unoccupied.
+
+static void test_mheardSortedIndex_leere_tabelle(void)
+{
+    uint8_t idx[MAX_MHEARD];
+
+    uint8_t n = mheardSortedIndex(idx, (uint32_t)millis());
+
+    TEST_ASSERT_EQUAL_UINT8(0, n);
+}
+
+static void test_mheardSortedIndex_sortiert_nach_alter_aufsteigend(void)
+{
+    // Slot-Positionen absichtlich nicht sortiert und nicht benachbart, damit
+    // ein Mutant, der einfach die physische Reihenfolge durchreicht, nicht
+    // zufaellig durchrutscht.
+    mheardCalls[10][0] = 'A'; mheardMillis[10] = 100;
+    mheardCalls[5][0]  = 'B'; mheardMillis[5]  = 300;
+    mheardCalls[20][0] = 'C'; mheardMillis[20] = 200;
+
+    uint8_t idx[MAX_MHEARD];
+    uint8_t n = mheardSortedIndex(idx, 1000);
+
+    TEST_ASSERT_EQUAL_UINT8(3, n);
+    // millis 300 -> kleinstes Alter -> zuerst; millis 100 -> groesstes
+    // Alter -> zuletzt.
+    TEST_ASSERT_EQUAL_UINT8(5,  idx[0]);
+    TEST_ASSERT_EQUAL_UINT8(20, idx[1]);
+    TEST_ASSERT_EQUAL_UINT8(10, idx[2]);
+}
+
+// Rollover-Sicherheit: dieselbe unsigned-Subtraktion wie die bestehenden
+// Aging-Filter in diesem File (NC-01) -- ein Eintrag, dessen mheardMillis[]
+// kurz VOR einem uint32_t-Ueberlauf liegt, muss trotzdem als AELTER gelten
+// als einer kurz NACH `now`s Nulldurchgang, nicht juenger.
+static void test_mheardSortedIndex_rollover_sicher(void)
+{
+    mheardCalls[3][0] = 'X'; mheardMillis[3] = 0xFFFFFF00UL;   // Alter bei now=50: 306
+    mheardCalls[7][0] = 'Y'; mheardMillis[7] = 10UL;           // Alter bei now=50: 40
+
+    uint8_t idx[MAX_MHEARD];
+    uint8_t n = mheardSortedIndex(idx, 50);
+
+    TEST_ASSERT_EQUAL_UINT8(2, n);
+    TEST_ASSERT_EQUAL_UINT8(7, idx[0]);   // Alter 40 -> juenger -> zuerst
+    TEST_ASSERT_EQUAL_UINT8(3, idx[1]);   // Alter 306 -> aelter -> zuletzt
+}
+
+// Gleichstand (identisches Alter): haelt den niedrigeren Slot zuerst -- die
+// stabile Sortierung schiebt ein Element nur an Eintraegen mit STRENG
+// groesserem Alter vorbei (siehe mheardSortedIndex()-Kommentar).
+static void test_mheardSortedIndex_gleichstand_haelt_niedrigeren_slot_zuerst(void)
+{
+    mheardCalls[15][0] = 'A'; mheardMillis[15] = 100;
+    mheardCalls[8][0]  = 'B'; mheardMillis[8]  = 100;   // gleiches Alter wie Slot 15
+
+    uint8_t idx[MAX_MHEARD];
+    uint8_t n = mheardSortedIndex(idx, 1000);
+
+    TEST_ASSERT_EQUAL_UINT8(2, n);
+    TEST_ASSERT_EQUAL_UINT8(8,  idx[0]);
+    TEST_ASSERT_EQUAL_UINT8(15, idx[1]);
+}
+
+// Volle Tabelle: MAX_MHEARD belegte Slots -> n == MAX_MHEARD, und jeder Slot
+// kommt in idx[] genau einmal vor (kein Slot doppelt, keiner fehlt).
+static void test_mheardSortedIndex_volle_tabelle_jeder_slot_genau_einmal(void)
+{
+    for(int i = 0; i < MAX_MHEARD; i++)
+    {
+        mheardCalls[i][0] = (char)('A' + (i % 26));
+        mheardMillis[i] = (uint32_t)i;   // paarweise verschiedenes Alter
+    }
+
+    uint8_t idx[MAX_MHEARD];
+    uint8_t n = mheardSortedIndex(idx, 1000);
+
+    TEST_ASSERT_EQUAL_UINT8(MAX_MHEARD, n);
+
+    bool seen[MAX_MHEARD] = {false};
+    for(uint8_t k = 0; k < n; k++)
+    {
+        TEST_ASSERT_FALSE(seen[idx[k]]);
+        seen[idx[k]] = true;
+    }
+    for(int i = 0; i < MAX_MHEARD; i++)
+        TEST_ASSERT_TRUE(seen[i]);
+}
+
 // ============================================================ showPath()
 
 static void test_showPath_leere_tabelle_nur_rahmen(void)
@@ -587,14 +692,19 @@ int main(int argc, char **argv)
     RUN_TEST(test_getHardwareLong_out_of_range_faellt_auf_no_info);
     RUN_TEST(test_showMHeard_leere_tabelle_nur_rahmen);
     RUN_TEST(test_showMHeard_ein_eintrag_alle_spalten);
-    RUN_TEST(test_showMHeard_zeigt_physische_slot_reihenfolge_nicht_zeit_oder_alphabet);
+    RUN_TEST(test_showMHeard_zeigt_zuletzt_gehoert_zuerst);
     RUN_TEST(test_showMHeard_negative_und_null_felder);
     RUN_TEST(test_showMHeard_callsign_an_speichergrenze_wird_gekappt);
     RUN_TEST(test_showMHeard_eintrag_ueber_zwoelf_stunden_wird_nicht_angezeigt);
     RUN_TEST(test_sendMheard_ein_frischer_eintrag_json_feldreihenfolge);
-    RUN_TEST(test_sendMheard_physische_slot_reihenfolge);
+    RUN_TEST(test_sendMheard_zuletzt_gehoert_zuerst);
     RUN_TEST(test_sendMheard_deckt_slot_null_ab);
     RUN_TEST(test_sendMheard_eintrag_ueber_zwoelf_stunden_wird_nicht_gesendet);
+    RUN_TEST(test_mheardSortedIndex_leere_tabelle);
+    RUN_TEST(test_mheardSortedIndex_sortiert_nach_alter_aufsteigend);
+    RUN_TEST(test_mheardSortedIndex_rollover_sicher);
+    RUN_TEST(test_mheardSortedIndex_gleichstand_haelt_niedrigeren_slot_zuerst);
+    RUN_TEST(test_mheardSortedIndex_volle_tabelle_jeder_slot_genau_einmal);
     RUN_TEST(test_showPath_leere_tabelle_nur_rahmen);
     RUN_TEST(test_showPath_ein_eintrag);
     return UNITY_END();

@@ -17,6 +17,18 @@ void mheardRecordFromLine(const struct mheardLine &mheardLine, MheardRecord &rec
 void showMHeard();
 void showPath();
 void sendMheard();
+
+// DR-28 (BACKLOG OPT-D16, decided 2026-09-12): fills idx[] with the
+// occupied mHeard slots, most recently heard first. Returns the number of
+// entries written to idx[]. The slot-parallel storage arrays themselves
+// (mheardRecords, mheardCalls, mheardLat/Lon/Alt, mheardEpoch, mheardMillis,
+// mheardNCount -- all written by updateMheard() from the LORA task) are
+// NEVER reordered; this is a read-only view over them for the renderers
+// (showMHeard()/sendMheard()/showMHeardTDECK(), sub_page_mheard() in
+// web_functions.cpp). `now` is the caller's millis() snapshot, so every
+// renderer sorts against the same instant it also uses for its own
+// aging/freshness check.
+uint8_t mheardSortedIndex(uint8_t *idx, uint32_t now);
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 void showMHeardTDECK();
 void showPathTDECK();
