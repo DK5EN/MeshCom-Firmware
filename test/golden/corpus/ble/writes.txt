@@ -29,3 +29,11 @@
 --softser app0
 --maxhop
 --maxhop 5
+#
+# CS-01: `--maxhop 5` above persists meshcom_settings.max_hop_text and
+# the node answers neither form of --maxhop over BLE, so the value cannot
+# be read back and restored exactly. Put it back to the compile-time
+# default (MAX_HOP_TEXT_DEFAULT == 4) -- this assumes the node was at the
+# default before the run. RESTORE: excludes the write from the golden
+# comparison (ble_golden.py read_corpus / Capture.on_write).
+RESTORE:--maxhop 4

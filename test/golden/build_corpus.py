@@ -341,6 +341,10 @@ def command_scripts(commands: List[extract_commands.Command]) -> Dict[str, str]:
         "--softser app", "--softser app0",
         "--maxhop", "--maxhop 5",
         "--passwd", "--passwd test",
+        # CS-01: put max_hop_text back to its compile-time default (4) so the
+        # corpus leaves the node as it found it. The console echoes the set
+        # value, so this line's answer is a stable part of the capture.
+        "--maxhop 4",
     ]
 
     header = (
@@ -380,6 +384,12 @@ BLE_ADVERSARIAL = (
     "--heap", "--heap tag",
     "--softser app", "--softser app0",
     "--maxhop", "--maxhop 5",
+)
+
+# Leaves the node as the corpus found it (CS-01). Emitted last; the tool
+# excludes RESTORE: writes from the comparison.
+BLE_RESTORE = (
+    "RESTORE:--maxhop 4",
 )
 
 
@@ -435,6 +445,14 @@ def ble_corpus() -> str:
         "#",
         "# adversarial prefix pairs",
         *BLE_ADVERSARIAL,
+        "#",
+        "# CS-01: `--maxhop 5` above persists meshcom_settings.max_hop_text and",
+        "# the node answers neither form of --maxhop over BLE, so the value cannot",
+        "# be read back and restored exactly. Put it back to the compile-time",
+        "# default (MAX_HOP_TEXT_DEFAULT == 4) -- this assumes the node was at the",
+        "# default before the run. RESTORE: excludes the write from the golden",
+        "# comparison (ble_golden.py read_corpus / Capture.on_write).",
+        *BLE_RESTORE,
     ]
     return "\n".join(lines) + "\n"
 

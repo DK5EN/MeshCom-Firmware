@@ -12,3 +12,4 @@
 --maxhop 5
 --passwd
 --passwd test
+--maxhop 4

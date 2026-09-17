@@ -132,13 +132,27 @@ def decode_notify(frame: bytes) -> str:
 # --------------------------------------------------------------- corpus
 
 
-def read_corpus(path: Path) -> List[str]:
-    """One write per line; '#' comments and blank lines ignored."""
-    return [
-        line.strip()
-        for line in path.read_text().splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    ]
+# A line prefixed with this sends the remainder as usual, but the write is
+# flagged `excluded`: any reply it provokes is kept out of the golden
+# comparison. Use it for a write that undoes a setting an earlier corpus line
+# changed (e.g. `--maxhop`) -- the restore itself is not part of what a golden
+# run is testing, and its reply (if the firmware answers over BLE at all)
+# must not become a spurious difference between two otherwise-identical runs.
+RESTORE_PREFIX = "RESTORE:"
+
+
+def read_corpus(path: Path) -> List[Tuple[str, bool]]:
+    """One (text, is_restore) pair per line; '#' comments and blanks ignored."""
+    out: List[Tuple[str, bool]] = []
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(RESTORE_PREFIX):
+            out.append((line[len(RESTORE_PREFIX):].strip(), True))
+        else:
+            out.append((line, False))
+    return out
 
 
 # --------------------------------------------------------------- capture
@@ -281,14 +295,28 @@ class Capture:
         self.t0 = time.monotonic()
         self.own_calls = own_calls
         self.notifications: List[Tuple[float, bytes]] = []
-        self.writes: List[Tuple[float, bytes, str]] = []
+        self.writes: List[Tuple[float, bytes, str, bool]] = []
         self.corpus_start: Optional[float] = None   # set when the burst has settled
 
     def on_notify(self, _sender, data: bytearray) -> None:
         self.notifications.append((time.monotonic() - self.t0, bytes(data)))
 
-    def on_write(self, frame: bytes, label: str) -> None:
-        self.writes.append((time.monotonic() - self.t0, redact(frame), label))
+    def on_write(self, frame: bytes, label: str, t: Optional[float] = None,
+                 excluded: bool = False) -> None:
+        """Record a write.
+
+        `t` is `time.monotonic()` taken BEFORE the GATT await, not after:
+        `write_gatt_char(..., response=True)` only returns
+        once the peripheral has acknowledged the write at the ATT level, which
+        on the bench measured 0.2-0.4 s. Timestamping after that await
+        inflates the recorded write time by the round trip and can even push
+        it past a fast reply's own timestamp, so that reply no longer counts
+        as "at or after" its write and gets attributed to the wrong one (or
+        to none). `t` defaults to now only for callers -- e.g. the self-test
+        -- that do not have a pre-await instant to hand.
+        """
+        when = (t if t is not None else time.monotonic()) - self.t0
+        self.writes.append((when, redact(frame), label, excluded))
 
     def _row(self, t: float, data: bytes, kind: str, attributed: str = "") -> str:
         src = own_source(data, self.own_calls)
@@ -326,9 +354,14 @@ class Capture:
         preceding = [w for w in self.writes if w[0] <= t]
         if not preceding:
             return "spontaneous", ""
-        wt, _frame, label = preceding[-1]
+        wt, _frame, label, w_excluded = preceding[-1]
         if t - wt > window:
             return "spontaneous", ""
+        if w_excluded:
+            # This write (e.g. a `RESTORE:` line) is not part of what the
+            # corpus is testing; keep its reply, if any, out of the compared
+            # sequence the same way a spontaneous frame is kept out.
+            return "restore", label
         return "reply", label
 
     def write_files(self, out: Path, window: float = 0.55) -> List[Path]:
@@ -338,9 +371,10 @@ class Capture:
         spontaneous status frames, or mesh traffic during the settle. None of
         it can be attributed to a write, so none of it is compared.
         `ble-frames.txt` holds everything after the settle, each row tagged
-        `reply` (with the write it answers), `mesh` or `spontaneous`. The
-        `.bin` carries the `reply` frames only -- those are what the byte
-        comparison runs on, and they are the only ones that repeat.
+        `reply` (with the write it answers), `mesh`, `spontaneous` or
+        `restore` (a reply to a `RESTORE:` corpus line). The `.bin` carries
+        the `reply` frames only -- those are what the byte comparison runs
+        on, and they are the only ones that repeat.
         """
         out.mkdir(parents=True, exist_ok=True)
         start = self.corpus_start if self.corpus_start is not None else 0.0
@@ -355,8 +389,8 @@ class Capture:
             when, label = self.attribute(t, window, data)
             if kind in ("mesh", "volatile"):
                 excluded.append(self._row(t, data, kind))
-            elif when == "spontaneous":
-                excluded.append(self._row(t, data, "spontaneous"))
+            elif when in ("spontaneous", "restore"):
+                excluded.append(self._row(t, data, when, label))
             else:
                 compared.append(self._row(t, data, "reply", label))
                 blob += struct.pack("<H", len(data)) + data
@@ -377,8 +411,9 @@ class Capture:
         written[2].write_text("\n".join(burst) + ("\n" if burst else ""))
         written[3].write_text(
             "".join(
-                f"{t:9.3f} {label:24} {frame.hex() if isinstance(frame, bytes) else frame}\n"
-                for t, frame, label in self.writes
+                f"{t:9.3f} {label:24}{' [excluded]' if excl else '':11} "
+                f"{frame.hex() if isinstance(frame, bytes) else frame}\n"
+                for t, frame, label, excl in self.writes
             )
         )
         self.counts = (len(burst), len(compared), len(excluded))
@@ -455,9 +490,16 @@ async def run(args: argparse.Namespace) -> int:
         # INIT_CONN_WAIT: the app waits before its hello and the node needs it.
         await asyncio.sleep(args.connect_wait)
 
-        async def send(frame: bytes, label: str) -> None:
+        async def send(frame: bytes, label: str, excluded: bool = False) -> None:
+            # Timestamp BEFORE the await: write_gatt_char(response=True) only
+            # returns once the peripheral has acknowledged the write, which
+            # measured 0.2-0.4 s on the bench nodes. Recording the time after
+            # that round trip inflates every write-to-reply delta and can
+            # even land a fast reply's own timestamp before the write's,
+            # breaking attribution (see Capture.on_write).
+            t = time.monotonic()
             await client.write_gatt_char(NUS_TX_CHAR, frame, response=True)
-            cap.on_write(frame, label)
+            cap.on_write(frame, label, t=t, excluded=excluded)
             await asyncio.sleep(args.gap)
 
         await send(build_hello(args.pin), f"hello pin={'yes' if args.pin else 'no'}")
@@ -478,8 +520,9 @@ async def run(args: argparse.Namespace) -> int:
         print(f"node settled after {settled:.1f} s, "
               f"{len(cap.notifications)} pre-corpus frames", file=sys.stderr)
 
-        for line in corpus:
-            await send(build_text(line), f"text {line[:18]!r}")
+        for line, is_restore in corpus:
+            kind = "restore" if is_restore else "text"
+            await send(build_text(line), f"{kind} {line[:18]!r}", excluded=is_restore)
 
         await asyncio.sleep(args.listen)
         await client.stop_notify(NUS_RX_CHAR)
@@ -567,8 +610,7 @@ def _self_test() -> int:
     # the record. f003 is exactly that shape: '!' to '*' from DK5EN-90.
     _beacon = b"\x40" + frames["f003"]
     _cap = Capture(("DK5EN",))
-    _cap.on_write(b"\xa0--io", "--io")
-    _cap.writes[-1] = (0.0, _cap.writes[-1][1], "--io")
+    _cap.on_write(b"\xa0--io", "--io", t=_cap.t0)   # t=t0 -> recorded at 0.0
     if _cap.attribute(0.4, 0.55, _beacon)[0] != "spontaneous":
         failures += 1
         print("FAIL: own position beacon inside the reply window counted as a reply")
