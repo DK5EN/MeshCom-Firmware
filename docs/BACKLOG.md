@@ -6122,6 +6122,98 @@ name "LilyGo T-Watch S3 M10Q". Its `memory_type` is `qio_qspi`
 two disagree. The `ps_calloc` evidence above says the quad path does find the
 PSRAM, so nothing is broken today, but the file is not describing this board.
 
+### 3.8am `R2-04` -- `aprsMessage` carries text, not `String` (2026-09-17)
+
+The largest row of the campaign by surface: 27 source files, 15 test suites,
+651 field usages. The audit called it "heap churn -450..550 B and ~14
+malloc/free per RX (est.)". Two corrections from measurement: it is about
+**seven** malloc/free per RX on most boards -- the second seven only happens on
+the T-Deck, which owns the single pass-by-value site
+(`lv_obj_functions.h:45`) -- and the row's real payoff is **flash**, which the
+audit did not mention at all.
+
+**What was there.** `decodeAPRS()` builds every text field in a local
+`char cConcat1..3[UDP_TX_BUF_SIZE]` on the stack, copies each into a `String`,
+and then about 110 call sites call `.c_str()` to get a `char*` back out. A
+serialise/deserialise round trip for data that never leaves the struct -- the
+same shape `R2-01` removed from the mheard buffer.
+
+**Measured, all 34 envs, against the `R4-01` baseline:**
+
+|       | per env                                   | total          |
+| ----- | ----------------------------------------- | -------------- |
+| Flash | -3 324 .. **-7 300** (2 safeboot envs: 0) | **-109 068 B** |
+| RAM   | +464 .. +496                              | +15 024 B      |
+
+The RAM is not diffuse: **+464 is one global.** `pendingDisplayMsg` goes from
+144 to 608 B (`nm`: `0x260`). Every other instance is on the stack, and the
+heap traffic those instances generated is gone.
+
+**The widths come from the decoder, not from taste.** Both path loops accept
+exactly 120 characters (`(ib - 6) < 120`, `(ib - inextstart) < 120`), so
+`MC_PATH_LEN` is 121 and every frame accepted today is still accepted. Calls
+get `MAX_CALL_LEN + 1`. That is the single behaviour change: a "callsign"
+longer than 20 is now rejected while splitting rather than moments later by
+`checkRegexCall()`. Both routes discard the frame.
+
+**`src/mc_text.h`** holds the eight operations that survive the change, rather
+than open-coding them at ~50 sites. `mcAppend()` is all-or-nothing on purpose:
+a half-appended callsign in a path is a WRONG callsign on the air, a missing
+one is only a missing hop. 21 host cases in `native_mc_text`.
+
+**Three defects the conversion exposed, each with a test:**
+
+1. **`decodeAPRS()`'s payload loop had no bound of its own.** It ran to `rsize`
+   while the check above it admits `MAX_APRS_FRAME_SIZE` (340) -- into a
+   255-byte stack buffer. Not live: `R1-06` established every caller is capped
+   at `UDP_TX_BUF_SIZE` (LoRa via `rxPayloadCopy[2][UDP_TX_BUF_SIZE]`, BLE via
+   a `uint8_t` length, UDP via the ring slots). But the loop was safe only by
+   borrowing its callers' limits. Feeding it a 340-byte frame with the bound
+   removed gives **SIGABRT, stack smashing detected**.
+
+2. **`initAPRS()` never cleared `msg_source_call`.** As a `String` it was empty
+   by construction, so the omission was invisible for years. As `char[]`, a
+   stack instance kept the PREVIOUS frame's callsign. `test_aprs_corpus` f008
+   caught it immediately (`srccall=` became `srccall=DK5EN-98`).
+
+3. **PONG read `msg_payload + 14`** where `substring(14,17)` used to clamp to
+   `""`. The guard only checks a 6-character prefix, so a payload of exactly
+   `{pong}` read past the terminator -- in bounds of the array, but
+   uninitialised. The clamp is restored explicitly.
+
+**Two more that only a wider type could reveal:**
+
+- **`utf8ascii()` has three overloads** (`byte`, `String`, `char*`). Changing
+  the field type moved three calls from `String utf8ascii(String)` to
+  `void utf8ascii(char*)`. Caught only because the result was assigned.
+- **`source_call[20]` / `destination_call[20]`** in BOTH `udp_frame` twins are
+  one byte short of a call field. The truncation was never impossible, only
+  invisible -- with a `String` source GCC could not know the length. The
+  buffers grew; the warning was not silenced.
+
+**The include-order trap, recorded because it cost a full native run.**
+Deriving the widths from `configuration_global.h` by including it from
+`aprs_structures.h` broke `test_mheard_render` and `test_mheard_aging`:
+`MAX_MHEARD` is defined PER BOARD there (50/80/10/30), and
+`aprs_structures.h` is included early -- earlier than the board macro is set.
+The header then chose the wrong branch and the mheard table silently had 50
+slots instead of 80. The widths are literals now, with `static_assert`s in
+`aprs_functions.cpp` where both headers are already visible. Same class as the
+guard-before-include pitfall in `dm-stage0-shipped`.
+
+**Method, and where it went wrong.** The bulk ran as scripted passes (419
+substitutions) with the compiler as the oracle. The first script was wrong
+twice -- it matched ACROSS newlines and rewrote a commented-out line, eating
+the next line's parenthesis, and its assignment regex stopped at a `;` INSIDE a
+string literal, turning `"R0;"` into `"R0);"`. Both passes were reverted
+wholesale and redone line-anchored with comment lines skipped, rather than
+patched. A regex that can span lines has no place in a mechanical source
+rewrite.
+
+**Still owed.** The heap claim is the row's whole premise and is NOT proven by
+any of this: it needs the 1 h `--heap` watermark on the bench, plus a BLE
+connect soak. Everything above is a build-and-test verdict.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
