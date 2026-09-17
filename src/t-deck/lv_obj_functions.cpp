@@ -4388,8 +4388,8 @@ void tdeck_add_MSG(aprsMessage aprsmsg, bool bWithAudio)
     payload = utf8ascii(payload);
 
     String local_call = String(meshcom_settings.node_call);
-    bool is_outgoing = aprsmsg.msg_source_path.equalsIgnoreCase(local_call)
-        || aprsmsg.msg_source_call.equalsIgnoreCase(local_call);
+    bool is_outgoing = strcasecmp(aprsmsg.msg_source_path, local_call.c_str()) == 0
+        || strcasecmp(aprsmsg.msg_source_call, local_call.c_str()) == 0;
 
     String conversation = is_outgoing ? aprsmsg.msg_destination_call : aprsmsg.msg_source_call;
     if(conversation.length() == 0)
@@ -4402,8 +4402,8 @@ void tdeck_add_MSG(aprsMessage aprsmsg, bool bWithAudio)
     bubble.type = is_outgoing ? MsgBubbleType::Outgoing : MsgBubbleType::Incoming;
     bubble.timestamp = build_timestamp_string();
 
-    String source_descriptor = aprsmsg.msg_source_path.length() > 0 ? aprsmsg.msg_source_path : aprsmsg.msg_source_call;
-    String dest_descriptor = aprsmsg.msg_destination_call; // routing nicht berücksichtigt aprsmsg.msg_destination_path.length() > 0 ? aprsmsg.msg_destination_path : aprsmsg.msg_destination_call;
+    String source_descriptor = strlen(aprsmsg.msg_source_path) > 0 ? aprsmsg.msg_source_path : aprsmsg.msg_source_call;
+    String dest_descriptor = aprsmsg.msg_destination_call; // routing nicht berücksichtigt strlen(aprsmsg.msg_destination_path) > 0 ? aprsmsg.msg_destination_path : aprsmsg.msg_destination_call;
 
     if(source_descriptor.length() == 0)
         source_descriptor = local_call.length() > 0 ? local_call : String("You");

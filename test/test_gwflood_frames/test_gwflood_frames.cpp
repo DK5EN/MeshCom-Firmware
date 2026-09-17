@@ -183,14 +183,14 @@ static void test_decoder_nimmt_jeden_frame_an(void)
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(want_id, m.msg_id, msg);
 
         snprintf(msg, sizeof(msg), "%s: Quellpfad leer", fx.name);
-        TEST_ASSERT_TRUE_MESSAGE(m.msg_source_path.length() > 0, msg);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_source_path) > 0, msg);
 
         // Der Injektor legt jeden Frame unveraendert auf die Luft -- die Quelle
         // muss unser eigenes Rufzeichen sein, nie ein mitgeschnittenes fremdes.
         snprintf(msg, sizeof(msg), "%s: Quelle ist nicht DK5EN-93", fx.name);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_call.c_str(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_call, msg);
         snprintf(msg, sizeof(msg), "%s: fremdes Rufzeichen im Pfad", fx.name);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_path.c_str(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-93", m.msg_source_path, msg);
 
         snprintf(msg, sizeof(msg), "%s: FCS-Feld nicht uebernommen", fx.name);
         TEST_ASSERT_EQUAL_UINT16_MESSAGE(wireFcsStored(fx), (uint16_t)m.msg_fcs, msg);
@@ -216,10 +216,10 @@ static void test_textframes_sind_broadcast_und_128_byte_klasse(void)
         // Broadcast "*" -> getMessagePriority() == MSG_PRIO_HIGH, die Klasse,
         // um die es in #568 geht (siehe test_txring_flood).
         snprintf(msg, sizeof(msg), "%s: Ziel ist nicht der Broadcast '*'", fx.name);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("*", m.msg_destination_call.c_str(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("*", m.msg_destination_call, msg);
 
         snprintf(msg, sizeof(msg), "%s: Nutzlast leer", fx.name);
-        TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() > 0, msg);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) > 0, msg);
 
         // #568: alle sieben Meldungen waren ~128 Byte gross.
         snprintf(msg, sizeof(msg), "%s: Frame ist %u Byte, erwartet 128", fx.name, fx.len);
@@ -244,7 +244,7 @@ static void test_laengenvarianten_dekodieren_ebenfalls(void)
         char msg[80];
         snprintf(msg, sizeof(msg), "%s: Laengenvariante abgewiesen", fx.name);
         TEST_ASSERT_NOT_EQUAL_MESSAGE(0, decodeAPRS(fx.bytes, fx.len, m), msg);
-        TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() > 0, msg);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) > 0, msg);
         checked++;
     }
     TEST_ASSERT_GREATER_THAN_MESSAGE(0, checked, "keine Laengenvarianten in der Fixture");

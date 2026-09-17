@@ -1,3 +1,4 @@
+#include "mc_text.h"
 #include <Arduino.h>
 #include <atomic>
 
@@ -259,7 +260,11 @@ void getExtern(unsigned char incoming[], int len)
   // maxima. sendMessage() takes an explicit length and clamps at 199, and
   // the frame body limit further downstream is UDP_TX_BUF_SIZE (255), so
   // the full 162-character frame passes unchanged.
-  char val[2 + 9 + 1 + 150 + 1] = {0};
+  // R2-04: fuer den ECHTEN Groesstfall bemessen, nicht fuer den erwarteten.
+  // ":{" + Zielpfad + "}" + Nutzlast + NUL. Mit festen Feldbreiten kann GCC
+  // das nachrechnen -- und mit den alten 163 Byte widersprach es der
+  // Zusicherung unten. Jetzt stimmt die Zusicherung wieder.
+  char val[2 + MC_PATH_LEN + 1 + MC_PAYLOAD_LEN + 1] = {0};
   struct aprsMessage aprsmsg;
 
   // Decode
@@ -269,14 +274,14 @@ void getExtern(unsigned char incoming[], int len)
 
   initAPRS(aprsmsg, ':');
 
-  aprsmsg.msg_source_path="HOME";
-  aprsmsg.msg_destination_path="*";
+  mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), "HOME");
+  mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "*");
   // PT-01 finding 4: msg_payload used to be pre-set to the literal "none" as
   // an internal "nothing set yet" marker, which a later `== "none"` check
   // then read back -- so a legitimate message whose text is exactly "none"
   // was dropped. Presence is decided by the JSON itself below (a missing key
   // yields a null variant), not by a magic payload value.
-  aprsmsg.msg_payload="";
+  aprsmsg.msg_payload[0] = 0;
 
   //Serial.printf("len:%i icomming:%s vgldst:%s vglmsg:%s\n", len, incoming, vgldst, vglmsg);
 
@@ -324,15 +329,15 @@ void getExtern(unsigned char incoming[], int len)
     Serial.printf("[EXT] invalid lengths dst:%i msg:%i\n", strlen(dst), strlen(msg));
     return;
   }
-  aprsmsg.msg_destination_path = dst;
-  aprsmsg.msg_payload = msg;
+  mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), dst);
+  mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), msg);
   
   //Serial.printf("aprsmsg.msg_destination_path:%s aprsmsg.msg_payload:%s\n", aprsmsg.msg_destination_path, aprsmsg.msg_payload);
 
   // val is sized for the largest frame the checks above can let through, and
   // snprintf() is bounded by that size -- no truncation is possible here any
   // more (PT-01 finding 5).
-  snprintf(val, sizeof(val), ":{%s}%s", aprsmsg.msg_destination_path.c_str(), aprsmsg.msg_payload.c_str());
+  snprintf(val, sizeof(val), ":{%s}%s", aprsmsg.msg_destination_path, aprsmsg.msg_payload);
 
   // BP-01: tag the origin so a QRS/QRT/QTA goes back on this socket and
   // nowhere else. Cleared right after -- everything that does not set this
@@ -537,7 +542,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     // build the json with Arduino JSON
     cJson["src_type"] = src_type;
     cJson["type"] = "pos";
-    cJson["src"] = aprsmsg.msg_source_path.c_str();
+    cJson["src"] = aprsmsg.msg_source_path;
     cJson["msg"] = "";
     cJson["lat"] = a_lat;
     cJson["lat_dir"] = _lat_c;
@@ -585,7 +590,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
           mcp17PortABits(meshcom_settings.node_mcp17in, meshcom_settings.node_mcp17io, cdin);
 
       externTeleJsonNode(c_tjson, sizeof(c_tjson),
-                         aprsmsg.msg_source_path.c_str(),
+                         aprsmsg.msg_source_path,
                          meshcom_settings.node_temp, meshcom_settings.node_temp2,
                          meshcom_settings.node_hum,
                          meshcom_settings.node_press, meshcom_settings.node_press_asl,
@@ -596,7 +601,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     {
       // qfe = /P= (station pressure), not /F= (pressure altitude in metres).
       externTeleJsonLora(c_tjson, sizeof(c_tjson),
-                         aprsmsg.msg_source_path.c_str(), aprspos.bat,
+                         aprsmsg.msg_source_path, aprspos.bat,
                          aprspos.temp, aprspos.temp2, aprspos.hum,
                          aprspos.press, aprspos.qnh, aprspos.qfe,
                          aprspos.gasres, aprspos.co2,
@@ -621,20 +626,20 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     // (today's behaviour, every deployed node already reads 0) so the
     // existing fleet forwards exactly as before, 1 = suppress -- an operator
     // opts in with "--nopmother on".
-    bool bIsGroupOrAll = (aprsmsg.msg_destination_call == "*") ||
+    bool bIsGroupOrAll = (strcmp(aprsmsg.msg_destination_call, "*") == 0) ||
                          (CheckGroup(aprsmsg.msg_destination_call) > 0);
-    bool bForOwnOrFromOwn = (aprsmsg.msg_destination_call == meshcom_settings.node_call) ||
-                            (aprsmsg.msg_source_call == meshcom_settings.node_call);
+    bool bForOwnOrFromOwn = (strcmp(aprsmsg.msg_destination_call, meshcom_settings.node_call) == 0) ||
+                            (strcmp(aprsmsg.msg_source_call, meshcom_settings.node_call) == 0);
 
     if((meshcom_settings.node_sset3 & 0x8000) && !bIsGroupOrAll && !bForOwnOrFromOwn)
     {
       Serial.printf("[EXT] pm dropped (NoPMOther): src;%s;dst;%s\n",
-                    aprsmsg.msg_source_call.c_str(), aprsmsg.msg_destination_call.c_str());
+                    aprsmsg.msg_source_call, aprsmsg.msg_destination_call);
       return;
     }
 
     // no telemetry
-    if(aprsmsg.msg_destination_path == "100001")
+    if(strcmp(aprsmsg.msg_destination_path, "100001") == 0)
     {
       // EXT-01 (BACKLOG.md): this leg built no JSON, so c_json stayed at its
       // memset-cleared "" and control fell through into the shared send
@@ -662,11 +667,11 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
       // build the json with Arduino JSON
       cJson["src_type"] = src_type;
       cJson["type"] = "msg";
-      cJson["src"] = aprsmsg.msg_source_path.c_str();
-      cJson["dst"] = aprsmsg.msg_destination_path.c_str();
+      cJson["src"] = aprsmsg.msg_source_path;
+      cJson["dst"] = aprsmsg.msg_destination_path;
       // JSN-01: assign raw -- ArduinoJson escapes JSON strings on
       // serializeJson() already; a separate escaper here double-escaped.
-      cJson["msg"] = aprsmsg.msg_payload.c_str();
+      cJson["msg"] = aprsmsg.msg_payload;
       cJson["msg_id"] = _msgId;
       
       // add firmware version if not a node

@@ -122,9 +122,9 @@ void sendMeshComUDP()
               // should have kept an unconfigured source out of
               // ringBufferUDPout in the first place) and skips the debug
               // print for it.
-              if(isUnconfiguredCall(aprsmsg.msg_source_call.c_str()))
+              if(isUnconfiguredCall(aprsmsg.msg_source_call))
               {
-                logRxDropUnconfigured(aprsmsg.msg_source_call.c_str());
+                logRxDropUnconfigured(aprsmsg.msg_source_call);
               }
               // print aprs message
               else if(bDisplayInfo)

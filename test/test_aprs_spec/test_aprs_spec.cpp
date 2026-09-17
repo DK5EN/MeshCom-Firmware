@@ -14,6 +14,7 @@
 //
 //   pio test -e native_aprs -f test_aprs_spec
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -107,13 +108,13 @@ static void test_spec_text_dm_alle_felder(void)
     TEST_ASSERT_TRUE(m.msg_mesh);
     TEST_ASSERT_FALSE(m.msg_track);
     TEST_ASSERT_FALSE(m.msg_app_offline);
-    TEST_ASSERT_EQUAL_STRING("DK5EN-90,DK5EN-98", m.msg_source_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("DK5EN-90", m.msg_source_call.c_str());
-    TEST_ASSERT_EQUAL_STRING("DK5EN-98", m.msg_source_last.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90,DK5EN-98", m.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", m.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-98", m.msg_source_last);
     TEST_ASSERT_EQUAL_INT(2, m.msg_last_path_cnt);
-    TEST_ASSERT_EQUAL_STRING("DK5EN-91", m.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("DK5EN-91", m.msg_destination_call.c_str());
-    TEST_ASSERT_EQUAL_STRING("Hallo Welt{123", m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-91", m.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-91", m.msg_destination_call);
+    TEST_ASSERT_EQUAL_STRING("Hallo Welt{123", m.msg_payload);
     TEST_ASSERT_EQUAL_UINT8(9, m.msg_source_hw);
     TEST_ASSERT_EQUAL_HEX8(0x88, m.msg_source_mod);
     TEST_ASSERT_EQUAL_UINT8(35, m.msg_source_fw_version);
@@ -171,7 +172,7 @@ static void test_spec_gruppenziele_und_sonderziele(void)
         struct aprsMessage m;
         initAPRS(m, 0x00);
         TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x3A, decodeAPRS(buf, len, m), dst);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(dst, m.msg_destination_call.c_str(), dst);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(dst, m.msg_destination_call, dst);
     }
 }
 
@@ -186,7 +187,7 @@ static void test_spec_trailer_optional_beim_decoder(void)
     struct aprsMessage m;
     initAPRS(m, 0x00);
     TEST_ASSERT_EQUAL_HEX16(0x3A, decodeAPRS(buf, len, m));
-    TEST_ASSERT_EQUAL_STRING("ohne Trailer", m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("ohne Trailer", m.msg_payload);
     TEST_ASSERT_EQUAL_UINT8(shortVERSION(), m.msg_source_fw_version);
     TEST_ASSERT_EQUAL_HEX8(0x80 | BOARD_HARDWARE, m.msg_last_hw);
     TEST_ASSERT_EQUAL_UINT8(shortSUBVERSION(), m.msg_source_fw_sub_version);
@@ -328,9 +329,9 @@ static void test_spec_encoder_bytegenau(void)
     m.msg_track = false;
     m.msg_app_offline = false;
     // bMESH ist true -> Encoder setzt 0x10 (§1.2)
-    m.msg_source_path = "DK5EN-90";
-    m.msg_destination_path = "9999";
-    m.msg_payload = "Spec-Encoder-Test";
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), "DK5EN-90");
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "9999");
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "Spec-Encoder-Test");
     m.msg_source_hw = 9;
     m.msg_source_mod = 0x88;
     m.msg_source_fw_version = 35;

@@ -12,6 +12,7 @@
 //
 //   pio test -e native_aprs
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <Arduino.h>
@@ -81,10 +82,10 @@ static void test_vektor1_position_dl2ja(void)
 
     TEST_ASSERT_EQUAL_UINT16(0x21, t);                 // MSG_TYPE_POSITION
     TEST_ASSERT_EQUAL_UINT32(0xE9F113ABu, m.msg_id);   // Byte 1..4 little-endian
-    TEST_ASSERT_EQUAL_STRING("DL2JA-1", m.msg_source_call.c_str());
-    TEST_ASSERT_EQUAL_STRING("DL2JA-2", m.msg_source_last.c_str());
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call.c_str());
-    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.indexOf("Marzling#Werner") >= 0,
+    TEST_ASSERT_EQUAL_STRING("DL2JA-1", m.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("DL2JA-2", m.msg_source_last);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call);
+    TEST_ASSERT_TRUE_MESSAGE(mcIndexOfStr(m.msg_payload, "Marzling#Werner") >= 0,
                              "Payload muss den Ortstext enthalten");
 }
 
@@ -109,10 +110,10 @@ static void test_vektor2_text_oe1xar(void)
 
     TEST_ASSERT_EQUAL_UINT16(0x3A, t);                 // MSG_TYPE_TEXT
     TEST_ASSERT_EQUAL_UINT32(0x6A8823A4u, m.msg_id);
-    TEST_ASSERT_EQUAL_STRING("OE1XAR-33", m.msg_source_call.c_str());
-    TEST_ASSERT_EQUAL_STRING("DK5EN-98", m.msg_source_last.c_str());
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call.c_str());
-    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.indexOf("{CET}2026-08-21 10:58:58") >= 0,
+    TEST_ASSERT_EQUAL_STRING("OE1XAR-33", m.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-98", m.msg_source_last);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call);
+    TEST_ASSERT_TRUE_MESSAGE(mcIndexOfStr(m.msg_payload, "{CET}2026-08-21 10:58:58") >= 0,
                              "Payload muss den Zeitstempel enthalten");
 }
 
@@ -142,9 +143,9 @@ static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
     struct aprsMessage tx;
     initAPRS(tx, ':');
     tx.msg_id = 0x12345678u;
-    tx.msg_source_path = "DK5EN-90";
-    tx.msg_destination_path = "*";
-    tx.msg_payload = payload;
+    mcSet(tx.msg_source_path, sizeof(tx.msg_source_path), "DK5EN-90");
+    mcSet(tx.msg_destination_path, sizeof(tx.msg_destination_path), "*");
+    mcSet(tx.msg_payload, sizeof(tx.msg_payload), payload.c_str());
 
     uint8_t buf[UDP_TX_BUF_SIZE] = {0};
     uint16_t len = encodeAPRS(buf, tx);
@@ -171,8 +172,8 @@ static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
 
     TEST_ASSERT_EQUAL_UINT16(0x3A, t);                 // MSG_TYPE_TEXT
     TEST_ASSERT_EQUAL_UINT32(0x12345678u, rx.msg_id);
-    TEST_ASSERT_EQUAL_STRING("DK5EN-90", rx.msg_source_call.c_str());
-    TEST_ASSERT_EQUAL_STRING(payload.c_str(), rx.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", rx.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING(payload.c_str(), rx.msg_payload);
 }
 
 static void test_leerer_frame_wird_abgelehnt(void)
@@ -315,6 +316,42 @@ static void test_alle_tags_in_encoder_reihenfolge(void)
     TEST_ASSERT_EQUAL_INT(1, pos.telemetry);
 }
 
+// R2-04. Der Nutzlast-Schleife in decodeAPRS() fehlte eine eigene Schranke:
+// sie lief bis `rsize`, und der Test darueber laesst rsize bis
+// MAX_APRS_FRAME_SIZE (340) durch -- waehrend der Zielpuffer cConcat1 nur
+// UDP_TX_BUF_SIZE (255) Byte hat. Heute reicht kein Aufrufer mehr als 255
+// herein (R1-06), die Schleife verliess sich also auf ihre Aufrufer statt auf
+// sich selbst. Dieser Fall ruft decodeAPRS() direkt mit einem 340-Byte-Frame
+// auf, also genau so, wie es der Test auf MAX_APRS_FRAME_SIZE erlaubt.
+//
+// OHNE die Schranke schreibt die Schleife rund 75 Byte hinter cConcat1 --
+// mitten in cConcat2/cConcat3 auf demselben Stack. Unter -fsanitize=address
+// ist das ein stack-buffer-overflow; ohne Sanitizer faellt hier die
+// Laengenzusicherung.
+static void test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht(void)
+{
+    uint8_t buf[512];
+    memset(buf, 'A', sizeof(buf));
+
+    buf[0] = 0x3A;                      // Textnachricht
+    buf[1] = 0x44; buf[2] = 0x33; buf[3] = 0x22; buf[4] = 0x11;   // msg_id
+    buf[5] = 0x03;                      // max_hop
+    memcpy(buf + 6, "DK5EN-90>*:", 11); // Quellpfad, Ziel, payload_type
+    // ab hier bis 339 nur 'A' -- kein 0x00, also laeuft die Schleife bis rsize
+    const uint16_t rsize = 340;         // exakt MAX_APRS_FRAME_SIZE
+
+    struct aprsMessage m;
+    initAPRS(m, ':');
+    decodeAPRS(buf, rsize, m);
+
+    // Die Nutzlast darf nie laenger sein als ihr Feld -- und das Feld ist die
+    // tatsaechliche Schranke des Zwischenpuffers.
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) < sizeof(m.msg_payload),
+                             "msg_payload ist nicht terminiert oder zu lang");
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) <= (size_t)UDP_TX_BUF_SIZE - 1,
+                             "die Nutzlast-Schleife hat ueber cConcat1 hinaus geschrieben");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -331,5 +368,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_v_und_y_lesen_oktal_wie_scanf_i);
     RUN_TEST(test_d_tags_leiten_keine_basis_ab);
     RUN_TEST(test_alle_tags_in_encoder_reihenfolge);
+    RUN_TEST(test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht);
     return UNITY_END();
 }

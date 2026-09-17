@@ -142,12 +142,12 @@ static void canonical(char *out, size_t outsz, uint16_t rc, const struct aprsMes
              "srccall=%s srclast=%s pathcnt=%d",
              (unsigned)rc, m.msg_id, (unsigned)(m.max_hop & 0x0F),
              (int)m.msg_server, (int)m.msg_mesh, (int)m.msg_track, (int)m.msg_app_offline,
-             m.msg_source_path.c_str(), m.msg_destination_path.c_str(),
-             m.msg_destination_call.c_str(), m.msg_payload.c_str(),
+             m.msg_source_path, m.msg_destination_path,
+             m.msg_destination_call, m.msg_payload,
              m.msg_fcs, (unsigned)m.msg_source_hw, (unsigned)m.msg_source_mod,
              (unsigned)m.msg_source_fw_version, (unsigned)m.msg_last_hw,
              (unsigned)m.msg_len,
-             m.msg_source_call.c_str(), m.msg_source_last.c_str(),
+             m.msg_source_call, m.msg_source_last,
              (int)m.msg_last_path_cnt);
 }
 
@@ -204,8 +204,8 @@ static void checkFrame(const char *name, const char *hex)
              name, (unsigned)m.msg_len, (unsigned)rsize);
     TEST_ASSERT_LESS_OR_EQUAL_MESSAGE(rsize, m.msg_len, msg);
 
-    size_t fields = m.msg_source_path.length() + m.msg_destination_path.length()
-                  + m.msg_payload.length();
+    size_t fields = strlen(m.msg_source_path) + strlen(m.msg_destination_path)
+                  + strlen(m.msg_payload);
     snprintf(msg, sizeof(msg), "%s: Feldsumme %zu > rsize=%u", name, fields, (unsigned)rsize);
     TEST_ASSERT_LESS_OR_EQUAL_MESSAGE((size_t)rsize, fields, msg);
 }

@@ -1,6 +1,7 @@
 // SPI and the W5100S driver are what nrf_eth.h's IPAddress comes from -- the
 // Ethernet library defines it, not the Adafruit core. Included for the type
 // only; this file touches no driver call.
+#include "mc_text.h"
 #include <SPI.h>
 #include <RAK13800_W5100S.h>
 #include <Arduino.h>
@@ -41,8 +42,8 @@ extern String strSource_call;
  */
 int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip)
 {
-  char source_call[20] = {0};
-  char destination_call[20] = {0};
+  char source_call[MC_CALL_LEN_Z] = {0};
+  char destination_call[MC_CALL_LEN_Z] = {0};
 
   // an extra buffer for udp tx, as we add other stuff (ID, RSSI, SNR, MODE)
   uint8_t convBuffer[UDP_TX_BUF_SIZE+5];
@@ -127,11 +128,11 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           bool bUDPtoLoraSend = true;
 
-          snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call.c_str());
-          snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call.c_str());
+          snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call);
+          snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);
 
-          aprsmsg.msg_source_path.concat(',');
-          aprsmsg.msg_source_path.concat(meshcom_settings.node_call);
+          mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
+          mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
 
           aprsmsg.msg_server = true;
 
@@ -140,7 +141,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           if(bDEBUG)
           {
-            printfdeb("RX-UDP Source-Path:%s\n",  aprsmsg.msg_source_path.c_str());
+            printfdeb("RX-UDP Source-Path:%s\n",  aprsmsg.msg_source_path);
           }
 
 
@@ -166,9 +167,9 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
             const char *gwRxType = "DATA";
             if(msg_type_b == 0x3A)
             {
-              if(memcmp(aprsmsg.msg_payload.c_str(), "{SET}", 5) == 0)
+              if(memcmp(aprsmsg.msg_payload, "{SET}", 5) == 0)
                 gwRxType = "SET";
-              else if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}", 5) == 0)
+              else if(memcmp(aprsmsg.msg_payload, "{CET}", 5) == 0)
                 gwRxType = "CET";
             }
             // DATA (a relayed mesh frame) is high-rate on a busy gateway: only with --udplog
@@ -178,12 +179,12 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           if(msg_type_b == 0x3A)
           {
-            if(memcmp(aprsmsg.msg_payload.c_str(), "{SET}", 5) == 0)
+            if(memcmp(aprsmsg.msg_payload, "{SET}", 5) == 0)
             {
                 sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
             }
             else
-            if(memcmp(aprsmsg.msg_payload.c_str(), "{CET}", 5) == 0)
+            if(memcmp(aprsmsg.msg_payload, "{CET}", 5) == 0)
             {
                 sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
             }
@@ -196,9 +197,9 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                 unsigned int iAckId = 0;
 
-                int iAckPos=aprsmsg.msg_payload.indexOf(":ack");
-                int iRefPos=aprsmsg.msg_payload.indexOf(":rej");
-                int iEnqPos=aprsmsg.msg_payload.indexOf("{", 1);
+                int iAckPos=mcIndexOfStr(aprsmsg.msg_payload, ":ack");
+                int iRefPos=mcIndexOfStr(aprsmsg.msg_payload, ":rej");
+                int iEnqPos=mcIndexOfStrFrom(aprsmsg.msg_payload, "{", 1);
 
                 if(strcmp(destination_call, "*") == 0)
                 {
@@ -209,7 +210,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 
                 if(iAckPos > 0 || iRefPos > 0)
                 {
-                    unsigned int iAckId = (aprsmsg.msg_payload.substring(iAckPos+4)).toInt();
+                    unsigned int iAckId = (unsigned int)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iAckPos+4), strlen(aprsmsg.msg_payload));
                     msg_counter = ((_GW_ID & 0x3FFFFF) << 10) | (iAckId & 0x3FF);
 
                     uint8_t print_buff[30];
@@ -249,8 +250,8 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                 if(iEnqPos > 0)
                 {
-                  iAckId = (aprsmsg.msg_payload.substring(iEnqPos+1)).toInt();
-                  aprsmsg.msg_payload = aprsmsg.msg_payload.substring(0, iEnqPos);
+                  iAckId = (unsigned int)mcSliceToLong(aprsmsg.msg_payload, (size_t)(iEnqPos+1), strlen(aprsmsg.msg_payload));
+                  mcTruncate(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), (size_t)(iEnqPos));
                 }
 
                 if(iAckPos <= 0)
@@ -312,7 +313,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 {
                     char buf[96];
                     setlogFormatGwi(buf, sizeof(buf), aprsmsg.msg_id, aprsmsg.payload_type,
-                                     aprsmsg.max_hop & 0x0F, aprsmsg.msg_source_call.c_str(), (uint32_t)millis());
+                                     aprsmsg.max_hop & 0x0F, aprsmsg.msg_source_call, (uint32_t)millis());
                     setlogPrint(buf);
                 }
 

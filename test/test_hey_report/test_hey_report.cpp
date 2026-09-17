@@ -9,6 +9,7 @@
 //
 //   pio test -e native_aprs -f test_hey_report
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <string.h>
@@ -35,11 +36,11 @@ static void test_report_format(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R0;";
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R0;");
 
     appendHeySignalReport(m, -118, 7, 5);
 
-    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", m.msg_payload);
 }
 
 // Negativer SNR bleibt vorzeichenbehaftet
@@ -47,11 +48,11 @@ static void test_report_negativer_snr(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R2;";
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R2;");
 
     appendHeySignalReport(m, -95, -3, 0);
 
-    TEST_ASSERT_EQUAL_STRING("R2;0,95,-3;", m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("R2;0,95,-3;", m.msg_payload);
 }
 
 // Mehrere Hops haengen ihre Reports hintereinander (Kette bleibt lesbar)
@@ -59,12 +60,12 @@ static void test_report_kette(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R0;";
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R0;");
 
     appendHeySignalReport(m, -118, 7, 5);
     appendHeySignalReport(m, -95, -1, 2);
 
-    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;2,95,-1;", m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;2,95,-1;", m.msg_payload);
 }
 
 // Der angereicherte Report ueberlebt encode -> decode (Wire-Roundtrip),
@@ -74,10 +75,10 @@ static void test_report_roundtrip(void)
     struct aprsMessage m;
     initAPRS(m, '@');
     m.msg_id = 0x11223344;
-    m.msg_source_path = "DK5EN-90";
-    m.msg_destination_path = "HG";
-    m.msg_destination_call = "HG";
-    m.msg_payload = "R0;";
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), "DK5EN-90");
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "HG");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "HG");
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R0;");
 
     appendHeySignalReport(m, -118, 7, 5);
 
@@ -89,9 +90,9 @@ static void test_report_roundtrip(void)
     initAPRS(d, 0x00);
     uint16_t t = decodeAPRS(buf, len, d);
     TEST_ASSERT_EQUAL_UINT16('@', t);
-    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", d.msg_payload.c_str());
-    TEST_ASSERT_EQUAL_STRING("DK5EN-90", d.msg_source_call.c_str());
-    TEST_ASSERT_EQUAL_STRING("HG", d.msg_destination_call.c_str());
+    TEST_ASSERT_EQUAL_STRING("R0;5,118,7;", d.msg_payload);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", d.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("HG", d.msg_destination_call);
 }
 
 // ---- Laengenschranke HEY_PATH_PAYLOAD_MAX ---------------------------------
@@ -107,15 +108,15 @@ static void test_report_volle_hoptiefe_bleibt_unangetastet(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R80;";
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R80;");
 
     // unguenstigste regulaere Gruppe: "80,128,-128;" (12 Zeichen)
     for(int hop = 0; hop < MAX_HOP_LIMIT; hop++)
         appendHeySignalReport(m, -128, -128, 80);
 
     // 4 + 7*12 = 88 Zeichen, alle sieben Gruppen sind angehaengt
-    TEST_ASSERT_EQUAL_size_t(4u + (size_t)MAX_HOP_LIMIT * 12u, m.msg_payload.length());
-    TEST_ASSERT_TRUE(m.msg_payload.length() <= HEY_PATH_PAYLOAD_MAX);
+    TEST_ASSERT_EQUAL_size_t(4u + (size_t)MAX_HOP_LIMIT * 12u, strlen(m.msg_payload));
+    TEST_ASSERT_TRUE(strlen(m.msg_payload) <= HEY_PATH_PAYLOAD_MAX);
 }
 
 // Direkt unterhalb der Schranke wird noch angehaengt.
@@ -123,14 +124,14 @@ static void test_report_schranke_untere_kante(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = String('x', 0);
-    while(m.msg_payload.length() < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX))
-        m.msg_payload.concat('x');
+    m.msg_payload[0] = 0;   // war String('x', 0) -- gemeint war: leer anfangen
+    while(strlen(m.msg_payload) < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX))
+        mcAppendChar(m.msg_payload, sizeof(m.msg_payload), 'x');
 
-    const unsigned before = m.msg_payload.length();
+    const unsigned before = strlen(m.msg_payload);
     appendHeySignalReport(m, -95, -3, 0);
 
-    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() > before,
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) > before,
                              "genau an der Kante muss noch angehaengt werden");
 }
 
@@ -140,14 +141,14 @@ static void test_report_schranke_kappt_nicht_sondern_beendet(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R80;";
-    while(m.msg_payload.length() < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX + 1))
-        m.msg_payload.concat('x');
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R80;");
+    while(strlen(m.msg_payload) < (unsigned)(HEY_PATH_PAYLOAD_MAX - HEY_REPORT_GROUP_MAX + 1))
+        mcAppendChar(m.msg_payload, sizeof(m.msg_payload), 'x');
 
     const String before = m.msg_payload;
     appendHeySignalReport(m, -95, -3, 0);
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(before.c_str(), m.msg_payload.c_str(),
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(before.c_str(), m.msg_payload,
                                      "ueber der Schranke darf nichts angehaengt und nichts gekappt werden");
 }
 
@@ -157,12 +158,12 @@ static void test_report_bleibt_beschraenkt(void)
 {
     struct aprsMessage m;
     initAPRS(m, '@');
-    m.msg_payload = "R80;";
+    mcSet(m.msg_payload, sizeof(m.msg_payload), "R80;");
 
     for(int i = 0; i < 50; i++)
         appendHeySignalReport(m, -128, -128, 80);
 
-    TEST_ASSERT_TRUE_MESSAGE(m.msg_payload.length() <= HEY_PATH_PAYLOAD_MAX,
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) <= HEY_PATH_PAYLOAD_MAX,
                              "Nutzlast muss unter HEY_PATH_PAYLOAD_MAX bleiben");
 }
 

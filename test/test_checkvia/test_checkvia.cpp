@@ -18,6 +18,7 @@
 //
 //   pio test -e native_parsers -f test_checkvia
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <Arduino.h>
@@ -73,12 +74,12 @@ static void test_bvia_aus_bleibt_unveraendert(void)
     strncpy(meshcom_settings.node_via, "DB0ABC-1", sizeof(meshcom_settings.node_via) - 1);
 
     struct aprsMessage m;
-    m.msg_destination_path = "*";
-    m.msg_destination_call = "*";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "*");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "*");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path);
 }
 
 // bVIA==true, node_via leer: der einzige noch aktive Zweig braucht
@@ -92,12 +93,12 @@ static void test_bvia_an_node_via_leer_bleibt_unveraendert(void)
     // node_via bleibt leer (setUp())
 
     struct aprsMessage m;
-    m.msg_destination_path = "*";
-    m.msg_destination_call = "*";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "*");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "*");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path);
 }
 
 // Derselbe Fall, aber bGATEWAY==true -- macht keinen Unterschied: der
@@ -108,12 +109,12 @@ static void test_bvia_an_node_via_leer_bgateway_macht_keinen_unterschied(void)
     bGATEWAY = true;
 
     struct aprsMessage m;
-    m.msg_destination_path = "*";
-    m.msg_destination_call = "*";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "*");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "*");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path);
 }
 
 // bVIA==true, node_via gesetzt, Zielrufzeichen OHNE SSID: Pfad wird komplett
@@ -124,12 +125,12 @@ static void test_node_via_gesetzt_ziel_ohne_ssid(void)
     strncpy(meshcom_settings.node_via, "DB0ABC-1", sizeof(meshcom_settings.node_via) - 1);
 
     struct aprsMessage m;
-    m.msg_destination_path = "*";   // muss komplett ueberschrieben werden
-    m.msg_destination_call = "*";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "*");   // muss komplett ueberschrieben werden
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "*");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,*", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,*", m.msg_destination_path);
 }
 
 // bVIA==true, node_via gesetzt, Zielrufzeichen MIT SSID.
@@ -139,12 +140,12 @@ static void test_node_via_gesetzt_ziel_mit_ssid(void)
     strncpy(meshcom_settings.node_via, "DB0ABC-1", sizeof(meshcom_settings.node_via) - 1);
 
     struct aprsMessage m;
-    m.msg_destination_path = "irrelevant-vorher";
-    m.msg_destination_call = "OE1KBC-7";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "irrelevant-vorher");
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "OE1KBC-7");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,OE1KBC-7", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,OE1KBC-7", m.msg_destination_path);
 }
 
 // Pfadkonstruktion: genau EIN Komma, keine Leerzeichen, node_via zuerst --
@@ -157,12 +158,12 @@ static void test_pfadkonstruktion_genau_ein_komma(void)
     strncpy(meshcom_settings.node_via, "OE1XAR-1", sizeof(meshcom_settings.node_via) - 1);
 
     struct aprsMessage m;
-    m.msg_destination_path = "";
-    m.msg_destination_call = "DL2JA-2";
+    m.msg_destination_path[0] = 0;
+    mcSet(m.msg_destination_call, sizeof(m.msg_destination_call), "DL2JA-2");
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("OE1XAR-1,DL2JA-2", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("OE1XAR-1,DL2JA-2", m.msg_destination_path);
     TEST_ASSERT_EQUAL_INT(1, countCommas(m.msg_destination_path));
 }
 
@@ -176,12 +177,12 @@ static void test_leeres_zielrufzeichen_erzeugt_trailing_komma(void)
     strncpy(meshcom_settings.node_via, "DB0ABC-1", sizeof(meshcom_settings.node_via) - 1);
 
     struct aprsMessage m;
-    m.msg_destination_path = "*";
-    m.msg_destination_call = "";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "*");
+    m.msg_destination_call[0] = 0;
 
     checkVia(m);
 
-    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,", m.msg_destination_path.c_str());
+    TEST_ASSERT_EQUAL_STRING("DB0ABC-1,", m.msg_destination_path);
 }
 
 int main(int argc, char **argv)

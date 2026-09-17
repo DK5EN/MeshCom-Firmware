@@ -35,6 +35,7 @@
 // difference explicit and failing-on-change, so that a unification wave that
 // alters one of them has to say so.
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -269,11 +270,11 @@ void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage,
     (void)tail;
     std::string s(msg_source ? msg_source : "");
     s += "|";
-    s += aprsMessage.msg_source_call.c_str();
+    s += aprsMessage.msg_source_call;
     g_printed.push_back(s);
-    g_payload.push_back(aprsMessage.msg_payload.c_str());
+    g_payload.push_back(aprsMessage.msg_payload);
     g_decoded_len.push_back((int)aprsMessage.msg_len);
-    log_sink("PRINT", s + "|" + aprsMessage.msg_payload.c_str());
+    log_sink("PRINT", s + "|" + aprsMessage.msg_payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,9 +299,9 @@ static uint16_t build_frame(uint8_t *out, const char *src, const char *text)
     m.msg_id = 0x4711;
     m.max_hop = 3;
     m.msg_server = true;
-    m.msg_source_path = String(src);
-    m.msg_destination_path = String("9");
-    m.msg_payload = String(text);
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), src);
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "9");   // Bench-Gruppe 9, nie "*"
+    mcSet(m.msg_payload, sizeof(m.msg_payload), text);
     m.msg_source_hw = 9;
     m.msg_source_mod = 0x88;
     m.msg_source_fw_version = 35;

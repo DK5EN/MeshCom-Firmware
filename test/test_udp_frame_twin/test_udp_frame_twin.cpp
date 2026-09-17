@@ -32,6 +32,7 @@
 // save_settings() -- read the drift note on it there before touching either
 // handler's call site.
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -233,7 +234,7 @@ void logRxDropUnconfigured(const char *call)
 void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage, const char *tail)
 {
     PrintedAprs p;
-    p.source = aprsMessage.msg_source_call.c_str();
+    p.source = aprsMessage.msg_source_call;
     p.tail = tail ? tail : "";
     (void)msg_source;
     g_printed.push_back(p);
@@ -354,9 +355,9 @@ static uint16_t build_frame(uint8_t *out, const char *src, const char *dest,
     m.msg_id = msg_id;
     m.max_hop = 3;
     m.msg_server = true;
-    m.msg_source_path = String(src);
-    m.msg_destination_path = String(dest);
-    m.msg_payload = String(payload);
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), src);
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), dest);
+    mcSet(m.msg_payload, sizeof(m.msg_payload), payload);
     return encodeAPRS(out, m);
 }
 

@@ -29,6 +29,7 @@
 //
 //   pio test -e native_aprs_fuzz -f test_aprs_reencode
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -127,9 +128,9 @@ static uint16_t reencode(const Vector &v, bool app_offline, unsigned &fcs_out)
     m.msg_track               = v.trk != 0;
     m.msg_app_offline         = app_offline;
     m.msg_mesh                = v.mesh != 0;
-    m.msg_source_path         = v.src;
-    m.msg_destination_path    = v.dst;
-    m.msg_payload             = v.payload;
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), v.src.c_str());
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), v.dst.c_str());
+    mcSet(m.msg_payload, sizeof(m.msg_payload), v.payload.c_str());
     m.msg_source_hw           = (uint8_t)v.hw;
     m.msg_source_mod          = (uint8_t)v.mod;
     m.msg_source_fw_version   = (uint8_t)v.fw;

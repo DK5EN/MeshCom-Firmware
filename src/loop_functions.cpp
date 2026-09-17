@@ -1,3 +1,4 @@
+#include "mc_text.h"
 #include "Arduino.h"
 
 #include <atomic>
@@ -720,10 +721,10 @@ void addBLECommandBack(char text[UDP_TX_BUF_SIZE])
     aprsmsg.msg_len = 0;
     aprsmsg.payload_type = ':';
     aprsmsg.msg_id = millis();
-    aprsmsg.msg_destination_path="*";
-    aprsmsg.msg_destination_call="*";
-    aprsmsg.msg_source_path="response";
-    aprsmsg.msg_payload=text;
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "*");
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "*");
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), "response");
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), text);
 
     aprsmsg.msg_app_offline = true; // Rückmeldungen niemals annoucen
 
@@ -2246,16 +2247,24 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     char cdur[30];
     char cmsg[30];
 
-    if(aprsmsg.msg_payload.startsWith("{ping}") > 0)
+    if(mcStartsWith(aprsmsg.msg_payload, "{ping}") > 0)
     {
         return;
     }
     else
-    if(aprsmsg.msg_payload.startsWith("{pong}") > 0)
+    if(mcStartsWith(aprsmsg.msg_payload, "{pong}") > 0)
     {
-        printfdeb("[PONG] from:%s <%s> rssi:%i snr:%i\n", aprsmsg.msg_source_call.c_str(), aprsmsg.msg_payload.substring(14,17).c_str(), rssi, snr);
+        // R2-04: war msg_payload.substring(14,17). substring() KLEMMT, wenn die
+        // Zeichenkette kuerzer als 14 ist, und liefert "". Ein blankes
+        // `msg_payload + 14` tut das nicht -- die Wache oben prueft nur das
+        // Praefix "{pong}" (6 Zeichen), eine genau so lange Nutzlast wuerde also
+        // hinter dem Terminator weiterlesen. Innerhalb des Feldes, aber
+        // uninitialisiert: statt nichts stuende dort Muell. Die Klemmung bleibt.
+        const char *cPongId = (strlen(aprsmsg.msg_payload) > 14) ? aprsmsg.msg_payload + 14 : "";
 
-        snprintf(cmsg, sizeof(cmsg), "PONG %s", aprsmsg.msg_payload.substring(14,17).c_str());
+        printfdeb("[PONG] from:%s <%.3s> rssi:%i snr:%i\n", aprsmsg.msg_source_call, cPongId, rssi, snr);
+
+        snprintf(cmsg, sizeof(cmsg), "PONG %.3s", cPongId);
         snprintf(cset, sizeof(cset), "R:%i S:%i", rssi, snr);
 
         meshcom_settings.node_pingduration = millis() - meshcom_settings.node_pingduration;
@@ -2263,7 +2272,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         fdur=fdur/1000;
         snprintf(cdur, sizeof(cdur), "D:%.3f s", fdur);
 
-        DisplayPong((char*)cmsg, (char*)aprsmsg.msg_source_call.c_str(), (char*)cset, (char*)cdur);
+        DisplayPong((char*)cmsg, (char*)aprsmsg.msg_source_call, (char*)cset, (char*)cdur);
 
         // text immer meshcom_settings.node_pingtime stehenlassen und Display immer ON
         DisplayOffWait = millis() + (meshcom_settings.node_pingtime * 1000);
@@ -2272,11 +2281,15 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         return;
     }
     else
-    if(aprsmsg.msg_payload.startsWith("{MCP}") || aprsmsg.msg_payload.startsWith("{mcp}"))
+    if(mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{mcp}"))
     {
         memset(cset, 0x00, sizeof(cset));
 
-        snprintf(cset, sizeof(cset), "%s", aprsmsg.msg_payload.c_str());
+        // R2-04: Praezision statt blankem %s. Gekuerzt wurde hier immer schon
+        // (snprintf ist auf sizeof(cset) begrenzt); mit fester Feldbreite
+        // sieht GCC es nun und verlangt, dass es dasteht. Gelesen werden
+        // ohnehin nur die Bytes 12..16 (cpasswd unten).
+        snprintf(cset, sizeof(cset), "%.*s", (int)sizeof(cset) - 1, aprsmsg.msg_payload);
         char cpasswd[6];
         memcpy(cpasswd, cset+5+2+2+3, 5);
 
@@ -2350,10 +2363,14 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         return;
     }
     else
-    if(aprsmsg.msg_payload.startsWith("{SET}") > 0)
+    if(mcStartsWith(aprsmsg.msg_payload, "{SET}") > 0)
     {
         char cset[30];
-        snprintf(cset, sizeof(cset), "%s", aprsmsg.msg_payload.c_str());
+        // R2-04: Praezision statt blankem %s. Gekuerzt wurde hier immer schon
+        // (snprintf ist auf sizeof(cset) begrenzt); mit fester Feldbreite
+        // sieht GCC es nun und verlangt, dass es dasteht. Gelesen werden
+        // ohnehin nur die Bytes 12..16 (cpasswd unten).
+        snprintf(cset, sizeof(cset), "%.*s", (int)sizeof(cset) - 1, aprsmsg.msg_payload);
 
         // Ohne Bereichspruefung landete ein Tippfehler wie {SET}44;2; direkt im
         // Hop-Feld der ausgesendeten Pakete. Byte 5 einer ACK fuehrt max_hop in
@@ -2379,7 +2396,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         return;
     }
     else
-    if(aprsmsg.msg_payload.startsWith("{CET}") > 0)
+    if(mcStartsWith(aprsmsg.msg_payload, "{CET}") > 0)
     {
         // CET Meldungen nur annehmen wenn nichr GPS, RTC oder Handyverbindung vorhanden ist
         if(!bRTCON && !posinfo_fix && !bNTPDateTimeValid) // !!!! erst aktivieren wenn PHone regelmässig zeit liefert  && !bPhoneTimeValid)
@@ -2392,13 +2409,13 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
             uint16_t Second=0;
 
             // {CET}2025-01-31 07:47:40
-            Year = (uint16_t)aprsmsg.msg_payload.substring(5, 9).toInt();
-            Month = (uint16_t)aprsmsg.msg_payload.substring(10, 12).toInt();
-            Day = (uint16_t)aprsmsg.msg_payload.substring(13, 15).toInt();
+            Year = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 5, 9);
+            Month = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 10, 12);
+            Day = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 13, 15);
 
-            Hour = (uint16_t)aprsmsg.msg_payload.substring(16, 18).toInt();
-            Minute = (uint16_t)aprsmsg.msg_payload.substring(19, 21).toInt();
-            Second = (uint16_t)aprsmsg.msg_payload.substring(22, 24).toInt();
+            Hour = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 16, 18);
+            Minute = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 19, 21);
+            Second = (uint16_t)mcSliceToLong(aprsmsg.msg_payload, 22, 24);
 
             if(Year > 2023)
             {
@@ -2410,7 +2427,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         return;
     }
     else
-    if(aprsmsg.msg_destination_call.compareTo("100001") == 0 && !bSOFTSERREAD)
+    if(strcmp(aprsmsg.msg_destination_call, "100001") == 0 && !bSOFTSERREAD)
     {
         return;
     }
@@ -2477,20 +2494,20 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
     #elif defined (BOARD_T_DECK_PRO)
 
-        String strPath = "M * <" + aprsmsg.msg_source_call + ">";
+        String strPath = String("M * <") + aprsmsg.msg_source_call + ">";
         
         // DM
         if(CheckGroup(aprsmsg.msg_destination_call))
         {
-            strPath = "GM " + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
+            strPath = String("GM ") + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
         }
         else
-            if(aprsmsg.msg_destination_call != "*")
+            if(strcmp(aprsmsg.msg_destination_call, "*") != 0)
             {
-                strPath = "DM <" + aprsmsg.msg_source_call + ">";
+                strPath = String("DM <") + aprsmsg.msg_source_call + ">";
             }
 
-        String strAscii = utf8ascii(aprsmsg.msg_payload);
+        String strAscii = utf8ascii(String(aprsmsg.msg_payload));
 
         TDeck_pro_lora_disp(strPath, strAscii);
 
@@ -2512,16 +2529,16 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     epaper_display.setCursor(0, dzeile[1]);
     epaper_display.setFont(WP_FONT9);
 
-    String strPath = "M* <" + aprsmsg.msg_source_call + ">";
+    String strPath = String("M* <") + aprsmsg.msg_source_call + ">";
     // DM
     if(CheckGroup(aprsmsg.msg_destination_call))
     {
-        strPath = "GM" + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
+        strPath = String("GM") + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
     }
     else
-        if(aprsmsg.msg_destination_call != "*")
+        if(strcmp(aprsmsg.msg_destination_call, "*") != 0)
         {
-            strPath = "DM <" + aprsmsg.msg_source_call + ">";
+            strPath = String("DM <") + aprsmsg.msg_source_call + ">";
         }
 
     #ifdef BOARD_T_ECHO
@@ -2540,7 +2557,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
     String strAscii = "";//aprsmsg.msg_payload;
 
-    strAscii = utf8ascii(aprsmsg.msg_payload);
+    strAscii = utf8ascii(String(aprsmsg.msg_payload));
 
     #if defined(WP_DISP)
     // Nachrichtentext mit kompakter Schrift (enger Zeilenabstand 15 statt 22) -> bis zu 160
@@ -2569,16 +2586,16 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     sendDisplayMainline();
     sendDisplay1306(false, true, 0, dzeile[0], (char*)"#F");    // not fastmode for CET display
 
-    String strPath = "M* <" + aprsmsg.msg_source_call + ">";
+    String strPath = String("M* <") + aprsmsg.msg_source_call + ">";
     // DM
     if(CheckGroup(aprsmsg.msg_destination_call))
     {
-        strPath = "GM" + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
+        strPath = String("GM") + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
     }
     else
-        if(aprsmsg.msg_destination_call != "*")
+        if(strcmp(aprsmsg.msg_destination_call, "*") != 0)
         {
-            strPath = "DM <" + aprsmsg.msg_source_call + ">";
+            strPath = String("DM <") + aprsmsg.msg_source_call + ">";
         }
 
     #if defined(BOARD_T_CONNECT_PRO)
@@ -2594,7 +2611,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
     String strAscii = "";//aprsmsg.msg_payload;
 
-    strAscii = utf8ascii(aprsmsg.msg_payload);
+    strAscii = utf8ascii(String(aprsmsg.msg_payload));
 
     strncpy(pageLastTextLong1[pagePointer], strPath.c_str(), sizeof(pageLastTextLong1[pagePointer]) - 1);
     pageLastTextLong1[pagePointer][sizeof(pageLastTextLong1[pagePointer]) - 1] = '\0';
@@ -2625,15 +2642,15 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     // DM
     if(CheckGroup(aprsmsg.msg_destination_call))
     {
-        strPath = "GM" + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
+        strPath = String("GM") + aprsmsg.msg_destination_call + " <" + aprsmsg.msg_source_call + ">";
     }
     else
-        if(aprsmsg.msg_destination_call != "*")
+        if(strcmp(aprsmsg.msg_destination_call, "*") != 0)
         {
-            strPath = "DM <" + aprsmsg.msg_source_call + ">";
+            strPath = String("DM <") + aprsmsg.msg_source_call + ">";
         }
 
-    if(aprsmsg.msg_source_path.length() < (20-5))
+    if(strlen(aprsmsg.msg_source_path) < (20-5))
         snprintf(msg_text, sizeof(msg_text), "%s <%i>", strPath.c_str(), rssi);
     else
         snprintf(msg_text, sizeof(msg_text), "%s", strPath.c_str());
@@ -2644,9 +2661,9 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     izeile++;
     bClear=false;
 
-    for(itxt=0; itxt<aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=0; itxt<strlen(aprsmsg.msg_payload); itxt++)
     {
-        words[iwords][ipos]=aprsmsg.msg_payload.charAt(itxt);
+        words[iwords][ipos]=aprsmsg.msg_payload[itxt];
 
         if(words[iwords][ipos] == ' ')
         {
@@ -2669,7 +2686,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
             iwords++;
             if(iwords >= 100)
                 iwords=99;
-            words[iwords][0]=aprsmsg.msg_payload.charAt(itxt);
+            words[iwords][0]=aprsmsg.msg_payload[itxt];
             ipos=1;
         }
         else
@@ -2877,17 +2894,17 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     #endif
 
     #if defined(BOARD_T_ECHO)
-    snprintf(msg_text, sizeof(msg_text), "%s", aprsmsg.msg_source_call.c_str());
+    snprintf(msg_text, sizeof(msg_text), "%s", aprsmsg.msg_source_call);
     msg_text[20]=0x00;
     sendDisplay1306(false, false, 3, dzeile[izeile], msg_text);
     izeile=izeile+1;
 
-    snprintf(msg_text, sizeof(msg_text), " <>%s", aprsmsg.msg_source_last.c_str());
+    snprintf(msg_text, sizeof(msg_text), " <>%s", aprsmsg.msg_source_last);
     msg_text[20]=0x00;
     sendDisplay1306(false, false, 3, dzeile[izeile], msg_text);
     izeile=izeile+1;
     #else
-    snprintf(msg_text, sizeof(msg_text), "%s<>%s", aprsmsg.msg_source_call.c_str(), aprsmsg.msg_source_last.c_str());
+    snprintf(msg_text, sizeof(msg_text), "%s<>%s", aprsmsg.msg_source_call, aprsmsg.msg_source_last);
     msg_text[20]=0x00;
     sendDisplay1306(false, false, 3, dzeile[izeile], msg_text);
     izeile=izeile+1;
@@ -2898,16 +2915,16 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     memset(scan_text, 0x00, sizeof(scan_text));
     ipt=0;
 
-    for(itxt=0; itxt<aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=0; itxt<strlen(aprsmsg.msg_payload); itxt++)
     {
-        if((aprsmsg.msg_payload.charAt(itxt) == 'N' || aprsmsg.msg_payload.charAt(itxt) == 'S'))
+        if((aprsmsg.msg_payload[itxt] == 'N' || aprsmsg.msg_payload[itxt] == 'S'))
         {
             sscanf(scan_text, "%lf", &lat);
 
             #if defined(BOARD_T_ECHO)
-            snprintf(msg_text, sizeof(msg_text), "LAT: %s%c", scan_text, aprsmsg.msg_payload.charAt(itxt));
+            snprintf(msg_text, sizeof(msg_text), "LAT: %s%c", scan_text, aprsmsg.msg_payload[itxt]);
             #else
-            snprintf(msg_text, sizeof(msg_text), "LAT: %s%c%5ikm", scan_text, aprsmsg.msg_payload.charAt(itxt), dist_to);
+            snprintf(msg_text, sizeof(msg_text), "LAT: %s%c%5ikm", scan_text, aprsmsg.msg_payload[itxt], dist_to);
             #endif
             msg_text[20]=0x00;
             sendDisplay1306(false, false, 3, dzeile[izeile], msg_text);
@@ -2920,7 +2937,7 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         {
             if(ipt < sizeof(scan_text)-1)
             {
-                scan_text[ipt]=aprsmsg.msg_payload.charAt(itxt);
+                scan_text[ipt]=aprsmsg.msg_payload[itxt];
                 ipt++;
             }
         }
@@ -2929,9 +2946,9 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     memset(scan_text, 0x00, sizeof(scan_text));
     ipt=0;
 
-    for(itxt=istarttext; itxt<aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=istarttext; itxt<strlen(aprsmsg.msg_payload); itxt++)
     {
-        if((aprsmsg.msg_payload.charAt(itxt) == 'W' || aprsmsg.msg_payload.charAt(itxt) == 'E'))
+        if((aprsmsg.msg_payload[itxt] == 'W' || aprsmsg.msg_payload[itxt] == 'E'))
         {
             sscanf(scan_text, "%lf", &lon);
 
@@ -2945,9 +2962,9 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
             }
 
             #if defined(BOARD_T_ECHO)
-            snprintf(msg_text, sizeof(msg_text), "LON:%s%c", scan_text, aprsmsg.msg_payload.charAt(itxt));
+            snprintf(msg_text, sizeof(msg_text), "LON:%s%c", scan_text, aprsmsg.msg_payload[itxt]);
             #else
-            snprintf(msg_text, sizeof(msg_text), "LON:%s%c%5i%s", scan_text, aprsmsg.msg_payload.charAt(itxt), dir_to, cdir_to);
+            snprintf(msg_text, sizeof(msg_text), "LON:%s%c%5i%s", scan_text, aprsmsg.msg_payload[itxt], dir_to, cdir_to);
             #endif
             msg_text[20]=0x00;
             sendDisplay1306(false, false, 3, dzeile[izeile], msg_text);
@@ -2960,7 +2977,7 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
         {
             if(ipt < sizeof(scan_text)-1)
             {
-                scan_text[ipt]=aprsmsg.msg_payload.charAt(itxt);
+                scan_text[ipt]=aprsmsg.msg_payload[itxt];
                 ipt++;
             }
         }
@@ -2973,14 +2990,14 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     ipt=0;
 
     // check Batt
-    for(itxt=istarttext; itxt<aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=istarttext; itxt<strlen(aprsmsg.msg_payload); itxt++)
     {
-        if(aprsmsg.msg_payload.charAt(itxt) == '/' && aprsmsg.msg_payload.charAt(itxt+1) == 'B' && aprsmsg.msg_payload.charAt(itxt+2) == '=')
+        if(aprsmsg.msg_payload[itxt] == '/' && aprsmsg.msg_payload[itxt+1] == 'B' && aprsmsg.msg_payload[itxt+2] == '=')
         {
-            for(unsigned int id=itxt+3;id<aprsmsg.msg_payload.length();id++)
+            for(unsigned int id=itxt+3;id<strlen(aprsmsg.msg_payload);id++)
             {
                 // ENDE
-                if(aprsmsg.msg_payload.charAt(id) == '/' || aprsmsg.msg_payload.charAt(id) == ' ' || id == aprsmsg.msg_payload.length())
+                if(aprsmsg.msg_payload[id] == '/' || aprsmsg.msg_payload[id] == ' ' || id == strlen(aprsmsg.msg_payload))
                 {
                     sscanf(scan_text, "%d", &bat);
                     break;
@@ -2988,7 +3005,7 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
                 if(ipt < sizeof(scan_text)-1)
                 {
-                    scan_text[ipt]=aprsmsg.msg_payload.charAt(id);
+                    scan_text[ipt]=aprsmsg.msg_payload[id];
                     ipt++;
                 }
             }
@@ -3020,14 +3037,14 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
     #endif
 
-    for(itxt=istarttext; itxt<aprsmsg.msg_payload.length(); itxt++)
+    for(itxt=istarttext; itxt<strlen(aprsmsg.msg_payload); itxt++)
     {
-        if(aprsmsg.msg_payload.charAt(itxt) == '/' && aprsmsg.msg_payload.charAt(itxt+1) == 'A' && aprsmsg.msg_payload.charAt(itxt+2) == '=')
+        if(aprsmsg.msg_payload[itxt] == '/' && aprsmsg.msg_payload[itxt+1] == 'A' && aprsmsg.msg_payload[itxt+2] == '=')
         {
-            for(unsigned int id=itxt+3;id<aprsmsg.msg_payload.length();id++)
+            for(unsigned int id=itxt+3;id<strlen(aprsmsg.msg_payload);id++)
             {
                 // ENDE
-                if(aprsmsg.msg_payload.charAt(id) == '/' || aprsmsg.msg_payload.charAt(id) == ' ' || id == aprsmsg.msg_payload.length())
+                if(aprsmsg.msg_payload[id] == '/' || aprsmsg.msg_payload[id] == ' ' || id == strlen(aprsmsg.msg_payload))
                 {
                     sscanf(scan_text, "%d", &alt);
 
@@ -3065,7 +3082,7 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
                 if(ipt < sizeof(scan_text)-1)
                 {
-                    scan_text[ipt]=aprsmsg.msg_payload.charAt(id);
+                    scan_text[ipt]=aprsmsg.msg_payload[id];
                     ipt++;
                 }
             }
@@ -3244,19 +3261,24 @@ void setlogFillStat(struct setlogStatFields *f, uint32_t heap)
 
 void charBuffer_aprs(struct aprsMessage &aprsmsg)
 {
-    char internal_message[UDP_TX_BUF_SIZE];
+    // R2-04: war UDP_TX_BUF_SIZE (255). Quell- und Zielpfad sind je bis zu
+    // MC_PATH_LEN lang, dazu Zeitstempel, Kopfdaten und 60 Byte Nutzlast --
+    // zusammen mehr als 255. snprintf() hat das immer sauber gekuerzt, aber
+    // die Zeile ist eine DIAGNOSEausgabe: sie soll den Pfad zeigen, nicht ihn
+    // abschneiden. Der Puffer waechst auf den tatsaechlichen Groesstfall.
+    char internal_message[2 * MC_PATH_LEN + 128];
     
-    memset(internal_message, 0x00, UDP_TX_BUF_SIZE);
+    memset(internal_message, 0x00, sizeof(internal_message));
 
-    int ilpayload=aprsmsg.msg_payload.length();
+    int ilpayload=strlen(aprsmsg.msg_payload);
     if(ilpayload > 60)
         ilpayload=60;
 
-    snprintf(internal_message, sizeof(internal_message), "%s :%08X %1u %i%i%i %01X/%1u LH:%02X %s>%s %c%s",  getTimeString().c_str(),
+    snprintf(internal_message, sizeof(internal_message), "%s :%08X %1u %i%i%i %01X/%1u LH:%02X %s>%s %c%.*s",  getTimeString().c_str(),
         aprsmsg.msg_id, aprsmsg.max_hop,aprsmsg.msg_server, aprsmsg.msg_track, aprsmsg.msg_mesh, (aprsmsg.msg_source_mod>>4), (aprsmsg.msg_source_mod & 0xf), aprsmsg.msg_last_hw,
         //aprsmsg.msg_source_hw, aprsmsg.msg_fcs, aprsmsg.msg_source_fw_version, aprsmsg.msg_source_fw_sub_version, aprsmsg.msg_last_hw,
-        aprsmsg.msg_source_path.c_str(), aprsmsg.msg_destination_path.c_str(),
-        aprsmsg.payload_type, aprsmsg.msg_payload.substring(0, ilpayload).c_str());
+        aprsmsg.msg_source_path, aprsmsg.msg_destination_path,
+        aprsmsg.payload_type, (int)ilpayload, aprsmsg.msg_payload);
 
     
     internal_message[UDP_TX_BUF_SIZE-1]=0x00;
@@ -3269,7 +3291,7 @@ void charBuffer_aprs(struct aprsMessage &aprsmsg)
 void printBuffer_aprs(char *msgSource, struct aprsMessage &aprsmsg, const char *tail)
 {
     printfdeb("%s %s %03i %c x%08X H%02X S%i T%i M%02X %s>%s%c%s HW:%02i MOD:%01X/%01i FCS:%04X FW:%02i:%c LH:%02X%s\n", getTimeString().c_str(), msgSource, aprsmsg.msg_len, aprsmsg.payload_type, aprsmsg.msg_id, aprsmsg.max_hop,
-        aprsmsg.msg_server, aprsmsg.msg_track, aprsmsg.msg_mesh, aprsmsg.msg_source_path.c_str(), aprsmsg.msg_destination_path.c_str(), aprsmsg.payload_type, aprsmsg.msg_payload.c_str(),
+        aprsmsg.msg_server, aprsmsg.msg_track, aprsmsg.msg_mesh, aprsmsg.msg_source_path, aprsmsg.msg_destination_path, aprsmsg.payload_type, aprsmsg.msg_payload,
         aprsmsg.msg_source_hw, (aprsmsg.msg_source_mod>>4), (aprsmsg.msg_source_mod & 0xf), aprsmsg.msg_fcs, aprsmsg.msg_source_fw_version, aprsmsg.msg_source_fw_sub_version, aprsmsg.msg_last_hw, tail);
 }
 
@@ -3366,15 +3388,15 @@ void sendPing(char msg_call[10])
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
     
-    aprsmsg.msg_destination_call = msg_call;
-    aprsmsg.msg_destination_path = msg_call;
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), msg_call);
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), msg_call);
 
     memset(msg_text, 0x00, sizeof(msg_text));
     snprintf(msg_text, sizeof(msg_text), "{ping}");
 
-    aprsmsg.msg_payload = msg_text;
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), msg_text);
     
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -3434,15 +3456,15 @@ void SendPong(String msg_call, unsigned int msg_id)
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
     
-    aprsmsg.msg_destination_call = msg_call;
-    aprsmsg.msg_destination_path = msg_call;
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), msg_call.c_str());
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), msg_call.c_str());
 
     memset(msg_text, 0x00, sizeof(msg_text));
     snprintf(msg_text, sizeof(msg_text), "{pong}{%03i}", msg_id);
 
-    aprsmsg.msg_payload = msg_text;
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), msg_text);
     
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -4069,18 +4091,18 @@ int sendMessage(char *msg_text, int len)
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max in real only 0-999
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
-    aprsmsg.msg_destination_path = strDestinationCall;  //Later FW insert PATH from HEY! collecting
-    aprsmsg.msg_destination_call = strDestinationCall;  //Later FW insert PATH from HEY! collecting
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), strDestinationCall.c_str());  //Later FW insert PATH from HEY! collecting
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), strDestinationCall.c_str());  //Later FW insert PATH from HEY! collecting
 
-    aprsmsg.msg_payload = strMsg;
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), strMsg.c_str());
 
     // ACK add request only DM Calls
     if(bDM)
     {
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
-        aprsmsg.msg_payload = strMsg + "{" + String(cAckId);
+        snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "%s{%s", strMsg.c_str(), cAckId);
     }
 
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
@@ -4101,7 +4123,7 @@ int sendMessage(char *msg_text, int len)
     uint8_t user_msg_status;
     if (msg_buffer[0] == 0x3A) // only Messages
     {
-        if(aprsmsg.msg_payload.startsWith("{CET}") || aprsmsg.msg_payload.startsWith("{MCP}") || aprsmsg.msg_payload.startsWith("{SET}"))
+        if(mcStartsWith(aprsmsg.msg_payload, "{CET}") || mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
@@ -4166,7 +4188,7 @@ int sendMessage(char *msg_text, int len)
         if(bGATEWAY && meshcom_settings.node_hasIPaddress)
         {
             // set Info message send and Server reached, not on DM
-            if(!bDM && (aprsmsg.msg_destination_call == "*" || CheckGroup(strDestinationCall)))
+            if(!bDM && (strcmp(aprsmsg.msg_destination_call, "*") == 0 || CheckGroup(strDestinationCall)))
             {
                 uint8_t ack_buff[ACK_PHONE_MAX_LEN];
                 uint16_t plen = buildAckPhoneFrame(ack_buff, aprsmsg.msg_id, 0x01, meshcom_settings.node_call);
@@ -4182,7 +4204,7 @@ int sendMessage(char *msg_text, int len)
     #endif
 
     #if defined(BOARD_T_DECK_PRO)
-    String strCall="<"+aprsmsg.msg_source_call+"> "+aprsmsg.msg_destination_call;
+    String strCall=String("<")+aprsmsg.msg_source_call+"> "+aprsmsg.msg_destination_call;
     TDeck_pro_lora_disp(strCall, aprsmsg.msg_payload);
     #endif
 
@@ -4715,18 +4737,18 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
             if(intervall != POSINFO_INTERVAL)
                 aprsmsg.msg_track=true;
 
-            aprsmsg.msg_source_path = meshcom_settings.node_call;
+            mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
             
             if(strlen(meshcom_settings.node_lora_call) != 0 && strcmp(meshcom_settings.node_lora_call, "none") != 0)
             {
-                aprsmsg.msg_source_path = meshcom_settings.node_lora_call;
+                mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_lora_call);
             }
 
-            aprsmsg.msg_destination_path = "*";
-            aprsmsg.msg_destination_call = "*";
-            aprsmsg.msg_payload = PositionToAPRS(true, false, true, lat, lat_c, lon, lon_c, alt, press, hum, temp, temp2, gasres, co2, qfe, qnh);
+            mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "*");
+            mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "*");
+            mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), PositionToAPRS(true, false, true, lat, lat_c, lon, lon_c, alt, press, hum, temp, temp2, gasres, co2, qfe, qnh).c_str());
             
-            if(aprsmsg.msg_payload == "")
+            if(aprsmsg.msg_payload[0] == 0)
                 return;
 
             checkVia(aprsmsg);
@@ -4769,12 +4791,12 @@ void sendPosition(unsigned long uintervall, double lat, char lat_c, double lon, 
         if(intervall != POSINFO_INTERVAL)
             aprsmsg.msg_track=true;
 
-        aprsmsg.msg_source_path = meshcom_settings.node_call;
-        aprsmsg.msg_destination_path = "*";
-        aprsmsg.msg_destination_call = "*";
-        aprsmsg.msg_payload = PositionToAPRS(true, bsendTele, true, lat, lat_c, lon, lon_c, alt, press, hum, temp, temp2, gasres, co2, qfe, qnh);
+        mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+        mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "*");
+        mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "*");
+        mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), PositionToAPRS(true, bsendTele, true, lat, lat_c, lon, lon_c, alt, press, hum, temp, temp2, gasres, co2, qfe, qnh).c_str());
         
-        if(aprsmsg.msg_payload == "")
+        if(aprsmsg.msg_payload[0] == 0)
             return;
 
         finalizeAndSendAPRS(aprsmsg, msg_buffer);
@@ -4837,12 +4859,12 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
 
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
-    aprsmsg.msg_destination_path = "*";
-    aprsmsg.msg_destination_call = "*";
-    aprsmsg.msg_payload = PositionToAPRS(true, false, true, lat, lat_c, lon, lon_c, 0, 0, 0, 0, temp2, 0, 0, 0, 0);
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "*");
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "*");
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), PositionToAPRS(true, false, true, lat, lat_c, lon, lon_c, 0, 0, 0, 0, temp2, 0, 0, 0, 0).c_str());
     
-    if(aprsmsg.msg_payload == "")
+    if(aprsmsg.msg_payload[0] == 0)
         return;
 
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
@@ -4888,16 +4910,16 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;   // own Call
-    aprsmsg.msg_destination_path = dest_call;
-    aprsmsg.msg_destination_call = dest_call;
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);   // own Call
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), dest_call.c_str());
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), dest_call.c_str());
 
     char cackmsg[20];
     if(strcmp(dest_call.c_str(), "WLNK-1") == 0)
         snprintf(cackmsg, sizeof(cackmsg), "ack%04i", iAckId);
     else
         snprintf(cackmsg, sizeof(cackmsg), "%-9.9s:ack%03i", dest_call.c_str(), iAckId);
-    aprsmsg.msg_payload = cackmsg;
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), cackmsg);
 
     meshcom_settings.node_msgid = msgIdAdvance(meshcom_settings.node_msgid);
 
@@ -4952,7 +4974,7 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
     if(bGATEWAY && meshcom_settings.node_hasIPaddress)
     {
 		// UDP out
-        if(aprsmsg.msg_destination_call != meshcom_settings.node_call)
+        if(strcmp(aprsmsg.msg_destination_call, meshcom_settings.node_call) != 0)
         {
             addNodeData(msg_buffer, aprsmsg.msg_len, 0, 0);
         }
@@ -4976,16 +4998,16 @@ void sendHey()
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
     
     if(bGATEWAY)
-        aprsmsg.msg_destination_path = "HG";
+        mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "HG");
     else
-        aprsmsg.msg_destination_path = "H";
+        mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "H");
 
-    aprsmsg.msg_destination_call = aprsmsg.msg_destination_path;
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), aprsmsg.msg_destination_path);
 
-    aprsmsg.msg_payload = "R" + String(getMheardCount()) + ";";
+    snprintf(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), "R%d;", getMheardCount());
    
     finalizeAndSendAPRS(aprsmsg, msg_buffer);
 
@@ -5091,10 +5113,10 @@ void sendTelemetry(int ID)
     // MSG ID zusammen setzen    
     aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);   // MAC-address + 3FF = 1023 max rela only 0-999
     
-    aprsmsg.msg_source_path = meshcom_settings.node_call;
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
     
-    aprsmsg.msg_destination_call = "100001";
-    aprsmsg.msg_destination_path = "100001";
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "100001");
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "100001");
 
     if(iNextTelemetry == 0)
     {
@@ -5314,7 +5336,7 @@ void sendTelemetry(int ID)
 
     if(strlen(msg_text) > 0)
     {
-        aprsmsg.msg_payload = msg_text;
+        mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), msg_text);
         
         finalizeAndSendAPRS(aprsmsg, msg_buffer);
 

@@ -45,6 +45,7 @@
 //
 //   pio test -e native_aprs -f test_aprs_epilogue
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -138,9 +139,9 @@ static void buildMessage(struct aprsMessage &m, char msgType, uint32_t id,
     m.msg_id = id;
     m.max_hop = 4;
     m.msg_server = true;
-    m.msg_source_path = "DK5EN-90";
-    m.msg_destination_path = "9999";
-    m.msg_payload = payload;
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), "DK5EN-90");
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "9999");
+    mcSet(m.msg_payload, sizeof(m.msg_payload), payload);
     m.msg_source_hw = hw;
     m.msg_source_mod = mod;
     m.msg_source_fw_version = fw;
@@ -208,7 +209,7 @@ static void test_epilogue_fcs_von_hand(void)
 {
     struct aprsMessage m;
     buildMessage(m, ':', 0x00000001UL, "Hi", 0x09, 0x83, 35, 0x80 | 9, 'p');
-    m.msg_destination_path = "9999";
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), "9999");
 
     uint8_t enc[UDP_TX_BUF_SIZE] = {0};
     uint16_t enc_len = encodeAPRS(enc, m);
@@ -360,7 +361,7 @@ static void test_epilogue_kuerzester_frame(void)
     struct aprsMessage rx;
     initAPRS(rx, 0x00);
     TEST_ASSERT_EQUAL_HEX16(0x3A, decodeAPRS(buf, len, rx));
-    TEST_ASSERT_EQUAL_STRING("X", rx.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("X", rx.msg_payload);
 
     // The empty-payload boundary: encodeAPRS() returns 0, it does not write
     // a frame with an empty payload and a bare epilogue.
@@ -409,7 +410,7 @@ static void test_epilogue_max_laenge_trunkierung(void)
     char expect_payload[226];
     memset(expect_payload, 'A', 225);
     expect_payload[225] = '\0';
-    TEST_ASSERT_EQUAL_STRING(expect_payload, rx.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING(expect_payload, rx.msg_payload);
 }
 
 int main(int argc, char **argv)

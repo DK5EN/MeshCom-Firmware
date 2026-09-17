@@ -398,7 +398,7 @@ void displaySOFTSER(struct aprsMessage &aprsmsg)
         return;
     }
 
-    strSOFTSERAPP_ID = aprsmsg.msg_payload.substring(0, 9);
+    strSOFTSERAPP_ID = String(aprsmsg.msg_payload).substring(0, 9);
     strSOFTSERAPP_ID.trim();
 
     int iID = getSOFTSER_ID(strSOFTSERAPP_ID);
@@ -410,12 +410,12 @@ void displaySOFTSER(struct aprsMessage &aprsmsg)
     int impos=0;
     String sDecode="";
 
-    if(aprsmsg.msg_payload.charAt(10) == 'P')
+    if(aprsmsg.msg_payload[10] == 'P')
     {
         ipos=15;
         for(int icd=0; icd<5; icd++)
         {
-            sDecode = aprsmsg.msg_payload.substring(ipos);
+            sDecode = String(aprsmsg.msg_payload).substring(ipos);
             impos = sDecode.indexOf(',');
             if(impos >= 0)
             {
@@ -433,12 +433,12 @@ void displaySOFTSER(struct aprsMessage &aprsmsg)
         return;
     }
     else
-    if(aprsmsg.msg_payload.charAt(10) == 'U')
+    if(aprsmsg.msg_payload[10] == 'U')
     {
         ipos=15;
         for(int icd=0; icd<5; icd++)
         {
-            sDecode = aprsmsg.msg_payload.substring(ipos);
+            sDecode = String(aprsmsg.msg_payload).substring(ipos);
             impos = sDecode.indexOf(',');
             if(impos >= 0)
             {
@@ -456,15 +456,15 @@ void displaySOFTSER(struct aprsMessage &aprsmsg)
         return;
     }
     else
-    if(aprsmsg.msg_payload.charAt(10) == 'E')
+    if(aprsmsg.msg_payload[10] == 'E')
     {
         return;
     }
     else
-    if(aprsmsg.msg_payload.charAt(10) == 'B')
+    if(aprsmsg.msg_payload[10] == 'B')
     {
         ipos=23;
-        sDecode = aprsmsg.msg_payload.substring(ipos);
+        sDecode = String(aprsmsg.msg_payload).substring(ipos);
 
         setSOFTSER_SNAME(iID, sDecode);
 
@@ -472,14 +472,14 @@ void displaySOFTSER(struct aprsMessage &aprsmsg)
     }
     else
     // VALUES receiced
-    if(aprsmsg.msg_payload.charAt(10) == 'T')
+    if(aprsmsg.msg_payload[10] == 'T')
     {
         String strValue[12] = {""};
 
         ipos=16;
         for(int icd=0; icd<12; icd++)
         {
-            sDecode = aprsmsg.msg_payload.substring(ipos);
+            sDecode = String(aprsmsg.msg_payload).substring(ipos);
             impos = sDecode.indexOf(',');
             if(impos >= 0)
             {

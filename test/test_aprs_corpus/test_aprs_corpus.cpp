@@ -128,12 +128,12 @@ static void canonical(char *out, size_t outsz, uint16_t rc, const struct aprsMes
              "appoff=%d srccall=%s srclast=%s pathcnt=%d",
              (unsigned)rc, m.msg_id, (unsigned)(m.max_hop & 0x0F),
              (int)m.msg_server, (int)m.msg_mesh, (int)m.msg_track,
-             m.msg_source_path.c_str(), m.msg_destination_path.c_str(),
-             m.msg_destination_call.c_str(), m.msg_payload.c_str(),
+             m.msg_source_path, m.msg_destination_path,
+             m.msg_destination_call, m.msg_payload,
              m.msg_fcs, (unsigned)m.msg_source_hw, (unsigned)m.msg_source_mod,
              (unsigned)m.msg_source_fw_version, (unsigned)m.msg_last_hw,
-             (int)m.msg_app_offline, m.msg_source_call.c_str(),
-             m.msg_source_last.c_str(), (int)m.msg_last_path_cnt);
+             (int)m.msg_app_offline, m.msg_source_call,
+             m.msg_source_last, (int)m.msg_last_path_cnt);
 }
 
 // Reduzierte Zeile fuer den Roundtrip-Vergleich (Encoder erneuert FCS,
@@ -157,8 +157,8 @@ static void canonicalCore(char *out, size_t outsz, uint16_t rc, const struct apr
              "srcpath=%s dstpath=%s dstcall=%s payload=%s",
              (unsigned)rc, m.msg_id, (unsigned)(m.max_hop & 0x0F),
              (int)m.msg_server, (int)m.msg_track, (int)m.msg_app_offline,
-             m.msg_source_path.c_str(), m.msg_destination_path.c_str(),
-             m.msg_destination_call.c_str(), m.msg_payload.c_str());
+             m.msg_source_path, m.msg_destination_path,
+             m.msg_destination_call, m.msg_payload);
 }
 
 #define MAX_FRAMES   64

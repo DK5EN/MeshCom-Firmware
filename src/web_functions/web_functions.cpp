@@ -2,6 +2,7 @@
  *  @author      Ralph Weich (DD5RW)
  *  @date        2025-12-03
  */
+#include "mc_text.h"
 #include <Arduino.h>
 
 #include <configuration.h>
@@ -1898,14 +1899,14 @@ void sub_content_messages()
                 // {CET} time beacons sit in the ring for the phone app's clock
                 // sync; they are not operator traffic and would light the tab
                 // badges on every beacon, so the web list skips them
-                if (aprsmsg.msg_payload.indexOf(":ack") < 1 && !aprsmsg.msg_payload.startsWith("{CET}"))
+                if (mcIndexOfStr(aprsmsg.msg_payload, ":ack") < 1 && !mcStartsWith(aprsmsg.msg_payload, "{CET}"))
                 {
                     String msgtxt = aprsmsg.msg_payload;
                     if (bDEBUG)
-                        Serial.printf("aprsmsg.msg_source_call.c_str():%s, aprsmsg.msg_gateway_call.c_str():%s, aprsmsg.msg_destination_call.c_str():%s, aprsmsg.msg_payload.c_str():%s\n", aprsmsg.msg_source_call.c_str(), aprsmsg.msg_source_last.c_str(), aprsmsg.msg_destination_call.c_str(), aprsmsg.msg_payload.c_str());
+                        Serial.printf("aprsmsg.msg_source_call:%s, aprsmsg.msg_gateway_call:%s, aprsmsg.msg_destination_call:%s, aprsmsg.msg_payload:%s\n", aprsmsg.msg_source_call, aprsmsg.msg_source_last, aprsmsg.msg_destination_call, aprsmsg.msg_payload);
 
                     if (msgtxt.indexOf('{') > 0)
-                        msgtxt = aprsmsg.msg_payload.substring(0, msgtxt.indexOf('{'));
+                        msgtxt = String(aprsmsg.msg_payload).substring(0, msgtxt.indexOf('{'));
 
                     // WEB-03a: mesh-derived strings (payload, path, callsigns) are attacker-controlled -- escape before HTML output
                     String msgtxt_esc = htmlEscape(msgtxt);
@@ -1913,7 +1914,7 @@ void sub_content_messages()
                     String msg_destination_path_esc = htmlEscape(aprsmsg.msg_destination_path);
 
                     // own messages (source == us): the browser's DM tab keys on the destination call
-                    if (is_equ(meshcom_settings.node_call, aprsmsg.msg_source_call.c_str()))
+                    if (is_equ(meshcom_settings.node_call, aprsmsg.msg_source_call))
                     {
                         String dst_esc = htmlEscape(aprsmsg.msg_destination_call);
 
@@ -1931,13 +1932,13 @@ void sub_content_messages()
                     // a DM to us keys on the source call so the DM tab shows both directions
                     else
                     {
-                        bool isGroupDst = is_equ(aprsmsg.msg_destination_call.c_str(), "*");
-                        if (!isGroupDst && aprsmsg.msg_destination_call.length() > 0)
+                        bool isGroupDst = is_equ(aprsmsg.msg_destination_call, "*");
+                        if (!isGroupDst && strlen(aprsmsg.msg_destination_call) > 0)
                         {
                             isGroupDst = true;
-                            for (unsigned int ci = 0; ci < aprsmsg.msg_destination_call.length(); ci++)
+                            for (unsigned int ci = 0; ci < strlen(aprsmsg.msg_destination_call); ci++)
                             {
-                                if (!isDigit(aprsmsg.msg_destination_call.charAt(ci)))
+                                if (!isDigit(aprsmsg.msg_destination_call[ci]))
                                 {
                                     isGroupDst = false;
                                     break;

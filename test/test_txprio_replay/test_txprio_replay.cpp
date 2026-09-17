@@ -21,6 +21,7 @@
 //
 //   pio test -e native_aprs -f test_txprio_replay
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <stdio.h>
@@ -108,9 +109,9 @@ static void fillSlot(uint8_t type, uint8_t status, uint16_t len,
     initAPRS(m, (char)type);
     m.payload_type         = (char)type;
     m.msg_id               = 0x11223344;
-    m.msg_source_path      = src;
-    m.msg_destination_path = dst;
-    m.msg_payload          = payload;
+    mcSet(m.msg_source_path, sizeof(m.msg_source_path), src.c_str());
+    mcSet(m.msg_destination_path, sizeof(m.msg_destination_path), dst.c_str());
+    mcSet(m.msg_payload, sizeof(m.msg_payload), payload.c_str());
 
     uint8_t frame[UDP_TX_BUF_SIZE];
     memset(frame, 0x00, sizeof(frame));

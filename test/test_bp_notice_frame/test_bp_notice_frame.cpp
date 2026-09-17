@@ -20,6 +20,7 @@
 //
 //   pio test -e native_aprs -f test_bp_notice_frame
 
+#include "../../src/mc_text.h"
 #include <unity.h>
 
 #include <string.h>
@@ -52,10 +53,10 @@ static void test_frame_felder(void)
     struct aprsMessage m;
     bpNoticeFillFrame(m, "DK5EN-99", QRS_TEXT, 0xABCD1234u, "*");
 
-    TEST_ASSERT_EQUAL_STRING("DK5EN-99", m.msg_source_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call.c_str());
-    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, m.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-99", m.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call);
+    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, m.msg_payload);
     TEST_ASSERT_EQUAL_CHAR(':', m.payload_type);
     TEST_ASSERT_EQUAL_UINT32(0xABCD1234u, m.msg_id);
     TEST_ASSERT_TRUE_MESSAGE(m.msg_app_offline,
@@ -69,8 +70,8 @@ static void test_frame_ziel_gruppe(void)
     struct aprsMessage m;
     bpNoticeFillFrame(m, "DK5EN-99", QRS_TEXT, 1u, "20");
 
-    TEST_ASSERT_EQUAL_STRING("20", m.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("20", m.msg_destination_call.c_str());
+    TEST_ASSERT_EQUAL_STRING("20", m.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING("20", m.msg_destination_call);
     TEST_ASSERT_TRUE_MESSAGE(m.msg_app_offline,
                              "auch bei Gruppenziel: nie on air");
 }
@@ -82,8 +83,8 @@ static void test_frame_ziel_dm(void)
     struct aprsMessage m;
     bpNoticeFillFrame(m, "DK5EN-99", QRS_TEXT, 1u, "DL7CL-7");
 
-    TEST_ASSERT_EQUAL_STRING("DL7CL-7", m.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("DL7CL-7", m.msg_destination_call.c_str());
+    TEST_ASSERT_EQUAL_STRING("DL7CL-7", m.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING("DL7CL-7", m.msg_destination_call);
     TEST_ASSERT_TRUE_MESSAGE(m.msg_app_offline,
                              "DM-Ziel bleibt lokal: nie on air");
 }
@@ -103,9 +104,9 @@ static void test_frame_roundtrip(void)
     uint16_t t = decodeAPRS(buf, len, d);
     TEST_ASSERT_GREATER_THAN_UINT16(0, t);
 
-    TEST_ASSERT_EQUAL_STRING("DK5EN-99", d.msg_source_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("*", d.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, d.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-99", d.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("*", d.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, d.msg_payload);
     TEST_ASSERT_EQUAL_CHAR(':', d.payload_type);
     TEST_ASSERT_EQUAL_UINT32(0x11223344u, d.msg_id);
 }
@@ -125,9 +126,9 @@ static void test_frame_roundtrip_dm_ziel(void)
     uint16_t t = decodeAPRS(buf, len, d);
     TEST_ASSERT_GREATER_THAN_UINT16(0, t);
 
-    TEST_ASSERT_EQUAL_STRING("DK5EN-99", d.msg_source_path.c_str());
-    TEST_ASSERT_EQUAL_STRING("DL7CL-7", d.msg_destination_path.c_str());
-    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, d.msg_payload.c_str());
+    TEST_ASSERT_EQUAL_STRING("DK5EN-99", d.msg_source_path);
+    TEST_ASSERT_EQUAL_STRING("DL7CL-7", d.msg_destination_path);
+    TEST_ASSERT_EQUAL_STRING(QRS_TEXT, d.msg_payload);
 }
 
 // Regression: der Pseudo-Absender "response" darf nie zurueckkommen
@@ -136,7 +137,7 @@ static void test_kein_response_absender(void)
     struct aprsMessage m;
     bpNoticeFillFrame(m, "DK5EN-99", QRS_TEXT, 1u, "*");
 
-    TEST_ASSERT_TRUE_MESSAGE(m.msg_source_path.indexOf("response") < 0,
+    TEST_ASSERT_TRUE_MESSAGE(mcIndexOfStr(m.msg_source_path, "response") < 0,
                              "Absender 'response' landet in McApps Spam-Klasse (9999)");
 }
 
