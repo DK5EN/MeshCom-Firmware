@@ -12,14 +12,8 @@
 #define MODUL_HARDWARE HELTEC_V4
 #define SX1262_V4
 #define RX_TIMEOUT_VALUE 0      // continous rx with 0
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_MC811
-#define ENABLE_RTC
+
+#define ENABLE_INA226_DISABLED
 
 //#define ENABLE_SOFTSER
 
@@ -95,7 +89,6 @@
 #define OneWire_GPIO -1
 
 // V4 has different GPS pins than V3
-#define ENABLE_GPS
 #define GPS_RX_PIN 38
 #define GPS_TX_PIN 39
 

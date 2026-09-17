@@ -12,15 +12,6 @@ definitions for TLORA_V2_1_1p6
 #define MODUL_HARDWARE TLORA_V2_1_1p6
 #define SX127X
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 
@@ -91,7 +82,6 @@ definitions for TLORA_V2_1_1p6
 #define GPS_RX_PIN 13
 #define GPS_TX_PIN 15
 
-#define ENABLE_GPS
 //#define GPS_BAUDRATE_SOFTCHECK          // GPS Baudratenermittlung wird mit Software Loop geprüft
 //#define ENABLE_GPS_UBLOX_FIX          // UBLOX wird fix festgelegt und kein setup gemacht
 //#define GPS_BAUDRATE_SETFIX 38400     // Die Baudrate für GPS wird auf FIXWERT gesetzt

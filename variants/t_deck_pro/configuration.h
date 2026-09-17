@@ -10,14 +10,16 @@
 // T-Deck specifig config
 #define MODUL_HARDWARE T_DECK_PRO
 #define SX1262X  // some functions differ from SX127x and SX126x in RadioLib based on Semtech Chip
-#define ENABLE_GPS
 #define GPS_L76K
-//#define ENABLE_BMX280
-//#define ENABLE_BMX680
-//#define ENABLE_MCP23017
-//#define ENABLE_INA226
-//#define ENABLE_MC811
-//#define ENABLE_RTC
+#define ENABLE_BMX280_DISABLED
+#define ENABLE_BMX680_DISABLED
+#define ENABLE_MCP23017_DISABLED
+#define ENABLE_INA226_DISABLED
+#define ENABLE_MC811_DISABLED
+#define ENABLE_RTC_DISABLED
+#define ENABLE_BMP390_DISABLED
+#define ENABLE_AHT20_DISABLED
+#define ENABLE_SHT21_DISABLED
 
 //#define ENABLE_SOFTSER
 //#define ENABLE_AUDIO

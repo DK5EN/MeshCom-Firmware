@@ -16,15 +16,14 @@ definitions for LILYGO T-ETH-Elite S3 + SX1262 shield
 #define BOARD_COUNTRY 8
 
 // External Hardware
-#define ENABLE_BMX280
-//#define ENABLE_BMP390
-//#define ENABLE_AHT20
-//#define ENABLE_SHT21
-//#define ENABLE_BMX680
-//#define ENABLE_MCP23017
-//#define ENABLE_INA226
-//#define ENABLE_MC811
-//#define ENABLE_RTC
+#define ENABLE_BMP390_DISABLED
+#define ENABLE_AHT20_DISABLED
+#define ENABLE_SHT21_DISABLED
+#define ENABLE_BMX680_DISABLED
+#define ENABLE_MCP23017_DISABLED
+#define ENABLE_INA226_DISABLED
+#define ENABLE_MC811_DISABLED
+#define ENABLE_RTC_DISABLED
 //#define ENABLE_SOFTSER
 
 #define CURRENT_LIMIT 140
@@ -74,7 +73,6 @@ definitions for LILYGO T-ETH-Elite S3 + SX1262 shield
 #define RADIO_BUSY_PIN  16
 
 // GPS
-#define ENABLE_GPS
 #define GPS_RESET_MODE 1
 #define GPS_TX_PIN 42
 #define GPS_RX_PIN 39

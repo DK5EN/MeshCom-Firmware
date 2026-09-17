@@ -10,15 +10,10 @@ definitions for HELTEC E290
 // HELTEC_E290 specifig config
 #define MODUL_HARDWARE HELTEC_E290
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
 #define ENABLE_MCU811
-#define ENABLE_RTC
+// W7: ENABLE_MCU811 above is pre-existing and out of scope here; the source only tests
+// ENABLE_MC811, so this board's MC811 sensor code was never actually reachable.
+#define ENABLE_MC811_DISABLED
 
 #define ENABLE_SOFTSER
 
@@ -139,7 +134,6 @@ definitions for HELTEC E290
 
 #define HAS_EPAPER
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 44
 #define GPS_TX_PIN 43
 

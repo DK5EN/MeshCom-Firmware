@@ -37,17 +37,8 @@ definitions for T-Beam
 #define XPOWERS_CHIP_AXP192
 
 // Telemetry
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
 
 // Extra Hardware
-#define ENABLE_RTC
 
 // Extra Project
 //#define ENABLE_SOFTSER    //do not enable on TBEAM !!
@@ -85,7 +76,6 @@ definitions for T-Beam
 */
 
 // GPS on Board
-#define ENABLE_GPS      // GPS on OnBoard or External
 #define GPS_RX_PIN 34   // Serial Pin RX
 #define GPS_TX_PIN 12   // Serial Pin TX
 

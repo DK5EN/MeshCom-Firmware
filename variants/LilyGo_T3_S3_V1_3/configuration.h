@@ -18,7 +18,6 @@ definitions for LilyGo T3_S3_V1_3
 #define I2C_SDA                     (18)
 #define I2C_SCL                     (17)
 
-#define ENABLE_GPS
 
 #define GPS_RX_PIN                  (44)
 #define GPS_TX_PIN                  (43)
@@ -75,15 +74,6 @@ definitions for LilyGo T3_S3_V1_3
 
 #define BOARD_COUNTRY 8   // EU8
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 

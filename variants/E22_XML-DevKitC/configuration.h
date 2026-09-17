@@ -14,15 +14,6 @@ definitions for E22 Board
 #define MODUL_HARDWARE EBYTE_E22
 #define SX126X  // some functions differ from SX127x and SX126x in RadioLib based on Semtech Chip
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 #define ENABLE_SOFTSER
 #define NO_NET_CONSOLE
@@ -94,7 +85,6 @@ definitions for E22 Board
 
 #define OneWire_GPIO 25 // getestet OE5HWN
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 16
 #define GPS_TX_PIN 17
 

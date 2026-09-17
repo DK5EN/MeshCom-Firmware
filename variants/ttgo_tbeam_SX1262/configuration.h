@@ -11,15 +11,6 @@ definitions for TBEAM 1262
 // TBEAM_1262 specific config
 #define MODUL_HARDWARE TBEAM_1262
 #define MODUL_FW_TBEAM  TBEAM_1262
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER    do not enable onj TBEAM !!
 
@@ -102,7 +93,6 @@ definitions for TBEAM 1262
 #define I2C_SDA    SDA_PIN
 #define I2C_SCL    SCL_PIN
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 34
 #define GPS_TX_PIN 12
 

@@ -10,15 +10,6 @@ definitions for HELTEC_V2_1
 // HELTEC_V2_1 specific config
 #define MODUL_HARDWARE HELTEC_V2_1
 #define SX127X
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 
@@ -65,7 +56,6 @@ definitions for HELTEC_V2_1
 
 #define OneWire_GPIO 17 // getestet OE5HWN
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 13
 #define GPS_TX_PIN 12
 

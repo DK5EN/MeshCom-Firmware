@@ -32,7 +32,6 @@ definitions for LilyGo T-CONNECT
 #define ETH_MISO_PIN                (13)
 #define ETH_MOSI_PIN                (11)
 
-#define ENABLE_GPS
 
 #define GPS_RX_PIN                  (5)
 #define GPS_TX_PIN                  (4)
@@ -83,15 +82,6 @@ definitions for LilyGo T-CONNECT
 
 #define BOARD_COUNTRY 8   // EU8
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 

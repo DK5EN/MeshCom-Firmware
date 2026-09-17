@@ -25,7 +25,15 @@ Pinbelegung verifiziert aus offiziellem Heltec-Schaltplan HT-VME213_V1.0:
 
 // --- Keine Onboard-Sensoren auf dem E213 -> bewusst NICHT aktiviert ---
 // (BMX280 / BMP390 / AHT20 / SHT21 / BMX680 / MCP23017 / INA226 / MCU811 / RTC / SOFTSER)
-#define ENABLE_GPS
+#define ENABLE_BMX280_DISABLED
+#define ENABLE_BMX680_DISABLED
+#define ENABLE_RTC_DISABLED
+#define ENABLE_BMP390_DISABLED
+#define ENABLE_AHT20_DISABLED
+#define ENABLE_MCP23017_DISABLED
+#define ENABLE_SHT21_DISABLED
+#define ENABLE_MC811_DISABLED
+#define ENABLE_INA226_DISABLED
 #define GPS_RX_PIN 44
 #define GPS_TX_PIN 43
 #define GPS_MODULE_REFRESH_INTERVAL 20 // sec

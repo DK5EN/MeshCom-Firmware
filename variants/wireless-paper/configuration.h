@@ -19,6 +19,16 @@ Chip-ID erkannt (detectEinkChipId() in esp32_functions.cpp):
 
 // --- Keine Onboard-Sensoren auf der Wireless Paper -> bewusst NICHT aktiviert ---
 // (kein ENABLE_GPS / BMX280 / BMP390 / AHT20 / SHT21 / BMX680 / MCP23017 / INA226 / MCU811 / RTC / SOFTSER)
+#define ENABLE_GPS_DISABLED
+#define ENABLE_BMX280_DISABLED
+#define ENABLE_BMX680_DISABLED
+#define ENABLE_RTC_DISABLED
+#define ENABLE_BMP390_DISABLED
+#define ENABLE_AHT20_DISABLED
+#define ENABLE_MCP23017_DISABLED
+#define ENABLE_SHT21_DISABLED
+#define ENABLE_MC811_DISABLED
+#define ENABLE_INA226_DISABLED
 
 #define TX_POWER_MIN 2
 

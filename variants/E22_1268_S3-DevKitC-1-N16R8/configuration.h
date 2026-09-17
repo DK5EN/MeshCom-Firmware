@@ -9,15 +9,6 @@ definitions for E22 + ESP32-S3_DevKitC-1_N16R8 Board
 
 // E22 specifig config
 #define MODUL_HARDWARE ESP32_S3_EBYTE_E22
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 
@@ -108,7 +99,6 @@ definitions for E22 + ESP32-S3_DevKitC-1_N16R8 Board
 #define SX126x_RST E22_NRST
 #define SX126x_GPIO E22_BUSY
 
-#define ENABLE_GPS
 #define GPS_TX_PIN  15
 #define GPS_RX_PIN  16
 

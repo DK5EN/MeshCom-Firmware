@@ -11,15 +11,6 @@ definitions for T-Beam-Supreme
 #define MODUL_HARDWARE TBEAM_SUPREME
 #define MODUL_FW_TBEAM TBEAM_SUPREME
 
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define ENABLE_SOFTSER
 
@@ -87,7 +78,6 @@ definitions for T-Beam-Supreme
 #define I2C1_SDA 42
 #define I2C1_SCL 41
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 9
 #define GPS_TX_PIN 8
 #define GPS_WAKEUP 7

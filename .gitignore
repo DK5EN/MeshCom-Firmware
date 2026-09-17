@@ -434,3 +434,6 @@ tools/bench/runs/**/runner.pid
 
 # Roh-Mitschnitt des Peer-Node, gleiche Begruendung wie bei *.out
 tools/bench/runs/*.log.peer
+
+# produced by test/golden/variant_macros_effective.py (pio run -t compiledb); never staged
+compile_commands.json

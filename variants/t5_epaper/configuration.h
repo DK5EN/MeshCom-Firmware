@@ -10,6 +10,18 @@
 // T5 ePaper specific config
 #define MODUL_HARDWARE T5_EPAPER
 
+// --- No onboard sensors and no GPS on the T5 ePaper -> deliberately NOT enabled ---
+#define ENABLE_GPS_DISABLED
+#define ENABLE_BMX280_DISABLED
+#define ENABLE_BMX680_DISABLED
+#define ENABLE_RTC_DISABLED
+#define ENABLE_BMP390_DISABLED
+#define ENABLE_AHT20_DISABLED
+#define ENABLE_MCP23017_DISABLED
+#define ENABLE_SHT21_DISABLED
+#define ENABLE_MC811_DISABLED
+#define ENABLE_INA226_DISABLED
+
 // RF defaults. The board runs its own SX1262 driver (src/t5-epaper/peri_lora.cpp),
 // which reads LORA_FREQUENNCY/LORA_BANDWIDTH/... from src/t5-epaper/peripheral.h
 // directly. These generic macros are still required by board-independent code

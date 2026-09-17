@@ -4,6 +4,10 @@
 # before trusting a capture produced with them.
 #
 #   sh test/golden/selftest.sh
+#
+# Since W7-II(b) the last step (variant_ini_effective.py) shells out to
+# `pio project config`, so this script is no longer toolchain-free and must
+# not run while a `pio` build is in progress (one pio process at a time).
 set -e
 cd "$(dirname "$0")/../.."
 
@@ -74,6 +78,16 @@ python3 test/golden/settings_schema_lint.py --self-test
 python3 test/golden/settings_schema_lint.py
 python3 test/golden/variant_macros_lint.py --self-test
 python3 test/golden/variant_macros_lint.py
+# W7-II(b): the root platformio.ini plus all 31 variants/*/platformio.ini were
+# restructured to hoist keys the variants repeated verbatim (upload_command,
+# a handful of redundant monitor_speed/upload_protocol duplicates) into two
+# new base sections, [esp32_s3] and [esp32_classic]. This gate checks
+# PlatformIO's OWN resolved configuration (`pio project config --json-output`)
+# for all 68 envs against the pre-refactor baseline, ignoring only the
+# structural `extends` key -- see test/golden/variant_ini_effective.py for why
+# a macro dump (variant_macros_effective.py) cannot see this class of change.
+python3 test/golden/variant_ini_effective.py --self-test
+python3 test/golden/variant_ini_effective.py
 python3 test/golden/twin_diff.py --self-test
 # The U1/U2 twin-diff artefacts (testplan 4.4/9.1). The pass condition is
 # NOT an empty diff -- the platform drift is expected -- it is that the

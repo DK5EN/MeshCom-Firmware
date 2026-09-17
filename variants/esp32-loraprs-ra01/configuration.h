@@ -11,15 +11,6 @@ definitions for esp32_loraprs Board with RA-01
 // esp32_loraprs specific config
 #define MODUL_HARDWARE ESP32_LORAPRS_RA01
 #define SX127X  // some functions differ from SX127x and SX126x in RadioLib based on Semtech Chip
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_SHT21
-#define ENABLE_BMX680
-#define ENABLE_MCP23017
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
 
 //#define USE_NEW_BATT              // neu batt_functions.cpp nehmen (kommt wenn alle Nodes umgestellt sind raus)
 //#define USE_BATT
@@ -90,7 +81,6 @@ definitions for esp32_loraprs Board with RA-01
 #define SX1268_RST LORA_RST
 #define SX1268_GPIO LORA_DIO0
 
-#define ENABLE_GPS
 #define GPS_RX_PIN 16
 #define GPS_TX_PIN 17
 

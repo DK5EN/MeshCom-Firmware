@@ -14,24 +14,18 @@ definitions for RAK4631
 #define RF_FREQUENCY 433175000 // 432900000   // Hz
 #define LORA_APRS_FREQUENCY 433775000 // 432900000   // Hz
 #define TX_POWER_MIN 2
-#define ENABLE_BMX280
-#define ENABLE_BMP390
-#define ENABLE_AHT20
-#define ENABLE_BMX680
-#define ENABLE_INA226
-#define ENABLE_MC811
-#define ENABLE_RTC
+#define ENABLE_SHT21_DISABLED
 
 // #define ENABLE_SOFTSER
 
 #define OLED
 #define USE_RAK4630
 
-#define ENABLE_MCP23017
 #define BUTTON_PIN WB_IO6       // only in combination with RAK13002
 #define OneWire_GPIO WB_IO1     // only in combination with RAK13002
 
 #define ENABLE_RAK_GPS
+#define ENABLE_GPS_DISABLED   // this board uses ENABLE_RAK_GPS instead of ENABLE_GPS
 
 
 #define LPS33     // Druckmesser
