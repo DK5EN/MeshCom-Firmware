@@ -7178,6 +7178,47 @@ instrument repaired (`289cf64b`: write timestamp before the `await`,
 `RESTORE:--maxhop 4` in the BLE corpus and `--maxhop 4` in the console
 corpus, both from `build_corpus.py`).
 
+### 3.8aw `W7-II` done -- the presence flags and the upload families (2026-09-17, late)
+
+**(a) The 325 lines were 227 defines plus 83 sentinels, and the gate said
+"92 additions, nothing else".** Ten empty presence flags that a strict
+majority of the 31 variants define identically now come from
+`configuration_default.h`; the guard is `!defined(X) && !defined(X_DISABLED)`,
+a board without the feature writes `#define X_DISABLED` (39 of those were
+existing `//#define X` comments and keep their reason), and a trailing
+`#error` forbids both. The risk §3.8aq named -- a silent `#undef` typo -- is
+answered by the sentinel being a positive definition plus the effective-macro
+gate: `variant_macros_effective.py` against the pre-change baseline showed
+**exactly 92 added `*_DISABLED=` lines over 32 envs and no other line**, so no
+`ENABLE_*` moved on any board. Both baselines regenerated with that reading on
+record (effective 7855 -> 7947 lines; text lint 1369 -> 1225).
+`vision-master-e290` has defined `ENABLE_MCU811` (a typo nobody tests) since
+forever; it keeps the typo and gains `ENABLE_MC811_DISABLED`, so nothing
+changes there either. Decision owed to a human: delete the typo, or enable the
+sensor.
+
+**(b) `${this.__env__}` cannot live in a base section.** PlatformIO evaluates
+every section standalone, so `[esp32_s3]` with `${this.__env__}` in its
+`upload_command` aborts `pio project config` (and every `pio run`) with
+`ProjectOptionValueError`. That blocked (a)'s compile gate for the whole wave.
+The templates use the SCons variable `$BUILD_DIR` instead (`builder/main.py:75`
+defines it as `$PROJECT_BUILD_DIR/$PIOENV`; `UPLOADCMD` is expanded by SCons at
+upload, `:177`, the same path that already expands `$UPLOAD_PORT`). 23 variants
+inherit one of two family commands (13 S3 at 0x0000/safeboot-s3.bin, 10
+classic at 0x1000/safeboot.bin); 9 dropped `monitor_speed`, one
+`upload_protocol`. Gate: `test/golden/variant_ini_effective.py` (new, wired
+into `selftest.sh`) compares the resolved config of all 68 envs against the
+dump taken BEFORE the edit, `$BUILD_DIR` normalised to the old text -- PASS,
+692 keys. And one real upload on DK5EN-93 through the template, hashes
+verified. Five ESP32 variants (`t5_epaper`, `t_deck_pro`, the two
+`vision-master`s, `wireless-paper`) do not `extends = esp32` at all and keep
+their own command; three of those still carry the `upload_protocol = custom`
+port-autodetect defect (memory `pio-custom-upload-no-port-autodetect`) --
+pre-existing, untouched, worth a row.
+
+**Note for the golden selftest:** `selftest.sh` now shells out to `pio` in its
+last step and must not run beside a build.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
