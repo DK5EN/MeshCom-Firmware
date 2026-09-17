@@ -1,472 +1,1583 @@
 <!doctype html>
 <html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DRY-Vereinheitlichung Gantt</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
-<style>
-  :root {
-    color-scheme: light;
-    --bg: #f7f7f4;
-    --surface: #fcfcfb;
-    --line: #dcdbd5;
-    --grid: #ebeae5;
-    --ink: #0b0b0b;
-    --ink-2: #52514e;
-    --ink-3: #8a8983;
-    --accent: #2a78d6;
-    --p1: #2a78d6; --p2: #eb6834; --p3: #1baf7a; --p4: #eda100; --p5: #4a3aa7;
-    --ext: #c3c2b7;
-    --today: #d03b3b;
-    --tip-bg: #0b0b0b; --tip-ink: #ffffff;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --bg: #141413; --surface: #1a1a19; --line: #34342f; --grid: #262622;
-      --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8a8983; --accent: #3987e5;
-      --p1: #3987e5; --p2: #d95926; --p3: #199e70; --p4: #c98500; --p5: #9085e9;
-      --ext: #52514e; --today: #e66767; --tip-bg: #f0efec; --tip-ink: #0b0b0b;
-    }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #141413; --surface: #1a1a19; --line: #34342f; --grid: #262622;
-    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8a8983; --accent: #3987e5;
-    --p1: #3987e5; --p2: #d95926; --p3: #199e70; --p4: #c98500; --p5: #9085e9;
-    --ext: #52514e; --today: #e66767; --tip-bg: #f0efec; --tip-ink: #0b0b0b;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-size: 14px; line-height: 1.45;
-    padding-inline: 20px; padding-block: 24px 48px;
-  }
-  .wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 20px; }
-  header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
-  h1 { font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif; font-weight: 600; font-size: 28px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
-  .sub { color: var(--ink-2); margin: 4px 0 0; max-width: 64ch; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 13px; color: var(--ink-2); }
-  .controls label { display: inline-flex; gap: 8px; align-items: center; }
-  .controls button { font: inherit; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
-  .controls button:hover { color: var(--ink); border-color: var(--ink-3); }
-  input[type="date"] { font: inherit; font-family: "IBM Plex Mono", monospace; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }
-  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
-  .kpi .l { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
-  .kpi .v { font-family: "IBM Plex Mono", monospace; font-size: 20px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .kpi .h { font-size: 12px; color: var(--ink-2); }
-  .chart { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 8px 12px; overflow-x: auto; position: relative; }
-  svg { display: block; font-family: "IBM Plex Sans", sans-serif; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--ink-2); padding: 0 6px; }
-  .legend span { display: inline-flex; align-items: center; gap: 7px; }
-  .sw { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
-  .sw.gate { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 1px; background: var(--ink); }
-  .sw.ext { background: repeating-linear-gradient(135deg, var(--ext) 0 3px, transparent 3px 6px); border: 1px solid var(--ext); }
-  .tip { position: absolute; pointer-events: none; background: var(--tip-bg); color: var(--tip-ink); padding: 8px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; max-width: 300px; display: none; z-index: 2; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
-  .tip b { font-weight: 600; }
-  .tip .m { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; opacity: .85; }
-  h2 { font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600; font-size: 18px; margin: 8px 0 0; }
-  .tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
-  th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
-  td.m { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.phase td { background: var(--grid); font-weight: 600; }
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: 1px; }
-  .notes { color: var(--ink-2); font-size: 13px; max-width: 78ch; }
-  .notes li { margin: 3px 0; }
-  @media (prefers-reduced-motion: no-preference) { .bar { transition: opacity .12s; } }
-  @media (max-width: 640px) { h1 { font-size: 22px; } body { padding-inline: 16px; } }
-</style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DRY-Vereinheitlichung Gantt</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f4;
+        --surface: #fcfcfb;
+        --line: #dcdbd5;
+        --grid: #ebeae5;
+        --ink: #0b0b0b;
+        --ink-2: #52514e;
+        --ink-3: #8a8983;
+        --accent: #2a78d6;
+        --p1: #2a78d6;
+        --p2: #eb6834;
+        --p3: #1baf7a;
+        --p4: #eda100;
+        --p5: #4a3aa7;
+        --ext: #c3c2b7;
+        --today: #d03b3b;
+        --tip-bg: #0b0b0b;
+        --tip-ink: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          color-scheme: dark;
+          --bg: #141413;
+          --surface: #1a1a19;
+          --line: #34342f;
+          --grid: #262622;
+          --ink: #ffffff;
+          --ink-2: #c3c2b7;
+          --ink-3: #8a8983;
+          --accent: #3987e5;
+          --p1: #3987e5;
+          --p2: #d95926;
+          --p3: #199e70;
+          --p4: #c98500;
+          --p5: #9085e9;
+          --ext: #52514e;
+          --today: #e66767;
+          --tip-bg: #f0efec;
+          --tip-ink: #0b0b0b;
+        }
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #141413;
+        --surface: #1a1a19;
+        --line: #34342f;
+        --grid: #262622;
+        --ink: #ffffff;
+        --ink-2: #c3c2b7;
+        --ink-3: #8a8983;
+        --accent: #3987e5;
+        --p1: #3987e5;
+        --p2: #d95926;
+        --p3: #199e70;
+        --p4: #c98500;
+        --p5: #9085e9;
+        --ext: #52514e;
+        --today: #e66767;
+        --tip-bg: #f0efec;
+        --tip-ink: #0b0b0b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          "IBM Plex Sans",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.45;
+        padding-inline: 20px;
+        padding-block: 24px 48px;
+      }
+      .wrap {
+        max-width: 1240px;
+        margin: 0 auto;
+        display: grid;
+        gap: 20px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px 24px;
+      }
+      h1 {
+        font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+        font-weight: 600;
+        font-size: 28px;
+        margin: 0;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+      .sub {
+        color: var(--ink-2);
+        margin: 4px 0 0;
+        max-width: 64ch;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+      .controls label {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .controls button {
+        font: inherit;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .controls button:hover {
+        color: var(--ink);
+        border-color: var(--ink-3);
+      }
+      input[type="date"] {
+        font: inherit;
+        font-family: "IBM Plex Mono", monospace;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--ink);
+      }
+      input:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .kpi {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px 14px;
+      }
+      .kpi .l {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .kpi .v {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 20px;
+        font-weight: 500;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+      }
+      .kpi .h {
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .chart {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 8px 12px;
+        overflow-x: auto;
+        position: relative;
+      }
+      svg {
+        display: block;
+        font-family: "IBM Plex Sans", sans-serif;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+        font-size: 13px;
+        color: var(--ink-2);
+        padding: 0 6px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .sw {
+        width: 14px;
+        height: 10px;
+        border-radius: 3px;
+        display: inline-block;
+      }
+      .sw.gate {
+        width: 10px;
+        height: 10px;
+        transform: rotate(45deg);
+        border-radius: 1px;
+        background: var(--ink);
+      }
+      .sw.ext {
+        background: repeating-linear-gradient(
+          135deg,
+          var(--ext) 0 3px,
+          transparent 3px 6px
+        );
+        border: 1px solid var(--ext);
+      }
+      .tip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--tip-bg);
+        color: var(--tip-ink);
+        padding: 8px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 300px;
+        display: none;
+        z-index: 2;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      }
+      .tip b {
+        font-weight: 600;
+      }
+      .tip .m {
+        font-family: "IBM Plex Mono", monospace;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.85;
+      }
+      h2 {
+        font-family: "IBM Plex Sans Condensed", sans-serif;
+        font-weight: 600;
+        font-size: 18px;
+        margin: 8px 0 0;
+      }
+      .tablewrap {
+        overflow-x: auto;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--grid);
+        vertical-align: top;
+      }
+      th {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 500;
+      }
+      td.m {
+        font-family: "IBM Plex Mono", monospace;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      tr.phase td {
+        background: var(--grid);
+        font-weight: 600;
+      }
+      .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        margin-right: 7px;
+        vertical-align: 1px;
+      }
+      .notes {
+        color: var(--ink-2);
+        font-size: 13px;
+        max-width: 78ch;
+      }
+      .notes li {
+        margin: 3px 0;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .bar {
+          transition: opacity 0.12s;
+        }
+      }
+      @media (max-width: 640px) {
+        h1 {
+          font-size: 22px;
+        }
+        body {
+          padding-inline: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>DRY-Vereinheitlichung Gantt</h1>
+          <p class="sub">
+            Wasserfall-Ablauf von Audit, Testplan, Vereinheitlichungswellen und
+            Upstream-PR für MeshCom fork-main. Arbeitstage Montag bis Freitag.
+            Jede Phase beginnt am Gate der vorherigen.
+          </p>
+        </div>
+        <div class="controls">
+          <label for="start"
+            >Start (Montag)
+            <input type="date" id="start" value="2026-09-14" />
+          </label>
+          <label
+            ><input type="checkbox" id="showreview" checked /> Upstream-Review
+            als Platzhalter anzeigen</label
+          >
+          <button
+            type="button"
+            id="reset"
+            title="Startdatum auf den tatsächlichen Projektbeginn zurücksetzen und die im Browser gemerkte Auswahl verwerfen"
+          >
+            zurücksetzen
+          </button>
+        </div>
+      </header>
 
-<div class="wrap">
-  <header>
-    <div>
-      <h1>DRY-Vereinheitlichung Gantt</h1>
-      <p class="sub">Wasserfall-Ablauf von Audit, Testplan, Vereinheitlichungswellen und Upstream-PR für MeshCom fork-main. Arbeitstage Montag bis Freitag. Jede Phase beginnt am Gate der vorherigen.</p>
+      <div class="kpis" id="kpis"></div>
+
+      <div class="legend" id="legend"></div>
+      <div class="chart" id="chart">
+        <div class="tip" id="tip"></div>
+      </div>
+
+      <h2>Terminplan als Tabelle</h2>
+      <div class="tablewrap">
+        <table id="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Aufgabe</th>
+              <th>Stand</th>
+              <th>Beginn</th>
+              <th>Ende</th>
+              <th>Tage</th>
+              <th>Gate / Ergebnis</th>
+              <th>Verantwortlich</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h2>Annahmen</h2>
+      <ul class="notes">
+        <li>
+          Die Dauern sind die Schätzungen aus
+          <code>docs/testplan-dry-unification-20260910.md</code> und dem
+          Wellenplan in
+          <code>docs/optimization-audit-20260910.md</code> Abschnitt 7.1. Eine
+          Person plus Agenten; keine parallelen Bench-Tage.
+        </li>
+        <li>
+          Ein Gate ist ein harter Stopp: die nächste Phase beginnt erst, wenn
+          die Prüfungen des Gates grün und committet sind. Gates sind als Rauten
+          am Phasenende gezeichnet.
+        </li>
+        <li>
+          Die Freigabe der Drift-Matrix (C2) ist der einzige menschliche
+          Entscheidungspunkt und liegt auf dem kritischen Pfad.
+        </li>
+        <li>
+          Das Upstream-Review ist extern und von unbekannter Dauer; der
+          schraffierte Balken ist ein Platzhalter und zählt nicht zur Summe.
+        </li>
+        <li>
+          Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur
+          in diesem Browser gespeichert. Voreingestellt ist der tatsächliche
+          Beginn, 11.09.2026.
+        </li>
+        <li>
+          <b
+            >Die Carve-outs heißen jetzt C1 bis C5 und stehen einzeln im
+            Diagramm.</b
+          >
+          Vorher steckten alle fünf in einer Sammelzeile „B2“, während die
+          Aufgaben der Phase <i>Entscheiden</i> ebenfalls C1, C2, C3 hießen —
+          „C4“ und „C5“ kamen im Diagramm also gar nicht vor, und „C2“ meinte
+          zwei verschiedene Dinge. Die Entscheidungsaufgaben heißen daher jetzt
+          M1 bis M3 (Matrix), die Carve-outs behalten die Bezeichnungen aus
+          <code>testplan-dry-unification-20260910.md</code> Abschnitt 4.2.
+        </li>
+        <li>
+          <b
+            >Warum der Standbalken jetzt am Fortschritt hängt, nicht am
+            Datum.</b
+          >
+          Er steht am Ende der am weitesten fortgeschrittenen nicht-offenen
+          Aufgabe — markiert also, wie viele Aufgaben erledigt sind, nicht
+          welcher Tag heute ist. Die Termine auf der Zeitachse bleiben
+          Schätzungen aus dem Plan; dass der tatsächliche Arbeitsfortschritt
+          ihnen bislang nicht gefolgt ist, zeigt sich am Abstand zwischen den
+          ausgefüllten Balken und dem Standbalken.
+        </li>
+        <li>
+          <b>Betreiberentscheidung 6 vom 17.09.2026: vorerst KEIN PR.</b>
+          Woertlich:
+          <i>"no PR at the moment. Everything here is very experimental"</i>.
+          Damit fallen <b>E4</b> (Einreichung an icssw-org DEV) und
+          <b>E5</b> (Review durch Kurt) aus dem Plan, und <b>E2</b> gleich mit
+          -- dessen einziges Erzeugnis ist die deutsche PR-Beschreibung. Der
+          Plan endet jetzt bei <b>E3</b> (Upstream-Resync und gezielter
+          Wiederholungslauf), was als Hygiene unabhaengig vom PR sinnvoll
+          bleibt. <b>Was das aendert:</b> das Zeitbudget bis zum "Ende" faellt
+          von rund 17 auf rund 12 Arbeitstage, und der Druck, W7 erst
+          unmittelbar vor dem PR zu machen, entfaellt technisch -- die
+          Reihenfolge bleibt trotzdem wie beschlossen, weil ein spaeterer PR
+          dieselbe Konfliktflaeche haette. <b>Was das NICHT aendert:</b> die
+          Arbeit selbst wird vollstaendig zu Ende gefuehrt und committet; nur
+          das Einreichen unterbleibt.
+        </li>
+        <li>
+          <b
+            >Stand 17.09.2026 (nachts): der Schlussdurchlauf ist durch -- 28 von
+            28 Zeilen erledigt oder per Entscheidung gestrichen.</b
+          >
+          Vier Wellen und der G2-Lauf an einem Abend: <b>ETH-03</b> war ein
+          Stack-Ueberlauf im 4-kB-Loop-Task des Adafruit-Cores (R2-04 hatte ~1,2
+          kB aprsMessage-Text auf den Pfad gelegt, ein Datagramm genuegt,
+          RESETREAS=0x4) -- der nRF52-Loop laeuft jetzt in einem 8-kB-Task, die
+          "[RING] overflow"-Zeile feuerte auf dem LEEREN Ring; <b>DR-28</b> ist
+          gebaut; das <b>H4-Instrument</b> stempelt vor dem await und stellt
+          --maxhop je Knoten zurueck; <b>W7-II</b> beide Haelften mit
+          byte-genauen Gates; <b>D1-10</b> mit sieben Timern statt "~18" oder
+          "50" -- die anderen neunzehn stehen mit Grund im Header. G2: H4
+          identisch, H6 wie vereinbart mit Befund <b>H6-01</b> (ein abgelehntes
+          UDP-1990-Datagramm setzt jetzt das WiFi-Radio zurueck und der Knoten
+          bootet -- DR-20-Pfad, offen), H11 automatisch gruen.
+          <b>Offen beim Betreiber:</b> Doppel-Tap am RAK (dann eth03_probe.py
+          PASS, H8, ETH-02), vier T-Deck-Sichtpruefungen, H6-01,
+          MCU811-Tippfehler. <b>E3 gestrichen</b> (Entscheidung 7: kein Merge
+          auf diesem Zweig). Zwei Bench-Fallen kosteten die ersten G2-Zahlen:
+          der Upload-Autodetect flasht den T-Deck, und "-D INSTRUMENT_ENABLED=1"
+          mit Leerzeichen baut ein Stock-Image.
+        </li>
+        <li>
+          <b
+            >Stand 17.09.2026 (spaet): drei Firmware-Defekte, und eine Messung,
+            die meine eigene Erklaerung widerlegt hat.</b
+          >
+          Die Jagd begann damit, dass DK5EN-90 keines von 23
+          EXTUDP-Korpusobjekten beantwortete, und endete zweimal in einer
+          falschen Diagnose, bevor eine Messung sie beendet hat. Der Reihe nach,
+          weil die Reihenfolge die Lehre ist.
+          <br /><br /><b>Erste Erklaerung, falsch: der Socket geht nie auf.</b>
+          <code>EthernetUDP::begin()</code> liefert 0, wenn kein Socket frei ist
+          -- der W5100S hat vier, geteilt mit dem 1990er-Socket, DHCP und dem
+          Webserver -- und der Rueckgabewert wurde weggeworfen. Danach druckte
+          der Code <i>now listening</i>, eine Behauptung, die er nie geprueft
+          hatte, und setzte <code>hasExternIPaddress</code>. Dieses Flag ist der
+          fruehe Ausstieg derselben Funktion und das, was der Empfangspfad
+          prueft: ein einmal fehlgeschlagenes bind waere damit still, dauerhaft
+          und ueber Neustarts hinweg unsichtbar gewesen, und
+          <code>--extudp off</code> loescht es nicht.
+          <b>Als EXT-02 behoben</b> -- ein echter latenter Defekt. Nur war er
+          hier nicht die Ursache: ein frischer Boot druckt sehr wohl
+          <i>now listening</i>, <code>begin()</code> liefert 1. <br /><br /><b
+            >Zweite Erklaerung, auch falsch: der Link ist instabil.</b
+          >
+          Er ist es nicht -- <code>[ETH]</code> meldet durchgehend
+          <code>link;1</code>. Dabei fiel allerdings ein zweiter, echter Defekt
+          auf: ein Knoten, der nie eine DHCP-Lease bekommt, fragt nie wieder.
+          <code>checkDHCP()</code> ist <code>Ethernet.maintain()</code> und
+          erneuert eine BESTEHENDE Lease; der einzige Pfad, der neu erwirbt,
+          liegt im <code>if(bGATEWAY)</code>-Block. Ein Webserver-Knoten oder
+          ein EXTUDP-Peer hat also genau einen Versuch, im Setup. Die eigenen
+          Zaehler des Knotens zeigten es unmissverstaendlich:
+          <code>link;1</code>, <code>ip;0.0.0.0</code>, <code>got_ip_n;0</code>,
+          <code>resets;0</code> -- PHY oben, nie eine Lease, nie ein Versuch,
+          auch ueber einen physischen Kabelwechsel hinweg.
+          <b>Als ETH-02 behoben</b>, Hardware-Bestaetigung noch offen.
+          <br /><br /><b>Dann wurde gemessen statt geraten.</b> Der EXTUDP-Pfad
+          war als einziger heisser Pfad ohne Zeitmessung -- deshalb war das
+          ueberhaupt unsichtbar. Vier <code>INSTR_SECTION</code>-Sonden, 397
+          Schleifendurchlaeufe: <code>extudp_parse</code> max <b>977 us</b>,
+          <code>extudp_guard</code> 977, <code>webserver_loop</code> <b>0</b>,
+          und <code>extudp_read</code> <b>nie ausgefuehrt</b>.
+          <b>Nichts haengt.</b> Die SPI-Bus-Theorie, die parsePacket-Theorie und
+          die verhungerter-Webserver-Theorie sind damit alle tot. Dass
+          extudp_read nie lief, heisst: die Datagramme erreichen den Socket
+          ueberhaupt nicht. <br /><br /><b
+            >Der wahre Befund (ETH-03), und er ist praeziser als alles davor:</b
+          >
+          waehrend der Knoten auf jedem Port taub ist, beantwortet der W5100S
+          <b>ICMP mit 3/3 Paketen in 3,5 ms</b> -- er haelt und nutzt die
+          Adresse --, und <code>--info</code> sagt gleichzeitig
+          <code>hasIpAddress: no</code>. Jeder Dienst haengt an diesem Flag, der
+          Knoten wird also zum Zombie: pingbar, Schleife laeuft, seriell
+          ansprechbar, taub. ETH-03 ist ein FALSCHES Loeschen von
+          <code>hasIPaddress</code> auf einem nachweislich oberen Link, und der
+          EXTUDP-Verkehr ist der Ausloeser, nicht das Opfer. Welche der vier
+          Loeschstellen feuert, ist der naechste Messschritt -- nicht die
+          naechste Vermutung. <br /><br /><b
+            >Beinahe waere die Messung leer geblieben</b
+          >, und das ist der Merkposten fuer jedes kuenftige Instrument:
+          <code>INSTR_SECTION_SLOTS</code> stand auf 16, der Baum traegt
+          <b>42</b> Sektionsnamen, Slots werden pro Boot nach Erstankunft
+          vergeben, und die Ablage kehrt bei voller Tabelle STILL zurueck.
+          Mindestens neun Sektionen laufen vor dem EXTUDP-Block -- die vier
+          neuen Sonden waeren vermutlich die abgeschnittenen gewesen, und der
+          Bericht haette ausgerechnet die Zeilen nicht enthalten, um die es
+          geht. Das liest sich dann wie &bdquo;die Sektion lief nie&ldquo;.
+          Jetzt 48, und da die Datei ganz in
+          <code>#if INSTRUMENT_ENABLED</code> liegt, kostet es die Auslieferung
+          nichts. <br /><br /><b
+            >H4 ist gelaufen und in Phase 1 nicht zur Ruhe gekommen</b
+          >, auf beiden Knoten, also kein G1-Vergleich -- siehe die Notiz an E1.
+          Beide Ursachen liegen im Instrument, nicht in der Firmware. Dazu hat
+          das Gate selbst noch einen Fehler im Pruefer gefangen:
+          <code>verify_captures.py</code> leitete den Knoten aus dem
+          unmittelbaren Elternverzeichnis ab und lehnte die vier neuen Aufnahmen
+          als <code>unknown node</code> ab. Der Fehler lag im Pruefer -- die
+          H4-Vorschrift sieht diese zweite Ebene ausdruecklich vor.
+        </li>
+        <li>
+          <b
+            >Stand 17.09.2026 (abends): W6 und C4d sind zu, W5 haengt nur noch
+            an einer Zeile.</b
+          >
+          <b>W6a</b> (<code>55a7b4c4</code>) hat neun entschiedene
+          U1-Driftzeilen vereinheitlicht; der Twin-Diff geht von
+          <b>24 auf 36 gleiche</b> und von <b>13 auf 1 verschiedene</b> Faelle,
+          ohne eine einzige Regression, und der eine Ueberlebende ist genau
+          DR-20. <b>W6b</b> (<code>3be9a9da</code>) hat DR-20, die sechs
+          U2-Zeilen und DR-18 Teil 2 nachgezogen. Damit ist
+          <b
+            >jede Driftmatrix-Zeile geschlossen, die eine Quellaenderung
+            schliessen kann</b
+          >. Der Advisor-Lauf hat dabei einen
+          <b>echten Cross-Task-Race gefangen, bevor er ausgeliefert wurde</b>:
+          <code>queueExternAck()</code> schrieb aus dem Main-Loop in die
+          Single-Producer-Queue <code>externQueue[]</code>, die
+          <code>OnRxDone</code> aus dem LORA-Task beschreibt. Das ist der Wert
+          des Gates, nicht die Zahl der Befunde. <br /><br /><b
+            >C4d ist mit DR-03 fertig.</b
+          >
+          nRF52 war in der ersten Stufe der Heartbeat-Ueberwachung
+          <b>65 Sekunden lang stumm</b> und ging dann direkt an die
+          Link-Neuinitialisierung; ESP32 warnt seit jeher nach 35 s. Die 30 s
+          dazwischen sind genau das Fenster, in dem das Log
+          <i>Server still</i> von <i>Link tot</i> unterscheiden koennte.
+          Portiert wurde
+          <b>nur die Diagnose, nicht die ESP32-Sofortaktion</b> -- deren
+          nRF52-Gegenstueck ist <code>resetDHCP()</code>, und das ist N-20:
+          jeder Retry resettet den W5100S hardwareseitig, danach verbindet ein
+          einmal gezogenes Kabel nie wieder. Eine zweite, fruehere
+          Ausloesestelle dafuer waere ein Rueckschritt im Gewand der Parität
+          gewesen. <br /><br /><b
+            >R1-04 ist eingecheckt und auf der Bank belegt.</b
+          >
+          Der RX-Log-Ring wird jetzt erst angelegt, wenn jemand die Seite
+          oeffnet: <b>-109 040 B RAM</b> ueber 34 Envs gegen
+          <b>+7 076 B Flash</b>. Der Soak lief auf
+          <b>zwei Knoten mit je einem Arm</b> -- DK5EN-93 mit angelegtem Ring
+          unter echtem LoRa-Empfang, DK5EN-90 mit nie angelegtem Ring. Die
+          Heap-Messung zeigt den Einmal-Charakter direkt: erster Seitenaufruf
+          <b>-3 132 B</b>, zweiter -236, dritter -224.
+          <b>Zwei Stunden haben gereicht, nicht zwoelf</b>; beide Arme sind
+          binnen Minuten sichtbar, alles danach ist Stabilitaet. Auch
+          <b>EXT-01</b> ist auf Hardware bestaetigt: der Telemetrie-Frame
+          erzeugt keinen <code>[EXT] Out: Len: 0</code>-Marker mehr, und der
+          Frame danach geht normal raus -- der Socket ueberlebt also den Frame,
+          der ihn vorher abgeraeumt hat. <br /><br /><b
+            >Offen sind noch vier Zeilen</b
+          >: die <code>mheardLine</code>-Haelfte von R2-04, W7, E1 und E3. E2,
+          E4 und E5 sind mit Entscheidung 6 gestrichen und stehen nur noch
+          durchgestrichen im Balkenplan, damit sichtbar bleibt, dass sie geplant
+          waren und warum sie wegfielen.
+        </li>
+        <li>
+          <b>Stand 17.09.2026:</b> <b>W5 ist zu sieben Neunteln durch</b> und
+          haengt nur noch an Hardware. Geliefert: <b>GRD-01</b> (ein
+          <code>MC_HAS_U8G2</code> statt sieben handgeschriebener Kopien und
+          einer Neun-Arm-Kaskade), <b>R2-01</b> (der MHeard-Textcodec ist weg:
+          -83 200 B RAM, -54 676 B Flash, -117 Zeilen), <b>R3-12</b>,
+          <b>R4-01</b> (-49 168 B internes DRAM auf dem T-Deck Pro),
+          <b>R2-04</b> aprsMessage-Haelfte (-109 068 B Flash) und
+          <b>R1-02</b> Schritt 1. Zusammen rund
+          <b>247 kB Flash und 117 kB RAM</b> zurueck ueber die Flotte. Zwei
+          Zeilen wurden <b>abgelehnt und die Bytes bewusst liegen gelassen</b>,
+          weil sie zwei Codepfade gekostet haetten, wo einer reicht: R3-13 (1
+          200 B, aber 6-Hop-Pfade wuerden abgeschnitten, und
+          <code>--maxhop</code> erlaubt 6) und R4-02/03 (1 400 B gegen einen
+          Alloc-Fehlerpfad auf 20+ Boards). Offen bleiben <b>R1-04</b> (braucht
+          den 12-h-nRF52-Soak) und die <b>mheardLine-Haelfte von R2-04</b>.
+          <br /><br /><b
+            >Was die Zeilen wert waren, war nicht das, was das Audit
+            vorhersagte.</b
+          >
+          Bei R2-01 fehlte die Flash-Ersparnis (54 kB) im Audit vollstaendig,
+          bei R2-04 ebenso (109 kB) -- und dessen RAM-<i>Kosten</i> sind kein
+          Streuverlust, sondern
+          <b>ein einziges Global</b> (<code>pendingDisplayMsg</code>, 144 -> 608
+          B). R4-01 war gar keine Abstimmungszeile: es gibt
+          <b>fuenf Kopien von lv_conf.h</b> im Baum, vier laufen seit jeher auf
+          <code>ps_malloc</code>, und <code>config/lv_conf.h</code> war schlicht
+          die, die den Schritt nie mitgemacht hat. Die Audit-Zeilen sind
+          Hypothesen, keine Befunde. <br /><br /><b
+            >Fuenf Defekte fielen bei R2-04 nebenbei an</b
+          >, jeder eine Klasse, die wiederkommt: eine Nutzlast-Schleife, die
+          <b>nur durch ihre Aufrufer begrenzt</b> war (direkt mit einem
+          340-Byte-Frame aufgerufen: SIGABRT, stack smashing -- heute nicht
+          ausloesbar, weil jeder Aufrufer auf 255 begrenzt ist, aber die
+          Sicherheit war geborgt); ein Feld, das jahrelang der
+          <code>String</code>-Konstruktor initialisiert hatte, sodass
+          <code>initAPRS()</code> es nie brauchte; die Klemmung von
+          <code>substring()</code>, die beim Uebergang auf Zeigerarithmetik
+          verloren ging; eine
+          <b
+            >Ueberladungsaufloesung, die bei breiterem Argumenttyp still
+            umsprang</b
+          >
+          (<code>utf8ascii</code> hat drei); und zwei Puffer, die um ein Byte zu
+          klein waren, solange der Compiler die Quelllaenge nicht kennen konnte.
+          Dazu eine Include-Falle:
+          <b
+            ><code>MAX_MHEARD</code> ist in
+            <code>configuration_global.h</code> pro Board definiert</b
+          >, und diesen Header aus einem frueh eingebundenen zu ziehen gab der
+          MHeard-Tabelle still 50 statt 80 Plaetze. <br /><br /><b
+            >Restaufwand:</b
+          >
+          von 31 Zeilen sind 21 erledigt, M3 laeuft, neun sind offen. Auf dem
+          kritischen Pfad liegen W6 (6 Tage), C4d (1), W7 (3) und Phase E1-E4
+          (6,5) -- rund <b>17 Arbeitstage</b> bis zum PR, Upstream-Review nicht
+          gerechnet. Drei Posten sind <b>nicht durch Agenten zu leisten</b>: E1
+          ist ein Bench-Lauf, R1-04 braucht den 12-h-Soak, und DISP-01 wartet
+          weiter auf Heltec V3 plus einen T-Beam.
+        </li>
+        <li>
+          <b>Stand 16.09.2026:</b>
+          <b>W3 ist geschlossen und auf Hardware bewiesen</b> -- der erzwungene
+          Rueckbau auf das offizielle v4.35t und das anschliessende Upgrade auf
+          DK5EN-90 lieferten legacy_migrated, 102 erhaltene Felder, 0
+          geaenderte, 0 verlorene; alle 17 reinen Persist-Schluessel sind ueber
+          --persiststat lesbar und durch einen Lint festgenagelt.
+          <b>W4 ist geschlossen:</b> D2-10, D2-06, D2-07 und D2-01 sind
+          committet (Zahlen und Einschraenkungen stehen in der Notiz zu W4).
+          <b>W5 ist entblockt</b> -- alle sechs Betreiberentscheidungen sind
+          gefallen, und R4-02/03 braucht keine Board-Liste, weil das OLED
+          bereits zur Laufzeit erkannt wird.
+          <b>Vier Befunde nebenbei, die keine DRY-Zeilen sind</b> (BACKLOG
+          &sect;3.8ah): src/configuration_global.h hatte GAR KEINEN
+          Include-Guard -- behoben; env:esp32-external-radio ist per #error
+          absichtlich nicht allein baubar und braucht ein Build-Overlay, das
+          nicht im Repo liegt -- kein Defekt, sondern eine fehlende Eingabe;
+          variants/t5_epaper/ ist das EINZIGE Variantenverzeichnis ohne
+          configuration.h, weshalb die Umgebung nie uebersetzt hat -- wird
+          geschrieben; und DISP-01: der ESP32-Zweig waehlt fuer die Antwort der
+          Display-Erkennung den FALSCHEN U8g2-Treiber (Vertrag ist 2 = SSD1306,
+          1 = SH1106; nRF52 haelt sich daran, ESP32 dreht es um, gegen den
+          eigenen Kommentar zwei Zeilen darueber). Dokumentiert, Code
+          unveraendert: die fest verdrahteten Frueh-Rueckgaben in
+          esp32_isSSD1306() scheinen auf die Umkehrung eingestellt zu sein, eine
+          blinde Korrektur tauschte nur einen ungeprueften Zustand gegen einen
+          anderen. Bench-Nachweis offen auf Heltec V3 und einem T-Beam.
+          <b>Zwei Dinge, die nicht im Plan standen.</b> <b>Erstens:</b> ein
+          blosses pio test ohne -e laeuft ueber ALLE Umgebungen und fuehrt auf
+          Board-Umgebungen upload __test aus -- es flasht also eine
+          Unity-Testfirmware auf angeschlossene Hardware. DK5EN-14 (T-Deck Plus)
+          landete dadurch im ROM-Bootloader und musste neu geflasht werden;
+          nichts kaputt, aber rund zwanzig Minuten weg. Der Befehl bekommt ab
+          jetzt immer eine ausdrueckliche Liste der native*-Umgebungen.
+          <b>Zweitens:</b> ein Scout-Agent ueberschrieb im gemeinsamen
+          Scratchpad die Skripte der Pipeline, weil beide dieselben Dateinamen
+          benutzten -- eine spaetere Neuausfuehrung lief still auf altem Code.
+          Die D2-06-Pipeline liegt jetzt in einem eigenen Verzeichnis.
+          <b>Restaufwand bis zum PR unveraendert bei rund 28 Arbeitstagen</b>,
+          Upstream-Review nicht gerechnet.
+        </li>
+        <li>
+          <b>Stand 13.09.2026 (abends):</b>
+          <b>Phase A und B sind durch, Phase C bis auf zwei banknur-Zeilen.</b>
+          M3 steht bei <b>4 von 29</b> Zeilen ohne pruefenden Test statt 8;
+          DR-03 und DR-16 warten auf den G2-Lauf (E1), die Flagge --phase
+          implementation faellt also nach E1, nicht nach M3.
+          <b>W1 ist fertig</b> (D6-10), <b>W2 ist durch</b>, und
+          <b>W3s ESP32-Haelfte steht und ist auf Hardware bewiesen</b>: DK5EN-93
+          behaelt nach dem Upgrade 104 von 107 exportierten Einstellungen
+          byteidentisch, ueber den Migrationsboot UND einen normalen Reboot; die
+          drei Abweichler sind lebendes GPS.
+          <b>Drei Dinge kamen dazu, die im Plan nicht standen.</b>
+          <b>Erstens W3b:</b> die BLE-Settings-Charakteristik nagelt das
+          Byte-Layout des Structs fest -- die Telefon-App schreibt ein rohes
+          Abbild, das der Knoten direkt ueber seine Einstellungen memcpy-t, ohne
+          Versionsfeld. Der Struct-Merge war damit vorher gar nicht sicher
+          machbar; das Layout musste erst hinter s_ble_settings_v1 eingefroren
+          werden, rund ein Tag, den der Plan nie hatte.
+          <b>Zweitens ein Defekt im eigenen Commit bce95db5:</b> save_settings()
+          lief aus init_flash() heraus, waehrend dessen Preferences-Handle offen
+          war, und setzte damit bei jedem Boot rund die zweite Haelfte aller
+          ESP32-Einstellungen zurueck -- gefunden, behoben, bewacht,
+          regressionsgetestet, nie auf Hardware gelangt.
+          <b>Drittens wurde fork-main hereingemergt</b> (33 Commits), wobei eine
+          echte ID-Kollision auffiel: beide Zweige hatten TD-16 vergeben, unsere
+          Zeile heisst jetzt TD-19. <b>Was W3 noch fehlt:</b> der Struct-Merge
+          selbst (D1-04, die riskante Haelfte), das mitgliedweise fail-closed
+          Gate und DR-12/DR-13.
+          <b>W4 bis W7, C4d und die ganze Phase E sind unberuehrt</b> — nach den
+          Planschaetzungen rund <b>30 Arbeitstage</b> bis zum PR (vorher 33),
+          das Upstream-Review nicht mitgerechnet. Die Aufstellung Zeile fuer
+          Zeile steht im BACKLOG unter &bdquo;Campaign stand 2026-09-13&ldquo;.
+        </li>
+        <li>
+          <b>Was der Review geaendert hat, und warum das hier steht.</b> Der
+          schaerfste Fund: <b>ESP32 hat nie blockiert.</b> Die Entscheidung
+          DR-21/DR-24 war gegen einen Fehlermodus geschrieben, den es nicht gibt
+          — <code>WiFiUDP::write()</code> puffert nur, das echte Sendeergebnis
+          liefert <code>endPacket()</code>, und das wurde geloggt und verworfen.
+          Beide Plattformen verwerfen also heute, und die geplante Retry-Logik
+          haette ein Problem geloest, das keines war. Zweiter Fund:
+          <b>DR-18 haette gar nichts ausgeliefert</b>, weil
+          <code>sendExtern()</code> keinen 0x41-Zweig hat — das Tor waere
+          erweitert worden auf eine Funktion, die ACKs ohnehin ignoriert.
+          Dritter: die geplante nRF52-Diagnose haette
+          <code>hasIPaddress</code> gelesen, das ein gezogenes Kabel nie meldet.
+          Nebenbei fiel ein echter, bisher unbekannter Defekt an (EXT-01).
+          <b>Die Lehre steht hier, nicht nur in der Matrix:</b> vier von 29
+          Entscheidungen waren nach sorgfaeltigem Lesen trotzdem falsch
+          begruendet, und keine davon haette ein Test gefangen — nur das erneute
+          Herleiten am Quelltext.
+        </li>
+        <li>
+          <b
+            >Drei Zahlen im Plan waren falsch und sind korrigiert statt still
+            uebernommen.</b
+          >
+          „C3 braucht keinen Carve" (der Blocker war nie <code>Serial</code>,
+          sondern die Uebersetzungseinheit), „~18 Timer-Praedikate" fuer D1-10
+          (gemessen: 78 Praedikatstellen ueber 43 Timer-Variablen, davon 25
+          gemeinsam — und nur die 25 sind fuer einen gemeinsamen Scheduler
+          relevant), und „sechs Felder fehlen auf nRF52" in DR-12 (gemessen: 14
+          nur-ESP32 und 2 nur-nRF52). Alle drei sind mit Definition und
+          Messdatum hinterlegt, weil eine Zahl ohne Definition genau so lange
+          ueberlebt wie „~18".
+        </li>
+
+        <li>
+          <b>Betreiberentscheidung 5 vom 11.09.: schmales G1 wird akzeptiert</b
+          >, kein zusätzlicher Bench-Tag. H1, H2, H5, H7 und H9 werden nicht
+          erfasst. Das ist bewusst und es hat einen Preis, der hier stehen
+          bleiben soll:
+          <b>sieben der neun Einheiten haben kein Vorher-Bild auf Hardware.</b>
+          G1 kann die Neutralität der Carve-outs nur für den UDP-Eingang (U1)
+          und die T-Deck-Oberfläche (U9) belegen; für alles andere stützt sich
+          die Aussage auf das 32-Env-Build, das Region-Gate und das Lesen des
+          Diffs. Das ist ein Beleg, aber keine Messung, und die Abnahmekriterien
+          in Abschnitt 9 müssen das so benennen. N1 trägt dadurch mehr — und für
+          die Datagramme aus U2 und die Frames aus U7/U8 trägt es gar nicht,
+          weil deren Fixtures aus demselben Code entstünden, der geändert wird.
+          Das Zeitfenster für eine Vorher-Aufnahme schließt mit C3; danach ginge
+          es nur noch über ein Zurück auf den Tag.
+        </li>
+        <li>
+          <b>Stand 15.09.2026:</b>
+          <b
+            >Welle 3c ist durch -- der Struct ist einer, und er darf sich ab
+            jetzt frei aendern.</b
+          >
+          Nichts haengt mehr an seinem Byte-Layout: ESP32 und nRF52 persistieren
+          per Schluessel, BLE spricht das eingefrorene v1-Abbild, der alte
+          nRF52-Blob wird durch dasselbe v1-Abbild gelesen. Das Member-Gate
+          ersetzt den textparsenden Struct-Zwilling durch einen kompilierten
+          Test, der jedes Member kennt. Was von W3 bleibt, ist Hardware: RAK-90,
+          Heltec-93 und T-Deck-14 auf den Tisch. Bis zum PR jetzt ~29
+          Arbeitstage.
+        </li>
+        <li>
+          <b>Stand 16.09.2026:</b>
+          <b
+            >Der W3-Bench-Lauf ist gemacht -- zwei von drei Knoten bestehen, W3
+            bleibt offen.</b
+          >
+          Alle drei Knoten lagen gleichzeitig auf dem Tisch, jeder von einem
+          echten 20260724-Image aus geflasht. Die ESP32-Haelfte besteht:
+          <b>DK5EN-93</b> 105 erhalten / 0 verloren (die drei Abweichler sind
+          lebendes GPS, nachgewiesen durch zwei Exporte 20 s auseinander
+          <i>ohne</i> Flash dazwischen: node_alt wandert von allein),
+          <b>DK5EN-14</b> <b>107 von 107</b> ueber Migrationsboot und Reboot.
+          Auch <b>DK5EN-90</b> behaelt jede Einstellung, meldete aber
+          <code>legacy_migration_failed</code> statt
+          <code>legacy_migrated</code> -- ein <b>Fehlalarm</b>:
+          <code>lfs_rename()</code> meldete einen Fehler fuer eine Verschiebung,
+          die es tatsaechlich ausgefuehrt hatte, und der Retry scheiterte danach
+          nur deshalb, weil seine Quelle schon weg war. <b>Behoben</b>, indem
+          jetzt das Ziel geprueft wird statt des Rueckgabewerts
+          (<code>save;rename_false_negative</code>), mit zwei
+          mutationsgeprueften Tests. Der Hardware-Arm wurde am selben Tag
+          nachgeholt (erzwungenes Downgrade auf die offizielle v4.35t und
+          zurueck): der Upgrade-Boot meldete <code>legacy_migrated</code>, 102
+          erhalten, 0 geaendert, 0 verloren. Zusammen mit
+          <code>--persiststat</code>, das jetzt alle 17 nur-persistierten
+          Schluessel zurueckliest, <b>ist W3 erledigt</b>.
+          <b>Nebenher geschlossen:</b> die Counters-Migration ist auf beiden
+          Plattformen belegt (neue Sonde <code>--msgid</code>; 182/282/382 pro
+          Boot auf dem Heltec).
+          <b>Drei Werkzeuge waren kaputt und sind repariert</b>, bevor der Lauf
+          ueberhaupt berichten konnte: <code>w3_upgrade_check.py</code> meldete
+          FAIL auf einem gesunden Knoten (jetzt <code>--gps-node</code> und ein
+          Bucket REMOVED BY DESIGN), die Baselines vom 12.09. waren abgedriftet
+          (Heltec 4 Felder, RAK 13 -- er war zwischenzeitlich auf
+          Werkseinstellungen zurueckgefallen), und
+          <code>pio run --target upload</code> meldet
+          <code>[SUCCESS]</code> ueber einen fehlgeschlagenen nrfutil-DFU: der
+          RAK geht nur ueber <code>--dfu</code> + UF2. Details:
+          <code>docs/bench/w3-baseline/README.md</code> Abschnitt 7.
+        </li>
+        <li>
+          <b>Zwei Funde, die nicht im Plan standen.</b> <b>TD-19/TD-18:</b> die
+          tote Tastatur des T-Deck war die gespeicherte Tastensperre (SYM+K),
+          und das automatisierte Szenario <code>input</code> meldete dabei PASS
+          auf einer Tastatur, mit der der Betreiber kein Zeichen tippen konnte —
+          es zählt die <code>[KEY]</code>-Zeile, die vor der Sperre gedruckt
+          wird. Nebenbei widerlegt: TD-10 galt als auf dieser Bench nicht
+          nachweisbar, weil der Controller angeblich nicht auf die
+          Raw-Mode-Probe antwortet; die Probe war nur nie gelaufen, weil sie an
+          <code>!node_keyboardlock</code> hängt. <b>RF-01..RF-06:</b> fünf
+          fehlende Einheiten-Umrechnungen auf dem SX126x-Pfad, gefunden beim
+          Lesen für C5 (Aufgabe B2a).
+        </li>
+      </ul>
     </div>
-    <div class="controls">
-      <label for="start">Start (Montag)
-        <input type="date" id="start" value="2026-09-14">
-      </label>
-      <label><input type="checkbox" id="showreview" checked> Upstream-Review als Platzhalter anzeigen</label>
-      <button type="button" id="reset" title="Startdatum auf den tatsächlichen Projektbeginn zurücksetzen und die im Browser gemerkte Auswahl verwerfen">zurücksetzen</button>
-    </div>
-  </header>
 
-  <div class="kpis" id="kpis"></div>
+    <script>
+      (() => {
+        const PHASES = [
+          { id: "A", name: "Vorbereiten", color: "var(--p1)" },
+          {
+            id: "B",
+            name: "Basislinie und Charakterisierung",
+            color: "var(--p2)",
+          },
+          { id: "C", name: "Entscheiden", color: "var(--p3)" },
+          {
+            id: "D",
+            name: "Vereinheitlichen (Wellen 1-7)",
+            color: "var(--p4)",
+          },
+          { id: "E", name: "Nachweisen und ausliefern", color: "var(--p5)" },
+        ];
+        // days = Arbeitstage; after = Aufgabe, nach der diese beginnt (null = Phasenbeginn); parallele Aufgaben teilen sich "after"
+        const TASKS = [
+          {
+            id: "A1",
+            ph: "A",
+            name: "Upstream-Sync, 32-Env-Build, Basis taggen",
+            days: 1,
+            after: null,
+            gate: "Tag dry-base, Ressourcen-Baseline",
+            owner: "Orchestrator",
+            st: "done",
+            note: "Tag dry-base-20260911, 32 Envs gebaut, Baseline erneuert, 12 native Suiten grün (673 Fälle)",
+          },
+          {
+            id: "A2",
+            ph: "A",
+            name: "Korpus zusammenstellen, Rufzeichen-Lint",
+            days: 2,
+            after: "A1",
+            gate: "test/golden/corpus committet",
+            owner: "Agenten",
+            st: "done",
+            note: "28 LoRa-Frames, 37 UDP-1990-Datagramme, 23 EXTUDP, 21 BLE-Writes, 305 Kommandos; Rufzeichen-Lint grün",
+          },
+          {
+            id: "A3",
+            ph: "A",
+            name: "Werkzeuge: UDP-1799-Stub, BLE-Golden-Client, Normalisierer",
+            days: 3,
+            after: "A1",
+            gate: "Trockenlauf der Werkzeuge gegen RAK-90",
+            owner: "Agenten",
+            st: "done",
+            note: "Stub-Server existierte bereits und wurde erweitert; normalize.py, mc_frame.py, corpus_lint.py, extract_commands.py, ble_golden.py, console_golden.py",
+          },
+          {
+            id: "A4",
+            ph: "A",
+            name: "Knoten-Einstellungen sichern, Protokollvorlagen",
+            days: 1,
+            after: "A3",
+            gate: "G0 bereit",
+            owner: "Orchestrator",
+            gateEnd: true,
+            st: "done",
+            note: "Einstellungen von 2 der 4 Knoten gesichert (maskiert im Repo, unmaskiert im Vault). P0.9 am 12.09. erledigt: docs/testplan/protocol-before.md und protocol-after.md tragen die Tabellen aus Abschnitt 8, je eine Zeile pro (Knoten, Schritt) vorbefuellt, damit ein Lauf nur noch Zellen fuellt. Zwei Zeilensaetze sind bewusst breiter als die Knotenspalte in Abschnitt 6 und sagen das auch: H4 BLE (G0 hat alle vier Knoten erfasst, nicht zwei) und H8 EXTUDP (fuer alle vier gefuehrt, drei Aufnahmen offen). Damit ist jedes Phase-0-Werkzeug geschrieben; offen sind nur noch zwei Laeufe auf der Bench (P0.3 zwei Knoten, P0.8 die macOS-Bluetooth-Freigabe), kein Code.",
+          },
 
-  <div class="legend" id="legend"></div>
-  <div class="chart" id="chart">
-    <div class="tip" id="tip"></div>
-  </div>
+          {
+            id: "B1",
+            ph: "B",
+            name: "G0 Hardware-Goldens, 4 Knoten (schmal, Entscheidung 5)",
+            days: 2,
+            after: null,
+            gate: "test/golden/hw/G0",
+            owner: "Bench",
+            st: "done",
+            note: "Erfasst auf allen vier Knoten: BLE (H4, byteweise reproduzierbar), UDP-1990 (H6), EXTUDP (H8), dazu die T-Deck-UI-Checkliste (H11) nach Behebung von TD-19. NICHT erfasst und laut Betreiberentscheidung 5 vom 11.09. auch nicht mehr geplant: H1 Bootlog, H2 Settings-Dump, H5 LoRa-RX, H7 UDP-Upstream, H9 Settings-Roundtrip. Die Konsole (H3) liegt nur fuer Heltec-93 vor und ist keine Vergleichsbasis. Folge: sieben der neun Einheiten haben kein Vorher-Bild auf Hardware, G1 kann die Neutralitaet der Carve-outs nur fuer U1-Eingang und U9 belegen.",
+          },
+          {
+            id: "C1",
+            ph: "B",
+            name: "Carve C1: UDP-Frame-Handler je Plattform (U1)",
+            days: 0.4,
+            after: "B1",
+            gate: "32 Envs, RAM +0 B, Regionen unveraendert",
+            owner: "Agenten",
+            st: "done",
+            note: "getMeshComUDPpacket() -> handleUdpFrame_esp32(buf,len,src_ip); die 411 Zeilen aus NrfETH::getUDP() als freie handleUdpFrame_nrf52() mit gleicher Signatur. Verschobener Bereich gegen HEAD gediffed (Einrueckung und neth.-Qualifizierung herausgerechnet): nur der beabsichtigte Epilog-Tausch. 32/32 Envs, RAM +0 B, Flash +4..+320 B, Regionen byteweise unveraendert.",
+          },
+          {
+            id: "C2",
+            ph: "B",
+            name: "Carve C2: Socket-Primitive fuer den Datagramm-Versand (U2)",
+            days: 0.4,
+            after: "C1",
+            gate: "32 Envs, Regionen unveraendert",
+            owner: "Agenten",
+            st: "done",
+            note: "Drei Primitive je Plattform statt des einen udpSendRaw() aus dem Plan: die Fehlerpolitik des Aufrufers laeuft auf ESP32 ZWISCHEN write und endPacket, und auf nRF52 steht ein Debug-Print zwischen beginPacket und der Schreibschleife -- beginPacket ist dort eine SPI-Transaktion zum W5100S. 32/32 Envs, RAM +0 B.",
+          },
+          {
+            id: "C3",
+            ph: "B",
+            name: "Carve C3: checkSerialCommand() in eigene TUs (U3)",
+            days: 0.4,
+            after: "C2",
+            gate: "32 Envs, Rumpf byteidentisch",
+            owner: "Agenten",
+            st: "done",
+            note: 'Die Planzeile "kein Carve noetig, nur Build" war falsch: blockiert war U3 nicht durch Serial, sondern dadurch, dass die Funktion in den beiden groessten Uebersetzungseinheiten des Baums lag, die nie auf einem Host uebersetzen. Je Plattform eine eigene TU, bewusst NICHT zusammengefuehrt -- Zusammenfuehren waere Vereinheitlichung und ist eine Matrix-Entscheidung. Beide Rumpfe diffen byteidentisch gegen HEAD. 32-Env-Gate laeuft.',
+          },
+          {
+            id: "C4",
+            ph: "B",
+            name: "Carve C4: Gateway-Block und Scheduler (D1-09, D1-10)",
+            days: 0.4,
+            after: "C3",
+            gate: "32 Envs, Regionen unveraendert",
+            owner: "Agenten",
+            st: "done",
+            note: 'gatewayService_esp32()/_nrf52(), beide Bloecke byteidentisch gegen HEAD. Nur D1-09 ist gecarvt; D1-10, der Loop-Scheduler, steht weiter aus. Die Zahl "~18 Timer-Praedikate" aus dem Plan war falsch und ist am 12.09. gemessen worden -- mit Definition, denn genau deren Fehlen hat "~18" so lange ueberleben lassen: 78 Praedikatstellen (if/while-Bedingungen mit millis(); 43 ESP32, 35 nRF52) ueber 43 Timer-Variablen, davon 25 auf beiden Seiten, 12 nur ESP32, 6 nur nRF52. Fuer den Carve zaehlen die 25 gemeinsamen -- nur die koennte ein gemeinsamer Scheduler uebernehmen.',
+          },
+          {
+            id: "C5",
+            ph: "B",
+            name: "Carve C5: countryProfile() aus lora_setcountry() (U6)",
+            days: 0.4,
+            after: "C4",
+            gate: "32 Envs, Laenderdump identisch",
+            owner: "Agenten",
+            st: "done",
+            note: "countryProfile() in eigener TU, haengt nur an den Konfigurationsmakros. Die 14 Tabellenfaelle diffen byteidentisch gegen HEAD, Land 7 (MAN) ist wortgleich in den else-Zweig gewandert. Beim Carve selbst eingebaut und gefangen: ohne explizites case 7 haette default den Code 7 verschluckt.",
+          },
+          {
+            id: "B2a",
+            ph: "B",
+            name: "Ungeplant: RF-01..RF-06, fehlende Einheiten-Umrechnungen",
+            days: 0.5,
+            after: "B1",
+            gate: "radio_units_lint + test_radio_units",
+            owner: "Agenten",
+            st: "done",
+            note: "Beim Lesen von lora_setcountry() fuer C5 gefunden, nicht durch einen Test. node_freq/node_bw/node_cr tragen je Plattform andere Einheiten (OPT-D14), und an fuenf Schreibstellen fehlte die Umrechnung: --txbw, --txcr, case 7 (MAN), --txfreq und die --info-Anzeige. Behoben ueber src/radio_units.cpp. Regression zweiteilig: test_radio_units fuer die Tabelle, radio_units_lint.py fuer die Aufrufstellen (18 Verstoesse vorher, 0 nachher). RF-04 bewusst nicht behoben (Schutzband 10x zu breit, waere auch auf ESP32 eine Verhaltensaenderung), RF-07 als unbelegte Spur abgelegt. Keine Bestaetigung auf Hardware: T114 und T-Echo stehen auf dieser Bench nicht.",
+          },
 
-  <h2>Terminplan als Tabelle</h2>
-  <div class="tablewrap"><table id="table">
-    <thead><tr><th>ID</th><th>Aufgabe</th><th>Stand</th><th>Beginn</th><th>Ende</th><th>Tage</th><th>Gate / Ergebnis</th><th>Verantwortlich</th></tr></thead>
-    <tbody></tbody>
-  </table></div>
+          {
+            id: "B3",
+            ph: "B",
+            name: "G1 Hardware-Goldens, muss G0 entsprechen",
+            days: 1,
+            after: "C5",
+            gate: "G1 == G0",
+            owner: "Bench",
+            st: "done",
+            note: "G1 vollstaendig und sauber: 12 von 12 Zellen identisch zu G0 -- BLE, UDP-1990 und EXTUDP auf allen vier Knoten, aufgenommen auf Instrument-Images des Baums nach den Carve-outs, jeder Knoten vorher aus dem Vault zurueckgespielt. Keine Abweichung ausserhalb von EXPECTED-DIFF.md, das vor dem Lauf geschrieben wurde. Drei Vergleichswerkzeuge mussten dafuer erst entstehen.",
+          },
+          {
+            id: "B4",
+            ph: "B",
+            name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten",
+            days: 6,
+            after: "B3",
+            gate: "Twin-Diff-Fixtures committet",
+            owner: "Agenten",
+            gateEnd: true,
+            st: "done",
+            note: "Sechs Suiten stehen: U1 Frame-Handler (14 Faelle), U2 Ring-Drain (15), U3 Serial (6x2), U6 Laender (4x2), U7 APRS-Epilog (8), U8 mHeard-Render (15) -- alle mutationsgetestet. U1 und U3 brauchten VORHER einen Carve: C1 und C3 hatten nur die Signatur getrennt, die Ruempfe lagen weiter in TUs, die nativ nie bauen; dritter Fall desselben Musters nach C2/U2. U4 Settings und U5 Kommandoleiter werden KEINE Zwillinge: beide Einheiten lassen sich zu keinem vertretbaren Preis nativ linken, also decken sie statische Python-Gates ab (settings_layout_lint.py, command_ladder_lint.py, je mit --self-test, beide in selftest.sh). Das ist schwaecher als ein Zwilling und wird auch so gefuehrt -- ein Lint liest den Quelltext, es fuehrt ihn nicht aus. U7/U8 haben zwei Befunde geliefert, beide festgenagelt statt behoben (OPT-D15 0x7E-Subversion geht pro Hop verloren, OPT-D16 die mHeard-Liste sortiert nicht). Offen bleibt nur U9 (UI), das Hardware braucht.",
+          },
 
-  <h2>Annahmen</h2>
-  <ul class="notes">
-    <li>Die Dauern sind die Schätzungen aus <code>docs/testplan-dry-unification-20260910.md</code> und dem Wellenplan in <code>docs/optimization-audit-20260910.md</code> Abschnitt 7.1. Eine Person plus Agenten; keine parallelen Bench-Tage.</li>
-    <li>Ein Gate ist ein harter Stopp: die nächste Phase beginnt erst, wenn die Prüfungen des Gates grün und committet sind. Gates sind als Rauten am Phasenende gezeichnet.</li>
-    <li>Die Freigabe der Drift-Matrix (C2) ist der einzige menschliche Entscheidungspunkt und liegt auf dem kritischen Pfad.</li>
-    <li>Das Upstream-Review ist extern und von unbekannter Dauer; der schraffierte Balken ist ein Platzhalter und zählt nicht zur Summe.</li>
-    <li>Das Startdatum oben verschiebt den gesamten Plan; die Wahl bleibt nur in diesem Browser gespeichert. Voreingestellt ist der tatsächliche Beginn, 11.09.2026.</li>
-    <li><b>Die Carve-outs heißen jetzt C1 bis C5 und stehen einzeln im Diagramm.</b> Vorher steckten alle fünf in einer Sammelzeile „B2“, während die Aufgaben der Phase <i>Entscheiden</i> ebenfalls C1, C2, C3 hießen — „C4“ und „C5“ kamen im Diagramm also gar nicht vor, und „C2“ meinte zwei verschiedene Dinge. Die Entscheidungsaufgaben heißen daher jetzt M1 bis M3 (Matrix), die Carve-outs behalten die Bezeichnungen aus <code>testplan-dry-unification-20260910.md</code> Abschnitt 4.2.</li>
-    <li><b>Warum der Standbalken jetzt am Fortschritt hängt, nicht am Datum.</b> Er steht am Ende der am weitesten fortgeschrittenen nicht-offenen Aufgabe — markiert also, wie viele Aufgaben erledigt sind, nicht welcher Tag heute ist. Die Termine auf der Zeitachse bleiben Schätzungen aus dem Plan; dass der tatsächliche Arbeitsfortschritt ihnen bislang nicht gefolgt ist, zeigt sich am Abstand zwischen den ausgefüllten Balken und dem Standbalken.</li>
-    <li><b>Betreiberentscheidung 6 vom 17.09.2026: vorerst KEIN PR.</b> Woertlich: <i>"no PR at the moment. Everything here is very experimental"</i>. Damit fallen <b>E4</b> (Einreichung an icssw-org DEV) und <b>E5</b> (Review durch Kurt) aus dem Plan, und <b>E2</b> gleich mit -- dessen einziges Erzeugnis ist die deutsche PR-Beschreibung. Der Plan endet jetzt bei <b>E3</b> (Upstream-Resync und gezielter Wiederholungslauf), was als Hygiene unabhaengig vom PR sinnvoll bleibt. <b>Was das aendert:</b> das Zeitbudget bis zum "Ende" faellt von rund 17 auf rund 12 Arbeitstage, und der Druck, W7 erst unmittelbar vor dem PR zu machen, entfaellt technisch -- die Reihenfolge bleibt trotzdem wie beschlossen, weil ein spaeterer PR dieselbe Konfliktflaeche haette. <b>Was das NICHT aendert:</b> die Arbeit selbst wird vollstaendig zu Ende gefuehrt und committet; nur das Einreichen unterbleibt.</li>
-    <li><b>Stand 17.09.2026 (spaet): drei Firmware-Defekte, und eine Messung, die meine eigene Erklaerung widerlegt hat.</b>
-      Die Jagd begann damit, dass DK5EN-90 keines von 23 EXTUDP-Korpusobjekten beantwortete, und endete zweimal in einer
-      falschen Diagnose, bevor eine Messung sie beendet hat. Der Reihe nach, weil die Reihenfolge die Lehre ist.
-      <br><br><b>Erste Erklaerung, falsch: der Socket geht nie auf.</b> <code>EthernetUDP::begin()</code> liefert 0, wenn
-      kein Socket frei ist -- der W5100S hat vier, geteilt mit dem 1990er-Socket, DHCP und dem Webserver -- und der
-      Rueckgabewert wurde weggeworfen. Danach druckte der Code <i>now listening</i>, eine Behauptung, die er nie geprueft
-      hatte, und setzte <code>hasExternIPaddress</code>. Dieses Flag ist der fruehe Ausstieg derselben Funktion und das,
-      was der Empfangspfad prueft: ein einmal fehlgeschlagenes bind waere damit still, dauerhaft und ueber Neustarts
-      hinweg unsichtbar gewesen, und <code>--extudp off</code> loescht es nicht. <b>Als EXT-02 behoben</b> -- ein echter
-      latenter Defekt. Nur war er hier nicht die Ursache: ein frischer Boot druckt sehr wohl <i>now listening</i>,
-      <code>begin()</code> liefert 1.
-      <br><br><b>Zweite Erklaerung, auch falsch: der Link ist instabil.</b> Er ist es nicht --
-      <code>[ETH]</code> meldet durchgehend <code>link;1</code>. Dabei fiel allerdings ein zweiter, echter Defekt auf:
-      ein Knoten, der nie eine DHCP-Lease bekommt, fragt nie wieder. <code>checkDHCP()</code> ist
-      <code>Ethernet.maintain()</code> und erneuert eine BESTEHENDE Lease; der einzige Pfad, der neu erwirbt, liegt im
-      <code>if(bGATEWAY)</code>-Block. Ein Webserver-Knoten oder ein EXTUDP-Peer hat also genau einen Versuch, im Setup.
-      Die eigenen Zaehler des Knotens zeigten es unmissverstaendlich: <code>link;1</code>, <code>ip;0.0.0.0</code>,
-      <code>got_ip_n;0</code>, <code>resets;0</code> -- PHY oben, nie eine Lease, nie ein Versuch, auch ueber einen
-      physischen Kabelwechsel hinweg. <b>Als ETH-02 behoben</b>, Hardware-Bestaetigung noch offen.
-      <br><br><b>Dann wurde gemessen statt geraten.</b> Der EXTUDP-Pfad war als einziger heisser Pfad ohne Zeitmessung --
-      deshalb war das ueberhaupt unsichtbar. Vier <code>INSTR_SECTION</code>-Sonden, 397 Schleifendurchlaeufe:
-      <code>extudp_parse</code> max <b>977 us</b>, <code>extudp_guard</code> 977, <code>webserver_loop</code> <b>0</b>,
-      und <code>extudp_read</code> <b>nie ausgefuehrt</b>. <b>Nichts haengt.</b> Die SPI-Bus-Theorie, die
-      parsePacket-Theorie und die verhungerter-Webserver-Theorie sind damit alle tot. Dass extudp_read nie lief, heisst:
-      die Datagramme erreichen den Socket ueberhaupt nicht.
-      <br><br><b>Der wahre Befund (ETH-03), und er ist praeziser als alles davor:</b> waehrend der Knoten auf jedem Port
-      taub ist, beantwortet der W5100S <b>ICMP mit 3/3 Paketen in 3,5 ms</b> -- er haelt und nutzt die Adresse --, und
-      <code>--info</code> sagt gleichzeitig <code>hasIpAddress: no</code>. Jeder Dienst haengt an diesem Flag, der Knoten
-      wird also zum Zombie: pingbar, Schleife laeuft, seriell ansprechbar, taub. ETH-03 ist ein FALSCHES Loeschen von
-      <code>hasIPaddress</code> auf einem nachweislich oberen Link, und der EXTUDP-Verkehr ist der Ausloeser, nicht das
-      Opfer. Welche der vier Loeschstellen feuert, ist der naechste Messschritt -- nicht die naechste Vermutung.
-      <br><br><b>Beinahe waere die Messung leer geblieben</b>, und das ist der Merkposten fuer jedes kuenftige
-      Instrument: <code>INSTR_SECTION_SLOTS</code> stand auf 16, der Baum traegt <b>42</b> Sektionsnamen, Slots werden pro
-      Boot nach Erstankunft vergeben, und die Ablage kehrt bei voller Tabelle STILL zurueck. Mindestens neun Sektionen
-      laufen vor dem EXTUDP-Block -- die vier neuen Sonden waeren vermutlich die abgeschnittenen gewesen, und der Bericht
-      haette ausgerechnet die Zeilen nicht enthalten, um die es geht. Das liest sich dann wie
-      &bdquo;die Sektion lief nie&ldquo;. Jetzt 48, und da die Datei ganz in <code>#if INSTRUMENT_ENABLED</code> liegt,
-      kostet es die Auslieferung nichts.
-      <br><br><b>H4 ist gelaufen und in Phase 1 nicht zur Ruhe gekommen</b>, auf beiden Knoten, also kein G1-Vergleich --
-      siehe die Notiz an E1. Beide Ursachen liegen im Instrument, nicht in der Firmware. Dazu hat das Gate selbst noch
-      einen Fehler im Pruefer gefangen: <code>verify_captures.py</code> leitete den Knoten aus dem unmittelbaren
-      Elternverzeichnis ab und lehnte die vier neuen Aufnahmen als <code>unknown node</code> ab. Der Fehler lag im
-      Pruefer -- die H4-Vorschrift sieht diese zweite Ebene ausdruecklich vor.</li>
-    <li><b>Stand 17.09.2026 (abends): W6 und C4d sind zu, W5 haengt nur noch an einer Zeile.</b>
-      <b>W6a</b> (<code>55a7b4c4</code>) hat neun entschiedene U1-Driftzeilen vereinheitlicht; der Twin-Diff geht von
-      <b>24 auf 36 gleiche</b> und von <b>13 auf 1 verschiedene</b> Faelle, ohne eine einzige Regression, und der eine
-      Ueberlebende ist genau DR-20. <b>W6b</b> (<code>3be9a9da</code>) hat DR-20, die sechs U2-Zeilen und DR-18 Teil 2
-      nachgezogen. Damit ist <b>jede Driftmatrix-Zeile geschlossen, die eine Quellaenderung schliessen kann</b>.
-      Der Advisor-Lauf hat dabei einen <b>echten Cross-Task-Race gefangen, bevor er ausgeliefert wurde</b>:
-      <code>queueExternAck()</code> schrieb aus dem Main-Loop in die Single-Producer-Queue <code>externQueue[]</code>,
-      die <code>OnRxDone</code> aus dem LORA-Task beschreibt. Das ist der Wert des Gates, nicht die Zahl der Befunde.
-      <br><br><b>C4d ist mit DR-03 fertig.</b> nRF52 war in der ersten Stufe der Heartbeat-Ueberwachung <b>65 Sekunden
-      lang stumm</b> und ging dann direkt an die Link-Neuinitialisierung; ESP32 warnt seit jeher nach 35 s. Die 30 s
-      dazwischen sind genau das Fenster, in dem das Log <i>Server still</i> von <i>Link tot</i> unterscheiden koennte.
-      Portiert wurde <b>nur die Diagnose, nicht die ESP32-Sofortaktion</b> -- deren nRF52-Gegenstueck ist
-      <code>resetDHCP()</code>, und das ist N-20: jeder Retry resettet den W5100S hardwareseitig, danach verbindet ein
-      einmal gezogenes Kabel nie wieder. Eine zweite, fruehere Ausloesestelle dafuer waere ein Rueckschritt im
-      Gewand der Parität gewesen.
-      <br><br><b>R1-04 ist eingecheckt und auf der Bank belegt.</b> Der RX-Log-Ring wird jetzt erst angelegt, wenn
-      jemand die Seite oeffnet: <b>-109 040 B RAM</b> ueber 34 Envs gegen <b>+7 076 B Flash</b>. Der Soak lief auf
-      <b>zwei Knoten mit je einem Arm</b> -- DK5EN-93 mit angelegtem Ring unter echtem LoRa-Empfang, DK5EN-90 mit nie
-      angelegtem Ring. Die Heap-Messung zeigt den Einmal-Charakter direkt: erster Seitenaufruf <b>-3 132 B</b>,
-      zweiter -236, dritter -224. <b>Zwei Stunden haben gereicht, nicht zwoelf</b>; beide Arme sind binnen Minuten
-      sichtbar, alles danach ist Stabilitaet. Auch <b>EXT-01</b> ist auf Hardware bestaetigt: der Telemetrie-Frame
-      erzeugt keinen <code>[EXT] Out: Len: 0</code>-Marker mehr, und der Frame danach geht normal raus -- der Socket
-      ueberlebt also den Frame, der ihn vorher abgeraeumt hat.
-      <br><br><b>Offen sind noch vier Zeilen</b>: die <code>mheardLine</code>-Haelfte von R2-04, W7, E1 und E3.
-      E2, E4 und E5 sind mit Entscheidung 6 gestrichen und stehen nur noch durchgestrichen im Balkenplan, damit
-      sichtbar bleibt, dass sie geplant waren und warum sie wegfielen.</li>
-    <li><b>Stand 17.09.2026:</b> <b>W5 ist zu sieben Neunteln durch</b> und haengt nur noch an Hardware. Geliefert: <b>GRD-01</b> (ein <code>MC_HAS_U8G2</code> statt sieben handgeschriebener Kopien und einer Neun-Arm-Kaskade), <b>R2-01</b> (der MHeard-Textcodec ist weg: -83 200 B RAM, -54 676 B Flash, -117 Zeilen), <b>R3-12</b>, <b>R4-01</b> (-49 168 B internes DRAM auf dem T-Deck Pro), <b>R2-04</b> aprsMessage-Haelfte (-109 068 B Flash) und <b>R1-02</b> Schritt 1. Zusammen rund <b>247 kB Flash und 117 kB RAM</b> zurueck ueber die Flotte. Zwei Zeilen wurden <b>abgelehnt und die Bytes bewusst liegen gelassen</b>, weil sie zwei Codepfade gekostet haetten, wo einer reicht: R3-13 (1 200 B, aber 6-Hop-Pfade wuerden abgeschnitten, und <code>--maxhop</code> erlaubt 6) und R4-02/03 (1 400 B gegen einen Alloc-Fehlerpfad auf 20+ Boards). Offen bleiben <b>R1-04</b> (braucht den 12-h-nRF52-Soak) und die <b>mheardLine-Haelfte von R2-04</b>.
-    <br><br><b>Was die Zeilen wert waren, war nicht das, was das Audit vorhersagte.</b> Bei R2-01 fehlte die Flash-Ersparnis (54 kB) im Audit vollstaendig, bei R2-04 ebenso (109 kB) -- und dessen RAM-<i>Kosten</i> sind kein Streuverlust, sondern <b>ein einziges Global</b> (<code>pendingDisplayMsg</code>, 144 -> 608 B). R4-01 war gar keine Abstimmungszeile: es gibt <b>fuenf Kopien von lv_conf.h</b> im Baum, vier laufen seit jeher auf <code>ps_malloc</code>, und <code>config/lv_conf.h</code> war schlicht die, die den Schritt nie mitgemacht hat. Die Audit-Zeilen sind Hypothesen, keine Befunde.
-    <br><br><b>Fuenf Defekte fielen bei R2-04 nebenbei an</b>, jeder eine Klasse, die wiederkommt: eine Nutzlast-Schleife, die <b>nur durch ihre Aufrufer begrenzt</b> war (direkt mit einem 340-Byte-Frame aufgerufen: SIGABRT, stack smashing -- heute nicht ausloesbar, weil jeder Aufrufer auf 255 begrenzt ist, aber die Sicherheit war geborgt); ein Feld, das jahrelang der <code>String</code>-Konstruktor initialisiert hatte, sodass <code>initAPRS()</code> es nie brauchte; die Klemmung von <code>substring()</code>, die beim Uebergang auf Zeigerarithmetik verloren ging; eine <b>Ueberladungsaufloesung, die bei breiterem Argumenttyp still umsprang</b> (<code>utf8ascii</code> hat drei); und zwei Puffer, die um ein Byte zu klein waren, solange der Compiler die Quelllaenge nicht kennen konnte. Dazu eine Include-Falle: <b><code>MAX_MHEARD</code> ist in <code>configuration_global.h</code> pro Board definiert</b>, und diesen Header aus einem frueh eingebundenen zu ziehen gab der MHeard-Tabelle still 50 statt 80 Plaetze.
-    <br><br><b>Restaufwand:</b> von 31 Zeilen sind 21 erledigt, M3 laeuft, neun sind offen. Auf dem kritischen Pfad liegen W6 (6 Tage), C4d (1), W7 (3) und Phase E1-E4 (6,5) -- rund <b>17 Arbeitstage</b> bis zum PR, Upstream-Review nicht gerechnet. Drei Posten sind <b>nicht durch Agenten zu leisten</b>: E1 ist ein Bench-Lauf, R1-04 braucht den 12-h-Soak, und DISP-01 wartet weiter auf Heltec V3 plus einen T-Beam.</li>
-    <li><b>Stand 16.09.2026:</b> <b>W3 ist geschlossen und auf Hardware bewiesen</b> -- der erzwungene Rueckbau auf das offizielle v4.35t und das anschliessende Upgrade auf DK5EN-90 lieferten legacy_migrated, 102 erhaltene Felder, 0 geaenderte, 0 verlorene; alle 17 reinen Persist-Schluessel sind ueber --persiststat lesbar und durch einen Lint festgenagelt. <b>W4 ist geschlossen:</b> D2-10, D2-06, D2-07 und D2-01 sind committet (Zahlen und Einschraenkungen stehen in der Notiz zu W4). <b>W5 ist entblockt</b> -- alle sechs Betreiberentscheidungen sind gefallen, und R4-02/03 braucht keine Board-Liste, weil das OLED bereits zur Laufzeit erkannt wird. <b>Vier Befunde nebenbei, die keine DRY-Zeilen sind</b> (BACKLOG &sect;3.8ah): src/configuration_global.h hatte GAR KEINEN Include-Guard -- behoben; env:esp32-external-radio ist per #error absichtlich nicht allein baubar und braucht ein Build-Overlay, das nicht im Repo liegt -- kein Defekt, sondern eine fehlende Eingabe; variants/t5_epaper/ ist das EINZIGE Variantenverzeichnis ohne configuration.h, weshalb die Umgebung nie uebersetzt hat -- wird geschrieben; und DISP-01: der ESP32-Zweig waehlt fuer die Antwort der Display-Erkennung den FALSCHEN U8g2-Treiber (Vertrag ist 2 = SSD1306, 1 = SH1106; nRF52 haelt sich daran, ESP32 dreht es um, gegen den eigenen Kommentar zwei Zeilen darueber). Dokumentiert, Code unveraendert: die fest verdrahteten Frueh-Rueckgaben in esp32_isSSD1306() scheinen auf die Umkehrung eingestellt zu sein, eine blinde Korrektur tauschte nur einen ungeprueften Zustand gegen einen anderen. Bench-Nachweis offen auf Heltec V3 und einem T-Beam. <b>Zwei Dinge, die nicht im Plan standen.</b> <b>Erstens:</b> ein blosses pio test ohne -e laeuft ueber ALLE Umgebungen und fuehrt auf Board-Umgebungen upload __test aus -- es flasht also eine Unity-Testfirmware auf angeschlossene Hardware. DK5EN-14 (T-Deck Plus) landete dadurch im ROM-Bootloader und musste neu geflasht werden; nichts kaputt, aber rund zwanzig Minuten weg. Der Befehl bekommt ab jetzt immer eine ausdrueckliche Liste der native*-Umgebungen. <b>Zweitens:</b> ein Scout-Agent ueberschrieb im gemeinsamen Scratchpad die Skripte der Pipeline, weil beide dieselben Dateinamen benutzten -- eine spaetere Neuausfuehrung lief still auf altem Code. Die D2-06-Pipeline liegt jetzt in einem eigenen Verzeichnis. <b>Restaufwand bis zum PR unveraendert bei rund 28 Arbeitstagen</b>, Upstream-Review nicht gerechnet.</li>
-    <li><b>Stand 13.09.2026 (abends):</b> <b>Phase A und B sind durch, Phase C bis auf zwei banknur-Zeilen.</b> M3 steht bei <b>4 von 29</b> Zeilen ohne pruefenden Test statt 8; DR-03 und DR-16 warten auf den G2-Lauf (E1), die Flagge --phase implementation faellt also nach E1, nicht nach M3. <b>W1 ist fertig</b> (D6-10), <b>W2 ist durch</b>, und <b>W3s ESP32-Haelfte steht und ist auf Hardware bewiesen</b>: DK5EN-93 behaelt nach dem Upgrade 104 von 107 exportierten Einstellungen byteidentisch, ueber den Migrationsboot UND einen normalen Reboot; die drei Abweichler sind lebendes GPS. <b>Drei Dinge kamen dazu, die im Plan nicht standen.</b> <b>Erstens W3b:</b> die BLE-Settings-Charakteristik nagelt das Byte-Layout des Structs fest -- die Telefon-App schreibt ein rohes Abbild, das der Knoten direkt ueber seine Einstellungen memcpy-t, ohne Versionsfeld. Der Struct-Merge war damit vorher gar nicht sicher machbar; das Layout musste erst hinter s_ble_settings_v1 eingefroren werden, rund ein Tag, den der Plan nie hatte. <b>Zweitens ein Defekt im eigenen Commit bce95db5:</b> save_settings() lief aus init_flash() heraus, waehrend dessen Preferences-Handle offen war, und setzte damit bei jedem Boot rund die zweite Haelfte aller ESP32-Einstellungen zurueck -- gefunden, behoben, bewacht, regressionsgetestet, nie auf Hardware gelangt. <b>Drittens wurde fork-main hereingemergt</b> (33 Commits), wobei eine echte ID-Kollision auffiel: beide Zweige hatten TD-16 vergeben, unsere Zeile heisst jetzt TD-19. <b>Was W3 noch fehlt:</b> der Struct-Merge selbst (D1-04, die riskante Haelfte), das mitgliedweise fail-closed Gate und DR-12/DR-13. <b>W4 bis W7, C4d und die ganze Phase E sind unberuehrt</b> — nach den Planschaetzungen rund <b>30 Arbeitstage</b> bis zum PR (vorher 33), das Upstream-Review nicht mitgerechnet. Die Aufstellung Zeile fuer Zeile steht im BACKLOG unter &bdquo;Campaign stand 2026-09-13&ldquo;.</li>
-    <li><b>Was der Review geaendert hat, und warum das hier steht.</b> Der schaerfste Fund: <b>ESP32 hat nie blockiert.</b> Die Entscheidung DR-21/DR-24 war gegen einen Fehlermodus geschrieben, den es nicht gibt — <code>WiFiUDP::write()</code> puffert nur, das echte Sendeergebnis liefert <code>endPacket()</code>, und das wurde geloggt und verworfen. Beide Plattformen verwerfen also heute, und die geplante Retry-Logik haette ein Problem geloest, das keines war. Zweiter Fund: <b>DR-18 haette gar nichts ausgeliefert</b>, weil <code>sendExtern()</code> keinen 0x41-Zweig hat — das Tor waere erweitert worden auf eine Funktion, die ACKs ohnehin ignoriert. Dritter: die geplante nRF52-Diagnose haette <code>hasIPaddress</code> gelesen, das ein gezogenes Kabel nie meldet. Nebenbei fiel ein echter, bisher unbekannter Defekt an (EXT-01). <b>Die Lehre steht hier, nicht nur in der Matrix:</b> vier von 29 Entscheidungen waren nach sorgfaeltigem Lesen trotzdem falsch begruendet, und keine davon haette ein Test gefangen — nur das erneute Herleiten am Quelltext.</li>
-    <li><b>Drei Zahlen im Plan waren falsch und sind korrigiert statt still uebernommen.</b> „C3 braucht keinen Carve" (der Blocker war nie <code>Serial</code>, sondern die Uebersetzungseinheit), „~18 Timer-Praedikate" fuer D1-10 (gemessen: 78 Praedikatstellen ueber 43 Timer-Variablen, davon 25 gemeinsam — und nur die 25 sind fuer einen gemeinsamen Scheduler relevant), und „sechs Felder fehlen auf nRF52" in DR-12 (gemessen: 14 nur-ESP32 und 2 nur-nRF52). Alle drei sind mit Definition und Messdatum hinterlegt, weil eine Zahl ohne Definition genau so lange ueberlebt wie „~18".</li>
+          {
+            id: "M1",
+            ph: "C",
+            name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export",
+            days: 1,
+            after: null,
+            gate: "drift-matrix.csv + xlsx",
+            owner: "Orchestrator",
+            st: "done",
+            note: "docs/testplan/drift-matrix.csv, 29 Zeilen DR-01..DR-29 in den Spalten aus Abschnitt 5.1. DR-01..DR-17 sind die Audit-Zeilen, jede gegen den Baum neu belegt statt aus der Prosa kopiert (88 file:line-Verweise, maschinell geprueft); DR-18..DR-29 stammen aus den sechs Zwillingen. Gate: test/golden/drift_matrix_lint.py in selftest.sh, prueft asserting_test als suite::case gegen den echten Baum (mutationsgetestet). Der xlsx-Export ist NICHT gebaut und auch nicht mehr noetig -- die Freigabe lief als Interview direkt gegen die CSV.",
+          },
+          {
+            id: "M2",
+            ph: "C",
+            name: "Freigabesitzung: Urteil je Zeile",
+            days: 1,
+            after: "M1",
+            gate: "Matrix freigegeben (Martin)",
+            owner: "Martin",
+            milestone: true,
+            st: "done",
+            note: "Alle 29 Zeilen entschieden, Zeile fuer Zeile im Interview: 13 esp32-correct, 3 nrf52-correct, 5 both-wrong, 8 both-valid. Fuenf Urteile fielen GEGEN die Empfehlung der Zeile, weil die Praemisse beim Lesen des Codes nicht standhielt. Danach ein unabhaengiger Fable-Review ueber die Entscheidungen selbst (17 Befunde, docs/testplan/drift-matrix-review-verdict-20260912.md): die Zeilenfakten hielten auf 26 von 29, VIER Entscheidungen ruhten auf einer falschen Praemisse und wurden neu entschieden. Wichtigster Fund: ESP32 hat NIE blockiert -- WiFiUDP::write() puffert nur, das echte endPacket()-Ergebnis wird geloggt und verworfen, also verwerfen beide Plattformen heute. Ausserdem: DR-18 haette nichts ausgeliefert, weil sendExtern() gar keinen 0x41-Zweig hat. Ein echter Defekt fiel nebenbei ab (EXT-01).",
+          },
+          {
+            id: "M3",
+            ph: "C",
+            name: "Erwartete-Diff-Fixtures aus den Urteilen",
+            days: 1,
+            after: "M2",
+            gate: "test_drift_matrix_complete grün",
+            owner: "Agenten",
+            gateEnd: true,
+            st: "done",
+            note: 'Stand 12.09. nachmittags, etwa zwei Drittel erledigt. FERTIG: M3-03, die drei Entscheidungen, die ALS Dokumentation gefallen sind (0x7E als reservierter Sub-Version-Wert, der PLT-Vertrag, der EXTUDP-Ausgangstyp-Vertrag -- letzterer existierte nirgends, weshalb DR-18 ueberhaupt strittig war); ebenso die "type":"ack"-Zeile in compare_extudp.py, damit der eine vorhergesagte Diff bei G2 nicht als Fehler liest. TEILWEISE: M3-01, 8 von 29 Zeilen nennen noch keinen Test (vorher 10 -- DR-14 und DR-15 haben durch den U10-Zwilling welche bekommen). BLOCKIERT: die twin-diff-Fixturen aus Abschnitt 4.4 lassen sich aus den Suiten NICHT erzeugen -- weder U1 noch U2 iteriert den Korpus oder gibt eine Aufruffolge aus, das waere ein Umbau beider Suiten und muss als solcher eingeplant werden, nicht als Fixture-Erzeugung. Solange --phase implementation gesetzt ist, laeuft das Gate gruen und meldet die Luecke bei jedem Lauf. Stand 13.09. unveraendert: 8 der 29 entschiedenen Zeilen benennen weiterhin keinen pruefenden Test (M3-01). DR-06/DR-08/DR-09 in test_udp_frame_twin, DR-21 in test_udp_send_twin, DR-12/DR-13 fahren mit W3 mit, DR-03 und DR-16 bleiben per Entscheidung Bench-Sache. NACHTRAG 13.09.: vier weitere Zeilen geschlossen -- DR-06, DR-08, DR-09 (test_udp_frame_twin) und DR-21 (test_udp_send_twin), jede mit einem mutationsgeprueften Fall, der BEIDE Plattformhandler festnagelt und die Meldung traegt, dass die Matrix zu aendern ist, sobald sich die Zeile bewegt. Damit stehen 4 von 29 Zeilen ohne Test statt 8. KORREKTUR einer Planannahme: die Flagge --phase implementation faellt NICHT mit M3. DR-03 und DR-16 sind per Entscheidung banknur, und der Lint loest eine Zelle nur auf ein test/test_<name>/-Verzeichnis oder eine [env:<name>] auf -- diese zwei Zeilen koennen also nie durch Code gefuellt werden. Ihr Beleg existiert ausserdem noch gar nicht: test/golden/hw/G2/ enthaelt nur EXPECTED-DIFF.md, die Vorhersagen, weil der G2-Lauf E1 ist. Die Flagge faellt nach E1. KORREKTUR 17.09. abends: die Aussage &bdquo;jede Driftzeile, die eine Quellaenderung schliessen kann, ist geschlossen&ldquo; war FALSCH. DR-28 widerlegt sie -- entschieden am 12.09. (both-wrong), aber nie implementiert: kein einziger Verweis darauf in src/, waehrend jede andere aendernde Zeile in zwei bis vier Dateien zitiert ist, und die beiden zugehoerigen Tests nageln bis heute das ALTE Verhalten fest. Der Grund, warum es durchrutschte, ist lehrreich: DR-28 ist kein Plattform-Unterschied, mheard_functions.cpp ist EINE gemeinsame Datei. Die Zeile taucht deshalb in der Twin-Diff-Arithmetik gar nicht auf, mit der W6a und W6b bestimmt haben, was noch offen ist -- ein Zaehler, der nur Plattformpaare vergleicht, kann eine Produktentscheidung nicht sehen.',
+          },
 
-    <li><b>Betreiberentscheidung 5 vom 11.09.: schmales G1 wird akzeptiert</b>, kein zusätzlicher Bench-Tag. H1, H2, H5, H7 und H9 werden nicht erfasst. Das ist bewusst und es hat einen Preis, der hier stehen bleiben soll: <b>sieben der neun Einheiten haben kein Vorher-Bild auf Hardware.</b> G1 kann die Neutralität der Carve-outs nur für den UDP-Eingang (U1) und die T-Deck-Oberfläche (U9) belegen; für alles andere stützt sich die Aussage auf das 32-Env-Build, das Region-Gate und das Lesen des Diffs. Das ist ein Beleg, aber keine Messung, und die Abnahmekriterien in Abschnitt 9 müssen das so benennen. N1 trägt dadurch mehr — und für die Datagramme aus U2 und die Frames aus U7/U8 trägt es gar nicht, weil deren Fixtures aus demselben Code entstünden, der geändert wird. Das Zeitfenster für eine Vorher-Aufnahme schließt mit C3; danach ginge es nur noch über ein Zurück auf den Tag.</li>
-    <li><b>Stand 15.09.2026:</b> <b>Welle 3c ist durch -- der Struct ist einer, und er darf sich ab jetzt frei aendern.</b> Nichts haengt mehr an seinem Byte-Layout: ESP32 und nRF52 persistieren per Schluessel, BLE spricht das eingefrorene v1-Abbild, der alte nRF52-Blob wird durch dasselbe v1-Abbild gelesen. Das Member-Gate ersetzt den textparsenden Struct-Zwilling durch einen kompilierten Test, der jedes Member kennt. Was von W3 bleibt, ist Hardware: RAK-90, Heltec-93 und T-Deck-14 auf den Tisch. Bis zum PR jetzt ~29 Arbeitstage.</li>
-    <li><b>Stand 16.09.2026:</b> <b>Der W3-Bench-Lauf ist gemacht -- zwei von drei Knoten bestehen, W3 bleibt offen.</b> Alle drei Knoten lagen gleichzeitig auf dem Tisch, jeder von einem echten 20260724-Image aus geflasht. Die ESP32-Haelfte besteht: <b>DK5EN-93</b> 105 erhalten / 0 verloren (die drei Abweichler sind lebendes GPS, nachgewiesen durch zwei Exporte 20 s auseinander <i>ohne</i> Flash dazwischen: node_alt wandert von allein), <b>DK5EN-14</b> <b>107 von 107</b> ueber Migrationsboot und Reboot. Auch <b>DK5EN-90</b> behaelt jede Einstellung, meldete aber <code>legacy_migration_failed</code> statt <code>legacy_migrated</code> -- ein <b>Fehlalarm</b>: <code>lfs_rename()</code> meldete einen Fehler fuer eine Verschiebung, die es tatsaechlich ausgefuehrt hatte, und der Retry scheiterte danach nur deshalb, weil seine Quelle schon weg war. <b>Behoben</b>, indem jetzt das Ziel geprueft wird statt des Rueckgabewerts (<code>save;rename_false_negative</code>), mit zwei mutationsgeprueften Tests. Der Hardware-Arm wurde am selben Tag nachgeholt (erzwungenes Downgrade auf die offizielle v4.35t und zurueck): der Upgrade-Boot meldete <code>legacy_migrated</code>, 102 erhalten, 0 geaendert, 0 verloren. Zusammen mit <code>--persiststat</code>, das jetzt alle 17 nur-persistierten Schluessel zurueckliest, <b>ist W3 erledigt</b>. <b>Nebenher geschlossen:</b> die Counters-Migration ist auf beiden Plattformen belegt (neue Sonde <code>--msgid</code>; 182/282/382 pro Boot auf dem Heltec). <b>Drei Werkzeuge waren kaputt und sind repariert</b>, bevor der Lauf ueberhaupt berichten konnte: <code>w3_upgrade_check.py</code> meldete FAIL auf einem gesunden Knoten (jetzt <code>--gps-node</code> und ein Bucket REMOVED BY DESIGN), die Baselines vom 12.09. waren abgedriftet (Heltec 4 Felder, RAK 13 -- er war zwischenzeitlich auf Werkseinstellungen zurueckgefallen), und <code>pio run --target upload</code> meldet <code>[SUCCESS]</code> ueber einen fehlgeschlagenen nrfutil-DFU: der RAK geht nur ueber <code>--dfu</code> + UF2. Details: <code>docs/bench/w3-baseline/README.md</code> Abschnitt 7.</li>
-    <li><b>Zwei Funde, die nicht im Plan standen.</b> <b>TD-19/TD-18:</b> die tote Tastatur des T-Deck war die gespeicherte Tastensperre (SYM+K), und das automatisierte Szenario <code>input</code> meldete dabei PASS auf einer Tastatur, mit der der Betreiber kein Zeichen tippen konnte — es zählt die <code>[KEY]</code>-Zeile, die vor der Sperre gedruckt wird. Nebenbei widerlegt: TD-10 galt als auf dieser Bench nicht nachweisbar, weil der Controller angeblich nicht auf die Raw-Mode-Probe antwortet; die Probe war nur nie gelaufen, weil sie an <code>!node_keyboardlock</code> hängt. <b>RF-01..RF-06:</b> fünf fehlende Einheiten-Umrechnungen auf dem SX126x-Pfad, gefunden beim Lesen für C5 (Aufgabe B2a).</li>
-  </ul>
-</div>
+          {
+            id: "W1",
+            ph: "D",
+            name: "Welle 1: Defekte 1,2,7,10,11 und Hygiene-Loeschungen",
+            days: 2,
+            after: null,
+            gate: "32-Env-Build, bin-Vergleich",
+            owner: "Agenten",
+            st: "done",
+            note: "FERTIG 13.09. Der letzte offene Punkt war D6-10, das unbenutzte #include <SD.h> in src/esp32/esp32_main.cpp -- entfernt. Nur die Variante LilyGo_T-Beam-1W definiert HAS_SDCARD, sie ist also der Beweis. Beim Pruefen separat gefunden und NICHT mitgenommen, weil ausserhalb der Zeile: src/t5-epaper/t5epaper_main.h bindet SD.h zweimal ein (Zeile 16 und 25) -- ein Duplikat, kein toter Include, denn dieser Header traegt die SD-Symbole fuer t5epaper_main.cpp und ui_port.cpp.",
+          },
+          {
+            id: "W2",
+            ph: "D",
+            name: "Welle 2: RAM-Zeilen mit niedrigem Risiko, tinyxml, softser",
+            days: 3,
+            after: "W1",
+            gate: "Frame-Dumps identisch, Regions-Delta",
+            owner: "Agenten",
+            st: "done",
+            note: "Rund 28 kB RAM zurueckgeholt, jede Zahl vorher/nachher je Env gemessen -- und diesmal stimmten die Schaetzungen des Audits. D5-01 ist die groesste Einzelzeile der ganzen Kampagne: ota_html[] fehlte das const, also wurde das ganze Array beim Boot ins RAM kopiert; mit const wandert es von .data nach .rodata, Flash unveraendert, -24 320 B RAM auf BEIDEN Safeboot-Images. Dazu -2 928 B aus den Puffergroessen (R1-01/03/06) und -848 B (ESP32) bzw. -648 B (nRF52) aus den String-Tabellen. R3-04 war schon erledigt (tinyxml2 wurde bei der MEM-04-Arbeit vendort). ZWEI ZEILEN WURDEN VERWEIGERT, und das ist das eigentliche Ergebnis: R3-07 (-462 B Stack) ist SO NICHT MACHBAR -- die Kopierschleifen in decodeAPRS() haben keine Laengenbegrenzung je Token, die Pruefung laeuft erst DANACH, und die Eingabe kommt roh aus OnRxDone(), also aus der Luft; ein praeparierter Frame schreibt bis zu ~120 Byte in einen Puffer, den das Audit auf 24 kuerzen will -- Stack-Overflow im 4-KB-LoRa-Task. Und R3-10 (2 720 B) beruht auf einer falschen Annahme: die softser-Tabellen sind zur Laufzeit beschreibbar, keine Konstanten. Beide als W2-01/W2-02 im BACKLOG, damit sie nicht als freie Ersparnis stehenbleiben.",
+          },
+          {
+            id: "W3B",
+            ph: "D",
+            name: "Welle 3b: BLE-Drahtformat einfrieren (ungeplant)",
+            days: 1,
+            after: "W2",
+            gate: "sizeof + alle 131 Offsets == Live-Struct auf ARM",
+            owner: "Agenten",
+            st: "done",
+            note: "STAND IM PLAN NICHT DRIN und ist trotzdem Voraussetzung fuer den Struct-Merge. Die nRF52-Settings-Charakteristik verschickt s_meshcom_settings als ROHE BYTES, und die Telefon-App schreibt ein Abbild, das der Knoten direkt ueber seine Einstellungen memcpy-t (nrf52_ble.cpp:354,380). Es gibt kein Versionsfeld -- die Laenge ist die ganze Aushandlung. Damit sind Offset, Reihenfolge und Typ JEDES Members ein Drahtvertrag. Haette man den Struct zuerst zusammengelegt, waere entweder die Laenge abgelehnt worden oder -- schlimmer, bei zufaellig gleicher Groesse -- das Abbild angenommen und die Konfiguration des Nutzers feldweise verschoben worden. s_ble_settings_v1 friert das heutige Layout ein (static_assert auf sizeof und alle 131 Offsets), der BLE-Pfad uebersetzt jetzt statt zu blitten. Unabhaengig geprueft mit einer temporaeren Sonde im ARM-Build, davor eine absichtlich falsche Gegenprobe, damit sicher ist, dass die Sonde ueberhaupt ausgewertet wird. Beim Lesen des Diffs gefunden und behoben: die erste Fassung las den geteilten Staging-Puffer AUSSERHALB der kritischen Sektion (CONC-17) -- ein zweiter Settings-Write haette zwei Abbilder verschmolzen und das Ergebnis gespeichert. Kein Host-Test kann das sehen.",
+          },
+          {
+            id: "W3",
+            ph: "D",
+            name: "Welle 3: Settings-Schema, ein Struct, Migration",
+            days: 9,
+            after: "W3B",
+            gate: "Roundtrip beide Plattformen, Upgrade behaelt Einstellungen auf BEIDEN",
+            owner: "Agenten",
+            st: "done",
+            note: "Stand 16.09.: Der Bench-Lauf ist gemacht, auf allen drei Knoten gleichzeitig, jeder von einem echten 20260724-Image aus geflasht. Die ESP32-Haelfte BESTEHT: DK5EN-93 (Heltec V3) 105 erhalten, 0 verloren, die einzigen drei Abweichler sind lebendes GPS; DK5EN-14 (T-Deck Plus) 107 von 107, ueber den Migrationsboot UND einen normalen Reboot. Die nRF52-Haelfte NICHT: DK5EN-90 behaelt zwar jede Einstellung (102 erhalten, 0 geaendert, 2 per Entscheidung entfallen -- send_repeat_time/auto_join), der Migrationsboot meldet aber [SETST];path;legacy_migration_failed statt legacy_migrated. Das war ein FEHLALARM und ist diagnostiziert und behoben: lfs_rename() meldete einen Fehler fuer eine Verschiebung, die es TATSAECHLICH AUSGEFUEHRT hatte. Drei unabhaengige Belege im Mitschnitt: der Store existierte beim Bootstart gar nicht (path;keyed_absent), das vor jedem Aufraeumen gezogene Inventar listet das Ziel in neuer Groesse ohne jede .tmp-Datei (die Summe laesst keine vierte Datei zu), und ein spaeterer Save im selben Boot findet das Ziel byteidentisch (save;skipped_unchanged). Der Retry scheiterte danach aus einem zweiten, anderen Grund -- seine Quelle war bereits weg -- und dieses Paar meldete eine fehlgeschlagene Migration fuer eine Migration, die jedes Byte korrekt geschrieben hatte. Behoben: writeFileAtomic() prueft bei gemeldetem rename-Fehler das Ziel direkt und akzeptiert den Schreibvorgang, wenn die Bytes dort stehen (save;rename_false_negative), statt den schaedlichen Retry zu fahren; zwei mutationsgepruefte Tests. W3 IST DAMIT ERLEDIGT. Der Hardware-Arm wurde am selben Tag nachgeholt: erzwungenes Downgrade auf die offizielle v4.35t (wiscore_rak4631.uf2 vom 10.09.) und wieder hoch auf den W3c-Stand mit Fix. Das Downgrade behielt von sich aus jeden gesetzten Wert, der Upgrade-Boot meldete legacy_rewritten -> sanity_gate_rejected (korrekt: der Task-7-Zusatz verweigert den schnellen Pfad, sobald die Blob-CRC gewandert ist, auch bei gesundem Keyed-Store) -> legacy_migrated. 102 erhalten, 0 geaendert, 0 verloren; Boot 2 laedt path;keyed mit 105 Feldern. Zweiter Rest ebenfalls erledigt: --persiststat liest jetzt alle 17 nur-persistierten Schluessel zurueck (vier gemeinsame auf jedem Board, 13 T-Deck-Zeilen unter demselben Guard wie ihre Struct-Member, jetzt inklusive BOARD_T_DECK_PRO), auf DK5EN-14 ueber einen Reboot byteidentisch, abgesichert durch test/golden/persist_readback_lint.py. Nebenher geschlossen: die Counters-Migration ist auf beiden Plattformen mit der neuen Sonde --msgid belegt (93: 182/282/382, exakt kMsgIdPersistStep pro Boot; 90: 412 -> 511, die fehlende 1 kommt aus laufendem Verkehr) -- kein Knoten faengt bei 0 an. Nicht abgedeckt: 12 der NVS-only-Schluessel haben kein Auslesekommando (--persiststat deckt vier ab, --info eines); die echte Zahl ist 17, nicht 25. Werkzeuge repariert: --msgid, w3_upgrade_check.py (--gps-node plus Bucket REMOVED BY DESIGN), frische Baselines 20260916-pre (die vom 12.09. waren abgedriftet: Heltec 4 Felder, RAK 13). Details: docs/bench/w3-baseline/README.md Abschnitt 7. Davor, Stand 13.09. abends: Die ESP32-Haelfte STEHT UND IST AUF HARDWARE BEWIESEN. Schritt 1 fertig: ESP32-NVS laeuft ueber settings_schema, 134 get*/132 put* Aufrufe durch EINEN Lauf ueber die Deskriptoren ersetzt. Das Upgrade im Feld ist nicht behauptet, sondern geprueft -- alle 132 historischen NVS-Schluessel gegen den neuen Satz diffed: KEIN umbenannter, KEIN neuer, sechs entfallen (der Sensor-Cache, Betreiberentscheidung). CFG_CHR bleibt bei getChar/putChar, damit nicht nur der Schluesselname, sondern der TYP-Tag auf dem Flash identisch bleibt. Schritt 5 fertig: Upgrade-Beweis auf DK5EN-93 (Heltec V3), 104 von 107 exportierten Einstellungen byteidentisch ueber den Migrationsboot UND einen normalen Reboot; die drei Abweichler sind lebendes GPS. Schritt 4 entschieden (Betreiber 13.09.): Sensorwerte nicht mehr persistent, node_ackid faellt als toter Zustand, node_msgid in einen Zaehler-Namensraum, die 14 ESP32-Felder bleiben plattformgebunden, auto_join/send_repeat_time sind toter Code und fliegen samt Timer-Geruest raus. OFFEN bleiben Schritt 2 (der Struct-Merge, die riskante Haelfte -- erst jetzt moeglich, siehe W3b), Schritt 3 (das memberweise fail-closed Gate; heute wird ein Member, der im Struct steht aber nicht im Schema, still nicht persistiert) und Schritt 6 (DR-12/DR-13). NEBENBEFUND, im eigenen Commit bce95db5 desselben Tages: save_settings() wurde aus init_flash() heraus aufgerufen, waehrend dessen Preferences-Handle offen war -- Preferences::end() ist bedingungslos, danach liefert jedes getX() nur noch seinen Default. Rund die zweite Haelfte aller ESP32-Einstellungen wurde so bei JEDEM Boot im NVS ueberschrieben und im RAM zurueckgesetzt. Nie auf Hardware gelangt, weil fuer jenen Commit nur ein nRF52 geflasht wurde. Behoben, mit Waechter ueber alle 250 Aufrufstellen und Regressionstest.",
+          },
+          {
+            id: "W3C",
+            ph: "D",
+            name: "Welle 3c: ein Struct, Zaehler-Namensraum, Member-Gate (W3 Schritte 2/3/6)",
+            days: 1.5,
+            after: "W3B",
+            gate: "27 native Envs, selftest.sh, 32-Env-Build, Advisor",
+            owner: "Agenten",
+            st: "done",
+            note: 'FERTIG 15.09. Der Struct s_meshcom_settings steht EINMAL in src/meshcom_settings.h, erzeugt aus X-Makro-Listen, damit ein nativer Test jedes Member mit offsetof/sizeof aufzaehlen kann. Genau das ist das Member-Gate (test_settings_members, je ein Env fuer ESP32+T-Deck und nRF52): jedes Member ist ENTWEDER eine settings_schema-Zeile ODER steht namentlich in meshcom_settings_runtime.h -- ein neues Member ohne Entscheidung laesst den Test fallen, mutationsgeprueft in beide Richtungen. Weg sind send_repeat_time/auto_join (LoRaWAN-Reste samt Timer-Geruest) und node_ackid; node_msgid bleibt Member, ist aber keine Schema-Zeile mehr, sondern haengt an counters_store.h: ESP32 Namensraum "Counters" mit Rueckfall auf den alten Credentials-Schluessel, nRF52 eigene Datei /counters.txt -- ein Settings-Import, ein BLE-Write oder ein Settings-Rewrite kann den Zaehler damit nicht mehr zurueckdrehen, und der 4-kB-Settings-Datensatz wandert nicht mehr alle 100 Frames ins Flash. Der nRF52-Legacy-Blob wird jetzt durch das eingefrorene s_ble_settings_v1 gelesen (byteidentisch mit dem Blob, den offizielle 4.35t schreibt -- gegen upstream geprueft), flash_reset() schreibt ein v1-Abbild, damit ein Downgrade die Datei noch lesen kann. Beim Lesen der Bench-Notizen gefunden: RAK-90 traegt noch eine Keyed-Store-Datei vom 12.09. neben dem neueren Blob des Release-Images -- der Keyed Store haette gewonnen. Das ist der echte Fall "Downgrade auf offiziell, dort umkonfiguriert, wieder hochgeflasht"; jetzt wird die CRC32 des Blobs festgehalten und ein veraenderter Blob erzwingt die Migration (Marker [SETST];path;legacy_rewritten, Regressionstest). Kosten: +2,1 kB BSS auf nRF52 fuer den statischen v1-Puffer (der 4-kB-Loop-Stack traegt keine zweite 2-kB-Struktur). settings_layout_lint.py ist ersatzlos weg (kein Zwilling mehr), twin_stub_lint fuehrt die beiden Stub-Header nicht mehr, weil sie den echten Header einbinden. Advisor-Pass (docs/w3c-advisor-verdict-20260915.md): ein echter Fund, im selben Commit behoben -- ein BLE-Settings-Write kopierte node_msgid noch hinein und drehte den Zaehler zurueck; dazu gewinnt auf dem Legacy-Pfad jetzt der Blob ueber eine alte counters-Datei. Tor: 868/868 native Faelle in 27 Envs, selftest.sh gruen, 28 von 29 Hardware-Envs gebaut (t5_epaper ist seit upstream v4.35a.07.10 ohne configuration.h und baut auch an HEAD nicht), Drift-Lint meldet noch 2 Zeilen ohne Test (DR-03, DR-16, banknur). Nebenbei: macOS 27 hatte Rosetta entfernt, kein nRF52-Build lief mehr -- reinstalliert.',
+          },
+          {
+            id: "W4",
+            ph: "D",
+            name: "Welle 4: Kommandotabelle (D2-10, D2-06, D2-07, D2-01)",
+            days: 6,
+            after: "W3",
+            gate: "Golden-Capture klassifiziert, test_command_table",
+            owner: "Agenten",
+            st: "done",
+            note: "D2-10 ist fertig (184f84ff): der Abgleich einer Kommandozeile war ein reiner Praefixvergleich, jeder Name verdeckte damit jeden laengeren -- nur die Reihenfolge der Sprossen hielt msg und msgid auseinander. Jetzt exakter Token-Abgleich in src/command_match.h, auf dem Host getestet (native_command_match), weil command_functions.cpp von keiner native-Umgebung uebersetzt wird und diese Regel, auf der alle rund 300 Sprossen stehen, vorher keinen einzigen ausfuehrbaren Test hatte. Genau das macht die Tabelle erst moeglich: eine Tabelle hat keine Reihenfolge. D2-06 steht im Baum: 70 der 107 on/off-Sprossen sind Zeilen in COMMAND_TOGGLES[], -768 Zeilen, Flash -2 696 B (ESP32) und -1 808 B (nRF52). DIE ZAHL DES AUDITS WAR ZU HOCH: es versprach 120 Sprossen und -6,0 kB; es sind 107, davon sind nur 70 regelmaessig genug, und die Tabelle kostet rund 2 kB zurueck. Die restlichen 37 verzweigen wirklich -- Fehlerpfade wie webserver on ohne SSID, Reboot-Planung bei wifiap, Hardware-Neuinit bei display und gps off, dazu Bench-Marker, deren Wortlaut die Capture-Werkzeuge woertlich greppen. DREI DEFEKTE IN DER EIGENEN ARBEIT, alle gefunden bevor etwas committet wurde: der Dispatch landete zuerst INNERHALB eines /* TEST */-Blocks, weil der Sprossen-Parser Kommentare nicht entfernte und die dort abgeschaltete compress-Sprosse fuer die erste echte hielt -- der Block uebersetzte fehlerfrei und tat nichts; das else-Geruest der Leiter zerbrach in Konfigurationen, in denen ein #if falsch ist (heltec_t114, t_deck_plus, wireless-paper), was auf einem einzelnen Board unsichtbar bleibt; und ina226 on schrieb Nullen ins Flash, weil setupINA226() vier persistierte Felder nullt, wenn der Chip fehlt, und der Aufruf vor save_settings() gerutscht war. Lehre fuer den Rest der Kampagne: Austrittscode 0 beweist nichts, wenn Code still verschwinden kann -- der Dispatch wird jetzt im Artefakt nachgewiesen, nicht im Compilerlauf. D2-07 IST FERTIG (27be0d12 + f8d937fe): 24 Setter teilen sich eine getestete Zahlen-Auswertung in src/command_setters.h. DIE FALLE WAREN NICHT DIE OFFSETS, SONDERN DIE STILLE UMDEUTUNG. Die erste, rein mechanische Fassung setzte iVar = 0 neben sscanf -- damit wurde Unsinn SPEICHERBAR: --txpower abc antwortete \u0022set txpower to 0 dBm\u0022, weil 0 im Bereich [-9, 22] liegt; sieben Stellen waren betroffen. Die Helfer WEISEN JETZT ZURUECK, statt umzudeuten, und die Nicht-Zahl-Pruefung steht GETRENNT von der Bereichspruefung: zusammengelegt kam \u0022txpower 0 dBm not between -9 and max 22\u0022 heraus, und 0 liegt sehr wohl zwischen -9 und 22. Zwei echte Defekte sind damit zu: --txpower abc las vorher ein uninitialisiertes iVar und meldete 16711680, und fuenf Setter hatten gar keine Bereichspruefung, schrieben also aus Unsinn stillschweigend einen Skalierungsfaktor oder Temperatur-Offset von NULL. Die Pruefbedingung war KLASSIFIKATION, nicht ein leerer Diff -- die Aenderung veraendert absichtlich, was auf Unsinn geantwortet wird: 332 identisch, 12 beabsichtigt, 0 unerklaert unter den 24 beruehrten Kommandos. D2-01 IST FERTIG: die letzten drei auskommentierten Sprossen-Bloecke sind geloescht (51 Zeilen) -- darunter genau der /* TEST */-compress-Block, der den D2-06-Dispatch in einen Kommentar rutschen liess. Das erzwang eine zweite Korrektur: der Selbsttest von extract_commands.py pruefte das Entfernen von Kommentaren AM LEBENDEN QUELLTEXT und fiel um, sobald es keinen toten Code mehr zu entfernen gab. Er laeuft jetzt gegen ein Fixture. EIN PRUEFSTAND DARF NICHT DARAUF ANGEWIESEN SEIN, DASS DER DEFEKT, GEGEN DEN ER SCHUETZT, WEITER EXISTIERT. W4 ist geschlossen.",
+          },
+          {
+            id: "W5",
+            ph: "D",
+            name: "Welle 5: RAM-Zeilen mit mittlerem Risiko, T-Deck Pro LVGL",
+            days: 5,
+            after: "W4",
+            gate: "Pruefung je Zeile, nRF52-Soak",
+            owner: "Agenten + Bench",
+            st: "done",
+            note: "STAND 17.09.2026: SIEBEN VON NEUN ZEILEN SIND DURCH, W5 haengt nur noch an Hardware. FERTIG: GRD-01 (ein MC_HAS_U8G2 statt sieben handgeschriebener Kopien plus einer Neun-Arm-Kaskade), R2-01 (der MHeard-Textcodec ist weg: -83 200 B RAM, -54 676 B Flash, -117 Zeilen), R3-12 (mheardLat/Lon double->float, -648..-240 B je Env), R4-01 (config/lv_conf.h war die FUENFTE lv_conf.h und die einzige noch auf LV_MEM_CUSTOM 0 -- LVGLs 48-kB-Arena war ein STATISCHES Feld, also zwingend interner DRAM: t_deck_pro -49 168 B RAM), R2-04 aprsMessage-Haelfte (sieben String-Felder -> feste char[], 27 Quelldateien, 15 Testsuiten, 651 Fundstellen: -109 068 B Flash gegen +15 024 B RAM, wovon +464 je Env EIN Global ist, pendingDisplayMsg 144->608 B), R1-02 Schritt 1 (die dreifache Telefon-Rahmung ist ein host-getestetes blePhoneFrame(), -976 B). ABGELEHNT mit Begruendung: R3-13 (1 200 B, wuerde aber 6-Hop-Pfade abschneiden, und --maxhop erlaubt 6) und R4-02/03 (rund 1 400 B gemessen gegen einen Alloc-Fehlerpfad auf 20+ Boards). OFFEN: R1-04 (ringbufferRAWLoraRX, 5 200 B) braucht den 12-h-nRF52-Soak, und die MHEARDLINE-HAELFTE von R2-04 ist noch nicht angefangen. Fuenf Defekte fielen bei R2-04 nebenbei an, die ohne die Typaenderung unsichtbar geblieben waeren: eine Nutzlast-Schleife, die nur durch ihre Aufrufer begrenzt war (direkt aufgerufen: SIGABRT, stack smashing), ein Feld, das jahrelang der String-Konstruktor initialisiert hatte (initAPRS() vergass msg_source_call), substring()s Klemmung, die beim Uebergang auf Zeigerarithmetik verloren ging, eine Ueberladungsaufloesung, die bei breiterem Argumenttyp still umsprang (utf8ascii), und zwei Puffer, die um ein Byte zu klein waren. Dazu eine Include-Falle: MAX_MHEARD ist in configuration_global.h PRO BOARD definiert, und dieser Header frueh einzubinden gab der MHeard-Tabelle still 50 statt 80 Plaetze. NACHTRAG 17.09. ABENDS: R1-04 ist eingecheckt (d5a071d8) und auf der Bank belegt -- -109 040 B RAM ueber 34 Envs gegen +7 076 B Flash, und der Soak lief auf ZWEI Knoten mit je einem Arm: DK5EN-93 mit angelegtem Ring unter echtem LoRa-Empfang, DK5EN-90 mit NIE angelegtem Ring. Die Heap-Messung zeigt den Einmal-Charakter direkt: erster Seitenaufruf -3 132 B, zweiter -236, dritter -224. Zwei Stunden haben gereicht, nicht zwoelf -- beide Arme sind binnen Minuten sichtbar, der Rest ist Stabilitaet. Offen ist damit nur noch die mheardLine-Haelfte von R2-04. ABGESCHLOSSEN 17.09. abends: die mheardLine-Haelfte von R2-04 ist eingecheckt (79242eda). Sieben String-Felder wurden feste char[], und der Umbau haette dabei ZWEI Defekte still eingebaut: zwei Inhaltsvergleiche (eigenes Rufzeichen ausschliessen, HG-Gateway-Erkennung) waeren zu Zeigervergleichen geworden -- immer falsch, ohne Warnung. Beide sind jetzt is_equ() und beide mutationsgeprueft festgenagelt. Der Advisor fand danach einen Befund, den die Zeile selbst nicht hatte: sizeof(mheardLine) geht von ~112 auf 584 Byte, und drei Funktionen halten so eine Struktur lokal auf dem 4-KB-Loop-Task des nRF52 -- demselben Stack, auf dem N-22 schon einmal ueberlief. Mit -fstack-usage gemessen und nach dem N-22-Muster nach BSS verschoben; der tiefste Loop-Pfad steht jetzt bei 1984 statt 2568 Byte und damit flacher als VOR der Zeile. Der R1-04-Soak ist gelaufen und bestanden: 2 h, 309 Frames in den angelegten Ring auf DK5EN-93, 37 durch den NULL-Pfad auf DK5EN-90, null Neustarts, Heap auf beiden unveraendert.",
+          },
+          {
+            id: "W6",
+            ph: "D",
+            name: "Welle 6: gemeinsamer UDP-Handler, Helfer, ui_common",
+            days: 6,
+            after: "W5",
+            gate: "EXTUDP-Bytevergleich beide Plattformen",
+            owner: "Agenten + Bench",
+            st: "done",
+            note: "In zwei Haelften gefahren. <b>W6a</b> (55a7b4c4): neun entschiedene U1-Driftzeilen vereinheitlicht, Twin-Diff 24-&gt;36 gleich, 13-&gt;1 verschieden, null Regressionen -- der einzige Ueberlebende ist genau DR-20. Dazu src/ui_common/ fuer die beiden LVGL-Zwillinge (peri_gps 417-&gt;271 / 387-&gt;312, zwei leere Uebersetzungseinheiten geloescht); ui_common ist nur build-verifiziert, keines der beiden LVGL-Boards steht hier. <b>W6b</b> (3be9a9da): DR-20, die sechs U2-Zeilen und DR-18 Teil 2. Der Advisor-Lauf fand dabei einen echten Cross-Task-Race, bevor er ausgeliefert wurde: queueExternAck() schrieb in die Single-Producer-Queue externQueue[] aus dem Main-Loop, waehrend OnRxDone sie aus dem LORA-Task beschreibt -- behoben durch direktes Senden. U2s Beweis ist schwaecher als U1s: das Vier-Block-Korpus erreicht DR-21..26 nicht (jedes Rufzeichen darin ist DK5EN-*), die Zeilen haengen an handgebauten Gleichheitstests. EXT-01 am 17.09. auf Hardware bestaetigt.",
+          },
+          {
+            id: "C4d",
+            ph: "D",
+            name: "Mini-Welle C4-diag: Diagnose-Port nRF52 (DR-03, DR-14, DR-16)",
+            days: 1,
+            after: "W6",
+            gate: "32 Envs, keine Recovery-Aktion geaendert",
+            owner: "Agenten",
+            st: "done",
+            note: "Aus dem M2-Review entstanden, im Plan vorher nicht vorhanden. DR-03: nRF52 bekommt die 35-s-Warnstufe und die Stage-2-Zeilen, aber gelesen wird s_ethLinkState (der echte PHY-Zustand), NICHT hasIPaddress -- das wird nur von Fehlerpfaden geloescht, nie von einem gezogenen Kabel, und genau das hat der Fable-Review korrigiert. DR-16: eigenes bTeleFirst, damit Hey und Telemetrie sich nicht eine Variable teilen. DR-14: der Kommentar, der erklaert, warum der TX-Drain auf nRF52 absichtlich nur auf RX-freien Durchlaeufen laeuft (geteilter SPI-Bus, verzoegerte Radio-Rearm) -- ohne ihn liest die naechste Pruefung das wieder als Bug, was schon zweimal passiert ist. Vom D1-09-Soak ausgenommen, weil keine Recovery-AKTION sich aendert, nur die Diagnose. Stand 13.09.: D1-10 (der Loop-Scheduler) ist auf 50 Timer-Praedikate NACHGEMESSEN, nicht die im Plan genannten ~18 -- die Schaetzung dieser Zeile ist entsprechend zu niedrig.",
+          },
+          {
+            id: "W7",
+            ph: "D",
+            name: "Welle 7: Varianten umstrukturieren",
+            days: 3,
+            after: "C4d",
+            gate: "Makro-Set-Diff je Env",
+            owner: "Agenten",
+            gateEnd: true,
+            st: "done",
+            note: "SCHRITT 2 FERTIG 17.09. spaet (6fd68840): zehn Praesenz-Flags per X_DISABLED-Sentinel im Default-Header (227 Zeilen raus, 83 rein; Makro-Gate: genau 92 Sentinel-Zeilen dazu, sonst nichts) und zwei Upload-Familien [esp32_s3]/[esp32_classic] (23 Varianten erben; ${this.__env__} geht in einer Basis-Section nicht, $BUILD_DIR tut es; Gate variant_ini_effective.py PASS 68 Envs). SCHRITT 1 FERTIG 17.09. (233257e3), und der Rest ist bewusst eine eigene Entscheidung. Neun Makros standen woertlich in allen 31 Varianten, 250 dieser Zeilen sagten dasselbe -- 433.175000 kam 28-mal vor. Sie stehen jetzt einmal in src/configuration_default.h, jedes #ifndef-bewacht, der Include als LETZTE Zeile jeder Variante: lokal gewinnt immer, weil lokal zuerst kommt. Aufgenommen wurden NUR Makros, die jede Variante ohnehin definiert -- damit ist der Umbau praesenzneutral per Konstruktion und nichts, was per #ifdef prueft, kann seine Meinung aendern. Bewiesen statt behauptet: das neue Effektiv-Makro-Gate zeigt fuer alle 32 Board-Envs einen BYTEGLEICHEN Makrosatz, obwohl 31 Dateien sich geaendert haben. Draussen bleiben die 73 praesenzgeprueften Flaggen (ENABLE_GPS und Co.): fuer die ist die ABWESENHEIT das Signal, ihr Opt-out waere ein #undef je Board, und ein #undef auf ein nie definiertes Makro ist legal und still -- ein Tippfehler schaltete einen Sensor flottenweit ab. Ebenso draussen: MODUL_HARDWARE (Identitaet des Boards) und BUTTON_PIN (GPIO-Nummer, nur 13 von 31 einig). Die extends=-Haelfte in den platformio.ini ist nicht angefasst -- upstream hat genau diese neun Dateien am 14.09. selbst angefasst (b30e31a4), also gehoert sie hinter den Resync, nicht davor.",
+          },
 
-<script>
-(() => {
-  const PHASES = [
-    { id: "A", name: "Vorbereiten", color: "var(--p1)" },
-    { id: "B", name: "Basislinie und Charakterisierung", color: "var(--p2)" },
-    { id: "C", name: "Entscheiden", color: "var(--p3)" },
-    { id: "D", name: "Vereinheitlichen (Wellen 1-7)", color: "var(--p4)" },
-    { id: "E", name: "Nachweisen und ausliefern", color: "var(--p5)" },
-  ];
-  // days = Arbeitstage; after = Aufgabe, nach der diese beginnt (null = Phasenbeginn); parallele Aufgaben teilen sich "after"
-  const TASKS = [
-    { id: "A1", ph: "A", name: "Upstream-Sync, 32-Env-Build, Basis taggen", days: 1, after: null, gate: "Tag dry-base, Ressourcen-Baseline", owner: "Orchestrator" , st: "done", note: 'Tag dry-base-20260911, 32 Envs gebaut, Baseline erneuert, 12 native Suiten grün (673 Fälle)'},
-    { id: "A2", ph: "A", name: "Korpus zusammenstellen, Rufzeichen-Lint", days: 2, after: "A1", gate: "test/golden/corpus committet", owner: "Agenten" , st: "done", note: '28 LoRa-Frames, 37 UDP-1990-Datagramme, 23 EXTUDP, 21 BLE-Writes, 305 Kommandos; Rufzeichen-Lint grün'},
-    { id: "A3", ph: "A", name: "Werkzeuge: UDP-1799-Stub, BLE-Golden-Client, Normalisierer", days: 3, after: "A1", gate: "Trockenlauf der Werkzeuge gegen RAK-90", owner: "Agenten" , st: "done", note: 'Stub-Server existierte bereits und wurde erweitert; normalize.py, mc_frame.py, corpus_lint.py, extract_commands.py, ble_golden.py, console_golden.py'},
-    { id: "A4", ph: "A", name: "Knoten-Einstellungen sichern, Protokollvorlagen", days: 1, after: "A3", gate: "G0 bereit", owner: "Orchestrator", gateEnd: true , st: "done", note: 'Einstellungen von 2 der 4 Knoten gesichert (maskiert im Repo, unmaskiert im Vault). P0.9 am 12.09. erledigt: docs/testplan/protocol-before.md und protocol-after.md tragen die Tabellen aus Abschnitt 8, je eine Zeile pro (Knoten, Schritt) vorbefuellt, damit ein Lauf nur noch Zellen fuellt. Zwei Zeilensaetze sind bewusst breiter als die Knotenspalte in Abschnitt 6 und sagen das auch: H4 BLE (G0 hat alle vier Knoten erfasst, nicht zwei) und H8 EXTUDP (fuer alle vier gefuehrt, drei Aufnahmen offen). Damit ist jedes Phase-0-Werkzeug geschrieben; offen sind nur noch zwei Laeufe auf der Bench (P0.3 zwei Knoten, P0.8 die macOS-Bluetooth-Freigabe), kein Code.'},
+          {
+            id: "D1-10",
+            ph: "D",
+            name: "Welle 8: gemeinsamer Loop-Scheduler (D1-10)",
+            days: 2,
+            after: "W7",
+            gate: "native_loop_scheduler, 10 Envs, Kadenz auf Hardware",
+            owner: "Agenten + Bench",
+            gateEnd: true,
+            st: "done",
+            note: "NACHGETRAGEN und ERLEDIGT 17.09. spaet (e64ce346) -- stand nie im Balkenplan. Sieben der 26 gemeinsamen Timer (retransmit, mcp, batt, heapMon, bmp3, mcu811, ina226) laufen aus EINER Tabelle in src/loop_scheduler.cpp, Rumpfe wortgleich je Plattform, 16-Fall-Twin gegen die echte Tabelle (mutationsfest). Neunzehn bleiben mit Begruendung im Header, darunter ein neuer Befund: config_to_phone_datetime_timer wettlaeuft mit updateTimeClient. Advisor-Blocker (ESP32-Aufruf im if(bRadio)) vor dem Commit behoben. Kadenz auf DK5EN-93: Batterie alle 30,0 s.",
+          },
 
-    { id: "B1", ph: "B", name: "G0 Hardware-Goldens, 4 Knoten (schmal, Entscheidung 5)", days: 2, after: null, gate: "test/golden/hw/G0", owner: "Bench" , st: "done", note: 'Erfasst auf allen vier Knoten: BLE (H4, byteweise reproduzierbar), UDP-1990 (H6), EXTUDP (H8), dazu die T-Deck-UI-Checkliste (H11) nach Behebung von TD-19. NICHT erfasst und laut Betreiberentscheidung 5 vom 11.09. auch nicht mehr geplant: H1 Bootlog, H2 Settings-Dump, H5 LoRa-RX, H7 UDP-Upstream, H9 Settings-Roundtrip. Die Konsole (H3) liegt nur fuer Heltec-93 vor und ist keine Vergleichsbasis. Folge: sieben der neun Einheiten haben kein Vorher-Bild auf Hardware, G1 kann die Neutralitaet der Carve-outs nur fuer U1-Eingang und U9 belegen.'},
-    { id: "C1", ph: "B", name: "Carve C1: UDP-Frame-Handler je Plattform (U1)", days: 0.4, after: "B1", gate: "32 Envs, RAM +0 B, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'getMeshComUDPpacket() -> handleUdpFrame_esp32(buf,len,src_ip); die 411 Zeilen aus NrfETH::getUDP() als freie handleUdpFrame_nrf52() mit gleicher Signatur. Verschobener Bereich gegen HEAD gediffed (Einrueckung und neth.-Qualifizierung herausgerechnet): nur der beabsichtigte Epilog-Tausch. 32/32 Envs, RAM +0 B, Flash +4..+320 B, Regionen byteweise unveraendert.'},
-    { id: "C2", ph: "B", name: "Carve C2: Socket-Primitive fuer den Datagramm-Versand (U2)", days: 0.4, after: "C1", gate: "32 Envs, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'Drei Primitive je Plattform statt des einen udpSendRaw() aus dem Plan: die Fehlerpolitik des Aufrufers laeuft auf ESP32 ZWISCHEN write und endPacket, und auf nRF52 steht ein Debug-Print zwischen beginPacket und der Schreibschleife -- beginPacket ist dort eine SPI-Transaktion zum W5100S. 32/32 Envs, RAM +0 B.'},
-    { id: "C3", ph: "B", name: "Carve C3: checkSerialCommand() in eigene TUs (U3)", days: 0.4, after: "C2", gate: "32 Envs, Rumpf byteidentisch", owner: "Agenten" , st: "done", note: 'Die Planzeile "kein Carve noetig, nur Build" war falsch: blockiert war U3 nicht durch Serial, sondern dadurch, dass die Funktion in den beiden groessten Uebersetzungseinheiten des Baums lag, die nie auf einem Host uebersetzen. Je Plattform eine eigene TU, bewusst NICHT zusammengefuehrt -- Zusammenfuehren waere Vereinheitlichung und ist eine Matrix-Entscheidung. Beide Rumpfe diffen byteidentisch gegen HEAD. 32-Env-Gate laeuft.'},
-    { id: "C4", ph: "B", name: "Carve C4: Gateway-Block und Scheduler (D1-09, D1-10)", days: 0.4, after: "C3", gate: "32 Envs, Regionen unveraendert", owner: "Agenten" , st: "done", note: 'gatewayService_esp32()/_nrf52(), beide Bloecke byteidentisch gegen HEAD. Nur D1-09 ist gecarvt; D1-10, der Loop-Scheduler, steht weiter aus. Die Zahl "~18 Timer-Praedikate" aus dem Plan war falsch und ist am 12.09. gemessen worden -- mit Definition, denn genau deren Fehlen hat "~18" so lange ueberleben lassen: 78 Praedikatstellen (if/while-Bedingungen mit millis(); 43 ESP32, 35 nRF52) ueber 43 Timer-Variablen, davon 25 auf beiden Seiten, 12 nur ESP32, 6 nur nRF52. Fuer den Carve zaehlen die 25 gemeinsamen -- nur die koennte ein gemeinsamer Scheduler uebernehmen.'},
-    { id: "C5", ph: "B", name: "Carve C5: countryProfile() aus lora_setcountry() (U6)", days: 0.4, after: "C4", gate: "32 Envs, Laenderdump identisch", owner: "Agenten" , st: "done", note: 'countryProfile() in eigener TU, haengt nur an den Konfigurationsmakros. Die 14 Tabellenfaelle diffen byteidentisch gegen HEAD, Land 7 (MAN) ist wortgleich in den else-Zweig gewandert. Beim Carve selbst eingebaut und gefangen: ohne explizites case 7 haette default den Code 7 verschluckt.'},
-    { id: "B2a", ph: "B", name: "Ungeplant: RF-01..RF-06, fehlende Einheiten-Umrechnungen", days: 0.5, after: "B1", gate: "radio_units_lint + test_radio_units", owner: "Agenten" , st: "done", note: 'Beim Lesen von lora_setcountry() fuer C5 gefunden, nicht durch einen Test. node_freq/node_bw/node_cr tragen je Plattform andere Einheiten (OPT-D14), und an fuenf Schreibstellen fehlte die Umrechnung: --txbw, --txcr, case 7 (MAN), --txfreq und die --info-Anzeige. Behoben ueber src/radio_units.cpp. Regression zweiteilig: test_radio_units fuer die Tabelle, radio_units_lint.py fuer die Aufrufstellen (18 Verstoesse vorher, 0 nachher). RF-04 bewusst nicht behoben (Schutzband 10x zu breit, waere auch auf ESP32 eine Verhaltensaenderung), RF-07 als unbelegte Spur abgelegt. Keine Bestaetigung auf Hardware: T114 und T-Echo stehen auf dieser Bench nicht.'},
+          {
+            id: "E1",
+            ph: "E",
+            name: "G2 Nachher-Lauf, Instrument-Lauf, nRF52-Migrationstest",
+            days: 2,
+            after: null,
+            gate: "G2 == G1 bis auf erwartete Diffs",
+            owner: "Bench",
+            st: "done",
+            note: 'ERLEDIGT WIE VEREINBART 17.09. (spaet, e303127c) auf dem Endstand e64ce346: H4 identisch (Wiederholbarkeit vorher bewiesen, Aufnahme 2 = 3; gegen das Morgen-Image nur das max_hop-Byte), H6 auf dem Instrument-Image -- Serverseite 36/36 und alle 30 Korpus-Klassifikationen identisch, dazu Befund H6-01 (missgebildeter Korpus-Schwanz -> DR-20-Pfad -> WiFi-Reset -> SW-Reboot, offen), H11 automatisch gruen (tabs, nav, input nach --keylock off), vier Sichtpruefungen beim Betreiber. RAK-Seite (ETH-03-Bench-PASS, H8, ETH-02) haengt am Doppel-Tap. Zwei Bench-Fallen: Upload-Autodetect flasht den T-Deck; -DINSTRUMENT_ENABLED=1 ohne Leerzeichen. VORHER: TEILWEISE 17.09. G2 kann nur die vier Schritte vergleichen, fuer die G1 eine Baseline hat (Betreiberentscheidung 5). H8 EXTUDP auf DK5EN-93: BESTANDEN, "corpus responses identical (8)" gegen G1 -- Relay- und Beacon-Zahlen weichen ab, was das Vergleichswerkzeug ausdruecklich zum Nicht-Fehler erklaert, weil beides Live-Verkehr und freilaufende Timer sind. H8 auf DK5EN-90: NULL von 23, wo G1 acht hat. Konfiguration geprueft, zwei Neustarts, und die Socket-Theorie (der W5100S hat vier) mit --webserver off widerlegt statt bloss ungetestet gelassen. Zweite unabhaengige Sichtung des nRF52-EXTUDP-Pfades nach 3.8l, und die erste mit kontrolliertem Vergleich gegen einen funktionierenden ESP32-Knoten in derselben Stunde. Erklaert auch, warum EXT-01 nur auf ESP32 bestaetigt ist. Offen: H4 (BLE, braucht erst zwei uebereinstimmende Aufnahmen desselben unveraenderten Images), H6 (UDP-Stub), H11 (unmoeglich, DK5EN-14 haengt nicht dran). NACHTRAG 17.09. SPAET: H4 (BLE) ist gelaufen und in Phase 1 auf BEIDEN Knoten NICHT zur Ruhe gekommen, also kein G1-Vergleich -- das ist das Ergebnis, keine Abkuerzung. Zwei Aufnahmen desselben UNVERAENDERTEN Images muessen erst miteinander uebereinstimmen, sonst sagt ein Diff gegen G1 nichts. Beide Ursachen liegen im INSTRUMENT, nicht in der Firmware, und genau dafuer gibt es Phase 1: auf DK5EN-93 stempelt Capture.on_write() einen Write erst NACH dem await, eine schnelle --conffin-Antwort landete dadurch vor ihrem eigenen Write und verschob jeden folgenden Frame um eins; auf DK5EN-14 enthaelt das BLE-Korpus selbst in Zeile 31 --maxhop 5 OHNE Wiederherstellung, Lauf 2 startete also aus anderem persistenten Zustand. Beide Laeufe liegen als phase1-run1/run2 bei, bewusst nicht befoerdert. Sicherheitspruefung: null dst=* in allen vier Aufnahmen, und das Korpus enthaelt ueberhaupt keinen Sendeeintrag. H6 ist entblockt -- der Mechanismus heisst --srvip und ist in den G0-READMEs belegt -- braucht aber ein INSTRUMENT_ENABLED-Image und kann das Auslieferungs-Image daher nicht pruefen. H11 bleibt offen.',
+          },
+          {
+            id: "E2",
+            ph: "E",
+            name: "Protokoll nachher, deutscher Nachweis, PR-Beschreibung",
+            days: 2,
+            after: "E1",
+            gate: "protocol-after.md vollständig",
+            owner: "Orchestrator",
+            st: "dropped",
+            note: "Gestrichen mit Operator-Entscheidung 6 (17.09.): einziges Ergebnis waere die deutsche PR-Beschreibung gewesen.",
+          },
+          {
+            id: "E3",
+            ph: "E",
+            name: "Upstream-Resync, gezielter Wiederholungslauf",
+            days: 2,
+            after: "E1",
+            gate: "gezielte Goldens grün",
+            owner: "Agenten + Bench",
+            st: "dropped",
+            note: 'Gestrichen mit Betreiberentscheidung 7 (17.09. abends): "we stay on this branch, this branch is experimental ... no merging, no pushing, no upstream PR". W7-II(b) lief deshalb auf der aktuellen Basis.',
+          },
+          {
+            id: "E4",
+            ph: "E",
+            name: "PR an icssw-org DEV einreichen",
+            days: 0.5,
+            after: "E3",
+            gate: "PR offen",
+            owner: "Martin",
+            milestone: true,
+            gateEnd: true,
+            st: "dropped",
+            note: 'Gestrichen mit Operator-Entscheidung 6 (17.09.): <i>"no PR at the moment. Everything here is very experimental"</i>.',
+          },
+          {
+            id: "E5",
+            ph: "E",
+            name: "Upstream-Review (Kurt), extern",
+            days: 10,
+            after: "E4",
+            gate: "Merge durch Upstream",
+            owner: "Upstream",
+            external: true,
+            st: "dropped",
+            note: "Faellt mit E4 weg -- ohne PR gibt es nichts zu reviewen.",
+          },
+        ];
 
-    { id: "B3", ph: "B", name: "G1 Hardware-Goldens, muss G0 entsprechen", days: 1, after: "C5", gate: "G1 == G0", owner: "Bench" , st: "done", note: 'G1 vollstaendig und sauber: 12 von 12 Zellen identisch zu G0 -- BLE, UDP-1990 und EXTUDP auf allen vier Knoten, aufgenommen auf Instrument-Images des Baums nach den Carve-outs, jeder Knoten vorher aus dem Vault zurueckgespielt. Keine Abweichung ausserhalb von EXPECTED-DIFF.md, das vor dem Lauf geschrieben wurde. Drei Vergleichswerkzeuge mussten dafuer erst entstehen.'},
-    { id: "B4", ph: "B", name: "Charakterisierungstests N1, Zwillingsläufe, Invarianten", days: 6, after: "B3", gate: "Twin-Diff-Fixtures committet", owner: "Agenten", gateEnd: true , st: "done", note: 'Sechs Suiten stehen: U1 Frame-Handler (14 Faelle), U2 Ring-Drain (15), U3 Serial (6x2), U6 Laender (4x2), U7 APRS-Epilog (8), U8 mHeard-Render (15) -- alle mutationsgetestet. U1 und U3 brauchten VORHER einen Carve: C1 und C3 hatten nur die Signatur getrennt, die Ruempfe lagen weiter in TUs, die nativ nie bauen; dritter Fall desselben Musters nach C2/U2. U4 Settings und U5 Kommandoleiter werden KEINE Zwillinge: beide Einheiten lassen sich zu keinem vertretbaren Preis nativ linken, also decken sie statische Python-Gates ab (settings_layout_lint.py, command_ladder_lint.py, je mit --self-test, beide in selftest.sh). Das ist schwaecher als ein Zwilling und wird auch so gefuehrt -- ein Lint liest den Quelltext, es fuehrt ihn nicht aus. U7/U8 haben zwei Befunde geliefert, beide festgenagelt statt behoben (OPT-D15 0x7E-Subversion geht pro Hop verloren, OPT-D16 die mHeard-Liste sortiert nicht). Offen bleibt nur U9 (UI), das Hardware braucht.'},
+        const PROJECT_START = "2026-09-11"; // tatsaechlicher erster Arbeitstag
+        const startEl = document.getElementById("start");
+        const reviewEl = document.getElementById("showreview");
+        const resetEl = document.getElementById("reset");
+        try {
+          const s = localStorage.getItem("gantt-start");
+          if (s) startEl.value = s;
+          else startEl.value = PROJECT_START;
+          const r = localStorage.getItem("gantt-review");
+          if (r !== null) reviewEl.checked = r === "1";
+        } catch (e) {
+          startEl.value = PROJECT_START;
+        }
 
-    { id: "M1", ph: "C", name: "Drift-Matrix aus Twin-Diffs vorbefüllen, xlsx-Export", days: 1, after: null, gate: "drift-matrix.csv + xlsx", owner: "Orchestrator" , st: "done", note: 'docs/testplan/drift-matrix.csv, 29 Zeilen DR-01..DR-29 in den Spalten aus Abschnitt 5.1. DR-01..DR-17 sind die Audit-Zeilen, jede gegen den Baum neu belegt statt aus der Prosa kopiert (88 file:line-Verweise, maschinell geprueft); DR-18..DR-29 stammen aus den sechs Zwillingen. Gate: test/golden/drift_matrix_lint.py in selftest.sh, prueft asserting_test als suite::case gegen den echten Baum (mutationsgetestet). Der xlsx-Export ist NICHT gebaut und auch nicht mehr noetig -- die Freigabe lief als Interview direkt gegen die CSV.'},
-    { id: "M2", ph: "C", name: "Freigabesitzung: Urteil je Zeile", days: 1, after: "M1", gate: "Matrix freigegeben (Martin)", owner: "Martin", milestone: true , st: "done", note: 'Alle 29 Zeilen entschieden, Zeile fuer Zeile im Interview: 13 esp32-correct, 3 nrf52-correct, 5 both-wrong, 8 both-valid. Fuenf Urteile fielen GEGEN die Empfehlung der Zeile, weil die Praemisse beim Lesen des Codes nicht standhielt. Danach ein unabhaengiger Fable-Review ueber die Entscheidungen selbst (17 Befunde, docs/testplan/drift-matrix-review-verdict-20260912.md): die Zeilenfakten hielten auf 26 von 29, VIER Entscheidungen ruhten auf einer falschen Praemisse und wurden neu entschieden. Wichtigster Fund: ESP32 hat NIE blockiert -- WiFiUDP::write() puffert nur, das echte endPacket()-Ergebnis wird geloggt und verworfen, also verwerfen beide Plattformen heute. Ausserdem: DR-18 haette nichts ausgeliefert, weil sendExtern() gar keinen 0x41-Zweig hat. Ein echter Defekt fiel nebenbei ab (EXT-01).'},
-    { id: "M3", ph: "C", name: "Erwartete-Diff-Fixtures aus den Urteilen", days: 1, after: "M2", gate: "test_drift_matrix_complete grün", owner: "Agenten", gateEnd: true , st: "done", note: 'Stand 12.09. nachmittags, etwa zwei Drittel erledigt. FERTIG: M3-03, die drei Entscheidungen, die ALS Dokumentation gefallen sind (0x7E als reservierter Sub-Version-Wert, der PLT-Vertrag, der EXTUDP-Ausgangstyp-Vertrag -- letzterer existierte nirgends, weshalb DR-18 ueberhaupt strittig war); ebenso die "type":"ack"-Zeile in compare_extudp.py, damit der eine vorhergesagte Diff bei G2 nicht als Fehler liest. TEILWEISE: M3-01, 8 von 29 Zeilen nennen noch keinen Test (vorher 10 -- DR-14 und DR-15 haben durch den U10-Zwilling welche bekommen). BLOCKIERT: die twin-diff-Fixturen aus Abschnitt 4.4 lassen sich aus den Suiten NICHT erzeugen -- weder U1 noch U2 iteriert den Korpus oder gibt eine Aufruffolge aus, das waere ein Umbau beider Suiten und muss als solcher eingeplant werden, nicht als Fixture-Erzeugung. Solange --phase implementation gesetzt ist, laeuft das Gate gruen und meldet die Luecke bei jedem Lauf. Stand 13.09. unveraendert: 8 der 29 entschiedenen Zeilen benennen weiterhin keinen pruefenden Test (M3-01). DR-06/DR-08/DR-09 in test_udp_frame_twin, DR-21 in test_udp_send_twin, DR-12/DR-13 fahren mit W3 mit, DR-03 und DR-16 bleiben per Entscheidung Bench-Sache. NACHTRAG 13.09.: vier weitere Zeilen geschlossen -- DR-06, DR-08, DR-09 (test_udp_frame_twin) und DR-21 (test_udp_send_twin), jede mit einem mutationsgeprueften Fall, der BEIDE Plattformhandler festnagelt und die Meldung traegt, dass die Matrix zu aendern ist, sobald sich die Zeile bewegt. Damit stehen 4 von 29 Zeilen ohne Test statt 8. KORREKTUR einer Planannahme: die Flagge --phase implementation faellt NICHT mit M3. DR-03 und DR-16 sind per Entscheidung banknur, und der Lint loest eine Zelle nur auf ein test/test_<name>/-Verzeichnis oder eine [env:<name>] auf -- diese zwei Zeilen koennen also nie durch Code gefuellt werden. Ihr Beleg existiert ausserdem noch gar nicht: test/golden/hw/G2/ enthaelt nur EXPECTED-DIFF.md, die Vorhersagen, weil der G2-Lauf E1 ist. Die Flagge faellt nach E1. KORREKTUR 17.09. abends: die Aussage &bdquo;jede Driftzeile, die eine Quellaenderung schliessen kann, ist geschlossen&ldquo; war FALSCH. DR-28 widerlegt sie -- entschieden am 12.09. (both-wrong), aber nie implementiert: kein einziger Verweis darauf in src/, waehrend jede andere aendernde Zeile in zwei bis vier Dateien zitiert ist, und die beiden zugehoerigen Tests nageln bis heute das ALTE Verhalten fest. Der Grund, warum es durchrutschte, ist lehrreich: DR-28 ist kein Plattform-Unterschied, mheard_functions.cpp ist EINE gemeinsame Datei. Die Zeile taucht deshalb in der Twin-Diff-Arithmetik gar nicht auf, mit der W6a und W6b bestimmt haben, was noch offen ist -- ein Zaehler, der nur Plattformpaare vergleicht, kann eine Produktentscheidung nicht sehen.'},
+        const DAY = 86400000;
+        function isWd(d) {
+          const w = d.getUTCDay();
+          return w !== 0 && w !== 6;
+        }
+        function addWd(d, n) {
+          let cur = new Date(d.getTime());
+          let left = n;
+          while (left > 0) {
+            const step = Math.min(1, left);
+            while (!isWd(cur)) cur = new Date(cur.getTime() + DAY);
+            if (step === 1) {
+              cur = new Date(cur.getTime() + DAY);
+              left -= 1;
+            } else {
+              cur = new Date(cur.getTime() + DAY * step);
+              left = 0;
+            }
+          }
+          return cur;
+        }
+        function nextWd(d) {
+          let c = new Date(d.getTime());
+          while (!isWd(c)) c = new Date(c.getTime() + DAY);
+          return c;
+        }
+        function fmt(d) {
+          return d.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            timeZone: "UTC",
+          });
+        }
+        function fmtShort(d) {
+          return d.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "short",
+            timeZone: "UTC",
+          });
+        }
+        function wdBetween(a, b) {
+          let n = 0;
+          let c = new Date(a.getTime());
+          while (c < b) {
+            if (isWd(c)) n++;
+            c = new Date(c.getTime() + DAY);
+          }
+          return n;
+        }
 
-    { id: "W1", ph: "D", name: "Welle 1: Defekte 1,2,7,10,11 und Hygiene-Loeschungen", days: 2, after: null, gate: "32-Env-Build, bin-Vergleich", owner: "Agenten" , st: "done", note: 'FERTIG 13.09. Der letzte offene Punkt war D6-10, das unbenutzte #include <SD.h> in src/esp32/esp32_main.cpp -- entfernt. Nur die Variante LilyGo_T-Beam-1W definiert HAS_SDCARD, sie ist also der Beweis. Beim Pruefen separat gefunden und NICHT mitgenommen, weil ausserhalb der Zeile: src/t5-epaper/t5epaper_main.h bindet SD.h zweimal ein (Zeile 16 und 25) -- ein Duplikat, kein toter Include, denn dieser Header traegt die SD-Symbole fuer t5epaper_main.cpp und ui_port.cpp.'},
-    { id: "W2", ph: "D", name: "Welle 2: RAM-Zeilen mit niedrigem Risiko, tinyxml, softser", days: 3, after: "W1", gate: "Frame-Dumps identisch, Regions-Delta", owner: "Agenten" , st: "done", note: 'Rund 28 kB RAM zurueckgeholt, jede Zahl vorher/nachher je Env gemessen -- und diesmal stimmten die Schaetzungen des Audits. D5-01 ist die groesste Einzelzeile der ganzen Kampagne: ota_html[] fehlte das const, also wurde das ganze Array beim Boot ins RAM kopiert; mit const wandert es von .data nach .rodata, Flash unveraendert, -24 320 B RAM auf BEIDEN Safeboot-Images. Dazu -2 928 B aus den Puffergroessen (R1-01/03/06) und -848 B (ESP32) bzw. -648 B (nRF52) aus den String-Tabellen. R3-04 war schon erledigt (tinyxml2 wurde bei der MEM-04-Arbeit vendort). ZWEI ZEILEN WURDEN VERWEIGERT, und das ist das eigentliche Ergebnis: R3-07 (-462 B Stack) ist SO NICHT MACHBAR -- die Kopierschleifen in decodeAPRS() haben keine Laengenbegrenzung je Token, die Pruefung laeuft erst DANACH, und die Eingabe kommt roh aus OnRxDone(), also aus der Luft; ein praeparierter Frame schreibt bis zu ~120 Byte in einen Puffer, den das Audit auf 24 kuerzen will -- Stack-Overflow im 4-KB-LoRa-Task. Und R3-10 (2 720 B) beruht auf einer falschen Annahme: die softser-Tabellen sind zur Laufzeit beschreibbar, keine Konstanten. Beide als W2-01/W2-02 im BACKLOG, damit sie nicht als freie Ersparnis stehenbleiben.'},
-    { id: "W3B", ph: "D", name: "Welle 3b: BLE-Drahtformat einfrieren (ungeplant)", days: 1, after: "W2", gate: "sizeof + alle 131 Offsets == Live-Struct auf ARM", owner: "Agenten" , st: "done", note: 'STAND IM PLAN NICHT DRIN und ist trotzdem Voraussetzung fuer den Struct-Merge. Die nRF52-Settings-Charakteristik verschickt s_meshcom_settings als ROHE BYTES, und die Telefon-App schreibt ein Abbild, das der Knoten direkt ueber seine Einstellungen memcpy-t (nrf52_ble.cpp:354,380). Es gibt kein Versionsfeld -- die Laenge ist die ganze Aushandlung. Damit sind Offset, Reihenfolge und Typ JEDES Members ein Drahtvertrag. Haette man den Struct zuerst zusammengelegt, waere entweder die Laenge abgelehnt worden oder -- schlimmer, bei zufaellig gleicher Groesse -- das Abbild angenommen und die Konfiguration des Nutzers feldweise verschoben worden. s_ble_settings_v1 friert das heutige Layout ein (static_assert auf sizeof und alle 131 Offsets), der BLE-Pfad uebersetzt jetzt statt zu blitten. Unabhaengig geprueft mit einer temporaeren Sonde im ARM-Build, davor eine absichtlich falsche Gegenprobe, damit sicher ist, dass die Sonde ueberhaupt ausgewertet wird. Beim Lesen des Diffs gefunden und behoben: die erste Fassung las den geteilten Staging-Puffer AUSSERHALB der kritischen Sektion (CONC-17) -- ein zweiter Settings-Write haette zwei Abbilder verschmolzen und das Ergebnis gespeichert. Kein Host-Test kann das sehen.'},
-    { id: "W3", ph: "D", name: "Welle 3: Settings-Schema, ein Struct, Migration", days: 9, after: "W3B", gate: "Roundtrip beide Plattformen, Upgrade behaelt Einstellungen auf BEIDEN", owner: "Agenten" , st: "done", note: 'Stand 16.09.: Der Bench-Lauf ist gemacht, auf allen drei Knoten gleichzeitig, jeder von einem echten 20260724-Image aus geflasht. Die ESP32-Haelfte BESTEHT: DK5EN-93 (Heltec V3) 105 erhalten, 0 verloren, die einzigen drei Abweichler sind lebendes GPS; DK5EN-14 (T-Deck Plus) 107 von 107, ueber den Migrationsboot UND einen normalen Reboot. Die nRF52-Haelfte NICHT: DK5EN-90 behaelt zwar jede Einstellung (102 erhalten, 0 geaendert, 2 per Entscheidung entfallen -- send_repeat_time/auto_join), der Migrationsboot meldet aber [SETST];path;legacy_migration_failed statt legacy_migrated. Das war ein FEHLALARM und ist diagnostiziert und behoben: lfs_rename() meldete einen Fehler fuer eine Verschiebung, die es TATSAECHLICH AUSGEFUEHRT hatte. Drei unabhaengige Belege im Mitschnitt: der Store existierte beim Bootstart gar nicht (path;keyed_absent), das vor jedem Aufraeumen gezogene Inventar listet das Ziel in neuer Groesse ohne jede .tmp-Datei (die Summe laesst keine vierte Datei zu), und ein spaeterer Save im selben Boot findet das Ziel byteidentisch (save;skipped_unchanged). Der Retry scheiterte danach aus einem zweiten, anderen Grund -- seine Quelle war bereits weg -- und dieses Paar meldete eine fehlgeschlagene Migration fuer eine Migration, die jedes Byte korrekt geschrieben hatte. Behoben: writeFileAtomic() prueft bei gemeldetem rename-Fehler das Ziel direkt und akzeptiert den Schreibvorgang, wenn die Bytes dort stehen (save;rename_false_negative), statt den schaedlichen Retry zu fahren; zwei mutationsgepruefte Tests. W3 IST DAMIT ERLEDIGT. Der Hardware-Arm wurde am selben Tag nachgeholt: erzwungenes Downgrade auf die offizielle v4.35t (wiscore_rak4631.uf2 vom 10.09.) und wieder hoch auf den W3c-Stand mit Fix. Das Downgrade behielt von sich aus jeden gesetzten Wert, der Upgrade-Boot meldete legacy_rewritten -> sanity_gate_rejected (korrekt: der Task-7-Zusatz verweigert den schnellen Pfad, sobald die Blob-CRC gewandert ist, auch bei gesundem Keyed-Store) -> legacy_migrated. 102 erhalten, 0 geaendert, 0 verloren; Boot 2 laedt path;keyed mit 105 Feldern. Zweiter Rest ebenfalls erledigt: --persiststat liest jetzt alle 17 nur-persistierten Schluessel zurueck (vier gemeinsame auf jedem Board, 13 T-Deck-Zeilen unter demselben Guard wie ihre Struct-Member, jetzt inklusive BOARD_T_DECK_PRO), auf DK5EN-14 ueber einen Reboot byteidentisch, abgesichert durch test/golden/persist_readback_lint.py. Nebenher geschlossen: die Counters-Migration ist auf beiden Plattformen mit der neuen Sonde --msgid belegt (93: 182/282/382, exakt kMsgIdPersistStep pro Boot; 90: 412 -> 511, die fehlende 1 kommt aus laufendem Verkehr) -- kein Knoten faengt bei 0 an. Nicht abgedeckt: 12 der NVS-only-Schluessel haben kein Auslesekommando (--persiststat deckt vier ab, --info eines); die echte Zahl ist 17, nicht 25. Werkzeuge repariert: --msgid, w3_upgrade_check.py (--gps-node plus Bucket REMOVED BY DESIGN), frische Baselines 20260916-pre (die vom 12.09. waren abgedriftet: Heltec 4 Felder, RAK 13). Details: docs/bench/w3-baseline/README.md Abschnitt 7. Davor, Stand 13.09. abends: Die ESP32-Haelfte STEHT UND IST AUF HARDWARE BEWIESEN. Schritt 1 fertig: ESP32-NVS laeuft ueber settings_schema, 134 get*/132 put* Aufrufe durch EINEN Lauf ueber die Deskriptoren ersetzt. Das Upgrade im Feld ist nicht behauptet, sondern geprueft -- alle 132 historischen NVS-Schluessel gegen den neuen Satz diffed: KEIN umbenannter, KEIN neuer, sechs entfallen (der Sensor-Cache, Betreiberentscheidung). CFG_CHR bleibt bei getChar/putChar, damit nicht nur der Schluesselname, sondern der TYP-Tag auf dem Flash identisch bleibt. Schritt 5 fertig: Upgrade-Beweis auf DK5EN-93 (Heltec V3), 104 von 107 exportierten Einstellungen byteidentisch ueber den Migrationsboot UND einen normalen Reboot; die drei Abweichler sind lebendes GPS. Schritt 4 entschieden (Betreiber 13.09.): Sensorwerte nicht mehr persistent, node_ackid faellt als toter Zustand, node_msgid in einen Zaehler-Namensraum, die 14 ESP32-Felder bleiben plattformgebunden, auto_join/send_repeat_time sind toter Code und fliegen samt Timer-Geruest raus. OFFEN bleiben Schritt 2 (der Struct-Merge, die riskante Haelfte -- erst jetzt moeglich, siehe W3b), Schritt 3 (das memberweise fail-closed Gate; heute wird ein Member, der im Struct steht aber nicht im Schema, still nicht persistiert) und Schritt 6 (DR-12/DR-13). NEBENBEFUND, im eigenen Commit bce95db5 desselben Tages: save_settings() wurde aus init_flash() heraus aufgerufen, waehrend dessen Preferences-Handle offen war -- Preferences::end() ist bedingungslos, danach liefert jedes getX() nur noch seinen Default. Rund die zweite Haelfte aller ESP32-Einstellungen wurde so bei JEDEM Boot im NVS ueberschrieben und im RAM zurueckgesetzt. Nie auf Hardware gelangt, weil fuer jenen Commit nur ein nRF52 geflasht wurde. Behoben, mit Waechter ueber alle 250 Aufrufstellen und Regressionstest.'},
-    { id: "W3C", ph: "D", name: "Welle 3c: ein Struct, Zaehler-Namensraum, Member-Gate (W3 Schritte 2/3/6)", days: 1.5, after: "W3B", gate: "27 native Envs, selftest.sh, 32-Env-Build, Advisor", owner: "Agenten" , st: "done", note: 'FERTIG 15.09. Der Struct s_meshcom_settings steht EINMAL in src/meshcom_settings.h, erzeugt aus X-Makro-Listen, damit ein nativer Test jedes Member mit offsetof/sizeof aufzaehlen kann. Genau das ist das Member-Gate (test_settings_members, je ein Env fuer ESP32+T-Deck und nRF52): jedes Member ist ENTWEDER eine settings_schema-Zeile ODER steht namentlich in meshcom_settings_runtime.h -- ein neues Member ohne Entscheidung laesst den Test fallen, mutationsgeprueft in beide Richtungen. Weg sind send_repeat_time/auto_join (LoRaWAN-Reste samt Timer-Geruest) und node_ackid; node_msgid bleibt Member, ist aber keine Schema-Zeile mehr, sondern haengt an counters_store.h: ESP32 Namensraum "Counters" mit Rueckfall auf den alten Credentials-Schluessel, nRF52 eigene Datei /counters.txt -- ein Settings-Import, ein BLE-Write oder ein Settings-Rewrite kann den Zaehler damit nicht mehr zurueckdrehen, und der 4-kB-Settings-Datensatz wandert nicht mehr alle 100 Frames ins Flash. Der nRF52-Legacy-Blob wird jetzt durch das eingefrorene s_ble_settings_v1 gelesen (byteidentisch mit dem Blob, den offizielle 4.35t schreibt -- gegen upstream geprueft), flash_reset() schreibt ein v1-Abbild, damit ein Downgrade die Datei noch lesen kann. Beim Lesen der Bench-Notizen gefunden: RAK-90 traegt noch eine Keyed-Store-Datei vom 12.09. neben dem neueren Blob des Release-Images -- der Keyed Store haette gewonnen. Das ist der echte Fall "Downgrade auf offiziell, dort umkonfiguriert, wieder hochgeflasht"; jetzt wird die CRC32 des Blobs festgehalten und ein veraenderter Blob erzwingt die Migration (Marker [SETST];path;legacy_rewritten, Regressionstest). Kosten: +2,1 kB BSS auf nRF52 fuer den statischen v1-Puffer (der 4-kB-Loop-Stack traegt keine zweite 2-kB-Struktur). settings_layout_lint.py ist ersatzlos weg (kein Zwilling mehr), twin_stub_lint fuehrt die beiden Stub-Header nicht mehr, weil sie den echten Header einbinden. Advisor-Pass (docs/w3c-advisor-verdict-20260915.md): ein echter Fund, im selben Commit behoben -- ein BLE-Settings-Write kopierte node_msgid noch hinein und drehte den Zaehler zurueck; dazu gewinnt auf dem Legacy-Pfad jetzt der Blob ueber eine alte counters-Datei. Tor: 868/868 native Faelle in 27 Envs, selftest.sh gruen, 28 von 29 Hardware-Envs gebaut (t5_epaper ist seit upstream v4.35a.07.10 ohne configuration.h und baut auch an HEAD nicht), Drift-Lint meldet noch 2 Zeilen ohne Test (DR-03, DR-16, banknur). Nebenbei: macOS 27 hatte Rosetta entfernt, kein nRF52-Build lief mehr -- reinstalliert.'},
-    { id: "W4", ph: "D", name: "Welle 4: Kommandotabelle (D2-10, D2-06, D2-07, D2-01)", days: 6, after: "W3", gate: "Golden-Capture klassifiziert, test_command_table", owner: "Agenten" , st: "done", note: 'D2-10 ist fertig (184f84ff): der Abgleich einer Kommandozeile war ein reiner Praefixvergleich, jeder Name verdeckte damit jeden laengeren -- nur die Reihenfolge der Sprossen hielt msg und msgid auseinander. Jetzt exakter Token-Abgleich in src/command_match.h, auf dem Host getestet (native_command_match), weil command_functions.cpp von keiner native-Umgebung uebersetzt wird und diese Regel, auf der alle rund 300 Sprossen stehen, vorher keinen einzigen ausfuehrbaren Test hatte. Genau das macht die Tabelle erst moeglich: eine Tabelle hat keine Reihenfolge. D2-06 steht im Baum: 70 der 107 on/off-Sprossen sind Zeilen in COMMAND_TOGGLES[], -768 Zeilen, Flash -2 696 B (ESP32) und -1 808 B (nRF52). DIE ZAHL DES AUDITS WAR ZU HOCH: es versprach 120 Sprossen und -6,0 kB; es sind 107, davon sind nur 70 regelmaessig genug, und die Tabelle kostet rund 2 kB zurueck. Die restlichen 37 verzweigen wirklich -- Fehlerpfade wie webserver on ohne SSID, Reboot-Planung bei wifiap, Hardware-Neuinit bei display und gps off, dazu Bench-Marker, deren Wortlaut die Capture-Werkzeuge woertlich greppen. DREI DEFEKTE IN DER EIGENEN ARBEIT, alle gefunden bevor etwas committet wurde: der Dispatch landete zuerst INNERHALB eines /* TEST */-Blocks, weil der Sprossen-Parser Kommentare nicht entfernte und die dort abgeschaltete compress-Sprosse fuer die erste echte hielt -- der Block uebersetzte fehlerfrei und tat nichts; das else-Geruest der Leiter zerbrach in Konfigurationen, in denen ein #if falsch ist (heltec_t114, t_deck_plus, wireless-paper), was auf einem einzelnen Board unsichtbar bleibt; und ina226 on schrieb Nullen ins Flash, weil setupINA226() vier persistierte Felder nullt, wenn der Chip fehlt, und der Aufruf vor save_settings() gerutscht war. Lehre fuer den Rest der Kampagne: Austrittscode 0 beweist nichts, wenn Code still verschwinden kann -- der Dispatch wird jetzt im Artefakt nachgewiesen, nicht im Compilerlauf. D2-07 IST FERTIG (27be0d12 + f8d937fe): 24 Setter teilen sich eine getestete Zahlen-Auswertung in src/command_setters.h. DIE FALLE WAREN NICHT DIE OFFSETS, SONDERN DIE STILLE UMDEUTUNG. Die erste, rein mechanische Fassung setzte iVar = 0 neben sscanf -- damit wurde Unsinn SPEICHERBAR: --txpower abc antwortete \u0022set txpower to 0 dBm\u0022, weil 0 im Bereich [-9, 22] liegt; sieben Stellen waren betroffen. Die Helfer WEISEN JETZT ZURUECK, statt umzudeuten, und die Nicht-Zahl-Pruefung steht GETRENNT von der Bereichspruefung: zusammengelegt kam \u0022txpower 0 dBm not between -9 and max 22\u0022 heraus, und 0 liegt sehr wohl zwischen -9 und 22. Zwei echte Defekte sind damit zu: --txpower abc las vorher ein uninitialisiertes iVar und meldete 16711680, und fuenf Setter hatten gar keine Bereichspruefung, schrieben also aus Unsinn stillschweigend einen Skalierungsfaktor oder Temperatur-Offset von NULL. Die Pruefbedingung war KLASSIFIKATION, nicht ein leerer Diff -- die Aenderung veraendert absichtlich, was auf Unsinn geantwortet wird: 332 identisch, 12 beabsichtigt, 0 unerklaert unter den 24 beruehrten Kommandos. D2-01 IST FERTIG: die letzten drei auskommentierten Sprossen-Bloecke sind geloescht (51 Zeilen) -- darunter genau der /* TEST */-compress-Block, der den D2-06-Dispatch in einen Kommentar rutschen liess. Das erzwang eine zweite Korrektur: der Selbsttest von extract_commands.py pruefte das Entfernen von Kommentaren AM LEBENDEN QUELLTEXT und fiel um, sobald es keinen toten Code mehr zu entfernen gab. Er laeuft jetzt gegen ein Fixture. EIN PRUEFSTAND DARF NICHT DARAUF ANGEWIESEN SEIN, DASS DER DEFEKT, GEGEN DEN ER SCHUETZT, WEITER EXISTIERT. W4 ist geschlossen.'},
-    { id: "W5", ph: "D", name: "Welle 5: RAM-Zeilen mit mittlerem Risiko, T-Deck Pro LVGL", days: 5, after: "W4", gate: "Pruefung je Zeile, nRF52-Soak", owner: "Agenten + Bench" , st: "done", note: 'STAND 17.09.2026: SIEBEN VON NEUN ZEILEN SIND DURCH, W5 haengt nur noch an Hardware. FERTIG: GRD-01 (ein MC_HAS_U8G2 statt sieben handgeschriebener Kopien plus einer Neun-Arm-Kaskade), R2-01 (der MHeard-Textcodec ist weg: -83 200 B RAM, -54 676 B Flash, -117 Zeilen), R3-12 (mheardLat/Lon double->float, -648..-240 B je Env), R4-01 (config/lv_conf.h war die FUENFTE lv_conf.h und die einzige noch auf LV_MEM_CUSTOM 0 -- LVGLs 48-kB-Arena war ein STATISCHES Feld, also zwingend interner DRAM: t_deck_pro -49 168 B RAM), R2-04 aprsMessage-Haelfte (sieben String-Felder -> feste char[], 27 Quelldateien, 15 Testsuiten, 651 Fundstellen: -109 068 B Flash gegen +15 024 B RAM, wovon +464 je Env EIN Global ist, pendingDisplayMsg 144->608 B), R1-02 Schritt 1 (die dreifache Telefon-Rahmung ist ein host-getestetes blePhoneFrame(), -976 B). ABGELEHNT mit Begruendung: R3-13 (1 200 B, wuerde aber 6-Hop-Pfade abschneiden, und --maxhop erlaubt 6) und R4-02/03 (rund 1 400 B gemessen gegen einen Alloc-Fehlerpfad auf 20+ Boards). OFFEN: R1-04 (ringbufferRAWLoraRX, 5 200 B) braucht den 12-h-nRF52-Soak, und die MHEARDLINE-HAELFTE von R2-04 ist noch nicht angefangen. Fuenf Defekte fielen bei R2-04 nebenbei an, die ohne die Typaenderung unsichtbar geblieben waeren: eine Nutzlast-Schleife, die nur durch ihre Aufrufer begrenzt war (direkt aufgerufen: SIGABRT, stack smashing), ein Feld, das jahrelang der String-Konstruktor initialisiert hatte (initAPRS() vergass msg_source_call), substring()s Klemmung, die beim Uebergang auf Zeigerarithmetik verloren ging, eine Ueberladungsaufloesung, die bei breiterem Argumenttyp still umsprang (utf8ascii), und zwei Puffer, die um ein Byte zu klein waren. Dazu eine Include-Falle: MAX_MHEARD ist in configuration_global.h PRO BOARD definiert, und dieser Header frueh einzubinden gab der MHeard-Tabelle still 50 statt 80 Plaetze. NACHTRAG 17.09. ABENDS: R1-04 ist eingecheckt (d5a071d8) und auf der Bank belegt -- -109 040 B RAM ueber 34 Envs gegen +7 076 B Flash, und der Soak lief auf ZWEI Knoten mit je einem Arm: DK5EN-93 mit angelegtem Ring unter echtem LoRa-Empfang, DK5EN-90 mit NIE angelegtem Ring. Die Heap-Messung zeigt den Einmal-Charakter direkt: erster Seitenaufruf -3 132 B, zweiter -236, dritter -224. Zwei Stunden haben gereicht, nicht zwoelf -- beide Arme sind binnen Minuten sichtbar, der Rest ist Stabilitaet. Offen ist damit nur noch die mheardLine-Haelfte von R2-04. ABGESCHLOSSEN 17.09. abends: die mheardLine-Haelfte von R2-04 ist eingecheckt (79242eda). Sieben String-Felder wurden feste char[], und der Umbau haette dabei ZWEI Defekte still eingebaut: zwei Inhaltsvergleiche (eigenes Rufzeichen ausschliessen, HG-Gateway-Erkennung) waeren zu Zeigervergleichen geworden -- immer falsch, ohne Warnung. Beide sind jetzt is_equ() und beide mutationsgeprueft festgenagelt. Der Advisor fand danach einen Befund, den die Zeile selbst nicht hatte: sizeof(mheardLine) geht von ~112 auf 584 Byte, und drei Funktionen halten so eine Struktur lokal auf dem 4-KB-Loop-Task des nRF52 -- demselben Stack, auf dem N-22 schon einmal ueberlief. Mit -fstack-usage gemessen und nach dem N-22-Muster nach BSS verschoben; der tiefste Loop-Pfad steht jetzt bei 1984 statt 2568 Byte und damit flacher als VOR der Zeile. Der R1-04-Soak ist gelaufen und bestanden: 2 h, 309 Frames in den angelegten Ring auf DK5EN-93, 37 durch den NULL-Pfad auf DK5EN-90, null Neustarts, Heap auf beiden unveraendert.'},
-    { id: "W6", ph: "D", name: "Welle 6: gemeinsamer UDP-Handler, Helfer, ui_common", days: 6, after: "W5", gate: "EXTUDP-Bytevergleich beide Plattformen", owner: "Agenten + Bench" , st: "done", note: 'In zwei Haelften gefahren. <b>W6a</b> (55a7b4c4): neun entschiedene U1-Driftzeilen vereinheitlicht, Twin-Diff 24-&gt;36 gleich, 13-&gt;1 verschieden, null Regressionen -- der einzige Ueberlebende ist genau DR-20. Dazu src/ui_common/ fuer die beiden LVGL-Zwillinge (peri_gps 417-&gt;271 / 387-&gt;312, zwei leere Uebersetzungseinheiten geloescht); ui_common ist nur build-verifiziert, keines der beiden LVGL-Boards steht hier. <b>W6b</b> (3be9a9da): DR-20, die sechs U2-Zeilen und DR-18 Teil 2. Der Advisor-Lauf fand dabei einen echten Cross-Task-Race, bevor er ausgeliefert wurde: queueExternAck() schrieb in die Single-Producer-Queue externQueue[] aus dem Main-Loop, waehrend OnRxDone sie aus dem LORA-Task beschreibt -- behoben durch direktes Senden. U2s Beweis ist schwaecher als U1s: das Vier-Block-Korpus erreicht DR-21..26 nicht (jedes Rufzeichen darin ist DK5EN-*), die Zeilen haengen an handgebauten Gleichheitstests. EXT-01 am 17.09. auf Hardware bestaetigt.'},
-    { id: "C4d", ph: "D", name: "Mini-Welle C4-diag: Diagnose-Port nRF52 (DR-03, DR-14, DR-16)", days: 1, after: "W6", gate: "32 Envs, keine Recovery-Aktion geaendert", owner: "Agenten" , st: "done", note: 'Aus dem M2-Review entstanden, im Plan vorher nicht vorhanden. DR-03: nRF52 bekommt die 35-s-Warnstufe und die Stage-2-Zeilen, aber gelesen wird s_ethLinkState (der echte PHY-Zustand), NICHT hasIPaddress -- das wird nur von Fehlerpfaden geloescht, nie von einem gezogenen Kabel, und genau das hat der Fable-Review korrigiert. DR-16: eigenes bTeleFirst, damit Hey und Telemetrie sich nicht eine Variable teilen. DR-14: der Kommentar, der erklaert, warum der TX-Drain auf nRF52 absichtlich nur auf RX-freien Durchlaeufen laeuft (geteilter SPI-Bus, verzoegerte Radio-Rearm) -- ohne ihn liest die naechste Pruefung das wieder als Bug, was schon zweimal passiert ist. Vom D1-09-Soak ausgenommen, weil keine Recovery-AKTION sich aendert, nur die Diagnose. Stand 13.09.: D1-10 (der Loop-Scheduler) ist auf 50 Timer-Praedikate NACHGEMESSEN, nicht die im Plan genannten ~18 -- die Schaetzung dieser Zeile ist entsprechend zu niedrig.'},
-    { id: "W7", ph: "D", name: "Welle 7: Varianten umstrukturieren", days: 3, after: "C4d", gate: "Makro-Set-Diff je Env", owner: "Agenten", gateEnd: true , st: "done", note: 'SCHRITT 1 FERTIG 17.09. (233257e3), und der Rest ist bewusst eine eigene Entscheidung. Neun Makros standen woertlich in allen 31 Varianten, 250 dieser Zeilen sagten dasselbe -- 433.175000 kam 28-mal vor. Sie stehen jetzt einmal in src/configuration_default.h, jedes #ifndef-bewacht, der Include als LETZTE Zeile jeder Variante: lokal gewinnt immer, weil lokal zuerst kommt. Aufgenommen wurden NUR Makros, die jede Variante ohnehin definiert -- damit ist der Umbau praesenzneutral per Konstruktion und nichts, was per #ifdef prueft, kann seine Meinung aendern. Bewiesen statt behauptet: das neue Effektiv-Makro-Gate zeigt fuer alle 32 Board-Envs einen BYTEGLEICHEN Makrosatz, obwohl 31 Dateien sich geaendert haben. Draussen bleiben die 73 praesenzgeprueften Flaggen (ENABLE_GPS und Co.): fuer die ist die ABWESENHEIT das Signal, ihr Opt-out waere ein #undef je Board, und ein #undef auf ein nie definiertes Makro ist legal und still -- ein Tippfehler schaltete einen Sensor flottenweit ab. Ebenso draussen: MODUL_HARDWARE (Identitaet des Boards) und BUTTON_PIN (GPIO-Nummer, nur 13 von 31 einig). Die extends=-Haelfte in den platformio.ini ist nicht angefasst -- upstream hat genau diese neun Dateien am 14.09. selbst angefasst (b30e31a4), also gehoert sie hinter den Resync, nicht davor.'},
+        function schedule() {
+          const start = nextWd(new Date(startEl.value + "T00:00:00Z"));
+          const showReview = reviewEl.checked;
+          const byId = {};
+          let phaseStart = start;
+          const out = [];
+          for (const ph of PHASES) {
+            const tasks = TASKS.filter(
+              (t) => t.ph === ph.id && (showReview || !t.external),
+            );
+            let phaseEnd = phaseStart;
+            for (const t of tasks) {
+              const s = t.after ? byId[t.after].end : phaseStart;
+              const sAligned = nextWd(s);
+              const e = addWd(sAligned, t.days);
+              const row = { ...t, phase: ph, start: sAligned, end: e };
+              byId[t.id] = row;
+              out.push(row);
+              if (!t.external && e > phaseEnd) phaseEnd = e;
+            }
+            phaseStart = nextWd(phaseEnd);
+          }
+          return { start, rows: out };
+        }
 
-    { id: "E1", ph: "E", name: "G2 Nachher-Lauf, Instrument-Lauf, nRF52-Migrationstest", days: 2, after: null, gate: "G2 == G1 bis auf erwartete Diffs", owner: "Bench" , st: "wip", note: 'TEILWEISE 17.09. G2 kann nur die vier Schritte vergleichen, fuer die G1 eine Baseline hat (Betreiberentscheidung 5). H8 EXTUDP auf DK5EN-93: BESTANDEN, "corpus responses identical (8)" gegen G1 -- Relay- und Beacon-Zahlen weichen ab, was das Vergleichswerkzeug ausdruecklich zum Nicht-Fehler erklaert, weil beides Live-Verkehr und freilaufende Timer sind. H8 auf DK5EN-90: NULL von 23, wo G1 acht hat. Konfiguration geprueft, zwei Neustarts, und die Socket-Theorie (der W5100S hat vier) mit --webserver off widerlegt statt bloss ungetestet gelassen. Zweite unabhaengige Sichtung des nRF52-EXTUDP-Pfades nach 3.8l, und die erste mit kontrolliertem Vergleich gegen einen funktionierenden ESP32-Knoten in derselben Stunde. Erklaert auch, warum EXT-01 nur auf ESP32 bestaetigt ist. Offen: H4 (BLE, braucht erst zwei uebereinstimmende Aufnahmen desselben unveraenderten Images), H6 (UDP-Stub), H11 (unmoeglich, DK5EN-14 haengt nicht dran). NACHTRAG 17.09. SPAET: H4 (BLE) ist gelaufen und in Phase 1 auf BEIDEN Knoten NICHT zur Ruhe gekommen, also kein G1-Vergleich -- das ist das Ergebnis, keine Abkuerzung. Zwei Aufnahmen desselben UNVERAENDERTEN Images muessen erst miteinander uebereinstimmen, sonst sagt ein Diff gegen G1 nichts. Beide Ursachen liegen im INSTRUMENT, nicht in der Firmware, und genau dafuer gibt es Phase 1: auf DK5EN-93 stempelt Capture.on_write() einen Write erst NACH dem await, eine schnelle --conffin-Antwort landete dadurch vor ihrem eigenen Write und verschob jeden folgenden Frame um eins; auf DK5EN-14 enthaelt das BLE-Korpus selbst in Zeile 31 --maxhop 5 OHNE Wiederherstellung, Lauf 2 startete also aus anderem persistenten Zustand. Beide Laeufe liegen als phase1-run1/run2 bei, bewusst nicht befoerdert. Sicherheitspruefung: null dst=* in allen vier Aufnahmen, und das Korpus enthaelt ueberhaupt keinen Sendeeintrag. H6 ist entblockt -- der Mechanismus heisst --srvip und ist in den G0-READMEs belegt -- braucht aber ein INSTRUMENT_ENABLED-Image und kann das Auslieferungs-Image daher nicht pruefen. H11 bleibt offen.'},
-    { id: "E2", ph: "E", name: "Protokoll nachher, deutscher Nachweis, PR-Beschreibung", days: 2, after: "E1", gate: "protocol-after.md vollständig", owner: "Orchestrator" , st: "dropped", note: 'Gestrichen mit Operator-Entscheidung 6 (17.09.): einziges Ergebnis waere die deutsche PR-Beschreibung gewesen.'},
-    { id: "E3", ph: "E", name: "Upstream-Resync, gezielter Wiederholungslauf", days: 2, after: "E1", gate: "gezielte Goldens grün", owner: "Agenten + Bench" , st: "open"},
-    { id: "E4", ph: "E", name: "PR an icssw-org DEV einreichen", days: 0.5, after: "E3", gate: "PR offen", owner: "Martin", milestone: true, gateEnd: true , st: "dropped", note: 'Gestrichen mit Operator-Entscheidung 6 (17.09.): <i>"no PR at the moment. Everything here is very experimental"</i>.'},
-    { id: "E5", ph: "E", name: "Upstream-Review (Kurt), extern", days: 10, after: "E4", gate: "Merge durch Upstream", owner: "Upstream", external: true , st: "dropped", note: 'Faellt mit E4 weg -- ohne PR gibt es nichts zu reviewen.'},
-  ];
+        function render() {
+          try {
+            localStorage.setItem("gantt-start", startEl.value);
+            localStorage.setItem("gantt-review", reviewEl.checked ? "1" : "0");
+          } catch (e) {}
+          const { start, rows } = schedule();
+          const internal = rows.filter((r) => !r.external);
+          // Gestrichene Zeilen bleiben sichtbar, zaehlen aber nicht mehr in den
+          // Nenner: "21 von 31" haette sonst drei Aufgaben mitgezaehlt, die nie
+          // erledigt werden, und der Fortschritt haette dauerhaft zu niedrig
+          // ausgesehen.
+          const active = internal.filter((r) => r.st !== "dropped");
+          const endAll = rows.reduce((m, r) => (r.end > m ? r.end : m), start);
+          const endInternal = internal.reduce(
+            (m, r) => (r.end > m ? r.end : m),
+            start,
+          );
+          const totalWd = wdBetween(start, endInternal);
+          const sign = rows.find((r) => r.id === "M2");
+          const submit = rows.find((r) => r.id === "E3"); // E4 gestrichen, Entscheidung 6
 
-  const PROJECT_START = "2026-09-11";   // tatsaechlicher erster Arbeitstag
-  const startEl = document.getElementById("start");
-  const reviewEl = document.getElementById("showreview");
-  const resetEl = document.getElementById("reset");
-  try { const s = localStorage.getItem("gantt-start"); if (s) startEl.value = s; else startEl.value = PROJECT_START; const r = localStorage.getItem("gantt-review"); if (r !== null) reviewEl.checked = r === "1"; } catch (e) { startEl.value = PROJECT_START; }
+          document.getElementById("kpis").innerHTML = [
+            ["Start", fmt(start), "erster Arbeitstag"],
+            ["Matrix-Freigabe", fmt(sign.end), "Entscheidungspunkt, Martin"],
+            [
+              "Kampagnenende",
+              fmt(submit.end),
+              "E3 Resync und Wiederholungslauf; kein PR (Entscheidung 6)",
+            ],
+            [
+              "Arbeitstage",
+              String(totalWd),
+              (Math.round((totalWd / 5) * 10) / 10).toLocaleString("de-DE") +
+                " Wochen, ohne Review",
+            ],
+            [
+              "Fortschritt",
+              active.filter((r) => r.st === "done").length +
+                " / " +
+                active.length +
+                " Aufgaben",
+              "erledigt; " +
+                active.filter((r) => r.st === "wip").length +
+                " laufend, " +
+                (internal.length - active.length) +
+                " gestrichen",
+            ],
+          ]
+            .map(
+              ([l, v, h]) =>
+                `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`,
+            )
+            .join("");
 
-  const DAY = 86400000;
-  function isWd(d) { const w = d.getUTCDay(); return w !== 0 && w !== 6; }
-  function addWd(d, n) {
-    let cur = new Date(d.getTime()); let left = n;
-    while (left > 0) {
-      const step = Math.min(1, left);
-      while (!isWd(cur)) cur = new Date(cur.getTime() + DAY);
-      if (step === 1) { cur = new Date(cur.getTime() + DAY); left -= 1; }
-      else { cur = new Date(cur.getTime() + DAY * step); left = 0; }
-    }
-    return cur;
-  }
-  function nextWd(d) { let c = new Date(d.getTime()); while (!isWd(c)) c = new Date(c.getTime() + DAY); return c; }
-  function fmt(d) { return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }); }
-  function fmtShort(d) { return d.toLocaleDateString("de-DE", { day: "2-digit", month: "short", timeZone: "UTC" }); }
-  function wdBetween(a, b) { let n = 0; let c = new Date(a.getTime()); while (c < b) { if (isWd(c)) n++; c = new Date(c.getTime() + DAY); } return n; }
+          document.getElementById("legend").innerHTML =
+            PHASES.map(
+              (p) =>
+                `<span><i class="sw" style="background:${p.color}"></i>${p.name}</span>`,
+            ).join("") +
+            `<span><i class="sw gate"></i>Gate</span><span><i class="sw ext"></i>extern, nicht gezählt</span>` +
+            `<span><i class="sw" style="background:var(--ink-2)"></i>erledigt</span>` +
+            `<span><i class="sw" style="background:var(--ink-2);opacity:.9"></i>läuft</span>` +
+            `<span><i class="sw" style="background:none;border:1.5px dashed var(--ink-3)"></i>offen</span>` +
+            `<span><i class="sw" style="background:none;border:1.5px dashed var(--ink-3);opacity:.45"></i>gestrichen</span>`;
 
-  function schedule() {
-    const start = nextWd(new Date(startEl.value + "T00:00:00Z"));
-    const showReview = reviewEl.checked;
-    const byId = {};
-    let phaseStart = start;
-    const out = [];
-    for (const ph of PHASES) {
-      const tasks = TASKS.filter(t => t.ph === ph.id && (showReview || !t.external));
-      let phaseEnd = phaseStart;
-      for (const t of tasks) {
-        const s = t.after ? byId[t.after].end : phaseStart;
-        const sAligned = nextWd(s);
-        const e = addWd(sAligned, t.days);
-        const row = { ...t, phase: ph, start: sAligned, end: e };
-        byId[t.id] = row; out.push(row);
-        if (!t.external && e > phaseEnd) phaseEnd = e;
-      }
-      phaseStart = nextWd(phaseEnd);
-    }
-    return { start, rows: out };
-  }
+          const labelW = 350,
+            dayW = 14,
+            rowH = 26,
+            top = 44,
+            left = 8,
+            hdrH = 24;
+          const days = Math.ceil((endAll - start) / DAY) + 3;
+          const width = left + labelW + days * dayW + 16;
+          const height =
+            top + rows.length * rowH + 20 + PHASES.length * (hdrH + 6);
+          const x = (d) => left + labelW + ((d - start) / DAY) * dayW;
 
-  function render() {
-    try { localStorage.setItem("gantt-start", startEl.value); localStorage.setItem("gantt-review", reviewEl.checked ? "1" : "0"); } catch (e) {}
-    const { start, rows } = schedule();
-    const internal = rows.filter(r => !r.external);
-    // Gestrichene Zeilen bleiben sichtbar, zaehlen aber nicht mehr in den
-    // Nenner: "21 von 31" haette sonst drei Aufgaben mitgezaehlt, die nie
-    // erledigt werden, und der Fortschritt haette dauerhaft zu niedrig
-    // ausgesehen.
-    const active = internal.filter(r => r.st !== "dropped");
-    const endAll = rows.reduce((m, r) => r.end > m ? r.end : m, start);
-    const endInternal = internal.reduce((m, r) => r.end > m ? r.end : m, start);
-    const totalWd = wdBetween(start, endInternal);
-    const sign = rows.find(r => r.id === "M2");
-    const submit = rows.find(r => r.id === "E3");   // E4 gestrichen, Entscheidung 6
+          let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Gantt-Diagramm der DRY-Vereinheitlichung">`;
+          for (let i = 0; i <= days; i++) {
+            const d = new Date(start.getTime() + i * DAY);
+            const w = d.getUTCDay();
+            if (w === 0 || w === 6)
+              svg += `<rect x="${x(d)}" y="${top - 6}" width="${dayW}" height="${height - top}" fill="var(--grid)" opacity=".6"/>`;
+            if (w === 1) {
+              svg += `<line x1="${x(d)}" x2="${x(d)}" y1="${top - 6}" y2="${height - 8}" stroke="var(--line)" stroke-width="1"/>`;
+              svg += `<text x="${x(d) + 3}" y="${top - 12}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${fmtShort(d)}</text>`;
+            }
+            if (d.getUTCDate() === 1 || i === 0) {
+              svg += `<text x="${x(d) + 3}" y="${top - 28}" font-size="11" font-weight="600" fill="var(--ink-2)">${d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" })}</text>`;
+            }
+          }
+          // Die Standlinie wird zuletzt gezeichnet (siehe unten), damit sie ueber
+          // den Balken liegt; hier nur der Wochenend-Raster-Teil.
 
-    document.getElementById("kpis").innerHTML = [
-      ["Start", fmt(start), "erster Arbeitstag"],
-      ["Matrix-Freigabe", fmt(sign.end), "Entscheidungspunkt, Martin"],
-      ["Kampagnenende", fmt(submit.end), "E3 Resync und Wiederholungslauf; kein PR (Entscheidung 6)"],
-      ["Arbeitstage", String(totalWd), (Math.round(totalWd / 5 * 10) / 10).toLocaleString("de-DE") + " Wochen, ohne Review"],
-      ["Fortschritt", active.filter(r => r.st === "done").length + " / " + active.length + " Aufgaben",
-       "erledigt; " + active.filter(r => r.st === "wip").length + " laufend, "
-       + (internal.length - active.length) + " gestrichen"],
-    ].map(([l, v, h]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`).join("");
+          svg += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="3" height="6" fill="var(--ext)"/></pattern></defs>`;
 
-    document.getElementById("legend").innerHTML = PHASES.map(p => `<span><i class="sw" style="background:${p.color}"></i>${p.name}</span>`).join("")
-      + `<span><i class="sw gate"></i>Gate</span><span><i class="sw ext"></i>extern, nicht gezählt</span>`
-      + `<span><i class="sw" style="background:var(--ink-2)"></i>erledigt</span>`
-      + `<span><i class="sw" style="background:var(--ink-2);opacity:.9"></i>läuft</span>`
-      + `<span><i class="sw" style="background:none;border:1.5px dashed var(--ink-3)"></i>offen</span>`
-      + `<span><i class="sw" style="background:none;border:1.5px dashed var(--ink-3);opacity:.45"></i>gestrichen</span>`;
+          let y = top;
+          let lastPh = null;
+          rows.forEach((r, i) => {
+            if (r.phase !== lastPh) {
+              if (lastPh) y += 6;
+              svg += `<rect x="${left}" y="${y + 4}" width="4" height="${hdrH - 8}" rx="1" fill="${r.phase.color}"/>`;
+              svg += `<text x="${left + 10}" y="${y + 16}" font-size="12" font-weight="600" fill="${r.phase.color}" font-family="IBM Plex Sans Condensed, sans-serif">${r.phase.id} ${r.phase.name}</text>`;
+              y += hdrH;
+              lastPh = r.phase;
+            }
+            const cy = y + rowH / 2;
+            svg += `<text x="${left + 18}" y="${cy + 4}" font-size="12" fill="var(--ink)">${r.id}</text>`;
+            svg += `<text x="${left + 52}" y="${cy + 4}" font-size="12" fill="var(--ink-2)">${trunc(r.name, 46)}</text>`;
+            // Mindestbreite 18 px: darunter passt weder der Haken fuer "erledigt"
+            // noch der Punkt fuer "laeuft" in den Balken, und die Halbtages-Carves
+            // C1..C5 waren als erledigt, laufend und offen nicht zu unterscheiden.
+            const bx = x(r.start),
+              bw = Math.max(18, x(r.end) - bx - 2);
+            // Vierter Zustand seit 17.09.: "gestrichen". Kommt VOR milestone und
+            // external, sonst zeichnete E4 weiter seine volle Meilenstein-Raute und
+            // E5 seine Schraffur, als stuenden sie noch im Plan.
+            if (r.st === "dropped") {
+              svg += `<g class="bar" data-i="${i}" opacity="0.45"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-dasharray="2 3"/><line x1="${bx + 3}" y1="${cy}" x2="${bx + bw - 3}" y2="${cy}" stroke="var(--ink-3)" stroke-width="1.5"/></g>`;
+            } else if (r.milestone) {
+              svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${r.phase.color}"/><path d="M${bx + bw + 7} ${cy - 9} l9 9 l-9 9 l-9 -9z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/></g>`;
+            } else if (r.external) {
+              svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="url(#hatch)" stroke="var(--ext)"/></g>`;
+            } else {
+              // Status: erledigt = voll, laufend = voll mit Rahmen und Punkt,
+              // offen = nur Umriss. Der Plan bleibt derselbe, sichtbar wird nur,
+              // wie weit er abgearbeitet ist.
+              const done = r.st === "done",
+                wip = r.st === "wip";
+              const fill = done || wip ? r.phase.color : "none";
+              const op = done ? 1 : wip ? 0.9 : 1;
+              svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${fill}" fill-opacity="${op}" stroke="${r.phase.color}" stroke-width="${done || wip ? 0 : 1.5}" stroke-dasharray="${r.st === "open" ? "4 3" : ""}"/>`;
+              if (done)
+                svg += `<path d="M${bx + 5} ${cy} l3.5 4 l7 -8" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+              if (wip)
+                svg += `<circle cx="${bx + 9}" cy="${cy}" r="3.5" fill="var(--surface)"/>`;
+              if (r.gateEnd)
+                svg += `<path d="M${bx + bw + 6} ${cy - 7} l7 7 l-7 7 l-7 -7z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>`;
+              svg += `</g>`;
+            }
+            svg += `<text x="${bx + bw + (r.gateEnd || r.milestone ? 18 : 6)}" y="${cy + 4}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${String(r.days).replace(".", ",")} T</text>`;
+            svg += `<rect class="hit" data-i="${i}" x="${left}" y="${y}" width="${width - left}" height="${rowH}" fill="transparent"/>`;
+            y += rowH;
+          });
+          // Standlinie zum Schluss: ein kraeftiger senkrechter Balken ueber der
+          // ganzen Hoehe, damit auf einen Blick zu sehen ist, wo der Plan steht.
+          //
+          // Markiert den Baustand, nicht das Kalenderdatum: die Linie steht am
+          // `end` der am weitesten fortgeschrittenen nicht-offenen internen
+          // Aufgabe (max. ueber alle "done"/"wip", robust gegen die Reihenfolge
+          // in `internal`), beschriftet mit erledigt/gesamt statt einem Datum.
+          {
+            const advanced = internal.filter(
+              (r) => r.st === "done" || r.st === "wip",
+            );
+            const markEnd = advanced.reduce(
+              (m, r) => (r.end > m ? r.end : m),
+              start,
+            );
+            const doneCount = active.filter((r) => r.st === "done").length;
+            const label = `Plan-Stand: ${doneCount} von ${active.length} Aufgaben`;
+            const tx = x(markEnd);
+            const boxW = 12 + label.length * 6.6;
+            // Beschriftung nach links kippen, wenn sie sonst rechts hinauslaeuft
+            const boxX = tx + 5 + boxW > width - 8 ? tx - boxW - 5 : tx + 5;
+            svg += `<rect x="${tx - 1.5}" y="${top - 30}" width="3" height="${height - top + 22}" fill="var(--today)" opacity="0.9"/>`;
+            svg += `<rect x="${boxX}" y="${top - 42}" width="${boxW}" height="18" rx="3" fill="var(--today)"/>`;
+            svg += `<text x="${boxX + 6}" y="${top - 29}" font-size="11" font-weight="700" fill="var(--surface)" font-family="IBM Plex Sans Condensed, sans-serif">${label}</text>`;
+          }
+          svg += `</svg>`;
+          const chart = document.getElementById("chart");
+          const tip = document.getElementById("tip");
+          chart.querySelectorAll("svg").forEach((n) => n.remove());
+          chart.insertAdjacentHTML("beforeend", svg);
 
-    const labelW = 350, dayW = 14, rowH = 26, top = 44, left = 8, hdrH = 24;
-    const days = Math.ceil((endAll - start) / DAY) + 3;
-    const width = left + labelW + days * dayW + 16;
-    const height = top + rows.length * rowH + 20 + PHASES.length * (hdrH + 6);
-    const x = d => left + labelW + ((d - start) / DAY) * dayW;
+          chart.querySelectorAll(".hit").forEach((h) => {
+            h.addEventListener("mousemove", (ev) => {
+              const r = rows[+h.dataset.i];
+              const stLabel =
+                {
+                  done: "erledigt",
+                  wip: "läuft",
+                  open: "offen",
+                  dropped: "gestrichen",
+                }[r.st] || "offen";
+              tip.innerHTML = `<b>${r.id} ${r.name}</b><br><span class="m">${fmt(r.start)} bis ${fmt(r.end)} (${String(r.days).replace(".", ",")} AT)</span><br>Status: <b>${stLabel}</b>${r.note ? "<br>" + r.note : ""}<br>Gate: ${r.gate}<br>Verantwortlich: ${r.owner}`;
+              tip.style.display = "block";
+              const rect = chart.getBoundingClientRect();
+              let tx = ev.clientX - rect.left + chart.scrollLeft + 14,
+                ty = ev.clientY - rect.top + 14;
+              if (tx + 310 > chart.scrollLeft + chart.clientWidth)
+                tx = ev.clientX - rect.left + chart.scrollLeft - 320;
+              tip.style.left = tx + "px";
+              tip.style.top = ty + "px";
+            });
+            h.addEventListener("mouseleave", () => {
+              tip.style.display = "none";
+            });
+          });
 
-    let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Gantt-Diagramm der DRY-Vereinheitlichung">`;
-    for (let i = 0; i <= days; i++) {
-      const d = new Date(start.getTime() + i * DAY);
-      const w = d.getUTCDay();
-      if (w === 0 || w === 6) svg += `<rect x="${x(d)}" y="${top - 6}" width="${dayW}" height="${height - top}" fill="var(--grid)" opacity=".6"/>`;
-      if (w === 1) {
-        svg += `<line x1="${x(d)}" x2="${x(d)}" y1="${top - 6}" y2="${height - 8}" stroke="var(--line)" stroke-width="1"/>`;
-        svg += `<text x="${x(d) + 3}" y="${top - 12}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${fmtShort(d)}</text>`;
-      }
-      if (d.getUTCDate() === 1 || i === 0) {
-        svg += `<text x="${x(d) + 3}" y="${top - 28}" font-size="11" font-weight="600" fill="var(--ink-2)">${d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" })}</text>`;
-      }
-    }
-    // Die Standlinie wird zuletzt gezeichnet (siehe unten), damit sie ueber
-    // den Balken liegt; hier nur der Wochenend-Raster-Teil.
+          const tb = document.querySelector("#table tbody");
+          let html = "";
+          lastPh = null;
+          rows.forEach((r) => {
+            if (r.phase !== lastPh) {
+              html += `<tr class="phase"><td colspan="8"><i class="dot" style="background:${r.phase.color}"></i>${r.phase.id} ${r.phase.name}</td></tr>`;
+              lastPh = r.phase;
+            }
+            // Der Stand gehoert AUCH hierher. Ohne ihn stand er nur im Balken, und
+            // wer die Tabelle liest -- was fuer Termine der naheliegende Weg ist --
+            // sah gestrichene Zeilen als ganz normale Planzeilen mit Datum.
+            const stTxt =
+              {
+                done: "erledigt",
+                wip: "läuft",
+                open: "offen",
+                dropped: "gestrichen",
+              }[r.st] || "offen";
+            const nameCell = r.st === "dropped" ? `<s>${r.name}</s>` : r.name;
+            html += `<tr${r.st === "dropped" ? ' style="opacity:.55"' : ""}><td class="m">${r.id}</td><td>${nameCell}${r.external ? " (Platzhalter, nicht gezählt)" : ""}</td><td class="m">${stTxt}</td><td class="m">${fmt(r.start)}</td><td class="m">${fmt(r.end)}</td><td class="m">${String(r.days).replace(".", ",")}</td><td>${r.gate}</td><td>${r.owner}</td></tr>`;
+          });
+          tb.innerHTML = html;
+        }
+        function trunc(s, n) {
+          return s.length > n ? s.slice(0, n - 1) + "…" : s;
+        }
 
-    svg += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="3" height="6" fill="var(--ext)"/></pattern></defs>`;
-
-    let y = top; let lastPh = null;
-    rows.forEach((r, i) => {
-      if (r.phase !== lastPh) {
-        if (lastPh) y += 6;
-        svg += `<rect x="${left}" y="${y + 4}" width="4" height="${hdrH - 8}" rx="1" fill="${r.phase.color}"/>`;
-        svg += `<text x="${left + 10}" y="${y + 16}" font-size="12" font-weight="600" fill="${r.phase.color}" font-family="IBM Plex Sans Condensed, sans-serif">${r.phase.id} ${r.phase.name}</text>`;
-        y += hdrH;
-        lastPh = r.phase;
-      }
-      const cy = y + rowH / 2;
-      svg += `<text x="${left + 18}" y="${cy + 4}" font-size="12" fill="var(--ink)">${r.id}</text>`;
-      svg += `<text x="${left + 52}" y="${cy + 4}" font-size="12" fill="var(--ink-2)">${trunc(r.name, 46)}</text>`;
-      // Mindestbreite 18 px: darunter passt weder der Haken fuer "erledigt"
-      // noch der Punkt fuer "laeuft" in den Balken, und die Halbtages-Carves
-      // C1..C5 waren als erledigt, laufend und offen nicht zu unterscheiden.
-      const bx = x(r.start), bw = Math.max(18, x(r.end) - bx - 2);
-      // Vierter Zustand seit 17.09.: "gestrichen". Kommt VOR milestone und
-      // external, sonst zeichnete E4 weiter seine volle Meilenstein-Raute und
-      // E5 seine Schraffur, als stuenden sie noch im Plan.
-      if (r.st === "dropped") {
-        svg += `<g class="bar" data-i="${i}" opacity="0.45"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-dasharray="2 3"/><line x1="${bx + 3}" y1="${cy}" x2="${bx + bw - 3}" y2="${cy}" stroke="var(--ink-3)" stroke-width="1.5"/></g>`;
-      } else if (r.milestone) {
-        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${r.phase.color}"/><path d="M${bx + bw + 7} ${cy - 9} l9 9 l-9 9 l-9 -9z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/></g>`;
-      } else if (r.external) {
-        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="url(#hatch)" stroke="var(--ext)"/></g>`;
-      } else {
-        // Status: erledigt = voll, laufend = voll mit Rahmen und Punkt,
-        // offen = nur Umriss. Der Plan bleibt derselbe, sichtbar wird nur,
-        // wie weit er abgearbeitet ist.
-        const done = r.st === "done", wip = r.st === "wip";
-        const fill = done || wip ? r.phase.color : "none";
-        const op = done ? 1 : (wip ? 0.9 : 1);
-        svg += `<g class="bar" data-i="${i}"><rect x="${bx}" y="${cy - 8}" width="${bw}" height="16" rx="3" fill="${fill}" fill-opacity="${op}" stroke="${r.phase.color}" stroke-width="${done || wip ? 0 : 1.5}" stroke-dasharray="${r.st === "open" ? "4 3" : ""}"/>`;
-        if (done) svg += `<path d="M${bx + 5} ${cy} l3.5 4 l7 -8" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-        if (wip) svg += `<circle cx="${bx + 9}" cy="${cy}" r="3.5" fill="var(--surface)"/>`;
-        if (r.gateEnd) svg += `<path d="M${bx + bw + 6} ${cy - 7} l7 7 l-7 7 l-7 -7z" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>`;
-        svg += `</g>`;
-      }
-      svg += `<text x="${bx + bw + (r.gateEnd || r.milestone ? 18 : 6)}" y="${cy + 4}" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${String(r.days).replace(".", ",")} T</text>`;
-      svg += `<rect class="hit" data-i="${i}" x="${left}" y="${y}" width="${width - left}" height="${rowH}" fill="transparent"/>`;
-      y += rowH;
-    });
-    // Standlinie zum Schluss: ein kraeftiger senkrechter Balken ueber der
-    // ganzen Hoehe, damit auf einen Blick zu sehen ist, wo der Plan steht.
-    //
-    // Markiert den Baustand, nicht das Kalenderdatum: die Linie steht am
-    // `end` der am weitesten fortgeschrittenen nicht-offenen internen
-    // Aufgabe (max. ueber alle "done"/"wip", robust gegen die Reihenfolge
-    // in `internal`), beschriftet mit erledigt/gesamt statt einem Datum.
-    {
-      const advanced = internal.filter(r => r.st === "done" || r.st === "wip");
-      const markEnd = advanced.reduce((m, r) => r.end > m ? r.end : m, start);
-      const doneCount = active.filter(r => r.st === "done").length;
-      const label = `Plan-Stand: ${doneCount} von ${active.length} Aufgaben`;
-      const tx = x(markEnd);
-      const boxW = 12 + label.length * 6.6;
-      // Beschriftung nach links kippen, wenn sie sonst rechts hinauslaeuft
-      const boxX = (tx + 5 + boxW > width - 8) ? tx - boxW - 5 : tx + 5;
-      svg += `<rect x="${tx - 1.5}" y="${top - 30}" width="3" height="${height - top + 22}" fill="var(--today)" opacity="0.9"/>`;
-      svg += `<rect x="${boxX}" y="${top - 42}" width="${boxW}" height="18" rx="3" fill="var(--today)"/>`;
-      svg += `<text x="${boxX + 6}" y="${top - 29}" font-size="11" font-weight="700" fill="var(--surface)" font-family="IBM Plex Sans Condensed, sans-serif">${label}</text>`;
-    }
-    svg += `</svg>`;
-    const chart = document.getElementById("chart");
-    const tip = document.getElementById("tip");
-    chart.querySelectorAll("svg").forEach(n => n.remove());
-    chart.insertAdjacentHTML("beforeend", svg);
-
-    chart.querySelectorAll(".hit").forEach(h => {
-      h.addEventListener("mousemove", ev => {
-        const r = rows[+h.dataset.i];
-        const stLabel = { done: "erledigt", wip: "läuft", open: "offen", dropped: "gestrichen" }[r.st] || "offen";
-        tip.innerHTML = `<b>${r.id} ${r.name}</b><br><span class="m">${fmt(r.start)} bis ${fmt(r.end)} (${String(r.days).replace(".", ",")} AT)</span><br>Status: <b>${stLabel}</b>${r.note ? "<br>" + r.note : ""}<br>Gate: ${r.gate}<br>Verantwortlich: ${r.owner}`;
-        tip.style.display = "block";
-        const rect = chart.getBoundingClientRect();
-        let tx = ev.clientX - rect.left + chart.scrollLeft + 14, ty = ev.clientY - rect.top + 14;
-        if (tx + 310 > chart.scrollLeft + chart.clientWidth) tx = ev.clientX - rect.left + chart.scrollLeft - 320;
-        tip.style.left = tx + "px"; tip.style.top = ty + "px";
-      });
-      h.addEventListener("mouseleave", () => { tip.style.display = "none"; });
-    });
-
-    const tb = document.querySelector("#table tbody");
-    let html = ""; lastPh = null;
-    rows.forEach(r => {
-      if (r.phase !== lastPh) { html += `<tr class="phase"><td colspan="8"><i class="dot" style="background:${r.phase.color}"></i>${r.phase.id} ${r.phase.name}</td></tr>`; lastPh = r.phase; }
-      // Der Stand gehoert AUCH hierher. Ohne ihn stand er nur im Balken, und
-      // wer die Tabelle liest -- was fuer Termine der naheliegende Weg ist --
-      // sah gestrichene Zeilen als ganz normale Planzeilen mit Datum.
-      const stTxt = { done: "erledigt", wip: "läuft", open: "offen", dropped: "gestrichen" }[r.st] || "offen";
-      const nameCell = r.st === "dropped" ? `<s>${r.name}</s>` : r.name;
-      html += `<tr${r.st === "dropped" ? ' style="opacity:.55"' : ""}><td class="m">${r.id}</td><td>${nameCell}${r.external ? " (Platzhalter, nicht gezählt)" : ""}</td><td class="m">${stTxt}</td><td class="m">${fmt(r.start)}</td><td class="m">${fmt(r.end)}</td><td class="m">${String(r.days).replace(".", ",")}</td><td>${r.gate}</td><td>${r.owner}</td></tr>`;
-    });
-    tb.innerHTML = html;
-  }
-  function trunc(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
-
-  startEl.addEventListener("change", render);
-  reviewEl.addEventListener("change", render);
-  resetEl.addEventListener("click", () => {
-    // Die gemerkte Auswahl ist pro Browser und pro Herkunft (file:// und
-    // http:// sind verschieden) -- zwei Leute sehen sonst zwei Plaene.
-    try { localStorage.removeItem("gantt-start"); localStorage.removeItem("gantt-review"); } catch (e) {}
-    startEl.value = PROJECT_START;
-    reviewEl.checked = true;
-    render();
-  });
-  render();
-})();
-</script>
-</body>
+        startEl.addEventListener("change", render);
+        reviewEl.addEventListener("change", render);
+        resetEl.addEventListener("click", () => {
+          // Die gemerkte Auswahl ist pro Browser und pro Herkunft (file:// und
+          // http:// sind verschieden) -- zwei Leute sehen sonst zwei Plaene.
+          try {
+            localStorage.removeItem("gantt-start");
+            localStorage.removeItem("gantt-review");
+          } catch (e) {}
+          startEl.value = PROJECT_START;
+          reviewEl.checked = true;
+          render();
+        });
+        render();
+      })();
+    </script>
+  </body>
 </html>

@@ -7209,8 +7209,10 @@ classic at 0x1000/safeboot.bin); 9 dropped `monitor_speed`, one
 `upload_protocol`. Gate: `test/golden/variant_ini_effective.py` (new, wired
 into `selftest.sh`) compares the resolved config of all 68 envs against the
 dump taken BEFORE the edit, `$BUILD_DIR` normalised to the old text -- PASS,
-692 keys. And one real upload on DK5EN-93 through the template, hashes
-verified. Five ESP32 variants (`t5_epaper`, `t_deck_pro`, the two
+692 keys. And one real upload through the template, hashes verified --
+CORRECTION (23:30): that upload went to the T-Deck, not DK5EN-93, because
+`$UPLOAD_PORT` autodetects the first S3 on the bus (§3.8ay); the template
+expansion is proven either way, the board was the wrong one. Five ESP32 variants (`t5_epaper`, `t_deck_pro`, the two
 `vision-master`s, `wireless-paper`) do not `extends = esp32` at all and keep
 their own command; three of those still carry the `upload_protocol = custom`
 port-autodetect defect (memory `pio-custom-upload-no-port-autodetect`) --
