@@ -2469,6 +2469,9 @@ void nrf52loop()
 
     if(bEXTUDP)
     {
+        // ETH-03: one number for the whole guard-hold -- how long the SPI
+        // bus is unavailable to the radio/webserver for this pass.
+        INSTR_SECTION("extudp_guard");
         bSPI_ETH_Active = true;   // SPI guard: Ethernet owns bus
         getExternUDP();
         flushExternQueue();
@@ -2519,8 +2522,11 @@ void nrf52loop()
 
         if(bWEBSERVER)
         {
+            // ETH-03: the starvation victim -- compare against extudp_guard
+            // to tell "webserver stalled because EXTUDP held the bus" from
+            // "webserver stalled on its own".
             bSPI_ETH_Active = true;   // SPI guard: Ethernet owns bus (web page delivery)
-            loopWebserver();
+            { INSTR_SECTION("webserver_loop"); loopWebserver(); }
             bSPI_ETH_Active = false;  // SPI guard: release bus
             if(bPendingRadioRx) { bPendingRadioRx = false; startRadioReceive(); }
         }

@@ -5,6 +5,7 @@
 #include <extudp_functions.h>
 #include <loop_functions.h>
 #include <debugconf.h>
+#include "instrument.h"
 #include "ArduinoJson.h"
 #include "extern_notice_json.h"
 #include "extern_tele_json.h"
@@ -445,11 +446,15 @@ void getExternUDP()
   if(bEXTUDP && (int)strlen(meshcom_settings.node_extern) > 7)
   {
     // check if we received a UDP packet
-    packetExtSize = UdpExtern.parsePacket();
-    
+    // ETH-03: prime suspect for the multi-second stall (docs/BACKLOG.md
+    // §3.8at) -- parsePacket() touches the W5100S over the SPI bus shared
+    // with the SX1262 radio; a block here holds bSPI_ETH_Active and starves
+    // loopWebserver() on the same bus.
+    { INSTR_SECTION("extudp_parse"); packetExtSize = UdpExtern.parsePacket(); }
+
     if (packetExtSize > 0)
     {
-      len = UdpExtern.read(incomingExtPacket, UDP_TX_BUF_SIZE - 1);
+      { INSTR_SECTION("extudp_read"); len = UdpExtern.read(incomingExtPacket, UDP_TX_BUF_SIZE - 1); }
 
       // UDP-02 (docs/bench-extudp-regression.md §6): we read at most
       // UDP_TX_BUF_SIZE-1 = 254 bytes, so a datagram of 255 bytes or more

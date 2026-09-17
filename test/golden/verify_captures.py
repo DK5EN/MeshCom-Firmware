@@ -52,8 +52,23 @@ def main() -> int:
     problems = []
     checked = 0
     for path in sorted((ROOT / "test" / "golden" / "hw").rglob("ble-frames.bin")):
-        node = path.parent.name
-        call = NODE_CALLSIGN.get(node)
+        # Resolve the node by walking UP from the capture, not by assuming its
+        # immediate parent is the node directory. A capture may legitimately
+        # sit one level deeper: the H4 protocol takes TWO captures of the same
+        # unchanged image and only promotes one to <node>/ble-frames.* once
+        # they agree, so a run that did not converge is kept as
+        # <node>/phase1-run1/ble-frames.bin -- deliberately not promoted.
+        # Keying on parent.name rejected exactly those, which would have
+        # pushed whoever hit it toward flattening the directory (losing the
+        # distinction between a verified baseline and an unconverged run) or
+        # toward adding 'phase1-run1' to NODE_CALLSIGN as if it were a board.
+        node, call = None, None
+        for parent in path.parents:
+            if parent.name in NODE_CALLSIGN:
+                node, call = parent.name, NODE_CALLSIGN[parent.name]
+                break
+        if node is None:
+            node = path.parent.name
         if call is None:
             problems.append(f"{path}: unknown node {node!r}, add it to NODE_CALLSIGN")
             continue

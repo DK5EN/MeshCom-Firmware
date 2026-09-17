@@ -6820,7 +6820,7 @@ finding should be read as "one of two candidate causes", not as a diagnosis.
 
 Gate: 34/34 board envs, 962/962 native cases, `selftest.sh` exit 0.
 
-### 3.8at `ETH-03` -- inbound EXTUDP stalls the whole Ethernet stack on nRF52 (2026-09-17)
+### 3.8at `ETH-03` -- inbound EXTUDP takes the nRF52 off the network, and it is NOT a stall (2026-09-17)
 
 **Reproduced twice, cleanly.** The node is healthy, four small JSON datagrams
 arrive on UDP 1799, and its entire network goes away for about 25 seconds:
@@ -6855,6 +6855,62 @@ an unnecessary request to replug the cable.
 not what was happening here. The "no heartbeat left the node" observation from
 that write-up was worthless in both directions: `sendExternHeartbeat()`
 (`extudp_functions.cpp:928`) has an **empty body**. There is no heartbeat.
+
+#### MEASURED 2026-09-17 evening: the stall hypothesis is refuted
+
+The EXTUDP path had no timing instrumentation, which is why this was invisible.
+Four `INSTR_SECTION()` probes were added (`extudp_parse`, `extudp_read`,
+`extudp_guard`, `webserver_loop`) and the repro run again on an
+`INSTRUMENT_ENABLED=1` image. Result, over 397 loop passes:
+
+| section          | n                  | max_us           |
+| ---------------- | ------------------ | ---------------- |
+| `extudp_parse`   | 397                | **977** (< 1 ms) |
+| `extudp_guard`   | 397                | 977              |
+| `webserver_loop` | 397                | **0**            |
+| `extudp_read`    | **never executed** | --               |
+
+**Nothing stalls.** The loop ran 397 times during the capture; a 25 s block
+would have shown as one enormous `max_us` and a loop count near zero. The
+shared-SPI-bus theory, the `parsePacket()` theory and the
+starved-`loopWebserver()` theory are all dead.
+
+**What the numbers say instead.** `extudp_read` never ran even once, which
+means `parsePacket()` returned 0 on every one of those 397 passes -- **the
+datagrams never reach the socket at all.** The node is not stalling on the
+traffic; it never sees it.
+
+And the state at that moment is the real finding:
+
+```
+ICMP  192.168.68.66 : 3/3 packets, 3.5 ms      <- chip holds and uses the address
+web   192.168.68.66 : http=000                  <- service dead
+--info              : hasIpAddress: no          <- FIRMWARE thinks there is no IP
+```
+
+The W5100S is answering ARP and ping on the address while the firmware's
+`neth.hasIPaddress` is false. Every service is gated on that flag --
+`if(bWEBSERVER && neth.hasIPaddress)`, `if(bEXTUDP && neth.hasIPaddress)` -- so
+once it clears, the node becomes a zombie: pingable, loop running, serial
+responsive, and deaf on every port. Later captures show it flapping back
+(`resets;1`, `link;up`, `ip;192.168.68.66`), which matches the ~25 s
+self-recovery originally observed.
+
+So `ETH-03` is **not** a stall. It is a false `hasIPaddress` clear on a link
+that is demonstrably up, and the EXTUDP traffic is the trigger, not the victim.
+The remaining question is which of the clear sites fires
+(`nrf_eth.cpp:169/281/294/567` -- all inside DHCP/ETH re-init paths) and what
+makes DHCP fail while the chip is plainly working. That needs a probe at those
+four assignments, which is the next instrumentation step, not a guess.
+
+**Instrument capacity was nearly the undoing of this measurement.**
+`INSTR_SECTION_SLOTS` was 16 and the tree carries **42** distinct section names;
+slots are handed out first-come per boot and `instrument_note_section()`
+silently returns when the table is full. At least nine sections run every pass
+before the EXTUDP block, so the four new probes would very plausibly have been
+the ones cut -- producing a report that omits exactly the rows under test and
+reads as "the section never ran". Raised to 48; the file is entirely inside
+`#if INSTRUMENT_ENABLED`, so shipping images are unaffected.
 
 #### Where to look
 
