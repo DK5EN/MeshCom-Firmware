@@ -202,6 +202,15 @@ def variant_macro_names(root: Path = ROOT) -> set:
     # instead of 80. That is exactly the failure this gate has to catch, and
     # it is invisible if only the variant headers' own names are recorded.
     sources.append(root / "src" / "configuration_global.h")
+    # ...and src/configuration_default.h, which is where W7 MOVES the fleet
+    # defaults to. Without it this gate has the very blind spot it was built to
+    # avoid: the name set would be read from the variant headers only, so a
+    # macro hoisted OUT of them would drop out of the recorded set entirely and
+    # the dump would show it "disappearing" on every board -- indistinguishable
+    # from a value genuinely lost. The union of both locations is stable across
+    # the refactor: before the hoist the name lives in the variants, after it
+    # lives in the default, and either way it is recorded.
+    sources.append(root / "src" / "configuration_default.h")
     for cfg in sources:
         if not cfg.exists():
             continue
@@ -323,6 +332,10 @@ def self_test() -> int:
            parsed.get("BARE") == "")
 
     names = variant_macro_names()
+    report("macro-name set survives a hoist into the shared default",
+           "RF_FREQUENCY" in variant_macro_names()
+           and (ROOT / "src" / "configuration_default.h").exists())
+
     report("macro-name set covers the variant headers AND the global buffers",
            200 < len(names) < 600
            and {"RF_FREQUENCY", "LORA_SF", "LORA_CR"} <= names

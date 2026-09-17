@@ -16,13 +16,10 @@ Chip-ID erkannt (detectEinkChipId() in esp32_functions.cpp):
 // Wireless Paper specific config
 #define MODUL_HARDWARE HELTEC_WIRELESS_PAPER
 
-#define RF_FREQUENCY 433.175000          // Hz  (AT 70cm, wie E290)
-#define LORA_APRS_FREQUENCY 433.775000   // Hz
 
 // --- Keine Onboard-Sensoren auf der Wireless Paper -> bewusst NICHT aktiviert ---
 // (kein ENABLE_GPS / BMX280 / BMP390 / AHT20 / SHT21 / BMX680 / MCP23017 / INA226 / MCU811 / RTC / SOFTSER)
 
-#define TX_POWER_MAX 22  // max 22 dBm
 #define TX_POWER_MIN 2
 
 // SX1262 mit identischer Pinbelegung wie E290 -> eigener Schalter, additiv in lora_setchip.cpp
@@ -41,17 +38,12 @@ Chip-ID erkannt (detectEinkChipId() in esp32_functions.cpp):
 // muss HAS_EPAPER hier gesetzt sein - genau wie in der vision-master-e290 configuration.h.
 #define HAS_EPAPER
 
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 #define WAIT_TX 5         // ticks waiting after Lora TX in doTX()
 
-#define TX_OUTPUT_POWER 22  // SX1262 up to +22dBm
 #define CURRENT_LIMIT 140   // mA
 
 // RadioLib Modem-Parameter (wie E290)
-#define LORA_CR 6
-#define LORA_BANDWIDTH 250
-#define LORA_SF 11
 
 // =============================================
 // GPIOs
@@ -135,3 +127,8 @@ Chip-ID erkannt (detectEinkChipId() in esp32_functions.cpp):
 #define PIN_LORA_SCK            9
 #define PIN_LORA_MISO           11
 #define PIN_LORA_MOSI           10
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

@@ -315,10 +315,19 @@ def self_test() -> int:
         report("real variants/ tree, freshly generated baseline -> exit 0", code == 0)
         # remove one macro from one real variant's configuration.h and prove
         # the gate now fails against the same baseline
+        # The victim macro is picked from the file, not hard-coded. It used to
+        # be LORA_SF, and W7 hoisted LORA_SF into src/configuration_default.h
+        # -- at which point this self-test failed at its own setup step, not
+        # because the gate broke but because the fixture assumed a particular
+        # macro would stay put. Same rule the D2-06 gate learned: a gate must
+        # not depend on the thing it guards against continuing to exist.
         victim = sorted((root / "variants").glob("*/configuration.h"))[0]
         text = victim.read_text()
-        removed = re.sub(r"^\s*#\s*define\s+LORA_SF\b.*$", "", text,
-                         count=1, flags=re.M)
+        m = re.search(r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\b.*$",
+                      text, flags=re.M)
+        report("setup: the victim variant defines at least one macro",
+               m is not None)
+        removed = (text[:m.start()] + text[m.end():]) if m else text
         report("setup: a real #define line was actually removed",
                removed != text)
         victim.write_text(removed)

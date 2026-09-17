@@ -10,8 +10,6 @@ definitions for esp32_loraprs Board with RA-01
 
 // esp32_loraprs specific config
 #define MODUL_HARDWARE ESP32_LORAPRS_RA01
-#define RF_FREQUENCY 433.175000 // 432.900000   // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // 432.900000   // Hz
 #define SX127X  // some functions differ from SX127x and SX126x in RadioLib based on Semtech Chip
 #define ENABLE_BMX280
 #define ENABLE_BMP390
@@ -41,9 +39,6 @@ definitions for esp32_loraprs Board with RA-01
 #endif
 
 #define ANALOG_REFRESH_INTERVAL 30 // sec messure intervall
-#define TX_POWER_MAX 22  // max 22dBm
-#define TX_POWER_MIN -9
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 //#define ENABLE_SOFTSER
 
@@ -59,10 +54,8 @@ definitions for esp32_loraprs Board with RA-01
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -73,7 +66,6 @@ definitions for esp32_loraprs Board with RA-01
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 // AZ Delivery ESP32 DevKitC v4 + RA-01 (SX1278)
 
@@ -105,3 +97,8 @@ definitions for esp32_loraprs Board with RA-01
 //#define GPS_BAUDRATE_SOFTCHECK        // GPS Baudratenermittlung wird mit Software Loop gepr�ft
 //#define ENABLE_GPS_UBLOX_FIX          // UBLOX wird fix festgelegt und kein setup gemacht
 //#define GPS_BAUDRATE_SETFIX 38400     // Die Baudrate f�r GPS wird auf FIXWERT gesetzt
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

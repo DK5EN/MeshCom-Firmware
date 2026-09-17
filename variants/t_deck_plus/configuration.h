@@ -9,8 +9,6 @@
 
 // T-Deck specifig config
 #define MODUL_HARDWARE T_DECK_PLUS
-#define RF_FREQUENCY 433.175000 // 432.900000   // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // 432.900000   // Hz
 #define SX1262X  // some functions differ from SX127x and SX126x in RadioLib based on Semtech Chip
 
 #define ENABLE_BMX280
@@ -23,15 +21,11 @@
 #define ENABLE_SOFTSER
 #define ENABLE_AUDIO
 
-#define TX_POWER_MAX 22  // max 22 dBm
-#define TX_POWER_MIN -9
 
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 #define TDECK_TFT_TIMEOUT 30  // time until display turns dark in seconds
 
 #define WAIT_TX 5         // ticks waiting after Lora TX in doTX()
-#define TX_OUTPUT_POWER 22  // SX1268 have up to +22dBm
 #define CURRENT_LIMIT 140 // in mA +20dBm are about 120mA -> check if enough headroom 
 
 
@@ -42,10 +36,8 @@
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -56,7 +48,6 @@
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 
 // OE3GJC: TODO check
@@ -147,3 +138,8 @@
 
 #define TDECK_KEYBOARD_INT  46
 #define TDECK_BL_PIN        42
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

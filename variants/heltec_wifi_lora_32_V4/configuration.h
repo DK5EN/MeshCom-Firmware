@@ -10,8 +10,6 @@
 
 // HELTEC_V4 specific config
 #define MODUL_HARDWARE HELTEC_V4
-#define RF_FREQUENCY 433.175000 // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // Hz
 #define SX1262_V4
 #define RX_TIMEOUT_VALUE 0      // continous rx with 0
 #define ENABLE_BMX280
@@ -25,14 +23,10 @@
 
 //#define ENABLE_SOFTSER
 
-#define TX_POWER_MAX 22
-#define TX_POWER_MIN -9
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 #define WAIT_TX 5         // ticks waiting after Lora TX in doTX()
 
 #define CURRENT_LIMIT 140 // in mA
-#define TX_OUTPUT_POWER 22
 
 /**
  * RadioLib Coding Rate: Allowed values range from 5 to 8.
@@ -41,10 +35,8 @@
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -55,7 +47,6 @@
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 #define RESET_OLED RST_OLED
 
@@ -112,3 +103,8 @@
 // P_LORA_PA_POWER 7   - PA power enable
 // P_LORA_PA_EN    2   - PA enable
 // P_LORA_PA_TX_EN 46  - PA TX enable during transmission
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

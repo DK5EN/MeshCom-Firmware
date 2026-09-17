@@ -10,8 +10,6 @@ definitions for T-Beam-Supreme
 // T-Beam specific config
 #define MODUL_HARDWARE TBEAM_SUPREME
 #define MODUL_FW_TBEAM TBEAM_SUPREME
-#define RF_FREQUENCY 433.175000 // 432.900000   // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // 432.900000   // Hz
 
 #define ENABLE_BMX280
 #define ENABLE_BMP390
@@ -30,17 +28,13 @@ definitions for T-Beam-Supreme
 
 #define SX1262_V3
 
-#define TX_POWER_MAX 22  // max 22 dBm
-#define TX_POWER_MIN -9
 
 // Defined using AXP192
 #define XPOWERS_CHIP_AXP192
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 
 #define WAIT_TX 5         // ticks waiting after Lora TX in doTX()
 
-#define TX_OUTPUT_POWER 22
 #define CURRENT_LIMIT 140 // in mA +20dBm are about 120mA -> check if enough headroom 
 
 /**
@@ -50,10 +44,8 @@ definitions for T-Beam-Supreme
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -64,7 +56,6 @@ definitions for T-Beam-Supreme
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 #define RESET_OLED RST_OLED
 
@@ -113,3 +104,8 @@ definitions for T-Beam-Supreme
 // auch mit `--owgpio <pin>` nicht mehr einschalten -- das waere eine
 // Funktionsentfernung, keine Bereinigung.
 #define OneWire_GPIO -1
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

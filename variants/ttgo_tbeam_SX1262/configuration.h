@@ -11,8 +11,6 @@ definitions for TBEAM 1262
 // TBEAM_1262 specific config
 #define MODUL_HARDWARE TBEAM_1262
 #define MODUL_FW_TBEAM  TBEAM_1262
-#define RF_FREQUENCY 433.175000 // 432.900000   // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // 432.900000   // Hz
 #define ENABLE_BMX280
 #define ENABLE_BMP390
 #define ENABLE_AHT20
@@ -29,12 +27,9 @@ definitions for TBEAM 1262
 #define ANALOG_REFRESH_INTERVAL 30 // sec messure intervall
 
 #define SX1262X
-#define TX_POWER_MAX 22  // max 22dBm
-#define TX_POWER_MIN -9
 
 // Defined using AXP192
 #define XPOWERS_CHIP_AXP192
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 #define BOARD_LED 4    // LED_BUILTIN
 
@@ -56,7 +51,6 @@ definitions for TBEAM 1262
 // wird aber grundsätzlich in der Modem-Config benötigt!!!
 
 
-#define TX_OUTPUT_POWER 22  // SX1268 have up to +22dBm
 
 #define CURRENT_LIMIT 140 // in mA +20dBm are about 120mA -> check if enough headroom 
 
@@ -67,10 +61,8 @@ definitions for TBEAM 1262
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -81,7 +73,6 @@ definitions for TBEAM 1262
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 #define RESET_OLED RST_OLED
 
@@ -119,3 +110,8 @@ definitions for TBEAM 1262
 #define GPS_BAUDRATE_SOFTCHECK        // GPS Baudratenermittlung wird mit Software Loop geprüft
 //#define ENABLE_GPS_UBLOX_FIX          // UBLOX wird fix festgelegt und kein setup gemacht
 //#define GPS_BAUDRATE_SETFIX 38400     // Die Baudrate für GPS wird auf FIXWERT gesetzt
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt

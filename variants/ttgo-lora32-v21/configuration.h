@@ -10,8 +10,6 @@ definitions for TLORA_V2_1_1p6
 
 // TLORA_V2_1_1p6 specific config
 #define MODUL_HARDWARE TLORA_V2_1_1p6
-#define RF_FREQUENCY 433.175000 // 432.900000   // Hz
-#define LORA_APRS_FREQUENCY 433.775000 // 432.900000   // Hz
 #define SX127X
 
 #define ENABLE_BMX280
@@ -46,7 +44,6 @@ definitions for TLORA_V2_1_1p6
 
 #define TX_POWER_MAX 20  // max 20dBm
 #define TX_POWER_MIN -4
-#define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH  // Same for Tx and Rx
 
 #define BOARD_LED 25    // LED_BUILTIN
 
@@ -64,10 +61,8 @@ definitions for TLORA_V2_1_1p6
     case 7: CR_4_7;
     case 8: CR_4_8;
 */
-#define LORA_CR 6
 
 // RadioLib LoRa Bandwidth Setting in kHz
-#define LORA_BANDWIDTH 250
 
 /** RadioLib Spreading Factor
  * case 6: SF_6;
@@ -78,7 +73,6 @@ definitions for TLORA_V2_1_1p6
     case 11: SF_11;
     case 12: SF_12;
 */
-#define LORA_SF 11
 
 
 //#define LORA_RST  //already defined
@@ -101,3 +95,8 @@ definitions for TLORA_V2_1_1p6
 //#define GPS_BAUDRATE_SOFTCHECK          // GPS Baudratenermittlung wird mit Software Loop geprüft
 //#define ENABLE_GPS_UBLOX_FIX          // UBLOX wird fix festgelegt und kein setup gemacht
 //#define GPS_BAUDRATE_SETFIX 38400     // Die Baudrate für GPS wird auf FIXWERT gesetzt
+
+// W7 (D6-01): die Flottenvorgaben stehen in src/configuration_default.h.
+// Der Include gehoert ans ENDE: was diese Datei oben selbst setzt, hat es
+// dann schon gesetzt, und die #ifndef-Waechter dort ueberspringen es.
+#include <configuration_default.h>   // W7: Flottenvorgaben, #ifndef -- was oben steht, gewinnt
