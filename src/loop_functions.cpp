@@ -899,7 +899,14 @@ int esp32_isSSD1306(int address)
     #endif
 
     #if defined(BOARD_TBEAM_1W)
-        return 1;  //SH1106 aber stimmt 1 wirklich?
+        // DISP-01: der Zweifel im alten Kommentar ("SH1106 aber stimmt 1
+        // wirklich?") ist BERECHTIGT und bleibt offen. Unter dem jetzt
+        // geklaerten Vertrag heisst 1 = 0,9"/SSD1306. Ist das Panel dieses
+        // Boards tatsaechlich ein 1,3"/SH1106, muesste hier 2 stehen. Nicht
+        // blind geaendert: kein T-Beam 1W auf dieser Bench, und ein falscher
+        // Wert tauscht nur einen ungeprueften Zustand gegen einen anderen.
+        // Zu pruefen ist genau eins -- Panelgroesse des Boards.
+        return 1;
     #endif
 
     #if defined(BOARD_T3S3_V13)
@@ -952,14 +959,55 @@ int esp32_isSSD1306(int address)
     byte checkByte = buffer[0] & 0x03f;
     if(checkByte == 0x28 || checkByte == 0x16 || checkByte == 0x00)
     {
-        printlndeb("[INIT]...OLED Display is SSD1306");
+        // DISP-01, 2026-09-17: diese Zeile sagte "SSD1306" und war damit GENAU
+        // VERKEHRT. Der Test hier klassifiziert nach PANEL-GROESSE, nicht nach
+        // Controller: die Kommentare darueber ordnen 0x28/0x16/0x00 alle einem
+        // 1,3"-Panel zu, und 1,3"-OLEDs sind SH1106 (0,96" sind SSD1306). Der
+        // Kommentar "0x00 == T-BEAM 1.3\" 1106 !! sonst kommen artefakte" sagt
+        // es sogar ausdruecklich. Die falsche Beschriftung hat die Pruefzeile
+        // DISP-01 und einen spaeteren Leser in die entgegengesetzte Richtung
+        // geschickt -- beide hielten den ESP32-Zweig fuer verdreht, obwohl er
+        // richtig ist. Bench-belegt 2026-09-17 auf DK5EN-93 (Heltec V3,
+        // fest verdrahtet 1) und einem T-Beam (Sonde: 0x04 -> 1): beide
+        // bekommen u8g2_1 (SSD1306) und stellen sauber dar.
+        printlndeb("[INIT]...OLED panel is 1.3 inch -> SH1106");
         return 2;
     }
 
-    // cheched 0.9"
-    printlndeb("[INIT]...OLED Display is SH1106");
+    // 0,9"-Panel: SSD1306. Auch diese Zeile war verkehrt beschriftet.
+    printlndeb("[INIT]...OLED panel is 0.9 inch -> SSD1306");
     return 1;
 }
+
+// DISP-01: die Zuordnung "Sondenwert -> U8g2-Objekt" lag ZWEIMAL im Baum,
+// einmal in esp32_functions.cpp und einmal in nrf52_functions.cpp -- und die
+// beiden Kopien waren GEGENLAEUFIG. ESP32 bildete 1 auf u8g2_1 ab, nRF52 auf
+// u8g2_2, obwohl beide dieselbe Sonde aufrufen. Eine der beiden musste falsch
+// sein; auf der Bench ist ESP32 als richtig belegt (siehe esp32_isSSD1306()).
+//
+// Statt die nRF52-Kopie zu korrigieren und zwei Kopien zu behalten, gibt es
+// jetzt EINE Zuordnung. Ein kuenftiges Auseinanderlaufen ist damit nicht mehr
+// moeglich, und das war der eigentliche Defekt -- nicht der Zahlendreher.
+//
+//   1 = 0,9"-Panel = SSD1306 = u8g2_1
+//   2 = 1,3"-Panel = SH1106  = u8g2_2
+//   < 0 = kein Panel gefunden
+#if MC_HAS_U8G2   // GRD-01: u8g2_1/u8g2_2 gibt es nur auf Boards mit Panel
+U8G2 *mcSelectU8g2(int idtype)
+{
+    if(idtype < 0)
+        return NULL;
+
+    // Beide Objekte sind verschiedene U8g2-Unterklassen; der ternaere
+    // Ausdruck braucht daher den gemeinsamen Basistyp ausdruecklich.
+    return (idtype == 1) ? (U8G2 *)&u8g2_1 : (U8G2 *)&u8g2_2;
+}
+#else
+// Board ohne U8g2-Panel: die beiden Treiberobjekte existieren nicht, und
+// initDisplay() wird auf diesen Boards gar nicht erst aufgerufen. Die
+// Fassung hier haelt nur die Verlinkung zusammen.
+U8G2 *mcSelectU8g2(int idtype) { (void)idtype; return NULL; }
+#endif
 
 void E290DisplayUpdate()
 {
