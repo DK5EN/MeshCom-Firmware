@@ -5296,6 +5296,63 @@ t-deck-pro, and which board's invalid-sentence display semantics are right.
 
 Gate: 34/34 board envs, 33/33 native envs (948 cases), `selftest.sh` exit 0.
 
+#### 3.8ao `DISP-01` -- bench-resolved, and the audit row pointed at the wrong platform (2026-09-17)
+
+**The row said the ESP32 branch was inverted. It is not. Correcting it would
+have broken every working ESP32 board**, including the two on the bench.
+
+**What actually happened.** `esp32_isSSD1306()` does not classify the
+controller, it classifies the PANEL SIZE -- its own comment table maps
+`0x28`/`0x16`/`0x00` to 1,3-inch panels and `0x03`/`0x07`/`0x09`/`0x3F` to
+0,9-inch ones, Heltec V3 among the latter. 0,96-inch OLEDs are SSD1306,
+1,3-inch are SH1106. But the function PRINTED the two labels the wrong way
+round -- `"OLED Display is SSD1306"` on the branch that returns the SH1106
+case, and vice versa -- and the header comment in `esp32_functions.cpp`
+repeated the same inversion. The audit read the labels and concluded ESP32 was
+wrong. So did this session, at first.
+
+**Bench evidence, 2026-09-17:**
+
+| board                 | probe                       | driver picked       | display                                            |
+| --------------------- | --------------------------- | ------------------- | -------------------------------------------------- |
+| Heltec V3 (DK5EN-93)  | hardwired `1`, no probe     | `u8g2_1` = SSD1306  | **clean**                                          |
+| T-Beam (AXP2101/1276) | `Display type: 0x04` -> `1` | `u8g2_1` = SSD1306  | **clean** (one dead row + cracked glass, physical) |
+| RAK4631               | `Display not found`         | none, `bDisplayOff` | no OLED fitted                                     |
+
+Two independent boards confirm the ESP32 mapping. The RAK has no panel, so the
+nRF52 side could NOT be shown on hardware.
+
+**The real defect was duplication, not a number.** The `idtype -> u8g2`
+mapping existed TWICE -- `esp32_functions.cpp` and `nrf52_functions.cpp` --
+fed by the same probe, and the two copies had drifted into opposition: ESP32
+mapped `1` to `u8g2_1`, nRF52 mapped `1` to `u8g2_2`. One had to be wrong.
+Rather than correct one copy and keep two, there is now one, `mcSelectU8g2()`
+in `loop_functions.cpp`, called by both. They cannot diverge again.
+
+The two lying log lines now read `OLED panel is 0.9 inch -> SSD1306` and
+`OLED panel is 1.3 inch -> SH1106`. That mislabelling is what sent two
+independent readers the wrong way; it was the actual root cause of the row.
+
+**Evidence, at its real strength:**
+
+- ESP32 mapping correct -- **bench-proven on two boards**.
+- nRF52 was inverted -- **code-proven, hardware-unverified**. Only a RAK4631
+  WITH a RAK1921 OLED can show it; the bench RAK has none, so it was latent.
+- `BOARD_TBEAM_1W`'s hardwired `1` with `//SH1106 aber stimmt 1 wirklich?` --
+  **still open**. Under the clarified contract `1` means 0,9-inch/SSD1306; if
+  that board's panel is 1,3-inch it should be `2`. Not changed blind: no such
+  board here, and guessing swaps one unverified state for another. One question
+  settles it -- the panel size.
+
+**Withdrawn.** An earlier reading in this session claimed every probe-detected
+ESP32 board (E22 family, `ttgo_tbeam`, `ttgo-lora32-v21`, `heltec_wifi_lora_32_V2`,
+`T-ETH-ELITE_1262`) was getting the wrong driver. That was wrong and is
+withdrawn -- those boards are fine.
+
+**Also learned:** `--oledstat` is inside `#if INSTRUMENT_ENABLED`, which is 0 in
+every env, so the display instrumentation is unreachable in every shipping
+build. That is why the row had no runtime evidence for so long.
+
 #### Operator decision 6, 2026-09-17: no PR for now
 
 Verbatim: _"no PR at the moment. Everything here is very experimental"_.
