@@ -7264,6 +7264,56 @@ gate 6) and asked for every interval as a literal, done. `DR-16` still has no
 host test: `telemetry_timer` is a `||` first-fire timer and stays in the
 loops, so that row remains bench-only as recorded in `M3-01`.
 
+### 3.8ay `E1` G2 after-run on the final image, and two bench traps that cost the evening's first results (2026-09-17, night)
+
+**Final image `e64ce346`** (ETH-03 fix, DR-28, W7-II both halves, D1-10).
+Node states after the run: DK5EN-93 stock, gateway off, max_hop 2, debug off;
+DK5EN-14 instrument image, KEYLOCK off; DK5EN-90 in the serial-DFU bootloader
+(needs the double-tap, UF2 on the Desktop).
+
+| step            | node      | result                                                                                                                                                                                                                                                                |
+| --------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `H4`            | Heltec-93 | **identical.** Reproducibility proven first (captures 2 = 3 of the unchanged image); G2 vs same-corpus morning image: only the max_hop byte (restore 2 vs 4); vs G1: settings drift + corpus growth only                                                              |
+| `H6`            | Heltec-93 | **done as scoped** (instrument image). Server side 36/36 identical, the 30 corpus classifications identical; plus finding `H6-01` below                                                                                                                               |
+| `H8`            | Heltec-93 | passed 17.09. afternoon (§3.8ar); RAK-90 side blocked by ETH-03, now fixed in code, bench PASS owed after the double-tap                                                                                                                                              |
+| `H11`           | T-Deck-14 | automated half **PASS** on the final instrument image: tabs 8/8 repainted, nav 34/34, input keys 7/7 (p95 166 ms) + trackball 40/40 after `--keylock off` (TD-18 precondition fired first, correctly). Four by-eye items owed to the operator, DR-28 order among them |
+| `D1-10` cadence | Heltec-93 | battery reads at 0.0, 28.5, 58.5, 88.5, 118.5 s: 30 s exact, first fire on pass 1 as before                                                                                                                                                                           |
+| `ETH-02`        | RAK-90    | hardware confirmation still owed (needs the RAK back and a boot without DHCP)                                                                                                                                                                                         |
+
+**`H6-01` (open, medium): a malformed datagram on UDP 1990 now takes the WiFi
+radio down and the node reboots.** New against G1. The corpus tail
+(`3x-m0x`, e.g. a 91-byte bad GATE) hits the `DR-20` path W6 introduced
+(`getMeshComUDP()` acts on the handler's failure status and calls
+`resetMeshComUDP()`), which does `WiFi.disconnect(true,true)` + `WIFI_OFF`;
+the IDF logs `timeout when WiFi un-init`, a second leave follows at 104 s and
+`RESET_REASON=3 SW`. At G1 the same datagrams were classified `OTHER` and
+ignored. EXPECTED-DIFF.md filed DR-20 as "fault path, U1 twin only"; it did
+not foresee that the recovery is a full radio reset with a reboot behind it.
+The restart site is not pinned (`rebootAuto` from a settings command is the
+candidate; no radio-init site fits). Evidence:
+`test/golden/hw/G2/heltec-93/udp/serial-raw.txt` lines 138-186. Needs a repro
+with the reset site instrumented, then a decision whether a rejected datagram
+deserves more than a counter.
+
+**Trap 1: `pio run -t upload` autodetects the T-Deck.** Every "Heltec" upload
+of the evening (four, all `SUCCESS`, hashes verified) landed on DK5EN-14:
+`$UPLOAD_PORT` picks `/dev/cu.usbmodem1101` (USB-JTAG) before the CP2102, and
+both boards are S3. The Heltec kept the morning image, the T-Deck booted a
+Heltec image, and a G2 golden, a cadence check and two H6 runs were measured
+on the wrong firmware before `--info`'s `build:` time gave it away. Rule:
+`--upload-port` always, and compare the build time after every flash.
+
+**Trap 2: `PLATFORMIO_BUILD_FLAGS="-D INSTRUMENT_ENABLED=1"` is dropped
+silently.** The spaced form never reaches the compiler (`pio run -v`), the
+build says SUCCESS, the node answers `wrong command --srvip`. The no-space
+form `-DINSTRUMENT_ENABLED=1` works. `--udplog on` working proves nothing:
+INS-01 made it a field diagnostic. String-scan the ELF for `[SRVIP];err`.
+
+**Campaign state:** 28 of 28 Gantt rows closed or struck by decision. Open in
+one line: RAK double-tap (then ETH-03 bench PASS, ETH-02, H8 on RAK); H11
+four by-eye checks; `H6-01`; `ENABLE_MCU811` typo decision; E3 dropped (no
+merging on this branch).
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
