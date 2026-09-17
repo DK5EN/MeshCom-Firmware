@@ -2066,6 +2066,53 @@ void nrf52loop()
         dhcp_timer = millis();
     }
 
+    // ETH-02: DHCP ACQUISITION retry -- the renewal above cannot do this job.
+    //
+    // checkDHCP() is Ethernet.maintain() (nrf_eth.cpp:709), which renews or
+    // rebinds an EXISTING lease. A node that never got one has nothing to
+    // maintain, and maintain() returns 0 forever. The only path that actually
+    // re-acquires is resetDHCP()/initethfixIP(), and that path lives inside
+    // gatewayService_nrf52()'s `if(bGATEWAY)` block -- so until now a node with
+    // the gateway OFF (webserver-only, or an EXTUDP peer) had exactly ONE
+    // attempt, in setup, and no second chance ever.
+    //
+    // Measured on DK5EN-90, 2026-09-17, with the cable physically seated:
+    //   [ETH];link;down;link;1;...;ip;0.0.0.0;...;got_ip_n;0;downs;0;resets;0
+    // Read that line carefully -- `link;1` is the PHY reporting the cable UP,
+    // while the node sits at 0.0.0.0, has never once obtained a lease
+    // (got_ip_n;0) and has never once retried (resets;0). It stayed that way
+    // across a physical replug, because nothing was ever going to try again.
+    //
+    // resetDHCP(), not initethDHCP(): that is the N-20 distinction and it
+    // matters here for the same reason it matters in the gateway path --
+    // initethDHCP() hardware-resets the W5100S on every retry, after which PHY
+    // negotiation needs seconds and startETH() sees a permanent LinkOFF.
+    // resetDHCP() re-runs DHCP without the PHY reset.
+    //
+    // Gated on hasETHlink() so we do not hammer DHCP on a node with no cable
+    // in it, and on a 30 s interval so a genuinely absent DHCP server costs
+    // one attempt per half minute rather than one per loop pass.
+    if(neth.hasETHHardware && !neth.hasIPaddress
+       && !(strlen(meshcom_settings.node_ownip) > 6 && strlen(meshcom_settings.node_ownms) > 6 && strlen(meshcom_settings.node_owngw) > 6))
+    {
+        static uint32_t eth_acquire_timer = 0;
+        if(eth_acquire_timer == 0 || (uint32_t)(millis() - eth_acquire_timer) >= 30000)
+        {
+            eth_acquire_timer = millis();
+
+            bSPI_ETH_Active = true;   // SPI guard: Ethernet owns the shared bus
+            bool link = neth.hasETHlink();
+            if(link)
+            {
+                Serial.printf("[ETH];event;dhcp_acquire_retry;link;1;ms;%lu\n",
+                              (unsigned long)millis());
+                neth.resetDHCP();
+            }
+            bSPI_ETH_Active = false;
+            if(bPendingRadioRx) { bPendingRadioRx = false; startRadioReceive(); }
+        }
+    }
+
     // C4 carve-out: the gateway service block lives in gateway_service_nrf52.cpp
     gatewayService_nrf52();
 

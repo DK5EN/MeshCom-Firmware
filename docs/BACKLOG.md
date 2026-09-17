@@ -6820,6 +6820,117 @@ finding should be read as "one of two candidate causes", not as a diagnosis.
 
 Gate: 34/34 board envs, 962/962 native cases, `selftest.sh` exit 0.
 
+### 3.8at `ETH-03` -- inbound EXTUDP stalls the whole Ethernet stack on nRF52 (2026-09-17)
+
+**Reproduced twice, cleanly.** The node is healthy, four small JSON datagrams
+arrive on UDP 1799, and its entire network goes away for about 25 seconds:
+
+```
+--- round 1 ---            --- round 2 ---
+  before: http=200           before: http=200
+  sent 4 EXTUDP datagrams    sent 4 EXTUDP datagrams
+  after:  http=000           after:  http=000
+  +25s:   http=200           +25s:   http=200
+```
+
+`http` is the node's own web server on the same chip. It answers before, is
+unreachable immediately after, and comes back by itself. `DK5EN-90`, stock
+`HEAD` build, gateway off, webserver on, `--extudp on`, link verified up on
+both sides of each round.
+
+**This is the cause of §3.8ar's "0 of 23", and it retires both earlier
+theories.** The node never answers the corpus because it stalls on the first
+datagram; by the time it recovers the sender has moved on. It also explains
+every apparent "link loss" chased this afternoon, including the one that led to
+an unnecessary request to replug the cable.
+
+#### The two theories this replaces, and why they were wrong
+
+| Theory                                     | Refuted by                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `EXT-02` -- the extern socket never opened | A fresh boot prints `[EXT]...now listening at IP 192.168.68.66, UDP port 1799`. `begin()` returned 1 |
+| The Ethernet link is physically unstable   | `[ETH]` reports `link;1` throughout, and the web server answers 200 immediately before each round    |
+
+`EXT-02` remains a real latent defect and stays fixed (§3.8as) -- it is simply
+not what was happening here. The "no heartbeat left the node" observation from
+that write-up was worthless in both directions: `sendExternHeartbeat()`
+(`extudp_functions.cpp:928`) has an **empty body**. There is no heartbeat.
+
+#### Where to look
+
+The codebase already describes this failure mode, in a comment written
+2026-08-22 next to the EXTUDP start site (`nrf52_main.cpp`, above the
+`bWEBSERVER && neth.hasIPaddress` block):
+
+> _"ohne initialisiertes Ethernet ... blockieren W5100S-Socket-Ops
+> (`UdpExtern.begin()`/`sendExternHeartbeat()`) den Loop-Task unbegrenzt --
+> Node wirkt tot"_
+
+The same class, at a different site: the blocking call is now in the receive
+path. `getExternUDP()` runs every loop pass under the `bSPI_ETH_Active` guard
+and calls `UdpExtern.parsePacket()` on the W5100S; on the RAK4631 that chip
+shares its SPI bus with the SX1262. A stall there holds the guard, starves
+`loopWebserver()` on the same bus, and the whole stack goes quiet until it
+clears. Serial keeps answering, which is why the node does not look dead.
+
+**Not yet established**: whether the stall is inside `parsePacket()` itself,
+inside the SPI arbitration with the radio, or in the read-loop below it
+(`UDP-02`'s oversized-datagram case is documented at `:452` but the corpus
+objects here are far under 254 bytes). Deciding that needs timing
+instrumentation around the call, not more black-box probing -- which is where
+this stops today rather than guessing.
+
+#### Bench recipe, so the next person reproduces it in one minute
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://<node>/        # expect 200
+python3 -c "import socket,time
+tx=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+[ (tx.sendto(b'{\"type\":\"msg\",\"dst\":\"DK5EN-1\",\"msg\":\"x\"}',('<node>',1799)), time.sleep(0.5)) for _ in range(4) ]"
+curl -s -o /dev/null -w "%{http_code}\n" http://<node>/        # expect 000
+sleep 25
+curl -s -o /dev/null -w "%{http_code}\n" http://<node>/        # expect 200
+```
+
+Needs `--extudp on` and a valid `--extudpip` on the node; gateway may be off.
+
+### 3.8au `ETH-02` -- a node that never gets a DHCP lease never asks again (2026-09-17)
+
+Separate defect, found while chasing the above and confirmed from the node's
+own counters:
+
+```
+[ETH];link;down;link;1;...;ip;0.0.0.0;...;got_ip_n;0;downs;0;renews;0;renew_fail;0;resets;0
+```
+
+`link;1` is the PHY reporting the cable **up**. The node sits at `0.0.0.0`, has
+**never once** obtained a lease this boot (`got_ip_n;0`) and has **never once
+retried** (`resets;0`). It stayed that way across a physical cable replug.
+
+**Why nothing retried.** `checkDHCP()` is `Ethernet.maintain()`
+(`nrf_eth.cpp:709`), which renews or rebinds an **existing** lease -- a node
+that never had one has nothing to maintain and gets 0 back forever. The only
+path that re-acquires is `resetDHCP()`/`initethfixIP()`, and it lives inside
+`gatewayService_nrf52()`'s `if(bGATEWAY)` block. `ETH-01` had already hoisted
+the link poll and the lease _refresh_ out of that block for gateway-off nodes;
+the _acquisition_ retry was left behind. So a webserver-only node or an EXTUDP
+peer gets exactly one attempt, in setup, and no second chance ever.
+
+**Fixed** in `nrf52_main.cpp` beside the `ETH-01` block: when the hardware is
+initialised, no IP is held, and the node is not on a static address, retry
+`resetDHCP()` every 30 s while `hasETHlink()` is true. `resetDHCP()` and not
+`initethDHCP()` for the `N-20` reason that governs the gateway path too --
+`initethDHCP()` hardware-resets the W5100S on every retry, after which PHY
+negotiation needs seconds and `startETH()` sees a permanent `LinkOFF`. The
+link check keeps a cable-less node from hammering DHCP; the 30 s interval keeps
+an absent DHCP server to one attempt per half minute.
+
+**Verification status: code-proven, hardware confirmation owed.** The retry
+did not fire on the test boot -- that boot acquired a lease on the first
+attempt (`got_ip_n;1` at ms 20463) -- so the new branch is unexercised on
+hardware. Reproducing it needs a boot where DHCP fails, e.g. the node powered
+up before the switch port is forwarding. Noted rather than dressed up.
+
 ### 3.8ah Build-env and display defects found during `W4` (2026-09-16)
 
 Four findings that are not DRY rows. They surfaced because the `W4` gate builds
