@@ -30,9 +30,28 @@
 // WHAT THE TWO COPIES DO DIFFERENTLY. All four were open drift-matrix
 // questions as of the M2 review; all four are now DECIDED (2026-09-12,
 // docs/testplan/drift-matrix.csv, drift-matrix-review-verdict-20260912.md).
-// None of the decisions is implemented yet -- this block records the target,
-// not the current state, so update it in the same edit that lands each fix
-// or it goes back to advertising a settled question as open.
+// STAND 2026-09-17 (Welle W6): DR-02, DR-05 und DR-18 sind IMPLEMENTIERT,
+// zusammen mit DR-04, DR-06, DR-07, DR-08, DR-09 und DR-19 -- jede Zeile
+// traegt jetzt einen test_agreement_*-Fall in
+// test/test_udp_frame_twin/test_udp_frame_twin.cpp statt eines
+// test_drift_*-Falls. OFFEN bleibt allein DR-20, und zwar bewusst: dessen
+// Entscheidung verlangt, dass der AUFRUFER die Verbindungspolitik
+// entscheidet, also muessen sich udp_functions.h und udp_functions.cpp
+// mitaendern -- der Rueckgabetyp allein in dieser Datei zu drehen wuerde
+// entweder nicht uebersetzen oder den Socket-Reset auf ESP32 still
+// verlieren. Eigene Welle.
+//
+// Von DR-18 ist nur der TEIL (1), die FORMPARITAET, umgesetzt: der
+// EXTUDP-Abzweig liegt auf beiden Plattformen in einem eigenen Typtest vor
+// is_new_packet(). TEIL (2), der JSON-Ack, IST W6-Arbeit und steht noch aus --
+// die Zeile benennt dafuer ausdruecklich die Stellen, die
+// buildAckPhoneFrame()/addBLEOutBuffer() fuer 0x41 aufrufen, also DR-09s
+// Stelle auf nRF52. Mit offen: der G2-EXPECTED-DIFF-Eintrag, der
+// Ausgangstyp-Vertrag in docs/ext_udp_telemetry.md und die Korrektur in
+// docs/ack-wer-hat-quittiert.md:266. Ausserdem fehlt der von der Zeile
+// bestellte Test: je ein DEKODIERBARER Frame pro Typ durch beide Handler --
+// heute deckt nur 0x3A positiv ab, 0x21 und 0x40 sind unbelegt (nachgewiesen:
+// den Typtest auf beiden Seiten auf 0x3A zu verengen laesst die Suite gruen).
 //
 //   - DR-20 (return value / reset call): ESP32 returns void and swallows the
 //     over-MAX_ZEROS case, calling resetMeshComUDP() itself; nRF52 returns 1

@@ -101,6 +101,33 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
           default: DEBUG_MSG("UDP", "Received unknown"); break;
         }
 
+        // DR-18/DR-07/DR-19 (2026-09-12 decided, RE-DECIDED withdrawing the
+        // wider 4-type set): EXTUDP forward as its own explicit type test,
+        // evaluated identically on both platforms (udp_frame_nrf52.cpp) and
+        // kept ahead of is_new_packet() below, so duplicates still reach
+        // EXTUDP as before. Was previously nested inside the relay branch --
+        // harmless today since both use the same 3-type set, but a future
+        // widening of the relay branch's types must not silently widen this
+        // forward too. DR-19 also drops nRF52's redundant (uint8_t) length
+        // cast on the mirrored call (latent truncation risk if
+        // UDP_TX_BUF_SIZE is ever raised past 255).
+        // W6-Nachtrag (Advisor-Befund 4): der memcpy() lag im EXTUDP-Block und
+        // der Verarbeitungsblock darunter verliess sich darauf, dass dieser
+        // gelaufen war -- gekoppelt allein dadurch, dass beide Bedingungen
+        // WORTGLEICH sind. Eine Mutation nur der ersten Bedingung fuellte
+        // convBuffer nicht mehr und der Relay-Pfad dekodierte alte Bytes.
+        // Der Puffer wird jetzt VOR beiden Bloecken gefuellt.
+        memcpy(convBuffer, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, lora_tx_msg_len);
+
+        if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
+        {
+          if(hasExternIPaddress)
+          {
+            if(bEXTUDP)
+              sendExtern(true, (char*)"udp", convBuffer, lora_tx_msg_len, 0, 0);
+          }
+        }
+
         if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
         {
           bool bBLELoopOut = true;
@@ -108,20 +135,23 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
           last_upd_timer = millis();
           hb_warn_logged = false;
 
-          memcpy(convBuffer, inc_udp_buffer + UDP_MSG_INDICATOR_LEN, lora_tx_msg_len);
-
-          // send JSON to Extern IP
-          if(hasExternIPaddress)
-          {
-            if(bEXTUDP)
-              sendExtern(true, (char*)"udp", convBuffer, lora_tx_msg_len, 0, 0);
-          }
-          
           struct aprsMessage aprsmsg;
-          
-          // print which message type we got
-          decodeAPRS(convBuffer, lora_tx_msg_len, aprsmsg);
 
+          // DR-06 (2026-09-12 decided nrf52-correct): capture decodeAPRS()'s
+          // return value and gate everything below on it, matching nRF52
+          // (udp_frame_nrf52.cpp:144-146, msg_type_b_lora). Previously
+          // discarded -- a frame decodeAPRS() rejected (e.g. rsize<16) still
+          // ran the position/display/dedup-insert logic below on a zeroed
+          // aprsmsg (REVIEW 2026-09-12, fable Finding 7: display-call and
+          // ring-insert were not gated by RX-01 either, only bUDPtoLoraSend).
+          // The relay itself was closed only by accident, via
+          // isUnconfiguredCall("") on the empty source_call a failed decode
+          // leaves behind -- that RX-01 coupling below is unchanged and now
+          // redundant-but-harmless once decode itself gates entry.
+          uint8_t msg_type_b_lora = decodeAPRS(convBuffer, lora_tx_msg_len, aprsmsg);
+
+          if(msg_type_b_lora > 0)
+          {
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call);
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);
 
@@ -131,6 +161,13 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
           // RX side (lora_functions.cpp, OnRxDone), so this frame should
           // never have reached the server in the first place -- this is
           // belt-and-braces for an unpatched gateway elsewhere on the mesh.
+          // EINSCHRAENKUNG (Advisor W6): diese Wache deckt den RELAY-Pfad
+          // ab, nicht jeden Sendeweg. SendAckMessage() weiter unten
+          // erreicht addTxRingEntry(), ohne bUDPtoLoraSend zu lesen --
+          // ein DM mit unkonfigurierter Quelle an dieses Node oder eine
+          // beigetretene Gruppe loest weiterhin eine LoRa-Aussendung aus.
+          // Auf beiden Plattformen gleich, kein Rueckschritt; die Wache
+          // verspricht nur weniger, als ihr Name nahelegt.
           bool bSrcUnconfigured = isUnconfiguredCall(source_call);
           if(bSrcUnconfigured)
               logRxDropUnconfigured(source_call);
@@ -346,9 +383,10 @@ void handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pac
               }
             }
           }
+          } // DR-06: end if(msg_type_b_lora > 0)
         }
 
-        // zero out the inc buffer  
+        // zero out the inc buffer
         memset(inc_udp_buffer, 0, UDP_TX_BUF_SIZE);
 
         udp_is_busy = false;   //setting the busy flag

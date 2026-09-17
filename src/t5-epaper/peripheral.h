@@ -59,6 +59,11 @@ void gps_get_coord(double *lat, double *lng);
 void gps_get_data(uint16_t *year, uint8_t *month, uint8_t *day);
 void gps_get_time(uint8_t *hour, uint8_t *minute, uint8_t *second);
 void gps_get_satellites(uint32_t *vsat);
+// DRY-Kampagne D4-01/02: additiv aus dem gepflegten Zwilling
+// src/t-deck-pro/peripheral.h:72,74 nachgezogen (reine TinyGPS++-
+// Buchfuehrung, kein Hardwarebezug) -- siehe src/t5-epaper/peri_gps.cpp.
+void gps_get_satellites(uint32_t *vsat, int *hdop);
+void gps_get_fix(uint8_t *fix);
 void gps_get_speed(double *speed);
 
 #endif

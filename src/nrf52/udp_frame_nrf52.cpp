@@ -21,6 +21,7 @@
 #include "conf_frame.h"
 #include "setlog_lines.h"
 #include "udp_frame.h"
+#include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 
 // C1/U1 carve of handleUdpFrame_nrf52() out of nrf_eth.cpp; see udp_frame.h
 // for why it moved and why the two platform copies are not merged. Moved
@@ -32,6 +33,12 @@ extern NrfETH neth;
 // same name -- see the note at nrf_eth.cpp's definition.
 extern bool bUDPLOG;
 extern String strSource_call;
+// DR-07/DR-18: shared with the ESP32 copy (extudp_functions.cpp), which
+// already externs it (udp_frame_esp32.cpp:36); not previously read here.
+extern bool hasExternIPaddress;
+// DR-02: shared with the ESP32 copy (lora_functions.cpp defines it,
+// udp_frame_esp32.cpp:40 already externs it the same way).
+void logRxDropUnconfigured(const char *call);
 
 /**@brief C1 carve-out (DRY unification U1): everything that happens once a
  * datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0 when the
@@ -95,10 +102,6 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
       memcpy(RcvBuffer, inc_udp_buffer+UDP_MSG_INDICATOR_LEN, neth.lora_tx_msg_len);
 
-      // send JSON to Extern IP
-      if(bEXTUDP)
-        sendExtern(true, (char*)"udp", RcvBuffer, (uint8_t)neth.lora_tx_msg_len, 0, 0);
-
       // printout message type
       uint8_t msg_type_b = RcvBuffer[0];
 
@@ -108,6 +111,27 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
         case 0x21: DEBUG_MSG("UDP", "Received PosInfo"); break;
         case 0x40: DEBUG_MSG("UDP", "Received Weather"); break;
         default: DEBUG_MSG("UDP", "Received unknown"); break;
+      }
+
+      // DR-18/DR-07/DR-19 (2026-09-12 decided, RE-DECIDED withdrawing the
+      // wider 4-type set): EXTUDP forward as its own explicit type test,
+      // evaluated identically on both platforms (udp_frame_esp32.cpp) and
+      // kept ahead of is_new_packet() below, so duplicates still reach
+      // EXTUDP as before. Was previously unconditional and ahead of the
+      // type switch above (drift DR-18), gated on bEXTUDP alone without the
+      // hasExternIPaddress precondition ESP32 checks (drift DR-07 -- no
+      // observable hole either way, sendExtern() already guards itself on
+      // both preconditions, but the call sites now read alike), and cast
+      // the length argument to (uint8_t) for no reason (drift DR-19 --
+      // latent truncation risk if UDP_TX_BUF_SIZE is ever raised past 255,
+      // removed now while it is still a no-op).
+      if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
+      {
+        if(hasExternIPaddress)
+        {
+          if(bEXTUDP)
+            sendExtern(true, (char*)"udp", RcvBuffer, neth.lora_tx_msg_len, 0, 0);
+        }
       }
 
       if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
@@ -126,10 +150,29 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
             printBuffer_aprs((char*)"RX-UDP ", aprsmsg);
           }
 
-          bool bUDPtoLoraSend = true;
-
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call);
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);
+
+          // DR-02 (RX-01, BACKLOG 3.8k) (2026-09-12 decided esp32-correct):
+          // second door -- a GATE frame whose APRS source call is still the
+          // factory default must not be radiated onto LoRa by this gateway,
+          // mirroring udp_frame_esp32.cpp:134-136. The primary guard sits on
+          // the LoRa RX side (OnRxDone); this is belt-and-braces for an
+          // unpatched gateway elsewhere on the mesh. Previously missing here
+          // entirely -- an unconfigured-source GATE frame relayed exactly
+          // like any other.
+          // EINSCHRAENKUNG (Advisor W6): diese Wache deckt den RELAY-Pfad
+          // ab, nicht jeden Sendeweg. SendAckMessage() weiter unten
+          // erreicht addTxRingEntry(), ohne bUDPtoLoraSend zu lesen --
+          // ein DM mit unkonfigurierter Quelle an dieses Node oder eine
+          // beigetretene Gruppe loest weiterhin eine LoRa-Aussendung aus.
+          // Auf beiden Plattformen gleich, kein Rueckschritt; die Wache
+          // verspricht nur weniger, als ihr Name nahelegt.
+          bool bSrcUnconfigured = isUnconfiguredCall(source_call);
+          if(bSrcUnconfigured)
+              logRxDropUnconfigured(source_call);
+
+          bool bUDPtoLoraSend = !bSrcUnconfigured;
 
           mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
           mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
@@ -177,6 +220,23 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
               Serial.printf("[GW];rx;type;%s;len;%d;ms;%lu\n", gwRxType, packetSize, (unsigned long)millis());
           }
 
+          // DR-04/DR-05 (2026-09-12 decided esp32-correct): position-branch
+          // display parity and bGATEWAY_NOPOS veto, mirroring
+          // udp_frame_esp32.cpp:174-184. Lands after DR-06's decode gate
+          // above, so a decode-rejected frame never reaches this either.
+          // Deliberately NOT porting the early addLoraRxBuffer()/dedup-insert
+          // that sits alongside it on ESP32 (the TM-31 fix): this side never
+          // had the early-insert bug TM-31 describes, and adding it here
+          // would reintroduce exactly that bug (the is_new_packet() read
+          // below would see the id this same call just inserted).
+          if(msg_type_b == 0x21)
+          {
+            sendDisplayPosition(aprsmsg, 99, 0);
+
+            if(bGATEWAY_NOPOS)
+              bUDPtoLoraSend = false;
+          }
+
           if(msg_type_b == 0x3A)
           {
             if(memcmp(aprsmsg.msg_payload, "{SET}", 5) == 0)
@@ -215,13 +275,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
                     uint8_t print_buff[30];
 
-                    print_buff[0]=0x41;
-                    print_buff[1]=msg_counter & 0xFF;
-                    print_buff[2]=(msg_counter >> 8) & 0xFF;
-                    print_buff[3]=(msg_counter >> 16) & 0xFF;
-                    print_buff[4]=(msg_counter >> 24) & 0xFF;
-                    print_buff[5]=0x01;  // ACK
-                    print_buff[6]=0x00;
+                    uint8_t ack_status = 0x01;  // ACK
 
                     int iackcheck = checkOwnTx(msg_counter);
                     if(iackcheck >= 0)
@@ -231,8 +285,19 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                         // dort bekommt die App fuer die eigene Nachricht den ACK-Level
                         // 0x02 ("eigene Nachricht bestaetigt"); hier blieb es bei 0x01,
                         // die App zeigte auf nRF52-Gateways nie den vollen ACK-Status.
-                        print_buff[5]=0x02;  // 02...ACK
+                        ack_status = 0x02;  // 02...ACK
                     }
+
+                    // DR-09 (2026-09-12 decided esp32-correct, via the shared
+                    // helper): built via buildAckPhoneFrame() (ack_attribution.h)
+                    // instead of a hand-rolled 7-byte copy -- the hand-rolled
+                    // version never attached the acknowledging callsign as an
+                    // attribution suffix, so an nRF52 gateway's ACK looked
+                    // different on the wire than an ESP32 one's
+                    // (udp_frame_esp32.cpp:259). DRY-21's status-byte fix
+                    // (ack_status above) is unchanged, just folded into the
+                    // shared builder's argument.
+                    uint16_t plen = buildAckPhoneFrame(print_buff, msg_counter, ack_status, aprsmsg.msg_source_call);
 
                     // DRY-21: Debug-Ausgabe wie in der ESP32-Kopie — nach dem
                     // checkOwnTx (damit der ACK-Level stimmt) und mit der msg_id in
@@ -240,7 +305,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     if(bDisplayInfo)
                         printfdeb("[UDP-MSGID] ack_msg_id:%02X%02X%02X%02X ACK...%02X\n", print_buff[4], print_buff[3], print_buff[2], print_buff[1], print_buff[5]);
 
-                    addBLEOutBuffer(print_buff, 7);
+                    addBLEOutBuffer(print_buff, plen);
 
                     if(strcmp(source_call, meshcom_settings.node_call) == 0)
                         bUDPtoLoraSend=false;
@@ -370,7 +435,14 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       {
         printfdeb("[CONF] ignored: size %d out of bounds\n", packetSize);
       }
-      else if (!(remote_ip == neth.udp_dest_addr))   // nRF52 IPAddress has no operator!=
+      // DR-08 (2026-09-12 decided esp32-correct): explicit zero-address
+      // guard added to the equality check, mirroring
+      // udp_frame_esp32.cpp:369-387 -- a plain equality check alone would
+      // let a CONF datagram whose OWN source also reads 0.0.0.0 through
+      // while udp_dest_addr (the resolved gateway server) is itself still
+      // unresolved (pre-DHCP/pre-resolve). ESP32's comment there treats
+      // this as a deliberate anti-spoofing measure, not an accident.
+      else if ((uint32_t)neth.udp_dest_addr == 0 || !(remote_ip == neth.udp_dest_addr))   // nRF52 IPAddress has no operator!=
       {
         printfdeb("[CONF] ignored: source %d.%d.%d.%d does not match gateway server %d.%d.%d.%d\n",
                    remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3],
