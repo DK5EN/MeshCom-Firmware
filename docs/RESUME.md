@@ -15,18 +15,35 @@ stock `HEAD` images and their pre-bench configuration.
 
 **What is left, in order:**
 
-| row     | state                                                                                                                                                 |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `E1`    | G2 after-run. Scope is fixed by what G1 captured: `H4` BLE, `H6` UDP-1990 inbound, `H8` EXTUDP, `H11` T-Deck checklist -- nothing else has a baseline |
-| `E3`    | upstream resync. A trial merge conflicts on **four files** only; the nine `variants/*/platformio.ini` merge cleanly **today**                         |
-| `W7` II | the 325 presence-tested flags, and the `extends=` half. Both deliberately deferred, reasons in BACKLOG §3.8aq and the `W7` Gantt note                 |
-| `D1-10` | **not on the Gantt** -- the loop scheduler, measured at 50 timer predicates against the audit's "~18". An open row, not a silent omission             |
+| row     | state                                                                                                                         |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `DR-28` | **decided 2026-09-12, never implemented.** See the correction below -- this one was wrongly reported as closed                |
+| `E1`    | partial. `H8` passed on Heltec-93; on RAK-90 it returned 0 of 23 (§3.8ar). `H4`/`H6` not started, `H11` needs a T-Deck on USB |
+| `E3`    | upstream resync. A trial merge conflicts on **four files**; the nine `variants/*/platformio.ini` merge cleanly **today**      |
+| `W7` II | the 325 presence-tested flags, and the `extends=` half. Both deliberately deferred, reasons in BACKLOG §3.8aq                 |
+| `D1-10` | **not on the Gantt** -- the loop scheduler, measured at 50 timer predicates against the audit's "~18"                         |
 
-**`E3` before the `extends=` half of `W7`, not after.** Upstream commit `b30e31a4` (2026-09-14)
-rewrote the `upload_command` of exactly the nine `variants/*/platformio.ini` that half would
-restructure. Git merges them cleanly as they stand; it would not once they are folded into
-`extends=` bases. The `configuration_default.h` half had no such conflict -- upstream touched **zero**
-`variants/*/configuration.h` -- which is why it went first and is already committed.
+#### Correction: "every drift row a source change can close is closed" was wrong
+
+That sentence has stood in this file and in the `W6b` commit since 2026-09-17
+morning. **`DR-28` refutes it.** The row is decided (`both-wrong`, Martin,
+2026-09-12): all three mHeard renderers should list most-recent-first by sorting
+a local index array over `mheardMillis[]`, never permuting the eight
+slot-parallel arrays that `updateMheard()` writes from the LORA task.
+
+Nothing in `src/` mentions `DR-28`. Every other changing row is cited in two to
+four source files; this one is cited in none. Its two asserting tests
+(`test_mheard_render.cpp:292,451`) currently pin the **old** behaviour -- the
+physical slot walk the row calls the defect -- so the suite is green and says
+nothing about the row.
+
+How it slipped: `DR-28` is not a platform split. `mheard_functions.cpp` is one
+shared file, so the row never appeared in the U1/U2 twin arithmetic that `W6a`
+and `W6b` used to decide what was left. It is a product decision surfaced by
+`U8`, and the twin-diff count that closed the other rows could not see it.
+
+**It is visible work, not cosmetic**: it moves the console `--mheard` table, the
+T-Deck MHeard screen and the BLE `MH` order on every node.
 
 ### Bench state as of 2026-09-17
 
