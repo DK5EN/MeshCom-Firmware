@@ -5215,6 +5215,21 @@ than by reading:
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
 
+#### Operator decision 6, 2026-09-17: no PR for now
+
+Verbatim: _"no PR at the moment. Everything here is very experimental"_.
+
+`E4` (submit to icssw-org DEV) and `E5` (Kurt's review) leave the plan, and
+`E2` goes with them because its only output is the German PR description. The
+campaign now ends at **`E3`** -- upstream resync plus a targeted re-run, which
+is worth doing as hygiene whether or not anything is ever submitted.
+
+**What this changes:** the budget to "done" drops from ~17 to ~12 working days.
+**What it does not change:** the work is still carried to completion and
+committed on `dry-unification`; only the submission is withheld. `W7` also
+stays last, even though the upstream-conflict argument for deferring it is
+weaker without a near-term PR -- a later PR would face the same surface.
+
 #### Campaign stand 2026-09-17: 21 of 31 rows done, three posts need hardware
 
 Supersedes the 2026-09-15 stand below, which is kept because its findings
