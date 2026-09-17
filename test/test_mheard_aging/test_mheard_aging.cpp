@@ -54,7 +54,9 @@
 
 #include <Arduino.h>
 #include <aprs_structures.h>
+#include <mc_text.h>
 #include <mheard_functions.h>
+#include <mheard_record.h>
 #include <nrf52/WisBlock-API.h>
 
 // ---- Link-Stubs fuer aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
@@ -106,6 +108,8 @@ bool bVIA = false;
 // Wiederholung des NC-02-Antipatterns aus via_functions.cpp/web_functions.cpp.
 extern char mheardCalls[MAX_MHEARD][10];
 extern char mheardPathCalls[MAX_MHPATH][10];
+extern unsigned char mheardPathBuffer1[MAX_MHPATH][52];
+extern uint8_t mheardPathLen[MAX_MHPATH];
 
 // ------------------------------------------------------------ Testaufbau
 
@@ -115,9 +119,9 @@ extern char mheardPathCalls[MAX_MHPATH][10];
 static void buildLine(struct mheardLine &mh, const char *callsign)
 {
     initMheardLine(mh);
-    mh.mh_callsign = callsign;
-    mh.mh_date = "2026-08-31";
-    mh.mh_time = "12:00:00";
+    mcSet(mh.mh_callsign, sizeof(mh.mh_callsign), callsign);
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-08-31");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "12:00:00");
     mh.mh_payload_type = '!';
     mh.mh_hw = BOARD_HARDWARE;
     mh.mh_mod = 136;
@@ -137,11 +141,12 @@ static void buildLine(struct mheardLine &mh, const char *callsign)
 static void buildPathLine(struct mheardLine &mh, const char *sourcecall)
 {
     initMheardLine(mh);
-    mh.mh_date = "2026-08-31";
-    mh.mh_time = "12:00:00";
-    mh.mh_sourcecallsign = sourcecall;
-    mh.mh_sourcepath = String(sourcecall) + ",DB0XXX-12";
-    mh.mh_destinationpath = "";
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-08-31");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "12:00:00");
+    mcSet(mh.mh_sourcecallsign, sizeof(mh.mh_sourcecallsign), sourcecall);
+    mcSet(mh.mh_sourcepath, sizeof(mh.mh_sourcepath), sourcecall);
+    mcAppend(mh.mh_sourcepath, sizeof(mh.mh_sourcepath), ",DB0XXX-12");
+    mh.mh_destinationpath[0] = 0;
     mh.mh_path_len = 0;
 }
 
@@ -368,6 +373,186 @@ static void test_pfad_eintrag_ueber_zwoelf_stunden_gilt_nicht_mehr_als_frisch_un
     TEST_ASSERT_EQUAL_UINT8(0x00, (uint8_t)mheardPathCalls[0][0]);
 }
 
+// ---------------------------------------------- R2-04 (mheardLine-Haelfte)
+//
+// mheardLine.mh_callsign/mh_date/mh_time/mh_sourcecallsign/mh_sourcepath/
+// mh_destinationpath/mh_path_payload sind ab hier feste char[] statt
+// Arduino-String (aprs_structures.h). Die drei Faelle unten pruefen genau
+// die Stellen, an denen das schiefgehen koennte: eine Kuerzung, die
+// unbemerkt ueberlaeuft statt sauber an der Feldgrenze zu stoppen; ein
+// Datensatz-Rundlauf, der nicht mehr Byte fuer Byte ankommt; und -- der
+// eigentliche Anlass fuer R3-13s Ablehnung (BACKLOG SS3.8aj) -- ein
+// 6-Hop-Pfad (--maxhop erlaubt 6), der durch den Typwechsel eine NEUE
+// Kuerzung vor der bereits bestehenden 51-Zeichen-Grenze von
+// mheardPathBuffer1[][52] bekommt.
+
+// Fall (a): ein zu langes mh_sourcepath wird an der Strukturgrenze
+// (MC_PATH_LEN, aprs_structures.h) GEKUERZT -- mcSet() (mc_text.h)
+// terminiert immer und ueberschreibt nie mehr als dstsz. Das direkt danach
+// deklarierte Feld (mh_destinationpath) traegt einen Sentinel, der einen
+// Ueberlauf sichtbar machen wuerde.
+static void test_ueberlanger_sourcepath_wird_an_der_strukturgrenze_gekuerzt(void)
+{
+    struct mheardLine mh;
+    initMheardLine(mh);
+
+    mcSet(mh.mh_destinationpath, sizeof(mh.mh_destinationpath), "SENTINEL");
+
+    char longpath[300];
+    memset(longpath, 'A', sizeof(longpath) - 1);
+    longpath[sizeof(longpath) - 1] = 0;
+
+    bool ok = mcSet(mh.mh_sourcepath, sizeof(mh.mh_sourcepath), longpath);
+
+    TEST_ASSERT_FALSE(ok);   // mcSet() meldet die Kuerzung
+    TEST_ASSERT_EQUAL_size_t((size_t)MC_PATH_LEN - 1, strlen(mh.mh_sourcepath));
+    TEST_ASSERT_EQUAL_STRING("SENTINEL", mh.mh_destinationpath);   // Nachbarfeld unberuehrt
+}
+
+// Fall (b): mheardRecordFromLine()/mheardLineFromRecord() muessen einen
+// Datensatz unveraendert hin- und zurueckreichen -- genau der Rundweg, den
+// updateMheard()s REP-Zweig (mheardLine_save) und sendMheard()/showMHeard()
+// bei jedem Lesen nutzen.
+static void test_mheardline_record_round_trip_unveraendert(void)
+{
+    struct mheardLine mh;
+    initMheardLine(mh);
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-09-16");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "23:59:01");
+    mh.mh_payload_type = '@';
+    mh.mh_hw = 14;
+    mh.mh_mod = 0x83;
+    mh.mh_rssi = -97;
+    mh.mh_snr = -4;
+    mh.mh_dist = 3.4;
+    mh.mh_path_len = 5;
+    mh.mh_mesh = 1;
+    mh.mh_ncount = 7;
+
+    MheardRecord rec;
+    mheardRecordFromLine(mh, rec);
+
+    struct mheardLine mh2;
+    mheardLineFromRecord(rec, mh2);
+
+    TEST_ASSERT_EQUAL_STRING("2026-09-16", mh2.mh_date);
+    TEST_ASSERT_EQUAL_STRING("23:59:01", mh2.mh_time);
+    TEST_ASSERT_EQUAL_CHAR('@', mh2.mh_payload_type);
+    TEST_ASSERT_EQUAL_UINT8(14, mh2.mh_hw);
+    TEST_ASSERT_EQUAL_UINT8(0x83, mh2.mh_mod);
+    TEST_ASSERT_EQUAL_INT16(-97, mh2.mh_rssi);
+    TEST_ASSERT_EQUAL_INT8(-4, mh2.mh_snr);
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 3.4f, mh2.mh_dist);
+    TEST_ASSERT_EQUAL_UINT8(5, mh2.mh_path_len);
+    TEST_ASSERT_EQUAL_UINT8(1, mh2.mh_mesh);
+    TEST_ASSERT_EQUAL_UINT8(7, mh2.mh_ncount);
+}
+
+// Fall (c): ein 6-Hop-Pfad (--maxhop erlaubt 6) uebersteht updateHeyPath()
+// unveraendert. mh_sourcepath ist MC_PATH_LEN (121) breit -- weit ueber
+// jeder realen Pfadlaenge --, die einzige Kuerzung, die greifen darf, ist
+// die bereits bestehende 51-Zeichen-Grenze von mheardPathBuffer1[][52]
+// (R3-13 wurde bewusst NICHT umgesetzt, siehe BACKLOG SS3.8aj); dieser
+// 6-Hop-Pfad bleibt mit 34 Zeichen deutlich darunter, belegt also, dass der
+// Typwechsel selbst KEINE neue, engere Kuerzung einfuehrt.
+static void test_sechs_hop_pfad_ueberlebt_updateheypath_unveraendert(void)
+{
+    mc_test_set_millis(0);
+
+    struct mheardLine mh;
+    initMheardLine(mh);
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-09-16");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "12:00:00");
+    mcSet(mh.mh_sourcecallsign, sizeof(mh.mh_sourcecallsign), "DK5EN-9");
+
+    // 6 Hops insgesamt: DK5EN-9 (Quelle) + 5 Relais.
+    mcSet(mh.mh_sourcepath, sizeof(mh.mh_sourcepath),
+          "DK5EN-9,OE3A-1,OE3B-2,OE3C-3,OE3D-4,OE3E-5");
+    mh.mh_destinationpath[0] = 0;
+    mh.mh_path_len = 6;
+
+    updateHeyPath(mh);
+
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9", mheardPathCalls[0]);
+    TEST_ASSERT_EQUAL_UINT8(6, mheardPathLen[0] & 0x7F);
+
+    const char *expected_tail = "OE3A-1,OE3B-2,OE3C-3,OE3D-4,OE3E-5";
+    TEST_ASSERT_TRUE(strlen(expected_tail) <= 51);   // Testaufbau bleibt selbst unter der bestehenden Grenze
+    TEST_ASSERT_EQUAL_STRING(expected_tail, (const char *)mheardPathBuffer1[0]);
+}
+
+// ---- Die beiden Textvergleiche, die der Typwechsel still gekippt haette --
+//
+// Vor R2-04 waren mh_sourcecallsign und mh_destinationpath Arduino-String,
+// und `mheardLine.mh_sourcecallsign == meshcom_settings.node_call` bzw.
+// `mheardLine.mh_destinationpath == "HG"` verglichen INHALTE (String hat
+// dafuer einen operator==). Als char[] waeren beide zu ZEIGERvergleichen
+// geworden: zwei verschiedene Arrays sind nie derselbe Zeiger, also immer
+// false -- ohne Warnung, ohne Absturz, auf jeder Plattform.
+//
+// Beide Stellen sind jetzt is_equ() (mheard_functions.cpp:469,638). Diese
+// zwei Faelle fallen um, wenn jemand sie wieder auf == zurueckdreht; ohne
+// sie merkt es niemand, weil beide Defekte nur STILL falsch sind:
+// der Knoten traegt sich selbst in die Pfadtabelle ein, und die
+// Gateway-Markierung im GUI verschwindet.
+
+static void test_eigenes_rufzeichen_kommt_nicht_in_die_pfadtabelle(void)
+{
+    // updateHeyPath() schliesst das eigene Rufzeichen aus. Wird der Vergleich
+    // zum Zeigervergleich, greift der Ausschluss nie und der Knoten landet in
+    // seiner eigenen PATH-Tabelle.
+    mcSet(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "DK5EN-9");
+
+    struct mheardLine mh;
+    buildPathLine(mh, "DK5EN-9");          // Quelle == eigenes Rufzeichen
+    updateHeyPath(mh);
+
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, mheardPathCalls[0][0],
+        "updateHeyPath() hat das EIGENE Rufzeichen in die Pfadtabelle "
+        "geschrieben -- der Ausschluss (mheard_functions.cpp:469) vergleicht "
+        "wieder Zeiger statt Inhalte");
+
+    // Gegenprobe: ein fremdes Rufzeichen MUSS eingetragen werden, sonst
+    // besteht der Test auch dann, wenn updateHeyPath() gar nichts mehr tut.
+    struct mheardLine other;
+    buildPathLine(other, "OE1XYZ-1");
+    updateHeyPath(other);
+
+    TEST_ASSERT_NOT_EQUAL_MESSAGE(0x00, mheardPathCalls[0][0],
+        "Gegenprobe gescheitert: ein FREMDES Rufzeichen wurde ebenfalls nicht "
+        "eingetragen -- dann prueft der Fall oben nichts");
+}
+
+static void test_hg_ziel_setzt_das_gateway_bit_im_pfadlaengenfeld(void)
+{
+    // mh_destinationpath == "HG" markiert einen ueber ein Gateway gehoerten
+    // Pfad, indem mheardPathLen das oberste Bit bekommt. Als Zeigervergleich
+    // waere die Markierung lautlos verschwunden.
+    mcSet(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "DK5EN-1");
+
+    struct mheardLine mh;
+    buildPathLine(mh, "OE1XYZ-1");
+    mcSet(mh.mh_destinationpath, sizeof(mh.mh_destinationpath), "HG");
+    mh.mh_path_len = 3;
+    updateHeyPath(mh);
+
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(3 | 0x80), mheardPathLen[0],
+        "Ziel \"HG\" hat das Gateway-Bit nicht gesetzt -- der Vergleich in "
+        "mheard_functions.cpp:638 prueft wieder Zeiger statt Inhalte");
+
+    // Gegenprobe mit einem anderen Ziel: dasselbe Feld OHNE das Bit.
+    initMheard();
+    struct mheardLine plain;
+    buildPathLine(plain, "OE1XYZ-2");
+    mcSet(plain.mh_destinationpath, sizeof(plain.mh_destinationpath), "*");
+    plain.mh_path_len = 3;
+    updateHeyPath(plain);
+
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(3, mheardPathLen[0],
+        "Ein Ziel, das NICHT \"HG\" ist, hat trotzdem das Gateway-Bit "
+        "bekommen -- dann sagt der Fall oben nichts ueber den Vergleich aus");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -378,5 +563,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_eviction_waehlt_monoton_aeltesten_eintrag);
     RUN_TEST(test_pfad_frischer_eintrag_ueberlebt_naechsten_aufruf_trotz_kaputter_wanduhr);
     RUN_TEST(test_pfad_eintrag_ueber_zwoelf_stunden_gilt_nicht_mehr_als_frisch_und_wird_geloescht);
+    RUN_TEST(test_ueberlanger_sourcepath_wird_an_der_strukturgrenze_gekuerzt);
+    RUN_TEST(test_eigenes_rufzeichen_kommt_nicht_in_die_pfadtabelle);
+    RUN_TEST(test_hg_ziel_setzt_das_gateway_bit_im_pfadlaengenfeld);
+    RUN_TEST(test_mheardline_record_round_trip_unveraendert);
+    RUN_TEST(test_sechs_hop_pfad_ueberlebt_updateheypath_unveraendert);
     return UNITY_END();
 }

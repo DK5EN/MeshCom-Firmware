@@ -786,12 +786,17 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                 initMheardLine(mheardLine);
 
-                mheardLine.mh_callsign = aprsmsg.msg_source_last;
-                mheardLine.mh_sourcepath = aprsmsg.msg_source_path;
-                mheardLine.mh_sourcecallsign = aprsmsg.msg_source_call;
-                mheardLine.mh_destinationpath = aprsmsg.msg_destination_path;
+                // R2-04 (zweite Haelfte): msg_source_last/msg_source_path/
+                // msg_source_call/msg_destination_path sind bereits char[]
+                // mit exakt denselben Breiten wie die mheardLine-Gegenstuecke
+                // (aprs_structures.h), mcSet() also nur eine Kopie, keine
+                // Kuerzung.
+                mcSet(mheardLine.mh_callsign, sizeof(mheardLine.mh_callsign), aprsmsg.msg_source_last);
+                mcSet(mheardLine.mh_sourcepath, sizeof(mheardLine.mh_sourcepath), aprsmsg.msg_source_path);
+                mcSet(mheardLine.mh_sourcecallsign, sizeof(mheardLine.mh_sourcecallsign), aprsmsg.msg_source_call);
+                mcSet(mheardLine.mh_destinationpath, sizeof(mheardLine.mh_destinationpath), aprsmsg.msg_destination_path);
                 mheardLine.mh_hw = aprsmsg.msg_last_hw & 0x7F;
-                
+
                 if((aprsmsg.msg_last_hw & 0x80) == 0x80)    // Last-Sending
                     mheardLine.mh_mod = aprsmsg.msg_source_mod;
                 else
@@ -799,14 +804,14 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                 mheardLine.mh_rssi = rssi;
                 mheardLine.mh_snr = snr;
-                mheardLine.mh_date = getDateString();
-                mheardLine.mh_time = getTimeString();
+                mcSet(mheardLine.mh_date, sizeof(mheardLine.mh_date), getDateString().c_str());
+                mcSet(mheardLine.mh_time, sizeof(mheardLine.mh_time), getTimeString().c_str());
                 mheardLine.mh_payload_type = aprsmsg.payload_type;
                 mheardLine.mh_dist = -1;
                 mheardLine.mh_path_len = aprsmsg.msg_last_path_cnt;
                 mheardLine.mh_mesh = aprsmsg.msg_mesh;
                 mheardLine.mh_ncount = 0;
-                mheardLine.mh_path_payload = "";
+                mheardLine.mh_path_payload[0] = 0;
 
                 ///////////////////////////////////////////////
                 // MHeard
@@ -824,7 +829,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     {
                         if(mheardCalls[iset][0] != 0x00)
                         {
-                            if(is_equ(mheardCalls[iset], mheardLine.mh_callsign.c_str()))
+                            if(is_equ(mheardCalls[iset], mheardLine.mh_callsign))
                             {
                                 ipos=iset;
                                 lat = mheardLat[ipos];
@@ -914,7 +919,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 {
                     ///////////////////////////////////////////////
                     // Path
-                    mheardLine.mh_path_payload = aprsmsg.msg_payload;
+                    mcSet(mheardLine.mh_path_payload, sizeof(mheardLine.mh_path_payload), aprsmsg.msg_payload);
 
                     updateHeyPath(mheardLine);
                     //

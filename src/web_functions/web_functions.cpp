@@ -1445,7 +1445,25 @@ void sub_page_position()
  */
 void sub_page_mheard()
 {
+    // N-22 (BACKLOG SS3.8m, Fix 9ce62aa0): der Loop-Task auf nRF52 hat 4 KB
+    // Stack -- LOOP_STACK_SZ = 256*4 Woerter, hart im Adafruit-Core, nicht per
+    // Build-Flag zu erhoehen. Seit R2-04 ist struct mheardLine 584 Byte statt
+    // ~112 (sieben String-Handles a 12 B wurden feste char[]), und dieser Pfad
+    // liegt damit 1904 B tief auf einem Stack, auf dem N-22 schon einmal
+    // uxTaskGetStackHighWaterMark(NULL) == 0 gemessen hat.
+    // Gemessen mit -fstack-usage auf wiscore_rak4631: nrf52loop 792 + loopWebserver 32 + web_client_html 120 + work_webpage 264 + sub_page_mheard 696.
+    // Nur auf dem Loop-Task aufgerufen (web_functions.cpp:685 ueber loopWebserver aus nrf52_main.cpp:2476), nicht reentrant --
+    // also nach BSS statt auf den Stack. ESP32 behaelt den Stack-Puffer:
+    // 8 KB Loop-Task, dort ist der Frame kein Thema.
+    // Bewusst DREI getrennte Statics statt eines gemeinsamen: ein gemeinsamer
+    // muesste ueber zwei Uebersetzungseinheiten hinweg extern sein und koppelte
+    // mheard_functions.cpp an web_functions.cpp ueber die Annahme, dass keine
+    // der drei Funktionen je auf einen anderen Task wandert.
+#if defined(NRF52_SERIES)
+    static mheardLine mheardLine;
+#else
     mheardLine mheardLine;
+#endif
     bool isShowing = false;
     _create_meshcom_subheader("MHeard Information");
     web_client.println("<div id=\"content_inner\">");
@@ -1458,7 +1476,7 @@ void sub_page_mheard()
                 isShowing = true;
             mheardLineFromRecord(mheardRecords[iset], mheardLine);
             web_client.printf("<div class=\"cardlayout\">\n");
-            web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date.c_str(), mheardLine.mh_time.c_str());
+            web_client.printf("<label class=\"cardlabel\"><a href=\"https://aprs.fi/?call=%s\" target=\"_blank\">%s</a> <span class=\"font-small\">(%s %s)</span></label>", mheardCalls[iset], mheardCalls[iset], mheardLine.mh_date, mheardLine.mh_time);
             web_client.printf("<div class=\"flex-auto-wrap\">");
             web_client.printf("<div><span class=\"font-bold\">Type:</span><br><span>%s</span></div>", getPayloadType(mheardLine.mh_payload_type));
             web_client.printf("<div><span class=\"font-bold\">Hardware:</span><br><span>%s</span></div>", getHardwareLong(mheardLine.mh_hw).c_str());
@@ -1502,7 +1520,6 @@ void sub_page_mheard()
 void sub_page_path()
 {
     bool isShowing = false;
-    mheardLine mheardLine;
     _create_meshcom_subheader("Path Information");
     web_client.println("<div id=\"content_inner\">");
     for (int iset = 0; iset < MAX_MHPATH; iset++)

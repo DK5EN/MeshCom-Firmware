@@ -55,6 +55,18 @@
 #define MC_CALL_LEN_Z   21     // MAX_CALL_LEN + 1
 #define MC_PAYLOAD_LEN  256    // UDP_TX_BUF_SIZE + 1
 
+// R2-04 (zweite Haelfte): dieselbe Umformung fuer `mheardLine`
+// (mheard_functions.cpp). mh_callsign/mh_sourcecallsign sind Rufzeichen
+// (MC_CALL_LEN_Z), mh_sourcepath/mh_destinationpath und mh_path_payload
+// kommen direkt aus den gleichnamigen Feldern von `aprsMessage` oben
+// (MC_PATH_LEN bzw. MC_PAYLOAD_LEN) -- dieselben Breiten, keine neuen.
+// mh_date/mh_time sind hier neu, aber NICHT von configuration_global.h
+// abgeleitet: sie sind der feste "YYYY-MM-DD"/"HH:MM:SS"-Vertrag von
+// mheardFormatDate()/mheardFormatTime() (mheard_record.h), also Literale
+// ohne Kopplungspruefung noetig.
+#define MC_DATE_LEN     11     // "YYYY-MM-DD" + NUL
+#define MC_TIME_LEN     9      // "HH:MM:SS" + NUL
+
 struct aprsMessage
 {
     uint16_t msg_len;
@@ -124,13 +136,13 @@ struct aprsPosition
 
 struct mheardLine
 {
-    String mh_callsign;
-    String mh_date;
-    String mh_time;
-    String mh_sourcecallsign;
-    String mh_sourcepath;
-    String mh_destinationpath;
-    String mh_path_payload;
+    char mh_callsign[MC_CALL_LEN_Z];
+    char mh_date[MC_DATE_LEN];
+    char mh_time[MC_TIME_LEN];
+    char mh_sourcecallsign[MC_CALL_LEN_Z];
+    char mh_sourcepath[MC_PATH_LEN];
+    char mh_destinationpath[MC_PATH_LEN];
+    char mh_path_payload[MC_PAYLOAD_LEN];
     char mh_payload_type;
     uint8_t mh_hw;
     uint8_t mh_mod;

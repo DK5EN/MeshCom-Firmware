@@ -58,6 +58,7 @@
 
 #include <Arduino.h>
 #include <aprs_structures.h>
+#include <mc_text.h>
 #include <mheard_functions.h>
 #include <nrf52/WisBlock-API.h>
 
@@ -176,9 +177,9 @@ static void buildLine(struct mheardLine &mh, const char *callsign,
                        uint8_t path_len, uint8_t mesh, uint8_t ncount)
 {
     initMheardLine(mh);
-    mh.mh_callsign = callsign;
-    mh.mh_date = "2026-09-12";
-    mh.mh_time = "10:00:00";
+    mcSet(mh.mh_callsign, sizeof(mh.mh_callsign), callsign);
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-09-12");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "10:00:00");
     mh.mh_payload_type = ptype;
     mh.mh_hw = hw;
     mh.mh_mod = mod;
@@ -548,11 +549,11 @@ static void test_showPath_ein_eintrag(void)
 {
     struct mheardLine mh;
     initMheardLine(mh);
-    mh.mh_date = "2026-09-12";
-    mh.mh_time = "10:00:00";
-    mh.mh_sourcecallsign = "DK5EN-9";
-    mh.mh_sourcepath = "DK5EN-9,DB0XXX-12";
-    mh.mh_destinationpath = "";
+    mcSet(mh.mh_date, sizeof(mh.mh_date), "2026-09-12");
+    mcSet(mh.mh_time, sizeof(mh.mh_time), "10:00:00");
+    mcSet(mh.mh_sourcecallsign, sizeof(mh.mh_sourcecallsign), "DK5EN-9");
+    mcSet(mh.mh_sourcepath, sizeof(mh.mh_sourcepath), "DK5EN-9,DB0XXX-12");
+    mh.mh_destinationpath[0] = 0;
     mh.mh_path_len = 3;
     updateHeyPath(mh);
     g_out.clear();
