@@ -253,7 +253,11 @@ void bpPollDrain(void);
 // or "*"), not a hardcoded broadcast.
 void sendExternNotice(const char *text, const char *dst);
 
-extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
+// R1-04: erst beim ersten Blick auf die rxlog-Seite angelegt, siehe
+// loop_functions.cpp. NULL heisst "noch nicht angesehen", nicht "Fehler".
+typedef unsigned char rawLogLine_t[UDP_TX_BUF_SIZE+5];
+extern rawLogLine_t *ringbufferRAWLoraRX;
+bool rawLogEnsure(void);
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;
 

@@ -1341,13 +1341,25 @@ void sub_page_rxlog()
     web_client.println("</div>");
 
     web_client.println("<div style=\"overflow:scroll;\">");
-    do
+
+    // R1-04: DIES ist die Stelle, die den Puffer ueberhaupt erst anlegt -- er
+    // hat keinen anderen Leser. Der erste Aufruf dieser Seite kostet die
+    // Zuteilung, ab dann fuellt der RX-Pfad ihn. Schlaegt sie fehl, bleibt die
+    // Seite bedienbar und sagt warum, statt auf einem NULL-Zeiger zu landen.
+    if(!rawLogEnsure())
     {
-        // WQ-01: normal text size (was font-small) -- the page uses three sizes only:
-        // title, normal (log lines, panel text), small (legend, notes, tick labels).
-        web_client.printf("<p class=\"no-wrap\"><%i>%s</p>\n", iRead, ringbufferRAWLoraRX[iRead]);
-        iRead = increment_mod(iRead, MAX_LOG);
-    } while (RAWLoRaRead != iRead);
+        web_client.println("<p class=\"no-wrap\">RX log buffer not available (out of memory)</p>");
+    }
+    else
+    {
+        do
+        {
+            // WQ-01: normal text size (was font-small) -- the page uses three sizes only:
+            // title, normal (log lines, panel text), small (legend, notes, tick labels).
+            web_client.printf("<p class=\"no-wrap\"><%i>%s</p>\n", iRead, ringbufferRAWLoraRX[iRead]);
+            iRead = increment_mod(iRead, MAX_LOG);
+        } while (RAWLoRaRead != iRead);
+    }
     web_client.println("</div></div>");
     web_client.println(); // The HTTP response ends with another blank line
 }

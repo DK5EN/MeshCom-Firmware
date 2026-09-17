@@ -439,7 +439,53 @@ uint8_t retryCount[MAX_RING] = {0};
 // ringBufferLoraRX/loraWrite liegen jetzt in dedup_functions.cpp.
 
 // RINGBUFFER RAW LoRa RX
-unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5] = {0};
+// R1-04: der RAW-RX-Ringpuffer wird erst angelegt, wenn ihn jemand ANSIEHT.
+//
+// Er hat genau EINEN Leser -- die rxlog-Seite der Web-Oberflaeche
+// (web_functions.cpp) -- und kostete bisher MAX_LOG * (UDP_TX_BUF_SIZE+5)
+// Byte statisch auf JEDEM Knoten, auch auf denen ohne Webserver und auf denen,
+// die die Seite nie oeffnen. Das sind 5 200 B bei MAX_LOG 20 und 2 600 B bei
+// MAX_LOG 10.
+//
+// WARUM DAS OHNE SPERRE SICHER IST, und das ist hier die eigentliche Frage:
+// der Schreiber laeuft auf einem ANDEREN Task als der Anleger. charBuffer_aprs()
+// haengt an OnRxDone(), also am LORA-Task (16 kB, nicht am 1-kB-Timer-Task --
+// die Audit-Zeile sagt "timer task" und liegt damit falsch, siehe die Notiz in
+// docs/BACKLOG.md). Angelegt wird aus dem Web-Pfad.
+//
+// Die Regeln, die den Wettlauf ausschliessen:
+//   1. Der Zeiger geht GENAU EINMAL von NULL auf gueltig und wird NIE wieder
+//      NULL. Es gibt kein free(), also auch kein use-after-free.
+//   2. Der Puffer ist VOLLSTAENDIG genullt, BEVOR der Zeiger veroeffentlicht
+//      wird. Ein Schreiber sieht darum entweder NULL -- dann schreibt er nicht --
+//      oder einen fertigen Puffer. Einen halb initialisierten sieht er nie.
+//   3. Der Schreiber liest den Zeiger EINMAL in eine lokale Variable und
+//      benutzt nur diese. Ein zweites Lesen koennte sonst zwischen Pruefung
+//      und Benutzung einen anderen Wert sehen.
+// Ein einzelner ausgerichteter Zeigerschreibzugriff ist auf ARM und Xtensa
+// atomar; mehr Synchronisation braucht es fuer dieses Muster nicht.
+typedef unsigned char rawLogLine_t[UDP_TX_BUF_SIZE+5];
+rawLogLine_t *ringbufferRAWLoraRX = NULL;
+
+// Legt den Puffer beim ersten Aufruf an. Gibt false zurueck, wenn kein Speicher
+// da ist -- die rxlog-Seite zeigt dann eine Notiz statt Zeilen, der Knoten
+// funkt unveraendert weiter.
+bool rawLogEnsure(void)
+{
+    if(ringbufferRAWLoraRX != NULL)
+        return true;
+
+    rawLogLine_t *p = (rawLogLine_t *)calloc(MAX_LOG, sizeof(rawLogLine_t));
+    if(p == NULL)
+    {
+        Serial.printf("[RXLOG];alloc;failed;bytes;%u\n",
+                      (unsigned)(MAX_LOG * sizeof(rawLogLine_t)));
+        return false;
+    }
+
+    ringbufferRAWLoraRX = p;   // Veroeffentlichung, nachdem calloc() genullt hat
+    return true;
+}
 int RAWLoRaWrite=0;
 int RAWLoRaRead=0;
 
@@ -3331,7 +3377,15 @@ void charBuffer_aprs(struct aprsMessage &aprsmsg)
     
     internal_message[UDP_TX_BUF_SIZE-1]=0x00;
 
-    memcpy(ringbufferRAWLoraRX[RAWLoRaWrite], internal_message, UDP_TX_BUF_SIZE-1);
+    // R1-04: Zeiger EINMAL lesen, dann nur die lokale Kopie benutzen. Ist der
+    // Puffer nicht angelegt (niemand hat die rxlog-Seite geoeffnet), passiert
+    // hier nichts -- der Ringzeiger laeuft trotzdem weiter, damit die Seite
+    // nach dem Anlegen dieselbe Reihenfolge zeigt wie vorher.
+    rawLogLine_t *raw = ringbufferRAWLoraRX;
+    if(raw == NULL)
+        return;
+
+    memcpy(raw[RAWLoRaWrite], internal_message, UDP_TX_BUF_SIZE-1);
 }
 
 // SL-01: `tail` haengt VOR dem `\n` an die bestehende Zeile an -- leer bei
