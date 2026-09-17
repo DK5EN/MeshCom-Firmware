@@ -5215,6 +5215,49 @@ than by reading:
   merely mangled. Its strict count was therefore 263, not the 233 previously
   recorded.
 
+#### Campaign stand 2026-09-17: 21 of 31 rows done, three posts need hardware
+
+Supersedes the 2026-09-15 stand below, which is kept because its findings
+(`OPT-D14`, `RF-09`, the corpus emission category) are still open rows.
+
+| Phase                        | Rows                               | State                                                                                                                                                                                                                        |
+| ---------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done**                                                                                                                                                                                                                     |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**                                                                                                                                                                                                                     |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; **`M3` 2 of 29 rows open** -- `DR-03`/`DR-16` wait for the `E1` G2 run, so the row cannot close before `E1`                                                                                                  |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1`-`W4` **done**. `W5` **7 of 9 rows done**, owes `R1-04` (12 h nRF52 soak) and the `mheardLine` half of `R2-04`. `W6` owes `D1-01` + `D4-01/02`. `C4d` owes `DR-03`. `W7` deferred to immediately before the PR by design |
+| E -- prove and ship          | `E1`-`E5`                          | **not started**. `E1` is a bench run; `E4` is an outward-facing submission; `E5` is Kurt's review, outside our control                                                                                                       |
+
+**W5, row by row (2026-09-17).** Delivered: `GRD-01`, `R2-01`, `R3-12`,
+`R4-01`, `R2-04` (`aprsMessage` half), `R1-02` step 1 -- together about
+**247 kB of flash and 117 kB of RAM** back across the fleet. Declined with the
+reason recorded, bytes deliberately left on the table: `R3-13` (1,200 B but it
+truncates 6-hop paths, and `--maxhop` allows 6) and `R4-02/03` (~1,400 B
+measured against an alloc-failure path on 20+ boards). Both refusals follow the
+standing rule: prefer the option that leaves ONE code path.
+
+**What is NOT agent-completable, and therefore caps "finish the Gantt":**
+
+| Post                 | Needs                                          |
+| -------------------- | ---------------------------------------------- |
+| `R1-04` (`W5`)       | 12 h nRF52 soak                                |
+| `E1` (G2 after-run)  | bench session, 3-4 nodes                       |
+| `M3` last 2 rows     | rides on `E1`                                  |
+| `DISP-01`            | Heltec V3 + a T-Beam (needs the RAK unplugged) |
+| BLE golden as a gate | a quiet bench -- antenna off DK5EN-93          |
+| `E4` submit PR       | operator authorisation; never done unprompted  |
+| `E5` upstream review | Kurt; external                                 |
+
+**Running tally of audit rows whose stated premise was wrong.** Six of eight
+checked so far: `R4-02/03` (4,304 B claimed, ~1,400 real, and no board list
+needed -- the OLED is already detected at runtime), `R1-02` ("byte 1 tags the
+type" false twice), `R3-13` (the corpus check passes but is not the bound),
+`R2-01` (flash saving absent from the audit entirely -- and it was the larger
+half), `R2-04` (same, 109 kB absent; and ~7 malloc/free per RX, not 14, except
+on the T-Deck), `R4-01` (framed as tuning; actually one of five `lv_conf.h`
+copies that never got a change the other four have had for years). Treat every
+remaining row description as a hypothesis to be measured, not a finding.
+
 #### Campaign stand 2026-09-15: what is done, what completing the plan takes
 
 The audit's plan (`optimization-audit-20260910.md` §7.1) is eight waves inside
