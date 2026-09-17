@@ -12,6 +12,7 @@
 // gateway_service.h for why it is carved but not unified. Moved unchanged.
 
 extern NrfETH neth;
+extern bool hb_warn_logged;
 extern unsigned long iReceiveTimeOutTime;
 void sendUDP(void);
 void startRadioReceive(void);
@@ -76,9 +77,57 @@ if(bGATEWAY)
         meshcom_settings.node_hasIPaddress = neth.hasIPaddress;
         meshcom_settings.node_last_upd_timer = neth.last_upd_timer;
         
+        // DR-03, DECIDED 2026-09-12 esp32-correct: bis heute war nRF52 in
+        // der ersten Stufe STUMM. ESP32 warnt nach HB_WARN_TIME (35 s) ohne
+        // serverseitige Antwort und handelt erst nach MAX_HB_RX_TIME (65 s)
+        // (gateway_service_esp32.cpp:36-62); nRF52 hatte nur die zweite
+        // Stufe, also 65 s ohne jede Ausgabe und danach direkt eine
+        // Neuinitialisierung. Die 30 s dazwischen sind genau das Fenster, in
+        // dem man am Log erkennen koennte, OB der Server oder der Link das
+        // Problem ist -- deshalb benennt die Zeile hier den Ethernet-Zustand,
+        // wo ESP32 den WiFi-Zustand benennt.
+        //
+        // Bewusst NUR die Diagnose portiert, nicht die ESP32-Sofortaktion:
+        // dort loest ein toter WiFi-Link in Stufe 1 gleich ein
+        // resetMeshComUDP() aus. Der nRF52-Gegenpart waere initethDHCP()/
+        // resetDHCP() -- und genau dieser Pfad ist N-20: ein einmal
+        // gezogenes Kabel verband nie wieder, weil jeder Retry den W5100S
+        // hardware-resettet (Begruendung im resetDHCP()-Zweig unten). Eine
+        // zweite, fruehere Ausloesestelle dafuer waere ein Rueckschritt.
+        // Stufe 2 bleibt daher unveraendert die einzige handelnde Stufe.
+        //
+        // neth.last_upd_timer > 0 wie auf ESP32 (dort last_upd_timer > 0).
+        // ACHTUNG, die Bedeutung ist auf nRF52 eine ANDERE als auf ESP32, und
+        // die erste Fassung dieses Kommentars hatte sie falsch: auf nRF52
+        // setzt nicht nur der Serververkehr diesen Zeitstempel, sondern auch
+        // der ETH-Aufbau selbst (nrf_eth.cpp:246 initethfixIP, :857 startUDP).
+        // Der Zaehler laeuft hier also ab LINK-UP, nicht ab der ersten
+        // Serverantwort -- ein Knoten, dem nie jemand antwortet, warnt 35 s
+        // nach dem ETH-Start. Das ist richtig so und passt zur handelnden
+        // Stufe, die 65 s nach demselben Bezugspunkt greift. Die Abfrage
+        // schuetzt damit genau einen Zustand: die Sekunden vor ETH-Up, in
+        // denen millis() - 0 sofort jede Schwelle reissen wuerde.
+        if(neth.last_upd_timer > 0)
+        {
+            uint32_t hb_age = (uint32_t)(millis() - neth.last_upd_timer);
+
+            if(hb_age > (uint32_t)(HB_WARN_TIME * 1000) && !hb_warn_logged)
+            {
+                printfdeb("[UDP] Server not responding for %lus - ETH %s\n",
+                          (unsigned long)(hb_age / 1000),
+                          neth.hasIPaddress ? "UP" : "DOWN");
+                hb_warn_logged = true;
+            }
+        }
+
         // check HB response (we also check successful sending KEEP. check if they work together!)
         if((uint32_t)(millis() - neth.last_upd_timer) >= (uint32_t)(MAX_HB_RX_TIME * 1000))
         {
+            // DR-03: Stufe 2 setzt die Alterung zurueck, also faellt hier
+            // auch der Latch -- sonst bliebe er nach dem ersten Mal
+            // gesetzt und die Warnung erschiene nie wieder.
+            hb_warn_logged = false;
+
             if(bDEBUG)
                 Serial.println("LOOP GATEWAY last_upd_timer actions");
 

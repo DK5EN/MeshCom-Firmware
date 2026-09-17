@@ -28,6 +28,9 @@
 // unchanged.
 
 extern NrfETH neth;
+// DR-03: der Warn-Latch der Heartbeat-Diagnose. Definiert in
+// loop_functions.cpp:629, bis 2026-09-17 nur von der ESP32-Seite gelesen.
+extern bool hb_warn_logged;
 // Defined in nrf_eth.cpp. The ESP32 bUDPLOG lives inside that file's
 // `#if defined(ESP32)`, so on nRF52 this is a separate symbol with the
 // same name -- see the note at nrf_eth.cpp's definition.
@@ -95,6 +98,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
         printfdeb("[GATE] Received a LoRa packet to transmit\n");
 
       neth.last_upd_timer = millis();
+      hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
 
       neth.lora_tx_msg_len = packetSize - UDP_MSG_INDICATOR_LEN;
       if (neth.lora_tx_msg_len > UDP_TX_BUF_SIZE)
@@ -433,6 +437,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       Serial.printf("[GW];rx;type;CONF;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
 
       neth.last_upd_timer = millis();
+      hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
 
       neth.had_initial_udp_conn = true;
 
@@ -524,6 +529,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       Serial.printf("[GW];rx;type;BEAT;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
 
       neth.last_upd_timer = millis();
+      hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
       
       /**
        * TODO check HB accordingly to format not only BEAT at beginning
@@ -537,6 +543,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // TM-39: raw & unconditional
       Serial.printf("[GW];rx;type;OTHER;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
       neth.last_upd_timer = millis();
+      hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
     }
 
     return 0;   // handled

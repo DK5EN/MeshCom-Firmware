@@ -719,6 +719,69 @@ static void test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines(v
     }
 }
 
+// DR-03 / F3: die vier Latch-Loeschungen sind sonst durch KEINEN Test
+// gedeckt -- man kann jede einzelne entfernen und 961 Faelle bleiben gruen.
+//
+// Der Latch hb_warn_logged macht aus der Heartbeat-Warnung einen Einmalruf pro
+// Episode. Wer Serververkehr sieht, muss ihn zusammen mit der Alterung
+// zuruecksetzen, sonst warnt der Knoten nach der ersten Stille nie wieder --
+// ein Defekt, den man nur daran merkt, dass eine Logzeile FEHLT. Genau die
+// Sorte, die jahrelang unbemerkt bleibt.
+//
+// Beide Plattformen, alle drei erreichbaren Zweige (GATE braucht einen
+// vollstaendigen LoRa-Frame und ist durch die Faelle oben abgedeckt; BEAT,
+// CONF und OTHER sind hier die drei, die ein Datagramm allein ausloest).
+static void test_agreement_live_traffic_clears_the_heartbeat_warn_latch(void)
+{
+    uint8_t tmpl[BUF_CAP];
+
+    struct { const char *name; uint16_t len; } kinds[3];
+
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t beat_len = build_beat_datagram(tmpl);
+    uint8_t beat_tmpl[BUF_CAP];
+    memcpy(beat_tmpl, tmpl, sizeof(beat_tmpl));
+
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t conf_len = build_conf_datagram(tmpl, "DK5EN-9");
+    uint8_t conf_tmpl[BUF_CAP];
+    memcpy(conf_tmpl, tmpl, sizeof(conf_tmpl));
+
+    uint8_t other_tmpl[BUF_CAP];
+    memset(other_tmpl, 0, sizeof(other_tmpl));
+    memcpy(other_tmpl, "ZZZZ", 4);
+    memset(other_tmpl + 4, 0xAB, 8);
+    uint16_t other_len = 12;
+
+    (void)kinds;
+
+    const uint8_t *tmpls[3] = { beat_tmpl, conf_tmpl, other_tmpl };
+    const uint16_t lens[3]  = { beat_len,  conf_len,  other_len };
+    const char *names[3]    = { "BEAT",    "CONF",    "OTHER"   };
+
+    for (int k = 0; k < 3; k++)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            recorder_reset();
+            hb_warn_logged = true;          // eine Warnung steht bereits
+
+            uint8_t buf[BUF_CAP];
+            copy_into(buf, tmpls[k], lens[k]);
+            if (side) handleUdpFrame_nrf52(buf, lens[k], IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, lens[k], IPAddress(1, 2, 3, 4));
+
+            char msg[160];
+            snprintf(msg, sizeof(msg),
+                     "DR-03: %s auf %s hat hb_warn_logged nicht geloescht -- "
+                     "nach der ersten Warnung warnt dieser Knoten nie wieder, "
+                     "bis die handelnde Stufe den Latch faellt",
+                     names[k], side ? "nrf52" : "esp32");
+            TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged, msg);
+        }
+    }
+}
+
 static void test_agreement_conf_updates_node_call_and_short_identically(void)
 {
     uint8_t tmpl[BUF_CAP];
@@ -1694,6 +1757,7 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
     RUN_TEST(test_agreement_max_zeros_rejected_by_both);
     RUN_TEST(test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines);
+    RUN_TEST(test_agreement_live_traffic_clears_the_heartbeat_warn_latch);
     RUN_TEST(test_agreement_conf_updates_node_call_and_short_identically);
     RUN_TEST(test_agreement_zero_scan_bound_matches_on_odd_length);
     RUN_TEST(test_regression_zero_scan_oob_byte_flips_verdict_before_fix);

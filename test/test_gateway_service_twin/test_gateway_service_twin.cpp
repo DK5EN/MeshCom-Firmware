@@ -473,6 +473,151 @@ static void test_drift_esp32_heartbeat_interval_gate_nrf52_has_none(void)
         "esp32 did not send a heartbeat once HEARTBEAT_INTERVAL elapsed");
 }
 
+// ===========================================================================
+// DR-03: the heartbeat WARNING stage. Decided esp32-correct 2026-09-12 and
+// implemented on nRF52 2026-09-17. Until then nRF52 had only the acting
+// stage at MAX_HB_RX_TIME (65 s): for the first 65 s of server silence it
+// printed nothing at all, so the log could not distinguish "the server went
+// quiet" from "the link went down" -- exactly the 30 s window ESP32 uses to
+// say so.
+//
+// These cases assert the LATCH, not the printed text: hb_warn_logged is the
+// one-shot that makes the diagnostic fire once per episode instead of once
+// per loop pass, and it is observable from this TU (it is defined at the top
+// of this file). A test on the text would pin the wording; a test on the
+// latch pins the behaviour.
+// ===========================================================================
+
+static void test_dr03_nrf52_warns_once_in_the_window_and_does_not_act(void)
+{
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    neth.last_upd_timer = 1000;   // the server was last heard at t=1s
+    hb_warn_logged = false;
+    g_mock_getUDP_return = 1;     // no packet this pass, so the block runs
+    mc_test_set_millis(41000);    // hb_age = 40 s: past HB_WARN_TIME (35 s),
+                                  // short of MAX_HB_RX_TIME (65 s)
+
+    gatewayService_nrf52();
+    TEST_ASSERT_TRUE_MESSAGE(hb_warn_logged,
+        "DR-03: nrf52 must raise the heartbeat warning once hb_age passes "
+        "HB_WARN_TIME (docs/testplan/drift-matrix.csv DR-03)");
+
+    // The diagnostic stage must DIAGNOSE only. ESP32's stage 1 resets the UDP
+    // session when its link is also down; the nRF52 counterpart of that reset
+    // is resetDHCP()/initethfixIP(), and that path is N-20 -- a retry there
+    // hardware-resets the W5100S and a once-unplugged cable never reconnects.
+    // A second, earlier trigger for it would be a regression, not parity.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count_of("nrf_resetDHCP"),
+        "DR-03: the warning stage must not trigger DHCP recovery -- only the "
+        "65 s stage acts (N-20: every resetDHCP() retry hardware-resets the "
+        "W5100S)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count_of("nrf_initethfixIP"),
+        "DR-03: the warning stage must not trigger fixed-IP recovery");
+
+    // Second pass still inside the window: the latch holds, so the line is
+    // printed once per episode and not once per loop pass.
+    mc_test_set_millis(45000);
+    gatewayService_nrf52();
+    TEST_ASSERT_TRUE_MESSAGE(hb_warn_logged,
+        "DR-03: the latch must stay set for the rest of the episode");
+}
+
+static void test_dr03_nrf52_silent_before_the_warn_time(void)
+{
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    neth.last_upd_timer = 1000;
+    hb_warn_logged = false;
+    g_mock_getUDP_return = 1;
+    mc_test_set_millis(21000);   // hb_age = 20 s, short of HB_WARN_TIME
+
+    gatewayService_nrf52();
+    TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged,
+        "DR-03: no warning before HB_WARN_TIME -- a heartbeat interval of "
+        "silence is normal, not a fault");
+}
+
+static void test_dr03_nrf52_no_warn_before_the_link_is_up(void)
+{
+    // neth.last_upd_timer == 0 is the state before the Ethernet link is up.
+    // NOT "no server has ever answered" -- that was this test's first
+    // rationale and it describes ESP32, not nRF52: here the timestamp is also
+    // set by the link bring-up itself (nrf_eth.cpp:246, :857), so a node that
+    // never hears a server still warns 35 s after ETH start, which is correct
+    // and matches the acting stage at 65 s from the same reference point.
+    // What the guard actually prevents is the window before ETH is up, where
+    // millis() - 0 clears every threshold instantly. ESP32 carries the same
+    // guard for its own (narrower) reason, gateway_service_esp32.cpp:31.
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    neth.last_upd_timer = 0;
+    hb_warn_logged = false;
+    g_mock_getUDP_return = 1;
+    mc_test_set_millis(41000);
+
+    gatewayService_nrf52();
+    TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged,
+        "DR-03: a node whose link is not up yet must not warn -- the age is "
+        "measured from ETH bring-up, and before that millis() - 0 clears "
+        "every threshold");
+}
+
+static void test_dr03_nrf52_latch_clears_when_the_acting_stage_runs(void)
+{
+    // Stage 2 restarts the age, so the latch has to fall with it -- otherwise
+    // the warning fires exactly once in the node's lifetime and every later
+    // episode is silent again, which is the bug this row is about.
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    neth.last_upd_timer = 1000;
+    hb_warn_logged = false;
+    g_mock_getUDP_return = 1;
+    mc_test_set_millis(66000);   // past MAX_HB_RX_TIME: stage 1 fires, then
+                                 // stage 2 restarts the age in the same pass
+
+    gatewayService_nrf52();
+    TEST_ASSERT_FALSE_MESSAGE(hb_warn_logged,
+        "DR-03: the acting stage restarts the age and must clear the latch, "
+        "so the next episode warns again");
+}
+
+static void test_dr03_both_platforms_warn_at_the_same_age(void)
+{
+    // The row's point is parity of the DIAGNOSTIC, so assert it as a
+    // differential in one process rather than twice in prose.
+    const unsigned long t_warn = 41000;   // hb_age 40 s on both
+
+    bGATEWAY = true;
+    meshcom_settings.node_hasIPaddress = true;
+    hb_timer = 0;                 // esp32 needs the heartbeat block to run
+    last_upd_timer = 1000;
+    WiFi.mock_connected = true;   // link up: stage 1 diagnoses, does not act
+    hb_warn_logged = false;
+    mc_test_set_millis(t_warn);
+
+    gatewayService_esp32();
+    const bool esp32_warned = hb_warn_logged;
+
+    recorder_reset();
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    neth.last_upd_timer = 1000;
+    g_mock_getUDP_return = 1;
+    hb_warn_logged = false;
+    mc_test_set_millis(t_warn);
+
+    gatewayService_nrf52();
+    const bool nrf52_warned = hb_warn_logged;
+
+    TEST_ASSERT_TRUE_MESSAGE(esp32_warned,
+        "sanity: esp32's stage 1 did not fire at hb_age 40 s -- this test's "
+        "own setup is wrong, not the nrf52 side");
+    TEST_ASSERT_EQUAL_MESSAGE(esp32_warned, nrf52_warned,
+        "DR-03: both platforms must raise the heartbeat warning at the same "
+        "age. nrf52 was silent for the whole 65 s until 2026-09-17");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -483,6 +628,12 @@ int main(int, char **)
 
     RUN_TEST(test_dr15_esp32_recovery_on_link_down_not_on_silent_server);
     RUN_TEST(test_dr15_nrf52_recovery_on_link_down_not_on_silent_server);
+
+    RUN_TEST(test_dr03_nrf52_warns_once_in_the_window_and_does_not_act);
+    RUN_TEST(test_dr03_nrf52_silent_before_the_warn_time);
+    RUN_TEST(test_dr03_nrf52_no_warn_before_the_link_is_up);
+    RUN_TEST(test_dr03_nrf52_latch_clears_when_the_acting_stage_runs);
+    RUN_TEST(test_dr03_both_platforms_warn_at_the_same_age);
 
     RUN_TEST(test_agreement_bgateway_off_only_harvests_ntp_on_both);
     RUN_TEST(test_drift_esp32_heartbeat_interval_gate_nrf52_has_none);
