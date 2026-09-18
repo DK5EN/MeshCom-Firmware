@@ -129,6 +129,27 @@ and answers `Please set EXPUDP IP first` (correct). With `--extudpip
 still without a reboot. The net console was switched back off at the end; the
 ext IP stays set.
 
+## Follow-up fixes 2026-09-18 afternoon
+
+**H6-01 closed.** A zero-padded datagram on UDP 1990 made the ESP32 caller run
+the full `resetMeshComUDP()` (WiFi teardown). Reproduced on the shipping
+Heltec image with `tools/bench/udp_inject.py` and corpus datagram `33-m03`
+sent from this Mac: `[WIFI];event;disconnected;reason;8`, `timeout when WiFi
+un-init`, 9 s offline (the reboot seen at G2 is the non-deterministic tail of
+that outage and did not occur in this run). Fix in `src/udp_functions.cpp`:
+while WiFi is connected only the socket is re-armed; the full teardown stays
+for the heartbeat paths that already require WiFi to be down. After: `UDP
+socket re-armed, WiFi kept`, server BEAT keeps arriving through four injected
+datagrams. Evidence `test/golden/hw/G2/heltec-93/udp/h6-01-fix/`.
+
+**Range checks for the other 999999 leftovers.** `--onewire gpio` now clamps
+to 0..99 (proven: 999999 rejected, 0 stored). `--postime` and `--gpsdebug`
+were deliberately left alone: the JSON restore bounds in `src/config_json.h`
+contradict the firmware (postime is stored in seconds with a 300 s floor and
+a 1800 s default, the JSON bound is 0..1440; gpsdebug level 3 is the valid
+raw-NMEA mode, the JSON bound is 0..2). Those two bounds are the defect, not
+the setters; open item.
+
 ## Open
 
 - `QNH` equals `QFE` and `ALT asl: 0` although the GPS has a fix at ~490 m:
@@ -136,11 +157,10 @@ ext IP stays set.
   (GPS-05b fusion) permits; not investigated further.
 - `--seset` prints nothing on the serial/net console (its output is the BLE
   JSON only); the text block comes from `--wx`.
-- The setters behind the other three leftovers (`--gpsdebug`, `--postime`,
-  `--onewire gpio`) still accept 999999; the values were restored by hand, the
-  range checks are outside this fix.
-- The operator's boot-logo observation is not reproduced. Candidates outside
-  this matrix: brownout on a weak USB supply when WiFi + gateway come up
-  (the Heltec reports `BATT 0.00 V`, no battery), H6-01 (a rejected UDP-1990
-  datagram reboots the node, BACKLOG §3.8ay), or a toggle sequence with
-  shorter gaps than 120 s.
+- `--postime` and `--gpsdebug` still accept 999999; the matching JSON bounds
+  in `src/config_json.h` (0..1440 minutes vs seconds stored, 0..2 vs the valid
+  level 3) are wrong and need a decision before either side is clamped.
+- The operator's boot-logo observation: closed 2026-09-18 by operator decision.
+  Not reproduced by any toggle in three passes per node; the most probable
+  cause is the by-design 5 s deferred restart after `--setboostedgain`, which
+  the app and console both trigger on SX126x boards.

@@ -182,10 +182,32 @@ void getMeshComUDP()
       // itself. This caller performs the reset, mirroring NrfETH::getUDP()
       // (nrf52/nrf_eth.cpp:442-453), which resets DHCP on the same verdict
       // from handleUdpFrame_nrf52(). Losing this call would silently stop
-      // resetting the UDP socket on every too-many-zeros datagram -- a real
-      // gateway regression, not just a caller-decides refactor.
+      // re-arming the UDP socket on every too-many-zeros datagram -- a real
+      // gateway regression, not just a caller-decides refactor. The verdict
+      // no longer always tears WiFi down (see H6-01 below).
+      //
+      // H6-01: a malformed datagram (too many consecutive zero bytes) is
+      // evidence the socket needs re-arming, not that the link is dead. The
+      // full WiFi teardown in resetMeshComUDP() belongs to the heartbeat
+      // paths in gateway_service_esp32.cpp, which only call it once
+      // WiFi.status() != WL_CONNECTED already confirms the link is down,
+      // and to the MAX_ERR_UDP_TX path in udp_drain_esp32.cpp.
       if(handleUdpFrame_esp32(incomingPacket, len, remote_ip) != 0)
-        resetMeshComUDP();
+      {
+        if(WiFi.status() == WL_CONNECTED)
+        {
+          Udp.stop();
+          err_cnt_udp_tx = 0;
+          if(Udp.begin(LOCAL_PORT))
+            printlndeb("[WIFI-DBG] too-many-zeros: UDP socket re-armed, WiFi kept");
+          else
+            resetMeshComUDP();   // bind failed: the old recovery is all that is left
+        }
+        else
+        {
+          resetMeshComUDP();
+        }
+      }
     }
   }
 }

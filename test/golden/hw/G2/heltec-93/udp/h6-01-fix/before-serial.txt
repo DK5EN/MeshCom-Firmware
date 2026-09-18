@@ -1,0 +1,239 @@
+2026-09-18T13:24:02.987  ### attached /dev/cu.usbserial-0001 dtr=False
+2026-09-18T13:24:03.392  [INIT]...Enabling Vext for OLED power
+2026-09-18T13:24:03.392  [INIT]...Resetting OLED display
+2026-09-18T13:24:04.002  
+2026-09-18T13:24:04.003  
+2026-09-18T13:24:04.003  ============
+2026-09-18T13:24:04.003  CLIENT SETUP
+2026-09-18T13:24:04.003  ============
+2026-09-18T13:24:04.003  [BOOT] RESET_REASON=1 POWERON
+2026-09-18T13:24:04.003  [HEAP] 00:00:00 256196 251048 221172 (init)
+2026-09-18T13:24:04.003  [PSRM] 00:00:00 0
+2026-09-18T13:24:04.207  [EFUS]...Two Point: NOT supported
+2026-09-18T13:24:04.207  [EFUS]...Vref: NOT supported
+2026-09-18T13:24:04.207  [INIT]...initMheard
+2026-09-18T13:24:04.207  [INIT]...init_flash
+2026-09-18T13:24:04.207  [INIT]...build Sep 17 2026 / 23:40:53
+2026-09-18T13:24:04.207  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T13:24:04.207  [TIME]...Loaded time persistence: saved_time=1789730626, mheard_time=0, msg_time=0
+2026-09-18T13:24:04.207  [INIT]...init_batt
+2026-09-18T13:24:04.412  [INIT]...ADC_CTRL_PIN probe: high=989 low=1 -> active HIGH
+2026-09-18T13:24:04.412  [ADC ]...Characterized using Default Vref
+2026-09-18T13:24:04.412  [INIT]...setupBMX280 - I2C:76
+2026-09-18T13:24:04.412  [INIT]...BME280 started
+2026-09-18T13:24:04.412  [INIT]...MCP23017 not found
+2026-09-18T13:24:04.412  [INIT]...RTC not found
+2026-09-18T13:24:04.412  [OBUT]...One Button GPIO(1) not activated
+2026-09-18T13:24:04.412  [INIT].._GW_ID: 433A8968
+2026-09-18T13:24:04.412  [INIT]...Initialize clock: ok
+2026-09-18T13:24:04.412  [INIT]...Auto detecting display:
+2026-09-18T13:24:04.821  [INIT]...OLED on Wire1 SDA 17 SCL 18: ack=0 clock=400000
+2026-09-18T13:24:05.436  [LoRa]...SX1262 V3 chip Initializing ... success
+2026-09-18T13:24:05.436  [LoRa]...RX_BOOSTED_GAIN: 1
+2026-09-18T13:24:05.436  [LoRa]...RF_FREQUENCY: 433.175 MHz
+2026-09-18T13:24:05.436  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T13:24:05.436  [LoRa]...RF_SF: 11
+2026-09-18T13:24:05.436  [LoRa]...RF_CR: 4/6
+2026-09-18T13:24:05.436  [LoRa]...RF_POWER: 1 dBm
+2026-09-18T13:24:05.436  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T13:24:05.436  [LoRa]...Starting to listen ... success
+2026-09-18T13:24:05.436  [LoRa]...All settings successfully changed
+2026-09-18T13:24:05.436  [BLE ]...Device started with BLE-Name <MC-8968-DK5EN-1>
+2026-09-18T13:24:05.436  [BLE ]...Device-Address <48:ca:43:3a:89:69>
+2026-09-18T13:24:05.436  [BLE ]...Waiting a client connection to notify...
+2026-09-18T13:24:05.436  ==============
+2026-09-18T13:24:05.436  CLIENT STARTED
+2026-09-18T13:24:05.436  ==============
+2026-09-18T13:24:05.732  ### boot marker seen
+2026-09-18T13:24:06.048  [WIFI];scan;skipped;first_bringup;ms;2876
+2026-09-18T13:24:06.049  [WIFI]...try connecting to SSID: ORBI63 
+2026-09-18T13:24:06.049  [WIFI];policy;pmf_off;rc;0
+2026-09-18T13:24:06.049  [readBatteryVoltage] 00:00:00 ... 0.00 V 0 % max_batt 4.200 V
+2026-09-18T13:24:06.049  [GPS ]...Init GPIO RX=47 TX=48
+2026-09-18T13:24:06.254  [GPS ]...38400 baud --> 62 chars (NMEA ok)
+2026-09-18T13:24:06.254  [GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 187 ms)
+2026-09-18T13:24:06.254  [GPS ]...erkannte Baudrate: 38400
+2026-09-18T13:24:06.254  [GPS ]...Try to init L76K/UBLOX
+2026-09-18T13:24:06.254  [GPS ]...clear NMEA-Buffer
+2026-09-18T13:24:06.254  [GPS ]>>> $PCAS06,0*1B
+2026-09-18T13:24:06.864  [GPS ]...wait[GPS ]<<< $GPTXT,01,01,01,PCAS inv format*3D
+2026-09-18T13:24:06.864   ...
+2026-09-18T13:24:06.864  check Input
+2026-09-18T13:24:06.864  [GPS ]...UBLOX connected
+2026-09-18T13:24:06.864  [GPS ]...UBX_CFG_PRT 38400
+2026-09-18T13:24:07.476  [GPS ]...Sende UBX_CFG_RATE
+2026-09-18T13:24:07.476  [GPS ]...Sende UBX_CFG_CFG
+2026-09-18T13:24:07.679  [GPS ]...UBLOX Flash save
+2026-09-18T13:24:07.679  [GPS ]...UBLOX config finished
+2026-09-18T13:24:07.679  [GPS ]...wait[GPS ]...Sende UBX_MON_VER
+2026-09-18T13:24:08.704  [GPS_VER] ub..d.1.00 (59842)..................00070000..PROTVER 14.00.................GPS;SBAS;GLO;QZSS.............q.$GPRMC,112408.00,A,4824.45517,N,01144.28565,E,0.091,,180926,,,A*76.$GPGGA,112408.00,4824.45517,N,01144.28565,E,1,06,3.22,493.2,M,46.2,M,,*5F.
+2026-09-18T13:24:08.704  [GPS ]...UBLOX erkannt
+2026-09-18T13:24:08.704  .[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;5624
+2026-09-18T13:24:08.737  ### sent: --srvip 192.168.68.58
+2026-09-18T13:24:09.315  --srvip 192.168.68.58
+2026-09-18T13:24:09.315  
+2026-09-18T13:24:09.315  ...wrong command --srvip 192.168.68.58
+2026-09-18T13:24:09.723  .[WIFI];event;connected;ms;6648
+2026-09-18T13:24:09.723  [WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-63;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6648
+2026-09-18T13:24:10.336  [WIFI];event;got_ip;ms;7184
+2026-09-18T13:24:10.337  [WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-62;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;7184
+2026-09-18T13:24:10.747  
+2026-09-18T13:24:10.747  [WIFI]...connect OK
+2026-09-18T13:24:10.747  [WIFI]...now listening at IP 192.168.68.71, UDP port 1990
+2026-09-18T13:24:10.747  [WIFI]...Internet UDP-DEST meshcom.oevsv.at
+2026-09-18T13:24:10.747  [WIFI]...Internet NTP-DEST pool.ntp.org
+2026-09-18T13:24:10.747  [GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7638
+2026-09-18T13:24:10.747  [CON ]...HMAC console init.
+2026-09-18T13:24:10.747  [CON ]...Console started on port 2323
+2026-09-18T13:24:10.747  [BOOT];ready;ms;7647;ip;1
+2026-09-18T13:24:10.747  TimeClient no update possible --> CPU-Mode
+2026-09-18T13:24:10.747  [WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;74
+2026-09-18T13:24:10.747  [WIFI];dns;pool.ntp.org;ip;85.214.38.116;ms;74
+2026-09-18T13:24:10.948  [NTP];ok;epoch;1789730650;rtt;69
+2026-09-18T13:24:11.762  13:24:11 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:11.762  [GPS ]...position  : lat:48.407584 lon:11.738114 alt:492.9
+2026-09-18T13:24:14.823  13:24:14 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:14.823  [GPS ]...position  : lat:48.407583 lon:11.738124 alt:492.3
+2026-09-18T13:24:15.262  ### verdict OK for probe:--srvip 192.168.68.58
+2026-09-18T13:24:15.262  ### sent: --gateway on
+2026-09-18T13:24:15.640  --gateway on
+2026-09-18T13:24:17.684  13:24:17 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:17.684  [GPS ]...position  : lat:48.407582 lon:11.738126 alt:491.6
+2026-09-18T13:24:20.753  13:24:20 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:20.754  [GPS ]...position  : lat:48.407582 lon:11.738124 alt:491.1
+2026-09-18T13:24:21.583  ### verdict OK for probe:--gateway on
+2026-09-18T13:24:21.583  ### step run: python3 /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/udp_inject.py 192.168.68.71 1990 /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/test/golden/corpus/udp1990/33-m03-trailing-zeros.hex
+2026-09-18T13:24:21.618  ### run rc=0
+2026-09-18T13:24:21.618  ### run| sent 91 B to 192.168.68.71:1990 head 47415445 (1/1)
+2026-09-18T13:24:21.618  ### verdict OK for run:python3 /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/udp_inject.py 192.168.68.71 1990 /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/test/golden/corpus/udp1990/33-m03-trailing-zeros.hex
+2026-09-18T13:24:21.618  ### step wait
+2026-09-18T13:24:21.778  [WIFI];event;disconnected;reason;8;ms;18659
+2026-09-18T13:24:21.778  [WIFI];assoc;disconnected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-62;auth;7;phy;bgn;pmf;0;wpa3;0;live;0;reason;8;ms;18659
+2026-09-18T13:24:21.778  [WIFI-DBG] resetMeshComUDP: WiFi disconnected, flags reset for reconnect
+2026-09-18T13:24:21.778  E (19351) wifi:timeout when WiFi un-init, type=4
+2026-09-18T13:24:23.814  s13:24:23 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:23.815  [GPS ]...position  : lat:48.407583 lon:11.738125 alt:490.4
+2026-09-18T13:24:25.860  ss[WIFI]...SSID: ORBI63 CHAN: 3 RSSI: -62 BSSID: 5A:AF:97:2E:2B:8B
+2026-09-18T13:24:25.860  [WIFI]...SSID: ORBI63 CHAN: 3 RSSI: -73 BSSID: 46:AF:97:2E:2B:86
+2026-09-18T13:24:25.860  [WIFI]...try connecting to SSID: ORBI63 
+2026-09-18T13:24:25.860  [WIFI];policy;pmf_off;rc;0
+2026-09-18T13:24:26.875  [WIFI]...Wait connect .13:24:26 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:26.875  [GPS ]...position  : lat:48.407583 lon:11.738139 alt:489.8
+2026-09-18T13:24:29.728  ...[WIFI];event;connected;ms;26544
+2026-09-18T13:24:29.728  [WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-61;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;26545
+2026-09-18T13:24:29.728  13:24:29 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:29.728  [GPS ]...position  : lat:48.407584 lon:11.738157 alt:489.3
+2026-09-18T13:24:30.138  .[WIFI];event;got_ip;ms;27061
+2026-09-18T13:24:30.138  [WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-61;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;27061
+2026-09-18T13:24:30.949  
+2026-09-18T13:24:30.949  [WIFI]...connect OK
+2026-09-18T13:24:30.950  [WIFI]...now listening at IP 192.168.68.71, UDP port 1990
+2026-09-18T13:24:30.950  [WIFI]...Internet UDP-DEST meshcom.oevsv.at
+2026-09-18T13:24:30.950  [WIFI]...Internet NTP-DEST pool.ntp.org
+2026-09-18T13:24:30.950  [GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;27789
+2026-09-18T13:24:30.950  [WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;20151
+2026-09-18T13:24:30.950  [GW];keep;tx;ok;1;ms;27799
+2026-09-18T13:24:30.950  [WIFI];dns;pool.ntp.org;ip;85.214.38.116;ms;20160
+2026-09-18T13:24:30.950  [GW];rx;type;BEAT;len;19;ms;27891
+2026-09-18T13:24:32.790  13:24:32 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:32.790  [GPS ]...position  : lat:48.407584 lon:11.738167 alt:488.8
+2026-09-18T13:24:33.192  [GW];keep;tx;ok;1;ms;30001
+2026-09-18T13:24:33.192  [GW];rx;type;BEAT;len;19;ms;30033
+2026-09-18T13:24:35.844  13:24:35 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:35.844  [GPS ]...position  : lat:48.407586 lon:11.738176 alt:488.4
+2026-09-18T13:24:36.045  [readBatteryVoltage] 13:24:35 ... 3.71 V 26 % max_batt 4.200 V
+2026-09-18T13:24:37.668  13:24:36 [LOG] TX xEA25A000 @ H02 prio=5 src=o wait=4538 q=1 cad=0 len=29 t=34538
+2026-09-18T13:24:38.897  13:24:38 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:38.898  [GPS ]...position  : lat:48.407585 lon:11.738182 alt:488.0
+2026-09-18T13:24:41.953  13:24:41 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:41.953  [GPS ]...position  : lat:48.407584 lon:11.738176 alt:487.6
+2026-09-18T13:24:44.802  13:24:44 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:44.803  [GPS ]...position  : lat:48.407584 lon:11.738168 alt:487.3
+2026-09-18T13:24:47.857  13:24:47 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:47.857  [GPS ]...position  : lat:48.407584 lon:11.738172 alt:486.5
+2026-09-18T13:24:50.919  13:24:50 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:50.919  [GPS ]...position  : lat:48.407584 lon:11.738174 alt:486.6
+2026-09-18T13:24:53.975  13:24:53 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:53.976  [GPS ]...position  : lat:48.407584 lon:11.738188 alt:486.9
+2026-09-18T13:24:56.835  13:24:56 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:57.038  [GPS ]...position  : lat:48.407586 lon:11.738197 alt:487.4
+2026-09-18T13:24:59.888  13:24:58 [LOG] 156 ! xA1E5217A H00 S1 T0 M01 DF8RD-10,DB0ISM-1,DL2JA-2>*!4813.46N/01140.98E-JN58UF#Dieter/B=100/A=001657/N2/P=960.7/T=29.7/O=20.3/F=507/Q=1017.0/R=2;262;20;999;26244;228; HW:12 MOD:8/8 FCS:2347 FW:35:t LH:AB RSSI:-127 SNR:-16 DUP:n OWN:- t=56769
+2026-09-18T13:24:59.888  [MESH]...<false>...Payload<4813.46N/01140.98E-JN58UF#Dieter/B=100/A=001657/N2/P=960.7/T=29.7/O=20.3/F=507/Q=1017.0/R=2;262;20;999;26244;228;>
+2026-09-18T13:24:59.888  13:24:58 MESH    : <no via info>return MESH=false
+2026-09-18T13:24:59.888  13:24:58 [LOG] RLY xA1E5217A ! H00 q=gwcap prio=0 slot=-1
+2026-09-18T13:24:59.888  13:24:59 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:24:59.888  [GPS ]...position  : lat:48.407587 lon:11.738199 alt:487.8
+2026-09-18T13:25:02.946  13:25:02 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:02.947  [GPS ]...position  : lat:48.407586 lon:11.738195 alt:487.9
+2026-09-18T13:25:03.148  [GW];keep;tx;ok;1;ms;60003
+2026-09-18T13:25:03.148  [GW];rx;type;BEAT;len;19;ms;60031
+2026-09-18T13:25:06.002  13:25:05 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:06.002  [GPS ]...position  : lat:48.407587 lon:11.738190 alt:487.1
+2026-09-18T13:25:06.002  [readBatteryVoltage] 13:25:05 ... 3.71 V 26 % max_batt 4.200 V
+2026-09-18T13:25:06.617  13:25:05 [LOG] 103 @ xB105A936 H00 S1 T0 M01 HB3XTK-2,HB3XTK-12,DB0MMR-12,DD7MH-55,DL2JA-2>H@R2;6,63,13;7,101,-13;10,80,6;16,121,-19; HW:09 MOD:8/8 FCS:1685 FW:35:o LH:AB RSSI:-127 SNR:-18 DUP:n OWN:- t=63476
+2026-09-18T13:25:06.617  13:25:05 [LOG] GWU xB105A936 @ H00 t=63488
+2026-09-18T13:25:06.617  [MESH]...<false>...Payload<R2;6,63,13;7,101,-13;10,80,6;16,121,-19;1,127,-18;>
+2026-09-18T13:25:06.617  13:25:05 MESH    : <no via info>return MESH=false
+2026-09-18T13:25:06.617  13:25:05 [LOG] RLY xB105A936 @ H00 q=nomesh prio=0 slot=-1
+2026-09-18T13:25:08.662  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;38;got_ip_n;2;ip;1;ms;65626
+2026-09-18T13:25:09.070  13:25:08 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:09.070  [GPS ]...position  : lat:48.407587 lon:11.738183 alt:485.9
+2026-09-18T13:25:11.920  13:25:11 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:12.123  [GPS ]...position  : lat:48.407585 lon:11.738189 alt:485.1
+2026-09-18T13:25:14.974  13:25:14 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:14.974  [GPS ]...position  : lat:48.407586 lon:11.738188 alt:484.7
+2026-09-18T13:25:18.034  13:25:17 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:18.034  [GPS ]...position  : lat:48.407589 lon:11.738189 alt:483.7
+2026-09-18T13:25:21.084  13:25:20 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:21.084  [GPS ]...position  : lat:48.407590 lon:11.738195 alt:482.7
+2026-09-18T13:25:21.622  ### verdict OK for wait
+2026-09-18T13:25:21.622  ### sent: --gateway off
+2026-09-18T13:25:22.098  --gateway off
+2026-09-18T13:25:24.139  13:25:23 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:24.139  [GPS ]...position  : lat:48.407591 lon:11.738198 alt:481.6
+2026-09-18T13:25:27.189  13:25:26 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:27.190  [GPS ]...position  : lat:48.407593 lon:11.738204 alt:480.8
+2026-09-18T13:25:27.952  ### verdict OK for probe:--gateway off
+2026-09-18T13:25:27.953  ### sent: --info
+2026-09-18T13:25:28.203  --info
+2026-09-18T13:25:28.203  --MeshCom 4.35t (build: Sep 18 2026 / 10:16:58)
+2026-09-18T13:25:28.203  ...UPDATE: 2026-09-18 13:23:50
+2026-09-18T13:25:28.203  ...Call: <DK5EN-1> ...ID 433A8968 ...NODE 43 <HELTEC_V3> ...UTC-OFF 2.000000 [GPS]
+2026-09-18T13:25:28.203  ...BATT 3.71 V ...BATT 26 % ...MAXV 4.200 V
+2026-09-18T13:25:28.203  ...TIME 85107 ms
+2026-09-18T13:25:28.203  ...Flash-Version 20260724
+2026-09-18T13:25:28.203  ...NOMSGALL off ...MESH off ...BUTTON (1) off ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T13:25:28.203  ...PASSWD <>
+2026-09-18T13:25:28.203  ...DEBUG man ...DEBUG de
+2026-09-18T13:25:28.203  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T13:25:28.203  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T13:25:28.203  ...DisplayInfo off ...DisplayCont on ...DisplyLog on ...contrast 1 ...ackinfo off
+2026-09-18T13:25:28.203  ...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T13:25:28.203  ...BTCODE 000000
+2026-09-18T13:25:28.203  ...APRSMC: APRSMC
+2026-09-18T13:25:28.203  ...ATXT: abc
+2026-09-18T13:25:28.203  ...NAME: abc
+2026-09-18T13:25:28.203  ...BLE : long
+2026-09-18T13:25:28.203  ...DISPLAY on
+2026-09-18T13:25:28.203  ...CTRY EU8
+2026-09-18T13:25:28.203  ...FREQ 433.1750 MHz TXPWR 1 dBm RXBOOST on
+2026-09-18T13:25:28.203  ...MAXHOP text 2 / pos 2
+2026-09-18T13:25:28.203  
+2026-09-18T13:25:28.203  ...BATTERY PIN 1 factor 0.0000
+2026-09-18T13:25:28.203  
+2026-09-18T13:25:28.203  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T13:25:28.203  ...NETConsole on (port 2323)
+2026-09-18T13:25:28.203  ...WIFI-AP    off
+2026-09-18T13:25:28.203  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T13:25:28.203  ...NETWORK Mode:WiFi
+2026-09-18T13:25:28.203  ...hasIpAddress: yes
+2026-09-18T13:25:28.203  ...IP address   : 192.168.68.71
+2026-09-18T13:25:28.203  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T13:25:28.203  ...GW address   : 192.168.68.1
+2026-09-18T13:25:28.203  ...DNS address  : 217.237.150.188
+2026-09-18T13:25:28.203  ...UDP-HBeat : 25198
+2026-09-18T13:25:30.045  13:25:29 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:30.045  [GPS ]...position  : lat:48.407596 lon:11.738220 alt:479.0
+2026-09-18T13:25:33.090  13:25:32 [POSINFO]...Stationary -> Suppressing drift (Rate: 1800s)
+2026-09-18T13:25:33.090  [GPS ]...position  : lat:48.407599 lon:11.738240 alt:477.3
+2026-09-18T13:25:34.125  ### verdict OK for probe:--info

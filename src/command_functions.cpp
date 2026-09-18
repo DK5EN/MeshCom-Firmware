@@ -1997,7 +1997,15 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"onewire gpio ") == 0)
     {
-        sscanf(msg_text+15, "%d", &meshcom_settings.node_owgpio);
+        CmdSetResult setres = cmdStoreInt(msg_text+15, &meshcom_settings.node_owgpio, 0.0, 99.0, &iVar);
+
+        if(setres == CMD_SET_NAN) { cmdArgNotNumber("onewire gpio", msg_text+15); return; }
+
+        if(setres == CMD_SET_RANGE)
+        {
+            printfdeb("onewire gpio %i out of range (0..99), ignored\n", iVar);
+            return;
+        }
 
         // Pin 2 is used for powering peripherals on RAK4630
         #ifdef BOARD_RAK4630

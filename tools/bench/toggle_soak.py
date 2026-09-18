@@ -33,7 +33,7 @@ import time
 
 import serial  # pyserial
 
-RESET_RE = re.compile(r"RESET_REASON=|rst:0x|CLIENT SETUP|\[BOOT\] RESET")
+RESET_RE = re.compile(r"RESET_REASON=|RESETREAS=|rst:0x|CLIENT SETUP|\[BOOT\] RESET")
 CRASH_RE = re.compile(
     r"Guru Meditation|abort\(\) was called|Backtrace:|Task watchdog|TWDT|"
     r"assert failed|Interrupt wdt|Stack canary|StackOverflow|Cache disabled|"
@@ -179,7 +179,7 @@ def main() -> int:
             time.sleep(3)
         else:
             verdict = "OK"
-        reason = next((l for l in lines if "RESET_REASON" in l), "")
+        reason = next((l for l in lines if "RESET_REASON" in l or "RESETREAS" in l), "")
         rows.append((body, expect_reboot, verdict, len(lines), round(time.time() - t0, 1), reason, evidence[:6]))
         ses.mark(f"### verdict {verdict} for {body}")
 

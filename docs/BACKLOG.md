@@ -7277,8 +7277,8 @@ DK5EN-14 instrument image, KEYLOCK off; DK5EN-90 in the serial-DFU bootloader
 | `D1-10` cadence | Heltec-93 | battery reads at 0.0, 28.5, 58.5, 88.5, 118.5 s: 30 s exact, first fire on pass 1 as before                                                                                                                                                                           |
 | `ETH-02`        | RAK-90    | hardware confirmation still owed (needs the RAK back and a boot without DHCP)                                                                                                                                                                                         |
 
-**`H6-01` (open, medium): a malformed datagram on UDP 1990 now takes the WiFi
-radio down and the node reboots.** New against G1. The corpus tail
+**`H6-01` (fixed 2026-09-18, see below): a malformed datagram on UDP 1990 took the WiFi
+radio down and the node rebooted.** New against G1. The corpus tail
 (`3x-m0x`, e.g. a 91-byte bad GATE) hits the `DR-20` path W6 introduced
 (`getMeshComUDP()` acts on the handler's failure status and calls
 `resetMeshComUDP()`), which does `WiFi.disconnect(true,true)` + `WIFI_OFF`;
@@ -7291,6 +7291,29 @@ candidate; no radio-init site fits). Evidence:
 `test/golden/hw/G2/heltec-93/udp/serial-raw.txt` lines 138-186. Needs a repro
 with the reset site instrumented, then a decision whether a rejected datagram
 deserves more than a counter.
+
+**Fix 2026-09-18:** `getMeshComUDP()` (`src/udp_functions.cpp`) re-arms only
+the UDP socket (`Udp.stop()` + `Udp.begin(LOCAL_PORT)`, TX error counter
+cleared) when `WiFi.status()==WL_CONNECTED`; `resetMeshComUDP()` stays for
+the heartbeat paths that already require WiFi to be down. Repro on the
+shipping build with `tools/bench/udp_inject.py` and corpus `33-m03`: before =
+`[WIFI];event;disconnected;reason;8` + `timeout when WiFi un-init` (no reboot
+in that run, the G2 reboot is the non-deterministic tail); after =
+`[WIFI-DBG] too-many-zeros: UDP socket re-armed, WiFi kept` and the server
+BEAT keeps arriving through four injected datagrams. Evidence
+`test/golden/hw/G2/heltec-93/udp/h6-01-fix/`. Any LAN host can reach the
+socket (the datagram came from the Mac while `--srvip` was the OE server).
+
+**`CJ-01` (open, medium, found 2026-09-18): two `config_json.h` bounds reject a
+normal node's own export.** `node_postime` is bounded 0..1440 (:293) but the
+setter stores seconds with a 300 s floor and the default is 1800 s;
+`node_gpsdebug` is bounded 0..2 (:330) but level 3 is the live raw-NMEA mode
+(`gps_functions.cpp:299`). `config_json.cpp:451-514` rejects the whole file on
+the first out-of-range value (`CFG_IMP_EVALUE`), nothing is clamped or
+partially applied, so a node that ever set `--postime 1800` or `--gpsdebug 3`
+cannot restore its own backup. `test_config_json.cpp:109` uses 30 and hides
+it. Fix: postime bound in seconds (0..86400), gpsdebug 0..3, and a round-trip
+test with 1800 and 3; then clamp the two serial setters to the same bounds.
 
 **Trap 1: `pio run -t upload` autodetects the T-Deck.** Every "Heltec" upload
 of the evening (four, all `SUCCESS`, hashes verified) landed on DK5EN-14:

@@ -36,8 +36,9 @@ counters, ETH-02b fixed in code (proof owed), H8 on the RAK still not captured -
 2. **T-Deck by-eye checklist** (four items, `test/golden/hw/G2/t-deck-14/ui/README.md`),
    DR-28's most-recent-first MHeard order among them. The node runs the instrument image,
    KEYLOCK off; reflash stock `t_deck_plus` with `--upload-port /dev/cu.usbmodem1101` after.
-3. **`H6-01`** (BACKLOG §3.8ay): a rejected UDP-1990 datagram now resets the WiFi radio and
-   the node reboots. Not fixed; needs the reset site instrumented first.
+3. **`H6-01`** (BACKLOG §3.8ay): **fixed 2026-09-18** -- a rejected UDP-1990 datagram now
+   re-arms the socket only, WiFi stays up; bench before/after in
+   `test/golden/hw/G2/heltec-93/udp/h6-01-fix/`.
 4. `vision-master-e290`: `ENABLE_MCU811` typo, delete or enable the sensor.
 
 **Two bench rules learned the hard way tonight** (also in memory): `pio run -t upload`
