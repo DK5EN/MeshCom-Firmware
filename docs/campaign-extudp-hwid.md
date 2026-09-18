@@ -26,13 +26,13 @@ Resume point for the wave campaign started 2026-09-18. Handover:
 
 ## Waves
 
-| Wave | Owner | Files | Status |
-| ---- | ----- | ----- | ------ |
-| 0 | orchestrator | merge upstream, scout, golden capture, this doc | DONE |
-| 1 | implementer A | `src/extern_msg_json.h` (new), `test/test_extern_msg_json/` (new), `platformio.ini` env:native filter line | DONE |
-| 1 gate | orchestrator | `src/extudp_functions.cpp` (0x3A -> helper, 0x21 + two keys), native suites (835/835, 13 envs), clean Heltec + RAK builds, ELF string scan, advisor (REWORK: buffer 500->700, air bound 636 B), commit | DONE |
-| 2 | orchestrator, hardware | bench DK5EN-93 PASS (`docs/bench-extudp-regression.md` §9); DK5EN-98 OTA to build Sep 18 22:11 done; mcapp.local row for an unsubscribed group | bench DONE, popover row open |
-| 3 | orchestrator | client wire doc, release-notes, BACKLOG, close this doc | open |
+| Wave   | Owner                  | Files                                                                                                                                                                                                  | Status                                                                                  |
+| ------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| 0      | orchestrator           | merge upstream, scout, golden capture, this doc                                                                                                                                                        | DONE                                                                                    |
+| 1      | implementer A          | `src/extern_msg_json.h` (new), `test/test_extern_msg_json/` (new), `platformio.ini` env:native filter line                                                                                             | DONE                                                                                    |
+| 1 gate | orchestrator           | `src/extudp_functions.cpp` (0x3A -> helper, 0x21 + two keys), native suites (835/835, 13 envs), clean Heltec + RAK builds, ELF string scan, advisor (REWORK: buffer 500->700, air bound 636 B), commit | DONE                                                                                    |
+| 2      | orchestrator, hardware | bench DK5EN-93 PASS (`docs/bench-extudp-regression.md` §9); DK5EN-98 OTA to build Sep 18 22:11 done; mcapp.local row for an unsubscribed group                                                         | DONE: mcapp.local row DO2QG-1 -> 20, 20:16 UTC, lora-only, 43/8/2 from the UDP datagram |
+| 3      | orchestrator           | `docs/client-integration-extudp-originator-keys.md`, CHANGELOG 225, BACKLOG 3.8ak; release.md/release-notes.md are written at release time                                                             | DONE                                                                                    |
 
 ## Gate facts (wave 1)
 
@@ -43,3 +43,5 @@ Resume point for the wave campaign started 2026-09-18. Handover:
   (+104 B vs the 500 buffer) / Flash 696920 B.
 - mcapp.local "before" evidence: 2026-09-18 20:01:13 UTC, DL1UDO-12 -> 26299, src_type lora,
   hw_id/lora_mod/max_hop NULL. DK5EN-98 flashed 20:13 UTC.
+
+## Status: CLOSED 2026-09-18. Nothing open on the firmware side.

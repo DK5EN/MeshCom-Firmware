@@ -400,11 +400,11 @@ and the 530-byte worst case pinned in `test/test_extern_msg_json` (env `native`)
 Bench, DK5EN-93 (configured as `DK5EN-1`, mesh off, gateway off, `--extudp on` to the Mac),
 instrumented build Sep 18 2026 22:05, `tools/bench/extudp_peer.py --listen` on 1799:
 
-| Case | Frame | Expected | Datagram |
-| --- | --- | --- | --- |
-| received text | corpus `f006` (DK5EN-98 -> 9999, epilogue `hw 0x2B mod 0x88`, hop nibble 4) via `--injectraw`, msg id rewritten, FCS recomputed | `hw_id 43`, `lora_mod 8` (0x88 masked), `max_hop 4` | see below, 211 B |
-| received position (positive control, on air) | DC2MAC-1 via DL2JA-2 | keys present with the originator's values | `"hw_id":12,...,"lora_mod":8,"max_hop":1`, 292 B |
-| own text | `::{9}after hw_id` | `hw_id` = BOARD_HARDWARE (43, HELTEC_V3), `max_hop` = `--maxhoptext` | `"hw_id":43,"lora_mod":8,"max_hop":2`, 182 B |
+| Case                                         | Frame                                                                                                                           | Expected                                                             | Datagram                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| received text                                | corpus `f006` (DK5EN-98 -> 9999, epilogue `hw 0x2B mod 0x88`, hop nibble 4) via `--injectraw`, msg id rewritten, FCS recomputed | `hw_id 43`, `lora_mod 8` (0x88 masked), `max_hop 4`                  | see below, 211 B                                 |
+| received position (positive control, on air) | DC2MAC-1 via DL2JA-2                                                                                                            | keys present with the originator's values                            | `"hw_id":12,...,"lora_mod":8,"max_hop":1`, 292 B |
+| own text                                     | `::{9}after hw_id`                                                                                                              | `hw_id` = BOARD_HARDWARE (43, HELTEC_V3), `max_hop` = `--maxhoptext` | `"hw_id":43,"lora_mod":8,"max_hop":2`, 182 B     |
 
 Received text datagram, byte-exact as captured by the peer:
 

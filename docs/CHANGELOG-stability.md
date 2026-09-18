@@ -205,6 +205,37 @@ upstream `dev` as [PR #1140](https://github.com/icssw-org/MeshCom-Firmware/pull/
      `.2` so the two names cannot be confused or clobber each other on a
      fetch. `FLASH_VERSION` 20260912, `FLASH_STRUCT_VERSION` unchanged.
 
+222. **Extern-UDP text datagrams carry the originator's hardware id, modulation
+     and hop budget** (fork-only, `6cdfe4f0`, 2026-09-18). A group message the node
+     is not subscribed to, or a DM between two other stations heard on RF, reaches
+     McApp only over Extern-UDP -- the node pushes nothing over BLE for it
+     (`CheckOwnGroup()` gate, `src/lora_functions.cpp`) -- and that `msg` datagram
+     ended at `snr`. The popover therefore showed no Hardware and no Max hops row
+     (mcapp.local, 2026-09-16, DL1UDO-12 -> 26299). The node knows the values on
+     the text path exactly as on the position path (`msg_source_hw`,
+     `msg_source_mod`, `max_hop`, parsed from the frame epilogue); they were
+     simply never serialized. The `msg` shape now appends `hw_id`, `lora_mod`
+     (modulation nibble only) and `max_hop` after its old keys, in the old order,
+     and the `pos` shape gains `lora_mod` and `max_hop` next to its existing
+     `hw_id`. The builder moved into `src/extern_msg_json.h` so the contract is
+     host-tested (`test/test_extern_msg_json`, 6 cases: key order, mask, the
+     node/lora firmware asymmetry, the byte-exact pre-change prefix, two buffer
+     budgets). The advisor pass caught the real budget: the 150-character limit
+     is what a peer may send _into_ the node, while a frame off the air is
+     bounded by `encodeAPRS()` at 239 bytes of `src>dst:payload`, and a short
+     source with a payload of quote characters serializes to 636 bytes -- the
+     former 500-byte `c_json` would have truncated it (and was 8 bytes short of
+     the 150-character case with the new keys). The buffer is
+     `EXTERN_MSG_JSON_BUF` = 700 now (+100 B ESP32 loop-task stack, +100 B nRF52
+     BSS). No proxy change: MCProxy reads the three keys straight from the UDP
+     dict (`storage/ingest.py`), and an older node simply keeps omitting them.
+     Bench DK5EN-93 (`docs/bench-extudp-regression.md` section 9): injected
+     corpus text frame -> `hw_id 43, lora_mod 8, max_hop 4`; on-air position from
+     DC2MAC-1 -> `12, 8, 1`; own text -> `43, 8, 2`. DK5EN-98 flashed over OTA;
+     the first lora-only text row on mcapp.local afterwards (DO2QG-1 via four
+     hops -> group 20, 20:16 UTC) stores `hw_id 43, lora_mod 8, max_hop 2` from
+     the UDP datagram. Client notes: `docs/client-integration-extudp-originator-keys.md`.
+
 ## New in v4.35t.09.10
 
 One change on top of `v4.35s.09.09`, item 211: the fork is brought level with

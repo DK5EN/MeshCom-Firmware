@@ -4104,6 +4104,25 @@ still advertised the command. Only SYM+M muted, and it did not save.
 the commands expected present **and** absent. `.claude/commands/release-firmware.md` now carries
 the T-Deck scan line next to the safeboot check.
 
+### 3.8ak Extern-UDP: originator `hw_id` / `lora_mod` / `max_hop` on text frames — 2026-09-18
+
+**Ausgangspunkt:** McApp-Popover ohne `Hardware`/`Max hops` fuer jede Nachricht, die den Proxy
+nur ueber Extern-UDP erreicht (fremde Gruppe, fremde DM auf RF). Handover
+`docs/2026-09-16_firmware-extudp-hw-id-on-text-frames.md`, Kampagne `docs/campaign-extudp-hwid.md`.
+
+**Was geliefert wurde** (`6cdfe4f0`, Changelog 225): `src/extern_msg_json.h` baut das
+`msg`-Datagramm (alte Schluessel in alter Reihenfolge, dann `hw_id`, `lora_mod` = Nibble,
+`max_hop`); `pos` bekommt `lora_mod`/`max_hop` neben dem vorhandenen `hw_id`. `c_json` in
+`sendExtern()` von 500 auf `EXTERN_MSG_JSON_BUF` 700, weil der laengste legale Frame von der
+Luft (encodeAPRS 239 B, Payload aus Anfuehrungszeichen) 636 B JSON ergibt. Host-Tests
+`test/test_extern_msg_json` (6), Bench DK5EN-93 (`docs/bench-extudp-regression.md` §9),
+DK5EN-98 per OTA geflasht, erste lora-only Zeile auf mcapp.local traegt die drei Werte.
+
+**Offen:** nichts firmwareseitig. mc-chat hat keinen Extern-UDP-Emitter (Paritaet gegenstandslos);
+MCProxy liest die Schluessel bereits (`storage/ingest.py`). Beobachtung am Rande: `[EXT]...now
+sending to IP ` druckt im hostByName-Zweig einen leeren String (`str_ip` wird nur im
+else-Zweig gesetzt) -- kosmetisch, `apip` ist korrekt.
+
 ## 4. State of the repository
 
 ### 4.1 Branch model (decided 2026-08-29, branch renamed 2026-09-03)
