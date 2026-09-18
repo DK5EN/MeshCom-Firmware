@@ -384,3 +384,41 @@ boundary and transport-size cases:
 The three `PT-01` findings that were pinned here are fixed as of 2026-08-30 and their cases are real assertions now (the
 `"none"` sentinel collision, the silent truncation at combined maximum lengths,
 and the embedded-NUL truncation) — they are documented behaviour, not fixed here.
+
+---
+
+## 9. Originator `hw_id` / `lora_mod` / `max_hop` on `msg` and `pos` datagrams (2026-09-18)
+
+Why: a text message the node is not subscribed to (foreign group, third-party DM) reaches
+McApp only over Extern-UDP, and that datagram carried no hardware id, so the popover showed
+no `Hardware` / `Max hops` row (handover
+`docs/2026-09-16_firmware-extudp-hw-id-on-text-frames.md`). The `msg` shape now appends
+`hw_id`, `lora_mod` (modulation nibble only), `max_hop`; the `pos` shape gains `lora_mod`
+and `max_hop` next to its existing `hw_id`. Built in `src/extern_msg_json.h`, key contract
+and the 530-byte worst case pinned in `test/test_extern_msg_json` (env `native`).
+
+Bench, DK5EN-93 (configured as `DK5EN-1`, mesh off, gateway off, `--extudp on` to the Mac),
+instrumented build Sep 18 2026 22:05, `tools/bench/extudp_peer.py --listen` on 1799:
+
+| Case | Frame | Expected | Datagram |
+| --- | --- | --- | --- |
+| received text | corpus `f006` (DK5EN-98 -> 9999, epilogue `hw 0x2B mod 0x88`, hop nibble 4) via `--injectraw`, msg id rewritten, FCS recomputed | `hw_id 43`, `lora_mod 8` (0x88 masked), `max_hop 4` | see below, 211 B |
+| received position (positive control, on air) | DC2MAC-1 via DL2JA-2 | keys present with the originator's values | `"hw_id":12,...,"lora_mod":8,"max_hop":1`, 292 B |
+| own text | `::{9}after hw_id` | `hw_id` = BOARD_HARDWARE (43, HELTEC_V3), `max_hop` = `--maxhoptext` | `"hw_id":43,"lora_mod":8,"max_hop":2`, 182 B |
+
+Received text datagram, byte-exact as captured by the peer:
+
+```
+{"src_type":"lora","type":"msg","src":"DK5EN-98","dst":"9999","msg":"Korpus-Testframe via MCProxy DK5EN-98","msg_id":"EEFFC09A","firmware":35,"fw_sub":"p","rssi":-50,"snr":10,"hw_id":43,"lora_mod":8,"max_hop":4}
+```
+
+The pre-change datagram for the own-text case, same node, build Sep 18 2026 13:24, for the
+byte-for-byte prefix comparison (`test_golden_before_prefix` pins it natively):
+
+```
+{"src_type":"node","type":"msg","src":"DK5EN-1","dst":"9","msg":"golden before hw_id","msg_id":"EA25A384","firmware":"4.35","fw_sub":"t","rssi":0,"snr":0}
+```
+
+Recipe (memory `injectraw-extudp-bench-recipe`): craft the frame from a corpus line with an
+own callsign only, rewrite bytes 1-4 (msg id) so the dedup ring does not swallow it, FCS = byte
+sum of everything before it, inject after `[BOOT];ready`, never with mesh or gateway on.

@@ -7,6 +7,7 @@
 #include "ArduinoJson.h"
 #include "extern_notice_json.h"
 #include "extern_tele_json.h"
+#include "extern_msg_json.h"
 #include "mcp17_bits.h"
 
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
@@ -467,14 +468,14 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     return;
   }
 
-  // ESP32 Loop-Task-Stack = 8 KB → 1000 B auf Stack ok.
+  // ESP32 Loop-Task-Stack = 8 KB → 1200 B (EXTERN_MSG_JSON_BUF + 500) auf Stack ok.
   // nRF52 Loop-Task-Stack = 4 KB → BSS, sonst Stack-Overflow Crash bei
   // sendPosition → sendExtern (siehe Commit 1951aa7d, fix RAK4631).
 #ifdef ESP32
-  char c_json[500] = {0};
+  char c_json[EXTERN_MSG_JSON_BUF] = {0};
   char c_tjson[500] = {0};
 #else
-  static char c_json[500];
+  static char c_json[EXTERN_MSG_JSON_BUF];
   static char c_tjson[500];
   memset(c_json, 0, sizeof(c_json));
   memset(c_tjson, 0, sizeof(c_tjson));
@@ -540,6 +541,11 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     cJson["hw_id"] = aprsmsg.msg_source_hw;
     cJson["msg_id"] = _msgId;
     cJson["alt"] = aprspos.alt;
+    // Same three originator/hop keys as the "msg" shape (extern_msg_json.h);
+    // hw_id was already here, lora_mod (modulation nibble only) and max_hop
+    // are appended so both datagram types carry one contract.
+    cJson["lora_mod"] = aprsmsg.msg_source_mod & 0x0F;
+    cJson["max_hop"] = aprsmsg.max_hop;
     
     // add firmware version if not a node
     if(strcmp(src_type, "node") == 0)
@@ -628,36 +634,22 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     // no telemetry
     if(aprsmsg.msg_destination_path != "100001")
     {
-      JsonDocument cJson;
-
-      // build the json with Arduino JSON
-      cJson["src_type"] = src_type;
-      cJson["type"] = "msg";
-      cJson["src"] = aprsmsg.msg_source_path.c_str();
-      cJson["dst"] = aprsmsg.msg_destination_path.c_str();
-      // JSN-01: assign raw -- ArduinoJson escapes JSON strings on
-      // serializeJson() already; a separate escaper here double-escaped.
-      cJson["msg"] = aprsmsg.msg_payload.c_str();
-      cJson["msg_id"] = _msgId;
-      
-      // add firmware version if not a node
-      if(strcmp(src_type, "node") == 0)
-      {
-        cJson["firmware"] = SOURCE_VERSION;
-      }
-      else
-      {
-        cJson["firmware"] = aprsmsg.msg_source_fw_version;
-      }
-
-      cJson["fw_sub"] = c_fw_sub;
-      cJson["rssi"] = rssi;
-      cJson["snr"] = snr;
-
-      // clear the buffer
+      // Built in extern_msg_json.h (native-tested key contract, incl. the
+      // originator hw_id/lora_mod and this copy's max_hop). "node" sends the
+      // firmware as the SOURCE_VERSION string, "lora" as the integer the
+      // originator put in the epilogue -- the helper keeps that asymmetry.
+      // JSN-01: bound by the buffer, not by measureJson(); the buffer is
+      // EXTERN_MSG_JSON_BUF because the worst frame off the air measures ~640 B (see the header).
       memset(c_json, 0x00, sizeof(c_json));
-      // JSN-01: bound by the buffer, not by measureJson().
-      serializeJson(cJson, c_json, sizeof(c_json));
+      externMsgJson(c_json, sizeof(c_json), src_type,
+                    aprsmsg.msg_source_path.c_str(),
+                    aprsmsg.msg_destination_path.c_str(),
+                    aprsmsg.msg_payload.c_str(), _msgId,
+                    (strcmp(src_type, "node") == 0) ? SOURCE_VERSION : nullptr,
+                    aprsmsg.msg_source_fw_version, c_fw_sub,
+                    rssi, snr,
+                    aprsmsg.msg_source_hw, aprsmsg.msg_source_mod,
+                    aprsmsg.max_hop);
 
       }
   }
@@ -805,7 +797,7 @@ void sendExternNotice(const char *text, const char *dst)
   // callsign/dst that left only 21 bytes of headroom at 300 -- see the
   // length budget table in docs/bp-l1-l4-impl-plan.md. Same N-22 pattern as
   // sendExtern() directly above: ESP32 stack (8 KB loop-task stack, already
-  // carries 2x500 there), nRF52 static BSS (4 KB loop-task stack).
+  // carries 700+500 there), nRF52 static BSS (4 KB loop-task stack).
 #ifdef ESP32
   char c_json[400] = {0};
 #else
