@@ -4119,9 +4119,10 @@ Luft (encodeAPRS 239 B, Payload aus Anfuehrungszeichen) 636 B JSON ergibt. Host-
 DK5EN-98 per OTA geflasht, erste lora-only Zeile auf mcapp.local traegt die drei Werte.
 
 **Offen:** nichts firmwareseitig. mc-chat hat keinen Extern-UDP-Emitter (Paritaet gegenstandslos);
-MCProxy liest die Schluessel bereits (`storage/ingest.py`). Beobachtung am Rande: `[EXT]...now
-sending to IP ` druckt im hostByName-Zweig einen leeren String (`str_ip` wird nur im
-else-Zweig gesetzt) -- kosmetisch, `apip` ist korrekt.
+MCProxy liest die Schluessel bereits (`storage/ingest.py`). Die Bootzeile `[EXT]...now sending to IP `
+druckte im hostByName-Zweig einen leeren String (`str_ip` nur im else-Zweig gesetzt);
+behoben im Folge-Commit, auf DK5EN-93 geprueft (nRF52 `IPAddress` hat kein `toString()`,
+daher im ESP32-Zweig gesetzt).
 
 ## 4. State of the repository
 
