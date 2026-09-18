@@ -16,6 +16,12 @@ this branch.
 | 5    | `E1` G2 on `e64ce346`                                         | `e303127c`. H4 identical, H6 done as scoped + finding **H6-01**, H11 automated PASS, cadence 30 s exact. BACKLOG §3.8ay |
 | --   | `E3`                                                          | dropped by decision                                                                                                     |
 
+**2026-09-18 10:30, toggle soak on Heltec-93 / T-Deck-14:** operator-reported reboots on
+toggling not reproduced over serial, web GUI or BLE (120 s soak each); the wrong temperature
+was `BME280 off` + a 999999 offset from the golden corpus. Fix: `--tempoff in|out` and the web
+`tempoffset*` params clamp to -50..50, proven on the Heltec. See
+`docs/toggle-soak-20260918.md`. Run `backup_nodes.py --restore` before the next capture.
+
 **2026-09-18 08:05, RAK update:** ETH-03 **PASS on hardware**, ETH-02 confirmed by
 counters, ETH-02b fixed in code (proof owed), H8 on the RAK still not captured -- see
 `docs/handover-rak-h8-20260918.md` for the exact state and the recipe.

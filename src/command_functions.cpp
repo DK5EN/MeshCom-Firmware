@@ -2818,12 +2818,15 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"tempoff in ") == 0)
     {
-        bArgOk = cmdArgFloat(msg_text+13, &fVar);
+        CmdSetResult setres = cmdStoreFloat(msg_text+13, &meshcom_settings.node_tempi_off, -50.0, 50.0, &fVar);
 
-        if(!bArgOk) { cmdArgNotNumber("tempoff in", msg_text+13); return; }
+        if(setres == CMD_SET_NAN) { cmdArgNotNumber("tempoff in", msg_text+13); return; }
 
-
-        meshcom_settings.node_tempi_off=fVar;
+        if(setres == CMD_SET_RANGE)
+        {
+            printfdeb("tempoff in %.1f out of range (-50..50 °C), ignored\n", fVar);
+            return;
+        }
 
         save_settings();
 
@@ -2837,12 +2840,15 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"tempoff out ") == 0)
     {
-        bArgOk = cmdArgFloat(msg_text+14, &fVar);
+        CmdSetResult setres = cmdStoreFloat(msg_text+14, &meshcom_settings.node_tempo_off, -50.0, 50.0, &fVar);
 
-        if(!bArgOk) { cmdArgNotNumber("tempoff out", msg_text+14); return; }
+        if(setres == CMD_SET_NAN) { cmdArgNotNumber("tempoff out", msg_text+14); return; }
 
-
-        meshcom_settings.node_tempo_off=fVar;
+        if(setres == CMD_SET_RANGE)
+        {
+            printfdeb("tempoff out %.1f out of range (-50..50 °C), ignored\n", fVar);
+            return;
+        }
 
         save_settings();
 

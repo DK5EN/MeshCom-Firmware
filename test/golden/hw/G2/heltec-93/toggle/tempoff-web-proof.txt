@@ -1,0 +1,4 @@
+out -999 -> {"returncode":1,"tempoffsetoutdoor":"0.00"}
+
+out 0 -> {"returncode":0,"tempoffsetoutdoor":"0.00"}
+
