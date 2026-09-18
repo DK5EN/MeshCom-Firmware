@@ -1355,7 +1355,7 @@
           );
           const totalWd = wdBetween(start, endInternal);
           const sign = rows.find((r) => r.id === "M2");
-          const submit = rows.find((r) => r.id === "E3"); // E4 gestrichen, Entscheidung 6
+          const submit = rows.find((r) => r.id === "E1"); // E3 gestrichen (Entscheidung 7), E4 (Entscheidung 6)
 
           document.getElementById("kpis").innerHTML = [
             ["Start", fmt(start), "erster Arbeitstag"],
@@ -1363,7 +1363,7 @@
             [
               "Kampagnenende",
               fmt(submit.end),
-              "E3 Resync und Wiederholungslauf; kein PR (Entscheidung 6)",
+              "E1 G2-Nachher-Lauf, erledigt 17.09.2026; kein Resync, kein PR (Entscheidungen 6, 7)",
             ],
             [
               "Arbeitstage",
