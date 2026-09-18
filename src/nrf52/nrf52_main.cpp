@@ -2103,6 +2103,22 @@ void nrf52loop()
                 Serial.printf("[ETH];event;dhcp_acquire_retry;link;1;ms;%lu\n",
                               (unsigned long)millis());
                 neth.resetDHCP();
+                // ETH-02b (bench 2026-09-18, DK5EN-90): when this retry is what
+                // finally gets the lease, nothing re-starts the services --
+                // setup() had started the webserver at boot without an IP, and
+                // the block below only re-runs on its 15-minute web_timer, so
+                // the node sat pingable on .66 with EXTUDP answering (the UDP
+                // socket binds without an IP) and the webserver dead for a
+                // quarter of an hour, --info still saying "hasIpAddress: no"
+                // (that flag is only copied there). Zeroing web_timer makes
+                // the next pass re-run that block: flag copy, webserver and
+                // extern socket start, exactly what a first-try lease gets.
+                if(neth.hasIPaddress)
+                {
+                    Serial.printf("[ETH];event;dhcp_acquired_late;ms;%lu\n",
+                                  (unsigned long)millis());
+                    web_timer = 0;
+                }
             }
             bSPI_ETH_Active = false;
             if(bPendingRadioRx) { bPendingRadioRx = false; startRadioReceive(); }
