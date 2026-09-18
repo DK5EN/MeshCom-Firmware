@@ -102,6 +102,33 @@ vault backup (`test/golden/nodes/heltec-93/settings-base.json`:
 proper tool is `test/golden/backup_nodes.py --restore`, which the G0 README
 requires before every capture and which was not run after the corpus drive.
 
+## T-Beam v1.2 (DK5EN-92), same matrix, 2026-09-18 midday
+
+Port `/dev/cu.usbserial-573C0005841` (CH9102, reboots on open), IP
+192.168.68.76, flashed to the branch image with the fix (build Sep 18 2026
+11:48, `ttgo_tbeam`, esptool at 460800 because 921600 fails on this bridge).
+GPS on, no environmental sensor (`BMP280: off / BME280: off`, correct). The net
+console was off on this node and was switched on for the run (`--netconsole
+on`, no reboot needed).
+
+| run                         | steps                                                                                         | verdict | evidence                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------- |
+| serial toggles + BLE cycles | gain on/off, webserver, display, gateway, mesh, extudp each on/off, 120 s each; 3 BLE cycles  | PASS    | `test/golden/hw/G2/t-beam-92/toggle/toggle-report.md` |
+| web GUI + BLE app path      | `/setparam/` display, gateway, mesh, extudp on/off 120 s each; ten toggles in one BLE session | PASS    | `.../toggle/webble-report.md`                         |
+| ext UDP retest + offset     | `--extudp on/off` serial and web with the ext IP set; `--tempoff in 999999` rejected          | PASS    | `.../toggle/extudp-retest-report.md`                  |
+
+`--setboostedgain` does not exist on this SX1276 board (the rung is compiled
+only for SX126x radios); the node answers `wrong command`, no reboot, which is
+the correct behaviour. Gateway on shows the `[GW];rx;type;BEAT` exchange; the
+only resets in the logs are the `POWERON` from each port open.
+
+The first two runs' ext UDP steps were no-ops: this node had no external IP
+and answers `Please set EXPUDP IP first` (correct). With `--extudpip
+192.168.68.58` set, the BLE session and the retest show the real path
+(`[EXT]...now listening at IP 192.168.68.76, UDP port 1799`, position sent),
+still without a reboot. The net console was switched back off at the end; the
+ext IP stays set.
+
 ## Open
 
 - `QNH` equals `QFE` and `ALT asl: 0` although the GPS has a fix at ~490 m:
