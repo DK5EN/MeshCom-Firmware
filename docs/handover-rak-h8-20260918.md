@@ -22,7 +22,7 @@ up from here without re-reading the session.
 2. **ETH-02 confirmed by its counters.** The first boot today got no lease;
    `[ETH];stat` showed `resets;1` and `got_ip` at 48.8 s -- the 30 s retry from
    BACKLOG §3.8au acquired it.
-3. **ETH-02b found and fixed in code, not yet proven.** After that late lease
+3. **ETH-02b found and fixed in code -- proven on hardware 2026-09-18 21:23, see `test/golden/hw/G2/rak-90/eth02b-README.md`.** After that late lease
    the web server stayed dead and `--info` said `hasIpAddress: no` (services
    are only re-run on the 15-minute `web_timer`; `--info` reads a copy of the
    flag). Fix in `src/nrf52/nrf52_main.cpp` (ETH-02b block: zero `web_timer`

@@ -1,0 +1,115 @@
+2026-09-18T21:22:25.752  ### attached /dev/cu.usbmodem2101 dtr=True
+2026-09-18T21:22:25.752  ### sent: --reboot
+2026-09-18T21:22:26.566  --reboot
+2026-09-18T21:22:29.836  ### serial lost (read failed: [Errno 6] Device not configured)
+2026-09-18T21:22:30.845  ### serial reopened
+2026-09-18T21:22:31.050  =====================================
+2026-09-18T21:22:31.050  [INIT] START CLIENT
+2026-09-18T21:22:31.050  00:00:00;[HEAP];139252;139272;69626;(init)
+2026-09-18T21:22:31.050  [INIT]...initMheard
+2026-09-18T21:22:31.050  [INIT]...init_batt
+2026-09-18T21:22:31.050  [SETST];path;keyed;fields_set=105;unknown_keys=0;malformed_lines=0;lines_total=105
+2026-09-18T21:22:31.660  [SETST];save;ok;bytes=15
+2026-09-18T21:22:31.661  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T21:22:31.661  [SETST];save;encoded;bytes=1471
+2026-09-18T21:22:31.661  [SETST];save;skipped_unchanged;bytes=1471
+2026-09-18T21:22:31.661  [OBUT]...One Button GPIO(10) not activated
+2026-09-18T21:22:31.661  [INIT]...Initialize clock: ok
+2026-09-18T21:22:31.975  ### verdict OK for probe:--reboot
+2026-09-18T21:22:31.976  ### step wait
+2026-09-18T21:22:33.706  =====================================
+2026-09-18T21:22:33.707  GPS: trying 9600 baud
+2026-09-18T21:22:37.161  GPS: trying 38400 baud
+2026-09-18T21:22:40.420  GPS: speed not found
+2026-09-18T21:22:43.070  [INIT]...Adafruit SHTC3 check
+2026-09-18T21:22:43.070  [INIT]...Couldn't find SHTC3
+2026-09-18T21:22:43.070  [INIT]...init helper_string:MC-690d-DK5EN-90
+2026-09-18T21:22:43.070  [INIT]...BLE init
+2026-09-18T21:22:43.070  [INIT]...MCP23017 not found
+2026-09-18T21:22:43.070  [INIT]...INA226 not found
+2026-09-18T21:22:43.070  [INIT]...RTC not found
+2026-09-18T21:22:43.070  [INIT]...Auto detecting display:
+2026-09-18T21:22:43.070  [INIT]...Display not found
+2026-09-18T21:22:43.070  [INIT]...CLIENT STARTED
+2026-09-18T21:22:43.070  [BOOT] RESETREAS=0x00000004
+2026-09-18T21:22:43.070  [INIT]...Radio-Sync: 1424
+2026-09-18T21:22:43.070  [SETST];save;encoded;bytes=1471
+2026-09-18T21:22:43.070  [SETST];save;skipped_unchanged;bytes=1471
+2026-09-18T21:22:43.070  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T21:22:43.070  [LoRa]...RF_SF: 11
+2026-09-18T21:22:43.070  [LoRa]...RF_CR: 4/6
+2026-09-18T21:22:43.070  [LoRa]...RF_FREQUENCY: 433.1750 433175000 MHz
+2026-09-18T21:22:43.070  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T21:22:43.070  [LoRa]...RF_POWER: 22 dBm
+2026-09-18T21:22:43.070  [INIT]...Radio-Sync: 242B
+2026-09-18T21:22:43.070  =====================================
+2026-09-18T21:22:43.479  [ETH];stall;hw_init;ms;200;task;loop
+2026-09-18T21:22:43.479  
+2026-09-18T21:22:43.479  Initialize Ethernet
+2026-09-18T21:22:47.128  Ethernet link OFF - skip DHCP
+2026-09-18T21:22:47.128  [ETH];clear;site;281;rc;2;linkst;2;ip;0.0.0.0;ms;17393
+2026-09-18T21:22:47.128  [BOOT];loopstack;words;2048
+2026-09-18T21:22:47.128  [BOOT];ready;ms;17394;ip;0;eth;1
+2026-09-18T21:22:47.128  00:00:02;[HEAP];104384;104384;52182;(mon)
+2026-09-18T21:22:47.128  [ETH];event;link;down;ip;0;ms;17396
+2026-09-18T21:22:47.128  [ETH];link;down;link;0;link_age_s;0;ip;0.0.0.0;dest;;hb_age_s;0;got_ip_n;0;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;17396
+2026-09-18T21:23:44.963  [ETH];event;link;up;ip;0;ms;75388
+2026-09-18T21:23:47.206  00:00:56;[HEAP];104352;104352;52166;(mon)
+2026-09-18T21:23:47.206  [ETH];link;down;link;1;link_age_s;2;ip;0.0.0.0;dest;;hb_age_s;0;got_ip_n;0;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;77481
+2026-09-18T21:23:47.206  [ETH];event;dhcp_acquire_retry;link;1;ms;77582
+2026-09-18T21:23:47.206  [ETH];event;reset;ms;77582
+2026-09-18T21:23:47.206  
+2026-09-18T21:23:47.206  Initialize Ethernet
+2026-09-18T21:23:47.412  [ETH];stall;dhcp_begin;ms;123;task;mcloop
+2026-09-18T21:23:47.412  Ethernet.localIP(): 192.168.68.66
+2026-09-18T21:23:47.412  
+2026-09-18T21:23:47.412  My IP address: 192.168.68.66
+2026-09-18T21:23:47.412  Default GW address: 192.168.68.1
+2026-09-18T21:23:47.412  DNS address: 217.237.150.188
+2026-09-18T21:23:47.412  SNM: 255.255.252.0
+2026-09-18T21:23:47.412  [ETH];event;got_ip;192.168.68.66;ms;77708
+2026-09-18T21:23:47.412  [GW];srv;OE;host;89.185.97.38;path;inet;ms;77708
+2026-09-18T21:23:47.412  [ETH];event;dhcp_acquired_late;ms;77708
+2026-09-18T21:23:47.615  [NTP];ok;epoch;1789759427;rtt;104
+2026-09-18T21:24:47.129  21:24:46;[HEAP];104228;104228;52154;(mon)
+2026-09-18T21:24:47.129  [ETH];link;up;link;1;link_age_s;62;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;59;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;1;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;137524
+2026-09-18T21:25:47.245  [ETH];link;up;link;1;link_age_s;122;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;119;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;1;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;197604
+2026-09-18T21:26:31.980  ### verdict CRASH for wait
+2026-09-18T21:26:31.982  ### step run: curl -s -o /dev/null -w 'http %{http_code} in %{time_total}s' -m 10 http://192.168.68.66/
+2026-09-18T21:26:33.256  ### run rc=0
+2026-09-18T21:26:33.256  ### run| http 200 in 1.255133s
+2026-09-18T21:26:33.256  ### verdict OK for run:curl -s -o /dev/null -w 'http %{http_code} in %{time_total}s' -m 10 http://192.168.68.66/
+2026-09-18T21:26:33.256  ### sent: --info
+2026-09-18T21:26:34.103  --info
+2026-09-18T21:26:34.103  --MeshCom 4.35t (build: Sep 18 2026 / 10:19:40)
+2026-09-18T21:26:34.103  ...UPDATE: 2026-09-18 21:23:47
+2026-09-18T21:26:34.103  ...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]
+2026-09-18T21:26:34.103  ...BATT 4.26 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T21:26:34.103  ...TIME 244381 ms
+2026-09-18T21:26:34.103  ...Flash-Version 20260724
+2026-09-18T21:26:34.103  ...NOMSGALL off ...MESH off ...BUTTON (10) off ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T21:26:34.103  ...PASSWD <>
+2026-09-18T21:26:34.103  ...DEBUG man ...DEBUG en
+2026-09-18T21:26:34.103  ...DEBUG off ...LORADEBUG off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
+2026-09-18T21:26:34.103  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T21:26:34.103  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T21:26:34.103  ...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T21:26:34.103  ...BTCODE 424242
+2026-09-18T21:26:34.103  ...APRSMC: APRSMC
+2026-09-18T21:26:34.103  ...ATXT: W3-BENCH-RAK90
+2026-09-18T21:26:34.103  ...NAME: Martin-W3
+2026-09-18T21:26:34.103  ...BLE : short
+2026-09-18T21:26:34.103  ...DISPLAY off
+2026-09-18T21:26:34.103  ...CTRY EU8
+2026-09-18T21:26:34.103  ...FREQ 433.1750 MHz TXPWR 22 dBm RXBOOST off
+2026-09-18T21:26:34.103  ...MAXHOP text 4 / pos 2
+2026-09-18T21:26:34.103  
+2026-09-18T21:26:34.103  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T21:26:34.103  ...NETWORK Mode:WiFi
+2026-09-18T21:26:34.103  ...hasIpAddress: yes
+2026-09-18T21:26:34.103  ...IP address   : 192.168.68.66
+2026-09-18T21:26:34.103  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T21:26:34.103  ...GW address   : 192.168.68.1
+2026-09-18T21:26:34.103  ...DNS address  : 217.237.150.188
+2026-09-18T21:26:34.103  ...UDP-HBeat : 244385
+2026-09-18T21:26:39.449  ### verdict OK for probe:--info
