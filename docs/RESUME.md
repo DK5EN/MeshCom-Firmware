@@ -16,6 +16,10 @@ this branch.
 | 5    | `E1` G2 on `e64ce346`                                         | `e303127c`. H4 identical, H6 done as scoped + finding **H6-01**, H11 automated PASS, cadence 30 s exact. BACKLOG §3.8ay |
 | --   | `E3`                                                          | dropped by decision                                                                                                     |
 
+**2026-09-18 08:05, RAK update:** ETH-03 **PASS on hardware**, ETH-02 confirmed by
+counters, ETH-02b fixed in code (proof owed), H8 on the RAK still not captured -- see
+`docs/handover-rak-h8-20260918.md` for the exact state and the recipe.
+
 **Owed to the operator (hardware or eyes):**
 
 1. **DK5EN-90 double-tap**, then `cp ~/Desktop/rak4631-eth03-fix.uf2 /Volumes/RAK4631/`
