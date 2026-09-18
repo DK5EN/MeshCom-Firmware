@@ -1,4 +1,4 @@
-# Toggle soak 2026-09-18: Heltec V3 and T-Deck Plus, no crash reproduced
+# Toggle soak 2026-09-18: four boards, no crash reproduced
 
 Operator report: toggling functions (rx gain boost, webserver, display,
 gateway, mesh, ext UDP) and a 2-minute soak makes the Heltec V3 reboot (boot
@@ -128,6 +128,29 @@ and answers `Please set EXPUDP IP first` (correct). With `--extudpip
 (`[EXT]...now listening at IP 192.168.68.76, UDP port 1799`, position sent),
 still without a reboot. The net console was switched back off at the end; the
 ext IP stays set.
+
+## RAK4631 (DK5EN-90), same matrix, 2026-09-18 afternoon
+
+Port `/dev/cu.usbmodem2101` (native USB, attached with DTR high, no reset on
+open; a real reset re-enumerates the port and the harness reopens it),
+Ethernet IP 192.168.68.66, flashed to the branch image via serial DFU (build
+Sep 18 2026 10:19, `wiscore_rak4631`). No net console on nRF52, so the serial
+capture is the only witness. BLE with the node's PIN (hashed hello).
+
+| run                                 | steps                                                                                                                                                                                    | verdict                  | evidence                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------- |
+| serial + web GUI + BLE, one session | gain on/off (`!`), webserver, display, gateway, mesh, extudp; `/setparam/` display, gateway, mesh, extudp; 3 BLE cycles; ten toggles in one 20-min BLE connection; `--tempoff in 999999` | PASS (2 expected resets) | `test/golden/hw/G2/rak-90/toggle/toggle-report.md` |
+
+`--setboostedgain` resets the nRF52 5 s later as designed
+(`RESETREAS=0x00000004`, soft request). Gateway on shows the server BEAT
+exchange over Ethernet; ext UDP on/off (the ETH-03 path) stays up; the offset
+clamp answers on this platform too (`%.1f` renders on nano printf). Ext UDP
+left off as the handover asked.
+
+**On four boards** (Heltec V3, T-Deck Plus, T-Beam v1.2, RAK4631) with the
+branch image: no toggle over serial, web GUI or BLE app path rebooted a node,
+and BLE attach/detach is clean; the only resets are the documented
+`--setboostedgain` restarts on SX126x boards.
 
 ## Follow-up fixes 2026-09-18 afternoon
 
