@@ -4175,7 +4175,8 @@ Two plan rows were wrong and are corrected in place rather than quietly
 followed: `C3` said "no carve needed, build only" -- the obstacle was never
 `Serial` but that the function lived in the two largest translation units in
 the tree, which never compile on a host. And `C4` names `D1-09` **and**
-`D1-10`; only `D1-09` is carved. `D1-10`, the loop scheduler, is still owed --
+`D1-10`; only `D1-09` is carved. `D1-10`, the loop scheduler, was still owed at
+this stand (done 2026-09-17 late, §3.8ax) --
 and the "~18 timer predicates" this row used to claim is wrong. It has now
 been measured three times and reported three different ways, so the row states
 the **definition** as well as the number -- a count whose definition is
@@ -5373,13 +5374,13 @@ weaker without a near-term PR -- a later PR would face the same surface.
 Supersedes the 2026-09-15 stand below, which is kept because its findings
 (`OPT-D14`, `RF-09`, the corpus emission category) are still open rows.
 
-| Phase                        | Rows                               | State                                                                                                                                                                                                                                                                                |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A -- prepare                 | `A1`-`A4`                          | **done**                                                                                                                                                                                                                                                                             |
-| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**                                                                                                                                                                                                                                                                             |
-| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done. **`M3` closed 2026-09-17**: `DR-16` shipped in the 2026-09-16 wave and `DR-03` in `C4d`, so no matrix row still waits on `E1`. All 29 rows carry a verdict and every row a source change can close is closed                                                         |
-| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | `W1`-`W6` **done** (`W6a` `55a7b4c4`, `W6b` `3be9a9da`). `W5` closed: `R1-04` committed `d5a071d8` and soaked on the bench 2026-09-17; the `mheardLine` half of `R2-04` is the wave's last row. **`C4d` done** (`DR-03`). `W7` is the only wave left, kept last by operator decision |
-| E -- prove and ship          | `E1`-`E3`                          | **not started**. `E1` is a bench run, `E3` the upstream resync. `E2`/`E4`/`E5` left the plan with operator decision 6 -- no PR for now                                                                                                                                               |
+| Phase                        | Rows                               | State                                                                                                                                                                                                                                                                |
+| ---------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A -- prepare                 | `A1`-`A4`                          | **done**                                                                                                                                                                                                                                                             |
+| B -- baseline, carves, twins | `B1`, `C1`-`C5`, `B2a`, `B3`, `B4` | **done**                                                                                                                                                                                                                                                             |
+| C -- decide                  | `M1`, `M2`, `M3`                   | `M1`/`M2` done; `M3`: `DR-12`/`DR-13` closed with `W3`, `DR-03` bench-only by decision, `DR-16` stays bench-only -- `telemetry_timer` is a first-fire timer and `D1-10` did not take it (§3.8ax)                                                                     |
+| D -- unify (waves 1-7)       | `W1`-`W7`, `C4d`                   | **all done 2026-09-17**: `W1`-`W6`, `C4d`, `W7` both halves (`6fd68840`, §3.8aw), and `D1-10` as the eighth wave (`e64ce346`, §3.8ax, seven timers, nineteen left with reasons)                                                                                      |
+| E -- prove and ship          | `E1`-`E3`                          | `E1` **done as scoped** (`e303127c`, §3.8ay: H4 identical, H6 on the instrument image, H11 automated PASS; RAK side and four by-eye checks owed to the operator); `E2`/`E4`/`E5` struck by decision 6 (no PR), `E3` struck by decision 7 (no merging on this branch) |
 
 **W5, row by row (2026-09-17).** Delivered: `GRD-01`, `R2-01`, `R3-12`,
 `R4-01`, `R2-04` (`aprsMessage` half), `R1-02` step 1 -- together about
@@ -5893,9 +5894,11 @@ now `R4-02/03` -- has been made.
   had to land with or before this wave. **Done**: `W6a` `55a7b4c4`, `W6b`
   `3be9a9da`, `EXT-01` confirmed on hardware (§3.8ao).
 - **`C4d`** the nRF52 diagnosis port out of `C4` -- **done 2026-09-17**
-  (§3.8ap). **`D1-10`** the loop scheduler is NOT done and was measured at
-  **50** timer predicates rather than the plan's "~18"; it is not on the Gantt
-  and stays an open row rather than a silent omission.
+  (§3.8ap). **`D1-10`** the loop scheduler -- **done 2026-09-17 late**
+  (`e64ce346`, §3.8ax) as the eighth wave, added to the Gantt: of the 25
+  shared timers the "~18"/"50" figures argued about, exactly seven can move
+  into one table without a behaviour change; the rest stay with a written
+  reason each.
 - **`W7`** variants restructure -- highest upstream-conflict surface. The
   "sync immediately before submitting" argument is weaker now that there is no
   near-term PR (operator decision 6), but it stays last by operator decision.
@@ -5907,16 +5910,10 @@ now `R4-02/03` -- has been made.
 Days are the audit's own estimates, carried in the Gantt, not measurements --
 except where a row has already been measured and corrected:
 
-| Row                    | Plan days            | Note                                                                   |
-| ---------------------- | -------------------- | ---------------------------------------------------------------------- |
-| `P0.9`                 | ~0.5                 | documentation only; `W1` and 4 of `M3`'s 8 rows are now done           |
-| `W3` remainder         | ~1 of 11.5           | bench only (step 7); W3c took 1.5 d on top of the audit's 9 + `W3-BLE` |
-| `W4`                   | 6                    |                                                                        |
-| `W5`                   | 5                    | gated on five operator decisions                                       |
-| `W6` + `C4d` + `D1-10` | 7+                   | `D1-10` re-measured at 50 predicates, so "+"                           |
-| `W7`                   | 3                    |                                                                        |
-| `E1`-`E4`              | 6.5                  | two of those days are bench time on four nodes                         |
-| **Total to PR**        | **~29 working days** | was ~30 at the 2026-09-13 stand; `E5` (10 d) sits outside that         |
+**Closed 2026-09-17 night.** The table that stood here estimated ~29 working days
+to a PR on 2026-09-13; the campaign ended without a PR by decision 6 and without
+a merge by decision 7, with every Gantt row done or struck (§3.8ay). What is
+still owed sits with the operator and is listed at the top of RESUME.md.
 
 `W3` is the one row where the plan was simply missing work: the audit costed
 the struct merge without noticing the BLE characteristic pins the struct's byte
@@ -6732,12 +6729,12 @@ be confirmed on nRF52.
 
 **Not run, and why**, so the Gantt row is not read as more than it is:
 
-| Step  | State                                                                                                                |
-| ----- | -------------------------------------------------------------------------------------------------------------------- |
-| `H4`  | BLE golden. Needs two agreeing captures of the UNCHANGED image before any before/after diff is evidence; not started |
-| `H6`  | UDP-1990 inbound. Needs the stub server; not started                                                                 |
-| `H8`  | **done** on Heltec-93 (pass) and RAK-90 (finding above)                                                              |
-| `H11` | T-Deck checklist -- **impossible today**, `DK5EN-14` is not connected                                                |
+| Step  | State                                                                                                                              |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `H4`  | BLE golden. Needs two agreeing captures of the UNCHANGED image before any before/after diff is evidence; not started               |
+| `H6`  | UDP-1990 inbound. Needs the stub server; not started                                                                               |
+| `H8`  | **done** on Heltec-93 (pass) and RAK-90 (finding above)                                                                            |
+| `H11` | T-Deck checklist -- **impossible today**, `DK5EN-14` is not connected. _Later that night: connected, automated half PASS (§3.8ay)_ |
 
 **A capture was thrown away before the passing one, and the reason generalises.**
 The first RAK run recorded two datagrams that came from **192.168.68.71**, the
@@ -7340,7 +7337,13 @@ upstream/dev --merge--> fork-main --branch--> topic branch (tdeck-...)
   For v5 the durable path is to offer the instrumentation upstream as a default-off compile
   option in its own PR once the T-Deck PR has landed.
 
-### 4.2 Branches as of 2026-09-11
+### 4.2 Branches as of 2026-09-18
+
+| Branch            | State                                                                                                                                         | Decision                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `dry-unification` | the DRY campaign, closed 2026-09-17 night at `72a5d1b9` (11 commits after `d05a0dc3`); base is `fork-main` before the 14.09. upstream refresh | **experimental PoC, stays as is**: no merge, no push, no PR (decisions 6 and 7, 2026-09-17); `E3` upstream resync struck |
+
+#### Branches as of 2026-09-11
 
 | Branch               | State                                                              | Decision                                              |
 | -------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
