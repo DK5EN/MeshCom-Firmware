@@ -83,7 +83,7 @@ where that verifiability lives.
 | 1     | `fork-neo-test` from `upstream/dev` -- **done**                     | 40/40 builds over 5 commits x 8 envs, regions measured at every commit, G1 empty                                    |
 | 2     | `fork-neo-test` complete -- **done**                                | 34/34 host envs, 32/32 board envs, 2/2 safeboot, one instrumented build with 13 INSTR strings in the ELF            |
 | 3     | `fork-neo` from `upstream/dev`, stripped -- **done**                | 38/40 (the two reds are upstream's baseline at K01), and the symbol sets match `fork-neo-test` on all eight targets |
-| 4     | `fork-neo` complete                                                 | all 32 board envs, tests against every firmware                                                                     |
+| 4     | `fork-neo` complete -- **done**                                     | 32/32 board envs, 2/2 safeboot, instrumented build with the same 13 INSTR strings as `fork-neo-test`                |
 | 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages               | differential run vs official 4.35t, 24 h soak                                                                       |
 | 6     | Negotiate `dev-dk5en` with Kurt, push                               | --                                                                                                                  |
 
@@ -545,7 +545,22 @@ Builds: 38/40. The two reds are `E22_XML-DevKitC` and `ttgo_tbeam` at the K01
 commit, which carries upstream's code plus deletions only -- upstream's own
 numbers, closed by the core commit. The tip is clean on all eight.
 
-## 14. Still open
+## 14. Stage 4 result
+
+`fork-neo` builds everything: **32/32 board envs, both safeboot envs**, and the
+`-DINSTRUMENT_ENABLED=1` build carries **13 `INSTR` strings -- the same count as
+`fork-neo-test`**. The instrumentation demonstrably survives the strip
+unchanged, which is the point: it is upstream's code and was never ours to
+remove.
+
+The host suite has no counterpart here by design. Its replacement is the
+stage-3 symbol diff, which is done.
+
+Everything that can be established without hardware is now established. What
+remains is the part the workstation cannot answer: does this firmware behave on
+the air like official 4.35t.
+
+## 15. Still open
 
 - The commit cut itself. A first proposal with all 248 files assigned to 18
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
@@ -554,7 +569,7 @@ numbers, closed by the core commit. The tip is clean on all eight.
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
 
-## 15. Review history
+## 16. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
