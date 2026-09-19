@@ -202,12 +202,23 @@ them. "tools/ is out" means the fork's additions only. The forced companions are
 `.github/workflows/ci-build.yml` is fork-added and runs `pio test -e native`
 plus `tools/resource_watch.py`. It cannot travel to `fork-neo` unchanged.
 
-### The root-level delta needs an owner
+### The root-level delta
 
-`.gitattributes`, `.gitignore`, `.github/ISSUE_TEMPLATE/*`,
-`.github/workflows/*`, `README.md` and `CLAUDE.md` are in neither the filter set
-nor the "out" list. Decide per file before stage 3 rather than discovering them
-at the first push.
+Decided 2026-09-19. `fork-neo` lives on `DK5EN/MeshCom-Firmware`, so these are
+ours to set:
+
+- **No automatic GitHub builds.** Releases are built on the operator's MacBook
+  (about six minutes for the full sweep) and published to GitHub by hand -- full
+  control over what ships, and the web flasher on gh-pages has its own concept.
+  Actions are already disabled at repo level, which is what actually prevents a
+  build; the fork-added `.github/workflows/ci-build.yml` is dropped because it
+  needs `test/` and `tools/resource_watch.py`, and upstream's
+  `meshcom-ci.yml` is left untouched so the branch carries no gratuitous delta
+  into the handover.
+- `.gitignore`, `.gitattributes`, `.github/ISSUE_TEMPLATE/*`: fork versions kept,
+  they are harmless and useful.
+- `README.md`, `CLAUDE.md`: decided at stage 3, when the branch gets its own
+  framing text.
 
 ### The strip is a script, not handwork
 
@@ -418,6 +429,11 @@ ends up.
   where the nine classic envs could diverge.
 - **`test/` and the native envs land last**, as chapter K19 on `fork-neo-test`
   only, because a native env's source filter is complete only at the tip.
+- **`docs/CHANGELOG-neo.md` is written complete in one pass**, not layered per
+  gate. The end state is known; commit hashes can be added as references
+  afterwards, once the chapters have survived their gates.
+- **No automatic GitHub builds** (section 5): build on the MacBook, publish by
+  hand.
 
 ## 11. Still open
 
@@ -425,10 +441,8 @@ ends up.
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
   upper bound and not the answer. K19 (`test/` plus the native envs) makes 19 on
   `fork-neo-test`.
-- Ownership of the root-level delta: `.github/workflows/`, `README.md`,
-  `.gitignore`, `.gitattributes` (section 5).
-- Whether `docs/CHANGELOG-neo.md` is written in full before stage 1 or chapter by
-  chapter as each gate passes.
+- Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
+  repo-level Actions disable, at the cost of a visible delta against upstream.
 
 ## 12. Review history
 
