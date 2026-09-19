@@ -629,8 +629,8 @@ static const char* resetReasonName(esp_reset_reason_t r)
     }
 }
 
-// DS-03: name of the wakeup cause after a deep-sleep reset. tools/bench/deepsleep_button.py
-// reads this line to prove the ext1 button wake in place of a scope on the wake pin.
+// Name of the wakeup cause after a deep-sleep reset, printed next to RESET_REASON so a
+// field log shows whether the button (EXT1), a timer or something else woke the node.
 static const char* wakeCauseName(esp_sleep_source_t c)
 {
     switch (c)

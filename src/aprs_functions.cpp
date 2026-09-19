@@ -747,7 +747,7 @@ uint16_t decodeAPRSPOS(String PayloadBuffer, struct aprsPosition &aprspos)
 
     ipt=0;
 
-    // check ATXT + #name (docs/architecture/11-wire-format.md §1.8.1/§1.8.5):
+    // check ATXT + #name:
     // the comment/name region runs from istarttext up to the first /X=-style
     // token -- '/' followed by an uppercase letter and '=', or '/N' followed
     // by a digit '1'-'9' (the neighbour-count key, matched the same way the

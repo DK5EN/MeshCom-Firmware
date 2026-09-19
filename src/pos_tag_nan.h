@@ -12,7 +12,7 @@
 // posTagIsNan() takes the buffer that was just written and checks only the
 // value after the 3-char key ("/X="), so each call site can be handed its
 // own buffer and get a correct answer independent of the tag letter.
-// Arduino-free so the contract is native-testable (test/test_pos_tag_nan).
+// Arduino-free so the contract is testable on the host.
 #ifndef _POS_TAG_NAN_H_
 #define _POS_TAG_NAN_H_
 
