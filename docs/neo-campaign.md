@@ -77,15 +77,15 @@ where that verifiability lives.
 
 ## 3. Stages
 
-| Stage | What                                                                  | Gate                                                                                                                |
-| ----- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**   | 34/34 native envs, 8/8 board envs                                                                                   |
-| 1     | `fork-neo-test` from `upstream/dev` -- **done**                       | 40/40 builds over 5 commits x 8 envs, regions measured at every commit, G1 empty                                    |
-| 2     | `fork-neo-test` complete -- **done**                                  | 34/34 host envs, 32/32 board envs, 2/2 safeboot, one instrumented build with 13 INSTR strings in the ELF            |
-| 3     | `fork-neo` from `upstream/dev`, the same chapters minus K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
-| 4     | `fork-neo` complete                                                   | all 32 board envs, tests against every firmware                                                                     |
-| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages                 | differential run vs official 4.35t, 24 h soak                                                                       |
-| 6     | Negotiate `dev-dk5en` with Kurt, push                                 | --                                                                                                                  |
+| Stage | What                                                                | Gate                                                                                                                |
+| ----- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`** | 34/34 native envs, 8/8 board envs                                                                                   |
+| 1     | `fork-neo-test` from `upstream/dev` -- **done**                     | 40/40 builds over 5 commits x 8 envs, regions measured at every commit, G1 empty                                    |
+| 2     | `fork-neo-test` complete -- **done**                                | 34/34 host envs, 32/32 board envs, 2/2 safeboot, one instrumented build with 13 INSTR strings in the ELF            |
+| 3     | `fork-neo` from `upstream/dev`, stripped -- **done**                | 38/40 (the two reds are upstream's baseline at K01), and the symbol sets match `fork-neo-test` on all eight targets |
+| 4     | `fork-neo` complete                                                 | all 32 board envs, tests against every firmware                                                                     |
+| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages               | differential run vs official 4.35t, 24 h soak                                                                       |
+| 6     | Negotiate `dev-dk5en` with Kurt, push                               | --                                                                                                                  |
 
 Stage 0 was mandatory before anything else: `dry-unification` branched at
 `1cb2d9e6` and did not know the last 11 upstream commits. Projecting fork
@@ -509,7 +509,43 @@ Three things the stage found that no plan document had:
 Three fixup commits are appended, to be folded before stage 3: the two `tools/`
 scripts and the rebuilt binaries.
 
-## 13. Still open
+## 13. Stage 3 result
+
+`fork-neo` exists: six commits on `upstream/dev`, the three stage-1/2 fixups
+folded into their chapters. `tools/force_include_settings_stub.py` is not needed
+here at all -- it hung off a native env the strip removes, which is a small
+independent sign that the cut is coherent.
+
+**The strip gate holds, byte for byte.** `tools/neo_strip.py` applied to
+`fork-neo-test`'s `platformio.ini` and `tdeck_helpers.cpp` produces exactly
+`fork-neo`'s versions, and a second run reports nothing left to strip. The whole
+difference between the branches over the filter set is those two files, 999
+deleted lines.
+
+**The symbol sets are identical on all eight targets**, which is the check that
+actually proves nothing was lost:
+
+| target                 | symbols |
+| ---------------------- | ------- |
+| heltec_wifi_lora_32_V3 | 12212   |
+| E22-DevKitC            | 11266   |
+| E22_XML-DevKitC        | 11474   |
+| ttgo_tbeam             | 11404   |
+| ttgo_tbeam_supreme     | 12463   |
+| t_deck                 | 15575   |
+| t_deck_plus            | 15574   |
+| wiscore_rak4631        | 3193    |
+
+Zero symbols present in one branch and absent in the other. Neither `test/` nor
+the native envs reach a board image, so this is what the theory predicted -- but
+a prediction is not a measurement, and the earlier instrument failure is why it
+was measured.
+
+Builds: 38/40. The two reds are `E22_XML-DevKitC` and `ttgo_tbeam` at the K01
+commit, which carries upstream's code plus deletions only -- upstream's own
+numbers, closed by the core commit. The tip is clean on all eight.
+
+## 14. Still open
 
 - The commit cut itself. A first proposal with all 248 files assigned to 18
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
@@ -518,7 +554,7 @@ scripts and the rebuilt binaries.
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
 
-## 14. Review history
+## 15. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
