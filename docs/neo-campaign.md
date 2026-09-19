@@ -80,7 +80,7 @@ where that verifiability lives.
 | Stage | What                                                                  | Gate                                                                                                                |
 | ----- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**   | 34/34 native envs, 8/8 board envs                                                                                   |
-| 1     | `fork-neo-test` from `upstream/dev`, the chapter commits with harness | per commit: 8 builds + region check. The host suite only runs from K19 on, when `test/` and the native envs land    |
+| 1     | `fork-neo-test` from `upstream/dev` -- **done**                       | 40/40 builds over 5 commits x 8 envs, regions measured at every commit, G1 empty                                    |
 | 2     | `fork-neo-test` complete                                              | all 32 board envs, both safeboot envs, full host suite, one `-DINSTRUMENT_ENABLED=1` build, bench fleet             |
 | 3     | `fork-neo` from `upstream/dev`, the same chapters minus K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
 | 4     | `fork-neo` complete                                                   | all 32 board envs, tests against every firmware                                                                     |
@@ -438,7 +438,48 @@ ends up.
 - **No automatic GitHub builds** (section 5): build on the MacBook, publish by
   hand.
 
-## 11. Still open
+## 11. Stage 1 result
+
+`fork-neo-test` exists: six commits on `upstream/dev` (the changelog, then five
+code commits). G1 is empty over the filter set -- the split provably lost
+nothing. 40/40 builds across 8 envs.
+
+**Seventeen chapters became five commits, and that is a property of the code.**
+Five projection attempts with different orderings converged on it. Four distinct
+dependency classes force it, and they were found in this order, each only
+visible after the previous one was fixed:
+
+1. **Missing new headers.** A chapter's file includes a header another chapter
+   owns. Solved as a fixpoint: a header lands no later than its first consumer.
+2. **Modified headers.** Upstream's version of a header lacks a declaration or,
+   in the case of `configuration_global.h`, the include guard the fork added.
+   Only visible once class 1 was gone.
+3. **Type changes.** R2-04 (`aprsMessage` from `String` to `char[]`) touches 18
+   files across 11 chapters. A type change and its call sites cannot be split.
+4. **Moved definitions.** The C-series carve-outs moved functions between files.
+   `checkSerialCommand()` in two commits means it is defined twice and the link
+   fails. This class is invisible to both header analysis and type checking --
+   and carve-outs were half the campaign.
+
+The lesson for stage 3: enumerate all four classes up front rather than
+discovering them one build at a time.
+
+**Measured on the way, and it belongs in the pitch to Kurt:** the first commit
+carries only upstream's code plus K01's deletions, so its region figures are
+upstream's. `ttgo_tbeam` sits at **20 bytes** of free `iram0_0_seg` there;
+`E22_XML-DevKitC` at **1160 bytes** of `dram0_0_seg`. After the core commit:
+4972 and 17816. Twenty bytes means the next IRAM-placed function breaks the
+link, which is what happened to upstream CI at `9d885b1a`.
+
+**One instrument failure, recorded so it is not repeated.** The first full gate
+reported 40/40 green with the region check silently doing nothing:
+`tools/resource_watch.py` is not projected onto `fork-neo-test`, and the gate
+tested for the string "error" rather than the exit code, so
+"No such file or directory" counted as a pass. The builds were real; the region
+verdict was void. The instrument now lives in the scratchpad, the gate uses the
+exit code and `--strict`, and it self-tests before the run.
+
+## 12. Still open
 
 - The commit cut itself. A first proposal with all 248 files assigned to 18
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
@@ -447,7 +488,7 @@ ends up.
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
 
-## 12. Review history
+## 13. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
