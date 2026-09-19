@@ -25,10 +25,39 @@ Test, ein Bench-Lauf auf einem echten Knoten, eine Messung -- steht er dabei,
 mit dem Commit, der ihn belegt. Wo keiner existiert, steht das ebenfalls dort.
 Ein duenner ehrlicher Eintrag ist uns lieber als ein gepolsterter.
 
-Die Kapitel entsprechen den Commits dieses Branches: ein Kapitel, ein Commit,
-dieselbe Reihenfolge. Die Nummerierung laeuft durchgehend durch das ganze
-Dokument und ist eine Nummerierung dieses Dokuments, nicht die Fortsetzung
-einer frueheren Zaehlung.
+Die Nummerierung laeuft durchgehend durch das ganze Dokument und ist eine
+Nummerierung dieses Dokuments, nicht die Fortsetzung einer frueheren Zaehlung.
+
+## Kapitel und Commits
+
+Die siebzehn Kapitel erzaehlen die Arbeit. Der Code kommt in fuenf Commits, und
+das ist kein Schnittfehler, sondern eine Eigenschaft des Codes: dreizehn der
+Kapitel sind ueber Header, Typen und verschobene Funktionsdefinitionen so
+verflochten, dass sie sich nicht einzeln uebersetzen lassen. Fuenf Projektions-
+versuche mit jeweils anderer Reihenfolge haben das gezeigt, bevor es gerechnet
+wurde; ueber alle Header des Deltas bilden diese dreizehn Kapitel eine einzige
+stark zusammenhaengende Komponente.
+
+Drei Beispiele, die das Muster tragen:
+
+- `udp_drain_esp32.cpp` ruft `udpBeginRaw_esp32()` aus `udp_functions.cpp`, und
+  dieselbe Datei braucht den Typwechsel von `aprsMessage`. Die Abhaengigkeit
+  laeuft in beide Richtungen.
+- Der C3-Carve-out hat `checkSerialCommand()` aus `esp32_main.cpp` in die neue
+  `serial_command_esp32.cpp` verschoben. Liegen die beiden in verschiedenen
+  Commits, ist die Funktion doppelt definiert und der Link bricht.
+- `event_functions.cpp` liest `node_audio_start` als `String`, waehrend der
+  Settings-Struct ihn schon als `char[128]` fuehrt.
+
+| Commit       | Kapitel                                                              |
+| ------------ | -------------------------------------------------------------------- |
+| `neo K01`    | K01                                                                  |
+| `neo` (Kern) | K02, K03, K04, K05, K06, K07, K08, K09, K10, K11, K12, K13, K14, K18 |
+| `neo K15`    | K15                                                                  |
+| `neo K16`    | K16                                                                  |
+| `neo K17`    | K17                                                                  |
+
+Jeder dieser fuenf Commits uebersetzt fuer sich auf allen acht Leitzielen.
 
 Einzelne Aenderungen laufen quer zu den Kapiteln -- eine Typumstellung etwa
 beruehrt fast jedes Subsystem. Solche Aenderungen werden in dem Kapitel
@@ -314,6 +343,30 @@ dem begleitenden Test-Branch. Ebenfalls nicht hier beschrieben: die
 Umbenennung der Diagnose-Flags -- beide aendern `platformio.ini` nur an einer
 Stelle nebenbei, ihre eigentliche Substanz liegt in Quelldateien ausserhalb
 dieses Kapitels.
+
+### Nachgemessen bei der Projektion auf upstream/dev
+
+Beim Aufbau dieses Branches wurde jeder Commit auf acht Leitzielen gebaut und
+die Linkerregionen dabei ausgelesen. Der erste Commit traegt nur Upstreams Code
+plus die Loeschungen aus K01 -- seine Zahlen sind damit Upstreams Zahlen, und
+sie belegen, wie eng zwei Umgebungen dort sitzen:
+
+| Umgebung               | Upstream (Commit 1) | nach dem Kern-Commit | Gewinn |
+| ---------------------- | ------------------- | -------------------- | ------ |
+| `ttgo_tbeam` IRAM      | **20 B frei**       | 4972 B               | +4952  |
+| `E22_XML-DevKitC` DRAM | **1160 B frei**     | 17816 B              | +16656 |
+| `E22_XML-DevKitC` IRAM | 3456 B              | 4028 B               | +572   |
+
+Zwanzig Byte im `iram0_0_seg` des T-Beam heisst: die naechste Funktion, die
+dorthin gelegt wird, bricht den Link. Genau das ist bei `9d885b1a` schon einmal
+passiert und hat die Upstream-CI zerlegt. Die beiden Hebel aus diesem Kapitel --
+die PSRAM-Flags und die vendorte tinyxml2 -- holen beide Umgebungen aus dieser
+Zone heraus.
+
+Die Zahlen stammen aus `tools/resource_watch.py dram` gegen die `firmware.map`
+des jeweiligen Builds, nicht aus der PlatformIO-Zusammenfassung: deren `RAM:`-
+Zeile misst gegen das PSRAM-inklusive Gesamtbudget und meldet fuer denselben
+T-Beam `7.9 %`.
 
 ## K02 Settings-Store: ein Schema fuer beide Plattformen
 
