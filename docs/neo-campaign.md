@@ -39,9 +39,15 @@ Consequences:
 - The release name `4.35t_20260919_neo` exists only in the git tag, the GitHub
   release, the asset filenames and the web-flasher manifest.
 - `FLASH_VERSION` (`src/configuration_global.h:88`) gets the neo date. It is a
-  compile-time literal printed in the boot log only, never transmitted, and
-  `flashLayoutCompatible()` compares `FLASH_STRUCT_VERSION` instead -- which
-  must NOT move, on pain of wiping the fleet's settings.
+  compile-time literal that reaches the boot log (`esp32_main.cpp:824`,
+  `nrf52_main.cpp:549`) **and the `--setlog` STAT line**
+  (`loop_functions.cpp:3346` into the `flash` field of `setlog_lines.h:106`) --
+  so serial, net console and web, but never the air. The U-boat property holds.
+  `flashLayoutCompatible()` compares `FLASH_STRUCT_VERSION` instead, which must
+  NOT move, on pain of wiping the fleet's settings. The bump belongs in the
+  chapter that owns `configuration_global.h` (K02), not at the tip -- with
+  fold-before-stage-3 a tip-only bump would leave the two branches disagreeing
+  on the value for the whole series.
 - `__DATE__` / `__TIME__` already reach `--info` and the web GUI, so a bench
   operator can always tell which image is running.
 
@@ -71,15 +77,15 @@ where that verifiability lives.
 
 ## 3. Stages
 
-| Stage | What                                                                | Gate                                             |
-| ----- | ------------------------------------------------------------------- | ------------------------------------------------ |
-| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`** | 34/34 native envs, 8/8 board envs                |
-| 1     | `fork-neo-test` from `upstream/dev`, the ~15 commits with harness   | per commit: host suite + 8 builds + region check |
-| 2     | `fork-neo-test` complete                                            | all 32 board envs, full suite, bench fleet       |
-| 3     | `fork-neo` from `upstream/dev`, same commits, stripped              | per commit: 8 builds + region check + strip scan |
-| 4     | `fork-neo` complete                                                 | all 32 board envs, tests against every firmware  |
-| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages               | differential run vs official 4.35t, 24 h soak    |
-| 6     | Negotiate `dev-dk5en` with Kurt, push                               | --                                               |
+| Stage | What                                                                          | Gate                                                                                                                |
+| ----- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**           | 34/34 native envs, 8/8 board envs                                                                                   |
+| 1     | `fork-neo-test` from `upstream/dev`, the chapter commits with harness         | per commit: 8 builds + region check. The host suite only runs from K19 on, when `test/` and the native envs land    |
+| 2     | `fork-neo-test` complete                                                      | all 32 board envs, both safeboot envs, full host suite, one `-DINSTRUMENT_ENABLED=1` build, bench fleet             |
+| 3     | `fork-neo` from `upstream/dev`, the same chapters minus K17 and K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
+| 4     | `fork-neo` complete                                                           | all 32 board envs, tests against every firmware                                                                     |
+| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages                         | differential run vs official 4.35t, 24 h soak                                                                       |
+| 6     | Negotiate `dev-dk5en` with Kurt, push                                         | --                                                                                                                  |
 
 Stage 0 was mandatory before anything else: `dry-unification` branched at
 `1cb2d9e6` and did not know the last 11 upstream commits. Projecting fork
@@ -88,6 +94,14 @@ Kurt's work wordlessly -- the trap that already hit PR #1135.
 
 The changelog (`docs/CHANGELOG-neo.md`) is written **before** stage 1, because
 it defines the commit cut. It is the outline, not the post-hoc documentation.
+Accept that stage 1 will rewrite parts of it: the build gate decides which
+chapters can stand alone, and merging two chapters merges two sections.
+
+One consequence of the fold-before-stage-3 policy, so it is not a surprise
+later: folding rewrites the intermediate commits of `fork-neo-test`. The
+per-commit builds of stage 1 then attest to commits that no longer exist. The
+tip is unchanged, so the stage-2 evidence survives intact -- but the branch is
+force-rewritten, and model B's forward merges start from the rewritten branch.
 
 ## 4. Construction: projection, not rebase
 
@@ -97,61 +111,138 @@ content appears to git as a conflict.
 
 ```
 git checkout -b <branch> upstream/dev
-# per theme:  git checkout <content tree> -- <paths>  ->  commit with changelog text
+# per theme:  git checkout --no-overlay <content tree> -- <paths>
+#             commit with the chapter's changelog text
 # closing:    git diff <content tree> <branch> -- <filter set>   must be empty
 ```
 
-The tree-identity check at the end makes the thematic split provably lossless.
-The split is a storytelling decision, not a correctness one.
+`--no-overlay` is not optional. `git checkout <tree> -- <paths>` runs in overlay
+mode by default and **never removes files absent from the source tree**
+(reproduced on git 2.55.0). 77 of the 248 files in the filter set are deletions,
+so without the flag chapters K01 and K10 would commit nothing at all and the
+error would surface only at the closing check, after eighteen chapters.
+
+The tree-identity check at the end makes the thematic split provably lossless on
+`fork-neo-test`. On `fork-neo` it does not apply as stated -- see section 7.
 
 Projection precondition: the content tree must already contain `upstream/dev` in
 full. After `c09e22b8` it does (`git merge-base --is-ancestor upstream/dev
 dry-unification` succeeds).
 
-Scope of the filter set, measured on the merged tree: **251 files** -- 49 added,
-77 deleted (vendor fonts, dead platforms, 20 `lv_conf.h` copies), 122 modified,
-1 renamed. `src/` 164, `variants/` 79, `lib/` 4, `config/` 1, `platformio.ini`,
-two `safeboot*.bin`.
+Scope of the filter set, measured on `c09e22b8`: **248 files** -- 48 added, 77
+deleted (vendor fonts, dead platforms, 20 `lv_conf.h` copies), 122 modified, 1
+renamed. `src/` 164, `variants/` 79, `lib/` 4, `config/` 1, `platformio.ini`.
+
+The two `safeboot*.bin` are at repo root and therefore **outside** the filter
+set, but every ESP32 `upload_command` flashes them (`platformio.ini:1082,1086`).
+K15 changes `src/safeboot/`, so those bins must be rebuilt and committed as part
+of K15 on both branches -- otherwise `fork-neo` ships new safeboot source with
+upstream's stale binary, and a stale safeboot ships unnoticed.
 
 ## 5. What gets stripped for fork-neo
 
-Two separate things, both removed:
+Two separate things, both removed -- and the inventory is larger than it looks.
 
-1. **Host test harness** -- `test/` (439 files) and the 34 `[env:native*]`
-   blocks in `platformio.ini`.
-2. **Firmware instrumentation** -- the `INSTRUMENT_ENABLED` blocks (7 files:
-   `instrument.cpp/.h`, `command_functions.cpp`, `configuration_global.h`,
-   `t-deck/lv_obj_functions.cpp`, `esp32/esp32_main.cpp`, `nrf52/nrf_eth.cpp`).
+**1. Host test harness.** `test/` and the 34 `[env:native*]` blocks in
+`platformio.ini`. These land last on `fork-neo-test` (chapter K19) because a
+native env's `build_src_filter` set is only complete at the tip; running them
+after an intermediate chapter fails for reasons that have nothing to do with the
+chapter. `platformio.ini` is therefore the one file split across two chapters:
+K18 lands it without the native blocks, K19 appends them.
 
-Also out: `docs/` except `CHANGELOG-neo.md`, `tools/`, `.claude/`,
-`.prettierignore`, `release.md`, `release-notes.md`.
+**2. Firmware instrumentation.** Not 7 files. `instrument.h` is included by
+**11** files, and the `INSTR_*` macros or `instrument_*` calls appear in
+`nrf52/nrf52_main.cpp`, `esp32/esp32_main.cpp`, `command_functions.cpp`,
+`nrf52/gateway_service_nrf52.cpp`, `loop_functions.cpp`,
+`t-deck/lv_obj_functions.cpp`, `t-deck/tdeck_main.cpp`, `extudp_functions.cpp`,
+`esp32/gateway_service_esp32.cpp` and `nrf52/nrf_eth.cpp`, plus
+`instrument.cpp/.h` themselves. On `fork-neo` every include and every macro
+invocation has to go. That is a source rewrite across 11 files, two of them the
+highest-churn files in the tree -- not "delete seven blocks".
 
-Forced companion: `platformio.ini:1119,1163` calls
-`tools/ensure_tasmota_framework.py` in both safeboot envs. Either the script
-travels or those two lines go, otherwise the safeboot build breaks.
+`src/configuration_global.h` is **not** a strip file. It mentions
+`INSTRUMENT_ENABLED` only in comments (lines 196-209).
 
-### The strip boundary that must not be crossed
+`src/t-deck/tdeck_helpers.cpp:143` carries a raw, completely unguarded bench
+marker (`Serial.printf("[KBL];set;%u\n", ...)`, preprocessor depth 0). A
+mechanical guard strip will not touch it. It needs an explicit rule.
 
-**Field diagnostics are not test instrumentation.** A guard change once swept
-`--udplog`, `--udpstat`, `--wifistat` and `--ethstat` out of shipped images
-without turning a single build red. `--persiststat` carries an explicit comment
-saying it is a field diagnostic and deliberately outside the
-`INSTRUMENT_ENABLED` surface, because the migration it checks happens on shipped
-images.
+Also out: `docs/` except `CHANGELOG-neo.md`, the **fork's additions to**
+`tools/`, `.claude/`, `.prettierignore`, `release.md`, `release-notes.md`.
 
-Every strip commit therefore ends with a **string scan of the built ELF**, not
-with a green build. Exit code 0 proves nothing about guarded code.
+### What must NOT be stripped
 
-### What the strip costs us
+- **`MC_DIAG` and `MC_INJECT_HOOKS` stay.** They are field diagnostics, not
+  instrumentation (`configuration_global.h:190-215` explains the difference at
+  length). K17's title naming both invites exactly the confusion that would lose
+  them.
+- **The field diagnostics stay**: `--udplog`, `--udpstat`, `--wifistat`,
+  `--ethstat`, `--persiststat`. Verified: none of them is inside
+  `#if INSTRUMENT_ENABLED` today -- they sit under plain `ESP32` / `NRF52_SERIES`
+  guards or at depth 0, before the instrumentation block that runs
+  `command_functions.cpp:4343-4803`. The boundary is implementable as written;
+  it is the inventory that was wrong.
+- **`lib/tinyxml2` stays.** It is not ballast. Upstream pulls tinyxml2 via a
+  `lib_deps` URL that drags in `contrib/html5-printer.cpp` and its own `main()`;
+  the linker resolves crt0's reference from it and pulls libstdc++ iostream and
+  locale in with it. Vendoring it with a `srcFilter` (`95d6fbe6`, MEM-04/R3-04)
+  bought `E22_XML-DevKitC` **+5768 B DRAM and +572 B IRAM**. Restoring the URL
+  would put that env back at 3456 B of IRAM -- below the threshold agreed in
+  section 6. It travels, and it earns a changelog chapter.
 
-`fork-neo` images are no longer comparable byte-for-byte with `fork-neo-test`.
-The replacement gate: build `fork-neo-test` with `INSTRUMENT_ENABLED=0` and
-compare that image against `fork-neo` at the same commit. If the strip was
-mechanical and complete, those two must agree. A difference means the strip
-removed something the guard did not.
+### tools/ is partly upstream's
 
-Note the flag spelling: `-DINSTRUMENT_ENABLED=1`, no space. The spaced form is
-dropped silently.
+`upstream/dev` already ships `tools/safeboot.py`, `tools/set_custom_name.py`,
+`tools/ensure_safeboot.py` and others, and its own safeboot envs call two of
+them. "tools/ is out" means the fork's additions only. The forced companions are
+**three** scripts per safeboot env, not one (`platformio.ini:1119-1121,
+1163-1165`): `ensure_tasmota_framework.py` (fork-added),
+`set_custom_name.py` and `safeboot.py` (both upstream's already).
+
+`.github/workflows/ci-build.yml` is fork-added and runs `pio test -e native`
+plus `tools/resource_watch.py`. It cannot travel to `fork-neo` unchanged.
+
+### The root-level delta needs an owner
+
+`.gitattributes`, `.gitignore`, `.github/ISSUE_TEMPLATE/*`,
+`.github/workflows/*`, `README.md` and `CLAUDE.md` are in neither the filter set
+nor the "out" list. Decide per file before stage 3 rather than discovering them
+at the first push.
+
+### The strip is a script, not handwork
+
+Define it once as a checked-in, deterministic transformation and run it. That is
+what makes section 7's G1 meaningful on `fork-neo`, and it is the difference
+between a repeatable branch and one nobody can rebuild.
+
+### How the strip is verified
+
+The originally planned bridge gate does not work. `INSTRUMENT_ENABLED` is
+already **0 by default** (`src/instrument.h:34-35`) and no ini sets it, so
+"build `fork-neo-test` with `INSTRUMENT_ENABLED=0`" is simply the ordinary
+build. Two consequences:
+
+1. **Nothing in stages 1 and 2 ever compiles the instrumented code.** The
+   measurement firmware can rot from commit 1 without a single red build. Add one
+   `-DINSTRUMENT_ENABLED=1` build to the stage-2 gate
+   (`PLATFORMIO_BUILD_FLAGS=-DINSTRUMENT_ENABLED=1`, no space after `-D`; note
+   that setting this env var changes `project.checksum` and wipes `.pio/build`).
+2. **Byte identity cannot hold anyway.** `__DATE__`/`__TIME__` are compiled into
+   the image at five sites (`command_functions.cpp:5293`,
+   `t-deck/tdeck_main.cpp:298`, `nrf52/nrf52_functions.cpp:225`,
+   `esp32/esp32_main.cpp:808`, `web_functions/web_functions.cpp:2136`), and
+   esptool appends an ELF SHA-256 to the app descriptor.
+
+What actually proves the strip was complete:
+
+- **Symbol-set diff.** `nm --defined-only --size-sort` and `size -A` between the
+  `INSTRUMENT_ENABLED=0` build of `fork-neo-test` and the stripped `fork-neo`
+  build at the same chapter. A symbol present in one and absent in the other
+  names the lost function directly. This is the load-bearing check.
+- **Byte compare, if wanted**: `SOURCE_DATE_EPOCH` set, both branches built at
+  the same absolute path (or `-ffile-prefix-map`), comparing `firmware.bin` with
+  the `esp_app_desc` SHA field masked.
+- **String scan of the ELF** after every strip commit, as G3 already requires.
 
 ## 6. The gate set: 8 envs
 
@@ -194,22 +285,43 @@ the tight regions -- wrong by an order of magnitude. Every gate run calls
 python3 tools/resource_watch.py dram --env <env> --map .pio/build/<env>/firmware.map
 ```
 
-Open operator decision: `E22_XML-DevKitC` is below the 4096 B threshold today.
-Proposed handling -- a per-env threshold taken from the current state, so a
-commit may not make it worse, instead of fixing a pre-existing constraint first.
-Known levers if headroom is needed: the T-Beam board JSON's PSRAM flags cost
-4.4 kB IRAM, the tinyxml2 example `main()` costs 5.8 kB DRAM.
+**Decided: `--min-headroom 4000` for `E22_XML-DevKitC`, 4096 for the rest.**
+The env sits at 4028 B today and the campaign is not going to fix a pre-existing
+constraint first. The rule the gate enforces is therefore "do not make it
+worse", not "reach the default". Note that the 4028 exist only because
+`lib/tinyxml2` is vendored (section 5); restoring upstream's `lib_deps` URL puts
+this env at 3456 B and the threshold fails. The two decisions are coupled.
+
+Known levers if headroom is ever needed: the T-Beam board JSON's PSRAM flags
+cost 4.4 kB IRAM, the tinyxml2 example `main()` 5.8 kB DRAM.
+
+**The nine-are-identical argument is a snapshot, not an invariant.** IRAM
+content is board-independent today because `src/` has exactly two `IRAM_ATTR`
+sites and no per-env flag places code in IRAM. A chapter that adds an ISR or an
+`IRAM_ATTR` function under a board-specific `#ifdef`, or that changes how
+`MC_DIAG` / `DISABLE_NET_CONSOLE` are handled (E22_XML only), would spread them
+apart silently and the 8-env gate would not see it. Rather than gate all ten
+classic envs every time, the gate carries a trigger:
+
+> If a chapter's diff touches `IRAM_ATTR`, an ISR registration, or any
+> `variants/*/platformio.ini` of a classic env, that chapter runs the full set of
+> ten classic envs instead of the single representative.
+
+**The two safeboot envs are the only entries in `default_envs`**
+(`platformio.ini:16-18`) and are not in the 8-env set. K15 changes
+`src/safeboot/`, so that chapter's gate must include `esp32-safeboot` and
+`esp32-S3-safeboot`, and must rebuild and commit the two root `safeboot*.bin`.
 
 ## 7. Verification
 
-| Gate | Check                                                                                                                                             |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G1   | Tree identity over the filter set. `platformio.ini` is exempt (transformed, not copied) and gets a narrower env-by-env comparison                 |
-| G2   | 8 builds per commit, sequential. Parallel `pio run` corrupts `.pio/build` and emits phantom linker errors in untouched files                      |
-| G3   | Region check per build; string scan of the ELF after every strip commit                                                                           |
-| G4   | RAM/flash/region deltas, same-base only -- cross-base figures are baseline drift                                                                  |
-| G5   | Differential run against official 4.35t: two nodes, same traffic, compare frames. Every difference is a known fix or a defect, nothing in between |
-| G6   | Bench fleet (RAK-90, Heltec-93, T-Beam-92, T-Deck-14), 24 h soak, web-flasher pass per chip family including an abort test                        |
+| Gate | Check                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1   | On `fork-neo-test`: tree identity over the whole filter set, `platformio.ini` included -- it is copied verbatim there. On `fork-neo` that check cannot hold (11 stripped files, `instrument.cpp/.h` absent, the `tdeck_helpers.cpp` marker, the transformed `platformio.ini`), so the check becomes `strip(fork-neo-test tree) == fork-neo tree`, with the strip as the checked-in script from section 5 |
+| G2   | 8 builds per commit, sequential. Parallel `pio run` corrupts `.pio/build` and emits phantom linker errors in untouched files                                                                                                                                                                                                                                                                             |
+| G3   | Region check per build; string scan of the ELF after every strip commit                                                                                                                                                                                                                                                                                                                                  |
+| G4   | RAM/flash/region deltas, same-base only -- cross-base figures are baseline drift                                                                                                                                                                                                                                                                                                                         |
+| G5   | Differential run against official 4.35t: two nodes, same traffic, compare frames. Every difference is a known fix or a defect, nothing in between                                                                                                                                                                                                                                                        |
+| G6   | Bench fleet (RAK-90, Heltec-93, T-Beam-92, T-Deck-14), 24 h soak, web-flasher pass per chip family including an abort test                                                                                                                                                                                                                                                                               |
 
 On-wire differences are detectable without hardware through the golden captures
 (`test/golden/`) and the corpora (`test_aprs_reencode`, `test_aprs_fuzz`,
@@ -217,9 +329,13 @@ On-wire differences are detectable without hardware through the golden captures
 `fork-neo-test` only, which is why truth is established there and `fork-neo`
 afterwards only has to prove it produces the same firmware.
 
-Cost: 15 commits x 8 envs, twice, plus two full 32-env sweeps -- about
-**310 sequential board builds**. This belongs in a driver script, not in hand
-work.
+Cost: about **310 sequential board builds** across both branches plus two full
+32-env sweeps. Measured on the stage-0 gate, an incremental board build takes
+**~30 s** (7 builds in 212 s), so a per-commit gate is minutes, not hours --
+which is also why the trigger rule in section 6 is affordable. The exception is
+any chapter that edits `platformio.ini` or a variant ini: that wipes
+`.pio/build` and forces full rebuilds, so K18 and K19 are the expensive ones.
+This belongs in a driver script, not in hand work.
 
 ## 8. Long-term maintenance: the part that is easy to underestimate
 
@@ -236,7 +352,7 @@ explain, and the cost never goes away.
 **B -- `fork-neo` is the trunk, `fork-neo-test` is an overlay.** Upstream PRs
 land on `fork-neo` and are merged forward into `fork-neo-test`. Each change is
 made once. Cost: the `INSTRUMENT_ENABLED` blocks sit inside production files, so
-a PR touching one of those 7 files conflicts on the forward merge --
+a PR touching one of those 11 files conflicts on the forward merge --
 `command_functions.cpp` is both the highest-churn file and one of the seven.
 
 **C -- make the instrumentation additive.** Move the instrumentation out of
@@ -253,6 +369,14 @@ Operational consequence to write down before it bites: the forward merge is
 not optional and not occasional. A PR that reaches `fork-neo` and not
 `fork-neo-test` is a PR nobody can verify afterwards, which defeats the reason
 the split exists.
+
+**Model B needs a sealing step before the first upstream PR.** Both branches
+share only `upstream/dev` as a merge base, so the first forward merge is a full
+three-way merge of overlapping content: everywhere the strip changed a line the
+campaign also changed differently from base -- the `#if`/`#else` help text
+around `command_functions.cpp:1040` is one -- it conflicts. Resolve that once,
+deliberately, and record the sync point. Later PR merges then start from a base
+that has already moved past it.
 
 ## 9. Web flasher
 
@@ -274,17 +398,49 @@ ends up.
 - **Changelog language: German.** `docs/CHANGELOG-neo.md` is written in German
   because its first job is the negotiation with Kurt OE1KBC. It follows the
   structure of `docs/CHANGELOG-stability.md`, not its language.
-- **Maintenance model: B** (section 8).
+- **Maintenance model: B** (section 8), with the sealing merge recorded before
+  the first upstream PR.
 - **Failure policy: append during stage 1, fold before stage 3.** When a commit
   fails its gate on `fork-neo-test`, the fix is appended as a fixup rather than
   amended in, so the stage does not restart and the earlier builds stay valid.
-  Before stage 3 those fixups are folded into the chapter commits they belong
-  to, so `fork-neo` carries the clean series. `fork-neo-test` is allowed to be
-  honest about how it got there; `fork-neo` is the version Kurt reads.
+  Before stage 3 those fixups are folded into the chapter commits they belong to,
+  so `fork-neo` carries the clean series. `fork-neo-test` is allowed to be honest
+  about how it got there; `fork-neo` is the version Kurt reads.
+- **`E22_XML-DevKitC` threshold: `--min-headroom 4000`**, 4096 everywhere else.
+  The gate enforces "do not make it worse" on that env instead of a constraint
+  the campaign did not create.
+- **`lib/tinyxml2` travels to `fork-neo`.** Reverted from an earlier decision to
+  restore upstream's `lib_deps` URL: that URL drags in an example `main()` worth
+  5768 B of DRAM and 572 B of IRAM on the tightest env in the tree, which would
+  put it below the threshold just agreed. It is a campaign result, not ballast,
+  and it earns a changelog chapter.
+- **Gate stays at 8 envs**, with the trigger rule in section 6 covering the case
+  where the nine classic envs could diverge.
+- **`test/` and the native envs land last**, as chapter K19 on `fork-neo-test`
+  only, because a native env's source filter is complete only at the tip.
 
 ## 11. Still open
 
-- The `E22_XML-DevKitC` threshold decision in section 6.
 - The commit cut itself. A first proposal with all 248 files assigned to 18
-  chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is
-  an upper bound and not the answer.
+  chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
+  upper bound and not the answer. K19 (`test/` plus the native envs) makes 19 on
+  `fork-neo-test`.
+- Ownership of the root-level delta: `.github/workflows/`, `README.md`,
+  `.gitignore`, `.gitattributes` (section 5).
+- Whether `docs/CHANGELOG-neo.md` is written in full before stage 1 or chapter by
+  chapter as each gate passes.
+
+## 12. Review history
+
+- **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
+  confirmed against the tree and fixed in this revision. The load-bearing one:
+  `git checkout <tree> -- <paths>` runs in overlay mode and never deletes, so the
+  projection as originally written would have committed none of the 77 deletions.
+  Also confirmed: `INSTRUMENT_ENABLED` already defaults to 0, making the original
+  bridge gate a no-op; the strip surface is 11 files rather than 7;
+  `configuration_global.h` carries no guard at all; `tdeck_helpers.cpp:143` is an
+  unguarded bench marker; `FLASH_VERSION` also reaches the setlog STAT line;
+  dropping `lib/tinyxml2` breaks `E22_XML-DevKitC`; the file count was 248 with
+  48 additions, not 251 with 49; the two safeboot envs are the only members of
+  `default_envs` and were missing from the gate; and an incremental board build
+  takes ~30 s, which removes the economy argument for a reduced env set.

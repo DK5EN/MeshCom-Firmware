@@ -52,12 +52,21 @@ closing `git diff` over the union of all path sets must be empty.
 | K16 | Web-GUI                               | 2     | 102  | 70    | R1-04, R2-01, R2-04                            |
 | K17 | Instrumentierung und MC_DIAG          | 2     | 82   | 4     | R3-11, D2-09                                   |
 | K18 | Build-Konfiguration                   | 64    | 6987 | 619   | W7, W7-II                                      |
+| K19 | Testgeruest (nur `fork-neo-test`)     | 446+  | --   | --    | der Beleg der ganzen Kampagne                  |
 
 Two chapters dominate the line counts and both are explainable: K01 is pure
 subtraction (vendor fonts, dead platforms), K10's 14990 deletions are the twenty
 duplicated `lv_conf.h` copies collapsing into one `config/lv_conf.h`. K18's
 +6987 is mostly the 34 `[env:native*]` blocks in `platformio.ini` plus
-`lib/tinyxml2` -- neither of which survives onto `fork-neo`.
+`lib/tinyxml2`. The native blocks move to K19 and do not reach `fork-neo`;
+**`lib/tinyxml2` does travel** -- it is the MEM-04 fix (`95d6fbe6`) worth
+5768 B DRAM and 572 B IRAM on `E22_XML-DevKitC`, not ballast. An earlier draft
+of this document had that backwards.
+
+The "twenty copies into one" wording needs care in the changelog too: `t_deck`
+and `t_deck_plus` still carry their own `lv_conf.h`, and `config/lv_conf.h`
+already existed upstream. Twenty **non-LVGL** copies were deleted; twenty copies
+were not unified into one. Do not claim a unification that did not happen.
 
 ## 3. The problem this analysis found
 
@@ -90,6 +99,9 @@ prevent.
 Dependency first, narrative second. Foundations before consumers, deletions
 early so later diffs are small.
 
+0. **Projection note**: every chapter is applied with
+   `git checkout --no-overlay`, or its deletions silently do not happen. K01 and
+   K10 together are 77 of the 248 files and would otherwise commit nothing.
 1. **K01 Vendor-Ballast** -- pure subtraction, depends on nothing
 2. **K18 Build-Konfiguration** -- the variant and env restructuring the rest
    builds against
@@ -108,26 +120,48 @@ early so later diffs are small.
 15. **K14 EXTUDP**
 16. **K16 Web-GUI**
 17. **K15 Safeboot und OTA**
-18. **K17 Instrumentierung** -- last, because it is the chapter that does not
-    exist on `fork-neo`
+18. **K17 Instrumentierung** -- second to last, one of the two chapters that do
+    not exist on `fork-neo`
+19. **K19 Testgeruest** -- `test/` plus the 34 `[env:native*]` blocks, last and
+    `fork-neo-test` only. Last because a native env's `build_src_filter` set is
+    complete only at the tip; run after an intermediate chapter it fails for
+    reasons that have nothing to do with that chapter. This makes
+    `platformio.ini` the one file split across two chapters: K18 lands it without
+    the native blocks, K19 appends them.
 
-Putting K17 last is deliberate: `instrument.cpp` / `instrument.h` are the only
-two files that exist purely for instrumentation, so on `fork-neo` that chapter
-simply is not replayed. Everything else instrumentation-related lives inside
-`#if INSTRUMENT_ENABLED` blocks in production files owned by other chapters --
-which is precisely why the strip is mechanical rather than a commit deletion,
-and why option C in `docs/neo-campaign.md` section 8 (making instrumentation
-additive) would pay for itself.
+Putting K17 and K19 last is deliberate: they are exactly the two chapters
+`fork-neo` does not replay.
 
-## 5. What this does not yet answer
+But dropping those two is **not** the whole strip. `instrument.h` is included by
+11 files and its macros are invoked in nine of them, including the two
+highest-churn files in the tree; every include and call site has to go on
+`fork-neo`, plus the unguarded bench marker at
+`src/t-deck/tdeck_helpers.cpp:143`. That is a source rewrite, which is why
+`docs/neo-campaign.md` section 5 requires the strip to be a checked-in script
+and redefines G1 on `fork-neo` as `strip(fork-neo-test) == fork-neo`. It is also
+the strongest argument for option C in section 8: if the instrumentation were
+additive, the strip really would be two chapters not replayed.
+
+## 5. Advisor pass, 2026-09-19
+
+An independent Fable advisor re-derived the numbers in section 1 and 2 against
+the tree: the 248-file count, the 18 chapter file counts, the +19559/-40558 line
+totals and the 243/5 split all reconcile exactly. What it refuted was the
+procedure around them, not the arithmetic -- see
+`docs/neo-campaign.md` section 12 for the full list. The three findings that
+changed this document are the `--no-overlay` projection flag, `lib/tinyxml2`
+travelling after all, and K19.
+
+## 6. What this does not yet answer
 
 - The final chapter count, which the build gate decides, not this document.
 - Whether K05 and K06 can stand apart at all given R2-04.
-- Whether K18 has to split, because `platformio.ini` is a transformed file on
-  `fork-neo` and a copied one on `fork-neo-test`.
+- Whether K18 has to split further. It already does once, for K19's native env
+  blocks; `platformio.ini` is additionally a transformed file on `fork-neo` and a
+  copied one on `fork-neo-test`.
 - The per-chapter changelog text itself, which is the next deliverable.
 
-## 6. Reproducing this
+## 7. Reproducing this
 
 The classifier lives in the session scratchpad and is not part of the tree. It
 reads `git diff --numstat upstream/dev dry-unification` over the filter set,
