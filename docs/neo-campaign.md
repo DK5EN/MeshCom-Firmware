@@ -77,15 +77,15 @@ where that verifiability lives.
 
 ## 3. Stages
 
-| Stage | What                                                                          | Gate                                                                                                                |
-| ----- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**           | 34/34 native envs, 8/8 board envs                                                                                   |
-| 1     | `fork-neo-test` from `upstream/dev`, the chapter commits with harness         | per commit: 8 builds + region check. The host suite only runs from K19 on, when `test/` and the native envs land    |
-| 2     | `fork-neo-test` complete                                                      | all 32 board envs, both safeboot envs, full host suite, one `-DINSTRUMENT_ENABLED=1` build, bench fleet             |
-| 3     | `fork-neo` from `upstream/dev`, the same chapters minus K17 and K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
-| 4     | `fork-neo` complete                                                           | all 32 board envs, tests against every firmware                                                                     |
-| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages                         | differential run vs official 4.35t, 24 h soak                                                                       |
-| 6     | Negotiate `dev-dk5en` with Kurt, push                                         | --                                                                                                                  |
+| Stage | What                                                                  | Gate                                                                                                                |
+| ----- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**   | 34/34 native envs, 8/8 board envs                                                                                   |
+| 1     | `fork-neo-test` from `upstream/dev`, the chapter commits with harness | per commit: 8 builds + region check. The host suite only runs from K19 on, when `test/` and the native envs land    |
+| 2     | `fork-neo-test` complete                                              | all 32 board envs, both safeboot envs, full host suite, one `-DINSTRUMENT_ENABLED=1` build, bench fleet             |
+| 3     | `fork-neo` from `upstream/dev`, the same chapters minus K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
+| 4     | `fork-neo` complete                                                   | all 32 board envs, tests against every firmware                                                                     |
+| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages                 | differential run vs official 4.35t, 24 h soak                                                                       |
+| 6     | Negotiate `dev-dk5en` with Kurt, push                                 | --                                                                                                                  |
 
 Stage 0 was mandatory before anything else: `dry-unification` branched at
 `1cb2d9e6` and did not know the last 11 upstream commits. Projecting fork
@@ -150,22 +150,22 @@ after an intermediate chapter fails for reasons that have nothing to do with the
 chapter. `platformio.ini` is therefore the one file split across two chapters:
 K18 lands it without the native blocks, K19 appends them.
 
-**2. Firmware instrumentation.** Not 7 files. `instrument.h` is included by
-**11** files, and the `INSTR_*` macros or `instrument_*` calls appear in
-`nrf52/nrf52_main.cpp`, `esp32/esp32_main.cpp`, `command_functions.cpp`,
-`nrf52/gateway_service_nrf52.cpp`, `loop_functions.cpp`,
-`t-deck/lv_obj_functions.cpp`, `t-deck/tdeck_main.cpp`, `extudp_functions.cpp`,
-`esp32/gateway_service_esp32.cpp` and `nrf52/nrf_eth.cpp`, plus
-`instrument.cpp/.h` themselves. On `fork-neo` every include and every macro
-invocation has to go. That is a source rewrite across 11 files, two of them the
-highest-churn files in the tree -- not "delete seven blocks".
+**2. The firmware instrumentation is NOT stripped.** Corrected 2026-09-19 after
+checking the tree: `upstream/dev` already carries it. `src/instrument.h` is
+byte-identical to ours, `src/instrument.cpp` differs by 18 lines, and seven
+files include it upstream already. Our entire delta is those 18 lines plus four
+additional includers (`extudp_functions.cpp`, `nrf52/nrf_eth.cpp`,
+`esp32/gateway_service_esp32.cpp`, `nrf52/gateway_service_nrf52.cpp`).
 
-`src/configuration_global.h` is **not** a strip file. It mentions
-`INSTRUMENT_ENABLED` only in comments (lines 196-209).
+Removing it from `fork-neo` would delete Kurt's own code and push the branch
+further from upstream instead of closer -- the wordless removal this whole plan
+exists to prevent. `INSTRUMENT_ENABLED` defaults to 0 and no env sets it, so it
+costs a shipped image nothing.
 
-`src/t-deck/tdeck_helpers.cpp:143` carries a raw, completely unguarded bench
-marker (`Serial.printf("[KBL];set;%u\n", ...)`, preprocessor depth 0). A
-mechanical guard strip will not touch it. It needs an explicit rule.
+**3. One unguarded bench marker.** `src/t-deck/tdeck_helpers.cpp:143` prints
+`[KBL];set;%u` at preprocessor depth 0. It is the only genuinely fork-local
+bench artefact in the production source, and the only hand-written line of the
+strip.
 
 Also out: `docs/` except `CHANGELOG-neo.md`, the **fork's additions to**
 `tools/`, `.claude/`, `.prettierignore`, `release.md`, `release-notes.md`.
@@ -228,32 +228,31 @@ between a repeatable branch and one nobody can rebuild.
 
 ### How the strip is verified
 
-The originally planned bridge gate does not work. `INSTRUMENT_ENABLED` is
-already **0 by default** (`src/instrument.h:34-35`) and no ini sets it, so
-"build `fork-neo-test` with `INSTRUMENT_ENABLED=0`" is simply the ordinary
-build. Two consequences:
+The strip is now small enough to state exactly: `test/` goes, the 34
+`[env:native*]` blocks in `platformio.ini` go, and one marker line goes. Nothing
+else. No source rewrite, no guard sweep.
 
-1. **Nothing in stages 1 and 2 ever compiles the instrumented code.** The
-   measurement firmware can rot from commit 1 without a single red build. Add one
-   `-DINSTRUMENT_ENABLED=1` build to the stage-2 gate
-   (`PLATFORMIO_BUILD_FLAGS=-DINSTRUMENT_ENABLED=1`, no space after `-D`; note
-   that setting this env var changes `project.checksum` and wipes `.pio/build`).
-2. **Byte identity cannot hold anyway.** `__DATE__`/`__TIME__` are compiled into
-   the image at five sites (`command_functions.cpp:5293`,
-   `t-deck/tdeck_main.cpp:298`, `nrf52/nrf52_functions.cpp:225`,
-   `esp32/esp32_main.cpp:808`, `web_functions/web_functions.cpp:2136`), and
-   esptool appends an ELF SHA-256 to the app descriptor.
+That restores the cheap gate the earlier draft had to give up. `test/` and the
+native envs reach no board image -- no `#include` in `src/` points at them and
+none of those envs is in `default_envs` -- so at the same chapter, `fork-neo` and
+`fork-neo-test` must produce **the same eight firmwares**.
 
-What actually proves the strip was complete:
-
-- **Symbol-set diff.** `nm --defined-only --size-sort` and `size -A` between the
-  `INSTRUMENT_ENABLED=0` build of `fork-neo-test` and the stripped `fork-neo`
-  build at the same chapter. A symbol present in one and absent in the other
-  names the lost function directly. This is the load-bearing check.
-- **Byte compare, if wanted**: `SOURCE_DATE_EPOCH` set, both branches built at
+- **Symbol-set diff** (`nm --defined-only --size-sort`, `size -A`) between the
+  two branches at the same chapter. A symbol in one and not the other names the
+  difference directly. This is the load-bearing check.
+- **Byte compare, if wanted**: `SOURCE_DATE_EPOCH` set and both branches built at
   the same absolute path (or `-ffile-prefix-map`), comparing `firmware.bin` with
-  the `esp_app_desc` SHA field masked.
-- **String scan of the ELF** after every strip commit, as G3 already requires.
+  the `esp_app_desc` SHA field masked. `__DATE__`/`__TIME__` sit in the image at
+  five sites, so this never works without those precautions.
+- **String scan of the ELF** after the strip commit, to prove the marker is gone
+  and nothing else went with it.
+
+One thing the earlier draft got right for the wrong reason and which still
+holds: add a `-DINSTRUMENT_ENABLED=1` build to the stage-2 gate. `INSTRUMENT_ENABLED`
+is 0 by default (`src/instrument.h:34-35`) and no ini sets it, so without that
+one build nothing ever compiles the instrumented path and it can rot unnoticed
+on both branches. Note the spelling: `-DINSTRUMENT_ENABLED=1`, no space. Setting
+`PLATFORMIO_BUILD_FLAGS` changes `project.checksum` and wipes `.pio/build`.
 
 ## 6. The gate set: 8 envs
 
@@ -363,7 +362,7 @@ explain, and the cost never goes away.
 **B -- `fork-neo` is the trunk, `fork-neo-test` is an overlay.** Upstream PRs
 land on `fork-neo` and are merged forward into `fork-neo-test`. Each change is
 made once. Cost: the `INSTRUMENT_ENABLED` blocks sit inside production files, so
-a PR touching one of those 11 files conflicts on the forward merge --
+a PR touching `platformio.ini` or the one marker line conflicts on the forward merge --
 `command_functions.cpp` is both the highest-churn file and one of the seven.
 
 **C -- make the instrumentation additive.** Move the instrumentation out of
@@ -427,6 +426,10 @@ ends up.
   and it earns a changelog chapter.
 - **Gate stays at 8 envs**, with the trigger rule in section 6 covering the case
   where the nine classic envs could diverge.
+- **The instrumentation stays on `fork-neo`.** Reversing the strip decision of
+  the same day: `upstream/dev` already ships it, so removing it would delete the
+  maintainer's own code. This restores the operator's original answer, which was
+  right; the later "no instrumentation" instruction meant the test harness.
 - **`test/` and the native envs land last**, as chapter K19 on `fork-neo-test`
   only, because a native env's source filter is complete only at the tip.
 - **`docs/CHANGELOG-neo.md` is written complete in one pass**, not layered per

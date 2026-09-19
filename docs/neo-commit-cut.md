@@ -129,18 +129,16 @@ early so later diffs are small.
     `platformio.ini` the one file split across two chapters: K18 lands it without
     the native blocks, K19 appends them.
 
-Putting K17 and K19 last is deliberate: they are exactly the two chapters
-`fork-neo` does not replay.
+Putting K19 last is deliberate: it is the one chapter `fork-neo` does not
+replay.
 
-But dropping those two is **not** the whole strip. `instrument.h` is included by
-11 files and its macros are invoked in nine of them, including the two
-highest-churn files in the tree; every include and call site has to go on
-`fork-neo`, plus the unguarded bench marker at
-`src/t-deck/tdeck_helpers.cpp:143`. That is a source rewrite, which is why
-`docs/neo-campaign.md` section 5 requires the strip to be a checked-in script
-and redefines G1 on `fork-neo` as `strip(fork-neo-test) == fork-neo`. It is also
-the strongest argument for option C in section 8: if the instrumentation were
-additive, the strip really would be two chapters not replayed.
+K17 is no longer such a chapter. `upstream/dev` already carries
+`src/instrument.h` (byte-identical) and `src/instrument.cpp` (18 lines apart),
+and seven files include it there. K17's real content is those 18 lines plus four
+additional includers -- a small fork addition that ships on both branches, not a
+chapter to drop. The strip is therefore `test/`, the 34 `[env:native*]` blocks
+and the unguarded bench marker at `src/t-deck/tdeck_helpers.cpp:143`; nothing
+else, and no source rewrite.
 
 ## 5. Advisor pass, 2026-09-19
 
