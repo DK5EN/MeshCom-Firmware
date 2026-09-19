@@ -244,8 +244,15 @@ production files behind hooks, so the overlay is purely new files plus a
 separate ini include and merges cleanly forever. Highest upfront cost, lowest
 ongoing cost, and it would make the strip trivial instead of mechanical.
 
-Recommendation: **B**, with C as the direction of travel once neo has shipped
-once. A is only defensible while the number of upstream PRs is small.
+**Decided 2026-09-19: B.** `fork-neo` is the trunk, upstream PRs land there
+and are merged forward into `fork-neo-test`. C stays the direction of travel
+once neo has shipped once -- the conflict surface B accepts is exactly the
+surface C would remove, so the two are the same decision seen twice.
+
+Operational consequence to write down before it bites: the forward merge is
+not optional and not occasional. A PR that reaches `fork-neo` and not
+`fork-neo-test` is a PR nobody can verify afterwards, which defeats the reason
+the split exists.
 
 ## 9. Web flasher
 
@@ -262,12 +269,22 @@ Location: `dk5en.github.io/MeshCom-Firmware`. Pages are not enabled on the
 upstream repo, so the flasher stays on the fork regardless of where the code
 ends up.
 
-## 10. Open points
+## 10. Decisions taken
 
-- Language of `docs/CHANGELOG-neo.md`: German for the negotiation with Kurt, or
-  English like `docs/CHANGELOG-stability.md`.
-- Failure policy when a commit fails its gate in stage 1: amend (clean history,
-  invalidates every build after it) or append a fixup (cheap, tells the story
-  neo exists to remove). Proposal: append during stage 1, fold before stage 3.
+- **Changelog language: German.** `docs/CHANGELOG-neo.md` is written in German
+  because its first job is the negotiation with Kurt OE1KBC. It follows the
+  structure of `docs/CHANGELOG-stability.md`, not its language.
+- **Maintenance model: B** (section 8).
+- **Failure policy: append during stage 1, fold before stage 3.** When a commit
+  fails its gate on `fork-neo-test`, the fix is appended as a fixup rather than
+  amended in, so the stage does not restart and the earlier builds stay valid.
+  Before stage 3 those fixups are folded into the chapter commits they belong
+  to, so `fork-neo` carries the clean series. `fork-neo-test` is allowed to be
+  honest about how it got there; `fork-neo` is the version Kurt reads.
+
+## 11. Still open
+
 - The `E22_XML-DevKitC` threshold decision in section 6.
-- The commit cut itself -- follows from the changelog, which is not written yet.
+- The commit cut itself. A first proposal with all 248 files assigned to 18
+  chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is
+  an upper bound and not the answer.
