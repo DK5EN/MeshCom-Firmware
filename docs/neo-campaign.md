@@ -81,7 +81,7 @@ where that verifiability lives.
 | ----- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | 0     | Merge `upstream/dev` into `dry-unification` -- **done, `c09e22b8`**   | 34/34 native envs, 8/8 board envs                                                                                   |
 | 1     | `fork-neo-test` from `upstream/dev` -- **done**                       | 40/40 builds over 5 commits x 8 envs, regions measured at every commit, G1 empty                                    |
-| 2     | `fork-neo-test` complete                                              | all 32 board envs, both safeboot envs, full host suite, one `-DINSTRUMENT_ENABLED=1` build, bench fleet             |
+| 2     | `fork-neo-test` complete -- **done**                                  | 34/34 host envs, 32/32 board envs, 2/2 safeboot, one instrumented build with 13 INSTR strings in the ELF            |
 | 3     | `fork-neo` from `upstream/dev`, the same chapters minus K19, stripped | per commit: 8 builds + region check + ELF string scan + symbol-set diff against the same chapter on `fork-neo-test` |
 | 4     | `fork-neo` complete                                                   | all 32 board envs, tests against every firmware                                                                     |
 | 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages                 | differential run vs official 4.35t, 24 h soak                                                                       |
@@ -479,7 +479,37 @@ tested for the string "error" rather than the exit code, so
 verdict was void. The instrument now lives in the scratchpad, the gate uses the
 exit code and `--strict`, and it self-tests before the run.
 
-## 12. Still open
+## 12. Stage 2 result
+
+Everything green on the tip of `fork-neo-test`: **34/34 host envs, 32/32 board
+envs, both safeboot envs**, and one `-DINSTRUMENT_ENABLED=1` build whose ELF
+carries 13 `INSTR` strings -- so the measurement firmware demonstrably still
+compiles and is not rotting.
+
+Three things the stage found that no plan document had:
+
+1. **`tools/` is needed twice, not once.** `ensure_tasmota_framework.py` for the
+   two safeboot envs (known) and `force_include_settings_stub.py` for
+   `env:native_nrf52_settings_paths` (not known -- that env's build died with
+   "missing SConscript file" before a single test ran). All `tools/` references
+   in `platformio.ini` were then enumerated at once instead of discovered one at
+   a time: the remaining two, `bench/ble_golden.py` and `logharvest.py`, sit in
+   comment lines and are not dependencies.
+2. **Safeboot must be built last.** The safeboot envs use the Tasmota
+   platform-espressif32 fork, whose framework package shares its installation
+   directory with mainline espressif32. Building safeboot swaps that directory
+   out from under every subsequent mainline build. `ensure_tasmota_framework.py`
+   repairs the Tasmota side; the ordering avoids paying for it 32 times.
+3. **The root `safeboot*.bin` really do go stale.** They sit outside the filter
+   set while K15 changes `src/safeboot/`, so the branch carried new safeboot
+   source with upstream's old binary until the gate rebuilt them. Same size as
+   the working tree's, not byte-identical -- `__DATE__`/`__TIME__` and the ELF
+   checksum are in the image.
+
+Three fixup commits are appended, to be folded before stage 3: the two `tools/`
+scripts and the rebuilt binaries.
+
+## 13. Still open
 
 - The commit cut itself. A first proposal with all 248 files assigned to 18
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
@@ -488,7 +518,7 @@ exit code and `--strict`, and it self-tests before the run.
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
 
-## 13. Review history
+## 14. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
