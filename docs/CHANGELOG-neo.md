@@ -70,6 +70,38 @@ Erstellt auf `upstream/dev`, Stand `4058b25b` (Merge von PR #1145). Die
 Instrumentierung, die Kapitel K17 beschreibt, ist dort bereits enthalten; dieser
 Branch aendert an ihr achtzehn Zeilen.
 
+## Auf der Bank gemessen
+
+Am 2026-09-19 lief ein Differenzlauf gegen `upstream/dev` auf zwei Knoten:
+DK5EN-1 (Heltec V3, SX1262) und DK5EN-92 (T-Beam, SX1276), beide auf
+433.175 MHz mit 1 bzw. 2 dBm, Gateway und Mesh aus. Mitgeschnitten wurde von
+drei Seiten: beide Knoten seriell und DK5EN-98 als unabhaengiger Zeuge auf dem
+Draht. Dasselbe Skript -- zwei Gruppennachrichten je Knoten und je eine
+Direktnachricht in beide Richtungen -- lief zweimal je Firmware.
+
+**Auf dem Draht ist kein Unterschied messbar.** Beide Firmwares erzeugen
+dieselben acht Nutzlasten mit denselben Feldern: Rahmentyp, Hop-Flags, Quelle,
+Ziel, Text, Hardware-Kennung, Modulation, Firmware-Kennung, letzter Hop. Die
+Quittungen auf die Direktnachrichten kommen in beiden Faellen. Nur die
+Reihenfolge, in der Quittungen relativ zu den Nachrichten eintreffen,
+schwankt -- das sind Sekunden und haengt am Kanal, nicht an der Firmware; es
+schwankt innerhalb einer Firmware genauso wie zwischen beiden.
+
+**Im Knoten ist der Unterschied deutlich.** Freier Heap unmittelbar nach dem
+Start, gemittelt ueber je zwei Laeufe:
+
+| Knoten              | upstream/dev | dieser Stand | Gewinn    |
+| ------------------- | ------------ | ------------ | --------- |
+| DK5EN-1 (Heltec V3) | 244 900 B    | 256 196 B    | +11 296 B |
+| DK5EN-92 (T-Beam)   | 146 868 B    | 162 428 B    | +15 560 B |
+
+Die Werte sind innerhalb einer Firmware bitgenau stabil (beide neo-Laeufe
+melden 256 196), zwischen den Firmwares klar getrennt. Dazu die
+Flash-Ersparnis aus demselben Build: 10,5 kB auf dem Heltec, 45,5 kB auf dem
+T-Beam.
+
+Was der Lauf NICHT zeigt: Langzeitverhalten. Ein 24-Stunden-Soak steht aus.
+
 ## K01 Vendor-Ballast entfernen
 
 **1. 43 unbenutzte GFX-Fonts entfernt, die zehn tatsaechlich eingebundenen bleiben**
