@@ -1,0 +1,4 @@
+src/safeboot/ElegantOTA.cpp
+src/safeboot/ElegantOTA.h
+src/safeboot/main.cpp
+src/safeboot/ota.h
