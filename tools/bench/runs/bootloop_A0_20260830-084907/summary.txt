@@ -1,0 +1,11 @@
+arm A0  port /dev/cu.usbmodem1101
+
+boots                     24
+first join <= 25 s        0/24
+got_ip ms  median/max     55832 / 56459   (n=24)
+ready ms   median/max     23216 / 23685
+disconnect events         240
+    2:AUTH_EXPIRE                216
+    202:AUTH_FAIL                24
+connection-error bursts   288
+[WIFI];stall lines        0

@@ -1,0 +1,4 @@
+apreboot smoke3  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_smoke3_20260830-190430
+phase              DONE (no outage detected)
+verdict            FAIL
+see                /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_smoke3_20260830-190430/summary.txt

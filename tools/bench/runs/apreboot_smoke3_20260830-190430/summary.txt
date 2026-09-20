@@ -1,0 +1,66 @@
+apreboot smoke3  /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/apreboot_smoke3_20260830-190430
+started            2026-08-30 19:04:30
+windows            settle 60.0 s / cycle 20.0 s / recovery 30.0 s
+outage t0          none seen
+verdict            FAIL
+  !! no outage detected
+  WARN tdeck: no [UDP];tx during settle -- the node is not a gateway (KEEP is sent only with --gateway on), so the UDP half of the test is not exercised
+  WARN heltec: no [UDP];tx during settle -- the node is not a gateway (KEEP is sent only with --gateway on), so the UDP half of the test is not exercised
+  WARN tbeam: no [UDP];tx during settle -- the node is not a gateway (KEEP is sent only with --gateway on), so the UDP half of the test is not exercised
+
+== tdeck (esp32)   FAIL
+marker       before t0   after t0
+link_up              2   -
+got_ip               3   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   1 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+
+== heltec (esp32)   FAIL
+marker       before t0   after t0
+link_up              2   -
+got_ip               3   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   0 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+
+== tbeam (esp32)   FAIL
+marker       before t0   after t0
+link_up              2   -
+got_ip               3   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   1 / 1
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+
+== rak (rak)   FAIL
+marker       before t0   after t0
+link_up              1   -
+got_ip               1   -
+ntp_ok               0   -
+udp_tx               0   -
+udp_rx               0   -
+reboots after t0        0
+rst:0x / [BOOT];ready   0 / 0
+[WIFI];watchdog         0
+stall lines             0
+commands after t0       none
+  !! no outage detected
+

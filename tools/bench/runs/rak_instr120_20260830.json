@@ -1,0 +1,91 @@
+{
+  "instr": {
+    "ok": true,
+    "seconds": 120.0,
+    "loop_n": 1211,
+    "loop_avg_us": 99771,
+    "loop_max_us": 128906,
+    "gaps": 0,
+    "gap_events": [],
+    "sections": {
+      "eth_state": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "clock": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "display_rx": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "lora_sm": {
+        "n": 23,
+        "avg_us": 382,
+        "max_us": 5859
+      },
+      "ble_settings": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "telemetry": {
+        "n": 8,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "eth_udp_tx": {
+        "n": 1208,
+        "avg_us": 62,
+        "max_us": 28320
+      },
+      "eth_udp": {
+        "n": 1212,
+        "avg_us": 66,
+        "max_us": 28320
+      },
+      "gateway": {
+        "n": 1212,
+        "avg_us": 67,
+        "max_us": 28320
+      },
+      "display_tick": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "serial_cmd": {
+        "n": 1212,
+        "avg_us": 2,
+        "max_us": 2930
+      },
+      "lora_rx_timeout": {
+        "n": 1201,
+        "avg_us": 19,
+        "max_us": 1953
+      },
+      "lora_tx": {
+        "n": 1,
+        "avg_us": 5859,
+        "max_us": 5859
+      },
+      "eth_heartbeat": {
+        "n": 4,
+        "avg_us": 0,
+        "max_us": 0
+      },
+      "pos_timer": {
+        "n": 1212,
+        "avg_us": 0,
+        "max_us": 0
+      }
+    },
+    "heap_free": 110964,
+    "heap_largest": 97620,
+    "worst_section": "eth_udp_tx"
+  }
+}

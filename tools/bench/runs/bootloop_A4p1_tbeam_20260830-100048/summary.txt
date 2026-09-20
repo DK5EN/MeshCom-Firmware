@@ -1,0 +1,9 @@
+arm A4p1_tbeam  port /dev/cu.usbserial-573C0005841
+
+boots                     12
+first join <= 25 s        12/12
+got_ip ms  median/max     10579 / 11176   (n=12)
+ready ms   median/max     11584 / 12195
+disconnect events         0
+connection-error bursts   0
+[WIFI];stall lines        0

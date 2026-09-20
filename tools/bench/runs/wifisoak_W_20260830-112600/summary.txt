@@ -1,0 +1,51 @@
+wifisoak wifisoak_W_20260830-112600  elapsed 0.83 h  (interim)
+
+== tdeck
+resets seen               1
+first got_ip ms           14291
+ready ms / ip             15132 / 1
+drops sent                5
+reconnect after drop ms   n=5 median=4036 p90=4993 max=4993
+unsolicited disconnects   0
+BSSID changes             0
+    5A:AF:97:2E:2B:8B got_ip x6    chan [3] rssi min/med/max -75/-70/-69  auth=7 pmf=0 wpa3=0
+harvest same_ip           5
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -77/-72/-68  (n=49)
+dns                       2 resolutions, max 22 ms
+
+== heltec
+resets seen               0
+first got_ip ms           11367
+ready ms / ip             12180 / 1
+drops sent                3
+reconnect after drop ms   n=3 median=3958 p90=4017 max=4017
+unsolicited disconnects   0
+BSSID changes             1
+    5A:AF:97:2E:2B:8B got_ip x4    chan [3] rssi min/med/max -63/-57/-57  auth=7 pmf=0 wpa3=0
+    46:AF:97:2E:2B:86 got_ip x1    chan [3] rssi min/med/max -69/-69/-69  auth=7 pmf=0 wpa3=0
+harvest same_ip           3
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -66/-57/-53  (n=27)
+dns                       4 resolutions, max 33 ms
+
+!! heltec: serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+
+== tbeam
+resets seen               1
+first got_ip ms           10665
+ready ms / ip             11672 / 1
+drops sent                5
+reconnect after drop ms   n=5 median=3989 p90=4123 max=4123
+unsolicited disconnects   0
+BSSID changes             0
+    5A:AF:97:2E:2B:8B got_ip x6    chan [3] rssi min/med/max -56/-55/-53  auth=7 pmf=0 wpa3=0
+harvest same_ip           5
+watchdog actions          0
+[WIFI];stall lines        0
+link rssi min/med/max     -61/-57/-54  (n=42)
+dns                       2 resolutions, max 55 ms
+
+!! tbeam: serial error: device reports readiness to read but returned no data (device disconnected or multiple access on port?)

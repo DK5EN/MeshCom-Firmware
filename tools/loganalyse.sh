@@ -10,14 +10,69 @@
 # Output: Structured sections separated by "=== SECTION_NAME ===" markers
 # for easy parsing by the logauswertung skill.
 
-set -euo pipefail
+set +e  # Do not exit on errors; let sections fail visibly and continue
 
 if [ $# -lt 1 ] || [ ! -f "$1" ]; then
     echo "Usage: $0 <logfile>" >&2
     exit 1
 fi
 
-LOGFILE="$1"
+# ─── Input normalization (TOOL-04) ───
+# Firmware serial captures can contain stray non-UTF8 bytes (RF/UART noise).
+# Under a UTF-8 locale these abort awk mid-file ("towc: multibyte conversion
+# failure"), silently truncating every awk-based section. normalize_log strips
+# input to printable ASCII (plus tab/newline) under LC_ALL=C into a temp file
+# and echoes its path. Temp files are removed on exit.
+_NORMALIZED_TMPS=""
+cleanup_normalized_tmps() { [ -n "$_NORMALIZED_TMPS" ] && rm -f $_NORMALIZED_TMPS; }
+trap cleanup_normalized_tmps EXIT
+
+normalize_log() {
+    _src="$1"
+    _tmp="$(mktemp "${TMPDIR:-/tmp}/loganalyse.XXXXXX")"
+    _NORMALIZED_TMPS="$_NORMALIZED_TMPS $_tmp"
+    # TOOL-05: detect the raw firmware timestamp format
+    #   [EPOCHDAY.HHh.MMm.SSs.mmm]  and convert to serial_monitor format
+    #   YYYY-MM-DD HH:MM:SS.mmm  (epoch day -> date via pure-awk Gregorian
+    #   math; no `date` call, so identical on macOS/BSD and Linux/GNU).
+    # Byte sanitizing (TOOL-04) runs in both branches.
+    if LC_ALL=C grep -qE '^\[[0-9]+\.[0-9]+h\.[0-9]+m\.[0-9]+s\.[0-9]+\]' "$_src"; then
+        LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" | LC_ALL=C awk '
+        function civil(days,   z, era, doe, yoe, y, doy, mp, d, m) {
+            # days since 1970-01-01 -> Y-M-D (proleptic Gregorian, Hinnant)
+            z = days + 719468
+            era = int((z >= 0 ? z : z - 146096) / 146097)
+            doe = z - era * 146097
+            yoe = int((doe - int(doe/1460) + int(doe/36524) - int(doe/146096)) / 365)
+            y = yoe + era * 400
+            doy = doe - (365*yoe + int(yoe/4) - int(yoe/100))
+            mp = int((5*doy + 2) / 153)
+            d = doy - int((153*mp + 2) / 5) + 1
+            m = (mp < 10 ? mp + 3 : mp - 9)
+            return sprintf("%04d-%02d-%02d", (m <= 2 ? y + 1 : y), m, d)
+        }
+        BEGIN { last = "1970-01-01 00:00:00.000" }
+        {
+            if (match($0, /^\[[0-9]+\.[0-9]+h\.[0-9]+m\.[0-9]+s\.[0-9]+\]/)) {
+                hdr = substr($0, 2, RLENGTH - 2)
+                rest = substr($0, RLENGTH + 1); sub(/^ /, "", rest)
+                split(hdr, a, ".")
+                hh = a[2]; sub(/h$/, "", hh)
+                mm = a[3]; sub(/m$/, "", mm)
+                ss = a[4]; sub(/s$/, "", ss)
+                last = civil(a[1] + 0) " " hh ":" mm ":" ss "." a[5]
+                print last "  " rest
+            } else {
+                print last "  " $0
+            }
+        }' > "$_tmp"
+    else
+        LC_ALL=C tr -cd '\11\12\40-\176' < "$_src" > "$_tmp"
+    fi
+    echo "$_tmp"
+}
+
+LOGFILE="$(normalize_log "$1")"
 
 # ─── Helper ───
 section() { echo ""; echo "=== $1 ==="; }
@@ -179,13 +234,13 @@ grep "RX-LoRa-All:" "$LOGFILE" | grep -v 'H@R\|HG@R\|\*!' | head -20 || true
 section "HOP_DISTRIBUTION"
 
 echo "--- MH-LoRa (Empfangen) ---"
-grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "MH-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- RX-LoRa2 (Akzeptiert) ---"
-grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "RX-LoRa2:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 echo "--- TX-LoRa (Gesendet) ---"
-grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
+grep "TX-LoRa:" "$LOGFILE" | grep -oE 'H[0-9]{2} S[0-9]' | grep -oE 'H[0-9]{2}' | sort | uniq -c | sort -rn || true
 
 # ─── 5. LOOPS ───
 section "LOOPS"
@@ -398,9 +453,9 @@ grep "MH-LoRa:" "$LOGFILE" | grep -oE 'x[A-F0-9]{8}' | sort | uniq -c | awk '{pr
 section "STATE_MACHINE"
 
 echo "MC_SM_TOTAL: $(grep -c 'MC-SM' "$LOGFILE" 2>/dev/null; true)"
-echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -vc 'rc=0' 2>/dev/null; true)"
-
-grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | head -10 || true
+echo "MC_SM_ERRORS: $(grep 'MC-SM' "$LOGFILE" | grep -v 'rc=0' | grep -vc 'TX_PREPARE -> IDLE rc=-1' 2>/dev/null; true)"
+echo "MC_SM_CSMA_BACKOFF: $(grep -c 'TX_PREPARE -> IDLE rc=-1' "$LOGFILE" 2>/dev/null; true)"
+grep "MC-SM" "$LOGFILE" | grep -v "rc=0" | grep -v 'TX_PREPARE -> IDLE rc=-1' | head -10 || true
 
 # ─── 13. ADDITIONAL CHECKS ───
 section "ADDITIONAL"
@@ -898,7 +953,7 @@ END {
 
 # ─── 20. CROSS-LOG CORRELATION ───
 if [ $# -ge 2 ] && [ -f "$2" ]; then
-    LOGFILE2="$2"
+    LOGFILE2="$(normalize_log "$2")"
     section "CROSS_CORRELATION"
 
     echo "LOG1: $LOGFILE"
@@ -1003,7 +1058,8 @@ if grep -q '\[MC-STAT\]' "$LOGFILE"; then
     echo ""
     echo "--- Priority drops ---"
     grep 'RING_DROP_PRIO\|RING_DROP_NEW' "$LOGFILE" | wc -l | awk '{printf "  Total priority drops: %d\n", $1}'
-    grep 'RING_DROP_PRIO' "$LOGFILE" | grep -oE 'prio=[0-9]' | sort | uniq -c | sort -rn || true
+    echo "--- Dropped packets by prio+type ---"
+    (grep -E 'RING_DROP_(PRIO|NEW)' "$LOGFILE" | grep -oE 'prio=[0-9]+ type=[0-9A-Fa-f]+' | sort | uniq -c | sort -rn) || true
 else
     echo "  No [MC-STAT] data found (priority queue not active or no data yet)"
 fi
@@ -1039,6 +1095,1327 @@ if grep -q '\[MC-HWM\]' "$LOGFILE"; then
 else
     echo "  No [MC-HWM] data found"
 fi
+
+# ─── CONSOLIDATED ADVANCED ANALYSIS (Pass A) ───
+# Single awk pass over entire log for: HEAP, Starvation, Server, NTP,
+# Signal Profiling, Frequency Drift, Interferers, Top Talkers,
+# Channel Util Diagram, CSMA Timing, ACK Storm, CAD enhancements
+awk '
+BEGIN {
+    # HEAP
+    heap_cnt = 0; heap_sum = 0; heap_sumsq = 0
+    heap_min = 999999999; heap_max = 0
+    heap_mon_cnt = 0; heap_lwm = 999999999; heap_hwm = 0
+    heap_prev = 0; heap_mono_dec = 0; heap_mono_max = 0
+    heap_first = 0; heap_first_ts = ""
+    psrm_val = ""
+
+    # Starvation
+    last_rxfire_sec = -1; silent_cnt = 0
+    last_sm_sec = -1; last_sm_state = ""; stuck_cnt = 0
+    zombie_streak = 0; zombie_cnt = 0
+    prio1_starve_cnt = 0
+
+    # Server
+    keep_cnt = 0; last_keep_sec = -1; keep_gap_cnt = 0
+    wifi_connect = 0; wifi_disconnect = 0; udp_reset = 0
+    client_disconnect = 0
+
+    # NTP
+    ntp_cnt = 0; ntp_prev_sec = -1
+
+    # Signal profiling (per direct-heard node H00)
+    # Uses sig_rssi_sum[cs], sig_rssi_sumsq[cs], sig_rssi_cnt[cs],
+    #      sig_rssi_min[cs], sig_rssi_max[cs],
+    #      sig_snr_sum[cs], sig_snr_sumsq[cs], sig_snr_cnt[cs],
+    #      sig_snr_min[cs], sig_snr_max[cs],
+    #      sig_ferr_sum[cs], sig_ferr_sumsq[cs], sig_ferr_cnt[cs],
+    #      sig_ferr_min[cs], sig_ferr_max[cs]
+    # Freq drift: sig_ferr_day_sum[cs], sig_ferr_day_cnt[cs],
+    #             sig_ferr_night_sum[cs], sig_ferr_night_cnt[cs]
+    # Linear regression: sig_ferr_tx_sum[cs], sig_ferr_txx_sum[cs],
+    #                    sig_ferr_txy_sum[cs] (t = hour since start)
+
+    last_rx_rssi = 0; last_rx_snr = 0; last_rx_ferr = 0; has_rx = 0
+    last_rx_hour = 0
+
+    # Top talkers: heard[cs], tx_own = 0, tx_relay = 0
+    tx_own = 0; tx_relay = 0; relay_q_cnt = 0
+
+    # Channel util diagram: chutil_hour_sum[hh], chutil_hour_cnt[hh]
+    # CSMA timing: wait histogram
+    wait_lt3 = 0; wait_3_4 = 0; wait_4_5 = 0; wait_5_6 = 0; wait_gt6 = 0
+    wait_sum = 0; wait_cnt = 0; wait_min = 999999; wait_max = 0
+
+    # Inter-arrival: ia_sum, ia_cnt, ia_min, ia_max
+    last_rx_sec = -1; ia_sum = 0; ia_cnt = 0; ia_min = 999999; ia_max = 0
+
+    # TX gate
+    tx_gate_cnt = 0
+
+    # CAD enhanced
+    cad_busy_cnt = 0; cad_fp_cnt = 0; cad_giveup_cnt = 0
+    # CAD per hour: cad_busy_hour[hh], cad_fp_hour[hh]
+
+    # ACK
+    ack_cnt = 0; ack_rx_cancel = 0; ack_fwd_dedup = 0
+    ack_gw_dedup = 0; ack_skip = 0; ack_tx = 0
+    ack_cancel_retx = 0; ack_fwd_drop = 0; ack_gw_drop = 0
+    ack_cad_busy = 0
+    # ACK burst detection: last 10 ack timestamps
+    ack_burst_cnt = 0
+
+    # Interferer
+    interf_cnt = 0
+
+    # First timestamp for time calculations
+    start_sec = -1
+}
+
+function parse_sec(ts,    parts, hms) {
+    # Parse HH:MM:SS.mmm or HH:MM:SS to seconds
+    split(ts, hms, ":")
+    return hms[1]*3600 + hms[2]*60 + hms[3]+0
+}
+
+function parse_hour(ts,    hms) {
+    split(ts, hms, ":")
+    return hms[1]+0
+}
+
+function abs(v) { return v < 0 ? -v : v }
+
+function sqrt_approx(x,    g, i) {
+    if (x <= 0) return 0
+    g = x / 2
+    for (i = 0; i < 20; i++) g = (g + x/g) / 2
+    return g
+}
+
+function stddev(sum, sumsq, n) {
+    if (n < 2) return 0
+    return sqrt_approx((sumsq - sum*sum/n) / (n-1))
+}
+
+# ── Parse serial-monitor timestamp from every line ──
+{
+    line_ts = $2  # HH:MM:SS.mmm
+    line_sec = parse_sec(line_ts)
+    line_hour = parse_hour(line_ts)
+    if (start_sec < 0) start_sec = line_sec
+}
+
+# ── HEAP ──
+/\[HEAP\]/ {
+    n = split($0, parts, ";")
+    if (n >= 3) {
+        val = parts[3] + 0
+        if (val > 0) {
+            heap_cnt++
+            heap_sum += val
+            heap_sumsq += val * val
+            if (val < heap_min) heap_min = val
+            if (val > heap_max) heap_max = val
+            if (heap_cnt == 1) { heap_first = val; heap_first_ts = line_ts }
+            heap_last = val; heap_last_ts = line_ts
+
+            # Hourly bucket
+            heap_hour_sum[line_hour] += val
+            heap_hour_cnt[line_hour]++
+            if (!(line_hour in heap_hour_min) || val < heap_hour_min[line_hour])
+                heap_hour_min[line_hour] = val
+
+            # Monotonic decrease detection (steady state: after first 30 samples)
+            if (heap_cnt > 30) {
+                if (val < heap_prev) {
+                    heap_mono_dec++
+                    if (heap_mono_dec > heap_mono_max) heap_mono_max = heap_mono_dec
+                } else if (val > heap_prev) {
+                    heap_mono_dec = 0
+                }
+            }
+            heap_prev = val
+
+            # Extended format: HH:MM:SS;[HEAP];current;low;high;(mon)
+            # parts[6] = "(mon)", parts[4] = low_watermark, parts[5] = high_watermark
+            if (n >= 6 && parts[6] ~ /mon/) {
+                heap_mon_cnt++
+                lwm = parts[4] + 0
+                hwm_val = parts[5] + 0
+                if (lwm > 0 && lwm < heap_lwm) heap_lwm = lwm
+                if (hwm_val > 0 && hwm_val > heap_hwm) heap_hwm = hwm_val
+            }
+        }
+    }
+}
+
+/\[PSRM\]/ {
+    n = split($0, parts, ";")
+    if (n >= 3) psrm_val = parts[3]
+}
+
+# ── Starvation: RX_TIMEOUT_FIRE ──
+/RX_TIMEOUT_FIRE/ {
+    if (last_rxfire_sec >= 0) {
+        gap = line_sec - last_rxfire_sec
+        # Handle day wrap
+        if (gap < 0) gap += 86400
+        if (gap > 20) {
+            silent_cnt++
+            if (silent_cnt <= 20) {
+                silent_time[silent_cnt] = line_ts
+                silent_gap[silent_cnt] = gap
+            }
+        }
+    }
+    last_rxfire_sec = line_sec
+
+    # CSMA wait time extraction
+    if (match($0, /wait=[0-9]+/)) {
+        w = substr($0, RSTART+5, RLENGTH-5) + 0
+        wait_cnt++
+        wait_sum += w
+        if (w < wait_min) wait_min = w
+        if (w > wait_max) wait_max = w
+        if (w < 3000) wait_lt3++
+        else if (w < 4000) wait_3_4++
+        else if (w < 5000) wait_4_5++
+        else if (w < 6000) wait_5_6++
+        else wait_gt6++
+    }
+}
+
+# ── Starvation: MC-SM state transitions ──
+/\[MC-SM\]/ {
+    # Extract source and dest state
+    if (match($0, /\[MC-SM\] [A-Z_]+ -> [A-Z_]+/)) {
+        sm_str = substr($0, RSTART+7, RLENGTH-7)
+        split(sm_str, sm_parts, " -> ")
+        src_state = sm_parts[1]
+        dst_state = sm_parts[2]
+
+        if (last_sm_sec >= 0 && last_sm_state != "RX_LISTEN") {
+            dur = line_sec - last_sm_sec
+            if (dur < 0) dur += 86400
+            if (dur > 30) {
+                stuck_cnt++
+                if (stuck_cnt <= 10) {
+                    stuck_time[stuck_cnt] = line_ts
+                    stuck_state[stuck_cnt] = last_sm_state
+                    stuck_dur[stuck_cnt] = dur
+                }
+            }
+        }
+        last_sm_sec = line_sec
+        last_sm_state = dst_state
+    }
+}
+
+# ── Starvation: Ring zombies ──
+# BP-02: queued= in RING_STATUS is now the honest occupied-slot count
+# (was raw index distance iWrite-iRead, which counted holes freed behind a
+# priority-starved entry as still queued -- DJ8MEH-RCA 2026-08-31). The
+# zombie condition needs "ring actually drained", so prefer the new dist=
+# field (the old index-distance value, unaffected by the redefinition) when
+# present; fall back to queued==0 only for logs with no dist= field at all
+# (firmware built before BP-02).
+/RING_STATUS/ {
+    retrying = 0; queued = 0; dist = -1
+    if (match($0, /retrying=[0-9]+/))
+        retrying = substr($0, RSTART+9, RLENGTH-9) + 0
+    if (match($0, /queued=[0-9]+/))
+        queued = substr($0, RSTART+7, RLENGTH-7) + 0
+    if (match($0, /dist=[0-9]+/))
+        dist = substr($0, RSTART+5, RLENGTH-5) + 0
+    ring_drained = (dist >= 0) ? (dist == 0) : (queued == 0)
+    if (retrying > 0 && ring_drained) {
+        zombie_streak++
+        if (zombie_streak == 3) {
+            zombie_cnt++
+            if (zombie_cnt <= 10) zombie_time[zombie_cnt] = line_ts
+        }
+    } else {
+        zombie_streak = 0
+    }
+}
+
+# ── Starvation: Prio1 ──
+/\[MC-PRIO\]/ {
+    if (match($0, /p1_lat_avg=[0-9]+/)) {
+        lat = substr($0, RSTART+11, RLENGTH-11) + 0
+        if (lat > 10000) {
+            prio1_starve_cnt++
+            if (prio1_starve_cnt <= 10) prio1_time[prio1_starve_cnt] = line_ts
+        }
+    }
+}
+
+# ── Server: KEEP heartbeats ──
+/\[KEEP\]/ {
+    keep_cnt++
+    if (last_keep_sec >= 0) {
+        kgap = line_sec - last_keep_sec
+        if (kgap < 0) kgap += 86400
+        if (kgap > 90) {
+            keep_gap_cnt++
+            if (keep_gap_cnt <= 10) {
+                keep_gap_time[keep_gap_cnt] = line_ts
+                keep_gap_dur[keep_gap_cnt] = kgap
+            }
+        }
+    }
+    last_keep_sec = line_sec
+}
+
+# ── Server: WiFi events ──
+/\[WIFI\].*connect OK/ { wifi_connect++ }
+/\[WIFI\].*disconnect/ { wifi_disconnect++ }
+/Client disconnected/ { client_disconnect++ }
+/UDP.*reset\|UDP.*Reset/ { udp_reset++ }
+
+# ── NTP ──
+/TimeClient now/ {
+    ntp_cnt++
+    if (ntp_cnt <= 200) ntp_time[ntp_cnt] = line_ts
+    if (ntp_prev_sec >= 0) {
+        ndiff = line_sec - ntp_prev_sec
+        if (ndiff < 0) ndiff += 86400
+        ntp_interval_sum += ndiff
+        ntp_interval_cnt++
+    }
+    ntp_prev_sec = line_sec
+}
+
+# ── Received packet: signal data ──
+/Received packet:/ {
+    last_rx_rssi = 0; last_rx_snr = 0; last_rx_ferr = 0; has_rx = 1
+    for (i = 1; i <= NF; i++) {
+        if ($i == "RSSI:") {
+            for (j = i+1; j <= NF; j++) {
+                if ($j ~ /^-?[0-9]/) { last_rx_rssi = $j + 0; break }
+            }
+        }
+        if ($i == "SNR:") {
+            for (j = i+1; j <= NF; j++) {
+                if ($j ~ /^-?[0-9]/) { last_rx_snr = $j + 0; break }
+            }
+        }
+    }
+    # Frequency error
+    if (match($0, /Frequency error:[[:space:]]+[-0-9.]+/)) {
+        s = substr($0, RSTART, RLENGTH)
+        gsub(/Frequency error:[[:space:]]+/, "", s)
+        last_rx_ferr = s + 0
+    }
+    last_rx_hour = line_hour
+
+    # Inter-arrival time
+    if (last_rx_sec >= 0) {
+        ia = line_sec - last_rx_sec
+        if (ia < 0) ia += 86400
+        if (ia < 300) {  # ignore gaps > 5min (likely log gaps)
+            ia_cnt++
+            ia_sum += ia
+            if (ia < ia_min) ia_min = ia
+            if (ia > ia_max) ia_max = ia
+        }
+    }
+    last_rx_sec = line_sec
+}
+
+# ── MH-LoRa: per-node signal profiling + top talkers ──
+/MH-LoRa:/ {
+    cs = ""
+    is_direct = 0
+    pkt_size = 0
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ />/) {
+            split($i, r, /[,>]/)
+            cs = r[1]
+            break
+        }
+    }
+    if (cs == "" || cs ~ /^[0-9]/) next
+
+    # Check hop count for direct (H00)
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ /^H[0-9][0-9]$/) {
+            if ($i == "H00") is_direct = 1
+            break
+        }
+    }
+
+    # Packet size (3-digit number after "MH-LoRa:")
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9][0-9][0-9]$/) { pkt_size = $i + 0; break }
+    }
+
+    # Top talkers
+    heard[cs]++
+    heard_size[cs] += pkt_size
+
+    # Signal profiling for direct-heard nodes
+    if (is_direct && has_rx) {
+        sig_rssi_cnt[cs]++
+        sig_rssi_sum[cs] += last_rx_rssi
+        sig_rssi_sumsq[cs] += last_rx_rssi * last_rx_rssi
+        if (!(cs in sig_rssi_min) || last_rx_rssi < sig_rssi_min[cs])
+            sig_rssi_min[cs] = last_rx_rssi
+        if (!(cs in sig_rssi_max) || last_rx_rssi > sig_rssi_max[cs])
+            sig_rssi_max[cs] = last_rx_rssi
+
+        sig_snr_cnt[cs]++
+        sig_snr_sum[cs] += last_rx_snr
+        sig_snr_sumsq[cs] += last_rx_snr * last_rx_snr
+        if (!(cs in sig_snr_min) || last_rx_snr < sig_snr_min[cs])
+            sig_snr_min[cs] = last_rx_snr
+        if (!(cs in sig_snr_max) || last_rx_snr > sig_snr_max[cs])
+            sig_snr_max[cs] = last_rx_snr
+
+        sig_ferr_cnt[cs]++
+        sig_ferr_sum[cs] += last_rx_ferr
+        sig_ferr_sumsq[cs] += last_rx_ferr * last_rx_ferr
+        if (!(cs in sig_ferr_min) || last_rx_ferr < sig_ferr_min[cs])
+            sig_ferr_min[cs] = last_rx_ferr
+        if (!(cs in sig_ferr_max) || last_rx_ferr > sig_ferr_max[cs])
+            sig_ferr_max[cs] = last_rx_ferr
+
+        # Day/night freq drift (day=06-17, night=18-05)
+        if (last_rx_hour >= 6 && last_rx_hour < 18) {
+            sig_ferr_day_sum[cs] += last_rx_ferr
+            sig_ferr_day_cnt[cs]++
+        } else {
+            sig_ferr_night_sum[cs] += last_rx_ferr
+            sig_ferr_night_cnt[cs]++
+        }
+
+        # Linear regression: t = hours since start
+        t_hrs = (line_sec - start_sec) / 3600
+        if (t_hrs < 0) t_hrs += 24
+        sig_ferr_tx_sum[cs] += t_hrs
+        sig_ferr_txx_sum[cs] += t_hrs * t_hrs
+        sig_ferr_txy_sum[cs] += t_hrs * last_rx_ferr
+
+        # Interferer detection
+        if (abs(last_rx_ferr) > 5000) {
+            interf_cnt++
+            if (interf_cnt <= 20) {
+                interf_time[interf_cnt] = line_ts
+                interf_cs[interf_cnt] = cs
+                interf_ferr[interf_cnt] = last_rx_ferr
+                interf_rssi[interf_cnt] = last_rx_rssi
+                interf_snr[interf_cnt] = last_rx_snr
+            }
+        }
+
+        has_rx = 0
+    }
+}
+
+# ── TX-LoRa: own TX tracking ──
+/TX-LoRa:/ {
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ /^S[01]$/) {
+            if ($i == "S0") tx_own++
+            else tx_relay++
+            break
+        }
+    }
+    # Packet size for airtime
+    for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9][0-9][0-9]$/) { tx_total_size += $i + 0; break }
+    }
+}
+
+/RELAY_QUEUED/ { relay_q_cnt++ }
+
+# ── Channel utilization ──
+/CHANNEL_UTIL/ {
+    if (match($0, /util=[0-9]+/)) {
+        u = substr($0, RSTART+5, RLENGTH-5) + 0
+        chutil_hour_sum[line_hour] += u
+        chutil_hour_cnt[line_hour]++
+    }
+}
+
+# ── CAD enhanced ──
+/CAD_BUSY/ { cad_busy_cnt++; cad_busy_hour[line_hour]++ }
+/CAD_FALSE_POSITIVE/ { cad_fp_cnt++; cad_fp_hour[line_hour]++ }
+/CAD_GIVEUP/ { cad_giveup_cnt++ }
+
+# ── TX gate ──
+/TX_GATE_ENTER/ { tx_gate_cnt++; tx_gate_hour[line_hour]++ }
+
+# ── ACK events ──
+/ACK_RX_CANCEL/ { ack_rx_cancel++; ack_cnt++ }
+/ACK_FWD_DEDUP/ { ack_fwd_dedup++; ack_cnt++ }
+/ACK_GW_DEDUP/ { ack_gw_dedup++; ack_cnt++ }
+/ACK_SKIP/ { ack_skip++; ack_cnt++ }
+/ACK_FAST_TX/ { ack_tx++; ack_cnt++ }
+/ACK_CANCEL_RETRANSMIT/ { ack_cancel_retx++; ack_cnt++ }
+/ACK_FWD_DROPPED/ { ack_fwd_drop++; ack_cnt++ }
+/ACK_GW_DROPPED/ { ack_gw_drop++; ack_cnt++ }
+/ACK_CAD_BUSY/ { ack_cad_busy++; ack_cnt++ }
+
+# ── BLE TX Latency: track user_msg path ──
+/RING_WRITE.*src=user_msg/ {
+    if (match($0, /msg_id=[0-9A-Fa-f]+/)) {
+        bmid = substr($0, RSTART+7, RLENGTH-7)
+        ble_rw_sec[bmid] = line_sec
+        ble_is_user[bmid] = 1
+        ble_count++
+        ble_order[ble_count] = bmid
+    }
+    if (match($0, /queued=[0-9]+/))
+        ble_queued[bmid] = substr($0, RSTART+7, RLENGTH-7) + 0
+}
+
+/NEW-TXT:/ {
+    for (bi = 1; bi <= NF; bi++) {
+        if ($bi ~ /^x[0-9A-Fa-f]{8}$/) {
+            bmid = substr($bi, 2)
+            ble_newtxt_sec[bmid] = line_sec
+            # Extract short text
+            btxt = ""
+            bcap = 0
+            for (bj = bi+5; bj <= NF; bj++) {
+                if ($bj ~ /^HW:/) break
+                if (bcap) btxt = btxt " "
+                btxt = btxt $bj
+                bcap = 1
+            }
+            if (length(btxt) > 32) btxt = substr(btxt, 1, 32) "..."
+            ble_text[bmid] = btxt
+            break
+        }
+    }
+}
+
+/RING_TX_READ/ {
+    if (match($0, /msg_id=[0-9A-Fa-f]+/)) {
+        bmid = substr($0, RSTART+7, RLENGTH-7)
+        if (bmid in ble_is_user) {
+            ble_txr_sec[bmid] = line_sec
+            if (match($0, /lat=[0-9]+/))
+                ble_lat[bmid] = substr($0, RSTART+4, RLENGTH-4) + 0
+        }
+    }
+}
+
+/TX-LoRa:.*S0/ {
+    for (bi = 1; bi <= NF; bi++) {
+        if ($bi ~ /^x[0-9A-Fa-f]{8}$/) {
+            bmid = substr($bi, 2)
+            if (bmid in ble_is_user)
+                ble_tx_sec[bmid] = line_sec
+            break
+        }
+    }
+}
+
+END {
+    # ════════════════════════════════════════════════════════
+    # HEAP MONITORING
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== HEAP_MONITORING ==="
+    if (heap_cnt > 0) {
+        avg = heap_sum / heap_cnt
+        sd = stddev(heap_sum, heap_sumsq, heap_cnt)
+        printf "SAMPLES: %d (simple: %d, extended/mon: %d)\n", heap_cnt, heap_cnt - heap_mon_cnt, heap_mon_cnt
+        printf "FREE_HEAP: MIN=%d  MAX=%d  AVG=%.0f  STDDEV=%.0f\n", heap_min, heap_max, avg, sd
+        if (heap_mon_cnt > 0) {
+            if (heap_lwm < 999999999) printf "LOW_WATERMARK: %d (from extended monitoring)\n", heap_lwm
+            if (heap_hwm > 0) printf "HIGH_WATERMARK: %d (from extended monitoring)\n", heap_hwm
+        }
+        if (psrm_val != "") printf "PSRAM: %s\n", psrm_val
+
+        print ""
+        print "--- HEAP_TREND_HOURLY ---"
+        printf "%-6s %10s %10s %8s\n", "HOUR", "AVG_FREE", "MIN_FREE", "SAMPLES"
+        for (h = 0; h < 24; h++) {
+            if (h in heap_hour_cnt) {
+                printf "%02d:00  %10.0f %10d %8d\n", h, heap_hour_sum[h]/heap_hour_cnt[h], heap_hour_min[h], heap_hour_cnt[h]
+            }
+        }
+
+        print ""
+        print "--- STABILITY_ASSESSMENT ---"
+        printf "INITIAL_FREE: %d (%s)\n", heap_first, heap_first_ts
+        printf "FINAL_FREE: %d (%s)\n", heap_last, heap_last_ts
+        drop = heap_first - heap_last
+        drop_pct = (heap_first > 0) ? drop * 100.0 / heap_first : 0
+        printf "DROP: %d (%.1f%%)\n", drop, drop_pct
+        printf "MAX_MONOTONIC_DECREASE: %d consecutive samples\n", heap_mono_max
+
+        # Steady-state analysis (skip first 30 samples = init phase)
+        # Use overall stats as approximation since we track globally
+        ss_var_pct = (avg > 0) ? sd * 100.0 / avg : 0
+        printf "STEADY_STATE_VARIANCE: %.1f%%\n", ss_var_pct
+
+        # Distinguish init drop from real leak:
+        # If max monotonic decrease is short (< 20) AND variance is low,
+        # a large drop is just boot initialization, not a leak.
+        if (ss_var_pct > 15) {
+            printf "RATING: VOLATILE\n"
+        } else if (heap_mono_max >= 50) {
+            printf "RATING: MAJOR_LEAK (sustained monotonic decrease)\n"
+        } else if (heap_mono_max >= 20) {
+            printf "RATING: MINOR_LEAK (extended monotonic decrease: %d samples)\n", heap_mono_max
+        } else if (ss_var_pct < 5 && heap_mono_max < 20) {
+            printf "RATING: STABLE\n"
+            if (drop_pct > 20) {
+                printf "NOTE: Large initial drop (%.0f%%) is post-boot initialization, not a leak.\n", drop_pct
+                printf "      Steady-state heap is stable with %.1f%% variance.\n", ss_var_pct
+            }
+        } else {
+            printf "RATING: HEALTHY\n"
+        }
+    } else {
+        print "  No [HEAP] data found"
+    }
+
+    # ════════════════════════════════════════════════════════
+    # STARVATION EVENTS
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== STARVATION_EVENTS ==="
+    print "--- RADIO_SILENT (gap > 20s between RX_TIMEOUT_FIRE) ---"
+    if (silent_cnt > 0) {
+        for (i = 1; i <= silent_cnt && i <= 20; i++)
+            printf "  EVENT at %s  gap=%.1fs\n", silent_time[i], silent_gap[i]
+        printf "TOTAL_SILENT_EVENTS: %d\n", silent_cnt
+    } else {
+        print "  NONE DETECTED"
+    }
+
+    print ""
+    print "--- STUCK_STATES (non-RX_LISTEN state > 30s) ---"
+    if (stuck_cnt > 0) {
+        for (i = 1; i <= stuck_cnt && i <= 10; i++)
+            printf "  STUCK %s at %s  duration=%.0fs\n", stuck_state[i], stuck_time[i], stuck_dur[i]
+        printf "TOTAL_STUCK_EVENTS: %d\n", stuck_cnt
+    } else {
+        print "  NONE DETECTED"
+    }
+
+    print ""
+    print "--- RING_ZOMBIES (retrying>0, ring drained [dist==0, or queued==0 on pre-BP-02 logs], 3+ consecutive) ---"
+    if (zombie_cnt > 0) {
+        for (i = 1; i <= zombie_cnt && i <= 10; i++)
+            printf "  ZOMBIE at %s\n", zombie_time[i]
+        printf "TOTAL_ZOMBIE_EVENTS: %d\n", zombie_cnt
+    } else {
+        print "  NONE DETECTED"
+    }
+
+    print ""
+    print "--- PRIO1_STARVATION (p1 latency > 10000ms) ---"
+    if (prio1_starve_cnt > 0) {
+        for (i = 1; i <= prio1_starve_cnt && i <= 10; i++)
+            printf "  EVENT at %s\n", prio1_time[i]
+        printf "TOTAL_PRIO1_STARVATION: %d\n", prio1_starve_cnt
+    } else {
+        print "  NONE DETECTED"
+    }
+
+    # ════════════════════════════════════════════════════════
+    # SERVER CONNECTION
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== SERVER_CONNECTION ==="
+    printf "KEEP_HEARTBEATS: %d\n", keep_cnt
+    printf "KEEP_GAPS_GT_90S: %d\n", keep_gap_cnt
+    if (keep_gap_cnt > 0) {
+        for (i = 1; i <= keep_gap_cnt && i <= 10; i++)
+            printf "  GAP at %s  duration=%.0fs\n", keep_gap_time[i], keep_gap_dur[i]
+    }
+    print ""
+    print "--- WIFI_EVENTS ---"
+    printf "  WIFI_CONNECT: %d\n", wifi_connect
+    printf "  WIFI_DISCONNECT: %d\n", wifi_disconnect
+    printf "  CLIENT_DISCONNECT: %d\n", client_disconnect
+    printf "  UDP_RESET: %d\n", udp_reset
+    print ""
+    if (keep_gap_cnt == 0) {
+        print "SERVER_HEALTH: HEALTHY (no heartbeat gaps detected)"
+    } else if (keep_gap_cnt <= 2) {
+        print "SERVER_HEALTH: MINOR_ISSUES (occasional gaps)"
+    } else {
+        print "SERVER_HEALTH: DEGRADED (frequent gaps)"
+    }
+
+    # ════════════════════════════════════════════════════════
+    # NTP SYNC
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== NTP_SYNC ==="
+    printf "NTP_SYNCS: %d\n", ntp_cnt
+    if (ntp_interval_cnt > 0) {
+        avg_int = ntp_interval_sum / ntp_interval_cnt
+        printf "AVG_SYNC_INTERVAL: %.0fs (%.1f min)\n", avg_int, avg_int/60
+    }
+    if (ntp_cnt > 0) {
+        printf "FIRST_SYNC: %s\n", ntp_time[1]
+        printf "LAST_SYNC: %s\n", ntp_time[ntp_cnt < 200 ? ntp_cnt : 200]
+    }
+    if (ntp_cnt > 0 && ntp_interval_cnt > 0) {
+        if (avg_int > 1200) {
+            print "NTP_HEALTH: WARNING (sync interval > 20 min)"
+        } else {
+            print "NTP_HEALTH: HEALTHY"
+        }
+    } else if (ntp_cnt == 0) {
+        print "NTP_HEALTH: NO_DATA"
+    }
+
+    # ════════════════════════════════════════════════════════
+    # SIGNAL PROFILING
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== SIGNAL_PROFILING ==="
+    print "Per directly-heard node (H00) - RSSI, SNR, Frequency Error"
+    print ""
+    printf "%-15s %5s  %8s %7s %7s  %7s %6s %6s  %9s %8s %8s\n", \
+        "CALLSIGN", "PKTS", "RSSI_AVG", "RSSI_SD", "RSSI_RNG", \
+        "SNR_AVG", "SNR_SD", "SNR_RNG", "FERR_AVG", "FERR_SD", "FERR_RNG"
+
+    # Collect and sort by count
+    sig_n = 0
+    for (cs in sig_rssi_cnt) {
+        sig_n++
+        sig_list[sig_n] = cs
+        sig_sort[sig_n] = sig_rssi_cnt[cs]
+    }
+    # Simple insertion sort by count descending
+    for (i = 2; i <= sig_n; i++) {
+        j = i
+        while (j > 1 && sig_sort[j] > sig_sort[j-1]) {
+            tmp = sig_list[j]; sig_list[j] = sig_list[j-1]; sig_list[j-1] = tmp
+            tmp = sig_sort[j]; sig_sort[j] = sig_sort[j-1]; sig_sort[j-1] = tmp
+            j--
+        }
+    }
+    for (i = 1; i <= sig_n; i++) {
+        cs = sig_list[i]
+        n = sig_rssi_cnt[cs]
+        r_avg = sig_rssi_sum[cs] / n
+        r_sd = stddev(sig_rssi_sum[cs], sig_rssi_sumsq[cs], n)
+        s_avg = sig_snr_sum[cs] / sig_snr_cnt[cs]
+        s_sd = stddev(sig_snr_sum[cs], sig_snr_sumsq[cs], sig_snr_cnt[cs])
+        f_avg = sig_ferr_sum[cs] / sig_ferr_cnt[cs]
+        f_sd = stddev(sig_ferr_sum[cs], sig_ferr_sumsq[cs], sig_ferr_cnt[cs])
+        printf "%-15s %5d  %8.1f %7.1f %3d..%3d  %7.1f %6.1f %3d..%2d  %9.1f %8.1f %6.0f..%.0f\n", \
+            cs, n, r_avg, r_sd, sig_rssi_min[cs], sig_rssi_max[cs], \
+            s_avg, s_sd, sig_snr_min[cs], sig_snr_max[cs], \
+            f_avg, f_sd, sig_ferr_min[cs], sig_ferr_max[cs]
+    }
+
+    # ════════════════════════════════════════════════════════
+    # FREQUENCY DRIFT
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== FREQUENCY_DRIFT ==="
+    print "Day (06:00-17:59) vs Night (18:00-05:59) frequency error per node"
+    print ""
+    printf "%-15s %5s  %10s %10s %9s %8s  %s\n", \
+        "CALLSIGN", "PKTS", "DAY_AVG_Hz", "NIGHT_AVG", "SHIFT_Hz", "SLOPE", "ASSESSMENT"
+    for (i = 1; i <= sig_n; i++) {
+        cs = sig_list[i]
+        n = sig_ferr_cnt[cs]
+        if (n < 5) continue
+        day_avg = 0; night_avg = 0; shift = 0
+        has_day = (cs in sig_ferr_day_cnt && sig_ferr_day_cnt[cs] > 0)
+        has_night = (cs in sig_ferr_night_cnt && sig_ferr_night_cnt[cs] > 0)
+        if (has_day) day_avg = sig_ferr_day_sum[cs] / sig_ferr_day_cnt[cs]
+        if (has_night) night_avg = sig_ferr_night_sum[cs] / sig_ferr_night_cnt[cs]
+        if (has_day && has_night) shift = night_avg - day_avg
+
+        # Linear regression slope
+        slope = 0
+        if (n >= 2) {
+            sx = sig_ferr_tx_sum[cs]
+            sxx = sig_ferr_txx_sum[cs]
+            sxy = sig_ferr_txy_sum[cs]
+            sy = sig_ferr_sum[cs]
+            denom = n * sxx - sx * sx
+            if (denom != 0) slope = (n * sxy - sx * sy) / denom
+        }
+
+        assessment = "STABLE"
+        if (abs(shift) > 50) assessment = "TEMP_DRIFT"
+        if (abs(slope) > 20) assessment = "TRENDING"
+        if (abs(shift) > 50 && abs(slope) > 20) assessment = "TEMP_DRIFT+TRENDING"
+
+        printf "%-15s %5d  %10.1f %10.1f %9.1f %8.2f  %s\n", \
+            cs, n, day_avg, \
+            (has_night ? night_avg : 0), \
+            shift, slope, assessment
+    }
+    print ""
+    print "NOTE: Shifts > 50 Hz between day/night suggest crystal thermal drift."
+    print "      Slope = Hz/hour trend (positive = drifting up over time)."
+
+    # ════════════════════════════════════════════════════════
+    # INTERFERER DETECTION
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== INTERFERER_DETECTION ==="
+    printf "PACKETS_WITH_FERR_GT_5KHZ: %d\n", interf_cnt
+
+    # Check per-node averages > 3kHz
+    off_freq_cnt = 0
+    for (cs in sig_ferr_cnt) {
+        if (sig_ferr_cnt[cs] >= 3) {
+            avg_f = abs(sig_ferr_sum[cs] / sig_ferr_cnt[cs])
+            if (avg_f > 3000) {
+                off_freq_cnt++
+                printf "  OFF-FREQUENCY NODE: %s  avg_ferr=%.1f Hz (%d packets)\n", \
+                    cs, sig_ferr_sum[cs]/sig_ferr_cnt[cs], sig_ferr_cnt[cs]
+            }
+        }
+    }
+    if (off_freq_cnt == 0) print "NODES_AVG_FERR_GT_3KHZ: 0"
+
+    if (interf_cnt > 0) {
+        print ""
+        print "--- OFF_FREQUENCY_EVENTS (|freq_err| > 5 kHz) ---"
+        printf "%-12s %-15s %10s %6s %5s\n", "TIME", "CALLSIGN", "FERR_Hz", "RSSI", "SNR"
+        for (i = 1; i <= interf_cnt && i <= 20; i++) {
+            printf "%-12s %-15s %10.1f %6d %5d\n", \
+                interf_time[i], interf_cs[i], interf_ferr[i], interf_rssi[i], interf_snr[i]
+        }
+    }
+
+    # ════════════════════════════════════════════════════════
+    # TOP TALKERS
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== TOP_TALKERS ==="
+    print "--- MOST HEARD NODES (by packet count) ---"
+    # Sort heard[] by count
+    tt_n = 0; tt_total = 0
+    for (cs in heard) {
+        tt_n++
+        tt_list[tt_n] = cs
+        tt_sort[tt_n] = heard[cs]
+        tt_total += heard[cs]
+    }
+    for (i = 2; i <= tt_n; i++) {
+        j = i
+        while (j > 1 && tt_sort[j] > tt_sort[j-1]) {
+            tmp = tt_list[j]; tt_list[j] = tt_list[j-1]; tt_list[j-1] = tmp
+            tmp = tt_sort[j]; tt_sort[j] = tt_sort[j-1]; tt_sort[j-1] = tmp
+            j--
+        }
+    }
+    # Airtime: SF11/BW250 ~3ms/byte (approximate)
+    printf "%-15s %6s %6s %12s\n", "CALLSIGN", "HEARD", "PCT%", "EST_AIRTIME"
+    top = tt_n; if (top > 30) top = 30
+    for (i = 1; i <= top; i++) {
+        cs = tt_list[i]
+        pct = (tt_total > 0) ? heard[cs] * 100.0 / tt_total : 0
+        airtime_s = heard_size[cs] * 0.003  # 3ms per byte approx
+        printf "%-15s %6d %5.1f%% %10.1fs\n", cs, heard[cs], pct, airtime_s
+    }
+    print ""
+    print "--- OWN TX BREAKDOWN ---"
+    tx_total = tx_own + tx_relay
+    if (tx_total > 0) {
+        printf "OWN_ORIGIN (S0): %d packets\n", tx_own
+        printf "OWN_RELAY (S1): %d packets\n", tx_relay
+        printf "RELAY_RATIO: %.1f%%\n", tx_relay * 100.0 / tx_total
+        printf "TOTAL_TX: %d\n", tx_total
+        printf "EST_OWN_AIRTIME: %.1fs\n", tx_total_size * 0.003
+    }
+    printf "RELAY_QUEUED: %d\n", relay_q_cnt
+
+    # ════════════════════════════════════════════════════════
+    # CHANNEL UTILIZATION DIAGRAM
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== CHANNEL_UTIL_DIAGRAM ==="
+    print "Hourly average channel utilization (1-hour buckets)"
+    print ""
+    # Find max for scaling
+    ch_max = 1
+    for (h = 0; h < 24; h++) {
+        if (h in chutil_hour_cnt) {
+            v = chutil_hour_sum[h] / chutil_hour_cnt[h]
+            if (v > ch_max) ch_max = v
+        }
+    }
+    bar_width = 60
+    printf "%-6s %6s  %s\n", "HOUR", "UTIL%", "BAR"
+    for (h = 0; h < 24; h++) {
+        if (h in chutil_hour_cnt) {
+            v = chutil_hour_sum[h] / chutil_hour_cnt[h]
+            # Scale to percentage (util is already %, scale bar to 100%)
+            bars = int(v * bar_width / 100 + 0.5)
+            if (bars < 0) bars = 0
+            if (bars > bar_width) bars = bar_width
+            bar_str = ""
+            for (b = 0; b < bars; b++) bar_str = bar_str "#"
+            for (b = bars; b < bar_width; b++) bar_str = bar_str " "
+            printf "%02d:00  %5.1f%%  |%s|\n", h, v, bar_str
+        }
+    }
+
+    # ════════════════════════════════════════════════════════
+    # CSMA TIMING ANALYSIS
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== CSMA_TIMING ==="
+
+    print "--- ADAPTIVE_WAIT_DISTRIBUTION (from RX_TIMEOUT_FIRE wait=) ---"
+    printf "%-14s %7s %6s\n", "RANGE", "COUNT", "PCT%"
+    if (wait_cnt > 0) {
+        printf "< 3000ms       %7d %5.1f%%\n", wait_lt3, wait_lt3*100.0/wait_cnt
+        printf "3000-3999ms    %7d %5.1f%%\n", wait_3_4, wait_3_4*100.0/wait_cnt
+        printf "4000-4999ms    %7d %5.1f%%\n", wait_4_5, wait_4_5*100.0/wait_cnt
+        printf "5000-5999ms    %7d %5.1f%%\n", wait_5_6, wait_5_6*100.0/wait_cnt
+        printf "> 6000ms       %7d %5.1f%%\n", wait_gt6, wait_gt6*100.0/wait_cnt
+        print ""
+        printf "WAIT_SAMPLES: %d\n", wait_cnt
+        printf "WAIT_AVG: %.0f ms\n", wait_sum / wait_cnt
+        printf "WAIT_MIN: %d ms\n", wait_min
+        printf "WAIT_MAX: %d ms\n", wait_max
+    } else {
+        print "  No RX_TIMEOUT_FIRE wait data"
+    }
+
+    print ""
+    print "--- INTER_ARRIVAL_TIME (between consecutive Received packet:) ---"
+    if (ia_cnt > 0) {
+        printf "AVG: %.1fs\n", ia_sum / ia_cnt
+        printf "MIN: %.1fs\n", ia_min
+        printf "MAX: %.1fs\n", ia_max
+        printf "SAMPLES: %d\n", ia_cnt
+    } else {
+        print "  No inter-arrival data"
+    }
+
+    print ""
+    print "--- CAD_BUSY_VS_TRAFFIC (per hour) ---"
+    printf "%-6s %8s %10s %8s %10s\n", "HOUR", "TX_GATE", "CAD_BUSY", "CAD_FP", "CHAN_UTIL"
+    for (h = 0; h < 24; h++) {
+        if (h in chutil_hour_cnt || h in cad_busy_hour) {
+            cu = (h in chutil_hour_cnt) ? chutil_hour_sum[h]/chutil_hour_cnt[h] : 0
+            printf "%02d:00  %8d %10d %8d %9.1f%%\n", h, \
+                (h in tx_gate_hour ? tx_gate_hour[h] : 0), \
+                (h in cad_busy_hour ? cad_busy_hour[h] : 0), \
+                (h in cad_fp_hour ? cad_fp_hour[h] : 0), cu
+        }
+    }
+
+    print ""
+    print "--- CSMA_ASSESSMENT ---"
+    print "LoRa Parameters: SF11, BW250kHz, CR4/6, Preamble 8 symbols"
+    printf "Symbol time: 8.192 ms (2^11 / 250000)\n"
+    printf "Preamble duration: ~100 ms (12.25 symbols)\n"
+    printf "CAD detection window: ~16 ms (2 symbols)\n"
+    print ""
+    if (wait_cnt > 0) {
+        w_avg = wait_sum / wait_cnt
+        printf "Observed adaptive wait avg: %.0f ms\n", w_avg
+        printf "Observed wait range: %d - %d ms\n", wait_min, wait_max
+    }
+    if (cad_busy_cnt > 0 && tx_gate_cnt > 0) {
+        printf "CAD busy rate: %.1f%% (%d busy / %d scans)\n", \
+            cad_busy_cnt * 100.0 / (cad_busy_cnt + tx_gate_cnt), cad_busy_cnt, cad_busy_cnt + tx_gate_cnt
+    }
+    if (cad_fp_cnt > 0 && cad_busy_cnt > 0) {
+        printf "CAD false positive rate: %.1f%% (%d / %d initial busy)\n", \
+            cad_fp_cnt * 100.0 / cad_busy_cnt, cad_fp_cnt, cad_busy_cnt
+    }
+    printf "CAD giveup (forced TX): %d\n", cad_giveup_cnt
+    print ""
+
+    if (ia_cnt > 0 && wait_cnt > 0) {
+        ia_avg = ia_sum / ia_cnt
+        w_avg_s = (wait_sum / wait_cnt) / 1000.0
+        if (ia_avg > w_avg_s * 2) {
+            print "ASSESSMENT: ADEQUATE - Inter-arrival time >> wait time. Low collision risk."
+        } else if (ia_avg > w_avg_s) {
+            print "ASSESSMENT: MARGINAL - Inter-arrival approaching wait time. Monitor closely."
+        } else {
+            print "ASSESSMENT: CONGESTED - Inter-arrival < wait time. Consider longer backoff."
+        }
+        printf "  Inter-arrival avg: %.1fs vs wait avg: %.1fs (ratio: %.1f)\n", \
+            ia_avg, w_avg_s, ia_avg / w_avg_s
+    }
+
+    # ════════════════════════════════════════════════════════
+    # ACK STORM
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== ACK_STORM ==="
+    printf "TOTAL_ACK_EVENTS: %d\n", ack_cnt
+    print ""
+    print "--- ACK_BREAKDOWN ---"
+    printf "  ACK_RX_CANCEL: %d\n", ack_rx_cancel
+    printf "  ACK_FWD_DEDUP: %d\n", ack_fwd_dedup
+    printf "  ACK_GW_DEDUP: %d\n", ack_gw_dedup
+    printf "  ACK_SKIP: %d\n", ack_skip
+    printf "  ACK_FAST_TX: %d\n", ack_tx
+    printf "  ACK_CANCEL_RETRANSMIT: %d\n", ack_cancel_retx
+    printf "  ACK_FWD_DROPPED: %d\n", ack_fwd_drop
+    printf "  ACK_GW_DROPPED: %d\n", ack_gw_drop
+    printf "  ACK_CAD_BUSY: %d\n", ack_cad_busy
+    print ""
+    saved = ack_rx_cancel + ack_fwd_dedup + ack_gw_dedup + ack_skip
+    if (saved + ack_tx > 0) {
+        printf "ACK_EFFICIENCY: %.1f%% saved (%d saved / %d total)\n", \
+            saved * 100.0 / (saved + ack_tx), saved, saved + ack_tx
+    }
+    if (ack_cnt < 10) {
+        print "NOTE: Very low ACK activity in this log."
+    }
+
+    # ════════════════════════════════════════════════════════
+    # CAD ENHANCED STATS
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== CAD_ENHANCED ==="
+    printf "CAD_BUSY_TOTAL: %d\n", cad_busy_cnt
+    printf "CAD_FALSE_POSITIVE: %d", cad_fp_cnt
+    if (cad_busy_cnt > 0)
+        printf " (%.1f%% of initial busy)", cad_fp_cnt * 100.0 / cad_busy_cnt
+    printf "\n"
+    printf "CAD_CONFIRMED_BUSY: %d\n", cad_busy_cnt - cad_fp_cnt
+    printf "CAD_GIVEUP: %d\n", cad_giveup_cnt
+
+    # ════════════════════════════════════════════════════════
+    # BLE TX LATENCY
+    # ════════════════════════════════════════════════════════
+    print ""
+    print "=== BLE_TX_LATENCY ==="
+    if (ble_count > 0) {
+        printf "BLE user_msg events: %d\n\n", ble_count
+        printf "%-10s %-14s %-35s %6s %10s %10s\n", \
+            "MSG_ID", "TIME", "TEXT", "QUEUE", "Q_WAIT", "TOTAL"
+
+        bn = 0; bt_sum = 0; bq_sum = 0
+        bt_min = 999999999; bt_max = 0
+        bq_min = 999999999; bq_max = 0
+        for (bi = 1; bi <= ble_count; bi++) {
+            bmid = ble_order[bi]
+            if (!(bmid in ble_tx_sec)) continue
+            bn++
+
+            bq_wait = (bmid in ble_lat) ? ble_lat[bmid] : -1
+            btotal = -1
+            if (bmid in ble_newtxt_sec && bmid in ble_tx_sec) {
+                btotal = (ble_tx_sec[bmid] - ble_newtxt_sec[bmid]) * 1000
+                if (btotal < 0) btotal += 86400000
+            } else if (bmid in ble_rw_sec && bmid in ble_tx_sec) {
+                btotal = (ble_tx_sec[bmid] - ble_rw_sec[bmid]) * 1000
+                if (btotal < 0) btotal += 86400000
+            }
+
+            printf "%-10s %-14s %-35s %6d %8dms %8dms\n", \
+                bmid, (bmid in ble_rw_sec ? "" : "?"), \
+                (bmid in ble_text ? ble_text[bmid] : "?"), \
+                (bmid in ble_queued ? ble_queued[bmid] : -1), \
+                bq_wait, btotal
+
+            if (bq_wait > 0) {
+                bq_sum += bq_wait; bq_cnt++
+                if (bq_wait < bq_min) bq_min = bq_wait
+                if (bq_wait > bq_max) bq_max = bq_wait
+            }
+            if (btotal >= 0) {
+                bt_sum += btotal
+                if (btotal < bt_min) bt_min = btotal
+                if (btotal > bt_max) bt_max = btotal
+                # Histogram
+                if (btotal < 2000) bh_lt2++
+                else if (btotal < 5000) bh_2_5++
+                else if (btotal < 10000) bh_5_10++
+                else if (btotal < 20000) bh_10_20++
+                else bh_gt20++
+                # Sorted for median
+                bsorted[bn] = btotal
+                # Queue depth correlation
+                bqd = (bmid in ble_queued) ? ble_queued[bmid] : -1
+                if (bqd >= 0 && bq_wait > 0) {
+                    bqd_sum[bqd] += bq_wait
+                    bqd_cnt[bqd]++
+                }
+            }
+        }
+
+        printf "\n--- STATISTICS (%d messages with TX) ---\n", bn
+        if (bq_cnt > 0) printf "QUEUE_WAIT: AVG=%dms  MIN=%dms  MAX=%dms\n", bq_sum/bq_cnt, bq_min, bq_max
+        if (bn > 0) {
+            printf "END_TO_END: AVG=%dms  MIN=%dms  MAX=%dms\n", bt_sum/bn, bt_min, bt_max
+            # Sort for median/p95
+            for (bi = 2; bi <= bn; bi++) {
+                bj = bi; bv = bsorted[bj]
+                while (bj > 1 && bsorted[bj-1] > bv) {
+                    bsorted[bj] = bsorted[bj-1]; bj--
+                }
+                bsorted[bj] = bv
+            }
+            bmed = int(bn/2) + 1
+            bp95 = int(bn * 0.95) + 1
+            if (bp95 > bn) bp95 = bn
+            printf "MEDIAN:     %dms\n", bsorted[bmed]
+            printf "P95:        %dms\n", bsorted[bp95]
+        }
+
+        printf "\n--- HISTOGRAM ---\n"
+        printf "< 2s:   %3d  (%5.1f%%)\n", bh_lt2+0, (bn>0 ? (bh_lt2+0)*100.0/bn : 0)
+        printf "2-5s:   %3d  (%5.1f%%)\n", bh_2_5+0, (bn>0 ? (bh_2_5+0)*100.0/bn : 0)
+        printf "5-10s:  %3d  (%5.1f%%)\n", bh_5_10+0, (bn>0 ? (bh_5_10+0)*100.0/bn : 0)
+        printf "10-20s: %3d  (%5.1f%%)\n", bh_10_20+0, (bn>0 ? (bh_10_20+0)*100.0/bn : 0)
+        printf "> 20s:  %3d  (%5.1f%%)\n", bh_gt20+0, (bn>0 ? (bh_gt20+0)*100.0/bn : 0)
+
+        printf "\n--- QUEUE_DEPTH vs LATENZ ---\n"
+        printf "%-8s %10s %6s\n", "QUEUED", "AVG_WAIT", "COUNT"
+        for (bq = 0; bq <= 30; bq++) {
+            if (bq in bqd_cnt)
+                printf "%-8d %8dms %6d\n", bq, bqd_sum[bq]/bqd_cnt[bq], bqd_cnt[bq]
+        }
+    } else {
+        print "  No BLE user_msg events found"
+    }
+}
+' "$LOGFILE"
+
+# ─── CRC FORENSICS (Pass B) ───
+section "CRC_FORENSICS"
+awk '
+BEGIN {
+    # Build hex-to-decimal lookup
+    split("0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15", dec, " ")
+    hex_chars = "0123456789ABCDEF"
+    for (i = 1; i <= 16; i++) {
+        c = substr(hex_chars, i, 1)
+        h2d[c] = i - 1
+        h2d[tolower(c)] = i - 1
+    }
+
+    total = 0; cs0 = 0; cs1 = 0; cs2plus = 0
+    noise_cnt = 0; weak_cnt = 0; collision_cnt = 0; single_cnt = 0; unclass = 0
+    pending = 0
+}
+
+function hex2ascii(hexstr,    result, bytes, n, i, hi, lo, val) {
+    n = split(hexstr, bytes, " ")
+    result = ""
+    for (i = 1; i <= n; i++) {
+        if (length(bytes[i]) != 2) continue
+        hi = h2d[substr(bytes[i], 1, 1)]
+        lo = h2d[substr(bytes[i], 2, 1)]
+        val = hi * 16 + lo
+        if (val >= 32 && val <= 126)
+            result = result sprintf("%c", val)
+        else
+            result = result "."
+    }
+    return result
+}
+
+function extract_callsigns(ascii_str,    cs_list, cs_count, start, i, c, run, found) {
+    # Find patterns like XX0XX-NN (ham callsigns)
+    cs_count = 0
+    run = ""
+    for (i = 1; i <= length(ascii_str); i++) {
+        c = substr(ascii_str, i, 1)
+        if (c ~ /[A-Z0-9-]/) {
+            run = run c
+        } else {
+            if (length(run) >= 4 && run ~ /[A-Z][A-Z0-9]+-[0-9]/) {
+                # Deduplicate
+                found = 0
+                for (j = 1; j <= cs_count; j++) {
+                    if (cs_list[j] == run) { found = 1; break }
+                }
+                if (!found) {
+                    cs_count++
+                    cs_list[cs_count] = run
+                }
+            }
+            run = ""
+        }
+    }
+    # Check last run
+    if (length(run) >= 4 && run ~ /[A-Z][A-Z0-9]+-[0-9]/) {
+        found = 0
+        for (j = 1; j <= cs_count; j++) {
+            if (cs_list[j] == run) { found = 1; break }
+        }
+        if (!found) {
+            cs_count++
+            cs_list[cs_count] = run
+        }
+    }
+    return cs_count
+}
+
+/CRC_ERROR/ {
+    pending = 1
+    crc_rssi = 0; crc_snr = 0; crc_ferr = 0; crc_size = 0; crc_ts = $2
+    if (match($0, /rssi=-?[0-9]+/)) crc_rssi = substr($0, RSTART+5, RLENGTH-5) + 0
+    if (match($0, /snr=-?[0-9]+/)) crc_snr = substr($0, RSTART+4, RLENGTH-4) + 0
+    if (match($0, /freq_err=[-0-9.]+/)) crc_ferr = substr($0, RSTART+9, RLENGTH-9) + 0
+    if (match($0, /size=[0-9]+/)) crc_size = substr($0, RSTART+5, RLENGTH-5) + 0
+    next
+}
+
+/CRC_PAYLOAD/ && pending {
+    pending = 0
+    total++
+
+    # Extract hex data after the ]: marker
+    hex_data = ""
+    if (match($0, /\]: /)) {
+        hex_data = substr($0, RSTART + 3)
+    }
+
+    ascii = hex2ascii(hex_data)
+
+    # Extract callsigns
+    delete found_cs
+    n_cs = extract_callsigns(ascii, found_cs)
+
+    # Track callsign frequencies
+    for (k = 1; k <= n_cs; k++) {
+        crc_cs_cnt[found_cs[k]]++
+    }
+
+    # Track collision pairs
+    if (n_cs >= 2) {
+        # Sort first two for consistent pair key
+        a = found_cs[1]; b = found_cs[2]
+        if (a > b) { tmp = a; a = b; b = tmp }
+        pair = a " + " b
+        pair_cnt[pair]++
+    }
+
+    # Classify
+    abs_ferr = crc_ferr; if (abs_ferr < 0) abs_ferr = -abs_ferr
+
+    if (n_cs == 0) {
+        cs0++
+        if (abs_ferr > 3000) {
+            noise_cnt++
+            classify[total] = "NOISE"
+        } else if (crc_snr < -15) {
+            weak_cnt++
+            classify[total] = "WEAK_SIGNAL"
+        } else {
+            noise_cnt++
+            classify[total] = "NOISE"
+        }
+    } else if (n_cs == 1) {
+        cs1++
+        single_cnt++
+        classify[total] = "SINGLE_CORRUPT"
+    } else {
+        cs2plus++
+        collision_cnt++
+        classify[total] = "COLLISION"
+    }
+
+    # Store RSSI/SNR/FERR distributions
+    rssi_bucket = int((crc_rssi + 130) / 10)
+    if (rssi_bucket < 0) rssi_bucket = 0
+    if (rssi_bucket > 13) rssi_bucket = 13
+    crc_rssi_dist[rssi_bucket]++
+
+    ferr_bucket = int(abs_ferr / 200)
+    if (ferr_bucket > 10) ferr_bucket = 10
+    crc_ferr_dist[ferr_bucket]++
+}
+
+END {
+    print "TOTAL_CRC_WITH_PAYLOAD: " total
+    print ""
+    print "--- CALLSIGN_EXTRACTION ---"
+    printf "PAYLOADS_WITH_0_CALLSIGNS: %d (%.1f%%) -- noise/weak signal\n", cs0, (total>0 ? cs0*100.0/total : 0)
+    printf "PAYLOADS_WITH_1_CALLSIGN:  %d (%.1f%%) -- single packet corrupted\n", cs1, (total>0 ? cs1*100.0/total : 0)
+    printf "PAYLOADS_WITH_2+_CALLSIGNS: %d (%.1f%%) -- likely collisions\n", cs2plus, (total>0 ? cs2plus*100.0/total : 0)
+    print ""
+    print "--- CAUSE_CLASSIFICATION ---"
+    printf "COLLISION (2+ callsigns):     %d\n", collision_cnt
+    printf "SINGLE_CORRUPT (1 callsign):  %d\n", single_cnt
+    printf "WEAK_SIGNAL (snr<-15, 0 cs):  %d\n", weak_cnt
+    printf "NOISE (no callsign):          %d\n", noise_cnt
+    print ""
+
+    # Top colliding callsigns
+    print "--- TOP_CALLSIGNS_IN_CRC_ERRORS ---"
+    # Sort by count
+    tc_n = 0
+    for (cs in crc_cs_cnt) {
+        tc_n++
+        tc_list[tc_n] = cs
+        tc_sort[tc_n] = crc_cs_cnt[cs]
+    }
+    for (i = 2; i <= tc_n; i++) {
+        j = i
+        while (j > 1 && tc_sort[j] > tc_sort[j-1]) {
+            tmp = tc_list[j]; tc_list[j] = tc_list[j-1]; tc_list[j-1] = tmp
+            tmp = tc_sort[j]; tc_sort[j] = tc_sort[j-1]; tc_sort[j-1] = tmp
+            j--
+        }
+    }
+    top = tc_n; if (top > 20) top = 20
+    printf "%-20s %6s\n", "CALLSIGN", "COUNT"
+    for (i = 1; i <= top; i++) {
+        printf "%-20s %6d\n", tc_list[i], tc_sort[i]
+    }
+
+    # Top collision pairs
+    print ""
+    print "--- TOP_COLLISION_PAIRS ---"
+    tp_n = 0
+    for (p in pair_cnt) {
+        tp_n++
+        tp_list[tp_n] = p
+        tp_sort[tp_n] = pair_cnt[p]
+    }
+    for (i = 2; i <= tp_n; i++) {
+        j = i
+        while (j > 1 && tp_sort[j] > tp_sort[j-1]) {
+            tmp = tp_list[j]; tp_list[j] = tp_list[j-1]; tp_list[j-1] = tmp
+            tmp = tp_sort[j]; tp_sort[j] = tp_sort[j-1]; tp_sort[j-1] = tmp
+            j--
+        }
+    }
+    top = tp_n; if (top > 15) top = 15
+    printf "%-35s %6s\n", "PAIR", "COUNT"
+    for (i = 1; i <= top; i++) {
+        printf "%-35s %6d\n", tp_list[i], tp_sort[i]
+    }
+
+    # CRC signal distribution
+    print ""
+    print "--- CRC_SIGNAL_DISTRIBUTION ---"
+    print "RSSI distribution of CRC errors:"
+    for (i = 0; i <= 13; i++) {
+        if (i in crc_rssi_dist) {
+            lo = -130 + i * 10
+            hi = lo + 9
+            printf "  %4d..%4d dBm: %d\n", lo, hi, crc_rssi_dist[i]
+        }
+    }
+    print ""
+    print "Frequency error distribution of CRC errors:"
+    for (i = 0; i <= 10; i++) {
+        if (i in crc_ferr_dist) {
+            lo = i * 200
+            if (i == 10) {
+                printf "  %4d+ Hz:     %d\n", lo, crc_ferr_dist[i]
+            } else {
+                printf "  %4d-%4d Hz: %d\n", lo, lo+199, crc_ferr_dist[i]
+            }
+        }
+    }
+}
+' "$LOGFILE"
 
 # ─── DONE ───
 section "END"

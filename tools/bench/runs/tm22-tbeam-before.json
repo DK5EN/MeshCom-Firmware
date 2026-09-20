@@ -1,0 +1,167 @@
+{
+  "timing": {
+    "ok": true,
+    "flush_n": 7,
+    "flush_avg_us": 39316,
+    "flush_max_us": 48512,
+    "loop_max_us": 184010,
+    "flush_line": "[INSTR-FLUSH] n 7 total_us 275218 avg_us 39316 max_us 48512",
+    "loop_line": "[INSTR-LOOP] n 5742 total_us 30082990 avg_us 5239 max_us 184010"
+  },
+  "display": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "--display off\r[OLED];frame;us;33773;n;11;page;0;last;1;lines;0",
+        "frames": 1,
+        "frame_us_max": 33773,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 0,
+          "frames": 11,
+          "last_us": 33773,
+          "posdisp": 1,
+          "offwait_ms": 24210,
+          "u8g2": 1
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "--display on\r[OLED];frame;us;44994;n;12;page;0;last;1;lines;7",
+        "frames": 1,
+        "frame_us_max": 44994,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 12,
+          "last_us": 44994,
+          "posdisp": 1,
+          "offwait_ms": 22457,
+          "u8g2": 1
+        }
+      },
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "f\r[OLED];frame;us;33959;n;13;page;0;last;1;lines;0",
+        "frames": 1,
+        "frame_us_max": 33959,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 9,
+          "frames": 13,
+          "last_us": 33959,
+          "posdisp": 1,
+          "offwait_ms": 20622,
+          "u8g2": 1
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "--display on\r[OLED];frame;us;44986;n;14;page;0;last;1;lines;7",
+        "frames": 1,
+        "frame_us_max": 44986,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 14,
+          "last_us": 44986,
+          "posdisp": 1,
+          "offwait_ms": 18864,
+          "u8g2": 1
+        }
+      },
+      {
+        "cmd": "--display off",
+        "acked": true,
+        "ack_line": "--display off\r[OLED];frame;us;33830;n;15;page;0;last;1;lines;0",
+        "frames": 1,
+        "frame_us_max": 33830,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 1,
+          "isoff": 1,
+          "type": 9,
+          "frames": 15,
+          "last_us": 33830,
+          "posdisp": 1,
+          "offwait_ms": 17114,
+          "u8g2": 1
+        }
+      },
+      {
+        "cmd": "--display on",
+        "acked": true,
+        "ack_line": "--display on\r[OLED];frame;us;44947;n;16;page;0;last;1;lines;7",
+        "frames": 1,
+        "frame_us_max": 44947,
+        "page_after": 0,
+        "crashed": false,
+        "oledstat": {
+          "page": 0,
+          "last": 1,
+          "hold": 0,
+          "lines": 7,
+          "info": 0,
+          "track": 0,
+          "off": 0,
+          "isoff": 0,
+          "type": 9,
+          "frames": 16,
+          "last_us": 44947,
+          "posdisp": 1,
+          "offwait_ms": 15345,
+          "u8g2": 1
+        }
+      }
+    ],
+    "flags_ok": true
+  }
+}

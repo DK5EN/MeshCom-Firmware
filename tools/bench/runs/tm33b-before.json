@@ -1,0 +1,35 @@
+{
+  "displaycmd": {
+    "ok": false,
+    "steps": [
+      {
+        "cmd": "--display off",
+        "marker_seen": false,
+        "sleeping": 0,
+        "want": 1,
+        "ok": false
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": false,
+        "sleeping": 0,
+        "want": 0,
+        "ok": false
+      },
+      {
+        "cmd": "--display off",
+        "marker_seen": false,
+        "sleeping": 0,
+        "want": 1,
+        "ok": false
+      },
+      {
+        "cmd": "--display on",
+        "marker_seen": false,
+        "sleeping": 0,
+        "want": 0,
+        "ok": false
+      }
+    ]
+  }
+}

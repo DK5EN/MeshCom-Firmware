@@ -1,0 +1,109 @@
+{
+  "uptime": {
+    "ok": true,
+    "rows": [
+      {
+        "step": 0,
+        "uptime_s": 304,
+        "input_lat_ms": 27.0,
+        "input_probes": 2,
+        "loop_max_us": 590006,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 1,
+        "int_free": 104136,
+        "psram_free": 8028535,
+        "crash": []
+      },
+      {
+        "step": 1,
+        "uptime_s": 607,
+        "input_lat_ms": 21.7,
+        "input_probes": 2,
+        "loop_max_us": 589011,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 1,
+        "int_free": 103904,
+        "psram_free": 8027607,
+        "crash": []
+      },
+      {
+        "step": 2,
+        "uptime_s": 910,
+        "input_lat_ms": 21.7,
+        "input_probes": 2,
+        "loop_max_us": 589014,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 1,
+        "int_free": 103904,
+        "psram_free": 8027355,
+        "crash": []
+      },
+      {
+        "step": 3,
+        "uptime_s": 1213,
+        "input_lat_ms": 37.7,
+        "input_probes": 2,
+        "loop_max_us": 687004,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 2,
+        "int_free": 103276,
+        "psram_free": 8023119,
+        "crash": []
+      },
+      {
+        "step": 4,
+        "uptime_s": 1516,
+        "input_lat_ms": 35.5,
+        "input_probes": 2,
+        "loop_max_us": 686004,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 3,
+        "int_free": 102588,
+        "psram_free": 8019615,
+        "crash": []
+      },
+      {
+        "step": 5,
+        "uptime_s": 1819,
+        "input_lat_ms": 27.9,
+        "input_probes": 2,
+        "loop_max_us": 590000,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 3,
+        "int_free": 102600,
+        "psram_free": 8019499,
+        "crash": []
+      },
+      {
+        "step": 6,
+        "uptime_s": 2123,
+        "input_lat_ms": 17.2,
+        "input_probes": 2,
+        "loop_max_us": 590018,
+        "worst_section": null,
+        "worst_section_us": null,
+        "gaps": [],
+        "msg_list": 3,
+        "int_free": 102604,
+        "psram_free": 8019339,
+        "crash": []
+      }
+    ],
+    "steps": 7,
+    "step_s": 300.0,
+    "input_lat_grew": false,
+    "loop_max_grew": false
+  }
+}
