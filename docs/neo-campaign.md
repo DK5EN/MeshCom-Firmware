@@ -84,7 +84,7 @@ where that verifiability lives.
 | 2     | `fork-neo-test` complete -- **done**                                | 34/34 host envs, 32/32 board envs, 2/2 safeboot, one instrumented build with 13 INSTR strings in the ELF            |
 | 3     | `fork-neo` from `upstream/dev`, stripped -- **done**                | 38/40 (the two reds are upstream's baseline at K01), and the symbol sets match `fork-neo-test` on all eight targets |
 | 4     | `fork-neo` complete -- **done**                                     | 32/32 board envs, 2/2 safeboot, instrumented build with the same 13 INSTR strings as `fork-neo-test`                |
-| 5     | Release `4.35t_20260919_neo`, web flasher on gh-pages               | differential run vs official 4.35t, 24 h soak                                                                       |
+| 5     | Release + web flasher                                               | differential run **passed**, 12 h soak on three nodes **passed**; release and flasher still open                    |
 | 6     | Negotiate `dev-dk5en` with Kurt, push                               | --                                                                                                                  |
 
 Stage 0 was mandatory before anything else: `dry-unification` branched at
@@ -560,7 +560,24 @@ Everything that can be established without hardware is now established. What
 remains is the part the workstation cannot answer: does this firmware behave on
 the air like official 4.35t.
 
-## 15. Still open
+## 15. Stage 5 so far
+
+**Differential run passed** (2026-09-19): no measurable difference on the air
+against `upstream/dev`, +11 296 B heap on the Heltec and +15 560 B on the
+T-Beam, and 10,5 / 45,5 kB less flash.
+
+**Twelve-hour soak passed** (19:41 to 08:00, three nodes, one of them with mesh
+and gateway on under real network load). No reboot, no crash, no ring overflow,
+no gateway error, no reconnect. Uptime 12.00 h, strictly monotonic over 24
+snapshots. Heap flat after warm-up: 79 017 -> 78 119 B mean over nine hours.
+Loop instrumentation reported five gaps in twelve hours, all in the first minute
+after boot.
+
+Measurement note worth keeping: `loopAction_heapMon()` only prints when
+`!bDisplayLog`. A node with `DisplyLog on` silently reports no heap trend --
+that is why one of the two bench nodes delivered only the boot value.
+
+## 16. Still open
 
 - The commit cut itself. A first proposal with all 248 files assigned to 18
   chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
@@ -569,7 +586,7 @@ the air like official 4.35t.
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
 
-## 16. Review history
+## 17. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
