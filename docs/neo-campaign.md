@@ -460,6 +460,15 @@ ends up.
   afterwards, once the chapters have survived their gates.
 - **No automatic GitHub builds** (section 5): build on the MacBook, publish by
   hand.
+- **`fork-neo` does not advertise that it is a derivative.** Operator decision
+  2026-09-20. `tools/neo_strip.py` no longer travels -- `derive.sh` runs it from
+  a temporary copy -- and `docs/CHANGELOG-neo.md` gets no section explaining
+  what was removed. The branch is `upstream/dev` plus better code; the test
+  scaffolding is the fork's own business and was never part of the offer. The
+  consequence is accepted deliberately: 20 comments in 10 source files name
+  `env:native*` envs and `test/golden/*.py` linters that exist only on
+  `fork-neo-test`. They record how a change was verified, not a promise about
+  this tree.
 - **`fork-neo` keeps the campaign's `FLASH_VERSION` (`20260912`).** Decided
   2026-09-20. It is the stamp the campaign was built and measured under, and it
   is what the bench and soak results refer to. `upstream/dev` sits at
@@ -676,15 +685,19 @@ campaign is what gives those two boards room again.
 
 ## 17. Still open
 
-- Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
-  repo-level Actions disable, at the cost of a visible delta against upstream.
-  Relevant for `fork-neo-test`, which carries the fork's own `ci-build.yml`
-  triggering on branch pushes; `fork-neo` carries upstream's `.github`
-  unchanged and has no such delta.
-- Whether `tools/neo_strip.py` should travel to `fork-neo`. It documents
-  exactly what was removed, which is a courtesy to a reviewer; it also
-  describes two branches that do not exist in upstream's repository, which is
-  noise there. Currently it travels.
+- Whether `.github/workflows/` additionally gets a hard `if: false` in the
+  files themselves. Measured 2026-09-20, correcting an earlier claim in this
+  document: the repository's Actions permission is `"enabled": true`. What
+  keeps the two workflows from running is a per-workflow `disabled_manually`
+  toggle -- a repository setting, not code. It survives a push; it does not
+  survive someone re-enabling a workflow in the UI, and it does not travel with
+  a clone or a fork. The exposed triggers if it is ever flipped: `ci-build.yml`
+  on a push to any branch, and `meshcom-ci.yml` on any tag push -- the latter
+  publishes a GitHub release with its own asset set, which is exactly what
+  cutting the release tag by hand is meant to avoid. The cost this document
+  used to cite (a visible delta against upstream) no longer applies: `.github/`
+  is not in the chapter cut, so `fork-neo` carries upstream's copy
+  byte-identically and the change would live on `fork-neo-test` only.
 - Pushing both branches to `DK5EN/MeshCom-Firmware`, and whether
   `origin/dry-unification` is deleted along with the local branch.
 - Release `4.35t_20260919_neo` and the GH Pages web flasher

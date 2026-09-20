@@ -9,7 +9,24 @@ and section 4 (projection, not rebase).
 | `paths/*.txt`     | the chapter cut: which of the 688 paths belongs to which commit                |
 | `derive.sh`       | throws `fork-neo` away and rebuilds it from `upstream/dev`, then gates itself  |
 | `gate.sh`         | builds every `fork-neo` commit on the eight lead targets, then the symbol diff |
-| `../neo_strip.py` | the two content transformations `derive.sh` applies inside the core commit     |
+| `../neo_strip.py` | the two content transformations `derive.sh` applies -- it does not travel      |
+
+## `fork-neo` does not advertise that it is a derivative
+
+Operator decision 2026-09-20: nothing on `fork-neo` says a strip happened. It is
+`upstream/dev` plus better code, and the test scaffolding was never part of what
+is offered -- the fork's tests are the fork's, not production. Consequences for
+anyone touching these scripts:
+
+- `neo_strip.py` runs from a temporary copy and is **not** projected onto the
+  branch. Neither is anything else that exists only to produce it.
+- `docs/CHANGELOG-neo.md` carries no section explaining what was removed, and
+  should not grow one.
+- Source comments on `fork-neo` still name `env:native*` envs and
+  `test/golden/*.py` linters that live only on `fork-neo-test` (20 references in
+  10 files, measured 2026-09-20). Accepted, not an oversight: they record how
+  the change was verified here, the same way any comment may cite a bench the
+  reader does not have.
 
 ## Never commit to `fork-neo`
 

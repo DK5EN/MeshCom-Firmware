@@ -24,6 +24,12 @@ MSG=$WORK/msg
 HERE=$WORK/paths
 mkdir -p "$HERE"
 cp tools/neo/paths/*.txt "$HERE/"
+# Same for the strip itself. It runs against the working tree but must NOT end
+# up on the branch: fork-neo does not advertise that it is a derivative. It is
+# upstream/dev plus better code, and the test scaffolding was never part of
+# what is offered.
+STRIP=$WORK/neo_strip.py
+cp tools/neo_strip.py "$STRIP"
 
 [ -z "$(git status --porcelain | grep -v '^??')" ] || { echo "ABORT: working tree not clean"; exit 1; }
 git rev-parse --verify -q "$SRC" >/dev/null || { echo "ABORT: $SRC does not exist"; exit 1; }
@@ -50,8 +56,8 @@ for g in K01 CORE K15 K16 K17; do
   case "$g" in
     # platformio.ini arrives with CORE and names the Tasmota script as a
     # pre-step of both safeboot envs, so the script has to arrive with it.
-    CORE) git checkout --no-overlay "$SRC" -- tools/ensure_tasmota_framework.py tools/neo_strip.py
-          python3 tools/neo_strip.py
+    CORE) git checkout --no-overlay "$SRC" -- tools/ensure_tasmota_framework.py
+          python3 "$STRIP"
           git add -- platformio.ini src/t-deck/tdeck_helpers.cpp ;;
     K15)  git checkout --no-overlay "$SRC" -- safeboot.bin safeboot-s3.bin ;;
   esac
@@ -69,7 +75,7 @@ done
 echo
 echo "=== gate: strip identity ==="
 git checkout -q -b neo-stripcheck "$SRC"
-python3 tools/neo_strip.py > /dev/null
+python3 "$STRIP" > /dev/null
 git add -- platformio.ini src/t-deck/tdeck_helpers.cpp
 git commit -q -m "throwaway: strip"
 R=0
