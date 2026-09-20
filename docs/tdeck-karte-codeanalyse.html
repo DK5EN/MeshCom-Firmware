@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-Deck SD-Karte — Codeanalyse und Umbaubegründung</title>
+<style>
+:root{
+  --bg:#f7f6f3; --panel:#ffffff; --ink:#1b1b1a; --muted:#5f5d58; --line:#dcd9d2;
+  --accent:#8a5a2b; --accent-soft:#f2e9df;
+  --bad:#a33a2c; --bad-soft:#f8ece9;
+  --good:#2f6b46; --good-soft:#e9f2ec;
+  --code-bg:#f2f0ec; --code-ink:#26251f;
+  --old-bar:#c0705a; --new-bar:#4f8a6a;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16171a; --panel:#1d1f23; --ink:#e6e4df; --muted:#a09d96; --line:#32353b;
+    --accent:#d7a15f; --accent-soft:#2b2620;
+    --bad:#e08672; --bad-soft:#2c211e;
+    --good:#7fc09a; --good-soft:#1d2823;
+    --code-bg:#141519; --code-ink:#d9d6cf;
+    --old-bar:#a35844; --new-bar:#3f7a5c;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+     font-size:16px;line-height:1.6;}
+.wrap{max-width:1500px;margin:0 auto;padding:0 28px 96px}
+header.top{padding:64px 0 40px;border-bottom:1px solid var(--line);margin-bottom:44px}
+header.top .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
+h1{font-size:38px;line-height:1.15;margin:14px 0 12px;font-weight:650;letter-spacing:-.015em}
+header.top p.lede{font-size:18px;color:var(--muted);margin:0;max-width:74ch}
+.meta{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:26px;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:600}
+.meta code{font-family:var(--mono);font-size:12px}
+
+h2{font-size:25px;margin:64px 0 8px;font-weight:650;letter-spacing:-.01em;
+   padding-top:24px;border-top:1px solid var(--line)}
+h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:12px;font-weight:600}
+h2.plain{border-top:none;padding-top:0}
+h3{font-size:17px;margin:34px 0 8px;font-weight:650}
+p{margin:0 0 14px;max-width:82ch}
+ul{margin:0 0 14px;padding-left:22px;max-width:82ch}
+li{margin:4px 0}
+a{color:var(--accent)}
+.sub{color:var(--muted);font-size:15px;margin:-2px 0 22px;max-width:82ch}
+
+.callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+         border-radius:5px;padding:18px 22px;margin:22px 0}
+.callout p:last-child{margin-bottom:0}
+.callout.good{border-left-color:var(--good)}
+
+table{border-collapse:collapse;width:100%;font-size:14px;margin:18px 0 26px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;
+   border-bottom:1px solid var(--ink)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:13px}
+tbody tr:last-child td{border-bottom:none}
+.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+details.finding{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+                margin:16px 0;overflow:hidden}
+details.finding>summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;
+                        gap:14px;align-items:baseline;flex-wrap:wrap}
+details.finding>summary::-webkit-details-marker{display:none}
+details.finding>summary::after{content:"aufklappen";margin-left:auto;font-size:12px;color:var(--muted);
+                               white-space:nowrap;align-self:center}
+details.finding[open]>summary::after{content:"zuklappen"}
+details.finding[open]>summary{border-bottom:1px solid var(--line);background:var(--accent-soft)}
+summary .tag{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:3px 7px;border-radius:3px;
+             background:var(--bad-soft);color:var(--bad);font-weight:600;white-space:nowrap}
+summary .tag.info{background:var(--accent-soft);color:var(--accent)}
+summary .ttl{font-weight:650;font-size:16.5px}
+summary .hint{color:var(--muted);font-size:14px;flex-basis:100%;margin-left:0}
+.body{padding:22px 20px 26px}
+
+.tri{display:grid;grid-template-columns:1fr 1fr 0.92fr;gap:20px;align-items:start}
+@media (max-width:1150px){.tri{grid-template-columns:1fr}}
+.col>.hd{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+         font-weight:650;margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.col>.hd::before{content:"";width:22px;height:3px;border-radius:2px;background:var(--line)}
+.col.old>.hd::before{background:var(--old-bar)}
+.col.new>.hd::before{background:var(--new-bar)}
+pre{margin:0;background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);
+    border-radius:5px;padding:13px 15px;overflow-x:auto;font-family:var(--mono);
+    font-size:12.5px;line-height:1.62;tab-size:4}
+pre b{color:var(--bad);font-weight:700}
+.col.new pre b{color:var(--good)}
+pre i{color:var(--muted);font-style:normal}
+.why h4{margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.why h4:not(:first-child){margin-top:15px}
+.why p{margin:0;font-size:14.5px;line-height:1.58;max-width:none}
+.why ul{font-size:14.5px;padding-left:19px;margin:0;max-width:none}
+code{font-family:var(--mono);font-size:.9em;background:var(--code-bg);padding:1px 4px;border-radius:3px}
+.why code, td code, li code{font-size:12.5px}
+
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:22px 0 28px}
+.kpi .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.kpi .card .lbl{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.kpi .card .val{font-family:var(--mono);font-size:23px;font-weight:600;margin:6px 0 2px;letter-spacing:-.02em}
+.kpi .card .val .arrow{color:var(--muted);font-size:16px;margin:0 5px}
+.kpi .card .foot{font-size:12px;color:var(--muted)}
+footer{margin-top:72px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+@media print{
+  body{background:#fff;font-size:11pt}
+  details.finding{break-inside:avoid;border-color:#bbb}
+  details.finding>summary::after{content:""}
+  .tri{grid-template-columns:1fr 1fr .9fr}
+  h2{break-after:avoid}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">MeshCom Firmware · T-Deck Plus · Offline-Karte</div>
+  <h1>Die SD-Karten-Karte im T-Deck:<br>was geändert wurde und warum</h1>
+  <p class="lede">Michaels Beitrag hat die Offline-Karte im T-Deck überhaupt erst möglich gemacht. Beim Härten für den Dauerbetrieb sind an seinem Code acht Punkte aufgefallen, die geändert werden mussten. Dieses Dokument stellt jeden davon Zeile für Zeile gegenüber: links sein Stand, in der Mitte der heutige, rechts die Begründung und die Messung, die dahintersteht.</p>
+  <div class="meta">
+    <span><b>Vergleichsbasis</b> <code>6f37a206</code> · upstream/dev, 28.08.2026 („v4.35p T-DECK MAPS“)</span>
+    <span><b>Endstand</b> <code>fork-main</code>, 08.09.2026</span>
+    <span><b>Umfang</b> nur Dateien und Funktionen aus Michaels Beitrag</span>
+  </div>
+</header>
+
+<h2 class="plain"><span class="num">0</span>Kurzfassung</h2>
+<p class="sub">Das Wichtigste vorweg, damit klar ist, worum es geht und worum nicht.</p>
+
+<div class="callout">
+  <p><b>Die Idee war richtig, die Umsetzung war ein erster Wurf.</b> Kacheln von der SD-Karte statt einkompilierter Karten-Arrays ist die einzig sinnvolle Architektur für ein Gerät mit 8 MB Flash — daran wurde nichts geändert. Geändert wurde, wie aus den Kacheln ein Bild wird, wann gezeichnet wird und was dabei die Hauptschleife blockiert.</p>
+  <p>Die acht Befunde zerfallen in drei Gruppen: <b>ein Absturz</b> (Use-after-free beim Zoomen, reproduzierbar), <b>fünf Blockade- und Darstellungsfehler</b> (die Karte zeigte eine Kachel statt eines Bildausschnitts, Marker im falschen Maßstab, <code>delay()</code> im LoRa-Empfangspfad, doppelte Codepfade, ein <code>millis()</code>-Überlauf) und <b>zwei Performance-Punkte</b> (SD-Takt, doppelter Kartenaufbau beim Tab-Wechsel).</p>
+  <p>Gefunden wurde davon <b>kein einziger durch Hinsehen</b>. Vier der acht sind erst aufgefallen, nachdem in der Firmware Messpunkte eingebaut waren und ein Testautomat das Gerät über die serielle Schnittstelle fernbedient hat — Kapitel 3 beschreibt, wie das funktioniert, weil es der eigentlich übertragbare Teil ist.</p>
+</div>
+
+<div class="kpi">
+  <div class="card">
+    <div class="lbl">Kachel laden, pro Zoomschritt</div>
+    <div class="val">1,6–4,5 s<span class="arrow">→</span>0,33–0,79 s</div>
+    <div class="foot">SD-Takt 800 kHz → 20 MHz, gemessen auf DK5EN-14</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Blockierende <code>delay()</code> im Zeichenpfad</div>
+    <div class="val">bis 2,4 s<span class="arrow">→</span>0 ms</div>
+    <div class="foot">30 Stationen × 80 ms in einem Klick-Callback</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Kartentab per Tab-Leiste wählen</div>
+    <div class="val">1337 ms<span class="arrow">→</span>718 ms</div>
+    <div class="foot">2 Kartenaufbauten → 1, Loop-Gap gemessen</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Zentrierfehler eigene Position</div>
+    <div class="val">unbestimmt<span class="arrow">→</span>0/0 px</div>
+    <div class="foot">über Zoom 0–9, beide Richtungen, automatisch geprüft</div>
+  </div>
+</div>
+
+<h2><span class="num">1</span>Was an dem Beitrag tragfähig war</h2>
+<p class="sub">Das ist keine Höflichkeitsfloskel — diese Entscheidungen stehen unverändert im heutigen Code und werden im Folgenden nicht angetastet.</p>
+
+<div class="callout good">
+<ul>
+  <li><b>Kacheln von der SD-Karte statt einkompilierter Karten.</b> Der Beitrag hat fünf generierte C-Arrays mit zusammen <b>3.849 Zeilen</b> Kartendaten aus dem Repository entfernt (<code>map_europe.c</code>, <code>map_deutschland.c</code>, <code>map_oesterreich.c</code>, <code>map_wien.c</code>, <code>map_wien_umgebung.c</code>). Damit wird das Kartenmaterial vom Firmware-Build entkoppelt: neue Gebiete sind ein Kopiervorgang auf die SD-Karte, kein neuer Build.</li>
+  <li><b>Die Projektion ist korrekt.</b> <code>sdmap_lon2xf()</code> und <code>sdmap_lat2yf()</code> sind eine saubere Web-Mercator-/Slippy-Map-Umrechnung. Beide Funktionen sind heute Zeichen für Zeichen dieselben; alle späteren Erweiterungen (Pan, Viewport-Projektion) bauen darauf auf.</li>
+  <li><b>Kartensets werden zur Laufzeit erkannt.</b> <code>sdmap_init()</code> scannt <code>/maps</code>, liest die vorhandenen Zoomstufen pro Set aus den Verzeichnisnamen und leitet daraus Min-/Max-Zoom ab. Diese Funktion ist heute unverändert — 70 Zeilen, kein einziges Delta.</li>
+  <li><b>Zoom-Rückfall auf eine vorhandene Stufe.</b> Findet sich zur gewünschten Zoomstufe keine Kachel, geht die Schleife stufenweise hinunter, bis eine existiert, statt eine leere Karte zu zeigen. Diese Logik steht heute unverändert am Anfang von <code>sdmap_refresh()</code>.</li>
+  <li><b>„Keine Kartendaten“-Label</b> statt einer stumm schwarzen Fläche. Das Konzept wurde übernommen und nur bei der Auslösebedingung präzisiert.</li>
+</ul>
+</div>
+
+<h2><span class="num">2</span>Die acht Befunde</h2>
+<p class="sub">Jeder Block ist aufklappbar. Links der Code aus der Vergleichsbasis, in der Mitte der heutige Stand, rechts Ursache, Folge, Fundweg und Lösung. Zeilen ohne Belang sind gekürzt (<code>…</code>), sonst ist der Code wörtlich.</p>
+
+<details class="finding" open>
+<summary><span class="tag">Absturz</span><span class="ttl">1 — Zoomen mit anderen Stationen auf der Karte startete das Gerät neu</span>
+<span class="hint">Use-after-free: gelöschte LVGL-Objekte blieben im Slot stehen und wurden beim nächsten Aufbau ein zweites Mal gelöscht.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand · <code>lv_obj_functions.cpp</code></div>
+<pre>for(int ip = 0; ip &lt; MAX_POINTS; ip++)
+{
+  if(map_point_call[ip] == callsign)
+  {
+    if(map_point[ip] != NULL)
+    {
+      lv_obj_del(map_point[ip]);
+
+      <b>delay(19);</b>
+      <i>// Slot bleibt auf dem
+      // freigegebenen Zeiger stehen</i>
+    }
+
+    if(map_point_label[ip] != NULL)
+    {
+      lv_obj_del(map_point_label[ip]);
+    }
+
+    ipoint = ip; bFound = true;
+    break;
+  }
+}
+
+<i>…</i>
+
+if (!sdmap_in_current_tile(dlat, dlon))
+{
+  <b>return;</b>  <i>// verlaesst die Funktion,
+       // Slot immer noch nicht NULL</i>
+}</pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre>for(int ip = 0; ip &lt; MAX_POINTS; ip++)
+{
+  if(map_point_call[ip] == callsign)
+  {
+    <i>// G01: der Slot darf keinen Zeiger auf
+    // ein geloeschtes Objekt behalten -- der
+    // Off-Screen-Return unten laesst den Slot
+    // stehen, und der naechste Refresh wuerde
+    // ihn ein zweites Mal loeschen.</i>
+    if(map_point[ip] != NULL)
+    {
+      lv_obj_del(map_point[ip]);
+      <b>map_point[ip] = NULL;</b>
+    }
+
+    if(map_point_label[ip] != NULL)
+    {
+      lv_obj_del(map_point_label[ip]);
+      <b>map_point_label[ip] = NULL;</b>
+    }
+
+    ipoint = ip; bFound = true;
+    break;
+  }
+}</pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p><code>lv_obj_del()</code> gibt das LVGL-Objekt frei, aber der Zeiger im Array bleibt stehen. Liegt die Station außerhalb der sichtbaren Kachel, springt die Funktion direkt danach mit <code>return</code> heraus, ohne den Slot zu leeren. Beim nächsten Aufbau — jeder Zoomschritt ruft <code>add_map_point()</code> für alle Stationen erneut auf — findet die Schleife denselben Slot wieder, sieht ihn ungleich <code>NULL</code> und löscht ein Objekt, das es nicht mehr gibt.</p>
+<h4>Folge</h4>
+<p>Harter Reset: <code>Guru Meditation LoadProhibited</code> in <code>_lv_obj_get_ext_draw_size</code>. Der Fehler liegt im PSRAM-Heap, tritt also nicht schleichend auf, sondern sofort — er braucht nur einen Menschen, der zoomt, während andere Stationen eingetragen sind. Genau deshalb war er im Labor lange unsichtbar.</p>
+<h4>Wie gefunden</h4>
+<p>Beim Lesen des Codes vermutet, dann <b>reproduziert</b>: vier Stationen über <code>--injectpos</code> setzen, dann 36 Zoomschritte automatisiert fahren. Ohne den Fix stürzt das Gerät reproduzierbar bei Schritt 7 ab, mit dem Fix läuft der ganze Sweep durch. Ohne den Injektionsbefehl in der Firmware wäre das ein Zufallsfund geblieben.</p>
+<h4>Lösung</h4>
+<p>Slot unmittelbar nach dem Löschen auf <code>NULL</code> setzen. Genau dieses Muster stand schon zwanzig Zeilen weiter unten in derselben Funktion — es fehlte nur an dieser Stelle.</p>
+<h4>Fairnesshinweis</h4>
+<p>Kurt hat denselben Fehler unabhängig und zeitgleich gefunden und in der Vergleichsbasis bereits behoben. Im Diff Basis → heute erscheint dieser Punkt deshalb <b>nicht</b> mehr. Er steht hier trotzdem, weil er der Anlass war, überhaupt Messtechnik in den Kartenpfad einzubauen.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Darstellung</span><span class="ttl">2 — Die Karte zeigte eine Kachel, keinen Bildausschnitt</span>
+<span class="hint">Die eigene Position lag irgendwo in einem 256-px-Bild, das in einem 294×182-Tab scrollte. Nachbarn jenseits der Kachelgrenze waren unsichtbar, und beim Kachelwechsel sprang das Bild.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand · <code>tdeck_sdmap.cpp</code></div>
+<pre><i>// genau eine Kachel: die, in der die
+// eigene Position liegt</i>
+xtile = (int)sdmap_lon2xf(lon, useZoom);
+ytile = (int)sdmap_lat2yf(lat, useZoom);
+snprintf(path, sizeof(path),
+   "%s/%d/%d/%d.png",
+   sdmap_dirs[sdmap_activeSet],
+   useZoom, xtile, ytile);
+<i>…</i>
+lodepng_decode32(&amp;rgba32, &amp;pngW, &amp;pngH,
+                 pngRaw, fsize);
+<i>…</i>
+sdmap_dsc.header.w = (lv_coord_t)pngW;  <i>// 256</i>
+sdmap_dsc.header.h = (lv_coord_t)pngH;  <i>// 256</i>
+<b>lv_img_set_src(img, &amp;sdmap_dsc);</b>
+
+<i>// und in set_map():</i>
+map_x[iMap] = <b>SDMAP_TILE_PX</b>;   <i>// 256</i>
+map_y[iMap] = <b>SDMAP_TILE_PX</b>;   <i>// 256</i>
+lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
+lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);
+lv_obj_set_size(map_ta, map_x[iMap], map_y[iMap]);
+lv_obj_align(map_ta, LV_ALIGN_CENTER, 0, 0);</pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre><i>// Viewport = Inhaltsflaeche des Eltern-
+// objekts, typisch 294x182</i>
+lv_obj_t * vp = lv_obj_get_parent(img);
+lv_obj_update_layout(vp);
+int vw = lv_obj_get_content_width(vp);
+int vh = lv_obj_get_content_height(vp);
+<i>…</i>
+<i>// globale Pixelkoordinate der eigenen
+// Position, Viewport darum zentriert</i>
+double gx = sdmap_lon2xf(lon, z)*SDMAP_TILE_PX;
+double gy = sdmap_lat2yf(lat, z)*SDMAP_TILE_PX;
+<b>sdmap_originX = gx - vw / 2;</b>
+<b>sdmap_originY = gy - vh / 2;</b>
+
+<i>// alle Kacheln, die den Viewport schneiden
+// (max. 2x2, da Viewport &lt; Kachel)</i>
+int tx0 = floor(sdmap_originX / SDMAP_TILE_PX);
+int ty0 = floor(sdmap_originY / SDMAP_TILE_PX);
+int tx1 = floor((sdmap_originX+vw-1)/SDMAP_TILE_PX);
+int ty1 = floor((sdmap_originY+vh-1)/SDMAP_TILE_PX);
+for (int ty = ty0; ty &lt;= ty1; ty++)
+ for (int tx = tx0; tx &lt;= tx1; tx++) {
+   rgba = sdmap_load_tile_rgba(z, tx, ty, &amp;w, &amp;h);
+   if (!rgba) { nMissing++; continue; }  <i>// grau</i>
+   <b>/* Schnittbereich in den Viewport blitten */</b>
+ }
+
+<i>// und in set_map():</i>
+lv_obj_clear_flag(vp, LV_OBJ_FLAG_SCROLLABLE);
+lv_obj_set_scrollbar_mode(vp, LV_SCROLLBAR_MODE_OFF);
+lv_obj_set_align(map_ta, LV_ALIGN_TOP_LEFT);
+lv_obj_set_pos(map_ta, 0, 0);
+map_x[iMap] = <b>sdmap_view_w()</b>;
+map_y[iMap] = <b>sdmap_view_h()</b>;</pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p>Eine Kachel ist 256×256 px, der Kartentab 294×182. Ein 256er-Bild in eine 294 px breite Fläche gelegt heißt: rechts und links fehlt Karte, oben und unten ist zu viel da — deshalb scrollte der Tab. Vor allem aber steht die eigene Position <b>dort, wo sie zufällig in der Kachel liegt</b>. Wer am Kachelrand wohnt, sieht überwiegend das Nachbargebiet, das er nicht hat.</p>
+<h4>Folge</h4>
+<ul>
+  <li>Die eigene Position ist nicht zentriert und wandert bei jedem Zoomschritt an eine andere Stelle des Bildschirms.</li>
+  <li>Beim Überschreiten einer Kachelgrenze springt das ganze Bild um bis zu 256 px — der von Nutzern gemeldete „Sprung“.</li>
+  <li>Jede Station außerhalb der eigenen Kachel wird gar nicht gezeichnet: <code>add_map_point()</code> kehrte für sie ohne Marker zurück. Auf einer Karte, die Nachbarstationen zeigen soll, ist das der Kern der Funktion.</li>
+  <li>Der Tab scrollt unter dem Finger weg, weil das Bild größer ist als die Fläche.</li>
+</ul>
+<h4>Wie gefunden</h4>
+<p>Als Nutzerbeschwerde („springt, ist nicht zentriert“) eingegangen, dann <b>messbar gemacht</b>: die Firmware gibt seither pro gezeichneter eigener Position eine Zeile <code>[MAP];zoom;…;center_err;dx;dy</code> aus. Der Testautomat fährt einen vollen Zoom-Sweep und verlangt <code>center_err 0/0</code> auf jeder Stufe. Damit ist „zentriert“ keine Geschmacksfrage mehr, sondern ein Testkriterium.</p>
+<h4>Lösung</h4>
+<p><code>sdmap_refresh()</code> setzt jetzt ein Bild in Viewport-Größe aus allen Kacheln zusammen, die den Ausschnitt schneiden (höchstens 2×2, weil der Viewport kleiner als eine Kachel ist). Die eigene Position liegt konstruktionsbedingt in der Mitte. Fehlende Kacheln bleiben grau, statt den ganzen Aufbau abzubrechen; das „keine Daten“-Label erscheint nur, wenn <i>keine</i> Kachel vorhanden war. Das Scrollen des Tabs ist abgeschaltet.</p>
+<h4>Nebenwirkung</h4>
+<p>Erst dieser Umbau macht Pan überhaupt möglich: da der Ausschnitt jetzt ein freier Punkt und keine Kachel mehr ist, sind <code>i/j/k/l</code> zum Verschieben und <code>o</code> zum Zurückspringen nur noch ein Rechenschritt (<code>sdmap_pan_latlon()</code>).</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Darstellung</span><span class="ttl">3 — Die Stationsmarker lagen systematisch falsch</span>
+<span class="hint">Die x-Achse wurde mit 320 statt mit 256 skaliert und um 32 px zurückgeschoben — zwei Handkorrekturen, die einander nur ungefähr aufheben.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand</div>
+<pre>void sdmap_project(double lat, double lon,
+                   int16_t * x, int16_t * y)
+{
+  double xf = sdmap_lon2xf(lon, sdmap_zoom);
+  double yf = sdmap_lat2yf(lat, sdmap_zoom);
+
+  *x = ((int16_t)((xf - floor(xf)) * <b>320</b>))<b>-32</b>;
+  *y =  (int16_t)((yf - floor(yf)) * <b>SDMAP_TILE_PX</b>);
+}
+
+<i>// Aufrufseite in add_map_point():</i>
+if (!sdmap_in_current_tile(dlat, dlon))
+    return;               <i>// s. Befund 2</i>
+
+sdmap_project(dlat, dlon, &amp;sx, &amp;sy);
+x = (lv_coord_t)sx;
+y = (lv_coord_t)sy;
+<i>…</i>
+lv_obj_set_size(map_point[ipoint], 10, 10);
+<b>lv_obj_set_pos(map_point[ipoint], x, y);</b>
+<i>…</i>
+lv_obj_set_pos(map_point_label[ipoint],
+               x - 5, <b>y + 11</b>);</pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre><i>// Position in Pixeln des zusammengesetzten
+// Kartenbildes; darf ausserhalb liegen.</i>
+void sdmap_project_view(double lat, double lon,
+                        int16_t * x, int16_t * y)
+{
+  double gx = sdmap_lon2xf(lon, z)*SDMAP_TILE_PX;
+  double gy = sdmap_lat2yf(lat, z)*SDMAP_TILE_PX;
+  double vx = gx - <b>sdmap_originX</b>;
+  double vy = gy - <b>sdmap_originY</b>;
+  <b>if (vx &lt; -30000) vx = -30000;</b>   <i>// int16-Klemme</i>
+  <b>if (vx &gt;  30000) vx =  30000;</b>
+  <b>if (vy &lt; -30000) vy = -30000;</b>
+  <b>if (vy &gt;  30000) vy =  30000;</b>
+  *x = (int16_t)vx;  *y = (int16_t)vy;
+}
+
+<i>// Aufrufseite in add_map_point():</i>
+sdmap_project_view(dlat, dlon, &amp;sx, &amp;sy);
+if (sx &lt; -10 || sy &lt; -10 ||
+    sx &gt; sdmap_view_w() + 10 ||
+    sy &gt; sdmap_view_h() + 10)
+    return;         <i>// wirklich ausserhalb des Bildes</i>
+<i>…</i>
+lv_obj_set_size(map_point[ipoint], 10, 10);
+<b>lv_obj_set_pos(map_point[ipoint], x - 5, y - 5);</b>
+                          <i>// Punkt auf der Position zentriert</i>
+lv_obj_set_pos(map_point_label[ipoint],
+               x - 5, <b>y + 6</b>);
+
+<i>// und die alte Funktion, bereinigt:</i>
+*x = (int16_t)((xf - floor(xf)) * <b>SDMAP_TILE_PX</b>);
+*y = (int16_t)((yf - floor(yf)) * <b>SDMAP_TILE_PX</b>);</pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p>Der Bruchteil <code>xf - floor(xf)</code> ist die Position <i>innerhalb</i> der Kachel, also 0…1. Multipliziert gehört er mit der Kachelbreite, 256. Im Code stand für x die Zahl <b>320</b> — die Breite des Displays, nicht der Kachel — und anschließend ein fester Abzug von <b>32</b>. Für y stand korrekt <code>SDMAP_TILE_PX</code>. x und y liefen also in verschiedenen Maßstäben.</p>
+<h4>Folge</h4>
+<ul>
+  <li>Maßstabsfehler in x: Faktor 320/256 = <b>1,25</b>. Der Marker läuft der wahren Position um 25 % davon.</li>
+  <li>Der Abzug von 32 px macht das nur in der Kachelmitte wieder gut. Am linken Kachelrand landet der Marker <b>32 px außerhalb des Bildes</b>, am rechten Rand <b>32 px zu weit rechts</b>.</li>
+  <li>Der Punkt ist 10×10 px groß und wurde mit seiner <b>linken oberen Ecke</b> auf die Koordinate gesetzt — noch einmal 5 px Versatz nach rechts unten, in x und y gleichermaßen.</li>
+  <li>Ohne Klemme konnte eine weit entfernte Station den <code>int16_t</code> überlaufen und als Marker an einer völlig beliebigen Bildschirmstelle erscheinen.</li>
+</ul>
+<h4>Wie gefunden</h4>
+<p>Beim Lesen aufgefallen (die 320 neben einem <code>SDMAP_TILE_PX</code> in der Nachbarzeile ist ein sichtbarer Bruch), bestätigt über das <code>center_err</code>-Instrument: die eigene Position ist ein Marker wie jeder andere, und ihr Sollwert ist exakt die Bildmitte. Vor dem Umbau war <code>center_err</code> nie 0/0, danach auf allen Zoomstufen 0/0.</p>
+<h4>Lösung</h4>
+<p>Marker werden nicht mehr in Kachelpixeln, sondern in Pixeln des zusammengesetzten Bildes gerechnet — der Ursprung des Ausschnitts ist bekannt, also ist es eine Subtraktion und keine Schätzung. Keine magischen Zahlen mehr, dafür eine Klemme gegen den Überlauf und ein um seinen Mittelpunkt gesetzter Punkt.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Blockade</span><span class="ttl">4 — <code>delay()</code> mitten im LoRa-Empfangspfad</span>
+<span class="hint">Fünf Wartebefehle in den Kartenfunktionen, aufgerufen aus dem Empfangs-Callback und bis zu 30-mal pro Klick — in Summe bis zu 2,4 Sekunden blockierte Hauptschleife.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand</div>
+<pre><i>// add_map_point(), Loeschzweig</i>
+lv_obj_del(map_point[ip]);
+<b>delay(40);</b>
+map_point[ip] = NULL;
+
+lv_obj_del(map_point_label[ip]);
+<b>delay(40);</b>
+map_point_label[ip] = NULL;
+
+<i>// add_map_point(), Slot-Recycling</i>
+if(map_point[map_point_count] != NULL)
+{
+    lv_obj_del(map_point[map_point_count]);
+    <b>delay(10);</b>
+}
+
+<i>// del_map_point(), dieselbe Schleife noch einmal</i>
+lv_obj_del(map_point[ip]);
+<b>delay(40);</b>
+map_point[ip] = NULL;
+lv_obj_del(map_point_label[ip]);
+<b>delay(40);</b>
+map_point_label[ip] = NULL;</pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre><i>// add_map_point(), Loeschzweig</i>
+if(map_point[ip] != NULL)
+{
+    lv_obj_del(map_point[ip]);
+    map_point[ip] = NULL;
+}
+
+if(map_point_label[ip] != NULL)
+{
+    lv_obj_del(map_point_label[ip]);
+    map_point_label[ip] = NULL;
+}
+
+<i>// add_map_point(), Slot-Recycling</i>
+<i>// UP-02: kein delay hier -- das laeuft auf dem
+// LoRa-RX-Pfad (OnRxDone -&gt; tdeck_add_pos_point)
+// und 30x innerhalb von refresh_map(); das
+// Symptom, das es zugedeckt hat, ist mit dem
+// sofortigen NULLen (G01) und der Bus-Mitigation
+// abgedeckt.</i>
+if(map_point[map_point_count] != NULL)
+{
+    lv_obj_del(map_point[map_point_count]);
+}
+
+<b>// del_map_point() gibt es nicht mehr (Befund 5)</b></pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p><code>delay()</code> hält die Arduino-Hauptschleife an. In dieser Zeit läuft kein LVGL-Tick, kein Touch-Sampling, kein Cursor, und der Rest der Schleife — inklusive der Nachbereitung des LoRa-Empfangs — steht ebenfalls. Die Wartezeit ist keine Kleinigkeit an einer selten benutzten Stelle, sondern liegt auf zwei der heißesten Pfade des Geräts.</p>
+<h4>Rechnung</h4>
+<ul>
+  <li><b>Pro Positionsbake</b> aus der Luft: <code>OnRxDone → tdeck_add_pos_point → add_map_point</code>, also 40 + 40 = <b>80 ms</b> Stillstand, jedes Mal.</li>
+  <li><b>Pro Zoomklick</b>: <code>refresh_map_del()</code> lief über bis zu 30 Stationen mit je 80 ms — <b>2,4 s</b> — und danach kam erst noch das Nachladen der Kachel (damals 1,6–4,5 s, Befund 6). Ein Zoomschritt konnte das Gerät also mehrere Sekunden am Stück lahmlegen.</li>
+</ul>
+<h4>Warum es überhaupt dastand</h4>
+<p>Vermutlich als Notpflaster gegen ein Darstellungsproblem: auf dem T-Deck geht der erste TFT-Transfer nach einem SD-Zugriff auf dem gemeinsamen SPI-Bus verloren. Das sieht aus wie ein Zeichenfehler und „geht weg“, wenn man wartet. Die Ursache ist aber ein Registerzustand am Bus, keine Zeit — die Wartezeit hat das Symptom verdeckt und den Preis auf jeden Empfang umgelegt.</p>
+<h4>Wie gefunden</h4>
+<p>Über ein Loop-Instrument in der Firmware: <code>[INSTR-LOOP]</code> misst die längste Durchlaufzeit der Hauptschleife und benennt den Abschnitt, in dem sie aufgetreten ist. Damit werden solche Blockaden als Zahl sichtbar, statt als „fühlt sich hakelig an“.</p>
+<h4>Lösung</h4>
+<p>Alle fünf <code>delay()</code> entfernt; der Kartenpfad ist wartefrei. Das verdeckte Bus-Problem ist getrennt behandelt (eine Leer-Transaktion setzt das Taktregister vor jedem Flush neu). Abgesichert ist das über das Testszenario <code>map --map-stations 40</code>, das absichtlich mehr Stationen einspielt, als es Marker-Slots gibt: 40/40 eingespielt, der Ring läuft sauber über, kein Absturz.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Struktur</span><span class="ttl">5 — Vier Kopien derselben Zoomlogik, zwei davon bereits auseinandergelaufen</span>
+<span class="hint">Dazu zwei Funktionen, die wörtliche Kopien anderer Funktionen waren und Marker löschten, damit sie unmittelbar danach neu erzeugt werden konnten.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand · 4× derselbe Block</div>
+<pre><i>// event_functions.cpp — Touch-Knopf "+"</i>
+void btn_event_handler_zoomin(lv_event_t * e) {
+  if (...CLICKED) {
+    if (gpsData.latitude != 0.0 || ...) { ... }
+    if (sdmap_lastKnownLat == 0.0 &amp;&amp; ...) { ... }
+    <b>refresh_map_del(meshcom_settings.node_map);</b>
+    sdmap_zoom_in();
+    sdmap_refresh(map_ta, lat, lon);
+    refresh_map(meshcom_settings.node_map);
+    add_map_point(node_call, lat, lon, true);
+  }
+}
+
+<i>// event_functions.cpp — Touch-Knopf "-": derselbe
+// Block, ein Wort geaendert (zoom_out)</i>
+
+<i>// tdeck_main.cpp — Tastatur SYM+I</i>
+if(act_key == 0x2d) {
+    if (gpsData.latitude != 0.0 || ...) { ... }
+    if (sdmap_lastKnownLat == 0.0 &amp;&amp; ...) { ... }
+    <b><i>// kein refresh_map_del() -- Kopie 3 und 4
+    // sind von 1 und 2 abgewichen</i></b>
+    sdmap_zoom_in();
+    sdmap_refresh(map_ta, lat, lon);
+    refresh_map(meshcom_settings.node_map);
+    add_map_point(node_call, lat, lon, true);
+    bSPEC=true;
+}
+
+<i>// tdeck_main.cpp — Tastatur SYM+O: derselbe Block</i>
+
+<i>// lv_obj_functions.cpp — woertliche Kopien</i>
+void <b>del_map_point</b>(...)   <i>// = Loeschschleife
+                        // aus add_map_point()</i>
+void <b>refresh_map_del</b>(int) <i>// = refresh_map(),
+                        // nur mit del_map_point()</i></pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute · eine Implementierung</div>
+<pre><i>// lv_obj_functions.cpp — die einzige Stelle</i>
+void tdeck_map_zoom(int dir)
+{
+    if (gpsData.latitude != 0.0 || ...) { ... }
+    if (sdmap_lastKnownLat == 0.0 &amp;&amp; ...) { ... }
+    if (dir &gt; 0) sdmap_zoom_in();
+    else         sdmap_zoom_out();
+    sdmap_refresh(map_ta, lat, lon, "zoom");
+    refresh_map(meshcom_settings.node_map);
+    add_map_point(node_call, lat, lon, true);
+}
+
+<i>// event_functions.cpp</i>
+void btn_event_handler_zoomin(lv_event_t * e) {
+  if (...CLICKED) <b>tdeck_map_zoom(1);</b>
+}
+void btn_event_handler_zoomout(lv_event_t * e) {
+  if (...CLICKED) <b>tdeck_map_zoom(-1);</b>
+}
+
+<i>// tdeck_main.cpp — Tastatur</i>
+case 0x2d: <b>tdeck_map_zoom(1);</b>  bSPEC=true; break;
+case 0x2b: <b>tdeck_map_zoom(-1);</b> bSPEC=true; break;
+case 0x67: <b>tdeck_map_zoom(1);</b>  <i>// g</i>
+case 0x68: <b>tdeck_map_zoom(-1);</b> <i>// h</i>
+
+<b><i>// del_map_point() und refresh_map_del()
+// ersatzlos entfernt</i></b></pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p>Fünf Einstiegspunkte (zwei Touch-Knöpfe, zwei Tastenkürzel, später der Testbefehl) führten dieselben fünfzehn Zeilen aus — in vier separaten Kopien. Zwei davon waren zum Zeitpunkt der Analyse bereits <b>nicht mehr identisch</b>: die Touch-Knöpfe riefen vorab <code>refresh_map_del()</code>, die Tastenkürzel nicht.</p>
+<h4>Folge</h4>
+<ul>
+  <li>Zoomen per Touch und Zoomen per Tastatur verhielten sich messbar unterschiedlich — nicht als Entwurfsentscheidung, sondern weil eine Änderung nur in zwei von vier Kopien angekommen war.</li>
+  <li>Jeder Fehler in diesem Block — etwa der Absturz aus Befund 1 — musste an vier Stellen gefunden und an vier Stellen behoben werden. Genau so entstehen Fixes, die „bei mir geht’s“ sind.</li>
+</ul>
+<h4>Die beiden toten Funktionen</h4>
+<p><code>del_map_point()</code> war Zeile für Zeile die Löschschleife aus <code>add_map_point()</code>, nur ohne den Neuaufbau. <code>refresh_map_del()</code> war Zeile für Zeile <code>refresh_map()</code>, nur mit <code>del_map_point()</code> statt <code>add_map_point()</code>. Die Zoomknöpfe riefen also erst <code>refresh_map_del()</code>, um alle Marker zu löschen, und danach <code>refresh_map()</code>, das sie sofort wieder anlegte. <code>add_map_point()</code> löscht einen vorhandenen Marker ohnehin selbst, bevor es ihn neu setzt — die Vorab-Löschrunde war reine Arbeit ohne Ergebnis, bezahlt mit bis zu 2,4 s Wartezeit (Befund 4).</p>
+<h4>Wie gefunden</h4>
+<p>Durch Lesen — dafür braucht es keine Messtechnik. Sichtbar wurde die Tragweite aber erst, als die Loop-Messung zeigte, dass ein Touch-Zoom deutlich länger blockiert als ein Tastatur-Zoom, obwohl beide „dasselbe“ tun sollten.</p>
+<h4>Lösung</h4>
+<p>Eine Funktion <code>tdeck_map_zoom(dir)</code>, fünf Aufrufer. Beide toten Funktionen entfernt. Damit ist Zoomen an allen Bedienwegen garantiert identisch, und ein künftiger Fix wirkt überall.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Performance</span><span class="ttl">6 — Der Kartenaufbau war langsam, und niemand konnte sagen, wo die Zeit blieb</span>
+<span class="hint">Die SD-Karte lief mit 800 kHz, der Bildpuffer wurde pro Aufbau neu belegt, und es gab keine einzige Zeitmessung im ganzen Pfad.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand</div>
+<pre><i>// tdeck_main.cpp — SD-Takt</i>
+if (SD.begin(TDECK_SDCARD_CS, SPI, <b>800000U</b>)) {
+
+<i>// tdeck_sdmap.cpp — Puffer pro Aufbau neu</i>
+size_t nativeSize = pixelCount * sizeof(lv_color_t);
+uint8_t * newbuf = (uint8_t *)<b>ps_malloc(nativeSize);</b>
+<i>…</i>
+lv_img_cache_invalidate_src(&amp;sdmap_dsc);
+if (sdmap_buf != nullptr)
+    <b>free(sdmap_buf);</b>
+sdmap_buf = newbuf;
+
+<i>// die einzige Rueckmeldung ueberhaupt:</i>
+Serial.printf("[ SDMAP ]...Kachel geladen &amp; "
+    "dekodiert: %s (%ux%u, %u Bytes)\n",
+    path, pngW, pngH, (unsigned)nativeSize);
+<i>// keine Zeit, keine Zaehlung, kein Aufrufer</i></pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre><i>// tdeck_main.cpp — SD-Takt</i>
+if (SD.begin(TDECK_SDCARD_CS, SPI, <b>20000000U</b>)) {
+   <i>// 40 MHz gemessen identisch; ab hier
+   // dominiert der PNG-Decoder</i>
+
+<i>// tdeck_sdmap.cpp — Puffer wird behalten</i>
+if (sdmap_buf == nullptr || <b>sdmap_bufLen != nativeSize</b>)
+{
+    lv_img_cache_invalidate_src(&amp;sdmap_dsc);
+    if (sdmap_buf != nullptr) free(sdmap_buf);
+    sdmap_buf    = (uint8_t *)ps_malloc(nativeSize);
+    sdmap_bufLen = sdmap_buf ? nativeSize : 0;
+}
+
+<i>// Zeitmessung getrennt nach Lesen und Dekodieren</i>
+uint32_t tr = millis();
+readLen = f.read(pngRaw, fsize);
+<b>sdmap_tReadMs += millis() - tr;</b>
+uint32_t td = millis();
+lodepng_decode32(&amp;rgba32, w, h, pngRaw, fsize);
+<b>sdmap_tDecodeMs += millis() - td;</b>
+<i>…</i>
+Serial.printf("[ SDMAP ]...Karte zusammengesetzt: "
+  "zoom %d, Kacheln %d (fehlend %d), %dx%d px, "
+  "<b>%lu ms (read %lu ms / %lu KB, decode %lu ms)</b> "
+  "<b>from=%s</b>\n", ...);</pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p>Der SPI-Takt der SD-Karte stand auf 800 kHz. Das ist der konservative Wert, mit dem eine SD-Karte initialisiert wird — für den Dauerbetrieb ist er ungefähr um den Faktor 25 zu niedrig. Eine 256er-Kachel ist je nach Motiv 20–60 KB; bei 800 kHz ist allein der Transfer eine halbe Sekunde und mehr.</p>
+<p><b>Zur Herkunft, damit die Zurechnung stimmt:</b> diese Zeile stammt nicht aus dem Kartenbeitrag, sondern aus der ersten T-Deck-Inbetriebnahme vom März 2025 (<code>df79c0b5</code>, Jakob Gurnhofer). Solange die SD-Karte nur Klangdateien lieferte, war der Takt egal. Erst die Kartenkacheln haben ihn zum Engpass gemacht — der Punkt steht hier, weil er zur Rendergeschichte gehört, nicht als Vorwurf.</p>
+<h4>Messung</h4>
+<p>Ein Zoomschritt kostete <b>1,6–4,5 s</b> reine Kachelzeit. Mit 20 MHz sind es <b>0,33–0,79 s</b>. 40 MHz wurden gegengemessen und brachten nichts mehr — ab dort ist nicht mehr der Bus der Engpass, sondern der PNG-Decoder.</p>
+<h4>Was die Messung erst sichtbar machte</h4>
+<p>Nach dem Einbau der getrennten Zeitnahme stand schwarz auf weiß, dass <b>55–60 % jedes Kartenaufbaus reines PNG-Dekodieren</b> sind (rund 95–170 ms je Kachel, lodepng auf dem S3). Damit war klar, dass weitere Arbeit am Bus nichts bringt und der nächste sinnvolle Schritt ein Cache für dekodierte Kacheln ist. Diese Entscheidung war vorher nicht begründbar — man hätte raten müssen.</p>
+<h4>Puffer</h4>
+<p>Der ursprüngliche Code belegte bei jedem Aufbau einen neuen PSRAM-Block und gab den alten frei. Da der Ausschnitt fast immer dieselbe Größe hat, ist das vermeidbare Fragmentierung im PSRAM-Heap — demselben Heap, in dem der Absturz aus Befund 1 zuschlug. Heute wird der Puffer nur neu belegt, wenn sich die Größe tatsächlich ändert.</p>
+<h4>Der <code>from=</code>-Anhang</h4>
+<p>Jede Aufbauzeile nennt jetzt ihren Auslöser (<code>zoom</code>, <code>pan</code>, <code>tab</code>, <code>setmap</code>, <code>boundary</code>, <code>recenter</code>). Ohne diese eine Angabe wäre der folgende Befund nicht auffindbar gewesen.</p>
+
+<div style="margin-top:18px">
+<details class="finding" style="margin:0">
+<summary style="padding:12px 14px"><span class="tag info">Folgebefund</span><span class="ttl" style="font-size:15px">Der doppelte Kartenaufbau beim Tab-Wechsel</span></summary>
+<div class="body" style="padding:16px 14px 18px">
+<h4>Was passiert</h4>
+<p>Wird der Kartentab über die Tab-Leiste angetippt (nicht über eine Taste), baut das Gerät die Karte <b>zweimal hintereinander</b> auf: einmal für die Ansicht mit sichtbarer Leiste (294×140 px), einmal, nachdem die Leiste eingeklappt ist (294×182 px).</p>
+<h4>Ursache</h4>
+<p>Die liegt nicht im Kartencode: LVGL setzt auf die Knopfmatrix der Tab-Leiste das Flag <code>LV_OBJ_FLAG_EVENT_BUBBLE</code> (<code>lv_tabview.c:233</code>). Deren <code>VALUE_CHANGED</code> steigt damit zum Tabview auf, und <code>tabview_event_cb()</code> feuert für einen einzigen Tab-Wechsel zweimal. Das ist eine Falle der Bibliothek, die man nicht sieht, wenn man sie nicht kennt.</p>
+<h4>Warum es trotzdem hierher gehört</h4>
+<p>Ein doppelter Callback ist so lange harmlos, wie das, was er auslöst, billig ist. Weil ein Kartenaufbau 600–700 ms kostet, wird aus dem doppelten Ereignis eine <b>1,3 Sekunden lange Blockade</b> der Hauptschleife, in der Cursor und Touch stehen. Der Bibliotheksfehler ist der Auslöser, die Kosten der Komposition sind der Verstärker.</p>
+<h4>Wie gefunden</h4>
+<p>Über den <code>from=</code>-Anhang: im Protokoll standen zwei <code>Karte zusammengesetzt</code>-Zeilen mit identischem Auslöser <code>tab</code> und <b>unterschiedlicher Bildhöhe</b> — 140 und 182. Die unterschiedliche Höhe war der Hinweis auf die einklappende Leiste. Der Testautomat fährt dafür den Trackball auf den Tab-Knopf und klickt ihn, statt den Tab per Befehl umzuschalten, weil nur die echte Geste den Fehler auslöst.</p>
+<h4>Lösung und Messung</h4>
+<p>Das aufgestiegene Duplikat wird verworfen (<code>lv_event_get_target != lv_event_get_current_target</code>), die Leiste wird <i>vor</i> dem Aufbau eingeklappt, und <code>sdmap_refresh()</code> hat zusätzlich eine Sperre gegen einen unveränderten Aufbau (Schlüssel aus Set, Zoom, Position und Ausschnittsgröße). Gemessen: vorher 2 Aufbauten, Loop-Gap <b>1337 ms</b>; nachher 1 Aufbau, <b>718 ms</b>.</p>
+</div>
+</details>
+</div>
+
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag">Robustheit</span><span class="ttl">7 — Der Kachelgrenzen-Nachlader bricht nach 49,7 Tagen Laufzeit</span>
+<span class="hint">Klassischer <code>millis()</code>-Überlauf: die Additionsform der Zeitprüfung ist nicht überlaufsicher.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand · <code>esp32_main.cpp</code></div>
+<pre>static unsigned long sdmap_boundary_timer = 0;
+
+<b>if ((sdmap_boundary_timer + 30000UL) &lt; millis())</b>
+{
+    sdmap_boundary_timer = millis();
+
+    if (lv_tabview_get_tab_act(tv) == 3 &amp;&amp;
+        (gpsData.latitude  != 0.0 ||
+         gpsData.longitude != 0.0))
+    {
+        if (!sdmap_in_current_tile(gpsData.latitude,
+                                   gpsData.longitude))
+        {
+            <i>…</i>
+            sdmap_refresh(map_ta, lat, lon);
+            refresh_map(meshcom_settings.node_map);
+        }
+    }
+}</pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre>static unsigned long sdmap_boundary_timer = 0;
+
+<i>// N-08-Idiom, ueberlaufsicher</i>
+<b>if ((uint32_t)(millis() - sdmap_boundary_timer)
+        &gt;= 30000UL)</b>
+{
+    sdmap_boundary_timer = millis();
+
+    <i>// TD-07: kein Auto-Recenter, solange der
+    // Nutzer manuell gepannt hat</i>
+    if (lv_tabview_get_tab_act(tv) == 3 &amp;&amp;
+        <b>!tdeck_map_user_panned()</b> &amp;&amp;
+        (gpsData.latitude  != 0.0 ||
+         gpsData.longitude != 0.0))
+    {
+        if (!sdmap_in_current_tile(gpsData.latitude,
+                                   gpsData.longitude))
+        {
+            <i>…</i>
+            sdmap_refresh(map_ta, lat, lon, <b>"boundary"</b>);
+            refresh_map(meshcom_settings.node_map);
+        }
+    }
+}</pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Was passiert</h4>
+<p><code>millis()</code> läuft nach 2³² ms — rund 49,7 Tagen — auf 0 über. Die Form <code>letzterZeitpunkt + Intervall &lt; jetzt</code> vergleicht zwei Werte, von denen einer überlaufen kann und der andere nicht: kurz vor dem Überlauf ist <code>letzterZeitpunkt + 30000</code> selbst übergelaufen und damit eine sehr kleine Zahl, danach ist <code>jetzt</code> klein und die Bedingung wird falsch. Die Prüfung setzt für eine Weile aus beziehungsweise feuert zur Unzeit.</p>
+<h4>Folge</h4>
+<p>Auf einem Knoten, der wie vorgesehen wochenlang durchläuft, hört der Kartenausschnitt nach 49,7 Tagen auf, der eigenen Position zu folgen. Das ist der unangenehmste Fehlertyp überhaupt: er tritt nie auf dem Schreibtisch auf, sondern nur im Dauerbetrieb, und er sieht nach einem Zufall aus.</p>
+<h4>Wie gefunden</h4>
+<p>Durch eine gezielte Suche: nach dem ersten Überlauffehler an anderer Stelle im Projekt wurde das gesamte Repository nach dem Muster <code>timer + intervall &lt; millis()</code> durchsucht. Diese Stelle war einer der Treffer. Kein Test hätte das gefunden — 49,7 Tage Laufzeit kann man nicht wirtschaftlich nachstellen.</p>
+<h4>Lösung</h4>
+<p>Die Differenzform <code>(uint32_t)(millis() - letzterZeitpunkt) &gt;= intervall</code>. Sie ist überlaufsicher, weil die Subtraktion vorzeichenloser Ganzzahlen den Überlauf korrekt auflöst. Im selben Zug bekam die Bedingung die Pan-Sperre: hat der Nutzer manuell verschoben, soll ihn der Automatiklader nicht zurückreißen.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<details class="finding">
+<summary><span class="tag info">Hygiene</span><span class="ttl">8 — Eingriff in eine mitgelieferte Fremdbibliothek</span>
+<span class="hint">Eine funktionslose Änderung an <code>lib/lvgl</code>, die bei jedem LVGL-Update im Weg steht.</span></summary>
+<div class="body">
+<div class="tri">
+
+<div class="col old">
+<div class="hd">Ursprünglicher Stand</div>
+<pre><i>// lib/lvgl/src/extra/libs/png/lv_png.c</i>
+ #endif /*LV_USE_PNG*/
+<b>-</b>
+<b>-</b>
+<i>// zwei Leerzeilen am Dateiende entfernt,
+// Datei endet jetzt ohne Zeilenumbruch</i>
+
+<i>// variants/t_deck_plus/lv_conf.h</i>
+-#define LV_USE_PNG 0
++#define LV_USE_PNG <b>1</b></pre>
+</div>
+
+<div class="col new">
+<div class="hd">Heute</div>
+<pre><i>// unveraendert uebernommen — beides steht
+// heute noch genau so im Baum</i></pre>
+</div>
+
+<div class="col why">
+<div class="hd">Warum</div>
+<h4>Der Schalter ist richtig</h4>
+<p><code>LV_USE_PNG 1</code> muss gesetzt sein, denn <code>lodepng.c</code> ist in LVGL hinter genau diesem Schalter versteckt (<code>lodepng.c:32</code>) — ohne ihn fehlen die Symbole, die <code>tdeck_sdmap.cpp</code> direkt aufruft. Das ist der einzige Weg, und er wurde richtig gewählt.</p>
+<h4>Der Nebeneffekt</h4>
+<p>Mit dem Schalter wird auch <code>lv_png.c</code> übersetzt, also LVGLs eigener Bild-Decoder, der sich beim Framework registriert. Benutzt wird er nie, weil der Kartencode lodepng direkt aufruft. Es ist Flash für nichts — klein, aber es steht in einem Gerät, in dem der Platz gezählt wird.</p>
+<h4>Die Änderung an der Bibliothek</h4>
+<p>Der entfernte Zeilenumbruch am Ende von <code>lv_png.c</code> ändert am Programm nichts. Er ändert die Datei. Alles unter <code>lib/lvgl</code> ist eingebundener Fremdcode: jede Änderung dort ist beim nächsten Bibliotheks-Update ein Konflikt, den jemand auflösen muss, und beim Suchen nach eigenen Änderungen ein falscher Treffer. Die Regel ist einfach — Fremdbibliotheken werden nicht angefasst, und wenn es unvermeidlich ist, dann als benannter Patch mit Begründung.</p>
+<h4>Warum trotzdem nichts geändert wurde</h4>
+<p>Das Rückgängigmachen wäre eine weitere Änderung an derselben Fremddatei. Der Punkt steht hier als Hinweis, nicht als Aufgabe.</p>
+</div>
+
+</div>
+</div>
+</details>
+
+<h2><span class="num">3</span>Wie diese Fehler gefunden wurden</h2>
+<p class="sub">Der eigentlich übertragbare Teil. Vier der acht Befunde waren durch Lesen nicht zu sehen, und zwei waren durch Ausprobieren nicht zuverlässig auszulösen.</p>
+
+<p>Eine GUI auf einem Embedded-Gerät gilt als schlecht testbar: es gibt keinen Simulator, die Eingabe kommt über Touch und Trackball, die Ausgabe geht auf ein Display, das kein Testprogramm liest, und alles hängt am selben SPI-Bus wie die SD-Karte und das Funkmodul. Die übliche Konsequenz ist, dass man draufschaut und sagt, ob es gut aussieht. Damit findet man einen um 32 Pixel versetzten Marker nicht, einen Absturz nach dem siebten Zoomschritt nur zufällig, und einen doppelten Kartenaufbau überhaupt nicht.</p>
+
+<p>Der Ausweg war zweistufig: <b>erst das Gerät messbar machen</b>, dann <b>das Gerät fernsteuerbar machen</b>. Beides passiert über die serielle Schnittstelle, die ohnehin da ist.</p>
+
+<h3>Stufe 1 — Messpunkte in der Firmware</h3>
+<p>Jede Messzeile ist maschinenlesbar aufgebaut (Feldname, Semikolon, Wert), damit ein Testprogramm sie auswerten kann, statt Fließtext zu durchsuchen.</p>
+<div class="scroller">
+<table>
+<thead><tr><th>Messzeile</th><th>Inhalt</th><th>Hat gezeigt</th></tr></thead>
+<tbody>
+<tr><td><code>[MAP];zoom;…;center_err;dx;dy</code></td><td>Abweichung der eigenen Position von der Bildmitte, in Pixeln, bei jedem Zeichnen</td><td>Befund 2 und 3 — „zentriert“ wird von einer Meinung zu einer Zahl</td></tr>
+<tr><td><code>[ SDMAP ]…Karte zusammengesetzt</code></td><td>Zoom, Kachelzahl, fehlende Kacheln, Bildgröße, Gesamtzeit, davon Lesen und Dekodieren, gelesene KB, <code>from=</code>&nbsp;Auslöser</td><td>Befund 6 — PNG-Decode als Hauptkosten; der doppelte Aufbau als zwei Zeilen mit gleichem Auslöser und verschiedener Höhe</td></tr>
+<tr><td><code>[INSTR-LOOP];gap;ms;…;in;…</code></td><td>längste Durchlaufzeit der Hauptschleife und der Abschnitt, in dem sie auftrat</td><td>Befund 4 und 6 — Blockaden als Millisekunden statt als „hakelig“</td></tr>
+<tr><td><code>[INSTR-GUI];…;map_points;…</code></td><td>Zahl der belegten Marker-Slots</td><td>Befund 4 — dass das Slot-Recycling im Test wirklich erreicht wurde</td></tr>
+<tr><td><code>[BALL];x;…;y;…</code> · <code>[TAB];active;…</code></td><td>Cursorposition, aktiver Reiter</td><td>Voraussetzung, um eine echte Bediengeste nachzustellen statt sie zu umgehen</td></tr>
+<tr><td><code>[SPITRACE];…</code></td><td>Busnutzer und SPI-Register vor und nach jedem Display-Transfer</td><td>die Ursache hinter dem Symptom, das die <code>delay()</code> aus Befund 4 zugedeckt haben</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Stufe 2 — Fernbedienung über die serielle Schnittstelle</h3>
+<p>Die Firmware nimmt Testbefehle entgegen, mit denen ein Programm auf dem Rechner das Gerät genauso bedient wie ein Mensch — nur reproduzierbar und tausendfach.</p>
+<div class="scroller">
+<table>
+<thead><tr><th>Befehl</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td><code>--injectpos &lt;call&gt; &lt;lat&gt; &lt;lon&gt;</code></td><td>trägt eine fremde Station ein, als wäre ihre Positionsbake über Funk gekommen — ohne zweites Gerät, ohne Funklizenzfragen, an jeder gewünschten Koordinate</td></tr>
+<tr><td><code>--mapzoom in|out</code></td><td>ein Zoomschritt, quittiert, damit das Testprogramm auf ihn warten kann</td></tr>
+<tr><td><code>--ball left|right|up|down &lt;n&gt;</code></td><td>bewegt den Trackball-Cursor um n Schritte und meldet die Position zurück; ein Klick modelliert Drücken, Halten und Loslassen</td></tr>
+<tr><td><code>--tab &lt;n&gt;</code>, <code>--drawer on|off</code>, <code>--tft on|off</code></td><td>Reiter, Schublade, Display direkt schalten</td></tr>
+<tr><td><code>--instr</code>, <code>--instreset</code>, <code>--uistat</code>, <code>--pos</code></td><td>Messwerte abfragen und zurücksetzen, GUI-Zustand und eigene Position auslesen</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Stufe 3 — der Testautomat</h3>
+<p><code>tools/bench/tdeck_harness.py</code>, 2.808 Zeilen, <b>23 Szenarien</b>. Er öffnet den seriellen Port, wartet auf die Bootmeldung, fährt ein Szenario, sammelt die Messzeilen und fällt am Ende ein maschinelles Urteil. Kein Auge, kein „sieht gut aus“ — ein Szenario ist bestanden oder nicht, und wenn nicht, steht im Protokoll, an welcher Bedingung es gescheitert ist.</p>
+
+<div class="callout">
+<h3 style="margin-top:0">Szenario <code>map</code> — der eigentliche Kartentest</h3>
+<p>Setzt zehn fremde Stationen in 0,3 bis 400 km Entfernung rund um die eigene Position, davon einige bewusst außerhalb des sichtbaren Ausschnitts. Danach ein voller Zoom-Sweep bis an die obere Grenze des Kartensets und wieder zurück bis an die untere.</p>
+<p><b>Bestanden nur, wenn</b> jede Einspielung quittiert wurde, jeder Zoomschritt quittiert wurde, kein Absturz aufgetreten ist, beide Zoomgrenzen erreicht wurden und <code>center_err</code> auf <b>jeder</b> Stufe exakt 0/0 ist.</p>
+<p>Mit <code>--map-stations 40</code> werden absichtlich mehr Stationen eingespielt, als es Marker-Slots gibt (30), damit der Recycling-Zweig aus Befund 4 wirklich durchlaufen wird. Ergebnis auf DK5EN-14: 40/40 eingespielt, Ring läuft sauber über, kein Absturz.</p>
+<p><b>Ein Detail, das viel Zeit gekostet hat:</b> die Teststationen heißen <code>DK5EM-nn</code>, nicht <code>DK5EN-nn</code>. Mit <code>DK5EN-14</code> kollidierte eine Teststation mit dem Rufzeichen des Testgeräts selbst, und jede Kollision löste einen kompletten Kartenaufbau aus — 728 ms Blockade, die wie ein Befund aussah und keiner war. Auch ein Testaufbau muss verifiziert werden.</p>
+</div>
+
+<div class="callout">
+<h3 style="margin-top:0">Szenario <code>map_tab_pick</code> — warum die echte Geste zählt</h3>
+<p>Der doppelte Kartenaufbau tritt <b>nur</b> auf, wenn der Kartenreiter über die Tab-Leiste angeklickt wird. Der bequeme Testweg <code>--tab 3</code> schaltet den Reiter direkt um und umgeht die Leiste — und damit den Fehler. Ein Test, der den bequemen Weg nimmt, hätte hier dauerhaft „grün“ gemeldet.</p>
+<p>Das Szenario fährt deshalb den Trackball-Cursor Schritt für Schritt auf den Knopf des Kartenreiters (x 120…160, y 27…78), prüft über <code>[BALL]</code>, dass er wirklich dort steht, und klickt erst dann. Als Vergleichswert dient die Bildhöhe eines gewöhnlichen <code>--tab</code>-Wechsels, bei dem die Leiste schon eingeklappt ist.</p>
+<p><b>Bestanden nur, wenn</b> danach <code>[TAB];active;3</code> gemeldet wird, seit dem Klick <b>genau eine</b> <code>Karte zusammengesetzt</code>-Zeile aufgetreten ist, deren <code>from=</code> auf <code>tab</code> steht und deren Bildhöhe dem Vergleichswert entspricht.</p>
+<p>Vorher: zwei Aufbauten, 294×140 und 294×182, 1337 ms Loop-Blockade. Nachher: ein Aufbau, 294×182, 718 ms.</p>
+</div>
+
+<h3>Was welcher Befund gebraucht hat</h3>
+<div class="scroller">
+<table>
+<thead><tr><th>Befund</th><th>Durch Lesen sichtbar?</th><th>Was es tatsächlich gebraucht hat</th></tr></thead>
+<tbody>
+<tr><td>1 — Absturz beim Zoomen</td><td>vermutbar</td><td><code>--injectpos</code> + automatisierter Zoom-Sweep für den Nachweis: Absturz reproduzierbar bei Schritt 7</td></tr>
+<tr><td>2 — Kachel statt Ausschnitt</td><td>teilweise</td><td><code>center_err</code>, um „springt“ und „nicht zentriert“ von einer Beschwerde in ein Testkriterium zu verwandeln</td></tr>
+<tr><td>3 — Markerprojektion</td><td>ja</td><td>Lesen genügte; <code>center_err</code> lieferte den Beweis, dass die Korrektur stimmt</td></tr>
+<tr><td>4 — <code>delay()</code> im Empfangspfad</td><td>ja</td><td>Lesen genügte; <code>[INSTR-LOOP]</code> bezifferte die Folgen und <code>--map-stations 40</code> sicherte den Recycling-Zweig ab</td></tr>
+<tr><td>5 — vier Kopien</td><td>ja</td><td>Lesen genügte</td></tr>
+<tr><td>6 — Renderkosten</td><td><b>nein</b></td><td>getrennte Zeitnahme für Lesen und Dekodieren — vorher war jede Optimierung Raten</td></tr>
+<tr><td>6b — doppelter Aufbau</td><td><b>nein</b></td><td><code>from=</code>-Anhang plus eine <b>echte</b> Trackball-Geste; über <code>--tab</code> ist der Fehler unsichtbar</td></tr>
+<tr><td>7 — <code>millis()</code>-Überlauf</td><td>nur gezielt</td><td>Mustersuche über das ganze Repository; ein Test hätte 49,7 Tage gebraucht</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2><span class="num">4</span>Die Zahlen</h2>
+<p class="sub">Alles gemessen auf dem Testgerät DK5EN-14 (T-Deck Plus) mit dem Testautomaten, nicht geschätzt. Wo ein Wert aus gemessenen Einzelwerten zusammengerechnet ist, steht es dabei.</p>
+
+<div class="scroller">
+<table>
+<thead><tr><th>Größe</th><th class="num">vorher</th><th class="num">nachher</th><th>Anmerkung</th></tr></thead>
+<tbody>
+<tr><td>SPI-Takt der SD-Karte</td><td class="num">800 kHz</td><td class="num">20 MHz</td><td>40 MHz gegengemessen, identisch — ab dort ist der Decoder der Engpass</td></tr>
+<tr><td>Kachelzeit je Zoomschritt</td><td class="num">1,6–4,5 s</td><td class="num">0,33–0,79 s</td><td>direkte Folge des Takts</td></tr>
+<tr><td>Anteil PNG-Dekodierung am Aufbau</td><td class="num">unbekannt</td><td class="num">55–60 %</td><td>rund 95–170 ms je 256×256-Kachel; erst nach Einbau der Zeitnahme bekannt</td></tr>
+<tr><td>Kartenaufbau, ein Ausschnitt 294×182</td><td class="num">—</td><td class="num">470–750 ms</td><td>Zoomschritt oder eigene Positionsbake, ohne Kachel-Cache</td></tr>
+<tr><td>Kartenreiter über die Tab-Leiste wählen</td><td class="num">2 Aufbauten<br>1337 ms</td><td class="num">1 Aufbau<br>718 ms</td><td>Loop-Blockade, Szenario <code>map_tab_pick</code></td></tr>
+<tr><td>Blockade je empfangener Positionsbake</td><td class="num">80 ms</td><td class="num">0 ms</td><td>2 × <code>delay(40)</code> auf dem LoRa-Empfangspfad</td></tr>
+<tr><td>Blockade je Zoomklick, 30 Stationen</td><td class="num">bis 2400 ms</td><td class="num">0 ms</td><td>30 × 80 ms in <code>refresh_map_del()</code>; gerechnet aus den Einzelwerten</td></tr>
+<tr><td>Zoomklick gesamt, 30 Stationen</td><td class="num">4,0–6,9 s</td><td class="num">0,47–0,75 s</td><td>Summe aus Wartezeit und Kachelzeit; <b>gerechnet</b>, nicht als Ganzes gemessen</td></tr>
+<tr><td>Zentrierfehler der eigenen Position</td><td class="num">unbestimmt</td><td class="num">0 / 0 px</td><td>über Zoom 0–9, beide Richtungen, in jedem Testlauf geprüft</td></tr>
+<tr><td>Karten-Arrays im Repository</td><td class="num">3.849 Zeilen</td><td class="num">0</td><td>Michaels Beitrag — der größte Einzelgewinn des ganzen Vorhabens</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout">
+<p><b>Zur Einordnung der Beschleunigung.</b> Der Sprung kommt aus zwei unabhängigen Quellen: der SD-Takt bringt beim Kachelladen etwa den Faktor 5, und der Wegfall der Wartebefehle nimmt bei besetzter Karte bis zu 2,4 Sekunden aus jedem Zoomklick heraus. Zusammengerechnet wird aus einem Zoomschritt, der das Gerät vier bis sieben Sekunden anhielt, einer von etwa einer halben Sekunde. Der doppelte Aufbau beim Tab-Wechsel kommt als eigener Faktor 2 obendrauf, aber nur auf diesem einen Bedienweg.</p>
+</div>
+
+<h2><span class="num">5</span>Was offen ist</h2>
+<p class="sub">Der Vollständigkeit halber, und weil ein Bericht, der nur fertige Punkte aufzählt, den Stand falsch darstellt.</p>
+<ul>
+  <li><b>Kein Cache für dekodierte Kacheln.</b> Jeder Zoom-, Pan- und Bakenschritt liest und dekodiert alle beteiligten Kacheln neu — 0,33–0,79 s, jedes Mal. Ein LRU-Cache im PSRAM ist der nächste sinnvolle Schritt und würde vor allem das Zurückzoomen sofort machen. Bewusst zurückgestellt: erst Stabilität, dann Geschwindigkeit.</li>
+  <li><b>Kachelformat.</b> Solange PNG das Format ist, bleibt der Decoder der Engpass. Rohes RGB565 (kein Decoder, aber 128 KB je Kachel), 8-Bit-Palette-PNG oder QOI sind die Kandidaten; entschieden ist nichts.</li>
+  <li><b>Stationen außerhalb des Ausschnitts</b> werden weiterhin nicht gezeichnet. Das ist jetzt eine bewusste Entscheidung und kein Nebeneffekt der Kachelgrenze mehr, aber ein Randpfeil wäre die bessere Lösung.</li>
+  <li><b>Kartensetauswahl ohne Prüfung.</b> <code>sdmap_set_active_set()</code> klemmt den Index auf <code>SDMAP_SET_COUNT</code> (die Feldgröße, 5) statt auf die Zahl der tatsächlich gefundenen Sets. Wählt jemand ein Set, das auf der SD-Karte nicht existiert, sind Min- und Max-Zoom beide 0 und der Zoom wird stillschweigend auf 0 festgenagelt. Unverändert aus dem ursprünglichen Beitrag, bisher niemandem aufgefallen.</li>
+  <li><b>SD-Zugriffe ohne Busschutz.</b> Die SD-Zugriffe in <code>tdeck_sdmap.cpp</code> nehmen den SPI-Bus-Mutex nicht, den der Audiopfad inzwischen nimmt. Aufgefallen als Nebenfund beim Bus-Tracing, noch nicht behoben.</li>
+  <li><b>Ungenutzter LVGL-PNG-Decoder</b> im Firmware-Bild (Befund 8).</li>
+</ul>
+
+<h2><span class="num">6</span>Was man daraus mitnehmen kann</h2>
+<div class="callout">
+<ul>
+  <li><b>Eine Wartezeit ist nie die Lösung.</b> Ein <code>delay()</code>, das ein Darstellungsproblem verschwinden lässt, hat die Ursache nicht beseitigt, sondern nur verdeckt — und stellt die Rechnung dort aus, wo der Code am heißesten läuft. In diesem Fall auf dem Funkempfangspfad.</li>
+  <li><b>Zwei magische Zahlen, die einander ausgleichen, sind zwei Fehler.</b> Die 320 und die −32 in der Projektion haben sich in der Kachelmitte gegenseitig aufgehoben. Genau deshalb sah es beim Ausprobieren richtig aus und war am Rand um 32 Pixel falsch.</li>
+  <li><b>Ein Zeiger auf ein gelöschtes Objekt gehört sofort auf NULL</b> — in derselben Anweisungsgruppe, nicht irgendwann später. Jeder Rückgabepfad dazwischen ist ein potenzieller Absturz.</li>
+  <li><b>Die vierte Kopie ist die, die man beim Fixen vergisst.</b> Von den vier Zoom-Blöcken waren zwei schon auseinandergelaufen, bevor jemand hingesehen hat.</li>
+  <li><b>Was nicht gemessen wird, wird geraten.</b> Ohne die getrennte Zeitnahme wäre der nächste Optimierungsschritt vermutlich wieder am Bus angesetzt worden — dort, wo nichts mehr zu holen ist.</li>
+  <li><b>Ein Test, der den bequemen Weg nimmt, prüft den bequemen Weg.</b> Über <code>--tab 3</code> war der doppelte Kartenaufbau unsichtbar. Erst der Umweg über den echten Trackball-Klick hat ihn gezeigt.</li>
+</ul>
+</div>
+
+<footer>
+  <p>Vergleichsbasis <code>6f37a206</code> (upstream/dev, 28.08.2026) gegen <code>fork-main</code> (08.09.2026). Betrachtet wurden ausschließlich die Dateien und Funktionen aus Michaels Kartenbeitrag: <code>src/t-deck/tdeck_sdmap.cpp</code> und <code>.h</code>, die Kartenfunktionen in <code>src/t-deck/lv_obj_functions.cpp</code>, die Zoom- und Reiter-Handler in <code>src/t-deck/event_functions.cpp</code>, der Kachelgrenzen-Nachlader in <code>src/esp32/esp32_main.cpp</code> sowie <code>variants/t_deck_plus/lv_conf.h</code> und <code>lib/lvgl/src/extra/libs/png/lv_png.c</code>. Alle Messwerte stammen vom Testgerät DK5EN-14 (T-Deck Plus) und sind in <code>docs/tdeck-findings-20260828.md</code>, <code>docs/BACKLOG.md</code> und den Laufprotokollen unter <code>tools/bench/runs/</code> hinterlegt.</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:9';
+  var b = document.createElement('button');
+  b.textContent = 'Alle aufklappen';
+  b.style.cssText = 'font:600 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'
+    + 'padding:10px 15px;border-radius:20px;border:1px solid var(--line);'
+    + 'background:var(--panel);color:var(--ink);cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.12)';
+  var open = false;
+  b.onclick = function(){
+    open = !open;
+    document.querySelectorAll('details.finding').forEach(function(d){ d.open = open; });
+    b.textContent = open ? 'Alle zuklappen' : 'Alle aufklappen';
+  };
+  bar.appendChild(b); document.body.appendChild(bar);
+})();
+</script>
+</body>
+</html>

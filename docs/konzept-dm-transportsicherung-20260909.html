@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshCom: Transportsicherung fuer persoenliche Nachrichten</title>
+<style>
+  :root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; white-space: nowrap; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);} .tag.grey{background:var(--muted);}
+  .dash { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: #fafcfe; font-size: 13px; }
+  .dash h4 { margin: 0 0 6px; font-size: 14px; }
+  .dash .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .dash .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+  .dash .tile .v { font-size: 20px; font-weight: 600; }
+  .dash .tile .l { color: var(--muted); font-size: 12px; }
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  /* Simulator */
+  .sim { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #fafcfe; margin: 16px 0; }
+  .sim .ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+  .sim .ctl label { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+  .sim select, .sim input { font: inherit; font-size: 13px; padding: 2px 4px; }
+  .sim button { font: inherit; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  .sim button.primary { background: var(--acc); color: #fff; border-color: var(--acc); }
+  .sim button:disabled { opacity: .5; cursor: default; }
+  .sim .stage { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sim .stage button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .sim .canvas { border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .sim .canvas svg { width: 100%; height: auto; }
+  .sim .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .sim .log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; height: 230px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; white-space: pre-wrap; }
+  .sim .log .dm { color: var(--acc); } .sim .log .ack { color: var(--ok); } .sim .log .bad { color: var(--bad); } .sim .log .warn { color: var(--warn); } .sim .log .grey { color: var(--muted); }
+  .sim .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sim .tile { background:#fff; border:1px solid var(--line); border-radius: 5px; padding: 6px 10px; }
+  .sim .tile .v { font-size: 18px; font-weight: 600; }
+  .sim .tile .l { color: var(--muted); font-size: 12px; }
+  .sim .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  svg .simnode { fill: #fff; stroke: var(--ink); stroke-width: 1.4; }
+  svg .simnode.sender { fill: #e9f1fd; stroke: var(--acc); }
+  svg .simnode.dest { fill: #eaf7ef; stroke: var(--ok); }
+  svg .simnode.gw { fill: #fff6ea; stroke: var(--warn); }
+  svg .simnode.server { fill: #f1ebfa; stroke: var(--ham); }
+  svg .simnode.offline { fill: #eee; stroke: var(--muted); stroke-dasharray: 4 3; }
+  svg .simlink { stroke: var(--line); stroke-width: 2.5; cursor: pointer; }
+  svg .simlink.hit { stroke: transparent; stroke-width: 18; }
+  svg .simlink.next { stroke: var(--warn); stroke-dasharray: 6 4; }
+  svg .simlink.down { stroke: var(--bad); stroke-dasharray: 3 4; }
+  svg .simlink.wire { stroke: var(--ham); stroke-dasharray: 5 3; stroke-width: 1.6; }
+  svg .pkt { stroke: #fff; stroke-width: 1; }
+  svg .pkt.DM { fill: var(--acc); } svg .pkt.ACK { fill: var(--ok); } svg .pkt.GWACK { fill: var(--warn); } svg .pkt.HEY { fill: var(--muted); } svg .pkt.SRV { fill: var(--ham); }
+  svg .pktlabel { font-size: 10px; font-family: ui-monospace, Menlo, monospace; fill: var(--ink); pointer-events: none; }
+  svg .badge { font-size: 10px; fill: var(--muted); }
+  svg .dropx { stroke: var(--bad); stroke-width: 2.5; }
+  .matrix { font-size: 12px; }
+  .matrix td { padding: 4px 6px; white-space: nowrap; cursor: pointer; }
+  .matrix td.ok { background: #eaf7ef; } .matrix td.late { background: #fff6ea; } .matrix td.bad { background: #fdecec; } .matrix td.mute { background: #f2f2f2; }
+  .matrix th { position: sticky; top: 0; }
+  .matrixwrap { overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+  @media (max-width: 720px) { .dash .tiles, .sim .tiles { grid-template-columns: repeat(2,1fr);} .toc { columns: 1; } .sim .grid { grid-template-columns: 1fr; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } .sim .log { height: auto; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Transportsicherung fuer persoenliche Nachrichten ueber LoRa</h1>
+<p class="small">MeshCom-Firmware, Konzept mit interaktiven Demos</p>
+<ul class="meta">
+  <li>Stand: 2026-09-09</li>
+  <li>Autor: DK5EN, Recherche und Simulation mit Claude</li>
+  <li>Quelle Firmware: Fork <code>fork-main</code> auf Stand 8d9a5d9e (v4.35s.09.09), Zeilenangaben als Datei:Zeile</li>
+  <li>Quelle Konzepte: <code>docs/concept-dm-store-and-forward.md</code> (Entwurf v2, 2026-08-30) und Advisor-Verdikt <code>docs/review/advisor-dm-store-and-forward-20260830.md</code></li>
+  <li>Quelle Vortrag: <code>docs/presentation/meshcom-protocol.html</code> (EMCOMM-Anforderungen, Folien 19 bis 24)</li>
+  <li>Quelle Messungen: DG0OPK-Kampagnen 23. bis 27.08.2026 (47,6 h, fuenf Knoten), Bench 2026-09-01, BergLog 2026-03, mcmap <code>messages_stats</code> vom 2026-09-09</li>
+  <li>Vorarbeit in Englisch: <code>docs/proposal-dm-transport-reliability-20260909.md</code></li>
+  <li>Rufzeichen in Diagrammen und Demos sind Platzhalter aus dem eigenen Bestand (DK5EN-xx), keine fremden Stationen</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>MeshCom quittiert persoenliche Nachrichten (DM) heute schon Ende-zu-Ende: der Sender haengt <code>{NNN</code> an, der Empfaenger antwortet mit <code>:ackNNN</code>. Das ist fuer ein Flutnetz die richtige Architektur. Trotzdem gehen DMs verloren, weil drei Mechaniken versagen: die Wiederholung traegt dieselbe msg_id und wird von jedem Knoten, der das Original schon hat, im Dedup-Ring verworfen, also auch vom Empfaenger; der Wiederholungstimer steht fest auf 40 s, obwohl ein Umlauf im belasteten Netz 4 min im Median dauert; die Quittung selbst ist ein einzelner Frame ohne Schutz, und ein Scheitern nach drei Versuchen wird nicht gemeldet. Die DM-Menge ist klein: 1.182 DMs je Woche netzweit gegen 3.600 bis 4.600 HEY-Baken je Stunde.</p>
+<p>Daraus folgt:</p>
+<ol>
+  <li><b>Stufe 0, Reparatur der bestehenden ARQ:</b> Wiederholung nur, wenn kein Relais das Original gehoert hat (Echo-Gate), Quittung auch auf Duplikate, Fehlschlag melden, Flash-Schreibzugriff aus dem Quittungspfad. Kein neues Byte auf der Luft, kein RAM.</li>
+  <li><b>Stufe 1, Ende-zu-Ende-ARQ mit zwei Kennungen:</b> NNN bleibt ueber alle Versuche gleich, jede Neuflutung bekommt eine frische msg_id, der Empfaenger dedupliziert auf (Absender, NNN) und quittiert immer, Quittung mit Pruefsumme. Outbox als geparkter Ringslot (klassischer ESP32) oder eigene 5 Plaetze (S3, nRF52).</li>
+  <li><b>Stufe 2, Praesenz und Obhut:</b> eine wartende DM wird gesendet, sobald irgendein Frame des Ziels gehoert wird; eine Gateway-Quittung (0x41) setzt blinde Neuflutungen aus. Keine Sonden.</li>
+  <li><b>Stufe 3, Vorrangklassen und App-Outbox:</b> EMERGENCY-DMs mit doppelter Erstsendung und groesserem Budget; Outbox in der App oder auf dem T-Deck fuer Knoten ohne RAM.</li>
+</ol>
+<p class="reco">Empfehlung: Stufe 0 sofort als Upstream-PR mit Zaehlern, Stufe 1 danach auf allen Plattformen, Stufe 2 mit dem ersten Feldnachweis aus Stufe 1, Stufe 3 nach Bedarf.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>EMCOMM-Anforderungen aus dem Vortrag</td><td>Bestaetigte Zustellung durch Quittung mit Pruefsumme, Vorrang durch Klassen, off-grid ohne Server, Store-and-Forward nur beim Sender, kein neuer Frame-Typ</td><td>1 bis 3</td><td>4.2, 4.6</td></tr>
+<tr><td>2</td><td>Konzeptpapiere im docs-Ordner</td><td>Outbox, Leiter und Quittung v2 des DM-Konzepts bleiben; geaendert: NNN bleibt stabil, keine Sonden, klassischer ESP32 ueber geparkte Slots, Obhut-Regel, kein Flash-Write im ACK-Pfad</td><td>1, 2</td><td>4.2, 4.3</td></tr>
+<tr><td>3</td><td>Ping-Pong als Verbindungsaufbau</td><td>Nein: Ping ist einhopig und bleibt Handwerkzeug. Erreichbarkeit kommt kostenlos aus den Frames des Ziels, Timer-Kalibrierung aus dem eigenen Echo</td><td>2</td><td>4.3</td></tr>
+<tr><td>4</td><td>Gegenstelle offline</td><td>Sender-Outbox bis <code>storetime</code> (24 h), dann gemeldeter Fehlschlag; Server haelt die DM, wenn ein Gateway sie gehoert hat (zu pruefen); dauerhafte Ablage ist Sache der App</td><td>1 bis 3</td><td>4.2, 4.4, 4.5</td></tr>
+<tr><td>5</td><td>Gegenstelle voruebergehend nicht erreichbar</td><td>Praesenz-Trigger liefert binnen eines Baken-Intervalls nach Rueckkehr; Leiter als Rueckfall</td><td>2</td><td>4.3</td></tr>
+<tr><td>6</td><td>Netz nicht mit Wiederholungen ueberlasten</td><td>Echo-Gate streicht die blinden Erstwiederholungen, Versuche im Abstand der gemessenen Umlaufzeit, Sperre bei Kanallast und QRT, Deckel je DM und je Knoten, Aussetzen bei Obhut, Praesenz statt Sonden</td><td>0 bis 2</td><td>4.8</td></tr>
+<tr><td>7</td><td>Fast kein RAM frei</td><td>Stufe 0 braucht nichts; Stufe 1 parkt auf dem klassischen ESP32 den vorhandenen Ringslot (0 B) und legt nur auf S3 und nRF52 eine eigene Outbox an (1,2 kB)</td><td>1</td><td>4.2</td></tr>
+<tr><td>8</td><td>LoRa ist langsam, Protokoll frisst Bandbreite</td><td>Budget in Flut-Aequivalenten: eine Wiederholung kostet die Flutung, nicht die 1,4 s des Senders. Deshalb Gate, Abstand, Deckel</td><td>alle</td><td>3, 4.8</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfuellt</th><th>Luecke bei Verlust ab Hop 2</th><th>Luecke bei Ziel offline</th><th>Voraussetzung</th></tr>
+<tr><td>0 heute</td><td>3 Wiederholungen mit gleicher msg_id alle 40 s, Quittung einmalig, Scheitern stumm</td><td>Verlust auf Hop 1, sonst nichts</td><td>Wiederholung wird von jedem Relais verworfen</td><td>nach 2 min stumm aufgegeben</td><td>keine</td></tr>
+<tr><td>0 Reparatur</td><td>Echo-Gate, Re-ACK auf Duplikat, Fehlermeldung, kein Flash-Write im ACK</td><td>Verlust auf Hop 1, ACK-Verlust bei 1 Hop, ehrliche Anzeige</td><td>bleibt, wird aber gemeldet</td><td>gemeldeter Fehlschlag</td><td>Firmware beider Enden fuer Re-ACK, sonst nur Sender</td></tr>
+<tr><td>1</td><td>Outbox, Neuflutung mit frischer msg_id und festem NNN, Empfaenger-Cache, Quittung v2</td><td>Verlust auf jedem Hop, ACK-Verlust, Integritaet</td><td>keine</td><td>Leiter bis 24 h, dann gemeldet</td><td>Empfaenger auf Stufe 1, sonst Doppelanzeige dort</td></tr>
+<tr><td>2</td><td>Praesenz-Trigger, Obhut ueber Gateway-Quittung</td><td>Rueckkehr des Ziels binnen Minuten, weniger Neuflutungen</td><td>keine</td><td>bis das Ziel wieder bakt</td><td>Stufe 1</td></tr>
+<tr><td>3</td><td>Vorrangklassen, App-Outbox</td><td>EMERGENCY schneller, Outbox ueberlebt Neustart</td><td>keine</td><td>Tage, solange die App verbunden ist</td><td>App-Aenderung, Marker im Text</td></tr>
+</table>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+  <li><a href="#s1">Ergebnis</a></li>
+  <li><a href="#s2">Ausgangslage</a></li>
+  <li><a href="#s3">Zielbild</a></li>
+  <li><a href="#s4">Bausteine</a></li>
+  <li><a href="#s5">Fehlerszenarien und Demos</a></li>
+  <li><a href="#s6">Rollout</a></li>
+  <li><a href="#s7">Offene Punkte</a></li>
+</ol>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Alle Angaben sind im Code oder in Messungen belegt. Der Mechanismus ist vollstaendig vorhanden, nur falsch verschaltet.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>msg_id</td><td>22 Bit Knotenkennung plus 10 Bit Zaehler, Umlauf bei 1000; jeder Schritt wird in den Flash geschrieben</td><td>src/loop_functions.cpp:4035, :4051</td></tr>
+<tr><td>DM-Markierung</td><td>Payload endet auf <code>{NNN</code>, NNN ist derselbe Zaehler wie die unteren Bits der msg_id</td><td>src/loop_functions.cpp:4044-4048</td></tr>
+<tr><td>Wiederholung</td><td>Statusbyte tickt alle 2 s, bei 0x15 (rund 40 s) wird derselbe Frame mit derselben msg_id neu eingereiht, <code>MAX_RETRANSMIT 3</code>, danach Slot frei ohne Meldung</td><td>src/lora_functions.cpp:2044-2081</td></tr>
+<tr><td>Dedup-Gate</td><td><code>is_new_packet()</code> auf die msg_id entscheidet ueber jede Verarbeitung fremder Frames, auch den Zweig "DM ist fuer mich" und die Quittung</td><td>src/lora_functions.cpp:653, :896, :1072</td></tr>
+<tr><td>Quittung</td><td><code>SendAckMessage()</code> baut einen Textframe <code>ZIEL     :ackNNN</code> mit frischer msg_id, schreibt Settings in den Flash, reiht ein und setzt danach <code>RING_STATUS_DONE</code>: nie wiederholt</td><td>src/loop_functions.cpp:4858-4922</td></tr>
+<tr><td>Quittungsabgleich</td><td>Sender rekonstruiert die msg_id aus eigener Kennung und NNN, setzt <code>own_msg_id[][4]=0x02</code>, stoppt den Ringslot</td><td>src/lora_functions.cpp:1023-1060</td></tr>
+<tr><td>Eigenes Echo</td><td>Hoert der Sender seine msg_id von einem Relais, setzt er <code>own_msg_id[][4]=0x01</code> (gehoert) und meldet Status 0x00 ans Telefon. Fuer die Wiederholung ungenutzt</td><td>src/lora_functions.cpp:649, :869-893</td></tr>
+<tr><td>Gateway-Quittung</td><td>Ein Gateway, das die DM hochlaedt, sendet 12 Byte binaer 0x41 mit Status 0x01; wird im Mesh zurueckgetragen, nie zum Server</td><td>src/lora_functions.cpp:1206-1287, :420-430</td></tr>
+<tr><td>Ping/Pong</td><td>Textmarker <code>{ping}</code>/<code>{pong}</code>, am Ziel ohne Weiterleitung; kein Mehrhop-Werkzeug</td><td>src/lora_functions.cpp:1108-1118, src/via_functions.cpp:56</td></tr>
+<tr><td>Dedup-Ring</td><td>70 Eintraege (ESP32 klassisch), 100 (S3, nRF52); gemessener Korridor 39,6 bis 48,5 min, Groesse ist festgelegt</td><td>src/configuration_global.h:207-237, dedup-ring-size-settled</td></tr>
+<tr><td>TX-Ring</td><td>20 Slots zu 260 B; eine DM liegt dort heute hoechstens 120 s; Bench: nach einem Schub 251 s lang 11 von 20 Slots durch Wiederholungen belegt</td><td>src/loop_functions.cpp:416, docs/backpressure-protocol.md:213-222</td></tr>
+<tr><td>Hop-Budget</td><td>Text 4, Position 2, Grenze 7</td><td>src/configuration_global.h:248-250</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 430" role="img" aria-label="Ist-Zustand: DM, Quittung verloren, Wiederholung verworfen">
+  <text x="120" y="30" text-anchor="middle" class="b">DK5EN-14 Sender</text>
+  <text x="120" y="46" text-anchor="middle" class="mono">own_msg_id: M1 = ..123</text>
+  <text x="480" y="30" text-anchor="middle" class="b">DK5EN-93 Relais</text>
+  <text x="480" y="46" text-anchor="middle" class="mono">Dedup-Ring: msg_id</text>
+  <text x="840" y="30" text-anchor="middle" class="b">DK5EN-90 Ziel</text>
+  <text x="840" y="46" text-anchor="middle" class="mono">Dedup-Ring: msg_id</text>
+  <path d="M120 56 L120 420" class="lnd"/><path d="M480 56 L480 420" class="lnd"/><path d="M840 56 L840 420" class="lnd"/>
+
+  <path d="M120 90 L480 90" class="lnw"/>
+  <text x="300" y="83" text-anchor="middle" class="mono">DM M1 "Hallo{123"  hop 4</text>
+  <path d="M480 120 L840 120" class="lnw"/>
+  <text x="660" y="113" text-anchor="middle" class="mono">Relais: DM M1  hop 3</text>
+  <path d="M480 120 L120 120" class="lnd"/>
+  <text x="300" y="135" text-anchor="middle" class="t11">Echo: own_msg_id = gehoert (0x01)</text>
+  <rect x="700" y="130" width="250" height="30" class="node srv"/>
+  <text x="825" y="149" text-anchor="middle" class="t11">M1 in Ring, Anzeige, SendAckMessage()</text>
+
+  <path d="M840 190 L480 190" class="lnh"/>
+  <text x="660" y="183" text-anchor="middle" class="mono">ACK M2 "DK5EN-14 :ack123"</text>
+  <path d="M480 220 L330 220" class="lnx"/>
+  <path d="M322 212 L338 228 M338 212 L322 228" class="lnx"/>
+  <text x="300" y="240" text-anchor="middle" class="t11">Quittung verloren, wird nie wiederholt</text>
+
+  <text x="60" y="275" class="t11">t + 40 s</text>
+  <path d="M120 285 L480 285" class="lnw"/>
+  <text x="300" y="278" text-anchor="middle" class="mono">DM M1 erneut (gleiche msg_id)</text>
+  <rect x="490" y="295" width="200" height="30" class="node bad"/>
+  <text x="590" y="314" text-anchor="middle" class="t11">M1 im Ring: verworfen</text>
+  <text x="60" y="345" class="t11">t + 80 s, t + 120 s</text>
+  <path d="M120 355 L480 355" class="lnw"/>
+  <text x="300" y="348" text-anchor="middle" class="mono">zwei weitere Wiederholungen M1</text>
+  <rect x="490" y="365" width="200" height="30" class="node bad"/>
+  <text x="590" y="384" text-anchor="middle" class="t11">M1 im Ring: verworfen</text>
+  <rect x="10" y="380" width="230" height="30" class="node bad"/>
+  <text x="125" y="399" text-anchor="middle" class="t11">t + 160 s: Slot frei, keine Meldung</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand ueber ein Relais. Die DM kommt an und wird angezeigt, die Quittung geht auf dem Rueckweg verloren. Alle drei Wiederholungen tragen die msg_id M1 und sterben im Dedup-Ring des Relais; das Ziel wuerde sie ebenso verwerfen. Der Sender gibt nach 160 s auf, ohne dass App oder Web-GUI davon erfahren.</figcaption>
+</figure>
+
+<h3>Mengengeruest</h3>
+<p>Modulation SF11, BW 250 kHz, CR 4:6, 32 Symbole Praeambel, Symbolzeit 8,2 ms. Sendezeiten nach der Semtech-Formel, mit dem Frame-Overhead von rund 35 B je Textframe.</p>
+<table>
+<tr><th>Groesse</th><th>heute</th><th>Ziel</th><th>Bemerkung</th></tr>
+<tr><td>Sendezeit binaere Gateway-Quittung (12 B)</td><td class="num">0,51 s</td><td class="num">0,51 s</td><td>unveraendert</td></tr>
+<tr><td>Sendezeit Textquittung (rund 50 B)</td><td class="num">0,85 s</td><td class="num">0,95 s</td><td>Ziel: plus 7 B Pruefsumme</td></tr>
+<tr><td>Sendezeit typische DM (rund 115 B Frame)</td><td class="num">1,4 s</td><td class="num">1,4 s</td><td>maximale DM 200 B: 2,2 s</td></tr>
+<tr><td>Flut-Multiplikator je Frame</td><td class="num">2,1 bis 2,6</td><td class="num">gleich</td><td>jeder Knoten hoert jeden Frame so oft (DUP/NEW 1,57 bis 2,09 gemessen); Vortragsbeispiel 10 Knoten mal 4 Hops: rund 240 s Kanalzeit je Frame</td></tr>
+<tr><td>Warteschlange je Hop, ruhiges Netz</td><td class="num">4 bis 9 s</td><td class="num">gleich</td><td>3,9 s Einreihen bis Luft plus 3 bis 4,9 s CSMA (Bench 2026-09-01)</td></tr>
+<tr><td>Warteschlange je Hop, belastet (DG0OPK-11)</td><td class="num">30 s Median</td><td class="num">gleich</td><td>p99 286 s, Maximum 985 s; CAD fand den Kanal in 66 % der Versuche belegt (BergLog)</td></tr>
+<tr><td>Umlauf DM plus Quittung ueber 4 Hops</td><td class="num">1 min ruhig, 4 min belastet</td><td class="num">gleich</td><td>Annahme: 8 Hop-Wartezeiten; heutiger Timer 40 s liegt darunter</td></tr>
+<tr><td>DMs je Woche netzweit</td><td class="num">1.182</td><td class="num">gleich</td><td>185 Absender, Vorwoche 1.344; Gruppen 2.601; HEY 3.600 bis 4.600 je Stunde</td></tr>
+<tr><td>RAM-Reserve klassischer ESP32</td><td class="num">6,6 kB</td><td class="num">6,6 kB</td><td>E22 nach den geplanten Korrekturen; S3 und nRF52 rund 150 kB</td></tr>
+<tr><td>Flash-Schreibzugriffe je DM</td><td class="num">2</td><td class="num">1</td><td>heute Sender und Quittung je einer; Ziel: Quittungs-msg_id aus millis()</td></tr>
+<tr><td>Wiederholungen je DM auf der Luft</td><td class="num">bis 3 blind</td><td class="num">0 im Regelfall</td><td>Ziel: nur bei fehlendem Echo, sonst Neuflutung im Abstand der Umlaufzeit</td></tr>
+</table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p>Das Zielbild der Stufe 2: Zustand nur an den Enden, Relais unveraendert, Signale, die schon auf der Luft sind, werden ausgewertet.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 470" role="img" aria-label="Zielbild Stufe 2">
+  <rect x="20" y="20" width="290" height="300" class="zone www"/>
+  <text x="34" y="42" class="b" fill="#1f6feb">Sender DK5EN-14</text>
+  <rect x="30" y="60" width="270" height="62" class="node wwwf www"/>
+  <text x="165" y="80" text-anchor="middle" class="b">Outbox</text>
+  <text x="165" y="96" text-anchor="middle" class="t11">ESP32 klassisch: geparkter Ringslot, 0 B</text>
+  <text x="165" y="112" text-anchor="middle" class="t11">S3, nRF52: 5 Plaetze, 3 je Ziel, 1,2 kB</text>
+  <rect x="30" y="134" width="270" height="46" class="node wwwf www"/>
+  <text x="165" y="152" text-anchor="middle" class="b">Echo-Gate</text>
+  <text x="165" y="168" text-anchor="middle" class="t11">Echo 0x01 binnen 15 s, sonst gleiche msg_id</text>
+  <rect x="30" y="192" width="270" height="46" class="node wwwf www"/>
+  <text x="165" y="210" text-anchor="middle" class="b">Leiter, frische msg_id je Versuch</text>
+  <text x="165" y="226" text-anchor="middle" class="t11">+2, +10, +30, +60 min, dann stuendlich</text>
+  <rect x="30" y="250" width="270" height="62" class="node wwwf www"/>
+  <text x="165" y="270" text-anchor="middle" class="b">Trigger</text>
+  <text x="165" y="286" text-anchor="middle" class="t11">Praesenz: Frame mit Absender = Ziel gehoert</text>
+  <text x="165" y="302" text-anchor="middle" class="t11">Obhut: 0x41 gehoert, 15 min aussetzen</text>
+
+  <rect x="350" y="20" width="260" height="300" class="zone"/>
+  <text x="364" y="42" class="b">Relais, unveraendert</text>
+  <rect x="360" y="60" width="240" height="62" class="node"/>
+  <text x="480" y="80" text-anchor="middle" class="b">Dedup auf msg_id</text>
+  <text x="480" y="96" text-anchor="middle" class="t11">frische msg_id wird geflutet</text>
+  <text x="480" y="112" text-anchor="middle" class="t11">gleiche msg_id wird verworfen</text>
+  <rect x="360" y="134" width="240" height="46" class="node"/>
+  <text x="480" y="152" text-anchor="middle" class="b">Relay-Warteschlange</text>
+  <text x="480" y="168" text-anchor="middle" class="t11">4 bis 9 s ruhig, 30 s Median belastet</text>
+  <rect x="360" y="192" width="240" height="46" class="node prx"/>
+  <text x="480" y="210" text-anchor="middle" class="b">Gateway, falls vorhanden</text>
+  <text x="480" y="226" text-anchor="middle" class="t11">Upload, 0x41 zurueck ins Mesh</text>
+  <rect x="360" y="250" width="240" height="62" class="node"/>
+  <text x="480" y="270" text-anchor="middle" class="b">Baken</text>
+  <text x="480" y="286" text-anchor="middle" class="t11">HEY 30 s bis 15 min, Position, Text</text>
+  <text x="480" y="302" text-anchor="middle" class="t11">Absender bleibt im Pfad lesbar</text>
+
+  <rect x="650" y="20" width="290" height="300" class="zone" style="stroke:#2a9d5c"/>
+  <text x="664" y="42" class="b" fill="#2a9d5c">Ziel DK5EN-90</text>
+  <rect x="660" y="60" width="270" height="62" class="node srv"/>
+  <text x="795" y="80" text-anchor="middle" class="b">Cache (Absender, NNN)</text>
+  <text x="795" y="96" text-anchor="middle" class="t11">16 Eintraege, 1 h Alterung, rund 200 B</text>
+  <text x="795" y="112" text-anchor="middle" class="t11">Duplikat: keine Anzeige, kein Upload</text>
+  <rect x="660" y="134" width="270" height="46" class="node srv"/>
+  <text x="795" y="152" text-anchor="middle" class="b">Quittung immer</text>
+  <text x="795" y="168" text-anchor="middle" class="t11">auch auf Duplikat, hoechstens 1 je min</text>
+  <rect x="660" y="192" width="270" height="46" class="node srv"/>
+  <text x="795" y="210" text-anchor="middle" class="b">Quittung v2</text>
+  <text x="795" y="226" text-anchor="middle" class="mono">:ackNNN;H=crc16;F=R</text>
+  <rect x="660" y="250" width="270" height="62" class="node srv"/>
+  <text x="795" y="270" text-anchor="middle" class="b">Kein Flash-Write</text>
+  <text x="795" y="286" text-anchor="middle" class="t11">Quittungs-msg_id aus millis()</text>
+  <text x="795" y="302" text-anchor="middle" class="t11">Arbeit im Loop-Task, nicht im Timer-Task</text>
+
+  <path d="M300 90 L360 90" class="lnw"/>
+  <text x="330" y="82" text-anchor="middle" class="t11">DM</text>
+  <path d="M600 90 L660 90" class="lnw"/>
+  <text x="630" y="82" text-anchor="middle" class="t11">DM</text>
+  <path d="M660 215 L600 215" class="lnh"/>
+  <path d="M360 215 L300 215" class="lnh"/>
+  <text x="630" y="207" text-anchor="middle" class="t11">ACK</text>
+  <text x="330" y="207" text-anchor="middle" class="t11">ACK</text>
+  <path d="M360 280 L300 280" class="lnd"/>
+  <text x="330" y="272" text-anchor="middle" class="t11">Bake</text>
+
+  <rect x="20" y="350" width="920" height="100" class="zone" style="stroke:#7b4fbf"/>
+  <text x="34" y="372" class="b" fill="#7b4fbf">Server-Pfad, optional (nur wo ein Gateway hoert)</text>
+  <rect x="40" y="390" width="400" height="46" class="node hamf ham"/>
+  <text x="240" y="408" text-anchor="middle" class="b">Gateway nahe Sender: DATA hoch, 0x41 ins Mesh</text>
+  <text x="240" y="424" text-anchor="middle" class="t11">Sender wertet 0x41 als Obhut</text>
+  <rect x="500" y="390" width="420" height="46" class="node hamf ham"/>
+  <text x="710" y="408" text-anchor="middle" class="b">Server: GATE an Gateway nahe Ziel, Frame neu auf LoRa</text>
+  <text x="710" y="424" text-anchor="middle" class="t11">Ziel dedupliziert auf msg_id, Quittung laeuft denselben Weg zurueck</text>
+  <path d="M440 413 L500 413" class="lnh"/>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild Stufe 2. Nur Sender und Ziel bekommen neue Logik, Relais und Server bleiben wie sie sind. Der Sender nutzt drei Signale, die heute schon auf der Luft sind: das eigene Echo, die Gateway-Quittung 0x41 und die Baken des Ziels. Das Ziel dedupliziert auf zwei Feldern, die heute schon im Frame stehen.</figcaption>
+</figure>
+
+<table>
+<tr><th>Komponente</th><th>Ort</th><th>Rolle</th><th>Stufe</th></tr>
+<tr><td>Echo-Gate</td><td>Sender, <code>updateRetransmissionStatus()</code></td><td>Wiederholung mit gleicher msg_id nur, wenn kein Relais das Original gehoert hat</td><td>0</td></tr>
+<tr><td>Re-ACK auf Duplikat</td><td>Ziel, Gate bei src/lora_functions.cpp:896</td><td>Duplikat fuer mich mit <code>{NNN</code> quittieren, nicht anzeigen, nicht weiterleiten</td><td>0</td></tr>
+<tr><td>Fehlermeldung</td><td>Sender, BLE und Web-GUI</td><td>Statusframe 0x41 mit neuem Statuswert, nur zur App</td><td>0</td></tr>
+<tr><td>Outbox</td><td>Sender, TX-Ring oder eigenes Feld</td><td>DM bis zur Quittung oder bis <code>storetime</code> halten</td><td>1</td></tr>
+<tr><td>Neuflutung</td><td>Sender</td><td>gleiche Payload, gleiches NNN, frische msg_id, gleicher max_hop</td><td>1</td></tr>
+<tr><td>Cache (Absender, NNN)</td><td>Ziel, beide RX-Pfade</td><td>Doppelanzeige unterdruecken, immer quittieren</td><td>1</td></tr>
+<tr><td>Quittung v2</td><td>Ziel</td><td><code>:ackNNN;H=crc16</code>, alte Parser lesen bis zum ersten Nicht-Digit</td><td>1</td></tr>
+<tr><td>Praesenz-Trigger</td><td>Sender, RX-Pfad</td><td>Absender eines beliebigen Frames gleich Ziel einer wartenden DM: jetzt senden</td><td>2</td></tr>
+<tr><td>Obhut</td><td>Sender, <code>handleACK()</code></td><td>0x41 fuer wartende DM: Leiter 15 min aussetzen</td><td>2</td></tr>
+<tr><td>Vorrangklasse</td><td>Sender, Textmarker</td><td>EMERGENCY: zwei Erstsendungen, groesseres Budget</td><td>3</td></tr>
+<tr><td>App-Outbox</td><td>App, T-Deck</td><td>Outbox ausserhalb des Knotens, ueberlebt Neustart</td><td>3</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 330" role="img" aria-label="Zustandsautomat einer DM in der Outbox">
+  <rect x="20" y="40" width="150" height="60" class="node"/>
+  <text x="95" y="64" text-anchor="middle" class="b">NEU</text>
+  <text x="95" y="82" text-anchor="middle" class="t11">msg_id, NNN vergeben</text>
+  <rect x="230" y="40" width="170" height="60" class="node wwwf www"/>
+  <text x="315" y="64" text-anchor="middle" class="b">GESENDET</text>
+  <text x="315" y="82" text-anchor="middle" class="t11">Echo-Fenster 15 s laeuft</text>
+  <rect x="460" y="40" width="170" height="60" class="node wwwf www"/>
+  <text x="545" y="64" text-anchor="middle" class="b">GEHOERT</text>
+  <text x="545" y="82" text-anchor="middle" class="t11">Relais hat es, warten</text>
+  <rect x="690" y="40" width="170" height="60" class="node prx"/>
+  <text x="775" y="64" text-anchor="middle" class="b">IN OBHUT</text>
+  <text x="775" y="82" text-anchor="middle" class="t11">0x41 gehoert, 15 min Ruhe</text>
+  <rect x="230" y="200" width="170" height="60" class="node"/>
+  <text x="315" y="224" text-anchor="middle" class="b">WARTEND</text>
+  <text x="315" y="242" text-anchor="middle" class="t11">Leiter oder Praesenz</text>
+  <rect x="460" y="200" width="170" height="60" class="node srv"/>
+  <text x="545" y="224" text-anchor="middle" class="b">ZUGESTELLT</text>
+  <text x="545" y="242" text-anchor="middle" class="t11">:ackNNN, Pruefsumme passt</text>
+  <rect x="690" y="200" width="170" height="60" class="node bad"/>
+  <text x="775" y="224" text-anchor="middle" class="b">FEHLGESCHLAGEN</text>
+  <text x="775" y="242" text-anchor="middle" class="t11">storetime um, gemeldet</text>
+
+  <path d="M170 70 L230 70" class="ln"/>
+  <text x="200" y="62" text-anchor="middle" class="t11">TX</text>
+  <path d="M400 70 L460 70" class="ln"/>
+  <text x="430" y="62" text-anchor="middle" class="t11">Echo</text>
+  <path d="M630 70 L690 70" class="ln"/>
+  <text x="660" y="62" text-anchor="middle" class="t11">0x41</text>
+  <path d="M315 40 C315 10 200 10 230 40" class="ln"/>
+  <text x="270" y="22" text-anchor="middle" class="t11">kein Echo: gleiche msg_id, max 3</text>
+  <path d="M545 100 L545 200" class="lnh"/>
+  <text x="552" y="190" class="t11">:ackNNN</text>
+  <path d="M315 100 L315 200" class="ln"/>
+  <text x="240" y="150" class="t11">3 Versuche ohne Echo</text>
+  <path d="M500 100 L400 200" class="ln"/>
+  <text x="455" y="122" text-anchor="end" class="t11">Umlaufzeit um</text>
+  <path d="M700 100 L700 150 L400 150 L400 200" class="ln"/>
+  <text x="625" y="143" text-anchor="middle" class="t11">15 min ohne Quittung</text>
+  <path d="M230 230 L120 230 L120 70 L170 70" class="lnd"/>
+  <text x="125" y="160" class="t11">Neuflutung:</text>
+  <text x="125" y="174" class="t11">frische msg_id,</text>
+  <text x="125" y="188" class="t11">gleiches NNN</text>
+  <path d="M315 260 L315 290 L775 290 L775 260" class="lnx"/>
+  <text x="545" y="308" text-anchor="middle" class="t11">storetime erreicht oder 6 blinde Neuflutungen</text>
+  <path d="M830 100 L830 175 L615 175 L615 200" class="lnh"/>
+  <text x="720" y="190" text-anchor="middle" class="t11">:ackNNN ueber Server oder Mesh</text>
+</svg>
+</div>
+<figcaption>Abb. 3: Zustandsautomat einer DM in der Outbox ab Stufe 1. Die Schleife oben links ist die einzige Wiederholung mit gleicher msg_id; sie laeuft nur, solange kein Relais das Original gehoert hat. Jeder Weg zurueck nach GESENDET aus WARTEND ist eine Neuflutung mit frischer msg_id und unveraendertem NNN.</figcaption>
+</figure>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3 id="s41">4.1 Reparatur der bestehenden ARQ (Stufe 0)</h3>
+<p class="reco">Entscheidung: Wiederholung mit gleicher msg_id nur, wenn binnen 15 s weder Echo noch Quittung gehoert wurde; Duplikate fuer mich werden quittiert; Scheitern wird gemeldet; der Flash-Write verlaesst den Quittungspfad.</p>
+<p>Praemissen: Das Echo eines Relais kommt nach dessen Warteschlange, ruhig 4 bis 9 s. Zwei solche Fenster ergeben 15 s; wer bis dahin kein Echo hoert, hat mit hoher Wahrscheinlichkeit keinen Nachbarn erreicht. Eine Wiederholung mit gleicher msg_id kann genau diesen Fall reparieren und keinen anderen, weil jeder Knoten mit der msg_id im Ring sie verwirft. Der Deckel von drei Versuchen bleibt, weil ohne jedes Echo drei Sendungen die Grenze sind, ab der der Kanal, nicht der Knoten, das Problem ist.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Blinder Timer 40 s, dreimal</td><td>heutiger Code</td><td><span class="tag bad">verworfen</span> feuert unter dem Umlauf, wird ab Hop 2 verworfen, haelt den TX-Ring 120 s</td></tr>
+<tr><td>Echo-Gate</td><td>Retry nur bei <code>own_msg_id[][4] == 0x00</code> nach 15 s</td><td><span class="tag ok">gewaehlt</span> nutzt vorhandene Zustandsvariable, streicht die Wiederholung im Regelfall ganz</td></tr>
+<tr><td>Re-ACK auf Duplikat</td><td>Gate bei :896 in "neu" und "fuer mich" teilen; Quittung hoechstens einmal je Minute je (Absender, NNN)</td><td><span class="tag ok">gewaehlt</span> repariert Quittungsverlust auf 1 Hop, kostet 0,85 s je gehoerter Wiederholung</td></tr>
+<tr><td>Fehlermeldung</td><td>0x41 mit neuem Statuswert an die App, Markierung in der Web-GUI</td><td><span class="tag ok">gewaehlt</span> heute erfaehrt niemand vom Scheitern</td></tr>
+<tr><td>Flash-Write im ACK-Pfad</td><td><code>SendAckMessage()</code> laeuft auf nRF52 im Timer-Task und schreibt Settings</td><td><span class="tag ok">gewaehlt</span> msg_id aus millis(), Advisor-Befund M5</td></tr>
+<tr><td>Quittung wiederholen</td><td>Ziel wiederholt die Quittung blind</td><td><span class="tag bad">verworfen</span> verdoppelt Quittungsairtime fuer alle, ohne zu wissen ob noetig</td></tr>
+</table>
+<ul>
+  <li>Bei einer DM ohne Relais in Reichweite (direkter Nachbar) gibt es nie ein Echo; dann laufen bis zu drei Wiederholungen, und das Ziel quittiert jede davon erneut. Das deckt den Quittungsverlust im Einhop-Fall ab.</li>
+  <li>Bei gehoertem Echo endet Stufe 0 nach einer Umlaufzeit (5 min ruhig, 15 min belastet) mit gemeldetem Fehlschlag, wenn keine Quittung kommt. Die Luecke ab Hop 2 bleibt, ist aber sichtbar.</li>
+  <li>Zaehler in der STAT-Zeile des setlog: DM gesendet, Echo gehoert, Gateway-Quittung, Ziel-Quittung, aufgegeben, Median bis Quittung. Ohne diese Zahlen laesst sich der Nutzen der Stufen 1 und 2 nicht zeigen.</li>
+</ul>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 230" role="img" aria-label="Zeitachse Stufe 0">
+  <path d="M100 120 L920 120" class="ln"/>
+  <g class="mono">
+  <text x="100" y="145" text-anchor="middle">t=0</text>
+  <text x="260" y="145" text-anchor="middle">t=6 s</text>
+  <text x="420" y="145" text-anchor="middle">t=15 s</text>
+  <text x="600" y="145" text-anchor="middle">t=30 s</text>
+  <text x="800" y="145" text-anchor="middle">t=5 min</text>
+  </g>
+  <circle cx="100" cy="120" r="5" fill="#1f6feb"/>
+  <text x="100" y="70" text-anchor="middle" class="b">DM auf der Luft</text>
+  <text x="100" y="86" text-anchor="middle" class="t11">own_msg_id 0x00</text>
+  <circle cx="260" cy="120" r="5" fill="#2a9d5c"/>
+  <text x="260" y="70" text-anchor="middle" class="b">Echo vom Relais</text>
+  <text x="260" y="86" text-anchor="middle" class="t11">own_msg_id 0x01</text>
+  <text x="260" y="100" text-anchor="middle" class="t11">keine Wiederholung mehr</text>
+  <circle cx="420" cy="120" r="5" fill="#d9822b"/>
+  <text x="420" y="70" text-anchor="middle" class="b">Echo-Fenster zu</text>
+  <text x="420" y="86" text-anchor="middle" class="t11">ohne Echo: gleiche msg_id</text>
+  <text x="420" y="100" text-anchor="middle" class="t11">erneut, hoechstens 3 mal</text>
+  <circle cx="600" cy="120" r="5" fill="#2a9d5c"/>
+  <text x="600" y="70" text-anchor="middle" class="b">:ackNNN</text>
+  <text x="600" y="86" text-anchor="middle" class="t11">zugestellt, Slot frei</text>
+  <circle cx="800" cy="120" r="5" fill="#c62828"/>
+  <text x="800" y="70" text-anchor="middle" class="b">Umlaufzeit um</text>
+  <text x="800" y="86" text-anchor="middle" class="t11">Fehlschlag an App und GUI</text>
+  <text x="800" y="100" text-anchor="middle" class="t11">ab Stufe 1: Neuflutung</text>
+  <rect x="100" y="170" width="320" height="18" fill="#e9f1fd"/>
+  <text x="260" y="183" text-anchor="middle" class="t11">Echo-Fenster: einzige Wiederholung gleicher msg_id</text>
+  <rect x="420" y="170" width="380" height="18" fill="#eaf7ef"/>
+  <text x="610" y="183" text-anchor="middle" class="t11">Warten auf Ende-zu-Ende-Quittung, keine Sendung</text>
+</svg>
+</div>
+<figcaption>Abb. 4: Stufe 0 im ruhigen Netz. Das Echo nach 6 s beendet jede Wiederholung; erst nach einer vollen Umlaufzeit ohne Quittung wird der Fehlschlag gemeldet. Heute wuerden in derselben Zeit drei Wiederholungen gesendet und verworfen.</figcaption>
+</figure>
+
+<h3 id="s42">4.2 Ende-zu-Ende-ARQ mit zwei Kennungen (Stufe 1)</h3>
+<p class="reco">Entscheidung: NNN wird die Transport-Sequenznummer und bleibt ueber alle Versuche gleich; jede Neuflutung bekommt eine frische msg_id; das Ziel dedupliziert auf (Absender, NNN) und quittiert immer; die Quittung traegt eine 16-Bit-Pruefsumme.</p>
+<p>Praemissen: Die msg_id ist der Schluessel der Schleifenunterdrueckung und muss bei jeder Neuflutung frisch sein, sonst kommt der Frame nicht ueber das erste Relais. NNN steht heute schon in der Payload und in der Quittung; bleibt es gleich, findet der Sender jede Quittung zu jedem Versuch ohne Zusatzlogik, und das Ziel erkennt Wiederholungen ohne Hash. Die Leiterabstaende leiten sich aus den Umlaufzeiten ab: +2 min ist das Doppelte des ruhigen Umlaufs ueber 4 Hops, +10 min mehr als das Doppelte des belasteten Medians, +30 und +60 min decken das p99 und die Zeit, in der ein Ziel typischerweise wieder erscheint. Bei belastetem Kanal (5-Minuten-Mittel ueber 25 %) dehnt sich jeder Abstand um den Faktor 3. Sechs blinde Neuflutungen je DM und Tag sind der Deckel, danach hilft nur Praesenz.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Gleiche msg_id wiederholen</td><td>heute</td><td><span class="tag bad">verworfen</span> kommt nicht ueber Hop 1, wird vom Ziel verworfen</td></tr>
+<tr><td>Frische msg_id, neues NNN, Hash</td><td>DM-Konzept v2: Satz gemuenzter NNN je Slot, SHA-256/4 in der Quittung</td><td><span class="tag warn">Teilmenge</span> Outbox, Leiter und Quittung v2 bleiben; die NNN-Menge und der Hash-Abgleich entfallen (Advisor-Befund M2)</td></tr>
+<tr><td>Frische msg_id, festes NNN</td><td>Ziel-Cache (Absender, NNN), Quittung immer</td><td><span class="tag ok">gewaehlt</span> zwei Felder, die schon im Frame stehen; keine neue Abgleichlogik beim Sender</td></tr>
+<tr><td>Outbox als geparkter Ringslot</td><td>Status <code>RING_STATUS_PARKED</code>, hoechstens 2 Slots</td><td><span class="tag ok">gewaehlt</span> klassischer ESP32, 0 B; kostet 2 von 20 Ringslots</td></tr>
+<tr><td>Outbox als eigenes Feld</td><td>5 Plaetze, 3 je Ziel, rund 232 B je Platz</td><td><span class="tag ok">gewaehlt</span> S3 und nRF52, 1,2 kB; der Ring bleibt frei</td></tr>
+<tr><td>Outbox im Flash</td><td>LittleFS oder NVS</td><td><span class="tag bad">verworfen</span> msg_id schreibt schon je Nachricht, LittleFS auf nRF52 nur im Loop-Task, Verschleiss mal Leiter</td></tr>
+<tr><td>Pruefsumme in der Quittung</td><td><code>:ackNNN;H=crc16</code> ueber die Payload ohne <code>{NNN</code></td><td><span class="tag ok">gewaehlt</span> 7 B, alte Parser stoppen am Semikolon (toInt), Integritaet nach EMCOMM</td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 400" role="img" aria-label="Neuflutung mit frischer msg_id und festem NNN">
+  <text x="120" y="30" text-anchor="middle" class="b">DK5EN-14 Sender</text>
+  <text x="120" y="46" text-anchor="middle" class="mono">Outbox: NNN 123</text>
+  <text x="480" y="30" text-anchor="middle" class="b">DK5EN-93 Relais</text>
+  <text x="480" y="46" text-anchor="middle" class="mono">Dedup-Ring: msg_id</text>
+  <text x="840" y="30" text-anchor="middle" class="b">DK5EN-90 Ziel</text>
+  <text x="840" y="46" text-anchor="middle" class="mono">Cache: (Absender, NNN)</text>
+  <path d="M120 56 L120 390" class="lnd"/><path d="M480 56 L480 390" class="lnd"/><path d="M840 56 L840 390" class="lnd"/>
+
+  <path d="M120 90 L480 90" class="lnw"/>
+  <text x="300" y="83" text-anchor="middle" class="mono">DM M1 "Hallo{123"</text>
+  <path d="M480 120 L840 120" class="lnw"/>
+  <text x="660" y="113" text-anchor="middle" class="mono">DM M1</text>
+  <rect x="700" y="130" width="250" height="30" class="node srv"/>
+  <text x="825" y="149" text-anchor="middle" class="t11">(DK5EN-14, 123) neu: Anzeige, Quittung</text>
+  <path d="M840 190 L480 190" class="lnh"/>
+  <text x="660" y="183" text-anchor="middle" class="mono">ACK M2 ":ack123;H=9f3a"</text>
+  <path d="M480 220 L330 220" class="lnx"/>
+  <path d="M322 212 L338 228 M338 212 L322 228" class="lnx"/>
+  <text x="300" y="240" text-anchor="middle" class="t11">Quittung verloren</text>
+
+  <text x="60" y="270" class="t11">t + 2 min</text>
+  <path d="M120 280 L480 280" class="lnw"/>
+  <text x="300" y="273" text-anchor="middle" class="mono">DM M3 "Hallo{123"  frische msg_id</text>
+  <path d="M480 310 L840 310" class="lnw"/>
+  <text x="660" y="303" text-anchor="middle" class="mono">DM M3, M3 nicht im Ring: geflutet</text>
+  <rect x="700" y="320" width="250" height="30" class="node srv"/>
+  <text x="825" y="339" text-anchor="middle" class="t11">(DK5EN-14, 123) bekannt: nur Quittung</text>
+  <path d="M840 365 L480 365" class="lnh"/>
+  <text x="660" y="358" text-anchor="middle" class="mono">ACK M4 ":ack123;H=9f3a"</text>
+  <path d="M480 385 L120 385" class="lnh"/>
+  <text x="300" y="378" text-anchor="middle" class="mono">ACK M4: NNN 123 zugestellt, Hash passt</text>
+</svg>
+</div>
+<figcaption>Abb. 5: Stufe 1 im selben Fall wie Abb. 1. Die Neuflutung nach zwei Minuten traegt die frische msg_id M3 und kommt ueber das Relais. Das Ziel erkennt (DK5EN-14, 123) im Cache, zeigt nichts ein zweites Mal an und quittiert trotzdem. Der Sender ordnet die Quittung ueber NNN zu, unabhaengig davon, welcher Versuch sie ausgeloest hat.</figcaption>
+</figure>
+<ul>
+  <li>Jede Neuflutung durchlaeuft ihr eigenes Echo-Fenster aus Stufe 0.</li>
+  <li>Der Cache haelt (Absender, NNN) eine Stunde; das reicht bis zum Umlauf des NNN-Zaehlers bei jedem realistischen Sender und ist kuerzer als der Dedup-Ring.</li>
+  <li>Alte Ziele quittieren mit <code>:ackNNN</code> ohne Pruefsumme, der Sender zeigt "zugestellt, ungeprueft". Alte Ziele zeigen eine Neuflutung doppelt an, weil sie keinen Cache haben; das ist der Preis der Uebergangszeit und wird im Rollout benannt.</li>
+  <li>Der Server und mcmap sehen Neuflutungen als neue Nachrichten, weil die msg_id frisch ist. Die Auswertung muss auf (Absender, NNN) falten.</li>
+</ul>
+
+<h3 id="s43">4.3 Praesenz statt Sonden (Stufe 2)</h3>
+<p class="reco">Entscheidung: Eine wartende DM wird sofort gesendet, wenn irgendein empfangener Frame das Ziel als Absender traegt. Keine Sonde in der ersten Ausbaustufe.</p>
+<p>Praemissen: Jeder Knoten bakt, HEY im Trickle von 30 s bis 15 min, dazu Positionen und Text; die Absenderkennung steht in jedem Pfad. Ein Ziel, das zurueckkommt, meldet sich also von selbst, im schlechtesten Fall nach 15 min. Eine eigene Sonde wuerde 0,76 s je Versuch kosten und nur dann sparen, wenn DMs lang und Ziele meist abwesend sind; das zeigt die Feldlage nicht. Das Mindestintervall von 30 s zwischen Outbox-Aktionen ist der Takt des Schedulers und die Grenze gegen eine Sendeschleife. Der Trigger feuert fruehestens eine Umlaufzeit nach der letzten eigenen Sendung (2 min ruhig, 6 min belastet), sonst wuerde eine Quittung im Flug eine zweite Flutung ausloesen.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Sonde <code>{prb}</code>/<code>{prb-ack}</code></td><td>DM-Konzept v2, nur an v2-faehige Ziele</td><td><span class="tag bad">verworfen</span> fuer v1; die DM selbst ist die billigere Sonde</td></tr>
+<tr><td>Ping ueber Mesh</td><td><code>{ping}</code> mit Hop-Budget</td><td><span class="tag bad">verworfen</span> heute einhopig, muesste umgebaut werden, bringt nichts, was die Frames des Ziels nicht schon liefern</td></tr>
+<tr><td>Praesenz aus jedem Frame</td><td>RX-Pfad: Absender gleich Ziel einer wartenden DM</td><td><span class="tag ok">gewaehlt</span> null Airtime, deckt HEY, Position, Text, Quittungen an Dritte</td></tr>
+<tr><td>Praesenz aus mheard</td><td>Epoch des Eintrags juenger als N min</td><td><span class="tag warn">Teilmenge</span> gleiche Quelle, aber nur Baken; als Startpruefung beim Einreihen sinnvoll</td></tr>
+</table>
+<ul>
+  <li>Ziel offline: Leiter bis <code>storetime</code>, dann gemeldeter Fehlschlag. Ein Neustart des Senders verliert die Outbox im RAM und meldet das einmal beim Boot.</li>
+  <li>Ziel voruebergehend weg: Praesenz-Trigger, sobald es wieder bakt. HEY hat Hop-Budget 2; ein Ziel vier Hops entfernt erscheint beim Sender nur ueber Text oder Quittungen an Dritte, sonst greift die Leiter.</li>
+</ul>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 230" role="img" aria-label="Zeitachse Ziel kehrt zurueck">
+  <path d="M100 120 L920 120" class="ln"/>
+  <g class="mono">
+  <text x="100" y="145" text-anchor="middle">t=0</text>
+  <text x="260" y="145" text-anchor="middle">t=2 min</text>
+  <text x="420" y="145" text-anchor="middle">t=12 min</text>
+  <text x="600" y="145" text-anchor="middle">t=25 min</text>
+  <text x="760" y="145" text-anchor="middle">t=26 min</text>
+  <text x="900" y="145" text-anchor="middle">t=42 min</text>
+  </g>
+  <circle cx="100" cy="120" r="5" fill="#1f6feb"/>
+  <text x="100" y="70" text-anchor="middle" class="b">DM gesendet</text>
+  <text x="100" y="86" text-anchor="middle" class="t11">Ziel ist aus</text>
+  <circle cx="260" cy="120" r="5" fill="#5b6b7b"/>
+  <text x="260" y="70" text-anchor="middle" class="b">Leiter +2 min</text>
+  <text x="260" y="86" text-anchor="middle" class="t11">Neuflutung, keine Quittung</text>
+  <circle cx="420" cy="120" r="5" fill="#5b6b7b"/>
+  <text x="420" y="70" text-anchor="middle" class="b">Leiter +10 min</text>
+  <text x="420" y="86" text-anchor="middle" class="t11">Neuflutung, keine Quittung</text>
+  <circle cx="600" cy="120" r="5" fill="#d9822b"/>
+  <text x="600" y="70" text-anchor="middle" class="b">Ziel bootet</text>
+  <text x="600" y="86" text-anchor="middle" class="t11">HEY nach 30 s, Hop 2</text>
+  <circle cx="760" cy="120" r="5" fill="#2a9d5c"/>
+  <text x="760" y="70" text-anchor="middle" class="b">Praesenz-Trigger</text>
+  <text x="760" y="86" text-anchor="middle" class="t11">HEY beim Sender gehoert</text>
+  <text x="760" y="100" text-anchor="middle" class="t11">DM sofort, Quittung 1 min</text>
+  <circle cx="900" cy="120" r="5" fill="#5b6b7b"/>
+  <text x="900" y="70" text-anchor="middle" class="b">Leiter +30 min</text>
+  <text x="900" y="86" text-anchor="middle" class="t11">Stufe 1 allein</text>
+  <rect x="100" y="170" width="500" height="18" fill="#f2f2f2"/>
+  <text x="350" y="183" text-anchor="middle" class="t11">Ziel dunkel: zwei Neuflutungen laufen ins Leere</text>
+  <rect x="600" y="170" width="160" height="18" fill="#eaf7ef"/>
+  <text x="680" y="183" text-anchor="middle" class="t11">Zustellung binnen 2 min</text>
+  <rect x="760" y="170" width="160" height="18" fill="#fff6ea"/>
+  <text x="840" y="183" text-anchor="middle" class="t11">Stufe 1: 16 min spaeter</text>
+</svg>
+</div>
+<figcaption>Abb. 6: Ziel kehrt nach 25 min zurueck. Mit Praesenz-Trigger ist die DM eine Minute nach der ersten Bake zugestellt; die Leiter allein haette bis zur Stufe +30 min gewartet. Die zwei Neuflutungen ins Leere sind der Preis dafuer, keine Sonde zu senden; ein Cache der letzten Praesenz koennte sie in einer spaeteren Stufe sparen.</figcaption>
+</figure>
+
+<h3 id="s44">4.4 Obhut ueber die Gateway-Quittung (Stufe 2)</h3>
+<p class="reco">Entscheidung: Eine Gateway-Quittung 0x41 fuer eine wartende DM setzt blinde Neuflutungen 15 min aus; danach laeuft die Leiter weiter, falls keine Zielquittung kam.</p>
+<p>Praemissen: Der Server-Pfad braucht Sekunden, die Quittung des Ziels kommt dann ueber Mesh oder Server binnen einer Umlaufzeit. 15 min sind mehr als das belastete Median-p99 fuer den Rueckweg und kuerzer als die naechste Leiterstufe, in der die DM sowieso faellig waere. Die 0x41 ist heute schon auf der Luft und wird vom Sender empfangen; nur die Auswertung fehlt.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Server-Postfach als Hauptweg</td><td>Sender verlaesst sich auf GATE</td><td><span class="tag bad">verworfen</span> Grundsatzentscheidung des Vortrags, kein off-grid</td></tr>
+<tr><td>0x41 ignorieren</td><td>heute</td><td><span class="tag bad">verworfen</span> jede Neuflutung in Gateway-Naehe ist ueberfluessig</td></tr>
+<tr><td>0x41 als Obhut</td><td>Leiter 15 min aussetzen, Zielquittung abwarten</td><td><span class="tag ok">gewaehlt</span> null Bytes, spart in AT und DE die meisten Neuflutungen; off-grid bleibt unveraendert</td></tr>
+</table>
+<ul>
+  <li>Die 0x41 beweist nur "der Server hat es", nicht die Zustellung. Ob der Server DMs fuer abwesende Ziele haelt, ist mit dem Serverteam zu klaeren (Abschnitt 7).</li>
+  <li>Ohne Gateway in Hoerweite gibt es keine 0x41; die Leiter laeuft wie im off-grid-Fall.</li>
+</ul>
+
+<h3 id="s45">4.5 App-Outbox (Stufe 3)</h3>
+<p class="reco">Entscheidung: Fuer Knoten ohne RAM und fuer Ablage ueber einen Neustart hinaus liegt die Outbox in der App oder auf dem T-Deck; der Knoten liefert dafuer festes NNN, frische msg_id und den Fehlerstatus.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Outbox nur im Knoten</td><td>Stufe 1</td><td><span class="tag warn">Stufe 1</span> verliert bei Neustart, klassischer ESP32 nur 2 Plaetze</td></tr>
+<tr><td>Outbox in der App</td><td>App wiederholt ueber den vorhandenen Sendepfad, Knoten meldet Status 0x41</td><td><span class="tag ok">Stufe 3</span> Gigabytes statt Kilobytes, ueberlebt Neustart; laeuft nur bei verbundener App; McApp liegt ausserhalb dieses Repos, Start mit mc-chat und T-Deck</td></tr>
+</table>
+
+<h3 id="s46">4.6 Vorrangklassen (Stufe 3)</h3>
+<p class="reco">Entscheidung: EMERGENCY-DMs werden zweimal mit frischen msg_ids im Abstand einer Echo-Verzoegerung gesendet und bekommen ein groesseres Budget; Routine bleibt Einzelsendung.</p>
+<p>Praemissen: Zeitliche Diversitaet schlaegt eine Einzelsendung gegen Kollision und CAD-Verlust; der Preis ist eine zusaetzliche Flutung, und die faellt nur bei seltenem Verkehr an. Der Marker ist Text (<code>{E}</code> wie die vorhandenen <code>{CET}</code> und <code>{MCP}</code>), alte Knoten leiten ihn weiter und zeigen ihn an.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Alle DMs doppelt senden</td><td>proaktive Redundanz fuer alles</td><td><span class="tag bad">verworfen</span> verdoppelt die Flutkosten fuer 1.182 DMs je Woche ohne Not</td></tr>
+<tr><td>Doppelsendung nur mit Marker</td><td><code>{E}</code>, groesseres Budget, kuerzere Leiter, max_hop bis 6</td><td><span class="tag ok">Stufe 3</span> Vorrang nach EMCOMM, Kosten nur bei Bedarf</td></tr>
+</table>
+
+<h3 id="s47">4.7 Verworfene Ansaetze</h3>
+<table>
+<tr><th>Ansatz</th><th>Grund</th></tr>
+<tr><td>Quittung je Hop, Ablage in Relais</td><td>k Relais je Hop bedeuten k Quittungen je Hop, RAM in jedem Relais, Duplikatexplosion; widerspricht dem Flutprinzip des Vortrags</td></tr>
+<tr><td>Fenster nach AX.25 oder TCP</td><td>Verbindungszustand an beiden Enden fuer einen Kanal mit einer Nachricht je Minuten und minutenlangem Umlauf; nichts zu pipelinen</td></tr>
+<tr><td>Groesserer Dedup-Ring</td><td>Groesse ist gemessen und festgelegt; 40 min blindes Warten ist kein Transport</td></tr>
+<tr><td>Wiederholung ueber den Server als Regelfall</td><td>Infrastrukturabhaengigkeit; Obhut nutzt den Server nur, wo er zufaellig da ist</td></tr>
+</table>
+
+<h3 id="s48">4.8 Budget in Flut-Aequivalenten</h3>
+<p>Eine Flutung ist eine Sendung des Senders plus alle Wiederholungen der Relais bis zum Hop-Budget. Die Tabelle rechnet je DM bei ruhigem Kanal; belastet dehnen sich nur die Abstaende, nicht die Anzahl.</p>
+<table>
+<tr><th>Fall</th><th>heute</th><th>Stufe 0</th><th>Stufe 1</th><th>Stufe 2</th></tr>
+<tr><td>DM kommt an, Quittung kommt an</td><td>1 Flutung plus 3 verworfene Sendungen</td><td>1 Flutung</td><td>1 Flutung</td><td>1 Flutung</td></tr>
+<tr><td>DM verloren auf Hop 1</td><td>bis 4 Sendungen, ab Sendung 2 geflutet</td><td>2 Sendungen, ab Sendung 2 geflutet</td><td>gleich Stufe 0</td><td>gleich Stufe 0</td></tr>
+<tr><td>DM verloren ab Hop 2</td><td>1 Flutung, 3 verworfene Sendungen, stumm</td><td>1 Flutung, gemeldet</td><td>2 Flutungen (Neuflutung nach 2 min)</td><td>2 Flutungen, mit Gateway 1</td></tr>
+<tr><td>Quittung verloren, 1 Hop</td><td>1 Flutung, 3 verworfen, stumm</td><td>2 Sendungen, Re-ACK</td><td>gleich Stufe 0</td><td>gleich Stufe 0</td></tr>
+<tr><td>Quittung verloren, mehrere Hops</td><td>1 Flutung, 3 verworfen, stumm</td><td>1 Flutung, gemeldet</td><td>2 Flutungen</td><td>2 Flutungen, mit Gateway 1</td></tr>
+<tr><td>Ziel 25 min weg</td><td>1 Flutung, stumm nach 2 min</td><td>1 Flutung, gemeldet nach 5 min</td><td>4 Flutungen (Start, +2, +10, +30 min), Zustellung nach 43 min</td><td>4 Flutungen (Start, +2, +10 min, Praesenz), Zustellung 1 min nach Rueckkehr</td></tr>
+<tr><td>Ziel 24 h weg</td><td>1 Flutung</td><td>1 Flutung</td><td>hoechstens 7 Flutungen, dann gemeldet</td><td>hoechstens 7 Flutungen, dann gemeldet</td></tr>
+</table>
+<p>Mit einem Gateway in Hoerweite liefert der Server-Pfad in jeder Stufe, auch heute; die Obhut-Regel spart dann die Neuflutung, die Stufe 1 bei einer langsamen Zielquittung blind ausloesen wuerde. Der Simulator in Abschnitt 5 zeigt beides.</p>
+<p>Deckel und Sperren, die in jeder Stufe gelten: hoechstens eine Outbox-Aktion je 30 s je Knoten; keine Aktion bei QRS oder QRT; keine Neuflutung bei 5-Minuten-Kanallast ueber 25 %; hoechstens 6 blinde Neuflutungen je DM und Tag; hoechstens 3 wartende DMs je Ziel. Der Knotendeckel ist zugleich die Abwehr gegen eine Sendeschleife wie die beobachtete HEY-Flut mit 21 Frames je Sekunde.</p>
+
+<h2 id="s5">5. Fehlerszenarien und Demos</h2>
+<p>Jede Zeile der Tabelle ist im Simulator darunter als Kombination aus Szenario, Stoerung und Stufe nachstellbar. Die Matrix am Ende rechnet alle Kombinationen durch.</p>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Luecke</th><th>ab Stufe</th><th>Demo</th></tr>
+<tr><td>DM verloren auf Hop 1, kein Nachbar hoert sie</td><td>kein Echo binnen 15 s</td><td>gleiche msg_id erneut, hoechstens 3 mal</td><td>nach 3 Versuchen ist der Kanal das Problem</td><td>0</td><td>jedes Szenario, "DM verloren auf Hop 1"</td></tr>
+<tr><td>DM verloren ab Hop 2</td><td>Echo ja, keine Quittung binnen Umlauf</td><td>Neuflutung mit frischer msg_id</td><td>Stufe 0 meldet nur</td><td>1</td><td>zwei Relais, "DM verloren auf Hop 2"</td></tr>
+<tr><td>Quittung verloren, 1 Hop</td><td>kein Echo, keine Quittung</td><td>Wiederholung, Ziel quittiert das Duplikat</td><td>keine</td><td>0</td><td>direkt, "Quittung verloren"</td></tr>
+<tr><td>Quittung verloren, mehrere Hops</td><td>keine Quittung binnen Umlauf</td><td>Neuflutung, Ziel-Cache verhindert Doppelanzeige, Quittung erneut</td><td>altes Ziel zeigt doppelt</td><td>1</td><td>ein oder zwei Relais, "Quittung verloren auf letztem Rueck-Hop"</td></tr>
+<tr><td>Alternativpfade</td><td>keine noetig</td><td>Flutung nimmt beide Wege, ein Ausfall bleibt unsichtbar</td><td>Doppelempfang kostet Airtime</td><td>heute</td><td>Raute, Mesh mit Alternativen, "Link Hop 2 dauerhaft tot"</td></tr>
+<tr><td>Ziel voruebergehend weg</td><td>Frame mit Absender gleich Ziel gehoert</td><td>sofort senden</td><td>Ziel weiter als 2 Hops ohne Text: Leiter</td><td>2</td><td>Ziel offline, dann zurueck</td></tr>
+<tr><td>Ziel laenger weg als storetime</td><td>Leiter erschoepft</td><td>gemeldeter Fehlschlag</td><td>keine Ablage im Netz</td><td>1</td><td>Ziel offline, "Bis zum Ergebnis" ohne Rueckkehr im Zeitfenster</td></tr>
+<tr><td>Gateway in Hoerweite</td><td>0x41 gehoert</td><td>Leiter 15 min aussetzen, Server-Pfad liefert</td><td>Server haelt evtl. nicht fuer abwesende Ziele</td><td>2</td><td>Gateway und Server, "Link Hop 2 dauerhaft tot"</td></tr>
+<tr><td>Belasteter Kanal</td><td>Kanallast ueber 25 %, QRS/QRT</td><td>Abstaende mal 3, keine Aktion waehrend QRT</td><td>Zustellung dauert Minuten</td><td>1</td><td>jedes Szenario, Kanal "belastet"</td></tr>
+<tr><td>Mesh-Link dauerhaft tot, keine Alternative</td><td>Leiter ohne Quittung</td><td>gemeldeter Fehlschlag nach 6 Neuflutungen</td><td>nur Server oder Praesenz helfen</td><td>1</td><td>zwei Relais, "Link Hop 2 dauerhaft tot"</td></tr>
+</table>
+
+<h3 id="s51">5.1 Simulator</h3>
+<p>Das Modell bildet genau die Mechaniken aus Abschnitt 2 und 4 ab: Dedup auf msg_id in jedem Knoten, Warteschlange je Hop, Hop-Budget 4 fuer Text und 2 fuer HEY, Echo-Erkennung ueber die eigene msg_id, Quittung als eigener Textframe mit frischer msg_id, Gateway-Upload mit 0x41 und GATE-Rueckweg. Nicht modelliert: Kollisionen, CAD, Ringverdraengung, Kanallast als Sperre. Annahme: Sendezeiten aus Abschnitt 2, Warteschlange ruhig 4 bis 9 s gleichverteilt, belastet lognormal mit Median 30 s und p99 286 s, Server 1 s. Der heutige 40-s-Timer zaehlt hier ab Sendung, in der Firmware ab Einreihen; die Abweichung liegt unter einer Warteschlangenzeit.</p>
+<div class="sim" id="sim">
+  <div class="ctl">
+    <label>Szenario <select id="scn"></select></label>
+    <label>Stoerung <select id="fault"></select></label>
+    <label>Kanal <select id="chan"><option value="quiet">ruhig</option><option value="loaded">belastet</option></select></label>
+    <label>Seed <input id="seed" type="number" value="1" min="1" max="9999" style="width:64px"></label>
+  </div>
+  <div class="ctl">
+    <span>Stufe:</span>
+    <div class="stage" id="stages">
+      <button data-st="-1" class="on">heute</button>
+      <button data-st="0">Stufe 0</button>
+      <button data-st="1">Stufe 1</button>
+      <button data-st="2">Stufe 2</button>
+    </div>
+    <button id="play" class="primary">Start</button>
+    <button id="step">Schritt</button>
+    <button id="fin">Bis zum Ergebnis</button>
+    <button id="reset">Zuruecksetzen</button>
+    <label>Tempo <select id="speed"><option value="1">1x</option><option value="10" selected>10x</option><option value="60">60x</option><option value="600">600x</option></select></label>
+    <span id="clock" class="mono" style="font-family:ui-monospace,Menlo,monospace">t = 0:00</span>
+  </div>
+  <p id="scndesc" class="small" style="margin:4px 0 8px"></p>
+  <div class="canvas"><svg id="simsvg" viewBox="0 0 960 300" role="img" aria-label="Simulation"></svg></div>
+  <div class="hint">Klick auf eine Funkverbindung schaltet sie um: normal, naechsten Frame verlieren (orange), dauerhaft gestoert (rot). Blau DM, gruen Quittung, orange Gateway-Quittung 0x41, grau HEY-Bake, violett Server-Pfad. Ein rotes Kreuz ist ein verlorener Frame, ein graues ein Frame an einen ausgeschalteten Knoten. Sendungen und Airtime zaehlen DM, Quittungen und 0x41, keine Baken.</div>
+  <div class="grid">
+    <div class="tiles">
+      <div class="tile"><div class="v" id="m_result">offen</div><div class="l">Ergebnis beim Sender</div></div>
+      <div class="tile"><div class="v" id="m_tack">-</div><div class="l">Zeit bis Quittung</div></div>
+      <div class="tile"><div class="v" id="m_shown">0</div><div class="l">Anzeigen beim Ziel</div></div>
+      <div class="tile"><div class="v" id="m_tx">0</div><div class="l">Sendungen aller Knoten</div></div>
+      <div class="tile"><div class="v" id="m_air">0,0 s</div><div class="l">Airtime gesamt</div></div>
+      <div class="tile"><div class="v" id="m_dedup">0</div><div class="l">Dedup-Verwuerfe</div></div>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<h3 id="s52">5.2 Matrix aller Kombinationen</h3>
+<p>Die Matrix laeuft jedes Szenario mit jeder Stoerung durch alle vier Stufen und beide Kanalzustaende, mit dem Seed aus dem Simulator. Eine Zelle zeigt das Ergebnis beim Sender und die Zeit bis zur Quittung; "F" zaehlt die Flutungen. Klick auf eine Zelle laedt die Kombination in den Simulator.</p>
+<div class="ctl" style="margin-bottom:8px"><button id="runmatrix" class="primary" style="font:inherit;font-size:13px;padding:3px 10px;border:1px solid #1f6feb;border-radius:4px;background:#1f6feb;color:#fff;cursor:pointer">Matrix berechnen</button> <span id="matrixinfo" class="small"></span></div>
+<div class="matrixwrap"><table class="matrix" id="matrix"></table></div>
+<p class="small">Lesart: gruen zugestellt binnen 10 min, orange zugestellt spaeter, rot nicht zugestellt oder nicht quittiert, grau stumm aufgegeben. "angekommen" heisst: das Ziel hat die DM angezeigt, der Sender weiss es nur nicht.</p>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>1</td><td>0</td><td>Zaehler in der STAT-Zeile: DM gesendet, Echo, 0x41, Zielquittung, aufgegeben, Median bis Quittung</td><td>eine Woche Feldzahlen von DK5EN-98 und -90 als Basislinie</td></tr>
+<tr><td>2</td><td>0</td><td>Echo-Gate, Re-ACK auf Duplikat, Fehlermeldung, Flash-Write raus</td><td>Bench: Wiederholungen je DM im Regelfall 0 statt 3; Einhop-DM mit unterdrueckter Quittung wird nach der Wiederholung quittiert; Fehlschlag erscheint in App und GUI; Upstream-PR</td></tr>
+<tr><td>3</td><td>1</td><td>Geparkter Ringslot auf ESP32 klassisch, Outbox auf S3 und nRF52, Neuflutung mit frischer msg_id, Ziel-Cache auf beiden RX-Pfaden, Quittung v2</td><td>Bench: Zweihop-DM mit unterdrueckter Quittung des ersten Relais wird nach der Neuflutung quittiert, Ziel zeigt einmal an; Ring bei 25er-Schub nicht ueber 18 mit zwei geparkten Slots; alte Firmware am Ziel quittiert ohne Pruefsumme</td></tr>
+<tr><td>4</td><td>1</td><td>mcmap faltet auf (Absender, NNN)</td><td>Zaehlung je Woche unveraendert gegenueber Basislinie trotz Neuflutungen</td></tr>
+<tr><td>5</td><td>2</td><td>Praesenz-Trigger, Obhut</td><td>Bench: Ziel 25 min aus, Zustellung binnen 2 min nach erster Bake; mit Gateway keine Neuflutung vor Ablauf von 15 min</td></tr>
+<tr><td>6</td><td>3</td><td>Marker <code>{E}</code>, App-Outbox in mc-chat und T-Deck</td><td>EMERGENCY-DM zweimal auf der Luft mit frischen msg_ids; App-Outbox ueberlebt Knoten-Neustart</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zaehlt</th><th>Klaerungsweg</th></tr>
+<tr><td>Haelt der Server DMs fuer abwesende Ziele?</td><td>entscheidet, wie stark die Obhut-Regel ist</td><td>Serverteam fragen, Bench mit ausgeschaltetem Ziel hinter DK5EN-98</td></tr>
+<tr><td>Semikolon in der Quittung ueber den Server</td><td>Quittung v2 laeuft als Text ueber GATE; Server oder Apps koennten den Suffix verwerfen</td><td>eine Quittung v2 ueber DK5EN-98 einspielen, Server und McApp beobachten</td></tr>
+<tr><td>Geschweifte Klammer im Nachrichtentext</td><td>bricht heute schon den NNN-Abgleich</td><td>beim Sender entfernen oder ersetzen, Regressionstest im Parser</td></tr>
+<tr><td>NNN-Umlauf bei sehr aktiven Absendern</td><td>Cache (Absender, NNN) mit 1 h Alterung koennte bei ueber 1000 Nachrichten je Stunde kollidieren</td><td>Feldzahlen aus Schritt 1; falls noetig Alterung auf 30 min</td></tr>
+<tr><td>nRF52 Timer-Task</td><td>Empfangspfad laeuft dort; Outbox und Quittung muessen in den Loop-Task</td><td>Konzept N-14 aus dem Backpressure-Umbau wiederverwenden</td></tr>
+<tr><td>Doppelanzeige auf alter Firmware</td><td>alte Ziele haben keinen Cache und zeigen Neuflutungen doppelt</td><td>im Release-Text benennen; Uebergangszeit bis Upstream-Merge</td></tr>
+</table>
+
+</main>
+<script>
+(function () {
+'use strict';
+
+// ---------- Zufall, deterministisch ----------
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- Konstanten (Abschnitt 2 und 4) ----------
+const TOA = { DM: 1.4, ACK: 0.85, GWACK: 0.51, HEY: 0.8, SRV: 1.0 };
+const HOP_TEXT = 4, HOP_HEY = 2;
+const ECHO_WIN = 15, L1_MAX = 3, TODAY_TIMER = 40, TODAY_MAX = 3;
+const LADDER_MIN = [2, 10, 30, 60, 60, 60];
+const REACK_MIN = 60, CUSTODY = 15 * 60, OUTBOX_TICK = 30;
+const FAIL_QUIET = 5 * 60, FAIL_LOADED = 15 * 60;
+const HORIZON = 24 * 3600;
+const OFFLINE_UNTIL = 25 * 60, HEY_FIRST = 30, HEY_EVERY = 300;
+
+const NAMES = { A: 'DK5EN-14', B: 'DK5EN-90', R1: 'DK5EN-93', R2: 'DK5EN-92', R3: 'DK5EN-91', R4: 'DK5EN-94', GW1: 'DK5EN-98', GW2: 'DK5EN-97', SRV: 'Server' };
+function N(id, x, y, kind) { return { id, x, y, kind: kind || (id === 'A' ? 'sender' : id === 'B' ? 'dest' : 'relay') }; }
+
+const SCN = {
+  direct: { name: 'Direkt, ohne Relais', desc: 'Sender und Ziel hoeren sich direkt. Es gibt kein Echo, also laufen in Stufe 0 bis zu drei Wiederholungen, und das Ziel quittiert jede erneut.',
+    nodes: [N('A', 160, 150), N('B', 800, 150)], links: [['A', 'B']], path: ['A', 'B'] },
+  relay1: { name: 'Ein Relais dazwischen', desc: 'Der klassische Zweihop-Fall. Das Echo des Relais beendet die Wiederholung; ab Hop 2 hilft nur die Neuflutung mit frischer msg_id.',
+    nodes: [N('A', 120, 150), N('R1', 480, 150), N('B', 840, 150)], links: [['A', 'R1'], ['R1', 'B']], path: ['A', 'R1', 'B'] },
+  relay2: { name: 'Zwei Relais in Kette', desc: 'Dreihop-Kette ohne Alternative. Ein toter Link in der Mitte laesst sich nur ueber Zeit oder Praesenz ueberbruecken.',
+    nodes: [N('A', 100, 150), N('R1', 350, 150), N('R2', 600, 150), N('B', 860, 150)], links: [['A', 'R1'], ['R1', 'R2'], ['R2', 'B']], path: ['A', 'R1', 'R2', 'B'] },
+  diamond: { name: 'Raute, zwei Alternativen', desc: 'Zwei Relais hoeren den Sender und einander. Die Flutung nimmt beide Wege; das Ziel bekommt zwei Kopien und verwirft die zweite.',
+    nodes: [N('A', 120, 150), N('R1', 480, 60), N('R2', 480, 240), N('B', 840, 150)], links: [['A', 'R1'], ['A', 'R2'], ['R1', 'B'], ['R2', 'B'], ['R1', 'R2']], path: ['A', 'R1', 'B'], alt: ['A', 'R2', 'B'] },
+  mesh2: { name: 'Mesh mit Alternativen auf zwei Hops', desc: 'Vier Relais, kreuzweise verbunden. Zeigt den Flut-Multiplikator: jeder Frame wird von jedem Knoten mehrfach gehoert.',
+    nodes: [N('A', 80, 150), N('R1', 320, 60), N('R2', 320, 240), N('R3', 640, 60), N('R4', 640, 240), N('B', 880, 150)],
+    links: [['A', 'R1'], ['A', 'R2'], ['R1', 'R2'], ['R1', 'R3'], ['R2', 'R4'], ['R3', 'R4'], ['R1', 'R4'], ['R2', 'R3'], ['R3', 'B'], ['R4', 'B']], path: ['A', 'R1', 'R3', 'B'], alt: ['A', 'R2', 'R4', 'B'] },
+  gateway: { name: 'Gateway und Server parallel zum Mesh', desc: 'Ein Gateway nahe dem Sender laedt hoch und sendet 0x41; der Server liefert an das Gateway nahe dem Ziel. Der Mesh-Pfad ueber ein Relais laeuft parallel.',
+    nodes: [N('A', 80, 240), N('R1', 480, 240), N('B', 880, 240), N('GW1', 260, 110, 'gw'), N('GW2', 700, 110, 'gw'), N('SRV', 480, 40, 'server')],
+    links: [['A', 'R1'], ['R1', 'B'], ['A', 'GW1'], ['GW1', 'R1'], ['B', 'GW2']], wires: [['GW1', 'SRV'], ['GW2', 'SRV']], path: ['A', 'R1', 'B'] },
+  offline: { name: 'Ziel offline, kehrt nach 25 min zurueck', desc: 'Kette mit zwei Relais, das Ziel ist die ersten 25 min aus. Danach bakt es alle 5 min mit HEY (Hop 2). Stufe 2 liefert beim ersten HEY, Stufe 1 erst bei der naechsten Leiterstufe.',
+    nodes: [N('A', 100, 150), N('R1', 350, 150), N('R2', 600, 150), N('B', 860, 150)], links: [['A', 'R1'], ['R1', 'R2'], ['R2', 'B']], path: ['A', 'R1', 'R2', 'B'], offline: true }
+};
+
+function faultsFor(scn) {
+  const p = scn.path, last = p.length - 1, out = [], seen = new Set();
+  function add(id, name, rules) {
+    const key = JSON.stringify(rules);
+    if (seen.has(key)) return; seen.add(key); out.push({ id, name, rules });
+  }
+  add('none', 'kein Verlust', []);
+  add('dm1', 'DM verloren auf Hop 1', [{ from: p[0], to: p[1], type: 'DM', n: 1 }]);
+  if (p.length >= 3) add('dm2', 'DM verloren auf Hop 2', [{ from: p[1], to: p[2], type: 'DM', n: 1 }]);
+  add('dmlast', 'DM verloren auf letztem Hop', [{ from: p[last - 1], to: p[last], type: 'DM', n: 1 }]);
+  add('ack1', 'Quittung verloren auf erstem Rueck-Hop', [{ from: p[last], to: p[last - 1], type: 'ACK', n: 1 }]);
+  add('acklast', 'Quittung verloren auf letztem Rueck-Hop', [{ from: p[1], to: p[0], type: 'ACK', n: 1 }]);
+  if (scn.alt) add('dmboth', 'DM verloren auf beiden Alternativen, Hop 1', [{ from: p[0], to: p[1], type: 'DM', n: 1 }, { from: scn.alt[0], to: scn.alt[1], type: 'DM', n: 1 }]);
+  if (p.length >= 3) add('linkdown', 'Link Hop 2 dauerhaft tot', [{ from: p[1], to: p[2], type: '*', n: Infinity }, { from: p[2], to: p[1], type: '*', n: Infinity }]);
+  return out;
+}
+
+// ---------- Simulation ----------
+function fmt(t) { t = Math.max(0, Math.round(t)); const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; }
+function lkey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+function makeSim(cfg, userLinks) {
+  const scn = SCN[cfg.scn], stage = cfg.stage, loaded = cfg.chan === 'loaded';
+  const rnd = mulberry32(cfg.seed * 7919 + 1);
+  const S = { t: 0, ev: [], seq: 0, log: [], pk: [], nodes: {}, links: [], wires: [], scn, cfg, done: false,
+    m: { tx: 0, air: 0, dedup: 0 }, ids: {} };
+  scn.nodes.forEach(n => { S.nodes[n.id] = Object.assign({}, n, { name: NAMES[n.id], online: !(scn.offline && n.id === 'B'), dedup: new Set(), own: new Set(), cache: new Map(), reack: new Map(), shown: 0, nb: [] }); });
+  scn.links.forEach(([a, b]) => { S.nodes[a].nb.push(b); S.nodes[b].nb.push(a); S.links.push({ a, b, key: lkey(a, b), user: (userLinks && userLinks[lkey(a, b)]) || 'ok', rules: [] }); });
+  (scn.wires || []).forEach(([a, b]) => S.wires.push({ a, b }));
+  const fault = faultsFor(scn).find(f => f.id === cfg.fault) || faultsFor(scn)[0];
+  S.fault = fault;
+  fault.rules.forEach(r => { const L = S.links.find(l => l.key === lkey(r.from, r.to)); if (L) L.rules.push(Object.assign({}, r)); });
+  S.linkOf = (a, b) => S.links.find(l => l.key === lkey(a, b));
+  S.gateways = scn.nodes.filter(n => n.kind === 'gw').map(n => n.id);
+
+  const lat = id => id === 'SRV' ? TOA.SRV : (loaded ? Math.min(985, Math.max(5, 30 * Math.exp(0.97 * gauss()))) : 4 + rnd() * 5);
+  function gauss() { let u = 0, v = 0; while (u === 0) u = rnd(); while (v === 0) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const newId = pre => { S.ids[pre] = (S.ids[pre] || 0) + 1; return pre + S.ids[pre]; };
+  function log(cls, text) { S.log.push({ t: S.t, cls, text }); }
+  function at(dt, fn) { S.ev.push({ t: S.t + dt, seq: S.seq++, fn }); S.ev.sort((x, y) => x.t - y.t || x.seq - y.seq); }
+
+  // Sender-Zustand
+  const P = { nnn: 123, ids: [], cur: null, floods: 0, l1: 0, todayRetries: 0, heard: false, delivered: false, failed: false, silent: false, ver: 0, custodyUntil: -1, ladder: 0, lastAction: -1e9, phase: 'idle', tAck: null, tFirstTx: null };
+  S.P = P;
+  const A = S.nodes.A, B = S.nodes.B;
+
+  function frameLabel(F) { return F.type === 'DM' ? `DM ${F.id} {${F.nnn}` : F.type === 'ACK' ? `ACK ${F.id} :ack${F.nnn}${F.hash ? ';H=' + F.hash : ''}` : F.type === 'GWACK' ? `0x41 ${F.id} fuer ${F.target}` : F.type === 'HEY' ? `HEY ${F.id}` : `GATE ${F.id}`; }
+
+  function enqueueTx(nid, F, why) {
+    const n = S.nodes[nid];
+    const d = lat(nid);
+    log('grey', `${n.name}: ${why}, sendet in ${d.toFixed(0)} s`);
+    at(d, () => transmit(nid, F));
+  }
+
+  function transmit(nid, F) {
+    const n = S.nodes[nid];
+    if (!n.online) return;
+    if (F.type !== 'HEY') { S.m.tx++; S.m.air += TOA[F.type]; }
+    log(F.type === 'DM' ? 'dm' : F.type === 'ACK' ? 'ack' : F.type === 'GWACK' ? 'warn' : 'grey', `${n.name} sendet ${frameLabel(F)} (hop ${F.hops})`);
+    if (F.type === 'DM' && nid === 'A' && F.id === P.cur) { P.tFirstTx = P.tFirstTx ?? S.t; onSenderTx(); }
+    n.nb.forEach(mid => {
+      const m = S.nodes[mid], L = S.linkOf(nid, mid);
+      let drop = false, reason = '';
+      if (L.user === 'down') { drop = true; reason = 'Link gestoert'; }
+      else if (L.user === 'next') { drop = true; reason = 'Link verliert diesen Frame'; L.user = 'ok'; }
+      else { const r = L.rules.find(r => (r.type === '*' || r.type === F.type) && r.n > 0 && r.from === nid && r.to === mid); if (r) { drop = true; reason = 'Stoerung'; r.n--; } }
+      const rec = { type: F.type, from: nid, to: mid, t0: S.t, t1: S.t + TOA[F.type], label: F.type === 'DM' ? F.id : F.type === 'ACK' ? 'ack' + F.nnn : F.type === 'GWACK' ? '0x41' : 'HEY', status: 'ok' };
+      if (!m.online) { rec.status = 'offline'; log('grey', `${n.name} -> ${m.name}: ${m.name} ist aus, ${frameLabel(F)} verhallt`); }
+      else if (drop) { rec.status = 'drop'; log('bad', `${n.name} -> ${m.name}: ${frameLabel(F)} verloren (${reason})`); }
+      else at(TOA[F.type], () => receive(mid, nid, F));
+      S.pk.push(rec);
+    });
+  }
+
+  function sendCopy(fresh, why) {
+    if (fresh) { P.cur = newId('A'); P.ids.push(P.cur); P.floods++; P.l1 = 0; P.heard = false; A.own.add(P.cur); }
+    P.ver++; P.lastAction = S.t; P.phase = 'l1';
+    enqueueTx('A', { type: 'DM', id: P.cur, nnn: P.nnn, src: 'A', dst: 'B', hops: HOP_TEXT, path: ['A'] }, why);
+  }
+
+  function onSenderTx() {
+    const v = ++P.ver;
+    if (stage < 0) {
+      at(TODAY_TIMER, () => { if (v !== P.ver || P.delivered) return;
+        if (P.todayRetries < TODAY_MAX) { P.todayRetries++; log('warn', `${A.name}: ${TODAY_TIMER} s ohne Quittung, Wiederholung ${P.todayRetries} mit gleicher msg_id ${P.cur}`); sendCopy(false, 'Wiederholung'); }
+        else { P.silent = true; P.phase = 'done'; log('bad', `${A.name}: aufgegeben nach ${TODAY_MAX} Wiederholungen, keine Meldung an App oder GUI`); } });
+      return;
+    }
+    at(ECHO_WIN, () => { if (v !== P.ver || P.delivered) return;
+      if (!P.heard && P.l1 < L1_MAX) { P.l1++; log('warn', `${A.name}: kein Echo binnen ${ECHO_WIN} s, Wiederholung ${P.l1} mit gleicher msg_id ${P.cur}`); sendCopy(false, 'Wiederholung ohne Echo'); return; }
+      if (!P.heard) log('warn', `${A.name}: ${L1_MAX} Sendungen ohne Echo, kein Nachbar erreicht`);
+      else log('grey', `${A.name}: Echo-Fenster zu, Relais hat ${P.cur}, keine Wiederholung mit gleicher msg_id`);
+      P.phase = 'wait'; scheduleE2E(); });
+  }
+
+  function scheduleE2E() {
+    const v = ++P.ver;
+    if (stage === 0) {
+      const w = loaded ? FAIL_LOADED : FAIL_QUIET;
+      at(w, () => { if (v !== P.ver || P.delivered) return; P.failed = true; P.phase = 'done'; log('bad', `${A.name}: ${fmt(w)} ohne Quittung, Fehlschlag an App und GUI gemeldet`); });
+      return;
+    }
+    if (P.ladder >= LADDER_MIN.length) { P.failed = true; P.phase = 'done'; log('bad', `${A.name}: ${LADDER_MIN.length} Neuflutungen ohne Quittung, Fehlschlag gemeldet (storetime-Deckel)`); return; }
+    const w = LADDER_MIN[P.ladder] * 60 * (loaded ? 3 : 1); P.ladder++;
+    log('grey', `${A.name}: Leiter, naechste Neuflutung in ${fmt(w)}`);
+    const fire = () => { if (v !== P.ver || P.delivered) return;
+      if (stage >= 2 && P.custodyUntil > S.t) { log('grey', `${A.name}: in Obhut, Neuflutung bis ${fmt(P.custodyUntil)} ausgesetzt`); at(P.custodyUntil - S.t, fire); return; }
+      log('dm', `${A.name}: Neuflutung ${P.floods + 1} mit frischer msg_id, NNN ${P.nnn} bleibt`); sendCopy(true, 'Neuflutung'); };
+    at(w, fire);
+  }
+
+  function presence(src) {
+    if (stage < 2 || src !== 'B' || P.phase !== 'wait' || P.delivered) return;
+    const rtt = LADDER_MIN[0] * 60 * (loaded ? 3 : 1);
+    if (S.t - P.lastAction < Math.max(OUTBOX_TICK, rtt)) return;
+    log('ack', `${A.name}: Praesenz, Frame von ${B.name} gehoert, wartende DM sofort`);
+    sendCopy(true, 'Praesenz-Trigger');
+  }
+
+  function sendAck(nid, F) {
+    const n = S.nodes[nid];
+    const ack = { type: 'ACK', id: newId('B'), nnn: F.nnn, src: nid, dst: F.src, hops: HOP_TEXT, path: [nid], hash: stage >= 1 ? '9f3a' : null };
+    n.own.add(ack.id);
+    enqueueTx(nid, ack, `Quittung :ack${F.nnn}${ack.hash ? ';H=' + ack.hash : ''}`);
+  }
+
+  function receive(nid, from, F) {
+    const n = S.nodes[nid];
+    if (!n.online) return;
+    receiveInner(nid, from, F);
+    if (nid === 'A' && !(F.type === 'ACK' && F.dst === 'A')) presence(F.src);
+  }
+
+  function receiveInner(nid, from, F) {
+    const n = S.nodes[nid];
+    if (F.type === 'GWACK') {
+      if (nid === 'A' && P.ids.includes(F.target)) {
+        if (P.delivered) return;
+        if (stage >= 2) { P.custodyUntil = S.t + CUSTODY; log('warn', `${A.name}: Gateway-Quittung 0x41 fuer ${F.target}, Obhut bis ${fmt(P.custodyUntil)}`); }
+        else log('warn', `${A.name}: Gateway-Quittung 0x41 fuer ${F.target}, nur Status ans Telefon`);
+        return;
+      }
+      if (n.dedup.has(F.id)) { S.m.dedup++; return; }
+      n.dedup.add(F.id);
+      if (F.hops > 0) enqueueTx(nid, Object.assign({}, F, { hops: F.hops - 1 }), `0x41 weiterleiten`);
+      return;
+    }
+    if (n.own.has(F.id)) {
+      if (nid === 'A' && F.id === P.cur && !P.heard) { P.heard = true; log('ack', `${A.name} hoert eigenes Echo ${F.id} von ${S.nodes[from].name}: ein Relais hat es`); }
+      return;
+    }
+    if (F.type === 'HEY') {
+      if (n.dedup.has(F.id)) { S.m.dedup++; return; }
+      n.dedup.add(F.id);
+      if (F.hops > 0 && !F.path.includes(nid)) enqueueTx(nid, Object.assign({}, F, { hops: F.hops - 1, path: F.path.concat(nid) }), 'HEY weiterleiten');
+      return;
+    }
+    if (n.dedup.has(F.id)) {
+      S.m.dedup++;
+      if (F.type === 'DM' && F.dst === nid && stage >= 0) {
+        const key = F.src + '|' + F.nnn, last = n.reack.get(key) ?? -1e9;
+        if (S.t - last >= REACK_MIN) { n.reack.set(key, S.t); log('ack', `${n.name} empfaengt ${frameLabel(F)}: im Dedup-Ring, aber fuer mich mit NNN, Quittung erneut`); sendAck(nid, F); }
+        else log('grey', `${n.name} empfaengt ${frameLabel(F)}: im Dedup-Ring, Quittung gedrosselt`);
+      } else log('grey', `${n.name} empfaengt ${frameLabel(F)}: im Dedup-Ring, verworfen`);
+      return;
+    }
+    n.dedup.add(F.id);
+    if (F.dst === nid) {
+      if (F.type === 'DM') {
+        const key = F.src + '|' + F.nnn;
+        if (stage >= 1 && n.cache.has(key)) log('grey', `${n.name} empfaengt ${frameLabel(F)}: (${S.nodes[F.src].name}, ${F.nnn}) im Cache, keine Anzeige`);
+        else { n.shown++; n.cache.set(key, S.t); log('dm', `${n.name} empfaengt ${frameLabel(F)}: neu, Anzeige ${n.shown}`); }
+        n.reack.set(key, S.t); sendAck(nid, F);
+      } else if (F.type === 'ACK' && nid === 'A') {
+        if (F.nnn === P.nnn && !P.delivered) { P.delivered = true; P.tAck = S.t; P.phase = 'done'; P.ver++; log('ack', `${A.name} empfaengt ${frameLabel(F)}: NNN ${P.nnn} zugestellt${F.hash ? ', Pruefsumme passt' : ''}`); }
+      }
+      return;
+    }
+    if (n.kind === 'gw' && (F.type === 'DM' || F.type === 'ACK') && !F.viaServer) {
+      log('warn', `${n.name}: Upload an Server (DATA)`);
+      S.pk.push({ type: 'SRV', from: nid, to: 'SRV', t0: S.t, t1: S.t + TOA.SRV, label: 'DATA', status: 'ok' });
+      at(TOA.SRV, () => S.gateways.filter(g => g !== nid).forEach(g => {
+        const G = S.nodes[g];
+        S.pk.push({ type: 'SRV', from: 'SRV', to: g, t0: S.t, t1: S.t + TOA.SRV, label: 'GATE', status: 'ok' });
+        at(TOA.SRV, () => { if (G.dedup.has(F.id)) { S.m.dedup++; return; } G.dedup.add(F.id); enqueueTx(g, Object.assign({}, F, { hops: HOP_TEXT, path: F.path.concat(g), viaServer: true }), `GATE vom Server, ${frameLabel(F)} neu auf LoRa`); });
+      }));
+      if (F.type === 'DM') { const g = { type: 'GWACK', id: newId('G'), target: F.id, src: nid, hops: HOP_TEXT }; n.own.add(g.id); enqueueTx(nid, g, `Gateway-Quittung 0x41 fuer ${F.id}`); }
+    }
+    if (F.hops > 0 && !F.path.includes(nid)) enqueueTx(nid, Object.assign({}, F, { hops: F.hops - 1, path: F.path.concat(nid) }), `${frameLabel(F)} neu, Relais`);
+    else log('grey', `${n.name} empfaengt ${frameLabel(F)}: neu, Hop-Budget zu Ende`);
+  }
+
+  // Start
+  log('dm', `${A.name}: DM "Hallo{${P.nnn}" an ${B.name}, Stufe ${stage < 0 ? 'heute' : stage}, Kanal ${loaded ? 'belastet' : 'ruhig'}`);
+  sendCopy(true, 'neue DM');
+  if (scn.offline) {
+    log('grey', `${B.name} ist aus bis ${fmt(OFFLINE_UNTIL)}`);
+    at(OFFLINE_UNTIL, () => { B.online = true; log('warn', `${B.name} bootet`);
+      const hey = () => { if (P.phase === 'done') return; const F = { type: 'HEY', id: newId('H'), src: 'B', hops: HOP_HEY, path: ['B'] }; B.own.add(F.id); transmit('B', F); if (S.t < HORIZON) at(HEY_EVERY, hey); };
+      at(HEY_FIRST, hey); });
+  }
+
+  S.stepOne = function () { if (!S.ev.length) { S.done = true; return false; } const e = S.ev.shift(); S.t = e.t; e.fn(); if (S.t > HORIZON) S.done = true; return true; };
+  S.runTo = function (T) { while (S.ev.length && S.ev[0].t <= T) S.stepOne(); S.t = Math.max(S.t, Math.min(T, HORIZON)); if (!S.ev.length || S.t >= HORIZON) S.done = true; };
+  S.finish = function () { let guard = 0; while (S.ev.length && S.t <= HORIZON && guard++ < 200000) { if (P.phase === 'done' && !S.ev.some(e => e.t <= S.t + 600)) break; S.stepOne(); } S.done = true; };
+  S.outcome = function () {
+    const shown = B.shown;
+    let txt, cls;
+    if (P.delivered) { txt = `zugestellt ${fmt(P.tAck)}`; cls = P.tAck > 600 ? 'late' : 'ok'; }
+    else if (P.failed) { txt = (shown ? 'angekommen, ' : 'verloren, ') + 'gemeldet'; cls = 'bad'; }
+    else if (P.silent) { txt = (shown ? 'angekommen, ' : 'verloren, ') + 'stumm'; cls = 'mute'; }
+    else { txt = 'offen'; cls = 'mute'; }
+    if (shown > 1) txt += `, ${shown}x angezeigt`;
+    return { txt, cls, shown, floods: P.floods, tAck: P.tAck };
+  };
+  return S;
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const el = { scn: $('scn'), fault: $('fault'), chan: $('chan'), seed: $('seed'), stages: $('stages'), play: $('play'), step: $('step'), fin: $('fin'), reset: $('reset'), speed: $('speed'), clock: $('clock'), svg: $('simsvg'), log: $('log'), desc: $('scndesc') };
+const userLinks = {};
+let sim = null, playing = false, lastReal = 0, stage = -1, logShown = 0;
+
+Object.keys(SCN).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = SCN[k].name; el.scn.appendChild(o); });
+function fillFaults() { const keep = el.fault.value; el.fault.innerHTML = ''; faultsFor(SCN[el.scn.value]).forEach(f => { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; el.fault.appendChild(o); }); if ([...el.fault.options].some(o => o.value === keep)) el.fault.value = keep; }
+function cfg() { return { scn: el.scn.value, fault: el.fault.value, chan: el.chan.value, seed: parseInt(el.seed.value, 10) || 1, stage }; }
+function reset() { playing = false; el.play.textContent = 'Start'; sim = makeSim(cfg(), userLinks); logShown = 0; el.log.innerHTML = ''; el.desc.textContent = SCN[el.scn.value].desc + ' Stoerung: ' + sim.fault.name + '.'; render(); }
+
+function render() {
+  const S = sim, svg = el.svg, t = S.t;
+  const vb = S.scn.nodes.some(n => n.y > 260) ? 300 : 300; svg.setAttribute('viewBox', `0 0 960 ${vb}`);
+  let h = '';
+  S.wires.forEach(w => { const a = S.nodes[w.a], b = S.nodes[w.b]; h += `<line class="simlink wire" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`; });
+  S.links.forEach(L => { const a = S.nodes[L.a], b = S.nodes[L.b]; const hasRule = L.rules.some(r => r.n > 0); const cls = L.user !== 'ok' ? L.user : (L.rules.some(r => r.n === Infinity) ? 'down' : hasRule ? 'next' : ''); h += `<line class="simlink ${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><line class="simlink hit" data-key="${L.key}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`; });
+  S.pk.forEach(p => {
+    const a = S.nodes[p.from], b = S.nodes[p.to]; const end = p.status === 'drop' ? p.t1 + 2 : p.t1 + 0.6;
+    if (t < p.t0 || t > end) return;
+    let f = Math.min(1, (t - p.t0) / (p.t1 - p.t0)); if (p.status === 'drop') f = Math.min(f, 0.6);
+    const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+    if (p.status === 'drop' && t >= p.t0 + (p.t1 - p.t0) * 0.6) h += `<path class="dropx" d="M${x - 7} ${y - 7} L${x + 7} ${y + 7} M${x + 7} ${y - 7} L${x - 7} ${y + 7}"/>`;
+    else if (p.status === 'offline' && t >= p.t1) h += `<path class="dropx" style="stroke:#5b6b7b" d="M${x - 7} ${y - 7} L${x + 7} ${y + 7} M${x + 7} ${y - 7} L${x - 7} ${y + 7}"/>`;
+    else h += `<circle class="pkt ${p.type}" cx="${x}" cy="${y}" r="7"/><text class="pktlabel" x="${x + 9}" y="${y - 8}">${p.label}</text>`;
+  });
+  S.scn.nodes.forEach(n0 => { const n = S.nodes[n0.id]; const cls = n.kind + (n.online ? '' : ' offline');
+    const w = n.kind === 'server' ? 90 : 76;
+    h += `<rect class="simnode ${cls}" x="${n.x - w / 2}" y="${n.y - 16}" width="${w}" height="32" rx="7"/><text x="${n.x}" y="${n.y + 4}" text-anchor="middle" style="font-size:11px;font-weight:600">${n.name}</text>`;
+    let badge = '';
+    if (n.kind === 'sender') { const P = S.P; badge = P.delivered ? 'zugestellt' : P.failed ? 'Fehlschlag gemeldet' : P.silent ? 'stumm aufgegeben' : P.phase === 'l1' ? (P.heard ? 'Echo gehoert' : 'Echo-Fenster') : P.phase === 'wait' ? (P.custodyUntil > t ? 'Obhut' : 'wartet') : ''; badge += ` | Flutungen ${P.floods}`; }
+    else if (n.kind === 'dest') badge = n.online ? `Anzeige ${n.shown} | Ring ${n.dedup.size}` : 'aus';
+    else if (n.kind !== 'server') badge = `Ring ${n.dedup.size}`;
+    if (badge) h += `<text class="badge" x="${n.x}" y="${n.y + 30}" text-anchor="middle">${badge}</text>`;
+  });
+  svg.innerHTML = h;
+  el.clock.textContent = 't = ' + fmt(t);
+  while (logShown < S.log.length) { const L = S.log[logShown++]; const d = document.createElement('div'); d.className = L.cls; d.textContent = fmt(L.t).padStart(7) + '  ' + L.text; el.log.appendChild(d); }
+  el.log.scrollTop = el.log.scrollHeight;
+  const o = S.outcome();
+  $('m_result').textContent = o.txt; $('m_tack').textContent = o.tAck != null ? fmt(o.tAck) : '-'; $('m_shown').textContent = o.shown; $('m_tx').textContent = S.m.tx; $('m_air').textContent = S.m.air.toFixed(1).replace('.', ',') + ' s'; $('m_dedup').textContent = S.m.dedup;
+}
+
+function frame(now) {
+  if (!playing) return;
+  const dt = Math.min(0.1, (now - lastReal) / 1000); lastReal = now;
+  sim.runTo(sim.t + dt * parseFloat(el.speed.value));
+  render();
+  if (sim.done || (sim.P.phase === 'done' && !sim.ev.some(e => e.t <= sim.t + 30))) { playing = false; el.play.textContent = 'Start'; sim.done = true; }
+  else requestAnimationFrame(frame);
+}
+el.play.addEventListener('click', () => { if (sim.done) reset(); playing = !playing; el.play.textContent = playing ? 'Pause' : 'Start'; if (playing) { lastReal = performance.now(); requestAnimationFrame(frame); } });
+el.step.addEventListener('click', () => { playing = false; el.play.textContent = 'Start'; sim.stepOne(); render(); });
+el.fin.addEventListener('click', () => { playing = false; el.play.textContent = 'Start'; sim.finish(); render(); });
+el.reset.addEventListener('click', reset);
+el.scn.addEventListener('change', () => { fillFaults(); reset(); });
+el.fault.addEventListener('change', reset); el.chan.addEventListener('change', reset); el.seed.addEventListener('change', reset);
+el.stages.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; stage = parseInt(b.dataset.st, 10); [...el.stages.children].forEach(x => x.classList.toggle('on', x === b)); reset(); });
+el.svg.addEventListener('click', e => { const t = e.target.closest('.hit'); if (!t) return; const k = t.dataset.key; const L = sim.links.find(l => l.key === k); const next = { ok: 'next', next: 'down', down: 'ok' }[L.user]; L.user = next; userLinks[k] = next; sim.log.push({ t: sim.t, cls: 'warn', text: `Link ${k.replace('|', ' - ')}: ${next === 'ok' ? 'normal' : next === 'next' ? 'verliert naechsten Frame' : 'dauerhaft gestoert'}` }); render(); });
+
+// ---------- Matrix ----------
+$('runmatrix').addEventListener('click', () => {
+  const seed = parseInt(el.seed.value, 10) || 1, tbl = $('matrix'), stages = [-1, 0, 1, 2], chans = ['quiet', 'loaded'];
+  const t0 = performance.now();
+  let h = '<tr><th>Szenario</th><th>Stoerung</th>' + chans.map(c => stages.map(s => `<th>${s < 0 ? 'heute' : 'Stufe ' + s}<br><span class="small">${c === 'quiet' ? 'ruhig' : 'belastet'}</span></th>`).join('')).join('') + '</tr>';
+  let runs = 0;
+  Object.keys(SCN).forEach(sk => faultsFor(SCN[sk]).forEach(f => {
+    h += `<tr><td>${SCN[sk].name}</td><td>${f.name}</td>`;
+    chans.forEach(c => stages.forEach(s => { const S = makeSim({ scn: sk, fault: f.id, chan: c, seed, stage: s }, null); S.finish(); const o = S.outcome(); runs++;
+      h += `<td class="${o.cls}" data-scn="${sk}" data-fault="${f.id}" data-chan="${c}" data-st="${s}">${o.txt}<br><span class="small">F${o.floods}, ${S.m.tx} TX, ${S.m.air.toFixed(0)} s</span></td>`; }));
+    h += '</tr>';
+  }));
+  tbl.innerHTML = h;
+  $('matrixinfo').textContent = `${runs} Laeufe, Seed ${seed}, ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+});
+$('matrix').addEventListener('click', e => { const td = e.target.closest('td[data-scn]'); if (!td) return; el.scn.value = td.dataset.scn; fillFaults(); el.fault.value = td.dataset.fault; el.chan.value = td.dataset.chan; stage = parseInt(td.dataset.st, 10); [...el.stages.children].forEach(x => x.classList.toggle('on', parseInt(x.dataset.st, 10) === stage)); reset(); $('sim').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+window.__sim = { makeSim, SCN, faultsFor };
+fillFaults(); reset();
+})();
+</script>
+</body>
+</html>

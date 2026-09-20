@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshCom Wire Format</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F7F8; --panel:#FFFFFF; --ink:#1A222B; --ink-2:#4B5762; --mute:#7C8791;
+  --rule:#D8DFE5; --accent:#1F6F86; --accent-ink:#155463; --code-bg:#EEF2F4; --hi:#FFF3D6; --mark:#B8611A;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10161B; --panel:#161E25; --ink:#E4EAEE; --ink-2:#B3BEC7; --mute:#7F8C97;
+  --rule:#26323B; --accent:#5FBFD6; --accent-ink:#8ED5E6; --code-bg:#1B252D; --hi:#3A2E12; --mark:#E0A15A;
+}}
+:root[data-theme="dark"]{
+  --bg:#10161B; --panel:#161E25; --ink:#E4EAEE; --ink-2:#B3BEC7; --mute:#7F8C97;
+  --rule:#26323B; --accent:#5FBFD6; --accent-ink:#8ED5E6; --code-bg:#1B252D; --hi:#3A2E12; --mark:#E0A15A;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.6;padding-inline:20px;padding-block:0 64px}
+a{color:var(--accent-ink);text-decoration-thickness:1px;text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mast{max-width:1180px;margin:0 auto;padding-block:36px 20px;border-bottom:1px solid var(--rule)}
+.mast .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.mast h1{font-size:clamp(26px,3.2vw,38px);line-height:1.15;margin:0 0 12px;font-weight:600;letter-spacing:-.01em;text-wrap:balance;max-width:26ch}
+.mast .sub{color:var(--ink-2);margin:0;max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--mute)}
+.meta b{color:var(--ink-2);font-weight:500}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:48px;padding-top:28px}
+nav.toc{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto;font-size:13.5px;line-height:1.45;padding-right:8px}
+nav.toc .toc-h{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+nav.toc a{display:block;color:var(--ink-2);text-decoration:none;padding:4px 0 4px 10px;border-left:2px solid transparent}
+nav.toc a.toc-3{padding-left:22px;font-size:13px;color:var(--mute)}
+nav.toc a:hover{color:var(--ink)}
+nav.toc a.on{color:var(--accent-ink);border-left-color:var(--accent)}
+main{min-width:0}
+main p,main li{max-width:72ch}
+main h2{font-size:23px;font-weight:600;letter-spacing:-.01em;margin:56px 0 14px;padding-top:18px;border-top:1px solid var(--rule);text-wrap:balance}
+main h2:first-child{margin-top:0;border-top:0;padding-top:0}
+main h3{font-size:17.5px;font-weight:600;margin:34px 0 10px;text-wrap:balance}
+main h4{font-size:15px;font-weight:600;margin:26px 0 8px;color:var(--ink-2);text-wrap:balance}
+main h2 code,main h3 code,main h4 code{font-size:.92em}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
+pre{background:var(--code-bg);border:1px solid var(--rule);border-radius:4px;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.5;margin:14px 0}
+pre code{background:none;padding:0;font-size:inherit}
+.tbl{overflow-x:auto;margin:14px 0;border:1px solid var(--rule);border-radius:4px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:500;background:var(--code-bg);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+blockquote{margin:14px 0;padding:10px 16px;border-left:3px solid var(--mark);background:var(--hi);color:var(--ink);border-radius:0 4px 4px 0}
+blockquote p{margin:0}
+strong{font-weight:600}
+hr{border:0;border-top:1px solid var(--rule);margin:40px 0}
+ul,ol{padding-left:22px}
+li{margin:4px 0}
+.top{position:fixed;right:18px;bottom:18px;font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--rule);color:var(--ink-2);padding:6px 10px;border-radius:4px;text-decoration:none}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;gap:20px}
+  nav.toc{position:static;max-height:none;border:1px solid var(--rule);border-radius:4px;padding:12px 14px;background:var(--panel);columns:2;column-gap:20px}
+  nav.toc .toc-h{column-span:all}
+  nav.toc a{break-inside:avoid}
+}
+@media (max-width:520px){nav.toc{columns:1}}
+</style>
+</head>
+<body>
+<header class="mast">
+  <p class="eyebrow">MeshCom firmware · docs/architecture/11-wire-format.md</p>
+  <h1>MeshCom Wire Format</h1>
+  <p class="sub">LoRa on-air frames, server UDP on port 1990, the EXTUDP JSON sideband on port 1799, and the BLE phone protocol, described from the firmware source with byte-level examples captured on the air.</p>
+  <div class="meta"><span><b>Baseline</b> 4.35p, 2026-08-21</span><span><b>§1.8 added</b> 2026-09-11 · fork-main c6ac16bd</span><span><b>Vectors</b> test/test_aprs_corpus · pio test -e native_aprs</span></div>
+</header>
+<div class="wrap">
+<nav class="toc" aria-label="Contents"><p class="toc-h">Contents</p>
+<a class="toc-2" href="#1-lora-on-air-frame">1. LoRa on-air frame</a>
+<a class="toc-3" href="#1-1-layout">1.1 Layout</a>
+<a class="toc-3" href="#1-2-byte-5-flags-hop">1.2 Byte 5 — flags + hop</a>
+<a class="toc-3" href="#1-3-fcs">1.3 FCS</a>
+<a class="toc-3" href="#1-4-path-and-destination">1.4 Path and destination</a>
+<a class="toc-3" href="#1-5-acknowledgements">1.5 Acknowledgements</a>
+<a class="toc-3" href="#1-6-annotated-example-captured-on-air">1.6 Annotated example (captured on air)</a>
+<a class="toc-3" href="#1-7-control-payloads-in-text-frames">1.7 Control payloads in text frames</a>
+<a class="toc-3" href="#1-8-position-comment-tail-the-x-key-space">1.8 Position comment tail: the <code>/X=</code> key space</a>
+<a class="toc-2" href="#2-server-udp-protocol-port-1990">2. Server UDP protocol (port 1990)</a>
+<a class="toc-3" href="#2-1-node-server">2.1 Node → server</a>
+<a class="toc-3" href="#2-2-server-node">2.2 Server → node</a>
+<a class="toc-2" href="#3-extudp-json-sideband-port-1799">3. EXTUDP JSON sideband (port 1799)</a>
+<a class="toc-2" href="#4-ble-phone-protocol">4. BLE phone protocol</a>
+<a class="toc-3" href="#4-1-hello-handshake-and-app-layer-pin">4.1 Hello handshake and app-layer PIN</a>
+<a class="toc-3" href="#4-2-post-hello-config-burst">4.2 Post-hello config burst</a>
+<a class="toc-3" href="#4-3-node-phone-notifications">4.3 Node → phone notifications</a>
+<a class="toc-3" href="#4-4-phone-node-writes">4.4 Phone → node writes</a>
+<a class="toc-2" href="#5-adjacent-protocol-interlink-not-spoken-by-the-firmware">5. Adjacent protocol: INTERLINK (not spoken by the firmware)</a>
+<a class="toc-2" href="#6-reference-vectors">6. Reference vectors</a>
+</nav>
+<main>
+<p>Status: <strong>descriptive reference</strong>, written 2026-08-21 against firmware 4.35p
+(branch <code>v4.35p_prio</code>). This document describes what the code actually does,
+with <code>file:line</code> anchors into this repository and byte-level examples taken
+from frames captured on the air (433.175 MHz, raw-frame capture hook in
+<code>OnRxDone()</code>, see doc 08 §4). It is not an upstream-normative specification;
+where the wire format is ambiguous, the decoder in <code>src/aprs_functions.cpp</code>
+is the authority this document follows.</p>
+<p>Addendum: §1.8 (the <code>/X=</code> position-comment key space) was added 2026-09-11
+against firmware <code>fork-main</code> <code>c6ac16bd</code> (v4.35t base); the rest of this
+document is unchanged from the 4.35p baseline above.</p>
+<p>Purpose: precise enough to implement <strong>mock services and test doubles</strong> for
+<code>mc-chat</code>, <code>MCProxy</code> and <code>mcmap</code> — a fake node, a fake gateway, a fake server,
+and a fake BLE peripheral. Machine-readable companion vectors live in
+<code>test/test_aprs_corpus/corpus.txt</code> (raw frames) and <code>golden.txt</code> (decoded
+fields), regression-fenced by <code>pio test -e native_aprs</code>. A larger field corpus
+harvested from production logs (<code>tools/logharvest.py</code>) lives in
+<code>test/test_aprs_fuzz/</code> and <code>test/test_aprs_reencode/</code>, fenced by
+<code>pio test -e native_aprs_fuzz</code>.</p>
+<p>The re-encode vectors are worth singling out as evidence for §1.1 and §1.3:
+across 2.422 distinct frames heard in 32,7 h from eleven different hardware ids
+and two firmware generations, <code>encodeAPRS()</code> reproduces the sender&#39;s byte-sum
+<strong>every time</strong>, and the frame length in all but one case. That one is a sender
+that omits the <code>0x7E</code> end marker — which is why the trailer is described below
+as &quot;parsed if present&quot;.</p>
+<p>Layers covered:</p>
+<ol>
+<li><a href="#1-lora-on-air-frame">LoRa on-air frame</a> — what nodes exchange over radio</li>
+<li><a href="#2-server-udp-protocol-port-1990">Server UDP protocol</a> — gateway ↔ MeshCom server (OE/DL)</li>
+<li><a href="#3-extudp-json-sideband-port-1799">EXTUDP JSON sideband</a> — node ↔ local consumer (MCProxy et al.)</li>
+<li><a href="#4-ble-phone-protocol">BLE phone protocol</a> — node ↔ app (Nordic UART service)</li>
+</ol>
+<hr>
+<h2 id="1-lora-on-air-frame">1. LoRa on-air frame</h2>
+<p>Decoder: <code>decodeAPRS()</code> (<code>src/aprs_functions.cpp:122</code>); encoder:
+<code>encodeStartAPRS()</code>/<code>encodePayloadAPRS()</code>/<code>encodeAPRS()</code>
+(<code>src/aprs_functions.cpp:1012–1122</code>). Maximum frame size is 255 bytes
+(<code>UDP_TX_BUF_SIZE</code>); frames shorter than 16 bytes are rejected.</p>
+<h3 id="1-1-layout">1.1 Layout</h3>
+<pre><code>offset  size  field
+0       1     payload type: 0x3A &#39;:&#39; text | 0x21 &#39;!&#39; position | 0x40 &#39;@&#39; hey/weather
+1       4     msg_id, unsigned 32-bit LITTLE-ENDIAN
+5       1     flags + hop nibble (see 1.2)
+6       var   source path, printable ASCII, terminated by &#39;&gt;&#39;   (max 120 bytes)
+..      var   destination, printable ASCII, terminated by a REPEAT of the type byte
+..      var   payload, ASCII, terminated by 0x00
+..      1     HW id of the ORIGINATING node (hardware table, e.g. 9=RAK4631, 43=Heltec V3)
+..      1     MOD byte: (modulation &amp; 0x0F) | (country_code &lt;&lt; 4)
+..      2     FCS, BIG-ENDIAN 16-bit (see 1.3)
+..      1     FW version of originator (decimal, e.g. 35 = 4.35; values 1..34 are rejected)
+..      1     LASTHW: bit7 = &quot;last sender is gateway/… flag&quot;, bits 0..6 = HW id of the LAST hop
+..      1     FW sub-version, ASCII char (e.g. &#39;p&#39;); 0x00 and 0x7E are read back as &#39;#&#39;
+..      1     0x7E end marker
+</code></pre>
+<p>The trailer fields after the FCS (FW, LASTHW, FW-sub, 0x7E) are parsed
+&quot;if present&quot; by the decoder (<code>aprs_functions.cpp:446–481</code>) — robust decoders
+must tolerate their absence, encoders must always write all of them
+(<code>encodeAPRS()</code> does).</p>
+<p><strong>msg_id composition.</strong> The 32-bit msg_id is not opaque: firmware nodes build
+it as <code>((gw_id &amp; 0x3FFFFF) &lt;&lt; 10) | (counter &amp; 0x3FF)</code> — 22 bits of the
+node&#39;s gateway id (MAC-derived), low 10 bits a per-node message counter
+(<code>src/loop_functions.cpp:3119</code> and five sibling sites). The counter wraps at
+<strong>1000, not 1024</strong>: every site that advances <code>node_msgid</code> clamps it to 999
+(<code>loop_functions.cpp:3131–3133</code>), because the ack-request suffix <code>{NNN</code> is
+rendered <code>%03i</code> from the same counter — 1000..1023 would have no 3-digit
+representation and a peer&#39;s <code>:ackNNN</code> would match the wrong message. A mock
+node must reproduce both the composition and the 0..999 wrap
+(cross-validated against <code>mc-chat/meshcom_mock/protocol.py</code>, which documents
+the same constraint independently).</p>
+<h3 id="1-2-byte-5-flags-hop">1.2 Byte 5 — flags + hop</h3>
+<p><code>src/aprs_functions.cpp:160–172</code> (decode), <code>:1025–1037</code> (encode):</p>
+<pre><code>bit 7  0x80  msg_server   frame has passed a gateway/server
+bit 6  0x40  msg_track    tracking flag
+bit 5  0x20  msg_app_offline  set by a gateway when re-emitting a server frame
+bit 4  0x10  msg_mesh     mesh (relay) enabled — encoder sets it from bMESH
+bits 0-3     max_hop      remaining hop budget (decrements on relay)
+</code></pre>
+<p>Defaults: text messages start with <code>max_hop</code> 4, positions with 2
+(<code>MAX_HOP_TEXT_DEFAULT</code>/<code>MAX_HOP_POS_DEFAULT</code>, <code>src/configuration_global.h:162</code>).</p>
+<h3 id="1-3-fcs">1.3 FCS</h3>
+<p>Plain 16-bit <strong>byte sum</strong> (not a CRC): sum of all frame bytes from offset 0
+up to and <strong>including</strong> the HW and MOD bytes, stored big-endian
+(<code>aprs_functions.cpp:417–428</code> decode, <code>:1086–1097</code> encode). Frames failing
+the FCS check are discarded silently unless they originate from the node
+itself.</p>
+<h3 id="1-4-path-and-destination">1.4 Path and destination</h3>
+<ul>
+<li>Source path: comma-separated callsign list, <strong>originator first</strong>; each relay
+appends its own callsign. <code>msg_source_call</code> = first element,
+<code>msg_source_last</code> = last element. Both must pass the callsign regex
+(<code>checkRegexCall</code>, <code>src/regex_functions.cpp</code>); frames failing it are dropped.</li>
+<li>Destination: <code>*</code> = broadcast; a numeric group (<code>9999</code>, <code>20</code>, …); or a
+callsign for a direct message (DM). Non-group destinations must pass the
+callsign regex too.</li>
+<li>HEY beacons are <code>0x40</code> frames with destination <code>H</code> (<code>HG</code> from gateways) and
+payload like <code>R0;</code> (trickle neighbor discovery); weather frames share type
+<code>0x40</code> with other destinations. Each hop that handles a HEY appends a signal
+report <code>NCT,RSSI,SNR;</code> to the payload (<code>appendHeySignalReport</code>,
+<code>src/aprs_functions.cpp</code>) — mesh relays before re-transmitting, gateways
+before the UDP upload — e.g. <code>R0;5,118,7;</code> (5 neighbors, −118 dBm, +7 dB).</li>
+</ul>
+<h3 id="1-5-acknowledgements">1.5 Acknowledgements</h3>
+<ul>
+<li><p>A DM requests an ack by appending <code>{NNN</code> to its payload — <strong>no closing
+brace</strong> — where <code>NNN</code> is the sender&#39;s 3-digit message counter
+(<code>sendMessage()</code>, <code>src/loop_functions.cpp:3454</code>). One firmware path does
+emit a closing brace: <code>{pong}{NNN}</code> replies (<code>:3208</code>) — parsers should
+accept <code>{NNN</code> with an optional trailing <code>}</code>.</p>
+</li>
+<li><p>The addressed node answers with a normal <strong>text frame</strong> (<code>0x3A</code>) whose
+payload is built <code>%-9.9s:ack%03i</code> (<code>src/loop_functions.cpp:4198</code>) — the
+destination callsign space-padded/truncated to <strong>exactly 9 characters</strong>,
+then <code>:ackNNN</code> (or <code>:rejNNN</code>), e.g.
+<code>DK5EN-98,DK5EN-91&gt;DK5EN-90:DK5EN-90 :ack063</code> (the space is the padding).
+Parsers should match <code>:ack[0-9]+</code> anywhere in the payload rather than
+assume a separator.</p>
+</li>
+<li><p>Additionally, gateways emit a <strong>compact 12-byte binary ack</strong> for
+broadcast/group/WLNK/SOTA messages (<code>src/lora_functions.cpp:1078–1095</code>,
+captured on air as corpus frames <code>f008</code>/<code>f009</code>):</p>
+<pre><code>[0]     0x41  MSG_TYPE_ACK
+[1..4]  this ack frame&#39;s own msg_id, LE (derived from millis())
+[5]     0x80 (server flag) | max_hop nibble
+[6..9]  the ACKED message&#39;s msg_id, LE
+[10]    ack level: 0x00 node, 0x01 gateway
+[11]    0x00 terminator
+</code></pre>
+<p>Note: no path, no FCS, no trailer. <code>decodeAPRS()</code> classifies these by
+returning <code>0x41</code> without filling any fields (<code>aprs_functions.cpp:130</code>);
+the actual processing happens in the RX path of <code>lora_functions.cpp</code>.</p>
+</li>
+<li><p><code>0x3C</code> (<code>&lt;</code>, LoRa-APRS) frames are passed through undecoded.</p>
+</li>
+</ul>
+<h3 id="1-6-annotated-example-captured-on-air">1.6 Annotated example (captured on air)</h3>
+<p>Corpus frame <code>f001</code> — position beacon, DL2JA-1 relayed by DL2JA-2, received
+at RSSI −109 dBm:</p>
+<pre><code>21                                       type &#39;!&#39; position
+AB 13 F1 E9                              msg_id = 0xE9F113AB (LE)
+91                                       flags: 0x80 server | 0x10 mesh; hop = 1
+44 4C 32 4A 41 2D 31 2C                  &quot;DL2JA-1,&quot;
+44 4C 32 4A 41 2D 32 3E                  &quot;DL2JA-2&gt;&quot;
+2A                                       &quot;*&quot; destination (broadcast)
+21                                       &#39;!&#39; destination terminator (= type byte)
+34 38 32 35 2E 33 35 4E 5C ...           payload &quot;4825.35N\01147.19E-Marzling#Werner/R=9;&quot;
+00                                       payload terminator
+2B                                       HW id 0x2B = 43 (Heltec V3)
+88                                       MOD: mod 8, country 8 (EU8)
+13 2F                                    FCS = 0x132F (big-endian byte sum)
+23                                       FW version 0x23 = 35 (4.35)
+AB                                       LASTHW: 0x80 flag | hw 0x2B
+70                                       FW sub &#39;p&#39;
+7E                                       end marker
+</code></pre>
+<h3 id="1-7-control-payloads-in-text-frames">1.7 Control payloads in text frames</h3>
+<p>Some <code>0x3A</code> text payloads are control traffic, not chat. The receiving node
+consumes them in <code>loop_functions.cpp</code> and marks them no-retransmission
+(<code>:3527</code>, ring status <code>0xFF</code>):</p>
+<div class="tbl"><table><thead><tr>
+<th>Prefix</th>
+<th>Meaning</th>
+</tr>
+</thead><tbody><tr>
+<td><code>{CET}YYYY-MM-DD HH:MM:SS</code></td>
+<td>Server time sync (<code>:2228</code>). Accepted only when the node has no RTC, no GPS fix and no valid NTP time; years ≤ 2023 are ignored.</td>
+</tr>
+<tr>
+<td><code>{SET}N;M;</code></td>
+<td>Server sets the node&#39;s hop budgets: <code>max_hop_text</code> and <code>max_hop_pos</code>, parsed <code>%d;%d;</code> (<code>:2219</code>).</td>
+</tr>
+<tr>
+<td><code>{MCP}…</code> / <code>{mcp}…</code></td>
+<td>Remote IO switching (<code>:2141</code>): payload carries a 3-digit sequence check derived from the frame&#39;s own <code>msg_id &amp; 0x3FF</code>, a password checked against <code>node_passwd</code>, and `A</td>
+</tr>
+<tr>
+<td><code>{ping}</code> / <code>{pong}</code></td>
+<td>Connectivity test with RSSI/SNR display echo (<code>:2115</code>).</td>
+</tr>
+<tr>
+<td><code>:ackNNN</code> / <code>:rejNNN</code></td>
+<td>Text-level acknowledgement (§1.5).</td>
+</tr>
+</tbody></table></div>
+<h3 id="1-8-position-comment-tail-the-x-key-space">1.8 Position comment tail: the <code>/X=</code> key space</h3>
+<p>Encoder: <code>PositionToAPRS()</code> (<code>src/loop_functions.cpp:4200-4495</code>); decoder:
+<code>decodeAPRSPOS()</code> (<code>src/aprs_functions.cpp:556-1087</code>). This section covers
+only the comment/tag portion of a position payload — the lat/lon head is
+already covered by §1.1/§1.6.</p>
+<h4 id="1-8-1-grammar">1.8.1 Grammar</h4>
+<p>The on-air position payload (frame type byte <code>0x21</code> from §1.1, followed by
+the string <code>PositionToAPRS()</code> returns) is:</p>
+<pre><code>! ddmm.mm &lt;N|S&gt; &lt;symbol-table-char&gt; dddmm.mm &lt;E|W&gt; &lt;symbol-char&gt; [atxt] [#name] [tail]
+</code></pre>
+<ul>
+<li><code>ddmm.mm</code>/<code>dddmm.mm</code>: <code>%07.2lf</code>/<code>%08.2lf</code> degrees-minutes
+(<code>loop_functions.cpp:4492</code>).</li>
+<li><code>atxt</code>: free-text comment, optional, ≤ 25 bytes, UTF-8-safe truncated
+(<code>charset_utf8_safe_truncate</code>, <code>:4280</code>) and CHR-02-filtered — the bytes
+<code>{ } : ; , /</code> are stripped before truncation because each is structure
+elsewhere in the wire format (<code>src/charset_filter.h:71-89</code>; path
+<code>PositionToAPRS():4271-4284</code>).</li>
+<li><code>#name</code>: optional, <code>#</code> + <code>node_name</code> (<code>:4288</code>), only when a name is
+configured.</li>
+<li><code>tail</code>: the <code>/X=</code> key sequence, §1.8.2.</li>
+</ul>
+<p><strong>App-relevant fact</strong>: <code>tail</code> (if present) starts immediately after the
+symbol char only when both <code>atxt</code> and <code>#name</code> are absent — with either one
+present, a <code>split(&#39;/&#39;)</code>-style consumer must skip past it first, not assume a
+fixed offset. See §1.8.5 for the consequence.</p>
+<h4 id="1-8-2-the-17-keys">1.8.2 The 17 keys</h4>
+<p>One <code>snprintf</code> per key into its own small buffer, then concatenated in a
+fixed order (§1.8.3) into a single tail string. &quot;Branch&quot; is which half of
+<code>PositionToAPRS()</code> computes the value: the <code>bINA226ON</code> branch (<code>:4309-4333</code>),
+the plain-sensor <code>else</code> branch (<code>:4336-4419</code>), or code outside both (<code>/R=</code>,
+<code>/Y=</code>, <code>/D=</code> — computed unconditionally on their own gates).</p>
+<div class="tbl"><table><thead><tr>
+<th>Key</th>
+<th>printf format</th>
+<th>Unit / meaning</th>
+<th>Emit condition</th>
+<th>Branch</th>
+<th>Origin</th>
+</tr>
+</thead><tbody><tr>
+<td><code>/A=</code></td>
+<td><code>%06i</code> feet (<code>%05i</code> metres only if <code>bFuss=false</code>, no call site uses that)</td>
+<td>altitude, <code>conv_fuss(alt)</code> when <code>bFuss</code> (always true today)</td>
+<td><code>alt &gt; 0</code></td>
+<td>both</td>
+<td>upstream (<code>mcp23017-digital-field.md</code> §3)</td>
+</tr>
+<tr>
+<td><code>/B=</code></td>
+<td><code>%03d</code></td>
+<td>battery percent, sent at 0 % too (empty ≠ &quot;flat&quot;, it means &quot;no battery&quot;)</td>
+<td><code>battHardwarePresent()</code></td>
+<td>both</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/P=</code></td>
+<td><code>%.1f</code></td>
+<td>station pressure (QFE), hPa</td>
+<td><code>press &gt; 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/H=</code></td>
+<td><code>%.1f</code></td>
+<td>humidity, %</td>
+<td><code>hum &gt; 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/T=</code></td>
+<td><code>%.1f</code></td>
+<td>temperature, °C</td>
+<td><code>temp != 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/O=</code></td>
+<td><code>%.1f</code></td>
+<td>second/OneWire temperature, °C</td>
+<td><code>temp2 != 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/F=</code></td>
+<td><code>%i</code></td>
+<td><strong>pressure altitude in metres — not a pressure</strong> (<code>extern_tele_json.h:12-17</code>)</td>
+<td><code>qfe &gt; 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/Q=</code></td>
+<td><code>%.1f</code></td>
+<td>QNH, hPa</td>
+<td><code>qnh &gt; 0 &amp;&amp; !bMCU811ON &amp;&amp; !bBME680ON</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/G=</code></td>
+<td><code>%.1f</code></td>
+<td>BME680 gas resistance</td>
+<td><code>gasres &gt; 0 &amp;&amp; bBME680ON</code>; also sets <code>/V=3</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/C=</code></td>
+<td><code>%.0f</code></td>
+<td>CO2, ppm</td>
+<td><code>co2 &gt; 0 &amp;&amp; bMCU811ON</code>; also sets <code>/V=2</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/V=</code></td>
+<td>literal <code>2</code>, <code>3</code> or <code>5</code></td>
+<td>sensor-block version: <code>2</code>=MCU811/CO2, <code>3</code>=BME680/gas, <code>5</code>=INA226</td>
+<td>set by whichever of <code>/G=</code>/<code>/C=</code>/INA226 fired</td>
+<td>both</td>
+<td>upstream (meaning undocumented elsewhere)</td>
+</tr>
+<tr>
+<td><code>/N</code></td>
+<td><code>&quot;/N%i&quot;</code> — <strong>no <code>=</code></strong></td>
+<td>MHeard count, capped at 99</td>
+<td><code>getMheardCount() &gt; 0</code></td>
+<td>sensor only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/R=</code></td>
+<td><code>%i;</code> repeated, up to 6</td>
+<td>configured group-call list</td>
+<td>at least one non-zero <code>node_gcb[]</code> entry</td>
+<td>outside both</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/Y=</code></td>
+<td>literal <code>1</code></td>
+<td>telemetry-beacon flag</td>
+<td><code>bSsendTele</code></td>
+<td>outside both</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/D=</code></td>
+<td><code>%s</code>, 8 chars of <code>0</code>/<code>1</code></td>
+<td>MCP23017 port A input bits, GPA0 first</td>
+<td><code>bMCP23017</code> (chip answered at boot)</td>
+<td>outside both</td>
+<td><strong>fork-only</strong>, commit <code>b179fdff</code>, item 207</td>
+</tr>
+<tr>
+<td><code>/U=</code></td>
+<td><code>%.2f</code></td>
+<td>INA226 bus voltage, V</td>
+<td>inside the INA226 branch</td>
+<td>INA226 only</td>
+<td>upstream</td>
+</tr>
+<tr>
+<td><code>/I=</code></td>
+<td><code>%.1f</code></td>
+<td>INA226 current, A</td>
+<td>inside the INA226 branch</td>
+<td>INA226 only</td>
+<td>upstream</td>
+</tr>
+</tbody></table></div>
+<p>Origin follows the letter table in <code>docs/mcp23017-digital-field.md</code> §3
+(&quot;letters in use in the beacon sensor tail at the time of the decision&quot;),
+against which <code>D</code> was the only free, newly-assigned letter.</p>
+<h4 id="1-8-3-concatenation-order-separator-rule-and-the-100-byte-budget">1.8.3 Concatenation order, separator rule, and the 100-byte budget</h4>
+<p>There is no explicit separator between keys — <strong>the leading <code>/</code> of each key
+is the separator</strong> — so a decoder must scan for <code>/X=</code> (or <code>/N</code> + digit)
+tokens, never split on <code>/</code> as a delimiter (that would also split inside
+<code>/R=232;2321;</code>, which itself has no trailing <code>/</code>).</p>
+<p>Fixed emission order, the <code>strncat</code> chain at <code>loop_functions.cpp:4458-4478</code>:</p>
+<pre><code>B  A  N  P  H  T  O  F  Q  G  C  R  (4 dead buffers, never written)  V  U  I  D  Y
+</code></pre>
+<p>Four buffers (<code>csfpegel</code>, <code>csfpegel2</code>, <code>csftemp</code>, <code>csfbatt</code>,
+<code>loop_functions.cpp:4259-4262,4470-4473</code>) are concatenated but never
+populated by any code path — reserved slots, currently always empty.</p>
+<p>The tail plus <code>atxt</code> plus <code>#name</code> share a 100-byte budget
+(<code>strconcat[100]</code>, <code>:4455</code>). If the combined length exceeds 100 bytes, the
+encoder drops fields in this order: <strong><code>atxt</code> first</strong> (<code>:4481-4484</code>), then
+<strong><code>#name</code></strong> (<code>:4486-4489</code>) — the <code>/X=</code> tail itself is never truncated or
+reordered, only the free-text comment and the node name are sacrificed.</p>
+<h4 id="1-8-4-decoder-tolerance">1.8.4 Decoder tolerance</h4>
+<p><code>decodeAPRSPOS()</code> reads <strong>14 of the 17</strong> keys — <code>/R=</code>, <code>/U=</code>, <code>/I=</code> have no
+scan loop and are silently ignored on receive, even though the same
+firmware emits them. Scan order (independent of the encoder&#39;s emission
+order, since each key has its own forward scan over the whole payload):</p>
+<pre><code>B  A  P  H  T  O  F  Q  G  N  C  V  Y  D
+</code></pre>
+<p>Per-key notes:</p>
+<ul>
+<li>Each numeric key&#39;s value is read into a 25-byte buffer with a 6-or-7
+character cap (<code>ipt &gt; 6</code> cuts the scan; <code>decode_text[25]</code> is never
+overrun) — <code>/A=</code>, <code>/B=</code>, <code>/P=</code>, <code>/H=</code>, <code>/T=</code>, <code>/O=</code>, <code>/F=</code>, <code>/Q=</code>, <code>/G=</code>,
+<code>/C=</code>, <code>/V=</code> all share this shape.</li>
+<li><code>/N</code> is matched only as <code>/N</code> immediately followed by a digit <code>1</code>-<code>9</code>
+(<code>:921</code>) — a leading <code>0</code> (never emitted by the encoder, since it only
+writes <code>/N</code> when <code>incnt &gt; 0</code>) would not match at all. The value itself is
+capped at 3 characters.</li>
+<li><code>/D=</code> requires <strong>exactly 8 characters</strong>, each <code>0</code> or <code>1</code>
+(<code>:1028-1076</code>); 7, 9+, or any non-binary character leaves <code>aprspos.din</code>
+empty rather than accepting a partial value. 9+ data bytes set an
+overflow flag instead of being copied, so a long garbage token cannot
+overrun the 25-byte scratch buffer.</li>
+<li><code>/Y=</code>&#39;s scan loop (<code>:999-1022</code>) is not preceded by a <code>memset</code> of
+<code>decode_text</code> the way every other loop is — it can read a stale digit
+left over from the <code>/V=</code> scan directly above it if <code>/Y=</code> itself is absent
+or short. Not a §1.8 fix, just a decode caveat worth knowing before
+trusting <code>aprspos.telemetry</code>.</li>
+<li>All 14 decoded keys are found independent of their position in the
+string and independent of each other&#39;s presence — the 14 loops each
+scan the full payload from <code>istarttext</code> on.</li>
+</ul>
+<h4 id="1-8-5-consumer-notes">1.8.5 Consumer notes</h4>
+<ul>
+<li><strong>Never <code>split(&#39;/&#39;)</code> the comment.</strong> A free-text <code>atxt</code> may legitimately
+contain digits after a <code>/</code> that is not a key marker once CHR-02&#39;s filter
+is bypassed by an older firmware or a foreign encoder; anchor on the
+known key letters (§1.8.2), not on the separator byte.</li>
+<li><strong><code>/A=</code> is 6-digit feet.</strong> The 5-digit metre form (<code>%05i</code>, <code>bFuss=false</code>)
+exists in the encoder but no call site passes <code>bFuss=false</code> today — a
+consumer that branches on digit count to pick feet vs. metres is
+defending against a form that cannot currently occur on this firmware.</li>
+<li><strong><code>/Q=</code> can be legitimately absent</strong> even on a node with a barometric
+sensor: it is suppressed whenever <code>bMCU811ON</code> or <code>bBME680ON</code> is set
+(<code>:4387</code>), so &quot;no <code>/Q=</code>&quot; does not mean &quot;no pressure sensor&quot;.</li>
+<li><strong><code>/F=</code> is metres, not hPa</strong> — despite sitting next to <code>/P=</code> (hPa) and
+<code>/Q=</code> (hPa) in the tail, treating it as a pressure produces a value off
+by roughly three orders of magnitude.</li>
+</ul>
+<p>For the state of MCProxy&#39;s, the phone app&#39;s, and the firmware&#39;s own
+decoder&#39;s handling of each key relative to this grammar — including which
+keys each consumer drops, mis-types, or reads at the wrong offset — see
+<code>docs/aprs-parser-drift-20260911.md</code> §2 (per-key drift matrix) and §3
+(frame/trailer drift).</p>
+<hr>
+<h2 id="2-server-udp-protocol-port-1990">2. Server UDP protocol (port 1990)</h2>
+<p>Gateway nodes exchange UDP datagrams with the MeshCom server
+(<code>meshcom.oevsv.at</code> / OE and DL hamnet servers). Port: <code>UDP_PORT 1990</code>
+(<code>src/configuration_global.h:86</code>). Implementations: <code>src/udp_functions.cpp</code>
+(ESP32/WiFi) and <code>src/nrf52/nrf_eth.cpp</code> (nRF52/W5100S Ethernet). The
+DRY-21 clone covers only the <strong>server → node receive path</strong> (<code>getUDP()</code>);
+the encode side (<code>sendKEEP()</code>/<code>addNodeData()</code>) is compiled once for both
+platforms (nRF52 calls into <code>udp_functions.cpp</code>, <code>nrf52_main.cpp:2963</code>).
+The cloned receive paths are <strong>not</strong> feature-identical (see §2.2, CONF).</p>
+<p>An upstream spec for this layer exists:
+<a href="https://github.com/icssw-org/MeshCom-Reflector">icssw-org/MeshCom-Reflector</a>,
+<code>protocolls/refelctor_connections.md</code> (typo in the upstream path). Treat it
+as informational only — it contains known factual errors (DATA row labeled
+<code>BEAT</code>; DATA byte 34 described as a 1-byte binary payload length where the
+firmware actually writes two ASCII modulation digits; <code>LOGN</code> length given as
+5 for a 4-char tag), catalogued with evidence in
+<code>mc-chat/doc/proto-deviations.md</code>. Where spec, firmware and live traffic
+disagree, the firmware wins. The spec&#39;s reflector side (<code>LOGN</code>/<code>CONN</code>,
+port 6901, server ↔ reflector) is out of scope here — nodes never speak it.</p>
+<p>This section is cross-validated against a second independent implementation:
+<code>mc-chat/meshcom_mock/</code> (softnodes live-connected to the OE and DL servers;
+<code>protocol.py</code> builds KEEP/DATA/positions, <code>decoder.py</code> parses everything the
+servers send). Its empirical record: 800+ positions and 7000+ chat messages
+decoded with the 36-byte DATA assumption, zero outer-framing failures.</p>
+<h3 id="2-1-node-server">2.1 Node → server</h3>
+<p><strong>KEEP</strong> (heartbeat, every <code>HEARTBEAT_INTERVAL</code> = 30 s; <code>sendKEEP()</code>,
+<code>src/udp_functions.cpp:1113</code>): ASCII, NUL-terminated —</p>
+<pre><code>&quot;KEEP&quot; + %08X gateway_id + %-9.9s callsign + %-4.4s version + %-1.1s sub + &lt;grc_ids&gt; + 0x00
+</code></pre>
+<p><code>gateway_id</code> is derived from the MAC (<code>macaddr[5..2]</code>), <code>grc_ids</code> is the
+node&#39;s group list as <code>NNN;NNN;…</code>. Example from the bench:
+<code>KEEP48A4690DDK5EN-90 4.35p20;232;262;9;26244;26244;</code>.</p>
+<p><strong>DATA</strong> (LoRa frame forwarded to the server; <code>addNodeData()</code>,
+<code>src/udp_functions.cpp:1154</code>): a fixed <strong>36-byte ASCII header</strong> followed by
+the raw LoRa frame of §1 —</p>
+<pre><code>&quot;DATA&quot; + %08X gateway_id + %-9.9s callsign + %-4.4s version + %-1.1s sub
+       + %4i rssi + %4i snr + &quot;03&quot;          (4+8+9+4+1+4+4+2 = 36 bytes)
+&lt;raw LoRa frame bytes&gt;
+</code></pre>
+<p>The trailing two bytes are <strong>ASCII modulation digits</strong>, hardcoded to <code>&quot;03&quot;</code>
+by the firmware (mode 3 = SF11/CR 4:6/BW 250 kHz; snprintf literal,
+<code>udp_functions.cpp:1077–1079</code>) — not a binary payload-length byte as the
+upstream spec claims. The LoRa frame always begins at offset 36; a decoder
+that trusted the spec&#39;s length-byte reading would find <code>0x30</code> (<code>&#39;0&#39;</code>) where
+the frame type belongs and decode nothing.</p>
+<p>The node also sends its <strong>own</strong> transmissions to the server through the same
+envelope (with rssi/snr 0).</p>
+<h3 id="2-2-server-node">2.2 Server → node</h3>
+<p>The first 4 bytes of each datagram are an indicator
+(<code>UDP_MSG_INDICATOR_LEN 4</code>; parsing: <code>getUDP()</code>, <code>src/nrf52/nrf_eth.cpp:255</code>
+and <code>src/udp_functions.cpp:144</code>):</p>
+<ul>
+<li><p><strong><code>GATE</code></strong> + raw LoRa frame — a frame the gateway shall transmit on LoRa.
+The node decodes it (§1), appends itself to the source path, sets
+<code>msg_app_offline</code> (0x20) and re-encodes before transmitting; acks embedded
+in such frames (<code>:ackNNN</code>) are forwarded to the BLE app with ack level
+<code>0x02</code> when they confirm the node&#39;s own message. Server control payloads
+(§1.7: <code>{CET}</code>, <code>{SET}</code>, …) arrive as <code>GATE</code>-wrapped text frames.</p>
+</li>
+<li><p><strong><code>CONF</code></strong> + config TLV sequence — <strong>nRF52 only</strong> (<code>nrf_eth.cpp:497–587</code>;
+the ESP32 <code>getUDP()</code> mentions CONF in a comment but has no code branch for
+it — only GATE and BEAT are handled, <code>udp_functions.cpp:148–151,382</code>):</p>
+<pre><code>0x00 &lt;len&gt; &lt;callsign bytes&gt;        assigned callsign (&quot;longname&quot;)
+0x01 &lt;len&gt; &lt;shortname bytes&gt;
+0x02 &lt;int32 LE&gt;                    latitude
+0x03 &lt;int32 LE&gt;                    longitude
+0x04 &lt;int32 LE&gt;                    altitude
+</code></pre>
+<p><strong>The TLV order is a hard wire-contract, not a convention</strong> — the firmware
+parser is offset arithmetic, not a general TLV scanner
+(<code>nrf_eth.cpp:532–581</code>): the callsign TLV (<code>0x00</code>) must come <strong>first</strong> or
+the entire datagram is discarded; the shortname TLV must immediately
+follow it, and it is <strong>effectively mandatory whenever coordinates are
+sent</strong> — the coordinate offset is computed as
+<code>2 + call_len + short_len + 2</code> (<code>:557</code>), which adds the two shortname
+header bytes even when the TLV is absent, so omitting it misaligns the
+<code>0x02/0x03/0x04</code> reads by two bytes and the coordinates are silently
+dropped; lat/lon/alt must then appear contiguously in exactly that
+order, 5 bytes each. A mock server must emit all five TLVs in the listed
+order (<code>tools/mock/meshcom_server.py</code> does).</p>
+</li>
+<li><p><strong><code>BEAT</code></strong> — server heartbeat response; the node only checks the 4-byte
+indicator and refreshes its link-alive timestamp (<code>last_upd_timer</code>). If no
+server traffic arrives for <code>MAX_HB_RX_TIME</code> = 65 s, the gateway re-runs
+DHCP/reconnect. The datagram does carry structure beyond the indicator —
+observed on the OE/DL servers and parsed by mc-chat
+(<code>meshcom_mock/decoder.py:_decode_beat_struct</code>):</p>
+<pre><code>&quot;BEAT&quot; + 0x00 + &lt;call_len 1B&gt; + &lt;callsign&gt;
+       [+ 0x01 + &lt;status_len 1B&gt; + &lt;status bytes&gt;]     (optional)
+</code></pre>
+<p>The firmware ignores everything after the indicator, but a mock <strong>server</strong>
+should emit the full form, and the server answers <strong>every</strong> KEEP with a
+BEAT — one datagram per 30 s heartbeat is the liveness signal mc-chat&#39;s
+softnodes build their connected-check on.</p>
+</li>
+</ul>
+<p>Datagrams whose <strong>trailing</strong> zero-run exceeds <code>MAX_ZEROS</code> = 6 bytes are
+discarded as corrupt — with two precision caveats a mock must know
+(<code>udp_functions.cpp:122–136</code>, clone <code>nrf_eth.cpp:210ff</code>): the counter scans
+non-overlapping 2-byte-aligned pairs and <strong>resets on any non-zero pair</strong>, so
+only a zero-run at the <em>end</em> of the datagram (aligned to even offsets)
+trips the check; a 7+ zero-byte run in the middle of an otherwise valid
+datagram passes real firmware. The mock server
+(<code>tools/mock/meshcom_server.py</code>) deliberately implements the stricter
+any-run reading — stricter than firmware is safe for a test double.</p>
+<hr>
+<h2 id="3-extudp-json-sideband-port-1799">3. EXTUDP JSON sideband (port 1799)</h2>
+<p>A local JSON-over-UDP feed for consumers on the LAN (MCProxy&#39;s UDP leg,
+telemetry sinks). Port <code>EXTERN_PORT 1799</code>; implementation
+<code>src/extudp_functions.cpp</code>. Enabled with <code>--extudp on</code>, peer set with
+<code>--extudpip &lt;ip&gt;</code>.</p>
+<p><strong>Node → peer</strong> (<code>sendExtern()</code>, <code>:321</code>): one JSON object per datagram, no
+terminator. Message example (captured):</p>
+<pre><code class="language-json">{
+  &quot;src_type&quot;: &quot;node&quot;,
+  &quot;type&quot;: &quot;msg&quot;,
+  &quot;src&quot;: &quot;DK5EN-90&quot;,
+  &quot;dst&quot;: &quot;9999&quot;,
+  &quot;msg&quot;: &quot;…&quot;,
+  &quot;msg_id&quot;: &quot;91A436A5&quot;,
+  &quot;firmware&quot;: &quot;4.35&quot;,
+  &quot;fw_sub&quot;: &quot;p&quot;,
+  &quot;rssi&quot;: 0,
+  &quot;snr&quot;: 0
+}
+</code></pre>
+<p><code>src_type</code> is <code>node</code> (own traffic), <code>lora</code> (received frames) or <code>udp</code>
+(server-gated frames). Received LoRa frames are forwarded with their real
+<code>rssi</code>/<code>snr</code>. Consumer-relevant edge rules (all <code>sendExtern()</code>):</p>
+<ul>
+<li>The position schema&#39;s longitude fields are <strong><code>long</code>/<code>long_dir</code></strong> —
+not <code>lon</code> (<code>:412–413</code>).</li>
+<li>Position frames additionally produce a <code>&quot;type&quot;:&quot;tele&quot;</code> companion datagram
+with sensor fields — but only for <code>src_type</code> <code>node</code> and <code>lora</code>, never for
+server-gated (<code>udp</code>) frames (<code>:448,468</code>).</li>
+<li>Text frames addressed to group <code>100001</code> produce <strong>no</strong> msg datagram at all
+(<code>:495</code>).</li>
+<li>HEY/weather frames (<code>0x40</code>) are never forwarded — the type dispatch ends
+in <code>else return</code> (<code>:530</code>).</li>
+</ul>
+<p><strong>Peer → node</strong> (<code>getExtern()</code>, <code>:218</code>): JSON commands —</p>
+<pre><code class="language-json">{&quot;type&quot;:&quot;msg&quot;,&quot;dst&quot;:&quot;*&quot;,&quot;msg&quot;:&quot;text&quot;}          send a message (dst ≤ 9 chars, msg ≤ 150)
+{&quot;type&quot;:&quot;tele&quot;,&quot;temp&quot;:23.3,&quot;hum&quot;:60,...}       inject telemetry (only if the node has
+                                               no real sensor hardware; triggers a beacon)
+</code></pre>
+<hr>
+<h2 id="4-ble-phone-protocol">4. BLE phone protocol</h2>
+<p>GATT: Nordic UART Service, <code>SERVICE_UUID 6E400001-B5A3-F393-E0A9-E50E24DCCA9E</code>,
+phone→node writes on <code>…0002</code>, node→phone notifications on <code>…0003</code>
+(<code>src/esp32/esp32_main.cpp:1644</code>; nRF52 uses the Adafruit BLE UART service
+with the same layout). Device name: <code>MC-&lt;id&gt;-&lt;CALLSIGN&gt;</code>. An independent,
+field-tested implementation of this layer exists in
+<code>MCProxy/src/mcapp/ble_protocol.py</code> and was used to cross-check this section.</p>
+<h3 id="4-1-hello-handshake-and-app-layer-pin">4.1 Hello handshake and app-layer PIN</h3>
+<p>After GATT connect the node stays silent — every notification path is gated
+on <code>isPhoneReady</code> (<code>src/phone_commands.cpp:62,160</code>), which only a valid hello
+sets. The phone opens with a <strong>hello write</strong> on <code>…0002</code>
+(<code>readPhoneCommand()</code>, <code>phone_commands.cpp:307–362</code>):</p>
+<pre><code>open hello:  04 10 20 30                       (len, type 0x10, magic 0x20 0x30)
+PIN hello:   24 10 20 30 &lt;32-byte SHA-256&gt;     (len 0x24 = 36; firmware accepts msg_len &gt;= 35, phone_commands.cpp:321)
+</code></pre>
+<p>MCProxy&#39;s live implementation builds exactly these forms
+(<code>build_hello_bytes()</code>, <code>MCProxy/ble_service/src/ble_adapter.py:335–345</code>;
+the identical-looking constant in <code>mcapp/config_loader.py</code> is dead code —
+cite the adapter). If the node has a BLE PIN
+configured (<code>--btcode</code>, <code>meshcom_settings.bt_code</code> in 1..999999), the hello
+must instead carry the SHA-256 hash of the PIN formatted as a zero-padded
+6-digit decimal string (<code>hash_pin()</code>, <code>phone_commands.cpp:227</code>); a missing or
+wrong hash makes the firmware drop the BLE connection
+(<code>ble_disconnect_requested</code>). With <code>bt_code == 0</code> the open hello is accepted.</p>
+<p>A valid hello sets <code>isPhoneReady = 1</code> and queues the <strong>config burst</strong>
+(§4.2). The phone is expected to send its <code>0x20</code> timestamp write after the
+hello (the node uses it to set its clock when it has no better source).</p>
+<h3 id="4-2-post-hello-config-burst">4.2 Post-hello config burst</h3>
+<p>On hello the main loop runs a fixed command list with BLE output enabled
+(<code>config_cmds[]</code>, <code>src/nrf52/nrf52_main.cpp:268</code> /
+<code>src/esp32/esp32_main.cpp:297</code>):</p>
+<pre><code>--info --seset --wifiset --nodeset --wx --pos --aprsset --io --tel [--analogset (ESP32 only)]
+</code></pre>
+<p>plus <code>sendMheard()</code> (one <code>MH</code> JSON per MHeard entry from the last 12 h).
+Each command emits one or two <code>0x44</code> JSON notifications (§4.3). After a 3 s
+settle and once both notification rings have drained, the node sends
+<code>{&quot;TYP&quot;:&quot;CONFFIN&quot;}</code> exactly once (<code>nrf52_main.cpp:1707–1748</code>,
+<code>sendConfigFinish()</code>, <code>src/command_functions.cpp:5513</code>). The burst happens
+once per genuine hello — a mock phone that reconnects without a new hello
+gets no re-send, and a mock node must reproduce the burst-then-CONFFIN order
+(MCProxy&#39;s cache hydration depends on it,
+<code>MCProxy/src/mcapp/ble_hydration_tests.py</code>).</p>
+<p><code>0x44</code> JSON schemas (producers in <code>src/command_functions.cpp</code>; all objects
+carry <code>&quot;TYP&quot;</code> as discriminator):</p>
+<div class="tbl"><table><thead><tr>
+<th>TYP</th>
+<th>source command</th>
+<th>fields</th>
+</tr>
+</thead><tbody><tr>
+<td><code>I</code></td>
+<td><code>--info</code></td>
+<td>FWVER, CALL, ID (gateway id), HWID, MAXV, BLE (&quot;long&quot;/&quot;short&quot;), BATP, BATV, GCB0…GCB5 (groups), CTRY, BOOST, BPIN</td>
+</tr>
+<tr>
+<td><code>SE</code>+<code>S1</code></td>
+<td><code>--seset</code></td>
+<td>SE: BME, BMP, BMP3, BMP3F, AHT, AHTF, BMXF, 680, 680F, 811, 811F, SS, LPS33, OW, OWPIN, OWF, USERPIN · S1: INA226, SHUNT, IMAX, SAMP, SHT, SHTF, 226, 226F</td>
+</tr>
+<tr>
+<td><code>SW</code>+<code>S2</code></td>
+<td><code>--wifiset</code></td>
+<td>SW: SSID, IP, GW, AP, DNS, SUB · S2: OWNIP, OWNGW, OWNMS, OWNDNS, OWNNTP, EUDP, EUDPIP, TXPOW</td>
+</tr>
+<tr>
+<td><code>SN</code></td>
+<td><code>--nodeset</code></td>
+<td>GW, WS, WSPWD, DISP, BTN, MSH, GPS, TRACK, UTCOF, TXP, MQRG, MSF, MCR, MBW, GWNPOS, NOALL, BLED, GWS, ASYM</td>
+</tr>
+<tr>
+<td><code>W</code></td>
+<td><code>--wx</code></td>
+<td>TEMP, TOFFI, TOUT, TOFFO, HUM, PRES, QNH, ALT, GAS, CO2, VBUS, VSHUNT, VAMP, VPOW</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td><code>--pos</code></td>
+<td>LAT, LON (signed decimal degrees), ALT, SAT, SFIX, HDOP, RATE, NEXT, DIST, DIRn, DIRo, DATE</td>
+</tr>
+<tr>
+<td><code>SA</code></td>
+<td><code>--aprsset</code></td>
+<td>ATXT, SYMID, SYMCD, NAME</td>
+</tr>
+<tr>
+<td><code>IO</code></td>
+<td><code>--io</code></td>
+<td>MCP23017, AxOUT, AxVAL, BxOUT, BxVAL (bit strings)</td>
+</tr>
+<tr>
+<td><code>TM</code></td>
+<td><code>--tel</code></td>
+<td>PARM, UNIT, FORMAT, EQNS, VALES, PTIME</td>
+</tr>
+<tr>
+<td><code>AN</code></td>
+<td><code>--analogset</code></td>
+<td>ESP32 only: APN, AFC, AK, AFL, ACK, ADC, ADCRAW, ADCE1, ADCE2, ADCSL, ADCOF, ADCAT</td>
+</tr>
+<tr>
+<td><code>MH</code></td>
+<td>(MHeard)</td>
+<td>CALL, DATE, TIME, PLT (payload type byte), HW, MOD, RSSI, SNR, DIST, PL, MESH, NCNT</td>
+</tr>
+<tr>
+<td><code>CONFFIN</code></td>
+<td><code>--conffin</code></td>
+<td>no further fields</td>
+</tr>
+</tbody></table></div>
+<p><code>MH</code> records are also pushed live as each frame updates the MHeard table
+(<code>updateMheard()</code>, <code>src/mheard_functions.cpp:331</code>).</p>
+<h3 id="4-3-node-phone-notifications">4.3 Node → phone notifications</h3>
+<p>Framing (<code>sendToPhone()</code>/<code>sendComToPhone()</code>, <code>src/phone_commands.cpp:50–220</code>):
+the first ring byte is a status/type byte, then:</p>
+<ul>
+<li><strong>Data frames (text/position)</strong>: prefix byte <code>0x40</code> (<code>&#39;@&#39;</code>) + the <strong>raw
+LoRa frame of §1</strong> + a 4-byte <strong>BIG-endian</strong> unix timestamp appended by
+the firmware (<code>addBLEOutBuffer()</code>, <code>src/loop_functions.cpp:563–568</code> —
+MSB first). So a notification starts <code>40 3A …</code> (text) or <code>40 21 …</code>
+(position) and ends <code>… 7E &lt;time ×4 BE&gt; &lt;pad&gt;</code>. A well-formed data
+notification has <code>0x7E</code> at offset −6 — a free integrity gate before
+trusting the trailer fields.</li>
+<li><strong>ACK frames</strong>: <code>40 41 &lt;orig_msg_id ×4 LE&gt; &lt;ack_level&gt; 00 &lt;time ×4 BE&gt; &lt;pad&gt;</code> — <strong>13 bytes on the wire</strong>. <code>ack_level</code>: <code>0x00</code> node-level ack,
+<code>0x01</code> heard/gateway ack, <code>0x02</code> &quot;own message confirmed&quot; — emitted both
+when a matched <code>:ack</code>/<code>:rej</code> arrives over RF
+(<code>src/lora_functions.cpp:868–896</code>) and via the server path
+(<code>src/udp_functions.cpp:277–284</code>).</li>
+<li><strong><code>0x44</code></strong>: JSON message (§4.2 schemas), sent unprefixed: <code>44 {…}</code>.</li>
+<li><strong>Command replies</strong>: responses to <code>--…</code> commands are <strong>full §1 text
+frames</strong> (<code>addBLECommandBack()</code>, <code>src/loop_functions.cpp:635–655</code>:
+source path <code>response</code>, destination <code>*</code>, encoded via <code>encodeAPRS()</code>) and
+travel the same <code>40 3A</code> data path — not bare ASCII.</li>
+<li>The senders still contain a <code>0x91</code> MHeard-binary branch, but no producer
+enqueues <code>0x91</code> records anymore — MHeard data travels as <code>MH</code> JSON.
+Treat <code>0x91</code> as legacy; a mock phone need not implement it.</li>
+</ul>
+<p><strong>Trailing pad bytes — count depends on the branch.</strong> Both senders transmit
+<code>blelen + 2</code> bytes (<code>phone_commands.cpp:129,203</code>), but <code>blelen</code> means
+different things: on the data/ACK path the ring length already includes the
+4-byte timestamp and the <code>0x40</code> prefix is written into byte 0, so exactly
+<strong>one</strong> pad byte follows the timestamp; on the <code>0x44</code> JSON path the payload
+starts at byte 0, so <strong>two</strong> pad bytes follow the JSON. A mock node that
+emits two pads on data frames shifts every trailer field by one.
+(<code>sendComToPhone</code>&#39;s non-JSON text branch frames differently again,
+<code>phone_commands.cpp:188–193</code> — currently dead: every producer on that ring
+is <code>0x44</code>.)</p>
+<p><strong>Size ceilings</strong> (a mock must respect all three): <code>0x44</code> register JSON is
+producer-clamped at <strong>245 bytes</strong> (<code>addBLEComToOutBuffer</code>,
+<code>src/loop_functions.cpp:607–611</code> — the binding limit, before any MTU);
+data-path ring entries are clamped at <code>UDP_TX_BUF_SIZE − 4</code> = 251
+(<code>:539</code>). ATT MTU is <strong>not uniform across the bench</strong>: nRF52 pins 250
+(<code>Bluefruit.configPrphConn(250)</code>, <code>src/nrf52/nrf52_ble.cpp:91</code>), ESP32
+NimBLE defaults to 255. The firmware never splits a notification across
+writes — oversized content is truncated at the source, not fragmented.</p>
+<p><strong>Which frames reach BLE</strong>: from RF, only text (<code>0x3A</code>) and position
+(<code>0x21</code>) frames are forwarded to the phone; HEY/weather (<code>0x40</code>) is not.
+The server GATE path however forwards all three types
+(<code>udp_functions.cpp:171</code>), so <code>40 40</code> notifications occur on gateway nodes
+only.</p>
+<h3 id="4-4-phone-node-writes">4.4 Phone → node writes</h3>
+<p>Command frames are <code>[len][type][payload…]</code> (<code>phone_commands.cpp:248–300</code>):</p>
+<pre><code>0x10  hello (see §4.1)            0x20  timestamp from phone (4B LE unix)
+0x50  callsign  (1B len + chars)  0x55  WiFi: 1B len SSID + 1B len PWD
+0x70  latitude  (4B float)        0x80  longitude (4B float)
+0x90  altitude  (4B int)          0x95  APRS symbols
+0xA0  text message                0xF0  save settings to flash
+</code></pre>
+<p>Position frames (<code>0x70/0x80/0x90</code>) carry a save flag at offset 6
+(<code>0x0A</code> = persist, <code>0x0B</code> = don&#39;t — periodic app positions use the latter).</p>
+<p><strong>Text message syntax (0xA0)</strong>: the phone sends <code>{dst}text</code> for a DM/group
+message or bare <code>text</code> for broadcast — <strong>without</strong> any leading colon; the
+firmware prepends the <code>:</code> itself when the payload does not start with <code>--</code>
+(<code>phone_commands.cpp:583–588</code>). The <code>::…</code> double-colon form exists only on
+the serial console. <code>--…</code> command strings are dispatched through the same
+<code>commandAction()</code> as the serial console.</p>
+<p><strong>Hard limits in <code>sendMessage()</code> a sender must pre-validate</strong> (the firmware
+enforces them silently — no error reaches the phone):</p>
+<ul>
+<li>Total <code>{dst}text</code> longer than <strong>160 characters</strong> → dropped
+(<code>src/loop_functions.cpp:3388</code>, debug-log only).</li>
+<li>The closing <code>}</code> must appear at index ≤ 10, i.e. <strong>dst ≤ 9 characters</strong>
+(<code>:3396</code>). A longer destination is not an error: the message goes out as
+a <strong>broadcast</strong> with the braces left in the payload — an intended DM
+becomes public.</li>
+<li><code>0x95</code> accepts only symbol table ids <code>/</code> (0x2F) and <code>\</code> (0x5C)
+(<code>phone_commands.cpp:552</code>); anything else is silently ignored while the
+ASCII <code>--symid</code> path accepts more.</li>
+</ul>
+<p>Settings written over BLE are staged and applied from the main loop
+(<code>applyPendingBleSettings()</code>, CONC-17) — a mock phone must not assume the
+settings notification arrives synchronously with the write.</p>
+<hr>
+<h2 id="5-adjacent-protocol-interlink-not-spoken-by-the-firmware">5. Adjacent protocol: INTERLINK (not spoken by the firmware)</h2>
+<p>Listed here to prevent confusion, not as part of the firmware wire format.
+<strong>INTERLINK</strong> is the icssw.org <strong>server-to-server feed</strong> on UDP port 1985 —
+a consumer-facing alternative to running a BLE/EXTUDP connection to a
+physical node. Framing:</p>
+<pre><code>register   client → server:  &quot;DNCLOUD&quot; + &lt;code&gt;, NUL-padded to 50 bytes, re-sent ~70 s
+heartbeat  server → client:  &quot;HBMASTER&quot; (8 bytes)
+data       server → client:  &quot;DNCDATA&quot; + &lt;JSON string&gt; + 0x00
+bye        client → server:  &quot;DNCBYE&quot; + &lt;code&gt;, same 50-byte framing (ack: &quot;HBGOODBYE&quot;)
+</code></pre>
+<p>The firmware has no code for any of this; nodes reach the servers only via
+§2. Authoritative implementations: <code>mc-chat/meshcom_mock/interlink.py</code>
+(origin) and <code>mcmap/proxy/src/interlink/</code> (port of it, with framing notes on
+the server-side <code>DNCDATA-M</code>/<code>-D</code> mode suffix). mcmap consumes the mesh
+exclusively through INTERLINK plus HTTP scrapers — it speaks none of the
+four firmware layers directly, so its mocks need §1 (frame semantics inside
+the JSON) but not §2–§4 framing.</p>
+<hr>
+<h2 id="6-reference-vectors">6. Reference vectors</h2>
+<ul>
+<li><code>test/test_aprs_corpus/corpus.txt</code> — captured on-air frames (hex)</li>
+<li><code>test/test_aprs_corpus/golden.txt</code> — frozen <code>decodeAPRS()</code> field output</li>
+<li><code>test/test_aprs_decode/test_aprs_decode.cpp</code> — hand-verified interop
+vectors (expected values read from raw bytes, not from the decoder)</li>
+<li><code>test/test_aprs_spec/test_aprs_spec.cpp</code> — vectors constructed from §1 of
+this document, independent of the encoder</li>
+<li>Regenerating golden after a deliberate decoder change:
+<code>APRS_GOLDEN_UPDATE=1 pio test -e native_aprs</code> — review the git diff of
+<code>golden.txt</code>; it <em>is</em> the behavior change.</li>
+</ul>
+<p>Provenance: frames captured 2026-08-21 on 433.175 MHz (EU8 preset,
+BW 250 kHz, SF 11, CR 4/6) with the raw-frame capture hook
+(<code>src/capture_functions.cpp</code>, <code>--loradebug on</code> / <code>--txcapture on</code>); encoders observed
+on the air include this firmware (RAK4631, Heltec V3), other MeshCom 4.35
+devices (T-Beam), and gateway-emitted server frames. Cross-validation:
+§4 (BLE) against <code>MCProxy/src/mcapp/ble_protocol.py</code>; §2 (server UDP)
+against <code>mc-chat/meshcom_mock/</code> (softnodes live on the OE and DL servers)
+and the upstream MeshCom-Reflector spec, 2026-08-21.</p>
+
+</main>
+</div>
+<a class="top" href="#" aria-label="Back to top">↑ top</a>
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll("nav.toc a"));
+  var heads=links.map(function(a){return document.getElementById(a.getAttribute("href").slice(1));});
+  function upd(){var y=window.scrollY+90,i=0;for(var k=0;k<heads.length;k++){if(heads[k]&&heads[k].offsetTop<=y)i=k;}links.forEach(function(a,k){a.classList.toggle("on",k===i);});}
+  window.addEventListener("scroll",upd,{passive:true});upd();
+})();
+</script></body>
+</html>

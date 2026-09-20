@@ -1,13 +1,16 @@
 # LoRa Debug Ausgaben (`--loradebug on`)
 
 Aktivierung via seriellem Kommando oder BLE:
+
 ```
 --loradebug on
 --loradebug off
 ```
 
 `--loradebug on` setzt intern **drei Flags gleichzeitig**:
-- `bLORADEBUG = true` — alle `[MC-DBG]`/`[MC-SM]` Zeilen
+
+- `bLORADEBUG = true` — alle `[MC-DBG]`/`[MC-SM]` Zeilen sowie der
+  Rohframe-Mitschnitt der Empfangsseite (`[MC-TEST] RX_FRAME`, s.u.)
 - `bDisplayInfo = true` — MH-LoRa / RX-LoRa2 / TX-LoRa Pakete werden ausgegeben
 - `bDisplayRetx = true` — Retransmission-Statuszeilen werden ausgegeben
 
@@ -34,16 +37,19 @@ Jeder Zustandswechsel des LoRa-Automaten:
 ## Empfangspfad
 
 ### Chip-Werte nach Empfang
+
 ```
 [LoRa]...Received packet: RSSI:  -110 dBm / SNR:  -5 dB / Frequency error:  234 Hz
 ```
-| Feld | Bedeutung |
-|---|---|
-| RSSI | Empfangspegel in dBm (typisch -80 bis -130) |
-| SNR | Signal-Rausch-Abstand in dB |
+
+| Feld            | Bedeutung                                                                          |
+| --------------- | ---------------------------------------------------------------------------------- |
+| RSSI            | Empfangspegel in dBm (typisch -80 bis -130)                                        |
+| SNR             | Signal-Rausch-Abstand in dB                                                        |
 | Frequency error | Frequenzabweichung in Hz: <1000 Hz = Kollision, >3000 Hz = falsches Gerät/Frequenz |
 
 ### Puffer & Timing
+
 ```
 [MC-DBG] RX_BUF_SWITCH buf=1          Doppelpuffer-Wechsel (RAK4630)
 [MC-DBG] RX_BUF_OVERWRITE buf=1       WARNUNG: Puffer noch in Verwendung!
@@ -72,21 +78,25 @@ OnRxError                              CRC-/Header-Fehler
 ## TX-Pfad / CSMA
 
 ### CSMA-Backoff-Timer
+
 ```
 [MC-DBG] RX_TIMEOUT_FIRE ts=123456 wait=4675 delta=4680
 ```
-| Feld | Bedeutung |
-|---|---|
-| `wait` | Berechnete CSMA-Wartezeit in ms (adaptiv nach Kanalauslastung) |
-| `delta` | Tatsächlich gewartet in ms |
+
+| Feld    | Bedeutung                                                      |
+| ------- | -------------------------------------------------------------- |
+| `wait`  | Berechnete CSMA-Wartezeit in ms (adaptiv nach Kanalauslastung) |
+| `delta` | Tatsächlich gewartet in ms                                     |
 
 Typische `wait`-Werte je nach `cad_attempt`:
+
 - Versuch 0: ~4675 ms
 - Versuch 1: ~3087 ms
 - Versuch 2: ~2087 ms
 - Versuch ≥3: ~35 ms (Notfall-TX)
 
 ### TX-Gate und CAD
+
 ```
 [MC-DBG] RX_TIMEOUT_DEFERRED src=receiveFlag    Paket kam kurz vor TX → aufgeschoben
 [MC-DBG] TX_GATE_ENTER qlen=2 cad_attempt=0     TX-Gate betreten; 2 Pakete in Queue
@@ -105,18 +115,21 @@ Typische `wait`-Werte je nach `cad_attempt`:
 ## Ring-Buffer (TX-Queue)
 
 Alle 30 Sekunden:
+
 ```
 [MC-DBG] RING_STATUS queued=1 pending=2 retrying=0 done=3 iW=5 iR=4 dedup=7/16
 ```
-| Feld | Bedeutung |
-|---|---|
-| `queued` | Neu eingereiht, noch nicht gesendet |
-| `pending` | Gesendet, ACK ausstehend |
-| `retrying` | Wiederholungsversuch läuft |
-| `done` | Fertig (ACK erhalten oder kein Retry nötig) |
-| `dedup=7/16` | 7 von 16 Dedup-Slots belegt |
+
+| Feld         | Bedeutung                                   |
+| ------------ | ------------------------------------------- |
+| `queued`     | Neu eingereiht, noch nicht gesendet         |
+| `pending`    | Gesendet, ACK ausstehend                    |
+| `retrying`   | Wiederholungsversuch läuft                  |
+| `done`       | Fertig (ACK erhalten oder kein Retry nötig) |
+| `dedup=7/16` | 7 von 16 Dedup-Slots belegt                 |
 
 ### Einzelereignisse
+
 ```
 [MC-DBG] RING_WRITE slot=2 type=3A status=01 ...    Slot beschrieben
 [MC-DBG] RING_PRIO slot=2 prio=1                    Priorität zugewiesen
@@ -156,11 +169,18 @@ Alle 30 Sekunden:
 ```
 [MC-DBG] CHANNEL_UTIL rx=1200ms tx=300ms util=15%
 ```
+
 Wird alle 10 Sekunden ausgegeben — unabhängig von `bLORADEBUG`.
+
+> Bis 2026-08-25 war `rx` auf ESP32 um Faktor 1,8–4,1 zu hoch: `checkRX()` buchte
+> die Sendedauer eines 255-Byte-Pakets für **jeden** Empfang, weil RadioLib die
+> tatsächliche Paketlänge nicht zurückschreibt (N-29). Ältere ESP32-Logs sind
+> deshalb nicht mit nRF52-Logs vergleichbar — dort stimmte die Zahl immer.
 
 ```
 [MC-HWM] uptime=3600s queue_hwm=3/8 csma_hwm=4 trickle=120000ms
 ```
+
 Alle 30 Minuten: Maximale Queue-Tiefe, maximale CAD-Versuche, Trickle-Intervall.
 
 ---
@@ -168,6 +188,7 @@ Alle 30 Minuten: Maximale Queue-Tiefe, maximale CAD-Versuche, Trickle-Intervall.
 ## APRS-Protokoll-Fehler
 
 Nur sichtbar wenn `bLORADEBUG=true`:
+
 ```
 APRS decode - Packet discarded, wrong APRS-protocol - size <8> to short!
 APRS decode - Source-CallSign Error [DK?ABC]
@@ -176,6 +197,7 @@ APRS decode - Packet discarded, wrong APRS-protocol - bSourceEndOk (>) missing!
 APRS decode - Packet discarded, wrong APRS-protocol - PayloadEnd (0x00) missing!
 APRS decode - Packet (47) discarded, wrong FCS <0012>:<0013> wrong! <...>
 ```
+
 Nach jedem Fehler folgt bei Paketen < 255 Byte ein Hex-Dump (`printAsciiBuffer`).
 
 ---
@@ -193,10 +215,106 @@ RX-LoRa-All: ...                                       Rohempfang vor Filterung
 
 ---
 
+## Rohframe-Mitschnitt `[MC-TEST]`
+
+Die Zeilen oben zeigen Frames **dekodiert** — also das Ergebnis unseres
+Parsers. Ein Frame, den der Decoder falsch liest, steht falsch geparst im Log;
+nichts darin verrät, was wirklich auf dem Kanal lag. Der Mitschnitt liefert die
+Bytes selbst.
+
+| Kommando                 | Wirkung                                                               |
+| ------------------------ | --------------------------------------------------------------------- |
+| `--loradebug on`         | schaltet zusätzlich den **Empfangs**-Mitschnitt ein                   |
+| `--txcapture on` / `off` | schaltet den **Sende**-Mitschnitt (eigener Schalter, überlebt Reboot) |
+
+```
+[MC-TEST] RX_FRAME len=64 rssi=-85 snr=0 hex=40F1A125A183444A384D45482D34332C...
+[MC-TEST] TX_FRAME len=70 hex=3A100310E9444A384D45482D382C444A384D45482D3431...
+[MC-TEST] CAPTURE_DROPPED n=3 serial_bytes=512
+```
+
+`CAPTURE_DROPPED` meldet **beide** Verlustquellen, und beide gehören zur
+Auswertung:
+
+| Feld           | Bedeutung                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| `n`            | Frames, für die im Ringpuffer kein Platz war                                                                   |
+| `serial_bytes` | Bytes, die `printfdeb()` verworfen hat, weil der USB-CDC-Sendepuffer voll blieb (nur nRF52; auf ESP32 immer 0) |
+
+Gemeldet wird jeweils der **Zuwachs** seit der letzten Meldung, nicht der
+Gesamtstand. Ein Frame kann sauber durch den Ring laufen und trotzdem
+unvollständig im Log landen — deshalb reicht die erste Zahl allein nicht.
+
+Beide werden genau dann groß, wenn der Kanal ausgelastet ist — also in den
+Kollisionslagen, um derentwillen man mitschneidet. Ein Mitschnitt ohne diese
+Zahlen behauptet Vollständigkeit, die er nicht hat.
+
+Erfasst wird im Radio-Callback bzw. zwischen CAD und `startTransmit()`; dort
+wird nur kopiert. Ausgegeben wird aus dem Loop (`captureDrain()` in
+`main.cpp`), ein Frame je Durchlauf. Details und Begründung in
+`src/capture_functions.h`.
+
+**Kosten:** eine ~550 Zeichen lange Zeile je Frame. Bei 115200 Baud sind das
+rund 48 ms Sendezeit auf der seriellen Schnittstelle — auf einem stark
+gehörten Standort kann das die Konsole sättigen. Der RAM-Preis liegt bei
+1.400 Byte (RAK4631).
+
+---
+
 ## Analyse-Tools
 
-| Tool | Beschreibung |
-|---|---|
-| `tools/serial_monitor.py --port COMx` | Live-Monitoring mit Alerts |
-| `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs |
-| `tools/loganalyse.sh <logfile>` | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL) |
+| Tool                                         | Beschreibung                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `tools/meshlogger.py <host> --hours 48`      | Langzeit-Mitschnitt der Netzkonsole (Port 2323) auf Platte, schaltet die Debugflags selbst        |
+| `tools/serial_monitor.py --port COMx`        | Live-Monitoring mit Alerts                                                                        |
+| `tools/serial_monitor.py --replay <logfile>` | Offline-Analyse gespeicherter Logs                                                                |
+| `tools/loganalyse.sh <logfile>`              | Batch-Auswertung in 15 Abschnitten (Linux/macOS/WSL)                                              |
+| `tools/logharvest.py <logdir>`               | erntet Testkorpora aus Logs (CRC-Dumps, ACK-Frames, Re-Enkodier-Vektoren, `[MC-TEST]`-Mitschnitt) |
+| `tools/traceharvest.py <logdir>`             | erntet Entscheidungsfolgen (Dedup, TX-Priorität, ACK) für das Layer-B-Replay                      |
+
+### Langzeit-Mitschnitt
+
+`logharvest.py` und `traceharvest.py` brauchen Logs von Stunden bis Tagen —
+ein Vordergrund-`nc` oder eine SSH-Sitzung liefert die nicht.
+`tools/meshlogger.py` haengt sich dafuer an die Netzkonsole, setzt einmalig
+`--loradebug on` und `--txcapture on` (beide ueberleben einen Reboot im Flash)
+und stellt den vorgefundenen Zustand am Ende wieder her. Geschrieben wird
+`<outdir>/YYYY-MM-DD.log` mit dem Zeitstempelpraefix von `serial_monitor.py`,
+das beide Harvester kennen; `<outdir>/status.txt` traegt jede Minute den
+Fortschritt nach. Rund 200 B/s bei gesetzten Debugflags, also ~36 MB fuer 48 h.
+
+```
+screen -dmS meshlog python3 tools/meshlogger.py dk5en-98.local --hours 48 \
+    --outdir ~/meshlog/dk5en-98
+```
+
+> **Die Konsole nimmt genau EINEN Client.** `net_console.cpp` schliesst den
+> alten Socket, sobald sich ein neuer Client anmeldet — wer sich waehrend
+> eines Mitschnitts verbindet, wirft den Logger hinaus, der sich nach 5 s neu
+> verbindet und seinerseits den Menschen hinauswirft. Um die Konsole zu
+> uebernehmen, ohne den Lauf zu beenden: `touch <outdir>/PAUSE` anlegen und
+> nach Gebrauch wieder loeschen.
+
+---
+
+## Layer-B-Replay
+
+Die `[MC-DBG]`-Zeilen sind nicht nur zum Lesen da. `tools/traceharvest.py`
+macht aus ihnen Traces, die drei native Suiten gegen den **echten** Code
+nachfahren — nicht gegen eine Nachbildung:
+
+| Suite                | fährt nach                             | Umfang                                        |
+| -------------------- | -------------------------------------- | --------------------------------------------- |
+| `test_dedup_replay`  | `is_new_packet()`, `addLoraRxBuffer()` | 8.813 Urteile, 10.652 Slotbelegungen          |
+| `test_txprio_replay` | `getMessagePriority()`                 | 729 Einstufungen, alle fünf Prioritätsklassen |
+| `test_ack_replay`    | `isPlausibleAckFrame()`                | 30 im Feld honorierte ACKs                    |
+
+Weicht eine Suite ab, hat sich der Code vom Feldverhalten entfernt. Das ist
+der Grund, die Logs aufzuheben:
+
+```
+uv run tools/traceharvest.py <logdir>
+pio test -e native_dedup
+pio test -e native_aprs -f test_txprio_replay
+pio test -e native -f test_ack_replay
+```

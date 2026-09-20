@@ -1,0 +1,49 @@
+SUPERSEDED 2026-09-12 -- DO NOT USE THESE NUMBERS.
+
+Kept only as the record of a measurement that was wrong in two ways, because
+docs/w3-settings-verdict.md refers to it:
+
+  1. HOST ABI, not the device. This was compiled for macOS arm64, where
+     `unsigned long` is 8 bytes; on the nRF52 it is 4. The struct is 2000 B on
+     hardware, NOT the 2008 B below, and 15 of the 18 region boundaries listed
+     here do not exist on the device at all.
+
+  2. WRONG INSTRUMENT. Per-byte schema coverage was the gate proposed after the
+     RAK-90 settings loss. The Fable review (verdict Finding 5) refuted it: it
+     invents a padding-classification problem, is per-build-env rather than
+     per-platform, cannot see a field covered by a WRONG-TYPED descriptor, and
+     its clean state would read 36 % red. Of the 724 bytes it flags, zero are a
+     defect -- they are flash markers, the device EUI (rebuilt each boot),
+     deliberate exclusions, and the struct's own "nicht im Flash" section.
+
+The replacement invariant is member-level and fail-closed, described in the
+verdict. The "uncovered" figure below never justified adding a single field.
+
+----------------------------------------------------------------------------
+
+struct bytes      : 2008
+schema rows       : 107
+covered bytes     : 1284
+UNCOVERED bytes   : 724  (36.1% of the struct)
+
+uncovered byte ranges (offset..offset+len):
+      0 ..    10  (10 bytes)
+     26 ..    32  (6 bytes)
+     41 ..    48  (7 bytes)
+     57 ..    60  (3 bytes)
+     66 ..   116  (50 bytes)
+    201 ..   204  (3 bytes)
+    256 ..   264  (8 bytes)
+    332 ..   336  (4 bytes)
+    340 ..   348  (8 bytes)
+    683 ..   684  (1 bytes)
+    893 ..   896  (3 bytes)
+   1154 ..  1156  (2 bytes)
+   1174 ..  1176  (2 bytes)
+   1195 ..  1196  (1 bytes)
+   1370 ..  1372  (2 bytes)
+   1386 ..  1388  (2 bytes)
+   1392 ..  1608  (216 bytes)
+   1612 ..  2008  (396 bytes)
+
+18 uncovered region(s)

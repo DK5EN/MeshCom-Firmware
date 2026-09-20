@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adaptiver Relay-Slot nach Hörerschaft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans+Condensed:wght@500;600;700&amp;family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap">
+<style>
+:root{
+  --bg:#f4f6f7;
+  --surface:#ffffff;
+  --surface-2:#eef2f3;
+  --ink:#131b20;
+  --ink-2:#3c4a53;
+  --muted:#657580;
+  --line:#d6dfe3;
+  --line-strong:#b6c4ca;
+  --accent:#0b5766;
+  --accent-ink:#0b5766;
+  --accent-soft:#e4f0f2;
+  --r1:#8fd3dd;
+  --r1-ink:#0b3038;
+  --r2:#2e97a8;
+  --r3:#0b5766;
+  --ok:#1a6b40;
+  --ok-bg:#e6f2ea;
+  --ok-bd:#a9cdb9;
+  --note:#8a5400;
+  --note-bg:#faf0dd;
+  --note-bd:#e0c48b;
+  --band:#d3ab63;
+  --alert:#9d2235;
+  --alert-bg:#fbe9eb;
+  --alert-bd:#e3aeb5;
+  --shadow:0 1px 2px rgba(19,27,32,.05), 0 8px 24px -18px rgba(19,27,32,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1418;
+    --surface:#151d22;
+    --surface-2:#1b252b;
+    --ink:#e7eef1;
+    --ink-2:#c0ced6;
+    --muted:#8fa1ab;
+    --line:#26333a;
+    --line-strong:#3c4c55;
+    --accent:#5cc4d6;
+    --accent-ink:#7fd4e2;
+    --accent-soft:#17323a;
+    --r1:#2f7180;
+    --r1-ink:#e2f4f8;
+    --r2:#3a9dae;
+    --r3:#5cc4d6;
+    --ok:#5cc189;
+    --ok-bg:#15291f;
+    --ok-bd:#2f5a41;
+    --note:#dda94a;
+    --note-bg:#2d2415;
+    --note-bd:#5e4a22;
+    --band:#8a6c33;
+    --alert:#e88b98;
+    --alert-bg:#31191d;
+    --alert-bd:#6a343c;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px -18px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1418;
+  --surface:#151d22;
+  --surface-2:#1b252b;
+  --ink:#e7eef1;
+  --ink-2:#c0ced6;
+  --muted:#8fa1ab;
+  --line:#26333a;
+  --line-strong:#3c4c55;
+  --accent:#5cc4d6;
+  --accent-ink:#7fd4e2;
+  --accent-soft:#17323a;
+  --r1:#2f7180;
+  --r1-ink:#e2f4f8;
+  --r2:#3a9dae;
+  --r3:#5cc4d6;
+  --ok:#5cc189;
+  --ok-bg:#15291f;
+  --ok-bd:#2f5a41;
+  --note:#dda94a;
+  --note-bg:#2d2415;
+  --note-bd:#5e4a22;
+  --band:#8a6c33;
+  --alert:#e88b98;
+  --alert-bg:#31191d;
+  --alert-bd:#6a343c;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px -18px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:73rem;margin:0 auto;padding:2.6rem 1.3rem 5rem;display:flex;flex-direction:column;gap:2.7rem}
+h1,h2,h3,.eyebrow,.chip,th,.stat .k,.metagrid dt,summary{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif}
+h1{font-size:clamp(1.9rem,4.4vw,2.7rem);line-height:1.1;margin:0;font-weight:700;letter-spacing:-.012em;text-wrap:balance}
+h2{font-size:1.42rem;font-weight:600;margin:0;letter-spacing:-.005em;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:600;margin:0;letter-spacing:.005em;text-wrap:balance}
+p{margin:0}
+.prose{max-width:70ch;display:flex;flex-direction:column;gap:.62rem}
+.eyebrow{font-size:.72rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0}
+.num,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+code{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.86em;background:var(--surface-2);padding:.08em .34em;border-radius:3px;color:var(--ink-2)}
+a{color:var(--accent-ink);text-underline-offset:2px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+
+header.masthead{display:flex;flex-direction:column;gap:1.05rem;border-bottom:3px solid var(--accent);padding-bottom:1.5rem}
+.lede{font-size:1.06rem;color:var(--ink-2);max-width:64ch}
+.metagrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:0}
+.metagrid > div{background:var(--surface);padding:.6rem .8rem}
+.metagrid dt{font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+.metagrid dd{margin:.1rem 0 0;font-size:.93rem}
+
+.index{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.index a{display:grid;grid-template-columns:2.1rem 1fr auto;gap:.9rem;align-items:baseline;background:var(--surface);padding:.78rem .95rem;text-decoration:none;color:inherit}
+.index a:hover{background:var(--accent-soft)}
+.index .q{font-weight:500}
+.index .qn{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.index .ans{display:block;font-size:.88rem;color:var(--muted);margin-top:.05rem;line-height:1.5}
+.chip{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:.2rem .55rem;border-radius:999px;white-space:nowrap;border:1px solid var(--line-strong);color:var(--muted);background:var(--surface-2)}
+.chip.ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-bd)}
+.chip.note{color:var(--note);background:var(--note-bg);border-color:var(--note-bd)}
+.chip.alert{color:var(--alert);background:var(--alert-bg);border-color:var(--alert-bd)}
+
+section{display:flex;flex-direction:column;gap:1.05rem;scroll-margin-top:1.5rem}
+.sechead{display:flex;flex-wrap:wrap;align-items:baseline;gap:.55rem .8rem;border-bottom:1px solid var(--line-strong);padding-bottom:.5rem}
+.sechead .qn{font-family:"IBM Plex Mono",monospace;font-size:.9rem;color:var(--accent-ink);font-weight:500}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:min(100%,32rem)}
+caption{caption-side:top;text-align:left;color:var(--muted);font-size:.83rem;padding:.6rem .8rem .15rem;line-height:1.45}
+th,td{padding:.42rem .8rem;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{font-weight:600;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+thead th{border-bottom:1px solid var(--line-strong)}
+th:first-child,td:first-child{text-align:left;font-variant-numeric:normal}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface-2)}
+td.mono{font-family:"IBM Plex Mono",monospace}
+tr.total td{font-weight:600;border-top:1px solid var(--line-strong)}
+.tag{font-size:.74rem;color:var(--muted)}
+
+.call{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;background:var(--surface);padding:.85rem 1.05rem;display:flex;flex-direction:column;gap:.42rem;max-width:78ch}
+.call.ok{border-color:var(--ok-bd);border-left-color:var(--ok);background:var(--ok-bg)}
+.call.note{border-color:var(--note-bd);border-left-color:var(--note);background:var(--note-bg)}
+.call.alert{border-color:var(--alert-bd);border-left-color:var(--alert);background:var(--alert-bg)}
+.call h3{font-size:.95rem}
+.call p{font-size:.94rem;color:var(--ink-2)}
+.call.ok p,.call.note p,.call.alert p{color:var(--ink)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stat{background:var(--surface);padding:.7rem .85rem}
+.stat .k{font-size:.7rem;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:"IBM Plex Mono",monospace;font-size:1.3rem;font-weight:500;line-height:1.3;font-variant-numeric:tabular-nums}
+.stat .s{font-size:.79rem;color:var(--muted);line-height:1.4}
+
+figure{margin:0;display:flex;flex-direction:column;gap:.55rem}
+figcaption{font-size:.83rem;color:var(--muted);max-width:72ch;line-height:1.5}
+.chartbox{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:.9rem 1rem;overflow-x:auto}
+svg{display:block;max-width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:.35rem 1.1rem;font-size:.82rem;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:.4rem}
+.sw{width:.72rem;height:.72rem;border-radius:2px;display:inline-block;flex:none}
+
+.minibar{display:inline-block;width:4.2rem;height:.42rem;border-radius:2px;background:var(--surface-2);
+  margin-right:.5rem;vertical-align:middle;overflow:hidden}
+.minibar i{display:block;height:100%;background:var(--r2);border-radius:2px}
+.fwold{color:var(--note);font-weight:600}
+.comp{display:flex;flex-direction:column;gap:.55rem}
+.comprow{display:grid;grid-template-columns:6.5rem 1fr;gap:.7rem;align-items:center}
+.comprow .lbl{font-family:"IBM Plex Mono",monospace;font-size:.84rem;color:var(--ink-2)}
+.bar{display:flex;height:1.55rem;gap:2px}
+.bar span{display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;min-width:0;overflow:hidden;white-space:nowrap}
+.bar span:first-child{border-radius:4px 0 0 4px}
+.bar span:last-child{border-radius:0 4px 4px 0}
+.seg1{background:var(--r3);color:#f2fbfd}
+:root[data-theme="dark"] .seg1{color:#08262d}
+.seg2{background:var(--r2);color:#f2fbfd}
+:root[data-theme="dark"] .seg2{color:#08262d}
+.seg3{background:var(--r1);color:var(--r1-ink)}
+
+ol.recs{margin:0;padding-left:1.3rem;display:flex;flex-direction:column;gap:.7rem;max-width:76ch}
+ol.recs li{padding-left:.15rem}
+ul.tight{margin:.2rem 0 0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.35rem}
+
+details{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:.55rem .9rem}
+summary{cursor:pointer;font-weight:600;font-size:.92rem}
+details[open] summary{margin-bottom:.55rem}
+
+footer{border-top:1px solid var(--line);padding-top:1.1rem;color:var(--muted);font-size:.83rem;display:flex;flex-direction:column;gap:.3rem}
+
+@media (max-width:640px){
+  .index a{grid-template-columns:1.7rem 1fr;gap:.5rem}
+  .index .chip{grid-column:2;justify-self:start;margin-top:.35rem}
+  .comprow{grid-template-columns:1fr;gap:.25rem}
+}
+@media print{
+  body{background:#fff}
+  .wrap{padding:0;gap:1.7rem}
+  section,figure,.tablewrap{break-inside:avoid}
+  .index a:hover{background:var(--surface)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">MeshCom Konzeptpr&uuml;fung &middot; Datenbasis Nacht 1./2. September 2026</p>
+  <h1>Adaptiver Relay-Slot nach H&ouml;rerschaft</h1>
+  <p class="lede">Ein Knoten misst, <strong>wie viele Stationen ihn nachweislich h&ouml;ren</strong>
+  &mdash; seine H&ouml;rerschaft &mdash;, ordnet sich damit in eine Rangfolge ein und leitet etwas
+  <strong>fr&uuml;her</strong> weiter, wenn diese H&ouml;rerschaft gro&szlig; ist; die
+  Nachrangigen finden das Paket dann bereits in ihrem Doppelfilter und schweigen, es sei denn, sie
+  versorgen ein Tal-Blatt exklusiv. Gesendet werden darf immer, nur nicht sofort.
+  <strong>Das Urteil in einem Satz: Die Rangfolge allein spart exakt nichts &mdash; der Nutzen
+  steckt vollst&auml;ndig im Nachgeben der Nachrangigen, und in der Simulation liefert die
+  Variante &bdquo;aufschieben, dann pr&uuml;fen&ldquo; 55 bis 71&nbsp;% der heutigen Sendungen bei
+  95,6 bis 98,5&nbsp;% Abdeckung.</strong></p>
+
+  <dl class="metagrid">
+    <div><dt>Datenbasis</dt><dd class="num">3 Empfangslogs &middot; 8,18 h</dd></div>
+    <div><dt>Nachrichten</dt><dd class="num">1.800 verschiedene</dd></div>
+    <div><dt>H&ouml;rgraph</dt><dd class="num">132 Knoten &middot; 610 H&ouml;rkanten</dd></div>
+    <div><dt>Simulation</dt><dd class="num">5 Regelfamilien &middot; 48 Rasterpunkte &middot; 5 Seeds</dd></div>
+    <div><dt>Code-Stand</dt><dd class="num">v4.35p_prio &middot; 02.09.2026</dd></div>
+    <div><dt>Vergleichsbasis</dt><dd class="num">ADR 02, Rev. 3 <span class="tag">1.886 Zeilen</span></dd></div>
+  </dl>
+</header>
+
+<section aria-label="Das Konzept">
+  <div class="call">
+    <h3>Das Konzept in den Worten des Betreibers</h3>
+    <p>&bdquo;Die Idee ist, dass ein Knoten erst einmal die Umgebung kennenlernt. Dann bildet er eine
+    Hierarchie, wer besonders viel h&ouml;rt und wo er damit steht. Wenn ich wei&szlig;, dass mich
+    besonders viele h&ouml;ren, dann sende ich etwas fr&uuml;her als Knoten, die nicht so viele
+    Nachbarn haben. Damit werden viele Knoten mit dem Paket versorgt und senden auf Grund von De-Dup
+    nicht mehr aus. Ich muss aber parallel auch schauen, ob ich exklusive Leaves bediene &mdash; dann
+    bin ich ein Bergknoten, der zwei im Tal gelegene Nodes bedienen muss. Wir skewen CAD+W&uuml;rfel
+    f&uuml;r Nodes, die mit h&ouml;herer Wahrscheinlichkeit von vielen geh&ouml;rt werden. Gesendet
+    darf immer werden, nur nicht sofort. Langzeitziel: Mesh immer eingeschaltet, Hop-Count und
+    Sendeslot adaptiv nach Umgebung."</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Die Begriffe dieses Berichts, einmal geradegezogen.</strong>
+    <em>H&ouml;rerschaft</em> (englisch <em>audience</em>) ist die Zahl der Stationen, die mich
+    nachweislich empfangen &mdash; im Graphen der <em>Ausgangsgrad</em> (Out-Degree). Die
+    <em>Nachbarzahl</em> <code>NC</code> ist die Gegenrichtung: wie viele Stationen <em>ich</em>
+    h&ouml;re, im Graphen der Eingangsgrad. <code>NC_self</code> ist der selbst gez&auml;hlte Wert
+    (<code>getMheardCount()</code>), <code>NC_reported</code> der Wert, den ein Nachbar &uuml;ber
+    Funk von sich meldet. Die <em>Wichtigkeit</em> des ADR 02 ist die Summe
+    <code>&Sigma; 1/NC_reported</code> &uuml;ber alle geh&ouml;rten Nachbarn &mdash; ein Ma&szlig;
+    daf&uuml;r, wie abh&auml;ngig die Nachbarn von mir sind, nicht daf&uuml;r, wie viele mich
+    h&ouml;ren. Der <em>Dedup-Ring</em> &mdash; im Folgenden auch Doppelfilter &mdash; ist der Ringpuffer
+    bereits gesehener Nachrichtenkennungen, an dem eine zweite Kopie ausgefiltert wird. <em>CAD</em> (Channel Activity Detection) ist die
+    Kanalpr&uuml;fung vor dem Senden. Das <em>Hop-Budget</em> (<code>max_hop</code>) ist die Zahl
+    der verbleibenden Weiterleitungen einer Nachricht. Das
+    <em>Alleinversorger-Veto</em> (sole-provider veto) verbietet einem Knoten das Schweigen, wenn er
+    der einzige Weg zu einem Nachbarn ist.</p>
+  </div>
+</section>
+
+<section aria-label="Kurzantworten">
+  <div class="sechead"><h2>Die Antworten auf einen Blick</h2></div>
+  <nav class="index">
+    <a href="#f1">
+      <span class="qn">1</span>
+      <span><span class="q">Ist die H&ouml;rerschaft im Knoten &uuml;berhaupt messbar?</span>
+        <span class="ans">Ja, ohne Protokoll&auml;nderung. Jeder Bergknoten h&ouml;rt seine eigenen Weiterleitungen zur&uuml;ck: OE3XIR-12 von 20 Nachbarn (521 Echos), OE3XOC-12 von 16 (573), OE3XWJ-12 von 15 (981). Aus dem Pfad &bdquo;ich, X&ldquo; folgt &bdquo;X h&ouml;rt mich&ldquo;.</span></span>
+      <span class="chip ok">Belegt</span>
+    </a>
+    <a href="#f2">
+      <span class="qn">2</span>
+      <span><span class="q">Gibt es die Hierarchie heute schon?</span>
+        <span class="ans">Nein. Weder H&ouml;rerschaft noch Nachbarzahl noch ADR-Wichtigkeit sagen voraus, wer die erste Kopie liefert. Alle drei sagen voraus, wer sp&auml;t kommt. Die Knoten, die zuerst senden sollten, senden heute zuletzt.</span></span>
+      <span class="chip alert">Handlungsbedarf</span>
+    </a>
+    <a href="#f3">
+      <span class="qn">3</span>
+      <span><span class="q">Spart fr&uuml;her senden allein etwas?</span>
+        <span class="ans">Nein, exakt null. 72.010 Sendungen mit und ohne Rangfolge. Solange keiner ein bereits eingereihtes Relay zur&uuml;ckzieht, &auml;ndert die Reihenfolge nur, wer zuerst liefert.</span></span>
+      <span class="chip note">Beobachten</span>
+    </a>
+    <a href="#f4">
+      <span class="qn">4</span>
+      <span><span class="q">Wie viel spart &bdquo;erst schauen, dann senden&ldquo;?</span>
+        <span class="ans">Hartes Stornieren beim ersten Mith&ouml;ren: 65&nbsp;% weniger Sendungen, aber 27&nbsp;% Abdeckungsverlust. Aufschieben und pr&uuml;fen mit weichem Veto: 44,7&nbsp;% weniger bei 95,6&nbsp;% Abdeckung, 3.919&nbsp;s Sendezeit je Stunde.</span></span>
+      <span class="chip alert">Handlungsbedarf</span>
+    </a>
+    <a href="#f5">
+      <span class="qn">5</span>
+      <span><span class="q">Wer verliert Abdeckung?</span>
+        <span class="ans">Nicht nur Bl&auml;tter. OE3BCB-10 mit acht Zubringern verliert unter hartem Storno 72&nbsp;% seiner Nachrichten, weil alle acht sich gegenseitig stornieren. Das Veto sch&uuml;tzt Bl&auml;tter, nicht Rudel.</span></span>
+      <span class="chip alert">Handlungsbedarf</span>
+    </a>
+    <a href="#f6">
+      <span class="qn">6</span>
+      <span><span class="q">Was ist mit den exklusiven Bl&auml;ttern?</span>
+        <span class="ans">17 strikte Bl&auml;tter, 30 weiche, 14 Relais mit mindestens einem. Neun Bl&auml;tter h&auml;ngen an einem Relais ohne Kanalpr&uuml;fung, f&uuml;nf davon ohne jede CAD-f&auml;hige Alternative.</span></span>
+      <span class="chip note">Beobachten</span>
+    </a>
+    <a href="#f7">
+      <span class="qn">7</span>
+      <span><span class="q">Wie gro&szlig; ist das H&ouml;rfenster in Wirklichkeit?</span>
+        <span class="ans">29 bis 41 Sekunden Median, in denen die Kopie eines kleineren Relais der eines gr&ouml;&szlig;eren hinterherl&auml;uft. Die Wirklichkeit gibt dem Konzept mehr Luft, als die Simulation annimmt.</span></span>
+      <span class="chip ok">Belegt</span>
+    </a>
+    <a href="#f8">
+      <span class="qn">8</span>
+      <span><span class="q">Adaptiver Hop-Count?</span>
+        <span class="ans">Als Storno-Ersatz ein Sicherheitsnetz, keine Ersparnis: 96 bis 100&nbsp;% der heutigen Sendungen. Der gro&szlig;e Hop-Gewinn liegt woanders &mdash; im Startbudget der HEY-Bake, zwei Zeilen Diff.</span></span>
+      <span class="chip note">Beobachten</span>
+    </a>
+    <a href="#f9">
+      <span class="qn">9</span>
+      <span><span class="q">Was sagt der Code?</span>
+        <span class="ans">Nichts davon existiert: kein R&uuml;ckzug eines eingereihten Relays, keine Nachbarzahl im Timeout, keine H&ouml;rerschaftstabelle. Und der Eingang des Vetos ist f&uuml;r die halbe Flotte messbar falsch.</span></span>
+      <span class="chip alert">Defekt gefunden</span>
+    </a>
+    <a href="#f10">
+      <span class="qn">10</span>
+      <span><span class="q">Was sagt das ADR 02?</span>
+        <span class="ans">Der fr&uuml;here Slot f&uuml;r Hubs ist dort Stufe 1, das Alleinversorger-Veto ist Leitplanke E5. Die H&ouml;rerschaft fehlt dem ADR &mdash; und trifft genau seine offene Link-Asymmetrie.</span></span>
+      <span class="chip">Referenz</span>
+    </a>
+    <a href="#einordnung">
+      <span class="qn">+</span>
+      <span><span class="q">Einordnung</span>
+        <span class="ans">Sechs Feststellungen: das richtige Ma&szlig;, der blinde Fleck, das Rudel-Problem, die 40&nbsp;% ohne Kanalpr&uuml;fung, der Weg dorthin und was nicht simuliert wurde.</span></span>
+      <span class="chip">Bewertung</span>
+    </a>
+    <a href="#entwurf">
+      <span class="qn">+</span>
+      <span><span class="q">Der Entwurf im Code</span>
+        <span class="ans">Wo die H&ouml;rerschaft anf&auml;llt, wo der Slot entschieden wird, wie &bdquo;aufschieben, dann stornieren&ldquo; aussieht &mdash; mit Datei und Zeilennummer.</span></span>
+      <span class="chip">Referenz</span>
+    </a>
+    <a href="#prserie">
+      <span class="qn">+</span>
+      <span><span class="q">PR-Serie</span>
+        <span class="ans">Sieben Schritte, jeder mit Dateien, Zeilenzahl, RAM, Logzeile und der Kennzahl, die ihn widerlegen kann. Die ersten drei geh&ouml;ren gar nicht zum Konzept.</span></span>
+      <span class="chip">Vorschlag</span>
+    </a>
+    <a href="#adr">
+      <span class="qn">+</span>
+      <span><span class="q">Abgleich mit ADR 02</span>
+        <span class="ans">Elf Konzept-Elemente gegen das bestehende Architekturdokument: zwei starke &Uuml;bereinstimmungen, drei echte L&uuml;cken, ein struktureller Unterschied.</span></span>
+      <span class="chip">Referenz</span>
+    </a>
+    <a href="#risiken">
+      <span class="qn">+</span>
+      <span><span class="q">Risiken</span>
+        <span class="ans">Zehn Risiken des Entwurfs und neun Annahmen der Simulation &mdash; jeweils mit der Richtung, in die sie das Ergebnis verbiegen.</span></span>
+      <span class="chip alert">Vorbehalt</span>
+    </a>
+    <a href="#methodik">
+      <span class="qn">+</span>
+      <span><span class="q">Methodik und Datengrundlage</span>
+        <span class="ans">Womit gerechnet wurde, wie der H&ouml;rgraph entsteht, wie gut er gegen die gemeldeten Nachbarzahlen validiert &mdash; und warum absolute Zahlen hier nichts bedeuten.</span></span>
+      <span class="chip">Referenz</span>
+    </a>
+    <a href="#offen">
+      <span class="qn">+</span>
+      <span><span class="q">Offene Fragen</span>
+        <span class="ans">Vier Entscheidungen, die nur der Betreiber treffen kann, und neun Punkte, die das ADR 02 selbst offenl&auml;sst.</span></span>
+      <span class="chip alert">R&uuml;ckfrage</span>
+    </a>
+  </nav>
+</section>
+
+
+<!-- ============ 1 ============ -->
+<section id="f1">
+  <div class="sechead"><span class="qn">Frage 1</span><h2>Ist die H&ouml;rerschaft im Knoten &uuml;berhaupt messbar?</h2><span class="chip ok">Belegt</span></div>
+
+  <div class="prose">
+    <p>Ja &mdash; und zwar ohne eine einzige &Auml;nderung am Funkprotokoll. Der Beweis liegt bereits
+    im Empfangspfad und wird dort weggeworfen.</p>
+
+    <p><strong>Das Pfadfeld ist der Beweis.</strong> Jeder Weiterleiter h&auml;ngt sein eigenes
+    Rufzeichen an den Pfad an (<code>src/lora_functions.cpp:1316-1321</code>). Enth&auml;lt ein
+    empfangener Rahmen die Folge <code>&hellip;,MEINRUF,X,&hellip;</code>, dann hat X eine Aussendung
+    von mir demoduliert und weitergereicht. Das ist kein Indiz, sondern ein Nachweis: X kann mein
+    Rufzeichen nur dann vor sein eigenes gesetzt haben, wenn sein Empf&auml;nger meinen Sender
+    geh&ouml;rt hat. <code>origin,ICH,X</code> hei&szlig;t &bdquo;X hat meine Weiterleitung
+    geh&ouml;rt&ldquo;, <code>ICH,X</code> hei&szlig;t &bdquo;X hat meine eigene Aussendung
+    geh&ouml;rt&ldquo;.</p>
+
+    <p><strong>Die Menge reicht deutlich.</strong> Zwischen 10,7 und 23,0&nbsp;% aller Empf&auml;nge
+    tragen diesen Nachweis bereits heute.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Echo der eigenen Aussendungen. Die <code>[LOG]</code>-Zeile wird vor der
+      Eigenempfangs-Pr&uuml;fung geschrieben, deshalb sind diese Zeilen &uuml;berhaupt sichtbar.
+      &bdquo;eigenes Relay&ldquo; z&auml;hlt die F&auml;lle, in denen das eigene Rufzeichen
+      vorletztes Pfadelement ist.</caption>
+      <thead><tr><th>Knoten</th><th>Empf&auml;nge mit eigenem Ruf im Pfad</th><th>Anteil</th><th>eigenes Relay</th><th>tiefer im Pfad</th><th>echoende Nachbarn</th><th>lautester Echo-Nachbar</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">OE3XIR-12</td><td class="num">600</td><td class="num">14,59 %</td><td class="num">521</td><td class="num">77</td><td class="num">20</td><td class="mono">OE3RFA-7 (87 / 16,70 %)</td></tr>
+        <tr><td class="mono">OE3XOC-12</td><td class="num">678</td><td class="num">10,71 %</td><td class="num">573</td><td class="num">104</td><td class="num">16</td><td class="mono">OE3WFA-12 (103 / 17,98 %)</td></tr>
+        <tr><td class="mono">OE3XWJ-12</td><td class="num">1.091</td><td class="num">22,96 %</td><td class="num">981</td><td class="num">110</td><td class="num">15</td><td class="mono">OE3AJC-12 (192 / 19,57 %)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>600 bis 1.091 Nachweise je Knoten und acht Stunden &mdash; das ist keine Kennzahl, die
+    m&uuml;hsam angesammelt werden muss, sondern eine, die im Sekundentakt vorbeifliegt. Der
+    lauteste Echo-Nachbar am Jauerling, <strong>OE3AJC-12</strong> (TLORA&nbsp;V2.1.6, 4.35p, mit
+    Kanalpr&uuml;fung), belegt allein 19,57&nbsp;% aller Echos dieses Knotens.</p>
+
+    <p><strong>Und genau hier wird der Nachweis verworfen.</strong> Von den Echos sind 521 / 573 / 981
+    Echos <em>eigener Weiterleitungen</em>, also rund 87 bis 90&nbsp;% des gesamten Materials. Die
+    landen in der Duplikatpr&uuml;fung und fallen dort ins Leere.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Wo der Nachweis ankommt und was heute damit geschieht. <code>checkOwnTx()</code>
+      erkennt nur, was der Knoten selbst <em>erzeugt</em> hat &mdash; eine Weiterleitung wird beim
+      Einreihen nie in diese Liste eingetragen.</caption>
+      <thead><tr><th>Echo von&nbsp;&hellip;</th><th>Treffer in <code>checkOwnTx()</code></th><th>landet bei</th><th>heute</th></tr></thead>
+      <tbody>
+        <tr><td>meiner eigenen Aussendung (HEY, Position, eigener Text)</td><td>ja &mdash; <code>insertOwnTx()</code>, <code>src/loop_functions.cpp:4834</code></td><td class="mono">src/lora_functions.cpp:771-795</td><td>nur ein &bdquo;HEARD&ldquo;-Merker ans Telefon</td></tr>
+        <tr><td>meiner Weiterleitung eines fremden Rahmens</td><td><strong>nein</strong> &mdash; das Relay-Einreihen bei <code>src/lora_functions.cpp:1346</code> ruft <code>insertOwnTx()</code> nie</td><td class="mono">src/lora_functions.cpp:797</td><td><strong>verworfen &mdash; der <code>else</code>-Zweig existiert nicht</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><strong>Ein einziger Haken f&auml;ngt beide F&auml;lle.</strong> Der Pfad ist ab
+    <code>decodeAPRS()</code> (<code>src/lora_functions.cpp:563</code>) gef&uuml;llt; der Block, der
+    f&uuml;r <em>jeden</em> entschl&uuml;sselbaren Rahmen einschlie&szlig;lich der Duplikate
+    l&auml;uft, beginnt bei <code>:615</code>. Der Einh&auml;ngepunkt ist unmittelbar nach
+    <code>updateMheard()</code> bei <code>src/lora_functions.cpp:750</code> &mdash; dort existiert
+    der mheard-Eintrag des letzten Hops bereits, und die Stelle liegt vor beiden Abzweigungen
+    (<code>icheck</code> bei <code>:771</code>, Dedup-Tor bei <code>:797</code>). Ein Vorbild
+    f&uuml;r die Suche steht in derselben Datei (<code>:1285-1287</code>, Schleifen-Erkennung),
+    <em>darf aber nicht abgeschrieben werden</em>: es baut zwei Arduino-<code>String</code>-Objekte
+    je Aufruf, und auf dem nRF52 l&auml;uft dieser Code auf einem 1&nbsp;KB gro&szlig;en Stack.
+    <code>strstr()</code> &uuml;ber <code>c_str()</code> in ein festes <code>char[12]</code>, ohne
+    Heap.</p>
+
+    <p><strong>Der blinde Fleck hei&szlig;t <code>bSHORTPATH</code>.</strong> Ein Weiterleiter mit
+    gesetztem Kurzpfad-Schalter schreibt den Pfad auf <code>origin,X</code> um
+    (<code>src/lora_functions.cpp:1309-1315</code>) und wirft alle Zwischenstationen weg &mdash;
+    mich eingeschlossen. Die gemessene H&ouml;rerschaft ist damit eine <em>Untergrenze mit
+    unbekanntem Nenner</em>. Der Schalter ist standardm&auml;&szlig;ig aus
+    (<code>node_sset &amp; 0x0400</code>), aber jede Ver&ouml;ffentlichung einer
+    H&ouml;rerschaftszahl muss einen Kurzpfad-Z&auml;hler danebenstellen, sonst wird eine
+    gedr&uuml;ckte Zahl als kleine H&ouml;rerschaft gelesen.</p>
+
+    <h3>Wo die Tabelle liegen soll</h3>
+
+    <p>Eine <em>eigene</em> kompakte Tabelle, nicht zwei zus&auml;tzliche Spalten in mheard. Der
+    wichtigste Fall ist n&auml;mlich genau der, den mheard strukturell nicht abbilden kann:
+    <em>X h&ouml;rt mich, aber ich h&ouml;re X nie</em>. mheard ist auf
+    <code>msg_source_last</code> geschl&uuml;sselt (<code>src/lora_functions.cpp:631</code>), also
+    auf Stationen, die <em>ich</em> h&ouml;re.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Speicherbedarf bei 15&nbsp;Byte je Eintrag (Rufzeichen, Zeitstempel, Pegelmeldung).
+      <code>MAX_AUD = MAX_MHEARD / 2</code>.</caption>
+      <thead><tr><th>Klasse</th><th>MAX_MHEARD</th><th>MAX_AUD</th><th>Tabelle</th></tr></thead>
+      <tbody>
+        <tr><td>ESP32-S3 / RAK4631 <span class="tag">configuration_global.h:211-215</span></td><td class="num">80</td><td class="num">40</td><td class="num"><strong>600 B</strong></td></tr>
+        <tr><td>ESP32 klassisch <span class="tag">:226-236</span></td><td class="num">30</td><td class="num">15</td><td class="num"><strong>225 B</strong></td></tr>
+        <tr><td><code>ENABLE_XML</code> / <code>ENABLE_SBUFFER</code> <span class="tag">:203-206</span></td><td class="num">50</td><td class="num">25</td><td class="num">375 B</td></tr>
+        <tr><td><code>ENABLE_TBEAM</code> <span class="tag">:218-221</span></td><td class="num">10</td><td class="num">5</td><td>toter Code &mdash; keine Build-Umgebung definiert es</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Die Gr&ouml;&szlig;enprobe gegen das Feld: Die drei Bergknoten sehen 30 / 31 / 20 direkte
+    Funknachbarn. <code>MAX_AUD = 40</code> liegt bequem dar&uuml;ber, <code>MAX_AUD = 15</code> auf
+    der klassischen ESP32-Klasse <em>nicht</em> &mdash; dort l&auml;uft die Tabelle an den Anschlag,
+    und ein Anschlag ist keine Messung. Genau daf&uuml;r braucht es die Qualit&auml;tspr&uuml;fung
+    aus &sect;B.4.</p>
+
+    <p><strong>Alterung: 3 Stunden, nicht 1.</strong> mheard altert nach einer Stunde
+    (<code>MHEARD_AGE_WINDOW_MS</code>, <code>src/mheard_functions.cpp:63</code>).
+    H&ouml;rerschafts-Nachweise entstehen aber nur, wenn jemand <em>meinen</em> Verkehr weiterreicht,
+    und der ist d&uuml;nn ges&auml;t: <code>TRICKLE_IMAX_S</code> 15 Minuten,
+    <code>POSINFO_INTERVAL</code> 30 Minuten. Ein Ein-Stunden-Fenster l&auml;se bei gesunden Knoten
+    schlicht 0. Gealtert wird &uuml;ber <code>millis()</code>, nie &uuml;ber die Uhrzeit &mdash; ein
+    Knoten ohne Zeitsynchronisation bek&auml;me sonst Unsinn, und jeder Eintrag s&auml;he veraltet
+    aus.</p>
+  </div>
+
+  <div class="call note">
+    <h3>Die eine Invariante, die nicht verhandelbar ist</h3>
+    <p>H&ouml;rerschaft 0 muss &bdquo;unbekannt&ldquo; bedeuten, niemals &bdquo;klein&ldquo;. Jeder
+    Neustart beginnt bei 0 (die Tabelle wird au&szlig;er auf dem T-Deck nicht persistiert), und ein
+    frisch gestarteter Bergknoten, der deshalb nach hinten sortiert wird, ist genau der Fehler, den
+    das ADR 02 als Kaltstart-Risiko f&uuml;hrt. Deshalb: unbekannter Rang = Spitzenrang = heutiges
+    Verhalten, plus eine Stunde Anlaufsperre.</p>
+  </div>
+
+  <div class="prose">
+    <h3>Die Zugabe: die Pegelmeldung der Gegenrichtung</h3>
+    <p>Wenn X meine HEY-Bake weiterreicht, tr&auml;gt die zur&uuml;ckkommende Kopie <em>X&rsquo;s
+    Messung meines Signals</em> &mdash; Empfangspegel und Rauschabstand der Gegenrichtung, sonst
+    nirgends beobachtbar (<code>src/aprs_functions.cpp:1174-1179</code>). Die Zuordnung
+    h&auml;lt, weil Pfadelement und Reportgruppe in derselben Reihenfolge wachsen
+    (<code>:1319-1320</code>, dann <code>:1323-1324</code>, dann <code>encodeAPRS()</code> bei
+    <code>:1328</code>). Das Feld best&auml;tigt es: in <strong>7.155 von 7.214</strong>
+    HEY-Empf&auml;ngen (<strong>99,18&nbsp;%</strong>) entspricht die Zahl der Reportgruppen genau
+    der Zahl der Spr&uuml;nge. 59 Ketten sind k&uuml;rzer.</p>
+  </div>
+</section>
+
+
+<!-- ============ 2 ============ -->
+<section id="f2">
+  <div class="sechead"><span class="qn">Frage 2</span><h2>Gibt es die Hierarchie heute schon?</h2><span class="chip alert">Handlungsbedarf</span></div>
+
+  <div class="prose">
+    <p>Nein. Und das ist nicht Zufall, sondern systematisch: <strong>die Knoten, die nach dem Konzept
+    zuerst senden sollten, senden heute zuletzt.</strong></p>
+
+    <p>Drei Ma&szlig;e stehen zur Auswahl &mdash; die H&ouml;rerschaft (wer h&ouml;rt mich), die
+    eigene Nachbarzahl <code>NC_self</code> (wen h&ouml;re ich) und die ADR-Wichtigkeit
+    <code>&Sigma; 1/NC_reported</code> (wie abh&auml;ngig sind meine Nachbarn von mir). Keines
+    sagt voraus, wer die erste Kopie liefert; alle drei sagen voraus, wer zu sp&auml;t kommt.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Rangkorrelation (Spearman) der drei Ma&szlig;e gegen das gemessene Wettrennen um die
+      erste Kopie. Positiv beim Verzug hei&szlig;t: gr&ouml;&szlig;eres Ma&szlig; &rarr; sp&auml;ter
+      dran.</caption>
+      <thead><tr><th>Ma&szlig;</th><th>n</th><th>gegen Erstkopien-Quote</th><th>n</th><th>gegen Medianverzug hinter der ersten Kopie</th></tr></thead>
+      <tbody>
+        <tr><td>H&ouml;rerschaft (Out-Degree)</td><td class="num">40</td><td class="num">&minus;0,038</td><td class="num">32</td><td class="num">+0,4476</td></tr>
+        <tr><td><code>NC_self</code></td><td class="num">25</td><td class="num">+0,239</td><td class="num">20</td><td class="num">+0,6312</td></tr>
+        <tr><td>ADR-Wichtigkeit <code>&Sigma; 1/NC</code></td><td class="num">40</td><td class="num">&minus;0,2894</td><td class="num">32</td><td class="num">+0,4465</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Die Wichtigkeit korreliert sogar <em>negativ</em> mit der Erstkopien-Quote: Je abh&auml;ngiger
+    die Nachbarn von einer Station sind, desto seltener ist sie die erste, die liefert. Das ist die
+    Rangfolge auf dem Kopf.</p>
+
+    <p><strong>Die drei Ma&szlig;e sind auch untereinander nicht austauschbar.</strong>
+    H&ouml;rerschaft gegen <code>NC_self</code>: Spearman 0,6847 (n&nbsp;=&nbsp;62).
+    H&ouml;rerschaft gegen Wichtigkeit: 0,2935 (n&nbsp;=&nbsp;118). <code>NC_self</code> gegen
+    Wichtigkeit: 0,4255 (n&nbsp;=&nbsp;62). Reichweite und Abh&auml;ngigkeit sind verschiedene
+    Gr&ouml;&szlig;en; keine ist ein Stellvertreter der anderen.</p>
+
+    <p><strong>Der Rohlog-Gegencheck ohne jedes Modell.</strong> F&uuml;r jede Nachricht mit
+    mindestens zwei Kopien: Kam die erste Kopie von dem Weiterleiter mit der gr&ouml;&szlig;ten
+    H&ouml;rerschaft? In <strong>919 von 3.244</strong> F&auml;llen (28,33&nbsp;%) ja, davon 48
+    Gleichst&auml;nde. Die heutige Reihenfolge ist also zu gut einem Viertel bereits zuf&auml;llig
+    h&ouml;rerschaftsf&ouml;rmig &mdash; und zu drei Vierteln nicht.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Erste Kopie vom h&ouml;rerschaftsst&auml;rksten Weiterleiter, je Empfangslog. Die
+      Nachlaufzeit ist die Spanne, in der die Kopie eines <em>kleineren</em> Relais der eines
+      gr&ouml;&szlig;eren hinterherl&auml;uft &mdash; das Zeitfenster, in dem eine
+      Storno-Regel &uuml;berhaupt arbeiten kann.</caption>
+      <thead><tr><th>Log</th><th>Nachrichten mit &ge; 2 Kopien</th><th>erste Kopie vom Gr&ouml;&szlig;ten</th><th>Anteil</th><th>Gleichst&auml;nde</th><th>Nachl&auml;ufer n</th><th>Median s</th><th>p90 s</th><th>max s</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">oe3xia <span class="tag">OE3XIR-12</span></td><td class="num">956</td><td class="num">304</td><td class="num">31,80 %</td><td class="num">37</td><td class="num">1.233</td><td class="num">28,877</td><td class="num">330,575</td><td class="num">2.134,1</td></tr>
+        <tr><td class="mono">oe3xoc <span class="tag">OE3XOC-12</span></td><td class="num">1.200</td><td class="num">292</td><td class="num">24,33 %</td><td class="num">9</td><td class="num">2.235</td><td class="num">41,023</td><td class="num">360,745</td><td class="num">2.028,2</td></tr>
+        <tr><td class="mono">oe3xwj <span class="tag">OE3XWJ-12</span></td><td class="num">1.088</td><td class="num">323</td><td class="num">29,69 %</td><td class="num">2</td><td class="num">1.622</td><td class="num">33,909</td><td class="num">372,200</td><td class="num">2.616,5</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Die dreissig h&ouml;rerschaftsst&auml;rksten Stationen</h3>
+  <div class="tablewrap">
+    <table>
+      <caption>H&ouml;rerschaft gegen Eingangsgrad f&uuml;r die Spitzengruppe. &bdquo;Rahmen&ldquo;
+      ist die Zahl der Empf&auml;nge, in denen die Station irgendwo im Pfad steht.
+      &bdquo;Erstkopie&ldquo; und &bdquo;Verzug&ldquo; stammen aus dem gemessenen Wettrennen, nicht
+      aus dem Modell; ein Strich hei&szlig;t, dass die Station als Weiterleiter zu selten auftrat.
+      Firmwarebuchstabe <code>p</code> ist der aktuelle Stand mit Kanalpr&uuml;fung.</caption>
+      <thead><tr><th>Rufzeichen</th><th>Rahmen</th><th>H&ouml;rerschaft</th><th>Eingangsgrad</th><th>NC_self</th><th>Wichtigkeit</th><th>Erstkopie %</th><th>Verzug s</th><th>Hardware</th><th>FW</th><th>CAD</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">OE3XPA-12</td><td class="num">3.112</td><td class="num">23</td><td class="num">24</td><td class="num">17,0</td><td class="num">16,91</td><td class="num">26,43</td><td class="num">27,89</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3XWJ-12 <span class="tag">Jauerling</span></td><td class="num">7.860</td><td class="num">22</td><td class="num">27</td><td class="num">17,0</td><td class="num">17,46</td><td class="num">36,78</td><td class="num">27,96</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3XIR-12 <span class="tag">Hegerberg</span></td><td class="num">7.270</td><td class="num">21</td><td class="num">36</td><td class="num">26,5</td><td class="num">22,08</td><td class="num">29,02</td><td class="num">39,55</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1XAR-33 <span class="tag">Server-Einspeisung</span></td><td class="num">1.036</td><td class="num">19</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>unbekannt (0)</td><td class="num">0:#</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3XIA-12</td><td class="num">2.592</td><td class="num">18</td><td class="num">41</td><td class="num">36,0</td><td class="num">24,83</td><td class="num">45,80</td><td class="num">82,47</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3XOC-12 <span class="tag">Buchberg</span></td><td class="num">7.961</td><td class="num">18</td><td class="num">36</td><td class="num">27,0</td><td class="num">20,92</td><td class="num">24,09</td><td class="num">60,16</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3KJO-62</td><td class="num">1.403</td><td class="num">17</td><td class="num">25</td><td class="num">22,0</td><td class="num">12,11</td><td class="num">46,88</td><td class="num">86,65</td><td>TLORA V2.1.6</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">DK5EN-98</td><td class="num">295</td><td class="num">16</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3MIF-12</td><td class="num">2.299</td><td class="num">16</td><td class="num">25</td><td class="num">&ndash;</td><td class="num">15,15</td><td class="num">24,85</td><td class="num">98,48</td><td>RAK4631 <span class="tag">aus LH-Byte</span></td><td class="num">n/a</td><td>&ndash;</td></tr>
+        <tr><td class="mono">DG2NPE-5</td><td class="num">118</td><td class="num">15</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>EBYTE E22</td><td class="num">35:e</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">DK3ACH-12</td><td class="num">329</td><td class="num">15</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1XAR-13</td><td class="num">1.604</td><td class="num">13</td><td class="num">27</td><td class="num">19,0</td><td class="num">15,29</td><td class="num">56,80</td><td class="num">58,66</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1FFS-10</td><td class="num">304</td><td class="num">12</td><td class="num">8</td><td class="num">&ndash;</td><td class="num">5,38</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>TLORA V2.1.6</td><td class="num">35:k</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3MTC-10</td><td class="num">1.097</td><td class="num">12</td><td class="num">13</td><td class="num">&ndash;</td><td class="num">6,38</td><td class="num">30,28</td><td class="num">439,61</td><td>EBYTE E22</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3XKD-1</td><td class="num">522</td><td class="num">12</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">100,00</td><td class="num">&ndash;</td><td>T-Beam AXP2101</td><td class="num">35:f</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">DL9UW-01</td><td class="num">30</td><td class="num">11</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>TLORA V2.1.6</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE5HWN-12</td><td class="num">35</td><td class="num">11</td><td class="num">1</td><td class="num">&ndash;</td><td class="num">1,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">DO7DAD-12</td><td class="num">26</td><td class="num">10</td><td class="num">0</td><td class="num">&ndash;</td><td class="num">0,00</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>Heltec V2.1</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3GHB-1</td><td class="num">785</td><td class="num">10</td><td class="num">3</td><td class="num">3,0</td><td class="num">1,09</td><td class="num">25,87</td><td class="num">35,56</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3RFA-7</td><td class="num">1.747</td><td class="num">10</td><td class="num">13</td><td class="num">&ndash;</td><td class="num">4,87</td><td class="num">37,78</td><td class="num">21,05</td><td>T-Deck</td><td class="num">35:h</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3XWJ-94</td><td class="num">1.309</td><td class="num">10</td><td class="num">11</td><td class="num">&ndash;</td><td class="num">5,44</td><td class="num">37,23</td><td class="num">33,25</td><td>EBYTE E22</td><td class="num">35:d</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3NRA-1</td><td class="num">1.083</td><td class="num">9</td><td class="num">11</td><td class="num">&ndash;</td><td class="num">4,47</td><td class="num">10,51</td><td class="num">52,13</td><td>RAK4631 <span class="tag">aus LH-Byte</span></td><td class="num">n/a</td><td>&ndash;</td></tr>
+        <tr><td class="mono">OE3ZKW-12</td><td class="num">543</td><td class="num">9</td><td class="num">8</td><td class="num">1,0</td><td class="num">7,33</td><td class="num">30,29</td><td class="num">22,07</td><td>TLORA V2.1.6</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1MOJ-1</td><td class="num">363</td><td class="num">8</td><td class="num">2</td><td class="num">2,0</td><td class="num">1,20</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td>TLORA V2.1.6</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3LXF-21</td><td class="num">168</td><td class="num">8</td><td class="num">0</td><td class="num">18,0</td><td class="num">0,00</td><td class="num">100,00</td><td class="num">&ndash;</td><td>TLORA V2.1.6</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3MZC-1</td><td class="num">252</td><td class="num">8</td><td class="num">0</td><td class="num">10,0</td><td class="num">0,00</td><td class="num">100,00</td><td class="num">&ndash;</td><td>T-Beam</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3REI-14</td><td class="num">1.530</td><td class="num">8</td><td class="num">5</td><td class="num">&ndash;</td><td class="num">1,30</td><td class="num">27,96</td><td class="num">16,19</td><td>RAK4631</td><td class="num">35:k</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3XDC-12</td><td class="num">290</td><td class="num">8</td><td class="num">10</td><td class="num">&ndash;</td><td class="num">4,27</td><td class="num">38,61</td><td class="num">15,33</td><td>TLORA V2.1.6</td><td class="num">34:v</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE1KBC-25</td><td class="num">1.972</td><td class="num">7</td><td class="num">10</td><td class="num">10,0</td><td class="num">3,96</td><td class="num">30,69</td><td class="num">30,21</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3KJO-64</td><td class="num">1.132</td><td class="num">7</td><td class="num">11</td><td class="num">11,0</td><td class="num">4,31</td><td class="num">24,39</td><td class="num">33,41</td><td>T-Beam</td><td class="num">35:p</td><td>ja</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Die Tabelle zeigt den Kern der Sache in den ersten sechs Zeilen: <strong>H&ouml;rerschaft und
+    Eingangsgrad laufen auseinander.</strong> OE3XPA-12 hat die gr&ouml;&szlig;te H&ouml;rerschaft
+    des ganzen Netzes (23) bei einem Eingangsgrad von 24; OE3XIA-12 h&ouml;rt mit 41 Nachbarn fast
+    doppelt so viele, wird aber nur von 18 geh&ouml;rt. Wer nur die eigene Nachbarzahl kennt, kann
+    diese beiden nicht unterscheiden &mdash; und das ist genau der Vorwurf, den das ADR 02 seiner
+    eigenen verworfenen Alternative&nbsp;1 macht.</p>
+
+    <p>Ein zweiter Befund steht in den Nullen: <strong>OE1XAR-33, DK5EN-98, DG2NPE-5, DK3ACH-12,
+    OE3XKD-1</strong> und weitere haben Eingangsgrad 0 bei H&ouml;rerschaft 12 bis 19. Das
+    hei&szlig;t nicht, dass sie niemanden h&ouml;ren, sondern dass in dieser Nacht keine von ihnen
+    weitergereichte Nachricht in einem der drei Empfangslogs auftauchte. Der Graph ist eine
+    Untergrenze, kein Abbild.</p>
+
+    <p>Die drei Bergknoten und ihre beiden st&auml;rksten Nachbarn belegen &uuml;brigens die Spitze: OE3XPA-12 Rang 1,
+    OE3XWJ-12 Rang 2, OE3XIR-12 Rang 3, OE3XIA-12 Rang 5, OE3XOC-12 Rang 6 von 132 &mdash; alle im
+    obersten Zehntel, dessen Schwelle bei 12 Ausgangskanten liegt und dem 15 Stationen
+    angeh&ouml;ren. Die Hierarchie ist im Graphen also da; sie ist nur nicht im Sendeverhalten
+    abgebildet.</p>
+  </div>
+</section>
+
+
+<!-- ============ 3 ============ -->
+<section id="f3">
+  <div class="sechead"><span class="qn">Frage 3</span><h2>Spart fr&uuml;her senden allein etwas?</h2><span class="chip note">Beobachten</span></div>
+
+  <div class="prose">
+    <p>Nein. Exakt null &mdash; und das ist keine Rundung, sondern eine Identit&auml;t.</p>
+
+    <p>Die Simulation vergleicht <strong>P0</strong> (das heutige Verhalten: feste CSMA-Wartezeit,
+    nie zur&uuml;ckziehen) mit <strong>P1</strong> (H&ouml;rerschafts-Skew auf den Slot, sonst
+    unver&auml;ndert). Ergebnis: <strong>72.010 gegen 72.010 Sendungen</strong>, 40,006 Sendungen je
+    Nachricht in beiden F&auml;llen, 100&nbsp;% Abdeckung in beiden F&auml;llen.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">P0 Sendungen</div><div class="v">72.010</div><div class="s">heutiges Verhalten</div></div>
+    <div class="stat"><div class="k">P1 Sendungen</div><div class="v">72.010</div><div class="s">mit Rangfolge</div></div>
+    <div class="stat"><div class="k">Unterschied</div><div class="v">0</div><div class="s">bei 5 Seeds, Streuung 0,000</div></div>
+    <div class="stat"><div class="k">Kopien je Nachricht</div><div class="v">3,0 &ndash; 3,9</div><div class="s">gemessen, nicht simuliert</div></div>
+  </div>
+
+  <div class="prose">
+    <p><strong>Der Mechanismus.</strong> Bei einer Grundwartezeit von 4,5 bis 5,5&nbsp;s
+    &uuml;berlappen die Relay-Generationen nicht. Eine Umsortierung <em>innerhalb</em> einer
+    Generation kann deshalb nicht &auml;ndern, mit welchem Hop-Budget eine Station den Rahmen zuerst
+    empf&auml;ngt &mdash; und jede Station, die ihn mit Budget &gt; 0 empf&auml;ngt, leitet ihn
+    genau einmal weiter. Umsortieren &auml;ndert, <em>wer</em> zuerst liefert, nicht <em>wie
+    viele</em> liefern.</p>
+
+    <p>Selbst mit gro&szlig;en Schritten bleibt es dabei. Erst bei 5&nbsp;s Schrittweite beginnen die
+    Generationen zu &uuml;berlappen, und die Ersparnis betr&auml;gt dann 0,3&nbsp;% &mdash; bei
+    0,12&nbsp;% Abdeckungsverlust.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Empfindlichkeit der reinen Rangfolge gegen die Schrittweite des Skews, ohne
+      Stornieren.</caption>
+      <thead><tr><th>Variante</th><th>Skew-Schritt s</th><th>Sendungen je Nachricht</th><th>gegen P0</th><th>Abdeckung %</th></tr></thead>
+      <tbody>
+        <tr><td>P1, Schritt 1,0 s</td><td class="num">1,0</td><td class="num">40,006</td><td class="num">100,0 %</td><td class="num">100,000</td></tr>
+        <tr><td>P1, Schritt 2,5 s</td><td class="num">2,5</td><td class="num">39,989</td><td class="num">100,0 %</td><td class="num">99,989</td></tr>
+        <tr><td>P1, Schritt 5,0 s</td><td class="num">5,0</td><td class="num">39,876</td><td class="num">99,7 %</td><td class="num">99,878</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><strong>Das Feld sagt dasselbe, ohne Modell.</strong> Fast jede Kopie kommt von einem
+    <em>anderen</em> Weiterleiter. Z&auml;hlt man am Buchberg statt der Kopien die verschiedenen
+    Relais je Nachricht, ergibt sich praktisch dieselbe Verteilung: 415 Nachrichten mit einem
+    Relais, 184 mit zweien, 202 mit dreien, 212 mit vieren &mdash; gegen&uuml;ber 415, 184, 202 und
+    211 Nachrichten mit einer, zwei, drei und vier Kopien. Es gibt also keinen Knoten, der doppelt
+    sendet und den man einsparen k&ouml;nnte; es sind viele Knoten, die je einmal senden, ohne
+    voneinander zu wissen. Die schlimmste einzelne Nachricht der Nacht kam in <strong>15 Kopien von
+    15 verschiedenen Stationen</strong>.</p>
+
+    <p>Dazu kommt die Gr&ouml;&szlig;enordnung. Das Zufallsfenster des Sendezugriffs ist 350&nbsp;ms
+    breit (<code>CSMA_PRIO_SLOTS</code> 10 &times; <code>CSMA_SLOT_SIZE</code> 35). Der
+    Medianabstand zwischen zwei aufeinanderfolgenden Kopien derselben Nachricht liegt bei
+    <strong>16,62 / 13,95 / 17,48&nbsp;s</strong>. Ein Skew, der in Millisekunden bemessen ist,
+    sortiert Knoten, die nie miteinander konkurriert haben.</p>
+  </div>
+
+  <div class="call">
+    <h3>Was daraus folgt</h3>
+    <p>Die Rangfolge ist <strong>Voraussetzung, nicht Wirkung</strong>. Sie geh&ouml;rt in den
+    Entwurf, weil das ADR 02 zeigt, dass Unterdr&uuml;ckung <em>ohne</em> Ordnung die falschen
+    Knoten trifft &mdash; die Hubs statt der Bl&auml;tter. Als Einsparma&szlig;nahme f&uuml;r sich
+    genommen ist sie widerlegt. Und wenn ihre Schrittweite &uuml;berhaupt etwas bewirken soll, muss
+    sie in Sekunden bemessen sein, nicht in Millisekunden.</p>
+  </div>
+</section>
+
+
+<!-- ============ 4 ============ -->
+<section id="f4">
+  <div class="sechead"><span class="qn">Frage 4</span><h2>Wie viel spart &bdquo;erst schauen, dann senden&ldquo;?</h2><span class="chip alert">Handlungsbedarf, mit Leitplanken</span></div>
+
+  <div class="prose">
+    <p>Hier steckt der gesamte Nutzen des Konzepts &mdash; und die gesamte Gefahr. Die Simulation
+    spielt f&uuml;nf Regelfamilien &uuml;ber denselben H&ouml;rgraphen, 1.800 Nachrichten, je
+    f&uuml;nf Zufallsdurchl&auml;ufe:</p>
+
+    <ul class="tight">
+      <li><strong>P0</strong> &mdash; heute: feste Wartezeit, ein eingereihtes Relay wird nie
+        zur&uuml;ckgezogen.</li>
+      <li><strong>P1</strong> &mdash; Rangfolge nach H&ouml;rerschaft, sonst wie P0.</li>
+      <li><strong>P2</strong> &mdash; P1 plus <em>hartes Stornieren beim ersten Mith&ouml;ren</em>.</li>
+      <li><strong>P3</strong> &mdash; P2 plus Alleinversorger-Veto f&uuml;r strikte Bl&auml;tter
+        (Eingangsgrad 1); <strong>P3b</strong> dasselbe mit weichem Veto (Eingangsgrad &le; 2).</li>
+      <li><strong>P4</strong> &mdash; P3 plus adaptives Hop-Budget beim Ursprung.</li>
+      <li><strong>P5</strong> &mdash; die W&ouml;rter des Betreibers w&ouml;rtlich genommen:
+        <em>gesendet darf immer werden, nur nicht sofort</em>. Ein Hub beh&auml;lt den normalen
+        Slot; alle anderen warten einen Nachlauf ab und z&auml;hlen <em>erst dann</em>, wie viele
+        Kopien sie geh&ouml;rt haben. Wer weniger als <em>k</em> gez&auml;hlt hat oder
+        Alleinversorger ist, sendet trotzdem. <strong>P5h</strong> schweigt nie: statt zu
+        stornieren, gibt es sein Hop-Budget ab und sendet mit <code>max_hop = 1</code>.</li>
+    </ul>
+  </div>
+
+  <h3>Die f&uuml;nf Regelfamilien im Vergleich</h3>
+  <figure>
+    <div class="chartbox">
+      <svg viewBox="0 0 780 285" role="img" aria-label="Sendungen als Anteil von P0 und Abdeckung, je Regelfamilie. P0 100 zu 100. P1 100 zu 100. P2 35,4 zu 72,7. P3 38,4 zu 78,4. P3b 47,3 zu 89,8. P4 28,0 zu 72,4. P5 mit k gleich 1 55,3 zu 95,6. P5 mit k gleich 2 70,6 zu 98,5. P5h 99,3 zu 99,9.">
+<g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor">
+<g stroke="currentColor" stroke-opacity=".15">
+<line x1="48" y1="180.5" x2="766" y2="180.5"/>
+<line x1="48" y1="129.0" x2="766" y2="129.0"/>
+<line x1="48" y1="77.5" x2="766" y2="77.5"/>
+<line x1="48" y1="26.0" x2="766" y2="26.0"/>
+</g>
+<line x1="48" y1="232" x2="766" y2="232" stroke="currentColor" stroke-opacity=".4"/>
+<g fill-opacity=".55" text-anchor="end">
+<text x="40" y="235.5">0</text>
+<text x="40" y="184.0">25</text>
+<text x="40" y="132.5">50</text>
+<text x="40" y="81.0">75</text>
+<text x="40" y="29.5">100</text>
+</g>
+<g>
+<rect x="58.9" y="26.0" width="27" height="206.0" rx="2" fill="var(--r3)"/>
+<rect x="89.9" y="26.0" width="27" height="206.0" rx="2" fill="var(--r1)"/>
+<text x="72.4" y="21.0" text-anchor="middle" font-size="9">100,0</text>
+<text x="103.4" y="21.0" text-anchor="middle" font-size="9">100,0</text>
+<text x="87.9" y="248.0" text-anchor="middle" font-size="10.5">P0</text>
+<text x="87.9" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">heute</text>
+<rect x="138.7" y="26.0" width="27" height="206.0" rx="2" fill="var(--r3)"/>
+<rect x="169.7" y="26.0" width="27" height="206.0" rx="2" fill="var(--r1)"/>
+<text x="152.2" y="21.0" text-anchor="middle" font-size="9">100,0</text>
+<text x="183.2" y="21.0" text-anchor="middle" font-size="9">100,0</text>
+<text x="167.7" y="248.0" text-anchor="middle" font-size="10.5">P1</text>
+<text x="167.7" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">nur Skew</text>
+<rect x="218.4" y="159.1" width="27" height="72.9" rx="2" fill="var(--r3)"/>
+<rect x="249.4" y="82.3" width="27" height="149.7" rx="2" fill="var(--r1)"/>
+<text x="231.9" y="154.1" text-anchor="middle" font-size="9">35,4</text>
+<text x="262.9" y="77.3" text-anchor="middle" font-size="9">72,7</text>
+<text x="247.4" y="248.0" text-anchor="middle" font-size="10.5">P2</text>
+<text x="247.4" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">+ Storno</text>
+<rect x="298.2" y="152.9" width="27" height="79.1" rx="2" fill="var(--r3)"/>
+<rect x="329.2" y="70.5" width="27" height="161.5" rx="2" fill="var(--r1)"/>
+<text x="311.7" y="147.9" text-anchor="middle" font-size="9">38,4</text>
+<text x="342.7" y="65.5" text-anchor="middle" font-size="9">78,4</text>
+<text x="327.2" y="248.0" text-anchor="middle" font-size="10.5">P3</text>
+<text x="327.2" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">+ Veto 1</text>
+<rect x="378.0" y="134.6" width="27" height="97.4" rx="2" fill="var(--r3)"/>
+<rect x="409.0" y="47.0" width="27" height="185.0" rx="2" fill="var(--r1)"/>
+<text x="391.5" y="129.6" text-anchor="middle" font-size="9">47,3</text>
+<text x="422.5" y="42.0" text-anchor="middle" font-size="9">89,8</text>
+<text x="407.0" y="248.0" text-anchor="middle" font-size="10.5">P3b</text>
+<text x="407.0" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">+ Veto 2</text>
+<rect x="457.8" y="174.3" width="27" height="57.7" rx="2" fill="var(--r3)"/>
+<rect x="488.8" y="82.9" width="27" height="149.1" rx="2" fill="var(--r1)"/>
+<text x="471.3" y="169.3" text-anchor="middle" font-size="9">28,0</text>
+<text x="502.3" y="77.9" text-anchor="middle" font-size="9">72,4</text>
+<text x="486.8" y="248.0" text-anchor="middle" font-size="10.5">P4</text>
+<text x="486.8" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">+ Hop</text>
+<rect x="537.6" y="118.1" width="27" height="113.9" rx="2" fill="var(--r3)"/>
+<rect x="568.6" y="35.2" width="27" height="196.8" rx="2" fill="var(--r1)"/>
+<text x="551.1" y="113.1" text-anchor="middle" font-size="9">55,3</text>
+<text x="582.1" y="30.2" text-anchor="middle" font-size="9">95,6</text>
+<text x="566.6" y="248.0" text-anchor="middle" font-size="10.5">P5 k=1</text>
+<text x="566.6" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">sp&#228;t 3 s</text>
+<rect x="617.3" y="86.6" width="27" height="145.4" rx="2" fill="var(--r3)"/>
+<rect x="648.3" y="29.0" width="27" height="203.0" rx="2" fill="var(--r1)"/>
+<text x="630.8" y="81.6" text-anchor="middle" font-size="9">70,6</text>
+<text x="661.8" y="24.0" text-anchor="middle" font-size="9">98,5</text>
+<text x="646.3" y="248.0" text-anchor="middle" font-size="10.5">P5 k=2</text>
+<text x="646.3" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">sp&#228;t 10 s</text>
+<rect x="697.1" y="27.4" width="27" height="204.6" rx="2" fill="var(--r3)"/>
+<rect x="728.1" y="26.3" width="27" height="205.7" rx="2" fill="var(--r1)"/>
+<text x="710.6" y="22.4" text-anchor="middle" font-size="9">99,3</text>
+<text x="741.6" y="21.3" text-anchor="middle" font-size="9">99,9</text>
+<text x="726.1" y="248.0" text-anchor="middle" font-size="10.5">P5h</text>
+<text x="726.1" y="261.0" text-anchor="middle" font-size="9" fill-opacity=".5">Hop-Yield</text>
+</g>
+<text x="407" y="279" text-anchor="middle" fill-opacity=".55" font-size="10">Prozent &#183; P5-Punkte jeweils mit weichem Veto</text>
+</g></svg>
+<div class="legend"><span><i class="sw" style="background:var(--r3)"></i>Sendungen, Anteil an P0</span><span><i class="sw" style="background:var(--r1)"></i>Abdeckung</span></div>
+    </div>
+    <figcaption>Die beiden Balken je Familie sind die ganze Entscheidung: links, was gesendet wird,
+    rechts, was ankommt. P1 spart nichts. P2 spart am meisten und kostet am meisten. P5 ist die
+    einzige Familie, die beides gleichzeitig vertretbar h&auml;lt. P5h spart praktisch nichts &mdash;
+    es ist ein Sicherheitsnetz, keine Sparma&szlig;nahme.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Kopfzahlen der Simulation. &bdquo;Sendungen je Nachricht&ldquo; ist der Mittelwert
+      &uuml;ber f&uuml;nf Durchl&auml;ufe; &bdquo;Streuung&ldquo; deren Spannweite. Die Sendezeit ist
+      auf eine Stunde des 8,18-Stunden-Fensters normiert.</caption>
+      <thead><tr><th>Regel</th><th>was sie tut</th><th>Sendungen/Nachricht</th><th>Streuung</th><th>p90</th><th>gegen P0</th><th>Abdeckung %</th><th>Sendezeit s/h</th><th>gespart s/h</th><th>Stornos</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">P0</td><td>heute: feste Wartezeit, nie zur&uuml;ckziehen</td><td class="num">40,006</td><td class="num">0,000</td><td class="num">57,00</td><td class="num">100,0 %</td><td class="num">100,000</td><td class="num">8.772,0</td><td class="num">0,0</td><td class="num">0</td></tr>
+        <tr><td class="mono">P1</td><td>nur Rangfolge, nie zur&uuml;ckziehen</td><td class="num">40,006</td><td class="num">0,000</td><td class="num">57,00</td><td class="num">100,0 %</td><td class="num">100,000</td><td class="num">8.772,0</td><td class="num">0,0</td><td class="num">0</td></tr>
+        <tr><td class="mono">P2</td><td>Rangfolge + Storno beim Mith&ouml;ren</td><td class="num">14,162</td><td class="num">0,138</td><td class="num">24,60</td><td class="num">35,4 %</td><td class="num">72,670</td><td class="num">3.082,1</td><td class="num">5.689,9</td><td class="num">27.970</td></tr>
+        <tr><td class="mono">P3</td><td>P2 + Veto f&uuml;r Eingangsgrad 1</td><td class="num">15,371</td><td class="num">0,111</td><td class="num">26,40</td><td class="num">38,4 %</td><td class="num">78,386</td><td class="num">3.334,1</td><td class="num">5.437,9</td><td class="num">29.228</td></tr>
+        <tr><td class="mono">P3b</td><td>P2 + Veto f&uuml;r Eingangsgrad &le; 2</td><td class="num">18,921</td><td class="num">0,081</td><td class="num">29,00</td><td class="num">47,3 %</td><td class="num">89,815</td><td class="num">4.138,7</td><td class="num">4.633,3</td><td class="num">30.683</td></tr>
+        <tr><td class="mono">P4</td><td>P3 + adaptives Hop-Budget am Ursprung</td><td class="num">11,200</td><td class="num">0,208</td><td class="num">18,80</td><td class="num">28,0 %</td><td class="num">72,401</td><td class="num">2.462,1</td><td class="num">6.309,9</td><td class="num">25.356</td></tr>
+        <tr class="total"><td class="mono">P5 k=1</td><td>aufschieben 3 s, dann pr&uuml;fen, weiches Veto</td><td class="num">22,107</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">55,3 %</td><td class="num">95,557</td><td class="num">&ndash;</td><td class="num">3.918,7</td><td class="num">29.646</td></tr>
+        <tr class="total"><td class="mono">P5 k=2</td><td>aufschieben 10 s, dann pr&uuml;fen, weiches Veto</td><td class="num">28,245</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">70,6 %</td><td class="num">98,533</td><td class="num">&ndash;</td><td class="num">2.593,1</td><td class="num">20.325</td></tr>
+        <tr><td class="mono">P5h</td><td>nie schweigen, stattdessen Hop-Budget abgeben</td><td class="num">39,742</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">99,3 %</td><td class="num">99,858</td><td class="num">&ndash;</td><td class="num">57,0</td><td class="num">0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><strong>Hartes Stornieren ist zu teuer.</strong> P2 spart knapp zwei Drittel der Sendungen
+    &mdash; und verliert &uuml;ber ein Viertel der Zustellungen. Das Veto f&uuml;r strikte
+    Bl&auml;tter (P3) holt nur f&uuml;nf Punkte Abdeckung zur&uuml;ck. Erst das weiche Veto (P3b,
+    Eingangsgrad &le; 2) bringt 89,8&nbsp;% &mdash; und kostet daf&uuml;r ein Drittel der Ersparnis.
+    Zwischen P3 und P3b liegen 11,4 Punkte Abdeckung f&uuml;r 8,9 Punkte Sendungen: <strong>das
+    weiche Veto ist der tragende Stellhebel des ganzen Entwurfs</strong>, nicht die Rangfolge und
+    nicht die Wartezeit.</p>
+
+    <p><strong>Aufschieben schl&auml;gt stornieren.</strong> P5 nimmt die Formulierung des Betreibers
+    beim Wort und pr&uuml;ft <em>nach</em> dem Nachlauf statt beim ersten Duplikat. Bei
+    k&nbsp;=&nbsp;1 und 3&nbsp;s Nachlauf mit weichem Veto: 55,3&nbsp;% der heutigen Sendungen,
+    <strong>95,56&nbsp;% Abdeckung</strong>, 3.919&nbsp;s gesparte Sendezeit je Stunde, acht
+    Stationen &uuml;ber der 5-%-Verlustschwelle. Bei k&nbsp;=&nbsp;2 und 10&nbsp;s Nachlauf:
+    70,6&nbsp;%, <strong>98,53&nbsp;% Abdeckung</strong>, 2.593&nbsp;s/h, f&uuml;nf Verlierer.</p>
+  </div>
+
+  <h3>Der Handel: Abdeckung gegen Sendungen</h3>
+  <figure>
+    <div class="chartbox">
+      <svg viewBox="0 0 780 300" role="img" aria-label="Streudiagramm aller 48 Rasterpunkte der P5-Familie. Waagrecht die Abdeckung von 88 bis 100 Prozent, senkrecht die Sendungen als Anteil von P0 von 50 bis 100 Prozent. Die P5-Punkte liegen unten links bis Mitte, die P5h-Punkte oben rechts. Die beiden empfohlenen Punkte liegen bei 95,6 zu 55,3 und bei 98,5 zu 70,6 Prozent.">
+<g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor">
+<g stroke="currentColor" stroke-opacity=".13">
+<line x1="111.9" y1="24" x2="111.9" y2="250"/>
+<line x1="215.6" y1="24" x2="215.6" y2="250"/>
+<line x1="319.3" y1="24" x2="319.3" y2="250"/>
+<line x1="423.0" y1="24" x2="423.0" y2="250"/>
+<line x1="526.7" y1="24" x2="526.7" y2="250"/>
+<line x1="630.4" y1="24" x2="630.4" y2="250"/>
+<line x1="734.1" y1="24" x2="734.1" y2="250"/>
+<line x1="60" y1="230.2" x2="760" y2="230.2"/>
+<line x1="60" y1="190.5" x2="760" y2="190.5"/>
+<line x1="60" y1="150.9" x2="760" y2="150.9"/>
+<line x1="60" y1="111.2" x2="760" y2="111.2"/>
+<line x1="60" y1="71.6" x2="760" y2="71.6"/>
+<line x1="60" y1="31.9" x2="760" y2="31.9"/>
+</g>
+<line x1="60" y1="250" x2="760" y2="250" stroke="currentColor" stroke-opacity=".4"/>
+<line x1="60" y1="24" x2="60" y2="250" stroke="currentColor" stroke-opacity=".4"/>
+<g fill-opacity=".55" text-anchor="middle">
+<text x="111.9" y="268">88</text>
+<text x="215.6" y="268">90</text>
+<text x="319.3" y="268">92</text>
+<text x="423.0" y="268">94</text>
+<text x="526.7" y="268">96</text>
+<text x="630.4" y="268">98</text>
+<text x="734.1" y="268">100</text>
+</g>
+<g fill-opacity=".55" text-anchor="end">
+<text x="52" y="233.7">50</text>
+<text x="52" y="194.0">60</text>
+<text x="52" y="154.4">70</text>
+<text x="52" y="114.7">80</text>
+<text x="52" y="75.1">90</text>
+<text x="52" y="35.4">100</text>
+</g>
+<circle cx="150.6" cy="233.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="503.7" cy="209.2" r="4" fill="var(--r2)"/>
+<circle cx="160.9" cy="232.2" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="508.2" cy="208.0" r="4" fill="var(--r2)"/>
+<circle cx="160.1" cy="232.2" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="508.1" cy="208.0" r="4" fill="var(--r2)"/>
+<circle cx="160.1" cy="232.2" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="508.4" cy="208.0" r="4" fill="var(--r2)"/>
+<circle cx="400.0" cy="171.5" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="657.5" cy="147.3" r="4" fill="var(--r2)"/>
+<circle cx="410.8" cy="170.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="659.6" cy="148.1" r="4" fill="var(--r2)"/>
+<circle cx="410.3" cy="170.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="658.0" cy="148.5" r="4" fill="var(--r2)"/>
+<circle cx="410.1" cy="170.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="658.5" cy="148.5" r="4" fill="var(--r2)"/>
+<circle cx="559.2" cy="123.1" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="672.1" cy="110.0" r="4" fill="var(--r2)"/>
+<circle cx="560.7" cy="122.3" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="671.2" cy="110.0" r="4" fill="var(--r2)"/>
+<circle cx="558.0" cy="124.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="671.2" cy="111.6" r="4" fill="var(--r2)"/>
+<circle cx="558.1" cy="124.7" r="4" fill="none" stroke="var(--r2)" stroke-width="1.6"/>
+<circle cx="671.3" cy="111.6" r="4" fill="var(--r2)"/>
+<circle cx="621.9" cy="45.8" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="726.7" cy="34.7" r="4" fill="var(--r1)"/>
+<circle cx="621.8" cy="46.2" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="727.6" cy="35.1" r="4" fill="var(--r1)"/>
+<circle cx="621.7" cy="46.2" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="727.0" cy="35.1" r="4" fill="var(--r1)"/>
+<circle cx="621.6" cy="46.2" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="727.1" cy="35.1" r="4" fill="var(--r1)"/>
+<circle cx="636.1" cy="38.7" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="733.0" cy="32.7" r="4" fill="var(--r1)"/>
+<circle cx="635.9" cy="38.7" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="732.5" cy="33.5" r="4" fill="var(--r1)"/>
+<circle cx="635.8" cy="38.7" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="732.8" cy="33.5" r="4" fill="var(--r1)"/>
+<circle cx="635.8" cy="38.7" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="732.8" cy="33.5" r="4" fill="var(--r1)"/>
+<circle cx="692.6" cy="34.7" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="734.1" cy="32.3" r="4" fill="var(--r1)"/>
+<circle cx="692.3" cy="35.1" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="733.5" cy="33.1" r="4" fill="var(--r1)"/>
+<circle cx="692.3" cy="35.1" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="733.5" cy="33.1" r="4" fill="var(--r1)"/>
+<circle cx="692.3" cy="35.1" r="4" fill="none" stroke="var(--r1)" stroke-width="1.6"/>
+<circle cx="733.5" cy="33.1" r="4" fill="var(--r1)"/>
+<circle cx="503.7" cy="209.2" r="9" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+<circle cx="658.0" cy="148.5" r="9" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+<line x1="503.7" y1="200.2" x2="470" y2="176" stroke="currentColor" stroke-opacity=".45"/>
+<line x1="658.0" y1="139.5" x2="620" y2="96" stroke="currentColor" stroke-opacity=".45"/>
+<text x="466" y="172" text-anchor="end" font-size="10.5">k=1, sp&#228;t 3 s, weich</text>
+<text x="466" y="184" text-anchor="end" font-size="9.5" fill-opacity=".6">95,56 % / 55,3 % / 8 Verlierer</text>
+<text x="616" y="92" text-anchor="end" font-size="10.5">k=2, sp&#228;t 10 s, weich</text>
+<text x="616" y="104" text-anchor="end" font-size="9.5" fill-opacity=".6">98,53 % / 70,6 % / 5 Verlierer</text>
+<text x="410" y="290" text-anchor="middle" fill-opacity=".55" font-size="10">Abdeckung % &#8594;   /   &#8593; Sendungen als Anteil von P0 %</text>
+</g></svg>
+<div class="legend"><span><i class="sw" style="background:var(--r2)"></i>P5 (stornieren nach Nachlauf)</span><span><i class="sw" style="background:var(--r1)"></i>P5h (Hop-Budget abgeben)</span><span><i class="sw" style="border:1.6px solid var(--muted);background:transparent"></i>hohl = striktes Veto</span><span><i class="sw" style="background:var(--muted)"></i>voll = weiches Veto</span></div>
+    </div>
+    <figcaption>Alle 48 Rasterpunkte. Je weiter unten ein Punkt liegt, desto mehr Sendezeit spart
+    er; je weiter rechts, desto weniger Zustellungen gehen verloren. Die Punktpaare je Familie sind
+    die vier Nachlaufzeiten &mdash; sie liegen praktisch aufeinander, der Nachlauf ist also der
+    unwichtigste Parameter. Der Sprung von hohl nach voll ist der Wechsel vom strikten zum weichen
+    Veto: derselbe Nachlauf, dieselbe Kopienzahl, 5 bis 7 Punkte mehr Abdeckung.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <p><strong>Der Nachlauf ist fast bedeutungslos.</strong> Zwischen 3&nbsp;s und 20&nbsp;s
+    Nachlauf &auml;ndert sich die Abdeckung um <strong>weniger als 0,2 Prozentpunkte</strong> (k=1
+    weich: 95,557 &rarr; 95,647; k=2 weich: 98,524 &rarr; 98,542). Das ist eine gute Nachricht
+    f&uuml;r die Umsetzung: die Konstante darf gro&szlig;z&uuml;gig gew&auml;hlt werden, ohne dass etwas
+    kippt. Was z&auml;hlt, sind <em>k</em> und die Vetobreite.</p>
+
+    <p><strong>P5 verdr&auml;ngt P2 und P3.</strong> P3 kauft 78,4&nbsp;% Abdeckung f&uuml;r
+    38,4&nbsp;% der Sendungen; P5 mit k=1 und striktem Veto kauft 88,7&nbsp;% f&uuml;r 49,1&nbsp;%.
+    Jeder zus&auml;tzliche Abdeckungspunkt ist bei P5 billiger, und der Grund ist strukturell: die
+    Entscheidung f&auml;llt sp&auml;ter und mit mehr Information. Wer bis dahin nichts geh&ouml;rt
+    hat, sendet.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Die beiden Betriebspunkte, gesucht als gr&ouml;&szlig;te Ersparnis, die eine
+      Abdeckungsschwelle noch einh&auml;lt. &bdquo;Verlierer&ldquo; sind Stationen, die mindestens
+      5&nbsp;% der Nachrichten verlieren, die sie unter P0 erhalten h&auml;tten.</caption>
+      <thead><tr><th>Schwelle</th><th>bester Punkt</th><th>Sendungen/Nachricht</th><th>gegen P0</th><th>Abdeckung %</th><th>gespart s/h</th><th>Verlierer</th><th>Rasterpunkte &uuml;ber der Schwelle</th></tr></thead>
+      <tbody>
+        <tr><td>&ge; 95 % Abdeckung</td><td class="mono">P5 k=1, sp&auml;t 3 s, weiches Veto</td><td class="num">22,107</td><td class="num">55,3 %</td><td class="num">95,557</td><td class="num">3.918,7</td><td class="num">8</td><td class="num">40 von 48</td></tr>
+        <tr><td>&ge; 98 % Abdeckung</td><td class="mono">P5 k=2, sp&auml;t 10 s, weiches Veto</td><td class="num">28,245</td><td class="num">70,6 %</td><td class="num">98,533</td><td class="num">2.593,1</td><td class="num">5</td><td class="num">28 von 48</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Zum Vergleich, was das Netz heute an Wiederholung tr&auml;gt: 66,90 / 74,48 / 68,16&nbsp;% der
+    Empf&auml;nge sind Wiederholungen, das sind 67,53 / 75,20 / 68,83&nbsp;% der geh&ouml;rten
+    Sendezeit. Eine Ersparnis von 3.919&nbsp;s je Stunde bei 95,6&nbsp;% Abdeckung greift also genau
+    in diesen Block und l&auml;sst ihn nicht ganz verschwinden &mdash; was auch nicht das Ziel ist,
+    denn ein Teil der Wiederholung <em>ist</em> die Zustellung.</p>
+  </div>
+
+  <details>
+    <summary>Der vollst&auml;ndige Raster&uuml;berblick: 48 Punkte, k &times; Nachlauf &times; Vetobreite</summary>
+    <div class="tablewrap">
+      <table>
+        <caption>Raster: k in 1/2/3, Nachlauf in 3/6/10/20&nbsp;s, Veto strikt (Eingangsgrad 1)
+        oder weich (&le; 2), H&ouml;rsperre 1&nbsp;s, je f&uuml;nf Durchl&auml;ufe.
+        &bdquo;Veto greift&ldquo; z&auml;hlt die F&auml;lle, in denen das Alleinversorger-Veto ein
+        Schweigen verhindert hat; &bdquo;Hop-Abgaben&ldquo; die F&auml;lle, in denen P5h statt zu
+        schweigen mit gek&uuml;rztem Budget gesendet hat.</caption>
+        <thead><tr><th>Familie</th><th>k</th><th>Nachlauf s</th><th>Veto</th><th>Sendungen/Nachr.</th><th>gegen P0</th><th>Abdeckung %</th><th>gespart s/h</th><th>Stornos</th><th>Veto greift</th><th>Hop-Abgaben</th><th>Verlierer</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">3</td><td>strikt</td><td class="num">19,639</td><td class="num">49,1 %</td><td class="num">88,747</td><td class="num">4.505,7</td><td class="num">30.971</td><td class="num">1.619</td><td class="num">0</td><td class="num">28</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">3</td><td>weich</td><td class="num">22,107</td><td class="num">55,3 %</td><td class="num">95,557</td><td class="num">3.918,7</td><td class="num">29.646</td><td class="num">8.934</td><td class="num">0</td><td class="num">8</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">6</td><td>strikt</td><td class="num">19,791</td><td class="num">49,5 %</td><td class="num">88,945</td><td class="num">4.469,3</td><td class="num">30.790</td><td class="num">1.618</td><td class="num">0</td><td class="num">27</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">6</td><td>weich</td><td class="num">22,226</td><td class="num">55,6 %</td><td class="num">95,643</td><td class="num">3.890,4</td><td class="num">29.424</td><td class="num">8.775</td><td class="num">0</td><td class="num">8</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">10</td><td>strikt</td><td class="num">19,794</td><td class="num">49,5 %</td><td class="num">88,930</td><td class="num">4.469,2</td><td class="num">30.767</td><td class="num">1.653</td><td class="num">0</td><td class="num">27</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">10</td><td>weich</td><td class="num">22,229</td><td class="num">55,6 %</td><td class="num">95,642</td><td class="num">3.889,9</td><td class="num">29.420</td><td class="num">8.806</td><td class="num">0</td><td class="num">8</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">20</td><td>strikt</td><td class="num">19,801</td><td class="num">49,5 %</td><td class="num">88,930</td><td class="num">4.467,8</td><td class="num">30.755</td><td class="num">1.653</td><td class="num">0</td><td class="num">27</td></tr>
+          <tr><td class="mono">P5</td><td class="num">1</td><td class="num">20</td><td>weich</td><td class="num">22,241</td><td class="num">55,6 %</td><td class="num">95,647</td><td class="num">3.887,3</td><td class="num">29.392</td><td class="num">8.804</td><td class="num">0</td><td class="num">8</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">3</td><td>strikt</td><td class="num">25,906</td><td class="num">64,8 %</td><td class="num">93,557</td><td class="num">3.094,5</td><td class="num">22.695</td><td class="num">788</td><td class="num">0</td><td class="num">18</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">3</td><td>weich</td><td class="num">28,348</td><td class="num">70,9 %</td><td class="num">98,524</td><td class="num">2.570,0</td><td class="num">20.190</td><td class="num">5.266</td><td class="num">0</td><td class="num">5</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">6</td><td>strikt</td><td class="num">26,020</td><td class="num">65,0 %</td><td class="num">93,766</td><td class="num">3.072,0</td><td class="num">22.609</td><td class="num">817</td><td class="num">0</td><td class="num">18</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">6</td><td>weich</td><td class="num">28,293</td><td class="num">70,7 %</td><td class="num">98,563</td><td class="num">2.582,0</td><td class="num">20.260</td><td class="num">5.089</td><td class="num">0</td><td class="num">5</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">10</td><td>strikt</td><td class="num">25,990</td><td class="num">65,0 %</td><td class="num">93,755</td><td class="num">3.078,1</td><td class="num">22.651</td><td class="num">901</td><td class="num">0</td><td class="num">18</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">10</td><td>weich</td><td class="num">28,245</td><td class="num">70,6 %</td><td class="num">98,533</td><td class="num">2.593,1</td><td class="num">20.325</td><td class="num">5.158</td><td class="num">0</td><td class="num">5</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">20</td><td>strikt</td><td class="num">25,998</td><td class="num">65,0 %</td><td class="num">93,752</td><td class="num">3.076,3</td><td class="num">22.631</td><td class="num">901</td><td class="num">0</td><td class="num">18</td></tr>
+          <tr><td class="mono">P5</td><td class="num">2</td><td class="num">20</td><td>weich</td><td class="num">28,254</td><td class="num">70,6 %</td><td class="num">98,542</td><td class="num">2.590,9</td><td class="num">20.304</td><td class="num">5.158</td><td class="num">0</td><td class="num">5</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">3</td><td>strikt</td><td class="num">30,816</td><td class="num">77,0 %</td><td class="num">96,627</td><td class="num">2.012,3</td><td class="num">15.012</td><td class="num">390</td><td class="num">0</td><td class="num">16</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">3</td><td>weich</td><td class="num">32,114</td><td class="num">80,3 %</td><td class="num">98,805</td><td class="num">1.747,3</td><td class="num">13.516</td><td class="num">3.041</td><td class="num">0</td><td class="num">4</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">6</td><td>strikt</td><td class="num">30,876</td><td class="num">77,2 %</td><td class="num">96,657</td><td class="num">1.996,0</td><td class="num">14.883</td><td class="num">331</td><td class="num">0</td><td class="num">16</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">6</td><td>weich</td><td class="num">32,141</td><td class="num">80,3 %</td><td class="num">98,788</td><td class="num">1.739,1</td><td class="num">13.409</td><td class="num">2.916</td><td class="num">0</td><td class="num">4</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">10</td><td>strikt</td><td class="num">30,640</td><td class="num">76,6 %</td><td class="num">96,604</td><td class="num">2.045,3</td><td class="num">15.261</td><td class="num">322</td><td class="num">0</td><td class="num">16</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">10</td><td>weich</td><td class="num">31,949</td><td class="num">79,9 %</td><td class="num">98,787</td><td class="num">1.779,3</td><td class="num">13.754</td><td class="num">2.973</td><td class="num">0</td><td class="num">4</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">20</td><td>strikt</td><td class="num">30,644</td><td class="num">76,6 %</td><td class="num">96,607</td><td class="num">2.044,5</td><td class="num">15.250</td><td class="num">322</td><td class="num">0</td><td class="num">16</td></tr>
+          <tr><td class="mono">P5</td><td class="num">3</td><td class="num">20</td><td>weich</td><td class="num">31,953</td><td class="num">79,9 %</td><td class="num">98,790</td><td class="num">1.777,9</td><td class="num">13.740</td><td class="num">2.973</td><td class="num">0</td><td class="num">4</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">3</td><td>strikt</td><td class="num">38,587</td><td class="num">96,5 %</td><td class="num">97,837</td><td class="num">312,9</td><td class="num">0</td><td class="num">2.274</td><td class="num">39.013</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">3</td><td>weich</td><td class="num">39,742</td><td class="num">99,3 %</td><td class="num">99,858</td><td class="num">57,0</td><td class="num">0</td><td class="num">9.217</td><td class="num">32.939</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">6</td><td>strikt</td><td class="num">38,578</td><td class="num">96,4 %</td><td class="num">97,834</td><td class="num">317,4</td><td class="num">0</td><td class="num">2.276</td><td class="num">38.422</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">6</td><td>weich</td><td class="num">39,690</td><td class="num">99,2 %</td><td class="num">99,876</td><td class="num">70,4</td><td class="num">0</td><td class="num">8.980</td><td class="num">32.556</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">10</td><td>strikt</td><td class="num">38,578</td><td class="num">96,4 %</td><td class="num">97,833</td><td class="num">317,5</td><td class="num">0</td><td class="num">2.305</td><td class="num">38.466</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">10</td><td>weich</td><td class="num">39,682</td><td class="num">99,2 %</td><td class="num">99,864</td><td class="num">72,4</td><td class="num">0</td><td class="num">9.008</td><td class="num">32.601</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">20</td><td>strikt</td><td class="num">38,574</td><td class="num">96,4 %</td><td class="num">97,830</td><td class="num">318,2</td><td class="num">0</td><td class="num">2.305</td><td class="num">38.426</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">1</td><td class="num">20</td><td>weich</td><td class="num">39,680</td><td class="num">99,2 %</td><td class="num">99,865</td><td class="num">72,8</td><td class="num">0</td><td class="num">9.007</td><td class="num">32.574</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">3</td><td>strikt</td><td class="num">39,318</td><td class="num">98,3 %</td><td class="num">98,110</td><td class="num">151,0</td><td class="num">0</td><td class="num">1.086</td><td class="num">28.340</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">3</td><td>weich</td><td class="num">39,930</td><td class="num">99,8 %</td><td class="num">99,979</td><td class="num">15,1</td><td class="num">0</td><td class="num">6.240</td><td class="num">23.406</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">6</td><td>strikt</td><td class="num">39,344</td><td class="num">98,3 %</td><td class="num">98,107</td><td class="num">144,2</td><td class="num">0</td><td class="num">1.089</td><td class="num">27.859</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">6</td><td>weich</td><td class="num">39,858</td><td class="num">99,6 %</td><td class="num">99,970</td><td class="num">33,2</td><td class="num">0</td><td class="num">5.797</td><td class="num">23.474</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">10</td><td>strikt</td><td class="num">39,342</td><td class="num">98,3 %</td><td class="num">98,105</td><td class="num">144,8</td><td class="num">0</td><td class="num">1.217</td><td class="num">27.995</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">10</td><td>weich</td><td class="num">39,863</td><td class="num">99,6 %</td><td class="num">99,975</td><td class="num">31,9</td><td class="num">0</td><td class="num">5.941</td><td class="num">23.594</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">20</td><td>strikt</td><td class="num">39,338</td><td class="num">98,3 %</td><td class="num">98,105</td><td class="num">145,5</td><td class="num">0</td><td class="num">1.217</td><td class="num">27.934</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">2</td><td class="num">20</td><td>weich</td><td class="num">39,860</td><td class="num">99,6 %</td><td class="num">99,975</td><td class="num">32,6</td><td class="num">0</td><td class="num">5.941</td><td class="num">23.550</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">3</td><td>strikt</td><td class="num">39,746</td><td class="num">99,3 %</td><td class="num">99,200</td><td class="num">44,9</td><td class="num">0</td><td class="num">690</td><td class="num">17.419</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">3</td><td>weich</td><td class="num">39,959</td><td class="num">99,9 %</td><td class="num">100,000</td><td class="num">8,6</td><td class="num">0</td><td class="num">3.441</td><td class="num">14.666</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">6</td><td>strikt</td><td class="num">39,685</td><td class="num">99,2 %</td><td class="num">99,195</td><td class="num">61,1</td><td class="num">0</td><td class="num">514</td><td class="num">17.083</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">6</td><td>weich</td><td class="num">39,881</td><td class="num">99,7 %</td><td class="num">99,989</td><td class="num">28,0</td><td class="num">0</td><td class="num">3.011</td><td class="num">14.571</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">10</td><td>strikt</td><td class="num">39,685</td><td class="num">99,2 %</td><td class="num">99,195</td><td class="num">61,2</td><td class="num">0</td><td class="num">518</td><td class="num">17.595</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">10</td><td>weich</td><td class="num">39,881</td><td class="num">99,7 %</td><td class="num">99,989</td><td class="num">28,1</td><td class="num">0</td><td class="num">3.079</td><td class="num">15.024</td><td class="num">0</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">20</td><td>strikt</td><td class="num">39,682</td><td class="num">99,2 %</td><td class="num">99,195</td><td class="num">61,9</td><td class="num">0</td><td class="num">518</td><td class="num">17.586</td><td class="num">6</td></tr>
+          <tr><td class="mono">P5h</td><td class="num">3</td><td class="num">20</td><td>weich</td><td class="num">39,877</td><td class="num">99,7 %</td><td class="num">99,989</td><td class="num">28,8</td><td class="num">0</td><td class="num">3.079</td><td class="num">15.019</td><td class="num">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <h3>Wo die Ersparnis nach Nachrichtenart anf&auml;llt</h3>
+  <div class="tablewrap">
+    <table>
+      <caption>Sendungen je Nachricht, nach Nutzlasttyp. Position sind Standortbaken, Text sind
+      Kurznachrichten, HEY sind die Nachbarschaftsbaken mit Signalreport.</caption>
+      <thead><tr><th>Regel</th><th>Position</th><th>Text</th><th>HEY</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">P0</td><td class="num">26,592</td><td class="num">55,586</td><td class="num">51,863</td></tr>
+        <tr><td class="mono">P1</td><td class="num">26,592</td><td class="num">55,586</td><td class="num">51,863</td></tr>
+        <tr><td class="mono">P2</td><td class="num">8,423</td><td class="num">22,237</td><td class="num">18,795</td></tr>
+        <tr><td class="mono">P3</td><td class="num">8,842</td><td class="num">24,785</td><td class="num">20,571</td></tr>
+        <tr><td class="mono">P3b</td><td class="num">12,097</td><td class="num">28,334</td><td class="num">24,489</td></tr>
+        <tr><td class="mono">P4</td><td class="num">8,826</td><td class="num">16,071</td><td class="num">12,637</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Der Text ist die teuerste Nachrichtenart und bleibt es unter jeder Regel &mdash; 55,6
+    Sendungen je Nachricht unter P0, immer noch 22,2 unter P2. Das ist der Grund, warum der Entwurf
+    das Aufschieben ausdr&uuml;cklich <em>nicht</em> auf Text anwendet: Text ist das, worauf Menschen
+    warten, und sein Vorsprung der ersten Kopie ist mit 5,97 bis 10,15&nbsp;s Median der k&uuml;rzeste
+    aller Typen.</p>
+  </div>
+
+  <details>
+    <summary>Empfindlichkeit gegen die H&ouml;rsperre &mdash; die zweite wichtige Konstante</summary>
+    <div class="tablewrap">
+      <table>
+        <caption>Die H&ouml;rsperre ist die Zeit, ab der eine ankommende Kopie ein bereits
+        eingereihtes Relay <em>nicht mehr</em> abbrechen kann. Sie ist die Modellierung der Frage,
+        wie sp&auml;t ein Sender einen laufenden Sendevorgang noch abbrechen darf.</caption>
+        <thead><tr><th>Variante</th><th>Skew-Schritt s</th><th>H&ouml;rsperre s</th><th>Sendungen/Nachr.</th><th>gegen P0</th><th>Abdeckung %</th><th>Stornos</th></tr></thead>
+        <tbody>
+          <tr><td>P3</td><td class="num">0,5</td><td class="num">0,0</td><td class="num">15,374</td><td class="num">38,4 %</td><td class="num">78,386</td><td class="num">29.223</td></tr>
+          <tr><td>P3</td><td class="num">0,5</td><td class="num">1,0</td><td class="num">24,074</td><td class="num">60,2 %</td><td class="num">90,495</td><td class="num">24.100</td></tr>
+          <tr><td>P3</td><td class="num">1,0</td><td class="num">0,0</td><td class="num">15,371</td><td class="num">38,4 %</td><td class="num">78,386</td><td class="num">29.228</td></tr>
+          <tr><td>P3</td><td class="num">1,0</td><td class="num">1,0</td><td class="num">20,278</td><td class="num">50,7 %</td><td class="num">89,109</td><td class="num">30.157</td></tr>
+          <tr><td>P3</td><td class="num">2,5</td><td class="num">0,0</td><td class="num">15,326</td><td class="num">38,3 %</td><td class="num">78,365</td><td class="num">29.289</td></tr>
+          <tr><td>P3</td><td class="num">2,5</td><td class="num">1,0</td><td class="num">19,456</td><td class="num">48,6 %</td><td class="num">88,647</td><td class="num">31.282</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tag">Eine einzige Sekunde H&ouml;rsperre hebt die Abdeckung um 10 bis 12 Punkte und
+    kostet 10 bis 22 Punkte Ersparnis. Sie wirkt in dieselbe Richtung wie das weiche Veto und ist
+    die zweite Leitplanke, die nicht wegverhandelt werden darf.</p>
+  </details>
+</section>
+
+
+<!-- ============ 5 ============ -->
+<section id="f5">
+  <div class="sechead"><span class="qn">Frage 5</span><h2>Wer verliert Abdeckung?</h2><span class="chip alert">Handlungsbedarf</span></div>
+
+  <div class="prose">
+    <p>Die naheliegende Antwort w&auml;re: die Bl&auml;tter. Sie ist falsch, und der Irrtum ist
+    genau der, an dem der R&uuml;ckbau von 2024 gescheitert ist.</p>
+
+    <p>Unter hartem Stornieren (P2) verlieren <strong>47 Stationen</strong> mindestens 5&nbsp;% der
+    Nachrichten, die sie unter dem heutigen Verhalten erhalten h&auml;tten. Der schlimmste Fall ist
+    kein Blatt: <strong>OE3BCB-10</strong> (Heltec&nbsp;V3, 4.35p, mit Kanalpr&uuml;fung) hat <em>acht</em> Zubringer und verliert 1.238 von 1.711 Nachrichten &mdash;
+    72,36&nbsp;%.</p>
+  </div>
+
+  <div class="call alert">
+    <h3>Das Rudel-Storno</h3>
+    <p>Ein Knoten mit acht Zubringern verhungert, wenn alle acht sich gegenseitig stornieren. Jeder
+    einzelne von ihnen h&ouml;rt die Kopie eines anderen und schweigt &mdash; jeder von ihnen liegt
+    damit richtig, und in der Summe kommt nichts an. Das Alleinversorger-Veto hilft hier nicht: es
+    fragt, ob <em>ich</em> der einzige Versorger bin, und die Antwort ist achtmal &bdquo;nein&ldquo;.
+    Gegen das Rudel-Storno helfen nur zwei Dinge: <strong>k &ge; 2</strong> (erst schweigen, wenn
+    mindestens zwei andere geliefert haben) und die <strong>H&ouml;rsperre</strong>, die ein
+    Abbrechen kurz vor dem Sendezeitpunkt verbietet.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Die zehn gr&ouml;&szlig;ten Verlierer unter hartem Stornieren (P2). &bdquo;unter P0
+      erreichbar&ldquo; ist die Zahl der Nachrichten, die die Station im heutigen Verhalten
+      erhalten h&auml;tte.</caption>
+      <thead><tr><th>Rufzeichen</th><th>Eingangsgrad</th><th>unter P0 erreichbar</th><th>verloren</th><th>Verlust %</th><th>Zubringer (nach H&ouml;rerschaft)</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">OE3BCB-10</td><td class="num">8</td><td class="num">1.711</td><td class="num">1.238</td><td class="num">72,36</td><td class="mono">OE1XAR-33, OE3XOC-12, DK5EN-98, DG2NPE-5, DK3ACH-12, OE5HWN-12, OE3MZC-1, OE3LCR-55</td></tr>
+        <tr><td class="mono">OE1AYS-12</td><td class="num">2</td><td class="num">1.735</td><td class="num">1.163</td><td class="num">67,03</td><td class="mono">OE3XIA-12, DK5EN-98</td></tr>
+        <tr><td class="mono">OE3TEC-10</td><td class="num">3</td><td class="num">1.728</td><td class="num">1.155</td><td class="num">66,84</td><td class="mono">OE3XWJ-12, OE3LXF-21, OE3LXF-71</td></tr>
+        <tr><td class="mono">OE3AJC-12</td><td class="num">3</td><td class="num">1.641</td><td class="num">1.143</td><td class="num">69,65</td><td class="mono">OE3XWJ-12, OE3AJC-7, OE3XER-12</td></tr>
+        <tr><td class="mono">OE3XRB-15</td><td class="num">7</td><td class="num">1.649</td><td class="num">1.084</td><td class="num">65,74</td><td class="mono">OE3XWJ-12, OE1XAR-33, OE3DNA-15, OE5GHO-12, OE5XLM-12, OE5ANI-12, OE5ROI-12</td></tr>
+        <tr><td class="mono">OE3AJS-12</td><td class="num">2</td><td class="num">1.697</td><td class="num">996</td><td class="num">58,69</td><td class="mono">OE3KJO-62, OE3KJO-64</td></tr>
+        <tr><td class="mono">OE3TVJ-10</td><td class="num">1</td><td class="num">1.662</td><td class="num">983</td><td class="num">59,15</td><td class="mono">OE3XPA-12</td></tr>
+        <tr><td class="mono">OE3REI-13</td><td class="num">1</td><td class="num">1.662</td><td class="num">981</td><td class="num">59,03</td><td class="mono">OE3XPA-12</td></tr>
+        <tr><td class="mono">OE3WFA-5</td><td class="num">2</td><td class="num">1.711</td><td class="num">875</td><td class="num">51,14</td><td class="mono">OE3XOC-12, OE3WFA-12</td></tr>
+        <tr><td class="mono">OE3CZC-2</td><td class="num">1</td><td class="num">1.510</td><td class="num">831</td><td class="num">55,03</td><td class="mono">OE3CZC-1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Die Liste zeigt beide Schadensbilder nebeneinander. <strong>OE3TVJ-10</strong> (T-Beam,
+    4.35p, mit Kanalpr&uuml;fung) und <strong>OE3REI-13</strong> (T-Beam, 4.35p) sind echte
+    Bl&auml;tter mit genau einem Zubringer &mdash; hier greift das Veto und rettet sie.
+    <strong>OE3XRB-15</strong> (RAK4631, 4.35p) mit sieben Zubringern und
+    <strong>OE3BCB-10</strong> mit acht sind Rudel-F&auml;lle &mdash; hier rettet nur k&nbsp;&ge;&nbsp;2.
+    <strong>OE1AYS-12</strong> (T-Beam AXP2101, 4.35p) und <strong>OE3AJS-12</strong> (T-Echo,
+    4.35p) liegen mit zwei Zubringern dazwischen: sie werden vom <em>weichen</em> Veto erfasst, vom
+    strikten nicht. Das ist der ganze Unterschied zwischen 78,4 und 89,8&nbsp;% Abdeckung.</p>
+
+    <p>Unter den beiden empfohlenen Betriebspunkten schrumpft die Liste auf acht beziehungsweise
+    f&uuml;nf Stationen.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Verlierer der empfohlenen Betriebspunkte. Alle &uuml;brigen Stationen bleiben unter
+      der 5-%-Schwelle.</caption>
+      <thead><tr><th>Schwelle</th><th>Rufzeichen</th><th>Eingangsgrad</th><th>unter P0 erreichbar</th><th>verloren</th><th>Verlust %</th><th>Zubringer (vier st&auml;rkste)</th></tr></thead>
+      <tbody>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3ZKW-12</td><td class="num">8</td><td class="num">1.343</td><td class="num">1.199</td><td class="num">89,28</td><td class="mono">OE1XAR-33, DK5EN-98, DG2NPE-5, DK3ACH-12</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3AJC-12</td><td class="num">3</td><td class="num">1.641</td><td class="num">587</td><td class="num">35,77</td><td class="mono">OE3XWJ-12, OE3AJC-7, OE3XER-12</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3XRB-15</td><td class="num">7</td><td class="num">1.649</td><td class="num">580</td><td class="num">35,17</td><td class="mono">OE3XWJ-12, OE1XAR-33, OE3DNA-15, OE5GHO-12</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3TEC-10</td><td class="num">3</td><td class="num">1.728</td><td class="num">602</td><td class="num">34,84</td><td class="mono">OE3XWJ-12, OE3LXF-21, OE3LXF-71</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3KHA-20</td><td class="num">4</td><td class="num">1.360</td><td class="num">395</td><td class="num">29,04</td><td class="mono">OE1XAR-33, OE3GHB-1, OE3CZC-2, OE3KHA-12</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3DNA-15</td><td class="num">1</td><td class="num">1.142</td><td class="num">298</td><td class="num">26,09</td><td class="mono">OE3XRB-15</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3ALB-2</td><td class="num">4</td><td class="num">1.395</td><td class="num">175</td><td class="num">12,54</td><td class="mono">OE1FFS-10, OE3XHQ-12, OE3GJC-12, OE1IAH-12</td></tr>
+        <tr><td>&ge; 95 %</td><td class="mono">OE3AHU-13</td><td class="num">9</td><td class="num">1.757</td><td class="num">163</td><td class="num">9,28</td><td class="mono">OE3XWJ-12, OE1XAR-33, OE3MIF-12, DG2NPE-5</td></tr>
+        <tr><td>&ge; 98 %</td><td class="mono">OE3AJC-12</td><td class="num">3</td><td class="num">1.641</td><td class="num">335</td><td class="num">20,41</td><td class="mono">OE3XWJ-12, OE3AJC-7, OE3XER-12</td></tr>
+        <tr><td>&ge; 98 %</td><td class="mono">OE3XRB-15</td><td class="num">7</td><td class="num">1.649</td><td class="num">335</td><td class="num">20,32</td><td class="mono">OE3XWJ-12, OE1XAR-33, OE3DNA-15, OE5GHO-12</td></tr>
+        <tr><td>&ge; 98 %</td><td class="mono">OE3TEC-10</td><td class="num">3</td><td class="num">1.728</td><td class="num">350</td><td class="num">20,25</td><td class="mono">OE3XWJ-12, OE3LXF-21, OE3LXF-71</td></tr>
+        <tr><td>&ge; 98 %</td><td class="mono">OE3DNA-15</td><td class="num">1</td><td class="num">1.142</td><td class="num">195</td><td class="num">17,08</td><td class="mono">OE3XRB-15</td></tr>
+        <tr><td>&ge; 98 %</td><td class="mono">OE3ALB-2</td><td class="num">4</td><td class="num">1.395</td><td class="num">110</td><td class="num">7,89</td><td class="mono">OE1FFS-10, OE3XHQ-12, OE3GJC-12, OE1IAH-12</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><strong>Ein Fall bleibt auff&auml;llig.</strong> <strong>OE3ZKW-12</strong> (TLORA&nbsp;V2.1.6,
+    4.35p, mit Kanalpr&uuml;fung) verliert unter dem 95-%-Punkt 89,28&nbsp;% seiner Nachrichten,
+    obwohl es acht Zubringer hat. Der Grund steht in der Zubringerliste: die vier st&auml;rksten
+    sind OE1XAR-33 (die Server-Einspeisung), DK5EN-98, DG2NPE-5 und DK3ACH-12 &mdash; Stationen, die
+    in diesem Graphen keinen einzigen beobachteten Eingangsgrad haben und deren gemeldete
+    Nachbarzahl damit unbekannt ist. Sie sind gleichzeitig die, die im Modell am ehesten schweigen.
+    Das ist weniger ein Befund &uuml;ber OE3ZKW-12 als &uuml;ber die Grenzen des Graphen; unter dem
+    98-%-Punkt verschwindet der Fall vollst&auml;ndig.</p>
+
+    <p>Die Gegenprobe zur Bewertung: <strong>OE3DNA-15</strong> ist ein striktes Blatt hinter
+    OE3XRB-15, und es verliert unter beiden empfohlenen Punkten immer noch 17 bis 26&nbsp;%. Das
+    Veto rettet ein Blatt nur, wenn der Versorger das Blatt <em>kennt</em>. Genau daran h&auml;ngt
+    der Defekt aus Frage&nbsp;9.</p>
+  </div>
+</section>
+
+
+<!-- ============ 6 ============ -->
+<section id="f6">
+  <div class="sechead"><span class="qn">Frage 6</span><h2>Was ist mit den exklusiven Bl&auml;ttern?</h2><span class="chip note">Beobachten</span></div>
+
+  <div class="prose">
+    <p>Es gibt sie, sie sind z&auml;hlbar, und sie sind weniger, als das Konzept bef&uuml;rchtet
+    &mdash; aber ihre Versorger sind zum Teil genau die Ger&auml;te, die keine Regel befolgen
+    k&ouml;nnen.</p>
+
+    <p>Im H&ouml;rgraphen der Nacht: <strong>17 strikte Bl&auml;tter</strong> (genau ein Zubringer),
+    <strong>30 weiche</strong> (h&ouml;chstens zwei), und 47 Stationen mit Eingangsgrad 0 &mdash;
+    letztere sind Stationen, die wir nur als Ursprung gesehen haben, deren Empfang also nie
+    beobachtbar war. <strong>14 Relais</strong> versorgen mindestens ein striktes Blatt.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Relais mit exklusiven Bl&auml;ttern. &bdquo;weich&ldquo; z&auml;hlt zus&auml;tzlich
+      die Nachbarn mit h&ouml;chstens zwei Zubringern.</caption>
+      <thead><tr><th>Relais</th><th>H&ouml;rerschaft</th><th>exklusive Bl&auml;tter</th><th>Anzahl</th><th>weich</th><th>Hardware</th><th>FW</th><th>CAD</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">DK3ACH-12</td><td class="num">15</td><td class="mono">OE1KFR-12, OE3KHA-12</td><td class="num">2</td><td class="num">2</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3HUS-01</td><td class="num">5</td><td class="mono">OE3HOI-10, OE3MAG-12</td><td class="num">2</td><td class="num">2</td><td>T-Beam</td><td class="num">35:k</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3XPA-12</td><td class="num">23</td><td class="mono">OE3REI-13, OE3TVJ-10</td><td class="num">2</td><td class="num">2</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1FFS-10</td><td class="num">12</td><td class="mono">OE1KDA-9</td><td class="num">1</td><td class="num">5</td><td>TLORA V2.1.6</td><td class="num">35:k</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE1KBC-24</td><td class="num">4</td><td class="mono">OE1KBC-14</td><td class="num">1</td><td class="num">1</td><td>EBYTE E22</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE1XAR-33</td><td class="num">19</td><td class="mono">OE3RAB-99</td><td class="num">1</td><td class="num">1</td><td>unbekannt (0)</td><td class="num">0:#</td><td class="fwold">nein</td></tr>
+        <tr><td class="mono">OE3AOG-18</td><td class="num">1</td><td class="mono">OE3AOG-12</td><td class="num">1</td><td class="num">1</td><td>Heltec E290</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3CZC-1</td><td class="num">5</td><td class="mono">OE3CZC-2</td><td class="num">1</td><td class="num">1</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3GBB-2</td><td class="num">1</td><td class="mono">OE3GBB-12</td><td class="num">1</td><td class="num">1</td><td>T-Beam</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE3XRB-15</td><td class="num">2</td><td class="mono">OE3DNA-15</td><td class="num">1</td><td class="num">1</td><td>RAK4631</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE5HWN-14</td><td class="num">1</td><td class="mono">OE5HWN-12</td><td class="num">1</td><td class="num">1</td><td>T-Beam Supreme</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE5RGM-1</td><td class="num">1</td><td class="mono">OE5RGM-73</td><td class="num">1</td><td class="num">1</td><td>Heltec E290</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE5SRL-1</td><td class="num">1</td><td class="mono">OE5SRL-12</td><td class="num">1</td><td class="num">1</td><td>T-Beam AXP2101</td><td class="num">35:p</td><td>ja</td></tr>
+        <tr><td class="mono">OE5VVM-13</td><td class="num">1</td><td class="mono">OE5XFK-12</td><td class="num">1</td><td class="num">1</td><td>Heltec V3</td><td class="num">35:p</td><td>ja</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Bemerkenswert daran ist die Verteilung: die H&auml;lfte dieser Versorger hat selbst eine
+    H&ouml;rerschaft von 1 oder 2. Es sind also gerade <em>nicht</em> die Bergknoten, die die
+    exklusiven T&auml;ler bedienen, sondern kleine Stationen am Rand. Eine Regel, die nur die Hubs
+    verschont, verschont die falschen.</p>
+
+    <p><strong>Neun Bl&auml;tter h&auml;ngen an einem Versorger ohne Kanalpr&uuml;fung</strong>,
+    f&uuml;nf davon haben &uuml;berhaupt keinen CAD-f&auml;higen Versorger.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Bl&auml;tter, deren Versorger auf einem Firmwarestand vor der Kanalpr&uuml;fung
+      l&auml;uft. Solche Versorger warten nicht vor dem Senden &mdash; und sie werden auch keine
+      neue Nachgeberegel befolgen.</caption>
+      <thead><tr><th>Blatt</th><th>Eingangsgrad</th><th>Versorger</th><th>davon ohne CAD</th><th>gar kein CAD-Versorger</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">OE1GKS-4</td><td class="num">2</td><td class="mono">OE1FFS-10, OE1GKS-12</td><td class="mono">OE1FFS-10</td><td></td></tr>
+        <tr><td class="mono">OE1GNR-12</td><td class="num">2</td><td class="mono">OE1FFS-10, OE1MOJ-1</td><td class="mono">OE1FFS-10</td><td></td></tr>
+        <tr><td class="mono">OE1IAH-12</td><td class="num">2</td><td class="mono">OE1FFS-10, OE1IAH-1</td><td class="mono">OE1FFS-10</td><td></td></tr>
+        <tr><td class="mono">OE1KDA-4</td><td class="num">2</td><td class="mono">OE1FFS-10, OE1KDA-9</td><td class="mono">OE1FFS-10</td><td></td></tr>
+        <tr><td class="mono">OE1KDA-9</td><td class="num">1</td><td class="mono">OE1FFS-10</td><td class="mono">OE1FFS-10</td><td><strong>ja</strong></td></tr>
+        <tr><td class="mono">OE3HOI-10</td><td class="num">1</td><td class="mono">OE3HUS-01</td><td class="mono">OE3HUS-01</td><td><strong>ja</strong></td></tr>
+        <tr><td class="mono">OE3MAG-12</td><td class="num">1</td><td class="mono">OE3HUS-01</td><td class="mono">OE3HUS-01</td><td><strong>ja</strong></td></tr>
+        <tr><td class="mono">OE3RAB-1</td><td class="num">2</td><td class="mono">OE3RAB-2, OE3RAB-99</td><td class="mono">OE3RAB-2, OE3RAB-99</td><td><strong>ja</strong></td></tr>
+        <tr><td class="mono">OE3RAB-99</td><td class="num">1</td><td class="mono">OE1XAR-33</td><td class="mono">OE1XAR-33</td><td><strong>ja</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="call note">
+    <h3>Eine dieser neun Zeilen ist ein Artefakt</h3>
+    <p><strong>OE1XAR-33</strong> taucht als Versorger ohne Kanalpr&uuml;fung nur deshalb auf, weil
+    sein Firmwarefeld <code>0:#</code> die CAD-Pr&uuml;fung nicht besteht. Es ist keine Funkstation
+    mit altem Stand, sondern die <em>Einspeisung des Servers &uuml;ber das Internet</em>. Das davon
+    abh&auml;ngige Blatt OE3RAB-99 (T-Beam, 4.35f, ohne Kanalpr&uuml;fung) ist damit ein
+    Artefakt der Art, wie die Einspeisung in einem Pfad erscheint &mdash; nicht ein Tal-Knoten hinter
+    einem alten Ger&auml;t.</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Und ein Wort zur Erkennung im Knoten.</strong> Der Entwurf pr&uuml;ft
+    Alleinversorgung &uuml;ber die gemeldete Nachbarzahl des Nachbarn
+    (<code>mheardNCount[i] &le; 2</code> oder <code>== 0</code>). Die naheliegende Alternative
+    &mdash; &bdquo;ich habe die Rahmen dieses Blatts immer nur selbst als erstes Relais gesehen&ldquo;
+    &mdash; ist schw&auml;cher, als sie aussieht: die Pfadtabelle h&auml;lt je Ursprung genau
+    <em>einen</em> Pfad, und zwar nur den k&uuml;rzesten
+    (<code>src/mheard_functions.cpp:584-588</code>). Sie beantwortet &bdquo;der beste bekannte Weg
+    zu L f&uuml;hrt &uuml;ber mich&ldquo;, niemals &bdquo;jeder Weg zu L f&uuml;hrt &uuml;ber
+    mich&ldquo;. Als Alleinversorgerbeweis w&uuml;rde sie den Fehler von 2024 mit Umweg
+    wiederholen. Als <em>zus&auml;tzliche</em> Verst&auml;rkung des Vetos ist sie brauchbar.</p>
+
+    <p>Der Fall, den keine lokale Pr&uuml;fung erreicht, bleibt offen: eine reine Empfangsstation,
+    die nie sendet, ist f&uuml;r jeden Nachbarn unsichtbar. Das ADR 02 benennt diese Grenze
+    ausdr&uuml;cklich. Aufschieben statt Stornieren scheitert dort <em>sicher</em> &mdash; die
+    Nachricht kommt sp&auml;t, aber sie kommt &mdash;, hartes Stornieren scheitert <em>still</em>.</p>
+  </div>
+</section>
+
+
+<!-- ============ 7 ============ -->
+<section id="f7">
+  <div class="sechead"><span class="qn">Frage 7</span><h2>Wie gro&szlig; ist das H&ouml;rfenster in Wirklichkeit?</h2><span class="chip ok">Belegt</span></div>
+
+  <div class="prose">
+    <p>Gr&ouml;&szlig;er als das Konzept hofft und deutlich gr&ouml;&szlig;er, als die Simulation
+    annimmt. Das ist der einzige Punkt, an dem die Wirklichkeit dem Entwurf entgegenkommt.</p>
+
+    <p>Die entscheidende Gr&ouml;&szlig;e ist die <em>Nachlaufzeit</em>: wie lange nach der ersten
+    Kopie die Kopie eines Relais mit kleinerer H&ouml;rerschaft eintrifft. Genau diese Spanne ist
+    das Fenster, in dem eine Nachgeberegel arbeiten kann.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Nachlauf Median</div><div class="v">29 &ndash; 41 s</div><div class="s">28,877 / 41,023 / 33,909 s</div></div>
+    <div class="stat"><div class="k">Nachlauf p90</div><div class="v">330 &ndash; 372 s</div><div class="s">oberes Zehntel</div></div>
+    <div class="stat"><div class="k">Modellannahme</div><div class="v">4,5 s</div><div class="s">Relay-Grundwartezeit</div></div>
+    <div class="stat"><div class="k">Abstand aufeinander&shy;folgender Kopien</div><div class="v">14 &ndash; 17 s</div><div class="s">16,62 / 13,95 / 17,48 s Median</div></div>
+  </div>
+
+  <div class="prose">
+    <p>Ein Knoten, der ein Duplikat h&ouml;rt, hat im Median <strong>14 bis 17 Sekunden</strong>
+    Vorwarnung, bevor seine eigene Kopie an der Reihe w&auml;re &mdash; und im oberen Zehntel sind
+    es Minuten. Die Simulation rechnet dagegen mit einer Relay-Grundwartezeit von 4,5&nbsp;s. Sie
+    unterst&uuml;tzt das Konzept also <em>zu wenig</em>, nicht zu viel: in der Wirklichkeit ist mehr
+    Zeit zum Zuh&ouml;ren da als im Modell.</p>
+
+    <p>Aufgeschl&uuml;sselt nach Nachrichtenart wird sichtbar, warum der Entwurf Text vom
+    Aufschieben ausnimmt.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Vorsprung der ersten Kopie vor der zweiten, Median in Sekunden. Das ist die Zeit, die
+      ein nachrangiger Knoten h&ouml;chstens zum Zuh&ouml;ren hat, bevor er selbst dran w&auml;re.</caption>
+      <thead><tr><th>Nachrichtenart</th><th>OE3XIR-12</th><th>OE3XOC-12</th><th>OE3XWJ-12</th><th>Bewertung</th></tr></thead>
+      <tbody>
+        <tr><td>Text</td><td class="num">10,145</td><td class="num">5,973</td><td class="num">7,052</td><td>k&uuml;rzestes Fenster &mdash; Aufschieben verboten</td></tr>
+        <tr><td>Position</td><td class="num">17,057</td><td class="num">14,209</td><td class="num">19,831</td><td>reichlich Luft</td></tr>
+        <tr><td>HEY</td><td class="num">25,417</td><td class="num">20,176</td><td class="num">21,469</td><td>reichlich Luft</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Abstand zwischen zwei aufeinanderfolgenden Kopien derselben Nachricht an einem
+      Knoten, in Sekunden.</caption>
+      <thead><tr><th>Log</th><th>n</th><th>min</th><th>Median</th><th>p90</th><th>max</th><th>Mittel</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">oe3xia <span class="tag">OE3XIR-12</span></td><td class="num">2.751</td><td class="num">0,595</td><td class="num">16,621</td><td class="num">220,419</td><td class="num">2.009,06</td><td class="num">78,729</td></tr>
+        <tr><td class="mono">oe3xoc <span class="tag">OE3XOC-12</span></td><td class="num">4.713</td><td class="num">0,377</td><td class="num">13,954</td><td class="num">204,602</td><td class="num">2.062,31</td><td class="num">72,828</td></tr>
+        <tr><td class="mono">oe3xwj <span class="tag">OE3XWJ-12</span></td><td class="num">3.239</td><td class="num">0,636</td><td class="num">17,480</td><td class="num">287,241</td><td class="num">2.090,79</td><td class="num">87,429</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Der Umkehrschluss ist genauso wichtig: <strong>die Verz&ouml;gerung entsteht nicht am
+    Kanalzugriff</strong>. Ein Fenster von 350&nbsp;Millisekunden kann keine Abst&auml;nde von 14
+    Sekunden erzeugen. Was diese Abst&auml;nde erzeugt, ist die Warteschlange &mdash; Knoten, die
+    den Kanal bekommen h&auml;tten, ihn aber erst sp&auml;t nutzen. F&uuml;r den Entwurf ist das
+    eine gute Nachricht (viel Zeit zum Zuh&ouml;ren) und eine schlechte (die Wartezeit, die
+    aufgeschoben werden soll, ist ohnehin schon lang).</p>
+  </div>
+</section>
+
+
+<!-- ============ 8 ============ -->
+<section id="f8">
+  <div class="sechead"><span class="qn">Frage 8</span><h2>Adaptiver Hop-Count?</h2><span class="chip note">Beobachten</span></div>
+
+  <div class="prose">
+    <p>Das Hop-Budget (<code>max_hop</code>) ist die Zahl der verbleibenden Weiterleitungen, die eine
+    Nachricht beim Absenden mitbekommt und die jedes Relais um eins vermindert. Es adaptiv zu machen
+    hat zwei ganz verschiedene Gesichter, und nur eines davon ist interessant.</p>
+
+    <p><strong>Als Sparma&szlig;nahme am Ursprung ist es ohne Leitplanken zu scharf.</strong>
+    Regel P4 &mdash; ein Ursprung, der einen Hub in H&ouml;rweite hat, startet mit Budget 2 statt
+    4 &mdash; kommt auf 28,0&nbsp;% der heutigen Sendungen bei 72,4&nbsp;% Abdeckung. Das ist die
+    aggressivste Regel im ganzen Raster und liegt beim Abdeckungsverlust auf dem Niveau des harten
+    Stornierens.</p>
+
+    <p><strong>Als Storno-Ersatz ist es ein Sicherheitsnetz, keine Ersparnis.</strong> Die Variante
+    P5h dreht die Logik um: wer schweigen w&uuml;rde, schweigt <em>nicht</em>, sondern sendet mit auf
+    1 gek&uuml;rztem Budget &mdash; die eigenen exklusiven Nachbarn bekommen ihren einen Sprung, die
+    Region dahinter nicht noch einmal. Ergebnis: <strong>96,4 bis 99,9&nbsp;% der heutigen
+    Sendungen</strong> bei einer Abdeckung von 97,8 bis 100,0&nbsp;%. Die gesparte Sendezeit sinkt
+    auf 8,6 bis 318&nbsp;s je Stunde &mdash; gegen 2.593 bis 3.919&nbsp;s bei P5. P5h kauft also
+    Sicherheit, nicht Luftzeit.</p>
+  </div>
+
+  <div class="call">
+    <h3>Wof&uuml;r P5h dann gut ist</h3>
+    <p>Als <strong>erste Ausbaustufe von P5</strong>: dieselbe Entscheidungslogik, dieselben
+    Z&auml;hler, dieselben Logzeilen &mdash; nur ohne die M&ouml;glichkeit, eine Zustellung zu
+    verlieren. Wer die Mechanik im Feld erproben will, ohne die Blatt-Zustellrate zu riskieren,
+    schaltet P5h ein und misst; erst wenn die Z&auml;hler stimmen, wird auf echtes Nachgeben
+    umgeschaltet. Die Zahl der Verlierer ist bei weichem Veto in allen zw&ouml;lf P5h-Rasterpunkten
+    <strong>null</strong>.</p>
+  </div>
+
+  <div class="prose">
+    <h3>Der eigentliche Hop-Gewinn liegt woanders</h3>
+    <p>Es gibt eine Hop-&Auml;nderung, die alles in diesem Bericht schl&auml;gt, und sie hat mit dem
+    Konzept nichts zu tun. Bei der Erzeugung einer Nachricht wird die HEY-Bake
+    (<code>'@'</code>) mit dem Textbudget behandelt statt mit dem Positionsbudget:</p>
+    <pre style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem .95rem;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.5;margin:0"><code style="background:none;padding:0;font-size:1em">// src/aprs_functions.cpp:99-101
+aprsmsg.max_hop = meshcom_settings.max_hop_pos;      // 2
+if(msgType == ':' || msgType == '@')
+    aprsmsg.max_hop = meshcom_settings.max_hop_text; // 4</code></pre>
+    <p>Die Bake mit dem geringsten Wert in der Ferne bekommt damit das doppelte Budget. Was das
+    kostet, ist gemessen:</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>HEY-Baken im Empfang. &bdquo;weitergeleitet&ldquo; sind die Empf&auml;nge, die nicht
+      direkt vom Ursprung kamen.</caption>
+      <thead><tr><th>Log</th><th>HEY-Empf&auml;nge</th><th>Anteil aller Empf&auml;nge</th><th>Kopien je HEY</th><th>weitergeleitet</th><th>mittlere Sprungzahl</th><th>Sendezeit s</th><th>Anteil der Sendezeit</th><th>nach 3 oder 4 Spr&uuml;ngen</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">oe3xia <span class="tag">OE3XIR-12</span></td><td class="num">1.938</td><td class="num">47,13 %</td><td class="num">3,31</td><td class="num">93,40 %</td><td class="num">2,357</td><td class="num">1.645,2</td><td class="num">41,49 %</td><td class="num">45,6 %</td></tr>
+        <tr><td class="mono">oe3xoc <span class="tag">OE3XOC-12</span></td><td class="num">2.973</td><td class="num">46,98 %</td><td class="num">4,51</td><td class="num">95,53 %</td><td class="num">2,507</td><td class="num">2.613,8</td><td class="num">42,00 %</td><td class="num">52,6 %</td></tr>
+        <tr><td class="mono">oe3xwj <span class="tag">OE3XWJ-12</span></td><td class="num">2.303</td><td class="num">48,46 %</td><td class="num">3,74</td><td class="num">95,92 %</td><td class="num">2,387</td><td class="num">1.972,6</td><td class="num">42,78 %</td><td class="num">47,3 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Von 1.210 verschiedenen Nachricht/Pfad-Kombinationen mit mehr als vier Rufzeichen im Pfad
+    sind <strong>1.127 HEY-Baken und 83 Texte</strong>. Das Budget der Bake auf 2 zu setzen &mdash;
+    zwei Zeilen Diff, kein neuer Zustand, keine Protokoll&auml;nderung, r&uuml;ckw&auml;rtskompatibel
+    &mdash; l&auml;sst rund die H&auml;lfte der HEY-Weiterleitungen entfallen, das sind etwa
+    <strong>20&nbsp;% der gesamten geh&ouml;rten Sendezeit</strong> an diesen Knoten. Zum Vergleich:
+    das gesamte P5-Konzept spart 30 bis 45&nbsp;%, braucht daf&uuml;r aber neue
+    Zustandsvariablen, einen Notausschalter und einen Feldtest.</p>
+  </div>
+
+  <div class="call alert">
+    <h3>Ein Vorbehalt, der jede Hop-Ma&szlig;nahme betrifft</h3>
+    <p>Auf dem Weg Server &rarr; LoRa gibt es <strong>kein Dekrement und keinen Deckel</strong>
+    (<code>src/udp_functions.cpp:361</code>, <code>src/nrf52/nrf_eth.cpp:434-620</code>): Ein
+    Gateway speist jede Nachricht mit vollem Budget neu ein, und der Internetsprung ist gratis. Das
+    Zeitsignal wird deshalb an einem Knoten im Schnitt 5,74 / <strong>9,24</strong> /
+    5,92-mal geh&ouml;rt. Jede Hop-Ma&szlig;nahme wirkt nur auf Verkehr, der kein Gateway
+    passiert &mdash; und jede Messung von &bdquo;Kopien je Nachricht&ldquo; muss RF-Kopien und
+    Gateway-Einspeisungen trennen, sonst sieht eine wirksame Regel wie eine wirkungslose aus.</p>
+  </div>
+
+  <div class="prose">
+    <p>Im ADR 02 kommt adaptiver Hop-Count &uuml;berhaupt nicht vor &mdash; weder als Entscheidung
+    noch als verworfene Alternative. Das ist eine echte L&uuml;cke, keine Meinungsverschiedenheit.
+    Was das ADR hat, sind Messungen: die Hop-Verteilung und der Befund, dass 20,7&nbsp;% der Rahmen
+    ihr Budget vollst&auml;ndig aufbrauchen.</p>
+  </div>
+</section>
+
+
+<!-- ============ 9 ============ -->
+<section id="f9">
+  <div class="sechead"><span class="qn">Frage 9</span><h2>Was sagt der Code?</h2><span class="chip alert">Defekt gefunden</span></div>
+
+  <div class="prose">
+    <p>Vom Konzept existiert im Stand <code>v4.35p_prio</code> <strong>nichts</strong>. Das ist keine
+    Kritik, sondern die Ausgangslage: drei getrennte Baustellen, keine davon angefangen.</p>
+  </div>
+
+  <ol class="recs">
+    <li><strong>Kein R&uuml;ckzug eines eingereihten Relays.</strong> Der Empfangspfad hat genau zwei
+      Zweige: eigener Rahmen (<code>src/lora_functions.cpp:771</code>) oder neuer Rahmen
+      (<code>:797</code>). Ein Duplikat f&auml;llt hinten heraus, und nichts geschieht au&szlig;er
+      einem Z&auml;hlermerker. Der Ringpuffer-Scan bei <code>:515-534</code> hilft nicht: er
+      schlie&szlig;t bei <code>:517</code> ausdr&uuml;cklich den Zustand
+      <code>RING_STATUS_DONE</code> aus &mdash; und genau den tr&auml;gt jedes eingereihte Relay.
+      <em>Der dritte Zweig, den das Konzept braucht, ist nicht vorhanden.</em></li>
+    <li><strong>Keine Nachbarzahl und keine H&ouml;rerschaft in der Wartezeit.</strong>
+      <code>csma_compute_timeout()</code> (<code>src/lora_functions.cpp:2210-2215</code>) kennt
+      genau zwei Eingaben: den Versuchsz&auml;hler und die Priorit&auml;t des n&auml;chsten
+      Ringeintrags. Die Wartezeit ist <code>base(prio) + random(0,slots+1) * 35 ms</code>, mit
+      Grundwerten 3000 / 4500 / 5500&nbsp;ms und 10 Slots
+      (<code>src/configuration_global.h:325-337</code>). Kein Platz f&uuml;r einen Rang, aber auch
+      kein Hindernis: der Aufrufer h&auml;lt den Slot bereits und kann ein Relay am Zustand
+      <code>RING_STATUS_DONE</code> erkennen.</li>
+    <li><strong>Keine H&ouml;rerschaftstabelle.</strong> <code>mheardNCount[]</code>
+      (<code>src/mheard_functions.cpp:56</code>) tr&auml;gt die gemeldete Nachbarzahl aus zwei
+      Quellen &mdash; dem <code>/N&lt;nn&gt;</code>-Feld der Positionsbake und dem
+      <code>R&lt;n&gt;;</code>-Kopf der HEY-Bake. Ein Feld f&uuml;r &bdquo;wer h&ouml;rt mich&ldquo;
+      gibt es nicht, und mheard kann es strukturell nicht aufnehmen (Frage&nbsp;1).</li>
+  </ol>
+
+  <h3>Der Defekt: die halbe Flotte tr&auml;gt eine erfundene Nachbarzahl</h3>
+
+  <div class="prose">
+    <p>Bei der Pr&uuml;fung des Vetos ist ein bisher nicht berichteter Fehler aufgefallen, und er
+    trifft genau die Sicherung, auf der das ganze Konzept ruht.</p>
+
+    <p><code>updateHeyPath()</code> (<code>src/mheard_functions.cpp:493-519</code>) liest die
+    Nachbarzahl aus dem Kopf der HEY-Nutzlast. Der Kopf hat zwei erlaubte Formen:
+    <code>R99;</code> (neu, null Kommata) und <code>R99,99,99;</code> (alt, zwei Kommata). Der
+    Parser z&auml;hlt die Kommata bis zum ersten Semikolon und akzeptiert <code>icomma == 0</code>
+    oder <code>icomma == 2</code>. <strong>&Auml;ltere Firmware sendet aber ein nacktes
+    <code>R</code> ganz ohne Zahl</strong> &mdash; dann folgt unmittelbar die erste Reportgruppe des
+    ersten Relais, und die hat drei Felder, also zwei Kommata. Der Parser nimmt sie f&uuml;r den
+    Alt-Kopf, schneidet sie heraus und liest mit <code>toInt()</code> die erste Zahl.</p>
+  </div>
+
+  <div class="call alert">
+    <h3>Belegt an einer Rohlog-Zeile</h3>
+    <p><code>OE3NRS-12,OE3XIR-12,OE3XPA-12&gt;H@R28,111,-17;16,91,5;</code></p>
+    <p>Ursprung ist <strong>OE3NRS-12</strong> (T-Beam, 4.35k, ohne Kanalpr&uuml;fung), ein
+    Sender mit nacktem <code>R</code>. Die Gruppe <code>28,111,-17</code> geh&ouml;rt dem ersten
+    Relais <strong>OE3XIR-12</strong> (RAK4631, 4.35p): 28 Nachbarn, Empfangspegel
+    &minus;111&nbsp;dBm, Rauschabstand &minus;17. Der Parser findet zwei Kommata vor dem Semikolon,
+    akzeptiert &uuml;ber den Alt-Zweig und speichert <strong>28 als Nachbarzahl von
+    OE3NRS-12</strong>. Der Wert ist nicht fehlend, sondern falsch &mdash; und plausibel genug, dass
+    er nie auff&auml;llt.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Kopfvarianten in HEY-Rahmen, gez&auml;hlt an Empf&auml;ngen direkt vom Ursprung (Pfad
+      der L&auml;nge 1, Nutzlast also unver&auml;ndert).</caption>
+      <thead><tr><th>Kopfvariante</th><th>Empf&auml;nge</th><th>Anteil</th><th>Parser heute</th></tr></thead>
+      <tbody>
+        <tr><td><code>R</code> ohne Zahl, dann Reportgruppen</td><td class="num">3.469</td><td class="num">48,09 %</td><td><strong>akzeptiert eine fremde Zahl</strong></td></tr>
+        <tr><td><code>R&lt;n&gt;;</code> dann Reportgruppen</td><td class="num">3.555</td><td class="num">49,28 %</td><td>korrekt</td></tr>
+        <tr><td><code>R</code> ohne jede Gruppe</td><td class="num">190</td><td class="num">2,63 %</td><td>keine Zahl</td></tr>
+        <tr class="total"><td>Summe</td><td class="num">7.214</td><td class="num">100,00 %</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><strong>Warum das genau die Sicherung trifft.</strong> Das Alleinversorger-Veto feuert, wenn
+    ein Nachbar eine Nachbarzahl von h&ouml;chstens 2 oder von 0 (unbekannt) meldet. Eine erfundene
+    28 sagt dem Knoten: &bdquo;dieser Nachbar ist gut vernetzt, du darfst schweigen&ldquo;. Der
+    Defekt <em>deaktiviert das Veto still</em>, und zwar f&uuml;r knapp die H&auml;lfte der
+    beobachteten Ursprungsstationen. Genau so sind 2024 die Bl&auml;tter verhungert.</p>
+
+    <p><strong>Die Korrektur ist klein.</strong> Jedes Komma im Kopf als &bdquo;Nachbarzahl
+    unbekannt&ldquo; (0) behandeln, statt das erste Feld zu lesen &mdash; rund vier Zeilen bei
+    <code>src/mheard_functions.cpp:510</code>. Das ist strikt sicherer als heute: heute wird ein
+    Wert erfunden, danach wird Unwissen zugegeben, und 0 bedeutet im Entwurf ohnehin
+    &bdquo;Veto&ldquo;, also die sichere Richtung. Der Fehler ist unabh&auml;ngig vom Konzept
+    behebenswert: er verf&auml;lscht auch die Wichtigkeitssumme des ADR 02 und die Nachbarzahl, die
+    der Server aufzeichnet.</p>
+  </div>
+
+  <h3>Der Ausf&uuml;hrungskontext &mdash; vor der ersten Zeile Code zu lesen</h3>
+  <div class="tablewrap">
+    <table>
+      <caption>Wo <code>OnRxDone()</code> l&auml;uft. Auf dem nRF52 ist das ein FreeRTOS-Timertask
+      mit Priorit&auml;t 2, der die Hauptschleife verdr&auml;ngt &mdash; auf einem Stack von
+      1&nbsp;KB.</caption>
+      <thead><tr><th>Plattform</th><th>Kontext</th><th>Stack</th><th>verdr&auml;ngt die Hauptschleife?</th></tr></thead>
+      <tbody>
+        <tr><td>nRF52 / RAK4631</td><td>Timer-Service-Task, Priorit&auml;t 2 <span class="tag">nrf52_main.cpp:982</span></td><td class="num">1 KB</td><td><strong>ja</strong></td></tr>
+        <tr><td>ESP32</td><td><code>loopTask</code> &uuml;ber <code>checkRX()</code> <span class="tag">esp32_main.cpp:4004, :4111</span></td><td>Schleifentask</td><td>nein</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Drei Konsequenzen daraus sind nicht verhandelbar: jeder Schreibzugriff auf den Sendering
+    geh&ouml;rt in denselben kritischen Abschnitt, den <code>addTxRingEntry()</code> benutzt; kein
+    <code>printfdeb</code>, kein <code>Serial.printf</code>, kein <code>String</code> und kein
+    <code>malloc</code> innerhalb der Sperre &mdash; erst sammeln, nach dem Verlassen ausgeben; und
+    auf dem 1-KB-Stack keine Arduino-<code>String</code>-Objekte, sondern feste Puffer.</p>
+  </div>
+</section>
+
+
+<!-- ============ 10 ============ -->
+<section id="f10">
+  <div class="sechead"><span class="qn">Frage 10</span><h2>Was sagt das ADR 02?</h2><span class="chip">Referenz</span></div>
+
+  <div class="prose">
+    <p>Mehr, als man erwartet &mdash; und an einer entscheidenden Stelle nichts.</p>
+
+    <p><strong>Zwei Konzept-Elemente sind dort bereits ausgearbeitet.</strong> Der fr&uuml;here Slot
+    f&uuml;r wichtige Knoten ist die Stufe&nbsp;1 des ADR, mitsamt Slotfenstern statt fester
+    Zeitscheiben. Das Alleinversorger-Veto ist die Leitplanke E5 einer m&ouml;glichen Stufe&nbsp;2,
+    inklusive Schwellenwert <code>NC_VETO = 2</code>, Mindestzahl geh&ouml;rter Duplikate
+    <code>k &ge; 2</code>, Zufallsanteil und Protokollpflicht.</p>
+
+    <p><strong>Ein Element unterscheidet sich strukturell.</strong> Die Formulierung des Betreibers
+    &mdash; gesendet werden darf immer, nur nicht sofort &mdash; ist die Semantik der ADR-Stufe 1
+    (reine Umsortierung, R&uuml;ckgabewert unver&auml;ndert) plus weiches Nachgeben. Die
+    zur&uuml;ckgebaute Stufe&nbsp;2 war ein <em>hartes</em> Stornieren zum fr&uuml;hestm&ouml;glichen
+    Zeitpunkt. Das ist nicht dieselbe Sache mit anderen Konstanten, sondern ein anderer
+    Mechanismus.</p>
+
+    <p><strong>Drei Elemente fehlen ganz.</strong> Die H&ouml;rerschaft als Ma&szlig; kommt im ADR
+    nicht vor &mdash; und trifft genau die L&uuml;cke, die das ADR bei sich selbst benennt: mheard
+    misst, wen wir h&ouml;ren, nicht wer uns h&ouml;rt. Adaptiver Hop-Count kommt nicht vor.
+    &bdquo;Mesh immer eingeschaltet&ldquo; kommt nicht vor.</p>
+
+    <p>Der vollst&auml;ndige Abgleich steht weiter unten im Abschnitt
+    <a href="#adr">Abgleich mit ADR 02</a>.</p>
+  </div>
+</section>
+
+
+<!-- ============ Einordnung ============ -->
+<section id="einordnung">
+  <div class="sechead"><h2>Einordnung</h2><span class="chip">Bewertung</span></div>
+
+  <div class="prose">
+    <p>Sechs Feststellungen, die aus der Zusammenschau von Messung, Simulation, Code und ADR
+    folgen.</p>
+  </div>
+
+  <ol class="recs">
+    <li><strong>Die H&ouml;rerschaft ist das richtige Ma&szlig; &mdash; und dem ADR-Ma&szlig; in
+      einem Punkt &uuml;berlegen.</strong> Sie misst die Richtung, in der ein Relais wirkt. Sie hat
+      aber denselben blinden Fleck wie jede rohe Zahl: sie wei&szlig; nicht, ob die H&ouml;rer
+      Alternativen haben. Eine gro&szlig;e H&ouml;rerschaft, deren H&ouml;rer alle andere Wege
+      haben, ist redundant; eine kleine, deren einziger H&ouml;rer keinen hat, ist kritisch. Deshalb
+      bleibt die Blatt-Pr&uuml;fung Pflicht, und die saubere Form lautet
+      <em>H&ouml;rerschaft, gewichtet mit 1/Alternativen der H&ouml;rer</em> &mdash; die
+      ADR-Formel, gespiegelt auf den Ausgangsgrad.</li>
+
+    <li><strong>Reihenfolge ist Voraussetzung, nicht Wirkung.</strong> Die Wirkung kommt aus dem
+      Nachgeben der Nachrangigen. Die sichere Form ist Aufschieben und Pr&uuml;fen, nicht Stornieren
+      beim ersten Mith&ouml;ren; die Zahl <em>k</em> der geh&ouml;rten Kopien und ein
+      H&ouml;rfenster von mindestens einer Sekunde sind die zwei Stellschrauben, die zwischen
+      27&nbsp;% Abdeckungsverlust und 95,6&nbsp;% Abdeckung entscheiden.</li>
+
+    <li><strong>Das Rudel-Problem ist neu gegen&uuml;ber dem Blatt-Problem des R&uuml;ckbaus.</strong>
+      Ein Knoten mit acht Zubringern verhungert, wenn alle acht sich gegenseitig stornieren.
+      <em>k &ge; 2</em> mit H&ouml;rfenster ist die Antwort; das Veto allein nicht. Das ist der
+      Befund, den weder das ADR 02 noch der Post-mortem von 2024 enth&auml;lt.</li>
+
+    <li><strong>40&nbsp;% des Verkehrs kommt von Knoten ohne Kanalpr&uuml;fung</strong>, die weder
+      warten noch nachgeben. Jede Regel gilt nur f&uuml;r den Teil der Flotte, der sie kennt; die
+      Ersparnis skaliert mit dem Anteil aktueller Firmware. Feldbewertungen geh&ouml;ren deshalb
+      gegen die Teilmenge moderner Knoten gerechnet, nicht gegen den Flottenschnitt.</li>
+
+    <li><strong>Der Weg dorthin ist die PR-Serie aus dem Entwurf:</strong> erst messen
+      (H&ouml;rerschaftstabelle plus Logzeile, kein Verhaltenswechsel), dann Slot-Skew hinter einem
+      Schalter, dann Aufschieben-und-Pr&uuml;fen mit Veto und <em>k</em>, zuletzt die Hop-Abgabe.
+      Jede Stufe hat eine Kennzahl, die sie widerlegen kann: die Erstkopien-Quote der Hubs, die
+      Kopien je Nachricht, die Blatt-Zustellrate.</li>
+
+    <li><strong>Nicht simuliert und deshalb nicht behauptet:</strong> Kollisionen, Warteschlangen,
+      die reale Rahmendauer von 1,1 bis 1,4&nbsp;s, die Server-Reinjektion und die
+      Unvollst&auml;ndigkeit des Graphen (im Median sind 67,5&nbsp;% der gemeldeten Nachbarn
+      sichtbar). <strong>Die Verh&auml;ltnisse zwischen den Regeln sind belastbar, die absoluten
+      Zahlen nicht.</strong></li>
+  </ol>
+</section>
+
+
+<!-- ============ Entwurf ============ -->
+<section id="entwurf">
+  <div class="sechead"><h2>Der Entwurf im Code</h2><span class="chip">Referenz</span></div>
+
+  <div class="prose">
+    <p>Alle Stellenangaben beziehen sich auf den Stand <code>v4.35p_prio</code> vom 02.09.2026 und
+    wurden im Baum nachgelesen. Am Code wurde nichts ge&auml;ndert; dies ist ein Entwurf, keine
+    Umsetzung.</p>
+
+    <h3>A &mdash; messen, ohne das Verhalten zu &auml;ndern</h3>
+    <p>Der Haken sitzt unmittelbar nach <code>updateMheard()</code> bei
+    <code>src/lora_functions.cpp:750</code> und pr&uuml;ft mit <code>strstr()</code> &uuml;ber
+    <code>msg_source_path.c_str()</code>, ob das eigene Rufzeichen im Pfad steht; das Token danach
+    ist der Beweistr&auml;ger. Gespeichert wird in einer eigenen Tabelle neben den mheard-Feldern
+    (<code>src/mheard_functions.cpp:35-56</code>):</p>
+    <pre style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem .95rem;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.5;margin:0"><code style="background:none;padding:0;font-size:1em">#define MAX_AUD  (MAX_MHEARD / 2)      /* 40 / 25 / 15 */
+char     audCalls[MAX_AUD][10];        /* wer mich nachweislich geh&ouml;rt hat  */
+uint32_t audMillis[MAX_AUD];           /* letzter Nachweis, millis()          */
+int8_t   audRssi[MAX_AUD];             /* X's Pegelmeldung MEINES Signals     */
+
+#define AUD_AGE_WINDOW_MS (3UL*60UL*60UL*1000UL)   /* 3 h */</code></pre>
+    <p><code>getAudienceCount()</code> ist die exakte Entsprechung zu <code>getMheardCount()</code>
+    (<code>src/mheard_functions.cpp:653-672</code>): ein begrenzter Durchlauf mit Frischepr&uuml;fung,
+    ohne Allokation, damit vom Timertask aus benutzbar.</p>
+
+    <p><strong>Die H&ouml;rerschaft eines <em>Nachbarn</em> steht heute nicht auf dem Draht.</strong>
+    Der naheliegende Weg &mdash; ein drittes Feld im HEY-Kopf (<code>R12,7,3;</code>) &mdash; ist
+    durch den Defekt aus Frage&nbsp;9 versperrt: <code>R12,7,3;</code> und der nackte Kopf
+    <code>R5,80,7;</code> sind f&uuml;r jeden Parser byte-identisch unterscheidbar nur, wenn er die
+    Firmware des Absenders bereits kennt. Der Vorschlag ist deshalb eine <em>angeh&auml;ngte
+    Gruppe</em> nach der gesamten Reportkette: <code>A&lt;n&gt;;</code>. Alte Parser lesen den Kopf
+    wie bisher, eine buchstabengef&uuml;hrte Gruppe ist von jeder Zahlengruppe unterscheidbar, die
+    Positionszuordnung der ersten <em>N</em> Gruppen zum Pfad bleibt unangetastet, und wenn der
+    Platz ausgeht, f&auml;llt genau diese Gruppe weg &mdash; <code>appendHeySignalReport()</code>
+    beginnt ohnehin keine Gruppe, die es nicht zu Ende schreiben kann
+    (<code>src/aprs_functions.cpp:1171-1172</code>). Kosten: +3 bis +5&nbsp;Byte je erzeugter
+    HEY-Bake, einmalig, nicht je Sprung. <code>HEY_PATH_PAYLOAD_MAX</code>
+    (<code>src/configuration_global.h:260-261</code>) muss dabei von 8 auf etwa 15 Byte
+    Kopfreserve wachsen. Das ist aus Sicht des Servers eine Formats&auml;nderung und braucht
+    <code>docs/wire-compat.md</code> und die Zustimmung des Projektleiters <em>vor</em> dem PR.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Welches Ma&szlig; welche Aufgabe bekommt &mdash; so, wie die Felddaten es neu
+      verteilen.</caption>
+      <thead><tr><th>Ma&szlig;</th><th>misst</th><th>Quelle</th><th>Aufgabe</th></tr></thead>
+      <tbody>
+        <tr><td><code>NC_self</code> = <code>getMheardCount()</code></td><td>wie viele ich h&ouml;re</td><td>lokal</td><td><strong>keine.</strong> Auf Messdaten widerlegt und vom ADR 02 als Alternative&nbsp;1 verworfen</td></tr>
+        <tr><td>ADR-Wichtigkeit <code>&Sigma; 1/NC_reported</code></td><td>wie sehr Nachbarn von mir abh&auml;ngen</td><td><code>mheardNCount[]</code>, &uuml;ber Funk</td><td>Eingang des <strong>Vetos</strong></td></tr>
+        <tr><td><strong>H&ouml;rerschaft</strong></td><td>wie viele mich h&ouml;ren k&ouml;nnen</td><td>Pfad-Echos, keine Protokoll&auml;nderung</td><td>das <strong>Storno-Tor</strong> &mdash; und nachrangig der Slot-Skew</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>B &mdash; den Sendeslot verschieben</h3>
+    <p>Entschieden wird die Wartezeit in <code>csma_compute_timeout()</code>
+    (<code>src/lora_functions.cpp:2210-2215</code>). Die Funktion sieht nur Versuchsz&auml;hler und
+    Priorit&auml;t, kann also ein Relais nicht von einer eigenen Aussendung unterscheiden &mdash;
+    aber der Aufrufer h&auml;lt den Ringslot bereits, und Relais sind genau die Eintr&auml;ge im
+    Zustand <code>RING_STATUS_DONE</code> (gesetzt bei <code>src/lora_functions.cpp:1346</code>,
+    <code>src/udp_functions.cpp:479</code>, <code>src/nrf52/nrf_eth.cpp:656</code> und sonst
+    nirgends f&uuml;r fremden Verkehr). Eine zus&auml;tzliche Kennung mit Vorgabewert
+    <code>false</code> gen&uuml;gt, damit alle bisherigen Aufrufstellen unver&auml;ndert
+    &uuml;bersetzen. Eigene Best&auml;tigungen und Direktnachrichten sind strukturell
+    ausgeschlossen, weil sie nie <code>DONE</code> tragen.</p>
+
+    <pre style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem .95rem;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.5;margin:0"><code style="background:none;padding:0;font-size:1em">delay = base(prio) + skew(rang) + jitter
+skew  = (RANK_TOP - rang) * RELAY_RANK_STEP_MS     /* hoher Rang => skew 0 => frueh */
+jitter= random(0, CSMA_PRIO_SLOTS_x + 1) * CSMA_SLOT_SIZE   /* unveraendert 0..350 ms */
+
+#define RELAY_RANK_STEP_MS     1500   /* Sekunden, nicht Millisekunden */
+#define RELAY_RANK_BANDS          3   /* Rang 2/1/0 -> skew 0 / 1500 / 3000 ms */
+#define AUD_HUB                  12   /* Schwelle Rang 2 */
+#define AUD_MID                   5   /* Schwelle Rang 1 */
+#define AUD_MIN_OBS               3   /* Qualitaetstor: verschiedene Nachweise */
+#define RELAY_AUD_UPTIME_MS  (60UL*60UL*1000UL)   /* Kaltstartsperre */</code></pre>
+
+    <p>Zwei Invarianten sind Absicht. <strong>Der Skew wird nur addiert, nie subtrahiert</strong>
+    &mdash; der Spitzenrang beh&auml;lt exakt das heutige Zeitverhalten, kein Knoten wird schneller
+    als die aktuelle Firmware, und damit kann diese &Auml;nderung den Kollisionsdruck nicht
+    erh&ouml;hen. <strong>Unbekannter Rang gilt als Spitzenrang</strong> &mdash; die Umkehrung
+    w&uuml;rde einen frisch gestarteten Bergknoten genau dann nach hinten sortieren, wenn das Netz
+    ihn braucht.</p>
+
+    <p>Die Gr&ouml;&szlig;e 1.500&nbsp;ms &times; 3 B&auml;nder = 3&nbsp;s Skew ist gegen die
+    Messung bemessen: viermal &uuml;ber dem 350-ms-Rauschen, das sie schlagen muss, und unter dem
+    k&uuml;rzesten gemessenen Vorsprung der ersten Kopie (5,97&nbsp;s, Text am Buchberg), damit ein
+    zur&uuml;ckgestufter Knoten den Vorreiter noch h&ouml;ren kann. Schlimmstenfalls dehnt sich die
+    Wartezeit eines Relays von 4.500&ndash;4.850 auf 7.500&ndash;7.850&nbsp;ms &mdash; immer noch
+    eine Gr&ouml;&szlig;enordnung unter den 14 bis 17&nbsp;s, in denen Kopien heute ohnehin
+    eintreffen.</p>
+
+    <p>Der Skew gilt nur, wenn alle drei Bedingungen erf&uuml;llt sind, sonst Skew 0:
+    <code>H&ouml;rerschaft &ge; AUD_MIN_OBS</code>, <code>millis() &ge; RELAY_AUD_UPTIME_MS</code>
+    und <code>H&ouml;rerschaft &lt; MAX_AUD</code> &mdash; die letzte Bedingung, weil ein Anschlag
+    keine Messung ist. Notausschalter nach dem Muster von <code>--shortpath</code>
+    (<code>src/command_functions.cpp:618-629</code>): <code>--relayslot on|off|auto</code> auf dem
+    freien Bit <code>0x2000</code> in <code>node_sset2</code>. Nicht <code>0x8000</code>:
+    <code>node_sset2</code> ist als <code>int</code> deklariert und l&auml;uft durch die
+    Einstellungs-JSON, das Vorzeichenbit ist eine Falle.</p>
+  </div>
+
+  <h3>C &mdash; aufschieben, dann pr&uuml;fen: der tragende Mechanismus</h3>
+
+  <div class="prose">
+    <p><strong>Stufe 1, beim ersten Duplikat.</strong> Nicht stornieren. Das eingereihte Relay
+    suchen und verschieben:</p>
+    <pre style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem .95rem;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.5;margin:0"><code style="background:none;padding:0;font-size:1em">ringDupSeen[slot]++
+ringNotBefore[slot] = millis() + RELAY_LATE_MS</code></pre>
+    <p><strong>Stufe 2, wenn die Verschiebung abgelaufen ist.</strong> <code>getNextTxSlot()</code>
+    &uuml;berspringt Slots, deren Sperrzeit noch l&auml;uft. Wird der Slot wieder w&auml;hlbar, wird
+    <em>nur dann</em> storniert, wenn <strong>alle vier</strong> Bedingungen gelten:</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Die vier Bedingungen f&uuml;r ein Storno. Jede einzelne verhindert es; das ist der
+      Unterschied zur zur&uuml;ckgebauten Fassung, die nur eine kannte.</caption>
+      <thead><tr><th>#</th><th>Bedingung</th><th>Konstante</th><th>Herkunft</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>mindestens <em>k</em> Duplikate geh&ouml;rt</td><td class="mono">RELAY_CANCEL_K = 2</td><td>ADR 02 Leitplanke 1, best&auml;tigt durch das Rudel-Storno</td></tr>
+        <tr><td class="num">2</td><td>eigene H&ouml;rerschaft unterhalb des obersten Bandes &mdash; wer der Hub ist, sendet</td><td class="mono">AUD_HUB = 12</td><td>Konzept des Betreibers</td></tr>
+        <tr><td class="num">3</td><td>kein aktiver Nachbar mit gemeldeter Nachbarzahl &le; 2 oder unbekannt</td><td class="mono">NC_VETO = 2</td><td>ADR 02 Leitplanke 3 (E5)</td></tr>
+        <tr><td class="num">4</td><td>Zufallsprobe <code>random(0,100) &lt; 75</code></td><td class="mono">RELAY_CANCEL_PCT = 75</td><td>ADR 02 Leitplanke 4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>Andernfalls sendet das Relay ganz normal &mdash; nur sp&auml;ter.
+    <code>RELAY_LATE_MS = 8000</code> ist so bemessen, dass es lang genug ist, um ein zweites
+    Duplikat einzusammeln (der Medianabstand liegt bei 13,95&ndash;17,48&nbsp;s, acht Sekunden
+    fangen also einen brauchbaren Teil ab, ohne einen ganzen Median abzuwarten), und deutlich unter
+    <code>RING_BG_MAX_AGE_MS</code> = 180.000&nbsp;ms
+    (<code>src/configuration_global.h:316-323</code>), ab dem der Ring den Eintrag ohnehin
+    verwerfen w&uuml;rde. <strong>Nicht auf Text anwenden:</strong> Stufe 1 wird auf
+    <code>payload_type == '@' || payload_type == '!'</code> begrenzt &mdash; die rund 80 bis
+    84&nbsp;% des Verkehrs, die Statusmeldungen sind.</p>
+  </div>
+
+  <div class="call ok">
+    <h3>Warum das nicht der R&uuml;ckbau von 2024 ist</h3>
+    <p>Der damalige Commit stornierte im Empfangsmoment, sobald genug andere geliefert hatten,
+    abgesichert nur durch die eigene Nachbarzahl. Das Schulbeispiel aus dem ADR: Ein Relais R
+    h&ouml;rt das Relay des Hubs H und das von M, storniert bei k=2 &mdash; und das Blatt L, das
+    <em>nur</em> R h&ouml;rt, bekommt nie etwas. Aufschieben-und-Pr&uuml;fen bricht das auf
+    <strong>drei voneinander unabh&auml;ngige Weisen</strong>, und die Unabh&auml;ngigkeit ist der
+    Punkt: f&auml;llt eine aus, bleiben zwei.</p>
+    <ul class="tight">
+      <li><strong>Das Veto greift.</strong> L meldet Nachbarzahl &le; 2, R sieht einen vetoberechtigten
+        Nachbarn und storniert nie. Deterministisch in der sicheren Richtung.</li>
+      <li><strong>Die Zufallsprobe beseitigt das Wort &bdquo;nie&ldquo;.</strong> Selbst mit
+        ausgehebeltem Veto sendet R in etwa einem Viertel der Runden. &bdquo;Selten&ldquo; ist eine
+        andere Fehlerklasse als &bdquo;nie&ldquo;.</li>
+      <li><strong>Die Verschiebung erlaubt eine zweite Beurteilung.</strong> Gepr&uuml;ft wird, wenn
+        die Sperrzeit abl&auml;uft, nicht wenn das Duplikat eintrifft. Waren H und M selbst
+        verschoben oder storniert, erreicht der Z&auml;hler nie <em>k</em>, und R sendet normal. Die
+        alte Fassung entschied einmal, im fr&uuml;hesten und schlechtest informierten Moment.</li>
+    </ul>
+    <p>Die Formulierung des Betreibers &mdash; &bdquo;gesendet darf immer werden, nur nicht
+    sofort&ldquo; &mdash; <em>ist</em> genau die dritte Eigenschaft. Sie ist der strukturelle
+    Unterschied, nicht eine andere Konstante.</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Zustand und Sperren.</strong> Zwei Nebenfelder je Ringslot,
+    <code>uint32_t ringNotBefore[MAX_RING]</code> und <code>uint8_t ringDupSeen[MAX_RING]</code>
+    &mdash; <strong>100&nbsp;Byte auf allen Ger&auml;ten</strong>. Beide werden in
+    <code>addTxRingEntry()</code> zur&uuml;ckgesetzt
+    (<code>src/txring_functions.cpp:477-478</code>) <em>und</em> im Verdr&auml;ngungsblock
+    mitverschoben (<code>:538-545</code>), der ohnehin Priorit&auml;t, Einreihzeitpunkt und
+    Wiederholungsz&auml;hler zusammen bewegt &mdash; die zweite Stelle zu vergessen ist der
+    wahrscheinlichste Fehler des ganzen PR.</p>
+
+    <p><strong>Bewusst kein neuer Ringzustand.</strong> Der Zustand wird an f&uuml;nf Stellen auf
+    exakte Gleichheit gepr&uuml;ft; ein sechster Wert h&auml;tte jede davon zur Pr&uuml;fung
+    gezwungen. Ein Zeitstempel in einem Nebenfeld ber&uuml;hrt genau eine Stelle: die Auswahl in
+    <code>getNextTxSlot()</code> (<code>src/txring_functions.cpp:176</code>), erweitert um einen
+    &uuml;berlaufsicheren Vergleich. Ein vollst&auml;ndig verschobener Ring verh&auml;lt sich dann
+    wie ein leerer &mdash; ein Zustand, den beide Hauptschleifen bereits behandeln.</p>
+
+    <p><strong>Stufe 1 l&auml;uft im Empfangskontext</strong>, weil dort das Duplikat sichtbar wird,
+    schreibt aber nur zwei Bytes in Nebenfelder. <strong>Stufe 2 l&auml;uft in der
+    Hauptschleife</strong>, neben <code>txRingAgeBackground()</code> &mdash; der Veto-Durchlauf
+    &uuml;ber <code>MAX_MHEARD</code> hat auf einem 1-KB-Stack nichts verloren.</p>
+
+    <p><strong>Kosten je Entscheidung.</strong> Stufe 1: h&ouml;chstens 20 Ringslots, je ein
+    4-Byte-<code>memcmp</code> &mdash; derselbe Durchlauf, den der Empfangspfad heute bei
+    <code>src/lora_functions.cpp:515</code> auf <em>jedem</em> Rahmen ausf&uuml;hrt, hier aber nur
+    auf Duplikaten. Stufe 2: h&ouml;chstens 80 Ganzzahlvergleiche f&uuml;r das Veto, h&ouml;chstens
+    40 f&uuml;r die H&ouml;rerschaft. Keine Allokation, kein <code>String</code>, keine Ausgabe
+    innerhalb einer Sperre. Sch&auml;tzung: deutlich unter 100&nbsp;&micro;s auf dem nRF52. Die
+    Abnahmepr&uuml;fung ist nicht diese Sch&auml;tzung, sondern die vorhandene
+    <code>ONRXDONE_TIME</code>-Messung mit ihrer 50-ms-Warnschwelle.</p>
+
+    <h3>D &mdash; adaptiver Hop-Count</h3>
+    <p>Erzeugt wird das Budget an genau einer Stelle
+    (<code>src/aprs_functions.cpp:99-101</code>), vermindert an genau einer weiteren
+    (<code>src/lora_functions.cpp:1272-1278</code>, nur im Relay-Zweig). Vorgaben:
+    <code>MAX_HOP_TEXT_DEFAULT</code> 4, <code>MAX_HOP_POS_DEFAULT</code> 2
+    (<code>src/configuration_global.h:247-248</code>), Bedienbereich 1&ndash;6
+    (<code>src/maxhop.h:17-19</code>), absolute Obergrenze <code>MAX_HOP_LIMIT</code> 7.</p>
+    <ul class="tight">
+      <li><strong>Schritt 0:</strong> die HEY-Bake bekommt das Positionsbudget statt des Textbudgets.
+        Zwei Zeilen, kein neuer Zustand, rund 20&nbsp;% der geh&ouml;rten Sendezeit.</li>
+      <li><strong>Schritt 1 (Ursprung):</strong> Ist ein direkter Nachbar frisch, meldet er eine
+        H&ouml;rerschaft &ge; <code>AUD_HUB</code> <em>und</em> liegt meine eigene unter
+        <code>AUD_MID</code> &mdash; ich bin also ein Blatt, dessen Verkehr der Hub tr&auml;gt
+        &mdash;, dann mit Budget 2 senden. Die zweite Bedingung ist wesentlich: ein Hub, der sein
+        Budget k&uuml;rzt, weil ein anderer Hub in der N&auml;he ist, ist genau die Art, wie eine
+        Region ihre Abdeckung verliert.</li>
+      <li><strong>Schritt 2 (Relais):</strong> Wer selbst Hub ist, vermindert bei Status- und
+        Positionsverkehr um 2 statt um 1. <strong>Niemals bei Text.</strong> Text muss Bl&auml;tter
+        erreichen, Baken m&uuml;ssen es nicht &mdash; diese Asymmetrie geh&ouml;rt so in die
+        PR-Beschreibung.</li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ============ PR-Serie ============ -->
+<section id="prserie">
+  <div class="sechead"><h2>PR-Serie</h2><span class="chip">Vorschlag</span></div>
+
+  <div class="prose">
+    <p>Sieben Schritte in fester Reihenfolge. Die ersten drei geh&ouml;ren nicht zum Konzept: sie
+    tragen die gr&ouml;&szlig;ten gemessenen Gewinne, brauchen keinen Notausschalter, keine
+    Formatverhandlung und zusammen rund 50 Zeilen Code plus 400&nbsp;Byte RAM.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Die Serie in der vorgeschlagenen Reihenfolge. &bdquo;beweist / widerlegt&ldquo; ist
+      die Kennzahl, an der der Schritt im Feld scheitern darf &mdash; jede Stufe muss widerlegbar
+      sein.</caption>
+      <thead><tr><th>Schritt</th><th>Dateien</th><th>Zeilen</th><th>RAM</th><th>Logzeile</th><th>beweist / widerlegt</th><th>h&auml;ngt ab von</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>PR-0</strong><br><span class="tag">HEY-Hop-Budget</span></td>
+          <td class="mono">src/aprs_functions.cpp:100-101<br>test/test_maxhop, test/test_aprs_reencode</td>
+          <td class="num">2</td><td class="num">0</td>
+          <td>&mdash; <span class="tag">Vorgabe&auml;nderung</span></td>
+          <td>Pfadl&auml;ngen-Histogramm je Typ und HEY-Hop-Histogramm. Erwartet <strong>&asymp; 20 % der geh&ouml;rten Sendezeit</strong></td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><strong>PR-0b</strong><br><span class="tag">Dedup nach Zeit altern</span></td>
+          <td class="mono">src/dedup_functions.cpp/.h<br>test/test_dedup_replay</td>
+          <td class="num">~40</td><td class="num">400 B</td>
+          <td>&mdash;</td>
+          <td>Fenster 30&ndash;45 min: &uuml;ber dem l&auml;ngsten beobachteten Nachz&uuml;gler (34,8 min), unter der k&uuml;rzesten Wiederverwendung einer Kennung (48,5 min)</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><strong>PR-0c</strong><br><span class="tag">nackter <code>R</code>-Kopf</span></td>
+          <td class="mono">src/mheard_functions.cpp:510<br>test/test_mheard_aging</td>
+          <td class="num">~4</td><td class="num">0</td>
+          <td>&mdash;</td>
+          <td>Korrigiert <strong>3.469 von 7.214</strong> Direktempf&auml;ngen mit erfundener Nachbarzahl. <strong>Harte Voraussetzung f&uuml;r PR-C</strong></td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><strong>PR-A</strong><br><span class="tag">nur messen</span></td>
+          <td class="mono">src/mheard_functions.cpp/.h<br>src/lora_functions.cpp (Haken nach :750, Pegel auf die <code>[LOG]</code>-Zeile :573-582)<br>src/configuration_global.h</td>
+          <td class="num">~120</td><td class="num">600 B / 225 B</td>
+          <td class="mono">[MC-AUD] n= fresh= shortpath_seen= top=&lt;call&gt;/&lt;rssi&gt;</td>
+          <td>Erwartet 10,7&ndash;23,0 % der Empf&auml;nge als Nachweis. Dominiert <code>shortpath_seen</code>, ist die Kennzahl tot und PR-B darf nicht kommen</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><strong>PR-B</strong><br><span class="tag">Slot-Skew, aus</span></td>
+          <td class="mono">src/lora_functions.cpp:2210-2237<br>src/command_functions.cpp (<code>--relayslot</code>)<br>beide Loader (Bit <code>0x2000</code>)<br>test/test_txprio_replay</td>
+          <td class="num">~70</td><td class="num">0</td>
+          <td class="mono">[MC-SLOT] rank= aud= skew= base= prio= gate=</td>
+          <td>Erstkopien-Quote je Relais (heute 8,99&ndash;72,06 %). <strong>Keine Sendezeitersparnis erwarten</strong> und nicht darauf pr&uuml;fen</td>
+          <td>PR-A</td>
+        </tr>
+        <tr class="total">
+          <td><strong>PR-C</strong><br><span class="tag">aufschieben + Veto, aus</span></td>
+          <td class="mono">src/txring_functions.cpp/.h<br>src/loop_functions.cpp<br>src/lora_functions.cpp:797<br>src/mheard_functions.cpp<br>beide Hauptschleifen<br>test/test_txring, test_txring_flood, test_dedup_replay</td>
+          <td class="num">~180</td><td class="num">100 B</td>
+          <td class="mono">[MC-POSTPONE] / [MC-CANCEL] / [MC-VETO]</td>
+          <td><strong>Beweist:</strong> Kopien je Nachricht m&uuml;ssen von 3,02 / 3,92 / 3,14 fallen. <strong>Widerlegt / R&uuml;ckbau:</strong> die Blatt-Zustellrate darf nicht fallen &mdash; das ist die Abnahmeschwelle, nicht ein Wunsch</td>
+          <td><strong>PR-0c</strong>, PR-0b, PR-B</td>
+        </tr>
+        <tr>
+          <td><strong>PR-D</strong><br><span class="tag">adaptiver Hop, aus</span></td>
+          <td class="mono">src/aprs_functions.cpp:99-101<br>src/lora_functions.cpp:1272-1278<br>src/command_functions.cpp (<code>--adaptivehop</code>, Bit <code>0x0010</code>)<br>test/test_maxhop</td>
+          <td class="num">~60</td><td class="num">0</td>
+          <td class="mono">[MC-HOP] type= orig= chosen= reason=</td>
+          <td>Pfadl&auml;ngen-Histogramm <em>und</em> Blatt-Abdeckung. R&uuml;ckbau, sobald ein Blatt ausf&auml;llt. Der Gateway-Effekt wird den Gewinn auf diesem Kamm gr&ouml;&szlig;tenteils verdecken</td>
+          <td>PR-0, PR-A, Draht-Erweiterung</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="call note">
+    <h3>Was PR-A nebenbei repariert</h3>
+    <p><code>printBuffer_aprs()</code> (<code>src/loop_functions.cpp:3144-3148</code>) schreibt
+    Hop-Budget, Flags und beide Pfade &mdash; aber <strong>keinen Empfangspegel</strong>. Deshalb
+    enth&auml;lt die ganze Nachtaufzeichnung keinen einzigen Pegelwert, und deshalb sind Kollisionen
+    darin nicht z&auml;hlbar. Eine Zeile schlie&szlig;t das. Ohne sie und ohne eine Aufzeichnung mit
+    eingeschaltetem <code>--loradebug</code> sind die Abnahmekriterien von PR-B und PR-C aus den
+    Logs, die die Flotte erzeugt, gar nicht berechenbar.</p>
+  </div>
+</section>
+
+
+<!-- ============ ADR ============ -->
+<section id="adr">
+  <div class="sechead"><h2>Abgleich mit ADR 02</h2><span class="chip">Referenz</span></div>
+
+  <div class="prose">
+    <p>Grundlage: <code>docs/adr-nc-importance-backoff.md</code> in Revision 3 (1.886 Zeilen),
+    <code>docs/hey-supp.md</code> und der zur&uuml;ckgebaute Commit <code>60ea7d8</code>. Die
+    Stellenangaben sind Zeilennummern im ADR.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Zw&ouml;lf Elemente des Konzepts gegen das bestehende Architekturdokument.</caption>
+      <thead><tr><th>Konzept-Element</th><th>ADR 02 sagt</th><th>Stelle</th><th>Bewertung</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Ma&szlig;: H&ouml;rerschaft statt <code>&Sigma; 1/NC</code> oder <code>NC_self</code></strong></td>
+          <td>Kennt nur <code>NC_self</code> (&bdquo;wie viele h&ouml;re ich&ldquo;) und
+            <code>NC_reported</code> (die Selbstauskunft des Nachbarn per HEY). Gew&auml;hlte
+            Wichtigkeit ist <code>&Sigma; 1/NC_reported</code>: &bdquo;wie abh&auml;ngig sind meine
+            Nachbarn von mir&ldquo;, nicht &bdquo;wie viele h&ouml;ren mich&ldquo;.</td>
+          <td class="mono">33-41; 480-519</td>
+          <td><strong>L&Uuml;CKE.</strong> Der Ausgangsgrad ist keines der ADR-Ma&szlig;e. Am
+            n&auml;chsten kommt das ADR-eigene Eingest&auml;ndnis, dass mheard die Gegenrichtung
+            misst.</td>
+        </tr>
+        <tr>
+          <td><strong>Hierarchiebildung</strong></td>
+          <td>Keine dauerhafte Hierarchie; die Wichtigkeit wird je Entscheidung zustandslos aus der
+            lokalen mheard-Tabelle neu berechnet. Br&uuml;cken- und Artikulationspunkt-Erkennung nur
+            als ungebaute Ausbaustufe.</td>
+          <td class="mono">1025-1082; 1165-1275</td>
+          <td>Teilweiser Vorl&auml;ufer, nicht gebaut, nur ein Sprung weit.</td>
+        </tr>
+        <tr>
+          <td><strong>Fr&uuml;herer Slot f&uuml;r Hubs</strong></td>
+          <td>Unmittelbar als Stufe&nbsp;1 umgesetzt: wichtiger Knoten &rarr; vordere Slots
+            (0&ndash;2) &rarr; k&uuml;rzerer Jitter &rarr; sendet fr&uuml;her. Vorrang &uuml;ber
+            Slotfenster, nicht &uuml;ber feste Zeitscheiben.</td>
+          <td class="mono">768-996; 818-826</td>
+          <td><strong>STARKE &Uuml;BEREINSTIMMUNG:</strong> der Kernmechanismus des ADR, nur von
+            einem anderen Ma&szlig; angetrieben.</td>
+        </tr>
+        <tr>
+          <td><strong>Unterdr&uuml;ckung &uuml;ber den Doppelfilter</strong></td>
+          <td>Zwei verschiedene Dinge: (a) empfangsseitiger Filter, der ein neues Einreihen
+            verhindert &mdash; heute aktiv; (b) sendeseitiges Stornieren eines bereits eingereihten
+            Relays &mdash; Stufe&nbsp;2, gebaut und zur&uuml;ckgebaut. Ein Storno-Pfad existiert
+            heute nicht.</td>
+          <td class="mono">1733-1741</td>
+          <td>Deckt sich mit (a), weicht bei (b) ab. Das &bdquo;die anderen finden es bekannt und
+            schweigen&ldquo; des Konzepts ist die Pr&uuml;fung <em>vor</em> dem Einreihen; was
+            zur&uuml;ckgebaut wurde, war das Stornieren <em>danach</em>.</td>
+        </tr>
+        <tr>
+          <td><strong>Alleinversorger-Veto</strong></td>
+          <td>Verbindliche Leitplanke E5 f&uuml;r jede Neuauflage der Stufe&nbsp;2: stornieren nur
+            bei <code>k &ge; 2</code> Duplikaten <em>und</em> eigener Wichtigkeit unter der Schwelle
+            <em>und</em> Alleinversorger-Veto <code>NC_VETO = 2</code> <em>und</em> Zufallsanteil
+            <em>und</em> Protokollpflicht. Mit benannten blinden Flecken.</td>
+          <td class="mono">473; 1770-1795</td>
+          <td><strong>NAHEZU IDENTISCH</strong>, dort bereits im Detail spezifiziert. Die
+            st&auml;rkste &Uuml;berlappung.</td>
+        </tr>
+        <tr>
+          <td><strong>Jeder darf senden (aufschieben statt stornieren)</strong></td>
+          <td>Stufe&nbsp;1 ist reine Umsortierung ohne &Auml;nderung daran, <em>ob</em> gesendet
+            wird; sie hat auch ohne Stornieren Wert. Stufe&nbsp;2 ist ein hartes Storno, keine
+            Verschiebung.</td>
+          <td class="mono">1644-1652; 1721-1724</td>
+          <td><strong>UNTERSCHIED.</strong> Die Formulierung des Betreibers ist Stufe-1-Semantik plus
+            weiches Nachgeben &mdash; strukturell etwas anderes als <code>60ea7d8</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Adaptiver Hop-Count</strong></td>
+          <td>Kommt nirgends vor. Nur Messungen: Hop-Verteilung, festes 4er-Budget, 20,7&nbsp;%
+            aufgebrauchte Budgets.</td>
+          <td class="mono">durch Volltextsuche best&auml;tigt</td>
+          <td><strong>ECHTE L&Uuml;CKE.</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Mesh immer eingeschaltet</strong></td>
+          <td>Nicht behandelt. Die einzige MESH-Diskussion steht in <code>hey-supp.md</code> und
+            betrifft Routing &uuml;ber gelernte HEY-Pfade, nicht den Kanalzugriff.</td>
+          <td class="mono">hey-supp.md 218-236</td>
+          <td><strong>ECHTE L&Uuml;CKE</strong> im ADR 02.</td>
+        </tr>
+        <tr>
+          <td><strong>Qualit&auml;tstor</strong></td>
+          <td>Dreifachbedingung: Anteil bekannter Nachbarn &ge; 60&nbsp;%,
+            <code>getMheardCount() &lt; MAX_MHEARD</code>, Betriebszeit &ge; 1&nbsp;h. Felddaten:
+            98,6&nbsp;% bestehen bei 50&nbsp;%, 97,6&nbsp;% bei 60&nbsp;% von 508 Knoten.</td>
+          <td class="mono">706-767</td>
+          <td>Unmittelbarer Vorl&auml;ufer; ein entsprechendes Tor f&uuml;r die Verl&auml;sslichkeit
+            von H&ouml;rerschaftsdaten fehlt noch.</td>
+        </tr>
+        <tr>
+          <td><strong>Notausschalter</strong></td>
+          <td>E7: <code>--impslot on/off/auto</code> nach dem Muster von <code>--shortpath</code>
+            (Bit in <code>node_sset</code>, <code>save_settings()</code>) &mdash; begr&uuml;ndet mit
+            den Kosten der Flottenneuprogrammierung beim R&uuml;ckbau von <code>60ea7d8</code>.</td>
+          <td class="mono">475; 1661-1676</td>
+          <td>Unmittelbarer Vorl&auml;ufer; wird &uuml;bernommen.</td>
+        </tr>
+        <tr>
+          <td><strong>Stufenweiser Rollout</strong></td>
+          <td>Stufe 0 &rarr; 0.5 &rarr; S &rarr; 1a &rarr; 1b &rarr; 1c &rarr; 2 mit Ein- und
+            Ausstiegskriterien und Abbruchschwellen gegen die eigene Cluster-Basislinie.</td>
+          <td class="mono">1644-1652; 1704-1713</td>
+          <td>Unmittelbarer Vorl&auml;ufer; die PR-Serie folgt derselben Logik.</td>
+        </tr>
+        <tr>
+          <td><strong>Kennzahlen zum Nachweis</strong></td>
+          <td>M1&ndash;M6: Duplikatquote, CAD-Besetztquote, Zombie-Rate, Ordnungseffekt &uuml;ber
+            synchronisierte Mehrknoten-Aufzeichnung, Best&auml;tigungslatenz, Blatt-Zustellrate. M6
+            geht auf die Lehre aus <code>60ea7d8</code> zur&uuml;ck.</td>
+          <td class="mono">1678-1690</td>
+          <td>Wiederverwendbarer Rahmen &mdash; aber keine dieser Kennzahlen misst die Genauigkeit
+            der H&ouml;rerschaft oder die Stabilit&auml;t der Hierarchie.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Warum das ADR &bdquo;wer viele Nachbarn hat, zuerst&ldquo; verwirft &mdash; und ob das die H&ouml;rerschaft trifft</h3>
+    <p>Das ADR verwirft seine Alternative&nbsp;1 (Backoff nur nach <code>NC_self</code>) mit dem
+    Argument, <code>NC_self</code> unterscheide den Hub auf dem Berg (viele Nachbarn, die alle nur
+    ihn haben) nicht vom redundanten Stadtknoten (gleich viele Nachbarn, die alle Alternativen
+    haben). Genau daf&uuml;r wurde <code>NC_reported</code> eingef&uuml;hrt. Das ist bewiesen: auf
+    einem symmetrischen H&ouml;rgraphen sortiert <code>&Sigma; 1/NC_reported</code> den
+    abh&auml;ngigen Bergknoten &uuml;ber den redundanten Stadtknoten, wo der rohe Grad es nicht
+    kann.</p>
+
+    <p>Trifft das Argument auch die H&ouml;rerschaft? <strong>In der allgemeinen Form ja:</strong>
+    eine rohe H&ouml;rerschaftszahl hat denselben strukturellen Fehler &mdash; eine gro&szlig;e
+    H&ouml;rerschaft mit lauter alternativenreichen H&ouml;rern ist redundant. Sie braucht dieselbe
+    Korrektur &bdquo;welche Alternativen haben meine H&ouml;rer&ldquo;.
+    <strong>In der Richtung, die dem ADR fehlt, nein:</strong> <code>NC_self</code> ist der
+    Eingangsgrad, die H&ouml;rerschaft der Ausgangsgrad. Das ADR f&uuml;hrt die Link-Asymmetrie als
+    eigenes Risiko und verschiebt sie ausdr&uuml;cklich in eine sp&auml;tere Ausbaustufe &mdash;
+    &bdquo;mheard misst, wen wir h&ouml;ren, nicht wer uns h&ouml;rt&ldquo;. Die H&ouml;rerschaft
+    zielt genau auf diese eingestandene, ungeschlossene L&uuml;cke.</p>
+
+    <h3>Der R&uuml;ckbau <code>60ea7d8</code> im Detail</h3>
+    <p>Mechanisch: beim Empfang eines Duplikats wurde, wenn die Kennung im Doppelfilter stand, ein
+    Z&auml;hler erh&ouml;ht; ab Schwelle 2 (bei <code>NC &le; 8</code>) beziehungsweise 3 (bei
+    <code>NC &ge; 9</code>) wurde das eigene, bereits eingereihte Relay storniert. Hartes Storno im
+    Empfangsmoment, abgesichert allein durch die eigene Nachbarzahl; <code>NC &le; 2</code>
+    unterdr&uuml;ckte nie.</p>
+    <p>Der Post-mortem des ADR: &bdquo;Implementiert und wieder entfernt. Feldtest zeigte:
+    Leaf&nbsp;Nodes mit nur einer Gegenstelle haben oft keine Nachrichten erhalten &hellip;
+    Suppression ohne Importance-Backoff storniert die falschen Nodes (Hubs statt Bl&auml;tter).&ldquo;
+    Der gr&ouml;&szlig;te Hub h&ouml;rt die Duplikate am schnellsten und storniert sich als erster
+    selbst. Revision 3 zeigt zus&auml;tzlich, dass selbst die <em>richtige</em> Reihenfolge nicht
+    gen&uuml;gt: ein zu Recht als unwichtig eingestufter Knoten kann der einzige Weg zu einem
+    verborgenen Blatt sein.</p>
+    <p>H&auml;tte &bdquo;aufschieben statt stornieren, nie unterhalb der Blattpr&uuml;fung&ldquo; das
+    verhindert? <strong>Weitgehend ja</strong> &mdash; Aufschieben kann &bdquo;das Blatt bekam nie
+    etwas&ldquo; konstruktionsbedingt nicht erzeugen. Mit einem Vorbehalt: das Veto ist eine
+    Heuristik. Knoten ohne Nachbarzahlmeldung und alte Firmware (15 bis 19&nbsp;% der Flotte) lassen
+    es h&auml;ufig ausl&ouml;sen &mdash; sicher, aber ohne Ersparnis &mdash;, und reine
+    Empfangsstationen sind f&uuml;r jede lokale Pr&uuml;fung unsichtbar. Dort scheitert Aufschieben
+    <em>sicher</em> statt still.</p>
+
+    <h3>Ein Zielkonflikt mit dem HEY-Sparverfahren</h3>
+    <p><code>hey-supp.md</code> beschreibt ein Trickle-Verfahren, das die <em>eigenen</em> HEY-Baken
+    eines Knotens drosselt: Mindestintervall 30&nbsp;s, H&ouml;chstintervall 15&nbsp;min, eigene Bake
+    unterdr&uuml;cken, wenn mindestens zwei Nachbarbaken geh&ouml;rt wurden. Flottenergebnis: 29 bis
+    75&nbsp;% weniger eigene Baken, im Mittel 53&nbsp;%. Weitergeleitete HEY-Baken drosselt es
+    <em>nicht</em>.</p>
+    <p>Die Zeitgeberei daraus passt gut zu &bdquo;gew&uuml;rfelt, aber aufgeschoben&ldquo;. Der
+    Z&auml;hler selbst misst allerdings wieder die falsche Richtung (empfangene Baken = Eingangsgrad).
+    Und es gibt eine Zirkularit&auml;t, die das ADR selbst benennt: <em>gerade gut vernetzte Knoten
+    senden am seltensten Baken &mdash; ihre Pfade lernt niemand.</em> Eine H&ouml;rerschaftshierarchie
+    braucht aber genau deren Baken, um sich zu bilden. Wer beides einschaltet, muss diese
+    Wechselwirkung messen.</p>
+  </div>
+</section>
+
+
+<!-- ============ Risiken ============ -->
+<section id="risiken">
+  <div class="sechead"><h2>Risiken</h2><span class="chip alert">Vorbehalt</span></div>
+
+  <div class="prose">
+    <p>Zehn Risiken des Entwurfs, jeweils mit der Richtung, in die sie wirken. Sie sind so
+    formuliert, dass sie im Feld widerlegbar sind.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Risiken des Entwurfs. &bdquo;Richtung&ldquo; sagt, ob der Fehler in die sichere oder
+      in die unsichere Richtung wirkt.</caption>
+      <thead><tr><th>#</th><th>Risiko</th><th>Was passiert</th><th>Richtung</th></tr></thead>
+      <tbody>
+        <tr><td class="num">F1</td><td>Asymmetrische Funkstrecken</td><td>Eine Station, die mich h&ouml;rt, aber nie weiterleitet (nur Empfang, MESH aus, voller Sendering), liefert keinen Nachweis. Die H&ouml;rerschaft ist eine Untergrenze. Die getrennte Tabelle ist genau deshalb n&ouml;tig: in mheard eingebettet, ginge auch der Fall &bdquo;h&ouml;rt mich, ich h&ouml;re ihn nicht&ldquo; verloren.</td><td class="chip ok">sicher</td></tr>
+        <tr><td class="num">F2</td><td>Veraltete H&ouml;rerschaft nach einem Ausfall</td><td>Das 3-h-Fenster l&auml;sst einen Hub bis zu drei Stunden lang fr&uuml;h senden, nachdem die H&auml;lfte seiner H&ouml;rer verschwunden ist. Ein zu fr&uuml;hes Relay ist verschwenderisch, nie falsch. Das Fenster darf nicht unter den Bakentakt (15 / 30 min) fallen, sonst liest es bei gesunden Knoten 0.</td><td class="chip note">mild</td></tr>
+        <tr><td class="num">F3</td><td>Gef&auml;lschte Nachbarzahl oder H&ouml;rerschaft</td><td>Die gemeldete Nachbarzahl ist eine unbeglaubigte Selbstauskunft; eine gemeldete H&ouml;rerschaft w&auml;re es auch. Begrenzt wird der Schaden durch die Invariante &bdquo;Skew wird nur addiert&ldquo;: ein L&uuml;gner erreicht f&uuml;r sich das heutige Verhalten und schiebt ehrliche Nachbarn um 1,5 bis 3&nbsp;s nach hinten. <strong>Lokal aus Pfad-Echos gemessene H&ouml;rerschaft ist so nicht f&auml;lschbar</strong> &mdash; ein Angreifer m&uuml;sste meine Rahmen tats&auml;chlich weiterleiten.</td><td class="chip note">begrenzt</td></tr>
+        <tr><td class="num">F4</td><td>Pendeln zwischen benachbarten R&auml;ngen</td><td>Zwei Knoten mit H&ouml;rerschaft 11 und 12 liegen in verschiedenen B&auml;ndern; kreuzen sich ihre Werte, kippt die Reihenfolge. Harmlos je Ereignis, st&ouml;rend f&uuml;r die Messung. Drei ganzzahlige B&auml;nder geben bereits Hysterese; eine Mindestverweildauer erst nachr&uuml;sten, wenn das Protokoll Flattern zeigt.</td><td class="chip note">mild</td></tr>
+        <tr><td class="num">F5</td><td>Verkehr ohne Kanalpr&uuml;fung &mdash; drei Korrekturen an der &bdquo;40&nbsp;%&ldquo;</td><td>Erstens: 40,22 / 41,51 / 42,91&nbsp;% sind <em>Empf&auml;nge</em> und enthalten die Server-Einspeisung, die allein 6,98 / 7,16 / 6,23&nbsp;% ausmacht &mdash; echter Alt-Knotenverkehr sind rund 33 / 34 / 37&nbsp;%. Zweitens: gemessen wird der <em>Ursprung</em>, nicht der Weiterleiter; da 93 bis 96&nbsp;% der HEY-Empf&auml;nge Weiterleitungen sind, ist die Firmware des letzten Senders meist unbekannt. Drittens: &bdquo;wartet nicht und storniert nicht&ldquo; vermengt zwei Dinge &mdash; <em>nicht stornieren</em> ist universell und gilt auch f&uuml;r 4.35p.</td><td class="chip alert">Messfehlerquelle</td></tr>
+        <tr><td class="num">F6</td><td>Gateways speisen mit vollem Budget neu ein</td><td>Diese Kopien sind aus Sicht des Servers Neuaussendungen, kein lokaler Skew und kein Storno kann sie unterdr&uuml;cken; Baken werden dadurch bis 9,2-fach geh&ouml;rt. Jede Messung von &bdquo;Kopien je Nachricht&ldquo; muss RF-Kopien und Gateway-Kopien trennen, sonst sieht PR-C wie ein Fehlschlag aus.</td><td class="chip alert">Messfehlerquelle</td></tr>
+        <tr><td class="num">F7</td><td>Der dichte Cluster, in dem jeder jeden h&ouml;rt</td><td>Haben alle eine gro&szlig;e H&ouml;rerschaft, landen alle im obersten Band, alle bekommen Skew 0, und der Slot-Skew entartet zum heutigen Verhalten. Das ist die <em>richtige</em> Entartung &mdash; aber es hei&szlig;t, dass diese drei Gipfel der falsche Ort sind, um PR-B zu erproben. 64,89&nbsp;% der Nachrichten werden von allen dreien geh&ouml;rt: ein Cluster, nicht drei Beobachtungspunkte.</td><td class="chip note">Testplanung</td></tr>
+        <tr><td class="num">F8</td><td>Kurzpfad macht die Kennzahl blind</td><td>Wo <code>bSHORTPATH</code> eingeschaltet ist, verschwindet das eigene Rufzeichen aus dem Pfad. Kein Code-Risiko, aber ein Nenner, der zu jeder H&ouml;rerschaftszahl dazugeh&ouml;rt.</td><td class="chip note">Nenner</td></tr>
+        <tr><td class="num">F9</td><td>Kaltstart</td><td>Jeder Neustart setzt die Tabelle auf 0. Die einst&uuml;ndige Anlaufsperre ist nicht optional: ohne sie leitet ein neu gestarteter Hub so lange sp&auml;t weiter, bis er seine H&ouml;rerschaft neu beobachtet hat &mdash; genau in dem Zeitfenster nach einem Stromausfall, in dem das Netz ihn am dringendsten braucht.</td><td class="chip alert">unsicher ohne Sperre</td></tr>
+        <tr><td class="num">F10</td><td>Das Messger&auml;t fehlt f&uuml;r die H&auml;lfte des Vorhabens</td><td>Aus dieser Aufzeichnung sind nicht berechenbar: Kanalbelegung im Sendemoment, CAD-Wiederholungen, Ringf&uuml;llstand, Rauschboden, Kollisionszahlen &mdash; <code>--loradebug</code> war aus und die <code>[LOG]</code>-Zeile tr&auml;gt keinen Pegel. Die oft zitierten &bdquo;66&nbsp;% der Sendeversuche fanden den Kanal belegt&ldquo; stammen aus einer <em>Tagmessung</em> im M&auml;rz mit f&uuml;nf Knoten &uuml;ber 16&nbsp;h. Eine Nachtmessung mit CAD-Protokoll fehlt bis heute.</td><td class="chip alert">blockierend</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="call note">
+    <h3>Und die Vorbehalte der Simulation</h3>
+    <p>Neun Annahmen stehen zwischen dem Modell und der Wirklichkeit; sie sind im Abschnitt
+    <a href="#methodik">Methodik</a> einzeln mit ihrer Wirkungsrichtung aufgef&uuml;hrt. Vier davon
+    schmeicheln dem heutigen Verhalten (P0) st&auml;rker als den sparenden Regeln, drei
+    unterzeichnen die absoluten Sendungszahlen f&uuml;r alle Regeln gleicherma&szlig;en, und zwei
+    schmeicheln den Skew-Regeln. In der Summe hei&szlig;t das:
+    <strong>die Verh&auml;ltnisse zwischen den Regeln sind belastbar, die absoluten Zahlen sind
+    es nicht.</strong> Keine Zahl aus diesem Bericht darf als Vorhersage der Sendungszahl eines
+    realen Knotens gelesen werden.</p>
+  </div>
+</section>
+
+
+<!-- ============ Methodik ============ -->
+<section id="methodik">
+  <div class="sechead"><h2>Methodik und Datengrundlage</h2><span class="chip">Referenz</span></div>
+
+  <div class="prose">
+    <p>Dieselben vier Dateien wie im Nachtbericht, dieselbe Rechneruhr. Alles hier ist entweder an
+    den Logs gemessen oder &uuml;ber dem Graphen nachgespielt, den die Logs implizieren. Drei der
+    vier Dateien sind Empfangslogs; die vierte (OE3MAG-12) hat keine <code>[LOG]</code>-Zeilen
+    geschrieben und tr&auml;gt zu keiner Verkehrszahl bei. Die Datei mit dem Namensteil
+    &bdquo;oe3xia&ldquo; stammt von OE3XIR-12 am Hegerberg.</p>
+
+    <pre style="overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem .95rem;font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;line-height:1.5;margin:0"><code style="background:none;padding:0;font-size:1em">python3 tools/berglog_sim.py \
+    oe3mag_meshcom_2026-09-01_220824.log \
+    oe3xia_meshcom_2026-09-01_220932.log \
+    oe3xoc_meshcom_2026-09-01_221146.log \
+    oe3xwj_meshcom_2026-09-01_220645.log \
+    --out &lt;ausgabeverzeichnis&gt; --seeds 5</code></pre>
+
+    <h3>Wie der H&ouml;rgraph entsteht</h3>
+    <p>Im Pfad <code>A,B,C</code> hat B den Rahmen von A weitergereicht, also hat B A geh&ouml;rt:
+    Kante <code>A&rarr;B</code>. Der aufzeichnende Knoten wird angeh&auml;ngt, denn er hat den
+    letzten Sprung jedes empfangenen Rahmens geh&ouml;rt. <strong>Ausgangsgrad = H&ouml;rerschaft</strong>
+    (Stationen, die meine Rahmen weiterreichen), <strong>Eingangsgrad = die Stationen, die ich
+    h&ouml;re</strong>.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Knoten</div><div class="v">132</div><div class="s">im Graphen</div></div>
+    <div class="stat"><div class="k">Kanten</div><div class="v">610</div><div class="s">3 Eigenkanten verworfen</div></div>
+    <div class="stat"><div class="k">wechselseitig</div><div class="v">270</div><div class="s">44,26 %</div></div>
+    <div class="stat"><div class="k">Eingangsgrad 0</div><div class="v">47</div><div class="s">nur als Ursprung gesehen</div></div>
+  </div>
+
+  <div class="prose">
+    <h3>Wie gut der Graph ist</h3>
+    <p>Gegenprobe gegen die Nachbarzahl, die die Stationen selbst &uuml;ber Funk melden:
+    <strong>Spearman(Eingangsgrad, gemeldete Nachbarzahl) = 0,4999</strong> &uuml;ber 68 Stationen,
+    die &uuml;berhaupt eine Zahl melden. Der beobachtete Eingangsgrad betr&auml;gt im
+    <strong>Median 67,5&nbsp;%</strong> der gemeldeten Nachbarzahl, im oberen Zehntel
+    141,6&nbsp;%. Eine Kante existiert nur dann, wenn ein &uuml;ber sie gelaufener Rahmen in einem
+    Pfad landete, den einer der drei Empf&auml;nger geh&ouml;rt hat. <strong>Der Graph ist damit
+    eine Untergrenze der Vernetzung, und jede simulierte Sendungszahl ist ebenfalls eine
+    Untergrenze.</strong></p>
+    <p>Der Wert &uuml;ber 100&nbsp;% im oberen Zehntel ist kein Widerspruch: die drei Bergknoten
+    sehen 13 bis 18&nbsp;% mehr direkte Nachbarn, als sie selbst melden &mdash; und auf rund zwei
+    Dritteln der Flotte ist die gemeldete Zahl bei <code>MAX_MHEARD</code> = 30 gedeckelt. Ein Wert
+    von 30 ist dort ein Anschlag, keine Messung.</p>
+
+    <h3>Die Annahmen des Modells, und in welche Richtung jede die Antwort verbiegt</h3>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <caption>Vollst&auml;ndige Annahmenliste der Replay-Simulation.</caption>
+      <thead><tr><th>Annahme</th><th>warum</th><th>Wirkungsrichtung</th></tr></thead>
+      <tbody>
+        <tr><td>Aussendungen dauern keine Zeit</td><td>keine Sendedauer in der Ereignisschleife; ein Rahmen ist im Moment des Absendens zugestellt</td><td>l&auml;sst Storno-beim-Mith&ouml;ren <strong>besser</strong> aussehen als in Wirklichkeit &mdash; ein realer 1,4-s-Rahmen kommt sp&auml;ter an, also w&auml;ren weniger wartende Relais rechtzeitig zu stornieren</td></tr>
+        <tr><td>Keine Kollisionen, kein Capture-Effekt</td><td>jeder Ausgangsnachbar empf&auml;ngt jede Aussendung</td><td>schmeichelt <strong>allen</strong> Regeln, aber P0 am meisten (es sendet am meisten) &mdash; die gemessene Ersparnis ist damit eine Untergrenze</td></tr>
+        <tr><td>Keine Sendewarteschlange, kein Aufschub bei belegtem Kanal</td><td>ein geplantes Relay feuert exakt zu seinem Zeitpunkt</td><td>untersch&auml;tzt die heutige reale Streuung; auf dem Kanal verz&ouml;gert Belegung bereits heute manche Relais &mdash; eine schwache Form des vorgeschlagenen Skews</td></tr>
+        <tr><td>Der H&ouml;rgraph ist vollst&auml;ndig</td><td>nur Kanten, die in einem von drei Empf&auml;ngern geh&ouml;rten Pfad auftauchen, existieren</td><td>untersch&auml;tzt die Verzweigung &uuml;berall, also sind die absoluten Sendungszahlen zu niedrig; <strong>Verh&auml;ltnisse zwischen Regeln sind weit belastbarer als absolute Zahlen</strong></td></tr>
+        <tr><td>Knoten ohne Kanalpr&uuml;fung verhalten sich wie solche mit</td><td>kein eigenes Modell f&uuml;r die &auml;lteren Firmwarebuchstaben</td><td>untersch&auml;tzt die heutige Kanallast, weil Alt-Stationen ohne Pr&uuml;fung senden und h&auml;ufiger kollidieren</td></tr>
+        <tr><td>Neueinspeisung durch Gateways bleibt unber&uuml;cksichtigt</td><td>nur die Funkflut ist modelliert</td><td>untersch&auml;tzt die Sendungszahl f&uuml;r alle Regeln gleicherma&szlig;en</td></tr>
+        <tr><td>Rahmenl&auml;nge je Nachricht konstant</td><td>Sendezeit &uuml;ber die mittlere beobachtete L&auml;nge; real w&auml;chst der Rahmen mit jedem angeh&auml;ngten Rufzeichen</td><td>untersch&auml;tzt die Sendezeit tiefer Relais, also ist die Sendezeitersparnis der stornierenden Regeln <strong>untertrieben</strong></td></tr>
+        <tr><td>Der Doppelfilter ist perfekt und kostenlos</td><td>ein Knoten leitet h&ouml;chstens einmal weiter und nie eine bekannte Kennung erneut</td><td>entspricht der Firmware, solange der Ring h&auml;lt; der Ring altert aber nach St&uuml;ckzahl, also ist die Wirklichkeit f&uuml;r <em>alle</em> Regeln schlechter als das Modell</td></tr>
+        <tr><td>Der H&ouml;rerschaftsrang ist global und statisch</td><td>die Skew-Klasse stammt aus dem Graphen der ganzen Nacht, nicht aus dem, was ein Knoten in dem Moment wei&szlig;</td><td>schmeichelt den Skew-Regeln &mdash; ein realer Knoten lernt seine H&ouml;rerschaft erst allm&auml;hlich und stuft sich anfangs falsch ein</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Wo das Modell raten musste</h3>
+    <ul class="tight">
+      <li><strong>Das Hop-Budget je Nachricht wird nicht &uuml;bertragen</strong>; es wird als
+        &bdquo;Rest + zur&uuml;ckgelegte Spr&uuml;nge&ldquo; aus der fr&uuml;hesten beobachteten Kopie
+        rekonstruiert. War diese Kopie bereits ein Relais mit &uuml;bergelaufenem Restfeld, ist das
+        Budget f&uuml;r diese Nachricht falsch.</li>
+      <li><strong>Der Ursprung</strong> ist das erste Pfadelement der fr&uuml;hesten Kopie. Rahmen,
+        deren Ursprung im Graphen nicht vorkommt, werden &uuml;bersprungen &mdash; 0 von 1.800.</li>
+      <li><strong>Die gemeldete Nachbarzahl</strong> existiert nur f&uuml;r Stationen, die entweder
+        eine Position mit <code>/N</code> baken oder den Firmwaredialekt mit
+        <code>R&lt;n&gt;;</code> fahren. Alles andere ist &bdquo;unbekannt&ldquo;, was die
+        ADR-Wichtigkeitsformel bewusst als 1,0 behandelt &mdash; die gr&ouml;&szlig;te einzelne
+        Modellentscheidung.</li>
+      <li><strong>Die Bandgrenzen der H&ouml;rerschaft</strong> (oberste 10&nbsp;% / n&auml;chste
+        20&nbsp;% / Rest) stammen aus der Aufgabenstellung, nicht aus einer Optimierung.</li>
+      <li><strong>Der Skew nutzt einen globalen Rang.</strong> Ein realer Knoten kann die
+        H&ouml;rerschaft der anderen Empf&auml;nger derselben Kopie nicht kennen &mdash; das ist der
+        optimistische Fall.</li>
+      <li><strong>47 Stationen haben Eingangsgrad 0.</strong> Sie k&ouml;nnen im Modell empfangen,
+        aber nie weiterleiten, was die Sendungszahl untersch&auml;tzt.</li>
+      <li><strong>Die H&ouml;rsperre von 1&nbsp;s</strong> ist als Storno-Sperre modelliert: eine
+        Kopie, die weniger als eine Sekunde vor dem eigenen Sendezeitpunkt eintrifft, kann ihn nicht
+        mehr abbrechen. Ob ein reales Funkger&auml;t sp&auml;ter noch abbrechen kann, ist eine
+        Hardwarefrage, die diese Daten nicht beantworten.</li>
+      <li><strong>Der Nenner der Abdeckung</strong> ist die Reichweite von P0 im selben Durchlauf
+        &mdash; nicht die theoretische Hop-Kugel um den Ursprung, die P0 selbst nicht immer
+        ausf&uuml;llt.</li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ============ Offene Fragen ============ -->
+<section id="offen">
+  <div class="sechead"><h2>Offene Fragen</h2><span class="chip alert">R&uuml;ckfrage</span></div>
+
+  <div class="prose">
+    <p>Vier Entscheidungen kann nur der Betreiber treffen. Sie betreffen alle die Frage, wie
+    vorsichtig das Verfahren sein soll.</p>
+  </div>
+
+  <ol class="recs">
+    <li><strong>Wie alt darf eine H&ouml;rerschaftsbeobachtung sein?</strong> Eine Stunde wie bei
+      mheard, oder l&auml;nger? Ein Bergknoten mit 15-Minuten-Bakentakt braucht mehrere Takte, bis
+      die Tabelle steht &mdash; der Entwurf schl&auml;gt drei Stunden vor.</li>
+    <li><strong>Woran soll ein exklusives Blatt erkannt werden?</strong> An der eigenen Beobachtung
+      (nur ich reiche die Rahmen von L weiter), an der Meldung des Blatts selbst (Nachbarzahl
+      &le; 2), oder an beidem? Die erste Variante ist schw&auml;cher, als sie aussieht
+      (Frage&nbsp;6); die zweite h&auml;ngt an der Korrektur aus Frage&nbsp;9.</li>
+    <li><strong>Darf ein Hub sein Hop-Budget beim Weiterleiten k&uuml;rzen</strong> &mdash; er
+      erreicht die Region ja in einem Sprung &mdash;, oder nur der Ursprung sein Startbudget?</li>
+    <li><strong>Mesh immer eingeschaltet: gilt das auch f&uuml;r die dichten Stadtcluster</strong>,
+      in denen Betreiber heute MESH ausschalten? Genau dort ist das Rudel-Problem am
+      gr&ouml;&szlig;ten.</li>
+  </ol>
+
+  <div class="prose">
+    <p>Dazu kommen neun Punkte, die das ADR 02 selbst offenl&auml;sst und die eine
+    H&ouml;rerschaftshierarchie nicht umgehen kann:</p>
+    <ul class="tight">
+      <li>Bidirektionalit&auml;t und Link-Asymmetrie &mdash; im ADR in eine sp&auml;tere Ausbaustufe
+        verschoben, f&uuml;r die H&ouml;rerschaft aber grundlegend.</li>
+      <li>Adaptiver Hop-Count &mdash; im ADR nicht vorhanden.</li>
+      <li>Mesh immer an &mdash; au&szlig;erhalb des ADR-Rahmens; m&ouml;glicher Konflikt mit den
+        Sturm- und Doppelfilterbefunden.</li>
+      <li>Die Bootstrap-Zirkularit&auml;t mit dem HEY-Sparverfahren.</li>
+      <li>Zustand und Kosten einer Hierarchie: die heutige Wichtigkeit ist ein lokaler Durchlauf
+        &uuml;ber 30 bis 80 Eintr&auml;ge; mehrsprungiger Zustand droht an
+        <code>MAX_MHEARD</code> zu s&auml;ttigen.</li>
+      <li>Die heuristischen Grenzen jeder Exklusivit&auml;tspr&uuml;fung: reine Empfangsstationen
+        sind unsichtbar, 15 bis 19&nbsp;% der Flotte melden nichts.</li>
+      <li>Neue widerlegbare Kennzahlen im Stil von M1&ndash;M6 f&uuml;r die Genauigkeit der
+        H&ouml;rerschaft, die Stabilit&auml;t der Hierarchie und die Fehlklassifikationsrate.</li>
+      <li>Die Wechselwirkung mit Sturm- und Zombie-Effekten ist bisher nur f&uuml;r die
+        Wichtigkeitssumme untersucht.</li>
+      <li>Notausschalter und Stufenplan brauchen eigene Kriterien f&uuml;r den Testcluster.</li>
+    </ul>
+
+    <p>Und eine Frage an die Datenlage selbst: <strong>OE3MIF-12</strong> und
+    <strong>OE3NRA-1</strong> geh&ouml;ren zu den h&ouml;rerschaftsst&auml;rksten Stationen des
+    Clusters (16 und 9), erzeugen aber keinen eigenen Verkehr &mdash; ihre Hardware ist nur &uuml;ber
+    das Ger&auml;te-Byte des Rahmens erkennbar, ihre Firmware gar nicht. Beide sind reine Relais und
+    damit genau die Knoten, deren Verhalten das Konzept &auml;ndern will. Wer sie betreibt und auf
+    welchem Stand sie laufen, w&auml;re die n&uuml;tzlichste einzelne Auskunft aus dieser
+    Auswertung.</p>
+  </div>
+</section>
+
+<footer>
+  <p>MeshCom Konzeptpr&uuml;fung &middot; &bdquo;Adaptiver Relay-Slot nach H&ouml;rerschaft&ldquo;
+  &middot; Datenbasis OE3XIR-12 / OE3XOC-12 / OE3XWJ-12, Aufzeichnung 1./2.09.2026 &middot; erstellt
+  02.09.2026</p>
+  <p>Simulation &uuml;ber dem gemessenen H&ouml;rgraphen: 132 Knoten, 610 Kanten, 1.800 Nachrichten,
+  5 Regelfamilien, 48 Rasterpunkte, je 5 Durchl&auml;ufe &middot; Code-Stand
+  <code>v4.35p_prio</code> &middot; Vergleichsgrundlage ADR 02, Revision 3</p>
+  <p>Verh&auml;ltnisse zwischen den Regeln sind belastbar, absolute Zahlen nicht.</p>
+</footer>
+
+</div>
+</body>
+</html>
