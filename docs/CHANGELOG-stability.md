@@ -315,6 +315,102 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      `/ota/info`, and the Deco still showing `DK5EN-93` rather than
      `esp32-3A8968` (BACKLOG DH-04).
 
+225. **Node Settings no longer come up empty after a few hours of uptime**
+     (upstream [PR #1147](https://github.com/icssw-org/MeshCom-Firmware/pull/1147),
+     `8f4f8877`, merged 2026-09-20). Reported from the field by DG3FBL on official
+     4.35t (RAK, T-Beam and T-Beam 1W, iOS app 4.28a): after a BLE connect the app
+     showed `xx` and QRG 0 MHz, reloading the app did not help, only a node reboot
+     did. At BLE `hello` the main loop wrote the 9/10 config frames and then the
+     entire MHeard list of the last 12 h into `BLEComToPhoneBuff` in one pass.
+     `addBLEComToOutBuffer()` wrapped the write pointer without moving
+     `ComToPhoneRead`, so from 11 (ESP32) / 12 (nRF52) heard stations the config
+     frames were overwritten before the drain could send them -- the app received
+     `CONFFIN` without ever having seen the `I` frame, and a reboot "fixed" it only
+     because it empties the MHeard list. The ring shrink from 30 to 20 (item 190,
+     MEM-01) is what moved this latent overflow into normal operation.
+     `sendMheard()` is now resumable through a static cursor with
+     `startMheardToPhone()` / `mheardToPhonePending()`; the connect only arms the
+     cursor and the main loop refills the MHeard list in chunks once the command
+     ring has drained, in the order config -> MHeard -> message ring -> `--conffin`.
+     `addBLEComToOutBuffer()` uses `addRingPointer()` like the message ring, so an
+     overflow drops the oldest frame instead of hiding the whole ring from the
+     drain. Bench reproduction with a filled MHeard list is still owed
+     (BACKLOG PRM-04).
+
+226. **Group and broadcast frames no longer get a fresh 15-hop budget from an
+     unmanned relay** (upstream
+     [PR #1148](https://github.com/icssw-org/MeshCom-Firmware/pull/1148),
+     `97e5f1ff`, merged 2026-09-20). Thirty days of DK5EN LoRa RX showed group and
+     broadcast frames running far past the configured 4 hops -- 17 wraps in 10 days,
+     19 over-long paths in 30 days, and 0 of 8878 direct messages affected
+     (`~/Desktop/befund-maxhop-unterlauf.md`). With no phone connected
+     (`isPhoneReady == 0`), `OnRxDone()` ORed the app-offline flag `0x20` straight
+     into `aprsmsg.max_hop`. The relay guard `max_hop > 0` then saw `0x20`,
+     decremented it to `0x1F`, and `encodeAPRS()` masked that to 15 on air: an
+     exhausted frame left the node with a full hop budget. Five unmanned relays on
+     4.35c/p/s were derived as the wrap source; the code path was identical in
+     4.35t. `msg_app_offline` is now set only around the BLE `encodeAPRS()` and
+     restored afterwards, and the relay guard tests `(max_hop & 0x0F) > 0`. The
+     save/restore is load-bearing and must not be "simplified" into a bare
+     assignment -- the relay block re-encodes the same struct further down, and a
+     bare set would put `0x20` on every group frame relayed by an unmanned node,
+     which MCProxy push contract v9 treats as push-ineligible. Field confirmation
+     is owed two to four weeks after the affected relays update (BACKLOG PRM-06).
+
+227. **The node's own callsign is stored with a canonical SSID** (upstream
+     [PR #1149](https://github.com/icssw-org/MeshCom-Firmware/pull/1149),
+     `45bddbe6` + `7526295b`, merged 2026-09-20). **This one changes station
+     identity on affected nodes -- read it before updating a node you do not own.**
+     A callsign _without_ an SSID stays exactly as it is: that was always allowed
+     and APRS.fi forwarding depends on it. What changes is the non-canonical
+     spelling of an SSID that is present: `-` and `-0` and `-00` become no SSID at
+     all (APRS treats "no SSID" and a zero SSID as the same thing), and a leading
+     zero is dropped, so `-01` becomes `-1`. A callsign whose canonical form would
+     exceed nine characters -- the size of `meshcom_settings.node_call` and of the
+     `%-9.9s` field in the KEEP and DATA frames -- is rejected rather than stored
+     truncated, because a truncated callsign is somebody else's callsign. A node
+     that has `-01` or `-00` in flash today is migrated once at boot and will
+     therefore appear under its new name on the map, in MHeard lists and in running
+     message threads. The factory default `XX0XXX-00` is deliberately left alone so
+     it stays recognisable as unconfigured. New `normalizeOwnCall()` in
+     `src/regex_functions.cpp`, called from `--setcall` (which also covers the web
+     GUI and the T-Deck, since both build that command string), from the app path
+     (`phone_commands.cpp` case 0x50), from the T-Deck Pro settings page, and from
+     the boot migration in both main files. The callsign regex itself is untouched
+     on purpose: it also validates the source callsign of _received_ frames, and
+     making the SSID mandatory there would drop every frame from the SSID-less
+     stations already on the air. Short codes are unaffected --
+     `convertCallToShort()` breaks at the dash, so only the callsign changes on
+     air, not the short code. Nine cases added to `test/test_regex_call` (22 total).
+     The app path 0x50 is compiled but not yet exercised on hardware
+     (BACKLOG PRM-05).
+
+228. **Web GUI: setting Latitude or Longitude on nRF52 no longer reports a
+     failure that did not happen** (upstream
+     [PR #1150](https://github.com/icssw-org/MeshCom-Firmware/pull/1150),
+     `39536d0d`, merged 2026-09-20). Reported from DB0AIS-12 (RAK4631 on official
+     4.35t): typing `49.99700000` into Position Latitude and pressing the checkmark
+     popped `alert("Value could not be set.")`, yet after a page reload the new
+     value was there -- the node had stored it all along, only the success check
+     lied. `node_lat` and `node_lon` are `double`, and since the nRF52 core has no
+     `String::toDouble()` the `#else` branch compared against `toFloat()`. A float
+     cannot hold 49.997 (it becomes 49.9970016f), so the comparison failed for
+     practically every real coordinate; only values exact in float (48.5, 49.25,
+     50.0) passed. The nRF52 branch also lacked the `fabs()` the ESP32 branch had,
+     so southern and western coordinates failed too, `--setlat` storing them as a
+     magnitude plus `node_lat_c`. Present since `87c6c200` (2025-05-17), i.e. in
+     every nRF52 build with the web setup page, first tagged in
+     `4.35m.02.23-DK5EN`. Both cores now compare
+     `fabs(node_lat - fabs(atof(...))) < 1e-7`. Fork-only addition on top of the
+     upstream fix: the comparison moved into a header-only `src/coord_compare.h` so
+     it can be pinned by a host test (`test/test_web_setcoord`, 9 cases) -- the rule
+     was previously an expression inline in the handler, where a future
+     core-specific `#ifdef` could have reverted it to float without anything going
+     red. Verified red-before: routing the typed value back through a float fails 6
+     of the 9 cases. `setalt` is not affected (integer compare), and the remaining
+     `toFloat()` comparisons in that file are correct because those settings fields
+     really are `float`.
+
 ## New in v4.35s.09.09
 
 Two changes on top of `v4.35s.09.06.2`, items 209 and 210: a warning that
