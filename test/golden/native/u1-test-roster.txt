@@ -1,0 +1,50 @@
+# U1 twin (test/test_udp_frame_twin/test_udp_frame_twin.cpp), before-state.
+#
+# RENAMED 2026-09-12 by the orchestrator, from u1-twin-diff-before.txt.
+# The content below was accurate; the NAME was not. section 9.1 reserves
+# '<uut>-twin-diff-before.txt' for the fixture the after-run compares against,
+# and a file sitting at that name is what a script will pick up -- a header
+# explaining that it is something else only helps a human who opens it. The
+# real fixture is still owed (BACKLOG M3-02); squatting on its name would have
+# let G2 compare against this and look satisfied.
+#
+# WHAT THIS IS NOT: docs/testplan-dry-unification-20260910.md section 4.4
+# specifies u1-esp32.txt / u1-nrf52.txt (an ordered sink-call-sequence per
+# corpus datagram, one file per platform) and this file as their diff. That
+# suite does not exist. test_udp_frame_twin.cpp has no corpus loop and no
+# sink-sequence dump -- it is a fixed set of named Unity tests, each driving
+# one hand-built frame through both handlers and asserting specific sink
+# calls/return values inline (TEST_ASSERT_*). There is nothing to diff at
+# the per-datagram granularity the plan describes; producing that would mean
+# rewriting the suite to iterate test/golden/corpus/ and record an ordered
+# call list per platform, which is out of scope here.
+#
+# WHAT THIS IS INSTEAD: the ordered list of named tests this suite runs
+# today and their status, taken verbatim from `pio test -e
+# native_udp_frame_twin` (2026-09-12, all green, matching the drift-matrix.csv
+# DR rows as currently decided). "test_drift_*" names carry an inline comment
+# in the source explaining which platform the pinned behaviour belongs to;
+# the assertion failure message names the row ("... -- drift row changed,
+# update the matrix") for the side that is expected to stay put. A later run
+# is comparable against this by re-running the same command and diffing the
+# two (test-name, status) listings, line order included: a name disappearing
+# or being renamed, or PASSED flipping to FAILED, is a real change; nothing
+# below encodes datagram bytes or sink-call bodies.
+#
+# Format: "<status> <test_name>", one per RUN_TEST() in main(), in RUN_TEST
+# order. Regenerate: pio test -e native_udp_frame_twin (strip the
+# file:line: prefix and the "[...]" bracket punctuation Unity prints).
+PASSED test_agreement_gate_text_message_decodes_and_relays_on_both
+PASSED test_agreement_dedup_blocks_repeat_relay_on_both
+PASSED test_agreement_max_zeros_rejected_by_both
+PASSED test_agreement_indicator_dispatch_prints_matching_gw_rx_type_lines
+PASSED test_agreement_conf_updates_node_call_and_short_identically
+PASSED test_agreement_zero_scan_bound_matches_on_odd_length
+PASSED test_regression_zero_scan_oob_byte_flips_verdict_before_fix
+PASSED test_drift_extudp_requires_hasExternIPaddress_on_esp32_only
+PASSED test_drift_extudp_gate_before_vs_after_msgtype_check
+PASSED test_drift_extudp_length_arg_type_differs_but_is_unobservable_at_the_clamp
+PASSED test_drift_dedup_gate_position_esp32_honors_gateway_nopos_nrf52_does_not
+PASSED test_drift_senddisplayposition_esp32_only
+PASSED test_drift_rx01_unconfigured_guard_esp32_only
+PASSED test_drift_max_zeros_return_value_and_reset_call_differ

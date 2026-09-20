@@ -1,0 +1,1087 @@
+2026-09-18T12:17:05.702  ### attached /dev/cu.usbserial-573C0005841 dtr=False
+2026-09-18T12:17:05.907  ets Jul 29 2019 12:21:46
+2026-09-18T12:17:05.907  
+2026-09-18T12:17:05.907  rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+2026-09-18T12:17:05.907  configsip: 0, SPIWP:0xee
+2026-09-18T12:17:05.907  clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+2026-09-18T12:17:05.907  mode:DIO, clock div:2
+2026-09-18T12:17:05.907  load:0x3fff0030,len:1184
+2026-09-18T12:17:05.907  load:0x40078000,len:13232
+2026-09-18T12:17:05.907  load:0x40080400,len:3028
+2026-09-18T12:17:05.907  entry 0x400805e4
+2026-09-18T12:17:07.117  
+2026-09-18T12:17:07.117  
+2026-09-18T12:17:07.117  ============
+2026-09-18T12:17:07.117  CLIENT SETUP
+2026-09-18T12:17:07.117  ============
+2026-09-18T12:17:07.117  [BOOT] RESET_REASON=1 POWERON
+2026-09-18T12:17:07.117  [HEAP] 00:00:00 162564 160224 110580 (init)
+2026-09-18T12:17:07.117  [PSRM] 00:00:00 0
+2026-09-18T12:17:07.117  [EFUS]...Two Point: NOT supported
+2026-09-18T12:17:07.117  [EFUS]...Vref: Supported
+2026-09-18T12:17:07.117  [INIT]...initMheard
+2026-09-18T12:17:07.117  [INIT]...init_flash
+2026-09-18T12:17:07.117  [INIT]...build Sep 18 2026 / 11:48:01
+2026-09-18T12:17:07.117  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T12:17:07.117  [TIME]...Loaded time persistence: saved_time=1789725882, mheard_time=0, msg_time=0
+2026-09-18T12:17:07.117  [INIT]...init_batt
+2026-09-18T12:17:07.118  [ADC ]...Characterized using eFuse Vref
+2026-09-18T12:17:07.118  [INIT]...Start check AXP
+2026-09-18T12:17:07.118  [INIT]...AXP2101 PMU init succeeded, using AXP2101 PMU
+2026-09-18T12:17:07.118  [INIT]...AXP-Chip-Model:4 AXP-Chip-ID:74
+2026-09-18T12:17:07.118  [INIT]...AXP2101 chip
+2026-09-18T12:17:07.118  =======================================================================
+2026-09-18T12:17:07.118  DC1  : +   Voltage:3300 mV 
+2026-09-18T12:17:07.118  DC2  : -   Voltage:900 mV 
+2026-09-18T12:17:07.118  DC3  : -   Voltage:900 mV 
+2026-09-18T12:17:07.118  DC4  : -   Voltage:1100 mV 
+2026-09-18T12:17:07.323  ALDO1: -   Voltage:1800 mV 
+2026-09-18T12:17:07.323  ALDO2: +   Voltage:3300 mV 
+2026-09-18T12:17:07.323  ALDO3: +   Voltage:3300 mV 
+2026-09-18T12:17:07.323  ALDO4: -   Voltage:2900 mV 
+2026-09-18T12:17:07.323  BLDO1: -   Voltage:1800 mV 
+2026-09-18T12:17:07.323  BLDO2: -   Voltage:2800 mV 
+2026-09-18T12:17:07.323  VBACK: +   Voltage:3300 mV 
+2026-09-18T12:17:07.323  =======================================================================
+2026-09-18T12:17:07.323  [INIT]...All AXP2101 started
+2026-09-18T12:17:07.323  [INIT]...MCP23017 not found
+2026-09-18T12:17:07.323  [INIT]...INA226 not found
+2026-09-18T12:17:07.323  [INIT]...RTC not found
+2026-09-18T12:17:07.324  [OBUT]...One Button GPIO(38) started
+2026-09-18T12:17:07.324  [INIT].._GW_ID: E0D041B8
+2026-09-18T12:17:07.324  [INIT]...Initialize clock: ok
+2026-09-18T12:17:07.324  [INIT]...Auto detecting display:
+2026-09-18T12:17:07.324  [INIT]...Display type: 0x04
+2026-09-18T12:17:07.324  [INIT]...OLED panel is 0.9 inch -> SSD1306
+2026-09-18T12:17:07.726  [LoRa]...SX1276 Chip Initializing ... success
+2026-09-18T12:17:07.726  [LoRa]...RF_FREQUENCY: 433.175 MHz
+2026-09-18T12:17:07.726  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T12:17:07.726  [LoRa]...RF_SF: 11
+2026-09-18T12:17:07.726  [LoRa]...RF_CR: 4/6
+2026-09-18T12:17:07.928  [LoRa]...RF_POWER: 2 dBm
+2026-09-18T12:17:07.928  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T12:17:07.928  [LoRa]...Starting to listen ... success
+2026-09-18T12:17:07.928  [LoRa]...All settings successfully changed
+2026-09-18T12:17:07.928  [BLE ]...Device started with BLE-Name <MC-41b8-DK5EN-92>
+2026-09-18T12:17:08.132  [BLE ]...Device-Address <08:f9:e0:d0:41:ba>
+2026-09-18T12:17:08.132  [BLE ]...Waiting a client connection to notify...
+2026-09-18T12:17:08.132  ==============
+2026-09-18T12:17:08.132  CLIENT STARTED
+2026-09-18T12:17:08.132  ==============
+2026-09-18T12:17:08.426  ### boot marker seen
+2026-09-18T12:17:08.738  [WIFI];scan;skipped;first_bringup;ms;2245
+2026-09-18T12:17:08.739  [WIFI]...try connecting to SSID: ORBI63 
+2026-09-18T12:17:08.739  [WIFI];policy;pmf_off;rc;0
+2026-09-18T12:17:08.739  [HEAP] 00:00:00 96848 96728 90100 (mon)
+2026-09-18T12:17:08.739  [GPS ]...Init GPIO RX=34 TX=12
+2026-09-18T12:17:09.148  [GPS ]...38400 baud --> 62 chars (NMEA ok)
+2026-09-18T12:17:09.149  [GPS ]...found with 38400 baud (62 chars, NMEA-Pruefsumme gueltig, 439 ms)
+2026-09-18T12:17:09.149  [GPS ]...erkannte Baudrate: 38400
+2026-09-18T12:17:09.149  [GPS ]...Try to init L76K/UBLOX
+2026-09-18T12:17:09.149  [GPS ]...clear NMEA-Buffer
+2026-09-18T12:17:09.149  [GPS ]>>> $PCAS06,0*1B
+2026-09-18T12:17:09.761  [GPS ]...wait[GPS ]<<< $GPTXT,01,01,01,PCAS inv format*3D
+2026-09-18T12:17:09.761   ...
+2026-09-18T12:17:09.761  check Input
+2026-09-18T12:17:09.762  [GPS ]...UBLOX connected
+2026-09-18T12:17:09.762  [GPS ]...UBX_CFG_PRT 38400
+2026-09-18T12:17:10.373  [GPS ]...Sende UBX_CFG_RATE
+2026-09-18T12:17:10.574  [GPS ]...Sende UBX_CFG_CFG
+2026-09-18T12:17:10.574  [GPS ]...UBLOX Flash save
+2026-09-18T12:17:10.574  [GPS ]...UBLOX config finished
+2026-09-18T12:17:10.780  [GPS ]...wait[GPS ]...Sende UBX_MON_VER
+2026-09-18T12:17:11.428  ### sent: --info
+2026-09-18T12:17:11.795  [GPS_VER] $GPRMC,101711.00,A,4824.45534,N,01144.31855,E,0.082,,180926,,,A*7A.$GPGGA,101711.00,4824.45534,N,01144.31855,E,1,06,2.16,518.3,M,46.2,M,,*54.
+2026-09-18T12:17:11.795  [GPS ]...UBLOX erkannt
+2026-09-18T12:17:11.795  -.[WIFI];link;down;sta;1;status;6;down_s;0;last_reason;0;got_ip_n;0;ip;0;ms;5253
+2026-09-18T12:17:11.795  -info
+2026-09-18T12:17:11.795  --MeshCom 4.35t (build: Sep 18 2026 / 11:48:00)
+2026-09-18T12:17:11.795  ...UPDATE: 
+2026-09-18T12:17:11.796  ...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [INIT]
+2026-09-18T12:17:11.796  ...BATT 5.21 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T12:17:11.796  ...TIME 5301 ms
+2026-09-18T12:17:11.796  ...Flash-Version 20260724
+2026-09-18T12:17:11.796  ...NOMSGALL off ...MESH off ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T12:17:11.796  ...PASSWD <>
+2026-09-18T12:17:11.796  ...DEBUG man ...DEBUG en
+2026-09-18T12:17:11.796  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T12:17:11.796  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T12:17:11.796  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T12:17:11.796  ...EXTUDP off ...EXT IP none ...NOPMOTHER off
+2026-09-18T12:17:11.796  ...BTCODE 000000
+2026-09-18T12:17:11.796  ...APRSMC: APRSMC
+2026-09-18T12:17:11.796  ...ATXT: 
+2026-09-18T12:17:11.796  ...NAME: 
+2026-09-18T12:17:11.796  ...BLE : short
+2026-09-18T12:17:11.796  ...DISPLAY off
+2026-09-18T12:17:11.796  ...CTRY EU8
+2026-09-18T12:17:11.796  ...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+2026-09-18T12:17:11.796  ...MAXHOP text 4 / pos 2
+2026-09-18T12:17:11.796  
+2026-09-18T12:17:11.796  ...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+2026-09-18T12:17:11.796  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T12:17:11.796  ...NETConsole on (port 2323)
+2026-09-18T12:17:11.796  ...WIFI-AP    off
+2026-09-18T12:17:11.796  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T12:17:11.796  ...NETWORK Mode:WiFi
+2026-09-18T12:17:11.796  ...hasIpAddress: no
+2026-09-18T12:17:12.408  [WIFI];event;connected;ms;5886
+2026-09-18T12:17:12.408  [WIFI];assoc;connected;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-56;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;5887
+2026-09-18T12:17:13.016  .[WIFI];event;got_ip;ms;6522
+2026-09-18T12:17:13.016  [WIFI];assoc;got_ip;ssid;ORBI63;bssid;5A:AF:97:2E:2B:8B;chan;3;rssi;-56;auth;7;phy;bgn;pmf;0;wpa3;0;live;1;reason;0;ms;6522
+2026-09-18T12:17:13.624  
+2026-09-18T12:17:13.624  [WIFI]...connect OK
+2026-09-18T12:17:13.624  [WIFI]...now listening at IP 192.168.68.76, UDP port 1990
+2026-09-18T12:17:13.624  [WIFI]...Internet UDP-DEST meshcom.oevsv.at
+2026-09-18T12:17:13.624  [WIFI]...Internet NTP-DEST pool.ntp.org
+2026-09-18T12:17:13.624  [GW];srv;OE;host;meshcom.oevsv.at;path;inet;ms;7269
+2026-09-18T12:17:13.826  [CON ]...HMAC console init.
+2026-09-18T12:17:13.826  [CON ]...Console started on port 2323
+2026-09-18T12:17:13.826  [BOOT];ready;ms;7285;ip;1
+2026-09-18T12:17:13.826  TimeClient no update possible --> CPU-Mode
+2026-09-18T12:17:13.826  [WIFI];dns;meshcom.oevsv.at;ip;89.185.97.38;ms;104
+2026-09-18T12:17:13.826  [WIFI];dns;pool.ntp.org;ip;5.175.246.117;ms;102
+2026-09-18T12:17:13.826  [NTP];ok;epoch;1789726633;rtt;88
+2026-09-18T12:17:14.635  [GPS ]...position  : lat:48.407591 lon:11.738645 alt:519.2
+2026-09-18T12:17:17.679  [GPS ]...position  : lat:48.407594 lon:11.738652 alt:520.6
+2026-09-18T12:17:19.599  ### verdict OK for probe:--info
+2026-09-18T12:17:19.599  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?display=on'
+2026-09-18T12:17:20.735  [GPS ]...position  : lat:48.407597 lon:11.738659 alt:522.0
+2026-09-18T12:17:20.970  ### run rc=0
+2026-09-18T12:17:20.970  ### run| {"returncode":0,"display":"on"}
+2026-09-18T12:17:20.970  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?display=on'
+2026-09-18T12:17:20.970  ### step wait
+2026-09-18T12:17:23.787  [GPS ]...position  : lat:48.407597 lon:11.738656 alt:523.0
+2026-09-18T12:17:26.842  [GPS ]...position  : lat:48.407595 lon:11.738642 alt:523.2
+2026-09-18T12:17:29.884  [GPS ]...position  : lat:48.407591 lon:11.738629 alt:523.5
+2026-09-18T12:17:32.939  [GPS ]...position  : lat:48.407589 lon:11.738622 alt:523.2
+2026-09-18T12:17:35.797  [GPS ]...position  : lat:48.407587 lon:11.738617 alt:523.3
+2026-09-18T12:17:38.854  [GPS ]...position  : lat:48.407587 lon:11.738617 alt:523.0
+2026-09-18T12:17:41.900  [GPS ]...position  : lat:48.407587 lon:11.738617 alt:523.2
+2026-09-18T12:17:44.956  [GPS ]...position  : lat:48.407587 lon:11.738616 alt:523.6
+2026-09-18T12:17:48.008  [GPS ]...position  : lat:48.407589 lon:11.738619 alt:523.8
+2026-09-18T12:17:50.862  [GPS ]...position  : lat:48.407593 lon:11.738627 alt:524.7
+2026-09-18T12:17:52.088  [CON ]...accept() fd=51 free=79528
+2026-09-18T12:17:52.088  [CON ]...Client authenticated on port 2323. free heap=74056
+2026-09-18T12:17:53.925  [GPS ]...position  : lat:48.407596 lon:11.738632 alt:525.4
+2026-09-18T12:17:56.983  [GPS ]...position  : lat:48.407598 lon:11.738632 alt:525.5
+2026-09-18T12:18:00.042  [GPS ]...position  : lat:48.407601 lon:11.738631 alt:525.7
+2026-09-18T12:18:03.102  [GPS ]...position  : lat:48.407604 lon:11.738630 alt:525.5
+2026-09-18T12:18:05.938  [GPS ]...position  : lat:48.407606 lon:11.738629 alt:525.4
+2026-09-18T12:18:08.783  [HEAP] 11:18:07 84108 75020 77812 (mon)
+2026-09-18T12:18:08.988  [GPS ]...position  : lat:48.407605 lon:11.738621 alt:525.4
+2026-09-18T12:18:11.627  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;58;got_ip_n;1;ip;1;ms;65256
+2026-09-18T12:18:12.037  [GPS ]...position  : lat:48.407606 lon:11.738619 alt:524.8
+2026-09-18T12:18:15.088  [GPS ]...position  : lat:48.407608 lon:11.738620 alt:524.0
+2026-09-18T12:18:18.144  [GPS ]...position  : lat:48.407608 lon:11.738619 alt:522.9
+2026-09-18T12:18:21.197  [GPS ]...position  : lat:48.407606 lon:11.738611 alt:522.0
+2026-09-18T12:18:24.053  [GPS ]...position  : lat:48.407604 lon:11.738600 alt:521.0
+2026-09-18T12:18:27.103  [GPS ]...position  : lat:48.407600 lon:11.738592 alt:520.0
+2026-09-18T12:18:30.152  [GPS ]...position  : lat:48.407596 lon:11.738582 alt:519.2
+2026-09-18T12:18:33.198  [GPS ]...position  : lat:48.407591 lon:11.738563 alt:519.1
+2026-09-18T12:18:36.248  [GPS ]...position  : lat:48.407589 lon:11.738556 alt:518.9
+2026-09-18T12:18:39.290  [GPS ]...position  : lat:48.407585 lon:11.738542 alt:518.9
+2026-09-18T12:18:42.339  [GPS ]...position  : lat:48.407583 lon:11.738532 alt:519.1
+2026-09-18T12:18:45.184  [GPS ]...position  : lat:48.407582 lon:11.738528 alt:519.4
+2026-09-18T12:18:48.243  [GPS ]...position  : lat:48.407585 lon:11.738546 alt:519.6
+2026-09-18T12:18:51.297  [GPS ]...position  : lat:48.407587 lon:11.738557 alt:519.9
+2026-09-18T12:18:54.341  [GPS ]...position  : lat:48.407589 lon:11.738564 alt:519.9
+2026-09-18T12:18:57.394  [GPS ]...position  : lat:48.407592 lon:11.738579 alt:519.8
+2026-09-18T12:19:00.437  [GPS ]...position  : lat:48.407594 lon:11.738584 alt:519.8
+2026-09-18T12:19:03.480  [GPS ]...position  : lat:48.407596 lon:11.738597 alt:520.0
+2026-09-18T12:19:06.323  [GPS ]...position  : lat:48.407598 lon:11.738599 alt:519.6
+2026-09-18T12:19:09.371  [GPS ]...position  : lat:48.407598 lon:11.738602 alt:519.1
+2026-09-18T12:19:11.814  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;118;got_ip_n;1;ip;1;ms;125257
+2026-09-18T12:19:12.423  [GPS ]...position  : lat:48.407598 lon:11.738605 alt:518.5
+2026-09-18T12:19:15.472  [GPS ]...position  : lat:48.407597 lon:11.738611 alt:518.1
+2026-09-18T12:19:18.533  [GPS ]...position  : lat:48.407596 lon:11.738614 alt:517.7
+2026-09-18T12:19:20.978  ### verdict OK for wait
+2026-09-18T12:19:20.978  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?display=off'
+2026-09-18T12:19:21.281  ### run rc=0
+2026-09-18T12:19:21.281  ### run| {"returncode":0,"display":"off"}
+2026-09-18T12:19:21.281  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?display=off'
+2026-09-18T12:19:21.281  ### step wait
+2026-09-18T12:19:21.576  [GPS ]...position  : lat:48.407595 lon:11.738611 alt:517.6
+2026-09-18T12:19:24.410  [GPS ]...position  : lat:48.407593 lon:11.738604 alt:517.2
+2026-09-18T12:19:27.460  [GPS ]...position  : lat:48.407589 lon:11.738577 alt:516.3
+2026-09-18T12:19:30.511  [GPS ]...position  : lat:48.407588 lon:11.738571 alt:516.0
+2026-09-18T12:19:33.560  [GPS ]...position  : lat:48.407589 lon:11.738579 alt:515.8
+2026-09-18T12:19:36.614  [GPS ]...position  : lat:48.407589 lon:11.738572 alt:515.6
+2026-09-18T12:19:39.656  [GPS ]...position  : lat:48.407589 lon:11.738561 alt:515.6
+2026-09-18T12:19:42.693  [GPS ]...position  : lat:48.407590 lon:11.738561 alt:515.4
+2026-09-18T12:19:45.539  [GPS ]...position  : lat:48.407592 lon:11.738557 alt:515.1
+2026-09-18T12:19:48.593  [GPS ]...position  : lat:48.407594 lon:11.738560 alt:514.8
+2026-09-18T12:19:51.651  [GPS ]...position  : lat:48.407596 lon:11.738561 alt:514.7
+2026-09-18T12:19:54.704  [GPS ]...position  : lat:48.407598 lon:11.738569 alt:514.6
+2026-09-18T12:19:57.762  [GPS ]...position  : lat:48.407600 lon:11.738569 alt:514.2
+2026-09-18T12:20:00.810  [GPS ]...position  : lat:48.407600 lon:11.738583 alt:513.9
+2026-09-18T12:20:03.668  [GPS ]...position  : lat:48.407599 lon:11.738587 alt:513.2
+2026-09-18T12:20:06.721  [GPS ]...position  : lat:48.407597 lon:11.738586 alt:512.7
+2026-09-18T12:20:08.751  [HEAP] 11:20:07 83984 75020 77812 (mon)
+2026-09-18T12:20:09.763  [GPS ]...position  : lat:48.407596 lon:11.738595 alt:512.3
+2026-09-18T12:20:11.797  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;178;got_ip_n;1;ip;1;ms;185261
+2026-09-18T12:20:12.818  [GPS ]...position  : lat:48.407595 lon:11.738613 alt:511.9
+2026-09-18T12:20:15.870  [GPS ]...position  : lat:48.407595 lon:11.738622 alt:511.6
+2026-09-18T12:20:18.922  [GPS ]...position  : lat:48.407596 lon:11.738640 alt:511.3
+2026-09-18T12:20:21.760  [GPS ]...position  : lat:48.407597 lon:11.738642 alt:511.0
+2026-09-18T12:20:24.820  [GPS ]...position  : lat:48.407597 lon:11.738654 alt:510.7
+2026-09-18T12:20:27.878  [GPS ]...position  : lat:48.407597 lon:11.738654 alt:510.7
+2026-09-18T12:20:30.929  [GPS ]...position  : lat:48.407596 lon:11.738650 alt:510.6
+2026-09-18T12:20:33.985  [GPS ]...position  : lat:48.407596 lon:11.738661 alt:510.5
+2026-09-18T12:20:36.827  [GPS ]...position  : lat:48.407595 lon:11.738660 alt:510.3
+2026-09-18T12:20:39.875  [GPS ]...position  : lat:48.407593 lon:11.738657 alt:510.1
+2026-09-18T12:20:42.940  [GPS ]...position  : lat:48.407592 lon:11.738650 alt:509.8
+2026-09-18T12:20:45.997  [GPS ]...position  : lat:48.407591 lon:11.738651 alt:509.6
+2026-09-18T12:20:49.051  [GPS ]...position  : lat:48.407590 lon:11.738646 alt:509.2
+2026-09-18T12:20:52.112  [GPS ]...position  : lat:48.407589 lon:11.738643 alt:508.8
+2026-09-18T12:20:54.971  [GPS ]...position  : lat:48.407589 lon:11.738646 alt:508.3
+2026-09-18T12:20:58.026  [GPS ]...position  : lat:48.407587 lon:11.738628 alt:507.6
+2026-09-18T12:21:01.087  [GPS ]...position  : lat:48.407584 lon:11.738601 alt:506.9
+2026-09-18T12:21:04.141  [GPS ]...position  : lat:48.407580 lon:11.738583 alt:506.3
+2026-09-18T12:21:07.200  [GPS ]...position  : lat:48.407577 lon:11.738566 alt:505.8
+2026-09-18T12:21:10.046  [GPS ]...position  : lat:48.407575 lon:11.738551 alt:505.4
+2026-09-18T12:21:11.682  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;238;got_ip_n;1;ip;1;ms;245262
+2026-09-18T12:21:13.115  [GPS ]...position  : lat:48.407570 lon:11.738531 alt:504.7
+2026-09-18T12:21:16.169  [GPS ]...position  : lat:48.407567 lon:11.738510 alt:504.0
+2026-09-18T12:21:19.227  [GPS ]...position  : lat:48.407563 lon:11.738495 alt:503.6
+2026-09-18T12:21:21.286  ### verdict OK for wait
+2026-09-18T12:21:21.287  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?gateway=on'
+2026-09-18T12:21:21.568  ### run rc=0
+2026-09-18T12:21:21.568  ### run| {"returncode":0,"gateway":"on"}
+2026-09-18T12:21:21.568  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?gateway=on'
+2026-09-18T12:21:21.568  ### step wait
+2026-09-18T12:21:21.670  [GW];keep;tx;ok;1;ms;255184
+2026-09-18T12:21:21.670  [GW];rx;type;BEAT;len;20;ms;255285
+2026-09-18T12:21:22.280  [GPS ]...position  : lat:48.407562 lon:11.738496 alt:502.8
+2026-09-18T12:21:25.123  [GPS ]...alt converged: 516 m (P=2.5)
+2026-09-18T12:21:25.324  [GPS ]...position  : lat:48.407561 lon:11.738497 alt:502.4
+2026-09-18T12:21:28.171  [GPS ]...position  : lat:48.407562 lon:11.738502 alt:502.0
+2026-09-18T12:21:31.214  [GPS ]...position  : lat:48.407567 lon:11.738523 alt:501.6
+2026-09-18T12:21:34.277  [GPS ]...position  : lat:48.407570 lon:11.738530 alt:501.7
+2026-09-18T12:21:37.332  [GPS ]...position  : lat:48.407573 lon:11.738527 alt:501.8
+2026-09-18T12:21:40.389  [GPS ]...position  : lat:48.407575 lon:11.738527 alt:502.3
+2026-09-18T12:21:43.448  [GPS ]...position  : lat:48.407576 lon:11.738520 alt:502.5
+2026-09-18T12:21:46.297  [GPS ]...position  : lat:48.407576 lon:11.738511 alt:502.8
+2026-09-18T12:21:51.587  [GW];keep;tx;ok;1;ms;285192
+2026-09-18T12:21:51.792  [GW];rx;type;BEAT;len;20;ms;285285
+2026-09-18T12:21:52.401  [GPS ]...position  : lat:48.407575 lon:11.738506 alt:503.4
+2026-09-18T12:21:55.447  [GPS ]...position  : lat:48.407573 lon:11.738490 alt:503.3
+2026-09-18T12:22:04.389  [GPS ]...position  : lat:48.407572 lon:11.738492 alt:502.8
+2026-09-18T12:22:07.443  [GPS ]...position  : lat:48.407570 lon:11.738484 alt:501.9
+2026-09-18T12:22:08.658  [HEAP] 11:22:08 83804 75020 77812 (mon)
+2026-09-18T12:22:10.490  [GPS ]...position  : lat:48.407571 lon:11.738484 alt:500.2
+2026-09-18T12:22:11.710  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;298;got_ip_n;1;ip;1;ms;305263
+2026-09-18T12:22:13.542  [GPS ]...position  : lat:48.407569 lon:11.738479 alt:499.1
+2026-09-18T12:22:16.598  [GPS ]...position  : lat:48.407565 lon:11.738454 alt:498.1
+2026-09-18T12:22:19.650  [GPS ]...position  : lat:48.407558 lon:11.738409 alt:497.0
+2026-09-18T12:22:21.680  [GW];keep;tx;ok;1;ms;315198
+2026-09-18T12:22:21.680  [GW];rx;type;BEAT;len;20;ms;315294
+2026-09-18T12:22:22.499  [GPS ]...position  : lat:48.407556 lon:11.738401 alt:496.6
+2026-09-18T12:22:25.553  [GPS ]...position  : lat:48.407562 lon:11.738423 alt:497.1
+2026-09-18T12:22:28.610  [GPS ]...position  : lat:48.407570 lon:11.738457 alt:498.0
+2026-09-18T12:22:31.659  [GPS ]...position  : lat:48.407579 lon:11.738492 alt:498.9
+2026-09-18T12:22:34.706  [GPS ]...position  : lat:48.407583 lon:11.738509 alt:499.1
+2026-09-18T12:22:37.756  [GPS ]...position  : lat:48.407584 lon:11.738513 alt:499.2
+2026-09-18T12:22:40.602  [GPS ]...position  : lat:48.407585 lon:11.738516 alt:499.2
+2026-09-18T12:22:43.652  [GPS ]...position  : lat:48.407587 lon:11.738530 alt:499.5
+2026-09-18T12:22:46.708  [GPS ]...position  : lat:48.407586 lon:11.738531 alt:499.4
+2026-09-18T12:22:49.760  [GPS ]...position  : lat:48.407586 lon:11.738529 alt:499.3
+2026-09-18T12:22:51.593  [GW];keep;tx;ok;1;ms;345203
+2026-09-18T12:22:51.793  [GW];rx;type;BEAT;len;20;ms;345294
+2026-09-18T12:22:52.810  [GPS ]...position  : lat:48.407586 lon:11.738527 alt:499.2
+2026-09-18T12:22:55.665  [GPS ]...position  : lat:48.407587 lon:11.738529 alt:499.2
+2026-09-18T12:22:58.724  [GPS ]...position  : lat:48.407588 lon:11.738530 alt:499.0
+2026-09-18T12:23:01.769  [GPS ]...position  : lat:48.407589 lon:11.738530 alt:499.0
+2026-09-18T12:23:04.814  [GPS ]...position  : lat:48.407590 lon:11.738532 alt:499.0
+2026-09-18T12:23:07.869  [GPS ]...position  : lat:48.407591 lon:11.738540 alt:498.8
+2026-09-18T12:23:10.912  [GPS ]...position  : lat:48.407594 lon:11.738554 alt:498.6
+2026-09-18T12:23:11.724  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;358;got_ip_n;1;ip;1;ms;365264
+2026-09-18T12:23:13.964  [GPS ]...position  : lat:48.407596 lon:11.738567 alt:498.4
+2026-09-18T12:23:17.006  [GPS ]...position  : lat:48.407598 lon:11.738575 alt:498.3
+2026-09-18T12:23:19.858  [GPS ]...position  : lat:48.407600 lon:11.738588 alt:498.2
+2026-09-18T12:23:21.569  ### verdict OK for wait
+2026-09-18T12:23:21.569  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?gateway=off'
+2026-09-18T12:23:21.693  [GW];keep;tx;ok;1;ms;375212
+2026-09-18T12:23:21.694  [GW];rx;type;BEAT;len;20;ms;375296
+2026-09-18T12:23:21.829  ### run rc=0
+2026-09-18T12:23:21.829  ### run| {"returncode":0,"gateway":"off"}
+2026-09-18T12:23:21.829  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?gateway=off'
+2026-09-18T12:23:21.829  ### step wait
+2026-09-18T12:23:22.921  [GPS ]...position  : lat:48.407602 lon:11.738600 alt:498.2
+2026-09-18T12:23:25.985  [GPS ]...position  : lat:48.407603 lon:11.738609 alt:497.9
+2026-09-18T12:23:29.037  [GPS ]...position  : lat:48.407604 lon:11.738618 alt:497.3
+2026-09-18T12:23:31.888  [GPS ]...position  : lat:48.407605 lon:11.738631 alt:496.7
+2026-09-18T12:23:34.940  [GPS ]...position  : lat:48.407604 lon:11.738634 alt:496.1
+2026-09-18T12:23:37.992  [GPS ]...position  : lat:48.407601 lon:11.738631 alt:495.5
+2026-09-18T12:23:41.038  [GPS ]...position  : lat:48.407597 lon:11.738623 alt:494.7
+2026-09-18T12:23:44.093  [GPS ]...position  : lat:48.407593 lon:11.738614 alt:494.0
+2026-09-18T12:23:47.144  [GPS ]...position  : lat:48.407590 lon:11.738613 alt:493.2
+2026-09-18T12:23:50.199  [GPS ]...position  : lat:48.407586 lon:11.738610 alt:492.2
+2026-09-18T12:23:53.053  [GPS ]...position  : lat:48.407583 lon:11.738610 alt:491.4
+2026-09-18T12:23:56.108  [GPS ]...position  : lat:48.407579 lon:11.738607 alt:490.6
+2026-09-18T12:23:59.154  [GPS ]...position  : lat:48.407576 lon:11.738601 alt:489.9
+2026-09-18T12:24:02.215  [GPS ]...position  : lat:48.407575 lon:11.738599 alt:489.4
+2026-09-18T12:24:05.264  [GPS ]...position  : lat:48.407574 lon:11.738598 alt:489.2
+2026-09-18T12:24:08.311  [GPS ]...position  : lat:48.407573 lon:11.738595 alt:488.9
+2026-09-18T12:24:08.719  [HEAP] 11:24:08 83800 75020 77812 (mon)
+2026-09-18T12:24:11.156  [GPS ]...position  : lat:48.407571 lon:11.738584 alt:488.7
+2026-09-18T12:24:11.769  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;418;got_ip_n;1;ip;1;ms;425268
+2026-09-18T12:24:14.211  [GPS ]...position  : lat:48.407570 lon:11.738575 alt:488.5
+2026-09-18T12:24:17.261  [GPS ]...position  : lat:48.407567 lon:11.738561 alt:488.3
+2026-09-18T12:24:20.324  [GPS ]...position  : lat:48.407564 lon:11.738548 alt:488.2
+2026-09-18T12:24:23.377  [GPS ]...position  : lat:48.407563 lon:11.738543 alt:488.1
+2026-09-18T12:24:26.432  [GPS ]...position  : lat:48.407563 lon:11.738541 alt:488.1
+2026-09-18T12:24:29.286  [GPS ]...position  : lat:48.407564 lon:11.738546 alt:488.3
+2026-09-18T12:24:32.337  [GPS ]...position  : lat:48.407564 lon:11.738546 alt:488.5
+2026-09-18T12:24:35.400  [GPS ]...position  : lat:48.407563 lon:11.738545 alt:488.5
+2026-09-18T12:24:38.451  [GPS ]...position  : lat:48.407562 lon:11.738540 alt:488.4
+2026-09-18T12:24:41.508  [GPS ]...position  : lat:48.407560 lon:11.738536 alt:488.4
+2026-09-18T12:24:44.357  [GPS ]...position  : lat:48.407557 lon:11.738527 alt:488.6
+2026-09-18T12:24:47.404  [GPS ]...position  : lat:48.407555 lon:11.738520 alt:488.8
+2026-09-18T12:24:50.461  [GPS ]...position  : lat:48.407555 lon:11.738516 alt:489.0
+2026-09-18T12:24:53.511  [GPS ]...position  : lat:48.407554 lon:11.738507 alt:489.2
+2026-09-18T12:24:56.558  [GPS ]...position  : lat:48.407554 lon:11.738499 alt:489.7
+2026-09-18T12:24:59.607  [GPS ]...position  : lat:48.407555 lon:11.738498 alt:490.2
+2026-09-18T12:25:02.456  [GPS ]...position  : lat:48.407555 lon:11.738489 alt:490.6
+2026-09-18T12:25:05.515  [GPS ]...position  : lat:48.407556 lon:11.738483 alt:491.0
+2026-09-18T12:25:08.573  [GPS ]...position  : lat:48.407558 lon:11.738477 alt:491.3
+2026-09-18T12:25:08.778  [HEAP] 11:25:08 82080 75020 73716 (mon)
+2026-09-18T12:25:11.636  [GPS ]...position  : lat:48.407561 lon:11.738480 alt:491.9
+2026-09-18T12:25:11.636  [WIFI];link;up;rssi;-61;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;478;got_ip_n;1;ip;1;ms;485270
+2026-09-18T12:25:14.683  [GPS ]...position  : lat:48.407563 lon:11.738482 alt:492.4
+2026-09-18T12:25:17.730  [GPS ]...position  : lat:48.407565 lon:11.738488 alt:492.9
+2026-09-18T12:25:20.582  [GPS ]...position  : lat:48.407567 lon:11.738486 alt:493.3
+2026-09-18T12:25:21.835  ### verdict OK for wait
+2026-09-18T12:25:21.835  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?mesh=on'
+2026-09-18T12:25:22.258  ### run rc=0
+2026-09-18T12:25:22.258  ### run| {"returncode":0,"mesh":"on"}
+2026-09-18T12:25:22.258  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?mesh=on'
+2026-09-18T12:25:22.258  ### step wait
+2026-09-18T12:25:23.630  [GPS ]...position  : lat:48.407570 lon:11.738484 alt:494.0
+2026-09-18T12:25:26.686  [GPS ]...position  : lat:48.407572 lon:11.738479 alt:494.6
+2026-09-18T12:25:29.740  [GPS ]...position  : lat:48.407575 lon:11.738477 alt:495.3
+2026-09-18T12:25:32.787  [GPS ]...position  : lat:48.407578 lon:11.738475 alt:495.8
+2026-09-18T12:25:35.839  [GPS ]...position  : lat:48.407580 lon:11.738465 alt:496.4
+2026-09-18T12:25:38.690  [GPS ]...position  : lat:48.407581 lon:11.738454 alt:496.8
+2026-09-18T12:25:41.745  [GPS ]...position  : lat:48.407582 lon:11.738445 alt:497.3
+2026-09-18T12:25:44.800  [GPS ]...position  : lat:48.407582 lon:11.738430 alt:497.6
+2026-09-18T12:25:47.853  [GPS ]...position  : lat:48.407584 lon:11.738428 alt:498.0
+2026-09-18T12:25:50.910  [GPS ]...position  : lat:48.407584 lon:11.738423 alt:498.4
+2026-09-18T12:25:53.757  [GPS ]...position  : lat:48.407584 lon:11.738415 alt:498.5
+2026-09-18T12:25:56.804  [GPS ]...position  : lat:48.407584 lon:11.738411 alt:498.7
+2026-09-18T12:25:59.852  [GPS ]...position  : lat:48.407583 lon:11.738407 alt:498.8
+2026-09-18T12:26:02.902  [GPS ]...position  : lat:48.407582 lon:11.738399 alt:498.8
+2026-09-18T12:26:05.957  [GPS ]...position  : lat:48.407580 lon:11.738392 alt:498.8
+2026-09-18T12:26:08.808  [HEAP] 11:26:07 83972 75020 73716 (mon)
+2026-09-18T12:26:09.010  [GPS ]...position  : lat:48.407579 lon:11.738388 alt:498.8
+2026-09-18T12:26:11.654  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;538;got_ip_n;1;ip;1;ms;545271
+2026-09-18T12:26:12.060  [GPS ]...position  : lat:48.407578 lon:11.738388 alt:498.7
+2026-09-18T12:26:14.911  [GPS ]...position  : lat:48.407579 lon:11.738394 alt:498.6
+2026-09-18T12:26:17.965  [GPS ]...position  : lat:48.407579 lon:11.738401 alt:498.8
+2026-09-18T12:26:21.020  [GPS ]...position  : lat:48.407577 lon:11.738399 alt:498.5
+2026-09-18T12:26:24.061  [GPS ]...position  : lat:48.407574 lon:11.738395 alt:498.0
+2026-09-18T12:26:27.112  [GPS ]...position  : lat:48.407570 lon:11.738386 alt:497.5
+2026-09-18T12:26:30.165  [GPS ]...position  : lat:48.407567 lon:11.738377 alt:496.9
+2026-09-18T12:26:33.027  [GPS ]...position  : lat:48.407563 lon:11.738365 alt:496.3
+2026-09-18T12:26:36.074  [GPS ]...position  : lat:48.407561 lon:11.738354 alt:495.9
+2026-09-18T12:26:39.126  [GPS ]...position  : lat:48.407560 lon:11.738343 alt:495.8
+2026-09-18T12:26:42.185  [GPS ]...position  : lat:48.407559 lon:11.738330 alt:495.7
+2026-09-18T12:26:45.242  [GPS ]...position  : lat:48.407558 lon:11.738319 alt:495.7
+2026-09-18T12:26:48.090  [GPS ]...position  : lat:48.407556 lon:11.738308 alt:495.7
+2026-09-18T12:26:51.149  [GPS ]...position  : lat:48.407554 lon:11.738292 alt:495.8
+2026-09-18T12:26:54.203  [GPS ]...position  : lat:48.407553 lon:11.738281 alt:495.8
+2026-09-18T12:26:57.252  [GPS ]...position  : lat:48.407552 lon:11.738276 alt:495.8
+2026-09-18T12:27:00.304  [GPS ]...position  : lat:48.407551 lon:11.738275 alt:495.6
+2026-09-18T12:27:03.351  [GPS ]...position  : lat:48.407549 lon:11.738259 alt:495.5
+2026-09-18T12:27:06.195  [GPS ]...position  : lat:48.407549 lon:11.738262 alt:495.3
+2026-09-18T12:27:08.839  [HEAP] 11:27:08 83804 75020 73716 (mon)
+2026-09-18T12:27:09.250  [GPS ]...position  : lat:48.407550 lon:11.738269 alt:495.1
+2026-09-18T12:27:11.690  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;598;got_ip_n;1;ip;1;ms;605276
+2026-09-18T12:27:12.301  [GPS ]...position  : lat:48.407551 lon:11.738278 alt:495.2
+2026-09-18T12:27:15.351  [GPS ]...position  : lat:48.407553 lon:11.738288 alt:495.3
+2026-09-18T12:27:18.407  [GPS ]...position  : lat:48.407556 lon:11.738297 alt:495.6
+2026-09-18T12:27:21.461  [GPS ]...position  : lat:48.407559 lon:11.738307 alt:496.0
+2026-09-18T12:27:22.262  ### verdict OK for wait
+2026-09-18T12:27:22.262  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?mesh=off'
+2026-09-18T12:27:22.499  ### run rc=0
+2026-09-18T12:27:22.499  ### run| {"returncode":0,"mesh":"off"}
+2026-09-18T12:27:22.499  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?mesh=off'
+2026-09-18T12:27:22.499  ### step wait
+2026-09-18T12:27:24.320  [GPS ]...position  : lat:48.407561 lon:11.738317 alt:496.3
+2026-09-18T12:27:27.372  [GPS ]...position  : lat:48.407563 lon:11.738328 alt:496.5
+2026-09-18T12:27:30.429  [GPS ]...position  : lat:48.407565 lon:11.738337 alt:496.6
+2026-09-18T12:27:33.485  [GPS ]...position  : lat:48.407566 lon:11.738346 alt:496.6
+2026-09-18T12:27:36.535  [GPS ]...position  : lat:48.407565 lon:11.738347 alt:496.5
+2026-09-18T12:27:39.595  [GPS ]...position  : lat:48.407565 lon:11.738350 alt:496.2
+2026-09-18T12:27:42.443  [GPS ]...position  : lat:48.407564 lon:11.738353 alt:495.8
+2026-09-18T12:27:45.509  [GPS ]...position  : lat:48.407562 lon:11.738350 alt:495.3
+2026-09-18T12:27:48.562  [GPS ]...position  : lat:48.407558 lon:11.738345 alt:494.9
+2026-09-18T12:27:51.603  [GPS ]...position  : lat:48.407556 lon:11.738341 alt:494.4
+2026-09-18T12:27:54.647  [GPS ]...position  : lat:48.407555 lon:11.738338 alt:494.3
+2026-09-18T12:27:57.694  [GPS ]...position  : lat:48.407556 lon:11.738341 alt:494.7
+2026-09-18T12:28:00.740  [GPS ]...position  : lat:48.407558 lon:11.738339 alt:495.1
+2026-09-18T12:28:03.586  [GPS ]...position  : lat:48.407562 lon:11.738338 alt:496.0
+2026-09-18T12:28:06.638  [GPS ]...position  : lat:48.407565 lon:11.738332 alt:496.6
+2026-09-18T12:28:08.882  [HEAP] 11:28:08 83824 75020 73716 (mon)
+2026-09-18T12:28:09.693  [GPS ]...position  : lat:48.407569 lon:11.738330 alt:497.4
+2026-09-18T12:28:11.729  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;658;got_ip_n;1;ip;1;ms;665280
+2026-09-18T12:28:12.752  [GPS ]...position  : lat:48.407573 lon:11.738328 alt:498.2
+2026-09-18T12:28:15.812  [GPS ]...position  : lat:48.407575 lon:11.738322 alt:498.8
+2026-09-18T12:28:18.870  [GPS ]...position  : lat:48.407577 lon:11.738319 alt:499.3
+2026-09-18T12:28:21.720  [GPS ]...position  : lat:48.407578 lon:11.738316 alt:499.6
+2026-09-18T12:28:24.773  [GPS ]...position  : lat:48.407578 lon:11.738313 alt:499.7
+2026-09-18T12:28:27.820  [GPS ]...position  : lat:48.407577 lon:11.738308 alt:499.8
+2026-09-18T12:28:30.882  [GPS ]...position  : lat:48.407576 lon:11.738305 alt:499.7
+2026-09-18T12:28:33.933  [GPS ]...position  : lat:48.407575 lon:11.738309 alt:499.5
+2026-09-18T12:28:36.976  [GPS ]...position  : lat:48.407576 lon:11.738322 alt:499.4
+2026-09-18T12:28:39.840  [GPS ]...position  : lat:48.407575 lon:11.738323 alt:499.4
+2026-09-18T12:28:42.900  [GPS ]...position  : lat:48.407573 lon:11.738331 alt:499.1
+2026-09-18T12:28:45.945  [GPS ]...position  : lat:48.407570 lon:11.738335 alt:498.9
+2026-09-18T12:28:49.005  [GPS ]...position  : lat:48.407569 lon:11.738342 alt:498.7
+2026-09-18T12:28:52.062  [GPS ]...position  : lat:48.407566 lon:11.738347 alt:498.1
+2026-09-18T12:28:54.906  [GPS ]...position  : lat:48.407563 lon:11.738351 alt:497.6
+2026-09-18T12:28:57.957  [GPS ]...position  : lat:48.407558 lon:11.738351 alt:496.7
+2026-09-18T12:29:01.012  [GPS ]...position  : lat:48.407550 lon:11.738344 alt:495.6
+2026-09-18T12:29:04.069  [GPS ]...position  : lat:48.407543 lon:11.738340 alt:494.7
+2026-09-18T12:29:07.122  [GPS ]...position  : lat:48.407538 lon:11.738344 alt:493.7
+2026-09-18T12:29:08.756  [HEAP] 11:29:07 83960 75020 73716 (mon)
+2026-09-18T12:29:10.175  [GPS ]...position  : lat:48.407532 lon:11.738354 alt:492.6
+2026-09-18T12:29:11.803  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;718;got_ip_n;1;ip;1;ms;725284
+2026-09-18T12:29:13.025  [GPS ]...position  : lat:48.407530 lon:11.738361 alt:491.9
+2026-09-18T12:29:16.078  [GPS ]...position  : lat:48.407524 lon:11.738374 alt:490.8
+2026-09-18T12:29:19.134  [GPS ]...position  : lat:48.407520 lon:11.738391 alt:490.0
+2026-09-18T12:29:22.199  [GPS ]...position  : lat:48.407516 lon:11.738405 alt:489.4
+2026-09-18T12:29:22.503  ### verdict OK for wait
+2026-09-18T12:29:22.503  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?extudp=on'
+2026-09-18T12:29:22.694  ### run rc=0
+2026-09-18T12:29:22.694  ### run| {"returncode":1,"extudp":"off"}
+2026-09-18T12:29:22.694  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?extudp=on'
+2026-09-18T12:29:22.694  ### step wait
+2026-09-18T12:29:22.805  
+2026-09-18T12:29:22.805  Please set EXPUDP IP first
+2026-09-18T12:29:25.259  [GPS ]...position  : lat:48.407519 lon:11.738399 alt:489.7
+2026-09-18T12:29:28.108  [GPS ]...position  : lat:48.407524 lon:11.738390 alt:490.3
+2026-09-18T12:29:31.166  [GPS ]...position  : lat:48.407528 lon:11.738384 alt:491.0
+2026-09-18T12:29:34.221  [GPS ]...position  : lat:48.407530 lon:11.738367 alt:491.7
+2026-09-18T12:29:37.279  [GPS ]...position  : lat:48.407530 lon:11.738362 alt:491.8
+2026-09-18T12:29:40.329  [GPS ]...position  : lat:48.407531 lon:11.738352 alt:491.9
+2026-09-18T12:29:43.180  [GPS ]...position  : lat:48.407530 lon:11.738338 alt:491.7
+2026-09-18T12:29:58.252  [GPS ]...position  : lat:48.407541 lon:11.738321 alt:493.1
+2026-09-18T12:30:01.300  [GPS ]...position  : lat:48.407541 lon:11.738321 alt:493.1
+2026-09-18T12:30:02.934  [CON ]...Client disconnected. free heap=79264
+2026-09-18T12:30:04.355  [GPS ]...position  : lat:48.407539 lon:11.738323 alt:492.9
+2026-09-18T12:30:07.206  [CON ]...accept() fd=51 free=79388
+2026-09-18T12:30:07.206  [CON ]...Client authenticated on port 2323. free heap=73912
+2026-09-18T12:30:07.411  [GPS ]...position  : lat:48.407538 lon:11.738334 alt:492.5
+2026-09-18T12:30:08.838  --extu[HEAP] 11:30:08 80384 75020 73716 (mon)
+2026-09-18T12:30:09.248  dpip 192.168.68.58
+2026-09-18T12:30:10.468  [GPS ]...position  : lat:48.407538 lon:11.738347 alt:492.1
+2026-09-18T12:30:10.468  fo
+2026-09-18T12:30:10.468  --MeshCom 4.35t (build: Sep 18 2026 / 11:48:00)
+2026-09-18T12:30:10.468  ...UPDATE: 2026-09-18 11:04:45
+2026-09-18T12:30:10.468  ...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [GPS]
+2026-09-18T12:30:10.468  ...BATT 5.22 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T12:30:10.469  ...TIME 783986 ms
+2026-09-18T12:30:10.469  ...Flash-Version 20260724
+2026-09-18T12:30:10.469  ...NOMSGALL off ...MESH off ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T12:30:10.469  ...PASSWD <>
+2026-09-18T12:30:10.469  ...DEBUG man ...DEBUG en
+2026-09-18T12:30:10.469  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T12:30:10.469  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T12:30:10.469  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T12:30:10.469  ...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T12:30:10.469  ...BTCODE 000000
+2026-09-18T12:30:10.469  ...APRSMC: APRSMC
+2026-09-18T12:30:10.469  ...ATXT: 
+2026-09-18T12:30:10.469  ...NAME: 
+2026-09-18T12:30:10.469  ...BLE : short
+2026-09-18T12:30:10.469  ...DISPLAY off
+2026-09-18T12:30:10.469  ...CTRY EU8
+2026-09-18T12:30:10.469  ...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+2026-09-18T12:30:10.469  ...MAXHOP text 4 / pos 2
+2026-09-18T12:30:10.469  
+2026-09-18T12:30:10.469  ...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+2026-09-18T12:30:10.469  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T12:30:10.469  ...NETConsole on (port 2323)
+2026-09-18T12:30:10.469  ...WIFI-AP    off
+2026-09-18T12:30:10.469  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T12:30:10.469  ...NETWORK Mode:WiFi
+2026-09-18T12:30:10.469  ...hasIpAddress: yes
+2026-09-18T12:30:10.469  ...IP address   : 192.168.68.76
+2026-09-18T12:30:10.469  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T12:30:10.469  ...GW address   : 192.168.68.1
+2026-09-18T12:30:10.469  ...DNS address  : 217.237.150.188
+2026-09-18T12:30:10.469  ...UDP-HBeat : 408869
+2026-09-18T12:30:11.694  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;778;got_ip_n;1;ip;1;ms;785287
+2026-09-18T12:30:13.326  [GPS ]...position  : lat:48.407537 lon:11.738351 alt:491.7
+2026-09-18T12:30:16.389  [GPS ]...position  : lat:48.407536 lon:11.738357 alt:491.4
+2026-09-18T12:30:19.433  [GPS ]...position  : lat:48.407536 lon:11.738364 alt:491.0
+2026-09-18T12:30:20.248  [CON ]...Client disconnected. free heap=79416
+2026-09-18T12:30:20.454  [CON ]...accept() fd=51 free=79344
+2026-09-18T12:30:20.454  [CON ]...Client authenticated on port 2323. free heap=73860
+2026-09-18T12:30:22.493  [GPS ]...position  : lat:48.407537 lon:11.738371 alt:490.8
+2026-09-18T12:30:28.594  [GPS ]...position  : lat:48.407543 lon:11.738392 alt:490.9
+2026-09-18T12:30:31.442  [GPS ]...position  : lat:48.407550 lon:11.738399 alt:491.6
+2026-09-18T12:30:34.491  [GPS ]...position  : lat:48.407555 lon:11.738402 alt:492.2
+2026-09-18T12:30:37.547  [GPS ]...position  : lat:48.407560 lon:11.738402 alt:493.0
+2026-09-18T12:30:40.608  [GPS ]...position  : lat:48.407565 lon:11.738403 alt:494.0
+2026-09-18T12:30:43.655  [GPS ]...position  : lat:48.407573 lon:11.738410 alt:495.4
+2026-09-18T12:30:46.708  [GPS ]...position  : lat:48.407581 lon:11.738417 alt:496.5
+2026-09-18T12:30:49.563  [GPS ]...position  : lat:48.407591 lon:11.738432 alt:498.0
+2026-09-18T12:30:52.617  [GPS ]...position  : lat:48.407602 lon:11.738450 alt:499.6
+2026-09-18T12:30:55.670  [GPS ]...position  : lat:48.407613 lon:11.738468 alt:501.3
+2026-09-18T12:30:58.712  [GPS ]...position  : lat:48.407620 lon:11.738475 alt:502.6
+2026-09-18T12:31:01.774  [GPS ]...position  : lat:48.407629 lon:11.738486 alt:504.2
+2026-09-18T12:31:04.824  [GPS ]...position  : lat:48.407641 lon:11.738506 alt:506.4
+2026-09-18T12:31:07.662  [GPS ]...position  : lat:48.407652 lon:11.738525 alt:508.2
+2026-09-18T12:31:08.877  [HEAP] 11:31:08 83924 75020 73716 (mon)
+2026-09-18T12:31:10.708  [GPS ]...position  : lat:48.407661 lon:11.738539 alt:509.9
+2026-09-18T12:31:11.724  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;838;got_ip_n;1;ip;1;ms;845290
+2026-09-18T12:31:13.754  [GPS ]...position  : lat:48.407669 lon:11.738554 alt:511.3
+2026-09-18T12:31:16.802  [GPS ]...position  : lat:48.407674 lon:11.738565 alt:512.3
+2026-09-18T12:31:22.696  ### verdict OK for wait
+2026-09-18T12:31:22.696  ### step run: curl -s -m 10 'http://192.168.68.76/setparam/?extudp=off'
+2026-09-18T12:31:22.939  ### run rc=0
+2026-09-18T12:31:22.939  ### run| {"returncode":0,"extudp":"off"}
+2026-09-18T12:31:22.939  ### verdict OK for run:curl -s -m 10 'http://192.168.68.76/setparam/?extudp=off'
+2026-09-18T12:31:22.939  ### step wait
+2026-09-18T12:31:28.845  [GPS ]...position  : lat:48.407647 lon:11.738512 alt:508.0
+2026-09-18T12:31:31.900  [GPS ]...position  : lat:48.407646 lon:11.738516 alt:507.7
+2026-09-18T12:31:34.957  [GPS ]...position  : lat:48.407645 lon:11.738520 alt:507.5
+2026-09-18T12:31:37.810  [GPS ]...position  : lat:48.407644 lon:11.738518 alt:507.6
+2026-09-18T12:31:40.863  [GPS ]...position  : lat:48.407645 lon:11.738509 alt:508.3
+2026-09-18T12:31:43.917  [GPS ]...position  : lat:48.407651 lon:11.738510 alt:509.6
+2026-09-18T12:31:46.971  [GPS ]...position  : lat:48.407655 lon:11.738508 alt:510.5
+2026-09-18T12:31:50.028  [GPS ]...position  : lat:48.407656 lon:11.738498 alt:511.0
+2026-09-18T12:31:53.074  [GPS ]...position  : lat:48.407659 lon:11.738498 alt:511.5
+2026-09-18T12:31:55.915  [GPS ]...position  : lat:48.407660 lon:11.738487 alt:511.7
+2026-09-18T12:31:58.968  [GPS ]...position  : lat:48.407661 lon:11.738483 alt:511.8
+2026-09-18T12:32:02.024  [GPS ]...position  : lat:48.407662 lon:11.738483 alt:511.9
+2026-09-18T12:32:05.090  [GPS ]...position  : lat:48.407662 lon:11.738476 alt:511.7
+2026-09-18T12:32:08.143  [GPS ]...position  : lat:48.407660 lon:11.738465 alt:511.2
+2026-09-18T12:32:08.754  [HEAP] 11:32:07 83780 75020 73716 (mon)
+2026-09-18T12:32:10.986  [GPS ]...position  : lat:48.407659 lon:11.738459 alt:510.9
+2026-09-18T12:32:11.804  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;898;got_ip_n;1;ip;1;ms;905292
+2026-09-18T12:32:14.034  [GPS ]...position  : lat:48.407660 lon:11.738457 alt:510.6
+2026-09-18T12:32:17.089  [GPS ]...position  : lat:48.407661 lon:11.738456 alt:510.4
+2026-09-18T12:32:20.141  [GPS ]...position  : lat:48.407660 lon:11.738452 alt:510.0
+2026-09-18T12:32:23.185  [NTP];ok;epoch;1789727543;rtt;88
+2026-09-18T12:32:38.244  [GPS ]...position  : lat:48.407649 lon:11.738447 alt:506.6
+2026-09-18T12:32:44.148  [GPS ]...position  : lat:48.407642 lon:11.738431 alt:504.8
+2026-09-18T12:32:47.201  [GPS ]...position  : lat:48.407638 lon:11.738420 alt:504.1
+2026-09-18T12:32:50.266  [GPS ]...position  : lat:48.407635 lon:11.738409 alt:503.4
+2026-09-18T12:32:53.323  [GPS ]...position  : lat:48.407632 lon:11.738402 alt:502.8
+2026-09-18T12:32:56.382  [GPS ]...position  : lat:48.407631 lon:11.738388 alt:502.7
+2026-09-18T12:32:59.232  [GPS ]...position  : lat:48.407632 lon:11.738383 alt:503.2
+2026-09-18T12:33:02.288  [GPS ]...position  : lat:48.407636 lon:11.738380 alt:504.1
+2026-09-18T12:33:05.346  [GPS ]...position  : lat:48.407641 lon:11.738383 alt:504.9
+2026-09-18T12:33:08.392  [GPS ]...position  : lat:48.407646 lon:11.738388 alt:505.9
+2026-09-18T12:33:11.445  [GPS ]...position  : lat:48.407647 lon:11.738388 alt:506.4
+2026-09-18T12:33:11.851  [WIFI];link;up;rssi;-60;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;958;got_ip_n;1;ip;1;ms;965293
+2026-09-18T12:33:14.495  [GPS ]...position  : lat:48.407649 lon:11.738389 alt:507.1
+2026-09-18T12:33:17.337  [GPS ]...position  : lat:48.407650 lon:11.738386 alt:507.7
+2026-09-18T12:33:20.387  [GPS ]...position  : lat:48.407649 lon:11.738380 alt:508.1
+2026-09-18T12:33:22.945  ### verdict OK for wait
+2026-09-18T12:33:22.946  ### step run: cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address A53B5215-4472-F03A-5A5D-575274D96CC9 --cycles 1 --hold 120 --gap 5 --send '--webserver off' --send '--webserver on' --send '--display on' --send '--display off' --send '--gateway on' --send '--gateway off' --send '--mesh on' --send '--mesh off' --send '--extudp on' --send '--extudp off'
+2026-09-18T12:33:23.449  [GPS ]...position  : lat:48.407647 lon:11.738366 alt:508.4
+2026-09-18T12:33:24.061  BLE Connected with: 84:2f:57:82:2a:8c
+2026-09-18T12:33:26.498  [GPS ]...position  : lat:48.407647 lon:11.738367 alt:509.0
+2026-09-18T12:33:27.919  GPS<{"TYP":"G","LAT":48.4076,"LON":11.7384,"ALT":502,"SAT":6,"SFIX":true,"HDOP":2,"RATE":1800,"NEXT":948,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 11:33:27"}>
+2026-09-18T12:33:29.548  [GPS ]...position  : lat:48.407643 lon:11.738358 alt:508.6
+2026-09-18T12:33:32.594  [GPS ]...position  : lat:48.407640 lon:11.738354 alt:508.6
+2026-09-18T12:33:35.638  [GPS ]...position  : lat:48.407636 lon:11.738341 alt:508.4
+2026-09-18T12:33:38.487  [GPS ]...position  : lat:48.407629 lon:11.738325 alt:508.1
+2026-09-18T12:33:41.530  [GPS ]...position  : lat:48.407626 lon:11.738314 alt:508.0
+2026-09-18T12:33:44.582  [GPS ]...position  : lat:48.407621 lon:11.738300 alt:507.8
+2026-09-18T12:33:47.634  [GPS ]...position  : lat:48.407618 lon:11.738295 alt:507.4
+2026-09-18T12:33:50.679  [GPS ]...position  : lat:48.407614 lon:11.738293 alt:507.2
+2026-09-18T12:33:53.729  [GPS ]...position  : lat:48.407610 lon:11.738290 alt:506.7
+2026-09-18T12:33:56.779  [GPS ]...position  : lat:48.407610 lon:11.738295 alt:506.7
+2026-09-18T12:33:59.638  [GPS ]...position  : lat:48.407610 lon:11.738307 alt:506.7
+2026-09-18T12:34:02.683  [GPS ]...position  : lat:48.407611 lon:11.738318 alt:506.7
+2026-09-18T12:34:05.730  [GPS ]...position  : lat:48.407612 lon:11.738333 alt:506.3
+2026-09-18T12:34:08.780  [GPS ]...position  : lat:48.407614 lon:11.738347 alt:506.1
+2026-09-18T12:34:08.780  [HEAP] 11:34:08 83600 75020 73716 (mon)
+2026-09-18T12:34:11.837  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1018;got_ip_n;1;ip;1;ms;1025296
+2026-09-18T12:34:11.838  [GPS ]...position  : lat:48.407617 lon:11.738356 alt:506.6
+2026-09-18T12:34:14.893  [GPS ]...position  : lat:48.407622 lon:11.738367 alt:507.5
+2026-09-18T12:34:17.740  [GPS ]...position  : lat:48.407625 lon:11.738373 alt:507.9
+2026-09-18T12:34:20.796  [GPS ]...position  : lat:48.407628 lon:11.738379 alt:508.2
+2026-09-18T12:34:23.860  [GPS ]...position  : lat:48.407634 lon:11.738392 alt:508.9
+2026-09-18T12:34:26.914  [GPS ]...position  : lat:48.407639 lon:11.738405 alt:509.8
+2026-09-18T12:34:29.975  [GPS ]...position  : lat:48.407641 lon:11.738405 alt:510.3
+2026-09-18T12:34:32.825  [GPS ]...position  : lat:48.407643 lon:11.738404 alt:510.7
+2026-09-18T12:34:35.876  [GPS ]...position  : lat:48.407645 lon:11.738409 alt:510.8
+2026-09-18T12:34:38.935  [GPS ]...position  : lat:48.407647 lon:11.738410 alt:511.1
+2026-09-18T12:34:41.993  [GPS ]...position  : lat:48.407649 lon:11.738411 alt:511.2
+2026-09-18T12:34:45.043  [GPS ]...position  : lat:48.407654 lon:11.738431 alt:511.7
+2026-09-18T12:34:48.092  [GPS ]...position  : lat:48.407658 lon:11.738448 alt:511.9
+2026-09-18T12:34:50.947  [GPS ]...position  : lat:48.407659 lon:11.738457 alt:512.0
+2026-09-18T12:34:54.005  [GPS ]...position  : lat:48.407659 lon:11.738461 alt:511.7
+2026-09-18T12:34:57.063  [GPS ]...position  : lat:48.407657 lon:11.738459 alt:511.1
+2026-09-18T12:35:00.116  [GPS ]...position  : lat:48.407652 lon:11.738448 alt:510.4
+2026-09-18T12:35:03.173  [GPS ]...position  : lat:48.407647 lon:11.738426 alt:509.7
+2026-09-18T12:35:06.028  [GPS ]...position  : lat:48.407643 lon:11.738414 alt:509.2
+2026-09-18T12:35:09.084  [GPS ]...position  : lat:48.407636 lon:11.738399 alt:508.4
+2026-09-18T12:35:11.734  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1078;got_ip_n;1;ip;1;ms;1085297
+2026-09-18T12:35:12.144  [GPS ]...position  : lat:48.407630 lon:11.738382 alt:507.7
+2026-09-18T12:35:15.200  [GPS ]...position  : lat:48.407624 lon:11.738376 alt:507.0
+2026-09-18T12:35:18.255  [GPS ]...position  : lat:48.407618 lon:11.738366 alt:506.3
+2026-09-18T12:35:21.105  [GPS ]...position  : lat:48.407613 lon:11.738363 alt:505.7
+2026-09-18T12:35:24.158  [GPS ]...position  : lat:48.407608 lon:11.738360 alt:505.1
+2026-09-18T12:35:27.213  [GPS ]...position  : lat:48.407606 lon:11.738358 alt:504.4
+2026-09-18T12:35:30.265  [GPS ]...position  : lat:48.407603 lon:11.738353 alt:504.3
+2026-09-18T12:35:33.324  [GPS ]...position  : lat:48.407600 lon:11.738342 alt:503.9
+2026-09-18T12:35:36.379  [GPS ]...position  : lat:48.407599 lon:11.738342 alt:503.8
+2026-09-18T12:35:39.232  [GPS ]...position  : lat:48.407599 lon:11.738347 alt:503.5
+2026-09-18T12:35:42.293  [GPS ]...position  : lat:48.407598 lon:11.738349 alt:503.5
+2026-09-18T12:35:45.335  [GPS ]...position  : lat:48.407598 lon:11.738352 alt:503.3
+2026-09-18T12:35:48.392  [GPS ]...position  : lat:48.407598 lon:11.738360 alt:503.1
+2026-09-18T12:35:51.442  [GPS ]...position  : lat:48.407599 lon:11.738370 alt:502.9
+2026-09-18T12:35:54.294  [GPS ]...position  : lat:48.407598 lon:11.738373 alt:502.6
+2026-09-18T12:35:57.358  [GPS ]...position  : lat:48.407597 lon:11.738375 alt:502.0
+2026-09-18T12:36:00.406  [GPS ]...position  : lat:48.407596 lon:11.738375 alt:501.4
+2026-09-18T12:36:03.460  [GPS ]...position  : lat:48.407593 lon:11.738369 alt:500.8
+2026-09-18T12:36:06.518  [GPS ]...position  : lat:48.407591 lon:11.738364 alt:500.4
+2026-09-18T12:36:08.763  [HEAP] 11:36:08 83596 75020 73716 (mon)
+2026-09-18T12:36:09.368  [GPS ]...position  : lat:48.407589 lon:11.738361 alt:500.0
+2026-09-18T12:36:11.812  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1138;got_ip_n;1;ip;1;ms;1145302
+2026-09-18T12:36:12.423  [GPS ]...position  : lat:48.407587 lon:11.738357 alt:499.2
+2026-09-18T12:36:15.474  [GPS ]...position  : lat:48.407585 lon:11.738358 alt:498.5
+2026-09-18T12:36:18.535  [GPS ]...position  : lat:48.407584 lon:11.738360 alt:497.8
+2026-09-18T12:36:21.589  [GPS ]...position  : lat:48.407581 lon:11.738356 alt:497.1
+2026-09-18T12:36:24.647  [GPS ]...position  : lat:48.407580 lon:11.738353 alt:496.4
+2026-09-18T12:36:27.505  [GPS ]...position  : lat:48.407578 lon:11.738352 alt:495.6
+2026-09-18T12:36:30.543  [GPS ]...position  : lat:48.407579 lon:11.738358 alt:495.0
+2026-09-18T12:36:33.609  [GPS ]...position  : lat:48.407580 lon:11.738359 alt:494.6
+2026-09-18T12:36:36.663  [GPS ]...position  : lat:48.407581 lon:11.738360 alt:494.1
+2026-09-18T12:36:39.721  [GPS ]...position  : lat:48.407583 lon:11.738360 alt:494.0
+2026-09-18T12:36:42.581  [GPS ]...position  : lat:48.407584 lon:11.738358 alt:493.8
+2026-09-18T12:36:45.634  [GPS ]...position  : lat:48.407585 lon:11.738353 alt:493.6
+2026-09-18T12:36:48.692  [GPS ]...position  : lat:48.407586 lon:11.738352 alt:493.4
+2026-09-18T12:36:51.759  [GPS ]...position  : lat:48.407587 lon:11.738349 alt:493.4
+2026-09-18T12:36:54.816  [GPS ]...position  : lat:48.407588 lon:11.738347 alt:493.6
+2026-09-18T12:36:57.670  [GPS ]...position  : lat:48.407589 lon:11.738343 alt:493.9
+2026-09-18T12:37:00.715  [GPS ]...position  : lat:48.407589 lon:11.738336 alt:494.0
+2026-09-18T12:37:03.775  [GPS ]...position  : lat:48.407590 lon:11.738335 alt:494.1
+2026-09-18T12:37:06.824  [GPS ]...position  : lat:48.407592 lon:11.738336 alt:494.1
+2026-09-18T12:37:08.853  [HEAP] 11:37:08 83600 75020 73716 (mon)
+2026-09-18T12:37:09.873  [GPS ]...position  : lat:48.407594 lon:11.738340 alt:494.3
+2026-09-18T12:37:11.703  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1198;got_ip_n;1;ip;1;ms;1205307
+2026-09-18T12:37:15.771  [GPS ]...position  : lat:48.407595 lon:11.738340 alt:494.1
+2026-09-18T12:37:18.812  [GPS ]...position  : lat:48.407596 lon:11.738343 alt:494.0
+2026-09-18T12:37:21.864  [GPS ]...position  : lat:48.407597 lon:11.738345 alt:493.8
+2026-09-18T12:37:24.920  [GPS ]...position  : lat:48.407599 lon:11.738357 alt:493.8
+2026-09-18T12:37:27.979  [GPS ]...position  : lat:48.407600 lon:11.738365 alt:493.5
+2026-09-18T12:37:31.034  [GPS ]...position  : lat:48.407601 lon:11.738375 alt:493.5
+2026-09-18T12:37:34.084  [GPS ]...position  : lat:48.407601 lon:11.738380 alt:493.4
+2026-09-18T12:37:36.929  [GPS ]...position  : lat:48.407604 lon:11.738395 alt:493.6
+2026-09-18T12:37:39.979  [GPS ]...position  : lat:48.407605 lon:11.738404 alt:493.6
+2026-09-18T12:37:43.031  [GPS ]...position  : lat:48.407605 lon:11.738407 alt:493.7
+2026-09-18T12:37:46.080  [GPS ]...position  : lat:48.407603 lon:11.738402 alt:493.4
+2026-09-18T12:37:49.142  [GPS ]...position  : lat:48.407603 lon:11.738398 alt:493.3
+2026-09-18T12:37:52.203  [GPS ]...position  : lat:48.407603 lon:11.738397 alt:493.5
+2026-09-18T12:37:55.051  [GPS ]...position  : lat:48.407602 lon:11.738391 alt:493.5
+2026-09-18T12:37:58.100  [GPS ]...position  : lat:48.407601 lon:11.738384 alt:493.7
+2026-09-18T12:38:01.159  [GPS ]...position  : lat:48.407601 lon:11.738376 alt:494.0
+2026-09-18T12:38:04.212  [GPS ]...position  : lat:48.407602 lon:11.738372 alt:494.4
+2026-09-18T12:38:07.271  [GPS ]...position  : lat:48.407602 lon:11.738374 alt:494.4
+2026-09-18T12:38:10.322  [GPS ]...position  : lat:48.407603 lon:11.738377 alt:494.6
+2026-09-18T12:38:11.753  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1258;got_ip_n;1;ip;1;ms;1265310
+2026-09-18T12:38:13.381  [GPS ]...position  : lat:48.407605 lon:11.738377 alt:495.1
+2026-09-18T12:38:16.230  [GPS ]...position  : lat:48.407607 lon:11.738381 alt:495.7
+2026-09-18T12:38:19.287  [GPS ]...position  : lat:48.407609 lon:11.738378 alt:496.2
+2026-09-18T12:38:22.340  [GPS ]...position  : lat:48.407610 lon:11.738380 alt:496.8
+2026-09-18T12:38:25.386  [GPS ]...position  : lat:48.407612 lon:11.738380 alt:497.2
+2026-09-18T12:38:28.428  [GPS ]...position  : lat:48.407612 lon:11.738380 alt:497.7
+2026-09-18T12:38:31.484  [GPS ]...position  : lat:48.407611 lon:11.738378 alt:498.1
+2026-09-18T12:38:34.332  [GPS ]...position  : lat:48.407609 lon:11.738373 alt:498.3
+2026-09-18T12:38:37.398  [GPS ]...position  : lat:48.407608 lon:11.738369 alt:498.3
+2026-09-18T12:38:40.448  [GPS ]...position  : lat:48.407606 lon:11.738368 alt:498.7
+2026-09-18T12:38:43.513  [GPS ]...position  : lat:48.407606 lon:11.738371 alt:499.2
+2026-09-18T12:38:46.564  [GPS ]...position  : lat:48.407604 lon:11.738370 alt:499.3
+2026-09-18T12:38:49.612  [GPS ]...position  : lat:48.407604 lon:11.738371 alt:499.4
+2026-09-18T12:38:52.451  [GPS ]...position  : lat:48.407602 lon:11.738373 alt:499.5
+2026-09-18T12:38:55.509  [GPS ]...position  : lat:48.407601 lon:11.738376 alt:499.5
+2026-09-18T12:38:58.564  [GPS ]...position  : lat:48.407598 lon:11.738377 alt:499.4
+2026-09-18T12:39:01.622  [GPS ]...position  : lat:48.407596 lon:11.738379 alt:499.3
+2026-09-18T12:39:04.665  [GPS ]...position  : lat:48.407593 lon:11.738380 alt:499.4
+2026-09-18T12:39:07.716  [GPS ]...position  : lat:48.407591 lon:11.738379 alt:499.2
+2026-09-18T12:39:10.563  [GPS ]...position  : lat:48.407590 lon:11.738380 alt:498.7
+2026-09-18T12:39:11.791  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1318;got_ip_n;1;ip;1;ms;1325310
+2026-09-18T12:39:13.623  [GPS ]...position  : lat:48.407588 lon:11.738382 alt:498.3
+2026-09-18T12:39:16.668  [GPS ]...position  : lat:48.407587 lon:11.738379 alt:497.7
+2026-09-18T12:39:19.708  [GPS ]...position  : lat:48.407585 lon:11.738378 alt:497.3
+2026-09-18T12:39:22.764  [GPS ]...position  : lat:48.407583 lon:11.738377 alt:496.7
+2026-09-18T12:39:25.810  [GPS ]...position  : lat:48.407581 lon:11.738373 alt:496.4
+2026-09-18T12:39:28.664  [GPS ]...position  : lat:48.407580 lon:11.738369 alt:496.0
+2026-09-18T12:39:31.713  [GPS ]...position  : lat:48.407581 lon:11.738371 alt:495.6
+2026-09-18T12:39:34.771  [GPS ]...position  : lat:48.407581 lon:11.738375 alt:495.0
+2026-09-18T12:39:37.813  [GPS ]...position  : lat:48.407581 lon:11.738375 alt:494.3
+2026-09-18T12:39:40.872  [GPS ]...position  : lat:48.407582 lon:11.738382 alt:494.0
+2026-09-18T12:39:43.929  [GPS ]...position  : lat:48.407583 lon:11.738386 alt:494.1
+2026-09-18T12:39:46.785  [GPS ]...position  : lat:48.407582 lon:11.738389 alt:494.2
+2026-09-18T12:39:49.847  [GPS ]...position  : lat:48.407581 lon:11.738388 alt:494.0
+2026-09-18T12:39:52.903  [GPS ]...position  : lat:48.407579 lon:11.738390 alt:493.8
+2026-09-18T12:39:55.963  [GPS ]...position  : lat:48.407576 lon:11.738387 alt:493.6
+2026-09-18T12:39:59.010  [GPS ]...position  : lat:48.407575 lon:11.738387 alt:493.1
+2026-09-18T12:40:01.859  [GPS ]...position  : lat:48.407573 lon:11.738387 alt:492.6
+2026-09-18T12:40:04.911  [GPS ]...position  : lat:48.407573 lon:11.738390 alt:492.1
+2026-09-18T12:40:07.951  [GPS ]...position  : lat:48.407572 lon:11.738388 alt:491.9
+2026-09-18T12:40:11.011  [GPS ]...position  : lat:48.407572 lon:11.738388 alt:492.4
+2026-09-18T12:40:11.821  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1378;got_ip_n;1;ip;1;ms;1385313
+2026-09-18T12:40:14.055  [GPS ]...position  : lat:48.407571 lon:11.738388 alt:493.0
+2026-09-18T12:40:17.113  [GPS ]...position  : lat:48.407570 lon:11.738385 alt:493.5
+2026-09-18T12:40:19.966  [GPS ]...position  : lat:48.407570 lon:11.738383 alt:494.0
+2026-09-18T12:40:23.023  [GPS ]...position  : lat:48.407570 lon:11.738384 alt:494.3
+2026-09-18T12:40:26.071  [GPS ]...position  : lat:48.407570 lon:11.738383 alt:494.1
+2026-09-18T12:40:29.134  [GPS ]...position  : lat:48.407570 lon:11.738377 alt:494.2
+2026-09-18T12:40:32.189  [GPS ]...position  : lat:48.407570 lon:11.738376 alt:494.4
+2026-09-18T12:40:35.244  [GPS ]...position  : lat:48.407564 lon:11.738363 alt:493.4
+2026-09-18T12:40:38.085  [GPS ]...position  : lat:48.407561 lon:11.738353 alt:492.2
+2026-09-18T12:40:41.137  [GPS ]...position  : lat:48.407560 lon:11.738350 alt:491.3
+2026-09-18T12:40:44.190  [GPS ]...position  : lat:48.407556 lon:11.738340 alt:490.0
+2026-09-18T12:40:47.249  [GPS ]...position  : lat:48.407553 lon:11.738331 alt:489.1
+2026-09-18T12:40:50.300  [GPS ]...position  : lat:48.407551 lon:11.738321 alt:488.5
+2026-09-18T12:40:53.351  [GPS ]...position  : lat:48.407551 lon:11.738310 alt:488.8
+2026-09-18T12:40:56.201  [GPS ]...position  : lat:48.407553 lon:11.738307 alt:488.8
+2026-09-18T12:40:59.259  [GPS ]...position  : lat:48.407560 lon:11.738315 alt:489.0
+2026-09-18T12:41:02.314  [GPS ]...position  : lat:48.407564 lon:11.738312 alt:490.1
+2026-09-18T12:41:05.364  [GPS ]...position  : lat:48.407570 lon:11.738317 alt:490.9
+2026-09-18T12:41:08.408  [GPS ]...position  : lat:48.407576 lon:11.738318 alt:491.8
+2026-09-18T12:41:11.450  [GPS ]...position  : lat:48.407582 lon:11.738326 alt:492.7
+2026-09-18T12:41:11.851  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1438;got_ip_n;1;ip;1;ms;1445315
+2026-09-18T12:41:14.293  [GPS ]...position  : lat:48.407590 lon:11.738338 alt:493.8
+2026-09-18T12:41:17.345  [GPS ]...position  : lat:48.407594 lon:11.738346 alt:494.4
+2026-09-18T12:41:20.403  [GPS ]...position  : lat:48.407596 lon:11.738350 alt:494.7
+2026-09-18T12:41:23.463  [GPS ]...position  : lat:48.407601 lon:11.738360 alt:494.4
+2026-09-18T12:41:26.515  [GPS ]...position  : lat:48.407604 lon:11.738370 alt:494.7
+2026-09-18T12:41:29.569  [GPS ]...position  : lat:48.407607 lon:11.738376 alt:495.1
+2026-09-18T12:41:30.584  [GW];keep;tx;ok;1;ms;1464129
+2026-09-18T12:41:30.584  [UDP] Server not responding for 1088s — WiFi CONNECTED
+2026-09-18T12:41:30.584  [UDP] Heartbeat timeout 1088s — WiFi CONNECTED, server unresponsive, waiting
+2026-09-18T12:41:30.584  [GW];rx;type;BEAT;len;20;ms;1464233
+2026-09-18T12:41:32.418  [GPS ]...position  : lat:48.407610 lon:11.738388 alt:495.5
+2026-09-18T12:41:35.475  [GPS ]...position  : lat:48.407610 lon:11.738392 alt:495.4
+2026-09-18T12:41:38.522  [GPS ]...position  : lat:48.407609 lon:11.738394 alt:494.9
+2026-09-18T12:41:41.580  [GPS ]...position  : lat:48.407609 lon:11.738405 alt:494.5
+2026-09-18T12:41:44.638  [GPS ]...position  : lat:48.407610 lon:11.738417 alt:494.1
+2026-09-18T12:41:47.497  [GPS ]...position  : lat:48.407608 lon:11.738419 alt:492.8
+2026-09-18T12:41:50.543  [GPS ]...position  : lat:48.407608 lon:11.738421 alt:492.3
+2026-09-18T12:41:53.597  [GPS ]...position  : lat:48.407612 lon:11.738426 alt:493.0
+2026-09-18T12:41:56.647  [GPS ]...position  : lat:48.407613 lon:11.738429 alt:493.1
+2026-09-18T12:41:59.694  [GPS ]...position  : lat:48.407613 lon:11.738431 alt:492.4
+2026-09-18T12:42:00.504  [GW];keep;tx;ok;1;ms;1494139
+2026-09-18T12:42:00.708  [GW];rx;type;BEAT;len;20;ms;1494246
+2026-09-18T12:42:02.726  [GPS ]...position  : lat:48.407618 lon:11.738439 alt:492.9
+2026-09-18T12:42:05.768  [GPS ]...position  : lat:48.407621 lon:11.738442 alt:493.1
+2026-09-18T12:42:08.607  [GPS ]...position  : lat:48.407621 lon:11.738442 alt:492.9
+2026-09-18T12:42:11.660  [GPS ]...position  : lat:48.407621 lon:11.738441 alt:492.6
+2026-09-18T12:42:11.862  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1498;got_ip_n;1;ip;1;ms;1505320
+2026-09-18T12:42:14.701  [GPS ]...position  : lat:48.407618 lon:11.738433 alt:492.1
+2026-09-18T12:42:17.743  [GPS ]...position  : lat:48.407615 lon:11.738424 alt:492.1
+2026-09-18T12:42:20.798  [GPS ]...position  : lat:48.407614 lon:11.738419 alt:492.1
+2026-09-18T12:42:23.856  [GPS ]...position  : lat:48.407614 lon:11.738414 alt:492.6
+2026-09-18T12:42:26.702  [GPS ]...position  : lat:48.407616 lon:11.738421 alt:493.2
+2026-09-18T12:42:29.750  [GPS ]...position  : lat:48.407619 lon:11.738429 alt:493.7
+2026-09-18T12:42:30.565  [GW];keep;tx;ok;1;ms;1524143
+2026-09-18T12:42:30.768  [GW];rx;type;BEAT;len;20;ms;1524238
+2026-09-18T12:42:32.808  [GPS ]...position  : lat:48.407620 lon:11.738430 alt:494.2
+2026-09-18T12:42:35.860  [GPS ]...position  : lat:48.407623 lon:11.738436 alt:494.2
+2026-09-18T12:42:38.909  [GPS ]...position  : lat:48.407626 lon:11.738450 alt:494.5
+2026-09-18T12:42:41.969  [GPS ]...position  : lat:48.407629 lon:11.738462 alt:494.3
+2026-09-18T12:42:44.814  [GPS ]...position  : lat:48.407629 lon:11.738467 alt:494.1
+2026-09-18T12:42:47.864  [GPS ]...position  : lat:48.407627 lon:11.738468 alt:493.5
+2026-09-18T12:42:50.923  [GPS ]...position  : lat:48.407623 lon:11.738461 alt:492.7
+2026-09-18T12:42:53.971  [GPS ]...position  : lat:48.407618 lon:11.738448 alt:492.2
+2026-09-18T12:42:57.026  [GPS ]...position  : lat:48.407614 lon:11.738436 alt:491.4
+2026-09-18T12:43:00.068  [GPS ]...position  : lat:48.407610 lon:11.738428 alt:491.1
+2026-09-18T12:43:00.679  [GW];keep;tx;ok;1;ms;1554149
+2026-09-18T12:43:00.679  [GW];rx;type;BEAT;len;20;ms;1554240
+2026-09-18T12:43:02.921  [GPS ]...position  : lat:48.407609 lon:11.738430 alt:491.0
+2026-09-18T12:43:05.972  [GPS ]...position  : lat:48.407610 lon:11.738432 alt:491.3
+2026-09-18T12:43:09.037  [GPS ]...position  : lat:48.407608 lon:11.738425 alt:492.6
+2026-09-18T12:43:11.688  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1558;got_ip_n;1;ip;1;ms;1565320
+2026-09-18T12:43:12.099  [GPS ]...position  : lat:48.407606 lon:11.738416 alt:493.2
+2026-09-18T12:43:15.146  [GPS ]...position  : lat:48.407602 lon:11.738405 alt:493.7
+2026-09-18T12:43:17.995  [GPS ]...position  : lat:48.407598 lon:11.738393 alt:494.0
+2026-09-18T12:43:21.052  [GPS ]...position  : lat:48.407597 lon:11.738386 alt:494.7
+2026-09-18T12:43:24.108  [GPS ]...position  : lat:48.407596 lon:11.738383 alt:495.6
+2026-09-18T12:43:27.166  [GPS ]...position  : lat:48.407597 lon:11.738380 alt:496.0
+2026-09-18T12:43:30.228  [GPS ]...position  : lat:48.407596 lon:11.738381 alt:496.1
+2026-09-18T12:43:30.632  [GW];keep;tx;ok;1;ms;1584155
+2026-09-18T12:43:33.082  [GPS ]...position  : lat:48.407597 lon:11.738381 alt:496.4
+2026-09-18T12:43:36.144  [GPS ]...position  : lat:48.407596 lon:11.738377 alt:496.6
+2026-09-18T12:43:39.205  [GPS ]...position  : lat:48.407596 lon:11.738381 alt:496.7
+2026-09-18T12:43:42.261  [GPS ]...position  : lat:48.407596 lon:11.738382 alt:496.7
+2026-09-18T12:43:45.313  [GPS ]...position  : lat:48.407597 lon:11.738389 alt:496.4
+2026-09-18T12:43:48.163  [GPS ]...position  : lat:48.407597 lon:11.738389 alt:496.4
+2026-09-18T12:43:51.216  [GPS ]...position  : lat:48.407597 lon:11.738388 alt:496.4
+2026-09-18T12:43:54.260  [GPS ]...position  : lat:48.407600 lon:11.738397 alt:496.7
+2026-09-18T12:43:57.308  [GPS ]...position  : lat:48.407601 lon:11.738405 alt:496.8
+2026-09-18T12:44:00.348  [GPS ]...position  : lat:48.407599 lon:11.738405 alt:496.4
+2026-09-18T12:44:03.402  [GPS ]...position  : lat:48.407597 lon:11.738402 alt:496.0
+2026-09-18T12:44:06.245  [GPS ]...position  : lat:48.407590 lon:11.738395 alt:494.9
+2026-09-18T12:44:09.302  [GPS ]...position  : lat:48.407587 lon:11.738395 alt:494.4
+2026-09-18T12:44:11.744  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1618;got_ip_n;1;ip;1;ms;1625321
+2026-09-18T12:44:12.359  [GPS ]...position  : lat:48.407587 lon:11.738411 alt:494.5
+2026-09-18T12:44:15.409  [GPS ]...position  : lat:48.407588 lon:11.738426 alt:495.3
+2026-09-18T12:44:21.508  [GPS ]...position  : lat:48.407593 lon:11.738462 alt:497.3
+2026-09-18T12:44:24.355  [GPS ]...position  : lat:48.407592 lon:11.738464 alt:496.9
+2026-09-18T12:44:27.409  [GPS ]...position  : lat:48.407593 lon:11.738466 alt:497.3
+2026-09-18T12:44:30.462  [GPS ]...position  : lat:48.407593 lon:11.738472 alt:497.8
+2026-09-18T12:44:33.502  [GPS ]...position  : lat:48.407598 lon:11.738490 alt:498.2
+2026-09-18T12:44:36.551  [GPS ]...position  : lat:48.407603 lon:11.738517 alt:499.2
+2026-09-18T12:44:39.597  [GPS ]...position  : lat:48.407607 lon:11.738546 alt:500.0
+2026-09-18T12:44:42.434  [GPS ]...position  : lat:48.407609 lon:11.738553 alt:500.7
+2026-09-18T12:44:45.487  [GPS ]...position  : lat:48.407613 lon:11.738558 alt:501.4
+2026-09-18T12:44:48.546  [GPS ]...position  : lat:48.407609 lon:11.738548 alt:501.7
+2026-09-18T12:44:51.597  [GPS ]...position  : lat:48.407613 lon:11.738560 alt:503.8
+2026-09-18T12:44:54.649  [GPS ]...position  : lat:48.407614 lon:11.738561 alt:504.7
+2026-09-18T12:44:57.697  [GPS ]...position  : lat:48.407612 lon:11.738561 alt:505.6
+2026-09-18T12:45:00.549  [GPS ]...position  : lat:48.407612 lon:11.738581 alt:507.0
+2026-09-18T12:45:03.605  [GPS ]...position  : lat:48.407611 lon:11.738605 alt:508.4
+2026-09-18T12:45:11.734  [WIFI];link;up;rssi;-59;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1678;got_ip_n;1;ip;1;ms;1685322
+2026-09-18T12:45:15.605  [GPS ]...position  : lat:48.407604 lon:11.738683 alt:509.8
+2026-09-18T12:45:18.645  [GPS ]...position  : lat:48.407613 lon:11.738781 alt:512.4
+2026-09-18T12:45:27.804  [GPS ]...position  : lat:48.407591 lon:11.738727 alt:508.1
+2026-09-18T12:45:30.853  [GPS ]...position  : lat:48.407578 lon:11.738671 alt:505.1
+2026-09-18T12:45:33.695  [GPS ]...position  : lat:48.407567 lon:11.738624 alt:502.6
+2026-09-18T12:45:36.746  [GPS ]...position  : lat:48.407555 lon:11.738586 alt:499.7
+2026-09-18T12:45:39.803  [GPS ]...position  : lat:48.407546 lon:11.738567 alt:497.5
+2026-09-18T12:45:42.852  [GPS ]...position  : lat:48.407541 lon:11.738556 alt:496.4
+2026-09-18T12:45:45.885  [GPS ]...position  : lat:48.407538 lon:11.738544 alt:495.7
+2026-09-18T12:45:48.921  [GPS ]...position  : lat:48.407536 lon:11.738535 alt:495.0
+2026-09-18T12:45:51.969  [GPS ]...position  : lat:48.407533 lon:11.738532 alt:494.2
+2026-09-18T12:45:54.819  [GPS ]...position  : lat:48.407533 lon:11.738514 alt:494.3
+2026-09-18T12:45:57.876  [GPS ]...position  : lat:48.407533 lon:11.738487 alt:494.5
+2026-09-18T12:46:00.928  [GPS ]...position  : lat:48.407535 lon:11.738465 alt:494.7
+2026-09-18T12:46:03.991  [GPS ]...position  : lat:48.407536 lon:11.738451 alt:494.8
+2026-09-18T12:46:07.038  [GPS ]...position  : lat:48.407542 lon:11.738456 alt:495.9
+2026-09-18T12:46:10.093  [GPS ]...position  : lat:48.407548 lon:11.738460 alt:497.1
+2026-09-18T12:46:11.729  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1738;got_ip_n;1;ip;1;ms;1745324
+2026-09-18T12:46:19.044  [GPS ]...position  : lat:48.407562 lon:11.738460 alt:499.1
+2026-09-18T12:46:22.092  [GPS ]...position  : lat:48.407566 lon:11.738458 alt:499.4
+2026-09-18T12:46:25.142  [GPS ]...position  : lat:48.407566 lon:11.738426 alt:499.3
+2026-09-18T12:46:28.184  [GPS ]...position  : lat:48.407567 lon:11.738424 alt:499.1
+2026-09-18T12:46:31.025  [GPS ]...position  : lat:48.407569 lon:11.738422 alt:499.0
+2026-09-18T12:46:34.083  [GPS ]...position  : lat:48.407575 lon:11.738426 alt:499.1
+2026-09-18T12:46:37.130  [GPS ]...position  : lat:48.407577 lon:11.738412 alt:499.4
+2026-09-18T12:46:40.191  [GPS ]...position  : lat:48.407582 lon:11.738408 alt:500.3
+2026-09-18T12:46:43.245  [GPS ]...position  : lat:48.407585 lon:11.738389 alt:500.8
+2026-09-18T12:46:46.301  [GPS ]...position  : lat:48.407591 lon:11.738418 alt:501.7
+2026-09-18T12:46:49.153  [GPS ]...position  : lat:48.407597 lon:11.738447 alt:503.3
+2026-09-18T12:46:52.203  [GPS ]...position  : lat:48.407603 lon:11.738471 alt:505.1
+2026-09-18T12:47:06.455  [MC-HWM] uptime=1800s queue_hwm=1/20 csma_hwm=0 trickle=480000ms
+2026-09-18T12:47:10.323  [GPS ]...position  : lat:48.407609 lon:11.738485 alt:512.1
+2026-09-18T12:47:11.752  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1798;got_ip_n;1;ip;1;ms;1805327
+2026-09-18T12:47:13.383  [GPS ]...position  : lat:48.407604 lon:11.738419 alt:513.1
+2026-09-18T12:47:16.448  [GPS ]...position  : lat:48.407601 lon:11.738335 alt:514.1
+2026-09-18T12:47:19.303  [GPS ]...position  : lat:48.407599 lon:11.738303 alt:515.8
+2026-09-18T12:47:22.362  [GPS ]...position  : lat:48.407596 lon:11.738262 alt:517.6
+2026-09-18T12:47:25.414  [GPS ]...position  : lat:48.407594 lon:11.738221 alt:519.4
+2026-09-18T12:47:28.459  [GPS ]...position  : lat:48.407592 lon:11.738176 alt:520.9
+2026-09-18T12:47:31.514  [GPS ]...position  : lat:48.407587 lon:11.738157 alt:521.7
+2026-09-18T12:47:34.366  [GPS ]...position  : lat:48.407581 lon:11.738157 alt:522.3
+2026-09-18T12:47:37.640  [NTP];ok;epoch;1789728457;rtt;76
+2026-09-18T12:47:40.506  [GPS ]...position  : lat:48.407570 lon:11.738141 alt:523.3
+2026-09-18T12:47:43.562  [GPS ]...position  : lat:48.407572 lon:11.738145 alt:525.8
+2026-09-18T12:47:46.622  [GPS ]...position  : lat:48.407578 lon:11.738132 alt:528.5
+2026-09-18T12:47:49.476  [GPS ]...position  : lat:48.407587 lon:11.738125 alt:531.3
+2026-09-18T12:47:52.531  [GPS ]...position  : lat:48.407597 lon:11.738101 alt:534.5
+2026-09-18T12:47:55.585  [GPS ]...position  : lat:48.407604 lon:11.738096 alt:537.6
+2026-09-18T12:47:58.638  [GPS ]...position  : lat:48.407613 lon:11.738085 alt:540.5
+2026-09-18T12:48:01.697  [GPS ]...position  : lat:48.407625 lon:11.738082 alt:543.5
+2026-09-18T12:48:04.746  [GPS ]...position  : lat:48.407631 lon:11.738100 alt:546.0
+2026-09-18T12:48:07.595  [GPS ]...position  : lat:48.407637 lon:11.738142 alt:548.4
+2026-09-18T12:48:08.814  [HEAP] 11:48:08 83744 75020 77812 (mon)
+2026-09-18T12:48:11.859  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1858;got_ip_n;1;ip;1;ms;1865329
+2026-09-18T12:48:16.754  [GPS ]...position  : lat:48.407646 lon:11.738196 alt:553.9
+2026-09-18T12:48:19.795  [GPS ]...position  : lat:48.407647 lon:11.738204 alt:555.9
+2026-09-18T12:48:22.645  [GPS ]...position  : lat:48.407651 lon:11.738210 alt:557.5
+2026-09-18T12:48:25.690  [GPS ]...position  : lat:48.407653 lon:11.738179 alt:559.1
+2026-09-18T12:48:28.760  [GPS ]...position  : lat:48.407638 lon:11.738194 alt:561.0
+2026-09-18T12:48:34.858  [GPS ]...position  : lat:48.407601 lon:11.738226 alt:563.5
+2026-09-18T12:48:37.916  [GPS ]...position  : lat:48.407600 lon:11.738196 alt:564.8
+2026-09-18T12:48:43.827  [GPS ]...position  : lat:48.407610 lon:11.738233 alt:566.7
+2026-09-18T12:48:46.888  [GPS ]...position  : lat:48.407617 lon:11.738255 alt:567.4
+2026-09-18T12:48:49.938  [GPS ]...position  : lat:48.407627 lon:11.738262 alt:567.9
+2026-09-18T12:48:52.990  [GPS ]...position  : lat:48.407629 lon:11.738245 alt:567.9
+2026-09-18T12:48:55.842  [GPS ]...position  : lat:48.407630 lon:11.738231 alt:567.1
+2026-09-18T12:48:58.895  [GPS ]...position  : lat:48.407634 lon:11.738224 alt:566.0
+2026-09-18T12:49:01.942  [GPS ]...position  : lat:48.407632 lon:11.738207 alt:564.5
+2026-09-18T12:49:04.989  [GPS ]...position  : lat:48.407629 lon:11.738179 alt:562.5
+2026-09-18T12:49:08.046  [GPS ]...position  : lat:48.407626 lon:11.738159 alt:560.1
+2026-09-18T12:49:11.101  [GPS ]...position  : lat:48.407626 lon:11.738155 alt:558.3
+2026-09-18T12:49:11.712  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1918;got_ip_n;1;ip;1;ms;1925332
+2026-09-18T12:49:13.946  [GPS ]...position  : lat:48.407625 lon:11.738148 alt:556.0
+2026-09-18T12:49:16.990  [GPS ]...position  : lat:48.407621 lon:11.738135 alt:553.0
+2026-09-18T12:49:20.055  [GPS ]...position  : lat:48.407613 lon:11.738135 alt:549.5
+2026-09-18T12:49:23.099  [GPS ]...position  : lat:48.407605 lon:11.738154 alt:546.2
+2026-09-18T12:49:26.165  [GPS ]...position  : lat:48.407597 lon:11.738170 alt:542.6
+2026-09-18T12:49:29.021  [GPS ]...position  : lat:48.407590 lon:11.738184 alt:539.3
+2026-09-18T12:49:31.266  WiFI is open
+2026-09-18T12:49:31.266  [EXT] URL:192.168.68.58 to IP:192.168.68.58
+2026-09-18T12:49:31.266  [EXT]...now listening at IP 192.168.68.76, UDP port 1799
+2026-09-18T12:49:31.267  [EXT]...now sending   to IP , UDP port 1799
+2026-09-18T12:49:32.085  [GPS ]...position  : lat:48.407585 lon:11.738204 alt:536.4
+2026-09-18T12:49:35.134  [GPS ]...position  : lat:48.407582 lon:11.738231 alt:533.9
+2026-09-18T12:49:38.196  [GPS ]...position  : lat:48.407581 lon:11.738256 alt:532.0
+2026-09-18T12:49:41.250  [GPS ]...position  : lat:48.407579 lon:11.738277 alt:530.4
+2026-09-18T12:49:44.096  [GPS ]...position  : lat:48.407577 lon:11.738288 alt:529.1
+2026-09-18T12:49:46.544  [EXT] Out: {"src_type":"node","type":"pos","src":"DK5EN-92","msg":"","lat":48.4076,"lat_dir":"N","long":11.7383,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","hw_id":12,"msg_id":"4106E0D4","alt":1640,"batt":100,"firmware":"4.35","fw_sub":"t","rssi":0,"snr":0} Len: 259
+2026-09-18T12:49:46.544  [EXT] Tele-Out: {"src_type":"node","type":"tele","src":"DK5EN-92","temp1":0,"temp2":0,"hum":0,"qfe":0,"qnh":0,"gas":0,"co2":0} Len: 110
+2026-09-18T12:49:46.544  [EXT];tx;len;259;stack_hwm;1824;ms;1960049
+2026-09-18T12:49:47.158  [GPS ]...position  : lat:48.407573 lon:11.738307 alt:527.7
+2026-09-18T12:49:50.219  [GPS ]...position  : lat:48.407572 lon:11.738319 alt:526.5
+2026-09-18T12:49:53.279  [GPS ]...position  : lat:48.407572 lon:11.738324 alt:525.8
+2026-09-18T12:49:56.327  [GPS ]...position  : lat:48.407572 lon:11.738344 alt:525.3
+2026-09-18T12:49:59.188  [GPS ]...position  : lat:48.407570 lon:11.738361 alt:524.9
+2026-09-18T12:50:02.235  [GPS ]...position  : lat:48.407567 lon:11.738382 alt:524.6
+2026-09-18T12:50:05.288  [GPS ]...position  : lat:48.407565 lon:11.738392 alt:524.2
+2026-09-18T12:50:08.342  [GPS ]...position  : lat:48.407563 lon:11.738392 alt:523.9
+2026-09-18T12:50:08.951  [HEAP] 11:50:08 81932 73412 73716 (mon)
+2026-09-18T12:50:11.394  [GPS ]...position  : lat:48.407560 lon:11.738395 alt:523.6
+2026-09-18T12:50:11.800  [WIFI];link;up;rssi;-57;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;1978;got_ip_n;1;ip;1;ms;1985334
+2026-09-18T12:50:14.247  [GPS ]...position  : lat:48.407557 lon:11.738419 alt:522.7
+2026-09-18T12:50:17.288  [GPS ]...position  : lat:48.407555 lon:11.738427 alt:522.1
+2026-09-18T12:50:20.355  [GPS ]...position  : lat:48.407548 lon:11.738446 alt:522.1
+2026-09-18T12:50:23.405  [GPS ]...position  : lat:48.407545 lon:11.738468 alt:521.0
+2026-09-18T12:50:26.448  [GPS ]...position  : lat:48.407549 lon:11.738467 alt:519.6
+2026-09-18T12:50:29.502  [GPS ]...position  : lat:48.407551 lon:11.738481 alt:517.8
+2026-09-18T12:50:32.355  [GPS ]...position  : lat:48.407551 lon:11.738500 alt:515.7
+2026-09-18T12:50:35.400  [GPS ]...position  : lat:48.407553 lon:11.738507 alt:513.6
+2026-09-18T12:50:38.450  [GPS ]...position  : lat:48.407552 lon:11.738518 alt:511.5
+2026-09-18T12:50:41.501  [GPS ]...position  : lat:48.407552 lon:11.738524 alt:509.6
+2026-09-18T12:50:44.558  [GPS ]...position  : lat:48.407555 lon:11.738525 alt:507.6
+2026-09-18T12:50:47.604  [GPS ]...position  : lat:48.407557 lon:11.738534 alt:505.3
+2026-09-18T12:50:50.453  [GPS ]...position  : lat:48.407558 lon:11.738540 alt:503.6
+2026-09-18T12:50:53.521  [GPS ]...position  : lat:48.407558 lon:11.738534 alt:502.5
+2026-09-18T12:50:56.572  [GPS ]...position  : lat:48.407559 lon:11.738532 alt:501.4
+2026-09-18T12:50:59.625  [GPS ]...position  : lat:48.407560 lon:11.738527 alt:500.7
+2026-09-18T12:51:02.684  [GPS ]...position  : lat:48.407561 lon:11.738522 alt:500.0
+2026-09-18T12:51:03.092  [EXT] Out: {"src_type":"lora","type":"msg","src":"DO1AU-99,DK5EN-98","dst":"20","msg":"Mahlzeit und ein schönes Wochenende Ringsum aus Bad Frankenhausen jo51ni ","msg_id":"45B8D183","firmware":35,"fw_sub":"t","rssi":-60,"snr":14} Len: 219
+2026-09-18T12:51:03.092  [EXT];tx;len;219;stack_hwm;1824;ms;2036653
+2026-09-18T12:51:05.730  [GPS ]...position  : lat:48.407561 lon:11.738512 alt:499.7
+2026-09-18T12:51:08.568  [GPS ]...position  : lat:48.407561 lon:11.738504 alt:499.2
+2026-09-18T12:51:11.631  [GPS ]...position  : lat:48.407561 lon:11.738501 alt:498.3
+2026-09-18T12:51:11.836  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;2038;got_ip_n;1;ip;1;ms;2045339
+2026-09-18T12:51:14.698  [GPS ]...position  : lat:48.407561 lon:11.738501 alt:497.9
+2026-09-18T12:51:17.772  [GPS ]...position  : lat:48.407561 lon:11.738495 alt:497.0
+2026-09-18T12:51:20.838  [GPS ]...position  : lat:48.407561 lon:11.738504 alt:496.3
+2026-09-18T12:51:23.694  [GPS ]...position  : lat:48.407563 lon:11.738512 alt:495.9
+2026-09-18T12:51:26.747  [GPS ]...position  : lat:48.407563 lon:11.738516 alt:495.4
+2026-09-18T12:51:29.792  [GPS ]...position  : lat:48.407563 lon:11.738526 alt:494.9
+2026-09-18T12:51:32.846  [GPS ]...position  : lat:48.407560 lon:11.738518 alt:494.1
+2026-09-18T12:51:35.896  [GPS ]...position  : lat:48.407559 lon:11.738515 alt:493.7
+2026-09-18T12:51:38.938  [GPS ]...position  : lat:48.407557 lon:11.738518 alt:493.1
+2026-09-18T12:51:41.789  [GPS ]...position  : lat:48.407559 lon:11.738524 alt:492.9
+2026-09-18T12:51:44.840  [GPS ]...position  : lat:48.407561 lon:11.738532 alt:492.8
+2026-09-18T12:51:47.897  [GPS ]...position  : lat:48.407561 lon:11.738529 alt:492.3
+2026-09-18T12:51:50.950  [GPS ]...position  : lat:48.407564 lon:11.738544 alt:492.5
+2026-09-18T12:51:54.001  [GPS ]...position  : lat:48.407561 lon:11.738531 alt:492.3
+2026-09-18T12:51:57.055  [GPS ]...position  : lat:48.407563 lon:11.738539 alt:492.0
+2026-09-18T12:51:59.900  [GPS ]...position  : lat:48.407568 lon:11.738556 alt:491.7
+2026-09-18T12:52:02.955  [GPS ]...position  : lat:48.407573 lon:11.738580 alt:491.3
+2026-09-18T12:52:06.002  [GPS ]...position  : lat:48.407576 lon:11.738587 alt:490.5
+2026-09-18T12:52:08.850  [HEAP] 11:52:07 83744 73412 77812 (mon)
+2026-09-18T12:52:09.056  [GPS ]...position  : lat:48.407579 lon:11.738598 alt:489.4
+2026-09-18T12:52:11.704  [WIFI];link;up;rssi;-58;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;2098;got_ip_n;1;ip;1;ms;2105341
+2026-09-18T12:52:12.108  [GPS ]...position  : lat:48.407580 lon:11.738582 alt:488.1
+2026-09-18T12:52:15.155  [GPS ]...position  : lat:48.407578 lon:11.738580 alt:486.8
+2026-09-18T12:52:18.001  [GPS ]...position  : lat:48.407578 lon:11.738588 alt:485.3
+2026-09-18T12:52:21.048  [GPS ]...position  : lat:48.407574 lon:11.738588 alt:483.9
+2026-09-18T12:52:24.100  [GPS ]...position  : lat:48.407572 lon:11.738599 alt:482.4
+2026-09-18T12:52:27.151  [GPS ]...position  : lat:48.407570 lon:11.738605 alt:480.8
+2026-09-18T12:52:30.206  [GPS ]...position  : lat:48.407568 lon:11.738627 alt:479.9
+2026-09-18T12:52:33.257  [GPS ]...position  : lat:48.407567 lon:11.738636 alt:478.9
+2026-09-18T12:52:36.101  [GPS ]...position  : lat:48.407568 lon:11.738624 alt:478.3
+2026-09-18T12:52:39.151  [GPS ]...position  : lat:48.407565 lon:11.738618 alt:478.0
+2026-09-18T12:52:42.213  [GPS ]...position  : lat:48.407566 lon:11.738619 alt:477.0
+2026-09-18T12:52:45.275  [GPS ]...position  : lat:48.407567 lon:11.738609 alt:476.1
+2026-09-18T12:52:54.222  [GPS ]...position  : lat:48.407563 lon:11.738585 alt:475.0
+2026-09-18T12:52:57.276  [GPS ]...position  : lat:48.407562 lon:11.738582 alt:474.8
+2026-09-18T12:53:00.331  [GPS ]...position  : lat:48.407562 lon:11.738588 alt:474.8
+2026-09-18T12:53:03.385  [GPS ]...position  : lat:48.407560 lon:11.738592 alt:475.1
+2026-09-18T12:53:06.427  [GPS ]...position  : lat:48.407559 lon:11.738593 alt:475.3
+2026-09-18T12:53:08.868  [HEAP] 11:53:08 83776 73412 77812 (mon)
+2026-09-18T12:53:09.473  [GPS ]...position  : lat:48.407557 lon:11.738589 alt:475.5
+2026-09-18T12:53:11.714  [WIFI];link;up;rssi;-56;bssid;5A:AF:97:2E:2B:8B;chan;3;age_s;2158;got_ip_n;1;ip;1;ms;2165345
+2026-09-18T12:53:12.327  [GPS ]...position  : lat:48.407556 lon:11.738582 alt:475.7
+2026-09-18T12:53:15.385  [GPS ]...position  : lat:48.407555 lon:11.738577 alt:475.9
+2026-09-18T12:53:18.434  [GPS ]...position  : lat:48.407554 lon:11.738569 alt:476.1
+2026-09-18T12:53:21.488  [GPS ]...position  : lat:48.407552 lon:11.738573 alt:475.9
+2026-09-18T12:53:24.545  [GPS ]...position  : lat:48.407551 lon:11.738570 alt:476.0
+2026-09-18T12:53:27.396  [GPS ]...position  : lat:48.407551 lon:11.738567 alt:476.0
+2026-09-18T12:53:30.442  [GPS ]...position  : lat:48.407551 lon:11.738570 alt:476.1
+2026-09-18T12:53:31.657  BLE disconnected. Reason: 0x0213
+2026-09-18T12:53:33.494  [GPS ]...position  : lat:48.407553 lon:11.738573 alt:476.3
+2026-09-18T12:53:36.363  ### run rc=0
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:33:23.086  cycle 1/1 scanning for A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:33:25.974  cycle 1 connected A53B5215-4472-F03A-5A5D-575274D96CC9
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:33:27.893  cycle 1 hello sent, 10 commands, hold 120 s each
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:33:29.993  cycle 1 sent '--webserver off'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:35:29.994  cycle 1 after '--webserver off': notifications=19 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:35:30.117  cycle 1 sent '--webserver on'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:37:30.118  cycle 1 after '--webserver on': notifications=20 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:37:30.237  cycle 1 sent '--display on'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:39:30.238  cycle 1 after '--display on': notifications=24 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:39:30.358  cycle 1 sent '--display off'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:41:30.359  cycle 1 after '--display off': notifications=26 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:41:30.480  cycle 1 sent '--gateway on'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:43:30.481  cycle 1 after '--gateway on': notifications=28 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:43:30.721  cycle 1 sent '--gateway off'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:45:30.723  cycle 1 after '--gateway off': notifications=33 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:45:30.963  cycle 1 sent '--mesh on'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:47:30.966  cycle 1 after '--mesh on': notifications=36 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:47:31.086  cycle 1 sent '--mesh off'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:49:31.087  cycle 1 after '--mesh off': notifications=40 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:49:31.208  cycle 1 sent '--extudp on'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:51:31.208  cycle 1 after '--extudp on': notifications=45 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:51:31.330  cycle 1 sent '--extudp off'
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:53:31.331  cycle 1 after '--extudp off': notifications=47 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:53:31.331  cycle 1 notifications=47 still_connected=True
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:53:31.334  cycle 1 disconnected
+2026-09-18T12:53:36.363  ### run| 2026-09-18T12:53:36.335  === ble cycles done failures=0
+2026-09-18T12:53:36.365  ### verdict OK for run:cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address A53B5215-4472-F03A-5A5D-575274D96CC9 --cycles 1 --hold 120 --gap 5 --send '--webserver off' --send '--webserver on' --send '--display on' --send '--display off' --send '--gateway on' --send '--gateway off' --send '--mesh on' --send '--mesh off' --send '--extudp on' --send '--extudp off'
+2026-09-18T12:53:36.366  ### sent: --info
+2026-09-18T12:53:36.548  [GPS ]...position  : lat:48.407556 lon:11.738585 alt:476.4
+2026-09-18T12:53:36.548  info
+2026-09-18T12:53:36.548  --MeshCom 4.35t (build: Sep 18 2026 / 11:48:00)
+2026-09-18T12:53:36.548  ...UPDATE: 2026-09-18 11:04:45
+2026-09-18T12:53:36.548  ...Call: <DK5EN-92> ...ID E0D041B8 ...NODE 12 <TBEAM_AXP2101> ...UTC-OFF 1.000000 [GPS]
+2026-09-18T12:53:36.548  ...BATT 5.22 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T12:53:36.548  ...TIME 2190179 ms
+2026-09-18T12:53:36.752  ...Flash-Version 20260724
+2026-09-18T12:53:36.752  ...NOMSGALL off ...MESH off ...BUTTON (38) on ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T12:53:36.752  ...PASSWD <>
+2026-09-18T12:53:36.752  ...DEBUG man ...DEBUG en
+2026-09-18T12:53:36.752  ...DEBUG off ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+2026-09-18T12:53:36.752  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T12:53:36.752  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T12:53:36.752  ...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T12:53:36.752  ...BTCODE 000000
+2026-09-18T12:53:36.752  ...APRSMC: APRSMC
+2026-09-18T12:53:36.752  ...ATXT: 
+2026-09-18T12:53:36.753  ...NAME: 
+2026-09-18T12:53:36.753  ...BLE : short
+2026-09-18T12:53:36.753  ...DISPLAY off
+2026-09-18T12:53:36.753  ...CTRY EU8
+2026-09-18T12:53:36.753  ...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+2026-09-18T12:53:36.753  ...MAXHOP text 4 / pos 2
+2026-09-18T12:53:36.753  
+2026-09-18T12:53:36.753  ...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9 
+2026-09-18T12:53:36.753  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T12:53:36.753  ...NETConsole on (port 2323)
+2026-09-18T12:53:36.753  ...WIFI-AP    off
+2026-09-18T12:53:36.753  ...SSID <ORBI63> / PASSWORD <***>
+2026-09-18T12:53:36.753  ...NETWORK Mode:WiFi
+2026-09-18T12:53:36.753  ...hasIpAddress: yes
+2026-09-18T12:53:36.753  ...IP address   : 192.168.68.76
+2026-09-18T12:53:36.753  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T12:53:36.753  ...GW address   : 192.168.68.1
+2026-09-18T12:53:36.753  ...DNS address  : 217.237.150.188
+2026-09-18T12:53:36.753  ...UDP-HBeat : 606109
+2026-09-18T12:53:39.608  [GPS ]...position  : lat:48.407559 lon:11.738594 alt:476.6
+2026-09-18T12:53:42.664  [GPS ]...position  : lat:48.407561 lon:11.738595 alt:477.0
+2026-09-18T12:53:44.542  ### verdict OK for probe:--info

@@ -1,0 +1,528 @@
+2026-09-18T13:20:15.621  ### attached /dev/cu.usbmodem2101 dtr=True
+2026-09-18T13:20:15.621  ### sent: --info
+2026-09-18T13:20:16.438  --info
+2026-09-18T13:20:16.438  --MeshCom 4.35t (build: Sep 18 2026 / 10:19:40)
+2026-09-18T13:20:16.438  ...UPDATE: 2026-09-18 13:19:43
+2026-09-18T13:20:16.438  ...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]
+2026-09-18T13:20:16.438  ...BATT 4.23 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T13:20:16.438  ...TIME 53443 ms
+2026-09-18T13:20:16.438  ...Flash-Version 20260724
+2026-09-18T13:20:16.438  ...NOMSGALL off ...MESH off ...BUTTON (10) off ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T13:20:16.438  ...PASSWD <>
+2026-09-18T13:20:16.438  ...DEBUG man ...DEBUG en
+2026-09-18T13:20:16.438  ...DEBUG off ...LORADEBUG off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
+2026-09-18T13:20:16.438  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T13:20:16.438  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T13:20:16.438  ...EXTUDP on ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T13:20:16.438  ...BTCODE 424242
+2026-09-18T13:20:16.438  ...APRSMC: APRSMC
+2026-09-18T13:20:16.438  ...ATXT: W3-BENCH-RAK90
+2026-09-18T13:20:16.438  ...NAME: Martin-W3
+2026-09-18T13:20:16.438  ...BLE : short
+2026-09-18T13:20:16.438  ...DISPLAY off
+2026-09-18T13:20:16.438  ...CTRY EU8
+2026-09-18T13:20:16.438  ...FREQ 433.1750 MHz TXPWR 22 dBm RXBOOST off
+2026-09-18T13:20:16.438  ...MAXHOP text 4 / pos 2
+2026-09-18T13:20:16.438  
+2026-09-18T13:20:16.438  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T13:20:16.438  ...NETWORK Mode:WiFi
+2026-09-18T13:20:16.438  ...hasIpAddress: yes
+2026-09-18T13:20:16.438  ...IP address   : 192.168.68.66
+2026-09-18T13:20:16.438  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T13:20:16.438  ...GW address   : 192.168.68.1
+2026-09-18T13:20:16.438  ...DNS address  : 217.237.150.188
+2026-09-18T13:20:16.438  ...UDP-HBeat : 53447
+2026-09-18T13:20:23.793  ### verdict OK for probe:--info
+2026-09-18T13:20:23.793  ### sent: --setboostedgain on
+2026-09-18T13:20:26.644  --setboostedgain on
+2026-09-18T13:20:26.644  [SETST];save;encoded;bytes=1476
+2026-09-18T13:20:26.644  [SETST];save;ok;bytes=1476
+2026-09-18T13:20:31.917  ### serial lost (read failed: [Errno 6] Device not configured)
+2026-09-18T13:20:32.925  ### serial reopened
+2026-09-18T13:20:33.130  Auto. Reboot after 5 sec.=====================================
+2026-09-18T13:20:33.130  [INIT] START CLIENT
+2026-09-18T13:20:33.130  00:00:00;[HEAP];139252;139272;69626;(init)
+2026-09-18T13:20:33.130  [INIT]...initMheard
+2026-09-18T13:20:33.130  [INIT]...init_batt
+2026-09-18T13:20:33.130  [SETST];path;keyed;fields_set=105;unknown_keys=0;malformed_lines=0;lines_total=105
+2026-09-18T13:20:33.741  [SETST];save;ok;bytes=15
+2026-09-18T13:20:33.741  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T13:20:33.741  [SETST];save;encoded;bytes=1476
+2026-09-18T13:20:33.741  [SETST];save;skipped_unchanged;bytes=1476
+2026-09-18T13:20:33.741  [OBUT]...One Button GPIO(10) not activated
+2026-09-18T13:20:33.741  [INIT]...Initialize clock: ok
+2026-09-18T13:20:35.780  =====================================
+2026-09-18T13:20:35.780  GPS: trying 9600 baud
+2026-09-18T13:20:39.238  GPS: trying 38400 baud
+2026-09-18T13:20:42.507  GPS: speed not found
+2026-09-18T13:20:45.168  [INIT]...Adafruit SHTC3 check
+2026-09-18T13:20:45.169  [INIT]...Couldn't find SHTC3
+2026-09-18T13:20:45.169  [INIT]...init helper_string:MC-690d-DK5EN-90
+2026-09-18T13:20:45.169  [INIT]...BLE init
+2026-09-18T13:20:45.169  [INIT]...MCP23017 not found
+2026-09-18T13:20:45.169  [INIT]...INA226 not found
+2026-09-18T13:20:45.169  [INIT]...RTC not found
+2026-09-18T13:20:45.169  [INIT]...Auto detecting display:
+2026-09-18T13:20:45.169  [INIT]...Display not found
+2026-09-18T13:20:45.169  [INIT]...CLIENT STARTED
+2026-09-18T13:20:45.169  [BOOT] RESETREAS=0x00000004
+2026-09-18T13:20:45.169  [INIT]...Radio-Sync: 1424
+2026-09-18T13:20:45.169  [SETST];save;encoded;bytes=1476
+2026-09-18T13:20:45.169  [SETST];save;skipped_unchanged;bytes=1476
+2026-09-18T13:20:45.169  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T13:20:45.169  [LoRa]...RF_SF: 11
+2026-09-18T13:20:45.169  [LoRa]...RF_CR: 4/6
+2026-09-18T13:20:45.169  [LoRa]...RF_FREQUENCY: 433.1750 433175000 MHz
+2026-09-18T13:20:45.169  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T13:20:45.169  [LoRa]...RF_POWER: 22 dBm
+2026-09-18T13:20:45.169  [INIT]...Radio-Sync: 242B
+2026-09-18T13:20:45.169  =====================================
+2026-09-18T13:20:45.571  [ETH];stall;hw_init;ms;200;task;loop
+2026-09-18T13:20:45.571  
+2026-09-18T13:20:45.571  Initialize Ethernet
+2026-09-18T13:20:49.238  Ethernet link OFF - skip DHCP
+2026-09-18T13:20:49.238  [ETH];clear;site;281;rc;2;linkst;2;ip;0.0.0.0;ms;17394
+2026-09-18T13:20:49.238  [EXT] to IP:192.168.68.58
+2026-09-18T13:20:49.238  [EXT]...now listening at IP 0.0.0.0, UDP port 1799
+2026-09-18T13:20:49.238  [EXT]...now sending   to IP 192.168.68.58, UDP port 1799
+2026-09-18T13:20:49.238  [BOOT];loopstack;words;2048
+2026-09-18T13:20:49.238  [BOOT];ready;ms;17396;ip;0;eth;1
+2026-09-18T13:20:49.238  00:00:02;[HEAP];104368;104368;52172;(mon)
+2026-09-18T13:20:49.238  [ETH];event;link;down;ip;0;ms;17398
+2026-09-18T13:20:49.238  [ETH];link;down;link;0;link_age_s;0;ip;0.0.0.0;dest;;hb_age_s;0;got_ip_n;0;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;17399
+2026-09-18T13:20:52.510  [ETH];event;link;up;ip;0;ms;20686
+2026-09-18T13:21:19.210  [ETH];event;dhcp_acquire_retry;link;1;ms;47496
+2026-09-18T13:21:19.210  [ETH];event;reset;ms;47496
+2026-09-18T13:21:19.210  
+2026-09-18T13:21:19.210  Initialize Ethernet
+2026-09-18T13:21:19.414  [ETH];stall;dhcp_begin;ms;124;task;mcloop
+2026-09-18T13:21:19.414  Ethernet.localIP(): 192.168.68.66
+2026-09-18T13:21:19.414  
+2026-09-18T13:21:19.414  My IP address: 192.168.68.66
+2026-09-18T13:21:19.414  Default GW address: 192.168.68.1
+2026-09-18T13:21:19.414  DNS address: 217.237.150.188
+2026-09-18T13:21:19.414  SNM: 255.255.252.0
+2026-09-18T13:21:19.414  [ETH];event;got_ip;192.168.68.66;ms;47623
+2026-09-18T13:21:19.414  [GW];srv;OE;host;89.185.97.38;path;inet;ms;47623
+2026-09-18T13:21:19.414  [ETH];event;dhcp_acquired_late;ms;47624
+2026-09-18T13:21:19.619  [NTP];ok;epoch;1789730479;rtt;104
+2026-09-18T13:21:49.221  13:21:48;[HEAP];104288;104288;52134;(mon)
+2026-09-18T13:21:49.221  [ETH];link;up;link;1;link_age_s;56;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;29;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;1;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;77418
+2026-09-18T13:22:27.285  ### verdict EXPECTED-REBOOT for --setboostedgain on
+2026-09-18T13:22:27.285  ### sent: --setboostedgain off
+2026-09-18T13:22:30.457  --setboostedgain off
+2026-09-18T13:22:30.457  [SETST];save;encoded;bytes=1474
+2026-09-18T13:22:30.457  [SETST];save;ok;bytes=1474
+2026-09-18T13:22:35.721  ### serial lost (read failed: [Errno 6] Device not configured)
+2026-09-18T13:22:36.728  ### serial reopened
+2026-09-18T13:22:36.933  Auto. Reboot after 5 sec.=====================================
+2026-09-18T13:22:36.933  [INIT] START CLIENT
+2026-09-18T13:22:36.933  00:00:00;[HEAP];139252;139272;69626;(init)
+2026-09-18T13:22:36.933  [INIT]...initMheard
+2026-09-18T13:22:36.933  [INIT]...init_batt
+2026-09-18T13:22:36.933  [SETST];path;keyed;fields_set=105;unknown_keys=0;malformed_lines=0;lines_total=105
+2026-09-18T13:22:37.540  [SETST];save;ok;bytes=15
+2026-09-18T13:22:37.540  [INIT]...FLASH layout 20260724 ok, build 20260912
+2026-09-18T13:22:37.540  [SETST];save;encoded;bytes=1474
+2026-09-18T13:22:37.540  [SETST];save;skipped_unchanged;bytes=1474
+2026-09-18T13:22:37.540  [OBUT]...One Button GPIO(10) not activated
+2026-09-18T13:22:37.540  [INIT]...Initialize clock: ok
+2026-09-18T13:22:39.578  =====================================
+2026-09-18T13:22:39.578  GPS: trying 9600 baud
+2026-09-18T13:22:43.045  GPS: trying 38400 baud
+2026-09-18T13:22:46.302  GPS: speed not found
+2026-09-18T13:22:48.948  [INIT]...Adafruit SHTC3 check
+2026-09-18T13:22:48.948  [INIT]...Couldn't find SHTC3
+2026-09-18T13:22:48.948  [INIT]...init helper_string:MC-690d-DK5EN-90
+2026-09-18T13:22:48.948  [INIT]...BLE init
+2026-09-18T13:22:48.949  [INIT]...MCP23017 not found
+2026-09-18T13:22:48.949  [INIT]...INA226 not found
+2026-09-18T13:22:48.949  [INIT]...RTC not found
+2026-09-18T13:22:48.949  [INIT]...Auto detecting display:
+2026-09-18T13:22:48.949  [INIT]...Display not found
+2026-09-18T13:22:48.949  [INIT]...CLIENT STARTED
+2026-09-18T13:22:48.949  [BOOT] RESETREAS=0x00000004
+2026-09-18T13:22:48.949  [INIT]...Radio-Sync: 1424
+2026-09-18T13:22:48.949  [SETST];save;encoded;bytes=1474
+2026-09-18T13:22:48.949  [SETST];save;skipped_unchanged;bytes=1474
+2026-09-18T13:22:48.949  [LoRa]...RF_BANDWIDTH: 250 kHz
+2026-09-18T13:22:48.949  [LoRa]...RF_SF: 11
+2026-09-18T13:22:48.949  [LoRa]...RF_CR: 4/6
+2026-09-18T13:22:48.949  [LoRa]...RF_FREQUENCY: 433.1750 433175000 MHz
+2026-09-18T13:22:48.949  [LoRa]...PREAMBLE: 8 symbols
+2026-09-18T13:22:48.949  [LoRa]...RF_POWER: 22 dBm
+2026-09-18T13:22:48.949  [INIT]...Radio-Sync: 242B
+2026-09-18T13:22:48.949  =====================================
+2026-09-18T13:22:49.354  [ETH];stall;hw_init;ms;200;task;loop
+2026-09-18T13:22:49.354  
+2026-09-18T13:22:49.354  Initialize Ethernet
+2026-09-18T13:22:55.039  [ETH];stall;dhcp_begin;ms;4164;task;loop
+2026-09-18T13:22:55.039  Ethernet.localIP(): 192.168.68.66
+2026-09-18T13:22:55.039  
+2026-09-18T13:22:55.039  My IP address: 192.168.68.66
+2026-09-18T13:22:55.039  Default GW address: 192.168.68.1
+2026-09-18T13:22:55.039  DNS address: 217.237.150.188
+2026-09-18T13:22:55.039  SNM: 255.255.252.0
+2026-09-18T13:22:55.039  [ETH];event;got_ip;192.168.68.66;ms;19563
+2026-09-18T13:22:55.039  [GW];srv;OE;host;89.185.97.38;path;inet;ms;19564
+2026-09-18T13:22:55.039  [EXT] to IP:192.168.68.58
+2026-09-18T13:22:55.039  [EXT]...now listening at IP 192.168.68.66, UDP port 1799
+2026-09-18T13:22:55.039  [EXT]...now sending   to IP 192.168.68.58, UDP port 1799
+2026-09-18T13:22:55.039  [BOOT];loopstack;words;2048
+2026-09-18T13:22:55.039  [BOOT];ready;ms;19567;ip;1;eth;1
+2026-09-18T13:22:55.039  00:00:02;[HEAP];104304;104304;52140;(mon)
+2026-09-18T13:22:55.039  [ETH];event;link;up;ip;1;ms;19570
+2026-09-18T13:22:55.039  [ETH];link;up;link;1;link_age_s;0;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;0;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;19570
+2026-09-18T13:22:55.240  [NTP];ok;epoch;1789730575;rtt;104
+2026-09-18T13:23:55.164  13:23:54;[HEAP];104280;104280;52130;(mon)
+2026-09-18T13:23:55.164  [ETH];link;up;link;1;link_age_s;60;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;60;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;79664
+2026-09-18T13:24:30.815  ### verdict EXPECTED-REBOOT for --setboostedgain off
+2026-09-18T13:24:30.815  ### sent: --webserver off
+2026-09-18T13:24:33.327  --webserver off
+2026-09-18T13:24:33.327  [SETST];save;encoded;bytes=1474
+2026-09-18T13:24:33.327  [SETST];save;ok;bytes=1474
+2026-09-18T13:24:55.337  13:24:54;[HEAP];104264;104264;52122;(mon)
+2026-09-18T13:24:55.337  [ETH];link;up;link;1;link_age_s;120;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;120;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;139676
+2026-09-18T13:25:55.288  [ETH];link;up;link;1;link_age_s;180;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;180;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;199758
+2026-09-18T13:26:31.200  ### verdict OK for --webserver off
+2026-09-18T13:26:31.200  ### sent: --webserver on
+2026-09-18T13:26:33.612  --webserver on
+2026-09-18T13:26:33.612  [SETST];save;encoded;bytes=1474
+2026-09-18T13:26:33.612  [SETST];save;ok;bytes=1474
+2026-09-18T13:26:55.416  [ETH];link;up;link;1;link_age_s;240;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;240;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;259785
+2026-09-18T13:27:55.504  [ETH];link;up;link;1;link_age_s;300;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;300;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;319875
+2026-09-18T13:28:31.551  ### verdict OK for --webserver on
+2026-09-18T13:28:31.551  ### sent: --display on
+2026-09-18T13:28:34.152  --display on
+2026-09-18T13:28:34.153  [SETST];save;encoded;bytes=1474
+2026-09-18T13:28:34.153  [SETST];save;ok;bytes=1474
+2026-09-18T13:28:52.314  [EXT] Out: {"src_type":"lora","type":"pos","src":"DK5EN-1,DK5EN-2,DK5EN-1","msg":"","lat":48.4225,"lat_dir":"N","long":11.7865,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"E9F113AB","alt":0,"batt":0,"firmware":35,"fw_sub":"p","rssi":-59,"snr":6} Len: 270
+2026-09-18T13:28:52.314  [EXT] Tele-Out: {"src_type":"lora","type":"tele","src":"DK5EN-1,DK5EN-2,DK5EN-1","batt":0,"temp1":0,"temp2":0,"hum":0,"qfe":0,"qnh":0,"pressure_alt":0,"gas":0,"co2":0} Len: 151
+2026-09-18T13:28:52.314  [EXT];tx;len;270;stack_hwm;1092;ms;376763
+2026-09-18T13:28:55.419  [ETH];link;up;link;1;link_age_s;360;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;360;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;379951
+2026-09-18T13:29:32.289  [EXT] Out: {"src_type":"lora","type":"msg","src":"OE1XAR-33,DK5EN-1","dst":"*","msg":"{CET}2026-09-18 11:29:29","msg_id":"6AAA2BB3","firmware":0,"fw_sub":"#","rssi":-61,"snr":7} Len: 166
+2026-09-18T13:29:32.289  [EXT];tx;len;166;stack_hwm;1092;ms;416735
+2026-09-18T13:29:41.641  [EXT] Out: {"src_type":"lora","type":"pos","src":"DK5EN-1","msg":"","lat":48.4076,"lat_dir":"N","long":11.7378,"long_dir":"E","aprs_symbol":"a","aprs_symbol_group":"9","hw_id":43,"msg_id":"EA25A0CA","alt":0,"batt":0,"firmware":35,"fw_sub":"t","rssi":-58,"snr":7} Len: 251
+2026-09-18T13:29:41.641  [EXT] Tele-Out: {"src_type":"lora","type":"tele","src":"DK5EN-1","batt":0,"temp1":0,"temp2":0,"hum":0,"qfe":0,"qnh":0,"pressure_alt":0,"gas":0,"co2":0} Len: 135
+2026-09-18T13:29:41.641  [EXT];tx;len;251;stack_hwm;1092;ms;426115
+2026-09-18T13:29:55.495  [ETH];link;up;link;1;link_age_s;420;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;420;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;439962
+2026-09-18T13:30:31.924  ### verdict OK for --display on
+2026-09-18T13:30:31.924  ### sent: --display off
+2026-09-18T13:30:34.346  --display off
+2026-09-18T13:30:34.347  [SETST];save;encoded;bytes=1474
+2026-09-18T13:30:34.347  [SETST];save;ok;bytes=1474
+2026-09-18T13:30:55.531  [ETH];link;up;link;1;link_age_s;480;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;480;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;499969
+2026-09-18T13:31:55.548  [ETH];link;up;link;1;link_age_s;540;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;540;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;0;rx_max_ms;0;tx_fail;0;tx_max_ms;0;ms;560051
+2026-09-18T13:32:32.259  ### verdict OK for --display off
+2026-09-18T13:32:32.259  ### sent: --gateway on
+2026-09-18T13:32:34.647  --gateway on
+2026-09-18T13:32:34.648  [SETST];save;encoded;bytes=1475
+2026-09-18T13:32:34.648  [SETST];save;ok;bytes=1475
+2026-09-18T13:32:34.648  [GW];keep;tx;ok;1;ms;599021
+2026-09-18T13:32:34.648  [UDP] Server not responding for 579s - ETH UP
+2026-09-18T13:32:34.852  [GW];rx;type;BEAT;len;20;ms;599231
+2026-09-18T13:32:55.585  [ETH];link;up;link;1;link_age_s;600;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;20;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;1;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;620053
+2026-09-18T13:33:04.533  [GW];keep;tx;ok;1;ms;629031
+2026-09-18T13:33:04.738  [GW];rx;type;BEAT;len;20;ms;629238
+2026-09-18T13:33:34.671  [GW];keep;tx;ok;1;ms;659128
+2026-09-18T13:33:34.875  [GW];rx;type;BEAT;len;20;ms;659334
+2026-09-18T13:33:55.626  [ETH];link;up;link;1;link_age_s;660;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;20;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;3;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;680058
+2026-09-18T13:34:04.778  [GW];keep;tx;ok;1;ms;689135
+2026-09-18T13:34:04.981  [GW];rx;type;BEAT;len;20;ms;689341
+2026-09-18T13:34:32.576  ### verdict OK for --gateway on
+2026-09-18T13:34:32.576  ### sent: --gateway off
+2026-09-18T13:34:34.882  --gateway off
+2026-09-18T13:34:34.882  [SETST];save;encoded;bytes=1474
+2026-09-18T13:34:34.882  [SETST];save;ok;bytes=1474
+2026-09-18T13:34:55.713  [ETH];link;up;link;1;link_age_s;720;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;50;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;740072
+2026-09-18T13:35:02.254  [EXT] Out: {"src_type":"lora","type":"msg","src":"OE3MZC-29,DK5EN-98","dst":"*","msg":"IARU Conference starts in Vienna today ","msg_id":"EC43010B","firmware":35,"fw_sub":"p","rssi":-61,"snr":7} Len: 183
+2026-09-18T13:35:02.254  [EXT];tx;len;183;stack_hwm;1092;ms;746658
+2026-09-18T13:35:55.653  [ETH];link;up;link;1;link_age_s;780;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;110;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;800161
+2026-09-18T13:36:32.916  ### verdict OK for --gateway off
+2026-09-18T13:36:32.917  ### sent: --mesh on
+2026-09-18T13:36:35.253  --mesh on
+2026-09-18T13:36:35.253  [SETST];save;encoded;bytes=1474
+2026-09-18T13:36:35.253  [SETST];save;ok;bytes=1474
+2026-09-18T13:36:55.735  [ETH];link;up;link;1;link_age_s;840;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;170;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;860227
+2026-09-18T13:37:55.424  [NTP];ok;epoch;1789731475;rtt;104
+2026-09-18T13:37:55.840  [ETH];link;up;link;1;link_age_s;900;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;230;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;920314
+2026-09-18T13:38:33.185  ### verdict OK for --mesh on
+2026-09-18T13:38:33.185  ### sent: --mesh off
+2026-09-18T13:38:35.234  --mesh off
+2026-09-18T13:38:35.235  [SETST];save;encoded;bytes=1474
+2026-09-18T13:38:35.235  [SETST];save;ok;bytes=1474
+2026-09-18T13:38:55.914  [ETH];link;up;link;1;link_age_s;960;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;291;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;980383
+2026-09-18T13:39:37.632  [EXT] Out: {"src_type":"lora","type":"msg","src":"OE1XAR-33,DK5EN-98","dst":"*","msg":"{CET}2026-09-18 11:39:36","msg_id":"6AAA2BB4","firmware":0,"fw_sub":"#","rssi":-60,"snr":7} Len: 167
+2026-09-18T13:39:37.632  [EXT];tx;len;167;stack_hwm;1092;ms;1022040
+2026-09-18T13:39:56.041  [ETH];link;up;link;1;link_age_s;1020;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;351;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1040471
+2026-09-18T13:40:04.718  [EXT] Out: {"src_type":"lora","type":"pos","src":"DK5EN-98","msg":"","lat":48.4078,"lat_dir":"N","long":11.738,"long_dir":"E","aprs_symbol":"-","aprs_symbol_group":"\\\\","hw_id":43,"msg_id":"1AE1E224","alt":1575,"batt":100,"firmware":35,"fw_sub":"t","rssi":-61,"snr":6} Len: 259
+2026-09-18T13:40:04.925  [EXT] Tele-Out: {"src_type":"lora","type":"tele","src":"DK5EN-98","batt":100,"temp1":0,"temp2":0,"hum":0,"qfe":0,"qnh":0,"pressure_alt":0,"gas":0,"co2":0} Len: 138
+2026-09-18T13:40:04.925  [EXT];tx;len;259;stack_hwm;1092;ms;1049264
+2026-09-18T13:40:33.505  ### verdict OK for --mesh off
+2026-09-18T13:40:33.505  ### sent: --extudp off
+2026-09-18T13:40:35.970  --extudp off
+2026-09-18T13:40:35.970  [SETST];save;encoded;bytes=1471
+2026-09-18T13:40:35.970  [SETST];save;ok;bytes=1471
+2026-09-18T13:40:56.179  [ETH];link;up;link;1;link_age_s;1080;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;411;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1100526
+2026-09-18T13:41:56.139  [ETH];link;up;link;1;link_age_s;1141;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;471;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1160605
+2026-09-18T13:42:33.875  ### verdict OK for --extudp off
+2026-09-18T13:42:33.875  ### sent: --extudp on
+2026-09-18T13:42:36.055  --extudp on
+2026-09-18T13:42:36.056  [SETST];save;encoded;bytes=1474
+2026-09-18T13:42:36.056  [SETST];save;ok;bytes=1474
+2026-09-18T13:42:56.232  [ETH];link;up;link;1;link_age_s;1201;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;531;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1220648
+2026-09-18T13:43:56.327  [ETH];link;up;link;1;link_age_s;1261;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;591;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1280728
+2026-09-18T13:44:34.202  ### verdict OK for --extudp on
+2026-09-18T13:44:34.202  ### sent: --extudp off
+2026-09-18T13:44:36.593  --extudp off
+2026-09-18T13:44:36.593  [SETST];save;encoded;bytes=1471
+2026-09-18T13:44:36.593  [SETST];save;ok;bytes=1471
+2026-09-18T13:44:56.356  [ETH];link;up;link;1;link_age_s;1321;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;651;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1340782
+2026-09-18T13:45:56.372  [ETH];link;up;link;1;link_age_s;1381;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;711;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1400861
+2026-09-18T13:46:34.569  ### verdict OK for --extudp off
+2026-09-18T13:46:34.569  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?display=on'
+2026-09-18T13:46:35.871  ### run rc=0
+2026-09-18T13:46:35.872  ### run| {"returncode":0,"display":"on"}
+2026-09-18T13:46:35.872  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?display=on'
+2026-09-18T13:46:35.872  ### step wait
+2026-09-18T13:46:35.911  [SETST];save;encoded;bytes=1471
+2026-09-18T13:46:35.911  [SETST];save;ok;bytes=1471
+2026-09-18T13:46:56.484  13:46:56;[HEAP];104168;104168;52124;(mon)
+2026-09-18T13:46:56.484  [ETH];link;up;link;1;link_age_s;1441;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;771;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1460938
+2026-09-18T13:47:56.606  [ETH];link;up;link;1;link_age_s;1501;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;831;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1521020
+2026-09-18T13:48:35.880  ### verdict OK for wait
+2026-09-18T13:48:35.880  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?display=off'
+2026-09-18T13:48:36.873  ### run rc=0
+2026-09-18T13:48:36.873  ### run| {"returncode":0,"display":"off"}
+2026-09-18T13:48:36.873  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?display=off'
+2026-09-18T13:48:36.873  ### step wait
+2026-09-18T13:48:36.894  [SETST];save;encoded;bytes=1471
+2026-09-18T13:48:36.895  [SETST];save;ok;bytes=1471
+2026-09-18T13:48:56.660  [ETH];link;up;link;1;link_age_s;1561;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;891;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1581047
+2026-09-18T13:49:56.589  [ETH];link;up;link;1;link_age_s;1621;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;951;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;4;rx_max_ms;1;tx_fail;0;tx_max_ms;7;ms;1641130
+2026-09-18T13:50:36.880  ### verdict OK for wait
+2026-09-18T13:50:36.880  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?gateway=on'
+2026-09-18T13:50:37.915  ### run rc=0
+2026-09-18T13:50:37.916  ### run| {"returncode":0,"gateway":"on"}
+2026-09-18T13:50:37.916  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?gateway=on'
+2026-09-18T13:50:37.916  ### step wait
+2026-09-18T13:50:37.967  [SETST];save;encoded;bytes=1474
+2026-09-18T13:50:37.967  [SETST];save;ok;bytes=1474
+2026-09-18T13:50:38.169  [UDP] Server not responding for 993s - ETH UP
+2026-09-18T13:50:38.170  [GW];keep;tx;ok;1;ms;1682558
+2026-09-18T13:50:38.377  [GW];rx;type;BEAT;len;20;ms;1682767
+2026-09-18T13:50:56.688  [ETH];link;up;link;1;link_age_s;1681;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;18;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;5;rx_max_ms;1;tx_fail;0;tx_max_ms;15;ms;1701214
+2026-09-18T13:51:08.216  [GW];keep;tx;ok;1;ms;1712583
+2026-09-18T13:51:08.423  [GW];rx;type;BEAT;len;20;ms;1712789
+2026-09-18T13:51:38.244  [GW];keep;tx;ok;1;ms;1742678
+2026-09-18T13:51:38.448  [GW];rx;type;BEAT;len;20;ms;1742884
+2026-09-18T13:51:56.765  [ETH];link;up;link;1;link_age_s;1741;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;18;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;7;rx_max_ms;1;tx_fail;0;tx_max_ms;15;ms;1761216
+2026-09-18T13:52:08.314  [GW];keep;tx;ok;1;ms;1772775
+2026-09-18T13:52:08.515  [GW];rx;type;BEAT;len;20;ms;1772982
+2026-09-18T13:52:37.923  ### verdict OK for wait
+2026-09-18T13:52:37.923  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?gateway=off'
+2026-09-18T13:52:38.904  ### run rc=0
+2026-09-18T13:52:38.904  ### run| {"returncode":0,"gateway":"off"}
+2026-09-18T13:52:38.904  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?gateway=off'
+2026-09-18T13:52:38.904  ### step wait
+2026-09-18T13:52:39.008  [SETST];save;encoded;bytes=1471
+2026-09-18T13:52:39.008  [SETST];save;ok;bytes=1471
+2026-09-18T13:52:55.443  [NTP];ok;epoch;1789732375;rtt;103
+2026-09-18T13:52:56.892  [ETH];link;up;link;1;link_age_s;1801;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;30;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;1821287
+2026-09-18T13:53:56.836  [ETH];link;up;link;1;link_age_s;1861;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;90;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;1881367
+2026-09-18T13:54:38.913  ### verdict OK for wait
+2026-09-18T13:54:38.914  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?mesh=on'
+2026-09-18T13:54:40.122  ### run rc=0
+2026-09-18T13:54:40.122  ### run| {"returncode":0,"mesh":"on"}
+2026-09-18T13:54:40.122  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?mesh=on'
+2026-09-18T13:54:40.122  ### step wait
+2026-09-18T13:54:40.228  [SETST];save;encoded;bytes=1471
+2026-09-18T13:54:40.228  [SETST];save;ok;bytes=1471
+2026-09-18T13:54:57.053  [ETH];link;up;link;1;link_age_s;1921;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;150;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;1941405
+2026-09-18T13:55:57.164  [ETH];link;up;link;1;link_age_s;1981;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;210;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2001501
+2026-09-18T13:56:40.127  ### verdict OK for wait
+2026-09-18T13:56:40.127  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?mesh=off'
+2026-09-18T13:56:41.165  [SETST];save;encoded;bytes=1471
+2026-09-18T13:56:41.166  [SETST];save;ok;bytes=1471
+2026-09-18T13:56:41.190  ### run rc=0
+2026-09-18T13:56:41.191  ### run| {"returncode":0,"mesh":"off"}
+2026-09-18T13:56:41.191  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?mesh=off'
+2026-09-18T13:56:41.191  ### step wait
+2026-09-18T13:56:57.211  [ETH];link;up;link;1;link_age_s;2042;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;270;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2061575
+2026-09-18T13:57:57.286  [ETH];link;up;link;1;link_age_s;2102;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;330;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2121655
+2026-09-18T13:58:41.197  ### verdict OK for wait
+2026-09-18T13:58:41.197  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?extudp=on'
+2026-09-18T13:58:42.386  ### run rc=0
+2026-09-18T13:58:42.386  ### run| {"returncode":0,"extudp":"on"}
+2026-09-18T13:58:42.386  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?extudp=on'
+2026-09-18T13:58:42.386  ### step wait
+2026-09-18T13:58:42.415  [SETST];save;encoded;bytes=1474
+2026-09-18T13:58:42.415  [SETST];save;ok;bytes=1474
+2026-09-18T13:58:57.229  [ETH];link;up;link;1;link_age_s;2162;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;390;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2181675
+2026-09-18T13:59:57.394  [ETH];link;up;link;1;link_age_s;2222;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;450;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2241755
+2026-09-18T14:00:42.389  ### verdict OK for wait
+2026-09-18T14:00:42.390  ### step run: curl -s -m 10 'http://192.168.68.66/setparam/?extudp=off'
+2026-09-18T14:00:43.478  [SETST];save;encoded;bytes=1471
+2026-09-18T14:00:43.478  [SETST];save;ok;bytes=1471
+2026-09-18T14:00:43.506  ### run rc=0
+2026-09-18T14:00:43.506  ### run| {"returncode":0,"extudp":"off"}
+2026-09-18T14:00:43.506  ### verdict OK for run:curl -s -m 10 'http://192.168.68.66/setparam/?extudp=off'
+2026-09-18T14:00:43.506  ### step wait
+2026-09-18T14:00:57.432  [ETH];link;up;link;1;link_age_s;2282;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;510;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2301799
+2026-09-18T14:01:57.400  [ETH];link;up;link;1;link_age_s;2342;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;570;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2361879
+2026-09-18T14:02:43.515  ### verdict OK for wait
+2026-09-18T14:02:43.515  ### step run: cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address C33126E9-4928-7AD3-BE5F-A0064C5DD11D --pin 424242 --cycles 3 --hold 30 --gap 10
+2026-09-18T14:02:48.609  GPS<{"TYP":"G","LAT":0,"LON":0,"ALT":0,"SAT":0,"SFIX":false,"HDOP":0,"RATE":1800,"NEXT":1217,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 14:02:48"}>
+2026-09-18T14:02:57.463  14:02:57;[HEAP];103932;103932;52107;(mon)
+2026-09-18T14:02:57.463  [ETH];link;up;link;1;link_age_s;2402;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;630;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2421975
+2026-09-18T14:03:32.448  GPS<{"TYP":"G","LAT":0,"LON":0,"ALT":0,"SAT":0,"SFIX":false,"HDOP":0,"RATE":1800,"NEXT":1173,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 14:03:31"}>
+2026-09-18T14:03:57.590  [ETH];link;up;link;1;link_age_s;2462;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;690;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2481978
+2026-09-18T14:04:15.930  GPS<{"TYP":"G","LAT":0,"LON":0,"ALT":0,"SAT":0,"SFIX":false,"HDOP":0,"RATE":1800,"NEXT":1129,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 14:04:15"}>
+2026-09-18T14:04:55.843  ### run rc=0
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:02:43.711  cycle 1/3 scanning for C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:02:46.780  cycle 1 connected C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:02:48.401  cycle 1 hello sent, holding 30 s
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:03:18.403  cycle 1 notifications=21 still_connected=True
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:03:18.405  cycle 1 disconnected
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:03:28.407  cycle 2/3 scanning for C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:03:30.549  cycle 2 connected C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:03:32.168  cycle 2 hello sent, holding 30 s
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:02.171  cycle 2 notifications=15 still_connected=True
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:02.172  cycle 2 disconnected
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:12.174  cycle 3/3 scanning for C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:14.170  cycle 3 connected C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:15.789  cycle 3 hello sent, holding 30 s
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:45.792  cycle 3 notifications=15 still_connected=True
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:45.793  cycle 3 disconnected
+2026-09-18T14:04:55.843  ### run| 2026-09-18T14:04:55.794  === ble cycles done failures=0
+2026-09-18T14:04:55.843  ### verdict OK for run:cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address C33126E9-4928-7AD3-BE5F-A0064C5DD11D --pin 424242 --cycles 3 --hold 30 --gap 10
+2026-09-18T14:04:55.843  ### step run: cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address C33126E9-4928-7AD3-BE5F-A0064C5DD11D --pin 424242 --cycles 1 --hold 120 --gap 5 --send '--webserver off' --send '--webserver on' --send '--display on' --send '--display off' --send '--gateway on' --send '--gateway off' --send '--mesh on' --send '--mesh off' --send '--extudp on' --send '--extudp off'
+2026-09-18T14:04:57.731  [ETH];link;up;link;1;link_age_s;2522;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;751;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2542071
+2026-09-18T14:04:59.773  GPS<{"TYP":"G","LAT":0,"LON":0,"ALT":0,"SAT":0,"SFIX":false,"HDOP":0,"RATE":1800,"NEXT":1085,"DIST":0,"DIRn":0,"DIRo":0,"DATE":"2026-09-18 14:04:59"}>
+2026-09-18T14:05:03.062  [SETST];save;encoded;bytes=1471
+2026-09-18T14:05:03.062  [SETST];save;ok;bytes=1471
+2026-09-18T14:05:57.674  [ETH];link;up;link;1;link_age_s;2582;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;811;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2602087
+2026-09-18T14:06:57.779  [ETH];link;up;link;1;link_age_s;2642;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;871;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2662166
+2026-09-18T14:07:03.326  [SETST];save;encoded;bytes=1471
+2026-09-18T14:07:03.326  [SETST];save;ok;bytes=1471
+2026-09-18T14:07:55.458  [NTP];ok;epoch;1789733275;rtt;102
+2026-09-18T14:07:57.908  [ETH];link;up;link;1;link_age_s;2702;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;931;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2722263
+2026-09-18T14:08:57.899  [ETH];link;up;link;1;link_age_s;2762;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;991;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2782342
+2026-09-18T14:09:03.246  [SETST];save;encoded;bytes=1471
+2026-09-18T14:09:03.247  [SETST];save;ok;bytes=1471
+2026-09-18T14:09:57.990  [ETH];link;up;link;1;link_age_s;2822;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;1051;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2842343
+2026-09-18T14:10:57.897  [ETH];link;up;link;1;link_age_s;2882;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;1111;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2902425
+2026-09-18T14:11:03.241  [SETST];save;encoded;bytes=1471
+2026-09-18T14:11:03.241  [SETST];save;ok;bytes=1471
+2026-09-18T14:11:58.175  [ETH];link;up;link;1;link_age_s;2942;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;1171;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;2962514
+2026-09-18T14:12:58.197  [ETH];link;up;link;1;link_age_s;3003;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;1231;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;9;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3022594
+2026-09-18T14:13:03.357  [SETST];save;encoded;bytes=1474
+2026-09-18T14:13:03.357  [SETST];save;ok;bytes=1474
+2026-09-18T14:13:03.357  [UDP] Server not responding for 1236s - ETH UP
+2026-09-18T14:13:03.357  [GW];keep;tx;ok;1;ms;3027859
+2026-09-18T14:13:03.567  [GW];rx;type;BEAT;len;20;ms;3028068
+2026-09-18T14:13:33.528  [GW];keep;tx;ok;1;ms;3057957
+2026-09-18T14:13:33.737  [GW];rx;type;BEAT;len;20;ms;3058164
+2026-09-18T14:13:58.208  [ETH];link;up;link;1;link_age_s;3063;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;24;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;11;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3082674
+2026-09-18T14:14:03.579  [GW];keep;tx;ok;1;ms;3088055
+2026-09-18T14:14:03.781  [GW];rx;type;BEAT;len;20;ms;3088262
+2026-09-18T14:14:33.644  [GW];keep;tx;ok;1;ms;3118151
+2026-09-18T14:14:33.849  [GW];rx;type;BEAT;len;20;ms;3118358
+2026-09-18T14:14:58.272  [ETH];link;up;link;1;link_age_s;3123;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;24;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3142767
+2026-09-18T14:15:03.418  [SETST];save;encoded;bytes=1471
+2026-09-18T14:15:03.418  [SETST];save;ok;bytes=1471
+2026-09-18T14:15:58.263  [ETH];link;up;link;1;link_age_s;3183;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;84;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3202769
+2026-09-18T14:16:58.497  [ETH];link;up;link;1;link_age_s;3243;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;144;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3262849
+2026-09-18T14:17:03.619  [SETST];save;encoded;bytes=1471
+2026-09-18T14:17:03.619  [SETST];save;ok;bytes=1471
+2026-09-18T14:17:58.398  [ETH];link;up;link;1;link_age_s;3303;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;204;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3322941
+2026-09-18T14:18:58.534  [ETH];link;up;link;1;link_age_s;3363;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;264;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3383031
+2026-09-18T14:19:03.454  [SETST];save;encoded;bytes=1471
+2026-09-18T14:19:03.454  [SETST];save;ok;bytes=1471
+2026-09-18T14:19:58.608  [ETH];link;up;link;1;link_age_s;3423;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;324;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3443032
+2026-09-18T14:20:58.656  [ETH];link;up;link;1;link_age_s;3483;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;384;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3503111
+2026-09-18T14:21:03.606  [SETST];save;encoded;bytes=1474
+2026-09-18T14:21:03.606  [SETST];save;ok;bytes=1474
+2026-09-18T14:21:58.605  [ETH];link;up;link;1;link_age_s;3543;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;444;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3563116
+2026-09-18T14:22:40.171  [ETH];stall;dhcp_maintain;ms;62;task;mcloop
+2026-09-18T14:22:40.171  [ETH];event;dhcp;rc;2;ms;3604627
+2026-09-18T14:22:55.410  [EXT] to IP:192.168.68.58
+2026-09-18T14:22:55.410  [EXT]...now listening at IP 192.168.68.66, UDP port 1799
+2026-09-18T14:22:55.410  [EXT]...now sending   to IP 192.168.68.58, UDP port 1799
+2026-09-18T14:22:55.621  [NTP];ok;epoch;1789734175;rtt;103
+2026-09-18T14:22:58.714  [ETH];link;up;link;1;link_age_s;3603;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;504;got_ip_n;1;downs;0;renews;1;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3623165
+2026-09-18T14:23:03.649  [SETST];save;encoded;bytes=1471
+2026-09-18T14:23:03.649  [SETST];save;ok;bytes=1471
+2026-09-18T14:23:58.890  [ETH];link;up;link;1;link_age_s;3663;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;564;got_ip_n;1;downs;0;renews;1;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3683248
+2026-09-18T14:24:58.951  [ETH];link;up;link;1;link_age_s;3723;ip;192.168.68.66;dest;89.185.97.38;hb_age_s;624;got_ip_n;1;downs;0;renews;1;renew_fail;0;resets;0;rx_n;13;rx_max_ms;2;tx_fail;0;tx_max_ms;15;ms;3743328
+2026-09-18T14:25:07.243  ### run rc=0
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:04:55.910  cycle 1/1 scanning for C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:04:57.941  cycle 1 connected C33126E9-4928-7AD3-BE5F-A0064C5DD11D
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:04:59.560  cycle 1 hello sent, 10 commands, hold 120 s each
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:05:01.600  cycle 1 sent '--webserver off'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:07:01.603  cycle 1 after '--webserver off': notifications=16 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:07:01.663  cycle 1 sent '--webserver on'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:09:01.665  cycle 1 after '--webserver on': notifications=17 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:09:01.726  cycle 1 sent '--display on'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:11:01.728  cycle 1 after '--display on': notifications=23 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:11:01.788  cycle 1 sent '--display off'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:13:01.790  cycle 1 after '--display off': notifications=24 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:13:01.850  cycle 1 sent '--gateway on'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:15:01.853  cycle 1 after '--gateway on': notifications=25 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:15:01.913  cycle 1 sent '--gateway off'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:17:01.916  cycle 1 after '--gateway off': notifications=29 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:17:01.975  cycle 1 sent '--mesh on'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:19:01.978  cycle 1 after '--mesh on': notifications=31 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:19:02.068  cycle 1 sent '--mesh off'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:21:02.070  cycle 1 after '--mesh off': notifications=34 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:21:02.130  cycle 1 sent '--extudp on'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:23:02.131  cycle 1 after '--extudp on': notifications=36 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:23:02.193  cycle 1 sent '--extudp off'
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:25:02.195  cycle 1 after '--extudp off': notifications=38 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:25:02.195  cycle 1 notifications=38 still_connected=True
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:25:02.197  cycle 1 disconnected
+2026-09-18T14:25:07.243  ### run| 2026-09-18T14:25:07.199  === ble cycles done failures=0
+2026-09-18T14:25:07.243  ### verdict OK for run:cd /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main && uv run --with bleak tools/bench/ble_cycle.py --address C33126E9-4928-7AD3-BE5F-A0064C5DD11D --pin 424242 --cycles 1 --hold 120 --gap 5 --send '--webserver off' --send '--webserver on' --send '--display on' --send '--display off' --send '--gateway on' --send '--gateway off' --send '--mesh on' --send '--mesh off' --send '--extudp on' --send '--extudp off'
+2026-09-18T14:25:07.243  ### sent: --tempoff in 999999
+2026-09-18T14:25:09.210  --tempoff in 999999
+2026-09-18T14:25:09.210  tempoff in 999999.0 out of range (-50..50 °C), ignored
+2026-09-18T14:25:15.746  ### verdict OK for probe:--tempoff in 999999
+2026-09-18T14:25:15.746  ### sent: --tempoff in 0
+2026-09-18T14:25:17.424  --tempoff in 0
+2026-09-18T14:25:17.424  [SETST];save;encoded;bytes=1471
+2026-09-18T14:25:17.424  [SETST];save;skipped_unchanged;bytes=1471
+2026-09-18T14:25:24.140  ### verdict OK for probe:--tempoff in 0
+2026-09-18T14:25:24.140  ### sent: --info
+2026-09-18T14:25:24.806  --info
+2026-09-18T14:25:24.806  --MeshCom 4.35t (build: Sep 18 2026 / 10:19:40)
+2026-09-18T14:25:24.806  ...UPDATE: 2026-09-18 13:22:55
+2026-09-18T14:25:24.807  ...Call: <DK5EN-90> ...ID 48A4690D ...NODE 9 <RAK4631> ...UTC-OFF 2.000000 [NTP]
+2026-09-18T14:25:24.807  ...BATT 4.24 V ...BATT 100 % ...MAXV 4.200 V
+2026-09-18T14:25:24.807  ...TIME 3769342 ms
+2026-09-18T14:25:24.807  ...Flash-Version 20260724
+2026-09-18T14:25:24.807  ...NOMSGALL off ...MESH off ...BUTTON (10) off ...SOFTSER off ... SOFTSERREAD off
+2026-09-18T14:25:24.807  ...PASSWD <>
+2026-09-18T14:25:24.807  ...DEBUG man ...DEBUG en
+2026-09-18T14:25:24.807  ...DEBUG off ...LORADEBUG off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
+2026-09-18T14:25:24.807  ...WXDEBUG off ...BLEDEBUG off
+2026-09-18T14:25:24.807  ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
+2026-09-18T14:25:24.807  ...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+2026-09-18T14:25:24.807  ...BTCODE 424242
+2026-09-18T14:25:24.807  ...APRSMC: APRSMC
+2026-09-18T14:25:24.807  ...ATXT: W3-BENCH-RAK90
+2026-09-18T14:25:24.807  ...NAME: Martin-W3
+2026-09-18T14:25:24.807  ...BLE : short
+2026-09-18T14:25:24.807  ...DISPLAY off
+2026-09-18T14:25:24.807  ...CTRY EU8
+2026-09-18T14:25:24.807  ...FREQ 433.1750 MHz TXPWR 22 dBm RXBOOST off
+2026-09-18T14:25:24.807  ...MAXHOP text 4 / pos 2
+2026-09-18T14:25:24.807  
+2026-09-18T14:25:24.807  ...Webserver  on / Webpwd <> / Gateway off 
+2026-09-18T14:25:24.807  ...NETWORK Mode:WiFi
+2026-09-18T14:25:24.807  ...hasIpAddress: yes
+2026-09-18T14:25:24.807  ...IP address   : 192.168.68.66
+2026-09-18T14:25:24.807  ...SUBNET-MASK  : 255.255.252.0
+2026-09-18T14:25:24.807  ...GW address   : 192.168.68.1
+2026-09-18T14:25:24.807  ...DNS address  : 217.237.150.188
+2026-09-18T14:25:24.807  ...UDP-HBeat : 650988
+2026-09-18T14:25:32.329  ### verdict OK for probe:--info

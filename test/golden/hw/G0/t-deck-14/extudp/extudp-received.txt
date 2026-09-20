@@ -1,0 +1,13 @@
+   4.269   <ADDR>  156 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"Test 1 2 3{414","msg_id":"<ID1>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+   7.771   <ADDR>  146 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"9999","msg":"an alle","msg_id":"<ID2>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  14.747   <ADDR>  259 B  {"src_type":"node","type":"pos","src":"DK5EN-14","msg":"","lat":48.4075,"lat_dir":"N","long":11.7383,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","h
+  14.747   <ADDR>  111 B  {"src_type":"node","type":"tele","src":"DK5EN-14","temp1":21,"temp2":0,"hum":0,"qfe":0,"qnh":0,"gas":0,"co2":0}
+  28.857   <ADDR>  154 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"trotzdem{417","msg_id":"<ID3>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  30.631   <ADDR>  146 B  {"src_type":"lora","type":"msg","src":"DK5EN-98","dst":"20","msg":"tolles foto","msg_id":"<ID4>","firmware":35,"fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  32.322   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"kein type feld{418","msg_id":"<ID5>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  56.796   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"truncated case{420","msg_id":"<ID6>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  67.257   <ADDR>  158 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"nur das hier{421","msg_id":"<ID7>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  70.866   <ADDR>  259 B  {"src_type":"node","type":"pos","src":"DK5EN-14","msg":"","lat":48.4076,"lat_dir":"N","long":11.7383,"long_dir":"E","aprs_symbol":"#","aprs_symbol_group":"/","h
+  70.869   <ADDR>  113 B  {"src_type":"node","type":"tele","src":"DK5EN-14","temp1":23.5,"temp2":0,"hum":0,"qfe":0,"qnh":0,"gas":0,"co2":0}
+  74.351   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"none{423","msg_id":"<ID8>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  81.393   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-14","dst":"DK5EN-1","msg":"text{424","msg_id":"<ID9>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}

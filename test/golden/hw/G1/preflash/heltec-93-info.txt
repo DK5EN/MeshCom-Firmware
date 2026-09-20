@@ -1,0 +1,51 @@
+--info
+--MeshCom 4.35t (build: Sep 11 2026 / 13:30:09)
+...UPDATE: 2026-09-11 18:22:21
+...Call: <DK5EN-93> ...ID 433A8968 ...NODE 43 <HELTEC_V3> ...UTC-OFF 2.000000 [NTP]
+...BATT 0.00 V ...BATT 0 % ...MAXV 4.200 V
+...TIME 11538734 ms
+...Flash-Version 20260724
+...NOMSGALL off ...MESH off ...BUTTON (0) off ...SOFTSER off ... SOFTSERREAD off
+...PASSWD <>
+...DEBUG man ...DEBUG en
+...DEBUG on ...LORADEBUG off ...GPSDEBUG on/2 ...SOFTSERDEBUG off
+...WXDEBUG on ...BLEDEBUG off
+...DisplayInfo off ...DisplayCont on ...DisplyLog off ...contrast 255 ...ackinfo off
+...EXTUDP off ...EXT IP 192.168.68.58 ...NOPMOTHER off
+...BTCODE 000000
+...APRSMC: APRSMC
+...ATXT:
+...NAME:
+...BLE : short
+...DISPLAY off
+...CTRY EU8
+...FREQ 433.1750 MHz TXPWR 2 dBm RXBOOST off
+...MAXHOP text 2 / pos 2
+...GC-1:20 GC-2:232 GC-3:262 GC-4:26244 GC-5:9
+...BATTERY PIN 1 factor 0.0000
+...Webserver  on / Webpwd <> / Gateway off
+...NETConsole on (port 2323)
+...WIFI-AP    off
+...SSID <ORBI63> / PASSWORD <***>
+...NETWORK Mode:WiFi
+...hasIpAddress: yes
+...IP address   : 192.168.68.69
+...SUBNET-MASK  : 255.255.252.0
+...GW address   : 192.168.68.1
+...DNS address  : 217.237.150.188
+...UDP-HBeat : 11538827
+[readBatteryVoltage] ADC : 1060
+[readBatteryVoltage] Float : 4430.800
+[readBatteryVoltage] milliVolts : 4430
+[readBatteryVoltage] ADC : 1092
+[readBatteryVoltage] Float : 4564.560
+[readBatteryVoltage] milliVolts : 4564
+[GPS ]...fix:no sat:4 hdop:1.6
+[GPS ]...Time <UTC>: 19:49:03 / Date: 2026.09.11
+[readBatteryVoltage] ADC : 1076
+[readBatteryVoltage] Float : 4497.680
+[readBatteryVoltage] milliVolts : 4497
+[readBatteryVoltage] ADC : 1112
+[readBatteryVoltage] Float : 4648.160
+[readBatteryVoltage] milliVolts : 4648
+[readBatteryVoltage] 21:49:04 ... 0.00 V 0 % max_batt 4.200 V

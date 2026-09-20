@@ -1,0 +1,11 @@
+   4.717   <ADDR>  156 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"Test 1 2 3{132","msg_id":"<ID1>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+   8.240   <ADDR>  146 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"9999","msg":"an alle","msg_id":"<ID2>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  26.607   <ADDR>  247 B  {"src_type":"lora","type":"msg","src":"OE1KFR-3,DK5EN-98,DK5EN-92","dst":"20","msg":"Na dann lass sie dir gut schmecken. Muss jetzt ins Freie. Warm anziehen ist
+  29.417   <ADDR>  154 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"trotzdem{135","msg_id":"<ID3>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  32.928   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"kein type feld{136","msg_id":"<ID4>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  57.709   <ADDR>  160 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"truncated case{138","msg_id":"<ID5>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  67.848   <ADDR>  158 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"nur das hier{139","msg_id":"<ID6>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  75.057   <ADDR>  175 B  {"src_type":"lora","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"QRS - slow down, TX buffer is filling","msg_id":"<ID7>","firmware":35,"fw_sub":"t","r
+  75.062   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"none{140","msg_id":"<ID8>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  81.863   <ADDR>  150 B  {"src_type":"node","type":"msg","src":"DK5EN-90","dst":"DK5EN-1","msg":"text{141","msg_id":"<ID9>","firmware":"4.35","fw_sub":"t","rssi":<RF>,"snr":<RF>}
+  98.146   <ADDR>  172 B  {"src_type":"lora","type":"msg","src":"DK5EN-98","dst":"26386","msg":"A do nu eini an schön Abend z'am.","msg_id":"<ID10>","firmware":35,"fw_sub":"t","rssi":-

@@ -1,0 +1,16 @@
+# Eingefrorene kanonische decodeAPRS()-Ausgabe je Korpus-Frame.
+# Regenerieren NUR bewusst: APRS_GOLDEN_UPDATE=1 pio test -e native_aprs
+# — und den git-Diff dieser Datei reviewen: er IST die Verhaltensaenderung.
+f001 rc=21 id=E9F113AB hop=1 srv=1 mesh=1 track=0 srcpath=DL2JA-1,DL2JA-2 dstpath=* dstcall=* payload=4825.35N\01147.19E-Marzling#Werner/R=9; fcs=132F hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DL2JA-1 srclast=DL2JA-2 pathcnt=2
+f002 rc=3A id=6A8825A4 hop=0 srv=1 mesh=1 track=0 srcpath=OE1XAR-62,DK4YU-77,DL2JA-2,DK5EN-91 dstpath=* dstcall=* payload={CET}2026-08-21 10:57:28 fcs=11CC hw=0 mod=136 fw=0 lasthw=171 appoff=1 srccall=OE1XAR-62 srclast=DK5EN-91 pathcnt=4
+f003 rc=21 id=91A436B7 hop=1 srv=0 mesh=1 track=0 srcpath=DK5EN-90,DK5EN-91 dstpath=* dstcall=* payload=4824.43N/01144.40E#github.com/dk5en/mcapp#Martin/B=099/A=001657/N1/R=20;232;262;9;26244;26244; fcs=1FDF hw=9 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-90 srclast=DK5EN-91 pathcnt=2
+f004 rc=3A id=6A8823A4 hop=2 srv=1 mesh=0 track=0 srcpath=OE1XAR-33,DK5EN-98 dstpath=* dstcall=* payload={CET}2026-08-21 10:58:58 fcs=0DB5 hw=0 mod=136 fw=0 lasthw=171 appoff=1 srccall=OE1XAR-33 srclast=DK5EN-98 pathcnt=2
+f005 rc=3A id=6A8823A4 hop=1 srv=1 mesh=1 track=0 srcpath=OE1XAR-33,DK5EN-90,DK5EN-91 dstpath=* dstcall=* payload={CET}2026-08-21 10:58:58 fcs=0FD6 hw=0 mod=136 fw=0 lasthw=171 appoff=1 srccall=OE1XAR-33 srclast=DK5EN-91 pathcnt=3
+f006 rc=3A id=1AE1E385 hop=4 srv=0 mesh=0 track=0 srcpath=DK5EN-98 dstpath=9999 dstcall=9999 payload=Korpus-Testframe via MCProxy DK5EN-98 fcs=1348 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-98 srclast=DK5EN-98 pathcnt=1
+f007 rc=3A id=1AE1E386 hop=4 srv=0 mesh=0 track=0 srcpath=DK5EN-98 dstpath=DK5EN-90 dstcall=DK5EN-90 payload=Korpus-DM via MCProxy an 90{902 fcs=11B1 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-98 srclast=DK5EN-98 pathcnt=1
+f008 rc=41 id=00000000 hop=0 srv=0 mesh=0 track=0 srcpath= dstpath= dstcall= payload= fcs=0000 hw=9 mod=3 fw=35 lasthw=137 appoff=0 srccall= srclast= pathcnt=0
+f009 rc=3A id=B059E03F hop=4 srv=0 mesh=1 track=0 srcpath=DK5EN-91 dstpath=DK5EN-90 dstcall=DK5EN-90 payload=Korpus-DM von 91 an 90{063 fcs=0F47 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-91 srclast=DK5EN-91 pathcnt=1
+f010 rc=3A id=91A436C5 hop=4 srv=1 mesh=0 track=0 srcpath=DK5EN-90,DK5EN-98 dstpath=DK5EN-91 dstcall=DK5EN-91 payload=DK5EN-91 :ack063 fcs=0E03 hw=9 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-90 srclast=DK5EN-98 pathcnt=2
+f011 rc=21 id=B059E041 hop=2 srv=0 mesh=1 track=1 srcpath=DK5EN-91 dstpath=* dstcall=* payload=4825.00N/01145.46E#/B=057/N1 fcs=0B98 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-91 srclast=DK5EN-91 pathcnt=1
+f012 rc=40 id=B059E040 hop=4 srv=0 mesh=1 track=0 srcpath=DK5EN-91 dstpath=H dstcall=H payload=R1; fcs=06A2 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=DK5EN-91 srclast=DK5EN-91 pathcnt=1
+f013 rc=3A id=E507106D hop=4 srv=1 mesh=0 track=0 srcpath=IV3OEP-10,DK5EN-98 dstpath=1V3OEP-10,* dstcall=* payload=Hi dr Om from france best 73 in n. E. Italy jn66ic   fcs=1A50 hw=43 mod=136 fw=35 lasthw=171 appoff=0 srccall=IV3OEP-10 srclast=DK5EN-98 pathcnt=2

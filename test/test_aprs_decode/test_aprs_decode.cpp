@@ -1,0 +1,373 @@
+// Native Testsuite fuer decodeAPRS() — der Anfang des Test-Orakels aus
+// docs/architecture/08-defect-catalogue.md §4.
+//
+// Die Vektoren sind KEINE Ausgaben des Pruefling-Decoders: es sind echte,
+// am 2026-08-21 ueber den MC_TEST_HOOKS-Fang (OnRxDone-Hex-Dump, Mechanismus 2
+// aus doc 08 §4) auf 433,175 MHz mitgeschnittene Frames FREMDER Nodes —
+// encodiert von deren Firmware, nicht von unserer. Die Sollwerte wurden von
+// Hand aus den Roh-Bytes gelesen (Rufzeichen und Payload stehen als
+// ASCII im Frame, msg_id steht little-endian in Byte 1..4). Damit ist die
+// Suite ein Interop-Orakel: aendert ein kuenftiger Decoder-Umbau das
+// Verhalten gegenueber real existierenden Sendern, schlaegt sie fehl.
+//
+//   pio test -e native_aprs
+
+#include "../../src/mc_text.h"
+#include <unity.h>
+
+#include <Arduino.h>
+#include <aprs_functions.h>
+#include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
+
+// ---- Stubs fuer die Link-Abhaengigkeiten von aprs_functions.cpp ------------
+s_meshcom_settings meshcom_settings;
+bool bDisplayInfo = false;
+bool bDisplayCont = false;
+bool bLORADEBUG = false;
+bool bMESH = true;
+int BOARD_HARDWARE = 9;   // RAK4631 (wie auf der Bench) -- int statt uint8_t: ODR-Begruendung siehe test_txring.cpp (Verdict Finding 4)
+int getMOD(void) { return 3; }
+void printAsciiBuffer(unsigned char *buf, int len) { (void)buf; (void)len; }
+
+void setUp(void) {}
+void tearDown(void) {}
+
+// Hilfsfunktion: Hex-String -> Bytes
+static uint16_t hex2bin(const char *hex, uint8_t *out, uint16_t maxlen)
+{
+    uint16_t n = 0;
+    while (hex[0] && hex[1] && n < maxlen)
+    {
+        auto nib = [](char c) -> int {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            return -1;
+        };
+        int h = nib(hex[0]), l = nib(hex[1]);
+        if (h < 0 || l < 0) break;
+        out[n++] = (uint8_t)((h << 4) | l);
+        hex += 2;
+    }
+    return n;
+}
+
+// ---------------------------------------------------------------- Vektoren
+//
+// Beide Frames wurden am 2026-08-21 gegen 10:57/10:58 UTC auf 433,175 MHz
+// vom Bench-RAK4631 (DK5EN-90) mitgeschnitten. Die Sollwerte unten sind von
+// Hand aus den Hex-Bytes gelesen (Rufzeichen/Payload stehen als ASCII im
+// Frame, msg_id little-endian in Byte 1..4) und gegen die zeitgleich vom
+// Geraet geloggten Klartext-Zeilen gegengeprueft.
+
+// VEKTOR 1: Positionsbake ('!', MSG_TYPE_POSITION) von DL2JA-1, relayed
+// ueber DL2JA-2 — fremde Firmware, RSSI -109 dBm (echter Fern-Node).
+// Layout: 21 | AB 13 F1 E9 (msg_id LE) | 91 (Flags) |
+//         "DL2JA-1,DL2JA-2>*" | 21 | "4825.35N\01147.19E-Marzling#Werner/R=9;"
+//         | 00 | 2B 88 | 13 2F (FCS) | 23 AB 70 7E
+static const char *VEC1_HEX =
+    "21AB13F1E991444C324A412D312C444C324A412D323E2A21343832352E33354E5C"
+    "30313134372E3139452D4D61727A6C696E67235765726E65722F523D393B002B88"
+    "132F23AB707E";
+
+static void test_vektor1_position_dl2ja(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = hex2bin(VEC1_HEX, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_UINT16(72, len);
+
+    struct aprsMessage m;
+    initAPRS(m, 0x00);
+    uint16_t t = decodeAPRS(buf, len, m);
+
+    TEST_ASSERT_EQUAL_UINT16(0x21, t);                 // MSG_TYPE_POSITION
+    TEST_ASSERT_EQUAL_UINT32(0xE9F113ABu, m.msg_id);   // Byte 1..4 little-endian
+    TEST_ASSERT_EQUAL_STRING("DL2JA-1", m.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("DL2JA-2", m.msg_source_last);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call);
+    TEST_ASSERT_TRUE_MESSAGE(mcIndexOfStr(m.msg_payload, "Marzling#Werner") >= 0,
+                             "Payload muss den Ortstext enthalten");
+}
+
+// VEKTOR 2: Zeitbake (':', MSG_TYPE_TEXT) von OE1XAR-33, relayed ueber
+// DK5EN-98 (Produktions-Node) — RSSI -49 dBm.
+// Layout: 3A | A4 23 88 6A (msg_id LE) | A2 (Flags) |
+//         "OE1XAR-33,DK5EN-98>*" | 3A | "{CET}2026-08-21 10:58:58"
+//         | 00 00 88 | 0D B5 (FCS) | 00 AB 23 7E
+static const char *VEC2_HEX =
+    "3AA423886AA24F45315841522D33332C444B35454E2D39383E2A3A7B4345547D32"
+    "3032362D30382D32312031303A35383A35380000880DB500AB237E";
+
+static void test_vektor2_text_oe1xar(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = hex2bin(VEC2_HEX, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_UINT16(60, len);
+
+    struct aprsMessage m;
+    initAPRS(m, 0x00);
+    uint16_t t = decodeAPRS(buf, len, m);
+
+    TEST_ASSERT_EQUAL_UINT16(0x3A, t);                 // MSG_TYPE_TEXT
+    TEST_ASSERT_EQUAL_UINT32(0x6A8823A4u, m.msg_id);
+    TEST_ASSERT_EQUAL_STRING("OE1XAR-33", m.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-98", m.msg_source_last);
+    TEST_ASSERT_EQUAL_STRING("*", m.msg_destination_call);
+    TEST_ASSERT_TRUE_MESSAGE(mcIndexOfStr(m.msg_payload, "{CET}2026-08-21 10:58:58") >= 0,
+                             "Payload muss den Zeitstempel enthalten");
+}
+
+// CHR-03: Latin-1 durch BEIDE Chokepoints, nicht nur durch den Filter.
+// encodePayloadAPRS() ist die TX-Engstelle, decodeAPRS() die RX-Engstelle;
+// dieser Test faehrt eine Nachricht mit Latin-1-Umlauten einmal ganz herum.
+// Das Orakel ist nicht der Filter selbst, sondern die FCS-Pruefung im
+// Decoder (aprs_functions.cpp:427): haetten die Chokepoints Bytes entfernt
+// oder veraendert, passte die vom Encoder ueber die Wire-Bytes gerechnete
+// Pruefsumme nicht mehr und decodeAPRS() wuerde den Frame verwerfen.
+// Rufzeichen bewusst DK5EN-90 (eigenes Bench-Call), nicht fremd.
+static void test_latin1_umlaute_ueberleben_encode_und_decode(void)
+{
+    // "Gruesse" mit ue (0xFC) und scharfem S (0xDF) als Legacy-Einzelbytes,
+    // wie PinPoint sie sendet -- plus ein UTF-8-ae (C3 A4) und das
+    // CP1252-Euro-Zeichen (0x80) im selben Text, damit die Mischung und der
+    // 0x80-0x9F-Block mitgeprueft sind.
+    String payload = "Gr";
+    payload += (char)0xFC;
+    payload += (char)0xDF;
+    payload += "e ";
+    payload += (char)0xC3;
+    payload += (char)0xA4;
+    payload += " 5";
+    payload += (char)0x80;
+
+    struct aprsMessage tx;
+    initAPRS(tx, ':');
+    tx.msg_id = 0x12345678u;
+    mcSet(tx.msg_source_path, sizeof(tx.msg_source_path), "DK5EN-90");
+    mcSet(tx.msg_destination_path, sizeof(tx.msg_destination_path), "*");
+    mcSet(tx.msg_payload, sizeof(tx.msg_payload), payload.c_str());
+
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    uint16_t len = encodeAPRS(buf, tx);
+    TEST_ASSERT_TRUE_MESSAGE(len > 0, "encodeAPRS() muss einen Frame liefern");
+
+    // Die Latin-1-Bytes muessen unveraendert auf der Leitung stehen -- ein
+    // Byte bleibt ein Byte, es wird nichts nach UTF-8 transkodiert.
+    bool found_fc = false;
+    bool found_df = false;
+    bool found_80 = false;
+    for(uint16_t i = 0; i < len; i++)
+    {
+        if(buf[i] == 0xFC) found_fc = true;
+        if(buf[i] == 0xDF) found_df = true;
+        if(buf[i] == 0x80) found_80 = true;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(found_fc, "Latin-1 'ue' (0xFC) fehlt auf der Leitung");
+    TEST_ASSERT_TRUE_MESSAGE(found_df, "Latin-1 'sz' (0xDF) fehlt auf der Leitung");
+    TEST_ASSERT_TRUE_MESSAGE(found_80, "CP1252-Euro (0x80) fehlt auf der Leitung");
+
+    struct aprsMessage rx;
+    initAPRS(rx, 0x00);
+    uint16_t t = decodeAPRS(buf, len, rx);
+
+    TEST_ASSERT_EQUAL_UINT16(0x3A, t);                 // MSG_TYPE_TEXT
+    TEST_ASSERT_EQUAL_UINT32(0x12345678u, rx.msg_id);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-90", rx.msg_source_call);
+    TEST_ASSERT_EQUAL_STRING(payload.c_str(), rx.msg_payload);
+}
+
+static void test_leerer_frame_wird_abgelehnt(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE] = {0};
+    struct aprsMessage m;
+    initAPRS(m, 0x00);
+    TEST_ASSERT_EQUAL_UINT16(0, decodeAPRS(buf, 0, m));
+}
+
+// ---------------------------------------------------------------------
+// /R=, /U=, /I= decoding + /Y= reset regression (docs/aprs-parser-drift-
+// 20260911.md SS2, docs/architecture/11-wire-format.md SS1.8). These call
+// decodeAPRSPOS() directly on a position-payload String, the same way
+// test/test_decodeaprspos/test_decodeaprspos.cpp does -- decodeAPRS() only
+// splits the frame envelope, it never parses the extension tags itself.
+// ---------------------------------------------------------------------
+
+// /R=9;20; -- two Group-Call entries.
+static void test_grc_zwei_gruppen(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/R=9;20;", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(2, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+    TEST_ASSERT_EQUAL_INT(20, pos.grc[1]);
+}
+
+// /R=9; -- a single Group-Call entry.
+static void test_grc_eine_gruppe(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/R=9;", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(1, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+}
+
+// /U= (bus voltage) und /I= (current), beide float.
+static void test_bus_voltage_und_strom(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/U=12.34/I=0.5", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 12.34, pos.vbus);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 0.5, pos.vcurrent);
+}
+
+// Regression fuer Finding 3: die /Y=-Schleife setzte decode_text/ipt bislang
+// NICHT zurueck und erbte damit den Rest des /V=-Puffers. Bei "/V=3/Y=1"
+// haengt der ungefixte Code "1" hinter das stehengebliebene "3" und liest
+// telemetry=31 statt 1.
+static void test_telemetry_kein_puffer_leck_von_version(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=3/Y=1", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(3, pos.version);
+    TEST_ASSERT_EQUAL_INT(1, pos.telemetry);
+}
+
+// /V= ohne begleitendes /Y= -- telemetry bleibt auf dem initAPRSPOS()-Default.
+static void test_telemetry_ohne_y_bleibt_null(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=3", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(3, pos.version);
+    TEST_ASSERT_EQUAL_INT(0, pos.telemetry);
+}
+
+// D3-01: /V= und /Y= sind die EINZIGEN beiden Tags, die "%i" statt "%d"
+// benutzen -- "%i" leitet die Basis ab, also ist "010" oktal 8 und nicht
+// dezimal 10. Nach der Umstellung auf aprsExtractTag() waehlt ein
+// AprsTagType-Enum die Konversion; vertauscht man dort APRS_TAG_INT_AUTOBASE
+// gegen APRS_TAG_INT, dekodieren genau diese beiden Felder still anders und
+// KEIN anderer Test merkt es (alle vorhandenen /V=- und /Y=-Vektoren sind
+// einstellig, wo "%i" und "%d" uebereinstimmen). Diese beiden Faelle pinnen
+// die Basis-Ableitung fest.
+static void test_v_und_y_lesen_oktal_wie_scanf_i(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/V=010/Y=010", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(8, pos.version);   // "%d" wuerde hier 10 liefern
+    TEST_ASSERT_EQUAL_INT(8, pos.telemetry); // "%d" wuerde hier 10 liefern
+}
+
+// Gegenprobe: ein Tag mit "%d" darf die Basis NICHT ableiten. /A= (Altitude)
+// ist einer der drei reinen "%d"-Tags; "010" muss dort dezimal 10 bleiben.
+// Ohne diesen Fall wuerde ein pauschales Umstellen aller Int-Tags auf
+// APRS_TAG_INT_AUTOBASE unbemerkt durchgehen.
+static void test_d_tags_leiten_keine_basis_ab(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS("4825.35N/01147.19E-/A=010", pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(10, pos.alt); // "%i" wuerde hier oktal 8 liefern
+}
+
+// Voller Tag-Satz in Encoder-Reihenfolge (B A N P H T O F Q G C R V U I D Y,
+// src/loop_functions.cpp:4300-4447) -- jedes Feld muss unabhaengig von den
+// anderen korrekt decodiert werden.
+static void test_alle_tags_in_encoder_reihenfolge(void)
+{
+    struct aprsPosition pos;
+    uint16_t r = decodeAPRSPOS(
+        "4825.35N/01147.19E-"
+        "/B=099/A=001657/N5/P=1013.2/H=55.0/T=21.5/O=18.0/F=1000/Q=1015.0"
+        "/G=120.5/C=450/R=9;20;/V=5/U=12.34/I=0.5/D=00000101/Y=1",
+        pos);
+
+    TEST_ASSERT_EQUAL_UINT16(0x01, r);
+    TEST_ASSERT_EQUAL_INT(99, pos.bat);
+    TEST_ASSERT_EQUAL_INT(1657, pos.alt);
+    TEST_ASSERT_EQUAL_INT(5, pos.ncnt);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 1013.2, pos.press);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 55.0, pos.hum);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 21.5, pos.temp);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 18.0, pos.temp2);
+    TEST_ASSERT_EQUAL_INT(1000, pos.qfe);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 1015.0, pos.qnh);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 120.5, pos.gasres);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 450.0, pos.co2);
+    TEST_ASSERT_EQUAL_INT(2, pos.grccnt);
+    TEST_ASSERT_EQUAL_INT(9, pos.grc[0]);
+    TEST_ASSERT_EQUAL_INT(20, pos.grc[1]);
+    TEST_ASSERT_EQUAL_INT(5, pos.version);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 12.34, pos.vbus);
+    TEST_ASSERT_FLOAT_WITHIN(0.001, 0.5, pos.vcurrent);
+    TEST_ASSERT_EQUAL_STRING("00000101", pos.din);
+    TEST_ASSERT_EQUAL_INT(1, pos.telemetry);
+}
+
+// R2-04. Der Nutzlast-Schleife in decodeAPRS() fehlte eine eigene Schranke:
+// sie lief bis `rsize`, und der Test darueber laesst rsize bis
+// MAX_APRS_FRAME_SIZE (340) durch -- waehrend der Zielpuffer cConcat1 nur
+// UDP_TX_BUF_SIZE (255) Byte hat. Heute reicht kein Aufrufer mehr als 255
+// herein (R1-06), die Schleife verliess sich also auf ihre Aufrufer statt auf
+// sich selbst. Dieser Fall ruft decodeAPRS() direkt mit einem 340-Byte-Frame
+// auf, also genau so, wie es der Test auf MAX_APRS_FRAME_SIZE erlaubt.
+//
+// OHNE die Schranke schreibt die Schleife rund 75 Byte hinter cConcat1 --
+// mitten in cConcat2/cConcat3 auf demselben Stack. Unter -fsanitize=address
+// ist das ein stack-buffer-overflow; ohne Sanitizer faellt hier die
+// Laengenzusicherung.
+static void test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht(void)
+{
+    uint8_t buf[512];
+    memset(buf, 'A', sizeof(buf));
+
+    buf[0] = 0x3A;                      // Textnachricht
+    buf[1] = 0x44; buf[2] = 0x33; buf[3] = 0x22; buf[4] = 0x11;   // msg_id
+    buf[5] = 0x03;                      // max_hop
+    memcpy(buf + 6, "DK5EN-90>*:", 11); // Quellpfad, Ziel, payload_type
+    // ab hier bis 339 nur 'A' -- kein 0x00, also laeuft die Schleife bis rsize
+    const uint16_t rsize = 340;         // exakt MAX_APRS_FRAME_SIZE
+
+    struct aprsMessage m;
+    initAPRS(m, ':');
+    decodeAPRS(buf, rsize, m);
+
+    // Die Nutzlast darf nie laenger sein als ihr Feld -- und das Feld ist die
+    // tatsaechliche Schranke des Zwischenpuffers.
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) < sizeof(m.msg_payload),
+                             "msg_payload ist nicht terminiert oder zu lang");
+    TEST_ASSERT_TRUE_MESSAGE(strlen(m.msg_payload) <= (size_t)UDP_TX_BUF_SIZE - 1,
+                             "die Nutzlast-Schleife hat ueber cConcat1 hinaus geschrieben");
+}
+
+int main(int argc, char **argv)
+{
+    (void)argc; (void)argv;
+    UNITY_BEGIN();
+    RUN_TEST(test_leerer_frame_wird_abgelehnt);
+    RUN_TEST(test_vektor1_position_dl2ja);
+    RUN_TEST(test_vektor2_text_oe1xar);
+    RUN_TEST(test_latin1_umlaute_ueberleben_encode_und_decode);
+    RUN_TEST(test_grc_zwei_gruppen);
+    RUN_TEST(test_grc_eine_gruppe);
+    RUN_TEST(test_bus_voltage_und_strom);
+    RUN_TEST(test_telemetry_kein_puffer_leck_von_version);
+    RUN_TEST(test_telemetry_ohne_y_bleibt_null);
+    RUN_TEST(test_v_und_y_lesen_oktal_wie_scanf_i);
+    RUN_TEST(test_d_tags_leiten_keine_basis_ab);
+    RUN_TEST(test_alle_tags_in_encoder_reihenfolge);
+    RUN_TEST(test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht);
+    return UNITY_END();
+}
