@@ -1,5 +1,22 @@
 name: CI Build
 
+# ---------------------------------------------------------------------------
+# HART ABGESCHALTET (DK5EN-Fork, 20.09.2026).
+#
+# Releases dieses Fork werden lokal gebaut und von Hand veroeffentlicht --
+# siehe docs/neo-campaign.md, Abschnitt 5. Der Schalter in den Repository-
+# Einstellungen (`disabled_manually`) reicht dafuer nicht: er ist kein Code,
+# ueberlebt keinen Klick auf "Enable workflow" und reist weder mit einem Clone
+# noch mit einem Fork mit. Deshalb traegt JEDER Job hier zusaetzlich
+# `if: false`.
+#
+# Wieder anschalten: die `if: false`-Zeilen entfernen UND den Workflow in den
+# Repository-Einstellungen aktivieren. Beides, sonst passiert nichts.
+#
+# Wer hier einen Job ergaenzt, gibt ihm ebenfalls `if: false` -- sonst ist die
+# Abschaltung loechrig, ohne dass es auffaellt.
+# ---------------------------------------------------------------------------
+
 # Gate für Pull Requests und Branch-Pushes.
 #
 # Bewusst getrennt von meshcom-ci.yml: jene Workflow läuft ausschließlich auf
@@ -38,6 +55,7 @@ permissions:
 
 jobs:
   list-envs:
+    if: false  # siehe Kopf dieser Datei
     name: Environments ermitteln
     runs-on: ubuntu-latest
     outputs:
@@ -76,6 +94,7 @@ jobs:
           echo '${{ steps.collect.outputs.envs }}'
 
   macro-guards:
+    if: false  # siehe Kopf dieser Datei
     name: Board-Makro-Guards
     runs-on: ubuntu-latest
     # Ersetzt -Wundef als Regressionsschutz fuer N-10. -Wundef selbst ist im Build
@@ -99,6 +118,7 @@ jobs:
           echo "OK - keine blanken BOARD_*-Makros in #if-Ausdruecken."
 
   unit-tests:
+    if: false  # siehe Kopf dieser Datei
     name: Unit-Tests (nativ)
     runs-on: ubuntu-latest
     steps:
@@ -124,6 +144,7 @@ jobs:
         run: pio test -e native_aprs
 
   build:
+    if: false  # siehe Kopf dieser Datei
     name: ${{ matrix.env }}
     needs: list-envs
     runs-on: ubuntu-latest
@@ -205,9 +226,10 @@ jobs:
             --min-headroom 4096 --strict
 
   result:
+    if: false  # siehe Kopf dieser Datei
     name: Build-Gate
     needs: [build, unit-tests]
-    if: always()
+    # if: always()   (durch if: false ersetzt)
     runs-on: ubuntu-latest
     steps:
       - name: Ergebnis auswerten

@@ -1,5 +1,22 @@
 name: MeshCom CI
 
+# ---------------------------------------------------------------------------
+# HART ABGESCHALTET (DK5EN-Fork, 20.09.2026).
+#
+# Releases dieses Fork werden lokal gebaut und von Hand veroeffentlicht --
+# siehe docs/neo-campaign.md, Abschnitt 5. Der Schalter in den Repository-
+# Einstellungen (`disabled_manually`) reicht dafuer nicht: er ist kein Code,
+# ueberlebt keinen Klick auf "Enable workflow" und reist weder mit einem Clone
+# noch mit einem Fork mit. Deshalb traegt JEDER Job hier zusaetzlich
+# `if: false`.
+#
+# Wieder anschalten: die `if: false`-Zeilen entfernen UND den Workflow in den
+# Repository-Einstellungen aktivieren. Beides, sonst passiert nichts.
+#
+# Wer hier einen Job ergaenzt, gibt ihm ebenfalls `if: false` -- sonst ist die
+# Abschaltung loechrig, ohne dass es auffaellt.
+# ---------------------------------------------------------------------------
+
 on: 
   push:
     tags:
@@ -7,6 +24,7 @@ on:
 
 jobs:
   build:
+    if: false  # siehe Kopf dieser Datei
 
     runs-on: ubuntu-latest
 
