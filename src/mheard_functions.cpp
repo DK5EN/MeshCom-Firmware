@@ -791,18 +791,21 @@ String getValue(String data, char separator, int index)
 // zugleich dem Loop-Stack ab -- auf nRF52 ist das die Richtung, in die dieses
 // Modul ohnehin schon ausweicht (siehe N-22 in sendMheard()).
 //
-// mheard_send_now ist der Zeitpunkt der Sortierung. DR-28 verlangt, dass ein
-// Renderer gegen denselben Augenblick altert, gegen den er sortiert hat; ueber
-// mehrere Loop-Durchlaeufe hinweg geht das nur, wenn der Augenblick mitwandert.
+// Eingefroren wird ausschliesslich die REIHENFOLGE. Der Sortierzeitpunkt wird
+// bewusst NICHT mit eingefroren: DR-28 verlangt denselben Augenblick nur fuer
+// Renderer, die eine Altersspalte ausgeben, und sendMheard() gibt DATE/TIME
+// aus dem Datensatz aus, kein gerechnetes Alter. Wuerde hier gegen den
+// eingefrorenen Augenblick gealtert, verschwaende eine Station, die WAEHREND
+// der Uebertragung neu gehoert wird: mheardMillis[] waere dann groesser als
+// der Augenblick, die vorzeichenlose Differenz liefe unter und der Eintrag
+// fiele aus dem 12-h-Fenster heraus. Deshalb millis() in der Schleife.
 static uint8_t mheard_send_idx[MAX_MHEARD];
 static uint8_t mheard_send_n = 0;
-static uint32_t mheard_send_now = 0;
 static int mheard_send_cursor = -1;
 
 void startMheardToPhone()
 {
-    mheard_send_now = (uint32_t)millis();
-    mheard_send_n = mheardSortedIndex(mheard_send_idx, mheard_send_now);
+    mheard_send_n = mheardSortedIndex(mheard_send_idx, (uint32_t)millis());
     mheard_send_cursor = 0;
 }
 
@@ -850,7 +853,15 @@ void sendMheard()
     {
         uint8_t iset = mheard_send_idx[mheard_send_cursor];
 
-        if((uint32_t)(mheard_send_now - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
+        // Der Schnappschuss ist aelter als der Augenblick, in dem er
+        // abgelaufen wird: updateMheard() (LORA-Task) kann einen Slot
+        // zwischendurch geraeumt haben -- es setzt nur mheardCalls[x][0]
+        // auf 0x00 und laesst mheardMillis[] stehen. Ohne diese Pruefung
+        // ginge ein MH-Frame mit leerem CALL zum Telefon.
+        if(mheardCalls[iset][0] == 0x00)
+            continue;
+
+        if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
         {
             // Ring voll: ohne den Cursor weiterzuschalten zurueck, der
             // naechste Aufruf nimmt genau diesen Eintrag noch einmal.
