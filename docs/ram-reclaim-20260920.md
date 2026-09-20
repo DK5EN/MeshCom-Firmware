@@ -119,3 +119,34 @@ aus `/api/ble/registers` und der Datenbank des Proxys:
   Byte-Rings, eine empfangene und die eigene gesendete Nachricht.
 
 Was nur der Dauerlauf zeigt: Heap-Trend und Verdrängung unter Last.
+
+## Dauerlauf 20.09., 11:20-20:16 — ausgewertet
+
+Der Umbau besteht in allen Punkten, die er verspricht. Der Knoten ist trotzdem
+viermal neu gestartet, aus einem Grund, der nichts mit den Byte-Ringen zu tun
+hat und auch auf `fork-neo-test` reproduzierbar ist (siehe
+`docs/bug-extudp-stack-20260920.md`).
+
+| Kriterium        | Sollwert        | Messwert                                      |
+| ---------------- | --------------- | --------------------------------------------- |
+| Heap-Trend       | flach           | +23 B je 5-Minuten-Fenster, min 145 992       |
+| Heap gegen Basis | rund +10 kB     | +14 bis +21 kB                                |
+| `RING_OVERFLOW`  | Summe `lost=` 0 | 0 Ringe, 0 verlorene Frames                   |
+| Telefon-Ring     | `lost>0` nie    | 0                                             |
+| TX-Ring          | wie am Vorabend | Spitze 6/20, Drop-Muster `0/0/0/0/0`          |
+| Neustarts        | 0               | 4, alle am Extern-UDP-Eingang, Ursache extern |
+
+Zwei Korrekturen an der Auswertung vom Abend:
+
+- Es waren **vier** Neustarts, nicht drei. Der vierte (19:32:35, ausgeloest von
+  einem Datagramm mit reinem ASCII-Text) fehlte, weil `tools/reclaim_eval.py`
+  Neustarts nur an den 5-Minuten-`STAT`-Zeilen erkennt und dichter
+  aufeinanderfolgende verpasst. Verlaesslich ist der Ruecksprung von `millis()`
+  ueber alle `ms;`/`ts=`-Felder. Das Skript sollte darauf umgestellt werden.
+- `stack_hwm` 368 ist nicht der neue Normalwert, sondern das Minimum EINES
+  langen Boots. Nach jedem Neustart steht dort wieder 1 184 bis 2 284. Der
+  Vergleich 368 gegen 1 576 stellt zwei verschieden alte Uptimes gegenueber und
+  traegt die Aussage "1 200 Byte Stack-Reserve weniger" nicht.
+
+Damit ist `neo-ram-reclaim` aus Sicht des Dauerlaufs reif; die Entscheidung
+ueber den Weg nach `fork-neo-test` bleibt beim Operator.
