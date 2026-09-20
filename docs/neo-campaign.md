@@ -460,6 +460,17 @@ ends up.
   afterwards, once the chapters have survived their gates.
 - **No automatic GitHub builds** (section 5): build on the MacBook, publish by
   hand.
+- **Both workflows are hard-disabled in the files, not only in the settings.**
+  Decided 2026-09-20. Measured first, correcting an earlier claim in this
+  document: the repository's Actions permission is `"enabled": true`; what held
+  the workflows was a per-workflow `disabled_manually` toggle -- a repository
+  setting, not code, and it travels with neither a clone nor a fork. Exposure
+  if it is ever flipped: `ci-build.yml` on a push to any branch,
+  `meshcom-ci.yml` on any tag push, and the latter publishes a release with its
+  own asset set -- racing the hand-built one at exactly the moment the neo tag
+  is cut. All six jobs now carry `if: false`, each file carries the reason and
+  the rule for whoever adds the next job. Costs upstream nothing: `.github/` is
+  not in the chapter cut, so `fork-neo` keeps upstream's copy byte-identically.
 - **`fork-neo` does not advertise that it is a derivative.** Operator decision
   2026-09-20. `tools/neo_strip.py` no longer travels -- `derive.sh` runs it from
   a temporary copy -- and `docs/CHANGELOG-neo.md` gets no section explaining
@@ -685,19 +696,6 @@ campaign is what gives those two boards room again.
 
 ## 17. Still open
 
-- Whether `.github/workflows/` additionally gets a hard `if: false` in the
-  files themselves. Measured 2026-09-20, correcting an earlier claim in this
-  document: the repository's Actions permission is `"enabled": true`. What
-  keeps the two workflows from running is a per-workflow `disabled_manually`
-  toggle -- a repository setting, not code. It survives a push; it does not
-  survive someone re-enabling a workflow in the UI, and it does not travel with
-  a clone or a fork. The exposed triggers if it is ever flipped: `ci-build.yml`
-  on a push to any branch, and `meshcom-ci.yml` on any tag push -- the latter
-  publishes a GitHub release with its own asset set, which is exactly what
-  cutting the release tag by hand is meant to avoid. The cost this document
-  used to cite (a visible delta against upstream) no longer applies: `.github/`
-  is not in the chapter cut, so `fork-neo` carries upstream's copy
-  byte-identically and the change would live on `fork-neo-test` only.
 - Pushing both branches to `DK5EN/MeshCom-Firmware`, and whether
   `origin/dry-unification` is deleted along with the local branch.
 - Release `4.35t_20260919_neo` and the GH Pages web flasher
