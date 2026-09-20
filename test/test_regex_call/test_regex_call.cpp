@@ -154,6 +154,102 @@ static void test_board_profil_ist_gepinnt(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(100, MAX_DEDUP_RING, "MAX_DEDUP_RING");
 }
 
+// ------------------------------------------------- normalizeOwnCall (eigenes Call)
+// "-01" und "-1" galten als zwei Stationen, obwohl die SSID eine Zahl ist.
+// Ein Rufzeichen OHNE SSID bleibt dagegen zulaessig und unveraendert: das war
+// immer erlaubt, und die Weitergabe an APRS.fi haengt daran, ob eine SSID
+// gesetzt ist (Kurt, PR #1149).
+//
+// Die Sollwerte hier stammen aus dem APRS-Format, nicht aus der Funktion:
+// AX.25 fuehrt die SSID als Zahl, "no SSID represents a zero SSID" (also sind
+// -0 und fehlende SSID derselbe Fall, kanonisch das blanke Rufzeichen), und
+// APRS-IS begrenzt Rufzeichen samt SSID auf neun Zeichen.
+
+static String normalisiert(const char *call)
+{
+    String sVar = call;
+    normalizeOwnCall(sVar);
+    return sVar;
+}
+
+static void test_ohne_ssid_bleibt_ohne_ssid(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF", normalisiert("DL4ALF").c_str(), "ohne SSID");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN", normalisiert("DK5EN").c_str(), "fuenfstellige Basis");
+}
+
+static void test_null_ssid_gilt_als_keine_ssid(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF", normalisiert("DL4ALF-0").c_str(), "-0");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF", normalisiert("DL4ALF-00").c_str(), "-00");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF", normalisiert("DL4ALF-").c_str(), "Bindestrich ohne Ziffern");
+}
+
+static void test_streicht_fuehrende_null(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-1", normalisiert("DL4ALF-01").c_str(), "-01 ist -1");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-9", normalisiert("DL4ALF-09").c_str(), "-09 ist -9");
+}
+
+static void test_laesst_kanonische_form_unveraendert(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-1", normalisiert("DL4ALF-1").c_str(), "-1");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-12", normalisiert("DL4ALF-12").c_str(), "-12");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-99", normalisiert("DL4ALF-99").c_str(), "-99");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DB0ED-5", normalisiert("DB0ED-5").c_str(), "kurze Basis");
+}
+
+// Die Sondermarken aus checkRegexCall() sind keine Rufzeichen und duerfen
+// nicht umgeschrieben werden. Geschuetzt sind sie nicht durch eine zweite
+// Liste, sondern durch den Formtest (Basis drei bis sechs Zeichen, A-Z0-9,
+// mindestens eine Ziffer UND ein Buchstabe) -- deshalb steht hier jede
+// einzelne, auch die mit Bindestrich.
+static void test_laesst_dienstkennungen_unveraendert(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("*", normalisiert("*").c_str(), "TOALL");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("H", normalisiert("H").c_str(), "HEY");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("HG", normalisiert("HG").c_str(), "HEY vom Gateway");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("BOT GATE", normalisiert("BOT GATE").c_str(), "BOT GATE");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("TEST", normalisiert("TEST").c_str(), "Gruppe TEST");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("TESTER", normalisiert("TESTER").c_str(), "TESTER");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("WLNK-1", normalisiert("WLNK-1").c_str(), "WLNK-1");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("WLNK-01", normalisiert("WLNK-01").c_str(), "WLNK-01 ist keine Rufzeichenform");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("APRS2SOTA", normalisiert("APRS2SOTA").c_str(), "APRS2SOTA");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("OE2YOTA-1", normalisiert("OE2YOTA-1").c_str(), "OE2YOTA-1");
+}
+
+// Die Funktion macht keine Grossbuchstaben -- das tun die Aufrufer vorher.
+// Ohne diesen Test wuerde spaeter jemand annehmen, sie koenne beides.
+static void test_kleinbuchstaben_bleiben_unberuehrt(void)
+{
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("dl4alf-01", normalisiert("dl4alf-01").c_str(), "kleingeschrieben");
+}
+
+static void test_neun_zeichen_passen_noch(void)
+{
+    String sVar = "DB0ABC-099";
+    TEST_ASSERT_TRUE_MESSAGE(normalizeOwnCall(sVar), "sechs plus -99 sind neun Zeichen");
+    TEST_ASSERT_EQUAL_STRING("DB0ABC-99", sVar.c_str());
+}
+
+// Mehr als neun Zeichen passen weder in node_call noch in ein
+// APRS-IS-Rufzeichen. Abweisen statt abschneiden -- ein abgeschnittenes
+// Rufzeichen waere ein fremdes.
+static void test_lehnt_zu_lange_form_ab(void)
+{
+    String sVar = "DL4ALF-100";
+    TEST_ASSERT_FALSE_MESSAGE(normalizeOwnCall(sVar), "dreistellige SSID sprengt neun Zeichen");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("DL4ALF-100", sVar.c_str(), "bleibt unveraendert");
+}
+
+// Die Werkseinstellung WIRD von der Funktion angefasst -- geschuetzt wird sie
+// vom Aufrufer (isNodeUnconfigured() in esp32_main/nrf52_main), nicht hier.
+// Pinnt, wo die Verantwortung liegt, falls der Guard spaeter wegfaellt.
+static void test_werkseinstellung_haengt_am_aufrufer(void)
+{
+    TEST_ASSERT_EQUAL_STRING("XX0XXX", normalisiert("XX0XXX-00").c_str());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -172,6 +268,16 @@ int main(int, char **)
     RUN_TEST(test_lehnt_leeres_rufzeichen_ab);
     RUN_TEST(test_lehnt_offensichtlichen_unsinn_ab);
     RUN_TEST(test_ueberlanges_rufzeichen_stuerzt_nicht_ab);
+
+    RUN_TEST(test_ohne_ssid_bleibt_ohne_ssid);
+    RUN_TEST(test_null_ssid_gilt_als_keine_ssid);
+    RUN_TEST(test_streicht_fuehrende_null);
+    RUN_TEST(test_laesst_kanonische_form_unveraendert);
+    RUN_TEST(test_laesst_dienstkennungen_unveraendert);
+    RUN_TEST(test_kleinbuchstaben_bleiben_unberuehrt);
+    RUN_TEST(test_neun_zeichen_passen_noch);
+    RUN_TEST(test_lehnt_zu_lange_form_ab);
+    RUN_TEST(test_werkseinstellung_haengt_am_aufrufer);
 
     return UNITY_END();
 }
