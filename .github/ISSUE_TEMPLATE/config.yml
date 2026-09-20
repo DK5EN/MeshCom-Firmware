@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: MeshCom command reference
+    url: https://icssw.org/en/meshcom-kommandos-cl-gw/
+    about: Full list of the --commands understood by the node.
+  - name: MeshCom project documentation
+    url: https://icssw.org/en/meshcom/
+    about: Setup, hardware and general MeshCom documentation.

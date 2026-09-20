@@ -1,0 +1,225 @@
+name: CI Build
+
+# Gate für Pull Requests und Branch-Pushes.
+#
+# Bewusst getrennt von meshcom-ci.yml: jene Workflow läuft ausschließlich auf
+# Tags und veröffentlicht ein GitHub-Release. Sie darf nicht auf PRs laufen.
+# Diese hier baut nur und veröffentlicht nichts.
+#
+# Die Environment-Liste wird zur Laufzeit aus platformio.ini gelesen, damit eine
+# neue Variante nicht vergessen werden kann.
+
+# Doku-Commits (docs/, *.md) lösen keinen Build aus: kein Pfad davon geht in
+# die Firmware ein, und im August 2026 gingen dadurch tausende Runner-Minuten
+# an reine docs:-Pushes verloren. Kein Branch hat Required Checks, ein
+# übersprungener Lauf blockiert also nichts.
+on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+# Ein laufender Build für denselben Branch/PR wird abgebrochen, wenn nachgeschoben wird.
+concurrency:
+  group: ci-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  list-envs:
+    name: Environments ermitteln
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.collect.outputs.envs }}
+      count: ${{ steps.collect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio
+      - id: collect
+        name: default_envs aus platformio.ini lesen
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, subprocess
+          raw = subprocess.run(
+              ["pio", "project", "config", "--json-output"],
+              capture_output=True, text=True, check=True).stdout
+          cfg = dict(json.loads(raw))
+          default = []
+          for key, value in dict(cfg.get("platformio", [])).items():
+              if key == "default_envs":
+                  default = list(value)
+          # Fallback: alle deklarierten Environments, falls default_envs fehlt
+          if not default:
+              default = [s.split(":", 1)[1] for s, _ in json.loads(raw)
+                         if s.startswith("env:")]
+          print("envs=" + json.dumps(sorted(default)))
+          print("count=" + str(len(default)))
+          PY
+      - name: Gefundene Environments anzeigen
+        run: |
+          echo "::notice::${{ steps.collect.outputs.count }} Environments werden gebaut"
+          echo '${{ steps.collect.outputs.envs }}'
+
+  macro-guards:
+    name: Board-Makro-Guards
+    runs-on: ubuntu-latest
+    # Ersetzt -Wundef als Regressionsschutz fuer N-10. -Wundef selbst ist im Build
+    # unbrauchbar: es meldet ~10.300 Treffer aus den ESP-IDF-/Arduino-Headern und nur
+    # eine Handvoll aus src/. Dieser Grep prueft genau die eine Fehlerform.
+    #
+    # Falsch: #if defined(BOARD_A) || (BOARD_B)   -> BOARD_B ist ein Makro auf den
+    #         Produktnamen; der Praeprozessor rechnet ueber die Namensbestandteile
+    #         und der Guard stimmt nur zufaellig.
+    # Richtig: #if defined(BOARD_A) || defined(BOARD_B)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bare BOARD_*-Makros in #if suchen
+        run: |
+          # -a: src/aht20.cpp ist ISO-8859-kodiert und wird sonst als Binaerdatei
+          # uebersprungen -- genau so sind zwei Fundstellen jahrelang durchgerutscht.
+          if grep -ran --include='*.cpp' --include='*.h' -E '#if.*\|\|[[:space:]]*\(BOARD_' src/; then
+            echo "::error::Bare BOARD_*-Makro in einem #if. Bitte defined(BOARD_x) verwenden."
+            exit 1
+          fi
+          echo "OK - keine blanken BOARD_*-Makros in #if-Ausdruecken."
+
+  unit-tests:
+    name: Unit-Tests (nativ)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: pio-native-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-native-${{ runner.os }}-
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio
+      - name: Tests ausfuehren
+        run: pio test -e native
+      # Das Test-Orakel (doc 08 §4): Korpus-Differential (golden.txt-Fence),
+      # Spec-Vektoren aus doc 11 und Interop-Vektoren. Ohne diesen Schritt
+      # liefe die gesamte Decoder-Absicherung nur lokal.
+      - name: Orakel-Tests ausfuehren (native_aprs)
+        run: pio test -e native_aprs
+
+  build:
+    name: ${{ matrix.env }}
+    needs: list-envs
+    runs-on: ubuntu-latest
+    strategy:
+      # Alle Boards durchbauen, auch wenn eines bricht — sonst sieht man nur das erste.
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        env: ${{ fromJSON(needs.list-envs.outputs.envs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: PlatformIO-Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'variants/*/platformio.ini') }}
+          restore-keys: |
+            pio-${{ runner.os }}-${{ matrix.env }}-
+
+      - name: PlatformIO Core installieren
+        run: pip install --upgrade platformio intelhex
+
+      - name: T-Beam-Supreme-Boarddefinition nachziehen
+        # Wird von platform-espressif32 nicht mitgeliefert; identisch zu meshcom-ci.yml.
+        if: matrix.env == 'ttgo_tbeam_supreme'
+        run: |
+          mkdir -p ~/.platformio/platforms/espressif32/boards
+          wget -qO ~/.platformio/platforms/espressif32/boards/t-beams3-supreme.json \
+            https://raw.githubusercontent.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/master/boards/t-beams3-supreme.json
+
+      - name: Bauen
+        run: |
+          set -o pipefail
+          pio run -e ${{ matrix.env }} 2>&1 | tee build.log
+
+      - name: RAM/Flash und Warnungen berichten
+        if: always()
+        run: |
+          [ -f build.log ] || exit 0
+          usage=$(grep -E '^(RAM|Flash):' build.log | tr '\n' ' ')
+          [ -n "$usage" ] && echo "::notice title=${{ matrix.env }} Speicher::$usage"
+          # Nur Warnungen aus src/ zählen; libdeps sind Fremdcode.
+          warn=$(grep -c '^src/.*warning:' build.log || true)
+          echo "::notice title=${{ matrix.env }} Warnungen::${warn} in src/"
+          grep '^src/.*warning:' build.log | sort -u | head -20 || true
+
+      # Ressourcen-Waechter (Report-only): Delta gegen die eingecheckte
+      # Baseline; ::warning bei Wachstum ueber Schwelle oder schwindendem
+      # Headroom. Baseline bewusst aktualisieren mit:
+      #   python3 tools/resource_watch.py update --env <env> --log build.log
+      - name: Ressourcen-Delta gegen Baseline
+        if: always()
+        run: |
+          [ -f build.log ] || exit 0
+          python3 tools/resource_watch.py check \
+            --env "${{ matrix.env }}" --log build.log \
+            --baseline tools/resource_baseline.json || true
+
+      # MEM-01, hartes Gate: statisches DRAM (.data+.bss) gegen die
+      # Linker-Grenze dram0_0_seg. Auf den classic-ESP32-Boards war am
+      # 2026-08-30 nur noch 0.5-1.7 kB Headroom -- der naechste statische
+      # Puffer scheitert sonst kommentarlos am Link. nRF52 hat kein .map,
+      # der Schritt ueberspringt es dann.
+      - name: DRAM-Headroom (dram0_0_seg)
+        if: always()
+        run: |
+          python3 tools/resource_watch.py dram \
+            --env "${{ matrix.env }}" \
+            --map ".pio/build/${{ matrix.env }}/firmware.map" \
+            --min-headroom 4096 --strict
+
+  result:
+    name: Build-Gate
+    needs: [build, unit-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ergebnis auswerten
+        run: |
+          fail=0
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::Mindestens ein Environment hat nicht gebaut."
+            fail=1
+          fi
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "::error::Die nativen Unit-Tests sind fehlgeschlagen."
+            fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "Alle Environments gebaut, alle Tests gruen."
+          exit $fail
