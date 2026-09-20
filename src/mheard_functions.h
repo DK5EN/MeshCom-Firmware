@@ -29,6 +29,8 @@ void sendMheard();
 // renderer sorts against the same instant it also uses for its own
 // aging/freshness check.
 uint8_t mheardSortedIndex(uint8_t *idx, uint32_t now);
+void startMheardToPhone();
+bool mheardToPhonePending();
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 void showMHeardTDECK();
 void showPathTDECK();

@@ -767,6 +767,56 @@ String getValue(String data, char separator, int index)
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+// MHeard-Liste zum Telefon, wiederaufnehmbar.
+//
+// Bis 4.35t wurde die komplette Liste in einem Loop-Durchlauf direkt hinter
+// die Config-Frames in BLEComToPhoneBuff (MAX_RING Slots) geschrieben. Ab
+// MAX_RING - json_configs_cnt gehoerten Stationen (11 bzw. 12) ueberschrieb
+// die Liste die Config-Frames, bevor der Drain sie senden konnte; die App sah
+// CONFFIN ohne jemals das I-Frame bekommen zu haben (leere Node Settings,
+// erst ein Reboot der Node half, weil er die MHeard-Liste leert).
+//
+// Jetzt setzt der Connect nur den Cursor; die Main-Loop ruft sendMheard()
+// erst, wenn der Kommando-Ring leer ist, und jeder Aufruf legt nur so viele
+// Eintraege nach, wie der Ring frei hat. Cursor -1 = nichts anstehend.
+//
+// Abweichung von upstream/dev: dort laeuft der Cursor ueber die physischen
+// Slots 0..MAX_MHEARD, hier ueber die nach DR-28 sortierte Sicht. Diese
+// Reihenfolge wird deshalb EINMAL beim Connect eingefroren. mheardSortedIndex()
+// liefert bei jedem Aufruf eine frische Sortierung, und updateMheard() schreibt
+// zwischen zwei Loop-Durchlaeufen aus dem LORA-Task weiter; ein Cursor gegen
+// eine jedes Mal neu sortierte Liste wuerde Stationen doppelt senden oder
+// ueberspringen, sobald sich waehrend der Uebertragung die Reihenfolge
+// verschiebt. Der Schnappschuss kostet MAX_MHEARD Byte BSS und nimmt sie
+// zugleich dem Loop-Stack ab -- auf nRF52 ist das die Richtung, in die dieses
+// Modul ohnehin schon ausweicht (siehe N-22 in sendMheard()).
+//
+// mheard_send_now ist der Zeitpunkt der Sortierung. DR-28 verlangt, dass ein
+// Renderer gegen denselben Augenblick altert, gegen den er sortiert hat; ueber
+// mehrere Loop-Durchlaeufe hinweg geht das nur, wenn der Augenblick mitwandert.
+static uint8_t mheard_send_idx[MAX_MHEARD];
+static uint8_t mheard_send_n = 0;
+static uint32_t mheard_send_now = 0;
+static int mheard_send_cursor = -1;
+
+void startMheardToPhone()
+{
+    mheard_send_now = (uint32_t)millis();
+    mheard_send_n = mheardSortedIndex(mheard_send_idx, mheard_send_now);
+    mheard_send_cursor = 0;
+}
+
+bool mheardToPhonePending()
+{
+    return mheard_send_cursor >= 0;
+}
+
+static int comRingFree()
+{
+    // ein Slot bleibt frei, sonst waere Write == Read und der Ring gilt als leer
+    return (ComToPhoneRead - ComToPhoneWrite - 1 + MAX_RING) % MAX_RING;
+}
+
 void sendMheard()
 {
     // N-22 (BACKLOG SS3.8m, Fix 9ce62aa0): der Loop-Task auf nRF52 hat 4 KB
@@ -789,19 +839,24 @@ void sendMheard()
     struct mheardLine mheardLine;
 #endif
 
-    // DR-28: most-recent-first, via mheardSortedIndex() -- the storage
-    // arrays themselves stay in physical slot order, see that function's
-    // comment and mheard_functions.h.
-    uint8_t idx[MAX_MHEARD];
-    uint32_t now = (uint32_t)millis();
-    uint8_t n = mheardSortedIndex(idx, now);
+    // DR-28: most-recent-first, via mheardSortedIndex() -- die Speicher-
+    // arrays selbst bleiben in physischer Slot-Reihenfolge, siehe den
+    // Kommentar dieser Funktion und mheard_functions.h. Die Sortierung
+    // stammt aus startMheardToPhone(); hier wird sie nur abgelaufen.
+    if(mheard_send_cursor < 0)
+        return;
 
-    for(uint8_t k=0; k<n; k++)
+    for(; mheard_send_cursor < mheard_send_n; mheard_send_cursor++)
     {
-        uint8_t iset = idx[k];
+        uint8_t iset = mheard_send_idx[mheard_send_cursor];
 
-        if((uint32_t)(now - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
+        if((uint32_t)(mheard_send_now - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
         {
+            // Ring voll: ohne den Cursor weiterzuschalten zurueck, der
+            // naechste Aufruf nimmt genau diesen Eintrag noch einmal.
+            if(comRingFree() == 0)
+                return;
+
             // R2-01: hier stand die DRITTE Kopie derselben Zerlegung --
             // elf getValue()-Aufrufe, jeder mit einer eigenen String-
             // Anforderung, und jeder scannte die Zeichenkette erneut. Der
@@ -840,6 +895,8 @@ void sendMheard()
             addBLEComToOutBuffer(bleBuffer, frame_len);
         }
     }
+
+    mheard_send_cursor = -1;
 }
 
 void showMHeard()
