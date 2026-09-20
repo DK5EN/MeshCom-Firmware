@@ -16,6 +16,12 @@ TARGET=${2:-fork-neo}
 SRC=${3:-fork-neo-test}
 BASE=${4:-upstream/dev}
 SYM=$(mktemp -d); trap 'rm -rf "$SYM"' EXIT
+# resource_watch.py is a fork tool: it does not exist on upstream/dev and is not
+# part of the chapter cut, so it is absent from every commit this gate checks
+# out. Snapshot it before the first checkout -- otherwise the region check
+# silently does nothing and the gate reports all green.
+RW=$SYM/resource_watch.py
+cp tools/resource_watch.py "$RW"
 ENVS="heltec_wifi_lora_32_V3 E22-DevKitC E22_XML-DevKitC ttgo_tbeam ttgo_tbeam_supreme t_deck t_deck_plus wiscore_rak4631"
 say(){ echo "$@" | tee -a "$LOG"; }
 nm_for(){ case "$1" in
@@ -31,7 +37,7 @@ while read -r sha subj; do
   say "=== $(echo "$sha" | cut -c1-8)  $subj"
   for e in $ENVS; do
     if "$PIO" run -e "$e" >"$LOG.b" 2>&1; then
-      if reg=$(python3 tools/resource_watch.py dram --env "$e" --map ".pio/build/$e/firmware.map" --min-headroom 4000 --strict 2>&1)
+      if reg=$(python3 "$RW" dram --env "$e" --map ".pio/build/$e/firmware.map" --min-headroom 4000 --strict 2>&1)
         then say "   ok   $e"; p=$((p+1))
         else say "   REGION $e"; echo "$reg" | sed 's/^/      /' >> "$LOG"; f=$((f+1)); fi
     else

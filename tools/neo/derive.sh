@@ -12,12 +12,18 @@
 # Defaults: SRC=fork-neo-test  TARGET=fork-neo  BASE=upstream/dev
 set -e
 cd "$(git rev-parse --show-toplevel)"
-HERE=tools/neo/paths
 SRC=${1:-fork-neo-test}
 TARGET=${2:-fork-neo}
 BASE=${3:-upstream/dev}
 CO="Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
-MSG=$(mktemp); trap 'rm -f "$MSG"' EXIT
+WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
+MSG=$WORK/msg
+
+# The path lists live in the tree this script is about to check out from under
+# itself -- upstream/dev has no tools/neo. Snapshot them first.
+HERE=$WORK/paths
+mkdir -p "$HERE"
+cp tools/neo/paths/*.txt "$HERE/"
 
 [ -z "$(git status --porcelain | grep -v '^??')" ] || { echo "ABORT: working tree not clean"; exit 1; }
 git rev-parse --verify -q "$SRC" >/dev/null || { echo "ABORT: $SRC does not exist"; exit 1; }
