@@ -100,6 +100,22 @@ mitgeschnitten. Auswertung mit `tools/reclaim_eval.py <log>`:
 - `RING_OVERFLOW` mit `lost=`, Telefon-Ring `lost>0`.
 - TX-Ring `ringmax`/`drop`, unverändert erwartet.
 
-Was der Dauerlauf nicht prüft und noch offen ist: die BLE-Verbindung mit der
-App (Kommando-Ring beim Verbinden, Nachrichten-Ring beim Empfang) und die
-Nachrichtenseite der Web-Oberfläche. Beides von Hand.
+## BLE über McApp geprüft
+
+`mcapp.local` (McApp, `../MCProxy`, Dienst `mcapp-ble.service`) hängt per BLE
+am 98er. Beide OTA-Neustarts (11:12 und 11:15) hat der Proxy als Verlust
+gesehen und sich um 11:16:05 wieder verbunden; seither kein Abbruch. Danach,
+aus `/api/ble/registers` und der Datenbank des Proxys:
+
+- **Kommando-Ring:** die Register I, G, SN, SA, SE sind nach dem Verbinden
+  neu gefüllt, das sind die JSON-Antworten (`D`-Frames bis 245 Byte) auf die
+  zehn Abfragen des Proxys um 11:16:21 bis 11:16:30. Register G trägt um
+  11:25:59 noch eine frische Antwort.
+- **Daten-Ring:** Positionsframes anderer Stationen (`src_type lora`),
+  MHeard-Einträge (`0x91`, `transformer mh`) und die eigene DM
+  `reclaim webtest 11:20` an DK5EN-92 als `ble_remote` liegen in der
+  Datenbank, alle nach 11:16.
+- **Web-Oberfläche:** die Nachrichtenseite rendert aus dem Verlauf des
+  Byte-Rings, eine empfangene und die eigene gesendete Nachricht.
+
+Was nur der Dauerlauf zeigt: Heap-Trend und Verdrängung unter Last.
