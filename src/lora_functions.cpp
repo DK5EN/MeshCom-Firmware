@@ -9,6 +9,7 @@
 #include "capture_functions.h"
 #include "dedup_functions.h"
 #include "setlog_lines.h"
+#include "nbr_matrix.h"
 
 #ifdef SX127X
     #include <RadioLib.h>
@@ -754,6 +755,69 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         }
         else
         {
+            // NBR (Konzept ~/Desktop/Nachbarschaftsmatrix.html 4.1/4.4,
+            // nbr_matrix.h): Haken ganz vorn in diesem Zweig, VOR Dedup-
+            // Pruefung, Raw-Ring-Schreiben und dem Last-Hop-Check unten --
+            // Duplikate sind laut 4.1 die Hauptquelle fuer Hoerbeweise (erst
+            // die zweite Kopie eines Frames zeigt, dass ein zweiter Nachbar
+            // den Absender hoert), und auch das eigene Echo traegt noch den
+            // Pfad, der "wer hoert wen" beantwortet.
+            if(aprsmsg.payload_type == ':' || aprsmsg.payload_type == '!' || aprsmsg.payload_type == '@')
+            {
+                // Contract mit der Web-Seite (W3): Minuten seit Boot, nicht
+                // die Wanduhr (die steht nach einem Kaltstart auf 1970).
+                uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+                // Lazy Init deckt Boot UND ein Laufzeit-"--setcall" gleich mit
+                // ab -- kein zusaetzlicher Haken in setup() oder im Settings-
+                // Kommando noetig.
+                if(strcmp(nbrMatrix.rows[0].call, meshcom_settings.node_call) != 0)
+                    nbrInit(nbrMatrix, meshcom_settings.node_call, now_min);
+
+                // Zeile 0 bekommt nie einen fremden POS-Frame: eigene Position
+                // und eigene Flags (GW, Mesh) kommen aus den Settings, sonst
+                // bleibt die Reichweite der eigenen Zeile immer leer (Bench
+                // 2026-09-20, erste Seite nach dem Flash).
+                if(!(nbrMatrix.rows[0].flags & NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
+                    nbrNotePos(nbrMatrix, meshcom_settings.node_call, (float)meshcom_settings.node_lat,
+                               (float)meshcom_settings.node_lon, bMESH, 0, now_min);
+                if(bGATEWAY)
+                    nbrMatrix.rows[0].flags |= NBR_FLAG_GW;
+
+                int nbr_hits = nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
+                                             aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
+                                             rssi, now_min);
+
+                if(bLORADEBUG)
+                    printfdeb("[NBR] hits=%d path=%s\n", nbr_hits, aprsmsg.msg_source_path);
+
+                // Relayte POS-Frames (Konzept 4.4): MHeard traegt die Position
+                // nur bei Direktempfang ein (unten, msg_source_call ==
+                // msg_source_last), die Matrix braucht sie aber unabhaengig
+                // vom letzten Hop, sonst bleiben die Nachbarn hinter einem
+                // Relais positionslos. msg_source_hw ist -- anders als
+                // msg_last_hw -- bereits der Absender-Wert ohne Last-Hop-Bit,
+                // also ohne Maskierung uebernehmbar.
+                if(aprsmsg.payload_type == '!')
+                {
+                    struct aprsPosition aprspos;
+
+                    if(decodeAPRSPOS(aprsmsg.msg_payload, aprspos) == 0x01)
+                    {
+                        float nbr_lat = (float)conv_coord_to_dec(aprspos.lat);
+                        if(aprspos.lat_c == 'S')
+                            nbr_lat = nbr_lat * -1.0f;
+
+                        float nbr_lon = (float)conv_coord_to_dec(aprspos.lon);
+                        if(aprspos.lon_c == 'W')
+                            nbr_lon = nbr_lon * -1.0f;
+
+                        nbrNotePos(nbrMatrix, aprsmsg.msg_source_call, nbr_lat, nbr_lon, aprsmsg.msg_mesh,
+                                   aprsmsg.msg_source_hw, now_min);
+                    }
+                }
+            }
+
             // LoRx RX to RAW-Buffer
             //memcpy(ringbufferRAWLoraRX[RAWLoRaWrite], charBuffer_aprs((char*)"", aprsmsg).c_str(), UDP_TX_BUF_SIZE-1);
             charBuffer_aprs(aprsmsg);

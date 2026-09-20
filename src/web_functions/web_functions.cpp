@@ -22,6 +22,7 @@
 #include <txring_functions.h> // WQ-01: LoRa queue panel -- txRingPrioCounts()
 #include <setlog_lines.h>      // WQ-01: LoRa queue panel -- setlogDedupWindowMin()
 #include "track_warning.h"    // TRK-01: Warnhinweis-Text neben dem Track-Switch
+#include "nbr_matrix.h"        // NBR-W2: Nachbarschaftsmatrix -- Datenquelle fuer die neue Neighbours-Seite
 
 #include "web_UIComponents.h"
 #include "web_setup.h"
@@ -33,6 +34,13 @@ CommonWebServer web_server(80);
 CommonWebClient web_client;
 
 void web_client_html(CommonWebClient web_client);
+
+// NBR-W2: lokale Vorwaertsdeklaration, damit der Dispatcher weiter oben in
+// dieser Datei sub_page_neighbours() aufrufen kann, ohne web_functions.h
+// anzufassen (das liegt ausserhalb dieses Datei-Sets). Gehoert dort neben
+// die anderen sub_page_*()-Deklarationen -- das ist ein Punkt fuer den
+// naechsten, der web_functions.h anfassen darf.
+void sub_page_neighbours();
 
 
 String web_header;
@@ -684,6 +692,11 @@ String work_webpage(bool bget_password, int webid)
                             send_http_header(200, RESPONSE_TYPE_TEXT);
                             sub_page_mheard();
                         }
+                        else if (web_header.indexOf("/?page=neighbours") >= 0)
+                        { // NBR-W2: user requested the neighbour-matrix page
+                            send_http_header(200, RESPONSE_TYPE_TEXT);
+                            sub_page_neighbours();
+                        }
                         else if (web_header.indexOf("/?page=messages") >= 0)
                         { // user requested the messages page
                             send_http_header(200, RESPONSE_TYPE_TEXT);
@@ -1177,6 +1190,8 @@ void deliver_scaffold(bool bget_password)
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('position',this,true)\"><svg viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"#ffffff\" stroke=\"#ffffff\"><g stroke-width=\"0\"></g><g istroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"#ffffff\" d=\"M256 17.108c-75.73 0-137.122 61.392-137.122 137.122.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063c11.27-20.324 17.188-43.18 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108zm0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z\"></path></g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mheard',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 32 32\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <style type=\"text/css\"> .linesandangles_een{fill:#ffffff;} </style> <path class=\"linesandangles_een\" d=\"M25,13c0,3.348-2.208,7.455-4.286,9.618c-0.527,0.549-0.902,1.188-1.299,1.863 C18.447,26.131,17.35,28,14,28c-3.616,0-5.077-2.068-6.043-3.437c-0.238-0.337-0.464-0.657-0.664-0.856l1.414-1.414 C9.028,22.614,9.301,23,9.59,23.41C10.49,24.683,11.42,26,14,26c2.205,0,2.796-1.007,3.69-2.531 c0.417-0.711,0.891-1.517,1.581-2.236C21.064,19.366,23,15.687,23,13c0-3.86-3.14-7-7-7s-7,3.14-7,7H7c0-4.962,4.038-9,9-9 S25,8.038,25,13z M12,17h-1v2h1c1.206,0,3-0.799,3-3c0-1.639-0.994-2.5-2-2.833v-0.161C13.006,12.503,13.177,10,16,10 s2.994,2.503,3,3.005L20,13h1c0-1.729-1.045-5-5-5s-5,3.271-5,5l0.014,1.975L11.988,15C12.45,15.012,13,15.195,13,16 S12.45,16.988,12,17z\"></path> </g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('path',this,true)\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"#ffffff\" fill-rule=\"evenodd\" d=\"M13 0a3 3 0 00-1.65 5.506 7.338 7.338 0 01-.78 1.493c-.22.32-.472.635-.8 1.025a1.509 1.509 0 00-.832.085 12.722 12.722 0 00-1.773-1.124c-.66-.34-1.366-.616-2.215-.871a1.5 1.5 0 10-2.708 1.204c-.9 1.935-1.236 3.607-1.409 5.838a1.5 1.5 0 101.497.095c.162-2.07.464-3.55 1.25-5.253.381-.02.725-.183.979-.435.763.23 1.367.471 1.919.756a11.13 11.13 0 011.536.973 1.5 1.5 0 102.899-.296c.348-.415.64-.779.894-1.148.375-.548.665-1.103.964-1.857A3 3 0 1013 0zm-1.5 3a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z\" clip-rule=\"evenodd\"></path></g></svg></Button>\n");
+    // NBR-W2: Menueknopf fuer die Nachbarschaftsmatrix -- 3x3-Raster als Icon, Konzept 4.5.
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('neighbours',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke=\"#ffffff\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"16\" width=\"5\" height=\"5\"></rect></g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('rxlog',this,true)\"><svg viewBox=\"0 0 32 32\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:sketch=\"http://www.bohemiancoding.com/sketch/ns\" fill=\"#ffffff\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <title>book-album</title> <desc>Created with Sketch Beta.</desc><defs></defs><g stroke=\"none\" stroke-width=\"1\" fill=\"none\" fill-rule=\"evenodd\" sketch:type=\"MSPage\"> <g sketch:type=\"MSLayerGroup\" transform=\"translate(-412.000000, -99.000000)\" fill=\"#ffffff\"> <path d=\"M442,124 C442,125.104 441.073,125.656 440,126 C440,126 434.557,127.515 429,128.977 L429,104 L440,101 C441.104,101 442,101.896 442,103 L442,124 L442,124 Z M427,128.998 C421.538,127.53 416,126 416,126 C414.864,125.688 414,125.104 414,124 L414,103 C414,101.896 414.896,101 416,101 L427,104 L427,128.998 L427,128.998 Z M440,99 C440,99 434.211,100.594 428.95,102 C428.291,102.025 427.627,102 426.967,102 C421.955,100.656 416,99 416,99 C413.791,99 412,100.791 412,103 L412,124 C412,126.209 413.885,127.313 416,128 C416,128 421.393,129.5 426.967,131 L428.992,131 C434.612,129.5 440,128 440,128 C442.053,127.469 444,126.209 444,124 L444,103 C444,100.791 442.209,99 440,99 L440,99 Z\" sketch:type=\"MSShapeGroup\"> </path> </g> </g> </g></svg></Button>\n");
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('spectrum',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M13,11v4M9,7v8m8-6v6\" style=\"fill:none;stroke:#ffffff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path><path d=\"M3,19H21M5,3V21\" style=\"fill:none;stroke:#ffffff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path></g></svg></Button>\n");
     if(bMCP23017) {
@@ -1547,6 +1562,168 @@ void sub_page_path()
     if (!isShowing)
         web_client.println("No Paths available so far.");
     web_client.println("</div></div>");
+    web_client.println(); // The HTTP response ends with another blank line
+}
+
+/**
+ * ###########################################################################################################################
+ * delivers the neighbour-matrix page to be injected into the scaffold (NBR-W2, Konzept 4.5)
+ */
+void sub_page_neighbours()
+{
+    // Vertragspunkt mit dem OnRxDone-Haken (lora_functions.cpp): dieselbe
+    // Minuten-seit-Boot-Umrechnung, sonst laufen Web-Seite und Schreiber
+    // gegen unterschiedliche Uhren.
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+    _create_meshcom_subheader("Neighbours");
+    web_client.println("<div id=\"content_inner\">");
+
+    if (nbrMatrix.rows[0].call[0] == 0)
+    { // noch kein Frame ausgewertet -- Zeile 0 ist unbelegt
+        web_client.println("<p>No frames received yet.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
+
+    // Sichtbare Zeilen: Zeile 0 immer dabei, sonst USED und frisch (Konzept
+    // 4.5, Fenster 12h). NBR_MAX_ROWS ist board-abhaengig <= 21, das Feld
+    // bleibt klein genug fuer den 4-KB-Loop-Stack auf nRF52 (N-22).
+    uint8_t idx[NBR_MAX_ROWS];
+    uint8_t n = 0;
+    idx[n++] = 0;
+    for (uint8_t r = 1; r < NBR_MAX_ROWS; r++)
+    {
+        if ((nbrMatrix.rows[r].flags & NBR_FLAG_USED) && nbrFresh(nbrMatrix.rows[r].last_min, now_min))
+            idx[n++] = r;
+    }
+
+    // Urteil (Konzept 4.3): exklusive Zeilen sind die, die im Fenster nur ich
+    // hoere -- die einzigen, fuer die mein Mesh etwas beitraegt.
+    uint8_t excl[NBR_MAX_ROWS];
+    int nexcl = nbrExclusive(nbrMatrix, now_min, excl, NBR_MAX_ROWS);
+    uint8_t nexcl_shown = (nexcl > 0) ? ((nexcl < (int)NBR_MAX_ROWS) ? (uint8_t)nexcl : (uint8_t)NBR_MAX_ROWS) : 0;
+
+    web_client.printf("<p>Window: %u h, %u row(s) fresh. ", (unsigned)(NBR_WINDOW_MIN / 60), (unsigned)n);
+    if (nexcl < 0)
+    {
+        web_client.println("Nothing heard directly yet.</p>");
+    }
+    else if (nexcl == 0)
+    {
+        web_client.println("No exclusive nodes. Mesh is redundant here.</p>");
+    }
+    else
+    {
+        web_client.printf("%d exclusive node(s): ", nexcl);
+        for (uint8_t i = 0; i < nexcl_shown; i++)
+            web_client.printf("%s%s", (i ? ", " : ""), nbrMatrix.rows[excl[i]].call);
+        web_client.println(". Mesh needed.</p>");
+    }
+
+    // Kreuztabelle: Spaltenkoepfe sind Anzeige-Nummern (1..n), nicht der
+    // Speicherindex -- auf dem Telefon bleibt die Tabelle so schmal genug
+    // (Konzept 4.5: "auf dem Telefon werden die Spaltenkoepfe zu Nummern").
+    // Das Tabellen-CSS des Scaffolds greift nur auf "#content_inner > table"
+    // (Zeile ~1096); ein Wrapper-div fuer das seitliche Scrollen wuerde die
+    // Matrix aus dem Selektor werfen (Bench 2026-09-20: Matrix ohne Rahmen).
+    // Deshalb scrollt die Tabelle selbst als Block.
+    web_client.println("<table class=\"table\" style=\"display:inline-block;overflow-x:auto;width:auto;max-width:100%;\">");
+    web_client.print("<thead><tr class=\"font-bold\"><td></td>");
+    for (uint8_t j = 0; j < n; j++)
+        web_client.printf("<td>%u</td>", (unsigned)(j + 1));
+    web_client.println("</tr></thead>");
+
+    for (uint8_t i = 0; i < n; i++)
+    {
+        uint8_t X = idx[i];
+        bool rowExcl = false;
+        for (uint8_t e = 0; e < nexcl_shown; e++)
+        {
+            if (excl[e] == X)
+            {
+                rowExcl = true;
+                break;
+            }
+        }
+
+        if (X == 0)
+            web_client.print("<tr style=\"background-color:#d9ecff;\">");
+        else if (rowExcl)
+            web_client.print("<tr style=\"background-color:#ffd9d9;\">");
+        else
+            web_client.print("<tr>");
+        web_client.printf("<td class=\"font-bold\">%u %s</td>", (unsigned)(i + 1), nbrMatrix.rows[X].call);
+
+        for (uint8_t j = 0; j < n; j++)
+        {
+            uint8_t Y = idx[j];
+            if (X == Y)
+            {
+                web_client.print("<td>-</td>");
+                continue;
+            }
+            const NbrCell &c = nbrMatrix.cells[X][Y];
+            if ((c.cnt_text || c.cnt_pos || c.cnt_hey) && nbrFresh(c.last_min, now_min))
+            {
+                unsigned sum = (unsigned)c.cnt_text + (unsigned)c.cnt_pos + (unsigned)c.cnt_hey;
+                web_client.printf("<td title=\"T:%u P:%u H:%u rssi:%d\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, (int)c.rssi, sum);
+            }
+            else
+            {
+                web_client.print("<td></td>");
+            }
+        }
+        web_client.println("</tr>");
+    }
+    web_client.println("</table>");
+
+    // Zeilentabelle: eine Zeile je sichtbarer Nachbarschaftszeile, inkl. 0.
+    web_client.println("<table class=\"table mw-600\">");
+    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>GW</td><td>Mesh</td><td>Hears me</td><td>Hearers</td><td>Reach</td><td>Age</td></tr></thead>");
+    for (uint8_t i = 0; i < n; i++)
+    {
+        uint8_t X = idx[i];
+        const NbrRow &row = nbrMatrix.rows[X];
+
+        web_client.printf("<tr><td>%s</td><td>%s</td><td>%s</td>", row.call,
+                           (row.flags & NBR_FLAG_GW) ? "yes" : "no",
+                           (row.flags & NBR_FLAG_MESH) ? "yes" : "no");
+
+        const NbrCell &hm = nbrMatrix.cells[0][X];
+        if (X != 0 && hm.rssi != 0 && nbrFresh(hm.last_min, now_min))
+            web_client.printf("<td>%d</td>", (int)hm.rssi);
+        else
+            web_client.print("<td>-</td>");
+
+        uint8_t hearers[NBR_MAX_ROWS];
+        uint8_t nh = nbrHearers(nbrMatrix, X, now_min, hearers, NBR_MAX_ROWS);
+        uint8_t nh_shown = (nh < NBR_MAX_ROWS) ? nh : (uint8_t)NBR_MAX_ROWS;
+        web_client.print("<td>");
+        if (nh_shown == 0)
+        {
+            web_client.print("-");
+        }
+        else
+        {
+            for (uint8_t h = 0; h < nh_shown; h++)
+                web_client.printf("%s%s", (h ? "," : ""), nbrMatrix.rows[hearers[h]].call);
+        }
+        web_client.print("</td>");
+
+        int partner = -1;
+        float reach = nbrReach(nbrMatrix, X, now_min, &partner);
+        if (reach >= 0 && partner >= 0)
+            web_client.printf("<td>%.1f km @ %s</td>", (double)reach, nbrMatrix.rows[partner].call);
+        else
+            web_client.print("<td>-</td>");
+
+        web_client.printf("<td>%u min</td></tr>\n", (unsigned)nbrRowAgeMin(nbrMatrix, X, now_min));
+    }
+    web_client.println("</table>");
+
+    web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line
 }
 

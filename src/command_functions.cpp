@@ -10,6 +10,7 @@
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
 #include "mheard_functions.h"
+#include "nbr_matrix.h"
 #include "udp_functions.h"
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "extudp_functions.h"
@@ -914,7 +915,7 @@ void commandAction(char *umsg_text, bool ble)
                 delay(100);
             #endif
 
-            printfdeb("--info      show info\n--msgid     show message-id counter\n--mheard    show MHeard\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
+            printfdeb("--info      show info\n--msgid     show message-id counter\n--mheard    show MHeard\n--neighbours show neighbour matrix (alias --nbr)\n--nbrreset  reset neighbour matrix\n--gateway   on/off/pos/nopos\n--webserver on/off\n--webpwd    xxxx/none\n--mesh      on/off\n");
             delay(100);
             #ifdef ESP32
                 printlndeb("--netconsole on/off  (net console port 2323)\n");
@@ -4829,6 +4830,81 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"path") == 0 || commandCheck(msg_text+2, (char*)"hey") == 0)
     {
         showPath();
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"neighbours") == 0 || commandCheck(msg_text+2, (char*)"nbr") == 0)
+    {
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        // Konzept 4.2/4.5: "leer" heisst wirklich noch nichts gehoert, nicht
+        // nur ausserhalb des 720-min-Fensters -- Zeile 0 traegt vor der
+        // ersten OnRxDone-Ausfuehrung (Lazy Init dort) noch kein Rufzeichen.
+        if(nbrMatrix.rows[0].call[0] == 0x00)
+        {
+            printfdeb("[NBR] empty\n");
+            return;
+        }
+
+        // N-22: eigener Static statt Stack -- der Loop-Task hat auf nRF52 nur
+        // 4 KB (siehe showMHeard()), das Kommando laeuft ausschliesslich dort.
+        // 300 statt 200: Zeile 0 mit 20 Hoerern plus Reichweite und Alter
+        // liegt ueber 200 Zeichen, snprintf kappte dann stumm (Advisor L1).
+        static char nbr_buf[300];
+
+        uint8_t nbr_rows[NBR_MAX_ROWS];
+        uint8_t nbr_n = 0;
+        nbr_rows[nbr_n++] = 0;
+
+        for(int i = 1; i < NBR_MAX_ROWS; i++)
+        {
+            if((nbrMatrix.rows[i].flags & NBR_FLAG_USED) && nbrFresh(nbrMatrix.rows[i].last_min, now_min))
+                nbr_rows[nbr_n++] = (uint8_t)i;
+        }
+
+        uint8_t ex_idx[NBR_MAX_ROWS];
+        int ex_n = nbrExclusive(nbrMatrix, now_min, ex_idx, NBR_MAX_ROWS);
+
+        if(ex_n == -1)
+        {
+            printfdeb("[NBR] window=%dmin rows=%d now=%d verdict=nothing-heard\n", NBR_WINDOW_MIN, nbr_n, now_min);
+        }
+        else if(ex_n > 0)
+        {
+            int vpos = snprintf(nbr_buf, sizeof(nbr_buf), "[NBR] window=%dmin rows=%d now=%d verdict=exclusive:",
+                                 NBR_WINDOW_MIN, nbr_n, now_min);
+
+            for(int i = 0; i < ex_n && i < NBR_MAX_ROWS && vpos > 0 && vpos < (int)sizeof(nbr_buf); i++)
+            {
+                vpos += snprintf(nbr_buf+vpos, sizeof(nbr_buf)-vpos, "%s%s", (i > 0) ? "," : "",
+                                  nbrMatrix.rows[ex_idx[i]].call);
+            }
+
+            printfdeb("%s\n", nbr_buf);
+        }
+        else
+        {
+            printfdeb("[NBR] window=%dmin rows=%d now=%d verdict=redundant\n", NBR_WINDOW_MIN, nbr_n, now_min);
+        }
+
+        for(int k = 0; k < nbr_n; k++)
+        {
+            int flen = nbrFormatRow(nbrMatrix, nbr_rows[k], now_min, nbr_buf, sizeof(nbr_buf));
+            if(flen > 0)
+                printfdeb("[NBR] %s%s\n", nbr_buf, (flen >= (int)sizeof(nbr_buf)) ? " ..." : "");
+        }
+
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"nbrreset") == 0)
+    {
+        uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+        nbrReset(nbrMatrix, now_min);
+
+        printfdeb("[NBR] reset\n");
 
         return;
     }
