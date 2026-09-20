@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Nachbarschaftsmatrix: Wer hört wen</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+          --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+  html { color-scheme: light; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+  .meta li { margin: 2px 0; }
+  .bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+  .bluf p { margin: 6px 0; }
+  .bluf ol { margin: 4px 0 10px; }
+  .reco { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+  pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+  svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg text { font-size: 12px; fill: var(--ink); }
+  svg .t11 { font-size: 11px; fill: var(--muted); }
+  svg .b { font-weight: 600; }
+  svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+  svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+  svg .ham { stroke: var(--ham); } svg .hamf { fill: #f1ebfa; }
+  svg .www { stroke: var(--www); } svg .wwwf { fill: #e9f1fd; }
+  svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+  svg .prx { fill: #fff6ea; stroke: var(--warn); }
+  svg .bad { stroke: var(--bad); fill: #fdecec; }
+  svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+  svg .lnh { stroke: var(--ham); stroke-width: 1.4; fill: none; }
+  svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+  svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+  .tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+  .tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+  ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  .small { font-size: 13px; color: var(--muted); }
+  .mx td, .mx th { text-align:center; padding:4px 6px; font-variant-numeric: tabular-nums; }
+  .mx td.me { background:#e9f1fd; }
+  .mx td.ex { background:#fdecec; font-weight:600; }
+  .mx td.z { color:#b8c2cc; }
+  @media (max-width: 720px) { .toc { columns: 1; } }
+  @media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Nachbarschaftsmatrix: Wer hört wen</h1>
+<ul class="meta">
+<li>Stand: 2026-09-20</li>
+<li>Autor: DK5EN, mit Claude</li>
+<li>Codebasis: MeshCom-Firmware Fork, Branch <code>feature-neighbour-matrix</code> ab <code>5ed69ee2</code> (fork-neo-test)</li>
+<li>Quelle Empfangspfad: <code>src/lora_functions.cpp</code> (OnRxDone 505 ff., ACK-Handler 391 ff., Relay 1530 ff.)</li>
+<li>Quelle MHeard und HEY-Pfad: <code>src/mheard_functions.cpp</code>, <code>src/mheard_record.h</code></li>
+<li>Quelle ACK-Format: <code>src/ack_attribution.h</code>, <code>docs/ack-wer-hat-quittiert.md</code></li>
+<li>Quelle Web-Oberfläche: <code>src/web_functions/web_functions.cpp</code> (Dispatcher 682, Scaffold 841 ff., MHeard-Seite 1446)</li>
+<li>Rufzeichen im Text: DK5EN-93 ist der Bench-Heltec, alle anderen Rufzeichen sind Platzhalter des Betreibers</li>
+</ul>
+
+<h2 id="s1">1. Ergebnis</h2>
+<div class="bluf">
+<p>Jeder Frame, den der Knoten hört, trägt im Pfad einen Hörbeweis: wer ihn wiederholt hat, hat den Vorgänger gehört. Heute wertet die Firmware davon nur den letzten Hop (MHeard) und den Pfad je Absender (HEY-Pfad) aus, verwirft die Signalberichte über den eigenen HEY (<code>updateHeyPath()</code> Zeile 486) und kann bei Gateway-ACKs nicht sagen, wer quittiert hat. Die Frage, ob dieser Knoten meshen soll, wird deshalb ohne Daten entschieden.</p>
+<p>Daraus folgt:</p>
+<ol>
+<li><b>Stufe 1, Nachbarschaftsmatrix:</b> eine Regel (jedes Pfadpaar zählt), eine Tabelle N mal N mit Zähler, Signalbericht und Letztzeit, Zeithorizont 12 h, Positionscache je Zeile, eine Web-Seite und ein Serienkommando. Beantwortet die vier Betreiberfragen ohne Änderung am Funkprotokoll.</li>
+<li><b>Stufe 2, Gateway-ACK-Zuordnung (zurückgestellt):</b> der quittierende Gateway sendet den bereits definierten 3-Byte-Node-Hash, der Empfänger löst ihn über eine Hash-Tabelle aus <code>msg_id &gt;&gt; 10</code> auf. Wirkt nur zwischen Fork-Knoten.</li>
+</ol>
+<p class="reco">Empfehlung: Stufe 1 in drei Wellen umsetzen, auf dem Bench-Heltec DK5EN-93 flashen und im Browser abnehmen, danach 12 h Feldlauf auf DK5EN-98. Stufe 2 erst, wenn ein zweiter Fork-Gateway in Hörweite steht.</p>
+</div>
+
+<h3>Entscheidungen zu den Anforderungen</h3>
+<table>
+<tr><th>Nr</th><th>Anforderung</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>A</td><td>Kreuztabelle: mein Knoten und meine direkten Hops, stumpf hochgezählt</td><td>Matrix N mal N, Zeile 0 ist der eigene Knoten, Zelle (X,Y) zählt "Y hat X gehört"</td><td>1</td><td>4.1, 4.2</td></tr>
+<tr><td>B</td><td>Je Nachrichtentyp zählen, wer bestätigt hat (Heard, Gateway, Foreign GW)</td><td>Nur Textmeldungen bekommen ACKs, POS und HEY nie. Ersetzt durch drei Frame-Typ-Zähler je Zelle (Text, POS, HEY). Gateway-ACKs bleiben anonym</td><td>1, GW in 2</td><td>4.1, 4.6</td></tr>
+<tr><td>C</td><td>Knotentyp: Gateway oder nicht, Mesh oder nicht, Entfernung</td><td>Liegt vor: HEY-Ziel <code>H</code>/<code>HG</code>, Mesh-Flag aus dem POS-Frame, Entfernung aus dem Positionscache. Wird je Zeile angezeigt</td><td>1</td><td>4.4, 4.5</td></tr>
+<tr><td>1</td><td>Gibt es Knoten, die nur ich höre? Dann muss ich meshen</td><td>Zeile X ist exklusiv, wenn im Fenster kein anderer Hörer als ich eingetragen ist. Die Seite zählt die exklusiven Zeilen und nennt sie</td><td>1</td><td>4.3</td></tr>
+<tr><td>2</td><td>Höre ich nur Knoten, die ohnehin ein anderer wiederholt? Dann lieber nicht meshen</td><td>Null exklusive Zeilen bei mindestens einer gehörten Zeile ergibt den Hinweis "Mesh hier redundant". Gilt für die Knoten in meiner Hörweite, siehe Grenze in 4.3</td><td>1</td><td>4.3</td></tr>
+<tr><td>3</td><td>Zeithorizont 12 h, älteres altert heraus</td><td>Jede Zelle und jede Zeile trägt eine Letztzeit in Minuten. Älter als 720 min gilt als leer, ein Treffer auf eine verfallene Zelle beginnt bei 1</td><td>1</td><td>4.2</td></tr>
+<tr><td>4</td><td>Wie weit gehen die Links meines Knotens und der Nachbarn?</td><td>Positionscache je Zeile aus jedem POS-Frame des Absenders, auch relayed. Reichweite einer Zeile ist die größte Distanz zu einem frischen Partner, berechnet beim Rendern</td><td>1</td><td>4.4</td></tr>
+</table>
+
+<h3>Ausbaustufen</h3>
+<table>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>Lücke bei Knoten ohne Fork</th><th>Lücke bei Knoten mit <code>--shortpath on</code></th><th>Voraussetzung</th></tr>
+<tr><td>0 (heute)</td><td>MHeard je letztem Hop, HEY-Pfad je Absender, ACK-Status zur App</td><td>C teilweise</td><td>keine, alles passiv</td><td>keine</td><td>keine</td></tr>
+<tr><td>1</td><td>Matrix, Zeithorizont, Positionscache, Web-Seite, Kommando</td><td>A, B ohne GW-ACK, C, 1 bis 4</td><td>keine: die Regel liest nur Pfade, die jeder Knoten heute schon sendet</td><td>Zwischenhops fehlen im Pfad, das Paar Absender zu Relais wird als direkt gezählt (5, Szenario 1)</td><td>Fork-Image auf dem beobachtenden Knoten</td></tr>
+<tr><td>2 (zurückgestellt)</td><td>Hash-Anhang im Gateway-ACK, Hash-Tabelle, GW-ACK-Spalte je Zeile</td><td>B vollständig</td><td>GW-ACK bleibt anonym, Zähler bleibt bei "unbekannt"</td><td>wie Stufe 1</td><td>Fork-Image auf dem quittierenden Gateway</td></tr>
+</table>
+
+<h3>Inhalt</h3>
+<ol class="toc">
+<li><a href="#s1">Ergebnis</a></li>
+<li><a href="#s2">Ausgangslage</a></li>
+<li><a href="#s3">Zielbild</a></li>
+<li><a href="#s4">Bausteine</a>
+  <ol>
+  <li>Hörbeweis-Regel</li><li>Speicher und Alterung</li><li>Auswertung der vier Fragen</li><li>Reichweite</li><li>Web-Seite und Kommando</li><li>Stufe 2: Gateway-ACK-Zuordnung</li>
+  </ol></li>
+<li><a href="#s5">Fehlerszenarien</a></li>
+<li><a href="#s6">Rollout</a></li>
+<li><a href="#s7">Offene Punkte</a></li>
+</ol>
+
+<h2 id="s2">2. Ausgangslage</h2>
+<p>Der Knoten hat heute drei Datenpfade, die Wissen über die Nachbarschaft tragen, und keiner von ihnen hält das Paar "wer hat wen gehört" fest.</p>
+<table>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Pfad eines Frames</td><td><code>Absender,Hop1,Hop2</code>, jedes Relais hängt sein Rufzeichen an</td><td><code>lora_functions.cpp:1541-1546</code></td></tr>
+<tr><td>Letzter Hop</td><td><code>msg_source_last</code>, das Rufzeichen hinter dem letzten Komma</td><td><code>aprs_functions.cpp:255-257</code></td></tr>
+<tr><td>MHeard-Schlüssel</td><td>der letzte Hop, nicht der Absender</td><td><code>lora_functions.cpp:794</code></td></tr>
+<tr><td>MHeard-Position</td><td>nur gespeichert, wenn Absender gleich letzter Hop</td><td><code>lora_functions.cpp:849</code></td></tr>
+<tr><td>MHeard-Fenster</td><td>1 h für den Nachbarzähler, 12 h für das Ausdünnen</td><td><code>mheard_functions.cpp:103-104</code></td></tr>
+<tr><td>HEY-Aussendung</td><td>Typ <code>@</code>, Ziel <code>H</code> oder <code>HG</code> (Gateway), Nutzlast <code>R&lt;n&gt;;</code></td><td><code>loop_functions.cpp:5104-5119</code></td></tr>
+<tr><td>HEY-Anreicherung je Hop</td><td><code>NCT,RSSI,SNR;</code> angehängt, RSSI positiv</td><td><code>aprs_functions.cpp:1134</code>, Aufrufe <code>lora_functions.cpp:1436, 1549</code></td></tr>
+<tr><td>Eigener HEY zurück</td><td>wird verworfen, Absender gleich eigenes Rufzeichen</td><td><code>mheard_functions.cpp:486-487</code></td></tr>
+<tr><td>HEY-Pfad-Speicher</td><td>je Absender der Pfad ohne Absender, 52 Byte, Bit 7 der Länge ist das Gateway-Flag</td><td><code>mheard_functions.cpp:641-658</code></td></tr>
+<tr><td>Node ACK (heard)</td><td>Nachbar wiederholt meinen Textframe, Rufzeichen aus <code>msg_source_last</code></td><td><code>lora_functions.cpp:938-946</code></td></tr>
+<tr><td>Gateway ACK auf dem Draht</td><td>12 Byte, msg_id ist <code>millis()</code>, kein Rufzeichen, kein Hash, Byte 11 immer 0</td><td><code>lora_functions.cpp:1307-1321</code></td></tr>
+<tr><td>Hash-Anhang</td><td>definiert und beim Lesen erkannt, von keinem Knoten gesendet, nirgends aufgelöst</td><td><code>ack_attribution.h:12-15</code>, <code>lora_functions.cpp:416-417</code></td></tr>
+<tr><td>Eigene msg_id</td><td><code>((GW_ID &amp; 0x3FFFFF) &lt;&lt; 10) | Zähler</code>, die oberen 22 Bit sind der Node-Hash</td><td><code>loop_functions.cpp:5108</code></td></tr>
+<tr><td>Short path</td><td>Werkseinstellung aus, per <code>--shortpath on</code> schaltbar, kürzt den Pfad auf Absender und Relais</td><td><code>loop_functions.cpp:178</code>, <code>command_functions.cpp:228</code></td></tr>
+<tr><td>Web-Seiten</td><td>Server-seitig gerenderte HTML-Stücke, per <code>loadPage()</code> in das Scaffold geladen, kein JSON-Endpunkt</td><td><code>web_functions.cpp:682, 860, 1174</code></td></tr>
+<tr><td>Stack auf nRF52</td><td>Loop-Task 4 KB, Seitenrenderer arbeiten aus statischem Speicher</td><td><code>web_functions.cpp:1448-1465</code></td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 330" role="img" aria-label="Ist-Zustand">
+  <rect x="20" y="20" width="200" height="290" class="zone"/>
+  <text x="34" y="42" class="b">Luft</text>
+  <rect x="30" y="70" width="180" height="50" class="node"/>
+  <text x="120" y="90" text-anchor="middle" class="b">Frame mit Pfad</text>
+  <text x="120" y="108" text-anchor="middle" class="mono">OE1AAA-1,OE1BBB-2,DK5EN-93</text>
+  <rect x="30" y="140" width="180" height="50" class="node"/>
+  <text x="120" y="160" text-anchor="middle" class="b">Eigener HEY zurueck</text>
+  <text x="120" y="178" text-anchor="middle" class="mono">R5;3,97,7;4,101,3;</text>
+  <rect x="30" y="210" width="180" height="50" class="node"/>
+  <text x="120" y="230" text-anchor="middle" class="b">Gateway ACK</text>
+  <text x="120" y="248" text-anchor="middle" class="mono">0x41 millis() msg_id 01 00</text>
+
+  <rect x="300" y="20" width="640" height="290" class="zone"/>
+  <text x="314" y="42" class="b">Knoten, OnRxDone</text>
+
+  <rect x="320" y="60" width="200" height="66" class="node srv"/>
+  <text x="420" y="80" text-anchor="middle" class="b">MHeard</text>
+  <text x="420" y="96" text-anchor="middle" class="t11">Schluessel: letzter Hop</text>
+  <text x="420" y="112" text-anchor="middle" class="t11">Position nur bei Direktempfang</text>
+
+  <rect x="560" y="60" width="200" height="66" class="node srv"/>
+  <text x="660" y="80" text-anchor="middle" class="b">HEY-Pfad</text>
+  <text x="660" y="96" text-anchor="middle" class="t11">Schluessel: Absender</text>
+  <text x="660" y="112" text-anchor="middle" class="t11">Pfad ohne Absender, NCT</text>
+
+  <rect x="560" y="150" width="200" height="50" class="node bad"/>
+  <text x="660" y="170" text-anchor="middle" class="b">verworfen</text>
+  <text x="660" y="188" text-anchor="middle" class="t11">updateHeyPath() Zeile 486</text>
+
+  <rect x="320" y="230" width="200" height="66" class="node prx"/>
+  <text x="420" y="250" text-anchor="middle" class="b">own_msg_id Status</text>
+  <text x="420" y="266" text-anchor="middle" class="t11">heard / ACK je eigener msg_id</text>
+  <text x="420" y="282" text-anchor="middle" class="t11">ohne Rufzeichen des Gateways</text>
+
+  <rect x="560" y="230" width="200" height="66" class="node"/>
+  <text x="660" y="250" text-anchor="middle" class="b">App, BLE 0x41</text>
+  <text x="660" y="266" text-anchor="middle" class="t11">Node ACK mit Rufzeichen</text>
+  <text x="660" y="282" text-anchor="middle" class="t11">Gateway ACK ohne</text>
+
+  <path d="M210 95 L320 95" class="ln"/>
+  <path d="M210 88 L270 88 L270 52 L660 52 L660 60" class="ln"/>
+  <path d="M210 165 L560 175" class="lnx"/>
+  <path d="M210 235 L320 255" class="ln"/>
+  <path d="M520 262 L560 262" class="ln"/>
+  <text x="790" y="100" class="t11">Paar "wer hoerte wen":</text>
+  <text x="790" y="116" class="t11">nirgends gespeichert</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Ein Frame mit drei Rufzeichen im Pfad beweist zwei Hörbeziehungen und den Direktempfang beim eigenen Knoten, gespeichert wird nur der letzte Hop und der Pfad je Absender. Der zurückkommende eigene HEY, der einzige Frame, der sagt, wie stark die Nachbarn mich hören, wird verworfen. Der Gateway-ACK trägt keine Kennung des Quittierenden.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+<table>
+<tr><th>Größe</th><th>Heute</th><th>Ziel Stufe 1</th><th>Bemerkung</th></tr>
+<tr><td>MHeard-Plätze</td><td>80 auf ESP32-S3 und RAK4631, 50 in den XML-Varianten, 30 auf klassischem ESP32</td><td>unverändert</td><td><code>configuration_global.h</code>, je Board</td></tr>
+<tr><td>Matrixzeilen N</td><td>keine</td><td>21 auf ESP32-S3, RAK4631 und den XML-Varianten, 13 auf klassischem ESP32, 11 in der Entwickler-Variante ENABLE_TBEAM</td><td>Zeile 0 ist der eigene Knoten; Herleitung in 4.2</td></tr>
+<tr><td>Speicher Matrix</td><td>0</td><td>3,1 kB bei N = 21, 1,3 kB bei N = 13, 1,0 kB bei N = 11</td><!-- unveraendert --><td>Herleitung in 4.2</td></tr>
+<tr><td>Frames je Stunde</td><td>Annahme 150 bis 400 im Ballungsraum</td><td>unverändert, jeder liefert bis zu max_hop Paare</td><td>Annahme aus den Feldkorpora, nicht gemessen für diesen Zweck</td></tr>
+<tr><td>POS je Knoten</td><td>alle 30 min</td><td>24 Positionsupdates je Zeile im 12-h-Fenster</td><td>Betreiberangabe</td></tr>
+<tr><td>Zeithorizont</td><td>1 h Nachbarzähler, 12 h MHeard-Ausdünnen</td><td>12 h für Matrix und Zeilen</td><td>Anforderung 3</td></tr>
+</table>
+
+<h2 id="s3">3. Zielbild</h2>
+<p>Der Endzustand von Stufe 2 ist die Matrix aus Stufe 1 mit einer zusätzlichen Spalte je Zeile für zugeordnete Gateway-ACKs. Stufe 1 ist dasselbe Bild ohne diese Spalte und ohne Hash-Tabelle.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 400" role="img" aria-label="Zielbild">
+  <rect x="20" y="20" width="200" height="360" class="zone"/>
+  <text x="34" y="42" class="b">Luft</text>
+  <rect x="30" y="70" width="180" height="50" class="node"/>
+  <text x="120" y="90" text-anchor="middle" class="b">jeder Frame</text>
+  <text x="120" y="108" text-anchor="middle" class="t11">Text, POS, HEY, mit Pfad</text>
+  <rect x="30" y="150" width="180" height="50" class="node"/>
+  <text x="120" y="170" text-anchor="middle" class="b">HEY mit Berichten</text>
+  <text x="120" y="188" text-anchor="middle" class="t11">eigener und fremder</text>
+  <rect x="30" y="230" width="180" height="50" class="node"/>
+  <text x="120" y="250" text-anchor="middle" class="b">POS mit Position</text>
+  <text x="120" y="268" text-anchor="middle" class="t11">auch ueber Relais</text>
+  <rect x="30" y="310" width="180" height="50" class="node prx"/>
+  <text x="120" y="330" text-anchor="middle" class="b">Gateway ACK + Hash</text>
+  <text x="120" y="348" text-anchor="middle" class="t11">Stufe 2, nur Fork-Gateways</text>
+
+  <rect x="300" y="20" width="640" height="360" class="zone"/>
+  <text x="314" y="42" class="b">Knoten</text>
+
+  <rect x="320" y="60" width="220" height="82" class="node srv"/>
+  <text x="430" y="80" text-anchor="middle" class="b">nbr_matrix.h</text>
+  <text x="430" y="96" text-anchor="middle" class="t11">Arduino-frei, host-testbar</text>
+  <text x="430" y="112" text-anchor="middle" class="t11">nbrNoteFrame(pfad, typ, hey, jetzt)</text>
+  <text x="430" y="128" text-anchor="middle" class="t11">nbrNotePos(call, lat, lon)</text>
+
+  <rect x="580" y="60" width="340" height="82" class="node srv"/>
+  <text x="750" y="80" text-anchor="middle" class="b">Zeilen[N] und Zellen[N][N]</text>
+  <text x="750" y="96" text-anchor="middle" class="mono">Zeile: call, lat, lon, flags, letzte_min</text>
+  <text x="750" y="112" text-anchor="middle" class="mono">Zelle: cnt_t, cnt_p, cnt_h, rssi, letzte_min</text>
+  <text x="750" y="128" text-anchor="middle" class="t11">N = 21 / 13 / 11 je Board, 12-h-Fenster</text>
+
+  <rect x="320" y="180" width="220" height="66" class="node"/>
+  <text x="430" y="200" text-anchor="middle" class="b">OnRxDone-Haken</text>
+  <text x="430" y="216" text-anchor="middle" class="t11">nach decodeAPRS, vor Dedup</text>
+  <text x="430" y="232" text-anchor="middle" class="t11">lora_functions.cpp, eine Stelle</text>
+
+  <rect x="580" y="180" width="160" height="66" class="node"/>
+  <text x="660" y="200" text-anchor="middle" class="b">Web-Seite</text>
+  <text x="660" y="216" text-anchor="middle" class="t11">?page=neighbours</text>
+  <text x="660" y="232" text-anchor="middle" class="t11">Matrix, Urteile, Reichweite</text>
+
+  <rect x="760" y="180" width="160" height="66" class="node"/>
+  <text x="840" y="200" text-anchor="middle" class="b">Kommando</text>
+  <text x="840" y="216" text-anchor="middle" class="mono">--neighbours</text>
+  <text x="840" y="232" text-anchor="middle" class="mono">--nbrreset</text>
+
+  <rect x="320" y="290" width="220" height="66" class="node prx"/>
+  <text x="430" y="310" text-anchor="middle" class="b">Hash-Tabelle (Stufe 2)</text>
+  <text x="430" y="326" text-anchor="middle" class="t11">msg_id &gt;&gt; 10 zu Rufzeichen</text>
+  <text x="430" y="342" text-anchor="middle" class="t11">aus jedem gehoerten Frame</text>
+
+  <rect x="580" y="290" width="340" height="66" class="node prx"/>
+  <text x="750" y="310" text-anchor="middle" class="b">GW-ACK-Spalte je Zeile (Stufe 2)</text>
+  <text x="750" y="326" text-anchor="middle" class="t11">ACK-Handler liest Hash, Tabelle nennt den Gateway</text>
+  <text x="750" y="342" text-anchor="middle" class="t11">ohne Anhang: Zaehler "unbekannt"</text>
+
+  <path d="M210 95 L320 95" class="ln"/>
+  <path d="M210 175 L270 175 L270 110 L320 110" class="ln"/>
+  <path d="M210 255 L280 255 L280 128 L320 128" class="ln"/>
+  <path d="M210 335 L320 323" class="lnd"/>
+  <path d="M540 100 L580 100" class="ln"/>
+  <path d="M430 180 L430 142" class="ln"/>
+  <path d="M660 180 L660 142" class="ln"/>
+  <path d="M840 180 L840 142" class="ln"/>
+  <path d="M540 323 L580 323" class="lnd"/>
+  <path d="M750 290 L750 246" class="lnd"/>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild. Ein Arduino-freies Modul hält Zeilen und Zellen und bekommt aus einem einzigen Haken in OnRxDone jeden dekodierten Frame vor der Duplikatprüfung. Web-Seite und Serienkommando lesen nur. Die gestrichelten Teile sind Stufe 2.</figcaption>
+</figure>
+
+<table>
+<tr><th>Komponente</th><th>Ort</th><th>Rolle</th><th>Stufe</th></tr>
+<tr><td><code>src/nbr_matrix.h</code>, <code>src/nbr_matrix.cpp</code></td><td>Firmware, plattformneutral</td><td>Datenhaltung, Pfadparser, HEY-Berichtparser, Alterung, Urteile, Reichweite</td><td>1</td></tr>
+<tr><td>Haken in <code>OnRxDone</code></td><td><code>src/lora_functions.cpp</code>, nach <code>decodeAPRS</code></td><td>übergibt Pfad, Typ, Nutzlast, RSSI; bei POS zusätzlich die dekodierte Position</td><td>1</td></tr>
+<tr><td><code>sub_page_neighbours()</code></td><td><code>src/web_functions/web_functions.cpp</code></td><td>Matrix als HTML-Tabelle, darunter je Zeile Urteil, Flags, Reichweite</td><td>1</td></tr>
+<tr><td><code>--neighbours</code>, <code>--nbrreset</code></td><td><code>src/command_functions.cpp</code></td><td>Textausgabe für Bench und Feld, Reset des Fensters</td><td>1</td></tr>
+<tr><td><code>test/test_nbr_matrix</code>, env <code>native_nbr_matrix</code></td><td>Host</td><td>Regeln, Alterung, Verdrängung, Urteile ohne Hardware</td><td>1</td></tr>
+<tr><td>Hash-Tabelle, ACK-Builder mit Anhang</td><td><code>src/nbr_matrix.*</code>, <code>src/lora_functions.cpp:1321</code></td><td>Gateway-ACK-Zuordnung</td><td>2</td></tr>
+</table>
+
+<h2 id="s4">4. Bausteine</h2>
+
+<h3>4.1 Hörbeweis-Regel</h3>
+<p class="reco">Entscheidung: Jedes gehörte Frame liefert für jedes benachbarte Paar im Pfad einen Treffer "Nachfolger hat Vorgänger gehört", plus einen Treffer "ich habe den letzten Hop gehört". Frame-Typ und Duplikatstatus spielen für die Regel keine Rolle.</p>
+<p>Prämisse: ein Relais hängt sein Rufzeichen nur an einen Frame, den es selbst empfangen hat (<code>lora_functions.cpp:1541-1546</code>). Der Pfad ist damit eine Kette von Direktempfängen. Duplikate, also derselbe Frame über verschiedene Relais, sind für die Matrix keine Störung, sondern die Hauptquelle: erst die zweite Kopie zeigt, dass ein zweiter Knoten den Absender hört. Deshalb sitzt der Haken vor der Duplikatprüfung.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Nur ACK-Frames zählen</td><td>Zähler je ACK-Sorte und Absender</td><td><span class="tag bad">verworfen</span> Gateway-ACKs tragen keinen Absender, POS und HEY werden nie quittiert</td></tr>
+<tr><td>Nur Wiederholungen eigener Frames zählen</td><td>Treffer, wenn <code>checkOwnTx()</code> die msg_id kennt</td><td><span class="tag warn">Teilmenge</span> zeigt, wer mich hört, aber nichts über die Nachbarn untereinander</td></tr>
+<tr><td>Alle Pfadpaare aller Frames zählen</td><td>eine Schleife über den Pfad je Frame</td><td><span class="tag ok">gewählt</span> eine Regel deckt Text, POS und HEY ab und liefert die Paare unter den Nachbarn, die Frage 1 und 2 brauchen</td></tr>
+</table>
+<p>Der HEY-Frame liefert zusätzlich je Paar einen Signalbericht. Die Gruppen der Nutzlast stehen in Pfadreihenfolge: Gruppe i beschreibt, wie Hop i den Hop i minus 1 gehört hat. Beim eigenen HEY ist Gruppe 1 damit die Antwort auf "wie stark hört Nachbar A mich". Die Zelle (Vorgänger, Nachfolger) merkt sich den letzten RSSI aus einer solchen Gruppe. Nutzlasten ohne Bericht oder im alten Format (<code>updateHeyPath()</code> Zeile 505 ff.) liefern nur den Pfadtreffer.</p>
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 330" role="img" aria-label="Pfadpaare">
+  <text x="120" y="30" text-anchor="middle" class="b">DK5EN-93 (ich)</text>
+  <text x="400" y="30" text-anchor="middle" class="b">OE1AAA-1</text>
+  <text x="680" y="30" text-anchor="middle" class="b">OE1BBB-2</text>
+  <path d="M120 40 L120 310" class="lnd"/>
+  <path d="M400 40 L400 310" class="lnd"/>
+  <path d="M680 40 L680 310" class="lnd"/>
+
+  <path d="M120 70 L400 70" class="ln"/>
+  <text x="260" y="62" text-anchor="middle" class="mono">HEY  Pfad: DK5EN-93   R5;</text>
+  <path d="M400 110 L680 110" class="ln"/>
+  <text x="540" y="102" text-anchor="middle" class="mono">Pfad: DK5EN-93,OE1AAA-1   R5;3,97,7;</text>
+  <path d="M400 130 L120 130" class="lnh"/>
+  <text x="260" y="122" text-anchor="middle" class="mono">dieselbe Kopie, ich hoere sie</text>
+  <path d="M680 180 L120 180" class="lnh"/>
+  <text x="400" y="172" text-anchor="middle" class="mono">Pfad: DK5EN-93,OE1AAA-1,OE1BBB-2   R5;3,97,7;4,101,3;</text>
+
+  <rect x="740" y="200" width="200" height="110" class="node srv"/>
+  <text x="840" y="220" text-anchor="middle" class="b">Treffer aus Kopie 2</text>
+  <text x="840" y="240" text-anchor="middle" class="mono">AAA hat 93 gehoert, -97</text>
+  <text x="840" y="258" text-anchor="middle" class="mono">BBB hat AAA gehoert, -101</text>
+  <text x="840" y="276" text-anchor="middle" class="mono">93 hat BBB gehoert, RSSI</text>
+  <text x="840" y="296" text-anchor="middle" class="t11">Kopie 1 gab: AAA hat 93, 93 hat AAA</text>
+
+  <text x="260" y="250" text-anchor="middle" class="t11">Beide Kopien tragen die msg_id des HEY.</text>
+  <text x="260" y="266" text-anchor="middle" class="t11">Dedup wuerde Kopie 2 verwerfen,</text>
+  <text x="260" y="282" text-anchor="middle" class="t11">der Haken liegt davor.</text>
+</svg>
+</div>
+<figcaption>Abb. 3: Pfadpaare am eigenen HEY. Zwei Kopien desselben HEY erreichen mich, die zweite über zwei Hops. Aus den Pfaden fallen vier Hörbeziehungen ab, aus den Berichtsgruppen die Signalstärken für zwei davon. Dieselbe Regel gilt für Text und POS, dort ohne Signalbericht.</figcaption>
+</figure>
+<p>Regeln im Einzelnen:</p>
+<ul>
+<li>Der eigene Knoten ist Zeile und Spalte 0 und wird nie verdrängt.</li>
+<li>Ein Rufzeichen, das im Pfad zweimal vorkommt, beendet die Auswertung des Frames: das ist eine Schleife, kein Hörbeweis.</li>
+<li>Unkonfigurierte Rufzeichen (<code>isUnconfiguredCall()</code>) werden wie heute übergangen.</li>
+<li>Frames mit dem eigenen Rufzeichen als letztem Hop sind eigene Echos und liefern keinen Treffer für "ich habe den letzten Hop gehört".</li>
+<li>Je Zelle drei Typenzähler (Text, POS, HEY), 8 Bit, sättigend bei 255. Die Zahl dient dem Vergleich, nicht der Statistik.</li>
+</ul>
+
+<h3>4.2 Speicher und Alterung</h3>
+<p class="reco">Entscheidung: feste Tabelle mit N Zeilen und N mal N Zellen, jede Zelle und jede Zeile mit einer Letztzeit in Minuten seit Boot. Gültig ist, was jünger als 720 Minuten ist. Ein Treffer auf eine verfallene Zelle setzt ihre Zähler auf null, bevor er zählt. Keine Persistenz in Stufe 1.</p>
+<p>Prämissen: 720 Minuten sind die geforderten 12 h und decken 24 POS-Perioden ab. Minuten seit Boot statt Wanduhr, weil ein Knoten ohne Zeitquelle sonst alles verfallen ließe (dieselbe Lehre wie <code>mheardMillis[]</code>, NC-01). Ein 16-Bit-Minutenzähler läuft nach 45 Tagen über, die Differenzrechnung mit Überlauf ist bei einem Fenster von 720 Minuten eindeutig. N = 21 auf ESP32-S3 und RAK4631 entspricht 20 Nachbarn plus mir; das ist mehr als die Zahl der direkten Nachbarn, die die Feldlogs von DK5EN-98 zeigen, und weniger als MAX_MHEARD, weil die Matrix quadratisch wächst. Die Konstante heißt <code>NBR_MAX_ROWS</code> und steht je Board in <code>configuration_global.h</code> neben MAX_MHEARD.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Speicher bei N = 21</th><th>Bewertung</th></tr>
+<tr><td>Stundeneimer</td><td>12 Zähler je Zelle, jede Stunde rotiert</td><td>5,3 kB</td><td><span class="tag bad">verworfen</span> auf klassischem ESP32 nicht tragbar, DRAM dort ist der Grund für MAX_MHEARD 30 und MEM-01</td></tr>
+<tr><td>Nur Wahrheitswert je Zelle</td><td>Bitmatrix plus Letztzeit</td><td>1,4 kB</td><td><span class="tag warn">Teilmenge</span> beantwortet Frage 1 und 2, verliert die Typenzähler und den RSSI</td></tr>
+<tr><td>Zähler plus Letztzeit, Verfall beim Treffer</td><td>je Zelle 3 Zähler, RSSI, 16-Bit-Minute</td><td>3,1 kB</td><td><span class="tag ok">gewählt</span> exakt 12 h ab dem letzten Treffer, ohne Timer und ohne Rotation</td></tr>
+</table>
+<pre>Zeile   (24 Byte):  char call[10]; float lat, lon; uint16 letzte_min; uint8 flags; uint8 hw; 2 Byte Ausrichtung
+                    flags Bit 0 Gateway (HEY-Ziel HG), Bit 1 Mesh (POS-Flag), Bit 2 Position gueltig
+Zelle   ( 6 Byte):  uint8 cnt_text, cnt_pos, cnt_hey; int8 rssi; uint16 letzte_min;
+N = 21: 21 * 24 + 441 * 6 = 504 + 2646 = 3150 Byte     (ESP32-S3, RAK4631)
+N = 13: 13 * 24 + 169 * 6 = 312 + 1014 = 1326 Byte     (klassischer ESP32)
+N = 11: 11 * 24 + 121 * 6 = 264 +  726 =  990 Byte     (Entwickler-Variante ENABLE_TBEAM)</pre>
+<p>Verdrängung: ist die Tabelle voll, weicht die Zeile mit der ältesten Letztzeit, ihre Zeilen- und Spaltenzellen werden genullt. Die Letztzeit einer Zeile ist das Maximum ihrer Zellen und ihres letzten POS. Ein Reset per Kommando nullt alles außer Zeile 0.</p>
+
+<h3>4.3 Auswertung der vier Fragen</h3>
+<p class="reco">Entscheidung: die Urteile werden beim Rendern aus der Matrix berechnet und nicht gespeichert. Hörer(X) ist die Menge der Zeilen Y mit frischer Zelle (X,Y). Exklusiv ist X, wenn Hörer(X) genau aus mir besteht.</p>
+<table>
+<tr><th>Frage</th><th>Regel</th><th>Anzeige</th></tr>
+<tr><td>1 Exklusive Blätter</td><td>Zeilen X ungleich 0 mit Hörer(X) = {ich}</td><td>Zeile rot markiert, Kopfzeile "n exklusive Knoten: ..., Mesh nötig"</td></tr>
+<tr><td>2 Mesh redundant</td><td>keine exklusive Zeile und mindestens eine Zeile mit Zelle (X,ich)</td><td>Kopfzeile "keine exklusiven Knoten, Mesh hier redundant"</td></tr>
+<tr><td>Wer hört mich</td><td>Zeilen Y mit frischer Zelle (ich,Y), RSSI aus dem HEY-Bericht</td><td>Spalte "hört mich mit" je Zeile</td></tr>
+<tr><td>Knotentyp</td><td>Flags der Zeile aus HEY-Ziel und POS-Flag</td><td>Spalte "GW / Mesh"</td></tr>
+</table>
+<p>Grenze des Urteils: die Matrix sieht nur Relais, die ich selbst höre. Ein Knoten Y, der X wiederholt, aber außerhalb meiner Hörweite steht, bleibt unsichtbar. "Exklusiv" heißt deshalb: niemand in meiner Hörweite wiederholt X. Das ist genau die Menge, für die mein Mesh etwas beiträgt. Umgekehrt ist "redundant" nur ein Hinweis, kein Schaltbefehl: die Seite schaltet <code>--mesh</code> nicht selbst.</p>
+<table class="mx">
+<tr><th></th><th>93</th><th>AAA</th><th>BBB</th><th>CCC</th><th>Hörer</th><th>Urteil</th></tr>
+<tr><th>DK5EN-93</th><td class="me">-</td><td>12</td><td>3</td><td class="z">0</td><td>AAA, BBB</td><td>ich</td></tr>
+<tr><th>OE1AAA-1</th><td>40</td><td class="me">-</td><td>9</td><td class="z">0</td><td>93, BBB</td><td>gedeckt</td></tr>
+<tr><th>OE1BBB-2</th><td>7</td><td>9</td><td class="me">-</td><td class="z">0</td><td>93, AAA</td><td>gedeckt</td></tr>
+<tr><th>OE1CCC-3</th><td class="ex">5</td><td class="z">0</td><td class="z">0</td><td class="me">-</td><td>93</td><td>exklusiv</td></tr>
+</table>
+<p class="small">Beispiel einer gerenderten Matrix. Zeile X, Spalte Y: Y hat X so oft gehört. CCC hört im Fenster nur ich, also braucht CCC mein Mesh.</p>
+
+<h3>4.4 Reichweite</h3>
+<p class="reco">Entscheidung: jede Zeile hält die letzte Position ihres Rufzeichens aus jedem POS-Frame, auch über Relais. Die Reichweite einer Zeile ist die größte Distanz zu einer Zeile, mit der sie im Fenster in einer Richtung eine frische Zelle hat.</p>
+<p>Prämisse: MHeard speichert Positionen nur bei Direktempfang (<code>lora_functions.cpp:849</code>). Für die Links der Nachbarn untereinander brauche ich aber auch die Positionen der Knoten hinter ihnen, und die kommen mit relayed POS-Frames herein, deren Nutzlast die Position des Absenders trägt. Der Haken übergibt darum bei POS die dekodierte Position mit dem Absenderruf, unabhängig vom letzten Hop. Die Entfernungsrechnung verwendet die vorhandene Funktion aus dem MHeard-Pfad. Fehlt eine der beiden Positionen, zeigt die Seite einen Strich.</p>
+<ul>
+<li>Meine Reichweite: größte Distanz zu einer Zeile Y mit Zelle (ich,Y) oder (Y,ich).</li>
+<li>Reichweite von X: dasselbe über alle Partner von X. Die Partner von X sind auch die Knoten hinter X, soweit ihre Frames über X bei mir ankamen.</li>
+<li>Angezeigt werden Reichweite und der Partner, der sie liefert.</li>
+</ul>
+
+<h3>4.5 Web-Seite und Kommando</h3>
+<p class="reco">Entscheidung: eine neue Seite <code>?page=neighbours</code> im vorhandenen Scaffold, ein Menüknopf "Nachbarn", gerendert wie die MHeard-Seite aus statischem Speicher, ohne JSON und ohne eigenes JavaScript. Dazu <code>--neighbours</code> als Textausgabe und <code>--nbrreset</code>.</p>
+<p>Prämissen: alle Seiten des Knotens sind server-seitig gerenderte Stücke (<code>web_functions.cpp:682, 860</code>), eine JSON-Schnittstelle gäbe es nur für diese Seite. Der nRF52-Loop-Task hat 4 KB Stack (N-22), der Renderer darf keinen großen Stackrahmen anlegen. Bei N = 21 hat die Matrix 21 Spalten, auf dem Telefon werden die Spaltenköpfe zu Nummern, die Zeilen tragen die Rufzeichen.</p>
+<ul>
+<li>Kopf: Fensterlänge, Zahl der Zeilen, Urteil aus 4.3.</li>
+<li>Matrix: Zeilen und Spalten die frischen Rufzeichen, Zelle Summe der drei Zähler, Tooltip mit Text/POS/HEY und RSSI.</li>
+<li>Zeilentabelle darunter: Rufzeichen, GW/Mesh, hört mich mit (RSSI), Hörer, Reichweite mit Partner, Alter des letzten Treffers.</li>
+<li><code>--neighbours</code> druckt dieselben Zeilen als Text, eine je Zeile, für den Bench-Beweis über die serielle Schnittstelle. Die Ausgabe läuft über <code>printfdeb</code>, nicht über <code>DEBUG_MSG</code>, damit sie im Produktionsbuild existiert.</li>
+</ul>
+
+<h3>4.6 Stufe 2: Gateway-ACK-Zuordnung (zurückgestellt)</h3>
+<p class="reco">Entscheidung: zurückgestellt. Wenn umgesetzt, dann mit dem Hash-Anhang aus <code>ack_attribution.h</code> und einer Hash-Tabelle aus den oberen 22 Bit jeder gehörten msg_id.</p>
+<p>Prämissen: Der Gateway-ACK auf dem Draht hat keinen Absender, seine msg_id ist <code>millis()</code>, also lässt sich der Gateway nicht aus dem Frame selbst ableiten. Der Anhang ist seit 2026-09-05 festgelegt, wird vom Leser erkannt, aber von keinem Builder gesendet (<code>lora_functions.cpp:1321</code> schreibt Byte 11 = 0). Die Auflösung ist gratis: jede Text- und POS-msg_id trägt in <code>msg_id &gt;&gt; 10</code> den Node-Hash des Absenders, eine Tabelle Hash zu Rufzeichen füllt sich mit jedem gehörten Frame.</p>
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Hash-Anhang senden und auflösen</td><td>GW-ACK-Builder hängt 3 Byte an, Handler liest sie, Tabelle nennt den Gateway, Zeile bekommt GW-ACK-Zähler</td><td><span class="tag info">Stufe 2</span> wirkt nur, wenn der quittierende Gateway das Fork-Image fährt; heute kein zweiter Fork-Gateway in Hörweite</td></tr>
+<tr><td>Rufzeichen im Anhang</td><td>bis 10 Byte Klartext</td><td><span class="tag bad">verworfen</span> Entscheidung vom 2026-09-05, Draht bleibt beim Hash</td></tr>
+<tr><td>Gateway aus dem Zeitabstand raten</td><td>erster GW-ACK nach eigenem Text dem nächsten Gateway zuordnen</td><td><span class="tag bad">verworfen</span> Ratespiel ohne Beweis, Feldlogs zeigen mehrere Gateways binnen einer Sekunde</td></tr>
+</table>
+<p>Ohne Anhang zählt Stufe 1 GW-ACKs auf eigene Frames nur global als "quittiert, Gateway unbekannt"; das ist die Zahl, die die App heute als Wolke zeigt. Stufe 2 bleibt Fork-only, wie beim Echo-Guard 2026-09-11 entschieden; ein Upstream-PR wäre eine Protokolländerung und braucht Kurts Zustimmung.</p>
+
+<h2 id="s5">5. Fehlerszenarien</h2>
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>1 Nachbar fährt <code>--shortpath on</code>: Pfad ist Absender,Relais, Zwischenhops fehlen</td><td>nicht aus dem Frame erkennbar</td><td>Paar Absender zu Relais wird gezählt, als wäre es direkt</td><td>falsche Direktbeziehung für diesen Absender; Werkseinstellung ist aus, Verbreitung im Feld unbekannt (7)</td><td>1</td></tr>
+<tr><td>2 Knoten ohne Zeitquelle</td><td>Wanduhr steht auf 1970</td><td>Minuten seit Boot, Wanduhr wird nicht benutzt</td><td>keine</td><td>1</td></tr>
+<tr><td>3 Tabelle voll, neuer Knoten</td><td>keine freie Zeile</td><td>älteste Zeile weicht, ihre Zellen werden genullt</td><td>ein seltener Knoten kann einen häufigen verdrängen, wenn dieser 12 h still war; das ist gewollt</td><td>1</td></tr>
+<tr><td>4 Derselbe Frame zweimal gehört, gleicher Pfad</td><td>Dedup kennt die msg_id, der Haken liegt davor</td><td>zählt doppelt</td><td>Zähler leicht überhöht, die Wahrheitswerte der Urteile ändern sich nicht</td><td>1</td></tr>
+<tr><td>5 HEY-Nutzlast im alten Format oder abgeschnitten</td><td>Gruppe hat nicht drei Felder</td><td>Pfadtreffer ja, RSSI nein</td><td>keine, wie <code>updateHeyPath()</code> heute</td><td>1</td></tr>
+<tr><td>6 Schleife im Pfad, Rufzeichen doppelt</td><td>Vergleich beim Parsen</td><td>Frame liefert keinen Treffer</td><td>keine</td><td>1</td></tr>
+<tr><td>7 Neustart des Knotens</td><td>Tabelle leer</td><td>Seite zeigt "Fenster seit Boot: n min"</td><td>12 h Anlaufzeit nach jedem Neustart; Persistenz ist ein offener Punkt (7)</td><td>1</td></tr>
+<tr><td>8 Gateway-ACK ohne Anhang</td><td>Byte 11 ist 0</td><td>globaler Zähler "Gateway unbekannt"</td><td>keine Zuordnung</td><td>1, gelöst in 2</td></tr>
+<tr><td>9 POS eines Nachbarn über Relais mit alter Position</td><td>nicht erkennbar</td><td>Positionscache nimmt die letzte gehörte</td><td>Reichweite schwankt um die Fahrzeugbewegung; Ortsfeste Knoten sind unbetroffen</td><td>1</td></tr>
+</table>
+
+<h2 id="s6">6. Rollout</h2>
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>W1</td><td>1</td><td><code>nbr_matrix.h/.cpp</code> Arduino-frei, Host-Test <code>native_nbr_matrix</code>: Pfadpaare, HEY-Gruppen, Verfall bei 720 min, Überlauf der Minute, Verdrängung, Urteile, Reichweite</td><td>Host-Test grün, alle sieben Board-Envs bauen ohne Warnung</td></tr>
+<tr><td>W2</td><td>1</td><td>Haken in OnRxDone, POS-Übergabe, Kommandos <code>--neighbours</code> und <code>--nbrreset</code></td><td>Bench: injizierter Frame mit Pfad <code>DK5EN-98,DK5EN-93</code> erzeugt genau die erwarteten Zellen in <code>--neighbours</code>; String-Scan des Images findet den Kommandotext</td></tr>
+<tr><td>W3</td><td>1</td><td>Web-Seite und Menüknopf, nRF52 aus statischem Speicher</td><td>Heltec DK5EN-93 geflasht, Seite im Chrome zeigt Matrix und Urteil; Build-Zeit aus <code>--info</code> stimmt mit dem Build überein</td></tr>
+<tr><td>Feld</td><td>1</td><td>12 h auf DK5EN-98, Seite nach 1 h und 12 h aufnehmen</td><td>Urteil deckt sich mit der bekannten Umgebung des Standorts; keine Zeile mit Schleife oder unkonfiguriertem Ruf</td></tr>
+<tr><td>Review</td><td>1</td><td>Advisor-Durchgang je Welle vor dem Commit, Fable-Review vor dem Merge nach fork-main</td><td>keine offenen Befunde</td></tr>
+<tr><td>Später</td><td>2</td><td>Hash-Anhang, Hash-Tabelle, GW-ACK-Spalte</td><td>zwei Fork-Gateways in Hörweite, Bench mit DK5EN-98 als Gateway</td></tr>
+</table>
+
+<h2 id="s7">7. Offene Punkte</h2>
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Verbreitung von <code>--shortpath on</code> im Feld</td><td>entscheidet, wie oft Szenario 1 falsche Direktpaare erzeugt</td><td>Feldkorpora auf Pfade mit Sprung im Hop-Zähler prüfen; mcmap-Abfrage über <code>nodes_query</code></td></tr>
+<tr><td>Persistenz der Matrix</td><td>12 h Anlaufzeit nach jedem Neustart</td><td>nach dem Feldlauf entscheiden; T-Deck hat die SD-Karte, die anderen Boards nur den Flash mit Schreibzyklen</td></tr>
+<tr><td>N auf klassischem ESP32</td><td>DRAM dort ist der Engpass (E22, Heltec V2)</td><td>Bau mit N = 13 messen, Headroom gegen <code>docs/mem-headroom-classic-esp32-20260905.md</code> stellen</td></tr>
+<tr><td>Anzeige in der App</td><td>Betreiber will die Seite auf dem Knoten, nicht in der App</td><td>bewusst nicht Teil von Stufe 1; bei Bedarf JSON-Frame später</td></tr>
+</table>
+</main>
+</body>
+</html>
