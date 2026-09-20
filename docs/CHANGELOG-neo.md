@@ -100,7 +100,36 @@ melden 256 196), zwischen den Firmwares klar getrennt. Dazu die
 Flash-Ersparnis aus demselben Build: 10,5 kB auf dem Heltec, 45,5 kB auf dem
 T-Beam.
 
-Was der Lauf NICHT zeigt: Langzeitverhalten. Ein 24-Stunden-Soak steht aus.
+### Der Dauerlauf
+
+Vom 2026-09-19 19:41 bis 2026-09-20 08:00, zwoelf Stunden, auf drei Knoten:
+DK5EN-1 (Heltec V3), DK5EN-92 (T-Beam) und DK5EN-98 (Heltec V3) -- letzterer
+mit Mesh und Gateway EIN und Hop 2, also unter echter Netzlast. Alle drei auf
+diesem Stand mit `-DINSTRUMENT_ENABLED=1`.
+
+| Pruefpunkt                | Ergebnis                     |
+| ------------------------- | ---------------------------- |
+| Neustarts                 | keiner (nur der Start-Reset) |
+| Abstuerze, Backtraces     | keine                        |
+| Ringueberlaeufe           | keine                        |
+| Gateway-Fehler (DK5EN-98) | keine                        |
+| Verbindungsabbrueche      | keine                        |
+| Laufzeit                  | 12,00 h, streng monoton      |
+
+**Der Heap liegt flach.** DK5EN-92 lieferte 99 Messpunkte: 161 228 B beim Boot,
+dann der Abfall auf den Arbeitssatz, und ueber die restlichen neun Stunden ein
+Mittel von 79 017 B auf 78 119 B -- rund 900 Byte Unterschied, also Rauschen.
+Ein Leck saehe anders aus. (DK5EN-1 meldet keinen Heap-Verlauf, weil
+`DisplyLog on` gesetzt ist und `loopAction_heapMon()` nur bei `!bDisplayLog`
+druckt -- eine Knoteneinstellung, kein Firmware-Unterschied.)
+
+**Die Schleife stockt nicht.** Die Instrumentierung meldete ueber zwoelf Stunden
+fuenf Luecken, alle zwischen 19:41 und 19:42, also in der ersten Minute nach dem
+Boot, waehrend WLAN-Anmeldung, NTP und GPS-Erfassung zusammenfallen: zweimal
+`wifi_connect` (2569 und 2663 ms) und dreimal `udp` (2007, 939 und 632 ms). Im
+Dauerbetrieb danach keine einzige.
+
+Material: 8,2 MB, 13 910 Zeilen allein von der Netz-Konsole des Gateway-Knotens.
 
 ## K01 Vendor-Ballast entfernen
 
