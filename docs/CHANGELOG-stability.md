@@ -343,7 +343,7 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      `97e5f1ff`, merged 2026-09-20). Thirty days of DK5EN LoRa RX showed group and
      broadcast frames running far past the configured 4 hops -- 17 wraps in 10 days,
      19 over-long paths in 30 days, and 0 of 8878 direct messages affected
-     (`~/Desktop/befund-maxhop-unterlauf.md`). With no phone connected
+     (`~/Downloads/befund-maxhop-unterlauf.md`). With no phone connected
      (`isPhoneReady == 0`), `OnRxDone()` ORed the app-offline flag `0x20` straight
      into `aprsmsg.max_hop`. The relay guard `max_hop > 0` then saw `0x20`,
      decremented it to `0x1F`, and `encodeAPRS()` masked that to 15 on air: an
