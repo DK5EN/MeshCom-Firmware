@@ -370,23 +370,43 @@ production files behind hooks, so the overlay is purely new files plus a
 separate ini include and merges cleanly forever. Highest upfront cost, lowest
 ongoing cost, and it would make the strip trivial instead of mechanical.
 
-**Decided 2026-09-19: B.** `fork-neo` is the trunk, upstream PRs land there
-and are merged forward into `fork-neo-test`. C stays the direction of travel
-once neo has shipped once -- the conflict surface B accepts is exactly the
-surface C would remove, so the two are the same decision seen twice.
+**D -- `fork-neo-test` is the trunk, `fork-neo` is re-derived from it.** All
+work lands on `fork-neo-test`, which carries the full tree. `fork-neo` is not
+maintained at all: it is thrown away and re-projected from `fork-neo-test`
+whenever the upstream offering needs refreshing.
 
-Operational consequence to write down before it bites: the forward merge is
-not optional and not occasional. A PR that reaches `fork-neo` and not
-`fork-neo-test` is a PR nobody can verify afterwards, which defeats the reason
-the split exists.
+**Decided 2026-09-20: D, replacing B, on the operator's correction.** B had
+`fork-neo` as the trunk and required a forward merge into `fork-neo-test` for
+every change, plus a one-off sealing merge before the first PR to resolve the
+overlap between strip and campaign edits. Both disappear under D, because
+nothing is ever merged between the two branches -- one is a function of the
+other.
 
-**Model B needs a sealing step before the first upstream PR.** Both branches
-share only `upstream/dev` as a merge base, so the first forward merge is a full
-three-way merge of overlapping content: everywhere the strip changed a line the
-campaign also changed differently from base -- the `#if`/`#else` help text
-around `command_functions.cpp:1040` is one -- it conflicts. Resolve that once,
-deliberately, and record the sync point. Later PR merges then start from a base
-that has already moved past it.
+What makes D affordable is that the derivation is a script and its result is
+checkable, not a judgement call:
+
+- the projection is `git checkout --no-overlay <tree> --pathspec-from-file`
+  per chapter (section 4), driven by the same path lists both branches use;
+- the strip is `tools/neo_strip.py`, idempotent, and it exits non-zero if a
+  transformation it expected to make finds nothing;
+- two gates close it: `strip(fork-neo-test)` must equal `fork-neo` over
+  `src lib variants config platformio.ini`, and the defined-symbol sets of the
+  two branches must be identical on all eight lead targets.
+
+Both branches were rebuilt from scratch under D on 2026-09-20 and both gates
+came back empty, so the cost of a re-derivation is measured, not estimated: one
+script run plus the gate.
+
+C stays the direction of travel. Under D it buys less than it did under B --
+there is no forward merge left to conflict -- but it would shrink the strip from
+two transformations to zero, and that is the difference between a script that
+has to be right and one that has nothing to do.
+
+Operational consequence to write down before it bites: **never commit to
+`fork-neo`.** A change made there is lost at the next re-derivation, silently,
+because the derivation starts from `upstream/dev` and never reads the old
+branch. The tip that was thrown away is tagged (`neo-backup-<date>-fork-neo`)
+so the loss is recoverable, but nothing warns about it.
 
 ## 9. Web flasher
 
@@ -408,8 +428,11 @@ ends up.
 - **Changelog language: German.** `docs/CHANGELOG-neo.md` is written in German
   because its first job is the negotiation with Kurt OE1KBC. It follows the
   structure of `docs/CHANGELOG-stability.md`, not its language.
-- **Maintenance model: B** (section 8), with the sealing merge recorded before
-  the first upstream PR.
+- **Maintenance model: D** (section 8), decided 2026-09-20 on the operator's
+  correction. `fork-neo-test` is the trunk and replaces `dry-unification`;
+  `fork-neo` is re-derived from it by projection plus strip, never merged with
+  it, never committed to. This drops model B and with it the sealing merge B
+  would have needed.
 - **Failure policy: append during stage 1, fold before stage 3.** When a commit
   fails its gate on `fork-neo-test`, the fix is appended as a fixup rather than
   amended in, so the stage does not restart and the earlier builds stay valid.
@@ -437,6 +460,13 @@ ends up.
   afterwards, once the chapters have survived their gates.
 - **No automatic GitHub builds** (section 5): build on the MacBook, publish by
   hand.
+- **`fork-neo` keeps the campaign's `FLASH_VERSION` (`20260912`).** Decided
+  2026-09-20. It is the stamp the campaign was built and measured under, and it
+  is what the bench and soak results refer to. `upstream/dev` sits at
+  `20260909`; the difference is visible in the boot log and in the `fw=` field
+  of the STAT line, and it is the only version-like delta the branch carries.
+  The release name `4.35t_20260919_neo` lives in the GitHub tag, not in the
+  firmware.
 
 ## 11. Stage 1 result
 
@@ -560,7 +590,7 @@ Everything that can be established without hardware is now established. What
 remains is the part the workstation cannot answer: does this firmware behave on
 the air like official 4.35t.
 
-## 15. Stage 5 so far
+## 15. Stage 5 result -- both hardware checks passed
 
 **Differential run passed** (2026-09-19): no measurable difference on the air
 against `upstream/dev`, +11 296 B heap on the Heltec and +15 560 B on the
@@ -581,16 +611,87 @@ alone therefore misses two of the three soak nodes -- all three did report a
 flat heap. The asymmetry behind it (ESP32 gated only the print, nRF52 gated the
 whole scheduler entry) is cleaned up in stage 6.
 
-## 16. Still open
+## 16. Stage 6 result -- the branches consolidated
 
-- The commit cut itself. A first proposal with all 248 files assigned to 18
-  chapters is in `docs/neo-commit-cut.md`; that document also shows why 18 is an
-  upper bound and not the answer. K19 (`test/` plus the native envs) makes 19 on
-  `fork-neo-test`.
+Both branches were thrown away and rebuilt from scratch on 2026-09-20, so the
+three fixups stopped being fixups and `fork-neo-test` took over the whole tree.
+The old tips are kept as `neo-backup-20260920-fork-neo` and
+`neo-backup-20260920-fork-neo-test`.
+
+Two content changes went into `dry-unification` first, so the projection would
+pick them up:
+
+- `build(safeboot)` -- the checked-in `safeboot.bin`/`safeboot-s3.bin` still
+  came from before the campaign. The board envs flash exactly those root files
+  through their `upload_command`, so a stale image ships unnoticed. Rebuilt,
+  -1712 B each. The safeboot build sees nothing of the campaign delta: its
+  `build_src_filter` admits only `src/safeboot/*`, `esp32_flash.*` and
+  `settings_schema.cpp`.
+- `refactor(loop)` -- `heapMonTimer` was the only one of the seven migrated
+  scheduler entries whose `enabled()` meant something different per platform.
+  Both now gate on `!bDisplayLog`. Console output is indistinguishable either
+  way; see the changelog entry in K07 for why.
+
+`fork-neo-test`, ten commits on `upstream/dev`:
+
+| Commit         | Contents                                                |
+| -------------- | ------------------------------------------------------- |
+| `docs(neo)`    | `docs/CHANGELOG-neo.md`                                 |
+| `neo K01`      | 57 paths                                                |
+| `neo` (core)   | 187 paths, incl. `tools/ensure_tasmota_framework.py`    |
+| `neo K15`      | 6 paths, incl. both safeboot images                     |
+| `neo K16`      | 1 path                                                  |
+| `neo K17`      | 1 path                                                  |
+| `neo K19`      | 440 paths, incl. `tools/force_include_settings_stub.py` |
+| `neo: docs`    | 215 paths                                               |
+| `neo: tools`   | 188 paths                                               |
+| `neo: project` | 19 paths, including the fork's four deletions           |
+
+The three former fixups now sit where their reason sits: the Tasmota script in
+the core commit, because that commit brings the `platformio.ini` that names it
+as a pre-step of the two safeboot envs; the settings stub in K19, with the
+native env that needs it; the safeboot images in K15.
+
+`fork-neo`, six commits, the same chapters minus K19 and minus the three
+non-code commits, with `tools/neo_strip.py` applied inside the core commit.
+
+Gates, all green:
+
+| Gate                                                 | Result                                      |
+| ---------------------------------------------------- | ------------------------------------------- |
+| `git diff fork-neo-test dry-unification`, whole tree | empty                                       |
+| `strip(fork-neo-test)` vs `fork-neo`                 | empty over the filter set                   |
+| safeboot images, `fork-neo` vs `fork-neo-test`       | identical                                   |
+| `fork-neo` per commit, 8 lead targets                | 38/40                                       |
+| defined-symbol sets, 8 lead targets                  | 0 deviations, 3193-15575 symbols per target |
+| working tree at the tip                              | 8/8 boards, 34/34 native                    |
+
+The two reds are both on K01 and both are upstream's own baseline, not a
+regression: `ttgo_tbeam` has 20 bytes of free `iram0_0_seg` there and
+`E22_XML-DevKitC` 1160 B DRAM / 3456 B IRAM. K01 carries only upstream's code
+plus the campaign's deletions, so it is the closest thing to a measurement of
+`upstream/dev` itself. Both builds link; what fails is our own 4000-byte
+headroom rule. From the core commit onward all eight targets are green -- the
+campaign is what gives those two boards room again.
+
+## 17. Still open
+
 - Whether `.github/workflows/` additionally gets a hard `if: false` on top of the
   repo-level Actions disable, at the cost of a visible delta against upstream.
+  Relevant for `fork-neo-test`, which carries the fork's own `ci-build.yml`
+  triggering on branch pushes; `fork-neo` carries upstream's `.github`
+  unchanged and has no such delta.
+- Whether `tools/neo_strip.py` should travel to `fork-neo`. It documents
+  exactly what was removed, which is a courtesy to a reviewer; it also
+  describes two branches that do not exist in upstream's repository, which is
+  noise there. Currently it travels.
+- Pushing both branches to `DK5EN/MeshCom-Firmware`, and whether
+  `origin/dry-unification` is deleted along with the local branch.
+- Release `4.35t_20260919_neo` and the GH Pages web flasher
+  (`tools/pages_flasher.py` does not exist yet).
+- The conversation with Kurt OE1KBC about `fork-neo` as a PR.
 
-## 17. Review history
+## 18. Review history
 
 - **2026-09-19, advisor pass (Fable) on `1eb13f5f` + `332e9542`.** Ten defects
   confirmed against the tree and fixed in this revision. The load-bearing one:
