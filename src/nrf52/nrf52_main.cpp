@@ -1848,11 +1848,11 @@ void nrf52loop()
             {
                 // prepare JSON config to phone after BLE connection
                 // send JSON config to phone after BLE connection
-                if (ComToPhoneWrite != ComToPhoneRead)
+                if (!bf_empty(&phoneComRing))
                 {
                     sendComToPhone();
                 }
-                else if (toPhoneWrite != toPhoneRead)
+                else if (!bf_empty(&phoneRing))
                 {
                     sendToPhone();
                 }

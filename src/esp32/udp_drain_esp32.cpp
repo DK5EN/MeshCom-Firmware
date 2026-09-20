@@ -37,33 +37,23 @@ void sendMeshComUDP()
     if((uint32_t)node_hostip == 0)   // F6: Serveradresse noch nicht aufgeloest
       return;
 
-    if(udpWrite != udpRead)
+    if(!bf_empty(&udpOutRing))
     {
         if(!udp_is_busy)
         {
-            // CONC-16: snapshot the slot before the (comparatively slow) UDP
-            // send touches it. addUdpOutBuffer() (CONC-16) can wrap the ring
-            // and overwrite this exact slot from OnRxDone (nRF52 timer-
-            // service task, see C-01) while Udp.write()/endPacket() below are
-            // still running; everything from here on reads udpSnapshot, never
-            // the live ring again.
+            // CONC-16: den Frame als Kopie lesen, bevor das (vergleichsweise
+            // langsame) UDP-Senden laeuft. addUdpOutBuffer() kann aus OnRxDone
+            // (nRF52 Timer-Service-Task, C-01) waehrenddessen verdraengen;
+            // ab hier liest alles nur noch udpSnapshot. Byte 0 traegt wie
+            // bisher die Laenge, die Nutzlast beginnt bei Offset 1.
             //
-            // Sized past the source slot (UDP_TX_BUF_SIZE+20): the convBuffer
-            // copy below reads from offset 1+36 for msg_len bytes, which can
-            // run past what the producer actually wrote for a large msg_len
-            // (pre-existing in ringBufferUDPout too, not introduced here) --
-            // zero-filled so that tail is deterministic instead of reading
-            // adjacent stack memory.
-            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64] = {0};
-            int mySlot = udpRead;
-#if defined(NRF52_SERIES)
-            taskENTER_CRITICAL();
-#endif
-            memcpy(udpSnapshot, ringBufferUDPout[mySlot], sizeof(ringBufferUDPout[0]));
-#if defined(NRF52_SERIES)
-            taskEXIT_CRITICAL();
-#endif
-            uint16_t msg_len = (uint16_t)udpSnapshot[0];
+            // Groesser als ein Frame und nullgefuellt: die convBuffer-Kopie
+            // unten liest ab Offset 1+36; der Rest ist damit deterministisch.
+            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64];
+            memset(udpSnapshot, 0, sizeof(udpSnapshot));
+            uint16_t myGen = bf_tail_gen(&udpOutRing);
+            uint16_t msg_len = bf_peek(&udpOutRing, udpSnapshot + 1, sizeof(udpSnapshot) - 1);
+            udpSnapshot[0] = (uint8_t)msg_len;
 
             // send it over UDP
 
@@ -180,19 +170,11 @@ void sendMeshComUDP()
             // sending — extremely narrow (needs the ring to wrap completely
             // during one synchronous Udp.write()/endPacket()), but skipping
             // the advance in that case avoids a double-advance.
-#if defined(NRF52_SERIES)
-            taskENTER_CRITICAL();
-#endif
-            if (udpRead == mySlot)
-            {
-                memset(ringBufferUDPout[mySlot], 0, UDP_TX_BUF_SIZE);
-                udpRead++;
-                if (udpRead >= MAX_RING_UDP)
-                    udpRead = 0;
-            }
-#if defined(NRF52_SERIES)
-            taskEXIT_CRITICAL();
-#endif
+            // Nur entnehmen, wenn es noch derselbe Frame ist: hat ein Schreiber
+            // ihn waehrend des Sendens verdraengt, steht die Generation anders
+            // und pop() traefe den naechsten Frame (byte_fifo.h, tail_gen).
+            if (bf_tail_gen(&udpOutRing) == myGen)
+                bf_pop(&udpOutRing);
 
         }
         else

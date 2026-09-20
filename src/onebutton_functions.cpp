@@ -161,6 +161,7 @@ void singleClick()
     #if defined(HAS_TFT) || defined(HAS_TFT_114)
       displayTFT(pageLastTextLong1[pagePointer], pageLastTextLong2[pagePointer]);
     #else
+      #if defined(HAS_LONG_PAGE_TEXT)
       strncpy(pageTextLong1, pageLastTextLong1[pagePointer], sizeof(pageTextLong1));
       if(bDisplayCont && strlen(pageTextLong1) > 0)
         Serial.println(pageTextLong1);
@@ -168,6 +169,7 @@ void singleClick()
       strncpy(pageTextLong2, pageLastTextLong2[pagePointer], sizeof(pageTextLong2));
       if(bDisplayCont && strlen(pageTextLong2) > 0)
         Serial.println(pageTextLong2);
+      #endif
 
       sendDisplay1306(false, true, 0, 0, (char*)"#N");
     #endif
