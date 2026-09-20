@@ -9,6 +9,7 @@
  *  @date        2025-12-03
  */
 
+#include "mheard_record.h"   // MheardRecord, siehe mheardRecords[] unten
 #include <atomic>
 
 // WQ-01 (2026-09-05): queue panel on the rxlog web page -- pulls in
@@ -69,6 +70,11 @@ extern char LogCallsign[10];
 extern bool bDisplayRetx;
 extern unsigned long DisplayOffWait;
 extern int DisplayTimeWait;
+// retransmit_timer/mcp_refresh_timer: each platform main defines its OWN
+// `unsigned long`, same name, no prior shared extern (D1-10 loop scheduler
+// needs one to build the shared table in loop_scheduler.cpp).
+extern unsigned long retransmit_timer;
+extern unsigned long mcp_refresh_timer;
 extern unsigned long BattTimeWait;
 extern unsigned long BattTimeAPP;
 extern unsigned long BMXTimeWait;
@@ -252,24 +258,32 @@ void bpPollDrain(void);
 // or "*"), not a hardcoded broadcast.
 void sendExternNotice(const char *text, const char *dst);
 
-extern unsigned char ringbufferRAWLoraRX[MAX_LOG][UDP_TX_BUF_SIZE+5];
+// R1-04: erst beim ersten Blick auf die rxlog-Seite angelegt, siehe
+// loop_functions.cpp. NULL heisst "noch nicht angesehen", nicht "Fehler".
+typedef unsigned char rawLogLine_t[UDP_TX_BUF_SIZE+5];
+extern rawLogLine_t *ringbufferRAWLoraRX;
+bool rawLogEnsure(void);
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;
 
 // RINGBUFFER for outgoing UDP lora packets for lora TX
-extern uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+20];
+// R1-03: kept in lockstep with the definition in loop_functions.cpp -- see
+// the comment there for why +1 (not +20) is the true bound.
+extern uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+1];
 extern int udpWrite;
 extern int udpRead;
 
 extern bool hasMsgFromPhone;
 
 // BLE Ringbuffer to phone
-extern unsigned char BLEtoPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5];
+// R1-01: kept in lockstep with the definition in loop_functions.cpp -- see
+// the comment there for the producer-clamp derivation of these sizes.
+extern unsigned char BLEtoPhoneBuff[MAX_RING][UDP_TX_BUF_SIZE+5];
 extern int toPhoneWrite;
 extern int toPhoneRead;
 
 // BLE Commands Ringbuffer to phone
-extern unsigned char BLEComToPhoneBuff[MAX_RING][MAX_MSG_LEN_PHONE+5];
+extern unsigned char BLEComToPhoneBuff[MAX_RING][246];
 extern int ComToPhoneWrite;
 extern int ComToPhoneRead;
 
@@ -300,11 +314,6 @@ extern std::atomic<bool> cad_in_progress;
 extern std::atomic<bool> cad_done_flag;
 extern std::atomic<bool> cad_double_check;
 
-
-// RACE-01 fix: spinlock for deferred display update (ISR → main loop)
-#if defined(ESP32)
-extern portMUX_TYPE displayMux;
-#endif
 
 // Channel utilization tracking (10s window)
 #if defined(ESP32)
@@ -436,7 +445,9 @@ extern unsigned long web_timer;          // Refreshtime WEbServer
 extern float global_batt;
 extern int global_proz;
 
-extern unsigned char mheardBuffer[MAX_MHEARD][60]; //Ringbuffer for MHeard Lines
+// R2-01: war `unsigned char mheardBuffer[MAX_MHEARD][60]` -- Text je
+// Eintrag. Jetzt der Datensatz, 20 statt 60 Byte (src/mheard_record.h).
+extern MheardRecord mheardRecords[MAX_MHEARD];
 extern char mheardCalls[MAX_MHEARD][10]; //Ringbuffer for MHeard Key = Call
 extern unsigned long mheardEpoch[MAX_MHEARD];  //Ringbuffer for MHeard EPoch Update Time
 extern int mheardNCount[MAX_MHEARD];
