@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay-Prioritäten: drei Urteile</title>
+<style>
+:root { --ink:#1f2a37; --muted:#5b6b7b; --line:#c9d3dd; --bg:#ffffff; --soft:#f3f6f9;
+        --acc:#1f6feb; --ok:#2a9d5c; --warn:#d9822b; --bad:#c62828; --ham:#7b4fbf; --www:#1f6feb; }
+html { color-scheme: light; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 80px; }
+h1 { font-size: 28px; line-height:1.2; margin: 0 0 6px; }
+h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 26px 0 8px; }
+p { margin: 8px 0; }
+.meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; padding-left: 18px; }
+.meta li { margin: 2px 0; }
+.bluf { background: var(--soft); border-left: 4px solid var(--acc); padding: 12px 16px; margin: 18px 0; }
+.bluf p { margin: 6px 0; }
+.bluf ol { margin: 4px 0 10px; }
+.reco { font-weight: 600; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+th { background: var(--soft); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+code { background: var(--soft); padding: 1px 4px; border-radius: 3px; }
+pre { background: var(--soft); padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); }
+figure { margin: 18px 0; }
+figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.fig { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: #fff; overflow-x: auto; }
+svg { width: 100%; height: auto; display: block; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+svg text { font-size: 12px; fill: var(--ink); }
+svg .t11 { font-size: 11px; fill: var(--muted); }
+svg .b { font-weight: 600; }
+svg .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+svg .node { fill: #fff; stroke: var(--ink); stroke-width: 1.2; rx: 6; }
+svg .zone { fill: none; stroke: var(--line); stroke-dasharray: 5 4; rx: 8; }
+svg .srv { fill: #eaf7ef; stroke: var(--ok); }
+svg .prx { fill: #fff6ea; stroke: var(--warn); }
+svg .bad { stroke: var(--bad); fill: #fdecec; }
+svg .ln { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+svg .lnw { stroke: var(--www); stroke-width: 1.4; fill: none; }
+svg .lnd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+svg .lnx { stroke: var(--bad); stroke-width: 1.4; fill: none; }
+.tag { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; color:#fff; }
+.tag.ok { background: var(--ok);} .tag.bad{ background: var(--bad);} .tag.warn{ background: var(--warn);} .tag.info{background:var(--acc);}
+ul, ol { padding-left: 22px; } li { margin: 3px 0; }
+.toc { columns: 2; column-gap: 32px; font-size: 14px; }
+.toc li { break-inside: avoid; }
+.small { font-size: 13px; color: var(--muted); }
+blockquote { margin: 10px 0 10px 0; padding: 8px 14px; border-left: 3px solid var(--line); color: var(--ink); background: var(--soft); font-size: 14px; }
+@media (max-width: 720px) { .toc { columns: 1; } }
+@media print { main { padding: 0; } h2 { break-after: avoid; } figure, table, pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Relay-Prioritäten: drei Urteile</h1>
+<ul class="meta">
+  <li>Stand: 2026-09-20</li>
+  <li>Autor: DK5EN, mit Claude</li>
+  <li>Anlass: <em>MeshCom CH — Relay-Prioritäten &amp; Flooding</em>, HB9VQQ, meshcom.hb9vqq.ch/relay-prioritaeten.html, Stand 20.09.2026</li>
+  <li>Quelle Firmware: MeshCom-Firmware, <code>upstream/dev</code> 80b85a5a, geprüft gegen den Zweig <code>feature-neighbour-matrix</code></li>
+  <li>Quelle Feldmessung: <code>logs/dg0opk/report-2026-08-27-dg0opk.htm</code>, 47,6 h lückenlos, DG0OPK-11/-12/-13, Firmware 4.35p</li>
+  <li>Quelle Protokoll: RFC 3626 (OLSR), Wu &amp; Li 1999 (Connected Dominating Set)</li>
+  <li>Funkparameter aller Sendezeitrechnungen: 433,175 MHz, SF11, BW 250 kHz, CR 4/6, Präambel 8, expliziter Header, CRC ein</li>
+  <li>Rufzeichen: DK5EN-xx sind eigene Bench-Knoten, alle übrigen stammen aus den zitierten Messungen</li>
+</ul>
+
+<h2 id="ergebnis">1. Ergebnis</h2>
+
+<div class="bluf">
+<p>HB9VQQ zeigt an zwei realen Clustern, dass MPR und Backbone die Weiterleitungen je Nachricht um rund drei Viertel senken, bei voller Abdeckung. Die Kernaussage trägt: Mengenreduktion ist der Hebel, Sendereihenfolge allein ist keiner.</p>
+<p>Die Rechnung vergleicht jedoch die eingesparten Relays gegen null Kosten. Die Nachbarlisten-Ebene, die MPR voraussetzt, kostet auf SF11 rund 0,95 s Sendezeit je Knoten und Periode; auf seinem eigenen Florenz-Cluster liegt der Gleichstand bei 1,8 Nachrichten je HELLO-Periode. Unterhalb davon kostet die Ebene mehr, als sie spart. Zugleich ordnet die MeshCom-Firmware ihren Sendeverkehr bereits nach Prioritätsklassen mit skaliertem Backoff, und sie besitzt bereits einen Sendeabbruch auf gehörte Nachrichten, der Relay-Einträge per Status ausnimmt.</p>
+<p>Daraus folgt:</p>
+<ol>
+  <li><strong>Stufe 0, heute:</strong> Prioritätsklassen mit skaliertem CSMA-Backoff, Overhear-Abbruch für eigene Wiederholungen, Relays davon ausgenommen. Nichts zu bauen, nur zu wissen.</li>
+  <li><strong>Stufe 1, Overhear-Abbruch für Relays:</strong> den vorhandenen Ring-Scan auch Relay-Einträge sehen lassen, freigegeben nur, wenn die Nachbarschaftsmatrix die Abdeckung bestätigt. Reagiert auf eine beobachtete Konkurrenzaussendung statt auf ein Modell.</li>
+  <li><strong>Stufe 2, abgestufte Relay-Pflicht:</strong> die vorhandene Rückdruckstufe wirft unter Last redundante Relays ab statt der eigenen Nutzernachrichten des Betreibers.</li>
+  <li><strong>Stufe 3, Set-Auswahl aus der Matrix: verworfen.</strong> Nicht aus Vorsicht, sondern weil die Regel auf fehlenden Kanten entscheidet und die Matrix ausschließlich positive Evidenz kennt.</li>
+</ol>
+<p class="reco">Empfehlung: Stufe 1 zuerst nur als Zähler bauen, der mitschreibt, wie oft ein Relay hätte abgebrochen werden können, ohne etwas abzubrechen. Stufe 2 danach. Σ(1/NC) ist die billigste der drei Schweizer Optionen, weil ihr Eingabewert bereits auf dem Kanal liegt.</p>
+</div>
+
+<table>
+<caption class="small">Entscheidungen zu den gestellten Fragen</caption>
+<tr><th>Nr</th><th>Frage</th><th>Entscheidung</th><th>Stufe</th><th>Abschnitt</th></tr>
+<tr><td>1</td><td>Urteil zur Schweizer Seite</td><td>Kernaussage trägt. Zwei Einwände: die Nachbarlisten-Ebene ist nicht kostenlos, und die 100 % Abdeckung überleben die Richtungsannahme nicht. Σ(1/NC) ist unterbewertet, weil sein Eingabewert schon gesendet wird</td><td>—</td><td>4.1</td></tr>
+<tr><td>2</td><td>Ist MPR/CDS ein Ausbaupfad der Matrix, oder bleibt sie Diagnose?</td><td>Diagnose. Set-Auswahl ist aus diesen Daten strukturell nicht erreichbar, nicht bloß ungenau</td><td>3 verworfen</td><td>4.2</td></tr>
+<tr><td>3</td><td>Wie geht die Auswahl mit einem kritischen Knoten am Limit um?</td><td>Priorität und Pflicht trennen. Mehr Priorität erzeugt keine Mehrlast. Das Lastventil existiert und wirft heute das Falsche ab</td><td>2</td><td>4.3</td></tr>
+<tr><td>4</td><td>Ist chronische Sättigung an einem Exklusiv-Punkt das Signal für einen zweiten Pfad?</td><td>Ja, und das ist das wertvollste Erzeugnis der Matrix: benannter Knoten, Richtung, Entfernung</td><td>2</td><td>4.3</td></tr>
+</table>
+
+<table>
+<caption class="small">Ausbaustufen. Jede Stufe ist für sich betreibbar.</caption>
+<tr><th>Stufe</th><th>Was steht</th><th>Erfüllt</th><th>Lücke bei Knoten ohne diese Firmware</th><th>Lücke bei leerer Matrix</th><th>Voraussetzung</th></tr>
+<tr><td>0 (heute)</td><td>Prioritätsklassen, skalierter Backoff, Overhear-Abbruch für eigene Wiederholungen</td><td>—</td><td>keine, alles knotenlokal</td><td>keine</td><td>keine</td></tr>
+<tr><td>1</td><td>Overhear-Abbruch auch für Relay-Einträge, freigegeben über die Matrix</td><td>Mengenreduktion ohne Modell</td><td>keine: der Knoten entscheidet allein und unterdrückt nur gegen eine gehörte Aussendung</td><td>fällt auf heutiges Fluten zurück</td><td>Nachbarschaftsmatrix auf dem entscheidenden Knoten</td></tr>
+<tr><td>2</td><td>Abgestufte Relay-Pflicht an der vorhandenen Rückdruckstufe</td><td>Frage 3 und 4</td><td>keine</td><td>Knoten bleibt bei heutigem Verhalten</td><td>Stufe 1</td></tr>
+<tr><td>3 (verworfen)</td><td>Selbstmarkierung nach Wu-Li aus der Matrix</td><td>nichts Messbares</td><td>—</td><td>—</td><td>vollständige, gerichtete, momentane Nachbarschaftskenntnis, die nicht vorliegt</td></tr>
+</table>
+
+<h3>Inhalt</h3>
+<ul class="toc">
+<li><a href="#ergebnis">1. Ergebnis</a></li>
+<li><a href="#ausgangslage">2. Ausgangslage</a></li>
+<li><a href="#zielbild">3. Zielbild</a></li>
+<li><a href="#bausteine">4. Bausteine</a></li>
+<li><a href="#b41">4.1 Urteil zur Schweizer Seite</a></li>
+<li><a href="#b42">4.2 Urteil zum MPR-Ausbaupfad</a></li>
+<li><a href="#b43">4.3 Urteil zum kritischen Knoten</a></li>
+<li><a href="#b44">4.4 Stufe 1: Overhear-Abbruch für Relays</a></li>
+<li><a href="#b45">4.5 Stufe 2: abgestufte Relay-Pflicht</a></li>
+<li><a href="#fehler">5. Fehlerszenarien</a></li>
+<li><a href="#rollout">6. Rollout</a></li>
+<li><a href="#offen">7. Offene Punkte</a></li>
+</ul>
+
+<h2 id="ausgangslage">2. Ausgangslage</h2>
+
+<p>Die Diskussion über Relay-Prioritäten setzt an einer Firmware an, die bereits priorisiert. Wer die vorhandenen Mechanismen nicht kennt, schlägt Dinge vor, die es gibt, und übersieht die eine Stelle, an der wenige Zeilen wirken würden.</p>
+
+<table>
+<caption class="small">Was in der Firmware heute steht. Zeilenangaben gegen <code>upstream/dev</code> 80b85a5a, nachgeprüft am 2026-09-20.</caption>
+<tr><th>Element</th><th>Wert</th><th>Quelle</th></tr>
+<tr><td>Sendeprioritäten</td><td>1 ACK und persönliche DM, 2 Gruppe und Broadcast, 3 Relay, 4 Position, 5 HEY</td><td><code>txring_functions.cpp:93</code></td></tr>
+<tr><td>CSMA-Basiszeit je Priorität</td><td>3000 / 3000 / 4500 / 5500 / 5500 ms, dazu bis 350 ms Jitter</td><td><code>configuration_global.h:392-396</code></td></tr>
+<tr><td>Relay-Einreihung</td><td><code>addTxRingEntry(..., RING_STATUS_DONE, "rx_relay", ...)</code>, endgültig, keine Wiederholung</td><td><code>lora_functions.cpp</code>, Relay-Block</td></tr>
+<tr><td>Overhear-Abbruch</td><td>bei jedem Empfang Ring nach der <code>msg_id</code> durchsuchen und den Slot freigeben</td><td><code>lora_functions.cpp:654-698</code></td></tr>
+<tr><td>dessen Wächter</td><td><code>ringBuffer[i][1] != RING_STATUS_DONE &amp;&amp; != RING_STATUS_READY</code> — ein Relay ist DONE und damit ausgenommen</td><td><code>lora_functions.cpp:656</code></td></tr>
+<tr><td>Wiederholung eigener Nachrichten</td><td>bis 3 Versuche, für jede lokal erzeugte Textnachricht, ohne Verzweigung auf DM gegen Gruppe</td><td><code>loop_functions.cpp:4233-4239</code></td></tr>
+<tr><td>Rückdruck an den Absender</td><td>QRS ab Tiefe 5, QRT bei 80 % von <code>MAX_RING</code>, QTA beim Verwurf</td><td><code>backpressure.h</code></td></tr>
+<tr><td>was QRT verweigert</td><td>nur lokal erzeugte Nutzernachrichten; Relay, ACK und Beacon rufen <code>sendMessage()</code> nicht auf</td><td><code>loop_functions.cpp:4170</code></td></tr>
+<tr><td>Dedup-Ring</td><td>reiner Verdrängungsring ohne Alterung, 100 Einträge auf ESP32-S3 und RAK, 70 klassischer ESP32</td><td><code>dedup_functions.cpp</code>, <code>configuration_global.h</code></td></tr>
+<tr><td>Nachbarzahl auf dem Kanal</td><td>als <code>/N</code> im Positions-Beacon und als NCT je Hop im HEY-Bericht</td><td><code>mheard_functions.cpp:700</code>, <code>aprs_functions.cpp:1132</code></td></tr>
+<tr><td>Mesh-Schalter</td><td><code>--mesh off</code> setzt <code>bMESH</code>; die Relay-Schranke liest es nur, wenn der Pfad keinen Via-Hop nennt</td><td><code>command_functions.cpp:244</code>, <code>via_functions.cpp:78</code></td></tr>
+</table>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 372" role="img" aria-label="Ist-Zustand des Relay-Pfads">
+  <text x="30" y="24" class="b">Empfang eines Frames</text>
+
+  <rect x="30" y="40" width="150" height="52" class="node"/>
+  <text x="105" y="62" text-anchor="middle" class="b">OnRxDone</text>
+  <text x="105" y="79" text-anchor="middle" class="t11">Frame dekodiert</text>
+
+  <rect x="230" y="40" width="190" height="52" class="node"/>
+  <text x="325" y="62" text-anchor="middle" class="b">Overhear-Scan</text>
+  <text x="325" y="79" text-anchor="middle" class="mono">654-698, je Empfang</text>
+
+  <rect x="470" y="40" width="190" height="52" class="node"/>
+  <text x="565" y="62" text-anchor="middle" class="b">is_new_packet()</text>
+  <text x="565" y="79" text-anchor="middle" class="t11">Dedup, 100 msg_id</text>
+
+  <rect x="710" y="40" width="220" height="52" class="node"/>
+  <text x="820" y="62" text-anchor="middle" class="b">Relay gebaut</text>
+  <text x="820" y="79" text-anchor="middle" class="mono">RING_STATUS_DONE</text>
+
+  <path d="M180 66 L230 66" class="ln"/>
+  <path d="M420 66 L470 66" class="ln"/>
+  <path d="M660 66 L710 66" class="ln"/>
+
+  <rect x="30" y="160" width="900" height="100" class="zone"/>
+  <text x="46" y="182" class="b">TX-Ring</text>
+
+  <rect x="70" y="195" width="185" height="48" class="node srv"/>
+  <text x="162" y="215" text-anchor="middle" class="b">eigene Nachricht</text>
+  <text x="162" y="232" text-anchor="middle" class="t11">Status SENT, Prio 1 oder 2</text>
+
+  <rect x="290" y="195" width="185" height="48" class="node srv"/>
+  <text x="382" y="215" text-anchor="middle" class="b">eigene Wiederholung</text>
+  <text x="382" y="232" text-anchor="middle" class="t11">bis 3 Versuche</text>
+
+  <rect x="620" y="195" width="270" height="48" class="node bad"/>
+  <text x="755" y="215" text-anchor="middle" class="b">Relay fuer andere</text>
+  <text x="755" y="232" text-anchor="middle" class="t11">Status DONE, Prio 3, Backoff 4500 ms</text>
+
+  <path d="M300 92 L300 140 L162 140 L162 195" class="lnw"/>
+  <path d="M350 92 L350 140 L382 140 L382 195" class="lnw"/>
+  <text x="440" y="136" class="t11">Slot freigeben: schon gehoert, also nicht mehr wiederholen</text>
+
+  <path d="M820 92 L820 172 L755 172 L755 195" class="ln"/>
+
+  <path d="M755 243 L755 276 L40 276" class="lnx"/>
+
+  <text x="30" y="300" class="b">Der Scan sieht diesen Eintrag nie.</text>
+  <text x="30" y="318" class="t11">Der Waechter in Zeile 656 ueberspringt jeden Eintrag mit Status DONE, und ein Relay wird als DONE eingereiht.</text>
+  <text x="30" y="335" class="t11">Ein einmal eingereihtes Relay geht heraus, gleichgueltig wie viele andere Knoten denselben Frame vorher wiederholt haben.</text>
+  <text x="30" y="352" class="t11">CAD verschiebt eine Aussendung nur, solange der Kanal belegt ist, und verwirft sie nie.</text>
+</svg>
+</div>
+<figcaption>Abb. 1: Ist-Zustand. Der Sendeabbruch auf eine gehörte Nachricht ist vorhanden und wirkt zuverlässig für eigene Wiederholungen. Relays sind davon nicht vergessen, sondern per Status ausgenommen. Genau diese eine Schranke ist der Hebel für Stufe 1.</figcaption>
+</figure>
+
+<h3>Mengengerüst</h3>
+
+<p>Prämisse aller Sendezeiten: 433,175 MHz, SF11, BW 250 kHz, CR 4/6, Präambel 8, expliziter Header, CRC ein. Daraus Symbolzeit 8,192 ms. Die Formel prüft sich selbst: 255 Byte ergeben 2476,0 ms, und genau mit diesem Wert hat der fehlerhafte ESP32-Zähler bis zum 25.08.2026 jeden Empfang verbucht.</p>
+
+<table>
+<tr><th>Größe</th><th class="num">Wert</th><th>Bemerkung</th></tr>
+<tr><td>Sendezeit 255 Byte</td><td class="num">2476,0 ms</td><td>Prüfwert gegen den Firmware-Zähler</td></tr>
+<tr><td>Sendezeit 180 Byte (20 Nachbarn)</td><td class="num">1787,9 ms</td><td>Nachbarliste eines dichten Knotens</td></tr>
+<tr><td>Sendezeit 88 Byte (8,3 Nachbarn)</td><td class="num">952,3 ms</td><td>mittlerer Knoten im Florenz-Cluster</td></tr>
+<tr><td>Sendezeit 60 Byte</td><td class="num">706,6 ms</td><td>Annahme: kurze Textnachricht</td></tr>
+<tr><td>Dedup-Fenster im Feld</td><td class="num">28,8–52,3 min</td><td>gemessen, lastabhängig, DG0OPK 47,6 h</td></tr>
+<tr><td>Warteschlange Text, DG0OPK-11</td><td class="num">Median 30 s</td><td>schlechtester Fall 16 min 25 s; -12 liegt bei 18,3 s, -13 bei 15,1 s</td></tr>
+<tr><td>Warteschlange Heartbeat, DG0OPK-11</td><td class="num">Median &gt; 14 min</td><td>Extremfall 36 min</td></tr>
+<tr><td>Verschiedene Rufzeichen im Korpus</td><td class="num">263</td><td>drei Knoten, 47,6 h</td></tr>
+<tr><td>Matrixzeilen je Board</td><td class="num">21 / 13 / 11</td><td>ESP32-S3, RAK und XML-Varianten / klassischer ESP32 / Entwicklervariante</td></tr>
+</table>
+
+<h2 id="zielbild">3. Zielbild</h2>
+
+<p>Der Endzustand von Stufe 2 ist ein Knoten, der seine Relay-Pflicht an der eigenen Warteschlangentiefe bemisst und redundante Relays abwirft, bevor er den Betreiber zum Schweigen bringt. Stufe 1 ist dasselbe Bild ohne die Bänder: nur der Abbruch auf eine tatsächlich gehörte Konkurrenzaussendung.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 300" role="img" aria-label="Abgestufte Relay-Pflicht">
+  <rect x="20" y="95" width="200" height="66" class="node srv"/>
+  <text x="120" y="119" text-anchor="middle" class="b">RUHE</text>
+  <text x="120" y="136" text-anchor="middle" class="t11">Tiefe unter 5</text>
+  <text x="120" y="152" text-anchor="middle" class="t11">alles weiterleiten, wie heute</text>
+
+  <rect x="265" y="95" width="200" height="66" class="node"/>
+  <text x="365" y="119" text-anchor="middle" class="b">QRS</text>
+  <text x="365" y="136" text-anchor="middle" class="t11">Tiefe ab 5</text>
+  <text x="365" y="152" text-anchor="middle" class="t11">Overhear-Abbruch aktiv</text>
+
+  <rect x="510" y="95" width="200" height="66" class="node prx"/>
+  <text x="610" y="119" text-anchor="middle" class="b">QRT</text>
+  <text x="610" y="136" text-anchor="middle" class="t11">80 % von MAX_RING</text>
+  <text x="610" y="152" text-anchor="middle" class="t11">nur exklusive Zeilen relayen</text>
+
+  <rect x="755" y="95" width="185" height="66" class="node bad"/>
+  <text x="847" y="119" text-anchor="middle" class="b">QTA</text>
+  <text x="847" y="136" text-anchor="middle" class="t11">Ring verwirft</text>
+  <text x="847" y="152" text-anchor="middle" class="t11">exklusiv und eigener Verkehr</text>
+
+  <path d="M220 128 L265 128" class="ln"/>
+  <path d="M465 128 L510 128" class="ln"/>
+  <path d="M710 128 L755 128" class="ln"/>
+
+  <path d="M847 95 C847 45 120 45 120 95" class="lnw"/>
+  <text x="480" y="36" text-anchor="middle" class="t11">Tiefe faellt zurueck ins Ruheband: Latch loeschen, Zyklus neu scharf</text>
+
+  <text x="20" y="215" class="b">Heute verweigert QRT die lokal erzeugten Nutzernachrichten, Relay und ACK laufen weiter.</text>
+  <text x="20" y="235" class="t11">Fuer einen gewoehnlichen Knoten ist das richtig. Fuer einen topologisch unverzichtbaren ist es verkehrt herum:</text>
+  <text x="20" y="252" class="t11">er bringt seinen Betreiber zum Schweigen und traegt den redundanten Verkehr weiter, der die Verstopfung erzeugt.</text>
+  <text x="20" y="276" class="t11">Die Matrix liefert das fehlende Unterscheidungsmerkmal: exklusive Zeile heisst, niemand sonst in Hoerweite wiederholt diesen Knoten.</text>
+</svg>
+</div>
+<figcaption>Abb. 2: Zielbild Stufe 2. Die Zustände, die Hysterese und der Episoden-Latch existieren bereits in der Rückdruckstufe und sind im Feld kalibriert. Neu ist allein, dass die Bänder zusätzlich die Relay-Pflicht steuern und nicht nur den Absender bremsen.</figcaption>
+</figure>
+
+<table>
+<tr><th>Komponente</th><th>Ort</th><th>Rolle</th><th>Stufe</th></tr>
+<tr><td>Overhear-Scan mit Relay-Freigabe</td><td><code>lora_functions.cpp:654-698</code></td><td>Relay-Eintrag verwerfen, wenn ein anderer denselben Frame bereits wiederholt hat</td><td>1</td></tr>
+<tr><td>Abdeckungsprüfung</td><td><code>nbr_matrix.*</code></td><td>Freigabe nur, wenn jeder exklusiv gehörte Knoten auch vom beobachteten Sender gehört wird</td><td>1</td></tr>
+<tr><td>Zähler ohne Wirkung</td><td>Relay-Block</td><td>mitschreiben, wie oft abgebrochen werden könnte, ohne abzubrechen</td><td>1, zuerst</td></tr>
+<tr><td>Bänder der Relay-Pflicht</td><td><code>backpressure.h</code>, Relay-Block</td><td>Tiefe entscheidet, welche Relays noch Pflicht sind</td><td>2</td></tr>
+</table>
+
+<h2 id="bausteine">4. Bausteine</h2>
+
+<h3 id="b41">4.1 Urteil zur Schweizer Seite</h3>
+
+<p class="reco">Entscheidung: Die Kernaussage trägt und deckt sich mit unseren Messungen. Zwei Einwände: die Nachbarlisten-Ebene fehlt in der Kostenrechnung, und die 100 % Abdeckung überleben die Richtungsannahme nicht. Die billigste der drei Optionen ist unterbewertet.</p>
+
+<p>Was zuerst gesagt gehört, weil es stimmt: Befund 3 ist der wertvolle Satz der Seite. Σ(1/NC) ordnet, es reduziert nicht. In MeshCom gilt das sogar schärfer als dort steht. Die Relay-Entscheidung fällt einmal, beim Empfang; der Hop-Zähler ist beim Einreihen bereits dekrementiert; und nichts sieht den Eintrag danach noch einmal an. Eine Ordnungsregel kann deshalb keine einzige Aussendung entfernen. Ebenso richtig sind die Grenzen, die er selbst nennt, und seine Zurückhaltung im Anspruch:</p>
+
+<blockquote>„MeshCom braucht nicht das ganze OLSR (kein Routing, keine Topologie-Datenbank) — nur der MPR-Mechanismus lässt sich als Flooding-Optimierung ausleihen."</blockquote>
+
+<p>Der Einwand richtet sich deshalb nicht gegen OLSR als Ganzes, sondern gegen die eine Ebene, die er behält.</p>
+
+<h4>Einwand 1: die Nachbarlisten-Ebene ist nicht kostenlos</h4>
+
+<blockquote>„Selbstorganisierend und lokal — braucht nur, dass jeder seine Nachbarliste verbreitet (2-Hop-Info)."</blockquote>
+
+<p>Das „nur" ist der Preis. RFC 3626 §6.2 verlangt, dass ein Knoten seine gesamte symmetrische 1-Hop-Nachbarschaft ankündigt; die Vorgabewerte in §18.2 setzen HELLO_INTERVAL und REFRESH_INTERVAL auf 2 s. Dass die Norm in §6.2 ausdrücklich teilweise HELLOs erlaubt, hilft auf LoRa nicht, sondern schadet: dieselben Bytes auf mehr Frames verteilt zahlen jede zusätzliche Präambel mit.</p>
+
+<p>Prämisse der folgenden Rechnung: 9 Byte je Nachbareintrag, was für Rufzeichen mit SSID (<code>DB0SAC-12</code> sind 9 Zeichen) optimistisch gerechnet ist, weil je Eintrag noch mindestens ein Metadatenbyte anfällt. Gerechnet wird auf seinem eigenen Florenz-Cluster: 36 Knoten, mittlerer Grad 8,3, also rund 88 Byte HELLO einschließlich Rahmen.</p>
+
+<table>
+<tr><th>Größe</th><th class="num">Wert</th><th>Herleitung</th></tr>
+<tr><td>HELLO eines Knotens</td><td class="num">0,95 s</td><td>88 Byte bei SF11</td></tr>
+<tr><td>eine HELLO-Runde über 36 Knoten</td><td class="num">34,3 s</td><td>36 × 0,95 s</td></tr>
+<tr><td>Kanalbelegung bei 10 min Periode</td><td class="num">5,7 %</td><td>34,3 s / 600 s, bevor eine einzige Nachricht fließt</td></tr>
+<tr><td>Kanalbelegung bei 5 min Periode</td><td class="num">11,4 %</td><td>—</td></tr>
+<tr><td>Kanalbelegung bei 1 min Periode</td><td class="num">57,1 %</td><td>—</td></tr>
+<tr><td>Ersparnis je Nachricht</td><td class="num">18,8 s</td><td>26,6 eingesparte Wiederholungen × 0,71 s</td></tr>
+<tr><td><strong>Gleichstand</strong></td><td class="num"><strong>1,8 Nachrichten</strong></td><td>je HELLO-Periode; darunter kostet die Ebene mehr, als sie spart</td></tr>
+</table>
+
+<p>Zwei Einschränkungen dieser Rechnung, damit sie niemand stärker liest, als sie ist: die Prozentwerte sind Summenairtime über den Cluster, örtliche Wiederverwendung senkt die tatsächliche Belegung an einem einzelnen Standort; und ein reales Verfahren würde die Liste auf den vorhandenen Beacon aufsatteln, was den Rahmen einspart, nicht die Liste. Beides verschiebt den Gleichstand, hebt ihn nicht auf.</p>
+
+<p>Eine Feinheit, die der Sache nach wichtiger ist als die absolute Zahl: der netzweite HELLO-Aufwand je Periode ist die Summe aller Knotengrade, also das Doppelte der Kantenzahl. Er wächst damit am schnellsten genau in den dichten Clustern, in denen MPR prozentual am meisten spart. Der Aufwand skaliert mit Kanten, der Nutzen mit Verkehr.</p>
+
+<h4>Einwand 2: Σ(1/NC) ist bereits bezahlt, MPR nicht</h4>
+
+<p>Die MeshCom-Firmware sendet die Nachbarzahl bereits über Funk: als <code>/N</code> im Positions-Beacon (<code>mheard_functions.cpp:700</code>) und als NCT je Hop im HEY-Bericht (<code>aprs_functions.cpp:1132</code>). Σ(1/NC) ist über genau dieses Feld definiert. Die billige Option kostet also null zusätzliche Sendezeit, die teure kostet 0,95 bis 1,8 s je Knoten und Periode.</p>
+
+<p>Dazu kommen zwei seiner eigenen Befunde. Erstens seine Bewertung der Metrik:</p>
+
+<blockquote>„Die Netzwichtigkeit ist ein guter, lokaler Betweenness-Proxy und trifft die Spitzenknoten richtig"</blockquote>
+
+<p>Zweitens sein Ergebnis im dünnen Cluster: „Im Zürcher Cluster wählen MPR und Backbone exakt dieselben drei Knoten". Wenn die kostenlose Metrik die Spitzenknoten richtig trifft und die teuren Verfahren im dünnen Netz dieselben Knoten wählen, dann identifiziert das freie Signal im Notfunkfall, für den er argumentiert, dieselben Knoten wie die Ebene, die 5,7 % Kanal kostet. Dieses Argument besteht vollständig aus seinen eigenen Daten, und es spricht für die Option, die er am schwächsten bewertet.</p>
+
+<h4>Einwand 3: die 100 % Abdeckung überleben die Richtungsannahme nicht</h4>
+
+<p>OLSR ist nicht bloß skeptisch gegenüber asymmetrischen Verbindungen, es ist ausschließlich über symmetrische definiert: §8.3.1 rechnet über die symmetrische strikte 2-Hop-Nachbarschaft, §3.4.1 verwirft jede Nachricht, deren Absender nicht in der symmetrischen 1-Hop-Nachbarschaft steht. Sein Graph entsteht aus beobachteten Pfaden, ist also eine Vereinigung beider Richtungen und enthält mindestens so viele Kanten wie der symmetrische Graph, den OLSR tatsächlich benutzen würde. Mehr Kanten bedeuten eine leichtere Überdeckung, also kleinere Relay-Mengen und eine höhere Reduktionsquote.</p>
+
+<p>Seine Vereinfachung ist damit in drei Richtungen optimistisch. Er schreibt:</p>
+
+<blockquote>„Die Grundaussagen — ~¾ weniger Relays, dünn vs. dicht — sind robust"</blockquote>
+
+<p>Für die Reduktionsquote und für den Unterschied dünn gegen dicht trifft das zu. Für die 100 % Abdeckung trifft es nicht zu, und zwar genau wegen der Asymmetrie, die er selbst als Grenze nennt: Knoten, die an einer asymmetrischen Kante hängen, sind über MPR-Fluten nicht erreichbar. Die Abdeckung ist die eine Grundaussage, die diese Vereinfachung nicht übersteht.</p>
+
+<h4>Einschränkung des eigenen Einwands</h4>
+
+<p>Der Satz, Fluten sei die Versicherungsprämie und MPR koste im Fehlerfall die Nachricht, gilt nur für die minimale Redundanz. RFC 3626 §16 kennt MPR_COVERAGE als Regler: mit <em>m</em> größer eins ist jeder strikte 2-Hop-Knoten über mindestens <em>m</em> MPR-Knoten erreichbar, je Knoten einstellbar. Redundanz fehlt also nicht, sie steht auf Minimum. Das stärkt den Einwand eher: seine −73 bis −78 % sind die Zahlen für <em>m</em> = 1, und jede zurückgekaufte Robustheit geht direkt von der Schlagzeile ab.</p>
+
+<p>Zwei kleinere Punkte zur Genauigkeit. Im Florenz-Cluster wählt MPR 13 der 36 Knoten als Relais; die −76 % sind Wiederholungen je Nachricht, nicht der Anteil sendender Knoten, und beides wird leicht verwechselt. Und die Seite trägt weder Datensatz noch Code, die Zahlen sind für Dritte nicht nachrechenbar. Für eine Diskussionsgrundlage, als die sie sich ausdrücklich bezeichnet, ist das in Ordnung, für eine Firmware-Entscheidung nicht.</p>
+
+<table>
+<caption class="small">Die drei Optionen der Seite, mit dem Preis der Eingangsdaten bewertet.</caption>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>Σ(1/NC)</td><td>Rangzahl aus der gemeldeten Nachbarzahl, steuert den Backoff</td><td><span class="tag info">unterbewertet</span> Eingabe liegt bereits auf dem Kanal, Kosten null. Ordnet aber nur, und MeshCom ordnet bereits nach Klassen</td></tr>
+<tr><td>MPR</td><td>kleinste Teilmenge, die alle 2-Hop-Knoten erreicht</td><td><span class="tag warn">Preis fehlt</span> braucht eine Nachbarlisten-Ebene zu 0,95 bis 1,8 s je Knoten und Periode; Gleichstand bei 1,8 Nachrichten je Periode</td></tr>
+<tr><td>Backbone von Hand</td><td>fest gewählte Menge, die alle anderen berührt</td><td><span class="tag ok">tragfähig</span> sein Argument ist operativ und trifft zu: „robust gegen kaputte oder alte Firmware". Der Schalter dafür existiert, er heißt <code>--mesh off</code></td></tr>
+</table>
+
+<p>Der letzte Punkt ist die Stelle, an der sich beide Wege treffen. Sein Fazit lautet:</p>
+
+<blockquote>„Genau dort, wo es wenige kritische Knoten gibt, ist Priorisierung wertvoll — und ein manuell gepflegtes Backbone (wie HAMNET) ist robust gegen kaputte oder alte Firmware."</blockquote>
+
+<p>Das ist keine Algorithmenfrage mehr, sondern eine Betriebsfrage, und sie ist stichhaltig: ein von Hand gepflegtes Backbone funktioniert weiter, wenn ein Teil der Flotte eine Firmware fährt, die das Verfahren nicht kennt. Genau das leistet kein selbstorganisierendes Verfahren. Sein Backbone und das Urteil „Mesh hier redundant" aus der Nachbarschaftsmatrix sind dieselbe Sache von zwei Seiten: die Matrix sagt dem Betreiber, welche Knoten den Schalter umlegen sollen.</p>
+
+<h3 id="b42">4.2 Urteil zum MPR-Ausbaupfad</h3>
+
+<p class="reco">Entscheidung: Die Matrix bleibt Diagnose. Set-Auswahl ist aus diesen Daten nicht erreichbar, und der Grund ist strukturell, nicht eine Frage der Genauigkeit.</p>
+
+<p>Die Beobachtung der Frage ist richtig und gut gesehen: die Matrix rekonstruiert nicht nur die eigenen Nachbarn, sondern die Hörbeziehungen der Nachbarn untereinander, also 2-Hop-Wissen. Sie ist dafür sogar besser geformt als ein aus einer Karte abgeleiteter Graph, weil sie gerichtet ist. Zelle (X,Y) heißt „Y hat X gehört", nicht „X und Y sind verbunden" (<code>nbr_matrix.h:84</code>), und sie trägt je Zelle einen Signalbericht.</p>
+
+<p>Trotzdem ist der Weg versperrt, und zwar an einer Stelle, die sich nicht durch mehr Laufzeit oder mehr Speicher beheben lässt.</p>
+
+<h4>Liefert die Matrix nicht dieselbe Information wie HELLO?</h4>
+
+<p>Die Form ja, die Eigenschaften nein, und der Unterschied liegt genau dort, wo MPR seine Korrektheit herholt. Richtig ist: die Matrix enthält echte 2-Hop-Zeilen. Sendet C, wiederholt A, und höre ich A, dann bekommt C eine eigene Zeile und die Zelle sagt „A hat C gehört", obwohl C nie direkt zu hören war. Der Host-Test <code>test_pair_rule_text_frame</code> nagelt genau das fest. Als Rohmaterial ist sie damit besser geformt als ein ungerichteter Kartengraph.</p>
+
+<table>
+<caption class="small">Was die Nachbarlisten-Ebene liefert und was aus beobachtetem Verkehr ableitbar ist.</caption>
+<tr><th>Eigenschaft</th><th>HELLO</th><th>Nachbarschaftsmatrix</th></tr>
+<tr><td>Herkunft</td><td>der Knoten erklärt seine Nachbarn selbst</td><td>aus fremdem Verkehr erschlossen</td></tr>
+<tr><td>Vollständigkeit</td><td>alle, auch stille Nachbarn</td><td>nur Paare, deren Verkehr mich erreicht hat</td></tr>
+<tr><td>Aktualität</td><td>Momentaufnahme, Vorgabe alle 2 s</td><td>ODER-Vereinigung über 12 Stunden</td></tr>
+<tr><td>Symmetrie</td><td>nur beidseitig bestätigte Verbindungen</td><td>gerichtet; „Y hat X gehört" beweist nicht „X hört Y"</td></tr>
+<tr><td>Negativwissen</td><td>implizit: wer nicht gelistet ist, ist kein Nachbar</td><td>gibt es nicht</td></tr>
+<tr><td>Umfang</td><td>so viele Einträge, wie der Knoten Nachbarn hat</td><td>21, 13 oder 11 Zeilen je Board, jedes Rufzeichen aus jedem Pfad belegt eine</td></tr>
+</table>
+
+<p>Die Zeile Negativwissen ist die entscheidende. Zellen werden nur hochgezählt oder verfallen; einen Eintrag „X hört Y nicht" gibt es nirgends. Eine Regel, die auf fehlenden Kanten entscheidet, liest „nicht beobachtet" zwangsläufig als „nicht vorhanden".</p>
+
+<p>Die Duplikatunterdrückung verschärft das, und zwar in die unbequemste Richtung.</p>
+
+<figure>
+<div class="fig">
+<svg viewBox="0 0 960 344" role="img" aria-label="Warum Dedup die entscheidende Kante verbirgt">
+  <rect x="30" y="130" width="150" height="52" class="node"/>
+  <text x="105" y="152" text-anchor="middle" class="b">C sendet</text>
+  <text x="105" y="169" text-anchor="middle" class="t11">einmal, eine msg_id</text>
+
+  <rect x="280" y="48" width="190" height="52" class="node srv"/>
+  <text x="375" y="70" text-anchor="middle" class="b">A hoert C</text>
+  <text x="375" y="87" text-anchor="middle" class="t11">wiederholt zuerst</text>
+
+  <rect x="280" y="212" width="190" height="52" class="node bad"/>
+  <text x="375" y="234" text-anchor="middle" class="b">B hoert C ebenfalls</text>
+  <text x="375" y="251" text-anchor="middle" class="t11">Dedup greift, B schweigt</text>
+
+  <rect x="700" y="130" width="210" height="52" class="node"/>
+  <text x="805" y="152" text-anchor="middle" class="b">mein Knoten</text>
+  <text x="805" y="169" text-anchor="middle" class="t11">hoert nur die Kopie von A</text>
+
+  <path d="M180 145 L230 145 L230 74 L280 74" class="ln"/>
+  <path d="M180 168 L230 168 L230 238 L280 238" class="ln"/>
+  <path d="M470 74 L600 74 L600 145 L700 145" class="lnw"/>
+  <path d="M470 238 L600 238 L600 168 L700 168" class="lnd"/>
+
+  <path d="M375 100 L375 212" class="lnx"/>
+  <text x="390" y="150" class="t11">B hoert die Wiederholung von A,</text>
+  <text x="390" y="166" class="t11">Dedup verwirft sie, B sendet nicht.</text>
+
+  <text x="612" y="112" class="t11">Zelle wird gesetzt: A hat C gehoert</text>
+  <text x="612" y="212" class="t11">nichts kommt an, nichts wird gesetzt</text>
+
+  <text x="30" y="296" class="b">Die Kante "B hoert C" fehlt in meiner Matrix.</text>
+  <text x="30" y="314" class="t11">Nicht weil es sie nicht gibt, sondern weil die Duplikatunterdrueckung den Beweis verhindert hat.</text>
+  <text x="30" y="331" class="t11">Je dichter der Cluster, desto haeufiger, also genau dort, wo Mengenreduktion sich lohnen wuerde.</text>
+</svg>
+</div>
+<figcaption>Abb. 3: Der blinde Fleck. Ein Relais wiederholt eine Nachricht genau einmal. Wer die Kopie eines anderen zuerst hört, schweigt, und damit entsteht kein Frame, aus dem sich seine Hörbeziehung ablesen ließe. Die Matrix sieht eine dünnere Nachbarschaft, als tatsächlich besteht, und der Fehler wächst mit der Dichte.</figcaption>
+</figure>
+
+<p>Dazu zwei Verzerrungen, beide in dieselbe Richtung: die Reichweitenrechnung verodert beide Richtungen (<code>nbr_matrix.cpp:520</code>) und führt damit die Symmetrieannahme wieder ein, die die Datenhaltung gerade vermeidet; und auf klassischem ESP32 stehen 12 fremden Zeilen 263 Rufzeichen des Feldkorpus gegenüber, wobei eine Verdrängung die Zeile <em>und ihre Spalte</em> nullt (<code>nbr_matrix.cpp:36, 49, 51</code>) und so auch alle Belege dafür löscht, dass dieser Knoten Hörer war.</p>
+
+<p>Der Satz, auf den es hinausläuft: die Matrix ist eine <strong>Stichprobe</strong> des Graphen, HELLO ist eine <strong>Vollerhebung</strong>. Der Beweis, dass eine gewählte Relaismenge wirklich jeden erreicht, setzt die Vollerhebung voraus.</p>
+
+<p>Diese Lücke lässt sich auch nicht wegprogrammieren. Was fehlt, ist das Wissen, was ein Nachbar <em>nicht</em> gehört hat, und das weiß nur er selbst. Sobald er es mitteilt, ist HELLO gebaut, mit der Sendezeit aus 4.1. Eine Vollerhebung aus beobachtetem Fremdverkehr abzuleiten ist nicht möglich, weil die Leerstellen mehrdeutig sind.</p>
+
+<p>Ein entartetes HELLO sendet MeshCom allerdings längst: das <code>/N</code> im Positions-Beacon ist die Nachbar<em>zahl</em>, eine Zahl statt einer Liste. Für Σ(1/NC) genügt genau das, für MPR nicht. Der Schritt von der Zahl zur Liste ist der ganze Preis.</p>
+
+<table>
+<tr><th>Option</th><th>Mechanik</th><th>Bewertung</th></tr>
+<tr><td>MPR aus der Matrix</td><td>kleinste Teilmenge der Nachbarn wählen, Auswahl dem Gewählten mitteilen</td><td><span class="tag bad">verworfen</span> braucht die Nachbarlisten-Ebene aus 4.1; das Mitteilen selbst wäre billig</td></tr>
+<tr><td>Selbstmarkierung nach Wu-Li</td><td>markiere dich, wenn zwei deiner Nachbarn einander nicht hören</td><td><span class="tag bad">verworfen</span> entscheidet auf fehlenden Kanten, die die Matrix nicht kennt; die Pruning-Regeln sind nicht knotenlokal</td></tr>
+<tr><td>Abbruch gegen eine gehörte Aussendung</td><td>Relay verwerfen, wenn ein anderer denselben Frame bereits wiederholt hat und die Abdeckung passt</td><td><span class="tag ok">gewählt, Stufe 1</span> entscheidet auf beobachteter Evidenz statt auf einem Modell des Netzes</td></tr>
+</table>
+
+<h4>Warum die Selbstmarkierung nicht trägt</h4>
+
+<p>Die Markierungsregel lautet: markiere dich als Weiterleiter, wenn zwei deiner Nachbarn einander nicht hören. Sie entscheidet damit auf genau der Größe, die nach dem vorigen Abschnitt in der Matrix nicht steht, und liest jede unbeobachtete Kante als nicht vorhandene.</p>
+
+<p>Die praktische Folge ist unspektakulär und deshalb gefährlich: weil beobachtete Nichtnachbarschaft die Regel auslöst, markiert sich nahezu jeder Knoten. Die Reduktion ist null, und der Code sieht dabei aus, als arbeite er. Die Fehlerrichtung ist immerhin die sichere, sie führt zum Status quo. Die unsichere Richtung droht aus der 12-Stunden-Vereinigung und dem Richtungs-ODER: zu viele geglaubte Kanten führen zu Untermarkierung, und ein Knoten wird still und dauerhaft unerreichbar, ohne dass irgendwo ein Fehler sichtbar wird.</p>
+
+<h4>Zwei Korrekturen an unserer eigenen ersten Einschätzung</h4>
+
+<p>Erstens ist die Selbstmarkierung nicht protokollfrei. Der Markierungsschritt bei Wu und Li verlangt, dass jeder Knoten seine offene Nachbarmenge mit allen Nachbarn austauscht, und das ist ein HELLO mit Nachbarliste, also genau die Ebene aus 4.1. Und die Pruning-Regeln, die erst die tatsächliche Verkleinerung bringen, verlangen zusätzlich, dass markierte Knoten ihren Status senden. Knotenlokal ist daran nur die Markierung selbst, und die reduziert nichts.</p>
+
+<p>Zweitens war unser erster Einwand gegen MPR falsch. Wir hatten argumentiert, MeshCom habe kein Frame-Feld für die Selector-Meldung. Das trifft nicht zu: die HEY-Nutzlast ist bereits ein erweiterbarer Kanal je Hop (<code>appendHeySignalReport()</code>, <code>aprs_functions.cpp:1134</code>), dort würde eine Selector-Liste ohne Formatänderung mitreisen. Der bindende Einwand gegen MPR ist die Sendezeit der Nachbarlisten-Ebene, nicht die Verfügbarkeit eines Feldes.</p>
+
+<p>Verloren geht bei einer Selbstmarkierung auf dieser Eingabe das, was das Verfahren überhaupt erst brauchbar macht: der Beweis, dass die markierte Menge dominierend und zusammenhängend ist. Beide Sätze sind über einen global konsistenten, ungerichteten, vollständig bekannten 2-Hop-Graphen bewiesen. Fällt diese Voraussetzung, garantiert nichts mehr, dass eine geflutete Nachricht jeden Knoten erreicht.</p>
+
+<p class="reco">Antwort auf die Frage: die Matrix bleibt bewusst Diagnose, und die Set-Auswahl gehört nicht woandershin, sondern vorerst gar nicht in die Firmware. Was automatisierbar ist, ist der umgekehrte Weg: nicht ein Set vorab berechnen, sondern auf eine tatsächlich beobachtete Konkurrenzaussendung reagieren. Das ist Stufe 1, und es braucht überhaupt keinen Graphalgorithmus.</p>
+
+<h3 id="b43">4.3 Urteil zum kritischen Knoten</h3>
+
+<p class="reco">Entscheidung: Priorität und Pflicht trennen. Mehr Priorität erzeugt keine Mehrlast. Das Lastventil existiert bereits und wirft heute das Falsche ab.</p>
+
+<p>Die Sorge im Wortlaut der Frage lautet: topologisch unverzichtbar, also mehr Priorität, also mehr Last, also Kollaps. Diese Kette hat ein schwaches Glied. Ein Knoten wiederholt die Frames, die er hört, unabhängig von seinem Backoff; ein kürzerer Backoff heißt nur, dass er den Kanal früher gewinnt. Welche Frames er tragen muss, bestimmen Topologie und Verkehr, nicht die Sendereihenfolge. „Mehr Priorität gleich mehr Last" gilt allein dann, wenn Priorität an Mengenzugehörigkeit gekoppelt ist, also bei MPR, wo wichtig sein bedeutet, <em>der</em> Weiterleiter zu sein. Hält man beides getrennt, verschwindet der Kollapsmechanismus.</p>
+
+<p>Die zweite Hälfte der Frage trifft dagegen genau: der kritische Knoten soll seine exklusive Last schützen und die redundante zuerst abwerfen. Bemerkenswert ist, dass das Ventil dafür schon existiert und derzeit in die andere Richtung arbeitet.</p>
+
+<p>Die Rückdruckstufe misst die Tiefe des Sende-Rings mit Hysterese und Episoden-Latch, die Schwellen aus <code>MAX_RING</code> abgeleitet. Bei QRT, also 80 % der Ringgröße, verweigert sie <strong>lokal erzeugte Nutzernachrichten</strong>, während Relay, ACK und Beacon weiterlaufen, denn letztere rufen den betroffenen Pfad gar nicht erst auf, sondern reihen direkt ein. Für einen gewöhnlichen Knoten ist das die richtige Entscheidung. Für einen topologisch unverzichtbaren ist sie verkehrt herum: unter Druck bringt er seinen eigenen Betreiber zum Schweigen und trägt weiter den redundanten Relay-Verkehr, der die Verstopfung erzeugt.</p>
+
+<p>Dass diese Kopplung real ist und nicht bloß plausibel, zeigt die Feldmessung. In 47,6 Stunden auf drei Knoten sind zwei Dedup-Ringüberläufe eingetreten, beide beweisbar: dieselbe <code>msg_id</code> erscheint zweimal als neu, dazwischen mehr als 100 Ringeinträge. Der Bericht benennt die Ursache direkt:</p>
+
+<blockquote>„Der Auslöser ist die Warteschlange, nicht der Ring."</blockquote>
+
+<p>Beide Pakete bekamen ihre lange Lebensdauer nicht durch weite Wege, sondern durch Wartezeit im eigenen Cluster: ein Knoten sendete 9 Minuten nach Empfang, der nächste nach 8 weiteren. Dass daraus kein Kreisverkehr wurde, lag allein daran, dass das Sprungkonto beim Wiederannehmen bereits erschöpft war. Der Bericht dazu: „Die zweite Sicherung hat gehalten, weil die erste ausgefallen ist." Einen Hop früher wäre es eine echte Schleife geworden.</p>
+
+<p>Damit ist die Rückkopplung geschlossen und gemessen: tiefe Warteschlange, lange Paketlebensdauer, Dedup-Fenster reicht nicht mehr, der Knoten flutet erneut, was er bereits weitergeleitet hat. Das Dedup-Fenster schwankte in dieser Aufzeichnung lastabhängig zwischen 28,8 und 52,3 Minuten, weil der Ring ein reiner Verdrängungsring ohne Alterung ist.</p>
+
+<p class="reco">Entscheidung zum Lastsignal: Ringtiefe, nicht Kanalauslastung.</p>
+
+<p>Prämisse: der Firmwarezähler für die Kanalauslastung war auf ESP32-Knoten bis zum 25.08.2026 um den Faktor 1,8 bis 4,1 zu hoch, weil jeder Empfang mit der vollen Paketlänge von 255 Byte verbucht wurde, also mit 2476 ms statt der tatsächlichen 608 bis 1394 ms. Auf nRF52 trat das nicht auf, dort liefert der Radio-Callback die echte Länge. Die Auswertung der Feldmessung musste die Belegung deshalb aus den Paketlängen nachrechnen, „weil der Firmwarezähler unbrauchbar ist". Werte von ESP32- und nRF52-Knoten waren nie vergleichbar. Die Ringtiefe ist dagegen knotenlokal, ehrlich und wird ohnehin geführt.</p>
+
+<p><strong>Zur vierten Frage:</strong> ja, chronische Sättigung an einem Exklusiv-Punkt ist das Signal, einen zweiten Pfad zu bauen, und das ist das wertvollste Erzeugnis der ganzen Matrix. Sie macht aus „das Netz fühlt sich langsam an" einen benannten Knoten, eine Richtung und eine Entfernung. Eine Zeile, die über Wochen exklusiv bleibt, und ein Hörer, der chronisch im QRT-Band steht, sind zusammen ein dokumentierter Fall für einen zweiten Standort — samt Position des Knotens, der abgedeckt werden muss, denn der Positionscache je Zeile nimmt auch relayed gesendete Positionen auf.</p>
+
+<p>Eine Unterscheidung kann die Matrix treffen, die weder Σ(1/NC) noch MPR trifft: ob ein Knoten exklusiv ist, weil die Topologie es verlangt, oder weil er schlecht aufgestellt ist. Eine exklusive Zeile, die bei sehr schwachem Pegel hereinkommt, ist ein Antennenfall, kein Relaisfall. Diese Unterscheidung ist allerdings schwächer belegt als der Rest: der Signalwert 0 ist in der Datenhaltung mit „unbekannt" überladen, und auf klassischem ESP32 verdrängt die Matrix bei realen Netzgrößen fortlaufend Zeilen. Als Betreiberhinweis taugt sie, als Eingang einer automatischen Entscheidung nicht.</p>
+
+<h3 id="b44">4.4 Stufe 1: Overhear-Abbruch für Relays</h3>
+
+<p class="reco">Entscheidung: den vorhandenen Ring-Scan auch Relay-Einträge sehen lassen, freigegeben allein durch eine Abdeckungsprüfung aus der Matrix. Zuerst als Zähler ohne Wirkung.</p>
+
+<p>Prämisse: der Mechanismus existiert bereits und ist im Feld erprobt. Bei jedem Empfang durchsucht die Firmware den Sende-Ring nach der <code>msg_id</code> und gibt den Slot frei; so hört ein Knoten auf, seine eigene Nachricht zu wiederholen, sobald er sie von einem Relais zurückhört. Die Schleife überspringt jedoch jeden Eintrag mit Status DONE, und ein Relay wird als DONE eingereiht. Relays sind also nicht vergessen, sondern ausgenommen.</p>
+
+<p>Die Freigabe darf nicht blind sein: dass ein anderer denselben Frame wiederholt hat, heißt nicht, dass er dieselben Knoten erreicht. Deshalb bricht der Knoten nur ab, wenn jeder Knoten, den er exklusiv hört, auch vom beobachteten Sender gehört wird. Genau diese Frage beantwortet die Matrix bereits für die Web-Seite.</p>
+
+<ul>
+<li>Es wird nie auf eine Hypothese hin unterdrückt, sondern nur gegen eine tatsächlich gehörte Konkurrenzaussendung. Kein Modell, das falsch sein kann.</li>
+<li>Fehlt der Matrix die Kenntnis, bricht nichts ab: das Verhalten fällt auf heutiges Fluten zurück.</li>
+<li>Die Entscheidung ist knotenlokal. Kein Feld auf dem Draht, keine Absprache, keine Wirkung auf Knoten mit anderer Firmware.</li>
+<li>Der Zeitpunkt ist günstiger als bei jedem Vorabverfahren: entschieden wird, wenn die Konkurrenz bereits gesendet hat, nicht Minuten vorher auf Vorrat.</li>
+</ul>
+
+<p>Erster Schritt ist ausdrücklich <em>kein</em> Abbruch, sondern ein Zähler: mitschreiben, wie oft ein Relay hätte abgebrochen werden können und für welche Absender. Erst diese Zahl sagt, ob der Aufwand sich lohnt und wie oft die Abdeckungsprüfung die Freigabe verweigert.</p>
+
+<h3 id="b45">4.5 Stufe 2: abgestufte Relay-Pflicht</h3>
+
+<p class="reco">Entscheidung: die Bänder der vorhandenen Rückdruckstufe steuern zusätzlich die Relay-Pflicht, damit ein Knoten unter Last redundante Relays abwirft statt der Nachrichten seines Betreibers.</p>
+
+<p>Prämisse: Zustände, Schwellen, Hysterese und Episoden-Latch sind vorhanden und im Feld kalibriert; die Schwellen leiten sich aus der Ringgröße ab und sind deshalb auf jedem Board richtig. Neu ist allein ein zweites Kriterium an denselben Bändern.</p>
+
+<table>
+<tr><th>Band</th><th>Auslöser</th><th>Relay-Pflicht</th></tr>
+<tr><td>Ruhe</td><td>Tiefe unter 5</td><td>alles weiterleiten, wie heute</td></tr>
+<tr><td>QRS</td><td>Tiefe ab 5</td><td>alles weiterleiten, Overhear-Abbruch aus Stufe 1 aktiv</td></tr>
+<tr><td>QRT</td><td>80 % der Ringgröße</td><td>nur Frames weiterleiten, deren Absender in einer exklusiven Zeile steht</td></tr>
+<tr><td>QTA</td><td>Ring hat verworfen</td><td>exklusive Zeilen und eigener Verkehr</td></tr>
+</table>
+
+<p>Der Knoten degradiert damit zur reinen Brücke, statt zusammenzubrechen, und trägt genau den Verkehr weiter, den sonst niemand trägt. Die heutige Regel, die dem Betreiber das Senden verweigert, bleibt als letzte Stufe erhalten, rückt aber hinter den Abwurf redundanter Fremdlast.</p>
+
+<h2 id="fehler">5. Fehlerszenarien</h2>
+
+<table>
+<tr><th>Szenario</th><th>Erkennung</th><th>Reaktion</th><th>Lücke</th><th>ab Stufe</th></tr>
+<tr><td>Der beobachtete Sender erreicht die eigenen Exklusivknoten doch nicht</td><td>Abdeckungsprüfung gegen die Matrix vor der Freigabe</td><td>Abbruch unterbleibt, Relay geht heraus</td><td>bleibt, solange die Matrix eine Kante nicht gesehen hat; Fehler geht Richtung Fluten</td><td>1</td></tr>
+<tr><td>Matrix leer nach Neustart</td><td>Fensterlänge seit Boot</td><td>keine Freigabe, heutiges Verhalten</td><td>12 h Anlaufzeit ohne Wirkung der Stufe 1</td><td>1</td></tr>
+<tr><td>Matrix verdrängt laufend Zeilen (klassischer ESP32)</td><td>Zahl der Verdrängungen je Stunde</td><td>Exklusivurteil ist unzuverlässig, Freigabe verweigern</td><td>Stufe 1 wirkt auf kleinen Boards kaum</td><td>1</td></tr>
+<tr><td>Systematische statt zufälliger Unterdrückung</td><td>nicht aus dem Frame erkennbar</td><td>Wiederholung des Absenders läuft trotzdem, hilft aber nicht</td><td>bis zu 3 Versuche gegen Fading, kein Schutz gegen eine gleichbleibende Entscheidung</td><td>1</td></tr>
+<tr><td>Warteschlange tief, Dedup-Fenster schrumpft</td><td>Ringtiefe und Paketlebensdauer</td><td>Stufe 2 wirft redundante Relays ab und verkürzt die Warteschlange</td><td>Fenster bleibt lastabhängig, Alterung nach Uhrzeit ist nicht Teil dieser Stufen</td><td>2</td></tr>
+<tr><td>Knoten ist exklusiv, weil er schlecht steht</td><td>Signalwert und Reichweite der Zeile</td><td>Betreiberhinweis, keine automatische Folge</td><td>Signalwert 0 ist mit unbekannt überladen</td><td>—</td></tr>
+<tr><td><code>--mesh off</code> gesetzt, Frame nennt den Knoten als Via-Hop</td><td>Pfadauswertung</td><td>wird weitergeleitet, obwohl der Schalter aus ist</td><td>der Schalter schaltet die Relay-Teilnahme nicht vollständig ab</td><td>0, heute</td></tr>
+</table>
+
+<h2 id="rollout">6. Rollout</h2>
+
+<table>
+<tr><th>Schritt</th><th>Stufe</th><th>Inhalt</th><th>Abnahmekriterium</th></tr>
+<tr><td>M1</td><td>1</td><td>Zähler ohne Wirkung: mitschreiben, wie oft ein Relay hätte abgebrochen werden können, und wie oft die Abdeckungsprüfung es verweigert hätte</td><td>eine Woche Feldlauf; die Zahl der möglichen Abbrüche je Stunde liegt vor und ist nach Absendern aufgeschlüsselt</td></tr>
+<tr><td>M2</td><td>1</td><td>Abbruch scharf schalten, Freigabe nur über die Abdeckungsprüfung</td><td>gemessene Sendelast sinkt, ohne dass ein bekannter Exklusivknoten aus der Reichweite fällt</td></tr>
+<tr><td>M3</td><td>2</td><td>Bänder der Rückdruckstufe an die Relay-Pflicht koppeln</td><td>unter Last wird zuerst redundanter Fremdverkehr abgeworfen, erst danach eigener; QRT-Episoden werden kürzer</td></tr>
+<tr><td>Gegenprobe</td><td>1, 2</td><td>Wiederholung der DG0OPK-Auswertung auf einem Knoten mit und einem ohne die Stufen</td><td>Warteschlangenlatenz und Paketlebensdauer sinken messbar; kein neuer Dedup-Überlauf</td></tr>
+</table>
+
+<h2 id="offen">7. Offene Punkte</h2>
+
+<table>
+<tr><th>Punkt</th><th>Warum es zählt</th><th>Klärungsweg</th></tr>
+<tr><td>Obergrenze des sicheren Dedup-Korridors</td><td>der Korridor 39,6 bis 48,5 min stützt sich an der Obergrenze auf einen einzigen beobachteten Fall</td><td>vor einer Umstellung auf Alterung nach Uhrzeit über einen längeren Zeitraum bestätigen</td></tr>
+<tr><td>Nachbarzahl eines realen Knotens</td><td>begründet die Zeilenzahl der Matrix, ist aber nirgends beziffert</td><td>aus einem Feldlauf auszählen und gegen 21 beziehungsweise 13 Zeilen stellen</td></tr>
+<tr><td>Wirkung der Stufe 1 auf kleinen Boards</td><td>auf klassischem ESP32 stehen 12 fremde Zeilen gegen 263 Rufzeichen im Korpus</td><td>Verdrängungen je Stunde messen; unterhalb einer Mindestqualität die Freigabe grundsätzlich verweigern</td></tr>
+<tr><td>Via-Pfad umgeht <code>--mesh off</code></td><td>der Betriebsschalter, auf den sich das Backbone-Argument stützt, wirkt nicht vollständig</td><td>gesondert prüfen, ob das gewollt ist, und gegebenenfalls als Fehlerbericht einreichen</td></tr>
+<tr><td>Reproduzierbarkeit der Schweizer Zahlen</td><td>die Seite trägt weder Datensatz noch Code</td><td>bei Interesse den Linkgraphen und das Greedy-Verfahren austauschen und die Rechnung gegen den gerichteten Graphen wiederholen</td></tr>
+</table>
+
+<p class="small">Sendezeiten nach der LoRa-Formel für SF11, BW 250 kHz, CR 4/6, Präambel 8, expliziter Header, CRC ein, ohne Low-Data-Rate-Optimierung. Die Rechnung ist gegen den Firmware-Zähler geprüft: 255 Byte ergeben 2476,0 ms.</p>
+
+</main>
+</body>
+</html>
