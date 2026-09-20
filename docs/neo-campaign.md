@@ -573,9 +573,13 @@ snapshots. Heap flat after warm-up: 79 017 -> 78 119 B mean over nine hours.
 Loop instrumentation reported five gaps in twelve hours, all in the first minute
 after boot.
 
-Measurement note worth keeping: `loopAction_heapMon()` only prints when
-`!bDisplayLog`. A node with `DisplyLog on` silently reports no heap trend --
-that is why one of the two bench nodes delivered only the boot value.
+Measurement note worth keeping: the free heap reaches the console over two
+different channels depending on `--setlog`. With `off` it is the `[HEAP]` line
+from `loopAction_heapMon()`; with `on` that line is suppressed and the value
+appears once per STAT window in the `heap=` field instead. Grepping for `[HEAP]`
+alone therefore misses two of the three soak nodes -- all three did report a
+flat heap. The asymmetry behind it (ESP32 gated only the print, nRF52 gated the
+whole scheduler entry) is cleaned up in stage 6.
 
 ## 16. Still open
 

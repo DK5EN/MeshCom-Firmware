@@ -80,12 +80,18 @@ void loopAction_mcpRefresh(void)
 
 bool loopEnabled_heapMon(void)
 {
-    // Old code's zero-check ran unconditionally on ESP32 (no !bDisplayLog
-    // guard, unlike nRF52 -- see loop_scheduler.h).
-    if (heapMonTimer == 0)
+    // Under `--setlog on` this block prints nothing anyway -- the heap is
+    // reported once per STAT window in the `heap=` field instead -- so the
+    // timer no longer runs at all, the same way it does not on nRF52. The old
+    // ESP32 version kept it ticking and refreshed lFreeHeap/lFreePsram, which
+    // nothing outside this block reads (see loop_scheduler.h). Console output
+    // is identical either way.
+    bool on = !bDisplayLog;
+
+    if (on && heapMonTimer == 0)
         heapMonTimer = millis();
 
-    return true; // always active on ESP32
+    return on;
 }
 
 void loopAction_heapMon(void)
@@ -95,19 +101,16 @@ void loopAction_heapMon(void)
         lFreeHeap = ESP.getFreeHeap();
         lFreePsram = ESP.getFreePsram();
 
-        if(!bDisplayLog)
-        {
-            printfdeb("[HEAP];%s;%lu;%d;%d;(mon)\n",
-                getTimeString().c_str(),
-                lFreeHeap,
-                ESP.getMinFreeHeap(),
-                ESP.getMaxAllocHeap());
-            #if defined(BOARD_HAS_PSRAM)
-            printfdeb("[PSRM];%s;%lu;(mon)\n",
-                getTimeString().c_str(),
-                lFreePsram);
-            #endif
-        }
+        printfdeb("[HEAP];%s;%lu;%d;%d;(mon)\n",
+            getTimeString().c_str(),
+            lFreeHeap,
+            ESP.getMinFreeHeap(),
+            ESP.getMaxAllocHeap());
+        #if defined(BOARD_HAS_PSRAM)
+        printfdeb("[PSRM];%s;%lu;(mon)\n",
+            getTimeString().c_str(),
+            lFreePsram);
+        #endif
     }
 }
 

@@ -92,7 +92,9 @@
 //   - heapMonTimer: reads only ESP.getFreeHeap()/getFreePsram() (ESP32) or
 //     nrf52_getFreeHeap()/nrf52_getMaxFreeBlock() (nRF52) plus its own
 //     lFreeHeap/lFreePsram/nrf52_heapFree/nrf52_heapMinFree state; no other
-//     block reads or writes these. Independent.
+//     block reads or writes these. Independent -- which is also why gating
+//     the whole entry on !bDisplayLog (rather than only its print, as the
+//     old ESP32 code did) cannot be observed from anywhere else.
 // All 7 entries have intervals >= 2 s, so the worst case is a one-pass
 // timing shift (rarely, a value gets read a few ms fresher than before),
 // never a skipped or duplicated firing.
@@ -184,10 +186,10 @@ bool loopEnabled_battCheck(void); // == tx_is_active==false && is_receiving==fal
 // providing its own trivial counting stubs.
 bool loopEnabled_retransmit(void); // ESP32: bRadio; nRF52: always true
 
-// heapMonTimer's own `if(heapMonTimer==0) heapMonTimer=millis();` seed is
-// unconditional on ESP32 but nested inside `if(!bDisplayLog)` on nRF52 in
-// the original code, so it lives inside these, not as a top-level statement.
-bool loopEnabled_heapMon(void);    // ESP32: always true (+ seed); nRF52: !bDisplayLog (+ seed when true)
+// heapMonTimer's own `if(heapMonTimer==0) heapMonTimer=millis();` seed sits
+// inside these, not as a top-level statement, because it must only run while
+// the entry is enabled.
+bool loopEnabled_heapMon(void);    // both: !bDisplayLog (+ seed when true)
 
 #if defined(ENABLE_MC811)
 bool loopEnabled_mcu811(void); // == bMCU811ON && mcu811_found on both; nRF52 also seeds MCU811TimeWait when true (ESP32 never seeds it)

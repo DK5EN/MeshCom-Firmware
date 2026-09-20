@@ -116,12 +116,22 @@ diesem Stand mit `-DINSTRUMENT_ENABLED=1`.
 | Verbindungsabbrueche      | keine                        |
 | Laufzeit                  | 12,00 h, streng monoton      |
 
-**Der Heap liegt flach.** DK5EN-92 lieferte 99 Messpunkte: 161 228 B beim Boot,
-dann der Abfall auf den Arbeitssatz, und ueber die restlichen neun Stunden ein
-Mittel von 79 017 B auf 78 119 B -- rund 900 Byte Unterschied, also Rauschen.
-Ein Leck saehe anders aus. (DK5EN-1 meldet keinen Heap-Verlauf, weil
-`DisplyLog on` gesetzt ist und `loopAction_heapMon()` nur bei `!bDisplayLog`
-druckt -- eine Knoteneinstellung, kein Firmware-Unterschied.)
+**Der Heap liegt flach, auf allen drei Knoten.** Die Knoten melden ihn ueber
+zwei Kanaele, je nach `--setlog`: DK5EN-92 (`off`) ueber die `[HEAP]`-Zeile,
+DK5EN-1 und DK5EN-98 (`on`) im Feld `heap=` der STAT-Zeile, einmal je
+Fuenf-Minuten-Fenster. Drei unabhaengige Verlaeufe:
+
+| Knoten   | Kanal    | Punkte | Mittel erste Haelfte | Mittel zweite Haelfte |
+| -------- | -------- | -----: | -------------------: | --------------------: |
+| DK5EN-92 | `[HEAP]` |     99 |             79 017 B |              78 119 B |
+| DK5EN-1  | `STAT`   |    147 |            139 925 B |             139 839 B |
+| DK5EN-98 | `STAT`   |    133 |            132 088 B |             132 234 B |
+
+Die groesste Bewegung sind rund 900 Byte ueber neun Stunden; der Gateway-Knoten
+unter Last steigt sogar leicht. Das ist Rauschen -- ein Leck saehe anders aus.
+Die 161 228 B, die DK5EN-92 als ersten Wert meldet, sind der Zustand vor dem
+Hochlauf: WLAN, GPS und Puffer belegen danach ihren Arbeitssatz, und die Zahl
+faellt einmalig auf rund 79 kB. Alles danach ist die Gerade in der Tabelle.
 
 **Die Schleife stockt nicht.** Die Instrumentierung meldete ueber zwoelf Stunden
 fuenf Luecken, alle zwischen 19:41 und 19:42, also in der ersten Minute nach dem
@@ -1611,6 +1621,8 @@ Ein vom Advisor gefundener Blocker wurde vor dem Merge korrigiert: der Aufruf vo
 **76. Ein toter Spinlock-Extern verschwindet, mit der Begruendung dafuer.** (`36c37b5f`). Der ESP32-Spinlock `displayMux` hatte laut Commit seit einer frueheren Aenderung (`4a250602`) keine Stelle mehr, die ihn nimmt oder gibt -- nur die `extern`-Deklaration in `loop_functions_extern.h` und Kommentare an drei Stellen ueberlebten, und die Kommentare waren die eigentliche Irrefuehrung: sie behaupteten, `pendingDisplayMsg` sei auf ESP32 gegen `OnRxDone` abgesichert. Das ist unnoetig, weil `OnRxDone` auf ESP32 innerhalb von `esp32loop()` selbst laeuft (Erzeuger und Verbraucher sind derselbe Task); auf nRF52, wo echtes Preemption moeglich ist, bleibt der Schutz per `taskENTER_CRITICAL()` bestehen. Reine Dokumentationskorrektur plus toter-Code-Entfernung, keine Verhaltensaenderung.
 
 Kleinere Randnotizen aus demselben Commit-Satz: `36c37b5f` korrigiert nebenbei die eigene Zaehlung der Timer-Kandidaten fuer D1-10 (78 Praedikatsstellen ueber 43 Timer-Variablen, davon 25 plattformgemeinsam, statt der zuvor kursierenden "50/27") -- die Zahl, auf der `e64ce346` spaeter mit "26 gemeinsam, 7 migriert" aufbaut. `09524068` (R2-01, mheard-Textcodec-Abloesung) zieht in `loop_functions_extern.h` nur die `extern`-Deklaration von `mheardBuffer` auf `MheardRecord mheardRecords[MAX_MHEARD]` nach; die eigentliche Struct-Umstellung liegt in `mheard_functions.cpp`, ausserhalb dieses Kapitels. `3be9a9da` (W6b) nimmt eine einzelne, echte Korrektur in `loop_functions.cpp:5907` vor: der `"udp"`-Ring war laut Commit der einzige, dessen Ringueberlauf-Diagnose (`RING_OVERFLOW`) unterdrueckt wurde; diese Ausnahme entfaellt, weil ein neuer frueher Ruecksprung anderswo genau diesen Ring fuellen kann und die Verdraengung sonst unbeobachtbar bliebe.
+
+Nachtrag aus der neo-Kampagne selbst, ohne Kampagnen-Commit: `heapMonTimer` war der einzige der sieben migrierten Timer, dessen `enabled()` auf den beiden Plattformen etwas anderes bedeutete. Der nRF52 schaltete den Eintrag unter `--setlog on` ganz ab, der ESP32 liess ihn laufen und unterdrueckte nur den Druck -- der Timer las also alle 60 s `ESP.getFreeHeap()` und `ESP.getFreePsram()` und schrieb `lFreeHeap`/`lFreePsram` fort, die ausser diesem Block niemand liest. `loopEnabled_heapMon()` liefert jetzt auf beiden Plattformen `!bDisplayLog` (`src/esp32/loop_actions_esp32.cpp:81`), die `if(!bDisplayLog)`-Huelle im Rumpf entfaellt. Reine Restrukturierung, auf der Konsole nicht unterscheidbar: unter `--setlog off` -- dem Auslieferungszustand -- aendert sich nichts, unter `--setlog on` war die `[HEAP]`-Zeile schon vorher stumm. Der freie Heap geht in dieser Betriebsart ohnehin nicht verloren, er steht einmal je STAT-Fenster im Feld `heap=` (`setlogFormatStat()`, `src/setlog_lines.cpp`) -- worauf sich der Dauerlauf oben stuetzt: zwei der drei Knoten liefern ihren Heap-Verlauf ueber die STAT-Zeile, einer ueber `[HEAP]`.
 
 ## K11 nRF52-Netzstack
 
