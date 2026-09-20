@@ -7,6 +7,7 @@ This file contains all web-based setup functions
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <string>
+#include <coord_compare.h> // setlat/setlon: PR #1150, native-testbarer Vergleich
 #include <dm_settings.h> // stage 1: dmretry setparam mapping, every board
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots setparam mapping
@@ -218,9 +219,10 @@ void webSetup_setParam(setupStruct *setupData){
         commandAction(message_text, bPhoneReady);
         // node_lat ist double, der nRF52-Core hat kein String::toDouble(): ein
         // float-Vergleich scheitert fuer fast jede Koordinate (49.997 != 49.9970016f).
-        // atof() liefert auf beiden Cores double; fabs(), weil --setlat negative
-        // Werte als Betrag plus 'S'/'W' ablegt.
-        setupData->returnCode = (fabs(meshcom_settings.node_lat - fabs(atof(setupData->paramValue.c_str()))) < 1e-7)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        // Der Vergleichshelfer in src/coord_compare.h liefert auf beiden Cores
+        // double und faengt --setlat's Betrag/S-W-Ablage (fabs) sowie die
+        // Text->double-Rundung (1e-7) ab.
+        setupData->returnCode = coordMatches(meshcom_settings.node_lat, setupData->paramValue.c_str())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = String(meshcom_settings.node_lat,6);
         return;
     } else
@@ -230,9 +232,10 @@ void webSetup_setParam(setupStruct *setupData){
         commandAction(message_text, bPhoneReady);
         // node_lon ist double, der nRF52-Core hat kein String::toDouble(): ein
         // float-Vergleich scheitert fuer fast jede Koordinate (49.997 != 49.9970016f).
-        // atof() liefert auf beiden Cores double; fabs(), weil --setlon negative
-        // Werte als Betrag plus 'S'/'W' ablegt.
-        setupData->returnCode = (fabs(meshcom_settings.node_lon - fabs(atof(setupData->paramValue.c_str()))) < 1e-7)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        // Der Vergleichshelfer in src/coord_compare.h liefert auf beiden Cores
+        // double und faengt --setlon's Betrag/S-W-Ablage (fabs) sowie die
+        // Text->double-Rundung (1e-7) ab.
+        setupData->returnCode = coordMatches(meshcom_settings.node_lon, setupData->paramValue.c_str())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = String(meshcom_settings.node_lon,6);
         return;
     } else
