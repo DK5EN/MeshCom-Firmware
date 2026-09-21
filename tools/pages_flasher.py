@@ -86,8 +86,14 @@ DISPLAY = {
     "vision-master-e290": ("Heltec", "Vision Master E290"),
     "wireless-paper": ("Heltec", "Wireless Paper"),
     "heltec_t114": ("Heltec", "Mesh Node T114"),
-    "ttgo_tbeam": ("LilyGo", "T-Beam v1.1 (SX1276)"),
-    "ttgo_tbeam_SX1262": ("LilyGo", "T-Beam v1.2 (SX1262)"),
+    # The three T-Beam envs differ ONLY in the radio chip (BOARD_TBEAM /
+    # BOARD_SX1262 / BOARD_SX1268); they share one board definition. Naming
+    # them after a board revision invents a distinction the code does not
+    # make, and it misled a bench flash on 2026-09-21: a v1.2 board carrying
+    # an SX1276 got the "v1.2" entry and came up with
+    # "SX1262 chip Initializing ... failed, code -2".
+    "ttgo_tbeam": ("LilyGo", "T-Beam (SX1276)"),
+    "ttgo_tbeam_SX1262": ("LilyGo", "T-Beam (SX1262)"),
     "ttgo_tbeam_SX1268": ("LilyGo", "T-Beam (SX1268)"),
     "ttgo_tbeam_supreme": ("LilyGo", "T-Beam Supreme"),
     "LilyGo_T-Beam-1W": ("LilyGo", "T-Beam 1 W"),
