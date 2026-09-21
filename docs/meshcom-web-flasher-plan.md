@@ -300,9 +300,34 @@ not make. A v1.2 board carrying an SX1276 got the "v1.2" entry and came up with
 says so under the board picker. Section 9's "user flashes the wrong board" risk was real, and the
 mitigation was made worse by the display table, not by the mechanism.
 
+T-Deck Plus (DK5EN-14) followed on the same evening, flashed with `t_deck_plus` and erased:
+
+| Region      | Offset  | Size        | Result    |
+| ----------- | ------- | ----------- | --------- |
+| bootloader  | 0x0     | 15 104 B    | identical |
+| partitions  | 0x8000  | 3 072 B     | identical |
+| otadata     | 0xE000  | 8 192 B     | identical |
+| safeboot-s3 | 0x10000 | 643 424 B   | identical |
+| app         | 0xC0000 | 2 176 640 B | identical |
+
+Decoding the table read off the device settles section 4.1's 16 MB question directly:
+`app` is 12 288 K at 0xC0000, `spiffs` follows at 0xCC0000, and the last entry ends at
+0x1000000 — the 16 MB layout, not the 4 MB one. The node boots the full UI (SD OK, touch OK,
+keyboard OK, `SX1262 chip Initializing ... success`).
+
+**Correction to section 8 step 5.** "Confirm SPIFFS mounts" is not a usable check and never was:
+the whole persisted-message path in `src/t-deck/lv_obj_functions.cpp` sits behind
+`#ifdef T_DECK_SPIFFS`, and nothing in the tree defines that macro. The shipped T-Deck image
+never touches the spiffs partition, so no mount can be observed. The same run also showed the
+harness route is closed on a release image: `tdeck_harness.py` needs `--uistat`, and the ~50
+bench commands (`--injectmsg`, `--spiffs reset`, ...) are compiled out unless
+`-DINSTRUMENT_ENABLED=1`. Reading the partition table back is both available and stronger, so
+that replaces step 5.
+
 Still open:
 
-- Wave 2 for the T-Deck: the 16 MB partition table and the SPIFFS mount are unproven on hardware.
+- Nothing from wave 2. All three chip cases — ESP32-S3 4 MB, classic ESP32, ESP32-S3 16 MB — are
+  flashed from the live page and verified region by region.
 - Section 6's `partitions-16MB.bin` release asset. The flasher no longer needs it -- each board
   folder carries its own table -- but the manual asset set still cannot fully flash a T-Deck.
   Adding it moves the release from 39 to 40 assets and breaks the diff-identical name check in
