@@ -261,6 +261,39 @@ static void test_reset_clears_everything(void)
     TEST_ASSERT_EQUAL_UINT16(0, bf_used(&f));
 }
 
+
+// bf_unread()/bf_frames() zaehlen FRAMES, bf_used() zaehlt BYTES. Der
+// Unterschied hat einmal Geld gekostet: eine Drossel verglich bf_unread()
+// direkt mit der Ringkapazitaet in Byte, war damit still wirkungslos und
+// liess sendMheard() die gerade selbst geschriebenen Frames verdraengen.
+// Dieser Fall nagelt die Einheiten fest, damit der naechste Leser sie nicht
+// wieder verwechselt.
+static void test_unread_counts_frames_used_counts_bytes(void)
+{
+    uint8_t a[20];
+    memset(a, 'x', sizeof(a));
+
+    bf_push(&f, a, (uint8_t)sizeof(a));
+
+    // EIN Frame -- nicht 20, nicht 21.
+    TEST_ASSERT_EQUAL_UINT16(1, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(1, bf_frames(&f));
+    // Bytes dagegen: Nutzlast plus Laengenbyte.
+    TEST_ASSERT_EQUAL_UINT16(21, bf_used(&f));
+
+    bf_push(&f, a, (uint8_t)sizeof(a));
+    TEST_ASSERT_EQUAL_UINT16(2, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(42, bf_used(&f));
+
+    // bf_pop() senkt nur die ungelesenen Frames; der Verlauf und damit
+    // bf_used() bleibt stehen. Wer bf_used() als Drossel nimmt, haengt nach
+    // dem ersten vollen Ringumlauf dauerhaft.
+    bf_pop(&f);
+    TEST_ASSERT_EQUAL_UINT16(1, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(2, bf_frames(&f));
+    TEST_ASSERT_EQUAL_UINT16(42, bf_used(&f));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -276,6 +309,7 @@ int main(int, char **)
     RUN_TEST(test_tail_gen_detects_eviction_during_send);
     RUN_TEST(test_history_iterates_oldest_to_newest_including_read);
     RUN_TEST(test_history_stops_after_eviction_mid_walk);
+    RUN_TEST(test_unread_counts_frames_used_counts_bytes);
     RUN_TEST(test_reset_clears_everything);
     return UNITY_END();
 }

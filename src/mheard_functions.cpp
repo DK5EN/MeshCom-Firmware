@@ -817,19 +817,28 @@ bool mheardToPhonePending()
 static bool comRingWouldEvictUnread()
 {
     // Byte-Ring statt Schlitzfeld: der Kommando-Ring ist nie "voll" --
-    // bf_push() verdraengt notfalls die aeltesten Frames. Die alte Schranke
-    // (comRingFree() == 0) meinte aber genau das, was hier zu vermeiden ist:
-    // nichts mehr nachlegen, sobald der naechste Frame nur noch Platz faende,
-    // indem er einen UNGELESENEN verdraengt. Gelesene Frames liegen nur als
-    // Verlauf herum und duerfen weichen, deshalb bf_unread() und nicht
-    // bf_used().
+    // bf_push() verdraengt notfalls die aeltesten Frames. Zu vermeiden ist
+    // nur, dass dabei ein UNGELESENER weggeworfen wird, denn das sind genau
+    // die, die dieser sendMheard()-Aufruf gerade selbst geschrieben hat: die
+    // Liste verloere still Eintraege.
     //
-    // Schranke ist der groesste Frame, der hier ueberhaupt in den Ring kommt:
-    // addBLEComToOutBuffer() klemmt jede Laenge auf 245, dazu das Laengenbyte
-    // des Rings. Nicht MAX_MSG_LEN_PHONE (300) -- so lang wird hier nie
-    // geschrieben, und die kleinste Ringklasse (1536 B) haette sonst unnoetig
-    // weniger Durchsatz.
-    return (uint32_t)bf_unread(&phoneComRing) + 1u + 245u > (uint32_t)phoneComRing.cap;
+    // bf_unread() zaehlt FRAMES, nicht Bytes -- byte_fifo.cpp erhoeht es je
+    // push und senkt es je pop. Es direkt gegen cap zu stellen waere still
+    // wirkungslos, die Drossel griffe nie.
+    //
+    // Die Bytes der ungelesenen Frames fuehrt der Ring nicht einzeln, nach
+    // oben sind sie aber durch unread * 256 beschraenkt (bf_push2() laesst
+    // hoechstens 255 Byte Nutzlast plus Laengenbyte zu). Dazu der groesste
+    // Frame, der hier hineinkommt: addBLEComToOutBuffer() klemmt auf 245,
+    // plus Laengenbyte.
+    //
+    // Bewusst NICHT bf_used(): das enthaelt den gelesenen Verlauf, faellt nie
+    // (bf_pop() ruehrt es nicht an, nur die Verdraengung tut es) und stuende
+    // nach dem ersten vollen Ringumlauf dauerhaft dicht an cap -- die Drossel
+    // bliebe dann fuer immer haengen und die MHeard-Liste erreichte das
+    // Telefon nie wieder.
+    const uint32_t worst_unread_bytes = (uint32_t)bf_unread(&phoneComRing) * 256u;
+    return worst_unread_bytes + 1u + 245u > (uint32_t)phoneComRing.cap;
 }
 
 void sendMheard()
