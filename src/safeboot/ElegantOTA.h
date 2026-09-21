@@ -134,23 +134,29 @@ class ElegantOTAClass{
     bool _reboot = false;
     unsigned long _reboot_request_millis = 0;
 
+    // Debug-only text from Update.printError(); no longer the source of the
+    // HTTP response body -- the completion handler now answers with
+    // safeboot::OtaSession::reasonName() (see docs/safeboot-ota-contract.md
+    // and src/safeboot/ota_state.h). Still populated so the failure reason
+    // is visible on the serial console.
     String _update_error_str = "";
     unsigned long _current_progress_size;
 
-    // TM-46: bumped once per /ota/start so a late-arriving disconnect from a
-    // superseded upload (AsyncTCP can deliver it after a new session already
-    // began) can be told apart from a disconnect of the still-active one.
-    uint32_t _updateGeneration = 0;
-
-    // TM-49: fail-closed completion gate. `Update.hasError()` only becomes true
-    // when something actively failed; an upload whose connection dies before
-    // the `final` frame arrives never runs `Update.end()`, so nothing sets an
-    // error and the completion handler would treat a PARTIAL image as good.
-    // This flag is the inverse: false from /ota/start, set true ONLY after
-    // `Update.end(true)` has verified the image (length + client MD5) and
-    // `Update.isFinished()` confirms it. Every reboot / partition switch is
-    // gated on it, so "we never got there" now reads as failure.
-    bool _ota_image_valid = false;
+    // Session bookkeeping (generation, verified-image gate) moved to the
+    // shared safeboot::OtaSession g_ota (src/safeboot/ota_state.h), owned by
+    // main.cpp and driven from the handlers below -- see
+    // docs/safeboot-ota-contract.md. The generation for a disconnect
+    // closure is now read from g_ota.state().generation at upload start,
+    // and the verified-image gate from g_ota.state().image_valid, so this
+    // class no longer keeps its own copies.
+    //
+    // NOTE: the #else (non-AsyncWebServer) branches below this class'
+    // corresponding .cpp still reference the old `_updateGeneration` /
+    // `_ota_image_valid` members and will not compile if
+    // ELEGANTOTA_USE_ASYNC_WEBSERVER is ever set to 0 for a safeboot build.
+    // That branch is dead code today (src/safeboot/* is only pulled into
+    // esp32-safeboot / esp32-S3-safeboot, both ASYNC=1) and was left
+    // otherwise untouched per the wave brief.
 
     std::function<void()> preUpdateCallback = NULL;
     std::function<void(size_t current, size_t final)> progressUpdateCallback = NULL;
