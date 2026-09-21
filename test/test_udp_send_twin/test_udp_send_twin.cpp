@@ -4,10 +4,10 @@
 //
 // Unlike the U6 country twin, this is ONE binary, not one per side: the two
 // drains are named differently (sendMeshComUDP on ESP32, sendUDP on nRF52),
-// so both translation units link together and share one ringBufferUDPout.
-// The same ring is therefore drained by both implementations in the same
-// process, and the comparison is a real differential rather than two runs
-// compared through files.
+// so both translation units link together and share one udpOutRing
+// (byte_fifo_t, src/byte_fifo.h). The same ring is therefore drained by both
+// implementations in the same process, and the comparison is a real
+// differential rather than two runs compared through files.
 //
 //   pio test -e native_udp_send_twin -f test_udp_send_twin
 //
@@ -68,13 +68,14 @@ bool bDisplayInfo = false;
 bool bDisplayVia = false;
 bool bDisplayCont = false;
 bool bWIFIAP = false;
-// R1-03 (wave 2): the slot padding shrank from +20 to +1 in
-// src/loop_functions_extern.h. This definition MUST track that header --
-// it is the same object, and a mismatch is a redefinition error, which is
-// how the change announced itself. Do not re-hardcode a number here.
-uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE + 1];
-int udpWrite = 0;
-int udpRead = 0;
+// RAM-Rueckgewinn (neo-ram-reclaim): the ring is now a byte_fifo_t
+// (src/byte_fifo.h), declared extern in src/loop_functions_extern.h and
+// defined in src/loop_functions.cpp on hardware. This test does not compile
+// that TU, so it supplies the one definition here instead -- storage sized
+// from RING_BYTES_UDP (src/configuration_global.h), the same constant the
+// shipped ring uses for this memory class.
+static uint8_t udpOutStore[RING_BYTES_UDP];
+byte_fifo_t udpOutRing = BYTE_FIFO_INIT(udpOutStore);
 
 bool hasIPaddress = true;
 IPAddress node_hostip(44, 143, 8, 143);
@@ -178,8 +179,11 @@ static bool g_write_fails = false;
 // non-empty frame). Has no nRF52 counterpart: NrfETH::sendUDP() wraps both
 // and is driven by g_write_fails alone.
 static bool g_end_fails = false;
-// When set, the sink force-advances udpRead mid-send, modelling the ring-full
-// eviction path in addRingPointer() overtaking the reader (CONC-16).
+// When set, the sink models a writer racing ahead of this read by pushing
+// filler frames into udpOutRing until the frame being sent is evicted -- the
+// byte_fifo_t equivalent of the ring-full eviction path bf_push2() runs
+// internally (src/byte_fifo.cpp), which is what the CONC-16 guard defends
+// against.
 static bool g_evict_during_send = false;
 
 static void recorder_reset()
@@ -220,9 +224,20 @@ static void sink_write(const uint8_t *buf, uint16_t len)
     log_sink("UDPWRITE", hex_render(buf, len));
     if (g_evict_during_send)
     {
-        udpRead++;
-        if (udpRead >= MAX_RING_UDP)
-            udpRead = 0;
+        // CONC-16 guard test: the drain has already peeked the oldest
+        // unread frame (still sitting at tail, not yet popped) and captured
+        // its tail_gen. Push same-sized filler frames -- like the real
+        // ~80-byte traffic byte_fifo.h measured -- until that frame is
+        // evicted, observable as tail_gen ticking away from what it was
+        // when this call started. RING_BYTES_UDP=2048 against ~80-byte
+        // frames is about 26 pushes; the loop derives the count from the
+        // ring's own state rather than hardcoding it.
+        uint16_t gen_before = bf_tail_gen(&udpOutRing);
+        uint8_t filler[80];
+        memset(filler, 0xEE, sizeof(filler));
+        int guard = 0;
+        while (bf_tail_gen(&udpOutRing) == gen_before && guard++ < RING_BYTES_UDP)
+            bf_push(&udpOutRing, filler, sizeof(filler));
     }
 }
 
@@ -338,43 +353,61 @@ static uint16_t build_frame(uint8_t *out, const char *src, const char *text)
     return encodeAPRS(out, m);
 }
 
-// Writes one slot at `slot` and returns the msg_len stored in byte 0.
-static uint16_t put_slot(int slot, const char *src, const char *text)
+// Builds the on-wire payload for one frame into `out` -- the recognisable
+// 36-byte header (0xC0..), then the APRS frame -- and returns its length
+// (msg_len = UDP_HDR + frame length). Shared by put_slot() (which also
+// pushes it onto udpOutRing) and any test that needs the exact bytes a
+// drain should send, to compare against what it actually sent.
+static uint16_t build_payload(uint8_t *out, const char *src, const char *text)
 {
     uint8_t frame[UDP_TX_BUF_SIZE];
     memset(frame, 0, sizeof(frame));
     uint16_t flen = build_frame(frame, src, text);
 
-    memset(ringBufferUDPout[slot], 0, sizeof(ringBufferUDPout[0]));
-    uint16_t msg_len = (uint16_t)(UDP_HDR + flen);
-    ringBufferUDPout[slot][0] = (uint8_t)msg_len;
     // a recognisable header, so a side that sent the wrong offset is obvious
     for (int i = 0; i < UDP_HDR; i++)
-        ringBufferUDPout[slot][1 + i] = (uint8_t)(0xC0 + i);
-    memcpy(ringBufferUDPout[slot] + 1 + UDP_HDR, frame, flen);
+        out[i] = (uint8_t)(0xC0 + i);
+    memcpy(out + UDP_HDR, frame, flen);
+    return (uint16_t)(UDP_HDR + flen);
+}
+
+// Builds one frame and pushes it onto udpOutRing. Returns the msg_len a
+// drain will read back via bf_peek().
+static uint16_t put_slot(const char *src, const char *text)
+{
+    uint8_t payload[UDP_HDR + UDP_TX_BUF_SIZE];
+    uint16_t msg_len = build_payload(payload, src, text);
+    TEST_ASSERT_TRUE_MESSAGE(bf_push(&udpOutRing, payload, (uint8_t)msg_len) >= 0,
+                             "put_slot: bf_push rejected the frame");
     return msg_len;
 }
 
-static void fill_ring(int n, const char *src = "DK5EN-1")
+// Resets udpOutRing and pushes `n` frames onto it ("slot 0".."slot n-1").
+// Returns the msg_len of the last frame pushed (0 if n == 0).
+static uint16_t fill_ring(int n, const char *src = "DK5EN-1")
 {
-    memset(ringBufferUDPout, 0, sizeof(ringBufferUDPout));
+    bf_reset(&udpOutRing);
+    uint16_t last_len = 0;
     for (int i = 0; i < n; i++)
     {
         char text[32];
         snprintf(text, sizeof(text), "slot %d", i);
-        put_slot(i, src, text);
+        last_len = put_slot(src, text);
     }
-    udpRead = 0;
-    udpWrite = n % MAX_RING_UDP;
+    return last_len;
 }
 
 // Drains until the ring is empty or `max_passes` is reached, so a drain that
-// fails to advance cannot hang the suite.
+// fails to advance cannot hang the suite. Default bound is derived from the
+// ring's own frame count at the call site (there is no fixed slot count to
+// multiply by any more), plus a small margin.
 typedef void (*Drain)(void);
-static int drain_all(Drain fn, int max_passes = MAX_RING_UDP * 2)
+static int drain_all(Drain fn, int max_passes = -1)
 {
+    if (max_passes < 0)
+        max_passes = (int)bf_frames(&udpOutRing) + 4;
     int passes = 0;
-    while (udpWrite != udpRead && passes < max_passes)
+    while (!bf_empty(&udpOutRing) && passes < max_passes)
     {
         fn();
         passes++;
@@ -420,62 +453,68 @@ static void test_same_ring_drains_to_the_same_datagrams(void)
 
 static void test_datagram_is_the_slot_from_offset_one(void)
 {
-    // The wire bytes are ringBufferUDPout[slot][1 .. 1+msg_len), header
+    // The wire bytes are exactly the payload build_payload() built -- header
     // included. Pinned because "off by the 36-byte header" is exactly the
     // bug class the CONC-16 commit found in the *other* copy of this
     // arithmetic (the convBuffer copy below).
     recorder_reset();
-    memset(ringBufferUDPout, 0, sizeof(ringBufferUDPout));
-    uint16_t msg_len = put_slot(0, "DK5EN-1", "hello");
-    // snapshot first: the drain zeroes the slot it just sent
-    uint8_t before[UDP_TX_BUF_SIZE + 20];
-    memcpy(before, ringBufferUDPout[0], sizeof(before));
-    udpRead = 0;
-    udpWrite = 1;
+    bf_reset(&udpOutRing);
+    uint8_t expected[UDP_HDR + UDP_TX_BUF_SIZE];
+    uint16_t msg_len = build_payload(expected, "DK5EN-1", "hello");
+    TEST_ASSERT_TRUE(bf_push(&udpOutRing, expected, (uint8_t)msg_len) >= 0);
+
     sendMeshComUDP();
 
     TEST_ASSERT_EQUAL_INT(1, (int)g_sent.size());
     TEST_ASSERT_EQUAL_INT(msg_len, (int)g_sent[0].bytes.size());
-    TEST_ASSERT_EQUAL_MEMORY(before + 1, g_sent[0].bytes.data(), msg_len);
+    TEST_ASSERT_EQUAL_MEMORY(expected, g_sent[0].bytes.data(), msg_len);
 }
 
 static void test_pointer_moves_one_slot_per_pass_and_wraps(void)
 {
+    // Byte-ring equivalent of the old slot-index wrap: there is no fixed
+    // slot count to wrap around any more (that was purely an artefact of
+    // the array-of-slots representation), so what is pinned instead is "N
+    // pushed frames drain one per pass, in order, until the ring is empty".
     for (int side = 0; side < 2; side++)
     {
         Drain fn = side ? sendUDP : sendMeshComUDP;
         const char *name = side ? "nrf52" : "esp32";
         recorder_reset();
-        fill_ring(3);
-        // start near the end so the wrap is covered
-        udpRead = MAX_RING_UDP - 1;
-        udpWrite = 1;
-        put_slot(MAX_RING_UDP - 1, "DK5EN-1", "wrap");
+        fill_ring(4);
 
         char msg[64];
         fn();
-        snprintf(msg, sizeof(msg), "%s: udpRead wraps to 0", name);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead, msg);
+        snprintf(msg, sizeof(msg), "%s: three frames left after the first pass", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(3, (int)bf_unread(&udpOutRing), msg);
         fn();
-        snprintf(msg, sizeof(msg), "%s: udpRead advances to 1", name);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, udpRead, msg);
+        snprintf(msg, sizeof(msg), "%s: two frames left after the second pass", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing), msg);
+        int passes = drain_all(fn);
         snprintf(msg, sizeof(msg), "%s: ring drained", name);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(udpWrite, udpRead, msg);
+        TEST_ASSERT_TRUE_MESSAGE(bf_empty(&udpOutRing), msg);
+        snprintf(msg, sizeof(msg), "%s: the two remaining frames took exactly two more passes", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, passes, msg);
     }
 }
 
 static void test_sent_slot_is_zeroed(void)
 {
+    // R1-03 predecessor: a slot ring zeroed the consumed slot after sending
+    // it. byte_fifo_t has no per-slot storage to zero -- popping a frame
+    // only moves tail past it (it stays on as history until the space is
+    // needed, byte_fifo.h). What is pinned here instead is that the pop
+    // actually happened: bf_unread() drops to 0 after the one frame in the
+    // ring is sent.
     for (int side = 0; side < 2; side++)
     {
         Drain fn = side ? sendUDP : sendMeshComUDP;
         recorder_reset();
         fill_ring(1);
         fn();
-        for (int i = 0; i < UDP_TX_BUF_SIZE; i++)
-            TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBufferUDPout[0][i],
-                                            side ? "nrf52 slot not zeroed"
-                                                 : "esp32 slot not zeroed");
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0, bf_unread(&udpOutRing),
+                                         side ? "nrf52 did not pop the sent frame"
+                                              : "esp32 did not pop the sent frame");
     }
 }
 
@@ -485,10 +524,10 @@ static void test_empty_ring_sends_nothing(void)
     {
         recorder_reset();
         fill_ring(0);
-        udpRead = udpWrite = 4;
+        TEST_ASSERT_TRUE(bf_empty(&udpOutRing));
         (side ? sendUDP : sendMeshComUDP)();
         TEST_ASSERT_EQUAL_INT(0, (int)g_sent.size());
-        TEST_ASSERT_EQUAL_INT(4, udpRead);
+        TEST_ASSERT_TRUE(bf_empty(&udpOutRing));
     }
 }
 
@@ -499,35 +538,54 @@ static void test_busy_flag_holds_the_slot_on_both_sides(void)
     udp_is_busy = true;
     sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(), "esp32 sent while busy");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead, "esp32 advanced while busy");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing), "esp32 advanced while busy");
 
     recorder_reset();
     fill_ring(2);
     neth.udp_is_busy = true;
     sendUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(), "nrf52 sent while busy");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead, "nrf52 advanced while busy");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing), "nrf52 advanced while busy");
 }
 
 static void test_mid_send_eviction_does_not_double_advance(void)
 {
-    // CONC-16 guard: a writer force-advancing udpRead past us through the
-    // ring-full eviction path must not be followed by our own advance.
+    // CONC-16 guard: a writer racing ahead through byte_fifo's own eviction
+    // path (bf_push2, src/byte_fifo.cpp) must not be followed by an extra
+    // pop from a reader that was already mid-send when it happened.
+    bDisplayInfo = true;
     for (int side = 0; side < 2; side++)
     {
         Drain fn = side ? sendUDP : sendMeshComUDP;
+        const char *name = side ? "nrf52" : "esp32";
         recorder_reset();
-        fill_ring(4);
+        bDisplayInfo = true;
+        fill_ring(4);   // "slot 0".."slot 3"; slot 0 is the one about to send
+
         g_evict_during_send = true;
         fn();
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, udpRead,
-                                      side ? "nrf52 double-advanced"
-                                           : "esp32 double-advanced");
-        // the evicted slot must also NOT have been zeroed by us
-        TEST_ASSERT_NOT_EQUAL_MESSAGE(0, ringBufferUDPout[1][0],
-                                      side ? "nrf52 zeroed a slot it no longer owns"
-                                           : "esp32 zeroed a slot it no longer owns");
+        g_evict_during_send = false;
+
+        char msg[112];
+        // frames == unread confirms nothing has actually been popped: every
+        // frame left in the ring, filler and real alike, is still unread --
+        // an erroneous double-pop here would leave frames > unread (a
+        // popped frame stays on as history and no longer counts as unread,
+        // byte_fifo.h).
+        snprintf(msg, sizeof(msg), "%s: guard popped on top of the eviction", name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(bf_frames(&udpOutRing), bf_unread(&udpOutRing), msg);
+        snprintf(msg, sizeof(msg), "%s: decoded slot 0 before the eviction caught it", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("slot 0", g_payload.back().c_str(), msg);
+
+        // The eviction took slot 0 -- already sent above, from the snapshot
+        // the drain took before the eviction ran -- not slot 1 as well. The
+        // next drain pass must reach slot 1, never slot 2.
+        fn();
+        snprintf(msg, sizeof(msg),
+                "%s: next frame after the eviction is not slot 1 -- double-advanced", name);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("slot 1", g_payload.back().c_str(), msg);
     }
+    bDisplayInfo = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -551,7 +609,7 @@ static void test_drift_esp32_has_three_preconditions_nrf52_has_none(void)
         char msg[80];
         snprintf(msg, sizeof(msg), "esp32 drained despite %s", why[c]);
         TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(), msg);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing), msg);
     }
 
     // nRF52 under all three: still drains. Those globals are not even in
@@ -586,7 +644,7 @@ static void test_agreement_both_refuse_an_unresolved_destination(void)
     sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(),
                                   "esp32 drained despite an unresolved gateway server address");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing),
                                   "esp32 advanced the ring despite an unresolved gateway server address");
 
     recorder_reset();
@@ -596,7 +654,7 @@ static void test_agreement_both_refuse_an_unresolved_destination(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sent.size(),
                                   "nrf52 drained despite an unresolved destination address -- "
                                   "DR-21's early return regressed");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, udpRead,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)bf_unread(&udpOutRing),
                                   "nrf52 advanced the ring despite an unresolved destination address");
 }
 
@@ -666,7 +724,10 @@ static void test_agreement_error_limit_drops_the_slot_on_both_sides(void)
     // can actually happen on hardware; nRF52's NrfETH::sendUDP() is one call
     // (g_write_fails fails the whole send), matching what actually can
     // happen there.
-    const int N = MAX_RING_UDP - 1;
+    // No fixed slot count to derive N from any more -- a generous margin
+    // above MAX_ERR_UDP_TX that still comfortably fits RING_BYTES_UDP at the
+    // ~80-byte frame size these frames build to (see byte_fifo.h).
+    const int N = MAX_ERR_UDP_TX + 5;
     TEST_ASSERT_TRUE_MESSAGE(N > MAX_ERR_UDP_TX,
                              "ring too small to reach the error limit");
 
@@ -676,10 +737,12 @@ static void test_agreement_error_limit_drops_the_slot_on_both_sides(void)
     for (int i = 0; i < MAX_ERR_UDP_TX; i++)
         sendMeshComUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_reset_udp, "esp32 resetMeshComUDP count");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_ERR_UDP_TX, udpRead,
+    // N frames pushed, MAX_ERR_UDP_TX passes each dropping exactly one slot
+    // (DR-24: no retry) -- N - MAX_ERR_UDP_TX must remain unread. There is
+    // no per-slot zero to check any more (no equivalent in byte_fifo_t); this
+    // unread count IS the "was it dropped, not kept" signal.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(N - MAX_ERR_UDP_TX, (int)bf_unread(&udpOutRing),
                                   "esp32 kept a failing slot instead of dropping it -- DR-24 regressed");
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBufferUDPout[MAX_ERR_UDP_TX - 1][0],
-                                    "esp32 kept the slot it failed on");
     TEST_ASSERT_FALSE_MESSAGE(hasIPaddress, "esp32 kept hasIPaddress after reset");
     TEST_ASSERT_FALSE_MESSAGE(meshcom_settings.node_hasIPaddress,
                               "esp32 did not mirror hasIPaddress into settings");
@@ -690,10 +753,8 @@ static void test_agreement_error_limit_drops_the_slot_on_both_sides(void)
     for (int i = 0; i < MAX_ERR_UDP_TX; i++)
         sendUDP();
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_reset_dhcp, "nrf52 resetDHCP count");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MAX_ERR_UDP_TX, udpRead,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(N - MAX_ERR_UDP_TX, (int)bf_unread(&udpOutRing),
                                   "nrf52 stopped advancing on a failed write");
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, ringBufferUDPout[MAX_ERR_UDP_TX - 1][0],
-                                    "nrf52 kept the slot it failed on");
     TEST_ASSERT_FALSE_MESSAGE(neth.hasIPaddress,
                               "nrf52 kept hasIPaddress after reset");
 }
@@ -833,9 +894,9 @@ static void test_frame_survives_the_drain_intact_on_both_sides(void)
     {
         const char *name = side ? "nrf52" : "esp32";
         recorder_reset();
-        // fill_ring() writes "slot 0" as the text of the first slot
-        fill_ring(1, "DK5EN-9");
-        uint16_t msg_len = ringBufferUDPout[0][0];
+        // fill_ring() writes "slot 0" as the text of the first slot, and
+        // returns the msg_len of the last (here: only) frame it pushed.
+        uint16_t msg_len = fill_ring(1, "DK5EN-9");
         (side ? sendUDP : sendMeshComUDP)();
 
         char msg[96];
@@ -860,17 +921,16 @@ static void test_short_slot_is_not_decoded_on_either_side(void)
     for (int side = 0; side < 2; side++)
     {
         recorder_reset();
-        memset(ringBufferUDPout, 0, sizeof(ringBufferUDPout));
-        ringBufferUDPout[0][0] = UDP_HDR;
+        bf_reset(&udpOutRing);
+        uint8_t hdr[UDP_HDR];
         for (int i = 0; i < UDP_HDR; i++)
-            ringBufferUDPout[0][1 + i] = (uint8_t)(0xC0 + i);
-        udpRead = 0;
-        udpWrite = 1;
+            hdr[i] = (uint8_t)(0xC0 + i);
+        TEST_ASSERT_TRUE(bf_push(&udpOutRing, hdr, UDP_HDR) >= 0);
         (side ? sendUDP : sendMeshComUDP)();
         TEST_ASSERT_EQUAL_INT(1, (int)g_sent.size());
         TEST_ASSERT_EQUAL_INT(UDP_HDR, (int)g_sent[0].bytes.size());
         TEST_ASSERT_EQUAL_INT(0, (int)g_printed.size());
-        TEST_ASSERT_EQUAL_INT(1, udpRead);
+        TEST_ASSERT_TRUE(bf_empty(&udpOutRing));
     }
     bDisplayInfo = false;
 }
@@ -884,7 +944,7 @@ static void test_short_slot_is_not_decoded_on_either_side(void)
 // test/golden/corpus/udp1990/*.hex holds wire datagrams for the INCOMING UDP
 // side (GATE/BEAT/CONF-indicator-wrapped, consumed by handleUdpFrame_*() in
 // src/esp32|nrf52/udp_frame_*.cpp, which relays a decoded GATE frame to LoRa
-// TX -- never back onto ringBufferUDPout). There is no src/ code path that
+// TX -- never back onto udpOutRing). There is no src/ code path that
 // turns a corpus item into outbound-ring content, so nothing here invents
 // one. Instead every corpus item's raw bytes are staged into the ring
 // verbatim, the same way the hand-built cases above stage a frame via
@@ -1038,13 +1098,13 @@ static std::vector<CorpusItem> load_corpus(const std::string &dir)
     return items;
 }
 
-// Stages one corpus item into ring slot `slot`, same shape as put_slot():
-// byte 0 = msg_len, then the fixed dummy 36-byte header, then the datagram
-// bytes verbatim. `msg_len` is a uint8_t in the real ring (ringBufferUDPout's
-// byte 0), so a datagram that would overflow it cannot be staged this way --
-// returns false with a reason rather than truncating or wrapping it.
-static bool stage_corpus_item(int slot, const std::vector<uint8_t> &bytes,
-                              std::string &why_not)
+// Stages one corpus item onto udpOutRing, same shape as put_slot(): the
+// fixed dummy 36-byte header, then the datagram bytes verbatim, pushed as
+// one frame. byte_fifo_t stores each frame's length as a uint8_t
+// (src/byte_fifo.h), so a datagram that would overflow it cannot be staged
+// this way -- returns false with a reason rather than truncating or
+// wrapping it.
+static bool stage_corpus_item(const std::vector<uint8_t> &bytes, std::string &why_not)
 {
     size_t total = (size_t)UDP_HDR + bytes.size();
     if (total > 255)
@@ -1052,23 +1112,22 @@ static bool stage_corpus_item(int slot, const std::vector<uint8_t> &bytes,
         char msg[160];
         snprintf(msg, sizeof(msg),
                  "exceeds UDP_TX_BUF_SIZE: %d-byte header + %d-byte payload = "
-                 "%d > 255 (ringBufferUDPout[..][0] / msg_len is a uint8_t)",
+                 "%d > 255 (byte_fifo_t frame length is a uint8_t)",
                  UDP_HDR, (int)bytes.size(), (int)total);
         why_not = msg;
         return false;
     }
-    if (1 + total > sizeof(ringBufferUDPout[0]))
+
+    uint8_t payload[UDP_HDR + 255];
+    for (int i = 0; i < UDP_HDR; i++)
+        payload[i] = (uint8_t)(0xC0 + i);
+    if (!bytes.empty())
+        memcpy(payload + UDP_HDR, bytes.data(), bytes.size());
+    if (bf_push(&udpOutRing, payload, (uint8_t)total) < 0)
     {
-        why_not = "exceeds the ring slot buffer (UDP_TX_BUF_SIZE+20)";
+        why_not = "rejected by bf_push (does not fit RING_BYTES_UDP)";
         return false;
     }
-
-    memset(ringBufferUDPout[slot], 0, sizeof(ringBufferUDPout[0]));
-    ringBufferUDPout[slot][0] = (uint8_t)total;
-    for (int i = 0; i < UDP_HDR; i++)
-        ringBufferUDPout[slot][1 + i] = (uint8_t)(0xC0 + i);
-    if (!bytes.empty())
-        memcpy(ringBufferUDPout[slot] + 1 + UDP_HDR, bytes.data(), bytes.size());
     return true;
 }
 
@@ -1101,12 +1160,12 @@ static std::vector<CorpusItem> representative_subset(const std::vector<CorpusIte
     std::vector<CorpusItem> out;
     for (size_t i = 0; i < all.size(); i++)
     {
-        // Same two bounds stage_corpus_item() enforces, asked without
-        // staging: byte 0 of a ring slot is the uint8_t msg_len, and the
-        // slot itself is finite. Kept in step with that function by
-        // construction -- if its bounds change, this must change with it.
+        // Same bound stage_corpus_item() enforces, asked without staging: a
+        // byte_fifo_t frame length is a uint8_t. Kept in step with that
+        // function by construction -- if its bound changes, this must
+        // change with it.
         size_t total = (size_t)UDP_HDR + all[i].bytes.size();
-        bool stageable = (total <= 255) && (1 + total <= sizeof(ringBufferUDPout[0]));
+        bool stageable = (total <= 255);
         if (i < KEEP_LEADING || !stageable)
             out.push_back(all[i]);
     }
@@ -1135,7 +1194,7 @@ static void dump_platform(const std::string &out_path, Drain fn)
         out << "=== " << item.filename << "\n";
 
         recorder_reset();
-        memset(ringBufferUDPout, 0, sizeof(ringBufferUDPout));
+        bf_reset(&udpOutRing);
         // decodeAPRS() runs its gate unconditionally; PRINT itself is gated
         // by bDisplayInfo (ESP32) / bDisplayInfo or bDisplayVia (nRF52) --
         // on, so a corpus item that DID carry a decodable frame at offset 0
@@ -1144,14 +1203,12 @@ static void dump_platform(const std::string &out_path, Drain fn)
         bDisplayInfo = true;
 
         std::string why_not;
-        if (!stage_corpus_item(0, item.bytes, why_not))
+        if (!stage_corpus_item(item.bytes, why_not))
         {
             out << "(not applicable: " << why_not << ")\n";
             bDisplayInfo = false;
             continue;
         }
-        udpRead = 0;
-        udpWrite = 1;
 
         fn();
 

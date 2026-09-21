@@ -36,10 +36,10 @@ void sendUDP()
     if((uint32_t)neth.udp_dest_addr == 0)
         return;
 
-    if(udpWrite != udpRead)
+    if(!bf_empty(&udpOutRing))
     {
         if(bDisplayCont)
-            Serial.printf("udpWrite:%i udpRead:%i neth.udp_is_busy:%i\n", udpWrite, udpRead, neth.udp_is_busy);
+            Serial.printf("udpOutRing unread:%u neth.udp_is_busy:%i\n", (unsigned)bf_unread(&udpOutRing), neth.udp_is_busy);
 
         if(!neth.udp_is_busy)
         {
@@ -52,11 +52,11 @@ void sendUDP()
             // Behandlung wie sendMeshComUDP() in udp_functions.cpp (ESP32).
             // Snapshot bewusst groesser als der Quell-Slot und nullgefuellt
             // (siehe dortige Begruendung).
-            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64] = {0};
-            int mySlot = udpRead;
-            /*BISECT*/ memcpy(udpSnapshot, ringBufferUDPout[mySlot], sizeof(ringBufferUDPout[0]));
-
-            uint16_t msg_len = udpSnapshot[0];
+            static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64];
+            memset(udpSnapshot, 0, sizeof(udpSnapshot));
+            uint16_t myGen = bf_tail_gen(&udpOutRing);
+            uint16_t msg_len = bf_peek(&udpOutRing, udpSnapshot + 1, sizeof(udpSnapshot) - 1);
+            udpSnapshot[0] = (uint8_t)msg_len;
 
             // send it over UDP
             // DR-24: nRF52's shape -- key on the one result NrfETH::sendUDP()
@@ -148,13 +148,10 @@ void sendUDP()
             // lock as the writer's addRingPointer() (CONC-16). Guard against a
             // writer having already force-advanced udpRead past us via the
             // ring-full eviction path while we were sending.
-            /*BISECT*/ if (udpRead == mySlot)
-            {
-                memset(ringBufferUDPout[mySlot], 0, UDP_TX_BUF_SIZE);
-                udpRead++;
-                if (udpRead >= MAX_RING_UDP)
-                    udpRead = 0;
-            }
+            // Nur entnehmen, wenn es noch derselbe Frame ist (byte_fifo.h,
+            // tail_gen) -- sonst hat der Schreiber ihn schon verdraengt.
+            if (bf_tail_gen(&udpOutRing) == myGen)
+                bf_pop(&udpOutRing);
 
         }
         else

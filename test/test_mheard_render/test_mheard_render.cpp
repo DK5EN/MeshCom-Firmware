@@ -150,6 +150,15 @@ String convertUNIXtoString(uint32_t timestamp) { (void)timestamp; return String(
 bool bGATEWAY = false;
 bool bVIA = false;
 
+// Kommando-Ring: sendMheard() drosselt sich daran (comRingWouldEvictUnread()),
+// damit es keinen ungelesenen Frame verdraengt. Leer angelegt, also greift die
+// Drossel nie -- genau wie frueher der leere Schlitzring. Vor dem Byte-Ring
+// fehlten hier die zwei Schlitz-Zeiger und die Env linkte gar nicht.
+#include "byte_fifo.h"
+static uint8_t phoneComStoreStub[2048];
+byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStoreStub);
+
+
 // mheard_functions.cpp's globals, inspected directly the same way
 // test_mheard_aging.cpp does (mheard_functions.h deliberately does not
 // extern them for production callers -- see NC-02 comment there -- but a
@@ -437,6 +446,13 @@ static void test_sendMheard_ein_frischer_eintrag_json_feldreihenfolge(void)
     updateMheard(mh, 0);
     g_bleFrames.clear();
 
+    // sendMheard() laeuft nur einen Schnappschuss ab, den
+    // startMheardToPhone() anlegt (Cursor sonst -1, die Funktion kehrt
+    // sofort zurueck). Genau so ruft es die Produktion auf
+    // (esp32_main.cpp:3159, nrf52_main.cpp:1854). Ohne diese Zeile pruefte
+    // der Fall nichts -- er fiel nur nicht auf, weil native_parsers seit dem
+    // MHeard-Umbau gar nicht mehr linkte.
+    startMheardToPhone();
     sendMheard();
 
     TEST_ASSERT_EQUAL_INT(1, (int)g_bleFrames.size());
@@ -471,6 +487,13 @@ static void test_sendMheard_zuletzt_gehoert_zuerst(void)
     updateMheard(mh, 0);
 
     g_bleFrames.clear();
+    // sendMheard() laeuft nur einen Schnappschuss ab, den
+    // startMheardToPhone() anlegt (Cursor sonst -1, die Funktion kehrt
+    // sofort zurueck). Genau so ruft es die Produktion auf
+    // (esp32_main.cpp:3159, nrf52_main.cpp:1854). Ohne diese Zeile pruefte
+    // der Fall nichts -- er fiel nur nicht auf, weil native_parsers seit dem
+    // MHeard-Umbau gar nicht mehr linkte.
+    startMheardToPhone();
     sendMheard();
 
     TEST_ASSERT_EQUAL_INT(3, (int)g_bleFrames.size());
@@ -514,6 +537,13 @@ static void test_sendMheard_deckt_slot_null_ab(void)
     TEST_ASSERT_EQUAL_STRING("DK5EN-00", mheardCalls[79]);
 
     g_bleFrames.clear();
+    // sendMheard() laeuft nur einen Schnappschuss ab, den
+    // startMheardToPhone() anlegt (Cursor sonst -1, die Funktion kehrt
+    // sofort zurueck). Genau so ruft es die Produktion auf
+    // (esp32_main.cpp:3159, nrf52_main.cpp:1854). Ohne diese Zeile pruefte
+    // der Fall nichts -- er fiel nur nicht auf, weil native_parsers seit dem
+    // MHeard-Umbau gar nicht mehr linkte.
+    startMheardToPhone();
     sendMheard();
 
     // Framezahl selbst ist der Beweis gegen "Slot 0 wird uebersprungen":
@@ -538,6 +568,13 @@ static void test_sendMheard_eintrag_ueber_zwoelf_stunden_wird_nicht_gesendet(voi
     mc_test_advance_millis(60UL * 60UL * 12UL * 1000UL + 1000UL);
     g_bleFrames.clear();
 
+    // sendMheard() laeuft nur einen Schnappschuss ab, den
+    // startMheardToPhone() anlegt (Cursor sonst -1, die Funktion kehrt
+    // sofort zurueck). Genau so ruft es die Produktion auf
+    // (esp32_main.cpp:3159, nrf52_main.cpp:1854). Ohne diese Zeile pruefte
+    // der Fall nichts -- er fiel nur nicht auf, weil native_parsers seit dem
+    // MHeard-Umbau gar nicht mehr linkte.
+    startMheardToPhone();
     sendMheard();
 
     TEST_ASSERT_EQUAL_INT(0, (int)g_bleFrames.size());

@@ -542,11 +542,18 @@ static void sub_config_upload(long content_length)
  */
 String work_webpage(bool bget_password, int webid)
 {
-    static char web_header_collect[1024];        // BSS statt Heap
-    static uint16_t web_header_collect_len = 0;
-    // ...
-    web_header_collect_len = 0;
-    web_header_collect[0] = '\0';
+    // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
+    // lag als statisches Feld im DRAM und wurde am Ende ohnehin in den String
+    // kopiert. Jetzt sammelt der String selbst; reserve() holt die 1 kB EINMAL
+    // beim ersten Aufruf vom Heap und behaelt sie (der String ist global),
+    // also kein Wachsen und kein Freigeben je Anfrage -- dieselbe Obergrenze
+    // wie vorher (WEB_HEADER_MAX), nur dass sie nicht mehr im Linkerbild steht.
+    // Das ist eine Verschiebung aus dem statischen Bild in den Heap, kein
+    // Byte weniger zur Laufzeit; sie entlastet die Linkregion, die auf den
+    // klassischen ESP32 knapp ist.
+    static const uint16_t WEB_HEADER_MAX = 1023;
+    web_header.reserve(WEB_HEADER_MAX + 1);
+    web_header = "";
 
     web_currentTime = millis();
     web_previousTime = web_currentTime;
@@ -554,7 +561,7 @@ String work_webpage(bool bget_password, int webid)
     String web_currentLine = ""; // make a String to hold incoming data from the client
 
     // CS-03: an upload needs its body length, and the header may well be
-    // longer than web_header_collect[]. Picked off the line as it completes,
+    // longer than WEB_HEADER_MAX. Picked off the line as it completes,
     // so it does not depend on that 1 kB window.
     long web_content_length = -1;
 
@@ -578,11 +585,8 @@ String work_webpage(bool bget_password, int webid)
             if (bDEBUG)
                 Serial.write(c); // print it out the serial monitor
 
-            if (web_header_collect_len < sizeof(web_header_collect) - 1)
-            {
-                web_header_collect[web_header_collect_len++] = c;
-                web_header_collect[web_header_collect_len] = '\0';
-            }
+            if (web_header.length() < WEB_HEADER_MAX)
+                web_header += c;
 
             if (c == '\n')
             {
@@ -591,8 +595,6 @@ String work_webpage(bool bget_password, int webid)
                 // that's the end of the client HTTP request, so send a response:
                 if (web_currentLine.length() == 0)
                 {
-                    web_header = web_header_collect;
-                    
                     // Serial.println(web_header);
 
                     // user sends authentication
@@ -2039,41 +2041,38 @@ void sub_page_setup()
  * ###########################################################################################################################
  * This will only deliver the preformatted messages to be loaded asyncronous into the WebUI scaffold
  */
-// The ring has no reader cursor of its own. toPhoneRead only advances when a
-// BLE client with an active "hello" session drains a slot, which happens
-// within ~100 ms of the write -- following toPhoneRead here reliably finds
-// an empty window while a phone is connected. toPhoneWrite always points at
-// the oldest surviving slot (the writer fills it, then wraps toPhoneWrite
-// forward), so scan the full ring from there instead. Upstream origin
+// Die Seite liest den VERLAUF des Telefon-Rings, nicht die ungelesenen
+// Frames: ein Frame bleibt nach dem Senden ans Telefon liegen, bis sein Platz
+// gebraucht wird (byte_fifo.h, "oldest"). Vorher lief die Schleife ueber alle
+// MAX_RING Schlitze ab toPhoneWrite -- dasselbe, nur dass der Verlauf jetzt
+// so viele Frames haelt, wie in RING_BYTES_PHONE passen. Upstream origin
 // 87c6c200.
 void sub_content_messages()
 {
     int rendered = 0;
-    int iStart = toPhoneWrite; // snapshot: the writer may advance it while we scan
+    bf_iter_t it;
+    bf_iter_begin(&phoneRing, &it);
 
     if (bDEBUG)
-        Serial.printf("toPhoneWrite:%i\n", iStart);
+        Serial.printf("phoneRing frames:%u unread:%u\n", (unsigned)bf_frames(&phoneRing), (unsigned)bf_unread(&phoneRing));
 
-    for (int i = 0; i < MAX_RING; i++)
+    for (;;)
     {
-        int iRead = (iStart + i) % MAX_RING;
-
-        if (BLEtoPhoneBuff[iRead][0] == 0) // 0 = slot never written since reboot
-            continue;
+        uint8_t frame[256];
+        uint8_t blelen = bf_iter_next(&phoneRing, &it, frame, sizeof(frame));
+        if (blelen == 0)
+            break;
 
         if (bDEBUG)
-            Serial.printf("iRead:%i [1]:%02X\n", iRead, BLEtoPhoneBuff[iRead][1]);
+            Serial.printf("frame len:%u [0]:%02X\n", blelen, frame[0]);
 
         uint8_t toPhoneBuff[MAX_MSG_LEN_PHONE] = {0}; // we need to insert the first byte text msg flag
-        uint8_t blelen = BLEtoPhoneBuff[iRead][0];    // MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
 
-        if (BLEtoPhoneBuff[iRead][1] == 0x91)
+        if (frame[0] == 0x91)
         { // Mheard
-          // memcpy(toPhoneBuff, BLEtoPhoneBuff[iRead]+1, blelen-1);
         }
-        else if (BLEtoPhoneBuff[iRead][1] == 0x44)
+        else if (frame[0] == 0x44)
         { // Data Message (JSON)
-          // memcpy(toPhoneBuff, BLEtoPhoneBuff[iRead]+1, blelen);
         }
         else if (blelen >= 4 && (size_t)(blelen - 4) <= sizeof(toPhoneBuff))
         { // Text Message and Position
@@ -2082,8 +2081,8 @@ void sub_content_messages()
             char timestamp[21];
             String ccheck = "";
 
-            memcpy(toPhoneBuff, BLEtoPhoneBuff[iRead] + 1, blelen - 4);
-            memcpy(tbuffer, BLEtoPhoneBuff[iRead] + 1 + (blelen - 4), 4);
+            memcpy(toPhoneBuff, frame, blelen - 4);
+            memcpy(tbuffer, frame + (blelen - 4), 4);
             unix_time = (tbuffer[0] << 24) | (tbuffer[1] << 16) | (tbuffer[2] << 8) | tbuffer[3];
             time_t unix_t = (time_t)(unix_time + (long)(meshcom_settings.node_utcoff * 60 * 60));
             struct tm *oldt = gmtime(&unix_t);

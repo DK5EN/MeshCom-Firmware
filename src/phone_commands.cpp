@@ -2,6 +2,7 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
+#include <regex_functions.h>
 #include <debugconf.h>
 #include <configuration.h>
 #include <batt_functions.h>
@@ -66,34 +67,14 @@ void sendToPhone()
 		uint8_t toPhoneBuff [MAX_MSG_LEN_PHONE] = {0};
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
 		uint8_t blelen;
-		// CONC-18: snapshot the slot's length/status/payload bytes under a
-		// single lock, instead of reading blelen here and memcpy-ing from the
-		// live ring further down. addBLEOutBuffer() (CONC-15) can wrap the
-		// ring and overwrite this exact slot from OnRxDone (nRF52 timer-
-		// service task, see C-01) in the gap between the two; a snapshot
-		// buffer makes what follows immune to that regardless of timing.
+		// CONC-18: den Frame als Kopie entnehmen, nicht aus dem lebenden Ring
+		// lesen. addBLEOutBuffer() (CONC-15) kann aus OnRxDone (nRF52 Timer-
+		// Service-Task, C-01) jederzeit verdraengen; peek() kopiert unter der
+		// Sperre des Rings, pop() rueckt danach weiter -- was dazwischen
+		// passiert, trifft nur noch die Kopie nicht.
 		uint8_t ringSnapshot[MAX_MSG_LEN_PHONE];
-#if defined(NRF52_SERIES)
-		taskENTER_CRITICAL();
-#endif
-		blelen = BLEtoPhoneBuff[toPhoneRead][0];
-		// (Das Typbyte wurde hier zusaetzlich als statusByte gelesen. Es ist
-		//  dasselbe Byte wie ringSnapshot[0], das der memcpy unten ohnehin
-		//  mitnimmt, und seit blePhoneFrame() die Verzweigung macht,
-		//  brauchte es niemand mehr -- eine Lesestelle weniger im
-		//  kritischen Abschnitt.)
-		if(blelen > 0)
-			memcpy(ringSnapshot, BLEtoPhoneBuff[toPhoneRead]+1, blelen);
-		// Advance the read pointer here, still under the lock: the slot's
-		// content is already captured above, and this keeps the index update
-		// atomic with addBLEOutBuffer()'s writer-side overflow check
-		// (addRingPointer(), CONC-15) instead of racing it later.
-		toPhoneRead++;
-		if (toPhoneRead >= MAX_RING)
-			toPhoneRead = 0;
-#if defined(NRF52_SERIES)
-		taskEXIT_CRITICAL();
-#endif
+		blelen = bf_peek(&phoneRing, ringSnapshot, sizeof(ringSnapshot));
+		bf_pop(&phoneRing);
 
 		// N-04 residual: the producer clamp only closed the RF-reachable path;
 		// blelen==0 here would underflow to 255 below and memcpy past the
@@ -129,9 +110,9 @@ void sendToPhone()
 		if(bBLEDEBUG)
 		{
 			if(toPhoneBuff[0] == ':' || toPhoneBuff[0] == '!' || toPhoneBuff[0] == '@')
-				Serial.printf("toPhoneWrite:%i toPhoneRead:%i buff:%s lng:%i\n", toPhoneWrite, toPhoneRead, toPhoneBuff+7, blelen);
+				Serial.printf("toPhone unread:%u buff:%s lng:%i\n", (unsigned)bf_unread(&phoneRing), toPhoneBuff+7, blelen);
 			else
-				Serial.printf("toPhoneWrite:%i toPhoneRead:%i buff:%s lng:%i\n", toPhoneWrite, toPhoneRead, toPhoneBuff, blelen);
+				Serial.printf("toPhone unread:%u buff:%s lng:%i\n", (unsigned)bf_unread(&phoneRing), toPhoneBuff, blelen);
 		}
     }
     
@@ -159,14 +140,15 @@ void sendComToPhone()
 		// we need to insert the first byte text msg flag
 		uint8_t ComToPhoneBuff [MAX_MSG_LEN_PHONE] = {0};
 		// MAXIMUM PACKET Length over BLE is 245 (MTU=247 bytes), two get lost, otherwise we need to split it up!
-		uint8_t blelen = BLEComToPhoneBuff[ComToPhoneRead][0];
+		// Kopie entnehmen wie in sendToPhone(): der Erzeuger klemmt auf 245,
+		// der Ring nimmt bis 255, die Kopie ist auf 255 ausgelegt.
+		uint8_t ringSnapshot[256];
+		uint8_t blelen = bf_peek(&phoneComRing, ringSnapshot, sizeof(ringSnapshot));
+		bf_pop(&phoneComRing);
 
 		// N-04 residual: see sendToPhone() above.
 		if(blelen == 0)
 		{
-			ComToPhoneRead++;
-			if (ComToPhoneRead >= MAX_RING)
-				ComToPhoneRead = 0;
 			ble_busy_flag = false;
 			return;
 		}
@@ -176,16 +158,11 @@ void sendComToPhone()
 		// ein Byte zu wenig. Unerreichbar, weil beide Erzeuger dieses Rings
 		// 0x44 setzen (Begruendung im Header), aber falsch; massgeblich ist
 		// die Fassung aus sendToPhone().
-		if(!blePhoneFrame(BLEComToPhoneBuff[ComToPhoneRead]+1, blelen,
+		if(!blePhoneFrame(ringSnapshot, blelen,
 		                  ComToPhoneBuff, sizeof(ComToPhoneBuff)))
 		{
-			// Lesezeiger MUSS weiter, wie im blelen==0-Fall darueber:
-			// ComToPhoneRead wandert sonst erst nach dem Senden weiter, und
-			// ein Schlitz, der sich nicht rahmen laesst, haette den Ring
-			// dauerhaft an genau dieser Stelle stehenlassen.
-			ComToPhoneRead++;
-			if (ComToPhoneRead >= MAX_RING)
-				ComToPhoneRead = 0;
+			// Der Frame ist schon entnommen (pop() oben): ein Frame, der sich
+			// nicht rahmen laesst, kann den Ring nicht mehr blockieren.
 			ble_busy_flag = false;
 			return;
 		}
@@ -200,10 +177,6 @@ void sendComToPhone()
 		#else
 			g_ble_uart.write(ComToPhoneBuff, blelen + 2);
 		#endif
-
-		ComToPhoneRead++;
-		if (ComToPhoneRead >= MAX_RING)
-			ComToPhoneRead = 0;
 
 		if(bBLEDEBUG)
 		{
@@ -446,6 +419,14 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 			String sVar = call_arr;
 			sVar.toUpperCase();
 			sVar.trim();
+
+			// Dieselbe Normalisierung wie bei --setcall -- sonst hebt der
+			// naechste Config-Schreibvorgang des Telefons die kanonische Form
+			// wieder auf. Bewusst ohne checkRegexCall(): dieser Pfad hat noch
+			// nie geprueft, und ihn jetzt scharf zu stellen wuerde Rufzeichen
+			// abweisen, die die App bisher setzen konnte. Passt die kanonische
+			// Form nicht in node_call, bleibt das Rufzeichen wie es kam.
+			normalizeOwnCall(sVar);
 
 			snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", sVar.c_str());
 

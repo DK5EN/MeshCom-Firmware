@@ -716,3 +716,30 @@ campaign is what gives those two boards room again.
   48 additions, not 251 with 49; the two safeboot envs are the only members of
   `default_envs` and were missing from the gate; and an incremental board build
   takes ~30 s, which removes the economy argument for a reduced env set.
+
+## 19. RAM-Rückgewinn auf `fork-neo-test`, 2026-09-21
+
+Der Umbau von `neo-ram-reclaim` (Byte-Ringe, Web-Header im `String`,
+Display-Cache, dazu der Extern-UDP-Stack-Fix) ist nach dem Nachtlauf auf
+DK5EN-98 nach `fork-neo-test` gemerged. Urteil, Messwerte und die Funde beim
+Merge stehen in `docs/reclaim-abschluss-20260921.md`; die beiden
+Auswertungsdokumente `docs/reclaim-auswertung-20260920.md` und
+`docs/reclaim-auswertung-20260921.md` liegen als Beleg daneben.
+
+**Für die Ableitung wichtig: der Filtersatz ist gewachsen.** Vier Dateien waren
+in keiner Pfadliste und wären bei `tools/neo/derive.sh` wortlos liegengeblieben
+— die Strip-Identitätsprüfung hätte es gemeldet, aber erst am Ende:
+
+- `tools/neo/paths/CORE.txt`: `src/byte_fifo.cpp`, `src/byte_fifo.h`,
+  `src/display_pages_cfg.h`, `src/onebutton_functions.cpp`
+- `tools/neo/paths/K19.txt`: `test/test_byte_fifo/test_byte_fifo.cpp`
+
+Die Regel daraus: **jeder Commit, der eine neue Datei unter `src/` anlegt, muss
+sie in dieselbe Kapitelliste eintragen.** `derive.sh` liest ausschließlich die
+Listen, nie den Baum.
+
+Nebenbefund, unabhängig vom Umbau: `native_parsers` linkte seit PR #1147
+überhaupt nicht (`comRingFree()` las zwei Zeiger, die diese Env nicht linkt und
+die nicht gestubbt waren). Am unveränderten `4d162cdc` nachgestellt. Mitbehoben,
+dazu drei `sendMheard()`-Tests, die deshalb nie gelaufen waren und ohne
+`startMheardToPhone()` nichts prüften.

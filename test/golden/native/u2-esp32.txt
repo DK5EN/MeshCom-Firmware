@@ -14,4 +14,4 @@
 003	UDPEND	ok
 004	TXCOUNT	ok
 === 37-m07-oversize.hex
-(not applicable: exceeds UDP_TX_BUF_SIZE: 36-byte header + 300-byte payload = 336 > 255 (ringBufferUDPout[..][0] / msg_len is a uint8_t))
+(not applicable: exceeds UDP_TX_BUF_SIZE: 36-byte header + 300-byte payload = 336 > 255 (byte_fifo_t frame length is a uint8_t))

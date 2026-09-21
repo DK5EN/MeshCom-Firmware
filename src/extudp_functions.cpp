@@ -531,18 +531,34 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     return;
   }
 
-  // ESP32 Loop-Task-Stack = 8 KB → 1000 B auf Stack ok.
-  // nRF52 Loop-Task-Stack = 4 KB → BSS, sonst Stack-Overflow Crash bei
-  // sendPosition → sendExtern (siehe Commit 1951aa7d, fix RAK4631).
-#ifdef ESP32
-  char c_json[500] = {0};
-  char c_tjson[500] = {0};
-#else
+  // F2: auf beiden Plattformen jetzt BSS statt Stack (vorher nur auf nRF52,
+  // siehe Commit 1951aa7d). Grund ESP32: die Kette esp32loop -> getExternUDP
+  // -> getExtern -> sendMessage -> sendExtern -> decodeAPRS -> printfdeb ->
+  // MeshSerial/lwIP-Tail braucht am kompilierten Artefakt gemessen 8672 B,
+  // der Loop-Task hat nur 8192 B (Framework-Default) -- 2x500 B davon auf dem
+  // Stack reissen die Kette ueber die Grenze; ein Extern-UDP-{"type":"msg"}
+  // mit fremdem Ziel loeste darueber deterministisch einen Reset aus.
+  // Reentranz geprueft: alle fuenf Aufrufer von sendExtern() (hier unten in
+  // flushExternQueue(), sendMessage() und sendPosition() in
+  // loop_functions.cpp (4297 bzw. 4903), je ein
+  // Aufruf in udp_frame_esp32.cpp/udp_frame_nrf52.cpp) laufen auf beiden
+  // Plattformen ausschliesslich im Loop-Task -- NimBLE liefert per Queue an
+  // den Loop-Task zu (esp32_main.cpp: "BLE Queue: process data from NimBLE
+  // task in Main Loop context"), der Webserver ist ein synchron gepolltes
+  // WiFiServer (kein ESPAsyncWebServer in dieser Umgebung), und
+  // sendExtern() selbst ruft nichts auf, das erneut in sendMessage()/
+  // sendExtern() eintreten koennte. Der einzige bekannte Verschachtelungspfad
+  // ist bpRoute() -> bpEmitNotice() -> bpDeliver(), das auf dem T-Deck ueber
+  // lv_task_handler() einen GUI-Send re-entrant ausloesen kann (Kommentar bei
+  // bpRoute(), M5) -- der steht in sendMessage() aber VOR dem sendExtern()-
+  // Aufruf, laeuft also vollstaendig durch (inkl. seines eigenen
+  // sendExtern()) und kehrt zurueck, bevor die aeussere sendExtern()-
+  // Instanz ueberhaupt beginnt. Die beiden Aufrufe ueberlappen sich damit
+  // nie, statische Puffer sind also auch fuer diesen Pfad sicher.
   static char c_json[500];
   static char c_tjson[500];
   memset(c_json, 0, sizeof(c_json));
   memset(c_tjson, 0, sizeof(c_tjson));
-#endif
 
   char escape_symbol[3];
   char escape_group[3];
