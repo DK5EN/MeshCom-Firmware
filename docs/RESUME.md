@@ -1,5 +1,31 @@
 # RESUME — pick up here
 
+## 2026-09-21 (Abend): RAM-01 auf Hardware geprueft — bestanden, ein neuer Befund
+
+`RAM-01` ist erledigt. DK5EN-90 (RAK4631, nRF52, Ethernet) und DK5EN-1 (Heltec V3)
+mit `1b47d3e4` geflasht, Build-Zeitstempel gegengelesen. **Der nRF52-Drain und der
+UDP-Ausgangsring laufen**: `--ethstat` `tx_max_ms` 0 → 23, `tx_fail;0`, `rx_n` 0 → 12;
+das Drain-Instrument (`--setcont on`) zeigt `udpOutRing unread:1 used:389→594`. Dazu
+beide Telefon-Ringe ueber die Web-Nachrichtenseite (Verlaufs-Iterator) und die
+Stack-Regression auf echter Hardware: `[EXT];rx;len;72;stack_hwm;6736`, kein Reset.
+Volle Tabelle in BACKLOG §3.8an.
+
+Der nRF52-Drain war nur mit kurzem `--gateway on` pruefbar (Ring-Schreiber haengen
+hinter `bGATEWAY`, UDP-Ziel fest im Code) — vom Betreiber freigegeben, danach wieder
+aus. Aufbau empfangsseitig: nur der Heltec sendete, 1 dBm, Gruppe 9.
+
+**Neuer Befund `MHD-01` (High, offen).** Aus der Beobachtung entstanden, dass
+`bf_used()` im Drain-Instrument monoton waechst: `bf_pop()` senkt `bf_used()` nicht,
+nur die Verdraengung tut es. Die Drossel in `sendMheard()` (`mheard_functions.cpp:790`)
+vergleicht genau dieses `bf_used()` mit `cap` — nach dem ersten vollen Ringumlauf ist
+die Bedingung dauerhaft wahr und **die MHeard-Liste erreicht das Telefon nie wieder**.
+Am echten Ring nachgestellt: `used` bleibt ab Frame 10 bei 2010 von 2048 stehen.
+Fix-Vorschlag steht in der BACKLOG-Zeile; auf `fork-neo-test` ist die richtige Form
+schon drin (`5793c792`).
+
+**Noch offen:** der BLE-Config-Burst beim Connect (12 Frames in einem Durchlauf)
+braucht ein gekoppeltes Telefon und ist weiterhin ungeprueft.
+
 ## 2026-09-21: Extern-UDP stack overflow fixed + field-verified; RAM reclaim ported, hardware verification owed
 
 **Stack fix — DONE and gated.** A `{"type":"msg"}` Extern-UDP datagram with a foreign destination

@@ -4544,7 +4544,49 @@ Beim Suchen nach dem Via-Pfad-Fix (`45e411d4`, CHANGELOG-Item 231) bestaetigt: d
 Knotens, keine Weiterleitung fremder Frames — ob `--mesh off` sie erfassen soll, ist eine
 Betriebsentscheidung, kein Defekt im engen Sinn. `MESH-01` unten.
 
-| ID      | Typ  | Prio | Ort                                                                   | Item                                                                                                                                                                                                                                                                                                                     | Status                                      |
-| ------- | ---- | ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| RAM-01  | TEST | High | `src/byte_fifo.h`/`.cpp`, ESP32-Ausgangsringe, `nrf52_main.cpp`-Drain | Hardware-Verifikation der Byte-FIFO-Ringe (CHANGELOG 230/232) steht aus: BLE-Config-Burst beim Connect (12 Frames in einem Durchlauf), Web-Nachrichtenseite ueber den neuen Iterator, UDP-Ausgangsdrain auf ESP32 **und** auf dem nRF52 (eigene Implementierung, andere Codepfad). Bisher nur Host-Tests + Board-Builds. | offen, kein Board hat diesen Build gefahren |
-| MESH-01 | TASK | Low  | `src/lora_functions.cpp:1555`,`:1579`, `src/msgstore_glue.cpp:113`    | Soll `--mesh off` auch das Gateway-DM-ACK und die DM-Store-Custody-Zustellung stummschalten? Beides sind eigene Emissionen, keine Relays — anders als der `45e411d4`-Fix (item 231), der reine Weiterleitung betraf. Braucht eine Betriebsentscheidung vor jeder Code-Aenderung.                                         | offen, Betriebsentscheidung noetig          |
+| ID      | Typ  | Prio | Ort                                                                   | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Status                                                                                                                                                  |
+| ------- | ---- | ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RAM-01  | TEST | High | `src/byte_fifo.h`/`.cpp`, ESP32-Ausgangsringe, `nrf52_main.cpp`-Drain | Hardware-Verifikation der Byte-FIFO-Ringe (CHANGELOG 230/232) steht aus: BLE-Config-Burst beim Connect (12 Frames in einem Durchlauf), Web-Nachrichtenseite ueber den neuen Iterator, UDP-Ausgangsdrain auf ESP32 **und** auf dem nRF52 (eigene Implementierung, andere Codepfad). Bisher nur Host-Tests + Board-Builds.                                                                                                                                                                                                                                                                    | **erledigt 2026-09-21** auf DK5EN-90 (RAK4631) und DK5EN-1 (Heltec V3), beide mit `1b47d3e4` geflasht. Nachweise in §3.8an.                             |
+| MESH-01 | TASK | Low  | `src/lora_functions.cpp:1555`,`:1579`, `src/msgstore_glue.cpp:113`    | Soll `--mesh off` auch das Gateway-DM-ACK und die DM-Store-Custody-Zustellung stummschalten? Beides sind eigene Emissionen, keine Relays — anders als der `45e411d4`-Fix (item 231), der reine Weiterleitung betraf. Braucht eine Betriebsentscheidung vor jeder Code-Aenderung.                                                                                                                                                                                                                                                                                                            | offen, Betriebsentscheidung noetig                                                                                                                      |
+| MHD-01  | BUG  | High | `src/mheard_functions.cpp:790` (`sendMheard()`)                       | Die Drossel vor `addBLEComToOutBuffer()` vergleicht `bf_used()` (Bytes **inklusive** gelesenem Verlauf) mit der Ringkapazitaet. `bf_pop()` senkt `bf_used()` nicht, nur die Verdraengung tut es — nach dem ersten vollen Ringumlauf steht `bf_used()` also dauerhaft dicht an `cap` und die Bedingung ist ab da immer wahr. `sendMheard()` kehrt dann sofort zurueck: die MHeard-Liste erreicht das Telefon nie wieder. Am echten Ring nachgestellt (2048 B, 200-B-Frames, Drain leert nach jedem Push): `used` bleibt ab Frame 10 bei 2010 stehen, die Bedingung ist ab da dauerhaft wahr. | offen, nachgestellt 2026-09-21. Fix-Vorschlag: gegen die **ungelesenen** Frames schranken statt gegen `bf_used()`, so auf `fork-neo-test` in `5793c792` |
+
+### 3.8an RAM-01: Byte-FIFO-Ringe auf Hardware geprueft — 2026-09-21
+
+`RAM-01` ist erledigt. Zwei Knoten mit `1b47d3e4` geflasht und geprueft:
+DK5EN-90 (RAK4631, nRF52, W5100S-Ethernet, `/dev/cu.usbmodem1101`) und DK5EN-1
+(Heltec V3, ESP32-S3, `/dev/cu.usbserial-0001`). Build-Zeitstempel nach dem
+Flashen gegengelesen, nicht angenommen.
+
+| Prueffall                                   | Ergebnis                                                                                                    |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| nRF52-Drain (`sendUDP()`, `nrf52_main.cpp`) | **PASS** — `--ethstat` `tx_max_ms` 0 → 23, `tx_fail;0`, `rx_n` 0 → 12 (Server antwortet), `hb_age_s;13`     |
+| UDP-Ausgangsring unter dem Drain            | **PASS** — Instrument `--setcont on`: `udpOutRing unread:1 used:389→466→538→566→594`, `udp_is_busy:0`       |
+| Ring-Schreiber (KEEP + DATA)                | **PASS** — `[KEEP]...KEEP48A4690DDK5EN-90`, `[GW];keep;tx;ok;1` 3x, `[DATA]...DATA48A4690DDK5EN-90 ... -43` |
+| nRF52 Telefon-Ring + Verlaufs-Iterator      | **PASS** — Web-Nachrichtenseite des RAK rendert 2181 B aus `phoneRing` ueber `bf_iter_begin/next`           |
+| ESP32 Telefon-Ring + Verlaufs-Iterator      | **PASS** — Web-Nachrichtenseite DK5EN-1 rendert die gesendete Nachricht aus dem Byte-Ring                   |
+| ESP32 `sendExtern()` mit BSS-Puffern (P2)   | **PASS** — `[EXT];tx;len;189;stack_hwm;6752`, ueber mehrere Laeufe stabil                                   |
+| Stack-Regression (P1+P2) auf fork-main      | **PASS** — Fremdziel-Datagramm: `[EXT];rx;len;72;stack_hwm;6736`, genau ein `[BOOT];ready`, kein Reset      |
+
+Der nRF52-Drain war nur mit `--gateway on` pruefbar: `udpOutRing` wird
+ausschliesslich von `sendHeartbeat()` (KEEP) und `addNodeData()` (empfangene
+Frames) gefuellt, beide hinter `if (bGATEWAY)`, und das UDP-Ziel steht fest im
+Code (`nrf_eth.cpp`, 89.185.97.38 fuer EU) — es gibt keinen `--udpip`-Schalter.
+Der Betreiber hat dem kurzen Gateway-Betrieb des RAK ausdruecklich zugestimmt;
+danach wieder `--gateway off`.
+
+Aufbau bewusst empfangsseitig: nur der Heltec sendete (TXPWR 1 dBm, Gruppe 9),
+der RAK wurde ueber den Empfang getrieben. Ein Reiz prueft so beide Drains.
+
+**Nebenbefund, daraus entstanden:** die Beobachtung, dass `used` im
+Drain-Instrument monoton waechst und nie faellt, hat `MHD-01` aufgedeckt (oben)
+— und denselben Fehler in umgekehrter Richtung auf `fork-neo-test`, wo die
+Drossel Frames mit Bytes verglich und deshalb nie griff (dort gefixt in
+`5793c792` samt Regressionstest).
+
+**Offen geblieben:** der BLE-Config-Burst beim Connect (12 Frames in einem
+Durchlauf) ist weiterhin ungeprueft — dafuer braucht es ein gekoppeltes
+Telefon, nicht nur die Bank. Und die serielle USB-Konsole des RAK verstummte
+gegen Ende der Sitzung, waehrend der Knoten ueber Netz voll bedienbar blieb
+(Ping, Web, Empfang, Relay); die Einstellungen wurden deshalb ueber
+`/setparam/` zurueckgesetzt. Bekannte RAK-Eigenheit, kein Befund gegen diesen
+Build.
