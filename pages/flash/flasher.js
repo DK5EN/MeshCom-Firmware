@@ -13,6 +13,21 @@ const nrfSlot = $('nrf-slot');
 const uf2Link = $('uf2-link');
 const partsLine = $('parts');
 const loadError = $('load-error');
+const manual = $('manual');
+const partsList = $('parts-list');
+const cmdBox = $('cmd');
+const copyBtn = $('copy');
+
+// esptool's --chip argument for the families the generator emits.
+const ESPTOOL_CHIP = {
+  'ESP32': 'esp32',
+  'ESP32-S2': 'esp32s2',
+  'ESP32-S3': 'esp32s3',
+  'ESP32-C3': 'esp32c3',
+  'ESP32-C6': 'esp32c6',
+};
+
+const hex = (n) => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
 
 const hasSerial = 'serial' in navigator;
 $('no-serial').hidden = hasSerial;
@@ -65,12 +80,74 @@ function fillBoards(keepEnv) {
   if (keepEnv && rel.boards.some((b) => b.env === keepEnv)) boardSel.value = keepEnv;
 }
 
+function fmtSize(bytes) {
+  return bytes >= 1048576
+    ? `${(bytes / 1048576).toFixed(2)} MB`
+    : `${Math.round(bytes / 1024)} kB`;
+}
+
+// The same files the browser path writes, as download links plus the esptool
+// call that writes them. Both read the manifest, so they cannot drift apart.
+function buildManual(manifest, dir) {
+  const build = manifest.builds[0];
+  const chip = ESPTOOL_CHIP[build.chipFamily];
+  if (!chip) {
+    manual.hidden = true;
+    return;
+  }
+
+  partsList.replaceChildren();
+  for (const part of build.parts) {
+    const li = document.createElement('li');
+    const off = document.createElement('span');
+    off.className = 'off';
+    off.textContent = hex(part.offset);
+    const a = document.createElement('a');
+    a.href = `${dir}/${part.path}`;
+    a.textContent = part.path;
+    a.setAttribute('download', part.path);
+    const sz = document.createElement('span');
+    sz.className = 'sz';
+    li.append(off, a, sz);
+    partsList.append(li);
+    // The size is a nicety; a failed HEAD must not cost us the download link.
+    fetch(`${dir}/${part.path}`, { method: 'HEAD' })
+      .then((r) => {
+        const len = r.headers.get('content-length');
+        if (r.ok && len) sz.textContent = fmtSize(Number(len));
+      })
+      .catch(() => {});
+  }
+
+  const args = build.parts.map((p) => `${hex(p.offset)} ${p.path}`).join(' \\\n    ');
+  cmdBox.textContent = `esptool --chip ${chip} --port PORT -b 921600 write_flash \\\n    ${args}`;
+  manual.hidden = false;
+}
+
+copyBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(cmdBox.textContent);
+    copyBtn.textContent = 'kopiert';
+  } catch {
+    // Clipboard access is refused in some contexts. Select the text instead,
+    // so the user can copy it by hand rather than see nothing happen.
+    const range = document.createRange();
+    range.selectNodeContents(cmdBox);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    copyBtn.textContent = 'markiert \u2014 jetzt kopieren';
+  }
+  setTimeout(() => {
+    copyBtn.textContent = 'Befehl kopieren';
+  }, 2500);
+});
+
 function describeParts(manifest) {
   const build = manifest.builds[0];
   if (build.chipFamily === 'NRF52') {
     return 'Ein UF2-Abbild ueber den Bootloader des Boards.';
   }
-  const hex = (n) => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
   const list = build.parts.map((p) => `${p.path} → ${hex(p.offset)}`).join(', ');
   return `${build.chipFamily}: ${list}.`;
 }
@@ -83,6 +160,7 @@ async function select() {
 
   espSlot.replaceChildren();
   nrfSlot.hidden = true;
+  manual.hidden = true;
   partsLine.textContent = '—';
 
   let manifest;
@@ -96,6 +174,7 @@ async function select() {
   }
 
   partsLine.textContent = describeParts(manifest);
+  buildManual(manifest, dir);
 
   if (manifest.builds[0].chipFamily === 'NRF52') {
     uf2Link.href = `${dir}/${manifest.builds[0].parts[0].path}`;
