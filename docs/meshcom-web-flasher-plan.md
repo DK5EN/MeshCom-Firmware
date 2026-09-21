@@ -1,7 +1,8 @@
 # MeshCom Web Flasher on GitHub Pages: Design and Implementation Plan
 
 Date: 2026-09-18
-Status: approved design, not started
+Status: implemented 2026-09-21 on `fork-neo-test` (waves 1a, 1b, 3). Bench flashes (wave 2)
+and the `partitions-16MB.bin` release asset are still open -- see section 12.
 Decision: option 1, firmware binaries committed to the `gh-pages` branch and fetched same-origin
 
 ## 1. Summary
@@ -261,3 +262,25 @@ T-Deck reboots on port open.
 - Should the flasher also offer official icssw-org releases? Their assets have the same CORS
   problem, so it would mean mirroring their binaries into `gh-pages` too. Plan assumes fork
   releases only.
+
+## 12. Implementation record (2026-09-21)
+
+Built on `fork-neo-test`, published as `v4.35t.09.21-neo`. What deviates from sections 4-7:
+
+| Plan                                                     | As built                                                                                                                                                                                     |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chip family from the env's `extends` line                | From `build.mcu` in the board JSON. `extends` is not a reliable discriminator: five envs carry their own `upload_command` and none of the three base sections                                |
+| Offsets from a table in the generator                    | Parsed out of the env's effective `upload_command`, i.e. out of the exact esptool call the project itself uses. `t_deck_pro` has its line commented out and falls back to the family default |
+| `manifest.json` parts in `upload_command` order          | Sorted ascending by offset, so the manifest reads like the flash map                                                                                                                         |
+| Safeboot part published as `safeboot.bin` on every board | Published under its real name, `safeboot.bin` or `safeboot-s3.bin`. Board folders are self-contained, so the name may differ per folder                                                      |
+| `releases.json` lists board envs as bare strings         | Lists `{env, group, name, chipFamily}`, so the page needs no vendor or display-name knowledge of its own                                                                                     |
+| `flash-staging/` gate before `flash/`                    | Skipped by operator decision; published straight into `flash/`                                                                                                                               |
+
+Still open:
+
+- Wave 2, the bench flashes on Heltec V3, T-Beam v1.2 and T-Deck. Nothing in section 10 has
+  been confirmed on hardware; the page and the generator are verified, the flash path is not.
+- Section 6's `partitions-16MB.bin` release asset. The flasher no longer needs it -- each board
+  folder carries its own table -- but the manual asset set still cannot fully flash a T-Deck.
+  Adding it moves the release from 39 to 40 assets and breaks the diff-identical name check in
+  release step 5, so it is a deliberate separate change.

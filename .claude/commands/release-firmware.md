@@ -1,5 +1,5 @@
 ---
-description: Cut and publish a complete MeshCom fork release - docs, gates, tag, all 32 build envs, 39 GitHub assets - without rediscovering the process
+description: Cut and publish a complete MeshCom fork release - docs, gates, tag, all 32 build envs, 39 GitHub assets, web flasher on GitHub Pages - without rediscovering the process
 allowed-tools: [Bash, Read, Edit, Write, Glob, Grep]
 ---
 
@@ -180,6 +180,42 @@ diff <(gh release view <prev-tag> -R DK5EN/MeshCom-Firmware --json assets \
 (If the previous release is already gone, the canonical 39-name list is in
 this file's history and in docs/RESUME.md 2026-08-31.)
 
+## Step 5b — Web flasher on GitHub Pages
+
+The browser flasher at https://dk5en.github.io/MeshCom-Firmware/flash/ is the
+only path that writes bootloader, partition table and the safeboot factory
+partition; the firmware's own OTA writes `ota_0` alone. It is therefore the
+delivery route for any release that moves the partition layout or ships a new
+safeboot image. Design: `docs/meshcom-web-flasher-plan.md`.
+
+Runs against the same `.pio/build` tree step 4 produced, so it goes after
+step 5 and before the GitHub release:
+
+```
+uv run --with pytest pytest tools/tests/test_pages_flasher.py
+uv run tools/pages_flasher.py publish --version <tag> --keep 3
+```
+
+`publish` builds a detached `gh-pages` worktree from `origin/gh-pages`, writes
+`flash/<tag>/<env>/` for all 30 boards, regenerates `flash/releases.json`,
+prunes release folders beyond `--keep`, and commits. It refuses to run if any
+artefact is missing — a partial board never ships. Add `--push` once the
+commit looks right; without it the commit stays local and only the local
+`gh-pages` branch is moved.
+
+Offsets, chip families and the safeboot file per board are derived from the
+effective `upload_command` in `platformio.ini` and from `build.mcu` in the
+board JSON. Nothing there is hand-maintained, so a new variant needs only its
+display name in `DISPLAY` in `tools/pages_flasher.py`.
+
+After the push, the positive existence check:
+
+```
+uv run tools/pages_flasher.py check --version <tag>
+```
+
+It fetches every part over HTTPS and compares SHA-256 against the local build.
+
 ## Step 6 — Publish
 
 ```
@@ -199,6 +235,8 @@ must show 39 assets, not draft. (`isLatest` is not a valid `--json` field.)
   `git ls-remote --tags origin`.
 - Add a dated entry at the top of `docs/RESUME.md` (what shipped, what is
   deliberately still open), prettier it, commit, push.
+- Open the flasher, confirm the new version is the default in the version
+  dropdown and that the pruned release folder is gone.
 - Optionally flash the bench fleet + gateway — that is a separate step; the
   per-board quirks (T-Beam needs esptool at 460800, webflash for
   dk5en-98.local, RAK DFU) live in the flash tooling and auto-memory, not
