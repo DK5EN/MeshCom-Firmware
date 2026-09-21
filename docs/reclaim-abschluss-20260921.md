@@ -152,7 +152,32 @@ unterscheidet sich um acht Zeilen. Ein reiner Cherry-Pick von `8990e94d` geht
 nicht: `fork-main` hat in `sendExtern()` `EXTERN_MSG_JSON_BUF` statt `500` und
 zusätzlich den BP-07-Puffer. Portiert wird inhaltlich, nicht mechanisch.
 
-Der Wellenplan dafür liegt als `~/Desktop/konzept-stackfix-p2-p4-forkmain-20260921.md`.
+Der Wellenplan dafür lag als `~/Desktop/konzept-stackfix-p2-p4-forkmain-20260921.md`
+und ist am 21.09.2026 abgearbeitet. Auf `fork-main` sind jetzt:
+
+| Commit     | Inhalt                                                                   |
+| ---------- | ------------------------------------------------------------------------ |
+| `efc9681e` | P2 (`c_json`/`c_tjson` nach BSS), `tools/stack_budget.py`, die Gate-Doku |
+| `36b3a895` | Option 2 (Web-Header im `String`) und Option 3 (Display-Cache)           |
+
+Gemessen an diesem Baum, Schwelle 11 776:
+
+| Kette          | vorher   | nachher | Delta  |
+| -------------- | -------- | ------- | ------ |
+| `getExternUDP` | 8 464 B  | 7 264 B | −1 200 |
+| `esp32loop`    | 10 160 B | 8 960 B | −1 200 |
+
+−1 200 B ist exakt `EXTERN_MSG_JSON_BUF` (700) + 500 — die beiden Puffer, sonst
+nichts. Gate: 14 Board-Envs über alle Display-Familien SUCCESS, 873 von 873
+Host-Testfällen, unverändert gegen die Baseline vor der Welle. Ein Advisor-Pass
+(Fable-Modus) hat die drei tragenden Behauptungen — Reentranz von
+`sendExtern()`, Schrankengleichheit des Web-Headers, Vollständigkeit der
+Guard-Vereinigung — angegriffen und keine davon widerlegt; am Artefakt
+nachgewiesen, dass `pageLastTextLong1/2` auf OLED-Boards fehlen und auf
+TFT/E-Paper-Boards vorhanden sind.
+
+`t5_epaper` und `esp32-external-radio` bauen weiterhin nicht. Beide sind schon
+am unveränderten `45e411d4` rot und aus Gründen ohne Bezug zu dieser Änderung.
 
 ## Offen
 
