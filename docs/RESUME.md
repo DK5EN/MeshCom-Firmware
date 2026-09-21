@@ -14,14 +14,16 @@ Der nRF52-Drain war nur mit kurzem `--gateway on` pruefbar (Ring-Schreiber haeng
 hinter `bGATEWAY`, UDP-Ziel fest im Code) — vom Betreiber freigegeben, danach wieder
 aus. Aufbau empfangsseitig: nur der Heltec sendete, 1 dBm, Gruppe 9.
 
-**Neuer Befund `MHD-01` (High, offen).** Aus der Beobachtung entstanden, dass
-`bf_used()` im Drain-Instrument monoton waechst: `bf_pop()` senkt `bf_used()` nicht,
-nur die Verdraengung tut es. Die Drossel in `sendMheard()` (`mheard_functions.cpp:790`)
-vergleicht genau dieses `bf_used()` mit `cap` — nach dem ersten vollen Ringumlauf ist
-die Bedingung dauerhaft wahr und **die MHeard-Liste erreicht das Telefon nie wieder**.
+**Befund `MHD-01` (High) — gefunden und am selben Tag behoben.** Aus der Beobachtung
+entstanden, dass `bf_used()` im Drain-Instrument monoton waechst: `bf_pop()` senkt
+`bf_used()` nicht, nur die Verdraengung tut es. Die Drossel in `sendMheard()` verglich
+genau dieses `bf_used()` mit `cap` — nach dem ersten vollen Ringumlauf war die
+Bedingung dauerhaft wahr und **die MHeard-Liste erreichte das Telefon nie wieder**.
 Am echten Ring nachgestellt: `used` bleibt ab Frame 10 bei 2010 von 2048 stehen.
-Fix-Vorschlag steht in der BACKLOG-Zeile; auf `fork-neo-test` ist die richtige Form
-schon drin (`5793c792`).
+Behoben (CHANGELOG 233): die Drossel schrankt jetzt gegen die ungelesenen Bytes
+(`bf_unread() * 256`), das Praedikat liegt host-pruefbar in `src/mheard_throttle.h`,
+drei Faelle in `test/test_byte_fifo/` halten es fest. **Auf Hardware noch nicht
+nachgeprueft** — dazu braucht es ein gekoppeltes Telefon, das den Ring leert.
 
 **Noch offen:** der BLE-Config-Burst beim Connect (12 Frames in einem Durchlauf)
 braucht ein gekoppeltes Telefon und ist weiterhin ungeprueft.

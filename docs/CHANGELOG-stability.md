@@ -543,6 +543,35 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      nRF52), 873/873 host test cases unchanged against the pre-wave baseline.
      Invisible from outside either way. **Not yet verified on hardware.**
 
+233. **The MHeard list stopped reaching the phone for good after the command ring
+     had wrapped once** (fork-only, 2026-09-21, `MHD-01`). `sendMheard()` throttles
+     itself before `addBLEComToOutBuffer()` so that pushing the next entry cannot
+     evict an unread frame -- and the unread frames at that moment are exactly the
+     ones the same `sendMheard()` call has just written. The throttle compared
+     `bf_used()` against the ring capacity. `bf_used()` counts bytes _including the
+     already-read history_ and never falls: `bf_pop()` does not touch it, only
+     eviction lowers it, and eviction frees exactly as much as the incoming frame
+     needs. So once the ring has wrapped, `bf_used()` sits permanently just below
+     `cap`, the condition is true from then on, and `sendMheard()` returns
+     immediately -- forever. Reproduced against the real ring (2048 B, 200-byte
+     frames, drain emptied after every push): `used` latches at 2010 of 2048 from
+     frame 10 on. The throttle now bounds the _unread_ bytes instead
+     (`bf_unread() * 256`; `bf_push2()` admits at most 255 payload bytes plus one
+     length byte), so read history may be evicted and unread frames may not.
+     The predicate moved into the new header `src/mheard_throttle.h` -- same
+     pattern as `src/coord_compare.h` -- because `mheard_functions.cpp` drags in
+     Arduino and ArduinoJson and could not be host-tested otherwise. Two
+     regression cases pin it, plus one that nails down the units
+     (`bf_unread`/`bf_frames` count frames, `bf_used` counts bytes): with the old
+     `bf_used()` condition the drain case fails, with the fix it passes. Found
+     during the `RAM-01` hardware verification (item 230/232), from the
+     observation that the drain instrument's `used` grows monotonically. Gate:
+     876/876 host test cases, 6 board envs SUCCESS. The mirror-image bug -- the
+     throttle comparing frames against a byte capacity, so it never engaged --
+     had already been fixed on `fork-neo-test` in `5793c792`; that branch and
+     this one now carry the same rule. Only affects nodes with a phone attached;
+     nothing changes on the air.
+
 ## New in v4.35s.09.09
 
 Two changes on top of `v4.35s.09.06.2`, items 209 and 210: a warning that

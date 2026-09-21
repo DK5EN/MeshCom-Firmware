@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include <byte_fifo.h>
+#include <mheard_throttle.h>
 
 static uint8_t store[64];
 static byte_fifo_t f = BYTE_FIFO_INIT(store);
@@ -250,6 +251,88 @@ static void test_history_stops_after_eviction_mid_walk(void)
     TEST_ASSERT_EQUAL_UINT8(0, bf_iter_next(&f, &it, out, sizeof(out)));
 }
 
+// MHD-01: die Drossel aus sendMheard() am echten Ring. Vorher stand dort
+// bf_used() -- das faellt nie, steht nach dem ersten vollen Ringumlauf
+// dauerhaft dicht an cap und haette ab da jeden weiteren Frame abgelehnt.
+// Hier wird der Drain nach jedem Push geleert, es liegt also nie mehr als ein
+// ungelesener Frame im Ring: die Drossel muss durchgehend freigeben.
+static void test_mheard_throttle_releases_after_drain(void)
+{
+    // Eigener Ring in der Groesse des echten Telefon-Kommandorings.
+    static uint8_t mh_store[2048];
+    byte_fifo_t mh = BYTE_FIFO_INIT(mh_store);
+    bf_reset(&mh);
+
+    uint8_t a[200];
+    memset(a, 'x', sizeof(a));
+
+    for(int i = 0; i < 40; i++)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(mheardFrameFits(bf_unread(&mh), 200, mh.cap),
+                                 "Drossel haengt -- MHeard erreicht das Telefon nie wieder");
+        bf_push(&mh, a, (uint8_t)sizeof(a));
+        bf_pop(&mh); // Drain
+    }
+
+    // Der Verlauf ist laengst einmal rundgelaufen; bf_used() steht jetzt
+    // dicht an cap, bf_unread() dagegen bei 0. Genau hier haengte MHD-01.
+    TEST_ASSERT_EQUAL_UINT16(0, bf_unread(&mh));
+    TEST_ASSERT_TRUE((uint32_t)bf_used(&mh) + 201u > (uint32_t)mh.cap);
+}
+
+// Die Gegenrichtung: ohne Drain darf die Drossel nicht endlos durchlassen,
+// sonst verdraengt bf_push2() die gerade selbst geschriebenen Frames.
+static void test_mheard_throttle_stops_before_evicting_unread(void)
+{
+    static uint8_t mh_store[2048];
+    byte_fifo_t mh = BYTE_FIFO_INIT(mh_store);
+    bf_reset(&mh);
+
+    uint8_t a[200];
+    memset(a, 'x', sizeof(a));
+
+    int pushed = 0;
+    while(mheardFrameFits(bf_unread(&mh), 200, mh.cap))
+    {
+        bf_push(&mh, a, (uint8_t)sizeof(a));
+        pushed++;
+        TEST_ASSERT_TRUE_MESSAGE(pushed < 100, "Drossel greift nie");
+    }
+
+    // Nichts Ungelesenes ist verlorengegangen: kein bf_push2() hat einen
+    // Frame verdraengt, den derselbe Durchlauf gerade geschrieben hat.
+    TEST_ASSERT_TRUE(pushed > 0);
+    TEST_ASSERT_EQUAL_UINT16(pushed, bf_unread(&mh));
+}
+
+// bf_unread()/bf_frames() zaehlen FRAMES, bf_used() zaehlt BYTES. Die
+// Verwechslung hat beide Fehler oben verursacht; dieser Fall nagelt die
+// Einheiten fest.
+static void test_unread_counts_frames_used_counts_bytes(void)
+{
+    uint8_t a[20];
+    memset(a, 'x', sizeof(a));
+
+    bf_push(&f, a, (uint8_t)sizeof(a));
+
+    // EIN Frame -- nicht 20, nicht 21.
+    TEST_ASSERT_EQUAL_UINT16(1, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(1, bf_frames(&f));
+    // Bytes dagegen: Nutzlast plus Laengenbyte.
+    TEST_ASSERT_EQUAL_UINT16(21, bf_used(&f));
+
+    bf_push(&f, a, (uint8_t)sizeof(a));
+    TEST_ASSERT_EQUAL_UINT16(2, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(42, bf_used(&f));
+
+    // bf_pop() senkt nur die ungelesenen Frames; der Verlauf und damit
+    // bf_used() bleibt stehen.
+    bf_pop(&f);
+    TEST_ASSERT_EQUAL_UINT16(1, bf_unread(&f));
+    TEST_ASSERT_EQUAL_UINT16(2, bf_frames(&f));
+    TEST_ASSERT_EQUAL_UINT16(42, bf_used(&f));
+}
+
 static void test_reset_clears_everything(void)
 {
     uint8_t a[8];
@@ -276,6 +359,9 @@ int main(int, char **)
     RUN_TEST(test_tail_gen_detects_eviction_during_send);
     RUN_TEST(test_history_iterates_oldest_to_newest_including_read);
     RUN_TEST(test_history_stops_after_eviction_mid_walk);
+    RUN_TEST(test_mheard_throttle_releases_after_drain);
+    RUN_TEST(test_mheard_throttle_stops_before_evicting_unread);
+    RUN_TEST(test_unread_counts_frames_used_counts_bytes);
     RUN_TEST(test_reset_clears_everything);
     return UNITY_END();
 }
