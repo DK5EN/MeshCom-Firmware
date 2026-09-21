@@ -107,6 +107,82 @@
         border: 1px solid var(--border);
         border-radius: 7px;
       }
+      .manual {
+        border-top: 1px solid var(--border);
+        margin-top: 18px;
+        padding-top: 16px;
+      }
+      .manual > summary {
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--muted);
+        list-style: none;
+      }
+      .manual > summary::-webkit-details-marker {
+        display: none;
+      }
+      .manual > summary::before {
+        content: '\25b8';
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.15s;
+      }
+      .manual[open] > summary::before {
+        transform: rotate(90deg);
+      }
+      .parts {
+        list-style: none;
+        padding: 0;
+        margin: 14px 0 0;
+      }
+      .parts li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.87rem;
+      }
+      .parts li:last-child {
+        border-bottom: 0;
+      }
+      .parts .off {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--muted);
+        min-width: 5.5em;
+      }
+      .parts .sz {
+        margin-left: auto;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      pre.cmd {
+        margin: 14px 0 0;
+        padding: 12px 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        overflow-x: auto;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        white-space: pre;
+      }
+      .copy {
+        margin-top: 10px;
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 0.83rem;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .copy:hover {
+        border-color: var(--accent);
+      }
       .hint {
         margin: 8px 0 0;
         font-size: 0.82rem;
@@ -218,6 +294,25 @@
             </div>
           </div>
         </div>
+
+        <details class="manual" id="manual" hidden>
+          <summary>Von Hand flashen (esptool, ohne Browser)</summary>
+          <p class="meta" id="manual-intro">
+            Alle Teile in <strong>einen eigenen Ordner</strong> laden &mdash; die Dateinamen sind
+            fuer jedes Board gleich und wuerden sich sonst gegenseitig ueberschreiben. Danach den
+            Befehl darunter ausfuehren und <code>PORT</code> durch die serielle Schnittstelle
+            ersetzen.
+          </p>
+          <ul class="parts" id="parts-list"></ul>
+          <pre class="cmd" id="cmd">&mdash;</pre>
+          <button class="copy" id="copy" type="button">Befehl kopieren</button>
+          <p class="meta">
+            Geht der Upload mit <code>Invalid head of packet</code> nicht durch, ist die Baudrate zu
+            hoch: <code>-b 460800</code>, notfalls <code>-b 115200</code>. Ein
+            <code>erase_flash</code> vorweg loescht auch Rufzeichen und Konfiguration &mdash; nur
+            beim Umstieg von einer Firmware ohne Safeboot-Partition noetig.
+          </p>
+        </details>
 
         <p class="note" id="no-serial" hidden>
           Dieser Browser kennt kein Web Serial. Der Flash-Knopf bleibt deshalb aus. Es funktionieren
