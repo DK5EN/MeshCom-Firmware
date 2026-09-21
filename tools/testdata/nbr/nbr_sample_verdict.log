@@ -1,10 +1,105 @@
+# Handrechnung (Advisor-Pass 2026-09-21, Fund 1-3 -- docs/nbr-logformat.md).
+# Diese sechs Kommentarzeilen sind keine Firmware-Ausgabe: der Parser muss sie
+# als Fremdzeile ("no_timestamp") verwerfen, ohne den Lauf zu stoeren.
+#
+# Eigener Call (SNAP): DK5EN-98.
+# Direkte Nachbarn (ME): DK5EN-93, DK5EN-94, DK5EN-95, DK5EN-96, DK5EN-97, DK5EN-99.
+# own_heard = genau diese sechs Rufzeichen (das ist, was ich selbst direkt hoere).
+#
+# H(N) je Nachbar := {X : EDGE X->N, ohne X==N, ohne X==DK5EN-98}:
+#   H(DK5EN-93) = {OE9ZZZ-5, OE1AAA-1, DK5EN-95}
+#     (EDGE DK5EN-98->DK5EN-93 ist absichtlich dabei, siehe unten -- sie
+#     gehoert NICHT in H(DK5EN-93), weil X==eigener Call. Fund 2b.)
+#   H(DK5EN-94) = {OE2BBB-9}
+#   H(DK5EN-95) = {OE1AAA-1}
+#   H(DK5EN-96) = {OE2BBB-9}
+#   H(DK5EN-97) = {}                      (leer -> per Definition redundant/RED)
+#   H(DK5EN-99) = {DK5EN-97}
+#
+# Deckung je Nachbar N (covered = own_heard u. Vereinigung H(M) aller ANDEREN
+# Nachbarn M != N; unabgedeckt = H(N) - covered; nicht leer -> exklusiv/MESH):
+#   DK5EN-93: unabgedeckt = {OE9ZZZ-5}
+#     (OE1AAA-1 gedeckt durch H(DK5EN-95)={OE1AAA-1}; DK5EN-95 selbst liegt in
+#     own_heard) -> EXKLUSIV / MESH.
+#   DK5EN-94: unabgedeckt = {} (OE2BBB-9 gedeckt durch H(DK5EN-96)) -> REDUNDANT / RED.
+#   DK5EN-95: unabgedeckt = {} (OE1AAA-1 gedeckt durch H(DK5EN-93)) -> REDUNDANT / RED.
+#   DK5EN-96: unabgedeckt = {} (OE2BBB-9 gedeckt durch H(DK5EN-94)) -> REDUNDANT / RED.
+#   DK5EN-97: unabgedeckt = {} (H leer)                              -> REDUNDANT / RED.
+#   DK5EN-99: unabgedeckt = {} (DK5EN-97 selbst liegt in own_heard)  -> REDUNDANT / RED.
+#   => 1x exklusiv (DK5EN-93), 5x redundant.
+#
+# Fund 3 (wechselseitig redundant): DK5EN-94 und DK5EN-96 hoeren BEIDE nur
+# OE2BBB-9 und sonst niemand -- jeder gilt einzeln als redundant (der jeweils
+# andere deckt es), aber schaltet man BEIDE ab, ist OE2BBB-9 komplett weg.
+# Fund 2a: DK5EN-99 ist redundant NUR wegen own_heard (ich hoere DK5EN-97
+# selbst direkt) -- kein anderer Nachbar hoert DK5EN-97, die alte (falsche)
+# Rechnung haette DK5EN-99 hier faelschlich als exklusiv/MESH gewertet.
+# Fund 2b: EDGE DK5EN-98->DK5EN-93 (ich werde von DK5EN-93 gehoert) darf
+# DK5EN-93s Urteil nicht veraendern -- H(DK5EN-93) oben enthaelt DK5EN-98 nicht.
+#
+# Minimale Deckungsmenge (Greedy) ueber dem Universum {OE9ZZZ-5, OE1AAA-1,
+# OE2BBB-9} (own_heard ist schon abgezogen, DK5EN-97/DK5EN-99 tragen nichts
+# bei -- ihr einziger H-Eintrag liegt in own_heard):
+#   Runde 1: DK5EN-93 deckt {OE9ZZZ-5, OE1AAA-1} (2 Treffer, groesster Beitrag) -> gewaehlt.
+#   Runde 2: verbleibt {OE2BBB-9}; DK5EN-94 UND DK5EN-96 decken es je einzeln
+#     (1 Treffer) -- bei Gleichstand gewinnt die Iterationsreihenfolge
+#     (alphabetisch), also DK5EN-94.
+#   => Deckungsmenge = {DK5EN-93, DK5EN-94}, Groesse 2 (NICHT beweisbar
+#      minimal, siehe Docstring von a4b_deckung -- {DK5EN-93, DK5EN-96} waere
+#      genauso gueltig).
+#
+# <verdict> je ROW (Fund 1 -- EDGE mit <from>==Rufzeichen: hoert mich
+# entfernt gesehen jemand AUSSER MIR? hearers zaehlt mich mit):
+#   DK5EN-93: kein EDGE mit from=DK5EN-93 -> EXCL, hearers=1 (nur ich).
+#   DK5EN-94: kein EDGE mit from=DK5EN-94 -> EXCL, hearers=1.
+#   DK5EN-95: EDGE DK5EN-95->DK5EN-93 (DK5EN-93 hoert DK5EN-95) -> RED, hearers=2.
+#   DK5EN-96: kein EDGE mit from=DK5EN-96 -> EXCL, hearers=1.
+#   DK5EN-97: EDGE DK5EN-97->DK5EN-99 (DK5EN-99 hoert DK5EN-97) -> RED, hearers=2.
+#   DK5EN-99: kein EDGE mit from=DK5EN-99 -> EXCL, hearers=1.
+#   OE1AAA-1 (kein direkter Nachbar, meshneed=NA): gehoert von DK5EN-93 UND
+#     DK5EN-95 -> RED, hearers=2.
+# DK5EN-94/DK5EN-96 zeigen absichtlich verdict=EXCL bei meshneed=RED -- genau
+# der Fall, den Fund 1 beschreibt: "ausser mir hoert niemand DIESEN Nachbarn"
+# und "DIESER Nachbar muss trotzdem nicht selbst meshen" sind unabhaengige
+# Aussagen ueber dieselbe Zeile.
+#
+# Bewusst eingefuegter Fehler zum Pruefen der Abweichungs-Erkennung: die
+# ROW-Zeile fuer DK5EN-97 traegt <meshneed>=MESH, obwohl die Handrechnung
+# oben RED ergibt. Das MUSS im Bericht als genau 1 Abweichung auftauchen.
+#
+# Rueckwaerts-Kompatibilitaet: der erste SNAP-Block unten ist im ALTEN Format
+# (ROW ohne <meshneed>, 6 statt 7 Felder) -- er muss meshneed=None liefern
+# und darf den Parser nicht stoeren. Der zweite (spaetere) Snapshot traegt die
+# aktuellen Werte fuer DK5EN-93 und gewinnt bei "letzter Snapshot je Call".
+
+2026-09-20 09:00:00.000  [NBR]|SNAP|50|DK5EN-98|2|21|3
+2026-09-20 09:00:00.010  [NBR]|ROW|50|0|DK5EN-98|1|0|0|UNK
+2026-09-20 09:00:00.020  [NBR]|ROW|50|1|DK5EN-93|5|9|1|EXCL
+2026-09-20 09:00:00.030  [NBR]|ENDSNAP|50
+
 2026-09-20 10:00:00.000  [NBR]|ME|100|DK5EN-93|T|-80|5
-2026-09-20 10:00:01.000  [NBR]|ME|101|DK5EN-95|T|-85|3
-2026-09-20 10:00:02.000  [NBR]|EDGE|102|OE1AAA-1|DK5EN-93|T|-70|10
-2026-09-20 10:00:03.000  [NBR]|EDGE|103|OE9ZZZ-5|DK5EN-93|T|-75|4
-2026-09-20 10:00:04.000  [NBR]|EDGE|104|OE1AAA-1|DK5EN-95|T|-72|6
-2026-09-20 10:00:05.000  [NBR]|SNAP|110|DK5EN-98|3|21|5
-2026-09-20 10:00:05.010  [NBR]|ROW|110|0|DK5EN-98|1|0|0|UNK
-2026-09-20 10:00:05.020  [NBR]|ROW|110|1|DK5EN-93|5|2|1|EXCL
-2026-09-20 10:00:05.030  [NBR]|ROW|110|2|DK5EN-95|5|3|1|RED
-2026-09-20 10:00:05.040  [NBR]|ENDSNAP|110
+2026-09-20 10:00:01.000  [NBR]|ME|101|DK5EN-94|T|-82|3
+2026-09-20 10:00:02.000  [NBR]|ME|102|DK5EN-95|T|-85|4
+2026-09-20 10:00:03.000  [NBR]|ME|103|DK5EN-96|T|-83|2
+2026-09-20 10:00:04.000  [NBR]|ME|104|DK5EN-97|T|-90|6
+2026-09-20 10:00:05.000  [NBR]|ME|105|DK5EN-99|T|-92|1
+
+2026-09-20 10:00:10.000  [NBR]|EDGE|110|OE9ZZZ-5|DK5EN-93|T|-75|4
+2026-09-20 10:00:11.000  [NBR]|EDGE|111|OE1AAA-1|DK5EN-93|T|-70|10
+2026-09-20 10:00:12.000  [NBR]|EDGE|112|OE1AAA-1|DK5EN-95|T|-72|6
+2026-09-20 10:00:13.000  [NBR]|EDGE|113|DK5EN-95|DK5EN-93|T|-77|3
+2026-09-20 10:00:14.000  [NBR]|EDGE|114|OE2BBB-9|DK5EN-94|T|-79|2
+2026-09-20 10:00:15.000  [NBR]|EDGE|115|OE2BBB-9|DK5EN-96|T|-81|2
+2026-09-20 10:00:16.000  [NBR]|EDGE|116|DK5EN-97|DK5EN-99|T|-84|5
+2026-09-20 10:00:17.000  [NBR]|EDGE|117|DK5EN-98|DK5EN-93|T|-60|8
+
+2026-09-20 10:00:20.000  [NBR]|SNAP|120|DK5EN-98|8|21|20
+2026-09-20 10:00:20.010  [NBR]|ROW|120|0|DK5EN-98|1|0|0|UNK|NA
+2026-09-20 10:00:20.020  [NBR]|ROW|120|1|DK5EN-93|5|1|1|EXCL|MESH
+2026-09-20 10:00:20.030  [NBR]|ROW|120|2|DK5EN-94|5|1|1|EXCL|RED
+2026-09-20 10:00:20.040  [NBR]|ROW|120|3|DK5EN-95|5|1|2|RED|RED
+2026-09-20 10:00:20.050  [NBR]|ROW|120|4|DK5EN-96|5|1|1|EXCL|RED
+2026-09-20 10:00:20.060  [NBR]|ROW|120|5|DK5EN-97|5|1|2|RED|MESH
+2026-09-20 10:00:20.070  [NBR]|ROW|120|6|DK5EN-99|5|1|1|EXCL|RED
+2026-09-20 10:00:20.080  [NBR]|ROW|120|7|OE1AAA-1|9|2|2|RED|NA
+2026-09-20 10:00:20.090  [NBR]|ENDSNAP|120

@@ -20,22 +20,36 @@ dieselbe Zeitbasis wie `NbrRow.last_min`. Nicht die Wanduhr.
 
 ## Zeilen
 
-| Zeile                                                                   | Wann                                                                            |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `[NBR]\|EDGE\|<up>\|<from>\|<to>\|<type>\|<rssi>\|<cnt>`                | Jede eingetragene Hoerbeziehung "`<to>` hat `<from>` gehoert".                  |
-| `[NBR]\|ME\|<up>\|<from>\|<type>\|<rssi>\|<cnt>`                        | Letzter Hop von mir direkt gehoert (Zelle `[last][0]`).                         |
-| `[NBR]\|CUT\|<up>\|<ntok>\|<kept>\|<path>`                              | Pfad war laenger als das 2-Hop-Fenster; `<ntok>-<kept>` Token verworfen.        |
-| `[NBR]\|DROP\|<up>\|<reason>\|<path>`                                   | Frame komplett verworfen. `<reason>`: `TOK`, `LOOP`, `FULL`, `TYPE`.            |
-| `[NBR]\|EVICT\|<up>\|<idx>\|<old>\|<new>`                               | Zeile `<idx>` verdraengt, `<old>` war das Opfer.                                |
-| `[NBR]\|POS\|<up>\|<call>\|<lat>\|<lon>\|<mesh>\|<hw>`                  | Positionscache gefuellt (`<mesh>` 0/1, `<lat>`/`<lon>` mit 5 Nachkommastellen). |
-| `[NBR]\|SNAP\|<up>\|<own>\|<rows>\|<maxrows>\|<cells>`                  | Alle 15 min, eroeffnet einen Snapshot-Block.                                    |
-| `[NBR]\|ROW\|<up>\|<idx>\|<call>\|<flags>\|<age>\|<hearers>\|<verdict>` | Eine Zeile je belegter Matrixzeile, direkt nach `SNAP`.                         |
-| `[NBR]\|ENDSNAP\|<up>`                                                  | Schliesst den Snapshot-Block.                                                   |
+| Zeile                                                                               | Wann                                                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `[NBR]\|EDGE\|<up>\|<from>\|<to>\|<type>\|<rssi>\|<cnt>`                            | Jede eingetragene Hoerbeziehung "`<to>` hat `<from>` gehoert".                  |
+| `[NBR]\|ME\|<up>\|<from>\|<type>\|<rssi>\|<cnt>`                                    | Letzter Hop von mir direkt gehoert (Zelle `[last][0]`).                         |
+| `[NBR]\|CUT\|<up>\|<ntok>\|<kept>\|<path>`                                          | Pfad war laenger als das 2-Hop-Fenster; `<ntok>-<kept>` Token verworfen.        |
+| `[NBR]\|DROP\|<up>\|<reason>\|<path>`                                               | Frame komplett verworfen. `<reason>`: `TOK`, `LOOP`, `FULL`, `TYPE`.            |
+| `[NBR]\|EVICT\|<up>\|<idx>\|<old>\|<new>`                                           | Zeile `<idx>` verdraengt, `<old>` war das Opfer.                                |
+| `[NBR]\|POS\|<up>\|<call>\|<lat>\|<lon>\|<mesh>\|<hw>`                              | Positionscache gefuellt (`<mesh>` 0/1, `<lat>`/`<lon>` mit 5 Nachkommastellen). |
+| `[NBR]\|SNAP\|<up>\|<own>\|<rows>\|<maxrows>\|<cells>`                              | Alle 15 min, eroeffnet einen Snapshot-Block.                                    |
+| `[NBR]\|ROW\|<up>\|<idx>\|<call>\|<flags>\|<age>\|<hearers>\|<verdict>\|<meshneed>` | Eine Zeile je belegter Matrixzeile, direkt nach `SNAP`.                         |
+| `[NBR]\|ENDSNAP\|<up>`                                                              | Schliesst den Snapshot-Block.                                                   |
 
 `<flags>` ist die rohe `NbrRow.flags`-Zahl (dezimal), `<age>` das Zeilenalter in Minuten,
-`<hearers>` die Anzahl Knoten, die diese Zeile hoeren, `<verdict>` einer aus
-`EXCL` (exklusive Blaetter, Mesh noetig), `RED` (redundant), `LEAF`, `UNK` -- die Urteile aus
-Konzept 4.3.
+`<hearers>` die Anzahl Knoten, die diese Zeile hoeren.
+
+Es gibt ZWEI Urteile, und sie beantworten entgegengesetzte Fragen an denselben Kanten. Sie
+duerfen nicht miteinander verglichen werden -- genau das war der Fehler, den der Advisor-Pass
+am 2026-09-21 gefunden hat.
+
+- `<verdict>` -- Konzept 4.3, die Sicht auf den Knoten als GEHOERTEN: `EXCL` heisst "ausser mir
+  hoert diese Zeile niemand", also ist MEIN Meshen fuer sie noetig. Sonst `RED`. Zeile 0 und
+  Zeilen ohne Hoerbeziehung: `LEAF` bzw. `UNK`.
+- `<meshneed>` -- die Betreiberfrage, die Sicht auf den Knoten als HOERER: `MESH` heisst "dieser
+  direkt gehoerte Nachbar hoert mindestens einen Knoten, den kein anderer meiner direkten
+  Nachbarn und ich selbst nicht hoere", er muss also selbst meshen. `RED` heisst, seine gehoerte
+  Menge ist bereits abgedeckt. `NA` steht fuer jede Zeile, die kein direkt gehoerter Nachbar ist
+  (inklusive Zeile 0) -- fuer sie ist die Frage nicht gestellt.
+
+`tools/nbrlog.py` rechnet `<meshneed>` aus den `EDGE`/`ME`-Zeilen selbst nach und stellt es dem
+Firmware-Wert gegenueber. `<verdict>` wird nur berichtet, nicht verglichen.
 
 ## Beispiel
 
@@ -44,7 +58,7 @@ Konzept 4.3.
 [NBR]|EDGE|132|OE3CCC-3|DK5EN-93|T|0|7
 [NBR]|ME|132|DK5EN-93|T|-91|41
 [NBR]|SNAP|135|DK5EN-98|9|21|24
-[NBR]|ROW|135|0|DK5EN-98|1|0|3|UNK
-[NBR]|ROW|135|1|DK5EN-93|5|2|1|EXCL
+[NBR]|ROW|135|0|DK5EN-98|1|0|3|UNK|NA
+[NBR]|ROW|135|1|DK5EN-93|5|2|1|EXCL|MESH
 [NBR]|ENDSNAP|135
 ```

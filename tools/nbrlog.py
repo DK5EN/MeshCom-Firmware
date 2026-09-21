@@ -13,9 +13,12 @@ Die Firmware schreibt ``[NBR]|...``-Zeilen auf die Netz-Debug-Konsole
 Host-Zeitstempel mit -- ``YYYY-MM-DD HH:MM:SS.mmm<zwei Leerzeichen><Text>`` --
 in taeglich rotierende Dateien. Dieses Skript liest diese Dateien (lokal oder
 per ``--fetch`` von einem Pi geholt) und beantwortet die fachliche Frage, ob
-ein direkt gehoerter Nachbar selbst meshen muss (er hat exklusive Nachbarn)
-oder ob sein Meshen redundant ist (ein anderer meiner Nachbarn deckt dieselben
-Knoten ab).
+ein direkt gehoerter Nachbar selbst meshen muss -- er hoert Knoten, die weder
+ich selbst direkt noch ein anderer meiner Nachbarn abdeckt (Firmware-
+``<meshneed>`` == ``MESH``) -- oder ob sein Meshen redundant ist, weil alles,
+was er hoert, anderweitig gedeckt ist (``RED``). Das ist eine andere Frage als
+das Firmware-``<verdict>`` (docs/nbr-logformat.md, Fund 1 des Advisor-Passes
+2026-09-21) und wird auch dagegen verglichen, nicht gegen ``<verdict>``.
 
 Der Parser ist bewusst tolerant: eine einzelne kaputte Zeile (fremder
 Zeitstempel, abgeschnittenes Dateiende, verschluckte Zeichen aus einer
@@ -70,6 +73,11 @@ EARTH_RADIUS_KM = 6371.0088
 #: Bekannte Firmware-Urteile aus docs/nbr-logformat.md (nur zur Anzeige, kein
 #: hartes Gate -- ein unbekannter Wert wird einfach durchgereicht).
 KNOWN_VERDICTS = frozenset({"EXCL", "RED", "LEAF", "UNK"})
+
+#: Bekannte Werte von <meshneed> (docs/nbr-logformat.md) -- ebenfalls nur zur
+#: Anzeige. ``None`` (Feld fehlt, altes Firmware-Format) ist gesondert erlaubt
+#: und steht NICHT in dieser Menge.
+KNOWN_MESHNEED = frozenset({"MESH", "RED", "NA"})
 
 
 def fmt_dt(dt: datetime) -> str:
@@ -165,6 +173,10 @@ class RowRec:
     age: int
     hearers: int
     verdict: str
+    #: Betreiberfrage "muss dieser Knoten selbst meshen" (docs/nbr-logformat.md).
+    #: ``None`` heisst: die Zeile kam aus einem Mitschnitt mit aelterer
+    #: Firmware ohne dieses Feld -- kein Fehler, siehe ``_h_row``.
+    meshneed: str | None = None
 
 
 @dataclass
@@ -272,11 +284,20 @@ def _h_snap(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
 
 
 def _h_row(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
-    (idx, call, flags, age, hearers, verdict) = f
     if state.open_snap is None:
         raise _Discard("row_without_snap")
+    if len(f) == 7:
+        # Aktuelles Format: <idx>|<call>|<flags>|<age>|<hearers>|<verdict>|<meshneed>.
+        (idx, call, flags, age, hearers, verdict, meshneed) = f
+    elif len(f) == 6:
+        # Aelteres Firmware-Format ohne <meshneed> -- rueckwaertskompatibel,
+        # KEIN Fehler (docs/nbr-logformat.md, Fund 1 des Advisor-Passes 2026-09-21).
+        (idx, call, flags, age, hearers, verdict) = f
+        meshneed = None
+    else:
+        raise _Discard("malformed:ROW")
     state.open_snap.rows_entries.append(
-        RowRec(int(idx), call, int(flags), int(age), int(hearers), verdict)
+        RowRec(int(idx), call, int(flags), int(age), int(hearers), verdict, meshneed)
     )
 
 
@@ -494,16 +515,27 @@ def direct_neighbours(state: NbrState) -> list[str]:
     return sorted({r.frm for r in state.me})
 
 
-def heard_sets(state: NbrState, neighbours: list[str]) -> dict[str, set[str]]:
+def heard_sets(
+    state: NbrState, neighbours: list[str], exclude: str | None = None
+) -> dict[str, set[str]]:
     """Fuer jeden direkten Nachbarn die Menge der Knoten, die er gehoert hat.
 
     Quelle: EDGE-Zeilen mit ``<to>`` == dieser Nachbar (docs/nbr-logformat.md:
-    "<to> hat <from> gehoert").
+    "<to> hat <from> gehoert"). Ein Selbstbezug (``<from> == <to>``) zaehlt nie
+    mit. Mit ``exclude`` faellt zusaetzlich ein bestimmter Rufname aus jeder
+    Menge heraus -- fuer Abschnitt 4 der eigene Call (Fund 2b des
+    Advisor-Passes 2026-09-21: dass ein Nachbar MICH gehoert hat, macht ihn
+    nicht unverzichtbar).
     """
     out: dict[str, set[str]] = {n: set() for n in neighbours}
     for e in state.edges:
-        if e.to in out:
-            out[e.to].add(e.frm)
+        if e.to not in out:
+            continue
+        if e.frm == e.to:
+            continue
+        if exclude is not None and e.frm == exclude:
+            continue
+        out[e.to].add(e.frm)
     return out
 
 
@@ -523,16 +555,41 @@ def a3_kreuzmatrix(state: NbrState, neighbours: list[str], heard: dict[str, set[
     return {"je_nachbar": je_nachbar, "umgekehrt": umgekehrt}
 
 
-def latest_firmware_verdict(state: NbrState, call: str) -> tuple[str | None, int | None]:
-    """Das ROW-Urteil aus dem letzten Snapshot, in dem ``call`` eine Zeile hat."""
+def latest_firmware_row(
+    state: NbrState, call: str
+) -> tuple[str | None, str | None, int | None]:
+    """(<verdict>, <meshneed>, snapshot-up) aus dem letzten Snapshot mit ``call``.
+
+    Beide Felder kommen aus derselben ROW-Zeile -- nie aus verschiedenen
+    Snapshots gemischt.
+    """
     for snap in reversed(state.snaps):
         for row in snap.rows_entries:
             if row.call == call:
-                return row.verdict, snap.up
-    return None, None
+                return row.verdict, row.meshneed, snap.up
+    return None, None, None
 
 
-def a4_urteil(state: NbrState, neighbours: list[str], heard: dict[str, set[str]]) -> dict[str, Any]:
+def a4_urteil(
+    state: NbrState,
+    neighbours: list[str],
+    heard: dict[str, set[str]],
+    own_heard: set[str],
+) -> dict[str, Any]:
+    """Abschnitt 4 -- Betreiberfrage "muss dieser direkte Nachbar selbst meshen?".
+
+    Deckungsregel (docs/nbr-logformat.md, Fund 2 des Advisor-Passes
+    2026-09-21, ``heard`` liefert H(n) bereits gefiltert -- ohne n selbst,
+    ohne den eigenen Call): ein Knoten aus H(n) gilt als abgedeckt, wenn ich
+    ihn selbst direkt hoere (``own_heard``, aus den ME-Zeilen) ODER ein
+    anderer direkter Nachbar ihn hoert. Bleibt mindestens ein Knoten
+    unabgedeckt, ist n "exklusiv" (Firmware-``MESH``), sonst "redundant"
+    (Firmware-``RED``). Leeres H(n) ist immer "redundant".
+
+    Verglichen wird gegen ``<meshneed>``, NICHT gegen ``<verdict>`` -- Fund 1:
+    die beiden beantworten entgegengesetzte Fragen an derselben Kante.
+    ``<verdict>`` wird nur mitgefuehrt, damit der Bericht es anzeigen kann.
+    """
     rows: list[dict[str, Any]] = []
     for n in neighbours:
         own_set = heard[n]
@@ -540,27 +597,144 @@ def a4_urteil(state: NbrState, neighbours: list[str], heard: dict[str, set[str]]
         for m in neighbours:
             if m != n:
                 others_union |= heard[m]
-        exclusive_nodes = own_set - others_union
-        mine = "exklusiv" if exclusive_nodes else "redundant"
-        fw_verdict, fw_up = latest_firmware_verdict(state, n)
-        if fw_verdict is None:
+        covered = own_heard | others_union
+        uncovered = own_set - covered
+        mine = "exklusiv" if uncovered else "redundant"
+        mine_meshneed = "MESH" if mine == "exklusiv" else "RED"
+        fw_verdict, fw_meshneed, fw_up = latest_firmware_row(state, n)
+        if fw_meshneed is None or fw_meshneed == "NA":
+            # None: kein Snapshot / altes Format. "NA" waere fuer einen
+            # direkten Nachbarn ohnehin unerwartet (die Frage ist fuer ihn
+            # IMMER gestellt) -- in beiden Faellen nichts zu vergleichen.
             match: bool | None = None
         else:
-            match = (mine == "exklusiv" and fw_verdict == "EXCL") or (
-                mine == "redundant" and fw_verdict == "RED"
-            )
+            match = mine_meshneed == fw_meshneed
         rows.append(
             {
                 "rufzeichen": n,
                 "eigenes_urteil": mine,
-                "exklusive_knoten": sorted(exclusive_nodes),
-                "firmware_urteil": fw_verdict,
+                "eigenes_meshneed": mine_meshneed,
+                "h_n": sorted(own_set),
+                "exklusive_knoten": sorted(uncovered),
+                "firmware_meshneed": fw_meshneed,
+                "firmware_verdict": fw_verdict,
                 "firmware_snapshot_up": fw_up,
                 "uebereinstimmung": match,
             }
         )
-    abweichungen = [r for r in rows if r["uebereinstimmung"] is not True]
-    return {"je_nachbar": rows, "abweichungen": abweichungen}
+    # "widerspricht sich" und "gar nicht vergleichbar" sind zwei verschiedene
+    # Befunde und duerfen nicht in einen Topf -- genau diese Verwechslung war
+    # der Advisor-Fund vom 2026-09-21 eine Ebene hoeher. uebereinstimmung is
+    # False heisst, die Firmware ist anderer Meinung als diese Rechnung (ein
+    # echter Fund). None heisst, es gab nichts zu vergleichen: kein Snapshot,
+    # altes Firmware-Format ohne <meshneed>, oder der Nachbar stand zum
+    # Snapshot-Zeitpunkt gar nicht in der Matrix (Tabellendruck) -- selbst
+    # interessant, aber kein Widerspruch.
+    abweichungen = [r for r in rows if r["uebereinstimmung"] is False]
+    nicht_vergleichbar = [r for r in rows if r["uebereinstimmung"] is None]
+    return {"je_nachbar": rows, "abweichungen": abweichungen,
+            "nicht_vergleichbar": nicht_vergleichbar}
+
+
+def a4b_deckung(
+    neighbours: list[str],
+    heard: dict[str, set[str]],
+    own_heard: set[str],
+    urteil_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Abschnitt 4b -- Fund 3 des Advisor-Passes 2026-09-21.
+
+    Die paarweise Rechnung aus ``a4_urteil`` beantwortet nur "ist DIESER eine
+    Nachbar verzichtbar, wenn alle anderen bleiben?". Hoeren zwei Nachbarn
+    exakt dieselbe (sonst von niemandem gehoerte) Menge, gilt in dieser
+    Rechnung JEDER fuer sich als redundant -- schaltet man aber beide ab,
+    fehlt die Menge. Dieser Abschnitt macht das ehrlich:
+
+    - eine minimale Deckungsmenge (Greedy -- NICHT beweisbar minimal, siehe
+      Kommentar unten), die alles abdeckt, was ueberhaupt ein Nachbar hoert
+      und ich nicht ohnehin selbst direkt hoere;
+    - die wechselseitig redundanten Gruppen: Nachbarn, die einzeln als
+      redundant gelten, aber nicht alle gleichzeitig entbehrlich sind.
+    """
+    contrib = {n: (heard[n] - own_heard) for n in neighbours}
+    universe: set[str] = set()
+    for s in contrib.values():
+        universe |= s
+
+    # Greedy-Mengenueberdeckung: waehlt wiederholt den Nachbarn mit dem
+    # groessten noch offenen Beitrag. Das ist eine obere Schranke, KEIN
+    # beweisbares Minimum (Set Cover ist NP-schwer) -- bei den kleinen
+    # Nachbarmengen eines Knotens (typischerweise < 30) ist der Unterschied
+    # zum Optimum in der Praxis vernachlaessigbar, aber unbewiesen.
+    remaining = set(universe)
+    chosen: list[str] = []
+    while remaining:
+        n_best: str | None = None
+        gain_best: set[str] = set()
+        for n in neighbours:
+            gain = contrib[n] & remaining
+            if len(gain) > len(gain_best):
+                n_best, gain_best = n, gain
+        if n_best is None:
+            break
+        chosen.append(n_best)
+        remaining -= gain_best
+    chosen.sort()
+
+    providers: dict[str, set[str]] = defaultdict(set)
+    for n in neighbours:
+        for x in contrib[n]:
+            providers[x].add(n)
+
+    redundant = {r["rufzeichen"] for r in urteil_rows if r["eigenes_urteil"] == "redundant"}
+
+    # Graph nur ueber einzeln-redundante Nachbarn: eine Kante (a, b) entsteht,
+    # wenn a und b (und sonst niemand ausser evtl. weiteren redundanten
+    # Nachbarn) gemeinsam einen Knoten abdecken. Zusammenhangskomponenten
+    # dieses Graphen sind die wechselseitig redundanten Gruppen. Das kann bei
+    # Ketten ueber mehrere geteilte Knoten groesser gruppieren, als fuer einen
+    # einzelnen Knoten noetig waere -- ``gemeinsame_knoten`` zeigt, WELCHE
+    # Knoten die Abhaengigkeit tatsaechlich erzeugen.
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    causes: dict[frozenset[str], set[str]] = defaultdict(set)
+    for x, provs in providers.items():
+        shared = provs & redundant
+        if len(shared) >= 2:
+            for a in shared:
+                for b in shared:
+                    if a != b:
+                        adjacency[a].add(b)
+            causes[frozenset(shared)].add(x)
+
+    visited: set[str] = set()
+    groups: list[dict[str, Any]] = []
+    for n in sorted(redundant):
+        if n in visited or n not in adjacency:
+            continue
+        stack = [n]
+        comp: set[str] = set()
+        while stack:
+            cur = stack.pop()
+            if cur in comp:
+                continue
+            comp.add(cur)
+            stack.extend(adjacency[cur] - comp)
+        visited |= comp
+        if len(comp) >= 2:
+            shared_nodes: set[str] = set()
+            for key, nodes in causes.items():
+                if key <= comp:
+                    shared_nodes |= nodes
+            groups.append(
+                {"nachbarn": sorted(comp), "gemeinsame_knoten": sorted(shared_nodes)}
+            )
+
+    return {
+        "universum_groesse": len(universe),
+        "deckungsmenge": chosen,
+        "deckungsmenge_groesse": len(chosen),
+        "wechselseitig_redundante_gruppen": groups,
+    }
 
 
 def a5_stabilitaet(state: NbrState, neighbours: list[str]) -> dict[str, Any]:
@@ -684,6 +858,12 @@ def analyze(state: NbrState) -> dict[str, Any]:
     own_call = own_call_of(state)
     neighbours = direct_neighbours(state)
     heard = heard_sets(state, neighbours)
+    # Fuer Abschnitt 4/4b (Fund 2b): der eigene Call darf in keiner gehoerten
+    # Menge auftauchen. Ohne bekannten eigenen Call (keine SNAP-Zeile im
+    # Mitschnitt) wird NICHT geraten -- die Filterung faellt dann einfach aus.
+    heard_for_urteil = heard_sets(state, neighbours, exclude=own_call)
+    own_heard = set(neighbours)
+    urteil = a4_urteil(state, neighbours, heard_for_urteil, own_heard)
     return {
         "meta": {
             "generated_by": "tools/nbrlog.py",
@@ -691,9 +871,11 @@ def analyze(state: NbrState) -> dict[str, Any]:
         },
         "1_rahmen": a1_rahmen(state),
         "eigener_rufzeichen": own_call,
+        "eigener_rufzeichen_bekannt": own_call is not None,
         "2_nachbarschaft": a2_nachbarschaft(state),
         "3_kreuzmatrix": a3_kreuzmatrix(state, neighbours, heard),
-        "4_urteil": a4_urteil(state, neighbours, heard),
+        "4_urteil": urteil,
+        "4b_deckung": a4b_deckung(neighbours, heard_for_urteil, own_heard, urteil["je_nachbar"]),
         "5_stabilitaet": a5_stabilitaet(state, neighbours),
         "6_tabellendruck": a6_tabellendruck(state),
         "7_zwei_hop_schnitt": a7_zwei_hop_schnitt(state),
@@ -786,20 +968,48 @@ def render_bluf(res: dict[str, Any]) -> list[str]:
     n_red = sum(1 for r in urteil["je_nachbar"] if r["eigenes_urteil"] == "redundant")
     n_neighbours = len(urteil["je_nachbar"])
     n_abw = len(urteil["abweichungen"])
+    n_nv = len(urteil.get("nicht_vergleichbar", []))
 
     lines.append(
         f"- Zeitraum {rahmen['von']} bis {rahmen['bis']}, "
         f"{n_neighbours} direkte Nachbarn: {n_excl} eigenes Urteil **exklusiv** "
-        f"(muessen selbst meshen), {n_red} **redundant**."
+        f"(muessen selbst meshen, == Firmware-`MESH`), {n_red} **redundant** (== `RED`)."
     )
     if n_abw:
         lines.append(
-            f"- **{n_abw} Abweichung(en)** zwischen eigenem Urteil und dem "
-            "Firmware-`<verdict>` -- Tabelle in Abschnitt 4, das ist das "
+            f"- **{n_abw} Abweichung(en)** zwischen eigenem Urteil und "
+            "Firmware-`<meshneed>` -- Tabelle in Abschnitt 4, das ist das "
             "interessanteste Ergebnis des Tests."
         )
+    elif n_abw == 0 and n_nv == n_neighbours and n_neighbours:
+        lines.append(
+            "- **Kein Vergleich moeglich**: fuer keinen Nachbarn lag ein Firmware-`<meshneed>` "
+            "vor (kein Snapshot, oder ein Mitschnitt aus der Zeit vor dem Feld). Das eigene "
+            "Urteil oben steht, aber es ist durch nichts gegengeprueft."
+        )
     else:
-        lines.append("- Eigenes Urteil und Firmware-`<verdict>` stimmen fuer alle Nachbarn ueberein.")
+        lines.append(
+            "- Eigenes Urteil und Firmware-`<meshneed>` stimmen ueberall dort ueberein, wo "
+            f"verglichen werden konnte ({n_neighbours - n_nv} von {n_neighbours} Nachbarn)."
+        )
+    if n_nv and n_abw:
+        lines.append(
+            f"- {n_nv} Nachbar(n) waren nicht vergleichbar (kein Firmware-Urteil vorhanden) -- "
+            "das ist kein Widerspruch, siehe Abschnitt 4."
+        )
+
+    deckung = res["4b_deckung"]
+    gruppen = deckung["wechselseitig_redundante_gruppen"]
+    if gruppen:
+        gruppen_txt = "; ".join(
+            f"{{{', '.join(g['nachbarn'])}}} (gemeinsam: {', '.join(g['gemeinsame_knoten'])})"
+            for g in gruppen
+        )
+        lines.append(
+            f"- **ACHTUNG: {len(gruppen)} wechselseitig redundante Gruppe(n)** -- "
+            f"einzeln als redundant markiert, aber nicht alle gleichzeitig abschaltbar: {gruppen_txt}. "
+            "Siehe Abschnitt 4b, das ist eine Warnung, kein Freibrief."
+        )
 
     if druck["ueberlauf_erkannt"]:
         lines.append(
@@ -905,29 +1115,111 @@ def render_md(res: dict[str, Any]) -> str:
     )
 
     urt = res["4_urteil"]
-    out.append("## 4. Urteil: exklusiv oder redundant")
+    out.append("## 4. Urteil: muss der Nachbar selbst meshen?")
+    out.append("")
+    out.append(
+        "Zwei Spalten, zwei entgegengesetzte Fragen an dieselbe Kante "
+        "(docs/nbr-logformat.md) -- sie duerfen nicht verwechselt werden: "
+        "**Firmware-`<verdict>`** fragt, ob AUSSER MIR jemand diesen Nachbarn "
+        "hoert (Sicht: Nachbar als Gehoerter); **eigenes Urteil / "
+        "Firmware-`<meshneed>`** fragt, ob DIESER Nachbar Knoten hoert, die "
+        "sonst niemand hoert (Sicht: Nachbar als Hoerer). Nur die zweite "
+        "Spalte wird unten verglichen, `<verdict>` steht nur zur Information "
+        "daneben."
+    )
+    if not res["eigener_rufzeichen_bekannt"]:
+        out.append("")
+        out.append(
+            "**Eigener Rufname unbekannt** (keine SNAP-Zeile im Mitschnitt) -- "
+            "die Fund-2b-Filterung (eigener Call raus aus jeder gehoerten "
+            "Menge) konnte nicht angewendet werden, das Urteil unten ist damit "
+            "mit Vorsicht zu lesen."
+        )
     out.append("")
     out.append(
         _md_table(
-            ["Rufzeichen", "eigenes Urteil", "exklusive Knoten", "Firmware-Urteil", "Snapshot up", "Uebereinstimmung"],
+            ["Rufzeichen", "eigenes Urteil", "unabgedeckte Knoten", "Firmware-`<meshneed>`", "Uebereinstimmung", "Firmware-`<verdict>` (nur Info)"],
             [
                 [
                     r["rufzeichen"], r["eigenes_urteil"], ", ".join(r["exklusive_knoten"]) or "-",
-                    r["firmware_urteil"] or "(nicht in Tabelle)", r["firmware_snapshot_up"],
+                    r["firmware_meshneed"] or "(nicht in Tabelle)",
                     "ja" if r["uebereinstimmung"] is True else ("nein" if r["uebereinstimmung"] is False else "n/a"),
+                    r["firmware_verdict"] or "(nicht in Tabelle)",
                 ]
                 for r in urt["je_nachbar"]
             ],
         )
     )
     out.append("")
-    out.append("### Abweichungen eigenes Urteil <-> Firmware-`<verdict>`")
+    out.append("### Abweichungen eigenes Urteil <-> Firmware-`<meshneed>`")
     out.append("")
     if urt["abweichungen"]:
         out.append(
             _md_table(
-                ["Rufzeichen", "eigenes Urteil", "Firmware-Urteil"],
-                [[r["rufzeichen"], r["eigenes_urteil"], r["firmware_urteil"] or "(nicht in Tabelle)"] for r in urt["abweichungen"]],
+                ["Rufzeichen", "eigenes Urteil", "Firmware-`<meshneed>`"],
+                [[r["rufzeichen"], r["eigenes_urteil"], r["firmware_meshneed"] or "(nicht in Tabelle)"] for r in urt["abweichungen"]],
+            )
+        )
+    else:
+        out.append("Keine.\n")
+
+    out.append("### Nicht vergleichbar")
+    out.append("")
+    if urt.get("nicht_vergleichbar"):
+        out.append(
+            "Kein Widerspruch, sondern nichts zum Vergleichen: kein Snapshot, ein Mitschnitt "
+            "aus der Zeit vor dem `<meshneed>`-Feld, oder der Nachbar stand zum "
+            "Snapshot-Zeitpunkt gar nicht in der Matrix. Der letzte Fall ist Tabellendruck "
+            "und gehoert zu Abschnitt 6.\n"
+        )
+        out.append(
+            _md_table(
+                ["Rufzeichen", "eigenes Urteil", "Firmware-`<meshneed>`"],
+                [[r["rufzeichen"], r["eigenes_urteil"],
+                  r["firmware_meshneed"] or "(nicht in Tabelle)"] for r in urt["nicht_vergleichbar"]],
+            )
+        )
+    else:
+        out.append("Keine.\n")
+
+    deck = res["4b_deckung"]
+    out.append("## 4b. Deckungsmenge und wechselseitig redundante Gruppen")
+    out.append("")
+    out.append(
+        "Die paarweise Rechnung aus Abschnitt 4 beantwortet nur \"ist DIESER "
+        "eine Nachbar verzichtbar, wenn alle anderen bleiben?\". Hoeren zwei "
+        "Nachbarn exakt dieselbe (sonst von niemandem gehoerte) Menge, gilt "
+        "in dieser Rechnung jeder fuer sich als redundant -- schaltet man "
+        "aber beide ab, fehlt die Menge. Dieser Abschnitt macht das explizit."
+    )
+    out.append("")
+    out.append(
+        f"- Universum (von irgendeinem Nachbarn gehoert, von mir nicht "
+        f"direkt): {deck['universum_groesse']} Knoten."
+    )
+    out.append(
+        f"- Minimale Deckungsmenge (Greedy, **nicht beweisbar minimal** -- "
+        f"Set Cover ist NP-schwer, das ist eine obere Schranke): "
+        f"{', '.join(deck['deckungsmenge']) or '(keine noetig)'} "
+        f"({deck['deckungsmenge_groesse']} Nachbar(n))."
+    )
+    out.append("")
+    out.append("### Wechselseitig redundante Gruppen")
+    out.append("")
+    if deck["wechselseitig_redundante_gruppen"]:
+        out.append(
+            "**Warnung, kein Freibrief:** jeder Nachbar in einer Gruppe gilt "
+            "einzeln als redundant, aber nicht alle gleichzeitig abschaltbar "
+            "-- mindestens einer muss bleiben, sonst fehlen die gemeinsamen Knoten."
+        )
+        out.append("")
+        out.append(
+            _md_table(
+                ["Nachbarn", "gemeinsame Knoten (Grund der Abhaengigkeit)"],
+                [
+                    [", ".join(g["nachbarn"]), ", ".join(g["gemeinsame_knoten"])]
+                    for g in deck["wechselseitig_redundante_gruppen"]
+                ],
             )
         )
     else:
@@ -1067,17 +1359,32 @@ def run_self_test() -> int:
     _check("24h ME97 rssi_min", nb["DK5EN-97"]["rssi_min"], -95, failures)
 
     urt = {row["rufzeichen"]: row for row in res["4_urteil"]["je_nachbar"]}
+    # Diese Fixture ist komplett im ALTEN ROW-Format (kein <meshneed>) --
+    # firmware_meshneed ist deshalb fuer jede Zeile None und uebereinstimmung
+    # entsprechend nirgends True. firmware_verdict (informativ, <verdict>)
+    # bleibt unabhaengig davon vorhanden, wo die Zeile in einem Snapshot war.
     _check("24h urteil 93", urt["DK5EN-93"]["eigenes_urteil"], "exklusiv", failures)
     _check("24h urteil 93 exkl-knoten", urt["DK5EN-93"]["exklusive_knoten"], ["OE9ZZZ-5"], failures)
-    _check("24h urteil 93 firmware", urt["DK5EN-93"]["firmware_urteil"], "EXCL", failures)
-    _check("24h urteil 93 match", urt["DK5EN-93"]["uebereinstimmung"], True, failures)
+    _check("24h urteil 93 firmware_verdict", urt["DK5EN-93"]["firmware_verdict"], "EXCL", failures)
+    _check("24h urteil 93 firmware_meshneed", urt["DK5EN-93"]["firmware_meshneed"], None, failures)
+    _check("24h urteil 93 match", urt["DK5EN-93"]["uebereinstimmung"], None, failures)
     _check("24h urteil 95", urt["DK5EN-95"]["eigenes_urteil"], "redundant", failures)
-    _check("24h urteil 95 firmware", urt["DK5EN-95"]["firmware_urteil"], "RED", failures)
-    _check("24h urteil 95 match", urt["DK5EN-95"]["uebereinstimmung"], True, failures)
+    _check("24h urteil 95 firmware_verdict", urt["DK5EN-95"]["firmware_verdict"], "RED", failures)
+    _check("24h urteil 95 firmware_meshneed", urt["DK5EN-95"]["firmware_meshneed"], None, failures)
+    _check("24h urteil 95 match", urt["DK5EN-95"]["uebereinstimmung"], None, failures)
     _check("24h urteil 97", urt["DK5EN-97"]["eigenes_urteil"], "redundant", failures)
-    _check("24h urteil 97 firmware", urt["DK5EN-97"]["firmware_urteil"], None, failures)
+    _check("24h urteil 97 firmware_verdict", urt["DK5EN-97"]["firmware_verdict"], None, failures)
     _check("24h urteil 97 match", urt["DK5EN-97"]["uebereinstimmung"], None, failures)
-    _check("24h abweichungen", len(res["4_urteil"]["abweichungen"]), 1, failures)
+    # Diese Fixture ist komplett im alten ROW-Format: es gibt nichts zu
+    # vergleichen, also NULL Widersprueche und drei nicht vergleichbare Zeilen.
+    _check("24h abweichungen", len(res["4_urteil"]["abweichungen"]), 0, failures)
+    _check("24h nicht vergleichbar", len(res["4_urteil"]["nicht_vergleichbar"]), 3, failures)
+
+    # Rueckwaerts-Kompatibilitaet: diese Fixture stammt aus der Zeit vor dem
+    # <meshneed>-Feld -- jede ROW-Zeile hat nur 6 statt 7 Felder und muss
+    # trotzdem sauber parsen, mit meshneed=None statt einem Fehler.
+    if state.snaps and state.snaps[0].rows_entries:
+        _check("24h alt-format meshneed", state.snaps[0].rows_entries[0].meshneed, None, failures)
 
     dr = res["6_tabellendruck"]
     _check("24h rows_max", dr["rows_max"], 21, failures)
@@ -1132,22 +1439,96 @@ def run_self_test() -> int:
     if state_c.snaps:
         _check("corrupt snap rows_entries", len(state_c.snaps[0].rows_entries), 2, failures)
 
-    # -- 3) handkonstruiertes Beispiel: genau ein exklusiver, genau ein
-    #    redundanter Nachbar, gegen das eigene und das Firmware-Urteil --
+    # -- 3) handkonstruiertes Beispiel fuer Abschnitt 4 (Betreiberfrage
+    #    MESH/RED gegen Firmware-<meshneed>) und 4b (Deckungsmenge /
+    #    wechselseitig redundante Gruppen). Die vollstaendige Handrechnung
+    #    steht als Kommentarkopf in nbr_sample_verdict.log; hier nur die
+    #    Werte, die daraus folgen.
     state_v = parse_files([TESTDATA_DIR / "nbr_sample_verdict.log"])
     res_v = analyze(state_v)
-    urt_v = res_v["4_urteil"]["je_nachbar"]
-    n_excl_v = [row for row in urt_v if row["eigenes_urteil"] == "exklusiv"]
-    n_red_v = [row for row in urt_v if row["eigenes_urteil"] == "redundant"]
+
+    # Rueckwaerts-Kompatibilitaet (Fund 1): der erste (aeltere) Snapshot hat
+    # keine <meshneed>-Spalte -- muss sauber als None durchgehen, kein Fehler.
+    _check("verdict snap count", len(state_v.snaps), 2, failures)
+    if len(state_v.snaps) >= 1 and len(state_v.snaps[0].rows_entries) >= 2:
+        old_row = state_v.snaps[0].rows_entries[1]
+        _check("verdict alt-format call", old_row.call, "DK5EN-93", failures)
+        _check("verdict alt-format meshneed", old_row.meshneed, None, failures)
+        _check("verdict alt-format verdict", old_row.verdict, "EXCL", failures)
+
+    # NA: OE1AAA-1 ist kein direkter Nachbar (keine ME-Zeile) -- meshneed=NA
+    # muss unveraendert durchgereicht werden und darf nicht in Abschnitt 4
+    # (nur direkte Nachbarn) auftauchen.
+    if len(state_v.snaps) >= 2:
+        new_rows = {r.call: r for r in state_v.snaps[1].rows_entries}
+        _check("verdict OE1AAA-1 meshneed", new_rows["OE1AAA-1"].meshneed, "NA", failures)
+        _check("verdict OE1AAA-1 verdict", new_rows["OE1AAA-1"].verdict, "RED", failures)
+
+    urt_v = {row["rufzeichen"]: row for row in res_v["4_urteil"]["je_nachbar"]}
+    _check("verdict anzahl nachbarn", len(urt_v), 6, failures)
+    _check("verdict OE1AAA-1 nicht in urteil", "OE1AAA-1" in urt_v, False, failures)
+
+    # DK5EN-93: H={OE9ZZZ-5, OE1AAA-1, DK5EN-95}. OE1AAA-1 gedeckt durch
+    # H(DK5EN-95); DK5EN-95 selbst liegt in own_heard; OE9ZZZ-5 bleibt
+    # unabgedeckt -> exklusiv/MESH. Fund 2b: EDGE DK5EN-98->DK5EN-93 (eigener
+    # Call als Hoerer) darf in h_n NICHT auftauchen.
+    _check("verdict 93 h_n", urt_v["DK5EN-93"]["h_n"], ["DK5EN-95", "OE1AAA-1", "OE9ZZZ-5"], failures)
+    _check("verdict 93 eigenes_urteil", urt_v["DK5EN-93"]["eigenes_urteil"], "exklusiv", failures)
+    _check("verdict 93 exklusive_knoten", urt_v["DK5EN-93"]["exklusive_knoten"], ["OE9ZZZ-5"], failures)
+    _check("verdict 93 firmware_meshneed", urt_v["DK5EN-93"]["firmware_meshneed"], "MESH", failures)
+    _check("verdict 93 firmware_verdict", urt_v["DK5EN-93"]["firmware_verdict"], "EXCL", failures)
+    _check("verdict 93 match", urt_v["DK5EN-93"]["uebereinstimmung"], True, failures)
+
+    # Fund 3: DK5EN-94 und DK5EN-96 hoeren beide NUR OE2BBB-9 und sonst
+    # niemand -- jeder einzeln redundant, aber verdict=EXCL (niemand ausser
+    # mir hoert SIE selbst) waehrend meshneed=RED (was SIE hoeren, ist
+    # gedeckt) -- genau die Divergenz aus Fund 1.
+    _check("verdict 94 eigenes_urteil", urt_v["DK5EN-94"]["eigenes_urteil"], "redundant", failures)
+    _check("verdict 94 firmware_verdict", urt_v["DK5EN-94"]["firmware_verdict"], "EXCL", failures)
+    _check("verdict 94 match", urt_v["DK5EN-94"]["uebereinstimmung"], True, failures)
+    _check("verdict 96 eigenes_urteil", urt_v["DK5EN-96"]["eigenes_urteil"], "redundant", failures)
+    _check("verdict 96 firmware_verdict", urt_v["DK5EN-96"]["firmware_verdict"], "EXCL", failures)
+    _check("verdict 96 match", urt_v["DK5EN-96"]["uebereinstimmung"], True, failures)
+
+    # Fund 2a: DK5EN-99 hoert nur DK5EN-97, den ich selbst direkt (ME) hoere
+    # -- das allein deckt ihn, unabhaengig von anderen Nachbarn.
+    _check("verdict 99 h_n", urt_v["DK5EN-99"]["h_n"], ["DK5EN-97"], failures)
+    _check("verdict 99 eigenes_urteil", urt_v["DK5EN-99"]["eigenes_urteil"], "redundant", failures)
+    _check("verdict 99 match", urt_v["DK5EN-99"]["uebereinstimmung"], True, failures)
+
+    # DK5EN-97: H ist leer -> per Definition redundant/RED. Die ROW-Zeile
+    # traegt bewusst das falsche <meshneed>=MESH, um die Abweichungs-
+    # Erkennung zu pruefen -- das MUSS als Abweichung auftauchen.
+    _check("verdict 97 h_n", urt_v["DK5EN-97"]["h_n"], [], failures)
+    _check("verdict 97 eigenes_urteil", urt_v["DK5EN-97"]["eigenes_urteil"], "redundant", failures)
+    _check("verdict 97 firmware_meshneed", urt_v["DK5EN-97"]["firmware_meshneed"], "MESH", failures)
+    _check("verdict 97 match", urt_v["DK5EN-97"]["uebereinstimmung"], False, failures)
+
+    n_excl_v = [r for r in urt_v.values() if r["eigenes_urteil"] == "exklusiv"]
+    n_red_v = [r for r in urt_v.values() if r["eigenes_urteil"] == "redundant"]
     _check("verdict anzahl exklusiv", len(n_excl_v), 1, failures)
-    _check("verdict anzahl redundant", len(n_red_v), 1, failures)
-    if n_excl_v:
-        _check("verdict exklusiv rufzeichen", n_excl_v[0]["rufzeichen"], "DK5EN-93", failures)
-        _check("verdict exklusiv knoten", n_excl_v[0]["exklusive_knoten"], ["OE9ZZZ-5"], failures)
-        _check("verdict exklusiv match firmware", n_excl_v[0]["uebereinstimmung"], True, failures)
-    if n_red_v:
-        _check("verdict redundant rufzeichen", n_red_v[0]["rufzeichen"], "DK5EN-95", failures)
-        _check("verdict redundant match firmware", n_red_v[0]["uebereinstimmung"], True, failures)
+    _check("verdict anzahl redundant", len(n_red_v), 5, failures)
+    _check("verdict abweichungen anzahl", len(res_v["4_urteil"]["abweichungen"]), 1, failures)
+    if res_v["4_urteil"]["abweichungen"]:
+        _check(
+            "verdict abweichung rufzeichen",
+            res_v["4_urteil"]["abweichungen"][0]["rufzeichen"],
+            "DK5EN-97",
+            failures,
+        )
+
+    # 4b: minimale Deckungsmenge (Greedy, siehe Handrechnung im Fixture-Kopf)
+    # und die eine wechselseitig redundante Gruppe (Fund 3).
+    deck_v = res_v["4b_deckung"]
+    _check("verdict universum_groesse", deck_v["universum_groesse"], 3, failures)
+    _check("verdict deckungsmenge", deck_v["deckungsmenge"], ["DK5EN-93", "DK5EN-94"], failures)
+    _check("verdict deckungsmenge_groesse", deck_v["deckungsmenge_groesse"], 2, failures)
+    _check(
+        "verdict wechselseitig redundante gruppen",
+        deck_v["wechselseitig_redundante_gruppen"],
+        [{"nachbarn": ["DK5EN-94", "DK5EN-96"], "gemeinsame_knoten": ["OE2BBB-9"]}],
+        failures,
+    )
 
     # -- 4) --fetch --dry-run darf das Netz nie anfassen --
     import unittest.mock as mock

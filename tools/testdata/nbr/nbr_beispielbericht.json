@@ -40,6 +40,7 @@
     "anzahl_luecken": 2
   },
   "eigener_rufzeichen": "DK5EN-98",
+  "eigener_rufzeichen_bekannt": true,
   "2_nachbarschaft": {
     "anzahl_direkte_nachbarn": 3,
     "je_nachbar": [
@@ -128,40 +129,94 @@
       {
         "rufzeichen": "DK5EN-93",
         "eigenes_urteil": "exklusiv",
+        "eigenes_meshneed": "MESH",
+        "h_n": [
+          "OE1AAA-1",
+          "OE9ZZZ-5"
+        ],
         "exklusive_knoten": [
           "OE9ZZZ-5"
         ],
-        "firmware_urteil": "EXCL",
+        "firmware_meshneed": null,
+        "firmware_verdict": "EXCL",
         "firmware_snapshot_up": 290,
-        "uebereinstimmung": true
+        "uebereinstimmung": null
       },
       {
         "rufzeichen": "DK5EN-95",
         "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [
+          "OE1AAA-1"
+        ],
         "exklusive_knoten": [],
-        "firmware_urteil": "RED",
+        "firmware_meshneed": null,
+        "firmware_verdict": "RED",
         "firmware_snapshot_up": 290,
-        "uebereinstimmung": true
+        "uebereinstimmung": null
       },
       {
         "rufzeichen": "DK5EN-97",
         "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [],
         "exklusive_knoten": [],
-        "firmware_urteil": null,
+        "firmware_meshneed": null,
+        "firmware_verdict": null,
         "firmware_snapshot_up": null,
         "uebereinstimmung": null
       }
     ],
     "abweichungen": [
       {
+        "rufzeichen": "DK5EN-93",
+        "eigenes_urteil": "exklusiv",
+        "eigenes_meshneed": "MESH",
+        "h_n": [
+          "OE1AAA-1",
+          "OE9ZZZ-5"
+        ],
+        "exklusive_knoten": [
+          "OE9ZZZ-5"
+        ],
+        "firmware_meshneed": null,
+        "firmware_verdict": "EXCL",
+        "firmware_snapshot_up": 290,
+        "uebereinstimmung": null
+      },
+      {
+        "rufzeichen": "DK5EN-95",
+        "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [
+          "OE1AAA-1"
+        ],
+        "exklusive_knoten": [],
+        "firmware_meshneed": null,
+        "firmware_verdict": "RED",
+        "firmware_snapshot_up": 290,
+        "uebereinstimmung": null
+      },
+      {
         "rufzeichen": "DK5EN-97",
         "eigenes_urteil": "redundant",
+        "eigenes_meshneed": "RED",
+        "h_n": [],
         "exklusive_knoten": [],
-        "firmware_urteil": null,
+        "firmware_meshneed": null,
+        "firmware_verdict": null,
         "firmware_snapshot_up": null,
         "uebereinstimmung": null
       }
     ]
+  },
+  "4b_deckung": {
+    "universum_groesse": 2,
+    "deckungsmenge": [
+      "DK5EN-93"
+    ],
+    "deckungsmenge_groesse": 1,
+    "wechselseitig_redundante_gruppen": []
   },
   "5_stabilitaet": {
     "je_nachbar": [

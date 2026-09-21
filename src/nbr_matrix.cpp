@@ -456,12 +456,35 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
     for (int i = 0; i < 8; i++)
         row_idx[i] = -1;
 
-    // Erst ALLE Fenster-Zeilen lesend planen (M1), danach erst committen --
-    // siehe nbrPlanRow(). Scheitert die Planung fuer ein Fenster-Rufzeichen,
-    // ist noch keine einzige Zeile angefasst, der Frame wird ganz verworfen.
+    // M2 (Advisor-Fund 2026-09-21): erst ALLE Fenster-Token, die schon eine
+    // Zeile haben, per nbrFind() aufloesen und ihren Index SOFORT in
+    // protected_mask eintragen -- nbrPlanRow() prueft protected_mask nur in
+    // seiner Frei- und seiner Opferschleife, nicht beim Treffer auf eine
+    // bereits bestehende Zeile (dessen erste Schleife). Ohne diese Reihen-
+    // folge koennte die Planung eines NOCH UNBEKANNTEN Fenster-Rufzeichens
+    // genau die Zeile eines ANDEREN, im selben Frame ebenfalls vorkommenden
+    // Rufzeichens als "aeltestes Opfer" waehlen: beide Token committen dann
+    // auf denselben Index, der zweite Treffer faellt auf die Diagonale, und
+    // der urspruengliche Zeileninhaber verliert seine Zeile komplett.
     uint32_t protected_mask = 0;
     for (int i = start; i < ntok; i++)
     {
+        int idx = nbrFind(m, tokens[i]);
+        if (idx < 0)
+            continue;
+        row_idx[i] = idx;
+        protected_mask |= (1u << (unsigned)idx);
+    }
+
+    // Erst danach fuer die noch unbekannten Fenster-Token (row_idx[i] noch
+    // -1) neue Zeilen lesend planen (M1, siehe nbrPlanRow()) -- geschuetzt
+    // gegen die oben bereits vergebenen Indizes UND gegeneinander. Scheitert
+    // die Planung fuer ein Rufzeichen, ist noch keine einzige Zeile
+    // angefasst, der Frame wird ganz verworfen.
+    for (int i = start; i < ntok; i++)
+    {
+        if (row_idx[i] >= 0)
+            continue;
         int idx = nbrPlanRow(m, tokens[i], now_min, protected_mask);
         if (idx < 0)
         {
@@ -476,9 +499,11 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
 
     // Regel 3 (Gratis-Erweiterung): ein Token VOR dem Fenster bekommt NIE
     // eine neue Zeile, aber wenn es schon eine hat, loesen wir sie hier NUR
-    // LESEND auf (nbrFind(), kein nbrPlanRow()/nbrCommitRow()) -- das kann
-    // aus einem frueheren Frame stammen oder, fuer i == start-1, aus dem
-    // Fenster-Commit von eben (dessen erstes Token).
+    // LESEND auf (nbrFind(), kein nbrPlanRow()/nbrCommitRow()) -- auch fuer
+    // i == start-1 (das Token direkt vor dem Fenster) kann das nur eine
+    // Zeile aus einem FRUEHEREN Frame sein: der Fenster-Commit von eben legt
+    // Zeilen ausschliesslich fuer tokens[start..ntok-1] an, tokens[start-1]
+    // gehoert nicht dazu.
     for (int i = 0; i < start; i++)
         row_idx[i] = nbrFind(m, tokens[i]);
 
@@ -489,8 +514,19 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
         if (x < 0 || y < 0)
             continue; // ausserhalb des Fensters ohne zwei bestehende Zeilen: keine Kante
         nbrHitCell(m.cells[x][y], type, now_min);
-        m.rows[x].last_min = now_min;
-        m.rows[y].last_min = now_min;
+        // Nur eine Kante INNERHALB des 2-Hop-Fensters (i >= start) darf die
+        // beteiligten Zeilen verjuengen. Eine Gratis-Kante (Regel 3, i <
+        // start) trifft zwar die Zelle oben, laesst die Zeilen aber in Ruhe
+        // altern -- sonst wuerde ein Knoten, der nur noch tief in fremden
+        // Pfaden auftaucht, bei jedem solchen Frame verjuengt, nie ueber
+        // NBR_WINDOW_MIN hinaus altern und dauerhaft einen Slot belegen,
+        // ohne je selbst wieder direkt gehoert zu werden (Advisor-Fund
+        // 2026-09-21).
+        if (i >= start)
+        {
+            m.rows[x].last_min = now_min;
+            m.rows[y].last_min = now_min;
+        }
         nbrLogEdge(now_min, tokens[i], tokens[i + 1], type, m.cells[x][y]);
         hits++;
     }
@@ -626,6 +662,47 @@ static const char *nbrRowVerdict(const NbrMatrix &m, int x, uint16_t now_min)
     return nbrRowExclusive(m, x, now_min) ? "EXCL" : "RED";
 }
 
+// Betreiberfrage (Advisor-Pass 2026-09-21, siehe nbr_matrix.h): die Sicht
+// auf row als HOERER, nicht als Gehoerten. row muss selbst meshen, wenn es
+// mindestens ein X gibt, das row gehoert hat, aber weder ich selbst noch
+// ein anderer direkt gehoerter Nachbar frisch hoeren.
+const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    if (row <= 0 || row >= NBR_MAX_ROWS)
+        return "NA";
+    if (!nbrHeardDirectly(m, row, now_min))
+        return "NA"; // row ist kein frisch direkt gehoerter Nachbar
+
+    for (int x = 0; x < NBR_MAX_ROWS; x++)
+    {
+        if (x == row || x == 0)
+            continue; // H(row) ohne row selbst und ohne meine eigene Zeile
+
+        const NbrCell &c_heard = m.cells[x][row];
+        if (!(nbrCellSet(c_heard) && nbrFresh(c_heard.last_min, now_min)))
+            continue; // row hat X nicht (mehr frisch) gehoert
+
+        if (nbrHeardDirectly(m, x, now_min))
+            continue; // ich selbst hoere X frisch direkt -> abgedeckt
+
+        bool covered_by_peer = false;
+        for (int mrow = 1; mrow < NBR_MAX_ROWS; mrow++)
+        {
+            if (mrow == row || !nbrHeardDirectly(m, mrow, now_min))
+                continue; // M muss selbst ein frisch direkt gehoerter Nachbar sein
+            const NbrCell &c_peer = m.cells[x][mrow];
+            if (nbrCellSet(c_peer) && nbrFresh(c_peer.last_min, now_min))
+            {
+                covered_by_peer = true;
+                break;
+            }
+        }
+        if (!covered_by_peer)
+            return "MESH"; // X ist von keinem anderweitig abgedeckt
+    }
+    return "RED"; // jedes X aus H(row) ist anderweitig abgedeckt (oder H(row) ist leer)
+}
+
 float nbrDistKm(float lat1, float lon1, float lat2, float lon2)
 {
     const double R = 6371.0;
@@ -751,9 +828,9 @@ void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
             continue;
         unsigned age = (unsigned)nbrRowAgeMin(m, i, now_min);
         unsigned hearers = (unsigned)nbrHearers(m, i, now_min, NULL, 0);
-        snprintf(buf, sizeof(buf), "[NBR]|ROW|%u|%d|%s|%u|%u|%u|%s",
+        snprintf(buf, sizeof(buf), "[NBR]|ROW|%u|%d|%s|%u|%u|%u|%s|%s",
                  (unsigned)now_min, i, m.rows[i].call, (unsigned)m.rows[i].flags,
-                 age, hearers, nbrRowVerdict(m, i, now_min));
+                 age, hearers, nbrRowVerdict(m, i, now_min), nbrRowMeshNeed(m, i, now_min));
         nbrLog(buf);
     }
 

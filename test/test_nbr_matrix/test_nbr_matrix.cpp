@@ -265,6 +265,52 @@ void test_long_path_beyond_two_hop_window_is_accepted_not_rejected(void)
     TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][ieee].cnt_text);
 }
 
+// --- M3: eine bestehende Zeile darf nicht Opfer eines Geschwister-Tokens ---
+// --- im selben Frame werden (Advisor-Fund 2026-09-21) -----------------------
+
+void test_existing_row_not_evicted_by_sibling_window_token(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    // Tabelle voll (Zeile 0 + 4 Fremde, NBR_MAX_ROWS=5 in dieser Umgebung).
+    // OE1BBB-2 hat mit last_min=10 die groesste Altersluecke und waere ohne
+    // den Fix das Verdraengungsopfer der Wahl.
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 10);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 20);
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, 30);
+    nbrNoteFrame(m, "OE1EEE-5", ':', NULL, false, -80, 40);
+    int ibbb_before = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(ibbb_before > 0);
+
+    // Pfad "OE1AAA-1,OE1BBB-2": A ist unbekannt, B ist die aelteste
+    // bestehende Zeile. Planung fuer A findet keine freie Zeile und waehlt
+    // (ohne den Fix) die aelteste -- Bs eigene Zeile. Planung fuer B trifft
+    // per Rufzeichen ebenfalls diese Zeile, weil protected_mask dort nicht
+    // geprueft wurde: beide committen auf denselben Index, A verdraengt B,
+    // B verdraengt A zurueck, und A hat am Ende gar keine Zeile. Mit dem Fix
+    // ist B geschuetzt, sobald es aufgeloest ist -- A verdraengt stattdessen
+    // die naechst-aelteste UNGESCHUETZTE Zeile (hier: OE1CCC-3). Dass dabei
+    // ueberhaupt jemand weicht, ist normale Verdraengung (Tabelle voll) und
+    // kein Fehler -- der Fehler war ausschliesslich, DASS B mitverdraengt
+    // wurde, obwohl es im selben Frame selbst vorkommt.
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 100);
+    TEST_ASSERT_TRUE(hits > 0);
+
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(iaaa >= 0);            // A muss eine eigene Zeile bekommen
+    TEST_ASSERT_EQUAL_INT(ibbb_before, ibbb); // B behaelt genau seinen Index
+    TEST_ASSERT_TRUE(iaaa != ibbb);         // keine gemeinsame Zeile / Diagonale
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text); // A->B normal eingetragen
+
+    // Die naechst-aeltere, UNGESCHUETZTE Zeile (CCC) weicht wie bei jeder
+    // normalen Verdraengung; D und E, juenger als CCC, bleiben unangetastet.
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1CCC-3"));
+    TEST_ASSERT_TRUE(nbrFind(m, "OE1DDD-4") >= 0);
+    TEST_ASSERT_TRUE(nbrFind(m, "OE1EEE-5") >= 0);
+}
+
 // --- M2: 16-Bit-Ueberlauf darf keine tote Zelle wiederbeleben ---------------
 
 void test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again(void)
@@ -416,6 +462,37 @@ void test_exclusive_rows_per_concept_43_example(void)
     nbrInit(empty, "DK5EN-93", 0);
     n = nbrExclusive(empty, 10, out, 8);
     TEST_ASSERT_EQUAL_INT(-1, n);
+}
+
+// --- 7b: Betreiberfrage nbrRowMeshNeed() (Advisor-Pass 2026-09-21) ----------
+
+void test_mesh_need_answers_the_opposite_question_from_exclusive(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    // AAA und BBB direkt gehoert (Ein-Token-Pfad setzt cells[X][0]).
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5);
+    // CCC bekommt eine Zeile, aber NICHT direkt: letzter Hop ist AAA (schon
+    // eine bestehende Zeile), die Kante CCC->AAA traegt nur "AAA hat CCC
+    // gehoert" ein, cells[CCC][0] bleibt ungesetzt.
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, 5);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    int iccc = nbrFind(m, "OE1CCC-3");
+
+    const uint16_t now = 10;
+
+    TEST_ASSERT_EQUAL_STRING("NA", nbrRowMeshNeed(m, 0, now));      // Zeile 0: Frage nicht gestellt
+    TEST_ASSERT_EQUAL_STRING("NA", nbrRowMeshNeed(m, iccc, now));   // CCC ist kein direkter Nachbar
+    TEST_ASSERT_EQUAL_STRING("MESH", nbrRowMeshNeed(m, iaaa, now)); // AAA hoert CCC exklusiv
+    TEST_ASSERT_EQUAL_STRING("RED", nbrRowMeshNeed(m, ibbb, now));  // BBB hoert niemanden -> H(BBB) leer
+
+    // BBB hoert CCC jetzt auch mit -> AAA ist nicht mehr die einzige Deckung
+    // fuer CCC, AAAs Meshen ist nicht mehr noetig. Das <verdict> (Sicht auf
+    // CCC als Gehoerten) bleibt davon unberuehrt -- andere Frage.
+    m.cells[iccc][ibbb].cnt_text = 1; m.cells[iccc][ibbb].last_min = now;
+    TEST_ASSERT_EQUAL_STRING("RED", nbrRowMeshNeed(m, iaaa, now));
 }
 
 // --- 8: Reichweite -----------------------------------------------------------
@@ -589,6 +666,39 @@ void test_hey_groups_only_apply_within_window_or_existing_rows(void)
     TEST_ASSERT_EQUAL_INT8(-99, m.cells[iccc][iddd].rssi);   // dritte Gruppe (C->D) kam an
 }
 
+// --- 14: Vor-Fenster-Kanten duerfen Zeilen nicht verjuengen -----------------
+// --- (Advisor-Fund 2026-09-21) ----------------------------------------------
+
+void test_pre_window_edge_does_not_refresh_row_age(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    // X bekommt frueh eine eigene Zeile ueber echten Direktempfang.
+    nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 10);
+    int ix = nbrFind(m, "OE1XXX-9");
+    TEST_ASSERT_TRUE(ix > 0);
+    nbrNoteFrame(m, "OE1YYY-8", ':', NULL, false, -80, 10);
+
+    // Ab jetzt taucht X nur noch als Vor-Fenster-Token auf: Pfad
+    // X,Y,C,D mit C,D als 2-Hop-Fenster (start=2). Die Paare (X,Y) und
+    // (Y,C) haben Index < start, sind also Gratis-Kanten (Regel 3) --
+    // sie treffen die Zelle, duerfen aber Xs (und Ys) Zeilenalter nicht
+    // anfassen. Wiederholt, bis mehr als NBR_WINDOW_MIN seit Xs letzter
+    // ECHTER Zeilenberuehrung (t=10) vergangen ist.
+    uint16_t t = 10;
+    for (int i = 0; i < 8; i++)
+    {
+        t = (uint16_t)(t + 100);
+        nbrNoteFrame(m, "OE1XXX-9,OE1YYY-8,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, t);
+    }
+    TEST_ASSERT_TRUE((uint16_t)(t - 10) > NBR_WINDOW_MIN); // Testaufbau: Fenster sicher ueberschritten
+
+    // X wurde in jedem dieser Frames als Zellentreffer beruehrt, aber nie
+    // als Zeile verjuengt -- die Zeile muss aus der Frische gefallen sein.
+    TEST_ASSERT_FALSE(nbrFresh(m.rows[ix].last_min, t));
+}
+
 // --- 13: Log-Emitter (docs/nbr-logformat.md) ---------------------------------
 
 static char g_log_buf[4096];
@@ -683,6 +793,29 @@ void test_log_snapshot_emits_snap_row_per_used_row_and_endsnap(void)
     }
     TEST_ASSERT_EQUAL_INT(3, row_lines);   // Zeile 0 + AAA + BBB
 
+    // <meshneed> ist die LETZTE Spalte, nach dem unveraenderten <verdict>
+    // (docs/nbr-logformat.md). AAA hoert niemanden -> H(AAA) leer -> RED,
+    // obwohl <verdict> EXCL ist (ich bin AAAs einziger Hoerer) -- die
+    // beiden Felder duerfen genau das auseinanderfallen. Nur die letzten
+    // beiden Felder werden geprueft, um die Zeile nicht an <flags>/<age>/
+    // <hearers> festzunageln.
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    char prefix_aaa[48];
+    snprintf(prefix_aaa, sizeof(prefix_aaa), "[NBR]|ROW|20|%d|OE1AAA-1|", iaaa);
+    const char *row_aaa = strstr(g_log_buf, prefix_aaa);
+    TEST_ASSERT_NOT_NULL(row_aaa);
+    const char *eol_aaa = strchr(row_aaa, '\n');
+    TEST_ASSERT_NOT_NULL(eol_aaa);
+    TEST_ASSERT_EQUAL_INT(0, strncmp(eol_aaa - 9, "|EXCL|RED", 9));
+
+    // Zeile 0: <verdict> UNK, <meshneed> NA (die Frage ist auf sich selbst
+    // nicht gestellt).
+    const char *row0 = strstr(g_log_buf, "[NBR]|ROW|20|0|DK5EN-93|");
+    TEST_ASSERT_NOT_NULL(row0);
+    const char *eol0 = strchr(row0, '\n');
+    TEST_ASSERT_NOT_NULL(eol0);
+    TEST_ASSERT_EQUAL_INT(0, strncmp(eol0 - 7, "|UNK|NA", 7));
+
     nbrLog = NULL;
 }
 
@@ -697,6 +830,7 @@ int main(int, char **)
     RUN_TEST(test_rejects_leave_matrix_byte_identical);
     RUN_TEST(test_aging_720_min_window_and_stale_reset);
     RUN_TEST(test_eviction_replaces_oldest_row_never_row_zero);
+    RUN_TEST(test_existing_row_not_evicted_by_sibling_window_token);
     RUN_TEST(test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal);
     RUN_TEST(test_long_path_beyond_two_hop_window_is_accepted_not_rejected);
     RUN_TEST(test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again);
@@ -705,6 +839,7 @@ int main(int, char **)
     RUN_TEST(test_note_pos_mesh_false_clears_previously_set_mesh_flag);
     RUN_TEST(test_hearers_returns_total_count_beyond_what_was_written);
     RUN_TEST(test_exclusive_rows_per_concept_43_example);
+    RUN_TEST(test_mesh_need_answers_the_opposite_question_from_exclusive);
     RUN_TEST(test_reach_haversine_distance_and_partner);
     RUN_TEST(test_format_row_contains_callsign_and_hearers);
     RUN_TEST(test_two_hop_window_only_creates_rows_for_last_two_tokens);
@@ -712,6 +847,7 @@ int main(int, char **)
     RUN_TEST(test_rule3_edge_between_two_existing_rows_creates_no_new_row);
     RUN_TEST(test_note_pos_unknown_call_leaves_matrix_untouched_known_call_writes);
     RUN_TEST(test_hey_groups_only_apply_within_window_or_existing_rows);
+    RUN_TEST(test_pre_window_edge_does_not_refresh_row_age);
     RUN_TEST(test_log_emitter_field_sequence_matches_format_doc);
     RUN_TEST(test_log_snapshot_emits_snap_row_per_used_row_and_endsnap);
     return UNITY_END();

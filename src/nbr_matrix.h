@@ -223,6 +223,24 @@ uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, 
 // vorhandenem Empfang.
 int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max);
 
+// Betreiberfrage (Advisor-Pass 2026-09-21, docs/nbr-logformat.md): die Sicht
+// auf row als HOERER, nicht als Gehoerten -- das Gegenstueck zu
+// nbrRowExclusive()/nbrExclusive() oben, das die Sicht auf row als
+// Gehoerten liefert. Beide Urteile beantworten entgegengesetzte Fragen an
+// denselben Kanten und duerfen nicht verglichen werden.
+//
+// "NA" fuer Zeile 0 und jede Zeile, die ich nicht frisch direkt gehoert
+// habe (cells[row][0] nicht gesetzt/frisch) -- fuer sie ist die Frage nicht
+// gestellt. Sonst: H(row) = alle X mit frischer, gesetzter cell[X][row]
+// ("row hat X gehoert"), ohne X == row und ohne X == 0 (dass ein Nachbar
+// mich hoert, macht ihn nicht unverzichtbar). Jedes X aus H(row) gilt als
+// anderweitig abgedeckt, wenn ich X selbst frisch direkt hoere ODER ein
+// anderer frisch direkt gehoerter Nachbar M (M != row, M != 0) X ebenfalls
+// frisch hoert. Bleibt mindestens ein X ohne Abdeckung, liefert die
+// Funktion "MESH" (row muss selbst meshen), sonst "RED" -- eine leere
+// Menge H(row) ist ebenfalls "RED" (row hoert niemanden, den ich brauche).
+const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min);
+
 // --- Reichweite (Konzept 4.4) ----------------------------------------------
 
 // Haversine-Distanz in km, Erdradius 6371.0 km.
@@ -274,6 +292,13 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
 // Beobachtung). Mit frischer cell[row][0] ist es EXCL, wenn kein anderer
 // Knoten in meiner Hoerweite die Zeile ebenfalls frisch hoert (dieselbe
 // Bedingung wie in nbrExclusive()), sonst RED (redundant gedeckt).
+//
+// <meshneed> je ROW, LETZTE Spalte, ist eines aus NA/MESH/RED aus
+// nbrRowMeshNeed() (Advisor-Pass 2026-09-21) -- die Gegenfrage zu
+// <verdict>: nicht "ist MEIN Meshen fuer row noetig", sondern "muss row
+// SELBST meshen, weil sie Knoten hoert, die sonst niemand hoert". Siehe
+// nbrRowMeshNeed() oben fuer die Herleitung; die beiden Felder duerfen
+// nicht miteinander verglichen werden (docs/nbr-logformat.md).
 void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min);
 
 // Eine gemeinsame Instanz fuers Geraet: geschrieben ausschliesslich aus
