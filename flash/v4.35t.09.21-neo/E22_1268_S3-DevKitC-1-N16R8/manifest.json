@@ -1,0 +1,33 @@
+{
+  "name": "MeshCom DevKit ESP32-S3 DevKitC-1 + E22 (SX1268)",
+  "version": "v4.35t.09.21-neo",
+  "new_install_prompt_erase": true,
+  "new_install_improv_wait_time": 0,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "bootloader.bin",
+          "offset": 0
+        },
+        {
+          "path": "partitions.bin",
+          "offset": 32768
+        },
+        {
+          "path": "otadata.bin",
+          "offset": 57344
+        },
+        {
+          "path": "safeboot-s3.bin",
+          "offset": 65536
+        },
+        {
+          "path": "firmware.bin",
+          "offset": 786432
+        }
+      ]
+    }
+  ]
+}
