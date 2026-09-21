@@ -266,26 +266,14 @@ bool rawLogEnsure(void);
 extern int RAWLoRaWrite;
 extern int RAWLoRaRead;
 
-// RINGBUFFER for outgoing UDP lora packets for lora TX
-// R1-03: kept in lockstep with the definition in loop_functions.cpp -- see
-// the comment there for why +1 (not +20) is the true bound.
-extern uint8_t ringBufferUDPout[MAX_RING_UDP][UDP_TX_BUF_SIZE+1];
-extern int udpWrite;
-extern int udpRead;
+// Die drei Ausgangsringe als Byte-Ringe (src/byte_fifo.h); Groessen in
+// configuration_global.h (RING_BYTES_*), Definition in loop_functions.cpp.
+#include "byte_fifo.h"
+extern byte_fifo_t udpOutRing;    // UDP-Ausgang (LoRa -> Gateway)
+extern byte_fifo_t phoneRing;     // BLE-Daten zum Telefon (+4 Byte Zeit je Frame ausser 'D')
+extern byte_fifo_t phoneComRing;  // BLE-Kommandos zum Telefon
 
 extern bool hasMsgFromPhone;
-
-// BLE Ringbuffer to phone
-// R1-01: kept in lockstep with the definition in loop_functions.cpp -- see
-// the comment there for the producer-clamp derivation of these sizes.
-extern unsigned char BLEtoPhoneBuff[MAX_RING][UDP_TX_BUF_SIZE+5];
-extern int toPhoneWrite;
-extern int toPhoneRead;
-
-// BLE Commands Ringbuffer to phone
-extern unsigned char BLEComToPhoneBuff[MAX_RING][246];
-extern int ComToPhoneWrite;
-extern int ComToPhoneRead;
 
 // ringBufferLoraRX/loraWrite werden jetzt in dedup_functions.h deklariert.
 
@@ -494,17 +482,25 @@ extern int iDisplayType;
 #define PAGE_MAX 6
 #endif
 
-extern int pageLine[maxdisplines][3];
+// RAM-Rueckgewinn (2026-09-20): Zeilenkoordinaten als int16_t statt int.
+// Werte sind Pixelkoordinaten (x, y, hoechstens 320) und eine Textlaenge
+// (20); y kann -1 sein, daher vorzeichenbehaftet. Halbiert pageLine und
+// pageLastLine.
+extern int16_t pageLine[maxdisplines][3];
 extern char pageText[maxdisplines][25];
 extern char pageTextLong1[25];
 extern char pageTextLong2[200];
 extern int pageLineAnz;
 
 
-extern int pageLastLine[PAGE_MAX][maxdisplines][3];
+extern int16_t pageLastLine[PAGE_MAX][maxdisplines][3];
 extern char pageLastText[PAGE_MAX][maxdisplines][25];
+// Langtext-Seiten nur auf TFT/E-Paper-Boards, siehe display_pages_cfg.h.
+#include "display_pages_cfg.h"
+#if defined(HAS_LONG_PAGE_TEXT)
 extern char pageLastTextLong1[PAGE_MAX][25];
 extern char pageLastTextLong2[PAGE_MAX][200];
+#endif
 extern int pageLastLineAnz[PAGE_MAX];
 extern int pageLastPointer;
 extern int pagePointer;

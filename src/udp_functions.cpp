@@ -1220,32 +1220,18 @@ void addUdpOutBuffer(uint8_t* buffer, uint16_t len)
     if (len > UDP_TX_BUF_SIZE)
         len = UDP_TX_BUF_SIZE; // just for safety
 
-    // CONC-16: udpWrite/udpRead are plain ints, same class as CONC-15.
-    // addUdpOutBuffer() is reachable from OnRxDone via addNodeData()
+    // CONC-16: addUdpOutBuffer() is reachable from OnRxDone via addNodeData()
     // (lora_functions.cpp) — the FreeRTOS timer-service task on nRF52,
     // priority 2, see C-01 — while sendMeshComUDP() drains the same ring
-    // from the Main Loop task.
-#if defined(NRF52_SERIES)
-    taskENTER_CRITICAL();
-#endif
-    // first byte is always the message length
-    // LoRa/Internal messages send to UDP TX
-    ringBufferUDPout[udpWrite][0] = len;
-    // WF-01: len statt len+1. Gesendet werden ohnehin nur msg_len == len Bytes
-    // (sendMeshComUDP liest die Laenge aus Byte 0), das zusaetzliche Byte war
-    // ein Lesezugriff ein Byte hinter der Nutzlast des Aufrufers. Bei allen
-    // heutigen Aufrufern liegt es noch im Puffer (>= 20 Byte Reserve), also
-    // latent, nicht akut -- aber es gibt keinen Grund, es zu lesen.
-    memcpy(ringBufferUDPout[udpWrite] + 1, buffer, len);
+    // from the Main Loop task. Der Byte-Ring sperrt sich selbst.
+    // WF-01: genau len Bytes, kein Byte hinter der Nutzlast des Aufrufers.
+    int lost = bf_push(&udpOutRing, buffer, (uint8_t)len);
 
-    //printfdeb("UDP out Ringbuffer added element: %u\n", udpWrite);
-    //DEBUG_MSG_VAL("UDP", udpWrite, "UDP Ringbuf added El.:");
-    //neth.printBuffer(ringBufferUDPout[udpWrite], len + 1);
-
-    addRingPointer(udpWrite, udpRead, MAX_RING_UDP, "udp");
-#if defined(NRF52_SERIES)
-    taskEXIT_CRITICAL();
-#endif
+    // DR-21 (Sichtbarkeitsklausel, 2026-09-12 entschieden): der Ausgangsring
+    // war der EINZIGE, dessen Ueberlauf stumm blieb. Der Byte-Ring meldet,
+    // wie viele UNGELESENE Frames die Verdraengung getroffen hat.
+    if(lost > 0 && bLORADEBUG)
+        printfdeb("[MC-DBG] RING_OVERFLOW buf=udp lost=%i\n", lost);
 }
 
 void sendKEEP()

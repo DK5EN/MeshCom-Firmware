@@ -63,3 +63,14 @@ String convertUNIXtoString(uint32_t timestamp) { (void)timestamp; return String(
 // ---- loop_functions_extern.h (globals checkMesh()/checkVia() read)
 bool bGATEWAY = false;
 bool bVIA = false;
+
+// ---- loop_functions.cpp (Kommando-Ring)
+// sendMheard() drosselt sich an phoneComRing, damit es keinen ungelesenen
+// Frame verdraengt. Der Ring selbst wird hier nie gefuellt -- diese Umgebung
+// baut loop_functions.cpp nicht mit --, aber comRingWouldEvictUnread() liest
+// ihn, also braucht der Linker ihn. Vor dem Byte-Ring standen hier die zwei
+// Schlitz-Zeiger, und sie fehlten: native_parsers linkte seit dem
+// MHeard-Umbau (PR #1147) gar nicht mehr, bis 2026-09-21.
+#include "byte_fifo.h"
+static uint8_t phoneComStoreStub[2048];
+byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStoreStub);

@@ -103,6 +103,15 @@ String convertUNIXtoString(uint32_t timestamp) { (void)timestamp; return String(
 bool bGATEWAY = false;
 bool bVIA = false;
 
+// Kommando-Ring: sendMheard() drosselt sich daran (comRingWouldEvictUnread()),
+// damit es keinen ungelesenen Frame verdraengt. Leer angelegt, also greift die
+// Drossel nie -- genau wie frueher der leere Schlitzring. Vor dem Byte-Ring
+// fehlten hier die zwei Schlitz-Zeiger und die Env linkte gar nicht.
+#include "byte_fifo.h"
+static uint8_t phoneComStoreStub[2048];
+byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStoreStub);
+
+
 // mheard_functions.cpp definiert diese Arrays (siehe Datei-Kommentar oben);
 // direkter extern-Zugriff hier ist testinterne Introspektion, keine
 // Wiederholung des NC-02-Antipatterns aus via_functions.cpp/web_functions.cpp.

@@ -814,10 +814,22 @@ bool mheardToPhonePending()
     return mheard_send_cursor >= 0;
 }
 
-static int comRingFree()
+static bool comRingWouldEvictUnread()
 {
-    // ein Slot bleibt frei, sonst waere Write == Read und der Ring gilt als leer
-    return (ComToPhoneRead - ComToPhoneWrite - 1 + MAX_RING) % MAX_RING;
+    // Byte-Ring statt Schlitzfeld: der Kommando-Ring ist nie "voll" --
+    // bf_push() verdraengt notfalls die aeltesten Frames. Die alte Schranke
+    // (comRingFree() == 0) meinte aber genau das, was hier zu vermeiden ist:
+    // nichts mehr nachlegen, sobald der naechste Frame nur noch Platz faende,
+    // indem er einen UNGELESENEN verdraengt. Gelesene Frames liegen nur als
+    // Verlauf herum und duerfen weichen, deshalb bf_unread() und nicht
+    // bf_used().
+    //
+    // Schranke ist der groesste Frame, der hier ueberhaupt in den Ring kommt:
+    // addBLEComToOutBuffer() klemmt jede Laenge auf 245, dazu das Laengenbyte
+    // des Rings. Nicht MAX_MSG_LEN_PHONE (300) -- so lang wird hier nie
+    // geschrieben, und die kleinste Ringklasse (1536 B) haette sonst unnoetig
+    // weniger Durchsatz.
+    return (uint32_t)bf_unread(&phoneComRing) + 1u + 245u > (uint32_t)phoneComRing.cap;
 }
 
 void sendMheard()
@@ -863,9 +875,10 @@ void sendMheard()
 
         if((uint32_t)(millis() - mheardMillis[iset]) < MHEARD_PRUNE_WINDOW_MS)  // mheard last 12 hours (NC-01: millis(), not wall clock)
         {
-            // Ring voll: ohne den Cursor weiterzuschalten zurueck, der
-            // naechste Aufruf nimmt genau diesen Eintrag noch einmal.
-            if(comRingFree() == 0)
+            // Kein Platz mehr, ohne etwas Ungelesenes zu verdraengen: ohne
+            // den Cursor weiterzuschalten zurueck, der naechste Aufruf nimmt
+            // genau diesen Eintrag noch einmal.
+            if(comRingWouldEvictUnread())
                 return;
 
             // R2-01: hier stand die DRITTE Kopie derselben Zerlegung --
