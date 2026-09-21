@@ -8,181 +8,211 @@
         {
           "env": "E22-DevKitC",
           "group": "DevKit",
-          "name": "ESP32 DevKitC + E22 (SX1262)",
+          "name": "ESP32 DevKitC + E22",
+          "radio": "SX1268",
           "chipFamily": "ESP32"
         },
         {
           "env": "E22_1262-DevKitC",
           "group": "DevKit",
           "name": "ESP32 DevKitC + E22-900M22S",
+          "radio": "SX1262",
           "chipFamily": "ESP32"
         },
         {
           "env": "E22_1262_S3-DevKitC-1-N16R8",
           "group": "DevKit",
-          "name": "ESP32-S3 DevKitC-1 + E22 (SX1262)",
+          "name": "ESP32-S3 DevKitC-1 + E22-900M30S",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "E22_1268_S3-DevKitC-1-N16R8",
           "group": "DevKit",
-          "name": "ESP32-S3 DevKitC-1 + E22 (SX1268)",
+          "name": "ESP32-S3 DevKitC-1 + E22-400M30S",
+          "radio": "SX1268",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "E22_XML-DevKitC",
           "group": "DevKit",
           "name": "ESP32 DevKitC + E22 (XML)",
+          "radio": "SX1268",
           "chipFamily": "ESP32"
         },
         {
           "env": "esp32-loraprs-e22",
           "group": "DevKit",
           "name": "LoRa-APRS ESP32 + E22",
+          "radio": "SX1268",
           "chipFamily": "ESP32"
         },
         {
           "env": "esp32-loraprs-ra01",
           "group": "DevKit",
           "name": "LoRa-APRS ESP32 + RA-01",
+          "radio": "SX1276/77/78/79",
           "chipFamily": "ESP32"
         },
         {
           "env": "heltec_wifi_lora_32_V2",
           "group": "Heltec",
           "name": "WiFi LoRa 32 V2",
+          "radio": "SX1276/77/78/79",
           "chipFamily": "ESP32"
         },
         {
           "env": "heltec_wifi_lora_32_V3",
           "group": "Heltec",
           "name": "WiFi LoRa 32 V3",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "heltec_wifi_lora_32_V4",
           "group": "Heltec",
           "name": "WiFi LoRa 32 V4",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "heltec_wireless_stick",
           "group": "Heltec",
           "name": "Wireless Stick V3",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "heltec_wireless_tracker",
           "group": "Heltec",
           "name": "Wireless Tracker",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "LilyGo_T-Beam-1W",
           "group": "LilyGo",
           "name": "T-Beam 1 W",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "T-ETH-ELITE_1262",
           "group": "LilyGo",
-          "name": "T-ETH-Elite (SX1262)",
+          "name": "T-ETH-Elite",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "LilyGo_T3_S3_V1_3",
           "group": "LilyGo",
           "name": "T3-S3 V1.3",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "ttgo-lora32-v21",
           "group": "LilyGo",
           "name": "TTGO LoRa32 V2.1",
+          "radio": "SX1276/77/78/79",
           "chipFamily": "ESP32"
         },
         {
           "env": "ttgo_tbeam",
           "group": "LilyGo",
-          "name": "T-Beam (SX1276)",
+          "name": "T-Beam",
+          "radio": "SX1276/77/78/79",
           "chipFamily": "ESP32"
         },
         {
           "env": "ttgo_tbeam_supreme",
           "group": "LilyGo",
           "name": "T-Beam Supreme",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "ttgo_tbeam_SX1262",
           "group": "LilyGo",
-          "name": "T-Beam (SX1262)",
+          "name": "T-Beam",
+          "radio": "SX1262",
           "chipFamily": "ESP32"
         },
         {
           "env": "ttgo_tbeam_SX1268",
           "group": "LilyGo",
-          "name": "T-Beam (SX1268)",
+          "name": "T-Beam",
+          "radio": "SX1268",
           "chipFamily": "ESP32"
         },
         {
           "env": "LilyGo_T_Connect_Pro",
           "group": "LilyGo",
           "name": "T-Connect Pro",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "t_deck",
           "group": "LilyGo",
           "name": "T-Deck",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "t_deck_plus",
           "group": "LilyGo",
           "name": "T-Deck Plus",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "t_deck_pro",
           "group": "LilyGo",
           "name": "T-Deck Pro",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "vision-master-e213",
           "group": "Heltec",
           "name": "Vision Master E213",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "vision-master-e290",
           "group": "Heltec",
           "name": "Vision Master E290",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "wireless-paper",
           "group": "Heltec",
           "name": "Wireless Paper",
+          "radio": "SX1262",
           "chipFamily": "ESP32-S3"
         },
         {
           "env": "heltec_t114",
           "group": "Heltec",
           "name": "Mesh Node T114",
+          "radio": "SX1262",
           "chipFamily": "NRF52"
         },
         {
           "env": "t_echo",
           "group": "LilyGo",
           "name": "T-Echo",
+          "radio": "SX1262",
           "chipFamily": "NRF52"
         },
         {
           "env": "wiscore_rak4631",
           "group": "RAKwireless",
           "name": "WisBlock RAK4631",
+          "radio": "SX1262",
           "chipFamily": "NRF52"
         }
       ]
