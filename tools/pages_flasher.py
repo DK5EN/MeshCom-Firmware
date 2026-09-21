@@ -30,6 +30,7 @@ import json
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -390,6 +391,31 @@ def cmd_publish(args) -> int:
     return 0
 
 
+def _https_context() -> ssl.SSLContext:
+    """A context with a usable CA store.
+
+    PlatformIO's bundled interpreter is first on PATH in this checkout and
+    ships no root certificates, so the plain default context fails every
+    HTTPS fetch with CERTIFICATE_VERIFY_FAILED. certifi is the fallback.
+    """
+    ctx = ssl.create_default_context()
+    if ctx.cert_store_stats()["x509_ca"]:
+        return ctx
+    try:
+        import certifi
+    except ImportError:
+        raise SystemExit(
+            "no CA certificates: run this with a different interpreter "
+            "(/usr/bin/python3) or install certifi"
+        ) from None
+    return ssl.create_default_context(cafile=certifi.where())
+
+
+def _get(url: str) -> bytes:
+    with urllib.request.urlopen(url, context=_https_context()) as r:
+        return r.read()
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -399,8 +425,7 @@ def cmd_check(args) -> int:
     build_dir = REPO / ".pio" / "build"
     cfg = load_config(REPO)
     bad = 0
-    with urllib.request.urlopen(f"{base}/releases.json") as r:
-        releases = json.load(r)["releases"]
+    releases = json.loads(_get(f"{base}/releases.json"))["releases"]
     rel = next((x for x in releases if x["version"] == args.version), None)
     if rel is None:
         print(f"FAIL releases.json has no {args.version}")
@@ -408,11 +433,9 @@ def cmd_check(args) -> int:
     for b in rel["boards"]:
         env = b["env"]
         url = f"{base}/{args.version}/{env}"
-        with urllib.request.urlopen(f"{url}/manifest.json") as r:
-            manifest = json.load(r)
+        manifest = json.loads(_get(f"{url}/manifest.json"))
         for part in manifest["builds"][0]["parts"]:
-            with urllib.request.urlopen(f"{url}/{part['path']}") as r:
-                remote = r.read()
+            remote = _get(f"{url}/{part['path']}")
             if part["path"] == "firmware.uf2":
                 with tempfile.TemporaryDirectory() as t:
                     local_p = Path(t) / "firmware.uf2"
