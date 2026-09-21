@@ -276,10 +276,33 @@ Built on `fork-neo-test`, published as `v4.35t.09.21-neo`. What deviates from se
 | `releases.json` lists board envs as bare strings         | Lists `{env, group, name, chipFamily}`, so the page needs no vendor or display-name knowledge of its own                                                                                     |
 | `flash-staging/` gate before `flash/`                    | Skipped by operator decision; published straight into `flash/`                                                                                                                               |
 
+### Wave 2, bench (2026-09-21 evening)
+
+Two boards flashed from the live page and verified by reading the flash back over esptool and
+comparing SHA-256 against the shipped artefacts. This is stronger than section 8 asked for: it
+proves the factory partition directly instead of inferring it from the safeboot status page.
+
+| Board                                   | Regions read back                        | Result             |
+| --------------------------------------- | ---------------------------------------- | ------------------ |
+| Heltec V3 (ESP32-S3, 4 MB, erase first) | 0x0, 0x8000, 0xE000, 0x10000, 0xC0000    | all five identical |
+| T-Beam (classic ESP32, erase first)     | 0x1000, 0x8000, 0xE000, 0x10000, 0xC0000 | all five identical |
+
+Both boot into the app, not into safeboot, and report the build stamp of the shipped image.
+After the erase the callsign is the factory `XX0XXX-00` and the node refuses to transmit
+(`[TX];refuse;unconfigured`), which is correct. The T-Beam covers the classic-ESP32 bootloader
+at 0x1000, the one offset the Heltec cannot exercise.
+
+**Finding, fixed the same evening:** the board dropdown named the three T-Beam entries after a
+board revision ("T-Beam v1.1 (SX1276)", "T-Beam v1.2 (SX1262)"). The envs share one board
+definition and differ only in the radio chip, so the labels invented a distinction the code does
+not make. A v1.2 board carrying an SX1276 got the "v1.2" entry and came up with
+`SX1262 chip Initializing ... failed, code -2`. The entries now name the chip alone, and the page
+says so under the board picker. Section 9's "user flashes the wrong board" risk was real, and the
+mitigation was made worse by the display table, not by the mechanism.
+
 Still open:
 
-- Wave 2, the bench flashes on Heltec V3, T-Beam v1.2 and T-Deck. Nothing in section 10 has
-  been confirmed on hardware; the page and the generator are verified, the flash path is not.
+- Wave 2 for the T-Deck: the 16 MB partition table and the SPIFFS mount are unproven on hardware.
 - Section 6's `partitions-16MB.bin` release asset. The flasher no longer needs it -- each board
   folder carries its own table -- but the manual asset set still cannot fully flash a T-Deck.
   Adding it moves the release from 39 to 40 assets and breaks the diff-identical name check in
