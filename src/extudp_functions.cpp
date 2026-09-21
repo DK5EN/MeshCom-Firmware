@@ -471,18 +471,59 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     return;
   }
 
-  // ESP32 Loop-Task-Stack = 8 KB → 1200 B (EXTERN_MSG_JSON_BUF + 500) auf Stack ok.
-  // nRF52 Loop-Task-Stack = 4 KB → BSS, sonst Stack-Overflow Crash bei
-  // sendPosition → sendExtern (siehe Commit 1951aa7d, fix RAK4631).
-#ifdef ESP32
-  char c_json[EXTERN_MSG_JSON_BUF] = {0};
-  char c_tjson[500] = {0};
-#else
+  // P2 (docs/bug-extudp-stack-20260920.md, Fix F2): jetzt auf beiden
+  // Plattformen BSS statt Stack (vorher nur auf nRF52, siehe Commit
+  // 1951aa7d). Grund ESP32: die Kette esp32loop -> getExternUDP -> getExtern
+  // -> sendMessage -> sendExtern -> decodeAPRS -> printfdeb ->
+  // MeshSerial/lwIP-Tail lag mit den Puffern auf dem Stack bei 8 464 B
+  // (tools/stack_budget.py --root getExternUDP gegen das Heltec-V3-Artefakt),
+  // der Loop-Task hatte davor nur 8 192 B (Framework-Default) -- die Kette
+  // passte also nicht; ein Extern-UDP-{"type":"msg"}-Datagramm mit fremdem
+  // Ziel loeste darueber deterministisch einen Reset aus.
+  //
+  // Nach dieser Verschiebung: 7 264 B, also -1 200 B, und das ist genau
+  // EXTERN_MSG_JSON_BUF (700) + 500 -- die beiden Puffer, nichts sonst.
+  // Dieselbe Messung fuer esp32loop: 10 160 -> 8 960 B. Beide Zahlen sind
+  // an DIESEM Baum gemessen, nicht aus neo uebernommen (dort -1 008 B, weil
+  // der Puffer dort anders dimensioniert ist).
+  //
+  // ARDUINO_LOOP_STACK_SIZE steht seit c754d01f auf 12 288 (P1); diese
+  // Verschiebung ist die zweite Haelfte und schafft den Abstand, den
+  // tools/stack_budget.py gegen die Schwelle 11 776 prueft.
+  //
+  // Reentranz auf fork-main geprueft (nicht die Zeilennummern aus neo
+  // uebernommen, hier neu ermittelt): sendExtern() hat fuenf Aufrufer, alle
+  // ausschliesslich im jeweiligen Loop-Task --
+  //   - flushExternQueue() (weiter unten in dieser Datei), aufgerufen aus
+  //     esp32_main.cpp/nrf52_main.cpp direkt in loop().
+  //   - udp_functions.cpp (getMeshComUDPpacket(), ESP32-Gateway-Pfad),
+  //     erreicht nur ueber getMeshComUDP() <- esp32_main.cpp loop().
+  //   - loop_functions.cpp (innerhalb sendMessage()), dessen Aufrufer
+  //     (checkSerialCommand/BLE-Queue in esp32_main.cpp/nrf52_main.cpp,
+  //     command_functions.cpp, web_functions.cpp, t-deck UI, getExtern()
+  //     hier in dieser Datei) laufen alle im Loop-Task -- BLE liefert per
+  //     Queue an den Loop-Task zu, der Webserver ist synchron gepollt.
+  //   - loop_functions.cpp (innerhalb sendPosition()), gleiche Aufruferliste
+  //     wie sendMessage().
+  //   - nrf_eth.cpp (NrfETH::getUDP(), nRF52-Gateway-Pfad), aufgerufen aus
+  //     nrf52_main.cpp direkt in loop().
+  // Der einzige radio-getriebene Einstieg ist OnRxDone() in lora_functions.cpp
+  // (LORA-Task auf nRF52; auf ESP32 je nach Board der Loop-Task ODER eine
+  // eigene FreeRTOS-Task -- t5_epaper ruft checkRX(true) aus lora_task,
+  // t5-epaper/peri_lora.cpp:220, t-deck-pro/ui_deckpro_port.cpp:54 hat
+  // dieselbe Form). Fuer die statischen Puffer ist das ohne Belang: der
+  // Pfad ruft nicht
+  // sendExtern() auf, sondern nur queueExtern() (memcpy in den Ringpuffer
+  // externQueue[], reines Datenkopieren, kein sendExtern()-Aufruf) --
+  // genau deshalb gibt es diese Queue ("Deferred sendExtern ringbuffer —
+  // queued from OnRxDone, flushed in main loop" weiter oben). sendExtern()
+  // selbst wird aus dem LORA-/RX-Kontext also nie direkt erreicht, nur ueber
+  // den Umweg durch die Queue und flushExternQueue() im Loop-Task. Statische
+  // Puffer sind damit auf beiden Plattformen sicher.
   static char c_json[EXTERN_MSG_JSON_BUF];
   static char c_tjson[500];
   memset(c_json, 0, sizeof(c_json));
   memset(c_tjson, 0, sizeof(c_tjson));
-#endif
 
   char escape_symbol[3];
   char escape_group[3];
@@ -798,9 +839,19 @@ void sendExternNotice(const char *text, const char *dst)
   // BP_NACK_TEXT_MAX) can run to 138 bytes ("QRT NOT SENT - " + 120 bytes +
   // "..."); together with the JSON skeleton at the longest possible
   // callsign/dst that left only 21 bytes of headroom at 300 -- see the
-  // length budget table in docs/bp-l1-l4-impl-plan.md. Same N-22 pattern as
-  // sendExtern() directly above: ESP32 stack (8 KB loop-task stack, already
-  // carries 700+500 there), nRF52 static BSS (4 KB loop-task stack).
+  // length budget table in docs/bp-l1-l4-impl-plan.md.
+  //
+  // P2-Nachtrag (docs/bug-extudp-stack-20260920.md, Fix F2 betraf nur
+  // c_json/c_tjson in sendExtern() oben): dieser Puffer bleibt bewusst auf
+  // dem ESP32-Stack. sendExternNotice() haengt nicht an der dort gemessenen
+  // Kette esp32loop -> getExternUDP -> getExtern -> sendMessage ->
+  // sendExtern -> ...; der einzige Aufrufer liegt in loop_functions.cpp
+  // (BP-Notice-Pfad, ~Zeile 3687) und antwortet direkt auf dem EXTUDP-
+  // Socket, ohne dass davor noch ein sendExtern()-Aufruf im selben
+  // Stackrahmen liegt. Ein einzelner 400-B-Puffer auf dem 8-KB-Loop-Stack
+  // ist unauffaellig, und der Referenz-Branch (neo-ram-reclaim) hat diesen
+  // Puffer ebenfalls nicht verschoben. nRF52 bleibt aus dem N-22-Grund
+  // (4-KB-Loop-Stack) bei static BSS wie zuvor.
 #ifdef ESP32
   char c_json[400] = {0};
 #else
