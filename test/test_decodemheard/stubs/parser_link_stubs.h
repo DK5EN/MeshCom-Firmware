@@ -40,6 +40,7 @@
 #include <cstring>
 
 #include <Arduino.h>
+#include "byte_fifo.h"
 
 // ---- printfdeb_functions.h (src/) -- nur die tatsaechlich verlinkten Overloads
 int printlndeb(const char *buff) { (void)buff; return 0; }
@@ -63,3 +64,14 @@ String convertUNIXtoString(uint32_t timestamp) { (void)timestamp; return String(
 // ---- loop_functions_extern.h (globals checkMesh()/checkVia() read)
 bool bGATEWAY = false;
 bool bVIA = false;
+
+// ---- byte_fifo.h: der Telefon-Kommando-Ring, den comRingFree() in
+// mheard_functions.cpp liest. Frueher waren das die beiden ints
+// ComToPhoneWrite/ComToPhoneRead, und sie fehlten hier -- env:native_parsers
+// scheiterte deshalb schon vor der Umstellung auf den Byte-Ring am Linker
+// ("Undefined symbols: _ComToPhoneRead"), alle fuenf Suiten ERRORED. Beim
+// Umbau mitgefixt. Die Groesse ist frei gewaehlt; comRingFree() rechnet mit
+// cap und bf_used(), beide kommen aus dem Ring selbst, also faellt hier keine
+// Abhaengigkeit auf configuration_global.h an.
+static uint8_t phoneComStore_stub[512];
+byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStore_stub);

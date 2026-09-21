@@ -55,6 +55,7 @@
 #include <Arduino.h>
 #include <aprs_structures.h>
 #include <mheard_functions.h>
+#include <byte_fifo.h>
 #include <nrf52/WisBlock-API.h>
 
 // ---- Link-Stubs fuer aprs_functions.cpp/mheard_functions.cpp/via_functions.cpp
@@ -93,6 +94,13 @@ unsigned long getUnixClock() { return (unsigned long)-1; }
 String getTimeString() { return String(""); }
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len) { (void)buffer; (void)len; }
 void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len) { (void)buffer; (void)len; }
+
+// Telefon-Kommando-Ring, den comRingFree() in mheard_functions.cpp liest.
+// Diese Suite bindet parser_link_stubs.h bewusst nicht ein (siehe Kopf), also
+// steht die Definition auch hier. Vorher fehlte sie als ComToPhoneWrite/
+// ComToPhoneRead und die Suite scheiterte am Linker.
+static uint8_t phoneComStore_stub[512];
+byte_fifo_t phoneComRing = BYTE_FIFO_INIT(phoneComStore_stub);
 bool is_equ(const char *buf1, const char *buf2)
 {
     return buf1 != nullptr && buf2 != nullptr && strcmp(buf1, buf2) == 0;
