@@ -126,11 +126,17 @@ uv run tools/stack_budget.py .pio/build/heltec_wifi_lora_32_V3/firmware.elf \
     --root esp32loop --root getExternUDP --budget 12288
 ```
 
-Gemessen (fork-main, HEAD `9397647e`, Heltec-V3-ELF):
+Gemessen auf `fork-main` am Heltec-V3-ELF, Schwellwert 11776 B, Exitcode 0:
 
-- `esp32loop`: 10160 B (Schwellwert 11776 B) -- PASS
-- `getExternUDP`: 8464 B (Schwellwert 11776 B) -- PASS
-- Exitcode: 0
+| Kette          | vor P2 (`45e411d4`) | nach P2 (`efc9681e`) | Delta |
+| -------------- | ------------------- | -------------------- | ----- |
+| `esp32loop`    | 10160 B             | 8960 B               | -1200 |
+| `getExternUDP` | 8464 B              | 7264 B               | -1200 |
+
+Beide Ketten bestehen in beiden Zustaenden -- P1 allein reichte dafuer schon.
+Die -1200 B sind exakt `EXTERN_MSG_JSON_BUF` (700) + 500, also die beiden
+Puffer aus `sendExtern()` und sonst nichts. Vor P1, mit 8192 B Stack, lagen
+beide Werte darueber: das war der Absturz.
 
 Beide Ketten tragen die oben erwaehnte Indirect-Call-WARNING; die genannten
 Zahlen sind damit untere Schranken, keine exakten Werte.

@@ -1,5 +1,47 @@
 # RESUME — pick up here
 
+## 2026-09-21: Extern-UDP stack overflow fixed + field-verified; RAM reclaim ported, hardware verification owed
+
+**Stack fix — DONE and gated.** A `{"type":"msg"}` Extern-UDP datagram with a foreign destination
+reset every ESP32 node running `--extudp on`; reproduced four times on DK5EN-98, 2026-09-20,
+triggered by McApp command replies. Root cause: the inbound chain `esp32loop -> getExternUDP ->
+getExtern -> sendMessage -> sendExtern -> decodeAPRS -> printfdeb -> MeshSerial/lwIP` did not fit
+the arduino-esp32 8192 B loop-task stack default. Fixed in two commits: `c754d01f` (P1,
+`ARDUINO_LOOP_STACK_SIZE=12288` on every ESP32 board env -- not the `CONFIG_` name, which the
+framework's own `sdkconfig.h` also defines and which wins silently) and `efc9681e` (P2/P3,
+`c_json`/`c_tjson` in `sendExtern()` moved to static BSS on ESP32, plus `tools/stack_budget.py` as
+a build-time gate, `docs/stack-budget.md`). CHANGELOG item 229. Field proof 2026-09-21: the
+reproducer now runs clean (`stack_hwm 4668`, relayed by four neighbours), and a 9 h 36 min night
+run held the outbound `stack_hwm` constant at 4876 against 368 before. Full derivation:
+`docs/bug-extudp-stack-20260920.md`. This answers the ESP32 half of BACKLOG `UDP-01` (the "inbound
+path never stack-measured" bullet); the RAK/nRF52 half is still genuinely open --
+`tools/stack_budget.py` walks the Xtensa call graph and has no ARM equivalent.
+
+**RAM reclaim — complete on `fork-main`, hardware verification OWED.** The byte-FIFO port from
+`neo-ram-reclaim` (`e2861458` + `9530967d`) replaces the three 20x246-260 B slot rings (phone
+data, phone commands, UDP output) with `src/byte_fifo.h` byte rings, plus (`36b3a895`) the
+web-header buffer folded into its `String` and `int16_t` display-page coordinates. Occasion:
+`E22_XML-DevKitC` had not linked since `731e0ebc` and is in `default_envs`. CHANGELOG items
+230-232. Gate: 873/873 host tests, 14 board envs SUCCESS (`t5_epaper` and `esp32-external-radio`
+were already red at the unchanged HEAD, unrelated to this work). **No board has run this build.**
+Two concrete gaps before it can ship: the ESP32 output-ring path (byte-fifo) and the nRF52 drain
+(a separate implementation in `nrf52_main.cpp`) both need a hardware pass. BACKLOG `PRM-08`
+updated; new BACKLOG §3.8am tracks `RAM-01` (hardware verification, both platforms).
+
+**Also in this wave: `--mesh off` now holds on via paths** (`45e411d4`, CHANGELOG item 231,
+listed under "What changes on the air" -- this one changes what a node puts on the air).
+`checkMesh()` had a regression (the via branch never read `bMESH`, returning a hard `true`
+instead) plus a prefix-match bug (`String::indexOf` instead of a token compare) that let e.g.
+`DK5EN-9` relay for `DK5EN-92`/`DK5EN-98`. Found while searching, not fixed here: the gateway DM
+ACK and DM-store custody delivery still transmit without a `bMESH` check -- both are the node's
+own emissions, not a relay of someone else's frame, so it is an operator decision, filed as
+`MESH-01`, not a defect.
+
+**Pick up with:** flash-test the byte-FIFO output-ring path (ESP32) and the nRF52 drain on real
+hardware (`RAM-01`); the RAK/nRF52 EXTUDP inbound stack depth is still unmeasured (`UDP-01`);
+`MESH-01` needs an operator decision before any code change. `docs/bug-extudp-stack-20260920.md`
+has the full stack-overflow derivation.
+
 ## 2026-09-14: DM transport campaign — five stages in the tree, bench session next
 
 Stages 0, 1, 2.1, 3 and 4 of `docs/dm-transport-impl-plan-20260913.md` are on fork-main

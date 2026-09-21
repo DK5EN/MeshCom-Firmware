@@ -84,6 +84,12 @@ discover them by surprise:
   were computed from a fixed 255-byte length. Nothing about the radio changed;
   the number is simply correct now. Expect roughly 7% where the same node used
   to report 18%.
+- **`--mesh off` now actually holds on via paths** (item 231). Previously a
+  node with mesh relaying disabled still relayed a frame whose via path named
+  its own callsign as a hop -- and, because of a prefix-match bug in the same
+  check, also relayed frames touching a differently-numbered station that
+  shares its callsign prefix. A node correctly configured with `--mesh off`
+  now stays silent on both paths.
 
 ## New in v4.35t.09.12.2
 
@@ -410,6 +416,132 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      of the 9 cases. `setalt` is not affected (integer compare), and the remaining
      `toFloat()` comparisons in that file are correct because those settings fields
      really are `float`.
+
+229. **Extern-UDP: a foreign-destination `{"type":"msg"}` datagram reset every ESP32
+     node running `--extudp on`** (fork-only, `c754d01f` + `efc9681e`, 2026-09-21).
+     Observed 2026-09-20 on DK5EN-98: four resets, all triggered by McApp command
+     replies arriving over Extern-UDP. Cause: the inbound chain `esp32loop -> getExternUDP -> getExtern -> sendMessage -> sendExtern -> decodeAPRS -> printfdeb -> MeshSerial/lwIP` did not fit the arduino-esp32 framework's
+     loop-task stack default of 8192 B -- no override existed anywhere in the tree.
+     Fixed in two parts, filed as one finding because the split into commits is an
+     implementation detail: P1 (`c754d01f`) sets `ARDUINO_LOOP_STACK_SIZE=12288` for
+     every ESP32 board env -- **not** `CONFIG_ARDUINO_LOOP_STACK_SIZE`, the name the
+     framework's own `sdkconfig.h` also defines, to 8192, and which wins silently
+     because it is included after the command line; the difference produces no
+     warning, since `-Werror` sits only on `build_src_flags`. P2/P3 (`efc9681e`)
+     move `c_json`/`c_tjson` in `sendExtern()` (`src/extudp_functions.cpp`) to
+     static BSS on ESP32 -- the nRF52 side already had them static since `1951aa7d`
+     -- and add `tools/stack_budget.py` as a build-time gate (`docs/stack-budget.md`),
+     which follows the compiled call graph on Xtensa and fails the build if a chain
+     crosses the budget minus a 512 B margin.
+     Measured on this tree against the `heltec_wifi_lora_32_V3` artefact, threshold
+     11776 B: `getExternUDP` 8464 -> 7264 B, `esp32loop` 10160 -> 8960 B after the
+     buffer move. The buffer move alone would **not** have sufficed -- both chains
+     were still above the 8192 B default before P1 raised the budget to 12288.
+     -1200 B is exactly `EXTERN_MSG_JSON_BUF` (700) + `c_tjson` (500), the two
+     buffers moved, nothing else.
+     Field proof 2026-09-21: the reproducer that previously killed the node ran
+     through clean, `[EXT];rx;len;67;stack_hwm;4668`, and the frame was relayed by
+     four neighbours. Over a 9 h 36 min night run the outbound `stack_hwm` sat
+     constant at 4876, against 368 before the fix. Affects every ESP32 node running
+     `--extudp on`, including nodes already in the field. Full derivation,
+     reproduction and measurement method: `docs/bug-extudp-stack-20260920.md`.
+
+230. **Phone data, phone commands and the UDP output ring moved from 20 fixed
+     246-260 B slots to byte-FIFO rings** (fork-only, `e2861458` + `9530967d`,
+     2026-09-21). New `src/byte_fifo.h`/`.cpp` packs frames back to back -- a
+     length byte plus payload, no fixed per-slot reserve -- and replaces
+     `BLEtoPhoneBuff`, `BLEComToPhoneBuff` and `ringBufferUDPout`, the three
+     largest BSS allocations in the tree. The occasion was a hard blocker, not a
+     wish list: `E22_XML-DevKitC` -- a board in `default_envs`, i.e. shipped --
+     had not linked since `731e0ebc` (`dram0_0_seg` 1008 B over). Measured on
+     `E22_XML-DevKitC`: 125588 B / 124580 available -> 115108 B (92.40%, 9472 B
+     free); `ttgo_tbeam` 116452 B -> 105972 B (85.06%).
+     About 25 callers of `addBLEOutBuffer()` are unaffected; rebuilt are the three
+     writers, the two phone-side readers, the web message page (now walks the ring
+     with `bf_iter_begin()`/`bf_iter_next()` instead of the write pointer) and both
+     UDP drains. The nRF52 drain is a separate implementation in `nrf52_main.cpp`,
+     not the same function as on ESP32; both now follow a peek/tail-generation/pop
+     sequence so an eviction during a slow send cannot pop the wrong frame.
+     `addBLEComToOutBuffer()` gained a lock it never had before -- the only one of
+     the three writers that had none.
+     Three findings from the advisor pass, fixed before the commit: the BLE config
+     burst writes 12 frames (~1972 B) into the command ring in one loop pass and
+     the ring must hold the whole burst, so `RING_BYTES_PHONECOM` is 3072 across
+     every board class (2048 keeps the real case with 76 B headroom but loses up to
+     four frames in the worst case, including the `I` frame; 1536 loses two).
+     `comRingFree()` estimated 160 B per MHeard frame against real frames up to
+     174 B, so it over-estimated free space and evicted frames `sendMheard()` had
+     just written -- the estimate is gone, the check is now exact. `bf_iter_begin()`
+     read `oldest`/`frames`/`evict_gen` unlocked, so an eviction between the three
+     reads could start the iterator with a `pos` from before and a `gen` from after
+     the eviction and render garbage on the web message page -- now under lock (the
+     same bug is still open on `neo-ram-reclaim`).
+     Gate: 867 host test cases, 33 of 33 buildable board envs (`t5_epaper` and
+     `esp32-external-radio` were already red at the unchanged HEAD, for reasons
+     unrelated to this change, and are not in `default_envs`). Invisible from
+     outside -- this is internal buffer layout, not a change to what a node sends
+     or reports. **Not yet verified on hardware.**
+
+231. **`--mesh off` did not hold on via paths, and a prefix-match bug let
+     neighbouring SSIDs relay each other's traffic** (`45e411d4`, 2026-09-21). Two
+     defects in `checkMesh()` (`src/via_functions.cpp`), both on the same code
+     path, neither ever covered by a test before this fix -- `checkMesh()` had
+     zero test coverage.
+     (1) The via branch never read `bMESH` at all: if a received frame's via path
+     named the node's own callsign as a hop, `checkMesh()` returned a hard `true`
+     regardless of the operator's `--mesh off` setting. `checkMesh()` is the only
+     relay gate (`lora_functions.cpp:1710`); there is no second `bMESH` check at
+     the caller. This is a regression, not a design decision: before `2c96f11b`
+     ("v4.35p via/routing", 2026-06-09) the whole function was `return bMESH;`.
+     That commit introduced the via branch and left the comment claiming "so
+     return bMESH" next to code that returned `true`. The file's own header
+     contract says "false if bMESH == false", without exception, and the web
+     toggle promises "enable mesh/forwarding of received LoRa messages".
+     (2) The "am I in the path" check was a substring search with no token
+     boundary (`String::indexOf`), so it matched any callsign whose prefix is the
+     node's own -- in this fleet, `DK5EN-1` inside `DK5EN-14`, `DK5EN-9` inside
+     `DK5EN-92`/`DK5EN-98`, and any base callsign inside its own SSIDs. Combined
+     with (1), a node relayed a foreign frame -- and did so even with
+     `--mesh off`. The `indexOf` bug was noted in
+     `docs/verdict-auto-via-routing-20260916.md` but never fixed. New
+     `pathNamesCall()` compares the comma-separated path token by token on full
+     length instead.
+     Six regression cases added to `test/test_checkvia/`: three failed before the
+     fix (mesh-off-still-relays, prefix-match, base-callsign-on-SSID) and pass
+     after (13/13); the three unchanged cases (no via info falls through to
+     `bMESH`, mesh-on relays, trailing comma) pin the branches that were not
+     broken.
+     Found and confirmed while searching, not fixed in this commit: the gateway DM
+     ACK (`lora_functions.cpp:1555`/`1579`) and DM-store custody delivery
+     (`msgstore_glue.cpp:113`) also transmit without a `bMESH` check. Both are the
+     node's own emissions, not a relay of someone else's frame, so whether
+     `--mesh off` should cover them is an operator decision, tracked in the
+     BACKLOG (`MESH-01`), not a defect in the narrow sense.
+     Gate: 873 host test cases, Heltec V3 / T-Beam / RAK4631 built.
+
+232. **Web header buffer moved into the `String` it was already copied into, and
+     display-page line coordinates halved** (fork-only, `36b3a895`, 2026-09-21).
+     The two remaining RAM-reclaim items fork-main was missing after the byte-FIFO
+     rings (item 230) shipped. Web header: the static 1 KB `web_header_collect`
+     buffer in `web_functions.cpp` is gone -- `work_webpage()` now collects
+     directly into the global `String` that copied it out anyway. Same ceiling as
+     before, checked: the old `sizeof(puffer)-1` bound and the new
+     `WEB_HEADER_MAX` both cap at 1023 characters, no off-by-one. This moves bytes
+     from the linker image into the heap -- not one byte less at runtime, but it
+     relieves the DRAM region that is the bottleneck on classic ESP32.
+     Display cache: `pageLine`/`pageLastLine` become `int16_t` instead of `int`
+     (`y` can be -1, so signed is required) -- nothing in the tree takes `sizeof`,
+     `memcpy`s, addresses or does pointer arithmetic on these fields, and none of
+     it is ever serialized (not flash, not BLE, not web, not JSON). The long-text
+     pages `pageLastTextLong1`/`2` now compile only on boards with TFT or E-Paper
+     (new `HAS_LONG_PAGE_TEXT` in `src/display_pages_cfg.h`) -- on OLED boards
+     those 1350 B were always empty, since every write site already sits inside
+     that guard. Verified on the artefact, not just the source: `pageLastTextLong1/2`
+     are absent from `heltec_wifi_lora_32_V3`, `ttgo_tbeam`, `wiscore_rak4631` and
+     `t_deck`, present in `wireless-paper`, `t_deck_pro` and `heltec_t114`.
+     Gate: 14 board envs SUCCESS across every display family (OLED, TFT, E-Paper,
+     nRF52), 873/873 host test cases unchanged against the pre-wave baseline.
+     Invisible from outside either way. **Not yet verified on hardware.**
 
 ## New in v4.35s.09.09
 
