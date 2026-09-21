@@ -1,9 +1,19 @@
-// Nachbarschaftsmatrix, Wave 1. Die Regeln (Pfadpaare, Schleifenerkennung,
-// HEY-Berichtsgruppen, 12-h-Verfall mit Minuten-Ueberlauf, Verdraengung,
-// die Urteile aus Konzept 4.3 und die Reichweite aus 4.4) hatten vor diesem
-// Modul keinen ausfuehrbaren Test, weil sie nur zusammen mit OnRxDone in
-// lora_functions.cpp existierten. env native_nbr_matrix setzt NBR_MAX_ROWS=5,
-// klein genug, um Verdraengung ohne 21 Zeilen Fuellarbeit zu pruefen.
+// Nachbarschaftsmatrix, Wave 1 + 2-Hop-Fenster. Die Regeln (Pfadpaare,
+// Schleifenerkennung, HEY-Berichtsgruppen, 12-h-Verfall mit Minuten-
+// Ueberlauf, Verdraengung, die Urteile aus Konzept 4.3, die Reichweite aus
+// 4.4, das 2-Hop-Fenster und die Log-Instrumentierung aus
+// docs/nbr-logformat.md) hatten vor diesem Modul keinen ausfuehrbaren Test,
+// weil sie nur zusammen mit OnRxDone in lora_functions.cpp existierten.
+// env native_nbr_matrix setzt NBR_MAX_ROWS=5, klein genug, um Verdraengung
+// ohne 21 Zeilen Fuellarbeit zu pruefen.
+//
+// Seit dem 2-Hop-Fenster legt nbrNoteFrame() nur noch fuer die letzten zwei
+// Pfad-Token eine Zeile an, und nbrNotePos() legt GAR KEINE Zeile mehr an
+// (siehe src/nbr_matrix.h). Mehrere hier vorher per nbrNotePos() gefuellte
+// Tests wurden deshalb auf eine Zeilen-Neuanlage per nbrNoteFrame() (Ein-
+// Token-Pfad, "direkt gehoert") vor dem eigentlichen nbrNotePos()-Aufruf
+// umgestellt; die einzelnen Anpassungen stehen jeweils als Kommentar an der
+// betroffenen Stelle.
 //
 // test_build_src=no fuer diese Umgebung: die Quelle kommt per #include, nicht
 // als eigenes Kompilat (siehe test/test_mheard_record fuer dasselbe Muster,
@@ -161,10 +171,13 @@ void test_eviction_replaces_oldest_row_never_row_zero(void)
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
 
-    nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, false, 1, 10);
-    nbrNotePos(m, "OE1BBB-2", 48.1f, 11.1f, false, 1, 20);
-    nbrNotePos(m, "OE1CCC-3", 48.2f, 11.2f, false, 1, 30);
-    nbrNotePos(m, "OE1DDD-4", 48.3f, 11.3f, false, 1, 40);
+    // Zeilen entstehen jetzt nur noch ueber nbrNoteFrame() (2-Hop-Fenster);
+    // ein Ein-Token-Pfad ist der minimale Fall "ich habe X direkt gehoert"
+    // und legt genau eine Zeile an (siehe nbrNoteFrame()-Kommentar).
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 20);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 30);
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, 40);
 
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
@@ -177,7 +190,7 @@ void test_eviction_replaces_oldest_row_never_row_zero(void)
 
     // Tabelle ist voll (Zeile 0 + 4 Fremde = NBR_MAX_ROWS). AAA hat mit
     // last_min=10 die groesste Altersluecke zu now=50 und weicht.
-    nbrNotePos(m, "OE1EEE-5", 48.4f, 11.4f, false, 1, 50);
+    nbrNoteFrame(m, "OE1EEE-5", ':', NULL, false, -80, 50);
 
     TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
     int ieee = nbrFind(m, "OE1EEE-5");
@@ -202,10 +215,12 @@ void test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNotePos(m, "OE1AAA-1", 0.0f, 0.0f, false, 0, 100);
-    nbrNotePos(m, "OE1BBB-2", 0.0f, 0.0f, false, 0, 100);
-    nbrNotePos(m, "OE1CCC-3", 0.0f, 0.0f, false, 0, 100);
-    nbrNotePos(m, "OE1DDD-4", 0.0f, 0.0f, false, 0, 100);
+    // Zeilen entstehen nur noch ueber nbrNoteFrame() (2-Hop-Fenster); ein
+    // Ein-Token-Pfad legt hier je eine Zeile fuer AAA..DDD an.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 100);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 100);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 100);
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, 100);
     // Tabelle ist jetzt voll (Zeile 0 + 4 Fremde), alle vier mit derselben
     // Letztzeit. Ohne den Kollisionsschutz wuerden EEE UND FFF beide "die
     // aelteste Zeile" (Index 1) planen; der zweite Treffer faellt dann auf
@@ -223,19 +238,31 @@ void test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal(void)
     TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifff][ifff].cnt_text);
 }
 
-void test_frame_needing_more_new_rows_than_capacity_is_rejected_atomically(void)
+// War vor dem 2-Hop-Fenster ein -3 (FULL): 5 neue Rufzeichen brauchten 5 neue
+// Zeilen, aber nur 4 Fremdzeilen sind frei (NBR_MAX_ROWS=5 in dieser
+// Umgebung) -- das Frame wurde komplett verworfen. Die neue Regel plant nur
+// noch die letzten zwei Pfad-Token, braucht also nie mehr als 2 neue Zeilen;
+// FULL ist bei NBR_MAX_ROWS >= 3 (jede reale Board-Konfiguration) praktisch
+// unerreichbar geworden (siehe nbrNoteFrame()-Kommentar). Dieser Test haelt
+// die neue Erwartung fest: der lange Pfad wird akzeptiert, nur die letzten
+// zwei Token bekommen eine Zeile, die drei davor bleiben ohne.
+void test_long_path_beyond_two_hop_window_is_accepted_not_rejected(void)
 {
-    NbrMatrix m, before;
+    NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    memcpy(&before, &m, sizeof(m));
 
-    // 5 fremde, bislang unbekannte Rufzeichen, aber nur 4 Fremdzeilen frei
-    // (NBR_MAX_ROWS=5 in dieser Umgebung) -- die Planung scheitert am
-    // fuenften Token, BEVOR irgendeine Zeile committet wurde.
     int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4,OE1EEE-5",
                              ':', NULL, false, -80, 100);
-    TEST_ASSERT_EQUAL_INT(-3, hits);
-    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+    TEST_ASSERT_TRUE(hits > 0);
+
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1BBB-2"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1CCC-3"));
+    int iddd = nbrFind(m, "OE1DDD-4");
+    int ieee = nbrFind(m, "OE1EEE-5");
+    TEST_ASSERT_TRUE(iddd > 0);
+    TEST_ASSERT_TRUE(ieee > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][ieee].cnt_text);
 }
 
 // --- M2: 16-Bit-Ueberlauf darf keine tote Zelle wiederbeleben ---------------
@@ -316,8 +343,11 @@ void test_note_pos_mesh_false_clears_previously_set_mesh_flag(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, true, 1, 10);
+    // nbrNotePos() legt keine Zeile mehr an -- erst per nbrNoteFrame()
+    // erzeugen, dann die Position draufschreiben.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);
     int iaaa = nbrFind(m, "OE1AAA-1");
+    nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, true, 1, 10);
     TEST_ASSERT_TRUE(m.rows[iaaa].flags & NBR_FLAG_MESH);
 
     nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, false, 1, 20);
@@ -328,9 +358,11 @@ void test_hearers_returns_total_count_beyond_what_was_written(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNotePos(m, "OE1AAA-1", 0.0f, 0.0f, false, 0, 5);
-    nbrNotePos(m, "OE1BBB-2", 0.0f, 0.0f, false, 0, 5);
-    nbrNotePos(m, "OE1CCC-3", 0.0f, 0.0f, false, 0, 5);
+    // nbrNotePos() legt keine Zeile mehr an -- die drei Zeilen entstehen
+    // hier ueber nbrNoteFrame() (Ein-Token-Pfad = "direkt gehoert").
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
     int iccc = nbrFind(m, "OE1CCC-3");
@@ -351,9 +383,10 @@ void test_exclusive_rows_per_concept_43_example(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNotePos(m, "OE1AAA-1", 0.0f, 0.0f, false, 0, 5);
-    nbrNotePos(m, "OE1BBB-2", 0.0f, 0.0f, false, 0, 5);
-    nbrNotePos(m, "OE1CCC-3", 0.0f, 0.0f, false, 0, 5);
+    // nbrNotePos() legt keine Zeile mehr an -- ueber nbrNoteFrame() erzeugen.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
     int iccc = nbrFind(m, "OE1CCC-3");
@@ -391,7 +424,10 @@ void test_reach_haversine_distance_and_partner(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNotePos(m, "DK5EN-93", 48.40f, 11.75f, false, 0, 5);   // Freising
+    nbrNotePos(m, "DK5EN-93", 48.40f, 11.75f, false, 0, 5);   // Freising, Zeile 0 existiert immer
+    // nbrNotePos() legt keine Zeile mehr an -- OE1AAA-1 erst per
+    // nbrNoteFrame() erzeugen, dann die Position draufschreiben.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
     nbrNotePos(m, "OE1AAA-1", 48.14f, 11.58f, false, 0, 5);   // Muenchen
     int iaaa = nbrFind(m, "OE1AAA-1");
     m.cells[iaaa][0].cnt_text = 1;
@@ -427,6 +463,229 @@ void test_format_row_contains_callsign_and_hearers(void)
     TEST_ASSERT_NOT_NULL(strstr(buf, "OE1BBB-2"));  // BBB hat AAA gehoert -> steht in hearers
 }
 
+// --- 10: 2-Hop-Fenster (Betreiber-Vorgabe) -----------------------------------
+
+void test_two_hop_window_only_creates_rows_for_last_two_tokens(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    // A,B liegen VOR dem Fenster (start = 4-2 = 2) -- sie bekommen keine
+    // Zeile. Nur C,D (das Fenster) und Zeile 0 existieren danach.
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 100);
+    TEST_ASSERT_TRUE(hits > 0);
+
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1BBB-2"));
+    int iccc = nbrFind(m, "OE1CCC-3");
+    int iddd = nbrFind(m, "OE1DDD-4");
+    TEST_ASSERT_TRUE(iccc > 0);
+    TEST_ASSERT_TRUE(iddd > 0);
+
+    // Kanten: nur C->D und D->ich, sonst keine einzige Zelle gesetzt.
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iccc][iddd].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][0].cnt_text);
+    int nonzero = 0;
+    for (int x = 0; x < NBR_MAX_ROWS; x++)
+        for (int y = 0; y < NBR_MAX_ROWS; y++)
+            if (m.cells[x][y].cnt_text || m.cells[x][y].cnt_pos || m.cells[x][y].cnt_hey)
+                nonzero++;
+    TEST_ASSERT_EQUAL_INT(2, nonzero);
+}
+
+void test_two_token_path_is_unaffected_by_the_window(void)
+{
+    // ntok <= 2: das Fenster ist der GANZE Pfad, das Verhalten bleibt
+    // identisch zu vor der Aenderung (Regression neben test_pair_rule_text_frame).
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 100);
+    TEST_ASSERT_EQUAL_INT(2, hits);
+
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(iaaa > 0);
+    TEST_ASSERT_TRUE(ibbb > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_text);
+}
+
+void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    // A und B bekommen ueber kurze Pfade je eine eigene Zeile.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 10);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(iaaa > 0 && ibbb > 0);
+
+    int rows_before = 0;
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+        if (i == 0 || (m.rows[i].flags & NBR_FLAG_USED))
+            rows_before++;
+
+    // Ein spaeterer 4-Token-Pfad A,B,C,D: C,D sind das Fenster, A,B liegen
+    // davor. A->B ist eine Kante zwischen zwei BESTEHENDEN Zeilen -- Regel 3
+    // traegt sie trotzdem ein, OHNE eine neue Zeile fuer A oder B anzulegen.
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 20);
+    TEST_ASSERT_TRUE(hits > 0);
+
+    int rows_after = 0;
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+        if (i == 0 || (m.rows[i].flags & NBR_FLAG_USED))
+            rows_after++;
+
+    TEST_ASSERT_EQUAL_INT(rows_before + 2, rows_after);   // nur C und D sind neu
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);   // A->B trotzdem eingetragen
+}
+
+// --- 11: nbrNotePos() legt keine Zeile mehr an -------------------------------
+
+void test_note_pos_unknown_call_leaves_matrix_untouched_known_call_writes(void)
+{
+    NbrMatrix m, before;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);
+    memcpy(&before, &m, sizeof(m));
+
+    // OE1BBB-2 hat keine Zeile -> nbrNotePos() darf die Matrix nicht anfassen.
+    nbrNotePos(m, "OE1BBB-2", 48.0f, 11.0f, true, 1, 20);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // OE1AAA-1 hat eine Zeile -> nbrNotePos() schreibt.
+    nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, true, 1, 20);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_TRUE(m.rows[iaaa].flags & NBR_FLAG_POS);
+    TEST_ASSERT_EQUAL_FLOAT(48.0f, m.rows[iaaa].lat);
+    TEST_ASSERT_EQUAL_FLOAT(11.0f, m.rows[iaaa].lon);
+    TEST_ASSERT_TRUE(memcmp(&before, &m, sizeof(m)) != 0);
+}
+
+// --- 12: HEY-Berichtsgruppen nur innerhalb des Fensters -----------------------
+
+void test_hey_groups_only_apply_within_window_or_existing_rows(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    // Vier Token: C,D sind das Fenster, A,B liegen davor und haben keine
+    // Zeile. R hat drei Gruppen fuer die drei Pfadpaare A-B, B-C, C-D --
+    // nur die dritte (C-D, beide Enden im Fenster) darf ankommen.
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", '@',
+                             "R5;3,90,7;3,95,7;3,99,7;", false, -70, 100);
+    TEST_ASSERT_TRUE(hits > 0);
+
+    // A und B duerfen durch die HEY-Gruppen KEINE Zeile bekommen haben.
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1BBB-2"));
+
+    int iccc = nbrFind(m, "OE1CCC-3");
+    int iddd = nbrFind(m, "OE1DDD-4");
+    TEST_ASSERT_TRUE(iccc > 0 && iddd > 0);
+    TEST_ASSERT_EQUAL_INT8(-99, m.cells[iccc][iddd].rssi);   // dritte Gruppe (C->D) kam an
+}
+
+// --- 13: Log-Emitter (docs/nbr-logformat.md) ---------------------------------
+
+static char g_log_buf[4096];
+
+static void test_log_capture(const char *line)
+{
+    size_t used = strlen(g_log_buf);
+    if (used + 2 >= sizeof(g_log_buf))
+        return;
+    strncat(g_log_buf, line, sizeof(g_log_buf) - used - 2);
+    strncat(g_log_buf, "\n", sizeof(g_log_buf) - strlen(g_log_buf) - 1);
+}
+
+static void test_log_reset(void)
+{
+    g_log_buf[0] = '\0';
+}
+
+void test_log_emitter_field_sequence_matches_format_doc(void)
+{
+    // nbrLog == NULL (Ausgangszustand): keine Ausgabe, kein Absturz.
+    TEST_ASSERT_NULL(nbrLog);
+    NbrMatrix m0;
+    nbrInit(m0, "DK5EN-93", 0);
+    nbrNoteFrame(m0, "OE1ZZZ-9,OE1YYY-8", ':', NULL, false, -80, 10);
+    nbrNotePos(m0, "OE1ZZZ-9", 1.0f, 2.0f, false, 0, 10);
+    nbrLogSnapshot(m0, 10);
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+
+    // EDGE + ME ueber einen einfachen 2-Token-Pfad.
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 100);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|EDGE|100|OE1AAA-1|OE1BBB-2|T|0|1\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ME|100|OE1BBB-2|T|-80|1\n"));
+
+    // CUT: derselbe Pfad um zwei weitere Hops verlaengert.
+    test_log_reset();
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 200);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf,
+        "[NBR]|CUT|200|4|2|OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4\n"));
+
+    // DROP: ein 2-Zeichen-Token unterschreitet die Mindestlaenge 3.
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteFrame(m, "AB,OE1BBB-2", ':', NULL, false, -80, 300));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|DROP|300|TOK|AB,OE1BBB-2\n"));
+
+    // EVICT: Tabelle (NBR_MAX_ROWS=5 in dieser Umgebung) mit 0 + 4 Fremden
+    // vollstopfen, ein fuenftes verdraengt das aelteste.
+    NbrMatrix m2;
+    nbrInit(m2, "DK5EN-93", 0);
+    nbrNoteFrame(m2, "OE1AAA-1", ':', NULL, false, -80, 10);
+    nbrNoteFrame(m2, "OE1BBB-2", ':', NULL, false, -80, 20);
+    nbrNoteFrame(m2, "OE1CCC-3", ':', NULL, false, -80, 30);
+    nbrNoteFrame(m2, "OE1DDD-4", ':', NULL, false, -80, 40);
+    int iaaa = nbrFind(m2, "OE1AAA-1");
+    test_log_reset();
+    nbrNoteFrame(m2, "OE1EEE-5", ':', NULL, false, -80, 50);
+    char expect[64];
+    snprintf(expect, sizeof(expect), "[NBR]|EVICT|50|%d|OE1AAA-1|OE1EEE-5\n", iaaa);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, expect));
+
+    nbrLog = NULL;
+}
+
+void test_log_snapshot_emits_snap_row_per_used_row_and_endsnap(void)
+{
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 10);
+
+    nbrLogSnapshot(m, 20);
+
+    char expect_snap[64];
+    snprintf(expect_snap, sizeof(expect_snap), "[NBR]|SNAP|20|DK5EN-93|3|%d|", (int)NBR_MAX_ROWS);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, expect_snap));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ENDSNAP|20\n"));
+
+    int row_lines = 0;
+    const char *p = g_log_buf;
+    while ((p = strstr(p, "[NBR]|ROW|")) != NULL)
+    {
+        row_lines++;
+        p += 1;
+    }
+    TEST_ASSERT_EQUAL_INT(3, row_lines);   // Zeile 0 + AAA + BBB
+
+    nbrLog = NULL;
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -439,7 +698,7 @@ int main(int, char **)
     RUN_TEST(test_aging_720_min_window_and_stale_reset);
     RUN_TEST(test_eviction_replaces_oldest_row_never_row_zero);
     RUN_TEST(test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal);
-    RUN_TEST(test_frame_needing_more_new_rows_than_capacity_is_rejected_atomically);
+    RUN_TEST(test_long_path_beyond_two_hop_window_is_accepted_not_rejected);
     RUN_TEST(test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again);
     RUN_TEST(test_more_than_eight_hops_is_rejected_whole);
     RUN_TEST(test_reset_keeps_only_row_zero_call);
@@ -448,5 +707,12 @@ int main(int, char **)
     RUN_TEST(test_exclusive_rows_per_concept_43_example);
     RUN_TEST(test_reach_haversine_distance_and_partner);
     RUN_TEST(test_format_row_contains_callsign_and_hearers);
+    RUN_TEST(test_two_hop_window_only_creates_rows_for_last_two_tokens);
+    RUN_TEST(test_two_token_path_is_unaffected_by_the_window);
+    RUN_TEST(test_rule3_edge_between_two_existing_rows_creates_no_new_row);
+    RUN_TEST(test_note_pos_unknown_call_leaves_matrix_untouched_known_call_writes);
+    RUN_TEST(test_hey_groups_only_apply_within_window_or_existing_rows);
+    RUN_TEST(test_log_emitter_field_sequence_matches_format_doc);
+    RUN_TEST(test_log_snapshot_emits_snap_row_per_used_row_and_endsnap);
     return UNITY_END();
 }

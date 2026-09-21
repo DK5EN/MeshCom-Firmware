@@ -9,6 +9,71 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// NULL = Instrumentierung aus (siehe nbr_matrix.h). Der Aufrufer im
+// Firmware-Rahmen haengt hier printfdeb() (oder aequivalent) ein.
+NbrLogFn nbrLog = NULL;
+
+// 'T'/'P'/'H' fuers Logformat (docs/nbr-logformat.md), statt des rohen
+// Frame-Typzeichens ':'/'!'/'@'.
+static char nbrLogTypeChar(char type)
+{
+    return (type == ':') ? 'T' : (type == '!') ? 'P' : 'H';
+}
+
+// Zaehler des zum Typ passenden Feldes -- fuer <cnt> in EDGE/ME NACH dem
+// Treffer (nbrHitCell() wurde vorher schon aufgerufen).
+static uint8_t nbrCellCount(const NbrCell &c, char type)
+{
+    return (type == ':') ? c.cnt_text : (type == '!') ? c.cnt_pos : c.cnt_hey;
+}
+
+// DROP-Zeile fuer jede fruehe Ablehnung in nbrNoteFrame(). path kann NULL
+// sein (ungueltiger Aufruf) -- dann wird ein leerer Pfad geloggt statt ein
+// %s mit NULL an snprintf zu reichen.
+static void nbrLogDrop(uint16_t now_min, const char *reason, const char *path)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|DROP|%u|%s|%s", (unsigned)now_min, reason, path ? path : "");
+    nbrLog(buf);
+}
+
+// CUT-Zeile: der Pfad war laenger als das 2-Hop-Fenster, <kept> Token davon
+// wurden fuer die Zeilenvergabe genutzt.
+static void nbrLogCut(uint16_t now_min, int ntok, int kept, const char *path)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|CUT|%u|%d|%d|%s", (unsigned)now_min, ntok, kept, path ? path : "");
+    nbrLog(buf);
+}
+
+// EDGE-Zeile: "<to> hat <from> gehoert" -- <cnt> ist der Typzaehler der
+// Zelle NACH dem Treffer (nbrHitCell() ist zu diesem Zeitpunkt schon
+// gelaufen).
+static void nbrLogEdge(uint16_t now_min, const char *from, const char *to, char type, const NbrCell &c)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|EDGE|%u|%s|%s|%c|%d|%u",
+             (unsigned)now_min, from, to, nbrLogTypeChar(type), (int)c.rssi, (unsigned)nbrCellCount(c, type));
+    nbrLog(buf);
+}
+
+// ME-Zeile: der letzte Hop wurde von mir direkt gehoert (cell[last][0]).
+static void nbrLogMe(uint16_t now_min, const char *from, char type, const NbrCell &c)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|ME|%u|%s|%c|%d|%u",
+             (unsigned)now_min, from, nbrLogTypeChar(type), (int)c.rssi, (unsigned)nbrCellCount(c, type));
+    nbrLog(buf);
+}
+
 // Eine Zelle gilt nur dann als Beobachtung, wenn mindestens einer ihrer
 // Typzaehler > 0 ist -- last_min allein (z. B. 0 nach memset) waere sonst
 // eine Beobachtung "zur Boot-Minute".
@@ -108,21 +173,20 @@ static void nbrCommitRow(NbrMatrix &m, int target_idx, const char *call, uint16_
     if ((m.rows[target_idx].flags & NBR_FLAG_USED) &&
         strncmp(call, m.rows[target_idx].call, NBR_CALL_LEN) == 0)
         return;
+
+    // Eine benutzte Zeile mit einem ANDEREN Rufzeichen wird hier ueberschrieben
+    // -- das ist eine echte Verdraengung, nicht nur die Erstbelegung eines
+    // freien Slots (der Fall oben, "gleiches Rufzeichen", ist schon
+    // abgehandelt; ein leerer Slot hat kein NBR_FLAG_USED).
+    if ((m.rows[target_idx].flags & NBR_FLAG_USED) && nbrLog)
+    {
+        char buf[160];
+        snprintf(buf, sizeof(buf), "[NBR]|EVICT|%u|%d|%s|%s",
+                 (unsigned)now_min, target_idx, m.rows[target_idx].call, call);
+        nbrLog(buf);
+    }
     nbrZeroRowAndColumn(m, target_idx);
     nbrRowInit(m, target_idx, call, now_min);
-}
-
-// Fuer einen einzelnen, unabhaengigen Touch (nbrNotePos): planen und sofort
-// committen, ohne Kollisionsschutz -- der ist nur noetig, wenn mehrere neue
-// Rufzeichen INNERHALB EINES Aufrufs um dieselbe Opferzeile konkurrieren
-// koennten, und das kann ein einzelner Touch nicht.
-static int nbrTouchRow(NbrMatrix &m, const char *call, uint16_t now_min)
-{
-    int idx = nbrPlanRow(m, call, now_min, 0);
-    if (idx < 0)
-        return -1; // nur bei NBR_MAX_ROWS <= 1 erreichbar, real nie < 5
-    nbrCommitRow(m, idx, call, now_min);
-    return idx;
 }
 
 // Ein Treffer auf eine verfallene Zelle faengt bei ihren Zaehlern neu bei 0
@@ -270,7 +334,10 @@ static void nbrApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, siz
 
 // Liest "R<n>;g1;g2;..." und verteilt Gruppe i (1-basiert) auf das Paar
 // (row_idx[i-1], row_idx[i]) -- Konzept 4.1, Abb. 3. Ueberzaehlige Gruppen
-// (mehr als ntok-1) werden ignoriert, fehlende ebenso.
+// (mehr als ntok-1) werden ignoriert, fehlende ebenso. row_idx traegt -1 fuer
+// jedes Token ausserhalb des 2-Hop-Fensters ohne bestehende Zeile (siehe
+// nbrNoteFrame()) -- eine Gruppe, deren Paar nicht VOLLSTAENDIG aufgeloest
+// ist, wird uebersprungen statt mit einem negativen Index zuzugreifen.
 static void nbrApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const char *payload)
 {
     if (!payload)
@@ -287,7 +354,7 @@ static void nbrApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const 
         while (*p && *p != ';')
             p++;
         size_t len = (size_t)(p - start);
-        if (len > 0)
+        if (len > 0 && row_idx[gi - 1] >= 0 && row_idx[gi] >= 0)
             nbrApplyGroup(m, row_idx[gi - 1], row_idx[gi], start, len);
         if (*p == ';')
             p++;
@@ -351,48 +418,86 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
     nbrMaybeSweep(m, now_min);
 
     if (type != ':' && type != '!' && type != '@')
+    {
+        nbrLogDrop(now_min, "TYPE", path);
         return 0;
+    }
 
     char tokens[8][NBR_CALL_LEN];
     int ntok = nbrTokenizePath(path, tokens, 8);
     if (ntok < 0)
+    {
+        nbrLogDrop(now_min, "TOK", path);
         return -1;
+    }
 
     // Eine Schleife (Rufzeichen doppelt im Pfad) ist kein Hoerbeweis --
-    // ganz verwerfen, bevor irgendeine Zeile angefasst wird.
+    // ganz verwerfen, bevor irgendeine Zeile angefasst wird. Laeuft ueber
+    // den GANZEN Pfad, unabhaengig vom 2-Hop-Fenster unten.
     for (int i = 0; i < ntok; i++)
         for (int j = i + 1; j < ntok; j++)
             if (strncmp(tokens[i], tokens[j], NBR_CALL_LEN) == 0)
+            {
+                nbrLogDrop(now_min, "LOOP", path);
                 return -2;
+            }
 
-    // Erst ALLE Zeilen lesend planen (M1), danach erst committen -- siehe
-    // nbrPlanRow(). Scheitert die Planung fuer irgendein Rufzeichen, ist
-    // noch keine einzige Zeile angefasst, der Frame wird ganz verworfen.
+    // 2-Hop-Fenster (Betreiber-Vorgabe, siehe nbr_matrix.h): nur die letzten
+    // zwei Pfad-Token duerfen noch eine Zeile bekommen. Token davor (Index
+    // < start) werden weder geplant noch committet.
+    int start = (ntok > 2) ? ntok - 2 : 0;
+    if (ntok > 2)
+        nbrLogCut(now_min, ntok, ntok - start, path);
+
+    // row_idx[i] = -1 heisst "kein Fenster-Token und (noch) keine bestehende
+    // Zeile" -- durchgaengig vorbelegt, damit jede spaetere Stelle (HEY-
+    // Gruppen, Kantenschleife) das statt eines undefinierten Werts sieht.
     int row_idx[8];
+    for (int i = 0; i < 8; i++)
+        row_idx[i] = -1;
+
+    // Erst ALLE Fenster-Zeilen lesend planen (M1), danach erst committen --
+    // siehe nbrPlanRow(). Scheitert die Planung fuer ein Fenster-Rufzeichen,
+    // ist noch keine einzige Zeile angefasst, der Frame wird ganz verworfen.
     uint32_t protected_mask = 0;
-    for (int i = 0; i < ntok; i++)
+    for (int i = start; i < ntok; i++)
     {
         int idx = nbrPlanRow(m, tokens[i], now_min, protected_mask);
         if (idx < 0)
+        {
+            nbrLogDrop(now_min, "FULL", path);
             return -3;
+        }
         row_idx[i] = idx;
         protected_mask |= (1u << (unsigned)idx);
     }
-    for (int i = 0; i < ntok; i++)
+    for (int i = start; i < ntok; i++)
         nbrCommitRow(m, row_idx[i], tokens[i], now_min);
+
+    // Regel 3 (Gratis-Erweiterung): ein Token VOR dem Fenster bekommt NIE
+    // eine neue Zeile, aber wenn es schon eine hat, loesen wir sie hier NUR
+    // LESEND auf (nbrFind(), kein nbrPlanRow()/nbrCommitRow()) -- das kann
+    // aus einem frueheren Frame stammen oder, fuer i == start-1, aus dem
+    // Fenster-Commit von eben (dessen erstes Token).
+    for (int i = 0; i < start; i++)
+        row_idx[i] = nbrFind(m, tokens[i]);
 
     int hits = 0;
     for (int i = 0; i + 1 < ntok; i++)
     {
         int x = row_idx[i], y = row_idx[i + 1];
+        if (x < 0 || y < 0)
+            continue; // ausserhalb des Fensters ohne zwei bestehende Zeilen: keine Kante
         nbrHitCell(m.cells[x][y], type, now_min);
         m.rows[x].last_min = now_min;
         m.rows[y].last_min = now_min;
+        nbrLogEdge(now_min, tokens[i], tokens[i + 1], type, m.cells[x][y]);
         hits++;
     }
 
     // "Ich habe den letzten Hop gehoert" -- entfaellt beim eigenen Echo
-    // (letzter Hop = ich selbst, Konzept 4.1).
+    // (letzter Hop = ich selbst, Konzept 4.1). Der letzte Hop ist immer
+    // Fenster-Token, row_idx[ntok-1] ist also immer gueltig.
     if (strncmp(tokens[ntok - 1], m.rows[0].call, NBR_CALL_LEN) != 0)
     {
         int last = row_idx[ntok - 1];
@@ -400,13 +505,15 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
         m.cells[last][0].rssi = nbrClampRssi(rssi_here);
         m.rows[last].last_min = now_min;
         m.rows[0].last_min = now_min;
+        nbrLogMe(now_min, tokens[ntok - 1], type, m.cells[last][0]);
         hits++;
     }
 
     if (type == '@')
     {
-        if (dest_gw)
-            m.rows[row_idx[0]].flags |= NBR_FLAG_GW;
+        int sender = row_idx[0];
+        if (dest_gw && sender >= 0)
+            m.rows[sender].flags |= NBR_FLAG_GW;
         nbrApplyHeyGroups(m, row_idx, ntok, payload);
     }
 
@@ -417,9 +524,11 @@ void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
                 uint8_t hw, uint16_t now_min)
 {
     nbrMaybeSweep(m, now_min);
-    int idx = nbrTouchRow(m, call, now_min);
+    // Legt bewusst KEINE Zeile mehr an (siehe nbr_matrix.h) -- ein Knoten,
+    // der nur ueber relayte POS-Frames sichtbar waere, bleibt ohne Zeile.
+    int idx = nbrFind(m, call);
     if (idx < 0)
-        return; // nur bei NBR_MAX_ROWS <= 1 erreichbar, real nie < 5
+        return;
     NbrRow &r = m.rows[idx];
     r.lat = lat;
     r.lon = lon;
@@ -430,6 +539,14 @@ void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
         r.flags &= (uint8_t)~NBR_FLAG_MESH;
     r.hw = hw;
     r.last_min = now_min;
+
+    if (nbrLog)
+    {
+        char buf[160];
+        snprintf(buf, sizeof(buf), "[NBR]|POS|%u|%s|%.5f|%.5f|%d|%u",
+                 (unsigned)now_min, call, (double)lat, (double)lon, mesh ? 1 : 0, (unsigned)hw);
+        nbrLog(buf);
+    }
 }
 
 uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, uint8_t max)
@@ -452,6 +569,29 @@ uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, 
     return n;
 }
 
+// Direkt gehoert: cell[x][0] gesetzt und frisch -- Basis fuer Exklusivitaet
+// UND fuer das Verdikt in nbrLogSnapshot() (Konzept 4.3).
+static bool nbrHeardDirectly(const NbrMatrix &m, int x, uint16_t now_min)
+{
+    const NbrCell &c0 = m.cells[x][0];
+    return nbrCellSet(c0) && nbrFresh(c0.last_min, now_min);
+}
+
+// Zeile x (!=0) ist exklusiv, wenn sonst niemand in meiner Hoerweite (y != 0,
+// x) eine frische cell[x][y] hat -- Konzept 4.3, "Hoerer(X) = {ich}".
+static bool nbrRowExclusive(const NbrMatrix &m, int x, uint16_t now_min)
+{
+    for (int y = 1; y < NBR_MAX_ROWS; y++)
+    {
+        if (y == x)
+            continue;
+        const NbrCell &c = m.cells[x][y];
+        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
+            return false;
+    }
+    return true;
+}
+
 int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
 {
     bool any_heard = false;
@@ -461,24 +601,11 @@ int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max
         if (!(m.rows[x].flags & NBR_FLAG_USED))
             continue;
 
-        const NbrCell &c0 = m.cells[x][0];
-        if (!(nbrCellSet(c0) && nbrFresh(c0.last_min, now_min)))
+        if (!nbrHeardDirectly(m, x, now_min))
             continue;
         any_heard = true;
 
-        bool exclusive = true;
-        for (int y = 1; y < NBR_MAX_ROWS; y++)
-        {
-            if (y == x)
-                continue;
-            const NbrCell &c = m.cells[x][y];
-            if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-            {
-                exclusive = false;
-                break;
-            }
-        }
-        if (exclusive)
+        if (nbrRowExclusive(m, x, now_min))
         {
             if (out && count < (int)max)
                 out[count] = (uint8_t)x;
@@ -486,6 +613,17 @@ int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max
         }
     }
     return any_heard ? count : -1;
+}
+
+// Verdikt je Zeile fuer nbrLogSnapshot() (Konzept 4.3) -- siehe nbr_matrix.h
+// bei nbrLogSnapshot() fuer die Herleitung je Fall.
+static const char *nbrRowVerdict(const NbrMatrix &m, int x, uint16_t now_min)
+{
+    if (x == 0)
+        return "UNK";
+    if (!nbrHeardDirectly(m, x, now_min))
+        return nbrHearers(m, x, now_min, NULL, 0) > 0 ? "LEAF" : "UNK";
+    return nbrRowExclusive(m, x, now_min) ? "EXCL" : "RED";
 }
 
 float nbrDistKm(float lat1, float lon1, float lat2, float lon2)
@@ -584,6 +722,43 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
                      (r.flags & NBR_FLAG_GW) ? "GW+" : "GW-",
                      (r.flags & NBR_FLAG_MESH) ? "M+" : "M-",
                      hears_me, hearers, reach_buf, age);
+}
+
+void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
+{
+    if (!nbrLog)
+        return;
+
+    int rows_used = 1; // Zeile 0 zaehlt immer, auch ohne NBR_FLAG_USED
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        if (m.rows[i].flags & NBR_FLAG_USED)
+            rows_used++;
+
+    int cells_set = 0;
+    for (int x = 0; x < NBR_MAX_ROWS; x++)
+        for (int y = 0; y < NBR_MAX_ROWS; y++)
+            if (nbrCellSet(m.cells[x][y]))
+                cells_set++;
+
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|SNAP|%u|%s|%d|%d|%d",
+             (unsigned)now_min, m.rows[0].call, rows_used, (int)NBR_MAX_ROWS, cells_set);
+    nbrLog(buf);
+
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+    {
+        if (i != 0 && !(m.rows[i].flags & NBR_FLAG_USED))
+            continue;
+        unsigned age = (unsigned)nbrRowAgeMin(m, i, now_min);
+        unsigned hearers = (unsigned)nbrHearers(m, i, now_min, NULL, 0);
+        snprintf(buf, sizeof(buf), "[NBR]|ROW|%u|%d|%s|%u|%u|%u|%s",
+                 (unsigned)now_min, i, m.rows[i].call, (unsigned)m.rows[i].flags,
+                 age, hearers, nbrRowVerdict(m, i, now_min));
+        nbrLog(buf);
+    }
+
+    snprintf(buf, sizeof(buf), "[NBR]|ENDSNAP|%u", (unsigned)now_min);
+    nbrLog(buf);
 }
 
 // Eine Instanz fuers ganze Geraet, im BSS: geschrieben ausschliesslich aus

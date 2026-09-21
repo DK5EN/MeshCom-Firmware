@@ -437,3 +437,7 @@ tools/bench/runs/*.log.peer
 
 # produced by test/golden/variant_macros_effective.py (pio run -t compiledb); never staged
 compile_commands.json
+
+# NBR-Logfixtures: der Selbsttest von tools/nbrlog.py haengt an ihnen,
+# sie sind Testdaten und kein Mitschnitt.
+!tools/testdata/nbr/*.log

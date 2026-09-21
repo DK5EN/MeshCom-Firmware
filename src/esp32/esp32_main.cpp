@@ -127,6 +127,7 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <regex_functions.h>
 #include <test_inject.h>
 #include <command_functions.h>
+#include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <phone_commands.h>
 #include <aprs_functions.h>
 #include <batt_functions.h>
@@ -927,6 +928,8 @@ void esp32setup()
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
+    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0010;
+    nbrDebugApply();
 
     if(strlen(meshcom_settings.node_aprsmc) < 4)
     {
@@ -3499,6 +3502,17 @@ void esp32loop()
         trickle_consistent_count = 0;
 
         heyinfo_timer = millis();
+    }
+
+    // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer
+    // nbrLogSnapshot(). Nur im Loop, NICHT im Timer-Task -- laesst sich hier nicht
+    // verletzen, esp32loop() ist der Loop-Task. Laeuft nur, wenn das Flag gesetzt
+    // ist; nbrDebugApply() setzt nbrsnap_timer beim Einschalten zurueck, damit der
+    // erste Schnappschuss nicht erst 15 Minuten nach dem Einschalten kommt.
+    if(bNBRDEBUG && (uint32_t)(millis() - nbrsnap_timer) >= 900000UL)
+    {
+        nbrsnap_timer = millis();
+        nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
     }
 
     // TELEMETRY_INTERVAL in Minutes == 15 minutes default

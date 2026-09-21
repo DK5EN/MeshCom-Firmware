@@ -1,0 +1,300 @@
+{
+  "meta": {
+    "generated_by": "tools/nbrlog.py",
+    "format_vertrag": "docs/nbr-logformat.md"
+  },
+  "1_rahmen": {
+    "dateien": [
+      "tools/testdata/nbr/nbr_sample_24h.log"
+    ],
+    "von": "2026-09-20 00:00:00.000",
+    "bis": "2026-09-20 08:00:02.000",
+    "zeilen_gesamt": 54,
+    "nbr_zeilen": 46,
+    "verworfen_gesamt": 8,
+    "verworfen_gruende": {
+      "foreign_line": 8
+    },
+    "gefiltert_durch_since": 0,
+    "anomalien": {},
+    "reboots": 1,
+    "reboot_ereignisse": [
+      {
+        "host": "2026-09-20 03:10:20.010",
+        "up_vorher": 195,
+        "up_nachher": 0
+      }
+    ],
+    "luecken": [
+      {
+        "von": "2026-09-20 00:00:07.000",
+        "bis": "2026-09-20 03:09:55.000",
+        "dauer_s": 11388.0
+      },
+      {
+        "von": "2026-09-20 03:10:20.070",
+        "bis": "2026-09-20 08:00:00.010",
+        "dauer_s": 17379.9
+      }
+    ],
+    "anzahl_luecken": 2
+  },
+  "eigener_rufzeichen": "DK5EN-98",
+  "2_nachbarschaft": {
+    "anzahl_direkte_nachbarn": 3,
+    "je_nachbar": [
+      {
+        "rufzeichen": "DK5EN-93",
+        "anzahl": 4,
+        "typverteilung": {
+          "T": 4
+        },
+        "rssi_median": -87.5,
+        "rssi_min": -91,
+        "rssi_max": -83,
+        "rssi_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-20 00:00:05.010",
+        "letzte_sichtung": "2026-09-20 08:00:00.010"
+      },
+      {
+        "rufzeichen": "DK5EN-95",
+        "anzahl": 3,
+        "typverteilung": {
+          "P": 3
+        },
+        "rssi_median": -88,
+        "rssi_min": -89,
+        "rssi_max": -86,
+        "rssi_ohne_bericht": 0,
+        "erste_sichtung": "2026-09-20 00:00:05.020",
+        "letzte_sichtung": "2026-09-20 08:00:00.020"
+      },
+      {
+        "rufzeichen": "DK5EN-97",
+        "anzahl": 2,
+        "typverteilung": {
+          "H": 2
+        },
+        "rssi_median": -95,
+        "rssi_min": -95,
+        "rssi_max": -95,
+        "rssi_ohne_bericht": 1,
+        "erste_sichtung": "2026-09-20 00:00:05.030",
+        "letzte_sichtung": "2026-09-20 03:10:05.020"
+      }
+    ]
+  },
+  "3_kreuzmatrix": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DK5EN-93",
+        "anzahl_gehoert": 2,
+        "gehoert": [
+          "OE1AAA-1",
+          "OE9ZZZ-5"
+        ]
+      },
+      {
+        "rufzeichen": "DK5EN-95",
+        "anzahl_gehoert": 1,
+        "gehoert": [
+          "OE1AAA-1"
+        ]
+      },
+      {
+        "rufzeichen": "DK5EN-97",
+        "anzahl_gehoert": 0,
+        "gehoert": []
+      }
+    ],
+    "umgekehrt": [
+      {
+        "rufzeichen": "OE1AAA-1",
+        "gehoert_von": [
+          "DK5EN-93",
+          "DK5EN-95"
+        ]
+      },
+      {
+        "rufzeichen": "OE9ZZZ-5",
+        "gehoert_von": [
+          "DK5EN-93"
+        ]
+      }
+    ]
+  },
+  "4_urteil": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DK5EN-93",
+        "eigenes_urteil": "exklusiv",
+        "exklusive_knoten": [
+          "OE9ZZZ-5"
+        ],
+        "firmware_urteil": "EXCL",
+        "firmware_snapshot_up": 290,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DK5EN-95",
+        "eigenes_urteil": "redundant",
+        "exklusive_knoten": [],
+        "firmware_urteil": "RED",
+        "firmware_snapshot_up": 290,
+        "uebereinstimmung": true
+      },
+      {
+        "rufzeichen": "DK5EN-97",
+        "eigenes_urteil": "redundant",
+        "exklusive_knoten": [],
+        "firmware_urteil": null,
+        "firmware_snapshot_up": null,
+        "uebereinstimmung": null
+      }
+    ],
+    "abweichungen": [
+      {
+        "rufzeichen": "DK5EN-97",
+        "eigenes_urteil": "redundant",
+        "exklusive_knoten": [],
+        "firmware_urteil": null,
+        "firmware_snapshot_up": null,
+        "uebereinstimmung": null
+      }
+    ]
+  },
+  "5_stabilitaet": {
+    "je_nachbar": [
+      {
+        "rufzeichen": "DK5EN-93",
+        "verlauf": [
+          "EXCL",
+          "EXCL",
+          "EXCL"
+        ],
+        "anzahl_snapshots": 3,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "EXCL"
+      },
+      {
+        "rufzeichen": "DK5EN-95",
+        "verlauf": [
+          "RED",
+          "RED",
+          "RED"
+        ],
+        "anzahl_snapshots": 3,
+        "stabil_ab_snapshot": 1,
+        "letztes_urteil": "RED"
+      },
+      {
+        "rufzeichen": "DK5EN-97",
+        "verlauf": [],
+        "anzahl_snapshots": 0,
+        "stabil_ab_snapshot": null,
+        "letztes_urteil": null
+      }
+    ]
+  },
+  "6_tabellendruck": {
+    "reihen": [
+      {
+        "host": "2026-09-20 00:00:06.000",
+        "up": 1,
+        "rows": 3,
+        "maxrows": 21,
+        "voll": false
+      },
+      {
+        "host": "2026-09-20 03:10:06.000",
+        "up": 195,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      },
+      {
+        "host": "2026-09-20 08:00:01.000",
+        "up": 290,
+        "rows": 3,
+        "maxrows": 21,
+        "voll": false
+      }
+    ],
+    "rows_max": 21,
+    "rows_median": 3,
+    "ueberlauf_snapshots": [
+      {
+        "host": "2026-09-20 03:10:06.000",
+        "up": 195,
+        "rows": 21,
+        "maxrows": 21,
+        "voll": true
+      }
+    ],
+    "ueberlauf_erkannt": true,
+    "evict_pro_stunde": {
+      "2026-09-20 03": 3
+    },
+    "verdraengte_rufzeichen": {
+      "OE2QQQ-1": 2,
+      "OE6FFF-6": 1
+    },
+    "evict_gesamt": 3
+  },
+  "7_zwei_hop_schnitt": {
+    "frames_gekuerzt": 2,
+    "token_verworfen_gesamt": 5,
+    "verteilung_ntok": {
+      "4": 1,
+      "5": 1
+    },
+    "verteilung_verworfene_token": {
+      "2": 1,
+      "3": 1
+    }
+  },
+  "8_verworfene_frames": {
+    "pro_grund": {
+      "FULL": 1,
+      "LOOP": 1,
+      "TOK": 1,
+      "TYPE": 1
+    },
+    "pro_stunde_und_grund": {
+      "2026-09-20 00": {
+        "TOK": 1
+      },
+      "2026-09-20 03": {
+        "LOOP": 1,
+        "FULL": 1,
+        "TYPE": 1
+      }
+    },
+    "full_anzahl": 1,
+    "full_alarm": true
+  },
+  "9_positionen": {
+    "eigener_rufzeichen": "DK5EN-98",
+    "eigene_position_bekannt": true,
+    "knoten": [
+      {
+        "rufzeichen": "DK5EN-98",
+        "lat": 48.21,
+        "lon": 16.31,
+        "mesh": true,
+        "hw": 9,
+        "letzte_sichtung": "2026-09-20 00:00:05.100",
+        "entfernung_km": null
+      },
+      {
+        "rufzeichen": "OE1AAA-1",
+        "lat": 48.2005,
+        "lon": 16.3005,
+        "mesh": false,
+        "hw": 43,
+        "letzte_sichtung": "2026-09-20 08:00:00.060",
+        "entfernung_km": 1.269
+      }
+    ]
+  }
+}

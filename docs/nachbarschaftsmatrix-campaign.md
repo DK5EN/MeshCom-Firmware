@@ -20,3 +20,46 @@ ab `5ed69ee2` (fork-neo-test). Stufe 2 (Gateway-ACK-Zuordnung) ist zurueckgestel
 - 12 h = 720 min, 16-Bit-Minute seit Boot, Verfall beim Treffer, keine Persistenz.
 - N = 21 (S3, RAK4631, XML-Varianten), 13 (klassischer ESP32), 11 (ENABLE_TBEAM).
 - Gateway-ACKs bleiben in Stufe 1 anonym.
+
+## Kampagne 2 (2026-09-21): 2-Hop-Schnitt, Instrumentierung, 24-h-Dauertest
+
+Ausloeser: Im Feld tauchten Knoten in 3 und 4 Hop Entfernung in der Matrix auf. Gebraucht wird
+nur die HELLO-Aussage "welche Nachbarn haben meine direkt gehoerten Nachbarn" -- daraus faellt
+das Urteil, ob ein Nachbar selbst meshen muss (exklusive Nachbarn) oder ob sein Meshen redundant
+ist, weil ein anderer meiner Nachbarn dieselbe Menge abdeckt.
+
+| Welle | Inhalt                                                                                              | Dateien                                                                                                                                                                    | Stand    |
+| ----- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| W0    | Merge `fork-neo-test` (Byte-Ringe, Extern-UDP-Stack, MHeard-Drossel) in den Feature-Zweig           | `src/configuration_global.h` (Konflikt: Byte-Ring-Konstanten plus `NBR_MAX_ROWS`)                                                                                          | erledigt |
+| W1a   | 2-Hop-Schnitt in `nbrNoteFrame()`, `nbrNotePos()` legt keine Zeile mehr an, Log-Emitter, Host-Tests | `src/nbr_matrix.h`, `src/nbr_matrix.cpp`, `test/test_nbr_matrix/`                                                                                                          | laeuft   |
+| W1b   | Logparser, `meshlogger.py --flags`                                                                  | `tools/nbrlog.py`, `tools/meshlogger.py`, `tools/testdata/nbr/`                                                                                                            | laeuft   |
+| W2    | `--nbrdebug on/off` (node_sset4), Flagdefinition, Boot-Restore, 15-min-Takt fuer `nbrLogSnapshot()` | `src/command_functions.cpp`, `src/loop_functions*.{cpp,h}`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`, `test/test_command_toggles/` | laeuft   |
+| Gate  | Host-Tests, Board-Builds, String-Scan des Images, Advisor-Pass                                      | Orchestrator                                                                                                                                                               | offen    |
+| Feld  | OTA auf DK5EN-98, 24-h-Mitschnitt auf rpizero, Auswertung mit `tools/nbrlog.py`                     | Orchestrator + Betreiber                                                                                                                                                   | offen    |
+
+### Entscheidungen dieser Kampagne
+
+- **2-Hop-Fenster**: Zeilen entstehen nur noch aus den letzten zwei Pfad-Token. Eine Kante weiter
+  vorn im Pfad wird zusaetzlich eingetragen, wenn BEIDE Endpunkte schon eine Zeile haben -- das
+  kostet keine Zeile und ist per Konstruktion eine Kante zwischen Knoten <= 2 Hops.
+- **`nbrNotePos()` legt keine Zeile mehr an.** Mehrfach relayte POS-Frames brachten sonst Knoten
+  in 3+ Hop Entfernung in die Tabelle.
+- **Trennzeichen im Log ist `|`, nicht `;`** -- `printfdeb()` verschluckt Semikolons ausserhalb
+  von `--debug csv` (`src/printfdeb_format.h`). Format: `docs/nbr-logformat.md`.
+- **Eigenes Flag `--nbrdebug`**, nicht an `bLORADEBUG` gehaengt: der 24-h-Mitschnitt soll nicht im
+  RX-Mitschnitt ersaufen. `meshlogger.py` wird darum mit `--flags nbrdebug` gefahren.
+- **Mitschnitt**: `martin@rpizero.local`, `tools/meshlogger.py dk5en-98.local --hours 24`,
+  Ablage `~/meshlog/dk5en-98/YYYY-MM-DD.log`, rund 1,2 MB/h, 23 GB frei. Die Konsole auf TCP 2323
+  ist Ein-Client -- waehrend des Laufs nicht selbst verbinden.
+- **Flashen**: WiFi-OTA mit `tools/webflash.py` (Standardziel ist dk5en-98.local / Heltec V3).
+  `ota_0` ist der einzige App-Slot, ein Abbruch zerstoert die App.
+
+### Nachtrag W1a (erledigt)
+
+- `nbrTouchRow()` entfernt -- nach dem Umbau von `nbrNotePos()` hatte es keinen Aufrufer mehr.
+- `DROP FULL` ist bei `NBR_MAX_ROWS >= 3` praktisch unerreichbar geworden: das Fenster braucht nie
+  mehr als zwei neue Zeilen. Der Pfad bleibt als Sicherung stehen.
+- Das GW-Flag aus einem HEY-Frame wird nur noch gesetzt, wenn der Absender (erstes Pfad-Token)
+  eine aufgeloeste Zeile hat. Bei einem Absender ausserhalb des Fensters verfaellt es still --
+  notwendige Folge des Schnitts, der Knoten steht ohnehin nicht mehr in der Matrix.
+- `bNBRDEBUG` belegt `node_sset4` Bit `0x0010` (0x0001..0x0008 sind vergeben, alles darueber frei).

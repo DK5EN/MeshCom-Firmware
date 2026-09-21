@@ -46,6 +46,7 @@ extern bool bDEBUGCSV;
 extern bool bDEBUGEN;
 extern bool bDEBUGLNG;
 extern bool bLORADEBUG;
+extern bool bNBRDEBUG;
 extern bool bBLEDEBUG;
 extern bool bWXDEBUG;
 extern bool bIODEBUG;
@@ -422,6 +423,9 @@ extern unsigned long posinfo_timer;      // we check periodically to send GPS
 extern unsigned long posinfo_timer_min;
 extern unsigned long heyinfo_timer;      // we check periodically to send HEY
 extern int ncnt_hold;
+extern unsigned long nbrsnap_timer;      // --nbrdebug: 15-min-Takt fuer nbrLogSnapshot()
+
+void nbrDebugApply(void);                // nbrLog an bNBRDEBUG angleichen (lora_functions.cpp)
 
 extern unsigned long telemetry_timer;    // we check periodically to send TELEMETRY
 extern unsigned long temphum_timer;      // we check periodically get TEMP/HUM

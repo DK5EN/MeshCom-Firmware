@@ -32,6 +32,15 @@ static int   post_saw_sset;   // value of ssetA at the moment post() ran
 
 static void post_probe() { ++post_calls; post_saw_sset = ssetA; }
 
+// --nbrdebug (docs/nbr-logformat.md, 24-h-Dauertest): eigenes Paar, damit die
+// post()-Sonde den FERTIGEN Zustand von Flag und Bit unabhaengig von den
+// uebrigen Tests einfangen kann.
+static bool flagNbr;
+static int  ssetNbr;
+static bool nbr_post_flag_seen;
+static int  nbr_post_sset_seen;
+static void nbr_post_probe() { nbr_post_flag_seen = flagNbr; nbr_post_sset_seen = ssetNbr; }
+
 static const ToggleRow TBL[] =
 {
     // name              flag    sset    and_mask     or_mask      post         dirty            opt
@@ -43,6 +52,9 @@ static const ToggleRow TBL[] =
     { "--early on",     &flagA, &ssetA, 0xFFFFFFFF,  0x0040,      post_probe,  TG_DIRTY_NONE,   TG_POST_FIRST },
     { "--bare on",      nullptr,nullptr,0xFFFFFFFF,  0x00000000,  nullptr,     TG_DIRTY_NONE,   TG_ECHO_LN },
     { "--echof on",     nullptr,nullptr,0xFFFFFFFF,  0x00000000,  nullptr,     TG_DIRTY_NONE,   TG_ECHO_F },
+    // Nachbildung der beiden echten "--nbrdebug on/off"-Zeilen (src/command_functions.cpp).
+    { "--nbrdebug on",  &flagNbr, &ssetNbr, 0xFFFFFFFF, 0x0010,     nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrdebug off", &flagNbr, &ssetNbr, 0xFFFFFFEF, 0x00000000, nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
 };
 static const size_t N = sizeof(TBL) / sizeof(TBL[0]);
 
@@ -52,6 +64,10 @@ static void reset()
     ssetA = 0;
     post_calls = 0;
     post_saw_sset = -1;
+    flagNbr = false;
+    ssetNbr = 0;
+    nbr_post_flag_seen = false;
+    nbr_post_sset_seen = -1;
 }
 
 static ToggleAction run(const char *cmd) { return toggleApply(TBL, N, cmd); }
@@ -210,6 +226,57 @@ static void test_a_trailing_argument_does_not_match_a_toggle_row()
     TEST_ASSERT_TRUE(run("alpha on extra").matched);  // "on" token, then args
 }
 
+// --nbrdebug (docs/nbr-logformat.md, 24-h-Dauertest): "on" sets bit 0x0010 and
+// the flag, and the post() hook -- handed back for the caller to run after
+// save_settings(), like every non-POST_FIRST row -- must see the FINISHED
+// state: flag already true, bit already OR'd in.
+static void test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state()
+{
+    reset();
+    ToggleAction a = run("nbrdebug on");
+    TEST_ASSERT_TRUE(a.matched);
+    TEST_ASSERT_TRUE(flagNbr);
+    TEST_ASSERT_EQUAL_INT(0x0010, ssetNbr);
+    TEST_ASSERT_TRUE(a.save);
+    TEST_ASSERT_TRUE(a.ble_echo);
+    TEST_ASSERT_TRUE(a.post_after == nbr_post_probe);   // not run yet
+    TEST_ASSERT_FALSE(nbr_post_flag_seen);
+
+    a.post_after();
+    TEST_ASSERT_TRUE(nbr_post_flag_seen);
+    TEST_ASSERT_EQUAL_INT(0x0010, nbr_post_sset_seen);
+}
+
+// "off" clears both the flag and the bit, and nothing else in the word.
+static void test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state()
+{
+    reset();
+    flagNbr = true;
+    ssetNbr = 0x0010;
+    ToggleAction a = run("nbrdebug off");
+    TEST_ASSERT_TRUE(a.matched);
+    TEST_ASSERT_FALSE(flagNbr);
+    TEST_ASSERT_EQUAL_INT(0x0000, ssetNbr);
+    TEST_ASSERT_TRUE(a.save);
+    TEST_ASSERT_TRUE(a.ble_echo);   // --txcapture off's opt bits: TG_SAVE | TG_BLE_ECHO
+
+    a.post_after();
+    TEST_ASSERT_FALSE(nbr_post_flag_seen);
+    TEST_ASSERT_EQUAL_INT(0x0000, nbr_post_sset_seen);
+}
+
+// The off row's and_mask is the bitwise complement of the on row's or_mask
+// (0xFFFFFFEF == ~0x0010): a 32-bit mask, so it must leave bits 16-31 alone
+// like the tilde-style masks in command_toggles.h, not clear them like the
+// four literal AND-masks that share this table.
+static void test_nbrdebug_off_mask_leaves_upper_bits_alone()
+{
+    reset();
+    ssetNbr = (int)0x7FFF0010u;
+    run("nbrdebug off");
+    TEST_ASSERT_EQUAL_HEX32(0x7FFF0000u, (unsigned)ssetNbr);
+}
+
 // ---------------------------------------------------------------------------
 // EXT-02, second half (docs/BACKLOG.md 3.8as): the "--extudp off" row in the
 // REAL COMMAND_TOGGLES table (src/command_functions.cpp) used to carry
@@ -314,6 +381,68 @@ static std::string nth_field(const std::string &line, int index)
     return std::string();
 }
 
+// ---------------------------------------------------------------------------
+// The synthetic TBL[] above cannot catch a wrong bit or a dropped post() hook
+// in the REAL table (src/command_functions.cpp cannot be linked into this
+// native test -- see the EXT-02 comment above for why). Scan the source, same
+// technique as the EXT-02 checks below.
+// ---------------------------------------------------------------------------
+
+static void test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    std::istringstream lines(src);
+    std::string line;
+    std::string row_line;
+    while (std::getline(lines, line))
+    {
+        if (line.find("\"--nbrdebug on\"") != std::string::npos)
+        {
+            row_line = line;
+            break;
+        }
+    }
+    TEST_ASSERT_FALSE_MESSAGE(row_line.empty(),
+        "no '--nbrdebug on' row found in src/command_functions.cpp -- has COMMAND_TOGGLES moved?");
+
+    // Columns: name, flag, sset, and_mask, or_mask, post, dirty, opt.
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("&meshcom_settings.node_sset4", nth_field(row_line, 2).c_str(),
+        "'--nbrdebug on' row must persist into node_sset4, like --debug/--txcapture");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0010", nth_field(row_line, 4).c_str(),
+        "'--nbrdebug on' row's or_mask must be the free bit 0x0010 (docs/nbr-logformat.md contract)");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("nbrDebugApply", nth_field(row_line, 5).c_str(),
+        "'--nbrdebug on' row must run nbrDebugApply() -- otherwise a runtime toggle "
+        "does not take effect until the next boot");
+}
+
+static void test_real_nbrdebug_off_row_clears_only_bit_0x0010()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    std::istringstream lines(src);
+    std::string line;
+    std::string row_line;
+    while (std::getline(lines, line))
+    {
+        if (line.find("\"--nbrdebug off\"") != std::string::npos)
+        {
+            row_line = line;
+            break;
+        }
+    }
+    TEST_ASSERT_FALSE_MESSAGE(row_line.empty(),
+        "no '--nbrdebug off' row found in src/command_functions.cpp -- has COMMAND_TOGGLES moved?");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFEF", nth_field(row_line, 3).c_str(),
+        "'--nbrdebug off' row's and_mask must clear bit 0x0010 and nothing else");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x00000000", nth_field(row_line, 4).c_str(),
+        "'--nbrdebug off' row's or_mask must be zero");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("nbrDebugApply", nth_field(row_line, 5).c_str(),
+        "'--nbrdebug off' row must also run nbrDebugApply(), or the pointer stays live "
+        "after switching off");
+}
+
 static void test_real_extudp_off_row_has_a_non_null_post_action()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
@@ -384,6 +513,11 @@ int main(int, char **)
     RUN_TEST(test_echo_style_is_reported_per_row);
     RUN_TEST(test_matching_is_exact_token_not_prefix);
     RUN_TEST(test_a_trailing_argument_does_not_match_a_toggle_row);
+    RUN_TEST(test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state);
+    RUN_TEST(test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state);
+    RUN_TEST(test_nbrdebug_off_mask_leaves_upper_bits_alone);
+    RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply);
+    RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0010);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
     return UNITY_END();

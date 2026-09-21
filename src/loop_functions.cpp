@@ -105,6 +105,7 @@ bool bDEBUGCSV = false;
 bool bDEBUGEN = false;
 bool bDEBUGLNG = false;
 bool bLORADEBUG = false;
+bool bNBRDEBUG = false;   // --nbrdebug: [NBR]-Zeilen der Nachbarschaftsmatrix, getrennt von bLORADEBUG
 bool bBLEDEBUG = false;
 bool bWXDEBUG = false;
 bool bIODEBUG = false;
@@ -587,6 +588,7 @@ static bool bHaveOwnHeyTx = false;
 static unsigned long iHeyShotSuppressed = 0;
 unsigned long heyinfo_timer = 0;        // we check periodically to send HEY
 int ncnt_hold = 0;
+unsigned long nbrsnap_timer = 0;        // --nbrdebug: 15-min-Takt fuer nbrLogSnapshot()
 
 // Priority Queue arrays
 uint8_t ringPriority[MAX_RING];                 // Prio 1-5 pro Slot

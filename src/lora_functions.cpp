@@ -500,6 +500,30 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
     return true;
 }
 
+// --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix, docs/nbr-logformat.md):
+// Konsolen-Emitter fuer nbrLog. `line` ist eine fertig formatierte [NBR]-Zeile
+// ohne abschliessendes '\n' -- printfdeb() entfernt Semikolons ausserhalb von
+// --debug csv, deshalb NIE als Format-String durchreichen, nur als %s-Argument.
+static void nbrLogToConsole(const char *line)
+{
+    printfdeb("%s\n", line);
+}
+
+// Gleicht nbrLog an bNBRDEBUG an. Genau zwei Aufrufstellen: einmal beim Boot
+// (nach dem Zurueckziehen aus node_sset4) und einmal als post()-Hook der
+// --nbrdebug on/off-Toggle-Zeilen -- NICHT in OnRxDone() oder im Loop, damit
+// der Zeiger nicht bei jedem Frame neu gesetzt wird.
+void nbrDebugApply(void)
+{
+    nbrLog = bNBRDEBUG ? nbrLogToConsole : NULL;
+
+    // Beim Einschalten soll der erste Schnappschuss beim naechsten faelligen
+    // 15-Minuten-Takt kommen, nicht erst 15 Minuten nach dem Boot -- also den
+    // Takt hier zuruecksetzen statt nur beim Boot zu initialisieren.
+    if(bNBRDEBUG)
+        nbrsnap_timer = millis();
+}
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa RX functions
 
@@ -784,12 +808,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 if(bGATEWAY)
                     nbrMatrix.rows[0].flags |= NBR_FLAG_GW;
 
-                int nbr_hits = nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
-                                             aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
-                                             rssi, now_min);
-
-                if(bLORADEBUG)
-                    printfdeb("[NBR] hits=%d path=%s\n", nbr_hits, aprsmsg.msg_source_path);
+                // Trefferzahl (frueher "[NBR] hits=%d path=%s" hinter bLORADEBUG)
+                // ist im neuen EDGE/ME/CUT/DROP-Format (docs/nbr-logformat.md,
+                // Vertrag der Nachbarschaftsmatrix) nicht mehr vorgesehen -- die
+                // Zeilen dort tragen die gleiche Information pro Hoerbeziehung.
+                nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
+                             aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
+                             rssi, now_min);
 
                 // Relayte POS-Frames (Konzept 4.4): MHeard traegt die Position
                 // nur bei Direktempfang ein (unten, msg_source_call ==

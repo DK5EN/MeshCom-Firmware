@@ -90,6 +90,18 @@ struct NbrMatrix
     uint16_t last_sweep;   // Minute des letzten Geister-Sweeps, siehe NBR_WINDOW_MIN oben
 };
 
+// --- Instrumentierung fuer den 24-h-Dauertest (docs/nbr-logformat.md) -----
+//
+// Diese Datei bleibt Arduino-frei (siehe Kopfkommentar), darum kein direkter
+// printfdeb()-Aufruf: der Aufrufer (lora_functions.cpp) haengt einen
+// Funktionszeiger ein. NULL = Instrumentierung aus, keine einzige Zeile wird
+// formatiert. Das Zeilenformat (Trennzeichen '|', Feldreihenfolge je Typ)
+// steht verbindlich in docs/nbr-logformat.md; wer es hier aendert, aendert
+// dort mit. Eine Zeile kommt OHNE abschliessendes '\n' -- das haengt der
+// Aufrufer an.
+typedef void (*NbrLogFn)(const char *line);
+extern NbrLogFn nbrLog;
+
 // --- Aufbau und Alterung --------------------------------------------------
 
 // Setzt die Matrix komplett zurueck und traegt die eigene Zeile 0 ein.
@@ -118,52 +130,80 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // Wertet den Pfad eines empfangenen Frames aus. path ist "A,B,C" wie
 // msg_source_path (erster Eintrag = Absender, letzter = letzter Hop, bis zu
 // 121 Zeichen, hoechstens 8 Rufzeichen). type ist ':' Text, '!' Position,
-// '@' HEY; jeder andere Typ tut nichts und liefert 0.
+// '@' HEY; jeder andere Typ tut nichts und liefert 0 (Log: DROP TYPE).
 //
 // Ablauf: der Pfad wird in bis zu 8 Rufzeichen zerlegt, jedes 3..9 Zeichen
 // aus [A-Z0-9-]; verletzt das ein Token oder gibt es mehr als 8, wird der
-// GANZE Frame verworfen (-1), die Matrix bleibt unangetastet. Kommt ein
-// Rufzeichen zweimal vor (Schleife), wird ebenso verworfen (-2).
+// GANZE Frame verworfen (-1, Log: DROP TOK), die Matrix bleibt unangetastet.
+// Kommt ein Rufzeichen zweimal vor (Schleife), wird ebenso verworfen
+// (-2, Log: DROP LOOP). Diese beiden Pruefungen laufen ueber den GANZEN
+// Pfad, unabhaengig vom Fenster unten.
 //
-// Erst danach werden ALLE Pfad-Rufzeichen lesend aufgeloest (Zeile vorhanden
+// 2-Hop-Fenster (Betreiber-Vorgabe: das ist eine HELLO-Matrix, keine
+// vollstaendige Nachbarschaftskarte): NEUE Zeilen entstehen nur noch fuer
+// die letzten zwei Pfad-Token, start = (ntok > 2) ? ntok - 2 : 0. Fuer jedes
+// Token VOR start wird NIE eine Zeile geplant oder committet -- ein Knoten
+// in 3+ Hop Entfernung darf die Tabelle nicht mehr fuellen. Ist der Pfad
+// laenger als das Fenster, wird das genau einmal pro Frame geloggt (CUT).
+//
+// Erst werden ALLE Fenster-Rufzeichen lesend aufgeloest (Zeile vorhanden
 // oder Zielindex einer Neuanlage/Verdraengung), bevor irgendeine Zelle
 // angefasst wird: zwei neue Rufzeichen im selben Frame duerfen nicht
 // dieselbe Opferzeile bekommen (sonst faellt der zweite Treffer auf die
-// Diagonale). Findet sich fuer ein Rufzeichen keine freie und keine
+// Diagonale). Findet sich fuer ein Fenster-Rufzeichen keine freie und keine
 // verdraengbare Zeile mehr, weil alle anderen bereits fuer dieses Frame
-// vergeben sind, wird der GANZE Frame verworfen (-3), die Matrix bleibt bis
-// auf einen faelligen Geister-Sweep (siehe NBR_WINDOW_MIN) unangetastet.
+// vergeben sind, wird der GANZE Frame verworfen (-3, Log: DROP FULL), die
+// Matrix bleibt bis auf einen faelligen Geister-Sweep (siehe NBR_WINDOW_MIN)
+// unangetastet. Da das Fenster hoechstens 2 Token breit ist, ist dieser Pfad
+// bei NBR_MAX_ROWS >= 3 (jede reale Board-Konfiguration) praktisch nie mehr
+// erreichbar -- er bleibt als Sicherung fuer eine sehr kleine Tabelle stehen.
 //
-// Erst dann wird geschrieben: fuer jedes Paar (p[i], p[i+1]) ein Treffer auf
-// cell[p[i]][p[i+1]] mit dem passenden Typzaehler (saettigt bei 255) und
-// last_min; danach, sofern der letzte Hop nicht das eigene Rufzeichen ist
-// (sonst ist es das eigene Echo), ein Treffer auf cell[letzter_hop][0] mit
-// rssi = rssi_here (auf int8 begrenzt). Eine Zelle, deren last_min beim
-// Treffer bereits verfallen ist, faengt bei ihren Zaehlern neu bei 0 an
-// (Konzept 4.2), bevor der Treffer zaehlt. Zeilen werden bei Bedarf angelegt;
-// ist die Tabelle voll, weicht die Zeile 1..N-1 mit der aeltesten last_min,
-// ihre Zeilen- und Spaltenzellen werden genullt (Zeile 0 ist davon nie
-// betroffen).
+// Danach wird geschrieben: fuer jedes Paar (p[i], p[i+1]) mit i >= start ein
+// Treffer auf cell[p[i]][p[i+1]] (Log: EDGE) mit dem passenden Typzaehler
+// (saettigt bei 255) und last_min. Ein Paar mit i < start (ausserhalb des
+// Fensters) bekommt TROTZDEM einen Treffer, aber OHNE je eine neue Zeile
+// anzulegen, wenn BEIDE Enden bereits eine bestehende Zeile haben
+// (nbrFind() >= 0) -- jeder existierende Zeileninhaber ist per Konstruktion
+// hoechstens 2 Hops entfernt, eine Kante zwischen zwei solchen Knoten ist
+// gueltige Information und kostet keine Zeile. Danach, sofern der letzte Hop
+// nicht das eigene Rufzeichen ist (sonst ist es das eigene Echo), ein
+// Treffer auf cell[letzter_hop][0] mit rssi = rssi_here (Log: ME). Eine
+// Zelle, deren last_min beim Treffer bereits verfallen ist, faengt bei ihren
+// Zaehlern neu bei 0 an (Konzept 4.2), bevor der Treffer zaehlt. Ist die
+// Tabelle voll, weicht beim Anlegen einer Fenster-Zeile die Zeile 1..N-1 mit
+// der aeltesten last_min (Log: EVICT), ihre Zeilen- und Spaltenzellen werden
+// genullt (Zeile 0 ist davon nie betroffen).
 //
 // Bei '@' setzt dest_gw=true das GW-Flag auf die Zeile des Absenders
-// (erster Pfadeintrag). Bei '@' wird zusaetzlich payload als
-// "R<n>;g1;g2;..." gelesen (siehe appendHeySignalReport(),
-// src/aprs_functions.cpp:1134): Gruppe i (1-basiert) ist "NCT,RSSI,SNR" und
-// gehoert zum Paar (p[i-1], p[i]) -- ihre Zelle bekommt rssi = -RSSI. Eine
-// Gruppe, die nicht aus genau drei Kommafeldern besteht (oder fehlt, altes
-// Format), wird uebersprungen; die Pfadtreffer aus dem ersten Schritt zaehlen
-// trotzdem.
+// (erster Pfadeintrag, ueber nbrFind() aufgeloest -- Absender ist meist
+// ausserhalb des Fensters und bekommt dafuer keine neue Zeile). Bei '@' wird
+// zusaetzlich payload als "R<n>;g1;g2;..." gelesen (siehe
+// appendHeySignalReport(), src/aprs_functions.cpp:1134): Gruppe i (1-basiert)
+// ist "NCT,RSSI,SNR" und gehoert zum Paar (p[i-1], p[i]) -- ihre Zelle
+// bekommt rssi = -RSSI, aber NUR wenn beide Enden aufgeloest sind (im
+// Fenster liegen oder nach der Regel oben als bestehende Zeile gelten).
+// Eine Gruppe, die nicht aus genau drei Kommafeldern besteht (oder fehlt,
+// altes Format), wird uebersprungen; die Pfadtreffer aus dem ersten Schritt
+// zaehlen trotzdem.
 //
-// Rueckgabe: Zahl der gemachten Pfad-Treffer (>= 0), -1 bei ungueltigem
-// Rufzeichen/zu vielen Hops, -2 bei einer Schleife, -3 wenn im selben Frame
-// mehr neue Rufzeichen aufzuloesen waren als Opferzeilen frei blieben,
-// 0 bei unbekanntem Typ.
+// Rueckgabe: Zahl der gemachten Pfad-Treffer (>= 0, zaehlt nur tatsaechlich
+// geschriebene Zellen), -1 bei ungueltigem Rufzeichen/zu vielen Hops, -2 bei
+// einer Schleife, -3 wenn im selben Frame mehr neue Fenster-Rufzeichen
+// aufzuloesen waren als Opferzeilen frei blieben, 0 bei unbekanntem Typ.
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
                   bool dest_gw, int16_t rssi_here, uint16_t now_min);
 
-// Traegt eine Position ein (auch aus einem relayten POS-Frame, Konzept 4.4).
-// Legt die Zeile bei Bedarf an, setzt lat/lon und NBR_FLAG_POS, setzt oder
-// loescht NBR_FLAG_MESH, setzt hw und last_min = now_min.
+// Traegt eine Position NUR in eine BEREITS BESTEHENDE Zeile ein (Konzept
+// 4.4). Legt anders als frueher KEINE Zeile mehr an: der Aufrufer in
+// lora_functions.cpp reicht das Sender-Rufzeichen eines POS-Frames durch,
+// das durch mehrfaches Relayen aus 3+ Hop Entfernung stammen kann -- das
+// waere ein stiller Zeilen-Neuanlage-Pfad am 2-Hop-Fenster von
+// nbrNoteFrame() vorbei. Ein Knoten, der nur ueber relayte POS-Frames
+// sichtbar waere, bekommt damit BEWUSST keine Zeile. Ist call nicht
+// gefunden (nbrFind() < 0), kehrt die Funktion folgenlos zurueck. Die
+// eigene Zeile 0 existiert immer und wird darueber weiterhin gefuellt.
+// Setzt bei einem Treffer lat/lon und NBR_FLAG_POS, setzt oder loescht
+// NBR_FLAG_MESH, setzt hw und last_min = now_min (Log: POS).
 void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
                 uint8_t hw, uint16_t now_min);
 
@@ -217,6 +257,24 @@ float nbrReach(const NbrMatrix &m, int row, uint16_t now_min, int *partner);
 // Semantik) und liefert die von snprintf gemeldete Laenge, oder 0 bei
 // ungueltigem Index oder einer nicht belegten Zeile != 0.
 int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_t outlen);
+
+// Periodischer Schnappschuss fuer den 24-h-Dauertest (docs/nbr-logformat.md):
+// emittiert SNAP, dann je belegter Zeile (Zeile 0 immer, sonst nur mit
+// NBR_FLAG_USED) genau eine ROW-Zeile, dann ENDSNAP. Tut nichts, wenn
+// nbrLog == NULL. Entscheidet NICHT selbst ueber das 15-Minuten-Intervall --
+// das setzt der Aufrufer im Firmware-Rahmen; diese Funktion emittiert bei
+// jedem Aufruf.
+//
+// <verdict> je ROW ist eines aus EXCL/RED/LEAF/UNK (Konzept 4.3), aus der
+// bestehenden Urteilslogik von nbrExclusive() abgeleitet: Zeile 0 ist immer
+// UNK (die Frage "exklusiv/redundant" ist auf sich selbst nicht definiert).
+// Fuer jede andere Zeile: ohne frische cell[row][0] (kein Direktempfang von
+// mir) ist es LEAF, wenn irgendjemand die Zeile trotzdem hoert
+// (nbrHearers() > 0, nur ueber Relais sichtbar), sonst UNK (keinerlei
+// Beobachtung). Mit frischer cell[row][0] ist es EXCL, wenn kein anderer
+// Knoten in meiner Hoerweite die Zeile ebenfalls frisch hoert (dieselbe
+// Bedingung wie in nbrExclusive()), sonst RED (redundant gedeckt).
+void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min);
 
 // Eine gemeinsame Instanz fuers Geraet: geschrieben ausschliesslich aus
 // OnRxDone (lora_functions.cpp), gelesen von Web-Seite und --neighbours/

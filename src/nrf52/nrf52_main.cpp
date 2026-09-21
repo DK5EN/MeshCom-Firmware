@@ -131,6 +131,7 @@ void sendHeartbeat();
 #include <regex_functions.h>
 #include "setlog_lines.h"
 #include "dedup_functions.h"
+#include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <command_functions.h>
 #include <aprs_functions.h>
 #include <batt_functions.h>
@@ -634,6 +635,8 @@ void nrf52setup()
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
+    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0010;
+    nbrDebugApply();
 
     bDisplayInfo = bLORADEBUG;
 
@@ -2030,6 +2033,18 @@ void nrf52loop()
         trickle_consistent_count = 0;
 
         heyinfo_timer = millis();
+    }
+
+    // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer
+    // nbrLogSnapshot(). Nur im Loop, NICHT im Timer-Task -- der hat auf nRF52 nur
+    // 1 kB Stack, nbrLogSnapshot() formatiert in einen 160-Byte-Puffer und laeuft
+    // ueber alle Zeilen. Laeuft nur, wenn das Flag gesetzt ist; nbrDebugApply()
+    // setzt nbrsnap_timer beim Einschalten zurueck, damit der erste Schnappschuss
+    // nicht erst 15 Minuten nach dem Einschalten kommt.
+    if(bNBRDEBUG && (uint32_t)(millis() - nbrsnap_timer) >= 900000UL)
+    {
+        nbrsnap_timer = millis();
+        nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
     }
 
     // TELEMETRY_INTERVAL in Minutes == 15 minutes default
