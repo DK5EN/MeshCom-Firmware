@@ -184,6 +184,95 @@ static void test_leeres_zielrufzeichen_erzeugt_trailing_komma(void)
     TEST_ASSERT_EQUAL_STRING("DB0ABC-1,", m.msg_destination_path.c_str());
 }
 
+
+// ------------------------------------------------------- checkMesh(): --mesh
+//
+// checkMesh() ist die EINZIGE Relay-Schranke (lora_functions.cpp), und der
+// Vertrag im Kopf von via_functions.cpp sagt "false if bMESH == false", ohne
+// Ausnahme. Bis zum Fix gab der Via-Zweig hart true zurueck und las bMESH
+// nie -- "--mesh off" schaltete das Relay auf Via-Pfaden also nicht ab.
+
+// Hilfsaufbau: Frame mit Via-Pfad, der uns als Hop nennt.
+static void mkViaFrame(struct aprsMessage &m, const char *pfad, const char *ziel)
+{
+    initAPRS(m, ':');
+    m.msg_source_call = "DL2JA-2";          // fremder Absender, nicht wir
+    m.msg_payload = "hallo";
+    m.msg_destination_path = pfad;
+    m.msg_destination_call = ziel;
+}
+
+static void test_mesh_aus_kein_relay_trotz_eigenem_call_im_pfad(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-1");
+    struct aprsMessage m;
+    mkViaFrame(m, "DK5EN-1,OE1KBC-7", "OE1KBC-7");
+
+    bMESH = false;
+    TEST_ASSERT_FALSE(checkMesh(m));
+    bMESH = true;
+}
+
+static void test_mesh_an_relay_bei_eigenem_call_im_pfad(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-1");
+    struct aprsMessage m;
+    mkViaFrame(m, "DK5EN-1,OE1KBC-7", "OE1KBC-7");
+
+    bMESH = true;
+    TEST_ASSERT_TRUE(checkMesh(m));
+}
+
+// Praefix-Kollision: indexOf() traf auf jedes Rufzeichen, dessen Praefix das
+// eigene ist. DK5EN-1 hielt sich fuer den benannten Hop, sobald DK5EN-14 im
+// Pfad stand -- beide Rufzeichen gibt es in dieser Flotte.
+static void test_fremder_hop_mit_eigenem_call_als_praefix(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-1");
+    struct aprsMessage m;
+    mkViaFrame(m, "DK5EN-14,OE1KBC-7", "OE1KBC-7");
+
+    bMESH = true;
+    TEST_ASSERT_FALSE(checkMesh(m));
+}
+
+// Basisrufzeichen darf nicht auf die eigene SSID-Variante matchen.
+static void test_basisrufzeichen_matcht_nicht_auf_ssid(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-9");
+    struct aprsMessage m;
+    mkViaFrame(m, "DK5EN-98,DL2JA-2", "DL2JA-2");
+
+    bMESH = true;
+    TEST_ASSERT_FALSE(checkMesh(m));
+}
+
+// Ohne Via-Info (Pfad == Zielrufzeichen) gilt bMESH unveraendert -- dieser
+// Zweig war nie kaputt und bleibt es.
+static void test_ohne_via_info_folgt_bmesh(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-1");
+    struct aprsMessage m;
+    mkViaFrame(m, "*", "*");
+
+    bMESH = false;
+    TEST_ASSERT_FALSE(checkMesh(m));
+    bMESH = true;
+    TEST_ASSERT_TRUE(checkMesh(m));
+}
+
+// Abschliessendes Komma erzeugt checkVia() selbst (s. Testfall oben) -- der
+// Token-Vergleich darf daran nicht haengenbleiben.
+static void test_trailing_komma_im_pfad(void)
+{
+    snprintf(meshcom_settings.node_call, sizeof(meshcom_settings.node_call), "%s", "DK5EN-1");
+    struct aprsMessage m;
+    mkViaFrame(m, "DK5EN-1,", "");
+
+    bMESH = true;
+    TEST_ASSERT_TRUE(checkMesh(m));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -195,5 +284,11 @@ int main(int argc, char **argv)
     RUN_TEST(test_node_via_gesetzt_ziel_mit_ssid);
     RUN_TEST(test_pfadkonstruktion_genau_ein_komma);
     RUN_TEST(test_leeres_zielrufzeichen_erzeugt_trailing_komma);
+    RUN_TEST(test_mesh_aus_kein_relay_trotz_eigenem_call_im_pfad);
+    RUN_TEST(test_mesh_an_relay_bei_eigenem_call_im_pfad);
+    RUN_TEST(test_fremder_hop_mit_eigenem_call_als_praefix);
+    RUN_TEST(test_basisrufzeichen_matcht_nicht_auf_ssid);
+    RUN_TEST(test_ohne_via_info_folgt_bmesh);
+    RUN_TEST(test_trailing_komma_im_pfad);
     return UNITY_END();
 }
