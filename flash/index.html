@@ -107,6 +107,12 @@
         border: 1px solid var(--border);
         border-radius: 7px;
       }
+      .hint {
+        margin: 8px 0 0;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: var(--muted);
+      }
       .action {
         border-top: 1px solid var(--border);
         padding-top: 18px;
@@ -179,6 +185,12 @@
           <div class="field">
             <label for="board">Board</label>
             <select id="board"><option>lade ...</option></select>
+            <p class="hint">
+              Mehrere Eintraege zum selben Board unterscheiden sich im Funkchip, nicht in der
+              Boardrevision. Passt der gewaehlte Chip nicht, meldet der Knoten beim Start
+              <code>Chip Initializing ... failed</code> &mdash; dann einfach mit dem richtigen
+              Eintrag neu flashen.
+            </p>
           </div>
           <div class="field">
             <label for="version">Version</label>

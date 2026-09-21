@@ -104,7 +104,7 @@
         {
           "env": "ttgo_tbeam",
           "group": "LilyGo",
-          "name": "T-Beam v1.1 (SX1276)",
+          "name": "T-Beam (SX1276)",
           "chipFamily": "ESP32"
         },
         {
@@ -116,7 +116,7 @@
         {
           "env": "ttgo_tbeam_SX1262",
           "group": "LilyGo",
-          "name": "T-Beam v1.2 (SX1262)",
+          "name": "T-Beam (SX1262)",
           "chipFamily": "ESP32"
         },
         {
