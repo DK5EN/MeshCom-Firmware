@@ -75,7 +75,9 @@ RELEASE_ENVS = [
     "wiscore_rak4631",
 ]
 
-# env -> (vendor group, display name). The only hand-maintained table here.
+# env -> (vendor group, board name). The radio chip is NOT in here: it is
+# derived from the variant's configuration.h and appended by radio_label().
+# The only hand-maintained table in this file.
 DISPLAY = {
     "heltec_wifi_lora_32_V2": ("Heltec", "WiFi LoRa 32 V2"),
     "heltec_wifi_lora_32_V3": ("Heltec", "WiFi LoRa 32 V3"),
@@ -86,34 +88,77 @@ DISPLAY = {
     "vision-master-e290": ("Heltec", "Vision Master E290"),
     "wireless-paper": ("Heltec", "Wireless Paper"),
     "heltec_t114": ("Heltec", "Mesh Node T114"),
-    # The three T-Beam envs differ ONLY in the radio chip (BOARD_TBEAM /
-    # BOARD_SX1262 / BOARD_SX1268); they share one board definition. Naming
-    # them after a board revision invents a distinction the code does not
-    # make, and it misled a bench flash on 2026-09-21: a v1.2 board carrying
-    # an SX1276 got the "v1.2" entry and came up with
-    # "SX1262 chip Initializing ... failed, code -2".
-    "ttgo_tbeam": ("LilyGo", "T-Beam (SX1276)"),
-    "ttgo_tbeam_SX1262": ("LilyGo", "T-Beam (SX1262)"),
-    "ttgo_tbeam_SX1268": ("LilyGo", "T-Beam (SX1268)"),
+    "ttgo_tbeam": ("LilyGo", "T-Beam"),
+    "ttgo_tbeam_SX1262": ("LilyGo", "T-Beam"),
+    "ttgo_tbeam_SX1268": ("LilyGo", "T-Beam"),
     "ttgo_tbeam_supreme": ("LilyGo", "T-Beam Supreme"),
     "LilyGo_T-Beam-1W": ("LilyGo", "T-Beam 1 W"),
     "LilyGo_T3_S3_V1_3": ("LilyGo", "T3-S3 V1.3"),
     "LilyGo_T_Connect_Pro": ("LilyGo", "T-Connect Pro"),
-    "T-ETH-ELITE_1262": ("LilyGo", "T-ETH-Elite (SX1262)"),
+    "T-ETH-ELITE_1262": ("LilyGo", "T-ETH-Elite"),
     "ttgo-lora32-v21": ("LilyGo", "TTGO LoRa32 V2.1"),
     "t_deck": ("LilyGo", "T-Deck"),
     "t_deck_plus": ("LilyGo", "T-Deck Plus"),
     "t_deck_pro": ("LilyGo", "T-Deck Pro"),
     "t_echo": ("LilyGo", "T-Echo"),
     "wiscore_rak4631": ("RAKwireless", "WisBlock RAK4631"),
-    "E22-DevKitC": ("DevKit", "ESP32 DevKitC + E22 (SX1262)"),
+    "E22-DevKitC": ("DevKit", "ESP32 DevKitC + E22"),
     "E22_1262-DevKitC": ("DevKit", "ESP32 DevKitC + E22-900M22S"),
     "E22_XML-DevKitC": ("DevKit", "ESP32 DevKitC + E22 (XML)"),
-    "E22_1262_S3-DevKitC-1-N16R8": ("DevKit", "ESP32-S3 DevKitC-1 + E22 (SX1262)"),
-    "E22_1268_S3-DevKitC-1-N16R8": ("DevKit", "ESP32-S3 DevKitC-1 + E22 (SX1268)"),
+    "E22_1262_S3-DevKitC-1-N16R8": ("DevKit", "ESP32-S3 DevKitC-1 + E22-900M30S"),
+    "E22_1268_S3-DevKitC-1-N16R8": ("DevKit", "ESP32-S3 DevKitC-1 + E22-400M30S"),
     "esp32-loraprs-e22": ("DevKit", "LoRa-APRS ESP32 + E22"),
     "esp32-loraprs-ra01": ("DevKit", "LoRa-APRS ESP32 + RA-01"),
 }
+
+# Which RadioLib class each variant define actually instantiates. Ground truth
+# is the `extern SX12xx radio;` blocks in src/lora_functions.cpp and
+# src/lora_setchip.cpp -- not the define's name, which does not always match
+# (SX126X declares an SX1268, SX126x_V3 declares nothing on its own).
+RADIO_DEFINE_TO_CHIP = {
+    "SX127X": "SX1278",
+    "SX1262X": "SX1262",
+    "SX126X": "SX1268",
+    "SX1262_E22": "SX1262",
+    "SX1268_E22": "SX1268",
+    "USING_SX1262": "SX1262",
+    "SX1262_V3": "SX1262",
+    "SX1262_V4": "SX1262",
+    "SX1262_E290": "SX1262",
+    "SX1262_WIRELESS_PAPER": "SX1262",
+    "BOARD_E220": "LLCC68",
+}
+
+# SX1276/77/78/79 are one piece of silicon sold for different frequency bands;
+# the firmware drives all four through RadioLib's SX1278 class, so a single
+# image covers every one of them. The SX126x parts really are different chips.
+CHIP_LABEL = {
+    "SX1278": "SX1276/77/78/79",
+    "SX1262": "SX1262",
+    "SX1268": "SX1268",
+    "LLCC68": "LLCC68",
+}
+
+# The nRF52 boards take the SX126x-RAK4630 driver (src/nrf52/nrf52_main.cpp),
+# which has no variant define to read.
+NRF52_CHIP = "SX1262"
+
+def radio_chip(env: str, family: str, repo: Path = REPO) -> str:
+    """The RadioLib class this env's firmware instantiates."""
+    if family == "NRF52":
+        return NRF52_CHIP
+    cfg_h = repo / "variants" / env / "configuration.h"
+    if not cfg_h.is_file():
+        raise SystemExit(f"{env}: no variants/{env}/configuration.h to read the radio from")
+    found = set()
+    for line in cfg_h.read_text(errors="replace").splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 2 and parts[0] == "#define" and parts[1] in RADIO_DEFINE_TO_CHIP:
+            found.add(RADIO_DEFINE_TO_CHIP[parts[1]])
+    if len(found) != 1:
+        raise SystemExit(f"{env}: radio defines resolve to {sorted(found) or 'nothing'}")
+    return found.pop()
+
 
 MCU_FAMILY = {
     "esp32": "ESP32",
@@ -262,6 +307,7 @@ def uf2_from_hex(hex_path: Path, out: Path) -> None:
 def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: Path) -> dict:
     """Write one board folder. Returns its releases.json entry."""
     family = chip_family(cfg, env, repo)
+    radio = CHIP_LABEL[radio_chip(env, family, repo)]
     group, name = DISPLAY[env]
     dest.mkdir(parents=True, exist_ok=True)
 
@@ -281,14 +327,20 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
         builds = [{"chipFamily": family, "parts": parts}]
 
     manifest = {
-        "name": f"MeshCom {group} {name}",
+        "name": f"MeshCom {group} {name} ({radio})",
         "version": version,
         "new_install_prompt_erase": True,
         "new_install_improv_wait_time": 0,
         "builds": builds,
     }
     (dest / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    return {"env": env, "group": group, "name": name, "chipFamily": family}
+    return {
+        "env": env,
+        "group": group,
+        "name": name,
+        "radio": radio,
+        "chipFamily": family,
+    }
 
 
 def stage(version: str, out: Path, repo: Path = REPO, envs=None) -> list[dict]:

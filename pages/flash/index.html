@@ -186,10 +186,13 @@
             <label for="board">Board</label>
             <select id="board"><option>lade ...</option></select>
             <p class="hint">
-              Mehrere Eintraege zum selben Board unterscheiden sich im Funkchip, nicht in der
-              Boardrevision. Passt der gewaehlte Chip nicht, meldet der Knoten beim Start
-              <code>Chip Initializing ... failed</code> &mdash; dann einfach mit dem richtigen
-              Eintrag neu flashen.
+              Hinter dem Gedankenstrich steht der Funkchip. Mehrere Eintraege zum selben Board
+              unterscheiden sich darin, nicht in der Boardrevision.
+              <strong>SX1276, SX1277, SX1278 und SX1279 sind dasselbe Bauteil</strong> in
+              verschiedenen Frequenzbaendern &mdash; ein Abbild deckt alle vier ab. SX1262 und
+              SX1268 sind dagegen wirklich verschiedene Chips. Passt die Wahl nicht, meldet der
+              Knoten beim Start <code>Chip Initializing ... failed</code>; dann einfach mit dem
+              richtigen Eintrag neu flashen.
             </p>
           </div>
           <div class="field">

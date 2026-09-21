@@ -57,7 +57,7 @@ function fillBoards(keepEnv) {
     for (const b of boards) {
       const o = document.createElement('option');
       o.value = b.env;
-      o.textContent = b.name;
+      o.textContent = b.radio ? `${b.name} \u2014 ${b.radio}` : b.name;
       og.append(o);
     }
     boardSel.append(og);

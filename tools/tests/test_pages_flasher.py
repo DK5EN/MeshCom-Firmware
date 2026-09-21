@@ -112,6 +112,58 @@ def test_t_deck_pro_falls_back_to_family_default(cfg, tmp_path):
 
 
 # --------------------------------------------------------------------------
+# radio chip, derived from the variant header
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "env,chip",
+    [
+        ("ttgo_tbeam", "SX1278"),            # SX127X
+        ("ttgo_tbeam_SX1262", "SX1262"),     # SX1262X
+        ("ttgo_tbeam_SX1268", "SX1268"),     # SX126X -> declares an SX1268
+        ("E22-DevKitC", "SX1268"),           # SX126X, NOT an SX1262
+        ("E22_1262_S3-DevKitC-1-N16R8", "SX1262"),  # SX126x_V3 + SX1262_E22
+        ("E22_1268_S3-DevKitC-1-N16R8", "SX1268"),  # SX126x_V3 + SX1268_E22
+        ("heltec_wifi_lora_32_V3", "SX1262"),  # SX1262_V3
+        ("wireless-paper", "SX1262"),          # two defines, one chip
+        ("wiscore_rak4631", "SX1262"),         # nRF52, no variant define
+    ],
+)
+def test_radio_chip_from_variant_header(env, chip, cfg):
+    assert pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO) == chip
+
+
+def test_every_release_env_yields_exactly_one_radio(cfg):
+    for env in pf.RELEASE_ENVS:
+        chip = pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO)
+        assert chip in pf.CHIP_LABEL
+
+
+def test_sx127x_family_is_labelled_as_one_part():
+    """SX1276/77/78/79 are one piece of silicon; one image covers all four."""
+    assert pf.CHIP_LABEL["SX1278"] == "SX1276/77/78/79"
+    assert pf.CHIP_LABEL["SX1262"] == "SX1262"
+    assert pf.CHIP_LABEL["SX1268"] == "SX1268"
+
+
+def test_display_names_carry_no_chip_text():
+    """The chip belongs to radio_chip(), not to the hand-maintained table."""
+    for env, (_group, name) in pf.DISPLAY.items():
+        assert "SX12" not in name.upper(), f"{env}: chip text in the display name"
+
+
+def test_boards_sharing_a_name_are_told_apart_by_the_radio(cfg):
+    labels = {}
+    for env in pf.RELEASE_ENVS:
+        group, name = pf.DISPLAY[env]
+        radio = pf.CHIP_LABEL[pf.radio_chip(env, pf.chip_family(cfg, env, REPO), REPO)]
+        key = (group, name, radio)
+        assert key not in labels, f"{env} and {labels.get(key)} render identically"
+        labels[key] = env
+
+
+# --------------------------------------------------------------------------
 # staging
 # --------------------------------------------------------------------------
 
