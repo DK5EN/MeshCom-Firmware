@@ -34,6 +34,7 @@ src/esp32/loop_actions_esp32.cpp
 src/esp32/serial_command_esp32.cpp
 src/esp32/udp_drain_esp32.cpp
 src/esp32/udp_frame_esp32.cpp
+src/extern_msg_json.h
 src/extudp_functions.cpp
 src/extudp_functions.h
 src/gateway_service.h
