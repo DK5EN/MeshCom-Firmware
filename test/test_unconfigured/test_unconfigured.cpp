@@ -7,6 +7,11 @@
 //   * isUnconfiguredCall() (configuration_global.h) -- reines Praedikat,
 //     das RX-01 (Drop-Punkt in lora_functions.cpp/udp_functions.cpp) und
 //     TX-01 (Guard in addTxRingEntry()/doTX()) gemeinsam benutzen.
+//   * makeDhcpHostname() (configuration_global.h) -- baut aus demselben
+//     Praedikat (isUnconfiguredCall statt isNodeUnconfigured, siehe dortiger
+//     Kommentar) einen DHCP-Option-12-Hostnamen aus dem Rufzeichen. Kein
+//     RX-01/TX-01-Guard selbst, aber derselbe Header, dieselbe Vorbedingung,
+//     dieselbe Suite.
 //   * addTxRingEntry() (txring_functions.cpp) -- der TX-01-Ring-Guard: -1
 //     wenn meshcom_settings.node_call unkonfiguriert ist, normales Enqueue
 //     sonst. Inklusive Zaehler (stat_tx_refuse_unconfigured) und der
@@ -133,6 +138,139 @@ static void test_isUnconfiguredCall_predicate(void)
     TEST_ASSERT_FALSE(isUnconfiguredCall("None"));
 }
 
+// ------------------------------------------------- Test 1b: makeDhcpHostname
+
+// Fuellt buf komplett mit einem Sentinel-Byte, ruft makeDhcpHostname() mit
+// einem (laut isUnconfiguredCall()) unkonfigurierten Rufzeichen auf und prueft
+// beides: Rueckgabe false UND Puffer komplett unangetastet -- der fruehe
+// return in makeDhcpHostname() (out==nullptr || n<2 || isUnconfiguredCall())
+// schreibt kein einziges Byte, bevor er zurueckkehrt.
+static void assertRefusedAndUntouched(const char *call)
+{
+    char buf[8];
+    memset(buf, 0xAA, sizeof(buf));
+    char before[8];
+    memcpy(before, buf, sizeof(buf));
+
+    TEST_ASSERT_FALSE(makeDhcpHostname(buf, sizeof(buf), call));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY((uint8_t *)before, (uint8_t *)buf, sizeof(buf));
+}
+
+static void test_makeDhcpHostname_configured_call_roundtrip(void)
+{
+    char buf[32];
+    memset(buf, 0xAA, sizeof(buf));
+
+    TEST_ASSERT_TRUE(makeDhcpHostname(buf, sizeof(buf), "DK5EN-93"));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-93", buf);
+}
+
+// makeDhcpHostname() hat keinen Gross-/Kleinschreibungs-Schritt -- der
+// Zeichenfilter laesst a-z genauso durch wie A-Z (siehe "ok"-Bedingung im
+// Helfer). Kleingeschriebene Eingabe kommt also unveraendert zurueck.
+static void test_makeDhcpHostname_lowercase_not_uppercased(void)
+{
+    char buf[32];
+    memset(buf, 0xAA, sizeof(buf));
+
+    TEST_ASSERT_TRUE(makeDhcpHostname(buf, sizeof(buf), "dk5en-93"));
+    TEST_ASSERT_EQUAL_STRING("dk5en-93", buf);
+}
+
+static void test_makeDhcpHostname_refuses_unconfigured_and_leaves_buffer_untouched(void)
+{
+    assertRefusedAndUntouched(DEFAULT_CALL);        // "XX0XXX-00"
+    assertRefusedAndUntouched(DEFAULT_CALL_PREFIX); // "XX0XXX", ohne SSID
+    assertRefusedAndUntouched("");
+    assertRefusedAndUntouched("none");
+    assertRefusedAndUntouched(nullptr);
+}
+
+// '/' und '_' sind kein Bestandteil eines Rufzeichens (checkRegexCall()
+// filtert das im Normalfall schon vorher aus) -- die Rueckfallebene in
+// makeDhcpHostname() bildet beide auf '-' ab.
+static void test_makeDhcpHostname_illegal_chars_mapped_to_hyphen(void)
+{
+    char buf[32];
+    memset(buf, 0xAA, sizeof(buf));
+
+    TEST_ASSERT_TRUE(makeDhcpHostname(buf, sizeof(buf), "DK5EN/9_3"));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-9-3", buf);
+}
+
+// Zeichen, die auf '-' abgebildet werden UND am Ende landen, werden per
+// RFC 1123 (Label endet alphanumerisch) wieder entfernt -- hier durch zwei
+// illegale Endzeichen ('/' und '_') erzeugt, nicht durch woertliche '-'.
+static void test_makeDhcpHostname_trailing_hyphens_trimmed(void)
+{
+    char buf[32];
+    memset(buf, 0xAA, sizeof(buf));
+
+    TEST_ASSERT_TRUE(makeDhcpHostname(buf, sizeof(buf), "DK5EN-93/_"));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-93", buf);
+}
+
+// Interessanter Randfall: eine Eingabe, die NUR aus illegalen Zeichen
+// besteht. Die Schleife schreibt sie alle als '-' (o=3), der Trim-Schritt
+// laeuft danach bis o==0 zurueck (alle drei sind '-'), also gibt der Helfer
+// false zurueck (o>0 ist falsch). ABER: anders als beim fruehen return oben
+// ist der Puffer NICHT unangetastet -- out[0..2] wurden von der Schleife
+// bereits mit '-' beschrieben, nur out[0] wird danach zusaetzlich auf NUL
+// gesetzt (die Terminierung liegt bei Index o, hier 0). out[1]/out[2] bleiben
+// als '-' stehen, der Rest des Puffers bleibt Sentinel. Das ist aus Helfer-
+// Sicht unschaedlich (Rueckgabewert false, Aufrufer darf out bei false
+// ohnehin nicht benutzen), aber eben kein "Puffer unveraendert" wie bei den
+// fruehen returns -- bewusst so mitgetestet statt angenommen.
+static void test_makeDhcpHostname_all_illegal_chars_returns_false(void)
+{
+    char buf[8];
+    memset(buf, 0xAA, sizeof(buf));
+
+    TEST_ASSERT_FALSE(makeDhcpHostname(buf, sizeof(buf), "___"));
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)buf[0]);          // Terminator bei o==0
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)'-', (uint8_t)buf[1]); // von der Schleife geschrieben, vom Trim nicht geloescht
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)'-', (uint8_t)buf[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)buf[3]);       // ab hier: von der Schleife nie erreicht
+}
+
+// Eingabe laenger als der Puffer: die Schleifenbedingung "o < n-1" schneidet
+// bei n-1 Zeichen ab, danach folgt IMMER "out[o]=0" -- bei n=8 landet der
+// Terminator also exakt auf dem letzten Byte des Puffers, nie dahinter.
+// Guard-Bytes vor und hinter dem eigentlichen Puffer decken einen Overrun in
+// beide Richtungen ab.
+static void test_makeDhcpHostname_truncates_to_buffer_and_never_overruns(void)
+{
+    char storage[14];
+    memset(storage, 0xAA, sizeof(storage));
+    char *out = storage + 3; // storage[0..2] und storage[11..13] sind Guard-Zonen
+    unsigned long n = 8;
+
+    TEST_ASSERT_TRUE(makeDhcpHostname(out, n, "DK5ENALPHA99"));
+    TEST_ASSERT_EQUAL_STRING("DK5ENAL", out); // erste n-1 = 7 Zeichen, kein Trim noetig
+
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[11]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[12]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)storage[13]);
+}
+
+// n<2 (und out==nullptr) sind die beiden anderen fruehen returns -- keiner
+// von ihnen erreicht die Schleife, der Puffer bleibt unangetastet.
+static void test_makeDhcpHostname_guard_clauses_write_nothing(void)
+{
+    TEST_ASSERT_FALSE(makeDhcpHostname(nullptr, 8, "DK5EN-93"));
+
+    char buf[4];
+    memset(buf, 0xAA, sizeof(buf));
+    TEST_ASSERT_FALSE(makeDhcpHostname(buf, 1, "DK5EN-93"));
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)buf[0]);
+
+    TEST_ASSERT_FALSE(makeDhcpHostname(buf, 0, "DK5EN-93"));
+    TEST_ASSERT_EQUAL_UINT8(0xAA, (uint8_t)buf[0]);
+}
+
 // ------------------------------------------- Test 2: addTxRingEntry()-Guard
 
 static void test_addTxRingEntry_refuses_when_node_unconfigured(void)
@@ -238,6 +376,14 @@ int main(int argc, char **argv)
     (void)argc; (void)argv;
     UNITY_BEGIN();
     RUN_TEST(test_isUnconfiguredCall_predicate);
+    RUN_TEST(test_makeDhcpHostname_configured_call_roundtrip);
+    RUN_TEST(test_makeDhcpHostname_lowercase_not_uppercased);
+    RUN_TEST(test_makeDhcpHostname_refuses_unconfigured_and_leaves_buffer_untouched);
+    RUN_TEST(test_makeDhcpHostname_illegal_chars_mapped_to_hyphen);
+    RUN_TEST(test_makeDhcpHostname_trailing_hyphens_trimmed);
+    RUN_TEST(test_makeDhcpHostname_all_illegal_chars_returns_false);
+    RUN_TEST(test_makeDhcpHostname_truncates_to_buffer_and_never_overruns);
+    RUN_TEST(test_makeDhcpHostname_guard_clauses_write_nothing);
     RUN_TEST(test_addTxRingEntry_refuses_when_node_unconfigured);
     RUN_TEST(test_addTxRingEntry_refuses_for_empty_and_none);
     RUN_TEST(test_addTxRingEntry_queues_when_node_configured);

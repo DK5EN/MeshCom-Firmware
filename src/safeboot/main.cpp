@@ -92,6 +92,12 @@ void wifiConnect() {
    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
+   // Use the same DHCP hostname as the firmware/mDNS so the node shows up
+   // under one name in OTA mode too.
+   char host[32];
+   if(makeDhcpHostname(host, sizeof(host), meshcom_settings.node_call))
+     WiFi.setHostname(host);
+
    WiFi.mode(WIFI_STA);
    WiFi.disconnect(true);
 
