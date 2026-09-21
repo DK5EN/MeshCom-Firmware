@@ -28,14 +28,14 @@ nur die HELLO-Aussage "welche Nachbarn haben meine direkt gehoerten Nachbarn" --
 das Urteil, ob ein Nachbar selbst meshen muss (exklusive Nachbarn) oder ob sein Meshen redundant
 ist, weil ein anderer meiner Nachbarn dieselbe Menge abdeckt.
 
-| Welle | Inhalt                                                                                              | Dateien                                                                                                                                                                    | Stand    |
-| ----- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| W0    | Merge `fork-neo-test` (Byte-Ringe, Extern-UDP-Stack, MHeard-Drossel) in den Feature-Zweig           | `src/configuration_global.h` (Konflikt: Byte-Ring-Konstanten plus `NBR_MAX_ROWS`)                                                                                          | erledigt |
-| W1a   | 2-Hop-Schnitt in `nbrNoteFrame()`, `nbrNotePos()` legt keine Zeile mehr an, Log-Emitter, Host-Tests | `src/nbr_matrix.h`, `src/nbr_matrix.cpp`, `test/test_nbr_matrix/`                                                                                                          | laeuft   |
-| W1b   | Logparser, `meshlogger.py --flags`                                                                  | `tools/nbrlog.py`, `tools/meshlogger.py`, `tools/testdata/nbr/`                                                                                                            | laeuft   |
-| W2    | `--nbrdebug on/off` (node_sset4), Flagdefinition, Boot-Restore, 15-min-Takt fuer `nbrLogSnapshot()` | `src/command_functions.cpp`, `src/loop_functions*.{cpp,h}`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`, `test/test_command_toggles/` | laeuft   |
-| Gate  | Host-Tests, Board-Builds, String-Scan des Images, Advisor-Pass                                      | Orchestrator                                                                                                                                                               | offen    |
-| Feld  | OTA auf DK5EN-98, 24-h-Mitschnitt auf rpizero, Auswertung mit `tools/nbrlog.py`                     | Orchestrator + Betreiber                                                                                                                                                   | offen    |
+| Welle | Inhalt                                                                                              | Dateien                                                                                                                                                                    | Stand                 |
+| ----- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| W0    | Merge `fork-neo-test` (Byte-Ringe, Extern-UDP-Stack, MHeard-Drossel) in den Feature-Zweig           | `src/configuration_global.h` (Konflikt: Byte-Ring-Konstanten plus `NBR_MAX_ROWS`)                                                                                          | erledigt              |
+| W1a   | 2-Hop-Schnitt in `nbrNoteFrame()`, `nbrNotePos()` legt keine Zeile mehr an, Log-Emitter, Host-Tests | `src/nbr_matrix.h`, `src/nbr_matrix.cpp`, `test/test_nbr_matrix/`                                                                                                          | laeuft                |
+| W1b   | Logparser, `meshlogger.py --flags`                                                                  | `tools/nbrlog.py`, `tools/meshlogger.py`, `tools/testdata/nbr/`                                                                                                            | laeuft                |
+| W2    | `--nbrdebug on/off` (node_sset4), Flagdefinition, Boot-Restore, 15-min-Takt fuer `nbrLogSnapshot()` | `src/command_functions.cpp`, `src/loop_functions*.{cpp,h}`, `src/esp32/esp32_main.cpp`, `src/nrf52/nrf52_main.cpp`, `src/lora_functions.cpp`, `test/test_command_toggles/` | erledigt (`7065b587`) |
+| Gate  | Host-Tests, Board-Builds, String-Scan des Images, Advisor-Pass                                      | Orchestrator                                                                                                                                                               | offen                 |
+| Feld  | OTA auf DK5EN-98, 24-h-Mitschnitt auf rpizero, Auswertung mit `tools/nbrlog.py`                     | Orchestrator + Betreiber                                                                                                                                                   | offen                 |
 
 ### Entscheidungen dieser Kampagne
 
@@ -63,3 +63,37 @@ ist, weil ein anderer meiner Nachbarn dieselbe Menge abdeckt.
   eine aufgeloeste Zeile hat. Bei einem Absender ausserhalb des Fensters verfaellt es still --
   notwendige Folge des Schnitts, der Knoten steht ohnehin nicht mehr in der Matrix.
 - `bNBRDEBUG` belegt `node_sset4` Bit `0x0010` (0x0001..0x0008 sind vergeben, alles darueber frei).
+
+### Feldlauf 2026-09-21/22 -- Stand und Rezept
+
+- **Geflasht** 2026-09-21 19:16 per `python3 tools/webflash.py dk5en-98.local` (WiFi-OTA, Heltec V3).
+  Vorher `4.35t build Sep 20 22:04:46`, nachher `4.35t build Sep 21 19:16:08`. Kein
+  Settings-Layout geaendert, der Knoten hat seine Konfiguration behalten.
+- **Mitschnitt** laeuft auf `rpizero.local` seit 19:20:44, PID aus
+  `~/meshlog/dk5en-98/status.txt`:
+
+  ```
+  ssh rpizero.local
+  cd ~/meshlog && nohup python3 meshlogger.py dk5en-98.local \
+      --hours 24 --flags nbrdebug --outdir /home/martin/meshlog/dk5en-98 \
+      > /home/martin/meshlog/dk5en-98-nohup.out 2>&1 &
+  ```
+
+  Die alte Fassung liegt als `meshlogger.py.pre-20260921` daneben. `--flags nbrdebug` setzt
+  bewusst NICHT `loradebug`/`txcapture` -- sonst ersaeuft der Mitschnitt im RX-Capture.
+  Der Logger stellt `--nbrdebug` beim Beenden auf den Vorzustand (`off`) zurueck.
+
+- **Die Konsole auf TCP 2323 ist Ein-Client.** Waehrend der 24 Stunden nicht selbst verbinden --
+  eine zweite Verbindung wirft den Logger raus, er kommt nach fuenf Sekunden zurueck und wirft
+  dafuer den Stoerer raus. Zum Pausieren `touch ~/meshlog/dk5en-98/PAUSE` auf dem Pi.
+- **Auswertung** ab 2026-09-22 19:20:
+
+  ```
+  python3 tools/nbrlog.py --fetch martin@rpizero.local:~/meshlog/dk5en-98/ \
+      --since 2026-09-21 --out ~/Desktop/nbr-feldlauf-20260922.md --json ~/Desktop/nbr-feldlauf-20260922.json
+  ```
+
+  `--since` ist Pflicht: ohne sie zieht der Parser alle Altlogs ab dem 2026-08-25 mit herein.
+
+- **Erster Schnappschuss** kommt 15 Minuten nach dem Einschalten des Flags, danach alle 15 min.
+  Vorher hat der Bericht keine `<meshneed>`-Spalte zum Vergleichen -- das ist kein Fehler.
