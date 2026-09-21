@@ -9,6 +9,7 @@
 #include "ArduinoJson.h"
 #include "extern_notice_json.h"
 #include "extern_tele_json.h"
+#include "extern_msg_json.h"
 #include "mcp17_bits.h"
 // DR-18 part 2: queueExternAck()'s declaration and its pure JSON builder
 // buildExternAckJson() live in udp_frame.h (see that header for why -- not
@@ -555,7 +556,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   // sendExtern()) und kehrt zurueck, bevor die aeussere sendExtern()-
   // Instanz ueberhaupt beginnt. Die beiden Aufrufe ueberlappen sich damit
   // nie, statische Puffer sind also auch fuer diesen Pfad sicher.
-  static char c_json[500];
+  static char c_json[EXTERN_MSG_JSON_BUF];
   static char c_tjson[500];
   memset(c_json, 0, sizeof(c_json));
   memset(c_tjson, 0, sizeof(c_tjson));
@@ -620,6 +621,11 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     cJson["hw_id"] = aprsmsg.msg_source_hw;
     cJson["msg_id"] = _msgId;
     cJson["alt"] = aprspos.alt;
+    // Same three originator/hop keys as the "msg" shape (extern_msg_json.h);
+    // hw_id was already here, lora_mod (modulation nibble only) and max_hop
+    // are appended so both datagram types carry one contract.
+    cJson["lora_mod"] = aprsmsg.msg_source_mod & 0x0F;
+    cJson["max_hop"] = aprsmsg.max_hop;
     
     // add firmware version if not a node
     if(strcmp(src_type, "node") == 0)
@@ -729,36 +735,23 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     }
 
     {
-      JsonDocument cJson;
-
-      // build the json with Arduino JSON
-      cJson["src_type"] = src_type;
-      cJson["type"] = "msg";
-      cJson["src"] = aprsmsg.msg_source_path;
-      cJson["dst"] = aprsmsg.msg_destination_path;
-      // JSN-01: assign raw -- ArduinoJson escapes JSON strings on
-      // serializeJson() already; a separate escaper here double-escaped.
-      cJson["msg"] = aprsmsg.msg_payload;
-      cJson["msg_id"] = _msgId;
-      
-      // add firmware version if not a node
-      if(strcmp(src_type, "node") == 0)
-      {
-        cJson["firmware"] = SOURCE_VERSION;
-      }
-      else
-      {
-        cJson["firmware"] = aprsmsg.msg_source_fw_version;
-      }
-
-      cJson["fw_sub"] = c_fw_sub;
-      cJson["rssi"] = rssi;
-      cJson["snr"] = snr;
-
-      // clear the buffer
+      // Built in extern_msg_json.h (native-tested key contract, incl. the
+      // originator hw_id/lora_mod and this copy's max_hop). "node" sends the
+      // firmware as the SOURCE_VERSION string, "lora" as the integer the
+      // originator put in the epilogue -- the helper keeps that asymmetry.
+      // JSN-01: bound by the buffer, not by measureJson(); the buffer is
+      // EXTERN_MSG_JSON_BUF because the worst frame off the air measures
+      // ~640 B (see the header).
       memset(c_json, 0x00, sizeof(c_json));
-      // JSN-01: bound by the buffer, not by measureJson().
-      serializeJson(cJson, c_json, sizeof(c_json));
+      externMsgJson(c_json, sizeof(c_json), src_type,
+                    aprsmsg.msg_source_path,
+                    aprsmsg.msg_destination_path,
+                    aprsmsg.msg_payload, _msgId,
+                    (strcmp(src_type, "node") == 0) ? SOURCE_VERSION : nullptr,
+                    aprsmsg.msg_source_fw_version, c_fw_sub,
+                    rssi, snr,
+                    aprsmsg.msg_source_hw, aprsmsg.msg_source_mod,
+                    aprsmsg.max_hop);
 
       }
   }

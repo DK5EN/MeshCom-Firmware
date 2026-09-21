@@ -375,6 +375,7 @@ test/test_esp32_flash_lifecycle/stubs/lora_setchip.h
 test/test_esp32_flash_lifecycle/test_esp32_flash_lifecycle.cpp
 test/test_esp32_settings_nvs/stubs/Preferences.h
 test/test_esp32_settings_nvs/test_esp32_settings_nvs.cpp
+test/test_extern_msg_json/test_extern_msg_json.cpp
 test/test_extern_notice_json/test_extern_notice_json.cpp
 test/test_extern_tele_json/test_extern_tele_json.cpp
 test/test_gateway_service_twin/stubs/RAK13800_W5100S.h
