@@ -17,6 +17,20 @@ Test weiterlaufen lassen. Zweites Blatt = Bench-Heltec am Laptop mit 2 dBm.
 | Gate  | Host-Tests (native_nbr_matrix, native_aprs/test_txring, test_command_toggles), Builds heltec/rak/tbeam/tdeck sequenziell, String-Scan, Advisor (`/fable-review`), Commit                                                                                    | Orchestrator                                                                                                                             | erledigt: Host-Tests 34/21/120 gruen, vier Builds gruen (nRF52 brauchte `(unsigned)`-Casts), Advisor APPROVED (1 Medium behoben: kein Wissen ist nicht Fall B; 2 Low behoben: Text-Slots, Kommentar; 2 Low offen: Maskenindex bei Verdraengung, count-zu-on-Attribution), committed                                                                                                                                                                                                                                                  |
 | 2     | Hardware: OTA DK5EN-98 (PAUSE-Datei, meshlogger mit `nbrdebug,loradebug,txcapture` neu starten, `--nbrrelay count`), Bench-Heltec seriell flashen, `--txpower 2 --gateway off --nbrdebug on --setlog on --nbrrelay count`, serielle Aufzeichnung des Blatts | Orchestrator                                                                                                                             | erledigt 2026-09-22 09:20-09:35: DK5EN-98 per OTA auf Build 09:00:32, `--nbrrelay count`, Pi-Logger neu ab 09:28:34 fuer 48 h (`--since 2026-09-22T09:28` fuer die Auswertung, alter Lauf liegt in derselben Tagesdatei); DK5EN-1 per USB geflasht, `--txpower 2 --mesh on --nbrdebug on --setlog on --nbrrelay count`, Mitschnitt `~/meshlog/dk5en-1/2026-09-22.log` (`tools/bench/serial_capture.py`, nohup); Web-Seite per curl geprueft (Tags balanciert, alle neuen Spalten/Bloecke da), Chrome-Erweiterung war nicht verbunden |
 
+## Welle 3: Symmetrie-Annahme (`--nbrsym`), 2026-09-22
+
+Anlass: nach 11,6 h `count` auf DK5EN-98 926 A / 10 B / 1 `CANCEL?` / 185 `REFUSE`. Die
+Allein-Maske war in 96 % der NEED-Zeilen DK5EN-1 (echtes Blatt, 1099 von 1113 Empfaengen ueber
+DK5EN-98) und/oder DL2JA-1 (relayt nie, vier Wochen Logs, daher keine beobachtete Hoerkante).
+Ohne beide: 36 A / 900 B.
+
+| Schritt | Inhalt                                                                                                                                                                                                    | Stand                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 3A      | Firmware: Zelle speichert SNR statt RSSI (`NBR_SNR_UNKNOWN` = -128), `--nbrsym on\|off` (node_sset4 0x0080 invertiert, Default an), Fallback in `nbrRelayNeed`/`nbrCoverMask`, `SYM`-Zeilen, `<inferred>` | erledigt                                                                      |
+| 3B      | Logvertrag `docs/nbr-logformat.md`, `tools/nbrlog.py` (SNR-Statistik, Abschnitt 10 Symmetrie-Annahmen), neue Fixture                                                                                      | erledigt                                                                      |
+| Gate    | 1075 Host-Tests, Builds heltec/rak/tbeam/tdeck, String-Scan, Advisor                                                                                                                                      | gruen; Advisor APPROVED, 1 Medium behoben (keine gestapelten Annahmen), 3 Low |
+| 3C      | OTA DK5EN-98 und DK5EN-1 per `tools/webflash.py`, danach `--gateway on` auf DK5EN-1 ueber Konsole 2323                                                                                                    | offen                                                                         |
+
 ## Entscheidungen
 
 - pio-Slot: in Welle 1 ausschliesslich Agent B; D kompiliert nicht, das Gate kompiliert.
@@ -24,6 +38,17 @@ Test weiterlaufen lassen. Zweites Blatt = Bench-Heltec am Laptop mit 2 dBm.
   Allein-Maske von DK5EN-98 und `count` saehe nie einen Abbruchkandidaten.
 - `count` aendert kein Funkverhalten; `on` schaltet Abbruch UND Backoff nach Fall.
 - Settings-Bits: `node_sset4` 0x0020 count, 0x0040 on.
+- Symmetrie (Betreiberentscheidung 2026-09-22): SNR statt RSSI, Schwelle SNR >= -16 dB
+  (Erfahrungswert: DF2SI-12 kommt an DK5EN-98 mit -16 dB Median an und faellt regelmaessig ins
+  Rauschen). Keine Rechnung gegen Endstufen (E22, T-Beam 1W, Nachruest-PA), jede Annahme als
+  `[NBR]|SYM` geloggt. Nur die Stufe-2-Entscheidung, Stufe-1-Urteile bleiben beobachtet.
+  Beobachtete Kante gewinnt immer; ein Knoten, der den Frame nur per Annahme hat, versorgt
+  niemanden (hoechstens eine Annahme je Entscheidung, Advisor-Fund).
+- Settings-Bit `node_sset4` 0x0080 = `--nbrsym off` (invertiert wie `--mesh`).
+- Advisor Low, akzeptiert: `REFUSE` kann mit sym auch gegen einen nur per Annahme deckenden
+  Relayer fallen (ohne eigene `SYM`-Zeile); `EDGE`-`<snr>` ist der Wert vor dem Frame.
+- DK5EN-1 bekommt `--gateway on`: der Server versorgt es, damit faellt es aus der Abhaengigen-Menge
+  von DK5EN-98 (Konzept 5.4). Das Blatt taugt damit nicht mehr als R6-Zustellbeweis.
 - B musste die Deklaration von `addTxRingEntry()` in `src/loop_functions.h` und
   `src/loop_functions_extern.h` erweitern (drei Default-Parameter) -- ausserhalb seines Dateisatzes,
   gemeldet, vom Orchestrator geprueft: nur die zwei Signaturzeilen.

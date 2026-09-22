@@ -105,8 +105,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     rx_t.sort()
     span_h = (rx_t[-1] - rx_t[0]) / 3600000 if len(rx_t) > 1 else 0
+    # Praeexistente Randbedingung, beim Verifizieren der neuen Stage-2-Fixture
+    # aufgefallen: ein Mitschnitt ganz ohne [LOG]-RX-Zeile (z. B. ein reiner
+    # [NBR]-Auszug) liess rx_t leer und rx_t[-1] mit IndexError crashen.
+    mean_gap_s = (rx_t[-1] - rx_t[0]) / max(1, len(rx_t)) / 1000 if rx_t else 0.0
 
-    print(f"== Empfang je Typ (eigen: {own}, {len(rx_t)} Frames, {span_h:.1f} h, mittlerer Abstand {(rx_t[-1]-rx_t[0])/max(1,len(rx_t))/1000:.1f} s) ==")
+    print(f"== Empfang je Typ (eigen: {own}, {len(rx_t)} Frames, {span_h:.1f} h, mittlerer Abstand {mean_gap_s:.1f} s) ==")
     for typ in ":!@":
         print(f"  {NAMES[typ]:5s} rx={n_rx[typ]:5d} dup={n_dup[typ]:5d} ({pct(n_dup[typ], n_rx[typ])})")
 

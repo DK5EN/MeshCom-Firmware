@@ -49,6 +49,7 @@ extern bool bLORADEBUG;
 extern bool bNBRDEBUG;
 extern bool bNBRRELAY;                  // --nbrrelay count|on (Stufe 2), siehe loop_functions.cpp
 extern bool bNBRCANCEL;                 // --nbrrelay on
+extern bool bNBRSYM;                    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme), default on
 extern uint32_t stat_nbr_relay_a, stat_nbr_relay_b, stat_nbr_cancel, stat_nbr_cancel_possible, stat_nbr_refuse_alone;
 extern bool bBLEDEBUG;
 extern bool bWXDEBUG;

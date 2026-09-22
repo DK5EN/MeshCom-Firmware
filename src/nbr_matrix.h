@@ -70,13 +70,34 @@ struct NbrRow
     uint8_t  hw;
 };
 
+// Kein gueltiger Signalwert: int8_t deckt -127..127 ab, -128 bleibt
+// reserviert und wird nie aus einem echten SNR-Feld geschrieben (siehe
+// nbrClampSnr() in nbr_matrix.cpp, das den Wertebereich vorher auf
+// [-127,127] begrenzt).
+#define NBR_SNR_UNKNOWN (-128)
+
+// Schwelle fuer die Symmetrie-Annahme (--nbrsym, Abschnitt D unten):
+// Magischer Betreiberwert aus der Erfahrung am eigenen Heltec (DK5EN-98):
+// DF2SI-12 kommt dort mit einem SNR-Median von -16 dB an und faellt
+// regelmaessig in den Rauschteppich -- darueber gilt eine Strecke als stabil.
+// Der Vergleich ist EINSCHLIESSLICH (>= -16). Wir rechnen
+// NICHT gegen Endstufen (EBYTE E22, T-Beam 1W, Nachruest-PAs): der
+// beobachtete SNR wird genommen wie er ist, ueber die Sendeleistung der
+// Gegenstation wird keine Aussage getroffen -- die Symmetrie-Annahme gilt
+// unveraendert auch fuer solche Hochleistungsknoten. Jede Annahme wird als
+// SYM-Zeile geloggt, damit sie sich im Nachhinein pruefen laesst.
+#ifndef NBR_SYM_MIN_SNR
+#define NBR_SYM_MIN_SNR (-16)
+#endif
+
 // Zelle (6 Byte): "Spalte hat Zeile gehoert" -- drei sattelnde Zaehler nach
-// Frame-Typ, der zuletzt gesehene RSSI aus einem HEY-Bericht (negatives dBm,
-// 0 = unbekannt) und die Letztzeit dieser Zelle.
+// Frame-Typ, der zuletzt gesehene SNR aus einem HEY-Bericht bzw. aus dem
+// eigenen Empfang (dB, NBR_SNR_UNKNOWN = unbekannt) und die Letztzeit dieser
+// Zelle.
 struct NbrCell
 {
     uint8_t  cnt_text, cnt_pos, cnt_hey;
-    int8_t   rssi;
+    int8_t   snr;
     uint16_t last_min;
 };
 
@@ -167,7 +188,9 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // hoechstens 2 Hops entfernt, eine Kante zwischen zwei solchen Knoten ist
 // gueltige Information und kostet keine Zeile. Danach, sofern der letzte Hop
 // nicht das eigene Rufzeichen ist (sonst ist es das eigene Echo), ein
-// Treffer auf cell[letzter_hop][0] mit rssi = rssi_here (Log: ME). Eine
+// Treffer auf cell[letzter_hop][0] mit snr = snr_here (Log: ME, das dort
+// zusaetzlich rssi_here unveraendert im <rssi>-Feld traegt, ohne es zu
+// speichern). Eine
 // Zelle, deren last_min beim Treffer bereits verfallen ist, faengt bei ihren
 // Zaehlern neu bei 0 an (Konzept 4.2), bevor der Treffer zaehlt. Ein Paar
 // (p[i], p[i+1]) mit p[i+1] == eigenes Rufzeichen schreibt NIE cell[p[i]][0]:
@@ -185,8 +208,10 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // zusaetzlich payload als "R<n>;g1;g2;..." gelesen (siehe
 // appendHeySignalReport(), src/aprs_functions.cpp:1134): Gruppe i (1-basiert)
 // ist "NCT,RSSI,SNR" und gehoert zum Paar (p[i-1], p[i]) -- ihre Zelle
-// bekommt rssi = -RSSI, aber NUR wenn beide Enden aufgeloest sind (im
-// Fenster liegen oder nach der Regel oben als bestehende Zeile gelten).
+// bekommt snr = das dritte, vorzeichenbehaftete Feld (RSSI aus dem zweiten
+// Feld wird nicht mehr gespeichert), aber NUR wenn beide Enden aufgeloest
+// sind (im Fenster liegen oder nach der Regel oben als bestehende Zeile
+// gelten).
 // Eine Gruppe, die nicht aus genau drei Kommafeldern besteht (oder fehlt,
 // altes Format), wird uebersprungen; die Pfadtreffer aus dem ersten Schritt
 // zaehlen trotzdem.
@@ -195,8 +220,11 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // geschriebene Zellen), -1 bei ungueltigem Rufzeichen/zu vielen Hops, -2 bei
 // einer Schleife, -3 wenn im selben Frame mehr neue Fenster-Rufzeichen
 // aufzuloesen waren als Opferzeilen frei blieben, 0 bei unbekanntem Typ.
+// snr_here ist der SNR des gerade empfangenen Frames (OnRxDone hat ihn als
+// int8_t von der Radio-HAL) -- gespeichert wird NUR er (cell[letzter_hop][0].snr),
+// rssi_here bleibt reines Logfeld (Log: ME, <rssi>).
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
-                  bool dest_gw, int16_t rssi_here, uint16_t now_min);
+                  bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min);
 
 // Traegt eine Position NUR in eine BEREITS BESTEHENDE Zeile ein (Konzept
 // 4.4). Legt anders als frueher KEINE Zeile mehr an: der Aufrufer in
@@ -290,19 +318,36 @@ uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
 //           sondern relayt wie heute (Konzept 1: nichts unterdrueckt auf
 //           Verdacht) -- Advisor-Fund 2026-09-22. need == 0 bei known == true
 //           ("alle Abhaengigen haben den Frame schon") bleibt Fall B.
+//   inferred = Teilmenge von "X hat Bit in dieser Maske", deren HatF- oder
+//           Allein-Ergebnis NUR durch die Symmetrie-Annahme (sym, --nbrsym)
+//           zustande kam, nicht durch eine tatsaechliche Beobachtung. Bleibt
+//           0, wenn sym == false. Jede Annahme, die hasf oder alt aendert,
+//           erzeugt genau eine SYM-Zeile (nbrLog, Rollen HASF/ALT).
 struct NbrNeed
 {
     uint32_t need;
     uint32_t alone;
     bool     known;
+    uint32_t inferred;
 };
-NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min);
+// sym = --nbrsym (bNBRSYM): erlaubt den Symmetrie-Fallback aus nbrHearsSym()
+// fuer hasf UND alone (siehe nbr_matrix.cpp). msg_id geht nur in die
+// SYM-Log-Zeilen ein, sonst in keine Rechnung.
+NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, bool sym, uint32_t msg_id);
 
 // Deckung durch eine gehoerte fremde Wiederholung: die Hoerer des Relayers
-// (nbrHearersMask seiner Zeile), 0 wenn der Relayer keine Zeile hat oder ich
+// (nbrHearersMask seiner Zeile) plus, wenn sym, jedes X, fuer das der
+// Relayer M laut Symmetrie-Fallback X gehoert hat und das noch nicht
+// beobachtet war. Liefert 0, wenn der Relayer keine Zeile hat oder ich
 // selbst bin. Der Aufrufer rechnet need &= ~nbrCoverMask(...) und bricht bei
-// need == 0 ab -- nur wenn alone == 0 war.
-uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min);
+// need == 0 ab -- nur wenn alone == 0 war. relevant ist die Bedarfsmaske des
+// EINEN Slots, fuer den dieser Aufruf gilt -- eine SYM-COVER-Zeile erscheint
+// nur fuer ein per Symmetrie hinzugefuegtes X, dessen Bit auch in relevant
+// gesetzt ist (msg_id fuer die Log-Zeile). *inferred (darf NULL sein)
+// bekommt die per Symmetrie hinzugefuegten Bits, unabhaengig von relevant --
+// der Aufrufer bildet daraus "before & ~after & inferred" fuers Log.
+uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                       uint32_t relevant, uint32_t msg_id, uint32_t *inferred);
 
 // E_self (Konzept 4): direkt gehoerte Zeilen, die kein ANDERER direkt
 // gehoerter Nachbar frisch hoert. Anders als nbrExclusive() zaehlt ein
@@ -333,9 +378,9 @@ float nbrReach(const NbrMatrix &m, int row, uint16_t now_min, int *partner);
 //   1. Rufzeichen der Zeile.
 //   2. "GW+"/"GW-": NBR_FLAG_GW gesetzt/nicht gesetzt.
 //   3. "M+"/"M-": NBR_FLAG_MESH gesetzt/nicht gesetzt.
-//   4. "hears_me:<dBm>" oder "hears_me:-": RSSI aus cell[0][row], also wie
+//   4. "hears_me:<dB>" oder "hears_me:-": SNR aus cell[0][row], also wie
 //      DIESE Zeile MICH zuletzt gehoert hat (Konzept 4.3, "Wer hoert mich").
-//      "-" wenn nicht frisch oder RSSI unbekannt (0).
+//      "-" wenn nicht frisch oder SNR unbekannt (NBR_SNR_UNKNOWN).
 //   5. "hearers:<a>,<b>,...": Rufzeichen aus nbrHearers(row), kommagetrennt,
 //      "-" wenn leer.
 //   6. "reach:<km>@<partner>" mit einer Nachkommastelle, oder "reach:-".

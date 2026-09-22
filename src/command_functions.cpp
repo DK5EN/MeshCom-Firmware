@@ -262,6 +262,12 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--nbrrelay off",       &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFF9F,   0x00000000,   tg_post_nbrrelay_off,          TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--nbrrelay count",     &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFFBF,   0x0020,       tg_post_nbrrelay_count,        TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrrelay on",        &bNBRCANCEL,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0060,       tg_post_nbrrelay_on,           TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): 0x0080 in node_sset4, invertiert
+    // gespeichert ("aus" setzt das Bit) -- jeder bestehende Knoten startet damit ohne
+    // Migration mit sym an, derselbe Trick wie bei --mesh (Zeilen oben). Keine
+    // Neuberechnung noetig: die Relay-Entscheidung liest bNBRSYM je Frame neu.
+    { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFF7F,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     { "--via on",             &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x4000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
@@ -5408,10 +5414,11 @@ void commandAction(char *umsg_text, bool ble)
 
             // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): Modus und die
             // fuenf Zaehler, damit ein Feldlauf ohne Web-Seite ablesbar bleibt.
-            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu\n",
+            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s\n",
                 (bNBRCANCEL?"on":(bNBRRELAY?"count":"off")),
                 (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
-                (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone);
+                (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone,
+                (bNBRSYM?"on":"off"));
             
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));

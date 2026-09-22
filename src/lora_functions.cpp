@@ -769,11 +769,16 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
            !is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
         {
             uint16_t now_min_cover = (uint16_t)(millis() / 60000UL);
-            uint32_t cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover);
+            // Nur ein Vorabtest, ob der Relayer ueberhaupt etwas decken
+            // koennte (relevant=0, msg_id=0 -- das unterdrueckt jede
+            // SYM-COVER-Zeile hier, die eigentliche, slotgenaue Maske
+            // rechnet die Schleife unten je Slot neu).
+            uint32_t cover_gate = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                                bNBRSYM, 0, 0, NULL);
 
             // Relayer unbekannt (keine Zeile/keine frischen Hoerer) -> nichts
             // zu entscheiden (Konzept 5.2).
-            if(cover != 0)
+            if(cover_gate != 0)
             {
                 char nbr_typ = (aprsmsg.payload_type == ':') ? 'T' :
                                (aprsmsg.payload_type == '!') ? 'P' : 'H';
@@ -816,9 +821,22 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                     }
                     else
                     {
+                        // Slotgenau neu gerechnet (relevant = der Bedarf
+                        // GENAU dieses Slots, VOR dem Abzug): eine per
+                        // Symmetrie hinzugefuegte Hoererin loggt hier nur,
+                        // wenn ihr Bit auch in diesem Bedarf steht -- sonst
+                        // waere die Annahme fuer diesen Slot folgenlos.
+                        uint32_t slot_inferred = 0;
+                        uint32_t cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                                       bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
+
                         uint32_t nbr_before = ringNeed[nbr_i];
                         ringNeed[nbr_i] &= ~cover;
                         uint32_t nbr_after = ringNeed[nbr_i];
+                        // Bits, die dieser Abzug tatsaechlich entfernt hat
+                        // UND die nur per Symmetrie-Annahme dazukamen --
+                        // trailing Feld fuer CANCEL/CANCEL?.
+                        uint32_t nbr_removed_inferred = nbr_before & ~nbr_after & slot_inferred;
 
                         if(nbr_after == 0)
                         {
@@ -842,9 +860,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 {
                                     char nbr_line[96];
                                     snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%08X|%08X",
+                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%08X|%08X|%08X",
                                              (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after);
+                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after,
+                                             (unsigned)nbr_removed_inferred);
                                     nbrLog(nbr_line);
                                 }
                             }
@@ -859,9 +878,10 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 {
                                     char nbr_line[96];
                                     snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%08X|%08X",
+                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%08X|%08X|%08X",
                                              (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after);
+                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after,
+                                             (unsigned)nbr_removed_inferred);
                                     nbrLog(nbr_line);
                                 }
                             }
@@ -930,7 +950,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // Zeilen dort tragen die gleiche Information pro Hoerbeziehung.
                 nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
                              aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
-                             rssi, now_min);
+                             rssi, snr, now_min);
 
                 // Relayte POS-Frames (Konzept 4.4): MHeard traegt die Position
                 // nur bei Direktempfang ein (unten, msg_source_call ==
@@ -1253,7 +1273,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // deklariert VOR jedem goto in diesem Block (skip_relay unten
                         // springt sonst ueber die Initialisierung hinweg -- C++ verbietet
                         // das). Zugewiesen (nicht neu deklariert) kurz vor bSHORTPATH.
-                        NbrNeed nn_relay = {0, 0, false};
+                        NbrNeed nn_relay = {0, 0, false, 0};
                         uint16_t now_min_relay = 0;
 
                         if(msg_type_b_lora == MSG_TYPE_TEXT)    // text message store&forward
@@ -1762,7 +1782,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(bNBRRELAY)
                                 {
                                     now_min_relay = (uint16_t)(millis() / 60000UL);
-                                    nn_relay = nbrRelayNeed(nbrMatrix, aprsmsg.msg_source_path, now_min_relay);
+                                    nn_relay = nbrRelayNeed(nbrMatrix, aprsmsg.msg_source_path, now_min_relay,
+                                                             bNBRSYM, (uint32_t)aprsmsg.msg_id);
                                 }
 
                                 if(bSHORTPATH)
@@ -1841,13 +1862,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                                            (aprsmsg.payload_type == '!') ? 'P' : 'H';
                                             char nbr_case = !nn_relay.known ? 'U' : (nn_relay.alone != 0) ? 'A' : 'B';
                                             uint32_t nbr_mid = extractRingMsgId(rly_slot);
-                                            char nbr_line[96];
+                                            char nbr_line[112];
                                             snprintf(nbr_line, sizeof(nbr_line),
-                                                     "[NBR]|NEED|%u|%08X|%c|%c|%08X|%08X|%d",
+                                                     "[NBR]|NEED|%u|%08X|%c|%c|%08X|%08X|%d|%08X",
                                                      (unsigned)now_min_relay, (unsigned)nbr_mid,
                                                      nbr_typ, nbr_case,
                                                      (unsigned)nn_relay.need, (unsigned)nn_relay.alone,
-                                                     rly_slot);
+                                                     rly_slot, (unsigned)nn_relay.inferred);
                                             nbrLog(nbr_line);
                                         }
                                     }

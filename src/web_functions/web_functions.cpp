@@ -1753,10 +1753,10 @@ void sub_page_neighbours()
         else if (direct[i])
         {
             const NbrCell &c0 = nbrMatrix.cells[X][0];
-            if (c0.rssi != 0)
-                web_client.printf("<td title=\"Heard directly, RSSI %d dBm\">D</td>", (int)c0.rssi);
+            if (c0.snr != NBR_SNR_UNKNOWN)
+                web_client.printf("<td title=\"Heard directly, SNR %d dB\">D</td>", (int)c0.snr);
             else
-                web_client.print("<td title=\"Heard directly, RSSI unknown\">D</td>");
+                web_client.print("<td title=\"Heard directly, SNR unknown\">D</td>");
         }
         else
         {
@@ -1831,7 +1831,10 @@ void sub_page_neighbours()
             if ((c.cnt_text || c.cnt_pos || c.cnt_hey) && nbrFresh(c.last_min, now_min))
             {
                 unsigned sum = (unsigned)c.cnt_text + (unsigned)c.cnt_pos + (unsigned)c.cnt_hey;
-                web_client.printf("<td title=\"T:%u P:%u H:%u rssi:%d\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, (int)c.rssi, sum);
+                if (c.snr != NBR_SNR_UNKNOWN)
+                    web_client.printf("<td title=\"T:%u P:%u H:%u snr:%d\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, (int)c.snr, sum);
+                else
+                    web_client.printf("<td title=\"T:%u P:%u H:%u snr:NA\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, sum);
             }
             else
             {
@@ -1926,8 +1929,8 @@ void sub_page_neighbours()
                            (row.flags & NBR_FLAG_MESH) ? "yes" : "no");
 
         const NbrCell &hm = nbrMatrix.cells[0][X];
-        if (X != 0 && hm.rssi != 0 && nbrFresh(hm.last_min, now_min))
-            web_client.printf("<td>%d</td>", (int)hm.rssi);
+        if (X != 0 && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
+            web_client.printf("<td>%d</td>", (int)hm.snr);
         else
             web_client.print("<td>-</td>");
 
@@ -2009,6 +2012,12 @@ void sub_page_neighbours()
                        (bNBRCANCEL ? "on" : (bNBRRELAY ? "count" : "off")),
                        (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
                        (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone);
+
+    // Stufe 2 (--nbrsym): mirrors bNBRSYM, the flag the live relay decision
+    // in lora_functions.cpp actually reads per frame -- this page never
+    // calls nbrRelayNeed()/nbrCoverMask() itself, so there is no sym-aware
+    // call to thread the flag through, only this status line.
+    web_client.printf("<p>Symmetry: %s (SNR &gt;= %d dB)</p>", (bNBRSYM ? "on" : "off"), (int)NBR_SYM_MIN_SNR);
 
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line

@@ -111,6 +111,11 @@ bool bNBRDEBUG = false;   // --nbrdebug: [NBR]-Zeilen der Nachbarschaftsmatrix, 
 // on bricht Fall-B-Relays gegen gehoerte fremde Wiederholungen ab und staffelt den Backoff nach Fall.
 bool bNBRRELAY = false;   // count oder on: Masken rechnen, NEED/CANCEL?-Zeilen, Zaehler
 bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): default an, gespeichert invertiert
+// (node_sset4 0x0080 gesetzt heisst "aus") -- jeder bestehende Knoten startet damit
+// nach einem Firmware-Update ohne Migration mit sym an. Siehe nbr_matrix.h
+// NBR_SYM_MIN_SNR fuer die Schwelle.
+bool bNBRSYM = true;
 uint32_t stat_nbr_relay_a = 0;          // eingereihte Relays Fall A (Allein-Maske != 0)
 uint32_t stat_nbr_relay_b = 0;          // eingereihte Relays Fall B
 uint32_t stat_nbr_cancel = 0;           // abgebrochene Relays (nur on)

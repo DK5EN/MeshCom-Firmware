@@ -232,6 +232,13 @@ Zwei Annahmen, beide benannt und beide in der sicheren Richtung falsch:
 - **Symmetrie.** `Deckt(M, X)` liest "X hat M gehoert" und schliesst auf "X hoert M". Fehlt die
   Kante, weil X nie etwas von M wiederholt hat (Mesh aus, Dedup-Schatten aus
   `Relay-Prioritaeten-Verdict.html` Abb. 3), gilt X als ungedeckt → Fall A → ich relaye. Fluten.
+  **Nachtrag 2026-09-22 (Feldlauf 2):** genau das blockierte DK5EN-98 -- DL2JA-1 relayt nie (vier
+  Wochen Logs), stand deshalb dauerhaft in der Allein-Maske und zwang zusammen mit dem Blatt
+  DK5EN-1 96 % aller Relays in Fall A. Seitdem gibt es `--nbrsym on|off` (Default an, gespeichert):
+  fehlt "X hat M gehoert", gilt fuer die Stufe-2-Entscheidung ersatzweise "M hat X gehoert" mit
+  SNR >= -16 dB (Betreiberwert). Keine Rechnung gegen Endstufen; jede Annahme wird als
+  `[NBR]|SYM` geloggt. Die Stufe-1-Urteile bleiben beobachtungsbasiert. Details:
+  `docs/nbr-logformat.md`, Abschnitt `--nbrsym`.
 - **Beobachtbarkeit.** Ein Knoten, der mich hoert, den ich nie hoere und der nie etwas wiederholt,
   ist in keiner Matrix. Er wird von keinem lokalen Verfahren geschuetzt; im Lauf gab es keinen (2.5).
   Das ist die eine Luecke, die nur ein HELLO mit Nachbarliste schliessen wuerde, und dessen

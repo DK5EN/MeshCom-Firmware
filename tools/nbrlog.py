@@ -110,6 +110,11 @@ class MeRec:
     rssi: int
     cnt: int
     session: int
+    #: SNR in dB fuer "ich habe <frm> gehoert" (docs/nbr-logformat.md). ``None``
+    #: heisst: entweder ein Mitschnitt aelterer Firmware ohne dieses Feld, oder
+    #: die Firmware selbst kannte keine SNR (``NA``) -- beide Faelle sind fuer
+    #: die Auswertung gleich ("kein Wert"), sie werden nicht unterschieden.
+    snr: int | None = None
 
 
 @dataclass
@@ -122,6 +127,10 @@ class EdgeRec:
     rssi: int
     cnt: int
     session: int
+    #: SNR in dB fuer "<to> hat <frm> gehoert" (aus HEY-Berichten, kann aelter
+    #: sein als diese Zeile). ``None`` wie bei ``MeRec.snr``. ``rssi`` ist in
+    #: neuen Mitschnitten immer 0 -- die Zelle speichert keine RSSI mehr.
+    snr: int | None = None
 
 
 @dataclass
@@ -180,6 +189,26 @@ class RowRec:
 
 
 @dataclass
+class SymRec:
+    """Eine geloggte ``--nbrsym``-Annahme (docs/nbr-logformat.md, ``[NBR]|SYM``).
+
+    Wird von der Firmware nur geschrieben, wenn die Annahme das Ergebnis einer
+    Stufe-2-Relay-Entscheidung tatsaechlich veraendert hat -- ``<snr>`` ist die
+    SNR, mit der ``<m>`` ``<x>`` gehoert hat (nicht umgekehrt: die Annahme
+    LEITET aus dieser Kante "<x> hoert <m>" her, siehe ``<role>``).
+    """
+
+    host: datetime
+    up: int
+    msg_id: str
+    role: str
+    x: str
+    m: str
+    snr: int
+    session: int
+
+
+@dataclass
 class SnapBlock:
     host: datetime
     up: int
@@ -214,6 +243,7 @@ class NbrState:
 
     me: list[MeRec] = field(default_factory=list)
     edges: list[EdgeRec] = field(default_factory=list)
+    syms: list[SymRec] = field(default_factory=list)
     cuts: list[CutRec] = field(default_factory=list)
     drops: list[DropRec] = field(default_factory=list)
     evicts: list[EvictRec] = field(default_factory=list)
@@ -229,16 +259,51 @@ class NbrState:
 # --------------------------------------------------------------------------
 
 
+def _parse_snr(raw: str | None) -> int | None:
+    """``NA`` oder ein fehlendes (altes) Feld werden beide zu ``None``."""
+    if raw is None or raw == "NA":
+        return None
+    return int(raw)
+
+
 def _h_me(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
-    (frm, type_, rssi, cnt) = f
-    state.me.append(MeRec(host, up, frm, type_, int(rssi), int(cnt), state.session))
+    if len(f) == 5:
+        # Aktuelles Format: <from>|<type>|<rssi>|<cnt>|<snr>.
+        (frm, type_, rssi, cnt, snr_raw) = f
+    elif len(f) == 4:
+        # Aelteres Firmware-Format ohne <snr> -- rueckwaertskompatibel.
+        (frm, type_, rssi, cnt) = f
+        snr_raw = None
+    else:
+        raise _Discard("malformed:ME")
+    state.me.append(
+        MeRec(host, up, frm, type_, int(rssi), int(cnt), state.session, _parse_snr(snr_raw))
+    )
 
 
 def _h_edge(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
-    (frm, to, type_, rssi, cnt) = f
+    if len(f) == 6:
+        # Aktuelles Format: <from>|<to>|<type>|<rssi>|<cnt>|<snr>.
+        (frm, to, type_, rssi, cnt, snr_raw) = f
+    elif len(f) == 5:
+        # Aelteres Firmware-Format ohne <snr> -- rueckwaertskompatibel.
+        (frm, to, type_, rssi, cnt) = f
+        snr_raw = None
+    else:
+        raise _Discard("malformed:EDGE")
     state.edges.append(
-        EdgeRec(host, up, frm, to, type_, int(rssi), int(cnt), state.session)
+        EdgeRec(
+            host, up, frm, to, type_, int(rssi), int(cnt), state.session,
+            _parse_snr(snr_raw),
+        )
     )
+
+
+def _h_sym(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    if len(f) != 5:
+        raise _Discard("malformed:SYM")
+    (msg_id, role, x, m, snr) = f
+    state.syms.append(SymRec(host, up, msg_id, role, x, m, int(snr), state.session))
 
 
 def _h_cut(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -313,6 +378,7 @@ def _h_endsnap(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
 HANDLERS = {
     "ME": _h_me,
     "EDGE": _h_edge,
+    "SYM": _h_sym,
     "CUT": _h_cut,
     "DROP": _h_drop,
     "EVICT": _h_evict,
@@ -494,6 +560,10 @@ def a2_nachbarschaft(state: NbrState) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for call, recs in by_call.items():
         rssi_vals = [r.rssi for r in recs if r.rssi != 0]
+        # <snr> ist ein neues Feld (docs/nbr-logformat.md) -- ``None`` deckt
+        # sowohl "NA" als auch "Mitschnitt ohne dieses Feld" ab, beides zaehlt
+        # hier gleich als "kein Wert".
+        snr_vals = [r.snr for r in recs if r.snr is not None]
         rows.append(
             {
                 "rufzeichen": call,
@@ -503,6 +573,10 @@ def a2_nachbarschaft(state: NbrState) -> dict[str, Any]:
                 "rssi_min": min(rssi_vals) if rssi_vals else None,
                 "rssi_max": max(rssi_vals) if rssi_vals else None,
                 "rssi_ohne_bericht": len(recs) - len(rssi_vals),
+                "snr_median": round(statistics.median(snr_vals), 1) if snr_vals else None,
+                "snr_min": min(snr_vals) if snr_vals else None,
+                "snr_max": max(snr_vals) if snr_vals else None,
+                "snr_ohne_bericht": len(recs) - len(snr_vals),
                 "erste_sichtung": fmt_dt(min(r.host for r in recs)),
                 "letzte_sichtung": fmt_dt(max(r.host for r in recs)),
             }
@@ -854,6 +928,36 @@ def a9_positionen(state: NbrState, own_call: str | None) -> dict[str, Any]:
     }
 
 
+def a10_symmetrie(state: NbrState) -> dict[str, Any]:
+    """Abschnitt 10 -- ``[NBR]|SYM`` (docs/nbr-logformat.md, `--nbrsym`).
+
+    Nur geloggte Annahmen (die Firmware schreibt ``SYM`` ausschliesslich, wenn
+    die Annahme das Ergebnis veraendert hat), also KEINE Rate ueber alle
+    Pruefungen -- eine hohe Zahl zeigt, wie oft sich die Stufe-2-Relay-
+    Entscheidung tatsaechlich auf den Symmetrie-Fallback stuetzt statt auf
+    eine beobachtete Kante.
+    """
+    pro_rolle: Counter = Counter(s.role for s in state.syms)
+    by_pair: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for s in state.syms:
+        by_pair[(s.x, s.m)].append(s.snr)
+    paare = [
+        {
+            "x": x,
+            "m": m,
+            "anzahl": len(snrs),
+            "snr_median": round(statistics.median(snrs), 1),
+        }
+        for (x, m), snrs in sorted(by_pair.items())
+    ]
+    paare.sort(key=lambda d: -d["anzahl"])
+    return {
+        "anzahl_gesamt": len(state.syms),
+        "pro_rolle": dict(sorted(pro_rolle.items())),
+        "je_paar": paare,
+    }
+
+
 def analyze(state: NbrState) -> dict[str, Any]:
     own_call = own_call_of(state)
     neighbours = direct_neighbours(state)
@@ -881,6 +985,7 @@ def analyze(state: NbrState) -> dict[str, Any]:
         "7_zwei_hop_schnitt": a7_zwei_hop_schnitt(state),
         "8_verworfene_frames": a8_verworfene_frames(state),
         "9_positionen": a9_positionen(state, own_call),
+        "10_symmetrie": a10_symmetrie(state),
     }
 
 
@@ -1028,6 +1133,12 @@ def render_bluf(res: dict[str, Any]) -> list[str]:
             f"- **{res['8_verworfene_frames']['full_anzahl']} DROP|FULL** -- Alarmsignal, "
             "die Matrix war voll und hat Frames verworfen statt sie einzutragen."
         )
+    n_sym = res["10_symmetrie"]["anzahl_gesamt"]
+    if n_sym:
+        lines.append(
+            f"- {n_sym} `--nbrsym`-Symmetrie-Annahme(n) haben eine Stufe-2-Relay-Entscheidung "
+            "veraendert -- Aufschluesselung in Abschnitt 10."
+        )
     lines.append("")
     return lines
 
@@ -1082,11 +1193,17 @@ def render_md(res: dict[str, Any]) -> str:
     out.append("")
     out.append(
         _md_table(
-            ["Rufzeichen", "Anzahl", "Typen", "RSSI median", "RSSI min", "RSSI max", "ohne Bericht", "erste Sichtung", "letzte Sichtung"],
+            [
+                "Rufzeichen", "Anzahl", "Typen",
+                "RSSI median", "RSSI min", "RSSI max", "RSSI ohne Bericht",
+                "SNR median", "SNR min", "SNR max", "SNR ohne Bericht",
+                "erste Sichtung", "letzte Sichtung",
+            ],
             [
                 [
                     r["rufzeichen"], r["anzahl"], r["typverteilung"],
                     r["rssi_median"], r["rssi_min"], r["rssi_max"], r["rssi_ohne_bericht"],
+                    r["snr_median"], r["snr_min"], r["snr_max"], r["snr_ohne_bericht"],
                     r["erste_sichtung"], r["letzte_sichtung"],
                 ]
                 for r in nb["je_nachbar"]
@@ -1299,6 +1416,32 @@ def render_md(res: dict[str, Any]) -> str:
                 [r["rufzeichen"], r["lat"], r["lon"], "ja" if r["mesh"] else "nein", r["hw"], r["letzte_sichtung"], r["entfernung_km"]]
                 for r in pos["knoten"]
             ],
+        )
+    )
+
+    sym = res["10_symmetrie"]
+    out.append("## 10. Symmetrie-Annahmen (SYM, `--nbrsym`)")
+    out.append("")
+    out.append(
+        "Nur geloggte Annahmen, die das Ergebnis einer Stufe-2-Relay-Entscheidung "
+        "tatsaechlich veraendert haben (docs/nbr-logformat.md) -- keine Zaehlung "
+        "aller Pruefungen. `HASF`: X gilt als schon im Besitz des Frames, weil es "
+        "M hoert. `ALT`: X gilt nicht als alleiniger Traeger, weil ein Versorger M "
+        "angenommen wird. `COVER`: X gilt durch die gehoerte Wiederholung von M als "
+        "abgedeckt."
+    )
+    out.append("")
+    out.append(f"- Annahmen insgesamt: {sym['anzahl_gesamt']}")
+    out.append("")
+    out.append("Je Rolle:")
+    out.append("")
+    out.append(_md_table(["Rolle", "Anzahl"], [[k, v] for k, v in sym["pro_rolle"].items()]))
+    out.append("Je Paar (x hoert m angenommen):")
+    out.append("")
+    out.append(
+        _md_table(
+            ["x", "m", "Anzahl", "SNR median"],
+            [[p["x"], p["m"], p["anzahl"], p["snr_median"]] for p in sym["je_paar"]],
         )
     )
 
@@ -1530,7 +1673,80 @@ def run_self_test() -> int:
         failures,
     )
 
-    # -- 4) --fetch --dry-run darf das Netz nie anfassen --
+    # -- 4) Stage-2-Erweiterung (docs/nbr-logformat.md): <snr> bei ME/EDGE
+    #    (neues und altes Feldformat gemischt in einer Datei), [NBR]|SYM, und
+    #    dass NEED/CANCEL?/CANCEL/REFUSE (mit ihrem neuen <inferred>-Feld)
+    #    sauber als unbekannter Untertyp durchgereicht werden, statt als
+    #    "foreign_line" oder als Parserfehler zu zaehlen --
+    state_s2 = parse_files([TESTDATA_DIR / "nbr_sample_stage2.log"])
+    res_s2 = analyze(state_s2)
+    r_s2 = res_s2["1_rahmen"]
+    _check("stage2 zeilen_gesamt", r_s2["zeilen_gesamt"], 25, failures)
+    _check("stage2 nbr_zeilen", r_s2["nbr_zeilen"], 15, failures)
+    _check("stage2 verworfen_gesamt", r_s2["verworfen_gesamt"], 10, failures)
+    _check(
+        "stage2 verworfen_gruende",
+        r_s2["verworfen_gruende"],
+        {
+            "no_timestamp": 6,
+            "unknown_subtype:CANCEL": 1,
+            "unknown_subtype:CANCEL?": 1,
+            "unknown_subtype:NEED": 1,
+            "unknown_subtype:REFUSE": 1,
+        },
+        failures,
+    )
+    _check("stage2 reboots", r_s2["reboots"], 0, failures)
+
+    # ME: gemischtes Format. DK5EN-93 hat drei neue Zeilen (snr -8, -6, NA),
+    # DK5EN-94 eine alte Zeile ganz ohne <snr>-Feld -- beide muessen sauber
+    # parsen, RSSI unveraendert, SNR bzw. None je nach Fall.
+    _check("stage2 me count", len(state_s2.me), 4, failures)
+    _check("stage2 me93[0] rssi", state_s2.me[0].rssi, -80, failures)
+    _check("stage2 me93[0] snr", state_s2.me[0].snr, -8, failures)
+    _check("stage2 me93[2] snr (NA)", state_s2.me[2].snr, None, failures)
+    _check("stage2 me94 snr (altes Format)", state_s2.me[3].snr, None, failures)
+
+    nb_s2 = {row["rufzeichen"]: row for row in res_s2["2_nachbarschaft"]["je_nachbar"]}
+    _check("stage2 nb93 rssi_min", nb_s2["DK5EN-93"]["rssi_min"], -82, failures)
+    _check("stage2 nb93 rssi_max", nb_s2["DK5EN-93"]["rssi_max"], -79, failures)
+    _check("stage2 nb93 snr_median", nb_s2["DK5EN-93"]["snr_median"], -7.0, failures)
+    _check("stage2 nb93 snr_min", nb_s2["DK5EN-93"]["snr_min"], -8, failures)
+    _check("stage2 nb93 snr_max", nb_s2["DK5EN-93"]["snr_max"], -6, failures)
+    _check("stage2 nb93 snr_ohne_bericht", nb_s2["DK5EN-93"]["snr_ohne_bericht"], 1, failures)
+    _check("stage2 nb94 snr_median (altes Format)", nb_s2["DK5EN-94"]["snr_median"], None, failures)
+    _check("stage2 nb94 snr_ohne_bericht", nb_s2["DK5EN-94"]["snr_ohne_bericht"], 1, failures)
+    # RSSI-Statistik bleibt trotz des neuen SNR-Feldes unveraendert vorhanden.
+    _check("stage2 nb94 rssi_min", nb_s2["DK5EN-94"]["rssi_min"], -90, failures)
+
+    # EDGE: gemischtes Format. Neue Zeilen tragen rssi=0 (Zelle speichert keine
+    # RSSI mehr) und ein <snr>; eine alte Zeile ohne <snr> hat weiterhin eine
+    # echte (von Null verschiedene) RSSI -- beide muessen parsen.
+    _check("stage2 edge count", len(state_s2.edges), 3, failures)
+    _check("stage2 edge[0] rssi (neu, immer 0)", state_s2.edges[0].rssi, 0, failures)
+    _check("stage2 edge[0] snr", state_s2.edges[0].snr, -9, failures)
+    _check("stage2 edge[1] snr", state_s2.edges[1].snr, -11, failures)
+    _check("stage2 edge[2] rssi (altes Format)", state_s2.edges[2].rssi, -77, failures)
+    _check("stage2 edge[2] snr (altes Format)", state_s2.edges[2].snr, None, failures)
+
+    # SYM: nur geloggte (ergebnisveraendernde) Annahmen, kein Zeilenfehler.
+    sym_s2 = res_s2["10_symmetrie"]
+    _check("stage2 sym anzahl_gesamt", sym_s2["anzahl_gesamt"], 4, failures)
+    _check(
+        "stage2 sym pro_rolle",
+        sym_s2["pro_rolle"],
+        {"ALT": 1, "COVER": 1, "HASF": 2},
+        failures,
+    )
+    _check("stage2 sym je_paar anzahl", len(sym_s2["je_paar"]), 3, failures)
+    if sym_s2["je_paar"]:
+        top = sym_s2["je_paar"][0]
+        _check("stage2 sym top paar x", top["x"], "DK5EN-95", failures)
+        _check("stage2 sym top paar m", top["m"], "DK5EN-93", failures)
+        _check("stage2 sym top paar anzahl", top["anzahl"], 2, failures)
+        _check("stage2 sym top paar snr_median", top["snr_median"], -11.0, failures)
+
+    # -- 5) --fetch --dry-run darf das Netz nie anfassen --
     import unittest.mock as mock
 
     with mock.patch(

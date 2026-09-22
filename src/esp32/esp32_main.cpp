@@ -933,6 +933,8 @@ void esp32setup()
     // --nbrrelay off|count|on (Stufe 2): 0x0020 rechnen/zaehlen, 0x0040 anwenden.
     bNBRRELAY  = (meshcom_settings.node_sset4 & 0x0060) != 0;
     bNBRCANCEL = (meshcom_settings.node_sset4 & 0x0040) != 0;
+    // --nbrsym on|off (Stufe 2): 0x0080 invertiert gespeichert, siehe command_functions.cpp.
+    bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;
 
     if(strlen(meshcom_settings.node_aprsmc) < 4)
     {

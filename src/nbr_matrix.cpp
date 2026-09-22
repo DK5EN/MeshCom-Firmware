@@ -50,27 +50,61 @@ static void nbrLogCut(uint16_t now_min, int ntok, int kept, const char *path)
     nbrLog(buf);
 }
 
+// SNR-Feld fuer eine ME/EDGE/SYM-Zeile: "NA", wenn die Zelle keinen Wert
+// traegt, sonst der numerische Wert -- gemeinsamer Formatierer statt drei
+// Kopien derselben Fallunterscheidung.
+static void nbrFormatSnrField(char *out, size_t outlen, int8_t snr)
+{
+    if (snr == NBR_SNR_UNKNOWN)
+        snprintf(out, outlen, "NA");
+    else
+        snprintf(out, outlen, "%d", (int)snr);
+}
+
 // EDGE-Zeile: "<to> hat <from> gehoert" -- <cnt> ist der Typzaehler der
 // Zelle NACH dem Treffer (nbrHitCell() ist zu diesem Zeitpunkt schon
-// gelaufen).
+// gelaufen). <rssi> ist seit der Umstellung auf SNR immer 0 (Feldposition
+// bleibt erhalten, docs/nbr-logformat.md); der trailing <snr> ist der
+// gespeicherte SNR der Zelle, "NA" wenn unbekannt.
 static void nbrLogEdge(uint16_t now_min, const char *from, const char *to, char type, const NbrCell &c)
 {
     if (!nbrLog)
         return;
+    char snr_buf[8];
+    nbrFormatSnrField(snr_buf, sizeof(snr_buf), c.snr);
     char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|EDGE|%u|%s|%s|%c|%d|%u",
-             (unsigned)now_min, from, to, nbrLogTypeChar(type), (int)c.rssi, (unsigned)nbrCellCount(c, type));
+    snprintf(buf, sizeof(buf), "[NBR]|EDGE|%u|%s|%s|%c|%d|%u|%s",
+             (unsigned)now_min, from, to, nbrLogTypeChar(type), 0, (unsigned)nbrCellCount(c, type), snr_buf);
     nbrLog(buf);
 }
 
 // ME-Zeile: der letzte Hop wurde von mir direkt gehoert (cell[last][0]).
-static void nbrLogMe(uint16_t now_min, const char *from, char type, const NbrCell &c)
+// <rssi> ist rssi_here durchgereicht (nicht gespeichert), der trailing
+// <snr> ist der gespeicherte SNR der Zelle, "NA" wenn unbekannt.
+static void nbrLogMe(uint16_t now_min, const char *from, char type, int16_t rssi_here, const NbrCell &c)
+{
+    if (!nbrLog)
+        return;
+    char snr_buf[8];
+    nbrFormatSnrField(snr_buf, sizeof(snr_buf), c.snr);
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|ME|%u|%s|%c|%d|%u|%s",
+             (unsigned)now_min, from, nbrLogTypeChar(type), (int)rssi_here, (unsigned)nbrCellCount(c, type), snr_buf);
+    nbrLog(buf);
+}
+
+// SYM-Zeile: eine Symmetrie-Annahme, die ein Stufe-2-Ergebnis (HASF/ALT/COVER)
+// tatsaechlich veraendert hat -- "angenommen <x> hoert <m>, weil <m> <x> bei
+// <snr> dB gehoert hat". msg_id kommt roh vom Aufrufer (aprsmsg.msg_id ist
+// unsigned int, hier als uint32_t durchgereicht).
+static void nbrLogSym(uint16_t now_min, uint32_t msg_id, const char *role,
+                       const char *x_call, const char *m_call, int8_t snr)
 {
     if (!nbrLog)
         return;
     char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|ME|%u|%s|%c|%d|%u",
-             (unsigned)now_min, from, nbrLogTypeChar(type), (int)c.rssi, (unsigned)nbrCellCount(c, type));
+    snprintf(buf, sizeof(buf), "[NBR]|SYM|%u|%08X|%s|%s|%s|%d",
+             (unsigned)now_min, (unsigned)msg_id, role, x_call, m_call, (int)snr);
     nbrLog(buf);
 }
 
@@ -82,17 +116,17 @@ static bool nbrCellSet(const NbrCell &c)
     return c.cnt_text || c.cnt_pos || c.cnt_hey;
 }
 
-// RSSI wird immer auf den Wertebereich begrenzt, den int8_t und die
-// Konzept-Zusicherung "-128..0, 0 = unbekannt" vorsehen. Der Parameter ist
-// bewusst breiter als int8_t, damit weder rssi_here (int16_t) noch eine
-// negierte HEY-RSSI-Ziffernfolge vor dem Vergleich ueberlaeuft.
-static int8_t nbrClampRssi(int32_t rssi)
+// SNR wird immer auf [-127,127] begrenzt -- -128 bleibt NBR_SNR_UNKNOWN
+// vorbehalten, ein realer Treffer darf ihn nie erreichen. Der Parameter ist
+// bewusst breiter als int8_t, damit weder snr_here (von der Radio-HAL) noch
+// eine vorzeichenbehaftete HEY-SNR-Ziffernfolge vor dem Vergleich ueberlaeuft.
+static int8_t nbrClampSnr(int32_t snr)
 {
-    if (rssi > 0)
-        return 0;
-    if (rssi < -128)
-        return -128;
-    return (int8_t)rssi;
+    if (snr > 127)
+        return 127;
+    if (snr < -127)
+        return -127;
+    return (int8_t)snr;
 }
 
 // Legt Zeile idx neu an (Rufzeichen + USED, alles andere auf 0/now_min).
@@ -107,13 +141,21 @@ static void nbrRowInit(NbrMatrix &m, int idx, const char *call, uint16_t now_min
 
 // Nullt bei einer Verdraengung sowohl die Zeile als auch die Spalte idx --
 // eine verdraengte Zeile darf keine alte Hoerbeziehung hinterlassen, weder
-// als Zeile noch als Spalte (Konzept 4.2).
+// als Zeile noch als Spalte (Konzept 4.2). memset() allein wuerde snr auf 0
+// setzen, einen GUELTIGEN Wert (0 dB) statt NBR_SNR_UNKNOWN -- danach also
+// je Zelle einzeln nachtragen.
 static void nbrZeroRowAndColumn(NbrMatrix &m, int idx)
 {
     for (int y = 0; y < NBR_MAX_ROWS; y++)
+    {
         memset(&m.cells[idx][y], 0, sizeof(NbrCell));
+        m.cells[idx][y].snr = NBR_SNR_UNKNOWN;
+    }
     for (int x = 0; x < NBR_MAX_ROWS; x++)
+    {
         memset(&m.cells[x][idx], 0, sizeof(NbrCell));
+        m.cells[x][idx].snr = NBR_SNR_UNKNOWN;
+    }
 }
 
 // Liest-ONLY, welchen Index ein Touch fuer call waehlen wuerde: die
@@ -204,16 +246,17 @@ static void nbrCommitRow(NbrMatrix &m, int target_idx, const char *call, uint16_
 }
 
 // Ein Treffer auf eine verfallene Zelle faengt bei ihren Zaehlern neu bei 0
-// an (Konzept 4.2), bevor er zaehlt; der RSSI wird dabei mitgeloescht, weil
-// er zu genau diesen Zaehlern gehoert. Eine frische Zelle behaelt ihren
-// RSSI, auch wenn der aktuelle Treffer keinen eigenen mitbringt (Text-/POS-
-// Frames haben keinen Signalbericht).
+// an (Konzept 4.2), bevor er zaehlt; der SNR wird dabei mitgeloescht (auf
+// NBR_SNR_UNKNOWN, nicht 0 -- 0 dB waere ein gueltiger Wert), weil er zu
+// genau diesen Zaehlern gehoert. Eine frische Zelle behaelt ihren SNR, auch
+// wenn der aktuelle Treffer keinen eigenen mitbringt (Text-/POS-Frames haben
+// keinen Signalbericht).
 static void nbrHitCell(NbrCell &c, char type, uint16_t now_min)
 {
     if (nbrCellSet(c) && (uint16_t)(now_min - c.last_min) >= NBR_WINDOW_MIN)
     {
         c.cnt_text = c.cnt_pos = c.cnt_hey = 0;
-        c.rssi = 0;
+        c.snr = NBR_SNR_UNKNOWN;
     }
     uint8_t *cnt = (type == ':') ? &c.cnt_text : (type == '!') ? &c.cnt_pos : &c.cnt_hey;
     if (*cnt < 255)
@@ -248,7 +291,7 @@ static void nbrMaybeSweep(NbrMatrix &m, uint16_t now_min)
             if (nbrCellSet(c) && (uint16_t)(now_min - c.last_min) >= 32768)
             {
                 c.cnt_text = c.cnt_pos = c.cnt_hey = 0;
-                c.rssi = 0;
+                c.snr = NBR_SNR_UNKNOWN;
             }
         }
     m.last_sweep = now_min;
@@ -300,8 +343,9 @@ static int nbrTokenizePath(const char *path, char tokens[][NBR_CALL_LEN], int ma
 }
 
 // Ziffernfolge -> long, ohne stdlib.h (dessen strtol dieser Datei nicht zur
-// Verfuegung steht). Auf 6 Ziffern begrenzt: mehr braucht keine reale RSSI-
-// Zahl, und das haelt die folgende Negation garantiert ueberlauffrei.
+// Verfuegung steht). Auf 6 Ziffern begrenzt: mehr braucht keine reale
+// Signalzahl, und das haelt eine folgende Vorzeichen-Anwendung garantiert
+// ueberlauffrei.
 static long nbrParseUint(const char *s, size_t len)
 {
     if (len == 0 || len > 6)
@@ -316,9 +360,27 @@ static long nbrParseUint(const char *s, size_t len)
     return v;
 }
 
+// Wie nbrParseUint(), aber mit optionalem fuehrenden '-' -- das SNR-Feld
+// eines HEY-Berichts ist vorzeichenbehaftet (z. B. "3,115,-10"). Liefert
+// false bei leerem/ungueltigem Feld, sonst *out = der geparste Wert. Ein
+// bool-Rueckgabewert statt "< 0 heisst ungueltig" wie bei nbrParseUint(),
+// weil ein gueltiges Ergebnis hier selbst negativ sein darf.
+static bool nbrParseInt(const char *s, size_t len, long *out)
+{
+    bool neg = (len > 0 && s[0] == '-');
+    long digits = nbrParseUint(s + (neg ? 1 : 0), len - (neg ? 1 : 0));
+    if (digits < 0)
+        return false;
+    *out = neg ? -digits : digits;
+    return true;
+}
+
 // Eine HEY-Berichtsgruppe "NCT,RSSI,SNR" (appendHeySignalReport(),
 // src/aprs_functions.cpp:1134): genau zwei Kommas, sonst ist es kein
-// gueltiger Bericht und wird uebersprungen (altes/fremdes Format).
+// gueltiger Bericht und wird uebersprungen (altes/fremdes Format). Gelesen
+// wird nur noch das DRITTE Feld (SNR, vorzeichenbehaftet) -- das mittlere
+// (RSSI) wird seit der Umstellung auf SNR nicht mehr gespeichert, nur noch
+// als Feldgrenze gebraucht.
 static void nbrApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, size_t len)
 {
     const char *comma1 = NULL;
@@ -337,13 +399,13 @@ static void nbrApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, siz
     if (!comma1 || !comma2)
         return;
 
-    const char *rssi_start = comma1 + 1;
-    size_t rssi_len = (size_t)(comma2 - rssi_start);
-    long rssi = nbrParseUint(rssi_start, rssi_len);
-    if (rssi < 0)
-        return; // nicht numerisch
+    const char *snr_start = comma2 + 1;
+    size_t snr_len = (size_t)((g + len) - snr_start);
+    long snr;
+    if (!nbrParseInt(snr_start, snr_len, &snr))
+        return; // nicht numerisch, Zelle bleibt unangetastet
 
-    m.cells[row_x][row_y].rssi = nbrClampRssi((int32_t)(-rssi));
+    m.cells[row_x][row_y].snr = nbrClampSnr((int32_t)snr);
 }
 
 // Liest "R<n>;g1;g2;..." und verteilt Gruppe i (1-basiert) auf das Paar
@@ -376,11 +438,25 @@ static void nbrApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const 
     }
 }
 
+// Nach einem memset() der ganzen Matrix (nbrInit()/nbrReset()) stehen alle
+// Zellen-SNR auf 0 -- ein GUELTIGER Wert, nicht NBR_SNR_UNKNOWN. Diese Zellen
+// sind zwar ueber nbrCellSet() (alle Zaehler 0) als "keine Beobachtung"
+// erkennbar, aber mindestens ein Leser (nbrFormatRow()) prueft das SNR-Feld
+// zusaetzlich zu last_min/nbrFresh() ohne nbrCellSet() -- deshalb hier
+// explizit nachtragen, statt sich auf die Zaehler allein zu verlassen.
+static void nbrFillUnknownSnr(NbrMatrix &m)
+{
+    for (int x = 0; x < NBR_MAX_ROWS; x++)
+        for (int y = 0; y < NBR_MAX_ROWS; y++)
+            m.cells[x][y].snr = NBR_SNR_UNKNOWN;
+}
+
 // --- oeffentliche Schnittstelle --------------------------------------------
 
 void nbrInit(NbrMatrix &m, const char *own_call, uint16_t now_min)
 {
     memset(&m, 0, sizeof(NbrMatrix));
+    nbrFillUnknownSnr(m);
     strncpy(m.rows[0].call, own_call, NBR_CALL_LEN - 1);
     m.rows[0].call[NBR_CALL_LEN - 1] = '\0';
     m.rows[0].flags = NBR_FLAG_USED;
@@ -411,6 +487,7 @@ void nbrReset(NbrMatrix &m, uint16_t now_min)
     char own[NBR_CALL_LEN];
     memcpy(own, m.rows[0].call, NBR_CALL_LEN);
     memset(&m, 0, sizeof(NbrMatrix));
+    nbrFillUnknownSnr(m);
     memcpy(m.rows[0].call, own, NBR_CALL_LEN);
     m.boot_min = now_min;
     m.last_sweep = now_min;
@@ -424,7 +501,7 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min)
 }
 
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
-                  bool dest_gw, int16_t rssi_here, uint16_t now_min)
+                  bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
 {
     // Der Sweep ist Wartung unabhaengig von diesem Frame und laeuft darum
     // VOR jeder Pruefung -- auch ein Frame, der gleich danach verworfen
@@ -562,10 +639,10 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
     {
         int last = row_idx[ntok - 1];
         nbrHitCell(m.cells[last][0], type, now_min);
-        m.cells[last][0].rssi = nbrClampRssi(rssi_here);
+        m.cells[last][0].snr = nbrClampSnr(snr_here);
         m.rows[last].last_min = now_min;
         m.rows[0].last_min = now_min;
-        nbrLogMe(now_min, tokens[ntok - 1], type, m.cells[last][0]);
+        nbrLogMe(now_min, tokens[ntok - 1], type, rssi_here, m.cells[last][0]);
         hits++;
     }
 
@@ -793,12 +870,49 @@ uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
     return mask;
 }
 
-NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min)
+// Hoerbeweis "hoert X M" mit optionalem symmetrischem Fallback (--nbrsym,
+// nbr_matrix.h NBR_SYM_MIN_SNR): beobachtet ist cells[mrow][x] ("X hat M
+// gehoert", Zellsemantik cells[A][B] = "B hat A gehoert", A=mrow, B=x). Ohne
+// Beobachtung wird -- nur wenn sym -- die UMGEKEHRTE Zelle cells[x][mrow]
+// ("M hat X gehoert") herangezogen: hat M die Gegenstation X frisch und mit
+// SNR >= NBR_SYM_MIN_SNR gehoert, wird angenommen, dass X umgekehrt M auch
+// hoert (Funkstrecken sind ueberwiegend symmetrisch). *snr_used bekommt in
+// diesem Fall den SNR von "M hat X gehoert" (fuer die SYM-Log-Zeile beim
+// Aufrufer); *inferred zeigt an, ob das Ergebnis eine Annahme war. Beide
+// Ausgabeparameter duerfen NULL sein.
+static bool nbrHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, bool sym,
+                         int8_t *snr_used, bool *inferred)
+{
+    if (inferred)
+        *inferred = false;
+
+    const NbrCell &observed = m.cells[mrow][x]; // "X hat M gehoert"
+    if (nbrCellSet(observed) && nbrFresh(observed.last_min, now_min))
+        return true;
+
+    if (!sym || x == mrow)
+        return false;
+
+    const NbrCell &reverse = m.cells[x][mrow]; // "M hat X gehoert"
+    if (!(nbrCellSet(reverse) && nbrFresh(reverse.last_min, now_min)))
+        return false;
+    if (reverse.snr == NBR_SNR_UNKNOWN || reverse.snr < NBR_SYM_MIN_SNR)
+        return false;
+
+    if (snr_used)
+        *snr_used = reverse.snr;
+    if (inferred)
+        *inferred = true;
+    return true;
+}
+
+NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, bool sym, uint32_t msg_id)
 {
     NbrNeed r;
     r.need = 0;
     r.alone = 0;
     r.known = false;
+    r.inferred = 0;
 
     char tokens[8][NBR_CALL_LEN];
     int ntok = nbrTokenizePath(path, tokens, 8);
@@ -834,11 +948,46 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min)
         return r;
     r.known = true;
 
+    // HatF-Symmetrie-Fallback (--nbrsym): NUR fuer Abhaengige, die weder per
+    // Pfad noch per Beobachtung schon in hasf stehen, und NUR ueber die
+    // Pfadteilnehmer selbst (dieselbe Menge wie der Beobachtungs-Schritt
+    // oben) -- eine Annahme fuer einen Nicht-Abhaengigen wuerde need/alone
+    // nie beeinflussen und keine Log-Zeile rechtfertigen.
+    if (sym)
+    {
+        for (int x = 1; x < NBR_MAX_ROWS; x++)
+        {
+            if (!(dep & nbrBit(x)) || (hasf & nbrBit(x)))
+                continue;
+            for (int i = 0; i < ntok; i++)
+            {
+                if (pidx[i] < 0)
+                    continue;
+                int8_t snr_used = 0;
+                bool inferred = false;
+                if (nbrHearsSym(m, x, pidx[i], now_min, sym, &snr_used, &inferred) && inferred)
+                {
+                    hasf |= nbrBit(x);
+                    r.inferred |= nbrBit(x);
+                    nbrLogSym(now_min, msg_id, "HASF", m.rows[x].call, tokens[i], snr_used);
+                    break;
+                }
+            }
+        }
+    }
+
     r.need = dep & ~hasf;
 
     // Allein: X aus dem Bedarf ohne Alternative -- kein direkter M != X, der
-    // den Frame hat (HatF) und den X frisch gehoert hat (cell[M][X]).
-    uint32_t providers = direct & hasf;
+    // den Frame hat (HatF) und den X frisch gehoert hat (cell[M][X]). Erst
+    // beobachtet gesucht, nur wenn nichts gefunden wird (und sym) der
+    // symmetrische Fallback ueber dieselben Provider.
+    // Versorger muss den Frame BEOBACHTET haben: ein X, das nur per
+    // HASF-Annahme in hasf steht, versorgt niemanden (Advisor 2026-09-22) --
+    // sonst stapelten sich zwei Annahmen, und der zweite Nachbar verloere
+    // seinen Allein-Status ohne eigene SYM-Zeile. Hoechstens eine Annahme
+    // je Entscheidung.
+    uint32_t providers = direct & hasf & ~r.inferred;
     for (int x = 1; x < NBR_MAX_ROWS; x++)
     {
         if (!(r.need & nbrBit(x)))
@@ -852,18 +1001,71 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min)
             if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
                 alt = true;
         }
+        if (!alt && sym)
+        {
+            for (int mrow = 1; mrow < NBR_MAX_ROWS && !alt; mrow++)
+            {
+                if (mrow == x || !(providers & nbrBit(mrow)))
+                    continue;
+                int8_t snr_used = 0;
+                bool inferred = false;
+                if (nbrHearsSym(m, x, mrow, now_min, sym, &snr_used, &inferred) && inferred)
+                {
+                    alt = true;
+                    r.inferred |= nbrBit(x);
+                    nbrLogSym(now_min, msg_id, "ALT", m.rows[x].call, m.rows[mrow].call, snr_used);
+                }
+            }
+        }
         if (!alt)
             r.alone |= nbrBit(x);
     }
     return r;
 }
 
-uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min)
+uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                       uint32_t relevant, uint32_t msg_id, uint32_t *inferred)
 {
+    if (inferred)
+        *inferred = 0;
+
     int idx = nbrFind(m, relayer);
     if (idx <= 0)
         return 0; // unbekannt oder ich selbst: deckt nichts, was ich nachweisen koennte
-    return nbrHearersMask(m, idx, now_min);
+
+    uint32_t mask = nbrHearersMask(m, idx, now_min); // beobachtete Hoerer des Relayers, unveraendert
+    if (!sym)
+        return mask;
+
+    // Symmetrie-Fallback: jedes NOCH NICHT beobachtete X, fuer das der
+    // Relayer M X frisch mit ausreichendem SNR gehoert hat, gilt als
+    // zusaetzlicher Hoerer. nbrHearsSym(m, x, idx, ...) prueft in dieser
+    // Rollenverteilung genau das: beobachtet waere cells[idx][x] ("X hat M
+    // gehoert", bereits oben in mask erfasst und deshalb hier immer falsch),
+    // der Fallback zieht cells[x][idx] ("M hat X gehoert") heran.
+    uint32_t local_inferred = 0;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (x == idx || (mask & nbrBit(x)) || !(m.rows[x].flags & NBR_FLAG_USED))
+            continue;
+
+        int8_t snr_used = 0;
+        bool was_inferred = false;
+        if (nbrHearsSym(m, x, idx, now_min, sym, &snr_used, &was_inferred) && was_inferred)
+        {
+            mask |= nbrBit(x);
+            local_inferred |= nbrBit(x);
+            // Nur loggen, wenn das X fuer DIESEN Slot (relevant) tatsaechlich
+            // etwas aendern kann -- sonst waere die Annahme fuer den Aufruf
+            // folgenlos und die Zeile Rauschen im 24-h-Log.
+            if (relevant & nbrBit(x))
+                nbrLogSym(now_min, msg_id, "COVER", m.rows[x].call, m.rows[idx].call, snr_used);
+        }
+    }
+
+    if (inferred)
+        *inferred = local_inferred;
+    return mask;
 }
 
 int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
@@ -947,12 +1149,12 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
     const NbrRow &r = m.rows[row];
 
     // "hoert mich mit": cell[0][row] ist "row hat 0 (mich) gehoert" --
-    // Konzept 4.3, Spalte "hoert mich mit". 0 im Feld heisst "unbekannt",
-    // nicht "0 dBm".
+    // Konzept 4.3, Spalte "hoert mich mit". NBR_SNR_UNKNOWN im Feld heisst
+    // "unbekannt", nicht "0 dB".
     char hears_me[8] = "-";
     const NbrCell &c_hears = m.cells[0][row];
-    if (row != 0 && nbrFresh(c_hears.last_min, now_min) && c_hears.rssi != 0)
-        snprintf(hears_me, sizeof(hears_me), "%d", (int)c_hears.rssi);
+    if (row != 0 && nbrFresh(c_hears.last_min, now_min) && c_hears.snr != NBR_SNR_UNKNOWN)
+        snprintf(hears_me, sizeof(hears_me), "%d", (int)c_hears.snr);
 
     uint8_t hearer_idx[NBR_MAX_ROWS];
     uint8_t hn = nbrHearers(m, row, now_min, hearer_idx, (uint8_t)NBR_MAX_ROWS);

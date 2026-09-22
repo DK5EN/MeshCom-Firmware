@@ -41,6 +41,13 @@ static bool nbr_post_flag_seen;
 static int  nbr_post_sset_seen;
 static void nbr_post_probe() { nbr_post_flag_seen = flagNbr; nbr_post_sset_seen = ssetNbr; }
 
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): eigenes Paar wie --nbrdebug,
+// aber invertiert gespeichert (0x0080 gesetzt heisst "aus", derselbe Trick
+// wie --mesh) -- kein post()-Hook noetig, die Entscheidung liest bNBRSYM je
+// Frame neu.
+static bool flagSym;
+static int  ssetSym;
+
 static const ToggleRow TBL[] =
 {
     // name              flag    sset    and_mask     or_mask      post         dirty            opt
@@ -55,6 +62,9 @@ static const ToggleRow TBL[] =
     // Nachbildung der beiden echten "--nbrdebug on/off"-Zeilen (src/command_functions.cpp).
     { "--nbrdebug on",  &flagNbr, &ssetNbr, 0xFFFFFFFF, 0x0010,     nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrdebug off", &flagNbr, &ssetNbr, 0xFFFFFFEF, 0x00000000, nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
+    // Nachbildung der beiden echten "--nbrsym on/off"-Zeilen (src/command_functions.cpp).
+    { "--nbrsym on",    &flagSym, &ssetSym, 0xFFFFFF7F, 0x00000000, nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrsym off",   &flagSym, &ssetSym, 0xFFFFFFFF, 0x0080,     nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
 };
 static const size_t N = sizeof(TBL) / sizeof(TBL[0]);
 
@@ -68,6 +78,8 @@ static void reset()
     ssetNbr = 0;
     nbr_post_flag_seen = false;
     nbr_post_sset_seen = -1;
+    flagSym = false;
+    ssetSym = 0;
 }
 
 static ToggleAction run(const char *cmd) { return toggleApply(TBL, N, cmd); }
@@ -277,6 +289,60 @@ static void test_nbrdebug_off_mask_leaves_upper_bits_alone()
     TEST_ASSERT_EQUAL_HEX32(0x7FFF0000u, (unsigned)ssetNbr);
 }
 
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): invertiert gespeichert --
+// "on" CLEARS 0x0080 while SETTING the flag true, "off" SETS 0x0080 while
+// clearing the flag. Same shape as --mesh, opposite of --nbrdebug.
+static void test_nbrsym_on_sets_flag_true_and_clears_bit_0x0080()
+{
+    reset();
+    ssetSym = 0x0080;   // Ausgangszustand "aus"
+    ToggleAction a = run("nbrsym on");
+    TEST_ASSERT_TRUE(a.matched);
+    TEST_ASSERT_TRUE(flagSym);
+    TEST_ASSERT_EQUAL_INT(0x0000, ssetSym & 0x0080);
+    TEST_ASSERT_TRUE(a.save);
+    TEST_ASSERT_TRUE(a.ble_echo);
+}
+
+static void test_nbrsym_off_clears_flag_and_sets_bit_0x0080()
+{
+    reset();
+    ssetSym = 0x0000;   // Ausgangszustand "an"
+    ToggleAction a = run("nbrsym off");
+    TEST_ASSERT_TRUE(a.matched);
+    TEST_ASSERT_FALSE(flagSym);
+    TEST_ASSERT_EQUAL_INT(0x0080, ssetSym & 0x0080);
+    TEST_ASSERT_TRUE(a.save);
+    TEST_ASSERT_TRUE(a.ble_echo);
+}
+
+// The on row's and_mask is the bitwise complement of the off row's or_mask
+// (0xFFFFFF7F == ~0x0080): a 32-bit mask must leave bits 16-31 alone.
+static void test_nbrsym_on_mask_leaves_upper_bits_alone()
+{
+    reset();
+    ssetSym = (int)0x7FFF0080u;
+    run("nbrsym on");
+    TEST_ASSERT_EQUAL_HEX32(0x7FFF0000u, (unsigned)ssetSym);
+}
+
+// Default-an-Semantik (Boot-Restore): beide Boot-Pfade muessen bNBRSYM aus
+// dem INVERTIERTEN Bit lesen, sonst startet ein frischer Knoten (node_sset4
+// == 0, keine Migration) mit sym aus. Die Dateien lassen sich hier nicht
+// linken (Arduino-Framework), deshalb prueft der Test den Quelltext.
+static std::string repo_root();
+static std::string read_whole_file(const std::string &path);
+
+static void test_nbrsym_boot_restore_reads_inverted_bit()
+{
+    const char *mains[] = { "/src/esp32/esp32_main.cpp", "/src/nrf52/nrf52_main.cpp" };
+    for (const char *f : mains)
+    {
+        std::string src = read_whole_file(repo_root() + f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;") != std::string::npos, f);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // EXT-02, second half (docs/BACKLOG.md 3.8as): the "--extudp off" row in the
 // REAL COMMAND_TOGGLES table (src/command_functions.cpp) used to carry
@@ -452,6 +518,29 @@ static void test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040()
     TEST_ASSERT_EQUAL_STRING("&bNBRRELAY", nth_field(off, 1).c_str());
 }
 
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): ein Bit 0x0080 in node_sset4,
+// invertiert gespeichert wie --mesh -- "on" clears it while setting the flag,
+// "off" sets it while clearing the flag. No post() (the decision re-reads
+// bNBRSYM per frame, no reboot needed).
+static void test_real_nbrsym_rows_use_bit_0x0080_inverted()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    std::string on = real_row(src, "\"--nbrsym on\"");
+    std::string off = real_row(src, "\"--nbrsym off\"");
+    TEST_ASSERT_FALSE_MESSAGE(on.empty() || off.empty(),
+        "one of the two '--nbrsym' rows is missing in src/command_functions.cpp");
+
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(on, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(off, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("&bNBRSYM", nth_field(on, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING("&bNBRSYM", nth_field(off, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFF7F", nth_field(on, 3).c_str(), "'on' must clear only 0x0080");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x00000000", nth_field(on, 4).c_str(), "'on' must not set any bit");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFFF", nth_field(off, 3).c_str(), "'off' and_mask must not touch other bits");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0080", nth_field(off, 4).c_str(), "'off' must set 0x0080");
+}
+
 static void test_real_nbrdebug_off_row_clears_only_bit_0x0010()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
@@ -552,8 +641,13 @@ int main(int, char **)
     RUN_TEST(test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state);
     RUN_TEST(test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state);
     RUN_TEST(test_nbrdebug_off_mask_leaves_upper_bits_alone);
+    RUN_TEST(test_nbrsym_on_sets_flag_true_and_clears_bit_0x0080);
+    RUN_TEST(test_nbrsym_off_clears_flag_and_sets_bit_0x0080);
+    RUN_TEST(test_nbrsym_on_mask_leaves_upper_bits_alone);
+    RUN_TEST(test_nbrsym_boot_restore_reads_inverted_bit);
     RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply);
     RUN_TEST(test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040);
+    RUN_TEST(test_real_nbrsym_rows_use_bit_0x0080_inverted);
     RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0010);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
