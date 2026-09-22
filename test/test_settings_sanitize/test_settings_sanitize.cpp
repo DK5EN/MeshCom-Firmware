@@ -192,6 +192,46 @@ static void test_cstring_terminator(void)
     TEST_ASSERT_FALSE(sanitize_cstring(bad, 0));
 }
 
+// TBEAM_1W (2S, BAT_MIN 6.5 V / BAT_MAX 8.1 V): nach einem Wipe liefert
+// preferences.getFloat("node_maxv", 4.200) den 1S-Default. BAT-01 rechnet das
+// Plausibilitaetsband relativ zu node_maxv (2.31..4.83 V), der 7.6-V-Pack faellt
+// heraus, Anzeige bleibt dauerhaft auf "USB". Muss beim Laden auf 8.1 V zurueck.
+static void test_maxv_2s_nach_wipe_auf_boardwert(void)
+{
+    float v = 4.2f;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 6.5f, 8.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(8.1f, v);
+    TEST_ASSERT_EQUAL_INT(1, g_log_calls);
+    TEST_ASSERT_EQUAL_STRING("node_maxv", g_last_field);
+}
+
+static void test_maxv_plausible_werte_bleiben(void)
+{
+    float v = 8.2f;   // Issue #1053: von Hand gesetzter 2S-Wert
+    TEST_ASSERT_FALSE(sanitize_max_voltage(v, 6.5f, 8.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(8.2f, v);
+
+    v = 4.2f;         // 1S-Board, Default nach Wipe: unveraendert
+    TEST_ASSERT_FALSE(sanitize_max_voltage(v, 3.3f, 4.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(4.2f, v);
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+}
+
+static void test_maxv_grenze_null_und_nan(void)
+{
+    float v = 6.5f;   // gleich BAT_MIN: Prozentskala haette Nenner 0
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 6.5f, 8.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(8.1f, v);
+
+    v = 0.0f;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 3.3f, 4.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(4.1f, v);
+
+    v = NAN;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 3.3f, 4.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(4.1f, v);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -207,5 +247,8 @@ int main(int, char **)
     RUN_TEST(test_max_hop_text_plausibilitaet);
     RUN_TEST(test_1132_resolve_tx_power_sentinels);
     RUN_TEST(test_cstring_terminator);
+    RUN_TEST(test_maxv_2s_nach_wipe_auf_boardwert);
+    RUN_TEST(test_maxv_plausible_werte_bleiben);
+    RUN_TEST(test_maxv_grenze_null_und_nan);
     return UNITY_END();
 }
