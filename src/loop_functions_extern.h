@@ -47,6 +47,9 @@ extern bool bDEBUGEN;
 extern bool bDEBUGLNG;
 extern bool bLORADEBUG;
 extern bool bNBRDEBUG;
+extern bool bNBRRELAY;                  // --nbrrelay count|on (Stufe 2), siehe loop_functions.cpp
+extern bool bNBRCANCEL;                 // --nbrrelay on
+extern uint32_t stat_nbr_relay_a, stat_nbr_relay_b, stat_nbr_cancel, stat_nbr_cancel_possible, stat_nbr_refuse_alone;
 extern bool bBLEDEBUG;
 extern bool bWXDEBUG;
 extern bool bIODEBUG;
@@ -212,8 +215,10 @@ extern uint32_t ringEnqueueTime[MAX_RING];     // millis() timestamp when enqueu
 // N-14: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
 // (ein Default darf pro Parameter nur einmal je Uebersetzungseinheit stehen);
 // diese Zeile deckt nur TUs ab, die ausschliesslich dieses Extern-Header ziehen.
+// Stufe-2-Parameter (kind/need/alone): siehe loop_functions.h.
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
-                    const char* source, int retryCountIn, bool clearSlotFirst);
+                    const char* source, int retryCountIn, bool clearSlotFirst,
+                    uint8_t kind, uint32_t need, uint32_t alone);
 
 // BP-01 (BACKLOG) / TM-37: back-pressure to the sender, in Q-codes.
 //

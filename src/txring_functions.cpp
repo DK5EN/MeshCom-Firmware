@@ -47,6 +47,13 @@ std::atomic<uint8_t> stat_ring_max;
 // Datei, und so braucht der native Testbuild keinen zweiten Definitionszweig.
 uint8_t ringSource[MAX_RING] = {0};
 
+// Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.1/5.2):
+// wie ringSource[] oben unbedingt definiert (kein NATIVE_BUILD-Zweig
+// noetig), geschrieben ausschliesslich in addTxRingEntry() unten.
+uint32_t ringNeed[MAX_RING]  = {0};
+uint32_t ringAlone[MAX_RING] = {0};
+uint8_t  ringKind[MAX_RING]  = {0};
+
 //////////////////////////////////////////////////////////////////////////
 // LoRa TX functions
 
@@ -435,12 +442,22 @@ void txRingAgeBackground(uint32_t now_ms)
  *                        zurueckgesetzt — Alt-Verhalten bewusst beibehalten)
  * @param clearSlotFirst true = Slot vor dem Schreiben komplett nullen (nur
  *                        der rx_relay-Aufruf tat das bisher selbst)
+ * @param kind           Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): RING_KIND_*
+ *                        (txring_functions.h), Default RING_KIND_OTHER. Nur
+ *                        der rx_relay-Aufruf setzt RING_KIND_RELAY.
+ * @param need           Stufe 2: Bedarfsmaske (Konzept 4/5.1) aus nbrRelayNeed(),
+ *                        Default 0. Wird JEDEM Slot zugewiesen, auch wenn 0 --
+ *                        so behaelt ein wiederverwendeter Slot nie die Maske
+ *                        seines Vorbesitzers.
+ * @param alone          Stufe 2: Allein-Maske (Konzept 4/5.1) aus nbrRelayNeed(),
+ *                        Default 0.
  * @return Slot-Index (>=0) oder -1, wenn die Overflow-Logik den neuen
  *         Eintrag verworfen hat (Ring voll, keine niedrigere Prio zum
  *         Verdraengen vorhanden)
  */
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
-                    const char* source, int retryCountIn, bool clearSlotFirst)
+                    const char* source, int retryCountIn, bool clearSlotFirst,
+                    uint8_t kind, uint32_t need, uint32_t alone)
 {
     // TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
     // transmit at all -- refuse here so its ring never even fills, on top
@@ -531,6 +548,14 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
     // SL-03/SL-06: Herkunft aus dem `source`-Label festhalten, solange es im
     // Scope ist -- die TX-Zeile in doTX() sieht spaeter nur noch den Slot.
     ringSource[w] = setlogRingSourceCode(source);
+    // Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): JEDER Enqueue setzt alle
+    // drei Seitenfelder, auch auf ihre Defaults -- sonst wuerde ein Slot, der
+    // vorher ein Relay mit alter Bedarfsmaske trug, diese Maske fuer den
+    // neuen Eintrag stillschweigend behalten (Regression: der Mithoer-Scan
+    // in lora_functions.cpp bricht dann gegen die FALSCHE Nachricht ab).
+    ringKind[w]  = kind;
+    ringNeed[w]  = need;
+    ringAlone[w] = alone;
     prio = ringPriority[w];
 
     // Track queue depth for high-water mark
@@ -596,6 +621,9 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                 ringPriority[worst_slot]    = ringPriority[r];
                 ringEnqueueTime[worst_slot] = ringEnqueueTime[r];
                 ringSource[worst_slot]      = ringSource[r];   // SL-03/SL-06
+                ringKind[worst_slot]        = ringKind[r];     // Stufe 2, Konzept 5.1
+                ringNeed[worst_slot]        = ringNeed[r];
+                ringAlone[worst_slot]       = ringAlone[r];
                 retryCount[worst_slot]      = retryCount[r];
                 ringBuffer[r][0] = 0;
             }

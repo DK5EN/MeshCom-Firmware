@@ -24,6 +24,28 @@
 // MAX_RING Byte (20 auf allen aktuellen Boards).
 extern uint8_t ringSource[MAX_RING];
 
+// Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.1/5.2):
+// Bedarfs- und Allein-Maske sowie die Ring-Herkunftsart je Slot, Seite an
+// Seite mit ringSource[] oben gefuehrt und wie dieses unbedingt (nicht nur
+// unter NATIVE_BUILD) in txring_functions.cpp definiert. Geschrieben
+// ausschliesslich in addTxRingEntry() (jeder Enqueue ueberschreibt alle drei,
+// damit ein wiederverwendeter Slot nie die Masken seines Vorbesitzers
+// behaelt) und beim N-24-Slot-Umzug mitkopiert; gelesen/veraendert vom
+// Mithoer-Scan (lora_functions.cpp OnRxDone) und vom fallabhaengigen
+// CSMA-Backoff (csma_compute_timeout_slot()).
+extern uint32_t ringNeed[MAX_RING];
+extern uint32_t ringAlone[MAX_RING];
+extern uint8_t  ringKind[MAX_RING];
+
+// ringKind-Werte. RING_KIND_COUNTED ist ein Kennbit (ORed auf RING_KIND_*),
+// das eine bereits geloggte Zaehlentscheidung markiert (CANCEL?/REFUSE),
+// damit --nbrrelay count denselben Slot nicht mehrfach zaehlt; mit
+// `& 0x7F` maskieren, bevor gegen RING_KIND_OTHER/RING_KIND_RELAY verglichen
+// wird.
+#define RING_KIND_OTHER   0x00   // kein Relay-Slot (rx_ack_fwd, DM-ACKs, eigene Sends, ...)
+#define RING_KIND_RELAY   0x01   // Slot ist das Relay eines empfangenen Frames
+#define RING_KIND_COUNTED 0x80   // Kennbit: Zaehlentscheidung bereits geloggt (nur --nbrrelay count)
+
 uint8_t getMessagePriority(int slot);
 int getNextTxSlot(void);
 void advanceIReadPastEmpty(void);

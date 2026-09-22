@@ -416,6 +416,42 @@ static void test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply()
         "does not take effect until the next boot");
 }
 
+// --nbrrelay off|count|on (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): drei
+// echte Zeilen auf node_sset4, Bits 0x0020 (count) und 0x0040 (on). "on" setzt
+// beide Bits (0x0060), "count" setzt 0x0020 und loescht 0x0040 (and 0xFFFFFFBF),
+// "off" loescht beide (and 0xFFFFFF9F) und laesst alle anderen Bits stehen.
+static std::string real_row(const std::string &src, const char *name)
+{
+    std::istringstream lines(src);
+    std::string line;
+    while (std::getline(lines, line))
+        if (line.find(name) != std::string::npos)
+            return line;
+    return "";
+}
+
+static void test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    std::string on = real_row(src, "\"--nbrrelay on\"");
+    std::string count = real_row(src, "\"--nbrrelay count\"");
+    std::string off = real_row(src, "\"--nbrrelay off\"");
+    TEST_ASSERT_FALSE_MESSAGE(on.empty() || count.empty() || off.empty(),
+        "one of the three '--nbrrelay' rows is missing in src/command_functions.cpp");
+
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(on, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(count, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(off, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0060", nth_field(on, 4).c_str(), "'on' must set 0x0020|0x0040");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0020", nth_field(count, 4).c_str(), "'count' must set only 0x0020");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFBF", nth_field(count, 3).c_str(), "'count' must clear 0x0040");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFF9F", nth_field(off, 3).c_str(), "'off' must clear 0x0020|0x0040 only");
+    TEST_ASSERT_EQUAL_STRING("&bNBRCANCEL", nth_field(on, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING("&bNBRRELAY", nth_field(count, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING("&bNBRRELAY", nth_field(off, 1).c_str());
+}
+
 static void test_real_nbrdebug_off_row_clears_only_bit_0x0010()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
@@ -517,6 +553,7 @@ int main(int, char **)
     RUN_TEST(test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state);
     RUN_TEST(test_nbrdebug_off_mask_leaves_upper_bits_alone);
     RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply);
+    RUN_TEST(test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040);
     RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0010);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);

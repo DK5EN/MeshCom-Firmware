@@ -1567,9 +1567,27 @@ void sub_page_path()
     web_client.println(); // The HTTP response ends with another blank line
 }
 
+// Direktheitstest einer Zeile (Konzept docs/nbr-wichtigkeit-konzept.md 6.1,
+// Spalte "D/I", und Zeile-0-Ausnahme in 6.1/6.2): Zeile 0 gilt nie als
+// "direkt" -- die Frage "hoere ich mich selbst direkt" ist nicht gestellt.
+// Sonst frisch und gesetzt heisst cells[X][0] (Konzept 4.1: der ME-Schritt
+// beim Empfang). sub_page_neighbours() teilt diesen Test zwischen der
+// D/I-Spalte, #X/Role (nbrRowMeshNeedCount() ist NA fuer dieselbe Bedingung)
+// und der Sortierung von Tabelle 2 (6.2, Regel 2) -- ein Helfer statt drei
+// Kopien.
+static bool nbrRowIsDirect(uint8_t X, uint16_t now_min)
+{
+    if (X == 0)
+        return false;
+    const NbrCell &c0 = nbrMatrix.cells[X][0];
+    return (c0.cnt_text || c0.cnt_pos || c0.cnt_hey) && nbrFresh(c0.last_min, now_min);
+}
+
 /**
  * ###########################################################################################################################
- * delivers the neighbour-matrix page to be injected into the scaffold (NBR-W2, Konzept 4.5)
+ * delivers the neighbour-matrix page to be injected into the scaffold (NBR-W2, Konzept 4.5;
+ * Stufe 2a, docs/nbr-wichtigkeit-konzept.md Abschnitt 6: Rollenspalten, Legende, Sortierung,
+ * "Covered by" und der Block "My relay decision")
  */
 void sub_page_neighbours()
 {
@@ -1601,62 +1619,205 @@ void sub_page_neighbours()
             idx[n++] = r;
     }
 
-    // Urteil (Konzept 4.3): exklusive Zeilen sind die, die im Fenster nur ich
-    // hoere -- die einzigen, fuer die mein Mesh etwas beitraegt.
-    uint8_t excl[NBR_MAX_ROWS];
-    int nexcl = nbrExclusive(nbrMatrix, now_min, excl, NBR_MAX_ROWS);
-    uint8_t nexcl_shown = (nexcl > 0) ? ((nexcl < (int)NBR_MAX_ROWS) ? (uint8_t)nexcl : (uint8_t)NBR_MAX_ROWS) : 0;
+    // E_self (Konzept 4, 6.1 Zeilenfarbe / 6.2 "Covered by"): direkt gehoerte
+    // Zeilen, die kein ANDERER direkter Nachbar frisch hoert -- ersetzt die
+    // alte <verdict>-Faerbung (frueher ueber die 2-Hop-Funktion) vollstaendig.
+    uint8_t eself[NBR_MAX_ROWS];
+    int neself = nbrExclusiveDirect(nbrMatrix, now_min, eself, NBR_MAX_ROWS);
+    uint8_t neself_shown = (neself > 0) ? ((neself < (int)NBR_MAX_ROWS) ? (uint8_t)neself : (uint8_t)NBR_MAX_ROWS) : 0;
 
     web_client.printf("<p>Window: %u h, %u row(s) fresh. ", (unsigned)(NBR_WINDOW_MIN / 60), (unsigned)n);
-    if (nexcl < 0)
+    if (neself < 0)
     {
         web_client.println("Nothing heard directly yet.</p>");
     }
-    else if (nexcl == 0)
+    else if (neself == 0)
     {
         web_client.println("No exclusive nodes. Mesh is redundant here.</p>");
     }
     else
     {
-        web_client.printf("%d exclusive node(s): ", nexcl);
-        for (uint8_t i = 0; i < nexcl_shown; i++)
-            web_client.printf("%s%s", (i ? ", " : ""), nbrMatrix.rows[excl[i]].call);
+        web_client.print("Exclusive to me (only I hear them directly): ");
+        for (uint8_t i = 0; i < neself_shown; i++)
+            web_client.printf("%s%s", (i ? ", " : ""), nbrMatrix.rows[eself[i]].call);
         web_client.println(". Mesh needed.</p>");
     }
 
-    // Kreuztabelle: Spaltenkoepfe sind Anzeige-Nummern (1..n), nicht der
-    // Speicherindex -- auf dem Telefon bleibt die Tabelle so schmal genug
-    // (Konzept 4.5: "auf dem Telefon werden die Spaltenkoepfe zu Nummern").
-    // Das Tabellen-CSS des Scaffolds greift nur auf "#content_inner > table"
-    // (Zeile ~1096); ein Wrapper-div fuer das seitliche Scrollen wuerde die
-    // Matrix aus dem Selektor werfen (Bench 2026-09-20: Matrix ohne Rahmen).
-    // Deshalb scrollt die Tabelle selbst als Block.
+    // Vorpass fuer 6.1/6.2: direct[i] (D/I), nCount[i] (#N, Spaltenzaehlung
+    // cells[*][X]) und xCount[i] (#X, nur wenn direkt) je sichtbarer Zeile,
+    // einmal berechnet und von beiden Tabellen genutzt.
+    uint8_t direct[NBR_MAX_ROWS];
+    uint8_t nCount[NBR_MAX_ROWS];
+    uint8_t xCount[NBR_MAX_ROWS];
+    for (uint8_t i = 0; i < n; i++)
+    {
+        uint8_t X = idx[i];
+        direct[i] = nbrRowIsDirect(X, now_min) ? 1 : 0;
+
+        uint8_t cnt = 0;
+        for (uint8_t frm = 0; frm < NBR_MAX_ROWS; frm++)
+        {
+            if (frm == X)
+                continue;
+            const NbrCell &c = nbrMatrix.cells[frm][X];
+            if ((c.cnt_text || c.cnt_pos || c.cnt_hey) && nbrFresh(c.last_min, now_min))
+                cnt++;
+        }
+        nCount[i] = cnt;
+
+        xCount[i] = direct[i] ? (uint8_t)nbrRowMeshNeedCount(nbrMatrix, X, now_min) : 0;
+    }
+
+    // Super-Node (Konzept 5.3/6.1): der direkte Nachbar mit dem groessten #X,
+    // wenn #X >= 2 UND mindestens doppelt so gross wie der naechstbeste --
+    // sonst kein Super-Node in Reichweite.
+    int superI = -1;
+    int superTop2 = 0;
+    {
+        int topVal = -1, top2Val = -1, topI = -1;
+        for (uint8_t i = 0; i < n; i++)
+        {
+            if (!direct[i])
+                continue;
+            int v = (int)xCount[i];
+            if (v > topVal)
+            {
+                top2Val = topVal;
+                topVal = v;
+                topI = i;
+            }
+            else if (v > top2Val)
+            {
+                top2Val = v;
+            }
+        }
+        int top2 = (top2Val < 0) ? 0 : top2Val;
+        if (topI >= 0 && topVal >= 2 && topVal >= 2 * top2)
+        {
+            superI = topI;
+            superTop2 = top2;
+        }
+    }
+
+    // Kreuztabelle: Spaltenkoepfe sind Anzeige-Nummern (1..n) mit dem
+    // Rufzeichen darunter, senkrecht gesetzt (6.1, Regel 1) -- die Tabelle
+    // waechst dadurch in der Hoehe, nicht in der Breite. Das Tabellen-CSS
+    // des Scaffolds greift nur auf "#content_inner > table" (Zeile ~1096);
+    // ein Wrapper-div fuer das seitliche Scrollen wuerde die Matrix aus dem
+    // Selektor werfen (Bench 2026-09-20: Matrix ohne Rahmen). Deshalb
+    // scrollt die Tabelle selbst als Block.
     web_client.println("<table class=\"table\" style=\"display:inline-block;overflow-x:auto;width:auto;max-width:100%;\">");
-    web_client.print("<thead><tr class=\"font-bold\"><td></td>");
+    web_client.print("<thead><tr class=\"font-bold\">");
+    web_client.print("<td></td>");
+    web_client.print("<td title=\"Direct: heard by me over the air. Indirect: only via a neighbour.\">D/I</td>");
+    web_client.print("<td title=\"Gateway: a HEY addressed to HG was seen from this node. 'no' means not observed.\">G</td>");
+    web_client.print("<td title=\"Mesh: relays foreign frames, from its last position frame.\">M</td>");
+    web_client.print("<td title=\"Neighbours: nodes this node hears, as far as this table can hold them.\">#N</td>");
+    web_client.print("<td title=\"Exclusive: nodes that ONLY this neighbour hears. This is the value of a relay.\">#X</td>");
+    web_client.print("<td title=\"Super: largest exclusive share. Needed: has exclusive nodes. Redundant: everything it hears is heard by others.\">Role</td>");
     for (uint8_t j = 0; j < n; j++)
-        web_client.printf("<td>%u</td>", (unsigned)(j + 1));
+        web_client.printf("<td>%u<br><span style=\"writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;\">%s</span></td>",
+                           (unsigned)(j + 1), nbrMatrix.rows[idx[j]].call);
     web_client.println("</tr></thead>");
 
     for (uint8_t i = 0; i < n; i++)
     {
         uint8_t X = idx[i];
-        bool rowExcl = false;
-        for (uint8_t e = 0; e < nexcl_shown; e++)
+        bool rowESelf = false;
+        for (uint8_t e = 0; e < neself_shown; e++)
         {
-            if (excl[e] == X)
+            if (eself[e] == X)
             {
-                rowExcl = true;
+                rowESelf = true;
                 break;
             }
         }
 
+        // Zeilenfarbe nach Rolle, nicht mehr nach <verdict> (6.1, Regel 2):
+        // Zeile 0 blau, der Super-Node gruen, E_self weiterhin rot.
         if (X == 0)
             web_client.print("<tr style=\"background-color:#d9ecff;\">");
-        else if (rowExcl)
+        else if ((int)i == superI)
+            web_client.print("<tr style=\"background-color:#d9f5d9;\">");
+        else if (rowESelf)
             web_client.print("<tr style=\"background-color:#ffd9d9;\">");
         else
             web_client.print("<tr>");
         web_client.printf("<td class=\"font-bold\">%u %s</td>", (unsigned)(i + 1), nbrMatrix.rows[X].call);
+
+        // D/I
+        if (X == 0)
+        {
+            web_client.print("<td>-</td>");
+        }
+        else if (direct[i])
+        {
+            const NbrCell &c0 = nbrMatrix.cells[X][0];
+            if (c0.rssi != 0)
+                web_client.printf("<td title=\"Heard directly, RSSI %d dBm\">D</td>", (int)c0.rssi);
+            else
+                web_client.print("<td title=\"Heard directly, RSSI unknown\">D</td>");
+        }
+        else
+        {
+            uint32_t hm = nbrHearersMask(nbrMatrix, X, now_min);
+            int via = -1;
+            for (uint8_t m = 1; m < NBR_MAX_ROWS; m++)
+            {
+                if (hm & (1UL << m))
+                {
+                    via = m;
+                    break;
+                }
+            }
+            if (via >= 0)
+                web_client.printf("<td title=\"Indirect, via %s\">I</td>", nbrMatrix.rows[via].call);
+            else
+                web_client.print("<td title=\"Indirect\">I</td>");
+        }
+
+        // G
+        if (nbrMatrix.rows[X].flags & NBR_FLAG_GW)
+            web_client.print("<td title=\"Gateway HEY seen\">Y</td>");
+        else
+            web_client.print("<td title=\"No gateway HEY observed\">N</td>");
+
+        // M
+        if (!(nbrMatrix.rows[X].flags & NBR_FLAG_POS))
+            web_client.print("<td title=\"No position frame in window\">-</td>");
+        else if (nbrMatrix.rows[X].flags & NBR_FLAG_MESH)
+            web_client.print("<td title=\"Mesh enabled\">Y</td>");
+        else
+            web_client.print("<td title=\"Mesh disabled\">N</td>");
+
+        // #N
+        web_client.printf("<td title=\"Hears %u node(s) (table holds %u rows)\">%u</td>",
+                           (unsigned)nCount[i], (unsigned)NBR_MAX_ROWS, (unsigned)nCount[i]);
+
+        // #X
+        if (direct[i])
+            web_client.printf("<td title=\"%u of %u heard by nobody else in my range\">%u</td>",
+                               (unsigned)xCount[i], (unsigned)nCount[i], (unsigned)xCount[i]);
+        else
+            web_client.print("<td>-</td>");
+
+        // Role
+        if (X == 0 || !direct[i])
+        {
+            web_client.print("<td>-</td>");
+        }
+        else if ((int)i == superI)
+        {
+            web_client.printf("<td title=\"Super node: %u exclusive, next best %u\">Super</td>", (unsigned)xCount[i], (unsigned)superTop2);
+        }
+        else if (xCount[i] >= 1)
+        {
+            web_client.printf("<td title=\"Needed: %u exclusive\">Needed</td>", (unsigned)xCount[i]);
+        }
+        else
+        {
+            web_client.print("<td title=\"Redundant: 0 exclusive, heard by others\">Redundant</td>");
+        }
 
         for (uint8_t j = 0; j < n; j++)
         {
@@ -1681,11 +1842,82 @@ void sub_page_neighbours()
     }
     web_client.println("</table>");
 
-    // Zeilentabelle: eine Zeile je sichtbarer Nachbarschaftszeile, inkl. 0.
-    web_client.println("<table class=\"table mw-600\">");
-    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>GW</td><td>Mesh</td><td>Hears me</td><td>Hearers</td><td>Reach</td><td>Age</td></tr></thead>");
-    for (uint8_t i = 0; i < n; i++)
+    // Legende (6.1, Kopf): title= wirkt auf dem Telefon nicht, deshalb
+    // stehen dieselben sechs Erklaerungen hier zusaetzlich als Text.
+    web_client.print("<p style=\"font-size:0.85em;color:#555;\">"
+                      "D/I: Direct: heard by me over the air. Indirect: only via a neighbour."
+                      " | G: Gateway: a HEY addressed to HG was seen from this node. 'no' means not observed."
+                      " | M: Mesh: relays foreign frames, from its last position frame."
+                      " | #N: Neighbours: nodes this node hears, as far as this table can hold them."
+                      " | #X: Exclusive: nodes that ONLY this neighbour hears. This is the value of a relay."
+                      " | Role: Super: largest exclusive share. Needed: has exclusive nodes."
+                      " Redundant: everything it hears is heard by others.");
+    web_client.println("</p>");
+
+    // Sortierung fuer Tabelle 2 (6.2, Regel 2): Zeile 0 zuerst, dann direkte
+    // Nachbarn nach #X absteigend (Gleichstand nach Rufzeichen), dann
+    // Indirekte nach Alter aufsteigend -- der Super-Node steht damit oben.
+    uint8_t order[NBR_MAX_ROWS];
+    uint8_t no_ = 0;
+    order[no_++] = 0; // idx[0] ist per Aufbau immer Zeile 0
+
+    uint8_t directList[NBR_MAX_ROWS];
+    uint8_t nDirectList = 0;
+    for (uint8_t i = 1; i < n; i++)
+        if (direct[i])
+            directList[nDirectList++] = i;
+    for (uint8_t a = 1; a < nDirectList; a++)
     {
+        uint8_t key = directList[a];
+        int b = (int)a - 1;
+        while (b >= 0)
+        {
+            uint8_t other = directList[b];
+            bool keyFirst = (xCount[key] > xCount[other]) ||
+                             (xCount[key] == xCount[other] &&
+                              strncmp(nbrMatrix.rows[idx[key]].call, nbrMatrix.rows[idx[other]].call, NBR_CALL_LEN) < 0);
+            if (!keyFirst)
+                break;
+            directList[b + 1] = other;
+            b--;
+        }
+        directList[b + 1] = key;
+    }
+    for (uint8_t k = 0; k < nDirectList; k++)
+        order[no_++] = directList[k];
+
+    uint8_t indirectList[NBR_MAX_ROWS];
+    uint8_t nIndirectList = 0;
+    for (uint8_t i = 1; i < n; i++)
+        if (!direct[i])
+            indirectList[nIndirectList++] = i;
+    for (uint8_t a = 1; a < nIndirectList; a++)
+    {
+        uint8_t key = indirectList[a];
+        int b = (int)a - 1;
+        while (b >= 0)
+        {
+            uint8_t other = indirectList[b];
+            if (nbrRowAgeMin(nbrMatrix, idx[key], now_min) >= nbrRowAgeMin(nbrMatrix, idx[other], now_min))
+                break;
+            indirectList[b + 1] = other;
+            b--;
+        }
+        indirectList[b + 1] = key;
+    }
+    for (uint8_t k = 0; k < nIndirectList; k++)
+        order[no_++] = indirectList[k];
+
+    uint32_t directMask = nbrDirectMask(nbrMatrix, now_min);
+
+    // Zeilentabelle: eine Zeile je sichtbarer Nachbarschaftszeile, inkl. 0,
+    // in der Sortierung von oben. "Hearers" bricht um (6.2, Regel 1); die
+    // Tabelle waechst in die Hoehe, nicht in die Breite.
+    web_client.println("<table class=\"table mw-600\">");
+    web_client.println("<thead><tr class=\"font-bold\"><td>Call</td><td>GW</td><td>Mesh</td><td>Hears me</td><td>Hearers</td><td>Covered by</td><td>Reach</td><td>Age</td></tr></thead>");
+    for (uint8_t oi = 0; oi < n; oi++)
+    {
+        uint8_t i = order[oi];
         uint8_t X = idx[i];
         const NbrRow &row = nbrMatrix.rows[X];
 
@@ -1702,7 +1934,7 @@ void sub_page_neighbours()
         uint8_t hearers[NBR_MAX_ROWS];
         uint8_t nh = nbrHearers(nbrMatrix, X, now_min, hearers, NBR_MAX_ROWS);
         uint8_t nh_shown = (nh < NBR_MAX_ROWS) ? nh : (uint8_t)NBR_MAX_ROWS;
-        web_client.print("<td>");
+        web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
         if (nh_shown == 0)
         {
             web_client.print("-");
@@ -1711,6 +1943,31 @@ void sub_page_neighbours()
         {
             for (uint8_t h = 0; h < nh_shown; h++)
                 web_client.printf("%s%s", (h ? "," : ""), nbrMatrix.rows[hearers[h]].call);
+        }
+        web_client.print("</td>");
+
+        // Covered by (6.2, Regel 3): direkte Nachbarn, die X ebenfalls
+        // frisch hoeren -- leer ist genau E_self, "nur ich erreiche diesen
+        // Knoten".
+        web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
+        if (direct[i])
+        {
+            uint32_t covered = nbrHearersMask(nbrMatrix, X, now_min) & directMask;
+            bool first = true;
+            for (uint8_t m = 1; m < NBR_MAX_ROWS; m++)
+            {
+                if (covered & (1UL << m))
+                {
+                    web_client.printf("%s%s", (first ? "" : ","), nbrMatrix.rows[m].call);
+                    first = false;
+                }
+            }
+            if (first)
+                web_client.print("-");
+        }
+        else
+        {
+            web_client.print("-");
         }
         web_client.print("</td>");
 
@@ -1724,6 +1981,34 @@ void sub_page_neighbours()
         web_client.printf("<td>%u min</td></tr>\n", (unsigned)nbrRowAgeMin(nbrMatrix, X, now_min));
     }
     web_client.println("</table>");
+
+    // 6.3: "My relay decision" -- drei Zeilen Text, keine Tabelle. Die
+    // Zaehler kommen aus loop_functions.cpp (5.8 Punkt 3); solange
+    // --nbrrelay off ist (Default), bleiben sie 0.
+    web_client.println("<h4>My relay decision</h4>");
+    web_client.print("<p>Exclusive to me: ");
+    if (neself_shown == 0)
+    {
+        web_client.print("none");
+    }
+    else
+    {
+        for (uint8_t e = 0; e < neself_shown; e++)
+            web_client.printf("%s%s", (e ? ", " : ""), nbrMatrix.rows[eself[e]].call);
+    }
+    web_client.println("</p>");
+
+    web_client.print("<p>Super node in range: ");
+    if (superI >= 0)
+        web_client.printf("%s (%u exclusive)", nbrMatrix.rows[idx[superI]].call, (unsigned)xCount[superI]);
+    else
+        web_client.print("none");
+    web_client.println("</p>");
+
+    web_client.printf("<p>Relay mode: %s -- relays A: %lu, B: %lu, cancelled: %lu, could have cancelled: %lu, refused (sole provider): %lu</p>",
+                       (bNBRCANCEL ? "on" : (bNBRRELAY ? "count" : "off")),
+                       (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
+                       (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone);
 
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line

@@ -930,6 +930,9 @@ void esp32setup()
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
     bNBRDEBUG = meshcom_settings.node_sset4 & 0x0010;
     nbrDebugApply();
+    // --nbrrelay off|count|on (Stufe 2): 0x0020 rechnen/zaehlen, 0x0040 anwenden.
+    bNBRRELAY  = (meshcom_settings.node_sset4 & 0x0060) != 0;
+    bNBRCANCEL = (meshcom_settings.node_sset4 & 0x0040) != 0;
 
     if(strlen(meshcom_settings.node_aprsmc) < 4)
     {

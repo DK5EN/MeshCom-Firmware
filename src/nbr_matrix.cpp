@@ -143,20 +143,34 @@ static int nbrPlanRow(const NbrMatrix &m, const char *call, uint16_t now_min, ui
     // Tabelle voll: die nicht gesperrte Zeile mit der groessten
     // Alterslluecke weicht. Der ueberlaufsichere Altersvergleich ist
     // derselbe wie in nbrFresh().
-    int oldest = -1;
-    uint16_t oldest_age = 0;
-    for (int i = 1; i < NBR_MAX_ROWS; i++)
+    //
+    // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8, Punkt 1): zuerst unter
+    // den Zeilen, die ich NICHT frisch direkt hoere (2-Hop-Zeilen), erst
+    // wenn es keine solche gibt, unter allen. Die Relay-Entscheidung
+    // (nbrRelayNeed()) rechnet ausschliesslich auf Direktzeilen; eine
+    // 2-Hop-Zeile ist Anzeige, eine Direktzeile Evidenz. Im Feldlauf
+    // 2026-09-21 fielen 2 von 56 Verdraengungen auf Direktzeilen.
+    for (int pass = 0; pass < 2; pass++)
     {
-        if (protected_mask & (1u << (unsigned)i))
-            continue;
-        uint16_t age = (uint16_t)(now_min - m.rows[i].last_min);
-        if (oldest < 0 || age > oldest_age)
+        int oldest = -1;
+        uint16_t oldest_age = 0;
+        for (int i = 1; i < NBR_MAX_ROWS; i++)
         {
-            oldest = i;
-            oldest_age = age;
+            if (protected_mask & (1u << (unsigned)i))
+                continue;
+            if (pass == 0 && nbrCellSet(m.cells[i][0]) && nbrFresh(m.cells[i][0].last_min, now_min))
+                continue; // frisch direkt gehoert: erst im zweiten Durchgang verdraengbar
+            uint16_t age = (uint16_t)(now_min - m.rows[i].last_min);
+            if (oldest < 0 || age > oldest_age)
+            {
+                oldest = i;
+                oldest_age = age;
+            }
         }
+        if (oldest >= 0)
+            return oldest;
     }
-    return oldest; // -1, wenn in diesem Aufruf kein Opfer mehr frei ist
+    return -1; // in diesem Aufruf ist kein Opfer mehr frei
 }
 
 // Setzt einen von nbrPlanRow() gelieferten Index tatsaechlich um: nichts zu
@@ -513,6 +527,16 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
         int x = row_idx[i], y = row_idx[i + 1];
         if (x < 0 || y < 0)
             continue; // ausserhalb des Fensters ohne zwei bestehende Zeilen: keine Kante
+        // Spalte 0 ("ich habe X gehoert") schreibt ausschliesslich der
+        // ME-Schritt unten, nie ein Pfadpaar (X, ich): mein Rufzeichen steht
+        // nur in Pfaden, die ich selbst gesendet habe, und ob ich X je per
+        // Funk gehoert habe, ist beim Empfang schon eingetragen. Ein Gateway
+        // setzt Serverframes mit "<Absender>,<ich>" auf LoRa; das Echo
+        // dieser Aussendung machte den Absender sonst zum direkten Nachbarn
+        // (Feldlauf 2026-09-21: neun Rufzeichen ohne Funkempfang, OE1XAR-33
+        // in 44 von 46 Schnappschuessen; docs/nbr-wichtigkeit-konzept.md 2.3).
+        if (y == 0)
+            continue;
         nbrHitCell(m.cells[x][y], type, now_min);
         // Nur eine Kante INNERHALB des 2-Hop-Fensters (i >= start) darf die
         // beteiligten Zeilen verjuengen. Eine Gratis-Kante (Regel 3, i <
@@ -666,13 +690,14 @@ static const char *nbrRowVerdict(const NbrMatrix &m, int x, uint16_t now_min)
 // auf row als HOERER, nicht als Gehoerten. row muss selbst meshen, wenn es
 // mindestens ein X gibt, das row gehoert hat, aber weder ich selbst noch
 // ein anderer direkt gehoerter Nachbar frisch hoeren.
-const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
+int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min)
 {
     if (row <= 0 || row >= NBR_MAX_ROWS)
-        return "NA";
+        return -1;
     if (!nbrHeardDirectly(m, row, now_min))
-        return "NA"; // row ist kein frisch direkt gehoerter Nachbar
+        return -1; // row ist kein frisch direkt gehoerter Nachbar
 
+    int uncovered = 0;
     for (int x = 0; x < NBR_MAX_ROWS; x++)
     {
         if (x == row || x == 0)
@@ -698,9 +723,168 @@ const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
             }
         }
         if (!covered_by_peer)
-            return "MESH"; // X ist von keinem anderweitig abgedeckt
+            uncovered++; // X ist von keinem anderweitig abgedeckt
     }
-    return "RED"; // jedes X aus H(row) ist anderweitig abgedeckt (oder H(row) ist leer)
+    return uncovered;
+}
+
+const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    int n = nbrRowMeshNeedCount(m, row, now_min);
+    if (n < 0)
+        return "NA";
+    return n > 0 ? "MESH" : "RED"; // RED auch bei leerem H(row)
+}
+
+// --- Stufe 2: Masken und Relay-Entscheidung (docs/nbr-wichtigkeit-konzept.md 4/5)
+
+static uint32_t nbrBit(int idx)
+{
+    return (idx >= 0 && idx < 32) ? (1u << (unsigned)idx) : 0u;
+}
+
+int nbrMaskCount(uint32_t mask)
+{
+    int n = 0;
+    while (mask)
+    {
+        mask &= mask - 1;
+        n++;
+    }
+    return n;
+}
+
+uint32_t nbrDirectMask(const NbrMatrix &m, uint16_t now_min)
+{
+    uint32_t mask = 0;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+        if ((m.rows[x].flags & NBR_FLAG_USED) && nbrHeardDirectly(m, x, now_min))
+            mask |= nbrBit(x);
+    return mask;
+}
+
+uint32_t nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min)
+{
+    uint32_t mask = 0;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (!(m.rows[x].flags & NBR_FLAG_USED))
+            continue;
+        const NbrCell &c = m.cells[0][x];
+        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
+            mask |= nbrBit(x);
+    }
+    return mask;
+}
+
+uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return 0;
+    uint32_t mask = 0;
+    for (int y = 1; y < NBR_MAX_ROWS; y++)
+    {
+        if (y == row || !(m.rows[y].flags & NBR_FLAG_USED))
+            continue;
+        const NbrCell &c = m.cells[row][y];
+        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
+            mask |= nbrBit(y);
+    }
+    return mask;
+}
+
+NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min)
+{
+    NbrNeed r;
+    r.need = 0;
+    r.alone = 0;
+    r.known = false;
+
+    char tokens[8][NBR_CALL_LEN];
+    int ntok = nbrTokenizePath(path, tokens, 8);
+    if (ntok < 0)
+        return r; // ungueltiger Pfad: kein Wissen (known == false), der Aufrufer relayt wie heute
+
+    // Pfad(F): wer den Frame nachweislich schon hat (steht im Pfad) ...
+    uint32_t inpath = 0;
+    int pidx[8];
+    for (int i = 0; i < ntok; i++)
+    {
+        pidx[i] = nbrFind(m, tokens[i]);
+        inpath |= nbrBit(pidx[i]);
+    }
+    // ... und wer einen Pfadteilnehmer frisch gehoert hat (HatF).
+    uint32_t hasf = inpath;
+    for (int i = 0; i < ntok; i++)
+        if (pidx[i] >= 0)
+            hasf |= nbrHearersMask(m, pidx[i], now_min);
+
+    // Abhaengige D: direkt gehoert oder hat mich gehoert, ohne Zeile 0 und
+    // ohne Gateways (die bekommen den Frame vom Server, Konzept 5.4).
+    uint32_t direct = nbrDirectMask(m, now_min);
+    uint32_t dep = (direct | nbrHeardMeMask(m, now_min)) & ~1u;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+        if ((dep & nbrBit(x)) && (m.rows[x].flags & NBR_FLAG_GW))
+            dep &= ~nbrBit(x);
+
+    // Ohne eine einzige abhaengige Zeile (leere Matrix nach Boot oder Reset)
+    // gibt es nichts zu entscheiden -- known bleibt false, der Aufrufer
+    // relayt wie heute statt in Fall B zu gehen (Advisor-Fund 2026-09-22).
+    if (dep == 0)
+        return r;
+    r.known = true;
+
+    r.need = dep & ~hasf;
+
+    // Allein: X aus dem Bedarf ohne Alternative -- kein direkter M != X, der
+    // den Frame hat (HatF) und den X frisch gehoert hat (cell[M][X]).
+    uint32_t providers = direct & hasf;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (!(r.need & nbrBit(x)))
+            continue;
+        bool alt = false;
+        for (int mrow = 1; mrow < NBR_MAX_ROWS && !alt; mrow++)
+        {
+            if (mrow == x || !(providers & nbrBit(mrow)))
+                continue;
+            const NbrCell &c = m.cells[mrow][x];
+            if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
+                alt = true;
+        }
+        if (!alt)
+            r.alone |= nbrBit(x);
+    }
+    return r;
+}
+
+uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min)
+{
+    int idx = nbrFind(m, relayer);
+    if (idx <= 0)
+        return 0; // unbekannt oder ich selbst: deckt nichts, was ich nachweisen koennte
+    return nbrHearersMask(m, idx, now_min);
+}
+
+int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
+{
+    uint32_t direct = nbrDirectMask(m, now_min);
+    if (!direct)
+        return -1;
+    int count = 0;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (!(direct & nbrBit(x)))
+            continue;
+        // Nur ein DIREKTER Nachbar M zaehlt als Deckung: seine Wiederholung
+        // kann ich hoeren und darauf abbrechen, die eines 2-Hop-Knotens nicht.
+        if (nbrHearersMask(m, x, now_min) & direct & ~nbrBit(x))
+            continue;
+        if (out && count < (int)max)
+            out[count] = (uint8_t)x;
+        count++;
+    }
+    return count;
 }
 
 float nbrDistKm(float lat1, float lon1, float lat2, float lon2)

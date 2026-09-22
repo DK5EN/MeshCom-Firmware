@@ -65,6 +65,9 @@ static void resetRing(void)
     memset(ringPriority, 0, sizeof(ringPriority));
     memset(ringEnqueueTime, 0, sizeof(ringEnqueueTime));
     memset(ringSource, 0, sizeof(ringSource));
+    memset(ringNeed, 0, sizeof(ringNeed));
+    memset(ringAlone, 0, sizeof(ringAlone));
+    memset(ringKind, 0, sizeof(ringKind));
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
     mc_test_set_millis(0);
@@ -446,6 +449,92 @@ static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
     TEST_ASSERT_EQUAL_INT('r', (int)ringSource[5]);
     // unbeteiligte Slots unveraendert
     TEST_ASSERT_EQUAL_INT('o', (int)ringSource[1]);
+}
+
+// --------------------------- Nachbarschaftsmatrix Stufe 2: ringKind/ringNeed/ringAlone
+//
+// docs/nbr-wichtigkeit-konzept.md 5.1: drei neue Seitenfelder neben
+// ringSource[], gesetzt in addTxRingEntry(). Drei Eigenschaften werden hier
+// fixiert: (a) jeder Enqueue OHNE die neuen Argumente nullt sie, auch wenn
+// der Slot vorher eine fremde Maske trug (kein Leck zwischen Wiederverwendungen),
+// (b) mit Argumenten landen sie unveraendert im Slot, (c) der N-24-Umzug
+// nimmt sie mit wie ringSource[].
+
+// (a) Default-Ueberschreiben: Slot 3 traegt eine simulierte Alt-Maske aus
+// einem fruehereren Relay (RING_KIND_COUNTED gesetzt); ein Enqueue OHNE
+// kind/need/alone in genau diesen Slot muss sie auf 0/RING_KIND_OTHER
+// zuruecksetzen.
+static void test_stufe2_default_ueberschreibt_alte_maske(void)
+{
+    ringKind[3]  = RING_KIND_RELAY | RING_KIND_COUNTED;
+    ringNeed[3]  = 0xAAAAAAAAUL;
+    ringAlone[3] = 0x55555555UL;
+
+    iWrite = 3;
+    iRead = 3;
+
+    BuiltFrame f = buildPositionFrame(0x9001UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "user_pos"); // keine Stufe-2-Argumente
+    TEST_ASSERT_EQUAL_INT(3, slot);
+
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[slot]);
+    TEST_ASSERT_EQUAL_UINT32(0, ringNeed[slot]);
+    TEST_ASSERT_EQUAL_UINT32(0, ringAlone[slot]);
+}
+
+// (b) Mit Argumenten landen kind/need/alone unveraendert im Slot.
+static void test_stufe2_kind_need_alone_werden_gesetzt(void)
+{
+    BuiltFrame f = buildPositionFrame(0x9010UL);
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "rx_relay", 0, true,
+                               RING_KIND_RELAY, 0x0000000FUL, 0x00000003UL);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[slot]);
+    TEST_ASSERT_EQUAL_UINT32(0x0000000FUL, ringNeed[slot]);
+    TEST_ASSERT_EQUAL_UINT32(0x00000003UL, ringAlone[slot]);
+}
+
+// (c) N-24-Umzug (siehe test_n24_indirekte_eviction_verwaist_keinen_slot
+// oben): derselbe Aufbau, aber Slot 0 traegt eine Stufe-2-Maske, die den
+// Umzug nach Slot 5 ueberleben muss.
+static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
+{
+    BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
+    int slot0 = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_DONE, "rx_relay", 0, true,
+                                RING_KIND_RELAY, 0x000000AAUL, 0x00000002UL);
+    TEST_ASSERT_EQUAL_INT(0, slot0);
+
+    for (int i = 1; i <= 4; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x5100 + i));
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill");
+    }
+
+    BuiltFrame hey = buildHeyFrame(0x6100UL);
+    int slot5 = addTxRingEntry(hey.bytes, hey.len, RING_STATUS_READY, "orphanworst");
+    TEST_ASSERT_EQUAL_INT(5, slot5);
+
+    for (int i = 6; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildPositionFrame((uint32_t)(0x7100 + i));
+        addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "orphanfill2");
+    }
+    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    BuiltFrame trigger = buildPositionFrame(0x8100UL);
+    int slotNew = addTxRingEntry(trigger.bytes, trigger.len, RING_STATUS_READY, "orphantrigger");
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slotNew);
+
+    // Der CRITICAL-Relay-Eintrag ist von Slot 0 nach Slot 5 umgezogen --
+    // seine Stufe-2-Maske muss ihn begleitet haben.
+    TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[5]);
+    TEST_ASSERT_EQUAL_UINT32(0x000000AAUL, ringNeed[5]);
+    TEST_ASSERT_EQUAL_UINT32(0x00000002UL, ringAlone[5]);
+
+    // Slot 0 ist geleert.
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
 }
 
 // ----------------------------------------------------- Test 5: Overflow-Drop
@@ -1000,6 +1089,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_overflow_mit_eviction);
     RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
     RUN_TEST(test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert);
+    RUN_TEST(test_stufe2_default_ueberschreibt_alte_maske);
+    RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
+    RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
     RUN_TEST(test_len_null_wird_abgewiesen);
     RUN_TEST(test_len_ueber_max_wird_abgewiesen);
     RUN_TEST(test_len_exakt_max_wird_enqueued);

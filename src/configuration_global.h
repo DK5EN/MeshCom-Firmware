@@ -455,6 +455,18 @@ static inline bool flashLayoutCompatible(int stored)
 #define TRICKLE_IMAX_S        (15*60) // Langsamstes HEY-Intervall (15min, wie bisher)
 #define TRICKLE_K             2       // Redundanzschwelle: eigenen HEY unterdruecken wenn >=k konsistente gehoert
 
+// Nachbarschaftsmatrix Stufe 2: Relay-Entscheidung je Frame (docs/nbr-wichtigkeit-konzept.md,
+// Abschnitt 5). Fall A = mindestens ein direkter Nachbar bekommt den Frame nur von mir:
+// vorn, gekappter Re-Arm, nie Abbruch. Fall B = alles, was ich erreiche, erreicht auch ein
+// anderer, der den Frame hat: Nachrang, Abbruch gegen eine gehoerte fremde Wiederholung.
+// Wirksam nur mit --nbrrelay on; --nbrrelay count rechnet und zaehlt ohne Wirkung.
+#define NBR_RELAY_CASE_A_BASE_MS     3500   // Fall A: Basis vor Relay/POS/HEY (4500/5500), hinter ACK/DM (3000)
+#define NBR_RELAY_CASE_A_SLOTS       3      // Fall A: Jitter-Slots 0..2
+#define NBR_RELAY_CASE_A_MAX_WAIT_MS 8000   // Fall A: ab so viel Wartezeit seit Einreihen nur noch Kurzsuche je Re-Arm
+#define NBR_RELAY_CASE_A_SHORT_MS    150    // Fall A: Kurzsuche = Schutzabstand nach Empfangsende, dann CAD
+#define NBR_RELAY_CASE_B_EXTRA_MS    20000  // Fall B (POS/HEY): Nachrang, laesst die Flut der Nachbarn vor mir laufen
+#define NBR_RELAY_CASE_B_SLOT_START  7      // Fall B: Jitter-Slots 7..9
+
 // Priority statistics interval
 #define PRIO_STAT_INTERVAL_S  300   // 5 Minuten
 #define PRIO_HWM_INTERVAL_S   1800  // 30 Minuten

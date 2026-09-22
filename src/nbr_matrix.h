@@ -169,10 +169,15 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // nicht das eigene Rufzeichen ist (sonst ist es das eigene Echo), ein
 // Treffer auf cell[letzter_hop][0] mit rssi = rssi_here (Log: ME). Eine
 // Zelle, deren last_min beim Treffer bereits verfallen ist, faengt bei ihren
-// Zaehlern neu bei 0 an (Konzept 4.2), bevor der Treffer zaehlt. Ist die
-// Tabelle voll, weicht beim Anlegen einer Fenster-Zeile die Zeile 1..N-1 mit
-// der aeltesten last_min (Log: EVICT), ihre Zeilen- und Spaltenzellen werden
-// genullt (Zeile 0 ist davon nie betroffen).
+// Zaehlern neu bei 0 an (Konzept 4.2), bevor der Treffer zaehlt. Ein Paar
+// (p[i], p[i+1]) mit p[i+1] == eigenes Rufzeichen schreibt NIE cell[p[i]][0]:
+// Spalte 0 fuellt ausschliesslich der ME-Schritt beim Empfang (Stufe 2,
+// docs/nbr-wichtigkeit-konzept.md 2.3: das Echo eines vom Server
+// eingespeisten Frames machte sonst dessen Absender zum direkten Nachbarn).
+// Ist die Tabelle voll, weicht beim Anlegen einer Fenster-Zeile die Zeile
+// 1..N-1 mit der aeltesten last_min (Log: EVICT) -- zuerst unter den nicht
+// frisch direkt gehoerten Zeilen, erst dann unter allen --, ihre Zeilen- und
+// Spaltenzellen werden genullt (Zeile 0 ist davon nie betroffen).
 //
 // Bei '@' setzt dest_gw=true das GW-Flag auf die Zeile des Absenders
 // (erster Pfadeintrag, ueber nbrFind() aufgeloest -- Absender ist meist
@@ -240,6 +245,71 @@ int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max
 // Funktion "MESH" (row muss selbst meshen), sonst "RED" -- eine leere
 // Menge H(row) ist ebenfalls "RED" (row hoert niemanden, den ich brauche).
 const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min);
+
+// Dieselbe Rechnung als Zahl (Stufe 2, docs/nbr-wichtigkeit-konzept.md 2.1
+// und 6.1, Spalte "#X"): -1 fuer "NA", sonst die Zahl der Knoten, die row
+// hoert und die weder ich noch ein anderer direkt gehoerter Nachbar frisch
+// hoert. nbrRowMeshNeed() ist nur noch die Wortfassung davon.
+int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min);
+
+// --- Stufe 2: Masken und Relay-Entscheidung (Konzept Abschnitt 4 und 5) ---
+//
+// Alle Masken sind Bitmasken ueber Zeilenindizes (Bit i = Zeile i); mit
+// NBR_MAX_ROWS <= 21 passt das in 32 Bit. Bit 0 (ich selbst) ist in keiner
+// dieser Masken gesetzt.
+
+// Anzahl gesetzter Bits.
+int nbrMaskCount(uint32_t mask);
+
+// Direkt(X): belegte Zeilen X != 0 mit frischer, gesetzter cell[X][0].
+uint32_t nbrDirectMask(const NbrMatrix &m, uint16_t now_min);
+
+// HoertMich(X): belegte Zeilen X != 0 mit frischer, gesetzter cell[0][X]
+// ("X hat mich gehoert" -- sichtbar nur, wenn X meine Frames wiederholt).
+uint32_t nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min);
+
+// Hoerer von row: Zeilen Y != row, Y != 0 mit frischer, gesetzter
+// cell[row][Y] ("Y hat row gehoert"). Dieselbe Menge wie nbrHearers(), ohne
+// Zeile 0 und als Maske.
+uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
+
+// Relay-Entscheidung fuer einen Frame mit Pfad path (msg_source_path, SO WIE
+// EMPFANGEN, vor dem Anhaengen des eigenen Rufzeichens):
+//   need  = Abhaengige, die den Frame noch nicht haben koennen:
+//           (Direkt | HoertMich) ohne Zeile 0, ohne Zeilen mit NBR_FLAG_GW
+//           (Gateways bekommen den Frame vom Server), ohne Pfadteilnehmer und
+//           ohne jeden X, der einen Pfadteilnehmer P frisch gehoert hat
+//           (cell[P][X]).
+//   alone = Teilmenge von need ohne Alternative: kein direkter Nachbar M != X,
+//           der den Frame hat (im Pfad steht oder einen Pfadteilnehmer
+//           gehoert hat) UND den X frisch gehoert hat (cell[M][X]).
+// alone != 0 ist Fall A (Relay mit Vorrang, nie Abbruch), alone == 0 Fall B.
+//   known = false heisst "kein Wissen": ungueltiger Pfad oder keine einzige
+//           abhaengige Zeile (leere Matrix nach Boot/Reset). Dann ist need ==
+//           alone == 0, und der Aufrufer darf das NICHT als Fall B lesen,
+//           sondern relayt wie heute (Konzept 1: nichts unterdrueckt auf
+//           Verdacht) -- Advisor-Fund 2026-09-22. need == 0 bei known == true
+//           ("alle Abhaengigen haben den Frame schon") bleibt Fall B.
+struct NbrNeed
+{
+    uint32_t need;
+    uint32_t alone;
+    bool     known;
+};
+NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min);
+
+// Deckung durch eine gehoerte fremde Wiederholung: die Hoerer des Relayers
+// (nbrHearersMask seiner Zeile), 0 wenn der Relayer keine Zeile hat oder ich
+// selbst bin. Der Aufrufer rechnet need &= ~nbrCoverMask(...) und bricht bei
+// need == 0 ab -- nur wenn alone == 0 war.
+uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min);
+
+// E_self (Konzept 4): direkt gehoerte Zeilen, die kein ANDERER direkt
+// gehoerter Nachbar frisch hoert. Anders als nbrExclusive() zaehlt ein
+// 2-Hop-Hoerer nicht als Deckung -- seine Wiederholung kann ich nie hoeren.
+// Schreibt bis zu max Indizes nach out, liefert die Gesamtzahl, -1 wenn
+// ueberhaupt keine Zeile frisch direkt gehoert wurde.
+int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max);
 
 // --- Reichweite (Konzept 4.4) ----------------------------------------------
 

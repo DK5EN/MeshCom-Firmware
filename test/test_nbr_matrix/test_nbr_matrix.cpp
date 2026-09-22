@@ -83,7 +83,10 @@ void test_own_frame_returning_via_relay_is_echo_not_direct_hearing(void)
     nbrNoteFrame(m, "OE1AAA-1,DK5EN-93", ':', NULL, false, -70, 200);
     int iaaa = nbrFind(m, "OE1AAA-1");
     TEST_ASSERT_TRUE(iaaa > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);   // ich habe AAA gehoert
+    // Stufe 2 (Konzept 2.3 / 5.8 Punkt 0): auch das Paar (AAA, ich) schreibt
+    // Spalte 0 nicht mehr -- ob ich AAA je per Funk gehoert habe, weiss nur
+    // der ME-Schritt beim Empfang. Vorher stand hier 1.
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][0].cnt_text);   // kein Hoerbeweis aus meinem eigenen Pfad
     TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);   // kein Zusatztreffer aus dem Echo
 }
 
@@ -819,6 +822,195 @@ void test_log_snapshot_emits_snap_row_per_used_row_and_endsnap(void)
     nbrLog = NULL;
 }
 
+// --- 12: Stufe 2 (docs/nbr-wichtigkeit-konzept.md, Abschnitt 4, 5, 5.8) ------
+
+void test_gateway_echo_does_not_mark_server_origin_as_directly_heard(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    // AAA ist mein direkter Nachbar, FAR ein Knoten, den AAA wiederholt hat
+    // (2-Hop-Zeile ueber das Fenster).
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE3FAR-9,OE1AAA-1", ':', NULL, false, -80, 5);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ifar = nbrFind(m, "OE3FAR-9");
+    TEST_ASSERT_TRUE(iaaa > 0 && ifar > 0);
+
+    // Ich (Gateway) habe FARs Frame vom Server auf LoRa gesetzt, AAA hat
+    // meine Aussendung wiederholt: "FAR,ich,AAA" kommt zurueck. Das Paar
+    // (FAR, ich) darf NICHT "ich habe FAR gehoert" eintragen.
+    int hits = nbrNoteFrame(m, "OE3FAR-9,DK5EN-93,OE1AAA-1", ':', NULL, false, -80, 6);
+    TEST_ASSERT_EQUAL_INT(2, hits);                                  // (ich,AAA) + ME(AAA), nicht (FAR,ich)
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifar][0].cnt_text);           // FAR bleibt nicht-direkt
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_text);           // AAA hat mich gehoert
+    TEST_ASSERT_EQUAL_UINT8(3, m.cells[iaaa][0].cnt_text);           // ich habe AAA zum dritten Mal gehoert (ME-Schritt)
+    TEST_ASSERT_EQUAL_STRING("NA", nbrRowMeshNeed(m, ifar, 6));      // FAR ist kein direkter Nachbar
+    TEST_ASSERT_EQUAL_INT(0, (int)(nbrDirectMask(m, 6) & (1u << (unsigned)ifar)));
+}
+
+void test_eviction_prefers_two_hop_row_over_older_direct_rows(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10);            // direkt, aelteste
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 20);            // direkt
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 30);            // direkt
+    nbrNoteFrame(m, "OE1DDD-4,OE1CCC-3", ':', NULL, false, -80, 40);   // DDD nur ueber CCC: 2-Hop-Zeile, juengste
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int iddd = nbrFind(m, "OE1DDD-4");
+    TEST_ASSERT_TRUE(iaaa > 0 && iddd > 0);
+
+    // Tabelle voll (NBR_MAX_ROWS = 5). Aelteste Zeile ist AAA, aber AAA ist
+    // frisch direkt gehoert; die einzige 2-Hop-Zeile DDD weicht zuerst.
+    nbrNoteFrame(m, "OE1EEE-5", ':', NULL, false, -80, 50);
+    TEST_ASSERT_TRUE(nbrFind(m, "OE1AAA-1") == iaaa);
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1DDD-4"));
+    TEST_ASSERT_EQUAL_INT(iddd, nbrFind(m, "OE1EEE-5"));
+
+    // Ohne 2-Hop-Zeile faellt die Wahl wie bisher auf die aelteste Direktzeile.
+    nbrNoteFrame(m, "OE1FFF-6", ':', NULL, false, -80, 60);
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
+    TEST_ASSERT_EQUAL_INT(iaaa, nbrFind(m, "OE1FFF-6"));
+}
+
+void test_mesh_need_count_is_the_number_behind_the_word(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1DDD-4,OE1AAA-1", ':', NULL, false, -80, 5);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_EQUAL_INT(-1, nbrRowMeshNeedCount(m, 0, 10));
+    TEST_ASSERT_EQUAL_INT(-1, nbrRowMeshNeedCount(m, iccc, 10));
+    TEST_ASSERT_EQUAL_INT(2, nbrRowMeshNeedCount(m, iaaa, 10));   // CCC und DDD nur ueber AAA
+    TEST_ASSERT_EQUAL_INT(0, nbrRowMeshNeedCount(m, ibbb, 10));
+    TEST_ASSERT_EQUAL_STRING("MESH", nbrRowMeshNeed(m, iaaa, 10));
+    m.cells[iccc][ibbb].cnt_text = 1; m.cells[iccc][ibbb].last_min = 10;   // BBB hoert CCC auch
+    TEST_ASSERT_EQUAL_INT(1, nbrRowMeshNeedCount(m, iaaa, 10));
+    TEST_ASSERT_EQUAL_STRING("MESH", nbrRowMeshNeed(m, iaaa, 10));
+}
+
+void test_relay_need_masks_follow_concept_section_5(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    // AAA: direkt, und AAA hoert mich (hat meinen Frame wiederholt).
+    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", ':', NULL, false, -80, 5);
+    // BBB: direkt. LLL: direkt, sonst von niemandem gehoert (Blatt).
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    int illl = nbrFind(m, "OE1LLL-7");
+    TEST_ASSERT_TRUE(iaaa > 0 && ibbb > 0 && illl > 0);
+    const uint32_t bA = 1u << (unsigned)iaaa, bB = 1u << (unsigned)ibbb, bL = 1u << (unsigned)illl;
+    const uint16_t now = 10;
+
+    // Frame von OE9ORG-1, letzter Hop AAA: AAA hat ihn (steht im Pfad).
+    // BBB und LLL brauchen ihn; fuer beide ist niemand als Alternative
+    // bekannt -> Fall A, beide "allein".
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now);
+    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.need);
+    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.alone);
+
+    // BBB hat AAA gehoert (cell[AAA][BBB]): BBB hat den Frame damit
+    // wahrscheinlich schon (HatF) -> faellt aus dem Bedarf.
+    m.cells[iaaa][ibbb].cnt_text = 1; m.cells[iaaa][ibbb].last_min = now;
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now);
+    TEST_ASSERT_EQUAL_UINT32(bL, r.need);
+    TEST_ASSERT_EQUAL_UINT32(bL, r.alone);
+
+    // Frame von OE9ORG-1 ueber CCC (kein Nachbar von mir, keine Zeile),
+    // BBB hat CCC nicht gehoert: BBB im Bedarf; Alternative fuer BBB ist AAA
+    // nur, wenn AAA den Frame hat -- AAA steht nicht im Pfad und hat CCC
+    // nicht gehoert -> BBB allein. Sobald AAA CCC gehoert hat, deckt AAA BBB.
+    m.cells[iaaa][ibbb].last_min = now; // BBB hoert AAA (Deckung), s.o.
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now);
+    TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.need);
+    TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.alone);
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, now);   // AAA hat CCC gehoert
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_TRUE(iccc > 0);
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now);
+    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.need);      // AAA hat den Frame (HatF), BBB und LLL nicht
+    TEST_ASSERT_EQUAL_UINT32(bL, r.alone);          // BBB erreicht AAA, LLL erreicht nur ich
+
+    // Gateway-Ausnahme: ein Blatt mit GW-Flag bekommt den Frame vom Server.
+    m.rows[illl].flags |= NBR_FLAG_GW;
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now);
+    TEST_ASSERT_EQUAL_UINT32(bB, r.need);
+    TEST_ASSERT_EQUAL_UINT32(0, r.alone);           // Fall B
+    m.rows[illl].flags &= (uint8_t)~NBR_FLAG_GW;
+
+    // Deckung durch eine gehoerte Wiederholung von AAA: AAAs Hoerer ist BBB
+    // (cell[AAA][BBB]; dass AAA CCC gehoert hat, ist die Gegenrichtung und
+    // zaehlt nicht); need & ~cover wird 0 fuer den Fall-B-Rest {BBB}.
+    uint32_t cover = nbrCoverMask(m, "OE1AAA-1", now);
+    TEST_ASSERT_EQUAL_UINT32(bB, cover);
+    TEST_ASSERT_EQUAL_UINT32(0, bB & ~cover);
+    TEST_ASSERT_EQUAL_UINT32(0, nbrCoverMask(m, "DK5EN-93", now));   // ich selbst decke nichts
+    TEST_ASSERT_EQUAL_UINT32(0, nbrCoverMask(m, "OE9ZZZ-1", now));   // unbekannt
+
+    // Ungueltiger Pfad: kein Wissen, keine Masken, known == false.
+    r = nbrRelayNeed(m, "bad path!", now);
+    TEST_ASSERT_EQUAL_UINT32(0, r.need);
+    TEST_ASSERT_EQUAL_UINT32(0, r.alone);
+    TEST_ASSERT_FALSE(r.known);
+    TEST_ASSERT_EQUAL_INT(2, nbrMaskCount(bB | bL));
+
+    // Gueltiger Pfad, gueltige Matrix: known == true, auch wenn need == 0
+    // ("alle Abhaengigen haben den Frame") -- das ist Fall B, kein Unwissen.
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now);
+    TEST_ASSERT_TRUE(r.known);
+}
+
+void test_relay_need_on_empty_matrix_is_no_knowledge_not_case_b(void)
+{
+    NbrMatrix e;
+    nbrInit(e, "DK5EN-93", 0);
+    // Leere Matrix (nur Zeile 0): keine abhaengige Zeile, also kein Wissen.
+    // Der Aufrufer muss wie heute fluten, statt das Relay als Fall B mit
+    // leerem Bedarf einzureihen und beim ersten fremden Echo abzubrechen
+    // (Advisor-Fund 2026-09-22).
+    NbrNeed r = nbrRelayNeed(e, "OE9ORG-1,OE1AAA-1", 10);
+    TEST_ASSERT_FALSE(r.known);
+    TEST_ASSERT_EQUAL_UINT32(0, r.need);
+    TEST_ASSERT_EQUAL_UINT32(0, r.alone);
+}
+
+void test_exclusive_direct_ignores_two_hop_hearers(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5);
+    nbrNoteFrame(m, "OE1LLL-7,OE1CCC-3", ':', NULL, false, -80, 5);   // CCC (2-Hop) hoert LLL
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int illl = nbrFind(m, "OE1LLL-7");
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_TRUE(iaaa > 0 && illl > 0 && iccc > 0);
+    // Moment: "OE1LLL-7,OE1CCC-3" macht CCC zum letzten Hop, also direkt --
+    // dafuer CCCs Direktheit wieder loeschen, damit CCC ein reiner 2-Hop-Hoerer ist.
+    memset(&m.cells[iccc][0], 0, sizeof(NbrCell));
+
+    uint8_t out[NBR_MAX_ROWS];
+    int n_old = nbrExclusive(m, 10, out, NBR_MAX_ROWS);
+    int n_new = nbrExclusiveDirect(m, 10, out, NBR_MAX_ROWS);
+    TEST_ASSERT_EQUAL_INT(1, n_old);      // altes Urteil: nur AAA, LLL gilt als durch CCC gedeckt
+    TEST_ASSERT_EQUAL_INT(2, n_new);      // Direktregel: AAA und LLL, CCCs Wiederholung hoere ich nie
+    // AAA hoert LLL (direkte Deckung): LLL faellt aus E_self.
+    m.cells[illl][iaaa].cnt_text = 1; m.cells[illl][iaaa].last_min = 10;
+    TEST_ASSERT_EQUAL_INT(1, nbrExclusiveDirect(m, 10, out, NBR_MAX_ROWS));
+    TEST_ASSERT_EQUAL_INT(iaaa, out[0]);
+    NbrMatrix e;
+    nbrInit(e, "DK5EN-93", 0);
+    TEST_ASSERT_EQUAL_INT(-1, nbrExclusiveDirect(e, 10, out, NBR_MAX_ROWS));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -850,5 +1042,11 @@ int main(int, char **)
     RUN_TEST(test_pre_window_edge_does_not_refresh_row_age);
     RUN_TEST(test_log_emitter_field_sequence_matches_format_doc);
     RUN_TEST(test_log_snapshot_emits_snap_row_per_used_row_and_endsnap);
+    RUN_TEST(test_gateway_echo_does_not_mark_server_origin_as_directly_heard);
+    RUN_TEST(test_eviction_prefers_two_hop_row_over_older_direct_rows);
+    RUN_TEST(test_mesh_need_count_is_the_number_behind_the_word);
+    RUN_TEST(test_relay_need_masks_follow_concept_section_5);
+    RUN_TEST(test_relay_need_on_empty_matrix_is_no_knowledge_not_case_b);
+    RUN_TEST(test_exclusive_direct_ignores_two_hop_hearers);
     return UNITY_END();
 }

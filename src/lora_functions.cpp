@@ -755,6 +755,122 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 printBuffer_aprs((char*)"[LOG]", aprsmsg, tail);
         }
 
+        // Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.2):
+        // fremde Wiederholung erkannt -- ein GEHOERTER Frame mit mindestens
+        // zwei Pfad-Token, dessen letzter Hop nicht ich selbst bin, kann den
+        // Bedarf eines schon eingereihten eigenen Relays desselben Frames
+        // decken. msg_type_b_lora != 0 schliesst einen fehlgeschlagenen
+        // decodeAPRS() aus (aprsmsg waere dann nicht verlaesslich befuellt);
+        // der Absender-Retry (ein einzelnes Pfad-Token) und das eigene Echo
+        // (letzter Hop == ich) duerfen diesen Zweig nie erreichen.
+        if(bNBRRELAY && msg_type_b_lora != 0 &&
+           (aprsmsg.payload_type == ':' || aprsmsg.payload_type == '!' || aprsmsg.payload_type == '@') &&
+           strchr(aprsmsg.msg_source_path, ',') != NULL &&
+           !is_equ(aprsmsg.msg_source_last, meshcom_settings.node_call))
+        {
+            uint16_t now_min_cover = (uint16_t)(millis() / 60000UL);
+            uint32_t cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover);
+
+            // Relayer unbekannt (keine Zeile/keine frischen Hoerer) -> nichts
+            // zu entscheiden (Konzept 5.2).
+            if(cover != 0)
+            {
+                char nbr_typ = (aprsmsg.payload_type == ':') ? 'T' :
+                               (aprsmsg.payload_type == '!') ? 'P' : 'H';
+
+                for(int nbr_i = 0; nbr_i < MAX_RING; nbr_i++)
+                {
+                    // ringBuffer[i][1] == RING_STATUS_DONE schliesst
+                    // RING_STATUS_EXT_PENDING (0x80) und die SENT-Alterung
+                    // (0x01..0x14) bereits per Wertevergleich aus -- ein
+                    // Relay-Slot laeuft nie ueber den External-Radio-
+                    // Bridge-Pfad (der setzt EXT_PENDING nur fuer eigene
+                    // Sends). Gleicher msg_id-Vergleich wie der bestehende
+                    // ACK-Scan weiter oben.
+                    if(ringBuffer[nbr_i][0] == 0 ||
+                       (ringKind[nbr_i] & 0x7F) != RING_KIND_RELAY ||
+                       ringBuffer[nbr_i][1] != RING_STATUS_DONE ||
+                       memcmp(ringBuffer[nbr_i]+3, RcvBuffer+1, 4) != 0)
+                        continue;
+
+                    uint32_t nbr_mid = extractRingMsgId(nbr_i);
+
+                    if(ringAlone[nbr_i] != 0)
+                    {
+                        // Fall A: Sole-Provider-Veto, nie Abbruch (Konzept 5.2).
+                        if(!(ringKind[nbr_i] & RING_KIND_COUNTED))
+                        {
+                            stat_nbr_refuse_alone++;
+                            ringKind[nbr_i] |= RING_KIND_COUNTED;
+
+                            if(nbrLog != NULL)
+                            {
+                                char nbr_line[96];
+                                snprintf(nbr_line, sizeof(nbr_line),
+                                         "[NBR]|REFUSE|%u|%08X|%c|%s|%08X",
+                                         (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
+                                         aprsmsg.msg_source_last, (unsigned)ringAlone[nbr_i]);
+                                nbrLog(nbr_line);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        uint32_t nbr_before = ringNeed[nbr_i];
+                        ringNeed[nbr_i] &= ~cover;
+                        uint32_t nbr_after = ringNeed[nbr_i];
+
+                        if(nbr_after == 0)
+                        {
+                            if(bNBRCANCEL)
+                            {
+                                // Slot freigeben mit denselben drei Schreibzugriffen
+                                // wie die ACK-Freigabe weiter oben -- aber auf einen
+                                // DONE-Slot, den getNextTxSlot() waehlen kann (die
+                                // ACK-Freigabe trifft nur SENT-Slots). Auf nRF52 kann
+                                // doTX() (Loop-Task) den Slot zwischen Auswahl und
+                                // Verbrauch verlieren: ein leerer Sendeversuch, oder
+                                // ein Frame, der trotz CANCEL-Zeile noch rausgeht.
+                                // Dasselbe Fenster hat der N-24-Umzug schon heute
+                                // (Advisor 2026-09-22, Befund 2, akzeptiert).
+                                ringBuffer[nbr_i][1] = RING_STATUS_DONE;
+                                retryCount[nbr_i] = 0;
+                                ringBuffer[nbr_i][0] = 0;
+                                stat_nbr_cancel++;
+
+                                if(nbrLog != NULL)
+                                {
+                                    char nbr_line[96];
+                                    snprintf(nbr_line, sizeof(nbr_line),
+                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%08X|%08X",
+                                             (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
+                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after);
+                                    nbrLog(nbr_line);
+                                }
+                            }
+                            else if(!(ringKind[nbr_i] & RING_KIND_COUNTED))
+                            {
+                                // Zaehlmodus (--nbrrelay count, Verdict M1):
+                                // dieselbe Rechnung, aber ohne Wirkung.
+                                stat_nbr_cancel_possible++;
+                                ringKind[nbr_i] |= RING_KIND_COUNTED;
+
+                                if(nbrLog != NULL)
+                                {
+                                    char nbr_line[96];
+                                    snprintf(nbr_line, sizeof(nbr_line),
+                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%08X|%08X",
+                                             (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
+                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after);
+                                    nbrLog(nbr_line);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if(msg_type_b_lora == 0x00)
         {
             if(bDisplayCont)
@@ -1131,6 +1247,14 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         int rly_prio = 0;
                         int rly_slot = -1;
                         uint8_t rly_hop = aprsmsg.max_hop & 0x0F;
+
+                        // Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md
+                        // 5.1): Bedarfs-/Allein-Maske des Relays, mit Initialisierer
+                        // deklariert VOR jedem goto in diesem Block (skip_relay unten
+                        // springt sonst ueber die Initialisierung hinweg -- C++ verbietet
+                        // das). Zugewiesen (nicht neu deklariert) kurz vor bSHORTPATH.
+                        NbrNeed nn_relay = {0, 0, false};
+                        uint16_t now_min_relay = 0;
 
                         if(msg_type_b_lora == MSG_TYPE_TEXT)    // text message store&forward
                         {
@@ -1628,6 +1752,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 //
                                 ////////////////////////////////////////////////////////////
 
+                                // Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md
+                                // 5.1): Bedarf VOR dem Umschreiben des Pfads berechnen --
+                                // msg_source_path traegt hier noch die Ansicht, wie der Frame
+                                // ankam (Absender zuerst, letzter Hop zuletzt), genau die
+                                // Ansicht, die nbrRelayNeed() braucht. Nach bSHORTPATH/dem
+                                // Anhaengen des eigenen Rufzeichens waere es bereits die
+                                // eigene Aussendung.
+                                if(bNBRRELAY)
+                                {
+                                    now_min_relay = (uint16_t)(millis() / 60000UL);
+                                    nn_relay = nbrRelayNeed(nbrMatrix, aprsmsg.msg_source_path, now_min_relay);
+                                }
+
                                 if(bSHORTPATH)
                                 {
                                     /* short path */
@@ -1665,7 +1802,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                 // no retransmission for ANY relay message; Slot vorher komplett
                                 // nullen (Alt-Verhalten: memset des ganzen Rings vor dem Schreiben)
-                                rly_slot = addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true);
+                                // Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): kind/need/alone
+                                // durchreichen, damit der Mithoer-Scan (OnRxDone weiter oben)
+                                // und der fallabhaengige CSMA-Backoff (csma_compute_timeout_slot())
+                                // diesen Slot wiederfinden. Ohne --nbrrelay bleibt kind
+                                // RING_KIND_OTHER wie bisher (nn_relay bleibt {0,0}).
+                                // known == false ("kein Wissen": leere Matrix, ungueltiger
+                                // Pfad) bleibt RING_KIND_OTHER -- heutiges Fluten, nie Fall B
+                                // (Advisor-Fund 2026-09-22, Konzept 1: nichts unterdrueckt auf
+                                // Verdacht).
+                                rly_slot = addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true,
+                                                           (bNBRRELAY && nn_relay.known) ? RING_KIND_RELAY : RING_KIND_OTHER,
+                                                           nn_relay.need, nn_relay.alone);
 
                                 // SL-02: Rueckgabe ist der belegte Slot bzw. -1,
                                 // wenn der Ring den Eintrag verworfen hat.
@@ -1673,6 +1821,36 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 {
                                     rly_reason = "tx";
                                     rly_prio = ringPriority[rly_slot];
+
+                                    // Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): Zaehler je Fall
+                                    // und die NEED-Zeile fuers 24-h-Log (docs/nbr-logformat.md-
+                                    // Familie), nur wenn die Masken oben tatsaechlich berechnet
+                                    // wurden.
+                                    if(bNBRRELAY)
+                                    {
+                                        if(!nn_relay.known)
+                                            ; // kein Wissen: kein Fall, kein Zaehler -- nur die NEED-Zeile mit 'U'
+                                        else if(nn_relay.alone != 0)
+                                            stat_nbr_relay_a++;
+                                        else
+                                            stat_nbr_relay_b++;
+
+                                        if(nbrLog != NULL)
+                                        {
+                                            char nbr_typ = (aprsmsg.payload_type == ':') ? 'T' :
+                                                           (aprsmsg.payload_type == '!') ? 'P' : 'H';
+                                            char nbr_case = !nn_relay.known ? 'U' : (nn_relay.alone != 0) ? 'A' : 'B';
+                                            uint32_t nbr_mid = extractRingMsgId(rly_slot);
+                                            char nbr_line[96];
+                                            snprintf(nbr_line, sizeof(nbr_line),
+                                                     "[NBR]|NEED|%u|%08X|%c|%c|%08X|%08X|%d",
+                                                     (unsigned)now_min_relay, (unsigned)nbr_mid,
+                                                     nbr_typ, nbr_case,
+                                                     (unsigned)nn_relay.need, (unsigned)nn_relay.alone,
+                                                     rly_slot);
+                                            nbrLog(nbr_line);
+                                        }
+                                    }
                                 }
                                 else
                                     rly_reason = "full";
@@ -2615,11 +2793,81 @@ void OnHeaderDetect(void)
     }
 }
 
+// Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.1): fallab-
+// haengiger CSMA-Backoff fuer einen Relay-Slot, wirksam nur unter
+// --nbrrelay on (bNBRCANCEL) -- --nbrrelay count rechnet die Masken und
+// zaehlt, veraendert aber keine Funkzeitwerte (Verdict M1). Ohne
+// bNBRCANCEL oder fuer jeden Nicht-Relay-Slot ist dies byte-identisch zu
+// csma_compute_timeout_prio(attempt, ringPriority[slot]), das unveraendert
+// bleibt und von test_inject.cpp o.ae. weiter direkt aufrufbar ist.
+//
+// Fall A (ringAlone[slot] != 0, Konzept-Tabelle 5.1): Vorrang, Slots 0..2
+// (vorn). Ab NBR_RELAY_CASE_A_MAX_WAIT_MS seit dem Einreihen (Wartezeit,
+// nicht Versuchszahl -- ein Fall-A-Relay soll nach kurzer erfolgloser
+// Wartezeit auf den reinen Schutzabstand plus CAD zurueckfallen, egal wie
+// oft der CSMA-Zaehler seither neu gestartet wurde) nur noch die
+// "Kurzsuche": Schutzabstand nach Empfangsende, dann CAD -- der gekappte
+// Re-Arm aus der Konzept-Tabelle.
+//
+// Fall B (ringAlone[slot] == 0): Nachrang, Prio-Basis + NBR_RELAY_CASE_B_EXTRA_MS
+// (ausser bei Text -- Menschen warten darauf, siehe Konzept 5.1), Slots
+// NBR_RELAY_CASE_B_SLOT_START..+2 (hinten), damit die natuerliche Flut der
+// Alt-Firmware zuerst ankommt und der Abbruch (5.2) noch greifen kann.
+unsigned long csma_compute_timeout_slot(int attempt, int slot) {
+    if(attempt >= CSMA_MAX_ATTEMPTS)
+        return CSMA_RAPID_RX_MS; // rapid-fire with preamble check, wie csma_compute_timeout_prio()
+
+    uint8_t prio = (slot >= 0) ? ringPriority[slot] : MSG_PRIO_NORMAL;
+
+    if(bNBRCANCEL && slot >= 0 && (ringKind[slot] & 0x7F) == RING_KIND_RELAY)
+    {
+        if(ringAlone[slot] != 0)
+        {
+            // Fall A.
+            if((uint32_t)(millis() - ringEnqueueTime[slot]) >= NBR_RELAY_CASE_A_MAX_WAIT_MS)
+                return NBR_RELAY_CASE_A_SHORT_MS +
+                       (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+
+            unsigned long base_a = NBR_RELAY_CASE_A_BASE_MS;
+            if(attempt >= 2) base_a = base_a * 2 / 3;
+            else if(attempt >= 1) base_a = base_a * 5 / 6;
+
+            return base_a + (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+        }
+        else
+        {
+            // Fall B: Prio-Basis wie csma_compute_timeout_prio(), aber eigene
+            // Slots (hinten) und der bewusst lange Nachrang ausser bei Text.
+            unsigned long base_b;
+            switch(prio) {
+                case MSG_PRIO_CRITICAL:   base_b = CSMA_PRIO_BASE_1; break;
+                case MSG_PRIO_HIGH:       base_b = CSMA_PRIO_BASE_2; break;
+                case MSG_PRIO_NORMAL:     base_b = CSMA_PRIO_BASE_3; break;
+                case MSG_PRIO_LOW:        base_b = CSMA_PRIO_BASE_4; break;
+                case MSG_PRIO_BACKGROUND: base_b = CSMA_PRIO_BASE_5; break;
+                default:                  base_b = CSMA_PRIO_BASE_3; break;
+            }
+            if(attempt >= 2) base_b = base_b * 2 / 3;
+            else if(attempt >= 1) base_b = base_b * 5 / 6;
+
+            // Text bleibt komplett bei heutiger Basis UND heutigen Slots
+            // (Konzept 5.1: Menschen warten darauf); nur der Abbruch gilt.
+            if(ringBuffer[slot][2] == MSG_TYPE_TEXT)
+                return csma_compute_timeout_prio(attempt, prio);
+
+            base_b += NBR_RELAY_CASE_B_EXTRA_MS;
+
+            return base_b + (unsigned long)(NBR_RELAY_CASE_B_SLOT_START + random(0, 3)) * CSMA_SLOT_SIZE;
+        }
+    }
+
+    return csma_compute_timeout_prio(attempt, prio);
+}
+
 unsigned long csma_compute_timeout(int attempt) {
     // Default (no priority context): use priority of next queued packet
     int txSlot = getNextTxSlot();
-    uint8_t prio = (txSlot >= 0) ? ringPriority[txSlot] : MSG_PRIO_NORMAL;
-    return csma_compute_timeout_prio(attempt, prio);
+    return csma_compute_timeout_slot(attempt, txSlot);
 }
 
 unsigned long csma_compute_timeout_prio(int attempt, uint8_t priority) {

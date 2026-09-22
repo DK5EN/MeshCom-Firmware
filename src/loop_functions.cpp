@@ -106,6 +106,16 @@ bool bDEBUGEN = false;
 bool bDEBUGLNG = false;
 bool bLORADEBUG = false;
 bool bNBRDEBUG = false;   // --nbrdebug: [NBR]-Zeilen der Nachbarschaftsmatrix, getrennt von bLORADEBUG
+// --nbrrelay off|count|on (Stufe 2, docs/nbr-wichtigkeit-konzept.md Abschnitt 5): count rechnet
+// Bedarfs- und Allein-Maske je Relay und zaehlt, was abgebrochen werden koennte, ohne Wirkung;
+// on bricht Fall-B-Relays gegen gehoerte fremde Wiederholungen ab und staffelt den Backoff nach Fall.
+bool bNBRRELAY = false;   // count oder on: Masken rechnen, NEED/CANCEL?-Zeilen, Zaehler
+bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
+uint32_t stat_nbr_relay_a = 0;          // eingereihte Relays Fall A (Allein-Maske != 0)
+uint32_t stat_nbr_relay_b = 0;          // eingereihte Relays Fall B
+uint32_t stat_nbr_cancel = 0;           // abgebrochene Relays (nur on)
+uint32_t stat_nbr_cancel_possible = 0;  // Relays, deren Bedarf durch fremde Wiederholungen gedeckt war (count: je Slot einmal)
+uint32_t stat_nbr_refuse_alone = 0;     // gehoerte fremde Wiederholung, Abbruch wegen Allein-Maske verweigert (je Slot einmal)
 bool bBLEDEBUG = false;
 bool bWXDEBUG = false;
 bool bIODEBUG = false;

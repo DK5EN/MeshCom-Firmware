@@ -215,6 +215,15 @@ static void tg_post_tft_off() { tdeck_dbg_tft(0); }
 #endif
 #endif
 
+// --nbrrelay off|count|on (Nachbarschaftsmatrix Stufe 2, docs/nbr-wichtigkeit-konzept.md
+// Abschnitt 5 und 5.8 Punkt 4): zwei Bits in node_sset4 -- 0x0020 "rechnen und zaehlen"
+// (bNBRRELAY), 0x0040 "Abbruch und Backoff nach Fall anwenden" (bNBRCANCEL). on setzt beide,
+// count nur das erste, off keines. Die Nachlaeufer halten die beiden Laufzeitflags konsistent,
+// weil eine Tabellenzeile nur EIN Flag schreibt.
+static void tg_post_nbrrelay_off()   { bNBRCANCEL = false; }
+static void tg_post_nbrrelay_count() { bNBRCANCEL = false; }
+static void tg_post_nbrrelay_on()    { bNBRRELAY = true; }
+
 static const ToggleRow COMMAND_TOGGLES[] =
 {
     { "--setinfo off",        &bDisplayInfo,         nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_ECHO_LN },
@@ -250,6 +259,9 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--txcapture off",      &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--nbrdebug on",        &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0010,       nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrdebug off",       &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFEF,   0x00000000,   nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay off",       &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFF9F,   0x00000000,   tg_post_nbrrelay_off,          TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay count",     &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFFBF,   0x0020,       tg_post_nbrrelay_count,        TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrrelay on",        &bNBRCANCEL,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0060,       tg_post_nbrrelay_on,           TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     { "--via on",             &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x4000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
@@ -5393,6 +5405,13 @@ void commandAction(char *umsg_text, bool ble)
             // blind aus; ohne diese Spalte bliebe es nach einem Lauf an.
             printfdeb("...DEBUG %s ...LORADEBUG %s ...NBRDEBUG %s ...TXCAPTURE %s ...GPSDEBUG %s/%i ...SOFTSERDEBUG %s\n...WXDEBUG %s ...BLEDEBUG %s\n",
                 (bDEBUG?"on":"off"), (bLORADEBUG?"on":"off"), (bNBRDEBUG?"on":"off"), (bTXCAPTURE?"on":"off"), (iGPSDEBUG?"on":"off"), iGPSDEBUG, (bSOFTSERDEBUG?"on":"off"),(bWXDEBUG?"on":"off"), (bBLEDEBUG?"on":"off"));
+
+            // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): Modus und die
+            // fuenf Zaehler, damit ein Feldlauf ohne Web-Seite ablesbar bleibt.
+            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu\n",
+                (bNBRCANCEL?"on":(bNBRRELAY?"count":"off")),
+                (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
+                (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone);
             
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));
