@@ -51,6 +51,24 @@ am 2026-09-21 gefunden hat.
 `tools/nbrlog.py` rechnet `<meshneed>` aus den `EDGE`/`ME`-Zeilen selbst nach und stellt es dem
 Firmware-Wert gegenueber. `<verdict>` wird nur berichtet, nicht verglichen.
 
+## Stufe 2: Relay-Entscheidung (`--nbrrelay count|on`, docs/nbr-wichtigkeit-konzept.md 5)
+
+Diese Zeilen kommen nur mit `--nbrdebug on` UND `--nbrrelay count` oder `on`. `<need>` und
+`<alone>` sind Bitmasken ueber Zeilenindizes (Bit i = Zeile i der Matrix), hexadezimal mit acht
+Stellen; `<msg_id>` ebenso. `<typ>` wie oben, `<relayer>` ist der letzte Hop der gehoerten fremden
+Wiederholung.
+
+| Zeile                                                                    | Wann                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[NBR]\|NEED\|<up>\|<msg_id>\|<typ>\|<A\|B\|U>\|<need>\|<alone>\|<slot>` | Relay eingereiht; `A` heisst `alone != 0` (nie Abbruch), `B` heisst Nachrang und Abbruch moeglich, `U` heisst kein Wissen (leere Matrix, ungueltiger Pfad): Relay laeuft wie heute, zaehlt in keinem Fall. |
+| `[NBR]\|CANCEL?\|<up>\|<msg_id>\|<typ>\|<relayer>\|<vorher>\|<nachher>`  | `count`: die gehoerte Wiederholung von `<relayer>` deckte den Restbedarf; nichts passiert. Einmal je Slot.                                                                                                 |
+| `[NBR]\|CANCEL\|<up>\|<msg_id>\|<typ>\|<relayer>\|<vorher>\|<nachher>`   | `on`: dasselbe, und der Ring-Slot wurde freigegeben.                                                                                                                                                       |
+| `[NBR]\|REFUSE\|<up>\|<msg_id>\|<typ>\|<relayer>\|<alone>`               | Fremde Wiederholung gehoert, aber `alone != 0`: Abbruch verweigert. Einmal je Slot.                                                                                                                        |
+
+`<vorher>`/`<nachher>` sind die Bedarfsmaske vor und nach Abzug der Hoerer des Relayers. Die
+Zaehler dazu stehen in `--info` (`...NBRRELAY <off|count|on> ...relays A <n> B <n> ...cancelled
+<n> ...possible <n> ...refused <n>`).
+
 ## Beispiel
 
 ```
