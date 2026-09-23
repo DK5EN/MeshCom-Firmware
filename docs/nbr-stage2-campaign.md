@@ -31,6 +31,21 @@ Ohne beide: 36 A / 900 B.
 | Gate    | 1075 Host-Tests, Builds heltec/rak/tbeam/tdeck, String-Scan, Advisor                                                                                                                                      | gruen; Advisor APPROVED, 1 Medium behoben (keine gestapelten Annahmen), 3 Low                                                                                                                                                                                                                                                                 |
 | 3C      | OTA DK5EN-98 und DK5EN-1 per `tools/webflash.py`, danach `--gateway on` auf DK5EN-1 ueber Konsole 2323                                                                                                    | erledigt 23:12: beide Knoten Build `Sep 22 2026 / 23:08:13`, Web-Seite zeigt `Symmetry: on (SNR >= -16 dB)`; DK5EN-1 per `/setparam/?gateway=on` (Konsole 2323 dort aus), Server-BEAT ok, an DK5EN-98 `G = Y`, Bit weg aus NEED; USB-Mitschnitt des Blatts lief durch. Auswertung ab `--since 2026-09-22T23:12`, fruehestens nach einer Nacht |
 
+## Welle 4: HN-Nachbarschaftsmeldung (`--nbrreport`), 2026-09-23
+
+Anlass: Nachtlauf 22./23.09. mit `--nbrsym`: 518 B / 14 A, 96 `CANCEL?` (19 % der B-Relays), aber
+72 davon ruhen auf Annahmen ueber DL2JA-1, 19 auf einer -15-dB-Strecke. Nur der Knoten selbst kann
+sagen, wen er hoert -- per Einzel-ACK (etwa 60 s/h Sendezeit je Endknoten) verworfen, stattdessen
+eine seltene Ein-Hop-Meldung.
+
+| Schritt | Inhalt                                                                                                                                                                                                                                | Stand                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 4A      | Matrix: `nbrBuildReport`/`nbrNoteReport`, Veto der Symmetrie durch vollstaendige frische Meldung (45 min), `RPT`/`RPTSUM`/`DROP RPT`/`SYM VETO`, `NbrRow` bleibt 24 B                                                                 | erledigt, 58 + 3 Host-Tests (neue Umgebung `native_nbr_report` fuer die Kappung)                        |
+| 4B      | Firmware: Decoder nimmt `HN` nur bei `@`, RX-Abfang vor Stufe 2/Dedup/Trickle/Upload, `sendNbrReport` (max_hop 0), fester 15-min-Takt (`NBR_REPORT_INTERVAL_S` = `TRICKLE_IMAX_S`), `--nbrreport off\|auto\|on` (sset4 0x0100/0x0200) | erledigt                                                                                                |
+| 4C      | Logvertrag, `nbrlog.py` Abschnitt 11, Fixture                                                                                                                                                                                         | erledigt                                                                                                |
+| Gate    | 1100 Host-Tests, vier Builds, String-Scan, Golden-Makrodatei (separat nachgezogen), Advisor                                                                                                                                           | gruen; Advisor mit 1 Medium (Doku `<heard>`) und 3 Low (VETO-Menge, Ping-Guard, Golden) -- alle behoben |
+| 4D      | OTA beider Knoten, DK5EN-98 `--nbrreport on` (Bench-Sender) und `--nbrrelay on`                                                                                                                                                       | offen                                                                                                   |
+
 ## Entscheidungen
 
 - pio-Slot: in Welle 1 ausschliesslich Agent B; D kompiliert nicht, das Gate kompiliert.
@@ -45,6 +60,12 @@ Ohne beide: 36 A / 900 B.
   Beobachtete Kante gewinnt immer; ein Knoten, der den Frame nur per Annahme hat, versorgt
   niemanden (hoechstens eine Annahme je Entscheidung, Advisor-Fund).
 - Settings-Bit `node_sset4` 0x0080 = `--nbrsym off` (invertiert wie `--mesh`).
+- Settings-Bits `node_sset4` 0x0100 = `--nbrreport off`, 0x0200 = `--nbrreport on`, keins = auto
+  (Default; sendet nur bei Mesh aus UND Gateway aus).
+- Schwelle `LORA_SNR_STABLE_MIN_DB` (-16) steht in `src/configuration_default.h` direkt bei
+  SF/BW/CR, weil sie an der Modulation haengt; `NBR_SYM_MIN_SNR` ist nur noch ein Alias.
+- Abbruch unter `on` darf auf beobachteter, gemeldeter UND angenommener Deckung ruhen
+  (Betreiberentscheidung 2026-09-23).
 - Advisor Low, akzeptiert: `REFUSE` kann mit sym auch gegen einen nur per Annahme deckenden
   Relayer fallen (ohne eigene `SYM`-Zeile); `EDGE`-`<snr>` ist der Wert vor dem Frame.
 - DK5EN-1 bekommt `--gateway on`: der Server versorgt es, damit faellt es aus der Abhaengigen-Menge

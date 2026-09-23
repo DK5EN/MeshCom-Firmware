@@ -935,6 +935,9 @@ void esp32setup()
     bNBRCANCEL = (meshcom_settings.node_sset4 & 0x0040) != 0;
     // --nbrsym on|off (Stufe 2): 0x0080 invertiert gespeichert, siehe command_functions.cpp.
     bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;
+    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100 off, 0x0200 on, keines von beiden auto.
+    bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;
+    bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;
 
     if(strlen(meshcom_settings.node_aprsmc) < 4)
     {
@@ -3508,6 +3511,11 @@ void esp32loop()
 
         heyinfo_timer = millis();
     }
+
+    // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): eigener Takt,
+    // unabhaengig vom Trickle-Intervall oben und nie unterdrueckt -- siehe
+    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und Modus-Auswertung.
+    nbrReportTick();
 
     // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer
     // nbrLogSnapshot(). Nur im Loop, NICHT im Timer-Task -- laesst sich hier nicht

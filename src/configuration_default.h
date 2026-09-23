@@ -87,6 +87,17 @@
 #define LORA_CR 6                               // [1: 4/5, 2: 4/6, 3: 4/7, 4: 4/8]
 #endif
 
+// Niedrigster SNR, bei dem eine Strecke mit der Modulation oben (SF11 /
+// BW 250 kHz / CR 4/6, EU8) als stabil gilt -- Betreiberwert aus der
+// Erfahrung am eigenen Heltec: bei -16 dB etwa 1 % Paketverlust, DF2SI-12
+// kommt dort mit einem Median von -16 dB an und faellt regelmaessig ins
+// Rauschen. Haengt an SF/BW/CR: wer die Modulation aendert, muss diesen Wert
+// neu bestimmen. Genutzt von der Nachbarschaftsmatrix (--nbrsym, Filter der
+// HN-Nachbarschaftsmeldung), Vergleich immer einschliesslich (>=).
+#ifndef LORA_SNR_STABLE_MIN_DB
+#define LORA_SNR_STABLE_MIN_DB (-16)
+#endif
+
 #ifndef LORA_PREAMBLE_LENGTH
 #define LORA_PREAMBLE_LENGTH DEFAULT_PREAMPLE_LENGTH   // same for Tx and Rx
 #endif

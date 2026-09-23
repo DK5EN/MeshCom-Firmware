@@ -33,7 +33,7 @@ und diese Datei.
 | `[NBR]\|EDGE\|<up>\|<from>\|<to>\|<type>\|<rssi>\|<cnt>\|<snr>`                     | Jede eingetragene Hoerbeziehung "`<to>` hat `<from>` gehoert". `<rssi>` ist in neuen Mitschnitten IMMER `0` -- die Zelle speichert keine RSSI mehr, nur noch SNR (siehe unten). `<snr>` ist die fuer "`<to>` hat `<from>` gehoert" gespeicherte SNR (aus HEY-Berichten) und kann aelter sein als diese Zeile. |
 | `[NBR]\|ME\|<up>\|<from>\|<type>\|<rssi>\|<cnt>\|<snr>`                             | Letzter Hop von mir direkt gehoert (Zelle `[last][0]`). `<rssi>` unveraendert die empfangene RSSI dieses Frames. `<snr>` die fuer "ich habe `<from>` gehoert" gespeicherte SNR.                                                                                                                               |
 | `[NBR]\|CUT\|<up>\|<ntok>\|<kept>\|<path>`                                          | Pfad war laenger als das 2-Hop-Fenster; `<ntok>-<kept>` Token verworfen.                                                                                                                                                                                                                                      |
-| `[NBR]\|DROP\|<up>\|<reason>\|<path>`                                               | Frame komplett verworfen. `<reason>`: `TOK`, `LOOP`, `FULL`, `TYPE`.                                                                                                                                                                                                                                          |
+| `[NBR]\|DROP\|<up>\|<reason>\|<path>`                                               | Frame komplett verworfen. `<reason>`: `TOK`, `LOOP`, `FULL`, `TYPE`, `RPT` (fehlerhafter HN-Bericht, siehe Stufe 3 unten -- `<path>` ist dort nur `<x>`, der Absender).                                                                                                                                       |
 | `[NBR]\|EVICT\|<up>\|<idx>\|<old>\|<new>`                                           | Zeile `<idx>` verdraengt, `<old>` war das Opfer.                                                                                                                                                                                                                                                              |
 | `[NBR]\|POS\|<up>\|<call>\|<lat>\|<lon>\|<mesh>\|<hw>`                              | Positionscache gefuellt (`<mesh>` 0/1, `<lat>`/`<lon>` mit 5 Nachkommastellen).                                                                                                                                                                                                                               |
 | `[NBR]\|SNAP\|<up>\|<own>\|<rows>\|<maxrows>\|<cells>`                              | Alle 15 min, eroeffnet einen Snapshot-Block.                                                                                                                                                                                                                                                                  |
@@ -131,7 +131,119 @@ Boards).
 `tools/nbrlog.py` traegt die geloggten `SYM`-Zeilen im Bericht unter "Symmetrie-Annahmen"
 zusammen (Anzahl je `<role>`, je Paar `(<x>, <m>)` mit Median-SNR) -- eine unerwartet hohe Zahl
 zeigt, wie sehr sich die Stufe-2-Relay-Entscheidung auf den Fallback statt auf Beobachtung
-stuetzt.
+stuetzt. Die Rolle `VETO` (siehe unten) zaehlt dort NICHT mit -- sie ist das Gegenteil einer
+angewendeten Annahme und gehoert zum HN-Bericht.
+
+## Stufe 3: HN-Nachbarschaftsmeldung (`--nbrreport off|auto|on`)
+
+### Warum ein eigener Frame
+
+Ein Knoten, der nie relayed (`--mesh off`, kein Gateway), taucht in keinem gehoerten Pfad eines
+anderen Knotens auf und bleibt fuer die Nachbarschaftsmatrix unsichtbar -- die Matrix lernt
+Kanten nur aus Pfaden relayter Frames. Drei Alternativen wurden verworfen, bevor die HN-Meldung
+als eigener Frame entstand:
+
+- **Ein ACK je Frame** haette die Beobachtungsluecke ebenfalls geschlossen, kostet aber pro
+  Endpunkt in der Groessenordnung 60 s Airtime/h -- gegen ~4 s/h fuer die HN-Meldung (siehe
+  unten) ein Vielfaches.
+- **Huckepack auf dem regulaeren HEY** waere billiger gewesen, haette aber die
+  Relayer-eigenen `NCT,RSSI,SNR`-Positionsgruppen im selben Frame verschoben (Format-Bruch fuer
+  aeltere Firmware), waere netzweit relayt worden (die Meldung ist aber nur fuer die direkten
+  Hoerer gedacht) und waere der Trickle-Unterdrueckung unterworfen gewesen -- ein Knoten, dessen
+  HEY laengst von genuegend Nachbarn gehoert und deshalb unterdrueckt wird, haette dann auch nie
+  eine HN-Meldung gesendet.
+
+Der eigene Frame umgeht alle drei Punkte: eigener Typ mit fester Ziel-Kennung `HN`, `max_hop 0`
+(nie relayt, nur der direkte Hoererkreis empfaengt ihn), fester Takt ausserhalb der
+Trickle-Unterdrueckung.
+
+### Frame
+
+HEY-Rahmen (Typ `@`), Ziel `HN`, `max_hop 0`. Payload:
+
+```
+R<heard>;N<k>[+];<CALL>,<snr>;<CALL>,<snr>;...;
+```
+
+`<heard>` ist dieselbe Zahl wie im `R<n>` des regulaeren HEY: die Eintraege der MHeard-Tabelle des
+Senders der letzten Stunde, unabhaengig vom SNR (`getMheardCount()`). Sie ist NICHT die Zahl der
+Listeneintraege und kein Kappungssignal. `<k>` ist die Anzahl der GELISTETEN Eintraege: direkt
+gehoerte Stationen der letzten 60 min mit SNR >= `LORA_SNR_STABLE_MIN_DB`
+(`src/configuration_default.h`, an SF11/BW250/CR4/6 gebunden, aktuell -16 dB), absteigend nach SNR
+sortiert, hoechstens 8. Das `+` ist das EINZIGE Kappungssignal: es steht genau dann, wenn mehr als 8
+Stationen die Bedingung erfuellt haben. Ohne `+` ist die Liste vollstaendig: eine Station, die darin
+fehlt, ist der Beleg, dass der Sender sie nicht mit >= -16 dB hoert. `<heard>` - `<k>` darf nicht als
+"ungelistete Stationen" gelesen werden (MHeard zaehlt auch schwache und nicht mehr frische Stationen).
+
+Beispiel, vollstaendig (kein `+`, obwohl `<heard>` groesser ist):
+
+```
+R12;N5;DL2JA-2,7;DB0ISM-1,5;DK5EN-98,-8;DB0ED-99,-11;DL2UD-1,-12;
+```
+
+Beispiel, gekuerzt (mehr als 8 qualifiziert, `N8+`):
+
+```
+R11;N8+;DL2JA-2,9;DB0ISM-1,6;DK5EN-98,3;DB0ED-99,1;DL2UD-1,-2;OE1AAA-1,-5;OE2BBB-9,-9;OE3CCC-3,-13;
+```
+
+Beispiel, leer (kein direkter Nachbar mit >= -16 dB gehoert -- `N0` bleibt vollstaendig, kein `+`):
+
+```
+R0;N0;
+```
+
+Aktuelle und aeltere Firmware ohne dieses Feature verwerfen `HN`-Frames beim Dekodieren
+kommentarlos -- sie werden weder relayt noch hochgeladen noch angezeigt.
+
+### Takt (`NBR_REPORT_INTERVAL_S`, `src/configuration_global.h`)
+
+Alle `NBR_REPORT_INTERVAL_S` (== `TRICKLE_IMAX_S`, 15 min), erste Meldung `NBR_REPORT_FIRST_S`
+(5 min) nach dem Start, danach `NBR_REPORT_JITTER_S` (0..30 s) Zufallsversatz je Meldung. Die
+Meldung unterliegt zu keinem Zeitpunkt der Trickle-Unterdrueckung -- die eigene Hoerliste ist je
+Knoten einmalig und nie redundant zu einem anderen Sender.
+
+### Schalter `--nbrreport off|auto|on`
+
+Persistiert in `node_sset4`: `0x0100` gesetzt heisst `off`, `0x0200` gesetzt heisst `on`, keins
+von beiden heisst `auto` (Default). `auto` sendet nur, wenn Mesh AUS UND Gateway AUS sind -- genau
+die Situation, in der der Knoten sonst unsichtbar bliebe. `--info` bekommt das Feld
+` ...NBRREPORT off|auto|on` angehaengt.
+
+### Empfaenger: gelistete Eintraege werden zu Kanten
+
+Jeder gelistete Eintrag `<CALL>,<snr>` eines empfangenen `HN`-Berichts von `<x>` wird als
+beobachtungsgleiche Kante "`<x>` hat `<CALL>` gehoert" mit dieser SNR eingetragen -- dieselbe
+Semantik wie eine `EDGE` aus einem relayten Pfad, nur direkt aus dem Bericht statt aus einem
+Pfad-Token. Ein vollstaendiger (kein `+`), frischer (innerhalb der letzten 45 min empfangener)
+Bericht von `<x>` **verwirft** (veto) die `--nbrsym`-Symmetrie-Annahme fuer `<x>`, sobald diese
+angewendet wuerde -- eine tatsaechlich beobachtete Abwesenheit (die Station fehlt in der
+vollstaendigen Liste) sticht die Annahme "angenommen symmetrisch". Prioritaet, hoechste zuerst:
+per Relay beobachtete Kante == per HN-Bericht gemeldete Kante > `--nbrsym`-Annahme.
+
+### Neue Log-Zeilen
+
+| Zeile                                                       | Wann                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[NBR]\|RPT\|<up>\|<x>\|<m>\|<snr>\|<status>`               | Ein gelisteter Eintrag aus einem empfangenen `HN`-Bericht von `<x>` verarbeitet. `<status>`: `ok` (Kante "`<x>` hat `<m>` gehoert" eingetragen), `self` (`<m>` bin ich selbst: "`<x>` hat mich gehoert"), `norow` (`<m>` hat keine Matrixzeile, ignoriert).                  |
+| `[NBR]\|RPTSUM\|<up>\|<x>\|<heard>\|<k>\|<full>\|<applied>` | Zusammenfassung EINES empfangenen Berichts, direkt bei Erhalt. `<heard>`/`<k>` wie im Frame oben. `<full>` ist `1`, wenn der Bericht vollstaendig war (kein `+`), sonst `0`. `<applied>` ist die Anzahl der Eintraege mit `<status>` `ok` aus den zugehoerigen `RPT`-Zeilen. |
+| `[NBR]\|RPTTX\|<up>\|<len>\|<payload>`                      | Eigener Bericht gesendet. `<len>` ist die tatsaechliche On-Air-Laenge des Payloads, `<payload>` der Frame-Inhalt wie oben (die `;` darin sind Nutzdaten, kein `printfdeb`-Formatstring -- siehe "Trennzeichen" oben, sie ueberleben unangetastet).                           |
+| `[NBR]\|DROP\|<up>\|RPT\|<x>`                               | Neuer `<reason>`-Wert fuer die bestehende `DROP`-Zeile (siehe oben): ein `HN`-Bericht von `<x>` war fehlerhaft (Parsing, Grammatik), nichts daraus wurde angewendet.                                                                                                         |
+
+### `[NBR]|SYM|...|VETO` -- blockierte Annahme
+
+Zusaetzlich zu `HASF`/`ALT`/`COVER` (oben) gibt es die Rolle `VETO`, mit derselben Zeilenform
+`[NBR]|SYM|<up>|<msg_id>|VETO|<x>|<m>|<snr>`: eine `--nbrsym`-Annahme, die das Ergebnis der
+Stufe-2-Relay-Entscheidung veraendert HAETTE, wurde durch einen vollstaendigen, frischen
+`HN`-Bericht von `<x>` blockiert. Lesart: "`<x>` haette (angenommen) `<m>` gehoert, aber `<x>`s
+eigener Bericht sagt, dass es das NICHT tut". `VETO` ist das Gegenteil einer angewendeten
+Annahme -- `tools/nbrlog.py` zaehlt es deshalb nicht unter "Symmetrie-Annahmen" (Abschnitt 10),
+sondern unter "HN-Nachbarschaftsmeldungen" (Abschnitt 11).
+
+`tools/nbrlog.py` fasst die Stufe-3-Zeilen im Bericht unter "HN-Nachbarschaftsmeldungen"
+zusammen: empfangene Berichte je Sender (Anzahl, vollstaendig/gekuerzt, Median-`<k>`), angewendete
+Kanten je `(<x>, <m>)` mit Median-SNR, `self`-/`norow`-Zaehler, selbst gesendete Berichte (Anzahl,
+Median-Laenge), und `VETO`-Zaehler je `(<x>, <m>)`.
 
 ## Beispiel
 
@@ -146,7 +258,16 @@ stuetzt.
 [NBR]|SYM|136|1A2B3C4D|HASF|DK5EN-95|DK5EN-93|-10
 [NBR]|NEED|136|1A2B3C4D|T|B|00000002|00000000|1|00000020
 [NBR]|CANCEL?|137|1A2B3C4D|T|DK5EN-93|00000006|00000000|00000020
+[NBR]|RPTTX|300|58|R5;N5;DL2JA-2,7;DB0ISM-1,5;DK5EN-98,-8;DB0ED-99,-11;DL2UD-1,-12;
+[NBR]|RPT|315|DL2JA-2|DB0ISM-1|6|ok
+[NBR]|RPT|315|DL2JA-2|DK5EN-98|-9|self
+[NBR]|RPT|315|DL2JA-2|OE9ZZZ-9|-14|norow
+[NBR]|RPTSUM|315|DL2JA-2|3|3|1|1
+[NBR]|SYM|316|2B3C4D5E|VETO|DK5EN-95|DK5EN-93|-11
+[NBR]|DROP|317|RPT|OE1XXX-1
 ```
 
 Aeltere Mitschnitte ohne `<snr>` (bei `EDGE`/`ME`) und ohne `<inferred>` (bei `NEED`/`CANCEL?`/
-`CANCEL`) bleiben gueltig -- siehe die Ruckwaertskompatibilitaets-Hinweise oben je Feld.
+`CANCEL`) bleiben gueltig -- siehe die Ruckwaertskompatibilitaets-Hinweise oben je Feld. `RPT`,
+`RPTSUM`, `RPTTX`, `DROP|RPT` und `SYM|...|VETO` (Stufe 3) fehlen in jedem Mitschnitt vor dieser
+Aenderung vollstaendig -- kein Feld, keine Zeile, kein Ersatz.

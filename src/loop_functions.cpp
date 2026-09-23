@@ -34,6 +34,7 @@
 #include "setlog_lines.h"
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
+#include "nbr_matrix.h"   // nbrMatrix, nbrBuildReport(), nbrLog -- sendNbrReport() unten
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -116,6 +117,14 @@ bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
 // nach einem Firmware-Update ohne Migration mit sym an. Siehe nbr_matrix.h
 // NBR_SYM_MIN_SNR fuer die Schwelle.
 bool bNBRSYM = true;
+// --nbrreport off|auto|on (Stufe 3, HN-Bericht): zwei Bits in node_sset4 --
+// 0x0100 "off" (nie senden), 0x0200 "on" (immer senden), keines von beiden
+// "auto" (Default fuer jeden bestehenden Knoten, keine Migration noetig):
+// Bericht nur, wenn weder bMESH noch bGATEWAY (siehe sendNbrReport()-Aufrufer
+// in esp32_main.cpp/nrf52_main.cpp). Modell wie --nbrrelay oben: EIN Bool je
+// Bit, jede Kommandozeile schreibt nur ihr eigenes.
+bool bNBRRPTOFF = false;   // 0x0100 gesetzt
+bool bNBRRPTON = false;    // 0x0200 gesetzt
 uint32_t stat_nbr_relay_a = 0;          // eingereihte Relays Fall A (Allein-Maske != 0)
 uint32_t stat_nbr_relay_b = 0;          // eingereihte Relays Fall B
 uint32_t stat_nbr_cancel = 0;           // abgebrochene Relays (nur on)
@@ -5114,6 +5123,115 @@ void sendHey()
             iWrite=0;
         */
     }
+}
+
+// HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport off|auto|on): periodischer
+// HEY-artiger Bericht "wen ich direkt mit welchem SNR hoere" (Nachbau von
+// sendHey() oben) an das eigene Ziel "HN", max_hop 0 explizit gesetzt --
+// dieser Bericht wird NIE weiterrelayt (siehe OnRxDone-Abfangpunkt in
+// lora_functions.cpp, der ihn ausschliesslich in die eigene Matrix fuettert
+// und aus jedem anderen Pfad heraushaelt). Der Aufrufer (Timer in
+// esp32_main.cpp/nrf52_main.cpp) entscheidet Takt und ob der --nbrreport-Modus
+// ueberhaupt senden soll; diese Funktion prueft den Modus nicht noch einmal.
+//
+// Wie sendHey() (GW-01) geht der Bericht NUR ueber addTxRingEntry() auf die
+// LoRa-TX-Seite: finalizeAndSendAPRS() ruft weder addNodeData() (Server-
+// Upload) noch sendExternNotice()/queueExtern() (EXTUDP) noch addBLE*Buffer()
+// (Telefon) auf, und diese Funktion selbst auch nicht -- der eigene HN-
+// Bericht bleibt reines LoRa.
+void sendNbrReport()
+{
+    // Wie sendHey(): im Ping-Testbetrieb (node_pingtime > 0) bleibt der
+    // Knoten auch fuer die HN-Meldung still (Advisor R4).
+    if(meshcom_settings.node_call[0] != 0x00 && meshcom_settings.node_pingtime > 0)
+        return;
+
+    uint16_t now_min = (uint16_t)(millis() / 60000UL);
+
+    char nbr_payload[128];
+    int nbr_plen = nbrBuildReport(nbrMatrix, now_min, getMheardCount(), nbr_payload, sizeof(nbr_payload));
+
+    if(nbr_plen < 0)
+    {
+        // Kein Bericht baubar (leere Matrix o.ae.) -- nichts senden. Feldzahl
+        // wie eine normale RPTTX-Zeile (docs/nbr-logformat.md), nur mit
+        // leerem Payload-Feld, damit ein Auswerter, der immer vier Felder
+        // hinter "RPTTX" erwartet, nicht auf einer fehlenden Spalte stolpert.
+        if(bNBRDEBUG && nbrLog != NULL)
+        {
+            char nbr_line[32];
+            snprintf(nbr_line, sizeof(nbr_line), "[NBR]|RPTTX|%u|-1|", (unsigned)now_min);
+            nbrLog(nbr_line);
+        }
+        return;
+    }
+
+    uint8_t msg_buffer[MAX_MSG_LEN_PHONE];
+
+    struct aprsMessage aprsmsg;
+
+    initAPRS(aprsmsg, '@');
+
+    aprsmsg.msg_len = 0;
+    aprsmsg.max_hop = 0;   // HN-Bericht wird nie weiterrelayt
+
+    // MSG ID zusammen setzen (gleiches Muster wie sendHey())
+    aprsmsg.msg_id = ((_GW_ID & 0x3FFFFF) << 10) | (meshcom_settings.node_msgid & 0x3FF);
+
+    mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+
+    mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), "HN");
+    mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), "HN");
+
+    mcSet(aprsmsg.msg_payload, sizeof(aprsmsg.msg_payload), nbr_payload);
+
+    finalizeAndSendAPRS(aprsmsg, msg_buffer);
+
+    if(bNBRDEBUG && nbrLog != NULL)
+    {
+        char nbr_line[160];
+        snprintf(nbr_line, sizeof(nbr_line), "[NBR]|RPTTX|%u|%d|%s", (unsigned)now_min, nbr_plen, nbr_payload);
+        nbrLog(nbr_line);
+    }
+
+    // store last message to compare later on
+    insertOwnTx(aprsmsg.msg_id);
+
+    // to LoRa
+    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "nbr_report"); // 0xFF no retransmission
+}
+
+// Takt fuer sendNbrReport() (Stufe 3): laeuft UNABHAENGIG vom Trickle-
+// Intervall und wird NIE unterdrueckt -- der Zeitpunkt der naechsten Pruefung
+// ruckt immer weiter, auch bei --nbrreport off, damit ein spaeteres Umschalten
+// auf auto/on nicht sofort einen aufgestauten Bericht nachholt. Nur der
+// SEND-Entscheid haengt am Modus (siehe unten).
+static unsigned long nbrreport_timer = 0;
+static unsigned long nbrreport_due_ms = (unsigned long)NBR_REPORT_FIRST_S * 1000UL;
+
+void nbrReportTick()
+{
+    if((uint32_t)(millis() - nbrreport_timer) < nbrreport_due_ms)
+        return;
+
+    // off (bNBRRPTOFF) nie, on (bNBRRPTON) immer, sonst auto: nur wenn weder
+    // Mesh-Relay noch Gateway-Betrieb an sind -- ein Gateway hoert die
+    // eigentliche Information laengst aus dem Server, ein Mesh-Relay flutet
+    // ohnehin schon.
+    bool bSend;
+    if(bNBRRPTON)
+        bSend = true;
+    else if(bNBRRPTOFF)
+        bSend = false;
+    else
+        bSend = (!bMESH && !bGATEWAY);
+
+    if(bSend)
+        sendNbrReport();
+
+    nbrreport_due_ms = (unsigned long)NBR_REPORT_INTERVAL_S * 1000UL
+                        + (unsigned long)random(0, (long)(NBR_REPORT_JITTER_S * 1000L) + 1);
+    nbrreport_timer = millis();
 }
 
 // Sofort-Pfad fuer sendHey() (FL-02): --sendhey ruft diese Funktion statt

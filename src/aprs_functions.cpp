@@ -354,7 +354,18 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 
         if(CheckGroup(aprsmsg.msg_destination_call) == 0)
         {
-            if(!checkRegexCall(aprsmsg.msg_destination_call))
+            // HN-Bericht (Nachbarschaftsmatrix, Stufe 3): eigenes Frame-Ziel fuer
+            // den periodischen HEY-artigen Nachbarschaftsbericht (payload_type
+            // '@'). Bewusst NICHT in checkRegexCall()s globaler Liste (dort neben
+            // "H"/"HG") -- die Liste gilt auch fuer QUELL-Rufzeichen, und "HN" soll
+            // dort kein legales Rufzeichen sein. Nur als ZIEL eines '@'-Frames
+            // zulaessig, jeder andere payload_type faellt weiter unten in
+            // checkRegexCall() und wird wie bisher abgelehnt.
+            if(aprsmsg.payload_type == '@' && strcmp(aprsmsg.msg_destination_call, "HN") == 0)   // strcmp statt is_equ(): diese Datei laeuft auch in Host-Tests ohne loop_functions
+            {
+                // ok, HN-Bericht
+            }
+            else if(!checkRegexCall(aprsmsg.msg_destination_call))
             {
                 if(bLORADEBUG)
                 {

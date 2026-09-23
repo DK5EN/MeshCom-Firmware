@@ -281,6 +281,7 @@ static void nbrMaybeSweep(NbrMatrix &m, uint16_t now_min)
         if ((m.rows[i].flags & NBR_FLAG_USED) && (uint16_t)(now_min - m.rows[i].last_min) >= 32768)
         {
             m.rows[i].flags = 0;
+            m.rows[i].rpt_min = 0;   // NBR_FLAG_RPT ist schon weg; Feld defensiv mitraeumen (Spec: "beide" leeren)
             nbrZeroRowAndColumn(m, i);
         }
     }
@@ -686,6 +687,257 @@ void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
     }
 }
 
+// --- HN-Nachbarschaftsbericht (Report), Abschnitt E, siehe nbr_matrix.h ----
+
+// Ein Kandidat fuer nbrBuildReport(): Zeilenindex + der SNR, mit dem er
+// sortiert wird. call wird erst beim Formatieren aus m.rows[idx].call
+// gelesen -- der Index reicht zum Sortieren und Vergleichen.
+struct NbrReportCand
+{
+    int    idx;
+    int8_t snr;
+};
+
+// Baut den Bericht: siehe nbr_matrix.h fuer die vollstaendige Beschreibung.
+int nbrBuildReport(const NbrMatrix &m, uint16_t now_min, int heard_count, char *out, size_t outlen)
+{
+    if (!out || outlen == 0)
+        return -1;
+    out[0] = '\0';
+
+    // Kandidaten sammeln: X != 0, belegt, cells[X][0] gesetzt ("ich habe X
+    // gehoert"), frisch innerhalb NBR_REPORT_FRESH_MIN (eigenes, kuerzeres
+    // Fenster als NBR_WINDOW_MIN -- ein Bericht ist eine Momentaufnahme),
+    // SNR bekannt und >= NBR_SYM_MIN_SNR.
+    NbrReportCand cand[NBR_MAX_ROWS];
+    int ncand = 0;
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (!(m.rows[x].flags & NBR_FLAG_USED))
+            continue;
+        const NbrCell &c = m.cells[x][0];
+        if (!nbrCellSet(c))
+            continue;
+        if ((uint16_t)(now_min - c.last_min) >= NBR_REPORT_FRESH_MIN)
+            continue;
+        if (c.snr == NBR_SNR_UNKNOWN || c.snr < NBR_SYM_MIN_SNR)
+            continue;
+        cand[ncand].idx = x;
+        cand[ncand].snr = c.snr;
+        ncand++;
+    }
+
+    // Sortieren: SNR ABSTEIGEND, bei Gleichstand Rufzeichen AUFSTEIGEND.
+    // Insertion-Sort reicht (ncand <= NBR_MAX_ROWS <= 21 in jeder realen
+    // Board-Konfiguration).
+    for (int i = 1; i < ncand; i++)
+    {
+        NbrReportCand key = cand[i];
+        int j = i - 1;
+        while (j >= 0 &&
+               (cand[j].snr < key.snr ||
+                (cand[j].snr == key.snr &&
+                 strncmp(m.rows[cand[j].idx].call, m.rows[key.idx].call, NBR_CALL_LEN) > 0)))
+        {
+            cand[j + 1] = cand[j];
+            j--;
+        }
+        cand[j + 1] = key;
+    }
+
+    int listed = ncand < NBR_REPORT_MAX_ENTRIES ? ncand : NBR_REPORT_MAX_ENTRIES;
+    bool truncated = ncand > listed;
+
+    // Lokaler Zwischenpuffer, grosszuegig ueber der in nbr_matrix.h
+    // dokumentierten Regelobergrenze (128 Byte) -- ein Aufrufer mit einem
+    // untypisch grossen heard_count oder einer am Build ueberschriebenen
+    // NBR_SYM_MIN_SNR bekommt so immer noch ein korrektes -1 statt eines
+    // abgeschnittenen Strings, wenn outlen zu knapp ist.
+    char line[256];
+    int n = snprintf(line, sizeof(line), "R%d;N%d%s;", heard_count, listed, truncated ? "+" : "");
+    if (n < 0)
+    {
+        out[0] = '\0';
+        return -1;
+    }
+
+    for (int i = 0; i < listed && strlen(line) < sizeof(line) - 1; i++)
+    {
+        size_t used = strlen(line);
+        snprintf(line + used, sizeof(line) - used, "%s,%d;",
+                 m.rows[cand[i].idx].call, (int)cand[i].snr);
+    }
+
+    size_t len = strlen(line);
+    if (len + 1 > outlen)
+    {
+        out[0] = '\0';
+        return -1;
+    }
+    memcpy(out, line, len + 1);
+    return (int)len;
+}
+
+// Ein per nbrParseReport() geparster Eintrag, bereits numerisch ausgewertet
+// und SNR-geklemmt -- der Grammatik-Parse ruehrt die Matrix nicht an.
+struct NbrReportEntryIn
+{
+    char   call[NBR_CALL_LEN];
+    int8_t snr;
+};
+
+// Strikter Grammatik-Parse, siehe nbrNoteReport() in nbr_matrix.h fuer die
+// vollstaendige Regel. Schreibt bei Erfolg *heard, *k, *truncated und bis zu
+// NBR_REPORT_MAX_ENTRIES Eintraege nach entries; liest dabei NICHTS aus der
+// Matrix. false bei jeder Abweichung -- der Aufrufer wendet dann nichts an.
+static bool nbrParseReport(const char *payload, long *heard, int *k, bool *truncated,
+                            NbrReportEntryIn *entries)
+{
+    if (!payload || payload[0] != 'R')
+        return false;
+    const char *p = payload + 1;
+
+    const char *seg = p;
+    while (*p && *p != ';')
+        p++;
+    if (*p != ';')
+        return false;
+    long h = nbrParseUint(seg, (size_t)(p - seg));
+    if (h < 0)
+        return false;
+    p++; // hinter dem ';'
+
+    if (*p != 'N')
+        return false;
+    p++;
+    seg = p;
+    while (*p && *p != ';' && *p != '+')
+        p++;
+    long kk = nbrParseUint(seg, (size_t)(p - seg));
+    if (kk < 0 || kk > NBR_REPORT_MAX_ENTRIES)
+        return false;
+    bool trunc = false;
+    if (*p == '+')
+    {
+        trunc = true;
+        p++;
+    }
+    if (*p != ';')
+        return false;
+    p++;
+
+    for (long i = 0; i < kk; i++)
+    {
+        seg = p;
+        while (*p && *p != ',')
+            p++;
+        if (*p != ',')
+            return false;
+        size_t call_len = (size_t)(p - seg);
+        if (call_len < 1 || call_len >= NBR_CALL_LEN)
+            return false;
+        p++; // hinter dem ','
+
+        const char *snr_start = p;
+        while (*p && *p != ';')
+            p++;
+        if (*p != ';')
+            return false;
+        long snr_v;
+        if (!nbrParseInt(snr_start, (size_t)(p - snr_start), &snr_v))
+            return false;
+        p++;
+
+        memcpy(entries[i].call, seg, call_len);
+        entries[i].call[call_len] = '\0';
+        entries[i].snr = nbrClampSnr((int32_t)snr_v);
+    }
+
+    if (*p != '\0')
+        return false; // strikt: kein Rest nach dem letzten Eintrag
+
+    *heard = h;
+    *k = (int)kk;
+    *truncated = trunc;
+    return true;
+}
+
+// Liest einen empfangenen HN-Bericht: siehe nbr_matrix.h fuer die
+// vollstaendige Beschreibung.
+int nbrNoteReport(NbrMatrix &m, const char *sender, const char *payload, uint16_t now_min)
+{
+    long heard = 0;
+    int k = 0;
+    bool truncated = false;
+    NbrReportEntryIn entries[NBR_REPORT_MAX_ENTRIES];
+
+    if (!nbrParseReport(payload, &heard, &k, &truncated, entries))
+    {
+        nbrLogDrop(now_min, "RPT", sender);
+        return -1;
+    }
+
+    int s = nbrFind(m, sender);
+    if (s < 0)
+        return 0; // Absender (noch) unbekannt: kein Protokollfehler, aber nichts anzuwenden
+
+    int applied = 0;
+    for (int i = 0; i < k; i++)
+    {
+        const char *status;
+        if (strncmp(entries[i].call, m.rows[0].call, NBR_CALL_LEN) == 0)
+        {
+            // "Absender s hat mich gehoert" -> cells[0][s].
+            nbrHitCell(m.cells[0][s], '@', now_min);
+            m.cells[0][s].snr = entries[i].snr;
+            status = "self";
+            applied++;
+        }
+        else
+        {
+            int mrow = nbrFind(m, entries[i].call);
+            if (mrow < 0)
+            {
+                status = "norow"; // keine neue Zeile fuer einen Bericht-Eintrag
+            }
+            else
+            {
+                // "s hat mrow gehoert" -> cells[mrow][s], HEY-Typ-Treffer.
+                nbrHitCell(m.cells[mrow][s], '@', now_min);
+                m.cells[mrow][s].snr = entries[i].snr;
+                status = "ok";
+                applied++;
+            }
+        }
+        if (nbrLog)
+        {
+            char buf[160];
+            snprintf(buf, sizeof(buf), "[NBR]|RPT|%u|%s|%s|%d|%s",
+                     (unsigned)now_min, sender, entries[i].call, (int)entries[i].snr, status);
+            nbrLog(buf);
+        }
+    }
+
+    // NBR_FLAG_RPT = "letzter Bericht war VOLLSTAENDIG" -- ein abgeschnittener
+    // Bericht ('+') wendet seine Eintraege trotzdem an, taugt aber nicht als
+    // Symmetrie-Veto (siehe nbrHearsSym()).
+    if (truncated)
+        m.rows[s].flags &= (uint8_t)~NBR_FLAG_RPT;
+    else
+        m.rows[s].flags |= NBR_FLAG_RPT;
+    m.rows[s].rpt_min = now_min;
+
+    if (nbrLog)
+    {
+        char buf[160];
+        snprintf(buf, sizeof(buf), "[NBR]|RPTSUM|%u|%s|%ld|%d|%d|%d",
+                 (unsigned)now_min, sender, heard, k, truncated ? 0 : 1, applied);
+        nbrLog(buf);
+    }
+
+    return applied;
+}
+
 uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, uint8_t max)
 {
     if (row < 0 || row >= NBR_MAX_ROWS)
@@ -880,11 +1132,25 @@ uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
 // diesem Fall den SNR von "M hat X gehoert" (fuer die SYM-Log-Zeile beim
 // Aufrufer); *inferred zeigt an, ob das Ergebnis eine Annahme war. Beide
 // Ausgabeparameter duerfen NULL sein.
+//
+// Symmetrie-VETO (HN-Bericht, nbr_matrix.h Abschnitt E): traegt X einen
+// gueltigen, VOLLSTAENDIGEN HN-Bericht (NBR_FLAG_RPT, rpt_min noch innerhalb
+// NBR_REPORT_VALID_MIN), ist DIESER Bericht die massgebliche Aussage
+// darueber, wen X hoert -- fehlt M darin (die Zelle cells[mrow][x] waere
+// sonst schon durch nbrNoteReport() gesetzt und haette den Beobachtungs-Zweig
+// oben schon bedient), gilt "X hoert M nicht", nicht die Annahme. Der Zweig
+// wird nur erreicht, wenn die umgekehrte Zelle sonst qualifiziert haette (das
+// ist die vom Aufrufer geforderte Bedingung fuer eine VETO-Log-Zeile); *snr_used
+// bekommt trotzdem den SNR, den die Annahme benutzt HAETTE, damit der
+// Aufrufer dieselbe SYM-Zeile mit Rolle VETO statt HASF/ALT/COVER loggen
+// kann. *vetoed darf NULL sein.
 static bool nbrHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, bool sym,
-                         int8_t *snr_used, bool *inferred)
+                         int8_t *snr_used, bool *inferred, bool *vetoed)
 {
     if (inferred)
         *inferred = false;
+    if (vetoed)
+        *vetoed = false;
 
     const NbrCell &observed = m.cells[mrow][x]; // "X hat M gehoert"
     if (nbrCellSet(observed) && nbrFresh(observed.last_min, now_min))
@@ -898,6 +1164,16 @@ static bool nbrHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, b
         return false;
     if (reverse.snr == NBR_SNR_UNKNOWN || reverse.snr < NBR_SYM_MIN_SNR)
         return false;
+
+    const NbrRow &rx = m.rows[x];
+    if ((rx.flags & NBR_FLAG_RPT) && (uint16_t)(now_min - rx.rpt_min) < NBR_REPORT_VALID_MIN)
+    {
+        if (snr_used)
+            *snr_used = reverse.snr;
+        if (vetoed)
+            *vetoed = true;
+        return false;
+    }
 
     if (snr_used)
         *snr_used = reverse.snr;
@@ -965,11 +1241,20 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, boo
                     continue;
                 int8_t snr_used = 0;
                 bool inferred = false;
-                if (nbrHearsSym(m, x, pidx[i], now_min, sym, &snr_used, &inferred) && inferred)
+                bool vetoed = false;
+                if (nbrHearsSym(m, x, pidx[i], now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
                 {
                     hasf |= nbrBit(x);
                     r.inferred |= nbrBit(x);
                     nbrLogSym(now_min, msg_id, "HASF", m.rows[x].call, tokens[i], snr_used);
+                    break;
+                }
+                if (vetoed)
+                {
+                    // Der Veto haengt nur an der Zeile von X: fuer dieses X ist in
+                    // dieser Entscheidung keine Annahme mehr moeglich -- eine
+                    // VETO-Zeile je X reicht (Advisor R3).
+                    nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, tokens[i], snr_used);
                     break;
                 }
             }
@@ -1009,11 +1294,17 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, boo
                     continue;
                 int8_t snr_used = 0;
                 bool inferred = false;
-                if (nbrHearsSym(m, x, mrow, now_min, sym, &snr_used, &inferred) && inferred)
+                bool vetoed = false;
+                if (nbrHearsSym(m, x, mrow, now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
                 {
                     alt = true;
                     r.inferred |= nbrBit(x);
                     nbrLogSym(now_min, msg_id, "ALT", m.rows[x].call, m.rows[mrow].call, snr_used);
+                }
+                else if (vetoed)
+                {
+                    nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, m.rows[mrow].call, snr_used);
+                    break;   // eine VETO-Zeile je X, siehe HatF-Schleife oben
                 }
             }
         }
@@ -1051,7 +1342,8 @@ uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min,
 
         int8_t snr_used = 0;
         bool was_inferred = false;
-        if (nbrHearsSym(m, x, idx, now_min, sym, &snr_used, &was_inferred) && was_inferred)
+        bool was_vetoed = false;
+        if (nbrHearsSym(m, x, idx, now_min, sym, &snr_used, &was_inferred, &was_vetoed) && was_inferred)
         {
             mask |= nbrBit(x);
             local_inferred |= nbrBit(x);
@@ -1060,6 +1352,10 @@ uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min,
             // folgenlos und die Zeile Rauschen im 24-h-Log.
             if (relevant & nbrBit(x))
                 nbrLogSym(now_min, msg_id, "COVER", m.rows[x].call, m.rows[idx].call, snr_used);
+        }
+        else if (was_vetoed && (relevant & nbrBit(x)))
+        {
+            nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, m.rows[idx].call, snr_used);
         }
     }
 

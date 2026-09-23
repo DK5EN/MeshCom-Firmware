@@ -755,6 +755,65 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 printBuffer_aprs((char*)"[LOG]", aprsmsg, tail);
         }
 
+        // Nachbarschaftsmatrix Stufe 3 (HN-Bericht): der periodische HEY-artige
+        // Nachbarschaftsbericht (payload_type '@', Ziel "HN", max_hop 0, siehe
+        // sendNbrReport() in loop_functions.cpp) ist KEIN normaler Frame -- er
+        // darf weder in die Stufe-2-Deckungs-/Abbruchpruefung unten laufen noch
+        // in den grossen if/else-Block ab msg_type_b_lora==0x00 (Dedup-Zaehlung,
+        // trickle_consistent_count, MHeard, Relay, Gateway-/Server-Upload,
+        // EXTUDP, Telefon/BLE, Display). Er fuettert ausschliesslich die eigene
+        // Matrix (nbrNoteFrame fuer die Pfadkanten wie jeder andere Frame,
+        // danach nbrNoteReport fuer den Berichtsinhalt) und verlaesst OnRxDone
+        // ueber denselben Aufraeum-/Timing-Ausstieg wie handleACK() weiter oben
+        // (RX-Neustart lief auf nRF52 schon am Funktionsanfang).
+        // is_equ() statt strcmp(): gleiche Wahl wie ueberall sonst in diesem
+        // Block. Der Selbstschutz gegen das eigene Echo ist bei max_hop 0
+        // eigentlich unerreichbar (kein Relay wiederholt so ein Frame), bleibt
+        // aber als Guard stehen.
+        if(msg_type_b_lora != 0 && aprsmsg.payload_type == '@' &&
+           is_equ(aprsmsg.msg_destination_call, "HN") &&
+           !is_equ(aprsmsg.msg_source_call, meshcom_settings.node_call))
+        {
+            uint16_t now_min_hn = (uint16_t)(millis() / 60000UL);
+
+            // Gleiches Lazy-Init/Positions-/GW-Flag-Muster wie beim regulaeren
+            // '@'/':'/'!'-Zweig weiter unten (Stufe 1) -- ohne Zeile 0 faende
+            // nbrFind() das eigene Rufzeichen im Pfad nicht und wuerde dafuer
+            // faelschlich eine neue Zeile anlegen, wenn der HN-Bericht der
+            // allererste verarbeitete Frame nach dem Boot ist.
+            if(strcmp(nbrMatrix.rows[0].call, meshcom_settings.node_call) != 0)
+                nbrInit(nbrMatrix, meshcom_settings.node_call, now_min_hn);
+
+            if(!(nbrMatrix.rows[0].flags & NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
+                nbrNotePos(nbrMatrix, meshcom_settings.node_call, (float)meshcom_settings.node_lat,
+                           (float)meshcom_settings.node_lon, bMESH, 0, now_min_hn);
+            if(bGATEWAY)
+                nbrMatrix.rows[0].flags |= NBR_FLAG_GW;
+
+            nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
+                         aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
+                         rssi, snr, now_min_hn);
+
+            nbrNoteReport(nbrMatrix, aprsmsg.msg_source_call, aprsmsg.msg_payload, now_min_hn);
+
+#if defined BOARD_RAK4630
+            taskENTER_CRITICAL();
+            rxBufInUse[rxBufIndex] = false;
+            taskEXIT_CRITICAL();
+#endif
+            is_receiving = false;
+
+            if(bLORADEBUG)
+                printfdeb("[MC-DBG] ONRXDONE_TIME ms=%lu\n", millis() - _onrxdone_start);
+
+            iReceiveTimeOutTime = millis();
+            csma_timeout = csma_compute_timeout(cad_attempt);
+
+            test_inject_service();
+
+            return;
+        }
+
         // Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.2):
         // fremde Wiederholung erkannt -- ein GEHOERTER Frame mit mindestens
         // zwei Pfad-Token, dessen letzter Hop nicht ich selbst bin, kann den

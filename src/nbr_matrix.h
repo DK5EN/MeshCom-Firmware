@@ -29,14 +29,32 @@
 // dokumentierten Speicherrechnungen aus Konzept 4.2 passt -- deshalb Abbruch
 // beim Bauen statt einer Zahl, die niemand gewaehlt hat.
 // Board-Builds: die Zeilenzahl steht in configuration_global.h, das ueber
-// configuration.h kommt. Der Host-Test (NATIVE_BUILD) bekommt sie aus
-// platformio.ini und darf kein Arduino-Include sehen; deshalb der Zweig.
-#if !defined(NBR_MAX_ROWS) && !defined(NATIVE_BUILD)
+// configuration.h kommt; configuration.h haengt an seinem Ende ausserdem
+// configuration_default.h an (#ifndef-Flottendefaults, u. a.
+// LORA_SNR_STABLE_MIN_DB fuer NBR_SYM_MIN_SNR unten). Der Include ist
+// UNBEDINGT, nicht nur "falls NBR_MAX_ROWS noch fehlt": lora_functions.cpp
+// und command_functions.cpp binden configuration.h schon VOR nbr_matrix.h
+// ein, ein bedingter Include haette LORA_SNR_STABLE_MIN_DB dort NICHT
+// garantiert sichtbar gemacht, nur NBR_MAX_ROWS. Jede
+// variants/<board>/configuration.h traegt "#pragma once" -- ein zweiter
+// Include hier ist ein billiges No-Op, kein Doppel-Parse.
+//
+// Der Host-Test (NATIVE_BUILD) bekommt NBR_MAX_ROWS aus platformio.ini und
+// darf kein Arduino-Include sehen (siehe Kopfkommentar); configuration_default.h
+// ist mit voller Absicht Arduino-frei (siehe dessen Kopfkommentar) und ist
+// darum die einzig zulaessige Quelle fuer LORA_SNR_STABLE_MIN_DB hier.
+#ifdef NATIVE_BUILD
+#include "configuration_default.h"
+#else
 #include "configuration.h"
 #endif
 
 #ifndef NBR_MAX_ROWS
 #error "NBR_MAX_ROWS ist nicht definiert. Board-Builds bekommen ihn aus configuration_global.h, der Host-Test aus platformio.ini (env native_nbr_matrix, -D NBR_MAX_ROWS=5)."
+#endif
+
+#ifndef LORA_SNR_STABLE_MIN_DB
+#error "LORA_SNR_STABLE_MIN_DB ist nicht definiert -- siehe configuration_default.h (Flottendefault, #ifndef-Wert -16)."
 #endif
 
 // Fenster, in dem ein Treffer als "frisch" gilt: 12 h, deckt 24 POS-Perioden
@@ -59,11 +77,20 @@
 #define NBR_FLAG_MESH 0x02   // msg_mesh-Flag aus einem POS-Frame dieses Rufzeichens
 #define NBR_FLAG_POS  0x04   // lat/lon sind gueltig
 #define NBR_FLAG_USED 0x08   // Zeile ist belegt (Zeile 0 ist es immer, auch ohne dieses Bit)
+#define NBR_FLAG_RPT  0x10   // letzter HN-Bericht dieser Zeile war VOLLSTAENDIG (kein '+'); rpt_min traegt seine Minute
 
-// Zeile (24 Byte): ein gehoertes Rufzeichen mit letzter Position und Typ.
+// Zeile (weiterhin 24 Byte -- siehe rpt_min unten): ein gehoertes Rufzeichen
+// mit letzter Position und Typ.
 struct NbrRow
 {
     char     call[NBR_CALL_LEN];
+    // Minute des letzten VOLLSTAENDIGEN HN-Berichts dieser Zeile
+    // (NBR_FLAG_RPT), fuer den Symmetrie-Veto in nbrHearsSym()
+    // (nbr_matrix.cpp). Absichtlich HIER platziert statt hinter hw: char[10]
+    // laesst vor dem folgenden float (4-Byte-Ausrichtung) ohnehin 2 Byte
+    // Luecke, die ein uint16_t genau fuellt -- die Zeile bleibt bei 24 Byte,
+    // kein zusaetzlicher RAM-Bedarf trotz drittem Report-Feld.
+    uint16_t rpt_min;
     float    lat, lon;
     uint16_t last_min;
     uint8_t  flags;
@@ -76,18 +103,47 @@ struct NbrRow
 // [-127,127] begrenzt).
 #define NBR_SNR_UNKNOWN (-128)
 
-// Schwelle fuer die Symmetrie-Annahme (--nbrsym, Abschnitt D unten):
-// Magischer Betreiberwert aus der Erfahrung am eigenen Heltec (DK5EN-98):
-// DF2SI-12 kommt dort mit einem SNR-Median von -16 dB an und faellt
-// regelmaessig in den Rauschteppich -- darueber gilt eine Strecke als stabil.
-// Der Vergleich ist EINSCHLIESSLICH (>= -16). Wir rechnen
-// NICHT gegen Endstufen (EBYTE E22, T-Beam 1W, Nachruest-PAs): der
-// beobachtete SNR wird genommen wie er ist, ueber die Sendeleistung der
+// Schwelle fuer die Symmetrie-Annahme (--nbrsym, Abschnitt D unten) UND fuer
+// den HN-Nachbarschaftsbericht (nbrBuildReport() unten, Abschnitt E):
+// derselbe Betreiberwert, ein einziges Mal definiert. Der Wert selbst
+// (Herleitung: DF2SI-12 an DK5EN-98, SNR-Median -16 dB, darueber gilt eine
+// Strecke als stabil) steht in src/configuration_default.h als
+// LORA_SNR_STABLE_MIN_DB -- dort, weil er an der Modulation haengt (SF/BW/CR),
+// nicht an der Nachbarschaftsmatrix, und weil ihn auch die Flottendefaults
+// kennen muessen. Der Vergleich ist EINSCHLIESSLICH (>= LORA_SNR_STABLE_MIN_DB).
+// Wir rechnen NICHT gegen Endstufen (EBYTE E22, T-Beam 1W, Nachruest-PAs):
+// der beobachtete SNR wird genommen wie er ist, ueber die Sendeleistung der
 // Gegenstation wird keine Aussage getroffen -- die Symmetrie-Annahme gilt
 // unveraendert auch fuer solche Hochleistungsknoten. Jede Annahme wird als
-// SYM-Zeile geloggt, damit sie sich im Nachhinein pruefen laesst.
+// SYM-Zeile geloggt (HASF/ALT/COVER bei Erfolg, VETO bei einem durch einen
+// gueltigen HN-Bericht verhinderten Schluss, siehe nbrNoteReport() unten),
+// damit sie sich im Nachhinein pruefen laesst.
 #ifndef NBR_SYM_MIN_SNR
-#define NBR_SYM_MIN_SNR (-16)
+#define NBR_SYM_MIN_SNR LORA_SNR_STABLE_MIN_DB
+#endif
+
+// --- HN-Nachbarschaftsbericht: Konstanten (Abschnitt E, siehe nbrBuildReport()
+// und nbrNoteReport() unten) ---------------------------------------------
+
+// Hoechstzahl Eintraege in einem gesendeten Bericht -- mehr passt nicht mehr
+// verlustfrei in eine einzelne '@'-Nutzlast neben dem uebrigen HEY-Rahmen.
+#ifndef NBR_REPORT_MAX_ENTRIES
+#define NBR_REPORT_MAX_ENTRIES 8
+#endif
+
+// Ein Direktempfang zaehlt fuer den Bericht nur, wenn er innerhalb dieser
+// Minutenzahl liegt -- eigenes, kuerzeres Fenster als NBR_WINDOW_MIN oben: ein
+// Bericht ist eine Momentaufnahme ("wen hoere ich GERADE"), kein 12-h-Verlauf.
+#ifndef NBR_REPORT_FRESH_MIN
+#define NBR_REPORT_FRESH_MIN 60
+#endif
+
+// Ein empfangener VOLLSTAENDIGER Bericht (kein '+') bleibt so lange
+// massgeblich fuer die Symmetrie-Annahme (nbrHearsSym() in nbr_matrix.cpp):
+// 3 Sendeintervalle (3 x NBR_REPORT_INTERVAL_S = 3 x 15 min), danach gilt er als veraltet
+// und die Annahme darf wieder greifen.
+#ifndef NBR_REPORT_VALID_MIN
+#define NBR_REPORT_VALID_MIN 45
 #endif
 
 // Zelle (6 Byte): "Spalte hat Zeile gehoert" -- drei sattelnde Zaehler nach
@@ -240,6 +296,86 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
 void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
                 uint8_t hw, uint16_t now_min);
 
+// --- HN-Nachbarschaftsbericht (Report), Abschnitt E -------------------------
+//
+// Baut/liest die Nutzlast eines HN-Frames: Ziel "HN", Typ '@' (wie HEY),
+// max_hop 0 -- ein Knoten meldet, wen er GERADE direkt hoert, mit SNR.
+// Grammatik (strikt, kein Leerzeichen, jedes Feld mit ';' beendet):
+//
+//   R<heard>;N<k>[+];<CALL>,<snr>;...;
+//
+// <heard> ist der aufrufer-seitige Zaehler, identisch zum Feld im normalen
+// HEY-Bericht ("R<n>", appendHeySignalReport()/loop_functions.cpp). <k> ist
+// die Zahl der folgenden Eintraege, '+' folgt <k> GENAU DANN, wenn mehr
+// Kandidaten qualifiziert waren als gelistet wurden (Abschneiden am Limit,
+// nicht am Rufzeichen). <k> == 0 ist gueltig ("R3;N0;", eine leere, aber
+// VOLLSTAENDIGE Liste). Jeder Eintrag ist "<CALL>,<snr>;" mit <snr>
+// vorzeichenbehaftet.
+
+// Baut den Bericht aus den EIGENEN Direktempfaengen: Zeilen X != 0 mit
+// gesetzter cells[X][0] ("ich habe X gehoert"), frisch innerhalb
+// NBR_REPORT_FRESH_MIN, SNR bekannt und >= NBR_SYM_MIN_SNR (dieselbe Schwelle
+// wie --nbrsym -- ein Nachbar, dessen Strecke zu mir als instabil gilt, ist
+// keine verlaessliche Aussage ueber SEINE Nachbarschaft). Sortiert nach SNR
+// ABSTEIGEND, bei Gleichstand nach Rufzeichen (strncmp, aufsteigend). Listet
+// hoechstens NBR_REPORT_MAX_ENTRIES Eintraege, mit '+' wenn mehr qualifiziert
+// waren.
+//
+// Obergrenze fuer out: bei der Default-Schwelle NBR_SYM_MIN_SNR == -16 hat
+// jeder gelistete SNR-Wert hoechstens 3 Ziffern inkl. Vorzeichen ("-16" oder
+// "127"), ein Eintrag also hoechstens 9 (Rufzeichen) + 1 (',') + 3 (SNR) + 1
+// (';') = 14 Byte; 8 Eintraege = 112 Byte, plus ein kurzes Praefix
+// "R<heard>;N8+;" (<= 9 Byte fuer ein zwei- bis dreistelliges <heard>) --
+// zusammen deutlich unter 128 Byte. Ein Aufrufer, der NBR_SYM_MIN_SNR am Build
+// ueberschreibt (theoretisch bis -127) oder ein sehr grosses <heard> erwartet,
+// braucht entsprechend mehr; die Funktion selbst erkennt einen zu kleinen
+// Puffer immer (Rueckgabe -1, out[0] = 0, nichts wird geschrieben).
+//
+// Rueckgabe: strlen(out) bei Erfolg, oder -1 wenn outlen nicht reicht (dann
+// out[0] = 0, nichts Teilweises steht im Puffer).
+int nbrBuildReport(const NbrMatrix &m, uint16_t now_min, int heard_count, char *out, size_t outlen);
+
+// Liest einen empfangenen HN-Bericht. Wird NACH nbrNoteFrame() fuer denselben
+// DIREKT empfangenen HN-Frame aufgerufen (die Zeile des Absenders existiert
+// dann in der Regel schon -- der letzte Hop eines '@'-Frames ist immer
+// Fenster-Token, siehe nbrNoteFrame()). sender ist das Absender-Rufzeichen
+// (msg_source_path[0] bzw. der letzte Hop bei einem 1-Hop-Frame), payload die
+// rohe HN-Nutzlast (siehe Grammatik oben).
+//
+// Strikter Parse ZUERST, bevor irgendetwas an der Matrix angefasst wird:
+// "R"+Ziffern, ";N"+Ziffern+optional '+'+";", dann GENAU k Eintraege
+// "<CALL>,<vorzeichenbehaftete Ziffern>;", <CALL> nichtleer und kuerzer als
+// NBR_CALL_LEN, k <= NBR_REPORT_MAX_ENTRIES, kein Rest nach dem letzten
+// Eintrag. Jede Abweichung (fehlendes Feld, ueberzaehliger/fehlender
+// Eintrag, nicht-numerisches Feld, ueberlanges Rufzeichen, k > Limit) ist
+// GANZ ungueltig: Rueckgabe -1, Log [NBR]|DROP|<up>|RPT|<sender>, NICHTS wird
+// angewendet.
+//
+// Ist der Parse gueltig, aber der Absender hat keine Zeile (nbrFind() < 0),
+// kehrt die Funktion folgenlos mit 0 zurueck -- ein HN-Bericht von einem noch
+// unbekannten Knoten ist (noch) nicht auswertbar, aber kein Protokollfehler.
+//
+// Sonst je Eintrag <CALL>=m_call:
+//   - m_call == eigenes Rufzeichen (Zeile 0): Treffer auf cells[0][s]
+//     ("Absender s hat mich gehoert"), Status "self".
+//   - m_call hat eine Zeile mrow: Treffer auf cells[mrow][s] ("s hat mrow
+//     gehoert") als HEY-Typ-Treffer (nbrHitCell() mit '@'), .snr = der
+//     geparste (bereits geklemmte) SNR, Status "ok".
+//   - m_call hat keine Zeile: KEINE neue Zeile, Status "norow".
+// Je Eintrag eine Log-Zeile [NBR]|RPT|<up>|<x>|<m>|<snr>|<status> (<x> =
+// sender, <m> = m_call), danach genau eine Zusammenfassung
+// [NBR]|RPTSUM|<up>|<x>|<heard>|<k>|<full 1/0>|<applied>.
+//
+// Traegt auf der Absender-Zeile NBR_FLAG_RPT (gesetzt bei einem
+// VOLLSTAENDIGEN Bericht, geloescht bei einem abgeschnittenen '+') und
+// rpt_min = now_min -- ein abgeschnittener Bericht wendet seine Eintraege
+// trotzdem an, taugt aber NICHT als Symmetrie-Veto (siehe nbrHearsSym() in
+// nbr_matrix.cpp und NBR_REPORT_VALID_MIN oben).
+//
+// Rueckgabe: Zahl der angewendeten Eintraege (self + ok, nicht norow), 0 wenn
+// der Absender keine Zeile hat, -1 bei ungueltiger Grammatik.
+int nbrNoteReport(NbrMatrix &m, const char *sender, const char *payload, uint16_t now_min);
+
 // --- Urteile (Konzept 4.3) -------------------------------------------------
 
 // Hoerer(row) = Menge der Spalten Y mit frischer, gesetzter cell[row][Y],
@@ -322,7 +458,11 @@ uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
 //           Allein-Ergebnis NUR durch die Symmetrie-Annahme (sym, --nbrsym)
 //           zustande kam, nicht durch eine tatsaechliche Beobachtung. Bleibt
 //           0, wenn sym == false. Jede Annahme, die hasf oder alt aendert,
-//           erzeugt genau eine SYM-Zeile (nbrLog, Rollen HASF/ALT).
+//           erzeugt genau eine SYM-Zeile (nbrLog, Rollen HASF/ALT). Eine durch
+//           einen gueltigen, vollstaendigen HN-Bericht des Kandidaten X
+//           VERHINDERTE Annahme (NBR_REPORT_VALID_MIN, nbrHearsSym() in
+//           nbr_matrix.cpp) aendert weder hasf/alone noch inferred, erzeugt
+//           aber eine SYM-Zeile mit Rolle VETO statt HASF/ALT.
 struct NbrNeed
 {
     uint32_t need;
@@ -345,7 +485,10 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, boo
 // nur fuer ein per Symmetrie hinzugefuegtes X, dessen Bit auch in relevant
 // gesetzt ist (msg_id fuer die Log-Zeile). *inferred (darf NULL sein)
 // bekommt die per Symmetrie hinzugefuegten Bits, unabhaengig von relevant --
-// der Aufrufer bildet daraus "before & ~after & inferred" fuers Log.
+// der Aufrufer bildet daraus "before & ~after & inferred" fuers Log. Ein X,
+// dessen Annahme durch seinen eigenen gueltigen HN-Bericht verhindert wird
+// (siehe nbrHearsSym()), bleibt NICHT in mask, erzeugt aber -- ebenfalls nur
+// bei gesetztem relevant-Bit -- eine SYM-Zeile mit Rolle VETO statt COVER.
 uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
                        uint32_t relevant, uint32_t msg_id, uint32_t *inferred);
 

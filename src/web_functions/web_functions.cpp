@@ -2019,6 +2019,18 @@ void sub_page_neighbours()
     // call to thread the flag through, only this status line.
     web_client.printf("<p>Symmetry: %s (SNR &gt;= %d dB)</p>", (bNBRSYM ? "on" : "off"), (int)NBR_SYM_MIN_SNR);
 
+    // Stufe 3 (--nbrreport): eigener HN-Bericht, unabhaengig vom Trickle-HEY
+    // oben. "auto" sendet nur, wenn weder Mesh-Relay noch Gateway-Betrieb an
+    // sind (nbrReportTick() in loop_functions.cpp) -- die dritte Zeile sagt
+    // fuer den aktuell konfigurierten Modus dazu, ob das gerade zutrifft.
+    {
+        const char *nbrreport_mode = bNBRRPTOFF ? "off" : (bNBRRPTON ? "on" : "auto");
+        bool nbrreport_sends_now = bNBRRPTON || (!bNBRRPTOFF && !bMESH && !bGATEWAY);
+        web_client.printf("<p>HN report: %s (every %d min, SNR &gt;= %d dB)%s</p>",
+                           nbrreport_mode, (int)(NBR_REPORT_INTERVAL_S / 60), (int)LORA_SNR_STABLE_MIN_DB,
+                           (bNBRRPTOFF ? "" : (nbrreport_sends_now ? " -- sending" : " -- not sending (mesh/gateway on)")));
+    }
+
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line
 }

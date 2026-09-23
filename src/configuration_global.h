@@ -455,6 +455,14 @@ static inline bool flashLayoutCompatible(int stored)
 #define TRICKLE_IMAX_S        (15*60) // Langsamstes HEY-Intervall (15min, wie bisher)
 #define TRICKLE_K             2       // Redundanzschwelle: eigenen HEY unterdruecken wenn >=k konsistente gehoert
 
+// HN-Nachbarschaftsmeldung (HEY-Rahmen an "HN", max_hop 0, --nbrreport): fester
+// Takt im langsamsten Trickle-Intervall, NICHT dem Trickle unterworfen (kein
+// Schnellstart nach Topologieaenderung, keine Unterdrueckung) -- die Liste ist
+// je Knoten einmalig, nie redundant.
+#define NBR_REPORT_INTERVAL_S TRICKLE_IMAX_S   // 15 min
+#define NBR_REPORT_FIRST_S    (5*60)           // erste Meldung 5 min nach dem Start
+#define NBR_REPORT_JITTER_S   30               // 0..30 s Zufallsversatz je Meldung
+
 // Nachbarschaftsmatrix Stufe 2: Relay-Entscheidung je Frame (docs/nbr-wichtigkeit-konzept.md,
 // Abschnitt 5). Fall A = mindestens ein direkter Nachbar bekommt den Frame nur von mir:
 // vorn, gekappter Re-Arm, nie Abbruch. Fall B = alles, was ich erreiche, erreicht auch ein

@@ -224,6 +224,16 @@ static void tg_post_nbrrelay_off()   { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_count() { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_on()    { bNBRRELAY = true; }
 
+// --nbrreport off|auto|on (Nachbarschaftsmatrix Stufe 3, HN-Bericht): zwei Bits in
+// node_sset4 -- 0x0100 "off" (bNBRRPTOFF), 0x0200 "on" (bNBRRPTON), keines von
+// beiden "auto" (Default, kein bestehender Knoten braucht Migration). Jede Zeile
+// schreibt ihr eigenes Flag per row.flag/TG_FLAG_TRUE und raeumt das jeweils
+// andere per Nachlaeufer weg, damit hoechstens eines der beiden je gesetzt ist --
+// gleiches Muster wie bei --nbrrelay oben.
+static void tg_post_nbrreport_off()  { bNBRRPTON = false; }
+static void tg_post_nbrreport_auto() { bNBRRPTOFF = false; bNBRRPTON = false; }
+static void tg_post_nbrreport_on()   { bNBRRPTOFF = false; }
+
 static const ToggleRow COMMAND_TOGGLES[] =
 {
     { "--setinfo off",        &bDisplayInfo,         nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_ECHO_LN },
@@ -268,6 +278,12 @@ static const ToggleRow COMMAND_TOGGLES[] =
     // Neuberechnung noetig: die Relay-Entscheidung liest bNBRSYM je Frame neu.
     { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFF7F,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100/0x0200 in node_sset4,
+    // siehe tg_post_nbrreport_*() oben. Jede Zeile loescht zuerst BEIDE Bits
+    // (and_mask 0xFFFFFCFF), dann setzt or_mask hoechstens eines davon.
+    { "--nbrreport off",      &bNBRRPTOFF,           &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0100,       tg_post_nbrreport_off,         TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrreport auto",     nullptr,               &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x00000000,   tg_post_nbrreport_auto,        TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrreport on",       &bNBRRPTON,            &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0200,       tg_post_nbrreport_on,          TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     { "--via on",             &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x4000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
@@ -5414,11 +5430,12 @@ void commandAction(char *umsg_text, bool ble)
 
             // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): Modus und die
             // fuenf Zaehler, damit ein Feldlauf ohne Web-Seite ablesbar bleibt.
-            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s\n",
+            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s ...NBRREPORT %s\n",
                 (bNBRCANCEL?"on":(bNBRRELAY?"count":"off")),
                 (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
                 (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone,
-                (bNBRSYM?"on":"off"));
+                (bNBRSYM?"on":"off"),
+                (bNBRRPTOFF?"off":(bNBRRPTON?"on":"auto")));
             
             printfdeb("...DisplayInfo %s ...DisplayCont %s ...DisplyLog %s ...contrast %i ...ackinfo %s\n",
                 (bDisplayInfo?"on":"off"), (bDisplayCont?"on":"off"), (bDisplayLog?"on":"off"), meshcom_settings.node_contrast, (bAckInfo?"on":"off"));

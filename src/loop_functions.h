@@ -89,6 +89,18 @@ void sendAPPPosition(double lat, char lat_c, double lon, char lon_c, float temp2
 void SendAckMessage(String dest_call, unsigned int iAckId);
 void sendHey();
 bool sendHeyShot();
+// HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): periodischer, von
+// sendHey() unabhaengiger Bericht "wen ich direkt hoere" an Ziel "HN",
+// max_hop 0. Der Aufrufer (esp32_main.cpp/nrf52_main.cpp) entscheidet Takt
+// und Modus (off/auto/on); diese Funktion sendet immer, wenn gerufen.
+void sendNbrReport();
+// Eigener Takt fuer sendNbrReport(), UNABHAENGIG vom Trickle-Intervall und nie
+// unterdrueckt: erster Bericht NBR_REPORT_FIRST_S nach dem Start, danach alle
+// NBR_REPORT_INTERVAL_S + 0..NBR_REPORT_JITTER_S s Zufallsversatz. Wertet
+// --nbrreport (bNBRRPTOFF/bNBRRPTON) und im Modus auto zusaetzlich bMESH/
+// bGATEWAY aus. Von esp32loop()/nrf52loop() je einmal pro Durchlauf gerufen,
+// gleiche Stelle wie der Trickle-HEY-Block.
+void nbrReportTick();
 void sendTelemetry(int ID);
 
 unsigned int setSMartBeaconing(double flat, double flon);

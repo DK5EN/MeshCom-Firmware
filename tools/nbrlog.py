@@ -79,6 +79,10 @@ KNOWN_VERDICTS = frozenset({"EXCL", "RED", "LEAF", "UNK"})
 #: und steht NICHT in dieser Menge.
 KNOWN_MESHNEED = frozenset({"MESH", "RED", "NA"})
 
+#: Bekannte Werte von <status> bei [NBR]|RPT (docs/nbr-logformat.md, HN-Bericht)
+#: -- nur zur Anzeige, kein hartes Gate.
+KNOWN_RPT_STATUS = frozenset({"ok", "self", "norow"})
+
 
 def fmt_dt(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S.") + f"{dt.microsecond // 1000:03d}"
@@ -190,12 +194,18 @@ class RowRec:
 
 @dataclass
 class SymRec:
-    """Eine geloggte ``--nbrsym``-Annahme (docs/nbr-logformat.md, ``[NBR]|SYM``).
+    """Eine geloggte ``--nbrsym``-Annahme ODER ein ``VETO`` (docs/nbr-logformat.md,
+    ``[NBR]|SYM``).
 
-    Wird von der Firmware nur geschrieben, wenn die Annahme das Ergebnis einer
-    Stufe-2-Relay-Entscheidung tatsaechlich veraendert hat -- ``<snr>`` ist die
-    SNR, mit der ``<m>`` ``<x>`` gehoert hat (nicht umgekehrt: die Annahme
-    LEITET aus dieser Kante "<x> hoert <m>" her, siehe ``<role>``).
+    Fuer die Rollen ``HASF``/``ALT``/``COVER`` nur geschrieben, wenn die
+    Annahme das Ergebnis einer Stufe-2-Relay-Entscheidung tatsaechlich
+    veraendert hat -- ``<snr>`` ist die SNR, mit der ``<m>`` ``<x>`` gehoert
+    hat (nicht umgekehrt: die Annahme LEITET aus dieser Kante "<x> hoert <m>"
+    her, siehe ``<role>``). Die Rolle ``VETO`` ist das GEGENTEIL einer
+    angewendeten Annahme: sie zaehlt NICHT unter Abschnitt 10
+    (Symmetrie-Annahmen), sondern unter Abschnitt 11 (HN-Nachbarschafts-
+    meldungen) -- eine Annahme, die angewendet WORDEN WAERE, wurde durch
+    ``<x>``s vollstaendigen frischen HN-Bericht blockiert.
     """
 
     host: datetime
@@ -205,6 +215,58 @@ class SymRec:
     x: str
     m: str
     snr: int
+    session: int
+
+
+@dataclass
+class RptRec:
+    """Eine eingetragene/verworfene HN-Berichtszeile (docs/nbr-logformat.md,
+    ``[NBR]|RPT``). ``<status>`` ist ``ok`` (Kante eingetragen), ``self``
+    (``<m>`` bin ich selbst: "<x> hat mich gehoert") oder ``norow`` (``<m>``
+    hat keine Matrixzeile, ignoriert)."""
+
+    host: datetime
+    up: int
+    x: str
+    m: str
+    snr: int
+    status: str
+    session: int
+
+
+@dataclass
+class RptSumRec:
+    """Zusammenfassung eines empfangenen HN-Berichts (docs/nbr-logformat.md,
+    ``[NBR]|RPTSUM``). ``full`` ist die Vollstaendigkeit des Berichts (kein
+    ``+`` im Frame -- ``True`` heisst, ``<x>`` hoert AUSSER den ``<k>``
+    gelisteten Stationen keine weitere mit SNR >= ``LORA_SNR_STABLE_MIN_DB``).
+    ``heard`` ist die MHeard-Zahl des Senders (wie ``R<n>`` im HEY), kein
+    Kappungssignal -- das ist allein ``full``.
+    ``applied`` ist die Anzahl der daraus tatsaechlich eingetragenen Kanten
+    (Status ``ok`` unter den zugehoerigen RPT-Zeilen; ``self``/``norow``
+    zaehlen nicht mit)."""
+
+    host: datetime
+    up: int
+    x: str
+    heard: int
+    k: int
+    full: bool
+    applied: int
+    session: int
+
+
+@dataclass
+class RptTxRec:
+    """Ein selbst gesendeter HN-Bericht (docs/nbr-logformat.md,
+    ``[NBR]|RPTTX``). ``length`` ist die vom Sender selbst berichtete
+    On-Air-Laenge des Payloads -- massgeblich, nicht ``len(payload)`` (die
+    Netz-Konsole koennte das Feld theoretisch verstuemmeln)."""
+
+    host: datetime
+    up: int
+    length: int
+    payload: str
     session: int
 
 
@@ -244,6 +306,10 @@ class NbrState:
     me: list[MeRec] = field(default_factory=list)
     edges: list[EdgeRec] = field(default_factory=list)
     syms: list[SymRec] = field(default_factory=list)
+    #: HN-Nachbarschaftsmeldung (docs/nbr-logformat.md, ``--nbrreport``).
+    rpts: list[RptRec] = field(default_factory=list)
+    rptsums: list[RptSumRec] = field(default_factory=list)
+    rpttx: list[RptTxRec] = field(default_factory=list)
     cuts: list[CutRec] = field(default_factory=list)
     drops: list[DropRec] = field(default_factory=list)
     evicts: list[EvictRec] = field(default_factory=list)
@@ -304,6 +370,29 @@ def _h_sym(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
         raise _Discard("malformed:SYM")
     (msg_id, role, x, m, snr) = f
     state.syms.append(SymRec(host, up, msg_id, role, x, m, int(snr), state.session))
+
+
+def _h_rpt(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    if len(f) != 4:
+        raise _Discard("malformed:RPT")
+    (x, m, snr, status) = f
+    state.rpts.append(RptRec(host, up, x, m, int(snr), status, state.session))
+
+
+def _h_rptsum(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    if len(f) != 5:
+        raise _Discard("malformed:RPTSUM")
+    (x, heard, k, full, applied) = f
+    state.rptsums.append(
+        RptSumRec(host, up, x, int(heard), int(k), bool(int(full)), int(applied), state.session)
+    )
+
+
+def _h_rpttx(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    if len(f) != 2:
+        raise _Discard("malformed:RPTTX")
+    (length, payload) = f
+    state.rpttx.append(RptTxRec(host, up, int(length), payload, state.session))
 
 
 def _h_cut(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
@@ -379,6 +468,9 @@ HANDLERS = {
     "ME": _h_me,
     "EDGE": _h_edge,
     "SYM": _h_sym,
+    "RPT": _h_rpt,
+    "RPTSUM": _h_rptsum,
+    "RPTTX": _h_rpttx,
     "CUT": _h_cut,
     "DROP": _h_drop,
     "EVICT": _h_evict,
@@ -931,15 +1023,20 @@ def a9_positionen(state: NbrState, own_call: str | None) -> dict[str, Any]:
 def a10_symmetrie(state: NbrState) -> dict[str, Any]:
     """Abschnitt 10 -- ``[NBR]|SYM`` (docs/nbr-logformat.md, `--nbrsym`).
 
-    Nur geloggte Annahmen (die Firmware schreibt ``SYM`` ausschliesslich, wenn
-    die Annahme das Ergebnis veraendert hat), also KEINE Rate ueber alle
-    Pruefungen -- eine hohe Zahl zeigt, wie oft sich die Stufe-2-Relay-
-    Entscheidung tatsaechlich auf den Symmetrie-Fallback stuetzt statt auf
-    eine beobachtete Kante.
+    Nur geloggte ANGEWENDETE Annahmen (die Firmware schreibt ``SYM`` mit den
+    Rollen ``HASF``/``ALT``/``COVER`` ausschliesslich, wenn die Annahme das
+    Ergebnis veraendert hat), also KEINE Rate ueber alle Pruefungen -- eine
+    hohe Zahl zeigt, wie oft sich die Stufe-2-Relay-Entscheidung tatsaechlich
+    auf den Symmetrie-Fallback stuetzt statt auf eine beobachtete Kante.
+
+    Die Rolle ``VETO`` ist das Gegenteil (eine Annahme, die BLOCKIERT wurde)
+    und gehoert nicht hierher, sondern zu Abschnitt 11 (HN-Nachbarschafts-
+    meldungen) -- sie wird hier herausgefiltert.
     """
-    pro_rolle: Counter = Counter(s.role for s in state.syms)
+    syms = [s for s in state.syms if s.role != "VETO"]
+    pro_rolle: Counter = Counter(s.role for s in syms)
     by_pair: dict[tuple[str, str], list[int]] = defaultdict(list)
-    for s in state.syms:
+    for s in syms:
         by_pair[(s.x, s.m)].append(s.snr)
     paare = [
         {
@@ -952,9 +1049,101 @@ def a10_symmetrie(state: NbrState) -> dict[str, Any]:
     ]
     paare.sort(key=lambda d: -d["anzahl"])
     return {
-        "anzahl_gesamt": len(state.syms),
+        "anzahl_gesamt": len(syms),
         "pro_rolle": dict(sorted(pro_rolle.items())),
         "je_paar": paare,
+    }
+
+
+def a11_hn_berichte(state: NbrState) -> dict[str, Any]:
+    """Abschnitt 11 -- HN-Nachbarschaftsmeldung (docs/nbr-logformat.md,
+    ``--nbrreport``, ``[NBR]|RPT``/``RPTSUM``/``RPTTX``, ``[NBR]|SYM|...|VETO``,
+    ``[NBR]|DROP|...|RPT``).
+
+    Vier unabhaengige Quellen, die dieselbe Sache aus vier Seiten zeigen:
+
+    - ``RPTSUM`` -- je EMPFANGENEM Bericht, mit ``<k>`` (Anzahl gelisteter
+      Stationen) und ob er vollstaendig war (kein ``+``) oder gekuerzt.
+    - ``RPT`` -- je Eintrag DARIN, was daraus wurde (Kante eingetragen /
+      ich selbst / keine Zeile). Nur ``ok`` zaehlt als angewendete Kante.
+    - ``RPTTX`` -- je SELBST gesendetem Bericht.
+    - ``SYM``-Rolle ``VETO`` -- je BLOCKIERTER ``--nbrsym``-Annahme, weil ein
+      frischer vollstaendiger Bericht ihr widersprach.
+    """
+    by_sender: dict[str, list[RptSumRec]] = defaultdict(list)
+    for r in state.rptsums:
+        by_sender[r.x].append(r)
+    berichte_je_sender = [
+        {
+            "rufzeichen": x,
+            "anzahl": len(recs),
+            "vollstaendig": sum(1 for r in recs if r.full),
+            "gekuerzt": sum(1 for r in recs if not r.full),
+            "k_median": round(statistics.median([r.k for r in recs]), 1),
+            "heard_median": round(statistics.median([r.heard for r in recs]), 1),
+            "applied_gesamt": sum(r.applied for r in recs),
+        }
+        for x, recs in sorted(by_sender.items())
+    ]
+    berichte_je_sender.sort(key=lambda d: -d["anzahl"])
+
+    status_je_sender: dict[str, Counter] = defaultdict(Counter)
+    for r in state.rpts:
+        status_je_sender[r.x][r.status] += 1
+    status_rows = [
+        {
+            "rufzeichen": x,
+            "ok": c.get("ok", 0),
+            "self": c.get("self", 0),
+            "norow": c.get("norow", 0),
+        }
+        for x, c in sorted(status_je_sender.items())
+    ]
+
+    by_edge: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for r in state.rpts:
+        if r.status == "ok":
+            by_edge[(r.x, r.m)].append(r.snr)
+    kanten = [
+        {"x": x, "m": m, "anzahl": len(snrs), "snr_median": round(statistics.median(snrs), 1)}
+        for (x, m), snrs in sorted(by_edge.items())
+    ]
+    kanten.sort(key=lambda d: -d["anzahl"])
+
+    self_gesamt = sum(1 for r in state.rpts if r.status == "self")
+    norow_gesamt = sum(1 for r in state.rpts if r.status == "norow")
+
+    laengen = [r.length for r in state.rpttx]
+    eigene = {
+        "anzahl": len(state.rpttx),
+        "laenge_median": round(statistics.median(laengen), 1) if laengen else None,
+        "laenge_min": min(laengen) if laengen else None,
+        "laenge_max": max(laengen) if laengen else None,
+    }
+
+    veto_by_pair: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for s in state.syms:
+        if s.role == "VETO":
+            veto_by_pair[(s.x, s.m)].append(s.snr)
+    veto = [
+        {"x": x, "m": m, "anzahl": len(snrs), "snr_median": round(statistics.median(snrs), 1)}
+        for (x, m), snrs in sorted(veto_by_pair.items())
+    ]
+    veto.sort(key=lambda d: -d["anzahl"])
+    veto_gesamt = sum(v["anzahl"] for v in veto)
+
+    rpt_malformed = sum(1 for d in state.drops if d.reason == "RPT")
+
+    return {
+        "berichte_je_sender": berichte_je_sender,
+        "status_je_sender": status_rows,
+        "kanten_angewendet": kanten,
+        "self_gesamt": self_gesamt,
+        "norow_gesamt": norow_gesamt,
+        "eigene_berichte": eigene,
+        "veto_je_paar": veto,
+        "veto_gesamt": veto_gesamt,
+        "rpt_malformed_gesamt": rpt_malformed,
     }
 
 
@@ -986,6 +1175,7 @@ def analyze(state: NbrState) -> dict[str, Any]:
         "8_verworfene_frames": a8_verworfene_frames(state),
         "9_positionen": a9_positionen(state, own_call),
         "10_symmetrie": a10_symmetrie(state),
+        "11_hn_berichte": a11_hn_berichte(state),
     }
 
 
@@ -1138,6 +1328,17 @@ def render_bluf(res: dict[str, Any]) -> list[str]:
         lines.append(
             f"- {n_sym} `--nbrsym`-Symmetrie-Annahme(n) haben eine Stufe-2-Relay-Entscheidung "
             "veraendert -- Aufschluesselung in Abschnitt 10."
+        )
+    hn = res["11_hn_berichte"]
+    if hn["veto_gesamt"]:
+        lines.append(
+            f"- {hn['veto_gesamt']} `--nbrsym`-Annahme(n) durch einen frischen vollstaendigen "
+            "HN-Bericht blockiert (VETO) -- Abschnitt 11."
+        )
+    if hn["rpt_malformed_gesamt"]:
+        lines.append(
+            f"- **{hn['rpt_malformed_gesamt']}x DROP|RPT** -- fehlerhafte HN-Berichte, "
+            "nichts daraus angewendet."
         )
     lines.append("")
     return lines
@@ -1445,6 +1646,73 @@ def render_md(res: dict[str, Any]) -> str:
         )
     )
 
+    hn = res["11_hn_berichte"]
+    out.append("## 11. HN-Nachbarschaftsmeldungen (`--nbrreport`)")
+    out.append("")
+    out.append(
+        "Vier Quellen (docs/nbr-logformat.md): `RPTSUM` je empfangenem Bericht, `RPT` je "
+        "Eintrag darin (nur `ok` ist eine angewendete Kante), `RPTTX` je selbst gesendetem "
+        "Bericht, `SYM`-Rolle `VETO` je durch einen frischen vollstaendigen Bericht "
+        "blockierter `--nbrsym`-Annahme."
+    )
+    out.append("")
+    out.append("### Empfangene Berichte je Sender")
+    out.append("")
+    out.append(
+        _md_table(
+            ["Sender x", "Anzahl", "vollstaendig", "gekuerzt (+)", "k median", "heard median", "Kanten angewendet"],
+            [
+                [
+                    r["rufzeichen"], r["anzahl"], r["vollstaendig"], r["gekuerzt"],
+                    r["k_median"], r["heard_median"], r["applied_gesamt"],
+                ]
+                for r in hn["berichte_je_sender"]
+            ],
+        )
+    )
+    out.append("### Status je Eintrag, je Sender")
+    out.append("")
+    out.append(
+        _md_table(
+            ["Sender x", "ok", "self", "norow"],
+            [[r["rufzeichen"], r["ok"], r["self"], r["norow"]] for r in hn["status_je_sender"]],
+        )
+    )
+    out.append(f"- `self` gesamt (x hat MICH gehoert): {hn['self_gesamt']}")
+    out.append(f"- `norow` gesamt (m ohne Matrixzeile, ignoriert): {hn['norow_gesamt']}")
+    out.append("")
+    out.append("### Angewendete Kanten (x hoert m, aus HN-Bericht)")
+    out.append("")
+    out.append(
+        _md_table(
+            ["x", "m", "Anzahl", "SNR median"],
+            [[k["x"], k["m"], k["anzahl"], k["snr_median"]] for k in hn["kanten_angewendet"]],
+        )
+    )
+    eigene = hn["eigene_berichte"]
+    out.append("### Selbst gesendete Berichte (RPTTX)")
+    out.append("")
+    out.append(
+        f"- Anzahl: {eigene['anzahl']}, Laenge median: {eigene['laenge_median']}, "
+        f"min: {eigene['laenge_min']}, max: {eigene['laenge_max']}"
+    )
+    out.append("")
+    out.append("### VETO -- blockierte `--nbrsym`-Annahmen")
+    out.append("")
+    out.append(f"- Insgesamt: {hn['veto_gesamt']}")
+    out.append("")
+    out.append(
+        _md_table(
+            ["x", "m", "Anzahl", "SNR median"],
+            [[v["x"], v["m"], v["anzahl"], v["snr_median"]] for v in hn["veto_je_paar"]],
+        )
+    )
+    if hn["rpt_malformed_gesamt"]:
+        out.append(
+            f"**{hn['rpt_malformed_gesamt']}x DROP|RPT** -- fehlerhafte HN-Berichte verworfen, "
+            "nichts angewendet.\n"
+        )
+
     return "\n".join(out) + "\n"
 
 
@@ -1746,7 +2014,73 @@ def run_self_test() -> int:
         _check("stage2 sym top paar anzahl", top["anzahl"], 2, failures)
         _check("stage2 sym top paar snr_median", top["snr_median"], -11.0, failures)
 
-    # -- 5) --fetch --dry-run darf das Netz nie anfassen --
+    # -- 5) Stufe-3-Erweiterung (docs/nbr-logformat.md, --nbrreport): RPT,
+    #    RPTSUM, RPTTX, SYM-Rolle VETO, DROP-Grund RPT -- alle fuenf muessen
+    #    sauber parsen (RPT mit fehlendem Feld als "malformed:RPT", nie als
+    #    "foreign_line"), und Abschnitt 11 muss die richtigen Kennzahlen
+    #    liefern. Die Handrechnung steht als Kommentarkopf im Fixture.
+    state_s3 = parse_files([TESTDATA_DIR / "nbr_sample_stage3.log"])
+    res_s3 = analyze(state_s3)
+    r_s3 = res_s3["1_rahmen"]
+    _check("stage3 zeilen_gesamt", r_s3["zeilen_gesamt"], 21, failures)
+    _check("stage3 nbr_zeilen", r_s3["nbr_zeilen"], 14, failures)
+    _check("stage3 verworfen_gesamt", r_s3["verworfen_gesamt"], 7, failures)
+    _check(
+        "stage3 verworfen_gruende",
+        r_s3["verworfen_gruende"],
+        {"no_timestamp": 6, "malformed:RPT": 1},
+        failures,
+    )
+    _check("stage3 reboots", r_s3["reboots"], 0, failures)
+
+    hn = res_s3["11_hn_berichte"]
+    berichte = {r["rufzeichen"]: r for r in hn["berichte_je_sender"]}
+    _check("stage3 berichte anzahl sender", len(berichte), 2, failures)
+    _check("stage3 DL2JA-2 anzahl", berichte["DL2JA-2"]["anzahl"], 2, failures)
+    _check("stage3 DL2JA-2 vollstaendig", berichte["DL2JA-2"]["vollstaendig"], 1, failures)
+    _check("stage3 DL2JA-2 gekuerzt", berichte["DL2JA-2"]["gekuerzt"], 1, failures)
+    _check("stage3 DL2JA-2 k_median", berichte["DL2JA-2"]["k_median"], 5.5, failures)
+    _check("stage3 DL2JA-2 heard_median", berichte["DL2JA-2"]["heard_median"], 6.0, failures)
+    _check("stage3 DL2JA-2 applied_gesamt", berichte["DL2JA-2"]["applied_gesamt"], 2, failures)
+    _check("stage3 DB0ISM-1 anzahl", berichte["DB0ISM-1"]["anzahl"], 1, failures)
+    _check("stage3 DB0ISM-1 vollstaendig", berichte["DB0ISM-1"]["vollstaendig"], 1, failures)
+
+    status = {r["rufzeichen"]: r for r in hn["status_je_sender"]}
+    _check("stage3 DL2JA-2 status ok", status["DL2JA-2"]["ok"], 2, failures)
+    _check("stage3 DL2JA-2 status self", status["DL2JA-2"]["self"], 1, failures)
+    _check("stage3 DL2JA-2 status norow", status["DL2JA-2"]["norow"], 1, failures)
+    _check("stage3 DB0ISM-1 status ok", status["DB0ISM-1"]["ok"], 1, failures)
+    _check("stage3 self_gesamt", hn["self_gesamt"], 1, failures)
+    _check("stage3 norow_gesamt", hn["norow_gesamt"], 1, failures)
+
+    kanten = {(k["x"], k["m"]): k for k in hn["kanten_angewendet"]}
+    _check("stage3 kanten anzahl", len(kanten), 2, failures)
+    _check("stage3 kante DL2JA-2/93 anzahl", kanten[("DL2JA-2", "DK5EN-93")]["anzahl"], 2, failures)
+    _check("stage3 kante DL2JA-2/93 snr_median", kanten[("DL2JA-2", "DK5EN-93")]["snr_median"], 8.0, failures)
+    _check("stage3 kante DB0ISM-1/93 anzahl", kanten[("DB0ISM-1", "DK5EN-93")]["anzahl"], 1, failures)
+    _check("stage3 kante DB0ISM-1/93 snr_median", kanten[("DB0ISM-1", "DK5EN-93")]["snr_median"], 5.0, failures)
+
+    eigene = hn["eigene_berichte"]
+    _check("stage3 rpttx anzahl", eigene["anzahl"], 2, failures)
+    _check("stage3 rpttx laenge_median", eigene["laenge_median"], 60.0, failures)
+    _check("stage3 rpttx laenge_min", eigene["laenge_min"], 58, failures)
+    _check("stage3 rpttx laenge_max", eigene["laenge_max"], 62, failures)
+
+    veto = {(v["x"], v["m"]): v for v in hn["veto_je_paar"]}
+    _check("stage3 veto_gesamt", hn["veto_gesamt"], 3, failures)
+    _check("stage3 veto paare", len(veto), 2, failures)
+    _check("stage3 veto DK5EN-95/93 anzahl", veto[("DK5EN-95", "DK5EN-93")]["anzahl"], 2, failures)
+    _check("stage3 veto DK5EN-95/93 snr_median", veto[("DK5EN-95", "DK5EN-93")]["snr_median"], -8.0, failures)
+    _check("stage3 veto DK5EN-96/94 anzahl", veto[("DK5EN-96", "DK5EN-94")]["anzahl"], 1, failures)
+
+    _check("stage3 rpt_malformed_gesamt", hn["rpt_malformed_gesamt"], 1, failures)
+    _check("stage3 drop pro_grund", res_s3["8_verworfene_frames"]["pro_grund"], {"RPT": 1}, failures)
+
+    # VETO gehoert NICHT in Abschnitt 10 (angewendete Annahmen) -- diese
+    # Fixture hat ausschliesslich VETO-Zeilen, Abschnitt 10 muss leer bleiben.
+    _check("stage3 sym (VETO ausgeschlossen) anzahl_gesamt", res_s3["10_symmetrie"]["anzahl_gesamt"], 0, failures)
+
+    # -- 6) --fetch --dry-run darf das Netz nie anfassen --
     import unittest.mock as mock
 
     with mock.patch(

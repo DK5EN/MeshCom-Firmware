@@ -50,6 +50,8 @@ extern bool bNBRDEBUG;
 extern bool bNBRRELAY;                  // --nbrrelay count|on (Stufe 2), siehe loop_functions.cpp
 extern bool bNBRCANCEL;                 // --nbrrelay on
 extern bool bNBRSYM;                    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme), default on
+extern bool bNBRRPTOFF;                 // --nbrreport off (Stufe 3, HN-Bericht), node_sset4 0x0100
+extern bool bNBRRPTON;                  // --nbrreport on  (Stufe 3, HN-Bericht), node_sset4 0x0200 -- weder/noch = auto
 extern uint32_t stat_nbr_relay_a, stat_nbr_relay_b, stat_nbr_cancel, stat_nbr_cancel_possible, stat_nbr_refuse_alone;
 extern bool bBLEDEBUG;
 extern bool bWXDEBUG;

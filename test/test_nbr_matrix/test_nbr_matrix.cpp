@@ -1277,6 +1277,387 @@ void test_cover_mask_symmetry_fallback_respects_relevant_for_logging(void)
     nbrLog = NULL;
 }
 
+// --- HN-Nachbarschaftsbericht (Report), Abschnitt E, src/nbr_matrix.h ------
+
+void test_nbr_row_size_and_sym_threshold_unchanged_by_the_new_field(void)
+{
+    // NbrRow bleibt bei 24 Byte: rpt_min fuellt die 2-Byte-Ausrichtungsluecke
+    // zwischen call[10] und dem folgenden float lat (siehe Struct-Kommentar
+    // in nbr_matrix.h) -- kein zusaetzlicher RAM-Bedarf trotz drittem
+    // Report-Feld. Wird hier gemessen statt nur behauptet.
+    TEST_ASSERT_EQUAL_UINT32(24, (unsigned)sizeof(NbrRow));
+
+    // NBR_SYM_MIN_SNR zieht seinen Wert jetzt von LORA_SNR_STABLE_MIN_DB
+    // (configuration_default.h) statt einer eigenen Kopie der -16.
+    TEST_ASSERT_EQUAL_INT(LORA_SNR_STABLE_MIN_DB, NBR_SYM_MIN_SNR);
+    TEST_ASSERT_EQUAL_INT(-16, NBR_SYM_MIN_SNR);
+}
+
+// --- Builder: nbrBuildReport() ----------------------------------------------
+
+void test_build_report_orders_by_snr_desc_tie_by_callsign(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 100);
+    // Reihenfolge der nbrNoteFrame()-Aufrufe bewusst NICHT sortiert, damit
+    // der Test die Sortierung der Funktion prueft, nicht die Anlagereihenfolge.
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 100);    // SNR 5
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 100);    // SNR 5, Gleichstand mit BBB
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 9, 100);    // SNR 9, hoechster
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, -10, 100);  // SNR -10, niedrigster (noch >= -16)
+
+    char buf[160];
+    int n = nbrBuildReport(m, 100, 12, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    // CCC (9) > AAA/BBB (5, Gleichstand: AAA vor BBB alphabetisch) > DDD (-10).
+    TEST_ASSERT_EQUAL_STRING("R12;N4;OE1CCC-3,9;OE1AAA-1,5;OE1BBB-2,5;OE1DDD-4,-10;", buf);
+}
+
+void test_build_report_threshold_inclusive_at_sym_min_snr_and_excluded_below(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, (int8_t)NBR_SYM_MIN_SNR, 0);        // genau an der Schwelle: drin
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, (int8_t)(NBR_SYM_MIN_SNR - 1), 0);  // 1 dB drunter: raus
+
+    char buf[160];
+    int n = nbrBuildReport(m, 0, 1, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "OE1AAA-1"));
+    TEST_ASSERT_NULL(strstr(buf, "OE1BBB-2"));
+}
+
+void test_build_report_freshness_cut_at_60_min(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 100);
+
+    char buf[160];
+    // 59 min alt (NBR_REPORT_FRESH_MIN == 60): noch frisch.
+    int n = nbrBuildReport(m, 159, 1, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "OE1AAA-1"));
+
+    // genau 60 min alt: die Grenze ist exklusiv, wie bei nbrFresh()/NBR_WINDOW_MIN.
+    n = nbrBuildReport(m, 160, 1, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NULL(strstr(buf, "OE1AAA-1"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "N0;"));
+}
+
+void test_build_report_unknown_snr_excluded(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 0);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    // Zelle bleibt "gesetzt" (Zaehler > 0), SNR wird gezielt auf unbekannt
+    // zurueckgesetzt -- eine Zelle mit Beobachtung, aber ohne Signalbericht.
+    m.cells[iaaa][0].snr = NBR_SNR_UNKNOWN;
+
+    char buf[160];
+    int n = nbrBuildReport(m, 0, 1, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NULL(strstr(buf, "OE1AAA-1"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "N0;"));
+}
+
+void test_build_report_n0_is_a_valid_empty_list(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    char buf[160];
+    int n = nbrBuildReport(m, 0, 3, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_EQUAL_STRING("R3;N0;", buf);
+}
+
+void test_build_report_buffer_too_small_returns_minus1(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 0);
+
+    char buf[8]; // "R1;N1;OE1AAA-1,5;" braucht 18+1 Byte, passt nicht
+    int n = nbrBuildReport(m, 0, 1, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_INT(-1, n);
+    TEST_ASSERT_EQUAL_STRING("", buf);
+}
+
+// NBR_MAX_ROWS=5 in dieser Umgebung erlaubt hoechstens NBR_MAX_ROWS-1 = 4
+// gleichzeitig direkt gehoerte Nachbarn. Die Kappung bei
+// NBR_REPORT_MAX_ENTRIES == 8 ("+" bei mehr Kandidaten als Eintraegen, kein
+// "+" bei genau 8) kann darum in DIESER Testumgebung nicht end-to-end mit
+// echten Zeilen durchexerziert werden -- das braeuchte
+// NBR_MAX_ROWS >= 9 (bzw. 10 fuer den >8-Fall), eine platformio.ini-Aenderung
+// ausserhalb des Dateisatzes dieses Wave-Agenten (siehe dessen
+// Abschluss-Report). Dieser Test haelt fest, was OHNE diese Grenze schon
+// geprueft werden kann: die Konstante selbst, und dass unterhalb des Limits
+// nie abgeschnitten wird.
+void test_build_report_cap_constant_and_no_truncation_below_it(void)
+{
+    TEST_ASSERT_EQUAL_INT(8, NBR_REPORT_MAX_ENTRIES);
+
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 0);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 4, 0);
+    nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 3, 0);
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, 2, 0); // NBR_MAX_ROWS-1: die Obergrenze dieser Umgebung
+
+    char buf[160];
+    int n = nbrBuildReport(m, 0, 4, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "N4;"));
+    TEST_ASSERT_NULL(strstr(buf, "+"));
+}
+
+// --- Empfaenger: nbrNoteReport() --------------------------------------------
+
+void test_note_report_applies_full_spec_example(void)
+{
+    // Eigenes Rufzeichen ist absichtlich einer der Bericht-Eintraege
+    // (DK5EN-98), um "self" im selben Aufruf wie "ok" und "norow" zu pruefen.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-98", 0);
+    nbrNoteFrame(m, "OE1SEND-1", ':', NULL, false, -80, 5, 0);   // Absender, braucht eine Zeile
+    nbrNoteFrame(m, "DL2JA-2", ':', NULL, false, -80, 3, 0);     // bekannter Nachbar -> "ok"
+    int isend = nbrFind(m, "OE1SEND-1");
+    int idja = nbrFind(m, "DL2JA-2");
+    TEST_ASSERT_TRUE(isend > 0 && idja > 0);
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    int applied = nbrNoteReport(m, "OE1SEND-1",
+        "R12;N5;DL2JA-2,7;DB0ISM-1,5;DK5EN-98,-8;DB0ED-99,-11;DL2UD-1,-12;", 50);
+    TEST_ASSERT_EQUAL_INT(2, applied);   // DL2JA-2 (ok) + DK5EN-98 (self); die drei uebrigen sind norow
+
+    TEST_ASSERT_EQUAL_INT8(7, m.cells[idja][isend].snr);    // "OE1SEND-1 hat DL2JA-2 gehoert"
+    TEST_ASSERT_EQUAL_INT8(-8, m.cells[0][isend].snr);      // "OE1SEND-1 hat mich gehoert"
+    TEST_ASSERT_TRUE(m.rows[isend].flags & NBR_FLAG_RPT);   // kein '+' -> vollstaendig
+    TEST_ASSERT_EQUAL_UINT16(50, m.rows[isend].rpt_min);
+
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DL2JA-2|7|ok\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DB0ISM-1|5|norow\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DK5EN-98|-8|self\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DB0ED-99|-11|norow\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DL2UD-1|-12|norow\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPTSUM|50|OE1SEND-1|12|5|1|2\n"));
+
+    nbrLog = NULL;
+}
+
+void test_note_report_malformed_variants_are_rejected_wholesale(void)
+{
+    NbrMatrix m, before;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1SEND-1", ':', NULL, false, -80, 5, 0);
+    memcpy(&before, &m, sizeof(m));
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    // k-Diskrepanz: Header behauptet N2, nur ein Eintrag folgt.
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N2;OE1AAA-1,5;", 10));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|DROP|10|RPT|OE1SEND-1\n"));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // k-Diskrepanz umgekehrt: Header behauptet N1, ein zweiter Eintrag folgt trotzdem.
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N1;OE1AAA-1,5;OE1BBB-2,3;", 10));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // k > NBR_REPORT_MAX_ENTRIES (8).
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N9;", 10));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // fehlendes Komma im Eintrag.
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N1;OE1AAA-1 5;", 10));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // nicht-numerischer SNR.
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N1;OE1AAA-1,x;", 10));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    // ueberlanges Rufzeichen (>= NBR_CALL_LEN Zeichen).
+    test_log_reset();
+    TEST_ASSERT_EQUAL_INT(-1, nbrNoteReport(m, "OE1SEND-1", "R1;N1;TOOLONGCALL1,5;", 10));
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+
+    nbrLog = NULL;
+}
+
+void test_note_report_sender_without_row_returns_zero(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    int applied = nbrNoteReport(m, "OE1UNKNOWN-9", "R1;N1;OE1AAA-1,5;", 10);
+    TEST_ASSERT_EQUAL_INT(0, applied);
+}
+
+// --- Symmetrie-Veto durch einen gueltigen HN-Bericht ------------------------
+
+void test_sym_veto_blocks_inference_when_report_is_complete_and_fresh(void)
+{
+    // Regression: derselbe Aufbau wie test_sym_hasf_fallback_removes_dependent_from_need,
+    // ZUSAETZLICH mit einem frischen, vollstaendigen HN-Bericht auf X, der P
+    // NICHT enthielt. Ohne die VETO-Pruefung in nbrHearsSym() wuerde die
+    // Annahme weiterhin ziehen: TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX)
+    // ist genau die Assertion, die gegen den Code VOR diesem Fix fehlschlaegt
+    // (r.inferred wuerde bX enthalten, r.need nicht).
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1PPP-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, 5);
+    int ippp = nbrFind(m, "OE1PPP-1");
+    int ixxx = nbrFind(m, "OE1XXX-9");
+    TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0);
+    const uint32_t bX = 1u << (unsigned)ixxx;
+    const uint16_t now = 100;
+
+    // "P hat X gehoert" (die Beobachtung, die sonst den HASF-Fallback traegt).
+    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+
+    // X hat vor 10 min einen VOLLSTAENDIGEN HN-Bericht gesendet, der P nicht
+    // enthielt (kein cells[ippp][ixxx] gesetzt -- sonst waere es der direkte
+    // Beobachtungszweig, keine Annahme noetig).
+    m.rows[ixxx].flags |= NBR_FLAG_RPT;
+    m.rows[ixxx].rpt_min = (uint16_t)(now - 10);
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0x42);
+    TEST_ASSERT_TRUE((r.need & bX) != 0);          // X bleibt im Bedarf: keine Annahme
+    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);  // <-- schlaegt ohne den Fix fehl
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|SYM|100|00000042|VETO|OE1XXX-9|OE1PPP-1|-5\n"));
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|HASF|"));
+
+    nbrLog = NULL;
+}
+
+void test_sym_veto_does_not_apply_to_a_truncated_report(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1PPP-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, 5);
+    int ippp = nbrFind(m, "OE1PPP-1");
+    int ixxx = nbrFind(m, "OE1XXX-9");
+    const uint32_t bX = 1u << (unsigned)ixxx;
+    const uint16_t now = 100;
+
+    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+
+    // Bericht war ABGESCHNITTEN ('+'): NBR_FLAG_RPT bewusst NICHT gesetzt.
+    m.rows[ixxx].rpt_min = (uint16_t)(now - 10);
+
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
+    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);
+    TEST_ASSERT_TRUE((r.inferred & bX) != 0);
+}
+
+void test_sym_veto_expires_after_valid_window(void)
+{
+    NbrMatrix m;
+    const uint16_t now = 1000;
+    nbrInit(m, "DK5EN-93", 0);
+    // Zeilen bei "now" anlegen, nicht bei einer weit zurueckliegenden Minute
+    // -- sonst faellt cells[X][0] schon vor dem eigentlichen Testfenster aus
+    // dem allgemeinen NBR_WINDOW_MIN (720 min), und X ist gar nicht mehr
+    // "direkt", unabhaengig vom Report-Veto.
+    nbrNoteFrame(m, "OE1PPP-1", ':', NULL, false, -80, 5, now);
+    nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, now);
+    int ippp = nbrFind(m, "OE1PPP-1");
+    int ixxx = nbrFind(m, "OE1XXX-9");
+    const uint32_t bX = 1u << (unsigned)ixxx;
+
+    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+    m.rows[ixxx].flags |= NBR_FLAG_RPT;
+
+    // Genau innerhalb der Grenze (NBR_REPORT_VALID_MIN == 45): Veto greift noch.
+    m.rows[ixxx].rpt_min = (uint16_t)(now - (NBR_REPORT_VALID_MIN - 1));
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
+    TEST_ASSERT_TRUE((r.need & bX) != 0);
+    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);
+
+    // Genau NBR_REPORT_VALID_MIN alt: Grenze exklusiv (ueberlaufsicherer
+    // Vergleich wie nbrFresh()) -- die Annahme darf wieder greifen.
+    m.rows[ixxx].rpt_min = (uint16_t)(now - NBR_REPORT_VALID_MIN);
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
+    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);
+    TEST_ASSERT_TRUE((r.inferred & bX) != 0);
+}
+
+void test_sym_veto_report_listing_m_is_observed_not_inferred(void)
+{
+    // X meldet P direkt in seinem HN-Bericht -> cells[P][X] wird zur echten
+    // Beobachtung (dieselbe Zelle, die nbrHearsSym() als "observed" prueft);
+    // der Rueckschluss wird dafuer gar nicht erst gebraucht, kein SYM-Log.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1PPP-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, 5);
+    int ippp = nbrFind(m, "OE1PPP-1");
+    int ixxx = nbrFind(m, "OE1XXX-9");
+    TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0);
+    const uint32_t bX = 1u << (unsigned)ixxx;
+    const uint16_t now = 100;
+
+    int applied = nbrNoteReport(m, "OE1XXX-9", "R1;N1;OE1PPP-1,6;", now);
+    TEST_ASSERT_EQUAL_INT(1, applied);
+    TEST_ASSERT_TRUE(m.rows[ixxx].flags & NBR_FLAG_RPT);
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
+    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);      // X gilt als versorgt: HatF via echter Beobachtung
+    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);  // keine Annahme -- es war Beobachtung
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|SYM|"));  // weder HASF/ALT noch VETO
+
+    nbrLog = NULL;
+}
+
+// --- Rundlauf: Baustein und Empfaenger auf zwei getrennten Matrizen --------
+
+void test_report_round_trip_build_then_note(void)
+{
+    // Sende-Knoten A hoert direkt zwei Nachbarn mit unterschiedlichem SNR.
+    NbrMatrix a;
+    nbrInit(a, "OE1SEND-1", 0);
+    nbrNoteFrame(a, "OE1AAA-1", ':', NULL, false, -80, 7, 0);
+    nbrNoteFrame(a, "OE1BBB-2", ':', NULL, false, -80, -3, 0);
+
+    char payload[160];
+    int n = nbrBuildReport(a, 0, 2, payload, sizeof(payload));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_EQUAL_STRING("R2;N2;OE1AAA-1,7;OE1BBB-2,-3;", payload);
+
+    // Empfangs-Knoten B kennt den Absender UND beide gemeldeten Rufzeichen.
+    NbrMatrix b;
+    nbrInit(b, "DK5EN-93", 0);
+    nbrNoteFrame(b, "OE1SEND-1", ':', NULL, false, -80, 4, 100);
+    nbrNoteFrame(b, "OE1AAA-1", ':', NULL, false, -80, 1, 100);
+    nbrNoteFrame(b, "OE1BBB-2", ':', NULL, false, -80, 1, 100);
+    int isend = nbrFind(b, "OE1SEND-1");
+    int iaaa = nbrFind(b, "OE1AAA-1");
+    int ibbb = nbrFind(b, "OE1BBB-2");
+    TEST_ASSERT_TRUE(isend > 0 && iaaa > 0 && ibbb > 0);
+
+    int applied = nbrNoteReport(b, "OE1SEND-1", payload, 100);
+    TEST_ASSERT_EQUAL_INT(2, applied);
+    TEST_ASSERT_EQUAL_INT8(7, b.cells[iaaa][isend].snr);
+    TEST_ASSERT_EQUAL_INT8(-3, b.cells[ibbb][isend].snr);
+    TEST_ASSERT_TRUE(b.rows[isend].flags & NBR_FLAG_RPT);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1322,5 +1703,21 @@ int main(int, char **)
     RUN_TEST(test_sym_hasf_fallback_removes_dependent_from_need);
     RUN_TEST(test_sym_hasf_inferred_node_is_no_provider);
     RUN_TEST(test_cover_mask_symmetry_fallback_respects_relevant_for_logging);
+    RUN_TEST(test_nbr_row_size_and_sym_threshold_unchanged_by_the_new_field);
+    RUN_TEST(test_build_report_orders_by_snr_desc_tie_by_callsign);
+    RUN_TEST(test_build_report_threshold_inclusive_at_sym_min_snr_and_excluded_below);
+    RUN_TEST(test_build_report_freshness_cut_at_60_min);
+    RUN_TEST(test_build_report_unknown_snr_excluded);
+    RUN_TEST(test_build_report_n0_is_a_valid_empty_list);
+    RUN_TEST(test_build_report_buffer_too_small_returns_minus1);
+    RUN_TEST(test_build_report_cap_constant_and_no_truncation_below_it);
+    RUN_TEST(test_note_report_applies_full_spec_example);
+    RUN_TEST(test_note_report_malformed_variants_are_rejected_wholesale);
+    RUN_TEST(test_note_report_sender_without_row_returns_zero);
+    RUN_TEST(test_sym_veto_blocks_inference_when_report_is_complete_and_fresh);
+    RUN_TEST(test_sym_veto_does_not_apply_to_a_truncated_report);
+    RUN_TEST(test_sym_veto_expires_after_valid_window);
+    RUN_TEST(test_sym_veto_report_listing_m_is_observed_not_inferred);
+    RUN_TEST(test_report_round_trip_build_then_note);
     return UNITY_END();
 }
