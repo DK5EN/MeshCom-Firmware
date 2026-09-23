@@ -199,7 +199,7 @@ Recon corrections to the tables above:
 | 2a   | `web_setup.cpp` (volt, small, handler guards), `onebutton_functions.cpp` (gps gesture)   | 1 implementer | done                                                                |
 | 2b   | `web_functions.cpp` GUI element guards                                                   | 1 implementer | done                                                                |
 | gate | lint + host suite + all board builds, string scan, advisor pass, commit                  | orchestrator  | done                                                                |
-| 3    | upstream PR (`--volt` only), port to `fork-main`                                         | orchestrator  | open                                                                |
+| 3    | upstream PR (`--volt` only), port to `fork-main`                                         | orchestrator  | PR branch ready, fork-main done                                     |
 
 Wave 1 findings beyond the report (all the same pattern, a handler compiled in where its rung is not):
 analog gpio/factor/slope/offset/check (GUI guarded by `ANALOG_PIN`, handler not), `aht20`, `sht21` (GUI
@@ -240,3 +240,13 @@ drift above; all 30 board envs and both safeboot envs build. Image scan over the
 the 10 guarded GUI controls is present exactly where its guard evaluates true (300 checks, 0
 mismatches), and `--volt %s` is in every image. No bench run in this campaign; hardware verification
 (toggle both directions on Heltec V3 and RAK4631, value survives a reboot) is still owed.
+
+Wave 3 (2026-09-23):
+
+- Upstream PR: branch `pr-web-volt-20260923` from `upstream/dev` `dc1a012c`, one hunk in
+  `web_setup.cpp` (`--volt %s`), commit `aea946ef`, built for Heltec V3 and RAK4631. Local only; the
+  German description is drafted and waits for the operator before push and submission.
+- `fork-main`: `814a0bc6`, source part of `248662ff` applied as a patch. The guards were re-checked
+  against `fork-main`'s own rungs (every command has one rung there, same guard). `fork-main` has no
+  `test/golden` infrastructure, so the lint does not travel; gate there: 14 host envs 879/879, 9 board
+  envs covering every guard variant, image scan per board. Not pushed.
