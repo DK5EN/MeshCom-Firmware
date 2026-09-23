@@ -1906,7 +1906,7 @@ void sub_page_setup()
     _create_setup_switch_element("netmode", "Ethernet Mode", "switch between WiFi and Ethernet", meshcom_settings.node_netmode == 1);
     #endif
     _create_setup_switch_element("extudp", "ext UDP", "enable ext. UDP", bEXTUDP); // create Switch-Element inclucing Label and Description
-    #ifndef BOARD_RAK4630
+    #if !defined(BOARD_RAK4630) && !defined(DISABLE_NET_CONSOLE)
     _create_setup_switch_element("netconsole", "net console", "enable net console (port 2323, HMAC auth)", bNETCONSOLE); // create Switch-Element inclucing Label and Description
     #endif
     _create_setup_switch_element("gateway", "Gateway", "enable gateway", bGATEWAY);   // create Switch-Element inclucing Label and Description
@@ -1926,7 +1926,9 @@ void sub_page_setup()
 
     web_client.println("</div><div class=\"grid grid2\">");
 
+    #if defined (ENABLE_GPS) or defined(BOARD_RAK4630) or defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
     _create_setup_switch_element("gps", "GPS", "enable GPS", bGPSON);                                  // create Switch-Element inclucing Label and Description
+    #endif
     _create_setup_switch_element("track", "Track", "enable display of SmartBeaconing", bDisplayTrack, TRACK_WARNING_TEXT, bDisplayTrack); // create Switch-Element inclucing Label and Description; TRK-01: Warnhinweis neben dem Switch
 
     web_client.println("</div></div>");
@@ -1952,15 +1954,20 @@ void sub_page_setup()
     web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
     web_client.println("<div class=\"grid grid3\">");
 
+    #ifdef OneWire_GPIO
     _create_setup_textinput_element("owgpio", "1-Wire GPIO", String(meshcom_settings.node_owgpio), "36", "onewiregpio", 3, false, false); // create Textinput-Element including Label and Button
+    #endif
 
     web_client.println("</div><div class=\"grid grid2\">");
 
+    #ifdef OneWire_GPIO
     _create_setup_switch_element("onewire", "1-Wire", "enable 1-Wire capability", bONEWIRE); // create Switch-Element inclucing Label and Description
+    #endif
 
     web_client.println("</div>");
     web_client.println("<div class=\"grid grid3\">");
 
+    #ifndef BOARD_T_DECK_PRO
     int iButtonPin = 0;
     #ifdef BUTTON_PIN
         iButtonPin = BUTTON_PIN;
@@ -1972,6 +1979,7 @@ void sub_page_setup()
         iButtonPin = meshcom_settings.node_button_pin;
 
     _create_setup_textinput_element("ubgpio", "Userbutton GPIO", String(iButtonPin), "0", "buttongpio", 3, false, false); // create Textinput-Element including Label and Button
+    #endif
 
     web_client.println("</div>");
     web_client.println("<div class=\"grid grid2\">");
@@ -1995,11 +2003,15 @@ void sub_page_setup()
     #if defined(ANALOG_PIN)
     _create_setup_switch_element("analogcheck", "Analog", "enable analog GPIO measurement", bAnalogCheck); // create Switch-Element inclucing Label and Description
     #endif
+    #if defined(ENABLE_BMX280)
     _create_setup_switch_element("bmp", "BMP280", "enable BMP280 sensor", bBMPON);                         // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("bme", "BME280", "enable BME280 sensor", bBMEON);                         // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("680", "BME680", "enable BME680 sensor", bBME680ON);                      // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("811", "MCU811", "enable MCU811 sensor", bMCU811ON);                      // create Switch-Element inclucing Label and Description
+    #endif
+    #if defined (ENABLE_INA226)
     _create_setup_switch_element("ina226", "INA226", "enable INA226 sensor", bINA226ON);                   // create Switch-Element inclucing Label and Description
+    #endif
     #if defined(ENABLE_AHT20)
     _create_setup_switch_element("aht20", "AHT20", "enable AHT20 sensor", bAHT20ON);                       // create Switch-Element inclucing Label and Description
     #endif
