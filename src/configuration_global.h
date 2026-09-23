@@ -472,7 +472,8 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_RELAY_CASE_A_SLOTS       3      // Fall A: Jitter-Slots 0..2
 #define NBR_RELAY_CASE_A_MAX_WAIT_MS 8000   // Fall A: ab so viel Wartezeit seit Einreihen nur noch Kurzsuche je Re-Arm
 #define NBR_RELAY_CASE_A_SHORT_MS    150    // Fall A: Kurzsuche = Schutzabstand nach Empfangsende, dann CAD
-#define NBR_RELAY_CASE_B_EXTRA_MS    20000  // Fall B (POS/HEY): Nachrang, laesst die Flut der Nachbarn vor mir laufen
+#define NBR_RELAY_CASE_B_EXTRA_MS    20000  // Fall B (POS/HEY): Nachrang als EINMALIGE Sperre ab Einreihen (nicht je Re-Arm), laesst die Flut der Nachbarn vor mir laufen
+#define NBR_RELAY_CASE_B_MAX_WAIT_MS 60000  // Fall B: ab so viel Wartezeit seit Einreihen nur noch Kurzsuche wie Fall A (82 % der Abbrueche fallen in die ersten 60 s, Feldlauf 23.09.)
 #define NBR_RELAY_CASE_B_SLOT_START  7      // Fall B: Jitter-Slots 7..9
 
 // Priority statistics interval

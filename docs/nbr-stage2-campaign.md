@@ -46,6 +46,24 @@ eine seltene Ein-Hop-Meldung.
 | Gate    | 1100 Host-Tests, vier Builds, String-Scan, Golden-Makrodatei (separat nachgezogen), Advisor                                                                                                                                           | gruen; Advisor mit 1 Medium (Doku `<heard>`) und 3 Low (VETO-Menge, Ping-Guard, Golden) -- alle behoben                                                                                                                                                                              |
 | 4D      | OTA beider Knoten, DK5EN-98 `--nbrreport on` (Bench-Sender) und `--nbrrelay on`                                                                                                                                                       | erledigt 09:20: beide Knoten Build `Sep 23 2026 / 09:16`, DK5EN-98 `NBRRELAY on`, `NBRSYM on`, `NBRREPORT on`; erste Meldung 09:24:48 `R4;N4;DK5EN-1,5;DB0ED-99,-4;DL2JA-2,-9;DL2UD-1,-10;` (78 B, H00), am Blatt 2x ok, 1x self, 1x norow. Auswertung ab `--since 2026-09-23T09:20` |
 
+## Welle 5: Fall-B-Sperre als Frist, kein Kopfblockieren (2026-09-23 abends)
+
+Anlass: erster `on`-Tag (09:20 bis 18:38) -- Relays 72/h auf 22/h, aber 149 Relays und 10 HN-Meldungen
+verworfen (`RING_DROP_STALE` nach 180 s, `RING_DROP_NEW` "queue full" bei 4/20), Fall-B-Wartezeit im
+Median 137 s (max. 16 min), Fall A hinter Fall B bis 413 s. Ursache: die +20 s von Fall B wurden bei
+jedem Re-Arm neu addiert, und `getNextTxSlot()` liess einen gehaltenen Fall-B-Relay alles hinter sich
+blockieren.
+
+| Schritt | Inhalt                                                                                                                                                                                                       | Stand                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| 5A      | `txringCaseBackoffSlot()`: Sperre = einmalige Frist ab Einreihen, danach normaler Fall-B-Backoff, ab `NBR_RELAY_CASE_B_MAX_WAIT_MS` (60 s) Kurzsuche; `getNextTxSlot()` ueberspringt gehaltene Fall-B-Relays | erledigt, 6 Regressionstests in `test_txring` (3 schlagen ohne Fix fehl) |
+| Gate    | 1106 Host-Tests, vier Builds, Symbole im Image, Golden (+1 Makro), Advisor                                                                                                                                   | gruen; Advisor APPROVED, 2 Test-Nacharbeiten erledigt                    |
+| 5B      | OTA beider Knoten, Soak weiter mit `--nbrrelay on`                                                                                                                                                           | offen                                                                    |
+
+Offen aus dem Advisor (akzeptiert): der Ring meldet "voll" nach Indexabstand bei festgehaltenem
+`iRead`; jetzt nur noch bei mindestens 19 Einreihungen innerhalb von 60 s erreichbar. Unter lauter
+gehaltenen Kandidaten entscheidet Prio/FIFO statt der fruehesten Frist.
+
 ## Entscheidungen
 
 - pio-Slot: in Welle 1 ausschliesslich Agent B; D kompiliert nicht, das Gate kompiliert.

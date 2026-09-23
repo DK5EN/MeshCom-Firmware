@@ -39,6 +39,13 @@ uint8_t stat_queue_hwm;
 // SL-05: im Hardware-Build steht stat_ring_max in loop_functions.cpp neben
 // ch_util_*_accum; nativ gilt dieselbe Begruendung wie fuer die Arrays oben.
 std::atomic<uint8_t> stat_ring_max;
+// Nachbarschaftsmatrix Stufe 2 (Feldlauf 23.09., siehe txring_functions.h):
+// wie die Arrays oben kanonisch in loop_functions.cpp definiert (dort auch
+// von den Toggle-Kommandos gesetzt), das native_aprs/native_udp_frame_twin-
+// build_src_filter baut diese TU aber nicht mit -- txringInCaseBHold()/
+// txringCaseBackoffSlot() unten lesen bNBRCANCEL, darum hier derselbe
+// NATIVE_BUILD-Definitionszweig wie fuer ringBuffer/iWrite/iRead usw.
+bool bNBRCANCEL;
 #endif
 
 // SL-03/SL-06 (siehe txring_functions.h): Herkunft je Ring-Slot. Anders als
@@ -167,14 +174,31 @@ uint8_t getMessagePriority(int slot)
  * Scans all occupied slots between iRead and iWrite.
  * Returns slot index, or -1 if empty.
  * Within same priority, oldest entry (closest to iRead) wins (FIFO).
+ *
+ * Nachbarschaftsmatrix Stufe 2, Feldlauf 23.09. (siehe txringInCaseBHold() in
+ * txring_functions.h fuer den vollen Befund): ein Fall-B-Relay-Slot, der noch
+ * in seiner einmaligen Sperre steckt, darf ab hier keinen anderen Slot mehr
+ * blockieren. Der Scan fuehrt daher zwei Kandidaten mit: den besten NICHT
+ * gehaltenen Slot (Prio dann FIFO, wie bisher) und den besten GEHALTENEN
+ * Slot. Gibt es einen nicht gehaltenen Kandidaten, gewinnt der -- ein Fall-A-
+ * Relay, eine eigene Sendung, ein ACK oder eine HN-Meldung (Prio 5) ueberholt
+ * so einen gehaltenen Fall-B-Relay. Nur wenn ALLE Kandidaten gehalten sind
+ * (Ring voll mit wartenden Fall-B-Relays), faellt die Auswahl auf den besten
+ * gehaltenen zurueck -- exakt das heutige Verhalten, und der von
+ * csma_compute_timeout_slot() dafuer berechnete Backoff ist dann der
+ * Rest-Hold (txringCaseBackoffSlot()).
  */
 int getNextTxSlot(void)
 {
     if(iWrite == iRead)
         return -1;
 
+    uint32_t now_ms = (uint32_t)millis();
+
     int best_slot = -1;
     uint8_t best_prio = 255;
+    int best_held_slot = -1;
+    uint8_t best_held_prio = 255;
 
     int pos = iRead;
     while(pos != iWrite)
@@ -197,12 +221,23 @@ int getNextTxSlot(void)
            (ringBuffer[pos][1] == RING_STATUS_READY || ringBuffer[pos][1] == RING_STATUS_DONE))
         {
             uint8_t prio = ringPriority[pos];
-            if(prio < best_prio)
+            if(txringInCaseBHold(pos, now_ms))
             {
-                best_prio = prio;
-                best_slot = pos;
+                if(prio < best_held_prio)
+                {
+                    best_held_prio = prio;
+                    best_held_slot = pos;
+                }
             }
-            // Same prio: keep first found (= oldest = FIFO)
+            else
+            {
+                if(prio < best_prio)
+                {
+                    best_prio = prio;
+                    best_slot = pos;
+                }
+            }
+            // Same prio, same Gehalten-Status: keep first found (= oldest = FIFO)
         }
 
         pos++;
@@ -210,7 +245,7 @@ int getNextTxSlot(void)
             pos = 0;
     }
 
-    return best_slot;
+    return (best_slot >= 0) ? best_slot : best_held_slot;
 }
 
 /**
@@ -234,6 +269,110 @@ void advanceIReadPastEmpty(void)
             localRead = 0;
     }
     iRead = localRead;
+}
+
+/**
+ * Nachbarschaftsmatrix Stufe 2, Feldlauf 23.09. -- siehe die Kommentare bei
+ * den Deklarationen in txring_functions.h fuer den vollen Befund/die
+ * Motivation. Beide Funktionen zusammen ersetzen den frueheren, bei JEDEM
+ * CSMA-Re-Arm neu addierten Fall-B-Nachrang durch eine einmalige Deadline ab
+ * Einreihen und lassen andere Slots waehrend dieser Sperre nicht mehr
+ * mitwarten.
+ */
+
+// Gemeinsame Vorbedingung von txringInCaseBHold() und dem Fall-B-Zweig von
+// txringCaseBackoffSlot(): bNBRCANCEL, Slot ist ein Relay (RING_KIND_RELAY,
+// Zaehl-Kennbit RING_KIND_COUNTED maskiert), Fall B (ringAlone[slot]==0,
+// nicht Fall A) und kein Text (Konzept 5.1 -- Text bleibt bei der normalen
+// Prio-Basis, unveraendert; der Aufrufer in lora_functions.cpp filtert
+// diesen Fall VOR dem Aufruf von txringCaseBackoffSlot() bereits aus,
+// txringInCaseBHold() prueft ihn hier trotzdem selbst -- sie wird auch
+// unabhaengig davon aus getNextTxSlot() aufgerufen).
+static bool txring_is_case_b_relay(int slot)
+{
+    if(!bNBRCANCEL || slot < 0 || slot >= MAX_RING)
+        return false;
+    if((ringKind[slot] & 0x7F) != RING_KIND_RELAY)
+        return false;
+    if(ringAlone[slot] != 0)
+        return false;
+    if(ringBuffer[slot][2] == MSG_TYPE_TEXT)
+        return false;
+    return true;
+}
+
+bool txringInCaseBHold(int slot, uint32_t now_ms)
+{
+    if(!txring_is_case_b_relay(slot))
+        return false;
+
+    // F8-Stil (siehe txRingAgeBackground()): rollover-sicherer Cast, damit
+    // ein Wrap von now_ms/ringEnqueueTime[slot] ueber UINT32_MAX kein
+    // negatives/riesiges "waited" liefert.
+    uint32_t waited = (uint32_t)(now_ms - ringEnqueueTime[slot]);
+    return waited < NBR_RELAY_CASE_B_EXTRA_MS;
+}
+
+unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms)
+{
+    if(slot < 0 || slot >= MAX_RING)
+        return 0; // defensiv; der Aufrufer garantiert einen gueltigen Relay-Slot
+
+    if(ringAlone[slot] != 0)
+    {
+        // Fall A: Vorrang, unveraendert -- nur Fall B litt unter dem
+        // re-armten Hold (Feldlauf 23.09.), Fall A war nie betroffen.
+        if((uint32_t)(now_ms - ringEnqueueTime[slot]) >= NBR_RELAY_CASE_A_MAX_WAIT_MS)
+            return NBR_RELAY_CASE_A_SHORT_MS +
+                   (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+
+        unsigned long base_a = NBR_RELAY_CASE_A_BASE_MS;
+        if(attempt >= 2) base_a = base_a * 2 / 3;
+        else if(attempt >= 1) base_a = base_a * 5 / 6;
+
+        return base_a + (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+    }
+
+    // Fall B (ringAlone[slot]==0). Text ist bereits vom Aufrufer
+    // ausgefiltert (siehe Kopfkommentar) -- hier immer die Prio-Basis+Slots.
+    uint32_t waited = (uint32_t)(now_ms - ringEnqueueTime[slot]); // F8-Stil, rollover-sicher
+
+    unsigned long base_b;
+    switch(ringPriority[slot]) {
+        case MSG_PRIO_CRITICAL:   base_b = CSMA_PRIO_BASE_1; break;
+        case MSG_PRIO_HIGH:       base_b = CSMA_PRIO_BASE_2; break;
+        case MSG_PRIO_NORMAL:     base_b = CSMA_PRIO_BASE_3; break;
+        case MSG_PRIO_LOW:        base_b = CSMA_PRIO_BASE_4; break;
+        case MSG_PRIO_BACKGROUND: base_b = CSMA_PRIO_BASE_5; break;
+        default:                  base_b = CSMA_PRIO_BASE_3; break;
+    }
+    if(attempt >= 2) base_b = base_b * 2 / 3;
+    else if(attempt >= 1) base_b = base_b * 5 / 6;
+
+    // Normale Fall-B-Basis: heutiger Wert OHNE NBR_RELAY_CASE_B_EXTRA_MS --
+    // die frueher bei JEDEM Re-Arm neu addierte Sperre entfaellt hier, sie
+    // wirkt nur noch unten als einmalige Deadline.
+    unsigned long normal_b = base_b +
+        (unsigned long)(NBR_RELAY_CASE_B_SLOT_START + random(0, 3)) * CSMA_SLOT_SIZE;
+
+    if(waited < NBR_RELAY_CASE_B_EXTRA_MS)
+    {
+        // Noch innerhalb der einmaligen Sperre: der laengere der beiden
+        // Werte gewinnt -- eine hohe Prio (kleine normale Basis) darf die
+        // Sperre nicht per niedrigerer Basis umgehen, eine niedrige Prio
+        // (grosse normale Basis) darf laenger warten als die reine Sperre.
+        unsigned long remaining = NBR_RELAY_CASE_B_EXTRA_MS - waited;
+        return (remaining > normal_b) ? remaining : normal_b;
+    }
+
+    if(waited < NBR_RELAY_CASE_B_MAX_WAIT_MS)
+        return normal_b; // Sperre abgelaufen, weiterhin Nachrang -- ohne EXTRA
+
+    // 60s-Deckel (NBR_RELAY_CASE_B_MAX_WAIT_MS, Feldlauf 23.09.: 82% der
+    // Abbrueche fielen in die ersten 60s): danach wie Fall A nur noch die
+    // Kurzsuche -- Schutzabstand nach Empfangsende, dann CAD.
+    return NBR_RELAY_CASE_A_SHORT_MS +
+           (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
 }
 
 /**

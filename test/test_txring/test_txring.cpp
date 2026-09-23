@@ -71,6 +71,10 @@ static void resetRing(void)
     memset(stat_drop_count, 0, sizeof(stat_drop_count));
     stat_queue_hwm = 0;
     mc_test_set_millis(0);
+    // Nachbarschaftsmatrix Stufe 2 (Feldlauf 23.09.): jeder Test startet mit
+    // --nbrrelay aus, sonst wuerde ein liegen gebliebenes bNBRCANCEL=true aus
+    // einem frueheren Test den naechsten unbemerkt mitfaerben.
+    bNBRCANCEL = false;
 }
 
 void setUp(void) { resetRing(); }
@@ -1079,6 +1083,198 @@ static void test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt(void)
 // [env:*_external_radio]). Ein #if-gated Test wuerde in diesem Env nie
 // laufen (toter Test) -- deshalb hier bewusst ausgelassen, siehe Wave-Report.
 
+// ----------------------------------- Nachbarschaftsmatrix Stufe 2, Fix vom
+// -------------------------------------------------- Feldlauf 23.09.2026
+//
+// Feldbefund (DK5EN-98, --nbrrelay on, 9h): der Fall-B-Nachrang
+// (NBR_RELAY_CASE_B_EXTRA_MS) wurde bei JEDEM CSMA-Re-Arm (jedes empfangene
+// Frame) neu auf die Basis addiert statt nur EINMAL ab dem Einreihen zu
+// gelten -- ein Fall-B-Relay an der Ringspitze wartete dadurch effektiv auf
+// eine durchgehende Funkstille (Median 137s, Maximum 16min), und
+// getNextTxSlot() kannte den Fall gar nicht: alles dahinter (auch Fall-A-
+// Relays, eigene Sendungen, HN-Meldungen) wartete mit. Ergebnis: 149
+// verworfene Relays + 10 eigene HN-Meldungen in 9h (RING_DROP_NEW/
+// RING_DROP_STALE), 0 im reinen --nbrrelay count.
+//
+// Die folgenden Tests fixieren den GEFIXTEN Zustand (einmalige Deadline ab
+// Einreihen, dreiphasiger Fall-B-Backoff, Fall-B-Hold blockiert
+// getNextTxSlot() nicht mehr) und dokumentieren je die genaue Assertion, die
+// gegen den ALTEN Code (bei jedem Aufruf erneut EXTRA addieren, kein
+// Hold-Wissen in getNextTxSlot()) rot faellt.
+
+// Test 1: ein Fall-B-Relay (ringAlone==0) vor einem Fall-A-Relay
+// (ringAlone!=0) derselben Prioritaet (beide POS, also LOW) -- waehrend der
+// Fall-B-Sperre gewinnt Fall A (obwohl B zuerst eingereiht wurde und bei
+// gleicher Prio sonst FIFO gilt), nach Ablauf der Sperre gewinnt wieder B
+// (FIFO, B war zuerst da). ALTER CODE (kein Hold-Wissen in getNextTxSlot()):
+// die erste Assertion (waehrend der Sperre) faellt rot -- getNextTxSlot()
+// haette B (FIFO-Erster) zurueckgegeben, nicht A.
+static void test_nbr_caseb_hold_weicht_fall_a_gleicher_prio(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(1000);
+
+    BuiltFrame posB = buildPositionFrame(0xB001UL); // LOW
+    int slotB = addTxRingEntry(posB.bytes, posB.len, RING_STATUS_DONE, "rx_relay",
+                                0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // Fall B
+    TEST_ASSERT_EQUAL_INT(0, slotB);
+
+    BuiltFrame posA = buildPositionFrame(0xA001UL); // LOW, gleiche Prio wie B
+    int slotA = addTxRingEntry(posA.bytes, posA.len, RING_STATUS_DONE, "rx_relay",
+                                0, true, RING_KIND_RELAY, /*need*/0, /*alone*/1); // Fall A
+    TEST_ASSERT_EQUAL_INT(1, slotA);
+
+    // Innerhalb der Fall-B-Sperre (waited=0 < NBR_RELAY_CASE_B_EXTRA_MS):
+    // Fall A ist der einzige NICHT gehaltene Kandidat und gewinnt, trotz
+    // gleicher Prio und spaeterer Einreihung.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotA, getNextTxSlot(), "waehrend der Fall-B-Sperre muss Fall A gewinnen");
+
+    // Nach Ablauf der Sperre sind beide nicht mehr gehalten -> normales
+    // Prio+FIFO greift wieder, B (zuerst eingereiht) gewinnt.
+    mc_test_set_millis(1000UL + NBR_RELAY_CASE_B_EXTRA_MS + 1UL);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotB, getNextTxSlot(), "nach der Sperre muss B (FIFO-Erster) gewinnen");
+}
+
+// Test 2: ein gehaltener Fall-B-Relay (hier: Positions-Relay, Prio LOW=4,
+// also "bessere" Prio-Nummer als die HN-Meldung) darf eine spaeter
+// eingereihte, nominell schlechter priorisierte eigene HN-Meldung
+// (HEY-Frame, RING_KIND_OTHER, Prio BACKGROUND=5) NICHT blockieren -- genau
+// das Feldsymptom ("10 eigene HN-Meldungen in 9h verhungert"). ALTER CODE:
+// getNextTxSlot() kennt den Hold nicht und waehlt stur nach Prio -> haette
+// den ACK-Relay-Slot zurueckgegeben (Prio 1 < 5), diese Assertion faellt rot.
+static void test_nbr_caseb_hold_blockiert_hn_meldung_nicht(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(2000);
+
+    // Positions-Relay (LOW, bessere Prio als die HN-Meldung) in Fall B -- genau
+    // die Lage aus dem Feldlauf 23.09. (ACK-Relays bekommen nie RING_KIND_RELAY,
+    // nur Text/POS/HEY laufen durch nbrRelayNeed()).
+    BuiltFrame posRelay = buildPositionFrame(0xB002UL);
+    int slotHeld = addTxRingEntry(posRelay.bytes, posRelay.len, RING_STATUS_DONE, "rx_relay",
+                                   0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // Fall B -> gehalten
+    TEST_ASSERT_EQUAL_INT(0, slotHeld);
+
+    BuiltFrame heyOwn = buildHeyFrame(0xC002UL); // BACKGROUND -- eigene HN-Meldung, kind=OTHER (Default)
+    int slotHN = addTxRingEntry(heyOwn.bytes, heyOwn.len, RING_STATUS_READY, "nbr_report");
+    TEST_ASSERT_EQUAL_INT(1, slotHN);
+
+    TEST_ASSERT_TRUE(txringInCaseBHold(slotHeld, (uint32_t)millis()));
+    TEST_ASSERT_FALSE(txringInCaseBHold(slotHN, (uint32_t)millis()));
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotHN, getNextTxSlot(),
+        "gehaltener Fall-B-Relay darf die spaeter eingereihte HN-Meldung nicht blockieren");
+}
+
+// Test 3: dreiphasiger Fall-B-Backoff direkt gegen txringCaseBackoffSlot()
+// (LOW-Prio-Slot, CSMA_PRIO_BASE_4=5500, attempt=0 -- keine Versuchs-
+// Skalierung). Normale Fall-B-Basis (kein EXTRA): 5500 + (7..9)*35 =
+// [5745,5815] (NBR_RELAY_CASE_B_SLOT_START=7 + random(0,3)={0,1,2}).
+//
+// waited=5000 (< EXTRA=20000): Rest-Hold (20000-5000=15000) > normale Basis
+// (max. 5815) -> Ergebnis GENAU 15000, kein Zufallsanteil. ALTER CODE
+// (Basis+EXTRA+Slots bei jedem Aufruf, unabhaengig von waited) haette hier
+// ~25745..25815 geliefert -- die Obergrenze 16000 faellt dagegen rot.
+//
+// waited=25000 (>= EXTRA, < MAX_WAIT=60000): normale Basis OHNE EXTRA,
+// [5745,5815]. ALTER CODE haette weiterhin ~25745..25815 geliefert -- die
+// Obergrenze 5815 faellt dagegen rot.
+//
+// waited=65000 (>= MAX_WAIT=60000, neuer 60s-Deckel): Kurzsuche wie Fall A,
+// NBR_RELAY_CASE_A_SHORT_MS(150) + random(0,3)*35 = [150,220]. ALTER CODE
+// kannte MAX_WAIT gar nicht -- haette weiterhin ~25745..25815 geliefert, die
+// Obergrenze 220 faellt dagegen rot.
+static void test_nbr_caseb_backoff_dreiphasig(void)
+{
+    ringPriority[0] = MSG_PRIO_LOW;
+    ringAlone[0] = 0; // Fall B
+
+    unsigned long b1 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/5000UL);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(15000UL, b1, "Rest-Hold bei waited=5s");
+
+    unsigned long b2 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/25000UL);
+    TEST_ASSERT_TRUE_MESSAGE(b2 >= 5745UL && b2 <= 5815UL, "normale Fall-B-Basis ohne EXTRA bei waited=25s");
+
+    unsigned long b3 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/65000UL);
+    TEST_ASSERT_TRUE_MESSAGE(b3 >= 150UL && b3 <= 220UL, "Kurzsuche wie Fall A ab dem 60s-Deckel");
+}
+
+// Test 4: Re-Arm-Invarianz -- zwei Aufrufe fuer DENSELBEN Slot, 50ms
+// auseinander (wie zwei kurz aufeinanderfolgende CSMA-Re-Arms durch zwei
+// empfangene Frames), duerfen die Sperre NICHT neu starten. Bei
+// waited=3000/3050 (beide < EXTRA=20000, Rest-Hold jeweils weit ueber der
+// normalen Basis) ist das Ergebnis exakt EXTRA-waited, ohne Zufallsanteil --
+// exakt pruefbar. ALTER CODE addierte EXTRA bei jedem Aufruf neu und war von
+// waited komplett unabhaengig: beide Aufrufe haetten denselben, viel
+// groesseren Wert (~25745..25815) geliefert -- diese beiden Assertions
+// fallen einzeln schon rot (siehe Test 3), hier zusaetzlich fixiert, dass
+// der zweite Aufruf die Sperre um genau das Delta (50ms) verkuerzt statt sie
+// zu verlaengern/neu zu starten.
+static void test_nbr_caseb_kein_re_arm(void)
+{
+    ringPriority[0] = MSG_PRIO_LOW;
+    ringAlone[0] = 0; // Fall B
+
+    unsigned long first = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3000UL);
+    unsigned long second = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3050UL);
+
+    TEST_ASSERT_EQUAL_UINT32(17000UL, first);
+    TEST_ASSERT_EQUAL_UINT32(16950UL, second);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(50UL, first - second,
+        "die Sperre muss um genau das Zeitdelta zwischen den Re-Arms schrumpfen, nicht neu starten");
+}
+
+// Test 5: ohne bNBRCANCEL (--nbrrelay off/count) bleibt alles unveraendert
+// -- txringInCaseBHold() liefert immer false, egal wie kind/alone stehen,
+// und getNextTxSlot() waehlt reines Prio+FIFO wie vor diesem Fix. ALTER CODE
+// hatte diesen Codepfad ueberhaupt nicht -- dieser Test fixiert nur, dass
+// der NEUE Code ihn ebenfalls nicht aendert.
+static void test_nbr_ohne_bnbrcancel_unveraendert(void)
+{
+    // bNBRCANCEL bleibt false (Default aus resetRing()).
+    mc_test_set_millis(3000);
+
+    BuiltFrame posLow = buildPositionFrame(0xB005UL); // LOW, kind/alone wie ein Fall-B-Relay, aber bNBRCANCEL aus
+    int slotLow = addTxRingEntry(posLow.bytes, posLow.len, RING_STATUS_DONE, "rx_relay",
+                                  0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0);
+    TEST_ASSERT_EQUAL_INT(0, slotLow);
+
+    BuiltFrame heyBg = buildHeyFrame(0xC005UL); // BACKGROUND, schlechtere Prio
+    int slotBg = addTxRingEntry(heyBg.bytes, heyBg.len, RING_STATUS_READY, "nbr_report");
+    TEST_ASSERT_EQUAL_INT(1, slotBg);
+
+    TEST_ASSERT_FALSE(txringInCaseBHold(slotLow, (uint32_t)millis()));
+    // Reines Prio+FIFO: LOW (4) schlaegt BACKGROUND (5), wie vor diesem Fix.
+    TEST_ASSERT_EQUAL_INT(slotLow, getNextTxSlot());
+}
+
+// Test 6: eine Text-Relay-Nachricht bleibt vom Fall-B-Hold komplett
+// unberuehrt (Konzept 5.1: Menschen warten darauf), SELBST wenn ringAlone==0
+// und RING_KIND_RELAY gesetzt sind. Realistische Probe (Advisor 2026-09-23;
+// ACK-Frames bekommen in der Firmware nie RING_KIND_RELAY): Text-Relay
+// (NORMAL=3) vor einer eigenen, NICHT gehaltenen Position (RING_KIND_OTHER,
+// LOW=4). Richtig klassifiziert gewinnt der Text nach Prio; waere er
+// faelschlich gehalten, gewaenne die Position als einziger nicht gehaltener
+// Kandidat.
+static void test_nbr_caseb_text_relay_kein_hold(void)
+{
+    bNBRCANCEL = true;
+    mc_test_set_millis(4000);
+
+    BuiltFrame textRelay = buildTextFrame("DK5EN-91", "Hallo", 0xE006UL, "DK5EN-90");
+    int slotText = addTxRingEntry(textRelay.bytes, textRelay.len, RING_STATUS_DONE, "rx_relay",
+                                   0, true, RING_KIND_RELAY, /*need*/0, /*alone*/0); // alone=0, waere Fall B ohne den Text-Ausschluss
+    TEST_ASSERT_EQUAL_INT(0, slotText);
+
+    BuiltFrame ownPos = buildPositionFrame(0xD006UL);
+    int slotPos = addTxRingEntry(ownPos.bytes, ownPos.len, RING_STATUS_READY, "own_pos");
+    TEST_ASSERT_EQUAL_INT(1, slotPos);
+
+    TEST_ASSERT_FALSE_MESSAGE(txringInCaseBHold(slotText, (uint32_t)millis()), "Text-Relay darf nie gehalten sein");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(slotText, getNextTxSlot(),
+        "Text-Relay (NORMAL) muss vor der eigenen Position (LOW) gewinnen -- er ist nicht gehalten");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -1110,5 +1306,11 @@ int main(int argc, char **argv)
     RUN_TEST(test_wq01_leerer_ring_liefert_nur_nullen);
     RUN_TEST(test_wq01_gemischte_prioritaeten_stimmen_mit_klassifizierung_ueberein);
     RUN_TEST(test_wq01_loch_in_der_mitte_wird_nicht_mitgezaehlt);
+    RUN_TEST(test_nbr_caseb_hold_weicht_fall_a_gleicher_prio);
+    RUN_TEST(test_nbr_caseb_hold_blockiert_hn_meldung_nicht);
+    RUN_TEST(test_nbr_caseb_backoff_dreiphasig);
+    RUN_TEST(test_nbr_caseb_kein_re_arm);
+    RUN_TEST(test_nbr_ohne_bnbrcancel_unveraendert);
+    RUN_TEST(test_nbr_caseb_text_relay_kein_hold);
     return UNITY_END();
 }

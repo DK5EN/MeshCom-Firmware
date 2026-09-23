@@ -2881,18 +2881,21 @@ void OnHeaderDetect(void)
 // csma_compute_timeout_prio(attempt, ringPriority[slot]), das unveraendert
 // bleibt und von test_inject.cpp o.ae. weiter direkt aufrufbar ist.
 //
-// Fall A (ringAlone[slot] != 0, Konzept-Tabelle 5.1): Vorrang, Slots 0..2
-// (vorn). Ab NBR_RELAY_CASE_A_MAX_WAIT_MS seit dem Einreihen (Wartezeit,
-// nicht Versuchszahl -- ein Fall-A-Relay soll nach kurzer erfolgloser
-// Wartezeit auf den reinen Schutzabstand plus CAD zurueckfallen, egal wie
-// oft der CSMA-Zaehler seither neu gestartet wurde) nur noch die
-// "Kurzsuche": Schutzabstand nach Empfangsende, dann CAD -- der gekappte
-// Re-Arm aus der Konzept-Tabelle.
+// Fall A/B selbst (Slot-Wahl in getNextTxSlot() + Backoff-Zahlen) sind nach
+// txring_functions.cpp ausgelagert (txringInCaseBHold()/txringCaseBackoffSlot(),
+// siehe dortige Kommentare fuer den Feldlauf-23.09.-Befund zum re-armten
+// Fall-B-Hold: 149 verworfene Relays + 10 eigene HN-Meldungen in 9h), damit
+// dieser Feld-bewiesene Code nativ (env:native_aprs, ohne Hardware) testbar
+// ist -- txring_functions.cpp bleibt dabei absichtlich frei von
+// lora_functions.cpp (dessen csma_compute_timeout_prio() braucht sie
+// deshalb hier, nicht dort, siehe die beiden Sonderfaelle unten).
 //
-// Fall B (ringAlone[slot] == 0): Nachrang, Prio-Basis + NBR_RELAY_CASE_B_EXTRA_MS
-// (ausser bei Text -- Menschen warten darauf, siehe Konzept 5.1), Slots
-// NBR_RELAY_CASE_B_SLOT_START..+2 (hinten), damit die natuerliche Flut der
-// Alt-Firmware zuerst ankommt und der Abbruch (5.2) noch greifen kann.
+// Diese Funktion bleibt nur noch ein duenner Caller: Fruehausstieg (Rapid-
+// fire), Vorbedingungspruefung (bNBRCANCEL + RING_KIND_RELAY), der
+// Fall-B-Text-Sonderfall (unveraendert bei der normalen Prio-Basis, Konzept
+// 5.1 -- Menschen warten darauf) sowie der generische Fallback rufen
+// csma_compute_timeout_prio() direkt; alles andere delegiert an
+// txringCaseBackoffSlot().
 unsigned long csma_compute_timeout_slot(int attempt, int slot) {
     if(attempt >= CSMA_MAX_ATTEMPTS)
         return CSMA_RAPID_RX_MS; // rapid-fire with preamble check, wie csma_compute_timeout_prio()
@@ -2901,44 +2904,12 @@ unsigned long csma_compute_timeout_slot(int attempt, int slot) {
 
     if(bNBRCANCEL && slot >= 0 && (ringKind[slot] & 0x7F) == RING_KIND_RELAY)
     {
-        if(ringAlone[slot] != 0)
-        {
-            // Fall A.
-            if((uint32_t)(millis() - ringEnqueueTime[slot]) >= NBR_RELAY_CASE_A_MAX_WAIT_MS)
-                return NBR_RELAY_CASE_A_SHORT_MS +
-                       (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+        // Fall B, Text: komplett bei der heutigen Basis UND heutigen Slots
+        // bleiben (Konzept 5.1); Fall A hat keinen Text-Sonderfall.
+        if(ringAlone[slot] == 0 && ringBuffer[slot][2] == MSG_TYPE_TEXT)
+            return csma_compute_timeout_prio(attempt, prio);
 
-            unsigned long base_a = NBR_RELAY_CASE_A_BASE_MS;
-            if(attempt >= 2) base_a = base_a * 2 / 3;
-            else if(attempt >= 1) base_a = base_a * 5 / 6;
-
-            return base_a + (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
-        }
-        else
-        {
-            // Fall B: Prio-Basis wie csma_compute_timeout_prio(), aber eigene
-            // Slots (hinten) und der bewusst lange Nachrang ausser bei Text.
-            unsigned long base_b;
-            switch(prio) {
-                case MSG_PRIO_CRITICAL:   base_b = CSMA_PRIO_BASE_1; break;
-                case MSG_PRIO_HIGH:       base_b = CSMA_PRIO_BASE_2; break;
-                case MSG_PRIO_NORMAL:     base_b = CSMA_PRIO_BASE_3; break;
-                case MSG_PRIO_LOW:        base_b = CSMA_PRIO_BASE_4; break;
-                case MSG_PRIO_BACKGROUND: base_b = CSMA_PRIO_BASE_5; break;
-                default:                  base_b = CSMA_PRIO_BASE_3; break;
-            }
-            if(attempt >= 2) base_b = base_b * 2 / 3;
-            else if(attempt >= 1) base_b = base_b * 5 / 6;
-
-            // Text bleibt komplett bei heutiger Basis UND heutigen Slots
-            // (Konzept 5.1: Menschen warten darauf); nur der Abbruch gilt.
-            if(ringBuffer[slot][2] == MSG_TYPE_TEXT)
-                return csma_compute_timeout_prio(attempt, prio);
-
-            base_b += NBR_RELAY_CASE_B_EXTRA_MS;
-
-            return base_b + (unsigned long)(NBR_RELAY_CASE_B_SLOT_START + random(0, 3)) * CSMA_SLOT_SIZE;
-        }
+        return txringCaseBackoffSlot(slot, attempt, (uint32_t)millis());
     }
 
     return csma_compute_timeout_prio(attempt, prio);

@@ -50,6 +50,52 @@ uint8_t getMessagePriority(int slot);
 int getNextTxSlot(void);
 void advanceIReadPastEmpty(void);
 
+// Nachbarschaftsmatrix Stufe 2, Feldlauf 23.09. (docs/nbr-wichtigkeit-konzept.md
+// 5.1/5.2; DK5EN-98, --nbrrelay on: 149 verworfene Relays + 10 eigene
+// HN-Meldungen in 9h): die Fall-B-Sperre (POS/HEY-Relay, ringAlone==0) ist
+// eine EINMALIGE Deadline ab Einreihen (waited = now_ms - ringEnqueueTime[slot]
+// < NBR_RELAY_CASE_B_EXTRA_MS), keine bei jedem CSMA-Re-Arm neu addierte
+// Sperre -- csma_compute_timeout() (lora_functions.cpp) laeuft auf JEDEM
+// empfangenen Frame neu, die alte Fassung addierte NBR_RELAY_CASE_B_EXTRA_MS
+// dabei jedesmal erneut auf die Basis, ein Fall-B-Relay an der Ringspitze
+// wartete dadurch effektiv auf eine durchgehende Funkstille (Median 137s,
+// Maximum 16min im Feldlauf).
+//
+// txringInCaseBHold() beantwortet "steckt slot JETZT (now_ms) noch in dieser
+// Sperre" -- Vorbedingung: bNBRCANCEL, Slot ist RING_KIND_RELAY, ringAlone[slot]==0
+// (Fall B, nicht Fall A) und kein Text (Konzept 5.1: Text bleibt aussen vor,
+// Menschen warten darauf). Ausserhalb dieser Vorbedingung immer false.
+//
+// getNextTxSlot() nutzt sie, damit ein gehaltener Fall-B-Relay an der
+// Ringspitze keinen anderen Slot (eigene Sendung, ACK, HN-Meldung, Fall-A-Relay)
+// mehr blockiert: unter den READY/DONE-Slots gewinnt zuerst Prio+FIFO ueber
+// alle NICHT gehaltenen Slots, nur wenn ALLE Kandidaten gehalten sind, gewinnt
+// wie bisher Prio+FIFO unter den gehaltenen (der zurueckgegebene Backoff ist
+// dann der Rest-Hold).
+bool txringInCaseBHold(int slot, uint32_t now_ms);
+
+// Fallabhaengiger CSMA-Backoff fuer Fall A (ringAlone[slot]!=0, Vorrang,
+// unveraendert) und Fall B (ringAlone[slot]==0, Nachrang, HIER gefixt --
+// siehe txringInCaseBHold() oben fuer den Feldbefund). Ausgelagert aus
+// csma_compute_timeout_slot() (lora_functions.cpp), damit dieser
+// Feld-bewiesene Code nativ (env:native_aprs, ohne Hardware) testbar ist --
+// derselbe Beweggrund wie fuer den Rest dieser Datei (Kopfkommentar).
+//
+// Vorbedingung (bNBRCANCEL, RING_KIND_RELAY-Slot, Fall B ohne Text ->
+// csma_compute_timeout_prio() direkt, unveraendert) prueft der Aufrufer;
+// diese Funktion kennt nur noch Fall A und Fall B (Text bereits
+// ausgefiltert) und ruft absichtlich NICHT csma_compute_timeout_prio() auf
+// -- das lebt in lora_functions.cpp, txring_functions.cpp bleibt im nativen
+// Testbuild frei davon (build_src_filter, siehe platformio.ini).
+//
+// Fall B, drei Zeitfenster ab waited = now_ms - ringEnqueueTime[slot]:
+//   waited <  NBR_RELAY_CASE_B_EXTRA_MS:      max(Rest-Hold, normale Fall-B-Basis)
+//   waited <  NBR_RELAY_CASE_B_MAX_WAIT_MS:   normale Fall-B-Basis (kein EXTRA mehr)
+//   waited >= NBR_RELAY_CASE_B_MAX_WAIT_MS:   Kurzsuche wie Fall A (60s-Deckel,
+//                                              82% der Abbrueche im Feldlauf 23.09.
+//                                              fielen in die ersten 60s)
+unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms);
+
 // BP-01 (BACKLOG) / TM-37: current fill level of the TX ring, same arithmetic
 // as the local `queued` inside addTxRingEntry(). Read-only; the back-pressure
 // state machine (src/backpressure.h) needs the depth from outside this file,
