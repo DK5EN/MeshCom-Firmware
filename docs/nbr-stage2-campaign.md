@@ -75,11 +75,11 @@ einspeisenden Gateway (DL2JA-2 57, DK5EN-1 22); kein letzter Hop war nur per Tex
 Server-Bit (Byte 5, 0x80) trennt Einspeisung nicht vom normalen Relay eines IP-Gateways und taugt
 nicht als Merkmal.
 
-| Schritt | Inhalt                                                                                                                        | Stand                                                                                                                       |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 6A      | `nbrNoteFrame()`: `:` liefert nur den ME-Schritt (keine Kanten, keine Zeile ausser fuer den letzten Hop, kein `CUT`), 6 Tests | erledigt                                                                                                                    |
-| Gate    | Host-Tests, vier Builds, Advisor                                                                                              | gruen; 1112 Host-Tests, 4 neue Tests schlagen ohne Fix fehl; Advisor REWORK (nur Kommentare/Tests, 7 Punkte), alle erledigt |
-| 6B      | OTA beider Knoten, `--nbrreset` nicht noetig (Neustart leert die Matrix)                                                      | offen                                                                                                                       |
+| Schritt | Inhalt                                                                                                                        | Stand                                                                                                                          |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 6A      | `nbrNoteFrame()`: `:` liefert nur den ME-Schritt (keine Kanten, keine Zeile ausser fuer den letzten Hop, kein `CUT`), 6 Tests | erledigt                                                                                                                       |
+| Gate    | Host-Tests, vier Builds, Advisor                                                                                              | gruen; 1112 Host-Tests, 4 neue Tests schlagen ohne Fix fehl; Advisor REWORK (nur Kommentare/Tests, 7 Punkte), alle erledigt    |
+| 6B      | OTA beider Knoten per `tools/webflash.py`, Einstellungen blieben erhalten                                                     | erledigt 20:01: beide Knoten Build `Sep 23 2026 / 19:59:40`; erster Text danach (`OE1XAR-33,DK5EN-98,DB0ED-99`, {CET}) nur `ME | DB0ED-99 | T`, kein `EDGE`; Auswertung beider Fixes ab `--since 2026-09-23T20:01` |
 
 Restrisiko: die Regel setzt voraus, dass der Server nur Text an Gateways schickt;
 `udp_frame_esp32.cpp` nimmt weiterhin `!`/`@` vom Server an, ohne Merkmal auf der Luft.
