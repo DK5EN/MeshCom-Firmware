@@ -174,6 +174,90 @@ UF2_FAMILY_ID = "0xADA52840"
 
 
 # --------------------------------------------------------------------------
+# board detection data (detect.json)
+# --------------------------------------------------------------------------
+
+_DEFINE_INT = re.compile(r"^\s*#define\s+(\w+)\s+(\d+)\b")
+_MODUL_HARDWARE = re.compile(r"^\s*#define\s+MODUL_HARDWARE\s+(\w+)\b")
+_PMU_DEFINE = re.compile(r"^\s*#define\s+XPOWERS_CHIP_(AXP192|AXP2101)\b")
+
+
+def hardware_ids(repo: Path = REPO) -> dict[str, int]:
+    """The `//Hardware Types` table of src/configuration_global.h, name -> ID."""
+    ids = {}
+    text = (repo / "src" / "configuration_global.h").read_text(errors="replace")
+    in_table = False
+    for line in text.splitlines():
+        if line.strip() == "//Hardware Types":
+            in_table = True
+            continue
+        if in_table:
+            m = _DEFINE_INT.match(line)
+            if m:
+                ids[m.group(1)] = int(m.group(2))
+            elif line.strip():
+                break
+    if not ids:
+        raise SystemExit("no //Hardware Types table in src/configuration_global.h")
+    return ids
+
+
+def modul_hardware(env: str, repo: Path = REPO) -> str:
+    """The MODUL_HARDWARE symbol of a variant, e.g. HELTEC_V3."""
+    cfg_h = repo / "variants" / env / "configuration.h"
+    for line in cfg_h.read_text(errors="replace").splitlines():
+        m = _MODUL_HARDWARE.match(line)
+        if m:
+            return m.group(1)
+    raise SystemExit(f"{env}: no MODUL_HARDWARE in variants/{env}/configuration.h")
+
+
+def reports_axp2101_id(cfg, env: str, repo: Path = REPO) -> bool:
+    """True if this image reports TBEAM_AXP2101 once it finds an AXP2101.
+
+    Mirrors src/esp32/esp32_pmu.cpp: the PMU code is compiled for variants
+    that define XPOWERS_CHIP_AXP192/AXP2101, and it overwrites BOARD_HARDWARE
+    with TBEAM_AXP2101 unless BOARD_TBEAM_V3 (the Supreme) is set. Every
+    T-Beam image run on a v1.2 board therefore answers with that one ID.
+    """
+    cfg_h = repo / "variants" / env / "configuration.h"
+    has_pmu = any(_PMU_DEFINE.match(line) for line in
+                  cfg_h.read_text(errors="replace").splitlines())
+    flags = resolve(cfg, env, "build_flags") or ""
+    return has_pmu and "BOARD_TBEAM_V3" not in flags
+
+
+def detect_table(repo: Path = REPO, envs=None) -> dict:
+    """What the page needs to map a node's --info answer onto release boards.
+
+    Hardware IDs are on-air identities and never change meaning, so one table
+    from the current tree serves every release the page lists.
+    """
+    envs = envs or RELEASE_ENVS
+    cfg = load_config(repo)
+    ids = hardware_ids(repo)
+    boards = {}
+    axp = []
+    for env in envs:
+        family = chip_family(cfg, env, repo)
+        sym = modul_hardware(env, repo)
+        if sym not in ids:
+            raise SystemExit(f"{env}: MODUL_HARDWARE {sym} is not in the Hardware Types table")
+        boards[env] = {"hwid": ids[sym], "radio": radio_chip(env, family, repo),
+                       "chipFamily": family}
+        if family != "NRF52" and reports_axp2101_id(cfg, env, repo):
+            axp.append(env)
+    aliases = {}
+    if axp:
+        aliases[str(ids["TBEAM_AXP2101"])] = axp
+    return {"boards": boards, "aliases": aliases}
+
+
+def write_detect(pages_root: Path, repo: Path = REPO) -> None:
+    (pages_root / "detect.json").write_text(json.dumps(detect_table(repo), indent=2) + "\n")
+
+
+# --------------------------------------------------------------------------
 # platformio.ini
 # --------------------------------------------------------------------------
 
@@ -374,7 +458,7 @@ def update_releases(pages_root: Path, version: str, boards: list[dict], keep: in
 
 def copy_page(pages_root: Path, repo: Path = REPO) -> None:
     src = repo / "pages" / "flash"
-    for item in ("index.html", "flasher.js", "VERSION"):
+    for item in ("index.html", "flasher.js", "detect.js", "VERSION"):
         if (src / item).is_file():
             shutil.copy2(src / item, pages_root / item)
     ewt = pages_root / "esp-web-tools"
@@ -398,6 +482,7 @@ def cmd_stage(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     boards = stage(args.version, out, REPO, args.envs)
     copy_page(out)
+    write_detect(out)
     info = update_releases(out, args.version, boards, args.keep)
     print(f"staged {len(boards)} boards into {out}/{args.version} ({du(out)})")
     print(f"releases kept: {', '.join(info['kept'])}")
@@ -421,6 +506,7 @@ def cmd_publish(args) -> int:
                 shutil.rmtree(target)
             boards = stage(args.version, root, REPO, args.envs)
             copy_page(root)
+            write_detect(root)
             info = update_releases(root, args.version, boards, args.keep)
             for old in info["pruned"]:
                 if (root / old).is_dir():

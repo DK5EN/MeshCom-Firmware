@@ -332,3 +332,52 @@ Still open:
   folder carries its own table -- but the manual asset set still cannot fully flash a T-Deck.
   Adding it moves the release from 39 to 40 assets and breaks the diff-identical name check in
   release step 5, so it is a deliberate separate change.
+
+## 13. Board detection (2026-09-23)
+
+The page has a "Board erkennen" button. It asks the node for its board over Web Serial and
+pre-selects that board in the dropdown. The user confirms before anything is written; the
+manual choice stays.
+
+**What it reads.** Three facts, in falling order of trust:
+
+| Fact                                                  | Source          | Tells                                  |
+| ----------------------------------------------------- | --------------- | -------------------------------------- |
+| `[LoRa]...<chip> ... Initializing ... success/failed` | boot log        | whether the running image's radio fits |
+| `...NODE <id> <name>`                                 | `--info`        | which image runs, not which board      |
+| `ESP-ROM:esp32s3` / `ets Jul 29 2019`, USB vendor     | ROM banner, USB | chip family, even without MeshCom      |
+
+The hardware ID alone would have repeated the 2026-09-21 T-Beam misflash: every T-Beam image on
+a v1.2 board answers `NODE 12 <TBEAM_AXP2101>` (`src/esp32/esp32_pmu.cpp`), whatever its radio.
+A radio that initialises narrows the pool to images with that radio; a radio that fails rules
+that image out and the page says so.
+
+**How it talks.** On a USB-UART bridge (CP210x, CH34x) the page pulses RTS with DTR low: a
+plain reboot, so the boot log with the radio line comes out. On native USB (Espressif 0x303a,
+Adafruit 0x239a) it only raises DTR, which these boards need before they send anything; no RTS
+pulse, because that resets the chip through the USB link. It then sends `--info\n` every 2 s
+for up to 20 s.
+
+**Handoff.** An ESP32 port stays open after detection and goes straight to ESP Web Tools'
+`ewt-install-dialog`, the same wiring `install-button.js` uses, so there is no second port
+picker. The dialog chunk's hashed file name is read out of `install-button.js` at runtime; if
+that fails, the page closes the port and falls back to the normal button. nRF52 ports are
+closed; those boards take the UF2 download.
+
+**Data.** `tools/pages_flasher.py` writes `flash/detect.json` next to `releases.json`: hardware
+ID, radio class and chip family per release env, from `MODUL_HARDWARE` in each variant and the
+`//Hardware Types` table in `src/configuration_global.h`, plus the ID-12 alias set derived from
+the same guards `esp32_pmu.cpp` uses. Hardware IDs are on-air identities and never change
+meaning, so one table serves every listed release.
+
+**Tests.** `node --test tools/tests/test_flasher_detect.mjs` runs `pages/flash/detect.js`
+against the Heltec, RAK and T-Beam v1.2 bench captures in `test/golden/hw/`, with the real
+table from this tree. `test_pages_flasher.py` pins the table and the esp32_pmu.cpp block it
+mirrors.
+
+Still open:
+
+- Bench run on real hardware. The flow was run in headless Chrome against a simulated port (T-Beam
+  v1.2 boot log, RAK, shared E22 ID, silent node, lost port); a live Web Serial run on the four
+  bench boards is owed, especially the T-Deck, which reboots on port open.
+- Boards without MeshCom are narrowed to their chip family only; flash size is not read.

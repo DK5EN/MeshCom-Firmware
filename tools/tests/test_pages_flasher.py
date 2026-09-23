@@ -164,6 +164,65 @@ def test_boards_sharing_a_name_are_told_apart_by_the_radio(cfg):
 
 
 # --------------------------------------------------------------------------
+# detect.json: hardware IDs for the "Board erkennen" button
+# --------------------------------------------------------------------------
+
+
+def test_hardware_ids_from_the_global_table():
+    ids = pf.hardware_ids(REPO)
+    assert ids["TBEAM"] == 4
+    assert ids["RAK4631"] == 9
+    assert ids["TBEAM_AXP2101"] == 12
+    assert ids["HELTEC_V3"] == 43
+
+
+def test_every_release_env_has_a_hardware_id():
+    table = pf.detect_table(REPO)
+    assert sorted(table["boards"]) == sorted(pf.RELEASE_ENVS)
+    for env, b in table["boards"].items():
+        assert isinstance(b["hwid"], int), env
+        assert b["radio"] in pf.CHIP_LABEL, env
+        assert b["chipFamily"] in pf.MCU_FAMILY.values(), env
+
+
+@pytest.mark.parametrize(
+    "env,hwid",
+    [
+        ("heltec_wifi_lora_32_V3", 43),
+        ("wiscore_rak4631", 9),
+        ("ttgo_tbeam", 4),
+        ("ttgo_tbeam_SX1262", 45),
+        ("ttgo_tbeam_SX1268", 5),
+        ("ttgo_tbeam_supreme", 47),
+        ("t_deck_plus", 46),
+    ],
+)
+def test_hardware_id_per_env(env, hwid):
+    assert pf.detect_table(REPO)["boards"][env]["hwid"] == hwid
+
+
+def test_axp2101_id_covers_the_tbeam_images_but_not_the_supreme():
+    """A T-Beam image on a v1.2 board answers 12 whatever its radio.
+
+    The Supreme has an AXP2101 too, but BOARD_TBEAM_V3 keeps its own ID.
+    """
+    aliases = pf.detect_table(REPO)["aliases"]
+    assert sorted(aliases["12"]) == ["ttgo_tbeam", "ttgo_tbeam_SX1262", "ttgo_tbeam_SX1268"]
+
+
+def test_axp2101_override_still_in_the_firmware():
+    """reports_axp2101_id() mirrors this block; if it moves, the alias is stale."""
+    src = (REPO / "src" / "esp32" / "esp32_pmu.cpp").read_text()
+    assert "#ifndef BOARD_TBEAM_V3\n            BOARD_HARDWARE = TBEAM_AXP2101;" in src
+
+
+def test_write_detect_lands_next_to_releases_json(tmp_path):
+    pf.write_detect(tmp_path, REPO)
+    data = json.loads((tmp_path / "detect.json").read_text())
+    assert data["boards"]["wiscore_rak4631"]["chipFamily"] == "NRF52"
+
+
+# --------------------------------------------------------------------------
 # staging
 # --------------------------------------------------------------------------
 
