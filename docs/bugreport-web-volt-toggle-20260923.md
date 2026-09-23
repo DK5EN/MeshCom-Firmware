@@ -177,3 +177,66 @@ No finding.
   instead of broken.
 - Prevention: a host test that runs the producer/rung extraction on every build and fails on an unmatched
   producer. It would have caught `93d9fee6` the day it landed.
+
+## Fix campaign (2026-09-23)
+
+Scope decided by the operator: fix A (`--volt`), drop the dead `small` handler, fix B (guard each GUI
+control and its handler with the rung's macro), and a prevention lint. Branches: `fork-neo-test` first,
+then an upstream PR with the `--volt` fix alone, then a port to `fork-main`. No bench run in this
+campaign; hardware verification stays owed.
+
+Recon corrections to the tables above:
+
+- BMP280 / BME280 / BME680 / MCU811: only the `on` rungs sit behind `ENABLE_BMX280`. The `off` rungs
+  (ladder `bmx off|bme off|bmp off`, toggle rows `--680 off`, `--811 off`) are unguarded, so on those
+  boards the switch can be turned off but never on.
+- Net console: the GUI element is guarded by `#ifndef BOARD_RAK4630` only, the handler not at all, the
+  rungs by `#ifndef DISABLE_NET_CONSOLE`. Dead control on E22_XML DevKitC, as listed.
+
+| Wave | Content                                                                                  | Owner         | State                                                               |
+| ---- | ---------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------- |
+| 1    | `test/golden/producer_match_lint.py`: producers vs rungs per env, GUI element vs handler | 1 implementer | done: fails with 41 violations on the unfixed tree, self-test 28/28 |
+| 2a   | `web_setup.cpp` (volt, small, handler guards), `onebutton_functions.cpp` (gps gesture)   | 1 implementer | done                                                                |
+| 2b   | `web_functions.cpp` GUI element guards                                                   | 1 implementer | done                                                                |
+| gate | lint + host suite + all board builds, string scan, advisor pass, commit                  | orchestrator  | done                                                                |
+| 3    | upstream PR (`--volt` only), port to `fork-main`                                         | orchestrator  | open                                                                |
+
+Wave 1 findings beyond the report (all the same pattern, a handler compiled in where its rung is not):
+analog gpio/factor/slope/offset/check (GUI guarded by `ANALOG_PIN`, handler not), `aht20`, `sht21` (GUI
+guarded, handler not), `setssid`/`setpwd` on the RAK4631-family envs, and `--ota-update` through the
+`/callfunction/` API on nRF52. The INA226, BMX, 1-Wire rows also hit `heltec_t114` and `t_echo`, which
+compile the web code but never start the web server there.
+
+Open, outside this campaign: `test/golden/extract_commands.py` treats an `if(` indented 8 spaces (a
+ladder rung under its own `#if`) as an inner disambiguation, so ten real rungs (`netmode wifi|eth`,
+`relay on|off`, `udplog on`, `persistflash|persistsd|immediatesave on`, `wifi on`) are missing from its
+ladder list and from `command_ladder_lint.py`'s ordering check. `producer_match_lint.py` works around it
+by folding the inner list in.
+
+Wave 2 result: `web_setup.cpp` sends `--volt %s`, the `small` handler is gone, and 13 setParam handlers,
+the `otaupdate` call, the tripleClick GPS sends and 10 GUI elements carry the guard of the rung they
+hit. `producer_match_lint.py`: 41 violations before, 0 after.
+
+Advisor pass (independent review of the wave diff): source diff approved; one rework in the lint, done.
+The GUI-parity check scanned all of `web_setup.cpp`, so `webSetup_getParam()`'s unguarded twins stood
+in for every setParam block and the check could never fire. It now reads `webSetup_setParam()` only,
+with a self-test fixture for exactly that; mutation-checked on a copy of the tree (strip the BMX guard
+from the GUI `bmp` element, or delete the setParam `gps` block: one violation each, right envs).
+
+Open, noted by the advisor, not changed in this campaign:
+
+- Producers whose own guard evaluates unknown are skipped silently (one today: `--deepsleep` under
+  `#elif defined(BOARD_HELTEC_V2)` in `onebutton_functions.cpp`; `_guard_stack` also drops earlier
+  `#elif` arms).
+- `test/golden/native/variant-macros-effective.txt` has no freshness check of its own. It was last
+  regenerated in `e14a7a36`; the variant changes since then touch no guard macro the lint evaluates.
+- `test/golden/selftest.sh` was already red before this campaign at `variant_ini_effective.py`: 34
+  differing keys, 30 of them the `ARDUINO_LOOP_STACK_SIZE=12288` flag from `8990e94d`, whose baseline was
+  never regenerated. `set -e` stops the script there; the steps after it were run by hand and pass.
+
+Gate (2026-09-23, fork-neo-test): host suite 35 envs, 1022/1022 cases; `producer_match_lint.py` 0
+violations (self-test ok); the golden self-test steps pass except the older `variant_ini_effective`
+drift above; all 30 board envs and both safeboot envs build. Image scan over the 30 board ELFs: each of
+the 10 guarded GUI controls is present exactly where its guard evaluates true (300 checks, 0
+mismatches), and `--volt %s` is in every image. No bench run in this campaign; hardware verification
+(toggle both directions on Heltec V3 and RAK4631, value survives a reboot) is still owed.
