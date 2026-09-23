@@ -16,6 +16,15 @@ Zahlenfelder sind vorzeichenbehaftete Dezimalzahlen ohne Auffuellung. Kein `%lld
 dieselbe Zeitbasis wie `NbrRow.last_min`. Nicht die Wanduhr.
 
 `<type>` ist `T` (Text `:`), `P` (Position `!`) oder `H` (HEY `@`).
+
+**Text erzeugt seit 2026-09-23 abends nur noch `ME`-Zeilen** (Welle 6, `docs/nbr-stage2-campaign.md`):
+kein `EDGE` mit `<type>` `T`, kein `CUT` fuer Text, keine Zeile fuer ein Pfad-Token ausser dem
+letzten Hop. Grund: Gateways mit Mesh an senden vom Server eingespeiste Texte mit
+`<Server-Pfad>,<Gateway>` auf LoRa, das Paar davor war nie ein Funkempfang. Mitschnitte aelterer
+Firmware enthalten solche `EDGE|...|T`-Zeilen noch; wer alte und neue Laeufe vergleicht, filtert
+Text-`EDGE` aus dem alten Lauf vorher heraus -- die Skripte haben dafuer keinen Schalter:
+`grep -vE '\[NBR\]\|EDGE\|[^|]*\|[^|]*\|[^|]*\|T\|' alt.log > alt-ohne-text.log`.
+
 `<rssi>` ist dBm als negative Ganzzahl, `0` heisst "kein Bericht". `<snr>` (wo vorhanden) ist die
 in der Matrix gespeicherte SNR in dB, vorzeichenbehaftet, oder das Literal `NA`, wenn keine
 bekannt ist -- dieselbe "kein Bericht"-Semantik wie `<rssi>` == `0`, nur eben als Text statt als

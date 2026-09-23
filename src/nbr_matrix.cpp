@@ -534,9 +534,46 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
                 return -2;
             }
 
+    // Text (':') faellt nicht unter das 2-Hop-Fenster/die Pfadpaar-Kanten
+    // unten (siehe nbr_matrix.h): ein Gateway mit Mesh an setzt vom Server
+    // eingespeiste Frames mit "<Server-Pfad>,<Gateway>" auf LoRa, und das
+    // Paar (letztes Server-Token, Gateway) ist dabei nie ein Funkempfang.
+    // Der on-air Server-Bit trennt das nicht (lora_functions.cpp:1800 setzt
+    // ihn bei jedem IP-Gateway-Relay), also bleibt der Frame-Typ das einzige
+    // Merkmal (Feldlog DK5EN-98, 22.-23.09.2026: 511 Server->Gateway-Frames,
+    // 100% Text; alle 79 reinen Text-Kanten endeten an einem einspeisenden
+    // Gateway). Text liefert darum NUR den ME-Schritt: keine Kanten, keine
+    // Zeile fuer irgendein Token ausser dem letzten Hop, keine CUT-Zeile
+    // (die beschreibt das hier nicht angewandte 2-Hop-Fenster).
+    if (type == ':')
+    {
+        int last_idx = nbrFind(m, tokens[ntok - 1]);
+        if (last_idx < 0)
+        {
+            last_idx = nbrPlanRow(m, tokens[ntok - 1], now_min, 0);
+            if (last_idx < 0)
+            {
+                nbrLogDrop(now_min, "FULL", path);
+                return -3;
+            }
+            nbrCommitRow(m, last_idx, tokens[ntok - 1], now_min);
+        }
+
+        if (strncmp(tokens[ntok - 1], m.rows[0].call, NBR_CALL_LEN) == 0)
+            return 0; // eigenes Echo, kein Hoerbeweis (wie bei '!'/'@' unten)
+
+        nbrHitCell(m.cells[last_idx][0], type, now_min);
+        m.cells[last_idx][0].snr = nbrClampSnr(snr_here);
+        m.rows[last_idx].last_min = now_min;
+        m.rows[0].last_min = now_min;
+        nbrLogMe(now_min, tokens[ntok - 1], type, rssi_here, m.cells[last_idx][0]);
+        return 1;
+    }
+
     // 2-Hop-Fenster (Betreiber-Vorgabe, siehe nbr_matrix.h): nur die letzten
     // zwei Pfad-Token duerfen noch eine Zeile bekommen. Token davor (Index
-    // < start) werden weder geplant noch committet.
+    // < start) werden weder geplant noch committet. Gilt ab hier nur noch
+    // fuer '!'/'@' (Text ist oben schon zurueckgekehrt).
     int start = (ntok > 2) ? ntok - 2 : 0;
     if (ntok > 2)
         nbrLogCut(now_min, ntok, ntok - start, path);

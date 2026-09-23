@@ -64,6 +64,29 @@ Offen aus dem Advisor (akzeptiert): der Ring meldet "voll" nach Indexabstand bei
 `iRead`; jetzt nur noch bei mindestens 19 Einreihungen innerhalb von 60 s erreichbar. Unter lauter
 gehaltenen Kandidaten entscheidet Prio/FIFO statt der fruehesten Frist.
 
+## Welle 6: Text nur noch als ME-Schritt (2026-09-23 abends)
+
+Anlass: die Matrix auf DK5EN-98 zeigte Zeilen, die nie per Funk da waren (OE1XAR-33, DO2QG-1,
+DM3KS-12, DL1GFM-7), alle als Kante in die Spalte eines Gateways mit Mesh an (DL2JA-2, DK5EN-1,
+DF8RD-1). Ein Gateway setzt Server-Frames mit `<Server-Pfad>,<Gateway>` auf LoRa. Auswertung des
+Mitschnitts 22.09. 09:28 bis 23.09. 19:11 (34 h): der Server schickte DK5EN-98 511 Frames, 100 %
+Text, kein POS, kein HEY; 79 Kanten entstanden nur aus Text, alle 79 endeten an einem
+einspeisenden Gateway (DL2JA-2 57, DK5EN-1 22); kein letzter Hop war nur per Text erreichbar. Das
+Server-Bit (Byte 5, 0x80) trennt Einspeisung nicht vom normalen Relay eines IP-Gateways und taugt
+nicht als Merkmal.
+
+| Schritt | Inhalt                                                                                                                        | Stand                                                                                                                       |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 6A      | `nbrNoteFrame()`: `:` liefert nur den ME-Schritt (keine Kanten, keine Zeile ausser fuer den letzten Hop, kein `CUT`), 6 Tests | erledigt                                                                                                                    |
+| Gate    | Host-Tests, vier Builds, Advisor                                                                                              | gruen; 1112 Host-Tests, 4 neue Tests schlagen ohne Fix fehl; Advisor REWORK (nur Kommentare/Tests, 7 Punkte), alle erledigt |
+| 6B      | OTA beider Knoten, `--nbrreset` nicht noetig (Neustart leert die Matrix)                                                      | offen                                                                                                                       |
+
+Restrisiko: die Regel setzt voraus, dass der Server nur Text an Gateways schickt;
+`udp_frame_esp32.cpp` nimmt weiterhin `!`/`@` vom Server an, ohne Merkmal auf der Luft.
+Bewusster Verlust: Text traegt auch kein "X hoert mich" (Echo `<ich>,X`) und keine echte
+Relay-Kante `A,M` mehr ein -- ein anderes Gateway kann meinen hochgeladenen Text ebenso als
+`<ich>,<Gateway>` senden. Diese Kanten kommen jetzt nur noch aus POS, HEY und HN-Bericht.
+
 ## Entscheidungen
 
 - pio-Slot: in Welle 1 ausschliesslich Agent B; D kompiliert nicht, das Gate kompiliert.

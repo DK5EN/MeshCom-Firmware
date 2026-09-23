@@ -216,6 +216,29 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // (-2, Log: DROP LOOP). Diese beiden Pruefungen laufen ueber den GANZEN
 // Pfad, unabhaengig vom Fenster unten.
 //
+// Text (':') faellt NICHT unter das 2-Hop-Fenster und die Pfadpaar-Kanten
+// unten: ein Gateway mit Mesh an setzt vom Server eingespeiste Frames mit
+// dem Pfad "<Server-Pfad>,<Gateway>" auf LoRa, und das Paar (letztes
+// Server-Token, Gateway) ist dabei nie ein Funkempfang. Der on-air
+// Server-Bit (Byte 5, 0x80) trennt Einspeisung nicht von normalem Relay
+// (lora_functions.cpp:1800 setzt ihn bei jedem IP-Gateway-Relay), darum ist
+// der Frame-Typ das einzig nutzbare Merkmal (Feldlog DK5EN-98,
+// 22.-23.09.2026, 34h: 511 Server->Gateway-Frames, 100% Text, 0 POS/HEY;
+// alle 79 reinen Text-Kanten endeten an einem einspeisenden Gateway). Text
+// liefert daher NUR den ME-Schritt unten ("ich habe den letzten Hop
+// gehoert"): keine Pfadpaar-Kanten (weder Fenster- noch Regel-3-Gratis-
+// Kanten) und keine Zeile fuer irgendein Pfad-Token ausser dem letzten Hop;
+// die CUT-Zeile (sie beschreibt das 2-Hop-Fenster) entfaellt fuer Text
+// ebenfalls. Restrisiko: das setzt voraus, dass der Server ausschliesslich
+// Text nach unten schickt -- udp_frame_esp32.cpp nimmt weiterhin '!'/'@'
+// von UDP an. Bewusster Verlust: auch das Echo meines eigenen Textes
+// ("<ich>,X") traegt kein "X hoert mich" (cells[0][X]) mehr ein, und ein
+// echter Funk-Relay eines Textes ("A,M") keine Kante A->M -- ein anderes
+// Gateway kann meinen hochgeladenen Text ebenso als "<ich>,<Gateway>"
+// einspeisen. Diese Kanten liefern POS, HEY und HN-Bericht. Alles ab dem
+// naechsten Absatz (2-Hop-Fenster, Pfadpaar-Kanten) gilt nur noch fuer '!'
+// und '@'; EVICT kann auch Text ausloesen (Zeile des letzten Hops).
+//
 // 2-Hop-Fenster (Betreiber-Vorgabe: das ist eine HELLO-Matrix, keine
 // vollstaendige Nachbarschaftskarte): NEUE Zeilen entstehen nur noch fuer
 // die letzten zwei Pfad-Token, start = (ntok > 2) ? ntok - 2 : 0. Fuer jedes

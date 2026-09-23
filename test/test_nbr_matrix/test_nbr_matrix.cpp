@@ -30,12 +30,17 @@ void tearDown(void) {}
 
 // --- 1: Pfadpaar-Regel -----------------------------------------------------
 
+// Trotz des Namens (aus der Zeit vor dem Text-Sonderfall) laeuft dieser Test
+// jetzt mit '!': Text ('bleibt') nimmt den Pfadpaar-Zweig gar nicht mehr,
+// siehe nbrNoteFrame()-Kommentar. Die eigentliche Pfadpaar-Mechanik (EDGE +
+// ME aus einem 2-Token-Pfad) bleibt fuer '!'/'@' unveraendert und wird hier
+// weiter geprueft; das Text-eigene Verhalten (nur ME) hat eigene Tests unten.
 void test_pair_rule_text_frame(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 100);
 
-    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_EQUAL_INT(2, hits);
 
     int iaaa = nbrFind(m, "OE1AAA-1");
@@ -43,8 +48,8 @@ void test_pair_rule_text_frame(void)
     TEST_ASSERT_TRUE(iaaa > 0);
     TEST_ASSERT_TRUE(ibbb > 0);
 
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_pos);
     TEST_ASSERT_EQUAL_INT8(5, m.cells[ibbb][0].snr);   // ME-Schritt speichert snr_here (5), nicht rssi_here (-80)
 
     // Keine andere Zelle darf einen Zaehler > 0 tragen.
@@ -65,11 +70,11 @@ void test_own_relay_seen_directly_gives_both_cells(void)
 
     // Mein eigener Frame, einmal ueber AAA relayt, erreicht mich direkt: ich
     // hoere AAAs Kopie, UND das ist zugleich der Beweis, dass AAA mich hoert.
-    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", ':', NULL, false, -70, 5, 200);
+    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '!', NULL, false, -70, 5, 200);
     int iaaa = nbrFind(m, "OE1AAA-1");
     TEST_ASSERT_TRUE(iaaa > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_text);   // AAA hat mich gehoert
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);   // ich habe AAAs Kopie gehoert
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_pos);   // AAA hat mich gehoert
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_pos);   // ich habe AAAs Kopie gehoert
 }
 
 void test_own_frame_returning_via_relay_is_echo_not_direct_hearing(void)
@@ -80,14 +85,14 @@ void test_own_frame_returning_via_relay_is_echo_not_direct_hearing(void)
     // Derselbe Frame kommt ueber AAA zurueck, mit meinem eigenen Rufzeichen
     // als letztem Hop: das ist mein Echo, kein Hoerbeweis fuer "ich habe den
     // letzten Hop gehoert" (Konzept 4.1).
-    nbrNoteFrame(m, "OE1AAA-1,DK5EN-93", ':', NULL, false, -70, 5, 200);
+    nbrNoteFrame(m, "OE1AAA-1,DK5EN-93", '!', NULL, false, -70, 5, 200);
     int iaaa = nbrFind(m, "OE1AAA-1");
     TEST_ASSERT_TRUE(iaaa > 0);
     // Stufe 2 (Konzept 2.3 / 5.8 Punkt 0): auch das Paar (AAA, ich) schreibt
     // Spalte 0 nicht mehr -- ob ich AAA je per Funk gehoert habe, weiss nur
     // der ME-Schritt beim Empfang. Vorher stand hier 1.
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][0].cnt_text);   // kein Hoerbeweis aus meinem eigenen Pfad
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);   // kein Zusatztreffer aus dem Echo
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][0].cnt_pos);   // kein Hoerbeweis aus meinem eigenen Pfad
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_pos);   // kein Zusatztreffer aus dem Echo
 }
 
 // --- 3: HEY-Berichtsgruppen --------------------------------------------------
@@ -170,7 +175,7 @@ void test_aging_720_min_window_and_stale_reset(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
 
@@ -178,8 +183,8 @@ void test_aging_720_min_window_and_stale_reset(void)
     TEST_ASSERT_FALSE(nbrFresh(m.cells[iaaa][ibbb].last_min, 820));  // genau 720: nicht mehr frisch
 
     // Treffer auf eine inzwischen verfallene Zelle faengt bei 1 an, nicht bei 2.
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 900);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 900);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
 
     // Ueberlauf des 16-Bit-Minutenzaehlers: 65500 -> 10 sind 46 min, klar frisch.
     TEST_ASSERT_TRUE(nbrFresh(65500, 10));
@@ -246,7 +251,7 @@ void test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal(void)
     // Letztzeit. Ohne den Kollisionsschutz wuerden EEE UND FFF beide "die
     // aelteste Zeile" (Index 1) planen; der zweite Treffer faellt dann auf
     // die Diagonale statt auf ein eigenes Paar.
-    int hits = nbrNoteFrame(m, "OE1EEE-5,OE1FFF-6", ':', NULL, false, -80, 5, 100);
+    int hits = nbrNoteFrame(m, "OE1EEE-5,OE1FFF-6", '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_TRUE(hits > 0);
 
     int ieee = nbrFind(m, "OE1EEE-5");
@@ -254,9 +259,9 @@ void test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal(void)
     TEST_ASSERT_TRUE(ieee >= 0);
     TEST_ASSERT_TRUE(ifff >= 0);
     TEST_ASSERT_TRUE(ieee != ifff);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ieee][ifff].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ieee][ieee].cnt_text);  // keine Diagonale
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifff][ifff].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ieee][ifff].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ieee][ieee].cnt_pos);  // keine Diagonale
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifff][ifff].cnt_pos);
 }
 
 // War vor dem 2-Hop-Fenster ein -3 (FULL): 5 neue Rufzeichen brauchten 5 neue
@@ -273,7 +278,7 @@ void test_long_path_beyond_two_hop_window_is_accepted_not_rejected(void)
     nbrInit(m, "DK5EN-93", 0);
 
     int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4,OE1EEE-5",
-                             ':', NULL, false, -80, 5, 100);
+                             '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_TRUE(hits > 0);
 
     TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
@@ -283,7 +288,7 @@ void test_long_path_beyond_two_hop_window_is_accepted_not_rejected(void)
     int ieee = nbrFind(m, "OE1EEE-5");
     TEST_ASSERT_TRUE(iddd > 0);
     TEST_ASSERT_TRUE(ieee > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][ieee].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][ieee].cnt_pos);
 }
 
 // --- M3: eine bestehende Zeile darf nicht Opfer eines Geschwister-Tokens ---
@@ -315,7 +320,7 @@ void test_existing_row_not_evicted_by_sibling_window_token(void)
     // ueberhaupt jemand weicht, ist normale Verdraengung (Tabelle voll) und
     // kein Fehler -- der Fehler war ausschliesslich, DASS B mitverdraengt
     // wurde, obwohl es im selben Frame selbst vorkommt.
-    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_TRUE(hits > 0);
 
     int iaaa = nbrFind(m, "OE1AAA-1");
@@ -323,7 +328,7 @@ void test_existing_row_not_evicted_by_sibling_window_token(void)
     TEST_ASSERT_TRUE(iaaa >= 0);            // A muss eine eigene Zeile bekommen
     TEST_ASSERT_EQUAL_INT(ibbb_before, ibbb); // B behaelt genau seinen Index
     TEST_ASSERT_TRUE(iaaa != ibbb);         // keine gemeinsame Zeile / Diagonale
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text); // A->B normal eingetragen
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos); // A->B normal eingetragen
 
     // Die naechst-aeltere, UNGESCHUETZTE Zeile (CCC) weicht wie bei jeder
     // normalen Verdraengung; D und E, juenger als CCC, bleiben unangetastet.
@@ -338,10 +343,10 @@ void test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
 
     // Die absolute Minutenzahl seit Boot laeuft im Test ungekappt weiter;
     // nur der an nbrNoteFrame() uebergebene now_min-Wert wird -- wie auf dem
@@ -364,7 +369,7 @@ void test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again(void)
     // Ohne den Sweep waere nbrFresh(100, 100) wahr (Alter 0) und die alten
     // Zaehler stuenden noch da -- der Geist saehe aus wie "gerade eben
     // getroffen". Der Sweep muss das laengst aufgeraeumt haben.
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][ibbb].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][ibbb].cnt_pos);
     TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[iaaa][ibbb].snr);
 }
 
@@ -386,7 +391,7 @@ void test_reset_keeps_only_row_zero_call(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 100);
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     m.rows[0].flags |= NBR_FLAG_GW;
 
     nbrReset(m, 500);
@@ -500,7 +505,7 @@ void test_mesh_need_answers_the_opposite_question_from_exclusive(void)
     // CCC bekommt eine Zeile, aber NICHT direkt: letzter Hop ist AAA (schon
     // eine bestehende Zeile), die Kante CCC->AAA traegt nur "AAA hat CCC
     // gehoert" ein, cells[CCC][0] bleibt ungesetzt.
-    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", '!', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
     int iccc = nbrFind(m, "OE1CCC-3");
@@ -554,7 +559,7 @@ void test_format_row_contains_callsign_and_hearers(void)
 {
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 10);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 10);
     int iaaa = nbrFind(m, "OE1AAA-1");
 
     char buf[128];
@@ -573,7 +578,7 @@ void test_two_hop_window_only_creates_rows_for_last_two_tokens(void)
 
     // A,B liegen VOR dem Fenster (start = 4-2 = 2) -- sie bekommen keine
     // Zeile. Nur C,D (das Fenster) und Zeile 0 existieren danach.
-    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 5, 100);
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_TRUE(hits > 0);
 
     TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
@@ -584,8 +589,8 @@ void test_two_hop_window_only_creates_rows_for_last_two_tokens(void)
     TEST_ASSERT_TRUE(iddd > 0);
 
     // Kanten: nur C->D und D->ich, sonst keine einzige Zelle gesetzt.
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iccc][iddd].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iccc][iddd].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][0].cnt_pos);
     int nonzero = 0;
     for (int x = 0; x < NBR_MAX_ROWS; x++)
         for (int y = 0; y < NBR_MAX_ROWS; y++)
@@ -601,15 +606,15 @@ void test_two_token_path_is_unaffected_by_the_window(void)
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 100);
 
-    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     TEST_ASSERT_EQUAL_INT(2, hits);
 
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
     TEST_ASSERT_TRUE(iaaa > 0);
     TEST_ASSERT_TRUE(ibbb > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_pos);
 }
 
 void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
@@ -632,7 +637,7 @@ void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
     // Ein spaeterer 4-Token-Pfad A,B,C,D: C,D sind das Fenster, A,B liegen
     // davor. A->B ist eine Kante zwischen zwei BESTEHENDEN Zeilen -- Regel 3
     // traegt sie trotzdem ein, OHNE eine neue Zeile fuer A oder B anzulegen.
-    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 5, 20);
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", '!', NULL, false, -80, 5, 20);
     TEST_ASSERT_TRUE(hits > 0);
 
     int rows_after = 0;
@@ -641,7 +646,7 @@ void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
             rows_after++;
 
     TEST_ASSERT_EQUAL_INT(rows_before + 2, rows_after);   // nur C und D sind neu
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_text);   // A->B trotzdem eingetragen
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);   // A->B trotzdem eingetragen
 }
 
 // --- 11: nbrNotePos() legt keine Zeile mehr an -------------------------------
@@ -714,7 +719,7 @@ void test_pre_window_edge_does_not_refresh_row_age(void)
     for (int i = 0; i < 8; i++)
     {
         t = (uint16_t)(t + 100);
-        nbrNoteFrame(m, "OE1XXX-9,OE1YYY-8,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 5, t);
+        nbrNoteFrame(m, "OE1XXX-9,OE1YYY-8,OE1CCC-3,OE1DDD-4", '!', NULL, false, -80, 5, t);
     }
     TEST_ASSERT_TRUE((uint16_t)(t - 10) > NBR_WINDOW_MIN); // Testaufbau: Fenster sicher ueberschritten
 
@@ -758,17 +763,17 @@ void test_log_emitter_field_sequence_matches_format_doc(void)
     nbrInit(m, "DK5EN-93", 100);
 
     // EDGE + ME ueber einen einfachen 2-Token-Pfad.
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", ':', NULL, false, -80, 5, 100);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     // EDGE: <rssi> ist seit der SNR-Umstellung immer 0, trailing <snr> ist
     // NA (die Paar-Zelle bekommt nie einen SNR, nur der ME-Schritt schreibt
     // in eine Zelle). ME: <rssi> ist rssi_here durchgereicht (-80), trailing
     // <snr> ist snr_here (5), das die Zelle tatsaechlich speichert.
-    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|EDGE|100|OE1AAA-1|OE1BBB-2|T|0|1|NA\n"));
-    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ME|100|OE1BBB-2|T|-80|1|5\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|EDGE|100|OE1AAA-1|OE1BBB-2|P|0|1|NA\n"));
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ME|100|OE1BBB-2|P|-80|1|5\n"));
 
     // CUT: derselbe Pfad um zwei weitere Hops verlaengert.
     test_log_reset();
-    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", ':', NULL, false, -80, 5, 200);
+    nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4", '!', NULL, false, -80, 5, 200);
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf,
         "[NBR]|CUT|200|4|2|OE1AAA-1,OE1BBB-2,OE1CCC-3,OE1DDD-4\n"));
 
@@ -855,8 +860,11 @@ void test_gateway_echo_does_not_mark_server_origin_as_directly_heard(void)
     nbrInit(m, "DK5EN-93", 0);
     // AAA ist mein direkter Nachbar, FAR ein Knoten, den AAA wiederholt hat
     // (2-Hop-Zeile ueber das Fenster).
-    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 5);
-    nbrNoteFrame(m, "OE3FAR-9,OE1AAA-1", ':', NULL, false, -80, 5, 5);
+    // '!' statt ':': alle drei Aufrufe muessen denselben Typzaehler fuellen,
+    // damit "zum dritten Mal" unten stimmt -- Text haette hier ohnehin keine
+    // FAR-Zeile ueber das Fenster angelegt (siehe nbrNoteFrame()-Kommentar).
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE3FAR-9,OE1AAA-1", '!', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ifar = nbrFind(m, "OE3FAR-9");
     TEST_ASSERT_TRUE(iaaa > 0 && ifar > 0);
@@ -864,11 +872,11 @@ void test_gateway_echo_does_not_mark_server_origin_as_directly_heard(void)
     // Ich (Gateway) habe FARs Frame vom Server auf LoRa gesetzt, AAA hat
     // meine Aussendung wiederholt: "FAR,ich,AAA" kommt zurueck. Das Paar
     // (FAR, ich) darf NICHT "ich habe FAR gehoert" eintragen.
-    int hits = nbrNoteFrame(m, "OE3FAR-9,DK5EN-93,OE1AAA-1", ':', NULL, false, -80, 5, 6);
+    int hits = nbrNoteFrame(m, "OE3FAR-9,DK5EN-93,OE1AAA-1", '!', NULL, false, -80, 5, 6);
     TEST_ASSERT_EQUAL_INT(2, hits);                                  // (ich,AAA) + ME(AAA), nicht (FAR,ich)
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifar][0].cnt_text);           // FAR bleibt nicht-direkt
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_text);           // AAA hat mich gehoert
-    TEST_ASSERT_EQUAL_UINT8(3, m.cells[iaaa][0].cnt_text);           // ich habe AAA zum dritten Mal gehoert (ME-Schritt)
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifar][0].cnt_pos);            // FAR bleibt nicht-direkt
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_pos);            // AAA hat mich gehoert
+    TEST_ASSERT_EQUAL_UINT8(3, m.cells[iaaa][0].cnt_pos);            // ich habe AAA zum dritten Mal gehoert (ME-Schritt)
     TEST_ASSERT_EQUAL_STRING("NA", nbrRowMeshNeed(m, ifar, 6));      // FAR ist kein direkter Nachbar
     TEST_ASSERT_EQUAL_INT(0, (int)(nbrDirectMask(m, 6) & (1u << (unsigned)ifar)));
 }
@@ -880,7 +888,7 @@ void test_eviction_prefers_two_hop_row_over_older_direct_rows(void)
     nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 10);            // direkt, aelteste
     nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 20);            // direkt
     nbrNoteFrame(m, "OE1CCC-3", ':', NULL, false, -80, 5, 30);            // direkt
-    nbrNoteFrame(m, "OE1DDD-4,OE1CCC-3", ':', NULL, false, -80, 5, 40);   // DDD nur ueber CCC: 2-Hop-Zeile, juengste
+    nbrNoteFrame(m, "OE1DDD-4,OE1CCC-3", '!', NULL, false, -80, 5, 40);   // DDD nur ueber CCC: 2-Hop-Zeile, juengste
     int iaaa = nbrFind(m, "OE1AAA-1");
     int iddd = nbrFind(m, "OE1DDD-4");
     TEST_ASSERT_TRUE(iaaa > 0 && iddd > 0);
@@ -904,8 +912,8 @@ void test_mesh_need_count_is_the_number_behind_the_word(void)
     nbrInit(m, "DK5EN-93", 0);
     nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 5);
     nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 5);
-    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, 5, 5);
-    nbrNoteFrame(m, "OE1DDD-4,OE1AAA-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", '!', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1DDD-4,OE1AAA-1", '!', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
     int iccc = nbrFind(m, "OE1CCC-3");
@@ -924,7 +932,7 @@ void test_relay_need_masks_follow_concept_section_5(void)
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 0);
     // AAA: direkt, und AAA hoert mich (hat meinen Frame wiederholt).
-    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '!', NULL, false, -80, 5, 5);
     // BBB: direkt. LLL: direkt, sonst von niemandem gehoert (Blatt).
     nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 5);
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);
@@ -959,7 +967,7 @@ void test_relay_need_masks_follow_concept_section_5(void)
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
     TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.need);
     TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.alone);
-    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", ':', NULL, false, -80, 5, now);   // AAA hat CCC gehoert
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", '!', NULL, false, -80, 5, now);   // AAA hat CCC gehoert
     int iccc = nbrFind(m, "OE1CCC-3");
     TEST_ASSERT_TRUE(iccc > 0);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
@@ -1017,7 +1025,7 @@ void test_exclusive_direct_ignores_two_hop_hearers(void)
     nbrInit(m, "DK5EN-93", 0);
     nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 5);
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);
-    nbrNoteFrame(m, "OE1LLL-7,OE1CCC-3", ':', NULL, false, -80, 5, 5);   // CCC (2-Hop) hoert LLL
+    nbrNoteFrame(m, "OE1LLL-7,OE1CCC-3", '!', NULL, false, -80, 5, 5);   // CCC (2-Hop) hoert LLL
     int iaaa = nbrFind(m, "OE1AAA-1");
     int illl = nbrFind(m, "OE1LLL-7");
     int iccc = nbrFind(m, "OE1CCC-3");
@@ -1068,7 +1076,7 @@ void test_sym_alt_fallback_makes_lone_dependent_not_alone(void)
     // (cell[AAA][PROV], das Paar im Pfad "AAA,PROV") -- das macht PROV zu
     // einem zweiten, unabhaengigen Anbieter (HatF ueber Beobachtung) UND zum
     // letzten Hop, also ebenfalls direkt gehoert.
-    nbrNoteFrame(m, "OE1AAA-1,OE1PROV-1", ':', NULL, false, -80, 5, 5);
+    nbrNoteFrame(m, "OE1AAA-1,OE1PROV-1", '!', NULL, false, -80, 5, 5);
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);   // X = LLL: relayt nie
     int iaaa = nbrFind(m, "OE1AAA-1");
     int iprov = nbrFind(m, "OE1PROV-1");
@@ -1658,6 +1666,133 @@ void test_report_round_trip_build_then_note(void)
     TEST_ASSERT_TRUE(b.rows[isend].flags & NBR_FLAG_RPT);
 }
 
+// --- 15: Text nimmt keinen Pfadpaar-Pfad mehr (Gateway-Einspeisung) --------
+//
+// Feldlog DK5EN-98, 22.-23.09.2026, 34h: der Server haengt seinen eigenen
+// Pfad vor den einspeisenden Gateway-Namen ("<Server-Pfad>,<Gateway>");
+// das Paar (letztes Server-Token, Gateway) war nie ein Funkempfang. Text
+// (':') liefert seither NUR noch den ME-Schritt (siehe nbrNoteFrame()-
+// Kommentar); '!'/'@' bleiben unveraendert.
+
+void test_text_frame_creates_only_me_row_not_the_injecting_path(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    int hits = nbrNoteFrame(m, "OE1XAR-33,DL2JA-2", ':', NULL, false, -80, 5, 10);
+    TEST_ASSERT_EQUAL_INT(1, hits);   // nur ME(DL2JA-2), keine Kante
+
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1XAR-33"));   // Server-Token bekommt keine Zeile
+    int idja = nbrFind(m, "DL2JA-2");
+    TEST_ASSERT_TRUE(idja > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[idja][0].cnt_text);
+}
+
+void test_pos_frame_same_path_still_creates_the_pair_edge(void)
+{
+    // Gegenprobe: derselbe Pfad bleibt fuer '!' unveraendert -- die
+    // Pfadpaar-Kante entsteht weiterhin, POS ist von der Text-Ausnahme
+    // nicht betroffen.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    int hits = nbrNoteFrame(m, "OE1XAR-33,DL2JA-2", '!', NULL, false, -80, 5, 10);
+    TEST_ASSERT_EQUAL_INT(2, hits);   // Kante + ME
+
+    int ixar = nbrFind(m, "OE1XAR-33");
+    int idja = nbrFind(m, "DL2JA-2");
+    TEST_ASSERT_TRUE(ixar > 0);
+    TEST_ASSERT_TRUE(idja > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ixar][idja].cnt_pos);
+}
+
+void test_text_frame_with_three_tokens_touches_only_the_last_hop(void)
+{
+    // A und GW existieren schon (ueber POS-Frames angelegt), mit einer
+    // fruehen last_min. Ein spaeterer 3-Token-Text-Frame "A,GW,B" darf
+    // weder die Fenster-Kante (GW,B) noch die Regel-3-Gratis-Kante (A,GW)
+    // eintragen -- unter der alten Regel haette (A,GW) getroffen, weil
+    // beide Enden schon Zeilen hatten. Nur B (letzter Hop) bekommt den
+    // ME-Treffer; A und GW duerfen dabei nicht verjuengt werden.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, 5, 10);
+    nbrNoteFrame(m, "OE1GWY-1", '!', NULL, false, -80, 5, 10);
+    int ia = nbrFind(m, "OE1AAA-1");
+    int igw = nbrFind(m, "OE1GWY-1");
+    TEST_ASSERT_TRUE(ia > 0 && igw > 0);
+
+    g_log_buf[0] = '\0';
+    nbrLog = test_log_capture;
+    int hits = nbrNoteFrame(m, "OE1AAA-1,OE1GWY-1,OE1BBB-2", ':', NULL, false, -80, 5, 200);
+    nbrLog = NULL;
+    TEST_ASSERT_EQUAL_INT(1, hits);   // nur ME(B)
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|ME|200|OE1BBB-2|T|-80|1|5\n"));
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|CUT|"));    // Text kennt kein 2-Hop-Fenster
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|EDGE|"));   // und keine Pfadkante
+
+    int ib = nbrFind(m, "OE1BBB-2");
+    TEST_ASSERT_TRUE(ib > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ib][0].cnt_text);
+
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ia][igw].cnt_text);   // keine Regel-3-Gratis-Kante
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[igw][ib].cnt_text);   // keine Fenster-Kante
+
+    TEST_ASSERT_EQUAL_UINT16(10, m.rows[ia].last_min);       // A nicht verjuengt
+    TEST_ASSERT_EQUAL_UINT16(10, m.rows[igw].last_min);      // GW nicht verjuengt
+}
+
+void test_text_frame_with_own_call_as_last_hop_is_still_a_pure_echo(void)
+{
+    // Pin: das eigene Echo bleibt fuer Text folgenlos, auch nach der
+    // Text-Sonderregel (unveraenderte Erwartung, siehe
+    // test_own_frame_returning_via_relay_is_echo_not_direct_hearing).
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, 5, 10);
+    TEST_ASSERT_TRUE(nbrFind(m, "OE1AAA-1") > 0);
+
+    NbrMatrix before;
+    memcpy(&before, &m, sizeof(m));
+
+    int hits = nbrNoteFrame(m, "OE1AAA-1,DK5EN-93", ':', NULL, false, -80, 5, 20);
+    TEST_ASSERT_EQUAL_INT(0, hits);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &m, sizeof(m)));
+}
+
+void test_text_echo_of_my_own_frame_marks_no_hears_me_edge(void)
+{
+    // Bewusster Verlust (nbr_matrix.h): "<ich>,X" als Text traegt nur
+    // "ich habe X gehoert" ein, nicht "X hoert mich" -- ein anderes Gateway
+    // kann meinen hochgeladenen Text genauso als "<ich>,<Gateway>" senden.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    int hits = nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", ':', NULL, false, -70, 5, 200);
+    TEST_ASSERT_EQUAL_INT(1, hits);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_TRUE(iaaa > 0);
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);   // ich habe AAA gehoert
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);   // keine "AAA hoert mich"-Kante aus Text
+}
+
+void test_gateway_echo_text_gives_far_origin_no_row(void)
+{
+    // Text-Zwilling von test_gateway_echo_does_not_mark_server_origin_as_directly_heard:
+    // der Feldfall, der die Text-Regel ausgeloest hat. Ich (Gateway) setze
+    // FARs Server-Text auf LoRa, AAA wiederholt: "FAR,ich,AAA". FAR bekommt
+    // keine Zeile, nur AAA den ME-Treffer.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, 5, 5);
+    int hits = nbrNoteFrame(m, "OE3FAR-9,DK5EN-93,OE1AAA-1", ':', NULL, false, -80, 5, 6);
+    TEST_ASSERT_EQUAL_INT(1, hits);
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE3FAR-9"));
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1719,5 +1854,11 @@ int main(int, char **)
     RUN_TEST(test_sym_veto_expires_after_valid_window);
     RUN_TEST(test_sym_veto_report_listing_m_is_observed_not_inferred);
     RUN_TEST(test_report_round_trip_build_then_note);
+    RUN_TEST(test_text_frame_creates_only_me_row_not_the_injecting_path);
+    RUN_TEST(test_pos_frame_same_path_still_creates_the_pair_edge);
+    RUN_TEST(test_text_frame_with_three_tokens_touches_only_the_last_hop);
+    RUN_TEST(test_text_frame_with_own_call_as_last_hop_is_still_a_pure_echo);
+    RUN_TEST(test_text_echo_of_my_own_frame_marks_no_hears_me_edge);
+    RUN_TEST(test_gateway_echo_text_gives_far_origin_no_row);
     return UNITY_END();
 }
