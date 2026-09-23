@@ -55,7 +55,7 @@ Fluten zurueck. Nichts unterdrueckt auf Verdacht.
 
 Quelle: `martin@rpizero.local:~/meshlog/dk5en-98/`, Mitschnitt mit `--nbrdebug` und `--setlog`.
 Ausgewertet mit `tools/nbrlog.py --since 2026-09-21` (Bericht
-`~/Desktop/nbr-feldlauf-20260922-zwischenstand.md`) sowie den beiden neuen Skripten
+`docs/archive/nbr-feldlauf-20260922-zwischenstand.md`) sowie den beiden neuen Skripten
 `tools/nbrsnap.py` (Geraetesicht je Schnappschuss) und `tools/nbrrelay.py` (Relay-Baseline).
 
 | Groesse                                         | Wert                                                    |
