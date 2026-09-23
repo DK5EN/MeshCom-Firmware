@@ -32,6 +32,8 @@ tr.closed td{color:var(--fg3)}
 tr.closed .note{font-size:.78rem;margin-top:.15rem}
 .tocwrap{overflow-x:auto}
 .box{border-radius:10px;border:1px solid var(--line);background:var(--bg2);padding:.85rem 1rem;margin:1rem 0;color:var(--fg2)}
+table.cap th:nth-child(1){width:14%}table.cap th:nth-child(2){width:70%}table.cap th:nth-child(3){width:16%}
+td.sha{font-family:var(--mono);font-size:.8rem}
 @media (max-width:640px){table{table-layout:auto;font-size:.78rem}th,td{padding:.35rem .4rem}}
 </style>
 </head>
@@ -39,15 +41,15 @@ tr.closed .note{font-size:.78rem;margin-top:.15rem}
 <div class="wrap">
 <p class="small" style="margin:0 0 .6rem"><a href="./">← Übersicht</a></p>
 <div class="eyebrow">icssw-org/MeshCom-Firmware · Pull Requests von DK5EN</div>
-<h1>Drei Runden nach upstream: von 4.35m bis 4.35t</h1>
-<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in drei Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt.</p>
+<h1>Vier Runden nach upstream: von 4.35m bis 4.35t.09.20</h1>
+<p class="lead">Alle Beiträge dieses Forks an die offizielle Firmware, chronologisch in vier Runden. Jede Runde hat ein Thema, jede Zeile die Zeilenbilanz aus GitHub. Vier geschlossene PRs sind der Vollständigkeit halber dabei und erklärt. Am Ende steht, was noch kein PR ist: <b>neo</b>, der Zweig <code>fork-neo-test</code>.</p>
 <div class="stats">
-<div class="stat"><div class="k">Gemergte PRs</div><div class="v">33</div></div>
-<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+24.696</span> <span class="minus">−5.941</span></div></div>
-<div class="stat"><div class="k">Dateiänderungen</div><div class="v">348</div></div>
-<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 13.09.2026</div></div>
+<div class="stat"><div class="k">Gemergte PRs</div><div class="v">41</div></div>
+<div class="stat"><div class="k">Zeilen gesamt</div><div class="v"><span class="plus">+25.222</span> <span class="minus">−5.995</span></div></div>
+<div class="stat"><div class="k">Dateiänderungen</div><div class="v">373</div></div>
+<div class="stat"><div class="k">Zeitraum</div><div class="v">22.02. – 22.09.2026</div></div>
 </div>
-<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.) → <b>4.35t</b> (10.09., fortgeführt bis 13.09.). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
+<div class="box">Versionsfolge upstream: <b>4.35l</b> → <b>4.35m</b> (22.02.2026) → <b>4.35n</b> (05.03.) → <b>4.35o</b> (08.03.) → <b>4.35p</b> (22.03.) → <b>4.35s</b> (03.09.) → <b>4.35t</b> (10.09., fortgeführt bis 13.09.) → <b>4.35t.09.20</b> (20.09.). Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</div>
 <section>
 <div class="eyebrow">Februar 2026 · 4.35m → 4.35n</div>
 <h2>Empfangslöcher und Wiederholungen</h2>
@@ -111,8 +113,72 @@ tr.closed .note{font-size:.78rem;margin-top:.15rem}
 </section>
 
 <section>
+<div class="eyebrow">September 2026 · 4.35t → 4.35t.09.20</div>
+<h2>Feldmeldungen gegen 4.35t</h2>
+<p class="lead">Acht kleine PRs, jeder aus einer Meldung aus dem Betrieb. #1142: der APRS-Positionsdecoder liest <code>#name</code> sowie <code>/R=</code>, <code>/U=</code> und <code>/I=</code>, und der Encoder schreibt keine NaN-Werte mehr. #1143: nach dem Deepsleep nennt das Boot-Log den Aufwachgrund. #1144: in der Web-GUI bleibt die Gruppennummer nach dem Senden im Zielfeld, statt dass die nächste Nachricht als Broadcast hinausgeht. #1147: über BLE kamen nach längerer Laufzeit leere Node Settings an, weil der MHeard-Schub die Config-Frames im Kommando-Ring überschrieb. #1148: ohne App lief der Hop-Zähler bei Gruppen- und Broadcast-Frames auf 15 über. #1149: das eigene Rufzeichen steht immer mit SSID und in kanonischer Schreibweise. #1150: <code>setlat</code>/<code>setlon</code> über die Web-GUI meldeten auf nRF52 fälschlich einen Fehler. #1152: eine T-Beam 1W zeigte nach dem Löschen der Einstellungen dauerhaft USB statt Akku. Sieben davon sind im upstream-Tag 4.35t.09.20; #1152 kam zwei Tage danach und liegt auf dev.</p>
+<div class="stats"><div class="stat"><div class="k">PRs gemerged</div><div class="v">8</div></div><div class="stat"><div class="k">Zeilen</div><div class="v"><span class="plus">+526</span> <span class="minus">−54</span></div></div><div class="stat"><div class="k">Dateien</div><div class="v">25</div></div></div>
+<div class="tocwrap"><table><thead><tr><th>PR</th><th>Merge</th><th>Titel</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1142">#1142</a></td><td>2026-09-14</td><td>fix(aprs): Positionsdecoder liest #name, /R= /U= /I=; NaN-Schutz je Tag im Encoder</td><td class="num"><span class="plus">+230</span> <span class="minus">−25</span></td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1143">#1143</a></td><td>2026-09-14</td><td>feat(esp32): Aufwachgrund nach Deepsleep im Boot-Log (WAKE_CAUSE)</td><td class="num"><span class="plus">+29</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1144">#1144</a></td><td>2026-09-14</td><td>fix(webgui): Gruppennummer bleibt nach dem Senden im Zielfeld, kein ungewollter Broadcast</td><td class="num"><span class="plus">+6</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1147">#1147</a></td><td>2026-09-20</td><td>fix(ble): leere Node Settings nach laengerer Laufzeit - MHeard-Schub ueberschreibt Config-Frames im Kommando-Ring</td><td class="num"><span class="plus">+61</span> <span class="minus">−13</span></td><td class="num">5</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1148">#1148</a></td><td>2026-09-20</td><td>fix(relay): Hop-Zaehler laeuft bei Gruppen-/Broadcast-Frames ohne App auf 15 ueber</td><td class="num"><span class="plus">+10</span> <span class="minus">−2</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1149">#1149</a></td><td>2026-09-20</td><td>fix(call): eigenes Rufzeichen immer mit SSID, kanonisch geschrieben</td><td class="num"><span class="plus">+154</span> <span class="minus">−2</span></td><td class="num">8</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1150">#1150</a></td><td>2026-09-20</td><td>fix(web): setlat/setlon auf nRF52 meldeten faelschlich "Value could not be set"</td><td class="num"><span class="plus">+10</span> <span class="minus">−10</span></td><td class="num">1</td></tr>
+<tr><td><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1152">#1152</a></td><td>2026-09-22</td><td>fix(batt): T-Beam 1W zeigt nach Wipe dauerhaft USB statt Akku</td><td class="num"><span class="plus">+26</span></td><td class="num">3</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<div class="eyebrow">September 2026 · fork-neo-test auf 4.35t.09.20</div>
+<h2>neo: derselbe Funk, besserer Code</h2>
+<p class="lead"><a href="https://github.com/DK5EN/MeshCom-Firmware/tree/fork-neo-test"><code>fork-neo-test</code></a> ist <code>upstream/dev</code> im Stand des Tags 4.35t.09.20 plus eine Aufräum- und Vereinheitlichungskampagne. Code, der an zwei oder an achtundzwanzig Stellen gleichzeitig stand, steht jetzt einmal; tote Dateien sind weg; und wo die Doppelung auseinandergelaufen war, sind dabei echte Fehler sichtbar geworden und behoben. Das Versprechen: auf dem Funk verhält sich diese Firmware wie die offizielle 4.35t, besser wird sie nur unter Last. Noch ist das kein PR, sondern ein offener Zweig zum Nachlesen und Mitmessen.</p>
+<div class="stats"><div class="stat"><div class="k">Board-Code: Dateien</div><div class="v">258</div></div><div class="stat"><div class="k">Board-Code: Zeilen</div><div class="v"><span class="plus">+24.810</span> <span class="minus">−42.011</span></div></div><div class="stat"><div class="k">Kapitel / Einträge</div><div class="v">18 / 117</div></div><div class="stat"><div class="k">Basis</div><div class="v">4.35t.09.20</div></div></div>
+<div class="box"><b>Gemessen, nicht behauptet.</b> Differenzlauf am 19.09. gegen <code>upstream/dev</code> auf einem Heltec V3 und einem T-Beam, mitgeschnitten von beiden Knoten und einem dritten als Zeugen: dieselben Nutzlasten mit denselben Feldern, auf dem Funk kein Unterschied. Im Knoten dagegen <b>+11.296 B</b> freier Heap auf dem Heltec V3 und <b>+15.560 B</b> auf dem T-Beam, dazu 10,5 kB und 45,5 kB weniger Flash. Danach zwölf Stunden Dauerlauf auf drei Knoten, einer davon mit Mesh und Gateway unter echter Netzlast: kein Neustart, kein Absturz, kein Ringüberlauf, der Heap flach.</div>
+<p class="lead">Das <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-neo-test/docs/CHANGELOG-neo.md">Changelog</a> erzählt die Arbeit in achtzehn Kapiteln mit 117 Einträgen. Jeder Eintrag sagt, ob er reine Restrukturierung ist oder eine Fehlerbehebung, und nennt seinen Nachweis, wo es einen gibt.</p>
+<div class="tocwrap"><table class="cap"><thead><tr><th>Kapitel</th><th>Thema</th><th>Einträge</th></tr></thead><tbody>
+<tr><td class="sha">K01</td><td>Vendor-Ballast entfernen</td><td class="num">3</td></tr>
+<tr><td class="sha">K18</td><td>Build-Konfiguration</td><td class="num">7</td></tr>
+<tr><td class="sha">K02</td><td>Settings-Store: ein Schema für beide Plattformen</td><td class="num">11</td></tr>
+<tr><td class="sha">K03</td><td>BLE-Settings v1</td><td class="num">4</td></tr>
+<tr><td class="sha">K05</td><td>UDP-Rahmen und Gateway-Dienst</td><td class="num">8</td></tr>
+<tr><td class="sha">K08</td><td>APRS und Textcodec</td><td class="num">3</td></tr>
+<tr><td class="sha">K06</td><td>MHeard</td><td class="num">5</td></tr>
+<tr><td class="sha">K09</td><td>LoRa-Schicht und Funkparameter</td><td class="num">12</td></tr>
+<tr><td class="sha">K04</td><td>Kommandotabelle und Setter</td><td class="num">14</td></tr>
+<tr><td class="sha">K07</td><td>Loop-Scheduler und Plattform-Aktionen</td><td class="num">9</td></tr>
+<tr><td class="sha">K11</td><td>nRF52-Netzstack</td><td class="num">4</td></tr>
+<tr><td class="sha">K12</td><td>ESP32-Kern und Peripherie</td><td class="num">10</td></tr>
+<tr><td class="sha">K10</td><td>LVGL: ui_common und ein lv_conf</td><td class="num">5</td></tr>
+<tr><td class="sha">K13</td><td>T-Deck</td><td class="num">4</td></tr>
+<tr><td class="sha">K14</td><td>EXTUDP und Aufzeichnung</td><td class="num">7</td></tr>
+<tr><td class="sha">K16</td><td>Web-GUI</td><td class="num">5</td></tr>
+<tr><td class="sha">K15</td><td>Safeboot und OTA</td><td class="num">5</td></tr>
+<tr><td class="sha">K17</td><td>Instrumentierung</td><td class="num">1</td></tr>
+</tbody></table></div>
+<p class="lead">Im Code sind es weniger Schritte als Kapitel: dreizehn Kapitel greifen über Header, Typen und verschobene Funktionen so ineinander, dass sie nur gemeinsam übersetzen, und stehen deshalb in einem Commit. Das Changelog beschreibt den Stand vom 20.09.; die Zeilen ab der RAM-Arbeit kamen danach, darunter zwei kleine Funktionen außerhalb des Funkpfads (Originator-Felder im Extern-UDP, DHCP-Hostname).</p>
+<div class="tocwrap"><table><thead><tr><th>Commit</th><th>Datum</th><th>Inhalt</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/c6fe6087774822cbaf62b0a7b02e22e17b03b699">c6fe6087</a></td><td>2026-09-20</td><td>K01: Vendor-Ballast entfernen</td><td class="num"><span class="minus">−18.508</span></td><td class="num">57</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/3b2fbb8c6e3c1c908758e6b349149c953cc67511">3b2fbb8c</a></td><td>2026-09-20</td><td>Der verflochtene Kern: K02 bis K14 und K18 – Konfiguration, Persistenz, Transport, Typwechsel</td><td class="num"><span class="plus">+19.294</span> <span class="minus">−21.933</span></td><td class="num">185</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/ee68a44744ada269575afc0a429d11beab4ad3d8">ee68a447</a></td><td>2026-09-20</td><td>K15: Safeboot und OTA</td><td class="num"><span class="plus">+238</span> <span class="minus">−98</span></td><td class="num">4</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/01cf69203076f294f53d3b32801897b2bb13f8c5">01cf6920</a></td><td>2026-09-20</td><td>K16: Web-GUI</td><td class="num"><span class="plus">+14</span> <span class="minus">−18</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/f175b3bf7b3424fe2a4754e511e7f50db5781ca0">f175b3bf</a></td><td>2026-09-20</td><td>K17: Instrumentierung</td><td class="num"><span class="plus">+18</span> <span class="minus">−1</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/2616ef59ddd91244a4bf115d70de290daf94e72c">2616ef59</a></td><td>2026-09-20</td><td>RAM: die drei Ausgangsringe als Byte-Ringe, Web-Header im String, Display-Cache halbiert</td><td class="num"><span class="plus">+472</span> <span class="minus">−270</span></td><td class="num">16</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/4d162cdcf0a9d4c1c2ebbbc268573a39f12349bb">4d162cdc</a></td><td>2026-09-20</td><td>fix(mheard): beide Schleifenwächter aus upstream auf den eingefrorenen Schnappschuss zurückgeholt</td><td class="num"><span class="plus">+18</span> <span class="minus">−7</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/8990e94dbaa393e634f3b06b1c0882758382b491">8990e94d</a></td><td>2026-09-20</td><td>fix(extudp): der Loop-Task-Stack reichte nicht für die Extern-UDP-Eingangskette</td><td class="num"><span class="plus">+63</span> <span class="minus">−10</span></td><td class="num">7</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/5793c7929738fcf91ed4aedf6b82a6ac8f39cbc6">5793c792</a></td><td>2026-09-21</td><td>fix(mheard): die Drossel verglich Frames mit Bytes und griff deshalb nie</td><td class="num"><span class="plus">+21</span> <span class="minus">−12</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/0e20054f728814e77ba2ee0fcbdd70fbaa2dcc14">0e20054f</a></td><td>2026-09-21</td><td>fix(mesh): <code>--mesh off</code> galt auf Via-Pfaden nicht, und indexOf traf Präfixe</td><td class="num"><span class="plus">+48</span> <span class="minus">−2</span></td><td class="num">1</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/09267c3716a8c180c4366e76a907899bfbe179c0">09267c37</a></td><td>2026-09-21</td><td>feat(extudp): Originator-Felder hw_id, lora_mod und max_hop auf msg und pos</td><td class="num"><span class="plus">+129</span> <span class="minus">−30</span></td><td class="num">3</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/b43de53767440d8203c92214c032d91bfc421fe5">b43de537</a></td><td>2026-09-21</td><td>feat(net): DHCP-Hostname ist das Rufzeichen, nicht esp32-XXXXXX</td><td class="num"><span class="plus">+53</span></td><td class="num">3</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/a04d9c87fbc7ce2b08f44ef3af845f85c1ca2254">a04d9c87</a></td><td>2026-09-21</td><td>K15 vervollständigt: Safeboot-Stand aus fork-main übernommen</td><td class="num"><span class="plus">+4.628</span> <span class="minus">−1.368</span></td><td class="num">7</td></tr>
+<tr><td class="sha"><a href="https://github.com/DK5EN/MeshCom-Firmware/commit/551f9a0b9f061e400095677795dfd8e0e9d4e348">551f9a0b</a></td><td>2026-09-22</td><td>fix(batt): node_maxv beim Laden gegen die Board-Leerspannung prüfen</td><td class="num"><span class="plus">+26</span></td><td class="num">3</td></tr>
+</tbody></table></div>
+<p class="small">Die Zeilen je Commit summieren sich nicht zur Kopfzahl: spätere Commits überschreiben frühere, und die Kopfzahl ist der Nettovergleich gegen die Basis.</p>
+</section>
+
+<section>
 <div class="eyebrow">Quelle</div>
-<p class="small">Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 10.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst.</p>
+<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 23.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst. Die neo-Zahlen zählen nur den Code, der auf das Board kommt: <code>git diff --shortstat v4.35t.09.20 fork-neo-test -- src lib variants config platformio.ini</code>; Tests, Werkzeuge und Dokumentation des Zweigs sind darin nicht enthalten. Heap- und Flash-Werte aus dem Changelog, Abschnitt „Auf der Bank gemessen“.</p>
 </section>
 </div>
 </body>
