@@ -189,6 +189,44 @@
         line-height: 1.45;
         color: var(--muted);
       }
+      .detect-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .detect-row .copy {
+        margin-top: 0;
+        font-weight: 600;
+      }
+      .detect-row .copy:disabled {
+        opacity: 0.5;
+        cursor: progress;
+      }
+      .detect-status {
+        color: var(--muted);
+        font-size: 0.87rem;
+      }
+      .detect {
+        width: 100%;
+        font-size: 0.87rem;
+        line-height: 1.5;
+      }
+      .detect .warn {
+        background: var(--warn-bg);
+        border: 1px solid var(--warn-border);
+        color: var(--warn-fg);
+        border-radius: 7px;
+        padding: 8px 10px;
+        margin: 10px 0 0;
+      }
+      .detect .verdict {
+        font-weight: 600;
+        margin: 10px 0 0;
+      }
       .action {
         border-top: 1px solid var(--border);
         padding-top: 18px;
@@ -257,6 +295,14 @@
       </p>
 
       <div class="panel">
+        <div class="detect-row" id="detect-row" hidden>
+          <button class="copy" id="detect" type="button">Board erkennen</button>
+          <span class="detect-status" id="detect-status">
+            Fragt einen Knoten mit MeshCom nach seiner Hardware und waehlt das Board vor. Ohne
+            MeshCom auf dem Board bleibt die Auswahl von Hand.
+          </span>
+          <div class="detect" id="detect-result" hidden></div>
+        </div>
         <div class="row">
           <div class="field">
             <label for="board">Board</label>

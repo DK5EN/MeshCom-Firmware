@@ -1,0 +1,161 @@
+{
+  "boards": {
+    "E22-DevKitC": {
+      "hwid": 39,
+      "radio": "SX1268",
+      "chipFamily": "ESP32"
+    },
+    "E22_1262-DevKitC": {
+      "hwid": 39,
+      "radio": "SX1262",
+      "chipFamily": "ESP32"
+    },
+    "E22_1262_S3-DevKitC-1-N16R8": {
+      "hwid": 48,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "E22_1268_S3-DevKitC-1-N16R8": {
+      "hwid": 48,
+      "radio": "SX1268",
+      "chipFamily": "ESP32-S3"
+    },
+    "E22_XML-DevKitC": {
+      "hwid": 39,
+      "radio": "SX1268",
+      "chipFamily": "ESP32"
+    },
+    "esp32-loraprs-e22": {
+      "hwid": 59,
+      "radio": "SX1268",
+      "chipFamily": "ESP32"
+    },
+    "esp32-loraprs-ra01": {
+      "hwid": 60,
+      "radio": "SX1278",
+      "chipFamily": "ESP32"
+    },
+    "heltec_wifi_lora_32_V2": {
+      "hwid": 10,
+      "radio": "SX1278",
+      "chipFamily": "ESP32"
+    },
+    "heltec_wifi_lora_32_V3": {
+      "hwid": 43,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "heltec_wifi_lora_32_V4": {
+      "hwid": 52,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "heltec_wireless_stick": {
+      "hwid": 42,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "heltec_wireless_tracker": {
+      "hwid": 41,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "LilyGo_T-Beam-1W": {
+      "hwid": 51,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "T-ETH-ELITE_1262": {
+      "hwid": 53,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "LilyGo_T3_S3_V1_3": {
+      "hwid": 55,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "ttgo-lora32-v21": {
+      "hwid": 3,
+      "radio": "SX1278",
+      "chipFamily": "ESP32"
+    },
+    "ttgo_tbeam": {
+      "hwid": 4,
+      "radio": "SX1278",
+      "chipFamily": "ESP32"
+    },
+    "ttgo_tbeam_supreme": {
+      "hwid": 47,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "ttgo_tbeam_SX1262": {
+      "hwid": 45,
+      "radio": "SX1262",
+      "chipFamily": "ESP32"
+    },
+    "ttgo_tbeam_SX1268": {
+      "hwid": 5,
+      "radio": "SX1268",
+      "chipFamily": "ESP32"
+    },
+    "LilyGo_T_Connect_Pro": {
+      "hwid": 56,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "t_deck": {
+      "hwid": 8,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "t_deck_plus": {
+      "hwid": 46,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "t_deck_pro": {
+      "hwid": 50,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "vision-master-e213": {
+      "hwid": 58,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "vision-master-e290": {
+      "hwid": 44,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "wireless-paper": {
+      "hwid": 57,
+      "radio": "SX1262",
+      "chipFamily": "ESP32-S3"
+    },
+    "heltec_t114": {
+      "hwid": 54,
+      "radio": "SX1262",
+      "chipFamily": "NRF52"
+    },
+    "t_echo": {
+      "hwid": 7,
+      "radio": "SX1262",
+      "chipFamily": "NRF52"
+    },
+    "wiscore_rak4631": {
+      "hwid": 9,
+      "radio": "SX1262",
+      "chipFamily": "NRF52"
+    }
+  },
+  "aliases": {
+    "12": [
+      "ttgo_tbeam",
+      "ttgo_tbeam_SX1262",
+      "ttgo_tbeam_SX1268"
+    ]
+  }
+}
