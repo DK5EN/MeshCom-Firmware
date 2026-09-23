@@ -243,8 +243,8 @@ class RptSumRec:
     ``heard`` ist die MHeard-Zahl des Senders (wie ``R<n>`` im HEY), kein
     Kappungssignal -- das ist allein ``full``.
     ``applied`` ist die Anzahl der daraus tatsaechlich eingetragenen Kanten
-    (Status ``ok`` unter den zugehoerigen RPT-Zeilen; ``self``/``norow``
-    zaehlen nicht mit)."""
+    (Status ``ok`` oder ``self`` unter den zugehoerigen RPT-Zeilen -- beide
+    schreiben eine Kante; ``norow`` zaehlt nicht mit)."""
 
     host: datetime
     up: int
