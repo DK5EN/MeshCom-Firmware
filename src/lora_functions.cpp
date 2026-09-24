@@ -1369,7 +1369,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     }
 
                                     queueDisplayText(aprsmsg, rssi, snr);
-                                    
+
+                                    // P13: das Pong geht auch an den BLE-Client, wie jede andere
+                                    // DM an uns (else-Zweig unten). Sonst sieht ein ueber BLE
+                                    // gesendetes {ping} (App, McApp) nie eine Antwort. Roh
+                                    // weitergereicht: {pong}{<id>} ordnet es dem Ping zu.
+                                    addBLEOutBuffer(RcvBuffer, size);
+
                                     bPingSend = false;
 
                                 }
