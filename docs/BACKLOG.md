@@ -601,6 +601,7 @@ extraction of the ~221 genuinely shared, radio-independent loop lines.
 | ~~Licensing (`N-11`)~~ — **ACCEPTED** 2026-08-18, risk accepted, no fix planned          | closed                                                                                    |
 | `FLASH_VERSION` migration (`N-12`) — re-verified 2026-08-18, still deferred (see doc 08) | **before** any change to the `meshcom_settings` layout                                    |
 | Hardware bench (2 × Heltec V3)                                                           | after the no-hardware steps; see doc 07 for wiring, frequency plan and scenario catalogue |
+| HN upload by gateways — a gateway uploads received `HN` neighbor reports (`ec636e3f`) so mcmap gets named leaf neighborhoods instead of estimates; the hub must pass the `@`/`HN` frame through INTERLINK (outlook §8 of mcmap `docs/proposals/data-neighbor-2hop.md`, added 2026-09-24) | mcmap MC-319 is built and its gateway-bound graph (median coverage 0.36 of the self-reported count) proves too thin for the supernode/relay question |
 
 ### 3.6a Sizing — input for the G12 decision
 
