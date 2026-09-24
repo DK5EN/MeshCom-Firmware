@@ -4194,6 +4194,15 @@ int sendMessage(char *msg_text, int len)
 
     int w = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
 
+    // P14: auch {ping} nicht wiederholen. Die Gegenstelle antwortet mit {pong},
+    // nie mit ACK -- nichts stoppte die Wiederholung, ein Ping aus App/McApp
+    // ging dreimal in die Luft. Erst NACH dem Einreihen auf DONE setzen, wie
+    // in SendAckMessage(): getMessagePriority() liest den Status in
+    // addTxRingEntry() und stufte eine vorab auf DONE gesetzte DM als Relay
+    // (NORMAL) statt als persoenliche DM (CRITICAL) ein.
+    if(w >= 0 && msg_buffer[0] == 0x3A && mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+        ringBuffer[w][1] = RING_STATUS_DONE;
+
     if(bDisplayRetx && w >= 0)
     {
         unsigned int ring_msg_id = (ringBuffer[w][6]<<24) | (ringBuffer[w][5]<<16) | (ringBuffer[w][4]<<8) | ringBuffer[w][3];
