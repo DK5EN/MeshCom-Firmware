@@ -5032,7 +5032,10 @@ void commandAction(char *umsg_text, bool ble)
         // Konzept 4.2/4.5: "leer" heisst wirklich noch nichts gehoert, nicht
         // nur ausserhalb des 720-min-Fensters -- Zeile 0 traegt vor der
         // ersten OnRxDone-Ausfuehrung (Lazy Init dort) noch kein Rufzeichen.
-        if(nbrMatrix.rows[0].call[0] == 0x00)
+        // W2c CONTRACT: Zeile 0 nur noch ueber nbrRowGet() lesen -- das rows-
+        // Feld der Matrix ist seit dem Kantenpool-Umbau nicht mehr oeffentlich.
+        NbrRowView r0v;
+        if(!nbrRowGet(nbrMatrix, 0, &r0v) || r0v.call[0] == 0x00)
         {
             printfdeb("[NBR] empty\n");
             return;
@@ -5042,19 +5045,32 @@ void commandAction(char *umsg_text, bool ble)
         // 4 KB (siehe showMHeard()), das Kommando laeuft ausschliesslich dort.
         // 300 statt 200: Zeile 0 mit 20 Hoerern plus Reichweite und Alter
         // liegt ueber 200 Zeichen, snprintf kappte dann stumm (Advisor L1).
+        // nbr_buf bleibt static (fest 300 B, skaliert nicht mit NBR_MAX_ROWS).
+        // W2c (Orchestrator-Review 2026-09-25, zweite Runde): nbr_rows[]/
+        // ex_idx[] sind jetzt bis zu NBR_MAX_ROWS==128 (S3/nRF52) statt
+        // vormals <= 21 -- zusammen 256 B, die NICHT permanent im BSS liegen
+        // sollen (selten benutztes Kommando). Ein malloc()-Block statt zweier
+        // static-Arrays, free() vor jedem Rueckkehrpunkt danach.
         static char nbr_buf[300];
+        uint8_t *nbr_scratch = (uint8_t *)malloc(2 * (size_t)NBR_MAX_ROWS);
+        if(nbr_scratch == NULL)
+        {
+            printfdeb("[NBR] not enough memory\n");
+            return;
+        }
+        uint8_t *nbr_rows = nbr_scratch + 0 * NBR_MAX_ROWS;
+        uint8_t *ex_idx = nbr_scratch + 1 * NBR_MAX_ROWS;
 
-        uint8_t nbr_rows[NBR_MAX_ROWS];
         uint8_t nbr_n = 0;
         nbr_rows[nbr_n++] = 0;
 
         for(int i = 1; i < NBR_MAX_ROWS; i++)
         {
-            if((nbrMatrix.rows[i].flags & NBR_FLAG_USED) && nbrFresh(nbrMatrix.rows[i].last_min, now_min))
+            NbrRowView v;
+            if(nbrRowGet(nbrMatrix, i, &v) && nbrFresh(v.last_min, now_min))
                 nbr_rows[nbr_n++] = (uint8_t)i;
         }
 
-        uint8_t ex_idx[NBR_MAX_ROWS];
         int ex_n = nbrExclusive(nbrMatrix, now_min, ex_idx, NBR_MAX_ROWS);
 
         if(ex_n == -1)
@@ -5068,8 +5084,9 @@ void commandAction(char *umsg_text, bool ble)
 
             for(int i = 0; i < ex_n && i < NBR_MAX_ROWS && vpos > 0 && vpos < (int)sizeof(nbr_buf); i++)
             {
-                vpos += snprintf(nbr_buf+vpos, sizeof(nbr_buf)-vpos, "%s%s", (i > 0) ? "," : "",
-                                  nbrMatrix.rows[ex_idx[i]].call);
+                NbrRowView ev;
+                const char *ecall = nbrRowGet(nbrMatrix, ex_idx[i], &ev) ? ev.call : "?";
+                vpos += snprintf(nbr_buf+vpos, sizeof(nbr_buf)-vpos, "%s%s", (i > 0) ? "," : "", ecall);
             }
 
             printfdeb("%s\n", nbr_buf);
@@ -5086,6 +5103,7 @@ void commandAction(char *umsg_text, bool ble)
                 printfdeb("[NBR] %s%s\n", nbr_buf, (flen >= (int)sizeof(nbr_buf)) ? " ..." : "");
         }
 
+        free(nbr_scratch);
         return;
     }
     else

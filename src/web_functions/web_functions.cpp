@@ -1567,20 +1567,24 @@ void sub_page_path()
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// Direktheitstest einer Zeile (Konzept docs/nbr-wichtigkeit-konzept.md 6.1,
-// Spalte "D/I", und Zeile-0-Ausnahme in 6.1/6.2): Zeile 0 gilt nie als
-// "direkt" -- die Frage "hoere ich mich selbst direkt" ist nicht gestellt.
-// Sonst frisch und gesetzt heisst cells[X][0] (Konzept 4.1: der ME-Schritt
-// beim Empfang). sub_page_neighbours() teilt diesen Test zwischen der
-// D/I-Spalte, #X/Role (nbrRowMeshNeedCount() ist NA fuer dieselbe Bedingung)
-// und der Sortierung von Tabelle 2 (6.2, Regel 2) -- ein Helfer statt drei
-// Kopien.
-static bool nbrRowIsDirect(uint8_t X, uint16_t now_min)
+// W2c CONTRACT: jede Zeile ausserhalb von nbr_matrix.cpp liest nur ueber die
+// oeffentliche API (nbrRowGet()/nbrEdgeGet()/die Maskenfunktionen aus
+// nbr_matrix.h) -- die Zeilen- und Kantenfelder von NbrMatrix sind seit dem
+// Kantenpool-Umbau (Welle 2) nicht mehr oeffentlich, und NBR_MAX_ROWS ist
+// jetzt 64 (klassischer ESP32) bzw. 128 (S3, nRF52) statt vormals <= 21.
+// nbrRowGet() ist ein O(1)-Zeilenzugriff (NbrMatrix.row[] ist ein Array, kein
+// Pool) -- es GIBT bewusst kein Zeilen-Array als Zwischenspeicher mehr
+// (Orchestrator-Review 2026-09-25: eine NbrRowView[NBR_MAX_ROWS]-Kopie kostet
+// ~3.6 kB BSS auf S3/nRF52, fast die ganze Kampagnen-Ersparnis). Ein
+// Rufzeichen wird deshalb hier geholt, jedes Mal wenn es gebraucht wird --
+// nbrRowGet() nimmt die Scheduler-Klammer auf nRF52 selbst.
+static void nbrPrintCall(uint8_t row)
 {
-    if (X == 0)
-        return false;
-    const NbrCell &c0 = nbrMatrix.cells[X][0];
-    return (c0.cnt_text || c0.cnt_pos || c0.cnt_hey) && nbrFresh(c0.last_min, now_min);
+    NbrRowView v;
+    if (nbrRowGet(nbrMatrix, row, &v))
+        web_client.print(v.call);
+    else
+        web_client.print("?");
 }
 
 /**
@@ -1588,6 +1592,35 @@ static bool nbrRowIsDirect(uint8_t X, uint16_t now_min)
  * delivers the neighbour-matrix page to be injected into the scaffold (NBR-W2, Konzept 4.5;
  * Stufe 2a, docs/nbr-wichtigkeit-konzept.md Abschnitt 6: Rollenspalten, Legende, Sortierung,
  * "Covered by" und der Block "My relay decision")
+ *
+ * W2c (Kantenpool, docs/meshcom5-campaign.md Welle 2, Konzept 4.5 in
+ * docs/meshcom5-topologie/body/03-kern.html): NBR_MAX_ROWS kann jetzt 128
+ * erreichen (S3/nRF52). Zwei Kostenpunkte, die die alte, dichte Matrix nicht
+ * hatte, und die diese Fassung beide vermeidet:
+ *  - RAM: acht zeilengrosse uint8_t-Felder teilen sich EINEN malloc()-Block
+ *    (`scratch`, 8 * NBR_MAX_ROWS Byte, mit free() vor jedem Rueckkehrpunkt)
+ *    statt permanent im BSS zu liegen (Orchestrator-Review 2026-09-25, zweite
+ *    Runde: 1580 B `static` fuer eine selten geoeffnete Seite war noch immer
+ *    zu viel gegen eine geplante Kampagnen-Ersparnis von ~300 B). malloc()
+ *    schlaegt hier nicht wie printf() je Logzeile zu (siehe
+ *    printf-malloc-starves-nimble.md), sondern hoechstens einmal pro
+ *    Seitenaufruf -- ein Fehlschlag bricht mit einer Meldung ab, nie mit
+ *    einem Crash. Kein Array eines struct-Typs (NbrRowView, NbrMask) liegt
+ *    ueberhaupt im Speicher; ein einzelnes Exemplar auf dem Stack, direkt am
+ *    Ort seiner Benutzung, kostet nichts, solange es keine Zeile im Array
+ *    ist.
+ *  - CPU: nbrEdgeGet() sucht in einem Kantenpool (bis zu NBR_MAX_EDGES = 4 *
+ *    NBR_MAX_ROWS Eintraege) -- O(1) ist es NICHT. Jede Schleife hier fragt
+ *    deshalb zuerst eine Maske (nbrDirectMask()/nbrHearersMask(), beide auf
+ *    den mitgefuehrten Bitmasken der Matrix und damit billig) und ruft
+ *    nbrEdgeGet() nur noch fuer ein Bit, das die Maske schon als gesetzt
+ *    gemeldet hat -- dort, wo tatsaechlich ein cnt/snr-Wert fuer die Anzeige
+ *    gebraucht wird.
+ * Die Kreuztabelle "wer hoert wen" zeigt bei mehr als 64 sichtbaren Zeilen
+ * nur einen 64-Spalten-Ausschnitt, ueber &x=<Spalte> weitergeblaettert --
+ * alle ANDEREN Spalten der Kopfzeilen (D/I, G, M, #N, #X, Role) und Tabelle 2
+ * bleiben dabei fuer alle n Zeilen vollstaendig, nur das n*n-Gitter selbst
+ * wird seitenweise gerendert.
  */
 void sub_page_neighbours()
 {
@@ -1599,7 +1632,8 @@ void sub_page_neighbours()
     _create_meshcom_subheader("Neighbours");
     web_client.println("<div id=\"content_inner\">");
 
-    if (nbrMatrix.rows[0].call[0] == 0)
+    NbrRowView r0;
+    if (!nbrRowGet(nbrMatrix, 0, &r0) || r0.call[0] == 0)
     { // noch kein Frame ausgewertet -- Zeile 0 ist unbelegt
         web_client.println("<p>No frames received yet.</p>");
         web_client.println("</div>");
@@ -1607,22 +1641,47 @@ void sub_page_neighbours()
         return;
     }
 
-    // Sichtbare Zeilen: Zeile 0 immer dabei, sonst USED und frisch (Konzept
-    // 4.5, Fenster 12h). NBR_MAX_ROWS ist board-abhaengig <= 21, das Feld
-    // bleibt klein genug fuer den 4-KB-Loop-Stack auf nRF52 (N-22).
-    uint8_t idx[NBR_MAX_ROWS];
+    // W2c CONTRACT: ein einziger transienter Heap-Block statt acht einzelner
+    // static uint8_t[NBR_MAX_ROWS]-Arrays (Orchestrator-Review 2026-09-25,
+    // zweite Runde): die Seite wird selten geoeffnet, ~1 kB fuer die Dauer
+    // EINES Renderaufrufs ist unproblematisch -- anders als der printf-Heap-
+    // Churn je Logzeile (siehe printf-malloc-starves-nimble.md), der einmal
+    // pro RX/TX zuschlaegt, nicht einmal pro Seitenaufruf. free() steht direkt
+    // vor jedem Rueckkehrpunkt; die Funktion hat ab hier nur noch das
+    // natuerliche Ende (kein weiteres return), das free() steht dort.
+    uint8_t *scratch = (uint8_t *)malloc(8 * (size_t)NBR_MAX_ROWS);
+    if (scratch == NULL)
+    {
+        web_client.println("<p>Not enough memory to render the neighbour matrix.</p>");
+        web_client.println("</div>");
+        web_client.println(); // The HTTP response ends with another blank line
+        return;
+    }
+    uint8_t *idx = scratch + 0 * NBR_MAX_ROWS;
+    uint8_t *eself = scratch + 1 * NBR_MAX_ROWS;
+    uint8_t *xCount = scratch + 2 * NBR_MAX_ROWS;
+    uint8_t *nCount = scratch + 3 * NBR_MAX_ROWS;
+    uint8_t *order = scratch + 4 * NBR_MAX_ROWS;
+    uint8_t *directList = scratch + 5 * NBR_MAX_ROWS;
+    uint8_t *indirectList = scratch + 6 * NBR_MAX_ROWS;
+    uint8_t *hearers = scratch + 7 * NBR_MAX_ROWS;
+
+    // Sichtbare Zeilen: Zeile 0 immer dabei, sonst USED (nbrRowGet() liefert
+    // false fuer eine unbelegte Zeile != 0) und frisch (Konzept 4.5, Fenster
+    // 12h). idx[i] ist die Matrix-Zeilennummer -- nur diese Nummer wird
+    // gespeichert, keine Kopie der Zeile selbst (siehe Funktionskopf).
     uint8_t n = 0;
     idx[n++] = 0;
     for (uint8_t r = 1; r < NBR_MAX_ROWS; r++)
     {
-        if ((nbrMatrix.rows[r].flags & NBR_FLAG_USED) && nbrFresh(nbrMatrix.rows[r].last_min, now_min))
+        NbrRowView v;
+        if (nbrRowGet(nbrMatrix, r, &v) && nbrFresh(v.last_min, now_min))
             idx[n++] = r;
     }
 
     // E_self (Konzept 4, 6.1 Zeilenfarbe / 6.2 "Covered by"): direkt gehoerte
     // Zeilen, die kein ANDERER direkter Nachbar frisch hoert -- ersetzt die
     // alte <verdict>-Faerbung (frueher ueber die 2-Hop-Funktion) vollstaendig.
-    uint8_t eself[NBR_MAX_ROWS];
     int neself = nbrExclusiveDirect(nbrMatrix, now_min, eself, NBR_MAX_ROWS);
     uint8_t neself_shown = (neself > 0) ? ((neself < (int)NBR_MAX_ROWS) ? (uint8_t)neself : (uint8_t)NBR_MAX_ROWS) : 0;
 
@@ -1639,33 +1698,56 @@ void sub_page_neighbours()
     {
         web_client.print("Exclusive to me (only I hear them directly): ");
         for (uint8_t i = 0; i < neself_shown; i++)
-            web_client.printf("%s%s", (i ? ", " : ""), nbrMatrix.rows[eself[i]].call);
+        {
+            if (i)
+                web_client.print(", ");
+            nbrPrintCall(eself[i]);
+        }
         web_client.println(". Mesh needed.</p>");
     }
 
-    // Vorpass fuer 6.1/6.2: direct[i] (D/I), nCount[i] (#N, Spaltenzaehlung
-    // cells[*][X]) und xCount[i] (#X, nur wenn direkt) je sichtbarer Zeile,
-    // einmal berechnet und von beiden Tabellen genutzt.
-    uint8_t direct[NBR_MAX_ROWS];
-    uint8_t nCount[NBR_MAX_ROWS];
-    uint8_t xCount[NBR_MAX_ROWS];
+    // Direkt(X) (Konzept 4.3) EIN Mal geholt -- eine Bitmaske ueber
+    // Zeilenindizes, nicht 128 einzelne Kantenabfragen. Bit 0 ist darin per
+    // Vertrag nie gesetzt (nbrDirectMask() liefert nur X != 0), ein Test auf
+    // Zeile 0 gibt also ohnehin "nicht direkt" zurueck -- die expliziten
+    // "X == 0"-Zweige unten bleiben trotzdem, weil Zeile 0 andere Zellen
+    // zeigt (";-" statt "Indirect").
+    NbrMask directMaskGlobal = nbrDirectMask(nbrMatrix, now_min);
+
+    // Vorpass fuer 6.1/6.2: xCount[i] (#X, nur wenn direkt -- die
+    // Anteilsregel aus Konzept 4.3 steckt in nbrRowMeshNeedCount() selbst,
+    // wird hier nicht nachgebaut) je sichtbarer Zeile.
     for (uint8_t i = 0; i < n; i++)
     {
         uint8_t X = idx[i];
-        direct[i] = nbrRowIsDirect(X, now_min) ? 1 : 0;
+        // -1 ("NA") ist moeglich, wenn der LORA-Task (nRF52) die Kante (X, 0)
+        // zwischen nbrDirectMask() oben und diesem Aufruf freigibt -- als 0
+        // zaehlen, nicht als 255 (Advisor Welle 2, Befund B).
+        int xc = nbrMaskTest(directMaskGlobal, X) ? nbrRowMeshNeedCount(nbrMatrix, X, now_min) : 0;
+        xCount[i] = (xc < 0) ? 0 : (uint8_t)xc;
+    }
 
-        uint8_t cnt = 0;
-        for (uint8_t frm = 0; frm < NBR_MAX_ROWS; frm++)
+    // #N je ZEILENNUMMER (nicht Position -- siehe Render-Schleife unten, die
+    // per idx[i] direkt hineinindiziert): "wie viele Zeilen hat X gehoert".
+    // Das ist die SPALTE X der alten dichten Matrix (cell[frm][X] fuer alle
+    // frm), keine der vorhandenen Masken liefert diese Richtung direkt (nur
+    // nbrDirectMask()/nbrHeardMeMask() fuer Zeile 0 fest verdrahtet). Billig
+    // trotzdem: fuer jede Zeile frm liefert nbrHearersMask(frm) die (kleine,
+    // bitmaskenbasierte) Menge der Y, die frm gehoert haben -- steht X darin,
+    // hat X frm gehoert, zaehlt also fuer nCount[X]. Zeile 0 bekommt ihren
+    // Wert separat: nbrHearersMask() liefert nie Y == 0 (Vertrag), aber
+    // nbrDirectMask() IST "die Menge der von mir gehoerten Zeilen" = #N(0).
+    for (uint8_t r = 0; r < NBR_MAX_ROWS; r++)
+        nCount[r] = 0;
+    nCount[0] = (uint8_t)((nbrMaskCount(directMaskGlobal) > 255) ? 255 : nbrMaskCount(directMaskGlobal));
+    for (uint8_t frm = 0; frm < NBR_MAX_ROWS; frm++)
+    {
+        NbrMask hm = nbrHearersMask(nbrMatrix, frm, now_min);
+        for (int y = nbrMaskNext(hm, -1); y >= 0; y = nbrMaskNext(hm, y))
         {
-            if (frm == X)
-                continue;
-            const NbrCell &c = nbrMatrix.cells[frm][X];
-            if ((c.cnt_text || c.cnt_pos || c.cnt_hey) && nbrFresh(c.last_min, now_min))
-                cnt++;
+            if (nCount[y] < 255)
+                nCount[y]++;
         }
-        nCount[i] = cnt;
-
-        xCount[i] = direct[i] ? (uint8_t)nbrRowMeshNeedCount(nbrMatrix, X, now_min) : 0;
     }
 
     // Super-Node (Konzept 5.3/6.1): der direkte Nachbar mit dem groessten #X,
@@ -1677,7 +1759,7 @@ void sub_page_neighbours()
         int topVal = -1, top2Val = -1, topI = -1;
         for (uint8_t i = 0; i < n; i++)
         {
-            if (!direct[i])
+            if (!nbrMaskTest(directMaskGlobal, idx[i]))
                 continue;
             int v = (int)xCount[i];
             if (v > topVal)
@@ -1699,6 +1781,39 @@ void sub_page_neighbours()
         }
     }
 
+    // W2c: bei mehr als 64 sichtbaren Zeilen wird das n*n-Gitter (die
+    // "wer hoert wen"-Spalten) seitenweise zu 64 Spalten gerendert, ueber
+    // &x=<Startspalte> (0-basiert, auf 64 gerundet) weitergeblaettert --
+    // ALLE anderen Spalten (Kopf D/I..Role) und Tabelle 2 unten bleiben
+    // fuer alle n Zeilen vollstaendig, siehe Funktionskopf-Kommentar.
+    // web_header traegt weiterhin die rohe Request-Zeile ("GET /?page=
+    // neighbours&x=64 HTTP/1.1"); dieselbe indexOf()/substring()-Technik wie
+    // send_message() (Zeile ~2973) fuer &tocall=/&message=.
+    uint16_t colStart = 0;
+    if (n > 64)
+    {
+        int xp = web_header.indexOf("&x=");
+        if (xp >= 0)
+        {
+            long xv = web_header.substring(xp + 3).toInt();
+            if (xv > 0)
+                colStart = (uint16_t)(((unsigned long)xv / 64) * 64);
+        }
+        if (colStart >= n)
+            colStart = (uint16_t)(((n - 1) / 64) * 64);
+    }
+    uint16_t colEnd = (n > 64) ? ((colStart + 64 < n) ? (uint16_t)(colStart + 64) : n) : n;
+
+    if (n > 64)
+    {
+        web_client.printf("<p>Cross table columns %u-%u of %u. ", (unsigned)(colStart + 1), (unsigned)colEnd, (unsigned)n);
+        if (colStart > 0)
+            web_client.printf("<a href=\"?page=neighbours&x=%u\">&laquo; prev</a> ", (unsigned)((colStart >= 64) ? colStart - 64 : 0));
+        if (colEnd < n)
+            web_client.printf("<a href=\"?page=neighbours&x=%u\">next &raquo;</a>", (unsigned)(colStart + 64));
+        web_client.println("</p>");
+    }
+
     // Kreuztabelle: Spaltenkoepfe sind Anzeige-Nummern (1..n) mit dem
     // Rufzeichen darunter, senkrecht gesetzt (6.1, Regel 1) -- die Tabelle
     // waechst dadurch in der Hoehe, nicht in der Breite. Das Tabellen-CSS
@@ -1715,9 +1830,12 @@ void sub_page_neighbours()
     web_client.print("<td title=\"Neighbours: nodes this node hears, as far as this table can hold them.\">#N</td>");
     web_client.print("<td title=\"Exclusive: nodes that ONLY this neighbour hears. This is the value of a relay.\">#X</td>");
     web_client.print("<td title=\"Super: largest exclusive share. Needed: has exclusive nodes. Redundant: everything it hears is heard by others.\">Role</td>");
-    for (uint8_t j = 0; j < n; j++)
-        web_client.printf("<td>%u<br><span style=\"writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;\">%s</span></td>",
-                           (unsigned)(j + 1), nbrMatrix.rows[idx[j]].call);
+    for (uint8_t j = colStart; j < colEnd; j++)
+    {
+        web_client.printf("<td>%u<br><span style=\"writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;\">", (unsigned)(j + 1));
+        nbrPrintCall(idx[j]);
+        web_client.print("</span></td>");
+    }
     web_client.println("</tr></thead>");
 
     for (uint8_t i = 0; i < n; i++)
@@ -1732,6 +1850,13 @@ void sub_page_neighbours()
                 break;
             }
         }
+        bool isDirect = nbrMaskTest(directMaskGlobal, X);
+
+        // Hoerer von X (Konzept 4.3): EIN Mal je Zeile geholt (Bitmaske, kein
+        // Kantenpool-Scan), zweifach genutzt -- fuer die D/I-Spalte (die erste
+        // gesetzte Spalte ist "via") UND fuer jede Gitterzelle dieser Zeile
+        // unten (nbrMaskTest statt eines eigenen nbrEdgeGet() je Zelle).
+        NbrMask hm = nbrHearersMask(nbrMatrix, X, now_min);
 
         // Zeilenfarbe nach Rolle, nicht mehr nach <verdict> (6.1, Regel 2):
         // Zeile 0 blau, der Super-Node gruen, E_self weiterhin rot.
@@ -1743,66 +1868,76 @@ void sub_page_neighbours()
             web_client.print("<tr style=\"background-color:#ffd9d9;\">");
         else
             web_client.print("<tr>");
-        web_client.printf("<td class=\"font-bold\">%u %s</td>", (unsigned)(i + 1), nbrMatrix.rows[X].call);
+        web_client.printf("<td class=\"font-bold\">%u ", (unsigned)(i + 1));
+        nbrPrintCall(X);
+        web_client.print("</td>");
 
-        // D/I
+        // D/I. Bei X==0 gibt es keine Kante nach 0 -- direkt "-". Sonst nur
+        // fuer direkte Zeilen ein nbrEdgeGet() (fuer die SNR, die einzige
+        // Kanteneigenschaft, die hier angezeigt wird); "via" oben aus hm.
         if (X == 0)
         {
             web_client.print("<td>-</td>");
         }
-        else if (direct[i])
+        else if (isDirect)
         {
-            const NbrCell &c0 = nbrMatrix.cells[X][0];
-            if (c0.snr != NBR_SNR_UNKNOWN)
-                web_client.printf("<td title=\"Heard directly, SNR %d dB\">D</td>", (int)c0.snr);
+            NbrEdgeView e0;
+            if (nbrEdgeGet(nbrMatrix, X, 0, &e0) && e0.snr != NBR_SNR_UNKNOWN)
+                web_client.printf("<td title=\"Heard directly, SNR %d dB\">D</td>", (int)e0.snr);
             else
                 web_client.print("<td title=\"Heard directly, SNR unknown\">D</td>");
         }
         else
         {
-            uint32_t hm = nbrHearersMask(nbrMatrix, X, now_min);
-            int via = -1;
-            for (uint8_t m = 1; m < NBR_MAX_ROWS; m++)
-            {
-                if (hm & (1UL << m))
-                {
-                    via = m;
-                    break;
-                }
-            }
+            int via = nbrMaskNext(hm, -1);
             if (via >= 0)
-                web_client.printf("<td title=\"Indirect, via %s\">I</td>", nbrMatrix.rows[via].call);
+            {
+                web_client.print("<td title=\"Indirect, via ");
+                nbrPrintCall((uint8_t)via);
+                web_client.print("\">I</td>");
+            }
             else
                 web_client.print("<td title=\"Indirect\">I</td>");
         }
 
+        // G/M brauchen die Flags dieser einen Zeile -- ein lokales
+        // NbrRowView, kein Array (siehe Funktionskopf-Kommentar).
+        NbrRowView rowV;
+        uint8_t flags = nbrRowGet(nbrMatrix, X, &rowV) ? rowV.flags : 0;
+
         // G
-        if (nbrMatrix.rows[X].flags & NBR_FLAG_GW)
+        if (flags & NBR_FLAG_GW)
             web_client.print("<td title=\"Gateway HEY seen\">Y</td>");
         else
             web_client.print("<td title=\"No gateway HEY observed\">N</td>");
 
         // M
-        if (!(nbrMatrix.rows[X].flags & NBR_FLAG_POS))
+        if (!(flags & NBR_FLAG_POS))
             web_client.print("<td title=\"No position frame in window\">-</td>");
-        else if (nbrMatrix.rows[X].flags & NBR_FLAG_MESH)
+        else if (flags & NBR_FLAG_MESH)
             web_client.print("<td title=\"Mesh enabled\">Y</td>");
         else
             web_client.print("<td title=\"Mesh disabled\">N</td>");
 
-        // #N
+        // #N -- ueber die Zeilennummer X indiziert (siehe Vorpass oben), nicht
+        // ueber die Position i.
         web_client.printf("<td title=\"Hears %u node(s) (table holds %u rows)\">%u</td>",
-                           (unsigned)nCount[i], (unsigned)NBR_MAX_ROWS, (unsigned)nCount[i]);
+                           (unsigned)nCount[X], (unsigned)NBR_MAX_ROWS, (unsigned)nCount[X]);
 
-        // #X
-        if (direct[i])
+        // #X -- die title= nennt zugleich die beiden Zaehler, die #X
+        // entschieden haben: wie viele Knoten X ueberhaupt hoert (nCount, das
+        // Divisor der Anteilsregel) und wie viele davon niemand sonst deckt
+        // (xCount, der Zaehler); ein Aufschluesseln je Kandidaten-Kante
+        // braeuchte einen weiteren nbrEdgeGet()-Aufruf je Hoerer und ist das
+        // hier nicht wert (Konzept 4.3 wird nicht nachgebaut, nur angezeigt).
+        if (isDirect)
             web_client.printf("<td title=\"%u of %u heard by nobody else in my range\">%u</td>",
-                               (unsigned)xCount[i], (unsigned)nCount[i], (unsigned)xCount[i]);
+                               (unsigned)xCount[i], (unsigned)nCount[X], (unsigned)xCount[i]);
         else
             web_client.print("<td>-</td>");
 
         // Role
-        if (X == 0 || !direct[i])
+        if (X == 0 || !isDirect)
         {
             web_client.print("<td>-</td>");
         }
@@ -1819,31 +1954,39 @@ void sub_page_neighbours()
             web_client.print("<td title=\"Redundant: 0 exclusive, heard by others\">Redundant</td>");
         }
 
-        for (uint8_t j = 0; j < n; j++)
+        // Gitterzeile: hm (oben, EIN Aufruf je Zeile) sagt per nbrMaskTest,
+        // ob die Zelle ueberhaupt etwas zeigt -- nbrEdgeGet() (der teure
+        // Kantenpool-Scan) laeuft nur noch fuer eine Zelle, die die Maske
+        // schon als gesetzt gemeldet hat, und nur fuer cnt/snr zur Anzeige.
+        for (uint8_t j = colStart; j < colEnd; j++)
         {
             uint8_t Y = idx[j];
-            if (X == Y)
+            if (X == Y || !nbrMaskTest(hm, Y))
             {
-                web_client.print("<td>-</td>");
+                web_client.print((X == Y) ? "<td>-</td>" : "<td></td>");
                 continue;
             }
-            const NbrCell &c = nbrMatrix.cells[X][Y];
-            if ((c.cnt_text || c.cnt_pos || c.cnt_hey) && nbrFresh(c.last_min, now_min))
-            {
-                unsigned sum = (unsigned)c.cnt_text + (unsigned)c.cnt_pos + (unsigned)c.cnt_hey;
-                if (c.snr != NBR_SNR_UNKNOWN)
-                    web_client.printf("<td title=\"T:%u P:%u H:%u snr:%d\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, (int)c.snr, sum);
-                else
-                    web_client.printf("<td title=\"T:%u P:%u H:%u snr:NA\">%u</td>", (unsigned)c.cnt_text, (unsigned)c.cnt_pos, (unsigned)c.cnt_hey, sum);
-            }
+            NbrEdgeView c;
+            if (!nbrEdgeGet(nbrMatrix, X, Y, &c))
+                web_client.print("<td></td>"); // Maske war gesetzt, Kante ist inzwischen weg (Sweep/EVICT lief dazwischen)
+            else if (c.snr != NBR_SNR_UNKNOWN)
+                web_client.printf("<td title=\"cnt:%u snr:%d\">%u</td>", (unsigned)c.cnt, (int)c.snr, (unsigned)c.cnt);
             else
-            {
-                web_client.print("<td></td>");
-            }
+                web_client.printf("<td title=\"cnt:%u snr:NA\">%u</td>", (unsigned)c.cnt, (unsigned)c.cnt);
         }
         web_client.println("</tr>");
     }
     web_client.println("</table>");
+
+    if (n > 64)
+    {
+        web_client.printf("<p>Cross table columns %u-%u of %u. ", (unsigned)(colStart + 1), (unsigned)colEnd, (unsigned)n);
+        if (colStart > 0)
+            web_client.printf("<a href=\"?page=neighbours&x=%u\">&laquo; prev</a> ", (unsigned)((colStart >= 64) ? colStart - 64 : 0));
+        if (colEnd < n)
+            web_client.printf("<a href=\"?page=neighbours&x=%u\">next &raquo;</a>", (unsigned)(colStart + 64));
+        web_client.println("</p>");
+    }
 
     // Legende (6.1, Kopf): title= wirkt auf dem Telefon nicht, deshalb
     // stehen dieselben sechs Erklaerungen hier zusaetzlich als Text.
@@ -1860,14 +2003,14 @@ void sub_page_neighbours()
     // Sortierung fuer Tabelle 2 (6.2, Regel 2): Zeile 0 zuerst, dann direkte
     // Nachbarn nach #X absteigend (Gleichstand nach Rufzeichen), dann
     // Indirekte nach Alter aufsteigend -- der Super-Node steht damit oben.
-    uint8_t order[NBR_MAX_ROWS];
+    // order[]/directList[]/indirectList[] speichern POSITIONEN in idx[],
+    // keine Zeilennummern (wie schon vor W2c).
     uint8_t no_ = 0;
     order[no_++] = 0; // idx[0] ist per Aufbau immer Zeile 0
 
-    uint8_t directList[NBR_MAX_ROWS];
     uint8_t nDirectList = 0;
     for (uint8_t i = 1; i < n; i++)
-        if (direct[i])
+        if (nbrMaskTest(directMaskGlobal, idx[i]))
             directList[nDirectList++] = i;
     for (uint8_t a = 1; a < nDirectList; a++)
     {
@@ -1876,9 +2019,15 @@ void sub_page_neighbours()
         while (b >= 0)
         {
             uint8_t other = directList[b];
+            // Rufzeichen fuer den Gleichstand-Vergleich: je zwei nbrRowGet()-
+            // Aufrufe pro Vergleich, O(1) je Aufruf (row[] ist ein Array) --
+            // kein Grund, sie in einem Array vorzuhalten.
+            NbrRowView keyV, otherV;
+            nbrRowGet(nbrMatrix, idx[key], &keyV);
+            nbrRowGet(nbrMatrix, idx[other], &otherV);
             bool keyFirst = (xCount[key] > xCount[other]) ||
                              (xCount[key] == xCount[other] &&
-                              strncmp(nbrMatrix.rows[idx[key]].call, nbrMatrix.rows[idx[other]].call, NBR_CALL_LEN) < 0);
+                              strncmp(keyV.call, otherV.call, NBR_CALL_LEN) < 0);
             if (!keyFirst)
                 break;
             directList[b + 1] = other;
@@ -1889,10 +2038,9 @@ void sub_page_neighbours()
     for (uint8_t k = 0; k < nDirectList; k++)
         order[no_++] = directList[k];
 
-    uint8_t indirectList[NBR_MAX_ROWS];
     uint8_t nIndirectList = 0;
     for (uint8_t i = 1; i < n; i++)
-        if (!direct[i])
+        if (!nbrMaskTest(directMaskGlobal, idx[i]))
             indirectList[nIndirectList++] = i;
     for (uint8_t a = 1; a < nIndirectList; a++)
     {
@@ -1911,8 +2059,6 @@ void sub_page_neighbours()
     for (uint8_t k = 0; k < nIndirectList; k++)
         order[no_++] = indirectList[k];
 
-    uint32_t directMask = nbrDirectMask(nbrMatrix, now_min);
-
     // Zeilentabelle: eine Zeile je sichtbarer Nachbarschaftszeile, inkl. 0,
     // in der Sortierung von oben. "Hearers" bricht um (6.2, Regel 1); die
     // Tabelle waechst in die Hoehe, nicht in die Breite.
@@ -1922,19 +2068,19 @@ void sub_page_neighbours()
     {
         uint8_t i = order[oi];
         uint8_t X = idx[i];
-        const NbrRow &row = nbrMatrix.rows[X];
+        NbrRowView row;
+        nbrRowGet(nbrMatrix, X, &row);
 
         web_client.printf("<tr><td>%s</td><td>%s</td><td>%s</td>", row.call,
                            (row.flags & NBR_FLAG_GW) ? "yes" : "no",
                            (row.flags & NBR_FLAG_MESH) ? "yes" : "no");
 
-        const NbrCell &hm = nbrMatrix.cells[0][X];
-        if (X != 0 && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
+        NbrEdgeView hm;
+        if (X != 0 && nbrEdgeGet(nbrMatrix, 0, X, &hm) && hm.snr != NBR_SNR_UNKNOWN && nbrFresh(hm.last_min, now_min))
             web_client.printf("<td>%d</td>", (int)hm.snr);
         else
             web_client.print("<td>-</td>");
 
-        uint8_t hearers[NBR_MAX_ROWS];
         uint8_t nh = nbrHearers(nbrMatrix, X, now_min, hearers, NBR_MAX_ROWS);
         uint8_t nh_shown = (nh < NBR_MAX_ROWS) ? nh : (uint8_t)NBR_MAX_ROWS;
         web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
@@ -1945,7 +2091,11 @@ void sub_page_neighbours()
         else
         {
             for (uint8_t h = 0; h < nh_shown; h++)
-                web_client.printf("%s%s", (h ? "," : ""), nbrMatrix.rows[hearers[h]].call);
+            {
+                if (h)
+                    web_client.print(",");
+                nbrPrintCall(hearers[h]);
+            }
         }
         web_client.print("</td>");
 
@@ -1953,17 +2103,16 @@ void sub_page_neighbours()
         // frisch hoeren -- leer ist genau E_self, "nur ich erreiche diesen
         // Knoten".
         web_client.print("<td style=\"max-width:220px;overflow-wrap:anywhere;\">");
-        if (direct[i])
+        if (nbrMaskTest(directMaskGlobal, X))
         {
-            uint32_t covered = nbrHearersMask(nbrMatrix, X, now_min) & directMask;
+            NbrMask covered = nbrMaskAnd(nbrHearersMask(nbrMatrix, X, now_min), directMaskGlobal);
             bool first = true;
-            for (uint8_t m = 1; m < NBR_MAX_ROWS; m++)
+            for (int m = nbrMaskNext(covered, -1); m >= 0; m = nbrMaskNext(covered, m))
             {
-                if (covered & (1UL << m))
-                {
-                    web_client.printf("%s%s", (first ? "" : ","), nbrMatrix.rows[m].call);
-                    first = false;
-                }
+                if (!first)
+                    web_client.print(",");
+                nbrPrintCall((uint8_t)m);
+                first = false;
             }
             if (first)
                 web_client.print("-");
@@ -1977,7 +2126,11 @@ void sub_page_neighbours()
         int partner = -1;
         float reach = nbrReach(nbrMatrix, X, now_min, &partner);
         if (reach >= 0 && partner >= 0)
-            web_client.printf("<td>%.1f km @ %s</td>", (double)reach, nbrMatrix.rows[partner].call);
+        {
+            web_client.printf("<td>%.1f km @ ", (double)reach);
+            nbrPrintCall((uint8_t)partner);
+            web_client.print("</td>");
+        }
         else
             web_client.print("<td>-</td>");
 
@@ -1997,13 +2150,20 @@ void sub_page_neighbours()
     else
     {
         for (uint8_t e = 0; e < neself_shown; e++)
-            web_client.printf("%s%s", (e ? ", " : ""), nbrMatrix.rows[eself[e]].call);
+        {
+            if (e)
+                web_client.print(", ");
+            nbrPrintCall(eself[e]);
+        }
     }
     web_client.println("</p>");
 
     web_client.print("<p>Super node in range: ");
     if (superI >= 0)
-        web_client.printf("%s (%u exclusive)", nbrMatrix.rows[idx[superI]].call, (unsigned)xCount[superI]);
+    {
+        nbrPrintCall(idx[superI]);
+        web_client.printf(" (%u exclusive)", (unsigned)xCount[superI]);
+    }
     else
         web_client.print("none");
     web_client.println("</p>");
@@ -2033,6 +2193,7 @@ void sub_page_neighbours()
 
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line
+    free(scratch);
 }
 
 /**

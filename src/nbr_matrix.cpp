@@ -1,7 +1,20 @@
-// Nachbarschaftsmatrix, Wave 1 -- siehe src/nbr_matrix.h fuer die Regeln aus
-// Konzept ~/Desktop/Nachbarschaftsmatrix.html 4.1-4.4. Diese Datei bleibt
-// bewusst Arduino-frei (siehe Header); interne Helfer stehen `static`, weil
-// sie kein Teil der oeffentlichen Schnittstelle sind.
+// Nachbarschaftsmatrix als Kantenpool (MeshCom 5, Stufe 1, Welle 2) -- siehe
+// src/nbr_matrix.h fuer die oeffentliche Schnittstelle und
+// docs/meshcom5-topologie/ 4.1-4.5 fuer das Konzept. Diese Datei bleibt
+// Arduino-frei (siehe Header); einzige Ausnahme ist die Scheduler-Klammer
+// unten, die auf nRF52 FreeRTOS braucht.
+//
+// Aufbau:
+//   - Jede oeffentliche Funktion ist eine duenne Huelle: Klammer nehmen,
+//     eine interne static-Funktion rufen, Klammer loslassen, DANACH loggen.
+//     Intern ruft nie eine oeffentliche Funktion eine andere (keine
+//     verschachtelte Klammer, kein Log unter der Klammer), und keine interne
+//     Funktion ruft eine oeffentliche -- das haelt die Datei auch in einem
+//     Namensraum mehrfach einbindbar (test/test_nbr_replay).
+//   - Frische wird IMMER an der Kantenminute geprueft. nbrSweep() raeumt nur
+//     auf (Kanten ueber NBR_WINDOW_MIN frei, Geisterzeilen, Halbierung); ob er
+//     gelaufen ist, aendert keine Entscheidung (ausser ueber die Halbierung,
+//     die nur er ausfuehrt, und ueber einen vollen Pool).
 
 #include "nbr_matrix.h"
 
@@ -9,117 +22,96 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// NULL = Instrumentierung aus (siehe nbr_matrix.h). Der Aufrufer im
-// Firmware-Rahmen haengt hier printfdeb() (oder aequivalent) ein.
+// --- Scheduler-Klammer (Konzept 4.5) ----------------------------------------
+//
+// nRF52: LORA-Task (OnRxDone, Schreiber) und Loop-Task (Sweep, --nbrreset,
+// Web, Konsole, Bericht) haben dieselbe Prioritaet und wechseln bei jedem
+// Aufwachen eines hoeher priorisierten Tasks reihum -- mitten in einer
+// Aenderung. vTaskSuspendAll() haelt nur den Scheduler an (kein Interrupt-
+// Sperren, der Tick laeuft weiter, Vorbild N-16 in lora_functions.cpp) und
+// ist verschachtelbar. NRF52_SERIES und ARDUINO_ARCH_NRF52 setzt das
+// Adafruit-Framework fuer jedes nRF52-Board (RAK4631, Heltec T114, T-Echo);
+// die Host-Umgebung native_nrf52_settings_paths setzt NRF52_SERIES zusammen
+// mit NATIVE_BUILD, darum der NATIVE_BUILD-Ausschluss. ESP32 und Host: leer
+// (auf ESP32 laufen Empfang, Web und BLE im selben Loop-Task).
+//
+// Unter der Klammer: kein nbrLog (Serial kann auf nRF52 blockieren), kein
+// printf mit Gleitkomma (newlib-dtoa alloziert).
+#if (defined(NRF52_SERIES) || defined(ARDUINO_ARCH_NRF52)) && !defined(NATIVE_BUILD)
+#include <FreeRTOS.h>
+#include <task.h>
+#define NBR_LOCK()   vTaskSuspendAll()
+#define NBR_UNLOCK() ((void)xTaskResumeAll())
+#ifndef NBR_DEFER_LOG
+#define NBR_DEFER_LOG 1
+#endif
+#else
+#define NBR_LOCK()   ((void)0)
+#define NBR_UNLOCK() ((void)0)
+#endif
+
+// SYM-Zeilen entstehen mitten in der Relay-Rechnung. Wo die Klammer wirkt
+// (nRF52), werden sie als Satz gemerkt und erst nach der Klammer
+// ausgegeben (statischer Puffer, siehe nbrISymAdd()); ohne Klammer (ESP32,
+// Host) laeuft alles in einem Task, und die Zeile geht wie frueher sofort
+// hinaus -- kein Puffer, kein Generationszaehler. Ein Codepfad: beide Faelle
+// laufen durch nbrISymAdd()/nbrISymEmit(); der Host-Test setzt
+// NBR_DEFER_LOG=1, um den nRF52-Pfad ebenfalls zu pruefen.
+#ifndef NBR_DEFER_LOG
+#define NBR_DEFER_LOG 0
+#endif
+
+static_assert(sizeof(NbrRow) == 12, "NbrRow muss 12 Byte ohne Fuellung bleiben (Konzept 4.1)");
+static_assert(sizeof(NbrEdge) == 6, "NbrEdge muss 6 Byte ohne Fuellung bleiben (Konzept 4.1)");
+static_assert(NBR_MAX_EDGES <= 65535, "Kantenindex muss in uint16_t passen");
+
+// NULL = Instrumentierung aus (siehe nbr_matrix.h).
 NbrLogFn nbrLog = NULL;
 
-// 'T'/'P'/'H' fuers Logformat (docs/nbr-logformat.md), statt des rohen
-// Frame-Typzeichens ':'/'!'/'@'.
-static char nbrLogTypeChar(char type)
+#define NBR_EDGE_FREE   0xFF     // NbrEdge.x/.y eines freien Eintrags
+#define NBR_POS_UNKNOWN 0x7FFF   // NbrRow.lat16/.lon16 unbekannt
+
+// Rufzeichenwort fuer ein eigenes Rufzeichen, das nicht kodierbar ist (nicht
+// 3..9 Zeichen aus [A-Z0-9-]). Ein einzelnes Zeichen mit Code 63: kein
+// gueltiges Pfadtoken kann dieses Wort ergeben, und es ist != 0, damit die
+// Matrix als initialisiert gilt (siehe nbrOwnCallIs()).
+#define NBR_CALL_OWN_INVALID ((uint64_t)63)
+
+// Zaehlt jede Aenderung an der Zeilenbelegung (Anlage, Verdraengung,
+// Geisterraeumung, Reset). Eine SYM-Zeile, die NACH der Klammer formatiert
+// wird, liest ihre Rufzeichen nur dann aus der Matrix, wenn sich seither
+// nichts an der Belegung geaendert hat (siehe nbrISymFlush()). Nur mit
+// aufgeschobenem Log (nRF52) gebraucht.
+#if NBR_DEFER_LOG
+static uint32_t s_nbr_gen = 0;
+#define NBR_GEN_BUMP() (s_nbr_gen++)
+#else
+#define NBR_GEN_BUMP() ((void)0)
+#endif
+
+// --- kleine Helfer ------------------------------------------------------------
+
+static inline bool nbrIFresh(uint16_t last_min, uint16_t now_min)
 {
-    return (type == ':') ? 'T' : (type == '!') ? 'P' : 'H';
+    return (uint16_t)(now_min - last_min) < NBR_WINDOW_MIN;
 }
 
-// Zaehler des zum Typ passenden Feldes -- fuer <cnt> in EDGE/ME NACH dem
-// Treffer (nbrHitCell() wurde vorher schon aufgerufen).
-static uint8_t nbrCellCount(const NbrCell &c, char type)
+static inline bool nbrIReady(const NbrMatrix &m)
 {
-    return (type == ':') ? c.cnt_text : (type == '!') ? c.cnt_pos : c.cnt_hey;
+    return m.call[0] != 0;
 }
 
-// DROP-Zeile fuer jede fruehe Ablehnung in nbrNoteFrame(). path kann NULL
-// sein (ungueltiger Aufruf) -- dann wird ein leerer Pfad geloggt statt ein
-// %s mit NULL an snprintf zu reichen.
-static void nbrLogDrop(uint16_t now_min, const char *reason, const char *path)
+static inline bool nbrIUsed(const NbrMatrix &m, int i)
 {
-    if (!nbrLog)
-        return;
-    char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|DROP|%u|%s|%s", (unsigned)now_min, reason, path ? path : "");
-    nbrLog(buf);
+    return (m.row[i].flags & NBR_FLAG_USED) != 0;
 }
 
-// CUT-Zeile: der Pfad war laenger als das 2-Hop-Fenster, <kept> Token davon
-// wurden fuer die Zeilenvergabe genutzt.
-static void nbrLogCut(uint16_t now_min, int ntok, int kept, const char *path)
+static inline bool nbrIEdgeLive(const NbrEdge &e)
 {
-    if (!nbrLog)
-        return;
-    char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|CUT|%u|%d|%d|%s", (unsigned)now_min, ntok, kept, path ? path : "");
-    nbrLog(buf);
+    return e.x != NBR_EDGE_FREE;
 }
 
-// SNR-Feld fuer eine ME/EDGE/SYM-Zeile: "NA", wenn die Zelle keinen Wert
-// traegt, sonst der numerische Wert -- gemeinsamer Formatierer statt drei
-// Kopien derselben Fallunterscheidung.
-static void nbrFormatSnrField(char *out, size_t outlen, int8_t snr)
-{
-    if (snr == NBR_SNR_UNKNOWN)
-        snprintf(out, outlen, "NA");
-    else
-        snprintf(out, outlen, "%d", (int)snr);
-}
-
-// EDGE-Zeile: "<to> hat <from> gehoert" -- <cnt> ist der Typzaehler der
-// Zelle NACH dem Treffer (nbrHitCell() ist zu diesem Zeitpunkt schon
-// gelaufen). <rssi> ist seit der Umstellung auf SNR immer 0 (Feldposition
-// bleibt erhalten, docs/nbr-logformat.md); der trailing <snr> ist der
-// gespeicherte SNR der Zelle, "NA" wenn unbekannt.
-static void nbrLogEdge(uint16_t now_min, const char *from, const char *to, char type, const NbrCell &c)
-{
-    if (!nbrLog)
-        return;
-    char snr_buf[8];
-    nbrFormatSnrField(snr_buf, sizeof(snr_buf), c.snr);
-    char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|EDGE|%u|%s|%s|%c|%d|%u|%s",
-             (unsigned)now_min, from, to, nbrLogTypeChar(type), 0, (unsigned)nbrCellCount(c, type), snr_buf);
-    nbrLog(buf);
-}
-
-// ME-Zeile: der letzte Hop wurde von mir direkt gehoert (cell[last][0]).
-// <rssi> ist rssi_here durchgereicht (nicht gespeichert), der trailing
-// <snr> ist der gespeicherte SNR der Zelle, "NA" wenn unbekannt.
-static void nbrLogMe(uint16_t now_min, const char *from, char type, int16_t rssi_here, const NbrCell &c)
-{
-    if (!nbrLog)
-        return;
-    char snr_buf[8];
-    nbrFormatSnrField(snr_buf, sizeof(snr_buf), c.snr);
-    char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|ME|%u|%s|%c|%d|%u|%s",
-             (unsigned)now_min, from, nbrLogTypeChar(type), (int)rssi_here, (unsigned)nbrCellCount(c, type), snr_buf);
-    nbrLog(buf);
-}
-
-// SYM-Zeile: eine Symmetrie-Annahme, die ein Stufe-2-Ergebnis (HASF/ALT/COVER)
-// tatsaechlich veraendert hat -- "angenommen <x> hoert <m>, weil <m> <x> bei
-// <snr> dB gehoert hat". msg_id kommt roh vom Aufrufer (aprsmsg.msg_id ist
-// unsigned int, hier als uint32_t durchgereicht).
-static void nbrLogSym(uint16_t now_min, uint32_t msg_id, const char *role,
-                       const char *x_call, const char *m_call, int8_t snr)
-{
-    if (!nbrLog)
-        return;
-    char buf[160];
-    snprintf(buf, sizeof(buf), "[NBR]|SYM|%u|%08X|%s|%s|%s|%d",
-             (unsigned)now_min, (unsigned)msg_id, role, x_call, m_call, (int)snr);
-    nbrLog(buf);
-}
-
-// Eine Zelle gilt nur dann als Beobachtung, wenn mindestens einer ihrer
-// Typzaehler > 0 ist -- last_min allein (z. B. 0 nach memset) waere sonst
-// eine Beobachtung "zur Boot-Minute".
-static bool nbrCellSet(const NbrCell &c)
-{
-    return c.cnt_text || c.cnt_pos || c.cnt_hey;
-}
-
-// SNR wird immer auf [-127,127] begrenzt -- -128 bleibt NBR_SNR_UNKNOWN
-// vorbehalten, ein realer Treffer darf ihn nie erreichen. Der Parameter ist
-// bewusst breiter als int8_t, damit weder snr_here (von der Radio-HAL) noch
-// eine vorzeichenbehaftete HEY-SNR-Ziffernfolge vor dem Vergleich ueberlaeuft.
+// SNR wird immer auf [-127,127] begrenzt -- -128 bleibt NBR_SNR_UNKNOWN.
 static int8_t nbrClampSnr(int32_t snr)
 {
     if (snr > 127)
@@ -129,80 +121,446 @@ static int8_t nbrClampSnr(int32_t snr)
     return (int8_t)snr;
 }
 
-// Legt Zeile idx neu an (Rufzeichen + USED, alles andere auf 0/now_min).
-static void nbrRowInit(NbrMatrix &m, int idx, const char *call, uint16_t now_min)
+// --- Rufzeichenwort (Konzept 4.1) ---------------------------------------------
+
+static uint8_t nbrICharCode(char c)
 {
-    memset(&m.rows[idx], 0, sizeof(NbrRow));
-    strncpy(m.rows[idx].call, call, NBR_CALL_LEN - 1);
-    m.rows[idx].call[NBR_CALL_LEN - 1] = '\0';
-    m.rows[idx].flags = NBR_FLAG_USED;
-    m.rows[idx].last_min = now_min;
+    if (c >= '0' && c <= '9')
+        return (uint8_t)(1 + (c - '0'));
+    if (c >= 'A' && c <= 'Z')
+        return (uint8_t)(11 + (c - 'A'));
+    if (c == '-')
+        return 37;
+    return 0;
 }
 
-// Nullt bei einer Verdraengung sowohl die Zeile als auch die Spalte idx --
-// eine verdraengte Zeile darf keine alte Hoerbeziehung hinterlassen, weder
-// als Zeile noch als Spalte (Konzept 4.2). memset() allein wuerde snr auf 0
-// setzen, einen GUELTIGEN Wert (0 dB) statt NBR_SNR_UNKNOWN -- danach also
-// je Zelle einzeln nachtragen.
-static void nbrZeroRowAndColumn(NbrMatrix &m, int idx)
+static uint64_t nbrIEncodeN(const char *s, size_t len)
 {
-    for (int y = 0; y < NBR_MAX_ROWS; y++)
-    {
-        memset(&m.cells[idx][y], 0, sizeof(NbrCell));
-        m.cells[idx][y].snr = NBR_SNR_UNKNOWN;
-    }
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-    {
-        memset(&m.cells[x][idx], 0, sizeof(NbrCell));
-        m.cells[x][idx].snr = NBR_SNR_UNKNOWN;
-    }
-}
-
-// Liest-ONLY, welchen Index ein Touch fuer call waehlen wuerde: die
-// vorhandene Zeile, sonst die erste freie, sonst die mit der groessten
-// Alterslluecke -- aber niemals einen Index, dessen Bit in protected_mask
-// gesetzt ist. protected_mask haelt die Indizes fest, die im selben
-// nbrNoteFrame()-Aufruf schon einem ANDEREN Rufzeichen zugesagt wurden
-// (M1): ohne diese Sperre wuerden zwei neue Rufzeichen im selben Frame
-// beide dieselbe (freie oder aelteste) Zeile planen, der zweite Treffer
-// faellt dann auf die Diagonale statt auf ein eigenes Paar. Liefert -1,
-// wenn ausser Zeile 0 kein einziger Index mehr frei ist (weder unbenutzt
-// noch verdraengbar) -- der Aufrufer muss dann den ganzen Frame verwerfen,
-// BEVOR er irgendetwas committet.
-static int nbrPlanRow(const NbrMatrix &m, const char *call, uint16_t now_min, uint32_t protected_mask)
-{
-    if (strncmp(call, m.rows[0].call, NBR_CALL_LEN) == 0)
+    if (!s || len < 3 || len > 9)
         return 0;
+    uint64_t w = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        uint8_t v = nbrICharCode(s[i]);
+        if (!v)
+            return 0;
+        w |= (uint64_t)v << (6 * i);
+    }
+    return w;
+}
 
+static uint64_t nbrIEncode(const char *s)
+{
+    if (!s)
+        return 0;
+    size_t n = 0;
+    while (n < NBR_CALL_LEN && s[n])
+        n++;
+    if (n >= NBR_CALL_LEN)
+        return 0; // 10 Zeichen oder mehr
+    return nbrIEncodeN(s, n);
+}
+
+static void nbrIDecode(uint64_t w, char *out)
+{
+    int n = 0;
+    for (; n < NBR_CALL_LEN - 1; n++)
+    {
+        uint8_t v = (uint8_t)((w >> (6 * n)) & 63u);
+        if (!v)
+            break;
+        out[n] = (v <= 10) ? (char)('0' + v - 1) : (v <= 36) ? (char)('A' + v - 11) : (v == 37) ? '-' : '?';
+    }
+    out[n] = '\0';
+}
+
+// --- Maske als Hex (nbr_mask.h) ---------------------------------------------
+
+static int nbrIMaskHex(const NbrMask &mask, char *out, size_t outlen)
+{
+    if (!out || outlen == 0)
+        return 0;
+    char buf[NBR_MASK_HEX_LEN + 1];
+    size_t pos = 0;
+    for (int i = NBR_MASK_WORDS - 1; i >= 0; i--)
+    {
+        // %08lX mit unsigned long: auf nRF52 (32 Bit) wie auf dem Host (64 Bit)
+        // gueltig; nie %llX (nano-printf gaebe den Buchstaben woertlich aus).
+        snprintf(buf + pos, sizeof(buf) - pos, "%08lX%08lX",
+                 (unsigned long)(uint32_t)(mask.w[i] >> 32), (unsigned long)(uint32_t)(mask.w[i] & 0xFFFFFFFFu));
+        pos += 16;
+    }
+    buf[NBR_MASK_HEX_LEN] = '\0';
+    size_t n = (size_t)NBR_MASK_HEX_LEN < outlen - 1 ? (size_t)NBR_MASK_HEX_LEN : outlen - 1;
+    memcpy(out, buf, n);
+    out[n] = '\0';
+    return (int)n;
+}
+
+// --- Position in 0,01 Grad ----------------------------------------------------
+
+static int16_t nbrIDeg16(float v)
+{
+    if (v != v)
+        return (int16_t)NBR_POS_UNKNOWN; // NAN
+    float s = v * 100.0f;
+    s = (s >= 0.0f) ? floorf(s + 0.5f) : -floorf(-s + 0.5f);
+    if (s > 32766.0f)
+        s = 32766.0f;
+    if (s < -32768.0f)
+        s = -32768.0f;
+    return (int16_t)s;
+}
+
+static bool nbrIPosKnown(const NbrRow &r)
+{
+    return (r.flags & NBR_FLAG_POS) && r.lat16 != (int16_t)NBR_POS_UNKNOWN && r.lon16 != (int16_t)NBR_POS_UNKNOWN;
+}
+
+// --- Log-Helfer (nur AUSSERHALB der Klammer) ----------------------------------
+
+static char nbrLogTypeChar(char type)
+{
+    return (type == ':') ? 'T' : (type == '!') ? 'P' : 'H';
+}
+
+static void nbrLogDrop(uint16_t now_min, const char *reason, const char *path)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|DROP|%u|%s|%s", (unsigned)now_min, reason, path ? path : "");
+    nbrLog(buf);
+}
+
+static void nbrLogCut(uint16_t now_min, int ntok, int kept, const char *path)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|CUT|%u|%d|%d|%s", (unsigned)now_min, ntok, kept, path ? path : "");
+    nbrLog(buf);
+}
+
+static void nbrFormatSnrField(char *out, size_t outlen, int8_t snr)
+{
+    if (snr == NBR_SNR_UNKNOWN)
+        snprintf(out, outlen, "NA");
+    else
+        snprintf(out, outlen, "%d", (int)snr);
+}
+
+// EDGE: "<to> hat <from> gehoert", <cnt> ist der EINE Zaehler der Kante nach
+// dem Treffer (frueher der Typzaehler), <rssi> immer 0.
+static void nbrLogEdge(uint16_t now_min, const char *from, const char *to, char type, uint8_t cnt, int8_t snr)
+{
+    if (!nbrLog)
+        return;
+    char snr_buf[8];
+    nbrFormatSnrField(snr_buf, sizeof(snr_buf), snr);
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|EDGE|%u|%s|%s|%c|%d|%u|%s",
+             (unsigned)now_min, from, to, nbrLogTypeChar(type), 0, (unsigned)cnt, snr_buf);
+    nbrLog(buf);
+}
+
+static void nbrLogMe(uint16_t now_min, const char *from, char type, int16_t rssi_here, uint8_t cnt, int8_t snr)
+{
+    if (!nbrLog)
+        return;
+    char snr_buf[8];
+    nbrFormatSnrField(snr_buf, sizeof(snr_buf), snr);
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|ME|%u|%s|%c|%d|%u|%s",
+             (unsigned)now_min, from, nbrLogTypeChar(type), (int)rssi_here, (unsigned)cnt, snr_buf);
+    nbrLog(buf);
+}
+
+static void nbrLogSym(uint16_t now_min, uint32_t msg_id, const char *role,
+                      const char *x_call, const char *m_call, int8_t snr)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|SYM|%u|%08X|%s|%s|%s|%d",
+             (unsigned)now_min, (unsigned)msg_id, role, x_call, m_call, (int)snr);
+    nbrLog(buf);
+}
+
+static void nbrLogEvict(uint16_t now_min, int idx, const char *old_call, const char *new_call)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|EVICT|%u|%d|%s|%s", (unsigned)now_min, idx, old_call, new_call);
+    nbrLog(buf);
+}
+
+// EVICT-E: der Kantenpool war voll, die Kante "<to> hat <from> gehoert" wich.
+static void nbrLogEvictEdge(uint16_t now_min, const char *from, const char *to)
+{
+    if (!nbrLog)
+        return;
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|EVICT-E|%u|%s|%s", (unsigned)now_min, from, to);
+    nbrLog(buf);
+}
+
+// --- Ereignisliste eines Schreibaufrufs ----------------------------------------
+//
+// nbrNoteFrame()/nbrNoteReport() sammeln unter der Klammer, was sie loggen
+// wollen, und geben es danach in derselben Reihenfolge aus. Ein Frame hat
+// hoechstens 8 Token: 2 Zeilenverdraengungen, 7 Pfadkanten + ME (je mit
+// hoechstens einer Kantenverdraengung), 1 DROP -- 20 Eintraege reichen.
+// Liegt auf dem Stack des Aufrufers (LORA-Task, 16 KB auf nRF52).
+
+enum
+{
+    NBR_EV_EVICT = 1, // a = Zeilenindex, c1 = altes, c2 = neues Rufzeichen
+    NBR_EV_EVICTE,    // c1 = from, c2 = to der gewichenen Kante
+    NBR_EV_EDGE,      // a/b = Token-Index from/to, cnt, snr
+    NBR_EV_ME,        // a = Token-Index, cnt, snr
+    NBR_EV_DROPFULL
+};
+
+struct NbrEv
+{
+    uint8_t kind;
+    uint8_t a, b;
+    uint8_t cnt;
+    int8_t  snr;
+    char    c1[NBR_CALL_LEN];
+    char    c2[NBR_CALL_LEN];
+};
+
+#define NBR_EV_MAX 20
+struct NbrEvList
+{
+    int   n;
+    NbrEv ev[NBR_EV_MAX];
+};
+
+static NbrEv *nbrIEvAdd(NbrEvList *lg, uint8_t kind)
+{
+    if (!lg || lg->n >= NBR_EV_MAX)
+        return NULL;
+    NbrEv *e = &lg->ev[lg->n++];
+    memset(e, 0, sizeof(*e));
+    e->kind = kind;
+    return e;
+}
+
+// --- Kantenpool (Konzept 4.1) ---------------------------------------------------
+
+static int nbrIEdgeFind(const NbrMatrix &m, int x, int y)
+{
+    if (x < 0 || y < 0 || x >= NBR_MAX_ROWS || y >= NBR_MAX_ROWS || x == y)
+        return -1;
+    if (!nbrMaskTest(m.heardBy[x], y))
+        return -1; // die Maske ist der schnelle Negativtest: keine Kante (x, y) lebt
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+        if (m.edge[e].x == x && m.edge[e].y == y)
+            return e;
+    return -1;
+}
+
+static void nbrIEdgeFree(NbrMatrix &m, int e)
+{
+    NbrEdge &ed = m.edge[e];
+    if (nbrIEdgeLive(ed))
+    {
+        nbrMaskClear(m.hears[ed.y], ed.x);
+        nbrMaskClear(m.heardBy[ed.x], ed.y);
+    }
+    ed.x = ed.y = NBR_EDGE_FREE;
+    ed.cnt = 0;
+    ed.snr = NBR_SNR_UNKNOWN;
+    ed.last_min = 0;
+}
+
+// Neue Kante (x, y) mit cnt 0 und unbekanntem SNR. Ist der Pool voll, weicht
+// die aelteste Kante, die weder Spalte 0 noch Zeile 0 beruehrt, erst danach
+// die aelteste ueberhaupt (Konzept 4.1); Gleichstand: kleinster Index.
+static int nbrIEdgeAlloc(NbrMatrix &m, int x, int y, uint16_t now_min, NbrEvList *lg)
+{
+    int slot = -1;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+        if (!nbrIEdgeLive(m.edge[e]))
+        {
+            slot = e;
+            break;
+        }
+    if (slot < 0)
+    {
+        for (int pass = 0; pass < 2 && slot < 0; pass++)
+        {
+            uint16_t oldest_age = 0;
+            for (int e = 0; e < NBR_MAX_EDGES; e++)
+            {
+                const NbrEdge &ed = m.edge[e];
+                if (pass == 0 && (ed.x == 0 || ed.y == 0))
+                    continue;
+                uint16_t age = (uint16_t)(now_min - ed.last_min);
+                if (slot < 0 || age > oldest_age)
+                {
+                    slot = e;
+                    oldest_age = age;
+                }
+            }
+        }
+        NbrEv *ev = nbrIEvAdd(lg, NBR_EV_EVICTE);
+        if (ev)
+        {
+            nbrIDecode(m.call[m.edge[slot].x], ev->c1);
+            nbrIDecode(m.call[m.edge[slot].y], ev->c2);
+        }
+        nbrIEdgeFree(m, slot);
+    }
+    NbrEdge &ed = m.edge[slot];
+    ed.x = (uint8_t)x;
+    ed.y = (uint8_t)y;
+    ed.cnt = 0;
+    ed.snr = NBR_SNR_UNKNOWN;
+    ed.last_min = now_min;
+    nbrMaskSet(m.hears[y], x);
+    nbrMaskSet(m.heardBy[x], y);
+    return slot;
+}
+
+// Ein Treffer "y hat x gehoert". Eine Kante, deren last_min beim Treffer
+// bereits verfallen ist, faengt bei cnt 0 und unbekanntem SNR neu an
+// (Konzept 4.2) -- dasselbe Ergebnis, das eine vom Sweep schon freigegebene
+// und jetzt neu angelegte Kante haette. Liefert den Kantenindex, -1 fuer die
+// Diagonale.
+static int nbrIEdgeHit(NbrMatrix &m, int x, int y, uint16_t now_min, NbrEvList *lg)
+{
+    if (x == y || x < 0 || y < 0)
+        return -1;
+    int e = nbrIEdgeFind(m, x, y);
+    if (e < 0)
+        e = nbrIEdgeAlloc(m, x, y, now_min, lg);
+    else if (!nbrIFresh(m.edge[e].last_min, now_min))
+    {
+        m.edge[e].cnt = 0;
+        m.edge[e].snr = NBR_SNR_UNKNOWN;
+    }
+    if (m.edge[e].cnt < 255)
+        m.edge[e].cnt++;
+    m.edge[e].last_min = now_min;
+    return e;
+}
+
+static bool nbrIEdgeFresh(const NbrMatrix &m, int x, int y, uint16_t now_min)
+{
+    int e = nbrIEdgeFind(m, x, y);
+    return e >= 0 && nbrIFresh(m.edge[e].last_min, now_min);
+}
+
+// ME-Messwert fuer die Kante (x, ich): ganzzahliges gleitendes Mittel ueber
+// NBR_SNR_AVG_N Rahmen (Konzept 4.1/4.8). Der erste Wert (oder der erste nach
+// einem Neubeginn, SNR unbekannt) ist der Wert selbst; danach zaehlt n =
+// min(cnt, NBR_SNR_AVG_N) -- cnt der Kante (x, 0) zaehlt genau die ME-Rahmen,
+// eine Halbierung verkuerzt das Gedaechtnis entsprechend. Der Schritt
+// (Messwert - Mittel) / n wird gerundet und ist mindestens 1 dB in Richtung
+// des Messwerts, sonst bliebe das ganzzahlige Mittel bis zu n/2 dB vor einem
+// gleichbleibenden Wert stehen. NBR_SNR_AVG_N == 1: immer der letzte Wert
+// (bisheriges Verhalten).
+static void nbrISnrSample(NbrEdge &e, int8_t sample)
+{
+    if (NBR_SNR_AVG_N <= 1 || e.snr == NBR_SNR_UNKNOWN)
+    {
+        e.snr = sample;
+        return;
+    }
+    int n = (e.cnt < NBR_SNR_AVG_N) ? (int)e.cnt : (int)NBR_SNR_AVG_N;
+    if (n <= 1)
+    {
+        e.snr = sample;
+        return;
+    }
+    int d = (int)sample - (int)e.snr;
+    int step = (d >= 0) ? (d + n / 2) / n : -((-d + n / 2) / n);
+    if (step == 0 && d != 0)
+        step = (d > 0) ? 1 : -1;
+    e.snr = nbrClampSnr((int32_t)e.snr + step);
+}
+
+// --- Zeilen ----------------------------------------------------------------------
+
+static int nbrIFindWord(const NbrMatrix &m, uint64_t w)
+{
+    if (w == 0)
+        return -1;
+    if (w == m.call[0])
+        return 0;
     for (int i = 1; i < NBR_MAX_ROWS; i++)
-        if ((m.rows[i].flags & NBR_FLAG_USED) && strncmp(call, m.rows[i].call, NBR_CALL_LEN) == 0)
+        if (m.call[i] == w && nbrIUsed(m, i))
             return i;
+    return -1;
+}
 
+static void nbrIRowBlank(NbrMatrix &m, int idx)
+{
+    memset(&m.row[idx], 0, sizeof(NbrRow));
+    m.row[idx].lat16 = (int16_t)NBR_POS_UNKNOWN;
+    m.row[idx].lon16 = (int16_t)NBR_POS_UNKNOWN;
+    m.row[idx].ext = 0xFF;
+}
+
+// Zeile idx vollstaendig leeren: ihre Kanten frei (je zwei Maskenbits), ihr
+// Bit in jeder Maske geloescht, Rufzeichen 0 -- ein Durchlauf ueber den Pool
+// (Konzept 4.1). Nie fuer Zeile 0.
+static void nbrIRowClear(NbrMatrix &m, int idx)
+{
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+        if (nbrIEdgeLive(m.edge[e]) && (m.edge[e].x == idx || m.edge[e].y == idx))
+            nbrIEdgeFree(m, e);
+    for (int r = 0; r < NBR_MAX_ROWS; r++)
+    {
+        nbrMaskClear(m.hears[r], idx);
+        nbrMaskClear(m.heardBy[r], idx);
+    }
+    m.hears[idx] = nbrMaskNone();
+    m.heardBy[idx] = nbrMaskNone();
+    nbrIRowBlank(m, idx);
+    m.call[idx] = 0;
+    NBR_GEN_BUMP();
+}
+
+// Liest-ONLY, welchen Index ein Touch fuer w waehlen wuerde (frueher
+// nbrPlanRow(), unveraendert): vorhandene Zeile, sonst die erste freie, sonst
+// die mit der groessten Altersluecke -- zuerst unter den Zeilen, die ich NICHT
+// frisch direkt hoere, erst dann unter allen --, nie ein Index aus prot.
+static int nbrIPlanRow(const NbrMatrix &m, uint64_t w, uint16_t now_min, const NbrMask &prot)
+{
+    if (w == m.call[0])
+        return 0;
     for (int i = 1; i < NBR_MAX_ROWS; i++)
-        if (!(protected_mask & (1u << (unsigned)i)) && !(m.rows[i].flags & NBR_FLAG_USED))
+        if (nbrIUsed(m, i) && m.call[i] == w)
             return i;
-
-    // Tabelle voll: die nicht gesperrte Zeile mit der groessten
-    // Alterslluecke weicht. Der ueberlaufsichere Altersvergleich ist
-    // derselbe wie in nbrFresh().
-    //
-    // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8, Punkt 1): zuerst unter
-    // den Zeilen, die ich NICHT frisch direkt hoere (2-Hop-Zeilen), erst
-    // wenn es keine solche gibt, unter allen. Die Relay-Entscheidung
-    // (nbrRelayNeed()) rechnet ausschliesslich auf Direktzeilen; eine
-    // 2-Hop-Zeile ist Anzeige, eine Direktzeile Evidenz. Im Feldlauf
-    // 2026-09-21 fielen 2 von 56 Verdraengungen auf Direktzeilen.
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        if (!nbrMaskTest(prot, i) && !nbrIUsed(m, i))
+            return i;
+    // Frisch direkt gehoert, ein Durchlauf ueber den Pool statt einer
+    // Kantensuche je Zeile (die Klammer soll kurz bleiben).
+    NbrMask fresh_direct = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.y == 0 && nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(fresh_direct, ed.x);
+    }
     for (int pass = 0; pass < 2; pass++)
     {
         int oldest = -1;
         uint16_t oldest_age = 0;
         for (int i = 1; i < NBR_MAX_ROWS; i++)
         {
-            if (protected_mask & (1u << (unsigned)i))
+            if (nbrMaskTest(prot, i))
                 continue;
-            if (pass == 0 && nbrCellSet(m.cells[i][0]) && nbrFresh(m.cells[i][0].last_min, now_min))
+            if (pass == 0 && nbrMaskTest(fresh_direct, i))
                 continue; // frisch direkt gehoert: erst im zweiten Durchgang verdraengbar
-            uint16_t age = (uint16_t)(now_min - m.rows[i].last_min);
+            uint16_t age = (uint16_t)(now_min - m.row[i].last_min);
             if (oldest < 0 || age > oldest_age)
             {
                 oldest = i;
@@ -212,95 +570,53 @@ static int nbrPlanRow(const NbrMatrix &m, const char *call, uint16_t now_min, ui
         if (oldest >= 0)
             return oldest;
     }
-    return -1; // in diesem Aufruf ist kein Opfer mehr frei
+    return -1;
 }
 
-// Setzt einen von nbrPlanRow() gelieferten Index tatsaechlich um: nichts zu
-// tun fuer Zeile 0 oder einen bereits passenden Fund, sonst neu anlegen.
-// Zeile UND Spalte werden in BEIDEN Faellen (freier Slot wie Verdraengung)
-// zuerst genullt -- das nullt bei einer echten Verdraengung die alten
-// Hoerbeziehungen weg, und heilt nebenbei eine Zeile, die durch einen
-// unvollstaendigen Reset aus einem anderen Task faelschlich als "frei"
-// dasteht, aber noch alte Zellwerte traegt.
-static void nbrCommitRow(NbrMatrix &m, int target_idx, const char *call, uint16_t now_min)
+// Setzt einen geplanten Index um: nichts fuer Zeile 0 oder einen passenden
+// Fund, sonst leeren (Verdraengung loggt EVICT) und neu anlegen.
+static void nbrICommitRow(NbrMatrix &m, int idx, uint64_t w, const char *call, uint16_t now_min, NbrEvList *lg)
 {
-    if (target_idx == 0)
+    if (idx == 0)
         return;
-    if ((m.rows[target_idx].flags & NBR_FLAG_USED) &&
-        strncmp(call, m.rows[target_idx].call, NBR_CALL_LEN) == 0)
+    if (nbrIUsed(m, idx) && m.call[idx] == w)
         return;
-
-    // Eine benutzte Zeile mit einem ANDEREN Rufzeichen wird hier ueberschrieben
-    // -- das ist eine echte Verdraengung, nicht nur die Erstbelegung eines
-    // freien Slots (der Fall oben, "gleiches Rufzeichen", ist schon
-    // abgehandelt; ein leerer Slot hat kein NBR_FLAG_USED).
-    if ((m.rows[target_idx].flags & NBR_FLAG_USED) && nbrLog)
+    if (nbrIUsed(m, idx))
     {
-        char buf[160];
-        snprintf(buf, sizeof(buf), "[NBR]|EVICT|%u|%d|%s|%s",
-                 (unsigned)now_min, target_idx, m.rows[target_idx].call, call);
-        nbrLog(buf);
-    }
-    nbrZeroRowAndColumn(m, target_idx);
-    nbrRowInit(m, target_idx, call, now_min);
-}
-
-// Ein Treffer auf eine verfallene Zelle faengt bei ihren Zaehlern neu bei 0
-// an (Konzept 4.2), bevor er zaehlt; der SNR wird dabei mitgeloescht (auf
-// NBR_SNR_UNKNOWN, nicht 0 -- 0 dB waere ein gueltiger Wert), weil er zu
-// genau diesen Zaehlern gehoert. Eine frische Zelle behaelt ihren SNR, auch
-// wenn der aktuelle Treffer keinen eigenen mitbringt (Text-/POS-Frames haben
-// keinen Signalbericht).
-static void nbrHitCell(NbrCell &c, char type, uint16_t now_min)
-{
-    if (nbrCellSet(c) && (uint16_t)(now_min - c.last_min) >= NBR_WINDOW_MIN)
-    {
-        c.cnt_text = c.cnt_pos = c.cnt_hey = 0;
-        c.snr = NBR_SNR_UNKNOWN;
-    }
-    uint8_t *cnt = (type == ':') ? &c.cnt_text : (type == '!') ? &c.cnt_pos : &c.cnt_hey;
-    if (*cnt < 255)
-        (*cnt)++;
-    c.last_min = now_min;
-}
-
-// Geister-Sweep gegen den 16-Bit-Minuten-Ueberlauf (siehe NBR_WINDOW_MIN in
-// nbr_matrix.h): eine Zelle/Zeile, die seit > 32768 Minuten (die Haelfte des
-// darstellbaren Bereichs) nicht mehr getroffen wurde, koennte durch den
-// Ueberlauf wieder faelschlich frisch erscheinen UND als "juengste" Zeile
-// eine echte, aktuelle Zeile bei einer Verdraengung ausstechen. Laeuft nur
-// alle 1024 Minuten (billig genug fuer jeden nbrNoteFrame()/nbrNotePos()-
-// Aufruf), nicht bei jedem Treffer einzeln.
-static void nbrMaybeSweep(NbrMatrix &m, uint16_t now_min)
-{
-    if ((uint16_t)(now_min - m.last_sweep) < 1024)
-        return;
-
-    for (int i = 1; i < NBR_MAX_ROWS; i++)
-    {
-        if ((m.rows[i].flags & NBR_FLAG_USED) && (uint16_t)(now_min - m.rows[i].last_min) >= 32768)
+        NbrEv *ev = nbrIEvAdd(lg, NBR_EV_EVICT);
+        if (ev)
         {
-            m.rows[i].flags = 0;
-            m.rows[i].rpt_min = 0;   // NBR_FLAG_RPT ist schon weg; Feld defensiv mitraeumen (Spec: "beide" leeren)
-            nbrZeroRowAndColumn(m, i);
+            ev->a = (uint8_t)idx;
+            nbrIDecode(m.call[idx], ev->c1);
+            strncpy(ev->c2, call, NBR_CALL_LEN - 1);
+            ev->c2[NBR_CALL_LEN - 1] = '\0';
         }
     }
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-        for (int y = 0; y < NBR_MAX_ROWS; y++)
-        {
-            NbrCell &c = m.cells[x][y];
-            if (nbrCellSet(c) && (uint16_t)(now_min - c.last_min) >= 32768)
-            {
-                c.cnt_text = c.cnt_pos = c.cnt_hey = 0;
-                c.snr = NBR_SNR_UNKNOWN;
-            }
-        }
+    nbrIRowClear(m, idx);
+    m.call[idx] = w;
+    m.row[idx].flags = NBR_FLAG_USED;
+    m.row[idx].last_min = now_min;
+}
+
+static void nbrIInitAll(NbrMatrix &m, uint64_t own, uint16_t now_min)
+{
+    memset(&m, 0, sizeof(NbrMatrix));
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+        nbrIRowBlank(m, i);
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        m.edge[e].x = m.edge[e].y = NBR_EDGE_FREE;
+        m.edge[e].snr = NBR_SNR_UNKNOWN;
+    }
+    m.call[0] = own;
+    m.boot_min = now_min;
     m.last_sweep = now_min;
+    m.last_halve = now_min;
+    NBR_GEN_BUMP();
 }
 
-// Ein Rufzeichen-Token: 3..9 Zeichen aus [A-Z0-9-]. Dieselbe Zeichenmenge
-// wie das Pfadformat des Frames, nur ohne SSID-Sonderfaelle -- die Matrix
-// braucht keine SSID-Bedeutung, nur die Byte-Identitaet des Tokens.
+// --- Pfad- und Berichtsparser (unveraendert) --------------------------------------
+
 static bool nbrValidToken(const char *tok, size_t len)
 {
     if (len < 3 || len > 9)
@@ -314,15 +630,10 @@ static bool nbrValidToken(const char *tok, size_t len)
     return true;
 }
 
-// Zerlegt path an ',' in bis zu max_tokens Rufzeichen. Liefert die Anzahl
-// oder -1, wenn ein Token ungueltig ist oder es mehr als max_tokens gibt --
-// in beiden Faellen wird NICHTS geschrieben, der Aufrufer sieht das am
-// Rueckgabewert, bevor irgendeine Zeile angefasst wird.
 static int nbrTokenizePath(const char *path, char tokens[][NBR_CALL_LEN], int max_tokens)
 {
     if (!path || !*path)
         return -1;
-
     int n = 0;
     const char *p = path;
     for (;;)
@@ -343,10 +654,6 @@ static int nbrTokenizePath(const char *path, char tokens[][NBR_CALL_LEN], int ma
     return n;
 }
 
-// Ziffernfolge -> long, ohne stdlib.h (dessen strtol dieser Datei nicht zur
-// Verfuegung steht). Auf 6 Ziffern begrenzt: mehr braucht keine reale
-// Signalzahl, und das haelt eine folgende Vorzeichen-Anwendung garantiert
-// ueberlauffrei.
 static long nbrParseUint(const char *s, size_t len)
 {
     if (len == 0 || len > 6)
@@ -361,11 +668,6 @@ static long nbrParseUint(const char *s, size_t len)
     return v;
 }
 
-// Wie nbrParseUint(), aber mit optionalem fuehrenden '-' -- das SNR-Feld
-// eines HEY-Berichts ist vorzeichenbehaftet (z. B. "3,115,-10"). Liefert
-// false bei leerem/ungueltigem Feld, sonst *out = der geparste Wert. Ein
-// bool-Rueckgabewert statt "< 0 heisst ungueltig" wie bei nbrParseUint(),
-// weil ein gueltiges Ergebnis hier selbst negativ sein darf.
 static bool nbrParseInt(const char *s, size_t len, long *out)
 {
     bool neg = (len > 0 && s[0] == '-');
@@ -376,13 +678,13 @@ static bool nbrParseInt(const char *s, size_t len, long *out)
     return true;
 }
 
-// Eine HEY-Berichtsgruppe "NCT,RSSI,SNR" (appendHeySignalReport(),
-// src/aprs_functions.cpp:1134): genau zwei Kommas, sonst ist es kein
-// gueltiger Bericht und wird uebersprungen (altes/fremdes Format). Gelesen
-// wird nur noch das DRITTE Feld (SNR, vorzeichenbehaftet) -- das mittlere
-// (RSSI) wird seit der Umstellung auf SNR nicht mehr gespeichert, nur noch
-// als Feldgrenze gebraucht.
-static void nbrApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, size_t len)
+// HEY-Gruppe "NCT,RSSI,SNR": das dritte Feld wird der SNR der Kante (x, y),
+// aber nur wenn diese Kante lebt. Die Paarkanten dieses Frames sind vorher
+// getroffen worden; einzig (x, 0) -- mein Rufzeichen mitten im Pfad -- kann
+// ohne Kante sein, und dort gab es auch in der dichten Matrix keine
+// Beobachtung (nur einen SNR in einer leeren Zelle, den der naechste
+// ME-Treffer ohnehin ueberschrieb).
+static void nbrIApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, size_t len)
 {
     const char *comma1 = NULL;
     const char *comma2 = NULL;
@@ -395,34 +697,34 @@ static void nbrApplyGroup(NbrMatrix &m, int row_x, int row_y, const char *g, siz
         else if (!comma2)
             comma2 = g + i;
         else
-            return; // drittes Komma: nicht "NCT,RSSI,SNR"
+            return;
     }
     if (!comma1 || !comma2)
         return;
-
     const char *snr_start = comma2 + 1;
     size_t snr_len = (size_t)((g + len) - snr_start);
     long snr;
     if (!nbrParseInt(snr_start, snr_len, &snr))
-        return; // nicht numerisch, Zelle bleibt unangetastet
-
-    m.cells[row_x][row_y].snr = nbrClampSnr((int32_t)snr);
+        return;
+    // Kante (x, 0) gehoert dem ME-Schritt: die Gruppe ist mein eigener,
+    // frueherer Empfang von x, der als Echo zurueckkommt. Mit laufendem
+    // SNR-Mittel (NBR_SNR_AVG_N > 1) wuerde ein alter Einzelwert das Mittel
+    // ueberschreiben (Advisor Welle 2, Befund A). Mit N == 1 bleibt das
+    // Verhalten der dichten Matrix, damit der Differenzialtest exakt bleibt.
+    if (row_y == 0 && NBR_SNR_AVG_N > 1)
+        return;
+    int e = nbrIEdgeFind(m, row_x, row_y);
+    if (e >= 0)
+        m.edge[e].snr = nbrClampSnr((int32_t)snr);
 }
 
-// Liest "R<n>;g1;g2;..." und verteilt Gruppe i (1-basiert) auf das Paar
-// (row_idx[i-1], row_idx[i]) -- Konzept 4.1, Abb. 3. Ueberzaehlige Gruppen
-// (mehr als ntok-1) werden ignoriert, fehlende ebenso. row_idx traegt -1 fuer
-// jedes Token ausserhalb des 2-Hop-Fensters ohne bestehende Zeile (siehe
-// nbrNoteFrame()) -- eine Gruppe, deren Paar nicht VOLLSTAENDIG aufgeloest
-// ist, wird uebersprungen statt mit einem negativen Index zuzugreifen.
-static void nbrApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const char *payload)
+static void nbrIApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const char *payload)
 {
     if (!payload)
         return;
     const char *sep = strchr(payload, ';');
     if (!sep)
         return;
-
     const char *p = sep + 1;
     int gi = 1;
     while (*p && gi <= ntok - 1)
@@ -432,89 +734,916 @@ static void nbrApplyHeyGroups(NbrMatrix &m, const int *row_idx, int ntok, const 
             p++;
         size_t len = (size_t)(p - start);
         if (len > 0 && row_idx[gi - 1] >= 0 && row_idx[gi] >= 0)
-            nbrApplyGroup(m, row_idx[gi - 1], row_idx[gi], start, len);
+            nbrIApplyGroup(m, row_idx[gi - 1], row_idx[gi], start, len);
         if (*p == ';')
             p++;
         gi++;
     }
 }
 
-// Nach einem memset() der ganzen Matrix (nbrInit()/nbrReset()) stehen alle
-// Zellen-SNR auf 0 -- ein GUELTIGER Wert, nicht NBR_SNR_UNKNOWN. Diese Zellen
-// sind zwar ueber nbrCellSet() (alle Zaehler 0) als "keine Beobachtung"
-// erkennbar, aber mindestens ein Leser (nbrFormatRow()) prueft das SNR-Feld
-// zusaetzlich zu last_min/nbrFresh() ohne nbrCellSet() -- deshalb hier
-// explizit nachtragen, statt sich auf die Zaehler allein zu verlassen.
-static void nbrFillUnknownSnr(NbrMatrix &m)
+// --- nbrNoteFrame(), innerer Teil (unter der Klammer) ------------------------------
+
+static int nbrINoteFrame(NbrMatrix &m, char tokens[][NBR_CALL_LEN], const uint64_t *words, int ntok,
+                         char type, const char *payload, bool dest_gw, int8_t snr_here, uint16_t now_min,
+                         NbrEvList *lg)
 {
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-        for (int y = 0; y < NBR_MAX_ROWS; y++)
-            m.cells[x][y].snr = NBR_SNR_UNKNOWN;
+    // Text: nur der ME-Schritt (siehe nbr_matrix.h).
+    if (type == ':')
+    {
+        int last_idx = nbrIFindWord(m, words[ntok - 1]);
+        if (last_idx < 0)
+        {
+            last_idx = nbrIPlanRow(m, words[ntok - 1], now_min, nbrMaskNone());
+            if (last_idx < 0)
+            {
+                nbrIEvAdd(lg, NBR_EV_DROPFULL);
+                return -3;
+            }
+            nbrICommitRow(m, last_idx, words[ntok - 1], tokens[ntok - 1], now_min, lg);
+        }
+        if (words[ntok - 1] == m.call[0])
+            return 0; // eigenes Echo
+
+        int e = nbrIEdgeHit(m, last_idx, 0, now_min, lg);
+        nbrISnrSample(m.edge[e], nbrClampSnr(snr_here));
+        m.row[last_idx].last_min = now_min;
+        m.row[0].last_min = now_min;
+        NbrEv *ev = nbrIEvAdd(lg, NBR_EV_ME);
+        if (ev)
+        {
+            ev->a = (uint8_t)(ntok - 1);
+            ev->cnt = m.edge[e].cnt;
+            ev->snr = m.edge[e].snr;
+        }
+        return 1;
+    }
+
+    // 2-Hop-Fenster fuer '!'/'@'.
+    int start = (ntok > 2) ? ntok - 2 : 0;
+    int row_idx[8];
+    for (int i = 0; i < 8; i++)
+        row_idx[i] = -1;
+
+    // Erst bestehende Fenster-Zeilen aufloesen und schuetzen (M2), dann die
+    // unbekannten lesend planen (M1); scheitert eine Planung, ist noch nichts
+    // angefasst.
+    NbrMask prot = nbrMaskNone();
+    for (int i = start; i < ntok; i++)
+    {
+        int idx = nbrIFindWord(m, words[i]);
+        if (idx < 0)
+            continue;
+        row_idx[i] = idx;
+        nbrMaskSet(prot, idx);
+    }
+    for (int i = start; i < ntok; i++)
+    {
+        if (row_idx[i] >= 0)
+            continue;
+        int idx = nbrIPlanRow(m, words[i], now_min, prot);
+        if (idx < 0)
+        {
+            nbrIEvAdd(lg, NBR_EV_DROPFULL);
+            return -3;
+        }
+        row_idx[i] = idx;
+        nbrMaskSet(prot, idx);
+    }
+    for (int i = start; i < ntok; i++)
+        nbrICommitRow(m, row_idx[i], words[i], tokens[i], now_min, lg);
+
+    // Regel 3: Token vor dem Fenster nur lesend.
+    for (int i = 0; i < start; i++)
+        row_idx[i] = nbrIFindWord(m, words[i]);
+
+    int hits = 0;
+    for (int i = 0; i + 1 < ntok; i++)
+    {
+        int x = row_idx[i], y = row_idx[i + 1];
+        if (x < 0 || y < 0)
+            continue;
+        if (y == 0)
+            continue; // Spalte 0 schreibt nur der ME-Schritt
+        int e = nbrIEdgeHit(m, x, y, now_min, lg);
+        if (e < 0)
+            continue;
+        if (i >= start)
+        {
+            m.row[x].last_min = now_min;
+            m.row[y].last_min = now_min;
+        }
+        NbrEv *ev = nbrIEvAdd(lg, NBR_EV_EDGE);
+        if (ev)
+        {
+            ev->a = (uint8_t)i;
+            ev->b = (uint8_t)(i + 1);
+            ev->cnt = m.edge[e].cnt;
+            ev->snr = m.edge[e].snr;
+        }
+        hits++;
+    }
+
+    if (words[ntok - 1] != m.call[0])
+    {
+        int last = row_idx[ntok - 1];
+        int e = nbrIEdgeHit(m, last, 0, now_min, lg);
+        if (e >= 0)
+        {
+            nbrISnrSample(m.edge[e], nbrClampSnr(snr_here));
+            m.row[last].last_min = now_min;
+            m.row[0].last_min = now_min;
+            NbrEv *ev = nbrIEvAdd(lg, NBR_EV_ME);
+            if (ev)
+            {
+                ev->a = (uint8_t)(ntok - 1);
+                ev->cnt = m.edge[e].cnt;
+                ev->snr = m.edge[e].snr;
+            }
+            hits++;
+        }
+    }
+
+    if (type == '@')
+    {
+        int sender = row_idx[0];
+        if (dest_gw && sender >= 0)
+            m.row[sender].flags |= NBR_FLAG_GW;
+        nbrIApplyHeyGroups(m, row_idx, ntok, payload);
+    }
+    return hits;
 }
 
-// --- oeffentliche Schnittstelle --------------------------------------------
+// --- Kontext der Urteile: Direkt-Maske und staerkster direkter Hoerer --------------
+//
+// Anteilsregel (nbr_matrix.h, Konzept 4.3): die Kante (a, b) zaehlt als
+// Deckung, wenn sie lebt, frisch ist und cnt(a, b) mindestens NBR_SHARE_PCT
+// Prozent von maxd[a] erreicht, dem groessten frischen cnt(a, D) ueber alle
+// direkten Nachbarn D (ohne mich). NBR_SHARE_PCT == 0: jede frische Kante.
+//
+// Liegt auf dem Stack des Aufrufers (2 + 8 * NBR_MASK_WORDS + NBR_MAX_ROWS
+// Byte, rund 150 Byte bei 128 Zeilen) und lebt nur fuer einen Aufruf.
+
+struct NbrCtx
+{
+    uint16_t now;
+    NbrMask  direct;
+#if NBR_SHARE_PCT > 0
+    uint8_t  maxd[NBR_MAX_ROWS];
+#endif
+};
+
+static const NbrCtx &nbrICtx(const NbrMatrix &m, uint16_t now_min, NbrCtx &c)
+{
+    c.now = now_min;
+    c.direct = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.y == 0 && ed.x != 0 && nbrIUsed(m, ed.x) && nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(c.direct, ed.x);
+    }
+#if NBR_SHARE_PCT > 0
+    memset(c.maxd, 0, sizeof(c.maxd));
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && nbrMaskTest(c.direct, ed.y) && nbrIFresh(ed.last_min, now_min) && ed.cnt > c.maxd[ed.x])
+            c.maxd[ed.x] = ed.cnt;
+    }
+#endif
+    return c;
+}
+
+static inline bool nbrIShareOk(const NbrCtx &c, const NbrEdge &ed)
+{
+#if NBR_SHARE_PCT > 0
+    return (uint32_t)ed.cnt * 100u >= (uint32_t)NBR_SHARE_PCT * (uint32_t)c.maxd[ed.x];
+#else
+    (void)c;
+    (void)ed;
+    return true;
+#endif
+}
+
+// Frische, lebende Kante (a, b) mit Anteil.
+static inline bool nbrICovers(const NbrMatrix &m, const NbrCtx &c, const NbrEdge &ed)
+{
+    (void)m;
+    return nbrIEdgeLive(ed) && nbrIFresh(ed.last_min, c.now) && nbrIShareOk(c, ed);
+}
+
+// Hoerer von row (ohne Anteil): Y != row, Y != 0, belegt, frische Kante (row, Y).
+static NbrMask nbrIHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    NbrMask r = nbrMaskNone();
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return r;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.x == row && ed.y != 0 && nbrIUsed(m, ed.y) && nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(r, ed.y);
+    }
+    return r;
+}
+
+// Hoerer inklusive Zeile 0 (frueher nbrHearers()): alle Y != row mit frischer
+// Kante (row, Y).
+static NbrMask nbrIHearersAll(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    NbrMask r = nbrMaskNone();
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return r;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.x == row && nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(r, ed.y);
+    }
+    return r;
+}
+
+static NbrMask nbrIHeardMeMask(const NbrMatrix &m, uint16_t now_min)
+{
+    NbrMask r = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.x == 0 && ed.y != 0 && nbrIUsed(m, ed.y) && nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(r, ed.y);
+    }
+    return r;
+}
+
+// Zeilen, die irgendein Y != 0 mit Anteil hoert (frueher: nicht
+// nbrRowExclusive()).
+static NbrMask nbrICoveredByAnyone(const NbrMatrix &m, const NbrCtx &c)
+{
+    NbrMask r = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (ed.y != 0 && nbrICovers(m, c, ed))
+            nbrMaskSet(r, ed.x);
+    }
+    return r;
+}
+
+// E_self: direkte Zeilen, die kein ANDERER direkter Nachbar mit Anteil hoert.
+static NbrMask nbrIExclusiveDirect(const NbrMatrix &m, const NbrCtx &c)
+{
+    NbrMask cov = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && nbrMaskTest(c.direct, ed.x) && nbrMaskTest(c.direct, ed.y) && nbrICovers(m, c, ed))
+            nbrMaskSet(cov, ed.x);
+    }
+    return nbrMaskAndNot(c.direct, cov);
+}
+
+// #X-Menge von row (Konzept 4.3): X, die row mit Anteil hoert, die ich nicht
+// direkt hoere und die kein anderer direkter Nachbar mit Anteil hoert.
+// Liefert -1 ("NA") fuer Zeile 0 und nicht direkte Zeilen.
+static int nbrIMeshNeedSet(const NbrMatrix &m, const NbrCtx &c, int row, NbrMask *out)
+{
+    if (out)
+        *out = nbrMaskNone();
+    if (row <= 0 || row >= NBR_MAX_ROWS)
+        return -1;
+    if (!nbrMaskTest(c.direct, row))
+        return -1;
+    NbrMask rowcov = nbrMaskNone(), peercov = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (!nbrIEdgeLive(ed) || ed.x == 0 || ed.x == row)
+            continue;
+        if (!nbrICovers(m, c, ed))
+            continue;
+        if (ed.y == row)
+            nbrMaskSet(rowcov, ed.x);
+        else if (nbrMaskTest(c.direct, ed.y))
+            nbrMaskSet(peercov, ed.x);
+    }
+    NbrMask r = nbrMaskAndNot(nbrMaskAndNot(rowcov, c.direct), peercov);
+    if (out)
+        *out = r;
+    return nbrMaskCount(r);
+}
+
+static const char *nbrIRowVerdict(const NbrMatrix &m, const NbrCtx &c, int x, const NbrMask &covered_any)
+{
+    if (x == 0)
+        return "UNK";
+    if (!nbrMaskTest(c.direct, x))
+        return nbrMaskEmpty(nbrIHearersAll(m, x, c.now)) ? "UNK" : "LEAF";
+    return nbrMaskTest(covered_any, x) ? "RED" : "EXCL";
+}
+
+static const char *nbrIMeshNeedWord(int n)
+{
+    if (n < 0)
+        return "NA";
+    return n > 0 ? "MESH" : "RED";
+}
+
+// --- Symmetrie-Annahme ------------------------------------------------------------
+
+static bool nbrIHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, bool sym,
+                         int8_t *snr_used, bool *inferred, bool *vetoed)
+{
+    *inferred = false;
+    *vetoed = false;
+    if (nbrIEdgeFresh(m, mrow, x, now_min)) // "X hat M gehoert", beobachtet
+        return true;
+    if (!sym || x == mrow)
+        return false;
+    int e = nbrIEdgeFind(m, x, mrow); // "M hat X gehoert"
+    if (e < 0 || !nbrIFresh(m.edge[e].last_min, now_min))
+        return false;
+    int8_t snr = m.edge[e].snr;
+    if (snr == NBR_SNR_UNKNOWN || snr < NBR_SYM_MIN_SNR)
+        return false;
+    const NbrRow &rx = m.row[x];
+    *snr_used = snr;
+    if ((rx.flags & NBR_FLAG_RPT) && (uint16_t)(now_min - rx.rpt_min) < NBR_REPORT_VALID_MIN)
+    {
+        *vetoed = true;
+        return false;
+    }
+    *inferred = true;
+    return true;
+}
+
+// SYM-Zeilen. Mit NBR_DEFER_LOG (nRF52) unter der Klammer nur als 4-Byte-Satz
+// gemerkt und nach der Klammer formatiert: statisch, 96 Saetze = 384 Byte.
+// Belegt ihn ein anderer Task gerade oder laeuft er ueber, gehen die Zeilen
+// verloren -- gezaehlt und als "[NBR]|DROP|<up>|SYMBUF|<n>" gemeldet. Ohne
+// NBR_DEFER_LOG geht jede Zeile sofort hinaus (die Klammer ist dort leer).
+enum
+{
+    NBR_SYM_HASF = 1,
+    NBR_SYM_ALT,
+    NBR_SYM_COVER,
+    NBR_SYM_VETO
+};
+#define NBR_SYM_TOKEN 0x80 // im Rollenbyte: m ist ein Pfad-Token-Index, kein Zeilenindex
+
+struct NbrSymSink
+{
+    bool              on;     // Log an
+    const NbrMatrix  *m;
+    char            (*tokens)[NBR_CALL_LEN]; // Pfad-Token (nbrRelayNeed) oder NULL
+    uint16_t          now;
+    uint32_t          msg_id;
+#if NBR_DEFER_LOG
+    bool              owner;  // dieser Aufruf haelt s_sym
+    uint16_t          lost;
+    uint32_t          gen;
+#endif
+};
+
+// Eine SYM-Zeile formatieren und ausgeben. names: Zeilenindizes duerfen aus
+// der Matrix gelesen werden (sonst "?<idx>", siehe nbrISymFlush()).
+static void nbrISymEmit(const NbrSymSink &s, uint8_t role, int x, int mref, int8_t snr, uint64_t wx, uint64_t wm,
+                        bool names)
+{
+    bool tok = (role & NBR_SYM_TOKEN) != 0;
+    int role_id = role & 0x7F;
+    char xc[NBR_CALL_LEN], mc[NBR_CALL_LEN];
+    if (names)
+        nbrIDecode(wx, xc);
+    else
+        snprintf(xc, sizeof(xc), "?%u", (unsigned)x);
+    if (tok)
+    {
+        strncpy(mc, s.tokens ? s.tokens[mref] : "?", NBR_CALL_LEN - 1);
+        mc[NBR_CALL_LEN - 1] = '\0';
+    }
+    else if (names)
+        nbrIDecode(wm, mc);
+    else
+        snprintf(mc, sizeof(mc), "?%u", (unsigned)mref);
+    const char *r = (role_id == NBR_SYM_HASF) ? "HASF" : (role_id == NBR_SYM_ALT) ? "ALT"
+                  : (role_id == NBR_SYM_COVER) ? "COVER" : "VETO";
+    nbrLogSym(s.now, s.msg_id, r, xc, mc, snr);
+}
+
+#if NBR_DEFER_LOG
+struct NbrSymRec
+{
+    uint8_t role;
+    uint8_t x;
+    uint8_t m;
+    int8_t  snr;
+};
+#define NBR_SYM_REC_MAX 96
+static_assert(sizeof(NbrSymRec) * NBR_SYM_REC_MAX <= 384, "SYM-Puffer ueber 384 Byte");
+static NbrSymRec s_sym[NBR_SYM_REC_MAX];
+static uint8_t   s_sym_n = 0;
+static bool      s_sym_busy = false;
+#endif
+
+// Unter der Klammer.
+static void nbrISymBegin(NbrSymSink &s, const NbrMatrix &m, char (*tokens)[NBR_CALL_LEN], uint16_t now_min,
+                         uint32_t msg_id)
+{
+    s.on = (nbrLog != NULL);
+    s.m = &m;
+    s.tokens = tokens;
+    s.now = now_min;
+    s.msg_id = msg_id;
+#if NBR_DEFER_LOG
+    s.owner = false;
+    s.lost = 0;
+    s.gen = s_nbr_gen;
+    if (s.on && !s_sym_busy)
+    {
+        s_sym_busy = true;
+        s.owner = true;
+        s_sym_n = 0;
+    }
+#endif
+}
+
+// Unter der Klammer (die ohne NBR_DEFER_LOG leer ist).
+static void nbrISymAdd(NbrSymSink &s, uint8_t role, int x, int mref, int8_t snr)
+{
+    if (!s.on)
+        return;
+#if NBR_DEFER_LOG
+    if (!s.owner || s_sym_n >= NBR_SYM_REC_MAX)
+    {
+        s.lost++;
+        return;
+    }
+    NbrSymRec &r = s_sym[s_sym_n++];
+    r.role = role; // NBR_SYM_TOKEN bleibt im Rollenbyte, m ist ein voller Zeilenindex (bis 255)
+    r.x = (uint8_t)x;
+    r.m = (uint8_t)mref;
+    r.snr = snr;
+#else
+    bool tok = (role & NBR_SYM_TOKEN) != 0;
+    nbrISymEmit(s, role, x, mref, snr, s.m->call[x], tok ? 0 : s.m->call[mref], true);
+#endif
+}
+
+// Nach der Klammer: aufgeschobene SYM-Zeilen ausgeben, Puffer freigeben. Die
+// Rufzeichen je Zeile unter einer kurzen Klammer; hat sich die
+// Zeilenbelegung seit der Rechnung geaendert (s_nbr_gen), steht "?<idx>"
+// statt eines womoeglich falschen Namens. Ohne NBR_DEFER_LOG: nichts zu tun.
+static void nbrISymFlush(NbrSymSink &s)
+{
+#if NBR_DEFER_LOG
+    if (!s.on)
+        return;
+    if (s.owner)
+    {
+        for (int i = 0; i < (int)s_sym_n; i++)
+        {
+            const NbrSymRec &r = s_sym[i];
+            bool tok = (r.role & NBR_SYM_TOKEN) != 0;
+            uint64_t wx = 0, wm = 0;
+            bool same;
+            NBR_LOCK();
+            same = (s_nbr_gen == s.gen);
+            if (same)
+            {
+                wx = s.m->call[r.x];
+                if (!tok)
+                    wm = s.m->call[r.m];
+            }
+            NBR_UNLOCK();
+            nbrISymEmit(s, r.role, r.x, r.m, r.snr, wx, wm, same);
+        }
+        s_sym_n = 0;
+        s_sym_busy = false;
+    }
+    if (s.lost)
+    {
+        char n[12];
+        snprintf(n, sizeof(n), "%u", (unsigned)s.lost);
+        nbrLogDrop(s.now, "SYMBUF", n);
+    }
+#else
+    (void)s;
+#endif
+}
+
+// --- Relay-Entscheidung, innerer Teil ----------------------------------------------
+
+static NbrNeed nbrIRelayNeed(const NbrMatrix &m, const uint64_t *words, int ntok, uint16_t now_min, bool sym,
+                             NbrSymSink &sink)
+{
+    NbrNeed r;
+    r.need = nbrMaskNone();
+    r.alone = nbrMaskNone();
+    r.known = false;
+    r.inferred = nbrMaskNone();
+    if (!nbrIReady(m))
+        return r;
+
+    int pidx[8];
+    NbrMask inpath = nbrMaskNone();
+    for (int i = 0; i < ntok; i++)
+    {
+        pidx[i] = nbrIFindWord(m, words[i]);
+        nbrMaskSet(inpath, pidx[i]);
+    }
+    // HatF = Pfad | Hoerer der Pfadteilnehmer (blosse Kante, keine Anteilsregel).
+    NbrMask hasf = inpath;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && nbrMaskTest(inpath, ed.x) && ed.y != 0 && nbrIUsed(m, ed.y) &&
+            nbrIFresh(ed.last_min, now_min))
+            nbrMaskSet(hasf, ed.y);
+    }
+
+    NbrCtx cbuf;
+    const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+    NbrMask dep = nbrMaskOr(c.direct, nbrIHeardMeMask(m, now_min));
+    nbrMaskClear(dep, 0);
+    for (int x = nbrMaskNext(dep, -1); x >= 0; x = nbrMaskNext(dep, x))
+        if (m.row[x].flags & NBR_FLAG_GW)
+            nbrMaskClear(dep, x);
+    if (nbrMaskEmpty(dep))
+        return r;
+    r.known = true;
+
+    if (sym)
+    {
+        for (int x = nbrMaskNext(dep, -1); x >= 0; x = nbrMaskNext(dep, x))
+        {
+            if (nbrMaskTest(hasf, x))
+                continue;
+            for (int i = 0; i < ntok; i++)
+            {
+                if (pidx[i] < 0)
+                    continue;
+                int8_t snr_used = 0;
+                bool inferred = false, vetoed = false;
+                if (nbrIHearsSym(m, x, pidx[i], now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
+                {
+                    nbrMaskSet(hasf, x);
+                    nbrMaskSet(r.inferred, x);
+                    nbrISymAdd(sink, NBR_SYM_HASF | NBR_SYM_TOKEN, x, i, snr_used);
+                    break;
+                }
+                if (vetoed)
+                {
+                    nbrISymAdd(sink, NBR_SYM_VETO | NBR_SYM_TOKEN, x, i, snr_used);
+                    break;
+                }
+            }
+        }
+    }
+
+    r.need = nbrMaskAndNot(dep, hasf);
+
+    // Allein: kein Versorger M (direkt, hat den Frame beobachtet), dessen
+    // Kante (M, X) -- "X hat M gehoert" -- mit Anteil lebt.
+    NbrMask providers = nbrMaskAndNot(nbrMaskAnd(c.direct, hasf), r.inferred);
+    NbrMask altobs = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && nbrMaskTest(providers, ed.x) && nbrMaskTest(r.need, ed.y) && nbrICovers(m, c, ed))
+            nbrMaskSet(altobs, ed.y);
+    }
+    for (int x = nbrMaskNext(r.need, -1); x >= 0; x = nbrMaskNext(r.need, x))
+    {
+        bool alt = nbrMaskTest(altobs, x);
+        if (!alt && sym)
+        {
+            for (int mrow = nbrMaskNext(providers, -1); mrow >= 0 && !alt; mrow = nbrMaskNext(providers, mrow))
+            {
+                if (mrow == x)
+                    continue;
+                int8_t snr_used = 0;
+                bool inferred = false, vetoed = false;
+                if (nbrIHearsSym(m, x, mrow, now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
+                {
+                    alt = true;
+                    nbrMaskSet(r.inferred, x);
+                    nbrISymAdd(sink, NBR_SYM_ALT, x, mrow, snr_used);
+                }
+                else if (vetoed)
+                {
+                    nbrISymAdd(sink, NBR_SYM_VETO, x, mrow, snr_used);
+                    break;
+                }
+            }
+        }
+        if (!alt)
+            nbrMaskSet(r.alone, x);
+    }
+    return r;
+}
+
+static NbrMask nbrICoverMask(const NbrMatrix &m, uint64_t relayer, uint16_t now_min, bool sym,
+                             const NbrMask &relevant, NbrMask *inferred_out, NbrSymSink &sink)
+{
+    NbrMask mask = nbrMaskNone();
+    if (inferred_out)
+        *inferred_out = nbrMaskNone();
+    if (!nbrIReady(m))
+        return mask;
+    int idx = nbrIFindWord(m, relayer);
+    if (idx <= 0)
+        return mask;
+
+    NbrCtx cbuf;
+    const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (nbrIEdgeLive(ed) && ed.x == idx && ed.y != 0 && nbrIUsed(m, ed.y) && nbrICovers(m, c, ed))
+            nbrMaskSet(mask, ed.y);
+    }
+    if (!sym)
+        return mask;
+
+    NbrMask local_inferred = nbrMaskNone();
+    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    {
+        if (x == idx || nbrMaskTest(mask, x) || !nbrIUsed(m, x))
+            continue;
+        int8_t snr_used = 0;
+        bool was_inferred = false, was_vetoed = false;
+        if (nbrIHearsSym(m, x, idx, now_min, sym, &snr_used, &was_inferred, &was_vetoed) && was_inferred)
+        {
+            nbrMaskSet(mask, x);
+            nbrMaskSet(local_inferred, x);
+            if (nbrMaskTest(relevant, x))
+                nbrISymAdd(sink, NBR_SYM_COVER, x, idx, snr_used);
+        }
+        else if (was_vetoed && nbrMaskTest(relevant, x))
+            nbrISymAdd(sink, NBR_SYM_VETO, x, idx, snr_used);
+    }
+    if (inferred_out)
+        *inferred_out = local_inferred;
+    return mask;
+}
+
+// --- Reichweite ------------------------------------------------------------------------
+
+static float nbrIDistKm(float lat1, float lon1, float lat2, float lon2)
+{
+    const double R = 6371.0;
+    double dlat = (double)(lat2 - lat1) * M_PI / 180.0;
+    double dlon = (double)(lon2 - lon1) * M_PI / 180.0;
+    double a = sin(dlat / 2.0) * sin(dlat / 2.0) +
+               cos((double)lat1 * M_PI / 180.0) * cos((double)lat2 * M_PI / 180.0) *
+                   sin(dlon / 2.0) * sin(dlon / 2.0);
+    double cc = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+    return (float)(R * cc);
+}
+
+static float nbrIReach(const NbrMatrix &m, int row, uint16_t now_min, int *partner)
+{
+    *partner = -1;
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return -1.0f;
+    const NbrRow &r = m.row[row];
+    if (!nbrIPosKnown(r))
+        return -1.0f;
+    // Partner: frische Kante in irgendeiner Richtung.
+    NbrMask linked = nbrMaskNone();
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        const NbrEdge &ed = m.edge[e];
+        if (!nbrIEdgeLive(ed) || !nbrIFresh(ed.last_min, now_min))
+            continue;
+        if (ed.x == row)
+            nbrMaskSet(linked, ed.y);
+        else if (ed.y == row)
+            nbrMaskSet(linked, ed.x);
+    }
+    float best = -1.0f;
+    int best_partner = -1;
+    for (int y = nbrMaskNext(linked, -1); y >= 0; y = nbrMaskNext(linked, y))
+    {
+        if (!nbrIPosKnown(m.row[y]))
+            continue;
+        float d = nbrIDistKm(r.lat16 / 100.0f, r.lon16 / 100.0f, m.row[y].lat16 / 100.0f, m.row[y].lon16 / 100.0f);
+        if (d > best)
+        {
+            best = d;
+            best_partner = y;
+        }
+    }
+    if (best_partner < 0)
+        return -1.0f;
+    *partner = best_partner;
+    return best;
+}
+
+// ======================================================================================
+// Oeffentliche Schnittstelle
+// ======================================================================================
 
 void nbrInit(NbrMatrix &m, const char *own_call, uint16_t now_min)
 {
-    memset(&m, 0, sizeof(NbrMatrix));
-    nbrFillUnknownSnr(m);
-    strncpy(m.rows[0].call, own_call, NBR_CALL_LEN - 1);
-    m.rows[0].call[NBR_CALL_LEN - 1] = '\0';
-    m.rows[0].flags = NBR_FLAG_USED;
-    m.rows[0].last_min = now_min;
-    m.boot_min = now_min;
-    m.last_sweep = now_min;
+    uint64_t own = nbrIEncode(own_call);
+    if (own == 0)
+        own = NBR_CALL_OWN_INVALID;
+    NBR_LOCK();
+    nbrIInitAll(m, own, now_min);
+    m.row[0].flags = NBR_FLAG_USED;
+    m.row[0].last_min = now_min;
+    NBR_UNLOCK();
 }
 
 bool nbrFresh(uint16_t last_min, uint16_t now_min)
 {
-    return (uint16_t)(now_min - last_min) < NBR_WINDOW_MIN;
+    return nbrIFresh(last_min, now_min);
 }
 
 int nbrFind(const NbrMatrix &m, const char *call)
 {
-    if (!call)
-        return -1;
-    if (strncmp(call, m.rows[0].call, NBR_CALL_LEN) == 0)
-        return 0;
-    for (int i = 1; i < NBR_MAX_ROWS; i++)
-        if ((m.rows[i].flags & NBR_FLAG_USED) && strncmp(call, m.rows[i].call, NBR_CALL_LEN) == 0)
-            return i;
-    return -1;
+    uint64_t w = nbrIEncode(call);
+    NBR_LOCK();
+    int idx = nbrIReady(m) ? nbrIFindWord(m, w) : -1;
+    NBR_UNLOCK();
+    return idx;
 }
 
 void nbrReset(NbrMatrix &m, uint16_t now_min)
 {
-    char own[NBR_CALL_LEN];
-    memcpy(own, m.rows[0].call, NBR_CALL_LEN);
-    memset(&m, 0, sizeof(NbrMatrix));
-    nbrFillUnknownSnr(m);
-    memcpy(m.rows[0].call, own, NBR_CALL_LEN);
-    m.boot_min = now_min;
-    m.last_sweep = now_min;
+    NBR_LOCK();
+    uint64_t own = m.call[0];
+    nbrIInitAll(m, own, now_min);
+    NBR_UNLOCK();
+}
+
+void nbrSweep(NbrMatrix &m, uint16_t now_min)
+{
+    NBR_LOCK();
+    if (nbrIReady(m) && now_min != m.last_sweep)
+    {
+        for (int e = 0; e < NBR_MAX_EDGES; e++)
+            if (nbrIEdgeLive(m.edge[e]) && !nbrIFresh(m.edge[e].last_min, now_min))
+                nbrIEdgeFree(m, e);
+        // Geisterzeilen: eine Zeile, deren letzte Beobachtung die Haelfte des
+        // 16-Bit-Minutenbereichs zurueckliegt, saehe nach dem Ueberlauf wieder
+        // jung aus und staeche bei der Verdraengung eine echte Zeile aus.
+        for (int i = 1; i < NBR_MAX_ROWS; i++)
+            if (nbrIUsed(m, i) && (uint16_t)(now_min - m.row[i].last_min) >= 32768)
+                nbrIRowClear(m, i);
+#if NBR_CNT_HALVE_MIN > 0
+        if ((uint16_t)(now_min - m.last_halve) >= NBR_CNT_HALVE_MIN)
+        {
+            for (int e = 0; e < NBR_MAX_EDGES; e++)
+                if (nbrIEdgeLive(m.edge[e]))
+                    m.edge[e].cnt = (uint8_t)(((unsigned)m.edge[e].cnt + 1u) >> 1);
+            m.last_halve = now_min;
+        }
+#endif
+        m.last_sweep = now_min;
+    }
+    NBR_UNLOCK();
+}
+
+bool nbrRowGet(const NbrMatrix &m, int row, NbrRowView *out)
+{
+    if (!out || row < 0 || row >= NBR_MAX_ROWS)
+        return false;
+    uint64_t w;
+    NbrRow r;
+    NBR_LOCK();
+    bool ok = nbrIReady(m) && (row == 0 || nbrIUsed(m, row)); // vor nbrInit(): keine Zeile
+    w = m.call[row];
+    r = m.row[row];
+    NBR_UNLOCK();
+    if (!ok)
+        return false;
+    nbrIDecode(w, out->call);
+    bool pos = (r.lat16 != (int16_t)NBR_POS_UNKNOWN && r.lon16 != (int16_t)NBR_POS_UNKNOWN);
+    out->lat = pos ? r.lat16 / 100.0f : NAN;
+    out->lon = pos ? r.lon16 / 100.0f : NAN;
+    out->last_min = r.last_min;
+    out->rpt_min = r.rpt_min;
+    out->flags = r.flags;
+    out->hw = r.hw;
+    out->ncnt = r.ncnt;
+    return true;
+}
+
+bool nbrEdgeGet(const NbrMatrix &m, int from, int to, NbrEdgeView *out)
+{
+    bool ok = false;
+    NBR_LOCK();
+    int e = nbrIReady(m) ? nbrIEdgeFind(m, from, to) : -1;
+    if (e >= 0 && out)
+    {
+        out->cnt = m.edge[e].cnt;
+        out->snr = m.edge[e].snr;
+        out->last_min = m.edge[e].last_min;
+    }
+    ok = (e >= 0);
+    NBR_UNLOCK();
+    return ok;
+}
+
+bool nbrOwnCallIs(const NbrMatrix &m, const char *call)
+{
+    uint64_t w = nbrIEncode(call);
+    NBR_LOCK();
+    uint64_t own = m.call[0];
+    NBR_UNLOCK();
+    if (own == 0)
+        return false; // nie initialisiert
+    if (w == 0)
+        return own == NBR_CALL_OWN_INVALID && call && *call; // nicht kodierbares eigenes Rufzeichen
+    return w == own;
+}
+
+bool nbrRowHasFlag(const NbrMatrix &m, int row, uint8_t flag)
+{
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return false;
+    NBR_LOCK();
+    bool r = (m.row[row].flags & flag) != 0;
+    NBR_UNLOCK();
+    return r;
+}
+
+void nbrRowSetFlag(NbrMatrix &m, int row, uint8_t flag)
+{
+    if (row < 0 || row >= NBR_MAX_ROWS)
+        return;
+    NBR_LOCK();
+    if (row == 0 || nbrIUsed(m, row))
+        m.row[row].flags |= flag;
+    NBR_UNLOCK();
+}
+
+int nbrRowsUsed(const NbrMatrix &m)
+{
+    int n = 1; // Zeile 0 zaehlt immer
+    NBR_LOCK();
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        if (nbrIUsed(m, i))
+            n++;
+    NBR_UNLOCK();
+    return n;
+}
+
+static int nbrIEdgesUsed(const NbrMatrix &m)
+{
+    if (!nbrIReady(m))
+        return 0;
+    int n = 0;
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+        if (nbrIEdgeLive(m.edge[e]))
+            n++;
+    return n;
+}
+
+int nbrEdgesUsed(const NbrMatrix &m)
+{
+    NBR_LOCK();
+    int n = nbrIEdgesUsed(m);
+    NBR_UNLOCK();
+    return n;
+}
+
+uint64_t nbrCallEncode(const char *call)
+{
+    return nbrIEncode(call);
+}
+
+void nbrCallDecode(uint64_t word, char *out)
+{
+    if (out)
+        nbrIDecode(word, out);
+}
+
+int nbrMaskHex(const NbrMask &mask, char *out, size_t outlen)
+{
+    return nbrIMaskHex(mask, out, outlen);
 }
 
 uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min)
 {
     if (row < 0 || row >= NBR_MAX_ROWS)
         return 0;
-    return (uint16_t)(now_min - m.rows[row].last_min);
+    NBR_LOCK();
+    uint16_t last = m.row[row].last_min;
+    NBR_UNLOCK();
+    return (uint16_t)(now_min - last);
 }
 
 int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
-                  bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
+                 bool dest_gw, int16_t rssi_here, int8_t snr_here, uint16_t now_min)
 {
-    // Der Sweep ist Wartung unabhaengig von diesem Frame und laeuft darum
-    // VOR jeder Pruefung -- auch ein Frame, der gleich danach verworfen
-    // wird, darf einen faelligen Sweep nicht aufschieben.
-    nbrMaybeSweep(m, now_min);
-
     if (type != ':' && type != '!' && type != '@')
     {
         nbrLogDrop(now_min, "TYPE", path);
         return 0;
     }
-
     char tokens[8][NBR_CALL_LEN];
     int ntok = nbrTokenizePath(path, tokens, 8);
     if (ntok < 0)
@@ -522,10 +1651,6 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
         nbrLogDrop(now_min, "TOK", path);
         return -1;
     }
-
-    // Eine Schleife (Rufzeichen doppelt im Pfad) ist kein Hoerbeweis --
-    // ganz verwerfen, bevor irgendeine Zeile angefasst wird. Laeuft ueber
-    // den GANZEN Pfad, unabhaengig vom 2-Hop-Fenster unten.
     for (int i = 0; i < ntok; i++)
         for (int j = i + 1; j < ntok; j++)
             if (strncmp(tokens[i], tokens[j], NBR_CALL_LEN) == 0)
@@ -533,278 +1658,150 @@ int nbrNoteFrame(NbrMatrix &m, const char *path, char type, const char *payload,
                 nbrLogDrop(now_min, "LOOP", path);
                 return -2;
             }
+    uint64_t words[8];
+    for (int i = 0; i < ntok; i++)
+        words[i] = nbrIEncode(tokens[i]);
 
-    // Text (':') faellt nicht unter das 2-Hop-Fenster/die Pfadpaar-Kanten
-    // unten (siehe nbr_matrix.h): ein Gateway mit Mesh an setzt vom Server
-    // eingespeiste Frames mit "<Server-Pfad>,<Gateway>" auf LoRa, und das
-    // Paar (letztes Server-Token, Gateway) ist dabei nie ein Funkempfang.
-    // Der on-air Server-Bit trennt das nicht (lora_functions.cpp:1800 setzt
-    // ihn bei jedem IP-Gateway-Relay), also bleibt der Frame-Typ das einzige
-    // Merkmal (Feldlog DK5EN-98, 22.-23.09.2026: 511 Server->Gateway-Frames,
-    // 100% Text; alle 79 reinen Text-Kanten endeten an einem einspeisenden
-    // Gateway). Text liefert darum NUR den ME-Schritt: keine Kanten, keine
-    // Zeile fuer irgendein Token ausser dem letzten Hop, keine CUT-Zeile
-    // (die beschreibt das hier nicht angewandte 2-Hop-Fenster).
-    if (type == ':')
+    NBR_LOCK();
+    bool ready = nbrIReady(m);
+    NBR_UNLOCK();
+    if (!ready)
+        return 0; // vor nbrInit(): nichts einzutragen
+
+    if (type != ':' && ntok > 2)
+        nbrLogCut(now_min, ntok, 2, path);
+
+    NbrEvList lg;
+    lg.n = 0;
+    NBR_LOCK();
+    int rc = nbrINoteFrame(m, tokens, words, ntok, type, payload, dest_gw, snr_here, now_min, &lg);
+    NBR_UNLOCK();
+
+    for (int i = 0; i < lg.n; i++)
     {
-        int last_idx = nbrFind(m, tokens[ntok - 1]);
-        if (last_idx < 0)
+        const NbrEv &ev = lg.ev[i];
+        switch (ev.kind)
         {
-            last_idx = nbrPlanRow(m, tokens[ntok - 1], now_min, 0);
-            if (last_idx < 0)
-            {
-                nbrLogDrop(now_min, "FULL", path);
-                return -3;
-            }
-            nbrCommitRow(m, last_idx, tokens[ntok - 1], now_min);
-        }
-
-        if (strncmp(tokens[ntok - 1], m.rows[0].call, NBR_CALL_LEN) == 0)
-            return 0; // eigenes Echo, kein Hoerbeweis (wie bei '!'/'@' unten)
-
-        nbrHitCell(m.cells[last_idx][0], type, now_min);
-        m.cells[last_idx][0].snr = nbrClampSnr(snr_here);
-        m.rows[last_idx].last_min = now_min;
-        m.rows[0].last_min = now_min;
-        nbrLogMe(now_min, tokens[ntok - 1], type, rssi_here, m.cells[last_idx][0]);
-        return 1;
-    }
-
-    // 2-Hop-Fenster (Betreiber-Vorgabe, siehe nbr_matrix.h): nur die letzten
-    // zwei Pfad-Token duerfen noch eine Zeile bekommen. Token davor (Index
-    // < start) werden weder geplant noch committet. Gilt ab hier nur noch
-    // fuer '!'/'@' (Text ist oben schon zurueckgekehrt).
-    int start = (ntok > 2) ? ntok - 2 : 0;
-    if (ntok > 2)
-        nbrLogCut(now_min, ntok, ntok - start, path);
-
-    // row_idx[i] = -1 heisst "kein Fenster-Token und (noch) keine bestehende
-    // Zeile" -- durchgaengig vorbelegt, damit jede spaetere Stelle (HEY-
-    // Gruppen, Kantenschleife) das statt eines undefinierten Werts sieht.
-    int row_idx[8];
-    for (int i = 0; i < 8; i++)
-        row_idx[i] = -1;
-
-    // M2 (Advisor-Fund 2026-09-21): erst ALLE Fenster-Token, die schon eine
-    // Zeile haben, per nbrFind() aufloesen und ihren Index SOFORT in
-    // protected_mask eintragen -- nbrPlanRow() prueft protected_mask nur in
-    // seiner Frei- und seiner Opferschleife, nicht beim Treffer auf eine
-    // bereits bestehende Zeile (dessen erste Schleife). Ohne diese Reihen-
-    // folge koennte die Planung eines NOCH UNBEKANNTEN Fenster-Rufzeichens
-    // genau die Zeile eines ANDEREN, im selben Frame ebenfalls vorkommenden
-    // Rufzeichens als "aeltestes Opfer" waehlen: beide Token committen dann
-    // auf denselben Index, der zweite Treffer faellt auf die Diagonale, und
-    // der urspruengliche Zeileninhaber verliert seine Zeile komplett.
-    uint32_t protected_mask = 0;
-    for (int i = start; i < ntok; i++)
-    {
-        int idx = nbrFind(m, tokens[i]);
-        if (idx < 0)
-            continue;
-        row_idx[i] = idx;
-        protected_mask |= (1u << (unsigned)idx);
-    }
-
-    // Erst danach fuer die noch unbekannten Fenster-Token (row_idx[i] noch
-    // -1) neue Zeilen lesend planen (M1, siehe nbrPlanRow()) -- geschuetzt
-    // gegen die oben bereits vergebenen Indizes UND gegeneinander. Scheitert
-    // die Planung fuer ein Rufzeichen, ist noch keine einzige Zeile
-    // angefasst, der Frame wird ganz verworfen.
-    for (int i = start; i < ntok; i++)
-    {
-        if (row_idx[i] >= 0)
-            continue;
-        int idx = nbrPlanRow(m, tokens[i], now_min, protected_mask);
-        if (idx < 0)
-        {
+        case NBR_EV_EVICT:
+            nbrLogEvict(now_min, ev.a, ev.c1, ev.c2);
+            break;
+        case NBR_EV_EVICTE:
+            nbrLogEvictEdge(now_min, ev.c1, ev.c2);
+            break;
+        case NBR_EV_EDGE:
+            nbrLogEdge(now_min, tokens[ev.a], tokens[ev.b], type, ev.cnt, ev.snr);
+            break;
+        case NBR_EV_ME:
+            nbrLogMe(now_min, tokens[ev.a], type, rssi_here, ev.cnt, ev.snr);
+            break;
+        case NBR_EV_DROPFULL:
             nbrLogDrop(now_min, "FULL", path);
-            return -3;
+            break;
+        default:
+            break;
         }
-        row_idx[i] = idx;
-        protected_mask |= (1u << (unsigned)idx);
     }
-    for (int i = start; i < ntok; i++)
-        nbrCommitRow(m, row_idx[i], tokens[i], now_min);
-
-    // Regel 3 (Gratis-Erweiterung): ein Token VOR dem Fenster bekommt NIE
-    // eine neue Zeile, aber wenn es schon eine hat, loesen wir sie hier NUR
-    // LESEND auf (nbrFind(), kein nbrPlanRow()/nbrCommitRow()) -- auch fuer
-    // i == start-1 (das Token direkt vor dem Fenster) kann das nur eine
-    // Zeile aus einem FRUEHEREN Frame sein: der Fenster-Commit von eben legt
-    // Zeilen ausschliesslich fuer tokens[start..ntok-1] an, tokens[start-1]
-    // gehoert nicht dazu.
-    for (int i = 0; i < start; i++)
-        row_idx[i] = nbrFind(m, tokens[i]);
-
-    int hits = 0;
-    for (int i = 0; i + 1 < ntok; i++)
-    {
-        int x = row_idx[i], y = row_idx[i + 1];
-        if (x < 0 || y < 0)
-            continue; // ausserhalb des Fensters ohne zwei bestehende Zeilen: keine Kante
-        // Spalte 0 ("ich habe X gehoert") schreibt ausschliesslich der
-        // ME-Schritt unten, nie ein Pfadpaar (X, ich): mein Rufzeichen steht
-        // nur in Pfaden, die ich selbst gesendet habe, und ob ich X je per
-        // Funk gehoert habe, ist beim Empfang schon eingetragen. Ein Gateway
-        // setzt Serverframes mit "<Absender>,<ich>" auf LoRa; das Echo
-        // dieser Aussendung machte den Absender sonst zum direkten Nachbarn
-        // (Feldlauf 2026-09-21: neun Rufzeichen ohne Funkempfang, OE1XAR-33
-        // in 44 von 46 Schnappschuessen; docs/nbr-wichtigkeit-konzept.md 2.3).
-        if (y == 0)
-            continue;
-        nbrHitCell(m.cells[x][y], type, now_min);
-        // Nur eine Kante INNERHALB des 2-Hop-Fensters (i >= start) darf die
-        // beteiligten Zeilen verjuengen. Eine Gratis-Kante (Regel 3, i <
-        // start) trifft zwar die Zelle oben, laesst die Zeilen aber in Ruhe
-        // altern -- sonst wuerde ein Knoten, der nur noch tief in fremden
-        // Pfaden auftaucht, bei jedem solchen Frame verjuengt, nie ueber
-        // NBR_WINDOW_MIN hinaus altern und dauerhaft einen Slot belegen,
-        // ohne je selbst wieder direkt gehoert zu werden (Advisor-Fund
-        // 2026-09-21).
-        if (i >= start)
-        {
-            m.rows[x].last_min = now_min;
-            m.rows[y].last_min = now_min;
-        }
-        nbrLogEdge(now_min, tokens[i], tokens[i + 1], type, m.cells[x][y]);
-        hits++;
-    }
-
-    // "Ich habe den letzten Hop gehoert" -- entfaellt beim eigenen Echo
-    // (letzter Hop = ich selbst, Konzept 4.1). Der letzte Hop ist immer
-    // Fenster-Token, row_idx[ntok-1] ist also immer gueltig.
-    if (strncmp(tokens[ntok - 1], m.rows[0].call, NBR_CALL_LEN) != 0)
-    {
-        int last = row_idx[ntok - 1];
-        nbrHitCell(m.cells[last][0], type, now_min);
-        m.cells[last][0].snr = nbrClampSnr(snr_here);
-        m.rows[last].last_min = now_min;
-        m.rows[0].last_min = now_min;
-        nbrLogMe(now_min, tokens[ntok - 1], type, rssi_here, m.cells[last][0]);
-        hits++;
-    }
-
-    if (type == '@')
-    {
-        int sender = row_idx[0];
-        if (dest_gw && sender >= 0)
-            m.rows[sender].flags |= NBR_FLAG_GW;
-        nbrApplyHeyGroups(m, row_idx, ntok, payload);
-    }
-
-    return hits;
+    return rc;
 }
 
 void nbrNotePos(NbrMatrix &m, const char *call, float lat, float lon, bool mesh,
                 uint8_t hw, uint16_t now_min)
 {
-    nbrMaybeSweep(m, now_min);
-    // Legt bewusst KEINE Zeile mehr an (siehe nbr_matrix.h) -- ein Knoten,
-    // der nur ueber relayte POS-Frames sichtbar waere, bleibt ohne Zeile.
-    int idx = nbrFind(m, call);
-    if (idx < 0)
-        return;
-    NbrRow &r = m.rows[idx];
-    r.lat = lat;
-    r.lon = lon;
-    r.flags |= NBR_FLAG_POS;
-    if (mesh)
-        r.flags |= NBR_FLAG_MESH;
-    else
-        r.flags &= (uint8_t)~NBR_FLAG_MESH;
-    r.hw = hw;
-    r.last_min = now_min;
-
-    if (nbrLog)
+    uint64_t w = nbrIEncode(call);
+    NBR_LOCK();
+    int idx = nbrIReady(m) ? nbrIFindWord(m, w) : -1;
+    if (idx >= 0)
     {
-        char buf[160];
-        snprintf(buf, sizeof(buf), "[NBR]|POS|%u|%s|%.5f|%.5f|%d|%u",
-                 (unsigned)now_min, call, (double)lat, (double)lon, mesh ? 1 : 0, (unsigned)hw);
-        nbrLog(buf);
+        NbrRow &r = m.row[idx];
+        r.lat16 = nbrIDeg16(lat);
+        r.lon16 = nbrIDeg16(lon);
+        r.flags |= NBR_FLAG_POS;
+        if (mesh)
+            r.flags |= NBR_FLAG_MESH;
+        else
+            r.flags &= (uint8_t)~NBR_FLAG_MESH;
+        r.hw = hw;
+        r.last_min = now_min;
     }
+    NBR_UNLOCK();
+    if (idx < 0 || !nbrLog)
+        return;
+    // Log mit den EINGANGSwerten (5 Nachkommastellen wie bisher), nicht mit
+    // der auf 0,01 Grad gerundeten Speicherung.
+    char buf[160];
+    snprintf(buf, sizeof(buf), "[NBR]|POS|%u|%s|%.5f|%.5f|%d|%u",
+             (unsigned)now_min, call, (double)lat, (double)lon, mesh ? 1 : 0, (unsigned)hw);
+    nbrLog(buf);
 }
 
-// --- HN-Nachbarschaftsbericht (Report), Abschnitt E, siehe nbr_matrix.h ----
+// --- HN-Nachbarschaftsbericht ----------------------------------------------------------
 
-// Ein Kandidat fuer nbrBuildReport(): Zeilenindex + der SNR, mit dem er
-// sortiert wird. call wird erst beim Formatieren aus m.rows[idx].call
-// gelesen -- der Index reicht zum Sortieren und Vergleichen.
-struct NbrReportCand
+struct NbrReportTop
 {
-    int    idx;
     int8_t snr;
+    char   call[NBR_CALL_LEN];
 };
 
-// Baut den Bericht: siehe nbr_matrix.h fuer die vollstaendige Beschreibung.
+// a vor b: SNR absteigend, bei Gleichstand Rufzeichen aufsteigend.
+static bool nbrIReportBefore(int8_t snr_a, const char *call_a, const NbrReportTop &b)
+{
+    if (snr_a != b.snr)
+        return snr_a > b.snr;
+    return strncmp(call_a, b.call, NBR_CALL_LEN) < 0;
+}
+
 int nbrBuildReport(const NbrMatrix &m, uint16_t now_min, int heard_count, char *out, size_t outlen)
 {
     if (!out || outlen == 0)
         return -1;
     out[0] = '\0';
 
-    // Kandidaten sammeln: X != 0, belegt, cells[X][0] gesetzt ("ich habe X
-    // gehoert"), frisch innerhalb NBR_REPORT_FRESH_MIN (eigenes, kuerzeres
-    // Fenster als NBR_WINDOW_MIN -- ein Bericht ist eine Momentaufnahme),
-    // SNR bekannt und >= NBR_SYM_MIN_SNR.
-    NbrReportCand cand[NBR_MAX_ROWS];
-    int ncand = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    // Nur die besten NBR_REPORT_MAX_ENTRIES werden gebraucht (plus die
+    // Gesamtzahl fuer '+') -- eine sortierte Bestenliste statt einer
+    // zeilengrossen Kandidatenliste auf dem Loop-Stack.
+    NbrReportTop top[NBR_REPORT_MAX_ENTRIES];
+    int ntop = 0, ncand = 0;
+    NBR_LOCK();
+    if (nbrIReady(m))
     {
-        if (!(m.rows[x].flags & NBR_FLAG_USED))
-            continue;
-        const NbrCell &c = m.cells[x][0];
-        if (!nbrCellSet(c))
-            continue;
-        if ((uint16_t)(now_min - c.last_min) >= NBR_REPORT_FRESH_MIN)
-            continue;
-        if (c.snr == NBR_SNR_UNKNOWN || c.snr < NBR_SYM_MIN_SNR)
-            continue;
-        cand[ncand].idx = x;
-        cand[ncand].snr = c.snr;
-        ncand++;
-    }
-
-    // Sortieren: SNR ABSTEIGEND, bei Gleichstand Rufzeichen AUFSTEIGEND.
-    // Insertion-Sort reicht (ncand <= NBR_MAX_ROWS <= 21 in jeder realen
-    // Board-Konfiguration).
-    for (int i = 1; i < ncand; i++)
-    {
-        NbrReportCand key = cand[i];
-        int j = i - 1;
-        while (j >= 0 &&
-               (cand[j].snr < key.snr ||
-                (cand[j].snr == key.snr &&
-                 strncmp(m.rows[cand[j].idx].call, m.rows[key.idx].call, NBR_CALL_LEN) > 0)))
+        for (int e = 0; e < NBR_MAX_EDGES; e++)
         {
-            cand[j + 1] = cand[j];
-            j--;
+            const NbrEdge &ed = m.edge[e];
+            if (!nbrIEdgeLive(ed) || ed.y != 0 || ed.x == 0 || !nbrIUsed(m, ed.x))
+                continue;
+            if ((uint16_t)(now_min - ed.last_min) >= NBR_REPORT_FRESH_MIN)
+                continue;
+            if (ed.snr == NBR_SNR_UNKNOWN || ed.snr < NBR_SYM_MIN_SNR)
+                continue;
+            ncand++;
+            char call[NBR_CALL_LEN];
+            nbrIDecode(m.call[ed.x], call);
+            int pos = ntop;
+            while (pos > 0 && nbrIReportBefore(ed.snr, call, top[pos - 1]))
+                pos--;
+            if (pos >= NBR_REPORT_MAX_ENTRIES)
+                continue;
+            int last = (ntop < NBR_REPORT_MAX_ENTRIES) ? ntop : NBR_REPORT_MAX_ENTRIES - 1;
+            for (int k = last; k > pos; k--)
+                top[k] = top[k - 1];
+            top[pos].snr = ed.snr;
+            memcpy(top[pos].call, call, NBR_CALL_LEN);
+            if (ntop < NBR_REPORT_MAX_ENTRIES)
+                ntop++;
         }
-        cand[j + 1] = key;
     }
+    NBR_UNLOCK();
 
-    int listed = ncand < NBR_REPORT_MAX_ENTRIES ? ncand : NBR_REPORT_MAX_ENTRIES;
-    bool truncated = ncand > listed;
-
-    // Lokaler Zwischenpuffer, grosszuegig ueber der in nbr_matrix.h
-    // dokumentierten Regelobergrenze (128 Byte) -- ein Aufrufer mit einem
-    // untypisch grossen heard_count oder einer am Build ueberschriebenen
-    // NBR_SYM_MIN_SNR bekommt so immer noch ein korrektes -1 statt eines
-    // abgeschnittenen Strings, wenn outlen zu knapp ist.
+    bool truncated = ncand > ntop;
     char line[256];
-    int n = snprintf(line, sizeof(line), "R%d;N%d%s;", heard_count, listed, truncated ? "+" : "");
+    int n = snprintf(line, sizeof(line), "R%d;N%d%s;", heard_count, ntop, truncated ? "+" : "");
     if (n < 0)
-    {
-        out[0] = '\0';
         return -1;
-    }
-
-    for (int i = 0; i < listed && strlen(line) < sizeof(line) - 1; i++)
+    for (int i = 0; i < ntop && strlen(line) < sizeof(line) - 1; i++)
     {
         size_t used = strlen(line);
-        snprintf(line + used, sizeof(line) - used, "%s,%d;",
-                 m.rows[cand[i].idx].call, (int)cand[i].snr);
+        snprintf(line + used, sizeof(line) - used, "%s,%d;", top[i].call, (int)top[i].snr);
     }
-
     size_t len = strlen(line);
     if (len + 1 > outlen)
     {
@@ -815,25 +1812,18 @@ int nbrBuildReport(const NbrMatrix &m, uint16_t now_min, int heard_count, char *
     return (int)len;
 }
 
-// Ein per nbrParseReport() geparster Eintrag, bereits numerisch ausgewertet
-// und SNR-geklemmt -- der Grammatik-Parse ruehrt die Matrix nicht an.
 struct NbrReportEntryIn
 {
     char   call[NBR_CALL_LEN];
     int8_t snr;
 };
 
-// Strikter Grammatik-Parse, siehe nbrNoteReport() in nbr_matrix.h fuer die
-// vollstaendige Regel. Schreibt bei Erfolg *heard, *k, *truncated und bis zu
-// NBR_REPORT_MAX_ENTRIES Eintraege nach entries; liest dabei NICHTS aus der
-// Matrix. false bei jeder Abweichung -- der Aufrufer wendet dann nichts an.
 static bool nbrParseReport(const char *payload, long *heard, int *k, bool *truncated,
-                            NbrReportEntryIn *entries)
+                           NbrReportEntryIn *entries)
 {
     if (!payload || payload[0] != 'R')
         return false;
     const char *p = payload + 1;
-
     const char *seg = p;
     while (*p && *p != ';')
         p++;
@@ -842,8 +1832,7 @@ static bool nbrParseReport(const char *payload, long *heard, int *k, bool *trunc
     long h = nbrParseUint(seg, (size_t)(p - seg));
     if (h < 0)
         return false;
-    p++; // hinter dem ';'
-
+    p++;
     if (*p != 'N')
         return false;
     p++;
@@ -862,7 +1851,6 @@ static bool nbrParseReport(const char *payload, long *heard, int *k, bool *trunc
     if (*p != ';')
         return false;
     p++;
-
     for (long i = 0; i < kk; i++)
     {
         seg = p;
@@ -873,8 +1861,7 @@ static bool nbrParseReport(const char *payload, long *heard, int *k, bool *trunc
         size_t call_len = (size_t)(p - seg);
         if (call_len < 1 || call_len >= NBR_CALL_LEN)
             return false;
-        p++; // hinter dem ','
-
+        p++;
         const char *snr_start = p;
         while (*p && *p != ';')
             p++;
@@ -884,537 +1871,261 @@ static bool nbrParseReport(const char *payload, long *heard, int *k, bool *trunc
         if (!nbrParseInt(snr_start, (size_t)(p - snr_start), &snr_v))
             return false;
         p++;
-
         memcpy(entries[i].call, seg, call_len);
         entries[i].call[call_len] = '\0';
         entries[i].snr = nbrClampSnr((int32_t)snr_v);
     }
-
     if (*p != '\0')
-        return false; // strikt: kein Rest nach dem letzten Eintrag
-
+        return false;
     *heard = h;
     *k = (int)kk;
     *truncated = trunc;
     return true;
 }
 
-// Liest einen empfangenen HN-Bericht: siehe nbr_matrix.h fuer die
-// vollstaendige Beschreibung.
 int nbrNoteReport(NbrMatrix &m, const char *sender, const char *payload, uint16_t now_min)
 {
     long heard = 0;
     int k = 0;
     bool truncated = false;
     NbrReportEntryIn entries[NBR_REPORT_MAX_ENTRIES];
-
     if (!nbrParseReport(payload, &heard, &k, &truncated, entries))
     {
         nbrLogDrop(now_min, "RPT", sender);
         return -1;
     }
 
-    int s = nbrFind(m, sender);
-    if (s < 0)
-        return 0; // Absender (noch) unbekannt: kein Protokollfehler, aber nichts anzuwenden
-
-    int applied = 0;
+    uint64_t sw = nbrIEncode(sender);
+    uint64_t ew[NBR_REPORT_MAX_ENTRIES];
     for (int i = 0; i < k; i++)
+        ew[i] = nbrIEncode(entries[i].call);
+
+    // Status je Eintrag: 0 norow, 1 self, 2 ok. Eine Kantenverdraengung je
+    // Eintrag hoechstens (je Eintrag eine neue Kante).
+    uint8_t status[NBR_REPORT_MAX_ENTRIES];
+    NbrEvList lg;
+    lg.n = 0;
+    int ev_at[NBR_REPORT_MAX_ENTRIES + 1];
+    int applied = 0;
+
+    NBR_LOCK();
+    int s = nbrIReady(m) ? nbrIFindWord(m, sw) : -1;
+    if (s >= 0)
     {
-        const char *status;
-        if (strncmp(entries[i].call, m.rows[0].call, NBR_CALL_LEN) == 0)
+        for (int i = 0; i < k; i++)
         {
-            // "Absender s hat mich gehoert" -> cells[0][s].
-            nbrHitCell(m.cells[0][s], '@', now_min);
-            m.cells[0][s].snr = entries[i].snr;
-            status = "self";
-            applied++;
-        }
-        else
-        {
-            int mrow = nbrFind(m, entries[i].call);
-            if (mrow < 0)
+            ev_at[i] = lg.n;
+            int target;
+            if (ew[i] != 0 && ew[i] == m.call[0])
             {
-                status = "norow"; // keine neue Zeile fuer einen Bericht-Eintrag
+                target = 0; // "Absender s hat mich gehoert" -> Kante (0, s)
+                status[i] = 1;
             }
             else
             {
-                // "s hat mrow gehoert" -> cells[mrow][s], HEY-Typ-Treffer.
-                nbrHitCell(m.cells[mrow][s], '@', now_min);
-                m.cells[mrow][s].snr = entries[i].snr;
-                status = "ok";
-                applied++;
+                target = nbrIFindWord(m, ew[i]);
+                status[i] = (target < 0) ? 0 : 2;
             }
+            if (status[i] == 0)
+                continue;
+            // Die Diagonale bleibt leer (Konzept 4.1): ein Eintrag, der den
+            // Absender selbst nennt, zaehlt, schreibt aber keine Kante.
+            int e = nbrIEdgeHit(m, target, s, now_min, &lg);
+            if (e >= 0)
+                m.edge[e].snr = entries[i].snr;
+            applied++;
         }
-        if (nbrLog)
-        {
-            char buf[160];
-            snprintf(buf, sizeof(buf), "[NBR]|RPT|%u|%s|%s|%d|%s",
-                     (unsigned)now_min, sender, entries[i].call, (int)entries[i].snr, status);
-            nbrLog(buf);
-        }
+        ev_at[k] = lg.n;
+        if (truncated)
+            m.row[s].flags &= (uint8_t)~NBR_FLAG_RPT;
+        else
+            m.row[s].flags |= NBR_FLAG_RPT;
+        m.row[s].rpt_min = now_min;
     }
+    NBR_UNLOCK();
 
-    // NBR_FLAG_RPT = "letzter Bericht war VOLLSTAENDIG" -- ein abgeschnittener
-    // Bericht ('+') wendet seine Eintraege trotzdem an, taugt aber nicht als
-    // Symmetrie-Veto (siehe nbrHearsSym()).
-    if (truncated)
-        m.rows[s].flags &= (uint8_t)~NBR_FLAG_RPT;
-    else
-        m.rows[s].flags |= NBR_FLAG_RPT;
-    m.rows[s].rpt_min = now_min;
+    if (s < 0)
+        return 0; // Absender (noch) unbekannt
 
     if (nbrLog)
     {
+        for (int i = 0; i < k; i++)
+        {
+            for (int j = ev_at[i]; j < ev_at[i + 1]; j++)
+                if (lg.ev[j].kind == NBR_EV_EVICTE)
+                    nbrLogEvictEdge(now_min, lg.ev[j].c1, lg.ev[j].c2);
+            const char *st = (status[i] == 1) ? "self" : (status[i] == 2) ? "ok" : "norow";
+            char buf[160];
+            snprintf(buf, sizeof(buf), "[NBR]|RPT|%u|%s|%s|%d|%s",
+                     (unsigned)now_min, sender, entries[i].call, (int)entries[i].snr, st);
+            nbrLog(buf);
+        }
         char buf[160];
         snprintf(buf, sizeof(buf), "[NBR]|RPTSUM|%u|%s|%ld|%d|%d|%d",
                  (unsigned)now_min, sender, heard, k, truncated ? 0 : 1, applied);
         nbrLog(buf);
     }
-
     return applied;
 }
+
+// --- Urteile ------------------------------------------------------------------------------
 
 uint8_t nbrHearers(const NbrMatrix &m, int row, uint16_t now_min, uint8_t *out, uint8_t max)
 {
     if (row < 0 || row >= NBR_MAX_ROWS)
         return 0;
+    NBR_LOCK();
+    NbrMask h = nbrIReady(m) ? nbrIHearersAll(m, row, now_min) : nbrMaskNone();
+    NBR_UNLOCK();
     uint8_t n = 0;
-    for (int y = 0; y < NBR_MAX_ROWS; y++)
+    for (int y = nbrMaskNext(h, -1); y >= 0; y = nbrMaskNext(h, y))
     {
-        if (y == row)
-            continue;
-        const NbrCell &c = m.cells[row][y];
-        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-        {
-            if (out && n < max)
-                out[n] = (uint8_t)y;
-            n++;
-        }
-    }
-    return n;
-}
-
-// Direkt gehoert: cell[x][0] gesetzt und frisch -- Basis fuer Exklusivitaet
-// UND fuer das Verdikt in nbrLogSnapshot() (Konzept 4.3).
-static bool nbrHeardDirectly(const NbrMatrix &m, int x, uint16_t now_min)
-{
-    const NbrCell &c0 = m.cells[x][0];
-    return nbrCellSet(c0) && nbrFresh(c0.last_min, now_min);
-}
-
-// Zeile x (!=0) ist exklusiv, wenn sonst niemand in meiner Hoerweite (y != 0,
-// x) eine frische cell[x][y] hat -- Konzept 4.3, "Hoerer(X) = {ich}".
-static bool nbrRowExclusive(const NbrMatrix &m, int x, uint16_t now_min)
-{
-    for (int y = 1; y < NBR_MAX_ROWS; y++)
-    {
-        if (y == x)
-            continue;
-        const NbrCell &c = m.cells[x][y];
-        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-            return false;
-    }
-    return true;
-}
-
-int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
-{
-    bool any_heard = false;
-    int count = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-    {
-        if (!(m.rows[x].flags & NBR_FLAG_USED))
-            continue;
-
-        if (!nbrHeardDirectly(m, x, now_min))
-            continue;
-        any_heard = true;
-
-        if (nbrRowExclusive(m, x, now_min))
-        {
-            if (out && count < (int)max)
-                out[count] = (uint8_t)x;
-            count++;
-        }
-    }
-    return any_heard ? count : -1;
-}
-
-// Verdikt je Zeile fuer nbrLogSnapshot() (Konzept 4.3) -- siehe nbr_matrix.h
-// bei nbrLogSnapshot() fuer die Herleitung je Fall.
-static const char *nbrRowVerdict(const NbrMatrix &m, int x, uint16_t now_min)
-{
-    if (x == 0)
-        return "UNK";
-    if (!nbrHeardDirectly(m, x, now_min))
-        return nbrHearers(m, x, now_min, NULL, 0) > 0 ? "LEAF" : "UNK";
-    return nbrRowExclusive(m, x, now_min) ? "EXCL" : "RED";
-}
-
-// Betreiberfrage (Advisor-Pass 2026-09-21, siehe nbr_matrix.h): die Sicht
-// auf row als HOERER, nicht als Gehoerten. row muss selbst meshen, wenn es
-// mindestens ein X gibt, das row gehoert hat, aber weder ich selbst noch
-// ein anderer direkt gehoerter Nachbar frisch hoeren.
-int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min)
-{
-    if (row <= 0 || row >= NBR_MAX_ROWS)
-        return -1;
-    if (!nbrHeardDirectly(m, row, now_min))
-        return -1; // row ist kein frisch direkt gehoerter Nachbar
-
-    int uncovered = 0;
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-    {
-        if (x == row || x == 0)
-            continue; // H(row) ohne row selbst und ohne meine eigene Zeile
-
-        const NbrCell &c_heard = m.cells[x][row];
-        if (!(nbrCellSet(c_heard) && nbrFresh(c_heard.last_min, now_min)))
-            continue; // row hat X nicht (mehr frisch) gehoert
-
-        if (nbrHeardDirectly(m, x, now_min))
-            continue; // ich selbst hoere X frisch direkt -> abgedeckt
-
-        bool covered_by_peer = false;
-        for (int mrow = 1; mrow < NBR_MAX_ROWS; mrow++)
-        {
-            if (mrow == row || !nbrHeardDirectly(m, mrow, now_min))
-                continue; // M muss selbst ein frisch direkt gehoerter Nachbar sein
-            const NbrCell &c_peer = m.cells[x][mrow];
-            if (nbrCellSet(c_peer) && nbrFresh(c_peer.last_min, now_min))
-            {
-                covered_by_peer = true;
-                break;
-            }
-        }
-        if (!covered_by_peer)
-            uncovered++; // X ist von keinem anderweitig abgedeckt
-    }
-    return uncovered;
-}
-
-const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
-{
-    int n = nbrRowMeshNeedCount(m, row, now_min);
-    if (n < 0)
-        return "NA";
-    return n > 0 ? "MESH" : "RED"; // RED auch bei leerem H(row)
-}
-
-// --- Stufe 2: Masken und Relay-Entscheidung (docs/nbr-wichtigkeit-konzept.md 4/5)
-
-static uint32_t nbrBit(int idx)
-{
-    return (idx >= 0 && idx < 32) ? (1u << (unsigned)idx) : 0u;
-}
-
-int nbrMaskCount(uint32_t mask)
-{
-    int n = 0;
-    while (mask)
-    {
-        mask &= mask - 1;
+        if (out && n < max)
+            out[n] = (uint8_t)y;
         n++;
     }
     return n;
 }
 
-uint32_t nbrDirectMask(const NbrMatrix &m, uint16_t now_min)
+int nbrExclusive(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
 {
-    uint32_t mask = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-        if ((m.rows[x].flags & NBR_FLAG_USED) && nbrHeardDirectly(m, x, now_min))
-            mask |= nbrBit(x);
-    return mask;
+    NbrMask direct, excl;
+    NBR_LOCK();
+    if (nbrIReady(m))
+    {
+        NbrCtx cbuf;
+        const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+        direct = c.direct;
+        excl = nbrMaskAndNot(c.direct, nbrICoveredByAnyone(m, c));
+    }
+    else
+        direct = excl = nbrMaskNone();
+    NBR_UNLOCK();
+    if (nbrMaskEmpty(direct))
+        return -1;
+    int count = 0;
+    for (int x = nbrMaskNext(excl, -1); x >= 0; x = nbrMaskNext(excl, x))
+    {
+        if (out && count < (int)max)
+            out[count] = (uint8_t)x;
+        count++;
+    }
+    return count;
 }
 
-uint32_t nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min)
+int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min)
 {
-    uint32_t mask = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-    {
-        if (!(m.rows[x].flags & NBR_FLAG_USED))
-            continue;
-        const NbrCell &c = m.cells[0][x];
-        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-            mask |= nbrBit(x);
-    }
-    return mask;
+    NbrCtx cbuf;
+    NBR_LOCK();
+    int n = nbrIReady(m) ? nbrIMeshNeedSet(m, nbrICtx(m, now_min, cbuf), row, NULL) : -1;
+    NBR_UNLOCK();
+    return n;
 }
 
-uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
+const char *nbrRowMeshNeed(const NbrMatrix &m, int row, uint16_t now_min)
 {
-    if (row < 0 || row >= NBR_MAX_ROWS)
-        return 0;
-    uint32_t mask = 0;
-    for (int y = 1; y < NBR_MAX_ROWS; y++)
-    {
-        if (y == row || !(m.rows[y].flags & NBR_FLAG_USED))
-            continue;
-        const NbrCell &c = m.cells[row][y];
-        if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-            mask |= nbrBit(y);
-    }
-    return mask;
+    NbrCtx cbuf;
+    NBR_LOCK();
+    int n = nbrIReady(m) ? nbrIMeshNeedSet(m, nbrICtx(m, now_min, cbuf), row, NULL) : -1;
+    NBR_UNLOCK();
+    return nbrIMeshNeedWord(n);
 }
 
-// Hoerbeweis "hoert X M" mit optionalem symmetrischem Fallback (--nbrsym,
-// nbr_matrix.h NBR_SYM_MIN_SNR): beobachtet ist cells[mrow][x] ("X hat M
-// gehoert", Zellsemantik cells[A][B] = "B hat A gehoert", A=mrow, B=x). Ohne
-// Beobachtung wird -- nur wenn sym -- die UMGEKEHRTE Zelle cells[x][mrow]
-// ("M hat X gehoert") herangezogen: hat M die Gegenstation X frisch und mit
-// SNR >= NBR_SYM_MIN_SNR gehoert, wird angenommen, dass X umgekehrt M auch
-// hoert (Funkstrecken sind ueberwiegend symmetrisch). *snr_used bekommt in
-// diesem Fall den SNR von "M hat X gehoert" (fuer die SYM-Log-Zeile beim
-// Aufrufer); *inferred zeigt an, ob das Ergebnis eine Annahme war. Beide
-// Ausgabeparameter duerfen NULL sein.
-//
-// Symmetrie-VETO (HN-Bericht, nbr_matrix.h Abschnitt E): traegt X einen
-// gueltigen, VOLLSTAENDIGEN HN-Bericht (NBR_FLAG_RPT, rpt_min noch innerhalb
-// NBR_REPORT_VALID_MIN), ist DIESER Bericht die massgebliche Aussage
-// darueber, wen X hoert -- fehlt M darin (die Zelle cells[mrow][x] waere
-// sonst schon durch nbrNoteReport() gesetzt und haette den Beobachtungs-Zweig
-// oben schon bedient), gilt "X hoert M nicht", nicht die Annahme. Der Zweig
-// wird nur erreicht, wenn die umgekehrte Zelle sonst qualifiziert haette (das
-// ist die vom Aufrufer geforderte Bedingung fuer eine VETO-Log-Zeile); *snr_used
-// bekommt trotzdem den SNR, den die Annahme benutzt HAETTE, damit der
-// Aufrufer dieselbe SYM-Zeile mit Rolle VETO statt HASF/ALT/COVER loggen
-// kann. *vetoed darf NULL sein.
-static bool nbrHearsSym(const NbrMatrix &m, int x, int mrow, uint16_t now_min, bool sym,
-                         int8_t *snr_used, bool *inferred, bool *vetoed)
+// Privat (nicht im Header): die Menge hinter #X, fuer Tests und die Web-Sicht
+// einer spaeteren Welle. Liefert #X wie nbrRowMeshNeedCount(). unused, damit
+// ein Build ohne Aufrufer keine Warnung bekommt.
+__attribute__((unused)) static int nbrRowMeshNeedSet(const NbrMatrix &m, int row, uint16_t now_min, NbrMask *out)
 {
-    if (inferred)
-        *inferred = false;
-    if (vetoed)
-        *vetoed = false;
+    NbrCtx cbuf;
+    NBR_LOCK();
+    int n = nbrIReady(m) ? nbrIMeshNeedSet(m, nbrICtx(m, now_min, cbuf), row, out) : -1;
+    NBR_UNLOCK();
+    if (n < 0 && out)
+        *out = nbrMaskNone();
+    return n;
+}
 
-    const NbrCell &observed = m.cells[mrow][x]; // "X hat M gehoert"
-    if (nbrCellSet(observed) && nbrFresh(observed.last_min, now_min))
-        return true;
+NbrMask nbrDirectMask(const NbrMatrix &m, uint16_t now_min)
+{
+    NbrCtx cbuf;
+    NBR_LOCK();
+    NbrMask r = nbrIReady(m) ? nbrICtx(m, now_min, cbuf).direct : nbrMaskNone();
+    NBR_UNLOCK();
+    return r;
+}
 
-    if (!sym || x == mrow)
-        return false;
+NbrMask nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min)
+{
+    NBR_LOCK();
+    NbrMask r = nbrIReady(m) ? nbrIHeardMeMask(m, now_min) : nbrMaskNone();
+    NBR_UNLOCK();
+    return r;
+}
 
-    const NbrCell &reverse = m.cells[x][mrow]; // "M hat X gehoert"
-    if (!(nbrCellSet(reverse) && nbrFresh(reverse.last_min, now_min)))
-        return false;
-    if (reverse.snr == NBR_SNR_UNKNOWN || reverse.snr < NBR_SYM_MIN_SNR)
-        return false;
-
-    const NbrRow &rx = m.rows[x];
-    if ((rx.flags & NBR_FLAG_RPT) && (uint16_t)(now_min - rx.rpt_min) < NBR_REPORT_VALID_MIN)
-    {
-        if (snr_used)
-            *snr_used = reverse.snr;
-        if (vetoed)
-            *vetoed = true;
-        return false;
-    }
-
-    if (snr_used)
-        *snr_used = reverse.snr;
-    if (inferred)
-        *inferred = true;
-    return true;
+NbrMask nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min)
+{
+    NBR_LOCK();
+    NbrMask r = nbrIReady(m) ? nbrIHearersMask(m, row, now_min) : nbrMaskNone();
+    NBR_UNLOCK();
+    return r;
 }
 
 NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, bool sym, uint32_t msg_id)
 {
-    NbrNeed r;
-    r.need = 0;
-    r.alone = 0;
-    r.known = false;
-    r.inferred = 0;
-
     char tokens[8][NBR_CALL_LEN];
     int ntok = nbrTokenizePath(path, tokens, 8);
     if (ntok < 0)
-        return r; // ungueltiger Pfad: kein Wissen (known == false), der Aufrufer relayt wie heute
-
-    // Pfad(F): wer den Frame nachweislich schon hat (steht im Pfad) ...
-    uint32_t inpath = 0;
-    int pidx[8];
+    {
+        NbrNeed r;
+        r.need = r.alone = r.inferred = nbrMaskNone();
+        r.known = false;
+        return r; // ungueltiger Pfad: kein Wissen
+    }
+    uint64_t words[8];
     for (int i = 0; i < ntok; i++)
-    {
-        pidx[i] = nbrFind(m, tokens[i]);
-        inpath |= nbrBit(pidx[i]);
-    }
-    // ... und wer einen Pfadteilnehmer frisch gehoert hat (HatF).
-    uint32_t hasf = inpath;
-    for (int i = 0; i < ntok; i++)
-        if (pidx[i] >= 0)
-            hasf |= nbrHearersMask(m, pidx[i], now_min);
+        words[i] = nbrIEncode(tokens[i]);
 
-    // Abhaengige D: direkt gehoert oder hat mich gehoert, ohne Zeile 0 und
-    // ohne Gateways (die bekommen den Frame vom Server, Konzept 5.4).
-    uint32_t direct = nbrDirectMask(m, now_min);
-    uint32_t dep = (direct | nbrHeardMeMask(m, now_min)) & ~1u;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-        if ((dep & nbrBit(x)) && (m.rows[x].flags & NBR_FLAG_GW))
-            dep &= ~nbrBit(x);
-
-    // Ohne eine einzige abhaengige Zeile (leere Matrix nach Boot oder Reset)
-    // gibt es nichts zu entscheiden -- known bleibt false, der Aufrufer
-    // relayt wie heute statt in Fall B zu gehen (Advisor-Fund 2026-09-22).
-    if (dep == 0)
-        return r;
-    r.known = true;
-
-    // HatF-Symmetrie-Fallback (--nbrsym): NUR fuer Abhaengige, die weder per
-    // Pfad noch per Beobachtung schon in hasf stehen, und NUR ueber die
-    // Pfadteilnehmer selbst (dieselbe Menge wie der Beobachtungs-Schritt
-    // oben) -- eine Annahme fuer einen Nicht-Abhaengigen wuerde need/alone
-    // nie beeinflussen und keine Log-Zeile rechtfertigen.
-    if (sym)
-    {
-        for (int x = 1; x < NBR_MAX_ROWS; x++)
-        {
-            if (!(dep & nbrBit(x)) || (hasf & nbrBit(x)))
-                continue;
-            for (int i = 0; i < ntok; i++)
-            {
-                if (pidx[i] < 0)
-                    continue;
-                int8_t snr_used = 0;
-                bool inferred = false;
-                bool vetoed = false;
-                if (nbrHearsSym(m, x, pidx[i], now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
-                {
-                    hasf |= nbrBit(x);
-                    r.inferred |= nbrBit(x);
-                    nbrLogSym(now_min, msg_id, "HASF", m.rows[x].call, tokens[i], snr_used);
-                    break;
-                }
-                if (vetoed)
-                {
-                    // Der Veto haengt nur an der Zeile von X: fuer dieses X ist in
-                    // dieser Entscheidung keine Annahme mehr moeglich -- eine
-                    // VETO-Zeile je X reicht (Advisor R3).
-                    nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, tokens[i], snr_used);
-                    break;
-                }
-            }
-        }
-    }
-
-    r.need = dep & ~hasf;
-
-    // Allein: X aus dem Bedarf ohne Alternative -- kein direkter M != X, der
-    // den Frame hat (HatF) und den X frisch gehoert hat (cell[M][X]). Erst
-    // beobachtet gesucht, nur wenn nichts gefunden wird (und sym) der
-    // symmetrische Fallback ueber dieselben Provider.
-    // Versorger muss den Frame BEOBACHTET haben: ein X, das nur per
-    // HASF-Annahme in hasf steht, versorgt niemanden (Advisor 2026-09-22) --
-    // sonst stapelten sich zwei Annahmen, und der zweite Nachbar verloere
-    // seinen Allein-Status ohne eigene SYM-Zeile. Hoechstens eine Annahme
-    // je Entscheidung.
-    uint32_t providers = direct & hasf & ~r.inferred;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-    {
-        if (!(r.need & nbrBit(x)))
-            continue;
-        bool alt = false;
-        for (int mrow = 1; mrow < NBR_MAX_ROWS && !alt; mrow++)
-        {
-            if (mrow == x || !(providers & nbrBit(mrow)))
-                continue;
-            const NbrCell &c = m.cells[mrow][x];
-            if (nbrCellSet(c) && nbrFresh(c.last_min, now_min))
-                alt = true;
-        }
-        if (!alt && sym)
-        {
-            for (int mrow = 1; mrow < NBR_MAX_ROWS && !alt; mrow++)
-            {
-                if (mrow == x || !(providers & nbrBit(mrow)))
-                    continue;
-                int8_t snr_used = 0;
-                bool inferred = false;
-                bool vetoed = false;
-                if (nbrHearsSym(m, x, mrow, now_min, sym, &snr_used, &inferred, &vetoed) && inferred)
-                {
-                    alt = true;
-                    r.inferred |= nbrBit(x);
-                    nbrLogSym(now_min, msg_id, "ALT", m.rows[x].call, m.rows[mrow].call, snr_used);
-                }
-                else if (vetoed)
-                {
-                    nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, m.rows[mrow].call, snr_used);
-                    break;   // eine VETO-Zeile je X, siehe HatF-Schleife oben
-                }
-            }
-        }
-        if (!alt)
-            r.alone |= nbrBit(x);
-    }
+    NbrSymSink sink;
+    NBR_LOCK();
+    nbrISymBegin(sink, m, tokens, now_min, msg_id);
+    NbrNeed r = nbrIRelayNeed(m, words, ntok, now_min, sym, sink);
+    NBR_UNLOCK();
+    nbrISymFlush(sink);
     return r;
 }
 
-uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
-                       uint32_t relevant, uint32_t msg_id, uint32_t *inferred)
+NbrMask nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                     const NbrMask &relevant, uint32_t msg_id, NbrMask *inferred)
 {
-    if (inferred)
-        *inferred = 0;
-
-    int idx = nbrFind(m, relayer);
-    if (idx <= 0)
-        return 0; // unbekannt oder ich selbst: deckt nichts, was ich nachweisen koennte
-
-    uint32_t mask = nbrHearersMask(m, idx, now_min); // beobachtete Hoerer des Relayers, unveraendert
-    if (!sym)
-        return mask;
-
-    // Symmetrie-Fallback: jedes NOCH NICHT beobachtete X, fuer das der
-    // Relayer M X frisch mit ausreichendem SNR gehoert hat, gilt als
-    // zusaetzlicher Hoerer. nbrHearsSym(m, x, idx, ...) prueft in dieser
-    // Rollenverteilung genau das: beobachtet waere cells[idx][x] ("X hat M
-    // gehoert", bereits oben in mask erfasst und deshalb hier immer falsch),
-    // der Fallback zieht cells[x][idx] ("M hat X gehoert") heran.
-    uint32_t local_inferred = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
-    {
-        if (x == idx || (mask & nbrBit(x)) || !(m.rows[x].flags & NBR_FLAG_USED))
-            continue;
-
-        int8_t snr_used = 0;
-        bool was_inferred = false;
-        bool was_vetoed = false;
-        if (nbrHearsSym(m, x, idx, now_min, sym, &snr_used, &was_inferred, &was_vetoed) && was_inferred)
-        {
-            mask |= nbrBit(x);
-            local_inferred |= nbrBit(x);
-            // Nur loggen, wenn das X fuer DIESEN Slot (relevant) tatsaechlich
-            // etwas aendern kann -- sonst waere die Annahme fuer den Aufruf
-            // folgenlos und die Zeile Rauschen im 24-h-Log.
-            if (relevant & nbrBit(x))
-                nbrLogSym(now_min, msg_id, "COVER", m.rows[x].call, m.rows[idx].call, snr_used);
-        }
-        else if (was_vetoed && (relevant & nbrBit(x)))
-        {
-            nbrLogSym(now_min, msg_id, "VETO", m.rows[x].call, m.rows[idx].call, snr_used);
-        }
-    }
-
-    if (inferred)
-        *inferred = local_inferred;
-    return mask;
+    uint64_t w = nbrIEncode(relayer);
+    NbrSymSink sink;
+    NBR_LOCK();
+    nbrISymBegin(sink, m, NULL, now_min, msg_id);
+    NbrMask r = nbrICoverMask(m, w, now_min, sym, relevant, inferred, sink);
+    NBR_UNLOCK();
+    nbrISymFlush(sink);
+    return r;
 }
 
 int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8_t max)
 {
-    uint32_t direct = nbrDirectMask(m, now_min);
-    if (!direct)
+    NbrMask direct, excl;
+    NBR_LOCK();
+    if (nbrIReady(m))
+    {
+        NbrCtx cbuf;
+        const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+        direct = c.direct;
+        excl = nbrIExclusiveDirect(m, c);
+    }
+    else
+        direct = excl = nbrMaskNone();
+    NBR_UNLOCK();
+    if (nbrMaskEmpty(direct))
         return -1;
     int count = 0;
-    for (int x = 1; x < NBR_MAX_ROWS; x++)
+    for (int x = nbrMaskNext(excl, -1); x >= 0; x = nbrMaskNext(excl, x))
     {
-        if (!(direct & nbrBit(x)))
-            continue;
-        // Nur ein DIREKTER Nachbar M zaehlt als Deckung: seine Wiederholung
-        // kann ich hoeren und darauf abbrechen, die eines 2-Hop-Knotens nicht.
-        if (nbrHearersMask(m, x, now_min) & direct & ~nbrBit(x))
-            continue;
         if (out && count < (int)max)
             out[count] = (uint8_t)x;
         count++;
@@ -1424,49 +2135,59 @@ int nbrExclusiveDirect(const NbrMatrix &m, uint16_t now_min, uint8_t *out, uint8
 
 float nbrDistKm(float lat1, float lon1, float lat2, float lon2)
 {
-    const double R = 6371.0;
-    double dlat = (double)(lat2 - lat1) * M_PI / 180.0;
-    double dlon = (double)(lon2 - lon1) * M_PI / 180.0;
-    double a = sin(dlat / 2.0) * sin(dlat / 2.0) +
-               cos((double)lat1 * M_PI / 180.0) * cos((double)lat2 * M_PI / 180.0) *
-                   sin(dlon / 2.0) * sin(dlon / 2.0);
-    double c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
-    return (float)(R * c);
+    return nbrIDistKm(lat1, lon1, lat2, lon2);
 }
 
 float nbrReach(const NbrMatrix &m, int row, uint16_t now_min, int *partner)
 {
+    int p = -1;
+    NBR_LOCK();
+    float d = nbrIReady(m) ? nbrIReach(m, row, now_min, &p) : -1.0f;
+    NBR_UNLOCK();
     if (partner)
-        *partner = -1;
-    if (row < 0 || row >= NBR_MAX_ROWS)
-        return -1.0f;
-    if (!(m.rows[row].flags & NBR_FLAG_POS))
-        return -1.0f;
+        *partner = p;
+    return d;
+}
 
-    float best = -1.0f;
-    int best_partner = -1;
-    for (int y = 0; y < NBR_MAX_ROWS; y++)
+// --- Ausgabe ------------------------------------------------------------------------------
+
+// Anhaengen mit snprintf-Semantik: schreibt, solange Platz ist, und zaehlt
+// die Laenge weiter, die ein einziges snprintf gemeldet haette.
+struct NbrApp
+{
+    char  *out;
+    size_t cap;
+    size_t pos;
+};
+
+static void nbrAppStr(NbrApp &a, const char *s)
+{
+    size_t n = strlen(s);
+    if (a.pos + 1 < a.cap)
     {
-        if (y == row)
-            continue;
-        if (!(m.rows[y].flags & NBR_FLAG_POS))
-            continue;
-        bool linked = (nbrCellSet(m.cells[row][y]) && nbrFresh(m.cells[row][y].last_min, now_min)) ||
-                      (nbrCellSet(m.cells[y][row]) && nbrFresh(m.cells[y][row].last_min, now_min));
-        if (!linked)
-            continue;
-        float d = nbrDistKm(m.rows[row].lat, m.rows[row].lon, m.rows[y].lat, m.rows[y].lon);
-        if (d > best)
-        {
-            best = d;
-            best_partner = y;
-        }
+        size_t room = a.cap - a.pos - 1;
+        size_t k = n < room ? n : room;
+        memcpy(a.out + a.pos, s, k);
+        a.out[a.pos + k] = '\0';
     }
-    if (best_partner < 0)
-        return -1.0f;
-    if (partner)
-        *partner = best_partner;
-    return best;
+    a.pos += n;
+}
+
+static void nbrAppInt(NbrApp &a, long v)
+{
+    char buf[24];
+    char *p = buf + sizeof(buf) - 1;
+    *p = '\0';
+    bool neg = v < 0;
+    unsigned long u = neg ? (unsigned long)(-(v + 1)) + 1u : (unsigned long)v;
+    do
+    {
+        *--p = (char)('0' + (u % 10u));
+        u /= 10u;
+    } while (u);
+    if (neg)
+        *--p = '-';
+    nbrAppStr(a, p);
 }
 
 int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_t outlen)
@@ -1476,48 +2197,64 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
     out[0] = '\0';
     if (row < 0 || row >= NBR_MAX_ROWS)
         return 0;
-    if (row != 0 && !(m.rows[row].flags & NBR_FLAG_USED))
+
+    NbrApp a;
+    a.out = out;
+    a.cap = outlen;
+    a.pos = 0;
+    int partner = -1;
+    float reach = -1.0f;
+    char partner_call[NBR_CALL_LEN] = "";
+    uint16_t age = 0;
+    bool ok;
+
+    // Unter der Klammer nur Zeichenketten und Ganzzahlen, ohne printf.
+    NBR_LOCK();
+    ok = nbrIReady(m) && (row == 0 || nbrIUsed(m, row));
+    if (ok)
+    {
+        const NbrRow &r = m.row[row];
+        char call[NBR_CALL_LEN];
+        nbrIDecode(m.call[row], call);
+        nbrAppStr(a, call);
+        nbrAppStr(a, (r.flags & NBR_FLAG_GW) ? " GW+" : " GW-");
+        nbrAppStr(a, (r.flags & NBR_FLAG_MESH) ? " M+" : " M-");
+        nbrAppStr(a, " hears_me:");
+        int e = (row != 0) ? nbrIEdgeFind(m, 0, row) : -1;
+        if (e >= 0 && nbrIFresh(m.edge[e].last_min, now_min) && m.edge[e].snr != NBR_SNR_UNKNOWN)
+            nbrAppInt(a, m.edge[e].snr);
+        else
+            nbrAppStr(a, "-");
+        nbrAppStr(a, " hearers:");
+        NbrMask h = nbrIHearersAll(m, row, now_min);
+        if (nbrMaskEmpty(h))
+            nbrAppStr(a, "-");
+        bool first = true;
+        for (int y = nbrMaskNext(h, -1); y >= 0; y = nbrMaskNext(h, y))
+        {
+            if (!first)
+                nbrAppStr(a, ",");
+            first = false;
+            char hc[NBR_CALL_LEN];
+            nbrIDecode(m.call[y], hc);
+            nbrAppStr(a, hc);
+        }
+        reach = nbrIReach(m, row, now_min, &partner);
+        if (partner >= 0)
+            nbrIDecode(m.call[partner], partner_call);
+        age = (uint16_t)(now_min - r.last_min);
+    }
+    NBR_UNLOCK();
+    if (!ok)
         return 0;
 
-    const NbrRow &r = m.rows[row];
-
-    // "hoert mich mit": cell[0][row] ist "row hat 0 (mich) gehoert" --
-    // Konzept 4.3, Spalte "hoert mich mit". NBR_SNR_UNKNOWN im Feld heisst
-    // "unbekannt", nicht "0 dB".
-    char hears_me[8] = "-";
-    const NbrCell &c_hears = m.cells[0][row];
-    if (row != 0 && nbrFresh(c_hears.last_min, now_min) && c_hears.snr != NBR_SNR_UNKNOWN)
-        snprintf(hears_me, sizeof(hears_me), "%d", (int)c_hears.snr);
-
-    uint8_t hearer_idx[NBR_MAX_ROWS];
-    uint8_t hn = nbrHearers(m, row, now_min, hearer_idx, (uint8_t)NBR_MAX_ROWS);
-    char hearers[NBR_MAX_ROWS * NBR_CALL_LEN];
-    hearers[0] = '\0';
-    uint8_t list_n = hn < NBR_MAX_ROWS ? hn : NBR_MAX_ROWS;
-    for (uint8_t i = 0; i < list_n; i++)
-    {
-        if (i)
-            strncat(hearers, ",", sizeof(hearers) - strlen(hearers) - 1);
-        strncat(hearers, m.rows[hearer_idx[i]].call, sizeof(hearers) - strlen(hearers) - 1);
-    }
-    if (list_n == 0)
-        snprintf(hearers, sizeof(hearers), "-");
-
-    int partner = -1;
-    float reach = nbrReach(m, row, now_min, &partner);
-    char reach_buf[32];
+    char tail[64];
     if (reach >= 0.0f && partner >= 0)
-        snprintf(reach_buf, sizeof(reach_buf), "%.1fkm@%s", (double)reach, m.rows[partner].call);
+        snprintf(tail, sizeof(tail), " reach:%.1fkm@%s age:%um", (double)reach, partner_call, (unsigned)age);
     else
-        snprintf(reach_buf, sizeof(reach_buf), "-");
-
-    unsigned age = (unsigned)nbrRowAgeMin(m, row, now_min);
-
-    return snprintf(out, outlen, "%s %s %s hears_me:%s hearers:%s reach:%s age:%um",
-                     r.call,
-                     (r.flags & NBR_FLAG_GW) ? "GW+" : "GW-",
-                     (r.flags & NBR_FLAG_MESH) ? "M+" : "M-",
-                     hears_me, hearers, reach_buf, age);
+        snprintf(tail, sizeof(tail), " reach:- age:%um", (unsigned)age);
+    nbrAppStr(a, tail);
+    return (int)a.pos;
 }
 
 void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
@@ -1525,31 +2262,52 @@ void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
     if (!nbrLog)
         return;
 
-    int rows_used = 1; // Zeile 0 zaehlt immer, auch ohne NBR_FLAG_USED
+    char own[NBR_CALL_LEN];
+    int rows_used = 1, edges = 0;
+    NBR_LOCK();
+    nbrIDecode(m.call[0], own);
     for (int i = 1; i < NBR_MAX_ROWS; i++)
-        if (m.rows[i].flags & NBR_FLAG_USED)
+        if (nbrIUsed(m, i))
             rows_used++;
-
-    int cells_set = 0;
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-        for (int y = 0; y < NBR_MAX_ROWS; y++)
-            if (nbrCellSet(m.cells[x][y]))
-                cells_set++;
+    edges = nbrIEdgesUsed(m);
+    NBR_UNLOCK();
 
     char buf[160];
     snprintf(buf, sizeof(buf), "[NBR]|SNAP|%u|%s|%d|%d|%d",
-             (unsigned)now_min, m.rows[0].call, rows_used, (int)NBR_MAX_ROWS, cells_set);
+             (unsigned)now_min, own, rows_used, (int)NBR_MAX_ROWS, edges);
     nbrLog(buf);
 
+    // Je Zeile eine eigene kurze Klammer: jede ROW-Zeile ist in sich
+    // stimmig, zwischen zwei Zeilen darf der Empfang weiterlaufen.
     for (int i = 0; i < NBR_MAX_ROWS; i++)
     {
-        if (i != 0 && !(m.rows[i].flags & NBR_FLAG_USED))
+        bool show;
+        char call[NBR_CALL_LEN];
+        unsigned flags = 0, age = 0, hearers = 0;
+        const char *verdict = "UNK";
+        const char *meshneed = "NA";
+        NBR_LOCK();
+        show = (i == 0 || nbrIUsed(m, i));
+        if (show)
+        {
+            nbrIDecode(m.call[i], call);
+            flags = m.row[i].flags;
+            age = (uint16_t)(now_min - m.row[i].last_min);
+            if (nbrIReady(m))
+            {
+                hearers = (unsigned)nbrMaskCount(nbrIHearersAll(m, i, now_min));
+                NbrCtx cbuf;
+                const NbrCtx &c = nbrICtx(m, now_min, cbuf);
+                NbrMask cov = nbrICoveredByAnyone(m, c);
+                verdict = nbrIRowVerdict(m, c, i, cov);
+                meshneed = nbrIMeshNeedWord(nbrIMeshNeedSet(m, c, i, NULL));
+            }
+        }
+        NBR_UNLOCK();
+        if (!show)
             continue;
-        unsigned age = (unsigned)nbrRowAgeMin(m, i, now_min);
-        unsigned hearers = (unsigned)nbrHearers(m, i, now_min, NULL, 0);
         snprintf(buf, sizeof(buf), "[NBR]|ROW|%u|%d|%s|%u|%u|%u|%s|%s",
-                 (unsigned)now_min, i, m.rows[i].call, (unsigned)m.rows[i].flags,
-                 age, hearers, nbrRowVerdict(m, i, now_min), nbrRowMeshNeed(m, i, now_min));
+                 (unsigned)now_min, i, call, flags, age, hearers, verdict, meshneed);
         nbrLog(buf);
     }
 
@@ -1557,9 +2315,9 @@ void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min)
     nbrLog(buf);
 }
 
-// Eine Instanz fuers ganze Geraet, im BSS: geschrieben ausschliesslich aus
-// OnRxDone (lora_functions.cpp), gelesen von Web-Seite und --neighbours/
-// --nbrreset (W2).
+// Eine Instanz fuers ganze Geraet, im BSS (siehe nbr_matrix.h). Bis zum
+// ersten nbrInit() ist call[0] == 0, und jede Funktion behandelt die Matrix
+// als leer.
 #ifndef NATIVE_BUILD
 NbrMatrix nbrMatrix;
 #endif

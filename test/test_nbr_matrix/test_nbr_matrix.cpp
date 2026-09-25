@@ -28,6 +28,90 @@
 void setUp(void) {}
 void tearDown(void) {}
 
+// --- Zugriff (Welle 2: Kantenpool statt cells[x][y]) ----------------------
+//
+// Gelesen wird ueber die oeffentlichen Accessoren (nbrEdgeGet()/nbrRowGet());
+// wo ein Test einen Zustand direkt aufbaut (frueher m.cells[x][y].cnt_* = n),
+// setzt eset() die Kante ueber die internen Helfer aus nbr_matrix.cpp, damit
+// Pool und Masken zusammen stimmen. Kante (x, y) = "y hat x gehoert", wie
+// frueher cells[x][y].
+
+static uint8_t ecnt(const NbrMatrix &m, int x, int y)
+{
+    NbrEdgeView v;
+    return nbrEdgeGet(m, x, y, &v) ? v.cnt : 0;
+}
+
+static int8_t esnr(const NbrMatrix &m, int x, int y)
+{
+    NbrEdgeView v;
+    return nbrEdgeGet(m, x, y, &v) ? v.snr : (int8_t)NBR_SNR_UNKNOWN;
+}
+
+static uint16_t elast(const NbrMatrix &m, int x, int y)
+{
+    NbrEdgeView v;
+    return nbrEdgeGet(m, x, y, &v) ? v.last_min : 0;
+}
+
+static void eset(NbrMatrix &m, int x, int y, uint8_t cnt, uint16_t last, int8_t snr = NBR_SNR_UNKNOWN)
+{
+    int e = nbrIEdgeFind(m, x, y);
+    if (e < 0)
+        e = nbrIEdgeAlloc(m, x, y, last, NULL);
+    m.edge[e].cnt = cnt;
+    m.edge[e].last_min = last;
+    m.edge[e].snr = snr;
+}
+
+static void edel(NbrMatrix &m, int x, int y)
+{
+    int e = nbrIEdgeFind(m, x, y);
+    if (e >= 0)
+        nbrIEdgeFree(m, e);
+}
+
+static NbrRowView rview(const NbrMatrix &m, int row)
+{
+    NbrRowView v;
+    memset(&v, 0, sizeof(v));
+    nbrRowGet(m, row, &v);
+    return v;
+}
+
+static uint8_t rflags(const NbrMatrix &m, int row)
+{
+    return rview(m, row).flags;
+}
+
+// Masken-Invariante: hears[y] Bit x und heardBy[x] Bit y genau dann, wenn
+// eine Kante (x, y) im Pool lebt.
+static bool masks_match_pool(const NbrMatrix &m)
+{
+    for (int x = 0; x < NBR_MAX_ROWS; x++)
+        for (int y = 0; y < NBR_MAX_ROWS; y++)
+        {
+            bool live = false;
+            for (int e = 0; e < NBR_MAX_EDGES; e++)
+                if (m.edge[e].x == x && m.edge[e].y == y)
+                    live = true;
+            if (nbrMaskTest(m.hears[y], x) != live || nbrMaskTest(m.heardBy[x], y) != live)
+                return false;
+        }
+    return true;
+}
+
+static NbrMask mbits(int a, int b = -1, int c = -1)
+{
+    NbrMask r = nbrMaskNone();
+    nbrMaskSet(r, a);
+    nbrMaskSet(r, b);
+    nbrMaskSet(r, c);
+    return r;
+}
+
+#define TEST_ASSERT_MASK_EQ(exp, act) TEST_ASSERT_TRUE(nbrMaskEqual((exp), (act)))
+
 // --- 1: Pfadpaar-Regel -----------------------------------------------------
 
 // Trotz des Namens (aus der Zeit vor dem Text-Sonderfall) laeuft dieser Test
@@ -48,15 +132,15 @@ void test_pair_rule_text_frame(void)
     TEST_ASSERT_TRUE(iaaa > 0);
     TEST_ASSERT_TRUE(ibbb > 0);
 
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_pos);
-    TEST_ASSERT_EQUAL_INT8(5, m.cells[ibbb][0].snr);   // ME-Schritt speichert snr_here (5), nicht rssi_here (-80)
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ibbb, 0));
+    TEST_ASSERT_EQUAL_INT8(5, esnr(m, ibbb, 0));   // ME-Schritt speichert snr_here (5), nicht rssi_here (-80)
 
     // Keine andere Zelle darf einen Zaehler > 0 tragen.
     int nonzero = 0;
     for (int x = 0; x < NBR_MAX_ROWS; x++)
         for (int y = 0; y < NBR_MAX_ROWS; y++)
-            if (m.cells[x][y].cnt_text || m.cells[x][y].cnt_pos || m.cells[x][y].cnt_hey)
+            if (ecnt(m, x, y))
                 nonzero++;
     TEST_ASSERT_EQUAL_INT(2, nonzero);
 }
@@ -73,8 +157,8 @@ void test_own_relay_seen_directly_gives_both_cells(void)
     nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '!', NULL, false, -70, 5, 200);
     int iaaa = nbrFind(m, "OE1AAA-1");
     TEST_ASSERT_TRUE(iaaa > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_pos);   // AAA hat mich gehoert
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_pos);   // ich habe AAAs Kopie gehoert
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, 0, iaaa));   // AAA hat mich gehoert
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, 0));   // ich habe AAAs Kopie gehoert
 }
 
 void test_own_frame_returning_via_relay_is_echo_not_direct_hearing(void)
@@ -91,8 +175,8 @@ void test_own_frame_returning_via_relay_is_echo_not_direct_hearing(void)
     // Stufe 2 (Konzept 2.3 / 5.8 Punkt 0): auch das Paar (AAA, ich) schreibt
     // Spalte 0 nicht mehr -- ob ich AAA je per Funk gehoert habe, weiss nur
     // der ME-Schritt beim Empfang. Vorher stand hier 1.
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][0].cnt_pos);   // kein Hoerbeweis aus meinem eigenen Pfad
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_pos);   // kein Zusatztreffer aus dem Echo
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, iaaa, 0));   // kein Hoerbeweis aus meinem eigenen Pfad
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, 0, iaaa));   // kein Zusatztreffer aus dem Echo
 }
 
 // --- 3: HEY-Berichtsgruppen --------------------------------------------------
@@ -112,10 +196,10 @@ void test_hey_signal_report_groups_set_snr_per_pair(void)
 
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
-    TEST_ASSERT_EQUAL_INT8(7, m.cells[0][iaaa].snr);      // AAA hoert mich mit SNR 7 dB
-    TEST_ASSERT_EQUAL_INT8(-10, m.cells[iaaa][ibbb].snr); // BBB hoert AAA mit SNR -10 dB
-    TEST_ASSERT_EQUAL_INT8(5, m.cells[ibbb][0].snr);      // ich hoere BBB: ME-Schritt speichert snr_here
-    TEST_ASSERT_TRUE(m.rows[0].flags & NBR_FLAG_GW);
+    TEST_ASSERT_EQUAL_INT8(7, esnr(m, 0, iaaa));      // AAA hoert mich mit SNR 7 dB
+    TEST_ASSERT_EQUAL_INT8(-10, esnr(m, iaaa, ibbb)); // BBB hoert AAA mit SNR -10 dB
+    TEST_ASSERT_EQUAL_INT8(5, esnr(m, ibbb, 0));      // ich hoere BBB: ME-Schritt speichert snr_here
+    TEST_ASSERT_TRUE(rflags(m, 0) & NBR_FLAG_GW);
 }
 
 void test_hey_group_parses_negative_snr_field(void)
@@ -129,7 +213,7 @@ void test_hey_group_parses_negative_snr_field(void)
     int hits = nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '@', "R5;3,115,-10;", false, -60, 5, 300);
     TEST_ASSERT_TRUE(hits > 0);
     int iaaa = nbrFind(m, "OE1AAA-1");
-    TEST_ASSERT_EQUAL_INT8(-10, m.cells[0][iaaa].snr);
+    TEST_ASSERT_EQUAL_INT8(-10, esnr(m, 0, iaaa));
 }
 
 void test_hey_old_format_counts_hits_without_snr(void)
@@ -142,9 +226,9 @@ void test_hey_old_format_counts_hits_without_snr(void)
 
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
-    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[0][iaaa].snr);      // kein Bericht -> unbekannt
-    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[iaaa][ibbb].snr);
-    TEST_ASSERT_EQUAL_INT8(5, m.cells[ibbb][0].snr);      // der letzte Hop bekommt snr_here trotzdem
+    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, esnr(m, 0, iaaa));      // kein Bericht -> unbekannt
+    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, esnr(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_INT8(5, esnr(m, ibbb, 0));      // der letzte Hop bekommt snr_here trotzdem
 }
 
 // --- 4: Ablehnungen lassen die Matrix unangetastet --------------------------
@@ -179,12 +263,12 @@ void test_aging_720_min_window_and_stale_reset(void)
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
 
-    TEST_ASSERT_TRUE(nbrFresh(m.cells[iaaa][ibbb].last_min, 819));   // 719 min alt
-    TEST_ASSERT_FALSE(nbrFresh(m.cells[iaaa][ibbb].last_min, 820));  // genau 720: nicht mehr frisch
+    TEST_ASSERT_TRUE(nbrFresh(elast(m, iaaa, ibbb), 819));   // 719 min alt
+    TEST_ASSERT_FALSE(nbrFresh(elast(m, iaaa, ibbb), 820));  // genau 720: nicht mehr frisch
 
     // Treffer auf eine inzwischen verfallene Zelle faengt bei 1 an, nicht bei 2.
     nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 900);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb));
 
     // Ueberlauf des 16-Bit-Minutenzaehlers: 65500 -> 10 sind 46 min, klar frisch.
     TEST_ASSERT_TRUE(nbrFresh(65500, 10));
@@ -211,8 +295,8 @@ void test_eviction_replaces_oldest_row_never_row_zero(void)
 
     // AAA traegt eine Beobachtung als ZEILE und als SPALTE -- die
     // Verdraengung muss beide Richtungen nullen, nicht nur eine.
-    m.cells[iaaa][ibbb].cnt_text = 1; m.cells[iaaa][ibbb].last_min = 10;
-    m.cells[ibbb][iaaa].cnt_text = 1; m.cells[ibbb][iaaa].last_min = 10;
+    eset(m, iaaa, ibbb, 1, 10);
+    eset(m, ibbb, iaaa, 1, 10);
 
     // Tabelle ist voll (Zeile 0 + 4 Fremde = NBR_MAX_ROWS). AAA hat mit
     // last_min=10 die groesste Altersluecke zu now=50 und weicht.
@@ -230,8 +314,8 @@ void test_eviction_replaces_oldest_row_never_row_zero(void)
     // Zeile UND Spalte des verdraengten Index sind genullt (derselbe Index
     // traegt jetzt EEE, dessen frische Zelle zu BBB noch nie gesetzt wurde --
     // stuende hier noch AAAs alter Zaehler, waere das ein Verdraengungsfehler).
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][ibbb].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ibbb][iaaa].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, ibbb, iaaa));
 }
 
 // --- M1: zwei neue Rufzeichen im selben Frame duerfen nicht um dieselbe ----
@@ -259,9 +343,9 @@ void test_two_new_calls_in_one_frame_get_distinct_rows_not_the_diagonal(void)
     TEST_ASSERT_TRUE(ieee >= 0);
     TEST_ASSERT_TRUE(ifff >= 0);
     TEST_ASSERT_TRUE(ieee != ifff);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ieee][ifff].cnt_pos);
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ieee][ieee].cnt_pos);  // keine Diagonale
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifff][ifff].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ieee, ifff));
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, ieee, ieee));  // keine Diagonale
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, ifff, ifff));
 }
 
 // War vor dem 2-Hop-Fenster ein -3 (FULL): 5 neue Rufzeichen brauchten 5 neue
@@ -288,7 +372,7 @@ void test_long_path_beyond_two_hop_window_is_accepted_not_rejected(void)
     int ieee = nbrFind(m, "OE1EEE-5");
     TEST_ASSERT_TRUE(iddd > 0);
     TEST_ASSERT_TRUE(ieee > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][ieee].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iddd, ieee));
 }
 
 // --- M3: eine bestehende Zeile darf nicht Opfer eines Geschwister-Tokens ---
@@ -328,7 +412,7 @@ void test_existing_row_not_evicted_by_sibling_window_token(void)
     TEST_ASSERT_TRUE(iaaa >= 0);            // A muss eine eigene Zeile bekommen
     TEST_ASSERT_EQUAL_INT(ibbb_before, ibbb); // B behaelt genau seinen Index
     TEST_ASSERT_TRUE(iaaa != ibbb);         // keine gemeinsame Zeile / Diagonale
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos); // A->B normal eingetragen
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb)); // A->B normal eingetragen
 
     // Die naechst-aeltere, UNGESCHUETZTE Zeile (CCC) weicht wie bei jeder
     // normalen Verdraengung; D und E, juenger als CCC, bleiben unangetastet.
@@ -346,31 +430,36 @@ void test_sweep_clears_ghost_cell_before_it_can_wrap_fresh_again(void)
     nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int ibbb = nbrFind(m, "OE1BBB-2");
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb));
 
     // Die absolute Minutenzahl seit Boot laeuft im Test ungekappt weiter;
-    // nur der an nbrNoteFrame() uebergebene now_min-Wert wird -- wie auf dem
-    // echten Geraet -- auf uint16_t gekappt. In ~1000-min-Schritten auf ein
-    // unbeteiligtes Rufzeichenpaar, damit nbrMaybeSweep() oft genug zum Zug
-    // kommt (Schwelle 1024 min), bis die absolute Zeit 65636 erreicht --
-    // 65636 mod 65536 ist wieder 100, also genau der Umlaufpunkt, an dem der
-    // Geist ohne Sweep mit Alter 0 wiederauferstehen wuerde.
+    // nur der an nbrNoteFrame()/nbrSweep() uebergebene now_min-Wert wird --
+    // wie auf dem echten Geraet -- auf uint16_t gekappt. Welle 2: den Sweep
+    // ruft der Loop-Task (nicht mehr nbrNoteFrame()); hier in ~1000-min-
+    // Schritten, bis die absolute Zeit 65636 erreicht -- 65636 mod 65536 ist
+    // wieder 100, also genau der Umlaufpunkt, an dem der Geist ohne Sweep mit
+    // Alter 0 wiederauferstehen wuerde.
     uint32_t t = 100;
     while (t < 65636)
     {
         t += (t + 1000 <= 65636) ? 1000 : (65636 - t);
         nbrNoteFrame(m, "OE1ZZZ-9,OE1YYY-8", ':', NULL, false, -80, 5, (uint16_t)t);
+        nbrSweep(m, (uint16_t)t);
     }
     TEST_ASSERT_EQUAL_UINT32(65636u, t);
 
     uint16_t now = (uint16_t)t;
     TEST_ASSERT_EQUAL_UINT16(100, now);  // der Umlauf: 65636 mod 65536 ist wieder 100
 
-    // Ohne den Sweep waere nbrFresh(100, 100) wahr (Alter 0) und die alten
-    // Zaehler stuenden noch da -- der Geist saehe aus wie "gerade eben
-    // getroffen". Der Sweep muss das laengst aufgeraeumt haben.
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[iaaa][ibbb].cnt_pos);
-    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[iaaa][ibbb].snr);
+    // Ohne den Sweep waere nbrFresh(100, 100) wahr (Alter 0) und die alte
+    // Kante stuende noch im Pool -- der Geist saehe aus wie "gerade eben
+    // getroffen". Der Sweep hat die Kante nach 720 min freigegeben und die
+    // Zeilen nach 32768 min Stille geraeumt.
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, esnr(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1AAA-1"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1BBB-2"));
+    TEST_ASSERT_TRUE(masks_match_pool(m));
 }
 
 // --- L4: weitere Randfaelle ---------------------------------------------------
@@ -392,26 +481,28 @@ void test_reset_keeps_only_row_zero_call(void)
     NbrMatrix m;
     nbrInit(m, "DK5EN-93", 100);
     nbrNoteFrame(m, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100);
-    m.rows[0].flags |= NBR_FLAG_GW;
+    nbrRowSetFlag(m, 0, NBR_FLAG_GW);
 
     nbrReset(m, 500);
 
-    TEST_ASSERT_EQUAL_STRING("DK5EN-93", m.rows[0].call);
-    TEST_ASSERT_EQUAL_UINT8(0, m.rows[0].flags);
-    TEST_ASSERT_EQUAL_UINT16(0, m.rows[0].last_min);
+    TEST_ASSERT_EQUAL_STRING("DK5EN-93", rview(m, 0).call);
+    TEST_ASSERT_EQUAL_UINT8(0, rflags(m, 0));
+    TEST_ASSERT_EQUAL_UINT16(0, rview(m, 0).last_min);
     for (int i = 1; i < NBR_MAX_ROWS; i++)
-        TEST_ASSERT_EQUAL_UINT8(0, m.rows[i].flags);
-    for (int x = 0; x < NBR_MAX_ROWS; x++)
-        for (int y = 0; y < NBR_MAX_ROWS; y++)
-        {
-            TEST_ASSERT_EQUAL_UINT8(0, m.cells[x][y].cnt_text);
-            TEST_ASSERT_EQUAL_UINT8(0, m.cells[x][y].cnt_pos);
-            TEST_ASSERT_EQUAL_UINT8(0, m.cells[x][y].cnt_hey);
-            // Jede Zelle traegt NBR_SNR_UNKNOWN, nicht 0 (ein memset() allein
-            // wuerde 0 setzen -- einen GUELTIGEN SNR-Wert statt "unbekannt",
-            // siehe nbrFillUnknownSnr() in nbr_matrix.cpp).
-            TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[x][y].snr);
-        }
+        TEST_ASSERT_EQUAL_UINT8(0, rflags(m, i));
+    // Kein Eintrag im Pool lebt mehr, jeder traegt NBR_SNR_UNKNOWN (nicht 0,
+    // einen GUELTIGEN SNR-Wert), und keine Maske hat noch ein Bit.
+    TEST_ASSERT_EQUAL_INT(0, nbrEdgesUsed(m));
+    for (int e = 0; e < NBR_MAX_EDGES; e++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(0xFF, m.edge[e].x);
+        TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.edge[e].snr);
+    }
+    for (int i = 0; i < NBR_MAX_ROWS; i++)
+    {
+        TEST_ASSERT_TRUE(nbrMaskEmpty(m.hears[i]));
+        TEST_ASSERT_TRUE(nbrMaskEmpty(m.heardBy[i]));
+    }
 }
 
 void test_note_pos_mesh_false_clears_previously_set_mesh_flag(void)
@@ -423,10 +514,10 @@ void test_note_pos_mesh_false_clears_previously_set_mesh_flag(void)
     nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 10);
     int iaaa = nbrFind(m, "OE1AAA-1");
     nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, true, 1, 10);
-    TEST_ASSERT_TRUE(m.rows[iaaa].flags & NBR_FLAG_MESH);
+    TEST_ASSERT_TRUE(rflags(m, iaaa) & NBR_FLAG_MESH);
 
     nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, false, 1, 20);
-    TEST_ASSERT_FALSE(m.rows[iaaa].flags & NBR_FLAG_MESH);
+    TEST_ASSERT_FALSE(rflags(m, iaaa) & NBR_FLAG_MESH);
 }
 
 void test_hearers_returns_total_count_beyond_what_was_written(void)
@@ -443,9 +534,9 @@ void test_hearers_returns_total_count_beyond_what_was_written(void)
     int iccc = nbrFind(m, "OE1CCC-3");
 
     // Hoerer(AAA) = {BBB, CCC, 0}: drei Hoerer.
-    m.cells[iaaa][ibbb].cnt_text = 1; m.cells[iaaa][ibbb].last_min = 5;
-    m.cells[iaaa][iccc].cnt_text = 1; m.cells[iaaa][iccc].last_min = 5;
-    m.cells[iaaa][0].cnt_text = 1;    m.cells[iaaa][0].last_min = 5;
+    eset(m, iaaa, ibbb, 1, 5);
+    eset(m, iaaa, iccc, 1, 5);
+    eset(m, iaaa, 0, 1, 5);
 
     uint8_t out[2];
     uint8_t n = nbrHearers(m, iaaa, 5, out, 2);
@@ -468,13 +559,13 @@ void test_exclusive_rows_per_concept_43_example(void)
 
     const uint16_t now = 10;
     // AAA wird von 93 und BBB gehoert.
-    m.cells[iaaa][0].cnt_text = 40;    m.cells[iaaa][0].last_min = now;
-    m.cells[iaaa][ibbb].cnt_text = 9;  m.cells[iaaa][ibbb].last_min = now;
+    eset(m, iaaa, 0, 40, now);
+    eset(m, iaaa, ibbb, 9, now);
     // BBB wird von 93 und AAA gehoert.
-    m.cells[ibbb][0].cnt_text = 7;     m.cells[ibbb][0].last_min = now;
-    m.cells[ibbb][iaaa].cnt_text = 9;  m.cells[ibbb][iaaa].last_min = now;
+    eset(m, ibbb, 0, 7, now);
+    eset(m, ibbb, iaaa, 9, now);
     // CCC wird nur von 93 gehoert.
-    m.cells[iccc][0].cnt_text = 5;     m.cells[iccc][0].last_min = now;
+    eset(m, iccc, 0, 5, now);
 
     uint8_t out[8];
     int n = nbrExclusive(m, now, out, 8);
@@ -482,7 +573,7 @@ void test_exclusive_rows_per_concept_43_example(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)iccc, out[0]);
 
     // BBB wiederholt jetzt auch CCC -> CCC ist nicht mehr exklusiv.
-    m.cells[iccc][ibbb].cnt_text = 3; m.cells[iccc][ibbb].last_min = now;
+    eset(m, iccc, ibbb, 3, now);
     n = nbrExclusive(m, now, out, 8);
     TEST_ASSERT_EQUAL_INT(0, n);
 
@@ -520,7 +611,7 @@ void test_mesh_need_answers_the_opposite_question_from_exclusive(void)
     // BBB hoert CCC jetzt auch mit -> AAA ist nicht mehr die einzige Deckung
     // fuer CCC, AAAs Meshen ist nicht mehr noetig. Das <verdict> (Sicht auf
     // CCC als Gehoerten) bleibt davon unberuehrt -- andere Frage.
-    m.cells[iccc][ibbb].cnt_text = 1; m.cells[iccc][ibbb].last_min = now;
+    eset(m, iccc, ibbb, 1, now);
     TEST_ASSERT_EQUAL_STRING("RED", nbrRowMeshNeed(m, iaaa, now));
 }
 
@@ -536,8 +627,7 @@ void test_reach_haversine_distance_and_partner(void)
     nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 5);
     nbrNotePos(m, "OE1AAA-1", 48.14f, 11.58f, false, 0, 5);   // Muenchen
     int iaaa = nbrFind(m, "OE1AAA-1");
-    m.cells[iaaa][0].cnt_text = 1;
-    m.cells[iaaa][0].last_min = 5;   // ich habe AAA gehoert -> Verbindung fuer die Reichweite
+    eset(m, iaaa, 0, 1, 5);   // ich habe AAA gehoert -> Verbindung fuer die Reichweite
 
     int partner = -1;
     float d = nbrReach(m, 0, 10, &partner);
@@ -589,12 +679,12 @@ void test_two_hop_window_only_creates_rows_for_last_two_tokens(void)
     TEST_ASSERT_TRUE(iddd > 0);
 
     // Kanten: nur C->D und D->ich, sonst keine einzige Zelle gesetzt.
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iccc][iddd].cnt_pos);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iddd][0].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iccc, iddd));
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iddd, 0));
     int nonzero = 0;
     for (int x = 0; x < NBR_MAX_ROWS; x++)
         for (int y = 0; y < NBR_MAX_ROWS; y++)
-            if (m.cells[x][y].cnt_text || m.cells[x][y].cnt_pos || m.cells[x][y].cnt_hey)
+            if (ecnt(m, x, y))
                 nonzero++;
     TEST_ASSERT_EQUAL_INT(2, nonzero);
 }
@@ -613,8 +703,8 @@ void test_two_token_path_is_unaffected_by_the_window(void)
     int ibbb = nbrFind(m, "OE1BBB-2");
     TEST_ASSERT_TRUE(iaaa > 0);
     TEST_ASSERT_TRUE(ibbb > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ibbb][0].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb));
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ibbb, 0));
 }
 
 void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
@@ -631,7 +721,7 @@ void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
 
     int rows_before = 0;
     for (int i = 0; i < NBR_MAX_ROWS; i++)
-        if (i == 0 || (m.rows[i].flags & NBR_FLAG_USED))
+        if (i == 0 || (rflags(m, i) & NBR_FLAG_USED))
             rows_before++;
 
     // Ein spaeterer 4-Token-Pfad A,B,C,D: C,D sind das Fenster, A,B liegen
@@ -642,11 +732,11 @@ void test_rule3_edge_between_two_existing_rows_creates_no_new_row(void)
 
     int rows_after = 0;
     for (int i = 0; i < NBR_MAX_ROWS; i++)
-        if (i == 0 || (m.rows[i].flags & NBR_FLAG_USED))
+        if (i == 0 || (rflags(m, i) & NBR_FLAG_USED))
             rows_after++;
 
     TEST_ASSERT_EQUAL_INT(rows_before + 2, rows_after);   // nur C und D sind neu
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][ibbb].cnt_pos);   // A->B trotzdem eingetragen
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, ibbb));   // A->B trotzdem eingetragen
 }
 
 // --- 11: nbrNotePos() legt keine Zeile mehr an -------------------------------
@@ -665,9 +755,9 @@ void test_note_pos_unknown_call_leaves_matrix_untouched_known_call_writes(void)
     // OE1AAA-1 hat eine Zeile -> nbrNotePos() schreibt.
     nbrNotePos(m, "OE1AAA-1", 48.0f, 11.0f, true, 1, 20);
     int iaaa = nbrFind(m, "OE1AAA-1");
-    TEST_ASSERT_TRUE(m.rows[iaaa].flags & NBR_FLAG_POS);
-    TEST_ASSERT_EQUAL_FLOAT(48.0f, m.rows[iaaa].lat);
-    TEST_ASSERT_EQUAL_FLOAT(11.0f, m.rows[iaaa].lon);
+    TEST_ASSERT_TRUE(rflags(m, iaaa) & NBR_FLAG_POS);
+    TEST_ASSERT_EQUAL_FLOAT(48.0f, rview(m, iaaa).lat);
+    TEST_ASSERT_EQUAL_FLOAT(11.0f, rview(m, iaaa).lon);
     TEST_ASSERT_TRUE(memcmp(&before, &m, sizeof(m)) != 0);
 }
 
@@ -692,7 +782,7 @@ void test_hey_groups_only_apply_within_window_or_existing_rows(void)
     int iccc = nbrFind(m, "OE1CCC-3");
     int iddd = nbrFind(m, "OE1DDD-4");
     TEST_ASSERT_TRUE(iccc > 0 && iddd > 0);
-    TEST_ASSERT_EQUAL_INT8(7, m.cells[iccc][iddd].snr);   // dritte Gruppe (C->D) kam an, SNR statt RSSI
+    TEST_ASSERT_EQUAL_INT8(7, esnr(m, iccc, iddd));   // dritte Gruppe (C->D) kam an, SNR statt RSSI
 }
 
 // --- 14: Vor-Fenster-Kanten duerfen Zeilen nicht verjuengen -----------------
@@ -725,7 +815,7 @@ void test_pre_window_edge_does_not_refresh_row_age(void)
 
     // X wurde in jedem dieser Frames als Zellentreffer beruehrt, aber nie
     // als Zeile verjuengt -- die Zeile muss aus der Frische gefallen sein.
-    TEST_ASSERT_FALSE(nbrFresh(m.rows[ix].last_min, t));
+    TEST_ASSERT_FALSE(nbrFresh(rview(m, ix).last_min, t));
 }
 
 // --- 13: Log-Emitter (docs/nbr-logformat.md) ---------------------------------
@@ -874,11 +964,11 @@ void test_gateway_echo_does_not_mark_server_origin_as_directly_heard(void)
     // (FAR, ich) darf NICHT "ich habe FAR gehoert" eintragen.
     int hits = nbrNoteFrame(m, "OE3FAR-9,DK5EN-93,OE1AAA-1", '!', NULL, false, -80, 5, 6);
     TEST_ASSERT_EQUAL_INT(2, hits);                                  // (ich,AAA) + ME(AAA), nicht (FAR,ich)
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ifar][0].cnt_pos);            // FAR bleibt nicht-direkt
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[0][iaaa].cnt_pos);            // AAA hat mich gehoert
-    TEST_ASSERT_EQUAL_UINT8(3, m.cells[iaaa][0].cnt_pos);            // ich habe AAA zum dritten Mal gehoert (ME-Schritt)
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, ifar, 0));            // FAR bleibt nicht-direkt
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, 0, iaaa));            // AAA hat mich gehoert
+    TEST_ASSERT_EQUAL_UINT8(3, ecnt(m, iaaa, 0));            // ich habe AAA zum dritten Mal gehoert (ME-Schritt)
     TEST_ASSERT_EQUAL_STRING("NA", nbrRowMeshNeed(m, ifar, 6));      // FAR ist kein direkter Nachbar
-    TEST_ASSERT_EQUAL_INT(0, (int)(nbrDirectMask(m, 6) & (1u << (unsigned)ifar)));
+    TEST_ASSERT_FALSE(nbrMaskTest(nbrDirectMask(m, 6), ifar));
 }
 
 void test_eviction_prefers_two_hop_row_over_older_direct_rows(void)
@@ -922,7 +1012,7 @@ void test_mesh_need_count_is_the_number_behind_the_word(void)
     TEST_ASSERT_EQUAL_INT(2, nbrRowMeshNeedCount(m, iaaa, 10));   // CCC und DDD nur ueber AAA
     TEST_ASSERT_EQUAL_INT(0, nbrRowMeshNeedCount(m, ibbb, 10));
     TEST_ASSERT_EQUAL_STRING("MESH", nbrRowMeshNeed(m, iaaa, 10));
-    m.cells[iccc][ibbb].cnt_text = 1; m.cells[iccc][ibbb].last_min = 10;   // BBB hoert CCC auch
+    eset(m, iccc, ibbb, 1, 10);   // BBB hoert CCC auch
     TEST_ASSERT_EQUAL_INT(1, nbrRowMeshNeedCount(m, iaaa, 10));
     TEST_ASSERT_EQUAL_STRING("MESH", nbrRowMeshNeed(m, iaaa, 10));
 }
@@ -940,7 +1030,7 @@ void test_relay_need_masks_follow_concept_section_5(void)
     int ibbb = nbrFind(m, "OE1BBB-2");
     int illl = nbrFind(m, "OE1LLL-7");
     TEST_ASSERT_TRUE(iaaa > 0 && ibbb > 0 && illl > 0);
-    const uint32_t bA = 1u << (unsigned)iaaa, bB = 1u << (unsigned)ibbb, bL = 1u << (unsigned)illl;
+    const NbrMask bA = nbrMaskBit(iaaa), bB = nbrMaskBit(ibbb), bL = nbrMaskBit(illl);
     const uint16_t now = 10;
 
     // Frame von OE9ORG-1, letzter Hop AAA: AAA hat ihn (steht im Pfad).
@@ -948,55 +1038,55 @@ void test_relay_need_masks_follow_concept_section_5(void)
     // bekannt -> Fall A, beide "allein". sym=false: dieser Test bleibt rein
     // beobachtet, die Symmetrie-Annahme hat ihre eigenen Tests weiter unten.
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.need);
-    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.alone);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);
+    TEST_ASSERT_MASK_EQ(nbrMaskOr(bB, bL), r.need);
+    TEST_ASSERT_MASK_EQ(nbrMaskOr(bB, bL), r.alone);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));
 
     // BBB hat AAA gehoert (cell[AAA][BBB]): BBB hat den Frame damit
     // wahrscheinlich schon (HatF) -> faellt aus dem Bedarf.
-    m.cells[iaaa][ibbb].cnt_text = 1; m.cells[iaaa][ibbb].last_min = now;
+    eset(m, iaaa, ibbb, 1, now);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(bL, r.need);
-    TEST_ASSERT_EQUAL_UINT32(bL, r.alone);
+    TEST_ASSERT_MASK_EQ(bL, r.need);
+    TEST_ASSERT_MASK_EQ(bL, r.alone);
 
     // Frame von OE9ORG-1 ueber CCC (kein Nachbar von mir, keine Zeile),
     // BBB hat CCC nicht gehoert: BBB im Bedarf; Alternative fuer BBB ist AAA
     // nur, wenn AAA den Frame hat -- AAA steht nicht im Pfad und hat CCC
     // nicht gehoert -> BBB allein. Sobald AAA CCC gehoert hat, deckt AAA BBB.
-    m.cells[iaaa][ibbb].last_min = now; // BBB hoert AAA (Deckung), s.o.
+    eset(m, iaaa, ibbb, ecnt(m, iaaa, ibbb), now); // BBB hoert AAA (Deckung), s.o.
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.need);
-    TEST_ASSERT_EQUAL_UINT32(bA | bB | bL, r.alone);
+    TEST_ASSERT_MASK_EQ(nbrMaskOr(bA, nbrMaskOr(bB, bL)), r.need);
+    TEST_ASSERT_MASK_EQ(nbrMaskOr(bA, nbrMaskOr(bB, bL)), r.alone);
     nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", '!', NULL, false, -80, 5, now);   // AAA hat CCC gehoert
     int iccc = nbrFind(m, "OE1CCC-3");
     TEST_ASSERT_TRUE(iccc > 0);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(bB | bL, r.need);      // AAA hat den Frame (HatF), BBB und LLL nicht
-    TEST_ASSERT_EQUAL_UINT32(bL, r.alone);          // BBB erreicht AAA, LLL erreicht nur ich
+    TEST_ASSERT_MASK_EQ(nbrMaskOr(bB, bL), r.need); // AAA hat den Frame (HatF), BBB und LLL nicht
+    TEST_ASSERT_MASK_EQ(bL, r.alone);               // BBB erreicht AAA, LLL erreicht nur ich
 
     // Gateway-Ausnahme: ein Blatt mit GW-Flag bekommt den Frame vom Server.
-    m.rows[illl].flags |= NBR_FLAG_GW;
+    nbrRowSetFlag(m, illl, NBR_FLAG_GW);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(bB, r.need);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone);           // Fall B
-    m.rows[illl].flags &= (uint8_t)~NBR_FLAG_GW;
+    TEST_ASSERT_MASK_EQ(bB, r.need);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.alone));           // Fall B
+    m.row[illl].flags &= (uint8_t)~NBR_FLAG_GW;
 
     // Deckung durch eine gehoerte Wiederholung von AAA: AAAs Hoerer ist BBB
     // (cell[AAA][BBB]; dass AAA CCC gehoert hat, ist die Gegenrichtung und
     // zaehlt nicht); need & ~cover wird 0 fuer den Fall-B-Rest {BBB}. sym=false,
     // relevant=0, msg_id=0, inferred=NULL: reines Beobachtungsverhalten wie vorher.
-    uint32_t cover = nbrCoverMask(m, "OE1AAA-1", now, false, 0, 0, NULL);
-    TEST_ASSERT_EQUAL_UINT32(bB, cover);
-    TEST_ASSERT_EQUAL_UINT32(0, bB & ~cover);
-    TEST_ASSERT_EQUAL_UINT32(0, nbrCoverMask(m, "DK5EN-93", now, false, 0, 0, NULL));   // ich selbst decke nichts
-    TEST_ASSERT_EQUAL_UINT32(0, nbrCoverMask(m, "OE9ZZZ-1", now, false, 0, 0, NULL));   // unbekannt
+    NbrMask cover = nbrCoverMask(m, "OE1AAA-1", now, false, nbrMaskNone(), 0, NULL);
+    TEST_ASSERT_MASK_EQ(bB, cover);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAndNot(bB, cover)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCoverMask(m, "DK5EN-93", now, false, nbrMaskNone(), 0, NULL)));   // ich selbst decke nichts
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCoverMask(m, "OE9ZZZ-1", now, false, nbrMaskNone(), 0, NULL)));   // unbekannt
 
     // Ungueltiger Pfad: kein Wissen, keine Masken, known == false.
     r = nbrRelayNeed(m, "bad path!", now, false, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.need));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.alone));
     TEST_ASSERT_FALSE(r.known);
-    TEST_ASSERT_EQUAL_INT(2, nbrMaskCount(bB | bL));
+    TEST_ASSERT_EQUAL_INT(2, nbrMaskCount(nbrMaskOr(bB, bL)));
 
     // Gueltiger Pfad, gueltige Matrix: known == true, auch wenn need == 0
     // ("alle Abhaengigen haben den Frame") -- das ist Fall B, kein Unwissen.
@@ -1014,9 +1104,9 @@ void test_relay_need_on_empty_matrix_is_no_knowledge_not_case_b(void)
     // (Advisor-Fund 2026-09-22).
     NbrNeed r = nbrRelayNeed(e, "OE9ORG-1,OE1AAA-1", 10, false, 0);
     TEST_ASSERT_FALSE(r.known);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.need));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.alone));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));
 }
 
 void test_exclusive_direct_ignores_two_hop_hearers(void)
@@ -1032,7 +1122,7 @@ void test_exclusive_direct_ignores_two_hop_hearers(void)
     TEST_ASSERT_TRUE(iaaa > 0 && illl > 0 && iccc > 0);
     // Moment: "OE1LLL-7,OE1CCC-3" macht CCC zum letzten Hop, also direkt --
     // dafuer CCCs Direktheit wieder loeschen, damit CCC ein reiner 2-Hop-Hoerer ist.
-    memset(&m.cells[iccc][0], 0, sizeof(NbrCell));
+    edel(m, iccc, 0);
 
     uint8_t out[NBR_MAX_ROWS];
     int n_old = nbrExclusive(m, 10, out, NBR_MAX_ROWS);
@@ -1040,7 +1130,7 @@ void test_exclusive_direct_ignores_two_hop_hearers(void)
     TEST_ASSERT_EQUAL_INT(1, n_old);      // altes Urteil: nur AAA, LLL gilt als durch CCC gedeckt
     TEST_ASSERT_EQUAL_INT(2, n_new);      // Direktregel: AAA und LLL, CCCs Wiederholung hoere ich nie
     // AAA hoert LLL (direkte Deckung): LLL faellt aus E_self.
-    m.cells[illl][iaaa].cnt_text = 1; m.cells[illl][iaaa].last_min = 10;
+    eset(m, illl, iaaa, 1, 10);
     TEST_ASSERT_EQUAL_INT(1, nbrExclusiveDirect(m, 10, out, NBR_MAX_ROWS));
     TEST_ASSERT_EQUAL_INT(iaaa, out[0]);
     NbrMatrix e;
@@ -1082,26 +1172,26 @@ void test_sym_alt_fallback_makes_lone_dependent_not_alone(void)
     int iprov = nbrFind(m, "OE1PROV-1");
     int illl = nbrFind(m, "OE1LLL-7");
     TEST_ASSERT_TRUE(iaaa > 0 && iprov > 0 && illl > 0);
-    const uint32_t bL = 1u << (unsigned)illl;
+    const NbrMask bL = nbrMaskBit(illl);
     const uint16_t now = 10;
 
     // "PROV hat LLL gehoert" (die Beobachtung fuer den ALT-Fallback): cells[LLL][PROV].
-    m.cells[illl][iprov].cnt_hey = 1; m.cells[illl][iprov].last_min = now; m.cells[illl][iprov].snr = 6;
+    eset(m, illl, iprov, 1, now, 6);
 
     test_log_reset();
     nbrLog = test_log_capture;
 
     // sym=false: unveraendertes Verhalten, X bleibt allein, keine Annahme.
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0x99);
-    TEST_ASSERT_TRUE((r.alone & bL) != 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));
     TEST_ASSERT_NULL(strstr(g_log_buf, "|SYM|"));
 
     // sym=true: die Annahme greift, X ist nicht mehr allein.
     test_log_reset();
     r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, true, 0x99);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone & bL);
-    TEST_ASSERT_TRUE((r.inferred & bL) != 0);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bL)));
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|SYM|10|00000099|ALT|OE1LLL-7|OE1PROV-1|6\n"));
 
     nbrLog = NULL;
@@ -1115,22 +1205,22 @@ void test_sym_threshold_is_inclusive_at_minus_16(void)
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int illl = nbrFind(m, "OE1LLL-7");
-    const uint32_t bL = 1u << (unsigned)illl;
+    const NbrMask bL = nbrMaskBit(illl);
     const uint16_t now = 10;
 
     // Genau an der Schwelle (NBR_SYM_MIN_SNR == -16, Vergleich einschliesslich):
     // die Annahme greift.
-    m.cells[illl][iaaa].cnt_hey = 1; m.cells[illl][iaaa].last_min = now;
-    m.cells[illl][iaaa].snr = NBR_SYM_MIN_SNR;
+    eset(m, illl, iaaa, 1, now);
+    m.edge[nbrIEdgeFind(m, illl, iaaa)].snr = NBR_SYM_MIN_SNR;
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, true, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone & bL);
-    TEST_ASSERT_TRUE((r.inferred & bL) != 0);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bL)));
 
     // Ein dB darunter: die Annahme greift NICHT mehr, X bleibt allein.
-    m.cells[illl][iaaa].snr = (int8_t)(NBR_SYM_MIN_SNR - 1);
+    m.edge[nbrIEdgeFind(m, illl, iaaa)].snr = (int8_t)(NBR_SYM_MIN_SNR - 1);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, true, 0);
-    TEST_ASSERT_TRUE((r.alone & bL) != 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bL);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bL)));
 }
 
 void test_sym_observed_edge_present_skips_inference_and_log(void)
@@ -1141,19 +1231,19 @@ void test_sym_observed_edge_present_skips_inference_and_log(void)
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int illl = nbrFind(m, "OE1LLL-7");
-    const uint32_t bL = 1u << (unsigned)illl;
+    const NbrMask bL = nbrMaskBit(illl);
     const uint16_t now = 10;
 
     // LLL hat AAA BEOBACHTET gehoert (cell[AAA][LLL]) -- das reicht schon
     // fuer eine Alternative, unabhaengig von sym; die Annahme darf hier gar
     // nicht erst gebraucht werden.
-    m.cells[iaaa][illl].cnt_text = 1; m.cells[iaaa][illl].last_min = now;
+    eset(m, iaaa, illl, 1, now);
 
     test_log_reset();
     nbrLog = test_log_capture;
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, true, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.alone & bL);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);   // keine Annahme, es war Beobachtung
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));   // keine Annahme, es war Beobachtung
     TEST_ASSERT_NULL(strstr(g_log_buf, "|SYM|"));
     nbrLog = NULL;
 }
@@ -1166,7 +1256,7 @@ void test_sym_unknown_snr_on_reverse_cell_gives_no_inference(void)
     nbrNoteFrame(m, "OE1LLL-7", ':', NULL, false, -80, 5, 5);
     int iaaa = nbrFind(m, "OE1AAA-1");
     int illl = nbrFind(m, "OE1LLL-7");
-    const uint32_t bL = 1u << (unsigned)illl;
+    const NbrMask bL = nbrMaskBit(illl);
     const uint16_t now = 10;
 
     // "AAA hat LLL gehoert" ist gesetzt und frisch (ein Text-Frame ohne
@@ -1174,12 +1264,12 @@ void test_sym_unknown_snr_on_reverse_cell_gives_no_inference(void)
     // nbrInit()/nbrFillUnknownSnr() und nbrHitCell(), das die Zaehler
     // erhoeht, ohne snr anzufassen). Die Annahme darf daraus NICHTS
     // folgern, auch mit sym=true nicht.
-    m.cells[illl][iaaa].cnt_text = 1; m.cells[illl][iaaa].last_min = now;
-    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, m.cells[illl][iaaa].snr);
+    eset(m, illl, iaaa, 1, now);
+    TEST_ASSERT_EQUAL_INT8(NBR_SNR_UNKNOWN, esnr(m, illl, iaaa));
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, true, 0);
-    TEST_ASSERT_TRUE((r.alone & bL) != 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.alone, bL)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));
 }
 
 void test_sym_hasf_fallback_removes_dependent_from_need(void)
@@ -1191,23 +1281,23 @@ void test_sym_hasf_fallback_removes_dependent_from_need(void)
     int ippp = nbrFind(m, "OE1PPP-1");
     int ixxx = nbrFind(m, "OE1XXX-9");
     TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0);
-    const uint32_t bX = 1u << (unsigned)ixxx;
+    const NbrMask bX = nbrMaskBit(ixxx);
     const uint16_t now = 10;
 
     // "P hat X gehoert" (Beobachtung fuer den HASF-Fallback): cells[X][P].
-    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+    eset(m, ixxx, ippp, 1, now, -5);
 
     test_log_reset();
     nbrLog = test_log_capture;
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, false, 0x77);
-    TEST_ASSERT_TRUE((r.need & bX) != 0);         // sym=false: X bleibt im Bedarf
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));         // sym=false: X bleibt im Bedarf
+    TEST_ASSERT_TRUE(nbrMaskEmpty(r.inferred));
 
     test_log_reset();
     r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0x77);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);     // sym=true: die Annahme deckt X, need faellt weg
-    TEST_ASSERT_TRUE((r.inferred & bX) != 0);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));     // sym=true: die Annahme deckt X, need faellt weg
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|SYM|10|00000077|HASF|OE1XXX-9|OE1PPP-1|-5\n"));
 
     nbrLog = NULL;
@@ -1230,18 +1320,18 @@ void test_sym_hasf_inferred_node_is_no_provider(void)
     int ixxx = nbrFind(m, "OE1XXX-9");
     int iyyy = nbrFind(m, "OE1YYY-3");
     TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0 && iyyy > 0);
-    const uint32_t bX = 1u << (unsigned)ixxx;
-    const uint32_t bY = 1u << (unsigned)iyyy;
+    const NbrMask bX = nbrMaskBit(ixxx);
+    const NbrMask bY = nbrMaskBit(iyyy);
     const uint16_t now = 10;
 
-    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;  // P hat X gehoert
-    m.cells[ixxx][iyyy].cnt_text = 1; m.cells[ixxx][iyyy].last_min = now;                               // Y hat X gehoert
+    eset(m, ixxx, ippp, 1, now, -5);  // P hat X gehoert
+    eset(m, ixxx, iyyy, 1, now);                               // Y hat X gehoert
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0x55);
-    TEST_ASSERT_TRUE((r.inferred & bX) != 0);      // X per HASF angenommen
-    TEST_ASSERT_TRUE((r.need & bY) != 0);
-    TEST_ASSERT_TRUE((r.alone & bY) != 0);         // X versorgt Y NICHT
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bY);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));      // X per HASF angenommen
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.need, bY)));
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.alone, bY)));         // X versorgt Y NICHT
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bY)));
 }
 
 void test_cover_mask_symmetry_fallback_respects_relevant_for_logging(void)
@@ -1256,30 +1346,31 @@ void test_cover_mask_symmetry_fallback_respects_relevant_for_logging(void)
     const uint16_t now = 10;
 
     // "M hat X gehoert" (Beobachtung fuer den Fallback): cells[X][M].
-    m.cells[ix][im].cnt_hey = 1; m.cells[ix][im].last_min = now; m.cells[ix][im].snr = -12;
+    eset(m, ix, im, 1, now, -12);
 
     // sym=false: keine Erweiterung, *inferred bleibt 0.
-    uint32_t inferred = 0xFFFFFFFF;
-    uint32_t cover = nbrCoverMask(m, "OE1MMM-1", now, false, 0, 0, &inferred);
-    TEST_ASSERT_EQUAL_UINT32(0, cover & (1u << (unsigned)ix));
-    TEST_ASSERT_EQUAL_UINT32(0, inferred);
+    NbrMask inferred;
+    memset(&inferred, 0xFF, sizeof(inferred));
+    NbrMask cover = nbrCoverMask(m, "OE1MMM-1", now, false, nbrMaskNone(), 0, &inferred);
+    TEST_ASSERT_FALSE(nbrMaskTest(cover, ix));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(inferred));
 
     // sym=true, relevant OHNE X: die Maske wird trotzdem erweitert (der
     // Aufrufer braucht sie fuer die eigentliche Abzugsrechnung), aber es
     // erscheint KEINE SYM-COVER-Zeile -- relevant filtert nur das Log.
     test_log_reset();
     nbrLog = test_log_capture;
-    inferred = 0;
-    cover = nbrCoverMask(m, "OE1MMM-1", now, true, 0, 0xAB, &inferred);
-    TEST_ASSERT_TRUE((cover & (1u << (unsigned)ix)) != 0);
-    TEST_ASSERT_TRUE((inferred & (1u << (unsigned)ix)) != 0);
+    inferred = nbrMaskNone();
+    cover = nbrCoverMask(m, "OE1MMM-1", now, true, nbrMaskNone(), 0xAB, &inferred);
+    TEST_ASSERT_TRUE(nbrMaskTest(cover, ix));
+    TEST_ASSERT_TRUE(nbrMaskTest(inferred, ix));
     TEST_ASSERT_NULL(strstr(g_log_buf, "|SYM|"));
 
     // sym=true, relevant MIT X: dieselbe Maske, jetzt mit SYM-COVER-Zeile.
     test_log_reset();
-    inferred = 0;
-    cover = nbrCoverMask(m, "OE1MMM-1", now, true, (1u << (unsigned)ix), 0xAB, &inferred);
-    TEST_ASSERT_TRUE((cover & (1u << (unsigned)ix)) != 0);
+    inferred = nbrMaskNone();
+    cover = nbrCoverMask(m, "OE1MMM-1", now, true, nbrMaskBit(ix), 0xAB, &inferred);
+    TEST_ASSERT_TRUE(nbrMaskTest(cover, ix));
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|SYM|10|000000AB|COVER|OE1XXX-9|OE1MMM-1|-12\n"));
 
     nbrLog = NULL;
@@ -1289,11 +1380,11 @@ void test_cover_mask_symmetry_fallback_respects_relevant_for_logging(void)
 
 void test_nbr_row_size_and_sym_threshold_unchanged_by_the_new_field(void)
 {
-    // NbrRow bleibt bei 24 Byte: rpt_min fuellt die 2-Byte-Ausrichtungsluecke
-    // zwischen call[10] und dem folgenden float lat (siehe Struct-Kommentar
-    // in nbr_matrix.h) -- kein zusaetzlicher RAM-Bedarf trotz drittem
-    // Report-Feld. Wird hier gemessen statt nur behauptet.
-    TEST_ASSERT_EQUAL_UINT32(24, (unsigned)sizeof(NbrRow));
+    // Welle 2 (Konzept 4.1): Zeilenkern 12 Byte, Kante 6 Byte, beide ohne
+    // Fuellung; das Rufzeichen liegt als eigenes 64-Bit-Wort daneben. Wird
+    // hier gemessen statt nur behauptet (static_assert in nbr_matrix.cpp).
+    TEST_ASSERT_EQUAL_UINT32(12, (unsigned)sizeof(NbrRow));
+    TEST_ASSERT_EQUAL_UINT32(6, (unsigned)sizeof(NbrEdge));
 
     // NBR_SYM_MIN_SNR zieht seinen Wert jetzt von LORA_SNR_STABLE_MIN_DB
     // (configuration_default.h) statt einer eigenen Kopie der -16.
@@ -1362,7 +1453,7 @@ void test_build_report_unknown_snr_excluded(void)
     int iaaa = nbrFind(m, "OE1AAA-1");
     // Zelle bleibt "gesetzt" (Zaehler > 0), SNR wird gezielt auf unbekannt
     // zurueckgesetzt -- eine Zelle mit Beobachtung, aber ohne Signalbericht.
-    m.cells[iaaa][0].snr = NBR_SNR_UNKNOWN;
+    m.edge[nbrIEdgeFind(m, iaaa, 0)].snr = NBR_SNR_UNKNOWN;
 
     char buf[160];
     int n = nbrBuildReport(m, 0, 1, buf, sizeof(buf));
@@ -1443,10 +1534,10 @@ void test_note_report_applies_full_spec_example(void)
         "R12;N5;DL2JA-2,7;DB0ISM-1,5;DK5EN-98,-8;DB0ED-99,-11;DL2UD-1,-12;", 50);
     TEST_ASSERT_EQUAL_INT(2, applied);   // DL2JA-2 (ok) + DK5EN-98 (self); die drei uebrigen sind norow
 
-    TEST_ASSERT_EQUAL_INT8(7, m.cells[idja][isend].snr);    // "OE1SEND-1 hat DL2JA-2 gehoert"
-    TEST_ASSERT_EQUAL_INT8(-8, m.cells[0][isend].snr);      // "OE1SEND-1 hat mich gehoert"
-    TEST_ASSERT_TRUE(m.rows[isend].flags & NBR_FLAG_RPT);   // kein '+' -> vollstaendig
-    TEST_ASSERT_EQUAL_UINT16(50, m.rows[isend].rpt_min);
+    TEST_ASSERT_EQUAL_INT8(7, esnr(m, idja, isend));    // "OE1SEND-1 hat DL2JA-2 gehoert"
+    TEST_ASSERT_EQUAL_INT8(-8, esnr(m, 0, isend));      // "OE1SEND-1 hat mich gehoert"
+    TEST_ASSERT_TRUE(rflags(m, isend) & NBR_FLAG_RPT);   // kein '+' -> vollstaendig
+    TEST_ASSERT_EQUAL_UINT16(50, rview(m, isend).rpt_min);
 
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DL2JA-2|7|ok\n"));
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|RPT|50|OE1SEND-1|DB0ISM-1|5|norow\n"));
@@ -1526,24 +1617,24 @@ void test_sym_veto_blocks_inference_when_report_is_complete_and_fresh(void)
     int ippp = nbrFind(m, "OE1PPP-1");
     int ixxx = nbrFind(m, "OE1XXX-9");
     TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0);
-    const uint32_t bX = 1u << (unsigned)ixxx;
+    const NbrMask bX = nbrMaskBit(ixxx);
     const uint16_t now = 100;
 
     // "P hat X gehoert" (die Beobachtung, die sonst den HASF-Fallback traegt).
-    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+    eset(m, ixxx, ippp, 1, now, -5);
 
     // X hat vor 10 min einen VOLLSTAENDIGEN HN-Bericht gesendet, der P nicht
     // enthielt (kein cells[ippp][ixxx] gesetzt -- sonst waere es der direkte
     // Beobachtungszweig, keine Annahme noetig).
-    m.rows[ixxx].flags |= NBR_FLAG_RPT;
-    m.rows[ixxx].rpt_min = (uint16_t)(now - 10);
+    nbrRowSetFlag(m, ixxx, NBR_FLAG_RPT);
+    m.row[ixxx].rpt_min = (uint16_t)(now - 10);
 
     test_log_reset();
     nbrLog = test_log_capture;
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0x42);
-    TEST_ASSERT_TRUE((r.need & bX) != 0);          // X bleibt im Bedarf: keine Annahme
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);  // <-- schlaegt ohne den Fix fehl
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));          // X bleibt im Bedarf: keine Annahme
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));  // <-- schlaegt ohne den Fix fehl
     TEST_ASSERT_NOT_NULL(strstr(g_log_buf, "[NBR]|SYM|100|00000042|VETO|OE1XXX-9|OE1PPP-1|-5\n"));
     TEST_ASSERT_NULL(strstr(g_log_buf, "|HASF|"));
 
@@ -1558,17 +1649,17 @@ void test_sym_veto_does_not_apply_to_a_truncated_report(void)
     nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, 5);
     int ippp = nbrFind(m, "OE1PPP-1");
     int ixxx = nbrFind(m, "OE1XXX-9");
-    const uint32_t bX = 1u << (unsigned)ixxx;
+    const NbrMask bX = nbrMaskBit(ixxx);
     const uint16_t now = 100;
 
-    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
+    eset(m, ixxx, ippp, 1, now, -5);
 
     // Bericht war ABGESCHNITTEN ('+'): NBR_FLAG_RPT bewusst NICHT gesetzt.
-    m.rows[ixxx].rpt_min = (uint16_t)(now - 10);
+    m.row[ixxx].rpt_min = (uint16_t)(now - 10);
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);
-    TEST_ASSERT_TRUE((r.inferred & bX) != 0);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));
 }
 
 void test_sym_veto_expires_after_valid_window(void)
@@ -1584,23 +1675,23 @@ void test_sym_veto_expires_after_valid_window(void)
     nbrNoteFrame(m, "OE1XXX-9", ':', NULL, false, -80, 5, now);
     int ippp = nbrFind(m, "OE1PPP-1");
     int ixxx = nbrFind(m, "OE1XXX-9");
-    const uint32_t bX = 1u << (unsigned)ixxx;
+    const NbrMask bX = nbrMaskBit(ixxx);
 
-    m.cells[ixxx][ippp].cnt_hey = 1; m.cells[ixxx][ippp].last_min = now; m.cells[ixxx][ippp].snr = -5;
-    m.rows[ixxx].flags |= NBR_FLAG_RPT;
+    eset(m, ixxx, ippp, 1, now, -5);
+    nbrRowSetFlag(m, ixxx, NBR_FLAG_RPT);
 
     // Genau innerhalb der Grenze (NBR_REPORT_VALID_MIN == 45): Veto greift noch.
-    m.rows[ixxx].rpt_min = (uint16_t)(now - (NBR_REPORT_VALID_MIN - 1));
+    m.row[ixxx].rpt_min = (uint16_t)(now - (NBR_REPORT_VALID_MIN - 1));
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
-    TEST_ASSERT_TRUE((r.need & bX) != 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));
 
     // Genau NBR_REPORT_VALID_MIN alt: Grenze exklusiv (ueberlaufsicherer
     // Vergleich wie nbrFresh()) -- die Annahme darf wieder greifen.
-    m.rows[ixxx].rpt_min = (uint16_t)(now - NBR_REPORT_VALID_MIN);
+    m.row[ixxx].rpt_min = (uint16_t)(now - NBR_REPORT_VALID_MIN);
     r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);
-    TEST_ASSERT_TRUE((r.inferred & bX) != 0);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));
+    TEST_ASSERT_FALSE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));
 }
 
 void test_sym_veto_report_listing_m_is_observed_not_inferred(void)
@@ -1615,19 +1706,19 @@ void test_sym_veto_report_listing_m_is_observed_not_inferred(void)
     int ippp = nbrFind(m, "OE1PPP-1");
     int ixxx = nbrFind(m, "OE1XXX-9");
     TEST_ASSERT_TRUE(ippp > 0 && ixxx > 0);
-    const uint32_t bX = 1u << (unsigned)ixxx;
+    const NbrMask bX = nbrMaskBit(ixxx);
     const uint16_t now = 100;
 
     int applied = nbrNoteReport(m, "OE1XXX-9", "R1;N1;OE1PPP-1,6;", now);
     TEST_ASSERT_EQUAL_INT(1, applied);
-    TEST_ASSERT_TRUE(m.rows[ixxx].flags & NBR_FLAG_RPT);
+    TEST_ASSERT_TRUE(rflags(m, ixxx) & NBR_FLAG_RPT);
 
     test_log_reset();
     nbrLog = test_log_capture;
 
     NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1PPP-1", now, true, 0);
-    TEST_ASSERT_EQUAL_UINT32(0, r.need & bX);      // X gilt als versorgt: HatF via echter Beobachtung
-    TEST_ASSERT_EQUAL_UINT32(0, r.inferred & bX);  // keine Annahme -- es war Beobachtung
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.need, bX)));      // X gilt als versorgt: HatF via echter Beobachtung
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrMaskAnd(r.inferred, bX)));  // keine Annahme -- es war Beobachtung
     TEST_ASSERT_NULL(strstr(g_log_buf, "|SYM|"));  // weder HASF/ALT noch VETO
 
     nbrLog = NULL;
@@ -1661,9 +1752,9 @@ void test_report_round_trip_build_then_note(void)
 
     int applied = nbrNoteReport(b, "OE1SEND-1", payload, 100);
     TEST_ASSERT_EQUAL_INT(2, applied);
-    TEST_ASSERT_EQUAL_INT8(7, b.cells[iaaa][isend].snr);
-    TEST_ASSERT_EQUAL_INT8(-3, b.cells[ibbb][isend].snr);
-    TEST_ASSERT_TRUE(b.rows[isend].flags & NBR_FLAG_RPT);
+    TEST_ASSERT_EQUAL_INT8(7, esnr(b, iaaa, isend));
+    TEST_ASSERT_EQUAL_INT8(-3, esnr(b, ibbb, isend));
+    TEST_ASSERT_TRUE(rflags(b, isend) & NBR_FLAG_RPT);
 }
 
 // --- 15: Text nimmt keinen Pfadpaar-Pfad mehr (Gateway-Einspeisung) --------
@@ -1685,7 +1776,7 @@ void test_text_frame_creates_only_me_row_not_the_injecting_path(void)
     TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE1XAR-33"));   // Server-Token bekommt keine Zeile
     int idja = nbrFind(m, "DL2JA-2");
     TEST_ASSERT_TRUE(idja > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[idja][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, idja, 0));
 }
 
 void test_pos_frame_same_path_still_creates_the_pair_edge(void)
@@ -1703,7 +1794,7 @@ void test_pos_frame_same_path_still_creates_the_pair_edge(void)
     int idja = nbrFind(m, "DL2JA-2");
     TEST_ASSERT_TRUE(ixar > 0);
     TEST_ASSERT_TRUE(idja > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ixar][idja].cnt_pos);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ixar, idja));
 }
 
 void test_text_frame_with_three_tokens_touches_only_the_last_hop(void)
@@ -1734,13 +1825,13 @@ void test_text_frame_with_three_tokens_touches_only_the_last_hop(void)
 
     int ib = nbrFind(m, "OE1BBB-2");
     TEST_ASSERT_TRUE(ib > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[ib][0].cnt_text);
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ib, 0));
 
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[ia][igw].cnt_text);   // keine Regel-3-Gratis-Kante
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[igw][ib].cnt_text);   // keine Fenster-Kante
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, ia, igw));   // keine Regel-3-Gratis-Kante
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, igw, ib));   // keine Fenster-Kante
 
-    TEST_ASSERT_EQUAL_UINT16(10, m.rows[ia].last_min);       // A nicht verjuengt
-    TEST_ASSERT_EQUAL_UINT16(10, m.rows[igw].last_min);      // GW nicht verjuengt
+    TEST_ASSERT_EQUAL_UINT16(10, rview(m, ia).last_min);       // A nicht verjuengt
+    TEST_ASSERT_EQUAL_UINT16(10, rview(m, igw).last_min);      // GW nicht verjuengt
 }
 
 void test_text_frame_with_own_call_as_last_hop_is_still_a_pure_echo(void)
@@ -1772,8 +1863,8 @@ void test_text_echo_of_my_own_frame_marks_no_hears_me_edge(void)
     TEST_ASSERT_EQUAL_INT(1, hits);
     int iaaa = nbrFind(m, "OE1AAA-1");
     TEST_ASSERT_TRUE(iaaa > 0);
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);   // ich habe AAA gehoert
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);   // keine "AAA hoert mich"-Kante aus Text
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, 0));   // ich habe AAA gehoert
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, 0, iaaa));   // keine "AAA hoert mich"-Kante aus Text
 }
 
 void test_gateway_echo_text_gives_far_origin_no_row(void)
@@ -1789,8 +1880,365 @@ void test_gateway_echo_text_gives_far_origin_no_row(void)
     TEST_ASSERT_EQUAL_INT(1, hits);
     TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "OE3FAR-9"));
     int iaaa = nbrFind(m, "OE1AAA-1");
-    TEST_ASSERT_EQUAL_UINT8(1, m.cells[iaaa][0].cnt_text);
-    TEST_ASSERT_EQUAL_UINT8(0, m.cells[0][iaaa].cnt_text);
+    // Welle 2: ein Zaehler ueber alle Typen -- der POS-Treffer von oben plus
+    // dieser ME-Treffer (frueher cnt_text == 1 neben cnt_pos == 1).
+    TEST_ASSERT_EQUAL_UINT8(2, ecnt(m, iaaa, 0));
+    TEST_ASSERT_EQUAL_UINT8(0, ecnt(m, 0, iaaa));
+}
+
+// --- Welle 2: Kantenpool, Rufzeichenwort, Anteilsregel, Halbierung, SNR ----
+
+void test_call_word_round_trip_and_invalid_calls(void)
+{
+    const char *ok[] = {"DK5EN-98", "OE1XAR-62", "ABC", "DB0ED-99", "9A1-0"};
+    for (unsigned i = 0; i < sizeof(ok) / sizeof(ok[0]); i++)
+    {
+        uint64_t w = nbrCallEncode(ok[i]);
+        TEST_ASSERT_TRUE(w != 0);
+        char back[NBR_CALL_LEN];
+        nbrCallDecode(w, back);
+        TEST_ASSERT_EQUAL_STRING(ok[i], back);
+    }
+    // Zeichen 1 in Bit 0..5, 'A' = 11, '0' = 1, '-' = 37.
+    uint64_t w = nbrCallEncode("A0-");
+    TEST_ASSERT_EQUAL_UINT32(11u, (unsigned)(w & 63u));
+    TEST_ASSERT_EQUAL_UINT32(1u, (unsigned)((w >> 6) & 63u));
+    TEST_ASSERT_EQUAL_UINT32(37u, (unsigned)((w >> 12) & 63u));
+    TEST_ASSERT_EQUAL_UINT32(0u, (unsigned)(w >> 18));
+
+    TEST_ASSERT_TRUE(nbrCallEncode("AB") == 0);            // 2 Zeichen
+    TEST_ASSERT_TRUE(nbrCallEncode("ABCDEFGHIJ") == 0);    // 10 Zeichen
+    TEST_ASSERT_TRUE(nbrCallEncode("DK5EN-98X9") == 0);    // 10 Zeichen
+    TEST_ASSERT_TRUE(nbrCallEncode("dk5en-98") == 0);      // Kleinbuchstaben
+    TEST_ASSERT_TRUE(nbrCallEncode("DK5EN/P") == 0);       // '/'
+    TEST_ASSERT_TRUE(nbrCallEncode("") == 0);
+    TEST_ASSERT_TRUE(nbrCallEncode(NULL) == 0);
+    char empty[NBR_CALL_LEN];
+    nbrCallDecode(0, empty);
+    TEST_ASSERT_EQUAL_STRING("", empty);
+
+    // Die Suche ist ein Wortvergleich: ungueltige Rufzeichen finden nichts.
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    TEST_ASSERT_EQUAL_INT(0, nbrFind(m, "DK5EN-93"));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(m, "dk5en-93"));
+    TEST_ASSERT_TRUE(nbrOwnCallIs(m, "DK5EN-93"));
+    TEST_ASSERT_FALSE(nbrOwnCallIs(m, "DK5EN-94"));
+}
+
+void test_mask_hex_is_fixed_width_most_significant_first(void)
+{
+    NbrMask mk = nbrMaskNone();
+    nbrMaskSet(mk, 1);
+    nbrMaskSet(mk, 4);
+    char buf[NBR_MASK_HEX_LEN + 1];
+    TEST_ASSERT_EQUAL_INT(NBR_MASK_HEX_LEN, nbrMaskHex(mk, buf, sizeof(buf)));
+    char expect[NBR_MASK_HEX_LEN + 1];
+    memset(expect, '0', NBR_MASK_HEX_LEN);
+    expect[NBR_MASK_HEX_LEN] = '\0';
+    expect[NBR_MASK_HEX_LEN - 1] = '2';
+    expect[NBR_MASK_HEX_LEN - 2] = '1';
+    TEST_ASSERT_EQUAL_STRING(expect, buf);
+}
+
+// Nie initialisierte Matrix (BSS, alles 0): jede Funktion sieht "leer" --
+// kein Eintrag (0,0) gilt als Kante, der Sweep tut nichts, nichts wird
+// geschrieben (Orchestrator-Hinweis Welle 2: Sweep und Leser laufen ab Boot,
+// nbrInit() erst beim ersten Empfang).
+void test_never_initialised_matrix_reads_as_empty(void)
+{
+    static NbrMatrix z;
+    memset(&z, 0, sizeof(z));
+    static NbrMatrix before;
+    memcpy(&before, &z, sizeof(z));
+
+    test_log_reset();
+    nbrLog = test_log_capture;
+
+    nbrSweep(z, 100);
+    nbrSweep(z, 900);
+    NbrRowView v;
+    TEST_ASSERT_FALSE(nbrRowGet(z, 0, &v));
+    TEST_ASSERT_FALSE(nbrRowGet(z, 1, &v));
+    TEST_ASSERT_EQUAL_INT(1, nbrRowsUsed(z));
+    TEST_ASSERT_EQUAL_INT(0, nbrEdgesUsed(z));
+    NbrEdgeView ev;
+    TEST_ASSERT_FALSE(nbrEdgeGet(z, 0, 0, &ev));
+    TEST_ASSERT_FALSE(nbrEdgeGet(z, 1, 0, &ev));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrDirectMask(z, 100)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrHeardMeMask(z, 100)));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrHearersMask(z, 0, 100)));
+    TEST_ASSERT_EQUAL_UINT8(0, nbrHearers(z, 0, 100, NULL, 0));
+    TEST_ASSERT_EQUAL_INT(-1, nbrExclusive(z, 100, NULL, 0));
+    TEST_ASSERT_EQUAL_INT(-1, nbrExclusiveDirect(z, 100, NULL, 0));
+    TEST_ASSERT_EQUAL_INT(-1, nbrFind(z, "DK5EN-93"));
+    TEST_ASSERT_FALSE(nbrOwnCallIs(z, "DK5EN-93"));
+    NbrNeed r = nbrRelayNeed(z, "OE1AAA-1,OE1BBB-2", 100, true, 1);
+    TEST_ASSERT_FALSE(r.known);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(nbrCoverMask(z, "OE1AAA-1", 100, true, nbrMaskNone(), 1, NULL)));
+    char buf[160];
+    TEST_ASSERT_EQUAL_INT(0, nbrFormatRow(z, 0, 100, buf, sizeof(buf)));
+    TEST_ASSERT_TRUE(nbrBuildReport(z, 100, 0, buf, sizeof(buf)) > 0);
+    TEST_ASSERT_EQUAL_STRING("R0;N0;", buf);
+    TEST_ASSERT_EQUAL_INT(0, nbrNoteFrame(z, "OE1AAA-1,OE1BBB-2", '!', NULL, false, -80, 5, 100));
+    nbrNotePos(z, "OE1AAA-1", 48.0f, 11.0f, true, 1, 100);
+    TEST_ASSERT_EQUAL_INT(0, nbrNoteReport(z, "OE1AAA-1", "R1;N0;", 100));
+
+    nbrLogSnapshot(z, 100);
+    char expect[64];
+    snprintf(expect, sizeof(expect), "[NBR]|SNAP|100||1|%d|0\n", (int)NBR_MAX_ROWS);
+    TEST_ASSERT_NOT_NULL(strstr(g_log_buf, expect));
+    TEST_ASSERT_NULL(strstr(g_log_buf, "EVICT"));
+    TEST_ASSERT_NULL(strstr(g_log_buf, "|EDGE|"));
+    nbrLog = NULL;
+
+    TEST_ASSERT_EQUAL_INT(0, memcmp(&before, &z, sizeof(z)));   // nichts geschrieben
+}
+
+void test_row_eviction_frees_edges_and_clears_mask_bits(void)
+{
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, 5, 10);            // aelteste
+    nbrNoteFrame(m, "OE1BBB-2,OE1AAA-1", '!', NULL, false, -80, 5, 11);   // Kante (BBB, AAA)
+    nbrNoteFrame(m, "OE1AAA-1,OE1CCC-3", '!', NULL, false, -80, 5, 12);   // Kante (AAA, CCC)
+    nbrNoteFrame(m, "DK5EN-93,OE1DDD-4", '!', NULL, false, -80, 5, 13);   // Kante (0, DDD)
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_TRUE(ecnt(m, ibbb, iaaa) > 0 && ecnt(m, iaaa, iccc) > 0 && ecnt(m, iaaa, 0) > 0);
+    TEST_ASSERT_TRUE(nbrMaskTest(m.heardBy[ibbb], iaaa));
+    TEST_ASSERT_TRUE(nbrMaskTest(m.hears[iccc], iaaa));
+    int before = nbrEdgesUsed(m);
+
+    // Alle vier direkt gehoert, darum waehlt erst der zweite Durchgang: die
+    // aelteste Zeile weicht. AAA ist hier juenger als BBB -- das Opfer ist
+    // die Zeile mit der groessten Altersluecke.
+    nbrNoteFrame(m, "OE1EEE-5", ':', NULL, false, -80, 5, 20);
+    int ieee = nbrFind(m, "OE1EEE-5");
+    TEST_ASSERT_TRUE(ieee > 0);
+    int victim = ieee;
+    // Keine Kante beruehrt mehr den alten Inhaber; seine Bits sind weg.
+    for (int r = 0; r < NBR_MAX_ROWS; r++)
+    {
+        if (r == 0)
+            continue;   // (EEE, 0) ist die neue ME-Kante
+        TEST_ASSERT_FALSE(nbrMaskTest(m.hears[r], victim));
+        TEST_ASSERT_FALSE(nbrMaskTest(m.heardBy[victim], r));
+        TEST_ASSERT_FALSE(nbrMaskTest(m.heardBy[r], victim));
+        TEST_ASSERT_FALSE(nbrMaskTest(m.hears[victim], r));
+    }
+    TEST_ASSERT_TRUE(masks_match_pool(m));
+    TEST_ASSERT_TRUE(nbrEdgesUsed(m) < before + 1);
+}
+
+// Anteilsregel (nbr_matrix.h, Konzept 4.3): "M deckt x" erst ab
+// NBR_SHARE_PCT Prozent des staerksten direkten Hoerers von x, Grenze
+// einschliesslich. In dieser Umgebung gilt der Produktionswert 10.
+void test_share_rule_one_hit_against_fifty_does_not_cover(void)
+{
+#if NBR_SHARE_PCT == 10
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    const uint16_t now = 10;
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, now);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, now);
+    nbrNoteFrame(m, "OE1CCC-3,OE1AAA-1", '!', NULL, false, -80, 5, now);   // CCC: 2-Hop ueber AAA
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    int iccc = nbrFind(m, "OE1CCC-3");
+    TEST_ASSERT_TRUE(iaaa > 0 && ibbb > 0 && iccc > 0);
+
+    eset(m, iccc, iaaa, 50, now);   // AAA hoert CCC 50-mal
+    eset(m, iccc, ibbb, 1, now);    // BBB hoert CCC einmal (Streutreffer)
+    NbrMask set;
+    TEST_ASSERT_EQUAL_INT(1, nbrRowMeshNeedCount(m, iaaa, now));   // CCC gehoert AAA allein
+    TEST_ASSERT_EQUAL_INT(1, nbrRowMeshNeedSet(m, iaaa, now, &set));
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(iccc), set);
+    TEST_ASSERT_EQUAL_INT(0, nbrRowMeshNeedCount(m, ibbb, now));   // BBBs 1 von 50 ist keine Deckung
+
+    eset(m, iccc, ibbb, 4, now);    // 4 von 50 = 8 %: noch keine Deckung
+    TEST_ASSERT_EQUAL_INT(1, nbrRowMeshNeedCount(m, iaaa, now));
+    eset(m, iccc, ibbb, 5, now);    // 5 von 50 = 10 %: Grenze einschliesslich
+    TEST_ASSERT_EQUAL_INT(0, nbrRowMeshNeedCount(m, iaaa, now));
+    TEST_ASSERT_EQUAL_INT(0, nbrRowMeshNeedCount(m, ibbb, now));   // BBB deckt CCC jetzt, AAA aber auch
+
+    // Deckung durch eine gehoerte Wiederholung von AAA: Kante (AAA, Y) = "Y
+    // hat AAA gehoert", normiert auf AAAs staerksten direkten Hoerer.
+    nbrNoteFrame(m, "OE1DDD-4", ':', NULL, false, -80, 5, now);
+    int iddd = nbrFind(m, "OE1DDD-4");
+    TEST_ASSERT_TRUE(iddd > 0);
+    eset(m, iaaa, ibbb, 50, now);
+    eset(m, iaaa, iddd, 1, now);
+    NbrMask cover = nbrCoverMask(m, "OE1AAA-1", now, false, nbrMaskNone(), 0, NULL);
+    TEST_ASSERT_MASK_EQ(nbrMaskBit(ibbb), cover);
+    // Allein-Maske: Frame ueber CCC. AAA hat CCC gehoert (HatF) und ist
+    // damit Versorger; DDD braucht den Frame, hoert AAA aber nur 1-mal gegen
+    // AAAs staerksten direkten Hoerer BBB mit 50 -> keine Alternative, DDD
+    // bleibt allein (Fall A).
+    NbrNeed r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
+    TEST_ASSERT_TRUE(nbrMaskTest(r.need, iddd));
+    TEST_ASSERT_TRUE(nbrMaskTest(r.alone, iddd));
+    eset(m, iaaa, iddd, 5, now);    // 10 %: AAA versorgt DDD
+    cover = nbrCoverMask(m, "OE1AAA-1", now, false, nbrMaskNone(), 0, NULL);
+    TEST_ASSERT_MASK_EQ(mbits(ibbb, iddd), cover);
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1CCC-3", now, false, 0);
+    TEST_ASSERT_TRUE(nbrMaskTest(r.need, iddd));
+    TEST_ASSERT_FALSE(nbrMaskTest(r.alone, iddd));
+    // HatF bleibt die blosse Kante: mit AAA im Pfad hat DDD den Frame schon
+    // mit einem einzigen Treffer (need, nicht Anteil).
+    eset(m, iaaa, iddd, 1, now);
+    r = nbrRelayNeed(m, "OE9ORG-1,OE1AAA-1", now, false, 0);
+    TEST_ASSERT_FALSE(nbrMaskTest(r.need, iddd));
+#else
+    TEST_IGNORE_MESSAGE("NBR_SHARE_PCT != 10 in dieser Umgebung");
+#endif
+}
+
+void test_counter_halving_in_sweep(void)
+{
+#if NBR_CNT_HALVE_MIN == 90
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 5, 10);
+    nbrNoteFrame(m, "OE1BBB-2", ':', NULL, false, -80, 5, 10);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    int ibbb = nbrFind(m, "OE1BBB-2");
+    eset(m, iaaa, ibbb, 255, 80);
+    eset(m, ibbb, iaaa, 3, 80);
+    eset(m, iaaa, 0, 1, 80);
+    eset(m, ibbb, 0, 2, 80);
+
+    nbrSweep(m, 89);   // 89 min seit nbrInit(): noch nicht
+    TEST_ASSERT_EQUAL_UINT8(255, ecnt(m, iaaa, ibbb));
+    nbrSweep(m, 90);
+    TEST_ASSERT_EQUAL_UINT8(128, ecnt(m, iaaa, ibbb));   // (255+1)/2
+    TEST_ASSERT_EQUAL_UINT8(2, ecnt(m, ibbb, iaaa));     // (3+1)/2
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, iaaa, 0));        // faellt nie auf 0
+    TEST_ASSERT_EQUAL_UINT8(1, ecnt(m, ibbb, 0));
+    nbrSweep(m, 90);   // zweiter Aufruf in derselben Minute: nichts
+    TEST_ASSERT_EQUAL_UINT8(128, ecnt(m, iaaa, ibbb));
+    nbrSweep(m, 179);
+    TEST_ASSERT_EQUAL_UINT8(128, ecnt(m, iaaa, ibbb));
+    nbrSweep(m, 180);
+    TEST_ASSERT_EQUAL_UINT8(64, ecnt(m, iaaa, ibbb));
+    // Der Sweep gibt ausserdem Kanten ueber NBR_WINDOW_MIN frei.
+    nbrSweep(m, 80 + NBR_WINDOW_MIN);
+    TEST_ASSERT_EQUAL_INT(0, nbrEdgesUsed(m));
+    TEST_ASSERT_TRUE(masks_match_pool(m));
+#else
+    TEST_IGNORE_MESSAGE("NBR_CNT_HALVE_MIN != 90 in dieser Umgebung");
+#endif
+}
+
+void test_me_snr_is_a_running_mean(void)
+{
+#if NBR_SNR_AVG_N == 8
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 0);
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 0, 10);   // erster Wert: der Wert
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_EQUAL_INT8(0, esnr(m, iaaa, 0));
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 8, 10);   // n = 2: (0 + 8) / 2
+    TEST_ASSERT_EQUAL_INT8(4, esnr(m, iaaa, 0));
+    nbrNoteFrame(m, "OE1AAA-1", '!', NULL, false, -80, -8, 11);  // n = 3: 4 - 12/3
+    TEST_ASSERT_EQUAL_INT8(0, esnr(m, iaaa, 0));
+    for (int i = 0; i < 30; i++)
+        nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, 10, 12);
+    TEST_ASSERT_EQUAL_INT8(10, esnr(m, iaaa, 0));                  // ein gleichbleibender Wert wird erreicht
+    // Nicht (x, 0): der zuletzt gemeldete Wert, kein Mittel.
+    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '@', "R1;3,90,7;", false, -80, 5, 13);
+    TEST_ASSERT_EQUAL_INT8(7, esnr(m, 0, iaaa));
+    nbrNoteFrame(m, "DK5EN-93,OE1AAA-1", '@', "R1;3,90,-3;", false, -80, 5, 13);
+    TEST_ASSERT_EQUAL_INT8(-3, esnr(m, 0, iaaa));
+    // Ein verfallener Wert faengt neu an: erster Wert = der Wert.
+    nbrNoteFrame(m, "OE1AAA-1", ':', NULL, false, -80, -20, (uint16_t)(13 + NBR_WINDOW_MIN));
+    TEST_ASSERT_EQUAL_INT8(-20, esnr(m, iaaa, 0));
+#else
+    TEST_IGNORE_MESSAGE("NBR_SNR_AVG_N != 8 in dieser Umgebung");
+#endif
+}
+
+// Frische kommt aus der Kantenminute, nicht aus dem Sweep: zwei Matrizen mit
+// denselben Rahmen, eine jede Minute gesweept, eine nie, liefern dieselben
+// Urteile. Die Halbierung (die NUR der Sweep ausfuehrt) ist hier per
+// last_halve festgehalten; ohne sie unterscheidet die beiden nur, ob
+// verfallene Kanten noch im Pool stehen.
+void test_decisions_do_not_depend_on_the_sweep(void)
+{
+    static NbrMatrix a, b;
+    nbrInit(a, "DK5EN-93", 0);
+    nbrInit(b, "DK5EN-93", 0);
+    const char *frames[] = {"OE1AAA-1", "OE1BBB-2,OE1AAA-1", "DK5EN-93,OE1BBB-2", "OE1CCC-3,OE1BBB-2",
+                            "OE1AAA-1,OE1CCC-3", "OE1DDD-4"};
+    const char types[] = {'!', '!', '@', '!', '!', ':'};
+    const int nf = 6;
+    for (uint16_t t = 1; t < 1600; t++)
+    {
+        a.last_halve = t;   // Halbierung aus (siehe Kommentar)
+        nbrSweep(a, t);
+        int f = -1;
+        if (t < 200 && t % 7 == 0)
+            f = (t / 7) % nf;               // alle Kanten frisch
+        else if (t >= 1000 && t % 50 == 0)
+            f = (t / 50) % 3;               // nach > 720 min Pause nur noch ein Teil
+        if (f >= 0)
+        {
+            nbrNoteFrame(a, frames[f], types[f], "R1;3,90,-5;", false, -80, (int8_t)(t % 11 - 5), t);
+            nbrNoteFrame(b, frames[f], types[f], "R1;3,90,-5;", false, -80, (int8_t)(t % 11 - 5), t);
+        }
+        if (t % 37 == 0)
+        {
+            TEST_ASSERT_MASK_EQ(nbrDirectMask(b, t), nbrDirectMask(a, t));
+            TEST_ASSERT_MASK_EQ(nbrHeardMeMask(b, t), nbrHeardMeMask(a, t));
+            for (int row = 0; row < NBR_MAX_ROWS; row++)
+            {
+                TEST_ASSERT_EQUAL_INT(nbrRowMeshNeedCount(b, row, t), nbrRowMeshNeedCount(a, row, t));
+                TEST_ASSERT_MASK_EQ(nbrHearersMask(b, row, t), nbrHearersMask(a, row, t));
+                TEST_ASSERT_EQUAL_UINT8(nbrHearers(b, row, t, NULL, 0), nbrHearers(a, row, t, NULL, 0));
+            }
+            uint8_t oa[NBR_MAX_ROWS], ob[NBR_MAX_ROWS];
+            TEST_ASSERT_EQUAL_INT(nbrExclusive(b, t, ob, NBR_MAX_ROWS), nbrExclusive(a, t, oa, NBR_MAX_ROWS));
+            TEST_ASSERT_EQUAL_INT(nbrExclusiveDirect(b, t, ob, NBR_MAX_ROWS), nbrExclusiveDirect(a, t, oa, NBR_MAX_ROWS));
+            for (int f2 = 0; f2 < nf; f2++)
+            {
+                NbrNeed ra = nbrRelayNeed(a, frames[f2], t, true, 0);
+                NbrNeed rb = nbrRelayNeed(b, frames[f2], t, true, 0);
+                TEST_ASSERT_EQUAL(rb.known, ra.known);
+                TEST_ASSERT_MASK_EQ(rb.need, ra.need);
+                TEST_ASSERT_MASK_EQ(rb.alone, ra.alone);
+                TEST_ASSERT_MASK_EQ(rb.inferred, ra.inferred);
+            }
+            char ba[160], bb[160];
+            TEST_ASSERT_EQUAL_INT(nbrBuildReport(b, t, 1, bb, sizeof(bb)), nbrBuildReport(a, t, 1, ba, sizeof(ba)));
+            TEST_ASSERT_EQUAL_STRING(bb, ba);
+        }
+    }
+    // Der Sweep hat tatsaechlich aufgeraeumt, ohne ihn stehen verfallene Kanten.
+    TEST_ASSERT_TRUE(nbrEdgesUsed(a) < nbrEdgesUsed(b));
+    TEST_ASSERT_TRUE(masks_match_pool(a));
+    TEST_ASSERT_TRUE(masks_match_pool(b));
+}
+
+// Advisor Welle 2, Befund A: eine HEY-Gruppe fuer das Paar (x, ich) ist mein
+// eigener frueherer Empfang von x, als Echo zurueck. Sie darf das laufende
+// SNR-Mittel der Kante (x, 0) nicht ueberschreiben. Vor dem Fix: -20.
+static void test_echoed_hey_group_leaves_me_snr_mean_alone(void)
+{
+#if NBR_SNR_AVG_N > 1
+    NbrMatrix m;
+    nbrInit(m, "DK5EN-93", 300);
+    for (int i = 0; i < 8; i++)
+        nbrNoteFrame(m, "OE1AAA-1", '!', "", false, -70, 10, 300);
+    int iaaa = nbrFind(m, "OE1AAA-1");
+    TEST_ASSERT_TRUE(iaaa > 0);
+    TEST_ASSERT_EQUAL_INT8(10, esnr(m, iaaa, 0));
+
+    nbrNoteFrame(m, "OE1AAA-1,DK5EN-93,OE1BBB-2", '@', "R5;3,97,-20;4,101,3;", false, -60, 5, 301);
+    TEST_ASSERT_EQUAL_INT8(10, esnr(m, iaaa, 0));
+#else
+    TEST_IGNORE_MESSAGE("NBR_SNR_AVG_N == 1: Gruppe ueberschreibt wie in der dichten Matrix");
+#endif
 }
 
 int main(int, char **)
@@ -1860,5 +2308,14 @@ int main(int, char **)
     RUN_TEST(test_text_frame_with_own_call_as_last_hop_is_still_a_pure_echo);
     RUN_TEST(test_text_echo_of_my_own_frame_marks_no_hears_me_edge);
     RUN_TEST(test_gateway_echo_text_gives_far_origin_no_row);
+    RUN_TEST(test_call_word_round_trip_and_invalid_calls);
+    RUN_TEST(test_mask_hex_is_fixed_width_most_significant_first);
+    RUN_TEST(test_never_initialised_matrix_reads_as_empty);
+    RUN_TEST(test_row_eviction_frees_edges_and_clears_mask_bits);
+    RUN_TEST(test_share_rule_one_hit_against_fifty_does_not_cover);
+    RUN_TEST(test_counter_halving_in_sweep);
+    RUN_TEST(test_me_snr_is_a_running_mean);
+    RUN_TEST(test_decisions_do_not_depend_on_the_sweep);
+    RUN_TEST(test_echoed_hey_group_leaves_me_snr_mean_alone);
     return UNITY_END();
 }

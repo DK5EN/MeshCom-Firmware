@@ -2,11 +2,12 @@
 // replay harness that feeds a real field capture (DK5EN-98, cold boot
 // 2026-09-23 20:02:19 through 2026-09-24 09:28, firmware 8487ea2a -- see
 // ASSUMPTION 2 below for how the fixture was assembled from two raw days)
-// through the CURRENT dense neighbour matrix
-// (src/nbr_matrix.{h,cpp}) and checks that it reproduces the capture's
-// [NBR] lines. This is the regression instrument for the upcoming rewrite
-// of nbr_matrix into an edge pool: run the SAME fixture through the old and
-// the new code and diff the two "actual" streams against each other.
+// through the neighbour matrix and checks that it reproduces the capture's
+// [NBR] lines. Wave 1 wrote it against the dense matrix; since wave 2 the
+// dense code lives on as a frozen reference (reference/nbr_matrix_dense.*)
+// and the harness runs the SAME fixture through it and through the edge
+// pool (src/nbr_matrix.cpp) and diffs the two "actual" streams -- see
+// "Wave 2: differential harness" below.
 //
 // test_build_src=no (env native_nbr_replay, platformio.ini): the source
 // comes in by #include, same pattern as test/test_nbr_matrix/test_nbr_matrix.cpp.
@@ -206,40 +207,115 @@
 // set while still turning every POS line into a real, compared assertion
 // instead of an input copied from the fixture's own answer.
 //
-// --- Seam for a wave-2 differential test (nbr_matrix.cpp vs. an edge-pool
-// rewrite) -- NBR_MATRIX_SRC below, per orchestrator instruction: make the
-// seam, do not build the frozen copy or the differential test here. -------
+// --- Wave 2: differential harness (dense reference vs. edge pool) -----------
 //
-// A future env points NBR_MATRIX_SRC at a second implementation (build_flags
-// `-D NBR_MATRIX_SRC='"path/to/edge_pool.cpp"'`) and builds this SAME file a
-// second time in its own pio env -- two binaries, not one process linking
-// both (nbrNoteFrame() et al. are free functions; two implementations can't
-// share a translation unit under the same names). run_replay() needs no
-// change either way: it only calls the named functions/globals the macro's
-// target provides (NbrMatrix, nbrInit, nbrNoteFrame, nbrNotePos,
-// nbrRelayNeed, nbrCoverMask, nbrLogSnapshot, nbrBuildReport, nbrLog,
-// NBR_FLAG_*, NbrNeed, NBR_MAX_ROWS), so a same-shaped edge-pool
-// implementation is a drop-in. Each build's ReplayResult.groups (flattened
-// to its own expected/actual streams) is the artifact a wave-2 test dumps
-// and diffs against the other build's -- not implemented here.
+// The frozen dense implementation (886080c4, test/test_nbr_replay/reference/)
+// and the edge pool (src/nbr_matrix.cpp) are compiled into THIS binary, each
+// in its own namespace: `dense` (always 21 rows, the S3 build that produced
+// the capture) and `edge` (the env's NBR_MAX_ROWS/EDGES and rules). The
+// production envs (NBR_REPLAY_PRODUCTION) add two more copies of the edge
+// pool with rules switched off -- `edge_noshare` (NBR_SHARE_PCT 0) and
+// `edge_norules` (additionally NBR_CNT_HALVE_MIN 0, NBR_SNR_AVG_N 1) -- which
+// only exist to attribute each dense/production difference to a cause.
+// run_replay<Adapter>() drives any of them through the same fixture; the
+// adapters below hide the two APIs (uint32 masks and rows[]/cells[] vs.
+// NbrMask and accessors). nbr_matrix.cpp never calls one of its own public
+// functions internally, which is what makes it includable in a namespace.
+//
+// Tests:
+//   compat env (native_nbr_replay: 21 rows, share 0, no halving, SNR last
+//   value, 441 edges = never full):
+//     B  dense vs. edge (no sweep), line for line over every group, after
+//        only two normalisations: EDGE/ME <cnt> blanked (one counter vs.
+//        per-type counters), mask hex compared on its low 32 bits.
+//     S  edge swept every minute vs. edge never swept: identical, after
+//        blanking SNAP <cells> (stale edges stay in the pool without sweep).
+//     the wave-1 capture comparison (DECISION mode, 0 mismatches from up 180)
+//        on the edge run.
+//   production envs (64/128 rows, share 10 %, halving 90 min, SNR mean 8,
+//   swept every minute like the firmware):
+//     C  every decision that differs from dense (NEED case/need/alone,
+//        ROW verdict/meshneed, E_self), with a category; OTHER must be 0;
+//        the DB0ED-99/DB0FHR-12 check from concept 4.3.
+//     D  NbrMask operations on the upper rows.
 
 #include <unity.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
 
+#include "configuration_default.h"
+#include "nbr_matrix.h"   // global types: NbrMatrix, NbrMask, ... (env rows)
+
+// Dense reference, always 21 rows (it cannot be anything else: its masks are
+// uint32 and nbrBit() drops every index >= 32).
+#define NBR_DENSE_ROWS 21
+#pragma push_macro("NBR_MAX_ROWS")
+#undef NBR_MAX_ROWS
+#define NBR_MAX_ROWS NBR_DENSE_ROWS
+#define NBR_DENSE_REFERENCE_TU 1
+namespace dense
+{
+#include "reference/nbr_matrix_dense.cpp"
+}
+#undef NBR_DENSE_REFERENCE_TU
+#pragma pop_macro("NBR_MAX_ROWS")
+
 #ifndef NBR_MATRIX_SRC
 #define NBR_MATRIX_SRC "../../src/nbr_matrix.cpp"
 #endif
+
+namespace edge
+{
 #include NBR_MATRIX_SRC
+}
+
+#ifndef NBR_REPLAY_PRODUCTION
+// The nRF52 path of the SYM lines (recorded under the clamp, printed after
+// it) on the host: same rules, NBR_DEFER_LOG forced on. B runs it too.
+#undef NBR_DEFER_LOG
+#undef NBR_GEN_BUMP
+#define NBR_DEFER_LOG 1
+namespace edge_deferred
+{
+#include NBR_MATRIX_SRC
+}
+#undef NBR_DEFER_LOG
+#undef NBR_GEN_BUMP
+#endif
+
+#ifdef NBR_REPLAY_PRODUCTION
+#pragma push_macro("NBR_SHARE_PCT")
+#pragma push_macro("NBR_CNT_HALVE_MIN")
+#pragma push_macro("NBR_SNR_AVG_N")
+#undef NBR_SHARE_PCT
+#define NBR_SHARE_PCT 0
+namespace edge_noshare
+{
+#include NBR_MATRIX_SRC
+}
+#undef NBR_CNT_HALVE_MIN
+#define NBR_CNT_HALVE_MIN 0
+#undef NBR_SNR_AVG_N
+#define NBR_SNR_AVG_N 1
+namespace edge_norules
+{
+#include NBR_MATRIX_SRC
+}
+#pragma pop_macro("NBR_SNR_AVG_N")
+#pragma pop_macro("NBR_CNT_HALVE_MIN")
+#pragma pop_macro("NBR_SHARE_PCT")
+#endif
 
 // --- fixture location, same pattern as test_command_toggles.cpp ------------
 
@@ -284,6 +360,11 @@ static std::string repo_root()
     }
     TEST_FAIL_MESSAGE("could not locate repo root from __FILE__ or cwd");
     return std::string();
+}
+
+static std::string fixture_path()
+{
+    return repo_root() + "/test/test_nbr_replay/fixtures/dk5en98-20260923-boot.txt";
 }
 
 // --- small string helpers ---------------------------------------------------
@@ -425,10 +506,6 @@ struct LogFrame
     bool decoded;
 };
 
-// Returns false (leaving *err set) on a line this parser cannot make sense
-// of -- the caller reports that as a hard failure rather than skipping it
-// silently, since tools/nbr_replay_extract.py already filtered to lines
-// that are supposed to have this exact shape.
 static bool parse_log_line(const std::string &line, LogFrame &out, std::string &err)
 {
     size_t p = line.find("[LOG] ");
@@ -514,12 +591,300 @@ static void capture_cb(const char *line)
         g_capture->push_back(std::string(line));
 }
 
+// --- harness-side row set: up to 128 rows, whatever the implementation -----
+
+struct HMask
+{
+    uint64_t w[2];
+};
+
+static HMask hm_none()
+{
+    HMask m;
+    m.w[0] = m.w[1] = 0;
+    return m;
+}
+
+static bool hm_test(const HMask &m, int i)
+{
+    return i >= 0 && i < 128 && ((m.w[i >> 6] >> (i & 63)) & 1u);
+}
+
+static bool hm_empty(const HMask &m)
+{
+    return m.w[0] == 0 && m.w[1] == 0;
+}
+
+static HMask hm_andnot(const HMask &a, const HMask &b)
+{
+    HMask r;
+    r.w[0] = a.w[0] & ~b.w[0];
+    r.w[1] = a.w[1] & ~b.w[1];
+    return r;
+}
+
+static HMask hm_and(const HMask &a, const HMask &b)
+{
+    HMask r;
+    r.w[0] = a.w[0] & b.w[0];
+    r.w[1] = a.w[1] & b.w[1];
+    return r;
+}
+
+static HMask hm_from32(uint32_t v)
+{
+    HMask m = hm_none();
+    m.w[0] = v;
+    return m;
+}
+
+static HMask hm_from(const NbrMask &n)
+{
+    HMask m = hm_none();
+    for (int i = 0; i < NBR_MASK_WORDS && i < 2; i++)
+        m.w[i] = n.w[i];
+    return m;
+}
+
+static NbrMask hm_to(const HMask &h)
+{
+    NbrMask n = nbrMaskNone();
+    for (int i = 0; i < NBR_MASK_WORDS && i < 2; i++)
+        n.w[i] = h.w[i];
+    return n;
+}
+
+// Hex of any width (8 digits from the dense code, 16/32 from nbrMaskHex())
+// back into a set; most significant digit first.
+static HMask hm_parse_hex(const std::string &hex)
+{
+    HMask m = hm_none();
+    int bit = 0;
+    for (int i = (int)hex.size() - 1; i >= 0 && bit < 128; i--, bit += 4)
+    {
+        char c = hex[i];
+        unsigned v = (c >= '0' && c <= '9') ? (unsigned)(c - '0')
+                   : (c >= 'A' && c <= 'F') ? (unsigned)(c - 'A' + 10)
+                   : (c >= 'a' && c <= 'f') ? (unsigned)(c - 'a' + 10) : 0u;
+        m.w[bit >> 6] |= (uint64_t)v << (bit & 63);
+    }
+    return m;
+}
+
+typedef std::unordered_map<int, std::string> IdxToCall;
+
+// Sorted, comma-joined callsigns for the bits set in mask, "-" if none, an
+// unknown index rendered as "?<idx>" rather than silently dropped.
+static std::string mask_to_names(const HMask &mask, const IdxToCall &idx_to_call)
+{
+    std::vector<std::string> names;
+    for (int i = 0; i < 128; i++)
+    {
+        if (!hm_test(mask, i))
+            continue;
+        IdxToCall::const_iterator it = idx_to_call.find(i);
+        if (it != idx_to_call.end())
+            names.push_back(it->second);
+        else
+        {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "?%d", i);
+            names.push_back(buf);
+        }
+    }
+    std::sort(names.begin(), names.end());
+    std::string out;
+    for (size_t i = 0; i < names.size(); i++)
+    {
+        if (i)
+            out += ",";
+        out += names[i];
+    }
+    return out.empty() ? "-" : out;
+}
+
+// --- adapters ------------------------------------------------------------------
+
+struct NeedRes
+{
+    HMask need, alone, inferred;
+    bool known;
+};
+
+struct DenseA
+{
+    typedef dense::NbrMatrix Mat;
+    static const char *name() { return "dense"; }
+    static void set_log(void (*fn)(const char *)) { dense::nbrLog = fn; }
+    static bool own_is(const Mat &m, const char *c) { return strcmp(m.rows[0].call, c) == 0; }
+    static void init(Mat &m, const char *c, uint16_t t) { dense::nbrInit(m, c, t); }
+    static void set_gw0(Mat &m) { m.rows[0].flags |= NBR_FLAG_GW; }
+    static void sweep(Mat &, uint16_t) {}
+    static void note_frame(Mat &m, const LogFrame &fr, bool dest_gw)
+    {
+        dense::nbrNoteFrame(m, fr.path.c_str(), fr.type, fr.payload.c_str(), dest_gw, fr.rssi, fr.snr, fr.now_min);
+    }
+    static void note_pos(Mat &m, const char *call, float lat, float lon, bool mesh, uint8_t hw, uint16_t t)
+    {
+        dense::nbrNotePos(m, call, lat, lon, mesh, hw, t);
+    }
+    static HMask cover(const Mat &m, const char *relayer, uint16_t t, bool sym, const HMask &relevant,
+                       uint32_t msgid, HMask *inferred)
+    {
+        uint32_t inf = 0;
+        uint32_t r = dense::nbrCoverMask(m, relayer, t, sym, (uint32_t)relevant.w[0], msgid, inferred ? &inf : NULL);
+        if (inferred)
+            *inferred = hm_from32(inf);
+        return hm_from32(r);
+    }
+    static NeedRes need(const Mat &m, const char *path, uint16_t t, bool sym, uint32_t msgid)
+    {
+        dense::NbrNeed r = dense::nbrRelayNeed(m, path, t, sym, msgid);
+        NeedRes o;
+        o.need = hm_from32(r.need);
+        o.alone = hm_from32(r.alone);
+        o.inferred = hm_from32(r.inferred);
+        o.known = r.known;
+        return o;
+    }
+    static void snapshot(const Mat &m, uint16_t t) { dense::nbrLogSnapshot(m, t); }
+    static int build_report(const Mat &m, uint16_t t, int heard, char *out, size_t n)
+    {
+        return dense::nbrBuildReport(m, t, heard, out, n);
+    }
+    static std::string mask_hex(const HMask &h)
+    {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%08X", (unsigned)(uint32_t)h.w[0]);
+        return buf;
+    }
+    static IdxToCall idx_to_call(const Mat &m)
+    {
+        IdxToCall t;
+        t[0] = m.rows[0].call;
+        for (int i = 1; i < NBR_DENSE_ROWS; i++)
+            if (m.rows[i].flags & NBR_FLAG_USED)
+                t[i] = m.rows[i].call;
+        return t;
+    }
+    static HMask eself(const Mat &m, uint16_t t)
+    {
+        uint8_t out[NBR_DENSE_ROWS];
+        int n = dense::nbrExclusiveDirect(m, t, out, NBR_DENSE_ROWS);
+        HMask r = hm_none();
+        for (int i = 0; i < n && i < NBR_DENSE_ROWS; i++)
+            r.w[0] |= (uint64_t)1 << out[i];
+        return r;
+    }
+    // #X of a row and the set behind it; the dense code has only the count.
+    static int meshneed(const Mat &m, const char *call, uint16_t t, HMask *set)
+    {
+        *set = hm_none();
+        int row = dense::nbrFind(m, call);
+        if (row < 0)
+            return -2;
+        return dense::nbrRowMeshNeedCount(m, row, t);
+    }
+};
+
+#define EDGE_ADAPTER(NAME, NS)                                                                            \
+    struct NAME                                                                                           \
+    {                                                                                                     \
+        typedef ::NbrMatrix Mat;                                                                          \
+        static const char *name() { return #NS; }                                                         \
+        static void set_log(void (*fn)(const char *)) { NS::nbrLog = fn; }                                \
+        static bool own_is(const Mat &m, const char *c) { return NS::nbrOwnCallIs(m, c); }                \
+        static void init(Mat &m, const char *c, uint16_t t) { NS::nbrInit(m, c, t); }                     \
+        static void set_gw0(Mat &m) { NS::nbrRowSetFlag(m, 0, NBR_FLAG_GW); }                             \
+        static void sweep(Mat &m, uint16_t t) { NS::nbrSweep(m, t); }                                     \
+        static void note_frame(Mat &m, const LogFrame &fr, bool dest_gw)                                  \
+        {                                                                                                 \
+            NS::nbrNoteFrame(m, fr.path.c_str(), fr.type, fr.payload.c_str(), dest_gw, fr.rssi, fr.snr,  \
+                             fr.now_min);                                                                 \
+        }                                                                                                 \
+        static void note_pos(Mat &m, const char *call, float lat, float lon, bool mesh, uint8_t hw,       \
+                             uint16_t t)                                                                  \
+        {                                                                                                 \
+            NS::nbrNotePos(m, call, lat, lon, mesh, hw, t);                                               \
+        }                                                                                                 \
+        static HMask cover(const Mat &m, const char *relayer, uint16_t t, bool sym, const HMask &relevant, \
+                           uint32_t msgid, HMask *inferred)                                               \
+        {                                                                                                 \
+            NbrMask inf = nbrMaskNone();                                                                  \
+            NbrMask r = NS::nbrCoverMask(m, relayer, t, sym, hm_to(relevant), msgid, inferred ? &inf : NULL); \
+            if (inferred)                                                                                 \
+                *inferred = hm_from(inf);                                                                 \
+            return hm_from(r);                                                                            \
+        }                                                                                                 \
+        static NeedRes need(const Mat &m, const char *path, uint16_t t, bool sym, uint32_t msgid)         \
+        {                                                                                                 \
+            NbrNeed r = NS::nbrRelayNeed(m, path, t, sym, msgid);                                         \
+            NeedRes o;                                                                                    \
+            o.need = hm_from(r.need);                                                                     \
+            o.alone = hm_from(r.alone);                                                                   \
+            o.inferred = hm_from(r.inferred);                                                             \
+            o.known = r.known;                                                                            \
+            return o;                                                                                     \
+        }                                                                                                 \
+        static void snapshot(const Mat &m, uint16_t t) { NS::nbrLogSnapshot(m, t); }                      \
+        static int build_report(const Mat &m, uint16_t t, int heard, char *out, size_t n)                 \
+        {                                                                                                 \
+            return NS::nbrBuildReport(m, t, heard, out, n);                                               \
+        }                                                                                                 \
+        static std::string mask_hex(const HMask &h)                                                       \
+        {                                                                                                 \
+            char buf[NBR_MASK_HEX_LEN + 1];                                                               \
+            NS::nbrMaskHex(hm_to(h), buf, sizeof(buf));                                                   \
+            return buf;                                                                                   \
+        }                                                                                                 \
+        static IdxToCall idx_to_call(const Mat &m)                                                        \
+        {                                                                                                 \
+            IdxToCall t;                                                                                  \
+            for (int i = 0; i < NBR_MAX_ROWS; i++)                                                        \
+            {                                                                                             \
+                NbrRowView v;                                                                             \
+                if (NS::nbrRowGet(m, i, &v))                                                              \
+                    t[i] = v.call;                                                                        \
+            }                                                                                             \
+            return t;                                                                                     \
+        }                                                                                                 \
+        static HMask eself(const Mat &m, uint16_t t)                                                      \
+        {                                                                                                 \
+            uint8_t out[NBR_MAX_ROWS];                                                                    \
+            int n = NS::nbrExclusiveDirect(m, t, out, NBR_MAX_ROWS);                                      \
+            HMask r = hm_none();                                                                          \
+            for (int i = 0; i < n && i < NBR_MAX_ROWS; i++)                                               \
+                r.w[out[i] >> 6] |= (uint64_t)1 << (out[i] & 63);                                         \
+            return r;                                                                                     \
+        }                                                                                                 \
+        static int meshneed(const Mat &m, const char *call, uint16_t t, HMask *set)                       \
+        {                                                                                                 \
+            *set = hm_none();                                                                             \
+            int row = NS::nbrFind(m, call);                                                               \
+            if (row < 0)                                                                                  \
+                return -2;                                                                                \
+            NbrMask s;                                                                                    \
+            int n = NS::nbrRowMeshNeedSet(m, row, t, &s);                                                 \
+            *set = hm_from(s);                                                                            \
+            return n;                                                                                     \
+        }                                                                                                 \
+    };
+
+EDGE_ADAPTER(EdgeA, edge)
+#ifndef NBR_REPLAY_PRODUCTION
+EDGE_ADAPTER(EdgeDeferredA, edge_deferred)
+#endif
+#ifdef NBR_REPLAY_PRODUCTION
+EDGE_ADAPTER(EdgeNoShareA, edge_noshare)
+EDGE_ADAPTER(EdgeNoRulesA, edge_norules)
+#endif
+
 // --- Stufe-2 ring model (see file header comment) ---------------------------
 
 struct RingEntry
 {
-    uint32_t need;
-    uint32_t alone;
+    HMask need;
+    HMask alone;
     bool active;
     bool counted;
 };
@@ -528,41 +893,30 @@ static const char *OWN_CALL = "DK5EN-98";
 static const bool BNBRSYM = true;
 static const bool BGATEWAY = true;
 
+// The row the concept 4.3 check is about, and the station it should carry.
+static const char *PROBE_CALL = "DB0ED-99";
+__attribute__((unused)) static const char *PROBE_EXCL = "DB0FHR-12";
+
 // --- trigger groups (see ASSUMPTION 2c) -------------------------------------
-//
-// One group per [LOG] frame (its own Stufe-2 CANCEL/REFUSE/SYM, Stufe-1
-// CUT/DROP/EDGE*/EVICT*/ME/POS, and -- still the SAME group, see run_replay()
-// -- its NEED/SYM if the capture shows one for this frame's msg_id), one per
-// SNAP..ENDSNAP block, one per RPTTX. idx_to_call is a snapshot for
-// normalize_indexfree() (see below), taken once per group right after that
-// group's own row-mutating call -- see the file header comment for the
-// (documented, best-effort) timing this implies for Stufe-2 lines.
+
 struct TriggerGroup
 {
     std::string kind; // "LOG" | "SNAP" | "RPTTX"
     uint16_t up;
     std::vector<std::string> expected;
     std::vector<std::string> actual;
-    std::unordered_map<int, std::string> exp_idx_to_call;
-    std::unordered_map<int, std::string> act_idx_to_call;
+    IdxToCall exp_idx_to_call;
+    IdxToCall act_idx_to_call;
+    // Wave 2 (production envs): decisions keyed for the dense/production
+    // comparison -- "NEED|<msgid>" -> "case|need|alone" (callsign sets),
+    // "ESELF" -> callsign set; ROW verdicts are read back from `actual`.
+    std::vector<std::pair<std::string, std::string> > decisions;
+    // #X of every row at a SNAP (not a categorised decision: shown only to
+    // make the share rule's own effect visible, see test C).
+    std::vector<std::pair<std::string, std::string> > xcounts;
+    int probe_x = -3;            // #X of PROBE_CALL at this SNAP, -2 = no row, -3 = not probed
+    std::string probe_set;       // callsigns behind it ("" for the dense code)
 };
-
-static std::unordered_map<int, std::string> snapshot_actual_idx_to_call(const NbrMatrix &m)
-{
-    std::unordered_map<int, std::string> t;
-    t[0] = m.rows[0].call;
-    for (int i = 1; i < NBR_MAX_ROWS; i++)
-        if (m.rows[i].flags & NBR_FLAG_USED)
-            t[i] = m.rows[i].call;
-    return t;
-}
-
-// --- replay: fixture -> ordered TriggerGroups -------------------------------
-//
-// Kept deliberately separate from the comparison below: a later wave can
-// call run_replay() again against a different nbr_matrix.cpp (see the
-// NBR_MATRIX_SRC seam in the file header) and diff its `groups` against
-// THIS run's, without touching the comparator at all.
 
 struct ReplayResult
 {
@@ -571,7 +925,16 @@ struct ReplayResult
     long need_no_path = 0;                 // NEED lines whose msg_id had no preceding [LOG] line
 };
 
-static void run_replay(const std::string &fixture_path, ReplayResult &out)
+struct ReplayOpts
+{
+    bool sweep_each_minute = false; // call nbrSweep() once per minute like the loop task
+    bool probe = false;             // record decisions/probes per group (production envs)
+};
+
+// --- replay: fixture -> ordered TriggerGroups -------------------------------
+
+template <class A>
+static void run_replay(const std::string &fixture_path, ReplayResult &out, const ReplayOpts &opt)
 {
     std::ifstream f(fixture_path.c_str());
     if (!f.good())
@@ -580,17 +943,34 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
         return;
     }
 
-    NbrMatrix m;
-    memset(&m, 0, sizeof(m)); // rows[0].call == "" -- the lazy-init sentinel, same as a real cold matrix
+    typename A::Mat *mp = new typename A::Mat();
+    typename A::Mat &m = *mp;
+    memset(mp, 0, sizeof(*mp)); // the lazy-init sentinel, same as a real cold matrix (BSS)
+    bool inited = false;
+    uint16_t last_swept = 0;
+
+    // The loop task sweeps once a minute, whether or not frames arrive.
+    // Called before every event with that event's minute, it runs every
+    // minute in between.
+    auto advance = [&](uint16_t up) {
+        if (!opt.sweep_each_minute || !inited)
+            return;
+        uint16_t steps = (uint16_t)(up - last_swept);
+        if (steps > 2000)
+            steps = 1; // clock jump: one sweep at the new minute
+        for (uint16_t k = 1; k <= steps; k++)
+            A::sweep(m, (uint16_t)(up - steps + k));
+        last_swept = up;
+    };
 
     std::unordered_map<uint32_t, RingEntry> ring;
     std::unordered_map<uint32_t, std::string> last_path;
-    std::unordered_map<int, std::string> exp_idx_to_call; // rolling, best-effort (see TriggerGroup comment)
+    IdxToCall exp_idx_to_call; // rolling, best-effort (see TriggerGroup comment)
 
-    nbrLog = capture_cb;
+    A::set_log(capture_cb);
 
-    TriggerGroup *cur = NULL;     // group currently receiving g_capture output / stray expected lines
-    TriggerGroup *cur_log = NULL; // most recent LOG-kind group -- NEED attaches here, not to `cur`
+    TriggerGroup *cur = NULL;
+    TriggerGroup *cur_log = NULL;
 
     std::string line;
     long lineno = 0;
@@ -616,53 +996,52 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
             cur_log = cur;
             g_capture = &cur->actual;
 
-            // Decode failure (FCS:0000): logged by the firmware, never fed to
-            // the matrix -- keep the (empty) group so the trigger is counted.
+            advance(fr.now_min);
             if (!fr.decoded)
                 continue;
 
             std::string last_hop = token_last(fr.path);
             bool has_comma = fr.path.find(',') != std::string::npos;
 
-            // 1) Stufe 2 cover-check -- BEFORE lazy init/Stufe 1, same order
-            //    as lora_functions.cpp (see file header comment).
+            // 1) Stufe 2 cover-check -- BEFORE lazy init/Stufe 1.
             if (has_comma && last_hop != OWN_CALL)
             {
-                uint32_t cover_gate = nbrCoverMask(m, last_hop.c_str(), fr.now_min, BNBRSYM, 0, 0, NULL);
-                if (cover_gate != 0)
+                HMask cover_gate = A::cover(m, last_hop.c_str(), fr.now_min, BNBRSYM, hm_none(), 0, NULL);
+                if (!hm_empty(cover_gate))
                 {
                     std::unordered_map<uint32_t, RingEntry>::iterator it = ring.find(fr.msg_id);
                     if (it != ring.end() && it->second.active)
                     {
                         RingEntry &e = it->second;
                         char typ = nbr_typ_char(fr.type);
-                        if (e.alone != 0)
+                        if (!hm_empty(e.alone))
                         {
                             if (!e.counted)
                             {
                                 e.counted = true;
-                                char buf[112];
-                                snprintf(buf, sizeof(buf), "[NBR]|REFUSE|%u|%08X|%c|%s|%08X",
+                                char buf[160];
+                                snprintf(buf, sizeof(buf), "[NBR]|REFUSE|%u|%08X|%c|%s|%s",
                                          (unsigned)fr.now_min, (unsigned)fr.msg_id, typ,
-                                         last_hop.c_str(), (unsigned)e.alone);
+                                         last_hop.c_str(), A::mask_hex(e.alone).c_str());
                                 cur->actual.push_back(buf);
                             }
                         }
                         else
                         {
-                            uint32_t slot_inferred = 0;
-                            uint32_t cover = nbrCoverMask(m, last_hop.c_str(), fr.now_min, BNBRSYM,
-                                                           e.need, fr.msg_id, &slot_inferred);
-                            uint32_t before = e.need;
-                            e.need &= ~cover;
-                            uint32_t after = e.need;
-                            uint32_t removed_inferred = before & ~after & slot_inferred;
-                            if (after == 0)
+                            HMask slot_inferred = hm_none();
+                            HMask cover = A::cover(m, last_hop.c_str(), fr.now_min, BNBRSYM, e.need, fr.msg_id,
+                                                   &slot_inferred);
+                            HMask before = e.need;
+                            e.need = hm_andnot(e.need, cover);
+                            HMask after = e.need;
+                            HMask removed_inferred = hm_and(hm_andnot(before, after), slot_inferred);
+                            if (hm_empty(after))
                             {
-                                char buf[112];
-                                snprintf(buf, sizeof(buf), "[NBR]|CANCEL|%u|%08X|%c|%s|%08X|%08X|%08X",
+                                char buf[224];
+                                snprintf(buf, sizeof(buf), "[NBR]|CANCEL|%u|%08X|%c|%s|%s|%s|%s",
                                          (unsigned)fr.now_min, (unsigned)fr.msg_id, typ, last_hop.c_str(),
-                                         (unsigned)before, (unsigned)after, (unsigned)removed_inferred);
+                                         A::mask_hex(before).c_str(), A::mask_hex(after).c_str(),
+                                         A::mask_hex(removed_inferred).c_str());
                                 cur->actual.push_back(buf);
                                 e.active = false;
                             }
@@ -671,38 +1050,36 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
                 }
             }
 
-            // 2) Lazy nbrInit()/GW-flag (own-position branch intentionally
-            //    skipped, see ASSUMPTION 2 in the file header comment).
-            if (strcmp(m.rows[0].call, OWN_CALL) != 0)
-                nbrInit(m, OWN_CALL, fr.now_min);
+            // 2) Lazy nbrInit()/GW-flag.
+            if (!A::own_is(m, OWN_CALL))
+            {
+                A::init(m, OWN_CALL, fr.now_min);
+                inited = true;
+                last_swept = fr.now_min;
+            }
             if (BGATEWAY)
-                m.rows[0].flags |= NBR_FLAG_GW;
+                A::set_gw0(m);
 
             // 3) Stufe 1.
             bool dest_gw = (fr.dest == "HG");
-            nbrNoteFrame(m, fr.path.c_str(), fr.type, fr.payload.c_str(), dest_gw, fr.rssi, fr.snr, fr.now_min);
+            A::note_frame(m, fr, dest_gw);
             last_path[fr.msg_id] = fr.path;
 
             if (fr.type == '!')
             {
                 DecodedPos d = decode_pos_payload(fr.payload);
                 if (d.ok)
-                    nbrNotePos(m, token_first(fr.path).c_str(), d.lat, d.lon, fr.mesh, fr.hw, fr.now_min);
+                    A::note_pos(m, token_first(fr.path).c_str(), d.lat, d.lon, fr.mesh, fr.hw, fr.now_min);
             }
 
-            // Snapshot both idx->call tables now: this group's own
-            // row-mutating calls (Stufe 1 above) are done, and nothing
-            // mutates `m` again until the NEXT [LOG] frame's own Stufe 2
-            // (see file header comment for the resulting, accepted,
-            // Stufe-2-uses-slightly-future-state approximation).
-            cur->act_idx_to_call = snapshot_actual_idx_to_call(m);
+            cur->act_idx_to_call = A::idx_to_call(m);
             cur->exp_idx_to_call = exp_idx_to_call;
         }
         else
         {
             size_t p = line.find("[NBR]|");
             if (p == std::string::npos)
-                continue; // neither a [LOG] nor an [NBR] line -- extractor should never emit this
+                continue;
             std::string nbrtext = line.substr(p);
 
             std::vector<std::string> fld = split_pipe(nbrtext);
@@ -717,9 +1094,27 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
                 cur->up = up;
                 cur->expected.push_back(nbrtext);
                 g_capture = &cur->actual;
-                nbrLogSnapshot(m, up);
-                cur->act_idx_to_call = snapshot_actual_idx_to_call(m);
-                cur->exp_idx_to_call = exp_idx_to_call; // updated below as this block's own ROW lines arrive
+                advance(up);
+                A::snapshot(m, up);
+                cur->act_idx_to_call = A::idx_to_call(m);
+                cur->exp_idx_to_call = exp_idx_to_call;
+                if (opt.probe)
+                {
+                    cur->decisions.push_back(std::make_pair(std::string("ESELF"),
+                                                            mask_to_names(A::eself(m, up), cur->act_idx_to_call)));
+                    HMask set;
+                    cur->probe_x = A::meshneed(m, PROBE_CALL, up, &set);
+                    cur->probe_set = mask_to_names(set, cur->act_idx_to_call);
+                    for (IdxToCall::const_iterator it = cur->act_idx_to_call.begin();
+                         it != cur->act_idx_to_call.end(); ++it)
+                    {
+                        if (it->first == 0)
+                            continue;
+                        HMask xs;
+                        int n = A::meshneed(m, it->second.c_str(), up, &xs);
+                        cur->xcounts.push_back(std::make_pair("#X|" + it->second, std::to_string(n)));
+                    }
+                }
             }
             else if (type == "RPTTX")
             {
@@ -729,35 +1124,25 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
                 cur->up = up;
                 cur->expected.push_back(nbrtext);
                 g_capture = &cur->actual;
+                advance(up);
 
-                // sendNbrReport() (src/loop_functions.cpp:5246-5299): own
-                // periodic HN-report send. heard_count is getMheardCount()
-                // (out of the file set) -- an INPUT to nbrBuildReport(), not
-                // something it computes, exactly like NEED's msg_id below;
-                // taken from the capture's own payload ("R<heard>;...", the
-                // same field the real call formats FROM this value, so
-                // reading it back is not reading the answer). Everything
-                // nbrBuildReport() actually decides is freshly computed.
                 int heard_count = 0;
                 if (fld.size() > 4 && !fld[4].empty() && fld[4][0] == 'R')
                     heard_count = atoi(fld[4].c_str() + 1);
 
                 char report[160];
-                int n = nbrBuildReport(m, up, heard_count, report, sizeof(report));
+                int n = A::build_report(m, up, heard_count, report, sizeof(report));
                 char buf[224];
                 if (n >= 0)
                     snprintf(buf, sizeof(buf), "[NBR]|RPTTX|%u|%d|%s", (unsigned)up, n, report);
                 else
                     snprintf(buf, sizeof(buf), "[NBR]|RPTTX|%u|-1|", (unsigned)up);
                 cur->actual.push_back(buf);
-                cur->act_idx_to_call = snapshot_actual_idx_to_call(m);
+                cur->act_idx_to_call = A::idx_to_call(m);
                 cur->exp_idx_to_call = exp_idx_to_call;
             }
             else if (type == "NEED")
             {
-                // NEED belongs to the [LOG] frame that caused it -- stays in
-                // cur_log's group, does NOT open a new one (ASSUMPTION 2c /
-                // the orchestrator's grouping rule).
                 if (cur_log == NULL)
                 {
                     out.need_no_path++;
@@ -765,6 +1150,7 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
                 }
                 cur_log->expected.push_back(nbrtext);
                 g_capture = &cur_log->actual;
+                advance(up);
 
                 uint32_t msgid = fld.size() > 3 ? (uint32_t)strtoul(fld[3].c_str(), NULL, 16) : 0;
                 char typ = (fld.size() > 4 && !fld[4].empty()) ? fld[4][0] : '?';
@@ -779,16 +1165,23 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
                 }
                 else
                 {
-                    NbrNeed r = nbrRelayNeed(m, pit->second.c_str(), up, BNBRSYM, msgid);
-                    char case_ch = !r.known ? 'U' : (r.alone != 0 ? 'A' : 'B');
-                    char buf[112];
-                    // <slot> (8th field) is a TX-ring index this harness cannot
-                    // reproduce (see file header comment) -- "-1" placeholder,
-                    // normalized away by both comparator modes, never silently.
-                    snprintf(buf, sizeof(buf), "[NBR]|NEED|%u|%08X|%c|%c|%08X|%08X|%d|%08X",
-                             (unsigned)up, (unsigned)msgid, typ, case_ch,
-                             (unsigned)r.need, (unsigned)r.alone, -1, (unsigned)r.inferred);
+                    NeedRes r = A::need(m, pit->second.c_str(), up, BNBRSYM, msgid);
+                    char case_ch = !r.known ? 'U' : (!hm_empty(r.alone) ? 'A' : 'B');
+                    char buf[224];
+                    snprintf(buf, sizeof(buf), "[NBR]|NEED|%u|%08X|%c|%c|%s|%s|%d|%s",
+                             (unsigned)up, (unsigned)msgid, typ, case_ch, A::mask_hex(r.need).c_str(),
+                             A::mask_hex(r.alone).c_str(), -1, A::mask_hex(r.inferred).c_str());
                     cur_log->actual.push_back(buf);
+
+                    if (opt.probe)
+                    {
+                        IdxToCall t = A::idx_to_call(m);
+                        char key[32];
+                        snprintf(key, sizeof(key), "NEED|%08X", (unsigned)msgid);
+                        cur_log->decisions.push_back(std::make_pair(
+                            std::string(key),
+                            std::string(1, case_ch) + "|" + mask_to_names(r.need, t) + "|" + mask_to_names(r.alone, t)));
+                    }
 
                     if (r.known)
                     {
@@ -803,66 +1196,29 @@ static void run_replay(const std::string &fixture_path, ReplayResult &out)
             }
             else
             {
-                // EDGE/ME/CUT/DROP/EVICT/POS/SYM/CANCEL/CANCEL?/REFUSE/ROW/
-                // ENDSNAP: byproducts of the trigger already open above.
                 if (cur != NULL)
                     cur->expected.push_back(nbrtext);
                 else
                     out.parse_errors.push_back(
                         std::to_string(lineno) + ": [NBR] line before any trigger: " + nbrtext);
 
-                // Roll the EXPECTED-side idx->call table forward as ROW/
-                // EVICT lines reveal it (see TriggerGroup comment).
                 if (type == "ROW" && fld.size() > 4)
                     exp_idx_to_call[atoi(fld[3].c_str())] = fld[4];
                 else if (type == "EVICT" && fld.size() > 5)
                     exp_idx_to_call[atoi(fld[3].c_str())] = fld[5];
                 if (cur != NULL && (type == "ROW" || type == "ENDSNAP"))
-                    cur->exp_idx_to_call = exp_idx_to_call; // keep the SNAP group's own snapshot current
+                    cur->exp_idx_to_call = exp_idx_to_call;
             }
         }
     }
 
     g_capture = NULL;
-    nbrLog = NULL;
+    A::set_log(NULL);
+    delete mp;
 }
 
-// --- compare: grouped, multiset, two modes (see ASSUMPTION 2c) -------------
+// --- compare against the capture: grouped, multiset, three modes ------------
 
-// Sorted, comma-joined callsigns for the bits set in mask, "-" if none, an
-// unknown index rendered as "?<idx>" rather than silently dropped (an
-// idx->call table that is missing an entry is reported as a mismatch
-// against a real callsign, not quietly treated as a match).
-static std::string mask_to_names(uint32_t mask, const std::unordered_map<int, std::string> &idx_to_call)
-{
-    std::vector<std::string> names;
-    for (int i = 0; i < 32; i++)
-    {
-        if (!(mask & (1u << (unsigned)i)))
-            continue;
-        std::unordered_map<int, std::string>::const_iterator it = idx_to_call.find(i);
-        if (it != idx_to_call.end())
-            names.push_back(it->second);
-        else
-        {
-            char buf[16];
-            snprintf(buf, sizeof(buf), "?%d", i);
-            names.push_back(buf);
-        }
-    }
-    std::sort(names.begin(), names.end());
-    std::string out;
-    for (size_t i = 0; i < names.size(); i++)
-    {
-        if (i)
-            out += ",";
-        out += names[i];
-    }
-    return out.empty() ? "-" : out;
-}
-
-// EXACT mode: byte-identical except NEED's <slot> (TX-ring index, out of
-// file set -- see file header comment), always normalized to "-".
 static std::string normalize_exact(const std::string &line)
 {
     std::vector<std::string> fld = split_pipe(line);
@@ -871,12 +1227,7 @@ static std::string normalize_exact(const std::string &line)
     return join_pipe(fld);
 }
 
-// INDEX-FREE mode: EXACT's rewrite, plus ROW's/EVICT's <idx> field blanked
-// (row-table SLOT, not identity) and NEED's/CANCEL's/CANCEL?'s/REFUSE's hex
-// bitmasks rewritten to sorted callsign lists via idx_to_call (see
-// TriggerGroup / mask_to_names above).
-static std::string normalize_indexfree(const std::string &line,
-                                        const std::unordered_map<int, std::string> &idx_to_call)
+static std::string normalize_indexfree(const std::string &line, const IdxToCall &idx_to_call)
 {
     std::vector<std::string> fld = split_pipe(line);
     std::string type = fld.size() > 1 ? fld[1] : std::string();
@@ -887,20 +1238,20 @@ static std::string normalize_indexfree(const std::string &line,
         fld[3] = "-";
     else if (type == "NEED" && fld.size() > 9)
     {
-        fld[6] = mask_to_names((uint32_t)strtoul(fld[6].c_str(), NULL, 16), idx_to_call);
-        fld[7] = mask_to_names((uint32_t)strtoul(fld[7].c_str(), NULL, 16), idx_to_call);
+        fld[6] = mask_to_names(hm_parse_hex(fld[6]), idx_to_call);
+        fld[7] = mask_to_names(hm_parse_hex(fld[7]), idx_to_call);
         fld[8] = "-";
-        fld[9] = mask_to_names((uint32_t)strtoul(fld[9].c_str(), NULL, 16), idx_to_call);
+        fld[9] = mask_to_names(hm_parse_hex(fld[9]), idx_to_call);
     }
     else if ((type == "CANCEL" || type == "CANCEL?") && fld.size() > 8)
     {
-        fld[6] = mask_to_names((uint32_t)strtoul(fld[6].c_str(), NULL, 16), idx_to_call);
-        fld[7] = mask_to_names((uint32_t)strtoul(fld[7].c_str(), NULL, 16), idx_to_call);
-        fld[8] = mask_to_names((uint32_t)strtoul(fld[8].c_str(), NULL, 16), idx_to_call);
+        fld[6] = mask_to_names(hm_parse_hex(fld[6]), idx_to_call);
+        fld[7] = mask_to_names(hm_parse_hex(fld[7]), idx_to_call);
+        fld[8] = mask_to_names(hm_parse_hex(fld[8]), idx_to_call);
     }
     else if (type == "REFUSE" && fld.size() > 6)
     {
-        fld[6] = mask_to_names((uint32_t)strtoul(fld[6].c_str(), NULL, 16), idx_to_call);
+        fld[6] = mask_to_names(hm_parse_hex(fld[6]), idx_to_call);
     }
     return join_pipe(fld);
 }
@@ -912,26 +1263,13 @@ enum class CompareMode
     DECISION
 };
 
-// DECISION mode (orchestrator, wave 1 gate): INDEX_FREE plus two exclusions
-// that are properties of the capture, not of the matrix code --
-//  - EDGE/ME <cnt> blanked: the per-type counter of a cell that stays fresh
-//    for the whole capture never resets, so the ~40 s boot gap
-//    (ASSUMPTION 2b) leaves a permanent offset of 1-3 on the core relay
-//    pairs (ASSUMPTION 2d);
-//  - CANCEL/CANCEL?/REFUSE dropped: whether a slot is still in the TX ring
-//    when a foreign copy arrives depends on the device's TX timing, which the
-//    harness ring model cannot know (seen: replay CANCELs for slots the
-//    device had already sent).
-// Everything that IS a matrix decision stays compared exactly: NEED case and
-// masks, SYM, EDGE/ME presence and SNR, CUT, EVICT, POS, ROW verdicts, RPTTX.
 static bool decision_keeps(const std::string &line)
 {
     std::string type = nbr_line_type(line);
     return !(type == "CANCEL" || type == "CANCEL?" || type == "REFUSE");
 }
 
-static std::string normalize_decision(const std::string &line,
-                                      const std::unordered_map<int, std::string> &idx_to_call)
+static std::string normalize_decision(const std::string &line, const IdxToCall &idx_to_call)
 {
     std::vector<std::string> fld = split_pipe(normalize_indexfree(line, idx_to_call));
     std::string type = fld.size() > 1 ? fld[1] : std::string();
@@ -942,8 +1280,6 @@ static std::string normalize_decision(const std::string &line,
     return join_pipe(fld);
 }
 
-// Sorted (order-within-group-insensitive), byte-exact-after-normalization
-// multiset compare -- see ASSUMPTION 2c.
 static bool group_matches(const TriggerGroup &g, CompareMode mode)
 {
     std::vector<std::string> exp, act;
@@ -970,8 +1306,8 @@ static bool group_matches(const TriggerGroup &g, CompareMode mode)
     return exp == act;
 }
 
-// The set of [NBR] types present in a group (union of expected+actual) --
-// the "category" a mismatched group is reported under.
+#ifndef NBR_REPLAY_PRODUCTION // capture comparison: compat env only
+
 static std::vector<std::string> group_types(const TriggerGroup &g)
 {
     std::vector<std::string> types;
@@ -996,8 +1332,6 @@ static std::string join_comma(const std::vector<std::string> &v)
     return out;
 }
 
-// --- per-hour-of-uptime report (see ASSUMPTION 2c) --------------------------
-
 struct HourBucket
 {
     long groups = 0;
@@ -1007,7 +1341,7 @@ struct HourBucket
 
 struct GroupReport
 {
-    std::map<int, HourBucket> hours; // ordered by hour
+    std::map<int, HourBucket> hours;
     long total_groups = 0;
     long total_mismatched = 0;
 };
@@ -1056,21 +1390,115 @@ static void print_hourly_table(const char *label, const GroupReport &rep)
     printf("[nbr_replay] %s total: %ld/%ld groups mismatched\n", label, rep.total_mismatched, rep.total_groups);
 }
 
+#endif // !NBR_REPLAY_PRODUCTION
+
+// --- implementation vs. implementation, line for line ------------------------
+
+// Wave 2 differential (B): the only two normalisations allowed between the
+// dense reference and the edge pool. EDGE/ME <cnt> is one counter over all
+// frame types now instead of the counter of the frame's own type; a mask is
+// printed with NBR_MASK_HEX_LEN digits instead of 8 -- compared on the low
+// 32 bits, which hold all 21 rows of the compat build.
+static std::string low32_hex(const std::string &hex)
+{
+    return hex.size() > 8 ? hex.substr(hex.size() - 8) : hex;
+}
+
+static std::string normalize_b(const std::string &line)
+{
+    std::vector<std::string> fld = split_pipe(line);
+    std::string type = fld.size() > 1 ? fld[1] : std::string();
+    if (type == "EDGE" && fld.size() > 7)
+        fld[7] = "-";
+    else if (type == "ME" && fld.size() > 6)
+        fld[6] = "-";
+    else if (type == "NEED" && fld.size() > 9)
+    {
+        fld[6] = low32_hex(fld[6]);
+        fld[7] = low32_hex(fld[7]);
+        fld[9] = low32_hex(fld[9]);
+    }
+    else if ((type == "CANCEL" || type == "CANCEL?") && fld.size() > 8)
+    {
+        fld[6] = low32_hex(fld[6]);
+        fld[7] = low32_hex(fld[7]);
+        fld[8] = low32_hex(fld[8]);
+    }
+    else if (type == "REFUSE" && fld.size() > 6)
+        fld[6] = low32_hex(fld[6]);
+    return join_pipe(fld);
+}
+
+// Sweep independence (S): SNAP <cells> counts live pool entries, and without
+// the sweep stale edges stay in the pool. Nothing else may differ.
+static std::string normalize_s(const std::string &line)
+{
+    std::vector<std::string> fld = split_pipe(line);
+    if (fld.size() > 6 && fld[1] == "SNAP")
+        fld[6] = "-";
+    return join_pipe(fld);
+}
+
+#ifndef NBR_REPLAY_PRODUCTION
+// Line-for-line, in emission order, over every group of two runs of the same
+// fixture. Returns the number of differing lines and prints the first few.
+static long diff_runs(const char *label, const ReplayResult &a, const ReplayResult &b,
+                      std::string (*norm)(const std::string &))
+{
+    long bad = 0, lines = 0, shown = 0;
+    if (a.groups.size() != b.groups.size())
+    {
+        printf("[nbr_replay] %s: group count differs %zu vs %zu\n", label, a.groups.size(), b.groups.size());
+        return 1;
+    }
+    for (size_t g = 0; g < a.groups.size(); g++)
+    {
+        const std::vector<std::string> &la = a.groups[g].actual;
+        const std::vector<std::string> &lb = b.groups[g].actual;
+        size_t n = std::max(la.size(), lb.size());
+        for (size_t i = 0; i < n; i++)
+        {
+            lines++;
+            std::string x = i < la.size() ? norm(la[i]) : std::string("<none>");
+            std::string y = i < lb.size() ? norm(lb[i]) : std::string("<none>");
+            if (x != y)
+            {
+                bad++;
+                if (shown++ < 12)
+                    printf("  %s group %zu up=%u line %zu:\n    A: %s\n    B: %s\n", label, g,
+                           (unsigned)a.groups[g].up, i, x.c_str(), y.c_str());
+            }
+        }
+    }
+    printf("[nbr_replay] %s: %ld/%ld lines differ over %zu groups\n", label, bad, lines, a.groups.size());
+    return bad;
+}
+
+#endif
+
+static long count_lines(const ReplayResult &r, const char *type)
+{
+    long n = 0;
+    for (size_t g = 0; g < r.groups.size(); g++)
+        for (size_t i = 0; i < r.groups[g].actual.size(); i++)
+            if (nbr_line_type(r.groups[g].actual[i]) == type)
+                n++;
+    return n;
+}
+
 // --- tests -------------------------------------------------------------
 
 void setUp(void) {}
 void tearDown(void)
 {
-    nbrLog = NULL;
+    dense::nbrLog = NULL;
+    edge::nbrLog = NULL;
+#ifndef NBR_REPLAY_PRODUCTION
+    edge_deferred::nbrLog = NULL;
+#endif
     g_capture = NULL;
 }
 
-// Known example from the fixture itself (DL2JA-1's beacon, several
-// occurrences in test/test_nbr_replay/fixtures/dk5en98-20260923-boot.txt,
-// e.g. line 359): "4825.35N\01147.19E" -> the capture's own POS line for
-// the same frame says "48.42250|11.78650" -- decode_pos_payload() must
-// land on exactly that, via the reimplemented arithmetic (see file header
-// comment), not by reading the answer back out of the fixture.
 void test_decode_pos_payload_matches_known_capture_example(void)
 {
     DecodedPos d = decode_pos_payload("4825.35N\\01147.19E-Marzling#Werner/R=9;");
@@ -1101,43 +1529,38 @@ void test_token_first_last_and_split_pipe(void)
     TEST_ASSERT_EQUAL_STRING("[NBR]|NEED|1|2|3", join_pipe(f).c_str());
 }
 
-// The NEED slot placeholder is the ONLY field BOTH comparator modes are
-// told to ignore -- pin that down directly so a future edit cannot widen
-// it by accident without a test noticing.
 void test_normalize_exact_ignores_only_the_need_slot_field(void)
 {
     TEST_ASSERT_EQUAL_STRING(
         normalize_exact("[NBR]|NEED|1|AABBCCDD|P|B|00000000|00000000|7|00000000").c_str(),
         normalize_exact("[NBR]|NEED|1|AABBCCDD|P|B|00000000|00000000|-1|00000000").c_str());
-    // A non-slot field differing must still differ after normalization.
     TEST_ASSERT_TRUE(
         normalize_exact("[NBR]|NEED|1|AABBCCDD|P|B|00000001|00000000|7|00000000") !=
         normalize_exact("[NBR]|NEED|1|AABBCCDD|P|B|00000000|00000000|-1|00000000"));
-    TEST_ASSERT_EQUAL_STRING(
-        normalize_exact("[NBR]|EDGE|1|A|B|P|0|1|NA").c_str(),
-        normalize_exact("[NBR]|EDGE|1|A|B|P|0|1|NA").c_str());
     TEST_ASSERT_TRUE(
         normalize_exact("[NBR]|EDGE|1|A|B|P|0|1|NA") != normalize_exact("[NBR]|EDGE|1|A|B|P|0|2|NA"));
 }
 
 void test_mask_to_names_sorts_and_marks_unknown_index(void)
 {
-    std::unordered_map<int, std::string> table;
+    IdxToCall table;
     table[1] = "AAA-1";
     table[3] = "CCC-3";
-    // bit 5 has no table entry -- rendered "?5", not dropped.
-    uint32_t mask = (1u << 1) | (1u << 3) | (1u << 5);
-    TEST_ASSERT_EQUAL_STRING("?5,AAA-1,CCC-3", mask_to_names(mask, table).c_str());
-    TEST_ASSERT_EQUAL_STRING("-", mask_to_names(0, table).c_str());
+    table[100] = "ZZZ-9";
+    HMask mask = hm_parse_hex("0000001000000000000000000000002A"); // bits 1, 3, 5, 100
+    TEST_ASSERT_EQUAL_STRING("?5,AAA-1,CCC-3,ZZZ-9", mask_to_names(mask, table).c_str());
+    TEST_ASSERT_EQUAL_STRING("-", mask_to_names(hm_none(), table).c_str());
+    // 8, 16 and 32 digits of the same low set parse to the same set.
+    TEST_ASSERT_EQUAL_STRING(mask_to_names(hm_parse_hex("0000002A"), table).c_str(),
+                             mask_to_names(hm_parse_hex("000000000000002A"), table).c_str());
 }
 
 void test_normalize_indexfree_strips_row_and_evict_idx_and_rewrites_need_masks(void)
 {
-    std::unordered_map<int, std::string> table;
+    IdxToCall table;
     table[2] = "OE1AAA-1";
     table[5] = "OE1BBB-2";
 
-    // ROW/EVICT <idx> (field 3) is blanked, not compared.
     TEST_ASSERT_EQUAL_STRING(
         "[NBR]|ROW|10|-|OE1AAA-1|1|0|3|UNK|NA",
         normalize_indexfree("[NBR]|ROW|10|2|OE1AAA-1|1|0|3|UNK|NA", table).c_str());
@@ -1145,18 +1568,31 @@ void test_normalize_indexfree_strips_row_and_evict_idx_and_rewrites_need_masks(v
         "[NBR]|EVICT|10|-|OLD-1|OE1AAA-1",
         normalize_indexfree("[NBR]|EVICT|10|2|OLD-1|OE1AAA-1", table).c_str());
 
-    // NEED's need/alone/inferred masks (bits 2 and 5) become sorted names;
-    // <slot> is still blanked, same as normalize_exact().
     std::string got = normalize_indexfree(
         "[NBR]|NEED|10|AABBCCDD|P|B|00000024|00000004|7|00000020", table);
     TEST_ASSERT_EQUAL_STRING(
         "[NBR]|NEED|10|AABBCCDD|P|B|OE1AAA-1,OE1BBB-2|OE1AAA-1|-|OE1BBB-2", got.c_str());
 }
 
-// A group compares equal to itself with its lines reshuffled -- the whole
-// point of the multiset comparator (see ASSUMPTION 2c): a harmlessly
-// different emission order inside one frame's own group must not read as
-// a mismatch.
+// The differential normalisation is exactly the two the brief allows: <cnt>
+// of EDGE/ME, and mask width. Everything else must still differ.
+void test_normalize_b_allows_only_cnt_and_mask_width(void)
+{
+    TEST_ASSERT_EQUAL_STRING(normalize_b("[NBR]|EDGE|1|A|B|P|0|1|NA").c_str(),
+                             normalize_b("[NBR]|EDGE|1|A|B|P|0|7|NA").c_str());
+    TEST_ASSERT_EQUAL_STRING(normalize_b("[NBR]|ME|1|B|P|-90|1|5").c_str(),
+                             normalize_b("[NBR]|ME|1|B|P|-90|3|5").c_str());
+    TEST_ASSERT_TRUE(normalize_b("[NBR]|ME|1|B|P|-90|1|5") != normalize_b("[NBR]|ME|1|B|P|-90|1|6"));
+    TEST_ASSERT_EQUAL_STRING(
+        normalize_b("[NBR]|NEED|1|AABBCCDD|P|B|00000024|00000004|-1|00000000").c_str(),
+        normalize_b("[NBR]|NEED|1|AABBCCDD|P|B|0000000000000024|0000000000000004|-1|0000000000000000").c_str());
+    TEST_ASSERT_TRUE(normalize_b("[NBR]|NEED|1|AABBCCDD|P|B|00000024|00000004|-1|00000000") !=
+                     normalize_b("[NBR]|NEED|1|AABBCCDD|P|A|00000024|00000004|-1|00000000"));
+    TEST_ASSERT_TRUE(normalize_b("[NBR]|SNAP|1|X|3|21|16") != normalize_b("[NBR]|SNAP|1|X|3|21|15"));
+    TEST_ASSERT_EQUAL_STRING(normalize_s("[NBR]|SNAP|1|X|3|21|16").c_str(),
+                             normalize_s("[NBR]|SNAP|1|X|3|21|15").c_str());
+}
+
 void test_group_matches_is_order_insensitive_within_a_group(void)
 {
     TriggerGroup g;
@@ -1168,40 +1604,118 @@ void test_group_matches_is_order_insensitive_within_a_group(void)
     g.actual.push_back("[NBR]|EDGE|5|A|B|P|0|1|NA");
     TEST_ASSERT_TRUE(group_matches(g, CompareMode::EXACT));
 
-    g.actual.pop_back(); // drop the EDGE -- now a real mismatch
+    g.actual.pop_back();
     TEST_ASSERT_FALSE(group_matches(g, CompareMode::EXACT));
 }
 
-// Convergence minute: NBR_WINDOW_MIN (720 min, nbr_matrix.h) plus a small
-// margin -- ASSUMPTION 2b's boot-gap history cannot influence any decision
-// once every cell it touched has aged out. Configurable (not a magic
-// number baked into the assertion below) so a later wave can tighten it.
-// Measured at the wave 1 gate (DECISION mode): the boot gap stops showing
-// after up 180 -- hours 3..13 of the fixture are clean -- so the assertion
-// covers everything from there, not only the last 1.5 h after 720 + 2.
+// Wave 2, D: the mask operations on the upper rows (64..127 on the 128-row
+// build, the top of the single word on the 64-row build), and the hex form
+// the log lines use.
+void test_mask_ops_on_upper_rows(void)
+{
+    const int lo = NBR_MAX_ROWS > 64 ? 64 : NBR_MAX_ROWS / 2;
+    const int hi = NBR_MAX_ROWS - 1;
+    NbrMask m = nbrMaskNone();
+    TEST_ASSERT_TRUE(nbrMaskEmpty(m));
+    nbrMaskSet(m, lo);
+    nbrMaskSet(m, hi);
+    nbrMaskSet(m, (lo + hi) / 2);
+    TEST_ASSERT_TRUE(nbrMaskTest(m, lo));
+    TEST_ASSERT_TRUE(nbrMaskTest(m, hi));
+    TEST_ASSERT_TRUE(nbrMaskTest(m, (lo + hi) / 2));
+    TEST_ASSERT_FALSE(nbrMaskTest(m, lo + 1));
+    TEST_ASSERT_FALSE(nbrMaskTest(m, NBR_MAX_ROWS));   // ausserhalb: nie gesetzt
+    nbrMaskSet(m, NBR_MAX_ROWS);                       // ausserhalb: kein Effekt
+    TEST_ASSERT_EQUAL_INT(3, nbrMaskCount(m));
+
+    // Iteration in aufsteigender Reihenfolge ueber die Wortgrenze.
+    nbrMaskSet(m, 1);
+    nbrMaskSet(m, 63);
+    std::vector<int> seen;
+    for (int i = nbrMaskNext(m, -1); i >= 0; i = nbrMaskNext(m, i))
+        seen.push_back(i);
+    std::set<int> ws;
+    ws.insert(1);
+    if (63 < NBR_MAX_ROWS)
+        ws.insert(63);
+    ws.insert(lo);
+    ws.insert((lo + hi) / 2);
+    ws.insert(hi);
+    std::vector<int> wv(ws.begin(), ws.end());
+    TEST_ASSERT_EQUAL_INT((int)wv.size(), (int)seen.size());
+    for (size_t i = 0; i < wv.size(); i++)
+        TEST_ASSERT_EQUAL_INT(wv[i], seen[i]);
+    TEST_ASSERT_EQUAL_INT(-1, nbrMaskNext(m, hi));
+
+    nbrMaskClear(m, hi);
+    TEST_ASSERT_FALSE(nbrMaskTest(m, hi));
+    NbrMask b = nbrMaskBit(lo);
+    TEST_ASSERT_TRUE(nbrMaskEqual(nbrMaskAnd(m, b), b));
+    TEST_ASSERT_FALSE(nbrMaskTest(nbrMaskAndNot(m, b), lo));
+    TEST_ASSERT_TRUE(nbrMaskTest(nbrMaskOr(nbrMaskNone(), b), lo));
+
+    // Hex: NBR_MASK_HEX_LEN Stellen, hoechstwertige zuerst, %08lX-Haelften.
+    char buf[NBR_MASK_HEX_LEN + 1];
+    NbrMask one = nbrMaskBit(hi);
+    TEST_ASSERT_EQUAL_INT(NBR_MASK_HEX_LEN, edge::nbrMaskHex(one, buf, sizeof(buf)));
+    std::string want_hex(NBR_MASK_HEX_LEN, '0');
+    int digit = hi / 4, nib = 1 << (hi % 4);
+    want_hex[NBR_MASK_HEX_LEN - 1 - digit] = "0123456789ABCDEF"[nib];
+    TEST_ASSERT_EQUAL_STRING(want_hex.c_str(), buf);
+    HMask back = hm_parse_hex(buf);
+    TEST_ASSERT_TRUE(hm_test(back, hi));
+    TEST_ASSERT_EQUAL_INT(NBR_MASK_WORDS * 16, (int)strlen(buf));
+#if NBR_MAX_ROWS > 64
+    TEST_ASSERT_EQUAL_INT(32, NBR_MASK_HEX_LEN);
+    NbrMask two = nbrMaskBit(64);
+    nbrMaskSet(two, 0);
+    edge::nbrMaskHex(two, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("0000000000000001" "0000000000000001", buf);
+#else
+    TEST_ASSERT_EQUAL_INT(16, NBR_MASK_HEX_LEN);
+#endif
+}
+
+#ifndef NBR_REPLAY_PRODUCTION
+
+// Convergence minute, see wave 1: the boot-gap stops showing after up 180.
 static const uint16_t CONVERGENCE_MINUTE = 180;
 
-// The main instrument: replay the DK5EN-98 fixture and diff every [NBR]
-// line it produces against the capture, grouped by trigger (ASSUMPTION 2c).
-// Everything before CONVERGENCE_MINUTE is reported, not asserted -- see the
-// file header for why (ASSUMPTION 2b's boot-gap is expected to still be
-// visible there). At and after it, index-free mode must be a clean match.
+static ReplayResult &dense_run()
+{
+    static ReplayResult r;
+    static bool done = false;
+    if (!done)
+    {
+        run_replay<DenseA>(fixture_path(), r, ReplayOpts());
+        done = true;
+    }
+    return r;
+}
+
+static ReplayResult &edge_run(bool sweep)
+{
+    static ReplayResult r[2];
+    static bool done[2] = {false, false};
+    if (!done[sweep])
+    {
+        ReplayOpts o;
+        o.sweep_each_minute = sweep;
+        run_replay<EdgeA>(fixture_path(), r[sweep], o);
+        done[sweep] = true;
+    }
+    return r[sweep];
+}
+
+// The wave-1 instrument, now on the edge pool (no sweep, the compat build):
+// every [NBR] line it produces against the capture, grouped by trigger.
 void test_replay_reproduces_dk5en98_20260923_boot(void)
 {
-    std::string fixture = repo_root() + "/test/test_nbr_replay/fixtures/dk5en98-20260923-boot.txt";
-    TEST_ASSERT_TRUE_MESSAGE(path_exists(fixture), ("fixture missing: " + fixture).c_str());
+    TEST_ASSERT_TRUE_MESSAGE(path_exists(fixture_path()), ("fixture missing: " + fixture_path()).c_str());
+    ReplayResult &rr = edge_run(false);
 
-    ReplayResult rr;
-    run_replay(fixture, rr);
-
-    GroupReport exact_rep = build_group_report(rr.groups, CompareMode::EXACT);
-    GroupReport idxfree_rep = build_group_report(rr.groups, CompareMode::INDEX_FREE);
-    print_hourly_table("EXACT", exact_rep);
-    print_hourly_table("INDEX-FREE", idxfree_rep);
     GroupReport decision_rep = build_group_report(rr.groups, CompareMode::DECISION);
-    print_hourly_table("DECISION", decision_rep);
-    printf("[nbr_replay] convergence minute: up >= %u (NBR_WINDOW_MIN=%d + margin)\n",
-           (unsigned)CONVERGENCE_MINUTE, (int)NBR_WINDOW_MIN);
+    print_hourly_table("DECISION (edge pool)", decision_rep);
     printf("[nbr_replay] parse_errors=%zu need_no_path=%ld total_groups=%zu\n",
            rr.parse_errors.size(), rr.need_no_path, rr.groups.size());
     for (size_t i = 0; i < rr.parse_errors.size() && i < 5; i++)
@@ -1235,16 +1749,244 @@ void test_replay_reproduces_dk5en98_20260923_boot(void)
             printf("      actual:   %s\n", g.actual[j].c_str());
     }
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rr.parse_errors.size(),
-        "unparseable [LOG] line(s) in the fixture -- see printed parse errors above");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rr.parse_errors.size(), "unparseable [LOG] line(s) in the fixture");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)rr.need_no_path,
-        "NEED line(s) whose msg_id had no preceding [LOG] line in the fixture");
+                                  "NEED line(s) whose msg_id had no preceding [LOG] line in the fixture");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)post_mismatched,
-        "post-convergence (up>=CONVERGENCE_MINUTE) decision-mode group mismatches -- "
-        "see the groups printed above; <cnt> drift and TX-timing CANCEL/REFUSE are "
-        "already excluded (CompareMode::DECISION), so anything left is a real "
-        "decision difference");
+                                  "post-convergence decision-mode group mismatches against the capture");
 }
+
+// B: dense reference vs. edge pool, line for line, every group, every hour.
+void test_differential_dense_vs_edge_pool_compat(void)
+{
+    ReplayResult &d = dense_run();
+    ReplayResult &e = edge_run(false);
+    TEST_ASSERT_TRUE(d.groups.size() > 1000);
+    long bad = diff_runs("B dense vs edge", d, e, normalize_b);
+    printf("[nbr_replay] B: EVICT dense=%ld edge=%ld, EVICT-E edge=%ld, SYM dense=%ld edge=%ld\n",
+           count_lines(d, "EVICT"), count_lines(e, "EVICT"), count_lines(e, "EVICT-E"),
+           count_lines(d, "SYM"), count_lines(e, "SYM"));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)count_lines(e, "EVICT-E"), "compat pool (441) must never fill");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)bad, "dense and edge pool differ beyond <cnt> and mask width");
+}
+
+// B': the same differential against the nRF52 logging path (SYM lines
+// recorded under the clamp and printed after it).
+void test_differential_dense_vs_edge_pool_deferred_log(void)
+{
+    static ReplayResult r;
+    run_replay<EdgeDeferredA>(fixture_path(), r, ReplayOpts());
+    long bad = diff_runs("B' dense vs edge (deferred SYM)", dense_run(), r, normalize_b);
+    long drops = 0;
+    for (size_t g = 0; g < r.groups.size(); g++)
+        for (size_t i = 0; i < r.groups[g].actual.size(); i++)
+            if (r.groups[g].actual[i].find("|SYMBUF|") != std::string::npos)
+                drops++;
+    printf("[nbr_replay] B': SYM dense=%ld deferred=%ld, SYMBUF drops=%ld\n", count_lines(dense_run(), "SYM"),
+           count_lines(r, "SYM"), drops);
+    TEST_ASSERT_EQUAL_INT(0, (int)drops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)bad, "deferred SYM path differs from dense");
+}
+
+// S: the sweep is cleanup only -- swept every minute or never, same lines.
+void test_sweep_independence_compat(void)
+{
+    ReplayResult &a = edge_run(true);
+    ReplayResult &b = edge_run(false);
+    long bad = diff_runs("S sweep vs no sweep", a, b, normalize_s);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)bad, "decisions depend on whether nbrSweep() ran");
+}
+
+#else // NBR_REPLAY_PRODUCTION
+
+// --- C: production rules vs. dense ---------------------------------------------
+
+typedef std::map<std::string, std::string> DecisionMap;
+
+// Per group: NEED and ESELF from the run, ROW verdict|meshneed from the
+// group's own ROW lines (a row missing on one side reads "(absent)").
+static std::vector<DecisionMap> extract_decisions(const ReplayResult &r)
+{
+    std::vector<DecisionMap> out(r.groups.size());
+    for (size_t g = 0; g < r.groups.size(); g++)
+    {
+        const TriggerGroup &tg = r.groups[g];
+        for (size_t i = 0; i < tg.decisions.size(); i++)
+            out[g][tg.decisions[i].first] = tg.decisions[i].second;
+        for (size_t i = 0; i < tg.actual.size(); i++)
+        {
+            std::vector<std::string> fld = split_pipe(tg.actual[i]);
+            if (fld.size() > 9 && fld[1] == "ROW")
+                out[g]["ROW|" + fld[4]] = fld[8] + "|" + fld[9];
+        }
+    }
+    return out;
+}
+
+static std::string dget(const DecisionMap &m, const std::string &k)
+{
+    DecisionMap::const_iterator it = m.find(k);
+    return it == m.end() ? std::string("(absent)") : it->second;
+}
+
+// Cumulative count of a line type up to and including each group.
+static std::vector<long> cumulative(const ReplayResult &r, const char *type)
+{
+    std::vector<long> c(r.groups.size());
+    long n = 0;
+    for (size_t g = 0; g < r.groups.size(); g++)
+    {
+        for (size_t i = 0; i < r.groups[g].actual.size(); i++)
+            if (nbr_line_type(r.groups[g].actual[i]) == type)
+                n++;
+        c[g] = n;
+    }
+    return c;
+}
+
+void test_production_rules_against_dense(void)
+{
+    ReplayOpts dense_opt;
+    dense_opt.probe = true;
+    ReplayOpts edge_opt;
+    edge_opt.probe = true;
+    edge_opt.sweep_each_minute = true; // the loop task does, and only the sweep halves
+
+    static ReplayResult rd, rp, rs, rn;
+    run_replay<DenseA>(fixture_path(), rd, dense_opt);
+    run_replay<EdgeA>(fixture_path(), rp, edge_opt);
+    run_replay<EdgeNoShareA>(fixture_path(), rs, edge_opt);
+    run_replay<EdgeNoRulesA>(fixture_path(), rn, edge_opt);
+    TEST_ASSERT_EQUAL_INT(0, (int)rd.parse_errors.size());
+    TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rp.groups.size());
+    TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rs.groups.size());
+    TEST_ASSERT_EQUAL_INT((int)rd.groups.size(), (int)rn.groups.size());
+
+    std::vector<DecisionMap> dd = extract_decisions(rd), dp = extract_decisions(rp),
+                             ds = extract_decisions(rs), dn = extract_decisions(rn);
+    std::vector<long> dense_evict = cumulative(rd, "EVICT");
+    std::vector<long> norules_evicte = cumulative(rn, "EVICT-E");
+
+    std::map<std::string, long> cat_count;
+    cat_count["SHARE"] = 0;
+    cat_count["HALVE/SNRAVG"] = 0;
+    cat_count["CAPACITY"] = 0;
+    cat_count["OTHER"] = 0;
+    long compared = 0;
+    printf("\n[nbr_replay] C: rows=%d edges=%d share=%d%% halve=%dmin snr_avg=%d vs dense %d rows\n",
+           (int)NBR_MAX_ROWS, (int)NBR_MAX_EDGES, (int)NBR_SHARE_PCT, (int)NBR_CNT_HALVE_MIN,
+           (int)NBR_SNR_AVG_N, (int)NBR_DENSE_ROWS);
+    printf("[nbr_replay] C: every differing decision (group up kind key: dense => production [category])\n");
+    for (size_t g = 0; g < rd.groups.size(); g++)
+    {
+        std::set<std::string> keys;
+        for (DecisionMap::const_iterator it = dd[g].begin(); it != dd[g].end(); ++it)
+            keys.insert(it->first);
+        for (DecisionMap::const_iterator it = dp[g].begin(); it != dp[g].end(); ++it)
+            keys.insert(it->first);
+        for (std::set<std::string>::const_iterator k = keys.begin(); k != keys.end(); ++k)
+        {
+            compared++;
+            std::string vd = dget(dd[g], *k), vp = dget(dp[g], *k);
+            if (vd == vp)
+                continue;
+            std::string vs = dget(ds[g], *k), vn = dget(dn[g], *k);
+            const char *cat;
+            if (vn != vd)
+                cat = (dense_evict[g] > 0 && norules_evicte[g] == 0) ? "CAPACITY" : "OTHER";
+            else if (vs != vn)
+                cat = "HALVE/SNRAVG";
+            else if (vp != vs)
+                cat = "SHARE";
+            else
+                cat = "OTHER";
+            cat_count[cat]++;
+            printf("  g%zu up=%u %s %s: %s => %s [%s]\n", g, (unsigned)rd.groups[g].up, rd.groups[g].kind.c_str(),
+                   k->c_str(), vd.c_str(), vp.c_str(), cat);
+        }
+    }
+    printf("[nbr_replay] C: %ld decisions compared; differing: SHARE=%ld HALVE/SNRAVG=%ld CAPACITY=%ld OTHER=%ld\n",
+           compared, cat_count["SHARE"], cat_count["HALVE/SNRAVG"], cat_count["CAPACITY"], cat_count["OTHER"]);
+    printf("[nbr_replay] C: EVICT dense=%ld production=%ld, EVICT-E production=%ld noshare=%ld norules=%ld\n",
+           count_lines(rd, "EVICT"), count_lines(rp, "EVICT"), count_lines(rp, "EVICT-E"),
+           count_lines(rs, "EVICT-E"), count_lines(rn, "EVICT-E"));
+
+    // Concept 4.3: at the final snapshot DB0FHR-12 belongs to DB0ED-99 alone
+    // under the share rule; the dense one-hit rule shows DB0ED-99 with #X 0.
+    int last = -1;
+    for (size_t g = 0; g < rd.groups.size(); g++)
+        if (rd.groups[g].kind == "SNAP")
+            last = (int)g;
+    TEST_ASSERT_TRUE(last >= 0);
+    const TriggerGroup &gd = rd.groups[last], &gp = rp.groups[last];
+    printf("[nbr_replay] C: final SNAP up=%u: %s #X dense=%d production=%d {%s}\n", (unsigned)gp.up, PROBE_CALL,
+           gd.probe_x, gp.probe_x, gp.probe_set.c_str());
+    // Isolated rule effects (report only): the same pool with and without
+    // the share rule, and with and without halving + SNR mean, over the
+    // categorised decisions plus #X per row. Capacity plays no part here.
+    long share_eff = 0, halve_eff = 0;
+    printf("[nbr_replay] C: isolated rule effects (key: without rule => with rule)\n");
+    for (size_t g = 0; g < rp.groups.size(); g++)
+    {
+        DecisionMap xp = dp[g], xs = ds[g], xn = dn[g];
+        for (size_t i = 0; i < rp.groups[g].xcounts.size(); i++)
+            xp[rp.groups[g].xcounts[i].first] = rp.groups[g].xcounts[i].second;
+        for (size_t i = 0; i < rs.groups[g].xcounts.size(); i++)
+            xs[rs.groups[g].xcounts[i].first] = rs.groups[g].xcounts[i].second;
+        for (size_t i = 0; i < rn.groups[g].xcounts.size(); i++)
+            xn[rn.groups[g].xcounts[i].first] = rn.groups[g].xcounts[i].second;
+        std::set<std::string> keys;
+        for (DecisionMap::const_iterator it = xp.begin(); it != xp.end(); ++it)
+            keys.insert(it->first);
+        for (DecisionMap::const_iterator it = xs.begin(); it != xs.end(); ++it)
+            keys.insert(it->first);
+        for (DecisionMap::const_iterator it = xn.begin(); it != xn.end(); ++it)
+            keys.insert(it->first);
+        for (std::set<std::string>::const_iterator k = keys.begin(); k != keys.end(); ++k)
+        {
+            std::string vp = dget(xp, *k), vs = dget(xs, *k), vn = dget(xn, *k);
+            if (vs != vn)
+            {
+                halve_eff++;
+                printf("  g%zu up=%u %s: %s => %s [HALVE/SNRAVG]\n", g, (unsigned)rp.groups[g].up, k->c_str(),
+                       vn.c_str(), vs.c_str());
+            }
+            if (vp != vs)
+            {
+                share_eff++;
+                printf("  g%zu up=%u %s: %s => %s [SHARE]\n", g, (unsigned)rp.groups[g].up, k->c_str(),
+                       vs.c_str(), vp.c_str());
+            }
+        }
+    }
+    printf("[nbr_replay] C: isolated effects: SHARE=%ld HALVE/SNRAVG=%ld\n", share_eff, halve_eff);
+
+    // Trend of the check over all snapshots (report only).
+    long snaps = 0, dense_zero = 0, prod_zero = 0, prod_has = 0;
+    for (size_t g = 0; g < rd.groups.size(); g++)
+    {
+        if (rd.groups[g].kind != "SNAP" || rd.groups[g].probe_x < 0 || rp.groups[g].probe_x < 0)
+            continue;
+        snaps++;
+        if (rd.groups[g].probe_x == 0)
+            dense_zero++;
+        if (rp.groups[g].probe_x == 0)
+            prod_zero++;
+        if (("," + rp.groups[g].probe_set + ",").find(std::string(",") + PROBE_EXCL + ",") != std::string::npos)
+            prod_has++;
+    }
+    printf("[nbr_replay] C: %s over %ld snapshots: #X==0 dense %ld, production %ld; %s in its set %ld\n",
+           PROBE_CALL, snaps, dense_zero, prod_zero, PROBE_EXCL, prod_has);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)cat_count["OTHER"], "unexplained dense/production differences");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, gd.probe_x, "dense: DB0ED-99 #X at the final snapshot");
+    TEST_ASSERT_TRUE_MESSAGE(gp.probe_x >= 1, "production: DB0ED-99 #X >= 1 at the final snapshot");
+    TEST_ASSERT_TRUE_MESSAGE(
+        ("," + gp.probe_set + ",").find(std::string(",") + PROBE_EXCL + ",") != std::string::npos,
+        "production: DB0FHR-12 in DB0ED-99's exclusive set at the final snapshot");
+}
+
+#endif // NBR_REPLAY_PRODUCTION
 
 int main(int, char **)
 {
@@ -1255,7 +1997,16 @@ int main(int, char **)
     RUN_TEST(test_normalize_exact_ignores_only_the_need_slot_field);
     RUN_TEST(test_mask_to_names_sorts_and_marks_unknown_index);
     RUN_TEST(test_normalize_indexfree_strips_row_and_evict_idx_and_rewrites_need_masks);
+    RUN_TEST(test_normalize_b_allows_only_cnt_and_mask_width);
     RUN_TEST(test_group_matches_is_order_insensitive_within_a_group);
+    RUN_TEST(test_mask_ops_on_upper_rows);
+#ifndef NBR_REPLAY_PRODUCTION
     RUN_TEST(test_replay_reproduces_dk5en98_20260923_boot);
+    RUN_TEST(test_differential_dense_vs_edge_pool_compat);
+    RUN_TEST(test_differential_dense_vs_edge_pool_deferred_log);
+    RUN_TEST(test_sweep_independence_compat);
+#else
+    RUN_TEST(test_production_rules_against_dense);
+#endif
     return UNITY_END();
 }

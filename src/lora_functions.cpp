@@ -782,14 +782,14 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // nbrFind() das eigene Rufzeichen im Pfad nicht und wuerde dafuer
             // faelschlich eine neue Zeile anlegen, wenn der HN-Bericht der
             // allererste verarbeitete Frame nach dem Boot ist.
-            if(strcmp(nbrMatrix.rows[0].call, meshcom_settings.node_call) != 0)
+            if(!nbrOwnCallIs(nbrMatrix, meshcom_settings.node_call))
                 nbrInit(nbrMatrix, meshcom_settings.node_call, now_min_hn);
 
-            if(!(nbrMatrix.rows[0].flags & NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
+            if(!nbrRowHasFlag(nbrMatrix, 0, NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
                 nbrNotePos(nbrMatrix, meshcom_settings.node_call, (float)meshcom_settings.node_lat,
                            (float)meshcom_settings.node_lon, bMESH, 0, now_min_hn);
             if(bGATEWAY)
-                nbrMatrix.rows[0].flags |= NBR_FLAG_GW;
+                nbrRowSetFlag(nbrMatrix, 0, NBR_FLAG_GW);
 
             nbrNoteFrame(nbrMatrix, aprsmsg.msg_source_path, aprsmsg.payload_type,
                          aprsmsg.msg_payload, is_equ(aprsmsg.msg_destination_path, "HG"),
@@ -833,12 +833,12 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
             // koennte (relevant=0, msg_id=0 -- das unterdrueckt jede
             // SYM-COVER-Zeile hier, die eigentliche, slotgenaue Maske
             // rechnet die Schleife unten je Slot neu).
-            uint32_t cover_gate = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
-                                                bNBRSYM, 0, 0, NULL);
+            NbrMask cover_gate = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                               bNBRSYM, nbrMaskNone(), 0, NULL);
 
             // Relayer unbekannt (keine Zeile/keine frischen Hoerer) -> nichts
             // zu entscheiden (Konzept 5.2).
-            if(cover_gate != 0)
+            if(!nbrMaskEmpty(cover_gate))
             {
                 char nbr_typ = (aprsmsg.payload_type == ':') ? 'T' :
                                (aprsmsg.payload_type == '!') ? 'P' : 'H';
@@ -860,7 +860,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                     uint32_t nbr_mid = extractRingMsgId(nbr_i);
 
-                    if(ringAlone[nbr_i] != 0)
+                    if(!nbrMaskEmpty(ringAlone[nbr_i]))
                     {
                         // Fall A: Sole-Provider-Veto, nie Abbruch (Konzept 5.2).
                         if(!(ringKind[nbr_i] & RING_KIND_COUNTED))
@@ -870,11 +870,13 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                             if(nbrLog != NULL)
                             {
-                                char nbr_line[96];
+                                char alone_hex[NBR_MASK_HEX_LEN + 1];
+                                nbrMaskHex(ringAlone[nbr_i], alone_hex, sizeof(alone_hex));
+                                char nbr_line[64 + (NBR_MASK_HEX_LEN + 1)];
                                 snprintf(nbr_line, sizeof(nbr_line),
-                                         "[NBR]|REFUSE|%u|%08X|%c|%s|%08X",
+                                         "[NBR]|REFUSE|%u|%08X|%c|%s|%s",
                                          (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                         aprsmsg.msg_source_last, (unsigned)ringAlone[nbr_i]);
+                                         aprsmsg.msg_source_last, alone_hex);
                                 nbrLog(nbr_line);
                             }
                         }
@@ -886,19 +888,19 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // Symmetrie hinzugefuegte Hoererin loggt hier nur,
                         // wenn ihr Bit auch in diesem Bedarf steht -- sonst
                         // waere die Annahme fuer diesen Slot folgenlos.
-                        uint32_t slot_inferred = 0;
-                        uint32_t cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
-                                                       bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
+                        NbrMask slot_inferred = nbrMaskNone();
+                        NbrMask cover = nbrCoverMask(nbrMatrix, aprsmsg.msg_source_last, now_min_cover,
+                                                      bNBRSYM, ringNeed[nbr_i], nbr_mid, &slot_inferred);
 
-                        uint32_t nbr_before = ringNeed[nbr_i];
-                        ringNeed[nbr_i] &= ~cover;
-                        uint32_t nbr_after = ringNeed[nbr_i];
+                        NbrMask nbr_before = ringNeed[nbr_i];
+                        ringNeed[nbr_i] = nbrMaskAndNot(ringNeed[nbr_i], cover);
+                        NbrMask nbr_after = ringNeed[nbr_i];
                         // Bits, die dieser Abzug tatsaechlich entfernt hat
                         // UND die nur per Symmetrie-Annahme dazukamen --
                         // trailing Feld fuer CANCEL/CANCEL?.
-                        uint32_t nbr_removed_inferred = nbr_before & ~nbr_after & slot_inferred;
+                        NbrMask nbr_removed_inferred = nbrMaskAnd(nbrMaskAndNot(nbr_before, nbr_after), slot_inferred);
 
-                        if(nbr_after == 0)
+                        if(nbrMaskEmpty(nbr_after))
                         {
                             if(bNBRCANCEL)
                             {
@@ -918,12 +920,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                 if(nbrLog != NULL)
                                 {
-                                    char nbr_line[96];
+                                    char before_hex[NBR_MASK_HEX_LEN + 1];
+                                    char after_hex[NBR_MASK_HEX_LEN + 1];
+                                    char removed_hex[NBR_MASK_HEX_LEN + 1];
+                                    nbrMaskHex(nbr_before, before_hex, sizeof(before_hex));
+                                    nbrMaskHex(nbr_after, after_hex, sizeof(after_hex));
+                                    nbrMaskHex(nbr_removed_inferred, removed_hex, sizeof(removed_hex));
+                                    char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
                                     snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%08X|%08X|%08X",
+                                             "[NBR]|CANCEL|%u|%08X|%c|%s|%s|%s|%s",
                                              (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after,
-                                             (unsigned)nbr_removed_inferred);
+                                             aprsmsg.msg_source_last, before_hex, after_hex,
+                                             removed_hex);
                                     nbrLog(nbr_line);
                                 }
                             }
@@ -936,12 +944,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
                                 if(nbrLog != NULL)
                                 {
-                                    char nbr_line[96];
+                                    char before_hex[NBR_MASK_HEX_LEN + 1];
+                                    char after_hex[NBR_MASK_HEX_LEN + 1];
+                                    char removed_hex[NBR_MASK_HEX_LEN + 1];
+                                    nbrMaskHex(nbr_before, before_hex, sizeof(before_hex));
+                                    nbrMaskHex(nbr_after, after_hex, sizeof(after_hex));
+                                    nbrMaskHex(nbr_removed_inferred, removed_hex, sizeof(removed_hex));
+                                    char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
                                     snprintf(nbr_line, sizeof(nbr_line),
-                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%08X|%08X|%08X",
+                                             "[NBR]|CANCEL?|%u|%08X|%c|%s|%s|%s|%s",
                                              (unsigned)now_min_cover, (unsigned)nbr_mid, nbr_typ,
-                                             aprsmsg.msg_source_last, (unsigned)nbr_before, (unsigned)nbr_after,
-                                             (unsigned)nbr_removed_inferred);
+                                             aprsmsg.msg_source_last, before_hex, after_hex,
+                                             removed_hex);
                                     nbrLog(nbr_line);
                                 }
                             }
@@ -991,18 +1005,18 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                 // Lazy Init deckt Boot UND ein Laufzeit-"--setcall" gleich mit
                 // ab -- kein zusaetzlicher Haken in setup() oder im Settings-
                 // Kommando noetig.
-                if(strcmp(nbrMatrix.rows[0].call, meshcom_settings.node_call) != 0)
+                if(!nbrOwnCallIs(nbrMatrix, meshcom_settings.node_call))
                     nbrInit(nbrMatrix, meshcom_settings.node_call, now_min);
 
                 // Zeile 0 bekommt nie einen fremden POS-Frame: eigene Position
                 // und eigene Flags (GW, Mesh) kommen aus den Settings, sonst
                 // bleibt die Reichweite der eigenen Zeile immer leer (Bench
                 // 2026-09-20, erste Seite nach dem Flash).
-                if(!(nbrMatrix.rows[0].flags & NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
+                if(!nbrRowHasFlag(nbrMatrix, 0, NBR_FLAG_POS) && meshcom_settings.node_lat != 0.0)
                     nbrNotePos(nbrMatrix, meshcom_settings.node_call, (float)meshcom_settings.node_lat,
                                (float)meshcom_settings.node_lon, bMESH, 0, now_min);
                 if(bGATEWAY)
-                    nbrMatrix.rows[0].flags |= NBR_FLAG_GW;
+                    nbrRowSetFlag(nbrMatrix, 0, NBR_FLAG_GW);
 
                 // Trefferzahl (frueher "[NBR] hits=%d path=%s" hinter bLORADEBUG)
                 // ist im neuen EDGE/ME/CUT/DROP-Format (docs/nbr-logformat.md,
@@ -1341,7 +1355,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // deklariert VOR jedem goto in diesem Block (skip_relay unten
                         // springt sonst ueber die Initialisierung hinweg -- C++ verbietet
                         // das). Zugewiesen (nicht neu deklariert) kurz vor bSHORTPATH.
-                        NbrNeed nn_relay = {0, 0, false, 0};
+                        NbrNeed nn_relay = {nbrMaskNone(), nbrMaskNone(), false, nbrMaskNone()};
                         uint16_t now_min_relay = 0;
 
                         if(msg_type_b_lora == MSG_TYPE_TEXT)    // text message store&forward
@@ -1901,14 +1915,14 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 // durchreichen, damit der Mithoer-Scan (OnRxDone weiter oben)
                                 // und der fallabhaengige CSMA-Backoff (csma_compute_timeout_slot())
                                 // diesen Slot wiederfinden. Ohne --nbrrelay bleibt kind
-                                // RING_KIND_OTHER wie bisher (nn_relay bleibt {0,0}).
+                                // RING_KIND_OTHER wie bisher (nn_relay bleibt leer).
                                 // known == false ("kein Wissen": leere Matrix, ungueltiger
                                 // Pfad) bleibt RING_KIND_OTHER -- heutiges Fluten, nie Fall B
                                 // (Advisor-Fund 2026-09-22, Konzept 1: nichts unterdrueckt auf
                                 // Verdacht).
                                 rly_slot = addTxRingEntry(RcvBuffer, size, RING_STATUS_DONE, "rx_relay", 0, true,
                                                            (bNBRRELAY && nn_relay.known) ? RING_KIND_RELAY : RING_KIND_OTHER,
-                                                           nn_relay.need, nn_relay.alone);
+                                                           &nn_relay.need, &nn_relay.alone);
 
                                 // SL-02: Rueckgabe ist der belegte Slot bzw. -1,
                                 // wenn der Ring den Eintrag verworfen hat.
@@ -1925,7 +1939,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                     {
                                         if(!nn_relay.known)
                                             ; // kein Wissen: kein Fall, kein Zaehler -- nur die NEED-Zeile mit 'U'
-                                        else if(nn_relay.alone != 0)
+                                        else if(!nbrMaskEmpty(nn_relay.alone))
                                             stat_nbr_relay_a++;
                                         else
                                             stat_nbr_relay_b++;
@@ -1934,15 +1948,21 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                         {
                                             char nbr_typ = (aprsmsg.payload_type == ':') ? 'T' :
                                                            (aprsmsg.payload_type == '!') ? 'P' : 'H';
-                                            char nbr_case = !nn_relay.known ? 'U' : (nn_relay.alone != 0) ? 'A' : 'B';
+                                            char nbr_case = !nn_relay.known ? 'U' : (!nbrMaskEmpty(nn_relay.alone)) ? 'A' : 'B';
                                             uint32_t nbr_mid = extractRingMsgId(rly_slot);
-                                            char nbr_line[112];
+                                            char need_hex[NBR_MASK_HEX_LEN + 1];
+                                            char alone_hex[NBR_MASK_HEX_LEN + 1];
+                                            char inferred_hex[NBR_MASK_HEX_LEN + 1];
+                                            nbrMaskHex(nn_relay.need, need_hex, sizeof(need_hex));
+                                            nbrMaskHex(nn_relay.alone, alone_hex, sizeof(alone_hex));
+                                            nbrMaskHex(nn_relay.inferred, inferred_hex, sizeof(inferred_hex));
+                                            char nbr_line[64 + 3 * (NBR_MASK_HEX_LEN + 1)];
                                             snprintf(nbr_line, sizeof(nbr_line),
-                                                     "[NBR]|NEED|%u|%08X|%c|%c|%08X|%08X|%d|%08X",
+                                                     "[NBR]|NEED|%u|%08X|%c|%c|%s|%s|%d|%s",
                                                      (unsigned)now_min_relay, (unsigned)nbr_mid,
                                                      nbr_typ, nbr_case,
-                                                     (unsigned)nn_relay.need, (unsigned)nn_relay.alone,
-                                                     rly_slot, (unsigned)nn_relay.inferred);
+                                                     need_hex, alone_hex,
+                                                     rly_slot, inferred_hex);
                                             nbrLog(nbr_line);
                                         }
                                     }
@@ -2921,7 +2941,7 @@ unsigned long csma_compute_timeout_slot(int attempt, int slot) {
     {
         // Fall B, Text: komplett bei der heutigen Basis UND heutigen Slots
         // bleiben (Konzept 5.1); Fall A hat keinen Text-Sonderfall.
-        if(ringAlone[slot] == 0 && ringBuffer[slot][2] == MSG_TYPE_TEXT)
+        if(nbrMaskEmpty(ringAlone[slot]) && ringBuffer[slot][2] == MSG_TYPE_TEXT)
             return csma_compute_timeout_prio(attempt, prio);
 
         return txringCaseBackoffSlot(slot, attempt, (uint32_t)millis());

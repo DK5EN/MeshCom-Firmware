@@ -2909,6 +2909,48 @@
    "-D NATIVE_BUILD=1",
    "-D UNIT_TEST=1",
    "-D NBR_MAX_ROWS=21",
+   "-D NBR_SHARE_PCT=0",
+   "-D NBR_CNT_HALVE_MIN=0",
+   "-D NBR_SNR_AVG_N=1",
+   "-D NBR_MAX_EDGES=441",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_replay"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_replay128": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=128",
+   "-D NBR_MAX_EDGES=512",
+   "-D NBR_REPLAY_PRODUCTION=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_replay"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_replay64": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=64",
+   "-D NBR_MAX_EDGES=256",
+   "-D NBR_REPLAY_PRODUCTION=1",
    "-I src",
    "-Wall",
    "-Wextra"

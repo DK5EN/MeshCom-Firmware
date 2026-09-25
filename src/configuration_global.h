@@ -294,7 +294,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define MC_I2C_NEEDS_BUS_RESET 0
 #endif
 
-// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle acht Konstanten setzen --
+// Eine Speicherklasse pro Zweig. Jeder Zweig MUSS alle sieben Konstanten und seine NBR_FAMILY_*-Marke setzen --
 // wer eine vergisst, bekommt keinen stillen Fehlwert, sondern einen Compile-Fehler,
 // weil die Konstanten Array-Groessen sind. ALT-33.
 #if defined(ENABLE_XML) || defined(ENABLE_SBUFFER)
@@ -308,7 +308,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
 #define RING_BYTES_PHONECOM 1536           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
 #define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256)
-#define NBR_MAX_ROWS 21                    // Nachbarschaftsmatrix: Zeilen inkl. eigener Knoten (Zeile 0), Konzept Nachbarschaftsmatrix 4.2
+#define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: E22_XML zaehlt zur klassischen Familie (64 Zeilen), docs/meshcom5-topologie 4.2
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(BOARD_RAK4630)
 // ESP32-S3 (320 KB SRAM) and nRF52840 (256 KB RAM) — full buffer sizes
 #define MAX_MHEARD 80                      // max count of messages in mheard ringbuffer (was 20, 85-124 H00 nodes observed)
@@ -319,7 +319,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define RING_BYTES_PHONE 3072              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 Schlitze)
 #define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246)
 #define RING_BYTES_UDP 3072                // Byte-Ring UDP-Ausgang (war 20 x 256)
-#define NBR_MAX_ROWS 21                    // Nachbarschaftsmatrix: 21 Zeilen = 3,1 kB BSS, Konzept 4.2
+#define NBR_FAMILY_LARGE                   // MeshCom-5-Topologie: 128 Zeilen, 128-Bit-Masken, docs/meshcom5-topologie 4.2
 #elif defined(ENABLE_TBEAM)                // very smal version only for developer tests
 #define MAX_MHEARD 10                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
 #define MAX_MHPATH 10                      // max count of messages in mhpath ringbuffer (was 30, limited by DRAM)
@@ -329,7 +329,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define RING_BYTES_PHONE 1024              // Byte-Ring BLE-Daten zum Telefon (war 10 x 260 Schlitze)
 #define RING_BYTES_PHONECOM 1024           // Byte-Ring BLE-Kommandos zum Telefon (war 10 x 246)
 #define RING_BYTES_UDP 1024                // Byte-Ring UDP-Ausgang (war 10 x 256)
-#define NBR_MAX_ROWS 11                    // Nachbarschaftsmatrix: Entwickler-Variante, 1,0 kB
+#define NBR_FAMILY_DEV                     // MeshCom-5-Topologie: Entwickler-Variante, 32 Zeilen
 #else
 // ESP32 original (~160 KB DRAM) — reduced buffer sizes due to RAM constraints
 #define MAX_MHEARD 30                      // max count of messages in mheard ringbuffer (was 20, limited by DRAM)
@@ -351,7 +351,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define RING_BYTES_PHONE 2048              // Byte-Ring BLE-Daten zum Telefon (war 20 x 260 = 5200)
 #define RING_BYTES_PHONECOM 2048           // Byte-Ring BLE-Kommandos zum Telefon (war 20 x 246 = 4920)
 #define RING_BYTES_UDP 2048                // Byte-Ring UDP-Ausgang (war 20 x 256 = 5120)
-#define NBR_MAX_ROWS 13                    // Nachbarschaftsmatrix: 13 Zeilen = 1,3 kB, klassischer ESP32 ist DRAM-begrenzt
+#define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: 64 Zeilen, 64-Bit-Masken, docs/meshcom5-topologie 4.2
 #endif
 
 #define MAX_ZEROS 6                        // maximum number of zeros in a row in a received udp message
@@ -456,6 +456,71 @@ static inline bool flashLayoutCompatible(int stored)
 #define TRICKLE_IMIN_S        30      // Schnellstes HEY-Intervall (30s nach Topologieaenderung)
 #define TRICKLE_IMAX_S        (15*60) // Langsamstes HEY-Intervall (15min, wie bisher)
 #define TRICKLE_K             2       // Redundanzschwelle: eigenen HEY unterdruecken wenn >=k konsistente gehoert
+
+// MeshCom-5-Topologie (docs/meshcom5-topologie/, docs/meshcom5-campaign.md): alle
+// Groessen je Familie an EINER Stelle, jede einzeln per -D ueberschreibbar. Wer im
+// Feld RAM zurueckholen muss, dreht hier; nbr_matrix.h prueft die Abhaengigkeiten
+// (Maskenbreite >= Zeilen, Zeilenindex passt in ein Byte) per static_assert.
+//   NBR_MAX_ROWS      Zeilen inkl. eigener Zeile 0            (8 B Rufzeichen + 12 B Kern + 2 Masken)
+//   NBR_MAX_EDGES     Kantenpool, 6 B je Kante                 (Konzept: 4 Kanten je Zeile)
+//   NBR_EXT_SLOTS     Direkt-Erweiterung, 13 B je Slot         (ab Stufe 2)
+//   NBR_HZ_ENTRIES    Horizont, 20 B (klassisch) / 28 B        (ab Stufe 2)
+//   NBR_SHARE_PCT     Deckung ab diesem Anteil am Zaehler des staerksten direkten Hoerers; 0 = Ein-Treffer-Regel (alt)
+//   NBR_CNT_HALVE_MIN Kantenzaehler alle n Minuten halbieren; 0 = nie
+//   NBR_SNR_AVG_N     gleitendes SNR-Mittel der Kante (x, ich) ueber n Rahmen; 1 = letzter Wert (alt)
+//   NBR_NCNT_AIR_MAX  Deckel fuer NCNT auf der Luft (R<n>, /N, HEY-Gruppe, HN), zweistellig
+#if defined(NBR_FAMILY_LARGE)
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 128
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 512
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 64
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 112
+#endif
+#elif defined(NBR_FAMILY_DEV)
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 32
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 128
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 16
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 16
+#endif
+#else   // NBR_FAMILY_CLASSIC
+#ifndef NBR_MAX_ROWS
+#define NBR_MAX_ROWS 64
+#endif
+#ifndef NBR_MAX_EDGES
+#define NBR_MAX_EDGES 256
+#endif
+#ifndef NBR_EXT_SLOTS
+#define NBR_EXT_SLOTS 48
+#endif
+#ifndef NBR_HZ_ENTRIES
+#define NBR_HZ_ENTRIES 48
+#endif
+#endif
+#ifndef NBR_SHARE_PCT
+#define NBR_SHARE_PCT 10
+#endif
+#ifndef NBR_CNT_HALVE_MIN
+#define NBR_CNT_HALVE_MIN 90
+#endif
+#ifndef NBR_SNR_AVG_N
+#define NBR_SNR_AVG_N 8
+#endif
+#ifndef NBR_NCNT_AIR_MAX
+#define NBR_NCNT_AIR_MAX 99
+#endif
 
 // HN-Nachbarschaftsmeldung (HEY-Rahmen an "HN", max_hop 0, --nbrreport): fester
 // Takt im langsamsten Trickle-Intervall, NICHT dem Trickle unterworfen (kein

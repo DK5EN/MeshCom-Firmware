@@ -3538,6 +3538,22 @@ void esp32loop()
         nbrLogSnapshot(nbrMatrix, (uint16_t)(millis() / 60000UL));
     }
 
+    // Nachbarschaftsmatrix (Welle 2, edge pool): Minuten-Sweep (nbrSweep(),
+    // CONTRACT in nbr_matrix.h) -- IMMER, unabhaengig von --nbrdebug (das
+    // steuert nur den 15-Minuten-Schnappschuss oben). Loop-Task, nicht
+    // Timer-Task, wie nbrLogSnapshot() oben. nbrSweep() selbst ist ein No-Op
+    // bei einem zweiten Aufruf in derselben Minute; die Minuten-Waechter hier
+    // spart trotzdem den Funktionsaufruf bei jedem Loop-Durchlauf.
+    {
+        static uint16_t s_nbr_sweep_min = 0xFFFF;
+        uint16_t now_min_sweep = (uint16_t)(millis() / 60000UL);
+        if(now_min_sweep != s_nbr_sweep_min)
+        {
+            s_nbr_sweep_min = now_min_sweep;
+            nbrSweep(nbrMatrix, now_min_sweep);
+        }
+    }
+
     // TELEMETRY_INTERVAL in Minutes == 15 minutes default
     unsigned long akt_timer = meshcom_settings.node_parm_time;
     if(akt_timer < 5 || akt_timer > 120)

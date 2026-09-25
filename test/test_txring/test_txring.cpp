@@ -590,16 +590,29 @@ static void test_sl06_ringsource_aus_label_und_bei_verdraengung_kopiert(void)
 // der Slot vorher eine fremde Maske trug (kein Leck zwischen Wiederverwendungen),
 // (b) mit Argumenten landen sie unveraendert im Slot, (c) der N-24-Umzug
 // nimmt sie mit wie ringSource[].
+//
+// Welle 2 (edge pool): ringNeed[]/ringAlone[] sind NbrMask (nbr_mask.h), und
+// addTxRingEntry() nimmt need/alone als const NbrMask* (nullptr = leere
+// Maske) statt als uint32_t. maskFromU32() baut zum Vergleich mit den alten
+// Bitmustern eine NbrMask, deren unterstes Wort exakt diese 32 Bit traegt --
+// bequem fuer die alten festen Testwerte, ohne dass die Tests wissen muessen,
+// wie viele Woerter NBR_MASK_WORDS auf diesem Env hat.
+static NbrMask maskFromU32(uint32_t bits)
+{
+    NbrMask m = nbrMaskNone();
+    m.w[0] = bits;
+    return m;
+}
 
 // (a) Default-Ueberschreiben: Slot 3 traegt eine simulierte Alt-Maske aus
 // einem fruehereren Relay (RING_KIND_COUNTED gesetzt); ein Enqueue OHNE
-// kind/need/alone in genau diesen Slot muss sie auf 0/RING_KIND_OTHER
+// kind/need/alone in genau diesen Slot muss sie auf leer/RING_KIND_OTHER
 // zuruecksetzen.
 static void test_stufe2_default_ueberschreibt_alte_maske(void)
 {
     ringKind[3]  = RING_KIND_RELAY | RING_KIND_COUNTED;
-    ringNeed[3]  = 0xAAAAAAAAUL;
-    ringAlone[3] = 0x55555555UL;
+    ringNeed[3]  = maskFromU32(0xAAAAAAAAUL);
+    ringAlone[3] = maskFromU32(0x55555555UL);
 
     iWrite = 3;
     iRead = 3;
@@ -609,21 +622,24 @@ static void test_stufe2_default_ueberschreibt_alte_maske(void)
     TEST_ASSERT_EQUAL_INT(3, slot);
 
     TEST_ASSERT_EQUAL_UINT8(RING_KIND_OTHER, ringKind[slot]);
-    TEST_ASSERT_EQUAL_UINT32(0, ringNeed[slot]);
-    TEST_ASSERT_EQUAL_UINT32(0, ringAlone[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[slot]));
 }
 
 // (b) Mit Argumenten landen kind/need/alone unveraendert im Slot.
 static void test_stufe2_kind_need_alone_werden_gesetzt(void)
 {
+    NbrMask needMask  = maskFromU32(0x0000000FUL);
+    NbrMask aloneMask = maskFromU32(0x00000003UL);
+
     BuiltFrame f = buildPositionFrame(0x9010UL);
     int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "rx_relay", 0, true,
-                               RING_KIND_RELAY, 0x0000000FUL, 0x00000003UL);
+                               RING_KIND_RELAY, &needMask, &aloneMask);
     TEST_ASSERT_EQUAL_INT(0, slot);
 
     TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[slot]);
-    TEST_ASSERT_EQUAL_UINT32(0x0000000FUL, ringNeed[slot]);
-    TEST_ASSERT_EQUAL_UINT32(0x00000003UL, ringAlone[slot]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[slot]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[slot]));
 }
 
 // (c) N-24-Umzug (siehe test_n24_indirekte_eviction_verwaist_keinen_slot
@@ -631,9 +647,12 @@ static void test_stufe2_kind_need_alone_werden_gesetzt(void)
 // Umzug nach Slot 5 ueberleben muss.
 static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
 {
+    NbrMask needMask  = maskFromU32(0x000000AAUL);
+    NbrMask aloneMask = maskFromU32(0x00000002UL);
+
     BuiltFrame ack = buildAckFrame(0xC0FFEEUL);
     int slot0 = addTxRingEntry(ack.bytes, ack.len, RING_STATUS_DONE, "rx_relay", 0, true,
-                                RING_KIND_RELAY, 0x000000AAUL, 0x00000002UL);
+                                RING_KIND_RELAY, &needMask, &aloneMask);
     TEST_ASSERT_EQUAL_INT(0, slot0);
 
     for (int i = 1; i <= 4; i++)
@@ -661,11 +680,43 @@ static void test_stufe2_n24_umzug_nimmt_kind_need_alone_mit(void)
     // Der CRITICAL-Relay-Eintrag ist von Slot 0 nach Slot 5 umgezogen --
     // seine Stufe-2-Maske muss ihn begleitet haben.
     TEST_ASSERT_EQUAL_UINT8(RING_KIND_RELAY, ringKind[5]);
-    TEST_ASSERT_EQUAL_UINT32(0x000000AAUL, ringNeed[5]);
-    TEST_ASSERT_EQUAL_UINT32(0x00000002UL, ringAlone[5]);
+    TEST_ASSERT_TRUE(nbrMaskEqual(needMask, ringNeed[5]));
+    TEST_ASSERT_TRUE(nbrMaskEqual(aloneMask, ringAlone[5]));
 
     // Slot 0 ist geleert.
     TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
+}
+
+// (d) Ein Zeilenindex >= 32 liegt jenseits des ersten Maskenworts (NBR_MASK_WORDS
+// >= 2 bei den 128 Zeilen, die dieses Env ueber CONFIG_IDF_TARGET_ESP32S3
+// -- siehe test/support/configuration.h -- bekommt): pinnt, dass ein Bit im
+// ZWEITEN Wort addTxRingEntry()/ringNeed[]/txringInCaseBHold() genauso
+// unveraendert durchlaeuft wie eines im ersten.
+static void test_stufe2_maskenbit_ueber_32_ueberlebt_case_b(void)
+{
+    TEST_ASSERT_TRUE_MESSAGE(NBR_MAX_ROWS > 40,
+        "Env liefert weniger als 41 Zeilen -- Bit 40 waere gar nicht darstellbar");
+
+    bNBRCANCEL = true;
+    mc_test_set_millis(1000);
+
+    NbrMask need40    = nbrMaskBit(40);
+    NbrMask aloneEmpty = nbrMaskNone();   // Fall B: alone leer
+
+    BuiltFrame pos = buildPositionFrame(0xB040UL); // LOW
+    int slot = addTxRingEntry(pos.bytes, pos.len, RING_STATUS_DONE, "rx_relay",
+                               0, true, RING_KIND_RELAY, &need40, &aloneEmpty);
+    TEST_ASSERT_EQUAL_INT(0, slot);
+
+    TEST_ASSERT_TRUE(nbrMaskTest(ringNeed[slot], 40));
+    TEST_ASSERT_FALSE(nbrMaskTest(ringNeed[slot], 39));
+    TEST_ASSERT_TRUE(nbrMaskEmpty(ringAlone[slot]));
+
+    // Fall B (ringAlone leer) -> im Hold-Fenster gehalten, wie jeder andere
+    // Fall-B-Relay-Slot (txringInCaseBHold(), siehe txring_functions.h) --
+    // das Bit jenseits von Wort 0 darf die Fall-A/B-Unterscheidung nicht
+    // verfaelschen.
+    TEST_ASSERT_TRUE(txringInCaseBHold(slot, (uint32_t)millis()));
 }
 
 // ----------------------------------------------------- Test 5: Overflow-Drop
@@ -1247,8 +1298,9 @@ static void test_nbr_caseb_hold_weicht_fall_a_gleicher_prio(void)
     TEST_ASSERT_EQUAL_INT(0, slotB);
 
     BuiltFrame posA = buildPositionFrame(0xA001UL); // LOW, gleiche Prio wie B
+    NbrMask aloneA = nbrMaskBit(0); // irgendein gesetztes Bit -- nur "nicht leer" zaehlt fuer Fall A
     int slotA = addTxRingEntry(posA.bytes, posA.len, RING_STATUS_DONE, "rx_relay",
-                                0, true, RING_KIND_RELAY, /*need*/0, /*alone*/1); // Fall A
+                                0, true, RING_KIND_RELAY, /*need*/nullptr, /*alone*/&aloneA); // Fall A
     TEST_ASSERT_EQUAL_INT(1, slotA);
 
     // Innerhalb der Fall-B-Sperre (waited=0 < NBR_RELAY_CASE_B_EXTRA_MS):
@@ -1314,7 +1366,7 @@ static void test_nbr_caseb_hold_blockiert_hn_meldung_nicht(void)
 static void test_nbr_caseb_backoff_dreiphasig(void)
 {
     ringPriority[0] = MSG_PRIO_LOW;
-    ringAlone[0] = 0; // Fall B
+    ringAlone[0] = nbrMaskNone(); // Fall B
 
     unsigned long b1 = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/5000UL);
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(15000UL, b1, "Rest-Hold bei waited=5s");
@@ -1340,7 +1392,7 @@ static void test_nbr_caseb_backoff_dreiphasig(void)
 static void test_nbr_caseb_kein_re_arm(void)
 {
     ringPriority[0] = MSG_PRIO_LOW;
-    ringAlone[0] = 0; // Fall B
+    ringAlone[0] = nbrMaskNone(); // Fall B
 
     unsigned long first = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3000UL);
     unsigned long second = txringCaseBackoffSlot(0, /*attempt*/0, /*now_ms*/3050UL);
@@ -1421,6 +1473,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_stufe2_default_ueberschreibt_alte_maske);
     RUN_TEST(test_stufe2_kind_need_alone_werden_gesetzt);
     RUN_TEST(test_stufe2_n24_umzug_nimmt_kind_need_alone_mit);
+    RUN_TEST(test_stufe2_maskenbit_ueber_32_ueberlebt_case_b);
     RUN_TEST(test_len_null_wird_abgewiesen);
     RUN_TEST(test_len_ueber_max_wird_abgewiesen);
     RUN_TEST(test_len_exakt_max_wird_enqueued);

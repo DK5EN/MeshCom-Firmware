@@ -52,19 +52,26 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len);
 void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len);
 void addBLECommandBack(char *text);
 // addLoraRxBuffer() wird jetzt in dedup_functions.h deklariert.
+// Welle 2 (edge pool, nbr_mask.h): NbrMask nur vorwaerts deklariert, nicht
+// per Include gezogen -- dieser Header wird sehr breit eingebunden, und
+// nbr_mask.h braucht NBR_MAX_ROWS bereits definiert (siehe dessen
+// Kopfkommentar). Ein Zeiger auf einen unvollstaendigen Typ ist als
+// Funktionsparameter gueltig; die volle Definition holt sich jede TU, die
+// need/alone tatsaechlich dereferenziert (txring_functions.h/.cpp), selbst.
+struct NbrMask;
 // N-14: kompletter TX-Ring-Enqueue (Slot-Wahl, Payload-Kopie, Prio/Overflow,
 // iWrite/iRead) in einer Funktion unter einem Lock (nRF52) -- siehe
 // lora_functions.cpp fuer Details/Locking-Begruendung. Rueckgabe: Slot-Index
 // oder -1 wenn die Overflow-Logik den Eintrag verworfen hat.
 // retryCountIn: -1 (Default) laesst retryCount[Slot] unangetastet.
 // kind/need/alone: Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md
-// 5.1, txring_functions.h) -- kind=0 ist RING_KIND_OTHER, need/alone=0 die
-// leere Maske; der Default gilt fuer jeden Aufrufer, der die Matrix nicht
+// 5.1, txring_functions.h) -- kind=0 ist RING_KIND_OTHER, need/alone=nullptr
+// die leere Maske; der Default gilt fuer jeden Aufrufer, der die Matrix nicht
 // kennt. Literale statt RING_KIND_OTHER, weil dieser Header txring_functions.h
 // nicht einbindet.
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn = -1, bool clearSlotFirst = false,
-                    uint8_t kind = 0, uint32_t need = 0, uint32_t alone = 0);
+                    uint8_t kind = 0, const NbrMask *need = nullptr, const NbrMask *alone = nullptr);
 
 // P15: wie addTxRingEntry(), aber fuer eine eigene Nachricht, die nie
 // wiederholt werden soll (DM/Gruppe/Broadcast mit Status DONE) UND trotzdem
@@ -75,7 +82,7 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
 // kind/need/alone: siehe addTxRingEntry() oben, gleiche Defaults.
 int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
                         int retryCountIn = -1, bool clearSlotFirst = false,
-                        uint8_t kind = 0, uint32_t need = 0, uint32_t alone = 0);
+                        uint8_t kind = 0, const NbrMask *need = nullptr, const NbrMask *alone = nullptr);
 
 // checkOwnRx()/checkServerRx() werden jetzt in dedup_functions.h deklariert.
 int checkOwnTx(unsigned int msg_id);

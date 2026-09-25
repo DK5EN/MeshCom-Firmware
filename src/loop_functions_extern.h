@@ -219,19 +219,23 @@ extern uint8_t retryCount[MAX_RING];
 extern uint8_t ringPriority[MAX_RING];         // Prio 1-5 pro Slot
 extern uint32_t ringEnqueueTime[MAX_RING];     // millis() timestamp when enqueued
 
+// Welle 2 (edge pool, nbr_mask.h): wie in loop_functions.h nur vorwaerts
+// deklariert, nicht per Include gezogen -- gleiche Begruendung dort.
+struct NbrMask;
+
 // N-14: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
 // (ein Default darf pro Parameter nur einmal je Uebersetzungseinheit stehen);
 // diese Zeile deckt nur TUs ab, die ausschliesslich dieses Extern-Header ziehen.
 // Stufe-2-Parameter (kind/need/alone): siehe loop_functions.h.
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst,
-                    uint8_t kind, uint32_t need, uint32_t alone);
+                    uint8_t kind, const NbrMask *need, const NbrMask *alone);
 
 // P15: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
 // (siehe Kommentar bei addTxRingEntry() oben) -- gleiche Begruendung.
 int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
                         int retryCountIn, bool clearSlotFirst,
-                        uint8_t kind, uint32_t need, uint32_t alone);
+                        uint8_t kind, const NbrMask *need, const NbrMask *alone);
 
 // BP-01 (BACKLOG) / TM-37: back-pressure to the sender, in Q-codes.
 //

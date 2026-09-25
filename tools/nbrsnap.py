@@ -82,6 +82,13 @@ def main(argv: list[str] | None = None) -> int:
                 elif kind == "EVICT":
                     evicts.append((up, f_[3], f_[4]))
                     zero_call(f_[3])
+                elif kind == "EVICT-E":
+                    # W2c (Kantenpool): eine einzelne Kante wurde verdraengt, keine
+                    # ganze Zeile -- beide Rufzeichen bleiben bestehen, nur die
+                    # eine Beobachtung "<to> hat <from> gehoert" faellt weg. Wie
+                    # zero_call() betrifft das nicht union_heard (das ist die
+                    # Union ueber den GANZEN Lauf, nie rueckwirkend genullt).
+                    edges.pop((f_[2], f_[3]), None)
                 elif kind == "SNAP":
                     own = f_[2]
                     cur = {"up": up, "host": host, "rows": OrderedDict(), "nrows": int(f_[3]), "max": int(f_[4])}

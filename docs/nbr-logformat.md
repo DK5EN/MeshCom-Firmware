@@ -74,6 +74,25 @@ am 2026-09-21 gefunden hat.
 `tools/nbrlog.py` rechnet `<meshneed>` aus den `EDGE`/`ME`-Zeilen selbst nach und stellt es dem
 Firmware-Wert gegenueber. `<verdict>` wird nur berichtet, nicht verglichen.
 
+## MeshCom 5, Kantenpool (seit Welle 2, `docs/meshcom5-campaign.md`)
+
+Die dichte N x N-Matrix ist durch einen Kantenpool ersetzt (64 Zeilen klassisch, 128 auf S3 und
+nRF52). Was sich an den Zeilen aendert:
+
+| Zeile / Feld                                 | Aenderung                                                                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EDGE`/`ME` `<cnt>`                          | EIN Zaehler je Kante ueber alle Typen statt eines Zaehlers je Typ; mit `NBR_CNT_HALVE_MIN` alle 90 min als `(cnt+1)/2` halbiert.                  |
+| `ME` `<snr>`                                 | gleitendes Mittel ueber `NBR_SNR_AVG_N` (8) Rahmen fuer die Kante (x, ich), nicht mehr der letzte Wert.                                           |
+| `SNAP` `<cells>`                             | Zahl lebender Kanten im Pool (nach dem Minuten-Sweep fallen verfallene Kanten heraus).                                                            |
+| Masken in `NEED`/`CANCEL?`/`CANCEL`/`REFUSE` | 16 (klassisch) oder 32 (S3, nRF52) Hex-Stellen statt 8, hoechstwertige zuerst, als `%08lX`-Haelften (nRF52 kennt kein `%llX`). Bit i = Zeile i.   |
+| `[NBR]\|EVICT-E\|<up>\|<from>\|<to>`         | neu: der Kantenpool war voll, die aelteste Kante ohne Bezug zu Zeile 0 wich (erst danach die aelteste ueberhaupt). `<to>` hatte `<from>` gehoert. |
+| `[NBR]\|DROP\|<up>\|SYMBUF\|<n>`             | neu, nur nRF52: `<n>` SYM-Zeilen gingen verloren, weil der Puffer fuer Zeilen aus der Scheduler-Klammer voll war.                                 |
+
+Deckung nach Anteil (`NBR_SHARE_PCT`, 10 %): eine Kante deckt nur, wenn ihr Zaehler mindestens 10 %
+des Zaehlers der staerksten Kante derselben Art erreicht. Fuer #X (`<meshneed>`, Web-Rollen) ist das
+"M hat x gehoert"; fuer die Allein-Maske und die Deckung beim Abbruch "X hat die Kopie von M gehoert",
+dieselbe Richtung wie vor dem Umbau.
+
 ## Stufe 2: Relay-Entscheidung (`--nbrrelay count|on`, docs/nbr-wichtigkeit-konzept.md 5)
 
 Diese Zeilen kommen nur mit `--nbrdebug on` UND `--nbrrelay count` oder `on`. `<need>`, `<alone>`

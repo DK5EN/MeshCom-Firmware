@@ -15,6 +15,7 @@
 
 #include <Arduino.h>
 #include <configuration.h>
+#include "nbr_mask.h"
 
 // SL-03/SL-06: Herkunft je Ring-Slot, 'o' eigene Nachricht, 'r' Relay eines
 // Empfangs, 'g' vom Server eingespeist. Gesetzt in addTxRingEntry() aus dem
@@ -33,8 +34,11 @@ extern uint8_t ringSource[MAX_RING];
 // behaelt) und beim N-24-Slot-Umzug mitkopiert; gelesen/veraendert vom
 // Mithoer-Scan (lora_functions.cpp OnRxDone) und vom fallabhaengigen
 // CSMA-Backoff (csma_compute_timeout_slot()).
-extern uint32_t ringNeed[MAX_RING];
-extern uint32_t ringAlone[MAX_RING];
+// Welle 2 (edge pool): NbrMask statt uint32_t (nbr_mask.h) -- ein Wort auf
+// klassischem ESP32 (64 Zeilen), zwei auf S3/nRF52 (128 Zeilen). ==0/&=~x
+// werden an den Aufrufstellen zu nbrMaskEmpty()/nbrMaskAndNot().
+extern NbrMask ringNeed[MAX_RING];
+extern NbrMask ringAlone[MAX_RING];
 extern uint8_t  ringKind[MAX_RING];
 
 // ringKind-Werte. RING_KIND_COUNTED ist ein Kennbit (ORed auf RING_KIND_*),

@@ -167,6 +167,21 @@ class EvictRec:
 
 
 @dataclass
+class EvictERec:
+    """Eine einzelne verdraengte KANTE, nicht eine ganze Zeile (W2c, Kantenpool
+    ``docs/meshcom5-campaign.md`` Welle 2, ``[NBR]|EVICT-E|<up>|<from>|<to>``).
+    Anders als ``EvictRec`` (eine Zeile weicht komplett) bleiben beide Rufzeichen
+    ``<from>``/``<to>`` als Zeilen bestehen -- nur die eine Kante "``<to>`` hat
+    ``<from>`` gehoert" wurde aus dem Kantenpool verdraengt."""
+
+    host: datetime
+    up: int
+    frm: str
+    to: str
+    session: int
+
+
+@dataclass
 class PosRec:
     host: datetime
     up: int
@@ -313,6 +328,9 @@ class NbrState:
     cuts: list[CutRec] = field(default_factory=list)
     drops: list[DropRec] = field(default_factory=list)
     evicts: list[EvictRec] = field(default_factory=list)
+    #: W2c: einzelne Kanten-Verdraengungen ([NBR]|EVICT-E), getrennt von den
+    #: ganzen Zeilen-Verdraengungen oben.
+    evicts_e: list[EvictERec] = field(default_factory=list)
     pos: list[PosRec] = field(default_factory=list)
     snaps: list[SnapBlock] = field(default_factory=list)
     open_snap: SnapBlock | None = None
@@ -416,6 +434,11 @@ def _h_evict(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     )
 
 
+def _h_evict_e(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
+    (frm, to) = f
+    state.evicts_e.append(EvictERec(host, up, frm, to, state.session))
+
+
 def _h_pos(state: NbrState, host: datetime, up: int, f: list[str]) -> None:
     (call, lat, lon, mesh, hw) = f
     state.pos.append(
@@ -474,6 +497,7 @@ HANDLERS = {
     "CUT": _h_cut,
     "DROP": _h_drop,
     "EVICT": _h_evict,
+    "EVICT-E": _h_evict_e,
     "POS": _h_pos,
     "SNAP": _h_snap,
     "ROW": _h_row,
@@ -963,6 +987,10 @@ def a6_tabellendruck(state: NbrState) -> dict[str, Any]:
         "evict_pro_stunde": dict(sorted(evict_pro_stunde.items())),
         "verdraengte_rufzeichen": dict(verdraengt.most_common()),
         "evict_gesamt": len(state.evicts),
+        # W2c: Kanten-Verdraengungen zaehlen getrennt -- eine EVICT-E trifft nur
+        # eine einzelne Kante, keine ganze Zeile, und darf die Zeilen-Statistik
+        # oben nicht verfaelschen.
+        "evict_e_gesamt": len(state.evicts_e),
     }
 
 
@@ -1318,6 +1346,8 @@ def render_bluf(res: dict[str, Any]) -> list[str]:
         lines.append(f"- {rahmen['anzahl_luecken']} Mitschnitt-Luecke(n) > 2 min.")
     if druck["evict_gesamt"]:
         lines.append(f"- {druck['evict_gesamt']} EVICT-Ereignisse insgesamt -- Tabellendruck ist real.")
+    if druck["evict_e_gesamt"]:
+        lines.append(f"- {druck['evict_e_gesamt']} EVICT-E-Ereignis(se) (einzelne Kante verdraengt).")
     if res["8_verworfene_frames"]["full_alarm"]:
         lines.append(
             f"- **{res['8_verworfene_frames']['full_anzahl']} DROP|FULL** -- Alarmsignal, "
@@ -1561,6 +1591,7 @@ def render_md(res: dict[str, Any]) -> str:
     out.append("")
     out.append(f"- rows max: {dr['rows_max']}, rows median: {dr['rows_median']}")
     out.append(f"- EVICT gesamt: {dr['evict_gesamt']}")
+    out.append(f"- EVICT-E (einzelne Kante) gesamt: {dr['evict_e_gesamt']}")
     if dr["ueberlauf_erkannt"]:
         out.append(f"- **Tabellenueberlauf in {len(dr['ueberlauf_snapshots'])} Snapshot(s)** -- Urteil aus Abschnitt 4 dort nicht haltbar.")
     out.append("")
@@ -2079,6 +2110,41 @@ def run_self_test() -> int:
     # VETO gehoert NICHT in Abschnitt 10 (angewendete Annahmen) -- diese
     # Fixture hat ausschliesslich VETO-Zeilen, Abschnitt 10 muss leer bleiben.
     _check("stage3 sym (VETO ausgeschlossen) anzahl_gesamt", res_s3["10_symmetrie"]["anzahl_gesamt"], 0, failures)
+
+    # -- 5b) W2c: Kantenpool (docs/meshcom5-campaign.md Welle 2) -- Masken bei
+    #    NEED/CANCEL?/CANCEL/REFUSE sind jetzt 16 (klassischer ESP32) oder 32
+    #    (S3/nRF52) Hex-Stellen statt 8. Diese Zeilen werden von nbrlog.py nach
+    #    wie vor NICHT inhaltlich geparst (kein Handler in HANDLERS), nur ihr
+    #    Untertyp gezaehlt -- die Breite darf daran nichts aendern, weder in
+    #    einen Parserfehler noch nach "foreign_line" kippen. Dazu die neue
+    #    Zeile [NBR]|EVICT-E (einzelne Kante, keine ganze Zeile).
+    state_w2c = parse_files([TESTDATA_DIR / "nbr_sample_w2c.log"])
+    res_w2c = analyze(state_w2c)
+    r_w2c = res_w2c["1_rahmen"]
+    _check("w2c zeilen_gesamt", r_w2c["zeilen_gesamt"], 26, failures)
+    _check("w2c nbr_zeilen", r_w2c["nbr_zeilen"], 9, failures)
+    _check("w2c verworfen_gesamt", r_w2c["verworfen_gesamt"], 17, failures)
+    _check(
+        "w2c verworfen_gruende (16- und 32-Hex-Masken beide nur unknown_subtype)",
+        r_w2c["verworfen_gruende"],
+        {
+            "no_timestamp": 9,
+            "unknown_subtype:NEED": 2,
+            "unknown_subtype:CANCEL?": 2,
+            "unknown_subtype:CANCEL": 2,
+            "unknown_subtype:REFUSE": 2,
+        },
+        failures,
+    )
+    _check("w2c eigener_rufzeichen", res_w2c["eigener_rufzeichen"], "DK5EN-98", failures)
+    _check("w2c evict_e count", len(state_w2c.evicts_e), 2, failures)
+    if len(state_w2c.evicts_e) == 2:
+        _check("w2c evict_e[0] frm/to", (state_w2c.evicts_e[0].frm, state_w2c.evicts_e[0].to), ("OE3ZZZ-1", "DK5EN-93"), failures)
+        _check("w2c evict_e[1] frm/to", (state_w2c.evicts_e[1].frm, state_w2c.evicts_e[1].to), ("OE4YYY-2", "DK5EN-94"), failures)
+    _check("w2c evict_e_gesamt (Abschnitt 6)", res_w2c["6_tabellendruck"]["evict_e_gesamt"], 2, failures)
+    # EVICT-E darf die Zeilen-EVICT-Zaehlung nicht mitzaehlen -- diese Fixture
+    # hat keine einzige [NBR]|EVICT-Zeile (nur EVICT-E).
+    _check("w2c evict_gesamt (Zeilen, unveraendert 0)", res_w2c["6_tabellendruck"]["evict_gesamt"], 0, failures)
 
     # -- 6) --fetch --dry-run darf das Netz nie anfassen --
     import unittest.mock as mock

@@ -11,6 +11,17 @@
 
 static NbrMatrix m;
 
+static char g_log[4096];
+static void log_capture(const char *line)
+{
+    size_t used = strlen(g_log);
+    if (used + strlen(line) + 2 < sizeof(g_log))
+    {
+        strcat(g_log, line);
+        strcat(g_log, "\n");
+    }
+}
+
 static void add_direct(const char *call, int snr)
 {
     nbrNoteFrame(m, call, ':', NULL, false, -80, (int8_t)snr, 10);
@@ -65,7 +76,82 @@ void test_truncated_report_round_trip_clears_complete_flag(void)
     TEST_ASSERT_TRUE(applied >= 0);
     int sx = nbrFind(r, "DK5EN-98");
     TEST_ASSERT_TRUE(sx > 0);
-    TEST_ASSERT_EQUAL_UINT8(0, r.rows[sx].flags & NBR_FLAG_RPT);   // gekappt: kein Veto
+    TEST_ASSERT_FALSE(nbrRowHasFlag(r, sx, NBR_FLAG_RPT));   // gekappt: kein Veto
+}
+
+// Kantenpool voll (Welle 2, Konzept 4.1): es weicht die aelteste Kante, die
+// weder Zeile 0 noch Spalte 0 beruehrt -- auch wenn eine Kante an mir selbst
+// noch aelter ist. Eigene Umgebung, weil native_nbr_matrix (5 Zeilen, 20
+// Kanten) jede moegliche Kante halten kann und nie voll wird.
+void test_full_edge_pool_evicts_oldest_edge_not_touching_row_zero(void)
+{
+    static NbrMatrix p;
+    nbrInit(p, "DK5EN-98", 0);
+    char call[NBR_CALL_LEN];
+    int idx[NBR_MAX_ROWS];
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+    {
+        snprintf(call, sizeof(call), "DA1A%c-1", 'A' + i);
+        nbrNoteFrame(p, call, ':', NULL, false, -80, 5, 1);   // Kante (i, 0) mit Minute 1
+        idx[i] = nbrFind(p, call);
+        TEST_ASSERT_TRUE(idx[i] > 0);
+    }
+    // Den Rest des Pools mit Kanten zwischen Fremden fuellen, Minute 10, 11, ...
+    int used = nbrEdgesUsed(p);
+    uint16_t t = 10;
+    int first_x = -1, first_y = -1;
+    for (int x = 1; x < NBR_MAX_ROWS && used < NBR_MAX_EDGES; x++)
+        for (int y = 1; y < NBR_MAX_ROWS && used < NBR_MAX_EDGES; y++)
+        {
+            if (x == y)
+                continue;
+            int e = nbrIEdgeAlloc(p, idx[x], idx[y], t, NULL);
+            p.edge[e].cnt = 1;
+            if (first_x < 0)
+            {
+                first_x = idx[x];
+                first_y = idx[y];
+            }
+            t++;
+            used++;
+        }
+    TEST_ASSERT_EQUAL_INT(NBR_MAX_EDGES, nbrEdgesUsed(p));
+
+    // Eine noch fehlende Paarkante (x, y) zwischen zwei Fremden erzwingt die
+    // Verdraengung (die ME-Kante (y, 0) des Rahmens gibt es schon).
+    int nx = -1, ny = -1;
+    for (int x = 1; x < NBR_MAX_ROWS && nx < 0; x++)
+        for (int y = 1; y < NBR_MAX_ROWS && nx < 0; y++)
+            if (x != y && nbrIEdgeFind(p, idx[x], idx[y]) < 0)
+            {
+                nx = x;
+                ny = y;
+            }
+    TEST_ASSERT_TRUE(nx > 0);
+    char path[32], cx[NBR_CALL_LEN], cy[NBR_CALL_LEN], cfx[NBR_CALL_LEN], cfy[NBR_CALL_LEN];
+    nbrCallDecode(p.call[idx[nx]], cx);
+    nbrCallDecode(p.call[idx[ny]], cy);
+    nbrCallDecode(p.call[first_x], cfx);
+    nbrCallDecode(p.call[first_y], cfy);
+    snprintf(path, sizeof(path), "%s,%s", cx, cy);
+
+    g_log[0] = '\0';
+    nbrLog = log_capture;
+    nbrNoteFrame(p, path, '!', NULL, false, -80, 5, 200);
+    nbrLog = NULL;
+
+    // Die aelteste Kante ueberhaupt ist eine Kante an mir (Minute 1); weichen
+    // muss aber die aelteste Fremdkante (Minute 10).
+    char expect[64];
+    snprintf(expect, sizeof(expect), "[NBR]|EVICT-E|200|%s|%s\n", cfx, cfy);
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(g_log, expect), g_log);
+    TEST_ASSERT_TRUE(nbrIEdgeFind(p, first_x, first_y) < 0);
+    TEST_ASSERT_TRUE(nbrIEdgeFind(p, idx[nx], idx[ny]) >= 0);
+    for (int i = 1; i < NBR_MAX_ROWS; i++)
+        TEST_ASSERT_TRUE(nbrIEdgeFind(p, idx[i], 0) >= 0);   // alle Kanten an mir leben noch
+    TEST_ASSERT_FALSE(nbrMaskTest(p.heardBy[first_x], first_y));
+    TEST_ASSERT_FALSE(nbrMaskTest(p.hears[first_y], first_x));
+    TEST_ASSERT_EQUAL_INT(NBR_MAX_EDGES, nbrEdgesUsed(p));
 }
 
 int main(int, char **)
@@ -74,5 +160,6 @@ int main(int, char **)
     RUN_TEST(test_more_than_max_entries_truncates_with_plus);
     RUN_TEST(test_exactly_max_entries_has_no_plus);
     RUN_TEST(test_truncated_report_round_trip_clears_complete_flag);
+    RUN_TEST(test_full_edge_pool_evicts_oldest_edge_not_touching_row_zero);
     return UNITY_END();
 }

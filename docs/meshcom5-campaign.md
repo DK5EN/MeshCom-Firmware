@@ -20,7 +20,7 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
 | ---- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
 | 0    | sync      | Merge `fork-neo-test`, delete sset4 migration, baseline (native suites, golden, all firmware envs, nm symbols) -- done, 0f7749c2                                                                                                                                         | done   |
 | 1    | 1 prep    | W1a replay harness + 24.09 fixture (byte-identical `[NBR]` lines from the dense build); W1b `tools/nm_symsum.py`                                                                                                                                                         | done   |
-| 2    | 1 core    | Header contract by the orchestrator; W2a `nbr_matrix.*` (edge pool, NbrMask, callsign word, share rule, counter halving, clamp, minute sweep); W2b mask consumers (txring, lora cover scan, web/command neighbours, loop, both mains)                                    | open   |
+| 2    | 1 core    | Header contract by the orchestrator; W2a `nbr_matrix.*` (edge pool, NbrMask, callsign word, share rule, counter halving, clamp, minute sweep); W2b mask consumers (txring, lora cover scan, web/command neighbours, loop, both mains)                                    | done   |
 | 3    | 2 views   | W3a `nbr_views.*`, direct extension, horizon, echo table, ME step off the path check; W3b horizon/echo feed in `lora_functions.cpp` + replay shadow over 21.-24.09.                                                                                                      | open   |
 | 4    | 3 cutover | W4a removal + core readers; W4b web + command; W4c mains + loop + MH JSON (7 new fields, FailSoft); W4d T-Deck, T-Deck Pro, `topo.dat`                                                                                                                                   | open   |
 | 5    | 3 field   | Bench on the three USB nodes (T-Deck Plus DK5EN-14 reboot keeps topology, Heltec V3 DK5EN-1, T-Beam v1.2), then 24 h field run on DK5EN-98 and DK5EN-1. The RAK4631 DK5EN-90 nRF52 consistency test runs last, after everything else is finished (operator, 2026-09-25). | open   |
@@ -70,3 +70,44 @@ M1 to M3 are out of scope. Run with `/orchestrate-waves`; this file is the resum
   show 41 boot-gap groups (reported only).
 - Seam for wave 2: `-D NBR_MATRIX_SRC='"..."'` selects which implementation the harness
   includes, so the same file runs against a frozen copy of the dense code and the edge pool.
+
+### Wave 2
+
+- Contract in `src/`: per-family constants in `configuration_global.h` (`NBR_FAMILY_*` markers,
+  `NBR_MAX_ROWS/EDGES/EXT_SLOTS/HZ_ENTRIES`, `NBR_SHARE_PCT`, `NBR_CNT_HALVE_MIN`,
+  `NBR_SNR_AVG_N`, `NBR_NCNT_AIR_MAX`), new `src/nbr_mask.h`, public API frozen in
+  `src/nbr_matrix.h` ("CONTRACT (Welle 2)" comments).
+- Envs: `native_nbr_replay` is now the compat build (21 rows, share 0, no halving, SNR last
+  value, 441 edges); `native_nbr_replay64` and `native_nbr_replay128` run production rules.
+- Writers: W2a `nbr_matrix.*` + nbr tests (Opus); W2b txring, `loop_functions.h`/`_extern.h`,
+  `lora_functions.cpp`, `loop_functions.cpp`, both mains, txring tests; W2c `web_functions.cpp`,
+  `command_functions.cpp`, `tools/nbr*.py`. Orchestrator-owned: `platformio.ini`,
+  `configuration_global.h`, `nbr_mask.h`, `docs/nbr-logformat.md`.
+- Result: edge pool in `src/nbr_matrix.cpp`; the compat build (21 rows, old rules) matches the
+  frozen dense code in 0 of 12,468 lines differing (EDGE/ME `<cnt>` blanked, masks on the low
+  32 bits), also with the nRF52 deferred-log path and with or without the minute sweep. The
+  production rules at 64 and 128 rows change no decision except through capacity (177 ROW
+  keys, rows the dense table had evicted). DB0ED-99 keeps DB0FHR-12 as exclusive in all 53
+  snapshots (#X 0 -> 2 in the final one).
+- Decision recorded (W2a): the share rule for the alone mask and the cancel cover uses edge
+  (M, X) "X heard M's copy", the direction of the dense code; the concept's formula (x, M)
+  applies to #X only. The concept text in 4.2/4.3 is ambiguous here; the code is the reference.
+- RAM after wave 2 (nm, transitional, old MHeard and path table still present):
+
+  | Family                | Topology (was matrix) | Rings     | Total stores    | Linker RAM before -> after |
+  | --------------------- | --------------------- | --------- | --------------- | -------------------------- |
+  | classic (E22, T-Beam) | 3,848 (1,332)         | 320 (160) | 8,665 (5,989)   | 95,584 -> 98,264           |
+  | E22_XML               | 3,848 (3,156)         | 320       | 10,475          |                            |
+  | S3 (Heltec V3)        | 9,736 (3,156)         | 640       | 21,883 (14,823) | 101,548 -> 108,628         |
+  | nRF52 (RAK4631)       | 9,736 (3,156)         | 640       | 23,635 (16,575) | 81,408 -> 88,872           |
+
+  The topology matches the concept (3,840 / 9,728 B plus header). Static extras: nRF52-only
+  deferred SYM buffer 390 B; web and console take their row scratch from the heap per render.
+
+- Advisor (Fable): APPROVED. Two low findings fixed at the gate: an echoed HEY group no longer
+  overwrites the SNR mean of edge (x, 0) when `NBR_SNR_AVG_N > 1` (regression test fails
+  before, passes after); the web page counts #X = -1 as 0 instead of 255 (nRF52 race).
+  Advisor note for wave 5: the mask/edge consistency check exists only in host tests; the RAK
+  test needs a firmware-side check.
+- Gate: all native suites and golden green; 34 of 35 firmware envs build with >= 4 kB DRAM
+  headroom (esp32-external-radio as before).

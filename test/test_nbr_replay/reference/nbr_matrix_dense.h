@@ -53,24 +53,6 @@
 #error "NBR_MAX_ROWS ist nicht definiert. Board-Builds bekommen ihn aus configuration_global.h, der Host-Test aus platformio.ini (env native_nbr_matrix, -D NBR_MAX_ROWS=5)."
 #endif
 
-#include "nbr_mask.h"
-
-// MeshCom-5-Konstanten (configuration_global.h, je Familie; Host-Defaults hier).
-#ifndef NBR_MAX_EDGES
-#define NBR_MAX_EDGES (NBR_MAX_ROWS * 4)
-#endif
-#ifndef NBR_SHARE_PCT
-#define NBR_SHARE_PCT 10
-#endif
-#ifndef NBR_CNT_HALVE_MIN
-#define NBR_CNT_HALVE_MIN 90
-#endif
-#ifndef NBR_SNR_AVG_N
-#define NBR_SNR_AVG_N 8
-#endif
-static_assert(NBR_MAX_EDGES >= NBR_MAX_ROWS, "Kantenpool kleiner als die Zeilenzahl");
-static_assert(NBR_SNR_AVG_N >= 1, "NBR_SNR_AVG_N ist mindestens 1 (= letzter Wert)");
-
 #ifndef LORA_SNR_STABLE_MIN_DB
 #error "LORA_SNR_STABLE_MIN_DB ist nicht definiert -- siehe configuration_default.h (Flottendefault, #ifndef-Wert -16)."
 #endif
@@ -79,13 +61,12 @@ static_assert(NBR_SNR_AVG_N >= 1, "NBR_SNR_AVG_N ist mindestens 1 (= letzter Wer
 // ab (Konzept 4.2). Der ueberlaufsichere Vergleich (uint16_t)(now-last) <
 // NBR_WINDOW_MIN ist nur INNERHALB von 65536 Minuten (45 Tage) nach dem
 // letzten Treffer eindeutig -- laeuft der 16-Bit-Minutenzaehler seither
-// einmal ganz herum, sieht eine seit Ewigkeiten tote Kante wieder wie
-// gerade eben getroffen aus ("Geist"). Dagegen gibt nbrSweep() (Loop-Task,
-// einmal je Minute) jede Kante ab NBR_WINDOW_MIN frei und raeumt jede Zeile
-// mit einer Altersluecke >= 32768 (die Haelfte des 16-Bit-Bereichs), bevor
-// sie als "aeltestes Opfer" oder als frisch durchgehen kann. Fuer jede
-// Entscheidung innerhalb der 45 Tage braucht es den Sweep nicht: alle Leser
-// pruefen die Frische an der Kantenminute.
+// einmal ganz herum, sieht eine seit Ewigkeiten tote Zelle wieder wie
+// gerade eben getroffen aus ("Geist"). Dagegen faehrt nbrNoteFrame()/
+// nbrNotePos() periodisch einen Sweep (siehe nbrMaybeSweep() in
+// nbr_matrix.cpp), der jede Zelle/Zeile mit einer Alterslluecke >= 32768
+// (die Haelfte des 16-Bit-Bereichs) zuruecksetzt, bevor sie als "aeltestes
+// Opfer" oder als frisch durchgehen kann.
 #define NBR_WINDOW_MIN 720
 
 // Rufzeichen inkl. Nullterminierung, wie mheardCalls[][10] es schon vorgibt.
@@ -98,19 +79,22 @@ static_assert(NBR_SNR_AVG_N >= 1, "NBR_SNR_AVG_N ist mindestens 1 (= letzter Wer
 #define NBR_FLAG_USED 0x08   // Zeile ist belegt (Zeile 0 ist es immer, auch ohne dieses Bit)
 #define NBR_FLAG_RPT  0x10   // letzter HN-Bericht dieser Zeile war VOLLSTAENDIG (kein '+'); rpt_min traegt seine Minute
 
-// CONTRACT (Welle 2): Zeilenkern, 12 Byte, keine Fuellung (static_assert in
-// nbr_matrix.cpp). Position in 0,01 Grad (int16), 0x7FFF = unbekannt. ext ist
-// der Index des Direkt-Slots (ab Stufe 2), 0xFF = keiner; ncnt die zuletzt
-// gemeldete Nachbarzahl dieser Station (ab Stufe 3 beschrieben).
+// Zeile (weiterhin 24 Byte -- siehe rpt_min unten): ein gehoertes Rufzeichen
+// mit letzter Position und Typ.
 struct NbrRow
 {
-    int16_t  lat16, lon16;
-    uint16_t last_min;
+    char     call[NBR_CALL_LEN];
+    // Minute des letzten VOLLSTAENDIGEN HN-Berichts dieser Zeile
+    // (NBR_FLAG_RPT), fuer den Symmetrie-Veto in nbrHearsSym()
+    // (nbr_matrix.cpp). Absichtlich HIER platziert statt hinter hw: char[10]
+    // laesst vor dem folgenden float (4-Byte-Ausrichtung) ohnehin 2 Byte
+    // Luecke, die ein uint16_t genau fuellt -- die Zeile bleibt bei 24 Byte,
+    // kein zusaetzlicher RAM-Bedarf trotz drittem Report-Feld.
     uint16_t rpt_min;
+    float    lat, lon;
+    uint16_t last_min;
     uint8_t  flags;
     uint8_t  hw;
-    uint8_t  ncnt;
-    uint8_t  ext;
 };
 
 // Kein gueltiger Signalwert: int8_t deckt -127..127 ab, -128 bleibt
@@ -162,57 +146,25 @@ struct NbrRow
 #define NBR_REPORT_VALID_MIN 45
 #endif
 
-// CONTRACT (Welle 2): Kante (6 Byte) = eine Beobachtung "y hat x gehoert",
-// frueher cells[x][y]. cnt: ein Zaehler ueber alle Typen, saettigt bei 255,
-// wird alle NBR_CNT_HALVE_MIN Minuten als (cnt+1)/2 halbiert (faellt nie auf 0,
-// solange die Kante lebt). snr: fuer die Kante (x, 0) das gleitende Mittel ueber
-// NBR_SNR_AVG_N Rahmen, sonst der zuletzt gemeldete Wert. x == 0xFF: freier
-// Eintrag.
-struct NbrEdge
+// Zelle (6 Byte): "Spalte hat Zeile gehoert" -- drei sattelnde Zaehler nach
+// Frame-Typ, der zuletzt gesehene SNR aus einem HEY-Bericht bzw. aus dem
+// eigenen Empfang (dB, NBR_SNR_UNKNOWN = unbekannt) und die Letztzeit dieser
+// Zelle.
+struct NbrCell
 {
-    uint8_t  x, y;
-    uint8_t  cnt;
+    uint8_t  cnt_text, cnt_pos, cnt_hey;
     int8_t   snr;
     uint16_t last_min;
 };
 
-// CONTRACT (Welle 2): Topologie in getrennten Feldern (Konzept 4.1). Das
-// Rufzeichen liegt als 64-Bit-Wort vor (6 Bit je Zeichen, nbrCallEncode()),
-// die Suche ist ein Wortvergleich je Zeile. hears[y] hat Bit x, heardBy[x] hat
-// Bit y, sobald eine Kante (x, y) lebt; beide Masken sind der einzige Weg, auf
-// dem Urteile und Relay-Entscheidung Mengen bilden. Nur nbr_matrix.cpp greift
-// auf diese Felder zu; alle anderen lesen ueber nbrRowGet()/nbrEdgeGet() und
-// die Maskenfunktionen unten (Scheduler-Klammer, siehe nbr_matrix.cpp).
+// N mal N Kreuztabelle. cell[X][Y] = "Y hat X gehoert". Zeile 0 ist der
+// eigene Knoten und wird nie verdraengt.
 struct NbrMatrix
 {
-    uint64_t call[NBR_MAX_ROWS];
-    NbrRow   row[NBR_MAX_ROWS];
-    NbrMask  hears[NBR_MAX_ROWS];
-    NbrMask  heardBy[NBR_MAX_ROWS];
-    NbrEdge  edge[NBR_MAX_EDGES];
+    NbrRow  rows[NBR_MAX_ROWS];
+    NbrCell cells[NBR_MAX_ROWS][NBR_MAX_ROWS];
     uint16_t boot_min;
-    uint16_t last_sweep;   // Minute des letzten nbrSweep()
-    uint16_t last_halve;   // Minute der letzten Zaehlerhalbierung
-};
-
-// CONTRACT (Welle 2): entschluesselte Zeile fuer Leser ausserhalb von
-// nbr_matrix.cpp. Position als float wie frueher, NAN wenn unbekannt.
-struct NbrRowView
-{
-    char     call[NBR_CALL_LEN];
-    float    lat, lon;
-    uint16_t last_min;
-    uint16_t rpt_min;
-    uint8_t  flags;
-    uint8_t  hw;
-    uint8_t  ncnt;
-};
-
-struct NbrEdgeView
-{
-    uint8_t  cnt;
-    int8_t   snr;
-    uint16_t last_min;
+    uint16_t last_sweep;   // Minute des letzten Geister-Sweeps, siehe NBR_WINDOW_MIN oben
 };
 
 // --- Instrumentierung fuer den 24-h-Dauertest (docs/nbr-logformat.md) -----
@@ -245,42 +197,6 @@ int nbrFind(const NbrMatrix &m, const char *call);
 // Setzt alles zurueck bis auf das Rufzeichen von Zeile 0 (Konzept 4.2:
 // "Reset per Kommando nullt alles ausser Zeile 0").
 void nbrReset(NbrMatrix &m, uint16_t now_min);
-
-// CONTRACT (Welle 2): Minuten-Sweep aus dem Loop-Task (beide Mains, einmal je
-// Minute; ein zweiter Aufruf in derselben Minute tut nichts). Gibt Kanten frei,
-// die NBR_WINDOW_MIN ueberschritten haben (und ihre zwei Maskenbits), halbiert
-// die Zaehler alle NBR_CNT_HALVE_MIN Minuten und raeumt Geister nach 16-Bit-
-// Ueberlauf. Aufraeumarbeit, keine Voraussetzung fuer richtige Zahlen: jeder
-// Leser prueft die Frische zusaetzlich an der Kantenminute.
-void nbrSweep(NbrMatrix &m, uint16_t now_min);
-
-// CONTRACT (Welle 2): Leserzugang. false bei ungueltigem Index oder nicht
-// belegter Zeile != 0 -- und vor dem ersten nbrInit() fuer jede Zeile, auch
-// Zeile 0 (die BSS-Instanz ist bis dahin leer: call[0] == 0 heisst "nicht
-// initialisiert", jede Funktion behandelt die Matrix dann als leer, der
-// Sweep tut nichts). Unter der Scheduler-Klammer kopiert.
-bool nbrRowGet(const NbrMatrix &m, int row, NbrRowView *out);
-// Kante "to hat from gehoert" (frueher cells[from][to]); false, wenn keine
-// Kante lebt. Frische prueft der Aufrufer mit nbrFresh(out->last_min, now).
-bool nbrEdgeGet(const NbrMatrix &m, int from, int to, NbrEdgeView *out);
-// Zeile 0 (ich): Rufzeichen vergleichen und Flags setzen, ohne die Felder zu
-// kennen (ersetzt nbrMatrix.rows[0].call / .flags in lora_functions.cpp).
-bool nbrOwnCallIs(const NbrMatrix &m, const char *call);
-bool nbrRowHasFlag(const NbrMatrix &m, int row, uint8_t flag);
-void nbrRowSetFlag(NbrMatrix &m, int row, uint8_t flag);
-// Zahl belegter Zeilen und lebender Kanten (SNAP-Zeile, Web-Kopf).
-int nbrRowsUsed(const NbrMatrix &m);
-int nbrEdgesUsed(const NbrMatrix &m);
-
-// CONTRACT (Welle 2): Rufzeichenwort (Konzept 4.1): 0 Ende, 1..10 Ziffern,
-// 11..36 A..Z, 37 '-', Zeichen 1 in Bit 0..5. Nur 3..9 Zeichen aus [A-Z0-9-];
-// sonst 0. Decode schreibt nullterminiert nach out (NBR_CALL_LEN Byte).
-uint64_t nbrCallEncode(const char *call);
-void     nbrCallDecode(uint64_t word, char *out);
-
-// CONTRACT (Welle 2): Maske als Hex fuer die Log-Zeilen (nbr_mask.h,
-// NBR_MASK_HEX_LEN Stellen, %08lX-Haelften, nie %llX). Liefert strlen(out).
-int nbrMaskHex(const NbrMask &mask, char *out, size_t outlen);
 
 // Alter der letzten Beobachtung dieser Zeile in Minuten (now_min - last_min,
 // ueberlaufsicher). Ungueltiger Index liefert 0.
@@ -362,12 +278,8 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // eingespeisten Frames machte sonst dessen Absender zum direkten Nachbarn).
 // Ist die Tabelle voll, weicht beim Anlegen einer Fenster-Zeile die Zeile
 // 1..N-1 mit der aeltesten last_min (Log: EVICT) -- zuerst unter den nicht
-// frisch direkt gehoerten Zeilen, erst dann unter allen --, ihre Kanten
-// werden frei und ihr Bit verschwindet aus jeder Maske (Zeile 0 ist davon
-// nie betroffen). Ist der Kantenpool voll, weicht die aelteste Kante, die
-// weder Zeile noch Spalte 0 beruehrt, erst danach die aelteste ueberhaupt
-// (Log: [NBR]|EVICT-E|<up>|<from>|<to>). <cnt> in EDGE/ME ist seit Welle 2
-// der EINE Zaehler der Kante ueber alle Typen.
+// frisch direkt gehoerten Zeilen, erst dann unter allen --, ihre Zeilen- und
+// Spaltenzellen werden genullt (Zeile 0 ist davon nie betroffen).
 //
 // Bei '@' setzt dest_gw=true das GW-Flag auf die Zeile des Absenders
 // (erster Pfadeintrag, ueber nbrFind() aufgeloest -- Absender ist meist
@@ -529,30 +441,24 @@ int nbrRowMeshNeedCount(const NbrMatrix &m, int row, uint16_t now_min);
 
 // --- Stufe 2: Masken und Relay-Entscheidung (Konzept Abschnitt 4 und 5) ---
 //
-// Alle Masken sind NbrMask ueber Zeilenindizes (nbr_mask.h). Bit 0 (ich
-// selbst) ist in keiner dieser Masken gesetzt. nbrMaskCount() steht in
-// nbr_mask.h.
-//
-// CONTRACT (Welle 2), Anteilsregel (Konzept 4.3): "M deckt x" heisst, die
-// Kante (x, M) lebt UND ihr cnt erreicht mindestens NBR_SHARE_PCT Prozent des
-// groessten cnt(x, D) ueber alle direkten Nachbarn D (Direkt, ohne mich).
-// NBR_SHARE_PCT == 0 ist die alte Ein-Treffer-Regel. Sie gilt fuer #X
-// (nbrRowMeshNeedCount/nbrRowMeshNeed), E_self (nbrExclusiveDirect), das
-// Urteil in nbrExclusive/ROW, die Allein-Maske in nbrRelayNeed und die
-// Deckung in nbrCoverMask -- NICHT fuer HatF/need ("hat den Frame"), das
-// bleibt die blosse Kante (Konzept 4.2).
+// Alle Masken sind Bitmasken ueber Zeilenindizes (Bit i = Zeile i); mit
+// NBR_MAX_ROWS <= 21 passt das in 32 Bit. Bit 0 (ich selbst) ist in keiner
+// dieser Masken gesetzt.
+
+// Anzahl gesetzter Bits.
+int nbrMaskCount(uint32_t mask);
 
 // Direkt(X): belegte Zeilen X != 0 mit frischer, gesetzter cell[X][0].
-NbrMask nbrDirectMask(const NbrMatrix &m, uint16_t now_min);
+uint32_t nbrDirectMask(const NbrMatrix &m, uint16_t now_min);
 
 // HoertMich(X): belegte Zeilen X != 0 mit frischer, gesetzter cell[0][X]
 // ("X hat mich gehoert" -- sichtbar nur, wenn X meine Frames wiederholt).
-NbrMask nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min);
+uint32_t nbrHeardMeMask(const NbrMatrix &m, uint16_t now_min);
 
 // Hoerer von row: Zeilen Y != row, Y != 0 mit frischer, gesetzter
 // cell[row][Y] ("Y hat row gehoert"). Dieselbe Menge wie nbrHearers(), ohne
 // Zeile 0 und als Maske.
-NbrMask nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
+uint32_t nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
 
 // Relay-Entscheidung fuer einen Frame mit Pfad path (msg_source_path, SO WIE
 // EMPFANGEN, vor dem Anhaengen des eigenen Rufzeichens):
@@ -582,10 +488,10 @@ NbrMask nbrHearersMask(const NbrMatrix &m, int row, uint16_t now_min);
 //           aber eine SYM-Zeile mit Rolle VETO statt HASF/ALT.
 struct NbrNeed
 {
-    NbrMask need;
-    NbrMask alone;
-    bool    known;
-    NbrMask inferred;
+    uint32_t need;
+    uint32_t alone;
+    bool     known;
+    uint32_t inferred;
 };
 // sym = --nbrsym (bNBRSYM): erlaubt den Symmetrie-Fallback aus nbrHearsSym()
 // fuer hasf UND alone (siehe nbr_matrix.cpp). msg_id geht nur in die
@@ -606,8 +512,8 @@ NbrNeed nbrRelayNeed(const NbrMatrix &m, const char *path, uint16_t now_min, boo
 // dessen Annahme durch seinen eigenen gueltigen HN-Bericht verhindert wird
 // (siehe nbrHearsSym()), bleibt NICHT in mask, erzeugt aber -- ebenfalls nur
 // bei gesetztem relevant-Bit -- eine SYM-Zeile mit Rolle VETO statt COVER.
-NbrMask nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
-                     const NbrMask &relevant, uint32_t msg_id, NbrMask *inferred);
+uint32_t nbrCoverMask(const NbrMatrix &m, const char *relayer, uint16_t now_min, bool sym,
+                       uint32_t relevant, uint32_t msg_id, uint32_t *inferred);
 
 // E_self (Konzept 4): direkt gehoerte Zeilen, die kein ANDERER direkt
 // gehoerter Nachbar frisch hoert. Anders als nbrExclusive() zaehlt ein
@@ -676,12 +582,9 @@ int nbrFormatRow(const NbrMatrix &m, int row, uint16_t now_min, char *out, size_
 // nicht miteinander verglichen werden (docs/nbr-logformat.md).
 void nbrLogSnapshot(const NbrMatrix &m, uint16_t now_min);
 
-// Eine gemeinsame Instanz fuers Geraet: geschrieben aus OnRxDone
-// (lora_functions.cpp, auf nRF52 im LORA-Task) und vom Minuten-Sweep und
-// --nbrreset (Loop-Task), gelesen von Web-Seite und --neighbours. CONTRACT
-// (Welle 2): jede oeffentliche Funktion nimmt die Scheduler-Klammer selbst
-// (nRF52: vTaskSuspendAll/xTaskResumeAll, verschachtelbar; ESP32 und Host:
-// leer) und ruft nbrLog erst NACH dem Loslassen auf. Der Host-Test legt eigene lokale NbrMatrix-Werte an und
+// Eine gemeinsame Instanz fuers Geraet: geschrieben ausschliesslich aus
+// OnRxDone (lora_functions.cpp), gelesen von Web-Seite und --neighbours/
+// --nbrreset. Der Host-Test legt eigene lokale NbrMatrix-Werte an und
 // braucht diese globale Instanz nicht.
 #ifndef NATIVE_BUILD
 extern NbrMatrix nbrMatrix;

@@ -57,8 +57,10 @@ uint8_t ringSource[MAX_RING] = {0};
 // Nachbarschaftsmatrix Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.1/5.2):
 // wie ringSource[] oben unbedingt definiert (kein NATIVE_BUILD-Zweig
 // noetig), geschrieben ausschliesslich in addTxRingEntry() unten.
-uint32_t ringNeed[MAX_RING]  = {0};
-uint32_t ringAlone[MAX_RING] = {0};
+// Welle 2 (edge pool): NbrMask (nbr_mask.h) statt uint32_t; Aggregat-Init
+// nullt jedes Element (alle w[] Woerter 0), wie das alte {0} fuer uint32_t.
+NbrMask  ringNeed[MAX_RING]  = {};
+NbrMask  ringAlone[MAX_RING] = {};
 uint8_t  ringKind[MAX_RING]  = {0};
 
 //////////////////////////////////////////////////////////////////////////
@@ -294,7 +296,7 @@ static bool txring_is_case_b_relay(int slot)
         return false;
     if((ringKind[slot] & 0x7F) != RING_KIND_RELAY)
         return false;
-    if(ringAlone[slot] != 0)
+    if(!nbrMaskEmpty(ringAlone[slot]))
         return false;
     if(ringBuffer[slot][2] == MSG_TYPE_TEXT)
         return false;
@@ -318,7 +320,7 @@ unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms)
     if(slot < 0 || slot >= MAX_RING)
         return 0; // defensiv; der Aufrufer garantiert einen gueltigen Relay-Slot
 
-    if(ringAlone[slot] != 0)
+    if(!nbrMaskEmpty(ringAlone[slot]))
     {
         // Fall A: Vorrang, unveraendert -- nur Fall B litt unter dem
         // re-armten Hold (Feldlauf 23.09.), Fall A war nie betroffen.
@@ -590,12 +592,13 @@ void txRingAgeBackground(uint32_t now_ms)
  * @param kind           Nachbarschaftsmatrix Stufe 2 (Konzept 5.1): RING_KIND_*
  *                        (txring_functions.h), Default RING_KIND_OTHER. Nur
  *                        der rx_relay-Aufruf setzt RING_KIND_RELAY.
- * @param need           Stufe 2: Bedarfsmaske (Konzept 4/5.1) aus nbrRelayNeed(),
- *                        Default 0. Wird JEDEM Slot zugewiesen, auch wenn 0 --
- *                        so behaelt ein wiederverwendeter Slot nie die Maske
+ * @param need           Stufe 2 (Welle 2: NbrMask*, nbr_mask.h): Bedarfsmaske
+ *                        aus nbrRelayNeed(), Default nullptr = leere Maske.
+ *                        Wird JEDEM Slot zugewiesen, auch wenn leer -- so
+ *                        behaelt ein wiederverwendeter Slot nie die Maske
  *                        seines Vorbesitzers.
- * @param alone          Stufe 2: Allein-Maske (Konzept 4/5.1) aus nbrRelayNeed(),
- *                        Default 0.
+ * @param alone          Stufe 2 (Welle 2: NbrMask*): Allein-Maske aus
+ *                        nbrRelayNeed(), Default nullptr = leere Maske.
  * @return Slot-Index (>=0) oder -1, wenn die Overflow-Logik den neuen
  *         Eintrag verworfen hat (Ring voll, keine niedrigere Prio zum
  *         Verdraengen vorhanden)
@@ -614,7 +617,7 @@ void txRingAgeBackground(uint32_t now_ms)
 static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
                                uint8_t classify_status, uint8_t store_status,
                                const char* source, int retryCountIn, bool clearSlotFirst,
-                               uint8_t kind, uint32_t need, uint32_t alone)
+                               uint8_t kind, const NbrMask *need, const NbrMask *alone)
 {
     // TX-01 (BACKLOG 3.8k): an unconfigured node (factory callsign) must not
     // transmit at all -- refuse here so its ring never even fills, on top
@@ -718,8 +721,8 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
     // neuen Eintrag stillschweigend behalten (Regression: der Mithoer-Scan
     // in lora_functions.cpp bricht dann gegen die FALSCHE Nachricht ab).
     ringKind[w]  = kind;
-    ringNeed[w]  = need;
-    ringAlone[w] = alone;
+    ringNeed[w]  = need  ? *need  : nbrMaskNone();
+    ringAlone[w] = alone ? *alone : nbrMaskNone();
     prio = ringPriority[w];
 
     // Track queue depth for high-water mark
@@ -870,7 +873,7 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
 
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst,
-                    uint8_t kind, uint32_t need, uint32_t alone)
+                    uint8_t kind, const NbrMask *need, const NbrMask *alone)
 {
     return addTxRingEntryCore(frame, len, ring_status, ring_status,
                                source, retryCountIn, clearSlotFirst,
@@ -895,7 +898,7 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
  */
 int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
                         int retryCountIn, bool clearSlotFirst,
-                        uint8_t kind, uint32_t need, uint32_t alone)
+                        uint8_t kind, const NbrMask *need, const NbrMask *alone)
 {
     return addTxRingEntryCore(frame, len, RING_STATUS_READY, RING_STATUS_DONE,
                                source, retryCountIn, clearSlotFirst,
