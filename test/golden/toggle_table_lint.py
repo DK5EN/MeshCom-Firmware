@@ -101,12 +101,24 @@ WHAT EACH CHECK IS FOR
    hoisted table row does not follow such an upstream change by itself:
    ``--via on``/``--via off`` answer with ``sendNodeSetting()`` (SN + SN1)
    since upstream d93c05a0/31ef8648, and the 2026-09-25 upstream merge
-   silently dropped that fix here until this check pinned it.
+   silently dropped that fix here until this check pinned it. The pinned
+   rows must also NOT carry ``TG_BRETURN`` (check 9 says why); the caller
+   sends ``sendNodeSetting()`` itself for a ``TG_DIRTY_NODE`` row without it.
+
+9. **Fall-through into a later rung.** ``TG_BRETURN`` is documented as
+   "fall through to the tail", but ``commandAction()``'s ladder is not one
+   if/else chain: it breaks into several (a plain ``if(commandCheck(...))``
+   after a closing brace), so a ``TG_BRETURN`` row's input runs on through
+   every later chain. A ladder rung that also matches the row's text then
+   executes as well. That happened on the bench (DK5EN-1, 2026-09-25): with
+   ``TG_BRETURN`` on ``--via on`` the argument rung ``"via "`` stored "ON"
+   as the via call. Hard failure for any ``TG_BRETURN`` row whose text a
+   ``commandCheck(msg_text+2, ...)`` rung matches under ``commandMatches()``.
 
     python3 test/golden/toggle_table_lint.py
     python3 test/golden/toggle_table_lint.py --self-test
 
-Exit 0 when every hard check (1-6, 8) passes, 1 when any fails. Check 7's
+Exit 0 when every hard check (1-6, 8, 9) passes, 1 when any fails. Check 7's
 findings are printed as warnings and never affect the exit code.
 """
 import re
@@ -135,6 +147,8 @@ TRIVIAL_OR = 0x00000000
 # Check 8: rows whose answer to the phone is a settings JSON by upstream's
 # rung, pinned to that dirty class (see the module docstring).
 TG_BLE_ECHO = re.compile(r"\bTG_BLE_ECHO\b")
+TG_BRETURN = re.compile(r"\bTG_BRETURN\b")
+RUNG_RE = re.compile(r'commandCheck\(\s*msg_text\s*\+\s*2\s*,\s*\(char\s*\*\)\s*"([^"]+)"\s*\)')
 SETTINGS_ANSWER = {
     "via on": "TG_DIRTY_NODE",
     "via off": "TG_DIRTY_NODE",
@@ -380,11 +394,26 @@ def check_phone_answer(rows: list[Row], require_pinned: bool) -> list[str]:
             if require_pinned:
                 out.append("'--%s': pinned phone answer, but no such row" % name)
             continue
-        if row.dirty != dirty or TG_BLE_ECHO.search(row.opt):
+        if row.dirty != dirty or TG_BLE_ECHO.search(row.opt) or TG_BRETURN.search(row.opt):
             out.append(
                 "%s: must answer the phone with a settings JSON (%s, no "
-                "TG_BLE_ECHO), has %s / %s" % (row.where(), dirty, row.dirty, row.opt)
+                "TG_BLE_ECHO, no TG_BRETURN), has %s / %s" % (row.where(), dirty, row.dirty, row.opt)
             )
+    return out
+
+
+def check_breturn_fallthrough(rows: list[Row], commands_text: str) -> list[str]:
+    out = []
+    rungs = sorted(set(RUNG_RE.findall(commands_text)))
+    for row in rows:
+        if not TG_BRETURN.search(row.opt):
+            continue
+        for rung in rungs:
+            if commands_matches(row.bare, rung):
+                out.append(
+                    "%s: TG_BRETURN lets %r run on into the ladder, where the rung "
+                    "%r matches it too" % (row.where(), row.name, rung)
+                )
     return out
 
 
@@ -429,6 +458,7 @@ def run_checks(table_text: str, commands_text: str, start_lineno: int = 1,
     hard += check_mask_register_pairing(rows)
     hard += check_flag_true_needs_flag(rows)
     hard += check_phone_answer(rows, require_pinned)
+    hard += check_breturn_fallthrough(rows, commands_text)
     warnings = check_pair_complementarity(rows)
     return rows, hard, warnings
 
@@ -610,8 +640,7 @@ def self_test() -> int:
             '0x00000000, nullptr, %s, %s },\n' % (dirty, opt_off)
         )
 
-    good_via = via_rows("TG_DIRTY_NODE", "TG_SAVE | TG_BRETURN | TG_FLAG_TRUE",
-                        "TG_SAVE | TG_BRETURN")
+    good_via = via_rows("TG_DIRTY_NODE", "TG_SAVE | TG_FLAG_TRUE", "TG_SAVE")
     hard, _ = messages(make_table(good_via))
     expect("'--via on/off' answering with the node-settings JSON passes",
            not any("phone" in h or "JSON" in h for h in hard))
@@ -622,6 +651,33 @@ def self_test() -> int:
     hard, _ = messages(make_table(old_via))
     expect("'--via on/off' with a text echo instead of the JSON is reported",
            sum("must answer the phone" in h for h in hard) == 2)
+
+    # The first merge fix: JSON answer, but through TG_BRETURN (check 9's bug).
+    breturn_via = via_rows("TG_DIRTY_NODE", "TG_SAVE | TG_BRETURN | TG_FLAG_TRUE",
+                           "TG_SAVE | TG_BRETURN")
+    hard, _ = messages(make_table(breturn_via))
+    expect("'--via on/off' with TG_BRETURN is reported",
+           sum("must answer the phone" in h for h in hard) == 2)
+
+    # -- check 9: TG_BRETURN fall-through into a later rung -----------------
+    ladder = 'if(commandCheck(msg_text+2, (char*)"via ") == 0)\n'
+    hard, _ = messages(make_table(breturn_via), ladder)
+    expect("a TG_BRETURN row caught by an argument rung is reported",
+           sum("run on into the ladder" in h for h in hard) == 2)
+    hard, _ = messages(make_table(good_via), ladder)
+    expect("the same rows without TG_BRETURN are not reported by check 9",
+           not any("run on into the ladder" in h for h in hard))
+    gw = GOOD_ROW_TMPL.format(
+        name="gateway on", flag="&bGATEWAY", sset="&meshcom_settings.node_sset",
+        and_mask="0xFFFFFFFF", or_mask="0x1000", opt="TG_SAVE | TG_BRETURN | TG_FLAG_TRUE",
+    )
+    hard, _ = messages(make_table(gw), ladder + 'if(commandCheck(msg_text+2, (char*)"gateway pos") == 0)\n')
+    expect("a rung that is a different command does not trip check 9",
+           not any("run on into the ladder" in h for h in hard))
+    # A bare exact-token rung DOES catch "gateway on" (a space ends the token).
+    hard, _ = messages(make_table(gw), 'if(commandCheck(msg_text+2, (char*)"gateway") == 0)\n')
+    expect("a bare exact-token rung with the row's base name trips check 9",
+           any("run on into the ladder" in h for h in hard))
 
     both = GOOD_ROW_TMPL.replace("TG_DIRTY_NONE", "TG_DIRTY_NODE").format(
         name="foo on", flag="&bFOO", sset="nullptr",

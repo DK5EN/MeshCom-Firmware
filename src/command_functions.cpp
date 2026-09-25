@@ -281,10 +281,14 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--txcapture off",      &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
-    // Upstream d93c05a0/31ef8648: the phone gets SN + SN1 (sendNodeSetting() at
-    // the ladder tail via bNodeSetting), not a text echo the app shows as chat.
-    { "--via on",             &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x4000,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
-    { "--via off",            &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFBFFF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
+    // Upstream d93c05a0/31ef8648: the phone gets SN + SN1, not a text echo the
+    // app shows as chat. TG_DIRTY_NODE WITHOUT TG_BRETURN: the caller sends
+    // sendNodeSetting() at once and returns. With TG_BRETURN the input would
+    // run on into the later if-chains of the ladder, where the argument rung
+    // "via " also matches "via on" and stores "ON" as the via call (bench
+    // DK5EN-1 2026-09-25; toggle_table_lint.py check 9).
+    { "--via on",             &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFFFFF,   0x4000,       nullptr,                       TG_DIRTY_NODE,   TG_SAVE | TG_FLAG_TRUE },
+    { "--via off",            &bVIA,                 &meshcom_settings.node_sset2,    0xFFFFBFFF,   0x00000000,   nullptr,                       TG_DIRTY_NODE,   TG_SAVE },
     { "--bledebug on",        &bBLEDEBUG,            &meshcom_settings.node_sset3,    0xFFFFFFFF,   0x0004,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--bledebug off",       &bBLEDEBUG,            &meshcom_settings.node_sset3,    0xFFFFFFFB,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
 #if defined BOARD_T5_EPAPER
@@ -524,7 +528,14 @@ void commandAction(char *umsg_text, bool ble)
             tgact.post_after();
 
         if(!tgact.breturn)
+        {
+            // A node-settings row that must not fall through (see "--via on"):
+            // answer the phone here, as the tail's bNodeSetting branch would.
+            if(ble && tgact.dirty == TG_DIRTY_NODE)
+                sendNodeSetting();
+
             return;
+        }
 
         bReturn = true;
     }
