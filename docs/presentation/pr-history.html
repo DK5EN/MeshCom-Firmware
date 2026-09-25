@@ -130,12 +130,12 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 </section>
 
 <section>
-<div class="eyebrow">September 2026 · fork-neo-test auf 4.35t.09.20</div>
+<div class="eyebrow">September 2026 · fork-neo-test auf upstream/dev vom 25.09.</div>
 <h2>neo: derselbe Funk, besserer Code</h2>
-<p class="lead"><a href="https://github.com/DK5EN/MeshCom-Firmware/tree/fork-neo-test"><code>fork-neo-test</code></a> ist <code>upstream/dev</code> im Stand des Tags 4.35t.09.20 plus eine Aufräum- und Vereinheitlichungskampagne. Code, der an zwei oder an achtundzwanzig Stellen gleichzeitig stand, steht jetzt einmal; tote Dateien sind weg; und wo die Doppelung auseinandergelaufen war, sind dabei echte Fehler sichtbar geworden und behoben. Das Versprechen: auf dem Funk verhält sich diese Firmware wie die offizielle 4.35t, besser wird sie nur unter Last. Noch ist das kein PR, sondern ein offener Zweig zum Nachlesen und Mitmessen.</p>
-<div class="stats"><div class="stat"><div class="k">Board-Code: Dateien</div><div class="v">258</div></div><div class="stat"><div class="k">Board-Code: Zeilen</div><div class="v"><span class="plus">+24.810</span> <span class="minus">−42.011</span></div></div><div class="stat"><div class="k">Kapitel / Einträge</div><div class="v">18 / 117</div></div><div class="stat"><div class="k">Basis</div><div class="v">4.35t.09.20</div></div></div>
+<p class="lead"><a href="https://github.com/DK5EN/MeshCom-Firmware/tree/fork-neo-test"><code>fork-neo-test</code></a> ist <code>upstream/dev</code> im Stand vom 25.09.2026 (Tag 4.35t.09.24 plus #1155 und #1156) plus eine Aufräum- und Vereinheitlichungskampagne. Code, der an zwei oder an achtundzwanzig Stellen gleichzeitig stand, steht jetzt einmal; tote Dateien sind weg; und wo die Doppelung auseinandergelaufen war, sind dabei echte Fehler sichtbar geworden und behoben. Das Versprechen: auf dem Funk verhält sich diese Firmware wie die offizielle 4.35t, besser wird sie nur unter Last. Noch ist das kein PR, sondern ein offener Zweig zum Nachlesen und Mitmessen.</p>
+<div class="stats"><div class="stat"><div class="k">Board-Code: Dateien</div><div class="v">261</div></div><div class="stat"><div class="k">Board-Code: Zeilen</div><div class="v"><span class="plus">+25.274</span> <span class="minus">−42.211</span></div></div><div class="stat"><div class="k">Kapitel / Einträge</div><div class="v">18 / 123</div></div><div class="stat"><div class="k">Basis</div><div class="v">dev 25.09.</div></div></div>
 <div class="box"><b>Gemessen, nicht behauptet.</b> Differenzlauf am 19.09. gegen <code>upstream/dev</code> auf einem Heltec V3 und einem T-Beam, mitgeschnitten von beiden Knoten und einem dritten als Zeugen: dieselben Nutzlasten mit denselben Feldern, auf dem Funk kein Unterschied. Im Knoten dagegen <b>+11.296 B</b> freier Heap auf dem Heltec V3 und <b>+15.560 B</b> auf dem T-Beam, dazu 10,5 kB und 45,5 kB weniger Flash. Danach zwölf Stunden Dauerlauf auf drei Knoten, einer davon mit Mesh und Gateway unter echter Netzlast: kein Neustart, kein Absturz, kein Ringüberlauf, der Heap flach.</div>
-<p class="lead">Das <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-neo-test/docs/CHANGELOG-neo.md">Changelog</a> erzählt die Arbeit in achtzehn Kapiteln mit 117 Einträgen. Jeder Eintrag sagt, ob er reine Restrukturierung ist oder eine Fehlerbehebung, und nennt seinen Nachweis, wo es einen gibt.</p>
+<p class="lead">Das <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/fork-neo-test/docs/CHANGELOG-neo.md">Changelog</a> erzählt die Arbeit in achtzehn Kapiteln mit 117 Einträgen, dazu sechs Einträge zum Nachziehen von upstream/dev am 25.09. Jeder Eintrag sagt, ob er reine Restrukturierung ist oder eine Fehlerbehebung, und nennt seinen Nachweis, wo es einen gibt.</p>
 <div class="tocwrap"><table class="cap"><thead><tr><th>Kapitel</th><th>Thema</th><th>Einträge</th></tr></thead><tbody>
 <tr><td class="sha">K01</td><td>Vendor-Ballast entfernen</td><td class="num">3</td></tr>
 <tr><td class="sha">K18</td><td>Build-Konfiguration</td><td class="num">7</td></tr>
@@ -155,6 +155,7 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 <tr><td class="sha">K16</td><td>Web-GUI</td><td class="num">5</td></tr>
 <tr><td class="sha">K15</td><td>Safeboot und OTA</td><td class="num">5</td></tr>
 <tr><td class="sha">K17</td><td>Instrumentierung</td><td class="num">1</td></tr>
+<tr><td class="sha">–</td><td>Nachgezogen aus upstream/dev (25.09.)</td><td class="num">6</td></tr>
 </tbody></table></div>
 <p class="lead">Im Code sind es weniger Schritte als Kapitel: dreizehn Kapitel greifen über Header, Typen und verschobene Funktionen so ineinander, dass sie nur gemeinsam übersetzen, und stehen deshalb in einem Commit. Das Changelog beschreibt den Stand vom 20.09.; die Zeilen ab der RAM-Arbeit kamen danach, darunter zwei kleine Funktionen außerhalb des Funkpfads (Originator-Felder im Extern-UDP, DHCP-Hostname).</p>
 <div class="tocwrap"><table><thead><tr><th>Commit</th><th>Datum</th><th>Inhalt</th><th>Zeilen</th><th>Dateien</th></tr></thead><tbody>
@@ -178,7 +179,7 @@ td.sha{font-family:var(--mono);font-size:.8rem}
 
 <section>
 <div class="eyebrow">Quelle</div>
-<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 23.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst. Die neo-Zahlen zählen nur den Code, der auf das Board kommt: <code>git diff --shortstat v4.35t.09.20 fork-neo-test -- src lib variants config platformio.ini</code>; Tests, Werkzeuge und Dokumentation des Zweigs sind darin nicht enthalten. Heap- und Flash-Werte aus dem Changelog, Abschnitt „Auf der Bank gemessen“.</p>
+<p class="small">PR-Zahlen aus der GitHub-API (<code>gh pr list --author dk5en</code>, Felder additions/deletions/changedFiles), Stand 23.09.2026. Die Zeilenbilanz zählt, was GitHub im PR-Diff sieht; Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen. Alle Beschreibungen der PRs sind auf Deutsch in den PRs selbst. Die neo-Zahlen zählen nur den Code, der auf das Board kommt: <code>git diff --shortstat e4a2393f fork-neo-test -- src lib variants config platformio.ini</code> (e4a2393f ist upstream/dev vom 25.09.2026); Tests, Werkzeuge und Dokumentation des Zweigs sind darin nicht enthalten. Heap- und Flash-Werte aus dem Changelog, Abschnitt „Auf der Bank gemessen“.</p>
 </section>
 </div>
 </body>

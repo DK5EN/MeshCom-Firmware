@@ -70,6 +70,66 @@ Erstellt auf `upstream/dev`, Stand `4058b25b` (Merge von PR #1145). Die
 Instrumentierung, die Kapitel K17 beschreibt, ist dort bereits enthalten; dieser
 Branch aendert an ihr achtzehn Zeilen.
 
+Seitdem zweimal nachgezogen: auf `80b85a5a` (PRs #1147 bis #1150, 2026-09-20)
+und auf `e4a2393f` (PRs #1151 bis #1153, #1155, #1156, 2026-09-25). Was upstream
+dabei gebracht hat, verhaelt sich hier wie upstream; wo dieser Branch davon
+abweicht, steht es im folgenden Abschnitt.
+
+## Nachgezogen aus upstream/dev (2026-09-25)
+
+Der Merge `def2dc7e` bringt die KISS/TCP-Schnittstelle (#1151, DH1FR), die
+Via-Einstellungen als zweites Knoten-JSON `SN1` (#1155) und das Build-Datum als
+zweites Info-JSON `IS1` (#1156); #1152 und #1153 sind eigene PRs und lagen hier
+schon. Upstreams Code passt an vier Stellen nicht wortgleich auf diesen Branch
+(`aprsMessage` traegt `char[]` statt `String`, die Ein/Aus-Kommandos stehen in
+einer Tabelle, der UDP-Rahmenkoerper liegt in `udp_frame_esp32.cpp`); dort ist
+er nach Absicht portiert, nicht nach Diff. Nachweis fuer den ganzen Merge: 36
+Host-Umgebungen 1067/1067, 30 Board- und 2 Safeboot-Umgebungen gruen, KISS kostet
+auf jedem ESP32 1224 bis 1240 B DRAM und 0 B IRAM.
+
+**118. KISS/TCP laeuft auch auf E22_XML-DevKitC.** (`def2dc7e`). Upstream nimmt
+das Board mit `-D DISABLE_KISS_TCP` aus, weil `dram0_0_seg` dort mit KISS um 32 B
+ueberlaeuft (1160 B Reserve). Nach der RAM-Rueckgewinnung dieses Branches hat
+das Board mit KISS noch 27 776 B DRAM- und unveraendert 4028 B IRAM-Reserve,
+gemessen am sauberen Build vor und nach dem Merge. Abweichung von upstream:
+ein Board mehr mit der Funktion.
+
+**119. Eine per KISS eingespeiste Position schreibt nicht mehr jedes Mal den
+Flash.** (`def2dc7e`). Upstreams `sendInjectedPosition()` zaehlt die
+Nachrichten-ID von Hand hoch und ruft danach `save_settings()`. Hier laeuft sie
+wie `SendAckMessage()` ueber `msgIdAdvance()` und schreibt nur an der
+Hochwassermarke (`msgid_counter.h`, siehe Eintrag zu W3 in K08). Kein
+Unterschied auf dem Draht; kein Hardware-Nachweis.
+
+**120. Die Ack-Umschreibung fuer KISS-Clients kappt statt zu wachsen.**
+(`def2dc7e`, Test `71502a94`). Upstream setzt die Antwort `:ackNN` per
+`String`-Verkettung neu zusammen; hier ist die Nutzlast ein festes Feld mit
+`MC_PAYLOAD_LEN`, und die neue Funktion `kissAckRewrite()` (`src/kiss_frame.cpp`)
+kappt am Feldende. Im Betrieb nie erreicht (die Nummer hat hoechstens sieben
+Zeichen). Die beiden reinen Funktionen `kissBuildAx25()` und `kissAckRewrite()`
+sind dafuer aus `kiss_functions.cpp` herausgeloest und haben einen Host-Test mit
+18 Faellen (`native_kiss_frame`), der die AX.25-Rahmen Byte fuer Byte prueft.
+
+**121. `--via on` / `--via off` antworten dem Telefon mit `SN` und `SN1`.**
+(`def2dc7e`, Lint `71502a94`). Das ist upstreams Fix (die Text-Antwort erschien in
+der App als Chatzeile); hier stehen die beiden Kommandos in `COMMAND_TOGGLES[]`,
+deshalb waere der Fix beim Merge stumm verloren gegangen. Die beiden Tabellenzeilen
+tragen jetzt `TG_DIRTY_NODE` statt `TG_BLE_ECHO`; `toggle_table_lint.py` prueft
+das seitdem (Pruefung 8). Kein Unterschied zu upstream.
+
+**122. Der KISS-Abgriff fuer Rahmen vom MeshCom-Server sitzt in
+`handleUdpFrame_esp32()`.** (`def2dc7e`). Upstream hat ihn in
+`getMeshComUDPpacket()`; dessen Koerper liegt hier seit dem C1/U1-Carve in
+`udp_frame_esp32.cpp`, und der Merge hat den Abgriff ohne Konflikt verworfen.
+Wieder eingesetzt direkt nach dem Dedup-Gatter, mit upstreams Bedingungen. Der
+Zwillingstest `test_drift_kiss_server_relay_tap_is_esp32_only` schlaegt ohne
+den Abgriff fehl und besteht mit ihm. Kein Unterschied zu upstream.
+
+**123. Die zwei CS-01-`static_assert`s sind wieder da.** (`def2dc7e`). Sie
+binden `MAXHOP_TEXT_FALLBACK` an `MAX_HOP_TEXT_DEFAULT` und das Kommandofenster
+an `MAX_HOP_LIMIT`; der Kern-Commit dieses Branches hatte sie beim Verschieben
+von `casecmp()` verloren, obwohl `maxhop.h` sie weiter nennt. Nur Uebersetzungszeit.
+
 ## Auf der Bank gemessen
 
 Am 2026-09-19 lief ein Differenzlauf gegen `upstream/dev` auf zwei Knoten:

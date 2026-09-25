@@ -6,7 +6,7 @@ and section 4 (projection, not rebase).
 
 | File              | What it does                                                                   |
 | ----------------- | ------------------------------------------------------------------------------ |
-| `paths/*.txt`     | the chapter cut: which of the 688 paths belongs to which commit                |
+| `paths/*.txt`     | the chapter cut: which of the 706 paths belongs to which commit                |
 | `derive.sh`       | throws `fork-neo` away and rebuilds it from `upstream/dev`, then gates itself  |
 | `gate.sh`         | builds every `fork-neo` commit on the eight lead targets, then the symbol diff |
 | `../neo_strip.py` | the two content transformations `derive.sh` applies -- it does not travel      |
@@ -49,9 +49,9 @@ defined-symbol comparison.
 
 ## The path lists
 
-`K01 CORE K15 K16 K17` are the code cut, 249 paths, disjoint and complete
+`K01 CORE K15 K16 K17` are the code cut, 262 paths, disjoint and complete
 against `git diff --no-renames upstream/dev fork-neo-test` over
-`src lib variants config platformio.ini`. `K19.txt` (439 paths, `test/`) is
+`src lib variants config platformio.ini`. `K19.txt` (444 paths, `test/`) is
 listed here for the record; `derive.sh` does not use it, because the test
 harness does not travel to `fork-neo`.
 
@@ -62,7 +62,7 @@ Two properties are worth restating because they are easy to lose:
   path, so the old one survives the projection and the closing tree-identity
   check fails somewhere unrelated.
 - **`--no-overlay`.** `git checkout <tree> -- <paths>` deletes nothing in its
-  default overlay mode. 77 of the 249 paths are deletions.
+  default overlay mode. 78 of the 262 paths are deletions.
 
 If the cut ever changes, re-assert disjointness and completeness before
 projecting -- a path claimed twice, or by nothing, breaks the closing check in a
