@@ -1,6 +1,6 @@
 # fork-neo-test: merge upstream/dev e4a2393f -- campaign plan
 
-Status: **APPROVED 2026-09-25**, in progress. Operator decisions: merge the tip incl. #1156;
+Status: **DONE 2026-09-25** (all waves). Approved 2026-09-25. Operator decisions: merge the tip incl. #1156;
 adopt KISS; E22_XML gets KISS too (DRAM fix, see F7); one merge commit for all code; W4 and W5
 now; W4 node DK5EN-1 (bench Heltec V3); after W5 push `fork-neo` (first push), NOT
 `fork-neo-test`; fork-main untouched.
@@ -15,7 +15,7 @@ now; W4 node DK5EN-1 (bench Heltec V3); after W5 push `fork-neo` (first push), N
 | W2   | Gate: host suite, lints, 32 envs, advisor, commit    | done: host 1067/1067, selftest green, 32/32 envs, advisor APPROVED; commits def2dc7e, 71502a94, 7ba19935   |
 | W3   | neo path lists, lint rule, CHANGELOG-neo, pr-history | done: path lists 262/262 + K19 444, README counts, CHANGELOG-neo 118-123, pr-history figures               |
 | W4   | Bench check on DK5EN-1 (OTA), restore afterwards     | done: IS1/SN1 over BLE, KISS server-relay tap proven, --via bug found + fixed (0923e037), DK5EN-1 restored |
-| W5   | Re-derive fork-neo + `gate.sh`, push fork-neo        | pending                                                                                                    |
+| W5   | Re-derive fork-neo + `gate.sh`, push fork-neo        | done: derive.sh identity empty, gate.sh 38/40 + 0 symbol deviations, fork-neo 5d8b1f11 pushed              |
 
 ## Gate log (W2)
 
@@ -64,6 +64,19 @@ now; W4 node DK5EN-1 (bench Heltec V3); after W5 push `fork-neo` (first push), N
   text/position frame in the window, only HEY (excluded by design).
 - Restored feature-neighbour-matrix 14a2b2eb (rebuilt, build 19:54:11); NBR
   lines resume. Field-run capture gap 19:55-20:07.
+
+## W5 log
+
+- `tools/neo/derive.sh fork-neo-test fork-neo upstream/dev`: K01 57 / CORE 195 /
+  K15 9 / K16 2 / K17 1 paths; strip identity empty, safeboot images same. Old tip
+  tagged `neo-backup-202609252008-fork-neo`. derive.sh leaves the checkout ON
+  fork-neo, which has no `tools/` -- run gate.sh only after switching back to
+  fork-neo-test (first attempt: exit 127).
+- `tools/neo/gate.sh`: builds 38/40 (the two K01 upstream-baseline headroom reds:
+  E22_XML DRAM 1160 B, ttgo_tbeam IRAM), symbol deviations on 0 of 8 targets.
+- `git push origin fork-neo:refs/heads/fork-neo` (first push, no tracking) ->
+  5d8b1f11. Both workflows `disabled_manually` beforehand; no Actions run
+  afterwards. fork-neo-test NOT pushed (origin stays at b55fe5d7), by decision.
 
 ## Open decision: node_sset4 bit collision
 
