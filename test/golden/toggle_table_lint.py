@@ -22,6 +22,13 @@ WHAT EACH CHECK IS FOR
    forms are prefix matches with no "on"/"off" -- ``toggleApply()`` has no
    code path for them at all).
 
+   Three-state switches are the one exception (2026-09-25): a row may end in
+   another lowercase word -- ``--nbrrelay count``, ``--nbrreport auto`` --
+   when the same base also has an "on" and an "off" row. Such a row is still
+   an exact token (no trailing space, no argument), so ``toggleApply()``
+   handles it like any other row; what the rule keeps out is a lone word row
+   with no on/off siblings, which is the argument-form mistake in disguise.
+
 2. **No duplicate names.** ``toggleApply()`` returns on the first match
    (D2-10's exact-token loop over the array); a later row with the same name
    is silently unreachable dead code, exactly the ``setowndns`` bug that
@@ -106,6 +113,8 @@ COMMANDS = REPO / "src" / "command_functions.cpp"
 TABLE_START = "static const ToggleRow COMMAND_TOGGLES[]"
 
 NAME_RE = re.compile(r"^[a-z0-9_]+(?: [a-z0-9_]+)* (on|off)$")
+# check 1's three-state exception: "<base> <word>" with <base> on / <base> off rows
+STATE_RE = re.compile(r"^([a-z0-9_]+(?: [a-z0-9_]+)*) ([a-z0-9_]+)$")
 ROW_RE = re.compile(r'^\s*\{\s*"([^"]*)"\s*,\s*(.*)\}\s*,?\s*$')
 GUARD_OPEN_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef)\b(.*)$")
 GUARD_ELIF_RE = re.compile(r"^\s*#\s*(elif|else)\b(.*)$")
@@ -252,13 +261,20 @@ def commands_matches(msg: str, command: str) -> bool:
 
 def check_name_shape(rows: list[Row]) -> list[str]:
     out = []
+    bares = {row.bare for row in rows}
     for row in rows:
         if not row.name.startswith("--"):
             out.append('%s: name %r does not start with "--"' % (row.where(), row.name))
             continue
-        if not NAME_RE.match(row.bare):
+        if NAME_RE.match(row.bare):
+            continue
+        m = STATE_RE.match(row.bare)
+        if m and (m.group(1) + " on") in bares and (m.group(1) + " off") in bares:
+            continue    # three-state switch, see check 1 in the docstring
+        if True:
             out.append(
-                '%s: name %r (bare %r) does not match "<lowercase tokens> (on|off)"'
+                '%s: name %r (bare %r) does not match "<lowercase tokens> (on|off)" '
+                'and is no third state of a base that has both an on and an off row'
                 % (row.where(), row.name, row.bare)
             )
     return out
@@ -553,6 +569,27 @@ def self_test() -> int:
            "bit too, so it passes cleanly with no hard failure and no warning",
            hard == [] and warn == [])
 
+    # -- check 1: three-state exception ------------------------------------
+    def row(name, opt="TG_SAVE"):
+        return GOOD_ROW_TMPL.format(name=name, flag="&bFOO", sset="nullptr",
+                                    and_mask="0xFFFFFFFF", or_mask="0x00000000", opt=opt)
+    tri = row("foo on", "TG_FLAG_TRUE") + row("foo off") + row("foo count", "TG_FLAG_TRUE")
+    hard, _ = messages(make_table(tri))
+    expect("a third state next to on and off rows passes check 1",
+           not any("does not match" in h for h in hard))
+    lone = row("foo count", "TG_FLAG_TRUE")
+    hard, _ = messages(make_table(lone))
+    expect("a lone third-state word without on/off rows fails check 1",
+           any("foo count" in h and "does not match" in h for h in hard))
+    half = row("foo on", "TG_FLAG_TRUE") + row("foo auto")
+    hard, _ = messages(make_table(half))
+    expect("a third state with only an on row fails check 1",
+           any("foo auto" in h for h in hard))
+    argform = row("foo on", "TG_FLAG_TRUE") + row("foo off") + row("foo ")
+    hard, _ = messages(make_table(argform))
+    expect("an argument form next to on/off rows still fails check 1",
+           any("'foo '" in h and "does not match" in h for h in hard))
+
     # -- guards are recorded but never used to skip rows --------------------
     guarded = (
         "#if defined(ENABLE_FOO)\n"
@@ -573,9 +610,9 @@ def self_test() -> int:
     real_table = extract_table_text(real_text)
     real_rows, real_hard, real_warn = run_checks(real_table, real_text)
     expect(
-        "the real tree has 70 rows and no hard failures (%d rows, %d hard, %d warn)"
+        "the real tree has 80 rows and no hard failures (%d rows, %d hard, %d warn)"
         % (len(real_rows), len(real_hard), len(real_warn)),
-        len(real_rows) == 70 and real_hard == [],
+        len(real_rows) == 80 and real_hard == [],
     )
     if real_hard:
         for h in real_hard:
