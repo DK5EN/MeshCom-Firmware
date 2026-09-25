@@ -223,6 +223,12 @@ int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn, bool clearSlotFirst,
                     uint8_t kind, uint32_t need, uint32_t alone);
 
+// P15: kanonische Deklaration mit Default-Argumenten steht in loop_functions.h
+// (siehe Kommentar bei addTxRingEntry() oben) -- gleiche Begruendung.
+int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
+                        int retryCountIn, bool clearSlotFirst,
+                        uint8_t kind, uint32_t need, uint32_t alone);
+
 // BP-01 (BACKLOG) / TM-37: back-pressure to the sender, in Q-codes.
 //
 // sendMessage() has no transport parameter, so the only way it can answer on

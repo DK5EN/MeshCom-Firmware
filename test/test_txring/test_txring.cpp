@@ -243,6 +243,133 @@ static void test_prioritaets_klassifizierung(void)
     expectPriority(unknown, RING_STATUS_READY, MSG_PRIO_NORMAL, "Typ 0x99");
 }
 
+// -------------------------------------------- Test 2b: addTxRingEntryOnce()
+//
+// P15: SendAckMessage()/sendPing()/SendPong() und der {ping}-Zweig von
+// sendMessage() wollten alle dasselbe -- Status DONE speichern (keine
+// Wiederholung), aber als eigene DM/Gruppen-/Broadcast-Nachricht
+// klassifizieren, nicht als Relay (die TEXT-Falle: ein VORAB auf DONE
+// gesetzter Status stuft getMessagePriority() als "Relay" ein, siehe Test
+// oben "Text-Relay"). SendAckMessage() reihte deshalb bisher mit temp-READY
+// ein und schrieb den Status NACH addTxRingEntry() per Hand nach --
+// ausserhalb des Locks, auf nRF52 ein Fenster fuer eine Race mit doTX() im
+// anderen Task. Diese Tests pinnen addTxRingEntryOnce()s Ersatz dafuer:
+// Klassifizierung UND Status-Schreiben in einem Aufruf.
+//
+// bNBRCANCEL bleibt hier false (resetRing()) und kind/need/alone bleiben auf
+// ihren Defaults (RING_KIND_OTHER, 0, 0) -- keiner dieser Slots kann also in
+// die Nachbarschaftsmatrix-Stufe-2-Fall-B-Sperre (txringInCaseBHold())
+// geraten, die nur RING_KIND_RELAY-Slots mit ringAlone==0 haelt.
+
+static void test_add_tx_ring_entry_once_dm_wird_critical_und_done(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo");
+
+    int slot = addTxRingEntryOnce(f.bytes, f.len, "t2b");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+}
+
+static void test_add_tx_ring_entry_once_gruppe_wird_high_und_done(void)
+{
+    BuiltFrame f = buildTextFrame("9999", "Gruppen-Text");
+
+    int slot = addTxRingEntryOnce(f.bytes, f.len, "t2b");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[slot]);
+}
+
+static void test_add_tx_ring_entry_once_broadcast_wird_high_und_done(void)
+{
+    BuiltFrame f = buildTextFrame("*", "Hallo Welt");
+
+    int slot = addTxRingEntryOnce(f.bytes, f.len, "t2b");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_HIGH, ringPriority[slot]);
+}
+
+// Falle pinnen (und Alt-Verhalten von addTxRingEntry() unveraendert lassen):
+// wer eine eigene DM per addTxRingEntry() weiterhin VORAB auf DONE setzt,
+// bekommt weiter NORMAL statt CRITICAL -- genau das ist der Fehler, den
+// addTxRingEntryOnce() fuer seine Aufrufer beseitigt, aber addTxRingEntry()
+// selbst darf sich fuer seine (unveraenderten) Aufrufer nicht anders
+// verhalten als bisher.
+static void test_add_tx_ring_entry_mit_done_klassifiziert_weiter_als_relay(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo");
+
+    int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "t2b_plain");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);
+}
+
+// getNextTxSlot() waehlt READY oder DONE aus, uebergeht aber jeden Status
+// dazwischen (SENT..Schwelle, "wartet auf Retransmit-Timer"). Ein per
+// addTxRingEntryOnce() eingereihter Slot landet mit DONE im Ring: er wird
+// also EINMAL zur Sendung ausgewaehlt (wie READY), aber nie durch die
+// Retransmit-Statusfolge erneut vorgemerkt -- das ist der gesamte
+// Mechanismus, der eine Wiederholung verhindert (doTX()/
+// updateRetransmissionStatus() selbst sitzen in lora_functions.cpp, nativ
+// hier nicht mitgebaut, siehe env:native_aprs build_src_filter). RING_KIND_OTHER
+// (Default) heisst auch: kein Fall-B-Hold, der Slot waere sonst nicht sofort
+// waehlbar.
+static void test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done(void)
+{
+    BuiltFrame f = buildTextFrame("DK5EN-91", "Hallo");
+
+    int slot = addTxRingEntryOnce(f.bytes, f.len, "t2b");
+
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_INT(slot, getNextTxSlot());
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+}
+
+// Neue beobachtbare Konsequenz des Fixes: ein Ring voller Relay-Eintraege
+// (NORMAL, Prio 3) verdraengt frueher hoechstens LOW/BACKGROUND (Prio 4/5) --
+// eine eigene DM, die (vor P15) wegen des vorab gesetzten DONE-Status
+// ebenfalls als NORMAL eingestuft wurde, war gleich/nicht niedriger prio als
+// jeder Ring-Eintrag und wurde beim Overflow VERWORFEN (droppedNew-Zweig,
+// "same or lower priority than everything in queue"). Ueber
+// addTxRingEntryOnce() klassifiziert dieselbe DM CRITICAL (Prio 1) und
+// verdraengt jetzt den aeltesten Relay-Eintrag, statt selbst zu
+// verschwinden. Die Relay-Fuellung geht ueber addTxRingEntry(..., DONE, ...)
+// mit Default-kind (RING_KIND_OTHER) -- kein RING_KIND_RELAY, also auch kein
+// Fall-B-Hold, der die Eviction-Auswahl hier verzerren wuerde.
+static void test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden(void)
+{
+    // Ring mit MAX_RING-1 Relay-Eintraegen (Text, Status DONE -> NORMAL,
+    // siehe getMessagePriority()) "voll" fuellen.
+    for (int i = 0; i < MAX_RING - 1; i++)
+    {
+        BuiltFrame f = buildTextFrame("DK5EN-91", "relay", (uint32_t)(0x4000 + i));
+        int slot = addTxRingEntry(f.bytes, f.len, RING_STATUS_DONE, "t2b_relayfill");
+        TEST_ASSERT_EQUAL_INT(i, slot);
+        TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, ringPriority[slot]);
+    }
+    TEST_ASSERT_EQUAL_UINT8(MAX_RING - 1, (uint8_t)iWrite);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)iRead);
+
+    BuiltFrame dm = buildTextFrame("DK5EN-92", "dringend", 0x5000UL);
+    int slot = addTxRingEntryOnce(dm.bytes, dm.len, "t2b_evict");
+
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, slot); // landet im zuvor freien letzten Slot
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[slot][1]);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(dm.bytes, &ringBuffer[slot][2], dm.len);
+
+    // Slot 0 (aeltester Relay-Eintrag) wurde verdraengt, nicht die neue DM.
+    TEST_ASSERT_EQUAL_UINT8(0, ringBuffer[0][0]);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_NORMAL]);
+}
+
 // ----------------------------------------------------- Test 3: Ring-Wrap
 
 static void test_ring_wrap(void)
@@ -1281,6 +1408,12 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_einfacher_enqueue);
     RUN_TEST(test_prioritaets_klassifizierung);
+    RUN_TEST(test_add_tx_ring_entry_once_dm_wird_critical_und_done);
+    RUN_TEST(test_add_tx_ring_entry_once_gruppe_wird_high_und_done);
+    RUN_TEST(test_add_tx_ring_entry_once_broadcast_wird_high_und_done);
+    RUN_TEST(test_add_tx_ring_entry_mit_done_klassifiziert_weiter_als_relay);
+    RUN_TEST(test_add_tx_ring_entry_once_slot_ist_fuer_getnexttxslot_done);
+    RUN_TEST(test_add_tx_ring_entry_once_verdraengt_relay_statt_verworfen_zu_werden);
     RUN_TEST(test_ring_wrap);
     RUN_TEST(test_overflow_mit_eviction);
     RUN_TEST(test_n24_indirekte_eviction_verwaist_keinen_slot);
