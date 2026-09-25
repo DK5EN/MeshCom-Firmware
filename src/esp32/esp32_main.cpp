@@ -1144,7 +1144,9 @@ void esp32setup()
     #endif
 
     // Initialize battery reading
-    #if not defined (BOARD_T_DECK_PRO)
+    #if defined(DISABLE_BATTERY)   // opt-out -D DISABLE_BATTERY: board without a battery divider
+    battProbeState = BATT_PROBE_NONE;   // no battery measurement on this board
+    #elif not defined (BOARD_T_DECK_PRO)
 	init_batt();
     #endif
 

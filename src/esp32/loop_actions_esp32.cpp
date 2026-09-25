@@ -204,7 +204,15 @@ void loopAction_ina226(void)
 
 void loopAction_battCheck(void)
 {
-    #if defined(MODUL_FW_TBEAM)
+    #if defined(DISABLE_BATTERY)
+
+        // Board without battery measurement: report "not measurable", as the
+        // MODUL_FW_TBEAM branch below does without a PMU.
+        global_batt = 0;
+        global_proz = 0;
+        battProbeState = BATT_PROBE_NONE;
+
+    #elif defined(MODUL_FW_TBEAM)
         int pmu_proz=0;
         if(PMU != NULL)
         {
