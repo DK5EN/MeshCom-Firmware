@@ -580,6 +580,40 @@ void webSetup_setParam(setupStruct *setupData){
     } else
     #endif
 
+    #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+    if(setupData->paramName.equals("kiss")) {
+        snprintf(message_text, sizeof(message_text), "--kiss %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bKISS == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bKISS?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("kisstx")) {
+        snprintf(message_text, sizeof(message_text), "--kiss tx %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bKISSTX == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bKISSTX?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("kissmeta")) {
+        snprintf(message_text, sizeof(message_text), "--kiss meta %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bKISSMETA == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bKISSMETA?"on":"off";
+        return;
+    } else
+
+    if(setupData->paramName.equals("kissauth")) {
+        snprintf(message_text, sizeof(message_text), "--kiss auth %s", setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
+        setupData->returnCode = (bKISSAUTH == (setupData->paramValue.compareTo("on")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = bKISSAUTH?"on":"off";
+        return;
+    } else
+    #endif
+
     /// ###################################### MCPIO ######################################
     if(setupData->paramName.substring(0,5).equals("mcpio")) {
         String port = setupData->paramName.substring(5);
@@ -1024,6 +1058,28 @@ void webSetup_getParam(setupStruct *setupData){
 
     if(setupData->paramName.equals("storenotice")) {
         setupData->returnValue = msgstoreNotice()?"on":"off";
+        return;
+    }
+    #endif
+
+    #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
+    if(setupData->paramName.equals("kiss")) {
+        setupData->returnValue = bKISS?"on":"off";
+        return;
+    }
+
+    if(setupData->paramName.equals("kisstx")) {
+        setupData->returnValue = bKISSTX?"on":"off";
+        return;
+    }
+
+    if(setupData->paramName.equals("kissmeta")) {
+        setupData->returnValue = bKISSMETA?"on":"off";
+        return;
+    }
+
+    if(setupData->paramName.equals("kissauth")) {
+        setupData->returnValue = bKISSAUTH?"on":"off";
         return;
     }
     #endif

@@ -60,8 +60,9 @@ static int g_sendMessage_calls = 0;
 // stub always reports success since getExtern()'s "msg" path (extudp_functions.cpp)
 // discards the return value anyway (E4: what doesn't go out on HF doesn't go
 // into the backbone either, but that decision is made inside sendMessage()
-// itself, not by this caller).
-int sendMessage(char *msg_text, int len)
+// itself, not by this caller). src_override/out_msg_id came with the KISS
+// interface (upstream #1151); getExtern() passes neither.
+int sendMessage(char *msg_text, int len, const char *, unsigned int *)
 {
     g_sent_msg_text.assign(msg_text, msg_text + len);
     g_sent_msg_len = len;
