@@ -86,7 +86,14 @@ feature-neighbour-matrix uses node_sset4 0x10 (nbrdebug), 0x20/0x40
 0x80 auth. Any node moving between the two builds reinterprets the bits: a
 feature-neighbour-matrix node flashed with fork-neo-test/fork-main opens an
 unauthenticated KISS listener with TX allowed. The NBR bits must move before
-feature-neighbour-matrix takes upstream/dev. Operator decision owed.
+feature-neighbour-matrix takes upstream/dev.
+
+**Decided and done 2026-09-25** on feature-neighbour-matrix (ebcf7f0b): 0x0010 ->
+0x0400, 0x0020 -> 0x0800, 0x0040 -> 0x1000, 0x0080 -> 0x2000; --nbrreport
+0x0100/0x0200 unchanged (no collision; only 0x0400-0x4000 is usable because
+`--setlog off` wipes 0x8000+). Existing nodes migrate at boot in
+sanitize_loaded_settings(); a `#error` on KISS_TCP_PORT forces the migration out
+before that branch merges upstream KISS.
 
 ## Starting point
 
