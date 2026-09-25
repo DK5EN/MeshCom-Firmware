@@ -5,6 +5,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -120,6 +121,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -237,6 +239,7 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -358,6 +361,7 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -477,6 +481,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -596,6 +601,7 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -711,6 +717,7 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -832,6 +839,7 @@
   "board_upload.flash_size": "16MB",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -976,6 +984,7 @@
   "board_upload.maximum_size": "16777216",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -1145,6 +1154,7 @@
  "env:esp32-external-radio": {
   "board": "T-Deck-Pro",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DBOARD_HAS_PSRAM",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-DDISABLE_ALL_LIBRARY_WARNINGS",
@@ -1234,6 +1244,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -1349,6 +1360,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -1676,6 +1688,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -1788,6 +1801,7 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -1901,6 +1915,7 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -2019,6 +2034,7 @@
   "build_flags": [
    "-D U8X8_HAVE_2ND_HW_I2C=1",
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -2130,6 +2146,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -2306,6 +2323,7 @@
    "test_bp_echo_guard",
    "test_extern_notice_json",
    "test_extern_tele_json",
+   "test_extern_msg_json",
    "test_mcp17_bits",
    "test_setlog_lines",
    "test_gps_filter",
@@ -2448,6 +2466,26 @@
   "test_build_src": true,
   "test_filter": [
    "test_ble_settings_v1"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_byte_fifo": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<byte_fifo.cpp>"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_byte_fifo"
   ],
   "test_framework": "unity"
  },
@@ -2772,6 +2810,28 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_loop_scheduler": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I test/test_loop_scheduler/stubs",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<loop_scheduler.cpp>"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_loop_scheduler"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_mc_text": {
   "build_flags": [
    "-std=gnu++17",
@@ -2801,6 +2861,40 @@
   "test_build_src": false,
   "test_filter": [
    "test_mheard_record"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_matrix": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=5",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_matrix"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_report": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=12",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_report"
   ],
   "test_framework": "unity"
  },
@@ -3064,6 +3158,7 @@
    "+<regex_functions.cpp>",
    "+<aprs_functions.cpp>",
    "+<charset_filter.cpp>",
+   "+<byte_fifo.cpp>",
    "+<esp32/udp_drain_esp32.cpp>",
    "+<nrf52/udp_drain_nrf52.cpp>"
   ],
@@ -3103,6 +3198,7 @@
  "env:t5_epaper": {
   "board": "T5-ePaper-S3",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DBOARD_HAS_PSRAM",
    "-D MONITOR_SPEED=115200",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
@@ -3173,6 +3269,7 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -3306,6 +3403,7 @@
   "board_build.partitions": "partitions-16MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -3436,6 +3534,7 @@
  "env:t_deck_pro": {
   "board": "T-Deck-Pro",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DBOARD_HAS_PSRAM",
    "-DARDUINO_USB_CDC_ON_BOOT=1",
    "-DDISABLE_ALL_LIBRARY_WARNINGS",
@@ -3658,6 +3757,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -3770,6 +3870,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -3886,6 +3987,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -4002,6 +4104,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -4119,6 +4222,7 @@
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
    "-D MONITOR_SPEED=115200",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
    "-DCONFIG_BT_NIMBLE_MAX_BONDS=1",
    "-DCONFIG_BT_NIMBLE_MAX_CCCDS=2",
@@ -4235,6 +4339,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DRADIOLIB_EXCLUDE_CC1101=1",
    "-DRADIOLIB_EXCLUDE_NRF24=1",
    "-DRADIOLIB_EXCLUDE_RF69=1",
@@ -4361,6 +4466,7 @@
    "-DRADIOLIB_EXCLUDE_RFM2X=1",
    "-DRADIOLIB_EXCLUDE_SX128X=1",
    "-Wl,--print-memory-usage",
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-D ARDUINO_USB_CDC_ON_BOOT=1",
    "-D MONITOR_SPEED=115200",
    "-D BOARD_E213=\"Vision_Master_E213\"",
@@ -4436,6 +4542,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DRADIOLIB_EXCLUDE_CC1101=1",
    "-DRADIOLIB_EXCLUDE_NRF24=1",
    "-DRADIOLIB_EXCLUDE_RF69=1",
@@ -4533,6 +4640,7 @@
   "board_build.partitions": "partitions-4MB-safeboot.csv",
   "board_upload.use_1200bps_touch": "true",
   "build_flags": [
+   "-D ARDUINO_LOOP_STACK_SIZE=12288",
    "-DRADIOLIB_EXCLUDE_CC1101=1",
    "-DRADIOLIB_EXCLUDE_NRF24=1",
    "-DRADIOLIB_EXCLUDE_RF69=1",
