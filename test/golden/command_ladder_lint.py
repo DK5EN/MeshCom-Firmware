@@ -41,7 +41,13 @@ The ladder already gets this right elsewhere on purpose -- see the "heap "
 vs "heap" comment at command_functions.cpp:4843 -- so the discipline is
 known, just unenforced. This script enforces it: extract every
 `commandCheck(<anything>, (char*)"NAME")` rung in source order, and fail
-when a shorter name's rung precedes a longer name it is a prefix of.
+when a shorter name's rung precedes a longer name that commandMatches()
+would let it catch -- the shorter name is an argument form (ends in a
+space) and the longer one starts with it, or the longer one is the shorter
+exact token followed by a space. A plain text prefix is NOT enough any more
+(2026-09-25): "nbr" does not catch "nbrreset", and "softser app" does not
+catch "softser app0". Until then find_violations() still used a bare
+startswith() and reported such pairs although both rungs are reachable.
 
 A SECOND, distinct way the same ladder shadows itself: two rungs with the
 EXACTLY SAME name. commandCheck() returns on the first match, so whichever
@@ -110,11 +116,11 @@ class Violation:
     def message(self, rel: str) -> str:
         return (
             f'{rel}:{self.prefix_line}: "{self.prefix_name}" is tested before '
-            f'{rel}:{self.blocked_line}: "{self.blocked_name}", and is a '
-            f'prefix of it -- commandCheck() is a prefix match, so '
-            f'"{self.blocked_name}" can never be reached; it always matches '
-            f'"{self.prefix_name}" first. Move the longer rung ahead of the '
-            f'shorter one.')
+            f'{rel}:{self.blocked_line}: "{self.blocked_name}", and '
+            f'commandMatches() lets it catch that command (argument form, or '
+            f'the exact token followed by a space), so "{self.blocked_name}" '
+            f'can never be reached; it always matches "{self.prefix_name}" '
+            f'first. Move the longer rung ahead of the shorter one.')
 
 
 @dataclass
@@ -255,6 +261,21 @@ def extract_rungs(text: str) -> List[Rung]:
     return out
 
 
+def shadows(shorter: str, longer: str) -> bool:
+    """True when a rung named `shorter` would also match the input `longer`
+    under src/command_match.h's commandMatches(): case-insensitive, and
+    either `shorter` is an argument form (ends in a space) that `longer`
+    starts with, or `longer` continues `shorter` with a space/CR/LF (an
+    exact token ends there). Mirrors the C rule literally, like
+    toggle_table_lint.py's commands_matches()."""
+    s, l = shorter.lower(), longer.lower()
+    if len(l) <= len(s) or not l.startswith(s):
+        return False
+    if s.endswith(" "):
+        return True
+    return l[len(s)] in (" ", "\r", "\n")
+
+
 def find_violations(rungs: List[Rung]) -> Tuple[List[Violation], int]:
     """Compare every pair of DISTINCT names for a prefix relationship.
 
@@ -292,7 +313,7 @@ def find_violations(rungs: List[Rung]) -> Tuple[List[Violation], int]:
             shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
             if len(shorter) == len(longer):
                 continue
-            if not longer.startswith(shorter):
+            if not shadows(shorter, longer):
                 continue
             if first_line[shorter] < first_line[longer]:
                 violations.append(Violation(
@@ -384,11 +405,29 @@ def self_test() -> int:
             '    else\n'
             '    if(commandCheck(msg_text+2, (char*)"heap") == 0) { return; }\n'
         ), "clean"),
-        ("reversed prefix pair", (
+        ("reversed pair: exact token before its argument form", (
+            '    if(commandCheck(msg_text+2, (char*)"heap") == 0) { return; }\n'
+            '    else\n'
+            '    if(commandCheck(msg_text+2, (char*)"heap ") == 0) { return; }\n'
+        ), "fatal"),
+        ("reversed pair: argument form before a longer exact name", (
+            '    if(commandCheck(msg_text+2, (char*)"setname ") == 0) { return; }\n'
+            '    else\n'
+            '    if(commandCheck(msg_text+2, (char*)"setname reset") == 0) { return; }\n'
+        ), "fatal"),
+        # Since D2-10 a plain text prefix does not shadow: "softser app" is an
+        # exact token and never matches "softser app0", and "nbr" never
+        # matches "nbrreset" (the false positive on feature-neighbour-matrix
+        # that prompted this fix, 2026-09-25).
+        ("text prefix without a space is not a shadow", (
             '    if(commandCheck(msg_text+2, (char*)"softser app") == 0) { return; }\n'
             '    else\n'
             '    if(commandCheck(msg_text+2, (char*)"softser app0") == 0) { return; }\n'
-        ), "fatal"),
+            '    else\n'
+            '    if(commandCheck(msg_text+2, (char*)"nbr") == 0) { return; }\n'
+            '    else\n'
+            '    if(commandCheck(msg_text+2, (char*)"nbrreset") == 0) { return; }\n'
+        ), "clean"),
         ("no prefix pairs at all", (
             '    if(commandCheck(msg_text+2, (char*)"utcoff") == 0) { return; }\n'
             '    else\n'
@@ -407,13 +446,13 @@ def self_test() -> int:
             '    /*\n'
             '    if(commandCheck(msg_text+2, (char*)"softser test") == 0) { return; }\n'
             '    else\n'
-            '    if(commandCheck(msg_text+2, (char*)"softser test0") == 0) { return; }\n'
+            '    if(commandCheck(msg_text+2, (char*)"softser test ") == 0) { return; }\n'
             '    */\n'
             '    if(commandCheck(msg_text+2, (char*)"utcoff") == 0) { return; }\n'
         ), "clean"),
         ("reversed prefix pair behind a line comment", (
             '    // if(commandCheck(msg_text+2, (char*)"softser test") == 0) { return; }\n'
-            '    // if(commandCheck(msg_text+2, (char*)"softser test0") == 0) { return; }\n'
+            '    // if(commandCheck(msg_text+2, (char*)"softser test ") == 0) { return; }\n'
             '    if(commandCheck(msg_text+2, (char*)"utcoff") == 0) { return; }\n'
         ), "clean"),
         # ...but a LIVE rung after a comment block must still be seen, so the
@@ -422,7 +461,7 @@ def self_test() -> int:
             '    /* an explanatory comment about softser */\n'
             '    if(commandCheck(msg_text+2, (char*)"softser app") == 0) { return; }\n'
             '    else\n'
-            '    if(commandCheck(msg_text+2, (char*)"softser app0") == 0) { return; }\n'
+            '    if(commandCheck(msg_text+2, (char*)"softser app ") == 0) { return; }\n'
         ), "fatal"),
         ("pattern matches nothing", (
             '    // this file has no commandCheck rungs at all\n'
@@ -455,7 +494,7 @@ def self_test() -> int:
     _, violations, _, _ = analyze(
         '    if(commandCheck(msg_text+2, (char*)"softser app") == 0) { return; }\n'
         '    else\n'
-        '    if(commandCheck(msg_text+2, (char*)"softser app0") == 0) { return; }\n')
+        '    if(commandCheck(msg_text+2, (char*)"softser app ") == 0) { return; }\n')
     named_both_lines = (
         len(violations) == 1
         and violations[0].prefix_line == 1
