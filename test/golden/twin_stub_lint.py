@@ -48,6 +48,11 @@ PAIRS: List[Tuple[str, str]] = [
     # in-tree original to compare against.
     ("test/test_gateway_service_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_gateway_service_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
+    # 2026-09-25 upstream merge: the U1 twin shadows kiss_functions.h so the
+    # KISS server-relay tap in handleUdpFrame_esp32() becomes observable. Its
+    # queueKiss() is the real header's ESP32 declaration and its no-ops are the
+    # real header's #else lines, so every stub line has a verbatim original.
+    ("test/test_udp_frame_twin/stubs/kiss_functions.h", "src/kiss_functions.h"),
     # D1-04 (W3c, 2026-09-15): the two settings-suite stubs
     # (test/test_nrf52_settings_paths and test/test_ble_settings_v1) used to
     # carry a hand-copied struct s_meshcom_settings and were registered here
