@@ -61,8 +61,12 @@ static int g_sendMessage_calls = 0;
 // discards the return value anyway (E4: what doesn't go out on HF doesn't go
 // into the backbone either, but that decision is made inside sendMessage()
 // itself, not by this caller).
-int sendMessage(char *msg_text, int len)
+// src_override / out_msg_id: added by the 2026-09-25 upstream merge (KISS
+// #1151), default nullptr in loop_functions.h, never passed by getExtern().
+int sendMessage(char *msg_text, int len, const char *src_override, unsigned int *out_msg_id)
 {
+    (void)src_override;
+    (void)out_msg_id;
     g_sent_msg_text.assign(msg_text, msg_text + len);
     g_sent_msg_len = len;
     g_sendMessage_calls++;
