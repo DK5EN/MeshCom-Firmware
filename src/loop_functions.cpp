@@ -38,6 +38,7 @@
 #endif
 #include "mcp17_bits.h"
 #include "pos_tag_nan.h"
+#include "dm_text_escape.h"   // P15: {ping}/{SET}-Ausnahme vom Klammer-Escape
 
 bool gpsDetected = false;
 bool gpsInitDone = false;
@@ -3388,7 +3389,10 @@ PingResult sendPing(char msg_call[10])
     // spaeter kam dann ein irrefuehrendes "[PONG]...fail". Sofort raus, noch
     // vor DisplayPong/bPingSend, damit kein Zaehler fuer einen nie
     // eingereihten Frame scharf gestellt wird.
-    if(addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg") < 0) // 0xFF no retransmission
+    // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
+    // ...) -- ein Ping ist eine persoenliche DM und soll als solche
+    // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
+    if(addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg") < 0)
     {
         printfdeb("[PING]...not queued: TX ring refused the frame\n");
         return PING_RING_REFUSED;
@@ -3483,7 +3487,8 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
+    // P15: siehe sendPing() oben -- ein Pong ist ebenfalls eine persoenliche DM.
+    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg");
 }
 
 // ===========================================================================
@@ -4109,6 +4114,14 @@ int sendMessage(char *msg_text, int len)
         return BP_SEND_REFUSED;
     }
 
+    // P15: ein {ping} wird nie wiederholt -- weder vom Ring noch von der
+    // Outbox-Leiter. Die Gegenstelle antwortet mit {pong}, nie mit ACK, also
+    // stoppte nichts die Wiederholung (ein Ping aus App/McApp ging dreimal
+    // in die Luft). sendPing() selbst reiht schon ohne Wiederholung ein
+    // (addTxRingEntryOnce()); dieses Flag haelt ein {ping}, das ueber
+    // sendMessage() eingeht (App/McApp-Pfad), von der Outbox fern.
+    const bool bPingMsg = strMsg.startsWith("{ping}");
+
     // S1 (docs/dm-stage1-plan-20260914.md section 3, decision 3): the stage 1
     // outbox refuses a DM outright when it has no free slot, the same way
     // the BP-01/BP-07 check above refuses one -- before any side effect
@@ -4116,7 +4129,7 @@ int sendMessage(char *msg_text, int len)
     // happened, so a refused message does not consume a message id either.
     // Mode off: dmOutboxHasRoom() is never consulted (short-circuit on
     // dmRetryMode()), sendMessage() stays byte-identical to today (T-1.7).
-    if(bDM && dmRetryMode() != DM_RETRY_OFF && !dmOutboxHasRoom())
+    if(bDM && !bPingMsg && dmRetryMode() != DM_RETRY_OFF && !dmOutboxHasRoom())
     {
         Serial.printf("[OUTBOX];refuse;full\n");
         dmstat_outbox_full.fetch_add(1);
@@ -4156,7 +4169,16 @@ int sendMessage(char *msg_text, int len)
         // A '{' inside the user text breaks the receiver's NNN parse
         // (indexOf("{", 1) finds the first brace, not the ack tag); escape it
         // at the sender (plan risk list, advisor m4).
-        strMsg.replace('{', '(');
+        //
+        // P15: ausser bei einem fuehrenden {ping}/{SET}-Tag -- das ist kein
+        // Fliesstext, sondern das Tag selbst (siehe dm_text_escape.h). Ein
+        // '{' NACH dem Tag bricht weiterhin den NNN-Parse und wird escaped.
+        size_t escFrom = dmTextEscapeFrom(strMsg.c_str());
+        for(size_t i = escFrom; i < (size_t)strMsg.length(); i++)
+        {
+            if(strMsg[i] == '{')
+                strMsg.setCharAt(i, '(');
+        }
 
         char cAckId[4] = {0};
         snprintf(cAckId, sizeof(cAckId), "%03i", meshcom_settings.node_msgid);
@@ -4165,8 +4187,16 @@ int sendMessage(char *msg_text, int len)
         // 0.4: DM outcome counters (docs/dm-transport-impl-plan-20260913.md).
         // nnn is the same node_msgid value just written into cAckId, before
         // the increment below.
-        dmstat_sent.fetch_add(1);
-        dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
+        //
+        // P15: nicht fuer ein {ping} -- die Gegenstelle antwortet mit
+        // {pong}, nie mit einem ACK, also stuende es fuer immer als
+        // sent-nie-acked in der DM-Statistik und blockierte einen
+        // dmstat_sent_tab-Slot.
+        if(!bPingMsg)
+        {
+            dmstat_sent.fetch_add(1);
+            dmStatNoteSent((uint16_t)meshcom_settings.node_msgid, millis());
+        }
     }
 
     meshcom_settings.node_msgid++;
@@ -4193,13 +4223,21 @@ int sendMessage(char *msg_text, int len)
     }
     // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
     // Slot wird erst in addTxRingEntry() unter Lock gewaehlt/beschrieben.
-    uint8_t user_msg_status;
+    uint8_t user_msg_status = 0xFF;
+    // P15: {ping} und die DM, die die --dmretry-Outbox uebernimmt (S1),
+    // sollen beide als eigene DM klassifiziert (MSG_PRIO_CRITICAL) UND ohne
+    // Wiederholung gespeichert werden (DONE) -- ein einzelnes Status-Byte
+    // reicht dafuer nicht (siehe getMessagePriority()), deshalb dafuer weiter
+    // unten addTxRingEntryOnce() statt addTxRingEntry().
+    bool bUseOnce = false;
     if (msg_buffer[0] == 0x3A) // only Messages
     {
         if(aprsmsg.msg_payload.startsWith("{CET}") || aprsmsg.msg_payload.startsWith("{MCP}") || aprsmsg.msg_payload.startsWith("{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
+        else if(bPingMsg)
+            bUseOnce = true; // P15: {ping} wird nie wiederholt -- die Gegenstelle antwortet mit {pong}, nie mit ACK (wie auf den neo-Zweigen: jedes {ping}, auch an Gruppen)
         else if(bDM && dmRetryMode() != DM_RETRY_OFF)
-            user_msg_status = 0xFF; // S1: the outbox's own ladder replaces the ring's 3x40s retry
+            bUseOnce = true; // S1: the outbox's own ladder replaces the ring's 3x40s retry
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
     }
@@ -4208,7 +4246,8 @@ int sendMessage(char *msg_text, int len)
         user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission
     }
 
-    int w = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
+    int w = bUseOnce ? addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "user_msg", 0)
+                      : addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
 
     if(bDisplayRetx && w >= 0)
     {
@@ -4298,7 +4337,9 @@ int sendMessage(char *msg_text, int len)
     // above), the same reconstruction lora_functions.cpp uses for an
     // incoming :ackNNN/:stoNNN. Mode off: never called, sendMessage() stays
     // byte-identical to today (T-1.7); full was already refused earlier.
-    if(bDM && dmRetryMode() != DM_RETRY_OFF)
+    // P15: kein Ping in die Outbox -- ein {ping} wird nie wiederholt (siehe
+    // bPingMsg oben), die Outbox-Leiter haette hier nichts zu verwalten.
+    if(bDM && !bPingMsg && dmRetryMode() != DM_RETRY_OFF)
     {
         dmOutboxAdd((uint16_t)(aprsmsg.msg_id & 0x3FF), strDestinationCall.c_str(),
                     strMsg.c_str(), strMsg.length(), aprsmsg.max_hop, aprsmsg.msg_id,
@@ -5040,22 +5081,13 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
         printfdeb("");
     }
 
-    // Status kann nicht vorab auf 0xFF (DONE) gesetzt werden: getMessagePriority()
-    // liest innerhalb von addTxRingEntry() das Status-Byte und stuft eine TEXT-
-    // Nachricht mit Status DONE als "Relay" (MSG_PRIO_NORMAL) statt als echte
-    // Ziel-Message (MSG_PRIO_CRITICAL) ein. Also mit temp-READY (0x00) einreihen,
-    // damit die Prio-Klassifizierung den Zielrufzeichen-Pfad parst, und danach
-    // per zurueckgegebenem Slot auf DONE setzen. Restrisiko des Nachtrags:
-    // preemptet der Timer-Service-Task GENAU zwischen den beiden Statements UND
-    // ist der Ring voll UND waehlt dessen Eviction ausgerechnet diesen frisch
-    // als HIGH/CRITICAL eingestuften Slot als niedrigste Prio, traefe das 0xFF
-    // einen fremden Eintrag. Akzeptiert: alle drei Bedingungen zusammen sind
-    // praktisch ausgeschlossen, und das Fenster ist strikt kleiner als das der
-    // alten Vorab-iWrite-Schreibsequenz (N-14).
-    int savedAckSlot = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0x00, "beacon");
-
-    if(savedAckSlot >= 0)
-        ringBuffer[savedAckSlot][1]=0xFF;   // no retransmission (set after priority is recorded)
+    // P15: klassifiziert als eigene Ziel-Message (MSG_PRIO_CRITICAL), aber
+    // mit Status DONE gespeichert (keine Wiederholung) -- beides atomar unter
+    // einem Lock, siehe addTxRingEntryOnce()/addTxRingEntryCore() in
+    // txring_functions.cpp fuer den Hintergrund (frueher hier ein
+    // Status-Nachtrag ausserhalb des Locks, siehe dort). Rueckgabewert
+    // ungenutzt, wie schon bisher (kein Nachtrag mehr noetig).
+    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "beacon");
 
     /*
     iWrite++;

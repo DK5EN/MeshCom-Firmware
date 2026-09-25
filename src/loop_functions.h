@@ -60,6 +60,15 @@ void addBLECommandBack(char *text);
 int addTxRingEntry(const uint8_t* frame, uint16_t len, uint8_t ring_status,
                     const char* source, int retryCountIn = -1, bool clearSlotFirst = false);
 
+// P15: wie addTxRingEntry(), aber fuer eine eigene Nachricht, die nie
+// wiederholt werden soll (DM/Gruppe/Broadcast mit Status DONE) UND trotzdem
+// als eigene Nachricht klassifiziert wird, nicht als Relay -- siehe den
+// P15-Doc-Kommentar in txring_functions.cpp fuer den Hintergrund (die
+// SendAckMessage()-Falle: ein Status-Nachtrag nach addTxRingEntry() liegt
+// ausserhalb des Locks und kann sich mit doTX() auf nRF52 ueberschneiden).
+int addTxRingEntryOnce(const uint8_t* frame, uint16_t len, const char* source,
+                        int retryCountIn = -1, bool clearSlotFirst = false);
+
 // checkOwnRx()/checkServerRx() werden jetzt in dedup_functions.h deklariert.
 int checkOwnTx(unsigned int msg_id);
 void insertOwnTx(unsigned int id);

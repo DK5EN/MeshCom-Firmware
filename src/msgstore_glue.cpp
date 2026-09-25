@@ -17,7 +17,7 @@
 #include "aprs_functions.h"
 #include "via_functions.h"
 #include "mheard_functions.h"
-#include "loop_functions.h"        // addTxRingEntry() with its default args
+#include "loop_functions.h"        // addTxRingEntryOnce() with its default args
 #include <loop_functions_extern.h> // ringBuffer[], bpCurrentState(), stat_last_window
 #include "printfdeb_functions.h"
 
@@ -89,32 +89,20 @@ static bool glueDeliver(const struct MsgStoreEntry *e)
     if(len == 0)
         return false;
 
-    // SendAckMessage() precedent (loop_functions.cpp): enqueue READY, then
-    // flip the slot to DONE so the ring never retransmits it -- the ladder
-    // above is the mailbox's own retry schedule, not the ring's.
-    //
-    // F5 (docs/review/fable-dm-stage3-verdict-20260914.md): this inherits
-    // the same N-14 race window as SendAckMessage() -- getMessagePriority()
-    // (txring_functions.cpp) classifies MSG_TYPE_TEXT by destination as
-    // MSG_PRIO_CRITICAL *unless* the slot status already reads DONE, in
-    // which case it is the relay's MSG_PRIO_NORMAL. If a priority read lands
-    // inside this window it sees READY and scores CRITICAL, same as a live
-    // user-typed personal DM would; that is the correct classification for
-    // a mailbox delivery too -- it genuinely is a personal DM, just relayed
-    // on the destination's behalf, and it should not queue behind relay
-    // traffic and beacons any more than the user's own DM would. Enqueuing
-    // straight into DONE (addTxRingEntry's ring_status argument makes that
-    // one line) would close the window but always reads NORMAL instead --
-    // trading the correct-but-racy classification for a wrong-but-safe one.
-    // Enqueuing and staying at READY forever is not an option either: that
-    // is what the TX ring's own retransmit logic keys on, and D3 requires
-    // the mailbox's 9-step ladder to be the only retry schedule a delivery
-    // ever gets. So: no code change, same accepted window as the ACK path.
-    int slot = addTxRingEntry(buf, len, 0x00, "mbox");
+    // P15 (txring_functions.cpp): addTxRingEntryOnce() classifies the slot
+    // with READY (getMessagePriority() reads the destination and scores this
+    // MSG_PRIO_CRITICAL, the correct classification for a mailbox delivery --
+    // it genuinely is a personal DM, just relayed on the destination's
+    // behalf, and it should not queue behind relay traffic and beacons any
+    // more than the user's own DM would) and stores DONE, both under the
+    // same lock -- the mailbox's own 9-step ladder (D3) is the only retry
+    // schedule a delivery ever gets, never the TX ring's own retransmit
+    // logic. No more hand-written status flip after the call, and no more
+    // race window between it and doTX() on nRF52 (the trap
+    // addTxRingEntryOnce() removes; ex-SendAckMessage()/N-14 precedent).
+    int slot = addTxRingEntryOnce(buf, len, "mbox");
     if(slot < 0)
         return false;
-
-    ringBuffer[slot][1] = 0xFF;
 
     return true;
 }
@@ -163,15 +151,13 @@ static bool glueNotify(const struct MsgStoreEntry *e)
     if(len == 0)
         return false;
 
-    // Same READY-then-DONE enqueue as glueDeliver(): the mailbox's own
-    // ladder (for a delivery) or "pending until acked by notified==2" (for
-    // a notice) is the only retry schedule either ever gets, never the TX
-    // ring's own retransmit logic.
-    int slot = addTxRingEntry(buf, len, 0x00, "sto");
+    // Same addTxRingEntryOnce() enqueue as glueDeliver() above: the
+    // mailbox's own ladder (for a delivery) or "pending until acked by
+    // notified==2" (for a notice) is the only retry schedule either ever
+    // gets, never the TX ring's own retransmit logic.
+    int slot = addTxRingEntryOnce(buf, len, "sto");
     if(slot < 0)
         return false;
-
-    ringBuffer[slot][1] = 0xFF;
 
     return true;
 }

@@ -84,10 +84,14 @@ static bool glueTransmit(const struct DmOutboxEntry *e, uint32_t msg_id)
         return false;
 
     // Ring accept first, same order as sendMessage(): only a slot the ring
-    // actually took earns the own-tx/dedup bookkeeping below. 0xFF (=
-    // RING_STATUS_DONE): the ladder is this attempt's only retry schedule,
-    // the ring must never retransmit it on its own.
-    int slot = addTxRingEntry(buf, len, 0xFF, "dm_retry");
+    // actually took earns the own-tx/dedup bookkeeping below. P15: this DM is
+    // a retry the ladder itself schedules, so the ring must never retransmit
+    // it on its own (DONE) -- but it is still a personal DM, not a relay, so
+    // it must classify as MSG_PRIO_CRITICAL, not NORMAL (getMessagePriority()
+    // treats a pre-set DONE status on a TEXT frame as "Relay"). Same trap as
+    // SendAckMessage() used to hit; addTxRingEntryOnce() classifies with
+    // READY and stores DONE, both under one lock (see txring_functions.cpp).
+    int slot = addTxRingEntryOnce(buf, len, "dm_retry");
     if(slot < 0)
         return false;
 
