@@ -81,6 +81,15 @@ nicht als Merkmal.
 | Gate    | Host-Tests, vier Builds, Advisor                                                                                              | gruen; 1112 Host-Tests, 4 neue Tests schlagen ohne Fix fehl; Advisor REWORK (nur Kommentare/Tests, 7 Punkte), alle erledigt    |
 | 6B      | OTA beider Knoten per `tools/webflash.py`, Einstellungen blieben erhalten                                                     | erledigt 20:01: beide Knoten Build `Sep 23 2026 / 19:59:40`; erster Text danach (`OE1XAR-33,DK5EN-98,DB0ED-99`, {CET}) nur `ME | DB0ED-99 | T`, kein `EDGE`; Auswertung beider Fixes ab `--since 2026-09-23T20:01` |
 
+Auswertung 2026-09-24 07:05 (11 h ab 20:01, `tools/nbrhopcheck.py` und die elf Pruefungen aus dem
+Statusdokument): alles gruen. 44/44 Schnappschuesse nur Hop 1/Hop 2 (zuletzt 5 + 15 Zeilen, Tabelle
+voll, 16 Verdraengungen unter Hop-2-Zeilen), 0 Text-EDGE, Server schickte 238 Frames, alle Text;
+0 `RING_DROP`, eigene Relays POS p90 42 s / max 65 s, HEY p90 42 s / max 72 s; 208 CANCEL bei 661
+Fall-B- und 81 Fall-A-Entscheidungen (31 % statt 62 % am ersten `on`-Tag, Preis der 60-s-Kappung),
+eigene Relays 48/h; 44 HN gesendet, 41 am Blatt -- die drei fehlenden fielen jeweils in die eigene
+Relay-Aussendung des Blatts (Halbduplex). Kein Neustart. DL2JA-2 bleibt Super mit #X 8, jetzt aus
+echten Hop-2-Knoten (OE7XWT-12 per Signalbericht von DL2JA-2 im HEY belegt).
+
 Restrisiko: die Regel setzt voraus, dass der Server nur Text an Gateways schickt;
 `udp_frame_esp32.cpp` nimmt weiterhin `!`/`@` vom Server an, ohne Merkmal auf der Luft.
 Bewusster Verlust: Text traegt auch kein "X hoert mich" (Echo `<ich>,X`) und keine echte
