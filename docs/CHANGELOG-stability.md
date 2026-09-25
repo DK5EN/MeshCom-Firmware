@@ -572,6 +572,27 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      this one now carry the same rule. Only affects nodes with a phone attached;
      nothing changes on the air.
 
+234. **A `{pong}` addressed to the node now reaches the phone** (fork-only,
+     2026-09-24, `P13`). The `{pong}` branch of the DM-to-self handler in
+     `OnRxDone()` queued the reply for the display (and, on a gateway, for the
+     server) but never called `addBLEOutBuffer()`, which every other DM to the
+     node gets. A ping sent from the phone app or McApp over BLE therefore never
+     showed an answer. The raw frame is now forwarded like a plain DM, so
+     `{pong}{<id>}` and the server flag arrive intact and the id still matches
+     the ping. Side effect: the official app shows the pong as a chat bubble,
+     because it discards only `{CET}`. Proven on hardware on the neo branch: a
+     BLE regression check (`tools/bench/pong_ble_check.py`, instrumented
+     builds, DK5EN-1) exits 1 on the unfixed image and 0 on the fixed one, with
+     its control DM arriving both times; McApp's link check DK5EN-98 -> DK5EN-1
+     over BLE, Extern-UDP off, answered in 12 s. **Caveat on this branch:** DM
+     stage 0 (`7aeb2ac5`) rewrites every `{` in a DM's text to `(` at the
+     sender, so a ping sent through `sendMessage()` currently leaves
+     `fork-main` as `(ping}{NNN` and is not a ping at all; until that is
+     resolved, only pongs to the node's own `--pingcall` pings benefit here.
+     The companion fix that sends such a ping only once (`P14`, on the neo
+     branches) is held back on `fork-main` for the same reason: on its own it
+     would strip the retries from what is, on this branch, an ordinary DM.
+
 ## New in v4.35s.09.09
 
 Two changes on top of `v4.35s.09.06.2`, items 209 and 210: a warning that
