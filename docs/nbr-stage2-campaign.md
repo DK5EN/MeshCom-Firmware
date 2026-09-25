@@ -24,12 +24,12 @@ Allein-Maske war in 96 % der NEED-Zeilen DK5EN-1 (echtes Blatt, 1099 von 1113 Em
 DK5EN-98) und/oder DL2JA-1 (relayt nie, vier Wochen Logs, daher keine beobachtete Hoerkante).
 Ohne beide: 36 A / 900 B.
 
-| Schritt | Inhalt                                                                                                                                                                                                    | Stand                                                                                                                                                                                                                                                                                                                                         |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3A      | Firmware: Zelle speichert SNR statt RSSI (`NBR_SNR_UNKNOWN` = -128), `--nbrsym on\|off` (node_sset4 0x0080 invertiert, Default an), Fallback in `nbrRelayNeed`/`nbrCoverMask`, `SYM`-Zeilen, `<inferred>` | erledigt                                                                                                                                                                                                                                                                                                                                      |
-| 3B      | Logvertrag `docs/nbr-logformat.md`, `tools/nbrlog.py` (SNR-Statistik, Abschnitt 10 Symmetrie-Annahmen), neue Fixture                                                                                      | erledigt                                                                                                                                                                                                                                                                                                                                      |
-| Gate    | 1075 Host-Tests, Builds heltec/rak/tbeam/tdeck, String-Scan, Advisor                                                                                                                                      | gruen; Advisor APPROVED, 1 Medium behoben (keine gestapelten Annahmen), 3 Low                                                                                                                                                                                                                                                                 |
-| 3C      | OTA DK5EN-98 und DK5EN-1 per `tools/webflash.py`, danach `--gateway on` auf DK5EN-1 ueber Konsole 2323                                                                                                    | erledigt 23:12: beide Knoten Build `Sep 22 2026 / 23:08:13`, Web-Seite zeigt `Symmetry: on (SNR >= -16 dB)`; DK5EN-1 per `/setparam/?gateway=on` (Konsole 2323 dort aus), Server-BEAT ok, an DK5EN-98 `G = Y`, Bit weg aus NEED; USB-Mitschnitt des Blatts lief durch. Auswertung ab `--since 2026-09-22T23:12`, fruehestens nach einer Nacht |
+| Schritt | Inhalt                                                                                                                                                                                                                                          | Stand                                                                                                                                                                                                                                                                                                                                         |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3A      | Firmware: Zelle speichert SNR statt RSSI (`NBR_SNR_UNKNOWN` = -128), `--nbrsym on\|off` (node_sset4 0x0080 invertiert, Default an; seit 25.09. 0x2000, siehe Bit layout), Fallback in `nbrRelayNeed`/`nbrCoverMask`, `SYM`-Zeilen, `<inferred>` | erledigt                                                                                                                                                                                                                                                                                                                                      |
+| 3B      | Logvertrag `docs/nbr-logformat.md`, `tools/nbrlog.py` (SNR-Statistik, Abschnitt 10 Symmetrie-Annahmen), neue Fixture                                                                                                                            | erledigt                                                                                                                                                                                                                                                                                                                                      |
+| Gate    | 1075 Host-Tests, Builds heltec/rak/tbeam/tdeck, String-Scan, Advisor                                                                                                                                                                            | gruen; Advisor APPROVED, 1 Medium behoben (keine gestapelten Annahmen), 3 Low                                                                                                                                                                                                                                                                 |
+| 3C      | OTA DK5EN-98 und DK5EN-1 per `tools/webflash.py`, danach `--gateway on` auf DK5EN-1 ueber Konsole 2323                                                                                                                                          | erledigt 23:12: beide Knoten Build `Sep 22 2026 / 23:08:13`, Web-Seite zeigt `Symmetry: on (SNR >= -16 dB)`; DK5EN-1 per `/setparam/?gateway=on` (Konsole 2323 dort aus), Server-BEAT ok, an DK5EN-98 `G = Y`, Bit weg aus NEED; USB-Mitschnitt des Blatts lief durch. Auswertung ab `--since 2026-09-22T23:12`, fruehestens nach einer Nacht |
 
 ## Welle 4: HN-Nachbarschaftsmeldung (`--nbrreport`), 2026-09-23
 
@@ -102,14 +102,14 @@ Relay-Kante `A,M` mehr ein -- ein anderes Gateway kann meinen hochgeladenen Text
 - Der Gateway-Echo-Fix (5.8 Punkt 0) ist in Welle 0 drin: ohne ihn stuende OE1XAR-33 in der
   Allein-Maske von DK5EN-98 und `count` saehe nie einen Abbruchkandidaten.
 - `count` aendert kein Funkverhalten; `on` schaltet Abbruch UND Backoff nach Fall.
-- Settings-Bits: `node_sset4` 0x0020 count, 0x0040 on.
+- Settings-Bits: `node_sset4` 0x0020 count, 0x0040 on (seit 25.09. 0x0800/0x1000, siehe Bit layout).
 - Symmetrie (Betreiberentscheidung 2026-09-22): SNR statt RSSI, Schwelle SNR >= -16 dB
   (Erfahrungswert: DF2SI-12 kommt an DK5EN-98 mit -16 dB Median an und faellt regelmaessig ins
   Rauschen). Keine Rechnung gegen Endstufen (E22, T-Beam 1W, Nachruest-PA), jede Annahme als
   `[NBR]|SYM` geloggt. Nur die Stufe-2-Entscheidung, Stufe-1-Urteile bleiben beobachtet.
   Beobachtete Kante gewinnt immer; ein Knoten, der den Frame nur per Annahme hat, versorgt
   niemanden (hoechstens eine Annahme je Entscheidung, Advisor-Fund).
-- Settings-Bit `node_sset4` 0x0080 = `--nbrsym off` (invertiert wie `--mesh`).
+- Settings-Bit `node_sset4` 0x0080 = `--nbrsym off` (invertiert wie `--mesh`; seit 25.09. 0x2000, siehe Bit layout).
 - Settings-Bits `node_sset4` 0x0100 = `--nbrreport off`, 0x0200 = `--nbrreport on`, keins = auto
   (Default; sendet nur bei Mesh aus UND Gateway aus).
 - Schwelle `LORA_SNR_STABLE_MIN_DB` (-16) steht in `src/configuration_default.h` direkt bei
@@ -128,6 +128,34 @@ Relay-Kante `A,M` mehr ein -- ein anderes Gateway kann meinen hochgeladenen Text
   `--mesh on` (war off; mit Mesh aus saehe DK5EN-98 nie, was das Blatt hoert, und hielte es fuer
   allein versorgt -- dann gaebe es an DK5EN-98 keinen Fall B mehr), `--nbrdebug on`, `--setlog on`,
   `--nbrrelay count`.
+
+## Bit layout since 2026-09-25
+
+Anlass: upstream/dev, fork-main und fork-neo-test lesen dieselben Bits in `node_sset4`
+(0x0010 enable, 0x0020 TX, 0x0040 RxMeta, 0x0080 auth) fuer KISS/TCP -- ein Knoten, der
+zwischen einem KISS-Build und diesem Zweig wechselt, deutet die Bits um (Bench-Beweis: ein
+KISS-Build startete KISS von selbst mit erlaubtem TX auf einem Knoten, der die NBR-Bits
+gesetzt hatte). Betreiberentscheidung: die vier kollidierenden Bits sechs Stellen nach oben
+verschieben, in den Bereich, den `--setlog off`s and_mask (0x00007FFB) bereits ausschliesst
+(loescht alles >= 0x8000; `node_sset`/`2`/`3` haben keine freien Bits mehr, nutzbar bleiben
+nur 0x0400..0x4000). `--nbrreport` (0x0100/0x0200) kollidiert nicht und bleibt stehen.
+
+| Schalter                                  | Bit alt (bis 2026-09-24) | Bit neu (ab 2026-09-25) |
+| ----------------------------------------- | ------------------------ | ----------------------- |
+| `--nbrdebug`                              | 0x0010                   | 0x0400                  |
+| `--nbrrelay` count                        | 0x0020                   | 0x0800                  |
+| `--nbrrelay` on (zusaetzlich, bNBRCANCEL) | 0x0040                   | 0x1000                  |
+| `--nbrrelay` on (beide Bits)              | 0x0060                   | 0x1800                  |
+| `--nbrsym off` (invertiert)               | 0x0080                   | 0x2000                  |
+| `--nbrreport off`/`on` (unveraendert)     | 0x0100/0x0200            | 0x0100/0x0200           |
+
+0x4000 bleibt frei. Bestandsknoten (DK5EN-1, DK5EN-98) tragen die alten Bits noch im Flash;
+`settings_sanitize.h::nbr_sset4_migrate_legacy_bits()` verschiebt sie beim Laden einmalig
+(aufgerufen aus `sanitize_loaded_settings()` auf beiden Plattformen), rein und idempotent,
+mit Log-Zeile wie die uebrigen Sanitize-Schritte. Die Migration traegt an jeder Aufrufstelle
+ein `#error` gegen `KISS_TCP_PORT` (aus `src/configuration_global.h` auf upstream/dev) als
+Stolperdraht: sobald dieser Zweig upstream KISS/TCP mergt, gehoeren 0x0010-0x0080 wieder KISS,
+und die Migration muss vorher raus, sonst wuerde sie KISS-Einstellungen zerstoeren.
 
 ## Offen
 

@@ -113,9 +113,10 @@ bool bNBRDEBUG = false;   // --nbrdebug: [NBR]-Zeilen der Nachbarschaftsmatrix, 
 bool bNBRRELAY = false;   // count oder on: Masken rechnen, NEED/CANCEL?-Zeilen, Zaehler
 bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
 // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): default an, gespeichert invertiert
-// (node_sset4 0x0080 gesetzt heisst "aus") -- jeder bestehende Knoten startet damit
+// (node_sset4 0x2000 gesetzt heisst "aus") -- jeder bestehende Knoten startet damit
 // nach einem Firmware-Update ohne Migration mit sym an. Siehe nbr_matrix.h
-// NBR_SYM_MIN_SNR fuer die Schwelle.
+// NBR_SYM_MIN_SNR fuer die Schwelle. Bit seit 2026-09-25 auf 0x2000 (vorher
+// 0x0080, kollidierte mit upstream KISS/TCP), siehe settings_sanitize.h.
 bool bNBRSYM = true;
 // --nbrreport off|auto|on (Stufe 3, HN-Bericht): zwei Bits in node_sset4 --
 // 0x0100 "off" (nie senden), 0x0200 "on" (immer senden), keines von beiden

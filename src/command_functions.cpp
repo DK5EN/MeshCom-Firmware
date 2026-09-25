@@ -216,10 +216,14 @@ static void tg_post_tft_off() { tdeck_dbg_tft(0); }
 #endif
 
 // --nbrrelay off|count|on (Nachbarschaftsmatrix Stufe 2, docs/nbr-wichtigkeit-konzept.md
-// Abschnitt 5 und 5.8 Punkt 4): zwei Bits in node_sset4 -- 0x0020 "rechnen und zaehlen"
-// (bNBRRELAY), 0x0040 "Abbruch und Backoff nach Fall anwenden" (bNBRCANCEL). on setzt beide,
+// Abschnitt 5 und 5.8 Punkt 4): zwei Bits in node_sset4 -- 0x0800 "rechnen und zaehlen"
+// (bNBRRELAY), 0x1000 "Abbruch und Backoff nach Fall anwenden" (bNBRCANCEL). on setzt beide,
 // count nur das erste, off keines. Die Nachlaeufer halten die beiden Laufzeitflags konsistent,
 // weil eine Tabellenzeile nur EIN Flag schreibt.
+// Bits seit 2026-09-25 verschoben (docs/nbr-stage2-campaign.md "Bit layout since
+// 2026-09-25"): 0x0020/0x0040 kollidierten mit upstream KISS/TCP auf demselben
+// Feld. settings_sanitize.h::nbr_sset4_migrate_legacy_bits() migriert Bestandsknoten
+// beim Laden.
 static void tg_post_nbrrelay_off()   { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_count() { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_on()    { bNBRRELAY = true; }
@@ -267,17 +271,17 @@ static const ToggleRow COMMAND_TOGGLES[] =
     { "--debug off",          &bDEBUG,               &meshcom_settings.node_sset,     0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     { "--txcapture on",       &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0008,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--txcapture off",      &bTXCAPTURE,           &meshcom_settings.node_sset4,    0xFFFFFFF7,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
-    { "--nbrdebug on",        &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0010,       nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrdebug off",       &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFEF,   0x00000000,   nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
-    { "--nbrrelay off",       &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFF9F,   0x00000000,   tg_post_nbrrelay_off,          TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
-    { "--nbrrelay count",     &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFFFBF,   0x0020,       tg_post_nbrrelay_count,        TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrrelay on",        &bNBRCANCEL,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0060,       tg_post_nbrrelay_on,           TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): 0x0080 in node_sset4, invertiert
+    { "--nbrdebug on",        &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0400,       nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrdebug off",       &bNBRDEBUG,            &meshcom_settings.node_sset4,    0xFFFFFBFF,   0x00000000,   nbrDebugApply,                 TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay off",       &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFE7FF,   0x00000000,   tg_post_nbrrelay_off,          TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrrelay count",     &bNBRRELAY,            &meshcom_settings.node_sset4,    0xFFFFEFFF,   0x0800,       tg_post_nbrrelay_count,        TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrrelay on",        &bNBRCANCEL,           &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x1800,       tg_post_nbrrelay_on,           TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): 0x2000 in node_sset4, invertiert
     // gespeichert ("aus" setzt das Bit) -- jeder bestehende Knoten startet damit ohne
     // Migration mit sym an, derselbe Trick wie bei --mesh (Zeilen oben). Keine
     // Neuberechnung noetig: die Relay-Entscheidung liest bNBRSYM je Frame neu.
-    { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFF7F,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x0080,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
+    { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFDFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x2000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
     // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100/0x0200 in node_sset4,
     // siehe tg_post_nbrreport_*() oben. Jede Zeile loescht zuerst BEIDE Bits
     // (and_mask 0xFFFFFCFF), dann setzt or_mask hoechstens eines davon.

@@ -125,6 +125,14 @@ int resolve_tx_power(int stored, int board_default)
     return stored;
 }
 
+int nbr_sset4_migrate_legacy_bits(int sset4)
+{
+    const int legacy = sset4 & 0x00F0;
+    if (legacy == 0)
+        return sset4;
+    return (sset4 & ~0x00F0) | (legacy << 6);
+}
+
 bool sanitize_cstring(char *s, size_t n)
 {
     if (s == NULL || n == 0)

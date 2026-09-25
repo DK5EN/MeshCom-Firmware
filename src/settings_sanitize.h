@@ -56,3 +56,34 @@ bool sanitize_max_hop_text(int &v, sanitize_log_fn log);
  * compat merge) and -20 (default since upstream 50c1ce59). Anything else is
  * returned unchanged; range clamping stays in getPower(). */
 int resolve_tx_power(int stored, int board_default);
+
+/* Nachbarschaftsmatrix Stufe 2 (feature-neighbour-matrix): node_sset4 0x0010,
+ * 0x0020, 0x0040 and 0x0080 collide with upstream's KISS/TCP feature on the
+ * same field (enable/TX/RxMeta/auth) -- a node moving between a KISS build and
+ * this branch's build reinterprets the bits (proved on the bench: a KISS
+ * build started KISS by itself with TX allowed after booting on a node that
+ * had the NBR bits set). Fixed 2026-09-25 by moving the four colliding bits
+ * six positions up, into the range upstream's --setlog off and_mask
+ * (0x00007FFB) already excludes: 0x0010->0x0400, 0x0020->0x0800,
+ * 0x0040->0x1000, 0x0080->0x2000. --nbrreport's 0x0100/0x0200 do not collide
+ * and stay put. See docs/nbr-stage2-campaign.md "Bit layout since 2026-09-25".
+ *
+ * Migrates an EXISTING node_sset4 value loaded from flash: if any bit in
+ * 0x00F0 is set, that nibble is cleared and reappears shifted left by 6 (so
+ * 0x0010->0x0400 etc); all other bits, including one already migrated or
+ * never set, pass through unchanged. Idempotent -- applying it twice is the
+ * same as applying it once, since the moved-to range (0x0400-0x2000) is
+ * disjoint from the moved-from range (0x0010-0x0080) it tests.
+ *
+ * This migration is a bridge for nodes that were already flashed with the
+ * OLD bits (DK5EN-1, DK5EN-98) and MUST be deleted before this branch ever
+ * merges upstream's KISS/TCP feature -- once that happens, 0x0010-0x0080
+ * belong to KISS and migrating them would corrupt KISS settings instead. Each
+ * call site carries a compile-time #error against KISS_TCP_PORT
+ * (src/configuration_global.h on upstream/dev) as a tripwire for that.
+ *
+ * One residue case changes RF behaviour: a node that ran a KISS build with
+ * `--kiss meta on` (0x0040) and is then flashed with this branch comes up
+ * with --nbrrelay on's cancel bit (0x1000). Accepted: only bench nodes move
+ * between the two builds; `--nbrrelay off` clears it. */
+int nbr_sset4_migrate_legacy_bits(int sset4);

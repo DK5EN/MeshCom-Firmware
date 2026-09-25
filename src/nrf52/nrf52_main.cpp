@@ -635,13 +635,13 @@ void nrf52setup()
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
     bDisplayLog = meshcom_settings.node_sset4 & 0x0004;
     bTXCAPTURE = meshcom_settings.node_sset4 & 0x0008;
-    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0010;
+    bNBRDEBUG = meshcom_settings.node_sset4 & 0x0400;
     nbrDebugApply();
-    // --nbrrelay off|count|on (Stufe 2): 0x0020 rechnen/zaehlen, 0x0040 anwenden.
-    bNBRRELAY  = (meshcom_settings.node_sset4 & 0x0060) != 0;
-    bNBRCANCEL = (meshcom_settings.node_sset4 & 0x0040) != 0;
-    // --nbrsym on|off (Stufe 2): 0x0080 invertiert gespeichert, siehe command_functions.cpp.
-    bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;
+    // --nbrrelay off|count|on (Stufe 2): 0x0800 rechnen/zaehlen, 0x1000 anwenden.
+    bNBRRELAY  = (meshcom_settings.node_sset4 & 0x1800) != 0;
+    bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;
+    // --nbrsym on|off (Stufe 2): 0x2000 invertiert gespeichert, siehe command_functions.cpp.
+    bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;
     // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100 off, 0x0200 on, keines von beiden auto.
     bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;
     bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;

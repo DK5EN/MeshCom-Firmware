@@ -115,7 +115,7 @@ veraendert hat (nicht bei jeder blossen Pruefung). Lesart: "angenommen, `<x>` ho
 
 ## `--nbrsym on|off` -- Symmetrie-Fallback fuer die Relay-Entscheidung
 
-Neuer Konsolenschalter, persistiert, Default AN (`node_sset4`-Bit `0x0080`, invertiert
+Neuer Konsolenschalter, persistiert, Default AN (`node_sset4`-Bit `0x0080`, seit 2026-09-25 `0x2000`, invertiert
 gespeichert: gesetzt heisst AUS -- dasselbe Muster wie `--mesh`, damit jeder bestehende Knoten
 ohne Migration mit AN startet).
 Mit `--nbrsym on` faellt die Stufe-2-Relay-Entscheidung ("hat X den Frame schon", "gibt es einen

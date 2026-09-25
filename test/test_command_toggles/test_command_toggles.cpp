@@ -42,7 +42,7 @@ static int  nbr_post_sset_seen;
 static void nbr_post_probe() { nbr_post_flag_seen = flagNbr; nbr_post_sset_seen = ssetNbr; }
 
 // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): eigenes Paar wie --nbrdebug,
-// aber invertiert gespeichert (0x0080 gesetzt heisst "aus", derselbe Trick
+// aber invertiert gespeichert (0x2000 gesetzt heisst "aus", derselbe Trick
 // wie --mesh) -- kein post()-Hook noetig, die Entscheidung liest bNBRSYM je
 // Frame neu.
 static bool flagSym;
@@ -72,11 +72,13 @@ static const ToggleRow TBL[] =
     { "--bare on",      nullptr,nullptr,0xFFFFFFFF,  0x00000000,  nullptr,     TG_DIRTY_NONE,   TG_ECHO_LN },
     { "--echof on",     nullptr,nullptr,0xFFFFFFFF,  0x00000000,  nullptr,     TG_DIRTY_NONE,   TG_ECHO_F },
     // Nachbildung der beiden echten "--nbrdebug on/off"-Zeilen (src/command_functions.cpp).
-    { "--nbrdebug on",  &flagNbr, &ssetNbr, 0xFFFFFFFF, 0x0010,     nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrdebug off", &flagNbr, &ssetNbr, 0xFFFFFFEF, 0x00000000, nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
+    // Bit seit 2026-09-25 0x0400 (vorher 0x0010, kollidierte mit upstream KISS/TCP).
+    { "--nbrdebug on",  &flagNbr, &ssetNbr, 0xFFFFFFFF, 0x0400,     nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrdebug off", &flagNbr, &ssetNbr, 0xFFFFFBFF, 0x00000000, nbr_post_probe, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
     // Nachbildung der beiden echten "--nbrsym on/off"-Zeilen (src/command_functions.cpp).
-    { "--nbrsym on",    &flagSym, &ssetSym, 0xFFFFFF7F, 0x00000000, nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrsym off",   &flagSym, &ssetSym, 0xFFFFFFFF, 0x0080,     nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
+    // Bit seit 2026-09-25 0x2000 (vorher 0x0080, kollidierte mit upstream KISS/TCP).
+    { "--nbrsym on",    &flagSym, &ssetSym, 0xFFFFDFFF, 0x00000000, nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
+    { "--nbrsym off",   &flagSym, &ssetSym, 0xFFFFFFFF, 0x2000,     nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
     // Nachbildung der drei echten "--nbrreport off/auto/on"-Zeilen (src/command_functions.cpp).
     { "--nbrreport off",  &flagRptOff, &ssetRpt, 0xFFFFFCFF, 0x0100,     nbrreport_post_off,  TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrreport auto", nullptr,     &ssetRpt, 0xFFFFFCFF, 0x00000000, nbrreport_post_auto, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
@@ -257,17 +259,18 @@ static void test_a_trailing_argument_does_not_match_a_toggle_row()
     TEST_ASSERT_TRUE(run("alpha on extra").matched);  // "on" token, then args
 }
 
-// --nbrdebug (docs/nbr-logformat.md, 24-h-Dauertest): "on" sets bit 0x0010 and
+// --nbrdebug (docs/nbr-logformat.md, 24-h-Dauertest): "on" sets bit 0x0400 and
 // the flag, and the post() hook -- handed back for the caller to run after
 // save_settings(), like every non-POST_FIRST row -- must see the FINISHED
-// state: flag already true, bit already OR'd in.
-static void test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state()
+// state: flag already true, bit already OR'd in. Bit moved from 0x0010 to
+// 0x0400 on 2026-09-25 (collided with upstream KISS/TCP on the same field).
+static void test_nbrdebug_on_sets_bit_0x0400_and_post_sees_finished_state()
 {
     reset();
     ToggleAction a = run("nbrdebug on");
     TEST_ASSERT_TRUE(a.matched);
     TEST_ASSERT_TRUE(flagNbr);
-    TEST_ASSERT_EQUAL_INT(0x0010, ssetNbr);
+    TEST_ASSERT_EQUAL_INT(0x0400, ssetNbr);
     TEST_ASSERT_TRUE(a.save);
     TEST_ASSERT_TRUE(a.ble_echo);
     TEST_ASSERT_TRUE(a.post_after == nbr_post_probe);   // not run yet
@@ -275,7 +278,7 @@ static void test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state()
 
     a.post_after();
     TEST_ASSERT_TRUE(nbr_post_flag_seen);
-    TEST_ASSERT_EQUAL_INT(0x0010, nbr_post_sset_seen);
+    TEST_ASSERT_EQUAL_INT(0x0400, nbr_post_sset_seen);
 }
 
 // "off" clears both the flag and the bit, and nothing else in the word.
@@ -283,7 +286,7 @@ static void test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state()
 {
     reset();
     flagNbr = true;
-    ssetNbr = 0x0010;
+    ssetNbr = 0x0400;
     ToggleAction a = run("nbrdebug off");
     TEST_ASSERT_TRUE(a.matched);
     TEST_ASSERT_FALSE(flagNbr);
@@ -297,50 +300,51 @@ static void test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state()
 }
 
 // The off row's and_mask is the bitwise complement of the on row's or_mask
-// (0xFFFFFFEF == ~0x0010): a 32-bit mask, so it must leave bits 16-31 alone
+// (0xFFFFFBFF == ~0x0400): a 32-bit mask, so it must leave bits 16-31 alone
 // like the tilde-style masks in command_toggles.h, not clear them like the
 // four literal AND-masks that share this table.
 static void test_nbrdebug_off_mask_leaves_upper_bits_alone()
 {
     reset();
-    ssetNbr = (int)0x7FFF0010u;
+    ssetNbr = (int)0x7FFF0400u;
     run("nbrdebug off");
     TEST_ASSERT_EQUAL_HEX32(0x7FFF0000u, (unsigned)ssetNbr);
 }
 
 // --nbrsym on|off (Stufe 2, Symmetrie-Annahme): invertiert gespeichert --
-// "on" CLEARS 0x0080 while SETTING the flag true, "off" SETS 0x0080 while
-// clearing the flag. Same shape as --mesh, opposite of --nbrdebug.
-static void test_nbrsym_on_sets_flag_true_and_clears_bit_0x0080()
+// "on" CLEARS 0x2000 while SETTING the flag true, "off" SETS 0x2000 while
+// clearing the flag. Same shape as --mesh, opposite of --nbrdebug. Bit moved
+// from 0x0080 to 0x2000 on 2026-09-25 (collided with upstream KISS/TCP).
+static void test_nbrsym_on_sets_flag_true_and_clears_bit_0x2000()
 {
     reset();
-    ssetSym = 0x0080;   // Ausgangszustand "aus"
+    ssetSym = 0x2000;   // Ausgangszustand "aus"
     ToggleAction a = run("nbrsym on");
     TEST_ASSERT_TRUE(a.matched);
     TEST_ASSERT_TRUE(flagSym);
-    TEST_ASSERT_EQUAL_INT(0x0000, ssetSym & 0x0080);
+    TEST_ASSERT_EQUAL_INT(0x0000, ssetSym & 0x2000);
     TEST_ASSERT_TRUE(a.save);
     TEST_ASSERT_TRUE(a.ble_echo);
 }
 
-static void test_nbrsym_off_clears_flag_and_sets_bit_0x0080()
+static void test_nbrsym_off_clears_flag_and_sets_bit_0x2000()
 {
     reset();
     ssetSym = 0x0000;   // Ausgangszustand "an"
     ToggleAction a = run("nbrsym off");
     TEST_ASSERT_TRUE(a.matched);
     TEST_ASSERT_FALSE(flagSym);
-    TEST_ASSERT_EQUAL_INT(0x0080, ssetSym & 0x0080);
+    TEST_ASSERT_EQUAL_INT(0x2000, ssetSym & 0x2000);
     TEST_ASSERT_TRUE(a.save);
     TEST_ASSERT_TRUE(a.ble_echo);
 }
 
 // The on row's and_mask is the bitwise complement of the off row's or_mask
-// (0xFFFFFF7F == ~0x0080): a 32-bit mask must leave bits 16-31 alone.
+// (0xFFFFDFFF == ~0x2000): a 32-bit mask must leave bits 16-31 alone.
 static void test_nbrsym_on_mask_leaves_upper_bits_alone()
 {
     reset();
-    ssetSym = (int)0x7FFF0080u;
+    ssetSym = (int)0x7FFF2000u;
     run("nbrsym on");
     TEST_ASSERT_EQUAL_HEX32(0x7FFF0000u, (unsigned)ssetSym);
 }
@@ -358,7 +362,28 @@ static void test_nbrsym_boot_restore_reads_inverted_bit()
     for (const char *f : mains)
     {
         std::string src = read_whole_file(repo_root() + f);
-        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;") != std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;") != std::string::npos, f);
+        // Moved from 0x0080 to 0x2000 on 2026-09-25 (collision with upstream
+        // KISS/TCP on the same field) -- the old boot-restore line must be gone.
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRSYM = (meshcom_settings.node_sset4 & 0x0080) == 0;") == std::string::npos, f);
+    }
+}
+
+// The other three moved flags, same source-text check: a boot path that still
+// read 0x0010/0x0060/0x0040 would decode KISS bits as NBR switches after the
+// 2026-09-25 move and would pass every row pin above.
+static void test_nbr_boot_restore_reads_moved_bits()
+{
+    const char *mains[] = { "/src/esp32/esp32_main.cpp", "/src/nrf52/nrf52_main.cpp" };
+    for (const char *f : mains)
+    {
+        std::string src = read_whole_file(repo_root() + f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRDEBUG = meshcom_settings.node_sset4 & 0x0400;") != std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRRELAY  = (meshcom_settings.node_sset4 & 0x1800) != 0;") != std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;") != std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0010") == std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0060") == std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0040") == std::string::npos, f);
     }
 }
 
@@ -422,13 +447,14 @@ static void test_nbrreport_auto_clears_both_bits_and_both_flags_via_post()
 }
 
 // The and_mask (0xFFFFFCFF) must clear ONLY the two report bits: bits 16-31
-// and a neighbouring bit already in use (0x0080, --nbrsym) survive untouched.
+// and a neighbouring bit already in use (0x2000, --nbrsym since 2026-09-25)
+// survive untouched.
 static void test_nbrreport_off_mask_leaves_other_bits_alone()
 {
     reset();
-    ssetRpt = (int)0x7FFF0280u;   // upper bits + nbrsym-Bit 0x0080 + report-on-Bit 0x0200
+    ssetRpt = (int)0x7FFF2200u;   // upper bits + nbrsym-Bit 0x2000 + report-on-Bit 0x0200
     run("nbrreport off");
-    TEST_ASSERT_EQUAL_HEX32(0x7FFF0180u, (unsigned)ssetRpt);
+    TEST_ASSERT_EQUAL_HEX32(0x7FFF2100u, (unsigned)ssetRpt);
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +568,7 @@ static std::string nth_field(const std::string &line, int index)
 // technique as the EXT-02 checks below.
 // ---------------------------------------------------------------------------
 
-static void test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply()
+static void test_real_nbrdebug_on_row_uses_bit_0x0400_and_nbrDebugApply()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
 
@@ -563,17 +589,23 @@ static void test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply()
     // Columns: name, flag, sset, and_mask, or_mask, post, dirty, opt.
     TEST_ASSERT_EQUAL_STRING_MESSAGE("&meshcom_settings.node_sset4", nth_field(row_line, 2).c_str(),
         "'--nbrdebug on' row must persist into node_sset4, like --debug/--txcapture");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0010", nth_field(row_line, 4).c_str(),
-        "'--nbrdebug on' row's or_mask must be the free bit 0x0010 (docs/nbr-logformat.md contract)");
+    // Bit moved from 0x0010 to 0x0400 on 2026-09-25 (collided with upstream
+    // KISS/TCP "enable" on the same field, see settings_sanitize.h).
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0400", nth_field(row_line, 4).c_str(),
+        "'--nbrdebug on' row's or_mask must be the free bit 0x0400 (docs/nbr-stage2-campaign.md contract)");
+    TEST_ASSERT_TRUE_MESSAGE(row_line.find("0x0010") == std::string::npos,
+        "'--nbrdebug on' row still carries the old, now KISS-colliding bit 0x0010");
     TEST_ASSERT_EQUAL_STRING_MESSAGE("nbrDebugApply", nth_field(row_line, 5).c_str(),
         "'--nbrdebug on' row must run nbrDebugApply() -- otherwise a runtime toggle "
         "does not take effect until the next boot");
 }
 
 // --nbrrelay off|count|on (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): drei
-// echte Zeilen auf node_sset4, Bits 0x0020 (count) und 0x0040 (on). "on" setzt
-// beide Bits (0x0060), "count" setzt 0x0020 und loescht 0x0040 (and 0xFFFFFFBF),
-// "off" loescht beide (and 0xFFFFFF9F) und laesst alle anderen Bits stehen.
+// echte Zeilen auf node_sset4, Bits 0x0800 (count) und 0x1000 (on). "on" setzt
+// beide Bits (0x1800), "count" setzt 0x0800 und loescht 0x1000 (and 0xFFFFEFFF),
+// "off" loescht beide (and 0xFFFFE7FF) und laesst alle anderen Bits stehen.
+// Bits seit 2026-09-25 verschoben (vorher 0x0020/0x0040, kollidierten mit
+// upstream KISS/TCP "TX"/"RxMeta" auf demselben Feld).
 static std::string real_row(const std::string &src, const char *name)
 {
     std::istringstream lines(src);
@@ -584,7 +616,7 @@ static std::string real_row(const std::string &src, const char *name)
     return "";
 }
 
-static void test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040()
+static void test_real_nbrrelay_rows_use_bits_0x0800_and_0x1000()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
 
@@ -597,20 +629,38 @@ static void test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040()
     TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(on, 2).c_str());
     TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(count, 2).c_str());
     TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(off, 2).c_str());
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0060", nth_field(on, 4).c_str(), "'on' must set 0x0020|0x0040");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0020", nth_field(count, 4).c_str(), "'count' must set only 0x0020");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFBF", nth_field(count, 3).c_str(), "'count' must clear 0x0040");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFF9F", nth_field(off, 3).c_str(), "'off' must clear 0x0020|0x0040 only");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x1800", nth_field(on, 4).c_str(), "'on' must set 0x0800|0x1000");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0800", nth_field(count, 4).c_str(), "'count' must set only 0x0800");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFEFFF", nth_field(count, 3).c_str(), "'count' must clear 0x1000");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFE7FF", nth_field(off, 3).c_str(), "'off' must clear 0x0800|0x1000 only");
     TEST_ASSERT_EQUAL_STRING("&bNBRCANCEL", nth_field(on, 1).c_str());
     TEST_ASSERT_EQUAL_STRING("&bNBRRELAY", nth_field(count, 1).c_str());
     TEST_ASSERT_EQUAL_STRING("&bNBRRELAY", nth_field(off, 1).c_str());
+
+    // Bits moved from 0x0020/0x0040 on 2026-09-25 (collided with upstream
+    // KISS/TCP "TX"/"RxMeta" on the same field) -- the old literals must be
+    // gone from all three rows, not just replaced in the ones checked above.
+    for (const std::string *row : { &on, &count, &off })
+    {
+        TEST_ASSERT_TRUE_MESSAGE(row->find("0x0020") == std::string::npos,
+            "a '--nbrrelay' row still carries the old, now KISS-colliding bit 0x0020");
+        TEST_ASSERT_TRUE_MESSAGE(row->find("0x0040") == std::string::npos,
+            "a '--nbrrelay' row still carries the old, now KISS-colliding bit 0x0040");
+        TEST_ASSERT_TRUE_MESSAGE(row->find("0x0060") == std::string::npos,
+            "a '--nbrrelay' row still carries the old, now KISS-colliding combined mask 0x0060");
+    }
+    TEST_ASSERT_TRUE_MESSAGE(count.find("0xFFFFFFBF") == std::string::npos,
+        "'--nbrrelay count' row still carries the old and_mask 0xFFFFFFBF");
+    TEST_ASSERT_TRUE_MESSAGE(off.find("0xFFFFFF9F") == std::string::npos,
+        "'--nbrrelay off' row still carries the old and_mask 0xFFFFFF9F");
 }
 
-// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): ein Bit 0x0080 in node_sset4,
+// --nbrsym on|off (Stufe 2, Symmetrie-Annahme): ein Bit 0x2000 in node_sset4,
 // invertiert gespeichert wie --mesh -- "on" clears it while setting the flag,
 // "off" sets it while clearing the flag. No post() (the decision re-reads
-// bNBRSYM per frame, no reboot needed).
-static void test_real_nbrsym_rows_use_bit_0x0080_inverted()
+// bNBRSYM per frame, no reboot needed). Bit moved from 0x0080 to 0x2000 on
+// 2026-09-25 (collided with upstream KISS/TCP "auth" on the same field).
+static void test_real_nbrsym_rows_use_bit_0x2000_inverted()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
 
@@ -623,10 +673,13 @@ static void test_real_nbrsym_rows_use_bit_0x0080_inverted()
     TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(off, 2).c_str());
     TEST_ASSERT_EQUAL_STRING("&bNBRSYM", nth_field(on, 1).c_str());
     TEST_ASSERT_EQUAL_STRING("&bNBRSYM", nth_field(off, 1).c_str());
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFF7F", nth_field(on, 3).c_str(), "'on' must clear only 0x0080");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFDFFF", nth_field(on, 3).c_str(), "'on' must clear only 0x2000");
     TEST_ASSERT_EQUAL_STRING_MESSAGE("0x00000000", nth_field(on, 4).c_str(), "'on' must not set any bit");
     TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFFF", nth_field(off, 3).c_str(), "'off' and_mask must not touch other bits");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0080", nth_field(off, 4).c_str(), "'off' must set 0x0080");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x2000", nth_field(off, 4).c_str(), "'off' must set 0x2000");
+
+    TEST_ASSERT_TRUE_MESSAGE(on.find("0x0080") == std::string::npos && off.find("0x0080") == std::string::npos,
+        "a '--nbrsym' row still carries the old, now KISS-colliding bit 0x0080");
 }
 
 // --nbrreport off|auto|on (Stufe 3, HN-Bericht): drei echte Zeilen, Bits
@@ -685,7 +738,7 @@ static void test_nbrreport_boot_restore_reads_both_bits()
     }
 }
 
-static void test_real_nbrdebug_off_row_clears_only_bit_0x0010()
+static void test_real_nbrdebug_off_row_clears_only_bit_0x0400()
 {
     std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
 
@@ -703,10 +756,14 @@ static void test_real_nbrdebug_off_row_clears_only_bit_0x0010()
     TEST_ASSERT_FALSE_MESSAGE(row_line.empty(),
         "no '--nbrdebug off' row found in src/command_functions.cpp -- has COMMAND_TOGGLES moved?");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFFEF", nth_field(row_line, 3).c_str(),
-        "'--nbrdebug off' row's and_mask must clear bit 0x0010 and nothing else");
+    // Bit moved from 0x0010 to 0x0400 on 2026-09-25 (collided with upstream
+    // KISS/TCP "enable" on the same field, see settings_sanitize.h).
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFBFF", nth_field(row_line, 3).c_str(),
+        "'--nbrdebug off' row's and_mask must clear bit 0x0400 and nothing else");
     TEST_ASSERT_EQUAL_STRING_MESSAGE("0x00000000", nth_field(row_line, 4).c_str(),
         "'--nbrdebug off' row's or_mask must be zero");
+    TEST_ASSERT_TRUE_MESSAGE(row_line.find("0x0010") == std::string::npos,
+        "'--nbrdebug off' row still carries the old, now KISS-colliding bit 0x0010");
     TEST_ASSERT_EQUAL_STRING_MESSAGE("nbrDebugApply", nth_field(row_line, 5).c_str(),
         "'--nbrdebug off' row must also run nbrDebugApply(), or the pointer stays live "
         "after switching off");
@@ -782,23 +839,24 @@ int main(int, char **)
     RUN_TEST(test_echo_style_is_reported_per_row);
     RUN_TEST(test_matching_is_exact_token_not_prefix);
     RUN_TEST(test_a_trailing_argument_does_not_match_a_toggle_row);
-    RUN_TEST(test_nbrdebug_on_sets_bit_0x0010_and_post_sees_finished_state);
+    RUN_TEST(test_nbrdebug_on_sets_bit_0x0400_and_post_sees_finished_state);
     RUN_TEST(test_nbrdebug_off_clears_bit_and_flag_post_sees_finished_state);
     RUN_TEST(test_nbrdebug_off_mask_leaves_upper_bits_alone);
-    RUN_TEST(test_nbrsym_on_sets_flag_true_and_clears_bit_0x0080);
-    RUN_TEST(test_nbrsym_off_clears_flag_and_sets_bit_0x0080);
+    RUN_TEST(test_nbrsym_on_sets_flag_true_and_clears_bit_0x2000);
+    RUN_TEST(test_nbrsym_off_clears_flag_and_sets_bit_0x2000);
     RUN_TEST(test_nbrsym_on_mask_leaves_upper_bits_alone);
     RUN_TEST(test_nbrsym_boot_restore_reads_inverted_bit);
+    RUN_TEST(test_nbr_boot_restore_reads_moved_bits);
     RUN_TEST(test_nbrreport_off_sets_flag_and_bit_0x0100_and_clears_on_flag);
     RUN_TEST(test_nbrreport_on_sets_flag_and_bit_0x0200_and_clears_off_flag);
     RUN_TEST(test_nbrreport_auto_clears_both_bits_and_both_flags_via_post);
     RUN_TEST(test_nbrreport_off_mask_leaves_other_bits_alone);
     RUN_TEST(test_nbrreport_boot_restore_reads_both_bits);
-    RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0010_and_nbrDebugApply);
-    RUN_TEST(test_real_nbrrelay_rows_use_bits_0x0020_and_0x0040);
-    RUN_TEST(test_real_nbrsym_rows_use_bit_0x0080_inverted);
+    RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0400_and_nbrDebugApply);
+    RUN_TEST(test_real_nbrrelay_rows_use_bits_0x0800_and_0x1000);
+    RUN_TEST(test_real_nbrsym_rows_use_bit_0x2000_inverted);
     RUN_TEST(test_real_nbrreport_rows_use_bits_0x0100_and_0x0200);
-    RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0010);
+    RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0400);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
     return UNITY_END();

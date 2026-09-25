@@ -62,7 +62,7 @@ ist, weil ein anderer meiner Nachbarn dieselbe Menge abdeckt.
 - Das GW-Flag aus einem HEY-Frame wird nur noch gesetzt, wenn der Absender (erstes Pfad-Token)
   eine aufgeloeste Zeile hat. Bei einem Absender ausserhalb des Fensters verfaellt es still --
   notwendige Folge des Schnitts, der Knoten steht ohnehin nicht mehr in der Matrix.
-- `bNBRDEBUG` belegt `node_sset4` Bit `0x0010` (0x0001..0x0008 sind vergeben, alles darueber frei).
+- `bNBRDEBUG` belegt `node_sset4` Bit `0x0010` (0x0001..0x0008 sind vergeben, alles darueber frei). Seit 2026-09-25 `0x0400`: 0x0010..0x0080 gehoeren upstream KISS/TCP, siehe `docs/nbr-stage2-campaign.md` "Bit layout".
 
 ### Feldlauf 2026-09-21/22 -- Stand und Rezept
 
