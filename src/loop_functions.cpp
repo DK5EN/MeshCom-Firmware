@@ -3462,7 +3462,10 @@ void sendPing(char msg_call[10])
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
+    // P15: addTxRingEntryOnce() statt addTxRingEntry(..., RING_STATUS_DONE,
+    // ...) -- ein Ping ist eine persoenliche DM und soll als solche
+    // (MSG_PRIO_CRITICAL) eingestuft werden, nicht als Relay (siehe dort).
+    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg");
 
     if(!bPingSend)
     {
@@ -3530,7 +3533,8 @@ void SendPong(String msg_call, unsigned int msg_id)
 
     // Master RingBuffer for transmission
     // local messages send to LoRa TX
-    addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0xFF, "phone_msg"); // 0xFF no retransmission
+    // P15: siehe sendPing() oben -- ein Pong ist ebenfalls eine persoenliche DM.
+    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "phone_msg");
 }
 
 // ===========================================================================
@@ -4179,11 +4183,25 @@ int sendMessage(char *msg_text, int len)
     }
     // Status vorab aus msg_buffer bestimmen (statt aus dem Ring zu lesen): der
     // Slot wird erst in addTxRingEntry() unter Lock gewaehlt/beschrieben.
-    uint8_t user_msg_status;
+    uint8_t user_msg_status = 0xFF;
+    // P14/P15: {ping} wird nie wiederholt -- die Gegenstelle antwortet mit
+    // {pong}, nie mit ACK, also stoppte nichts die Wiederholung (ein Ping aus
+    // App/McApp ging dreimal in die Luft). Frueher wurde dafuer NACH dem
+    // Einreihen der Slot per Hand auf DONE nachgetragen (wie einst in
+    // SendAckMessage()): getMessagePriority() liest den Status IN
+    // addTxRingEntry() und stufte eine vorab auf DONE gesetzte DM als Relay
+    // (NORMAL) statt als persoenliche DM (CRITICAL) ein -- ein Nachtrag nach
+    // dem Aufruf war der einzige Ausweg, aber ausserhalb des Locks (siehe
+    // addTxRingEntryOnce()-Doku in txring_functions.cpp). bUseOnce waehlt
+    // stattdessen addTxRingEntryOnce() weiter unten: klassifiziert READY,
+    // speichert DONE, beides atomar.
+    bool bUseOnce = false;
     if (msg_buffer[0] == 0x3A) // only Messages
     {
         if(mcStartsWith(aprsmsg.msg_payload, "{CET}") || mcStartsWith(aprsmsg.msg_payload, "{MCP}") || mcStartsWith(aprsmsg.msg_payload, "{SET}"))
             user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission on {CET} & Co.
+        else if(mcStartsWith(aprsmsg.msg_payload, "{ping}"))
+            bUseOnce = true; // P14/P15: siehe oben
         else
             user_msg_status = 0x00; // retransmission Status ...0xFF no retransmission
     }
@@ -4192,16 +4210,8 @@ int sendMessage(char *msg_text, int len)
         user_msg_status = 0xFF; // retransmission Status ...0xFF no retransmission
     }
 
-    int w = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
-
-    // P14: auch {ping} nicht wiederholen. Die Gegenstelle antwortet mit {pong},
-    // nie mit ACK -- nichts stoppte die Wiederholung, ein Ping aus App/McApp
-    // ging dreimal in die Luft. Erst NACH dem Einreihen auf DONE setzen, wie
-    // in SendAckMessage(): getMessagePriority() liest den Status in
-    // addTxRingEntry() und stufte eine vorab auf DONE gesetzte DM als Relay
-    // (NORMAL) statt als persoenliche DM (CRITICAL) ein.
-    if(w >= 0 && msg_buffer[0] == 0x3A && mcStartsWith(aprsmsg.msg_payload, "{ping}"))
-        ringBuffer[w][1] = RING_STATUS_DONE;
+    int w = bUseOnce ? addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "user_msg", 0)
+                      : addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, user_msg_status, "user_msg", 0);
 
     if(bDisplayRetx && w >= 0)
     {
@@ -5016,22 +5026,13 @@ void SendAckMessage(String dest_call, unsigned int iAckId)
         printfdeb("");
     }
 
-    // Status kann nicht vorab auf 0xFF (DONE) gesetzt werden: getMessagePriority()
-    // liest innerhalb von addTxRingEntry() das Status-Byte und stuft eine TEXT-
-    // Nachricht mit Status DONE als "Relay" (MSG_PRIO_NORMAL) statt als echte
-    // Ziel-Message (MSG_PRIO_CRITICAL) ein. Also mit temp-READY (0x00) einreihen,
-    // damit die Prio-Klassifizierung den Zielrufzeichen-Pfad parst, und danach
-    // per zurueckgegebenem Slot auf DONE setzen. Restrisiko des Nachtrags:
-    // preemptet der Timer-Service-Task GENAU zwischen den beiden Statements UND
-    // ist der Ring voll UND waehlt dessen Eviction ausgerechnet diesen frisch
-    // als HIGH/CRITICAL eingestuften Slot als niedrigste Prio, traefe das 0xFF
-    // einen fremden Eintrag. Akzeptiert: alle drei Bedingungen zusammen sind
-    // praktisch ausgeschlossen, und das Fenster ist strikt kleiner als das der
-    // alten Vorab-iWrite-Schreibsequenz (N-14).
-    int savedAckSlot = addTxRingEntry(msg_buffer, (uint16_t)aprsmsg.msg_len, 0x00, "beacon");
-
-    if(savedAckSlot >= 0)
-        ringBuffer[savedAckSlot][1]=0xFF;   // no retransmission (set after priority is recorded)
+    // P15: klassifiziert als eigene Ziel-Message (MSG_PRIO_CRITICAL), aber
+    // mit Status DONE gespeichert (keine Wiederholung) -- beides atomar unter
+    // einem Lock, siehe addTxRingEntryOnce()/addTxRingEntryCore() in
+    // txring_functions.cpp fuer den Hintergrund (frueher hier ein
+    // Status-Nachtrag ausserhalb des Locks, siehe dort). Rueckgabewert
+    // ungenutzt, wie schon bisher (kein Nachtrag mehr noetig).
+    addTxRingEntryOnce(msg_buffer, (uint16_t)aprsmsg.msg_len, "beacon");
 
     /*
     iWrite++;
