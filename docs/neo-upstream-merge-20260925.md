@@ -7,15 +7,15 @@ now; W4 node DK5EN-1 (bench Heltec V3); after W5 push `fork-neo` (first push), N
 
 ## Wave status log
 
-| Wave | Content                                              | State                                                                                                    |
-| ---- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| S    | Scouting (4 read-only scouts + own verification)     | done                                                                                                     |
-| W0   | Baseline builds, `git merge`, resolve 7 hunks        | done: 8/8 baseline green; merge committed as def2dc7e                                                    |
-| W1   | KISS `String` -> `char[]` port + host test           | done: kiss_frame carve, 18/18 host after advisor vectors                                                 |
-| W2   | Gate: host suite, lints, 32 envs, advisor, commit    | done: host 1067/1067, selftest green, 32/32 envs, advisor APPROVED; commits def2dc7e, 71502a94, 7ba19935 |
-| W3   | neo path lists, lint rule, CHANGELOG-neo, pr-history | done: path lists 262/262 + K19 444, README counts, CHANGELOG-neo 118-123, pr-history figures             |
-| W4   | Bench check on DK5EN-1 (OTA), restore afterwards     | pending                                                                                                  |
-| W5   | Re-derive fork-neo + `gate.sh`, push fork-neo        | pending                                                                                                  |
+| Wave | Content                                              | State                                                                                                      |
+| ---- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| S    | Scouting (4 read-only scouts + own verification)     | done                                                                                                       |
+| W0   | Baseline builds, `git merge`, resolve 7 hunks        | done: 8/8 baseline green; merge committed as def2dc7e                                                      |
+| W1   | KISS `String` -> `char[]` port + host test           | done: kiss_frame carve, 18/18 host after advisor vectors                                                   |
+| W2   | Gate: host suite, lints, 32 envs, advisor, commit    | done: host 1067/1067, selftest green, 32/32 envs, advisor APPROVED; commits def2dc7e, 71502a94, 7ba19935   |
+| W3   | neo path lists, lint rule, CHANGELOG-neo, pr-history | done: path lists 262/262 + K19 444, README counts, CHANGELOG-neo 118-123, pr-history figures               |
+| W4   | Bench check on DK5EN-1 (OTA), restore afterwards     | done: IS1/SN1 over BLE, KISS server-relay tap proven, --via bug found + fixed (0923e037), DK5EN-1 restored |
+| W5   | Re-derive fork-neo + `gate.sh`, push fork-neo        | pending                                                                                                    |
 
 ## Gate log (W2)
 
@@ -42,6 +42,38 @@ now; W4 node DK5EN-1 (bench Heltec V3); after W5 push `fork-neo` (first push), N
   Refuted: its vector (b) expectation (":rej5 :ack7" with slot 7 IS rewritten).
 - Rebuilt root safeboot*.bin discarded: no safeboot input changed, the byte
   difference is ESP32 build non-reproducibility.
+
+## Bench log (W4, DK5EN-1, 2026-09-25 19:55-20:07)
+
+- Flashed e79d1837 over WiFi (webflash.py, 36 s). Settings loaded ("FLASH
+  layout 20260724 ok").
+- **KISS started by itself** ("[KISS]...server started on port 8001"): the
+  feature-neighbour-matrix build stores `--nbrdebug` in node_sset4 0x10 and
+  `--nbrrelay count` in 0x20 -- the bits upstream's KISS reads as enable and
+  TX-allowed. See "Open decision" below.
+- BLE `--info`: I + `{"TYP":"IS1","BDATE":"20260925-193817"}`. `--nodeset`: SN +
+  `{"TYP":"SN1","VIA":false,"VIACALL":""}`.
+- BLE `--via on`/`off` on e79d1837: SN + SN1 as JSON, no text echo, but
+  VIACALL became "ON"/"OFF" -- the TG_BRETURN fall-through into the "via "
+  rung. Fixed in 0923e037 (lint check 9), flashed, re-measured: VIA toggles,
+  VIACALL stays "". `--via none` restored the original empty via call.
+- KISS read-only client, 7 min, nothing sent: the `{CET}` frame x6AAA30A6
+  arrived from the server first (GWI 19:57:47.385) and went to the client at
+  19:57:47 via the re-anchored tap (F4); the RF copy 7 s later was a duplicate
+  and was not delivered again. The LoRa RX tap was not exercised: no fresh RF
+  text/position frame in the window, only HEY (excluded by design).
+- Restored feature-neighbour-matrix 14a2b2eb (rebuilt, build 19:54:11); NBR
+  lines resume. Field-run capture gap 19:55-20:07.
+
+## Open decision: node_sset4 bit collision
+
+feature-neighbour-matrix uses node_sset4 0x10 (nbrdebug), 0x20/0x40
+(nbrrelay count/on), 0x80 (nbrsym off), 0x100/0x200 (nbrreport). Upstream KISS
+(now on fork-main and fork-neo-test) uses 0x10 enable, 0x20 TX, 0x40 RxMeta,
+0x80 auth. Any node moving between the two builds reinterprets the bits: a
+feature-neighbour-matrix node flashed with fork-neo-test/fork-main opens an
+unauthenticated KISS listener with TX allowed. The NBR bits must move before
+feature-neighbour-matrix takes upstream/dev. Operator decision owed.
 
 ## Starting point
 

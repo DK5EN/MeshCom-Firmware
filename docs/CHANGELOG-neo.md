@@ -111,11 +111,16 @@ sind dafuer aus `kiss_functions.cpp` herausgeloest und haben einen Host-Test mit
 18 Faellen (`native_kiss_frame`), der die AX.25-Rahmen Byte fuer Byte prueft.
 
 **121. `--via on` / `--via off` antworten dem Telefon mit `SN` und `SN1`.**
-(`def2dc7e`, Lint `71502a94`). Das ist upstreams Fix (die Text-Antwort erschien in
-der App als Chatzeile); hier stehen die beiden Kommandos in `COMMAND_TOGGLES[]`,
-deshalb waere der Fix beim Merge stumm verloren gegangen. Die beiden Tabellenzeilen
-tragen jetzt `TG_DIRTY_NODE` statt `TG_BLE_ECHO`; `toggle_table_lint.py` prueft
-das seitdem (Pruefung 8). Kein Unterschied zu upstream.
+(`def2dc7e`, `0923e037`, Lint `71502a94`). Das ist upstreams Fix (die
+Text-Antwort erschien in der App als Chatzeile); hier stehen die beiden Kommandos
+in `COMMAND_TOGGLES[]`, deshalb waere der Fix beim Merge stumm verloren gegangen.
+Die beiden Tabellenzeilen tragen jetzt `TG_DIRTY_NODE` statt `TG_BLE_ECHO`, und
+der Aufrufer schickt `sendNodeSetting()` selbst. Der erste Anlauf ging ueber
+`TG_BRETURN`; weil die Kommandoleiter keine durchgehende if/else-Kette ist, lief
+die Eingabe dann weiter bis zur Argument-Stufe `via ` und speicherte "ON" als
+Via-Rufzeichen -- auf der Bank an DK5EN-1 gefunden und dort nach der Korrektur
+nachgemessen (`VIA` wechselt, `VIACALL` bleibt leer). `toggle_table_lint.py`
+prueft beides seitdem (Pruefungen 8 und 9). Kein Unterschied zu upstream.
 
 **122. Der KISS-Abgriff fuer Rahmen vom MeshCom-Server sitzt in
 `handleUdpFrame_esp32()`.** (`def2dc7e`). Upstream hat ihn in
