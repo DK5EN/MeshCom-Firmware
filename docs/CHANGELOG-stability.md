@@ -584,14 +584,44 @@ makeDhcpHostname(char*, unsigned long, const char*)` in
      BLE regression check (`tools/bench/pong_ble_check.py`, instrumented
      builds, DK5EN-1) exits 1 on the unfixed image and 0 on the fixed one, with
      its control DM arriving both times; McApp's link check DK5EN-98 -> DK5EN-1
-     over BLE, Extern-UDP off, answered in 12 s. **Caveat on this branch:** DM
-     stage 0 (`7aeb2ac5`) rewrites every `{` in a DM's text to `(` at the
-     sender, so a ping sent through `sendMessage()` currently leaves
-     `fork-main` as `(ping}{NNN` and is not a ping at all; until that is
-     resolved, only pongs to the node's own `--pingcall` pings benefit here.
-     The companion fix that sends such a ping only once (`P14`, on the neo
-     branches) is held back on `fork-main` for the same reason: on its own it
-     would strip the retries from what is, on this branch, an ordinary DM.
+     over BLE, Extern-UDP off, answered in 12 s. On `fork-main`, pings sent
+     from the app get their pong only together with item 235.
+
+235. **`{ping}` and `{SET}` survive the DM brace escape; a ping from the app
+     goes out once** (fork-only, 2026-09-25, `P14`). DM stage 0 (`7aeb2ac5`)
+     rewrites every `{` in a DM's text to `(` at the sender, so the receiver's
+     `indexOf("{", 1)` finds the ACK tag. That turned a ping from the phone app
+     or McApp into `(ping}{NNN` -- an ordinary DM the target ACKs and never
+     pongs -- and a remote `{SET}n;m;` into text the receiver ignores. A
+     leading `{ping}` or `{SET}` is now kept (the ACK-tag search starts at
+     index 1, so a leading brace never confuses it); every later `{` is still
+     escaped. The rule lives in the Arduino-free `src/dm_text_escape.h`, pinned
+     by `test_dm_text_escape` (9 cases, including near-miss tags). A ping sent
+     through `sendMessage()` is also no longer retransmitted: it is answered
+     with a `{pong}`, never with an ACK, so the ring's three 40 s retries and,
+     with `--dmretry` on, the outbox ladder only ever repeated an answered
+     ping (the neo branches measured four receptions per ping before, one
+     after). A ping is never refused for a full outbox either, and it is no
+     longer booked in the DM statistics as a DM that was never acknowledged. No released
+     build contained `7aeb2ac5`.
+
+236. **Own messages that must not be retransmitted keep their priority**
+     (fork-only, 2026-09-25, `P15`). The TX ring classifies a slot once, at
+     enqueue, from its status byte: a text frame already marked "no
+     retransmission" counts as a relay (`MSG_PRIO_NORMAL`). `sendPing()`,
+     `SendPong()`, the `--dmretry` outbox re-sends and, with `--dmretry` on,
+     every first DM attempt were enqueued that way, so on a busy node a pong or
+     a DM waited behind ACKs, other DMs and group traffic. The new
+     `addTxRingEntryOnce()` classifies the frame as a fresh own message
+     (personal DM `CRITICAL`, group or `*` `HIGH`) and stores it as "done", both
+     inside the ring's existing critical section. `SendAckMessage()` used to do
+     the same by hand -- enqueue, then set the status after the lock was
+     released -- which on nRF52 left a window in which `doTX()` in the loop
+     task could restore the old status; it now uses the helper too, as do the
+     store node's mailbox deliveries and store notices (`msgstore_glue.cpp`),
+     which copied the same hand-written pattern. Pinned by
+     five new `test_txring` cases; the plain `addTxRingEntry()` is unchanged
+     for every other caller. `{CET}`/`{MCP}`/`{SET}` keep their old path.
 
 ## New in v4.35s.09.09
 
