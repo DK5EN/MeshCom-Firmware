@@ -237,29 +237,15 @@ bool sanitize_loaded_settings(void)
     if(sanitize_max_hop_text(meshcom_settings.max_hop_text, sanitize_log))
         fixed++;
 
-    // NBR-Stufe-2-Bitmigration (settings_sanitize.h::nbr_sset4_migrate_legacy_bits()):
-    // ein Bestandsknoten (DK5EN-1, DK5EN-98) traegt die alten Bits 0x0010-0x0080
-    // noch in node_sset4 -- verschieben, bevor irgendwer sie liest.
-    // TRIPWIRE: diese Migration MUSS weg, sobald dieser Zweig upstream KISS/TCP
-    // mergt, weil 0x0010-0x0080 dann KISS gehoeren (settings_sanitize.h).
-#ifdef KISS_TCP_PORT
-#error "remove nbr_sset4_migrate_legacy_bits(): node_sset4 0x0010-0x0080 belong to KISS once KISS_TCP_PORT exists"
-#endif
-    {
-        int migrated = nbr_sset4_migrate_legacy_bits(meshcom_settings.node_sset4);
-        if(migrated != meshcom_settings.node_sset4)
-        {
-            char oldv[16], newv[16];
-            snprintf(oldv, sizeof(oldv), "0x%04X", (unsigned)meshcom_settings.node_sset4);
-            snprintf(newv, sizeof(newv), "0x%04X", (unsigned)migrated);
-            sanitize_log("node_sset4_nbr_bits", oldv, newv);
-            meshcom_settings.node_sset4 = migrated;
-            fixed++;
-        }
-    }
+    // Akku-Maximalspannung muss ueber der Board-Leerspannung liegen (2S TBEAM_1W: nach
+    // Wipe 4.2 V < 6.5 V -> BAT-01 meldet "kein Akku", Anzeige bleibt auf USB)
+    #if defined(BAT_MIN_VOLTAGE) && defined(BAT_MAX_VOLTAGE)
+    if(sanitize_max_voltage(meshcom_settings.node_maxv, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE, sanitize_log))
+        fixed++;
+    #endif
 
     if(fixed > 0)
-        Serial.printf("[FLASH]...%d setting(s) corrected (out of range or NBR bits migrated)\n", fixed);
+        Serial.printf("[FLASH]...%d setting(s) out of range, reset to default\n", fixed);
 
     return fixed > 0;
 }

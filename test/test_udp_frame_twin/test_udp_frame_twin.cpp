@@ -101,6 +101,7 @@ bool bGATEWAY_NOPOS = false;
 bool bGATEWAY = false;
 bool bDEBUG = false;
 bool bVIA = false;
+bool bKISS = false;          // KISS/TCP on (loop_functions.cpp on the board)
 int isPhoneReady = 1;
 unsigned int msg_counter = 0;
 unsigned int _GW_ID = 0x99999999;
@@ -152,6 +153,21 @@ static std::vector<std::string> g_ack_dest;
 static int g_save_settings_calls = 0;
 static int g_sendDisplayText_calls = 0;
 static int g_sendDisplayPosition_calls = 0;
+
+// queueKiss() -- declared by stubs/kiss_functions.h, which shadows the real
+// header (see there). Kept out of the ordered sink log on purpose: bKISS is
+// off in every other test, and the corpus dump must not change with it.
+struct KissCall
+{
+    std::vector<uint8_t> bytes;
+    int16_t rssi;
+    int8_t snr;
+};
+static std::vector<KissCall> g_kiss;
+void queueKiss(uint8_t *buffer, uint16_t buflen, int16_t rssi, int8_t snr)
+{
+    g_kiss.push_back(KissCall{std::vector<uint8_t>(buffer, buffer + buflen), rssi, snr});
+}
 
 struct ExternCall
 {
@@ -308,13 +324,18 @@ void sendDisplayPosition(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     record_sink("DISPLAYPOS", "-");
 }
 
-void SendAckMessage(String dest_call, unsigned int iAckId)
+// Signature since the 2026-09-25 upstream merge (KISS #1151): returns the new
+// msg_id and takes an optional foreign source call. Neither frame handler
+// passes one; the stub returns 0 (no id), which neither handler reads.
+unsigned int SendAckMessage(String dest_call, unsigned int iAckId, const char *src_override)
 {
+    (void)src_override;
     g_ack_dest.push_back(dest_call.c_str());
     g_ack_ids.push_back(iAckId);
     char buf[96];
     snprintf(buf, sizeof(buf), "dest=%s id=%x", dest_call.c_str(), iAckId);
     record_sink("ACK", buf);
+    return 0;
 }
 
 void sendExtern(bool bUDP, char *src_type, uint8_t *buffer, uint16_t buflen, int16_t rssi, int8_t snr)
@@ -457,6 +478,7 @@ static void recorder_reset()
     g_save_settings_calls = 0;
     g_sendDisplayText_calls = 0;
     g_sendDisplayPosition_calls = 0;
+    g_kiss.clear();
     g_extern.clear();
     g_extern_ack.clear();
     g_sink_log.clear();
@@ -486,6 +508,7 @@ static void recorder_reset()
     bGATEWAY = false;
     bDEBUG = false;
     bVIA = false;
+    bKISS = false;
     isPhoneReady = 1;
     msg_counter = 0;
     memset(own_msg_id, 0, sizeof(own_msg_id));
@@ -1406,6 +1429,86 @@ static void test_agreement_extudp_ack_json_mirrors_ble_ack_on_both(void)
     }
 }
 
+// ===========================================================================
+// DRIFT (deliberate): KISS/TCP exists on ESP32 only
+// ===========================================================================
+
+// Upstream f070ad50 taps server-relayed TEXT/POSITION frames into queueKiss()
+// inside its monolithic getMeshComUDPpacket(). That body lives in
+// handleUdpFrame_esp32() here since the C1/U1 carve, so the 2026-09-25
+// upstream merge resolved the udp_functions.cpp conflict to our side and
+// silently dropped the tap; it was re-anchored by hand next to the dedup
+// gate. This test fails without it (zero calls). nRF52 has no KISS at all,
+// so its handler must never call queueKiss().
+static void test_drift_kiss_server_relay_tap_is_esp32_only(void)
+{
+    uint8_t tmpl[BUF_CAP];
+    uint8_t frame[BUF_CAP];
+    uint8_t buf[BUF_CAP];
+    char msg[96];
+
+    // 1. A fresh GATE text frame with KISS on: queued once, as the exact
+    //    decodeAPRS()-compatible frame (datagram minus the GATE indicator),
+    //    with the "came from the server" sentinel rssi=99/snr=0.
+    memset(tmpl, 0, sizeof(tmpl));
+    uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", ':', "kiss tap", 0x7101);
+    memset(frame, 0, sizeof(frame));
+    uint16_t flen = build_frame(frame, "DK5EN-2", "9", ':', "kiss tap", 0x7101);
+
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        recorder_reset();
+        bKISS = true;
+        copy_into(buf, tmpl, len);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+        snprintf(msg, sizeof(msg), "%s: queueKiss() call count for a fresh text frame", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(side ? 0 : 1, (int)g_kiss.size(), msg);
+    }
+    recorder_reset();
+    bKISS = true;
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_kiss.size(), "esp32: fresh text frame not queued");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(flen, (int)g_kiss[0].bytes.size(), "esp32: queued length");
+    TEST_ASSERT_EQUAL_MEMORY_MESSAGE(frame, g_kiss[0].bytes.data(), flen, "esp32: queued bytes");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(99, g_kiss[0].rssi, "esp32: rssi sentinel");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_kiss[0].snr, "esp32: snr sentinel");
+
+    // 2. The same msg_id again: the dedup gate stops a second delivery.
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_kiss.size(), "esp32: repeat was queued twice");
+
+    // 3. KISS off: nothing.
+    recorder_reset();
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_kiss.size(), "esp32: queued with KISS off");
+
+    // 4. A position frame is queued too.
+    recorder_reset();
+    bKISS = true;
+    memset(tmpl, 0, sizeof(tmpl));
+    len = build_gate_datagram(tmpl, "DK5EN-2", "9", '!', "4700.00N/01300.00E-test", 0x7102);
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_kiss.size(), "esp32: position frame not queued");
+
+    // 5. A factory-default source (RX-01) is not handed to the KISS client.
+    //    The factory call is used ONLY as the source of an inbound frame
+    //    under test, as in the RX-01 agreement test above.
+    recorder_reset();
+    bKISS = true;
+    memset(tmpl, 0, sizeof(tmpl));
+    len = build_gate_datagram(tmpl, "XX0XXX-00", "9", ':', "unconfigured", 0x7103);
+    copy_into(buf, tmpl, len);
+    handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_kiss.size(), "esp32: unconfigured source queued");
+}
+
 static void test_agreement_max_zeros_returns_1_without_resetting_on_both(void)
 {
     // DR-20 (2026-09-12 decided nrf52-correct on WHO decides, IMPLEMENTED
@@ -1777,6 +1880,8 @@ int main(int, char **argv)
     RUN_TEST(test_agreement_extudp_ack_json_mirrors_ble_ack_on_both);
     RUN_TEST(test_extern_ack_json_is_valid_at_its_edges);
     RUN_TEST(test_agreement_max_zeros_returns_1_without_resetting_on_both);
+
+    RUN_TEST(test_drift_kiss_server_relay_tap_is_esp32_only);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

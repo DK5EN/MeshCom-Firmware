@@ -177,74 +177,6 @@ static void test_1132_resolve_tx_power_sentinels(void)
     TEST_ASSERT_EQUAL_INT(10, resolve_tx_power(-20, 10));
 }
 
-// NBR-Stufe-2-Bitmigration (nbr_sset4_migrate_legacy_bits(), settings_sanitize.h):
-// node_sset4 0x0010-0x0080 kollidierten mit upstream KISS/TCP auf demselben
-// Feld, seit 2026-09-25 verschoben auf 0x0400-0x2000 (docs/nbr-stage2-campaign.md
-// "Bit layout since 2026-09-25"). Jedes Legacy-Bit einzeln, dann die beiden
-// realen Bestandsknoten-Werte, unbeteiligte Bits, und Idempotenz.
-static void test_nbr_migration_each_legacy_bit_alone(void)
-{
-    TEST_ASSERT_EQUAL_HEX32(0x0400, nbr_sset4_migrate_legacy_bits(0x0010));   // nbrdebug
-    TEST_ASSERT_EQUAL_HEX32(0x0800, nbr_sset4_migrate_legacy_bits(0x0020));   // nbrrelay count
-    TEST_ASSERT_EQUAL_HEX32(0x1000, nbr_sset4_migrate_legacy_bits(0x0040));   // nbrrelay on (bNBRCANCEL)
-    TEST_ASSERT_EQUAL_HEX32(0x2000, nbr_sset4_migrate_legacy_bits(0x0080));   // nbrsym off
-}
-
-static void test_nbr_migration_dk5en_1_value(void)
-{
-    // DK5EN-1: 0x0010 (nbrdebug) | 0x0020 (nbrrelay count) | 0x0002 (DEBUGEN,
-    // unrelated) -> 0x0400 | 0x0800 | 0x0002.
-    int before = 0x0010 | 0x0020 | 0x0002;
-    int after  = 0x0400 | 0x0800 | 0x0002;
-    TEST_ASSERT_EQUAL_HEX32(after, nbr_sset4_migrate_legacy_bits(before));
-}
-
-static void test_nbr_migration_dk5en_98_value(void)
-{
-    // DK5EN-98: 0x0060 (nbrrelay on: 0x0020|0x0040) | 0x0200 (nbrreport on,
-    // unrelated, no collision) | 0x0002 (DEBUGEN) -> 0x1800 | 0x0200 | 0x0002.
-    int before = 0x0060 | 0x0200 | 0x0002;
-    int after  = 0x1800 | 0x0200 | 0x0002;
-    TEST_ASSERT_EQUAL_HEX32(after, nbr_sset4_migrate_legacy_bits(before));
-}
-
-static void test_nbr_migration_leaves_unrelated_bits_untouched(void)
-{
-    // Bits outside 0x00F0 must never move, whether or not a legacy bit is
-    // also set alongside them.
-    const int unrelated[] = { 0x0001, 0x0002, 0x0004, 0x0008, 0x0100, 0x0200, 0x4000, 0x8000 };
-    for (size_t i = 0; i < sizeof(unrelated) / sizeof(unrelated[0]); i++)
-    {
-        // Alone: nothing to migrate, value passes through unchanged.
-        TEST_ASSERT_EQUAL_HEX32(unrelated[i], nbr_sset4_migrate_legacy_bits(unrelated[i]));
-
-        // Alongside a legacy bit: the unrelated bit must survive in the result.
-        int with_legacy = unrelated[i] | 0x0010;
-        int migrated = nbr_sset4_migrate_legacy_bits(with_legacy);
-        TEST_ASSERT_EQUAL_HEX32(unrelated[i] | 0x0400, migrated);
-    }
-}
-
-static void test_nbr_migration_already_migrated_value_unchanged(void)
-{
-    // A value that already carries the NEW bits (0x0400-0x2000) and none of
-    // the old ones must pass through untouched -- nothing in 0x00F0 is set.
-    int already = 0x0400 | 0x0800 | 0x1000 | 0x2000 | 0x0002;
-    TEST_ASSERT_EQUAL_HEX32(already, nbr_sset4_migrate_legacy_bits(already));
-}
-
-static void test_nbr_migration_is_idempotent(void)
-{
-    const int inputs[] = { 0x0010, 0x0020, 0x0040, 0x0080,
-                            0x0010 | 0x0020 | 0x0002, 0x0060 | 0x0200 | 0x0002, 0 };
-    for (size_t i = 0; i < sizeof(inputs) / sizeof(inputs[0]); i++)
-    {
-        int once  = nbr_sset4_migrate_legacy_bits(inputs[i]);
-        int twice = nbr_sset4_migrate_legacy_bits(once);
-        TEST_ASSERT_EQUAL_HEX32(once, twice);
-    }
-}
-
 static void test_cstring_terminator(void)
 {
     char ok[10] = "DK5EN-14";
@@ -258,6 +190,46 @@ static void test_cstring_terminator(void)
 
     TEST_ASSERT_FALSE(sanitize_cstring(NULL, 10));
     TEST_ASSERT_FALSE(sanitize_cstring(bad, 0));
+}
+
+// TBEAM_1W (2S, BAT_MIN 6.5 V / BAT_MAX 8.1 V): nach einem Wipe liefert
+// preferences.getFloat("node_maxv", 4.200) den 1S-Default. BAT-01 rechnet das
+// Plausibilitaetsband relativ zu node_maxv (2.31..4.83 V), der 7.6-V-Pack faellt
+// heraus, Anzeige bleibt dauerhaft auf "USB". Muss beim Laden auf 8.1 V zurueck.
+static void test_maxv_2s_nach_wipe_auf_boardwert(void)
+{
+    float v = 4.2f;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 6.5f, 8.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(8.1f, v);
+    TEST_ASSERT_EQUAL_INT(1, g_log_calls);
+    TEST_ASSERT_EQUAL_STRING("node_maxv", g_last_field);
+}
+
+static void test_maxv_plausible_werte_bleiben(void)
+{
+    float v = 8.2f;   // Issue #1053: von Hand gesetzter 2S-Wert
+    TEST_ASSERT_FALSE(sanitize_max_voltage(v, 6.5f, 8.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(8.2f, v);
+
+    v = 4.2f;         // 1S-Board, Default nach Wipe: unveraendert
+    TEST_ASSERT_FALSE(sanitize_max_voltage(v, 3.3f, 4.1f, capture_log));
+    TEST_ASSERT_EQUAL_FLOAT(4.2f, v);
+    TEST_ASSERT_EQUAL_INT(0, g_log_calls);
+}
+
+static void test_maxv_grenze_null_und_nan(void)
+{
+    float v = 6.5f;   // gleich BAT_MIN: Prozentskala haette Nenner 0
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 6.5f, 8.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(8.1f, v);
+
+    v = 0.0f;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 3.3f, 4.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(4.1f, v);
+
+    v = NAN;
+    TEST_ASSERT_TRUE(sanitize_max_voltage(v, 3.3f, 4.1f, NULL));
+    TEST_ASSERT_EQUAL_FLOAT(4.1f, v);
 }
 
 int main(int, char **)
@@ -274,12 +246,9 @@ int main(int, char **)
     RUN_TEST(test_ohne_logger);
     RUN_TEST(test_max_hop_text_plausibilitaet);
     RUN_TEST(test_1132_resolve_tx_power_sentinels);
-    RUN_TEST(test_nbr_migration_each_legacy_bit_alone);
-    RUN_TEST(test_nbr_migration_dk5en_1_value);
-    RUN_TEST(test_nbr_migration_dk5en_98_value);
-    RUN_TEST(test_nbr_migration_leaves_unrelated_bits_untouched);
-    RUN_TEST(test_nbr_migration_already_migrated_value_unchanged);
-    RUN_TEST(test_nbr_migration_is_idempotent);
     RUN_TEST(test_cstring_terminator);
+    RUN_TEST(test_maxv_2s_nach_wipe_auf_boardwert);
+    RUN_TEST(test_maxv_plausible_werte_bleiben);
+    RUN_TEST(test_maxv_grenze_null_und_nan);
     return UNITY_END();
 }

@@ -48,6 +48,15 @@ python3 test/golden/persist_readback_lint.py
 # register. Mutation-verified: re-add a `debug on` rung and it fails.
 python3 test/golden/toggle_table_lint.py --self-test
 python3 test/golden/toggle_table_lint.py
+# Every internal producer of a command string (web setup handlers, buttons,
+# UI code) must hit a parser rung that is compiled in on every board where
+# the producer is, and every web GUI element must have its handler compiled
+# in wherever the element is. Written for the web "Voltage" switch, which sent
+# a bare --volt for two and a half months after the rung became "volt on|off"
+# (docs/bugreport-web-volt-toggle-20260923.md). Fails on that tree, passes
+# after the fix.
+python3 test/golden/producer_match_lint.py --self-test
+python3 test/golden/producer_match_lint.py
 # settings_layout_lint.py (the struct-twin diff between src/esp32/esp32_flash.h
 # and src/nrf52/WisBlock-API.h) was retired in the D1-04 W3 struct merge: with
 # ONE struct (src/meshcom_settings.h) there is no twin left to diff. Its

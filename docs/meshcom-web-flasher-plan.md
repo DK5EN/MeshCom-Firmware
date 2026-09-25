@@ -1,7 +1,8 @@
 # MeshCom Web Flasher on GitHub Pages: Design and Implementation Plan
 
 Date: 2026-09-18
-Status: approved design, not started
+Status: implemented 2026-09-21 on `fork-neo-test` (waves 1a, 1b, 3). Bench flashes (wave 2)
+and the `partitions-16MB.bin` release asset are still open -- see section 12.
 Decision: option 1, firmware binaries committed to the `gh-pages` branch and fetched same-origin
 
 ## 1. Summary
@@ -261,3 +262,122 @@ T-Deck reboots on port open.
 - Should the flasher also offer official icssw-org releases? Their assets have the same CORS
   problem, so it would mean mirroring their binaries into `gh-pages` too. Plan assumes fork
   releases only.
+
+## 12. Implementation record (2026-09-21)
+
+Built on `fork-neo-test`, published as `v4.35t.09.21-neo`. What deviates from sections 4-7:
+
+| Plan                                                     | As built                                                                                                                                                                                     |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chip family from the env's `extends` line                | From `build.mcu` in the board JSON. `extends` is not a reliable discriminator: five envs carry their own `upload_command` and none of the three base sections                                |
+| Offsets from a table in the generator                    | Parsed out of the env's effective `upload_command`, i.e. out of the exact esptool call the project itself uses. `t_deck_pro` has its line commented out and falls back to the family default |
+| `manifest.json` parts in `upload_command` order          | Sorted ascending by offset, so the manifest reads like the flash map                                                                                                                         |
+| Safeboot part published as `safeboot.bin` on every board | Published under its real name, `safeboot.bin` or `safeboot-s3.bin`. Board folders are self-contained, so the name may differ per folder                                                      |
+| `releases.json` lists board envs as bare strings         | Lists `{env, group, name, chipFamily}`, so the page needs no vendor or display-name knowledge of its own                                                                                     |
+| `flash-staging/` gate before `flash/`                    | Skipped by operator decision; published straight into `flash/`                                                                                                                               |
+
+### Wave 2, bench (2026-09-21 evening)
+
+Two boards flashed from the live page and verified by reading the flash back over esptool and
+comparing SHA-256 against the shipped artefacts. This is stronger than section 8 asked for: it
+proves the factory partition directly instead of inferring it from the safeboot status page.
+
+| Board                                   | Regions read back                        | Result             |
+| --------------------------------------- | ---------------------------------------- | ------------------ |
+| Heltec V3 (ESP32-S3, 4 MB, erase first) | 0x0, 0x8000, 0xE000, 0x10000, 0xC0000    | all five identical |
+| T-Beam (classic ESP32, erase first)     | 0x1000, 0x8000, 0xE000, 0x10000, 0xC0000 | all five identical |
+
+Both boot into the app, not into safeboot, and report the build stamp of the shipped image.
+After the erase the callsign is the factory `XX0XXX-00` and the node refuses to transmit
+(`[TX];refuse;unconfigured`), which is correct. The T-Beam covers the classic-ESP32 bootloader
+at 0x1000, the one offset the Heltec cannot exercise.
+
+**Finding, fixed the same evening:** the board dropdown named the three T-Beam entries after a
+board revision ("T-Beam v1.1 (SX1276)", "T-Beam v1.2 (SX1262)"). The envs share one board
+definition and differ only in the radio chip, so the labels invented a distinction the code does
+not make. A v1.2 board carrying an SX1276 got the "v1.2" entry and came up with
+`SX1262 chip Initializing ... failed, code -2`. The entries now name the chip alone, and the page
+says so under the board picker. Section 9's "user flashes the wrong board" risk was real, and the
+mitigation was made worse by the display table, not by the mechanism.
+
+T-Deck Plus (DK5EN-14) followed on the same evening, flashed with `t_deck_plus` and erased:
+
+| Region      | Offset  | Size        | Result    |
+| ----------- | ------- | ----------- | --------- |
+| bootloader  | 0x0     | 15 104 B    | identical |
+| partitions  | 0x8000  | 3 072 B     | identical |
+| otadata     | 0xE000  | 8 192 B     | identical |
+| safeboot-s3 | 0x10000 | 643 424 B   | identical |
+| app         | 0xC0000 | 2 176 640 B | identical |
+
+Decoding the table read off the device settles section 4.1's 16 MB question directly:
+`app` is 12 288 K at 0xC0000, `spiffs` follows at 0xCC0000, and the last entry ends at
+0x1000000 — the 16 MB layout, not the 4 MB one. The node boots the full UI (SD OK, touch OK,
+keyboard OK, `SX1262 chip Initializing ... success`).
+
+**Correction to section 8 step 5.** "Confirm SPIFFS mounts" is not a usable check and never was:
+the whole persisted-message path in `src/t-deck/lv_obj_functions.cpp` sits behind
+`#ifdef T_DECK_SPIFFS`, and nothing in the tree defines that macro. The shipped T-Deck image
+never touches the spiffs partition, so no mount can be observed. The same run also showed the
+harness route is closed on a release image: `tdeck_harness.py` needs `--uistat`, and the ~50
+bench commands (`--injectmsg`, `--spiffs reset`, ...) are compiled out unless
+`-DINSTRUMENT_ENABLED=1`. Reading the partition table back is both available and stronger, so
+that replaces step 5.
+
+Still open:
+
+- Nothing from wave 2. All three chip cases — ESP32-S3 4 MB, classic ESP32, ESP32-S3 16 MB — are
+  flashed from the live page and verified region by region.
+- Section 6's `partitions-16MB.bin` release asset. The flasher no longer needs it -- each board
+  folder carries its own table -- but the manual asset set still cannot fully flash a T-Deck.
+  Adding it moves the release from 39 to 40 assets and breaks the diff-identical name check in
+  release step 5, so it is a deliberate separate change.
+
+## 13. Board detection (2026-09-23)
+
+The page has a "Board erkennen" button. It asks the node for its board over Web Serial and
+pre-selects that board in the dropdown. The user confirms before anything is written; the
+manual choice stays.
+
+**What it reads.** Three facts, in falling order of trust:
+
+| Fact                                                  | Source          | Tells                                  |
+| ----------------------------------------------------- | --------------- | -------------------------------------- |
+| `[LoRa]...<chip> ... Initializing ... success/failed` | boot log        | whether the running image's radio fits |
+| `...NODE <id> <name>`                                 | `--info`        | which image runs, not which board      |
+| `ESP-ROM:esp32s3` / `ets Jul 29 2019`, USB vendor     | ROM banner, USB | chip family, even without MeshCom      |
+
+The hardware ID alone would have repeated the 2026-09-21 T-Beam misflash: every T-Beam image on
+a v1.2 board answers `NODE 12 <TBEAM_AXP2101>` (`src/esp32/esp32_pmu.cpp`), whatever its radio.
+A radio that initialises narrows the pool to images with that radio; a radio that fails rules
+that image out and the page says so.
+
+**How it talks.** On a USB-UART bridge (CP210x, CH34x) the page pulses RTS with DTR low: a
+plain reboot, so the boot log with the radio line comes out. On native USB (Espressif 0x303a,
+Adafruit 0x239a) it only raises DTR, which these boards need before they send anything; no RTS
+pulse, because that resets the chip through the USB link. It then sends `--info\n` every 2 s
+for up to 20 s.
+
+**Handoff.** An ESP32 port stays open after detection and goes straight to ESP Web Tools'
+`ewt-install-dialog`, the same wiring `install-button.js` uses, so there is no second port
+picker. The dialog chunk's hashed file name is read out of `install-button.js` at runtime; if
+that fails, the page closes the port and falls back to the normal button. nRF52 ports are
+closed; those boards take the UF2 download.
+
+**Data.** `tools/pages_flasher.py` writes `flash/detect.json` next to `releases.json`: hardware
+ID, radio class and chip family per release env, from `MODUL_HARDWARE` in each variant and the
+`//Hardware Types` table in `src/configuration_global.h`, plus the ID-12 alias set derived from
+the same guards `esp32_pmu.cpp` uses. Hardware IDs are on-air identities and never change
+meaning, so one table serves every listed release.
+
+**Tests.** `node --test tools/tests/test_flasher_detect.mjs` runs `pages/flash/detect.js`
+against the Heltec, RAK and T-Beam v1.2 bench captures in `test/golden/hw/`, with the real
+table from this tree. `test_pages_flasher.py` pins the table and the esp32_pmu.cpp block it
+mirrors.
+
+Still open:
+
+- Bench run on real hardware. The flow was run in headless Chrome against a simulated port (T-Beam
+  v1.2 boot log, RAK, shared E22 ID, silent node, lost port); a live Web Serial run on the four
+  bench boards is owed, especially the T-Deck, which reboots on port open.
+- Boards without MeshCom are narrowed to their chip family only; flash size is not read.

@@ -52,7 +52,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -94,9 +94,9 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_dtr": "0",
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -112,7 +112,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/E22-DevKitC/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/E22-DevKitC/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/E22-DevKitC/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:E22_1262-DevKitC": {
@@ -168,7 +168,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -210,9 +210,9 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_dtr": "0",
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -228,7 +228,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/E22_1262-DevKitC/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/E22_1262-DevKitC/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/E22_1262-DevKitC/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:E22_1262_S3-DevKitC-1-N16R8": {
@@ -288,7 +288,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -329,12 +329,12 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
+  "monitor_dtr": "0",
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -350,7 +350,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/E22_1262_S3-DevKitC-1-N16R8/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/E22_1262_S3-DevKitC-1-N16R8/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/E22_1262_S3-DevKitC-1-N16R8/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:E22_1268_S3-DevKitC-1-N16R8": {
@@ -410,7 +410,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -451,12 +451,12 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
+  "monitor_dtr": "0",
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -472,7 +472,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/E22_1268_S3-DevKitC-1-N16R8/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/E22_1268_S3-DevKitC-1-N16R8/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/E22_1268_S3-DevKitC-1-N16R8/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:E22_XML-DevKitC": {
@@ -531,7 +531,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -572,9 +572,9 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_dtr": "0",
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -590,7 +590,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/E22_XML-DevKitC/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/E22_XML-DevKitC/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/E22_XML-DevKitC/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:LilyGo_T-Beam-1W": {
@@ -649,7 +649,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -691,7 +691,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -707,7 +707,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/LilyGo_T-Beam-1W/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/LilyGo_T-Beam-1W/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/LilyGo_T-Beam-1W/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:LilyGo_T3_S3_V1_3": {
@@ -766,7 +766,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -811,7 +811,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -827,7 +827,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/LilyGo_T3_S3_V1_3/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/LilyGo_T3_S3_V1_3/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/LilyGo_T3_S3_V1_3/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:LilyGo_T_Connect_Pro": {
@@ -912,7 +912,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -956,7 +956,7 @@
    "TFT_eSPI",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -972,9 +972,9 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/LilyGo_T_Connect_Pro/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/LilyGo_T_Connect_Pro/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/LilyGo_T_Connect_Pro/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool",
-  "upload_speed": 921600
+  "upload_speed": "921600"
  },
  "env:T-ETH-ELITE_1262": {
   "board": "esp32-s3-devkitc-1-n16r8",
@@ -1034,7 +1034,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -1081,7 +1081,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -1097,7 +1097,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/T-ETH-ELITE_1262/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/T-ETH-ELITE_1262/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/T-ETH-ELITE_1262/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:esp32-S3-safeboot": {
@@ -1148,7 +1148,7 @@
    "esp32_exception_decoder",
    "log2file"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "https://github.com/tasmota/platform-espressif32/releases/download/2026.02.30/platform-espressif32.zip"
  },
  "env:esp32-external-radio": {
@@ -1234,9 +1234,9 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@6.5.0",
-  "upload_speed": 115200
+  "upload_speed": "115200"
  },
  "env:esp32-loraprs-e22": {
   "board": "az-delivery-devkit-v4",
@@ -1291,7 +1291,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -1333,9 +1333,9 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_dtr": "0",
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -1351,7 +1351,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/esp32-loraprs-e22/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/esp32-loraprs-e22/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/esp32-loraprs-e22/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:esp32-loraprs-ra01": {
@@ -1407,7 +1407,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -1449,9 +1449,9 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_dtr": 0,
-  "monitor_rts": 0,
-  "monitor_speed": 115200,
+  "monitor_dtr": "0",
+  "monitor_rts": "0",
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -1467,7 +1467,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/esp32-loraprs-ra01/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/esp32-loraprs-ra01/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/esp32-loraprs-ra01/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:esp32-safeboot": {
@@ -1517,7 +1517,7 @@
    "esp32_exception_decoder",
    "log2file"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "https://github.com/tasmota/platform-espressif32/releases/download/2026.02.30/platform-espressif32.zip"
  },
  "env:heltec_t114": {
@@ -1639,7 +1639,7 @@
   "framework": [
    "arduino"
   ],
-  "lib_archive": false,
+  "lib_archive": "False",
   "lib_deps": [
    "SPI",
    "https://github.com/icssw-org/NTPClient",
@@ -1678,7 +1678,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "nordicnrf52@10.12.0",
   "upload_protocol": "nrfutil"
  },
@@ -1735,7 +1735,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -1775,7 +1775,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -1791,7 +1791,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V2/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V2/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V2/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:heltec_wifi_lora_32_V3": {
@@ -1849,7 +1849,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -1889,7 +1889,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -1905,7 +1905,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V3/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V3/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V3/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:heltec_wifi_lora_32_V4": {
@@ -1968,7 +1968,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -2008,7 +2008,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -2024,7 +2024,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V4/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V4/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/heltec_wifi_lora_32_V4/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:heltec_wireless_stick": {
@@ -2081,7 +2081,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -2121,7 +2121,7 @@
    "TFT_eSPI",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -2137,7 +2137,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/heltec_wireless_stick/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/heltec_wireless_stick/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/heltec_wireless_stick/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:heltec_wireless_tracker": {
@@ -2218,7 +2218,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -2257,7 +2257,7 @@
    "TinyGSM",
    "U8g2"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -2273,7 +2273,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/heltec_wireless_tracker/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/heltec_wireless_tracker/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/heltec_wireless_tracker/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:native": {
@@ -2303,7 +2303,7 @@
    "bblanchon/ArduinoJson@^7.4.3"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_regex_call",
    "test_millis_rollover",
@@ -2353,7 +2353,7 @@
    "+<txring_functions.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_aprs_decode",
    "test_aprs_corpus",
@@ -2392,7 +2392,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_aprs_fuzz",
    "test_aprs_reencode"
@@ -2419,7 +2419,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_batt_detect"
   ],
@@ -2435,7 +2435,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_ble_phone_frame"
   ],
@@ -2463,7 +2463,7 @@
    "pre:test/test_ble_settings_v1/force_include_stub.py"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_ble_settings_v1"
   ],
@@ -2508,7 +2508,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_capture_ring"
   ],
@@ -2524,7 +2524,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_command_match"
   ],
@@ -2541,7 +2541,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_command_setters"
   ],
@@ -2557,7 +2557,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_command_toggles"
   ],
@@ -2578,7 +2578,7 @@
    "+<conf_frame.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_conf_frame"
   ],
@@ -2603,7 +2603,7 @@
    "bblanchon/ArduinoJson@^7.4.3"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_config_json"
   ],
@@ -2624,7 +2624,7 @@
    "+<country_profile.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_country_twin"
   ],
@@ -2646,7 +2646,7 @@
    "+<country_profile.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_country_twin"
   ],
@@ -2671,7 +2671,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_dedup_replay"
   ],
@@ -2707,7 +2707,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_esp32_flash_lifecycle"
   ],
@@ -2739,7 +2739,7 @@
   ],
   "build_type": "debug",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_esp32_settings_nvs"
   ],
@@ -2768,7 +2768,7 @@
    "bblanchon/ArduinoJson@^7.4.3"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_getextern"
   ],
@@ -2783,7 +2783,8 @@
   "test_filter": [
    "test_external_radio_protocol",
    "test_external_radio_tcp",
-   "test_external_radio_txq"
+   "test_external_radio_txq",
+   "test_kiss_ax25"
   ],
   "test_framework": "unity"
  },
@@ -2804,9 +2805,30 @@
    "+<nrf52/gateway_service_nrf52.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_gateway_service_twin"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_kiss_frame": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<kiss_frame.cpp>"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_kiss_frame"
   ],
   "test_framework": "unity"
  },
@@ -2842,7 +2864,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_mc_text"
   ],
@@ -2858,7 +2880,7 @@
    "-Wextra"
   ],
   "platform": "native",
-  "test_build_src": false,
+  "test_build_src": "False",
   "test_filter": [
    "test_mheard_record"
   ],
@@ -2878,6 +2900,23 @@
   "test_build_src": "False",
   "test_filter": [
    "test_nbr_matrix"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_nbr_replay": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NBR_MAX_ROWS=21",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_nbr_replay"
   ],
   "test_framework": "unity"
  },
@@ -2926,7 +2965,7 @@
    "pre:tools/force_include_settings_stub.py"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_nrf52_settings_paths"
   ],
@@ -2957,7 +2996,7 @@
   ],
   "lib_ldf_mode": "chain+",
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_decodeaprspos",
    "test_mheard_aging",
@@ -2983,7 +3022,7 @@
    "+<esp32/serial_command_esp32.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_serial_command_twin"
   ],
@@ -3006,7 +3045,7 @@
    "+<nrf52/serial_command_nrf52.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_serial_command_twin"
   ],
@@ -3034,7 +3073,7 @@
    "+<settings_schema.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_settings_members"
   ],
@@ -3061,7 +3100,7 @@
    "+<settings_schema.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_settings_members"
   ],
@@ -3081,7 +3120,7 @@
    "+<settings_store.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_settings_roundtrip"
   ],
@@ -3103,7 +3142,7 @@
    "+<settings_store.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_settings_store"
   ],
@@ -3135,7 +3174,7 @@
    "+<nrf52/udp_frame_nrf52.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_udp_frame_twin"
   ],
@@ -3163,7 +3202,7 @@
    "+<nrf52/udp_drain_nrf52.cpp>"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_udp_send_twin"
   ],
@@ -3189,7 +3228,7 @@
    "https://github.com/leethomason/tinyxml2"
   ],
   "platform": "native",
-  "test_build_src": true,
+  "test_build_src": "True",
   "test_filter": [
    "test_decodetinyxml"
   ],
@@ -3259,9 +3298,9 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@6.5.0",
-  "upload_speed": 921600
+  "upload_speed": "921600"
  },
  "env:t_deck": {
   "board": "T-Deck",
@@ -3338,7 +3377,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -3375,7 +3414,7 @@
    "SensorLibTDECKpro",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32 @ 6.6.0",
   "src_filter": [
    "+<*>",
@@ -3394,7 +3433,7 @@
    "-<t-deck-pro/*>",
    "-<t5-epaper/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/t_deck/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/t_deck/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/t_deck/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:t_deck_plus": {
@@ -3472,7 +3511,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -3509,7 +3548,7 @@
    "SensorLibTDECKpro",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32 @ 6.6.0",
   "src_filter": [
    "+<*>",
@@ -3528,7 +3567,7 @@
    "-<t-deck-pro/*>",
    "-<t5-epaper/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/t_deck_plus/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/t_deck_plus/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/t_deck_plus/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:t_deck_pro": {
@@ -3610,9 +3649,9 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@6.5.0",
-  "upload_speed": 115200
+  "upload_speed": "115200"
  },
  "env:t_echo": {
   "board": "nrf52840_dk_adafruit",
@@ -3708,7 +3747,7 @@
   "framework": [
    "arduino"
   ],
-  "lib_archive": false,
+  "lib_archive": "False",
   "lib_deps": [
    "SPI",
    "https://github.com/icssw-org/NTPClient",
@@ -3747,7 +3786,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "nordicnrf52@10.12.0",
   "upload_protocol": "nrfutil"
  },
@@ -3804,7 +3843,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -3845,7 +3884,7 @@
    "TinyGSM",
    "XPowerLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -3861,7 +3900,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/ttgo-lora32-v21/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/ttgo-lora32-v21/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/ttgo-lora32-v21/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:ttgo_tbeam": {
@@ -3921,7 +3960,7 @@
    "-mfix-esp32-psram-cache-issue"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -3962,7 +4001,7 @@
    "TFT_eSPI",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -3978,7 +4017,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/ttgo_tbeam/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/ttgo_tbeam/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/ttgo_tbeam/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:ttgo_tbeam_SX1262": {
@@ -4038,7 +4077,7 @@
    "-mfix-esp32-psram-cache-issue"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -4079,7 +4118,7 @@
    "TFT_eSPI",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -4095,7 +4134,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1262/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1262/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1262/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:ttgo_tbeam_SX1268": {
@@ -4155,7 +4194,7 @@
    "-mfix-esp32-psram-cache-issue"
   ],
   "extends": [
-   "esp32"
+   "esp32_classic"
   ],
   "framework": [
    "arduino"
@@ -4196,7 +4235,7 @@
    "TFT_eSPI",
    "TinyGSM"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -4212,7 +4251,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1268/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1268/partitions.bin 0x10000 safeboot.bin 0xC0000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_SX1268/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x1000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:ttgo_tbeam_supreme": {
@@ -4271,7 +4310,7 @@
    "-Werror"
   ],
   "extends": [
-   "esp32"
+   "esp32_s3"
   ],
   "framework": [
    "arduino"
@@ -4314,7 +4353,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.13.0",
   "src_filter": [
    "+<*>",
@@ -4330,7 +4369,7 @@
    "-<ui_common/*>",
    "-<lvgl/*>"
   ],
-  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_supreme/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_supreme/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/ttgo_tbeam_supreme/firmware.bin",
+  "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 $BUILD_DIR/bootloader.bin 0xE000 otadata.bin 0x8000 $BUILD_DIR/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 $BUILD_DIR/firmware.bin",
   "upload_protocol": "esptool"
  },
  "env:vision-master-e213": {
@@ -4428,7 +4467,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e213/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e213/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e213/firmware.bin",
   "upload_protocol": "custom"
@@ -4531,7 +4570,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e213-preview/firmware.bin",
   "upload_protocol": "custom"
@@ -4629,7 +4668,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/vision-master-e290/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/vision-master-e290/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/vision-master-e290/firmware.bin",
   "upload_protocol": "custom"
@@ -4727,7 +4766,7 @@
   "monitor_filters": [
    "esp32_exception_decoder"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "espressif32@^6.6.0",
   "upload_command": "pio pkg exec -p \"tool-esptoolpy\" -- esptool --port \"$UPLOAD_PORT\" -b 921600 write_flash 0x0000 <PROJECT_DIR>/.pio/build/wireless-paper/bootloader.bin 0xE000 otadata.bin 0x8000 <PROJECT_DIR>/.pio/build/wireless-paper/partitions.bin 0x10000 safeboot-s3.bin 0xC0000 <PROJECT_DIR>/.pio/build/wireless-paper/firmware.bin",
   "upload_protocol": "custom"
@@ -4795,7 +4834,7 @@
   "framework": [
    "arduino"
   ],
-  "lib_archive": false,
+  "lib_archive": "False",
   "lib_deps": [
    "SPI",
    "https://github.com/icssw-org/NTPClient",
@@ -4833,7 +4872,7 @@
    "TinyGSM",
    "XPowersLib"
   ],
-  "monitor_speed": 115200,
+  "monitor_speed": "115200",
   "platform": "nordicnrf52@10.12.0"
  }
 }

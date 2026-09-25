@@ -24,3 +24,7 @@ docs/bench/**/*.txt
 
 # Board definitions are consumed verbatim by PlatformIO
 boards/
+
+# Vendored ESP Web Tools bundle for the GitHub-Pages flasher (pinned, see
+# pages/flash/VERSION). Reformatting a minified bundle would only obscure it.
+pages/flash/esp-web-tools/

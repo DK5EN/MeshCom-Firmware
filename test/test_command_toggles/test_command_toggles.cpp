@@ -381,9 +381,11 @@ static void test_nbr_boot_restore_reads_moved_bits()
         TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRDEBUG = meshcom_settings.node_sset4 & 0x0400;") != std::string::npos, f);
         TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRRELAY  = (meshcom_settings.node_sset4 & 0x1800) != 0;") != std::string::npos, f);
         TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;") != std::string::npos, f);
-        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0010") == std::string::npos, f);
-        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0060") == std::string::npos, f);
-        TEST_ASSERT_TRUE_MESSAGE(src.find("node_sset4 & 0x0040") == std::string::npos, f);
+        // Since the fork-neo-test merge (KISS/TCP) bKISS/bKISSMETA legitimately
+        // read 0x0010/0x0040 in esp32_main.cpp -- pin the NBR assignments only.
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRDEBUG = meshcom_settings.node_sset4 & 0x0010") == std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRRELAY  = (meshcom_settings.node_sset4 & 0x0060)") == std::string::npos, f);
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRCANCEL = (meshcom_settings.node_sset4 & 0x0040)") == std::string::npos, f);
     }
 }
 

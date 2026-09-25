@@ -245,8 +245,8 @@ static void test_prioritaets_klassifizierung(void)
 
 // -------------------------------------------- Test 2b: addTxRingEntryOnce()
 //
-// P15: SendAckMessage()/sendPing()/SendPong() und der {ping}-Zweig von
-// sendMessage() wollten alle dasselbe -- Status DONE speichern (keine
+// P15: SendAckMessage()/sendPing()/SendPong()/dm_outbox_glue.cpp und der
+// {ping}-Zweig von sendMessage() wollten alle dasselbe -- Status DONE speichern (keine
 // Wiederholung), aber als eigene DM/Gruppen-/Broadcast-Nachricht
 // klassifizieren, nicht als Relay (die TEXT-Falle: ein VORAB auf DONE
 // gesetzter Status stuft getMessagePriority() als "Relay" ein, siehe Test

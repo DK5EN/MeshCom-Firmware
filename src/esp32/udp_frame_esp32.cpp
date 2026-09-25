@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <udp_functions.h>
 #include <extudp_functions.h>
+#include <kiss_functions.h>
 #include <debugconf.h>
 #include <command_functions.h>
 #include <loop_functions.h>
@@ -197,6 +198,26 @@ int handleUdpFrame_esp32(unsigned char inc_udp_buffer[UDP_TX_BUF_SIZE], int pack
               (uint8_t)(aprsmsg.msg_id >> 24)
           };
           bool bUdpMsgIsNew = is_new_packet(udp_mid);
+
+          // KISS/TCP interface (upstream f070ad50, which put this tap into the
+          // monolithic getMeshComUDPpacket() -- here since the C1/U1 carve): a
+          // message that reaches this node only via the MeshCom server
+          // (another gateway heard it over RF, not this node) never runs
+          // through lora_functions.cpp's RX path, so it would otherwise never
+          // reach a locally connected KISS client. convBuffer/lora_tx_msg_len
+          // is the same decodeAPRS()-compatible buffer the LoRa RX path passes
+          // to queueKiss(), the dedup gate is the same ring LoRa RX uses (no
+          // double delivery if this node also hears the frame directly), and
+          // rssi=99/snr=0 is the existing "came from the server" sentinel of
+          // sendDisplayPosition()/sendDisplayText() below. HEY (0x40) is
+          // excluded -- buildAx25() cannot represent it, same as the LoRa path.
+          // No #if around the call, unlike upstream: kiss_functions.h already
+          // turns queueKiss() into an inline no-op without ESP32 or with
+          // DISABLE_KISS_TCP, and the unguarded call lets the native
+          // udp_frame twin test see the tap.
+          if (bKISS && bUdpMsgIsNew && !bSrcUnconfigured &&
+              (msg_type_b == 0x3A || msg_type_b == 0x21))
+              queueKiss(convBuffer, lora_tx_msg_len, 99, 0);
 
           bool bUDPtoLoraSend = !bSrcUnconfigured;
 

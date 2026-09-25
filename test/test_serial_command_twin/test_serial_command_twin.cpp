@@ -105,8 +105,13 @@ static void resetRecorders()
 
 // --- definitions for the symbols checkSerialCommand() calls ---------------
 
-int sendMessage(char *buf, int len)
+// Signature since the 2026-09-25 upstream merge (KISS #1151): src_override /
+// out_msg_id default to nullptr in loop_functions.h; the serial path never
+// passes them.
+int sendMessage(char *buf, int len, const char *src_override, unsigned int *out_msg_id)
 {
+    (void)src_override;
+    (void)out_msg_id;
     SendCall c;
     c.buf.assign(buf, buf + (len > 0 ? len : 0));
     c.len = len;

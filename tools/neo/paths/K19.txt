@@ -299,6 +299,7 @@ test/golden/nodes/t-beam-92/settings-base.json
 test/golden/nodes/t-deck-14/settings-base.json
 test/golden/normalize.py
 test/golden/persist_readback_lint.py
+test/golden/producer_match_lint.py
 test/golden/radio_units_lint.py
 test/golden/selftest.sh
 test/golden/settings_persist_lint.py
@@ -390,6 +391,7 @@ test/test_gps_filter/test_main.cpp
 test/test_gwflood_frames/test_gwflood_frames.cpp
 test/test_hey_report/test_hey_report.cpp
 test/test_kbd_repeat/test_main.cpp
+test/test_kiss_frame/test_kiss_frame.cpp
 test/test_loop_scheduler/stubs/configuration.h
 test/test_loop_scheduler/test_loop_scheduler.cpp
 test/test_mask_secret/test_mask_secret.cpp
@@ -429,6 +431,7 @@ test/test_txring/test_txring.cpp
 test/test_txring_flood/test_txring_flood.cpp
 test/test_udp_frame_twin/stubs/RAK13800_W5100S.h
 test/test_udp_frame_twin/stubs/SPI.h
+test/test_udp_frame_twin/stubs/kiss_functions.h
 test/test_udp_frame_twin/stubs/nrf_eth.h
 test/test_udp_frame_twin/stubs/udp_functions.h
 test/test_udp_frame_twin/test_udp_frame_twin.cpp
